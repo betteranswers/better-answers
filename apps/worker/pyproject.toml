@@ -103,12 +103,10 @@ dependencies = [
     # amended 22/09/2026): this tier reaches it through `AESGCM` and the api tier through
     # Node's own OpenSSL, so the frame one tier writes is one the other reads. The package was
     # already in the lock beneath `presidio-anonymizer`; `envelope.py` imports it directly, so
-    # it is named here rather than left transitive. The pin is the version the lock already
-    # resolved, so naming it adds no wheel to the image and does not move a dependency of the
-    # detector's under it — 50.0.1 is newest on PyPI, read 22/09/2026, and taking it is its own
-    # deliberate act. Apache-2.0 under its dual licence, which is the arm this repository takes
-    # (ADR 0027).
-    "cryptography==48.0.1",
+    # it is named here rather than left transitive. No version on this line: the override under
+    # `[tool.uv]` decides what this package resolves to, whatever is asked for here, so the
+    # override holds the pin and a number here would be a second one, ageing away from it.
+    "cryptography",
 ]
 
 [project.scripts]
@@ -137,6 +135,30 @@ dev = [
 [build-system]
 requires = ["uv_build>=0.12.9,<0.13.0"]
 build-backend = "uv_build"
+
+# The one pin for `cryptography`, and the only place in this tier carrying its version.
+# `presidio-anonymizer==2.2.364`, the newest on PyPI, asks for `cryptography>=48.0.1,<49`, and
+# 48.0.1 is exposed to GHSA-g6cj-pr64-35w5, fixed in 50.0.0, and to GHSA-m2h6-j472-rp4c and
+# GHSA-jwv3-5hgf-82ww, fixed in 49.0.0. While that cap holds, no resolution of this graph
+# reaches a release any of the three is fixed in, which is what the security pull request
+# raised against it ran into. The cap is overridden rather than waited out because presidio
+# touches this package at `Cipher(AES, CBC)` and `padding` alone, in
+# `presidio_anonymizer/operators/aes_cipher.py`, and this tier's own use is `AESGCM` in
+# `envelope.py` — none of the three is a surface either reaches, and neither major moved
+# either API.
+#
+# It goes when presidio lifts the cap: a `presidio-anonymizer` whose requirement admits 50
+# makes this block dead weight, and removing it then puts the version back on the dependency
+# itself. Until then the bump is by hand. Renovate's `pep621` manager reads `dev-dependencies`,
+# `sources`, `index` and `required-version` out of `tool.uv` and no override or constraint
+# list, so this is not a dependency it can see, and the bare name above carries no version for
+# it to bump either — whoever re-reads presidio's cap re-reads this release page in the same
+# sitting.
+#
+# Version read from PyPI's `cryptography` release metadata on 23/09/2026; Apache-2.0 under its
+# dual licence, which is the arm this repository takes (ADR 0027).
+[tool.uv]
+override-dependencies = ["cryptography==50.0.1"]
 
 [tool.uv.build-backend]
 module-name = "better_answers_worker"
