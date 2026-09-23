@@ -55,14 +55,10 @@ export const documentLanded = async (
       bindingId: binding.id,
       sourceDocumentId: document.id,
       content: shape.text,
-
       locator: `chars:0-${charEnd}`,
       ordinal: 0,
       charStart: 0,
       charEnd,
-      publishedAt,
-      sensitivity,
-      ...audience,
     });
     await client.query("COMMIT");
     return {

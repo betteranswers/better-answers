@@ -300,9 +300,6 @@ export const testData = (client: pg.PoolClient): TestData => {
       content: "test content",
       embedding: Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0),
       embeddingRouteId: `route-${ulid()}`,
-      sensitivity: "Internal",
-      audience: AUDIENCE_EVERYONE,
-      audienceGroups: null,
       bindingId: `binding-${ulid()}`,
 
       sourceDocumentId: null,

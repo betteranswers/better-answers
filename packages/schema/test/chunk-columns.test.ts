@@ -86,11 +86,7 @@ describe("the chunk's columns, on the parent and on a partition", () => {
         { column: "content", notNull: true, generated: "" },
         { column: "embedding", notNull: false, generated: "" },
         { column: "embedding_route_id", notNull: false, generated: "" },
-        { column: "published_at", notNull: false, generated: "" },
-        { column: "sensitivity", notNull: false, generated: "" },
-        { column: "audience", notNull: false, generated: "" },
         { column: "binding_id", notNull: true, generated: "" },
-        { column: "audience_groups", notNull: false, generated: "" },
         { column: "source_document_id", notNull: false, generated: "" },
         { column: "locator", notNull: false, generated: "" },
         { column: "ordinal", notNull: false, generated: "" },
@@ -291,20 +287,17 @@ describe("the worker on the chunk index", () => {
 
       const id = await chunkWrittenThroughTheParent(client, WS_A, document.id);
       await client.query(
-        `UPDATE "index".chunk SET published_at = now() WHERE workspace_id = $1 AND id = $2`,
+        `UPDATE "index".chunk SET content = 'the paragraph again' WHERE workspace_id = $1 AND id = $2`,
         [WS_A, id],
       );
-      const published = await client.query(
-        `SELECT published_at IS NOT NULL AS published FROM "index".chunk WHERE id = $1`,
-        [id],
-      );
+      const rewritten = await client.query(`SELECT content FROM "index".chunk WHERE id = $1`, [id]);
       await client.query(`DELETE FROM "index".chunk WHERE workspace_id = $1 AND id = $2`, [
         WS_A,
         id,
       ]);
       const afterDelete = await client.query(`SELECT id FROM "index".chunk WHERE id = $1`, [id]);
-      expect({ published: published.rows, left: afterDelete.rows }).toEqual({
-        published: [{ published: true }],
+      expect({ rewritten: rewritten.rows, left: afterDelete.rows }).toEqual({
+        rewritten: [{ content: "the paragraph again" }],
         left: [],
       });
 

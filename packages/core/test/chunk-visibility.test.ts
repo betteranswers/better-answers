@@ -89,38 +89,18 @@ type Landing = {
 
 const wireOf = (documentId: string, text: string): string => `${documentId}/chars:0-${text.length}`;
 
-const chunkRowOf = (workspaceId: string, where: Landing, copying: Visibility) => ({
-  workspaceId,
-  bindingId: where.bindingId,
-  sourceDocumentId: where.documentId,
-  content: where.text,
-  locator: wireOf(where.documentId, where.text),
-  ordinal: 0,
-  charStart: 0,
-  charEnd: where.text.length,
-  publishedAt: copying.publishedAt,
-  sensitivity: copying.sensitivity,
-  audience: copying.audience,
-  audienceGroups: copying.audienceGroups === null ? null : [...copying.audienceGroups],
-});
-
-const landed = (workspaceId: string, where: Landing, copying: Visibility): Promise<void> =>
+const landed = (workspaceId: string, where: Landing): Promise<void> =>
   seededBy(db(), async (seed) => {
-    await seed.chunk(chunkRowOf(workspaceId, where, copying));
-  });
-
-// Reading the binding is what makes the race real: both tiers still copy what they saw.
-const landedCopyingItsBinding = (workspaceId: string, where: Landing): Promise<void> =>
-  seededBy(db(), async (seed) => {
-    const read = await db().pool.query<Visibility>(
-      `SELECT published_at AS "publishedAt", sensitivity, audience,
-              audience_groups AS "audienceGroups"
-         FROM source_binding WHERE workspace_id = $1 AND id = $2`,
-      [workspaceId, where.bindingId],
-    );
-    const seen = read.rows[0];
-    if (seen === undefined) throw new Error("the lander found no binding to copy");
-    await seed.chunk(chunkRowOf(workspaceId, where, seen));
+    await seed.chunk({
+      workspaceId,
+      bindingId: where.bindingId,
+      sourceDocumentId: where.documentId,
+      content: where.text,
+      locator: wireOf(where.documentId, where.text),
+      ordinal: 0,
+      charStart: 0,
+      charEnd: where.text.length,
+    });
   });
 
 const landedBeside = (
@@ -139,10 +119,6 @@ const landedBeside = (
       ordinal: 1,
       charStart: first.text.length,
       charEnd: first.text.length + text.length,
-      publishedAt: PUBLISHED,
-      sensitivity: "Internal",
-      audience: "everyone",
-      audienceGroups: null,
     });
   });
 
@@ -195,18 +171,6 @@ const theDocumentRowNowSays = async (
     "UPDATE source_document SET sensitivity = $3 WHERE workspace_id = $1 AND id = $2",
     [workspaceId, documentId, sensitivity],
   );
-};
-
-const copiesUnder = async (
-  workspaceId: string,
-  documentId: string,
-): Promise<readonly { readonly sensitivity: string }[]> => {
-  const read = await db().pool.query<{ sensitivity: string }>(
-    `SELECT sensitivity FROM "index".chunk
-      WHERE workspace_id = $1 AND source_document_id = $2 ORDER BY ordinal`,
-    [workspaceId, documentId],
-  );
-  return read.rows;
 };
 
 const aBindingHoldingOneDocument = async (
@@ -333,7 +297,7 @@ describe("the answer a reader gets, as the Admin's acts move the source rows", (
       text: HANDBOOK,
     });
     const { bindingId } = where;
-    await landed(scenario.workspaceId, where, PUBLISHED_AND_INTERNAL);
+    await landed(scenario.workspaceId, where);
 
     const before = await reaches(scenario.viewer, where);
     answered(await narrowingTheBinding(scenario, bindingId, "Restricted"));
@@ -358,9 +322,9 @@ describe("the answer a reader gets, as the Admin's acts move the source rows", (
       title: "The handbook annex",
       text: ANNEX,
     });
-    await landed(scenario.workspaceId, theOne, PUBLISHED_AND_INTERNAL);
+    await landed(scenario.workspaceId, theOne);
     await landedBeside(scenario.workspaceId, theOne, theOne.bindingId, SECOND_ROW);
-    await landed(scenario.workspaceId, theOther, PUBLISHED_AND_INTERNAL);
+    await landed(scenario.workspaceId, theOther);
 
     const before = await rowsFound(scenario.viewer, theOne.documentId);
     answered(await narrowingTheDocument(scenario, theOne.bindingId, theOne.documentId));
@@ -392,7 +356,7 @@ describe("the answer a reader gets, as the Admin's acts move the source rows", (
       binding: { publishedAt: null },
     });
     const { bindingId } = where;
-    await landed(scenario.workspaceId, where, { ...PUBLISHED_AND_INTERNAL, publishedAt: null });
+    await landed(scenario.workspaceId, where);
     await aFinishedRun(scenario.workspaceId, bindingId);
 
     const before = await reaches(scenario.viewer, where);
@@ -446,7 +410,7 @@ describe("the race a narrowing in flight used to leave open", () => {
     });
 
     const narrowing = await aNarrowingHeldUncommitted(scenario, where.bindingId);
-    await landedCopyingItsBinding(scenario.workspaceId, where);
+    await landed(scenario.workspaceId, where);
     const beforeTheCommit = await reaches(scenario.viewer, where);
 
     await narrowing.commit();
@@ -469,25 +433,16 @@ describe("the race a narrowing in flight used to leave open", () => {
       title: "The handbook annex",
       text: ANNEX,
     });
-    await landed(scenario.workspaceId, theOld, PUBLISHED_AND_INTERNAL);
+    await landed(scenario.workspaceId, theOld);
 
     const narrowing = await aNarrowingHeldUncommitted(scenario, theOld.bindingId);
-    await landedCopyingItsBinding(scenario.workspaceId, theNew);
+    await landed(scenario.workspaceId, theNew);
     await narrowing.commit();
 
     expect({
       landedLongBefore: await reaches(scenario.viewer, theOld),
       landedDuring: await reaches(scenario.viewer, theNew),
     }).toEqual({ landedLongBefore: WITHHELD, landedDuring: WITHHELD });
-
-    // A read taken from the copies would hand the revoked class back for both rows.
-    expect({
-      landedLongBefore: await copiesUnder(scenario.workspaceId, theOld.documentId),
-      landedDuring: await copiesUnder(scenario.workspaceId, theNew.documentId),
-    }).toEqual({
-      landedLongBefore: [{ sensitivity: "Internal" }],
-      landedDuring: [{ sensitivity: "Internal" }],
-    });
   });
 });
 
@@ -501,7 +456,7 @@ describe("a passage whose rows do not all name one binding", () => {
       text: LEADING,
     });
     const narrow = await aBinding(scenario.workspaceId, { sensitivity: "Restricted" });
-    await landed(scenario.workspaceId, wide, PUBLISHED_AND_INTERNAL);
+    await landed(scenario.workspaceId, wide);
     await landedBeside(scenario.workspaceId, wide, narrow, TRAILING);
     const wire = `${wide.documentId}/chars:0-${LEADING.length + TRAILING.length}`;
 
@@ -536,8 +491,8 @@ describe("a chunk whose binding row is absent", () => {
       })),
       bindingId: absent,
     };
-    await landed(scenario.workspaceId, orphaned, PUBLISHED_AND_INTERNAL);
-    await landed(scenario.workspaceId, neighbour, PUBLISHED_AND_INTERNAL);
+    await landed(scenario.workspaceId, orphaned);
+    await landed(scenario.workspaceId, neighbour);
 
     expect({
       orphanedPreview: await previewing(scenario.admin, absent),

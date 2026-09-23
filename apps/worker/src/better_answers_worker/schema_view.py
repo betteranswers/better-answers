@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0046_the-unwritten-chunk-visibility"
+MIGRATION_ID = "0047_the-chunk-visibility-dropped"
 
-MIGRATION_WHEN = 1790131105386
+MIGRATION_WHEN = 1790137899068
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -11,11 +11,7 @@ TABLES: dict[str, dict[str, str]] = {
         "content": "text NOT NULL",
         "embedding": "vector(1024)",
         "embedding_route_id": "text",
-        "published_at": "timestamp with time zone",
-        "sensitivity": "text",
-        "audience": "text",
         "binding_id": "text NOT NULL",
-        "audience_groups": "text[]",
         "source_document_id": "text",
         "locator": "text",
         "ordinal": "integer",

@@ -22,7 +22,13 @@ import {
 import { getObject, listObjects, putObject } from "../src/store/objects/index.ts";
 import type { Tx } from "../src/store/postgres/index.ts";
 import { contractFixture, mediaTypeOutside } from "./contract-fixture.ts";
-import { chunkUnder, ledgerRowsOf, groupNamed, seededBy } from "./sourced-concept.ts";
+import {
+  chunkUnder,
+  chunkVersionsOf,
+  ledgerRowsOf,
+  groupNamed,
+  seededBy,
+} from "./sourced-concept.ts";
 import { inputOf } from "./suite-input.ts";
 import { objectStoreForSuite, textOf } from "./suite-objects.ts";
 import { answered, readingAs, whileWritesAreRefused } from "./suite-postgres.ts";
@@ -609,7 +615,7 @@ const publishStateOf = async (pool: pg.Pool, workspaceId: string, bindingId: str
 
 const chunkStampsOf = async (pool: pg.Pool, workspaceId: string, bindingId: string) => {
   const read = await pool.query<{ published_at: Date | null }>(
-    `SELECT published_at FROM "index".chunk
+    `SELECT published_at FROM "index".readable_chunk
       WHERE workspace_id = $1 AND binding_id = $2 ORDER BY ordinal`,
     [workspaceId, bindingId],
   );
@@ -683,6 +689,7 @@ describe("an Admin publishes a binding", () => {
     const { bindingId, documentId, jobId } = await boundHandbook(scenario);
     await runEndedAt(scenario.workspaceId, bindingId, jobId, "done", RUN_FINISHED_AT);
     await chunksOfTheHandbook(scenario.workspaceId, { bindingId, documentId });
+    const stoodAt = await chunkVersionsOf(db(), scenario.workspaceId, bindingId);
 
     await seededBy(db(), async (seed) => {
       await seed.finding({
@@ -729,7 +736,11 @@ describe("an Admin publishes a binding", () => {
       state: "published",
     });
 
-    expect(await chunkStampsOf(db().pool, scenario.workspaceId, bindingId)).toEqual([null, null]);
+    expect(await chunkVersionsOf(db(), scenario.workspaceId, bindingId)).toEqual(stoodAt);
+    expect(await chunkStampsOf(db().pool, scenario.workspaceId, bindingId)).toEqual([
+      PUBLISHED_AT,
+      PUBLISHED_AT,
+    ]);
 
     const rows = await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.published");
     expect(rows.length).toEqual(1);
@@ -940,7 +951,7 @@ const financeHandbook = async (scenario: Scenario, inTheGroup: readonly UserPrin
 describe("a Viewer inside the audience", () => {
   it("reads nothing of the binding before the publish, and its passages on the next read after it", async () => {
     const scenario = await arrange();
-    const { bindingId, documentId, finance } = await financeHandbook(scenario, [scenario.viewer]);
+    const { bindingId, documentId } = await financeHandbook(scenario, [scenario.viewer]);
 
     for (const [ordinal, content, charStart, charEnd] of [
       [0, HOLIDAY, 0, 53],
@@ -950,15 +961,7 @@ describe("a Viewer inside the audience", () => {
         db(),
         scenario.workspaceId,
         { bindingId, documentId },
-        {
-          content,
-          ordinal,
-          charStart,
-          charEnd,
-          sensitivity: "Internal",
-          audience: "groups",
-          audienceGroups: [finance],
-        },
+        { content, ordinal, charStart, charEnd },
       );
     }
 
@@ -974,20 +977,12 @@ describe("a Viewer inside the audience", () => {
 
   it("reads nothing of a published binding whose audience names a group they are not in", async () => {
     const scenario = await arrange();
-    const { bindingId, documentId, finance } = await financeHandbook(scenario, []);
+    const { bindingId, documentId } = await financeHandbook(scenario, []);
     await chunkUnder(
       db(),
       scenario.workspaceId,
       { bindingId, documentId },
-      {
-        content: HOLIDAY,
-        ordinal: 0,
-        charStart: 0,
-        charEnd: 53,
-        sensitivity: "Internal",
-        audience: "groups",
-        audienceGroups: [finance],
-      },
+      { content: HOLIDAY, ordinal: 0, charStart: 0, charEnd: 53 },
     );
 
     await publishedHandbook(scenario, bindingId);

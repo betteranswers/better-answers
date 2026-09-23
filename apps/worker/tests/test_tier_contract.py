@@ -21,7 +21,6 @@ SPOKEN_AGREEMENTS = {
     "queue": "sql-function",
     "redaction": "fixtured",
     "upload-media-types": "fixtured",
-    "visibility-columns": "fixtured",
 }
 NOT_FIXTURES = {"manifest.json", "README.md"}
 

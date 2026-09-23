@@ -286,12 +286,12 @@ describe("what the inbox substrate copies from the schema package", () => {
 });
 
 describe("what the audience substrate copies from the schema package", () => {
-  it("ties the word to the array on the chunk and graph tables with the one CHECK the declarations carry", () => {
+  it("ties the word to the array on the graph tables with the one CHECK the declarations carry", () => {
     const file = journalMigrationFiles().find((name) => name.endsWith("audience-substrate.sql"));
     if (file === undefined) throw new Error("the audience substrate is not in the journal");
     const sql = readFileSync(file, "utf8");
 
-    for (const table of ["chunk", "graph_node", "graph_edge"]) {
+    for (const table of ["graph_node", "graph_edge"]) {
       expect(sql).toContain(`"${table}_audience_check" CHECK (${AUDIENCE_CHECK})`);
     }
   });

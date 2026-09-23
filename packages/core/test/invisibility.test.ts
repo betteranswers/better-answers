@@ -43,7 +43,7 @@ const chunksReadableBy = async (
   answered(
     await reading(person, async (reader, tx) => {
       const read = await tx.query<{ id: string }>(
-        `SELECT c.id FROM "index".chunk c
+        `SELECT c.id FROM "index".readable_chunk c
         WHERE c.workspace_id = $1 AND c.source_document_id = $2 AND ${readableClause("c", 3)}
         ORDER BY c.id`,
         [reader.workspaceId, sourceDocumentId, ...readableParameters(reader)],
@@ -52,13 +52,7 @@ const chunksReadableBy = async (
     }),
   );
 
-const published = new Date("2026-09-11T09:00:00.000Z");
-
-const chunkOf = async (
-  workspaceId: string,
-  document: Sourced,
-  sensitivity: string,
-): Promise<string> => {
+const chunkOf = async (workspaceId: string, document: Sourced): Promise<string> => {
   const row = await seededBy(db(), (seed) =>
     seed.chunk({
       workspaceId,
@@ -69,8 +63,6 @@ const chunkOf = async (
       ordinal: 0,
       charStart: 0,
       charEnd: 30,
-      publishedAt: published,
-      sensitivity,
     }),
   );
   return row.id;
@@ -285,8 +277,8 @@ describe("a document narrowed under a binding its siblings stand under", () => {
       db(),
       scenario.workspaceId,
     );
-    const narrowedChunk = await chunkOf(scenario.workspaceId, narrowedUnderInternal, "Restricted");
-    const siblingChunk = await chunkOf(scenario.workspaceId, internal, "Internal");
+    const narrowedChunk = await chunkOf(scenario.workspaceId, narrowedUnderInternal);
+    const siblingChunk = await chunkOf(scenario.workspaceId, internal);
 
     const absent = await chunksReadableBy(scenario.viewer, ulid());
     expect(await chunksReadableBy(scenario.viewer, narrowedUnderInternal.documentId)).toEqual(

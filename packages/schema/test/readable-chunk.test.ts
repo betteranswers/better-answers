@@ -59,7 +59,6 @@ type Arrangement = {
   readonly audienceGroups?: readonly string[] | undefined;
   readonly publishedAt?: Date | null | undefined;
   readonly withoutADocument?: boolean | undefined;
-  readonly chunkCopies?: { readonly sensitivity: string; readonly audience: string } | undefined;
 };
 
 const aChunkUnderABinding = async (client: pg.PoolClient, arrangement: Arrangement = {}) => {
@@ -83,7 +82,6 @@ const aChunkUnderABinding = async (client: pg.PoolClient, arrangement: Arrangeme
     workspaceId,
     bindingId: binding.id,
     sourceDocumentId: document?.id ?? null,
-    ...arrangement.chunkCopies,
   });
   return { binding, document, chunk };
 };
@@ -345,32 +343,29 @@ describe("what the view reports for a chunk, as app_rt under RLS", () => {
     });
   });
 
-  it("reads the binding and the document as they stand now, not the class the chunk row was landed with", async () => {
+  it("reads the binding as it stands now, so a narrowing after the row was landed is seen at once", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
-      const { binding, chunk } = await aChunkUnderABinding(client, {
-        bindingClass: "Public",
-        chunkCopies: { sensitivity: "Public", audience: AUDIENCE_EVERYONE },
-      });
+      const { binding, chunk } = await aChunkUnderABinding(client, { bindingClass: "Public" });
+      await asAppRt(client, WS_A);
+      const before = await client.query<{ sensitivity: string }>(THE_VIEW);
+
+      await client.query("RESET ROLE");
       await client.query("UPDATE source_binding SET sensitivity = 'Restricted' WHERE id = $1", [
         binding.id,
       ]);
-      const copy = await client.query<{ sensitivity: string }>(
-        'SELECT sensitivity FROM "index".chunk WHERE id = $1',
-        [chunk.id],
-      );
       await asAppRt(client, WS_A);
 
-      const reported = await client.query<{ sensitivity: string }>(THE_VIEW);
+      const after = await client.query<{ sensitivity: string }>(THE_VIEW);
 
       expect({
-        onTheChunkRow: copy.rows[0]?.sensitivity,
-        throughTheView: reported.rows[0]?.sensitivity,
+        before: before.rows[0]?.sensitivity,
+        after: after.rows[0]?.sensitivity,
         viewer: await seenBy(client, VIEWER),
         admin: await seenBy(client, ADMIN),
       }).toEqual({
-        onTheChunkRow: "Public",
-        throughTheView: "Restricted",
+        before: "Public",
+        after: "Restricted",
         viewer: [],
         admin: [chunk.id],
       });

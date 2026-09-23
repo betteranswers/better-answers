@@ -1,4 +1,3 @@
-import { AUDIENCE_EVERYONE } from "@better-answers/schema";
 import { testData, type MigratedPostgres, type TestData } from "@better-answers/schema/testing";
 import type pg from "pg";
 
@@ -96,10 +95,6 @@ export type ChunkShape = {
   readonly ordinal: number;
   readonly charStart: number;
   readonly charEnd: number;
-  readonly publishedAt?: Date | null;
-  readonly sensitivity?: string;
-  readonly audience?: string;
-  readonly audienceGroups?: readonly string[] | null;
 };
 
 export const chunkUnder = (
@@ -120,13 +115,22 @@ export const chunkUnder = (
       ordinal: shape.ordinal,
       charStart: shape.charStart,
       charEnd: shape.charEnd,
-      publishedAt: shape.publishedAt ?? null,
-      sensitivity: shape.sensitivity ?? "Restricted",
-      audience: shape.audience ?? AUDIENCE_EVERYONE,
-      audienceGroups: shape.audienceGroups == null ? null : [...shape.audienceGroups],
     });
     return row.id;
   });
+
+export const chunkVersionsOf = async (
+  db: MigratedPostgres,
+  workspaceId: string,
+  bindingId: string,
+): Promise<readonly string[]> => {
+  const read = await db.pool.query<{ version: string }>(
+    `SELECT xmin::text AS version FROM "index".chunk
+      WHERE workspace_id = $1 AND binding_id = $2 ORDER BY id`,
+    [workspaceId, bindingId],
+  );
+  return read.rows.map((row) => row.version);
+};
 
 export const restrictedAndInternal = async (
   db: MigratedPostgres,

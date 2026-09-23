@@ -68,7 +68,6 @@ C4Container
 | concept-inbox | SQL function | the `concept_write_request` handshake |
 | llm-routing | SQL function | the route per workspace and purpose |
 | credential-envelope | fixtured | the encryption envelope both tiers decrypt |
-| visibility-columns | fixtured | the three columns the worker writes and the app's predicate reads |
 | id-shape | fixtured | the one ULID shape either tier mints |
 | concept-file | fixtured | the canonical text and content hash of a concept file |
 | cost-ledger | generated | the `llm_call` row's meaning |

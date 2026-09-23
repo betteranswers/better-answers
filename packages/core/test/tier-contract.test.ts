@@ -40,7 +40,6 @@ const SPOKEN_AGREEMENTS = {
   queue: "sql-function",
   redaction: "fixtured",
   "upload-media-types": "fixtured",
-  "visibility-columns": "fixtured",
 } as const;
 
 const NOT_FIXTURES = new Set(["manifest.json", "README.md"]);

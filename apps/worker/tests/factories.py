@@ -405,14 +405,12 @@ def seed_chunk(
     binding_id: str,
     chunk_id: str,
     content: str = "body",
-    sensitivity: str = "Public",
-    audience: str = "everyone",
 ) -> dict[str, Any]:
     cursor.execute(
-        'INSERT INTO "index".chunk (id, workspace_id, content, sensitivity, audience,'
-        " binding_id) VALUES (%s, %s, %s, %s, %s, %s)"
-        " RETURNING id, workspace_id, content, sensitivity, audience, binding_id",
-        (chunk_id, workspace_id, content, sensitivity, audience, binding_id),
+        'INSERT INTO "index".chunk (id, workspace_id, content, binding_id)'
+        " VALUES (%s, %s, %s, %s)"
+        " RETURNING id, workspace_id, content, binding_id",
+        (chunk_id, workspace_id, content, binding_id),
     )
     return _returning_row(cursor)
 
