@@ -130,6 +130,15 @@ jobs:
         with:
           version-file: apps/worker/.tool-versions
           enable-cache: true
+      - name: HF_HOME on the runner's own temp directory, not the checkout
+        run: echo "HF_HOME=${{ runner.temp }}/huggingface" >> "$GITHUB_ENV"
+      # `packages/core`'s cross-tier suite runs the worker over an index job, which loads the
+      # detector's models; without this the leg fetches them afresh every run.
+      - name: the redaction detector's weights, keyed on the pins that name them
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/huggingface
+          key: hugging-face-${{ runner.os }}-${{ hashFiles('apps/worker/src/better_answers_worker/redaction/pins.py') }}
       - run: pnpm install --frozen-lockfile
       # The only fresh clone in CI, so the only place install's promise can be tested.
       - name: the pre-commit hook is installed by install alone
@@ -154,11 +163,22 @@ jobs:
         with:
           node-version-file: .node-version
           cache: pnpm
-      # The binary, not an environment: this leg resolves no Python package to cache.
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           version-file: apps/worker/.tool-versions
+          enable-cache: true
+      - name: HF_HOME on the runner's own temp directory, not the checkout
+        run: echo "HF_HOME=${{ runner.temp }}/huggingface" >> "$GITHUB_ENV"
+      # This leg runs the worker over an index job, which loads the detector's models;
+      # without this it fetches them afresh every run.
+      - name: the redaction detector's weights, keyed on the pins that name them
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/huggingface
+          key: hugging-face-${{ runner.os }}-${{ hashFiles('apps/worker/src/better_answers_worker/redaction/pins.py') }}
       - run: pnpm install --frozen-lockfile
+      - run: uv sync --frozen
+        working-directory: apps/worker
       # The daemon's driver cannot read a `type=gha` cache, and a `run:` step gets the
       # `ACTIONS_*` variables only from the second.
       - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
@@ -253,6 +273,15 @@ jobs:
         with:
           version-file: apps/worker/.tool-versions
           enable-cache: true
+      - name: HF_HOME on the runner's own temp directory, not the checkout
+        run: echo "HF_HOME=${{ runner.temp }}/huggingface" >> "$GITHUB_ENV"
+      # This leg runs the worker over an index job, which loads the detector's models;
+      # without this it fetches them afresh every run.
+      - name: the redaction detector's weights, keyed on the pins that name them
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/huggingface
+          key: hugging-face-${{ runner.os }}-${{ hashFiles('apps/worker/src/better_answers_worker/redaction/pins.py') }}
       - name: the base the filter reads, and a rename read as both its paths
         env:
           BASE: ${{ needs.lane.outputs.base }}

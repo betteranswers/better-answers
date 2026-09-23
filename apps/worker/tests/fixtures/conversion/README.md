@@ -11,6 +11,20 @@ as a literal in `tests/test_pipeline_landed.py`; nothing here is read back to gr
 itself, because a case that asked a converter what it converted would agree with a
 converter that answered anything.
 
+**A synthetic sort code is `00-00-00`, here and in every other committed fixture.** A
+sort code's first pair names a bank, so anything else plants a real one: `20-00-00` is
+Barclays, and these fixtures carried it until 23 September 2026. `00-00-00` is issued to
+nobody, which is why the planted page uses it. Six digits either way, so a sort code
+swapped for it moves no span and no expected literal. The detector over
+`delivery-terms.txt`, run either side of the swap on 23 September 2026, raised the same
+three findings at the same offsets and the same scores:
+
+| Rule | Offsets | Score |
+| --- | --- | --- |
+| `UK_BANK_ACCOUNT` | 510–553 | 0.55 |
+| `PERSON` | 1149–1155 | 0.935 |
+| `PERSON` | 1189–1195 | 0.929 |
+
 | File | What it holds | What it proves |
 | --- | --- | --- |
 | `delivery-terms.txt` | Seven paragraphs of a supplier's terms — 1,337 bytes, one of them a sort code beside an account number — and no markup at all | Plain text passes through: the bytes the reader uploaded *are* the normalised text, so a locator's offsets are offsets into the file. The one fixture long enough to be cut in two, so the chunk rows rejoin to the redacted text and the second row's offsets carry on from the first's |

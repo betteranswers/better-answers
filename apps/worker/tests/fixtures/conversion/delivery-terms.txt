@@ -9,7 +9,7 @@ is noticed and never at the end of the month, because a pallet nobody counted is
 a pallet nobody can find.
 
 Payment is thirty days from the end of the month in which the invoice falls. The
-sort code is 20-00-00 and the account number is 12345678. Remittance advice goes
+sort code is 00-00-00 and the account number is 12345678. Remittance advice goes
 to the accounts inbox and not to the depot.
 
 Returns are accepted within fourteen days on the original pallet. A pallet that

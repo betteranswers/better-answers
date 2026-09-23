@@ -48,7 +48,7 @@ BINDING = "01M2B1ND1NGAAAAAAAAAAAAAAA"
 AN_INVOICE_ID = "01M2Q3R4S5T6V7W8X9YZAB0001"
 AN_INVOICE = (
     "Invoice 2026-041 is due on receipt.\n\n"
-    "The sort code is 20-00-00 and the account number is 12345678.\n\n"
+    "The sort code is 00-00-00 and the account number is 12345678.\n\n"
     "Delivery follows within ten working days of a signed order.\n"
 )
 AN_INVOICE_REDACTED = (
@@ -1024,7 +1024,7 @@ def test_a_span_an_admin_restored_is_back_in_the_text_after_the_next_run(
     ]
 
 
-THE_INVOICES_ACCOUNT_AS_FOUND = "20-00-00 and the account number is 12345678"
+THE_INVOICES_ACCOUNT_AS_FOUND = "00-00-00 and the account number is 12345678"
 
 
 # jscpd:ignore-start
@@ -1093,7 +1093,7 @@ def read_afresh_in(written: str) -> list[int]:
     ]
 
 
-def test_the_wipe_reason_empties_the_bindings_store_before_the_run_reads_anything(
+def test_a_reason_the_app_deletes_rows_for_empties_the_store_before_any_read(
     database: tuple[psycopg.Connection, str],
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -1119,8 +1119,17 @@ def test_the_wipe_reason_empties_the_bindings_store_before_the_run_reads_anythin
     index_binding(bootstrap, run_for(workspace_id), copies=a_bucket_holding_the_three())
     after_the_first = files_now()
     planted = binding_directory / "planted-before-the-wipe"
-    planted.write_bytes(b"what the wipe must take with it")
+    planted.write_bytes(b"what the removal must take with it")
     capsys.readouterr()
+
+    index_binding(
+        bootstrap,
+        run_for(workspace_id, "restored"),
+        copies=a_bucket_holding_the_three(),
+    )
+    after_the_restore = files_now()
+    restored_read = read_afresh_in(capsys.readouterr().out)
+    stood = planted.exists()
 
     index_binding(
         bootstrap,
@@ -1128,7 +1137,8 @@ def test_the_wipe_reason_empties_the_bindings_store_before_the_run_reads_anythin
         copies=a_bucket_holding_the_three(),
     )
     after_the_rule_change = files_now()
-    unwiped_read = read_afresh_in(capsys.readouterr().out)
+    rule_change_read = read_afresh_in(capsys.readouterr().out)
+
     wiped = index_binding(
         bootstrap, run_for(workspace_id, "wiped"), copies=a_bucket_holding_the_three()
     )
@@ -1136,13 +1146,17 @@ def test_the_wipe_reason_empties_the_bindings_store_before_the_run_reads_anythin
     wiped_read = read_afresh_in(capsys.readouterr().out)
 
     assert after_the_first != {}
-    kept, first = inodes_of(after_the_rule_change), inodes_of(after_the_first)
+    kept, first = inodes_of(after_the_restore), inodes_of(after_the_first)
     assert kept.items() >= first.items()
-    assert planted.exists() is False
-    assert set(after_the_wipe) & set(after_the_first) != set()
-    assert set(after_the_wipe.values()).isdisjoint(after_the_first.values())
+    assert stood is True
 
-    assert (unwiped_read, wiped_read) == ([0], [1])
+    assert planted.exists() is False
+    assert set(after_the_rule_change) & set(after_the_first) != set()
+    assert set(after_the_rule_change.values()).isdisjoint(after_the_first.values())
+    assert set(after_the_wipe) & set(after_the_rule_change) != set()
+    assert set(after_the_wipe.values()).isdisjoint(after_the_rule_change.values())
+
+    assert (restored_read, rule_change_read, wiped_read) == ([0], [1], [1])
     assert wiped.lmdb_bytes > 0
     assert chunk_rows_of(connection, workspace_id)[0]["content"] == AN_INVOICE_REDACTED
 
@@ -1190,6 +1204,42 @@ def test_a_run_dying_before_the_landing_leaves_the_verdict_and_no_chunk_at_all(
     assert [
         row["source_document_id"] for row in chunk_rows_of(connection, workspace_id)
     ] == [A_SICK_NOTE_ID]
+
+
+def test_a_rule_change_lands_again_every_chunk_row_the_apps_reprocess_deleted(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    connection, dsn = database
+    workspace_id = seed_the_binding(
+        connection, documents=(AN_INVOICE_ID, A_SICK_NOTE_ID, A_DELIVERY_NOTE_ID)
+    )
+    bootstrap = bootstrap_for(dsn, tmp_path)
+
+    index_binding(bootstrap, run_for(workspace_id), copies=a_bucket_holding_the_three())
+    landed = chunk_rows_of(connection, workspace_id)
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            'DELETE FROM "index".chunk WHERE workspace_id = %s', (workspace_id,)
+        )
+    connection.commit()
+    emptied = chunk_rows_of(connection, workspace_id)
+
+    index_binding(
+        bootstrap,
+        run_for(workspace_id, "rule-change"),
+        copies=a_bucket_holding_the_three(),
+    )
+
+    again = chunk_rows_of(connection, workspace_id)
+
+    assert len(landed) == 3
+    assert emptied == []
+    assert again == landed
+    invoice = [
+        row["content"] for row in again if row["source_document_id"] == AN_INVOICE_ID
+    ]
+    assert invoice == [AN_INVOICE_REDACTED]
 
 
 def test_a_row_from_before_is_rewritten_once_and_an_unchanged_next_run_writes_nothing(

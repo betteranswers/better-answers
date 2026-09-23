@@ -17,6 +17,12 @@ from .rows import CHUNK_TABLE, rows_of
 
 WIPED_REASON = "wiped"
 
+RULE_CHANGE_REASON = "rule-change"
+
+# The store is the target-state tracking: rows the app deleted beside a store
+# left standing are re-upserted by nothing, the engine believing them landed.
+REASONS_EMPTYING_THE_BINDING = frozenset({WIPED_REASON, RULE_CHANGE_REASON})
+
 
 @dataclass(frozen=True, slots=True)
 class OverriddenRestore:
@@ -60,7 +66,7 @@ def index_binding(
     margin_ms: int = TIMEOUT_MARGIN_MS,
 ) -> IndexOutcome:
     with Host(bootstrap) as host:
-        if run.reason == WIPED_REASON:
+        if run.reason in REASONS_EMPTYING_THE_BINDING:
             host.remove_binding_directory(run)
         store = copies or Bucket(bootstrap.object_store, run.workspace_id)
         with queue.connected(bootstrap.database_url) as connection:

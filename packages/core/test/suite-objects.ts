@@ -27,6 +27,9 @@ export type ObjectStore = {
   readonly door: ObjectDoor;
   readonly endpoint: string;
   readonly bucket: string;
+  readonly region: string;
+  readonly accessKeyId: string;
+  readonly secretAccessKey: string;
 };
 
 const GARAGE_CONFIG = path.resolve(import.meta.dirname, "../../../deploy/garage.toml");
@@ -82,7 +85,14 @@ const provisionCluster = async (container: StartedTestContainer): Promise<Object
     secretAccessKey,
   });
   if (!opened.ok) throw new Error(`the object door refused its settings: ${opened.error}`);
-  return { door: opened.value, endpoint, bucket: BUCKET };
+  return {
+    door: opened.value,
+    endpoint,
+    bucket: BUCKET,
+    region: REGION,
+    accessKeyId,
+    secretAccessKey,
+  };
 };
 
 export const objectStoreForSuite = (): (() => ObjectStore) => {

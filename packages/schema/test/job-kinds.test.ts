@@ -1,7 +1,13 @@
 import type pg from "pg";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { JOB_KIND_DESCRIPTORS, type JobKindDescriptor, JOB_KINDS } from "../src/index.ts";
+import {
+  INDEX_REASONS,
+  JOB_KIND_DESCRIPTORS,
+  type JobKindDescriptor,
+  JOB_KINDS,
+  REASONS_EMPTYING_THE_BINDING,
+} from "../src/index.ts";
 import { type JobProbeRow, seedClaimedJob, seedQueuedJob } from "./catalogue-statements.ts";
 import { testData } from "./factory.ts";
 import { type MigratedPostgres, withRollback } from "./harness.ts";
@@ -108,6 +114,15 @@ describe("the job kind descriptors", () => {
 
   it("is where the kind list comes from, so neither can gain a word without the other", () => {
     expect([...JOB_KINDS]).toEqual(["nightly-audit", "full-rebuild", "index"]);
+  });
+
+  it("names the reasons that empty a binding, each of them an index reason", () => {
+    expect([...REASONS_EMPTYING_THE_BINDING]).toEqual(["rule-change", "wiped"]);
+    const emptying: readonly string[] = REASONS_EMPTYING_THE_BINDING;
+    expect(INDEX_REASONS.filter((reason) => emptying.includes(reason))).toEqual([
+      "rule-change",
+      "wiped",
+    ]);
   });
 });
 

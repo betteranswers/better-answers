@@ -44,7 +44,7 @@ SEED = "b0f3a1d2c4e5"
 AN_INVOICE_ID = "01M2Q3R4S5T6V7W8X9YZAB0001"
 AN_INVOICE = (
     "Invoice 2026-041 is due on receipt.\n\n"
-    "The sort code is 20-00-00 and the account number is 12345678.\n\n"
+    "The sort code is 00-00-00 and the account number is 12345678.\n\n"
     "Delivery follows within ten working days of a signed order.\n"
 )
 AN_INVOICE_REDACTED = (
@@ -80,7 +80,7 @@ A_POLICY_ID = "01M2Q3R4S5T6V7W8X9YZAB0003"
 A_POLICY_CONVERTED = (
     "# Expenses policy\n\n"
     "Claims are paid monthly.\n\n"
-    "The sort code is 20-00-00 and the account number is 12345678.\n\n"
+    "The sort code is 00-00-00 and the account number is 12345678.\n\n"
     "- Keep receipts\n"
     "- Submit by the fifth\n\n"
     "| Item | Limit |\n"
@@ -273,7 +273,7 @@ def test_the_bindings_store_is_never_found_holding_a_span_the_seam_withheld(
     )
     assert b"[withheld]" in held, "the redacted text is what the memo is for"
     assert THE_ACCOUNT_NUMBER.encode() not in held
-    assert b"20-00-00" not in held
+    assert b"00-00-00" not in held
 
 
 def test_a_second_run_over_an_unchanged_document_reads_nothing_afresh(

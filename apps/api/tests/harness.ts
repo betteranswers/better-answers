@@ -8,9 +8,10 @@ import type { Pool } from "pg";
 import { pino } from "pino";
 import { z } from "zod";
 
-import type { Clock, PlatformPrincipal } from "@better-answers/core/kernel";
+import type { Clock, PlatformPrincipal, UserPrincipal } from "@better-answers/core/kernel";
 import type { GitDoor } from "@better-answers/core/store/git";
 import type { ObjectStoreSettings } from "@better-answers/core/store/objects";
+import { withPrincipal, type Tx } from "@better-answers/core/store/postgres";
 import { removeBundleRoot } from "@better-answers/core/testing/bundle-root";
 import {
   provisionWorkspace,
@@ -185,6 +186,16 @@ export const serverFor = (pool: Pool): Hono =>
     fetchClientMetadataResource: cimdFixture,
     logger: pino({ level: "silent" }),
   });
+
+export const actingIn = async <T>(
+  app: TestApp,
+  who: { readonly workspaceId: string; readonly userId: string },
+  work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
+) => {
+  const answered = await withPrincipal(app.doors.postgres, { ...who, issuedAt: new Date() }, work);
+  if (!answered.ok) throw new Error(`the act answered ${String(answered.error)}`);
+  return answered.value;
+};
 
 export const openTestGit = (app: TestApp): GitDoor => {
   if (app.doors.git?.ok !== true) {

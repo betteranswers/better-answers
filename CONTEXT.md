@@ -230,6 +230,11 @@ Where a unit lives is decided by **minting**.
   own placeholder, under another finding's, or not at all — a withheld finding inside a longer
   withheld span is written under that span's word and is no less withheld. A finding is never
   rewritten by a withholding. _Avoid_: decision, detection.
+- **emptying a binding** — deleting a binding's derived rows in the app's transaction and
+  removing that binding's store in the run the same act enqueues. The two go together, whatever
+  asked for them: the store is the engine's target-state tracking, so rows deleted beside a store
+  left standing are re-upserted by nothing (ADR 0036). A *wipe* empties a binding, and so does a
+  rule change. _Avoid_: clear, reset, purge.
 - **relation** — a link from one concept to another as the map holds it: the two kinds, the
   section and the sentence around the link (`LINKS_TO`); the kind of a relation is read from
   the sentence, never from a predicate list (ADR 0026). *Supersedes*, a composition's citation

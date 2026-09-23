@@ -526,9 +526,16 @@ const SETUP: readonly Setup[] = [
       "the worker's gates are uv's, packages/devtools runs ruff and mypy out of the same environment, and the api's hook suite asks the binary itself whether it is there",
   },
   {
+    tool: "uv sync --frozen",
+    onlyOn: ["full-root", "full-api", "full-worker", "affected-workspaces", "affected-worker"],
+    because:
+      "the binary alone runs nothing: a leg that spawns the worker, whether for its own gates or from a suite in the other tier, needs the environment the lockfile names",
+  },
+  {
     tool: "actions/cache@",
-    onlyOn: ["full-worker", "affected-worker"],
-    because: "the only cache with a key here is the redaction detector's weights",
+    onlyOn: ["full-root", "full-api", "full-worker", "affected-workspaces", "affected-worker"],
+    because:
+      "the only cache with a key here is the redaction detector's weights, and every leg that spawns the worker over an index job loads them",
   },
   {
     tool: "./.github/actions/git-filter-repo",
@@ -588,7 +595,7 @@ describe("what each leg of check.yml installs (T-333)", () => {
     const legs = Object.keys(checkJobs());
 
     expect(SETUP.flatMap((setup) => setup.onlyOn).filter((job) => !legs.includes(job))).toEqual([]);
-    expect(SETUP.length, "a row left this table without the leg that stopped needing it").toBe(7);
+    expect(SETUP.length, "a row left this table without the leg that stopped needing it").toBe(8);
   });
 });
 
