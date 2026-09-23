@@ -37,6 +37,7 @@
     {"role":"app_rt","object":"index.chunk","kind":"partitioned table","is_partition":false,"privilege":"INSERT","grantable":false},
     {"role":"app_rt","object":"index.chunk","kind":"partitioned table","is_partition":false,"privilege":"SELECT","grantable":false},
     {"role":"app_rt","object":"index.chunk","kind":"partitioned table","is_partition":false,"privilege":"UPDATE","grantable":false},
+    {"role":"app_rt","object":"index.readable_chunk","kind":"view","is_partition":false,"privilege":"SELECT","grantable":false},
     {"role":"app_rt","object":"public.access_request","kind":"table","is_partition":false,"privilege":"DELETE","grantable":false},
     {"role":"app_rt","object":"public.access_request","kind":"table","is_partition":false,"privilege":"INSERT","grantable":false},
     {"role":"app_rt","object":"public.access_request","kind":"table","is_partition":false,"privilege":"SELECT","grantable":false},
@@ -272,6 +273,7 @@
     {"role":"app_rt","object":"public.finish_job","args":"p_id text, p_worker_id text, p_outcome jsonb","security_definer":false,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},
     {"role":"app_rt","object":"public.heartbeat_job","args":"p_id text, p_worker_id text, p_lease interval","security_definer":false,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},
     {"role":"app_rt","object":"public.llm_route_for","args":"p_purpose llm_purpose","security_definer":false,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},
+    {"role":"app_rt","object":"public.narrower_class","args":"a text, b text","security_definer":false,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},
     {"role":"app_rt","object":"public.submit_suggestion_set","args":"p_set_id text, p_kind text, p_proposer text, p_requests jsonb","security_definer":true,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},
     {"role":"app_rt","object":"public.suggestion_set_summary","args":"p_set_id text","security_definer":true,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},
     {"role":"worker_rt","object":"public.claim_job","args":"p_worker_id text, p_lease interval, p_kinds text[]","security_definer":false,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},
@@ -279,12 +281,14 @@
     {"role":"worker_rt","object":"public.fail_job","args":"p_id text, p_worker_id text, p_outcome jsonb","security_definer":false,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},
     {"role":"worker_rt","object":"public.finish_job","args":"p_id text, p_worker_id text, p_outcome jsonb","security_definer":false,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},
     {"role":"worker_rt","object":"public.heartbeat_job","args":"p_id text, p_worker_id text, p_lease interval","security_definer":false,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},
+    {"role":"worker_rt","object":"public.narrower_class","args":"a text, b text","security_definer":false,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},
     {"role":"worker_rt","object":"public.submit_suggestion_set","args":"p_set_id text, p_kind text, p_proposer text, p_requests jsonb","security_definer":true,"acl_is_default":false,"privilege":"EXECUTE","grantable":false}
   ],
   "ownership": [
     {"owner":"<migrator>","kind":"<partition-of index.chunk>","relations":1},
     {"owner":"<migrator>","kind":"partitioned table","relations":1},
     {"owner":"<migrator>","kind":"sequence","relations":1},
-    {"owner":"<migrator>","kind":"table","relations":46}
+    {"owner":"<migrator>","kind":"table","relations":46},
+    {"owner":"<migrator>","kind":"view","relations":1}
   ]
 }

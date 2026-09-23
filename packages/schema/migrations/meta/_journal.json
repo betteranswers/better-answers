@@ -309,6 +309,13 @@
       "when": 1790109250308,
       "tag": "0043_the-worker-denied-by-default",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1790123720869,
+      "tag": "0044_the-readable-chunk",
+      "breakpoints": true
     }
   ]
 }
