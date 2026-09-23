@@ -121,16 +121,16 @@ def record_findings(
             run.workspace_id,
             mint(),
             document.source_document_id,
-            finding.category,
-            finding.tier,
-            finding.rule_id,
-            finding.start,
-            finding.end,
-            finding.score,
+            withholding.finding.category,
+            withholding.tier,
+            withholding.finding.rule_id,
+            withholding.finding.start,
+            withholding.finding.end,
+            withholding.finding.score,
             *_version_halves(document.redacted.version),
         )
         for document in documents
-        for finding in document.redacted.findings
+        for withholding in document.redacted.withholdings
     ]
     if not rows:
         return 0

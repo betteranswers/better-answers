@@ -4,6 +4,7 @@ from typing import Any
 from .. import queue
 from ..config import Bootstrap
 from ..log import logger
+from ..redaction.withholdings import overridden_in
 from .catalogue import (
     quarantine_catalogue,
     read_binding,
@@ -111,7 +112,7 @@ def index_binding(
                     char_end=finding.end,
                 )
                 for document in landed.documents
-                for finding in document.redacted.overridden
+                for finding in overridden_in(document.redacted.withholdings)
             ),
         )
     return _finished(outcome, run)

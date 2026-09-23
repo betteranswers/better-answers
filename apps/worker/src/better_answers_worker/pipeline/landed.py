@@ -10,6 +10,7 @@ from ..log import logger
 from ..redaction import Restore, redact
 from ..redaction.engine import Finding
 from ..redaction.pins import VERSION_STRING
+from ..redaction.withholdings import Withholding
 from .chunks import CHUNK_SIZE_BYTES, Chunk, split_into_chunks
 from .converter import (
     CONVERTER_PIN,
@@ -61,13 +62,12 @@ class LandedDocument:
 class RedactedDocument:
     text: str
     findings: tuple[Finding, ...]
+    withholdings: tuple[Withholding, ...]
     counts: tuple[tuple[str, int], ...]
     verdict: str | None
     version: str
 
     content_hash: str
-
-    overridden: tuple[Finding, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,11 +139,11 @@ def landed(
     return RedactedDocument(
         text=answer.text,
         findings=tuple(answer.findings),
+        withholdings=tuple(answer.withholdings),
         counts=tuple(sorted(answer.counts.items())),
         verdict=answer.verdict,
         version=answer.version,
         content_hash=hashlib.sha256(normalised.encode(TEXT_ENCODING)).hexdigest(),
-        overridden=tuple(answer.overridden),
     )
 
 

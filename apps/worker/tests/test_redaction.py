@@ -4,6 +4,18 @@ import pytest
 
 from better_answers_worker.redaction import Redaction, Restore, redact
 from better_answers_worker.redaction.pins import VERSION_STRING
+from better_answers_worker.redaction.withholdings import (
+    AN_ERASURE,
+    IN_FORCE,
+    NOT_WRITTEN_AT_ALL,
+    OVERRIDDEN_BY_THE_ERASURE,
+    RESTORED,
+    SWITCHED_OFF,
+    UNDER_ANOTHER_FINDINGS_PLACEHOLDER,
+    UNDER_ITS_OWN_PLACEHOLDER,
+    Withholding,
+    overridden_in,
+)
 from planted_page import (
     A_CONSUMER_ADDRESS,
     A_HEALTH_AND_SAFETY_SENTENCE,
@@ -120,6 +132,30 @@ def tiers_of(found: Redaction, page: str, span: str) -> set[str]:
         for finding in found.findings
         if page[finding.start : finding.end] == span
     }
+
+
+def withholdings_over(found: Redaction, page: str, span: str) -> list[Withholding]:
+    return [
+        withholding
+        for withholding in found.withholdings
+        if page[withholding.finding.start : withholding.finding.end] == span
+    ]
+
+
+def withheld_tiers_of(found: Redaction, page: str, span: str) -> set[str]:
+    return {withholding.tier for withholding in withholdings_over(found, page, span)}
+
+
+def reasons_over(found: Redaction, page: str, span: str) -> set[str]:
+    return {withholding.reason for withholding in withholdings_over(found, page, span)}
+
+
+def under_their_own_placeholder(found: Redaction) -> list[tuple[int, int]]:
+    return [
+        (withholding.finding.start, withholding.finding.end)
+        for withholding in found.withholdings
+        if withholding.written == UNDER_ITS_OWN_PLACEHOLDER
+    ]
 
 
 def test_every_span_is_cut_back_out_of_the_text_by_the_offsets_it_came_with(
@@ -421,9 +457,25 @@ def test_a_signatory_named_inside_a_home_address_is_withheld_with_its_block(
     for end_of_the_address in A_STREET_AND_ITS_POSTCODE:
         assert end_of_the_address not in on_a_plain_binding.text
 
+    (his_name,) = withholdings_over(on_a_plain_binding, page, A_FOURTH_OFFICER)
+
+    assert (his_name.withheld, his_name.written) == (
+        True,
+        UNDER_ANOTHER_FINDINGS_PLACEHOLDER,
+    )
+
     assert A_FOURTH_OFFICER not in with_nothing_switchable_on.text
     for end_of_the_address in A_STREET_AND_ITS_POSTCODE:
         assert end_of_the_address in with_nothing_switchable_on.text
+
+    (under_no_address,) = withholdings_over(
+        with_nothing_switchable_on, page, A_FOURTH_OFFICER
+    )
+
+    assert (under_no_address.withheld, under_no_address.written) == (
+        True,
+        UNDER_ITS_OWN_PLACEHOLDER,
+    )
 
 
 def test_a_suppressed_name_is_withheld_and_every_other_name_is_untouched(
@@ -439,7 +491,7 @@ def test_a_suppressed_name_is_withheld_and_every_other_name_is_untouched(
         ) == on_an_hr_shaped_binding.text.count(f"[person {letter}]")
 
 
-def test_a_suppression_raises_the_named_person_to_the_always_tier(
+def test_a_suppression_withholds_the_named_person_at_the_always_tier_and_rewrites_none(
     on_a_plain_binding: Redaction, with_one_name_suppressed: Redaction, page: str
 ) -> None:
 
@@ -447,8 +499,17 @@ def test_a_suppression_raises_the_named_person_to_the_always_tier(
         "always",
         "default-off",
     }
-    assert tiers_of(with_one_name_suppressed, page, "Rosalind Petheridge") == {"always"}
-    assert tiers_of(with_one_name_suppressed, page, "Imogen Sarkar") == {"default-off"}
+    assert tiers_of(with_one_name_suppressed, page, "Rosalind Petheridge") == {
+        "always",
+        "default-off",
+    }
+
+    assert withheld_tiers_of(with_one_name_suppressed, page, "Rosalind Petheridge") == {
+        "always"
+    }
+    assert withheld_tiers_of(with_one_name_suppressed, page, "Imogen Sarkar") == {
+        "default-off"
+    }
 
 
 def test_the_same_inputs_twice_give_identical_output(
@@ -459,6 +520,7 @@ def test_the_same_inputs_twice_give_identical_output(
 
     assert again.text == on_an_hr_shaped_binding.text
     assert again.findings == on_an_hr_shaped_binding.findings
+    assert again.withholdings == on_an_hr_shaped_binding.withholdings
     assert again.counts == on_an_hr_shaped_binding.counts
     assert again.verdict == on_an_hr_shaped_binding.verdict
     assert again.version == on_an_hr_shaped_binding.version
@@ -523,12 +585,7 @@ def test_an_erasure_outranks_a_restore(
     on_an_hr_shaped_binding: Redaction, page: str
 ) -> None:
 
-    in_the_block = next(
-        Restore(rule_id=finding.rule_id, start=finding.start, end=finding.end)
-        for finding in on_an_hr_shaped_binding.findings
-        if finding.tier == "always"
-        and page[finding.start : finding.end] == "Rosalind Petheridge"
-    )
+    in_the_block = restore_of(on_an_hr_shaped_binding, page, "Rosalind Petheridge")
 
     restored = redact(page, AN_HR_SHAPED_BINDING, NO_SUPPRESSIONS, SEED, [in_the_block])
     erased = redact(
@@ -538,8 +595,97 @@ def test_an_erasure_outranks_a_restore(
     assert "Rosalind Petheridge" in officers_block(restored.text)
     assert "Rosalind Petheridge" not in erased.text
 
-    assert restored.overridden == ()
+    assert overridden_in(restored.withholdings) == ()
     assert [
         Restore(rule_id=finding.rule_id, start=finding.start, end=finding.end)
-        for finding in erased.overridden
+        for finding in overridden_in(erased.withholdings)
     ] == [in_the_block]
+
+
+def test_the_withholding_names_the_first_of_the_five_reasons_that_holds(
+    on_a_plain_binding: Redaction, on_an_hr_shaped_binding: Redaction, page: str
+) -> None:
+
+    kept = restore_of(on_a_plain_binding, page, THE_COMPANYS_OWN_ACCOUNT)
+    in_the_block = restore_of(on_an_hr_shaped_binding, page, "Rosalind Petheridge")
+
+    restored = redact(page, THE_SAFE_SET, NO_SUPPRESSIONS, SEED, [kept])
+    erased = redact(
+        page, AN_HR_SHAPED_BINDING, ONE_NAME_SUPPRESSED, SEED, [in_the_block]
+    )
+
+    assert reasons_over(on_a_plain_binding, page, THE_COMPANYS_OWN_ACCOUNT) == {
+        IN_FORCE
+    }
+    assert reasons_over(on_a_plain_binding, page, A_PLANTED_JOB_TITLE) == {SWITCHED_OFF}
+    assert reasons_over(restored, page, THE_COMPANYS_OWN_ACCOUNT) == {RESTORED}
+    assert reasons_over(erased, page, "Rosalind Petheridge") == {
+        OVERRIDDEN_BY_THE_ERASURE,
+        AN_ERASURE,
+    }
+
+    assert {
+        withholding.reason
+        for found in (on_a_plain_binding, restored, erased)
+        for withholding in found.withholdings
+    } == {OVERRIDDEN_BY_THE_ERASURE, AN_ERASURE, RESTORED, SWITCHED_OFF, IN_FORCE}
+
+
+def test_the_seam_answers_one_withholding_for_each_finding_in_the_order_it_raised_them(
+    on_a_plain_binding: Redaction,
+    with_nothing_switchable_on: Redaction,
+    with_one_name_suppressed: Redaction,
+) -> None:
+
+    for found in (
+        on_a_plain_binding,
+        with_nothing_switchable_on,
+        with_one_name_suppressed,
+    ):
+        assert found.findings
+        assert [one.finding for one in found.withholdings] == list(found.findings)
+
+
+def test_a_restore_moves_neither_the_counts_nor_the_verdict_the_findings_give(
+    on_a_plain_binding: Redaction, page: str
+) -> None:
+
+    kept = restore_of(on_a_plain_binding, page, A_HEALTH_SENTENCE)
+
+    found = redact(page, THE_SAFE_SET, NO_SUPPRESSIONS, SEED, [kept])
+
+    assert A_HEALTH_SENTENCE not in on_a_plain_binding.text
+    assert A_HEALTH_SENTENCE in found.text
+    assert found.verdict == "Restricted"
+    assert found.counts["special-category"] == 1
+    assert found.counts == on_a_plain_binding.counts
+
+
+def test_a_withheld_finding_lies_under_a_written_placeholder_and_a_kept_one_writes_none(
+    on_a_plain_binding: Redaction,
+    with_nothing_switchable_on: Redaction,
+    on_an_hr_shaped_binding: Redaction,
+    under_another_seed: Redaction,
+    with_one_name_suppressed: Redaction,
+) -> None:
+
+    for found in (
+        on_a_plain_binding,
+        with_nothing_switchable_on,
+        on_an_hr_shaped_binding,
+        under_another_seed,
+        with_one_name_suppressed,
+    ):
+        written = under_their_own_placeholder(found)
+
+        assert written
+        for withholding in found.withholdings:
+            finding = withholding.finding
+            if not withholding.withheld:
+                assert withholding.written == NOT_WRITTEN_AT_ALL, finding
+                continue
+            assert any(
+                opened <= finding.start and finding.end <= shut
+                for opened, shut in written
+            ), (withholding.reason, finding)
+            assert withholding.written != NOT_WRITTEN_AT_ALL, finding
