@@ -93,7 +93,7 @@ STAGING_OBJECTSTORE_ROOT_KEY=
 STAGING_OBJECTSTORE_ROOT_SECRET=
 # The platform's bucket inside the staging Garage: it must equal S3_BUCKET in staging.env.
 STAGING_S3_BUCKET=better-answers
-# Named by the database resource's UUID, not its display name. No Postgres port is open.
+# Named by the database resource's UUID, not its display name. No Postgres port is open to the internet.
 PROD_PSQL="ssh -o BatchMode=yes root@${prod_host:-<VPC1 IP>} docker exec -i <pg-resource-uuid> psql -U postgres -d better_answers"
 DRILL_WORKSPACE=
 HEALTHCHECKS_PING_URL_DRILL=

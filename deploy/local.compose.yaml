@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: ${LOCAL_POSTGRES_IMAGE:?deploy/local-database.sh sets it from packages/schema/src/postgres-image.ts}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: better_answers
+      POSTGRES_PASSWORD: better_answers
+      POSTGRES_DB: better_answers
+    ports: ["127.0.0.1:${LOCAL_DATABASE_PORT:?deploy/local-database.sh sets it}:5432"]
+    # Over TCP: the image's first-boot server listens on the socket alone, and must not read as up.
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "better_answers", "-d", "better_answers"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - database:/var/lib/postgresql
+      - ./:/repo/deploy:ro
+      - ../contracts:/repo/contracts:ro
+
+volumes:
+  database:

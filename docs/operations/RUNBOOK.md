@@ -1,4 +1,4 @@
-# Runbook — ten pages and four procedures
+# Runbook — ten pages and five procedures
 
 **Operational reference, not a page of the docs site.** This file lives in `docs/operations/` because that is where the operational documents are kept; the docs site does not render it, and it is read from the repository.
 
@@ -117,6 +117,24 @@ The estate is two 4 GB boxes (ADR 0024): VPC 1 is production, VPC 2 is the orche
 ## Bring staging up / tear it down
 
 Staging is on demand on VPC 2 (ADR 0024): nothing stands between drills. To bring it up, with the repository checked out at `/opt/better-answers` and the staging env in the root-only file `host-setup.sh` creates: `docker compose --project-directory deploy --env-file /etc/better-answers/staging.env -f stores.compose.yaml -f staging.override.yaml -p better-answers-stores-staging up -d`, then the same for `platform.compose.yaml` (`up -d api` — the worker is behind the `pipeline` profile until `T-006`). The staging Postgres resource is created in the orchestrator the first time and kept empty; the digests are the ones `build.yml` last pushed, read from its run summary. `restore-drill.sh` does exactly this itself. To tear it down: `down --remove-orphans` on both, then wipe `/data/objectstore`, `/data/git`, `/data/worker/*`, the staging backup directory, and drop the three schemas the journal writes — `public`, `index` and `drizzle` — which is the whole wipe, because the graph is plain tables in `public` (ADR 0032). The drill's `wipe_staging` is the reference, `seed-synthetic.sh` re-seeds the fixture, and the `staging-wiped` ping is the proof. Staging holds client data only for the duration of a drill; a rehearsal that is not a drill uses the synthetic fixture — with one exception, the owner's of 22/09/2026: the first client's reviewed bundle may stand on staging for the length of its rehearsal under *Provision the first client and land its bundle* below, the two people that run needs signed in for real, and is wiped by the drill's own wipe when the rehearsal ends.
+
+## Browse production
+
+Production's rows are browsed in a GUI through an SSH forward, as the read-only role `browse_ro`; the mechanism, the posture and what the role reads are `coolify.md` § Browsing the database. The values below are the private file's § Browsing production, read by name — here and by the helper — and never written into this file. Every command runs from the repository root of the main checkout, where the private file lives.
+
+1. **Once, first: the public-port toggle, read on the day.** In the orchestrator, the Postgres resource's public-port toggle is on and publishes one port; the provider firewall does not let that port in. Both are recorded in the private file, dated. The toggle stays on: turned off, it leaves the forward nothing to reach.
+2. **Once: the private file's names.** § Browsing production in `.planning/estate/coolify.md` holds four lines: `VPC1_SSH_TARGET=<user>@<VPC 1's address>`, `VPC1_SSH_KEY=<the key's path>` (optional), `VPC1_DATABASE_PORT=<the port the toggle publishes>` and `VPC1_POSTGRES_CONTAINER=<the Postgres resource's UUID, which names its container>`. Steps 3 and 4 read them into the shell first, bash or zsh:
+
+   ```sh
+   estate=.planning/estate/coolify.md
+   read_estate() { sed -n "s/^$1=//p" "$estate" | tr -d '\r'; }
+   target=$(read_estate VPC1_SSH_TARGET); pg=$(read_estate VPC1_POSTGRES_CONTAINER); key=$(read_estate VPC1_SSH_KEY)
+   identity=(); [ -n "$key" ] && identity=(-o IdentitiesOnly=yes -i "${key/#\~/$HOME}")
+   ```
+
+3. **Once per estate, and again after a release adds a table: the role.** As the resource's owner through its container, as the drill reads production — `ssh "${identity[@]}" "$target" docker exec -i "$pg" psql -U postgres -d better_answers -v ON_ERROR_STOP=1 < deploy/browse-role.sql`. The file is one transaction, and run again it changes nothing that is already right.
+4. **Once: its password.** The same hop with a terminal — `ssh -t "${identity[@]}" "$target" docker exec -it "$pg" psql -U postgres -d better_answers -c '\password browse_ro'` — prompts twice and sends only the hash. The password goes to the password manager, and the private inventory records where it is held.
+5. **Each time: open, browse, close.** `deploy/browse-production.sh` prints the loopback port it holds; the GUI's *production (read-only)* profile points at host `127.0.0.1`, port `55433`, database `better_answers`, user `browse_ro`. Ctrl-C in that terminal closes the forward. A refusal names what it found wrong — a local port already held, the private file absent, or one of its names missing, doubled or malformed — and prints no value it read.
 
 ## Swap
 
