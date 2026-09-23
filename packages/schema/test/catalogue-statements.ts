@@ -1,6 +1,6 @@
 import type pg from "pg";
 
-import { JOB_QUEUED_STATUS, ulid } from "../src/index.ts";
+import { JOB_DONE_STATUS, JOB_QUEUED_STATUS, ulid } from "../src/index.ts";
 import { type TestData, testData } from "./factory.ts";
 
 export type CataloguePlace = {
@@ -100,6 +100,29 @@ export const seedQueuedJob = async (
     row.reason ?? null,
     row.subjectId ?? null,
     JOB_QUEUED_STATUS,
+    String(row.enqueuedAgoSeconds ?? 0),
+  ]);
+  return id;
+};
+
+const FINISHED_JOB = `INSERT INTO job (workspace_id, id, kind, reason, subject_id, status, attempts,
+                      enqueued_at, claimed_by, claimed_at, finished_at, outcome)
+       VALUES ($1, $2, $3, $4, $5, '${JOB_DONE_STATUS}', 1,
+               now() - ($6 || ' seconds')::interval, 'worker-that-ran', now(), now(),
+               '{"chunks": 0}'::jsonb)`;
+
+export const seedFinishedJob = async (
+  client: pg.PoolClient,
+  workspaceId: string,
+  row: JobProbeRow,
+): Promise<string> => {
+  const id = ulid();
+  await client.query(FINISHED_JOB, [
+    workspaceId,
+    id,
+    row.kind,
+    row.reason ?? null,
+    row.subjectId ?? null,
     String(row.enqueuedAgoSeconds ?? 0),
   ]);
   return id;

@@ -195,7 +195,7 @@
       "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
       "id": "01J6JDBBBBBBBBBBBBBBBBBBBB",
       "kind": "index",
-      "reason": "narrowed",
+      "reason": "bound",
       "subject_id": "01J6D2BBBBBBBBBBBBBBBBBBBB",
       "sqlstate": "23505"
     }
