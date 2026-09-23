@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0047_the-chunk-visibility-dropped"
+MIGRATION_ID = "0048_the-retired-run-reason"
 
-MIGRATION_WHEN = 1790137899068
+MIGRATION_WHEN = 1790142704500
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {

@@ -10,6 +10,7 @@ import psycopg
 import pytest
 
 from better_answers_worker import loop, queue
+from better_answers_worker.kinds import index_run
 from better_answers_worker.pipeline import (
     IndexRun,
     ReadDocument,
@@ -765,7 +766,7 @@ def test_a_second_run_lands_no_second_finding_row_and_moves_none(
     written = readings_of(connection, workspace_id)
     index_binding(
         bootstrap,
-        run_for(workspace_id, "narrowed"),
+        run_for(workspace_id, "restored"),
         copies=a_bucket_holding_the_three(),
     )
 
@@ -1159,6 +1160,51 @@ def test_a_reason_the_app_deletes_rows_for_empties_the_store_before_any_read(
     assert (restored_read, rule_change_read, wiped_read) == ([0], [1], [1])
     assert wiped.lmdb_bytes > 0
     assert chunk_rows_of(connection, workspace_id)[0]["content"] == AN_INVOICE_REDACTED
+
+
+A_REASON_NO_DESCRIPTOR_DECLARES = "a-word-no-descriptor-declares"
+
+
+def test_a_run_carrying_a_reason_this_tier_does_not_know_indexes_as_any_other_does(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    connection, dsn = database
+    workspace_id = seed_the_binding(connection, documents=(AN_INVOICE_ID,))
+    bootstrap = bootstrap_for(dsn, tmp_path)
+
+    outcome = index_binding(
+        bootstrap,
+        run_for(workspace_id, A_REASON_NO_DESCRIPTOR_DECLARES),
+        copies=a_bucket_holding_the_three(),
+    )
+
+    assert outcome.documents == 1
+    assert [row["content"] for row in chunk_rows_of(connection, workspace_id)] == [
+        AN_INVOICE_REDACTED
+    ]
+
+
+def test_the_claimant_hands_such_a_job_to_the_run_rather_than_raising_on_its_word(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    connection, dsn = database
+    workspace_id = seed_the_binding(connection, documents=())
+    bootstrap = bootstrap_for(dsn, tmp_path)
+
+    outcome = index_run(
+        bootstrap,
+        queue.ClaimedJob(
+            workspace_id=workspace_id,
+            id="01M2JOBAAAAAAAAAAAAAAAAAAA",
+            kind="index",
+            reason=A_REASON_NO_DESCRIPTOR_DECLARES,
+            subject_id=BINDING,
+            attempts=1,
+        ),
+    )
+
+    assert (outcome["documents"], outcome["chunks"]) == (0, 0)
+    assert outcome["lmdb_bytes"] > 0
 
 
 def test_a_run_dying_before_the_landing_leaves_the_verdict_and_no_chunk_at_all(

@@ -373,6 +373,58 @@ describe("the answer a reader gets, as the Admin's acts move the source rows", (
   });
 });
 
+type JobRow = {
+  readonly kind: string;
+  readonly reason: string | null;
+  readonly subject_id: string | null;
+  readonly status: string;
+};
+
+const jobsOf = async (workspaceId: string): Promise<readonly JobRow[]> =>
+  (
+    await db().pool.query<JobRow>(
+      "SELECT kind, reason, subject_id, status FROM job WHERE workspace_id = $1",
+      [workspaceId],
+    )
+  ).rows;
+
+describe("a narrowing queues no run", () => {
+  it("puts no job on the queue, whether the Admin narrows a binding or its documents", async () => {
+    const scenario = await arrange();
+    const theBinding = await aBindingHoldingOneDocument(scenario.workspaceId, {
+      title: "The staff handbook",
+      text: HANDBOOK,
+    });
+    const theOther = await aBindingHoldingOneDocument(scenario.workspaceId, {
+      title: "The handbook annex",
+      text: ANNEX,
+    });
+    await landed(scenario.workspaceId, theBinding);
+    await landed(scenario.workspaceId, theOther);
+    // The run that had already been and gone, so an empty answer below is the act and not a
+    // reader that sees nothing.
+    await aFinishedRun(scenario.workspaceId, theOther.bindingId);
+    const theRunThatRan = {
+      kind: "index",
+      reason: "bound",
+      subject_id: theOther.bindingId,
+      status: "done",
+    };
+
+    const before = await jobsOf(scenario.workspaceId);
+    answered(await narrowingTheBinding(scenario, theBinding.bindingId, "Restricted"));
+    const afterTheBinding = await jobsOf(scenario.workspaceId);
+    answered(await narrowingTheDocument(scenario, theOther.bindingId, theOther.documentId));
+    const afterTheDocuments = await jobsOf(scenario.workspaceId);
+
+    expect({ before, afterTheBinding, afterTheDocuments }).toEqual({
+      before: [theRunThatRan],
+      afterTheBinding: [theRunThatRan],
+      afterTheDocuments: [theRunThatRan],
+    });
+  });
+});
+
 type HeldNarrowing = { readonly commit: () => Promise<void> };
 
 // The act's work does not return until `commit` is called, so its transaction stays open with

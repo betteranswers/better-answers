@@ -1,12 +1,11 @@
-import { readFileSync } from "node:fs";
 import type pg from "pg";
 import { describe, expect, it } from "vitest";
 
 import { EMBEDDING_DIMENSIONS, ulid } from "../src/index.ts";
-import { journalMigrationFiles } from "../src/journal.ts";
 import { chunkWrittenThroughTheParent } from "./catalogue-statements.ts";
 import { testData } from "./factory.ts";
 import { withRollback } from "./harness.ts";
+import { migrationStatementSaying } from "./journal-statements.ts";
 import {
   ADMITTED,
   attemptChunkEmbeddedBy,
@@ -311,12 +310,5 @@ describe("the worker on the chunk index", () => {
   });
 });
 
-const migrationStatementMatching = (word: string): string => {
-  const file = journalMigrationFiles().find((name) => name.endsWith("the-chunk-substrate.sql"));
-  if (file === undefined) throw new Error("the chunk substrate is not in the journal");
-  const statement = readFileSync(file, "utf8")
-    .split("--> statement-breakpoint")
-    .find((part) => part.includes(word));
-  if (statement === undefined) throw new Error(`no statement of the chunk substrate says ${word}`);
-  return statement;
-};
+const migrationStatementMatching = (word: string): string =>
+  migrationStatementSaying("the-chunk-substrate.sql", word);

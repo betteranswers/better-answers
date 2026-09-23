@@ -8,9 +8,15 @@ import {
   JOB_KINDS,
   REASONS_EMPTYING_THE_BINDING,
 } from "../src/index.ts";
-import { type JobProbeRow, seedClaimedJob, seedQueuedJob } from "./catalogue-statements.ts";
+import {
+  type JobProbeRow,
+  seedClaimedJob,
+  seedFinishedJob,
+  seedQueuedJob,
+} from "./catalogue-statements.ts";
 import { testData } from "./factory.ts";
 import { type MigratedPostgres, withRollback } from "./harness.ts";
+import { migrationStatements, migrationStatementSaying } from "./journal-statements.ts";
 import { ADMITTED, refusalOf } from "./probes.ts";
 import { openMigratedPostgres } from "./warm-postgres.ts";
 
@@ -24,8 +30,34 @@ beforeAll(async () => {
 });
 
 const WS = "01J6JJJJJJJJJJJJJJJJJJJJJJ";
+const ANOTHER_WS = "01J6JKKKKKKKKKKKKKKKKKKKKK";
 const BINDING = "01J6BNNNNNNNNNNNNNNNNNNNNN";
 const ANOTHER_BINDING = "01J6BMMMMMMMMMMMMMMMMMMMMM";
+const A_THIRD_BINDING = "01J6BLLLLLLLLLLLLLLLLLLLLL";
+
+const RETIRED_REASON = "narrowed";
+
+const THE_RETIRING_MIGRATION = "0048_the-retired-run-reason.sql";
+
+const THE_MIGRATION_IT_REPLACED = "0034_the-job-subject-and-the-run-key.sql";
+
+const ADDS_THE_REASON_CHECK = 'ADD CONSTRAINT "job_reason_check"';
+
+// Replayed from the journal rather than copied, so the rows seeded under it are ones a real
+// database held.
+const theCheckItReplaced = (): string =>
+  migrationStatementSaying(THE_MIGRATION_IT_REPLACED, ADDS_THE_REASON_CHECK);
+
+const jobsStandingIn = async (
+  client: pg.PoolClient,
+  workspaceId: string,
+): Promise<readonly string[]> =>
+  (
+    await client.query<{ id: string }>(
+      "SELECT id FROM job WHERE workspace_id = $1 ORDER BY enqueued_at",
+      [workspaceId],
+    )
+  ).rows.map((row) => row.id);
 
 const DESCRIBED: readonly JobKindDescriptor[] = JOB_KIND_DESCRIPTORS;
 
@@ -106,7 +138,7 @@ describe("the job kind descriptors", () => {
         kind: "index",
         claimingTier: "worker",
         namesASubject: true,
-        reasons: ["bound", "restored", "rule-change", "wiped", "narrowed"],
+        reasons: ["bound", "restored", "rule-change", "wiped"],
         enqueuedBy: "Admin",
       },
     ]);
@@ -192,7 +224,6 @@ describe("the reason CHECK", () => {
         `index · restored · ${BINDING}`,
         `index · rule-change · ${BINDING}`,
         `index · wiped · ${BINDING}`,
-        `index · narrowed · ${BINDING}`,
       ]);
     });
   });
@@ -211,6 +242,14 @@ describe("the reason CHECK", () => {
           ).toBe("job_reason_check");
         }
       }
+    });
+  });
+
+  it("refuses the retired word, which no descriptor declares and no act writes", async () => {
+    await withWorkspace(async (client) => {
+      expect(
+        await refusedBy(client, { kind: "index", reason: RETIRED_REASON, subjectId: BINDING }),
+      ).toBe("job_reason_check");
     });
   });
 
@@ -344,6 +383,40 @@ describe("the claim's sibling check", () => {
       });
 
       expect(await claimed(client, ["nightly-audit"])).toEqual([second]);
+    });
+  });
+});
+
+describe("the migration that retired a run reason", () => {
+  it("takes every job row carrying the word, whatever its status, and leaves the rest standing", async () => {
+    await withWorkspace(async (client) => {
+      await client.query('ALTER TABLE "job" DROP CONSTRAINT "job_reason_check"');
+      await client.query(theCheckItReplaced());
+
+      // The delete runs under each workspace's own scope, and one that reached the first alone
+      // would leave this row for the CHECK.
+      await testData(client).workspace({ id: ANOTHER_WS, name: "The queue's other workspace" });
+
+      const retired = { kind: "index", reason: RETIRED_REASON } as const;
+      await seedQueuedJob(client, WS, { ...retired, subjectId: BINDING });
+      await seedClaimedJob(client, WS, { ...retired, subjectId: ANOTHER_BINDING }, 120);
+      await seedFinishedJob(client, WS, { ...retired, subjectId: A_THIRD_BINDING });
+      await seedQueuedJob(client, ANOTHER_WS, { ...retired, subjectId: BINDING });
+      const standing = await seedQueuedJob(client, WS, {
+        kind: "index",
+        reason: "rule-change",
+        subjectId: A_THIRD_BINDING,
+      });
+
+      for (const statement of migrationStatements(THE_RETIRING_MIGRATION)) {
+        await client.query(statement);
+      }
+
+      expect(await jobsStandingIn(client, ANOTHER_WS)).toEqual([]);
+      expect(await jobsStandingIn(client, WS)).toEqual([standing]);
+      expect(
+        await refusedBy(client, { kind: "index", reason: RETIRED_REASON, subjectId: BINDING }),
+      ).toBe("job_reason_check");
     });
   });
 });
