@@ -1,0 +1,63 @@
+packages/core/test/cross-tier-document.test.ts
+  s_69414e6e80cf2c::t_7f21f2e5cf9757 41,45-48,289-290,292
+  s_69414e6e80cf2c::t_bf903f35c5f8e1 13-14,27,68-71,161-165
+  s_69414e6e80cf2c::t_6df3ea15e694d3 15-16
+  s_69414e6e80cf2c::t_4639b062d93f75 347-372,399-409,420-425
+  s_69414e6e80cf2c::t_aa734fe22ee486 335-337
+  s_69414e6e80cf2c::t_359432f7959a22 137-156
+  s_69414e6e80cf2c::t_a639bb38bae98d 103
+  s_69414e6e80cf2c::t_d5fd0b164e6fec 54,56-57,100,104-105,447,474-475
+  s_69414e6e80cf2c::t_11823312fc645e 1-6,8-12,17-23,25-26,28-40,42-44,49-53,55,58-67,79-93,96-99,101-102,106-107,109-136,157-160,166-288,291,293-303,317-334,338-345,426-446,448-473,476-501
+  s_69414e6e80cf2c::t_293d194c1cdaac 304-316
+  s_69414e6e80cf2c::t_3a11ad52ed845d 75
+  s_69414e6e80cf2c::t_73cc28402a7583 346
+  s_69414e6e80cf2c::t_9204d3caced7d2 373-398,410-419
+  s_69414e6e80cf2c::t_01bcfc2dc9b3cf 24
+  s_69414e6e80cf2c::t_ab802269a084c5 7
+  s_69414e6e80cf2c::t_100591d1e63b38 72-74,76-78
+  s_69414e6e80cf2c::t_46b39b2490c949 94-95
+  s_69414e6e80cf2c::t_88f37e2086dabc 108
+packages/schema/src/job-tables.ts
+  s_69414e6e80cf2c::t_4ec0a435b37d00 26-32
+apps/worker/tests/test_pipeline_landed.py
+  s_69414e6e80cf2c::t_0ab322db91c4db 47,83,276
+apps/worker/tests/fixtures/conversion/README.md
+  s_69414e6e80cf2c::t_4e0a35b0f0c399 18-20
+  s_69414e6e80cf2c::t_6e8dae033306ec 14-17,21
+apps/worker/tests/test_pipeline_index.py
+  s_69414e6e80cf2c::t_fd60f561641514 1020,1023-1031,1038-1039,1047,1049-1050,1052-1055,1057
+  s_69414e6e80cf2c::t_757209ceef930f 1062-1091
+  s_69414e6e80cf2c::t_0ab322db91c4db 49,925
+  s_69414e6e80cf2c::t_27c3e14fe7542a 994
+packages/core/src/sources/binding.ts
+  s_69414e6e80cf2c::t_6e2fabb22b0ad0 9
+  s_69414e6e80cf2c::t_31ff32073cb8cf 467
+apps/worker/src/better_answers_worker/pipeline/run.py
+  s_69414e6e80cf2c::t_27c3e14fe7542a 23-24
+  s_69414e6e80cf2c::t_9422b42c0c65bf 70
+  s_69414e6e80cf2c::t_44b3f0d673441a 21-22,25-26
+packages/core/test/worker-process.ts
+  s_69414e6e80cf2c::t_0c37361e592114 26-44,49
+  s_69414e6e80cf2c::t_299ec8d1e5f024 59-64
+packages/core/test/suite-objects.ts
+  s_69414e6e80cf2c::t_f3d8f22a4c2a59 88-95
+  s_69414e6e80cf2c::t_2e22eb00091849 30-32
+apps/worker/tests/fixtures/conversion/delivery-terms.txt
+  s_69414e6e80cf2c::t_d154774a7ceec7 12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "1b0d586e6bfcd5eb1ce77caa5d163fc6a685ced6",
+  "prompts": {},
+  "sessions": {
+    "s_69414e6e80cf2c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6af0bc5d-5e17-4638-afb3-472e1f42e570",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
