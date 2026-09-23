@@ -90,6 +90,10 @@ const INVITATIONS_WHEREVER_SENT =
   "by the request that ends their last membership; the invitation line above counts this " +
   "workspace's alone.";
 
+const SIGN_IN_IDENTITY_REMOVED =
+  "A person's sign-in identity is removed from the platform by the request that ends their " +
+  "last membership.";
+
 // Every run in the file logs here, so a case reads back the lines of its own request alone.
 const operatorLines: ErasureLogLine[] = [];
 
@@ -166,7 +170,10 @@ const workspaceWithAnErasureRequest = async (named: { readonly byIdAlone?: boole
   };
 };
 
-const erasedOnEachArm = async (): Promise<Readonly<Record<IdentityArm, ErasureRun>>> => {
+const erasedOnEachArm = async (): Promise<{
+  readonly runs: Readonly<Record<IdentityArm, ErasureRun>>;
+  readonly elsewhereId: string;
+}> => {
   const scenario = await arrange();
   const elsewhere = await arrange();
   const onlyHere = addressOf("priya");
@@ -176,18 +183,37 @@ const erasedOnEachArm = async (): Promise<Readonly<Record<IdentityArm, ErasureRu
   await seedingWith(db().pool, (seed) =>
     seed.member({ workspaceId: elsewhere.workspaceId, userId: stillMember.id, role: "Editor" }),
   );
+  // The same records held here for each person, so a line that differs between them can differ
+  // only by the arm.
+  for (const [person, email] of [
+    [lastMember, onlyHere],
+    [stillMember, heldElsewhere],
+  ] as const) {
+    await identityRowsFor(db().pool, { userId: person.id, email });
+    await seedingWith(db().pool, (seed) =>
+      seed.invitation({ workspaceId: scenario.workspaceId, email }),
+    );
+  }
   const erased = async (personId: string | null, email: string): Promise<ErasureRun> =>
     completing(scenario, await erasureRequestAbout(scenario.workspaceId, personId, email));
   return {
-    "last-membership": await erased(lastMember.id, onlyHere),
-    "membership-ended": await erased(stillMember.id, heldElsewhere),
-    "no-person": await erased(null, addressOf("a-contact")),
+    runs: {
+      "last-membership": await erased(lastMember.id, onlyHere),
+      "membership-ended": await erased(stillMember.id, heldElsewhere),
+      "no-person": await erased(null, addressOf("a-contact")),
+    },
+    elsewhereId: elsewhere.workspaceId,
   };
 };
 
 let theArmsErased: ReturnType<typeof erasedOnEachArm> | undefined;
 
 const erasedOnEachArmOnce = () => (theArmsErased ??= erasedOnEachArm());
+
+const armsWhoseReportSays = async (sentence: string): Promise<readonly string[]> =>
+  Object.entries((await erasedOnEachArmOnce()).runs)
+    .filter(([, done]) => done.report.includes(sentence))
+    .map(([arm]) => arm);
 
 const filesNaming = (
   email: string,
@@ -624,15 +650,18 @@ describe("the report", () => {
   });
 
   it("says invitations are deleted wherever they were sent on every report, whichever arm ran, so the sentence tells nobody which one did", async () => {
-    const reports = Object.entries(await erasedOnEachArmOnce()).map(([arm, done]) => ({
-      arm,
-      says: done.report.includes(INVITATIONS_WHEREVER_SENT),
-    }));
+    expect(await armsWhoseReportSays(INVITATIONS_WHEREVER_SENT)).toEqual([
+      "last-membership",
+      "membership-ended",
+      "no-person",
+    ]);
+  });
 
-    expect(reports).toEqual([
-      { arm: "last-membership", says: true },
-      { arm: "membership-ended", says: true },
-      { arm: "no-person", says: true },
+  it("says a person's sign-in identity is removed by the request that ends their last membership on every report, whichever arm ran", async () => {
+    expect(await armsWhoseReportSays(SIGN_IN_IDENTITY_REMOVED)).toEqual([
+      "last-membership",
+      "membership-ended",
+      "no-person",
     ]);
   });
 
@@ -1090,7 +1119,7 @@ describe("the identity set on the person's last membership", () => {
     });
   });
 
-  it("counts this workspace's invitations alone on the report's line, and gives what it deleted everywhere to the operator's record", async () => {
+  it("counts on the report's line the invitations it found in this workspace alone, and gives what it deleted here and everywhere to the operator's record", async () => {
     const scenario = await arrange();
     const elsewhere = await arrange();
     const email = addressOf("priya");
@@ -1103,26 +1132,73 @@ describe("the identity set on the person's last membership", () => {
     const done = await completing(scenario, subjectRequestId);
 
     const [row] = await erasureRowsIn(scenario.workspaceId);
-    expect(row?.actions["identity-invitation"]).toEqual({ found: 1, deleted: 1 });
-    expect(done.report).toContain("- identity-invitation: deleted 1, found 1\n");
+    expect(row?.actions["identity-invitation"]).toEqual({ found: 1 });
+    expect(done.report).toContain("- identity-invitation: found 1\n");
     expect(done.report).toContain(INVITATIONS_WHEREVER_SENT);
     expect(operatorLinesAbout(done.erasureRequestId)).toEqual([
       {
         actor: ERASURE_ACTOR,
         erasure_request_id: done.erasureRequestId,
+        arm: "last-membership",
+        pseudonymised: 1,
+        sessions_deleted: 0,
+        verifications_deleted: 0,
+        accounts_deleted: 0,
+        invitations_deleted_here: 1,
         invitations_deleted: 2,
       },
     ]);
   });
 
-  it("gives the operator's record one line on every arm, naming the request and never an address", async () => {
-    const runs = Object.values(await erasedOnEachArmOnce());
+  it("gives the operator's record one line on every arm, carrying the arm, the pseudonymisation and every identity delete, and never an address", async () => {
+    const { runs } = await erasedOnEachArmOnce();
+    const namingTheRequest = (done: ErasureRun) => ({
+      actor: ERASURE_ACTOR,
+      erasure_request_id: done.erasureRequestId,
+    });
 
-    expect(runs.map((done) => operatorLinesAbout(done.erasureRequestId))).toEqual(
-      runs.map((done) => [
-        { actor: ERASURE_ACTOR, erasure_request_id: done.erasureRequestId, invitations_deleted: 0 },
-      ]),
-    );
+    expect({
+      "last-membership": operatorLinesAbout(runs["last-membership"].erasureRequestId),
+      "membership-ended": operatorLinesAbout(runs["membership-ended"].erasureRequestId),
+      "no-person": operatorLinesAbout(runs["no-person"].erasureRequestId),
+    }).toEqual({
+      "last-membership": [
+        {
+          ...namingTheRequest(runs["last-membership"]),
+          arm: "last-membership",
+          pseudonymised: 1,
+          sessions_deleted: 1,
+          verifications_deleted: 1,
+          accounts_deleted: 1,
+          invitations_deleted_here: 1,
+          invitations_deleted: 1,
+        },
+      ],
+      "membership-ended": [
+        {
+          ...namingTheRequest(runs["membership-ended"]),
+          arm: "membership-ended",
+          pseudonymised: 0,
+          sessions_deleted: 0,
+          verifications_deleted: 0,
+          accounts_deleted: 0,
+          invitations_deleted_here: 0,
+          invitations_deleted: 0,
+        },
+      ],
+      "no-person": [
+        {
+          ...namingTheRequest(runs["no-person"]),
+          arm: "no-person",
+          pseudonymised: 0,
+          sessions_deleted: 0,
+          verifications_deleted: 0,
+          accounts_deleted: 0,
+          invitations_deleted_here: 0,
+          invitations_deleted: 0,
+        },
+      ],
+    });
   });
 
   it("leaves every invitation standing when another membership does, because the address is still theirs to be invited by", async () => {
@@ -1148,23 +1224,42 @@ describe("the identity set on the person's last membership", () => {
     });
   });
 
-  it("says which arm ran in the report, and never how many memberships it counted", async () => {
-    const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
-    const elsewhere = await arrange();
-    const email = addressOf("nadia");
-    const other = await memberOf(db().pool, scenario.workspaceId, email);
-    await seedingWith(db().pool, (seed) =>
-      seed.member({ workspaceId: elsewhere.workspaceId, userId: other.id, role: "Editor" }),
-    );
-    const theirs = await erasureRequestAbout(scenario.workspaceId, other.id, email);
+  it("stores the same five identity lines whether or not another workspace holds the person, in the row's actions and in its report, and never names the other workspace", async () => {
+    const { runs, elsewhereId } = await erasedOnEachArmOnce();
+    const identityLinesOf = async (done: ErasureRun) => {
+      const row = (await erasureRowsIn(done.workspaceId)).find(
+        (stored) => stored.id === done.erasureRequestId,
+      );
+      return {
+        actions: Object.fromEntries(
+          Object.entries(row?.actions ?? {}).filter(([family]) => family.startsWith("identity-")),
+        ),
+        report: (row?.report ?? "").split("\n").filter((line) => line.startsWith("- identity-")),
+      };
+    };
 
-    const last = await completing(scenario, subjectRequestId);
-    const held = await completing(scenario, theirs);
+    const theSameLines = {
+      actions: {
+        "identity-user": { found: 1, membershipsEnded: 1 },
+        "identity-session": { found: 1 },
+        "identity-verification": { found: 1 },
+        "identity-invitation": { found: 1 },
+        "identity-account": { found: 1 },
+      },
+      report: [
+        "- identity-user: found 1, membershipsEnded 1",
+        "- identity-session: found 1",
+        "- identity-verification: found 1",
+        "- identity-invitation: found 1",
+        "- identity-account: found 1",
+      ],
+    };
+    expect({
+      "last-membership": await identityLinesOf(runs["last-membership"]),
+      "membership-ended": await identityLinesOf(runs["membership-ended"]),
+    }).toEqual({ "last-membership": theSameLines, "membership-ended": theSameLines });
 
-    expect(last.report).toContain("identity-user: arm last-membership");
-    expect(held.report).toContain("identity-user: arm membership-ended");
-
-    expect(held.report).not.toContain(elsewhere.workspaceId);
+    expect(runs["membership-ended"].report).not.toContain(elsewhereId);
   });
 });
 
@@ -1490,14 +1585,12 @@ const completedForASubjectWithNoUserRow = async () => {
 };
 
 describe("a subject with no user row", () => {
-  it("runs with its git and identity arms finding nothing and its suppression arm doing the erasure, and the report says which arms ran", async () => {
+  it("runs with its git and identity arms finding nothing and its suppression arm doing the erasure, and the report says what each did", async () => {
     const { scenario, done } = await completedForASubjectWithNoUserRow();
 
     expect(done.report).toContain("concept-file: found 0, reindexed 0, rewritten 0");
     expect(done.report).toContain("bundle-commit: found 0, moved 0");
-    expect(done.report).toContain(
-      "identity-user: arm no-person, found 0, membershipsEnded 0, pseudonymised 0",
-    );
+    expect(done.report).toContain("- identity-user: found 0, membershipsEnded 0\n");
     expect(done.report).toContain("source-document: bindings 0, found 0, suppressed 0");
 
     const [row] = await erasureRowsIn(scenario.workspaceId);

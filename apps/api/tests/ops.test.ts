@@ -685,7 +685,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       });
     });
 
-    it("leaves the operator the erasure's line in the tier's log, naming its request and no address", async () => {
+    it("leaves the operator the erasure's line in the tier's log, naming its request, its arm and what it deleted, and no address", async () => {
       const { workspaceId } = await app().provision();
       await initRepository(openTestGit(app()), workspaceId);
       const pinned = { doors: { clock: { now: () => REHEARSED_AT } } };
@@ -719,8 +719,14 @@ describe("pnpm ops — the restore scripts' commands", () => {
           level: 30,
           actor: "process:better-answers-erasure",
           erasure_request_id: erasure.rows[0]?.id,
+          arm: "last-membership",
+          pseudonymised: 1,
+          sessions_deleted: 0,
+          verifications_deleted: 0,
+          accounts_deleted: 0,
+          invitations_deleted_here: 0,
           invitations_deleted: 0,
-          msg: "erasure: what the identity step deleted across every workspace",
+          msg: "erasure: the identity step's arm, and what it pseudonymised and deleted",
         }),
       ]);
       expect(JSON.stringify(run.logs)).not.toContain("@");
