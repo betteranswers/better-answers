@@ -16,12 +16,14 @@
 # `tsconfig.base.json` is what keeps that true. The build stages exist for `apps/web` and for
 # the production dependency tree, not for `apps/api`.
 #
-# Base image read from Docker Hub on 03/09/2026: `node:24.20.0-bookworm-slim`,
-# the current Node 24 line, pinned by the tag's manifest digest as well as its tag — the tag
+# Base image read from Docker Hub on 24/09/2026: `node:24.20.0-trixie-slim`, on the
+# Node 24 line, pinned by the tag's manifest digest as well as its tag — the tag
 # is the label a person reads, the digest is what actually ships. Debian rather than Alpine,
 # because the lockfile's platform binaries and every test this tier has are resolved against
-# glibc today; an image is the wrong place to change a libc.
-FROM node:24.20.0-bookworm-slim@sha256:ba849c60be29959425b8734d57b8b4b7d56f98edd9504c9af091d5281095a71e AS base
+# glibc today; an image is the wrong place to change a libc. Debian 13 (trixie) rather than
+# 12, because 12 has passed from Debian's security team to its long-term-support team, which
+# patches fewer packages.
+FROM node:24.20.0-trixie-slim@sha256:50c3b2f6988dfc307b86e5301d69611af31f4789bdf232863b07d3b02fe55ae0 AS base
 
 # pnpm's version is the root manifest's `packageManager` field and nowhere else:
 # `corepack install` with no argument reads it, so this image cannot carry a second pin that
@@ -101,11 +103,12 @@ FROM base AS runtime
 # the worker holds no git credential, so that alternative founds a second writer for one
 # routine and hands the worker a credential the worker's rules say it does not have.
 #
-# The tool comes from PyPI at an exact version rather than from apt. Debian 12 packages 2.38.0
-# and the machines this repository is developed on install 2.47.0, and a rewrite proved at one
-# version and run at another is a rewrite nobody has tested; the pin here is what keeps the two
-# from skewing. Version read from PyPI on 11/09/2026: git-filter-repo 2.47.0, the current
-# release, published as a pure-Python wheel that needs no build tooling.
+# The tool comes from PyPI at an exact version rather than from apt. Debian 13 packages 2.47.0
+# today, but it holds a package at one version for the life of a release, while the runner and
+# the machines this repository is developed on install the version pinned here; a rewrite
+# proved at one version and run at another is a rewrite nobody has tested, and the pin here is
+# what keeps them from skewing. Version read from PyPI on 11/09/2026: git-filter-repo 2.47.0,
+# the current release, published as a pure-Python wheel that needs no build tooling.
 # `--break-system-packages` is answering the marker Debian sets to protect apt's own Python
 # packages — this install lands under /usr/local, which apt owns nothing under, and an image
 # has no system Python application to break. pip is purged in the same layer, because what
