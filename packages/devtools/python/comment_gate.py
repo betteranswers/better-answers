@@ -48,7 +48,8 @@ MARKER = Path(__file__).resolve().parents[1] / "migration-marker.json"
 def _migration_marker() -> str:
     fixture: Any = json.loads(MARKER.read_text(encoding="utf8"))
     marker = fixture.get("marker")
-    # A key that moved would exempt the string "None" and delete every marker in the tree.
+    # A key that moved would exempt the string "None" and delete every marker in
+    # the tree.
     if not isinstance(marker, str) or not marker.strip():
         raise ValueError(f"{MARKER} carries no marker")
     return marker
