@@ -9,10 +9,9 @@ import {
   reportOf,
 } from "@better-answers/devtools/comment-density";
 import { runsOverThrowawayTree } from "@better-answers/devtools/throwaway-tree";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { z } from "zod";
+
+import { rootScripts } from "./root-manifest.ts";
 
 import type { Unit } from "@better-answers/devtools/comment-density";
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
@@ -322,15 +321,6 @@ describe("the ceiling's wrapper over a set named as one unit", () => {
 });
 
 describe("the root manifest names each config root as a unit of its own", () => {
-  const rootScripts = (): Readonly<Record<string, string>> =>
-    z
-      .looseObject({ scripts: z.record(z.string(), z.string()).default({}) })
-      .parse(
-        JSON.parse(
-          readFileSync(path.resolve(import.meta.dirname, "../../../package.json"), "utf8"),
-        ),
-      ).scripts;
-
   it.each([
     "--directory packages/schema/migrations",
     "--directory .claude/hooks",

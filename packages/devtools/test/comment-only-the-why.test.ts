@@ -3,9 +3,17 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { executableOf, oxlintOver, writeUnder } from "@better-answers/devtools/throwaway-tree";
-import { pluginConfigFor } from "@better-answers/devtools/oxlint-config";
+import {
+  executableOf,
+  oxlintOver,
+  runsOverThrowawayTree,
+  writeUnder,
+} from "@better-answers/devtools/throwaway-tree";
+import { pluginConfigFor, repositoryRoot } from "@better-answers/devtools/oxlint-config";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
+
+import { rootScripts } from "./root-manifest.ts";
 
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
@@ -182,5 +190,103 @@ describe("the rule's fix", () => {
 
     expect(after).toContain("oxlint-disable-next-line no-console");
     expect(after).not.toContain(OVER_THE_CEILING);
+  });
+});
+
+const FORTY_WORDS =
+  "one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty twentyone twentytwo twentythree twentyfour twentyfive twentysix twentyseven twentyeight twentynine thirty thirtyone thirtytwo thirtythree thirtyfour thirtyfive thirtysix thirtyseven thirtyeight thirtynine forty";
+
+const A_WHY_OF_TWENTY =
+  "The strip reads this file, so a comment left here is one the next run of it would silently take away again";
+
+const A_ROOT_SCRIPT = "scripts/probe.mjs";
+
+// The command as the root manifest writes it, so this runs over the roots it really names.
+const gateArgv = (): readonly string[] => {
+  const command = rootScripts()["comment-gate:ts"] ?? "";
+  const [tool, ...rest] = command.split(/\s+/).filter((word) => word !== "");
+  if (tool !== "oxlint" || rest.length === 0) {
+    throw new Error(`\`comment-gate:ts\` is no longer an oxlint command: ${command}`);
+  }
+  return rest;
+};
+
+const gateConfigPath = (): string => {
+  const argv = gateArgv();
+  const named = argv[argv.indexOf("--config") + 1];
+  if (!argv.includes("--config") || named === undefined) {
+    throw new Error("`comment-gate:ts` names no --config, so this reading proves nothing.");
+  }
+  return named;
+};
+
+const gateRoots = (): readonly string[] =>
+  gateArgv().filter((word) => word !== "--config" && word !== gateConfigPath());
+
+const jsonConfig = z.looseObject({
+  jsPlugins: z.array(z.looseObject({ specifier: z.string() })),
+});
+
+// The gate's own config, JSONC, with its plugin resolved to this checkout's so the throwaway
+// tree needs no dependencies of its own.
+const gateConfig = (): string => {
+  const relative = gateConfigPath();
+  const source = readFileSync(path.join(repositoryRoot, relative), "utf8")
+    .split("\n")
+    .filter((line) => !line.trimStart().startsWith("//"))
+    .join("\n");
+  const parsed = jsonConfig.parse(JSON.parse(source));
+  return JSON.stringify({
+    ...parsed,
+    jsPlugins: parsed.jsPlugins.map((one) => ({
+      ...one,
+      specifier: path.resolve(repositoryRoot, path.dirname(relative), one.specifier),
+    })),
+  });
+};
+
+// Something clean at every root the command names, so a run fails on the probe and never on a
+// path this tree does not hold.
+const scaffold = (): Tree =>
+  Object.fromEntries([
+    [gateConfigPath(), gateConfig()],
+    ...gateRoots().map((root) =>
+      /\.[cm]?[jt]sx?$/.test(root)
+        ? [root, "export const keep = 1;\n"]
+        : [`${root}/keep.ts`, "export const keep = 1;\n"],
+    ),
+  ]);
+
+const scriptHolding = (comment: string): Tree => ({
+  [A_ROOT_SCRIPT]: `${comment}export const keep = 1;\n`,
+});
+
+const OVER_IN_A_SCRIPT = scriptHolding(`// ${FORTY_WORDS}\n`);
+
+describe("the gate's own command reaches the root scripts directory", () => {
+  const gate = runsOverThrowawayTree({
+    executable: OXLINT,
+    // Pinned, as the rule's own runner pins it: a reporter that names no file reads as silence.
+    argv: [...gateArgv(), "--format=unix"],
+    scaffold: scaffold(),
+    foundSomething: [1],
+    // Smoked under a root the command has always named, so dropping `scripts` fails the case
+    // below by its own assertion, not this runner.
+    smoke: {
+      tree: { "packages/devtools/probe.ts": `// ${FORTY_WORDS}\nexport const keep = 1;\n` },
+      reports: (output) => output.includes("runs to 40 words"),
+    },
+  });
+
+  it("refuses a 40-word comment in a root script, naming the file, the count and the rule", () => {
+    const output = gate(OVER_IN_A_SCRIPT);
+
+    expect(output).toContain(`${A_ROOT_SCRIPT}:`);
+    expect(output).toContain("runs to 40 words");
+    expect(output).toContain(tag("COMMENT", "1"));
+  });
+
+  it("stays silent over a why of twenty words in the same script", () => {
+    expect(gate(scriptHolding(`// ${A_WHY_OF_TWENTY}\n`))).toBe("");
   });
 });
