@@ -12,6 +12,7 @@ from better_answers_worker.config import Bootstrap, Engine, ObjectStore
 from better_answers_worker.pipeline import (
     BINDING_STORE,
     CHUNK_TABLE,
+    CHUNKS_APP,
     ENVIRONMENTS_HELD,
     FINDINGS_STORE,
     STORES_A_BINDING_HOLDS,
@@ -200,10 +201,15 @@ def test_dropping_one_bindings_state_leaves_the_table_its_indexes_and_every_row(
     assert chunk_indexes(connection, workspace_id) == indexes_before
 
 
+def a_run_on(binding_id: str) -> IndexRun:
+    return IndexRun(
+        workspace_id="01M2Q3R4S5T6V7W8X9YZAB0000", binding_id=binding_id, reason="bound"
+    )
+
+
 def test_the_environment_cache_holds_its_bound_and_drops_the_oldest_binding(
     tmp_path: Path,
 ) -> None:
-    workspace_id = "01M2Q3R4S5T6V7W8X9YZAB0000"
     touched = ("binding-one", "binding-two", "binding-one", "binding-three")
 
     with Host(
@@ -211,18 +217,53 @@ def test_the_environment_cache_holds_its_bound_and_drops_the_oldest_binding(
         environments_held=4,
     ) as host:
         for binding_id in touched:
-            host.open_binding(
-                IndexRun(
-                    workspace_id=workspace_id, binding_id=binding_id, reason="bound"
-                )
-            )
+            host.open_binding(a_run_on(binding_id))
 
         assert host.held_bindings() == ("binding-one", "binding-three")
 
 
-def test_the_bound_the_host_holds_by_default_is_two_handles_for_four_bindings() -> None:
+def test_the_default_bound_counts_eight_handles_and_sheds_the_oldest_binding_whole(
+    tmp_path: Path,
+) -> None:
+    whole = bootstrap_for("postgresql://unreached/unreached", tmp_path / "whole")
+    with Host(whole) as host:
+        for n in range(1, 5):
+            host.open_binding(a_run_on(f"binding-{n}"))
+        host.app_config(a_run_on("binding-5"), CHUNKS_APP)
+        held_whole = host.held_bindings()
+
+    half_open = bootstrap_for("postgresql://unreached/unreached", tmp_path / "half")
+    with Host(half_open) as host:
+        for n in range(1, 10):
+            host.app_config(a_run_on(f"binding-{n}"), CHUNKS_APP)
+        held_half_open = host.held_bindings()
+
     assert ENVIRONMENTS_HELD == 8
-    assert ENVIRONMENTS_HELD // len((BINDING_STORE, FINDINGS_STORE)) == 4
+    assert held_whole == ("binding-2", "binding-3", "binding-4", "binding-5")
+    assert held_half_open == (
+        "binding-2",
+        "binding-3",
+        "binding-4",
+        "binding-5",
+        "binding-6",
+        "binding-7",
+        "binding-8",
+        "binding-9",
+    )
+
+
+def test_a_bound_too_small_for_one_bindings_two_handles_is_refused(
+    tmp_path: Path,
+) -> None:
+    bootstrap = bootstrap_for("postgresql://unreached/unreached", tmp_path)
+
+    with pytest.raises(ValueError, match="a binding's 2 handles and was bounded at 1"):
+        Host(bootstrap, environments_held=1)
+
+    with Host(bootstrap, environments_held=2) as host:
+        host.open_binding(a_run_on("binding-one"))
+
+        assert host.held_bindings() == ("binding-one",)
 
 
 def test_the_seam_answers_an_outcome_of_plain_numbers_and_opens_the_bindings_store(

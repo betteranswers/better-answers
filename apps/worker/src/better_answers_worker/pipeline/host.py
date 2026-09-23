@@ -15,7 +15,7 @@ from ..config import Bootstrap
 from ..log import logger
 from .tables import POOL, Table, declare_nothing, declare_rows
 
-# Two handles a binding, so the bound is twice what it held when a binding had one.
+# Sized for four bindings with both stores open; the bound counts handles.
 ENVIRONMENTS_HELD = 8
 
 
@@ -100,15 +100,22 @@ class Host:
     def __init__(
         self, bootstrap: Bootstrap, *, environments_held: int = ENVIRONMENTS_HELD
     ) -> None:
+        # Under one binding's handles, the binding in use would be the one shed.
+        if environments_held < len(STORES_A_BINDING_HOLDS):
+            message = (
+                f"the Environment cache must hold a binding's"
+                f" {len(STORES_A_BINDING_HOLDS)} handles and was bounded at"
+                f" {environments_held}"
+            )
+            raise ValueError(message)
         self._bootstrap = bootstrap
         self._engine = bootstrap.engine
         self._held = environments_held
         self._loop = _Loop()
         self._pools: dict[str, asyncpg.Pool] = {}
-        self._environments: OrderedDict[tuple[str, str], coco.Environment] = (
+        self._environments: OrderedDict[str, dict[str, coco.Environment]] = (
             OrderedDict()
         )
-        self._providers: dict[tuple[str, str], coco.ContextProvider] = {}
 
     def __enter__(self) -> "Host":
         return self
@@ -161,20 +168,22 @@ class Host:
             self._environment(run, store)
 
     def held_bindings(self) -> tuple[str, ...]:
-        return tuple(dict.fromkeys(binding_id for binding_id, _ in self._environments))
-
-    def evict(self, run: IndexRun) -> None:
-        for store in STORES_A_BINDING_HOLDS:
-            self._evict(run, store)
+        return tuple(self._environments)
 
     def _evict(self, run: IndexRun, store: str) -> None:
-        self._environments.pop((run.binding_id, store), None)
-        self._providers.pop((run.binding_id, store), None)
+        stores = self._environments.get(run.binding_id, {})
+        stores.pop(store, None)
+        if not stores:
+            self._environments.pop(run.binding_id, None)
+
+    def _handles(self) -> int:
+        return sum(len(stores) for stores in self._environments.values())
 
     def _environment(self, run: IndexRun, store: str) -> coco.Environment:
-        held = self._environments.get((run.binding_id, store))
+        stores = self._environments.get(run.binding_id, {})
+        held = stores.get(store)
         if held is not None:
-            self._environments.move_to_end((run.binding_id, store))
+            self._environments.move_to_end(run.binding_id)
             return held
 
         directory = self.store_directory(run, store)
@@ -190,15 +199,14 @@ class Host:
             context_provider=provider,
             event_loop=self._loop.loop,
         )
-        self._environments[(run.binding_id, store)] = opened
-        self._providers[(run.binding_id, store)] = provider
-        while len(self._environments) > self._held:
-            dropped, _ = self._environments.popitem(last=False)
-            self._providers.pop(dropped, None)
+        self._environments.setdefault(run.binding_id, {})[store] = opened
+        self._environments.move_to_end(run.binding_id)
+        while self._handles() > self._held:
+            oldest, closed = self._environments.popitem(last=False)
             logger.info(
-                "the binding's store was closed to stay within the cache",
-                binding_id=dropped[0],
-                store=dropped[1],
+                "the binding's stores were closed to stay within the cache",
+                binding_id=oldest,
+                stores=list(closed),
                 held=self._held,
             )
         return opened
@@ -225,7 +233,6 @@ class Host:
 
     def close(self) -> None:
         self._environments.clear()
-        self._providers.clear()
         pools = list(self._pools.values())
         self._pools.clear()
         for pool in pools:
