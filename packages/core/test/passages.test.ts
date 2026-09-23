@@ -132,23 +132,32 @@ const documentWithOneChunk = (
 type StraddledRow = {
   readonly text: string;
   readonly charEnd: number;
-  readonly sensitivity: string;
 };
 
+// A straddle's two rows can only be narrowed from above, never one row and not the other.
 const documentWithTwoChunks = (
   workspaceId: string,
   what: {
     readonly title: string;
     readonly leading: StraddledRow;
     readonly trailing: StraddledRow;
+    readonly bindingClass?: string;
+    readonly documentClass?: string | null;
   },
 ): Promise<string> =>
   seededBy(db(), async (seed) => {
-    const binding = await seed.sourceBinding({ workspaceId, publishedAt: PUBLISHED });
+    const bindingClass = what.bindingClass ?? "Internal";
+    const documentClass = what.documentClass ?? null;
+    const binding = await seed.sourceBinding({
+      workspaceId,
+      publishedAt: PUBLISHED,
+      sensitivity: bindingClass,
+    });
     const held = await seed.sourceDocument({
       workspaceId,
       bindingId: binding.id,
       title: what.title,
+      sensitivity: documentClass,
     });
     const rows = [
       { ...what.leading, ordinal: 0, charStart: 0 },
@@ -165,7 +174,7 @@ const documentWithTwoChunks = (
         charStart: row.charStart,
         charEnd: row.charEnd,
         publishedAt: PUBLISHED,
-        sensitivity: row.sensitivity,
+        sensitivity: documentClass ?? bindingClass,
       });
     }
     return held.id;
@@ -253,13 +262,15 @@ describe("the passage a wire locator opens", () => {
     );
   });
 
-  it("answers a span running from one chunk row into the next as one passage, at the narrower of their classes", async () => {
+  it("answers a span running from one chunk row into the next as one passage, at the narrower of its binding's class and its document's", async () => {
     const scenario = await arrange();
 
     const documentId = await documentWithTwoChunks(scenario.workspaceId, {
       title: STRADDLED_TITLE,
-      leading: { ...STRADDLED_LEADING, sensitivity: "Internal" },
-      trailing: { ...STRADDLED_TRAILING, sensitivity: "Restricted" },
+      leading: STRADDLED_LEADING,
+      trailing: STRADDLED_TRAILING,
+      bindingClass: "Internal",
+      documentClass: "Restricted",
     });
     const wire = `${documentId}/${STRADDLING_SPAN}`;
 
@@ -330,40 +341,42 @@ describe("what a passage read refuses", () => {
     });
   });
 
-  it("refuses a straddle whole when either its leading or its trailing row is withheld, and serves the Admin who reaches both from the same locator", async () => {
+  it("refuses a straddle whole when its binding or its document is narrowed, and serves the Admin who reaches both rows from the same locator", async () => {
     const scenario = await arrange();
 
-    const narrowedTrailing = await documentWithTwoChunks(scenario.workspaceId, {
+    const narrowedBinding = await documentWithTwoChunks(scenario.workspaceId, {
       title: STRADDLED_TITLE,
-      leading: { ...STRADDLED_LEADING, sensitivity: "Internal" },
-      trailing: { ...STRADDLED_TRAILING, sensitivity: "Restricted" },
+      leading: STRADDLED_LEADING,
+      trailing: STRADDLED_TRAILING,
+      bindingClass: "Restricted",
     });
-    const narrowedLeading = await documentWithTwoChunks(scenario.workspaceId, {
+    const narrowedDocument = await documentWithTwoChunks(scenario.workspaceId, {
       title: STRADDLED_TITLE,
-      leading: { ...STRADDLED_LEADING, sensitivity: "Restricted" },
-      trailing: { ...STRADDLED_TRAILING, sensitivity: "Internal" },
+      leading: STRADDLED_LEADING,
+      trailing: STRADDLED_TRAILING,
+      documentClass: "Restricted",
     });
-    const atNarrowedTrailing = `${narrowedTrailing}/${STRADDLING_SPAN}`;
-    const atNarrowedLeading = `${narrowedLeading}/${STRADDLING_SPAN}`;
+    const atNarrowedBinding = `${narrowedBinding}/${STRADDLING_SPAN}`;
+    const atNarrowedDocument = `${narrowedDocument}/${STRADDLING_SPAN}`;
 
     const answered = {
-      "the Viewer, trailing row withheld": await opening(scenario.viewer, atNarrowedTrailing),
-      "the Viewer, leading row withheld": await opening(scenario.viewer, atNarrowedLeading),
-      "the Admin, trailing row narrowed": await opening(scenario.admin, atNarrowedTrailing),
-      "the Admin, leading row narrowed": await opening(scenario.admin, atNarrowedLeading),
+      "the Viewer, binding narrowed": await opening(scenario.viewer, atNarrowedBinding),
+      "the Viewer, document narrowed": await opening(scenario.viewer, atNarrowedDocument),
+      "the Admin, binding narrowed": await opening(scenario.admin, atNarrowedBinding),
+      "the Admin, document narrowed": await opening(scenario.admin, atNarrowedDocument),
     };
 
     expect(answered).toEqual({
-      "the Viewer, trailing row withheld": NOT_FOUND,
-      "the Viewer, leading row withheld": NOT_FOUND,
-      "the Admin, trailing row narrowed": {
-        locator: atNarrowedTrailing,
+      "the Viewer, binding narrowed": NOT_FOUND,
+      "the Viewer, document narrowed": NOT_FOUND,
+      "the Admin, binding narrowed": {
+        locator: atNarrowedBinding,
         title: "The staff handbook",
         text: "holiday policy grants twenty-eight days",
         sensitivity: "Restricted",
       },
-      "the Admin, leading row narrowed": {
-        locator: atNarrowedLeading,
+      "the Admin, document narrowed": {
+        locator: atNarrowedDocument,
         title: "The staff handbook",
         text: "holiday policy grants twenty-eight days",
         sensitivity: "Restricted",
@@ -471,21 +484,20 @@ const TERMS = "01M2D0CREV13WAAAAAAAAAAAA1";
 const ANNEX = "01M2D0CREV13WAAAAAAAAAAAA2";
 
 const ARMS_BINDING = "01M2B1ND1NGARMSAAAAAAAAAAA";
+const GROUP_BINDING = "01M2B1ND1NGARMSGRPAAAAAAAA";
 const BOARD_DOC = "01M2D0CARMSAAAAAAAAAAAAAA1";
 const GROUP_DOC = "01M2D0CARMSAAAAAAAAAAAAAA2";
 
 type ReviewedDocument = {
   readonly id: string;
   readonly title: string;
+  readonly sensitivity?: string;
   readonly chunks: readonly {
     readonly id: string;
     readonly ordinal: number;
     readonly charStart: number;
     readonly charEnd: number;
     readonly content: string;
-    readonly sensitivity?: string;
-
-    readonly audienceGroups?: readonly string[];
   }[];
 };
 
@@ -493,13 +505,20 @@ const bindingUnderReview = (
   workspaceId: string,
   bindingId: string,
   documents: readonly ReviewedDocument[],
+  onTheBinding: { readonly audienceGroups?: readonly string[] } = {},
 ): Promise<void> =>
   seededBy(db(), async (seed) => {
+    const { audienceGroups } = onTheBinding;
+    const audience =
+      audienceGroups === undefined
+        ? { audience: "everyone", audienceGroups: null }
+        : { audience: "groups", audienceGroups: [...audienceGroups] };
     const binding = await seed.sourceBinding({
       workspaceId,
       id: bindingId,
       publishedAt: null,
       sensitivity: "Internal",
+      ...audience,
     });
     for (const held of documents) {
       await seed.sourceDocument({
@@ -507,12 +526,9 @@ const bindingUnderReview = (
         bindingId: binding.id,
         id: held.id,
         title: held.title,
+        sensitivity: held.sensitivity ?? null,
       });
       for (const row of held.chunks) {
-        const audience =
-          row.audienceGroups === undefined
-            ? { audience: "everyone", audienceGroups: null }
-            : { audience: "groups", audienceGroups: [...row.audienceGroups] };
         await seed.chunk({
           workspaceId,
           bindingId: binding.id,
@@ -524,8 +540,12 @@ const bindingUnderReview = (
           locator: `${held.id}/chars:${row.charStart}-${row.charEnd}`,
           content: row.content,
           publishedAt: null,
-          sensitivity: row.sensitivity ?? "Internal",
-          ...audience,
+          sensitivity: held.sensitivity ?? "Internal",
+
+          // Left at the wide value a lander wrote before the binding was narrowed, so the
+          // preview's audience arm can only be the view's.
+          audience: "everyone",
+          audienceGroups: null,
         });
       }
     }
@@ -633,13 +653,14 @@ describe("the review list a binding is previewed with", () => {
     expect(opened).toBe(NOT_FOUND);
   });
 
-  it("applies the class and the audience arms all the same, so an Admin reaches a Restricted row and not a row for a group they are not in", async () => {
+  it("applies the class and the audience arms all the same, so an Admin lists a Restricted document's chunks and none of a binding for a group they are not in", async () => {
     const scenario = await arrange();
     const board = await groupNamed(db(), scenario, "Board", [scenario.editor]);
     await bindingUnderReview(scenario.workspaceId, ARMS_BINDING, [
       {
         id: BOARD_DOC,
         title: "The board's draft",
+        sensitivity: "Restricted",
         chunks: [
           {
             id: "01M2D0CARMSAAAAAAAAAAAAAA1#000000",
@@ -647,29 +668,35 @@ describe("the review list a binding is previewed with", () => {
             charStart: 0,
             charEnd: 32,
             content: "The board's holiday policy note.",
-            sensitivity: "Restricted",
-          },
-        ],
-      },
-      {
-        id: GROUP_DOC,
-        title: "The Board group's draft",
-        chunks: [
-          {
-            id: "01M2D0CARMSAAAAAAAAAAAAAA2#000000",
-            ordinal: 0,
-            charStart: 0,
-            charEnd: 32,
-            content: "The group's holiday policy note.",
-            audienceGroups: [board],
           },
         ],
       },
     ]);
+    await bindingUnderReview(
+      scenario.workspaceId,
+      GROUP_BINDING,
+      [
+        {
+          id: GROUP_DOC,
+          title: "The Board group's draft",
+          chunks: [
+            {
+              id: "01M2D0CARMSAAAAAAAAAAAAAA2#000000",
+              ordinal: 0,
+              charStart: 0,
+              charEnd: 32,
+              content: "The group's holiday policy note.",
+            },
+          ],
+        },
+      ],
+      { audienceGroups: [board] },
+    );
 
-    const admin = await previewing(scenario.admin, ARMS_BINDING);
+    const reachedByClass = await previewing(scenario.admin, ARMS_BINDING);
+    const withheldByAudience = await previewing(scenario.admin, GROUP_BINDING);
 
-    expect(admin).toEqual([
+    expect(reachedByClass).toEqual([
       {
         id: "01M2D0CARMSAAAAAAAAAAAAAA1#000000",
         sourceDocumentId: BOARD_DOC,
@@ -677,5 +704,6 @@ describe("the review list a binding is previewed with", () => {
         content: "The board's holiday policy note.",
       },
     ]);
+    expect(withheldByAudience).toEqual([]);
   });
 });
