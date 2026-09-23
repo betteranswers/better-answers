@@ -1,0 +1,65 @@
+packages/schema/migrations/0048_the-retired-run-reason.sql
+  s_69414e6e80cf2c::t_a8ba2b3eda18fe 1-13,17
+  s_69414e6e80cf2c::t_27a0a5808b5dc7 14
+  s_69414e6e80cf2c::t_f1ac8eb881b5ec 15-16
+packages/core/test/chunk-visibility.test.ts
+  s_69414e6e80cf2c::t_efa78f3269badc 386-388,392,404-412,414,416-418,420-423
+  s_69414e6e80cf2c::t_7a1642478666fa 376-383,385
+  s_69414e6e80cf2c::t_4c28a2f138d46e 384,389-391,393-403,413,415,419,424-427
+apps/worker/src/better_answers_worker/contract_stamp.py
+  s_69414e6e80cf2c::t_56958315e0b79c 3
+packages/schema/src/contract-stamp.ts
+  s_69414e6e80cf2c::t_cc91bef98b221c 3
+packages/schema/test/job-kinds.test.ts
+  s_69414e6e80cf2c::t_c7b669e6dd05aa 374-378,380,385-387,390-395,399,402-407
+  s_69414e6e80cf2c::t_14925ed18413f7 379,388,396-398
+  s_69414e6e80cf2c::t_a02aeb0e3ba614 30-35,37,39,44,49-51,53-54
+  s_69414e6e80cf2c::t_18235da984e2a1 233-240
+  s_69414e6e80cf2c::t_87a7f65f72abe6 135
+  s_69414e6e80cf2c::t_3504bc01dac7f3 40-41
+  s_69414e6e80cf2c::t_2968605cab857b 5-10,13
+  s_69414e6e80cf2c::t_8c04df0920220b 383-384,389,400-401
+  s_69414e6e80cf2c::t_7afe536a6f458f 27
+  s_69414e6e80cf2c::t_9dc48d47a155f2 381-382
+  s_69414e6e80cf2c::t_3440cbb3b88db5 45-48,52
+  s_69414e6e80cf2c::t_29e2f3e0cbce0f 36,38,42-43
+packages/schema/migrations/meta/_journal.json
+  s_69414e6e80cf2c::t_f1ac8eb881b5ec 340-346
+packages/schema/src/job-tables.ts
+  s_69414e6e80cf2c::t_059c152889f786 24
+packages/schema/test/chunk-columns.test.ts
+  s_69414e6e80cf2c::t_5b9bc45329ec6e 313-314
+  s_69414e6e80cf2c::t_e4b50a8601cd21 8
+packages/schema/migrations/meta/0048_snapshot.json
+  s_69414e6e80cf2c::t_f1ac8eb881b5ec 1-5454
+contracts/queue/cases.json
+  s_69414e6e80cf2c::t_c721045d830faf 198
+apps/worker/src/better_answers_worker/schema_view.py
+  s_69414e6e80cf2c::t_3cb8afd2bffe52 3,5
+packages/schema/test/catalogue-statements.ts
+  s_69414e6e80cf2c::t_2817b5c8e3e0e8 108-130
+  s_69414e6e80cf2c::t_3381756181f7f1 3
+apps/worker/tests/test_pipeline_index.py
+  s_69414e6e80cf2c::t_7c52e14dc6b7d9 1151-1153,1163,1171-1193
+  s_69414e6e80cf2c::t_52e15377289226 13
+  s_69414e6e80cf2c::t_d72efe065be092 769
+  s_69414e6e80cf2c::t_f10c2fcda708ae 1154-1162,1164-1170,1194-1195
+packages/schema/test/journal-statements.ts
+  s_69414e6e80cf2c::t_52bc24c26cfd70 1-20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "a0e0b0995ade5b4ea5c35f063fc4ea5dbc8ea004",
+  "prompts": {},
+  "sessions": {
+    "s_69414e6e80cf2c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6af0bc5d-5e17-4638-afb3-472e1f42e570",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
