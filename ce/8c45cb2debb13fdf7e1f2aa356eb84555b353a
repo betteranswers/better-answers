@@ -1,0 +1,21 @@
+packages/core/test/visibility.test.ts
+  s_69414e6e80cf2c::t_fba791aac30160 94
+  s_69414e6e80cf2c::t_1c5b1808a13c21 95-113
+  s_69414e6e80cf2c::t_9df95c9cad472f 585-590
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "ce8c45cb2debb13fdf7e1f2aa356eb84555b353a",
+  "prompts": {},
+  "sessions": {
+    "s_69414e6e80cf2c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6af0bc5d-5e17-4638-afb3-472e1f42e570",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
