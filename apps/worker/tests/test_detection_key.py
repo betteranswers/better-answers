@@ -2,7 +2,7 @@ import re
 from dataclasses import fields, replace
 
 from better_answers_worker.pipeline import CONVERTER_PIN
-from better_answers_worker.redaction import engine, recognisers
+from better_answers_worker.redaction import detector, engine, officers, recognisers
 from better_answers_worker.redaction.consumer_domains import CONSUMER_DOMAINS
 from better_answers_worker.redaction.descriptors import DESCRIPTORS, CategoryDescriptor
 from better_answers_worker.redaction.detection_key import (
@@ -23,14 +23,7 @@ WHAT_ONLY_THE_RULE_VERSION_STANDS_FOR = frozenset(
 )
 
 
-THE_ENGINE_S_OWN_IN_THE_KEY = frozenset(
-    {
-        "GLINER_LABELS",
-        "PHONE_LENIENCY",
-        "PHONE_REGIONS",
-        "WINDOWS_A_RUN_IS_READ_WHOLE_IN",
-    }
-)
+THE_ENGINE_S_OWN_IN_THE_KEY = frozenset({"GLINER_LABELS"})
 
 
 THE_ENGINE_S_OWN_CARRIED_BY_THE_PIN_OR_THE_RULES = frozenset(
@@ -41,15 +34,24 @@ THE_ENGINE_S_OWN_CARRIED_BY_THE_PIN_OR_THE_RULES = frozenset(
         "DESCRIPTOR_BY_CATEGORY",
         "DESCRIPTOR_BY_ENTITY",
         "GLINER_MODEL_ID",
-        "RECOGNISERS",
         "SPACY_MODEL",
     }
 )
 
 
-THE_ENGINE_S_OWN_READ_AFTER_THE_DETECTOR = frozenset(
-    {"ALWAYS_TIER", "MODEL_RULE_NAME", "TIER_PRECEDENCE"}
+THE_ENGINE_S_OWN_READ_AFTER_THE_DETECTOR = frozenset({"ALWAYS_TIER", "TIER_PRECEDENCE"})
+
+
+THE_DETECTOR_S_OWN_IN_THE_KEY = frozenset(
+    {"PHONE_LENIENCY", "PHONE_REGIONS", "WINDOWS_A_RUN_IS_READ_WHOLE_IN"}
 )
+
+
+THE_DETECTOR_S_OWN_OUTSIDE_THE_KEY = frozenset({"MODEL_RULE_NAME", "RECOGNISERS"})
+
+
+# `typing`'s flag, which reads nothing and stands for nothing the detector does.
+THE_TYPE_CHECKER_S_OWN = frozenset({"TYPE_CHECKING"})
 
 
 def key_over(
@@ -208,8 +210,8 @@ def test_every_literal_a_recogniser_holds_is_read_but_the_officers_blocks_own() 
 
     held = constants_of(recognisers)
 
-    assert set(RAISED_AFTER_THE_DETECTOR) <= held
-    assert held - set(RAISED_AFTER_THE_DETECTOR) == named & held
+    assert set(RAISED_AFTER_THE_DETECTOR) <= constants_of(officers)
+    assert held == named & held
     assert named.isdisjoint(RAISED_AFTER_THE_DETECTOR)
 
 
@@ -223,9 +225,22 @@ def test_every_constant_the_engine_holds_is_placed_on_one_side_of_the_key() -> N
         THE_ENGINE_S_OWN_IN_THE_KEY
         | THE_ENGINE_S_OWN_CARRIED_BY_THE_PIN_OR_THE_RULES
         | THE_ENGINE_S_OWN_READ_AFTER_THE_DETECTOR
+        | THE_TYPE_CHECKER_S_OWN
     )
     assert held & in_the_key == THE_ENGINE_S_OWN_IN_THE_KEY
     assert in_the_key.isdisjoint(
         THE_ENGINE_S_OWN_CARRIED_BY_THE_PIN_OR_THE_RULES
         | THE_ENGINE_S_OWN_READ_AFTER_THE_DETECTOR
+        | THE_TYPE_CHECKER_S_OWN
     )
+
+
+def test_every_constant_the_detector_holds_is_placed_on_one_side_of_the_key() -> None:
+    held = constants_of(detector)
+    in_the_key = {name for name, _ in DETECTOR_LITERALS} | {
+        name for name, _ in what_the_detector_reads().window_rule
+    }
+
+    assert held == THE_DETECTOR_S_OWN_IN_THE_KEY | THE_DETECTOR_S_OWN_OUTSIDE_THE_KEY
+    assert held & in_the_key == THE_DETECTOR_S_OWN_IN_THE_KEY
+    assert in_the_key.isdisjoint(THE_DETECTOR_S_OWN_OUTSIDE_THE_KEY)

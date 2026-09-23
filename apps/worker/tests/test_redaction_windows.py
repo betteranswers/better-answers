@@ -4,11 +4,8 @@ from typing import NamedTuple
 
 from presidio_analyzer.chunkers import CharacterBasedTextChunker
 
-from better_answers_worker.redaction.engine import (
-    AnchoredWindows,
-    findings_of,
-    spans_detected,
-)
+from better_answers_worker.redaction.detector import AnchoredWindows
+from better_answers_worker.redaction.engine import findings_of, spans_detected
 from planted_page import FIXTURE_PAGE
 
 HEADING_LESS_PAGE = FIXTURE_PAGE.parent / "depot-delivery-terms.txt"

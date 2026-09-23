@@ -164,7 +164,23 @@ def tick(
     return worked
 
 
+def warm_the_detectors_stack(worker_id: str) -> None:
+    from .redaction import detector
+    from .redaction.pins import VERSION_STRING
+
+    logger.info(
+        "the detector's stack is loaded",
+        worker_id=worker_id,
+        redaction_version=VERSION_STRING,
+        rules=len(detector.RECOGNISERS),
+    )
+
+
 def run(bootstrap: Bootstrap, *, once: bool) -> int:
+    # The daemon's first job would otherwise pay the stack; a `--once` spawn may never
+    # pay it at all.
+    if not once:
+        warm_the_detectors_stack(bootstrap.worker_id)
     # In autocommit: the bare stamp reads and workspace list below would, on a plain
     # connection, open a transaction turning every scoped block into a savepoint.
     with queue.connected(bootstrap.database_url) as connection:

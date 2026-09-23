@@ -8,7 +8,6 @@ import cocoindex as coco
 
 from ..log import logger
 from ..redaction import Restore, redact
-from ..redaction.detection_key import detection_key as the_detection_key
 from ..redaction.engine import Finding
 from ..redaction.withholdings import Withholding
 from .chunks import CHUNK_SIZE_BYTES, Chunk, split_into_chunks
@@ -252,6 +251,10 @@ def redact_landed_copies(
     ms_per_page: int = SEAM_MS_PER_PAGE,
     margin_ms: int = TIMEOUT_MARGIN_MS,
 ) -> LandedRun:
+    # Reading the key builds a recogniser of every rule, so presidio arrives with it. A
+    # spawn that lands nothing must not pay that.
+    from ..redaction.detection_key import detection_key as the_detection_key
+
     with_bytes = tuple(
         (document, copies.read(document.original_key)) for document in documents
     )

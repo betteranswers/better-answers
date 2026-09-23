@@ -7,8 +7,7 @@ from functools import cache
 
 from .consumer_domains import CONSUMER_DOMAINS
 from .descriptors import DESCRIPTORS, CategoryDescriptor
-from .engine import (
-    GLINER_LABELS,
+from .detector import (
     PHONE_LENIENCY,
     PHONE_REGIONS,
     RECOGNISERS,
@@ -16,6 +15,7 @@ from .engine import (
     AnchoredWindows,
     ModelRecogniser,
 )
+from .engine import GLINER_LABELS
 from .pins import DETECTOR_PIN
 from .recognisers import (
     A_DATE,
