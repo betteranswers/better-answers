@@ -50,7 +50,12 @@ from .landed import (
 )
 from .objects import Bucket, LandedCopies, object_key_of
 from .rows import CHUNK_TABLE, chunk_rows, rows_of
-from .run import WIPED_REASON, IndexOutcome, index_binding
+from .run import (
+    REASONS_EMPTYING_THE_BINDING,
+    WIPED_REASON,
+    IndexOutcome,
+    index_binding,
+)
 from .tables import Column, Table
 
 __all__ = [
@@ -67,6 +72,7 @@ __all__ = [
     "OCR_ANSWER",
     "PASSED_THROUGH",
     "PDF_MEDIA_TYPE",
+    "REASONS_EMPTYING_THE_BINDING",
     "SEAM_MS_PER_PAGE",
     "STORES_A_BINDING_HOLDS",
     "THE_MEMOS_IDENTITY",

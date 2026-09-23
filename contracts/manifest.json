@@ -10,7 +10,8 @@
     "redaction": { "form": "fixtured" },
     "document-chunk": { "form": "fixtured" },
     "upload-media-types": { "form": "fixtured" },
-    "citation": { "form": "fixtured" }
+    "citation": { "form": "fixtured" },
+    "emptying-a-binding": { "form": "fixtured" }
   },
   "fixtures": [
     { "agreement": "llm-routing", "path": "llm-routing/cases.json" },
@@ -23,6 +24,7 @@
     { "agreement": "document-chunk", "path": "document-chunk/cases.json" },
     { "agreement": "upload-media-types", "path": "upload-media-types/cases.json" },
     { "agreement": "citation", "path": "citation/cases.json" },
+    { "agreement": "emptying-a-binding", "path": "emptying-a-binding/cases.json" },
     { "agreement": "cost-ledger", "path": "cost-ledger/rows.json" }
   ]
 }
