@@ -17,6 +17,10 @@ were taken that day and its arrival edits are listed below with the others.
 T-228 added `sheet` the same day with the same CLI; its two digests were taken that day and its
 arrival edits are listed below with the others.
 
+T-136 added `checkbox` and `progress` on **23 September 2026** with the same CLI,
+`shadcn@4.20.1`, for the Sources screen's finding groups, publish confirmations and upload; their
+two digests were taken that day and their arrival edits are listed below with the others.
+
 This file records vendored source only. The npm packages those items stand on are ordinary
 dependencies with lockfile entries; their versions live in `apps/web/package.json` and the
 lockfile, which is where a reader reads them and where Renovate moves them.
@@ -59,6 +63,8 @@ the pin.
 | `label.tsx` | https://ui.shadcn.com/r/styles/new-york/label.json | `ea924e70d496cbd6` | `ec7442bb079f9558` |
 | `tooltip.tsx` | https://ui.shadcn.com/r/styles/new-york/tooltip.json | `aef6ec3c142b054e` | `275fe11838d9edd6` |
 | `sheet.tsx` | https://ui.shadcn.com/r/styles/new-york/sheet.json | `f9d5c635be778573` | `bc0fc5ea77392c4a` |
+| `checkbox.tsx` | https://ui.shadcn.com/r/styles/new-york/checkbox.json | `e1520741b7976375` | `c8cd1bd04ef664b7` |
+| `progress.tsx` | https://ui.shadcn.com/r/styles/new-york/progress.json | `5b99e42b997efaef` | `7b166fa8e9810e4d` |
 
 `components.json` writes `https://ui.shadcn.com/r/{name}.json` for the primitives because that is
 the CLI's own default form; the table records the style-qualified URL the CLI resolves it to,
@@ -117,6 +123,15 @@ T-228's arrival edits, on the one item it added:
 - The panel's `ease-in-out` became `ease-standard` and its `duration-500` / `duration-300` the
   bridge's slow and base steps, because 500ms is twice the register's ceiling and the curve and
   the durations are the design system's to name.
+
+T-136's arrival edits, on the two items it added:
+
+- The `cn` import repointed at `@/shared/lib/utils.ts` and the dependency on `cn` dropped, as the
+  tooltip's and the sheet's arrivals needed, and `progress.tsx`'s `"use client"` removed.
+- The checkbox's `rounded-[4px]` became `rounded-sm`, for the reason the tooltip's arrow's did.
+- The progress indicator's `transition-all` became `transition-transform duration-base
+  ease-standard`: it moves by a transform alone, and the curve and the duration are the design
+  system's to name.
 
 Everything else is upstream's, unedited. Their behaviour — keyboard handling, focus, ARIA
 wiring, virtualisation — is theirs by ADR 0033; the screens that use them carry the WCAG 2.2 AA

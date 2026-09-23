@@ -14,6 +14,7 @@ import { ChooseWorkspaceScreen } from "@/features/auth/choose-workspace-screen.t
 import { membershipRefusal, NEEDS_A_PICK } from "@/features/auth/membership.ts";
 import { NoWorkspaceScreen } from "@/features/auth/no-workspace-screen.tsx";
 import { SignInScreen } from "@/features/auth/sign-in-screen.tsx";
+import { BINDINGS_TOOLBAR, BindingsView } from "@/features/sources/bindings-view.tsx";
 import { createApiProxy, type ApiProxy } from "@/shared/api/trpc.ts";
 import { SCREENS, viewsOf, type Screen, type View } from "@/shared/screens.ts";
 import type { ViewToolbar } from "@/shared/view-toolbar.tsx";
@@ -28,6 +29,7 @@ type BuiltView = { readonly draw: () => ReactElement; readonly toolbar?: ViewToo
 
 // The list decides which views are built; this map only says by what, and with what in hand.
 const BUILT_VIEWS = new Map<View["path"], BuiltView>([
+  ["/sources/bindings", { draw: BindingsView, toolbar: BINDINGS_TOOLBAR }],
   ["/system/routes-and-spend", { draw: RoutesAndSpendView, toolbar: ROUTES_AND_SPEND_TOOLBAR }],
 ]);
 

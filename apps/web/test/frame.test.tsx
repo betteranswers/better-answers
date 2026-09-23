@@ -100,7 +100,7 @@ describe("Control Centre's three-region shell", () => {
     expect(container.textContent).not.toMatch(/sign out/i);
   });
 
-  it("says the five screens nobody has built are unbuilt, and does not say it of System", async () => {
+  it("says the four screens nobody has built are unbuilt, and does not say it of Sources or System", async () => {
     const unbuilt: string[] = [];
     for (const each of SCREENS) {
       const { unmount } = await openAt(each.path);
@@ -108,7 +108,7 @@ describe("Control Centre's three-region shell", () => {
       unmount();
     }
 
-    expect(unbuilt).toEqual(["Sources", "Suggestions", "Knowledge", "Questions", "People"]);
+    expect(unbuilt).toEqual(["Suggestions", "Knowledge", "Questions", "People"]);
   });
 
   it("gives System the routes card, and says the rest of the screen is unbuilt", async () => {
@@ -195,14 +195,14 @@ describe("Control Centre's one list of screens and their views", () => {
     ]);
   });
 
-  it("calls one view built — the routes list System's own address reaches — and the rest not", () => {
+  it("calls two views built — Sources' bindings and System's routes, each its screen's own address — and the rest not", () => {
     const built = SCREENS.flatMap((each) =>
       viewsOf(each)
         .filter((view) => view.built)
         .map((view) => view.path),
     );
 
-    expect(built).toEqual(["/system/routes-and-spend"]);
+    expect(built).toEqual(["/sources/bindings", "/system/routes-and-spend"]);
   });
 
   it("gives every view on the list a route of its own", () => {

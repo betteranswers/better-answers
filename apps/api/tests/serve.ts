@@ -3,6 +3,8 @@ import { fileURLToPath } from "node:url";
 
 import { Hono } from "hono";
 
+import { openObjectStore } from "@better-answers/core/testing/warm-objects";
+
 import { logger } from "../src/logger.ts";
 import { harnessControl } from "./harness-control.ts";
 import { startApp } from "./harness.ts";
@@ -12,7 +14,11 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error("the browser suite's app needs a port as its one argument");
 }
 
+// The Sources screen binds a document, and a bind puts its bytes in the object store first.
+const objects = await openObjectStore("browser-suite");
+
 const app = await startApp({
+  objectStore: objects,
   webRoot: fileURLToPath(new URL("../../web/dist", import.meta.url)),
   publicUrl: `http://127.0.0.1:${port}`,
   hostnames: {
@@ -44,7 +50,7 @@ listening.on("error", (cause: Error) => {
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
     listening.close(() => {
-      void app.stop().then(() => process.exit(0));
+      void Promise.all([app.stop(), objects.stop()]).then(() => process.exit(0));
     });
   });
 }

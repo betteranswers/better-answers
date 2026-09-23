@@ -2,7 +2,7 @@ import type { APIRequestContext, Page } from "@playwright/test";
 
 import { EMBEDDING_DIMENSIONS } from "@better-answers/schema";
 
-import { SCREENS } from "@/shared/screens.ts";
+import { SCREENS, viewsOf } from "@/shared/screens.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -232,7 +232,10 @@ test.describe("the System screen's routes card", () => {
 
     await expect(page.getByText(/The rest of System/)).toBeVisible();
     const navigation = page.getByRole("navigation", { name: "Control Centre" });
-    for (const screen of SCREENS.filter((candidate) => candidate.id !== "system")) {
+    const opensUnbuilt = SCREENS.filter((candidate) =>
+      viewsOf(candidate).some((view) => view.path === candidate.defaultView && !view.built),
+    );
+    for (const screen of opensUnbuilt) {
       await navigation.getByRole("link", { name: screen.name }).click();
       await expect(page.getByRole("heading", { level: 1, name: screen.name })).toBeVisible();
       await expect(page.getByText("This view is not built yet.")).toBeVisible();

@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@better-answers/design-system": "workspace:*",
+    "@better-answers/schema": "workspace:*",
     "@better-auth/oauth-provider": "1.7.2",
     "@phosphor-icons/react": "2.1.10",
     "@radix-ui/react-use-controllable-state": "1.2.6",
@@ -38,7 +39,6 @@
     "@axe-core/playwright": "4.13.0",
     "@better-answers/api": "workspace:*",
     "@better-answers/devtools": "workspace:*",
-    "@better-answers/schema": "workspace:*",
     "@playwright/test": "1.63.0",
     "@tailwindcss/vite": "4.3.3",
     "@testing-library/dom": "10.4.2",

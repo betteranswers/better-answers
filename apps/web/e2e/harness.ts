@@ -1,6 +1,8 @@
 import { expect, type APIRequestContext, type Page } from "@playwright/test";
 import { z } from "zod";
 
+import type { REDACTION_TIERS, SENSITIVITIES } from "@better-answers/schema";
+
 const HARNESS = "/__harness";
 
 const aPerson = z.object({ id: z.string(), email: z.string(), name: z.string() });
@@ -59,6 +61,63 @@ export const seedRoutes = (
   api: APIRequestContext,
   input: { workspaceId: string; routes: readonly SeedRoute[] },
 ) => ask(api, "/routes", input, routesSeeded);
+
+type Sensitivity = (typeof SENSITIVITIES)[number];
+
+type SeedFinding = {
+  readonly category: string;
+  readonly ruleId: string;
+  readonly tier: (typeof REDACTION_TIERS)[number];
+  readonly spans: number;
+  readonly kept?: boolean;
+  readonly overriddenByErasure?: boolean;
+};
+
+type SeedDocument = {
+  readonly title: string;
+  readonly sensitivity?: Sensitivity;
+  readonly quarantineError?: string;
+  readonly chunks?: readonly string[];
+  readonly findings?: readonly SeedFinding[];
+  readonly cited?: boolean;
+};
+
+export type SeedBinding = {
+  readonly name: string;
+  readonly sensitivity?: Sensitivity;
+  readonly run?: "none" | "queued" | "claimed" | "done";
+  readonly published?: boolean;
+  readonly documents?: readonly SeedDocument[];
+};
+
+const seededBindings = z.object({
+  bindings: z.array(
+    z.object({
+      bindingId: z.string(),
+      name: z.string(),
+      documents: z.array(
+        z.object({
+          documentId: z.string(),
+          title: z.string(),
+          citedBy: z.object({ iri: z.string(), compositionId: z.string() }).nullable(),
+        }),
+      ),
+    }),
+  ),
+});
+
+export const seedBindings = (
+  api: APIRequestContext,
+  input: { workspaceId: string; bindings: readonly SeedBinding[] },
+) => ask(api, "/bindings", input, seededBindings);
+
+const indexRunMoved = z.object({ jobId: z.string() });
+
+// The suite runs no worker, so a spec watching a state word move asks the harness for its steps.
+export const moveTheIndexRun = (
+  api: APIRequestContext,
+  input: { workspaceId: string; to: "claimed" | "done" },
+) => ask(api, "/index-runs", input, indexRunMoved);
 
 // The code the api captured for this address, in place of the email nobody receives.
 export const codeSentTo = async (api: APIRequestContext, email: string): Promise<string> => {

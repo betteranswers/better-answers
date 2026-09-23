@@ -46,15 +46,19 @@ const uploadHeadersOf = (context: OperationContext): Headers => {
   return held instanceof Headers ? held : new Headers();
 };
 
-type ApiLinkOptions = Pick<Parameters<typeof httpBatchLink>[0], "url" | "fetch">;
+type ApiLinkOptions = Pick<Parameters<typeof httpBatchLink>[0], "url" | "fetch"> & {
+  readonly uploadFetch?: Parameters<typeof httpLink>[0]["fetch"];
+};
 
 // A batch carries its inputs in the address, and an address past this length is one some proxies
 // refuse; the link splits the batch instead.
 const BATCH_URL_CEILING = 2083;
 
-export const apiLink = (options: ApiLinkOptions) =>
-  splitLink({
+export const apiLink = ({ uploadFetch, ...options }: ApiLinkOptions) => {
+  const uploading = uploadFetch === undefined ? options : { ...options, fetch: uploadFetch };
+  return splitLink({
     condition: (op) => isNonJsonSerializable(op.input),
-    true: httpLink({ ...options, headers: ({ op }) => uploadHeadersOf(op.context) }),
+    true: httpLink({ ...uploading, headers: ({ op }) => uploadHeadersOf(op.context) }),
     false: httpBatchLink({ ...options, maxURLLength: BATCH_URL_CEILING }),
   });
+};
