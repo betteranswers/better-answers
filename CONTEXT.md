@@ -414,7 +414,9 @@ The platform's trust tiers (unverified, machine-confirmed, human-reviewed) and s
 readers in these words and no others; each is a text tag, never a colour.
 
 - **Checked by <person>** — human-reviewed: a named person confirmed it against its sources on a
-  date; shown as "Checked by Priya Shah · 3 March 2026".
+  date; shown as "Checked by Priya Shah · 3 March 2026". The name is the checker's current *display
+  name*, and it stands after they leave the workspace; once they are erased the check reads
+  "Checked by a former member" and still counts.
 - **Checked by the platform** — machine-confirmed: an agent that did not generate it confirmed it.
 - **Unchecked** — unverified: nobody has confirmed it.
 - **Changed since checked** — its content changed after its latest check; the earlier check is kept.
@@ -524,7 +526,8 @@ to it by IRI and never restates it (ADR 0014).
   projection.
 - **verification request** — a reader's or the platform's ask that a concept or a composition be
   checked, with a reason — a reader's flag, *due a check*, *shelf life ending*, *source changed*,
-  *source gone*, *cited concept deprecated*; one open per concept and reason; lands in its
+  *source gone*, *cited concept deprecated*, *checker left*, *checker erased*; one open per
+  concept and reason; lands in its
   owner's queue, the cadence ones batched into the weekly digest.
 - **review cadence** — how long after its latest matching check a concept of a type is *due a
   check*: a per-kind workspace setting with platform defaults (Certification,
@@ -543,6 +546,10 @@ to it by IRI and never restates it (ADR 0014).
   record names a person by as `human:<person id>`. Never written into a concept file, which keeps
   `human:<email>` (ADR 0019). _Avoid_: member id (retired 05/09/2026 — the member row's key names
   nothing), user id (on a screen).
+- **display name** — the one line a person is credited by wherever the platform names them:
+  *Checked by*, a commit's author, a member list. The person states it themselves; an Admin or the
+  operator corrects an inappropriate one. Not a *Person* concept's name, which the company
+  publishes. _Avoid_: person's name, full name, username.
 - **minter** — the kernel's one function that mints every id the platform writes, a time-ordered
   ULID; Better Auth is handed it too, so every identity id has the same shape (ADR 0035). Not the
   *minting* rule, which decides where a unit of knowledge lives (ADR 0011). _Avoid_: id generator.
@@ -848,9 +855,9 @@ to it by IRI and never restates it (ADR 0014).
 - **Account page** — a person's own small surface outside Control Centre: name, role,
   workspace, personal tokens.
 - **sign-in** — how a person proves who they are to the platform: an email code, or Microsoft
-  for a company on Microsoft 365 (T-045 grilling Q10, 2026-09-03); never a password. A person is
-  invited by email first, and a Microsoft account signs in only on an exact match with that
-  email. _Avoid_: login, social login; SSO only for the per-client shape, a client's own tenant.
+  for a company on Microsoft 365 (T-045 grilling Q10, 2026-09-03); never a password. A person
+  signs in first and an Admin then adds them to a workspace; whether an invitation must come first
+  is open (T-027). A Microsoft account signs in only on an exact match with that person's email. _Avoid_: login, social login; SSO only for the per-client shape, a client's own tenant.
 
 - **map** — the reader's word for the graph, and the only one that reaches a surface (*graph*,
   *sync*, *traversal* and *generation* never do). **Two** fixed phrases tell its state: **map as of
