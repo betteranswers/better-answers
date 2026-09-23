@@ -398,6 +398,36 @@ describe("what a passage read refuses", () => {
   });
 });
 
+describe("what a passage read fails on", () => {
+  it("answers a row whose content runs past or short of its span as the store's error, never as a passage or a refusal", async () => {
+    const scenario = await arrange();
+    const runsPast = await documentWithOneChunk(scenario.workspaceId, {
+      title: BOARD_TITLE,
+      text: BOARD_TEXT,
+      charEnd: 16,
+      sensitivity: "Internal",
+    });
+    const fallsShort = await documentWithOneChunk(scenario.workspaceId, {
+      title: BOARD_TITLE,
+      text: BOARD_TEXT,
+      charEnd: 40,
+      sensitivity: "Internal",
+    });
+
+    const answered = {
+      "past its span": await opening(scenario.viewer, `${runsPast}/chars:0-28`),
+      "short of its span": await opening(scenario.viewer, `${fallsShort}/chars:0-40`),
+    };
+
+    expect(answered).toEqual({
+      "past its span": new Error(`the chunk row at ${runsPast}/chars:0-16 holds 28 code points`),
+      "short of its span": new Error(
+        `the chunk row at ${fallsShort}/chars:0-40 holds 28 code points`,
+      ),
+    });
+  });
+});
+
 const searching = async (
   person: UserPrincipal,
   limit = 10,

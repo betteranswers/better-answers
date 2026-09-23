@@ -21,8 +21,8 @@ export type Passage = {
   readonly sensitivity: Sensitivity;
 };
 
-// The view's class: a row whose class is NULL fails the read predicate, so one that
-// reaches here is one of the three words.
+// The view's class is NULL only for a word both source columns' CHECKs refuse; the
+// predicate's Admin arm passes it, and the parse fails it.
 const CHUNK_SENSITIVITY = z.enum(SENSITIVITIES);
 
 const COVERING_ROWS = `SELECT c.content, c.char_start, c.char_end, c.sensitivity, d.title
@@ -39,7 +39,7 @@ type CoveringRow = {
   readonly content: string;
   readonly char_start: number;
   readonly char_end: number;
-  readonly sensitivity: Sensitivity;
+  readonly sensitivity: string | null;
   readonly title: string;
 };
 
@@ -62,10 +62,17 @@ export const passageAt = async (
       charEnd,
     ]);
 
-    return read.rows.map((row) => ({
-      ...row,
-      sensitivity: CHUNK_SENSITIVITY.parse(row.sensitivity),
-    }));
+    return read.rows.map((row) => {
+      // No CHECK holds a row's content to its span; one that misses shifts every later
+      // offset or opens a passage no row covers.
+      const points = Array.from(row.content).length;
+      if (points !== row.char_end - row.char_start) {
+        throw new Error(
+          `the chunk row at ${locatorOf(sourceDocumentId, row.char_start, row.char_end)} holds ${String(points)} code points`,
+        );
+      }
+      return { ...row, sensitivity: CHUNK_SENSITIVITY.parse(row.sensitivity) };
+    });
   });
   if (!covering.ok) return err(covering.error);
 
@@ -77,7 +84,6 @@ export const passageAt = async (
     if (row.char_start !== reach) return err(NOT_FOUND);
     reach = row.char_end;
   }
-  if (reach < charEnd) return err(NOT_FOUND);
 
   const covered = spanText(rows.map((row) => row.content).join(""), {
     sourceDocumentId,
@@ -137,7 +143,7 @@ type HitRow = {
   readonly source_document_id: string;
   readonly char_start: number;
   readonly char_end: number;
-  readonly sensitivity: Sensitivity;
+  readonly sensitivity: string | null;
   readonly title: string;
 };
 
