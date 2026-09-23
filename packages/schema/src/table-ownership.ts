@@ -36,6 +36,8 @@ export const TABLE_OWNERS = {
 
   "public.contract_stamp": JOURNAL_MIGRATOR,
 
+  "public.sweep_pass": "sweeps",
+
   "public.workspace_config": "workspaces",
   "public.group": "members",
   "public.group_member": "members",

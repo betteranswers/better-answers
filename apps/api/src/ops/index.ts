@@ -35,6 +35,7 @@ import {
 import { initRepository, type GitDoor } from "@better-answers/core/store/git";
 import type { ObjectDoor } from "@better-answers/core/store/objects";
 import { tablesPresent, type PostgresDoor } from "@better-answers/core/store/postgres";
+import { SWEEPS, withSweepLock } from "@better-answers/core/sweeps";
 import {
   addMember,
   BOOTSTRAP,
@@ -507,7 +508,9 @@ const plural = (many: number, noun: string): string => `${noun}${many === 1 ? ""
 const counted = (many: number, noun: string): string => `${many} ${plural(many, noun)}`;
 
 const graphSweepCommand = async (doors: Doors, workspaceId: string, io: OpsIo): Promise<number> => {
-  const swept = await sweepGraph(GRAPH_MAINTENANCE, doors.postgres, { workspaceId });
+  const swept = await withSweepLock(SWEEPS, doors.postgres, () =>
+    sweepGraph(GRAPH_MAINTENANCE, doors.postgres, { workspaceId }),
+  );
   if (!swept.ok) return refused("graph-sweep", workspaceId, swept.error, io);
   if (swept.value.length === 0) {
     io.say("graph-sweep: done — nothing to sweep");
@@ -541,10 +544,12 @@ const objectStoreOrphans = async (
     io.say(`object-store-orphans: REFUSED — ${objects.error}`);
     return REFUSED;
   }
-  const swept = await sweepOrphanedUploads(
-    UPLOAD_SWEEP,
-    { postgres: doors.postgres, objects: objects.value },
-    { workspaceId, now: doors.clock.now(), dryRun: listing === true },
+  const swept = await withSweepLock(SWEEPS, doors.postgres, () =>
+    sweepOrphanedUploads(
+      UPLOAD_SWEEP,
+      { postgres: doors.postgres, objects: objects.value },
+      { workspaceId, now: doors.clock.now(), dryRun: listing === true },
+    ),
   );
   if (!swept.ok) return refused("object-store-orphans", workspaceId, swept.error, io);
   const past = `past the ${ORPHANED_UPLOAD_GRACE_HOURS}-hour grace no document names`;

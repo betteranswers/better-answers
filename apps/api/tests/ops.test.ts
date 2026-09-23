@@ -27,8 +27,13 @@ import {
   type Tx,
 } from "@better-answers/core/store/postgres";
 import { inputOf } from "@better-answers/core/testing/input";
+import { SWEEPS, withSweepLock } from "@better-answers/core/sweeps";
 import { objectStoreForSuite } from "@better-answers/core/testing/objects";
-import { whileWritesAreRefused } from "@better-answers/core/testing/postgres";
+import {
+  countWaitingOnLocks,
+  until,
+  whileWritesAreRefused,
+} from "@better-answers/core/testing/postgres";
 import { ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
@@ -897,6 +902,43 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(run.exitCode).toBe(2);
     });
+  });
+
+  describe("the two sweeps by hand never overlap the daily pass", () => {
+    it.each([
+      ["graph-sweep", "graph-sweep: done — nothing to sweep"],
+      [
+        "object-store-orphans",
+        "object-store-orphans: done — removed 0 objects past the 24-hour grace no document names",
+      ],
+    ])(
+      "%s waits while a pass holds the sweeps' lock, and runs once it lets go",
+      async (command, done) => {
+        const { workspaceId } = await app().provision();
+        let letGo = (): void => undefined;
+        const holding = new Promise<void>((resolve) => {
+          letGo = resolve;
+        });
+        let taken = false;
+        const pass = withSweepLock(SWEEPS, openPostgres(app().database.pool), async () => {
+          taken = true;
+          await holding;
+        });
+        await until(async () => taken);
+
+        let settled = false;
+        const run = ops(app(), [command, "--workspace", workspaceId]).finally(() => {
+          settled = true;
+        });
+        await until(async () => (await countWaitingOnLocks(app().database.superuser)) > 0);
+        expect(settled).toBe(false);
+
+        letGo();
+        await pass;
+
+        expect(await run).toEqual({ exitCode: 0, lines: [done] });
+      },
+    );
   });
 
   describe("reconcile-watermark — the reconciler on demand, which is the restore path", () => {

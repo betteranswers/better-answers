@@ -1,4 +1,4 @@
-# Runbook — ten pages and five procedures
+# Runbook — eleven pages and six procedures
 
 **Operational reference, not a page of the docs site.** This file lives in `docs/operations/` because that is where the operational documents are kept; the docs site does not render it, and it is read from the repository.
 
@@ -114,6 +114,15 @@ The estate is two 4 GB boxes (ADR 0024): VPC 1 is production, VPC 2 is the orche
 - **Escalate:** the technical contact before any rewind — this is the page that throws work away; the client's named contact once the list of edits to redo exists, since it is their people who redo them.
 - **Rehearsed by:** once on staging against a made-up stuck bundle, before the first client's data is on the box (ADR 0012, amended 2026-09-19; the same day as page 6's switch). A commit the governed write did not make, written into a staging workspace's bundle by hand, stops the replay as `unreadable-commit` and is the cheapest stuck bundle there is.
 
+## 11. The sweeps' check is red
+
+- **Fires:** the `sweeps` check at the dead-man service, by email only: a sweep is a day late, not an outage. **Late** means no pass completed in 25 hours; **failed** means a pass completed but could not sweep at least one workspace, or could not list the workspaces or write its row at all.
+- **Do — late:** the api's start line says why. `sweeps running` means the timer started, and the silence is the api being down (page 1) or a pass skipped for a held lock; `the sweeps are not running` names the reason: a wrong `UPLOAD_SWEEP`, or no object store on the api service. Fix the setting and redeploy. A skip reads `a sweep pass was skipped: another holder has the sweeps' lock`, and a sweep by hand that never finished is the usual holder.
+- **Do — failed:** read the last `sweep pass` line: its `refusals` names each workspace passed over, the sweep (`uploads` or `graph`) and the reason. Run that sweep by hand for that workspace to see the refusal on its own — `pnpm ops graph-sweep --workspace <id>`, or `pnpm ops object-store-orphans --workspace <id> --list` while `UPLOAD_SWEEP` is `list`, because without `--list` the command removes whatever the setting says — fix what it names, and let the next pass go green. The rest of the workspaces were swept. With no `sweep pass` line, `the sweep pass failed` carries the reason instead: the workspaces could not be listed, or the pass swept and could not write its row.
+- **Attach:** the `sweep pass` line or the start line that fired; the last `sweep_pass` row; the by-hand run's refusal line.
+- **Escalate:** the technical contact if the check is still red after two passes.
+- **Rehearsed by:** the drill's two sweeps on staging, which take the same lock and wait for a pass holding it.
+
 ## Bring staging up / tear it down
 
 Staging is on demand on VPC 2 (ADR 0024): nothing stands between drills. To bring it up, with the repository checked out at `/opt/better-answers` and the staging env in the root-only file `host-setup.sh` creates: `docker compose --project-directory deploy --env-file /etc/better-answers/staging.env -f stores.compose.yaml -f staging.override.yaml -p better-answers-stores-staging up -d`, then the same for `platform.compose.yaml` (`up -d api` — the worker is behind the `pipeline` profile until `T-006`). The staging Postgres resource is created in the orchestrator the first time and kept empty; the digests are the ones `build.yml` last pushed, read from its run summary. `restore-drill.sh` does exactly this itself. To tear it down: `down --remove-orphans` on both, then wipe `/data/objectstore`, `/data/git`, `/data/worker/*`, the staging backup directory, and drop the three schemas the journal writes — `public`, `index` and `drizzle` — which is the whole wipe, because the graph is plain tables in `public` (ADR 0032). The drill's `wipe_staging` is the reference, `seed-synthetic.sh` re-seeds the fixture, and the `staging-wiped` ping is the proof. Staging holds client data only for the duration of a drill; a rehearsal that is not a drill uses the synthetic fixture — with one exception, the owner's of 22/09/2026: the first client's reviewed bundle may stand on staging for the length of its rehearsal under *Provision the first client and land its bundle* below, the two people that run needs signed in for real, and is wiped by the drill's own wipe when the rehearsal ends.
@@ -139,6 +148,32 @@ Production's rows are browsed in a GUI through an SSH forward, as the read-only 
 ## Swap
 
 VPC 1 carries a 4 GB swap file on the NVMe so a first index that outgrows the worker's 1.5 GB cap slows down rather than fails (ADR 0024); `deploy/host-setup.sh vpc1` creates it once (`fallocate`, `mkswap`, `swapon`, the `fstab` line, `vm.swappiness=10`). The worker's own spill is bounded at 1.5 GB of swap by `memswap_limit` in `platform.compose.yaml`. The swap-in rate during the first index is ticket 42's measurement — the worker heartbeat's `pswpin` figure, above 4 MB/s for five minutes (ADR 0025) — and a box that swaps steadily is the signal for the WireGuard split; the page-cache floor in `BACKUPS.md` § Signals is the second trigger.
+
+## The daily sweeps
+
+Two sweeps clear what no row names. **The upload sweep** removes an original a failed bind left in the object store, once it is past the 24-hour grace and no document row names it: bytes that may hold personal data nobody can find (ADR 0020). **The graph sweep** deletes every generation of a workspace's map but the live one.
+
+**Where the schedule lives.** In the api process, on a daily timer of its own beside the reconciler's and never on its tick (`apps/api/src/sweeps.ts`). The first pass runs ten minutes after the api starts and the next every 24 hours after that, so a release restarts the wait without ever starving it. One pass sweeps every workspace in turn; a workspace whose sweep is refused is named in the log and passed over, and the rest are still swept.
+
+**One at a time.** A pass takes a Postgres advisory lock with a try, and is skipped while another holder has it. `pnpm ops graph-sweep` and `pnpm ops object-store-orphans` take the same lock and wait for a pass that holds it, so a run by hand and the timer never overlap; the restore drill's two sweeps wait the same way on staging.
+
+**The two settings, on the platform resource.**
+
+- `HEALTHCHECKS_PING_URL_SWEEPS` — the compose file requires it. The check it names is `sweeps` at healthchecks.io, period 24 h, grace 1 h, alerting by email; creating it is the operator's (`deploy/wizard-41.sh`, the healthchecks.io stage). **Set it before the release that brings the sweeps reaches either box**: on the platform resource in the orchestrator, and in staging's env file, or the compose file refuses to start the stack, the drill's `platform up` included. Staging's value is a URL of its own and never production's, because a staging pass would ping over production's silence; staging stands only during a drill, so its check carries no alert.
+- `UPLOAD_SWEEP` — `list` unless set, or `remove`. Any other value stops the sweeps with `the sweeps are not running` in the log, and the check goes quiet.
+
+**Reading the last pass.** Each of three places is enough on its own:
+
+- the `sweeps` check: a completed pass pings it with an outcome word and counts, such as `ok workspaces=3 refused=0 upload_sweep=list found=2 removed=0 generations=1`. A pass that passed over a workspace pings the check's failure with the same body under `fail`. The body never names a workspace, a key or an error.
+- the api's log: one `sweep pass` line per pass, at info even when it removed nothing and at warn when it passed over a workspace. It carries `upload_sweep`, `workspaces`, `refused`, `found`, `removed`, `generations` and `refusals`, which names each workspace passed over, which sweep and why. It never names a key.
+- the `sweep_pass` table: one row per completed pass, a pass that removed nothing included and a skipped one never, read through `browse_ro` (§ Browse production, whose step 3 is run again after the release that adds the table): `SELECT * FROM sweep_pass ORDER BY at DESC LIMIT 1`. It carries `at`, `upload_sweep`, `workspaces`, `refused` (how many were passed over), `found`, `removed` and `generations`, and names no workspace. The api writes it once and can neither change nor delete it.
+
+**List-only until an operator switches removal on.** On production the upload sweep starts as `list`: it counts what it would remove and removes nothing, so a pass reads `upload_sweep=list … removed=0` and `found` is the number of originals past the grace that no document row names, over every workspace. The graph sweep deletes from its first pass. A sweep that lists the bucket and removes what no row names deletes live bytes for good if its join is ever wrong, so its counts are read against their causes before it removes anything:
+
+- `found` rises by one for each bind whose second transaction failed, and falls only when something removes originals, such as `object-store-orphans` run by hand without `--list`. A rise with no failed bind behind it is the join being wrong: leave the setting at `list` and escalate.
+- `pnpm ops object-store-orphans --workspace <id> --list` gives one workspace's count, and the per-workspace counts add up to `found`. By hand the command removes unless given `--list`, whatever the setting says.
+
+Switch removal on after a week of list-only passes in which every rise in `found` has a failed bind behind it: set `UPLOAD_SWEEP=remove` on the platform resource and redeploy. The next pass reads `upload_sweep=remove`, with `removed` equal to `found`, and `found` falls to the binds that failed since. Setting it back to `list` stops the removal from the next start.
 
 ## Import a company's bundle
 

@@ -51,6 +51,9 @@ services:
       APEX_HOSTNAME: ${APEX_HOSTNAME:?}
       AGENT_MAX_FILE_BYTES: "104857600"
       HEALTHCHECKS_PING_URL_SCHEDULER: ${HEALTHCHECKS_PING_URL_SCHEDULER:?}
+      HEALTHCHECKS_PING_URL_SWEEPS: ${HEALTHCHECKS_PING_URL_SWEEPS:?}
+      # `remove` waits for an operator: a listing sweep that joins wrongly deletes live bytes for good.
+      UPLOAD_SWEEP: ${UPLOAD_SWEEP:-list}
     # A healthcheck declared here replaces the image's outright, so its own is repeated.
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]

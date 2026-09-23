@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { readBootstrap, readIdentityBootstrap, readObjectStore } from "../src/config.ts";
+import {
+  readBootstrap,
+  readIdentityBootstrap,
+  readObjectStore,
+  readSweeps,
+} from "../src/config.ts";
 
 const HOSTNAMES = {
   AGENT_HOSTNAME: "agent.example.test",
@@ -183,6 +188,46 @@ describe("the bootstrap configuration", () => {
     ["an empty value", ""],
   ])("refuses SMTP_URL with %s", (_case, url) => {
     expect(readIdentityBootstrap(identityEnvironment({ SMTP_URL: url })).ok).toBe(false);
+  });
+});
+
+describe("the sweeps' settings", () => {
+  it("keeps the upload sweep list-only, and pings nothing, until the estate says otherwise", () => {
+    expect(readSweeps({})).toEqual({
+      ok: true,
+      value: { uploadSweep: "list", pingUrl: undefined },
+    });
+  });
+
+  it("switches the upload sweep to removing, and gives the pass its check, when the estate names them", () => {
+    const read = readSweeps({
+      UPLOAD_SWEEP: "remove",
+      HEALTHCHECKS_PING_URL_SWEEPS: "https://hc-ping.com/0f5e8a2c-5d3a-4c55-9d0e-2b8c1f7a6e41",
+    });
+
+    expect(read).toEqual({
+      ok: true,
+      value: {
+        uploadSweep: "remove",
+        pingUrl: "https://hc-ping.com/0f5e8a2c-5d3a-4c55-9d0e-2b8c1f7a6e41",
+      },
+    });
+  });
+
+  it.each([
+    ["a word it does not know", "delete"],
+    ["the right word in another case", "Remove"],
+    ["an empty value", ""],
+  ])("refuses UPLOAD_SWEEP with %s rather than guess whether to remove", (_case, word) => {
+    expect(readSweeps({ UPLOAD_SWEEP: word }).ok).toBe(false);
+  });
+
+  it.each([
+    ["no scheme", "hc-ping.com/0f5e8a2c"],
+    ["another scheme", "ftp://hc-ping.com/0f5e8a2c"],
+    ["an empty value", ""],
+  ])("refuses a check to ping with %s", (_case, url) => {
+    expect(readSweeps({ HEALTHCHECKS_PING_URL_SWEEPS: url }).ok).toBe(false);
   });
 });
 

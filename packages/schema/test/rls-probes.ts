@@ -152,3 +152,9 @@ export const A_MIGRATION_STAMP =
 
 export const A_CONTRACT_STAMP =
   "INSERT INTO contract_stamp (only_row, digest) VALUES (true, 'a-contract-nobody-deployed')";
+
+export const A_SWEEP_PASS = `INSERT INTO sweep_pass (id, upload_sweep, workspaces, refused, found, removed, generations)
+                             VALUES ($1, 'list', 3, 0, 2, 0, 1)`;
+
+export const A_SWEEP_PASS_COUNTING = `INSERT INTO sweep_pass (id, upload_sweep, workspaces, refused, found, removed, generations)
+                                      VALUES ($1, $2, $3, $4, $5, $6, 0)`;

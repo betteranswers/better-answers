@@ -128,6 +128,33 @@ export const withSessionLock = async <T>(
   }
 };
 
+export type LockHeld = "held";
+
+// The try answers at once, so a second holder skips its work rather than queueing behind the
+// first.
+export const withSessionTryLock = async <T>(
+  platform: PlatformPrincipal,
+  door: PostgresDoor,
+  key: number,
+  work: (platform: PlatformPrincipal) => Promise<T>,
+): Promise<Result<T, LockHeld>> => {
+  const holder = await door.pool.connect();
+  try {
+    const tried = await holder.query<{ taken: boolean }>(
+      "SELECT pg_try_advisory_lock($1) AS taken",
+      [key],
+    );
+    if (tried.rows[0]?.taken !== true) return err("held");
+    try {
+      return ok(await work(platform));
+    } finally {
+      await holder.query("SELECT pg_advisory_unlock($1)", [key]);
+    }
+  } finally {
+    holder.release();
+  }
+};
+
 export const withIdentityWrite = async <T>(
   platform: PlatformPrincipal,
   door: PostgresDoor,

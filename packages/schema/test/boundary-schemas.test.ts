@@ -169,6 +169,18 @@ const acceptedRows = {
   mcpCallCounter: [{ workspaceId: WS_ID, tokenId: "jti-1", windowStart: NOW, count: 1 }],
   ingressCounter: [{ scope: "ip", key: "203.0.113.1", windowStart: NOW, count: 1 }],
   contractStamp: [{ onlyRow: true, digest: "a".repeat(64), stampedAt: NOW }],
+  sweepPass: [
+    {
+      id: "01J6SWEEPPASS0000000000000",
+      at: NOW,
+      uploadSweep: "list",
+      workspaces: 3,
+      refused: 0,
+      found: 2,
+      removed: 0,
+      generations: 1,
+    },
+  ],
 
   auditEvent: [
     {
@@ -750,6 +762,7 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "mcpCallCounter",
         "ingressCounter",
         "contractStamp",
+        "sweepPass",
         "auditEvent",
         "accessRequest",
 
@@ -836,6 +849,12 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { ...acceptedRows.contractStamp[0], digest: "A".repeat(64) },
       { ...acceptedRows.contractStamp[0], digest: "a".repeat(63) },
       { ...acceptedRows.contractStamp[0], onlyRow: false },
+    ],
+    sweepPass: [
+      { ...acceptedRows.sweepPass[0], id: "a-pass" },
+      { ...acceptedRows.sweepPass[0], uploadSweep: "delete" },
+      { ...acceptedRows.sweepPass[0], found: -1 },
+      { ...acceptedRows.sweepPass[0], removed: 0.5 },
     ],
     mcpCallCounter: [{ ...acceptedRows.mcpCallCounter[0], count: -1 }],
 

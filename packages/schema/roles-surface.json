@@ -198,6 +198,8 @@
     {"role":"app_rt","object":"public.suppression","kind":"table","is_partition":false,"privilege":"INSERT","grantable":false},
     {"role":"app_rt","object":"public.suppression","kind":"table","is_partition":false,"privilege":"SELECT","grantable":false},
     {"role":"app_rt","object":"public.suppression","kind":"table","is_partition":false,"privilege":"UPDATE","grantable":false},
+    {"role":"app_rt","object":"public.sweep_pass","kind":"table","is_partition":false,"privilege":"INSERT","grantable":false},
+    {"role":"app_rt","object":"public.sweep_pass","kind":"table","is_partition":false,"privilege":"SELECT","grantable":false},
     {"role":"app_rt","object":"public.user","kind":"table","is_partition":false,"privilege":"DELETE","grantable":false},
     {"role":"app_rt","object":"public.user","kind":"table","is_partition":false,"privilege":"INSERT","grantable":false},
     {"role":"app_rt","object":"public.user","kind":"table","is_partition":false,"privilege":"SELECT","grantable":false},
@@ -293,7 +295,7 @@
     {"owner":"<migrator>","kind":"<partition-of index.chunk>","relations":1},
     {"owner":"<migrator>","kind":"partitioned table","relations":1},
     {"owner":"<migrator>","kind":"sequence","relations":1},
-    {"owner":"<migrator>","kind":"table","relations":47},
+    {"owner":"<migrator>","kind":"table","relations":48},
     {"owner":"<migrator>","kind":"view","relations":1}
   ]
 }

@@ -10,8 +10,8 @@ import {
 } from "@better-answers/core/store/objects";
 import { openPostgres, type PostgresDoor } from "@better-answers/core/store/postgres";
 
-// Every pool this root opens takes one budget — requests, the MCP surface, sign-in and the tick
-// share it.
+// One budget for every pool this root opens: requests, the MCP surface, sign-in, the tick and a
+// sweep pass, whose lock holds a connection throughout.
 export const POSTGRES_POOL_MAX = 10;
 
 // Absent is a store nothing configured; a refusal is one configured that would not open, said

@@ -16,7 +16,7 @@ A living company knowledge map for UK SMBs on OKF v0.2. Three knowledge layers �
 
 | Path | What it is |
 | --- | --- |
-| `apps/api/` | The one TypeScript deployable — Hono on Node 24. Transports only: tRPC, the MCP surface, the authorization server and the SPA's static build on one origin, the `pnpm ops` commands and the reconciler's tick. No app↔worker HTTP — the control plane is rows |
+| `apps/api/` | The one TypeScript deployable — Hono on Node 24. Transports only: tRPC, the MCP surface, the authorization server and the SPA's static build on one origin, the `pnpm ops` commands, the reconciler's tick and the daily sweep pass. No app↔worker HTTP — the control plane is rows |
 | `apps/web/` | Vite React single-page app; talks to `apps/api/` over tRPC only |
 | `apps/worker/` | Python 3.13 knowledge worker (uv): the work loop, the nightly parser audit and the full rebuild. Connectors, conversion, indexing and extraction arrive with the route's S1 onward, composing cocoindex |
 | `packages/core/` | The business logic `apps/api` calls — capability slices over four store doors. Transport-agnostic, and lint-enforced as such |

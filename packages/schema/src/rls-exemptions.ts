@@ -28,6 +28,8 @@ export const RLS_EXEMPTIONS = {
     "The pre-authentication per-IP and per-email counter: no workspace exists yet to scope it by.",
   "public.contract_stamp":
     "One row saying which tier contract this deploy's api carries: a fact about the deploy, not about a tenant, and the worker reads it before any workspace is in hand.",
+  "public.sweep_pass":
+    "One row per sweep pass, and a pass covers every workspace at once: a fact about the deploy's schedule that names no tenant and holds counts alone.",
 } satisfies Record<string, string>;
 
 export const EXEMPT_TABLE_NAMES: readonly string[] = [

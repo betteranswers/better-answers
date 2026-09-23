@@ -6,7 +6,7 @@ import {
   type TestData,
 } from "@better-answers/schema/testing";
 import type pg from "pg";
-import { afterAll, beforeAll } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, expect } from "vitest";
 
 import type { Result, UserPrincipal } from "../src/kernel/index.ts";
 import { openPostgres, withPrincipal, type Opened, type Tx } from "../src/store/postgres/index.ts";
@@ -24,6 +24,30 @@ export const postgresForSuite = (): (() => MigratedPostgres) => {
 
   return () => {
     if (db === undefined) throw new Error("the suite's Postgres was read before it started");
+    return db;
+  };
+};
+
+// For an act that reads every workspace the database holds, whose totals another case's rows
+// would change.
+export const postgresForEachCase = (): (() => MigratedPostgres) => {
+  let db: MigratedPostgres | undefined;
+  let cases = 0;
+
+  beforeEach(async () => {
+    cases += 1;
+    const { testPath } = expect.getState();
+    if (testPath === undefined) throw new Error("a case's Postgres is named after its test file");
+    db = await openMigratedPostgres(`${testPath}#${String(cases)}`);
+  });
+
+  afterEach(async () => {
+    await db?.stop();
+    db = undefined;
+  });
+
+  return () => {
+    if (db === undefined) throw new Error("the case's Postgres was read before it started");
     return db;
   };
 };
