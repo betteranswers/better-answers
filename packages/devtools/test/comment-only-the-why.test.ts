@@ -10,10 +10,13 @@ import {
   writeUnder,
 } from "@better-answers/devtools/throwaway-tree";
 import { pluginConfigFor, repositoryRoot } from "@better-answers/devtools/oxlint-config";
+import {
+  commentGateRoots,
+  typeScriptGateArgv,
+  typeScriptGateConfig,
+} from "@better-answers/devtools/root-commands";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-
-import { rootScripts } from "./root-manifest.ts";
 
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
@@ -201,28 +204,6 @@ const A_WHY_OF_TWENTY =
 
 const A_ROOT_SCRIPT = "scripts/probe.mjs";
 
-// The command as the root manifest writes it, so this runs over the roots it really names.
-const gateArgv = (): readonly string[] => {
-  const command = rootScripts()["comment-gate:ts"] ?? "";
-  const [tool, ...rest] = command.split(/\s+/).filter((word) => word !== "");
-  if (tool !== "oxlint" || rest.length === 0) {
-    throw new Error(`\`comment-gate:ts\` is no longer an oxlint command: ${command}`);
-  }
-  return rest;
-};
-
-const gateConfigPath = (): string => {
-  const argv = gateArgv();
-  const named = argv[argv.indexOf("--config") + 1];
-  if (!argv.includes("--config") || named === undefined) {
-    throw new Error("`comment-gate:ts` names no --config, so this reading proves nothing.");
-  }
-  return named;
-};
-
-const gateRoots = (): readonly string[] =>
-  gateArgv().filter((word) => word !== "--config" && word !== gateConfigPath());
-
 const jsonConfig = z.looseObject({
   jsPlugins: z.array(z.looseObject({ specifier: z.string() })),
 });
@@ -230,7 +211,7 @@ const jsonConfig = z.looseObject({
 // The gate's own config, JSONC, with its plugin resolved to this checkout's so the throwaway
 // tree needs no dependencies of its own.
 const gateConfig = (): string => {
-  const relative = gateConfigPath();
+  const relative = typeScriptGateConfig();
   const source = readFileSync(path.join(repositoryRoot, relative), "utf8")
     .split("\n")
     .filter((line) => !line.trimStart().startsWith("//"))
@@ -249,8 +230,8 @@ const gateConfig = (): string => {
 // path this tree does not hold.
 const scaffold = (): Tree =>
   Object.fromEntries([
-    [gateConfigPath(), gateConfig()],
-    ...gateRoots().map((root) =>
+    [typeScriptGateConfig(), gateConfig()],
+    ...commentGateRoots().map((root) =>
       /\.[cm]?[jt]sx?$/.test(root)
         ? [root, "export const keep = 1;\n"]
         : [`${root}/keep.ts`, "export const keep = 1;\n"],
@@ -267,7 +248,7 @@ describe("the gate's own command reaches the root scripts directory", () => {
   const gate = runsOverThrowawayTree({
     executable: OXLINT,
     // Pinned, as the rule's own runner pins it: a reporter that names no file reads as silence.
-    argv: [...gateArgv(), "--format=unix"],
+    argv: [...typeScriptGateArgv(), "--format=unix"],
     scaffold: scaffold(),
     foundSomething: [1],
     // Smoked under a root the command has always named, so dropping `scripts` fails the case

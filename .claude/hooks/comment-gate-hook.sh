@@ -28,10 +28,10 @@ ROOT="$(cd "$ROOT" && pwd -P)"
 RELATIVE="${FILE#"$ROOT"/}"
 [ "$RELATIVE" != "$FILE" ] || exit 0
 
-# The roots this hook reads. Elsewhere it stays silent: a finding outside root `check`'s
-# gates would refuse an edit CI accepts.
+# Every root root `check` gates and no other: one short is a rule learnt a pull request late,
+# one over refuses an edit CI accepts.
 case "$RELATIVE" in
-apps/* | packages/* | scripts/* | .claude/hooks/*) ;;
+apps/* | packages/* | scripts/* | .claude/hooks/* | .github/* | deploy/*) ;;
 cubic.yaml | jscpd.config.mjs | knip.config.ts | lefthook.yml | pnpm-workspace.yaml) ;;
 *) exit 0 ;;
 esac

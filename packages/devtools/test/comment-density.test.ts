@@ -11,7 +11,7 @@ import {
 import { runsOverThrowawayTree } from "@better-answers/devtools/throwaway-tree";
 import { describe, expect, it } from "vitest";
 
-import { rootScripts } from "./root-manifest.ts";
+import { rootScripts } from "@better-answers/devtools/root-commands";
 
 import type { Unit } from "@better-answers/devtools/comment-density";
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
