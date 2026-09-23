@@ -1,0 +1,39 @@
+packages/core/test/tier-contract.test.ts
+  s_69414e6e80cf2c::t_1ee967e75a714b 192-193
+  s_69414e6e80cf2c::t_e4dacaea4096fe 118,127,131-133,136-139
+  s_69414e6e80cf2c::t_e2bed3b65d7b8c 72
+  s_69414e6e80cf2c::t_f8cd3064ea7754 184-191,194-200
+  s_69414e6e80cf2c::t_06db7cf46906ed 16
+  s_69414e6e80cf2c::t_e4ac034d16b6fe 62-66,68-71,73-81,83,88-90,92-104
+  s_69414e6e80cf2c::t_386247fe4197e4 51
+  s_69414e6e80cf2c::t_9d0677927e160a 67,82,84-87,91
+  s_69414e6e80cf2c::t_347075c54e7653 106,108-117,119-126,128-130,134-135,140
+  s_69414e6e80cf2c::t_cf4f5b3abf7273 52
+apps/worker/tests/test_tier_contract.py
+  s_69414e6e80cf2c::t_d21ba8bdb4ffe1 39-45,48-56
+  s_69414e6e80cf2c::t_0decaa3e09efd0 81,86-88,91-112,122,124
+  s_69414e6e80cf2c::t_e888cab39c36fa 223,232-234
+  s_69414e6e80cf2c::t_95a2b4846af4ac 224-231,235-243
+  s_69414e6e80cf2c::t_d3f6dedad33448 73-80,82-85,89-90,113-121,123,125-141,143-145,147-151,153-154,156-157,160-162,169-170,172-184
+  s_69414e6e80cf2c::t_60772949f262f5 142,146,152,155,158-159,163-168,171
+  s_69414e6e80cf2c::t_ce7e0266eb6add 46-47
+  s_69414e6e80cf2c::t_4656d66036f9bc 6
+contracts/README.md
+  s_69414e6e80cf2c::t_024f75fdd0e992 14-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "c323dd050f0a94c0ac95e703da8a4b00c907d2ec",
+  "prompts": {},
+  "sessions": {
+    "s_69414e6e80cf2c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6af0bc5d-5e17-4638-afb3-472e1f42e570",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
