@@ -7,6 +7,7 @@ import {
   JOB_KIND_DESCRIPTORS,
   JOB_QUEUED_STATUS,
   NIGHTLY_AUDIT_KIND,
+  REASONS_EMPTYING_THE_BINDING,
   REBUILD_REASONS,
   ROLES,
   type JOB_KINDS,
@@ -150,7 +151,8 @@ const ENQUEUE = `WITH inserted AS (
   ), taken AS (
     UPDATE job SET reason = $5::text
      WHERE workspace_id = $1 AND kind = $3 AND subject_id = $4::text
-       AND status = '${JOB_QUEUED_STATUS}' AND $5::text = '${WIPE_REASON}' AND reason <> '${WIPE_REASON}'
+       AND status = '${JOB_QUEUED_STATUS}'
+       AND $5::text = ANY($6::text[]) AND reason <> ALL($6::text[])
        AND NOT EXISTS (SELECT 1 FROM inserted)
     RETURNING id
   )
@@ -199,6 +201,7 @@ export const enqueueJobIn = async (
     parsed.data.kind,
     parsed.data.subjectId ?? null,
     parsed.data.reason ?? null,
+    REASONS_EMPTYING_THE_BINDING,
   ]);
   const answered = landed.rows[0]?.id;
   if (answered === undefined) {

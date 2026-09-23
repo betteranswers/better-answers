@@ -239,7 +239,7 @@ describe("an act that lands its rows and its job in one transaction", () => {
     const second = await actOf(scenario, async (tx) => {
       const answered = await enqueueJobIn(graphMaintenance, tx, {
         ...boundJob(scenario.workspaceId),
-        reason: "rule-change",
+        reason: "restored",
       });
       await tx.query("SELECT 1");
       return answered;
@@ -258,22 +258,30 @@ describe("an act that lands its rows and its job in one transaction", () => {
     ]);
   });
 
-  it("takes a wipe onto the job already queued, and keeps it there when a later reason arrives", async () => {
-    const scenario = await arrange();
-    const firstJobId = await queuedBound(scenario);
+  it.each([
+    ["rule-change", "wiped"],
+    ["wiped", "rule-change"],
+  ] as const)(
+    "takes %s onto the job already queued, and keeps it there when a later reason arrives, %s among them",
+    async (emptying, alsoEmptying) => {
+      const scenario = await arrange();
+      const firstJobId = await queuedBound(scenario);
 
-    const wipe = await actOf(scenario, (tx) =>
-      enqueueJobIn(graphMaintenance, tx, { ...boundJob(scenario.workspaceId), reason: "wiped" }),
-    );
-    expect(wipe).toEqual({ ok: true, value: { jobId: firstJobId } });
-    expect(await reasonsIn(scenario.workspaceId)).toEqual(["wiped"]);
+      const taken = await actOf(scenario, (tx) =>
+        enqueueJobIn(graphMaintenance, tx, { ...boundJob(scenario.workspaceId), reason: emptying }),
+      );
+      expect(taken).toEqual({ ok: true, value: { jobId: firstJobId } });
+      expect(await reasonsIn(scenario.workspaceId)).toEqual([emptying]);
 
-    const later = await actOf(scenario, (tx) =>
-      enqueueJobIn(graphMaintenance, tx, { ...boundJob(scenario.workspaceId), reason: "restored" }),
-    );
-    expect(later).toEqual({ ok: true, value: { jobId: firstJobId } });
-    expect(await reasonsIn(scenario.workspaceId)).toEqual(["wiped"]);
-  });
+      for (const reason of ["restored", alsoEmptying] as const) {
+        const later = await actOf(scenario, (tx) =>
+          enqueueJobIn(graphMaintenance, tx, { ...boundJob(scenario.workspaceId), reason }),
+        );
+        expect(later).toEqual({ ok: true, value: { jobId: firstJobId } });
+        expect(await reasonsIn(scenario.workspaceId)).toEqual([emptying]);
+      }
+    },
+  );
 
   it("queues a second binding on its own, because the run key is one per subject", async () => {
     const scenario = await arrange();

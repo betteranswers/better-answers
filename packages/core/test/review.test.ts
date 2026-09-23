@@ -1,3 +1,4 @@
+import { REASONS_EMPTYING_THE_BINDING } from "@better-answers/schema";
 import type pg from "pg";
 import { describe, expect, it } from "vitest";
 
@@ -1078,6 +1079,21 @@ describe("the reprocess that follows a review", () => {
     });
     expect(await marksOf(scenario.workspaceId, left)).toBeUndefined();
   });
+
+  it.each(REASONS_EMPTYING_THE_BINDING)(
+    "hands the keep's run still queued the reason %s, so the run the worker claims empties the store the rows went from",
+    async (reason) => {
+      const scenario = await arrange();
+      const { bindingId } = await keepingTwoGroupsOfThree(scenario);
+
+      const outcome = await reprocessAsAdmin(scenario, bindingId, reason);
+
+      expect(outcome).toMatchObject({ ok: true, value: { chunks: 2 } });
+      expect(await jobsOf(scenario.workspaceId)).toEqual([
+        { kind: "index", reason, subject_id: bindingId },
+      ]);
+    },
+  );
 
   it.each([
     [
