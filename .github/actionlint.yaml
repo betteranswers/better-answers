@@ -1,0 +1,4 @@
+self-hosted-runner:
+  # actionlint's list of hosted runners predates GitHub's `ubuntu-26.04`, so it refuses the label on every job.
+  labels:
+    - ubuntu-26.04
