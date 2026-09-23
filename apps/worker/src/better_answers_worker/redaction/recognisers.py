@@ -34,6 +34,7 @@ A_STREET_LINE = re.compile(
     r"|Terrace|Crescent|Grove|Hill|Row|Walk|Mews|Park)\b"
 )
 A_PROMOTED_POSTCODE = 0.8
+LINES_ABOVE_A_POSTCODE = 2
 
 
 A_SENTENCE_WITH_A_CUE = 0.85
@@ -141,7 +142,7 @@ class HomeAddressRecogniser(SeamRecogniser):
         self, text: str, nlp_artifacts: NlpArtifacts | None
     ) -> Iterator[tuple[int, int, float]]:
         for postcode in A_POSTCODE.finditer(text):
-            opened = two_lines_above(text, postcode.start())
+            opened = lines_above_a_postcode(text, postcode.start())
             streets = list(A_STREET_LINE.finditer(text, opened, postcode.start()))
             if streets:
                 yield streets[-1].start(), postcode.end(), A_PROMOTED_POSTCODE
@@ -176,9 +177,9 @@ def sentence_around(text: str, at: int) -> tuple[int, int]:
     )
 
 
-def two_lines_above(text: str, at: int) -> int:
+def lines_above_a_postcode(text: str, at: int) -> int:
     opened = at
-    for _ in range(2):
+    for _ in range(LINES_ABOVE_A_POSTCODE):
         break_before = text.rfind("\n", 0, opened)
         if break_before == -1:
             return 0
