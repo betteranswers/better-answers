@@ -1,0 +1,100 @@
+packages/schema/migrations/meta/0047_snapshot.json
+  s_69414e6e80cf2c::t_ad5e74e2de4e15 1-5454
+packages/core/test/review.test.ts
+  s_69414e6e80cf2c::t_5c576e5255f472 23
+  s_69414e6e80cf2c::t_5b67c92484a487 760,768
+  s_69414e6e80cf2c::t_6e4c9da79196ce 192
+  s_69414e6e80cf2c::t_8105cfc4bc0254 769
+packages/core/test/visibility.test.ts
+  s_69414e6e80cf2c::t_f889fb2b3376cc 521,536,539,543,546,583,955
+  s_69414e6e80cf2c::t_081aaba98a58b7 584
+  s_69414e6e80cf2c::t_398d81d2f80ebb 915
+  s_69414e6e80cf2c::t_c77e0d72c2922c 61
+  s_69414e6e80cf2c::t_cf9338bdec0c5a 29
+  s_69414e6e80cf2c::t_fa6b46e8ea5243 63
+  s_69414e6e80cf2c::t_18a80674bc8a34 513,538,540,544,547
+apps/worker/tests/test_pipeline_index.py
+  s_69414e6e80cf2c::t_7e77b11a625aee 318,325-326
+packages/schema/test/boundary-schemas.test.ts
+  s_69414e6e80cf2c::t_79f211f4b4c1fa 866
+packages/schema/migrations/0047_the-chunk-visibility-dropped.sql
+  s_69414e6e80cf2c::t_b3a4a99bcc8911 1-3,6-10
+  s_69414e6e80cf2c::t_04933982cf3fca 4-5
+packages/schema/src/index-tables.ts
+  s_69414e6e80cf2c::t_6910740ec7751a 2
+packages/schema/test/chunk-columns.test.ts
+  s_69414e6e80cf2c::t_796dffc26e661b 290
+  s_69414e6e80cf2c::t_86e9c2e4232ceb 293
+  s_69414e6e80cf2c::t_c8bcabaacfa896 299-300
+docs/specs/s4-a-chunks-visibility-is-read-not-copied.md
+  s_69414e6e80cf2c::t_27f94be93b1db6 92
+docs/specs/v01-route.md
+  s_69414e6e80cf2c::t_afa657f7fbe71b 282
+  s_69414e6e80cf2c::t_c2cea42a0f555c 286
+packages/core/test/sourced-concept.ts
+  s_69414e6e80cf2c::t_d1b19539d58834 122-134
+packages/schema/test/catalogue-statements.ts
+  s_69414e6e80cf2c::t_01675325d596dd 58,60
+docs/adr/0032-the-graph-is-plain-tables-under-rls-the-substrate-is-one-journal-one-role-seam-one-definer-function.md
+  s_69414e6e80cf2c::t_babcaf93e05abf 66
+  s_69414e6e80cf2c::t_7d34d67429405d 89-94
+packages/schema/migrations/meta/_journal.json
+  s_69414e6e80cf2c::t_ad5e74e2de4e15 333-339
+packages/schema/src/contract-stamp.ts
+  s_69414e6e80cf2c::t_aeee47c4b892bf 3
+CONTEXT.md
+  s_69414e6e80cf2c::t_259d2e008b7b88 173-175
+  s_69414e6e80cf2c::t_78f7ef73f9ae67 350-352
+packages/schema/test/probes.ts
+  s_69414e6e80cf2c::t_843c09bd0084bb 229-230
+  s_69414e6e80cf2c::t_9556f757054b1c 233-234
+apps/worker/tests/factories.py
+  s_69414e6e80cf2c::t_d44cecd0c70e42 410-413
+apps/worker/src/better_answers_worker/schema_view.py
+  s_69414e6e80cf2c::t_8fb1aa393285c1 3,5
+apps/worker/src/better_answers_worker/contract_stamp.py
+  s_69414e6e80cf2c::t_aeee47c4b892bf 3
+packages/schema/test/readable-chunk.test.ts
+  s_69414e6e80cf2c::t_48cb642d905f96 346,349-353,359,362-363,367-368
+packages/schema/test/migration-ownership.test.ts
+  s_69414e6e80cf2c::t_7215edeeffccdc 289,294
+packages/core/test/chunk-visibility.test.ts
+  s_69414e6e80cf2c::t_41641e5d572cb7 359
+  s_69414e6e80cf2c::t_bd9ea56eb6bf7e 413
+  s_69414e6e80cf2c::t_8762228bfbb85e 92,94-103
+  s_69414e6e80cf2c::t_09ff861847205d 436,439
+  s_69414e6e80cf2c::t_1939a92dcf2654 300,325,327,459,494-495
+docs/adr/0031-the-tier-contract-is-six-agreements-in-three-forms-fixtured-in-one-language-neutral-directory-both-suites-read.md
+  s_69414e6e80cf2c::t_ab0040adf13548 97
+  s_69414e6e80cf2c::t_7d01607e62b630 87-92
+docs/adr/README.md
+  s_69414e6e80cf2c::t_8f8ec0ad63784c 41
+packages/core/test/invisibility.test.ts
+  s_69414e6e80cf2c::t_f0976df8aaa972 55
+  s_69414e6e80cf2c::t_5b64adb68ae74c 46
+  s_69414e6e80cf2c::t_1d424aec66878c 280-281
+packages/core/test/sources.test.ts
+  s_69414e6e80cf2c::t_28fb21ab11b3af 25-31
+  s_69414e6e80cf2c::t_23ca6f7f808483 618
+  s_69414e6e80cf2c::t_ed4f1af3fda27b 740-743
+  s_69414e6e80cf2c::t_8d3af5c9a2328e 954,980
+  s_69414e6e80cf2c::t_1d454813c27608 964
+  s_69414e6e80cf2c::t_2590c2cf0ad77f 985
+  s_69414e6e80cf2c::t_11923013f0b24f 692,739
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "18e265fdd15b316e3e1c0a5fb68360ff57a71a72",
+  "prompts": {},
+  "sessions": {
+    "s_69414e6e80cf2c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6af0bc5d-5e17-4638-afb3-472e1f42e570",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
