@@ -28,9 +28,30 @@ describe("what a procedure may answer the wire", () => {
   it("reaches every procedure the router carries, by the path its caller names", () => {
     expect(Object.keys(appRouter._def.procedures).sort()).toEqual([
       "routes.list",
+      "runs.ofSubject",
       "session.membership",
+      "sources.bind",
+      "sources.findings",
+      "sources.keepInText",
+      "sources.list",
+      "sources.narrow",
+      "sources.narrowDocuments",
+      "sources.preview",
+      "sources.publish",
     ]);
-    expectTypeOf<EveryProcedure["path"]>().toEqualTypeOf<"session.membership" | "routes.list">();
+    expectTypeOf<EveryProcedure["path"]>().toEqualTypeOf<
+      | "session.membership"
+      | "routes.list"
+      | "sources.list"
+      | "sources.bind"
+      | "sources.findings"
+      | "sources.keepInText"
+      | "sources.narrowDocuments"
+      | "sources.publish"
+      | "sources.narrow"
+      | "sources.preview"
+      | "runs.ofSubject"
+    >();
   });
 
   it("answers no caller a Result, which would cross a refusal as a success", () => {

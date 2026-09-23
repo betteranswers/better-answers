@@ -101,6 +101,13 @@ export {
   type PreviewChunksInput,
   type PreviewedChunk,
 } from "./passages.ts";
+export {
+  listBindings,
+  type BindingState,
+  type ListBindingsRefusal,
+  type ListedBinding,
+  type QuarantinedDocument,
+} from "./listing.ts";
 export { SOURCE_REFUSALS, type SourceRefusal } from "./vocabulary.ts";
 
 const SOURCE_ACTS = declareActs("sources", {

@@ -1,9 +1,11 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { createTRPCClient, httpBatchLink, TRPCClientError } from "@trpc/client";
+import { createTRPCClient, TRPCClientError } from "@trpc/client";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import { createTRPCContext, createTRPCOptionsProxy } from "@trpc/tanstack-react-query";
 
 import type { AppRouter } from "@better-answers/api/trpc";
+
+import { apiLink } from "./link.ts";
 
 export const TRPC_ENDPOINT = "/trpc";
 
@@ -26,7 +28,7 @@ export const refusalOf = (error: Error): Refusal | undefined => {
 export const { TRPCProvider, useTRPC } = createTRPCContext<AppRouter>();
 
 export const createApiClient = () =>
-  createTRPCClient<AppRouter>({ links: [httpBatchLink({ url: TRPC_ENDPOINT })] });
+  createTRPCClient<AppRouter>({ links: [apiLink({ url: TRPC_ENDPOINT })] });
 
 export type ApiClient = ReturnType<typeof createApiClient>;
 

@@ -1,7 +1,17 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 import type { Logger } from "pino";
+import type { z } from "zod";
 
-import { attempt, type Claims, type RefusalClass, type Result } from "@better-answers/core/kernel";
+import {
+  attempt,
+  err,
+  parse,
+  type Claims,
+  type Clock,
+  type Malformed,
+  type RefusalClass,
+  type Result,
+} from "@better-answers/core/kernel";
 import { withHeldPrincipal, withPrincipal } from "@better-answers/core/store/postgres";
 
 import { sessionClaims, type SessionReader } from "../auth/verify.ts";
@@ -10,10 +20,40 @@ import { refusalLogged, refusalOf, RefusedError, type RefusalAnswer } from "../r
 
 type TrpcContext = {
   readonly doors: Doors;
+  readonly clock: Clock;
   readonly readSession: SessionReader;
   readonly headers: Headers;
   readonly log: Logger;
 };
+
+// Spelled here because tRPC exports the Standard Schema type only from a path it marks internal.
+type StandardParser<Input, Output> = {
+  readonly "~standard": {
+    readonly version: 1;
+    readonly vendor: string;
+    // oxlint-disable-next-line anti-slop/no-unknown-parameters -- the standard's own signature: the transport hands over whatever arrived, and the kernel `parse` it calls is what narrows it.
+    readonly validate: (value: unknown) => { readonly value: Output };
+    readonly types?: { readonly input: Input; readonly output: Output } | undefined;
+  };
+};
+
+// A refusal rides through as the input too, so a malformed input crosses, and is logged, where
+// every other refusal is.
+export const parsedBy = <Schema extends z.ZodType>(
+  schema: Schema,
+): StandardParser<z.input<Schema>, Result<z.output<Schema>, Malformed>> => ({
+  "~standard": {
+    version: 1,
+    vendor: "better-answers",
+    validate: (raw) => ({ value: parse(schema, raw) }),
+  },
+});
+
+export const given = <Input, Value, Refused>(
+  parsed: Result<Input, Malformed>,
+  run: (input: Input) => Promise<Result<Value, Refused>>,
+): Promise<Result<Value, Refused | Malformed>> =>
+  parsed.ok ? run(parsed.value) : Promise.resolve(err(parsed.error));
 
 // The seven classes sort a word by what its caller can do, which is why each falls on one status.
 const CODE_OF_CLASS = {

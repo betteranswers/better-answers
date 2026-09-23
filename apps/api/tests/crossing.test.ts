@@ -12,25 +12,16 @@ import { callMcp } from "./mcp-call.ts";
 import {
   constraintDefinition,
   memberOfTwoWorkspaces,
+  seededIn,
   sessionPointedAt,
   signedInClient,
+  THE_THREE_CONFIRMATIONS,
 } from "./provoke.ts";
+import { anAdminOnTheWeb, refusalOfCall, webSignedIn } from "./web-client.ts";
 
 const MEMBERSHIP = `${TRPC_ENDPOINT}/session.membership`;
 
 const MEMBER_WORKSPACE_FK = "member_workspace_id_workspace_id_fk";
-
-// `ops` reaches malformed and the two transports reach unauthenticated; every other class waits on
-// an act no entry calls yet.
-const NO_ENTRY_REACHES_THESE_YET = [
-  "forbidden",
-  "absent",
-  "inapplicable",
-  "conflict",
-  "precondition",
-];
-
-const REACHED_TODAY = ["unauthenticated", "malformed"];
 
 const crossed = z.object({
   error: z.object({
@@ -103,6 +94,98 @@ const asAnAgent = async (): Promise<{ readonly client: TestClient; readonly toke
   const tokens = await connectAsHost(app, client, workspace.admin);
   return { client, token: tokens.accessToken };
 };
+
+const anAdmin = async () => {
+  const { workspace, api } = await anAdminOnTheWeb(app);
+  return { workspaceId: workspace.workspaceId, api };
+};
+
+const bindingIn = (workspaceId: string, publishedAt: Date | null): Promise<string> =>
+  seededIn(app, async (seed) => (await seed.sourceBinding({ workspaceId, publishedAt })).id);
+
+const A_SORT_CODE = { category: "bank-details", ruleId: "sort-code-with-account-number" };
+
+// One word stands for its class: a class falls on one status, and the walk holds every word to
+// its class.
+const A_WORD_OF_EACH_CLASS = [
+  [
+    "malformed",
+    { word: "malformed", fields: { bindingId: "bad-format" } },
+    400,
+    async () => (await anAdmin()).api.sources.findings.query({ bindingId: "not-a-binding-id" }),
+  ],
+  [
+    "forbidden",
+    { word: "role-forbids" },
+    403,
+    async () => {
+      const workspace = await app.provision();
+      const editor = await app.person();
+      await app.addMember(workspace.workspaceId, editor.id, "Editor");
+      return (await webSignedIn(app, editor.email)).api.sources.list.query();
+    },
+  ],
+  [
+    "absent",
+    { word: "no-such-document" },
+    404,
+    async () => {
+      const { workspaceId, api } = await anAdmin();
+      const bindingId = await bindingIn(workspaceId, null);
+      return api.sources.narrowDocuments.mutate({
+        bindingId,
+        findingGroups: [{ documentId: ulid(), tier: "always", ...A_SORT_CODE }],
+      });
+    },
+  ],
+  [
+    "inapplicable",
+    { word: "not-the-always-set" },
+    422,
+    async () =>
+      (await anAdmin()).api.sources.keepInText.mutate({
+        bindingId: ulid(),
+        findingGroups: [{ documentId: ulid(), tier: "default-on", ...A_SORT_CODE }],
+        reason: "The sort code is the company's own.",
+      }),
+  ],
+  [
+    "conflict",
+    { word: "already-published" },
+    409,
+    async () => {
+      const { workspaceId, api } = await anAdmin();
+      const bindingId = await bindingIn(workspaceId, new Date("2026-09-22T09:00:00.000Z"));
+      return api.sources.publish.mutate({ bindingId, confirmations: THE_THREE_CONFIRMATIONS });
+    },
+  ],
+  [
+    "precondition",
+    { word: "not-indexed" },
+    412,
+    async () => {
+      const { workspaceId, api } = await anAdmin();
+      const bindingId = await bindingIn(workspaceId, null);
+      return api.sources.publish.mutate({ bindingId, confirmations: THE_THREE_CONFIRMATIONS });
+    },
+  ],
+] as const;
+
+describe("a word of every class an act answers, crossing tRPC", () => {
+  it.each(A_WORD_OF_EACH_CLASS)(
+    "sends a %s refusal as its own word, under the status its class carries, logged once",
+    async (refusalClass, refusal, status, provoke) => {
+      const refused = await refusalOfCall(provoke());
+
+      expect(refused).toMatchObject({
+        data: { httpStatus: status, refusal: { ...refusal, class: refusalClass } },
+      });
+      expect(logsOf("trpc.refused").map((line) => [line["refusal"], line["class"]])).toEqual([
+        [refusal.word, refusalClass],
+      ]);
+    },
+  );
+});
 
 describe("a refusal crossing tRPC", () => {
   it.each([
@@ -253,9 +336,10 @@ describe("a refusal crossing the MCP surface", () => {
 });
 
 describe("the classes a word may carry", () => {
-  it("names the classes no entry can reach beside the two these suites drive", () => {
-    expect([...REFUSAL_CLASSES].sort()).toEqual(
-      [...REACHED_TODAY, ...NO_ENTRY_REACHES_THESE_YET].sort(),
-    );
+  it("are each reached through an entry by a case above, and no case names a class beyond them", () => {
+    const driven = ["unauthenticated", ...A_WORD_OF_EACH_CLASS.map(([driving]) => driving)];
+
+    expect([...REFUSAL_CLASSES].sort()).toEqual([...new Set(driven)].sort());
+    expect(driven).toHaveLength(REFUSAL_CLASSES.length);
   });
 });

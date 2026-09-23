@@ -1,3 +1,5 @@
+import { testData } from "@better-answers/schema/testing";
+
 import { signIn } from "./flow.ts";
 import { APP_HOSTNAME, type TestApp, type TestClient } from "./harness.ts";
 
@@ -6,6 +8,23 @@ export const signedInClient = async (app: TestApp, email: string): Promise<TestC
   await signIn(app, client, email);
   return client;
 };
+
+type TestData = ReturnType<typeof testData>;
+
+export const seededIn = async <T>(app: TestApp, work: (seed: TestData) => Promise<T>) => {
+  const client = await app.database.superuser.connect();
+  try {
+    return await work(testData(client));
+  } finally {
+    client.release();
+  }
+};
+
+export const THE_THREE_CONFIRMATIONS = {
+  lawfulBasisRecorded: true,
+  privacyInformationUpdated: true,
+  dpiaReferenced: true,
+} as const;
 
 export const constraintDefinition = async (app: TestApp, name: string): Promise<string> => {
   const found = await app.database.superuser.query<{ definition: string }>(
@@ -24,6 +43,41 @@ export const memberOfTwoWorkspaces = async (app: TestApp): Promise<TestClient> =
   await app.addMember(first.workspaceId, person.id, "Viewer");
   await app.addMember(second.workspaceId, person.id, "Viewer");
   return signedInClient(app, person.email);
+};
+
+export type HeldRevocation = {
+  land(): Promise<void>;
+  abandon(): Promise<void>;
+};
+
+// The row is written and locked with its commit still to come: the moment a held membership read
+// must wait out.
+export const revocationHeldOpen = async (app: TestApp, userId: string): Promise<HeldRevocation> => {
+  const revoking = await app.database.superuser.connect();
+  await revoking.query("BEGIN");
+  await revoking.query('UPDATE "user" SET credentials_revoked_at = $2 WHERE id = $1', [
+    userId,
+    new Date(Date.now() + 60_000),
+  ]);
+  const state = { ended: false };
+  const end = async (how: "COMMIT" | "ROLLBACK"): Promise<void> => {
+    if (state.ended) return;
+    state.ended = true;
+    try {
+      await revoking.query(how);
+    } finally {
+      revoking.release();
+    }
+  };
+  return { land: () => end("COMMIT"), abandon: () => end("ROLLBACK") };
+};
+
+export const someoneWaitsOnALock = async (app: TestApp): Promise<boolean> => {
+  const found = await app.database.superuser.query<{ waiting: number }>(
+    `SELECT count(*)::int AS waiting FROM pg_stat_activity
+      WHERE datname = current_database() AND wait_event_type = 'Lock'`,
+  );
+  return (found.rows[0]?.waiting ?? 0) > 0;
 };
 
 export const sessionPointedAt = async (

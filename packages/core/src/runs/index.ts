@@ -10,6 +10,7 @@ import {
   REBUILD_REASONS,
   ROLES,
   type JOB_KINDS,
+  type JOB_REASONS,
   type JOB_STATUSES,
   type JobKindDescriptor,
 } from "@better-answers/schema";
@@ -24,6 +25,7 @@ import {
   ok,
   requireAdmin,
   ulid,
+  type AdminUserPrincipal,
   type InputOf,
   type KernelRefusal,
   type Principal,
@@ -265,6 +267,95 @@ export const latestIndexOutcomeIn = async (
   if (!read.ok) return err(read.error);
   const row = read.value.rows[0];
   return row === undefined ? ok(null) : outcomeOf(row.outcome);
+};
+
+export const runsOfSubjectInput = z.object({ subjectId: SUBJECT_ID });
+
+export type RunsOfSubjectInput = z.output<typeof runsOfSubjectInput>;
+
+export type SubjectRun = {
+  readonly jobId: string;
+  readonly kind: JobKind;
+  readonly reason: (typeof JOB_REASONS)[number] | null;
+  readonly status: JobStatus;
+  readonly attempts: number;
+  readonly enqueuedAt: string;
+
+  readonly finishedAt: string | null;
+  readonly outcome: JobOutcome | null;
+};
+
+type SubjectRunRow = Omit<SubjectRun, "enqueuedAt" | "finishedAt" | "jobId" | "outcome"> & {
+  readonly id: string;
+  readonly subject_id: string;
+  readonly enqueued_at: Date;
+  readonly finished_at: Date | null;
+  readonly outcome: OutcomeColumn;
+};
+
+const SUBJECT_RUN_COLUMNS =
+  "id, subject_id, kind, reason, status, attempts, enqueued_at, finished_at, outcome";
+
+const NEWEST_FIRST = "enqueued_at DESC, id DESC";
+
+const subjectRunsOf = (
+  rows: readonly SubjectRunRow[],
+): Result<ReadonlyArray<readonly [string, SubjectRun]>, Error> => {
+  const runs: Array<readonly [string, SubjectRun]> = [];
+  for (const { id, subject_id, enqueued_at, finished_at, outcome, ...run } of rows) {
+    const found = outcomeOf(outcome);
+    if (!found.ok) return err(found.error);
+    runs.push([
+      subject_id,
+      {
+        jobId: id,
+        ...run,
+        enqueuedAt: enqueued_at.toISOString(),
+        finishedAt: finished_at?.toISOString() ?? null,
+        outcome: found.value,
+      },
+    ]);
+  }
+  return ok(runs);
+};
+
+export const runsOfSubject = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  input: RunsOfSubjectInput,
+): Promise<Result<readonly SubjectRun[], RoleRefusal | Error>> => {
+  const admin = requireAdmin(principal);
+  if (!admin.ok) return err(admin.error);
+
+  const read = await attempt(() =>
+    tx.query<SubjectRunRow>(
+      `SELECT ${SUBJECT_RUN_COLUMNS} FROM job
+        WHERE workspace_id = $1 AND subject_id = $2
+        ORDER BY ${NEWEST_FIRST}`,
+      [admin.value.workspaceId, input.subjectId],
+    ),
+  );
+  if (!read.ok) return err(read.error);
+  const runs = subjectRunsOf(read.value.rows);
+  return runs.ok ? ok(runs.value.map(([, run]) => run)) : runs;
+};
+
+export const latestRunsOf = async (
+  admin: AdminUserPrincipal,
+  tx: Tx,
+  input: { readonly subjectIds: readonly string[] },
+): Promise<Result<ReadonlyMap<string, SubjectRun>, Error>> => {
+  const read = await attempt(() =>
+    tx.query<SubjectRunRow>(
+      `SELECT DISTINCT ON (subject_id) ${SUBJECT_RUN_COLUMNS} FROM job
+        WHERE workspace_id = $1 AND subject_id = ANY($2::text[])
+        ORDER BY subject_id, ${NEWEST_FIRST}`,
+      [admin.workspaceId, input.subjectIds],
+    ),
+  );
+  if (!read.ok) return err(read.error);
+  const runs = subjectRunsOf(read.value.rows);
+  return runs.ok ? ok(new Map(runs.value)) : runs;
 };
 
 const AUDIT_FINDINGS = ["mismatched", "unparsed", "missing_row", "missing_file"] as const;
