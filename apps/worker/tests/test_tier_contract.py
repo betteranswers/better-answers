@@ -3,7 +3,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, TypedDict, cast
 
 import psycopg
 import pytest
@@ -36,9 +36,24 @@ COMMENT_GATE = (
 )
 
 
-def read_manifest() -> dict[str, Any]:
-    raw = (CONTRACTS_DIR / "manifest.json").read_text(encoding="utf-8")
-    return cast("dict[str, Any]", json.loads(raw))
+class DeclaredForm(TypedDict):
+    form: str
+
+
+class ListedFixture(TypedDict):
+    agreement: str
+    path: str
+
+
+class Manifest(TypedDict):
+    contract_version: int
+    agreements: dict[str, DeclaredForm]
+    fixtures: list[ListedFixture]
+
+
+def read_manifest(directory: Path = CONTRACTS_DIR) -> Manifest:
+    raw = (directory / "manifest.json").read_text(encoding="utf-8")
+    return cast("Manifest", json.loads(raw))
 
 
 def fixtures_on_disk(directory: Path) -> set[str]:
@@ -53,6 +68,118 @@ def fixtures_on_disk(directory: Path) -> set[str]:
             continue
         found.add(str(relative))
     return found
+
+
+def directories_in(directory: Path) -> list[str]:
+    return [
+        entry.name
+        for entry in directory.iterdir()
+        if entry.is_dir() and not entry.name.startswith(".")
+    ]
+
+
+def files_under(root: Path, agreement: str) -> set[str]:
+    directory = root / agreement
+    return fixtures_on_disk(directory) if directory.is_dir() else set()
+
+
+def _fixtured_failures(
+    agreement: str, listed: list[ListedFixture], root: Path
+) -> list[str]:
+    failures: list[str] = []
+
+    if not listed:
+        failures.append(
+            f"{agreement} declares fixtured and the manifest lists no fixture under it"
+        )
+    for fixture in listed:
+        path = fixture["path"]
+        if not path.startswith(f"{agreement}/"):
+            failures.append(
+                f"{agreement} declares fixtured and lists {path}, "
+                f"which is not under {agreement}/"
+            )
+        elif not (root / path).exists():
+            failures.append(
+                f"{agreement} declares fixtured and lists {path}, which is not on disk"
+            )
+
+    return failures
+
+
+def form_failures(manifest: Manifest, root: Path) -> list[str]:
+    failures: list[str] = []
+
+    for agreement, entry in manifest["agreements"].items():
+        form = entry["form"]
+        listed = [
+            fixture
+            for fixture in manifest["fixtures"]
+            if fixture["agreement"] == agreement
+        ]
+
+        if form == "fixtured":
+            failures.extend(_fixtured_failures(agreement, listed, root))
+        elif form == "generated":
+            if not files_under(root, agreement):
+                failures.append(
+                    f"{agreement} declares generated and has no golden rows on disk"
+                )
+        elif form != "sql-function":
+            failures.append(
+                f"{agreement} declares {form}, a form this check does not know"
+            )
+
+    failures.extend(
+        f"{directory} is a directory under contracts/ that no agreement claims"
+        for directory in directories_in(root)
+        if directory not in manifest["agreements"]
+    )
+
+    return sorted(failures)
+
+
+BROKEN_AGREEMENTS: dict[str, DeclaredForm] = {
+    "shape": {"form": "fixtured"},
+    "empty-handed": {"form": "fixtured"},
+    "missing-file": {"form": "fixtured"},
+    "astray": {"form": "fixtured"},
+    "ledger": {"form": "generated"},
+    "rows": {"form": "generated"},
+    "routing": {"form": "sql-function"},
+    "hearsay": {"form": "spoken"},
+}
+BROKEN_FIXTURES: list[ListedFixture] = [
+    {"agreement": "shape", "path": "shape/cases.json"},
+    {"agreement": "missing-file", "path": "missing-file/cases.json"},
+    {"agreement": "astray", "path": "shape/cases.json"},
+    {"agreement": "rows", "path": "rows/rows.json"},
+]
+LISTED_BUT_ABSENT = "missing-file/cases.json"
+ON_DISK_BUT_UNLISTED = ["routing/cases.json", "orphan/cases.json"]
+
+
+def materialise_broken_contracts(root: Path) -> None:
+    listed = [
+        fixture["path"]
+        for fixture in BROKEN_FIXTURES
+        if fixture["path"] != LISTED_BUT_ABSENT
+    ]
+    for relative in listed + ON_DISK_BUT_UNLISTED:
+        written = root / relative
+        written.parent.mkdir(parents=True, exist_ok=True)
+        written.write_text("{}", encoding="utf-8")
+
+    (root / "manifest.json").write_text(
+        json.dumps(
+            {
+                "contract_version": 1,
+                "agreements": BROKEN_AGREEMENTS,
+                "fixtures": BROKEN_FIXTURES,
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 def test_speaks_this_tiers_contract_version() -> None:
@@ -91,6 +218,27 @@ def test_counts_a_fixture_and_never_a_dotfile(tmp_path: Path) -> None:
     (tmp_path / ".cache" / "cases.json").write_text("{}", encoding="utf-8")
 
     assert fixtures_on_disk(tmp_path) == {"id-shape/cases.json"}
+
+
+def test_the_disk_answers_every_form_declared_and_every_directory_is_claimed() -> None:
+    assert form_failures(read_manifest(), CONTRACTS_DIR) == []
+
+
+def test_names_the_agreement_and_its_form_for_each_entry_the_disk_denies(
+    tmp_path: Path,
+) -> None:
+    materialise_broken_contracts(tmp_path)
+
+    assert form_failures(read_manifest(tmp_path), tmp_path) == [
+        "astray declares fixtured and lists shape/cases.json, "
+        "which is not under astray/",
+        "empty-handed declares fixtured and the manifest lists no fixture under it",
+        "hearsay declares spoken, a form this check does not know",
+        "ledger declares generated and has no golden rows on disk",
+        "missing-file declares fixtured and lists missing-file/cases.json, "
+        "which is not on disk",
+        "orphan is a directory under contracts/ that no agreement claims",
+    ]
 
 
 def read_id_shape() -> dict[str, Any]:
