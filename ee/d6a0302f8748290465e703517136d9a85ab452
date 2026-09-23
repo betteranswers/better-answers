@@ -1,0 +1,49 @@
+apps/api/tests/docs-lane.test.ts
+  s_69414e6e80cf2c::t_2455b291882880 228-229
+docs/operations/BUILD_CACHE.md
+  s_69414e6e80cf2c::t_bd4a97be82bb1a 5
+apps/api/tests/deploy-tree.test.ts
+  s_69414e6e80cf2c::t_f8b88ec04e7c08 365
+  s_69414e6e80cf2c::t_ec127e961f2488 366
+  s_69414e6e80cf2c::t_18124f376de358 404
+  s_69414e6e80cf2c::t_daa51166874a08 379
+  s_69414e6e80cf2c::t_1023ecf65b4776 17-20
+  s_69414e6e80cf2c::t_3f6df1ddf5c876 346,360-364,367-378,380-403,405-412
+deploy/RELEASES.md
+  s_69414e6e80cf2c::t_c3fb7e0a54e758 1,3,5-8,10-12
+  s_69414e6e80cf2c::t_ddd6ae840ccfe8 14
+docs/operations/RUNBOOK.md
+  s_69414e6e80cf2c::t_998fd684c40aac 59-66
+  s_69414e6e80cf2c::t_f79bb325499744 69
+  s_69414e6e80cf2c::t_2ff33f3a2fc687 71
+docs/adr/0022-two-stacks-deployed-by-digest-every-irreplaceable-byte-encrypted-off-host-erasures-replayed-on-restore.md
+  s_69414e6e80cf2c::t_453121c2205cbc 81
+  s_69414e6e80cf2c::t_815e3c96cf40bc 105-116
+docs/adr/README.md
+  s_69414e6e80cf2c::t_6461590816bbb6 32
+docs/operations/CI.md
+  s_69414e6e80cf2c::t_49a52d280fbfc2 94
+  s_69414e6e80cf2c::t_2090f5758bdd12 98
+deploy/wizard-41.sh
+  s_69414e6e80cf2c::t_7cdc589b1d62e7 178
+  s_69414e6e80cf2c::t_b1b04d7abd7bdb 322-323
+.github/workflows/release.yml
+  s_69414e6e80cf2c::t_b982917ae4a211 68
+  s_69414e6e80cf2c::t_c537459cf47b36 105,110-111,115-127,130-131,135
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "eed6a0302f8748290465e703517136d9a85ab452",
+  "prompts": {},
+  "sessions": {
+    "s_69414e6e80cf2c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6af0bc5d-5e17-4638-afb3-472e1f42e570",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
