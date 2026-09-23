@@ -1,8 +1,23 @@
+import re
 from collections.abc import Sequence
 
 from .descriptors import A_PERSON_NAME
 from .engine import Finding, raised_to_always
-from .recognisers import officer_blocks
+
+AN_OFFICER_HEADING = re.compile(
+    r"^#{1,6}[^\n]*\b(?:persons? with significant control|officers?|directors?"
+    r"|signator(?:y|ies))\b[^\n]*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+ANY_HEADING = re.compile(r"^#{1,6}\s", re.MULTILINE)
+
+
+def officer_blocks(text: str) -> tuple[tuple[int, int], ...]:
+    blocks: list[tuple[int, int]] = []
+    for heading in AN_OFFICER_HEADING.finditer(text):
+        following = ANY_HEADING.search(text, heading.end())
+        blocks.append((heading.start(), following.start() if following else len(text)))
+    return tuple(blocks)
 
 
 def raised_by_the_block_rule(

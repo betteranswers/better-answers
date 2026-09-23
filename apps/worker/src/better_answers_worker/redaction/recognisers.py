@@ -43,14 +43,6 @@ A_SENTENCE_WITH_A_CUE = 0.85
 A_SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+|\n\s*\n")
 
 
-AN_OFFICER_HEADING = re.compile(
-    r"^#{1,6}[^\n]*\b(?:persons? with significant control|officers?|directors?"
-    r"|signator(?:y|ies))\b[^\n]*$",
-    re.IGNORECASE | re.MULTILINE,
-)
-ANY_HEADING = re.compile(r"^#{1,6}\s", re.MULTILINE)
-
-
 class SeamRecogniser(LocalRecognizer):
     def __init__(self, descriptor: CategoryDescriptor, entity: str) -> None:
         self.descriptor = descriptor
@@ -185,11 +177,3 @@ def lines_above_a_postcode(text: str, at: int) -> int:
             return 0
         opened = break_before
     return opened + 1
-
-
-def officer_blocks(text: str) -> tuple[tuple[int, int], ...]:
-    blocks: list[tuple[int, int]] = []
-    for heading in AN_OFFICER_HEADING.finditer(text):
-        following = ANY_HEADING.search(text, heading.end())
-        blocks.append((heading.start(), following.start() if following else len(text)))
-    return tuple(blocks)
