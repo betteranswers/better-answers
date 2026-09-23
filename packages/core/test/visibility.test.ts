@@ -91,6 +91,26 @@ const chunkRowsAreHeld = async (workspaceId: string, bindingId: string): Promise
   }
 };
 
+// No act under test holds a chunk row, so the probe's `true` branch needs this control to stay honest.
+const whileAChunkRowIsHeld = async <T>(
+  workspaceId: string,
+  bindingId: string,
+  work: () => Promise<T>,
+): Promise<T> => {
+  const holder = await db().pool.connect();
+  try {
+    await holder.query("BEGIN");
+    await holder.query(
+      `SELECT 1 FROM "index".chunk WHERE workspace_id = $1 AND binding_id = $2 FOR UPDATE`,
+      [workspaceId, bindingId],
+    );
+    return await work();
+  } finally {
+    await holder.query("ROLLBACK");
+    holder.release();
+  }
+};
+
 const overriddenTo = (scenario: Scenario, iri: string, sensitivity: string) =>
   reading(scenario.admin, (admin, tx) =>
     overrideConceptClass(admin, tx, { iri, sensitivity, audience: "everyone" }),
@@ -561,6 +581,12 @@ describe("narrowing a binding", () => {
         charEnd: 53,
       });
     }
+
+    expect(
+      await whileAChunkRowIsHeld(scenario.workspaceId, binding.bindingId, () =>
+        chunkRowsAreHeld(scenario.workspaceId, binding.bindingId),
+      ),
+    ).toBe(true);
 
     await whileActsWaitAt(db().pool, "concept_index", "UPDATE", async (release) => {
       const narrowing = reading(scenario.admin, (admin, tx) =>
