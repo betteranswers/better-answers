@@ -16,6 +16,7 @@ import {
 import { workspacePackages } from "./workspaces.ts";
 
 const manifestSchema = z.object({
+  packageManager: z.string().optional(),
   dependencies: z.record(z.string(), z.string()).optional(),
   devDependencies: z.record(z.string(), z.string()).optional(),
 });
@@ -51,6 +52,17 @@ const pinnedFilterRepoVersion = (): string => {
   return version;
 };
 
+const pinnedPnpmVersion = (): string => {
+  const packageManager = manifest(".").packageManager ?? "";
+  const version = /^pnpm@(?<version>[^+\s]+)/.exec(packageManager)?.groups?.["version"];
+  if (version === undefined) {
+    throw new Error(
+      `the root manifest's packageManager is "${packageManager}", which names no pnpm version this can read`,
+    );
+  }
+  return version;
+};
+
 const contentsSchema = z.object({
   resolvable: z.array(z.string()),
   missing: z.array(z.string()),
@@ -58,25 +70,41 @@ const contentsSchema = z.object({
   hasSpaBuild: z.boolean(),
   filterRepoVersion: z.string(),
   gitRanFilterRepo: z.boolean(),
+  commandsOnPath: z.array(z.string()),
+  hasNpmPackage: z.boolean(),
+  pnpmTarget: z.string(),
+  pnpmVersion: z.string(),
+  opsAnswer: z.string(),
 });
 
 type ImageContents = z.infer<typeof contentsSchema>;
 
 const probe = `
 const { createRequire } = require("node:module");
-const { existsSync } = require("node:fs");
+const { existsSync, lstatSync, realpathSync } = require("node:fs");
+const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const from = createRequire("/app/apps/api/");
 const resolves = (name) => { try { from.resolve(name); return true; } catch { return false; } };
-const answered = (command, args) => {
+const answered = (command, args, environment = {}) => {
   try {
-    return execFileSync(command, args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    return execFileSync(command, args, {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      env: { ...process.env, ...environment },
+    }).trim();
   } catch {
     return "";
   }
 };
+// lstat, not existsSync: a link left dangling on PATH still counts as a command shipped.
+const linkOrFileAt = (file) => { try { lstatSync(file); return true; } catch { return false; } };
+const onPath = (name) =>
+  (process.env.PATH ?? "").split(":").filter(Boolean).map((dir) => path.join(dir, name)).find(linkOrFileAt);
+const realTarget = (file) => { try { return realpathSync(file); } catch { return ""; } };
 const resolvable = JSON.parse(process.env.PROBE_NAMES).filter(resolves);
 const missing = JSON.parse(process.env.PROBE_REQUIRED).filter((name) => !resolves(name));
+const pnpm = onPath("pnpm");
 process.stdout.write(JSON.stringify({
   resolvable,
   missing,
@@ -87,6 +115,14 @@ process.stdout.write(JSON.stringify({
     "import importlib.metadata as m; print(m.version('git-filter-repo'))",
   ]),
   gitRanFilterRepo: answered("git", ["filter-repo", "--version"]) !== "",
+  commandsOnPath: JSON.parse(process.env.PROBE_COMMANDS).filter((name) => onPath(name) !== undefined),
+  hasNpmPackage: existsSync("/usr/local/lib/node_modules/npm"),
+  pnpmTarget: pnpm === undefined ? "" : realTarget(pnpm),
+  pnpmVersion: answered("pnpm", ["--version"]),
+  // ops.ts will not start without a database URL; help answers before any connection is made.
+  opsAnswer: answered("pnpm", ["--silent", "ops", "help"], {
+    DATABASE_URL: "postgres://probe@127.0.0.1:9/probe",
+  }),
 }));
 `;
 
@@ -104,6 +140,7 @@ describe.skipIf(nothingToProbeHere)("the app tier's runtime image", () => {
           PROBE_NAMES: JSON.stringify(developmentOnly),
 
           PROBE_REQUIRED: JSON.stringify(["@better-answers/core/kernel", "@better-answers/schema"]),
+          PROBE_COMMANDS: JSON.stringify(["corepack", "npm", "npx", "pnpm"]),
         },
       },
     );
@@ -133,6 +170,20 @@ describe.skipIf(nothingToProbeHere)("the app tier's runtime image", () => {
 
   it("puts the rewrite tool where git finds it as a subcommand", () => {
     expect(contents.gitRanFilterRepo).toBe(true);
+  });
+
+  it("ships no npm or npx, and keeps the corepack that provides pnpm", () => {
+    expect(contents.commandsOnPath).toEqual(["corepack", "pnpm"]);
+    expect(contents.hasNpmPackage).toBe(false);
+  });
+
+  it("runs pnpm through corepack at the version the root manifest pins", () => {
+    expect(contents.pnpmTarget).toBe("/usr/local/lib/node_modules/corepack/dist/pnpm.js");
+    expect(contents.pnpmVersion).toBe(pinnedPnpmVersion());
+  });
+
+  it("reaches the operator's commands through pnpm", () => {
+    expect(contents.opsAnswer).toContain("usage: pnpm ops <command> [options]");
   });
 });
 
