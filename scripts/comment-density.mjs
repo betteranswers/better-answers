@@ -107,7 +107,7 @@ const measured = measure(counted, units);
 
 for (const one of [...directories, ...named.map((unit) => unit.path)]) {
   // A named unit read as nothing is the same false green as a whole run read as nothing.
-  if (!measured.some((measure) => measure.unit === one)) {
+  if (!measured.some((seen) => seen.unit === one)) {
     refuse(`the line counter measured no file it understands under ${one}`);
   }
 }

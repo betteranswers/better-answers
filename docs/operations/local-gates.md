@@ -86,6 +86,12 @@ Nothing is copied from `.env.local`: no workspace, test or compose file reads it
 
 `provision-skills.sh <worktree-path>` is the skills stage, and is runnable by hand. It copies every `.agents/skills` entry and `skills-lock.json` the primary checkout has and the worktree does not; reinstalls from the manifest when the copy left the worktree with nothing; and then verifies that every skill link — the root's at depth two and each workspace's at depth four — resolves inside the worktree. The worktrees, the installs and the dependency trees are pruned rather than merely excluded from the walk, so a large `node_modules` is never entered.
 
+## The `check` runner
+
+`scripts/check.mjs` is `check` for a TypeScript workspace and for the root: it runs every step named on its command line, even after one fails, and ends by naming all of them. Each argument is a script in the manifest of the directory it runs in, so a manifest's `check` reads as the list of gates that workspace has and adding one is a word. Failures are collected rather than thrown at the first, because a session told only about lint fixes lint, runs `check` again, and is then told about types — three runs of a browser suite to learn three things.
+
+pnpm can select scripts by regular expression and `--no-bail` will keep going past a failure, but as of pnpm 11.24.0 that combination exits 0 with failed scripts behind it, which is the silent pass this file exists to refuse. `pnpm -r --no-bail` — the recursive form the root uses over the workspaces — does report a non-zero exit and is unaffected. The worker's equivalent is `apps/worker/src/better_answers_worker/check.py`; the two are separate because a uv workspace is not a pnpm one and neither tier can run the other's.
+
 ## The tool configuration at the repository root
 
 **`cubic.yaml`** is the reviewer's configuration, read from `main` only. Cubic enables five agents per repository across every source and drops a sixth with no error, so the two custom rules cost the generic slots they replaced; the generic API-auth agent was absorbed into the Principal rule rather than deleted, tenant scoping and request validation being what that rule is for.
