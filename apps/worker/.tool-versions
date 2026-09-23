@@ -11,4 +11,4 @@
 # `required-version` is enforced by uv itself — so it would stop every laptop whose uv is
 # older than this line, which is a toolchain upgrade and not a CI fix. asdf and mise read this
 # file too, which is the right answer for anyone who uses them; uv ignores it.
-uv 0.12.9
+uv 0.12.17
