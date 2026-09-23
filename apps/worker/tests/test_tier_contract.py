@@ -9,7 +9,6 @@ import psycopg
 import pytest
 from psycopg import Cursor
 
-SPOKEN_CONTRACT_VERSION = 12
 SPOKEN_AGREEMENTS = {
     "citation": "fixtured",
     "concept-file": "fixtured",
@@ -46,7 +45,6 @@ class ListedFixture(TypedDict):
 
 
 class Manifest(TypedDict):
-    contract_version: int
     agreements: dict[str, DeclaredForm]
     fixtures: list[ListedFixture]
 
@@ -171,19 +169,112 @@ def materialise_broken_contracts(root: Path) -> None:
         written.write_text("{}", encoding="utf-8")
 
     (root / "manifest.json").write_text(
-        json.dumps(
-            {
-                "contract_version": 1,
-                "agreements": BROKEN_AGREEMENTS,
-                "fixtures": BROKEN_FIXTURES,
-            }
-        ),
+        json.dumps({"agreements": BROKEN_AGREEMENTS, "fixtures": BROKEN_FIXTURES}),
         encoding="utf-8",
     )
 
 
-def test_speaks_this_tiers_contract_version() -> None:
-    assert read_manifest()["contract_version"] == SPOKEN_CONTRACT_VERSION
+# Each hex below is worked out of band from the framing, never by calling this
+# tier's own reading a second time.
+DIGEST_CASES: list[tuple[str, dict[str, bytes], str]] = [
+    (
+        "the manifest alone",
+        {"manifest.json": b"{}"},
+        "672dd81724a921629ec57079d240c5d4240d85207c5c577acc3d938a1da9a4b2",
+    ),
+    (
+        "a nested directory",
+        {"manifest.json": b"{}", "deep/under/cases.json": b"[1]"},
+        "1310b1d47249afd06d6da598edb9e740822903427cea944583bcd09cdad30f4b",
+    ),
+    (
+        "a file with no trailing newline",
+        {"manifest.json": b"{}", "id-shape/cases.json": b"no newline here"},
+        "c61774dee59597de850816f074c5b3898df77407b81f994c8f532db6ccdf9b01",
+    ),
+    (
+        "a file holding CRLF bytes",
+        {"manifest.json": b"{}", "queue/cases.json": b"one\r\ntwo\r\n"},
+        "d46eb55502392e4b377c93fc25bd904e84c3d3c1222ce84db61209ff9b3c229f",
+    ),
+    (
+        "an astral character in a filename and in content",
+        {"manifest.json": b"{}", "\U0001f680/\U0001f6f0.json": "\U0001f30d".encode()},
+        "157a522841253276bd185d632b885a7193389d3181826ac45bd0611acba19457",
+    ),
+    (
+        "an empty file",
+        {"manifest.json": b"{}", "redaction/cases.json": b""},
+        "d86176b333d785144bf5abef1f09c05550d49e57602b9965c15b9c919b4e38c3",
+    ),
+    (
+        "a dotfile that must not count",
+        {
+            "manifest.json": b"{}",
+            ".DS_Store": b"junk",
+            ".cache/cases.json": b"junk",
+            "citation/.hidden": b"junk",
+        },
+        "672dd81724a921629ec57079d240c5d4240d85207c5c577acc3d938a1da9a4b2",
+    ),
+    (
+        "a README that must not count",
+        {"manifest.json": b"{}", "README.md": b"prose for a person"},
+        "672dd81724a921629ec57079d240c5d4240d85207c5c577acc3d938a1da9a4b2",
+    ),
+]
+
+
+def materialised(root: Path, tree: dict[str, bytes]) -> Path:
+    for relative, content in tree.items():
+        written = root / relative
+        written.parent.mkdir(parents=True, exist_ok=True)
+        written.write_bytes(content)
+    return root
+
+
+def test_the_digest_answers_the_hex_the_framing_says_over_every_tree_the_cases_name(
+    tmp_path: Path,
+) -> None:
+    from better_answers_worker.contract_digest import contract_digest
+
+    answered = [
+        (why, contract_digest(materialised(tmp_path / str(index), tree)))
+        for index, (why, tree, _hex) in enumerate(DIGEST_CASES)
+    ]
+
+    assert answered == [(why, expected) for why, _tree, expected in DIGEST_CASES]
+
+
+def test_a_symlink_counts_for_nothing_so_neither_tier_reads_a_file_twice(
+    tmp_path: Path,
+) -> None:
+    from better_answers_worker.contract_digest import contract_digest
+
+    root = materialised(tmp_path / "linked", {"manifest.json": b"{}"})
+    (root / "queue").mkdir()
+    (root / "queue" / "cases.json").symlink_to(root / "manifest.json")
+
+    assert contract_digest(root) == DIGEST_CASES[0][2]
+
+
+def test_the_digest_this_tier_carries_is_whole_and_never_a_short_form() -> None:
+    from better_answers_worker.contract_stamp import CONTRACT_DIGEST
+
+    assert re.fullmatch(r"[0-9a-f]{64}", CONTRACT_DIGEST)
+
+
+def test_a_hand_edited_digest_fails_this_tiers_own_check() -> None:
+    from better_answers_worker.contract_digest import (
+        CONTRACT_STAMP_MODULE,
+        CONTRACTS_ROOT,
+        contract_digest,
+        render_contract_stamp,
+    )
+
+    assert CONTRACT_STAMP_MODULE.read_text(encoding="utf-8") == render_contract_stamp(
+        contract_digest(CONTRACTS_ROOT)
+    )
 
 
 def test_names_exactly_the_agreements_spoken_each_in_the_expected_form() -> None:

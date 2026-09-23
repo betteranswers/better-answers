@@ -6,6 +6,7 @@ import psycopg
 
 from . import queue
 from .config import Bootstrap, read_bootstrap
+from .contract_stamp import CONTRACT_DIGEST
 from .ids import ulid
 from .kinds import KINDS
 from .log import logger
@@ -16,6 +17,9 @@ IDLE_SLEEP_SECONDS = 5
 
 AUDIT_EVERY_SECONDS = 24 * 60 * 60
 
+MATCHES = "matches"
+DIFFERS = "differs"
+
 
 def schema_stamp_matches(connection: psycopg.Connection) -> bool:
     with connection.cursor() as cursor:
@@ -25,6 +29,21 @@ def schema_stamp_matches(connection: psycopg.Connection) -> bool:
         )
         row = cursor.fetchone()
     return row is not None and int(row[0]) == MIGRATION_WHEN
+
+
+def contract_stamp_matches(connection: psycopg.Connection) -> bool:
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT digest FROM contract_stamp")
+        row = cursor.fetchone()
+    return row is not None and str(row[0]) == CONTRACT_DIGEST
+
+
+# One line must tell an operator which of the two disagreed, so the words are the log's.
+def deploy_stamps(connection: psycopg.Connection) -> dict[str, str]:
+    return {
+        "schema_stamp": MATCHES if schema_stamp_matches(connection) else DIFFERS,
+        "contract_stamp": MATCHES if contract_stamp_matches(connection) else DIFFERS,
+    }
 
 
 def _due_for_audit(cursor: psycopg.Cursor) -> bool:
@@ -145,6 +164,38 @@ def tick(
     return worked
 
 
+def run(bootstrap: Bootstrap, *, once: bool) -> int:
+    # In autocommit: the bare stamp reads and workspace list below would, on a plain
+    # connection, open a transaction turning every scoped block into a savepoint.
+    with queue.connected(bootstrap.database_url) as connection:
+        said: dict[str, str] | None = None
+        while True:
+            stamps = deploy_stamps(connection)
+            if DIFFERS in stamps.values():
+                # Once rather than once a tick; again only when the disagreement moves.
+                if stamps != said:
+                    logger.error(
+                        "a deploy stamp does not match; claiming nothing",
+                        migration_id=MIGRATION_ID,
+                        contract_digest=CONTRACT_DIGEST,
+                        worker_id=bootstrap.worker_id,
+                        **stamps,
+                    )
+                    said = stamps
+                if once:
+                    return 1
+                # Re-checked rather than exited, so the refusal lifts by itself when the
+                # rest of the deploy lands.
+                time.sleep(IDLE_SLEEP_SECONDS)
+                continue
+            said = None
+            worked = tick(connection, bootstrap)
+            if once:
+                return 0
+            if not worked:
+                time.sleep(IDLE_SLEEP_SECONDS)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="better-answers-worker")
     parser.add_argument(
@@ -152,30 +203,5 @@ def main() -> int:
         action="store_true",
         help="one pass over every workspace, then exit — what a test drives",
     )
-    once = parser.parse_args().once
 
-    bootstrap = read_bootstrap()
-
-    # In autocommit: the bare stamp read and workspace list below would, on a plain
-    # connection, open a transaction turning every scoped block into a savepoint.
-    with queue.connected(bootstrap.database_url) as connection:
-        stamped = False
-        while True:
-            if not schema_stamp_matches(connection):
-                if not stamped:
-                    logger.error(
-                        "schema stamp does not match; claiming nothing",
-                        migration_id=MIGRATION_ID,
-                        worker_id=bootstrap.worker_id,
-                    )
-                    stamped = True
-                if once:
-                    return 1
-                time.sleep(IDLE_SLEEP_SECONDS)
-                continue
-            stamped = False
-            worked = tick(connection, bootstrap)
-            if once:
-                return 0
-            if not worked:
-                time.sleep(IDLE_SLEEP_SECONDS)
+    return run(read_bootstrap(), once=parser.parse_args().once)

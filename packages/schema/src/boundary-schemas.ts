@@ -26,7 +26,9 @@ import {
   IRI,
   VERIFICATION_ORIGINS,
 } from "./concept-tables.ts";
+import { CONTRACT_DIGEST_PATTERN } from "./contract-digest.ts";
 import { ingressCounter, mcpCallCounter } from "./counter-tables.ts";
+import { contractStamp } from "./platform-tables.ts";
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "./drizzle-zod.ts";
 import {
   erasureRequest,
@@ -259,6 +261,15 @@ const ingressCounterRefinements = {
 export const ingressCounterSelect = createSelectSchema(ingressCounter, ingressCounterRefinements);
 export const ingressCounterInsert = createInsertSchema(ingressCounter, ingressCounterRefinements);
 export const ingressCounterUpdate = createUpdateSchema(ingressCounter, ingressCounterRefinements);
+
+const contractStampRefinements = {
+  onlyRow: (schema: z.ZodBoolean) => schema.pipe(z.literal(true)),
+  digest: (schema: z.ZodString) => schema.regex(CONTRACT_DIGEST_PATTERN),
+};
+
+export const contractStampSelect = createSelectSchema(contractStamp, contractStampRefinements);
+export const contractStampInsert = createInsertSchema(contractStamp, contractStampRefinements);
+export const contractStampUpdate = createUpdateSchema(contractStamp, contractStampRefinements);
 
 export { ACTOR_ID } from "./actor-id.ts";
 
@@ -823,6 +834,12 @@ export const boundarySchemas = {
     select: ingressCounterSelect,
     insert: ingressCounterInsert,
     update: ingressCounterUpdate,
+  },
+  contractStamp: {
+    table: contractStamp,
+    select: contractStampSelect,
+    insert: contractStampInsert,
+    update: contractStampUpdate,
   },
   session: {
     table: session,

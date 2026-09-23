@@ -5,6 +5,7 @@ import { declaredTableNames } from "../scripts/worker-view.ts";
 import {
   boundarySchemas,
   CONCEPT_FRONTMATTER_MAX,
+  CONTRACT_DIGEST,
   EXEMPT_TABLE_NAMES,
   FAMILIES,
   IDENTITY_SET,
@@ -15,6 +16,7 @@ import {
   SUGGESTION_KINDS,
   SUGGESTION_KINDS_FROM_A_RUN,
   SUGGESTION_KINDS_FROM_THE_APP,
+  STAMP_THE_CONTRACT,
   ulid,
 } from "../src/index.ts";
 import { type TestData, testData } from "./factory.ts";
@@ -31,6 +33,7 @@ import {
   A_CONCEPT_VERIFICATION,
   A_CONCEPT_VERIFICATION_OF_ORIGIN,
   A_CONCEPT_WRITE_REQUEST,
+  A_CONTRACT_STAMP,
   A_DECIDED_ACCESS_REQUEST,
   A_DECIDED_SUGGESTION,
   A_FINDING,
@@ -3013,6 +3016,44 @@ describe("the migration stamp under worker_rt", () => {
         [
           "DELETE FROM drizzle.__drizzle_migrations",
           "a journal a reader can empty is a check that stops asking",
+        ],
+      ]);
+    });
+  });
+});
+
+describe("the contract stamp", () => {
+  it("holds one row, which the migrator rewrites rather than adds to", async () => {
+    await withRollback(db.pool, async (client) => {
+      await client.query(STAMP_THE_CONTRACT, [CONTRACT_DIGEST]);
+      await client.query(STAMP_THE_CONTRACT, ["a-contract-an-older-image-carried"]);
+      await client.query(STAMP_THE_CONTRACT, [CONTRACT_DIGEST]);
+
+      const stamped = await client.query<{ digest: string }>("SELECT digest FROM contract_stamp");
+      expect(stamped.rows).toEqual([{ digest: CONTRACT_DIGEST }]);
+    });
+  });
+
+  it("lets the worker read what the api carries, and refuses it every road to writing one", async () => {
+    await withRollback(db.pool, async (client) => {
+      await client.query(STAMP_THE_CONTRACT, [CONTRACT_DIGEST]);
+      await client.query("SET LOCAL ROLE worker_rt");
+
+      const read = await client.query<{ digest: string }>("SELECT digest FROM contract_stamp");
+      expect(read.rows).toEqual([{ digest: CONTRACT_DIGEST }]);
+
+      await refusesEach(client, [
+        [
+          A_CONTRACT_STAMP,
+          "a worker that could stamp a contract could tell itself the api had caught up",
+        ],
+        [
+          "UPDATE contract_stamp SET digest = 'x'",
+          "and one that could move the stamp could make its own check pass",
+        ],
+        [
+          "DELETE FROM contract_stamp",
+          "a stamp a reader can remove is a refusal that stops firing",
         ],
       ]);
     });

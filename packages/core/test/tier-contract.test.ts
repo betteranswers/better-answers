@@ -5,6 +5,7 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -14,15 +15,19 @@ import { z } from "zod";
 
 import { pluginConfigFor } from "@better-answers/devtools/oxlint-config";
 import { oxlintOver, writeUnder } from "@better-answers/devtools/throwaway-tree";
-import { boundarySchemas, ULID_PATTERN } from "@better-answers/schema";
+import {
+  boundarySchemas,
+  CONTRACT_DIGEST,
+  contractDigest,
+  ULID_PATTERN,
+} from "@better-answers/schema";
 
 import { ulid } from "../src/kernel/index.ts";
 
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
-// Version and agreements hardcoded on purpose, never read from a shared constant: that is
-// what fails a tier not yet taught a contract change.
-const SPOKEN_CONTRACT_VERSION = 12;
+// Hardcoded on purpose, never read from a shared constant: that is what fails a tier not yet
+// taught a contract change.
 const SPOKEN_AGREEMENTS = {
   citation: "fixtured",
   "concept-file": "fixtured",
@@ -43,7 +48,6 @@ const NOT_FIXTURES = new Set(["manifest.json", "README.md"]);
 const contractsDir = path.resolve(import.meta.dirname, "../../../contracts");
 
 const manifest = z.object({
-  contract_version: z.number(),
   agreements: z.record(z.string(), z.object({ form: z.string() })),
   fixtures: z.array(z.object({ agreement: z.string(), path: z.string() })),
 });
@@ -104,10 +108,12 @@ const formFailures = (contract: z.infer<typeof manifest>, root: string): readonl
 
 const throwaway = mkdtempSync(path.join(tmpdir(), "tier-contract-"));
 const brokenRoot = mkdtempSync(path.join(tmpdir(), "tier-contract-broken-"));
+const digestRoots = mkdtempSync(path.join(tmpdir(), "tier-contract-digest-"));
 
 afterAll(() => {
   rmSync(throwaway, { recursive: true, force: true });
   rmSync(brokenRoot, { recursive: true, force: true });
+  rmSync(digestRoots, { recursive: true, force: true });
 });
 
 const brokenContracts = {
@@ -136,14 +142,10 @@ const materialiseBrokenContracts = (root: string) => {
   for (const { path: listed } of brokenContracts.fixtures)
     if (listed !== LISTED_BUT_ABSENT) writeUnder(root, listed, "{}");
   for (const unlisted of ON_DISK_BUT_UNLISTED) writeUnder(root, unlisted, "{}");
-  writeUnder(root, "manifest.json", JSON.stringify({ contract_version: 1, ...brokenContracts }));
+  writeUnder(root, "manifest.json", JSON.stringify(brokenContracts));
 };
 
 describe("the tier contract", () => {
-  it("speaks this tier's contract version", () => {
-    expect(readManifest().contract_version).toBe(SPOKEN_CONTRACT_VERSION);
-  });
-
   it("names exactly the agreements this tier speaks, each in the form this tier expects", () => {
     const manifest = readManifest();
 
@@ -197,6 +199,84 @@ describe("the tier contract", () => {
       "missing-file declares fixtured and lists missing-file/cases.json, which is not on disk",
       "orphan is a directory under contracts/ that no agreement claims",
     ]);
+  });
+});
+
+// Each hex below is worked out of band from the framing, never by calling this tier's own
+// reading a second time.
+const DIGEST_CASES = [
+  { why: "the manifest alone", tree: { "manifest.json": "{}" } },
+  { why: "a nested directory", tree: { "manifest.json": "{}", "deep/under/cases.json": "[1]" } },
+  {
+    why: "a file with no trailing newline",
+    tree: { "manifest.json": "{}", "id-shape/cases.json": "no newline here" },
+  },
+  {
+    why: "a file holding CRLF bytes",
+    tree: { "manifest.json": "{}", "queue/cases.json": "one\r\ntwo\r\n" },
+  },
+  {
+    why: "an astral character in a filename and in content",
+    tree: { "manifest.json": "{}", "🚀/🛰.json": "🌍" },
+  },
+  { why: "an empty file", tree: { "manifest.json": "{}", "redaction/cases.json": "" } },
+  {
+    why: "a dotfile that must not count",
+    tree: {
+      "manifest.json": "{}",
+      ".DS_Store": "junk",
+      ".cache/cases.json": "junk",
+      "citation/.hidden": "junk",
+    },
+  },
+  {
+    why: "a README that must not count",
+    tree: { "manifest.json": "{}", "README.md": "prose for a person" },
+  },
+] as const satisfies readonly { readonly why: string; readonly tree: Tree }[];
+
+const EXPECTED_HEX: Record<string, string> = {
+  "the manifest alone": "672dd81724a921629ec57079d240c5d4240d85207c5c577acc3d938a1da9a4b2",
+  "a nested directory": "1310b1d47249afd06d6da598edb9e740822903427cea944583bcd09cdad30f4b",
+  "a file with no trailing newline":
+    "c61774dee59597de850816f074c5b3898df77407b81f994c8f532db6ccdf9b01",
+  "a file holding CRLF bytes": "d46eb55502392e4b377c93fc25bd904e84c3d3c1222ce84db61209ff9b3c229f",
+  "an astral character in a filename and in content":
+    "157a522841253276bd185d632b885a7193389d3181826ac45bd0611acba19457",
+  "an empty file": "d86176b333d785144bf5abef1f09c05550d49e57602b9965c15b9c919b4e38c3",
+  "a dotfile that must not count":
+    "672dd81724a921629ec57079d240c5d4240d85207c5c577acc3d938a1da9a4b2",
+  "a README that must not count":
+    "672dd81724a921629ec57079d240c5d4240d85207c5c577acc3d938a1da9a4b2",
+};
+
+const materialised = (index: number, tree: Tree): string => {
+  const root = path.join(digestRoots, String(index));
+  mkdirSync(root, { recursive: true });
+  for (const [file, content] of Object.entries(tree)) writeUnder(root, file, content);
+  return root;
+};
+
+describe("the contract's digest, which is this tier's version of the contract", () => {
+  it("answers the hex the framing says over every tree the cases name", () => {
+    expect(
+      DIGEST_CASES.map(({ why, tree }, index) => ({
+        why,
+        hex: contractDigest(materialised(index, tree)),
+      })),
+    ).toEqual(DIGEST_CASES.map(({ why }) => ({ why, hex: EXPECTED_HEX[why] })));
+  });
+
+  it("counts a symlink for nothing, so neither tier reads one file as two", () => {
+    const root = materialised(DIGEST_CASES.length, { "manifest.json": "{}" });
+    mkdirSync(path.join(root, "queue"));
+    symlinkSync(path.join(root, "manifest.json"), path.join(root, "queue", "cases.json"));
+
+    expect(contractDigest(root)).toBe(EXPECTED_HEX["the manifest alone"]);
+  });
+
+  it("carries the whole hash, so nothing an operator compares by eye is a short form", () => {
+    expect(CONTRACT_DIGEST).toMatch(/^[0-9a-f]{64}$/);
   });
 });
 

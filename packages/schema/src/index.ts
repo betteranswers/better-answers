@@ -12,6 +12,8 @@ export * from "./boundary-schemas.ts";
 export * from "./roles.ts";
 export * from "./ulid.ts";
 export * from "./bundle-manifest.ts";
+export * from "./contract-digest.ts";
+export * from "./contract-stamp.ts";
 
 // fileURLToPath, never URL.pathname: a percent-encoded space would hand the migrator a
 // directory that does not exist, and it would fail at deploy rather than here.

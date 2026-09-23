@@ -114,6 +114,10 @@ dependencies = [
 check = "better_answers_worker.check:main"
 # The work loop — the image's default command, and what a test runs with `--once`.
 better-answers-worker = "better_answers_worker.loop:main"
+# This tier's own reading of `contracts/`, written to a module the image carries because it
+# copies no contracts directory to read at boot. Never what CI runs: `check` regenerates and
+# compares, so a hand-edited constant fails here.
+generate-contract-stamp = "better_answers_worker.generate_contract_stamp:main"
 
 [dependency-groups]
 dev = [

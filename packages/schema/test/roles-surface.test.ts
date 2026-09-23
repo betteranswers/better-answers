@@ -60,8 +60,10 @@ const columnsHeld = async (
 
 const thePartition = async (client: pg.PoolClient): Promise<string> => {
   const found = await client.query<{ relname: string }>(
+    // `relispartition` is true of a partitioned index too, and pg_class answers in no order.
     `SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-      WHERE n.nspname = 'index' AND c.relispartition`,
+      WHERE n.nspname = 'index' AND c.relispartition AND c.relkind = 'r'
+      ORDER BY c.relname`,
   );
   const name = found.rows[0]?.relname;
   if (name === undefined) throw new Error("no partition was made before the surface was read");
