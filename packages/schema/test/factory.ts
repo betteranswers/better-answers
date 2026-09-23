@@ -183,7 +183,6 @@ const partitionExists = async (client: pg.PoolClient, workspaceId: string): Prom
   return found.rowCount === 1;
 };
 
-let seededSpans = 0;
 const SEEDED_SPAN_LENGTH = 8;
 
 export const testData = (client: pg.PoolClient): TestData => {
@@ -642,8 +641,12 @@ export const testData = (client: pg.PoolClient): TestData => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const documentId = overrides.documentId ?? (await sourceDocument({ workspaceId })).id;
 
-    const charStart = seededSpans * SEEDED_SPAN_LENGTH;
-    seededSpans += 1;
+    // Two defaults seeded at once in one document read the same end and collide; seed them in turn.
+    const furthest = await client.query<{ char_end: number | null }>(
+      "SELECT max(char_end) AS char_end FROM finding WHERE workspace_id = $1 AND document_id = $2",
+      [workspaceId, documentId],
+    );
+    const charStart = furthest.rows[0]?.char_end ?? 0;
     return insertRow(client, "finding", {
       id: ulid(),
       category: "bank-details",

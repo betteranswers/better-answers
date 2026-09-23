@@ -103,17 +103,40 @@ describe("the finding factory's default category", () => {
 });
 
 describe("the finding factory's default span", () => {
-  it("is a span of its own, so two findings seeded in one document under one rule are two rows", async () => {
+  it("gives each document's findings spans of their own from nought, whatever the file seeded before it, so a filtered run seeds what the whole file does", async () => {
     const spans = await withRollback(db.pool, async (client) => {
-      const first = await testData(client).finding();
-      const second = await testData(client).finding({
+      const seed = testData(client);
+      const first = await seed.finding();
+      const besideIt = await seed.finding({
         workspaceId: first.workspaceId,
         documentId: first.documentId,
       });
-      return [first, second].map((row) => row.charEnd - row.charStart);
+      const elsewhere = await seed.finding({ workspaceId: first.workspaceId });
+      return [first, besideIt, elsewhere].map((row) => [row.charStart, row.charEnd]);
     });
 
-    expect(spans).toEqual([8, 8]);
+    expect(spans).toEqual([
+      [0, 8],
+      [8, 16],
+      [0, 8],
+    ]);
+  });
+
+  it("lands past every span its document already holds, so a span written by hand before it is never taken", async () => {
+    const spans = await withRollback(db.pool, async (client) => {
+      const seed = testData(client);
+      const byHand = await seed.finding({ charStart: 8, charEnd: 16 });
+      const defaulted = await seed.finding({
+        workspaceId: byHand.workspaceId,
+        documentId: byHand.documentId,
+      });
+      return [byHand, defaulted].map((row) => [row.charStart, row.charEnd]);
+    });
+
+    expect(spans).toEqual([
+      [8, 16],
+      [16, 24],
+    ]);
   });
 });
 
