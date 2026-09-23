@@ -1,9 +1,3 @@
-import os
-
-# onnxruntime, under the detector, reads this once as it loads: its uploader's thread
-# outlives exit's destructors and can abort the process.
-os.environ["ORT_DISABLE_TELEMETRY"] = "1"
-
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType

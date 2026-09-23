@@ -23,6 +23,10 @@ def held_when_onnxruntime_was_imported(
             "from better_answers_worker.loop import warm_the_detectors_stack\n"
             "warm_the_detectors_stack('worker-under-test')",
         ),
+        (
+            "a module outside the detector's package that loads onnxruntime itself",
+            "import better_answers_worker.ids\nimport onnxruntime",
+        ),
     ],
 )
 def test_onnxruntime_is_imported_with_its_telemetry_switched_off(
