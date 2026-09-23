@@ -67,6 +67,21 @@ export const until = async (condition: () => Promise<boolean>): Promise<void> =>
   throw new Error("the condition never held");
 };
 
+// No test can end a worker mid-run, so the row a departed claimant would have left is
+// written instead, as the queue contract's `lapse_first` does.
+export const leaseLetLapse = async (
+  pool: pg.Pool,
+  job: { readonly workspaceId: string; readonly jobId: string },
+): Promise<void> => {
+  await pool.query(
+    `UPDATE job SET status = 'claimed', attempts = 1, claimed_by = 'a worker that went away',
+            claimed_at = now() - interval '5 minutes', heartbeat_at = now() - interval '5 minutes',
+            lease_expires_at = now() - interval '30 seconds'
+      WHERE workspace_id = $1 AND id = $2`,
+    [job.workspaceId, job.jobId],
+  );
+};
+
 export const isBlockedOnTable = async (pool: pg.Pool, table: string): Promise<boolean> => {
   const found = await pool.query(
     `SELECT 1 FROM pg_locks l JOIN pg_class c ON c.oid = l.relation

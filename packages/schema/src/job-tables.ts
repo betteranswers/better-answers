@@ -23,6 +23,13 @@ export const REBUILD_REASONS = [
 
 export const INDEX_REASONS = ["bound", "restored", "rule-change", "wiped", "narrowed"] as const;
 
+// The store is the target-state tracking: rows deleted beside a store left standing are
+// re-upserted by nothing, the engine believing them landed.
+export const REASONS_EMPTYING_THE_BINDING = [
+  "rule-change",
+  "wiped",
+] as const satisfies readonly (typeof INDEX_REASONS)[number][];
+
 export type ClaimingTier = "api" | "worker";
 
 export type JobKindDescriptor = {

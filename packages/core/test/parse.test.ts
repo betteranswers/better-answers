@@ -250,10 +250,16 @@ describe("the shapes the Sources acts are handed", () => {
     });
   });
 
-  it("refuses a reprocess reason no index run carries and a restore of a tier nobody named", () => {
+  it("refuses a reprocess reason no run carries or that empties no binding, and a restore of a tier nobody named", () => {
     expect(
       refusalOf(parse(reprocessBindingInput, { bindingId: A_BINDING, reason: "spring-clean" })),
     ).toEqual({ word: "malformed", fields: { reason: "not-in-set" } });
+    for (const reason of ["bound", "restored", "narrowed"]) {
+      expect(refusalOf(parse(reprocessBindingInput, { bindingId: A_BINDING, reason }))).toEqual({
+        word: "malformed",
+        fields: { reason: "not-in-set" },
+      });
+    }
     expect(
       refusalOf(
         parse(keepInTextInput, {

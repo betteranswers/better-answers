@@ -5,8 +5,8 @@ import {
   CONNECTOR_UPLOAD,
   FINDING_UNREVIEWED_STATE,
   INDEX_KIND,
-  INDEX_REASONS,
   JOB_DONE_STATUS,
+  REASONS_EMPTYING_THE_BINDING,
   SENSITIVITY_DEFAULT,
 } from "@better-answers/schema";
 import { z } from "zod";
@@ -450,7 +450,7 @@ export const publishBinding = async (
 export const reprocessBindingInput = z.object({
   bindingId: BINDING_ID,
 
-  reason: z.enum(INDEX_REASONS),
+  reason: z.enum(REASONS_EMPTYING_THE_BINDING),
 });
 
 export const reprocessBindingAct = declareAct({

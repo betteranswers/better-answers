@@ -24,7 +24,9 @@
     "./testing/objects": "./test/suite-objects.ts",
     "./testing/postgres": "./test/suite-postgres.ts",
     "./testing/bundle-root": "./test/bundle-root.ts",
-    "./testing/documents": "./test/suite-documents.ts"
+    "./testing/documents": "./test/suite-documents.ts",
+    "./testing/worker-process": "./test/worker-process.ts",
+    "./testing/cross-tier": "./test/cross-tier-fixture.ts"
   },
   "scripts": {
     "lint": "oxlint --config ../../.oxlintrc.json .",

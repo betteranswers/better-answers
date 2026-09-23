@@ -3,7 +3,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { writeConcept } from "@better-answers/core/concepts";
 import type { UserPrincipal } from "@better-answers/core/kernel";
 import { initRepository } from "@better-answers/core/store/git";
-import { withPrincipal } from "@better-answers/core/store/postgres";
 import {
   codePointsOf,
   documentLanded,
@@ -13,7 +12,8 @@ import {
 import { testData } from "@better-answers/schema/testing";
 
 import { connectAsHost } from "./flow.ts";
-import { openTestGit, startApp, type TestApp, type TestClient } from "./harness.ts";
+import { actingIn, openTestGit, startApp, type TestApp } from "./harness.ts";
+import { calledTool as called, rendered, rpcListOf, rpcOf, structured } from "./mcp-call.ts";
 
 let app: TestApp;
 
@@ -25,50 +25,8 @@ afterAll(async () => {
   await app.stop();
 });
 
-type Rpc = Readonly<Record<string, unknown>>;
-
-const isRpc = (value: unknown): value is Rpc =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
-
-const rpcOf = (value: unknown): Rpc => (isRpc(value) ? value : {});
-
-const rpcListOf = (value: unknown): readonly Rpc[] =>
-  Array.isArray(value) ? value.filter(isRpc) : [];
-
-const called = async (client: TestClient, token: string, name: string, args: Rpc): Promise<Rpc> => {
-  const headers = new Headers({ "content-type": "application/json" });
-  headers.set("accept", "application/json, text/event-stream");
-  headers.set("authorization", `Bearer ${token}`);
-  headers.set("mcp-protocol-version", "2025-11-25");
-  const call = { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } };
-  const response = await client.fetch("/mcp", {
-    method: "POST",
-    headers,
-    body: JSON.stringify(call),
-  });
-  const text = await response.text();
-  const streamed = [...text.matchAll(/^data:(.*)$/gm)].at(-1)?.[1];
-  const parsed: unknown = JSON.parse(streamed ?? text);
-  const body = rpcOf(parsed);
-  expect(body["error"]).toBeUndefined();
-  const result = rpcOf(body["result"]);
-  expect(result["isError"]).toBeFalsy();
-  return result;
-};
-
-const structured = (result: Rpc): Rpc => rpcOf(result["structuredContent"]);
-
-const rendered = (result: Rpc): string => String(rpcOf(rpcListOf(result["content"])[0])["text"]);
-
-const principalFor = async (workspaceId: string, userId: string): Promise<UserPrincipal> => {
-  const resolved = await withPrincipal(
-    app.doors.postgres,
-    { workspaceId, userId, issuedAt: new Date() },
-    async (principal) => principal,
-  );
-  if (!resolved.ok) throw new Error(`the principal did not resolve: ${resolved.error}`);
-  return resolved.value;
-};
+const principalFor = (workspaceId: string, userId: string): Promise<UserPrincipal> =>
+  actingIn(app, { workspaceId, userId }, async (principal) => principal);
 
 const TITLE = "Board remuneration";
 
