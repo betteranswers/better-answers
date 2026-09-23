@@ -1,0 +1,24 @@
+apps/worker/uv.lock
+  ai_agent 9-11,140,384,389,391-416
+apps/worker/pyproject.toml
+  s_7f9d314902ff79::t_dfb5d9d993e5d1 139-162
+  s_7f9d314902ff79::t_c73641cb351cbb 106,109
+  s_7f9d314902ff79::t_8e0b99e6aef663 108
+  s_7f9d314902ff79::t_d3313e3da32ffd 107
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "c18a24c639533c5883c4f3f4eac424ef027de570",
+  "prompts": {},
+  "sessions": {
+    "s_7f9d314902ff79": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ba770256-7145-4f54-b83c-479953d54d3d",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
