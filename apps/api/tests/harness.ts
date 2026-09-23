@@ -4,7 +4,7 @@ import path from "node:path";
 import { Writable } from "node:stream";
 
 import type { Hono } from "hono";
-import type { Pool } from "pg";
+import { Pool } from "pg";
 import { pino } from "pino";
 import { z } from "zod";
 
@@ -214,6 +214,12 @@ export type TestAppOptions = {
   readonly onEmail?: ((message: EmailMessage) => void) | undefined;
 
   readonly clock?: Clock | undefined;
+
+  readonly objectStore?: ObjectStoreSettings | undefined;
+
+  // A count of connections below the pool's ceiling reads what was asked for, and the suite's
+  // runtime pool is small.
+  readonly poolSize?: number | undefined;
 };
 
 export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> => {
@@ -232,7 +238,15 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
   const metadataFetches: string[] = [];
   const { logger, logs } = capturingLogger();
 
-  const doors = doorsFor(database.pool, { gitStoreDir, clock: options.clock });
+  const pool =
+    options.poolSize === undefined
+      ? database.pool
+      : new Pool({ ...database.pool.options, max: options.poolSize });
+  const doors = doorsFor(pool, {
+    gitStoreDir,
+    clock: options.clock,
+    objectStore: options.objectStore,
+  });
   const server = createServer({
     doors,
     publicUrl,
@@ -414,6 +428,7 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     setWorkspaceConfig,
     client,
     stop: async () => {
+      if (pool !== database.pool) await pool.end();
       await database.stop();
 
       await removeBundleRoot(gitStoreDir);

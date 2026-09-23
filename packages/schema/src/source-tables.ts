@@ -30,6 +30,10 @@ export const BINDING_STATES = ["landed", "indexing", "indexed", "published"] as 
 
 export const BINDING_LANDED_STATE = "landed" satisfies (typeof BINDING_STATES)[number];
 
+export const BINDING_INDEXING_STATE = "indexing" satisfies (typeof BINDING_STATES)[number];
+
+export const BINDING_INDEXED_STATE = "indexed" satisfies (typeof BINDING_STATES)[number];
+
 export const BINDING_PUBLISHED_STATE = "published" satisfies (typeof BINDING_STATES)[number];
 
 export const DOCUMENT_OUTCOMES = ["converted", "quarantined"] as const;
