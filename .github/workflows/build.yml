@@ -15,7 +15,7 @@ permissions:
 jobs:
   # Every way of not knowing is `no`, so `check` runs as it always did.
   already-checked:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     permissions:
       actions: read
@@ -67,7 +67,7 @@ jobs:
       packages: write
       attestations: write
       id-token: write
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 40
     strategy:
       fail-fast: false
