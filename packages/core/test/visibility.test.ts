@@ -22,7 +22,7 @@ import {
   narrowDocuments,
   narrowDocumentsInput,
 } from "../src/sources/index.ts";
-import type { Opened, Tx } from "../src/store/postgres/index.ts";
+import type { Folded, Tx } from "../src/store/postgres/index.ts";
 import { inputOf } from "./suite-input.ts";
 import { bundleHistory } from "./bundle.ts";
 import { countWaitingOnLocks, until, whileActsWaitAt } from "./suite-postgres.ts";
@@ -930,7 +930,7 @@ describe("narrowing a binding", () => {
     ]);
 
     await whileActsWaitAt(db().pool, "audit_event", "INSERT", async (release) => {
-      const narrowings: Promise<Opened<Awaited<ReturnType<typeof narrowBinding>>>>[] = [];
+      const narrowings: Promise<Folded<Awaited<ReturnType<typeof narrowBinding>>>>[] = [];
       for (const [at, binding] of [first, second].entries()) {
         narrowings.push(
           reading(scenario.admin, (admin, tx) =>

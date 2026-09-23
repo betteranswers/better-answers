@@ -31,8 +31,10 @@ import { holdsEveryGroup } from "../members/index.ts";
 import { enqueueJobIn, indexRunRefused } from "../runs/index.ts";
 import { putObject, type ObjectDoor } from "../store/objects/index.ts";
 import {
+  folded,
   withMembership,
-  type Opened,
+  type Foldable,
+  type Folded,
   type PostgresDoor,
   type Tx,
 } from "../store/postgres/index.ts";
@@ -191,10 +193,10 @@ const INSERT_DOCUMENT = `INSERT INTO source_document
 const inTransaction = async <T>(
   principal: UserPrincipal,
   door: PostgresDoor,
-  work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-): Promise<Opened<T, Error>> => {
+  work: (principal: UserPrincipal, tx: Tx) => Promise<Foldable<T>>,
+): Promise<Folded<T, Error>> => {
   const ran = await attempt(() => withMembership(principal, door, work));
-  return ran.ok ? ran.value : err(ran.error);
+  return ran.ok ? folded<T>(ran.value) : err(ran.error);
 };
 
 type CappedBody = {

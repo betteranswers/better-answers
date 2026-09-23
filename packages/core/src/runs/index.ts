@@ -34,10 +34,11 @@ import {
   type UserPrincipal,
 } from "../kernel/index.ts";
 import {
-  opened,
+  folded,
   withMembership,
   withScope,
-  type Opened,
+  type Foldable,
+  type Folded,
   type PostgresDoor,
   type Tx,
 } from "../store/postgres/index.ts";
@@ -90,14 +91,14 @@ const inWorkspace = async <T>(
   principal: Principal,
   door: PostgresDoor,
   workspaceId: string,
-  work: (tx: Tx) => Promise<T>,
-): Promise<Opened<T, Error>> => {
+  work: (tx: Tx) => Promise<Foldable<T>>,
+): Promise<Folded<T, Error>> => {
   if (principal.kind === "platform") {
     const ran = await attempt(() => withScope(principal, door, workspaceId, (tx) => work(tx)));
-    return ran.ok ? opened(ran.value) : err(ran.error);
+    return ran.ok ? folded<T>(ok(ran.value)) : err(ran.error);
   }
   const held = await attempt(() => withMembership(principal, door, (_fresh, tx) => work(tx)));
-  return held.ok ? held.value : err(held.error);
+  return held.ok ? folded<T>(held.value) : err(held.error);
 };
 
 const descriptorOf = (kind: string): JobKindDescriptor | undefined =>

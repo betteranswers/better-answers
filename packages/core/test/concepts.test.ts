@@ -19,7 +19,13 @@ import type { FrontmatterValue, TrustStatus } from "../src/answering/index.ts";
 import type { Result, UserPrincipal } from "../src/kernel/index.ts";
 import { commit, head, PLATFORM_BOT, withRepositoryLock } from "@better-answers/core/store/git";
 import { walkFrom } from "@better-answers/core/store/graph";
-import { openPostgres, type Opened, type Tx, withMembership } from "../src/store/postgres/index.ts";
+import {
+  openPostgres,
+  type Foldable,
+  type Folded,
+  type Tx,
+  withMembership,
+} from "../src/store/postgres/index.ts";
 import {
   bundleHistory,
   bundlesForSuite,
@@ -122,8 +128,8 @@ const recordedCommits = async (workspaceId: string): Promise<readonly string[]> 
 
 const reading = <T>(
   principal: UserPrincipal,
-  work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
-): Promise<Opened<T>> => readingAs(db().runtimePool, principal, work);
+  work: (principal: UserPrincipal, tx: Tx) => Promise<Foldable<T>>,
+): Promise<Folded<T>> => readingAs(db().runtimePool, principal, work);
 
 describe("a governed write", () => {
   it("lands one commit with the person as author and the platform bot as committer", async () => {

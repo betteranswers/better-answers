@@ -28,6 +28,7 @@ import {
 } from "../kernel/index.ts";
 import { withRepositoryLock, type GitDoor } from "../store/git/index.ts";
 import {
+  folded,
   scopeClause,
   scopeParameter,
   withMembership,
@@ -291,7 +292,7 @@ const decide = async (
       }),
     ),
   );
-  return decided.ok ? decided.value : err(decided.error);
+  return decided.ok ? folded(decided.value) : err(decided.error);
 };
 
 export const declineSuggestion = (

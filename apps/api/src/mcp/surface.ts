@@ -15,6 +15,7 @@ import { err, type Clock } from "@better-answers/core/kernel";
 import {
   consumeCall,
   consumeIngress,
+  folded,
   readWorkspaceConfig,
   withPrincipal,
   type PostgresDoor,
@@ -100,8 +101,10 @@ export const createMcpSurface = (
             async () =>
               bearer === undefined
                 ? err<RefusalAnswer>("no-session")
-                : withPrincipal(deps.door, bearer.claims, (principal, tx) =>
-                    entry.run(principal, tx, args, deps.clock.now()),
+                : folded(
+                    await withPrincipal(deps.door, bearer.claims, (principal, tx) =>
+                      entry.run(principal, tx, args, deps.clock.now()),
+                    ),
                   ),
             entry.render,
           ),

@@ -262,7 +262,7 @@ export const rehearseErasure = async (
   const subject = subjectOf(workspaceId, person.value);
 
   const at = doors.clock.now();
-  const recorded = await withPrincipal(
+  const opened = await withPrincipal(
     doors.postgres,
     { workspaceId, userId: subject.personId, issuedAt: at },
     (admin, tx) =>
@@ -274,6 +274,12 @@ export const rehearseErasure = async (
         clockStartedAt: at,
       }),
   );
+  if (!opened.ok) {
+    return err(
+      new Error(`erasure: the synthetic subject's principal was refused: ${opened.error}`),
+    );
+  }
+  const recorded = opened.value;
   if (!recorded.ok) {
     return err(
       new Error(`erasure: the rehearsal's request was refused: ${String(recorded.error)}`),

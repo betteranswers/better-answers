@@ -74,10 +74,12 @@ resolves the Principal in a short transaction, releases the connection and hands
 Principal and its doors — `kernel/principal.ts` already records that a Principal may outlive
 its resolving transaction and never the request, and `withMembership` re-judges it under the
 shared lock. A procedure that holds a `tx` cannot, by its context's type, reach a Postgres
-door. **The door rolls back**: `resolveScoped` rolls back when its work answers a `Result` that
-is not ok, and the four tails that return `enqueueJobIn`'s word after their rows have landed
-throw instead, as `bindUpload`'s does — that word would tell an Admin they are forbidden when
-the fault is a descriptor's. One composition root in `apps/api` opens the four doors and the
+door. **The door rolls back**: ~~`resolveScoped` rolls back when its work answers a `Result` that
+is not ok~~ every door rolls back when its work answers a `Result` that is not ok — the platform
+principal's `withScope` as well as `withPrincipal` and `withMembership`, one function holding the
+transaction for every Postgres door (the 2026-09-23 amendment below) — and the four tails that
+return `enqueueJobIn`'s word after their rows have landed throw instead, as `bindUpload`'s does —
+that word would tell an Admin they are forbidden when the fault is a descriptor's. One composition root in `apps/api` opens the four doors and the
 Clock (ADR 0040) and states the pool's size; the server, `ops` and the api harness call it.
 
 **Input and output.** Input is parsed once, where it enters the process, by a kernel `parse`
@@ -197,5 +199,27 @@ The vocabulary, the crossing, the roads and the composition root stand. T-237 la
 
 **Probe 5 — the suite lines.** Zero. The constructed acts kept their call shape, and no line of the
 sources suites moved.
+
+Nothing else in the decision moves.
+
+## Amendment — 2026-09-23, every door rolls back on a refusal, and a principal-scoped door answers its own refusal apart from its work's (T-338)
+
+**Every door rolls back.** *Transactions* named `resolveScoped` alone. `withScope`, the platform
+principal's door, committed whatever its work returned, so a platform act that refused after a
+write would have kept its rows; none did yet, but `inWorkspace` read the two doors alike while
+only one of them rolled back. One function now opens the transaction for every Postgres door and
+rolls it back when the work answers a `Result` that is not ok, when the work throws, and, for the
+two principal-scoped doors, when the door refuses the principal. The identity set's two doors pass
+through it as well; none of their work answers a `Result`.
+
+**The door's refusal is its own.** Since T-232 the principal-scoped door answered its work's
+`Result` as its own, with `PrincipalRefusal` folded into the work's union, so a caller could not
+tell a principal the door refused from an act that refused: the erasure rehearsal reported a
+subject whose credentials were revoked as "the rehearsal's request was refused". The door now
+answers a `Result` of its own, carrying its refusal or the work's answer untouched. An act whose
+face carries the door's words beside its own reads the two as one by calling `folded` on the
+door's answer, so the acts T-232 moved to one `Result` still read one; the rehearsal reads them
+apart. `folded` refuses, in the type, a work whose answer is only partly a `Result`, since the
+`Result` members of such a union would reach the caller as values.
 
 Nothing else in the decision moves.
