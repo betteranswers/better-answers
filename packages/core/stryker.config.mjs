@@ -27,10 +27,10 @@ export default {
   // Slack over the covering tests' measured time, so a mutant need only clear a re-import.
   timeoutMS: 30_000,
 
-  // Never raise: restarting a worker discards the Postgres container its `globalSetup`
-  // started, and every mutant after it pays a container start again.
+  // Never raise: restarting a worker discards the containers its `globalSetup` started, and
+  // every mutant after it pays a container start again.
   maxTestRunnerReuse: 0,
 
-  // Each test runner process owns a Postgres container, and the hosted runner has four vCPUs.
+  // Each test runner process owns its run's containers, and the hosted runner has four vCPUs.
   concurrency: 4,
 };

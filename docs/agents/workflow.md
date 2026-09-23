@@ -84,4 +84,6 @@ An acceptance line reading "`check` green" is CI's, on the pull request and agai
 
 ## Environment
 
-A Docker daemon (every suite starts a Testcontainers Postgres, the core suites a Garage), `uv`, `pnpm`, Playwright's Chromium for the web (`pnpm --filter @better-answers/web exec playwright install chromium`), a warm `HF_HOME` for the detector's weights, and `git-filter-repo` at the version `apps/api/Dockerfile` pins.
+A Docker daemon, `uv`, `pnpm`, Playwright's Chromium for the web (`pnpm --filter @better-answers/web exec playwright install chromium`), a warm `HF_HOME` for the detector's weights, and `git-filter-repo` at the version `apps/api/Dockerfile` pins.
+
+A vitest run starts its stores once, from `globalSetup`, and hands each file its own inside them: Postgres in every workspace, a database per file cloned from a migrated template; Garage in `packages/core` and `apps/api`, a bucket and a key per file through the admin API. Garage starts only where a selected file names `objectStoreForSuite`, so the docs lane and a run filtered to other files pay nothing for it.
