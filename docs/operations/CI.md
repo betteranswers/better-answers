@@ -1,0 +1,112 @@
+# Continuous integration
+
+**Operational reference, not a page of the docs site.** It is read from the repository, beside `BUILD_CACHE.md`, and it is where the design of `.github/workflows/` is written down. The files themselves carry only the whys a person editing a line needs at that line; everything about why the shape is the shape is here. Where a comment there and a sentence here disagree, the workflow is what runs and this page is what is wrong.
+
+Four workflows. `check.yml` decides whether a tree is green and is called from two places. `build.yml` builds and pushes the tier images on `main`. `release.yml` promotes a pair of digests to production when a person runs it. `mutation.yml` scores the two mutable workspaces nightly. The root `pnpm check` is still the one list of gates — `package.json` names every gate this repository has, and it is what a person runs on a laptop. What these files own is **where** each of those gates runs.
+
+## Every `uses:` names a commit SHA
+
+A tag is a moving reference into somebody else's repository, and these workflows hold a token that can push our images. So every `uses:` in the directory names a commit SHA with its tag beside it as a comment: the tag is what a person reads and what Renovate rewrites, the SHA is what runs. One pin per action across the whole directory. `renovate.json` keeps them pinned through `pinDigests` on the `github-actions` manager, and `apps/api/tests/workflow-pins.test.ts` refuses a `uses:` that names anything else.
+
+Two more moving references are pinned the same way and for the same reason.
+
+**Every `runs-on:` names a release, `ubuntu-24.04`, and not the `ubuntu-latest` label.** GitHub is migrating that label to Ubuntu 26 from 19/10/2026, which every job in the directory has been printing as a notice, so a tree that passed on Friday would fail on Monday for a reason no commit carries. `ubuntu-26.04` is the move to make and it is made on a branch of its own — one edit, every leg, a full run green before `main` sees it.
+
+**Every `setup-uv` reads its version out of one file**, `apps/worker/.tool-versions`, through `version-file:`. Unpinned, the action takes whatever uv is newest, which was 0.12.17 against the worker image's 0.12.9 — two builders resolving one lockfile. Why that file rather than `[tool.uv] required-version`, and what keeps it in step with the image, are said in the file itself.
+
+## The lanes
+
+A run is in one of three lanes, decided once by the `lane` job before any leg installs anything.
+
+| Lane | When | What runs |
+| --- | --- | --- |
+| docs | every changed path ends `.md` | `docs-gates` alone: the root `check:docs` |
+| affected | a pull request whose paths resolve to workspaces | `affected-gates`, `affected-workspaces`, `affected-worker` |
+| full | anything else, and every non-pull-request event | `full-root`, `full-api`, `full-web`, `full-worker` |
+
+Pre-merge checks as a subset and merge-time checks as the whole is the merge queue's own design: a pull request may narrow, and the commit that is about to land pays for everything. The lane script, `scripts/docs-lane.mjs`, answers from the paths alone; the half of the rule that reads the event lives in the `lane` job beside the base.
+
+**The base is per event.** A pull request carries its own base sha, a merge-group ref carries the commit the queue built it on, and a run `build.yml` calls reads the caller's `before` — the `github` context of a reusable workflow being the caller's. `workflow_call` is named beside `push` because GitHub documents `github.event_name` without saying which of the two a called run reads. Anything else — a dispatch, the all-zero `before` of a first push, a base this clone cannot fetch — leaves the lane at `full`: being wrong that way costs minutes, being wrong the other way ships a tree no gate read.
+
+A pull request's base sha is the one its event payload carried, which is behind the tip of `main` as soon as anything else lands. The diff then picks up those commits too and a genuinely markdown-only pull request takes the full lane. That is the safe direction, and it is why the docs lane fires less often on a busy `main` than the process review measured. The sharper base is the merge ref's own first parent, which costs a deeper fetch; measure before taking it.
+
+## The legs and the verdict
+
+**The leg names carry their lane, and the fan-in reads them.** A job called `full-<something>` runs on the full lane, `docs-<something>` on the docs lane, `affected-<something>` on the affected one, and the `check` job at the foot of the file requires exactly that: every leg whose prefix is this run's lane concluded success, and every other leg was skipped. A leg added by copying one of these is therefore already under the verdict, and a leg whose condition stopped matching its name is red rather than quietly absent — which is the failure this shape exists to refuse, a `check` that is green because nothing ran. The verdict also refuses a run that required nothing of anybody. `apps/api/tests/docs-lane.test.ts` holds the leg names against their conditions.
+
+**`check` is the name, and it is the fan-in's.** The branch ruleset requires the status context `check` and `build.yml`'s `image` job waits on `needs: check`; neither reads a leg. So the legs may be renamed, split or added to freely, and that one job name may not move.
+
+Four legs rather than one job because the four groups share nothing: run 35735268427 spent 795 seconds, of which the worker was 462, while the root gates, the libraries, the api and the web waited their turn. A full run now costs the longest leg rather than their sum, and each leg installs only the toolchain its own gates ask for.
+
+- **`full-root`** — every gate the root `check` names ahead of the workspaces, each one a tool walked over the whole tree, then the libraries, which are the workspaces nothing deploys. It brings uv because `packages/devtools`' lint and typecheck are ruff and mypy run through the worker's environment, and the rewrite tool because `packages/core`'s erasure suite shells out to it. It is also the only fresh clone in CI, so it is the only place the promise "install and the hook is there" can be tested.
+- **`full-api`** — the api's gates, which build two images inside the suite. It takes the container builder and the runtime credentials for the reason `BUILD_CACHE.md` gives, and the rewrite tool, because the erasure rehearsal reaches the same git step. Its uv is the binary alone with no environment and no cache: `tests/lefthook-config.test.ts` asks the tool whether it is there, and nothing on this leg resolves a Python package.
+- **`full-web`** — the SPA's gates, ending in a browser suite over the served build. Chromium is installed on this leg and no other, which is what the install is worth: 42 seconds of the 90 the old single job paid before any gate started.
+- **`full-worker`** — the longest leg, and therefore the length of a full run. The detector's weights, the container builder its image probe reads a layer cache through, and uv. No browser, and no `pnpm install` step — but that is not the same as not installing, which is why it takes `cache: pnpm`: pnpm verifies the tree before it runs a script, so `pnpm check:worker` installs all 665 packages first whether the leg asked for them or not, 12 seconds paid cold on every run. Removing the install itself is a change to how the root manifest spawns this gate. It also sets `COCOINDEX_DISABLE_USAGE_TRACKING`, because the indexing engine calls home on every update and this leg starts no container, so the image's own refusal cannot reach it.
+- **`affected-gates`** — the root gates, which are every lane's. None of them can be narrowed to the workspaces a change touched.
+- **`affected-workspaces`** — `pnpm --filter "...[<base>]"`, which is every package with a changed file and every package that imports one. It installs what any selection could ask for rather than what this one did: the filter's answer is not known until the tree is installed and the base is fetched, and a toolchain missing from a workspace that was selected is a red run while one installed needlessly costs seconds. The workspace root is excluded by name, because pnpm maps a root file to this repository itself, whose `check` is the whole run. A leg that selected nothing with no worker gates beside it is refused: that is the one way the affected lane could be silently green.
+- **`affected-worker`** — `pnpm --filter` never names this tier, a uv workspace not being a pnpm one, so the `lane` job answers for it from the paths: a change under `apps/worker/` or `contracts/`. The leg runs either way and its steps do not, because a leg skipped by its own condition concludes nothing and the verdict wants a conclusion.
+
+What the dependency graph does not carry, and it is one thing: the api's image holds the SPA's build, and `apps/web` depends on `apps/api` rather than the other way about — so a change to the SPA alone selects `apps/web` and the api's image suite runs in the merge group instead. That is an ejection when it goes red, and it is left rather than hand-wired: a filter arm written for one coupling is a second dependency graph beside pnpm's, read by nobody the day the real edge moves.
+
+## The docs lane
+
+`check:docs` runs the suites that read this repository's **documents**, through the same runner as the root `check`, so one command still names every step that failed. `format:check` leads it because it leads the root `check`; on this lane it is a no-op by construction, `.oxfmtrc.json` ignoring `**/*.md`.
+
+The lane keeps gates rather than skipping CI because a docs-only commit broke one: five specs moved into `docs/specs/` and the tag suite went red on the entries they made stale. It installs no uv, no browser, no rewrite tool and no builder, and `apps/api/tests/docs-lane.test.ts` holds that list against the job's steps.
+
+What it still pays, said plainly: `apps/api` and `packages/core` start a Postgres container from their vitest `globalSetup` whichever files are selected, so this lane pays two container starts none of its suites touch. Making it not do so is a change to those configurations rather than to the workflow. And it is not every suite coupled to a markdown file — five are left to the full lane, four reading a committed redaction fixture and the worker's half of the contract count, whose other half is in this lane and catches the same commit without a uv environment.
+
+## The concurrency groups
+
+A pull request cancels the run it supersedes; a run `build.yml` calls never does, because an image is worth building for every commit that lands. Both halves are written as one question — is this a pull request — so a merge-group run reads them as "no" and gets the commit for its group and no cancellation, which is exactly what the queue needs: its promise is that the commit it tested is the commit that lands.
+
+A group holds one running and one pending job whatever `cancel-in-progress` says, and a third arrival cancels the pending one. That is why `build.yml`'s group is per commit and a called run's is too: under one group for `main`, three pushes inside one `check` would lose the second commit's images. The called workflow's group must also stay different from its caller's, or it waits on itself.
+
+## `build.yml`
+
+Every commit gets its image. A run's concurrency group is its own commit, and the one tag a run writes is that commit's `sha-<short>` — a name no other run writes. There is no `:main` tag: with nothing serialising the runs it would end on whichever finished last. `release.yml` resolves the head of `main` by its `sha-` tag and refuses when that commit has no image yet.
+
+**Three images, and the list is here.** `api` from `apps/api/Dockerfile` built at the repository root, because it carries the SPA's build; `worker` from `apps/worker/Dockerfile` built in that directory; and `backup` from `deploy/backup.Dockerfile` built in `deploy/`. The first two are what `deploy/platform.compose.yaml` names by digest and what `release.yml` promotes; the third is `deploy/stores.compose.yaml`'s, set on that resource by hand at the first deploy and whenever the backup image changes, the stores stack not being the deploy unit. Postgres is never built here: it is the official pgvector image, pinned by digest in `packages/schema/src/postgres-image.ts` (ADR 0032).
+
+**The `already-checked` gate.** The merge queue tests a commit on a merge-group ref and then fast-forwards `main` to that very commit, so the tree this run is about and the tree the queue tested are the same bytes. The question is asked of the runs API and it is exact: a run of `check.yml`, triggered by `merge_group`, whose head is this commit, which concluded success. Every way of not knowing is `no` — an API that errors, a token that cannot read, a body that will not parse — so a broken gate runs `check` as it always did. `gh` rather than a third-party action, because an action for one API call is a tenth thing to keep pinned.
+
+**The image ships from a checked tree and nothing else.** A job skipped by its own condition makes its dependants skip, so the `image` job carries `!cancelled()`; but `!cancelled()` alone runs it after a `check` that failed, so the condition then names by hand the only two conclusions that may ship: `check` succeeded, or `check` was skipped and the gate above is the reason it was skipped. Nothing here asks what lane anything was in.
+
+**The two exports are one manifest.** The build runs once into the runner's daemon, is probed by the image's own contents test, and is exported again to the registry — the second call resolving every layer from the same builder's cache. Both exports name the same media types and refuse both attestations, or buildx picks per exporter and the digest read on the runner and the digest the registry answers to are two strings about one build. The summary says what was tested and what was pushed, and refuses to claim "tested" about bytes nothing read; the push has already happened by then, so a difference is a red `main` rather than a prevented push.
+
+**Provenance is written by referrer**, beside the image and keyed by the pushed digest, so the tag and the digest a person promotes still name the manifest itself rather than a wrapper around it (ADR 0022: the digest is the deploy variable). It is the job's last step and only on a leg that got that far. When it fails the leg is red with the image already pushed behind it — decided, not tolerated: a digest with no attestation must not look to a verifier like a digest something else pushed. `create-storage-record` is refused because it asks for a third scope and, without it, warns twice on every leg rather than failing.
+
+**The probes are declared, not switched on by tier.** Each matrix leg carries the command that reads its image and the toolchain that command needs, and every step is gated on what the leg declares, so a fourth image joins by declaring a probe rather than by editing steps. `apps/api/tests/image-job.test.ts` holds both halves — a probe whose toolchain nothing installs, and a toolchain installed for a leg with no probe.
+
+**The cache scope is the leg's name.** The backend's default is one scope for everyone, one scope holds one manifest, and three legs sharing it overwrote each other: the worker leg built cold on 47% of runs. The pushing leg is its scope's one writer; the probes and the pull requests read it and export nothing, an Actions cache being readable from its own ref and from the base branch.
+
+## `release.yml`
+
+A person runs this, and nothing else deploys production (ADR 0022). The `production` environment carries a required reviewer.
+
+**The digests.** Blank inputs mean the head of `main`: the digests `build.yml` pushed under that commit's `sha-<short>` tag, read back from ghcr.io. Staging is on demand and never stands (ADR 0024), so there is no "digest staging runs" to default to. When the head has no image — its build still running, or red, or the head is the row a release just pushed, which no build runs for because a `GITHUB_TOKEN` push starts no workflow — this refuses and names the commit. It never reaches back for an older image: the ways on are to wait for that build, to dispatch `build` on `main`, or to pass the digests, which is what the runbook's rollback does. Every digest is passed between steps through `env:` and matched against `^sha256:[0-9a-f]{64}$` on its own before anything is PATCHed, never interpolated into a shell line.
+
+**The rhythm**, which is a condition and not a date. While no client's data is on the box a release is minutes to undo, so any green build may be promoted and the post-deploy smoke is the release's last step. The day the first client's data is on the box, the owner sets the repository variable `CLIENT_DATA_ON_BOX`, and from then on this workflow refuses to run unless `rehearsed_by` names the drill report that just proved a restore, or a hotfix reason. That is the forcing function: the switch is a check in the workflow, not a sentence in a runbook. `RUNBOOK.md` page 6 is the procedure.
+
+**The record.** Every promotion is appended to `deploy/RELEASES.md` — date, who, both digests, what it rode on — and pushed to `main` before the smoke runs, so a release the smoke fails still has its row and the runbook's "the row above" exists. The `main` ruleset must let the GitHub Actions app bypass "require a pull request" for that one push.
+
+## `mutation.yml`
+
+Nightly at 02:17 UTC on hosted runners. The cadence is a choice and not a budget — the repository is public, so hosted standard runners carry no minute cap, and both legs finish inside an hour — and the coding rules' mutation-schedule rule is where the choice is made and where it changes. Nightly rather than weekly because the summary names what newly survived since the previous run, which is the one thing a reader needs from a run that happens while they sleep. A falling score is an ordna task, not a failed build: the job posts the numbers and does not gate, and a red job means the harness itself broke.
+
+**Two legs, and what would bring a third back.** A score is only worth reporting where the tests that produce it exercise the code being mutated.
+
+- `apps/web`. Its primary test interface is a browser, and Stryker's Vitest runner cannot drive it. What is left is three jsdom files against a dozen components, so the score would be dominated by mutants no test covers. It comes back when a runner can drive the browser suite, or when component tests cover the screens on their own.
+- `apps/worker`. Its mutatable source is a few dozen lines of configuration and logging plus a schema view generated from the migration journal, so a mutmut score today measures the generator. It comes back when the tier gets behaviour worth mutating; the settings stay in `apps/worker/pyproject.toml` ready for it.
+
+**The incremental cache.** The previous run's mutant results are restored so that a file nobody touched is not re-tested. A cache entry is written once and never overwritten, so a fixed key would pin the first run's results forever: the run id makes the key new every time and the prefix restores the newest entry this workspace has; the attempt number is on the key too, because a re-run keeps the run id and would be refused its own first attempt's entry. Restore and save are separate steps because the combined action saves in a post step conditioned on success, which discards the checkpoint of the one run that needed to keep it — a leg cancelled at the job timeout. A night where nothing restores is a full run: slower, never wrong, and the timeout is sized for exactly that night.
+
+**Cancellation has to reach Stryker.** A cancelled step signals its entry process and nothing under it, and a shell waiting on a child forwards no signal: behind `pnpm run mutation`, with a pnpm and an sh in between, Stryker was never signalled and never wrote the partial report it writes on SIGINT. The step `exec`s into pnpm's bin shim, which execs into node, so there is one process from the step down.
+
+## The `git-filter-repo` action
+
+`.github/actions/git-filter-repo/` installs the rewrite tool the erasure routine shells out to (ADR 0020), which `ubuntu-latest` does not carry. Without it a workspace's erasure suite fails on the runner while every machine it was written on is green, and there is no skip guard in that suite on purpose.
+
+It is an action rather than a step per workflow because the install was written into `check.yml` and copied nowhere: Stryker's initial test run is a workspace's suite run whole, so both mutation legs died on `git: 'filter-repo' is not a git command`, mutated nothing and scored nothing for three nights before anyone looked. A step that has to be remembered is a step that will be forgotten.
+
+**The version is read out of `apps/api/Dockerfile` and is not written in the action.** A rewrite proved against one version of the tool and run against another is a rewrite nobody has tested, so the runner and the api image must carry the same one; a pinned value is written down once and read from there, because a second copy ages on its own. An action cannot import a constant, so reading the pin out of the file that declares it is the substitute. `apps/api/tests/workflow-tools.test.ts` holds the action to that, and holds every workflow either to using it before the step that runs the suite or to being named as one that runs no such suite.
