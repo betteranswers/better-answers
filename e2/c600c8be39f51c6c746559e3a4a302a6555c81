@@ -1,0 +1,71 @@
+apps/worker/tests/factories.py
+  s_69414e6e80cf2c::t_09303279b2120a 423-424
+packages/schema/test/boundary-schemas.test.ts
+  s_69414e6e80cf2c::t_d96b32819f5f6f 1308-1309
+apps/worker/src/better_answers_worker/pipeline/__init__.py
+  s_69414e6e80cf2c::t_50e776c6029126 41
+packages/schema/migrations/meta/_journal.json
+  s_69414e6e80cf2c::t_6aa12e06648d9f 330
+  s_69414e6e80cf2c::t_a6b5f2d7d822ef 332
+apps/worker/src/better_answers_worker/schema_view.py
+  s_69414e6e80cf2c::t_d406dcf8dd7eae 15-16
+  s_69414e6e80cf2c::t_5d667af869bdb5 5
+docs/specs/s4-a-chunks-visibility-is-read-not-copied.md
+  s_69414e6e80cf2c::t_80becd1409d291 100
+apps/worker/tests/test_visibility_columns_contract.py
+  s_69414e6e80cf2c::t_af571b3c818cf1 46
+  s_69414e6e80cf2c::t_171ae4019c2aa1 22
+packages/schema/src/index-tables.ts
+  s_69414e6e80cf2c::t_5c10b6ca249edc 31-32
+docs/specs/v01-route.md
+  s_69414e6e80cf2c::t_5242c5f168fb0e 214
+apps/worker/src/better_answers_worker/pipeline/rows.py
+  s_69414e6e80cf2c::t_43e7a449ffa764 26,46
+  s_69414e6e80cf2c::t_01e4d4eac7500d 1,44
+packages/schema/test/chunk-columns.test.ts
+  s_69414e6e80cf2c::t_a51b6ac8d58aa8 90-91
+apps/worker/tests/test_pipeline_index.py
+  s_69414e6e80cf2c::t_046c877a10ff34 1216
+  s_69414e6e80cf2c::t_7a21f01d44c827 1222-1225,1228-1229,1231-1232,1236,1240-1252,1259-1260
+  s_69414e6e80cf2c::t_20fdfc13a97ea5 218-222,224-228
+  s_69414e6e80cf2c::t_04dae3d5565f5b 1171,1175,1177-1179,1182-1183,1185,1191,1206-1210,1233-1234
+  s_69414e6e80cf2c::t_d2c19efc9f159b 8
+  s_69414e6e80cf2c::t_21984e8a17e4b4 1195-1197,1200-1204
+  s_69414e6e80cf2c::t_ff31a01a7bcc98 223,1211-1213,1235,1238
+  s_69414e6e80cf2c::t_171ae4019c2aa1 19-22,1198-1199
+  s_69414e6e80cf2c::t_4f196392be4acb 1270-1277
+  s_69414e6e80cf2c::t_8753650d22e760 473,476-477,481-508,559-577
+  s_69414e6e80cf2c::t_5caa9bf599d4d0 337,345-346,355-361
+  s_69414e6e80cf2c::t_c543ae473fa817 1187-1190,1192-1193
+  s_69414e6e80cf2c::t_a49d84539697cf 509-558
+  s_69414e6e80cf2c::t_cf84012ca0e5d6 1194
+  s_69414e6e80cf2c::t_fdb57715e7d824 210-211,229-235
+packages/core/src/sources/passages.ts
+  s_69414e6e80cf2c::t_49d8686fea7817 26
+  s_69414e6e80cf2c::t_4f9540472442d6 1
+  s_69414e6e80cf2c::t_e2af34b71e91ea 24-25
+apps/worker/src/better_answers_worker/pipeline/run.py
+  s_69414e6e80cf2c::t_b9601b1ec1c0a4 88
+  s_69414e6e80cf2c::t_f68117a23bce5d 93
+  s_69414e6e80cf2c::t_43e7a449ffa764 94
+apps/worker/src/better_answers_worker/pipeline/catalogue.py
+  s_69414e6e80cf2c::t_d9e4071e560a58 51
+  s_69414e6e80cf2c::t_96a27517b65cb3 33,41
+  s_69414e6e80cf2c::t_ac6ffcff56c0ec 188-189,192
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "e2c600c8be39f51c6c746559e3a4a302a6555c81",
+  "prompts": {},
+  "sessions": {
+    "s_69414e6e80cf2c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6af0bc5d-5e17-4638-afb3-472e1f42e570",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
