@@ -16,7 +16,7 @@ import { withScope, type PostgresDoor, type Tx } from "../store/postgres/index.t
 import { workspaceIds } from "../workspaces/index.ts";
 import { replayCopiesSince, type ReplayCopy } from "./replay.ts";
 import { dueDateOf } from "./requests.ts";
-import { beyondUseFrom, runErasure, type ErasurePrincipal } from "./routine.ts";
+import { beyondUseFrom, runErasure, type ErasureLog, type ErasurePrincipal } from "./routine.ts";
 
 const REPLAY_ACTS = declareActs("platform", {
   replayed: act("platform.erasure.replayed", {
@@ -54,6 +54,7 @@ export type ReplayDoors = {
   readonly postgres: PostgresDoor;
   readonly objects: ObjectDoor;
   readonly clock: Clock;
+  readonly log: ErasureLog;
 };
 
 type CompletedRow = {

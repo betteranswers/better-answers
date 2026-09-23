@@ -25,9 +25,12 @@ import {
   rederiveAfterErasure,
   runErasure,
   suppressTheDocuments,
+  type ErasureLog,
+  type ErasureLogLine,
   type ErasureMap,
   type ErasureRefusal,
   type ErasureRun,
+  type IdentityArm,
 } from "../src/erasure/index.ts";
 import { actorIdOfPerson, type Result } from "../src/kernel/index.ts";
 import { authorLinesOf, bundleHistory, everyObjectOf, objectPresent } from "./bundle.ts";
@@ -82,6 +85,23 @@ const ERASURE_ACTOR = "process:better-answers-erasure";
 
 const COMPLETED = "people.erasure.completed";
 
+const INVITATIONS_WHEREVER_SENT =
+  "Invitations sent to the address a person signs in with are deleted wherever they were sent, " +
+  "by the request that ends their last membership; the invitation line above counts this " +
+  "workspace's alone.";
+
+// Every run in the file logs here, so a case reads back the lines of its own request alone.
+const operatorLines: ErasureLogLine[] = [];
+
+const operatorLog: ErasureLog = {
+  info: (line) => {
+    operatorLines.push(line);
+  },
+};
+
+const operatorLinesAbout = (erasureRequestId: string): readonly ErasureLogLine[] =>
+  operatorLines.filter((line) => line.erasure_request_id === erasureRequestId);
+
 const runningTheRoutine = (
   scenario: Scenario,
   subjectRequestId: string,
@@ -94,6 +114,7 @@ const runningTheRoutine = (
       postgres: scenario.postgres,
       objects: objects().door,
       clock: { now: () => at },
+      log: operatorLog,
     },
     { workspaceId: scenario.workspaceId, subjectRequestId },
   );
@@ -144,6 +165,29 @@ const workspaceWithAnErasureRequest = async (named: { readonly byIdAlone?: boole
     ),
   };
 };
+
+const erasedOnEachArm = async (): Promise<Readonly<Record<IdentityArm, ErasureRun>>> => {
+  const scenario = await arrange();
+  const elsewhere = await arrange();
+  const onlyHere = addressOf("priya");
+  const heldElsewhere = addressOf("nadia");
+  const lastMember = await memberOf(db().pool, scenario.workspaceId, onlyHere);
+  const stillMember = await memberOf(db().pool, scenario.workspaceId, heldElsewhere);
+  await seedingWith(db().pool, (seed) =>
+    seed.member({ workspaceId: elsewhere.workspaceId, userId: stillMember.id, role: "Editor" }),
+  );
+  const erased = async (personId: string | null, email: string): Promise<ErasureRun> =>
+    completing(scenario, await erasureRequestAbout(scenario.workspaceId, personId, email));
+  return {
+    "last-membership": await erased(lastMember.id, onlyHere),
+    "membership-ended": await erased(stillMember.id, heldElsewhere),
+    "no-person": await erased(null, addressOf("a-contact")),
+  };
+};
+
+let theArmsErased: ReturnType<typeof erasedOnEachArm> | undefined;
+
+const erasedOnEachArmOnce = () => (theArmsErased ??= erasedOnEachArm());
 
 const filesNaming = (
   email: string,
@@ -577,6 +621,19 @@ describe("the report", () => {
     expect(done.report).toContain(
       "Exports already issued are not recalled. None have been issued.",
     );
+  });
+
+  it("says invitations are deleted wherever they were sent on every report, whichever arm ran, so the sentence tells nobody which one did", async () => {
+    const reports = Object.entries(await erasedOnEachArmOnce()).map(([arm, done]) => ({
+      arm,
+      says: done.report.includes(INVITATIONS_WHEREVER_SENT),
+    }));
+
+    expect(reports).toEqual([
+      { arm: "last-membership", says: true },
+      { arm: "membership-ended", says: true },
+      { arm: "no-person", says: true },
+    ]);
   });
 
   it("lists the concepts whose body names the person by IRI, for the owner to edit", async () => {
@@ -1031,6 +1088,41 @@ describe("the identity set on the person's last membership", () => {
     expect(await identityRowCountsFor(elsewhere.workspaceId, person.id, notTheirs)).toMatchObject({
       invitations: 1,
     });
+  });
+
+  it("counts this workspace's invitations alone on the report's line, and gives what it deleted everywhere to the operator's record", async () => {
+    const scenario = await arrange();
+    const elsewhere = await arrange();
+    const email = addressOf("priya");
+    const person = await memberOf(db().pool, scenario.workspaceId, email);
+    for (const workspaceId of [scenario.workspaceId, elsewhere.workspaceId]) {
+      await seedingWith(db().pool, (seed) => seed.invitation({ workspaceId, email }));
+    }
+    const subjectRequestId = await erasureRequestAbout(scenario.workspaceId, person.id, email);
+
+    const done = await completing(scenario, subjectRequestId);
+
+    const [row] = await erasureRowsIn(scenario.workspaceId);
+    expect(row?.actions["identity-invitation"]).toEqual({ found: 1, deleted: 1 });
+    expect(done.report).toContain("- identity-invitation: deleted 1, found 1\n");
+    expect(done.report).toContain(INVITATIONS_WHEREVER_SENT);
+    expect(operatorLinesAbout(done.erasureRequestId)).toEqual([
+      {
+        actor: ERASURE_ACTOR,
+        erasure_request_id: done.erasureRequestId,
+        invitations_deleted: 2,
+      },
+    ]);
+  });
+
+  it("gives the operator's record one line on every arm, naming the request and never an address", async () => {
+    const runs = Object.values(await erasedOnEachArmOnce());
+
+    expect(runs.map((done) => operatorLinesAbout(done.erasureRequestId))).toEqual(
+      runs.map((done) => [
+        { actor: ERASURE_ACTOR, erasure_request_id: done.erasureRequestId, invitations_deleted: 0 },
+      ]),
+    );
   });
 
   it("leaves every invitation standing when another membership does, because the address is still theirs to be invited by", async () => {
@@ -1552,6 +1644,7 @@ describe("the replay copy the restore reads", () => {
         postgres: scenario.postgres,
         objects: shut.value,
         clock: { now: () => LOCKED_AT },
+        log: operatorLog,
       },
       { workspaceId: scenario.workspaceId, subjectRequestId },
     );

@@ -40,6 +40,20 @@ export type ErasurePrincipal = PlatformPrincipal & {
 
 export const ERASURE: ErasurePrincipal = { kind: "platform", actorId: ERASURE_ACTOR };
 
+export type ErasureLogLine = {
+  readonly actor: typeof ERASURE_ACTOR;
+  readonly erasure_request_id: string;
+  readonly invitations_deleted: number;
+};
+
+// The row and the report are the erasing workspace's to read, so what the routine did beyond it
+// goes to the tier's log.
+export type ErasureLog = {
+  readonly info: (line: ErasureLogLine, message: string) => void;
+};
+
+const IDENTITY_STEP_LOGGED = "erasure: what the identity step deleted across every workspace";
+
 // deploy/backup.sh takes the same advisory lock by this number; change one and a dump runs
 // beside an erasure.
 const DUMP_LOCK = 41;
@@ -241,8 +255,18 @@ const withTheIdentityStep = (actions: ErasureActions, swept: IdentitySwept): Era
   },
   "identity-session": { ...actions["identity-session"], deleted: swept.sessions },
   "identity-verification": { ...actions["identity-verification"], deleted: swept.verifications },
-  "identity-invitation": { ...actions["identity-invitation"], deleted: swept.invitations },
+  "identity-invitation": { ...actions["identity-invitation"], deleted: swept.invitationsHere },
   "identity-account": { ...actions["identity-account"], deleted: swept.accounts },
+});
+
+const identityStepLineOf = (
+  platform: ErasurePrincipal,
+  erasureRequestId: string,
+  swept: IdentitySwept,
+): ErasureLogLine => ({
+  actor: platform.actorId,
+  erasure_request_id: erasureRequestId,
+  invitations_deleted: swept.invitationsEverywhere,
 });
 
 const SOURCE_DOCUMENT: ErasureFamily = "source-document";
@@ -313,6 +337,7 @@ export const runErasure = async (
     readonly postgres: PostgresDoor;
     readonly objects: ObjectDoor;
     readonly clock: Clock;
+    readonly log: ErasureLog;
   },
   input: { readonly workspaceId: string; readonly subjectRequestId: string },
 ): Promise<Result<ErasureRun, ErasureRefusal | Error>> => {
@@ -384,6 +409,9 @@ export const runErasure = async (
       }),
     );
     if (!identity.ok) return err(identity.error);
+    // Logged as the step commits, not at completion: a run that dies after it leaves the next
+    // run nothing left to count.
+    doors.log.info(identityStepLineOf(platform, erasure.id, identity.value), IDENTITY_STEP_LOGGED);
 
     const suppressed = await attempt(() =>
       withScope(platform, doors.postgres, workspaceId, (tx) =>

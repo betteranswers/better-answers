@@ -1,3 +1,5 @@
+import type { Logger } from "pino";
+
 import {
   GRAPH_MAINTENANCE,
   graphCounts,
@@ -17,6 +19,7 @@ import {
   rehearseErasure,
   replayErasures,
   seedSyntheticSubject,
+  type ErasureLog,
   type RehearsalRefusal,
 } from "@better-answers/core/erasure";
 import {
@@ -73,6 +76,8 @@ export type OpsIo = {
 
   readonly stdin: () => Promise<string>;
   readonly say: (line: string) => void;
+
+  readonly logger: Logger;
 
   readonly appHostname?: string | undefined;
 
@@ -168,6 +173,7 @@ type ErasureDoors = {
   readonly postgres: PostgresDoor;
   readonly objects: ObjectDoor;
   readonly clock: Clock;
+  readonly log: ErasureLog;
 };
 
 const bundleStore = (doors: Doors, purpose: string): Result<GitDoor, string> =>
@@ -176,7 +182,7 @@ const bundleStore = (doors: Doors, purpose: string): Result<GitDoor, string> =>
     `no repositories' root is configured (GIT_STORE_DIR), so ${purpose}; the estate sets it to /data/git on the api service`,
   );
 
-const erasureDoors = (doors: Doors): Result<ErasureDoors, string> => {
+const erasureDoors = (doors: Doors, log: ErasureLog): Result<ErasureDoors, string> => {
   const git = bundleStore(doors, "the bundles an erasure rewrites cannot be opened");
   if (!git.ok) return err(git.error);
   const objects = doorTold(
@@ -189,6 +195,7 @@ const erasureDoors = (doors: Doors): Result<ErasureDoors, string> => {
     postgres: doors.postgres,
     objects: objects.value,
     clock: doors.clock,
+    log,
   });
 };
 
@@ -206,7 +213,7 @@ const replayErasuresCommand = async (doors: Doors, flags: Flags, io: OpsIo): Pro
     );
     return DONE;
   }
-  const opened = erasureDoors(doors);
+  const opened = erasureDoors(doors, io.logger);
   if (!opened.ok) {
     io.say(`replay-erasures: REFUSED — ${opened.error}; do not start api`);
     return REFUSED;
@@ -741,7 +748,7 @@ const erasureRehearsal = async (
     );
     return USAGE;
   }
-  const opened = erasureDoors(doors);
+  const opened = erasureDoors(doors, io.logger);
   if (!opened.ok) {
     io.say(`erasure-rehearsal: REFUSED — ${opened.error}`);
     return REFUSED;
