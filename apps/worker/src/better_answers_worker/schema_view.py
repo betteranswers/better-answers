@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0050_the-sweep-pass"
+MIGRATION_ID = "0051_the-unwritten-account-issuer"
 
-MIGRATION_WHEN = 1790192750641
+MIGRATION_WHEN = 1790206288505
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -32,7 +32,7 @@ TABLES: dict[str, dict[str, str]] = {
     },
     "public.account": {
         "id": "text NOT NULL",
-        "issuer": "text NOT NULL",
+        "issuer": "text",
         "account_id": "text NOT NULL",
         "provider_id": "text NOT NULL",
         "user_id": "text NOT NULL",
