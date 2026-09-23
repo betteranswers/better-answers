@@ -8,7 +8,6 @@ from .catalogue import (
     quarantine_catalogue,
     read_binding,
     reconcile_catalogue,
-    recopy_visibility,
     record_findings,
 )
 from .host import Host, IndexRun
@@ -86,14 +85,13 @@ def index_binding(
                 ms_per_page=ms_per_page,
                 margin_ms=margin_ms,
             )
-            rows = rows_of(run, landed.documents, binding.visibility_of)
-            chunks = host.land_rows(run, CHUNK_TABLE, rows)
-
+            # A document's class must be on its row before any chunk of it can be read.
             with queue.scoped(connection, run.workspace_id) as cursor:
                 record_findings(cursor, run, landed.documents)
                 reconcile_catalogue(cursor, landed.documents)
                 quarantine_catalogue(cursor, landed.quarantined)
-                recopy_visibility(cursor, run, [str(row["id"]) for row in rows])
+
+            chunks = host.land_rows(run, CHUNK_TABLE, rows_of(run, landed.documents))
 
         outcome = IndexOutcome(
             documents=len(landed.documents),

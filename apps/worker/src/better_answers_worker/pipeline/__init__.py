@@ -38,7 +38,7 @@ from .landed import (
     timeout_for,
 )
 from .objects import Bucket, LandedCopies, object_key_of
-from .rows import CHUNK_TABLE, SENSITIVITY_ORDER, Visibility, chunk_rows, rows_of
+from .rows import CHUNK_TABLE, chunk_rows, rows_of
 from .run import WIPED_REASON, IndexOutcome, index_binding
 from .tables import Column, Table
 
@@ -56,7 +56,6 @@ __all__ = [
     "PASSED_THROUGH",
     "PDF_MEDIA_TYPE",
     "SEAM_MS_PER_PAGE",
-    "SENSITIVITY_ORDER",
     "TIMEOUT_MARGIN_MS",
     "WIPED_REASON",
     "Bucket",
@@ -74,7 +73,6 @@ __all__ = [
     "Suppression",
     "Table",
     "UnreadableError",
-    "Visibility",
     "chunk_id_of",
     "chunk_rows",
     "converted",

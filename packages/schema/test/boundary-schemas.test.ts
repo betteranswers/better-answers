@@ -1305,8 +1305,8 @@ describe("5 — the inferred type is pinned", () => {
         embedding: number[] | null;
         embeddingRouteId: string | null;
         publishedAt: Date | null;
-        sensitivity: "Restricted" | "Internal" | "Public";
-        audience: "everyone" | "groups";
+        sensitivity: "Restricted" | "Internal" | "Public" | null;
+        audience: "everyone" | "groups" | null;
         audienceGroups: GroupId[] | null;
         bindingId: string;
         sourceDocumentId: string | null;

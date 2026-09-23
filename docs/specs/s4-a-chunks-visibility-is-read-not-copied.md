@@ -97,7 +97,7 @@ Edges first: after T-232 and T-236, which edit the same acts' tails; after Root 
 
 1. **The function and the view**, with the schema suite's cases. Additive: the copies still stand and nothing reads the view yet.
 2. **The readers move to the view**, with the core suite's race tests. From this commit a narrowing is right at the commit and the copies are dead weight.
-3. **The writers stop** — the three acts' chunk statements, the enqueue, `jobId`, the docblocks, the glossary; and the worker's ticket, being the shorter schema, the fold and the re-copy deleted, the catalogue-before-landing reorder and the verdict through `narrower_class`.
+3. **The writers stop** — the three acts' chunk statements, the enqueue, `jobId`, the docblocks, the glossary; and the worker's ticket, being the shorter schema, the fold and the re-copy deleted, the catalogue-before-landing reorder and the verdict through `narrower_class`. This step also carries a catalogue-only migration relaxing `sensitivity` and `audience` to nullable, because 0002 declared both NOT NULL with no default and a run that stops writing them cannot insert a row otherwise; unlike step 4's drop it is safe beneath an old image, which goes on writing a value a nullable column still accepts, so it merges here rather than waiting.
 4. **The columns go**, with the CHECK, the Drizzle mirror, the generated worker view and the fixture's chunk cases. **A later release than 3**: `migrate` runs before the app and the worker, so a drop landing while an old image still names the columns fails that image's statement.
 5. **The word leaves.**
 

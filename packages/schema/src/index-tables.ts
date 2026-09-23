@@ -28,8 +28,8 @@ export const chunk = indexSchema.table("chunk", {
   embeddingRouteId: text("embedding_route_id"),
 
   publishedAt: timestamp("published_at", { withTimezone: true, mode: "date" }),
-  sensitivity: text("sensitivity").notNull(),
-  audience: text("audience").notNull(),
+  sensitivity: text("sensitivity"),
+  audience: text("audience"),
   audienceGroups: text("audience_groups").array(),
 
   bindingId: text("binding_id").notNull(),

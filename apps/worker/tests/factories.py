@@ -420,14 +420,11 @@ def seed_chunk(
 async def land_chunk(connection: asyncpg.Connection, row: dict[str, Any]) -> None:
     # Placeholders are asyncpg's: the pools a row is landed through are asyncpg's.
     await connection.execute(
-        'INSERT INTO "index".chunk'
-        " (id, workspace_id, content, sensitivity, audience, binding_id)"
-        " VALUES ($1, $2, $3, $4, $5, $6)",
+        'INSERT INTO "index".chunk (id, workspace_id, content, binding_id)'
+        " VALUES ($1, $2, $3, $4)",
         row["id"],
         row["workspace_id"],
         row["content"],
-        row["sensitivity"],
-        row["audience"],
         row["binding_id"],
     )
 
