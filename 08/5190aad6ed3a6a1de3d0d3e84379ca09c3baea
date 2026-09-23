@@ -1,0 +1,54 @@
+packages/schema/roles-surface.json
+  s_69414e6e80cf2c::t_dd82f8326d922a 40,276,284,291-292
+packages/schema/migrations/meta/_journal.json
+  s_69414e6e80cf2c::t_bf63c76aa40d53 312-318
+packages/schema/test/readable-chunk.test.ts
+  s_69414e6e80cf2c::t_c4124b4536a63a 239-240
+  s_69414e6e80cf2c::t_d698967787219d 72
+  s_69414e6e80cf2c::t_198d69f4b8a9f8 183-201
+  s_69414e6e80cf2c::t_c0ace168270b03 274,276,279
+  s_69414e6e80cf2c::t_9182092ec51e88 304-305
+  s_69414e6e80cf2c::t_3f322120214c63 25-27,29-34
+  s_69414e6e80cf2c::t_298ba91a8d0ef9 28
+  s_69414e6e80cf2c::t_4d2dab734d7e03 75-81,85
+  s_69414e6e80cf2c::t_0497e4e5edbc8c 97-110
+  s_69414e6e80cf2c::t_0ef6bbf3bc1b6c 112-120,123-129,136-137
+  s_69414e6e80cf2c::t_bc1b6a74b40c12 445-447
+  s_69414e6e80cf2c::t_068d2115223497 56-62
+  s_69414e6e80cf2c::t_b7dad3bb136e93 221-238,257-267
+  s_69414e6e80cf2c::t_7a37963568ea8f 1-13,16-24,35-55,63-71,73-74,82-84,86-96,111,121-122,130-135,138-182,202-220,268-273,275,277-278,280-303,306-329,331-408,415-433,435-436,438,440-444,449-520
+  s_69414e6e80cf2c::t_5e9ef20e86e4ff 241-256
+  s_69414e6e80cf2c::t_b3314672f5442d 409-410
+  s_69414e6e80cf2c::t_4cfa570cc4eb96 330
+  s_69414e6e80cf2c::t_bf4679273a981c 14-15
+  s_69414e6e80cf2c::t_cfbefcf92fdbe8 434,437,439,448
+  s_69414e6e80cf2c::t_76361b14101613 411-414
+apps/worker/src/better_answers_worker/schema_view.py
+  s_69414e6e80cf2c::t_a0ef2813cd9792 3,5
+packages/schema/migrations/0044_the-readable-chunk.sql
+  s_69414e6e80cf2c::t_b7f100ce705819 46-47
+  s_69414e6e80cf2c::t_0e25cffb7e9426 1-32,34-45,48-54,56,58-106
+  s_69414e6e80cf2c::t_56b1cd993865a2 33
+  s_69414e6e80cf2c::t_1637ddd55a2c8f 55,57
+packages/schema/migrations/meta/0044_snapshot.json
+  s_69414e6e80cf2c::t_bf63c76aa40d53 1-5416
+packages/core/test/class-ranking.test.ts
+  s_69414e6e80cf2c::t_7cfc5119d9ba5b 1-7,19-20,22-25,27,29,38-39
+  s_69414e6e80cf2c::t_98cfb9bc1c6ce0 8-18,21,26,28,30-37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "085190aad6ed3a6a1de3d0d3e84379ca09c3baea",
+  "prompts": {},
+  "sessions": {
+    "s_69414e6e80cf2c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6af0bc5d-5e17-4638-afb3-472e1f42e570",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
