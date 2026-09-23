@@ -69,22 +69,49 @@ The shape above caps `worker` at 1.5 GB and gives it a swap file so that "a firs
 - **`memory.peak` was 1,536 MB in all three**, at the cap. **`memory.swap.peak` was 1,474, 1,456 and 1,473 MB**, which is 95–96 % of the 1,536 MB the deploy unit lets it spill.
 - **Steady state**, read 30 s after the last page: **994–1,051 MB resident plus 1,053–1,088 MB in swap, 2.08–2.10 GB in all.**
 - **With no limit**, the same image read `memory.peak` 2,889 MB and a process peak RSS of 2,992 MB, beside T-130's 2,967–2,975 MB on arm64. Its steady state was 2,115 MB.
-- **The peak is the load.** Torch reads the pinned model's 1.16 GB `pytorch_model.bin` whole and builds the model beside it. The process drops to its steady figure once the load is done.
+- **The peak is the load.** ~~Torch reads the pinned model's 1.16 GB `pytorch_model.bin` whole and builds the model beside it.~~ Since the amendment of 23/09/2026 below (T-347), torch maps the file and gliner assigns its tensors in place, so nothing is built beside it. The process drops to its steady figure once the load is done.
 - **`pswpin`**, read from the cgroup's `memory.stat`, which here matched `/proc/vmstat`:
   - During the model load: **2.1–2.2 GB swapped in at 98–113 MB/s for 19.8–23.1 s**, and 3.3–3.5 GB swapped out.
   - During detection, three pages: **3.8–4.6 MB/s**, 75–77 MB in all.
   - Idle: none.
 - **The seam's milliseconds per page under the limit** were 5,579, 6,453 and 5,273, over loads of 19.8–23.1 s. With no limit the same image read 4,554. S1's per-document timeout is re-cut from these readings.
 
-**Only the pinned model loads.** An audit hook caught every `open` under `HF_HOME`. The only weights the process opened were `urchade/gliner_multi_pii-v1`'s `pytorch_model.bin`. Of `microsoft/mdeberta-v3-base` it opened the tokenizer and the config alone, and the image carries no weights for it. `/proc/self/maps` held no file from the cache, because torch reads the weights rather than mapping them. The measured-only `knowledgator/gliner-pii-base-v1.0` has not been in the image since T-148. No model is loaded for nothing, so there is no free 1.8 GB to take.
+**Only the pinned model loads.** An audit hook caught every `open` under `HF_HOME`. The only weights the process opened were `urchade/gliner_multi_pii-v1`'s `pytorch_model.bin`. Of `microsoft/mdeberta-v3-base` it opened the tokenizer and the config alone, and the image carries no weights for it. ~~`/proc/self/maps` held no file from the cache, because torch reads the weights rather than mapping them.~~ Since the amendment of 23/09/2026 below (T-347), `/proc/self/maps` lists the weights file. The measured-only `knowledgator/gliner-pii-base-v1.0` has not been in the image since T-148. No model is loaded for nothing, so there is no free 1.8 GB to take.
 
-**What this settles.** The cap works as this ADR designed it, but only because of its swap. Without swap the worker cannot hold the detector under 1.5 GB at all: its steady state alone is 2.1 GB, and with 1 GB of swap the load was killed. With the unit's 1.5 GB of spill the worker runs, and it uses 95 % of that allowance at every process start. A heavier load beside the model could exhaust that allowance, and so could a box whose swap file is smaller than the spill the unit allows. The kernel would then kill the worker mid-load, with a claimed job under a live lease.
+**What this settles.** ~~The cap works as this ADR designed it, but only because of its swap. Without swap the worker cannot hold the detector under 1.5 GB at all: its steady state alone is 2.1 GB, and with 1 GB of swap the load was killed. With the unit's 1.5 GB of spill the worker runs, and it uses 95 % of that allowance at every process start. A heavier load beside the model could exhaust that allowance, and so could a box whose swap file is smaller than the spill the unit allows. The kernel would then kill the worker mid-load, with a claimed job under a live lease.~~ Superseded on 23/09/2026 by the amendment below (T-347): the load that holds the weights once swaps nothing.
 
-**The question it leaves open.** Is the always-on detector affordable on the two 4 GB boxes? Four answers are named, and none is chosen here:
+**The question it leaves open.** Is the always-on detector affordable on the two 4 GB boxes? ~~Four answers are named, and none is chosen here:~~ Four answers are named, and the amendment of 23/09/2026 below (T-347) chooses the second:
 
 - swap as designed, which this reading says works, slower;
-- a load that does not hold the weights twice, unmeasured;
+- ~~a load that does not hold the weights twice, unmeasured;~~ a load that does not hold the weights twice, read on VPC 1 on 23/09/2026;
 - a smaller detector;
 - growth step E.
 
-The deciding readings are the box's own, at S4's first index. The first is `memory.peak` and `memory.swap.peak` at native `linux/amd64`, which this laptop cannot give. The second is step A's signal. Every process that loads the detector swaps in about 2.2 GB within 20–23 s, a burst the five-minute window has to absorb. Detection itself runs either side of the 4 MB/s threshold, and whether it stays above it for five minutes over a real index is the reading that decides step A.
+The deciding readings are the box's own, at S4's first index. ~~The first is `memory.peak` and `memory.swap.peak` at native `linux/amd64`, which this laptop cannot give.~~ The first was read on VPC 1 on 23/09/2026 (the amendment below). The second is step A's signal. ~~Every process that loads the detector swaps in about 2.2 GB within 20–23 s, a burst the five-minute window has to absorb.~~ The load that holds the weights once swaps in 5–7 pages (the amendment below). Detection itself runs either side of the 4 MB/s threshold, and whether it stays above it for five minutes over a real index is the reading that decides step A.
+
+## Amendment — 2026-09-23 (T-347), the detector's weights held once and mapped from the file
+
+The amendment above named four answers to the worker's memory and left the choice to the box's own readings. VPC 1 read the load both ways the same day, and the second answer is chosen: **the worker holds the detector's weights once, mapped from the file.**
+
+**What the load was.** By default gliner 0.2.29 builds a randomly initialised model, resizes its embedding, then reads the whole 1.16 GB `pytorch_model.bin` beside that model and copies it in. For the length of the load the weights are held twice. What stays afterwards is anonymous memory, and only swap can take that off the cgroup.
+
+**What it is now.** `ModelRecogniser` builds `GLiNERRecognizer` with `low_cpu_mem_usage=True`, which Presidio forwards to `GLiNER.from_pretrained`. gliner then builds the model on the meta device and assigns the loaded tensors in place, so no second copy exists. The build runs inside torch's `load.mmap` setting, patched for the build alone, so torch maps the file rather than reading it. The assigned tensors are views of that mapping, which the cgroup charges as `file`, not `anon`. The kernel reclaims those pages by dropping them and reads them back from the image on the next fault, so they never go to swap. The weights are bit-identical and the predictions unchanged. gliner and Presidio are neither forked nor patched, and the image gains no file. When gliner cannot build on the meta device, it warns and falls back to the double load. The worker's suite turns that warning into an error, so a pin that brings the fallback back fails there and not on the box.
+
+**How it was read, 23/09/2026.** VPC 1 is an AMD EPYC-Milan with 4 vCPU and 3.8 GB, running native `linux/amd64` with the real 4 GB swap file at `vm.swappiness` 10. T-222's probe ran unchanged over the fixture page (3,107 bytes) and both converters' fixtures, with the network refused, under the deploy unit's `--memory=1536m --memory-swap=3072m`. The production worker and its neighbours were running beside it. The double load ran on image `e95f0c16`, three capped runs. The load that holds the weights once ran on image `1587e0c1` with the patched `detector.py` mounted over it, three capped runs and one uncapped.
+
+| | The double load (3 capped runs) | The weights held once (3 capped, 1 uncapped) |
+| --- | --- | --- |
+| `memory.peak` | 1,536 MB (the cap), all three | 1,032, 712 and 758 MB; uncapped 718 MB |
+| `memory.swap.peak` | 1,401, 1,509 and 1,302 MB (85–98 % of the spill) | 0 in all four |
+| Settled, 30 s after the last page | 1,175–1,293 MB resident plus 714–767 MB swap | 650–656 MB anonymous plus 4–324 MB of file-backed weights |
+| Model load (`load_ms`) | 17,671, 18,257 and 18,581 ms, after 4.2–4.9 s of imports | 4,451, 4,232 and 4,509 ms, the stack's imports included |
+| Seam, median of three, ms per page | 3,206, 3,100 and 2,946 | 3,209, 3,016 and 3,254; uncapped 3,119 |
+| Swap-in | about 150–170 MB/s box-wide through each load; about zero through detection | 5–7 pages per run |
+| Box `MemAvailable`, lowest | 719 MB | 1,565 MB |
+| Neighbours pushed to swap | Postgres 34 MB, api 17 MB, worker 9 MB | none |
+
+The second image defers the detector's imports into the load, so its `load_ms` includes them; the settled and swap figures compare directly. A file-backed page is charged to the cgroup that first faults it, which is why the second and third capped runs read less `file` than the first. The double load's worst run spilled 1,509 of its 1,536 MB, 27 MB short of the kill the amendment above names.
+
+**What this settles.** The worker swaps nothing at start and settles near 650 MB of anonymous memory, where the double load used 85–98 % of its spill at every start and settled at about 2 GB. At the probe's scale the always-on detector fits the box without a smaller detector or growth step E. Swap goes back to being the safety net this ADR designed it as, rather than something every process start leans on. The seam and load figures above are readings. S1's per-document ceiling stays as the amendment above cut it.
+
+**What stays, and why.** The worker keeps its 1.5 GB cap and its 1.5 GB of spill. The probe read three pages, not an index. A real index adds LMDB, cocoindex and larger documents to the 650 MB, and mapped LMDB pages count as `file` too. `memory.peak` can therefore still reach the cap from page cache, and that alone is not a failure: the signals are `anon`, `memory.swap.peak` and `pswpin`. This reading does not settle whether mapped weight pages are evicted and re-faulted once LMDB, cocoindex and the converters share the cgroup. S4's first index reads that, beside step A's swap-in signal.
