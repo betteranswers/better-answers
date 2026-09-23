@@ -138,6 +138,7 @@ if [ $(( $(date +%-m) % 3 )) -eq 0 ]; then
 
   # 3 alone means no tables; a wider guard would write that over a refused seed.
 
+  # A fence: the deploy tree's suite lifts the lines between the markers and runs them.
   # >>> seed status
   seed_rc=0
   subject=$(platform exec -T api pnpm --silent ops erasure-rehearsal --workspace "${DRILL_WORKSPACE}" --synthetic --seed | tail -n1) || seed_rc=$?

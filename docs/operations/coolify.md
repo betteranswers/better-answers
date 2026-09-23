@@ -58,12 +58,13 @@ A rule's effect on the real flow is rehearsed before it is written into the esta
 
 The CPU embedding host (bge-m3, 1024 dims) runs only for a workspace on the **local** embedding route, and the first estate has none: client one embeds on the hosted route, and a 4 GB box has no room for an idle model server (ADR 0024). A workspace choosing the local route is growth step E — a third contract, sized for a model host — and the route is immutable per workspace, so the choice is made once.
 
-The day a workspace takes it, add this service to `deploy/stores.compose.yaml` and add `embeddings:1000` to `init`'s directory list. Nothing under `/data/embeddings` existed before, so `init` is what creates and owns it. The image is chosen and pinned by digest on that day, as every other image in the file is.
+The day a workspace takes it, the service below joins a stores stack **on the model-host box**, not VPC 1 — growth step E buys that box precisely because a 3–5 GB model server does not fit beside the Postgres resource, `api`, `worker`, Garage, the tunnel and `backup`. Add `embeddings:1000` to that stack's `init` directory list: nothing under `/data/embeddings` existed before, so `init` is what creates and owns it. The image is chosen and pinned by digest on that day, as every other image in the file is, and the service carries an explicit memory limit like every other (§ Memory) — sized against the model chosen, and written into this section and the compose file together.
 
 ```yaml
   embeddings:
     image: # the OpenAI-shaped embedding server, pinned by digest on the day
     <<: [*restart, *logging]
+    deploy: { resources: { limits: { memory: # sized against the model chosen } } }
     environment:
       MODEL_ID: BAAI/bge-m3
     healthcheck:
@@ -77,7 +78,7 @@ The day a workspace takes it, add this service to `deploy/stores.compose.yaml` a
       init: { condition: service_completed_successfully }
 ```
 
-`EMBEDDINGS_URL` is already declared in `deploy/platform.compose.yaml`'s bootstrap block and is unset while no host runs; it is set to `http://embeddings:8080` in the platform resource's env when the service is added.
+`EMBEDDINGS_URL` is already declared in `deploy/platform.compose.yaml`'s bootstrap block and is unset while no host runs; it is set to the model host's address in the platform resource's env when the service is added.
 
 ## Probes at the first deploy
 

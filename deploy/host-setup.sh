@@ -14,8 +14,9 @@ host-setup.sh vpc2 --mirror-pubkey <file> --repo <git URL> [--prod-host <VPC1 ad
     mirror-shell, the checkout the drill runs from, the root-only env templates under
     /etc/better-answers, and the drill's host cron line.
 
-Run as root on the box named. Every value is an argument, nothing is read from the
-environment, and the two env files this script creates are empty templates you fill.
+Run as root on the box named. Both are idempotent, so either can be re-run safely. Every
+value is an argument, nothing is read from the environment, and the two env files this
+script creates are empty templates you fill.
 USAGE
   exit 2
 }
