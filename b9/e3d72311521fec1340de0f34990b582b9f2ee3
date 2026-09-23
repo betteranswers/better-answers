@@ -1,0 +1,78 @@
+jscpd.config.mjs
+  s_41bfaa1109f771::t_d8cc4d80b5ded8 1-3
+scripts/docs-lane.mjs
+  s_41bfaa1109f771::t_b5be95ab296806 21-22,40-41
+  s_41bfaa1109f771::t_a744070d36f64d 5-6,32-33
+scripts/strip-comments.mjs
+  s_41bfaa1109f771::t_b5be95ab296806 41,60-61,67,148-149,178-179
+scripts/strip_python_comments.py
+  s_41bfaa1109f771::t_b5be95ab296806 18-19
+lefthook.yml
+  s_41bfaa1109f771::t_db15ac9a248a12 53,58,63,68,73
+  s_41bfaa1109f771::t_d8cc4d80b5ded8 1-2,19,39
+scripts/comment-only-proof.mjs
+  s_41bfaa1109f771::t_41b193c8ad4aed 8
+  s_41bfaa1109f771::t_79f0326eb738cf 286
+  s_41bfaa1109f771::t_b5be95ab296806 48,90-91,125-126,164-165,303-304,347,376-377
+  s_41bfaa1109f771::t_a744070d36f64d 53-54
+packages/devtools/migration-marker.json
+  s_41bfaa1109f771::t_b947ad30479cd5 1-4
+.claude/hooks/provision-worktree.sh
+  s_41bfaa1109f771::t_0dc1bdc3f26091 11,36-37,68-69,89
+.claude/hooks/provision-skills.sh
+  s_41bfaa1109f771::t_0dc1bdc3f26091 15,80-81
+.claude/hooks/worktree-create-hook.sh
+  s_41bfaa1109f771::t_0dc1bdc3f26091 4-5
+packages/devtools/python/comment_gate.py
+  s_41bfaa1109f771::t_18a023fba84959 45-55
+docs/operations/local-gates.md
+  s_41bfaa1109f771::t_84086bdf73ce58 1-109
+scripts/comment-density.mjs
+  s_41bfaa1109f771::t_b5be95ab296806 13,39,56,75,83
+scripts/config-comments.mjs
+  s_41bfaa1109f771::t_3fe222fe46d9c0 152
+  s_41bfaa1109f771::t_05e792de577eda 1-3
+  s_41bfaa1109f771::t_316db54dfc80ab 413-420
+  s_41bfaa1109f771::t_b5be95ab296806 23,53,80,105-106,160-161,199,227,301-302,327-328,379,406,422,448,476
+scripts/comment_only_normalize.py
+  s_41bfaa1109f771::t_b5be95ab296806 34-35,49
+scripts/check.mjs
+  s_41bfaa1109f771::t_b5be95ab296806 10
+scripts/jscpd.mjs
+  s_41bfaa1109f771::t_a744070d36f64d 9-10
+scripts/insert-scan.mjs
+  s_41bfaa1109f771::t_b5be95ab296806 7,24
+knip.config.ts
+  s_41bfaa1109f771::t_d8cc4d80b5ded8 12,17,30-31
+scripts/worker-python.mjs
+  s_41bfaa1109f771::t_b5be95ab296806 4-5
+pnpm-workspace.yaml
+  s_41bfaa1109f771::t_d8cc4d80b5ded8 6
+.claude/hooks/comment-gate-hook.sh
+  s_41bfaa1109f771::t_0dc1bdc3f26091 4-5,10,18-19,52-53,70-71
+  s_41bfaa1109f771::t_a035625b8dfb97 31-32
+apps/api/tests/lefthook-config.test.ts
+  s_41bfaa1109f771::t_7802bb69b7b458 118,122,126,130,134,138,140-142,211-213
+  s_41bfaa1109f771::t_5f2f338fb4b8d8 65-82,84-94,96-101
+  s_41bfaa1109f771::t_7f54347338fc56 83
+  s_41bfaa1109f771::t_cf58392bf410c2 33-34
+  s_41bfaa1109f771::t_376862c8aeaa03 246-248,251-257,259-260
+.claude/hooks/worktree-remove-hook.sh
+  s_41bfaa1109f771::t_0dc1bdc3f26091 4,9,47
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "b9e3d72311521fec1340de0f34990b582b9f2ee3",
+  "prompts": {},
+  "sessions": {
+    "s_41bfaa1109f771": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0bc311b1-7404-4f66-a23e-5a963c829c9a",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "liam-jons <liamjons@hotmail.com>"
+    }
+  }
+}
