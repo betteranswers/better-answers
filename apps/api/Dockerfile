@@ -129,6 +129,12 @@ RUN apt-get update \
 ENV NODE_ENV=production \
     PORT=3000
 
+# The Node image ships npm beside corepack, and this image's pnpm is corepack's: `corepack
+# enable` in `base` linked `pnpm` to corepack's shim, which runs the version `corepack install`
+# cached from `packageManager`. Nothing here calls npm or npx, yet npm brings a dependency tree
+# of its own that every image scan reads. The build stages keep npm, because they never ship.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+
 # The repository's own project list — one source for it, not a second copy that ages
 # alone — plus the one setting that is true of an image and false of a
 # checkout. pnpm 11 verifies the dependency tree before `pnpm run` and repairs it by
