@@ -223,8 +223,6 @@ const acceptedRows = {
       content: "hello",
       embedding: Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0.5),
       embeddingRouteId: "route-embed",
-      sensitivity: "Internal",
-      audience: "everyone",
       bindingId: "binding-1",
     },
   ],
@@ -865,7 +863,7 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
         ...acceptedRows.chunk[0],
         embedding: Array.from({ length: EMBEDDING_DIMENSIONS - 1 }, () => 0.5),
       },
-      { ...acceptedRows.chunk[0], sensitivity: "Secret" },
+      { ...acceptedRows.chunk[0], embeddingRouteId: "   " },
     ],
 
     graphGeneration: [{ ...acceptedRows.graphGeneration[0], liveGen: 0 }],
@@ -1304,10 +1302,6 @@ describe("5 — the inferred type is pinned", () => {
         content: string;
         embedding: number[] | null;
         embeddingRouteId: string | null;
-        publishedAt: Date | null;
-        sensitivity: "Restricted" | "Internal" | "Public" | null;
-        audience: "everyone" | "groups" | null;
-        audienceGroups: GroupId[] | null;
         bindingId: string;
         sourceDocumentId: string | null;
         locator: string | null;

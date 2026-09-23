@@ -171,7 +171,6 @@ const chunkRefinements = {
 
   embedding: z.array(z.number()).length(EMBEDDING_DIMENSIONS).nullable(),
   embeddingRouteId: (schema: z.ZodString) => schema.trim().min(1),
-  ...readableUnit,
   bindingId: (schema: z.ZodString) => schema.trim().min(1),
   sourceDocumentId: (schema: z.ZodString) => schema.trim().min(1),
   locator: (schema: z.ZodString) => schema.trim().min(1),

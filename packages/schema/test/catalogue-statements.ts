@@ -55,9 +55,9 @@ export const citeDocument = (
   });
 
 const CHUNK_THROUGH_THE_PARENT = `INSERT INTO "index".chunk
-     (workspace_id, id, content, sensitivity, audience, binding_id,
+     (workspace_id, id, content, binding_id,
       source_document_id, locator, ordinal, char_start, char_end)
-   VALUES ($1, $2, 'a paragraph of the handbook', 'Internal', 'everyone', 'binding-1',
+   VALUES ($1, $2, 'a paragraph of the handbook', 'binding-1',
            $3, 'chars:0-40', 0, 0, 40)`;
 
 export const chunkWrittenThroughTheParent = async (

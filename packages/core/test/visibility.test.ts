@@ -26,6 +26,7 @@ import {
   bindingForGroups,
   bindingHolding,
   chunkUnder,
+  chunkVersionsOf,
   conceptCiting,
   conceptForGroup,
   conceptOnBoth,
@@ -57,9 +58,9 @@ const now = new Date("2026-09-08T12:00:00.000Z");
 const heldRow = (workspaceId: string, iri: string) =>
   visibilityHeld(db().pool, "concept_index", workspaceId, iri);
 
-const chunkCopiesOf = async (workspaceId: string, sourceDocumentId: string) => {
+const chunkVisibilityOf = async (workspaceId: string, sourceDocumentId: string) => {
   const read = await db().pool.query(
-    `SELECT sensitivity, audience, audience_groups FROM "index".chunk
+    `SELECT sensitivity, audience, audience_groups FROM "index".readable_chunk
       WHERE workspace_id = $1 AND source_document_id = $2 ORDER BY ordinal`,
     [workspaceId, sourceDocumentId],
   );
@@ -509,20 +510,15 @@ describe("narrowing a binding", () => {
       "Restricted",
     );
     const wider = await documentUnder(db(), scenario.workspaceId, binding.bindingId, "Public");
-    for (const [document, sensitivity] of [
-      [binding, "Internal"],
-      [narrowed, "Restricted"],
-      [wider, "Public"],
-    ] as const) {
+    for (const document of [binding, narrowed, wider]) {
       await chunkUnder(db(), scenario.workspaceId, document, {
         content: HOLIDAY,
         ordinal: 0,
         charStart: 0,
         charEnd: 53,
-        sensitivity,
-        audience: "everyone",
       });
     }
+    const stoodAt = await chunkVersionsOf(db(), scenario.workspaceId, binding.bindingId);
 
     const moved = await reading(scenario.admin, (admin, tx) =>
       narrowingAsked(admin, tx, {
@@ -537,16 +533,18 @@ describe("narrowing a binding", () => {
     expect(
       await visibilityHeld(db().pool, "source_binding", scenario.workspaceId, binding.bindingId),
     ).toEqual({ sensitivity: "Internal", audience: "groups", audience_groups: [hr] });
+    expect(await chunkVersionsOf(db(), scenario.workspaceId, binding.bindingId)).toEqual(stoodAt);
 
-    expect(await chunkCopiesOf(scenario.workspaceId, binding.documentId)).toEqual([
-      { sensitivity: "Internal", ...EVERYONE },
+    const toTheGroup = { audience: "groups", audience_groups: [hr] };
+    expect(await chunkVisibilityOf(scenario.workspaceId, binding.documentId)).toEqual([
+      { sensitivity: "Internal", ...toTheGroup },
     ]);
 
-    expect(await chunkCopiesOf(scenario.workspaceId, narrowed.documentId)).toEqual([
-      { sensitivity: "Restricted", ...EVERYONE },
+    expect(await chunkVisibilityOf(scenario.workspaceId, narrowed.documentId)).toEqual([
+      { sensitivity: "Restricted", ...toTheGroup },
     ]);
-    expect(await chunkCopiesOf(scenario.workspaceId, wider.documentId)).toEqual([
-      { sensitivity: "Public", ...EVERYONE },
+    expect(await chunkVisibilityOf(scenario.workspaceId, wider.documentId)).toEqual([
+      { sensitivity: "Internal", ...toTheGroup },
     ]);
   });
 
@@ -561,8 +559,6 @@ describe("narrowing a binding", () => {
         ordinal: 0,
         charStart: 0,
         charEnd: 53,
-        sensitivity: "Internal",
-        audience: "everyone",
       });
     }
 
@@ -584,8 +580,8 @@ describe("narrowing a binding", () => {
       expect(await narrowing).toMatchObject({ ok: true });
     });
 
-    expect(await chunkCopiesOf(scenario.workspaceId, binding.documentId)).toEqual([
-      { sensitivity: "Internal", ...EVERYONE },
+    expect(await chunkVisibilityOf(scenario.workspaceId, binding.documentId)).toEqual([
+      { sensitivity: "Restricted", ...EVERYONE },
     ]);
   });
 
@@ -916,7 +912,7 @@ describe("narrowing a binding", () => {
     ).toHaveLength(2);
   });
 
-  it("leaves neither the narrowed row, nor the chunk copies, nor the cascade, nor its ledger row when the transaction fails after it", async () => {
+  it("leaves neither the narrowed row, nor the class its chunks are read at, nor the cascade, nor its ledger row when the transaction fails after it", async () => {
     const scenario = await arrange();
     const binding = await bindingHolding(db(), scenario.workspaceId);
     const written = await conceptCiting(scenario, scenario.editor, [binding.documentId]);
@@ -925,8 +921,6 @@ describe("narrowing a binding", () => {
       ordinal: 0,
       charStart: 0,
       charEnd: 53,
-      sensitivity: "Internal",
-      audience: "everyone",
     });
 
     await expect(
@@ -958,7 +952,7 @@ describe("narrowing a binding", () => {
       ...EVERYONE,
     });
 
-    expect(await chunkCopiesOf(scenario.workspaceId, binding.documentId)).toEqual([
+    expect(await chunkVisibilityOf(scenario.workspaceId, binding.documentId)).toEqual([
       { sensitivity: "Internal", ...EVERYONE },
     ]);
     expect(await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.narrowed")).toEqual(

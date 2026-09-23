@@ -1826,7 +1826,6 @@ describe("the audience pair on every readable unit", () => {
     ],
     ["graph_node", "graph_node_audience_check", (seed) => seed.graphNode({ workspaceId: WS_A })],
     ["graph_edge", "graph_edge_audience_check", (seed) => seed.graphEdge({ workspaceId: WS_A })],
-    ['"index".chunk', "chunk_audience_check", (seed) => seed.chunk({ workspaceId: WS_A })],
     [
       "source_binding",
       "source_binding_audience_check",

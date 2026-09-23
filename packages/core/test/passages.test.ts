@@ -77,8 +77,6 @@ const seedTheAgreementsDocument = (workspaceId: string): Promise<void> =>
         charEnd: row.char_end,
         locator: row.locator,
         content: row.content,
-        publishedAt: PUBLISHED,
-        sensitivity: "Internal",
       });
     }
   });
@@ -122,9 +120,6 @@ const documentWithOneChunk = (
       ordinal: 0,
       charStart: 0,
       charEnd: what.charEnd,
-      publishedAt,
-      sensitivity: what.sensitivity,
-      ...audience,
     });
     return held.id;
   });
@@ -173,8 +168,6 @@ const documentWithTwoChunks = (
         ordinal: row.ordinal,
         charStart: row.charStart,
         charEnd: row.charEnd,
-        publishedAt: PUBLISHED,
-        sensitivity: documentClass ?? bindingClass,
       });
     }
     return held.id;
@@ -539,13 +532,6 @@ const bindingUnderReview = (
           charEnd: row.charEnd,
           locator: `${held.id}/chars:${row.charStart}-${row.charEnd}`,
           content: row.content,
-          publishedAt: null,
-          sensitivity: held.sensitivity ?? "Internal",
-
-          // Left at the wide value a lander wrote before the binding was narrowed, so the
-          // preview's audience arm can only be the view's.
-          audience: "everyone",
-          audienceGroups: null,
         });
       }
     }

@@ -255,18 +255,6 @@ def row_versions_of(
         return list(cursor.fetchall())
 
 
-def visibility_columns_of(
-    connection: psycopg.Connection, workspace_id: str
-) -> list[dict[str, Any]]:
-    with connection.cursor() as cursor:
-        cursor.execute(
-            "SELECT published_at, sensitivity, audience, audience_groups"
-            ' FROM "index".chunk WHERE workspace_id = %s ORDER BY id',
-            (workspace_id,),
-        )
-        return by_column(cursor)
-
-
 def finding_rows_of(
     connection: psycopg.Connection, workspace_id: str
 ) -> list[tuple[Any, ...]]:
@@ -327,13 +315,15 @@ def test_the_loop_claims_an_index_job_runs_it_and_finishes_it_with_its_three_fig
     assert row[4]["restores_overridden_by_erasure"] == []
 
 
-def test_every_column_of_the_chunk_rows_one_run_lands(
+def test_every_column_of_the_chunk_rows_one_run_lands_under_a_binding_with_a_visibility(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
     workspace_id = seed_the_binding(
         connection,
         documents=(AN_INVOICE_ID,),
+        audience="groups",
+        audience_groups=["01M2GR0PAAAAAAAAAAAAAAAAAA", "01M2GR0PBBBBBBBBBBBBBBBBBB"],
         published_at="2026-09-11T09:30:00Z",
     )
     bucket = a_bucket_holding_the_three()
@@ -359,34 +349,6 @@ def test_every_column_of_the_chunk_rows_one_run_lands(
             "ordinal": 0,
             "char_start": 0,
             "char_end": 127,
-        }
-    ]
-
-
-def test_a_landed_row_declares_no_visibility_though_its_binding_has_one(
-    database: tuple[psycopg.Connection, str], tmp_path: Path
-) -> None:
-    connection, dsn = database
-    workspace_id = seed_the_binding(
-        connection,
-        documents=(AN_INVOICE_ID,),
-        audience="groups",
-        audience_groups=["01M2GR0PAAAAAAAAAAAAAAAAAA", "01M2GR0PBBBBBBBBBBBBBBBBBB"],
-        published_at="2026-09-11T09:30:00Z",
-    )
-
-    index_binding(
-        bootstrap_for(dsn, tmp_path),
-        run_for(workspace_id),
-        copies=a_bucket_holding_the_three(),
-    )
-
-    assert visibility_columns_of(connection, workspace_id) == [
-        {
-            "published_at": None,
-            "sensitivity": None,
-            "audience": None,
-            "audience_groups": None,
         }
     ]
 
@@ -1248,29 +1210,6 @@ def test_a_row_from_before_is_rewritten_once_and_an_unchanged_next_run_writes_no
     assert row_versions_of(connection, workspace_id) == rewritten
     assert [row["content"] for row in chunk_rows_of(connection, workspace_id)] == [
         AN_INVOICE_REDACTED
-    ]
-
-
-def test_the_row_a_run_rewrites_keeps_the_visibility_an_earlier_release_left(
-    database: tuple[psycopg.Connection, str], tmp_path: Path
-) -> None:
-    connection, dsn = database
-    workspace_id = seed_the_binding(connection, documents=(AN_INVOICE_ID,))
-    seed_a_row_an_earlier_release_landed(connection, workspace_id)
-
-    index_binding(
-        bootstrap_for(dsn, tmp_path),
-        run_for(workspace_id),
-        copies=a_bucket_holding_the_three(),
-    )
-
-    assert visibility_columns_of(connection, workspace_id) == [
-        {
-            "published_at": None,
-            "sensitivity": "Public",
-            "audience": "everyone",
-            "audience_groups": None,
-        }
     ]
 
 

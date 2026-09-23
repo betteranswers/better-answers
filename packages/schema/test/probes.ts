@@ -226,12 +226,12 @@ export const attemptLedgerRowReusingAnId = (
   );
 
 const CHUNK_AND_ITS_EMBEDDING = `INSERT INTO "index".chunk
-    (workspace_id, id, content, embedding, embedding_route_id, sensitivity, audience, binding_id)
-  VALUES ($1, $2, 'a paragraph of the handbook', $3, $4, 'Internal', 'everyone', $5)`;
+    (workspace_id, id, content, embedding, embedding_route_id, binding_id)
+  VALUES ($1, $2, 'a paragraph of the handbook', $3, $4, $5)`;
 
 const CHUNK_CARRYING_ITS_OWN_FULL_TEXT = `INSERT INTO "index".chunk
-     (workspace_id, id, content, sensitivity, audience, binding_id, search)
-   VALUES ($1, $2, 'a paragraph', 'Internal', 'everyone', 'binding-1', to_tsvector('english', 'something else'))`;
+     (workspace_id, id, content, binding_id, search)
+   VALUES ($1, $2, 'a paragraph', 'binding-1', to_tsvector('english', 'something else'))`;
 
 export const attemptChunkEmbeddedBy = (
   client: pg.PoolClient,

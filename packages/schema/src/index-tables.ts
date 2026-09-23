@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { customType, integer, pgSchema, text, timestamp } from "drizzle-orm/pg-core";
+import { customType, integer, pgSchema, text } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
 export const indexSchema = pgSchema("index");
@@ -26,11 +26,6 @@ export const chunk = indexSchema.table("chunk", {
 
   embedding: embeddingVector("embedding"),
   embeddingRouteId: text("embedding_route_id"),
-
-  publishedAt: timestamp("published_at", { withTimezone: true, mode: "date" }),
-  sensitivity: text("sensitivity"),
-  audience: text("audience"),
-  audienceGroups: text("audience_groups").array(),
 
   bindingId: text("binding_id").notNull(),
 

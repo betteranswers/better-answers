@@ -20,6 +20,7 @@ import { inputOf } from "./suite-input.ts";
 import {
   bindingHolding,
   chunkUnder,
+  chunkVersionsOf,
   conceptCiting,
   documentUnder,
   seededBy,
@@ -188,7 +189,7 @@ const UNREVIEWED = {
 
 const chunkClassesOf = async (workspaceId: string, documentId: string) => {
   const found = await db().pool.query<{ sensitivity: string }>(
-    `SELECT sensitivity FROM "index".chunk
+    `SELECT sensitivity FROM "index".readable_chunk
       WHERE workspace_id = $1 AND source_document_id = $2 ORDER BY ordinal`,
     [workspaceId, documentId],
   );
@@ -253,15 +254,12 @@ const findingCountOf = async (workspaceId: string, documentId: string) => {
 const bindingWithTwoDocuments = async (scenario: Scenario) => {
   const first = await bindingHolding(db(), scenario.workspaceId, { sensitivity: "Internal" });
   const second = await documentUnder(db(), scenario.workspaceId, first.bindingId, null);
-  const published = new Date("2026-09-01T09:00:00.000Z");
   for (const document of [first, second]) {
     await chunkUnder(db(), scenario.workspaceId, document, {
       content: "12-34-56",
       ordinal: 0,
       charStart: 0,
       charEnd: 8,
-      sensitivity: "Internal",
-      publishedAt: published,
     });
   }
   return { bindingId: first.bindingId, first, second };
@@ -759,6 +757,7 @@ describe("an Admin narrowing named documents", () => {
   it("takes each one to Restricted, touches no chunk row and writes one ledger row per document", async () => {
     const scenario = await arrange();
     const { bindingId, first, second } = await bindingWithTwoDocuments(scenario);
+    const stoodAt = await chunkVersionsOf(db(), scenario.workspaceId, bindingId);
 
     const outcome = await narrowAs(scenario.admin, bindingId, [findingGroupIn(first.documentId)]);
 
@@ -766,7 +765,8 @@ describe("an Admin narrowing named documents", () => {
       ok: true,
       value: { bindingId, documentIds: [first.documentId], sensitivity: "Restricted" },
     });
-    expect(await chunkClassesOf(scenario.workspaceId, first.documentId)).toEqual(["Internal"]);
+    expect(await chunkVersionsOf(db(), scenario.workspaceId, bindingId)).toEqual(stoodAt);
+    expect(await chunkClassesOf(scenario.workspaceId, first.documentId)).toEqual(["Restricted"]);
 
     expect(await chunkClassesOf(scenario.workspaceId, second.documentId)).toEqual(["Internal"]);
     expect(
@@ -968,8 +968,6 @@ describe("an Admin narrowing named documents", () => {
       ordinal: 0,
       charStart: 0,
       charEnd: 8,
-      sensitivity: "Restricted",
-      publishedAt: new Date("2026-09-01T09:00:00.000Z"),
     });
 
     const outcome = await narrowAs(scenario.admin, bindingId, [findingGroupIn(held.documentId)], {

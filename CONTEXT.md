@@ -170,8 +170,9 @@ Where a unit lives is decided by **minting**.
   recorded when the concept is committed and kept until nothing cites it. A concept file's
   `sources` are its projection; a concept resting on another concept is a link, never evidence —
   except a successor's `sources[]` entry naming the concept it supersedes (lineage, ADR 0019).
-- **sensitivity** — a source binding's confidentiality class, carried onto every document,
-  chunk and source entity it yields and sitting on the concept row, deciding who may view them:
+- **sensitivity** — a source binding's confidentiality class, carried onto every document and
+  source entity it yields, read from the binding and the document for a chunk, and sitting on the
+  concept row, deciding who may view them:
   **Restricted** (Admins and named members; the default), **Internal** (the workspace, narrowed
   by audience), **Public** (already published by the company; still narrowed by audience). Only
   *Restricted* reaches a reader. Independent of trust: trust never gates viewing, sensitivity
@@ -346,9 +347,9 @@ Where a unit lives is decided by **minting**.
   suggestions. Its audit row carries the Admin's confirmations (lawful basis recorded, privacy
   information updated, DPIA reference). Unpublished content is seen by Admins, in Control Centre only.
 - **audience** — who a binding's content is for: everyone in the workspace, or named groups (plus,
-  if needed, named individuals). Set on the binding, carried with sensitivity onto every chunk and
-  source entity, and applied with *published* on every read and traversal hop. Distinct from
-  sensitivity (how confidential) and from trust (how reliable).
+  if needed, named individuals). Set on the binding, carried with sensitivity onto every source
+  entity and read from the binding for a chunk, and applied with *published* on every read and
+  traversal hop. Distinct from sensitivity (how confidential) and from trust (how reliable).
 - **cascade** — the re-derivation an Admin's narrowing of a binding or of named documents of one,
   or override of a concept's class, sets off inside the same act: first every concept citing the
   evidence that moved, then every composition including one of those concepts — two levels, the
