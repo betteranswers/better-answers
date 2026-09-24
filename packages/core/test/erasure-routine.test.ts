@@ -1345,6 +1345,7 @@ const bindingIn = (workspaceId: string) =>
 const chunksUnder = (
   workspaceId: string,
   documents: readonly { readonly id: string; readonly bindingId: string }[],
+  content = "Priya Anand approves expenses.",
 ) =>
   seedingWith(db().pool, async (seed) => {
     for (const document of documents) {
@@ -1352,11 +1353,11 @@ const chunksUnder = (
         workspaceId,
         bindingId: document.bindingId,
         sourceDocumentId: document.id,
-        content: "Priya Anand approves expenses.",
-        locator: `${document.id}/chars:0-30`,
+        content,
+        locator: `${document.id}/chars:0-${content.length}`,
         ordinal: 0,
         charStart: 0,
-        charEnd: 30,
+        charEnd: content.length,
       });
     }
   });
@@ -1643,6 +1644,30 @@ describe("the wipe of every binding the map found", () => {
     expect(rederived.rebuildJobId).not.toBeNull();
     expect(await whatTheWipeLeft(arranged.scenario.workspaceId)).toEqual(
       everyBindingWiped(arranged),
+    );
+  });
+
+  it("takes away the chunk rows of the binding holding a document that names the subject, and queues its index run as wiped, when the routine runs over the request", async () => {
+    const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
+    const workspaceId = scenario.workspaceId;
+    const naming = await bindingIn(workspaceId);
+    const elsewhere = await bindingIn(workspaceId);
+    const named = await documentIn(workspaceId, naming.id);
+    const unnamed = await documentIn(workspaceId, elsewhere.id);
+    await chunksUnder(workspaceId, [named]);
+    await chunksUnder(workspaceId, [unnamed], "Expenses are claimed within thirty days.");
+
+    const done = await completing(scenario, subjectRequestId);
+
+    expect(done.map.find((entry) => entry.family === "source-document")?.locations).toEqual([
+      named.id,
+    ]);
+    expect(await whatTheWipeLeft(workspaceId)).toEqual({
+      chunks: [{ binding_id: elsewhere.id, chunks: 1 }],
+      queued: [THE_REBUILD, ...wipesOf([naming])],
+    });
+    expect(done.report).toContain(
+      "\n- source-document: bindingsReindexed 1, found 1, identifiersWithheld 2\n",
     );
   });
 

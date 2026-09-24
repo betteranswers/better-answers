@@ -7,7 +7,7 @@
     "rule": "An identifier shorter than `characters` code points once normalised, or a name of fewer than `name_words` words once normalised, is below the floor. Words are the normalised name split at its spaces. Recording a request refuses such an identifier as `identifier-too-broad`, and one a request recorded before the floor existed raises no match: a case-folded match on a one-word name or a two-character code would withhold an ordinary word in every document of the workspace."
   },
   "normalisation": {
-    "rule": "An identifier and a text are compared after the same two steps. First, every run of whitespace becomes one space, and an identifier loses its leading and trailing whitespace. Whitespace is the code points listed under `whitespace`, and no other. Second, every character is replaced by its full Unicode case folding: the C and F mappings of CaseFolding.txt at Unicode 15.1, never the T (Turkic) ones. Folding is neither lower-casing, which keeps ß, nor lower-casing a whole word, which writes a final sigma as ς. Nothing else is folded: no accent is stripped, and no canonically equivalent sequence is composed.",
+    "rule": "An identifier and a text are compared after the same two steps. First, every run of whitespace becomes one space, and an identifier loses its leading and trailing whitespace. Whitespace is the code points listed under `whitespace`, and no other. Second, every character is replaced by its full Unicode case folding: the C and F mappings of CaseFolding.txt at Unicode 15.1, never the T (Turkic) ones, so a code point 15.1 does not assign folds to itself. Folding is neither lower-casing, which keeps ß, nor lower-casing a whole word, which writes a final sigma as ς. Nothing else is folded: no accent is stripped, and no canonically equivalent sequence is composed.",
     "whitespace": [
       "\t",
       "\n",
@@ -73,9 +73,20 @@
     ]
   },
   "boundary": {
-    "rule": "An occurrence is bounded. The character before it and the character after it, where the text has one, is not a word character, which is any code point of general category L, M or N (a letter, a mark or a number). An email address is bounded further, because an address carries on past a full stop or a hyphen. The occurrence is not one when the character after it is one of `address_joiners` and the character after that is a word character, or when the character before it is one of `address_joiners` and the character before that is a word character. A full stop that ends a sentence leaves an address bounded. An address that is the start or the end of a longer address is not an occurrence of it.",
+    "rule": "An occurrence is bounded. The character before it and the character after it, where the text has one, is not a word character, which is any code point of general category L, M or N (a letter, a mark or a number) at Unicode 15.1, so a code point 15.1 does not assign is none. An email address is bounded further, because an address carries on past a full stop or a hyphen. The occurrence is not one when the character after it is one of `address_joiners` and the character after that is a word character, or when the character before it is one of `address_joiners` and the character before that is a word character. A full stop that ends a sentence leaves an address bounded. An address that is the start or the end of a longer address is not an occurrence of it.",
     "word_categories": ["L", "M", "N"],
     "address_joiners": [".", "-", "_", "+"]
+  },
+  "digests": {
+    "rule": "Both tiers fold and bound by Unicode 15.1, whatever Unicode their runtime carries, and each digest holds a tier to that for every code point rather than for the cases alone. A digest is the SHA-256, in lower-case hex, of UTF-8 lines in code point order from U+0000 to U+10FFFF, the surrogates and the whitespace listed above aside. A code point is written as upper-case hex of at least four digits, the code points of a line are separated by single spaces, and every line ends with a line feed. A runtime whose Unicode moves answers another digest, so its suite fails before what the map finds and what the seam withholds can drift apart.",
+    "folding": {
+      "lines": "One for every code point whose folding is not itself: the code point, then each code point of its folding.",
+      "sha256": "2642b18cbb398f807ca302b3c0e53f32367e4af426cca7755cb95dc0d844678b"
+    },
+    "word_characters": {
+      "lines": "One for every word character: the code point.",
+      "sha256": "d7c4762c21fb8064a8b2aff45ae0e85537eddd689fd2bf97074b3abd2a004710"
+    }
   },
   "cases": [
     {
@@ -197,6 +208,22 @@
       "clears_the_floor": true,
       "occurrences": [{ "start": 16, "end": 19, "reads": "S21" }],
       "why": "Held at the other end: ß21 folds to ss21, which holds s21 from its second character, and an occurrence never starts inside a character of the text."
+    },
+    {
+      "kind": "names",
+      "identifier": "Aɤa Tan",
+      "text": "Signed by A\ua7cbA TAN and by Aɤa Tan.",
+      "clears_the_floor": true,
+      "occurrences": [{ "start": 25, "end": 32, "reads": "Aɤa Tan" }],
+      "why": "U+A7CB, the capital of ɤ, was assigned after Unicode 15.1, which folds it to itself, so the name written in capitals is not found. A tier folding by its runtime's later Unicode would find it, and the map would name a document the seam never withholds."
+    },
+    {
+      "kind": "names",
+      "identifier": "Maria Jose",
+      "text": "Maria Jose\u1acf signed; Maria Jose\u0301 countersigned.",
+      "clears_the_floor": true,
+      "occurrences": [{ "start": 0, "end": 10, "reads": "Maria Jose" }],
+      "why": "U+1ACF, a combining mark assigned after Unicode 15.1, is no word character to 15.1, so it bounds the name as a space would. A tier reading its runtime's later categories would take it for a mark and find nothing there."
     },
     {
       "kind": "other",
