@@ -197,9 +197,10 @@ RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 # installing; this image has no lockfile, no registry credential and no writable /app, so
 # that repair can only fail. The tree was built at image build time and is the artefact.
 # pnpm 12 also records the version it runs as in `pnpm-lock.yaml` before every command,
-# resolving it from the registry, which fails here for the same reasons and warns on every
-# `pnpm migrate`; corepack has already run the version `packageManager` pins, so
-# `pmOnFail: ignore` drops a check that has nothing left to catch.
+# resolving it from the registry, which fails here for the same reasons and fails every
+# `pnpm migrate` with it, after some 70 seconds of fetch retries when the registry is out of
+# reach; corepack has already run the version `packageManager` pins, so `pmOnFail: ignore`
+# drops a check that has nothing left to catch.
 COPY pnpm-workspace.yaml ./
 # The patch files that workspace file names, so no pnpm command reads a reference to a
 # path that is not there. Nothing installs here; the tree above already carries the patch.
