@@ -78,6 +78,23 @@ the report means anything. A leg cut short at its ceiling writes no report, so t
 read from the checkpoint it left instead. Its suite asserts the prose a reader sees, line by
 line, and runs the script over files.
 
+`src/mutation-shards.ts` cuts a mutation leg into shards and puts the leg back together, behind
+`scripts/mutation-shards.mjs`, which reads each leg's `mutate` patterns from its Stryker config.
+`slice --leg … --shard … --of …` prints one shard's files for `stryker run --mutate`: the
+patterns resolved in order as Stryker resolves them, then each file, biggest first, onto the
+lightest shard so far. Size is the one measure of a file's mutants the tree carries before
+Stryker runs, and ties break by path, so every job of a run cuts the same slices. `merge --leg …
+--of … --shards … --baseline … --out …` takes each file from the shard that owned it,
+renumbering the tests each shard numbered on its own. A shard that stopped leaves out what it
+never reached, so a forced run's gaps are not refilled with the results it was replacing; only
+a shard that left nothing is filled from the previous run, so a lost shard never leaves the leg
+poorer than it started. The merge writes the leg's checkpoint always and its report only when
+every shard finished, as one run would, and prints a line naming the shards that did not. A
+file keeps its results when a new file moves it to another shard, because every shard starts
+from the whole leg's results and Stryker carries a file outside `--mutate` forward from the file
+it read. The suite runs Stryker over a throwaway workspace, two shards merged against one whole
+run, then moves a file and reads its results back.
+
 `src/land.ts` is the landing command behind `scripts/land.mjs` (`pnpm land --message "…"`): the
 working tree's changes and one sentence become a branch named from the message, a commit over
 `origin/main`'s fetched head, a push, a pull request opened with `gh pr create --fill` and an

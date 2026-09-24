@@ -1,21 +1,11 @@
-import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-const require = createRequire(import.meta.url);
-const packageRoot = (name: string): string => path.dirname(require.resolve(`${name}/package.json`));
-
-const strykerRoot = packageRoot("@stryker-mutator/core");
-const runnerRoot = packageRoot("@stryker-mutator/vitest-runner");
-
-const vitestRoot = path.dirname(
-  createRequire(path.join(runnerRoot, "package.json")).resolve("vitest/package.json"),
-);
+import { runStryker, strykerWorkspace } from "./stryker-workspace.ts";
 
 const SOURCE = `const FAMILIES: readonly string[] = ["knowledge"];
 
@@ -73,23 +63,12 @@ const mutationReport = z.object({
   files: z.record(z.string(), z.object({ mutants: z.array(mutantRow) })),
 });
 
-const workspace = (): string => {
-  const root = mkdtempSync(path.join(tmpdir(), "vitest-runner-patch-"));
-  writeFileSync(
-    path.join(root, "package.json"),
-    JSON.stringify({ name: "throwaway", private: true, type: "module" }),
-  );
-  writeFileSync(path.join(root, "stryker.config.mjs"), STRYKER_CONFIG);
-  mkdirSync(path.join(root, "src"));
-  mkdirSync(path.join(root, "test"));
-  writeFileSync(path.join(root, "src/family.ts"), SOURCE);
-  writeFileSync(path.join(root, "test/family.test.ts"), SUITE);
-  mkdirSync(path.join(root, "node_modules/@stryker-mutator"), { recursive: true });
-  symlinkSync(strykerRoot, path.join(root, "node_modules/@stryker-mutator/core"));
-  symlinkSync(runnerRoot, path.join(root, "node_modules/@stryker-mutator/vitest-runner"));
-  symlinkSync(vitestRoot, path.join(root, "node_modules/vitest"));
-  return root;
-};
+const workspace = (): string =>
+  strykerWorkspace(mkdtempSync(path.join(tmpdir(), "vitest-runner-patch-")), {
+    "stryker.config.mjs": STRYKER_CONFIG,
+    "src/family.ts": SOURCE,
+    "test/family.test.ts": SUITE,
+  });
 
 const rowsOf = (root: string): readonly Row[] => {
   const parsed = mutationReport.parse(
@@ -122,13 +101,7 @@ describe("the vitest runner's patch, run over a throwaway workspace (T-107, T-37
   it("kills a mutant that throws while its module loads, and one that only its test inside a describe reaches, beside a plain kill and a survivor", () => {
     const root = workspace();
     try {
-      const run = spawnSync(process.execPath, [path.join(strykerRoot, "bin/stryker.js"), "run"], {
-        cwd: root,
-        encoding: "utf8",
-      });
-      if (run.status !== 0) {
-        throw new Error(`stryker exited ${String(run.status)}:\n${run.stdout}\n${run.stderr}`);
-      }
+      runStryker(root);
       const rows = rowsOf(root);
 
       expect(rowAt(rows, 3, "BlockStatement", "{}")).toMatchObject({

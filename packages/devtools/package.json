@@ -10,6 +10,7 @@
     "./insert-scan": "./src/insert-scan.ts",
     "./jscpd": "./src/jscpd.ts",
     "./mutant-probe": "./src/mutant-probe.ts",
+    "./mutation-shards": "./src/mutation-shards.ts",
     "./mutation-summary": "./src/mutation-summary.ts",
     "./oxlint-config": "./src/oxlint-config.ts",
     "./root-commands": "./src/root-commands.ts",

@@ -30,8 +30,9 @@ type DisplayNameRefusal = WorkspaceRefusal<
   | "display-name-too-long"
 >;
 
-// Trimming leaves U+0085 where it stands, so the next-line character is named here too.
-const LINE_BREAK = /[\n\v\f\r\u0085\u2028\u2029]/u;
+// Trimming leaves U+0085, so it is named here. No `u` flag: the mutation run negates `\v` to
+// `\V`, which `u` refuses at load.
+const LINE_BREAK = /[\n\v\f\r\u0085\u2028\u2029]/;
 
 const CONTROL_CHARACTER = /\p{Cc}/u;
 

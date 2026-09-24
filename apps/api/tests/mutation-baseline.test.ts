@@ -3,14 +3,21 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import path from "node:path";
 
+import { mutateSet } from "@better-answers/devtools/mutation-shards";
 import { describe, expect, it } from "vitest";
+import { parse } from "yaml";
 import { z } from "zod";
 
 import coreStrykerConfig from "../../../packages/core/stryker.config.mjs";
 import apiStrykerConfig from "../stryker.config.mjs";
-import { type ImageStep, readWorkflow, workflowStepSchema } from "./image-probe.ts";
+import { type ImageStep, readWorkflow, repositoryRoot, workflowStepSchema } from "./image-probe.ts";
 
-const legSchema = z.object({ name: z.string(), path: z.string() });
+const shardSchema = z.object({
+  name: z.string(),
+  path: z.string(),
+  shard: z.number(),
+  of: z.number(),
+});
 
 const mutationWorkflowSchema = z.object({
   concurrency: z.object({ group: z.string(), "cancel-in-progress": z.boolean() }).optional(),
@@ -19,7 +26,19 @@ const mutationWorkflowSchema = z.object({
     stryker: z.object({
       "timeout-minutes": z.union([z.number(), z.string()]),
       permissions: z.record(z.string(), z.string()).optional(),
-      strategy: z.object({ matrix: z.object({ include: z.array(legSchema) }) }),
+      strategy: z.object({
+        "max-parallel": z.number(),
+        matrix: z.object({ include: z.array(shardSchema) }),
+      }),
+      steps: z.array(workflowStepSchema),
+    }),
+    summary: z.object({
+      needs: z.string(),
+      if: z.string(),
+      permissions: z.record(z.string(), z.string()).optional(),
+      strategy: z.object({
+        matrix: z.object({ include: z.array(z.object({ name: z.string(), of: z.number() })) }),
+      }),
       steps: z.array(workflowStepSchema),
     }),
   }),
@@ -27,23 +46,41 @@ const mutationWorkflowSchema = z.object({
 
 const mutationWorkflow = () => readWorkflow("mutation.yml", mutationWorkflowSchema);
 
+const BASELINE_ACTION = "./.github/actions/mutation-baseline";
+
+const baselineActionSchema = z.object({
+  runs: z.object({ using: z.literal("composite"), steps: z.array(workflowStepSchema) }),
+});
+
 const NEWEST_CHECKPOINT_VARIABLE = "NEWEST_CHECKPOINT";
 
 const restoreStep = (): ImageStep => {
-  const found = mutationWorkflow().jobs.stryker.steps.find(
+  const action = baselineActionSchema.parse(
+    parse(readFileSync(path.join(repositoryRoot, BASELINE_ACTION, "action.yml"), "utf8")),
+  );
+  const found = action.runs.steps.find(
     (step) => step.env?.[NEWEST_CHECKPOINT_VARIABLE] !== undefined,
   );
   if (found === undefined) {
-    throw new Error(`mutation.yml has no step carrying \`${NEWEST_CHECKPOINT_VARIABLE}\``);
+    throw new Error(`${BASELINE_ACTION} has no step carrying \`${NEWEST_CHECKPOINT_VARIABLE}\``);
   }
   return found;
 };
 
-const uploadStep = (): ImageStep => {
-  const found = mutationWorkflow().jobs.stryker.steps.find((step) =>
-    (step.uses ?? "").startsWith("actions/upload-artifact@"),
-  );
-  if (found === undefined) throw new Error("mutation.yml's stryker job uploads no artifact");
+const stepsUsing = (steps: readonly ImageStep[], action: string): readonly ImageStep[] =>
+  steps.filter((step) => (step.uses ?? "").startsWith(action));
+
+const onlyStep = (steps: readonly ImageStep[], action: string, job: string): ImageStep => {
+  const [only, ...more] = stepsUsing(steps, action);
+  if (only === undefined || more.length > 0) {
+    throw new Error(`mutation.yml's ${job} job must use ${action} once`);
+  }
+  return only;
+};
+
+const stepRunning = (steps: readonly ImageStep[], text: string, job: string): ImageStep => {
+  const found = steps.find((step) => step.run?.includes(text));
+  if (found === undefined) throw new Error(`mutation.yml's ${job} job never runs \`${text}\``);
   return found;
 };
 
@@ -170,6 +207,17 @@ const LISTED = `api --paginate --slurp repos/${REPOSITORY}/actions/artifacts?nam
 const downloaded = (run: number, reports: string) =>
   `run download ${String(run)} --repo ${REPOSITORY} --name ${ARTIFACT} --dir ${reports}`;
 
+const CONFIGS = new Map([
+  ["apps/api", apiStrykerConfig],
+  ["packages/core", coreStrykerConfig],
+]);
+
+const configSchema = z.object({
+  mutate: z.array(z.string()),
+  incremental: z.boolean(),
+  incrementalFile: z.string(),
+});
+
 describe("the nightly mutation run's baseline, kept as the previous run's artifact (T-229)", () => {
   it("restores the newest checkpoint a run on main uploaded for this leg, into the file Stryker reads back and the summary compares against", () => {
     const restored = restoreAgainst([
@@ -227,43 +275,64 @@ describe("the nightly mutation run's baseline, kept as the previous run's artifa
     expect(restored.log).toContain(says);
   });
 
-  it("reads each leg's checkpoint from the artifact its own upload names", () => {
+  it("restores, in every shard and in the leg's summary, the artifact the summary uploads for that leg", () => {
+    const { stryker, summary } = mutationWorkflow().jobs;
     const restore = restoreStep();
+    const shardRestore = onlyStep(stryker.steps, BASELINE_ACTION, "stryker");
+    const summaryRestore = onlyStep(summary.steps, BASELINE_ACTION, "summary");
 
-    expect(uploadStep().with?.["name"]).toEqual("stryker-incremental-${{ matrix.name }}");
-    expect(restore.env?.["ARTIFACT"]).toEqual("stryker-incremental-${{ matrix.name }}");
-    expect(restore.env?.["REPORTS"]).toEqual("${{ matrix.path }}/reports/mutation");
+    expect(restore.env?.["ARTIFACT"]).toEqual("stryker-incremental-${{ inputs.leg }}");
+    expect(restore.env?.["REPORTS"]).toEqual("${{ inputs.reports }}");
     expect(restore.env?.["BRANCH"]).toEqual("${{ github.ref_name }}");
+    expect(shardRestore.with?.["leg"]).toEqual("${{ matrix.name }}");
+    expect(summaryRestore.with?.["leg"]).toEqual("${{ matrix.name }}");
+    expect(onlyStep(summary.steps, "actions/upload-artifact@", "summary").with?.["name"]).toEqual(
+      "stryker-incremental-${{ matrix.name }}",
+    );
   });
 
-  it("uploads the file Stryker writes and reads back, whether or not the leg finished, and a re-run replaces its first attempt's", () => {
-    const upload = uploadStep();
-    const configs = new Map([
-      ["apps/api", apiStrykerConfig],
-      ["packages/core", coreStrykerConfig],
-    ]);
+  it("hands each shard the whole leg's results in the file Stryker reads back, and gathers the file it writes whether or not it finished", () => {
+    const { stryker } = mutationWorkflow().jobs;
+    const gather = stepRunning(stryker.steps, "stryker-incremental.json", "stryker");
+    const upload = onlyStep(stryker.steps, "actions/upload-artifact@", "stryker");
 
+    expect(onlyStep(stryker.steps, BASELINE_ACTION, "stryker").with?.["reports"]).toEqual(
+      "${{ matrix.path }}/reports/mutation",
+    );
+    expect(gather.if).toEqual("always()");
+    expect(gather.env?.["REPORTS"]).toEqual("${{ matrix.path }}/reports/mutation");
     expect(upload.if).toEqual("always()");
     expect(upload.with?.["overwrite"]).toBe(true);
-    expect(upload.with?.["path"]).toEqual(
-      "${{ matrix.path }}/reports/mutation/stryker-incremental.json",
-    );
-    expect(mutationWorkflow().jobs.stryker.strategy.matrix.include.map((leg) => leg.path)).toEqual([
-      ...configs.keys(),
-    ]);
-    for (const [leg, config] of configs) {
-      const read = z
-        .object({ incremental: z.boolean(), incrementalFile: z.string() })
-        .parse(config);
+    expect(
+      [...new Set(stryker.strategy.matrix.include.map((shard) => shard.path))].toSorted(),
+    ).toEqual([...CONFIGS.keys()]);
+    for (const [leg, config] of CONFIGS) {
+      const read = configSchema.parse(config);
 
-      expect(read, `${leg} writes its checkpoint somewhere the upload does not read`).toEqual({
+      expect(
+        { incremental: read.incremental, incrementalFile: read.incrementalFile },
+        `${leg} writes its checkpoint somewhere the shard does not gather it from`,
+      ).toEqual({
         incremental: true,
         incrementalFile: "reports/mutation/stryker-incremental.json",
       });
     }
   });
 
-  it("holds a scheduled night to 120 minutes, and a dispatched run to the minutes it names, as the number the timeout takes", () => {
+  it("uploads the leg's merged results whether or not the leg went red, but never after a merge that failed", () => {
+    const upload = onlyStep(
+      mutationWorkflow().jobs.summary.steps,
+      "actions/upload-artifact@",
+      "summary",
+    );
+
+    expect(upload.if).toEqual("always() && steps.merge.outcome == 'success'");
+    expect(upload.with?.["path"]).toEqual("${{ runner.temp }}/merged/stryker-incremental.json");
+    expect(upload.with?.["retention-days"]).toBe(14);
+    expect(upload.with?.["overwrite"]).toBe(true);
+  });
+
+  it("holds a scheduled night to 120 minutes a shard, and a dispatched run to the minutes it names, as the number the timeout takes", () => {
     expect(mutationWorkflow().jobs.stryker["timeout-minutes"]).toEqual(
       "${{ fromJSON(inputs.ceiling-minutes || '120') }}",
     );
@@ -279,5 +348,104 @@ describe("the nightly mutation run's baseline, kept as the previous run's artifa
   it("asks for nothing beyond reading the tree and listing and downloading this repository's artifacts", () => {
     expect(mutationWorkflow().permissions).toEqual({ contents: "read", actions: "read" });
     expect(mutationWorkflow().jobs.stryker.permissions).toBeUndefined();
+    expect(mutationWorkflow().jobs.summary.permissions).toBeUndefined();
+  });
+});
+
+// The organisation's plan runs 20 jobs at once. A merge group runs four legs and a pull request
+// three, each opening with a lane job.
+const CONCURRENT_JOBS = 20;
+const MERGE_GROUP_LEGS = 4;
+const PULL_REQUEST_LEGS = 3;
+const A_LANE_JOB = 1;
+
+const legRoots = new Map([
+  ["api", "apps/api"],
+  ["core", "packages/core"],
+]);
+
+describe("each mutation leg, run as shards and summed up once (T-381)", () => {
+  it("runs each leg as shards 1 to N, each once, and sums it up in one summary that knows the same N", () => {
+    const { stryker, summary } = mutationWorkflow().jobs;
+    const shards = stryker.strategy.matrix.include;
+
+    expect(summary.strategy.matrix.include.map((leg) => leg.name).toSorted()).toEqual(
+      [...new Set(shards.map((shard) => shard.name))].toSorted(),
+    );
+    for (const { name, of } of summary.strategy.matrix.include) {
+      const own = shards.filter((shard) => shard.name === name);
+
+      expect(own.map((shard) => shard.shard)).toEqual(
+        Array.from({ length: of }, (_, index) => index + 1),
+      );
+      expect(own.every((shard) => shard.of === of && shard.path === legRoots.get(name))).toBe(true);
+    }
+  });
+
+  it("cuts each leg into slices that are disjoint, none empty, and together exactly the leg's mutate set", () => {
+    for (const { name, of } of mutationWorkflow().jobs.summary.strategy.matrix.include) {
+      const root = legRoots.get(name) ?? "";
+      const config = configSchema.parse(CONFIGS.get(root));
+      const slices = Array.from({ length: of }, (_, index) => {
+        const run = spawnSync(
+          process.execPath,
+          [
+            path.join(repositoryRoot, "scripts/mutation-shards.mjs"),
+            "slice",
+            "--leg",
+            name,
+            "--shard",
+            String(index + 1),
+            "--of",
+            String(of),
+          ],
+          { encoding: "utf8" },
+        );
+        expect(
+          run.status,
+          `${name} shard ${String(index + 1)} printed no slice: ${run.stderr}`,
+        ).toBe(0);
+        return run.stdout.split(",");
+      });
+      const flat = slices.flat();
+
+      expect(slices.every((slice) => slice.length > 0 && slice[0] !== "")).toBe(true);
+      expect(new Set(flat).size, `${name}'s slices share a file`).toBe(flat.length);
+      expect(flat.toSorted()).toEqual(mutateSet(path.join(repositoryRoot, root), config.mutate));
+    }
+  });
+
+  it("gathers each shard's two files under the names the merge reads, into the one directory the summary downloads them to", () => {
+    const { stryker, summary } = mutationWorkflow().jobs;
+    const gather = stepRunning(stryker.steps, "stryker-incremental.json", "stryker");
+    const upload = onlyStep(stryker.steps, "actions/upload-artifact@", "stryker");
+    const download = onlyStep(summary.steps, "actions/download-artifact@", "summary");
+
+    expect(gather.env?.["GATHERED"]).toEqual("${{ runner.temp }}/shard");
+    expect(gather.run).toContain('"${GATHERED}/${SHARD}.checkpoint.json"');
+    expect(gather.run).toContain('"${GATHERED}/${SHARD}.report.json"');
+    expect(upload.with?.["name"]).toEqual("stryker-shard-${{ matrix.name }}-${{ matrix.shard }}");
+    expect(upload.with?.["path"]).toEqual("${{ runner.temp }}/shard/");
+    expect(download.with).toEqual({
+      pattern: "stryker-shard-${{ matrix.name }}-*",
+      path: "${{ runner.temp }}/shards",
+      "merge-multiple": true,
+    });
+    expect(stepRunning(summary.steps, "mutation-shards.mjs merge", "summary").run).toContain(
+      '--shards "${RUNNER_TEMP}/shards"',
+    );
+  });
+
+  it("sums a leg up after every shard, whatever each shard's outcome, so a shard cut at its ceiling is carried forward", () => {
+    const { summary } = mutationWorkflow().jobs;
+
+    expect(summary.needs).toEqual("stryker");
+    expect(summary.if).toEqual("always()");
+  });
+
+  it("runs no more shards at once than leave a merge group's legs and a pull request's room", () => {
+    expect(mutationWorkflow().jobs.stryker.strategy["max-parallel"]).toBeLessThanOrEqual(
+      CONCURRENT_JOBS - MERGE_GROUP_LEGS - PULL_REQUEST_LEGS - A_LANE_JOB,
+    );
   });
 });

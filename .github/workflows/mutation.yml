@@ -10,7 +10,7 @@ on:
         type: boolean
         default: false
       ceiling-minutes:
-        description: "Minutes before each leg is cancelled, its checkpoint kept; empty is 120, and 350 at most, since a hosted job is terminated at 360"
+        description: "Minutes before each shard is cancelled, its checkpoint kept; empty is 120, and 350 at most, since a hosted job is terminated at 360"
         type: number
 
 # Overlapping runs would each start from the same checkpoint, and the later upload, however poorer, would win.
@@ -24,17 +24,37 @@ permissions:
 
 jobs:
   stryker:
+    name: stryker (${{ matrix.name }} ${{ matrix.shard }} of ${{ matrix.of }})
     runs-on: ubuntu-26.04
     # A dispatch hands its inputs over as strings, and the timeout refuses anything but a number.
     timeout-minutes: ${{ fromJSON(inputs.ceiling-minutes || '120') }}
     strategy:
       fail-fast: false
+      # The plan runs 20 jobs at once; 8 stay free for a merge group's four legs, a pull request's three and a lane job.
+      max-parallel: 12
       matrix:
         include:
-          - name: api
-            path: apps/api
-          - name: core
-            path: packages/core
+          - { name: api, path: apps/api, shard: 1, of: 5 }
+          - { name: api, path: apps/api, shard: 2, of: 5 }
+          - { name: api, path: apps/api, shard: 3, of: 5 }
+          - { name: api, path: apps/api, shard: 4, of: 5 }
+          - { name: api, path: apps/api, shard: 5, of: 5 }
+          - { name: core, path: packages/core, shard: 1, of: 16 }
+          - { name: core, path: packages/core, shard: 2, of: 16 }
+          - { name: core, path: packages/core, shard: 3, of: 16 }
+          - { name: core, path: packages/core, shard: 4, of: 16 }
+          - { name: core, path: packages/core, shard: 5, of: 16 }
+          - { name: core, path: packages/core, shard: 6, of: 16 }
+          - { name: core, path: packages/core, shard: 7, of: 16 }
+          - { name: core, path: packages/core, shard: 8, of: 16 }
+          - { name: core, path: packages/core, shard: 9, of: 16 }
+          - { name: core, path: packages/core, shard: 10, of: 16 }
+          - { name: core, path: packages/core, shard: 11, of: 16 }
+          - { name: core, path: packages/core, shard: 12, of: 16 }
+          - { name: core, path: packages/core, shard: 13, of: 16 }
+          - { name: core, path: packages/core, shard: 14, of: 16 }
+          - { name: core, path: packages/core, shard: 15, of: 16 }
+          - { name: core, path: packages/core, shard: 16, of: 16 }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
@@ -50,59 +70,102 @@ jobs:
       - run: uv sync --frozen
         working-directory: apps/worker
       - uses: ./.github/actions/git-filter-repo
-      # An artifact, not the Actions cache: the build's layers fill the cache, and it evicts a checkpoint read once a night.
+      # The whole leg's results, not this shard's: a file a new file moves to another shard keeps them.
       - name: the previous run's mutant results
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPOSITORY: ${{ github.repository }}
-          BRANCH: ${{ github.ref_name }}
-          ARTIFACT: stryker-incremental-${{ matrix.name }}
-          REPORTS: ${{ matrix.path }}/reports/mutation
-          # The head repository is checked because a fork's pull request can name its branch main.
-          NEWEST_CHECKPOINT: >-
-            [.[].artifacts[]
-            | select((.expired | not)
-            and .workflow_run.head_repository_id == .workflow_run.repository_id
-            and (.workflow_run.head_branch == "main" or .workflow_run.head_branch == env.BRANCH))]
-            | max_by(.created_at) // empty
-            | "\(.workflow_run.id) \(.created_at)"
-        run: |
-          set -euo pipefail
-          if ! pages="$(gh api --paginate --slurp "repos/${REPOSITORY}/actions/artifacts?name=${ARTIFACT}&per_page=100")"; then
-            echo "::error::the artifacts API would not list ${ARTIFACT} to this run's token"
-            exit 1
-          fi
-          if ! newest="$(jq --raw-output "${NEWEST_CHECKPOINT}" <<<"${pages}")"; then
-            echo "::error::the artifacts API answered with something other than a list of ${ARTIFACT}"
-            exit 1
-          fi
-          if [ -z "${newest}" ]; then
-            echo "No run on main or ${BRANCH} has left ${ARTIFACT}, so this leg tests every mutant."
-            exit 0
-          fi
-          read -r run uploaded <<<"${newest}"
-          gh run download "${run}" --repo "${REPOSITORY}" --name "${ARTIFACT}" --dir "${REPORTS}"
-          cp "${REPORTS}/stryker-incremental.json" "${REPORTS}/baseline.json"
-          echo "Restored ${ARTIFACT} from run ${run}, uploaded ${uploaded}."
+        uses: ./.github/actions/mutation-baseline
+        with:
+          leg: ${{ matrix.name }}
+          reports: ${{ matrix.path }}/reports/mutation
       # `exec` leaves one process from the step down, so cancellation reaches Stryker.
       - name: mutation
         working-directory: ${{ matrix.path }}
-        run: exec node_modules/.bin/stryker run ${{ inputs.force && '--force' || '' }}
+        env:
+          LEG: ${{ matrix.name }}
+          SHARD: ${{ matrix.shard }}
+          OF: ${{ matrix.of }}
+        run: |
+          slice="$(node ../../scripts/mutation-shards.mjs slice --leg "${LEG}" --shard "${SHARD}" --of "${OF}")"
+          exec node_modules/.bin/stryker run --mutate "${slice}" ${{ inputs.force && '--force' || '' }}
+      # Named for the shard, so the leg's summary gathers every shard into one directory.
+      - name: this shard's mutant results, whether or not it finished
+        if: always()
+        env:
+          REPORTS: ${{ matrix.path }}/reports/mutation
+          SHARD: ${{ matrix.shard }}
+          GATHERED: ${{ runner.temp }}/shard
+        run: |
+          mkdir -p "${GATHERED}"
+          if [ -f "${REPORTS}/stryker-incremental.json" ]; then
+            cp "${REPORTS}/stryker-incremental.json" "${GATHERED}/${SHARD}.checkpoint.json"
+          fi
+          if [ -f "${REPORTS}/mutation.json" ]; then
+            cp "${REPORTS}/mutation.json" "${GATHERED}/${SHARD}.report.json"
+          fi
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: stryker-shard-${{ matrix.name }}-${{ matrix.shard }}
+          path: ${{ runner.temp }}/shard/
+          retention-days: 1
+          # A re-run keeps the run id, so its first attempt's artifact may already hold this name.
+          overwrite: true
+
+  summary:
+    name: summary (${{ matrix.name }})
+    needs: stryker
+    # A shard cut at its ceiling still left a checkpoint, and the leg's results must carry it forward.
+    if: always()
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: api, of: 5 }
+          - { name: core, of: 16 }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: the previous run's mutant results
+        uses: ./.github/actions/mutation-baseline
+        with:
+          leg: ${{ matrix.name }}
+          reports: ${{ runner.temp }}/baseline
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: stryker-shard-${{ matrix.name }}-*
+          path: ${{ runner.temp }}/shards
+          merge-multiple: true
+      - id: merge
+        name: the shards' results, merged into the leg's
+        env:
+          LEG: ${{ matrix.name }}
+          OF: ${{ matrix.of }}
+        run: |
+          node scripts/mutation-shards.mjs merge --leg "${LEG}" --of "${OF}" \
+            --shards "${RUNNER_TEMP}/shards" \
+            --baseline "${RUNNER_TEMP}/baseline/baseline.json" \
+            --out "${RUNNER_TEMP}/merged" >> "${GITHUB_STEP_SUMMARY}"
       # Red when the runner ran no test for a mutant or killed none: a broken harness, never a score.
       - name: score and new survivors to the job summary
-        if: always()
+        env:
+          LEG: ${{ matrix.name }}
         run: |
-          node scripts/mutation-summary.mjs --leg ${{ matrix.name }} \
-            --report ${{ matrix.path }}/reports/mutation/mutation.json \
-            --checkpoint ${{ matrix.path }}/reports/mutation/stryker-incremental.json \
-            --baseline ${{ matrix.path }}/reports/mutation/baseline.json >> "$GITHUB_STEP_SUMMARY"
-      # The checkpoint rather than the report: a cancelled leg writes only the checkpoint.
-      - name: this run's mutant results, whether or not it finished
-        if: always()
+          node scripts/mutation-summary.mjs --leg "${LEG}" \
+            --report "${RUNNER_TEMP}/merged/mutation.json" \
+            --checkpoint "${RUNNER_TEMP}/merged/stryker-incremental.json" \
+            --baseline "${RUNNER_TEMP}/baseline/baseline.json" >> "${GITHUB_STEP_SUMMARY}"
+      # Not after a failed merge, which would upload nothing better than what the restore read.
+      - name: the leg's mutant results, for the next run to start from
+        if: always() && steps.merge.outcome == 'success'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: stryker-incremental-${{ matrix.name }}
-          path: ${{ matrix.path }}/reports/mutation/stryker-incremental.json
+          path: ${{ runner.temp }}/merged/stryker-incremental.json
           retention-days: 14
-          # A re-run keeps the run id, so its first attempt's artifact may already hold this name.
           overwrite: true
