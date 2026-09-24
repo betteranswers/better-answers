@@ -37,7 +37,7 @@ const constraintOf = (error: unknown): string => {
 
 // The closed set the pinned image has, so a privilege the journal never mentions is answered
 // false rather than left out of the question.
-export const TABLE_PRIVILEGES = [
+const TABLE_PRIVILEGES = [
   "SELECT",
   "INSERT",
   "UPDATE",

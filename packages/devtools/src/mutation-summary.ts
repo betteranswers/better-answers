@@ -14,10 +14,8 @@ const mutantStatus = z.enum([
   "RuntimeError",
   "Pending",
 ]);
-export type MutantStatus = z.infer<typeof mutantStatus>;
 
 const position = z.object({ line: z.number(), column: z.number() });
-export type Position = z.infer<typeof position>;
 
 const reportMutant = z.object({
   mutatorName: z.string(),

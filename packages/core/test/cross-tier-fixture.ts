@@ -28,7 +28,7 @@ export const THE_QUERY = "overtime";
 
 export const THE_TITLE = "depot-handbook.md";
 
-export const THE_BINDING = "The depot handbook";
+const THE_BINDING = "The depot handbook";
 
 export type Span = { readonly start: number; readonly end: number };
 
