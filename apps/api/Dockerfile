@@ -28,11 +28,20 @@ FROM node:24.20.0-trixie-slim@sha256:50c3b2f6988dfc307b86e5301d69611af31f4789bdf
 # pnpm's version is the root manifest's `packageManager` field and nowhere else:
 # `corepack install` with no argument reads it, so this image cannot carry a second pin that
 # ages alone. The cache is world-readable because the runtime stage runs as `node`, not root.
+#
+# From pnpm 12 the package corepack caches is a wrapper around a native binary, which the
+# package's install script would fetch; corepack runs no install script, so the wrapper
+# fetches the binary on its first run and keeps it beside itself in the cache. That first run
+# is the `pnpm --version` here, as root, before the cache turns read-only: the runtime runs as
+# `node` and could not write the binary, and a container should not fetch its own tooling.
+# `--pm-on-fail=ignore` because pnpm 12 otherwise records the version it runs as in a
+# `pnpm-lock.yaml` under /app, root-only, which the runtime would inherit and fail to read.
 ENV COREPACK_HOME=/opt/corepack \
     COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 WORKDIR /app
 COPY package.json ./
-RUN corepack enable && corepack install && chmod -R a+rX "$COREPACK_HOME"
+RUN corepack enable && corepack install && pnpm --pm-on-fail=ignore --version \
+ && chmod -R a+rX "$COREPACK_HOME"
 
 # Every workspace manifest, and nothing else, so a source edit does not invalidate the
 # install layer. `pnpm-workspace.yaml` lists six projects; the lockfile is checked against
@@ -183,15 +192,19 @@ ENV NODE_ENV=production \
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 # The repository's own project list — one source for it, not a second copy that ages
-# alone — plus the one setting that is true of an image and false of a
+# alone — plus the two settings that are true of an image and false of a
 # checkout. pnpm 11 verifies the dependency tree before `pnpm run` and repairs it by
 # installing; this image has no lockfile, no registry credential and no writable /app, so
 # that repair can only fail. The tree was built at image build time and is the artefact.
+# pnpm 12 also records the version it runs as in `pnpm-lock.yaml` before every command,
+# resolving it from the registry, which fails here for the same reasons and warns on every
+# `pnpm migrate`; corepack has already run the version `packageManager` pins, so
+# `pmOnFail: ignore` drops a check that has nothing left to catch.
 COPY pnpm-workspace.yaml ./
 # The patch files that workspace file names, so no pnpm command reads a reference to a
 # path that is not there. Nothing installs here; the tree above already carries the patch.
 COPY patches/ patches/
-RUN printf '\n# Set by apps/api/Dockerfile: an image never installs.\nverifyDepsBeforeRun: false\n' >> pnpm-workspace.yaml
+RUN printf '\n# Set by apps/api/Dockerfile: an image never installs, and corepack picks pnpm.\nverifyDepsBeforeRun: false\npmOnFail: ignore\n' >> pnpm-workspace.yaml
 
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=prod-deps /app/apps/api/node_modules ./apps/api/node_modules
