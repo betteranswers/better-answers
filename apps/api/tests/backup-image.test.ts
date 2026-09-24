@@ -44,14 +44,17 @@ const scriptModes = (): readonly string[] => {
 };
 
 const REQUIRED_TOOLS = [
+  "psql",
+  "pg_dumpall",
+  "pg_restore",
   "rclone",
   "age",
   "git",
   "ssh",
-
+  "curl",
   "jq",
-
   "cron",
+  "pgrep",
 ] as const;
 
 const contentsSchema = z.object({
@@ -119,7 +122,7 @@ describe.skipIf(nothingToProbeHere)("the backup image", () => {
     expect(clientMajor(contents.pgDump)).toEqual(serverMajor());
   });
 
-  it("resolves every tool the backup jobs run", () => {
+  it("resolves every tool beyond Debian's base that the backup jobs, their health check and the production restore call", () => {
     const missing = Object.entries(contents.resolved)
       .filter(([, where]) => where === "")
       .map(([tool]) => tool);

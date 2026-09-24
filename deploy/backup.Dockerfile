@@ -1,7 +1,13 @@
-# The same base as the database, so pg_dump and the server never skew. A test holds this
-# tag equal to the schema package's pin.
-FROM pgvector/pgvector:0.8.6-pg18-trixie@sha256:78bf48b801e792f99e3ac62b5036fd3876e9be48afda16c1e331af1c75ceb2ff
-RUN apt-get update && apt-get install -y --no-install-recommends cron git openssh-client curl jq unzip ca-certificates \
+# pgvector builds each tag once, so the database's image keeps the Debian packages of that
+# day. Debian's slim image takes a new digest every few weeks, and each one rebuilds the
+# layer below from current packages.
+FROM debian:trixie-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a
+# Debian 13 carries no PostgreSQL 18, so the client comes from PGDG, whose signing key
+# Debian's own postgresql-common ships; a test holds its major to the database image's.
+# procps is the health check's pgrep.
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates postgresql-common \
+ && /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y \
+ && apt-get install -y --no-install-recommends postgresql-client-18 cron git openssh-client curl jq unzip procps \
  && rm -rf /var/lib/apt/lists/*
 # The dockerfile manager sees `FROM` alone, so a version fetched by name ages in
 # silence. Each line below sits above its `ARG`.
@@ -21,8 +27,6 @@ RUN printf '%s\n' \
   '5 * * * * root /usr/local/bin/backup.sh hourly  >> /proc/1/fd/1 2>&1' \
   '0 2 * * * root /usr/local/bin/backup.sh nightly >> /proc/1/fd/1 2>&1' \
   > /etc/cron.d/backup && chmod 0644 /etc/cron.d/backup
-# The one service that stays root: cron reads /etc/cron.d as root or not at all. The
-# entrypoint is cleared so cron is the command.
+# The one service that stays root: cron reads /etc/cron.d as root or not at all.
 USER root
-ENTRYPOINT []
 CMD ["cron", "-f"]
