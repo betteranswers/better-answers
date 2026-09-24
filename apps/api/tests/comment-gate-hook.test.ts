@@ -162,23 +162,16 @@ describe("the write-time hook hands back the comment rule the edit broke", () =>
     expect(run.stderr).toContain(tag("COMMENT", "1"));
   });
 
-  it.each([
-    ["a YAML file", "packages/probe/long.yml", `# ${FORTY_WORDS}\nkeep: 1\n`],
-    ["a shell file", "packages/probe/long.sh", `# ${FORTY_WORDS}\nKEEP=1\n`],
-    ["a TOML file", "packages/probe/long.toml", `# ${FORTY_WORDS}\nkeep = 1\n`],
-    ["a SQL file", "packages/probe/long.sql", `-- ${FORTY_WORDS}\nSELECT 1;\n`],
-    ["a root script", "scripts/long.mjs", `// ${FORTY_WORDS}\nexport const keep = 1;\n`],
-    ["a hook script", ".claude/hooks/long.sh", `# ${FORTY_WORDS}\nKEEP=1\n`],
-    ["a root configuration file", "lefthook.yml", `# ${FORTY_WORDS}\nkeep: 1\n`],
-    ["a workflow", ".github/workflows/probe.yml", `# ${FORTY_WORDS}\nname: probe\n`],
-    ["a deployment script", "deploy/probe.sh", `# ${FORTY_WORDS}\nKEEP=1\n`],
-  ])("refuses a 40-word comment in %s, naming the count and its rule", (_what, file, source) => {
-    const run = edit(file, source);
+  it.each([["a root script", "scripts/long.mjs", `// ${FORTY_WORDS}\nexport const keep = 1;\n`]])(
+    "refuses a 40-word comment in %s, naming the count and its rule",
+    (_what, file, source) => {
+      const run = edit(file, source);
 
-    expect(run.status).toBe(2);
-    expect(run.stderr).toContain("runs to 40 words");
-    expect(run.stderr).toContain(tag("COMMENT", "1"));
-  });
+      expect(run.status).toBe(2);
+      expect(run.stderr).toContain("runs to 40 words");
+      expect(run.stderr).toContain(tag("COMMENT", "1"));
+    },
+  );
 
   it("reads a relative path against the session's directory, as the docs write one", () => {
     const file = "packages/probe/relative.ts";
@@ -210,18 +203,6 @@ describe("the write-time hook is silent where the comment earns its place", () =
     ],
     ["a why inside the ceiling", "probe/why.py", `# ${A_WHY_OF_TWENTY}\nKEEP = 1\n`],
     ["a type-checker escape", "probe/directive.py", "# type: ignore[attr-defined]\nKEEP = 1\n"],
-    ["a why inside the ceiling", "probe/why.yml", `# ${A_WHY_OF_TWENTY}\nkeep: 1\n`],
-    [
-      "an editor schema line",
-      "probe/directive.yml",
-      "# yaml-language-server: $schema=x\nkeep: 1\n",
-    ],
-    ["a why inside the ceiling", "probe/why.sh", `# ${A_WHY_OF_TWENTY}\nKEEP=1\n`],
-    ["a shellcheck directive", "probe/directive.sh", "# shellcheck disable=SC2016\nKEEP=1\n"],
-    ["a why inside the ceiling", "probe/why.toml", `# ${A_WHY_OF_TWENTY}\nkeep = 1\n`],
-    ["a renovate directive", "probe/directive.toml", "# renovate: datasource=docker\nkeep = 1\n"],
-    ["a why inside the ceiling", "probe/why.sql", `-- ${A_WHY_OF_TWENTY}\nSELECT 1;\n`],
-    ["a migration separator", "probe/directive.sql", "SELECT 1;\n--> statement-breakpoint\n"],
   ])("lets %s through", (_what, file, source) => {
     const run = edit(`packages/${file}`, source);
 
@@ -230,9 +211,12 @@ describe("the write-time hook is silent where the comment earns its place", () =
   });
 
   it.each([
-    ["a workflow", ".github/workflows/why.yml", `# ${A_WHY_OF_TWENTY}\nname: probe\n`],
-    ["a deployment script", "deploy/why.sh", `# ${A_WHY_OF_TWENTY}\nKEEP=1\n`],
-  ])("lets a why of twenty words through in %s", (_what, file, source) => {
+    ["a YAML file", "packages/probe/long.yml", `# ${FORTY_WORDS}\nkeep: 1\n`],
+    ["a shell file", "packages/probe/long.sh", `# ${FORTY_WORDS}\nKEEP=1\n`],
+    ["a TOML file", "packages/probe/long.toml", `# ${FORTY_WORDS}\nkeep = 1\n`],
+    ["a SQL file", "packages/probe/long.sql", `-- ${FORTY_WORDS}\nSELECT 1;\n`],
+    ["a workflow", ".github/workflows/long.yml", `# ${FORTY_WORDS}\nname: probe\n`],
+  ])("lets a 40-word comment in %s through, being no Python", (_what, file, source) => {
     const run = edit(file, source);
 
     expect(run.status).toBe(0);
@@ -303,16 +287,6 @@ describe("the write-time hook refuses nothing when it cannot run the gate", () =
   });
 });
 
-// Two readings of one list, each read here rather than restated, so neither drifts.
-const tableSuffixes = (): readonly string[] => {
-  const source = readFileSync(path.join(repositoryRoot, checkerPath()), "utf8");
-  const table = /SYNTAX[^{]*\{(?<body>[^}]*)\}/.exec(source)?.groups?.["body"];
-  if (table === undefined) {
-    throw new Error(`${checkerPath()} carries no syntax table this reading can find.`);
-  }
-  return [...table.matchAll(/"(?<suffix>\.\w+)"/g)].map((found) => found.groups?.["suffix"] ?? "");
-};
-
 const branchSuffixes = (): readonly string[] => {
   const branch = [...hookText.matchAll(/^(?<case>\*\..*)\)$/gm)]
     .map((found) => found.groups?.["case"] ?? "")
@@ -328,8 +302,8 @@ describe("the write-time hook runs the same gate the root check runs", () => {
     expect(hookText).toContain(configPath());
   });
 
-  it("dispatches to the checker on every file type its syntax table reads", () => {
-    expect([...branchSuffixes()].sort()).toEqual([...tableSuffixes()].sort());
+  it("dispatches to the checker on Python files alone", () => {
+    expect(branchSuffixes()).toEqual([".py"]);
   });
 
   it("names the checker `comment-gate:python` names", () => {

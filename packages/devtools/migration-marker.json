@@ -1,4 +1,0 @@
-{
-  "description": "Change the marker in the migrations and here in the same commit, or the gate deletes the line the strip keeps.",
-  "marker": "-- Custom migration (hand-written SQL; ADR 0032)."
-}

@@ -8,19 +8,24 @@ import re
 import sys
 import token
 import tokenize
-from bisect import bisect_right
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 from citations import citation_in
 
+SUFFIX = ".py"
+
 WORD_LIMIT = 25
 
-Comment = tuple[int, int, str]
-Block = tuple[int, str]
-Reader = Callable[[str], list[Block]]
+DOCSTRING_LIMIT = 50
 
+Comment = tuple[int, int, str]
+
+
+NOTICE = r"SPDX-License-Identifier|Copyright"
+
+A_NOTICE = re.compile(rf"^(?:{NOTICE})")
 
 EXEMPT_OPENING = re.compile(
     r"^(?:!"
@@ -34,35 +39,29 @@ EXEMPT_OPENING = re.compile(
     r"|nosec"
     r"|coding[:=]"
     r"|jscpd:ignore"
-    r"|shellcheck "
-    r"|renovate:"
-    r"|yaml-language-server:"
-    r"|SPDX-License-Identifier"
-    r"|Copyright"
+    rf"|{NOTICE}"
     r")"
 )
 
-MARKER = Path(__file__).resolve().parents[1] / "migration-marker.json"
+# A suppression's codes are machinery; whatever follows them is its reason, and counts.
+SUPPRESSION = re.compile(
+    r"^(?:noqa(?::\s*[A-Z]+[0-9]+(?:[,\s]+[A-Z]+[0-9]+)*)?"
+    r"|type:\s*ignore(?:\[[^\]]*\])?)"
+)
 
-
-def _migration_marker() -> str:
-    fixture: Any = json.loads(MARKER.read_text(encoding="utf8"))
-    marker = fixture.get("marker")
-    # A key that moved would exempt the string "None" and delete every marker in
-    # the tree.
-    if not isinstance(marker, str) or not marker.strip():
-        raise ValueError(f"{MARKER} carries no marker")
-    return marker
-
-
-EXEMPT_WHOLE = frozenset({"--> statement-breakpoint", _migration_marker()})
-
-MARKERS = "#-"
+# mypy and ruff take a directive's reason after a second `#`, so each `#` starts a part.
+MARKER = re.compile(r"(?:^|\s)#+")
 
 TOO_LONG = (
     "{path}:{line}: this comment runs to {words} words; a comment gives a reason the "
     "code cannot — a constraint, a trade-off, a gotcha — in {limit} at most "
     "([COMMENT1]). Delete what the code already says."
+)
+
+DOCSTRING_TOO_LONG = (
+    "{path}:{line}: this docstring runs to {words} words; a public function's "
+    "docstring says only what its signature cannot — units, ranges, what None means, "
+    "a side effect, a refusal — in {limit} at most ([COMMENT1]). Delete the rest."
 )
 
 CITES = (
@@ -77,9 +76,19 @@ STRING_CITES = (
     "they read it ([COMMENT1]). Say the thing instead."
 )
 
+
+class Block(NamedTuple):
+    line: int
+    prose: str
+    limit: int = WORD_LIMIT
+    too_long: str = TOO_LONG
+
+
 DOCSTRING_HOLDERS = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
 
 A_TEST_PATH = re.compile(r"(?:^|/)(?:tests?|e2e)/|(?:^|/)(?:test_[^/]*|conftest)\.py$")
+
+A_WORKER_MODULE = re.compile(r"(?:^|/)apps/worker/src/")
 
 A_SPACE = re.compile(r"\s")
 
@@ -108,51 +117,37 @@ NEVER_WALKED = frozenset(
     }
 )
 
-# Named by no root of the strip, so a finding here would refuse an edit the root
-# `check` accepts.
-UNCOVERED = (Path("apps/worker/pyproject.toml"),)
 
-DOLLAR = re.compile(r"\$[A-Za-z_][A-Za-z0-9_]*\$|\$\$")
-
-
-def _prose(comment: str) -> str:
-    return comment.lstrip(MARKERS)
+def _reason(part: str) -> str:
+    suppression = SUPPRESSION.match(part)
+    if suppression is not None:
+        return part[suppression.end() :].lstrip(" -—:")
+    return "" if EXEMPT_OPENING.match(part) else part
 
 
-def _exempt(comment: str) -> bool:
-    said = comment.strip()
-    return said in EXEMPT_WHOLE or EXEMPT_OPENING.match(_prose(said)) is not None
+def _prose(written: str) -> str | None:
+    parts = [part.strip() for part in MARKER.split(written)]
+    reasons = [_reason(part) for part in parts]
+    if reasons != parts and not any(reasons):
+        return None
+    return " ".join(reason for reason in reasons if reason)
 
 
 def _blocks(lines: list[str], comments: Iterable[Comment]) -> list[Block]:
-    blocks: list[Block] = []
-    start: int | None = None
-    parts: list[str] = []
+    runs: list[tuple[int, list[str]]] = []
     previous = -2
     for row, column, written in comments:
         text = _prose(written)
-        if _exempt(written):
-            if start is not None:
-                blocks.append((start, "\n".join(parts)))
-            start, parts, previous = None, [], -2
+        if text is None:
+            previous = -2
             continue
         own_line = lines[row - 1][:column].strip() == ""
-        if not own_line:
-            if start is not None:
-                blocks.append((start, "\n".join(parts)))
-            blocks.append((row, text))
-            start, parts, previous = None, [], -2
-            continue
-        if start is not None and row == previous + 1:
-            parts.append(text)
+        if own_line and row == previous + 1:
+            runs[-1][1].append(text)
         else:
-            if start is not None:
-                blocks.append((start, "\n".join(parts)))
-            start, parts = row, [text]
-        previous = row
-    if start is not None:
-        blocks.append((start, "\n".join(parts)))
-    return blocks
+            runs.append((row, [text]))
+        previous = row if own_line else -2
+    return [Block(start, "\n".join(parts)) for start, parts in runs]
 
 
 def _python_comments(source: str) -> list[Comment]:
@@ -165,89 +160,31 @@ def _python_comments(source: str) -> list[Comment]:
     return found
 
 
-def _hash_at(line: str) -> int | None:
-    quote: str | None = None
-    for index, character in enumerate(line):
-        if quote is not None:
-            if character == quote:
-                quote = None
-        elif character in "'\"":
-            quote = character
-        elif character == "#" and (index == 0 or line[index - 1].isspace()):
-            return index
-    return None
+def _public_worker_functions(path: Path, tree: ast.Module) -> set[ast.AST]:
+    if A_WORKER_MODULE.search(path.as_posix()) is None:
+        return set()
+    return {
+        node
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and not node.name.startswith("_")
+    }
 
 
-def _hash_comments(source: str) -> list[Comment]:
-    found: list[Comment] = []
-    for row, line in enumerate(source.splitlines(), start=1):
-        column = _hash_at(line)
-        if column is not None:
-            found.append((row, column, line[column:]))
-    return found
-
-
-def _quote_at(source: str, index: int) -> tuple[str, int, bool] | None:
-    before = source[index - 1] if index > 0 else ""
-    escaping = source[index] in "Ee" and not (before.isalnum() or before == "_")
-    if escaping and source.startswith("'", index + 1):
-        return "'", index + 2, True
-    if source[index] in "'\"":
-        return source[index], index + 1, False
-    return None
-
-
-def _past_code(source: str, index: int) -> int:
-    body = DOLLAR.match(source, index)
-    if body is not None:
-        closed = source.find(body.group(0), body.end())
-        return len(source) if closed == -1 else closed + len(body.group(0))
-    opened = _quote_at(source, index)
-    if opened is None:
-        return index + 1
-    quote, inside, escaping = opened
-    while inside < len(source):
-        if escaping and source[inside] == "\\":
-            inside += 2
-        elif source[inside] != quote:
-            inside += 1
-        elif source.startswith(quote * 2, inside):
-            inside += 2
-        else:
-            return inside + 1
-    return len(source)
-
-
-def _placed(starts: list[int], index: int) -> tuple[int, int]:
-    row = bisect_right(starts, index)
-    return row, index - starts[row - 1]
-
-
-def _sql_comments(source: str) -> list[Comment]:
-    starts = [0] + [at + 1 for at, character in enumerate(source) if character == "\n"]
-    found: list[Comment] = []
-    index = 0
-    while index < len(source):
-        if source.startswith("--", index):
-            ended = source.find("\n", index)
-            ended = len(source) if ended == -1 else ended
-            row, column = _placed(starts, index)
-            found.append((row, column, source[index:ended]))
-            index = ended
-            continue
-        index = _past_code(source, index)
-    return found
-
-
-def _docstrings(source: str) -> list[Block]:
+def _docstrings(path: Path, tree: ast.Module) -> list[Block]:
+    public = _public_worker_functions(path, tree)
     found: list[Block] = []
-    for node in ast.walk(ast.parse(source)):
+    for node in ast.walk(tree):
         if not isinstance(node, DOCSTRING_HOLDERS):
             continue
         text = ast.get_docstring(node, clean=False)
-        if text is None or _exempt(text):
+        if text is None or A_NOTICE.match(text.strip()) is not None:
             continue
-        found.append((getattr(node.body[0], "lineno", 1), text))
+        line = getattr(node.body[0], "lineno", 1)
+        if node in public:
+            found.append(Block(line, text, DOCSTRING_LIMIT, DOCSTRING_TOO_LONG))
+        else:
+            found.append(Block(line, text))
     return found
 
 
@@ -262,8 +199,7 @@ def _docstring_nodes(tree: ast.AST) -> set[int]:
     return held
 
 
-def _strings(source: str) -> list[Block]:
-    tree = ast.parse(source)
+def _strings(tree: ast.Module) -> list[tuple[int, str]]:
     a_docstring = _docstring_nodes(tree)
     # A string with no space in it is an identifier, a path, a key or a version —
     # a value, not something a person reads.
@@ -278,71 +214,46 @@ def _strings(source: str) -> list[Block]:
 
 
 def _strings_go_unread(path: Path) -> bool:
-    # Only Python source carries a string literal this check can read; the other
-    # languages in the table carry none.
-    if path.suffix != ".py":
-        return True
     text = path.as_posix()
     return bool(A_TEST_PATH.search(text)) or any(
         text == gate or text.endswith(f"/{gate}") for gate in PRINTS_A_TAG
     )
 
 
-def _python_blocks(source: str) -> list[Block]:
-    return _blocks(source.splitlines(), _python_comments(source)) + _docstrings(source)
-
-
-def _hash_blocks(source: str) -> list[Block]:
-    return _blocks(source.splitlines(), _hash_comments(source))
-
-
-def _sql_blocks(source: str) -> list[Block]:
-    return _blocks(source.splitlines(), _sql_comments(source))
-
-
-SYNTAX: dict[str, Reader] = {
-    ".py": _python_blocks,
-    ".yml": _hash_blocks,
-    ".yaml": _hash_blocks,
-    ".sh": _hash_blocks,
-    ".bash": _hash_blocks,
-    ".toml": _hash_blocks,
-    ".sql": _sql_blocks,
-}
+def _string_findings(path: Path, tree: ast.Module) -> list[str]:
+    if _strings_go_unread(path):
+        return []
+    said: list[str] = []
+    for line, text in _strings(tree):
+        cited = citation_in(text)
+        if cited is not None:
+            what, citation = cited
+            said.append(
+                STRING_CITES.format(path=path, line=line, what=what, cited=citation)
+            )
+    return said
 
 
 def _findings(path: Path, source: str) -> list[str]:
-    said: list[str] = []
-    if not _strings_go_unread(path):
-        for line, text in _strings(source):
-            cited = citation_in(text)
-            if cited is not None:
-                what, citation = cited
-                said.append(
-                    STRING_CITES.format(path=path, line=line, what=what, cited=citation)
-                )
-    for line, prose in SYNTAX[path.suffix](source):
+    tree = ast.parse(source)
+    said = _string_findings(path, tree)
+    comments = _blocks(source.splitlines(), _python_comments(source))
+    for line, prose, limit, too_long in comments + _docstrings(path, tree):
         cited = citation_in(prose)
         if cited is not None:
             what, citation = cited
             said.append(CITES.format(path=path, line=line, what=what, cited=citation))
             continue
         words = len(prose.split())
-        if words > WORD_LIMIT:
-            said.append(
-                TOO_LONG.format(path=path, line=line, words=words, limit=WORD_LIMIT)
-            )
+        if words > limit:
+            said.append(too_long.format(path=path, line=line, words=words, limit=limit))
     return said
-
-
-def _this_gates(found: Path) -> bool:
-    return not any(found == root or root in found.parents for root in UNCOVERED)
 
 
 def _under(root: Path) -> Iterable[Path]:
     if root.is_file():
         return [root]
-    return (found for suffix in SYNTAX for found in root.rglob(f"*{suffix}"))
+    return root.rglob(f"*{SUFFIX}")
 
 
 def main(argv: list[str]) -> int:
@@ -355,9 +266,7 @@ def main(argv: list[str]) -> int:
             found
             for root in named
             for found in _under(root)
-            if found.suffix in SYNTAX
-            and NEVER_WALKED.isdisjoint(found.parts)
-            and _this_gates(found)
+            if found.suffix == SUFFIX and NEVER_WALKED.isdisjoint(found.parts)
         }
     )
     findings: list[str] = []
