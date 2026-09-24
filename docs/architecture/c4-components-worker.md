@@ -23,7 +23,7 @@ C4Component
     Component(landed, "pipeline/landed.py, converter.py, chunks.py", "coco.fn, unmemoised", "Per document under a ceiling by page count: convert — anydoc for docx, pdf-inspector for PDF, text passed through — or quarantine; then detect, redact and split into chunks")
     Component(detected, "pipeline/detected.py", "coco.fn, memo=True", "detected(normalised_text, detection_key): the one memo, answering spans")
     Component(redaction, "redaction/", "Presidio, GLiNER, spaCy", "The detector's recognisers and detection key; redact: the block rule, pseudonyms, withholdings, written spans")
-    Component(catalogue, "pipeline/catalogue.py", "psycopg", "Reads the binding and its documents' suppressions, restores and dismissals; records findings, reconciles the catalogue, quarantines")
+    Component(catalogue, "pipeline/catalogue.py", "psycopg", "Reads the binding, its workspace's suppressions and its documents' restores and dismissals; records findings, reconciles the catalogue, quarantines")
     Component(extraction, "extraction", "planned S7", "Candidate concepts within the plan and the ceiling, proposed as concept_write_request rows; credentials injected per run")
     Component(substrate, "schema_view.py, contract_stamp.py, ids.py, envelope.py, health.py, log.py, config.py", "substrate", "The committed schema view and baked contract digest; the ULID minter; the credential envelope; the process probe; one JSON log shape; the box's limits")
   }
@@ -71,7 +71,7 @@ C4Component
 | --- | --- |
 | S0 | Landed — `redaction/`: the category descriptors, the recognisers over Presidio and GLiNER, the officer-block rule, pseudonyms, withholdings and written spans; the pytest harness asserting every fixture span back against the text by offset |
 | S1 | Landed — `KINDS`, `pipeline/`, the converter, the per-workspace pool, the Environment LRU with the LMDB size as a signal, `RUST_LOG=warn` bridged into one log shape, the cross-tier document test with the worker as a real process |
-| T-366 | Planned — a workspace-wide suppression the seam applies by exact case-folded match of the subject's identifiers (emails, names, other); today a suppression names one document, and the map finds none |
+| T-366 | The suppression is the workspace's since T-375, read for every document; the seam withholds a detected span equal to one of its identifiers. Planned — the exact case-folded erasure match of every identifier, detected or not (T-376), and the documents finder (T-377) |
 | S4 | A connector per provider beside the converter, the estate-size probe, `MAX_CONCURRENT_RUNS=1` measured, citation repair on a gone document, what becomes of findings when a `content_hash` moves |
 | S7 | Extraction over the accepted plan and the ceiling, the template per document kind, conflicts raised never resolved |
 | S8 | *reserve* — the concept unit: the `concept-catch-up` kind, embedding on the fixed route with an `llm_call` per call |
