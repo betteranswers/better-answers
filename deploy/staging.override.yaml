@@ -1,5 +1,17 @@
-# Staging only: the drill runs on the host, so the S3 port is published on the loopback.
+# Staging only, the stores' side: the drill runs on the host, so the S3 port is published on the loopback.
 services:
   objectstore:
     ports:
       - "127.0.0.1:3900:3900"
+    # Production's projects meet on Coolify's `coolify` network; staging's run under plain compose, so they meet on this one.
+    networks:
+      # Naming any network drops `default`, and backup reaches objectstore there.
+      default: {}
+      staging-shared:
+        aliases: [objectstore]
+
+networks:
+  # External, so it stands before either project starts and survives their `down`; restore-drill.sh creates it.
+  staging-shared:
+    name: better-answers-staging-shared
+    external: true

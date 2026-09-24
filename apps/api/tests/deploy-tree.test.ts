@@ -1,8 +1,9 @@
 import { execFileSync } from "node:child_process";
-import { readdirSync, readFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, onTestFinished } from "vitest";
 import { z } from "zod";
 
 import { GARAGE_IMAGE } from "@better-answers/core/store/objects";
@@ -56,6 +57,20 @@ const renovateSchema = z.object({
       }),
     )
     .default([]),
+});
+
+const composeModelSchema = z.object({
+  services: z.record(
+    z.string(),
+    z.object({
+      networks: z
+        .record(z.string(), z.object({ aliases: z.array(z.string()).optional() }).nullable())
+        .default({}),
+    }),
+  ),
+  networks: z
+    .record(z.string(), z.object({ name: z.string(), external: z.boolean().optional() }))
+    .default({}),
 });
 
 const composeServices = (file: string): readonly { name: string; body: string }[] => {
@@ -255,6 +270,89 @@ describe("the deploy tree (T-005)", () => {
     expect(anchor).toContain("S3_ACCESS_KEY: ${OBJECTSTORE_ROOT_KEY:?}");
     expect(anchor).toContain("S3_SECRET_KEY: ${OBJECTSTORE_ROOT_SECRET:?}");
     expect(read("deploy/garage.toml")).toContain('s3_region = "garage"');
+  });
+
+  it("lets staging's migrate, api and worker reach the stores project's objectstore, on one internal network the drill creates before either project starts", () => {
+    const drill = read("deploy/restore-drill.sh");
+    const projects = fencedIn(drill, "the staging projects");
+    expect({ markers: projects !== undefined }).toEqual({ markers: true });
+
+    const work = mkdtempSync(path.join(tmpdir(), "staging-projects-"));
+    onTestFinished(() => {
+      rmSync(work, { recursive: true, force: true });
+    });
+    const required = new Set(
+      ["deploy/stores.compose.yaml", "deploy/platform.compose.yaml"].flatMap((file) =>
+        [...read(file).matchAll(/\$\{(\w+):\?/g)].map((match) => match[1] ?? ""),
+      ),
+    );
+    writeFileSync(
+      path.join(work, "staging.env"),
+      [...required].map((key) => `${key}=staging\n`).join(""),
+    );
+    const drillRan = (lines: readonly string[]): BashRun =>
+      bashRan([
+        `REPO_DIR='${repositoryRoot}'`,
+        `STAGING_ENV_FILE='${work}/staging.env'`,
+        projects ?? "",
+        ...lines,
+      ]);
+
+    const composed = (project: "stores" | "platform"): readonly string[] => {
+      const ran = drillRan([`${project} config --format json`]);
+      expect({ project, code: ran.code }).toEqual({ project, code: 0 });
+      const model = composeModelSchema.parse(JSON.parse(ran.output));
+      return Object.entries(model.services).flatMap(([service, { networks }]) =>
+        Object.entries(networks).map(([key, attached]) => {
+          const network = model.networks[key];
+          const external = network?.external === true ? " external" : "";
+          const aliases = (attached?.aliases ?? []).map((alias) => ` as ${alias}`).join("");
+          return `${service} on ${network?.name ?? key}${external}${aliases}`;
+        }),
+      );
+    };
+
+    expect([...composed("stores")].sort()).toEqual([
+      "backup on better-answers-stores-staging_default",
+      "cloudflared on better-answers-stores-staging_default",
+      "init on better-answers-stores-staging_default",
+      "objectstore on better-answers-staging-shared external as objectstore",
+      "objectstore on better-answers-stores-staging_default",
+    ]);
+    expect([...composed("platform")].sort()).toEqual([
+      "api on better-answers-staging-shared external",
+      "api on better-answers-staging_default",
+      "migrate on better-answers-staging-shared external",
+      "migrate on better-answers-staging_default",
+      "worker on better-answers-staging-shared external",
+      "worker on better-answers-staging_default",
+    ]);
+
+    const dockerCalls = (inspectStatus: number): BashRun =>
+      drillRan([
+        `docker() { printf '%s\\n' "$*" >> '${work}/docker-${String(inspectStatus)}.log'; [ "$1 $2" != "network inspect" ] || return ${String(inspectStatus)}; }`,
+        "ensure_staging_network",
+        `cat '${work}/docker-${String(inspectStatus)}.log'`,
+      ]);
+    expect(dockerCalls(1)).toEqual({
+      code: 0,
+      output:
+        "network inspect better-answers-staging-shared\nnetwork create --internal better-answers-staging-shared\n",
+    });
+    expect(dockerCalls(0)).toEqual({
+      code: 0,
+      output: "network inspect better-answers-staging-shared\n",
+    });
+    expect(drill).toMatch(/^say "## 0 [^"\n]*"; ensure_staging_network; wipe_staging$/m);
+  });
+
+  it("leaves the compose files Coolify deploys to production without a network of their own, so staging's join changes nothing there", () => {
+    for (const file of ["deploy/stores.compose.yaml", "deploy/platform.compose.yaml"]) {
+      expect({ file, networks: /^\s*networks:/m.test(read(file)) }).toEqual({
+        file,
+        networks: false,
+      });
+    }
   });
 
   it("hands the api the digest its own image is pinned to, so /health names the build that answers", () => {
