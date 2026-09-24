@@ -103,6 +103,21 @@ const answered = (command, args, environment = {}) => {
     return "";
   }
 };
+// What a failed command said, so a red assertion names its cause rather than "".
+const answeredOrWhy = (command, args, environment = {}) => {
+  try {
+    return execFileSync(command, args, {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, ...environment },
+    }).trim();
+  } catch (error) {
+    return String(error.stderr || error.message).trim();
+  }
+};
+// pnpm 12 under corepack fetches its native binary on first run unless the cache holds it;
+// with corepack's network refused, a binary the image does not carry is red here, not fetched.
+const offline = { COREPACK_ENABLE_NETWORK: "0" };
 // lstat, not existsSync: a link left dangling on PATH still counts as a command shipped.
 const linkOrFileAt = (file) => { try { lstatSync(file); return true; } catch { return false; } };
 const onPath = (name) =>
@@ -168,9 +183,10 @@ process.stdout.write(JSON.stringify({
   commandsOnPath: JSON.parse(process.env.PROBE_COMMANDS).filter((name) => onPath(name) !== undefined),
   hasNpmPackage: existsSync("/usr/local/lib/node_modules/npm"),
   pnpmTarget: pnpm === undefined ? "" : realTarget(pnpm),
-  pnpmVersion: answered("pnpm", ["--version"]),
+  pnpmVersion: answeredOrWhy("pnpm", ["--version"], offline),
   // ops.ts will not start without a database URL; help answers before any connection is made.
   opsAnswer: answered("pnpm", ["--silent", "ops", "help"], {
+    ...offline,
     DATABASE_URL: "postgres://probe@127.0.0.1:9/probe",
   }),
 }));
