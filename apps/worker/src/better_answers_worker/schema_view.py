@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0053_the-account-issuer-goes"
+MIGRATION_ID = "0054_the-attached-partition"
 
-MIGRATION_WHEN = 1790249230248
+MIGRATION_WHEN = 1790266038459
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {

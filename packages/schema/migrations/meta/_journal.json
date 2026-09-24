@@ -379,6 +379,13 @@
       "when": 1790249230248,
       "tag": "0053_the-account-issuer-goes",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1790266038459,
+      "tag": "0054_the-attached-partition",
+      "breakpoints": true
     }
   ]
 }
