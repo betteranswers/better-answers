@@ -101,7 +101,6 @@ const acceptedRows = {
   account: [
     {
       id: "account-1",
-      issuer: "issuer",
       accountId: USER_ID,
       providerId: "credential",
       userId: USER_ID,
