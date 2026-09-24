@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { head } from "@better-answers/core/store/git";
 
+import { open, renderOpen } from "../src/answering/index.ts";
 import {
   importBundle,
   writeConcept,
@@ -14,7 +15,7 @@ import {
 } from "../src/concepts/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { bundleHistory, commitFacts, fileAtCommit } from "./bundle.ts";
-import { addressOf, holdingTable, isBlockedOnTable, until } from "./suite-postgres.ts";
+import { addressOf, holdingTable, isBlockedOnTable, readingAs, until } from "./suite-postgres.ts";
 import { doorsOf, memberOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
 const { db, arrange } = suiteWithBundles();
@@ -41,6 +42,7 @@ type Concept = {
   readonly entry?: string;
   readonly verified?: readonly Event[];
   readonly frontmatter?: string;
+  readonly sources?: string;
 };
 
 const conceptFile = (concept: Concept): string => {
@@ -49,6 +51,13 @@ const conceptFile = (concept: Concept): string => {
     concept.verified === undefined
       ? ""
       : `verified:\n${concept.verified.map((event) => `  - { by: ${event.by}, at: ${event.at} }`).join("\n")}\n`;
+  const sources =
+    concept.sources ??
+    `  - id: ${entry}
+    resource: ../sources/Acme_Bid_Library_v1.md
+    title: Acme Bid Library v1, entry ${entry}
+    last_modified: 2026-03-01
+`;
   return `---
 type: ${concept.type ?? "Answer"}
 title: ${concept.title}
@@ -56,11 +65,7 @@ description: One sentence a listing shows.
 tags: [${concept.tags ?? "company"}]
 generated: { by: claude-code/claude-fable-5-1, at: 2026-09-22T00:30:00Z }
 ${verified}${concept.frontmatter ?? ""}sources:
-  - id: ${entry}
-    resource: ../sources/Acme_Bid_Library_v1.md
-    title: Acme Bid Library v1, entry ${entry}
-    last_modified: 2026-03-01
----
+${sources}---
 
 ${concept.body}
 `;
@@ -781,6 +786,46 @@ describe("the second pass: every relative link becomes the iri of the concept it
     for (const file of (await filesAtHead(scenario)).values()) {
       expect(file).not.toMatch(/\]\([^)]*\.md/);
     }
+  });
+});
+
+describe("an imported concept, opened", () => {
+  it("renders the locator after a source that carries one, and no parenthesis after a source that carries none", async () => {
+    const { scenario, verifiers } = await arranged();
+    await imported(
+      scenario,
+      treeOf({
+        "manifest.yaml": MANIFEST,
+        "company/answers/support-hours.md": conceptFile({
+          title: "Support hours",
+          verified: [{ by: humanOf(verifiers.mona), at: CHECKED_AT }],
+          sources: [
+            "  - id: ENTRY-001",
+            "    resource: ../sources/Acme_Bid_Library_v1.md",
+            "    title: Acme Bid Library v1, entry ENTRY-001",
+            "    locator: p.4",
+            "  - id: PROD-005",
+            "    resource: ../sources/Acme_Product_Library_v2.md",
+            "    title: Acme Product Library v2, entry PROD-005",
+            "",
+          ].join("\n"),
+          body: "Support answers between 08:00 and 18:00 on working days.",
+        }),
+      }),
+    );
+    const iri = (await irisByPath(scenario.workspaceId)).get(LINKED.supportHours) ?? "";
+
+    const opened = await readingAs(db().runtimePool, scenario.viewer, (principal, tx) =>
+      open(principal, tx, { iri }, new Date("2026-09-22T10:00:00.000Z")),
+    );
+
+    expect(opened.ok).toBe(true);
+    if (!opened.ok) return;
+    expect(renderOpen(opened.value).split("\n").slice(-3)).toEqual([
+      "Evidence:",
+      "- Acme Bid Library v1, entry ENTRY-001 (p.4)",
+      "- Acme Product Library v2, entry PROD-005",
+    ]);
   });
 });
 

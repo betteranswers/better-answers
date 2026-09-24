@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -50,6 +50,7 @@ import {
   type OpsIo,
 } from "../src/ops/index.ts";
 import { readTreeUnder } from "../src/ops/read-tree.ts";
+import { connectAsHost } from "./flow.ts";
 import {
   APP_HOSTNAME,
   capturingLogger,
@@ -59,6 +60,7 @@ import {
   type LogLine,
   type TestApp,
 } from "./harness.ts";
+import { calledTool, rendered } from "./mcp-call.ts";
 import { servedApp } from "./suite-app.ts";
 
 type Run = {
@@ -1599,20 +1601,14 @@ describe("pnpm ops — the restore scripts' commands", () => {
       app: TestApp,
       workspaceId: string,
       email: string,
-      more: readonly string[] = [],
+      {
+        flags = [],
+        from = BUNDLE_FIXTURE,
+      }: { readonly flags?: readonly string[]; readonly from?: string } = {},
     ): Promise<Run> =>
       opsWith(
         app,
-        [
-          "import-bundle",
-          "--workspace",
-          workspaceId,
-          "--from",
-          BUNDLE_FIXTURE,
-          "--as",
-          email,
-          ...more,
-        ],
+        ["import-bundle", "--workspace", workspaceId, "--from", from, "--as", email, ...flags],
         { io: { readTree: readTreeUnder }, doors: { clock: { now: () => IMPORTED_AT } } },
       );
 
@@ -1872,6 +1868,53 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
+    it("renders an imported concept's evidence over MCP with the locator a source carries, and no parenthesis after a source that carries none", async () => {
+      const { workspaceId, admin } = await bundleWorkspace(app());
+      const from = await mkdtemp(path.join(tmpdir(), "bundle-"));
+      await mkdir(path.join(from, "company", "answers"), { recursive: true });
+      await writeFile(
+        path.join(from, "manifest.yaml"),
+        await readFile(path.join(BUNDLE_FIXTURE, "manifest.yaml")),
+      );
+      await writeFile(
+        path.join(from, "company", "answers", "support-hours.md"),
+        [
+          "---",
+          "type: Answer",
+          "title: Support hours",
+          "description: Support answers between 08:00 and 18:00 on working days.",
+          "tags: [company, support]",
+          "verified:",
+          `  - { by: human:${MONA}, at: 2026-04-16T00:00:00Z }`,
+          "sources:",
+          "  - id: ENTRY-001",
+          "    resource: ../sources/Acme_Bid_Library_v1.md",
+          "    title: Acme Bid Library v1, entry ENTRY-001",
+          "    locator: p.4",
+          "  - id: PROD-005",
+          "    resource: ../sources/Acme_Product_Library_v2.md",
+          "    title: Acme Product Library v2, entry PROD-005",
+          "---",
+          "",
+          "Support answers between 08:00 and 18:00 on working days.",
+          "",
+        ].join("\n"),
+      );
+      await importing(app(), workspaceId, admin.email, { from });
+      const iri = await iriOf(app(), workspaceId, "knowledge/company/answers/support-hours.md");
+      const { accessToken } = await connectAsHost(app(), app().client(), admin, {
+        scope: "knowledge:read offline_access",
+      });
+
+      const opened = await calledTool(app().client(), accessToken, "open", { iri });
+
+      expect(rendered(opened).split("\n").slice(-3)).toEqual([
+        "Evidence:",
+        "- Acme Bid Library v1, entry ENTRY-001 (p.4)",
+        "- Acme Product Library v2, entry PROD-005",
+      ]);
+    });
+
     it("skips every landed concept and every present check on a rerun, rewrites no link, and says so", async () => {
       const { workspaceId, admin } = await bundleWorkspace(app());
       await importing(app(), workspaceId, admin.email);
@@ -1904,7 +1947,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     it("reports what a run would do on a dry run and writes nothing", async () => {
       const { workspaceId, admin } = await bundleWorkspace(app());
 
-      const run = await importing(app(), workspaceId, admin.email, ["--dry-run"]);
+      const run = await importing(app(), workspaceId, admin.email, { flags: ["--dry-run"] });
 
       expect(run.exitCode).toBe(0);
       expect(run.lines).toEqual([
@@ -1917,7 +1960,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
     it("lands the bundle at the class the flag names", async () => {
       const { workspaceId, admin } = await bundleWorkspace(app());
 
-      const run = await importing(app(), workspaceId, admin.email, ["--sensitivity", "Restricted"]);
+      const run = await importing(app(), workspaceId, admin.email, {
+        flags: ["--sensitivity", "Restricted"],
+      });
 
       expect(run.exitCode).toBe(0);
       expect(
@@ -1942,7 +1987,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
     it("refuses an Editor asked to land the bundle Restricted, which only an Admin could read back, and writes nothing", async () => {
       const { workspaceId } = await bundleWorkspace(app());
 
-      const run = await importing(app(), workspaceId, MONA, ["--sensitivity", "Restricted"]);
+      const run = await importing(app(), workspaceId, MONA, {
+        flags: ["--sensitivity", "Restricted"],
+      });
 
       expect(run.exitCode).toBe(1);
       expect(run.lines).toEqual([

@@ -395,7 +395,9 @@ export const renderOpen = (result: OpenResult): string => {
   const { concept } = result;
   const title =
     typeof concept.frontmatter["title"] === "string" ? concept.frontmatter["title"] : concept.iri;
-  const evidence = concept.evidence.map((item) => `- ${item.source} (${item.locator})`).join("\n");
+  const evidence = concept.evidence
+    .map(({ source, locator }) => (locator === "" ? `- ${source}` : `- ${source} (${locator})`))
+    .join("\n");
   return [
     `# ${title}`,
     "",
