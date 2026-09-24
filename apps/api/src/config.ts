@@ -79,9 +79,22 @@ const objectStoreSchema = z.object({
   S3_SECRET_KEY: z.string().min(1),
 });
 
+// fetch refuses a URL with credentials in an error that quotes it whole, and that error is logged.
+const deadManPingUrl = z
+  .url({ protocol: /^https?$/, abort: true })
+  .refine((value) => {
+    const url = new URL(value);
+    return url.username === "" && url.password === "";
+  }, "a check's URL must carry no credentials")
+  .optional();
+
 const sweepsSchema = z.object({
   UPLOAD_SWEEP: z.enum(UPLOAD_SWEEP_MODES).default("list"),
-  HEALTHCHECKS_PING_URL_SWEEPS: z.url({ protocol: /^https?$/ }).optional(),
+  HEALTHCHECKS_PING_URL_SWEEPS: deadManPingUrl,
+});
+
+const headCheckSchema = z.object({
+  HEALTHCHECKS_PING_URL_SCHEDULER: deadManPingUrl,
 });
 
 export type Bootstrap = {
@@ -103,6 +116,10 @@ export type IdentityBootstrap = {
 export type SweepSettings = {
   readonly uploadSweep: UploadSweepMode;
 
+  readonly pingUrl: string | undefined;
+};
+
+export type HeadCheckSettings = {
   readonly pingUrl: string | undefined;
 };
 
@@ -162,6 +179,14 @@ export function readSweeps(
     uploadSweep: parsed.data.UPLOAD_SWEEP,
     pingUrl: parsed.data.HEALTHCHECKS_PING_URL_SWEEPS,
   });
+}
+
+export function readHeadCheck(
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): Result<HeadCheckSettings> {
+  const parsed = headCheckSchema.safeParse(environment);
+  if (!parsed.success) return err(invalid(parsed.error, "the head check's settings"));
+  return ok({ pingUrl: parsed.data.HEALTHCHECKS_PING_URL_SCHEDULER });
 }
 
 export function requireBootstrap(processName: string): Bootstrap {

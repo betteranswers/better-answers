@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   readBootstrap,
+  readHeadCheck,
   readIdentityBootstrap,
   readObjectStore,
   readSweeps,
@@ -226,8 +227,54 @@ describe("the sweeps' settings", () => {
     ["no scheme", "hc-ping.com/0f5e8a2c"],
     ["another scheme", "ftp://hc-ping.com/0f5e8a2c"],
     ["an empty value", ""],
+    ["credentials", "https://who:secret@hc-ping.com/0f5e8a2c"],
   ])("refuses a check to ping with %s", (_case, url) => {
     expect(readSweeps({ HEALTHCHECKS_PING_URL_SWEEPS: url }).ok).toBe(false);
+  });
+});
+
+describe("the head check's settings", () => {
+  it("pings nothing until the estate names the scheduler check", () => {
+    expect(readHeadCheck({})).toEqual({ ok: true, value: { pingUrl: undefined } });
+  });
+
+  it("gives the head check the scheduler check to ping when the estate names it", () => {
+    const read = readHeadCheck({
+      HEALTHCHECKS_PING_URL_SCHEDULER: "https://hc-ping.com/7c1d9e4a-2b6f-4e83-a5d0-9f3c8b1e6a27",
+    });
+
+    expect(read).toEqual({
+      ok: true,
+      value: { pingUrl: "https://hc-ping.com/7c1d9e4a-2b6f-4e83-a5d0-9f3c8b1e6a27" },
+    });
+  });
+
+  it("never takes the sweeps' check for its own", () => {
+    const read = readHeadCheck({
+      HEALTHCHECKS_PING_URL_SWEEPS: "https://hc-ping.com/0f5e8a2c-5d3a-4c55-9d0e-2b8c1f7a6e41",
+    });
+
+    expect(read).toEqual({ ok: true, value: { pingUrl: undefined } });
+  });
+
+  it.each([
+    ["no scheme", "hc-ping.com/7c1d9e4a"],
+    ["another scheme", "ftp://hc-ping.com/7c1d9e4a"],
+    ["an empty value", ""],
+    ["a user and a password", "https://who:secret@hc-ping.com/7c1d9e4a"],
+    ["a user alone", "https://who@hc-ping.com/7c1d9e4a"],
+    ["a password alone", "https://:secret@hc-ping.com/7c1d9e4a"],
+  ])("refuses a check to ping with %s", (_case, url) => {
+    expect(readHeadCheck({ HEALTHCHECKS_PING_URL_SCHEDULER: url }).ok).toBe(false);
+  });
+
+  it("names the setting it refused and never the value it was given", () => {
+    const read = readHeadCheck({ HEALTHCHECKS_PING_URL_SCHEDULER: "hc-ping.com/7c1d9e4a" });
+
+    expect(read.ok).toBe(false);
+    const reason = read.ok ? "" : read.error.message;
+    expect(reason).toContain("HEALTHCHECKS_PING_URL_SCHEDULER");
+    expect(reason).not.toContain("7c1d9e4a");
   });
 });
 
