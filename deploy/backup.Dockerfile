@@ -22,10 +22,15 @@ RUN curl -fsSL "https://github.com/FiloSottile/age/releases/download/${AGE_VERSI
 # Baked in, not bind-mounted: an image by digest that read its job from the checkout beside
 # it would be half an image.
 COPY backup.sh /usr/local/bin/backup.sh
-RUN chmod 0755 /usr/local/bin/backup.sh
+COPY backup-env.sh /usr/local/bin/backup-env
+RUN chmod 0755 /usr/local/bin/backup.sh /usr/local/bin/backup-env
+# The api's uid owns the workspace repositories, so root's git refuses them as dubious. The
+# mount is read-only, so root can leave nothing behind in them.
+RUN git config --system safe.directory '/data/git/*'
+# cron hands a job PATH=/usr/bin:/bin and nothing else, so backup-env gives it the variables.
 RUN printf '%s\n' \
-  '5 * * * * root /usr/local/bin/backup.sh hourly  >> /proc/1/fd/1 2>&1' \
-  '0 2 * * * root /usr/local/bin/backup.sh nightly >> /proc/1/fd/1 2>&1' \
+  '5 * * * * root /usr/local/bin/backup-env /usr/local/bin/backup.sh hourly  >> /proc/1/fd/1 2>&1' \
+  '0 2 * * * root /usr/local/bin/backup-env /usr/local/bin/backup.sh nightly >> /proc/1/fd/1 2>&1' \
   > /etc/cron.d/backup && chmod 0644 /etc/cron.d/backup
 # The one service that stays root: cron reads /etc/cron.d as root or not at all.
 USER root

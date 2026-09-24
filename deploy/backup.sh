@@ -5,6 +5,7 @@ set -euo pipefail
 GIT_STORE=/data/git
 STAGING=/staging
 NOW=$(date -u +%Y%m%dT%H%M%SZ)
+JOB=${1:-}
 
 record() {
   psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -qc \
@@ -12,9 +13,15 @@ record() {
     || echo "backup_run row not written (schema not migrated yet?)" >&2
 }
 ping() {
-  local url=$1 outcome=$2 bytes=${3:-0} secs=${4:-0} suffix=""
+  local url=$1 outcome=$2 body="$2 bytes=${3:-0} took=${4:-0}" suffix=""
   [ "${outcome}" = ok ] || suffix=/fail
-  curl -fsS -m 10 --retry 3 -o /dev/null --data-raw "${outcome} bytes=${bytes} took=${secs}" "${url}${suffix}" || true
+  curl -fsS -m 10 --retry 3 -o /dev/null --data-raw "${body}" "${url}${suffix}" || true
+  echo "backup.sh ${JOB}: ${body}"
+}
+# `bundle verify` refuses to run outside a repository, and a pass names its file on stderr,
+# where the log would carry the path.
+bundle_verifies() {
+  git -C "$1" bundle verify --quiet "$2" 2>&1 | { grep -v ' is okay$' || true; } >&2
 }
 erasure_running() {
   [ "$(psql "${DATABASE_URL}" -At -c 'select pg_try_advisory_lock(41)' 2>/dev/null || echo t)" = f ]
@@ -63,7 +70,7 @@ job_bundles() {
   while read -r repo; do
     ws=$(basename "${repo}" .git); out="${STAGING}/${ws}-${NOW}.bundle.age"
     git -C "${repo}" bundle create "${STAGING}/${ws}.bundle" --all \
-      && git bundle verify "${STAGING}/${ws}.bundle" >/dev/null \
+      && bundle_verifies "${repo}" "${STAGING}/${ws}.bundle" \
       && age -r "${BACKUP_AGE_RECIPIENT}" -o "${out}" "${STAGING}/${ws}.bundle" \
       && rclone copyto --s3-no-check-bucket "${out}" "dumps:${BACKUP_DUMPS_BUCKET}/git/${ws}/${ws}-${NOW}.bundle.age" \
       && verify "${out}" "dumps:${BACKUP_DUMPS_BUCKET}/git/${ws}/${ws}-${NOW}.bundle.age" || rc=1

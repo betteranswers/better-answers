@@ -49,6 +49,8 @@ const BUILD_ALLOWANCE = 900_000;
 
 const CONTAINER_ALLOWANCE = 120_000;
 
+const OUTPUT_CEILING_BYTES = 64 * 1024 * 1024;
+
 export const IMAGE_PROBE_ALLOWANCE = BUILD_ALLOWANCE + CONTAINER_ALLOWANCE;
 
 const SHARED_CACHE_TOKEN = "ACTIONS_RUNTIME_TOKEN";
@@ -126,7 +128,7 @@ const buildTheImage = async (image: ImageUnderTest): Promise<string> => {
     const built = await run(program, argv, {
       cwd: repositoryRoot,
       timeout: BUILD_ALLOWANCE,
-      maxBuffer: 64 * 1024 * 1024,
+      maxBuffer: OUTPUT_CEILING_BYTES,
     });
     return builder === undefined ? built.stdout.trim() : readFileSync(iidfile, "utf8").trim();
   } finally {
@@ -134,39 +136,99 @@ const buildTheImage = async (image: ImageUnderTest): Promise<string> => {
   }
 };
 
-export const readTheImage = async (
-  image: ImageUnderTest,
-  container: ContainerRun,
-): Promise<string> => {
+interface ImageToRun {
+  readonly id: string;
+  readonly builtHere: boolean;
+}
+
+const theImageToRun = async (image: ImageUnderTest): Promise<ImageToRun> => {
   if (!dockerAnswers) {
     throw new Error(
       "no Docker daemon answered, so the image cannot be read: on CI these tests fail rather than skip, because build.yml gates the image push on this workflow",
     );
   }
   const supplied = (process.env[IMAGE_ID_VARIABLE] ?? "").trim();
+  if (supplied !== "") return { id: supplied, builtHere: false };
+  return { id: await buildTheImage(image), builtHere: true };
+};
 
-  const builtHere = supplied === "" ? await buildTheImage(image) : undefined;
-  const environment = container.environment ?? {};
-  try {
-    const { stdout } = await run(
-      "docker",
-      [
-        "run",
-        "--rm",
-        ...Object.keys(environment).flatMap((name) => ["--env", name]),
-        builtHere ?? supplied,
-        ...container.command,
-      ],
-      { timeout: CONTAINER_ALLOWANCE, env: { ...process.env, ...environment } },
+const discardIfBuiltHere = async (image: ImageToRun): Promise<void> => {
+  if (image.builtHere) {
+    // An image left behind costs disk alone, and the next build reuses its layers.
+    await run("docker", ["rmi", "--force", image.id], { timeout: CONTAINER_ALLOWANCE }).catch(
+      () => undefined,
     );
-    return stdout;
-  } finally {
-    if (builtHere !== undefined) {
-      await run("docker", ["rmi", "--force", builtHere], { timeout: CONTAINER_ALLOWANCE }).catch(
-        () => undefined,
-      );
-    }
   }
+};
+
+type Environment = Readonly<Record<string, string>>;
+
+// Names on the command line and values through the client's environment, so no value is
+// in the argv a process listing shows.
+const docker = async (
+  subcommand: "run" | "exec",
+  argv: readonly string[],
+  environment: Environment = {},
+): Promise<string> => {
+  const { stdout } = await run(
+    "docker",
+    [subcommand, ...Object.keys(environment).flatMap((name) => ["--env", name]), ...argv],
+    {
+      timeout: CONTAINER_ALLOWANCE,
+      env: { ...process.env, ...environment },
+      maxBuffer: OUTPUT_CEILING_BYTES,
+    },
+  );
+  return stdout;
+};
+
+export const readTheImage = async (
+  image: ImageUnderTest,
+  container: ContainerRun,
+): Promise<string> => {
+  const toRun = await theImageToRun(image);
+  try {
+    return await docker("run", ["--rm", toRun.id, ...container.command], container.environment);
+  } finally {
+    await discardIfBuiltHere(toRun);
+  }
+};
+
+export interface StartedContainer {
+  readonly exec: (command: readonly string[], environment?: Environment) => Promise<string>;
+  readonly logs: () => Promise<string>;
+  readonly stop: () => Promise<void>;
+}
+
+export const startTheImage = async (
+  image: ImageUnderTest,
+  environment: Environment,
+): Promise<StartedContainer> => {
+  const toRun = await theImageToRun(image);
+  const started = await docker("run", ["--detach", toRun.id], environment).catch(
+    async (error: unknown) => {
+      await discardIfBuiltHere(toRun);
+      throw error;
+    },
+  );
+  const container = started.trim();
+  return {
+    exec: (command, execEnvironment) => docker("exec", [container, ...command], execEnvironment),
+    logs: async () => {
+      const { stdout, stderr } = await run("docker", ["logs", container], {
+        timeout: CONTAINER_ALLOWANCE,
+        maxBuffer: OUTPUT_CEILING_BYTES,
+      });
+      return stdout + stderr;
+    },
+    stop: async () => {
+      try {
+        await run("docker", ["rm", "--force", container], { timeout: CONTAINER_ALLOWANCE });
+      } finally {
+        await discardIfBuiltHere(toRun);
+      }
+    },
+  };
 };
 
 export const workflowStepSchema = z.object({
