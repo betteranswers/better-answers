@@ -66,13 +66,16 @@ throwaway git repository and interrupts it mid-run; `docs/agents/mutation-triage
 where the method that uses it is written.
 
 `src/mutation-summary.ts` is the mutation run's job summary behind
-`scripts/mutation-summary.mjs` (`--leg … --report … [--baseline …]`), which
+`scripts/mutation-summary.mjs` (`--leg … --report … [--baseline …] [--checkpoint …]`), which
 `.github/workflows/mutation.yml` appends to each leg's summary: the score, the mutants that
 survive in this run's report and did not in the previous run's — matched by the mutated text
 rather than the line number, so a file that gained lines above a survivor does not report it
 as new — and the rows the runner never tested, named as a runner fault rather than counted
-as survivors. A first run says "no baseline"; the script exits zero whatever the
-reports hold, so the summary never gates. Its suite asserts the prose a reader sees, line by
+as survivors. A first run says "no baseline". The script exits zero whatever the score, so
+the summary never gates on one; it exits one, naming a **runner fault** first in the summary
+and on stderr, when a mutant ran no test or the leg killed none, because then no verdict in
+the report means anything. A leg cut short at its ceiling writes no report, so the fault is
+read from the checkpoint it left instead. Its suite asserts the prose a reader sees, line by
 line, and runs the script over files.
 
 `src/land.ts` is the landing command behind `scripts/land.mjs` (`pnpm land --message "…"`): the

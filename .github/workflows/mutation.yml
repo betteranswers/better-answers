@@ -88,11 +88,13 @@ jobs:
       - name: mutation
         working-directory: ${{ matrix.path }}
         run: exec node_modules/.bin/stryker run ${{ inputs.force && '--force' || '' }}
+      # Red when the runner ran no test for a mutant or killed none: a broken harness, never a score.
       - name: score and new survivors to the job summary
         if: always()
         run: |
           node scripts/mutation-summary.mjs --leg ${{ matrix.name }} \
             --report ${{ matrix.path }}/reports/mutation/mutation.json \
+            --checkpoint ${{ matrix.path }}/reports/mutation/stryker-incremental.json \
             --baseline ${{ matrix.path }}/reports/mutation/baseline.json >> "$GITHUB_STEP_SUMMARY"
       # The checkpoint rather than the report: a cancelled leg writes only the checkpoint.
       - name: this run's mutant results, whether or not it finished

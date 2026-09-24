@@ -73,7 +73,7 @@ describe("the mutation summary (T-090)", () => {
       mutant("StringLiteral", '""', OTHER, "Survived", 1),
     ]);
 
-    expect(mutationSummary("api", current, baseline)).toBe(
+    expect(mutationSummary("api", current, baseline).summary).toBe(
       [
         "### api mutation score: 33.3% (1/3 mutants killed)",
         "### api new survivors: 1",
@@ -92,7 +92,7 @@ describe("the mutation summary (T-090)", () => {
       mutant("StringLiteral", '""', OTHER, "NoCoverage"),
     ]);
 
-    expect(mutationSummary("core", both, both)).toBe(
+    expect(mutationSummary("core", both, both).summary).toBe(
       [
         "### core mutation score: 33.3% (1/3 mutants killed)",
         "### core new survivors: none",
@@ -108,7 +108,7 @@ describe("the mutation summary (T-090)", () => {
       mutant("StringLiteral", '""', LABEL, "Survived", 1),
     ]);
 
-    expect(mutationSummary("api", current, undefined)).toBe(
+    expect(mutationSummary("api", current, undefined).summary).toBe(
       [
         "### api mutation score: 50% (1/2 mutants killed)",
         "### api new survivors: no baseline — nothing was restored to compare against, so this run's report is the next run's baseline",
@@ -128,7 +128,9 @@ describe("the mutation summary (T-090)", () => {
       mutant("StringLiteral", '""', FIRST_USER, "Killed", 1),
     ]);
 
-    expect(mutationSummary("api", current, baseline)).toContain("### api new survivors: none\n");
+    expect(mutationSummary("api", current, baseline).summary).toContain(
+      "### api new survivors: none\n",
+    );
   });
 
   it("matches a mutant by its text when the file gained lines above it", () => {
@@ -141,7 +143,7 @@ describe("the mutation summary (T-090)", () => {
       mutant("StringLiteral", '""', shifted(LABEL), "Survived", 1),
     ]);
 
-    const summary = mutationSummary("api", current, baseline);
+    const summary = mutationSummary("api", current, baseline).summary;
 
     expect(summary).toContain("### api new survivors: 1\n");
     expect(summary).toContain("- `src/answer.ts:2` — ArithmeticOperator — `n - 1`\n");
@@ -155,7 +157,7 @@ describe("the mutation summary (T-090)", () => {
       mutant("StringLiteral", '""', LABEL, "NoCoverage"),
     ]);
 
-    expect(mutationSummary("api", current, baseline)).toContain(
+    expect(mutationSummary("api", current, baseline).summary).toContain(
       '- `src/answer.ts:2` — StringLiteral — `""` (not in the baseline)\n',
     );
   });
@@ -170,14 +172,75 @@ describe("the mutation summary (T-090)", () => {
       mutant("StringLiteral", '""', OTHER, "Survived", 3),
     ]);
 
-    expect(mutationSummary("core", current, baseline)).toBe(
+    expect(mutationSummary("core", current, baseline).summary).toBe(
       [
+        "### core runner fault: 1 of its 2 covered mutants ran no test — no verdict in this report can be trusted, so the leg fails until the runner is fixed and a run with `force` tests every mutant again",
         "### core mutation score: 0% (0/2 mutants killed)",
         "### core new survivors: 1",
         "Survived or uncovered here, and not so in the previous run's report. Matched by the mutated text, not by line number; two identical spans in one file mutated the same way are matched by their order in the file.",
         '- `src/answer.ts:3` — StringLiteral — `""` (no verdict in the baseline)',
-        "### core mutants that ran no test: 1 — the runner resolved no test file for them, which is a runner fault to fix (the vitest-runner patch under `patches/`), never a survivor to triage",
+        "### core mutants that ran no test: 1 — the runner ran none of the tests that cover them, which is a runner fault to fix (the vitest-runner patch under `patches/`), never a survivor to triage",
         '- `src/answer.ts:2` — StringLiteral — `""`',
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("names a leg that ran no test for one mutant a runner fault, however many it killed", () => {
+    const current = report(SOURCE, [
+      mutant("ArithmeticOperator", "n - 1", PLUS, "Killed", 4),
+      mutant("StringLiteral", '""', LABEL, "Timeout", 2),
+      mutant("StringLiteral", '""', OTHER, "Survived", 0),
+    ]);
+
+    const { summary, fault } = mutationSummary("api", current, undefined);
+
+    expect(fault).toBe(
+      "api runner fault: 1 of its 3 covered mutants ran no test — no verdict in this report can be trusted, so the leg fails until the runner is fixed and a run with `force` tests every mutant again",
+    );
+    expect(summary.startsWith(`### ${fault ?? ""}\n### api mutation score: 66.7%`)).toBe(true);
+  });
+
+  it("names a leg that killed none of its mutants a runner fault, not a low score", () => {
+    const current = report(SOURCE, [
+      mutant("ArithmeticOperator", "n - 1", PLUS, "Survived", 2),
+      mutant("StringLiteral", '""', LABEL, "Survived", 1),
+      mutant("StringLiteral", '""', OTHER, "NoCoverage"),
+    ]);
+
+    expect(mutationSummary("api", current, undefined).summary).toBe(
+      [
+        "### api runner fault: it killed none of its 3 mutants — no verdict in this report can be trusted, so the leg fails until the runner is fixed and a run with `force` tests every mutant again",
+        "### api mutation score: 0% (0/3 mutants killed)",
+        "### api new survivors: no baseline — nothing was restored to compare against, so this run's report is the next run's baseline",
+        "### api mutants that ran no test: none",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("names no runner fault for a leg that killed one mutant and ran a test for every other", () => {
+    const current = report(SOURCE, [
+      mutant("ArithmeticOperator", "n - 1", PLUS, "Timeout", 1),
+      mutant("StringLiteral", '""', LABEL, "Survived", 1),
+      mutant("StringLiteral", '""', OTHER, "NoCoverage"),
+    ]);
+
+    const { summary, fault } = mutationSummary("core", current, undefined);
+
+    expect(fault).toBeUndefined();
+    expect(summary).not.toContain("runner fault");
+  });
+
+  it("names no runner fault for a leg with no mutants at all", () => {
+    const { summary, fault } = mutationSummary("core", report(SOURCE, []), undefined);
+
+    expect(fault).toBeUndefined();
+    expect(summary).toBe(
+      [
+        "### core mutation score: no mutants",
+        "### core new survivors: no baseline — nothing was restored to compare against, so this run's report is the next run's baseline",
+        "### core mutants that ran no test: none",
         "",
       ].join("\n"),
     );
@@ -187,7 +250,7 @@ describe("the mutation summary (T-090)", () => {
     const baseline = report(SOURCE, [mutant("StringLiteral", '""', LABEL, "Ignored")]);
     const current = report(SOURCE, [mutant("StringLiteral", '""', LABEL, "Survived", 1)]);
 
-    expect(mutationSummary("api", current, baseline)).toContain(
+    expect(mutationSummary("api", current, baseline).summary).toContain(
       '- `src/answer.ts:2` — StringLiteral — `""` (no verdict in the baseline)\n',
     );
   });
@@ -197,10 +260,10 @@ describe("the mutation summary (T-090)", () => {
       mutant("ArrowFunction", "() => {\n  return undefined;\n}", PLUS, "Survived", 1),
     ]);
 
-    expect(mutationSummary("api", current, undefined)).toContain(
+    expect(mutationSummary("api", current, undefined).summary).toContain(
       "### api mutation score: 0% (0/1 mutants killed)",
     );
-    expect(mutationSummary("api", current, report(SOURCE, []))).toContain(
+    expect(mutationSummary("api", current, report(SOURCE, [])).summary).toContain(
       "- `src/answer.ts:1` — ArrowFunction — `() => { return undefined; }` (not in the baseline)\n",
     );
   });
@@ -268,13 +331,96 @@ describe("the mutation summary script over files (T-090)", () => {
     writeFileSync(halfWritten, '{"files": {');
 
     expect(
-      mutationSummaryFromArgv(["--leg", "api", "--report", reportFile, "--baseline", halfWritten]),
+      mutationSummaryFromArgv(["--leg", "api", "--report", reportFile, "--baseline", halfWritten])
+        .summary,
     ).toContain("### api new survivors: no baseline — ");
   });
 
   it("refuses a command line without a leg or a report", () => {
     expect(() => mutationSummaryFromArgv(["--report", reportFile])).toThrow(
-      "usage: mutation-summary --leg <name> --report <path> [--baseline <path>]",
+      "usage: mutation-summary --leg <name> --report <path> [--baseline <path>] [--checkpoint <path>]",
     );
+  });
+});
+
+describe("a leg with a mutant that ran no test, or with no kill, fails and says why (T-372)", () => {
+  const untestedFile = path.join(scratch, "untested.json");
+  writeFileSync(
+    untestedFile,
+    JSON.stringify(
+      report(SOURCE, [
+        mutant("ArithmeticOperator", "n - 1", PLUS, "Survived", 0),
+        mutant("StringLiteral", '""', LABEL, "Survived", 0),
+        mutant("StringLiteral", '""', OTHER, "NoCoverage"),
+      ]),
+    ),
+  );
+  const FAULT =
+    "core runner fault: 2 of its 2 covered mutants ran no test — no verdict in this report can be trusted, so the leg fails until the runner is fixed and a run with `force` tests every mutant again";
+
+  it("exits non-zero, the summary and the error both naming the fault", () => {
+    const result = run("--leg", "core", "--report", untestedFile);
+
+    expect(result.status).toBe(1);
+    expect(result.stdout.startsWith(`### ${FAULT}\n### core mutation score: 0% (0/3`)).toBe(true);
+    expect(result.stderr).toBe(`${FAULT}\n`);
+  });
+
+  it("reads the checkpoint when the run wrote no report, as a leg cut short at its ceiling does", () => {
+    const result = run(
+      "--leg",
+      "core",
+      "--report",
+      path.join(scratch, "absent.json"),
+      "--checkpoint",
+      untestedFile,
+    );
+
+    const fromCheckpoint = FAULT.replace(
+      "ran no test —",
+      "ran no test, read from the checkpoint since the run wrote no report —",
+    );
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe(`### ${fromCheckpoint}\n### core mutation score: no report\n`);
+    expect(result.stderr).toBe(`${fromCheckpoint}\n`);
+  });
+
+  it("reads the report and not the checkpoint when the run wrote one", () => {
+    const testedFile = path.join(scratch, "tested.json");
+    writeFileSync(
+      testedFile,
+      JSON.stringify(
+        report(SOURCE, [
+          mutant("ArithmeticOperator", "n - 1", PLUS, "Killed", 1),
+          mutant("StringLiteral", '""', LABEL, "Survived", 1),
+        ]),
+      ),
+    );
+
+    const tested = mutationSummaryFromArgv([
+      "--leg",
+      "core",
+      "--report",
+      testedFile,
+      "--checkpoint",
+      untestedFile,
+    ]);
+
+    expect(tested.fault).toBeUndefined();
+    expect(tested.summary).toContain("### core mutation score: 50% (1/2 mutants killed)\n");
+  });
+
+  it("passes a leg with no report and no checkpoint, which has nothing to read", () => {
+    const result = run(
+      "--leg",
+      "api",
+      "--report",
+      path.join(scratch, "absent.json"),
+      "--checkpoint",
+      path.join(scratch, "absent.json"),
+    );
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toBe("### api mutation score: no report\n");
   });
 });
