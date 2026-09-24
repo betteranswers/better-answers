@@ -58,7 +58,6 @@ export const account = pgTable(
   "account",
   {
     id: text("id").primaryKey(),
-    issuer: text("issuer").notNull(),
     accountId: text("account_id").notNull(),
     providerId: text("provider_id").notNull(),
     userId: text("user_id")
@@ -76,7 +75,8 @@ export const account = pgTable(
     updatedAt: stamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
-    uniqueIndex("account_issuer_account_id_uidx").on(table.issuer, table.accountId),
+    // Better Auth declares no key here yet refuses a lookup that matches two rows.
+    uniqueIndex("account_provider_id_account_id_uidx").on(table.providerId, table.accountId),
     index("account_user_id_idx").on(table.userId),
   ],
 );

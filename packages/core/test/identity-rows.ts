@@ -22,8 +22,8 @@ export const identityRowsFor = async (
       [sessionId, `token-${sessionId}`, person.userId],
     );
     await superuser.query(
-      `INSERT INTO account (id, issuer, account_id, provider_id, user_id, created_at, updated_at)
-       VALUES ($1, 'https://accounts.example.invalid', $2, 'google', $3, now(), now())`,
+      `INSERT INTO account (id, account_id, provider_id, user_id, created_at, updated_at)
+       VALUES ($1, $2, 'google', $3, now(), now())`,
       [accountId, `google-${accountId}`, person.userId],
     );
   } finally {

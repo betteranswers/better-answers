@@ -40,6 +40,8 @@ export type TestData = {
 
   user(overrides?: Partial<InsertInput<"user">>): Promise<Row<"user">>;
 
+  account(overrides?: Partial<InsertInput<"account">>): Promise<Row<"account">>;
+
   member(overrides?: Partial<InsertInput<"member">>): Promise<Row<"member">>;
 
   invitation(overrides?: Partial<InsertInput<"invitation">>): Promise<Row<"invitation">>;
@@ -203,6 +205,18 @@ export const testData = (client: pg.PoolClient): TestData => {
       name: "Test person",
       email: `${id.toLowerCase()}@example.invalid`,
       ...overrides,
+    });
+  };
+
+  const account: TestData["account"] = async (overrides = {}) => {
+    const userId = overrides.userId ?? (await user()).id;
+    const id = overrides.id ?? ulid();
+    return insertRow(client, "account", {
+      id,
+      accountId: userId,
+      providerId: "credential",
+      ...overrides,
+      userId,
     });
   };
 
@@ -819,6 +833,7 @@ export const testData = (client: pg.PoolClient): TestData => {
   return {
     workspace,
     user,
+    account,
     member,
     invitation,
     group,
