@@ -2,6 +2,7 @@ import { rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { readUnder, repositoryRoot, treeFiles } from "./tree-walk.ts";
 
@@ -43,18 +44,12 @@ const quotedSpansOf = (text: string): readonly (readonly [number, number])[] => 
 const insideAString = (text: string, at: number): boolean =>
   quotedSpansOf(text).some(([from, to]) => from < at && at < to);
 
-// Each of these prints the rule it holds in the message a reader hits, so the reader reaches
-// the rule without asking.
-const GATES_PRINTING_A_TAG: readonly string[] = [
-  "apps/worker/tests/conftest.py",
-  "packages/devtools/lint-rules/rules/act-admits-before-await.ts",
-  "packages/devtools/lint-rules/rules/comment-only-the-why.ts",
-  "packages/devtools/lint-rules/rules/import-direction.ts",
-  "packages/devtools/lint-rules/rules/mcp-entry-no-workspace-argument.ts",
-  "packages/devtools/python/comment_gate.py",
-  "packages/devtools/src/comment-density.ts",
-  "packages/devtools/src/insert-scan.ts",
-];
+const gatesList = z.object({ gates: z.array(z.string()) });
+
+/** The list the string check walks past, so a gate the tag walk exempts is the one it names. */
+const GATES_PRINTING_A_TAG: readonly string[] = gatesList.parse(
+  JSON.parse(read("packages/devtools/gates-printing-a-tag.json")),
+).gates;
 
 type Citation = {
   readonly file: string;

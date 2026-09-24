@@ -329,8 +329,4 @@ describe("the root manifest names each config root as a unit of its own", () => 
   ])("measures %s apart from the workspaces beside it", (named) => {
     expect(rootScripts()["comment-density"] ?? "").toContain(named);
   });
-
-  it("names the root scripts in the TypeScript comment gate's own command", () => {
-    expect((rootScripts()["comment-gate:ts"] ?? "").split(/\s+/)).toContain("scripts");
-  });
 });

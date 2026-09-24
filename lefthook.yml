@@ -23,7 +23,7 @@ pre-commit:
 
     oxlint:
       glob: "*.{ts,tsx}"
-      run: pnpm exec oxlint {staged_files}
+      run: pnpm exec oxlint --report-unused-disable-directives-severity=error {staged_files}
 
     ruff-format:
       glob: "*.py"

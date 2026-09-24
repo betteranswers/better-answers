@@ -112,33 +112,53 @@ both ways and over the committed tree.
 
 ## The comment gate — three parts, all in root `check`
 
-The comment rule's two conditions — a comment block is 25 words at most and cites no ticket id,
-date, rule tag or ADR number — held by a rule for TypeScript, a check for the rest and a density
-ceiling over each unit. The check reads a file by a syntax table keyed on its extension: `#` for
-Python, YAML, shell and TOML, `--` for SQL, and docstrings on top for Python alone. Directives
-and notices are exempt by their opening text everywhere, two of the migrations' own by their
-whole text, and a directive is dropped before blocks are grouped so it cannot lend a paragraph
-its exemption. What a language calls code is code: a string in any of them, and a dollar-quoted
-body, an escaped string or a quoted identifier in SQL. Each part carries the rule in the message
-it prints, and each is proven through the runner above, both ways.
+The comment rules are held in three places. `.oxlintrc.json` holds them for TypeScript, a
+Python check holds them for `.py` files, and a density ceiling holds each unit. Each part prints
+the rule it holds in its message. Each is proved through the runner above, both ways.
 
-The citation half also reads the strings in source, because a usage line, a refusal message or
-a log line sends its reader somewhere just as a comment does, and the comment walk never saw
-one. A string with no space in it is a value — an identifier, a path, a key, a version — and
-goes past; the word ceiling is a comment's alone, because a usage text is long by design. A
-test is exempt, and so is a gate that prints its own rule tag in a failure message: those files
-are named in `gates-printing-a-tag.json` beside this README, which the oxlint rule reads through
-`src/tag-printing-gates.ts` and the Python check reads directly, so a new gate is one edit.
+The config holds every comment rule at error, so `pnpm lint`, the pre-commit hook and an
+editor all show a breach. Four are stock oxlint rules:
+
+- `typescript/ban-ts-comment` and `typescript/prefer-ts-expect-error` refuse `@ts-ignore` and a
+  `@ts-expect-error` with no reason.
+- `eslint/no-warning-comments` refuses a TODO, FIXME or XXX.
+- `unicorn/no-abusive-eslint-disable` refuses a disable that names no rule.
+
+No config key reports a disable that suppresses nothing, so the `lint` script passes
+`--report-unused-disable-directives-severity=error`. The pre-commit hook and each workspace's
+`lint` pass it too.
+
+Two rules are this plugin's own. `comment-only-the-why` holds the 25-word cap and the citation
+ban. A `/** */` block on an exported function under `packages/core/src` or `packages/schema/src` may
+run to 50 words. A disable gives its reason on the same line, and a directive's reason counts against
+the cap. A notice is exempt by its opening text. A directive is dropped before blocks are
+grouped, so it cannot lend a paragraph its exemption.
+
+`string-cites-nothing` reads the strings in source. A usage line, a refusal message or a log
+line sends its reader somewhere just as a comment does. A string with no space in it is a value
+— an identifier, a path, a key, a version — and goes past. A string has no word cap, because a
+usage text is long by design. A test is exempt, and so is a gate that prints its own rule tag in
+a failure message. Those files are named in `gates-printing-a-tag.json` beside this README. The
+string rule reads it through `src/tag-printing-gates.ts`, and the Python check and the tag test
+read it directly, so a new gate is one edit.
+
+The Python check reads `.py` files and nothing else: its comments, grouped into blocks of
+touching lines, and its docstrings. A docstring on a public module-level function under
+`apps/worker/src/` may run to 50 words, and every other block to 25. A directive or a notice is
+dropped by its opening text before blocks are grouped, so it cannot lend a paragraph its
+exemption. A suppression's reason is a block of its own. It is prose and counts, whether it
+follows a second `#` or the codes of a `noqa` or a `type: ignore` directly. A docstring is exempt only when it opens with a
+notice. A comment in YAML, shell, TOML or SQL is the density ceiling's alone.
 
 | Part | What runs it | Its suite |
 | --- | --- | --- |
-| `lint-rules/rules/comment-only-the-why.ts`, under `lint-rules/comment-gate.oxlintrc.json` | `pnpm comment-gate:ts` | `test/comment-only-the-why.test.ts` |
+| `.oxlintrc.json`, with `lint-rules/rules/comment-only-the-why.ts` and `lint-rules/rules/string-cites-nothing.ts` | `pnpm lint` | `test/comment-lint.test.ts`, `test/comment-only-the-why.test.ts`, `test/string-cites-nothing.test.ts` |
 | `python/comment_gate.py` | `pnpm comment-gate:python` | `test/comment-gate-python.test.ts` |
 | `src/comment-density.ts`, behind `scripts/comment-density.mjs` | `pnpm comment-density` | `test/comment-density.test.ts` |
 
-All three are root `check` steps, ahead of the tiers, and landed green with no baseline. The
-lint rule sits in a config of its own because oxlint switches a plugin rule on from a config's
-`rules` block and from nowhere on the command line — `--deny` does not reach one.
+All three are root `check` steps, ahead of the tiers, and landed green with no baseline.
+`test/comment-lint.test.ts` runs each comment rule at the setting the root config holds it, with
+the `lint` script's flags: one fixture refused and one accepted per rule.
 
 The ceiling measures two kinds of unit. A positional argument is a root of workspaces: each
 directory under it carrying a `package.json` or a `pyproject.toml` is one workspace, measured
@@ -149,14 +169,18 @@ SQL and JavaScript. The longest path wins where a directory sits inside a worksp
 `--directory packages/schema/migrations` gives the SQL a number of its own rather than one the
 TypeScript eight times its size decides. The report names a directory the way it names a
 workspace, and a named directory the counter read no file in is refused, never called clean.
-Root `check` names the two workspace roots and `packages/schema/migrations`; each config root
-is wired as its strip lands.
+Root `check` names the two workspace roots, `packages/schema/migrations`, `.github`, `deploy`,
+`.claude/hooks`, `scripts`, and the root tool configuration as one named unit; the ceiling is the
+only gate on a config file's comments. A config file inside a workspace and outside every named
+directory is measured by nothing: `apps/worker/pyproject.toml` and
+`packages/devtools/python/ruff.toml`.
 
-`.claude/hooks/comment-gate-hook.sh` runs the same two parts at write time over the file an
-edit touched, and hands their message straight back; its suite holds its extension list against
-the check's syntax table both ways. The check names one path it does not judge, proved by a
-case in its suite: `apps/worker/pyproject.toml`, which no root of the config-tree strip covers.
-Skills are walked past wherever they sit, being prose no comment gate reads.
+`.claude/hooks/comment-gate-hook.sh` runs the lint and the Python check at write time over the
+file an edit touched, and hands their message straight back. For a TypeScript file it runs the
+root config with the `lint` script's flag, anywhere in the tree the root run walks. It refuses the
+edit only on a comment rule's line; another rule's finding is left to `check`. Its suite checks
+that the hook hands the Python check only `.py` files, the one type it reads. Skills are walked
+past wherever they sit, being prose no comment gate reads.
 
 The counter is **cloc**, pinned at `2.6.0-cloc`, which carries upstream cloc `2.06` — the
 number a behaviour is compared against. **Read the pin off the registry's `latest` tag and
@@ -172,18 +196,18 @@ pnpm or uv. cloc agrees with scc where the choice mattered: a Python docstring i
 is passed because cloc counts a file with an identical twin once, which would quietly take an
 arm's lines away.
 
-The rule's fix deletes the offending block. The suite proves it by spawning oxlint `--fix` over
+`comment-only-the-why`'s fix deletes the offending block. The suite proves it by spawning oxlint `--fix` over
 a tree it wrote rather than through the runner, which answers with a report and not a rewrite;
 a linter that did not run leaves the text as it was, and both halves of that assertion fail.
 It spawns the binary the runner would, through the runner's own `executableOf`, so the two
 resolutions cannot drift.
 
-**The word limit is written twice, once per language** — the citation patterns are not, since
-both tiers compile `contracts/citation/cases.json`. The limit is two implementations of one
-rule, and nothing either tier could import at run time binds them, so what holds them together
-is the pair of suites: both run the same table — the same over-the-ceiling fixture, the same
-five citations, the same directive cases — so a limit that moved in one language and not the
-other is a red suite rather than a quiet divergence.
+**The two word limits, 25 and 50, are written twice, once per language** — the citation
+patterns are not, since both tiers compile `contracts/citation/cases.json`. Each limit is two
+implementations of one rule, and nothing either tier could import at run time binds them, so
+what holds them together is the pair of suites: both run the same table — the same
+over-the-ceiling fixture, the same five citations, the same directive cases — so a limit that
+moved in one language and not the other is a red suite rather than a quiet divergence.
 
 The Python check runs under bare `python3` and imports only the standard library, so a fresh
 clone can run it before `uv sync`. ruff reads it under `python/ruff.toml` and mypy under

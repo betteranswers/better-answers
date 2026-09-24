@@ -28,18 +28,26 @@ ROOT="$(cd "$ROOT" && pwd -P)"
 RELATIVE="${FILE#"$ROOT"/}"
 [ "$RELATIVE" != "$FILE" ] || exit 0
 
-# Every root root `check` gates and no other: one short is a rule learnt a pull request late,
-# one over refuses an edit CI accepts.
-case "$RELATIVE" in
-apps/* | packages/* | scripts/* | .claude/hooks/* | .github/* | deploy/*) ;;
-cubic.yaml | jscpd.config.mjs | knip.config.ts | lefthook.yml | pnpm-workspace.yaml) ;;
-*) exit 0 ;;
+# Root `lint` reads every TypeScript file. The Python gate reads only these roots, so the hook
+# reads the same ones.
+case "$FILE" in
+*.ts | *.tsx | *.mts | *.cts | *.js | *.jsx | *.mjs | *.cjs) ;;
+*)
+  case "$RELATIVE" in
+  apps/* | packages/* | scripts/* | .claude/hooks/* | .github/* | deploy/*) ;;
+  cubic.yaml | lefthook.yml | pnpm-workspace.yaml) ;;
+  *) exit 0 ;;
+  esac
+  ;;
 esac
 
+# The root config's ignore patterns: oxlint skips them on a walk and lints a file named to it.
 case "/$RELATIVE" in
-*/node_modules/* | */dist/* | */coverage/* | */reports/* | */.venv/*) exit 0 ;;
-/packages/devtools/lifts/anti-slop/*) exit 0 ;;
+*/node_modules/* | */dist/* | */coverage/* | */reports/* | */.venv/* | */stryker-setup-*.js) exit 0 ;;
+/packages/devtools/lifts/anti-slop/* | /.claude/worktrees/* | /.claude/skills/*) exit 0 ;;
 esac
+
+COMMENT_RULES='better-answers\((comment-only-the-why|string-cites-nothing)\)|typescript\((ban-ts-comment|prefer-ts-expect-error)\)|eslint\(no-warning-comments\)|unicorn\(no-abusive-eslint-disable\)|Unused (eslint|oxlint)-disable directive'
 
 case "$FILE" in
 *.ts | *.tsx | *.mts | *.cts | *.js | *.jsx | *.mjs | *.cjs)
@@ -48,11 +56,11 @@ case "$FILE" in
     echo "comment-gate-hook: $TOOL is not installed, so $RELATIVE went unchecked" >&2
     exit 0
   fi
-  FOUND="$(cd "$ROOT" && "$TOOL" --config packages/devtools/lint-rules/comment-gate.oxlintrc.json "$RELATIVE" 2>&1)"
+  OUTPUT="$(cd "$ROOT" && "$TOOL" --report-unused-disable-directives-severity=error --format=unix "$RELATIVE" 2>&1)"
   STATUS=$?
-  # oxlint answers 1 for a parse error and an unloadable config too, so only the rule's own
-  # name means a comment.
-  NAMES="better-answers(comment-only-the-why)"
+  # The root config holds every rule, and a parse error answers 1 too, so only a comment rule
+  # refuses the edit.
+  FOUND="$(printf '%s\n' "$OUTPUT" | grep -E "$COMMENT_RULES" || true)"
   ;;
 *.py)
   if ! command -v python3 >/dev/null 2>&1; then
@@ -61,19 +69,17 @@ case "$FILE" in
   fi
   FOUND="$(cd "$ROOT" && python3 packages/devtools/python/comment_gate.py "$RELATIVE" 2>&1)"
   STATUS=$?
-  NAMES=""
   ;;
 *) exit 0 ;;
 esac
 
 [ "$STATUS" -eq 0 ] && exit 0
 
-# A 1 naming no rule is the gate failing, not the comment, and refusing that edit leaves the
+# A 1 naming no comment is the gate failing, not the comment, and refusing that edit leaves the
 # agent no rule to read.
-if [ "$STATUS" -ne 1 ] || [ -z "$FOUND" ] ||
-  { [ -n "$NAMES" ] && [ "${FOUND#*"$NAMES"}" = "$FOUND" ]; }; then
+if [ "$STATUS" -ne 1 ] || [ -z "$FOUND" ]; then
   echo "comment-gate-hook: the comment gate exited $STATUS over $RELATIVE without naming a comment" >&2
-  printf '%s\n' "$FOUND" >&2
+  printf '%s\n' "${OUTPUT:-$FOUND}" >&2
   exit 0
 fi
 

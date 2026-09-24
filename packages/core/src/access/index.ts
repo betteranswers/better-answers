@@ -59,7 +59,7 @@ const audienceIntersection = (audiences: readonly Audience[]): Audience | "nobod
   return distinct.length === 0 ? "nobody" : { audience: AUDIENCE_GROUPS, audienceGroups: distinct };
 };
 
-// oxlint-disable-next-line anti-slop/no-known-value-widening -- kinds are open (ADR 0026): a concept arrives with whatever folded kind its file carries, so the floor is looked up by any string and the open dictionary is the decision, not an omission.
+// oxlint-disable-next-line anti-slop/no-known-value-widening -- kinds are open: a concept carries whatever folded kind its file holds, so the floor is looked up by any string
 const KIND_FLOOR: Readonly<Record<string, Sensitivity>> = { Person: RESTRICTED };
 
 export type Derivation = {

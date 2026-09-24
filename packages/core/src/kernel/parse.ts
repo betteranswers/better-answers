@@ -52,7 +52,7 @@ const wordOf = (issue: z.core.$ZodIssue): IssueWord => {
 
 export const parse = <Schema extends z.ZodType>(
   schema: Schema,
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- this is the boundary the rule points at: a transport hands over whatever arrived and the schema is what narrows it, so a named type here would be a second parse nothing has done yet.
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- the boundary itself: a transport hands over whatever arrived and the schema narrows it, so a named type would claim a parse not yet done
   raw: unknown,
 ): Result<z.output<Schema>, Malformed> => {
   // `reportInput` is how a missing key is told from a wrong-typed one; the values it

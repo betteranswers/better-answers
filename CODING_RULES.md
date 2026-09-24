@@ -107,13 +107,17 @@ A workspace's `check` runs every step it has even after one fails, and reports t
 
 ### [COMMENT1] Comment only the why
 
-A comment gives a reason the code cannot: a constraint, a trade-off, a gotcha. It never says what the code does or did, or which ticket, decision or rule asked for it. A string a person reads cites nothing either, tests apart. Absent is the default; a file opens with code. A directive, a notice and a copy-detection fence sit outside.
+Say only what the code cannot: a constraint, a trade-off or a trap, in plain words, 25 at most. Absent is the default. Never restate the code, tell its history, or cite a ticket, date, ADR or rule tag; nor may a string a person reads, tests apart. A declaration's comment is `/** */`. An exported function in `packages/core`, `packages/schema` or the worker may carry a 50-word doc block saying what its signature cannot.
 
-Reviewer: nothing reads a comment's intent, so a restatement or a narration is a person's to remove.
+Reviewer: no tool reads a comment's intent.
 
 ### [COMMENT2] Write a rule tag in a rules file, a review finding or a gate's failure message
 
 Those three places and nowhere else, with no document exempt. A tag in source, a test, a document or a deploy file is a pointer a reader cannot follow and a citation nothing keeps true: write the rule in words where the reader meets it, or delete the sentence. `apps/api/tests/coding-rules-tags.test.ts` holds the rule over the two of the three that are files.
+
+### [COMMENT3] Give a directive its reason on the same line
+
+A directive names what it suppresses and gives its reason on the same line: `@ts-expect-error`, an oxlint or ESLint disable, `// Stryker disable`, `# noqa`, `# type: ignore`. The reason counts against the 25-word cap. `@ts-expect-error` is the only TypeScript suppression; `@ts-ignore` is refused. Write no TODO, FIXME or XXX comment: file the ticket instead.
 
 ## GLOSSARY
 
@@ -139,7 +143,7 @@ An `enum` does not compile here. A union of string literals says the same thing 
 
 ### [TYPES4] Never assert a type with `as`
 
-A type assertion is refused in source and test alike; `as const` is not one. Parse the value with zod where it enters, narrow it in control flow, or state the type at the declaration. A test feeding a value its type forbids says so with `@ts-expect-error`. One survives only for a library's declaration gap or a generic the compiler leaves open, the comment saying why it is sound beside the disable.
+A type assertion is refused in source and test alike; `as const` is not one. Parse the value with zod where it enters, narrow it in control flow, or state the type at the declaration. A test feeding a value its type forbids says so with `@ts-expect-error`. One survives only for a library's declaration gap or a generic the compiler leaves open, the disable's reason saying why it is sound.
 
 ### [TYPES5] Never mutate a parameter
 

@@ -53,9 +53,14 @@ SUPPRESSION = re.compile(
 MARKER = re.compile(r"(?:^|\s)#+")
 
 TOO_LONG = (
-    "{path}:{line}: this comment runs to {words} words; a comment gives a reason the "
-    "code cannot — a constraint, a trade-off, a gotcha — in {limit} at most "
+    "{path}:{line}: this comment runs to {words} words; a comment says only what the "
+    "code cannot — a constraint, a trade-off, a trap — in {limit} at most "
     "([COMMENT1]). Delete what the code already says."
+)
+
+REASON_TOO_LONG = (
+    "{path}:{line}: this directive's reason runs to {words} words, and a reason counts "
+    "against the comment cap of {limit} ([COMMENT3]). Say the constraint alone."
 )
 
 DOCSTRING_TOO_LONG = (
@@ -133,21 +138,33 @@ def _prose(written: str) -> str | None:
     return " ".join(reason for reason in reasons if reason)
 
 
+def _suppresses(written: str) -> bool:
+    return any(SUPPRESSION.match(part.strip()) for part in MARKER.split(written))
+
+
 def _blocks(lines: list[str], comments: Iterable[Comment]) -> list[Block]:
-    runs: list[tuple[int, list[str]]] = []
+    runs: list[tuple[int, list[str], str]] = []
     previous = -2
     for row, column, written in comments:
         text = _prose(written)
         if text is None:
             previous = -2
             continue
+        # A reason is held to its own directive, never to the comments around it.
+        if _suppresses(written):
+            runs.append((row, [text], REASON_TOO_LONG))
+            previous = -2
+            continue
         own_line = lines[row - 1][:column].strip() == ""
         if own_line and row == previous + 1:
             runs[-1][1].append(text)
         else:
-            runs.append((row, [text]))
+            runs.append((row, [text], TOO_LONG))
         previous = row if own_line else -2
-    return [Block(start, "\n".join(parts)) for start, parts in runs]
+    return [
+        Block(start, "\n".join(parts), WORD_LIMIT, template)
+        for start, parts, template in runs
+    ]
 
 
 def _python_comments(source: str) -> list[Comment]:
