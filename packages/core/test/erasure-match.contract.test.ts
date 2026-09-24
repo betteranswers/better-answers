@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -7,7 +9,12 @@ import {
   SUBJECT_NAME_WORDS_FLOOR,
 } from "@better-answers/schema";
 
-import { floorNotCleared, normalisedIdentifier } from "../src/erasure/index.ts";
+import {
+  erasureMatchesIn,
+  floorNotCleared,
+  normalisedIdentifier,
+  soughtIdentifiersOf,
+} from "../src/erasure/index.ts";
 import { contractFixture } from "./contract-fixture.ts";
 
 const fixtureSchema = z.object({
@@ -29,6 +36,14 @@ const fixtureSchema = z.object({
     rule: z.string().min(1),
     word_categories: z.array(z.string().length(1)).min(1),
     address_joiners: z.array(z.string().length(1)).min(1),
+  }),
+  digests: z.object({
+    rule: z.string().min(1),
+    folding: z.object({ lines: z.string().min(1), sha256: z.string().regex(/^[0-9a-f]{64}$/) }),
+    word_characters: z.object({
+      lines: z.string().min(1),
+      sha256: z.string().regex(/^[0-9a-f]{64}$/),
+    }),
   }),
   cases: z
     .array(
@@ -55,6 +70,12 @@ const fixture = contractFixture("erasure-match", fixtureSchema);
 const LAST_CODE_POINT = 0x10ffff;
 const SURROGATES = { from: 0xd800, to: 0xdfff };
 
+const everyCharacter = function* (): Generator<string> {
+  for (let point = 0; point <= LAST_CODE_POINT; point += 1) {
+    if (point < SURROGATES.from || point > SURROGATES.to) yield String.fromCodePoint(point);
+  }
+};
+
 describe("an identifier as the erasure-match agreement normalises it", () => {
   it("is normalised as every case of the agreement answers", () => {
     for (const { identifier, normalised, why } of fixture.normalisation.cases) {
@@ -63,14 +84,89 @@ describe("an identifier as the erasure-match agreement normalises it", () => {
   });
 
   it("treats as whitespace every code point the agreement lists and no other", () => {
-    const spaced: string[] = [];
-    for (let point = 0; point <= LAST_CODE_POINT; point += 1) {
-      if (point >= SURROGATES.from && point <= SURROGATES.to) continue;
-      const character = String.fromCodePoint(point);
-      if (normalisedIdentifier(`a${character}b`) === "a b") spaced.push(character);
-    }
+    const spaced = [...everyCharacter()].filter(
+      (character) => normalisedIdentifier(`a${character}b`) === "a b",
+    );
 
     expect(spaced.toSorted()).toEqual(fixture.normalisation.whitespace.toSorted());
+  });
+});
+
+const WHITESPACE = new Set(fixture.normalisation.whitespace);
+
+const charactersTheDigestsRead = function* (): Generator<string> {
+  for (const character of everyCharacter()) {
+    if (!WHITESPACE.has(character)) yield character;
+  }
+};
+
+const digestOf = (lines: Iterable<string>): string =>
+  createHash("sha256")
+    .update([...lines].join(""), "utf8")
+    .digest("hex");
+
+const hexOf = (text: string): string =>
+  Array.from(text, (character) =>
+    (character.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, "0"),
+  ).join(" ");
+
+const matchesOf = (kind: (typeof SUBJECT_IDENTIFIER_KINDS)[number], identifier: string) => {
+  const sought = soughtIdentifiersOf({ emails: [], names: [], other: [], [kind]: [identifier] });
+  return (text: string) => erasureMatchesIn(text, sought);
+};
+
+let theWordCharacters: ReadonlySet<string> | undefined;
+
+// Read once for the two tests that need it: a walk of every code point takes seconds.
+const wordCharacters = (): ReadonlySet<string> => {
+  if (theWordCharacters !== undefined) return theWordCharacters;
+  const ofABC = matchesOf("other", "abc");
+  theWordCharacters = new Set(
+    [...charactersTheDigestsRead()].filter((character) => ofABC(`abc${character}`).length === 0),
+  );
+  return theWordCharacters;
+};
+
+describe("an occurrence as the erasure-match agreement answers it", () => {
+  it("is found at every place every case of the agreement names, and at no other", () => {
+    for (const { kind, identifier, text, occurrences, why } of fixture.cases) {
+      const characters = Array.from(text);
+      const matches = matchesOf(kind, identifier)(text);
+      const found = matches.map(({ start, end }) => ({
+        start,
+        end,
+        reads: characters.slice(start, end).join(""),
+      }));
+
+      expect({ why, found }).toEqual({ why, found: occurrences });
+    }
+  });
+
+  it("folds every code point as the agreement's digest says Unicode 15.1 folds it", () => {
+    const lines = function* () {
+      for (const character of charactersTheDigestsRead()) {
+        const folded = normalisedIdentifier(character);
+        if (folded !== character) yield `${hexOf(character)} ${hexOf(folded)}\n`;
+      }
+    };
+
+    expect(digestOf(lines())).toBe(fixture.digests.folding.sha256);
+  });
+
+  it("is not bounded by every word character the agreement's digest names, and is by every other", () => {
+    const lines = [...wordCharacters()].map((character) => `${hexOf(character)}\n`);
+
+    expect(digestOf(lines)).toBe(fixture.digests.word_characters.sha256);
+  });
+
+  it("is not bounded, for an address, by every joiner the agreement lists before a word character, and is by every other", () => {
+    const ofTheAddress = matchesOf("emails", "ab@cd.ef");
+    const words = wordCharacters();
+    const joiners = [...charactersTheDigestsRead()].filter(
+      (character) => !words.has(character) && ofTheAddress(`ab@cd.ef${character}g`).length === 0,
+    );
+
+    expect(joiners.toSorted()).toEqual(fixture.boundary.address_joiners.toSorted());
   });
 });
 

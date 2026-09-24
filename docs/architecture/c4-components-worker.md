@@ -71,7 +71,7 @@ C4Component
 | --- | --- |
 | S0 | Landed — `redaction/`: the category descriptors, the recognisers over Presidio and GLiNER, the officer-block rule, pseudonyms, withholdings and written spans; the pytest harness asserting every fixture span back against the text by offset |
 | S1 | Landed — `KINDS`, `pipeline/`, the converter, the per-workspace pool, the Environment LRU with the LMDB size as a signal, `RUST_LOG=warn` bridged into one log shape, the cross-tier document test with the worker as a real process |
-| T-366 | The suppression is the workspace's since T-375, read for every document; since T-376 the seam withholds every exact, case-folded occurrence of its identifiers, detected or not, as an erasure match with no finding. Planned — the documents finder (T-377) |
+| T-366 | The suppression is the workspace's since T-375, read for every document; since T-376 the seam withholds every exact, case-folded occurrence of its identifiers, detected or not, as an erasure match with no finding. Core's documents finder has each document naming the subject re-indexed now (T-377) |
 | S4 | A connector per provider beside the converter, the estate-size probe, `MAX_CONCURRENT_RUNS=1` measured, citation repair on a gone document, what becomes of findings when a `content_hash` moves |
 | S7 | Extraction over the accepted plan and the ceiling, the template per document kind, conflicts raised never resolved |
 | S8 | *reserve* — the concept unit: the `concept-catch-up` kind, embedding on the fixed route with an `llm_call` per call |

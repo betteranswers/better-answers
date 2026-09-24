@@ -1,5 +1,7 @@
+import hashlib
 import json
 import sys
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any, cast
 
@@ -82,3 +84,41 @@ def test_an_occurrence_is_bounded_by_the_characters_the_agreement_names() -> Non
 
     assert sorted(WORD_CATEGORIES) == sorted(boundary["word_categories"])
     assert sorted(ADDRESS_JOINERS) == sorted(boundary["address_joiners"])
+
+
+def code_points_the_digests_read() -> Iterator[tuple[int, str]]:
+    whitespace = set(read_erasure_match()["normalisation"]["whitespace"])
+    surrogates = range(0xD800, 0xE000)
+    for point in range(sys.maxunicode + 1):
+        if point not in surrogates and chr(point) not in whitespace:
+            yield point, chr(point)
+
+
+def digest_of(lines: Iterable[str]) -> str:
+    return hashlib.sha256("".join(lines).encode("utf-8")).hexdigest()
+
+
+def hex_of(text: str) -> str:
+    return " ".join(f"{ord(character):04X}" for character in text)
+
+
+def test_every_code_point_folds_as_the_agreement_digests_it() -> None:
+    lines = (
+        f"{point:04X} {hex_of(normalised(character))}\n"
+        for point, character in code_points_the_digests_read()
+        if normalised(character) != character
+    )
+
+    assert digest_of(lines) == read_erasure_match()["digests"]["folding"]["sha256"]
+
+
+def test_every_digested_word_character_and_no_other_unbounds_an_identifier() -> None:
+    suppressing_abc = ({"other": ("abc",)},)
+    lines = (
+        f"{point:04X}\n"
+        for point, character in code_points_the_digests_read()
+        if not erasure_matches_in(f"abc{character}", suppressing_abc)
+    )
+    word_characters = read_erasure_match()["digests"]["word_characters"]
+
+    assert digest_of(lines) == word_characters["sha256"]
