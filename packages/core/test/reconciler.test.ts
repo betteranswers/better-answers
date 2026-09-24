@@ -33,7 +33,7 @@ import {
   fileAtCommit,
   removeRepository,
 } from "./bundle.ts";
-import { bindingHolding } from "./sourced-concept.ts";
+import { bindingHolding, publishedOnceIndexed } from "./sourced-concept.ts";
 import { readingAs } from "./suite-postgres.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
@@ -203,6 +203,14 @@ const conceptRow = async (workspaceId: string, iri: string) => {
   );
   return found.rows[0];
 };
+
+const sensitivitiesOf = async (workspaceId: string, iris: readonly string[]) => {
+  const rows = await Promise.all(iris.map((iri) => conceptRow(workspaceId, iri)));
+  return rows.map((row) => row?.["sensitivity"]);
+};
+
+const handbook = { resource: "/sources/handbook.pdf", locator: "p.1" };
+const minutes = { resource: "/sources/board-minutes.pdf", locator: "p.2" };
 
 const decisionOf = async (suggestionId: string) => {
   const found = await db().pool.query<Record<string, unknown>>(
@@ -504,8 +512,6 @@ describe("a re-write whose rows were lost", () => {
     const restricted = await bindingHolding(db(), scenario.workspaceId, {
       sensitivity: "Restricted",
     });
-    const handbook = { resource: "/sources/handbook.pdf", locator: "p.1" };
-    const minutes = { resource: "/sources/board-minutes.pdf", locator: "p.2" };
     const input = guideline("Allowances", {
       frontmatter: { title: "Allowances", type: "Guideline", sources: [handbook] },
       evidence: [{ sourceDocumentId: internal.documentId, ...handbook }],
@@ -546,6 +552,72 @@ describe("a re-write whose rows were lost", () => {
     expect(events.map((event) => replayDetail.parse(event["detail"]).evidenceAgrees)).toEqual([
       true,
       false,
+    ]);
+  });
+
+  it("stays Restricted through the cascade of a publish and of a narrowing when the file's sources are not the standing citations, while a concept beside it moves with the binding", async () => {
+    const scenario = await arrange();
+    const website = await bindingHolding(db(), scenario.workspaceId, {
+      sensitivity: "Public",
+      publishedAt: null,
+    });
+    const restricted = await bindingHolding(db(), scenario.workspaceId, {
+      sensitivity: "Restricted",
+    });
+    const citingTheWebsite = (title: string) =>
+      guideline(title, {
+        frontmatter: { title, type: "Guideline", sources: [handbook] },
+        evidence: [{ sourceDocumentId: website.documentId, ...handbook }],
+        sensitivity: "Restricted",
+      });
+    const input = citingTheWebsite("Allowances");
+    const first = await landed(scenario, scenario.admin, input);
+    const beside = await landed(scenario, scenario.admin, {
+      ...citingTheWebsite("Mileage"),
+      expects: { head: first.sha },
+    });
+    await writeInTheWindow(scenario, scenario.admin, {
+      ...input,
+      iri: first.iri,
+      frontmatter: { title: "Allowances", type: "Guideline", sources: [handbook, minutes] },
+      evidence: [
+        { sourceDocumentId: website.documentId, ...handbook },
+        { sourceDocumentId: restricted.documentId, ...minutes },
+      ],
+      body: "# Allowances\n\nWhat the board minuted.",
+      expects: { head: beside.sha },
+    });
+    expect(await reconciled(scenario)).toMatchObject({ stopped: undefined });
+    expect(
+      (await replayedEvents(scenario.workspaceId)).map(
+        (event) => replayDetail.parse(event["detail"]).evidenceAgrees,
+      ),
+    ).toEqual([false]);
+
+    const published = await publishedOnceIndexed(db(), scenario.admin, website.bindingId);
+
+    expect(published.ok).toBe(true);
+    expect(await sensitivitiesOf(scenario.workspaceId, [first.iri, beside.iri])).toEqual([
+      "Restricted",
+      "Public",
+    ]);
+
+    const narrowed = await readingAs(db().runtimePool, scenario.admin, (admin, tx) =>
+      narrowBinding(
+        admin,
+        tx,
+        inputOf(narrowBindingInput, {
+          bindingId: website.bindingId,
+          sensitivity: "Internal",
+          audience: "everyone",
+        }),
+      ),
+    );
+
+    expect(narrowed.ok).toBe(true);
+    expect(await sensitivitiesOf(scenario.workspaceId, [first.iri, beside.iri])).toEqual([
+      "Restricted",
+      "Internal",
     ]);
   });
 

@@ -691,9 +691,11 @@ const publishedHandbook = async (scenario: Scenario, bindingId: string) => {
 };
 
 describe("an Admin publishes a binding", () => {
-  it("publishes the binding, touches no chunk row of it, and its ledger row carries the confirmations, the totals by category and the DPIA hash", async () => {
+  it("publishes the binding, touches no chunk row of it, and its ledger row carries the confirmations, the totals by category, the DPIA hash and the class and audience it releases", async () => {
     const scenario = await arrange();
-    const { bindingId, documentId, jobId } = await boundHandbook(scenario);
+    const { bindingId, documentId, jobId } = await boundHandbook(scenario, {
+      sensitivity: "Internal",
+    });
     await runEndedAt(scenario.workspaceId, bindingId, jobId, "done", RUN_FINISHED_AT);
     await chunksOfTheHandbook(scenario.workspaceId, { bindingId, documentId });
     const stoodAt = await chunkVersionsOf(db(), scenario.workspaceId, bindingId);
@@ -764,6 +766,8 @@ describe("an Admin publishes a binding", () => {
       findingsPersonName: 2,
       findingsBankDetails: 1,
       dpiaHash: row?.detail["dpiaHash"],
+      sensitivity: "Internal",
+      audience: "everyone",
     });
 
     expect(row?.detail["dpiaHash"]).toMatch(SHA256_HEX);

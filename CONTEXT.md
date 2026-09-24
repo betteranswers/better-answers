@@ -376,16 +376,17 @@ Where a unit lives is decided by **minting**.
 - **publish (a binding)** — the recorded Admin act that lets a binding's chunks and source entities
   reach anyone beyond Control Centre; separate from sensitivity, from audience and from accepting
   suggestions. Its audit row carries the Admin's confirmations (lawful basis recorded, privacy
-  information updated, DPIA reference). Unpublished content is seen by Admins, in Control Centre only.
+  information updated, DPIA reference). Unpublished content is seen by Admins, in Control Centre
+  only, and a concept citing it counts as Restricted until the publish releases the binding's class.
 - **audience** — who a binding's content is for: everyone in the workspace, or named groups (plus,
   if needed, named individuals). Set on the binding, carried with sensitivity onto every source
   entity and read from the binding for a chunk, and applied with *published* on every read and
   traversal hop. Distinct from sensitivity (how confidential) and from trust (how reliable).
 - **cascade** — the re-derivation an Admin's narrowing of a binding or of named documents of one,
-  or override of a concept's class, sets off inside the same act: first every concept citing the
-  evidence that moved, then every composition including one of those concepts — two levels, the
-  second reading what the first wrote, never a third — so a guide never reaches a reader its
-  includes would not. _Avoid_: recompute (one level's work, not the whole), propagation.
+  publish of a binding, or override of a concept's class sets off inside the same act: first every
+  concept citing the evidence that moved, then every composition including one of those concepts —
+  two levels, the second reading what the first wrote, never a third — so a guide never reaches a
+  reader its includes would not. _Avoid_: recompute (one level's work, not the whole), propagation.
 - **class override** — an Admin's recorded act that sets a concept's class — sensitivity and
   audience — whatever its evidence and its kind's floor derive: one row per concept, the latest
   standing, one audit event, and the *cascade* run inside the same act. The one act that may widen

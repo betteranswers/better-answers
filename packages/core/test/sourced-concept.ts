@@ -10,8 +10,9 @@ import {
 } from "../src/concepts/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { addToGroup, createGroup } from "../src/members/index.ts";
-import { chunkIdOf } from "../src/sources/index.ts";
+import { chunkIdOf, publishBinding, publishBindingInput } from "../src/sources/index.ts";
 import type { Foldable, Folded, Tx } from "../src/store/postgres/index.ts";
+import { inputOf } from "./suite-input.ts";
 import { answered, readingAs } from "./suite-postgres.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
@@ -65,6 +66,45 @@ export const bindingHolding = (
     const document = await seed.sourceDocument({ workspaceId, bindingId: binding.id });
     return { bindingId: binding.id, documentId: document.id };
   });
+
+const INDEXED_AT = new Date("2026-09-24T09:00:00.000Z");
+const PUBLISHED_AT = new Date("2026-09-24T10:00:00.000Z");
+
+export const publishedOnceIndexed = async (
+  db: MigratedPostgres,
+  admin: UserPrincipal,
+  bindingId: string,
+) => {
+  await seededBy(db, (seed) =>
+    seed.job({
+      workspaceId: admin.workspaceId,
+      kind: "index",
+      subjectId: bindingId,
+      reason: "bound",
+      status: "done",
+      enqueuedAt: INDEXED_AT,
+      attempts: 1,
+      claimedBy: "worker-1",
+      claimedAt: INDEXED_AT,
+      heartbeatAt: INDEXED_AT,
+      finishedAt: INDEXED_AT,
+      outcome: { chunks: 1 },
+    }),
+  );
+  return readingAs(db.runtimePool, admin, (principal, tx) =>
+    publishBinding(principal, tx, {
+      ...inputOf(publishBindingInput, {
+        bindingId,
+        confirmations: {
+          lawfulBasisRecorded: true,
+          privacyInformationUpdated: true,
+          dpiaReferenced: true,
+        },
+      }),
+      publishedAt: PUBLISHED_AT,
+    }),
+  );
+};
 
 export const bindingForGroups = (
   db: MigratedPostgres,
