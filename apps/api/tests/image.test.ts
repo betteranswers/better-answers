@@ -185,7 +185,7 @@ process.stdout.write(JSON.stringify({
   pnpmTarget: pnpm === undefined ? "" : realTarget(pnpm),
   pnpmVersion: answeredOrWhy("pnpm", ["--version"], offline),
   // ops.ts will not start without a database URL; help answers before any connection is made.
-  opsAnswer: answered("pnpm", ["--silent", "ops", "help"], {
+  opsAnswer: answeredOrWhy("pnpm", ["--silent", "ops", "help"], {
     ...offline,
     DATABASE_URL: "postgres://probe@127.0.0.1:9/probe",
   }),
