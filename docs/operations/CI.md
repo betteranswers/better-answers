@@ -122,6 +122,31 @@ Nightly at 03:41 UTC, after `mutation.yml` has started, and on dispatch. It read
 
 **Where a vulnerability shows.** Each one a scan reports is an alert in the repository's code scanning (Security, then Code scanning), filed on the branch the run was on, `main` for the nightly run, under its tier's category: `image-api`, `image-worker` or `image-backup`. An alert closes itself the first time a scan no longer finds it, so the list is always the latest scan's. The owner reads the list. Nothing else is told, and nothing waits on it. An alert is not a task: one base-image bump can close dozens of them, and most are closed by a change nobody here writes, such as a Renovate pull request moving a pinned base. What becomes an ordna task is a change to an image that the list shows is owed, such as a pin to move or a package to drop, and the task names the alerts it expects to close.
 
+**Triage of a vulnerability.** A vulnerability is assessed for its package in its image, not for its CVE alone, and settles one of three ways:
+
+- **A fix we can take**, when the alert's *Fixed Version* names one: the task above takes it, and the alert closes itself. A fix inside a binary someone else builds, such as `rclone` or `age`, can be taken only once that binary's own release carries it; Renovate proposes that release, and until then the vulnerability is assessed as one with no fix.
+- **No fix, and unreachable**: the running service never takes the flawed path. Dismiss the alert as "won't fix", with a one-line reason saying what shows it.
+- **No fix, and reachable**: the alert stays open, and `IMAGE_VULNERABILITIES.md` names it under *Held open*, with the mitigation that holds it today and the task that removes it.
+
+The assessment asks what the package is in that image for and whether the running service takes the flawed path, and it is decided by the calls the service makes, the image's entry points and the advisory's own conditions. The image is read directly: `docker export` of the digest, then dpkg's status file for why a package is there, each ELF file's `DT_NEEDED` for what links a library, and the file list for the binaries a flaw needs. `IMAGE_VULNERABILITIES.md` keeps each package's assessment, so a new vulnerability in a package already there starts from it. A dismissal goes through the API, its reason at most 280 characters:
+
+```sh
+gh api -X PATCH 'repos/{owner}/{repo}/code-scanning/alerts/<number>' -f state=dismissed \
+  -f dismissed_reason="won't fix" -f dismissed_comment='Unreachable (<task id>): <what shows it>'
+```
+
+A dismissal outlives every rebuild: code scanning keeps it while the scan still reports the same package and CVE, and a fixed version appearing in the alert's text does not reopen it. So reading the list includes this query. It names each dismissed alert that the latest scan still reports with a fixed version, for a Debian package (filed under the image's own name) or a library a manifest pins. Each is reopened with `-f state=open` and taken as a fix. A binary someone else builds is left out, because its fix arrives as a Renovate pull request, and the scan after that merge closes the alert.
+
+```sh
+gh api --paginate 'repos/{owner}/{repo}/code-scanning/alerts?state=dismissed&per_page=100' --jq '.[]
+  | select(.fixed_at == null)
+  | select(.most_recent_instance.location.path | test("^[^/]+/[^/]+$|package\\.json$|METADATA$"))
+  | select(.most_recent_instance.message.text | test("Fixed Version: \\S"))
+  | .number'
+```
+
+The method is the same at every severity; `IMAGE_VULNERABILITIES.md` says which severities have been through it.
+
 **Code scanning on the repository.** The workflow changes no repository setting. If code scanning refuses the upload until one is turned on, turning it on is the owner's call, as the repository's admin.
 
 ## The `git-filter-repo` action
