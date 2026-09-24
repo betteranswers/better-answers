@@ -11,8 +11,8 @@ const config: KnipConfig = {
 
   workspaces: {
     ".": {
-      // A spawned binary is no edge for knip to follow.
-      ignoreDependencies: ["@ast-grep/cli"],
+      // A skill's reference files are samples for other projects, so nothing here imports them.
+      ignore: [".claude/skills/*/references/**"],
     },
 
     "apps/api": {

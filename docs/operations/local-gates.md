@@ -116,7 +116,7 @@ An export is kept ahead of its caller only when the act it belongs to has no tra
 
 **`pnpm-workspace.yaml`** is the workspace manifest. `apps/worker/` is a uv workspace, not a pnpm one, and a documentation site would join the `packages:` list the day one is lifted in.
 
-`allowBuilds` runs postinstall scripts for two packages, each because the script is what puts a platform binary where the caller reaches it — esbuild for vite and drizzle-kit, ast-grep for the strip script. The other three are optional native accelerations we do not take. lefthook is `false` for the reason above. `false` rather than no entry at all, because pnpm 11 makes an undecided build script a hard error and silence would fail every fresh install.
+`allowBuilds` runs one package's postinstall script, esbuild's, because that script puts the platform binary where vite and drizzle-kit reach it. The other three are optional native accelerations we do not take. lefthook is `false` for the reason above. `false` rather than no entry at all, because pnpm 11 makes an undecided build script a hard error and silence would fail every fresh install.
 
 `minimumReleaseAgeExclude` names the releases taken at their current version deliberately, read from the registry on the day, against pnpm 11's hold on releases younger than its minimum age.
 

@@ -79,6 +79,18 @@
       "skillPath": "packages/client/skills/client-setup/SKILL.md",
       "computedHash": "65b2f97d796665441ec9044e422d549184836684b2f15b8586d978b9f8bb0406"
     },
+    "code-comments": {
+      "source": "jspiro/skills",
+      "sourceType": "github",
+      "skillPath": "skills/code-comments/SKILL.md",
+      "computedHash": "5f4e9eb405a3c54e5b8fe37daea20cb5b07a90aa3e251c28e662478f9fa23cde"
+    },
+    "complexity-gate": {
+      "source": "jspiro/skills",
+      "sourceType": "github",
+      "skillPath": "skills/complexity-gate/SKILL.md",
+      "computedHash": "a6ecc578515c889f5bd25496027448561bdd36d3c3e630de916fbc33bd00e950"
+    },
     "create-auth": {
       "source": "better-auth/skills",
       "sourceType": "github",
@@ -121,6 +133,12 @@
       "skillPath": "skills/hono/SKILL.md",
       "computedHash": "220e5e1b12bbaeec49ec362b6e2262d77632d0536e9758bba9acbbc323fef990"
     },
+    "human-writing": {
+      "source": "factory-ai/factory-plugins",
+      "sourceType": "github",
+      "skillPath": "plugins/droid-evolved/skills/human-writing/SKILL.md",
+      "computedHash": "46f8dfb97de1db8a7bc901b863354e7a14634be2ab309d001821f1a6ea7f84f1"
+    },
     "implementing-gdpr-data-subject-access-request": {
       "source": "mukul975/anthropic-cybersecurity-skills",
       "sourceType": "github",
@@ -156,6 +174,12 @@
       "sourceType": "github",
       "skillPath": "skills/multi-stage-dockerfile/SKILL.md",
       "computedHash": "698bf93a84dae18fd7bd0b1d35c21427307fde78fbdf4624be9726f5f98189ca"
+    },
+    "mutation-testing": {
+      "source": "jspiro/skills",
+      "sourceType": "github",
+      "skillPath": "skills/mutation-testing/SKILL.md",
+      "computedHash": "7b187f7c362047b4ce4fa8aa5e1f5c6e006ababd160e67d01aeca6b8ba0d27d5"
     },
     "nextjs-app-router": {
       "source": "trpc/trpc",
@@ -210,6 +234,12 @@
       "sourceType": "github",
       "skillPath": "packages/tanstack-react-query/skills/react-query-setup/SKILL.md",
       "computedHash": "34fc54299a4669024ee8e42ccde8f384533c3641f4c67306e5ebc454a7141484"
+    },
+    "repo-quality-sweep": {
+      "source": "jspiro/skills",
+      "sourceType": "github",
+      "skillPath": "skills/repo-quality-sweep/SKILL.md",
+      "computedHash": "09825ce8212ac56c75a6093bb1620a4b6ce0f8a33f03061302b3805a6a3164f6"
     },
     "server-setup": {
       "source": "trpc/trpc",

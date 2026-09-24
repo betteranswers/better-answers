@@ -26,8 +26,6 @@
     "comment-density": "node scripts/comment-density.mjs apps packages --directory .github --directory deploy --directory packages/schema/migrations --directory .claude/hooks --directory scripts --unit the-root-tool-configuration=cubic.yaml,jscpd.config.mjs,knip.config.ts,lefthook.yml,pnpm-workspace.yaml",
     "insert-scan": "node scripts/insert-scan.mjs apps packages",
     "mutant-probe": "node scripts/mutant-probe.mjs",
-    "strip-comments": "node scripts/strip-comments.mjs",
-    "comment-only-proof": "node scripts/comment-only-proof.mjs",
     "lint": "oxlint",
     "knip": "knip",
     "format": "oxfmt",
@@ -37,9 +35,7 @@
     "mutation": "pnpm -r --if-present run mutation"
   },
   "devDependencies": {
-    "@ast-grep/cli": "0.45.3",
     "@types/node": "24.13.6",
-    "esbuild": "0.28.2",
     "jscpd": "5.3.2",
     "knip": "6.38.0",
     "lefthook": "2.1.14",

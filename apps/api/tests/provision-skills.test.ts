@@ -336,7 +336,7 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
   });
 });
 
-describe("the skills this repository wrote (T-081)", () => {
+describe("the skills this repository tracks (T-081, T-384)", () => {
   const tracked = (directory: string): readonly string[] => {
     const listed = spawnSync("git", ["-C", repositoryRoot, "ls-files", directory], {
       encoding: "utf8",
@@ -356,7 +356,7 @@ describe("the skills this repository wrote (T-081)", () => {
     );
   });
 
-  it("tracks all three, so a clone that runs no installer is still offered them", () => {
+  it("tracks its own three skills, for clones without an installer", () => {
     const skills = tracked(".claude/skills");
 
     expect(skills).toContain(".claude/skills/better-answers-design");
@@ -364,13 +364,29 @@ describe("the skills this repository wrote (T-081)", () => {
     expect(skills).toContain(".claude/skills/renovate-prs/SKILL.md");
   });
 
-  it("tracks nothing else there, because the rest is third-party content (ADR 0027)", () => {
+  it("tracks five third-party skills, so every agent loads one copy", () => {
+    const skills = tracked(".claude/skills");
+
+    expect(skills).toContain(".claude/skills/code-comments/SKILL.md");
+    expect(skills).toContain(".claude/skills/complexity-gate/SKILL.md");
+    expect(skills).toContain(".claude/skills/human-writing/SKILL.md");
+    expect(skills).toContain(".claude/skills/mutation-testing/SKILL.md");
+    expect(skills).toContain(".claude/skills/repo-quality-sweep/SKILL.md");
+  });
+
+  it("tracks nothing else, since every other skill installs per checkout", () => {
     const ours = tracked(".claude/skills").map((file) => file.split("/")[2] ?? "");
 
     expect([...new Set(ours)].sort()).toEqual([
+      "THIRD_PARTY_NOTICES.md",
       "better-answers-design",
       "browser-suite",
+      "code-comments",
+      "complexity-gate",
+      "human-writing",
+      "mutation-testing",
       "renovate-prs",
+      "repo-quality-sweep",
     ]);
   });
 });
