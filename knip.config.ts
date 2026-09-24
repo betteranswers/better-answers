@@ -1,14 +1,6 @@
-import { existsSync } from "node:fs";
-import path from "node:path";
-
 import type { KnipConfig } from "knip";
 
-export const topLevelIgnore = (hasGitNexusIndex: boolean): readonly string[] =>
-  hasGitNexusIndex ? [".gitnexus/**"] : [];
-
 const config: KnipConfig = {
-  ignore: [...topLevelIgnore(existsSync(path.resolve(import.meta.dirname, ".gitnexus")))],
-
   // `uv` is installed on the machine and never by npm, so no manifest names it.
   ignoreBinaries: ["uv"],
 

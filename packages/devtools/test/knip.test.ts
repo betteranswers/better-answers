@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -6,8 +6,6 @@ import { z } from "zod";
 
 import { knipOver } from "@better-answers/devtools/throwaway-tree";
 import type { KnipFinding, Tree } from "@better-answers/devtools/throwaway-tree";
-
-import knipConfig, { topLevelIgnore } from "../../../knip.config.ts";
 
 const MANIFEST = JSON.stringify({
   name: "throwaway",
@@ -116,63 +114,22 @@ describe("the knip gate is a step of the root check (T-066)", () => {
   });
 });
 
-describe("the repository's own top-level `ignore` follows the index's presence (T-192)", () => {
-  it("ignores `.gitnexus/**` for a checkout that carries an index", () => {
-    expect(topLevelIgnore(true)).toEqual([".gitnexus/**"]);
-  });
+describe("a directory `.git/info/exclude` names is invisible to knip, so the config names none", () => {
+  const TREE = {
+    "src/main.ts": MAIN,
+    "src/reached.ts": REACHED,
+    ".gitnexus/probe.ts": "export const alone = 1;\n",
+  };
 
-  it("ignores nothing for a checkout that carries none", () => {
-    expect(topLevelIgnore(false)).toEqual([]);
-  });
-
-  it("ignores what this checkout's own directory asks for", () => {
-    if (typeof knipConfig === "function") {
-      throw new Error("the repository's knip config is a plain object, never the function form");
-    }
-    const root = path.resolve(import.meta.dirname, "../../..");
-
-    expect(knipConfig.ignore).toEqual(
-      existsSync(path.join(root, ".gitnexus")) ? [".gitnexus/**"] : [],
-    );
-  });
-});
-
-describe("the top-level `ignore` glob, proved both ways (T-180)", () => {
-  const IGNORES_GITNEXUS = JSON.stringify({
-    entry: ["src/main.ts", "src/registry/**"],
-    project: ["**/*.ts"],
-    ignore: [".gitnexus/**"],
-  });
-
-  const gitnexusIgnore = knipOver(
-    { "package.json": MANIFEST, "knip.json": IGNORES_GITNEXUS },
-    {
-      tree: {
-        "src/main.ts": MAIN,
-        "src/reached.ts": REACHED,
-        "other/probe.ts": "export const alone = 1;\n",
-      },
-      findings: [{ kind: "files", file: "other/probe.ts", name: "other/probe.ts" }],
-    },
-  );
-
-  it("stays silent about an unreached file under the ignored directory", () => {
-    const findings = gitnexusIgnore.findings({
-      "src/main.ts": MAIN,
-      "src/reached.ts": REACHED,
-      ".gitnexus/probe.ts": "export const alone = 1;\n",
-    });
+  it("stays silent about an unreached file under a directory the exclude file names", () => {
+    const findings = knip.findings({ ...TREE, ".git/info/exclude": ".gitnexus/\n" });
 
     expect(findings).toEqual([]);
   });
 
-  it("still names the same shape of unreached file under a directory the config does not name", () => {
-    const findings = gitnexusIgnore.findings({
-      "src/main.ts": MAIN,
-      "src/reached.ts": REACHED,
-      "other/probe.ts": "export const alone = 1;\n",
-    });
+  it("names the same file when the exclude file does not name its directory", () => {
+    const findings = knip.findings({ ...TREE, ".git/info/exclude": ".elsewhere/\n" });
 
-    expect(namesOf(findings)).toEqual(["files:other/probe.ts:other/probe.ts"]);
+    expect(namesOf(findings)).toEqual(["files:.gitnexus/probe.ts:.gitnexus/probe.ts"]);
   });
 });
