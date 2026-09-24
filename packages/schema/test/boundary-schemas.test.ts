@@ -1095,6 +1095,22 @@ describe("the rules in force a binding carries", () => {
   });
 });
 
+describe("the emails a suppression holds", () => {
+  const holding = (count: number) =>
+    boundarySchemas.suppression.insert.safeParse({
+      ...acceptedRows.suppression[0],
+      identifiers: {
+        emails: Array.from({ length: count }, (_, at) => `p${at}@x.invalid`),
+        names: [],
+        other: [],
+      },
+    }).success;
+
+  it("are a full request's fifty and the two sign-in addresses an erasure adds, and no more", () => {
+    expect([holding(52), holding(53)]).toEqual([true, false]);
+  });
+});
+
 describe("who a subject request is about", () => {
   const stranger = acceptedRows.subjectRequest[1];
 

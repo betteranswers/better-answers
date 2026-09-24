@@ -1,7 +1,7 @@
 import {
   boundarySchemas,
   SUBJECT_IDENTIFIER_FLOOR,
-  SUBJECT_NAME_WORDS_FLOOR,
+  SUBJECT_IDENTIFIER_KINDS,
 } from "@better-answers/schema";
 import type { z } from "zod";
 
@@ -17,6 +17,7 @@ import {
   type UserPrincipal,
 } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
+import { floorNotCleared } from "./identifiers.ts";
 import { IDENTIFIER_TOO_BROAD, type ErasureRefusal } from "./vocabulary.ts";
 
 const SUBJECT_REQUEST_ACTS = declareActs("people", {
@@ -87,18 +88,14 @@ export const deadlineOf = (request: Pick<SubjectRequest, "dueAt" | "extendedTo">
 export const identifierCountOf = (identifiers: SubjectIdentifiers): number =>
   Object.values(identifiers).reduce((total, named) => total + named.length, 0);
 
-// Counted as the seam matches: case-folded, each run of whitespace one space.
-const normalised = (identifier: string): string =>
-  identifier
-    .split(/\s+/u)
-    .filter((part) => part !== "")
-    .join(" ")
-    .toLowerCase();
-
 const tooBroadIn = (identifiers: SubjectIdentifiers): IdentifierTooBroad | undefined => {
-  const short = [...identifiers.emails, ...identifiers.names, ...identifiers.other].find(
-    (identifier) => Array.from(normalised(identifier)).length < SUBJECT_IDENTIFIER_FLOOR,
+  const measured = SUBJECT_IDENTIFIER_KINDS.flatMap((kind) =>
+    identifiers[kind].map((identifier) => ({
+      identifier,
+      below: floorNotCleared(kind, identifier),
+    })),
   );
+  const short = measured.find(({ below }) => below === "characters")?.identifier;
   if (short !== undefined) {
     return {
       word: IDENTIFIER_TOO_BROAD,
@@ -108,9 +105,7 @@ const tooBroadIn = (identifiers: SubjectIdentifiers): IdentifierTooBroad | undef
         "document of the workspace.",
     };
   }
-  const oneWord = identifiers.names.find(
-    (name) => normalised(name).split(" ").length < SUBJECT_NAME_WORDS_FLOOR,
-  );
+  const oneWord = measured.find(({ below }) => below === "name-words")?.identifier;
   if (oneWord !== undefined) {
     return {
       word: IDENTIFIER_TOO_BROAD,

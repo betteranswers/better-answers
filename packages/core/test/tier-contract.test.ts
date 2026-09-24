@@ -35,6 +35,7 @@ const SPOKEN_AGREEMENTS = {
   "cost-ledger": "generated",
   "document-chunk": "fixtured",
   "emptying-a-binding": "fixtured",
+  "erasure-match": "fixtured",
   "id-shape": "fixtured",
   "credential-envelope": "fixtured",
   "llm-routing": "sql-function",

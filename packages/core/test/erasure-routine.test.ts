@@ -1502,6 +1502,28 @@ describe("the suppression the workspace keeps for the request", () => {
     ]);
   });
 
+  it("writes a row the boundary admits for a request already holding fifty emails, the two sign-in addresses added", async () => {
+    const scenario = await arrange();
+    const erasure = await anOpenErasure(scenario.workspaceId);
+    const fifty = Array.from({ length: 50 }, (_, at) => `person-${at}@example.invalid`);
+
+    await suppressingAs(scenario, {
+      erasureRequestId: erasure.id,
+      identifiers: { emails: fifty, names: [], other: [] },
+      signInAddresses: ["priya@example.invalid", "priya.anand@example.invalid"],
+    });
+    const [row] = await suppressionsIn(scenario.workspaceId);
+
+    expect(row?.identifiers["emails"]).toHaveLength(52);
+    expect(
+      boundarySchemas.suppression.select.safeParse({
+        workspaceId: row?.workspace_id,
+        erasureRequestId: row?.erasure_request_id,
+        identifiers: row?.identifiers,
+      }).success,
+    ).toBe(true);
+  });
+
   it("writes nothing for a set that names nobody and a person with no address, because a suppression that keeps nothing out is an erasure undone at the next conversion", async () => {
     const scenario = await arrange();
     const erasure = await anOpenErasure(scenario.workspaceId);

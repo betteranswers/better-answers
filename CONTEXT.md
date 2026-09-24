@@ -250,10 +250,11 @@ Where a unit lives is decided by **minting**.
   the text*, at a tier, for one **reason**, the first of these that holds — *overridden by the
   erasure* (a request names it and an Admin had kept it) · *erasure* (a request names it) ·
   *restored* · *switched off* · *in force*. It says nothing of where a placeholder lands; the
-  *written spans* do. A finding is never rewritten by a withholding. _Avoid_: decision, detection.
+  *written spans* do. A finding is never rewritten by a withholding. An *erasure match* is the
+  one withholding with no finding: always withheld, at the always tier. _Avoid_: decision, detection.
 - **written span** — the run of characters one placeholder is written over, naming the
-  *withholding* it writes for. Every character of a withheld finding lies under exactly one, so a
-  finding that loses part of its run to another keeps its own word over the rest. How a finding
+  *withholding* it writes for. Every character of a withheld finding or an *erasure match* lies
+  under exactly one, so a finding that loses part of its run to another keeps its own word over the rest. How a finding
   was **written** is read off the spans: under its own placeholder where one names it, under
   another finding's where others cover every character of it, not at all otherwise.
 - **emptying a binding** — deleting a binding's derived rows in the api's transaction and
@@ -642,6 +643,11 @@ to it by IRI and never restates it (ADR 0014).
 - **suppression** — the workspace's entry that keeps a person's identifiers out of every derived
   store: one per *erasure request*, holding the request's identifier set, applied to every
   document of the workspace on every index run, now and later.
+- **erasure match** — a bounded, case-folded occurrence of a *suppression*'s identifier in a
+  document's normalised text, which the *redaction seam* withholds. It is a withholding and never
+  a *finding*: no finding row holds it, no review reaches it and no *keep in text* releases it. An
+  identifier below the **identifier floor** — under three characters once normalised, or a name of
+  one word — raises none, and recording a *subject request* refuses it as too broad to withhold.
 - **erasure map** — the per-store finder's answer for one *subject request*: every store family
   the platform holds and what in each of them names the person, found over the request's
   identifier set. Its documents entry names the live documents whose indexed text holds an
