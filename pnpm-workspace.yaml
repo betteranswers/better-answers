@@ -19,3 +19,8 @@ minimumReleaseAgeExclude:
 
 patchedDependencies:
   '@stryker-mutator/vitest-runner@10.0.0': patches/@stryker-mutator__vitest-runner@10.0.0.patch
+
+# `@trpc/server` needs TypeScript for its types alone, yet names it a required peer, which pnpm
+# installs, native compiler included, in the api's image.
+overrides:
+  '@trpc/server>typescript': '-'

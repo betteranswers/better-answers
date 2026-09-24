@@ -73,15 +73,59 @@ RUN pnpm --filter @better-answers/web run build
 # are — real directories under `/app/packages`, reached by the symlink pnpm writes — and the
 # `...` suffix selects the api together with its workspace dependencies and nothing else.
 #
-# What this does NOT remove, and it is worth knowing: `better-auth` and `@trpc/server` declare
-# optional peer dependencies on tooling (drizzle-kit, kysely, react, vitest, typescript), and
-# pnpm materialises a resolved peer in the virtual store whether or not `--prod` links it. So
-# `node_modules/.pnpm` holds some of those directories. None is reachable from the app: the
-# resolution path from `/app/apps/api` is its own `node_modules`, then `/app/node_modules`,
-# which holds `.pnpm` and nothing else — which is exactly the property `tests/image.test.ts`
-# asserts, rather than asserting on a directory listing that would be a lie either way.
+# pnpm links an optional peer that any workspace brings and `--prod` installs it, so
+# `better-auth`'s peers on drizzle-kit, vitest and react would ship here with their build tooling,
+# three esbuild binaries among it. The lockfile cannot drop them: an `overrides` removal leaves an
+# optional peer in place, and the Renovate app locks with `--ignore-pnpmfile`, so a hook would
+# come undone in every pull request it opens. Every optional peer the api loads is one its own
+# dependencies also reach, so a link to a package deleted here is one nothing follows. A required
+# peer is kept all the same, since its package may load it; `tests/image.test.ts` follows no peer,
+# so one kept that way turns it red for a person to declare or override away, as TypeScript was.
 FROM manifests AS prod-deps
 RUN pnpm install --frozen-lockfile --prod --filter @better-answers/api...
+RUN node --input-type=module <<'JS'
+import { existsSync, readdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import path from "node:path";
+
+const store = realpathSync("node_modules/.pnpm");
+const entryOf = (directory) => path.relative(store, directory).split(path.sep)[0];
+const namesIn = (modules) =>
+  readdirSync(modules).flatMap((entry) =>
+    entry.startsWith("@")
+      ? readdirSync(path.join(modules, entry)).map((name) => `${entry}/${name}`)
+      : [entry],
+  );
+
+const installed = ["apps", "packages"]
+  .flatMap((parent) => readdirSync(parent).map((workspace) => `${parent}/${workspace}/node_modules`))
+  .filter((modules) => existsSync(modules));
+const reached = new Set();
+const pending = installed.flatMap((modules) =>
+  namesIn(modules).map((name) => realpathSync(`${modules}/${name}`)),
+);
+while (pending.length > 0) {
+  const directory = pending.pop();
+  if (reached.has(directory) || !directory.startsWith(`${store}${path.sep}`)) continue;
+  reached.add(directory);
+  const manifest = JSON.parse(readFileSync(path.join(directory, "package.json"), "utf8"));
+  const peerMeta = manifest.peerDependenciesMeta ?? {};
+  const names = [
+    ...Object.keys({ ...manifest.dependencies, ...manifest.optionalDependencies }),
+    ...Object.keys(manifest.peerDependencies ?? {}).filter((name) => !peerMeta[name]?.optional),
+  ];
+  for (const name of names) {
+    const link = path.join(store, entryOf(directory), "node_modules", name);
+    if (existsSync(link)) pending.push(realpathSync(link));
+  }
+}
+
+const kept = new Set([...reached].map(entryOf));
+for (const entry of readdirSync(store, { withFileTypes: true })) {
+  if (entry.isDirectory() && entry.name !== "node_modules" && !kept.has(entry.name)) {
+    rmSync(path.join(store, entry.name), { recursive: true });
+  }
+}
+JS
 
 FROM base AS runtime
 
