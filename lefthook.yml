@@ -25,7 +25,6 @@ pre-commit:
       glob: "*.{ts,tsx}"
       run: pnpm exec oxlint {staged_files}
 
-    # Only the dev group syncs, so a commit never fetches torch from a wheel host the clone may not reach.
     ruff-format:
       glob: "*.py"
       root: apps/worker/
