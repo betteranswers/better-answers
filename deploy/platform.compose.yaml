@@ -40,6 +40,8 @@ services:
     <<: [*restart, *logging, *mem512]
     environment:
       <<: *bootstrap
+      # /health names it: the build being replaced answers healthy until the swap, and only this tells them apart.
+      API_IMAGE_DIGEST: ${API_IMAGE_DIGEST:?}
       NODE_ENV: production
       PORT: "3000"
       GIT_STORE_DIR: /data/git

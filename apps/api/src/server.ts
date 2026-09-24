@@ -36,6 +36,8 @@ export type ServerDependencies = {
   readonly serverVersion?: string;
 
   readonly webRoot?: string | undefined;
+
+  readonly imageDigest?: string | undefined;
 };
 
 export function createServer(dependencies: ServerDependencies): Hono {
@@ -77,21 +79,23 @@ export function createServer(dependencies: ServerDependencies): Hono {
     },
   );
 
+  const image = dependencies.imageDigest ?? null;
+
   server.get("/health", async (context) => {
     const reached = await attempt(async () => {
       await door.pool.query("select 1");
     });
 
     if (!reached.ok) {
-      return context.json({ status: "unhealthy", database: "unreachable", identity }, 503);
+      return context.json({ status: "unhealthy", database: "unreachable", identity, image }, 503);
     }
 
     await identityInit;
     if (identity !== "ready") {
-      return context.json({ status: "unhealthy", database: "reachable", identity }, 503);
+      return context.json({ status: "unhealthy", database: "reachable", identity, image }, 503);
     }
 
-    return context.json({ status: "healthy", database: "reachable", identity });
+    return context.json({ status: "healthy", database: "reachable", identity, image });
   });
 
   server.route(

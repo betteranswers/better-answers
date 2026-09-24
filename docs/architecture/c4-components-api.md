@@ -16,7 +16,7 @@ C4Component
     Component(main, "main.ts, config.ts and doors.ts", "bootstrap", "Reads the bootstrap env once; doors.ts is the one composition root — the four doors and one Clock, the Postgres pool sized there — which main.ts, ops.ts and the api harness alike build from")
     Component(fence, "ingress/hostnames.ts", "Hono middleware", "One list of surface to hostnames to reason; refuses a path outside its hostname's surface before any counter, session or body")
     Component(limits, "ingress/limits.ts", "per-IP counters", "The flood limits on /mcp, /oauth2/*, discovery and /jwks, as rows")
-    Component(health, "/health", "Hono route", "Database reachable and the authorization server initialised, or 503; Docker holds the worker on it")
+    Component(health, "/health", "Hono route", "Database reachable and the authorization server initialised, or 503, naming the image digest it runs; Docker holds the worker on it and a release waits on the digest")
     Component(auth, "auth/", "Better Auth in-process", "The identity provider and authorization server: email code, the organisation plugin as the workspace, /oauth2/*, discovery, /jwks, the consent page, CIMD fetch; Microsoft at P1")
     Component(mcp, "mcp/surface.ts and entries/", "MCP SDK v2 behind one fetch-shaped seam", "The token verifier over the JWKS, then four entries: find, ask, open, give_feedback; structured content with a human rendering")
     Component(trpc, "trpc/", "tRPC on Hono", "app-router, mount, base with three roads — query, mutation with the held read, own-transaction carrying the doors; the SPA's transport, event streams for answers, splitLink for the octet-stream upload at S1")

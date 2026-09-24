@@ -55,7 +55,12 @@ The estate is two 4 GB boxes (ADR 0024): VPC 1 is production, VPC 2 is the orche
 
 ## 6. A release went wrong
 
-- **Fires:** `release.yml`'s post-deploy smoke is red; the uptime check goes red within minutes of a promotion; the orchestrator's *failed deployment* or *unhealthy container* mail.
+- **Fires:** `release.yml`'s post-deploy smoke is red. `deploy/await-release.sh` polls `/health` for six minutes until it answers healthy **and** names the api digest the release promoted. Its error names *expected*, the promoted digest, and *answering*, the digest the last answer named, with that answer's status in brackets. Read the pair:
+  - *answering* the build it replaced, `healthy`: the promoted image never took over, and the orchestrator's deploy log says why;
+  - *answering* the promoted digest, `unhealthy`: it started, and `/health`'s body names the store it cannot reach;
+  - *answering no image named*, `no health answer`: nothing answers, so production is down, with the old container gone and the new one not up; *the last image named* is the build that answered last.
+
+  Also: the uptime check goes red within minutes of a promotion; the orchestrator's *failed deployment* or *unhealthy container* mail.
 - **Do:** **list the release tags newest first** and take the one *below* the promotion that just failed — that is the release that worked (promotions are `release/*` tags since 23/09/2026, T-342; `deploy/RELEASES.md` is frozen and holds the promotions before that date, its last row read the same way):
 
   ```sh
@@ -69,7 +74,8 @@ The estate is two 4 GB boxes (ADR 0024): VPC 1 is production, VPC 2 is the orche
 - **The switch (ticket 79 Q7):** the day the first client's data is on the box, set the repository variable `CLIENT_DATA_ON_BOX` to that date. From then on `release` refuses to run unless `rehearsed_by` names the drill report a restore was just proved on, or a hotfix reason — one deploy train a month, on the drill day, plus hotfixes. Before that day any green build may be promoted, and the smoke is the last step.
 - **The next release is two steps, once** (11/09/2026, T-125): `deploy/platform.compose.yaml`'s bootstrap anchor now **requires** `S3_BUCKET` — the replay of erasures reads the object store and refuses when it cannot, and a bucket name it had to guess would be that refusal in production. So before the next production deploy, **set `S3_BUCKET` on the platform resource** in the orchestrator, to the bucket `wizard-41.sh`'s Garage stage created, and **then deploy**. A stack deployed without it does not come up half-working: compose refuses to start it, which is the failure this page's second bullet describes.
 - **No digest rollback across migration 0053** (24/09/2026, T-356): `0053_the-account-issuer-goes` drops `account.issuer`, which Better Auth 1.7.2 reads on every email-code sign-in, so the api of any release before it fails every sign-in on a migrated database with `column "issuer" does not exist`. Rolling back from the first release that carries 0053 to a tag below it is the migration case above: `release` with that tag's digests, then `restore-production.sh --tier <tier> --dump <file>` naming the last dump stamped before that promotion's time on its `release/*` tag — hourly dumps are kept 48 hours, and the 02:00 UTC one is filed under daily, weekly or monthly. Every write since that dump is lost, and every erasure since it is replayed. Between two releases that both carry 0053, the digests alone are the rollback.
-- **Attach:** the two `release/*` tags (failed, rolled back to), each with the message `git show --no-patch` prints; the workflow run; the orchestrator's deploy log; the body `/health` answered.
+- **A rollback to an api that names no image ends red at the smoke** (24/09/2026, T-364): an api image built before `/health` named its digest answers without an `image`, so the smoke waits out its six minutes and fails with *answering no image named* and a `healthy` last answer. Read `/health` by hand: `healthy` with no `image` is that older build answering, and the rollback done; `healthy` naming the failed digest is the failed build still up.
+- **Attach:** the two `release/*` tags (failed, rolled back to), each with the message `git show --no-patch` prints; the workflow run, with the smoke's error line naming both digests; the orchestrator's deploy log; the body `/health` answered, whose `image` is the digest actually running.
 - **Escalate:** the technical contact if the rollback does not turn `/health` green within 30 minutes; the client's named contact if the product was unreachable for more than an hour.
 - **Rehearsed by:** the first release after the first drill is rolled back on purpose, once, and both tags are kept.
 

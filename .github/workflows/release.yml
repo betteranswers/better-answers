@@ -144,10 +144,11 @@ jobs:
             echo "The api refuses to start unless PUBLIC_URL, AGENT_HOSTNAME and APEX_HOSTNAME are set on the api resource and all three hostnames differ (ADR 0034)."
           } >> "$GITHUB_STEP_SUMMARY"
       - name: post-deploy smoke against production (the release's last step)
+        env:
+          API_DIGEST: ${{ steps.d.outputs.api }}
         run: |
           set -euo pipefail
-          # /deploy is asynchronous and a fresh image takes about three minutes to pull.
-          curl -fsS --retry 40 --retry-delay 6 --retry-all-errors -o /dev/null "${PUBLIC_URL}/health"
-          # The uptime check watches this path and the one above, so the smoke and the
-          # monitor read the same two.
+          deploy/await-release.sh "${PUBLIC_URL}" "${API_DIGEST}"
+          # The uptime check watches this path and /health, so the smoke and the monitor
+          # read the same two.
           curl -fsS --retry 5 --retry-delay 6 --retry-all-errors "${PUBLIC_URL}/.well-known/oauth-protected-resource/mcp" | jq -e --arg mcp "${PUBLIC_URL}/mcp" '.resource == $mcp' >/dev/null

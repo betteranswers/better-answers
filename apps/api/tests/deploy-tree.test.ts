@@ -63,6 +63,7 @@ describe("the deploy tree (T-005)", () => {
     }
     expect(deployScripts()).toEqual(
       expect.arrayContaining([
+        "await-release.sh",
         "backup.sh",
         "browse-production.sh",
         "host-setup.sh",
@@ -215,6 +216,18 @@ describe("the deploy tree (T-005)", () => {
     expect(anchor).toContain("S3_ACCESS_KEY: ${OBJECTSTORE_ROOT_KEY:?}");
     expect(anchor).toContain("S3_SECRET_KEY: ${OBJECTSTORE_ROOT_SECRET:?}");
     expect(read("deploy/garage.toml")).toContain('s3_region = "garage"');
+  });
+
+  it("hands the api the digest its own image is pinned to, so /health names the build that answers", () => {
+    const api = composeServices(read("deploy/platform.compose.yaml")).find(
+      (service) => service.name === "api",
+    );
+    const pinnedBy = /^ {4}image: ghcr\.io\/betteranswers\/api@\$\{(\w+):\?\}$/m.exec(
+      api?.body ?? "",
+    )?.[1];
+
+    expect(pinnedBy).toEqual("API_IMAGE_DIGEST");
+    expect(api?.body).toMatch(/^ {6}API_IMAGE_DIGEST: \$\{API_IMAGE_DIGEST:\?\}$/m);
   });
 
   it("creates Garage's root key and the platform's bucket — the wizard for production, the drill for staging", () => {
@@ -420,6 +433,35 @@ describe("the deploy tree (T-005)", () => {
       return index;
     };
     expect(stepAt("record the promotion")).toBeLessThan(stepAt("post-deploy smoke"));
+  });
+
+  it("smokes until /health names the api digest this release resolved, and reads discovery after it", () => {
+    const smoke = stepNamed(read(".github/workflows/release.yml"), "post-deploy smoke");
+
+    expect(smoke).toMatch(/env:\n\s+API_DIGEST: \$\{\{ steps\.d\.outputs\.api \}\}\n/);
+    const waits = smoke.indexOf('deploy/await-release.sh "${PUBLIC_URL}" "${API_DIGEST}"');
+    expect(waits).toBeGreaterThan(-1);
+    expect(smoke.indexOf("/.well-known/oauth-protected-resource/mcp")).toBeGreaterThan(waits);
+
+    // The build being replaced answers 200 until the swap, so a request that reads the status alone passes on it.
+    const readsTheStatusAlone = smoke
+      .split("\n")
+      .filter((line) => line.includes("curl") && line.includes("/health"));
+    expect(readsTheStatusAlone).toEqual([]);
+  });
+
+  it("waits out the pull it was sized against, and gives up inside the job's timeout", () => {
+    const script = read("deploy/await-release.sh");
+    const polls = Number(/AWAIT_RELEASE_POLLS:-(\d+)/.exec(script)?.[1]);
+    const delaySeconds = Number(/AWAIT_RELEASE_DELAY_SECONDS:-(\d+)/.exec(script)?.[1]);
+    const pollSeconds = Number(/curl [^\n]*--max-time (\d+)/.exec(script)?.[1]);
+    const jobMinutes = Number(
+      /timeout-minutes: (\d+)/.exec(read(".github/workflows/release.yml"))?.[1],
+    );
+
+    // Twice the three minutes a fresh image took to pull and start, end to end; no sleep follows the last poll.
+    expect((polls - 1) * delaySeconds).toBeGreaterThanOrEqual(360);
+    expect(polls * pollSeconds + (polls - 1) * delaySeconds).toBeLessThan(jobMinutes * 60);
   });
 
   it("says per digest whether the tag's commit resolved it or a rollback passed it in", () => {
