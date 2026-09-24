@@ -1,0 +1,16 @@
+# Staging only, the platform's side: S3_ENDPOINT names objectstore, which staging.override.yaml puts on this network from the stores project.
+x-on-staging-shared: &on-staging-shared
+  networks:
+    # Naming any network drops `default`, the one the platform's own services meet on.
+    default: {}
+    staging-shared: {}
+
+services:
+  migrate: *on-staging-shared
+  api: *on-staging-shared
+  worker: *on-staging-shared
+
+networks:
+  staging-shared:
+    name: better-answers-staging-shared
+    external: true

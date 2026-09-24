@@ -24,11 +24,19 @@ STAMP=$(date -u +%Y%m%dT%H%M%SZ); WORK=$(mktemp -d); REPORT="${WORK}/drill-${STA
 started=$(date -u +%FT%TZ); T0=$(date +%s)
 say() { printf '%s %s\n' "$(date -u +%T)" "$*" | tee -a "${REPORT}"; }
 aside() { printf '%s %s\n' "$(date -u +%T)" "$*" | tee -a "${REPORT}" >&2; }
+# >>> the staging projects
 DEPLOY_DIR="${REPO_DIR}/deploy"
 # The -f paths are absolute: compose resolves them against the caller's cwd.
 compose() { docker compose --project-directory "${DEPLOY_DIR}" --env-file "${STAGING_ENV_FILE}" "$@"; }
 stores()   { compose -f "${DEPLOY_DIR}/stores.compose.yaml" -f "${DEPLOY_DIR}/staging.override.yaml" -p better-answers-stores-staging "$@"; }
-platform() { compose -f "${DEPLOY_DIR}/platform.compose.yaml" -p better-answers-staging "$@"; }
+platform() { compose -f "${DEPLOY_DIR}/platform.compose.yaml" -f "${DEPLOY_DIR}/staging.platform.override.yaml" -p better-answers-staging "$@"; }
+# Both overrides name it external, and compose refuses to start a service on one that does not exist.
+STAGING_NETWORK=better-answers-staging-shared
+# --internal: a plain bridge sorts first by name, so it would carry every member's default route in place of its project's network.
+ensure_staging_network() {
+  docker network inspect "${STAGING_NETWORK}" >/dev/null 2>&1 || docker network create --internal "${STAGING_NETWORK}" >/dev/null
+}
+# <<< the staging projects
 ops() {
   local rc=0; platform exec -T api pnpm --silent ops "$@" || rc=$?
   if [ "${rc}" -eq "${NOT_BUILT}" ]; then aside "  -> not built yet: 'pnpm ops $1' found no tables for its slice (recorded, not failed)"; return 0; fi
@@ -59,7 +67,7 @@ trap on_exit EXIT
 
 say "# Restore drill ${STAMP} — workspace ${DRILL_WORKSPACE}"
 
-say "## 0 wipe staging (starts from nothing)"; wipe_staging
+say "## 0 wipe staging (starts from nothing)"; ensure_staging_network; wipe_staging
 say "## 1 postgres — latest daily dump"
 latest=$(rclone lsf "dumps:${BACKUP_DUMPS_BUCKET}/pg/daily/" | grep '^pg-' | sort | tail -n1)
 globals=$(rclone lsf "dumps:${BACKUP_DUMPS_BUCKET}/pg/daily/" | grep '^globals-' | sort | tail -n1)
