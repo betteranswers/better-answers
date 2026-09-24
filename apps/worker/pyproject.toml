@@ -9,11 +9,11 @@ dependencies = [
     # implementation is one pinned library rather than a second toolchain to patch.
     # Version read from PyPI's dulwich release metadata on 08/09/2026; Apache-2.0 under
     # its dual licence, which is the arm this repository takes (ADR 0027).
-    "dulwich==1.2.14",
+    "dulwich==1.2.15",
     # The claim protocol and every read the two job kinds make. It was in the dev group
     # while nothing in `src` opened a connection; the work loop opens one on every tick,
     # so it belongs to what the image ships.
-    "psycopg[binary]==3.3.5",
+    "psycopg[binary]==3.3.6",
     "structlog>=26.1.0",
     # The redaction seam's detector (ADR 0020). Presidio is the frame — the registry that
     # runs the recognisers, the context enhancer and the anonymizer that writes the
@@ -64,7 +64,7 @@ dependencies = [
     # that proved *when* is the docblock on
     # `apps/worker/tests/test_pipeline_engine_environment.py`.
     # Bumping this pin re-runs both probes and re-dates both records in the same commit.
-    "cocoindex==1.0.22",
+    "cocoindex==1.0.24",
     # The driver the engine's Postgres target acquires its own connections through, and
     # the one the pipeline's per-workspace pool is built from. It is named here rather
     # than left to cocoindex's `postgres` extra, whose floor would let the driver move
@@ -77,7 +77,7 @@ dependencies = [
     # source, because the bytes are addressed by keys the document's catalogue row
     # already holds and nothing here walks a bucket. Read from PyPI on 11/09/2026;
     # Apache-2.0.
-    "boto3==1.43.92",
+    "boto3==1.43.100",
     # The two converters, one per media type (ADR 0013, amended 20/09/2026). `anydoc`
     # answers a `.docx` as GitHub-flavoured Markdown; `pdf-inspector` answers a PDF as
     # Markdown and classifies its pages first. Both are Rust extensions with no model in
@@ -98,7 +98,7 @@ dependencies = [
     # readings: `apps/worker/tests/test_image.py`'s
     # `test_both_converters_hold_on_the_image_under_the_engines_own_runtime`.
     "firecrawl-anydoc==0.2.4",
-    "pdf-inspector==1.22.0",
+    "pdf-inspector==1.23.0",
     # The AEAD the credential envelope is sealed and opened under, AES-256-GCM (ADR 0005,
     # amended 22/09/2026): this tier reaches it through `AESGCM` and the api tier through
     # Node's own OpenSSL, so the frame one tier writes is one the other reads. The package was
