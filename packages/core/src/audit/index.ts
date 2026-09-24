@@ -16,15 +16,7 @@ import {
 } from "./vocabulary.ts";
 
 export { act, declareActs, declarations } from "./vocabulary.ts";
-export type {
-  ActName,
-  LedgerAct,
-  Declaration,
-  DetailKind,
-  DetailOf,
-  DetailShape,
-  Family,
-} from "./vocabulary.ts";
+export type { ActName, LedgerAct, DetailOf } from "./vocabulary.ts";
 
 export type AuditEvent<A extends LedgerAct> = {
   readonly id: string;
