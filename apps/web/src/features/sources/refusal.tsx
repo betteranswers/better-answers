@@ -72,7 +72,7 @@ const SAID_OF_WORD = {
 const SOURCE_WORDS = new Map<string, Said>(Object.entries(SAID_OF_WORD));
 
 // Where the screen can tell before the click, it says what the api would refuse in the same words.
-export const saidBeforehand = (word: keyof typeof SAID_OF_WORD): string =>
+export const whyAndNextOf = (word: keyof typeof SAID_OF_WORD): string =>
   `${SAID_OF_WORD[word].why} ${SAID_OF_WORD[word].next}`;
 
 const CLASS_WORDS = {

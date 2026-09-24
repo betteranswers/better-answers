@@ -67,7 +67,7 @@ def redact(
 
     withholdings = withholdings_over(findings, text, policy)
     written_spans = written_spans_of(withholdings)
-    narrowing = _narrowing(findings)
+    narrowing = _findings_that_narrow(findings)
     dismissed = dismissed_among(narrowing, dismissals)
     return Redaction(
         text=_written(text, written_spans, letters),
@@ -127,7 +127,7 @@ def _counted(findings: Sequence[Finding]) -> Mapping[str, int]:
     return MappingProxyType(dict(sorted(counts.items())))
 
 
-def _narrowing(findings: Sequence[Finding]) -> tuple[Finding, ...]:
+def _findings_that_narrow(findings: Sequence[Finding]) -> tuple[Finding, ...]:
     return tuple(
         finding
         for finding in findings

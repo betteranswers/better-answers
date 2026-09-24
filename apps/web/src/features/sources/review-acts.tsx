@@ -8,7 +8,7 @@ import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 
 import { ActDialog } from "./act-dialog.tsx";
-import { outcomeOfFailure, saidBeforehand } from "./refusal.tsx";
+import { outcomeOfFailure, whyAndNextOf } from "./refusal.tsx";
 import {
   groupKeyText,
   keyOf,
@@ -24,6 +24,7 @@ import {
 import {
   REVIEW_HEADING,
   SOURCES_KEYSTROKES,
+  groupsTickedIn,
   useTickedGroups,
   type TickedGroups,
 } from "./sources-state.ts";
@@ -43,9 +44,9 @@ const useBulkAct = (bindingId: string, takes: (group: FindingGroup) => boolean =
   const [open, setOpen] = useState(false);
   const [outcome, setOutcome] = useState<Outcome>();
   const opener = useRef<HTMLElement>(null);
-  const held = ticked?.bindingId === bindingId ? ticked.groups : [];
+  const selected = groupsTickedIn(ticked, bindingId);
   const ready: TickedGroups | undefined =
-    held.length > 0 && held.every(takes) ? { bindingId, groups: held } : undefined;
+    selected.length > 0 && selected.every(takes) ? { bindingId, groups: selected } : undefined;
 
   const show = () => {
     if (ready === undefined) return;
@@ -85,7 +86,7 @@ const useBulkAct = (bindingId: string, takes: (group: FindingGroup) => boolean =
     });
   };
 
-  return { held, ready, open, setOpen, show, returnFocus, outcome, command };
+  return { selected, ready, open, setOpen, show, returnFocus, outcome, command };
 };
 
 type BulkActState = ReturnType<typeof useBulkAct>;
@@ -94,13 +95,14 @@ function BulkAct(properties: {
   readonly act: BulkActState;
   readonly keystroke: Keystroke;
   readonly label: string;
-  readonly unfit?: string;
+  readonly refusedWhy?: string;
   readonly dialog: ReactNode;
 }) {
   const { act } = properties;
-  const unfitId = useId();
+  const refusedWhyId = useId();
   useKeystroke(properties.keystroke, act.show);
-  const unfit = act.held.length > 0 && act.ready === undefined ? properties.unfit : undefined;
+  const refusedWhy =
+    act.selected.length > 0 && act.ready === undefined ? properties.refusedWhy : undefined;
 
   return (
     <div className="grid content-start gap-1">
@@ -110,14 +112,14 @@ function BulkAct(properties: {
         className="h-auto min-h-8 justify-self-start py-1 text-left whitespace-normal"
         disabled={act.ready === undefined}
         aria-keyshortcuts={properties.keystroke.key}
-        aria-describedby={unfit === undefined ? undefined : unfitId}
+        aria-describedby={refusedWhy === undefined ? undefined : refusedWhyId}
         onClick={act.show}
       >
         {properties.label}
       </Button>
-      {unfit === undefined ? null : (
-        <p id={unfitId} className="text-sm text-muted-foreground">
-          {unfit}
+      {refusedWhy === undefined ? null : (
+        <p id={refusedWhyId} className="text-sm text-muted-foreground">
+          {refusedWhy}
         </p>
       )}
       {properties.dialog}
@@ -314,7 +316,7 @@ export function DismissAsNotSpecialCategoryAct(properties: { readonly bindingId:
           ? "Dismiss as not special category"
           : `Dismiss ${named} as not special category`
       }
-      unfit={saidBeforehand("not-special-category")}
+      refusedWhy={whyAndNextOf("not-special-category")}
       dialog={
         <ReasonedDialog
           act={act}

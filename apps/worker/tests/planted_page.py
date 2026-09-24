@@ -26,6 +26,17 @@ A_VERB_FORM_HEALTH_SENTENCE = (
 )
 
 
+THE_ENGINEERS_SENTENCE_AT = (34, 129)
+
+
+THE_DIAGNOSED_SENTENCE_AT = (141, 237)
+
+
+def the_engineers_section() -> str:
+    page = SERVICE_NOTES_PAGE.read_text(encoding="utf-8")
+    return page[: page.index("## Cover")]
+
+
 TIER_AGREEMENT = REPO_ROOT / "contracts" / "redaction" / "cases.json"
 
 _AGREEMENT = cast(

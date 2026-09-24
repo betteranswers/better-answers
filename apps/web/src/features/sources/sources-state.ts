@@ -25,3 +25,8 @@ export type TickedGroups = {
 };
 
 export const useTickedGroups = viewStateOf<TickedGroups>(BINDINGS_VIEW);
+
+export const groupsTickedIn = (
+  ticked: TickedGroups | undefined,
+  bindingId: string,
+): readonly FindingGroup[] => (ticked?.bindingId === bindingId ? ticked.groups : []);

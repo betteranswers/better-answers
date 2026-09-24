@@ -43,7 +43,12 @@ from factories import (
     seed_suppression,
 )
 from pg_harness import migrated_postgres_at
-from planted_page import SERVICE_NOTES_PAGE
+from planted_page import (
+    SERVICE_NOTES_PAGE,
+    THE_DIAGNOSED_SENTENCE_AT,
+    THE_ENGINEERS_SENTENCE_AT,
+    the_engineers_section,
+)
 from test_pipeline_host import (
     WORKER_LOGIN,
     WORKER_PASSWORD,
@@ -1086,13 +1091,10 @@ def test_a_span_an_admin_restored_is_back_in_the_text_after_the_next_run(
 A_SERVICE_NOTE_ID = "01M2Q3R4S5T6V7W8X9YZAB0004"
 
 
+AN_ENGINEERS_NOTE_ID = "01M2Q3R4S5T6V7W8X9YZAB0005"
+
+
 THE_SICK_NOTES_HEALTH_SENTENCE = (63, 131)
-
-
-THE_ENGINEERS_SENTENCE_AT = (34, 129)
-
-
-THE_DIAGNOSED_SENTENCE_AT = (141, 237)
 
 
 def a_bucket_holding_the_service_note_too() -> ABucket:
@@ -1100,6 +1102,7 @@ def a_bucket_holding_the_service_note_too() -> ABucket:
         {
             **a_bucket_holding_the_three().objects,
             original_key_of(A_SERVICE_NOTE_ID): SERVICE_NOTES_PAGE.read_bytes(),
+            original_key_of(AN_ENGINEERS_NOTE_ID): the_engineers_section().encode(),
         }
     )
 
@@ -1220,6 +1223,26 @@ def test_a_document_with_a_second_undismissed_health_finding_stays_restricted(
 
     assert one_dismissed["own"] == "Restricted"
     assert both_dismissed["own"] is None
+
+
+def test_dismissing_an_engineers_diagnosis_gives_its_document_back_after_the_run(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    connection, dsn = database
+    engineers_note = OneDocumentRun(
+        connection,
+        dsn,
+        tmp_path,
+        AN_ENGINEERS_NOTE_ID,
+        bucket=a_bucket_holding_the_service_note_too(),
+    )
+    narrowed = engineers_note.run()
+
+    engineers_note.marked(seed_dismissal, THE_ENGINEERS_SENTENCE_AT)
+    lifted = engineers_note.run("dismissed")
+
+    assert narrowed["own"] == "Restricted"
+    assert lifted == {"own": None, "narrowed_to": None, "chunks": ["Internal"]}
 
 
 def test_a_kept_health_sentence_is_back_in_the_text_and_its_document_restricted(

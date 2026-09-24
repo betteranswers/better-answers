@@ -220,16 +220,18 @@ Where a unit lives is decided by **minting**.
   document; it never widens.
 - **dismiss as not special category** — an Admin's bulk act over named special-category *finding
   groups* of one binding: every span of each group is reviewed as **dismissed** under one reason,
-  because what the *cue* caught is not health data. The run that reads the dismissal is queued with
-  it. The act changes what the finding is classed as and does not let the span be shown: the span
-  stays withheld unless it is also *kept in text*. On that run, a document whose every
+  because what the *cue* caught is not health data. Each such review is a **dismissal**. The run
+  that reads the dismissals is queued with them. The act changes what the finding is classed as
+  and does not let the span be shown: the span stays withheld unless it is also *kept in text*,
+  and a later keep leaves the dismissal standing. On that run, a document whose every
   special-category finding is dismissed has its **verdict lifted**, and the document's own class
   goes back to the Admin's narrowing, or to the binding's class if there is none. One ledger row
   per document. It is the one road by which a document's class widens. (Not *keep in text*, which
   lets a span back into the text and lifts no class.)
-- **cue** — a word whose lemma, found in a sentence, withholds that sentence whole as special
-  category at the always tier and narrows its document. It is the special-category rule's detection
-  and never a boost. _Avoid_: context word, which only raises a score a recogniser already gave.
+- **cue** — a word which, found in a sentence in any of its forms, withholds that sentence whole
+  as special category and narrows its document. It is how the special-category rule finds what
+  it withholds. _Avoid_: context word, a word near what another rule found that makes the rule
+  surer of it.
 - **redaction seam** — the one place a document's text is read for what must be withheld and
   the placeholders are written in, ahead of chunking, extraction and every model call, so that
   no derived store and no model ever holds the value.

@@ -7,6 +7,7 @@ import {
   SENSITIVITIES,
   SENSITIVITY_DEFAULT,
   type FINDING_REVIEW_STATES,
+  type INDEX_REASONS,
 } from "@better-answers/schema";
 import { z } from "zod";
 
@@ -296,7 +297,7 @@ const spansCommanded = async <GroupRefusal extends string>(
 const indexRunQueued = async (
   { admin, workspaceId, bindingId }: ActingOnBinding,
   tx: Tx,
-  reason: "restored" | "dismissed",
+  reason: Extract<(typeof INDEX_REASONS)[number], "restored" | "dismissed">,
 ): Promise<string> => {
   const queued = await enqueueJobIn(admin, tx, {
     workspaceId,
@@ -312,10 +313,12 @@ const indexRunQueued = async (
 
 const KEPT_IN_TEXT = "kept-in-text" satisfies (typeof FINDING_REVIEW_STATES)[number];
 
+// A later keep does not revise what a dismissal said the span is; the keep has the restore
+// columns.
 const KEPT_IN_TEXT_REVIEW = `UPDATE finding
         SET review_state = $3, reviewed_by = restored_by,
             reviewed_at = restored_at, review_reason = restore_reason
-      WHERE workspace_id = $1 AND id = ANY($2::text[])`;
+      WHERE workspace_id = $1 AND id = ANY($2::text[]) AND review_state <> $4`;
 
 export const keepInText = async (
   principal: UserPrincipal,
@@ -340,7 +343,7 @@ export const keepInText = async (
     if (!restored.ok) return err(restored.error);
   }
   const reviewed = await attempt(() =>
-    tx.query(KEPT_IN_TEXT_REVIEW, [workspaceId, named, KEPT_IN_TEXT]),
+    tx.query(KEPT_IN_TEXT_REVIEW, [workspaceId, named, KEPT_IN_TEXT, FINDING_DISMISSED_STATE]),
   );
   if (!reviewed.ok) return err(reviewed.error);
 

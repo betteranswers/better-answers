@@ -400,11 +400,11 @@ describe("a revocation landed while a mutation runs", () => {
 
 const A_HEALTH_CUE = { category: "special-category", ruleId: "HEALTH_CUE" } as const;
 
-const anAdminWhoseBindingHolds = async (finding: typeof A_HEALTH_CUE) => {
+const anAdminWhoseBindingHoldsAHealthCue = async () => {
   const { workspace, api } = await anAdmin();
   const { bindingId, documentId } = await unpublishedBinding(workspace.workspaceId);
   await seededIn(app, (seed) =>
-    seed.finding({ workspaceId: workspace.workspaceId, documentId, ...finding }),
+    seed.finding({ workspaceId: workspace.workspaceId, documentId, ...A_HEALTH_CUE }),
   );
   return { api, bindingId, documentId };
 };
@@ -574,7 +574,7 @@ describe("the Sources procedures over the wire", () => {
   });
 
   it("dismisses a special-category finding group as not special category and queues the run that reads it", async () => {
-    const { api, bindingId, documentId } = await anAdminWhoseBindingHolds(A_HEALTH_CUE);
+    const { api, bindingId, documentId } = await anAdminWhoseBindingHoldsAHealthCue();
 
     const dismissed = await api.sources.dismissAsNotSpecialCategory.mutate({
       bindingId,

@@ -27,6 +27,9 @@ from planted_page import (
     FIXTURE_PAGE,
     PLANTED_SPANS,
     SERVICE_NOTES_PAGE,
+    THE_DIAGNOSED_SENTENCE_AT,
+    THE_ENGINEERS_SENTENCE_AT,
+    the_engineers_section,
     typed_placeholders_under,
 )
 
@@ -745,12 +748,6 @@ def test_a_restore_moves_neither_the_counts_nor_the_verdict_the_findings_give(
     assert found.counts == on_a_plain_binding.counts
 
 
-THE_ENGINEERS_SENTENCE_AT = (34, 129)
-
-
-THE_DIAGNOSED_SENTENCE_AT = (141, 237)
-
-
 @pytest.fixture(scope="module")
 def service_notes() -> str:
     return SERVICE_NOTES_PAGE.read_text(encoding="utf-8")
@@ -845,6 +842,53 @@ def test_a_dismissal_that_leaves_one_special_category_finding_standing_lifts_not
     )
 
     assert (found.verdict, found.lifted) == ("Restricted", False)
+
+
+def test_dismissing_an_engineers_diagnosis_lifts_its_page_and_keeps_it_withheld() -> (
+    None
+):
+    section = the_engineers_section()
+    spans = spans_detected(section)
+    start, end = THE_ENGINEERS_SENTENCE_AT
+
+    standing = redact(section, spans, THE_SAFE_SET, NO_SUPPRESSIONS, SEED)
+    dismissed = redact(
+        section,
+        spans,
+        THE_SAFE_SET,
+        NO_SUPPRESSIONS,
+        SEED,
+        dismissals=[dismissal_at(THE_ENGINEERS_SENTENCE_AT)],
+    )
+
+    assert section[start:end] == AN_ENGINEERING_DIAGNOSIS
+    assert health_findings_on(standing) == [THE_ENGINEERS_SENTENCE_AT]
+    assert (standing.verdict, dismissed.verdict, dismissed.lifted) == (
+        "Restricted",
+        None,
+        True,
+    )
+    assert AN_ENGINEERING_DIAGNOSIS not in dismissed.text
+
+
+def test_a_span_both_kept_and_dismissed_is_back_in_the_text_and_lifts_the_verdict(
+    service_notes: str, service_spans: tuple[Span, ...]
+) -> None:
+    both = [THE_ENGINEERS_SENTENCE_AT, THE_DIAGNOSED_SENTENCE_AT]
+
+    found = redact(
+        service_notes,
+        service_spans,
+        THE_SAFE_SET,
+        NO_SUPPRESSIONS,
+        SEED,
+        [Restore(rule_id="HEALTH_CUE", start=start, end=end) for start, end in both],
+        [dismissal_at(at) for at in both],
+    )
+
+    assert AN_ENGINEERING_DIAGNOSIS in found.text
+    assert A_VERB_FORM_HEALTH_SENTENCE in found.text
+    assert (found.verdict, found.lifted) == (None, True)
 
 
 def test_a_dismissal_under_another_rule_dismisses_nothing(

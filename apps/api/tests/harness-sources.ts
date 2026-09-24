@@ -96,7 +96,6 @@ const inOneTransaction = async <T>(
   }
 };
 
-// The first spans of a group are the dismissed ones, so a count says how many an Admin dismissed.
 const reviewOf = (finding: z.output<typeof aFinding>, span: number) => {
   const now = new Date();
   if (span < finding.dismissed) {

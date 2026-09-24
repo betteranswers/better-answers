@@ -196,8 +196,8 @@ def reconcile_catalogue(cursor: Cursor[Any], documents: Sequence[ReadDocument]) 
             " redaction_version = %(version)s, outcome = %(outcome)s,"
             " quarantine_error = NULL,"
             " last_seen = now(),"
-            # The ranking is the database's, so a verdict only narrows; a lifted one
-            # returns to the Admin's narrowing, never past it.
+            # A verdict only narrows, by the database's ranking; a lifted one keeps the
+            # Admin's own word, which the seam never made.
             " sensitivity = CASE"
             "   WHEN %(lifted)s THEN narrowed_to"
             "   WHEN sensitivity IS NULL THEN %(verdict)s::text"

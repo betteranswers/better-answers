@@ -31,7 +31,12 @@ import {
   type FindingGroupKey,
   type ListedBinding,
 } from "./sources-api.ts";
-import { REVIEW_HEADING, SOURCES_KEYSTROKES, useTickedGroups } from "./sources-state.ts";
+import {
+  groupsTickedIn,
+  REVIEW_HEADING,
+  SOURCES_KEYSTROKES,
+  useTickedGroups,
+} from "./sources-state.ts";
 import { counted, spokenWord } from "./words.ts";
 
 const NOTHING_FOUND = {
@@ -120,14 +125,14 @@ function FindingsTable(properties: {
   const { binding, groups } = properties;
   const [ticked, tick] = useTickedGroups();
   const [inFocus, setInFocus] = useState<FindingGroupKey>();
-  const held = ticked?.bindingId === binding.bindingId ? ticked.groups : [];
+  const selected = groupsTickedIn(ticked, binding.bindingId);
 
   const toggle = (group: FindingGroup) => {
     tick({
       bindingId: binding.bindingId,
-      groups: groupIsIn(held, group)
-        ? held.filter((each) => !groupIsIn([keyOf(group)], each))
-        : [...held, group],
+      groups: groupIsIn(selected, group)
+        ? selected.filter((each) => !groupIsIn([keyOf(group)], each))
+        : [...selected, group],
     });
   };
   useKeystroke(SOURCES_KEYSTROKES.select, () => {
@@ -147,7 +152,7 @@ function FindingsTable(properties: {
   return (
     <Table>
       <TableCaption>
-        {counted(held.length, "finding group", "finding groups")} selected. Select a group with{" "}
+        {counted(selected.length, "finding group", "finding groups")} selected. Select a group with{" "}
         <kbd className="font-mono">{SOURCES_KEYSTROKES.select.key}</kbd>, then keep it in text,
         narrow its document or dismiss it as not special category with the acts above.
       </TableCaption>
@@ -171,7 +176,7 @@ function FindingsTable(properties: {
                 onFocus={() => {
                   setInFocus(keyOf(group));
                 }}
-                checked={groupIsIn(held, group)}
+                checked={groupIsIn(selected, group)}
                 onCheckedChange={() => {
                   toggle(group);
                 }}

@@ -919,7 +919,7 @@ describe("an Admin narrowing named documents", () => {
     });
   });
 
-  it("keeps the class it narrowed a document to apart from the seam's verdict, so a lifted verdict goes back to it", async () => {
+  it("writes the class it narrowed a document to as the Admin's own narrowing, beside the class the document is read at", async () => {
     const scenario = await arrange();
     const { bindingId, first, second } = await bindingWithTwoDocuments(scenario);
 
@@ -1219,6 +1219,32 @@ describe("an Admin dismissing named special-category finding groups as not speci
     });
     expect(await reviewOf(scenario.workspaceId, dropped)).toEqual(UNREVIEWED);
   });
+
+  it.each([
+    ["dismissed and then kept in text", ["dismiss", "keep"]],
+    ["kept in text and then dismissed", ["keep", "dismiss"]],
+  ] as const)(
+    "leaves a span %s reviewed as dismissed and back in the text, each act on its own record",
+    async (_order, acts) => {
+      const scenario = await arrange();
+      const { bindingId, first } = await twoDocumentsTheSeamNarrowed(scenario);
+      const named = await findingIn(scenario.workspaceId, first.documentId, HEALTH);
+      const group = [findingGroupIn(first.documentId, HEALTH)];
+
+      for (const taken of acts) {
+        await (taken === "dismiss" ? dismissAs : keepAs)(scenario.admin, bindingId, group);
+      }
+
+      expect(await reviewOf(scenario.workspaceId, named)).toMatchObject({
+        review_state: "dismissed",
+        review_reason: NOT_HEALTH_DATA,
+      });
+      expect(await restoreOf(scenario.workspaceId, named)).toMatchObject({
+        restored: true,
+        restore_reason: BUSINESS_FACT,
+      });
+    },
+  );
 
   it.each([
     ["the queue will not hold its run", "job"],
