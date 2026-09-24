@@ -51,6 +51,9 @@ const AFTER_THE_STOP_AT = new Date("2026-06-20T00:00:00.000Z");
 const BY_ADDRESS_SINCE = new Date("2026-06-21T00:00:00.000Z");
 const BY_ADDRESS_AT = new Date("2026-06-22T00:00:00.000Z");
 
+const INDEX_RESTORED_SINCE = new Date("2026-06-23T00:00:00.000Z");
+const INDEX_RESTORED_AT = new Date("2026-06-24T00:00:00.000Z");
+
 const ERASURE_ACTOR = "process:better-answers-erasure";
 
 const REPLAYED = "platform.erasure.replayed";
@@ -447,5 +450,107 @@ describe("the replay copy for a request named by address alone", () => {
         .filter((copy) => copy.workspaceId === scenario.workspaceId)
         .map((copy) => copy.personId),
     ).toEqual([person.id]);
+  });
+});
+
+type IndexedBinding = {
+  readonly id: string;
+  readonly documentId: string;
+  readonly content: string;
+};
+
+const aBindingIndexing = (workspaceId: string, content: string): Promise<IndexedBinding> =>
+  seedingWith(db().pool, async (seed) => {
+    const binding = await seed.sourceBinding({ workspaceId });
+    const document = await seed.sourceDocument({ workspaceId, bindingId: binding.id });
+    return { id: binding.id, documentId: document.id, content };
+  });
+
+const theIndexRestored = (workspaceId: string, bindings: readonly IndexedBinding[]) =>
+  seedingWith(db().pool, async (seed) => {
+    for (const binding of bindings) {
+      await seed.chunk({
+        workspaceId,
+        bindingId: binding.id,
+        sourceDocumentId: binding.documentId,
+        content: binding.content,
+        locator: `${binding.documentId}/chars:0-${binding.content.length}`,
+        ordinal: 0,
+        charStart: 0,
+        charEnd: binding.content.length,
+      });
+    }
+  });
+
+const asIfRestoredFromADumpOlderThanIt = async (
+  workspaceId: string,
+  erased: Erased,
+  bindings: readonly IndexedBinding[],
+): Promise<void> => {
+  await asIfTheDumpPredatedIt(workspaceId, erased);
+  await db().pool.query("DELETE FROM job WHERE workspace_id = $1", [workspaceId]);
+  await theIndexRestored(workspaceId, bindings);
+};
+
+const whatTheReplayLeft = async (workspaceId: string) => ({
+  suppressions: (
+    await db().pool.query<{ erasure_request_id: string; identifiers: unknown }>(
+      "SELECT erasure_request_id, identifiers FROM suppression WHERE workspace_id = $1",
+      [workspaceId],
+    )
+  ).rows,
+  indexed: (
+    await db().pool.query<{ binding_id: string }>(
+      `SELECT binding_id FROM "index".chunk WHERE workspace_id = $1 ORDER BY binding_id`,
+      [workspaceId],
+    )
+  ).rows.map((row) => row.binding_id),
+  queued: (
+    await db().pool.query<{ kind: string; subject_id: string | null; reason: string | null }>(
+      "SELECT kind, subject_id, reason FROM job WHERE workspace_id = $1 AND status = 'queued' ORDER BY kind",
+      [workspaceId],
+    )
+  ).rows,
+});
+
+describe("a restore from a dump older than the request", () => {
+  it("re-creates the workspace's suppression and wipes the binding whose restored index names the subject, queueing its index run, and leaves the binding beside it alone", async () => {
+    const scenario = await arrange();
+    const workspaceId = scenario.workspaceId;
+    const naming = await aBindingIndexing(
+      workspaceId,
+      "Expense claims go to Priya Anand for approval.",
+    );
+    const beside = await aBindingIndexing(workspaceId, "Expenses are claimed within thirty days.");
+    await theIndexRestored(workspaceId, [naming, beside]);
+    const erased = await completedInTheRows(workspaceId, INDEX_RESTORED_AT);
+    await leavingAReplayCopy(scenario, erased, INDEX_RESTORED_AT);
+    // The chunk beside it was never wiped, so the restore brings back the one the wipe took.
+    await asIfRestoredFromADumpOlderThanIt(workspaceId, erased, [naming]);
+    const restored = await whatTheReplayLeft(workspaceId);
+
+    const replayed = await replaying(scenario, INDEX_RESTORED_AT, INDEX_RESTORED_SINCE);
+
+    expect(restored).toEqual({
+      suppressions: [],
+      indexed: [naming.id, beside.id].sort(),
+      queued: [],
+    });
+    expect(replayed.map((one) => [one.erasureRequestId, one.fromReplayCopy])).toEqual([
+      [erased.erasureRequestId, true],
+    ]);
+    expect(await whatTheReplayLeft(workspaceId)).toEqual({
+      suppressions: [
+        {
+          erasure_request_id: erased.erasureRequestId,
+          identifiers: { emails: [erased.email], names: ["Priya Anand"], other: [] },
+        },
+      ],
+      indexed: [beside.id],
+      queued: [
+        { kind: "full-rebuild", subject_id: null, reason: "erasure" },
+        { kind: "index", subject_id: naming.id, reason: "wiped" },
+      ],
+    });
   });
 });

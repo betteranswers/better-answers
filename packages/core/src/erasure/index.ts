@@ -9,7 +9,7 @@ export { accessAnswerOf, ERASURE_FAMILIES, erasureMapOf } from "./map.ts";
 export type { AccessAnswer, ErasureFamily, ErasureFamilyDescriptor, ErasureMap } from "./map.ts";
 export { rederiveAfterErasure } from "./rederive.ts";
 export { rehearseErasure, seedSyntheticSubject } from "./rehearsal.ts";
-export type { ErasureRehearsed, RehearsalRefusal, SyntheticSubject } from "./rehearsal.ts";
+export type { ErasureRehearsed, RehearsalRefusal } from "./rehearsal.ts";
 export { replayCopiesSince } from "./replay.ts";
 export { replayableErasures, replayErasures } from "./replay-erasures.ts";
 export type { ReplayedErasure } from "./replay-erasures.ts";

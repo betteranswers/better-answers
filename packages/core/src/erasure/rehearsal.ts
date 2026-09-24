@@ -12,6 +12,7 @@ import {
   type Result,
   type UserPrincipal,
 } from "../kernel/index.ts";
+import { bindUpload, bindUploadFields } from "../sources/index.ts";
 import { head, type GitDoor } from "../store/git/index.ts";
 import type { ObjectDoor } from "../store/objects/index.ts";
 import {
@@ -45,7 +46,7 @@ export type RehearsalDoors = {
 
 export type RehearsalRefusal = "malformed" | "not-seeded";
 
-export type SyntheticSubject = {
+type SyntheticSubject = {
   readonly personId: string;
 
   readonly email: string;
@@ -55,6 +56,15 @@ export type SyntheticSubject = {
 
   readonly tokens: readonly string[];
 };
+
+type SeededDocument = {
+  readonly bindingId: string;
+  readonly documentId: string;
+
+  readonly indexJobId: string;
+};
+
+type SeededSubject = SyntheticSubject & { readonly document: SeededDocument };
 
 export type ErasureRehearsed = SyntheticSubject & {
   readonly subjectRequestId: string;
@@ -76,6 +86,20 @@ const CONCEPT_TITLE = "Erasure rehearsal";
 const CONCEPT_BODY =
   "The drill's synthetic note. It names the rehearsal's subject in the frontmatter's " +
   "`verified` entry and nowhere else, because that is the one form an erasure rewrites.";
+
+const DOCUMENT_BINDING = "Erasure rehearsal";
+
+// Named for the subject, so a re-run finds its binding and a subject seeded after an erasure
+// gets a document naming them.
+const documentFileOf = (subject: SyntheticSubject): string =>
+  `erasure-rehearsal-${subject.personId.toLowerCase()}.md`;
+
+// A work address and a name, neither of which a rule in force raises: the index holds both
+// until the erasure withholds them.
+const documentNaming = (subject: SyntheticSubject): string =>
+  "# Erasure rehearsal\n\n" +
+  `The drill's synthetic document. It names the rehearsal's subject, ${subject.name}, ` +
+  `who works at ${subject.email}.\n`;
 
 const addressFor = (workspaceId: string): string =>
   `subject-${workspaceId.toLowerCase()}@${SYNTHETIC_DOMAIN}`;
@@ -183,12 +207,61 @@ const conceptSeeded = async (
   return err(new Error(`erasure: the rehearsal's concept was refused: ${String(written.error)}`));
 };
 
+const bindingHolding = (
+  platform: ErasurePrincipal,
+  door: PostgresDoor,
+  workspaceId: string,
+  fileName: string,
+): Promise<string | undefined> =>
+  withScope(platform, door, workspaceId, async (tx) => {
+    const found = await tx.query<{ binding_id: string }>(
+      `SELECT binding_id FROM source_document
+        WHERE workspace_id = $1 AND source_system_id = $2
+        ORDER BY binding_id LIMIT 1`,
+      [workspaceId, fileName],
+    );
+    return found.rows[0]?.binding_id;
+  });
+
+const documentSeeded = async (
+  platform: ErasurePrincipal,
+  writer: UserPrincipal,
+  doors: RehearsalDoors,
+  subject: SyntheticSubject,
+): Promise<Result<SeededDocument, Error>> => {
+  const fileName = documentFileOf(subject);
+  const standing = await attempt(() =>
+    bindingHolding(platform, doors.postgres, writer.workspaceId, fileName),
+  );
+  if (!standing.ok) return err(standing.error);
+  const text = new TextEncoder().encode(documentNaming(subject));
+  const bound = await bindUpload(writer, doors, {
+    ...bindUploadFields.parse({
+      // A re-run binds under the standing id, which the bind answers with its first outcome.
+      bindingId: standing.value ?? ulid(),
+      name: DOCUMENT_BINDING,
+      fileName,
+      mediaType: "text/markdown",
+      byteSize: text.byteLength,
+    }),
+    body: new Blob([text]).stream(),
+  });
+  if (!bound.ok) {
+    return err(new Error(`erasure: the rehearsal's document was refused: ${String(bound.error)}`));
+  }
+  return ok({
+    bindingId: bound.value.bindingId,
+    documentId: bound.value.documentId,
+    indexJobId: bound.value.jobId,
+  });
+};
+
 /* jscpd:ignore-start */
 export const seedSyntheticSubject = async (
   platform: ErasurePrincipal,
   doors: RehearsalDoors,
   input: RehearsalInput,
-): Promise<Result<SyntheticSubject, RehearsalRefusal | Error>> => {
+): Promise<Result<SeededSubject, RehearsalRefusal | Error>> => {
   const named = workspaceNamed(input.workspaceId);
   if (!named.ok) return err(named.error);
   const { workspaceId, email } = named.value;
@@ -217,7 +290,10 @@ export const seedSyntheticSubject = async (
   if (!writer.ok) return err(writer.error);
 
   const concept = await conceptSeeded(writer.value, doors, subject);
-  return concept.ok ? ok(subject) : err(concept.error);
+  if (!concept.ok) return err(concept.error);
+
+  const document = await documentSeeded(platform, writer.value, doors, subject);
+  return document.ok ? ok({ ...subject, document: document.value }) : err(document.error);
 };
 
 const recordTheRehearsal = async (

@@ -27,10 +27,16 @@ import {
   err,
   ok,
   type Clock,
+  type PlatformPrincipal,
   type RefusalClass,
   type Result,
 } from "@better-answers/core/kernel";
-import { JOB_IS_OVER, jobById, type RebuildReason } from "@better-answers/core/runs";
+import {
+  JOB_IS_OVER,
+  jobById,
+  type JobStatus,
+  type RebuildReason,
+} from "@better-answers/core/runs";
 import {
   ORPHANED_UPLOAD_GRACE_HOURS,
   sweepOrphanedUploads,
@@ -152,7 +158,9 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
   object-store-orphans --workspace <id> [--list]            recovery order step 5: remove the originals a failed bind left, past a ${ORPHANED_UPLOAD_GRACE_HOURS}-hour grace, that no document row names
     --list         say how many there are, removing none
   smoke --url <origin> [--workspace <id>] [--find] [--guide] [--ask]
-  erasure-rehearsal --workspace <id> --synthetic --seed      phase one: the synthetic subject, its tokens on the last line
+  erasure-rehearsal --workspace <id> --synthetic --seed [--wait-seconds <n>]
+                                                            phase one: the synthetic subject and a document naming them, waited on until indexed; its tokens on the last line
+    --wait-seconds <n>  how long to wait for the document's index job (default ${WAIT_SECONDS})
   erasure-rehearsal --workspace <id> --synthetic --run --report <file>   phase two: erase them, write the report, print the tokens again
   dump-grep --tokens <a,b,…>                                stdin: a plain-SQL dump; per token, which COPY section holds it and in how many lines — never a line
   provision-workspace --name <name> --slug <slug> --admin <email>
@@ -443,6 +451,35 @@ const after = (ms: number): Promise<void> =>
     setTimeout(resolve, ms);
   });
 
+const jobAfterWaiting = async (
+  platform: PlatformPrincipal,
+  doors: Doors,
+  job: { readonly workspaceId: string; readonly jobId: string },
+  seconds: number,
+) => {
+  const deadline = doors.clock.now().getTime() + seconds * 1_000;
+  const pollMs = Math.min(WAIT_POLL_MS, seconds * 1_000);
+  let read = await jobById(platform, doors.postgres, job);
+  while (
+    read.ok &&
+    !JOB_IS_OVER.includes(read.value.status) &&
+    doors.clock.now().getTime() < deadline
+  ) {
+    await after(Math.min(pollMs, Math.max(deadline - doors.clock.now().getTime(), 0)));
+    read = await jobById(platform, doors.postgres, job);
+  }
+  return read;
+};
+
+const unfinished = (
+  job: { readonly status: JobStatus; readonly attempts: number },
+  seconds: number,
+  consequence: string,
+): string =>
+  JOB_IS_OVER.includes(job.status)
+    ? `${job.status} after ${counted(job.attempts, "attempt")}; the job's own row says what it found`
+    : `still ${job.status} after ${counted(seconds, "second")}, so ${consequence}`;
+
 const waitForJob = async (
   doors: Doors,
   workspaceId: string,
@@ -450,28 +487,17 @@ const waitForJob = async (
   seconds: number,
   io: OpsIo,
 ): Promise<number> => {
-  const door = doors.postgres;
-  const deadline = doors.clock.now().getTime() + seconds * 1_000;
-  const pollMs = Math.min(WAIT_POLL_MS, seconds * 1_000);
-  let job = await jobById(GRAPH_MAINTENANCE, door, { workspaceId, jobId });
-  while (
-    job.ok &&
-    !JOB_IS_OVER.includes(job.value.status) &&
-    doors.clock.now().getTime() < deadline
-  ) {
-    await after(Math.min(pollMs, Math.max(deadline - doors.clock.now().getTime(), 0)));
-    job = await jobById(GRAPH_MAINTENANCE, door, { workspaceId, jobId });
-  }
+  const job = await jobAfterWaiting(GRAPH_MAINTENANCE, doors, { workspaceId, jobId }, seconds);
   if (!job.ok) return refused("graph-rebuild", workspaceId, job.error, io);
-  const { status, attempts } = job.value;
-  if (status === "done") {
-    io.say(`graph-rebuild: done — job ${jobId} rebuilt the map on ${counted(attempts, "attempt")}`);
+  if (job.value.status === "done") {
+    io.say(
+      `graph-rebuild: done — job ${jobId} rebuilt the map on ${counted(job.value.attempts, "attempt")}`,
+    );
     return DONE;
   }
-  const ending = JOB_IS_OVER.includes(status)
-    ? `${status} after ${counted(attempts, "attempt")}; the job's own row says what it found`
-    : `still ${status} after ${counted(seconds, "second")}, so nothing has rebuilt this map`;
-  io.say(`graph-rebuild: REFUSED — job ${jobId} is ${ending}`);
+  io.say(
+    `graph-rebuild: REFUSED — job ${jobId} is ${unfinished(job.value, seconds, "nothing has rebuilt this map")}`,
+  );
   return REFUSED;
 };
 
@@ -721,6 +747,40 @@ const rehearsalReason = (reason: RehearsalRefusal | Error): string | Error =>
     ? "no synthetic subject stands in this workspace — phase one (--seed) has not been run here, or its subject has already been erased"
     : reason;
 
+const seedingToBeDumped = async (
+  doors: Doors,
+  erasure: ErasureDoors,
+  workspaceId: string,
+  waitSeconds: number,
+  io: OpsIo,
+): Promise<number> => {
+  const seeded = await seedSyntheticSubject(ERASURE, erasure, { workspaceId });
+  if (!seeded.ok) {
+    return refused("erasure-rehearsal", workspaceId, rehearsalReason(seeded.error), io);
+  }
+  // A dump taken before the worker indexes the document holds no chunk naming the subject,
+  // and phase two would then prove nothing about the index.
+  const { indexJobId } = seeded.value.document;
+  const indexed = await jobAfterWaiting(
+    ERASURE,
+    doors,
+    { workspaceId, jobId: indexJobId },
+    waitSeconds,
+  );
+  if (!indexed.ok) return refused("erasure-rehearsal", workspaceId, indexed.error, io);
+  if (indexed.value.status !== "done") {
+    io.say(
+      `erasure-rehearsal: REFUSED — the synthetic subject's document is not indexed: job ${indexJobId} is ${unfinished(indexed.value, waitSeconds, "no worker has indexed it")}`,
+    );
+    return REFUSED;
+  }
+  io.say(
+    `erasure-rehearsal: done — the synthetic subject of ${workspaceId} is seeded (a user row, an Admin membership, one concept file and one indexed document naming them); take the dump, then run phase two`,
+  );
+  io.say(seeded.value.tokens.join(","));
+  return DONE;
+};
+
 const erasureRehearsal = async (
   doors: Doors,
   workspaceId: string,
@@ -748,6 +808,11 @@ const erasureRehearsal = async (
     );
     return USAGE;
   }
+  const wait = waitSecondsOf(flags);
+  if (wait === "malformed") {
+    io.say("erasure-rehearsal: --wait-seconds takes a whole number of seconds");
+    return USAGE;
+  }
   const opened = erasureDoors(doors, io.logger);
   if (!opened.ok) {
     io.say(`erasure-rehearsal: REFUSED — ${opened.error}`);
@@ -755,15 +820,7 @@ const erasureRehearsal = async (
   }
 
   if (seeding) {
-    const seeded = await seedSyntheticSubject(ERASURE, opened.value, { workspaceId });
-    if (!seeded.ok) {
-      return refused("erasure-rehearsal", workspaceId, rehearsalReason(seeded.error), io);
-    }
-    io.say(
-      `erasure-rehearsal: done — the synthetic subject of ${workspaceId} is seeded (a user row, an Admin membership and one concept file naming them); take the dump, then run phase two`,
-    );
-    io.say(seeded.value.tokens.join(","));
-    return DONE;
+    return seedingToBeDumped(doors, opened.value, workspaceId, wait ?? WAIT_SECONDS, io);
   }
 
   const rehearsed = await rehearseErasure(ERASURE, opened.value, { workspaceId });

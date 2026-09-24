@@ -6,13 +6,13 @@ import {
   rehearseErasure,
   seedSyntheticSubject,
   type ErasureRehearsed,
-  type SyntheticSubject,
 } from "../src/erasure/index.ts";
+import { getObject } from "../src/store/objects/index.ts";
 import { revokeCredentials } from "../src/workspaces/index.ts";
 import { bundleHistory, everyObjectOf, fileAtCommit } from "./bundle.ts";
 import { bootstrap } from "./platform.ts";
 import { ledgerRowsOf } from "./sourced-concept.ts";
-import { objectStoreForSuite } from "./suite-objects.ts";
+import { objectStoreForSuite, textOf } from "./suite-objects.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
 const { db, arrange } = suiteWithBundles();
@@ -46,7 +46,7 @@ const expectedTokensFor = (workspaceId: string): readonly string[] => {
   return [email, `human:${email}`, `Rehearsal subject ${workspaceId}`];
 };
 
-const seeding = async (scenario: Scenario): Promise<SyntheticSubject> => {
+const seeding = async (scenario: Scenario) => {
   const seeded = await seedSyntheticSubject(ERASURE, doorsFor(scenario), {
     workspaceId: scenario.workspaceId,
   });
@@ -78,6 +78,34 @@ const membershipRows = async (workspaceId: string, personId: string) => {
   return read.rows;
 };
 
+const originalOf = async (scenario: Scenario, documentId: string): Promise<string> => {
+  const read = await db().pool.query<{ original_key: string }>(
+    "SELECT original_key FROM source_document WHERE workspace_id = $1 AND id = $2",
+    [scenario.workspaceId, documentId],
+  );
+  const key = read.rows[0]?.original_key;
+  if (key === undefined) throw new Error(`no document ${documentId} was bound`);
+  const got = await getObject(scenario.admin, objects().door, key);
+  if (!got.ok) throw new Error(`the original was not readable: ${got.error}`);
+  return textOf(got.value);
+};
+
+const jobRow = async (workspaceId: string, jobId: string) => {
+  const read = await db().pool.query<Record<string, unknown>>(
+    "SELECT kind, subject_id, reason, status FROM job WHERE workspace_id = $1 AND id = $2",
+    [workspaceId, jobId],
+  );
+  return read.rows[0];
+};
+
+const bindingsIn = async (workspaceId: string): Promise<readonly string[]> => {
+  const read = await db().pool.query<{ id: string }>(
+    "SELECT id FROM source_binding WHERE workspace_id = $1",
+    [workspaceId],
+  );
+  return read.rows.map((row) => row.id);
+};
+
 describe("the seed", () => {
   it("writes one synthetic person, their membership and one concept file naming them, and answers with the tokens a dump is grepped for", async () => {
     const scenario = await arrange();
@@ -90,6 +118,43 @@ describe("the seed", () => {
     expect(await membershipRows(scenario.workspaceId, subject.personId)).toEqual([
       { role: "Admin" },
     ]);
+  });
+
+  it("binds one document naming the subject by their work address and by name, and queues its index run", async () => {
+    const scenario = await arrange();
+    const [email, , name] = expectedTokensFor(scenario.workspaceId);
+
+    const { document } = await seeding(scenario);
+
+    expect(await originalOf(scenario, document.documentId)).toBe(
+      "# Erasure rehearsal\n\n" +
+        `The drill's synthetic document. It names the rehearsal's subject, ${name}, ` +
+        `who works at ${email}.\n`,
+    );
+    expect(await jobRow(scenario.workspaceId, document.indexJobId)).toEqual({
+      kind: "index",
+      subject_id: document.bindingId,
+      reason: "bound",
+      status: "queued",
+    });
+  });
+
+  it("binds a document of their own for a subject seeded after the last one was erased, rather than answering with the document naming the one erased", async () => {
+    const scenario = await arrange();
+    const erased = await seeding(scenario);
+    await rehearsing(scenario);
+
+    const next = await seeding(scenario);
+
+    expect(next.personId).not.toBe(erased.personId);
+    expect(next.document.bindingId).not.toBe(erased.document.bindingId);
+    expect(await jobRow(scenario.workspaceId, next.document.indexJobId)).toEqual({
+      kind: "index",
+      subject_id: next.document.bindingId,
+      reason: "bound",
+      status: "queued",
+    });
+    expect(await bindingsIn(scenario.workspaceId)).toHaveLength(2);
   });
 
   it("names the subject in the concept file's own text, in the one form the routine rewrites", async () => {
@@ -112,8 +177,10 @@ describe("the seed", () => {
 
     expect(second.personId).toBe(first.personId);
     expect(second.tokens).toEqual(first.tokens);
+    expect(second.document).toEqual(first.document);
     expect(await membershipRows(scenario.workspaceId, first.personId)).toHaveLength(1);
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(1);
+    expect(await bindingsIn(scenario.workspaceId)).toEqual([first.document.bindingId]);
   });
 
   it("refuses to seed a workspace where another concept holds the drill's path, with the bundle's head where it was, rather than reporting it seeded", async () => {
