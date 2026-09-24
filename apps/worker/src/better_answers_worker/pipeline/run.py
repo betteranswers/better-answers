@@ -20,7 +20,7 @@ WIPED_REASON = "wiped"
 
 RULE_CHANGE_REASON = "rule-change"
 
-# The store is the target-state tracking: rows the app deleted beside a store
+# The store is the target-state tracking: rows the api deleted beside a store
 # left standing are re-upserted by nothing, the engine believing them landed.
 REASONS_EMPTYING_THE_BINDING = frozenset({WIPED_REASON, RULE_CHANGE_REASON})
 
