@@ -16,14 +16,14 @@
 # `tsconfig.base.json` is what keeps that true. The build stages exist for `apps/web` and for
 # the production dependency tree, not for `apps/api`.
 #
-# Base image read from Docker Hub on 24/09/2026: `node:24.20.0-trixie-slim`, on the
+# Base image read from Docker Hub on 24/09/2026: `node:24.21.0-trixie-slim`, on the
 # Node 24 line, pinned by the tag's manifest digest as well as its tag — the tag
 # is the label a person reads, the digest is what actually ships. Debian rather than Alpine,
 # because the lockfile's platform binaries and every test this tier has are resolved against
 # glibc today; an image is the wrong place to change a libc. Debian 13 (trixie) rather than
 # 12, because 12 has passed from Debian's security team to its long-term-support team, which
 # patches fewer packages.
-FROM node:24.20.0-trixie-slim@sha256:50c3b2f6988dfc307b86e5301d69611af31f4789bdf232863b07d3b02fe55ae0 AS base
+FROM node:24.21.0-trixie-slim@sha256:8ec5d7557396cfe32d21c3f9c13072355ceab22b584578ca4bb28af31120cffe AS base
 
 # pnpm's version is the root manifest's `packageManager` field and nowhere else:
 # `corepack install` with no argument reads it, so this image cannot carry a second pin that
