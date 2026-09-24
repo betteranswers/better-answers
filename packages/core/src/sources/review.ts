@@ -171,7 +171,7 @@ export const findingGroupKey = boundarySchemas.finding.select.pick({
   tier: true,
 });
 
-export type FindingGroupKey = z.output<typeof findingGroupKey>;
+type FindingGroupKey = z.output<typeof findingGroupKey>;
 
 const commandedGroups = z.array(findingGroupKey).min(1);
 

@@ -1,20 +1,17 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { knipOver } from "@better-answers/devtools/throwaway-tree";
-import type { KnipFinding, Tree } from "@better-answers/devtools/throwaway-tree";
+import type { KnipFinding, KnipRunner, Tree } from "@better-answers/devtools/throwaway-tree";
 
-import knipConfig, { topLevelIgnore } from "../../../knip.config.ts";
+import knipConfig from "../../../knip.config.ts";
 
-const MANIFEST = JSON.stringify({
-  name: "throwaway",
-  version: "0.0.0",
-  private: true,
-  type: "module",
-});
+const PACKAGE = { name: "throwaway", version: "0.0.0", private: true, type: "module" };
+
+const MANIFEST = JSON.stringify(PACKAGE);
 
 const KNIP_CONFIG = JSON.stringify({
   entry: ["src/main.ts", "src/registry/**"],
@@ -26,10 +23,12 @@ const scaffold: Tree = { "package.json": MANIFEST, "knip.json": KNIP_CONFIG };
 const MAIN =
   'import { reached } from "./reached.ts";\n\nexport const run = (): number => reached;\n';
 const REACHED = "export const reached = 1;\n";
+const REACHED_AND_SPARE = `${REACHED}export const spare = 2;\n`;
+const ALONE = "export const alone = 1;\n";
 
 const smokeTree: Tree = {
   "src/main.ts": MAIN,
-  "src/reached.ts": `${REACHED}export const spare = 2;\n`,
+  "src/reached.ts": REACHED_AND_SPARE,
 };
 
 const knip = knipOver(scaffold, {
@@ -44,7 +43,7 @@ describe("knip over a throwaway tree (T-066)", () => {
   it("names an export nothing imports", () => {
     const findings = knip.findings({
       "src/main.ts": MAIN,
-      "src/reached.ts": `${REACHED}export const spare = 2;\n`,
+      "src/reached.ts": REACHED_AND_SPARE,
     });
 
     expect(namesOf(findings)).toEqual(["exports:src/reached.ts:spare"]);
@@ -53,10 +52,7 @@ describe("knip over a throwaway tree (T-066)", () => {
   it("names a dependency the tree declares and no file imports", () => {
     const findings = knip.findings({
       "package.json": JSON.stringify({
-        name: "throwaway",
-        version: "0.0.0",
-        private: true,
-        type: "module",
+        ...PACKAGE,
         dependencies: { "a-package-nothing-imports": "1.0.0" },
       }),
       "src/main.ts": MAIN,
@@ -70,7 +66,7 @@ describe("knip over a throwaway tree (T-066)", () => {
     const findings = knip.findings({
       "src/main.ts": MAIN,
       "src/reached.ts": REACHED,
-      "src/orphan.ts": "export const alone = 1;\n",
+      "src/orphan.ts": ALONE,
     });
 
     expect(namesOf(findings)).toEqual(["files:src/orphan.ts:src/orphan.ts"]);
@@ -116,63 +112,96 @@ describe("the knip gate is a step of the root check (T-066)", () => {
   });
 });
 
-describe("the repository's own top-level `ignore` follows the index's presence (T-192)", () => {
-  it("ignores `.gitnexus/**` for a checkout that carries an index", () => {
-    expect(topLevelIgnore(true)).toEqual([".gitnexus/**"]);
-  });
+describe("knip never reads a directory `.git/info/exclude` names", () => {
+  const TREE = { "src/main.ts": MAIN, "src/reached.ts": REACHED, ".gitnexus/probe.ts": ALONE };
 
-  it("ignores nothing for a checkout that carries none", () => {
-    expect(topLevelIgnore(false)).toEqual([]);
-  });
-
-  it("ignores what this checkout's own directory asks for", () => {
-    if (typeof knipConfig === "function") {
-      throw new Error("the repository's knip config is a plain object, never the function form");
-    }
-    const root = path.resolve(import.meta.dirname, "../../..");
-
-    expect(knipConfig.ignore).toEqual(
-      existsSync(path.join(root, ".gitnexus")) ? [".gitnexus/**"] : [],
-    );
-  });
-});
-
-describe("the top-level `ignore` glob, proved both ways (T-180)", () => {
-  const IGNORES_GITNEXUS = JSON.stringify({
-    entry: ["src/main.ts", "src/registry/**"],
-    project: ["**/*.ts"],
-    ignore: [".gitnexus/**"],
-  });
-
-  const gitnexusIgnore = knipOver(
-    { "package.json": MANIFEST, "knip.json": IGNORES_GITNEXUS },
-    {
-      tree: {
-        "src/main.ts": MAIN,
-        "src/reached.ts": REACHED,
-        "other/probe.ts": "export const alone = 1;\n",
-      },
-      findings: [{ kind: "files", file: "other/probe.ts", name: "other/probe.ts" }],
-    },
-  );
-
-  it("stays silent about an unreached file under the ignored directory", () => {
-    const findings = gitnexusIgnore.findings({
-      "src/main.ts": MAIN,
-      "src/reached.ts": REACHED,
-      ".gitnexus/probe.ts": "export const alone = 1;\n",
-    });
+  it("stays silent about an unreached file under a directory the exclude file names", () => {
+    const findings = knip.findings({ ...TREE, ".git/info/exclude": ".gitnexus/\n" });
 
     expect(findings).toEqual([]);
   });
 
-  it("still names the same shape of unreached file under a directory the config does not name", () => {
-    const findings = gitnexusIgnore.findings({
-      "src/main.ts": MAIN,
-      "src/reached.ts": REACHED,
-      "other/probe.ts": "export const alone = 1;\n",
-    });
+  it("names the same file when the exclude file does not name its directory", () => {
+    const findings = knip.findings({ ...TREE, ".git/info/exclude": ".elsewhere/\n" });
 
-    expect(namesOf(findings)).toEqual(["files:other/probe.ts:other/probe.ts"]);
+    expect(namesOf(findings)).toEqual(["files:.gitnexus/probe.ts:.gitnexus/probe.ts"]);
+  });
+});
+
+describe("a slice's barrel export nothing imports is named where the config gates entry exports", () => {
+  const SLICE_MANIFEST = JSON.stringify({
+    ...PACKAGE,
+    exports: { "./slice": "./src/slice/index.ts" },
+  });
+  const CONSUMER = 'import { reached } from "./slice/index.ts";\n\nconsole.log(reached);\n';
+  const ONE_NAME = 'export { reached } from "./reached.ts";\n';
+  const BOTH_NAMES = 'export { reached, spare } from "./reached.ts";\n';
+
+  const sliceTree = (barrel: string, source: string): Tree => ({
+    "src/consumer.ts": CONSUMER,
+    "src/slice/reached.ts": source,
+    "src/slice/index.ts": barrel,
+  });
+
+  // A workspace's own value wins over the top-level one, the order knip reads them in.
+  const entryExportsIn = (workspace: string): boolean => {
+    if (typeof knipConfig === "function") {
+      throw new Error("the repository's knip config is a plain object, never the function form");
+    }
+    return (
+      knipConfig.workspaces?.[workspace]?.includeEntryExports ??
+      knipConfig.includeEntryExports ??
+      false
+    );
+  };
+
+  const knipConfiguredAs = (workspace: string): KnipRunner =>
+    knipOver(
+      {
+        "package.json": SLICE_MANIFEST,
+        "knip.json": JSON.stringify({
+          entry: ["src/consumer.ts"],
+          project: ["**/*.ts"],
+          includeEntryExports: entryExportsIn(workspace),
+        }),
+      },
+      {
+        tree: { ...sliceTree(ONE_NAME, REACHED), "src/orphan.ts": ALONE },
+        findings: [{ kind: "files", file: "src/orphan.ts", name: "src/orphan.ts" }],
+      },
+    );
+
+  it.each([
+    ".",
+    "apps/api",
+    "packages/core",
+    "packages/design-system",
+    "packages/devtools",
+    "packages/schema",
+  ])("names it, and the source export it passes on, in %s", (workspace) => {
+    const findings = knipConfiguredAs(workspace).findings(sliceTree(BOTH_NAMES, REACHED_AND_SPARE));
+
+    expect(namesOf(findings)).toEqual([
+      "exports:src/slice/index.ts:spare",
+      "exports:src/slice/reached.ts:spare",
+    ]);
+  });
+
+  it("stays silent about it in apps/web, whose registry is installed ahead of its callers", () => {
+    const findings = knipConfiguredAs("apps/web").findings(
+      sliceTree(BOTH_NAMES, REACHED_AND_SPARE),
+    );
+
+    expect(findings).toEqual([]);
+  });
+
+  it("stays silent about one tagged `@public` for the block that will wire it", () => {
+    const tagged = `${ONE_NAME}/** @public S3 */\nexport { spare } from "./reached.ts";\n`;
+
+    const findings = knipConfiguredAs("packages/core").findings(
+      sliceTree(tagged, REACHED_AND_SPARE),
+    );
+
+    expect(findings).toEqual([]);
   });
 });

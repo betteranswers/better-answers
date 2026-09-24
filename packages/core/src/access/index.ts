@@ -10,7 +10,7 @@ import type { GroupId, Role, UserPrincipal } from "../kernel/index.ts";
 
 export type Sensitivity = (typeof SENSITIVITIES)[number];
 
-export type Audience =
+type Audience =
   | { readonly audience: typeof AUDIENCE_EVERYONE; readonly audienceGroups: null }
   | { readonly audience: typeof AUDIENCE_GROUPS; readonly audienceGroups: readonly GroupId[] };
 

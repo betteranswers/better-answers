@@ -13,7 +13,7 @@ import type { SubjectIdentifiers } from "./requests.ts";
 
 const REPLAY_PREFIX = "erasures/";
 
-export const replayCopyKeyOf = (workspaceId: string, erasureRequestId: string): string =>
+const replayCopyKeyOf = (workspaceId: string, erasureRequestId: string): string =>
   `${REPLAY_PREFIX}${workspaceId}/${erasureRequestId}.json`;
 
 export type ReplayCopy = {

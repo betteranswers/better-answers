@@ -315,7 +315,7 @@ export const overrideConceptClass = async (
   return ok({ iri: iri.data, auditEventId, visibility, compositions: cascaded.value });
 };
 
-export type ReadableEvidence = {
+type ReadableEvidence = {
   readonly locator: string;
 
   readonly resource: string;

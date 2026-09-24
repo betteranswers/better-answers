@@ -20,7 +20,7 @@ import {
 } from "../store/postgres/index.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
-export { WORKSPACE_REFUSALS, type WorkspaceRefusal } from "./vocabulary.ts";
+export { WORKSPACE_REFUSALS } from "./vocabulary.ts";
 
 export const TOOLS_LIST_TTL_MS_DEFAULT = 300_000;
 export const TOOLS_LIST_TTL_CONFIG_KEY = "mcp.tools_list_ttl_ms";

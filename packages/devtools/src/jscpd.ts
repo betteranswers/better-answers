@@ -37,7 +37,7 @@ export const jscpdArgv = (config: JscpdConfig): readonly string[] => [
   ...config.paths,
 ];
 
-export type Clone = { readonly left: string; readonly right: string };
+type Clone = { readonly left: string; readonly right: string };
 
 const clonesIn = (output: string): readonly Clone[] => {
   const fragment = /^\s*(?:- )?(?<file>\S+) \[\d+:\d+ - \d+:\d+]/;

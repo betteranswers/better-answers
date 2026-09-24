@@ -21,34 +21,19 @@ export {
   reprocessBindingInput,
   UPLOAD_BYTE_CAP,
   UPLOAD_MEDIA_TYPES,
-  UPLOAD_ORIGINALS_PREFIX,
-  type BindingPublished,
-  type BindingReprocessed,
   type BindUploadFields,
-  type BindUploadInput,
   type BindUploadRefusal,
-  type PublishBindingInput,
-  type PublishBindingRefusal,
   type ReprocessBindingInput,
   type ReprocessBindingRefusal,
-  type UploadBound,
 } from "./binding.ts";
 export {
   ORPHANED_UPLOAD_GRACE_HOURS,
   sweepOrphanedUploads,
   UPLOAD_SWEEP,
-  type SweepUploadsInput,
   type SweepUploadsRefusal,
   type SweptUploads,
-  type UploadSweepPrincipal,
 } from "./orphans.ts";
-export {
-  restoreFinding,
-  restoreFindingInput,
-  type FindingRestored,
-  type FindingRestoreRefusal,
-  type RestoreFindingInput,
-} from "./findings.ts";
+export { restoreFinding, restoreFindingInput } from "./findings.ts";
 export {
   dismissAsNotSpecialCategory,
   dismissAsNotSpecialCategoryInput,
@@ -59,19 +44,6 @@ export {
   keepInTextInput,
   narrowDocuments,
   narrowDocumentsInput,
-  type DismissAsNotSpecialCategoryInput,
-  type DismissAsNotSpecialCategoryRefusal,
-  type DismissedAsNotSpecialCategory,
-  type DocumentsNarrowed,
-  type FindingGroup,
-  type FindingGroupKey,
-  type FindingsOfInput,
-  type FindingsOfRefusal,
-  type KeepInTextInput,
-  type KeepInTextRefusal,
-  type KeptInText,
-  type NarrowDocumentsInput,
-  type NarrowDocumentsRefusal,
 } from "./review.ts";
 export {
   dpiaInputFor,
@@ -81,38 +53,21 @@ export {
   REDACTION_CATEGORIES,
   SPECIAL_CATEGORY_CONDITION,
   type DpiaInput,
-  type DpiaReadInput,
-  type DpiaInputRead,
-  type DpiaInputRefusal,
-  type DpiaRoute,
-  type RedactionCategory,
 } from "./dpia.ts";
+/** @public C1 */
+export type { DpiaReadInput, DpiaInputRead, DpiaInputRefusal } from "./dpia.ts";
 
-export {
-  chunkIdOf,
-  parseLocator,
-  spanText,
-  type Locator,
-  type LocatorRefusal,
-} from "./chunk-address.ts";
+export { chunkIdOf, parseLocator, spanText, type LocatorRefusal } from "./chunk-address.ts";
 export {
   findPassages,
-  MAX_PASSAGE_HITS,
   passageAt,
   previewChunks,
   previewChunksInput,
   type Passage,
   type PassageHit,
-  type PreviewChunksInput,
   type PreviewedChunk,
 } from "./passages.ts";
-export {
-  listBindings,
-  type BindingState,
-  type ListBindingsRefusal,
-  type ListedBinding,
-  type QuarantinedDocument,
-} from "./listing.ts";
+export { listBindings } from "./listing.ts";
 export { SOURCE_REFUSALS, type SourceRefusal } from "./vocabulary.ts";
 
 const SOURCE_ACTS = declareActs("sources", {

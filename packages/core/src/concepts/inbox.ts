@@ -45,7 +45,7 @@ const INBOX_ACTS = declareActs("knowledge", {
 type SuggestionRow = z.infer<typeof boundarySchemas.suggestion.select>;
 
 export type SuggestionKind = SuggestionRow["kind"];
-export type SuggestionStatus = SuggestionRow["status"];
+type SuggestionStatus = SuggestionRow["status"];
 
 export type SuggestionSummaryItem = {
   readonly suggestionId: string;

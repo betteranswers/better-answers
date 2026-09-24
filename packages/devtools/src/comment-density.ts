@@ -58,7 +58,7 @@ const TEST_DIRECTORIES = new Set(["e2e", "test", "tests"]);
 
 const TEST_FILE = /(^test_|[._](test|spec)\.)/;
 
-export const CLOC_EXECUTABLE = { package: "cloc", path: ["lib", "cloc"] } as const;
+const CLOC_EXECUTABLE = { package: "cloc", path: ["lib", "cloc"] } as const;
 
 export const clocArgv = (paths: readonly string[]): readonly string[] => [
   "--json",
@@ -94,7 +94,7 @@ const clocReport = z.record(
   }),
 );
 
-export const countedIn = (output: string): readonly Counted[] =>
+const countedIn = (output: string): readonly Counted[] =>
   Object.entries(clocReport.parse(JSON.parse(output)))
     .filter(([file]) => file !== "header" && file !== "SUM")
     .map(([file, entry]) => ({

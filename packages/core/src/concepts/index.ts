@@ -92,76 +92,66 @@ export {
   parseConceptFile,
   renderConceptFile,
   type Frontmatter,
-  type FrontmatterSource,
   type FrontmatterValue,
 } from "./file.ts";
-export {
-  carryChecksOntoRewrite,
-  foldKind,
-  moveBundleCommits,
-  type ChecksCarried,
-} from "./landing.ts";
+export { carryChecksOntoRewrite, foldKind, moveBundleCommits } from "./landing.ts";
 export {
   ERASURE_REHEARSAL_PATH,
   IMPORT_SENSITIVITY_DEFAULT,
   type BundleTree,
-  type ChecksRecorded,
-  type Unsound,
   type UnsoundReason,
 } from "./loader.ts";
-export {
-  writeManifest,
-  type ManifestWritten,
-  type WriteManifestInput,
-  type WriteManifestRefusal,
-} from "./manifest.ts";
+export { writeManifest, type ManifestWritten, type WriteManifestInput } from "./manifest.ts";
 export {
   RECONCILER,
   reconcile,
   reconcileEveryWorkspace,
   reconcilerHits,
-  type ReconcileRefusal,
   type Reconciled,
-  type ReconcilerHit,
-  type ReconcilerPrincipal,
-  type ReplayRefusal,
   type WorkspaceReconciled,
 } from "./reconciler.ts";
+/** @public S5 */
+export type { ReconcilerHit } from "./reconciler.ts";
 export {
   declineSuggestion,
   submitSuggestionSet,
   suggestionSetSummary,
-  type DecideSuggestionInput,
-  type DecideSuggestionRefusal,
-  type SubmitSuggestionSetInput,
-  type SubmitSuggestionSetRefusal,
-  type SuggestionDecided,
   type SuggestionKind,
   type SuggestionRequest,
-  type SuggestionSetSubmitted,
-  type SuggestionStatus,
-  type SuggestionSummaryItem,
 } from "./inbox.ts";
+/** @public S3 */
+export type {
+  DecideSuggestionInput,
+  DecideSuggestionRefusal,
+  SubmitSuggestionSetInput,
+  SubmitSuggestionSetRefusal,
+  SuggestionDecided,
+  SuggestionSetSubmitted,
+} from "./inbox.ts";
+/** @public S5 */
+export type { SuggestionSummaryItem } from "./inbox.ts";
 export {
   evidencePaneOf,
   overrideConceptClass,
   openingACascadeOverHeldGroups,
   recomputeVisibilitySourcedFrom,
-  type ConceptClassOverridden,
-  type EvidencePane,
-  type OverrideConceptClassInput,
-  type OverrideConceptClassRefusal,
-  type ReadableEvidence,
 } from "./visibility.ts";
+/** @public S3 */
+export type {
+  ConceptClassOverridden,
+  OverrideConceptClassInput,
+  OverrideConceptClassRefusal,
+} from "./visibility.ts";
+/** @public S2 */
+export type { EvidencePane } from "./visibility.ts";
 export {
   GRAPH_MAINTENANCE,
   graphCounts,
   rebuildGraph,
   sweepGraph,
-  type GraphMaintenancePrincipal,
   type GraphMaintenanceRefusal,
 } from "./graph-maintenance.ts";
-export type { GraphCounts, SweptGeneration } from "../store/graph/index.ts";
+export type { SweptGeneration } from "../store/graph/index.ts";
 
 const CONCEPT_ACTS = declareActs("knowledge", {
   committed: act("knowledge.concept.committed", {
@@ -178,7 +168,7 @@ const CONCEPT_ACTS = declareActs("knowledge", {
   }),
 });
 
-export type EvidenceInput = {
+type EvidenceInput = {
   readonly sourceDocumentId: string;
   readonly locator: string;
 
@@ -186,7 +176,7 @@ export type EvidenceInput = {
   readonly contentVersion?: string;
 };
 
-export type WritePrecondition = { readonly head: string | null } | { readonly base: string | null };
+type WritePrecondition = { readonly head: string | null } | { readonly base: string | null };
 
 export type Acceptance = {
   readonly suggestionId: string;
@@ -455,6 +445,7 @@ const ACCEPTANCE_DECISIONS = z
   .nonempty()
   .max(SUGGESTION_SET_MAX);
 
+/** @public S3 */
 export type AcceptSuggestionRefusal =
   | WriteConceptRefusal
   | "no-such-suggestion"
@@ -873,7 +864,7 @@ export const importBundle = async (
   });
 };
 
-export type ConceptCheck = {
+type ConceptCheck = {
   readonly actor: ActorId;
   readonly at: Date;
 

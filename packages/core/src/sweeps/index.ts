@@ -52,13 +52,13 @@ export type SweepDoors = {
   readonly clock: Clock;
 };
 
-export type WorkspaceSwept = {
+type WorkspaceSwept = {
   readonly workspaceId: WorkspaceId;
   readonly uploads: Result<SweptUploads, SweepUploadsRefusal>;
   readonly graph: Result<readonly SweptGeneration[], GraphMaintenanceRefusal | Error>;
 };
 
-export type SweepTotals = {
+type SweepTotals = {
   readonly workspaces: number;
 
   readonly refused: number;

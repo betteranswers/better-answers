@@ -67,11 +67,7 @@ const RECONCILER_ACTS = declareActs("platform", {
   }),
 });
 
-export type ReplayRefusal =
-  | "unreadable-commit"
-  | "rename-refused"
-  | "path-taken"
-  | "merge-key-taken";
+type ReplayRefusal = "unreadable-commit" | "rename-refused" | "path-taken" | "merge-key-taken";
 
 export type Reconciled = {
   readonly workspaceId: string;

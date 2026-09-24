@@ -46,7 +46,7 @@ import {
   type Tx,
 } from "../store/postgres/index.ts";
 
-export type JobKind = (typeof JOB_KINDS)[number];
+type JobKind = (typeof JOB_KINDS)[number];
 export type JobStatus = (typeof JOB_STATUSES)[number];
 export type RebuildReason = (typeof REBUILD_REASONS)[number];
 
