@@ -98,7 +98,7 @@ dependencies = [
     # readings: `apps/worker/tests/test_image.py`'s
     # `test_both_converters_hold_on_the_image_under_the_engines_own_runtime`.
     "firecrawl-anydoc==0.2.4",
-    "pdf-inspector==1.23.0",
+    "pdf-inspector==1.24.0",
     # The AEAD the credential envelope is sealed and opened under, AES-256-GCM (ADR 0005,
     # amended 22/09/2026): this tier reaches it through `AESGCM` and the api tier through
     # Node's own OpenSSL, so the frame one tier writes is one the other reads. The package was
