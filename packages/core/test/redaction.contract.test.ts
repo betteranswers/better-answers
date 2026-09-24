@@ -145,7 +145,7 @@ describe("the redaction agreement's categories", () => {
   });
 });
 
-describe("the category list the app declares and the agreement's own", () => {
+describe("the category list the api declares and the agreement's own", () => {
   it("declares every category the agreement names, at the tier and the flag the agreement gives it", () => {
     for (const { category, tier, special_category } of fixture.categories) {
       const declared = REDACTION_CATEGORIES.find((entry) => entry.category === category);

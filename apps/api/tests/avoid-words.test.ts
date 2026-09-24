@@ -130,8 +130,6 @@ const CARVED_OUT: readonly CarveOut[] = [
     holds: under("packages/design-system/"),
     why: "no tier-sense use: the word there is the SPA's own zone",
   },
-  { holds: under("packages/schema/"), why: "for now: T-215 sweeps it and removes this line" },
-  { holds: under("packages/core/"), why: "for now: T-215 sweeps it and removes this line" },
   { holds: under("apps/api/"), why: "for now: T-216 sweeps it and removes this line" },
 ];
 

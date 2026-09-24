@@ -90,7 +90,7 @@ describe("the warm harness", () => {
     }
   });
 
-  it("hands the copy back on the app's own footing, with the unscoped read still refused", async () => {
+  it("hands the copy back on the api's own footing, with the unscoped read still refused", async () => {
     const db = await openMigratedPostgres();
     try {
       await writeRoute(db);

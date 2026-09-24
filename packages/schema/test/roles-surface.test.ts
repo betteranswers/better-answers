@@ -186,15 +186,15 @@ describe("a table created after the flip", () => {
           table,
           worker: NOTHING_OF_THE_EIGHT,
         });
-        expect({ table, app: await privilegesHeld(client, "app_rt", table) }).toEqual({
+        expect({ table, api: await privilegesHeld(client, "app_rt", table) }).toEqual({
           table,
-          app: THE_FOUR_VERBS,
+          api: THE_FOUR_VERBS,
         });
       }
     });
   });
 
-  it("refuses the worker on the statement and serves the app, so a mistake is an error and not a silent zero rows", async () => {
+  it("refuses the worker on the statement and serves the api, so a mistake is an error and not a silent zero rows", async () => {
     await withRollback(db().pool, async (client) => {
       await client.query("CREATE TABLE public.after_the_flip (id text PRIMARY KEY)");
       await client.query("SET LOCAL ROLE worker_rt");

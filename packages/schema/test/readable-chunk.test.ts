@@ -457,7 +457,7 @@ describe("who may read the view", () => {
       await client.query("SET LOCAL ROLE worker_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
       await refusesEach(client, [
-        [THE_VIEW, "worker_rt selecting the view the app reads a chunk through"],
+        [THE_VIEW, "worker_rt selecting the view the api reads a chunk through"],
       ]);
       await client.query("RESET ROLE");
 

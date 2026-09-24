@@ -214,7 +214,7 @@ const buildTheMap = async (scenario: Scenario) => {
 
 const EQUIVALENCE_ALLOWANCE_MS = 120_000;
 
-describe("the worker's rebuild against the app's own map", () => {
+describe("the worker's rebuild against the api's own map", () => {
   it(
     "reproduces the live generation exactly, column by column, from the bundle and the records",
     async () => {
@@ -222,7 +222,7 @@ describe("the worker's rebuild against the app's own map", () => {
       const { linker, group } = await buildTheMap(scenario);
 
       const live = await liveGenerationOf(scenario.workspaceId);
-      expect(live, "the app's acts wrote a live generation").toBe(1);
+      expect(live, "the api's acts wrote a live generation").toBe(1);
       const liveNodes = await nodesAt(scenario.workspaceId, 1);
       const liveEdges = await edgesAt(scenario.workspaceId, 1);
 

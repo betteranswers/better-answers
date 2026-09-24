@@ -150,7 +150,7 @@ const partitionCopyOf = async (parentIndex: string, workspaceId: string): Promis
   return copy;
 };
 
-describe("find's plan, as the app and under the chunk's policy", () => {
+describe("find's plan, as the api and under the chunk's policy", () => {
   it("matches through the partition's GIN index on the full-text column", async () => {
     const arranged = await arrangedWithInvoices();
 
@@ -173,7 +173,7 @@ describe("find's plan, as the app and under the chunk's policy", () => {
   });
 });
 
-describe("previewChunks' plan, as the app and under the chunk's policy", () => {
+describe("previewChunks' plan, as the api and under the chunk's policy", () => {
   it("lists a binding's chunks through the index that leads with the binding", async () => {
     const arranged = await arrangedWithInvoices();
 
