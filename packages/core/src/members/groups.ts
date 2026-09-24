@@ -15,7 +15,7 @@ import type { MemberRefusal } from "./vocabulary.ts";
 
 type GroupRow = z.infer<typeof boundarySchemas.group.select>;
 
-export type GroupOrigin = GroupRow["origin"];
+type GroupOrigin = GroupRow["origin"];
 
 export type GroupSummary = {
   readonly id: GroupId;
