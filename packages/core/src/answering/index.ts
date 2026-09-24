@@ -11,7 +11,7 @@ import {
 import { findPassages, passageAt } from "../sources/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
-export type TrustTier = "unverified" | "machine-confirmed" | "human-reviewed";
+type TrustTier = "unverified" | "machine-confirmed" | "human-reviewed";
 export type TrustStatus =
   | "current"
   | "changed-since-checked"
@@ -19,7 +19,7 @@ export type TrustStatus =
   | "draft"
   | "deprecated";
 
-export type TrustRider = "imported" | "source-moved-on";
+type TrustRider = "imported" | "source-moved-on";
 
 export type Trust = {
   readonly tier: TrustTier;
@@ -75,7 +75,7 @@ const ukLongDate = (iso: string): string => {
 
 export const NOT_COMPANY_KNOWLEDGE = "Not company knowledge";
 
-export type ConceptHit = {
+type ConceptHit = {
   readonly layer: "bundles";
   readonly iri: string;
   readonly kind: string;
@@ -85,7 +85,7 @@ export type ConceptHit = {
   readonly tags: readonly string[];
 };
 
-export type DocumentHit = {
+type DocumentHit = {
   readonly layer: "sources";
   readonly kind: "document";
   readonly title: string;
@@ -100,9 +100,9 @@ export type FindResult = {
   readonly hits: readonly FindHit[];
 };
 
-export type { Frontmatter, FrontmatterSource, FrontmatterValue } from "../concepts/index.ts";
+export type { FrontmatterValue } from "../concepts/index.ts";
 
-export type ConceptView = {
+type ConceptView = {
   readonly iri: string;
   readonly frontmatter: Frontmatter;
   readonly body: string;
@@ -111,7 +111,7 @@ export type ConceptView = {
   readonly evidence: readonly { readonly locator: string; readonly source: string }[];
 };
 
-export type PassageView = {
+type PassageView = {
   readonly locator: string;
   readonly source: string;
   readonly text: string;
