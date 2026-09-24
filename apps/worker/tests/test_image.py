@@ -36,7 +36,31 @@ DOCKERFILE = WORKSPACE / "Dockerfile"
 TESTS_IN_THE_IMAGE = "/app/tests"
 
 
-BASE_IMAGE_PREFIX = "/usr/local"
+PYTHON_IMAGE_PREFIX = "/usr/local"
+
+
+DISTROLESS_CC = "gcr.io/distroless/cc-debian13"
+
+
+PINNED_BASE = re.compile(r"[\w.-]+(?:/[\w.-]+)*:[\w.-]+@sha256:[0-9a-f]{64}")
+
+
+RENOVATE = REPO_ROOT / "renovate.json"
+
+
+ABSENT_TOOLS = (
+    "sh",
+    "bash",
+    "dash",
+    "ash",
+    "busybox",
+    "apt",
+    "apt-get",
+    "dpkg",
+    "perl",
+    "pip",
+    "pip3",
+)
 
 
 REQUIRED_IMPORTS = ("better_answers_worker", "better_answers_worker.schema_view")
@@ -228,10 +252,10 @@ def required_python_floor() -> tuple[int, int]:
     return int(floor.group(1)), int(floor.group(2))
 
 
-def base_image_python_version() -> tuple[int, int, int]:
+def python_image_version() -> tuple[int, int, int]:
     tags = re.findall(
         r"^FROM python:(\d+)\.(\d+)\.(\d+)-",
-        WORKSPACE.joinpath("Dockerfile").read_text("utf-8"),
+        DOCKERFILE.read_text("utf-8"),
         re.M,
     )
     versions = {tuple(int(part) for part in tag) for tag in tags}
@@ -243,6 +267,64 @@ def base_image_python_version() -> tuple[int, int, int]:
         raise RuntimeError(message)
     major, minor, patch = versions.pop()
     return major, minor, patch
+
+
+def _instructions(dockerfile: str) -> list[str]:
+    joined = re.sub(r"\\\n", " ", dockerfile)
+    return [
+        line.strip()
+        for line in joined.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+
+
+def dockerfile_stages() -> list[tuple[str, str]]:
+    stages: list[tuple[str, str]] = []
+    for line in _instructions(DOCKERFILE.read_text("utf-8")):
+        if line.split()[0] != "FROM":
+            continue
+        found = re.fullmatch(r"FROM (\S+) AS (\S+)", line)
+        if found is None:
+            message = f"a FROM this cannot read in {DOCKERFILE}: {line!r}"
+            raise RuntimeError(message)
+        stages.append((found.group(1), found.group(2)))
+    return stages
+
+
+def runtime_base() -> str:
+    stages = dockerfile_stages()
+    images = {name: image for image, name in stages}
+    base = stages[-1][0]
+    while base in images:
+        base = images[base]
+    return base
+
+
+def _json_list(written: str) -> list[str] | None:
+    try:
+        found = json.loads(written)
+    except json.JSONDecodeError:
+        return None
+    return [str(each) for each in found] if isinstance(found, list) else None
+
+
+def exec_form(dockerfile: str, instruction: str) -> list[str] | None:
+    lines = [
+        line for line in _instructions(dockerfile) if line.split()[0] == instruction
+    ]
+    if len(lines) != 1:
+        message = f"the Dockerfile has {len(lines)} {instruction} lines; expected one"
+        raise RuntimeError(message)
+    written = lines[0].partition(" CMD ")[2] if instruction == "HEALTHCHECK" else ""
+    return _json_list(written or lines[0].split(maxsplit=1)[1])
+
+
+def worker_health_check() -> list[str] | None:
+    found = re.findall(r"^\s*test: (\[.*\])\s*$", worker_service(), re.M)
+    if len(found) != 1:
+        message = f"the worker service sets {len(found)} health checks; expected one"
+        raise RuntimeError(message)
+    return _json_list(found[0])
 
 
 def _declared(path: Path, name: str, value: str) -> str:
@@ -298,8 +380,69 @@ def chowned_worker_uid() -> int:
 
 
 PROBE = """
-import importlib, json, os, sys
+import glob, importlib, json, os, re, shutil, subprocess, sys
 from importlib import metadata
+
+SEARCHED = os.pathsep.join(
+    [os.environ["PATH"], "/bin", "/sbin", "/usr/bin", "/usr/sbin", "/busybox"]
+)
+RECORDS = "/var/lib/dpkg/status.d"
+
+def unresolved():
+    # The loader's own trace mode, which is what `ldd` runs: the image carries no `ldd`,
+    # and `--list` stops at the first library it cannot find.
+    loader = sorted(glob.glob("/lib*/ld-linux*.so*"))[0]
+    count, missing = 0, {}
+    for root in sorted({sys.base_prefix, sys.prefix}):
+        for where, _, names in os.walk(root):
+            for name in names:
+                path = os.path.join(where, name)
+                if os.path.islink(path) or not re.search(r"[.]so([.][0-9]+)*$", name):
+                    continue
+                count += 1
+                traced = subprocess.run(
+                    [loader, path],
+                    capture_output=True,
+                    text=True,
+                    env={"LD_TRACE_LOADED_OBJECTS": "1"},
+                )
+                absent = [
+                    line.split()[0]
+                    for line in traced.stdout.splitlines()
+                    if "not found" in line
+                ]
+                if absent:
+                    missing[path] = absent
+    return count, missing
+
+def unrecorded():
+    owned = set()
+    for name in os.listdir(RECORDS) if os.path.isdir(RECORDS) else ():
+        package = name.removesuffix(".md5sums")
+        if package == name or not os.path.isfile(os.path.join(RECORDS, package)):
+            continue
+        with open(os.path.join(RECORDS, name), encoding="utf-8") as sums:
+            owned.update(
+                "/" + line.split(maxsplit=1)[1].strip() for line in sums if line.strip()
+            )
+    carried = [
+        os.path.join(where, name)
+        for where, _, names in os.walk("/usr/lib")
+        for name in names
+        if not os.path.islink(os.path.join(where, name))
+    ]
+    return len(carried), sorted(path for path in carried if path not in owned)
+
+def interpreter_of(command):
+    found = shutil.which(command)
+    if found is None:
+        return ""
+    with open(found, "rb") as script:
+        line = script.readline().decode("utf-8", "replace").strip()
+    named = line.removeprefix("#!").split()
+    if not line.startswith("#!") or not named or not os.path.exists(named[0]):
+        return ""
+    return os.path.realpath(named[0])
 
 def installed(name):
     try:
@@ -335,6 +478,9 @@ def pipeline(name):
         return False
     return True
 
+shared_object_count, unresolved_shared_objects = unresolved()
+library_file_count, unrecorded_library_files = unrecorded()
+home = os.path.expanduser("~")
 sys.stdout.write(json.dumps({
     "development": [
         n
@@ -344,6 +490,21 @@ sys.stdout.write(json.dumps({
     "version": list(sys.version_info[:3]),
     "base_prefix": sys.base_prefix,
     "uid": os.getuid(),
+    "home": home,
+    "home_is_writable": os.path.isdir(home) and os.access(home, os.W_OK),
+    "tools_present": [
+        n
+        for n in json.loads(os.environ["PROBE_TOOLS"])
+        if shutil.which(n, path=SEARCHED)
+    ],
+    "bundled_wheels": sorted(
+        glob.glob(os.path.join(sys.base_prefix, "**", "*.whl"), recursive=True)
+    ),
+    "command_interpreter": interpreter_of(os.environ["PROBE_COMMAND"]),
+    "shared_object_count": shared_object_count,
+    "unresolved_shared_objects": unresolved_shared_objects,
+    "library_file_count": library_file_count,
+    "unrecorded_library_files": unrecorded_library_files,
     "imports": {n: imports(n) for n in json.loads(os.environ["PROBE_IMPORTS"])},
     "has_tests": os.path.isdir(os.environ["PROBE_TESTS"]),
     "weights": {m: cached(m) for m in json.loads(os.environ["PROBE_MODEL_IDS"])},
@@ -609,6 +770,15 @@ class ImageContents:
     version: tuple[int, int, int]
     base_prefix: str
     uid: int
+    home: str
+    home_is_writable: bool
+    tools_present: tuple[str, ...]
+    bundled_wheels: tuple[str, ...]
+    command_interpreter: str
+    shared_object_count: int
+    unresolved_shared_objects: Mapping[str, tuple[str, ...]]
+    library_file_count: int
+    unrecorded_library_files: tuple[str, ...]
     imports: Mapping[str, bool]
     has_tests: bool
     weights: Mapping[str, bool]
@@ -626,6 +796,20 @@ def _read_contents(stdout: str) -> ImageContents:
         version=(int(major), int(minor), int(patch)),
         base_prefix=str(answered["base_prefix"]),
         uid=int(answered["uid"]),
+        home=str(answered["home"]),
+        home_is_writable=bool(answered["home_is_writable"]),
+        tools_present=tuple(str(name) for name in answered["tools_present"]),
+        bundled_wheels=tuple(str(path) for path in answered["bundled_wheels"]),
+        command_interpreter=str(answered["command_interpreter"]),
+        shared_object_count=int(answered["shared_object_count"]),
+        unresolved_shared_objects={
+            str(path): tuple(str(name) for name in absent)
+            for path, absent in answered["unresolved_shared_objects"].items()
+        },
+        library_file_count=int(answered["library_file_count"]),
+        unrecorded_library_files=tuple(
+            str(path) for path in answered["unrecorded_library_files"]
+        ),
         imports={str(name): bool(found) for name, found in answered["imports"].items()},
         has_tests=bool(answered["has_tests"]),
         weights={
@@ -820,6 +1004,10 @@ def contents(image: str) -> ImageContents:
                 "PROBE_TESTS": TESTS_IN_THE_IMAGE,
                 "PROBE_MODEL_IDS": json.dumps(list(pinned_model_ids())),
                 "PROBE_SPACY_PIPELINE": _pin("SPACY_MODEL"),
+                "PROBE_TOOLS": json.dumps(list(ABSENT_TOOLS)),
+                "PROBE_COMMAND": (
+                    exec_form(DOCKERFILE.read_text("utf-8"), "CMD") or [""]
+                )[0],
             },
         )
     )
@@ -840,12 +1028,78 @@ def test_the_image_runs_the_interpreter_this_tier_says_it_requires(
     assert contents.version[:2] == pinned_python_version()
 
 
-def test_the_interpreter_is_the_base_images_and_not_one_the_build_fetched(
+def test_the_interpreter_is_the_python_images_and_not_one_the_build_fetched(
     contents: ImageContents,
 ) -> None:
 
-    assert contents.version == base_image_python_version()
-    assert contents.base_prefix == BASE_IMAGE_PREFIX
+    assert contents.version == python_image_version()
+    assert contents.base_prefix == PYTHON_IMAGE_PREFIX
+
+
+def test_the_runtime_is_distroless_and_renovate_moves_every_pinned_base() -> None:
+    stages = dockerfile_stages()
+    named = {name for _, name in stages}
+    renovate = json.loads(RENOVATE.read_text("utf-8"))
+
+    assert [
+        image
+        for image, _ in stages
+        if image not in named and PINNED_BASE.fullmatch(image) is None
+    ] == []
+    assert runtime_base().startswith(f"{DISTROLESS_CC}:")
+    assert "dockerfile" in renovate["enabledManagers"]
+    assert any(
+        "dockerfile" in rule.get("matchManagers", ())
+        and rule.get("groupName") == "images"
+        and rule.get("pinDigests") is True
+        for rule in renovate["packageRules"]
+    )
+
+
+def test_the_image_carries_no_shell_no_package_manager_and_no_wheel_to_install_one(
+    contents: ImageContents,
+) -> None:
+    assert contents.tools_present == ()
+    assert contents.bundled_wheels == ()
+
+
+def test_the_health_check_and_the_command_run_without_a_shell(
+    contents: ImageContents,
+) -> None:
+    dockerfile = DOCKERFILE.read_text("utf-8")
+    health = exec_form(dockerfile, "HEALTHCHECK")
+    major, minor = pinned_python_version()
+
+    assert health is not None
+    assert exec_form(dockerfile, "CMD") is not None
+    assert worker_health_check() == ["CMD", *health]
+    assert contents.command_interpreter == f"/usr/local/bin/python{major}.{minor}"
+
+
+def test_a_health_check_or_a_command_in_string_form_reads_as_no_exec_form() -> None:
+    written = (
+        "FROM scratch AS runtime\n"
+        "HEALTHCHECK --interval=15s \\\n"
+        "  CMD python -m better_answers_worker.health\n"
+        "CMD better-answers-worker\n"
+    )
+
+    assert exec_form(written, "HEALTHCHECK") is None
+    assert exec_form(written, "CMD") is None
+
+
+def test_every_shared_object_the_image_carries_resolves_on_its_own_loader(
+    contents: ImageContents,
+) -> None:
+    assert contents.shared_object_count > 0
+    assert dict(contents.unresolved_shared_objects) == {}
+
+
+def test_every_library_the_image_carries_has_a_package_record_a_scanner_reads(
+    contents: ImageContents,
+) -> None:
+    assert contents.library_file_count > 0
+    assert contents.unrecorded_library_files == ()
 
 
 def test_the_image_carries_the_tier_and_its_generated_schema_view(
@@ -966,11 +1220,11 @@ def test_the_build_fetches_the_weights_by_running_the_module_that_names_them(
 def test_the_runtime_stage_copies_the_source_last() -> None:
     runtime = DOCKERFILE.read_text("utf-8").rpartition("\nFROM ")[2]
     copies = [line.split() for line in runtime.splitlines() if line.startswith("COPY ")]
-    out_of_the_build = [words for words in copies if words[1] == "--from=build"]
+    out_of_a_stage = [words for words in copies if words[1].startswith("--from=")]
 
     assert copies[-1:] == [["COPY", "src", "src"]]
-    assert copies[:-1] == out_of_the_build
-    assert {words[-1] for words in out_of_the_build} >= {
+    assert copies[:-1] == out_of_a_stage
+    assert {words[-1] for words in out_of_a_stage} >= {
         "/app/.venv",
         worker_environment("HF_HOME"),
     }
@@ -1090,11 +1344,13 @@ def test_both_converters_hold_on_the_image_under_the_engines_own_runtime(
     )
 
 
-def test_the_container_runs_as_the_uid_that_owns_this_tiers_volumes(
+def test_the_container_runs_as_the_uid_that_owns_this_tiers_volumes_with_its_own_home(
     contents: ImageContents,
 ) -> None:
     assert contents.uid == chowned_worker_uid()
     assert contents.uid != 0
+    assert contents.home != "/"
+    assert contents.home_is_writable is True
 
 
 def test_the_image_leaves_this_tiers_tests_out_of_the_runtime(

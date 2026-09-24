@@ -3,10 +3,18 @@
 # its image needs nothing from the rest of the repository.
 #
 # Versions read: `python:3.13.15-slim-trixie` from Docker Hub on 24/09/2026 — 3.13 is what
-# `pyproject.toml` requires (`>=3.13,<3.14`) and `.python-version` names — and uv 0.12.9
-# from astral-sh/uv's releases on 03/09/2026. Both are pinned by digest as well as by tag:
-# the tag is the label a person reads, the digest is what actually ships. Debian 13 (trixie)
+# `pyproject.toml` requires (`>=3.13,<3.14`) and `.python-version` names — uv 0.12.9
+# from astral-sh/uv's releases on 03/09/2026, and `gcr.io/distroless/cc-debian13:nonroot`
+# from the gcr.io registry on 24/09/2026. Each is pinned by digest as well as by tag: the
+# tag is the label a person reads, the digest is what actually ships. Debian 13 (trixie)
 # rather than 12 for the reason `apps/api/Dockerfile` gives beside its own base image.
+#
+# Distroless for the runtime because the worker runs nothing a slim Debian adds: no shell,
+# no package manager, no perl — it reads git through dulwich. On the slim runtime, nearly
+# every finding a scan reported was in a package the worker never ran. What it keeps is
+# glibc, the C++ runtime, OpenSSL, zlib, CA certificates and time zones.
+# `docs/operations/RUNBOOK.md` § A shell in the worker says how an operator gets a shell
+# during an incident all the same.
 #
 # uv arrives by `COPY --from` off Astral's own image, which is their documented way to add
 # uv to a Python base. It puts the exact uv version in this file, where a reader looking for
@@ -25,7 +33,18 @@
 # `apps/worker/tests/test_image.py` holds that file to it.
 FROM ghcr.io/astral-sh/uv:0.12.9@sha256:8b940d3a9d65bed080436972241af2e21c84b5e8c9193f7014ed71479ee795ff AS uv
 
-FROM python:3.13.15-slim-trixie@sha256:8d9d0b8bcf6506481eae4907c18f5e3e7902e629f5f6d684f9e7c32e85e3ddf0 AS build
+# The runtime's base, named here because the `tree` stage reads its accounts before the
+# runtime stage builds on it. `cc` rather than Distroless's own `python3-debian13`: that
+# image carries Debian's Python, 3.13.5 on 24/09/2026, ten releases behind the 3.13.15
+# pinned below, at a path the build stage's venv does not point to. `nonroot`, so a lost
+# `USER` line would still not run the worker as root.
+FROM gcr.io/distroless/cc-debian13:nonroot@sha256:54df941ed0d06a1bd95ef5e0ce391fd8d9f94b64782dc9a60062727849ee3f97 AS distroless
+
+# The one pin of the Python image. The build stage makes the venv with its interpreter and
+# the `tree` stage hands that same interpreter to the runtime, so the two cannot drift.
+FROM python:3.13.15-slim-trixie@sha256:8d9d0b8bcf6506481eae4907c18f5e3e7902e629f5f6d684f9e7c32e85e3ddf0 AS interpreter
+
+FROM interpreter AS build
 COPY --from=uv /uv /uvx /usr/local/bin/
 # `--no-dev` is what keeps ruff, mypy, pytest, mutmut and testcontainers — the
 # `[dependency-groups] dev` list — out of the image. psycopg and dulwich are not on that
@@ -86,15 +105,52 @@ RUN --mount=type=cache,target=/tldextract-cache,uid=0 \
     /app/.venv/bin/python -m better_answers_worker.redaction.suffixes \
     /data/worker/tldextract-cache
 
-FROM python:3.13.15-slim-trixie@sha256:8d9d0b8bcf6506481eae4907c18f5e3e7902e629f5f6d684f9e7c32e85e3ddf0 AS runtime
+# What the runtime adds to its base, staged under /runtime because the runtime cannot run a
+# command to do it. A stage of its own off the Python image rather than the tail of the
+# build stage, so it carries the standard library as that image ships it and no bytecode a
+# build step wrote, and an edit inside `redaction/` does not re-make it.
+#
+# The interpreter sits at the path the venv's `python` already names, so the venv the
+# build stage made runs unchanged. pip and the wheel `ensurepip` would install it from stay
+# out: nothing installs a package at runtime, and pip's vendored libraries carried the slim
+# runtime's two high-severity findings that had a fix.
+#
+# Five Debian libraries the standard library loads on the worker's own paths and the base
+# does not carry: libffi for ctypes, bzip2, xz, SQLite and libuuid. Each comes with its
+# package record, in `status.d` where Distroless keeps its own, so a scanner names and
+# dates it; a library copied without one would be a finding nobody is ever shown. The six
+# standard-library modules whose libraries stay out are removed rather than shipped unable
+# to load: curses, readline, both dbm modules and Tk want a terminal, a database file or a
+# display, and the worker opens none.
+#
+# uid 1000 because `init` in `deploy/stores.compose.yaml` chowns /data/worker/{lmdb,trees}
+# to it, and a home it owns because libraries write their caches under `~`.
+FROM interpreter AS tree
+COPY --from=distroless /etc/passwd /etc/group /runtime/etc/
+RUN set -eu \
+ && cp -a --parents /usr/local/bin/python3 /usr/local/bin/python3.13 \
+      /usr/local/lib/libpython3.13.so.1.0 /usr/local/lib/python3.13 /runtime \
+ && rm -rf /runtime/usr/local/lib/python3.13/site-packages/* \
+      /runtime/usr/local/lib/python3.13/ensurepip/_bundled \
+ && for module in _curses _curses_panel _dbm _gdbm _tkinter readline; do \
+      rm /runtime/usr/local/lib/python3.13/lib-dynload/"$module".cpython-313-*.so; \
+    done \
+ && mkdir -p /runtime/var/lib/dpkg/status.d \
+ && for package in libbz2-1.0 libffi8 liblzma5 libsqlite3-0 libuuid1; do \
+      dpkg-query --listfiles "$package" | while read -r path; do \
+        if [ -f "$path" ] || [ -L "$path" ]; then cp -a --parents "$path" /runtime; fi; \
+      done; \
+      dpkg-query --status "$package" > /runtime/var/lib/dpkg/status.d/"$package"; \
+      cp "$(dpkg-query --control-path "$package" md5sums)" \
+        /runtime/var/lib/dpkg/status.d/"$package".md5sums; \
+    done \
+ && echo 'worker:x:1000:1000:worker:/home/worker:/sbin/nologin' >> /runtime/etc/passwd \
+ && echo 'worker:x:1000:' >> /runtime/etc/group \
+ && install -d -o 1000 -g 1000 /runtime/home/worker
 
-# uid 1000, the uid `init` in `deploy/stores.compose.yaml` chowns /data/worker/{lmdb,trees}
-# to; nothing runs as root to own a volume. The Python base ships no non-root
-# user, so this is where the worker's gets made. The weights below are chowned to the same
-# uid by their own `COPY`, since they come out of the build stage rather than off a host.
-RUN groupadd --system --gid 1000 worker \
- && useradd --system --uid 1000 --gid worker --home-dir /home/worker --create-home worker
+FROM distroless AS runtime
 
+COPY --from=tree /runtime/ /
 WORKDIR /app
 ENV PATH=/app/.venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
@@ -155,6 +211,8 @@ USER worker
 # copies of the probe, since the `worker` service in `deploy/platform.compose.yaml` runs the
 # same command and points here. Eight retries at fifteen seconds is longer than one lease,
 # so a claimant that goes quiet is given the lease's own grace before the container is.
+# Exec form here, in the `worker` service and in `CMD` below, because the image has no shell
+# to run a string form: the `CMD` is the venv's script, whose first line names its Python.
 HEALTHCHECK --interval=15s --timeout=3s --start-period=40s --retries=8 \
   CMD ["python", "-m", "better_answers_worker.health"]
 
