@@ -24,10 +24,13 @@ argument and listens on it, with the harness's control paths
 One origin carries the SPA, sign-in, consent and `/oauth2/*`, which is why the consent
 flow is provable in a browser at all.
 
-`apps/web/playwright.config.ts` holds the port, the `webServer` command — `serve:e2e` in the api's
-own scripts, handed that port — and `/health` as the readiness URL: the one path the loopback
+`apps/web/playwright.config.ts` holds the port, the `webServer` command — `node tests/serve.ts`
+run in `apps/api`, handed that port — and `/health` as the readiness URL: the one path the loopback
 carries whatever else changes, and it answers only once the database is migrated and the
-authorization server has initialised.
+authorization server has initialised. The api's `serve:e2e` script is the same command for a
+person to run by hand; Playwright never goes through it, because pnpm 11.27 and later start a
+script in a process group of its own, which Playwright's kill at the end of the run never
+reaches, so the server outlives the suite and the run hangs on its open output.
 
 ## The fixture module
 
