@@ -39,6 +39,10 @@ const SAID_OF_WORD = {
     why: "A publish needs all three confirmations.",
     next: "Tick each one, then publish.",
   },
+  "special-category-unreviewed": {
+    why: "A special category finding in this binding is still unreviewed, and a binding holding one cannot widen.",
+    next: "Review the binding, narrow or dismiss that finding group, then widen it.",
+  },
   "media-type-refused": {
     why: "The platform converts markdown, plain text, Word (.docx) and PDF, and this file is none of them.",
     next: "Choose a file of one of those kinds.",
@@ -56,8 +60,12 @@ const SAID_OF_WORD = {
     next: "Untick the groups of another category.",
   },
   "widening-refused": {
-    why: "That would widen who may read it, and this screen only narrows.",
+    why: "That would widen who may read it, and a narrowing never widens.",
     next: "Choose a class narrower than the one it has.",
+  },
+  "not-wider": {
+    why: "That is no wider than the class and audience it has.",
+    next: "Choose a wider class, or everyone in the workspace for its audience.",
   },
   "no-such-group": {
     why: "A named group is not one this workspace holds.",

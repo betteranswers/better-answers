@@ -69,6 +69,29 @@ const SPECIAL_CATEGORIES = new Set<string>(
   REDACTION_CATEGORIES.filter((entry) => entry.specialCategory).map((entry) => entry.category),
 );
 
+const HOLDS_AN_UNREVIEWED_SPECIAL_CATEGORY = `SELECT EXISTS (
+    SELECT 1 FROM finding f
+      JOIN source_document d ON d.workspace_id = f.workspace_id AND d.id = f.document_id
+     WHERE f.workspace_id = $1 AND d.binding_id = $2 AND f.category = ANY($3::text[])
+       AND f.review_state = $4 AND ${raisedByTheLastRun("f", "d")}
+  ) AS held`;
+
+export const holdsAnUnreviewedSpecialCategory = async (
+  acting: ActingOnBinding,
+  tx: Tx,
+): Promise<Result<boolean, Error>> => {
+  const found = await attempt(() =>
+    tx.query<{ held: boolean }>(HOLDS_AN_UNREVIEWED_SPECIAL_CATEGORY, [
+      acting.workspaceId,
+      acting.bindingId,
+      [...SPECIAL_CATEGORIES],
+      FINDING_UNREVIEWED_STATE,
+    ]),
+  );
+  if (!found.ok) return err(found.error);
+  return ok(found.value.rows[0]?.held === true);
+};
+
 const classOf = (word: string): Sensitivity | undefined =>
   SENSITIVITIES.find((known) => known === word);
 

@@ -206,11 +206,17 @@ export const seedBindings = async (
     const seeded: SeededBinding[] = [];
 
     for (const binding of asked.bindings) {
+      // The audience CHECK wants a named group beside the word, and the screen lists none by name.
+      const readers =
+        binding.audience === "groups"
+          ? [(await seed.group({ workspaceId, name: `${binding.name} readers` })).id]
+          : null;
       const row = await seed.sourceBinding({
         workspaceId,
         name: binding.name,
         sensitivity: binding.sensitivity,
         audience: binding.audience,
+        audienceGroups: readers,
         publishedAt: binding.published ? new Date() : null,
         state: binding.published ? "published" : "landed",
       });

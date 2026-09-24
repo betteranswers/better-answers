@@ -40,6 +40,7 @@ describe("what a procedure may answer the wire", () => {
       "sources.narrowDocuments",
       "sources.preview",
       "sources.publish",
+      "sources.widen",
     ]);
     expectTypeOf<EveryProcedure["path"]>().toEqualTypeOf<
       | "session.membership"
@@ -53,6 +54,7 @@ describe("what a procedure may answer the wire", () => {
       | "sources.dismissAsNotSpecialCategory"
       | "sources.publish"
       | "sources.narrow"
+      | "sources.widen"
       | "sources.preview"
       | "runs.ofSubject"
     >();

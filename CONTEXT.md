@@ -378,20 +378,30 @@ Where a unit lives is decided by **minting**.
   suggestions. Its audit row carries the Admin's confirmations (lawful basis recorded, privacy
   information updated, DPIA reference). Unpublished content is seen by Admins, in Control Centre
   only, and a concept citing it counts as Restricted until the publish releases the binding's class.
+- **widen (a binding)** — an Admin's recorded act that moves a binding to a wider class, a wider
+  audience or both, published or not, with the *cascade* run inside the same act. Its audit row
+  carries the class and audience it moved from and to. A request that widens no term, or narrows
+  any, is refused, and so is any widening while a special-category *finding* the last run raised
+  is unreviewed. A document's own class stays where it is, since the *effective class* is the
+  narrower of the two. The one road by which a binding's class widens. _Avoid_: reclassify,
+  unrestrict.
 - **audience** — who a binding's content is for: everyone in the workspace, or named groups (plus,
   if needed, named individuals). Set on the binding, carried with sensitivity onto every source
   entity and read from the binding for a chunk, and applied with *published* on every read and
   traversal hop. Distinct from sensitivity (how confidential) and from trust (how reliable).
 - **cascade** — the re-derivation an Admin's narrowing of a binding or of named documents of one,
-  publish of a binding, or override of a concept's class sets off inside the same act: first every
-  concept citing the evidence that moved, then every composition including one of those concepts —
-  two levels, the second reading what the first wrote, never a third — so a guide never reaches a
-  reader its includes would not. _Avoid_: recompute (one level's work, not the whole), propagation.
+  widening or publish of a binding, or override of a concept's class sets off inside the same act:
+  first every concept citing the evidence that moved, then every composition including one of those
+  concepts — two levels, the second reading what the first wrote, never a third — so a guide never
+  reaches a reader its includes would not. _Avoid_: recompute (one level's work, not the whole),
+  propagation.
 - **class override** — an Admin's recorded act that sets a concept's class — sensitivity and
   audience — whatever its evidence and its kind's floor derive: one row per concept, the latest
   standing, one audit event, and the *cascade* run inside the same act. The one act that may widen
-  a class; where it widens past the evidence, a reader is in the *shared beyond its evidence* state
-  and the *evidence pane* names the Admin (ADR 0039). _Avoid_: exception, exemption, allow-list.
+  a concept's class past what its evidence derives (a binding's widens by *widen (a binding)*, and
+  its concepts follow their evidence); where it does, a reader is in the *shared beyond its
+  evidence* state and the *evidence pane* names the Admin (ADR 0039). _Avoid_: exception,
+  exemption, allow-list.
 - **group** — a named set of members of one workspace: the one grouping concept, and the unit an
   *audience* names when a binding is not for everyone. Groups are flat, and a person may belong to
   several. A group may represent a team ("HR team", "Sales executives") — that is its name, not a

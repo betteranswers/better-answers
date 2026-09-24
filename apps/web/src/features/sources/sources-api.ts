@@ -5,10 +5,10 @@ import {
   type DataTag,
   type QueryKey,
 } from "@tanstack/react-query";
-import type { inferOutput } from "@trpc/tanstack-react-query";
+import type { inferInput, inferOutput } from "@trpc/tanstack-react-query";
 
 import { uploadOptions, type UploadDescriptor } from "@/shared/api/link.ts";
-import { useTRPC, useTRPCClient } from "@/shared/api/trpc.ts";
+import { useTRPC, useTRPCClient, type ApiError } from "@/shared/api/trpc.ts";
 
 type Api = ReturnType<typeof useTRPC>;
 
@@ -22,6 +22,8 @@ export type DocumentsNarrowed = inferOutput<Api["sources"]["narrowDocuments"]>;
 
 export type BindingNarrowed = inferOutput<Api["sources"]["narrow"]>;
 
+export type BindingWidened = inferOutput<Api["sources"]["widen"]>;
+
 export type DismissedAsNotSpecialCategory = inferOutput<
   Api["sources"]["dismissAsNotSpecialCategory"]
 >;
@@ -32,6 +34,13 @@ export type Sensitivity = ListedBinding["sensitivity"];
 export const CLASSES: readonly Sensitivity[] = ["Restricted", "Internal", "Public"];
 
 export const NARROWEST: Sensitivity = "Restricted";
+
+const WIDEST: Sensitivity = "Public";
+
+export const EVERYONE: ListedBinding["audience"] = "everyone";
+
+export const widestAlready = (binding: ListedBinding): boolean =>
+  binding.sensitivity === WIDEST && binding.audience === EVERYONE;
 
 const RUN_IN_FLIGHT: ReadonlySet<string> = new Set(["queued", "claimed"]);
 
@@ -134,24 +143,42 @@ export const usePublish = () => {
   );
 };
 
-export const useNarrowBinding = () => {
+// Text until parsed: the input's class and audience are the api's words as the wire carries them.
+type ClassAsked = inferInput<Api["sources"]["widen"]>;
+
+const classSetAsAsked =
+  (asked: ClassAsked) =>
+  (binding: ListedBinding): ListedBinding => {
+    const sensitivity = CLASSES.find((word) => word === asked.sensitivity) ?? binding.sensitivity;
+    return asked.audience === EVERYONE
+      ? { ...binding, sensitivity, audience: EVERYONE, audienceGroups: null }
+      : { ...binding, sensitivity };
+  };
+
+// A narrowing and a widening draw the same class on the row, and undo it the same way.
+const useClassSetOnTheRow = () => {
   const api = useTRPC();
   const optimistic = useOptimistic();
   const reconcile = useReconcile();
-  return useMutation(
-    api.sources.narrow.mutationOptions({
-      onMutate: (asked) =>
-        optimistic(
-          api.sources.list.queryKey(),
-          onTheBinding(asked.bindingId, (binding) => ({
-            ...binding,
-            sensitivity: CLASSES.find((word) => word === asked.sensitivity) ?? binding.sensitivity,
-          })),
-        ),
-      onError: (_refusal, _asked, held) => held?.undo(),
-      onSettled: () => reconcile(),
-    }),
-  );
+  return {
+    onMutate: (asked: ClassAsked) =>
+      optimistic(
+        api.sources.list.queryKey(),
+        onTheBinding(asked.bindingId, classSetAsAsked(asked)),
+      ),
+    onError: (_refusal: ApiError, _asked: ClassAsked, held: Undo | undefined) => held?.undo(),
+    onSettled: () => reconcile(),
+  };
+};
+
+export const useNarrowBinding = () => {
+  const api = useTRPC();
+  return useMutation(api.sources.narrow.mutationOptions(useClassSetOnTheRow()));
+};
+
+export const useWidenBinding = () => {
+  const api = useTRPC();
+  return useMutation(api.sources.widen.mutationOptions(useClassSetOnTheRow()));
 };
 
 const sameGroup = (left: FindingGroupKey, right: FindingGroupKey): boolean =>

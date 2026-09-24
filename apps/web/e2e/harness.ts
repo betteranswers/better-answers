@@ -90,6 +90,7 @@ type SeedDocument = {
 export type SeedBinding = {
   readonly name: string;
   readonly sensitivity?: Sensitivity;
+  readonly audience?: "everyone" | "groups";
   readonly run?: "none" | "queued" | "claimed" | "done";
   readonly published?: boolean;
   readonly documents?: readonly SeedDocument[];

@@ -166,6 +166,7 @@ test.describe("the Sources screen's list of bindings", () => {
         - button "Review Staff handbook"
         - button "Publish Staff handbook"
         - button "Narrow Staff handbook"
+        - button "Widen Staff handbook"
         - term: Connector
         - definition: upload
         - term: Class
@@ -762,7 +763,7 @@ test.describe("reviewing a binding's findings", () => {
   });
 });
 
-test.describe("publishing and narrowing a binding", () => {
+test.describe("publishing, narrowing and widening a binding", () => {
   test("the publish dialog states an Admin's three confirmations and the audit row before the click, and the act lands within 100 ms", async ({
     page,
     request,
@@ -806,6 +807,10 @@ test.describe("publishing and narrowing a binding", () => {
         - definition: Staff handbook
         - term: By
         - definition: You, at the instant the platform records it
+        - term: Class
+        - definition: Internal
+        - term: Audience
+        - definition: Everyone in the workspace
         - term: Lawful basis recorded
         - definition: Not yet confirmed
         - term: Privacy information updated
@@ -895,6 +900,178 @@ test.describe("publishing and narrowing a binding", () => {
     ).toBeVisible();
     await expect(page.getByText(citedBy?.iri ?? "")).toBeVisible();
   });
+
+  test("an Admin widens a binding published at Restricted by keyboard, told the consequence and the audit row before the click, and it lands within 100 ms with every concept citing it", async ({
+    page,
+    request,
+    passesTheAccessibilityGate,
+  }) => {
+    const { seeded } = await anAdminAtSources(page, request, {
+      workspace: "Hebden Bridge Joinery",
+      bindings: [
+        indexed("Tender answers", {
+          sensitivity: "Restricted",
+          published: true,
+          documents: [{ title: "Method statement", cited: true }],
+        }),
+      ],
+    });
+    const citedBy = seeded.bindings[0]?.documents[0]?.citedBy;
+    expect(citedBy, "the harness seeded no citing concept").toBeDefined();
+
+    await bindingNamed(page, "Tender answers")
+      .getByRole("button", { name: "Widen Tender answers" })
+      .focus();
+    await page.keyboard.press("w");
+    const dialog = page.getByRole("dialog", { name: "Widen Tender answers" });
+    await expect(dialog).toHaveAccessibleDescription(
+      "Its passages reach more readers the moment you widen it, and every concept citing its documents, and every composition including one, moves with it in the same act. A document with a narrower class of its own keeps it.",
+    );
+    const classPicked = dialog.getByRole("combobox", { name: "Class" });
+    await expect(classPicked).toBeFocused();
+    await expect(classPicked).toHaveText("Internal");
+    await expect(dialog.getByRole("region", { name: "What the audit row will carry" }))
+      .toMatchAriaSnapshot(`
+      - region "What the audit row will carry":
+        - heading "What the audit row will carry" [level=3]
+        - term: Act
+        - definition: sources.binding.widened
+        - term: Binding
+        - definition: Tender answers
+        - term: By
+        - definition: You, at the instant the platform records it
+        - term: Class, from
+        - definition: Restricted
+        - term: Class, to
+        - definition: Internal
+        - term: Audience, from
+        - definition: Everyone in the workspace
+        - term: Audience, to
+        - definition: Everyone in the workspace
+    `);
+    await passesTheAccessibilityGate();
+
+    await page.keyboard.press("Enter");
+    await page.getByRole("option", { name: "Restricted" }).press("Enter");
+    await expect(classPicked).toHaveText("Restricted");
+    await expect(classPicked, "the list of classes did not hand focus back").toBeFocused();
+    const commit = dialog.getByRole("button", { name: /^Widen Tender answers to / });
+    await expect(commit).toBeDisabled();
+    await expect(commit).toHaveAccessibleDescription(
+      "That is no wider than the class and audience it has. Choose a wider class, or everyone in the workspace for its audience.",
+    );
+
+    await classPicked.press("Enter");
+    await page.getByRole("option", { name: "Internal" }).press("Enter");
+    await expect(classPicked).toHaveText("Internal");
+    await expect(classPicked, "the list of classes did not hand focus back").toBeFocused();
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Tab");
+    await expect(
+      dialog.getByRole("button", {
+        name: "Widen Tender answers to Internal for everyone in the workspace",
+      }),
+    ).toBeFocused();
+
+    await clockTheNextKey(page, {
+      at: "//li[.//h3[.='Tender answers']]//dt[.='Class']/following-sibling::dd[1]",
+      reads: "Internal",
+    });
+    await page.keyboard.press("Enter");
+    await theActLandedWithinItsBudget(page, "widen");
+
+    await expect(bindingsRegion(page).getByRole("status")).toContainText(
+      "Widened “Tender answers” to Internal for everyone in the workspace. 1 concept and 1 composition moved with it.",
+    );
+    await expect(page.getByText(citedBy?.iri ?? "")).toBeVisible();
+    await expect(classOf(page, "Tender answers")).toHaveText("Internal");
+    await expect(page.getByRole("heading", { level: 3, name: "Tender answers" })).toBeFocused();
+  });
+
+  test("an Admin widens a Public binding's named groups to everyone in the workspace, and is told once nothing is wider", async ({
+    page,
+    request,
+    passesTheAccessibilityGate,
+  }) => {
+    await anAdminAtSources(page, request, {
+      workspace: "Ripponden Glass",
+      bindings: [
+        indexed("Price book", { sensitivity: "Public", audience: "groups", published: true }),
+      ],
+    });
+    const audienceOf = leadOf(page, "Price book", "Audience");
+    await expect(audienceOf).toHaveText("Named groups (1 group)");
+
+    await bindingNamed(page, "Price book")
+      .getByRole("button", { name: "Widen Price book" })
+      .focus();
+    await page.keyboard.press("w");
+    const dialog = page.getByRole("dialog", { name: "Widen Price book" });
+    await expect(dialog.getByRole("combobox", { name: "Audience" })).toHaveText(
+      "Everyone in the workspace",
+    );
+    await expect(dialog.getByRole("region", { name: "What the audit row will carry" }))
+      .toMatchAriaSnapshot(`
+      - region "What the audit row will carry":
+        - heading "What the audit row will carry" [level=3]
+        - term: Act
+        - definition: sources.binding.widened
+        - term: Binding
+        - definition: Price book
+        - term: By
+        - definition: You, at the instant the platform records it
+        - term: Class, from
+        - definition: Public
+        - term: Class, to
+        - definition: Public
+        - term: Audience, from
+        - definition: Named groups
+        - term: Audience, to
+        - definition: Everyone in the workspace
+    `);
+    await passesTheAccessibilityGate();
+
+    await dialog
+      .getByRole("button", { name: "Widen Price book to Public for everyone in the workspace" })
+      .press("Enter");
+
+    await expect(audienceOf).toHaveText("Everyone in the workspace");
+    await expect(
+      bindingNamed(page, "Price book").getByRole("button", { name: "Widen Price book" }),
+    ).toHaveCount(0);
+    await bindingNamed(page, "Price book")
+      .getByRole("button", { name: "Review Price book" })
+      .focus();
+    await page.keyboard.press("w");
+    await expect(bindingsRegion(page).getByRole("status")).toHaveText(
+      "“Price book” is Public for everyone in the workspace, and no class or audience is wider.",
+    );
+  });
+
+  test("tells an Admin the widening block in its own word, with what to do next, when a special category finding is unreviewed", async ({
+    page,
+    request,
+  }) => {
+    await anAdminAtSources(page, request, {
+      workspace: "Mytholmroyd Pumps",
+      bindings: [{ ...SERVICE_RECORDS, sensitivity: "Restricted", published: true }],
+    });
+
+    await bindingNamed(page, "Service records")
+      .getByRole("button", { name: "Widen Service records" })
+      .click();
+    await page
+      .getByRole("dialog", { name: "Widen Service records" })
+      .getByRole("button", {
+        name: "Widen Service records to Internal for everyone in the workspace",
+      })
+      .click();
+
+    await expect(bindingsRegion(page).getByRole("alert")).toHaveText(
+      "Refused: special-category-unreviewed. A special category finding in this binding is still unreviewed, and a binding holding one cannot widen. Review the binding, narrow or dismiss that finding group, then widen it.",
+    );
+    await expect(classOf(page, "Service records")).toHaveText("Restricted");
+  });
 });
 
 test.describe("the Sources screen's keystrokes", () => {
@@ -920,6 +1097,8 @@ test.describe("the Sources screen's keystrokes", () => {
         - definition: Publish the binding in focus
         - term: "n"
         - definition: Narrow the binding in focus
+        - term: w
+        - definition: Widen the binding in focus
         - term: x
         - definition: Select or clear the finding group in focus
         - term: k
