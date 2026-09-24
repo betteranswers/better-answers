@@ -75,13 +75,19 @@ const contentsSchema = z.object({
   pnpmTarget: z.string(),
   pnpmVersion: z.string(),
   opsAnswer: z.string(),
+  storedCount: z.number(),
+  unreached: z.array(z.string()),
+  broken: z.array(z.string()),
+  loaded: z.array(z.string()),
 });
 
 type ImageContents = z.infer<typeof contentsSchema>;
 
+// No peer is followed: pnpm links one from anywhere in the workspace's graph, and a peer the app
+// loads is one it declares.
 const probe = `
 const { createRequire } = require("node:module");
-const { existsSync, lstatSync, realpathSync } = require("node:fs");
+const { existsSync, lstatSync, readdirSync, readFileSync, realpathSync } = require("node:fs");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const from = createRequire("/app/apps/api/");
@@ -105,9 +111,53 @@ const realTarget = (file) => { try { return realpathSync(file); } catch { return
 const resolvable = JSON.parse(process.env.PROBE_NAMES).filter(resolves);
 const missing = JSON.parse(process.env.PROBE_REQUIRED).filter((name) => !resolves(name));
 const pnpm = onPath("pnpm");
+const namesIn = (modules) => readdirSync(modules).flatMap((entry) =>
+  entry.startsWith("@") ? readdirSync(path.join(modules, entry)).map((name) => entry + "/" + name) : [entry]);
+const store = "/app/node_modules/.pnpm";
+const stored = new Map();
+for (const entry of readdirSync(store)) {
+  const modules = path.join(store, entry, "node_modules");
+  if (!existsSync(modules)) continue;
+  for (const name of namesIn(modules)) {
+    const directory = path.join(modules, name);
+    if (!lstatSync(directory).isSymbolicLink()) stored.set(directory, name);
+  }
+}
+const reached = new Set();
+const broken = [];
+const pending = ["apps/api", "packages/core", "packages/schema"].flatMap((workspace) => {
+  const modules = path.join("/app", workspace, "node_modules");
+  return namesIn(modules).map((name) => realpathSync(path.join(modules, name)));
+});
+while (pending.length > 0) {
+  const directory = pending.pop();
+  if (reached.has(directory) || !stored.has(directory)) continue;
+  reached.add(directory);
+  const manifest = JSON.parse(readFileSync(path.join(directory, "package.json"), "utf8"));
+  const siblings = directory.slice(0, -stored.get(directory).length);
+  for (const name of Object.keys({ ...manifest.dependencies, ...manifest.optionalDependencies })) {
+    const link = path.join(siblings, name);
+    if (existsSync(link)) pending.push(realpathSync(link));
+    else if (!(name in (manifest.optionalDependencies ?? {}))) broken.push(manifest.name + " -> " + name);
+  }
+}
+const refusesItsBootstrap = (entry) => {
+  try {
+    execFileSync("node", ["/app/apps/api/src/" + entry], {
+      encoding: "utf8", env: { PATH: process.env.PATH }, stdio: ["ignore", "pipe", "pipe"], timeout: 20000,
+    });
+    return false;
+  } catch (error) {
+    return (String(error.stdout) + String(error.stderr)).includes("bootstrap configuration is invalid");
+  }
+};
 process.stdout.write(JSON.stringify({
   resolvable,
   missing,
+  storedCount: stored.size,
+  unreached: [...stored].filter(([directory]) => !reached.has(directory)).map(([, name]) => name).sort(),
+  broken: broken.sort(),
+  loaded: ["main.ts", "migrate.ts", "ops.ts"].filter(refusesItsBootstrap),
   hasContracts: existsSync("/app/contracts"),
   hasSpaBuild: existsSync("/app/apps/web/dist/index.html"),
   filterRepoVersion: answered("python3", [
@@ -154,6 +204,21 @@ describe.skipIf(nothingToProbeHere)("the app tier's runtime image", () => {
 
   it("carries the two workspace libraries the app imports", () => {
     expect(contents.missing).toEqual([]);
+  });
+
+  it("carries no package the app's own dependencies do not reach", () => {
+    expect(contents.storedCount).toBeGreaterThan(0);
+    expect(contents.unreached).toEqual([]);
+  });
+
+  it("keeps every dependency a package it carries declares", () => {
+    expect(contents.broken).toEqual([]);
+  });
+
+  it("loads every module the app, `migrate` and `pnpm ops` import from what the store kept", () => {
+    // Each entry reads its bootstrap first, and refuses it only once every static import has
+    // resolved.
+    expect(contents.loaded).toEqual(["main.ts", "migrate.ts", "ops.ts"]);
   });
 
   it("leaves the tier contract's fixtures out of the runtime", () => {
