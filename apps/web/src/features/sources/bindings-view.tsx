@@ -11,7 +11,7 @@ import { BindAct } from "./bind-act.tsx";
 import { movedWords, NarrowDialog, PublishDialog } from "./binding-dialogs.tsx";
 import { BindingList } from "./binding-list.tsx";
 import { outcomeOfFailure } from "./refusal.tsx";
-import { Review, REVIEW_HEADING } from "./review.tsx";
+import { Review } from "./review.tsx";
 import {
   NARROWEST,
   useBindings,
@@ -20,12 +20,12 @@ import {
   type BindingNarrowed,
   type ListedBinding,
 } from "./sources-api.ts";
-import { SOURCES_KEYSTROKES } from "./sources-state.ts";
+import { REVIEW_HEADING, SOURCES_KEYSTROKES } from "./sources-state.ts";
 import { AUDIENCE_WORDS } from "./words.ts";
 
 const sources = screenById("sources");
 
-// The two bulk acts sit beside the findings they command, in the review: four acts in the band
+// The three bulk acts sit beside the findings they command, in the review: five acts in the band
 // scroll a 320px screen sideways.
 export const BINDINGS_TOOLBAR: ViewToolbar = {
   acts: (

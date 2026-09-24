@@ -11,6 +11,32 @@ FIXTURE_PAGE = (
 )
 
 
+SERVICE_NOTES_PAGE = TEST_DIRECTORY / "fixtures" / "redaction" / "pump-service-notes.md"
+
+
+AN_ENGINEERING_DIAGNOSIS = (
+    "Our engineers diagnose the fault on site before any part is ordered, so a second "
+    "visit\nis rare."
+)
+
+
+A_VERB_FORM_HEALTH_SENTENCE = (
+    "In March he was diagnosed with a heart condition, and the depot rota was covered "
+    "for\nfour weeks."
+)
+
+
+THE_ENGINEERS_SENTENCE_AT = (34, 129)
+
+
+THE_DIAGNOSED_SENTENCE_AT = (141, 237)
+
+
+def the_engineers_section() -> str:
+    page = SERVICE_NOTES_PAGE.read_text(encoding="utf-8")
+    return page[: page.index("## Cover")]
+
+
 TIER_AGREEMENT = REPO_ROOT / "contracts" / "redaction" / "cases.json"
 
 _AGREEMENT = cast(

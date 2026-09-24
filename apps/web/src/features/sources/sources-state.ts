@@ -13,7 +13,10 @@ export const SOURCES_KEYSTROKES = {
   select: { key: "x", act: "Select or clear the finding group in focus" },
   keep: { key: "k", act: "Keep the selected finding groups in text" },
   narrowDocuments: { key: "d", act: "Narrow the documents the selected finding groups sit in" },
+  dismiss: { key: "s", act: "Dismiss the selected finding groups as not special category" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
+
+export const REVIEW_HEADING = "review-of-the-binding";
 
 // The groups as the review listed them: what the acts hand back is a group, never a finding.
 export type TickedGroups = {
@@ -22,3 +25,8 @@ export type TickedGroups = {
 };
 
 export const useTickedGroups = viewStateOf<TickedGroups>(BINDINGS_VIEW);
+
+export const groupsTickedIn = (
+  ticked: TickedGroups | undefined,
+  bindingId: string,
+): readonly FindingGroup[] => (ticked?.bindingId === bindingId ? ticked.groups : []);

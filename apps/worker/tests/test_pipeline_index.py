@@ -31,7 +31,9 @@ from better_answers_worker.redaction.withholdings import (
     Withholding,
 )
 from factories import (
+    seed_admin_narrowing,
     seed_chunk,
+    seed_dismissal,
     seed_finding,
     seed_job,
     seed_narrowed,
@@ -41,6 +43,12 @@ from factories import (
     seed_suppression,
 )
 from pg_harness import migrated_postgres_at
+from planted_page import (
+    SERVICE_NOTES_PAGE,
+    THE_DIAGNOSED_SENTENCE_AT,
+    THE_ENGINEERS_SENTENCE_AT,
+    the_engineers_section,
+)
 from test_pipeline_host import (
     WORKER_LOGIN,
     WORKER_PASSWORD,
@@ -101,6 +109,7 @@ def an_invoice_read_as(
     withholdings: tuple[Withholding, ...] = (),
     counts: tuple[tuple[str, int], ...] = (),
     verdict: str | None = None,
+    lifted: bool = False,
 ) -> ReadDocument:
     return ReadDocument(
         source_document_id=AN_INVOICE_ID,
@@ -111,6 +120,7 @@ def an_invoice_read_as(
             withholdings=withholdings,
             counts=counts,
             verdict=verdict,
+            lifted=lifted,
             version=THE_VERSION,
             content_hash=sha256_of(AN_INVOICE),
             detected_afresh=False,
@@ -1076,6 +1086,202 @@ def test_a_span_an_admin_restored_is_back_in_the_text_after_the_next_run(
             "restored": True,
         }
     ]
+
+
+A_SERVICE_NOTE_ID = "01M2Q3R4S5T6V7W8X9YZAB0004"
+
+
+AN_ENGINEERS_NOTE_ID = "01M2Q3R4S5T6V7W8X9YZAB0005"
+
+
+THE_SICK_NOTES_HEALTH_SENTENCE = (63, 131)
+
+
+def a_bucket_holding_the_service_note_too() -> ABucket:
+    return ABucket(
+        {
+            **a_bucket_holding_the_three().objects,
+            original_key_of(A_SERVICE_NOTE_ID): SERVICE_NOTES_PAGE.read_bytes(),
+            original_key_of(AN_ENGINEERS_NOTE_ID): the_engineers_section().encode(),
+        }
+    )
+
+
+Mark = Callable[..., dict[str, Any]]
+
+
+def marked_as(
+    connection: psycopg.Connection,
+    workspace_id: str,
+    mark: Mark,
+    document_id: str,
+    *spans: tuple[int, int],
+) -> None:
+    with connection.cursor() as cursor:
+        for start, end in spans:
+            mark(
+                cursor,
+                workspace_id=workspace_id,
+                document_id=document_id,
+                rule_id="HEALTH_CUE",
+                char_start=start,
+                char_end=end,
+            )
+    connection.commit()
+
+
+def classes_read_at(
+    connection: psycopg.Connection, workspace_id: str, document_id: str
+) -> dict[str, Any]:
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT sensitivity, narrowed_to FROM source_document WHERE id = %s",
+            (document_id,),
+        )
+        own, narrowed_to = cursor.fetchone() or (None, None)
+        cursor.execute(
+            'SELECT DISTINCT sensitivity FROM "index".readable_chunk'
+            " WHERE workspace_id = %s AND source_document_id = %s",
+            (workspace_id, document_id),
+        )
+        chunks = sorted(str(row[0]) for row in cursor.fetchall())
+    return {"own": own, "narrowed_to": narrowed_to, "chunks": chunks}
+
+
+class OneDocumentRun:
+    def __init__(
+        self,
+        connection: psycopg.Connection,
+        dsn: str,
+        tmp_path: Path,
+        document_id: str,
+        *,
+        bucket: ABucket | None = None,
+        sensitivity: str = "Internal",
+    ) -> None:
+        self.connection = connection
+        self.document_id = document_id
+        self.bucket = bucket or a_bucket_holding_the_three()
+        self.workspace_id = seed_the_binding(
+            connection, documents=(document_id,), sensitivity=sensitivity
+        )
+        self.bootstrap = bootstrap_for(dsn, tmp_path)
+
+    def run(self, reason: str = "bound") -> dict[str, Any]:
+        index_binding(
+            self.bootstrap, run_for(self.workspace_id, reason), copies=self.bucket
+        )
+        return classes_read_at(self.connection, self.workspace_id, self.document_id)
+
+    def marked(self, mark: Mark, span: tuple[int, int]) -> None:
+        marked_as(self.connection, self.workspace_id, mark, self.document_id, span)
+
+
+def test_a_dismissal_of_its_only_health_finding_reads_a_document_at_its_bindings_class(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    connection, dsn = database
+    sick_note = OneDocumentRun(connection, dsn, tmp_path, A_SICK_NOTE_ID)
+    narrowed = sick_note.run()
+
+    sick_note.marked(seed_dismissal, THE_SICK_NOTES_HEALTH_SENTENCE)
+    lifted = sick_note.run("dismissed")
+
+    assert narrowed == {
+        "own": "Restricted",
+        "narrowed_to": None,
+        "chunks": ["Restricted"],
+    }
+    assert lifted == {"own": None, "narrowed_to": None, "chunks": ["Internal"]}
+    assert [
+        row["content"] for row in chunk_rows_of(connection, sick_note.workspace_id)
+    ] == [A_SICK_NOTE_REDACTED]
+    assert [
+        (row["char_start"], row["char_end"], row["review_state"])
+        for row in marked_rows_of(connection, sick_note.workspace_id)
+        if row["rule_id"] == "HEALTH_CUE"
+    ] == [(*THE_SICK_NOTES_HEALTH_SENTENCE, "dismissed")]
+
+
+def test_a_document_with_a_second_undismissed_health_finding_stays_restricted(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    connection, dsn = database
+    service_note = OneDocumentRun(
+        connection,
+        dsn,
+        tmp_path,
+        A_SERVICE_NOTE_ID,
+        bucket=a_bucket_holding_the_service_note_too(),
+    )
+    service_note.run()
+
+    service_note.marked(seed_dismissal, THE_ENGINEERS_SENTENCE_AT)
+    one_dismissed = service_note.run("dismissed")
+    service_note.marked(seed_dismissal, THE_DIAGNOSED_SENTENCE_AT)
+    both_dismissed = service_note.run("dismissed")
+
+    assert one_dismissed["own"] == "Restricted"
+    assert both_dismissed["own"] is None
+
+
+def test_dismissing_an_engineers_diagnosis_gives_its_document_back_after_the_run(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    connection, dsn = database
+    engineers_note = OneDocumentRun(
+        connection,
+        dsn,
+        tmp_path,
+        AN_ENGINEERS_NOTE_ID,
+        bucket=a_bucket_holding_the_service_note_too(),
+    )
+    narrowed = engineers_note.run()
+
+    engineers_note.marked(seed_dismissal, THE_ENGINEERS_SENTENCE_AT)
+    lifted = engineers_note.run("dismissed")
+
+    assert narrowed["own"] == "Restricted"
+    assert lifted == {"own": None, "narrowed_to": None, "chunks": ["Internal"]}
+
+
+def test_a_kept_health_sentence_is_back_in_the_text_and_its_document_restricted(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    connection, dsn = database
+    sick_note = OneDocumentRun(connection, dsn, tmp_path, A_SICK_NOTE_ID)
+    sick_note.run()
+
+    sick_note.marked(seed_restore, THE_SICK_NOTES_HEALTH_SENTENCE)
+    kept = sick_note.run("restored")
+
+    assert [
+        row["content"] for row in chunk_rows_of(connection, sick_note.workspace_id)
+    ] == [A_SICK_NOTE]
+    assert kept == {"own": "Restricted", "narrowed_to": None, "chunks": ["Restricted"]}
+
+
+def test_a_lifted_verdict_returns_a_document_to_the_admins_narrowing_no_further(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    connection, dsn = database
+    sick_note = OneDocumentRun(
+        connection, dsn, tmp_path, A_SICK_NOTE_ID, sensitivity="Public"
+    )
+    with connection.cursor() as cursor:
+        seed_admin_narrowing(cursor, document_id=A_SICK_NOTE_ID, sensitivity="Internal")
+    connection.commit()
+    narrowed = sick_note.run()
+
+    sick_note.marked(seed_dismissal, THE_SICK_NOTES_HEALTH_SENTENCE)
+    lifted = sick_note.run("dismissed")
+
+    assert narrowed["own"] == "Restricted"
+    assert lifted == {
+        "own": "Internal",
+        "narrowed_to": "Internal",
+        "chunks": ["Internal"],
+    }
 
 
 THE_INVOICES_ACCOUNT_AS_FOUND = "00-00-00 and the account number is 12345678"

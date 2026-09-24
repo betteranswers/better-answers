@@ -1,11 +1,13 @@
 import {
   boundarySchemas,
+  FINDING_DISMISSED_STATE,
   FINDING_UNREVIEWED_STATE,
   INDEX_KIND,
   REDACTION_ALWAYS_TIER,
   SENSITIVITIES,
   SENSITIVITY_DEFAULT,
   type FINDING_REVIEW_STATES,
+  type INDEX_REASONS,
 } from "@better-answers/schema";
 import { z } from "zod";
 
@@ -28,7 +30,13 @@ import {
   type JobOutcome,
 } from "../runs/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
-import { adminOnBinding, bindingNamed, BINDING_ID } from "./admin-binding.ts";
+import {
+  adminOnBinding,
+  bindingNamed,
+  BINDING_ID,
+  type ActingOnBinding,
+  type BindingId,
+} from "./admin-binding.ts";
 import { cascadeOverEvidence } from "./cascade.ts";
 import { REDACTION_CATEGORIES } from "./dpia.ts";
 import { raisedByTheLastRun, RESTORE_REASON, restoreFinding } from "./findings.ts";
@@ -51,6 +59,8 @@ export type FindingGroup = {
   readonly found: number;
 
   readonly overriddenByErasure: number;
+
+  readonly dismissed: number;
 };
 
 export type FindingsOfRefusal = SourceRefusal<"role-forbids" | "no-such-binding"> | Error;
@@ -78,7 +88,8 @@ const FINDING_GROUPS = `SELECT d.id AS "documentId", d.title,
               WHERE f.restored_at IS NOT NULL
                 AND (f.document_id, f.rule_id, f.char_start, f.char_end) IN
                     (SELECT * FROM unnest($3::text[], $4::text[], $5::int[], $6::int[]))
-            )::int AS "overriddenByErasure"
+            )::int AS "overriddenByErasure",
+            count(*) FILTER (WHERE f.review_state = '${FINDING_DISMISSED_STATE}')::int AS dismissed
        FROM finding f
        JOIN source_document d ON d.workspace_id = f.workspace_id AND d.id = f.document_id
        JOIN source_binding b ON b.workspace_id = d.workspace_id AND b.id = d.binding_id
@@ -224,33 +235,16 @@ const FINDINGS_OF_GROUPS = `SELECT f.id, f.document_id AS "documentId", f.catego
       ORDER BY f.id
         FOR UPDATE OF f`;
 
-const KEPT_IN_TEXT = "kept-in-text" satisfies (typeof FINDING_REVIEW_STATES)[number];
+type HeldSpan = FindingGroupKey & { readonly id: string };
 
-const KEPT_IN_TEXT_REVIEW = `UPDATE finding
-        SET review_state = $3, reviewed_by = restored_by,
-            reviewed_at = restored_at, review_reason = restore_reason
-      WHERE workspace_id = $1 AND id = ANY($2::text[])`;
-
-export const keepInText = async (
-  principal: UserPrincipal,
+const spansOfGroups = async (
   tx: Tx,
-  input: KeepInTextInput,
-): Promise<Result<KeptInText, KeepInTextRefusal>> => {
-  const acting = adminOnBinding(principal, input.bindingId);
-  if (!acting.ok) return err(acting.error);
-  const { admin, workspaceId, bindingId } = acting.value;
-
-  const findingGroups = distinctFindingGroups(input.findingGroups);
-
-  if (findingGroups.some((findingGroup) => findingGroup.tier !== REDACTION_ALWAYS_TIER)) {
-    return err("not-the-always-set");
-  }
-
-  const standing = await bindingNamed(acting.value, tx, { columns: "1", lock: "for-update" });
-  if (!standing.ok) return err(standing.error);
-
+  workspaceId: string,
+  bindingId: string,
+  findingGroups: readonly FindingGroupKey[],
+): Promise<Result<readonly HeldSpan[], "no-such-finding" | Error>> => {
   const held = await attempt(() =>
-    tx.query<FindingGroupKey & { readonly id: string }>(FINDINGS_OF_GROUPS, [
+    tx.query<HeldSpan>(FINDINGS_OF_GROUPS, [
       workspaceId,
       bindingId,
       ...findingGroupParameters(findingGroups),
@@ -258,13 +252,85 @@ export const keepInText = async (
   );
   if (!held.ok) return err(held.error);
   const spans = held.value.rows;
-  if (
-    !findingGroups.every((findingGroup) =>
-      spans.some((span) => sameFindingGroup(span, findingGroup)),
-    )
-  ) {
-    return err("no-such-finding");
+  const everyGroupHeld = findingGroups.every((findingGroup) =>
+    spans.some((span) => sameFindingGroup(span, findingGroup)),
+  );
+  return everyGroupHeld ? ok(spans) : err("no-such-finding");
+};
+
+type CommandedSpans = { readonly acting: ActingOnBinding; readonly spans: readonly HeldSpan[] };
+
+type SpansRefusal<GroupRefusal> =
+  | GroupRefusal
+  | SourceRefusal<"role-forbids" | "no-such-binding" | "no-such-finding">
+  | Error;
+
+// Every group is judged before the first read, so a refused one lands nothing beside it.
+const spansCommanded = async <GroupRefusal extends string>(
+  principal: UserPrincipal,
+  tx: Tx,
+  input: { readonly bindingId: BindingId; readonly findingGroups: readonly FindingGroupKey[] },
+  refusalOf: (findingGroup: FindingGroupKey) => GroupRefusal | undefined,
+): Promise<Result<CommandedSpans, SpansRefusal<GroupRefusal>>> => {
+  const acting = adminOnBinding(principal, input.bindingId);
+  if (!acting.ok) return err(acting.error);
+
+  const findingGroups = distinctFindingGroups(input.findingGroups);
+  for (const findingGroup of findingGroups) {
+    const refused = refusalOf(findingGroup);
+    if (refused !== undefined) return err(refused);
   }
+
+  const standing = await bindingNamed(acting.value, tx, { columns: "1", lock: "for-update" });
+  if (!standing.ok) return err(standing.error);
+
+  const held = await spansOfGroups(
+    tx,
+    acting.value.workspaceId,
+    acting.value.bindingId,
+    findingGroups,
+  );
+  if (!held.ok) return err(held.error);
+  return ok({ acting: acting.value, spans: held.value });
+};
+
+const indexRunQueued = async (
+  { admin, workspaceId, bindingId }: ActingOnBinding,
+  tx: Tx,
+  reason: Extract<(typeof INDEX_REASONS)[number], "restored" | "dismissed">,
+): Promise<string> => {
+  const queued = await enqueueJobIn(admin, tx, {
+    workspaceId,
+    kind: INDEX_KIND,
+    subjectId: bindingId,
+    reason,
+  });
+  if (!queued.ok) {
+    throw indexRunRefused(queued.error);
+  }
+  return queued.value.jobId;
+};
+
+const KEPT_IN_TEXT = "kept-in-text" satisfies (typeof FINDING_REVIEW_STATES)[number];
+
+// A later keep does not revise what a dismissal said the span is; the keep has the restore
+// columns.
+const KEPT_IN_TEXT_REVIEW = `UPDATE finding
+        SET review_state = $3, reviewed_by = restored_by,
+            reviewed_at = restored_at, review_reason = restore_reason
+      WHERE workspace_id = $1 AND id = ANY($2::text[]) AND review_state <> $4`;
+
+export const keepInText = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  input: KeepInTextInput,
+): Promise<Result<KeptInText, KeepInTextRefusal>> => {
+  const commanded = await spansCommanded(principal, tx, input, (findingGroup) =>
+    findingGroup.tier === REDACTION_ALWAYS_TIER ? undefined : "not-the-always-set",
+  );
+  if (!commanded.ok) return err(commanded.error);
+  const { acting, spans } = commanded.value;
+  const { admin, workspaceId, bindingId } = acting;
 
   const named = spans.map((span) => span.id);
   const batchId = named.length > 1 ? ulid() : undefined;
@@ -277,20 +343,12 @@ export const keepInText = async (
     if (!restored.ok) return err(restored.error);
   }
   const reviewed = await attempt(() =>
-    tx.query(KEPT_IN_TEXT_REVIEW, [workspaceId, named, KEPT_IN_TEXT]),
+    tx.query(KEPT_IN_TEXT_REVIEW, [workspaceId, named, KEPT_IN_TEXT, FINDING_DISMISSED_STATE]),
   );
   if (!reviewed.ok) return err(reviewed.error);
 
-  const queued = await enqueueJobIn(admin, tx, {
-    workspaceId,
-    kind: INDEX_KIND,
-    subjectId: bindingId,
-    reason: "restored",
-  });
-  if (!queued.ok) {
-    throw indexRunRefused(queued.error);
-  }
-  return ok({ bindingId, findingIds: named, batchId, jobId: queued.value.jobId });
+  const jobId = await indexRunQueued(acting, tx, "restored");
+  return ok({ bindingId, findingIds: named, batchId, jobId });
 };
 
 const REVIEW_ACTS = declareActs("sources", {
@@ -298,6 +356,11 @@ const REVIEW_ACTS = declareActs("sources", {
     documentId: "id",
     bindingId: "id",
     sensitivity: "sensitivity",
+  }),
+  dismissed: act("sources.document.special_category_dismissed", {
+    documentId: "id",
+    bindingId: "id",
+    findingCount: "count",
   }),
 });
 
@@ -383,7 +446,7 @@ export const narrowDocuments = async (
 
   const narrowed = await attempt(() =>
     tx.query(
-      `UPDATE source_document SET sensitivity = $4
+      `UPDATE source_document SET sensitivity = $4, narrowed_to = $4
         WHERE workspace_id = $1 AND binding_id = $2 AND id = ANY($3::text[])`,
       [workspaceId, bindingId, named, next],
     ),
@@ -417,4 +480,75 @@ export const narrowDocuments = async (
   if (!cascaded.ok) return err(cascaded.error);
 
   return ok({ bindingId, documentIds, sensitivity: next, batchId, ...cascaded.value });
+};
+
+export const dismissAsNotSpecialCategoryInput = z.object({
+  bindingId: BINDING_ID,
+
+  findingGroups: commandedGroups,
+
+  reason: boundarySchemas.finding.select.shape.reviewReason.unwrap(),
+});
+
+export type DismissAsNotSpecialCategoryInput = z.output<typeof dismissAsNotSpecialCategoryInput>;
+
+export type DismissAsNotSpecialCategoryRefusal =
+  | SourceRefusal<"role-forbids" | "no-such-binding" | "no-such-finding" | "not-special-category">
+  | Error;
+
+export type DismissedAsNotSpecialCategory = {
+  readonly bindingId: string;
+
+  readonly documentIds: readonly string[];
+
+  readonly batchId: string | undefined;
+
+  readonly jobId: string;
+};
+
+const DISMISSED_REVIEW = `UPDATE finding
+        SET review_state = $3, reviewed_by = $4, reviewed_at = now(), review_reason = $5
+      WHERE workspace_id = $1 AND id = ANY($2::text[])`;
+
+export const dismissAsNotSpecialCategory = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  input: DismissAsNotSpecialCategoryInput,
+): Promise<Result<DismissedAsNotSpecialCategory, DismissAsNotSpecialCategoryRefusal>> => {
+  const commanded = await spansCommanded(principal, tx, input, (findingGroup) =>
+    SPECIAL_CATEGORIES.has(findingGroup.category) ? undefined : "not-special-category",
+  );
+  if (!commanded.ok) return err(commanded.error);
+  const { acting, spans } = commanded.value;
+  const { admin, workspaceId, bindingId } = acting;
+
+  const reviewed = await attempt(() =>
+    tx.query(DISMISSED_REVIEW, [
+      workspaceId,
+      spans.map((span) => span.id),
+      FINDING_DISMISSED_STATE,
+      actorIdOf(admin),
+      input.reason,
+    ]),
+  );
+  if (!reviewed.ok) return err(reviewed.error);
+
+  const documentIds = [...new Set(spans.map((span) => span.documentId))].toSorted();
+  const batchId = documentIds.length > 1 ? ulid() : undefined;
+  for (const documentId of documentIds) {
+    await record(admin, tx, {
+      id: ulid(),
+      act: REVIEW_ACTS.dismissed,
+      subjectId: documentId,
+      detail: {
+        documentId,
+        bindingId,
+        findingCount: spans.filter((span) => span.documentId === documentId).length,
+      },
+      batchId,
+    });
+  }
+
+  const jobId = await indexRunQueued(acting, tx, "dismissed");
+  return ok({ bindingId, documentIds, batchId, jobId });
 };

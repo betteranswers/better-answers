@@ -15,7 +15,9 @@ from better_answers_worker.redaction.detection_key import (
 )
 from better_answers_worker.redaction.pins import RULE_VERSION
 
-WHAT_THE_DETECTOR_READS_OF_A_CATEGORY = frozenset({"raised_by", "threshold", "context"})
+WHAT_THE_DETECTOR_READS_OF_A_CATEGORY = frozenset(
+    {"raised_by", "threshold", "context", "cues"}
+)
 
 
 WHAT_ONLY_THE_RULE_VERSION_STANDS_FOR = frozenset(
@@ -83,9 +85,9 @@ THE_FIRST_CATEGORY = DESCRIPTORS[0]
 def test_the_key_is_pinned_beside_the_rule_version_it_implies_a_move_of() -> None:
 
     assert detection_key() == (
-        "0917c5a29900111457ee127ebecb99363531765a0d7e7108851ef1a95a444d59"
+        "a1db6adae80d0dfd17b4589ac15842c84065f04d95cfce575260315764c467ac"
     )
-    assert RULE_VERSION == "4"
+    assert RULE_VERSION == "5"
 
 
 def test_every_field_a_category_declares_is_the_detector_s_or_policy_s_alone() -> None:
@@ -141,11 +143,21 @@ def test_moving_a_threshold_re_reads_every_page() -> None:
 
 
 def test_moving_a_context_lemma_re_reads_every_page() -> None:
+    bank_details = category_called("bank-details")
+    lemmas = bank_details.context
 
-    lemmas = THE_FIRST_CATEGORY.context
+    gained = replace(bank_details, context=(*lemmas, "iban"))
+    reordered = replace(bank_details, context=lemmas[::-1])
 
-    gained = replace(THE_FIRST_CATEGORY, context=(*lemmas, "unwell"))
-    reordered = replace(THE_FIRST_CATEGORY, context=lemmas[::-1])
+    assert key_over(the_table_with(gained)) != detection_key()
+    assert key_over(the_table_with(reordered)) == detection_key()
+
+
+def test_moving_a_cue_re_reads_every_page() -> None:
+    cues = THE_FIRST_CATEGORY.cues
+
+    gained = replace(THE_FIRST_CATEGORY, cues=(*cues, "unwell"))
+    reordered = replace(THE_FIRST_CATEGORY, cues=cues[::-1])
 
     assert key_over(the_table_with(gained)) != detection_key()
     assert key_over(the_table_with(reordered)) == detection_key()
@@ -155,7 +167,7 @@ def test_a_lemma_the_model_is_never_handed_re_reads_no_page() -> None:
     job_title = category_called("job-title")
     raised = {item.rule_id: item for item in what_the_detector_reads().rules}
 
-    assert job_title.context == ("role", "title", "position")
+    assert job_title.context == ()
     assert raised["JOB_TITLE"].recogniser == "ModelRecogniser"
     assert raised["JOB_TITLE"].context == ()
 

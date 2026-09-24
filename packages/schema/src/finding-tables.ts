@@ -18,10 +18,17 @@ export const REDACTION_TIERS = ["always", "default-on", "default-off"] as const;
 
 export const REDACTION_ALWAYS_TIER = "always" satisfies (typeof REDACTION_TIERS)[number];
 
-export const FINDING_REVIEW_STATES = ["unreviewed", "kept-in-text", "narrowed"] as const;
+export const FINDING_REVIEW_STATES = [
+  "unreviewed",
+  "kept-in-text",
+  "narrowed",
+  "dismissed",
+] as const;
 
 export const FINDING_UNREVIEWED_STATE =
   "unreviewed" satisfies (typeof FINDING_REVIEW_STATES)[number];
+
+export const FINDING_DISMISSED_STATE = "dismissed" satisfies (typeof FINDING_REVIEW_STATES)[number];
 
 export const FINDING_REASON_MAX = 1_000;
 

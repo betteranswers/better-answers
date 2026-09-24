@@ -16,7 +16,11 @@ import {
 } from "./catalogue-statements.ts";
 import { testData } from "./factory.ts";
 import { type MigratedPostgres, withRollback } from "./harness.ts";
-import { migrationStatements, migrationStatementSaying } from "./journal-statements.ts";
+import {
+  asTheMigrationOwnerOf,
+  migrationStatements,
+  migrationStatementSaying,
+} from "./journal-statements.ts";
 import { ADMITTED, refusalOf } from "./probes.ts";
 import { openMigratedPostgres } from "./warm-postgres.ts";
 
@@ -138,7 +142,7 @@ describe("the job kind descriptors", () => {
         kind: "index",
         claimingTier: "worker",
         namesASubject: true,
-        reasons: ["bound", "restored", "rule-change", "wiped"],
+        reasons: ["bound", "restored", "dismissed", "rule-change", "wiped"],
         enqueuedBy: "Admin",
       },
     ]);
@@ -222,6 +226,7 @@ describe("the reason CHECK", () => {
         "full-rebuild · drill · no subject",
         `index · bound · ${BINDING}`,
         `index · restored · ${BINDING}`,
+        `index · dismissed · ${BINDING}`,
         `index · rule-change · ${BINDING}`,
         `index · wiped · ${BINDING}`,
       ]);
@@ -387,27 +392,8 @@ describe("the claim's sibling check", () => {
   });
 });
 
-const THE_MIGRATION_OWNER = "the_migration_owner";
-
-// `migrate` connects as the owner, no superuser, so the policy `job` forces binds it; this
-// suite connects as a superuser, which no policy binds.
-const asTheMigrationOwner = async <T>(
-  client: pg.PoolClient,
-  work: () => Promise<T>,
-): Promise<T> => {
-  await client.query(`CREATE ROLE ${THE_MIGRATION_OWNER} NOLOGIN NOSUPERUSER NOBYPASSRLS`);
-  for (const object of [
-    "TABLE public.job",
-    "TABLE public.workspace",
-    "FUNCTION public.current_workspace_id()",
-  ]) {
-    await client.query(`ALTER ${object} OWNER TO ${THE_MIGRATION_OWNER}`);
-  }
-  await client.query(`SET LOCAL ROLE ${THE_MIGRATION_OWNER}`);
-  const done = await work();
-  await client.query("RESET ROLE");
-  return done;
-};
+const asTheMigrationOwner = <T>(client: pg.PoolClient, work: () => Promise<T>): Promise<T> =>
+  asTheMigrationOwnerOf(client, ["TABLE public.job"], work);
 
 const RETIRED = { kind: "index", reason: RETIRED_REASON } as const;
 

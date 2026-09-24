@@ -5,6 +5,8 @@ import { listRoutes } from "@better-answers/core/llm";
 import { runsOfSubject, runsOfSubjectInput } from "@better-answers/core/runs";
 import {
   bindUpload,
+  dismissAsNotSpecialCategory,
+  dismissAsNotSpecialCategoryInput,
   findingsOf,
   findingsOfInput,
   keepInText,
@@ -79,6 +81,15 @@ export const appRouter = router({
           ctx,
           narrowDocuments.name,
           given(input, (asked) => narrowDocuments(ctx.principal, ctx.tx, asked)),
+        ),
+      ),
+    dismissAsNotSpecialCategory: mutationProcedure
+      .input(parsedBy(dismissAsNotSpecialCategoryInput))
+      .mutation(({ ctx, input }) =>
+        crossing(
+          ctx,
+          dismissAsNotSpecialCategory.name,
+          given(input, (asked) => dismissAsNotSpecialCategory(ctx.principal, ctx.tx, asked)),
         ),
       ),
     publish: mutationProcedure.input(parsedBy(publishBindingInput)).mutation(({ ctx, input }) =>

@@ -19,6 +19,7 @@ import {
 } from "./catalogue-statements.ts";
 import { testData } from "./factory.ts";
 import { withRollback } from "./harness.ts";
+import { asTheMigrationOwnerOf, migrationStatementSaying } from "./journal-statements.ts";
 import {
   ADMITTED,
   attemptBindingOf,
@@ -423,6 +424,71 @@ describe("the ledger's unique pair", () => {
   it("refuses a second ledger row on the same pair", async () => {
     await withLedgerRow(async (client, id) => {
       expect(await attemptLedgerRowReusingAnId(client, WORKSPACE, id)).toBe("audit_event_pkey");
+    });
+  });
+});
+
+const THE_DISMISSAL_READ = "0052_the-dismissal-read.sql";
+
+const OTHER_WORKSPACE = "01J6CEEEEEEEEEEEEEEEEEEEEE";
+
+describe("the migration that keeps an Admin's narrowing apart from the seam's verdict", () => {
+  it("gives each document an Admin narrowed its last narrowing off the ledger, in every workspace, and none to a document only the seam narrowed", async () => {
+    await withWorkspace(async (client) => {
+      const seed = testData(client);
+      await seed.workspace({ id: OTHER_WORKSPACE, name: "The catalogue's other workspace" });
+      const narrowedTwice = await seed.sourceDocument({
+        workspaceId: WORKSPACE,
+        sensitivity: "Restricted",
+      });
+      const seamNarrowed = await seed.sourceDocument({
+        workspaceId: WORKSPACE,
+        sensitivity: "Restricted",
+      });
+      const theirs = await seed.sourceDocument({
+        workspaceId: OTHER_WORKSPACE,
+        sensitivity: "Internal",
+      });
+      const narrowings: readonly [string, string, string, string][] = [
+        [WORKSPACE, "01J6E0000000000000000000A0", narrowedTwice.id, "Internal"],
+        [WORKSPACE, "01J6E0000000000000000000B0", narrowedTwice.id, "Restricted"],
+        [OTHER_WORKSPACE, "01J6E0000000000000000000C0", theirs.id, "Internal"],
+      ];
+      for (const [workspaceId, id, documentId, sensitivity] of narrowings) {
+        await seed.auditEvent({
+          workspaceId,
+          id,
+          act: "sources.document.narrowed",
+          subjectId: documentId,
+          detail: { documentId, sensitivity },
+        });
+      }
+      await seed.auditEvent({
+        workspaceId: WORKSPACE,
+        act: "sources.binding.narrowed",
+        subjectId: seamNarrowed.id,
+        detail: { sensitivity: "Restricted" },
+      });
+
+      await asTheMigrationOwnerOf(
+        client,
+        [
+          "TABLE public.source_document",
+          "TABLE public.audit_event",
+          "FUNCTION public.narrower_class(text, text)",
+        ],
+        () => client.query(migrationStatementSaying(THE_DISMISSAL_READ, "DO $$")),
+      );
+
+      const backfilled = await client.query<{ id: string; narrowed_to: string | null }>(
+        "SELECT id, narrowed_to FROM source_document WHERE id = ANY($1) ORDER BY id",
+        [[narrowedTwice.id, seamNarrowed.id, theirs.id]],
+      );
+      expect(Object.fromEntries(backfilled.rows.map((row) => [row.id, row.narrowed_to]))).toEqual({
+        [narrowedTwice.id]: "Restricted",
+        [seamNarrowed.id]: null,
+        [theirs.id]: "Internal",
+      });
     });
   });
 });

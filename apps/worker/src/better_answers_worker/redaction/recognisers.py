@@ -116,7 +116,7 @@ class HealthCueRecogniser(SeamRecogniser):
     ) -> Iterator[tuple[int, int, float]]:
         if nlp_artifacts is None:
             return
-        cues = set(self.descriptor.context)
+        cues = set(self.descriptor.cues)
         raised: set[tuple[int, int]] = set()
         for lemma, at in zip(
             nlp_artifacts.lemmas, nlp_artifacts.tokens_indices, strict=False

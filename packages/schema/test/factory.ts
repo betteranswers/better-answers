@@ -631,6 +631,7 @@ export const testData = (client: pg.PoolClient): TestData => {
       quarantineError: null,
 
       sensitivity: null,
+      narrowedTo: null,
       ...overrides,
       workspaceId,
       bindingId,

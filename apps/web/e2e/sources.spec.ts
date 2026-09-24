@@ -75,6 +75,44 @@ const twoFramesDrawn = (page: Page) =>
       }),
   );
 
+// An act's 100 ms is timed in the page, key to first mutation showing it: a matcher's polling is
+// coarser than the budget.
+const clockTheNextKey = (page: Page, landed: { readonly at: string; readonly reads: string }) =>
+  page.evaluate((asked) => {
+    const reads = () =>
+      document
+        .evaluate(asked.at, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE)
+        .singleNodeValue?.textContent?.includes(asked.reads) === true;
+    const clocked = new Promise<number>((resolve) => {
+      document.addEventListener(
+        "keydown",
+        () => {
+          const pressedAt = performance.now();
+          const observer = new MutationObserver(() => {
+            if (!reads()) return;
+            observer.disconnect();
+            resolve(performance.now() - pressedAt);
+          });
+          observer.observe(document.body, {
+            subtree: true,
+            childList: true,
+            characterData: true,
+          });
+        },
+        { capture: true, once: true },
+      );
+    });
+    Reflect.set(window, "actClocked", clocked);
+  }, landed);
+
+const theActLandedWithinItsBudget = async (page: Page, act: string) => {
+  const elapsed = await page.evaluate(() => Reflect.get(window, "actClocked"));
+  test.info().annotations.push({ type: `${act} act`, description: `${elapsed} ms` });
+  expect(elapsed, `the ${act} did not read as landed within its budget`).toBeLessThan(
+    ACT_BUDGET_MS,
+  );
+};
+
 const indexed = (name: string, overrides: Partial<SeedBinding> = {}): SeedBinding => ({
   name,
   sensitivity: "Internal",
@@ -331,6 +369,43 @@ const SUPPLIER_FORMS: SeedBinding = indexed("Supplier forms", {
   ],
 });
 
+const HEALTH_CUE_BOX = "Select special category by HEALTH_CUE in Staff survey";
+
+const A_DISMISSED_SPAN =
+  "Dismissed 1 span as not special category. The seam's verdict passes over a dismissed span, which stays withheld unless kept in text.";
+
+// Two documents as a run leaves them after a dismissal: one lifted to its binding's class, one
+// still holding a span nobody dismissed.
+const SERVICE_RECORDS: SeedBinding = indexed("Service records", {
+  documents: [
+    {
+      title: "Pump service notes",
+      findings: [
+        {
+          category: "special-category",
+          ruleId: "HEALTH_CUE",
+          tier: "always",
+          spans: 1,
+          dismissed: 1,
+        },
+      ],
+    },
+    {
+      title: "Absence log",
+      sensitivity: "Restricted",
+      findings: [
+        {
+          category: "special-category",
+          ruleId: "HEALTH_CUE",
+          tier: "always",
+          spans: 2,
+          dismissed: 1,
+        },
+      ],
+    },
+  ],
+});
+
 const reviewOf = (page: Page, name: string) =>
   page.getByRole("region", { name: `Review of ${name}` });
 
@@ -357,7 +432,7 @@ test.describe("reviewing a binding's findings", () => {
 
     await expect(reviewOf(page, "Supplier forms").getByRole("table")).toMatchAriaSnapshot(`
       - table:
-        - caption: 0 finding groups selected. Select a group with x, then keep it in text or narrow its document with the acts above.
+        - caption: 0 finding groups selected. Select a group with x, then keep it in text, narrow its document or dismiss it as not special category with the acts above.
         - rowgroup:
           - row "Selected Category Rule Document Found Class":
             - columnheader "Selected"
@@ -475,6 +550,122 @@ test.describe("reviewing a binding's findings", () => {
     await expect(page.locator("body")).not.toContainText(AN_ID);
   });
 
+  test("an Admin dismisses a selected special category group as not special category with a reason, and the row and its index run say so", async ({
+    page,
+    request,
+  }) => {
+    const { workspace } = await anAdminAtSources(page, request, {
+      workspace: "Ripponden Pumps",
+      bindings: [SUPPLIER_FORMS],
+    });
+    await bindingNamed(page, "Supplier forms")
+      .getByRole("button", { name: "Review Supplier forms" })
+      .click();
+    const review = reviewOf(page, "Supplier forms");
+    const dismissal = review.getByRole("button", { name: /^Dismiss .*as not special category$/ });
+    await expect(dismissal).toBeDisabled();
+
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("x");
+    await expect(
+      review.getByRole("checkbox", {
+        name: "Select bank details by UK_BANK_ACCOUNT in Supplier form",
+      }),
+    ).toBeChecked();
+    await expect(dismissal).toBeDisabled();
+    await expect(review).toContainText(
+      "Only a special category finding group can be dismissed as not special category. Untick the groups of another category.",
+    );
+    await page.keyboard.press("x");
+
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Tab");
+    const healthCue = review.getByRole("checkbox", { name: HEALTH_CUE_BOX });
+    await expect(healthCue).toBeFocused();
+    await page.keyboard.press("x");
+    await expect(dismissal).toHaveAccessibleName("Dismiss 1 finding group as not special category");
+    await expect(dismissal).toBeEnabled();
+
+    await page.keyboard.press("s");
+    const dismissing = page.getByRole("dialog", {
+      name: "Dismiss 1 finding group as not special category",
+    });
+    await expect(dismissing).toContainText(
+      "special category by HEALTH_CUE in Staff survey: 1 found",
+    );
+    await expect(dismissing.getByLabel("Reason")).toBeFocused();
+    await page.keyboard.type("A survey of the pumps our engineers diagnose, not of people");
+    await clockTheNextKey(page, {
+      at: "//tr[td[.='HEALTH_CUE']][td[.='Staff survey']]",
+      reads: "Dismissed",
+    });
+    await page.keyboard.press("Enter");
+    await theActLandedWithinItsBudget(page, "dismissal");
+
+    await expect(review).toContainText(
+      "Dismissed 1 finding group as not special category in 1 document. The index run that reads the dismissal: queued.",
+    );
+    await expect(healthCue, "focus did not come back to the row the act left").toBeFocused();
+    const row = findingRow(page, "Supplier forms", "Staff survey", "HEALTH_CUE");
+    await expect(row).toContainText(A_DISMISSED_SPAN);
+    await expect(row).not.toContainText("Already narrowed");
+    await expect(lastRunOf(page, "Supplier forms")).toContainText("Index run queued");
+
+    await moveTheIndexRun(request, { workspaceId: workspace.workspaceId, to: "claimed" });
+    await expect(review).toContainText("The index run that reads the dismissal: claimed.");
+    await moveTheIndexRun(request, { workspaceId: workspace.workspaceId, to: "done" });
+    await expect(review).toContainText("The index run that reads the dismissal: done.");
+    await expect(page.locator("body")).not.toContainText(AN_ID);
+
+    await page.reload();
+    await bindingNamed(page, "Supplier forms")
+      .getByRole("button", { name: "Review Supplier forms" })
+      .click();
+    await expect(
+      findingRow(page, "Supplier forms", "Staff survey", "HEALTH_CUE"),
+      "the dismissal did not outlive the page that made it",
+    ).toContainText(A_DISMISSED_SPAN);
+  });
+
+  test("shows an Admin a document whose every special category span is dismissed at its binding's class, and one still holding an undismissed span as already narrowed", async ({
+    page,
+    request,
+  }) => {
+    await anAdminAtSources(page, request, {
+      workspace: "Sowerby Hydraulics",
+      bindings: [SERVICE_RECORDS],
+    });
+    await bindingNamed(page, "Service records")
+      .getByRole("button", { name: "Review Service records" })
+      .click();
+
+    await expect(reviewOf(page, "Service records").getByRole("rowgroup").last())
+      .toMatchAriaSnapshot(`
+      - rowgroup:
+        - row:
+          - cell:
+            - checkbox "Select special category by HEALTH_CUE in Absence log" [checked=false]
+          - cell "special category always"
+          - cell "HEALTH_CUE"
+          - cell "Absence log"
+          - cell "2"
+          - cell:
+            - text: Restricted
+            - paragraph: Already narrowed A special category finding narrowed this document at the seam.
+            - paragraph: ${A_DISMISSED_SPAN}
+        - row:
+          - cell:
+            - checkbox "Select special category by HEALTH_CUE in Pump service notes" [checked=false]
+          - cell "special category always"
+          - cell "HEALTH_CUE"
+          - cell "Pump service notes"
+          - cell "1"
+          - cell:
+            - text: Internal
+            - paragraph: ${A_DISMISSED_SPAN}
+    `);
+  });
+
   test("shows an Admin a kept group an erasure overrides as still withheld, and says why", async ({
     page,
     request,
@@ -541,7 +732,7 @@ test.describe("reviewing a binding's findings", () => {
     ]);
   });
 
-  test("scrolls nothing sideways for an Admin at 320 pixels with the review open, the table holding its own width", async ({
+  test("scrolls nothing sideways for an Admin at 320 pixels with the review open and the longest act named, the table holding its own width", async ({
     page,
     request,
   }) => {
@@ -554,6 +745,12 @@ test.describe("reviewing a binding's findings", () => {
       .getByRole("button", { name: "Review Supplier forms" })
       .click();
     await expect(reviewOf(page, "Supplier forms").getByRole("checkbox")).toHaveCount(3);
+    await reviewOf(page, "Supplier forms").getByRole("checkbox", { name: HEALTH_CUE_BOX }).click();
+    await expect(
+      reviewOf(page, "Supplier forms").getByRole("button", {
+        name: "Dismiss 1 finding group as not special category",
+      }),
+    ).toBeEnabled();
 
     const room = await page.evaluate(() => ({
       scrolls: document.documentElement.scrollWidth,
@@ -646,41 +843,12 @@ test.describe("publishing and narrowing a binding", () => {
     await page.keyboard.press("Tab");
     await expect(dialog.getByRole("button", { name: "Publish Staff handbook" })).toBeFocused();
 
-    await page.evaluate(() => {
-      const stateWord = () => {
-        const heading = [...document.querySelectorAll("h3")].find(
-          (candidate) => candidate.textContent === "Staff handbook",
-        );
-        const terms = [...(heading?.closest("li")?.querySelectorAll("dt") ?? [])];
-        return terms.find((term) => term.textContent === "State")?.nextElementSibling?.textContent;
-      };
-      const landed = new Promise<number>((resolve) => {
-        document.addEventListener(
-          "keydown",
-          () => {
-            const pressedAt = performance.now();
-            const observer = new MutationObserver(() => {
-              if (stateWord() !== "published") return;
-              observer.disconnect();
-              resolve(performance.now() - pressedAt);
-            });
-            observer.observe(document.body, {
-              subtree: true,
-              childList: true,
-              characterData: true,
-            });
-          },
-          { capture: true, once: true },
-        );
-      });
-      Reflect.set(window, "publishLanded", landed);
+    await clockTheNextKey(page, {
+      at: "//li[.//h3[.='Staff handbook']]//dt[.='State']/following-sibling::dd[1]",
+      reads: "published",
     });
     await page.keyboard.press("Enter");
-    const elapsed = await page.evaluate(() => Reflect.get(window, "publishLanded"));
-    test.info().annotations.push({ type: "publish act", description: `${elapsed} ms` });
-    expect(elapsed, "the publish did not read as landed within its budget").toBeLessThan(
-      ACT_BUDGET_MS,
-    );
+    await theActLandedWithinItsBudget(page, "publish");
 
     await expect(
       page.getByText(
@@ -758,6 +926,8 @@ test.describe("the Sources screen's keystrokes", () => {
         - definition: Keep the selected finding groups in text
         - term: d
         - definition: Narrow the documents the selected finding groups sit in
+        - term: s
+        - definition: Dismiss the selected finding groups as not special category
         - term: "?"
         - definition: List these keystrokes
     `);

@@ -5,7 +5,7 @@ from typing import Any
 from psycopg import Cursor
 
 from ..ids import ulid
-from ..redaction import Restore
+from ..redaction import Dismissal, Restore
 from .host import IndexRun
 from .landed import (
     LandedDocument,
@@ -45,7 +45,8 @@ def read_binding(cursor: Cursor[Any], run: IndexRun) -> BindingRun | None:
     catalogued = cursor.fetchall()
     document_ids = [str(row[0]) for row in catalogued]
     suppressions = _suppressions_by_document(cursor, document_ids)
-    restores = _restores_by_document(cursor, document_ids)
+    restores = _spans_by_document(cursor, document_ids, _RESTORED, Restore)
+    dismissals = _spans_by_document(cursor, document_ids, _DISMISSED, Dismissal)
 
     return BindingRun(
         rules_in_force={str(tier): bool(state) for tier, state in binding[0].items()},
@@ -59,6 +60,7 @@ def read_binding(cursor: Cursor[Any], run: IndexRun) -> BindingRun | None:
                 ),
                 suppressions=suppressions.get(str(row[0]), ()),
                 restores=restores.get(str(row[0]), ()),
+                dismissals=dismissals.get(str(row[0]), ()),
             )
             for row in catalogued
         ),
@@ -91,20 +93,29 @@ def _suppressions_by_document(
     return gathered
 
 
-def _restores_by_document(
-    cursor: Cursor[Any], document_ids: Sequence[str]
-) -> Mapping[str, tuple[Restore, ...]]:
+DISMISSED_REVIEW_STATE = "dismissed"
+
+_RESTORED = "restored_at IS NOT NULL"
+_DISMISSED = f"review_state = '{DISMISSED_REVIEW_STATE}'"
+
+
+def _spans_by_document[Marked](
+    cursor: Cursor[Any],
+    document_ids: Sequence[str],
+    marked: str,
+    span: Callable[[str, int, int], Marked],
+) -> Mapping[str, tuple[Marked, ...]]:
     if not document_ids:
         return {}
     cursor.execute(
         "SELECT document_id, rule_id, char_start, char_end FROM finding"
-        " WHERE document_id = ANY(%s) AND restored_at IS NOT NULL"
+        f" WHERE document_id = ANY(%s) AND {marked}"
         " ORDER BY document_id, char_start, char_end, rule_id",
         (list(document_ids),),
     )
-    gathered: dict[str, tuple[Restore, ...]] = {}
+    gathered: dict[str, tuple[Marked, ...]] = {}
     for document_id, rule_id, char_start, char_end in cursor.fetchall():
-        named = Restore(rule_id=str(rule_id), start=int(char_start), end=int(char_end))
+        named = span(str(rule_id), int(char_start), int(char_end))
         gathered[str(document_id)] = (*gathered.get(str(document_id), ()), named)
     return gathered
 
@@ -185,9 +196,10 @@ def reconcile_catalogue(cursor: Cursor[Any], documents: Sequence[ReadDocument]) 
             " redaction_version = %(version)s, outcome = %(outcome)s,"
             " quarantine_error = NULL,"
             " last_seen = now(),"
-            # A document with no class of its own takes the verdict; from there the
-            # ranking is the database's, so a verdict can only ever narrow.
+            # A verdict only narrows, by the database's ranking; a lifted one keeps the
+            # Admin's own word, which the seam never made.
             " sensitivity = CASE"
+            "   WHEN %(lifted)s THEN narrowed_to"
             "   WHEN sensitivity IS NULL THEN %(verdict)s::text"
             "   ELSE public.narrower_class(sensitivity, %(verdict)s::text) END"
             " WHERE id = %(id)s",
@@ -197,6 +209,7 @@ def reconcile_catalogue(cursor: Cursor[Any], documents: Sequence[ReadDocument]) 
                 "version": document.redacted.version,
                 "outcome": CONVERTED_OUTCOME,
                 "verdict": document.redacted.verdict,
+                "lifted": document.redacted.lifted,
                 "id": document.source_document_id,
             },
         )

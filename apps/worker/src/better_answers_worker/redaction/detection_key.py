@@ -67,6 +67,7 @@ class RuleReading:
     recogniser: str
     threshold: float
     context: tuple[str, ...]
+    cues: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,12 +89,14 @@ def reading_of(rule_id: str, descriptor: CategoryDescriptor) -> RuleReading:
             recogniser=RAISED_BY_THE_MODEL,
             threshold=descriptor.threshold,
             context=(),
+            cues=(),
         )
     return RuleReading(
         rule_id=rule_id,
         recogniser=type(build(descriptor)).__name__,
         threshold=descriptor.threshold,
         context=tuple(sorted(descriptor.context)),
+        cues=tuple(sorted(descriptor.cues)),
     )
 
 

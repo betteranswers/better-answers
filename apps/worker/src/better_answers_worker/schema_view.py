@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0050_the-sweep-pass"
+MIGRATION_ID = "0052_the-dismissal-read"
 
-MIGRATION_WHEN = 1790192750641
+MIGRATION_WHEN = 1790210130478
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -463,6 +463,7 @@ TABLES: dict[str, dict[str, str]] = {
         "outcome": "text",
         "sensitivity": "text",
         "quarantine_error": "text",
+        "narrowed_to": "text",
     },
     "public.subject_request": {
         "workspace_id": "text NOT NULL",

@@ -20,7 +20,7 @@ GLINER_MODEL_ID = "urchade/gliner_multi_pii-v1"
 GLINER_MODEL_ID_MEASURED = "knowledgator/gliner-pii-base-v1.0"
 
 
-RULE_VERSION = "4"
+RULE_VERSION = "5"
 
 
 _MODEL_IN_A_PIN = GLINER_MODEL_ID.rsplit("/", 1)[-1].replace("_", "-")

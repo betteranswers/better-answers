@@ -7,7 +7,7 @@ from types import MappingProxyType
 import cocoindex as coco
 
 from ..log import logger
-from ..redaction import Restore, redact
+from ..redaction import Dismissal, Restore, redact
 from ..redaction.engine import Finding
 from ..redaction.withholdings import Withholding
 from .chunks import CHUNK_SIZE_BYTES, Chunk, split_into_chunks
@@ -77,6 +77,8 @@ class LandedDocument:
 
     restores: tuple[Restore, ...] = ()
 
+    dismissals: tuple[Dismissal, ...] = ()
+
 
 @dataclass(frozen=True, slots=True)
 class RedactedDocument:
@@ -85,6 +87,7 @@ class RedactedDocument:
     withholdings: tuple[Withholding, ...]
     counts: tuple[tuple[str, int], ...]
     verdict: str | None
+    lifted: bool
     version: str
 
     content_hash: str
@@ -135,6 +138,7 @@ def landed(
     rules_in_force: tuple[tuple[str, bool], ...],
     suppressions: tuple[Suppression, ...],
     restores: tuple[Restore, ...],
+    dismissals: tuple[Dismissal, ...],
     seed: str,
     detection_key: str,
 ) -> RedactedDocument:
@@ -149,6 +153,7 @@ def landed(
         [suppression.as_set() for suppression in suppressions],
         seed,
         restores,
+        dismissals,
     )
     return RedactedDocument(
         text=answer.text,
@@ -156,6 +161,7 @@ def landed(
         withholdings=tuple(answer.withholdings),
         counts=tuple(sorted(answer.counts.items())),
         verdict=answer.verdict,
+        lifted=answer.lifted,
         version=answer.version,
         content_hash=hashlib.sha256(normalised.encode(TEXT_ENCODING)).hexdigest(),
         detected_afresh=raised.afresh,
@@ -197,6 +203,7 @@ async def _one_document(
                 wave.rules_in_force,
                 document.suppressions,
                 document.restores,
+                document.dismissals,
                 wave.seed,
                 wave.detection_key,
             )

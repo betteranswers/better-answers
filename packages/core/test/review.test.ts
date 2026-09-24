@@ -6,6 +6,8 @@ import type { z } from "zod";
 
 import { parse, type UserPrincipal } from "../src/kernel/index.ts";
 import {
+  dismissAsNotSpecialCategory,
+  dismissAsNotSpecialCategoryInput,
   findingsOf,
   findingsOfInput,
   keepInText,
@@ -63,6 +65,37 @@ const narrowAs = (
       inputOf(narrowDocumentsInput, { bindingId, findingGroups, sensitivity: to.sensitivity }),
     ),
   );
+
+const NOT_HEALTH_DATA = "Our engineers diagnose faults in pumps, never in people.";
+
+const HEALTH = { category: "special-category", ruleId: "HEALTH_CUE" };
+
+const dismissAs = (
+  who: UserPrincipal,
+  bindingId: string,
+  findingGroups: readonly FindingGroupAsked[],
+) =>
+  acting(who, (principal, tx) =>
+    dismissAsNotSpecialCategory(
+      principal,
+      tx,
+      inputOf(dismissAsNotSpecialCategoryInput, {
+        bindingId,
+        findingGroups,
+        reason: NOT_HEALTH_DATA,
+      }),
+    ),
+  );
+
+const DISMISSED_ACT = "sources.document.special_category_dismissed";
+
+const narrowedToOf = async (workspaceId: string, documentId: string) => {
+  const found = await db().pool.query<{ sensitivity: string | null; narrowed_to: string | null }>(
+    "SELECT sensitivity, narrowed_to FROM source_document WHERE workspace_id = $1 AND id = $2",
+    [workspaceId, documentId],
+  );
+  return found.rows[0];
+};
 
 const findingIn = async (
   workspaceId: string,
@@ -266,6 +299,21 @@ const bindingWithTwoDocuments = async (scenario: Scenario) => {
   return { bindingId: first.bindingId, first, second };
 };
 
+const twoDocumentsTheSeamNarrowed = async (scenario: Scenario) => {
+  const binding = await bindingHolding(db(), scenario.workspaceId, { sensitivity: "Internal" });
+  const first = await documentUnder(db(), scenario.workspaceId, binding.bindingId, "Restricted");
+  const second = await documentUnder(db(), scenario.workspaceId, binding.bindingId, "Restricted");
+  for (const document of [first, second]) {
+    await chunkUnder(db(), scenario.workspaceId, document, {
+      content: "He was diagnosed with a heart condition.",
+      ordinal: 0,
+      charStart: 0,
+      charEnd: 40,
+    });
+  }
+  return { bindingId: binding.bindingId, first, second };
+};
+
 describe("the review read of a binding's findings", () => {
   it("groups them by category and rule, with the document each sits in and how many", async () => {
     const scenario = await arrange();
@@ -293,6 +341,7 @@ describe("the review read of a binding's findings", () => {
           specialCategory: false,
           found: 2,
           overriddenByErasure: 0,
+          dismissed: 0,
         },
         {
           documentId: second.documentId,
@@ -304,6 +353,7 @@ describe("the review read of a binding's findings", () => {
           specialCategory: false,
           found: 1,
           overriddenByErasure: 0,
+          dismissed: 0,
         },
         {
           documentId: first.documentId,
@@ -315,6 +365,7 @@ describe("the review read of a binding's findings", () => {
           specialCategory: false,
           found: 1,
           overriddenByErasure: 0,
+          dismissed: 0,
         },
       ],
     });
@@ -329,6 +380,7 @@ describe("the review read of a binding's findings", () => {
 
     expect(read.ok ? Object.keys(read.value[0] ?? {}).toSorted() : []).toEqual([
       "category",
+      "dismissed",
       "documentId",
       "found",
       "overriddenByErasure",
@@ -369,6 +421,34 @@ describe("the review read of a binding's findings", () => {
     ).toEqual([
       { category: "bank-details", specialCategory: false, sensitivity: "Internal" },
       { category: "special-category", specialCategory: true, sensitivity: "Restricted" },
+    ]);
+  });
+
+  it("says how many of a special-category group's spans an Admin dismissed as not special category", async () => {
+    const scenario = await arrange();
+    const { bindingId, first, second } = await twoDocumentsTheSeamNarrowed(scenario);
+    await findingIn(scenario.workspaceId, first.documentId, HEALTH);
+    await findingIn(scenario.workspaceId, first.documentId, {
+      ...HEALTH,
+      charStart: 60,
+      charEnd: 120,
+    });
+    await findingIn(scenario.workspaceId, second.documentId, HEALTH);
+    await dismissAs(scenario.admin, bindingId, [findingGroupIn(first.documentId, HEALTH)]);
+
+    const read = await findingsAs(scenario.admin, bindingId);
+
+    expect(
+      read.ok
+        ? read.value.map((group) => ({
+            documentId: group.documentId,
+            found: group.found,
+            dismissed: group.dismissed,
+          }))
+        : [],
+    ).toEqual([
+      { documentId: first.documentId, found: 2, dismissed: 2 },
+      { documentId: second.documentId, found: 1, dismissed: 0 },
     ]);
   });
 
@@ -839,6 +919,22 @@ describe("an Admin narrowing named documents", () => {
     });
   });
 
+  it("writes the class it narrowed a document to as the Admin's own narrowing, beside the class the document is read at", async () => {
+    const scenario = await arrange();
+    const { bindingId, first, second } = await bindingWithTwoDocuments(scenario);
+
+    await narrowAs(scenario.admin, bindingId, [findingGroupIn(first.documentId)]);
+
+    expect(await narrowedToOf(scenario.workspaceId, first.documentId)).toEqual({
+      sensitivity: "Restricted",
+      narrowed_to: "Restricted",
+    });
+    expect(await narrowedToOf(scenario.workspaceId, second.documentId)).toEqual({
+      sensitivity: null,
+      narrowed_to: null,
+    });
+  });
+
   it("puts no job on the workspace's queue, however many documents it took", async () => {
     const scenario = await arrange();
     const { bindingId, first, second } = await bindingWithTwoDocuments(scenario);
@@ -1009,6 +1105,226 @@ describe("an Admin narrowing named documents", () => {
   });
 });
 
+const dismissingTwoGroupsOfThree = async (scenario: Scenario) => {
+  const { bindingId, first, second } = await twoDocumentsTheSeamNarrowed(scenario);
+  const dismissed = await findingIn(scenario.workspaceId, first.documentId, HEALTH);
+  const dismissedBesideIt = await findingIn(scenario.workspaceId, first.documentId, {
+    ...HEALTH,
+    charStart: 60,
+    charEnd: 120,
+  });
+  const alsoDismissed = await findingIn(scenario.workspaceId, second.documentId, HEALTH);
+  const left = await findingIn(scenario.workspaceId, first.documentId);
+  const outcome = await dismissAs(scenario.admin, bindingId, [
+    findingGroupIn(first.documentId, HEALTH),
+    findingGroupIn(second.documentId, HEALTH),
+  ]);
+  return {
+    bindingId,
+    first,
+    second,
+    dismissed,
+    dismissedBesideIt,
+    alsoDismissed,
+    left,
+    outcome,
+  };
+};
+
+describe("an Admin dismissing named special-category finding groups as not special category", () => {
+  it("reviews every span of every group as dismissed, by this Admin, for the batch's reason — and no other", async () => {
+    const scenario = await arrange();
+
+    const { dismissed, dismissedBesideIt, alsoDismissed, left } =
+      await dismissingTwoGroupsOfThree(scenario);
+
+    const dismissal = {
+      review_state: "dismissed",
+      reviewed: true,
+      reviewed_by: `human:${scenario.admin.userId}`,
+      review_reason: NOT_HEALTH_DATA,
+    };
+    expect(await reviewOf(scenario.workspaceId, dismissed)).toEqual(dismissal);
+    expect(await reviewOf(scenario.workspaceId, dismissedBesideIt)).toEqual(dismissal);
+    expect(await reviewOf(scenario.workspaceId, alsoDismissed)).toEqual(dismissal);
+    expect(await reviewOf(scenario.workspaceId, left)).toEqual(UNREVIEWED);
+  });
+
+  it("writes one ledger row per document under one batch id and queues one index run to read the dismissal", async () => {
+    const scenario = await arrange();
+
+    const { bindingId, first, second, outcome } = await dismissingTwoGroupsOfThree(scenario);
+
+    const documentIds = [first.documentId, second.documentId].toSorted();
+    const batchId = outcome.ok ? outcome.value.batchId : undefined;
+    expect(outcome).toMatchObject({ ok: true, value: { bindingId, documentIds } });
+    expect(typeof batchId).toBe("string");
+    expect(await batchedRowsOf(db().pool, scenario.workspaceId, DISMISSED_ACT)).toEqual(
+      documentIds.map((documentId) => ({
+        subject_id: documentId,
+        batch_id: batchId,
+        detail: {
+          documentId,
+          bindingId,
+          findingCount: documentId === first.documentId ? 2 : 1,
+        },
+      })),
+    );
+    expect(await jobsOf(scenario.workspaceId)).toEqual([
+      { kind: "index", reason: "dismissed", subject_id: bindingId },
+    ]);
+  });
+
+  it("lets no span back into the text and widens no document itself, because the run is what lifts a verdict", async () => {
+    const scenario = await arrange();
+
+    const { first, dismissed } = await dismissingTwoGroupsOfThree(scenario);
+
+    expect(await restoreOf(scenario.workspaceId, dismissed)).toMatchObject({ restored: false });
+    expect(await chunkClassesOf(scenario.workspaceId, first.documentId)).toEqual(["Restricted"]);
+  });
+
+  it("writes one ledger row with no batch id when it dismisses one document's group", async () => {
+    const scenario = await arrange();
+    const { bindingId, first } = await twoDocumentsTheSeamNarrowed(scenario);
+    await findingIn(scenario.workspaceId, first.documentId, HEALTH);
+
+    const outcome = await dismissAs(scenario.admin, bindingId, [
+      findingGroupIn(first.documentId, HEALTH),
+    ]);
+
+    expect(outcome).toMatchObject({ ok: true, value: { batchId: undefined } });
+    expect(await batchedRowsOf(db().pool, scenario.workspaceId, DISMISSED_ACT)).toEqual([
+      {
+        subject_id: first.documentId,
+        batch_id: null,
+        detail: { documentId: first.documentId, bindingId, findingCount: 1 },
+      },
+    ]);
+  });
+
+  it("dismisses the spans of a group the last run raised, and not one it no longer raises", async () => {
+    const scenario = await arrange();
+    const { bindingId, first } = await twoDocumentsTheSeamNarrowed(scenario);
+    const raised = await findingIn(scenario.workspaceId, first.documentId, HEALTH);
+    const dropped = await findingIn(scenario.workspaceId, first.documentId, {
+      ...HEALTH,
+      ...NO_LONGER_RAISED,
+    });
+
+    await dismissAs(scenario.admin, bindingId, [findingGroupIn(first.documentId, HEALTH)]);
+
+    expect(await reviewOf(scenario.workspaceId, raised)).toMatchObject({
+      review_state: "dismissed",
+    });
+    expect(await reviewOf(scenario.workspaceId, dropped)).toEqual(UNREVIEWED);
+  });
+
+  it.each([
+    ["dismissed and then kept in text", ["dismiss", "keep"]],
+    ["kept in text and then dismissed", ["keep", "dismiss"]],
+  ] as const)(
+    "leaves a span %s reviewed as dismissed and back in the text, each act on its own record",
+    async (_order, acts) => {
+      const scenario = await arrange();
+      const { bindingId, first } = await twoDocumentsTheSeamNarrowed(scenario);
+      const named = await findingIn(scenario.workspaceId, first.documentId, HEALTH);
+      const group = [findingGroupIn(first.documentId, HEALTH)];
+
+      for (const taken of acts) {
+        await (taken === "dismiss" ? dismissAs : keepAs)(scenario.admin, bindingId, group);
+      }
+
+      expect(await reviewOf(scenario.workspaceId, named)).toMatchObject({
+        review_state: "dismissed",
+        review_reason: NOT_HEALTH_DATA,
+      });
+      expect(await restoreOf(scenario.workspaceId, named)).toMatchObject({
+        restored: true,
+        restore_reason: BUSINESS_FACT,
+      });
+    },
+  );
+
+  it.each([
+    ["the queue will not hold its run", "job"],
+    ["the ledger refuses the event", "audit_event"],
+  ] as const)(
+    "dismisses not one span, and rejects rather than answering a word, when %s",
+    async (_when, table) => {
+      const scenario = await arrange();
+      const { bindingId, first } = await twoDocumentsTheSeamNarrowed(scenario);
+      const named = await findingIn(scenario.workspaceId, first.documentId, HEALTH);
+
+      await expect(
+        whileWritesAreRefused(db().pool, table, () =>
+          dismissAs(scenario.admin, bindingId, [findingGroupIn(first.documentId, HEALTH)]),
+        ),
+      ).rejects.toThrow(new RegExp(`refused a write to ${table}`));
+
+      expect(await reviewOf(scenario.workspaceId, named)).toEqual(UNREVIEWED);
+      expect(await batchedRowsOf(db().pool, scenario.workspaceId, DISMISSED_ACT)).toEqual([]);
+      expect(await jobsOf(scenario.workspaceId)).toEqual([]);
+    },
+  );
+
+  it.each([
+    ["an Editor", (scenario: Scenario) => scenario.editor],
+    ["a Viewer", (scenario: Scenario) => scenario.viewer],
+  ] as const)("refuses %s, and neither a row nor a run moves", async (_who, personOf) => {
+    const scenario = await arrange();
+    const { bindingId, first } = await twoDocumentsTheSeamNarrowed(scenario);
+    const named = await findingIn(scenario.workspaceId, first.documentId, HEALTH);
+
+    const outcome = await dismissAs(personOf(scenario), bindingId, [
+      findingGroupIn(first.documentId, HEALTH),
+    ]);
+
+    expect(outcome).toEqual({ ok: false, error: "role-forbids" });
+    expect(await reviewOf(scenario.workspaceId, named)).toEqual(UNREVIEWED);
+    expect(await jobsOf(scenario.workspaceId)).toEqual([]);
+  });
+
+  it("refuses a group that is not special category, and the special-category group beside it lands nothing", async () => {
+    const scenario = await arrange();
+    const { bindingId, first } = await twoDocumentsTheSeamNarrowed(scenario);
+    const health = await findingIn(scenario.workspaceId, first.documentId, HEALTH);
+    const sortCode = await findingIn(scenario.workspaceId, first.documentId);
+
+    const outcome = await dismissAs(scenario.admin, bindingId, [
+      findingGroupIn(first.documentId, HEALTH),
+      findingGroupIn(first.documentId),
+    ]);
+
+    expect(outcome).toEqual({ ok: false, error: "not-special-category" });
+    expect(await reviewOf(scenario.workspaceId, health)).toEqual(UNREVIEWED);
+    expect(await reviewOf(scenario.workspaceId, sortCode)).toEqual(UNREVIEWED);
+    expect(await jobsOf(scenario.workspaceId)).toEqual([]);
+  });
+
+  it("refuses a group the binding holds no span of, and the group beside it lands nothing", async () => {
+    const scenario = await arrange();
+    const { bindingId, first, second } = await twoDocumentsTheSeamNarrowed(scenario);
+    const health = await findingIn(scenario.workspaceId, first.documentId, HEALTH);
+    const elsewhere = await bindingHolding(db(), scenario.workspaceId, { sensitivity: "Internal" });
+    const theirs = await findingIn(scenario.workspaceId, elsewhere.documentId, HEALTH);
+
+    const noSpan = await dismissAs(scenario.admin, bindingId, [
+      findingGroupIn(first.documentId, HEALTH),
+      findingGroupIn(second.documentId, HEALTH),
+    ]);
+    const anotherBinding = await dismissAs(scenario.admin, bindingId, [
+      findingGroupIn(elsewhere.documentId, HEALTH),
+    ]);
+
+    expect(noSpan).toEqual({ ok: false, error: "no-such-finding" });
+    expect(anotherBinding).toEqual({ ok: false, error: "no-such-finding" });
+    expect(await reviewOf(scenario.workspaceId, health)).toEqual(UNREVIEWED);
+    expect(await reviewOf(scenario.workspaceId, theirs)).toEqual(UNREVIEWED);
+    expect(await jobsOf(scenario.workspaceId)).toEqual([]);
+  });
+});
+
 const reprocessAsAdmin = (
   scenario: Scenario,
   bindingId: string,
@@ -1044,6 +1360,16 @@ describe("a bulk act handed no finding group at all", () => {
     expect(parse(narrowDocumentsInput, { bindingId: A_BINDING, findingGroups: [] })).toEqual(
       EMPTY_LIST,
     );
+  });
+
+  it("names the empty list a dismissal was arranged with, because an empty dismissal would still queue a run", () => {
+    expect(
+      parse(dismissAsNotSpecialCategoryInput, {
+        bindingId: A_BINDING,
+        findingGroups: [],
+        reason: NOT_HEALTH_DATA,
+      }),
+    ).toEqual(EMPTY_LIST);
   });
 });
 

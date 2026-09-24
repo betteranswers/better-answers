@@ -5,6 +5,7 @@ import { z } from "zod";
 import { ISSUE_WORDS, parse, ROOT_PATH, type IssueWord } from "../src/kernel/index.ts";
 import {
   bindUploadFields,
+  dismissAsNotSpecialCategoryInput,
   findingsOfInput,
   keepInTextInput,
   narrowBindingInput,
@@ -272,6 +273,24 @@ describe("the shapes the Sources acts are handed", () => {
         }),
       ),
     ).toEqual({ word: "malformed", fields: { "findingGroups.0.tier": "not-in-set" } });
+  });
+
+  it("refuses a dismissal with no reason, a blank one or one past the review's ceiling", () => {
+    for (const [reason, word] of [
+      [undefined, "missing"],
+      ["   ", "too-small"],
+      ["x".repeat(1_001), "too-big"],
+    ] as const) {
+      expect(
+        refusalOf(
+          parse(dismissAsNotSpecialCategoryInput, {
+            bindingId: A_BINDING,
+            findingGroups: [ALWAYS_GROUP],
+            reason,
+          }),
+        ),
+      ).toEqual({ word: "malformed", fields: { reason: word } });
+    }
   });
 
   it("brands the ids an act is handed, so no act parses one a second time", () => {

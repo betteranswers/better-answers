@@ -31,6 +31,7 @@ describe("what a procedure may answer the wire", () => {
       "runs.ofSubject",
       "session.membership",
       "sources.bind",
+      "sources.dismissAsNotSpecialCategory",
       "sources.findings",
       "sources.keepInText",
       "sources.list",
@@ -47,6 +48,7 @@ describe("what a procedure may answer the wire", () => {
       | "sources.findings"
       | "sources.keepInText"
       | "sources.narrowDocuments"
+      | "sources.dismissAsNotSpecialCategory"
       | "sources.publish"
       | "sources.narrow"
       | "sources.preview"

@@ -298,6 +298,7 @@ const acceptedRows = {
       goneAt: NOW,
       outcome: "converted",
       sensitivity: "Restricted",
+      narrowedTo: "Internal",
     },
   ],
 
@@ -908,7 +909,7 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
 
     finding: [
       { ...acceptedRows.finding[0], tier: "sometimes" },
-      { ...acceptedRows.finding[1], reviewState: "dismissed" },
+      { ...acceptedRows.finding[1], reviewState: "ignored" },
       { ...acceptedRows.finding[0], charStart: 1.5 },
       { ...acceptedRows.finding[0], charEnd: 0 },
       { ...acceptedRows.finding[0], score: 1.1 },
@@ -946,6 +947,7 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { ...acceptedRows.sourceDocument[1], redactionVersion: "   " },
       { ...acceptedRows.sourceDocument[1], outcome: "skipped" },
       { ...acceptedRows.sourceDocument[1], sensitivity: "Secret" },
+      { ...acceptedRows.sourceDocument[1], narrowedTo: "Secret" },
     ],
 
     job: [

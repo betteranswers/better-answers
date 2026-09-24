@@ -133,6 +133,10 @@ export const sourceDocument = withRLS(
     quarantineError: text("quarantine_error"),
 
     sensitivity: text("sensitivity"),
+
+    // Kept apart from the seam's verdict it is folded with, so a lifted verdict returns the
+    // document to the Admin's narrowing and never past it.
+    narrowedTo: text("narrowed_to"),
   },
   "workspaceId",
   (table) => [
@@ -159,6 +163,15 @@ export const sourceDocument = withRLS(
     check(
       "source_document_sensitivity_check",
       sql.raw(`sensitivity IS NULL OR sensitivity IN (${listed(SENSITIVITIES)})`),
+    ),
+    check(
+      "source_document_narrowed_to_check",
+      sql.raw(
+        `narrowed_to IS NULL
+         OR (sensitivity IS NOT NULL
+             AND narrowed_to IN (${listed(SENSITIVITIES)})
+             AND public.narrower_class(sensitivity, narrowed_to) = sensitivity)`,
+      ),
     ),
 
     check(

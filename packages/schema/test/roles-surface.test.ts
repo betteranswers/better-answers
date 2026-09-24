@@ -272,6 +272,7 @@ describe("what worker_rt reaches after the flip", () => {
           "detector_pin",
           "document_id",
           "restored_at",
+          "review_state",
           "rule_id",
           "rule_version",
           "score",
@@ -279,6 +280,26 @@ describe("what worker_rt reaches after the flip", () => {
           "workspace_id",
         ],
         update: ["category", "detector_pin", "rule_version", "score", "tier"],
+      });
+    });
+  });
+
+  it("is a column set on the document for what a run writes back, and the whole table for what it reads", async () => {
+    await withRollback(db().pool, async (client) => {
+      expect({
+        table: await privilegesHeld(client, "worker_rt", "public.source_document"),
+        update: await columnsHeld(client, "worker_rt", "public.source_document", "UPDATE"),
+      }).toEqual({
+        table: held("SELECT"),
+        update: [
+          "content_hash",
+          "last_seen",
+          "normalised_key",
+          "outcome",
+          "quarantine_error",
+          "redaction_version",
+          "sensitivity",
+        ],
       });
     });
   });

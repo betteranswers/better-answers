@@ -51,6 +51,10 @@ const SAID_OF_WORD = {
     why: "Only a finding group of the always set can be kept in text.",
     next: "Untick the groups at another tier.",
   },
+  "not-special-category": {
+    why: "Only a special category finding group can be dismissed as not special category.",
+    next: "Untick the groups of another category.",
+  },
   "widening-refused": {
     why: "That would widen who may read it, and this screen only narrows.",
     next: "Choose a class narrower than the one it has.",
@@ -66,6 +70,10 @@ const SAID_OF_WORD = {
 } satisfies Partial<Record<RefusalWord, Said>>;
 
 const SOURCE_WORDS = new Map<string, Said>(Object.entries(SAID_OF_WORD));
+
+// Where the screen can tell before the click, it says what the api would refuse in the same words.
+export const whyAndNextOf = (word: keyof typeof SAID_OF_WORD): string =>
+  `${SAID_OF_WORD[word].why} ${SAID_OF_WORD[word].next}`;
 
 const CLASS_WORDS = {
   unauthenticated: { why: "Your session has ended.", next: "Sign in again." },
