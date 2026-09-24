@@ -1,4 +1,4 @@
-# Runbook — eleven pages and six procedures
+# Runbook — eleven pages and seven procedures
 
 **Operational reference, not a page of the docs site.** This file lives in `docs/operations/` because that is where the operational documents are kept; the docs site does not render it, and it is read from the repository.
 
@@ -144,6 +144,23 @@ Production's rows are browsed in a GUI through an SSH forward, as the read-only 
 3. **Once per estate, and again after a release adds a table: the role.** As the resource's owner through its container, as the drill reads production — `ssh "${identity[@]}" "$target" docker exec -i "$pg" psql -U postgres -d better_answers -v ON_ERROR_STOP=1 < deploy/browse-role.sql`. The file is one transaction, and run again it changes nothing that is already right.
 4. **Once: its password.** The same hop with a terminal — `ssh -t "${identity[@]}" "$target" docker exec -it "$pg" psql -U postgres -d better_answers -c '\password browse_ro'` — prompts twice and sends only the hash. The password goes to the password manager, and the private inventory records where it is held.
 5. **Each time: open, browse, close.** `deploy/browse-production.sh` prints the loopback port it holds; the GUI's *production (read-only)* profile points at host `127.0.0.1`, port `55433`, database `better_answers`, user `browse_ro`. Ctrl-C in that terminal closes the forward. A refusal names what it found wrong — a local port already held, the private file absent, or one of its names missing, doubled or malformed — and prints no value it read.
+
+## A shell in the worker
+
+The worker's image carries Python, its virtualenv and little else: no shell, no package manager, no `ls` (`apps/worker/Dockerfile` says why). So `exec worker sh` fails, and so does the orchestrator's terminal on the worker. There are three ways in, the lightest first. Each runs on VPC 1 against the platform stack's own compose project, `docker compose … -p better-answers`, which is the invocation `deploy/restore-production.sh`'s `platform` helper makes; the private file holds its env file. The api's image is Debian and keeps its shell, so none of this applies to `api`.
+
+1. **The worker's own Python.** `exec worker python` opens the worker's interpreter as the worker's own user, with its virtualenv, its environment and its mounts. It prints one warning line first, `can't use pyrepl`, because the image has no terminal library for the line editor; the plain prompt that follows works, without line editing. `os.listdir`, `pathlib.Path(…).read_text()` and `os.environ` do what `ls`, `cat` and `env` would. `exec -T worker python -m better_answers_worker.health` runs the health check by hand: exit 0 is healthy, 1 is not.
+2. **A file out.** `docker cp <the worker's container>:<path> <here>` copies a file or a directory out of the running container. It needs nothing in the image, because the daemon does the copying. Never copy anything in: a change reaches the worker in a new image, through a release.
+3. **A shell beside it.** When a shell's tools are wanted, such as `ps`, `top`, `nc` or `wget`, run the base's debug variant. It carries busybox, and it can join the worker's process and network namespaces as the worker's own uid:
+
+   ```sh
+   worker=$(docker compose … -p better-answers ps -q worker)
+   docker run --rm -it --pid "container:$worker" --network "container:$worker" \
+     --user 1000:1000 \
+     gcr.io/distroless/cc-debian13:debug-nonroot@sha256:f525a9a37aed3e8a848f46cfe055999782d66ed797e9e2886928c8caaaa4fc52
+   ```
+
+   The digest was read from the gcr.io registry on 24/09/2026 and is pinned because this image runs inside production's namespaces. Renovate does not read this file, so a newer digest is read from the registry and written here by hand. The prompt is busybox's `sh`. The worker is PID 1 there, so its filesystem is `/proc/1/root`: `ls /proc/1/root/app`, `cat /proc/1/root/data/worker/…`. `ps` and `top` show its processes, and `nc` and `wget` reach the network from its address. The debug image is not the worker's image and changes nothing in it; `exit` removes the container. Run it as uid 1000 and never as root or `--privileged`. The worker's uid is enough to read its `/proc`, and root would only add the power to write where the worker cannot.
 
 ## Swap
 

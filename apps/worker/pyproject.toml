@@ -5,7 +5,7 @@ description = "Better Answers — the Python knowledge worker (ADR 0005)"
 requires-python = ">=3.13,<3.14"
 dependencies = [
     # The bare repositories the worker reads at a commit (ADR 0024), in-process: the
-    # runtime image is python:3.13-slim and carries no git binary, so a pure-Python git
+    # runtime image is Distroless and carries no git binary, so a pure-Python git
     # implementation is one pinned library rather than a second toolchain to patch.
     # Version read from PyPI's dulwich release metadata on 24/09/2026; Apache-2.0 under
     # its dual licence, which is the arm this repository takes (ADR 0027).
