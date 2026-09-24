@@ -86,11 +86,13 @@ dependencies = [
     # `anydoc` bundles its own build of that engine, the two outputs differ, and a media
     # type has one converter because its output is the span address space.
     #
-    # Each name and version joins the memoised function's version
-    # (`pipeline/converter.py`), so a bump here misses the memo for its media type and is
-    # a reprocess somebody chose. Versions read from PyPI's release metadata on
-    # 24/09/2026; both MIT, which is the arm this repository takes (ADR 0027). The wheels
-    # are abi3 — `cp310-abi3` for `anydoc` and `cp38-abi3` for `pdf-inspector` — over
+    # A bump here is in no memo's key (ADR 0036). Conversion is unmemoised: every index
+    # run converts every document of its binding, so the new version reads each one on
+    # its binding's next run. The one memo, `pipeline/detected.py`'s, is keyed on the
+    # normalised text, so the detector reads again only a document whose text came out
+    # different. Versions read from PyPI's release metadata on 24/09/2026; both MIT,
+    # which is the arm this repository takes (ADR 0027). The wheels are abi3 —
+    # `cp310-abi3` for `anydoc` and `cp38-abi3` for `pdf-inspector` — over
     # manylinux_2_17 on x86_64 and aarch64 and macOS arm64, which is every machine this
     # repository builds on.
     #

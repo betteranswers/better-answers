@@ -111,7 +111,7 @@ The owner is not technical. One table, one line per pull request, in plain words
 
 | Update | State | What it needed | Needs you? |
 | --- | --- | --- | --- |
-| pdf-inspector 1.24.0 (#248) | Merged | A test still expected the old version | No. Every PDF is converted again once |
+| pdf-inspector 1.24.0 (#248) | Merged | A test still expected the old version | No. Nothing is reprocessed; a PDF is checked again for personal data only if its text now reads differently |
 | better-auth 1.7.5 (#211) | Open | A database change first (T-356) | Yes: a check on the live database before it ships |
 
 Name any side effect a person would notice (a reprocess, a slower first run, a laptop step), and keep version numbers to the update's own.
