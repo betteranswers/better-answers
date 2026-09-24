@@ -1,7 +1,9 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "types": ["node"]
+    "types": ["node"],
+    // The mutation run's suite imports both Stryker configurations, which are JavaScript modules.
+    "allowJs": true
   },
   "include": ["src", "lifts", "tests", "vitest.config.ts"]
 }
