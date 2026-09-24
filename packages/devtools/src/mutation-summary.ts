@@ -35,7 +35,8 @@ const report = z.object({
 });
 export type Report = z.infer<typeof report>;
 
-const USAGE = "usage: mutation-summary --leg <name> --report <path> [--baseline <path>]";
+const USAGE =
+  "usage: mutation-summary --leg <name> --report <path> [--baseline <path>] [--checkpoint <path>]";
 
 const MAX_REPLACEMENT = 80;
 
@@ -112,8 +113,11 @@ const byPlace = (left: Placed, right: Placed): number =>
   left.mutant.location.start.line - right.mutant.location.start.line ||
   left.mutant.location.start.column - right.mutant.location.start.column;
 
+const mutantsOf = (report: Report): readonly ReportMutant[] =>
+  placedIn(report).map((placed) => placed.mutant);
+
 const scoreLine = (leg: string, report: Report): string => {
-  const mutants = placedIn(report).map((placed) => placed.mutant);
+  const mutants = mutantsOf(report);
   const total = mutants.filter(scored).length;
   if (total === 0) return `### ${leg} mutation score: no mutants`;
   const kills = mutants.filter(killed).length;
@@ -179,18 +183,64 @@ const ranNoTestLines = (leg: string, report: Report): readonly string[] => {
     .sort(byPlace);
   if (rows.length === 0) return [`### ${leg} mutants that ran no test: none`];
   return [
-    `### ${leg} mutants that ran no test: ${String(rows.length)} — the runner resolved no test file for them, which is a runner fault to fix (the vitest-runner patch under \`patches/\`), never a survivor to triage`,
+    `### ${leg} mutants that ran no test: ${String(rows.length)} — the runner ran none of the tests that cover them, which is a runner fault to fix (the vitest-runner patch under \`patches/\`), never a survivor to triage`,
     ...rows.map((placed) => row(placed)),
   ];
+};
+
+const FAULT_CONSEQUENCE =
+  "no verdict in this report can be trusted, so the leg fails until the runner is fixed and a run with `force` tests every mutant again";
+
+const FROM_CHECKPOINT = ", read from the checkpoint since the run wrote no report";
+
+// A mutant that ran no test, or a leg that killed none, is a broken runner: never a low score.
+const runnerFault = (report: Report): string | undefined => {
+  const mutants = mutantsOf(report);
+  const covered = mutants.filter((mutant) => killed(mutant) || mutant.status === "Survived");
+  const untested = mutants.filter(ranNoTest).length;
+  if (untested > 0) {
+    return `${String(untested)} of its ${String(covered.length)} covered mutants ran no test`;
+  }
+  const total = mutants.filter(scored).length;
+  if (total > 0 && !mutants.some(killed)) return `it killed none of its ${String(total)} mutants`;
+  return undefined;
+};
+
+// The checkpoint is read only when there is no report: a leg cancelled at its ceiling writes none.
+const faultOf = (
+  leg: string,
+  report: Report | undefined,
+  checkpoint: Report | undefined,
+): string | undefined => {
+  const read = report ?? checkpoint;
+  const fault = read === undefined ? undefined : runnerFault(read);
+  if (fault === undefined) return undefined;
+  return `${leg} runner fault: ${fault}${report === undefined ? FROM_CHECKPOINT : ""} — ${FAULT_CONSEQUENCE}`;
+};
+
+type SummaryRun = {
+  readonly summary: string;
+  // Set when the leg must fail, and named first in the summary.
+  readonly fault: string | undefined;
 };
 
 export const mutationSummary = (
   leg: string,
   report: Report | undefined,
   baseline: Report | undefined,
-): string => {
-  if (report === undefined) return `### ${leg} mutation score: no report\n`;
-  return `${[scoreLine(leg, report), ...newSurvivorLines(leg, report, baseline), ...ranNoTestLines(leg, report)].join("\n")}\n`;
+  checkpoint?: Report,
+): SummaryRun => {
+  const fault = faultOf(leg, report, checkpoint);
+  const faultLines = fault === undefined ? [] : [`### ${fault}`];
+  const lines =
+    report === undefined
+      ? [`### ${leg} mutation score: no report`]
+      : [
+          scoreLine(leg, report),
+          ...newSurvivorLines(leg, report, baseline),
+          ...ranNoTestLines(leg, report),
+        ];
+  return { summary: `${[...faultLines, ...lines].join("\n")}\n`, fault };
 };
 
 // A file that is not a report, or not JSON, reads as no report.
@@ -204,17 +254,20 @@ const readReport = (file: string): Report | undefined => {
   }
 };
 
-export const mutationSummaryFromArgv = (argv: readonly string[]): string => {
+const readOptional = (file: string | undefined): Report | undefined =>
+  file === undefined ? undefined : readReport(file);
+
+export const mutationSummaryFromArgv = (argv: readonly string[]): SummaryRun => {
   const values = flagValues(argv);
   const leg = values?.get("leg");
   const reportFile = values?.get("report");
   if (values === undefined || leg === undefined || reportFile === undefined) {
     throw new Error(USAGE);
   }
-  const baselineFile = values.get("baseline");
   return mutationSummary(
     leg,
     readReport(reportFile),
-    baselineFile === undefined ? undefined : readReport(baselineFile),
+    readOptional(values.get("baseline")),
+    readOptional(values.get("checkpoint")),
   );
 };

@@ -25,14 +25,24 @@ export const declare = (family: string): string => {
 };
 
 export const ACTS = declare("knowledge");
+
+export const isFamily = (family: string): boolean => {
+  return FAMILIES.includes(family);
+};
 `;
 
-const SUITE = `import { expect, it } from "vitest";
+const SUITE = `import { describe, expect, it } from "vitest";
 
-import { ACTS } from "../src/family.ts";
+import { ACTS, isFamily } from "../src/family.ts";
 
-it("declares the family", () => {
-  expect(ACTS).toBe("knowledge");
+describe("a family", () => {
+  it("declares the family", () => {
+    expect(ACTS).toBe("knowledge");
+  });
+
+  it("tells a family from a stranger", () => {
+    expect(isFamily("knowledge")).toBe(true);
+  });
 });
 `;
 
@@ -108,8 +118,8 @@ const rowAt = (
   return found;
 };
 
-describe("the vitest runner's patch, run over a throwaway workspace (T-107)", () => {
-  it("kills a mutant that throws while its module loads, beside a plain kill and a survivor", () => {
+describe("the vitest runner's patch, run over a throwaway workspace (T-107, T-372)", () => {
+  it("kills a mutant that throws while its module loads, and one that only its test inside a describe reaches, beside a plain kill and a survivor", () => {
     const root = workspace();
     try {
       const run = spawnSync(process.execPath, [path.join(strykerRoot, "bin/stryker.js"), "run"], {
@@ -129,13 +139,19 @@ describe("the vitest runner's patch, run over a throwaway workspace (T-107)", ()
 
       expect(rowAt(rows, 4, "ConditionalExpression", "false")).toMatchObject({
         status: "Survived",
-        testsCompleted: 1,
+        testsCompleted: 2,
       });
 
       expect(rowAt(rows, 8, "StringLiteral", '""')).toMatchObject({
         status: "Killed",
         testsCompleted: 1,
         statusReason: expect.stringContaining("is not a family"),
+      });
+
+      // Reached only while a test runs, so its run is filtered to that test by its full name.
+      expect(rowAt(rows, 10, "BlockStatement", "{}")).toMatchObject({
+        status: "Killed",
+        testsCompleted: 1,
       });
     } finally {
       // A forked stryker worker outliving the CLI leaves an entry here, and rmSync retries
