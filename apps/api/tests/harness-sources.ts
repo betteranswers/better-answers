@@ -205,13 +205,6 @@ export const seedBindings = async (
     const { workspaceId } = asked;
     const seeded: SeededBinding[] = [];
 
-    // A provision's new partition locks the chunk table, then the documents its key references;
-    // taking them in that order too leaves no cycle.
-    const chunked = asked.bindings.some((binding) =>
-      binding.documents.some((document) => document.chunks.length > 0),
-    );
-    if (chunked) await client.query('LOCK TABLE "index".chunk IN ROW EXCLUSIVE MODE');
-
     for (const binding of asked.bindings) {
       const row = await seed.sourceBinding({
         workspaceId,
