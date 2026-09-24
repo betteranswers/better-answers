@@ -601,17 +601,25 @@ const keepingTwoGroupsOfThree = async (scenario: Scenario) => {
   ]);
 
   const spans = [kept, keptBesideIt, alsoKept].toSorted();
-  return { bindingId, kept, keptBesideIt, alsoKept, left, spans, outcome };
+  return { bindingId, first, second, kept, keptBesideIt, alsoKept, left, spans, outcome };
 };
 
 describe("an Admin keeping named finding groups in the text", () => {
   it("restores every span of every group under one batch id and queues one index run to let them back in", async () => {
     const scenario = await arrange();
 
-    const { bindingId, kept, keptBesideIt, alsoKept, left, spans, outcome } =
+    const { bindingId, first, second, kept, keptBesideIt, alsoKept, left, spans, outcome } =
       await keepingTwoGroupsOfThree(scenario);
 
-    expect(outcome).toMatchObject({ ok: true, value: { bindingId, findingIds: spans } });
+    expect(outcome).toEqual({
+      ok: true,
+      value: {
+        bindingId,
+        documentIds: [first.documentId, second.documentId].toSorted(),
+        batchId: expect.any(String),
+        jobId: expect.any(String),
+      },
+    });
     expect(await restoreOf(scenario.workspaceId, kept)).toEqual({
       restored: true,
       restored_by: `human:${scenario.admin.userId}`,
@@ -714,7 +722,7 @@ describe("an Admin keeping named finding groups in the text", () => {
 
       expect(outcome).toMatchObject({
         ok: true,
-        value: { findingIds: [kept], batchId: undefined },
+        value: { documentIds: [first.documentId], batchId: undefined },
       });
       expect(
         await batchedRowsOf(db().pool, scenario.workspaceId, "sources.finding.restored"),
@@ -792,7 +800,8 @@ describe("an Admin keeping named finding groups in the text", () => {
 
     const outcome = await keepAs(scenario.admin, bindingId, [group]);
 
-    expect(outcome).toMatchObject({ ok: true, value: { findingIds: [raised] } });
+    expect(outcome).toMatchObject({ ok: true });
+    expect(await restoreOf(scenario.workspaceId, raised)).toMatchObject({ restored: true });
     expect(await restoreOf(scenario.workspaceId, dropped)).toMatchObject({ restored: false });
   });
 
@@ -811,7 +820,8 @@ describe("an Admin keeping named finding groups in the text", () => {
     ]);
 
     expect(before).toEqual({ ok: false, error: "not-the-always-set" });
-    expect(after).toMatchObject({ ok: true, value: { findingIds: [officer] } });
+    expect(after).toMatchObject({ ok: true });
+    expect(await restoreOf(scenario.workspaceId, officer)).toMatchObject({ restored: true });
   });
 
   it("keeps an officer's name raised at the always tier and leaves the same rule's default-off names in that document", async () => {
@@ -829,7 +839,8 @@ describe("an Admin keeping named finding groups in the text", () => {
       findingGroupIn(first.documentId, NAMES),
     ]);
 
-    expect(outcome).toMatchObject({ ok: true, value: { findingIds: [officer] } });
+    expect(outcome).toMatchObject({ ok: true });
+    expect(await restoreOf(scenario.workspaceId, officer)).toMatchObject({ restored: true });
     expect(await restoreOf(scenario.workspaceId, bidWriter)).toMatchObject({ restored: false });
   });
 });

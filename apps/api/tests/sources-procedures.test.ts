@@ -546,12 +546,18 @@ describe("the Sources procedures over the wire", () => {
     ]);
   });
 
-  it("keeps a finding group in text and queues the run that lets it back in", async () => {
+  it("keeps a finding group in text, answering the documents it restored and no finding's id, and queues the run that lets it back in", async () => {
     const { workspace, api } = await anAdmin();
     const { bindingId, documentId } = await unpublishedBinding(workspace.workspaceId);
-    const finding = await seededIn(app, (seed) =>
-      seed.finding({ workspaceId: workspace.workspaceId, documentId }),
-    );
+    const { one, other } = await seededIn(app, async (seed) => ({
+      one: await seed.finding({ workspaceId: workspace.workspaceId, documentId }),
+      other: await seed.finding({
+        workspaceId: workspace.workspaceId,
+        documentId,
+        charStart: 40,
+        charEnd: 48,
+      }),
+    }));
 
     const kept = await api.sources.keepInText.mutate({
       bindingId,
@@ -566,7 +572,15 @@ describe("the Sources procedures over the wire", () => {
       reason: "The sort code is the company's own.",
     });
 
-    expect(kept).toEqual({ bindingId, findingIds: [finding.id], jobId: expect.any(String) });
+    expect(kept).toEqual({
+      bindingId,
+      documentIds: [documentId],
+      batchId: expect.any(String),
+      jobId: expect.any(String),
+    });
+    const answered = JSON.stringify(kept);
+    expect(answered).not.toContain(one.id);
+    expect(answered).not.toContain(other.id);
     const runs = await api.runs.ofSubject.query({ subjectId: bindingId });
     expect(runs.map((run) => [run.jobId, run.reason, run.status])).toEqual([
       [kept.jobId, "restored", "queued"],
