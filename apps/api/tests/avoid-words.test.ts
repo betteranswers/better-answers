@@ -132,10 +132,6 @@ const CARVED_OUT: readonly CarveOut[] = [
     holds: (file) => /^packages\/schema\/migrations\/.*\.sql$/.test(file),
     why: "a migration is a dated record, never edited once it has run",
   },
-  {
-    holds: under("contracts/"),
-    why: "both tiers' suites assert a fixture's values, so an edit there risks a version bump",
-  },
   { holds: under(".cubic/"), why: "Cubic generates it and rewrites it" },
   { holds: under("apps/web/"), why: "no tier-sense use: the word there is the SPA's own zone" },
   {
@@ -327,10 +323,19 @@ describe("the sense a planted line is read in", () => {
     ]);
   });
 
-  it("reads the worker's source, which no carve-out holds", () => {
-    expect(findingsOver(`# The ${WORD} claims the job.`, "apps/worker/src/planted.py")).toEqual([
-      `apps/worker/src/planted.py:1: # The ${WORD} claims the job.`,
-    ]);
+  it.each([
+    {
+      where: "the worker's source",
+      file: "apps/worker/src/planted.py",
+      planted: `# The ${WORD} claims the job.`,
+    },
+    {
+      where: "the tier contract's fixtures",
+      file: "contracts/queue/cases.json",
+      planted: `      "why": "the rebuild the ${WORD} claimed in the foreground",`,
+    },
+  ])("reads $where, which no carve-out holds", ({ file, planted }) => {
+    expect(findingsOver(planted, file)).toEqual([`${file}:1: ${planted.trim()}`]);
   });
 
   it("reads the api's source and tests, and holds out only this scan", () => {

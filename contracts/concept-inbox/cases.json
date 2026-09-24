@@ -83,21 +83,21 @@
   ],
   "refusals": [
     {
-      "why": "a payload is platform state in no knowledge layer: the app reaches it through the acceptance path's function and never through the table",
+      "why": "a payload is platform state in no knowledge layer: the api reaches it through the acceptance path's function and never through the table",
       "role": "app_rt",
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
       "statement": "SELECT 1 FROM concept_write_request LIMIT 1",
       "sqlstate": "42501"
     },
     {
-      "why": "no run reads another run's candidates out of the inbox: the payload function is the app's alone",
+      "why": "no run reads another run's candidates out of the inbox: the payload function is the api's alone",
       "role": "worker_rt",
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
       "statement": "SELECT 1 FROM concept_write_request_for('01J6S1AAAAAAAAAAAAAAAAAAAA')",
       "sqlstate": "42501"
     },
     {
-      "why": "the queue is the app's; a producer submits and reads nothing back",
+      "why": "the queue is the api's; a producer submits and reads nothing back",
       "role": "worker_rt",
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
       "statement": "SELECT 1 FROM suggestion LIMIT 1",
@@ -111,7 +111,7 @@
       "sqlstate": "42501"
     },
     {
-      "why": "a decided suggestion is a fact, so the app has no road to a deleted one",
+      "why": "a decided suggestion is a fact, so the api has no road to a deleted one",
       "role": "app_rt",
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
       "statement": "DELETE FROM suggestion WHERE id = '01J6S1AAAAAAAAAAAAAAAAAAAA'",
@@ -125,21 +125,21 @@
       "sqlstate": "23514"
     },
     {
-      "why": "an *edit* is a person's own change, offered through the app: the kind and the proposer are both the caller's words, so a producer that could raise one could put a change in a person's name into the queue an Admin decides from",
+      "why": "an *edit* is a person's own change, offered through the api: the kind and the proposer are both the caller's words, so a producer that could raise one could put a change in a person's name into the queue an Admin decides from",
       "role": "worker_rt",
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
       "statement": "SELECT * FROM submit_suggestion_set('01J6R5AAAAAAAAAAAAAAAAAAAA', 'edit', 'human:01J6CCCCCCCCCCCCCCCCCCCCCC', '[{\"suggestion_id\": \"01J6S6FFFFFFFFFFFFFFFFFFFF\", \"merge_key\": \"policy:expenses\", \"path\": \"knowledge/expenses.md\", \"concept_kind\": \"Policy\", \"title\": \"Expenses\", \"frontmatter\": \"{}\", \"body\": \"b\", \"base_content_hash\": null}]'::jsonb)",
       "sqlstate": "42501"
     },
     {
-      "why": "a *candidate* is what a run found, so an app that could raise one could put work no run did into the queue an Admin decides from",
+      "why": "a *candidate* is what a run found, so the api, if it could raise one, could put work no run did into the queue an Admin decides from",
       "role": "app_rt",
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
       "statement": "SELECT * FROM submit_suggestion_set('01J6R8AAAAAAAAAAAAAAAAAAAA', 'candidate', 'better-answers-extraction/1.2', '[{\"suggestion_id\": \"01J6S9JJJJJJJJJJJJJJJJJJJJ\", \"merge_key\": \"policy:expenses\", \"path\": \"knowledge/expenses.md\", \"concept_kind\": \"Policy\", \"title\": \"Expenses\", \"frontmatter\": \"{}\", \"body\": \"b\", \"base_content_hash\": null}]'::jsonb)",
       "sqlstate": "42501"
     },
     {
-      "why": "the platform's own citation repair is a routine the worker runs, and not a set the app may raise",
+      "why": "the platform's own citation repair is a routine the worker runs, and not a set the api may raise",
       "role": "app_rt",
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
       "statement": "SELECT * FROM submit_suggestion_set('01J6R6AAAAAAAAAAAAAAAAAAAA', 'repair', 'process:better-answers-citation-repair', '[{\"suggestion_id\": \"01J6S7GGGGGGGGGGGGGGGGGGGG\", \"merge_key\": \"policy:expenses\", \"path\": \"knowledge/expenses.md\", \"concept_kind\": \"Policy\", \"title\": \"Expenses\", \"frontmatter\": \"{}\", \"body\": \"b\", \"base_content_hash\": null}]'::jsonb)",

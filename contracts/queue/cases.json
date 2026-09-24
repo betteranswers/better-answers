@@ -91,7 +91,7 @@
       "lease_expires_in_seconds": -30
     },
     {
-      "why": "another tenant's queued audit, which the scope is what keeps out of every workspace A claim above, and which the app's own kinds leave alone",
+      "why": "another tenant's queued audit, which the scope is what keeps out of every workspace A claim above, and which the api's own kinds leave alone",
       "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
       "id": "01J6J5BBBBBBBBBBBBBBBBBBBB",
       "kind": "nightly-audit",
@@ -226,7 +226,7 @@
       "expect_ids": []
     },
     {
-      "why": "the app may claim too — the ops command that runs a rebuild in the foreground is a claimant like any other, passing the rebuild kind alone — and it takes that tenant's rebuild and not the audit sitting beside it. What this case proves is the grant and the policy: ADR 0031's agreement admits the app as a claimant, under its own role and in its own scope. It says nothing about which tier a kind belongs to — every kind's descriptor names the worker today, the full rebuild included, and an api-claimed kind arriving later brings its own descriptor and its own case here",
+      "why": "the api may claim too — the ops command that runs a rebuild in the foreground is a claimant like any other, passing the rebuild kind alone — and it takes that tenant's rebuild and not the audit sitting beside it. What this case proves is the grant and the policy: ADR 0031's agreement admits the api as a claimant, under its own role and in its own scope. It says nothing about which tier a kind belongs to — every kind's descriptor names the worker today, the full rebuild included, and an api-claimed kind arriving later brings its own descriptor and its own case here",
       "role": "app_rt",
       "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
       "worker_id": "ops-1",
@@ -234,7 +234,7 @@
       "expect_ids": ["01J6J7BBBBBBBBBBBBBBBBBBBB"]
     },
     {
-      "why": "and the worker in the same workspace takes the audit the app's one kind stepped over, on the kinds its own registry holds",
+      "why": "and the worker in the same workspace takes the audit the api's one kind stepped over, on the kinds its own registry holds",
       "role": "worker_rt",
       "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
       "worker_id": "worker-2",
@@ -447,7 +447,7 @@
       "claimed_by": "worker-slow"
     },
     {
-      "why": "the rebuild the app claimed in the foreground, on the one kind it passed",
+      "why": "the rebuild the api claimed in the foreground, on the one kind it passed",
       "workspace_id": "01J6BBBBBBBBBBBBBBBBBBBBBB",
       "id": "01J6J7BBBBBBBBBBBBBBBBBBBB",
       "status": "claimed",
