@@ -110,3 +110,9 @@ The 2026-09-07 amendment named what a replayed commit carries — a concept file
 **The replay recognises the manifest by its path and lands its commit row alone.** A missed commit whose one changed file is the reserved path is a manifest commit: the replay reads the manifest, refuses it as `unreadable-commit` if it does not parse, and otherwise lands the `bundle_commit` row and the reconciler's ledger row — detail the sha and the bundle's id, no IRI and no content hash, because nothing was indexed. The row's other fields are therefore optional in the act's declared shape, present exactly when a concept landed. The same id again is a no-op at the act and a skip at the replay, and a manifest with another id already standing is refused at the act as a taken path — the only path a bundle reserves.
 
 Everything else in this ADR and its amendments stands.
+
+## Amendment — 2026-09-24, a concept the replay landed Restricted stays there through a cascade (T-370)
+
+Since 2026-09-08 the replay lands a concept Restricted when its file's sources are not the standing citations, and says so on its ledger row. A cascade, a narrowing's or a publish's, re-derives a concept from its standing citations alone. For such a concept those are the citations from before the lost commit, not the ones its file names, so the cascade used to widen it to their class: the outcome the replay exists to refuse. The cascade now reads that ledger row through the concept's commit. While the concept's row stands on a replay whose sources disagreed, the cascade folds Restricted in, as the replay did. The hold ends when the concept lands again, through a governed write or a replay whose sources agree.
+
+Everything else in this ADR and its amendments stands.

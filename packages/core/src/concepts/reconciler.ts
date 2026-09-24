@@ -6,8 +6,7 @@ import {
   ULID,
 } from "@better-answers/schema";
 
-import { RESTRICTED_TO_ADMINS } from "../access/index.ts";
-import { act, declareActs, eventsOfAct, record } from "../audit/index.ts";
+import { eventsOfAct, record } from "../audit/index.ts";
 import {
   attempt,
   err,
@@ -48,6 +47,7 @@ import {
   WRITE_CONSTRAINTS,
 } from "./landing.ts";
 import { parseBundleManifest } from "./manifest.ts";
+import { RECONCILER_ACTS, restsAlsoOnWhenReplayed } from "./reconciler-hit.ts";
 
 const RECONCILER_ACTOR = "process:better-answers-reconciler";
 
@@ -56,16 +56,6 @@ export type ReconcilerPrincipal = PlatformPrincipal & {
 };
 
 export const RECONCILER: ReconcilerPrincipal = { kind: "platform", actorId: RECONCILER_ACTOR };
-
-const RECONCILER_ACTS = declareActs("platform", {
-  replayed: act("platform.reconciler.replayed", {
-    commitSha: "gitSha",
-    iri: "iri?",
-    contentHash: "contentHash?",
-    evidenceAgrees: "flag?",
-    bundleId: "id?",
-  }),
-});
 
 type ReplayRefusal = "unreadable-commit" | "rename-refused" | "path-taken" | "merge-key-taken";
 
@@ -314,7 +304,7 @@ const replayCommit = async (
 
           evidence: undefined,
 
-          restsAlsoOn: evidenceAgrees ? [] : [RESTRICTED_TO_ADMINS],
+          restsAlsoOn: restsAlsoOnWhenReplayed(evidenceAgrees),
           acceptance,
         });
         return ok("landed");

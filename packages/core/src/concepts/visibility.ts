@@ -4,6 +4,7 @@ import {
   derivedVisibility,
   readableClause,
   readableParameters,
+  RESTRICTED_TO_ADMINS,
   visibilityFrom,
   visibilityOf,
   type Visibility,
@@ -30,6 +31,7 @@ import { recomputeCompositionsIncluding } from "../guides/index.ts";
 import { holdsEveryGroup } from "../members/index.ts";
 import { writeConceptVisibility } from "../store/graph/index.ts";
 import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
+import { restsAlsoOnItsReconcilerHit } from "./reconciler-hit.ts";
 
 const VISIBILITY_ACTS = declareActs("knowledge", {
   classOverridden: act("knowledge.concept.class_overridden", {
@@ -78,12 +80,18 @@ const overrideOf = async (
   return found.rows[0];
 };
 
-type SourcedVisibilityRow = VisibilityRow & { readonly document_sensitivity: string | null };
+type SourcedVisibilityRow = VisibilityRow & {
+  readonly document_sensitivity: string | null;
+  readonly published: boolean;
+};
 
-const restingOn = (row: SourcedVisibilityRow): readonly Visibility[] =>
-  row.document_sensitivity === null
-    ? [visibilityOf(row)]
-    : [visibilityOf(row), visibilityOf({ ...row, sensitivity: row.document_sensitivity })];
+const restingOn = (row: SourcedVisibilityRow): readonly Visibility[] => [
+  visibilityOf(row),
+  ...(row.document_sensitivity === null
+    ? []
+    : [visibilityOf({ ...row, sensitivity: row.document_sensitivity })]),
+  ...(row.published ? [] : [RESTRICTED_TO_ADMINS]),
+];
 
 export const conceptVisibilityFrom = async (
   principal: Principal,
@@ -119,7 +127,8 @@ export const conceptVisibilityFrom = async (
   // document's class is read in the next.
   await tx.query(`SELECT 1 ${rowsCited.clause} FOR SHARE OF b`, rowsCited.parameters);
   const bindings = await tx.query<SourcedVisibilityRow>(
-    `SELECT b.sensitivity, b.audience, b.audience_groups, d.sensitivity AS document_sensitivity
+    `SELECT b.sensitivity, b.audience, b.audience_groups, d.sensitivity AS document_sensitivity,
+            b.published_at IS NOT NULL AS published
        ${rowsCited.clause}`,
     rowsCited.parameters,
   );
@@ -188,6 +197,7 @@ const recomputeConceptVisibility = async (
     iri,
     kind: row.kind,
     fallback: visibilityOf(row),
+    alsoOn: await restsAlsoOnItsReconcilerHit(principal, tx, iri),
   });
   await tx.query(
     `UPDATE concept_index SET sensitivity = $3, audience = $4, audience_groups = $5, updated_at = now()

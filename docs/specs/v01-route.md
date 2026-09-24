@@ -17,7 +17,7 @@ One document holds the route: this spec. Its head is the vision's v0.1 row expan
 ### The Admin at the first client
 
 1. As an Admin, I want to bind an uploaded document to my workspace, review what the pre-scan found in it by category and rule, and publish it, so that my company's knowledge enters the platform through a gate I ran and can explain.
-2. As an Admin, I want every binding to start Restricted and every widening to be my recorded act, so that doing nothing is the safe thing and nothing reaches a reader I did not admit.
+2. As an Admin, I want every binding to count as Restricted until I publish it, the publish to release the class I chose, and every widening to be my recorded act, so that doing nothing is the safe thing and nothing reaches a reader I did not admit.
 3. As an Admin, I want a sort code, a date of birth or a home address in a document withheld before it is chunked, embedded, extracted or sent to any model, so that no derived store and no processor ever holds the value.
 4. As an Admin, I want the platform to emit the DPIA input for each binding — the data types, the class, the rules in force, the routes with their processor and country, the retention tail — so that our privacy assessment is written from what the platform actually does.
 5. As an Admin, I want to bind my company's public website by URL prefix and a SharePoint library, see the enumeration and a priced extraction plan at review, and accept the plan once, so that indexing and extraction run on a cadence within a scope I priced.

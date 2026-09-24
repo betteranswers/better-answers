@@ -39,6 +39,7 @@ import {
   edgeVisibilityHeld,
   groupNamed,
   ledgerRowsOf,
+  publishedOnceIndexed,
   restrictedAndInternal,
   seededBy,
   visibilityHeld,
@@ -142,6 +143,14 @@ const rowAndNode = async (workspaceId: string, iri: string) => ({
 
 const bothAt = (pair: object) => ({ row: pair, node: pair });
 
+const documentsCitedBy = async (workspaceId: string, iri: string) => {
+  const read = await db().pool.query<{ source_document_id: string }>(
+    "SELECT source_document_id FROM concept_evidence WHERE workspace_id = $1 AND iri = $2",
+    [workspaceId, iri],
+  );
+  return read.rows.map((row) => row.source_document_id).toSorted();
+};
+
 const statementsWaitingOnALock = async (): Promise<readonly string[]> => {
   const found = await db().pool.query<{ query: string }>(
     "SELECT query FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'",
@@ -180,9 +189,19 @@ const besideAnOpenNarrowing = async <T>(
   }
 };
 
-const compositionIncluding = (workspaceId: string, iris: readonly string[]): Promise<string> =>
+const compositionIncluding = (
+  workspaceId: string,
+  iris: readonly string[],
+  held: { readonly sensitivity?: string; readonly audienceGroups?: readonly string[] } = {},
+): Promise<string> =>
   seededBy(db(), async (seed) => {
-    const composition = await seed.composition({ workspaceId });
+    const composition = await seed.composition({
+      workspaceId,
+      ...(held.sensitivity === undefined ? {} : { sensitivity: held.sensitivity }),
+      ...(held.audienceGroups === undefined
+        ? {}
+        : { audience: "groups", audienceGroups: [...held.audienceGroups] }),
+    });
     for (const [ordinal, iri] of iris.entries()) {
       await seed.compositionInclude({ workspaceId, compositionId: composition.id, iri, ordinal });
     }
@@ -335,6 +354,42 @@ describe("what a governed write derives from the bindings of what it cites", () 
       audience: "groups",
       audience_groups: [hr],
     });
+  });
+
+  it("lets a creation and a re-write cite a document whose binding is unpublished, landing the citation at Restricted whatever class the binding waits to release", async () => {
+    const scenario = await arrange();
+    const hr = await groupNamed(db(), scenario, "HR", [scenario.editor]);
+    const unpublished = await bindingHolding(db(), scenario.workspaceId, {
+      sensitivity: "Public",
+      audience: "groups",
+      audienceGroups: [hr],
+      publishedAt: null,
+    });
+    const published = await bindingHolding(db(), scenario.workspaceId);
+
+    const created = await conceptCiting(scenario, scenario.editor, [unpublished.documentId]);
+    const standing = await conceptCiting(scenario, scenario.editor, [published.documentId]);
+    const rewritten = await conceptCiting(
+      scenario,
+      scenario.editor,
+      [published.documentId, unpublished.documentId],
+      {
+        iri: standing.iri,
+        path: standing.path,
+        mergeKey: standing.mergeKey,
+        expects: { head: await head(scenario.editor, scenario.git) },
+      },
+    );
+
+    const restrictedToHr = { sensitivity: "Restricted", audience: "groups", audience_groups: [hr] };
+    expect(await rowAndNode(scenario.workspaceId, created.iri)).toEqual(bothAt(restrictedToHr));
+    expect(await rowAndNode(scenario.workspaceId, rewritten.iri)).toEqual(bothAt(restrictedToHr));
+    expect(await documentsCitedBy(scenario.workspaceId, created.iri)).toEqual([
+      unpublished.documentId,
+    ]);
+    expect(await documentsCitedBy(scenario.workspaceId, rewritten.iri)).toEqual(
+      [published.documentId, unpublished.documentId].toSorted(),
+    );
   });
 });
 
@@ -1005,6 +1060,44 @@ describe("narrowing a binding", () => {
     expect(await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.narrowed")).toEqual(
       [],
     );
+  });
+});
+
+describe("publishing a binding", () => {
+  it("releases the class its ledger row records to every concept citing its documents and every composition including them, and to nothing citing another binding", async () => {
+    const scenario = await arrange();
+    const hr = await groupNamed(db(), scenario, "HR", []);
+    const unpublishedForHr = {
+      sensitivity: "Internal",
+      audience: "groups",
+      audienceGroups: [hr],
+      publishedAt: null,
+    };
+    const binding = await bindingHolding(db(), scenario.workspaceId, unpublishedForHr);
+    const other = await bindingHolding(db(), scenario.workspaceId, unpublishedForHr);
+    const cited = await conceptCiting(scenario, scenario.editor, [binding.documentId]);
+    const untouched = await conceptCiting(scenario, scenario.editor, [other.documentId]);
+    const composition = await compositionIncluding(scenario.workspaceId, [cited.iri], {
+      sensitivity: "Restricted",
+      audienceGroups: [hr],
+    });
+    const restrictedToHr = { sensitivity: "Restricted", audience: "groups", audience_groups: [hr] };
+    expect(await heldRow(scenario.workspaceId, cited.iri)).toEqual(restrictedToHr);
+
+    const published = await publishedOnceIndexed(db(), scenario.admin, binding.bindingId);
+
+    expect(published.ok).toBe(true);
+    const internalToHr = { sensitivity: "Internal", audience: "groups", audience_groups: [hr] };
+    expect(await rowAndNode(scenario.workspaceId, cited.iri)).toEqual(bothAt(internalToHr));
+    expect(
+      await visibilityHeld(db().pool, "composition", scenario.workspaceId, composition),
+    ).toEqual(internalToHr);
+    expect(await heldRow(scenario.workspaceId, untouched.iri)).toEqual(restrictedToHr);
+    expect(
+      await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.published"),
+    ).toMatchObject([
+      { subject_id: binding.bindingId, detail: { sensitivity: "Internal", audience: "groups" } },
+    ]);
   });
 });
 

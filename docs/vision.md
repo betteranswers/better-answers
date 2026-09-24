@@ -48,7 +48,7 @@ Use cases, in the order they land:
 ## Principles that do not move
 
 - **Simplicity through OKF.** The concept file stays to spec; the spec's silences are met in the graph and records. If a feature needs more in the file, the approach is re-evaluated. (`docs/okf-v02.md`)
-- **Private by default.** A connected source starts restricted; personal data never enters the bundle; every call carries a principal; every answer is permission-aware.
+- **Private by default.** A connected source counts as restricted until an Admin publishes it; personal data never enters the bundle; every call carries a principal; every answer is permission-aware.
 - **Local models are preferred**, per purpose, per workspace — the route record keyed by purpose is what delivers it. Local *embedding* is a named precondition, triggered by the first workspace that asks for it and not by a date: it needs a model-host box the first estate has no room for.
 - **Multi-tenant-ready data model, single deployment**, UK-preferred hosting, customer-hosted later.
 - **Repo quality is first-class**: functional tests through the interface, a glossary that code obeys, ADRs for what is hard to reverse.

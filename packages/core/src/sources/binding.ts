@@ -28,6 +28,7 @@ import {
   type Result,
   type UserPrincipal,
 } from "../kernel/index.ts";
+import { openingACascadeOverHeldGroups } from "../concepts/index.ts";
 import { holdsEveryGroup } from "../members/index.ts";
 import { enqueueJobIn, indexRunRefused } from "../runs/index.ts";
 import { putObject, type ObjectDoor } from "../store/objects/index.ts";
@@ -46,6 +47,7 @@ import {
   type ActingOnBinding,
   type PlatformOnBinding,
 } from "./admin-binding.ts";
+import { cascadeOverEvidence } from "./cascade.ts";
 import { dpiaInputFor, type REDACTION_CATEGORIES } from "./dpia.ts";
 import { raisedByTheLastRun } from "./findings.ts";
 import type { SourceRefusal } from "./vocabulary.ts";
@@ -123,6 +125,8 @@ const BINDING_ACTS = declareActs("sources", {
     dpiaReferenced: "flag",
     ...FINDING_COUNT_SHAPE,
     dpiaHash: "contentHash",
+    sensitivity: "sensitivity",
+    audience: "audience",
   }),
 });
 
@@ -409,8 +413,15 @@ export const publishBinding = async (
     return err("confirmation-missing");
   }
 
-  const binding = await bindingNamed<{ published_at: Date | null }>(acting.value, tx, {
-    columns: "published_at",
+  const opened = await openingACascadeOverHeldGroups(admin, tx, []);
+  if (!opened.ok) return err(opened.error);
+
+  const binding = await bindingNamed<{
+    published_at: Date | null;
+    sensitivity: string;
+    audience: string;
+  }>(acting.value, tx, {
+    columns: "published_at, sensitivity, audience",
     lock: "for-update",
   });
   if (!binding.ok) return err(binding.error);
@@ -451,8 +462,12 @@ export const publishBinding = async (
       dpiaReferenced: input.confirmations.dpiaReferenced,
       ...countsOf(found),
       dpiaHash: dpia.value.hash,
+      sensitivity: binding.value.sensitivity,
+      audience: binding.value.audience,
     },
   });
+  const cascaded = await attempt(() => cascadeOverEvidence(admin, tx, { bindingId }));
+  if (!cascaded.ok) return err(cascaded.error);
   return ok({ bindingId: bindingId, auditEventId, dpiaHash: dpia.value.hash });
 };
 
