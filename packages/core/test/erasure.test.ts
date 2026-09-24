@@ -183,6 +183,66 @@ describe("recording a subject request", () => {
     expect(await requestRowsIn(scenario.workspaceId)).toEqual([]);
   });
 
+  it("refuses a name of one word as too broad to withhold, saying which and why in one sentence, and records nothing", async () => {
+    const scenario = await arrange();
+
+    const recorded = await recordingAs(
+      scenario.admin,
+      requestOf({
+        kind: "erasure",
+        identifiers: { emails: ["will@example.invalid"], names: ["  Will "], other: [] },
+      }),
+    );
+
+    expect(recorded).toEqual({
+      ok: false,
+      error: {
+        word: "identifier-too-broad",
+        said:
+          'The name "Will" is too broad to withhold: a name of one word would withhold that ' +
+          "word in every document of the workspace.",
+      },
+    });
+    expect(await requestRowsIn(scenario.workspaceId)).toEqual([]);
+  });
+
+  it.each([
+    ["an email", { emails: ["x@"], names: [], other: [] }, "x@"],
+    ["a name", { emails: [], names: ["Al"], other: [] }, "Al"],
+    ["another identifier", { emails: [], names: [], other: ["7\n "] }, "7"],
+  ])(
+    "refuses %s under three characters, named without the spaces around it, and records nothing",
+    async (_kind, identifiers, refused) => {
+      const scenario = await arrange();
+
+      const recorded = await recordingAs(
+        scenario.admin,
+        requestOf({ kind: "erasure", identifiers: { ...IDENTIFIERS, ...identifiers } }),
+      );
+
+      expect(recorded).toEqual({
+        ok: false,
+        error: {
+          word: "identifier-too-broad",
+          said:
+            `The identifier "${refused}" is too broad to withhold: one under 3 characters ` +
+            "would withhold those characters in every document of the workspace.",
+        },
+      });
+      expect(await requestRowsIn(scenario.workspaceId)).toEqual([]);
+    },
+  );
+
+  it("records a name of two words and another identifier of three characters, which clear the floor", async () => {
+    const scenario = await arrange();
+    const identifiers = { emails: [], names: ["Jo Li"], other: ["A 1"] };
+
+    const recorded = await recordingAs(scenario.admin, requestOf({ kind: "erasure", identifiers }));
+
+    expect(recorded.ok).toBe(true);
+    expect(await requestRowsIn(scenario.workspaceId)).toMatchObject([{ identifiers }]);
+  });
+
   it("lands nothing for a clock started before the request arrived, and answers a failure to log rather than a word to act on", async () => {
     const scenario = await arrange();
 

@@ -24,13 +24,13 @@ import {
   ERASURE_FAMILIES,
   rederiveAfterErasure,
   runErasure,
-  suppressTheDocuments,
+  suppressInTheWorkspace,
   type ErasureLog,
   type ErasureLogLine,
   type ErasureMap,
-  type ErasureRefusal,
   type ErasureRun,
   type IdentityArm,
+  type RunErasureRefusal,
 } from "../src/erasure/index.ts";
 import { actorIdOfPerson, type Result } from "../src/kernel/index.ts";
 import { setDisplayName } from "../src/workspaces/index.ts";
@@ -46,6 +46,7 @@ import {
   seedingWith,
   until,
   whileActsWaitAt,
+  whileWritesAreRefused,
 } from "./suite-postgres.ts";
 import {
   doorsOf,
@@ -96,6 +97,12 @@ const SIGN_IN_IDENTITY_REMOVED =
   "A person's sign-in identity is removed from the platform by the request that ends their " +
   "last membership.";
 
+const DOCUMENTS_WITHHELD =
+  "The original files in the object store are untouched; the identifiers named in this request " +
+  "are withheld from the text of every document in this workspace, those held now and those " +
+  "bound later, each time a document is indexed; and the documents found above are indexed " +
+  "again now.";
+
 // Every run in the file logs here, so a case reads back the lines of its own request alone.
 const operatorLines: ErasureLogLine[] = [];
 
@@ -112,7 +119,7 @@ const runningTheRoutine = (
   scenario: Scenario,
   subjectRequestId: string,
   at: Date = LOCKED_AT,
-): Promise<Result<ErasureRun, ErasureRefusal | Error>> =>
+): Promise<Result<ErasureRun, RunErasureRefusal | Error>> =>
   runErasure(
     ERASURE,
     {
@@ -637,18 +644,23 @@ describe("the report", () => {
     );
   });
 
-  it("says the object store is untouched and that no export is recalled, because none has been issued", async () => {
+  it("says that no export is recalled, because none has been issued", async () => {
     const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
 
     const done = await completing(scenario, subjectRequestId);
 
     expect(done.report).toContain(
-      "The object store is untouched: a company document that mentions a person is suppressed " +
-        "when it is next reprocessed, never deleted.",
-    );
-    expect(done.report).toContain(
       "Exports already issued are not recalled. None have been issued.",
     );
+  });
+
+  it("says in fixed words on every report, whichever arm ran, that the original files are untouched and the identifiers are withheld from every document of the workspace, now and later", async () => {
+    expect(await armsWhoseReportSays(DOCUMENTS_WITHHELD)).toEqual([
+      "last-membership",
+      "membership-ended",
+      "no-person",
+    ]);
+    expect(await armsWhoseReportSays("The object store is untouched")).toEqual([]);
   });
 
   it("says invitations are deleted wherever they were sent on every report, whichever arm ran, so the sentence tells nobody which one did", async () => {
@@ -1301,11 +1313,10 @@ const suppressionsIn = async (workspaceId: string) => {
   const read = await db().pool.query<{
     workspace_id: string;
     erasure_request_id: string;
-    document_id: string;
     identifiers: Record<string, readonly string[]>;
   }>(
-    `SELECT workspace_id, erasure_request_id, document_id, identifiers
-       FROM suppression WHERE workspace_id = $1 ORDER BY document_id`,
+    `SELECT workspace_id, erasure_request_id, identifiers
+       FROM suppression WHERE workspace_id = $1 ORDER BY erasure_request_id`,
     [workspaceId],
   );
   return read.rows;
@@ -1401,106 +1412,153 @@ const rederivingOver = (
     completedAt,
   });
 
-const anErasureOverOneDocument = async () => {
+const suppressingAs = (
+  scenario: Scenario,
+  input: Omit<Parameters<typeof suppressInTheWorkspace>[2], "workspaceId">,
+) =>
+  withScope(ERASURE, scenario.postgres, scenario.workspaceId, (tx) =>
+    suppressInTheWorkspace(ERASURE, tx, { ...input, workspaceId: scenario.workspaceId }),
+  );
+
+const aMemberAskingUnder = async (asked: (signsInWith: string) => string) => {
   const scenario = await arrange();
-  const erasure = await anOpenErasure(scenario.workspaceId);
-  const binding = await bindingIn(scenario.workspaceId);
-  const named = await documentIn(scenario.workspaceId, binding.id);
-  return { scenario, erasure, binding, named };
+  const signsInWith = addressOf("priya");
+  const person = await memberOf(db().pool, scenario.workspaceId, signsInWith);
+  const email = asked(signsInWith);
+  const subjectRequestId = await erasureRequestAbout(scenario.workspaceId, person.id, email);
+  return { scenario, signsInWith, email, subjectRequestId };
 };
 
-describe("the suppression written for every document the map found", () => {
-  it("writes one row per document, keyed by workspace, erasure request and document, carrying the request's set", async () => {
-    const { scenario, erasure, binding, named } = await anErasureOverOneDocument();
-    const alsoNamed = await documentIn(scenario.workspaceId, binding.id);
+const aHomeAddress = (): string => addressOf("priya-home");
 
-    const unnamed = await documentIn(scenario.workspaceId, binding.id);
+const theRowHoldingTheAddressAlone = (done: ErasureRun, email: string) => [
+  {
+    workspace_id: done.workspaceId,
+    erasure_request_id: done.erasureRequestId,
+    identifiers: { emails: [email], names: [], other: [] },
+  },
+];
 
-    const written = await withScope(ERASURE, scenario.postgres, scenario.workspaceId, (tx) =>
-      suppressTheDocuments(ERASURE, tx, {
-        workspaceId: scenario.workspaceId,
-        erasureRequestId: erasure.id,
-        identifiers: THE_SET,
-        map: mapNaming([named.id, alsoNamed.id]),
-      }),
-    );
+describe("the suppression the workspace keeps for the request", () => {
+  it("writes one row for the request, holding its set with the address the person signs in with here added to its emails, though the map found no document", async () => {
+    const {
+      scenario,
+      signsInWith,
+      email: atHome,
+      subjectRequestId,
+    } = await aMemberAskingUnder(aHomeAddress);
 
-    expect(written).toEqual({ suppressed: 2 });
-    const rows = await suppressionsIn(scenario.workspaceId);
-    expect(rows.map((row) => row.document_id).sort()).toEqual([named.id, alsoNamed.id].sort());
-    expect(rows.map((row) => row.document_id)).not.toContain(unnamed.id);
+    const done = await completing(scenario, subjectRequestId);
 
-    expect(rows.map((row) => [row.workspace_id, row.erasure_request_id]).sort()).toEqual(
-      [
-        [scenario.workspaceId, erasure.id],
-        [scenario.workspaceId, erasure.id],
-      ].sort(),
-    );
-    expect(rows.map((row) => row.identifiers)).toEqual([
-      { emails: ["priya@example.invalid"], names: ["Priya Anand"], other: [] },
-      { emails: ["priya@example.invalid"], names: ["Priya Anand"], other: [] },
+    expect(done.map.find((entry) => entry.family === "source-document")?.locations).toEqual([]);
+    expect(await suppressionsIn(scenario.workspaceId)).toEqual([
+      {
+        workspace_id: scenario.workspaceId,
+        erasure_request_id: done.erasureRequestId,
+        identifiers: { emails: [atHome, signsInWith], names: ["Priya Anand"], other: [] },
+      },
     ]);
   });
 
-  it("writes nothing for a set that names nobody, because a suppression that keeps nothing out is an erasure undone at the next conversion", async () => {
-    const { scenario, erasure, named } = await anErasureOverOneDocument();
+  it("writes one for a member's request recorded by their person id alone, holding the address they sign in with", async () => {
+    const { scenario, email, subjectRequestId } = await workspaceWithAnErasureRequest({
+      byIdAlone: true,
+    });
 
-    const emptied = await withScope(ERASURE, scenario.postgres, scenario.workspaceId, (tx) =>
-      suppressTheDocuments(ERASURE, tx, {
-        workspaceId: scenario.workspaceId,
-        erasureRequestId: erasure.id,
-        identifiers: { emails: [], names: [], other: [] },
-        map: mapNaming([named.id]),
-      }),
-    );
-    const absent = await withScope(ERASURE, scenario.postgres, scenario.workspaceId, (tx) =>
-      suppressTheDocuments(ERASURE, tx, {
-        workspaceId: scenario.workspaceId,
-        erasureRequestId: erasure.id,
-        identifiers: null,
-        map: mapNaming([named.id]),
-      }),
-    );
+    const done = await completing(scenario, subjectRequestId);
 
-    expect([emptied, absent]).toEqual([{ suppressed: 0 }, { suppressed: 0 }]);
+    expect(await suppressionsIn(scenario.workspaceId)).toEqual(
+      theRowHoldingTheAddressAlone(done, email),
+    );
+  });
+
+  it("keeps the address the person signs in with when a first run died writing the row, because the row is written before the identity step takes the address away", async () => {
+    const { scenario, email, subjectRequestId } = await workspaceWithAnErasureRequest({
+      byIdAlone: true,
+    });
+
+    const died = await whileWritesAreRefused(db().pool, "suppression", () =>
+      runningTheRoutine(scenario, subjectRequestId),
+    );
+    const done = await completing(scenario, subjectRequestId, RAN_AGAIN_AT);
+
+    expect(died.ok).toBe(false);
+    expect(await suppressionsIn(scenario.workspaceId)).toEqual(
+      theRowHoldingTheAddressAlone(done, email),
+    );
+  });
+
+  it("adds no second copy of a sign-in address the request already names in other capitals", async () => {
+    const {
+      scenario,
+      email: asGiven,
+      subjectRequestId,
+    } = await aMemberAskingUnder((signsInWith) => signsInWith.toUpperCase());
+
+    await completing(scenario, subjectRequestId);
+
+    expect((await suppressionsIn(scenario.workspaceId)).map((row) => row.identifiers)).toEqual([
+      { emails: [asGiven], names: ["Priya Anand"], other: [] },
+    ]);
+  });
+
+  it("writes nothing for a set that names nobody and a person with no address, because a suppression that keeps nothing out is an erasure undone at the next conversion", async () => {
+    const scenario = await arrange();
+    const erasure = await anOpenErasure(scenario.workspaceId);
+
+    const emptied = await suppressingAs(scenario, {
+      erasureRequestId: erasure.id,
+      identifiers: { emails: [], names: [], other: [] },
+      signInAddresses: [],
+    });
+    const absent = await suppressingAs(scenario, {
+      erasureRequestId: erasure.id,
+      identifiers: null,
+      signInAddresses: [],
+    });
+
+    expect([emptied, absent]).toEqual([{ identifiersWithheld: 0 }, { identifiersWithheld: 0 }]);
     expect(await suppressionsIn(scenario.workspaceId)).toEqual([]);
   });
 
-  it("leaves the rows it already wrote exactly as they are when the arm runs a second time", async () => {
-    const { scenario, erasure, named } = await anErasureOverOneDocument();
-    const input = {
-      workspaceId: scenario.workspaceId,
+  it("leaves the row it already wrote exactly as it is when the step runs a second time", async () => {
+    const scenario = await arrange();
+    const erasure = await anOpenErasure(scenario.workspaceId);
+
+    const first = await suppressingAs(scenario, {
       erasureRequestId: erasure.id,
       identifiers: THE_SET,
-      map: mapNaming([named.id]),
-    };
-
-    const first = await withScope(ERASURE, scenario.postgres, scenario.workspaceId, (tx) =>
-      suppressTheDocuments(ERASURE, tx, input),
-    );
+      signInAddresses: [],
+    });
     const before = await suppressionsIn(scenario.workspaceId);
+    const again = await suppressingAs(scenario, {
+      erasureRequestId: erasure.id,
+      identifiers: { emails: ["someone-else@example.invalid"], names: [], other: [] },
+      signInAddresses: ["another@example.invalid"],
+    });
 
-    const again = await withScope(ERASURE, scenario.postgres, scenario.workspaceId, (tx) =>
-      suppressTheDocuments(ERASURE, tx, {
-        ...input,
-        identifiers: { emails: ["someone-else@example.invalid"], names: [], other: [] },
-      }),
-    );
-
-    expect([first, again]).toEqual([{ suppressed: 1 }, { suppressed: 1 }]);
+    expect([first, again]).toEqual([{ identifiersWithheld: 2 }, { identifiersWithheld: 2 }]);
     expect(await suppressionsIn(scenario.workspaceId)).toEqual(before);
   });
 
-  it("writes none through the routine today, and the report says the documents arm found none", async () => {
-    const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
-
+  it("gives the documents found, the bindings re-indexed now and the identifiers withheld on the report's documents line, naming none of them", async () => {
+    const {
+      scenario,
+      signsInWith,
+      email: atHome,
+      subjectRequestId,
+    } = await aMemberAskingUnder(aHomeAddress);
     const binding = await bindingIn(scenario.workspaceId);
     await documentIn(scenario.workspaceId, binding.id);
 
     const done = await completing(scenario, subjectRequestId);
 
-    expect(await suppressionsIn(scenario.workspaceId)).toEqual([]);
-    expect(done.report).toContain("source-document: bindings 0, found 0, suppressed 0");
+    expect(done.report).toContain(
+      "\n- source-document: bindingsReindexed 0, found 0, identifiersWithheld 3\n",
+    );
+    for (const named of [atHome, signsInWith, "Priya Anand"]) {
+      expect(done.report).not.toContain(named);
+    }
   });
 });
 
@@ -1626,7 +1684,9 @@ describe("a subject with no user row", () => {
     expect(done.report).toContain("concept-file: found 0, reindexed 0, rewritten 0");
     expect(done.report).toContain("bundle-commit: found 0, moved 0");
     expect(done.report).toContain("- identity-user: found 0, membershipsEnded 0\n");
-    expect(done.report).toContain("source-document: bindings 0, found 0, suppressed 0");
+    expect(done.report).toContain(
+      "source-document: bindingsReindexed 0, found 0, identifiersWithheld 2",
+    );
 
     const [row] = await erasureRowsIn(scenario.workspaceId);
     expect(row?.completed_at).not.toBeNull();

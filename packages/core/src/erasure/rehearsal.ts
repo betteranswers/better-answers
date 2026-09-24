@@ -282,9 +282,11 @@ export const rehearseErasure = async (
   }
   const recorded = opened.value;
   if (!recorded.ok) {
-    return err(
-      new Error(`erasure: the rehearsal's request was refused: ${String(recorded.error)}`),
-    );
+    // The word and never the sentence, which quotes the identifier it refused.
+    const refused = recorded.error;
+    const word =
+      typeof refused === "string" || refused instanceof Error ? String(refused) : refused.word;
+    return err(new Error(`erasure: the rehearsal's request was refused: ${word}`));
   }
   const subjectRequestId = recorded.value.requestId;
 

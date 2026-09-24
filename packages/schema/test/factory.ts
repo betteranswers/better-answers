@@ -762,13 +762,11 @@ export const testData = (client: pg.PoolClient): TestData => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const erasureRequestId =
       overrides.erasureRequestId ?? (await erasureRequest({ workspaceId })).id;
-    const documentId = overrides.documentId ?? (await sourceDocument({ workspaceId })).id;
     return insertRow(client, "suppression", {
       identifiers: { emails: ["subject@example.invalid"], names: [], other: [] },
       ...overrides,
       workspaceId,
       erasureRequestId,
-      documentId,
     });
   };
 

@@ -1,4 +1,8 @@
-import { boundarySchemas } from "@better-answers/schema";
+import {
+  boundarySchemas,
+  SUBJECT_IDENTIFIER_FLOOR,
+  SUBJECT_NAME_WORDS_FLOOR,
+} from "@better-answers/schema";
 import type { z } from "zod";
 
 import { act, declareActs, record, type DetailOf } from "../audit/index.ts";
@@ -13,6 +17,7 @@ import {
   type UserPrincipal,
 } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
+import { IDENTIFIER_TOO_BROAD, type ErasureRefusal } from "./vocabulary.ts";
 
 const SUBJECT_REQUEST_ACTS = declareActs("people", {
   received: act("people.subject_request.received", {
@@ -43,7 +48,17 @@ export type SubjectRequestRecorded = {
   readonly dueAt: Date;
 };
 
-export type RecordSubjectRequestRefusal = RoleRefusal | "malformed" | Error;
+type IdentifierTooBroad = {
+  readonly word: ErasureRefusal<"identifier-too-broad">;
+
+  readonly said: string;
+};
+
+export type RecordSubjectRequestRefusal =
+  | RoleRefusal
+  | ErasureRefusal<"malformed">
+  | IdentifierTooBroad
+  | Error;
 
 export type ReadSubjectRequestRefusal = RoleRefusal | "malformed" | "no-such-request" | Error;
 
@@ -69,8 +84,43 @@ export const dueDateOf = (clockStartedAt: Date): Date => monthsOn(clockStartedAt
 export const deadlineOf = (request: Pick<SubjectRequest, "dueAt" | "extendedTo">): Date =>
   request.extendedTo ?? request.dueAt;
 
-const identifierCountOf = (identifiers: SubjectIdentifiers): number =>
+export const identifierCountOf = (identifiers: SubjectIdentifiers): number =>
   Object.values(identifiers).reduce((total, named) => total + named.length, 0);
+
+// Counted as the seam matches: case-folded, each run of whitespace one space.
+const normalised = (identifier: string): string =>
+  identifier
+    .split(/\s+/u)
+    .filter((part) => part !== "")
+    .join(" ")
+    .toLowerCase();
+
+const tooBroadIn = (identifiers: SubjectIdentifiers): IdentifierTooBroad | undefined => {
+  const short = [...identifiers.emails, ...identifiers.names, ...identifiers.other].find(
+    (identifier) => Array.from(normalised(identifier)).length < SUBJECT_IDENTIFIER_FLOOR,
+  );
+  if (short !== undefined) {
+    return {
+      word: IDENTIFIER_TOO_BROAD,
+      said:
+        `The identifier "${short}" is too broad to withhold: one under ` +
+        `${SUBJECT_IDENTIFIER_FLOOR} characters would withhold those characters in every ` +
+        "document of the workspace.",
+    };
+  }
+  const oneWord = identifiers.names.find(
+    (name) => normalised(name).split(" ").length < SUBJECT_NAME_WORDS_FLOOR,
+  );
+  if (oneWord !== undefined) {
+    return {
+      word: IDENTIFIER_TOO_BROAD,
+      said:
+        `The name "${oneWord}" is too broad to withhold: a name of one word would withhold ` +
+        "that word in every document of the workspace.",
+    };
+  }
+  return undefined;
+};
 
 export const recordSubjectRequest = async (
   principal: UserPrincipal,
@@ -96,6 +146,8 @@ export const recordSubjectRequest = async (
   });
   if (!row.success) return err("malformed");
   const { id: requestId, dueAt } = row.data;
+  const tooBroad = row.data.identifiers === null ? undefined : tooBroadIn(row.data.identifiers);
+  if (tooBroad !== undefined) return err(tooBroad);
 
   const written = await attempt(() =>
     tx.query(

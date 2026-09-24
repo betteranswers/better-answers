@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0055_the-identity-set-ledger"
+MIGRATION_ID = "0056_the-workspace-suppression"
 
-MIGRATION_WHEN = 1790270219455
+MIGRATION_WHEN = 1790271939666
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -504,7 +504,6 @@ TABLES: dict[str, dict[str, str]] = {
     "public.suppression": {
         "workspace_id": "text NOT NULL",
         "erasure_request_id": "text NOT NULL",
-        "document_id": "text NOT NULL",
         "identifiers": "jsonb NOT NULL",
     },
     "public.sweep_pass": {

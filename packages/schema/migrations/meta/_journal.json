@@ -393,6 +393,13 @@
       "when": 1790270219455,
       "tag": "0055_the-identity-set-ledger",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1790271939666,
+      "tag": "0056_the-workspace-suppression",
+      "breakpoints": true
     }
   ]
 }

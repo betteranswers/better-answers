@@ -633,7 +633,6 @@ export const erasureRequestUpdate = createUpdateSchema(erasureRequest, erasureRe
 const suppressionRefinements = {
   workspaceId,
   erasureRequestId: (schema: z.ZodString) => schema.regex(ULID),
-  documentId: (schema: z.ZodString) => schema.trim().min(1),
   identifiers: (schema: z.ZodType) => schema.pipe(subjectIdentifiers),
 };
 

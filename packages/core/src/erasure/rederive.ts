@@ -4,10 +4,15 @@ import { normalizeError, type PlatformPrincipal, type WorkspaceId } from "../ker
 import { enqueueJob, WIPE_REASON, type RebuildReason } from "../runs/index.ts";
 import { BINDING_ID, reprocessBinding, type BindingId } from "../sources/index.ts";
 import { withScope, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
-import type { ErasureMap } from "./map.ts";
-import { documentsTheMapFound } from "./suppressions.ts";
+import type { ErasureFamily, ErasureMap } from "./map.ts";
 
 const ERASURE_REASON: RebuildReason = "erasure";
+
+const SOURCE_DOCUMENT: ErasureFamily = "source-document";
+
+const documentsTheMapFound = (map: ErasureMap): readonly string[] => [
+  ...new Set(map.find((entry) => entry.family === SOURCE_DOCUMENT)?.locations ?? []),
+];
 
 export type Rederived = {
   readonly rebuildJobId: string | null;

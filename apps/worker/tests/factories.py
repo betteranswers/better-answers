@@ -152,7 +152,6 @@ def seed_suppression(
     cursor: Cursor[Any],
     *,
     workspace_id: str,
-    document_id: str,
     identifiers: dict[str, list[str]] | None = None,
 ) -> dict[str, Any]:
     subject_request_id = ulid()
@@ -179,12 +178,11 @@ def seed_suppression(
         (workspace_id, erasure_request_id, subject_request_id, ulid()),
     )
     cursor.execute(
-        "INSERT INTO suppression (workspace_id, erasure_request_id, document_id,"
-        " identifiers) VALUES (%s, %s, %s, %s::jsonb) RETURNING *",
+        "INSERT INTO suppression (workspace_id, erasure_request_id, identifiers)"
+        " VALUES (%s, %s, %s::jsonb) RETURNING *",
         (
             workspace_id,
             erasure_request_id,
-            document_id,
             json.dumps(
                 {
                     "emails": ["priya.raman@example.test"],

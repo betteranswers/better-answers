@@ -377,7 +377,6 @@ describe("one uploaded document, read back through both tiers", () => {
       await seededBy(db(), (seed) =>
         seed.suppression({
           workspaceId: scenario.workspaceId,
-          documentId: bound.documentId,
           identifiers: { emails: [], names: [], other: [THE_SPAN_AS_FOUND] },
         }),
       );

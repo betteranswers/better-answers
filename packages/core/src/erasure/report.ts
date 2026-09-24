@@ -55,9 +55,11 @@ const INVITATIONS_WHEREVER_SENT =
   "by the request that ends their last membership; the invitation line above counts this " +
   "workspace's alone.";
 
-const OBJECT_STORE_UNTOUCHED =
-  "The object store is untouched: a company document that mentions a person is suppressed " +
-  "when it is next reprocessed, never deleted.";
+const DOCUMENTS_WITHHELD =
+  "The original files in the object store are untouched; the identifiers named in this request " +
+  "are withheld from the text of every document in this workspace, those held now and those " +
+  "bound later, each time a document is indexed; and the documents found above are indexed " +
+  "again now.";
 
 const EXPORTS_NOT_RECALLED = "Exports already issued are not recalled. None have been issued.";
 
@@ -97,7 +99,7 @@ export const erasureReportOf = (input: ErasureReportInput): string => {
     "",
     INVITATIONS_WHEREVER_SENT,
     "",
-    OBJECT_STORE_UNTOUCHED,
+    DOCUMENTS_WITHHELD,
     "",
     EXPORTS_NOT_RECALLED,
     "",
