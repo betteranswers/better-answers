@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 import { defineConfig, devices } from "@playwright/test";
 
 const PORT = 3100;
@@ -12,7 +14,10 @@ export default defineConfig({
   use: { baseURL, trace: "on-first-retry" },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: `pnpm --filter @better-answers/api run serve:e2e ${PORT}`,
+    // Not `pnpm run`: pnpm 11.27 gives a script its own process group, which Playwright's
+    // kill misses, and the orphan's open pipe hangs the run.
+    command: `node tests/serve.ts ${PORT}`,
+    cwd: fileURLToPath(new URL("../api", import.meta.url)),
 
     url: `${baseURL}/health`,
 
