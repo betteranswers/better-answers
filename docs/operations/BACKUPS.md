@@ -74,7 +74,7 @@ Two boxes of 4 vCPU · 4 GB · 120 GB NVMe. VPC 1 runs all of production — the
 | Failure | Caught by |
 | --- | --- |
 | `/data/backup/staging` full | the job fails before upload → missed ping; the 42 disk signal at 80 % |
-| `pg_dump` / server version skew | the backup image is built FROM the database image — same major, always |
+| `pg_dump` / server version skew | the backup image installs PGDG's client of the database image's major, which a test on the Dockerfile and the image probe's `pg_dump --version` both hold |
 | bucket credential expired or rotated | `rclone` fails → missed ping |
 | partial upload | `verify` compares sizes against the bucket before the row and the ping |
 | lifecycle misconfigured | the drill's step 9 lists copies per tier against this matrix |

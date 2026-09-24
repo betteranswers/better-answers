@@ -12,6 +12,11 @@ const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 const read = (relative: string): string =>
   readFileSync(path.join(repositoryRoot, relative), "utf8");
 
+const liveLines = (relative: string): readonly string[] =>
+  read(relative)
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("#"));
+
 const operationsDocuments = "docs/operations";
 
 // One workflow step's block, so an assertion about it cannot pass on a neighbour's text.
@@ -79,10 +84,7 @@ describe("the deploy tree (T-005)", () => {
       "deploy/platform.compose.yaml",
       "deploy/garage.toml",
     ]) {
-      const live = read(file)
-        .split("\n")
-        .filter((line) => !line.trim().startsWith("#"))
-        .join("\n");
+      const live = liveLines(file).join("\n");
       expect({ file, placeholder: live.includes("<read on the day") }).toEqual({
         file,
         placeholder: false,
@@ -90,8 +92,21 @@ describe("the deploy tree (T-005)", () => {
     }
   });
 
-  it("builds the backup image on the one pinned database image, so pg_dump never skews from the server", () => {
-    expect(read("deploy/backup.Dockerfile")).toContain(`FROM ${POSTGRES_IMAGE}`);
+  it("installs the backup image's PostgreSQL client at the database image's major, so pg_dump never skews from the server", () => {
+    const serverMajor = /-pg(\d+)-/.exec(POSTGRES_IMAGE)?.[1];
+    const clientMajors = liveLines("deploy/backup.Dockerfile")
+      .flatMap((line) => [...line.matchAll(/\bpostgresql-client-(\d+)\b/g)])
+      .map((match) => match[1]);
+
+    expect(serverMajor).toBeDefined();
+    expect(clientMajors).toEqual([serverMajor]);
+  });
+
+  it("builds the backup image from a base pinned by digest, so a rebuild cannot pick up another", () => {
+    const bases = liveLines("deploy/backup.Dockerfile").filter((line) => line.startsWith("FROM "));
+
+    expect(bases).toHaveLength(1);
+    expect(bases[0]).toMatch(/^FROM \S+:\S+@sha256:[0-9a-f]{64}$/);
   });
 
   it("runs the backup service by digest from the image build.yml pushes, not from a host build", () => {
