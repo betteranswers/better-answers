@@ -4,6 +4,8 @@ const config: KnipConfig = {
   // `uv` is installed on the machine and never by npm, so no manifest names it.
   ignoreBinaries: ["uv"],
 
+  // An export kept for the route block that wires it is tagged `@public <block>`, as in
+  // `/** @public S3 */`; knip reports no `@public` export.
   workspaces: {
     ".": {
       // A spawned binary is no edge for knip to follow.
