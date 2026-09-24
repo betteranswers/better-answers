@@ -60,6 +60,7 @@ AGENTS.md.bak
 # agent tooling installed from third parties
 .claude/skills/*
 !.claude/skills/browser-suite/
+!.claude/skills/renovate-prs/
 !.claude/skills/better-answers-design
 .agents/
 tasks/AGENTS.md

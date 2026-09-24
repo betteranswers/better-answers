@@ -356,16 +356,21 @@ describe("the skills this repository wrote (T-081)", () => {
     );
   });
 
-  it("tracks both of them, so a clone that runs no installer is still offered them", () => {
+  it("tracks all three, so a clone that runs no installer is still offered them", () => {
     const skills = tracked(".claude/skills");
 
     expect(skills).toContain(".claude/skills/better-answers-design");
     expect(skills).toContain(".claude/skills/browser-suite/SKILL.md");
+    expect(skills).toContain(".claude/skills/renovate-prs/SKILL.md");
   });
 
   it("tracks nothing else there, because the rest is third-party content (ADR 0027)", () => {
     const ours = tracked(".claude/skills").map((file) => file.split("/")[2] ?? "");
 
-    expect([...new Set(ours)].sort()).toEqual(["better-answers-design", "browser-suite"]);
+    expect([...new Set(ours)].sort()).toEqual([
+      "better-answers-design",
+      "browser-suite",
+      "renovate-prs",
+    ]);
   });
 });
