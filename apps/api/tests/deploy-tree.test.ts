@@ -159,6 +159,28 @@ describe("the deploy tree (T-005)", () => {
     expect(read(`${operationsDocuments}/RUNBOOK.md`)).toContain("restore-production.sh");
   });
 
+  it("stops the backup service before the production restore's first change and starts it only once api answers, so no dump races the restore", () => {
+    const lines = liveLines("deploy/restore-production.sh").map((line) => line.trim());
+    const linesMatching = (pattern: RegExp): readonly number[] =>
+      lines.flatMap((line, index) => (pattern.test(line) ? [index] : []));
+
+    const stopped = linesMatching(/^stores stop backup$/);
+    const started = linesMatching(/^stores start backup$/);
+    const firstChange = linesMatching(/^platform stop api\b/);
+    const smoke = linesMatching(/pnpm ops smoke\b/);
+
+    expect({ stopped: stopped.length, started: started.length }).toEqual({
+      stopped: 1,
+      started: 1,
+    });
+    expect({ beforeTheFirstChange: (stopped[0] ?? Infinity) < (firstChange[0] ?? -1) }).toEqual({
+      beforeTheFirstChange: true,
+    });
+    expect({ afterApiAnswers: (started[0] ?? -1) > (smoke[0] ?? Infinity) }).toEqual({
+      afterApiAnswers: true,
+    });
+  });
+
   it("runs the replay after the object store and the git store, and before api, in both restore scripts", () => {
     for (const file of ["deploy/restore-production.sh", "deploy/restore-drill.sh"]) {
       const script = read(file);
@@ -255,7 +277,8 @@ describe("the deploy tree (T-005)", () => {
   it("wipes staging without a graph special case: the graph is plain tables in `public` (ADR 0032)", () => {
     const drill = read("deploy/restore-drill.sh");
     expect(drill).not.toMatch(/ag_catalog|drop_graph|\bAGE\b/);
-    expect(drill).toContain("drop schema if exists public cascade");
+    expect(drill).toContain('-f "${DEPLOY_DIR}/empty-database.sql"');
+    expect(read("deploy/empty-database.sql")).not.toMatch(/ag_catalog|drop_graph|\bAGE\b/);
     expect(drill).toContain("stagingstore:");
     expect(drill).toContain("seed-synthetic.sh");
   });

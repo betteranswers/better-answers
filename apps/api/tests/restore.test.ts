@@ -13,22 +13,19 @@ import { testData } from "@better-answers/schema/testing";
 const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 const apiRoot = path.resolve(import.meta.dirname, "..");
 
-const OPENS = "# >>> replace the database";
-const CLOSES = "# <<< replace the database";
-
-const replaceStep = (): string => {
-  const script = readFileSync(path.join(repositoryRoot, "deploy/restore-production.sh"), "utf8");
-  const opened = script.split(OPENS)[1];
-  const [step, closed] = opened?.slice(opened.indexOf("\n") + 1).split(CLOSES) ?? [];
-  if (step === undefined || closed === undefined) {
-    throw new Error(
-      "deploy/restore-production.sh no longer fences the step that replaces the database",
-    );
+const fenced = (script: string, step: string): string => {
+  const text = readFileSync(path.join(repositoryRoot, script), "utf8");
+  const opened = text.split(`# >>> ${step}`)[1];
+  const [body, closed] = opened?.slice(opened.indexOf("\n") + 1).split(`# <<< ${step}`) ?? [];
+  if (body === undefined || closed === undefined) {
+    throw new Error(`${script} no longer fences the lines that ${step}`);
   }
-  return step;
+  return body;
 };
 
 const PASSWORD = "restore-in-this-suite";
+
+const CHECKOUT = "/repo";
 
 const READY_WITHIN_MS = 60_000;
 
@@ -75,9 +72,23 @@ const replacing = (database: string): Ran =>
       "dump=pg-20260924T020000Z.dump.age",
       'say() { printf "%s\\n" "$*"; }',
       'tool() { "$@"; }',
-      replaceStep(),
+      fenced("deploy/restore-production.sh", "replace the database"),
     ].join("\n"),
-    { DATABASE_URL: insideUriFor(database) },
+    { DATABASE_URL: insideUriFor(database), REPO_DIR: CHECKOUT },
+  );
+
+// The drill runs its psql and pg_restore on VPC 2's host rather than in the backup image, so no
+// `tool` stands in.
+const drilling = (database: string): Ran =>
+  inTheContainer(
+    [
+      "set -euo pipefail",
+      "WORK=/work",
+      `DEPLOY_DIR=${CHECKOUT}/deploy`,
+      fenced("deploy/restore-drill.sh", "empty the database"),
+      fenced("deploy/restore-drill.sh", "restore the database"),
+    ].join("\n"),
+    { STAGING_DATABASE_URL: insideUriFor(database) },
   );
 
 const migrating = (database: string): Ran => {
@@ -222,6 +233,7 @@ const mustSucceed = (ran: Ran): void => {
 let production: pg.Pool;
 let fresh: pg.Pool;
 let untouched: pg.Pool;
+let staging: pg.Pool;
 let atTheDump: Readonly<Record<string, number>>;
 
 beforeAll(async () => {
@@ -243,10 +255,12 @@ beforeAll(async () => {
   if (port === "")
     throw new Error(`docker published the database on no port it names: ${published}`);
   await untilItAnswers();
+  docker(["exec", container, "mkdir", "-p", CHECKOUT]);
+  docker(["cp", path.join(repositoryRoot, "deploy"), `${container}:${CHECKOUT}/deploy`]);
 
   const admin = new pg.Pool({ connectionString: uriFor("postgres"), max: 1 });
   try {
-    for (const database of ["production", "fresh", "untouched"]) {
+    for (const database of ["production", "fresh", "untouched", "staging"]) {
       await admin.query(`CREATE DATABASE ${database}`);
       mustSucceed(migrating(database));
     }
@@ -256,7 +270,8 @@ beforeAll(async () => {
   production = new pg.Pool({ connectionString: uriFor("production"), max: 2 });
   fresh = new pg.Pool({ connectionString: uriFor("fresh"), max: 2 });
   untouched = new pg.Pool({ connectionString: uriFor("untouched"), max: 2 });
-  for (const pool of [production, fresh, untouched]) await seedAWorkspace(pool);
+  staging = new pg.Pool({ connectionString: uriFor("staging"), max: 2 });
+  for (const pool of [production, fresh, untouched, staging]) await seedAWorkspace(pool);
 
   // Piped, as the backup pipes it into age: an archive written to a pipe records no offsets, so
   // restores read it whole.
@@ -271,7 +286,7 @@ beforeAll(async () => {
 }, 240_000);
 
 afterAll(async () => {
-  await Promise.all([production, fresh, untouched].map((pool) => pool.end()));
+  await Promise.all([production, fresh, untouched, staging].map((pool) => pool.end()));
   if (container !== "") docker(["rm", "--force", container]);
 });
 
@@ -362,6 +377,33 @@ describe("the production restore, over a database that already holds the schema 
 
   it("leaves row-level security and every grant as a fresh `migrate` makes them", async () => {
     const restored = await securitySurface(production);
+
+    expect(restored).toEqual(await securitySurface(fresh));
+    expect(restored).toContain("public.source_binding: row security true, forced true");
+    expect(restored).toContain(
+      "schema public, owned by pg_database_owner: USAGE to PUBLIC, granted by pg_database_owner",
+    );
+  });
+});
+
+describe("the drill's restore, over staging as the last drill left it: migrated and seeded", () => {
+  let drilled: Ran;
+  let counted: Readonly<Record<string, number>>;
+
+  beforeAll(async () => {
+    mustSucceed(inTheContainer("cp /work/whole.dump /work/pg.dump"));
+    drilled = drilling("staging");
+    counted = await rowCounts(staging);
+  }, 120_000);
+
+  it("completes, and every table holds the rows the dump holds and none of staging's own", () => {
+    expect(drilled).toEqual({ code: 0, said: "" });
+    expect(counted).toEqual(atTheDump);
+    expect(counted).toMatchObject({ "public.workspace": 1, "public.oauth_refresh_token": 1 });
+  });
+
+  it("leaves row-level security and every grant as a fresh `migrate` makes them, as the production restore does", async () => {
+    const restored = await securitySurface(staging);
 
     expect(restored).toEqual(await securitySurface(fresh));
     expect(restored).toContain("public.source_binding: row security true, forced true");
