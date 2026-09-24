@@ -240,7 +240,7 @@ Where a unit lives is decided by **minting**.
   finding that loses part of its run to another keeps its own word over the rest. How a finding
   was **written** is read off the spans: under its own placeholder where one names it, under
   another finding's where others cover every character of it, not at all otherwise.
-- **emptying a binding** — deleting a binding's derived rows in the app's transaction and
+- **emptying a binding** — deleting a binding's derived rows in the api's transaction and
   removing that binding's store in the run the same act enqueues. The two go together, whatever
   asked for them: the store is the engine's target-state tracking, so rows deleted beside a store
   left standing are re-upserted by nothing (ADR 0036). A *wipe* empties a binding, and so does a

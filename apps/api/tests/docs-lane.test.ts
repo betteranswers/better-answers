@@ -224,6 +224,11 @@ const PROSE_SUITES: readonly ProseSuite[] = [
     inTheLane: "check:docs:api",
   },
   {
+    file: "apps/api/tests/avoid-words.test.ts",
+    reads: "CONTEXT.md's _Avoid_ lines, then every tracked text file outside its carve-outs",
+    inTheLane: "check:docs:api",
+  },
+  {
     file: "apps/api/tests/deploy-tree.test.ts",
     reads:
       "the deploy tree, .github/workflows/*.yml and deploy/RELEASES.md and docs/operations/{RUNBOOK,SECRETS,coolify}.md",

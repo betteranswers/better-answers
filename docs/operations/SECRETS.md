@@ -15,7 +15,7 @@ ADR 0041 fixes the seven classes and the secrets-seam rule keeps the rule that t
 | **bootstrap** | what the platform needs to start: the envelope key (`KEK`), the auth secret, the database DSNs, the tunnel token, transactional email, the object store's root pair, the dead-man ping URLs | read **once** by the typed config module at boot; never at a call site, never from `process.env` |
 | **ingestion** | a connector's credential for one source binding | the credentials provider, decrypted per run and injected through the control plane (ADR 0005) |
 | **acting** | writing back into a connected system as the user, approval-gated | not in v0.1; the class is reserved so its scope is a boundary, not a naming convention |
-| **agent** | a share agent's binding-scoped token on `/agent/v1` | checked in the app before any body is read (ADR 0008) |
+| **agent** | a share agent's binding-scoped token on `/agent/v1` | checked in the api before any body is read (ADR 0008) |
 | **LLM provider** | a model route's API key, per workspace and purpose | the credentials provider; never logged, never in an `llm_call` row |
 | **repository** | the git store's own keys — the mirror deploy key, the per-run read path | root-only on the host, mounted read-only into the service that needs it |
 | **object store** | the bucket credentials, in three grades: **write-and-list** on the host, **read** for the drill, **admin** (delete, lifecycle, governance bypass) never on any box; and the backup **`age` identity** — public half in the stores resource's env, private half in escrow **and resident on VPC 2** (§ The backup identity) | the write-and-list pair from env; the admin credential from escrow only; the identity from a root-only file on VPC 2 |

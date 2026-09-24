@@ -141,7 +141,7 @@ jobs:
             echo "- worker \`${WORKER_DIGEST}\`"
             echo "- rode on: ${rode}"
             echo ""
-            echo "The app refuses to start unless PUBLIC_URL, AGENT_HOSTNAME and APEX_HOSTNAME are set on the api resource and all three hostnames differ (ADR 0034)."
+            echo "The api refuses to start unless PUBLIC_URL, AGENT_HOSTNAME and APEX_HOSTNAME are set on the api resource and all three hostnames differ (ADR 0034)."
           } >> "$GITHUB_STEP_SUMMARY"
       - name: post-deploy smoke against production (the release's last step)
         run: |

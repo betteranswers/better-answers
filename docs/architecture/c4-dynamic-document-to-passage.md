@@ -9,7 +9,7 @@ C4Dynamic
   Person(admin, "Admin", "Binds, reviews, publishes on the Sources screen")
   Container(trpc, "tRPC mutation", "splitLink on isNonJsonSerializable", "The upload streams to the object door; no second HTTP route")
 
-  Container_Boundary(app, "api and packages/core") {
+  Container_Boundary(api, "api and packages/core") {
     Component(sources, "sources slice", "bind, review, publish, passageAt", "Owns the binding, its gates, the chunk's read")
     Component(runs, "runs slice", "enqueueJobIn", "The index job in the bind act's own transaction")
     Component(mcp, "MCP surface", "find, open", "The same predicate and audit as the web")
