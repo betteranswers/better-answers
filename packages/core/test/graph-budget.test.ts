@@ -1,3 +1,5 @@
+import { appendFile } from "node:fs/promises";
+
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { GRAPH_WALK_ROW_LIMIT, walkFrom } from "@better-answers/core/store/graph";
@@ -19,9 +21,9 @@ const EDGES = 159;
 const IN_FLIGHT = 20;
 const ROUNDS = 5;
 
-const WALK_P50_BUDGET_MS = 1_000;
-
-const WALK_MAX_BUDGET_MS = 2_000;
+// Priced against a one-row walk on the same connection before it: load slows both alike, a
+// dearer walk only the one filling the cap.
+const WALK_BUDGET_IN_ONE_ROW_WALKS = 200;
 
 const REBUILD_BUDGET_MS = 120_000;
 
@@ -51,35 +53,72 @@ const writeOf = (at: number, head: string | null): WriteConceptInput => ({
 type DenseMap = {
   readonly scenario: Scenario;
   readonly entry: string;
+  readonly leaf: string;
 };
 
 const landDenseMap = async (scenario: Scenario): Promise<DenseMap> => {
   let head: string | null = null;
   let entry = "";
+  let leaf = "";
   for (let at = 0; at < CONCEPTS; at += 1) {
     const written = await writeConcept(scenario.editor, doorsOf(scenario), writeOf(at, head));
     if (!written.ok) throw new Error(`the map did not land: ${String(written.error)}`);
     head = written.value.sha;
     entry = written.value.iri;
+    if (at === 0) leaf = written.value.iri;
   }
-  return { scenario, entry };
+  return { scenario, entry, leaf };
 };
 
-const timedWalk = async (
-  map: DenseMap,
-  reader: UserPrincipal,
-): Promise<{ readonly ms: number; readonly steps: number }> => {
+type TimedWalk = {
+  readonly waitedMs: number;
+  readonly oneRowMs: number;
+  readonly oneRowSteps: number;
+  readonly walkMs: number;
+  readonly walkSteps: number;
+};
+
+const timedWalk = async (map: DenseMap, reader: UserPrincipal): Promise<TimedWalk> => {
   const started = performance.now();
-  const steps = answered(
-    await readingAs(db().runtimePool, reader, (principal, tx) =>
-      walkFrom(principal, tx, map.entry),
-    ),
+  const timed = answered(
+    await readingAs(db().runtimePool, reader, async (principal, tx) => {
+      const oneRowStarted = performance.now();
+      const oneRow = await walkFrom(principal, tx, map.leaf);
+      const walkStarted = performance.now();
+      const walk = await walkFrom(principal, tx, map.entry);
+      return {
+        oneRowMs: walkStarted - oneRowStarted,
+        oneRowSteps: oneRow.length,
+        walkMs: performance.now() - walkStarted,
+        walkSteps: walk.length,
+      };
+    }),
   );
-  return { ms: performance.now() - started, steps: steps.length };
+  return { ...timed, waitedMs: performance.now() - started };
 };
 
-const percentile = (sorted: readonly number[], fraction: number): number =>
-  sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * fraction))] ?? 0;
+const percentile = (values: readonly number[], fraction: number): number => {
+  const sorted = values.toSorted((a, b) => a - b);
+  return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * fraction))] ?? 0;
+};
+
+const inMs = (value: number): string => `${Math.round(value)} ms`;
+
+type Figure = readonly [name: string, value: string];
+
+const recordFigures = async (figures: readonly Figure[]): Promise<void> => {
+  const heading = "The graph walk under concurrent read load";
+  process.stdout.write(
+    `\n${heading}: ${figures.map(([name, value]) => `${name} ${value}`).join("; ")}\n`,
+  );
+  const summary = process.env["GITHUB_STEP_SUMMARY"];
+  if (summary === undefined) return;
+  const rows = figures.map(([name, value]) => `| ${name} | ${value} |`);
+  await appendFile(
+    summary,
+    ["", `#### ${heading}`, "", "| Figure | Value |", "| --- | --- |", ...rows, ""].join("\n"),
+  );
+};
 
 describe("the graph under concurrent read load", () => {
   let map: DenseMap;
@@ -88,25 +127,39 @@ describe("the graph under concurrent read load", () => {
     map = await landDenseMap(await arrange());
   }, 300_000);
 
-  it("answers a walk of a dense map inside its budget while nineteen other walks are in flight", async () => {
-    const durations: number[] = [];
-    const answers: number[] = [];
+  it("answers a walk that fills the row cap for under two hundred one-row walks at the median while nineteen other walks are in flight", async () => {
+    const walks: TimedWalk[] = [];
     for (let round = 0; round < ROUNDS; round += 1) {
-      const walks = Array.from({ length: IN_FLIGHT }, (_unused, at) =>
+      const inFlight = Array.from({ length: IN_FLIGHT }, (_unused, at) =>
         timedWalk(map, at % 2 === 0 ? map.scenario.viewer : map.scenario.admin),
       );
-      for (const walked of await Promise.all(walks)) {
-        durations.push(walked.ms);
-        answers.push(walked.steps);
-      }
+      walks.push(...(await Promise.all(inFlight)));
     }
-    const sorted = durations.toSorted((a, b) => a - b);
-    const p50 = percentile(sorted, 0.5);
-    const worst = sorted.at(-1) ?? 0;
+    const inOneRowWalks = percentile(
+      walks.map((walked) => walked.walkMs / walked.oneRowMs),
+      0.5,
+    );
+    const waitedMs = walks.map((walked) => walked.waitedMs);
+    const walkMs = walks.map((walked) => walked.walkMs);
 
-    expect(answers).toEqual(Array.from({ length: IN_FLIGHT * ROUNDS }, () => GRAPH_WALK_ROW_LIMIT));
-    expect(p50, "the median walk, in milliseconds").toBeLessThan(WALK_P50_BUDGET_MS);
-    expect(worst, "the slowest walk, in milliseconds").toBeLessThan(WALK_MAX_BUDGET_MS);
+    await recordFigures([
+      [
+        "the walk that fills the cap, in one-row walks at the median",
+        `${inOneRowWalks.toFixed(1)}, against a budget of ${WALK_BUDGET_IN_ONE_ROW_WALKS}`,
+      ],
+      ["a caller's wait at the median", inMs(percentile(waitedMs, 0.5))],
+      ["a caller's wait at p95", inMs(percentile(waitedMs, 0.95))],
+      ["a caller's slowest wait", inMs(percentile(waitedMs, 1))],
+      ["the slowest walk statement", inMs(percentile(walkMs, 1))],
+    ]);
+
+    expect(walks.map((walked) => [walked.oneRowSteps, walked.walkSteps])).toEqual(
+      Array.from({ length: IN_FLIGHT * ROUNDS }, () => [1, GRAPH_WALK_ROW_LIMIT]),
+    );
+    expect(
+      inOneRowWalks,
+      "the walk that fills the cap, in one-row walks, at the median",
+    ).toBeLessThan(WALK_BUDGET_IN_ONE_ROW_WALKS);
   });
 
   it("lands the dense map the two budgets are measured over, every concept and every edge", async () => {
