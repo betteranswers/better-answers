@@ -21,7 +21,7 @@ git push origin "refs/tags/${tag}"
 
 **What blank inputs promote** (`T-211`, 20/09/2026, and still true): the image of `main`'s head commit, by its `sha-<short>` tag — every commit gets one, and there is no `:main` tag. A head with no image is refused by name and nothing older is promoted in its place. A tag moves no branch, so a release now leaves `main`'s head where it found it, with the image it just promoted: a second release with nothing merged between promotes that same head again, where the row used to leave a commit no build ran for.
 
-Standing release note, true of every row and every tag since: the app refuses to start unless `PUBLIC_URL`, `AGENT_HOSTNAME` and `APEX_HOSTNAME` are set on the `api` resource and all three hostnames differ, the derived `app.` one included (ADR 0034). The `worker` service is behind the `pipeline` compose profile until `T-006`; its digest is set so the file interpolates, and nothing runs it.
+Standing release note, true of every row and every tag since: the api refuses to start unless `PUBLIC_URL`, `AGENT_HOSTNAME` and `APEX_HOSTNAME` are set on the `api` resource and all three hostnames differ, the derived `app.` one included (ADR 0034). The `worker` service is behind the `pipeline` compose profile until `T-006`; its digest is set so the file interpolates, and nothing runs it.
 
 | When (UTC) | By | api | worker | Rode on |
 | --- | --- | --- | --- | --- |

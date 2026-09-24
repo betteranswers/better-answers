@@ -219,7 +219,7 @@ The structured detail names a record by its id and a role by its word — Admin,
 
 ### [AUDIT6] Keep the ledger append-only in the database
 
-The migration that creates `audit_event` revokes `UPDATE` and `DELETE` from the app's role and grants the worker's role nothing, each refusal tested beside the path it serves.
+The migration that creates `audit_event` revokes `UPDATE` and `DELETE` from the api's role and grants the worker's role nothing, each refusal tested beside the path it serves.
 
 ### [AUDIT7] Mint the row's id before the write
 

@@ -16,12 +16,12 @@ C4Container
     Container(web, "Single-page app", "Vite, React, TanStack Query", "Control Centre's six screens, sign-in, the workspace picker; talks tRPC only, plus the Better Auth client for sign-in")
     Container(api, "api", "Hono on Node 24", "The one TypeScript deployable: tRPC, the MCP surface, the authorization server, the SPA's static build, pnpm ops, the reconciler tick; logic from packages/core")
     Container(worker, "worker", "Python 3.13, uv, psycopg, dulwich", "The work loop claiming jobs by kind, the nightly parser audit, the full graph rebuild; S1 makes it a cocoindex host")
-    Container(migrate, "migrate", "Drizzle over one journal", "One-shot on every release, ahead of api: every migration the app owns, in index and the graph too")
+    Container(migrate, "migrate", "Drizzle over one journal", "One-shot on every release, ahead of api: every migration the api owns, in index and the graph too")
     Container(backup, "backup", "cron, pg_dump, age, rclone, git", "Hourly to monthly encrypted dumps, the nightly object-store mirror, one git bundle per repository and the push mirror")
 
     ContainerDb(postgres, "Postgres", "Postgres 18 with pgvector, RLS default-deny", "The identity set, every tenant table, the concept index, index.chunk, the graph tables, the queue, the ledger")
     ContainerDb(objects, "Object store", "Garage, S3 API, path-style", "Source documents as landed, under a per-workspace prefix")
-    ContainerDb(git, "Git store", "Bare repositories under GIT_STORE_DIR", "One repository per workspace holding the bundle; the app the only committer, one commit per act")
+    ContainerDb(git, "Git store", "Bare repositories under GIT_STORE_DIR", "One repository per workspace holding the bundle; the api the only committer, one commit per act")
     ContainerDb(lmdb, "Per-binding LMDB", "cocoindex Environment", "The worker's memo and target state; personal data on disk; never backed up, wiped and reprocessed; planned S1")
   }
 
@@ -55,9 +55,9 @@ C4Container
 ## What the diagram claims
 
 - **No arrow between api and worker.** A job is a row the api's act inserts in its own transaction and the worker claims with `claim_job` under `SKIP LOCKED`, keeping a lease alive by heartbeat; the reaper and poison come with the row (ADR 0005; the `queue` agreement). S1 adds the kinds a tier may claim — `claim_job(p_worker_id, p_lease, p_kinds text[])` — so S6's question-set job is claimed by the api and never by the worker (T-113).
-- **Postgres is four things in one resource.** The identity set Better Auth owns, isolated by key not scope; the tenant tables under `FORCE ROW LEVEL SECURITY` with `current_workspace_id()` as the one policy seam; the graph as plain tables under the same policy (ADR 0032, no AGE, no per-workspace role); and `index.chunk`, list-partitioned per workspace, the one table both tiers write into — the worker its rows, the app its DDL (ADR 0007).
+- **Postgres is four things in one resource.** The identity set Better Auth owns, isolated by key not scope; the tenant tables under `FORCE ROW LEVEL SECURITY` with `current_workspace_id()` as the one policy seam; the graph as plain tables under the same policy (ADR 0032, no AGE, no per-workspace role); and `index.chunk`, list-partitioned per workspace, the one table both tiers write into — the worker its rows, the api its DDL (ADR 0007).
 - **The git store is written by one process.** The api commits through the git binary under a per-repository lock held from the precondition through the Postgres COMMIT, so `bundle_commit` is a prefix of git history (ADR 0012). The worker mounts the same directory read-only and reads at the commit on the run row (ADR 0024).
-- **The per-binding LMDB is a store the contract names** (ADR 0005, 2026-08-27). It holds memoised output, which is personal data; it is disposable — a wipe is paired with deleting the binding's chunk rows in the app's transaction, because the LMDB is the engine's record of what to delete (ADR 0036, amended 2026-09-10; probe 4).
+- **The per-binding LMDB is a store the contract names** (ADR 0005, 2026-08-27). It holds memoised output, which is personal data; it is disposable — a wipe is paired with deleting the binding's chunk rows in the api's transaction, because the LMDB is the engine's record of what to delete (ADR 0036, amended 2026-09-10; probe 4).
 - **The web talks tRPC for everything with a shape.** A field, an output and a refusal word cross compiler-checked through `AppRouter` (ADR 0006, amended 2026-09-22). Beside it sit the Better Auth client — session, sign-in, sign-out, workspace, OAuth, live today — and bytes: the upload is a tRPC mutation over `octetInputParser` with the descriptor beside the bytes (S1), and a download, when a block lands one, is a route beside tRPC on the same origin, opened by that block's ADR.
 
 ## The tier contract

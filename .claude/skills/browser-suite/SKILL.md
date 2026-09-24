@@ -18,7 +18,7 @@ Playwright as a **process**, not
 imported. `apps/web` imports nothing from `apps/api` at runtime, so launching it is the only way
 the browser suite can reach the real server: `apps/api/tests/serve.ts` takes a port as its one
 argument and listens on it, with the harness's control paths
-(`apps/api/tests/harness-control.ts`) mounted in front of the app and served nowhere in
+(`apps/api/tests/harness-control.ts`) mounted in front of the api and served nowhere in
 `apps/api/src`.
 
 One origin carries the SPA, sign-in, consent and `/oauth2/*`, which is why the consent
@@ -102,7 +102,7 @@ Four more helpers in the same module drive the browser rather than the harness:
 | `signOutFromTheShell` | Opens the top bar's menu, then signs out, because sign-out is one disclosure in |
 | `skipLinkReachesTheScreen` | Tab, the skip link has focus, Enter, `main` has focus — where a shell spec's keyboard traversal starts |
 
-The code is read from that capture and from nowhere else: the app's logger is forbidden from ever
+The code is read from that capture and from nowhere else: the api's logger is forbidden from ever
 holding one.
 
 ## Writing a spec
@@ -118,7 +118,7 @@ holding one.
 - **Give an assertion a message wherever the failure would not name itself.** The harness's own
   `${path} answered ${status}` is the pattern, and so are the axe assertion and the gate's refusal
   in `apps/web/e2e/browser.ts`.
-- **Read the app's own constants rather than copying them.** `apps/web/e2e/routes.spec.ts` imports
+- **Read the SPA's own constants rather than copying them.** `apps/web/e2e/routes.spec.ts` imports
   `@/shared/screens.ts`, so the list of screens is written once.
 - **A latency budget is measured, annotated and asserted** — `test.info().annotations.push(…)`
   beside the comparison, so a run that passes still says how close it came. A list's second is

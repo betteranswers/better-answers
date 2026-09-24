@@ -40,7 +40,7 @@ The three dates are computed **from the timestamp of the last dump before the re
 
 ## Recovery order (ADR 0007)
 
-0. The stores, in this order and all of them before the app is started: Postgres from the latest dump (or the one the incident names), then the object store from the mirror bucket, then the git store from the nightly bundles.
+0. The stores, in this order and all of them before the api is started: Postgres from the latest dump (or the one the incident names), then the object store from the mirror bucket, then the git store from the nightly bundles.
 1. **Replay every erasure completed after the dump** — after the three stores are back and before `api` is up.
 2. Reconcile the bundle commit watermark against the git store's heads — the head-check reconciler.
 3. Resync the graph from git and records (the estate rebuild).

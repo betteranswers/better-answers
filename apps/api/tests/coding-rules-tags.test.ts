@@ -1,37 +1,14 @@
-import { execFileSync } from "node:child_process";
-import { lstatSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
+import { readUnder, repositoryRoot, treeFiles } from "./tree-walk.ts";
 
 const RULE_TAG = /\[(?<tag>[A-Z][A-Z0-9]*[A-Z][0-9]+)\]/g;
 const RULE_HEADING = /^#{2,3}\s+\[(?<tag>[A-Z][A-Z0-9]*[A-Z][0-9]+)\]/gm;
 
-const NOT_TEXT = /\.(png|jpe?g|gif|webp|ico|woff2?|ttf|otf|pdf|zip|gz|sqlite)$/i;
-const OUTSIDE = [".scratch/", ".cubic/"];
-
-// Reading a tracked symlink would follow it to a directory and throw; whatever it points at
-// is walked on its own account.
-const isLink = (file: string): boolean =>
-  lstatSync(path.join(repositoryRoot, file)).isSymbolicLink();
-
-// `--others --exclude-standard` sees a new file before it is added, so the walk reads the
-// tree a commit would carry.
-const treeFiles = (): readonly string[] =>
-  execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], {
-    cwd: repositoryRoot,
-    encoding: "utf8",
-    maxBuffer: 64 * 1024 * 1024,
-  })
-    .split("\0")
-    .filter((file) => file.length > 0)
-    .filter((file) => !OUTSIDE.some((prefix) => file.startsWith(prefix)))
-    .filter((file) => !NOT_TEXT.test(file))
-    .filter((file) => !isLink(file));
-
-const read = (file: string): string => readFileSync(path.join(repositoryRoot, file), "utf8");
+const read = (file: string): string => readUnder(repositoryRoot, file);
 
 const isRulesFile = (file: string): boolean => path.basename(file) === "CODING_RULES.md";
 

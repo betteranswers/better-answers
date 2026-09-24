@@ -16,7 +16,7 @@
     "check:web": "pnpm --no-bail --if-present --filter @better-answers/web run check",
     "check:worker": "cd apps/worker && uv run --frozen check",
     "check:docs": "node scripts/check.mjs format:check check:docs:api check:docs:core check:docs:web",
-    "check:docs:api": "pnpm --filter @better-answers/api exec vitest run tests/adr-index.test.ts tests/coding-rules-form.test.ts tests/coding-rules-tags.test.ts tests/deploy-tree.test.ts tests/docs-lane.test.ts tests/provision-skills.test.ts",
+    "check:docs:api": "pnpm --filter @better-answers/api exec vitest run tests/adr-index.test.ts tests/avoid-words.test.ts tests/coding-rules-form.test.ts tests/coding-rules-tags.test.ts tests/deploy-tree.test.ts tests/docs-lane.test.ts tests/provision-skills.test.ts",
     "check:docs:core": "pnpm --filter @better-answers/core exec vitest run test/tier-contract.test.ts",
     "check:docs:web": "pnpm --filter @better-answers/web exec vitest run test/browser-suite-skill.test.ts",
     "land": "node scripts/land.mjs",

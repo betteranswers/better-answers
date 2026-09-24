@@ -23,7 +23,7 @@ C4Component
     Component(answering, "answering", "slice", "find, ask, open; answer audits, feedback, usage; S2 re-seams ask as plan, draft, record")
     Component(guides, "guides", "slice", "Guide definitions, sections, compositions with two homes, includes, footnotes, the renderer; filled at S3")
     Component(erasure, "erasure", "slice", "Erasure requests, suppression, the routine, replay on restore; the one slice that imports other slices; filled at S0")
-    Component(runs, "runs", "slice", "The control plane as the app sees it: enqueue, run and heartbeat views; thin over the queue's SQL functions")
+    Component(runs, "runs", "slice", "The control plane as the api sees it: enqueue, run and heartbeat views; thin over the queue's SQL functions")
     Component(workspaces, "workspaces", "slice", "Provisioning under the platform principal, the picker's cross-workspace read, credentials revocation")
     Component(members, "members", "slice", "Groups and their memberships, access requests, the People acts")
   }
