@@ -12,11 +12,10 @@ export {
   openEnvelope,
   sealEnvelope,
 } from "./envelope.ts";
-export type { OpenEnvelopeRefusal } from "./envelope.ts";
 export { declareRefusals, REFUSAL_CLASSES, refusalRegister } from "./refusal.ts";
-export type { RefusalClass, RegisteredRefusal } from "./refusal.ts";
+export type { RefusalClass } from "./refusal.ts";
 export { KERNEL_REFUSALS, MALFORMED, NOT_FOUND } from "./vocabulary.ts";
-export type { KernelRefusal, KernelRefusalOfClass, RefusalWordFor } from "./vocabulary.ts";
+export type { KernelRefusal, RefusalWordFor } from "./vocabulary.ts";
 export { admit, declareAct, EVERY_PURPOSE } from "./admission.ts";
 export type { AdmissionRefusal, AdmittedOf, InputOf, RefusalOf } from "./admission.ts";
 export { ISSUE_WORDS, parse, ROOT_PATH } from "./parse.ts";
@@ -31,9 +30,8 @@ export {
   isPersonActor,
   personOfActor,
   PERSON_PREFIX,
-  PROCESS_PREFIX,
 } from "./actor.ts";
-export type { ActorId, ProcessActorId } from "./actor.ts";
+export type { ActorId } from "./actor.ts";
 export { requireAdmin } from "./role.ts";
 export type { AdminUserPrincipal, RoleRefusal } from "./role.ts";
 export type {
