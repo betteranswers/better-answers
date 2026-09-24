@@ -43,14 +43,37 @@ if [ "${yes}" != yes ]; then printf 'Type the dump timestamp (%s) to continue: '
 say "## 1 stop the platform stack — nothing writes while the database is replaced (the stores stack stays up)"
 platform stop api || true
 
-say "## 2 postgres"
+say "## 2 postgres — the dump read whole before anything changes, then one transaction empties the database and restores it"
 rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/pg/${tier}/${dump}" "/work/pg.dump.age"
 [ -z "${globals}" ] || rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/pg/${tier}/${globals}" "/work/globals.sql.age"
-[ ! -f "${WORK}/globals.sql.age" ] || tool sh -c 'age -d -i /run/age.key /work/globals.sql.age | psql "$DATABASE_URL" -q' || true
 tool age -d -i /run/age.key -o /work/pg.dump /work/pg.dump.age
-# --no-owner leaves the restoring role owning everything; the grants ride the dump.
-tool sh -c 'pg_restore --clean --if-exists --no-owner --dbname="$DATABASE_URL" /work/pg.dump'
-rm -f "${WORK}/pg.dump" "${WORK}/pg.dump.age" "${WORK}/globals.sql.age"
+# >>> replace the database
+# A dump not readable whole stops here, before any drop. --no-owner: the restoring role owns everything; the grants ride the dump.
+tool pg_restore --no-owner --file=/work/pg.sql /work/pg.dump \
+  || { say "REFUSED: ${dump} cannot be read whole — the database is unchanged"; exit 1; }
+[ ! -f "${WORK}/globals.sql.age" ] || tool sh -c 'age -d -i /run/age.key /work/globals.sql.age | psql "$DATABASE_URL" -q' || true
+# Emptied, not --clean: --clean cannot drop a partition's inherited key, keeps what the dump lacks, and recreates tables under the live default grants.
+cat > "${WORK}/empty.sql" <<'SQL'
+SET client_min_messages = warning;
+DO $empty$
+DECLARE
+  held name;
+BEGIN
+  FOR held IN
+    SELECT nspname FROM pg_catalog.pg_namespace
+     WHERE nspname NOT LIKE 'pg\_%' AND nspname <> 'information_schema'
+  LOOP
+    EXECUTE format('DROP SCHEMA %I CASCADE', held);
+  END LOOP;
+END $empty$;
+CREATE SCHEMA public AUTHORIZATION pg_database_owner;
+GRANT USAGE ON SCHEMA public TO PUBLIC;
+COMMENT ON SCHEMA public IS 'standard public schema';
+SQL
+# One transaction: a statement that fails leaves the database as it was, and no reader sees it half replaced.
+tool sh -c 'psql "$DATABASE_URL" -X -q -o /dev/null --single-transaction -v ON_ERROR_STOP=1 -f /work/empty.sql -f /work/pg.sql'
+# <<< replace the database
+rm -f "${WORK}/pg.dump" "${WORK}/pg.sql" "${WORK}/empty.sql" "${WORK}/pg.dump.age" "${WORK}/globals.sql.age"
 say "restored — RPO $(( ( $(date +%s) - $(date -d "${stamp:0:8} ${stamp:9:2}:${stamp:11:2}" +%s) ) / 60 )) min"
 
 say "## 3 migrate — the schema the restored dump carries, brought forward"
