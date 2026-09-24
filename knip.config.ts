@@ -1,11 +1,14 @@
 import type { KnipConfig } from "knip";
 
+// Not gated: `--production`/`--strict` call helpers unused and their devDependencies unlisted.
 const config: KnipConfig = {
   // `uv` is installed on the machine and never by npm, so no manifest names it.
   ignoreBinaries: ["uv"],
 
-  // An export kept for the route block that wires it is tagged `@public <block>`, as in
-  // `/** @public S3 */`; knip reports no `@public` export.
+  // Nothing here is published, so an unimported entry export is dead; one kept for a later route
+  // block carries `/** @public <block> */`.
+  includeEntryExports: true,
+
   workspaces: {
     ".": {
       // A spawned binary is no edge for knip to follow.
@@ -21,9 +24,10 @@ const config: KnipConfig = {
     },
 
     "apps/web": {
-      // Installed for a surface no ticket has opened yet, so a component nothing imports is not
-      // dead code.
+      // Installed for a surface no ticket has opened yet, so a component nothing imports, or an
+      // export of one, is not dead code.
       entry: ["src/shared/ui/**"],
+      includeEntryExports: false,
     },
 
     "packages/devtools": {
