@@ -66,6 +66,13 @@ on_exit() { rc=$?
 trap on_exit EXIT
 
 say "# Restore drill ${STAMP} — workspace ${DRILL_WORKSPACE}"
+# >>> workspace id
+synthetic_workspace=$("${DEPLOY_DIR}/seed-synthetic.sh" --workspace-id)
+# Every ops command refuses a workspace id that is not a ULID, and the first reads it half an hour in.
+if ! [[ "${DRILL_WORKSPACE}" =~ ^[0-9A-HJKMNP-TV-Z]{26}$ ]]; then
+  say "REFUSED: DRILL_WORKSPACE ${DRILL_WORKSPACE} is not a workspace id; the synthetic fixture's is ${synthetic_workspace}"; exit 1
+fi
+# <<< workspace id
 
 say "## 0 wipe staging (starts from nothing)"; ensure_staging_network; wipe_staging
 say "## 1 postgres — latest daily dump"
@@ -106,6 +113,11 @@ done
 
 say "## 5 REPLAY ERASURES completed after the dump (ADR 0020 — beyond use, made honest)"
 platform run --rm --no-deps api pnpm --silent ops replay-erasures --since "${dump_at}" | tee -a "${REPORT}"
+
+say "## 5b the synthetic fixture joins the restored copy: its workspace's rows, chunk partition and an empty repository"
+# No production dump holds it, and it is the one workspace the drill may always rebuild, seed a subject into and erase.
+STAGING_DATABASE_URL="${STAGING_DATABASE_URL}" "${DEPLOY_DIR}/seed-synthetic.sh" | tee -a "${REPORT}"
+[ -d "/data/git/${synthetic_workspace}.git" ] || sudo -u '#1000' git init --quiet --bare --initial-branch main "/data/git/${synthetic_workspace}.git"
 
 platform up -d --wait api worker
 say "api up — RTO so far $(( ( $(date +%s) - T0 ) / 60 )) min"

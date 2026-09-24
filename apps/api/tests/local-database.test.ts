@@ -39,6 +39,8 @@ const fixture = z
   })
   .parse(readJson("contracts/document-chunk/cases.json"));
 
+const SYNTHETIC_WORKSPACE = "01M2SYNTHET1CAAAAAAAAAAAAA";
+
 // Its own project and port, so a developer's own local database is never the one this stops.
 const project = `ba-local-database-test-${String(process.pid)}`;
 
@@ -108,6 +110,12 @@ describe("the local database", () => {
     expect(upFirst.stdout).toContain("--wipe");
   });
 
+  it("names the synthetic workspace by its id as it seeds it, so an ops command can be pointed at it", () => {
+    expect(upFirst.stdout).toContain(
+      `synthetic fixture present: workspace ${SYNTHETIC_WORKSPACE}, slug synthetic`,
+    );
+  });
+
   it("runs the one pinned image, by digest", () => {
     const images = containersOf(project).map((container) =>
       execFileSync("docker", ["inspect", "--format", "{{.Config.Image}}", container], {
@@ -145,7 +153,8 @@ describe("the local database", () => {
     it("holds one binding in the synthetic workspace, indexed and unpublished", async () => {
       const bindings = await browse.query(
         `SELECT id, connector, state, published_at FROM source_binding
-          WHERE workspace_id = 'ws_synthetic'`,
+          WHERE workspace_id = $1`,
+        [SYNTHETIC_WORKSPACE],
       );
       expect(bindings.rows).toEqual([
         {
@@ -160,7 +169,8 @@ describe("the local database", () => {
     it("holds the binding's one markdown document, converted, with no landed copy named", async () => {
       const documents = await browse.query(
         `SELECT id, binding_id, media_type, outcome, normalised_key, content_hash
-           FROM source_document WHERE workspace_id = 'ws_synthetic'`,
+           FROM source_document WHERE workspace_id = $1`,
+        [SYNTHETIC_WORKSPACE],
       );
       expect(documents.rows).toEqual([
         {
@@ -177,7 +187,8 @@ describe("the local database", () => {
     it("holds the document's chunk rows as the document-chunk agreement's redacted case cuts them", async () => {
       const chunks = await browse.query(
         `SELECT id, binding_id, source_document_id, ordinal, char_start, char_end, locator, content
-           FROM "index".chunk WHERE workspace_id = 'ws_synthetic' ORDER BY ordinal`,
+           FROM "index".chunk WHERE workspace_id = $1 ORDER BY ordinal`,
+        [SYNTHETIC_WORKSPACE],
       );
       expect(chunks.rows).toEqual(
         fixture.document.chunks.map((chunk) => ({
@@ -190,10 +201,11 @@ describe("the local database", () => {
 
     it("holds the redaction's placeholder where the sort code was, and no sort code anywhere", async () => {
       const held = await browse.query<{ text: string }>(
-        `SELECT content AS text FROM "index".chunk WHERE workspace_id = 'ws_synthetic'
+        `SELECT content AS text FROM "index".chunk WHERE workspace_id = $1
          UNION ALL
          SELECT concat_ws(' ', title, source_system_id, original_key) FROM source_document
-          WHERE workspace_id = 'ws_synthetic'`,
+          WHERE workspace_id = $1`,
+        [SYNTHETIC_WORKSPACE],
       );
       const text = held.rows.map((row) => row.text).join("\n");
       expect(text).toContain("The sort code is [withheld]");
@@ -217,7 +229,7 @@ describe("the local database", () => {
       );
       expect({ status: seeded.status, stderr: seeded.stderr }).toEqual({ status: 0, stderr: "" });
       expect(seeded.stdout).toContain(
-        "synthetic fixture present: workspace slug=synthetic, 1 binding, 1 document, 3 chunks",
+        `synthetic fixture present: workspace ${SYNTHETIC_WORKSPACE}, slug synthetic, 1 binding, 1 document, 3 chunks`,
       );
     });
   });
@@ -245,10 +257,10 @@ describe("the local database", () => {
     try {
       const held = await reopened.query(
         `SELECT (SELECT count(*)::int FROM workspace WHERE id = $1) AS marker,
-                (SELECT count(*)::int FROM source_binding WHERE workspace_id = 'ws_synthetic') AS bindings,
-                (SELECT count(*)::int FROM source_document WHERE workspace_id = 'ws_synthetic') AS documents,
-                (SELECT count(*)::int FROM "index".chunk WHERE workspace_id = 'ws_synthetic') AS chunks`,
-        [marker],
+                (SELECT count(*)::int FROM source_binding WHERE workspace_id = $2) AS bindings,
+                (SELECT count(*)::int FROM source_document WHERE workspace_id = $2) AS documents,
+                (SELECT count(*)::int FROM "index".chunk WHERE workspace_id = $2) AS chunks`,
+        [marker, SYNTHETIC_WORKSPACE],
       );
       expect(held.rows).toEqual([{ marker: 1, bindings: 1, documents: 1, chunks: 3 }]);
     } finally {
@@ -271,6 +283,29 @@ describe("the local database", () => {
       await released(held);
     }
   });
+
+  it("refuses to seed over a synthetic fixture an earlier seed left under another id, and says to wipe", async () => {
+    const owner = signedInAs("better_answers", "better_answers");
+    const client = await owner.connect();
+    let earlier: string;
+    try {
+      await client.query("UPDATE workspace SET slug = 'synthetic-now' WHERE id = $1", [
+        SYNTHETIC_WORKSPACE,
+      ]);
+      earlier = (await testData(client).workspace({ slug: "synthetic" })).id;
+    } finally {
+      client.release();
+      await owner.end();
+    }
+
+    const again = localDatabase(port, ["up"]);
+    expect({ status: again.status, stderr: again.stderr }).toEqual({
+      status: 1,
+      stderr: expect.stringContaining(
+        `local-database: REFUSED — this database holds the synthetic fixture under ${earlier}, and its workspace is ${SYNTHETIC_WORKSPACE} now — deploy/local-database.sh down --wipe, then up`,
+      ),
+    });
+  }, 180_000);
 
   it("drops its data only when told to wipe it", () => {
     expect(volumesOf(project)).toHaveLength(1);

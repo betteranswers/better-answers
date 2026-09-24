@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
 
 import { Pool } from "pg";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { find, open, trustWords } from "@better-answers/core/answering";
 import { writeConcept, writeManifest } from "@better-answers/core/concepts";
@@ -772,6 +772,69 @@ describe("pnpm ops — the restore scripts' commands", () => {
         );
         expect({ command, others }).toEqual({ command, others: [] });
       }
+    });
+
+    describe("on the synthetic fixture's workspace, standing as the drill's step 5b leaves it", () => {
+      const synthetic = "01M2SYNTHET1CAAAAAAAAAAAAA";
+
+      beforeAll(async () => {
+        const client = await app().database.superuser.connect();
+        try {
+          await testData(client).workspace({ id: synthetic });
+        } finally {
+          client.release();
+        }
+        await initRepository(openTestGit(app()), synthetic);
+      });
+
+      it.each([
+        {
+          command: "reconcile-watermark",
+          flags: [],
+          exitCode: 0,
+          first:
+            "reconcile-watermark: done — head none, watermark none, replayed 0, already landed 0",
+        },
+        {
+          command: "graph-rebuild",
+          flags: [],
+          exitCode: 0,
+          first: expect.stringMatching(/^graph-rebuild: done — enqueued [0-9A-HJKMNP-TV-Z]{26}$/),
+        },
+        {
+          command: "graph-sweep",
+          flags: [],
+          exitCode: 0,
+          first: "graph-sweep: done — nothing to sweep",
+        },
+        {
+          command: "object-store-orphans",
+          flags: ["--list"],
+          exitCode: 0,
+          first:
+            "object-store-orphans: done — 0 objects past the 24-hour grace no document names, removed none",
+        },
+        {
+          command: "graph-counts",
+          flags: [],
+          exitCode: 0,
+          first: '{"live_gen":null,"nodes":{},"edges":{}}',
+        },
+        {
+          command: "erasure-rehearsal",
+          flags: ["--synthetic", "--run", "--report", "/dev/null"],
+          exitCode: 1,
+          first:
+            "erasure-rehearsal: REFUSED — no synthetic subject stands in this workspace — phase one (--seed) has not been run here, or its subject has already been erased",
+        },
+      ])(
+        "$command, as the drill runs it, takes the id for a workspace id and answers",
+        async ({ command, flags, exitCode, first }) => {
+          const run = await ops(app(), [command, "--workspace", synthetic, ...flags]);
+
+          expect({ exitCode: run.exitCode, first: run.lines[0] }).toEqual({ exitCode, first });
+        },
+      );
     });
   });
 
