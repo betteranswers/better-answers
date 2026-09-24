@@ -1135,7 +1135,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
   });
 
   describe("smoke — the platform answers through its interface", () => {
-    it("passes against the running app: health, the protected-resource document, the bearer challenge, the shell", async () => {
+    it("passes against the running api: health, the protected-resource document, the bearer challenge, the shell", async () => {
       const run = await ops(app(), ["smoke", "--url", PUBLIC_URL, "--find", "--guide", "--ask"]);
 
       expect(run.lines.filter((line) => line.startsWith("FAIL"))).toEqual([]);

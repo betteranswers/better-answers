@@ -11,7 +11,7 @@ import { startApp } from "./harness.ts";
 
 const port = Number(process.argv[2]);
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
-  throw new Error("the browser suite's app needs a port as its one argument");
+  throw new Error("the browser suite's api needs a port as its one argument");
 }
 
 // The Sources screen binds a document, and a bind puts its bytes in the object store first.
@@ -31,7 +31,7 @@ const app = await startApp({
 const listening = serve(
   { fetch: withHarnessControl().fetch, port, hostname: "127.0.0.1" },
   (address) => {
-    logger.info({ port: address.port }, "the browser suite's app is listening");
+    logger.info({ port: address.port }, "the browser suite's api is listening");
   },
 );
 
@@ -43,7 +43,7 @@ function withHarnessControl(): Hono {
 }
 
 listening.on("error", (cause: Error) => {
-  logger.error({ port, reason: cause.message }, "the browser suite's app could not listen");
+  logger.error({ port, reason: cause.message }, "the browser suite's api could not listen");
   process.exit(1);
 });
 

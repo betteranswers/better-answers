@@ -201,7 +201,7 @@ export const actingIn = async <T>(
 
 export const openTestGit = (app: TestApp): GitDoor => {
   if (app.doors.git?.ok !== true) {
-    throw new Error(`the test app's repositories' root is ${app.doors.git?.error ?? "not set"}`);
+    throw new Error(`the TestApp's repositories' root is ${app.doors.git?.error ?? "not set"}`);
   }
   return app.doors.git.value;
 };

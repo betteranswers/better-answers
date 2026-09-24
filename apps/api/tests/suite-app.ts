@@ -17,7 +17,7 @@ export const appForSuite = (options: TestAppOptions = {}): (() => TestApp) => {
 
   return () => {
     if (started === undefined) {
-      throw new Error("the app is read before beforeAll has started it");
+      throw new Error("the TestApp is read before beforeAll has started it");
     }
     return started;
   };

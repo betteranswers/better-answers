@@ -58,7 +58,8 @@ const avoidedIn = ({ text }: Entry): readonly string[] => {
     .filter((word) => word.length > 0);
 };
 
-type Sense = { readonly sense: string; readonly written: RegExp };
+// A sense one directory's code alone writes is read there alone, so its shapes pass nowhere else.
+type Sense = { readonly sense: string; readonly written: RegExp; readonly within?: string };
 
 // Only a pattern tells the senses apart, so a use no permitted pattern explains is the avoided
 // sense, and an unwatched word goes unscanned.
@@ -85,8 +86,9 @@ const WATCHED: readonly Watched[] = [
           /(?<!\bthe )\bapp\.(?!\w)|\bapp (?:hostname\b|·)|\*\*app\*\* hostname|\| `app` \||`app` is a hostname role/gi,
       },
       {
-        sense: "a third-party app",
-        written: /\b(?:GitHub(?: Actions')?|OAuth|MCP|Renovate|chat) app\b/gi,
+        sense: "a third-party app, the consent page's client among them",
+        written:
+          /\b(?:GitHub(?: Actions')?|OAuth|MCP|Renovate|chat) app\b|\bThis app calls itself\b|"This app"/gi,
       },
       {
         sense: "an identifier: a path, a hyphenated name, a property or setting, a Hono app",
@@ -98,7 +100,17 @@ const WATCHED: readonly Watched[] = [
         written:
           /\bcoco\.App\b|\bapp(?:: coco\.App)? = coco\.App\b|["']app["']: (?:\w+_APP\b|["'](?:landed|chunks)["'])|\b(?:landed|chunks) app\b/gi,
       },
-      { sense: "the glossary naming the word it avoids", written: /"the app"|_Avoid_: app\b/gi },
+      {
+        sense:
+          "the api's own names: the harness's app() getter, a TestApp held as app and passed on, the app hostname's key",
+        within: "apps/api/",
+        written:
+          /"app"(?!:)|(?<!\.)\bapp\(|\b(?:readonly )?app: (?:TestApp\b|APP_HOSTNAME\b|string\b|hostnameOfUrl\(|"[^"]*")|\bapp = await startApp\(|(?<=\w\((?:\w+, )*)app(?=[,)])|^\s*(?:(?:const \w+ = )?await )?app,?$|\bhostnames\.app\b/gi,
+      },
+      {
+        sense: "the glossary naming the word it avoids",
+        written: /"the app" (?:is|reads)\b|_Avoid_: app\b/gi,
+      },
     ],
   },
 ];
@@ -130,7 +142,10 @@ const CARVED_OUT: readonly CarveOut[] = [
     holds: under("packages/design-system/"),
     why: "no tier-sense use: the word there is the SPA's own zone",
   },
-  { holds: under("apps/api/"), why: "for now: T-216 sweeps it and removes this line" },
+  {
+    holds: (file) => file === "apps/api/tests/avoid-words.test.ts",
+    why: "this scan: its patterns spell the word they permit",
+  },
 ];
 
 // A rules file binds every directory, so its sweep is this suite's own and no carve-out holds it.
@@ -139,12 +154,14 @@ const isCarvedOut = (file: string): boolean =>
 
 const escaped = (word: string): string => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const usesInAvoidedSense = ({ word, permitted }: Watched, text: string): boolean =>
+const usesInAvoidedSense = ({ word, permitted }: Watched, file: string, text: string): boolean =>
   new RegExp(`\\b${escaped(word)}\\b`, "i").test(
-    permitted.reduce(
-      (left, { written }) => left.replace(written, (found) => " ".repeat(found.length)),
-      text,
-    ),
+    permitted
+      .filter(({ within }) => within === undefined || file.startsWith(within))
+      .reduce(
+        (left, { written }) => left.replace(written, (found) => " ".repeat(found.length)),
+        text,
+      ),
   );
 
 const watchedIn = (root: string): readonly Watched[] => {
@@ -162,7 +179,7 @@ const avoidedSenseLines = (root: string): readonly string[] => {
       readUnder(root, file)
         .split("\n")
         .flatMap((text, index) =>
-          watched.some((one) => usesInAvoidedSense(one, text))
+          watched.some((one) => usesInAvoidedSense(one, file, text))
             ? [`${file}:${String(index + 1)}: ${text.trim()}`]
             : [],
         ),
@@ -200,8 +217,8 @@ afterAll(() => {
   rmSync(scratch, { force: true, recursive: true });
 });
 
-// Spelled in two halves, so the day this suite's own directory is scanned it does not read its
-// fixtures as findings.
+// Spelled in two halves, so no fixture reads as a finding should the carve-out that holds this
+// file out for its patterns ever be lifted.
 const WORD = ["a", "pp"].join("");
 
 const THE_GLOSSARY = [
@@ -235,6 +252,10 @@ describe("the sense a planted line is read in", () => {
     `The ${WORD} landed the rows.`,
     `The tunnel routes to \`http://${WORD}:3000\` on the platform stack.`,
     `Every restore replays the erasures before \`${WORD}\` turns healthy.`,
+    `const bootstrap = requireBootstrap("the ${WORD}");`,
+    `logger.info({ port: address.port }, "${WORD} listening");`,
+    `throw new Error("the browser suite's ${WORD} needs a port as its one argument");`,
+    `It starts ${WORD}, worker and migrate in that order.`,
   ])("refuses the tier: %s", (planted) => {
     expect(findingsOver(planted)).toEqual([`docs/planted.md:1: ${planted}`]);
   });
@@ -263,8 +284,27 @@ describe("the sense a planted line is read in", () => {
     `        '${WORD}': "chunks",`,
     `# The second store: the landed ${WORD} and the findings memo.`,
     `# The binding's store: the chunks ${WORD} and its target-state tracking.`,
+    `<p>This ${WORD} calls itself “Claude”. It is hosted at <strong>claude.ai</strong>.</p>`,
+    `      : undefined) ?? "This ${WORD}",`,
   ])("passes a permitted sense: %s", (planted) => {
     expect(findingsOver(planted)).toEqual([]);
+  });
+
+  it.each([
+    `export const HOSTNAME_ROLES = ["${WORD}", "agent", "apex", "loopback"] as const;`,
+    `  readonly ${WORD}: string;`,
+    `    ${WORD}: hostnameOfUrl(publicUrl),`,
+    `expect(read.ok && read.value.hostnames.${WORD}).toBe("${WORD}.example.test");`,
+    `export const openTestGit = (${WORD}: TestApp): GitDoor => {`,
+    `    ${WORD} = await startApp();`,
+    `  const acme = await ${WORD}().provision({ name: "Acme" });`,
+    `  const tokens = await connectAsHost(${WORD}, client, workspace.admin);`,
+    `  const git = openTestGit(${WORD});`,
+    `  const response = await ${WORD}`,
+    `      ${WORD},`,
+  ])("passes the api's own names in apps/api, and nowhere else: %s", (planted) => {
+    expect(findingsOver(planted, "apps/api/src/planted.ts")).toEqual([]);
+    expect(findingsOver(planted)).toEqual([`docs/planted.md:1: ${planted.trim()}`]);
   });
 
   it("passes the glossary's own entry, which names the word it avoids", () => {
@@ -290,6 +330,20 @@ describe("the sense a planted line is read in", () => {
   it("reads the worker's source, which no carve-out holds", () => {
     expect(findingsOver(`# The ${WORD} claims the job.`, "apps/worker/src/planted.py")).toEqual([
       `apps/worker/src/planted.py:1: # The ${WORD} claims the job.`,
+    ]);
+  });
+
+  it("reads the api's source and tests, and holds out only this scan", () => {
+    trees += 1;
+    const root = throwawayRepository(path.join(scratch, `tree-${String(trees)}`));
+    writeUnder(root, GLOSSARY, THE_GLOSSARY);
+    writeUnder(root, "apps/api/src/planted.ts", `// The ${WORD} claims the job.\n`);
+    writeUnder(root, "apps/api/tests/planted.test.ts", `// The ${WORD} claims the job.\n`);
+    writeUnder(root, "apps/api/tests/avoid-words.test.ts", `// The ${WORD} claims the job.\n`);
+
+    expect(avoidedSenseLines(root)).toEqual([
+      `apps/api/src/planted.ts:1: // The ${WORD} claims the job.`,
+      `apps/api/tests/planted.test.ts:1: // The ${WORD} claims the job.`,
     ]);
   });
 

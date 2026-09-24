@@ -83,7 +83,7 @@ const contentsSchema = z.object({
 
 type ImageContents = z.infer<typeof contentsSchema>;
 
-// No peer is followed: pnpm links one from anywhere in the workspace's graph, and a peer the app
+// No peer is followed: pnpm links one from anywhere in the workspace's graph, and a peer the api
 // loads is one it declares.
 const probe = `
 const { createRequire } = require("node:module");
@@ -192,7 +192,7 @@ process.stdout.write(JSON.stringify({
 }));
 `;
 
-describe.skipIf(nothingToProbeHere)("the app tier's runtime image", () => {
+describe.skipIf(nothingToProbeHere)("the api tier's runtime image", () => {
   let contents: ImageContents;
   const developmentOnly = developmentOnlyPackages();
 
@@ -213,16 +213,16 @@ describe.skipIf(nothingToProbeHere)("the app tier's runtime image", () => {
     contents = contentsSchema.parse(JSON.parse(stdout));
   }, IMAGE_PROBE_ALLOWANCE);
 
-  it("gives the app no development dependency it could load", () => {
+  it("gives the api no development dependency it could load", () => {
     expect(developmentOnly.length).toBeGreaterThan(0);
     expect(contents.resolvable).toEqual([]);
   });
 
-  it("carries the two workspace libraries the app imports", () => {
+  it("carries the two workspace libraries the api imports", () => {
     expect(contents.missing).toEqual([]);
   });
 
-  it("carries no package the app's own dependencies do not reach", () => {
+  it("carries no package the api's own dependencies do not reach", () => {
     expect(contents.storedCount).toBeGreaterThan(0);
     expect(contents.unreached).toEqual([]);
   });
@@ -231,7 +231,7 @@ describe.skipIf(nothingToProbeHere)("the app tier's runtime image", () => {
     expect(contents.broken).toEqual([]);
   });
 
-  it("loads every module the app, `migrate` and `pnpm ops` import from what the store kept", () => {
+  it("loads every module `main.ts`, `migrate` and `pnpm ops` import from what the store kept", () => {
     // Each entry reads its bootstrap first, and refuses it only once every static import has
     // resolved.
     expect(contents.loaded).toEqual(["main.ts", "migrate.ts", "ops.ts"]);
@@ -241,7 +241,7 @@ describe.skipIf(nothingToProbeHere)("the app tier's runtime image", () => {
     expect(contents.hasContracts).toBe(false);
   });
 
-  it("carries the single-page app's build where the app reads it", () => {
+  it("carries the single-page app's build where the api reads it", () => {
     expect(contents.hasSpaBuild).toBe(true);
   });
 

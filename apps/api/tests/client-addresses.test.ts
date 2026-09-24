@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { defaultClientAddresses } from "./client-addresses.ts";
 
 describe("the address a default client is given", () => {
-  it("gives every client in one app an address of its own", () => {
+  it("gives every client in one TestApp an address of its own", () => {
     const next = defaultClientAddresses();
 
     const drawn = Array.from({ length: 200 }, next);

@@ -24,7 +24,7 @@ export const HOSTNAME_SURFACES: readonly HostnameSurface[] = [
     paths: ["/agent/v1/*"],
     hosts: ["agent"],
     reason:
-      "The share agent's surface and nothing else. The edge holds `agent.` open and routed only to /agent/v1/*, refused before any body is read, and CONTEXT.md's *agent token* puts that check in the app rather than only at the edge. Nothing is mounted under it yet, the share agent being a later task: the fence is written before the mount so it is never a thing to remember to add.",
+      "The share agent's surface and nothing else. The edge holds `agent.` open and routed only to /agent/v1/*, refused before any body is read, and CONTEXT.md's *agent token* puts that check in the api rather than only at the edge. Nothing is mounted under it yet, the share agent being a later task: the fence is written before the mount so it is never a thing to remember to add.",
   },
   {
     paths: ["/mcp", "/.well-known/*", "/jwks", "/oauth2/*"],

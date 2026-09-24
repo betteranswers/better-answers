@@ -1,4 +1,4 @@
-# The app tier's image — ONE image, two commands.
+# The api tier's image — ONE image, two commands.
 #
 # `deploy/platform.compose.yaml` runs this image twice: `migrate` overrides the command with
 # `pnpm migrate` and runs to completion, then `api` runs this file's `CMD`. That is why pnpm
@@ -6,7 +6,7 @@
 # `pnpm migrate` is a root script that filters to this workspace, and a rollback is the
 # previous digest of *this* image (ADR 0022), so the two must never skew.
 #
-# The image also carries `apps/web`'s build. The app serves the SPA on the `app.` hostname
+# The image also carries `apps/web`'s build. The api serves the SPA on the `app.` hostname
 # (ADR 0006, amended 2026-09-02), and `apps/api/src/config.ts` reads it from `WEB_ROOT`,
 # whose default resolves to `<repo>/apps/web/dist`. This image keeps the repository's own
 # layout under `/app`, so that default is the correct path and the deploy unit sets no fifth
@@ -152,7 +152,7 @@ FROM base AS runtime
 # `git filter-repo` and the Python it runs on, because the erasure routine's git step is that
 # tool (ADR 0020) — a text replacement across every commit, then `git reflog expire
 # --expire=now --all` and `git gc --prune=now` on the bare repository. The recorded and
-# rejected alternative is a dulwich rewrite in the worker: the app is the only git writer and
+# rejected alternative is a dulwich rewrite in the worker: the api is the only git writer and
 # the worker holds no git credential, so that alternative founds a second writer for one
 # routine and hands the worker a credential the worker's rules say it does not have.
 #
@@ -234,7 +234,7 @@ USER node
 EXPOSE 3000
 
 # The loopback, so the probe carries no public hostname. There is no fifth hostname variable
-# to set: the app's fence holds the loopback (localhost, 127.0.0.1, ::1) as a fixed role
+# to set: the api's fence holds the loopback (localhost, 127.0.0.1, ::1) as a fixed role
 # carrying /health alone (T-030). Do not point this at a hostname — a probe that has to know
 # the estate's DNS is a probe that breaks when the DNS changes. /health answers 503 until the
 # authorization server is ready, which is what makes `worker`'s wait on `api` mean something
