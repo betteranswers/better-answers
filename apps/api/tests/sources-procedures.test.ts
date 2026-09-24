@@ -19,6 +19,7 @@ import {
 } from "./provoke.ts";
 import {
   anAdminOnTheWeb,
+  refusalOfCall,
   UPLOAD_HEADER_OF_FIELD,
   uploadHeaders,
   uploadOptions,
@@ -397,6 +398,17 @@ describe("a revocation landed while a mutation runs", () => {
   });
 });
 
+const A_HEALTH_CUE = { category: "special-category", ruleId: "HEALTH_CUE" } as const;
+
+const anAdminWhoseBindingHolds = async (finding: typeof A_HEALTH_CUE) => {
+  const { workspace, api } = await anAdmin();
+  const { bindingId, documentId } = await unpublishedBinding(workspace.workspaceId);
+  await seededIn(app, (seed) =>
+    seed.finding({ workspaceId: workspace.workspaceId, documentId, ...finding }),
+  );
+  return { api, bindingId, documentId };
+};
+
 describe("the Sources procedures over the wire", () => {
   it("lists an upload with its state, counts and last run, and says why a document was quarantined", async () => {
     const { workspace, api } = await anAdmin();
@@ -529,6 +541,7 @@ describe("the Sources procedures over the wire", () => {
         specialCategory: false,
         found: 2,
         overriddenByErasure: 1,
+        dismissed: 0,
       },
     ]);
   });
@@ -558,6 +571,49 @@ describe("the Sources procedures over the wire", () => {
     expect(runs.map((run) => [run.jobId, run.reason, run.status])).toEqual([
       [kept.jobId, "restored", "queued"],
     ]);
+  });
+
+  it("dismisses a special-category finding group as not special category and queues the run that reads it", async () => {
+    const { api, bindingId, documentId } = await anAdminWhoseBindingHolds(A_HEALTH_CUE);
+
+    const dismissed = await api.sources.dismissAsNotSpecialCategory.mutate({
+      bindingId,
+      findingGroups: [{ documentId, ...A_HEALTH_CUE, tier: "always" }],
+      reason: "Our engineers diagnose faults in pumps, never in people.",
+    });
+
+    expect(dismissed).toEqual({ bindingId, documentIds: [documentId], jobId: expect.any(String) });
+    const runs = await api.runs.ofSubject.query({ subjectId: bindingId });
+    expect(runs.map((run) => [run.jobId, run.reason, run.status])).toEqual([
+      [dismissed.jobId, "dismissed", "queued"],
+    ]);
+  });
+
+  it("refuses to dismiss a finding group that is not special category, and the word crosses as itself", async () => {
+    const { workspace, api } = await anAdmin();
+    const { bindingId, documentId } = await unpublishedBinding(workspace.workspaceId);
+
+    const refused = await refusalOfCall(
+      api.sources.dismissAsNotSpecialCategory.mutate({
+        bindingId,
+        findingGroups: [
+          {
+            documentId,
+            category: "bank-details",
+            ruleId: "sort-code-with-account-number",
+            tier: "always",
+          },
+        ],
+        reason: "The sort code is the company's own.",
+      }),
+    );
+
+    expect(refused).toMatchObject({
+      data: {
+        httpStatus: 422,
+        refusal: { word: "not-special-category", class: "inapplicable" },
+      },
+    });
   });
 
   it("narrows the documents a finding group sits in", async () => {

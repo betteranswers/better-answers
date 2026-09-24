@@ -235,7 +235,6 @@
     {"role":"worker_rt","object":"public.job","kind":"table","is_partition":false,"privilege":"UPDATE","grantable":false},
     {"role":"worker_rt","object":"public.source_binding","kind":"table","is_partition":false,"privilege":"SELECT","grantable":false},
     {"role":"worker_rt","object":"public.source_document","kind":"table","is_partition":false,"privilege":"SELECT","grantable":false},
-    {"role":"worker_rt","object":"public.source_document","kind":"table","is_partition":false,"privilege":"UPDATE","grantable":false},
     {"role":"worker_rt","object":"public.suppression","kind":"table","is_partition":false,"privilege":"SELECT","grantable":false},
     {"role":"worker_rt","object":"public.workspace","kind":"table","is_partition":false,"privilege":"SELECT","grantable":false}
   ],
@@ -257,6 +256,7 @@
     {"role":"worker_rt","object":"public.finding","column":"document_id","privilege":"SELECT","grantable":false},
     {"role":"worker_rt","object":"public.finding","column":"id","privilege":"INSERT","grantable":false},
     {"role":"worker_rt","object":"public.finding","column":"restored_at","privilege":"SELECT","grantable":false},
+    {"role":"worker_rt","object":"public.finding","column":"review_state","privilege":"SELECT","grantable":false},
     {"role":"worker_rt","object":"public.finding","column":"rule_id","privilege":"INSERT","grantable":false},
     {"role":"worker_rt","object":"public.finding","column":"rule_id","privilege":"SELECT","grantable":false},
     {"role":"worker_rt","object":"public.finding","column":"rule_version","privilege":"INSERT","grantable":false},
@@ -269,7 +269,14 @@
     {"role":"worker_rt","object":"public.finding","column":"tier","privilege":"SELECT","grantable":false},
     {"role":"worker_rt","object":"public.finding","column":"tier","privilege":"UPDATE","grantable":false},
     {"role":"worker_rt","object":"public.finding","column":"workspace_id","privilege":"INSERT","grantable":false},
-    {"role":"worker_rt","object":"public.finding","column":"workspace_id","privilege":"SELECT","grantable":false}
+    {"role":"worker_rt","object":"public.finding","column":"workspace_id","privilege":"SELECT","grantable":false},
+    {"role":"worker_rt","object":"public.source_document","column":"content_hash","privilege":"UPDATE","grantable":false},
+    {"role":"worker_rt","object":"public.source_document","column":"last_seen","privilege":"UPDATE","grantable":false},
+    {"role":"worker_rt","object":"public.source_document","column":"normalised_key","privilege":"UPDATE","grantable":false},
+    {"role":"worker_rt","object":"public.source_document","column":"outcome","privilege":"UPDATE","grantable":false},
+    {"role":"worker_rt","object":"public.source_document","column":"quarantine_error","privilege":"UPDATE","grantable":false},
+    {"role":"worker_rt","object":"public.source_document","column":"redaction_version","privilege":"UPDATE","grantable":false},
+    {"role":"worker_rt","object":"public.source_document","column":"sensitivity","privilege":"UPDATE","grantable":false}
   ],
   "functions": [
     {"role":"app_rt","object":"public.claim_job","args":"p_worker_id text, p_lease interval, p_kinds text[]","security_definer":false,"acl_is_default":false,"privilege":"EXECUTE","grantable":false},

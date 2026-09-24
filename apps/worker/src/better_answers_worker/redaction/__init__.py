@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 
 from .descriptors import A_PERSON_NAME, DESCRIPTORS
+from .dismissals import Dismissal, dismissed_among
 from .engine import (
     ALWAYS_TIER,
     DESCRIPTOR_BY_CATEGORY,
@@ -22,7 +23,7 @@ from .withholdings import (
     written_spans_of,
 )
 
-__all__ = ["Redaction", "Restore", "redact"]
+__all__ = ["Dismissal", "Redaction", "Restore", "redact"]
 
 
 ALWAYS_PLACEHOLDER = next(
@@ -38,6 +39,7 @@ class Redaction:
     written_spans: tuple[WrittenSpan, ...]
     counts: Mapping[str, int]
     verdict: str | None
+    lifted: bool
     version: str
 
 
@@ -48,6 +50,7 @@ def redact(
     suppressions: Sequence[Mapping[str, Sequence[str]]],
     seed: str,
     restores: Sequence[Restore] = (),
+    dismissals: Sequence[Dismissal] = (),
 ) -> Redaction:
 
     policy = Policy(
@@ -64,13 +67,16 @@ def redact(
 
     withholdings = withholdings_over(findings, text, policy)
     written_spans = written_spans_of(withholdings)
+    narrowing = _narrowing(findings)
+    dismissed = dismissed_among(narrowing, dismissals)
     return Redaction(
         text=_written(text, written_spans, letters),
         findings=findings,
         withholdings=withholdings,
         written_spans=written_spans,
         counts=_counted(findings),
-        verdict=_verdict_of(findings),
+        verdict=_verdict_of(narrowing, dismissed),
+        lifted=bool(narrowing) and dismissed == frozenset(narrowing),
         version=VERSION_STRING,
     )
 
@@ -121,9 +127,18 @@ def _counted(findings: Sequence[Finding]) -> Mapping[str, int]:
     return MappingProxyType(dict(sorted(counts.items())))
 
 
-def _verdict_of(findings: Sequence[Finding]) -> str | None:
-    for finding in findings:
-        narrows_to = DESCRIPTOR_BY_CATEGORY[finding.category].narrows_to
-        if narrows_to is not None:
-            return narrows_to
+def _narrowing(findings: Sequence[Finding]) -> tuple[Finding, ...]:
+    return tuple(
+        finding
+        for finding in findings
+        if DESCRIPTOR_BY_CATEGORY[finding.category].narrows_to is not None
+    )
+
+
+def _verdict_of(
+    narrowing: Sequence[Finding], dismissed: frozenset[Finding]
+) -> str | None:
+    for finding in narrowing:
+        if finding not in dismissed:
+            return DESCRIPTOR_BY_CATEGORY[finding.category].narrows_to
     return None

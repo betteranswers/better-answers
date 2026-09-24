@@ -187,13 +187,15 @@ Where a unit lives is decided by **minting**.
 - **effective class** — the class a source document is actually read at: the narrower of its
   binding's class and the document's own, where it has one — the seam's special-category verdict
   or an Admin's narrowing. Every chunk of the document is read at it and a narrowing is checked
-  against it, so a document's own class only ever takes visibility away. _Avoid_: folded class,
+  against it, so a document's own class only ever takes visibility away. The document's own class
+  goes back only when a *dismissal* lifts the verdict, and then no further than the Admin's
+  narrowing, or the binding's class if there is none. _Avoid_: folded class,
   derived class (a *concept's* class is derived, from its evidence).
 - **finding** — what the pre-scan found in one source document: a category (bank details, date of
   birth, home address, personal contact, special category, …), offsets into the normalised text,
   the rule and detector version that fired. Counted per category; never a class, never a value.
-  Born **unreviewed**; a review leaves it *kept in text* or *narrowed*, with the acting Admin and
-  the instant. **Marked** once an Admin has reviewed or restored it, *unmarked* until then. **The
+  Born **unreviewed**; a review leaves it *kept in text*, *narrowed* or *dismissed*, with the
+  acting Admin and the instant. **Marked** once an Admin has reviewed or restored it, *unmarked* until then. **The
   same finding on every run that finds it**: the document, the rule and the offsets are what it
   is, for as long as the document's content stands, so what an Admin decided about it stands on
   every later run. Its category, tier, score and version are a run's **reading** of it — the last
@@ -202,7 +204,7 @@ Where a unit lives is decided by **minting**.
   finding the last run did not raise, because the rules moved on, is no longer shown to a
   reviewer, acted on or counted at a publish.
 - **finding group** — the unit of the review: one document's *findings* of one category, raised
-  by one rule at one tier, with how many there are. It is what the review lists and what the two
+  by one rule at one tier, with how many there are. It is what the review lists and what the three
   bulk acts below are taken over; it names no span and carries no value, so a reviewer acts on
   what was found without ever being shown it. _Avoid_: group on its own (a *group* is members).
 - **keep in text** — an Admin's bulk act over named *finding groups* of one binding: every span
@@ -216,6 +218,18 @@ Where a unit lives is decided by **minting**.
   groups' unreviewed findings are reviewed as *narrowed* — and no finding the Admin was not
   shown — and the *cascade* runs from the concepts citing the documents. One ledger row per
   document; it never widens.
+- **dismiss as not special category** — an Admin's bulk act over named special-category *finding
+  groups* of one binding: every span of each group is reviewed as **dismissed** under one reason,
+  because what the *cue* caught is not health data. The run that reads the dismissal is queued with
+  it. The act changes what the finding is classed as and does not let the span be shown: the span
+  stays withheld unless it is also *kept in text*. On that run, a document whose every
+  special-category finding is dismissed has its **verdict lifted**, and the document's own class
+  goes back to the Admin's narrowing, or to the binding's class if there is none. One ledger row
+  per document. It is the one road by which a document's class widens. (Not *keep in text*, which
+  lets a span back into the text and lifts no class.)
+- **cue** — a word whose lemma, found in a sentence, withholds that sentence whole as special
+  category at the always tier and narrows its document. It is the special-category rule's detection
+  and never a boost. _Avoid_: context word, which only raises a score a recogniser already gave.
 - **redaction seam** — the one place a document's text is read for what must be withheld and
   the placeholders are written in, ahead of chunking, extraction and every model call, so that
   no derived store and no model ever holds the value.

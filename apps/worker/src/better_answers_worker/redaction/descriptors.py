@@ -10,6 +10,7 @@ class CategoryDescriptor:
     raised_by: tuple[str, ...]
     threshold: float
     context: tuple[str, ...]
+    cues: tuple[str, ...]
     placeholder: str
     narrows_to: str | None
 
@@ -20,7 +21,8 @@ DESCRIPTORS: tuple[CategoryDescriptor, ...] = (
         tier="always",
         raised_by=("HEALTH_CUE",),
         threshold=0.5,
-        context=("diagnosis", "medication", "sickness"),
+        context=(),
+        cues=("diagnose", "diagnosis", "medication", "sickness"),
         placeholder="[withheld]",
         narrows_to="Restricted",
     ),
@@ -30,6 +32,7 @@ DESCRIPTORS: tuple[CategoryDescriptor, ...] = (
         raised_by=("UK_BANK_ACCOUNT",),
         threshold=0.5,
         context=("account", "sort", "bank", "payment", "bacs"),
+        cues=(),
         placeholder="[withheld]",
         narrows_to=None,
     ),
@@ -39,6 +42,7 @@ DESCRIPTORS: tuple[CategoryDescriptor, ...] = (
         raised_by=("UK_NHS", "UK_NINO"),
         threshold=0.5,
         context=("national", "insurance", "nhs", "number"),
+        cues=(),
         placeholder="[withheld]",
         narrows_to=None,
     ),
@@ -48,6 +52,7 @@ DESCRIPTORS: tuple[CategoryDescriptor, ...] = (
         raised_by=("DATE_OF_BIRTH",),
         threshold=0.6,
         context=("birth", "born", "dob"),
+        cues=(),
         placeholder="[date of birth withheld]",
         narrows_to=None,
     ),
@@ -57,6 +62,7 @@ DESCRIPTORS: tuple[CategoryDescriptor, ...] = (
         raised_by=("UK_HOME_ADDRESS",),
         threshold=0.6,
         context=("address", "home", "residence", "postcode"),
+        cues=(),
         placeholder="[home address withheld]",
         narrows_to=None,
     ),
@@ -66,6 +72,7 @@ DESCRIPTORS: tuple[CategoryDescriptor, ...] = (
         raised_by=("EMAIL_ADDRESS", "PHONE_NUMBER"),
         threshold=0.6,
         context=("personal", "mobile", "email", "telephone", "contact"),
+        cues=(),
         placeholder="[personal contact withheld]",
         narrows_to=None,
     ),
@@ -75,6 +82,7 @@ DESCRIPTORS: tuple[CategoryDescriptor, ...] = (
         raised_by=("PERSON",),
         threshold=0.7,
         context=(),
+        cues=(),
         placeholder="[person A]",
         narrows_to=None,
     ),
@@ -83,7 +91,8 @@ DESCRIPTORS: tuple[CategoryDescriptor, ...] = (
         tier="default-off",
         raised_by=("JOB_TITLE",),
         threshold=0.7,
-        context=("role", "title", "position"),
+        context=(),
+        cues=(),
         placeholder="[job title withheld]",
         narrows_to=None,
     ),

@@ -21,7 +21,7 @@ import {
 } from "../src/index.ts";
 import { type TestData, testData } from "./factory.ts";
 import { type MigratedPostgres, withRollback } from "./harness.ts";
-import { ADMITTED, privilegesHeld, refusesEach, sqlstateOf } from "./probes.ts";
+import { ADMITTED, privilegesHeld, refusalOf, refusesEach, sqlstateOf } from "./probes.ts";
 import {
   A_BUNDLE_COMMIT,
   A_BUNDLE_COMMIT_WITH_A_PARENT,
@@ -1988,7 +1988,7 @@ describe("the derivation's tables under app_rt", () => {
     "composition_include",
   ] as const;
 
-  it("refuses the worker four of the six, and serves it exactly what a run reconciles on the other two (migrations 0020, 0037)", async () => {
+  it("refuses the worker four of the six, and serves it exactly what a run reconciles on the other two (migrations 0020, 0037, 0052)", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const seeded = await seedOneOfEach(seed, WS_A);
@@ -2019,17 +2019,39 @@ describe("the derivation's tables under app_rt", () => {
         "SELECT outcome, quarantine_error FROM source_document WHERE id = $1",
         [seeded.document.id],
       );
+      await client.query(
+        `UPDATE source_document
+            SET content_hash = $2, normalised_key = 'normalised/handbook.md',
+                redaction_version = '5:d1', outcome = 'converted', quarantine_error = NULL,
+                last_seen = now(), sensitivity = 'Restricted'
+          WHERE id = $1`,
+        [seeded.document.id, `sha256:${"a".repeat(64)}`],
+      );
+      const reconciled = await client.query(
+        "SELECT redaction_version, sensitivity FROM source_document WHERE id = $1",
+        [seeded.document.id],
+      );
       expect({
         binding: binding.rows,
         document: document.rows,
         quarantined: quarantined.rows,
+        reconciled: reconciled.rows,
       }).toEqual({
         binding: [{ id: seeded.binding.id }],
         document: [{ id: seeded.document.id }],
         quarantined: [{ outcome: "quarantined", quarantine_error: "NeedsOcrError" }],
+        reconciled: [{ redaction_version: "5:d1", sensitivity: "Restricted" }],
       });
 
       await refusesEach(client, [
+        [
+          "UPDATE source_document SET narrowed_to = NULL",
+          "an Admin's narrowing is an act with a ledger row, and a run that could clear it could widen a document at nobody's word",
+        ],
+        [
+          "UPDATE source_document SET title = 'Retitled by a run'",
+          "what an upload catalogued is the upload's, and a run writes back only what it read",
+        ],
         [
           "UPDATE source_binding SET name = 'renamed by a run'",
           "a binding is what an Admin made, and the tier that indexes it has no say in what it is",
@@ -2167,7 +2189,7 @@ describe("the finding under both runtime roles", () => {
     });
   });
 
-  it("lets the worker record a finding and refuses it every road to what an Admin wrote on one (migrations 0024, 0032, 0041, 0042)", async () => {
+  it("lets the worker record a finding and refuses it every road to what an Admin wrote on one (migrations 0024, 0032, 0041, 0042, 0052)", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const document = await seed.sourceDocument({ workspaceId: WS_A });
@@ -2198,14 +2220,22 @@ describe("the finding under both runtime roles", () => {
           "who restored a span is the review's business and the ledger's, never the run's",
         ],
         [
-          "SELECT review_state, reviewed_by, reviewed_at, review_reason FROM finding",
-          "the worker never reviews a finding, so it never reads a review back",
+          "SELECT reviewed_by FROM finding",
+          "who reviewed a span is the review's business and the ledger's, never the run's",
+        ],
+        [
+          "SELECT reviewed_at FROM finding",
+          "the run needs only that a span was dismissed, never when",
+        ],
+        [
+          "SELECT review_reason FROM finding",
+          "a reason is a sentence an Admin typed and may name a person",
         ],
         [
           "SELECT id FROM finding",
           "a finding's id is the ledger's subject and nothing a run names",
         ],
-        ["SELECT * FROM finding", "every column is more than the eleven the two grants name"],
+        ["SELECT * FROM finding", "every column is more than the twelve the grants name"],
 
         [
           "UPDATE finding SET restored_at = NULL, restored_by = NULL, restore_reason = NULL",
@@ -2231,6 +2261,10 @@ describe("the finding under both runtime roles", () => {
         [
           "UPDATE finding SET review_state = 'narrowed'",
           "the review is an Admin's act, and a worker that could stamp one could mark a special-category span reviewed",
+        ],
+        [
+          "UPDATE finding SET review_state = 'dismissed'",
+          "a worker that could dismiss a finding could lift a document's verdict at nobody's word",
         ],
         [
           "DELETE FROM finding",
@@ -2307,6 +2341,93 @@ describe("the finding under both runtime roles", () => {
           char_start: 12,
           char_end: 20,
         },
+      ]);
+    });
+  });
+
+  it("serves the worker which spans of a document an Admin dismissed, and only its own tenant's", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const document = await seed.sourceDocument({ workspaceId: WS_A });
+      const dismissed = {
+        category: "special-category",
+        ruleId: "HEALTH_CUE",
+        reviewState: "dismissed",
+        reviewedAt: new Date("2026-09-24T10:00:00.000Z"),
+        reviewedBy: `human:${WS_A}`,
+        reviewReason: "our engineers diagnose faults, not people",
+      } as const;
+      await seed.finding({
+        workspaceId: WS_A,
+        documentId: document.id,
+        charStart: 12,
+        charEnd: 60,
+        ...dismissed,
+      });
+      await seed.finding({
+        workspaceId: WS_A,
+        documentId: document.id,
+        category: "special-category",
+        ruleId: "HEALTH_CUE",
+        charStart: 80,
+        charEnd: 140,
+      });
+
+      const theirs = await seed.sourceDocument({ workspaceId: WS_B });
+      await seed.finding({
+        workspaceId: WS_B,
+        documentId: theirs.id,
+        charStart: 12,
+        charEnd: 60,
+        ...dismissed,
+      });
+
+      await client.query("SET LOCAL ROLE worker_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      const spans = await client.query(
+        `SELECT workspace_id, document_id, rule_id, char_start, char_end FROM finding
+          WHERE document_id = ANY($1) AND review_state = 'dismissed'`,
+        [[document.id, theirs.id]],
+      );
+
+      expect(spans.rows).toEqual([
+        {
+          workspace_id: WS_A,
+          document_id: document.id,
+          rule_id: "HEALTH_CUE",
+          char_start: 12,
+          char_end: 60,
+        },
+      ]);
+    });
+  });
+
+  it("holds a document's class no wider than the Admin narrowed it to", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const narrowed = await seed.sourceDocument({
+        workspaceId: WS_A,
+        sensitivity: "Internal",
+        narrowedTo: "Internal",
+      });
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      await client.query("UPDATE source_document SET sensitivity = 'Restricted' WHERE id = $1", [
+        narrowed.id,
+      ]);
+      const refused: string[] = [];
+      for (const statement of [
+        "UPDATE source_document SET sensitivity = 'Public' WHERE id = $1",
+        "UPDATE source_document SET sensitivity = NULL WHERE id = $1",
+        "UPDATE source_document SET narrowed_to = 'Secret' WHERE id = $1",
+      ]) {
+        refused.push(await refusalOf(client, () => client.query(statement, [narrowed.id])));
+      }
+      expect(refused).toEqual([
+        "source_document_narrowed_to_check",
+        "source_document_narrowed_to_check",
+        "source_document_narrowed_to_check",
       ]);
     });
   });
@@ -2511,7 +2632,7 @@ describe("the finding under both runtime roles", () => {
         ["UPDATE finding SET tier = 'sometimes' WHERE id = $1", [always.id], "finding_tier_check"],
 
         [
-          `UPDATE finding SET review_state = 'dismissed', reviewed_at = now(),
+          `UPDATE finding SET review_state = 'ignored', reviewed_at = now(),
                               reviewed_by = 'process:better-answers-test'
              WHERE id = $1`,
           [always.id],

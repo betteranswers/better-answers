@@ -234,6 +234,13 @@ def seed_finding(
     return _returning_row(cursor)
 
 
+_THE_SPAN = (
+    " WHERE workspace_id = %(workspace_id)s AND document_id = %(document_id)s"
+    " AND rule_id = %(rule_id)s AND char_start = %(char_start)s"
+    " AND char_end = %(char_end)s RETURNING *"
+)
+
+
 def seed_narrowed(
     cursor: Cursor[Any],
     *,
@@ -245,10 +252,7 @@ def seed_narrowed(
 ) -> dict[str, Any]:
     cursor.execute(
         "UPDATE finding SET review_state = 'narrowed', reviewed_by = %(admin)s,"
-        " reviewed_at = now()"
-        " WHERE workspace_id = %(workspace_id)s AND document_id = %(document_id)s"
-        " AND rule_id = %(rule_id)s AND char_start = %(char_start)s"
-        " AND char_end = %(char_end)s RETURNING *",
+        " reviewed_at = now()" + _THE_SPAN,
         {
             "admin": f"human:{ulid()}",
             "workspace_id": workspace_id,
@@ -274,9 +278,7 @@ def seed_restore(
         "UPDATE finding SET restored_at = now(), restored_by = %(admin)s,"
         " restore_reason = %(reason)s, review_state = 'kept-in-text',"
         " reviewed_by = %(admin)s, reviewed_at = now(), review_reason = %(reason)s"
-        " WHERE workspace_id = %(workspace_id)s AND document_id = %(document_id)s"
-        " AND rule_id = %(rule_id)s AND char_start = %(char_start)s"
-        " AND char_end = %(char_end)s RETURNING *",
+        + _THE_SPAN,
         {
             "admin": f"human:{ulid()}",
             "reason": "The account is the company's own, printed on every invoice.",
@@ -286,6 +288,42 @@ def seed_restore(
             "char_start": char_start,
             "char_end": char_end,
         },
+    )
+    return _returning_row(cursor)
+
+
+def seed_dismissal(
+    cursor: Cursor[Any],
+    *,
+    workspace_id: str,
+    document_id: str,
+    rule_id: str,
+    char_start: int,
+    char_end: int,
+) -> dict[str, Any]:
+    cursor.execute(
+        "UPDATE finding SET review_state = 'dismissed', reviewed_by = %(admin)s,"
+        " reviewed_at = now(), review_reason = %(reason)s" + _THE_SPAN,
+        {
+            "admin": f"human:{ulid()}",
+            "reason": "Our engineers diagnose faults in pumps, never in people.",
+            "workspace_id": workspace_id,
+            "document_id": document_id,
+            "rule_id": rule_id,
+            "char_start": char_start,
+            "char_end": char_end,
+        },
+    )
+    return _returning_row(cursor)
+
+
+def seed_admin_narrowing(
+    cursor: Cursor[Any], *, document_id: str, sensitivity: str
+) -> dict[str, Any]:
+    cursor.execute(
+        "UPDATE source_document SET sensitivity = %(sensitivity)s,"
+        " narrowed_to = %(sensitivity)s WHERE id = %(document_id)s RETURNING *",
+        {"sensitivity": sensitivity, "document_id": document_id},
     )
     return _returning_row(cursor)
 

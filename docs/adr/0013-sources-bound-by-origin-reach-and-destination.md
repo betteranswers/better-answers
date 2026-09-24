@@ -97,3 +97,9 @@ Everything else in this ADR and its amendments stands.
 ## Amendment — 2026-09-21, the credential class list is ADR 0041's, not the credential-class rule's (T-184)
 
 A citation repointed, no change of decision. The body above and the record-families consequence each read a source binding's credential as one of the classes the credential-class rule names. The coding-rules audit of 21 September 2026 found that list to be a decision recorded as a rule with nothing checking it, and moved it to **ADR 0041**, which carries the seven classes unchanged. Both citations are struck in the index's convention and repointed there. What this ADR says about a binding's credential — one class, injected per run, the agent token among them — is untouched; only the record that holds the list moves.
+
+## Amendment — 2026-09-24, a document's own class goes back by one road, an Admin's dismissal, and never past the Admin's narrowing (T-220, ADR 0020)
+
+The T-128 amendment says a document's own class can only narrow, and that nothing a document says can widen what its binding decided. The second sentence stands. The first gains one exception, which ADR 0020's amendment of this date builds. When an Admin dismisses every special-category finding the last run raised in a document, the next run lifts the seam's verdict and the document's own class returns to the Admin's narrowing, held on `narrowed_to` since this date, or to NULL, the binding's class, when there is none. It never goes wider than the binding's class, because the derivation still reads the narrower of the two. The widening block this ADR's 27/08 amendment set reads a dismissed finding as reviewed. No other act and no run widens a document: *narrow these documents* only narrows and now also records its word on `narrowed_to`, and a verdict that goes away for any other reason leaves the class where it stood.
+
+Everything else in this ADR and its amendments stands.

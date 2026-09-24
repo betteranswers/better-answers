@@ -543,6 +543,7 @@ const sourceDocumentRefinements = {
   outcome: (schema: z.ZodString) => schema.pipe(z.enum(DOCUMENT_OUTCOMES)),
   quarantineError: (schema: z.ZodString) => schema.regex(QUARANTINE_ERROR),
   sensitivity: (schema: z.ZodString) => schema.pipe(z.enum(SENSITIVITIES)),
+  narrowedTo: (schema: z.ZodString) => schema.pipe(z.enum(SENSITIVITIES)),
 };
 
 export const sourceDocumentSelect = createSelectSchema(sourceDocument, sourceDocumentRefinements);

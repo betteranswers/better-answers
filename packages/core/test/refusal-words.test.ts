@@ -40,6 +40,7 @@ const REGISTER = {
   "media-type-refused": "inapplicable by sources",
   "too-large": "inapplicable by sources",
   "not-the-always-set": "inapplicable by sources",
+  "not-special-category": "inapplicable by sources",
   "widening-refused": "inapplicable by sources",
 
   "no-such-group": "absent by members",

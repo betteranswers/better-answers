@@ -14,6 +14,7 @@ export const SOURCE_REFUSALS = declareRefusals("sources", {
   "media-type-refused": "inapplicable",
   "too-large": "inapplicable",
   "not-the-always-set": "inapplicable",
+  "not-special-category": "inapplicable",
   "widening-refused": "inapplicable",
 });
 

@@ -2,7 +2,7 @@ from collections.abc import Mapping, Sequence
 
 import pytest
 
-from better_answers_worker.redaction import Redaction, Restore, redact
+from better_answers_worker.redaction import Dismissal, Redaction, Restore, redact
 from better_answers_worker.redaction.engine import Finding, Span, spans_detected
 from better_answers_worker.redaction.pins import VERSION_STRING
 from better_answers_worker.redaction.withholdings import (
@@ -20,10 +20,13 @@ from planted_page import (
     A_HEALTH_AND_SAFETY_SENTENCE,
     A_HEALTH_SENTENCE,
     A_PLANTED_JOB_TITLE,
+    A_VERB_FORM_HEALTH_SENTENCE,
     AN_ADDRESS_AROUND_A_NAME,
+    AN_ENGINEERING_DIAGNOSIS,
     FINDINGS_BY_CATEGORY,
     FIXTURE_PAGE,
     PLANTED_SPANS,
+    SERVICE_NOTES_PAGE,
     typed_placeholders_under,
 )
 
@@ -740,6 +743,157 @@ def test_a_restore_moves_neither_the_counts_nor_the_verdict_the_findings_give(
     assert found.verdict == "Restricted"
     assert found.counts["special-category"] == 1
     assert found.counts == on_a_plain_binding.counts
+
+
+THE_ENGINEERS_SENTENCE_AT = (34, 129)
+
+
+THE_DIAGNOSED_SENTENCE_AT = (141, 237)
+
+
+@pytest.fixture(scope="module")
+def service_notes() -> str:
+    return SERVICE_NOTES_PAGE.read_text(encoding="utf-8")
+
+
+@pytest.fixture(scope="module")
+def service_spans(service_notes: str) -> tuple[Span, ...]:
+    return spans_detected(service_notes)
+
+
+def health_findings_on(found: Redaction) -> list[tuple[int, int]]:
+    return [
+        (finding.start, finding.end)
+        for finding in found.findings
+        if finding.category == "special-category"
+    ]
+
+
+def dismissal_at(at: tuple[int, int]) -> Dismissal:
+    return Dismissal(rule_id="HEALTH_CUE", start=at[0], end=at[1])
+
+
+def test_a_health_cue_in_the_verb_form_withholds_its_sentence_and_narrows_the_page(
+    service_notes: str, service_spans: tuple[Span, ...]
+) -> None:
+    start, end = THE_DIAGNOSED_SENTENCE_AT
+
+    found = redact(service_notes, service_spans, THE_SAFE_SET, NO_SUPPRESSIONS, SEED)
+
+    assert service_notes[start:end] == A_VERB_FORM_HEALTH_SENTENCE
+    assert THE_DIAGNOSED_SENTENCE_AT in health_findings_on(found)
+    assert [
+        (withholding.tier, withholding.withheld)
+        for withholding in withholdings_over(
+            found, service_notes, A_VERB_FORM_HEALTH_SENTENCE
+        )
+    ] == [("always", True)]
+    assert A_VERB_FORM_HEALTH_SENTENCE not in found.text
+    assert found.verdict == "Restricted"
+
+
+def test_the_verb_withholds_an_engineers_diagnosis_of_a_fault_too(
+    service_notes: str, service_spans: tuple[Span, ...]
+) -> None:
+    start, end = THE_ENGINEERS_SENTENCE_AT
+
+    found = redact(service_notes, service_spans, THE_SAFE_SET, NO_SUPPRESSIONS, SEED)
+
+    assert service_notes[start:end] == AN_ENGINEERING_DIAGNOSIS
+    assert health_findings_on(found) == [
+        THE_ENGINEERS_SENTENCE_AT,
+        THE_DIAGNOSED_SENTENCE_AT,
+    ]
+    assert AN_ENGINEERING_DIAGNOSIS not in found.text
+
+
+def test_dismissing_every_special_category_finding_lifts_the_verdict_and_nothing_else(
+    service_notes: str, service_spans: tuple[Span, ...]
+) -> None:
+    standing = redact(service_notes, service_spans, THE_SAFE_SET, NO_SUPPRESSIONS, SEED)
+
+    found = redact(
+        service_notes,
+        service_spans,
+        THE_SAFE_SET,
+        NO_SUPPRESSIONS,
+        SEED,
+        dismissals=[
+            dismissal_at(THE_ENGINEERS_SENTENCE_AT),
+            dismissal_at(THE_DIAGNOSED_SENTENCE_AT),
+        ],
+    )
+
+    assert (standing.verdict, standing.lifted) == ("Restricted", False)
+    assert (found.verdict, found.lifted) == (None, True)
+    assert found.text == standing.text
+    assert found.findings == standing.findings
+    assert found.counts == standing.counts
+
+
+def test_a_dismissal_that_leaves_one_special_category_finding_standing_lifts_nothing(
+    service_notes: str, service_spans: tuple[Span, ...]
+) -> None:
+
+    found = redact(
+        service_notes,
+        service_spans,
+        THE_SAFE_SET,
+        NO_SUPPRESSIONS,
+        SEED,
+        dismissals=[dismissal_at(THE_ENGINEERS_SENTENCE_AT)],
+    )
+
+    assert (found.verdict, found.lifted) == ("Restricted", False)
+
+
+def test_a_dismissal_under_another_rule_dismisses_nothing(
+    service_notes: str, service_spans: tuple[Span, ...]
+) -> None:
+    start, end = THE_ENGINEERS_SENTENCE_AT
+    both = [
+        Dismissal(rule_id="UK_NHS", start=start, end=end),
+        dismissal_at(THE_DIAGNOSED_SENTENCE_AT),
+    ]
+
+    found = redact(
+        service_notes,
+        service_spans,
+        THE_SAFE_SET,
+        NO_SUPPRESSIONS,
+        SEED,
+        dismissals=both,
+    )
+
+    assert (found.verdict, found.lifted) == ("Restricted", False)
+
+
+def test_a_keep_lets_a_health_sentence_back_in_and_lifts_nothing(
+    service_notes: str, service_spans: tuple[Span, ...]
+) -> None:
+    kept = [
+        Restore(rule_id="HEALTH_CUE", start=start, end=end)
+        for start, end in (THE_ENGINEERS_SENTENCE_AT, THE_DIAGNOSED_SENTENCE_AT)
+    ]
+
+    found = redact(
+        service_notes, service_spans, THE_SAFE_SET, NO_SUPPRESSIONS, SEED, kept
+    )
+
+    assert AN_ENGINEERING_DIAGNOSIS in found.text
+    assert (found.verdict, found.lifted) == ("Restricted", False)
+
+
+def test_a_page_that_raises_no_special_category_finding_is_never_lifted() -> None:
+    text = "The sort code is 00-00-00 and the account number is 12345678."
+
+    found = redacted_over(
+        text,
+        [("UK_BANK_ACCOUNT", "00-00-00 and the account number is 12345678")],
+        THE_SAFE_SET,
+    )
+
+    assert (found.verdict, found.lifted) == (None, False)
 
 
 def test_each_withheld_character_lies_under_one_written_span_and_a_kept_one_writes_none(

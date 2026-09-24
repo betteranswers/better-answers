@@ -85,6 +85,7 @@ def descriptor_digest() -> str:
                     "raised_by": list(descriptor.raised_by),
                     "threshold": descriptor.threshold,
                     "context": list(descriptor.context),
+                    "cues": list(descriptor.cues),
                     "placeholder": descriptor.placeholder,
                     "narrows_to": descriptor.narrows_to,
                 }
@@ -136,13 +137,30 @@ def test_the_always_set_is_raised_at_least_as_readily_as_a_switchable_one() -> N
         assert 0.0 < descriptor.threshold <= 1.0, descriptor.category
 
 
-def test_every_category_declares_the_words_its_context_enhancer_boosts_on() -> None:
-
+def test_only_a_category_a_pattern_raises_declares_words_its_enhancer_boosts_on() -> (
+    None
+):
     without_context = [
         descriptor.category for descriptor in DESCRIPTORS if not descriptor.context
     ]
 
-    assert without_context == ["person-name"]
+    # A cue's sentence scores a fixed figure and the model is handed no context, so
+    # neither has a score a lemma could boost.
+    assert without_context == ["special-category", "person-name", "job-title"]
+
+
+def test_the_special_category_row_alone_declares_cues_and_they_are_what_withholds() -> (
+    None
+):
+    with_cues = {
+        descriptor.category: descriptor.cues
+        for descriptor in DESCRIPTORS
+        if descriptor.cues
+    }
+
+    assert with_cues == {
+        "special-category": ("diagnose", "diagnosis", "medication", "sickness")
+    }
 
 
 def test_the_analyzer_is_asked_for_exactly_the_entities_the_descriptors_declare() -> (
@@ -213,10 +231,10 @@ def test_the_version_string_is_the_rule_version_and_the_detector_pin() -> None:
     written = VERSION_STRING
 
     assert written == (
-        "4:presidio-2.2.364+gliner-0.2.29+torch-2.14.0"
+        "5:presidio-2.2.364+gliner-0.2.29+torch-2.14.0"
         "+spacy-3.8.16+en-core-web-sm-3.8.0+gliner-multi-pii-v1"
     )
-    assert RULE_VERSION == "4"
+    assert RULE_VERSION == "5"
     assert VERSION_STRING.count(":") == 1
     assert VERSION_STRING.split(":") == [RULE_VERSION, DETECTOR_PIN]
 
@@ -229,10 +247,10 @@ def test_the_version_string_is_written_the_way_the_agreement_says() -> None:
 
 def test_the_rule_version_is_bumped_with_the_table_it_stands_for() -> None:
 
-    digest = "5b20e4baed2c0a147492e0695f18b25b630ab22f28a926b5ad48321fd998bf6c"
+    digest = "e2244c397c2677efaa5017848d17d8d7a499394902b73585bb67f090231b4d8d"
 
     assert descriptor_digest() == digest
-    assert RULE_VERSION == "4"
+    assert RULE_VERSION == "5"
 
 
 def test_the_consumer_domain_list_carries_its_date_and_its_source() -> None:

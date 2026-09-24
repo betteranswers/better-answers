@@ -50,6 +50,8 @@ export {
   type RestoreFindingInput,
 } from "./findings.ts";
 export {
+  dismissAsNotSpecialCategory,
+  dismissAsNotSpecialCategoryInput,
   findingGroupKey,
   findingsOf,
   findingsOfInput,
@@ -57,6 +59,9 @@ export {
   keepInTextInput,
   narrowDocuments,
   narrowDocumentsInput,
+  type DismissAsNotSpecialCategoryInput,
+  type DismissAsNotSpecialCategoryRefusal,
+  type DismissedAsNotSpecialCategory,
   type DocumentsNarrowed,
   type FindingGroup,
   type FindingGroupKey,

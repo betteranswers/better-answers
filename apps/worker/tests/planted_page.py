@@ -11,6 +11,21 @@ FIXTURE_PAGE = (
 )
 
 
+SERVICE_NOTES_PAGE = TEST_DIRECTORY / "fixtures" / "redaction" / "pump-service-notes.md"
+
+
+AN_ENGINEERING_DIAGNOSIS = (
+    "Our engineers diagnose the fault on site before any part is ordered, so a second "
+    "visit\nis rare."
+)
+
+
+A_VERB_FORM_HEALTH_SENTENCE = (
+    "In March he was diagnosed with a heart condition, and the depot rota was covered "
+    "for\nfour weeks."
+)
+
+
 TIER_AGREEMENT = REPO_ROOT / "contracts" / "redaction" / "cases.json"
 
 _AGREEMENT = cast(
