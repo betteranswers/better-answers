@@ -7,15 +7,23 @@ import {
 } from "@better-answers/core/concepts";
 import { attempt, err, ok, type Result } from "@better-answers/core/kernel";
 
+import type { HeadCheckSettings } from "./config.ts";
+import { deadManPing, type PingFetch, type PingOutcome } from "./dead-man-ping.ts";
 import type { Doors } from "./doors.ts";
 import { logger as tierLogger } from "./logger.ts";
 import { reasonOf } from "./ops/index.ts";
 
 export const RECONCILER_INTERVAL_MS = 30_000;
 
+// At thirty seconds a tick, every second tick is once a minute, the scheduler check's period; a
+// ping each tick tells it nothing more.
+const TICKS_PER_PING = 2;
+
 export type ReconcilerDependencies = {
   readonly doors: Doors;
+  readonly settings: HeadCheckSettings;
 
+  readonly fetch?: PingFetch | undefined;
   readonly intervalMs?: number | undefined;
   readonly logger?: Logger | undefined;
 };
@@ -56,21 +64,21 @@ export const startReconciler = (
   const { git, postgres, clock } = dependencies.doors;
   if (git?.ok !== true) return err("no-bundle-store");
   const doors = { git: git.value, postgres, clock };
+  const ping = deadManPing({
+    check: "scheduler",
+    url: dependencies.settings.pingUrl,
+    logger,
+    fetch: dependencies.fetch,
+  });
 
-  const tick = async (): Promise<void> => {
-    const pass = await attempt(() => reconcileEveryWorkspace(RECONCILER, doors));
+  const tick = async (): Promise<PingOutcome> => {
+    const run = await attempt(() => reconcileEveryWorkspace(RECONCILER, doors));
+    const pass = run.ok ? run.value : err(run.error);
     if (!pass.ok) {
       logger.error({ reason: pass.error.message }, "the reconciler tick failed");
-      return;
+      return "fail";
     }
-    if (!pass.value.ok) {
-      logger.error(
-        { reason: pass.value.error.message },
-        "the reconciler could not list the workspaces",
-      );
-      return;
-    }
-    const summary = summaryOf(pass.value.value);
+    const summary = summaryOf(pass.value);
 
     if (summary.stopped.length > 0 || summary.refused.length > 0) {
       logger.warn(summary, "reconciler tick");
@@ -79,6 +87,22 @@ export const startReconciler = (
     } else {
       logger.debug(summary, "reconciler tick");
     }
+    return "ok";
+  };
+
+  // A tick never awaits its ping, so a slow check cannot hold the next tick back.
+  const pinging = new Set<Promise<void>>();
+  let ticked = 0;
+  let failedSincePing = false;
+  const pingOnTheMinute = (outcome: PingOutcome): void => {
+    ticked += 1;
+    failedSincePing ||= outcome === "fail";
+    if (ticked % TICKS_PER_PING !== 0) return;
+    const reported: PingOutcome = failedSincePing ? "fail" : "ok";
+    failedSincePing = false;
+    const sent = ping(reported);
+    pinging.add(sent);
+    void sent.finally(() => pinging.delete(sent));
   };
 
   let inFlight: Promise<void> | undefined;
@@ -87,9 +111,11 @@ export const startReconciler = (
       logger.warn("a reconciler tick was skipped: the previous one is still running");
       return;
     }
-    inFlight = tick().finally(() => {
-      inFlight = undefined;
-    });
+    inFlight = tick()
+      .then(pingOnTheMinute)
+      .finally(() => {
+        inFlight = undefined;
+      });
   }, dependencies.intervalMs ?? RECONCILER_INTERVAL_MS);
   timer.unref();
 
@@ -97,6 +123,7 @@ export const startReconciler = (
     stop: async () => {
       clearInterval(timer);
       await inFlight;
+      await Promise.all(pinging);
     },
   });
 };

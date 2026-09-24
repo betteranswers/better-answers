@@ -2,6 +2,7 @@ import { serve } from "@hono/node-server";
 import { createTransport } from "nodemailer";
 
 import {
+  readHeadCheck,
   readObjectStore,
   readSweeps,
   requireBootstrap,
@@ -71,14 +72,27 @@ serve(
   },
 );
 
-const reconciler = startReconciler({ doors });
+// A wrong setting leaves the head check running unwatched rather than stopping it; the scheduler
+// check's silence tells the operator.
+const headCheck = readHeadCheck();
+if (!headCheck.ok) {
+  logger.error({ reason: headCheck.error.message }, "the scheduler check will not be pinged");
+}
+const headCheckSettings = headCheck.ok ? headCheck.value : { pingUrl: undefined };
+const reconciler = startReconciler({ doors, settings: headCheckSettings });
 if (!reconciler.ok) {
   logger.warn(
     { reason: reconciler.error },
     "no repositories' root is configured (GIT_STORE_DIR): the head check is not running",
   );
 } else {
-  logger.info({ interval_ms: RECONCILER_INTERVAL_MS }, "head check running");
+  logger.info(
+    {
+      interval_ms: RECONCILER_INTERVAL_MS,
+      check_configured: headCheckSettings.pingUrl !== undefined,
+    },
+    "head check running",
+  );
 }
 
 // A wrong setting stops the sweeps and not the api; their check's silence tells the operator.
