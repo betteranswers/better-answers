@@ -207,7 +207,7 @@ describe("the pre-commit hook (T-070)", () => {
   );
 
   it.each(uvCommands())("runs `%s` through uv inside the worker", (command) => {
-    expect(runOf(command)).toContain("uv run --frozen ruff");
+    expect(runOf(command)).toContain("uv run --frozen --only-group dev ruff");
     expect(commands()[command]?.root).toBe("apps/worker/");
 
     expect(() => execFileSync("uv", ["--version"], { stdio: "pipe" })).not.toThrow();

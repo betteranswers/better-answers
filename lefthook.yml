@@ -25,16 +25,17 @@ pre-commit:
       glob: "*.{ts,tsx}"
       run: pnpm exec oxlint {staged_files}
 
+    # Only the dev group syncs, so a commit never fetches torch from a wheel host the clone may not reach.
     ruff-format:
       glob: "*.py"
       root: apps/worker/
-      run: uv run --frozen ruff format {staged_files}
+      run: uv run --frozen --only-group dev ruff format {staged_files}
       stage_fixed: true
 
     ruff-check:
       glob: "*.py"
       root: apps/worker/
-      run: uv run --frozen ruff check {staged_files}
+      run: uv run --frozen --only-group dev ruff check {staged_files}
 
     # A Homebrew binary a clone may not have: a warning and a pass, never a failure.
     actionlint:
