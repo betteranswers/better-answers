@@ -80,6 +80,7 @@ Two boxes of 4 vCPU · 4 GB · 120 GB NVMe. VPC 1 runs all of production — the
 | lifecycle misconfigured | the drill's step 9 lists copies per tier against this matrix |
 | the service itself down | its healthcheck (cron alive, nothing stale in `/staging`); every check's missed ping |
 | a dump during the erasure routine | the routine holds `pg_advisory_lock(41)`; the hourly job skips while it is held |
+| a dump or a mirror sync during a production restore | `restore-production.sh` stops the service before its first change and starts it once `api` answers; a run that stops leaves it stopped (`RUNBOOK.md` page 1) |
 | a dump restored that predates an erasure | `replay-erasures --since` in every restore path |
 | the mirror push fails (VPC 2 down, key rotated) | `git push --mirror` fails → the nightly job fails → missed ping; the bundles in `dumps/git/` are the copy that does not depend on VPC 2 |
 | a job started without its variables | the image probe starts the image as compose does and reads what a job cron starts sees; at run time the job stops at its variable check, logs no closing line and misses its ping |

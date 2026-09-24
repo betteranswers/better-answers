@@ -4,6 +4,7 @@ set -euo pipefail
 : "${DATABASE_URL:?the production owner DSN}" "${REPO_DIR:?}" "${PLATFORM_ENV_FILE:?}" "${STORES_ENV_FILE:?}"
 : "${BACKUP_DUMPS_BUCKET:?}" "${BACKUP_MIRROR_BUCKET:?}" "${BACKUP_AGE_IDENTITY_FILE:?from escrow, for this restore only}"
 [ -s "${BACKUP_AGE_IDENTITY_FILE}" ] || { echo "the identity file is empty or missing" >&2; exit 1; }
+[ -s "${REPO_DIR}/deploy/empty-database.sql" ] || { echo "the checkout at REPO_DIR has no deploy/empty-database.sql" >&2; exit 1; }
 
 dump=latest; tier=daily; objectstore=no; git=no; yes=no
 while [ $# -gt 0 ]; do
@@ -29,6 +30,7 @@ cleanup_work() { rm -rf "${WORK}"; }   # the decrypted dump is personal data
 # No exit trap: the drill's wipe-on-exit is the wrong trap for the box you are saving.
 
 say "# Production restore — dump=${dump} tier=${tier} objectstore=${objectstore} git=${git}"
+say "work directory ${WORK} — the decrypted dump passes through it, and a run that stops leaves it there"
 
 say "## 0 the copy"
 if [ "${dump}" = latest ]; then
@@ -40,7 +42,9 @@ globals=$(rclone lsf "dumps:${BACKUP_DUMPS_BUCKET}/pg/${tier}/" | grep "^globals
 say "restoring ${dump} (taken ${stamp}) — every write since then is lost; every erasure since then is replayed"
 if [ "${yes}" != yes ]; then printf 'Type the dump timestamp (%s) to continue: ' "${stamp}"; read -r typed; [ "${typed}" = "${stamp}" ] || { say "aborted"; exit 1; }; fi
 
-say "## 1 stop the platform stack — nothing writes while the database is replaced (the stores stack stays up)"
+say "## 1 stop the backup service and api — no dump runs and nothing writes while the stores are replaced (the rest of the stores stack stays up)"
+# A dump's locks would hold up the one transaction below, and a nightly run would sync a half-restored object store over its mirror.
+stores stop backup
 platform stop api || true
 
 say "## 2 postgres — the dump read whole before anything changes, then one transaction empties the database and restores it"
@@ -53,23 +57,7 @@ tool pg_restore --no-owner --file=/work/pg.sql /work/pg.dump \
   || { say "REFUSED: ${dump} cannot be read whole — the database is unchanged"; exit 1; }
 [ ! -f "${WORK}/globals.sql.age" ] || tool sh -c 'age -d -i /run/age.key /work/globals.sql.age | psql "$DATABASE_URL" -q' || true
 # Emptied, not --clean: --clean cannot drop a partition's inherited key, keeps what the dump lacks, and recreates tables under the live default grants.
-cat > "${WORK}/empty.sql" <<'SQL'
-SET client_min_messages = warning;
-DO $empty$
-DECLARE
-  held name;
-BEGIN
-  FOR held IN
-    SELECT nspname FROM pg_catalog.pg_namespace
-     WHERE nspname NOT LIKE 'pg\_%' AND nspname <> 'information_schema'
-  LOOP
-    EXECUTE format('DROP SCHEMA %I CASCADE', held);
-  END LOOP;
-END $empty$;
-CREATE SCHEMA public AUTHORIZATION pg_database_owner;
-GRANT USAGE ON SCHEMA public TO PUBLIC;
-COMMENT ON SCHEMA public IS 'standard public schema';
-SQL
+cp "${REPO_DIR}/deploy/empty-database.sql" "${WORK}/empty.sql"
 # One transaction: a statement that fails leaves the database as it was, and no reader sees it half replaced.
 tool sh -c 'psql "$DATABASE_URL" -X -q -o /dev/null --single-transaction -v ON_ERROR_STOP=1 -f /work/empty.sql -f /work/pg.sql'
 # <<< replace the database
@@ -98,13 +86,16 @@ if [ "${git}" = yes ]; then
 fi
 cleanup_work
 
-say "## 6 REPLAY ERASURES completed after ${stamp} — mandatory; a failure here leaves api stopped"
+say "## 6 REPLAY ERASURES completed after ${stamp} — mandatory; a failure here leaves api and the backup service stopped"
 # On api, not migrate: only api carries the git directory and object store this reads.
 platform run --rm --no-deps api pnpm ops replay-erasures --since "${stamp}" | tee -a "${LOG}"
 
 say "## 7 start api and prove it answers"
 platform up -d --wait api
 platform exec -T api pnpm ops smoke --url http://127.0.0.1:3000 | tee -a "${LOG}"
+
+say "## 8 start the backup service — its next hourly run dumps the restored database"
+stores start backup
 
 rto=$(( ( $(date +%s) - T0 ) / 60 ))
 say "## done — RTO ${rto} min. Record it: RUNBOOK.md page 1 names the row (a *restore* audit_event and a backup_run row land with the signals task; until then this log is the record). Delete the age identity from this box now."

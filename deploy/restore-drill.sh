@@ -42,7 +42,10 @@ wipe_staging() {
   # Not "${WORK}": step 0 wipes too, and the report being written lives there.
   platform down --remove-orphans || true; stores down --remove-orphans || true
   sudo rm -rf /data/objectstore/* /data/git/* /data/worker/lmdb/* /data/worker/trees/* /data/backup/staging/*
-  psql "${STAGING_DATABASE_URL}" -qc "drop schema if exists public cascade; create schema public; drop schema if exists index cascade; drop schema if exists drizzle cascade;" || true
+  # >>> empty the database
+  # The file the production restore empties production with, so `public` and its grants come back as they do there.
+  psql "${STAGING_DATABASE_URL}" -X -q -v ON_ERROR_STOP=1 -f "${DEPLOY_DIR}/empty-database.sql"
+  # <<< empty the database
 }
 on_exit() { rc=$?
   if [ "${rc}" -ne 0 ]; then curl -fsS -m 10 -o /dev/null --data-raw "fail" "${HEALTHCHECKS_PING_URL_DRILL}/fail" || true; fi
@@ -67,8 +70,10 @@ rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/pg/daily/${latest}" "${WORK}/pg.dump
 staging_owner=$(printf '%s' "${STAGING_DATABASE_URL}" | sed -E 's|^[a-z]+://([^:/@]+).*|\1|')
 age -d -i "${BACKUP_AGE_IDENTITY_FILE}" "${WORK}/globals.sql.age" | grep -v -E "^(CREATE|ALTER) ROLE \"?${staging_owner}\"?[ ;]" | psql "${STAGING_DATABASE_URL}" -q || true
 age -d -i "${BACKUP_AGE_IDENTITY_FILE}" -o "${WORK}/pg.dump" "${WORK}/pg.dump.age"
+# >>> restore the database
 # --no-owner: the restoring role owns everything; the grants still ride the dump.
 pg_restore --no-owner --dbname="${STAGING_DATABASE_URL}" "${WORK}/pg.dump"
+# <<< restore the database
 say "restored ${latest} (taken ${dump_at}) — RPO $(( ( $(date +%s) - $(date -d "${dump_at:0:8} ${dump_at:9:2}:${dump_at:11:2}" +%s) ) / 60 )) min"
 
 say "## 2 stores up, the staging Garage keyed and its bucket made, migrate"
