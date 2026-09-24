@@ -22,6 +22,10 @@ export type DocumentsNarrowed = inferOutput<Api["sources"]["narrowDocuments"]>;
 
 export type BindingNarrowed = inferOutput<Api["sources"]["narrow"]>;
 
+export type DismissedAsNotSpecialCategory = inferOutput<
+  Api["sources"]["dismissAsNotSpecialCategory"]
+>;
+
 export type Sensitivity = ListedBinding["sensitivity"];
 
 // Narrowest first, the order a narrowing moves in.
@@ -196,6 +200,24 @@ export const useNarrowDocuments = () => {
       },
       onError: (_refusal, _asked, held) => held?.undo(),
       onSettled: (_narrowed, _refusal, asked) => reconcile(asked.bindingId),
+    }),
+  );
+};
+
+export const useDismissAsNotSpecialCategory = () => {
+  const api = useTRPC();
+  const optimistic = useOptimistic();
+  const reconcile = useReconcile();
+  return useMutation(
+    api.sources.dismissAsNotSpecialCategory.mutationOptions({
+      onMutate: (asked) =>
+        optimistic(api.sources.findings.queryKey({ bindingId: asked.bindingId }), (groups) =>
+          groups.map((group) =>
+            groupIsIn(asked.findingGroups, group) ? { ...group, dismissed: group.found } : group,
+          ),
+        ),
+      onError: (_refusal, _asked, held) => held?.undo(),
+      onSettled: (_dismissed, _refusal, asked) => reconcile(asked.bindingId),
     }),
   );
 };

@@ -1,4 +1,4 @@
-import { useId, useState, type FormEvent, type ReactNode } from "react";
+import { useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 
 import type { ApiError } from "@/shared/api/trpc.ts";
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
@@ -8,17 +8,25 @@ import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 
 import { ActDialog } from "./act-dialog.tsx";
-import { outcomeOfFailure } from "./refusal.tsx";
+import { outcomeOfFailure, saidBeforehand } from "./refusal.tsx";
 import {
   groupKeyText,
   keyOf,
   NARROWEST,
+  useBindings,
+  useDismissAsNotSpecialCategory,
   useKeepInText,
   useNarrowDocuments,
+  type DismissedAsNotSpecialCategory,
   type DocumentsNarrowed,
   type FindingGroup,
 } from "./sources-api.ts";
-import { SOURCES_KEYSTROKES, useTickedGroups, type TickedGroups } from "./sources-state.ts";
+import {
+  REVIEW_HEADING,
+  SOURCES_KEYSTROKES,
+  useTickedGroups,
+  type TickedGroups,
+} from "./sources-state.ts";
 import { counted, spokenWord } from "./words.ts";
 
 type Settled<Answer> = {
@@ -26,19 +34,40 @@ type Settled<Answer> = {
   readonly onError: (failure: Error | ApiError) => void;
 };
 
-// Inert until this binding's review has ticked a group: an act over nothing is disabled and reads
-// as such.
-const useBulkAct = (bindingId: string) => {
+const takesAnyGroup = (): boolean => true;
+
+// Inert until this binding's review has ticked groups the act takes: an act over nothing is
+// disabled and reads as such.
+const useBulkAct = (bindingId: string, takes: (group: FindingGroup) => boolean = takesAnyGroup) => {
   const [ticked, tick] = useTickedGroups();
   const [open, setOpen] = useState(false);
   const [outcome, setOutcome] = useState<Outcome>();
-  const ready = ticked?.bindingId === bindingId && ticked.groups.length > 0 ? ticked : undefined;
+  const opener = useRef<HTMLElement>(null);
+  const held = ticked?.bindingId === bindingId ? ticked.groups : [];
+  const ready: TickedGroups | undefined =
+    held.length > 0 && held.every(takes) ? { bindingId, groups: held } : undefined;
+
+  const show = () => {
+    if (ready === undefined) return;
+    opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setOpen(true);
+  };
+
+  // The act's own button is disabled once the selection is spent, so focus it cannot take goes to
+  // the review.
+  const returnFocus = (event: Event) => {
+    event.preventDefault();
+    opener.current?.focus();
+    if (document.activeElement !== opener.current) {
+      document.getElementById(REVIEW_HEADING)?.focus();
+    }
+  };
 
   // A command must read as taken within a tenth of a second, so the dialog closes and the
   // selection is spent before the api answers.
   const command = <Answer,>(said: {
     readonly pending: string;
-    readonly done: (answer: Answer) => string;
+    readonly done: (answer: Answer) => ReactNode;
     readonly run: (ready: TickedGroups, settled: Settled<Answer>) => void;
   }) => {
     if (ready === undefined) return;
@@ -56,33 +85,41 @@ const useBulkAct = (bindingId: string) => {
     });
   };
 
-  return { ready, open, setOpen, outcome, command };
+  return { held, ready, open, setOpen, show, returnFocus, outcome, command };
 };
 
+type BulkActState = ReturnType<typeof useBulkAct>;
+
 function BulkAct(properties: {
-  readonly act: ReturnType<typeof useBulkAct>;
+  readonly act: BulkActState;
   readonly keystroke: Keystroke;
   readonly label: string;
+  readonly unfit?: string;
   readonly dialog: ReactNode;
 }) {
   const { act } = properties;
-  const show = () => {
-    if (act.ready !== undefined) act.setOpen(true);
-  };
-  useKeystroke(properties.keystroke, show);
+  const unfitId = useId();
+  useKeystroke(properties.keystroke, act.show);
+  const unfit = act.held.length > 0 && act.ready === undefined ? properties.unfit : undefined;
 
   return (
     <div className="grid content-start gap-1">
       <Button
         variant="outline"
         size="sm"
-        className="justify-self-start"
+        className="h-auto min-h-8 justify-self-start py-1 text-left whitespace-normal"
         disabled={act.ready === undefined}
         aria-keyshortcuts={properties.keystroke.key}
-        onClick={show}
+        aria-describedby={unfit === undefined ? undefined : unfitId}
+        onClick={act.show}
       >
         {properties.label}
       </Button>
+      {unfit === undefined ? null : (
+        <p id={unfitId} className="text-sm text-muted-foreground">
+          {unfit}
+        </p>
+      )}
       {properties.dialog}
       <OutcomeLine outcome={act.outcome} className="text-sm" />
     </div>
@@ -102,11 +139,49 @@ function TickedList(properties: { readonly groups: readonly FindingGroup[] }) {
   );
 }
 
+// Both reasoned acts land the reason on the ledger beside the Admin who gave it, so they ask for it
+// alike.
+function ReasonedDialog(properties: {
+  readonly act: BulkActState;
+  readonly title: string;
+  readonly consequence: string;
+  readonly onReason: (reason: string) => void;
+}) {
+  const { act } = properties;
+  const reasonId = useId();
+  const formId = useId();
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const reason = new FormData(event.currentTarget).get("reason");
+    if (typeof reason === "string") properties.onReason(reason.trim());
+  };
+
+  return (
+    <ActDialog
+      open={act.open}
+      onOpenChange={act.setOpen}
+      content={{ onCloseAutoFocus: act.returnFocus }}
+      title={properties.title}
+      consequence={properties.consequence}
+      commit={
+        <Button type="submit" form={formId}>
+          {properties.title}
+        </Button>
+      }
+    >
+      <TickedList groups={act.ready?.groups ?? []} />
+      <form id={formId} onSubmit={submit} className="grid gap-2">
+        <Label htmlFor={reasonId}>Reason</Label>
+        <Input id={reasonId} name="reason" required autoComplete="off" />
+      </form>
+    </ActDialog>
+  );
+}
+
 export function KeepInTextAct(properties: { readonly bindingId: string }) {
   const act = useBulkAct(properties.bindingId);
   const keep = useKeepInText();
-  const reasonId = useId();
-  const formId = useId();
   const groups = act.ready?.groups ?? [];
   const named = counted(groups.length, "finding group", "finding groups");
   // Counted off the groups the review listed, so the screen reads nothing of the spans kept.
@@ -116,21 +191,14 @@ export function KeepInTextAct(properties: { readonly bindingId: string }) {
     "spans",
   );
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const reason = new FormData(event.currentTarget).get("reason");
-    if (typeof reason !== "string") return;
+  const kept = (reason: string) => {
     act.command({
       pending: `Keeping ${named} in text.`,
       done: () =>
         `Kept ${named} in text: ${spans} restored, and the index run that lets them back in is queued.`,
       run: (ready, settled) => {
         keep.mutate(
-          {
-            bindingId: ready.bindingId,
-            findingGroups: ready.groups.map(keyOf),
-            reason: reason.trim(),
-          },
+          { bindingId: ready.bindingId, findingGroups: ready.groups.map(keyOf), reason },
           settled,
         );
       },
@@ -143,23 +211,12 @@ export function KeepInTextAct(properties: { readonly bindingId: string }) {
       keystroke={SOURCES_KEYSTROKES.keep}
       label={act.ready === undefined ? "Keep in text" : `Keep ${named} in text`}
       dialog={
-        <ActDialog
-          open={act.open}
-          onOpenChange={act.setOpen}
+        <ReasonedDialog
+          act={act}
           title={`Keep ${named} in text`}
           consequence="Every span of each group goes back into its document's text on the next index run, restored under your name with this reason. An erasure request still outranks a keep."
-          commit={
-            <Button type="submit" form={formId}>
-              Keep {named} in text
-            </Button>
-          }
-        >
-          <TickedList groups={groups} />
-          <form id={formId} onSubmit={submit} className="grid gap-2">
-            <Label htmlFor={reasonId}>Reason</Label>
-            <Input id={reasonId} name="reason" required autoComplete="off" />
-          </form>
-        </ActDialog>
+          onReason={kept}
+        />
       }
     />
   );
@@ -195,6 +252,7 @@ export function NarrowDocumentsAct(properties: { readonly bindingId: string }) {
         <ActDialog
           open={act.open}
           onOpenChange={act.setOpen}
+          content={{ onCloseAutoFocus: act.returnFocus }}
           title={`Narrow ${named} to ${NARROWEST}`}
           consequence={`Each document takes the class ${NARROWEST}. The ticked groups' unreviewed findings are reviewed as narrowed, and every concept citing the documents moves with them. A narrowing never widens, and this screen cannot undo it.`}
           commit={
@@ -209,6 +267,61 @@ export function NarrowDocumentsAct(properties: { readonly bindingId: string }) {
             ))}
           </ul>
         </ActDialog>
+      }
+    />
+  );
+}
+
+// A ulid sorts by when it was minted, so a run at or past the act's own is one that reads it.
+function RunStatus(properties: { readonly bindingId: string; readonly jobId: string }) {
+  const bindings = useBindings();
+  const run = bindings.data?.find((binding) => binding.bindingId === properties.bindingId)?.lastRun;
+  return run === undefined || run === null || run.jobId < properties.jobId ? "queued" : run.status;
+}
+
+const isSpecialCategory = (group: FindingGroup): boolean => group.specialCategory;
+
+export function DismissAsNotSpecialCategoryAct(properties: { readonly bindingId: string }) {
+  const act = useBulkAct(properties.bindingId, isSpecialCategory);
+  const dismiss = useDismissAsNotSpecialCategory();
+  const named = counted(act.ready?.groups.length ?? 0, "finding group", "finding groups");
+
+  const dismissed = (reason: string) => {
+    act.command<DismissedAsNotSpecialCategory>({
+      pending: `Dismissing ${named} as not special category.`,
+      done: (answer) => (
+        <>
+          Dismissed {named} as not special category in{" "}
+          {counted(answer.documentIds.length, "document", "documents")}. The index run that reads
+          the dismissal: <RunStatus bindingId={answer.bindingId} jobId={answer.jobId} />.
+        </>
+      ),
+      run: (ready, settled) => {
+        dismiss.mutate(
+          { bindingId: ready.bindingId, findingGroups: ready.groups.map(keyOf), reason },
+          settled,
+        );
+      },
+    });
+  };
+
+  return (
+    <BulkAct
+      act={act}
+      keystroke={SOURCES_KEYSTROKES.dismiss}
+      label={
+        act.ready === undefined
+          ? "Dismiss as not special category"
+          : `Dismiss ${named} as not special category`
+      }
+      unfit={saidBeforehand("not-special-category")}
+      dialog={
+        <ReasonedDialog
+          act={act}
+          title={`Dismiss ${named} as not special category`}
+          consequence="Every span of each group is reviewed as dismissed under your name with this reason, and the index run that reads the dismissal is queued. On that run, a document whose every special category finding is dismissed goes back to the class an Admin narrowed it to, or to its binding's class if none did. The spans stay withheld unless kept in text."
+          onReason={dismissed}
+        />
       }
     />
   );

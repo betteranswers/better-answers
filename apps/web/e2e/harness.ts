@@ -71,6 +71,7 @@ type SeedFinding = {
   readonly spans: number;
   readonly kept?: boolean;
   readonly overriddenByErasure?: boolean;
+  readonly dismissed?: number;
 };
 
 type SeedDocument = {

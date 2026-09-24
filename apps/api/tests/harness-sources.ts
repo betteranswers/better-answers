@@ -14,14 +14,21 @@ const LEASE_MS = 5 * 60 * 1000;
 
 const KEPT_BECAUSE = "The company's own business fact";
 
-const aFinding = z.object({
-  category: z.string().min(1),
-  ruleId: z.string().min(1),
-  tier: z.enum(REDACTION_TIERS),
-  spans: z.int().positive(),
-  kept: z.boolean().default(false),
-  overriddenByErasure: z.boolean().default(false),
-});
+const DISMISSED_BECAUSE = "The cue caught engineering prose, not health data";
+
+const aFinding = z
+  .object({
+    category: z.string().min(1),
+    ruleId: z.string().min(1),
+    tier: z.enum(REDACTION_TIERS),
+    spans: z.int().positive(),
+    kept: z.boolean().default(false),
+    overriddenByErasure: z.boolean().default(false),
+    dismissed: z.int().nonnegative().default(0),
+  })
+  .refine((finding) => finding.dismissed <= finding.spans, {
+    message: "a group has no more dismissed spans than it has spans",
+  });
 
 const aDocument = z.object({
   title: z.string().min(1),
@@ -89,6 +96,28 @@ const inOneTransaction = async <T>(
   }
 };
 
+// The first spans of a group are the dismissed ones, so a count says how many an Admin dismissed.
+const reviewOf = (finding: z.output<typeof aFinding>, span: number) => {
+  const now = new Date();
+  if (span < finding.dismissed) {
+    return {
+      reviewState: "dismissed",
+      reviewedAt: now,
+      reviewedBy: SUITE_ACTOR,
+      reviewReason: DISMISSED_BECAUSE,
+    };
+  }
+  if (!finding.kept && !finding.overriddenByErasure) return {};
+  return {
+    reviewState: "kept-in-text",
+    reviewedAt: now,
+    reviewedBy: SUITE_ACTOR,
+    restoredAt: now,
+    restoredBy: SUITE_ACTOR,
+    restoreReason: KEPT_BECAUSE,
+  };
+};
+
 const seedFindings = async (
   seed: TestData,
   workspaceId: string,
@@ -98,24 +127,13 @@ const seedFindings = async (
   const overridden: OverriddenSpan[] = [];
   for (const finding of findings) {
     for (let span = 0; span < finding.spans; span += 1) {
-      const now = new Date();
-      const kept = finding.kept || finding.overriddenByErasure;
       const row = await seed.finding({
         workspaceId,
         documentId,
         category: finding.category,
         ruleId: finding.ruleId,
         tier: finding.tier,
-        ...(kept
-          ? {
-              reviewState: "kept-in-text",
-              reviewedAt: now,
-              reviewedBy: SUITE_ACTOR,
-              restoredAt: now,
-              restoredBy: SUITE_ACTOR,
-              restoreReason: KEPT_BECAUSE,
-            }
-          : {}),
+        ...reviewOf(finding, span),
       });
       if (finding.overriddenByErasure) {
         overridden.push({

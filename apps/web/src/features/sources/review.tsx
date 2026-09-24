@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { useKeystroke } from "@/shared/keystrokes.tsx";
 import { Badge } from "@/shared/ui/badge.tsx";
@@ -16,7 +16,11 @@ import {
 } from "@/shared/ui/table.tsx";
 
 import { outcomeOfFailure } from "./refusal.tsx";
-import { KeepInTextAct, NarrowDocumentsAct } from "./review-acts.tsx";
+import {
+  DismissAsNotSpecialCategoryAct,
+  KeepInTextAct,
+  NarrowDocumentsAct,
+} from "./review-acts.tsx";
 import {
   groupIsIn,
   groupKeyText,
@@ -27,7 +31,7 @@ import {
   type FindingGroupKey,
   type ListedBinding,
 } from "./sources-api.ts";
-import { SOURCES_KEYSTROKES, useTickedGroups } from "./sources-state.ts";
+import { REVIEW_HEADING, SOURCES_KEYSTROKES, useTickedGroups } from "./sources-state.ts";
 import { counted, spokenWord } from "./words.ts";
 
 const NOTHING_FOUND = {
@@ -36,6 +40,15 @@ const NOTHING_FOUND = {
   indexed: "The last run found nothing to withhold in this binding.",
   published: "The last run found nothing to withhold in this binding.",
 } satisfies Record<ListedBinding["state"], string>;
+
+function Note(properties: { readonly tag: string; readonly children: ReactNode }) {
+  return (
+    <p className="mt-1">
+      <Badge variant="outline">{properties.tag}</Badge>{" "}
+      <span className="text-muted-foreground">{properties.children}</span>
+    </p>
+  );
+}
 
 function GroupNotes(properties: {
   readonly group: FindingGroup;
@@ -46,21 +59,21 @@ function GroupNotes(properties: {
     <>
       <Badge variant="outline">{group.sensitivity}</Badge>
       {narrowedBySeam ? (
-        <p className="mt-1">
-          <Badge variant="outline">Already narrowed</Badge>{" "}
-          <span className="text-muted-foreground">
-            A special category finding narrowed this document at the seam.
-          </span>
-        </p>
+        <Note tag="Already narrowed">
+          A special category finding narrowed this document at the seam.
+        </Note>
       ) : null}
+      {group.dismissed === 0 ? null : (
+        <Note tag="Dismissed">
+          {counted(group.dismissed, "span", "spans")} as not special category. The seam&apos;s
+          verdict passes over a dismissed span, which stays withheld unless kept in text.
+        </Note>
+      )}
       {group.overriddenByErasure === 0 ? null : (
-        <p className="mt-1">
-          <Badge variant="outline">Kept, still withheld</Badge>{" "}
-          <span className="text-muted-foreground">
-            {counted(group.overriddenByErasure, "kept span", "kept spans")} overridden by an erasure
-            request: an erasure outranks a keep.
-          </span>
-        </p>
+        <Note tag="Kept, still withheld">
+          {counted(group.overriddenByErasure, "kept span", "kept spans")} overridden by an erasure
+          request: an erasure outranks a keep.
+        </Note>
       )}
     </>
   );
@@ -123,16 +136,20 @@ function FindingsTable(properties: {
     if (group !== undefined) toggle(group);
   });
 
+  // A dismissed span narrows nothing once a run reads it, so only a span nobody dismissed says the
+  // seam narrowed its document.
   const narrowedBySeam = new Set(
-    groups.filter((group) => group.specialCategory).map((group) => group.documentId),
+    groups
+      .filter((group) => group.specialCategory && group.dismissed < group.found)
+      .map((group) => group.documentId),
   );
 
   return (
     <Table>
       <TableCaption>
         {counted(held.length, "finding group", "finding groups")} selected. Select a group with{" "}
-        <kbd className="font-mono">{SOURCES_KEYSTROKES.select.key}</kbd>, then keep it in text or
-        narrow its document with the acts above.
+        <kbd className="font-mono">{SOURCES_KEYSTROKES.select.key}</kbd>, then keep it in text,
+        narrow its document or dismiss it as not special category with the acts above.
       </TableCaption>
       <TableHeader>
         <TableRow>
@@ -179,8 +196,6 @@ function FindingsTable(properties: {
   );
 }
 
-export const REVIEW_HEADING = "review-of-the-binding";
-
 export function Review(properties: { readonly binding: ListedBinding }) {
   const { binding } = properties;
   const findings = useFindings(binding.bindingId);
@@ -191,7 +206,7 @@ export function Review(properties: { readonly binding: ListedBinding }) {
         Review of {binding.name}
       </h2>
       <p className="mt-2 text-muted-foreground">
-        What the last run found, per category and rule, counted. No value is shown: the two acts
+        What the last run found, per category and rule, counted. No value is shown: the three acts
         take a finding group, never what it found.
       </p>
 
@@ -205,6 +220,7 @@ export function Review(properties: { readonly binding: ListedBinding }) {
           <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
             <KeepInTextAct bindingId={binding.bindingId} />
             <NarrowDocumentsAct bindingId={binding.bindingId} />
+            <DismissAsNotSpecialCategoryAct bindingId={binding.bindingId} />
           </div>
           <FindingsTable binding={binding} groups={findings.data} />
         </>
