@@ -1,6 +1,6 @@
 # Components — `apps/api`
 
-Level 3. The one TypeScript deployable is transports only (ADR 0029). `server.ts`'s `createServer` mounts them in order behind the hostname fence, and every mount calls `packages/core` through a slice's face. Beside the server, `main.ts` starts two schedules in the same process — the head check and the daily sweep pass — and `ops.ts` is a second entry, `pnpm ops`, over the same doors.
+Level 3. The one TypeScript deployable is transports only (ADR 0029). `server.ts`'s `createServer` mounts them in order behind the hostname fence, and every mount calls `packages/core` through a slice's face. Beside the mounts, `main.ts` starts two schedules in the same process — the head check and the daily sweep pass — and `ops.ts` is a second entry, `pnpm ops`, over the same doors.
 
 ```mermaid
 C4Component
@@ -30,7 +30,7 @@ C4Component
   }
 
   Rel(callers, fence, "Every request enters through", "HTTPS")
-  Rel(main, server, "Serves createServer's app on :3000")
+  Rel(main, server, "Listens on :3000 with what createServer builds")
   Rel(main, reconciler, "Starts")
   Rel(main, sweeps, "Starts")
   Rel(fence, server, "Passes what its hostname allows on to the mounts of")
