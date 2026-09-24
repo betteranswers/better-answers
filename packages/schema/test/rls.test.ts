@@ -333,7 +333,7 @@ describe("the ledger under app_rt", () => {
     });
   });
 
-  it("lets the app's role read and insert a row, and refuses it UPDATE and DELETE (migration 0009)", async () => {
+  it("lets the api's role read and insert a row, and refuses it UPDATE and DELETE (migration 0009)", async () => {
     await withRollback(db.pool, async (client) => {
       const row = await ledgerRowAsApp(client);
 
@@ -357,7 +357,7 @@ describe("the ledger under app_rt", () => {
     });
   });
 
-  it("refuses the app's role every other road to a changed row: an upsert, a cross-tenant insert, a derived column written", async () => {
+  it("refuses the api's role every other road to a changed row: an upsert, a cross-tenant insert, a derived column written", async () => {
     await withRollback(db.pool, async (client) => {
       const row = await ledgerRowAsApp(client);
 
@@ -733,11 +733,11 @@ describe("the concept write path under app_rt", () => {
       await refusesEach(client, [
         [
           "UPDATE concept_index SET title = 'renamed'",
-          "the row is derived from a commit the app made, and the worker makes no commits",
+          "the row is derived from a commit the api made, and the worker makes no commits",
         ],
         [
           "UPDATE concept_index SET sensitivity = 'Public'",
-          "the derived visibility is the app's; a worker that could write it would be a second opinion about who may read a concept",
+          "the derived visibility is the api's; a worker that could write it would be a second opinion about who may read a concept",
         ],
         [
           "DELETE FROM concept_index",
@@ -924,7 +924,7 @@ describe("the graph tables under app_rt", () => {
           "UPDATE graph_node SET kind = 'Product'",
           "a rebuild that could edit a node could edit the live generation's",
         ],
-        ["DELETE FROM graph_node", "sweeping a retired generation is the app's, not this"],
+        ["DELETE FROM graph_node", "sweeping a retired generation is the api's, not this"],
         [
           "UPDATE graph_edge SET section = 'elsewhere'",
           "the same for an edge, whose section and sentence are a concept's own content",
@@ -1182,7 +1182,7 @@ describe("the inbox under app_rt", () => {
     });
   });
 
-  it("refuses the app's role a deleted suggestion, so a decision can never become a silence", async () => {
+  it("refuses the api's role a deleted suggestion, so a decision can never become a silence", async () => {
     await withRollback(db.pool, async (client) => {
       const { here } = await inboxAsApp(client);
 
@@ -2711,7 +2711,7 @@ describe("the erasure request under both runtime roles", () => {
         ],
         [
           AN_ERASURE_ROUTINE,
-          "the routine runs under the platform principal in the app tier, so a worker that could insert one could claim an erasure that never ran",
+          "the routine runs under the platform principal in the api, so a worker that could insert one could claim an erasure that never ran",
           [WS_A, ulid(), request.subjectRequestId, ulid()],
         ],
         [
@@ -3008,7 +3008,7 @@ describe("the migration stamp under worker_rt", () => {
       await refusesEach(client, [
         [
           A_MIGRATION_STAMP,
-          "the app is the only migration owner, so a worker that could stamp one could tell itself the schema had moved",
+          "the api is the only migration owner, so a worker that could stamp one could tell itself the schema had moved",
         ],
         [
           "UPDATE drizzle.__drizzle_migrations SET created_at = 1",

@@ -73,7 +73,7 @@ const finishedAudit = async (
   }
 };
 
-describe("what the app puts on the worker's queue", () => {
+describe("what the api puts on the worker's queue", () => {
   it("queues a rebuild for one of the six reasons, and answers the id it queued", async () => {
     const scenario = await arrange();
 
