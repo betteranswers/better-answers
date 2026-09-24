@@ -9,6 +9,17 @@ export const signedInClient = async (app: TestApp, email: string): Promise<TestC
   return client;
 };
 
+export const displayNameHeldBy = async (
+  app: TestApp,
+  personId: string,
+): Promise<string | undefined> => {
+  const found = await app.database.superuser.query<{ name: string }>(
+    'SELECT name FROM "user" WHERE id = $1',
+    [personId],
+  );
+  return found.rows[0]?.name;
+};
+
 type TestData = ReturnType<typeof testData>;
 
 export const seededIn = async <T>(app: TestApp, work: (seed: TestData) => Promise<T>) => {

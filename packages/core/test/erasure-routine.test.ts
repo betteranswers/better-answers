@@ -33,8 +33,10 @@ import {
   type IdentityArm,
 } from "../src/erasure/index.ts";
 import { actorIdOfPerson, type Result } from "../src/kernel/index.ts";
+import { setDisplayName } from "../src/workspaces/index.ts";
 import { authorLinesOf, bundleHistory, everyObjectOf, objectPresent } from "./bundle.ts";
 import { identityRowsFor, verificationCodeFor } from "./identity-rows.ts";
+import { bootstrap } from "./platform.ts";
 import { ledgerRowsOf } from "./sourced-concept.ts";
 import { objectStoreForSuite, textOf } from "./suite-objects.ts";
 import {
@@ -725,6 +727,29 @@ describe("the ledger an erasure never rewrites", () => {
       "personId",
       "subjectRequestId",
     ]);
+  });
+
+  it("leaves the person's rows in the identity-set ledger as they were, their person id still naming the pseudonymised person", async () => {
+    const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
+    const named = await setDisplayName(bootstrap, scenario.postgres, {
+      personId: person.id,
+      displayName: "Priya Anand",
+    });
+    expect(named.ok).toBe(true);
+    const before = await db().pool.query<{ row: string }>(
+      "SELECT row_to_json(e)::text AS row FROM identity_audit_event e WHERE e.subject_id = $1",
+      [person.id],
+    );
+
+    await completing(scenario, subjectRequestId);
+
+    const after = await db().pool.query<{ row: string }>(
+      "SELECT row_to_json(e)::text AS row FROM identity_audit_event e WHERE e.subject_id = $1",
+      [person.id],
+    );
+    expect(before.rows).toHaveLength(1);
+    expect(after.rows).toEqual(before.rows);
+    expect(await userRowOf(person.id)).toMatchObject({ id: person.id, name: "" });
   });
 
   it("names in its detail the person the map found, whether or not the request named one", async () => {

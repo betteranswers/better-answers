@@ -11,18 +11,15 @@ import type pg from "pg";
 import type { Logger } from "pino";
 import { z } from "zod";
 
-import { ulid, type PlatformPrincipal } from "@better-answers/core/kernel";
+import { ulid } from "@better-answers/core/kernel";
 import {
   withIdentityWrite,
   withScope,
   type PostgresDoor,
 } from "@better-answers/core/store/postgres";
-import { workspacesHeldBy } from "@better-answers/core/workspaces";
+import { hasNoDisplayName, workspacesHeldBy } from "@better-answers/core/workspaces";
 
-const PLATFORM_PRINCIPAL: PlatformPrincipal = {
-  kind: "platform",
-  actorId: "process:better-answers-identity",
-};
+import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
 import {
   account,
   invitation,
@@ -173,7 +170,7 @@ export const createAuth = (deps: AuthDependencies) => {
   const audit = deps.logger.child({ module: "auth" });
 
   const membershipsOf = async (userId: string): Promise<readonly string[]> => {
-    const held = await workspacesHeldBy(PLATFORM_PRINCIPAL, deps.door, userId);
+    const held = await workspacesHeldBy(IDENTITY_PRINCIPAL, deps.door, userId);
     if (held.ok) return held.value;
     if (held.error instanceof Error) throw held.error;
     audit.warn(
@@ -198,9 +195,9 @@ export const createAuth = (deps: AuthDependencies) => {
     database: drizzleAdapter(db, { provider: "pg", schema: identitySchema }),
 
     trustedOrigins: [deps.publicUrl],
-    // The JWT plugin's /token is for services without an OAuth flow; under an OAuth
-    // provider the library asks for it off.
-    disabledPaths: ["/token"],
+    // /token serves callers with no OAuth flow, which the library asks off under a provider;
+    // /update-user writes a display name past its rule.
+    disabledPaths: ["/token", "/update-user"],
     user: {
       additionalFields: {
         credentialsRevokedAt: { type: "date", required: false, input: false },
@@ -223,6 +220,12 @@ export const createAuth = (deps: AuthDependencies) => {
       disableOriginCheck: false,
     },
     databaseHooks: {
+      // A first sign-in may carry a name, which would reach the row past the display-name rule.
+      user: {
+        create: {
+          before: async (person) => ({ data: { ...person, name: "" } }),
+        },
+      },
       session: {
         create: {
           before: async (session) => {
@@ -321,7 +324,7 @@ export const createAuth = (deps: AuthDependencies) => {
         },
         organizationHooks: {
           afterCreateOrganization: async ({ organization }) => {
-            await withScope(PLATFORM_PRINCIPAL, deps.door, organization.id, async (tx) => {
+            await withScope(IDENTITY_PRINCIPAL, deps.door, organization.id, async (tx) => {
               await tx.query("SELECT create_workspace_partition($1)", [organization.id]);
             });
           },
@@ -395,13 +398,16 @@ export const createAuth = (deps: AuthDependencies) => {
             },
 
             shouldRedirect: async ({ session, user: person }) => {
+              // The post-login page asks for a display name first; skipping it for a sole
+              // membership would carry an unnamed person straight to consent.
+              if (hasNoDisplayName(person.name)) return true;
               const held = await membershipsOf(person.id);
               const active = activeWorkspaceOf(session);
               if (active !== undefined && held.includes(active)) return false;
 
               const only = soleOf(held);
               if (only !== undefined) {
-                await withIdentityWrite(PLATFORM_PRINCIPAL, deps.door, (tx) =>
+                await withIdentityWrite(IDENTITY_PRINCIPAL, deps.door, (tx) =>
                   tx.query(
                     "UPDATE session SET active_workspace_id = $1, updated_at = now() WHERE id = $2",
                     [only, session.id],

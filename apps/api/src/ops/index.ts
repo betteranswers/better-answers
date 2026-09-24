@@ -803,9 +803,18 @@ const writeTheReport = async (
 const notSignedIn = (email: string): string =>
   `no-such-user: ${email} has not signed in; have them sign in with an email code first, then run this again`;
 
-const provisionReason = (refusal: ProvisionRefusal | Error, slug: string): string => {
+const noDisplayName = (email: string): string =>
+  `no-display-name: ${email} has given no display name; have them sign in and give one, then run this again`;
+
+const provisionReason = (
+  refusal: ProvisionRefusal | Error,
+  slug: string,
+  email: string,
+): string => {
   if (refusal instanceof Error) return refusal.message;
   switch (refusal) {
+    case "no-display-name":
+      return noDisplayName(email);
     case "slug-taken":
       return `slug-taken: another workspace already holds the slug ${slug}`;
     case "malformed":
@@ -852,7 +861,7 @@ const provisionWorkspaceCommand = async (
     adminUserId: admin.value,
   });
   if (!provisioned.ok) {
-    io.say(`provision-workspace: REFUSED — ${provisionReason(provisioned.error, slug)}`);
+    io.say(`provision-workspace: REFUSED — ${provisionReason(provisioned.error, slug, email)}`);
     return REFUSED;
   }
   const repository = await attempt(() => initRepository(git.value, id));
@@ -875,6 +884,8 @@ const memberReason = (
   switch (refusal) {
     case "no-such-user":
       return notSignedIn(email);
+    case "no-display-name":
+      return noDisplayName(email);
     case "no-such-workspace":
       return `no-such-workspace: ${workspaceId} is not a workspace`;
     case "already-a-member":

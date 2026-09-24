@@ -20,9 +20,11 @@ export function AuthScreen(properties: { readonly title: string; readonly childr
 export function Outcome(properties: {
   readonly tone: "said" | "refused";
   readonly children: ReactNode;
+  readonly id?: string;
 }) {
   return (
     <p
+      id={properties.id}
       role={properties.tone === "refused" ? "alert" : "status"}
       className={
         properties.tone === "refused"

@@ -30,6 +30,8 @@ export const RLS_EXEMPTIONS = {
     "One row saying which tier contract this deploy's api carries: a fact about the deploy, not about a tenant, and the worker reads it before any workspace is in hand.",
   "public.sweep_pass":
     "One row per sweep pass, and a pass covers every workspace at once: a fact about the deploy's schedule that names no tenant and holds counts alone.",
+  "public.identity_audit_event":
+    "The identity-set ledger: an act on a person's own identity belongs to no workspace, so no scope could hold its row; it names people by person id and acts by their word, never a name or an address.",
 } satisfies Record<string, string>;
 
 export const EXEMPT_TABLE_NAMES: readonly string[] = [

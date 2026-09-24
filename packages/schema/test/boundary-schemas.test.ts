@@ -181,6 +181,16 @@ const acceptedRows = {
     },
   ],
 
+  identityAuditEvent: [
+    {
+      id: "01J6GGGGGGGGGGGGGGGGGGGGG5",
+      act: "people.person.named",
+      actor: `human:${USER_ID}`,
+      subjectId: USER_ID,
+      detail: {},
+    },
+  ],
+
   auditEvent: [
     {
       id: AUDIT_EVENT_ID,
@@ -764,6 +774,7 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "contractStamp",
         "sweepPass",
         "auditEvent",
+        "identityAuditEvent",
         "accessRequest",
 
         "conceptIdentity",
@@ -867,6 +878,12 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { ...acceptedRows.auditEvent[0], actor: "Priya Patel" },
       { ...acceptedRows.auditEvent[0], detail: { person: { name: "Priya" } } },
       { ...acceptedRows.auditEvent[2], batchId: "batch-1" },
+    ],
+    identityAuditEvent: [
+      { ...acceptedRows.identityAuditEvent[0], id: "named-1" },
+      { ...acceptedRows.identityAuditEvent[0], act: "billing.person.named" },
+      { ...acceptedRows.identityAuditEvent[0], actor: "Priya Patel" },
+      { ...acceptedRows.identityAuditEvent[0], detail: { person: { name: "Priya" } } },
     ],
 
     accessRequest: [

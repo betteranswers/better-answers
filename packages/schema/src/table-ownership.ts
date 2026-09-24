@@ -43,6 +43,7 @@ export const TABLE_OWNERS = {
   "public.group_member": "members",
   "public.llm_route": "llm",
   "public.audit_event": "audit",
+  "public.identity_audit_event": "audit",
   "public.access_request": "members",
   "index.chunk": "sources",
 
@@ -112,7 +113,7 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "workspaces",
     access: "read and write",
     reason:
-      "Revoking a person's credentials writes the instant every later claim is refused against, and the membership read looks up the person's name and address for the shell.",
+      "Revoking a person's credentials writes the instant every later claim is refused against; the person's own act writes their display name under its one rule, and adding a member or provisioning reads it to refuse a person with none; and the membership read looks up the person's name and address for the shell.",
   },
   {
     table: "public.session",
@@ -139,7 +140,7 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "erasure",
     access: "read and write",
     reason:
-      "The routine's step 5 pseudonymises the row on the person's last membership — the address to a tombstone the erasure pseudonym names, the name cleared, the id kept because every ledger row names it — and reads the address off it first, because the two rows deleted below are keyed by address and not by person. The erasure rehearsal's seed writes one row the other way, the synthetic subject a drill erases, under a reserved domain that resolves nowhere.",
+      "The routine's step 5 pseudonymises the row on the person's last membership — the address to a tombstone the erasure pseudonym names, the name cleared, the id kept because every row of a workspace's ledger and of the identity-set ledger names it — and reads the address off it first, because the two rows deleted below are keyed by address and not by person. The erasure rehearsal's seed writes one row the other way, the synthetic subject a drill erases, under a reserved domain that resolves nowhere.",
   },
   {
     table: "public.member",

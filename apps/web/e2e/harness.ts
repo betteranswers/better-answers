@@ -32,8 +32,12 @@ const ask = async <T>(
 export const provision = (api: APIRequestContext, input: { name: string; adminEmail?: string }) =>
   ask(api, "/workspaces", input, aProvisionedWorkspace);
 
-export const person = (api: APIRequestContext, email: string) =>
-  ask(api, "/people", { email }, aPerson);
+// A display name left out is the harness's own; an empty one is a person who has given none yet.
+export const person = (
+  api: APIRequestContext,
+  email: string,
+  input: { displayName?: string } = {},
+) => ask(api, "/people", { email, ...input }, aPerson);
 
 export const addMember = (
   api: APIRequestContext,

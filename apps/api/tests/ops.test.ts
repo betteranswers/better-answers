@@ -1321,6 +1321,27 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await workspacesWithSlug(app(), slug)).toBe(0);
     });
 
+    it("refuses no-display-name for a person who has signed in and given no display name, says what to do next, and writes nothing", async () => {
+      const admin = await app().person(undefined, "");
+      const slug = aSlug();
+
+      const run = await provisioning(app(), [
+        "--name",
+        "Acme",
+        "--slug",
+        slug,
+        "--admin",
+        admin.email,
+      ]);
+
+      expect(run.exitCode).toBe(1);
+      expect(run.lines).toEqual([
+        `provision-workspace: REFUSED — no-display-name: ${admin.email} has given no display name; have them sign in and give one, then run this again`,
+      ]);
+      expect(await workspacesWithSlug(app(), slug)).toBe(0);
+      expect(await membershipsHeldBy(app(), admin.id)).toBe(0);
+    });
+
     it("refuses slug-taken for a slug another workspace holds, and writes nothing", async () => {
       const first = await app().person();
       const second = await app().person();
@@ -1455,6 +1476,20 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual([
         "add-member: REFUSED — no-such-user: nobody@acme.invalid has not signed in; have them sign in with an email code first, then run this again",
       ]);
+      expect(await rowsOfAct(app(), workspaceId, "people.member.added")).toEqual([]);
+    });
+
+    it("refuses no-display-name for a person who has signed in and given no display name, says what to do next, and writes nothing", async () => {
+      const { workspaceId } = await app().provision();
+      const person = await app().person(undefined, "");
+
+      const run = await adding(app(), workspaceId, person.email, "Editor");
+
+      expect(run.exitCode).toBe(1);
+      expect(run.lines).toEqual([
+        `add-member: REFUSED — no-display-name: ${person.email} has given no display name; have them sign in and give one, then run this again`,
+      ]);
+      expect(await membershipsHeldBy(app(), person.id)).toBe(0);
       expect(await rowsOfAct(app(), workspaceId, "people.member.added")).toEqual([]);
     });
 

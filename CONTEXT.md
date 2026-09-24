@@ -599,8 +599,10 @@ to it by IRI and never restates it (ADR 0014).
   answer must reach and must not, the `Answer` it must or must not reuse, the expected verdict;
   the workspace's tests are replayed retrieval-only when the answer path changes and weekly;
   *stale* when a concept it names is deprecated. _Avoid_: eval (on any screen).
-- **audit event** — the record of one act by an Admin or the platform — what was done, to what, by
-  whom, when, with what confirmations — in the one append-only *ledger*. Every event belongs to
+- **audit event** — the record of one act by an Admin, the platform or a person acting on their own
+  identity — what was done, to what, by whom, when, with what confirmations — in the one
+  append-only *ledger* a workspace keeps, or in the *identity-set ledger* when the act belongs to
+  no workspace. Every event belongs to
   one of four families — **people**, **knowledge**, **sources**, **platform** — named as the first
   word of its *ledger act*, `family.subject.verb`; runs, the *answer audit*, *signals* and spend are
   their own records and never audit events. _Avoid_: log.
@@ -610,6 +612,10 @@ to it by IRI and never restates it (ADR 0014).
   _Avoid_: event type, action name.
 - **ledger** — the one append-only record of every *audit event* a workspace keeps, written in
   the same act it records. _Avoid_: audit log, event log.
+- **identity-set ledger** — the append-only record of the acts that belong to no workspace
+  because they act on a person's identity itself, such as a person giving their own *display
+  name*. It sits beside the *ledger* and uses the same *ledger acts*. A person appears in it by
+  *person id*, never by name or address, and no row is ever rewritten.
 - **erasure request** — a person's request that their personal data leave the platform: what was
   done in every store, when, and when the backups are beyond use. A valid one reaching the bundle
   runs the history-rewrite routine (ADR 0020) and carries the *erasure pseudonym* it minted.

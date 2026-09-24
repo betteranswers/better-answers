@@ -18,9 +18,17 @@ import {
   withPrincipal,
   withScope,
 } from "../store/postgres/index.ts";
+import { hasNoDisplayName } from "./display-name.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
 export { WORKSPACE_REFUSALS } from "./vocabulary.ts";
+export {
+  applyDisplayNameRule,
+  hasNoDisplayName,
+  setDisplayName,
+  setDisplayNameInput,
+} from "./display-name.ts";
+export type { SetDisplayNameRefusal } from "./display-name.ts";
 
 export const TOOLS_LIST_TTL_MS_DEFAULT = 300_000;
 export const TOOLS_LIST_TTL_CONFIG_KEY = "mcp.tools_list_ttl_ms";
@@ -62,7 +70,7 @@ export type ProvisionWorkspaceInput = {
 };
 
 export type ProvisionRefusal = WorkspaceRefusal<
-  "slug-taken" | "workspace-exists" | "no-such-user" | "malformed"
+  "slug-taken" | "workspace-exists" | "no-such-user" | "no-display-name" | "malformed"
 >;
 
 const PROVISION_CONSTRAINTS = {
@@ -70,6 +78,30 @@ const PROVISION_CONSTRAINTS = {
   workspace_pkey: "workspace-exists",
   member_user_id_user_id_fk: "no-such-user",
 } as const satisfies Record<string, ProvisionRefusal>;
+
+type NamedPerson = { readonly id: UserId; readonly name: string };
+
+const personOf = (row: { readonly id: string; readonly name: string }): NamedPerson => ({
+  id: boundarySchemas.user.select.shape.id.parse(row.id),
+  name: row.name,
+});
+
+const personById = async (tx: Tx, id: UserId): Promise<NamedPerson | undefined> => {
+  const rows = await tx.query<{ id: string; name: string }>(
+    'SELECT id, name FROM "user" WHERE id = $1',
+    [id],
+  );
+  const row = rows.rows[0];
+  return row === undefined ? undefined : personOf(row);
+};
+
+type Credited = Result<NamedPerson, WorkspaceRefusal<"no-such-user" | "no-display-name">>;
+
+const credited = (person: NamedPerson | undefined): Credited => {
+  if (person === undefined) return err("no-such-user");
+  if (hasNoDisplayName(person.name)) return err("no-display-name");
+  return ok(person);
+};
 
 export const provisionWorkspace = async (
   platform: PlatformPrincipal,
@@ -90,7 +122,10 @@ export const provisionWorkspace = async (
   if (!row.success || !admin.success) return err("malformed");
 
   const act = await attempt(() =>
-    withScope(platform, door, row.data.id, async (tx) => {
+    withScope(platform, door, row.data.id, async (tx): Promise<Credited> => {
+      const person = credited(await personById(tx, admin.data));
+      if (!person.ok) return person;
+
       await tx.query("INSERT INTO workspace (id, name, slug) VALUES ($1, $2, $3)", [
         row.data.id,
         row.data.name,
@@ -110,20 +145,22 @@ export const provisionWorkspace = async (
         "INSERT INTO workspace_config (workspace_id, key, value) VALUES ($1, $2, $3)",
         [row.data.id, TOOLS_LIST_TTL_CONFIG_KEY, String(TOOLS_LIST_TTL_MS_DEFAULT)],
       );
+      return person;
     }),
   );
 
   if (!act.ok) return err(refusalFor(act.error, PROVISION_CONSTRAINTS));
+  if (!act.value.ok) return err(act.value.error);
   return ok({ workspaceId: row.data.id, actorId: platform.actorId });
 };
 
-const personIdIn = async (tx: Tx, email: string): Promise<UserId | undefined> => {
-  const rows = await tx.query<{ id: string }>(
-    'SELECT id FROM "user" WHERE lower(email) = lower($1)',
+const personByEmail = async (tx: Tx, email: string): Promise<NamedPerson | undefined> => {
+  const rows = await tx.query<{ id: string; name: string }>(
+    'SELECT id, name FROM "user" WHERE lower(email) = lower($1)',
     [email],
   );
-  const id = rows.rows[0]?.id;
-  return id === undefined ? undefined : boundarySchemas.user.select.shape.id.parse(id);
+  const row = rows.rows[0];
+  return row === undefined ? undefined : personOf(row);
 };
 
 export const personIdByEmail = (
@@ -131,7 +168,9 @@ export const personIdByEmail = (
   door: PostgresDoor,
   email: string,
 ): Promise<Result<UserId | undefined, Error>> =>
-  attempt(() => withIdentityRead(platform, door, (tx) => personIdIn(tx, email)));
+  attempt(() =>
+    withIdentityRead(platform, door, async (tx) => (await personByEmail(tx, email))?.id),
+  );
 
 export type AddMemberInput = {
   readonly workspaceId: string;
@@ -140,7 +179,7 @@ export type AddMemberInput = {
 };
 
 export type AddMemberRefusal = WorkspaceRefusal<
-  "malformed" | "no-such-workspace" | "no-such-user" | "already-a-member"
+  "malformed" | "no-such-workspace" | "no-such-user" | "no-display-name" | "already-a-member"
 >;
 
 export type MemberAdded = {
@@ -156,7 +195,7 @@ const holdsARow = async (tx: Tx, statement: string, ...parameters: string[]): Pr
 };
 
 type MembershipRefusal = WorkspaceRefusal<
-  "no-such-workspace" | "no-such-user" | "already-a-member"
+  "no-such-workspace" | "no-such-user" | "no-display-name" | "already-a-member"
 >;
 
 export const addMember = async (
@@ -176,8 +215,9 @@ export const addMember = async (
         if (!(await holdsARow(tx, "SELECT 1 FROM workspace WHERE id = $1", workspaceId.data))) {
           return err("no-such-workspace");
         }
-        const userId = await personIdIn(tx, input.email);
-        if (userId === undefined) return err("no-such-user");
+        const person = credited(await personByEmail(tx, input.email));
+        if (!person.ok) return person;
+        const userId = person.value.id;
         const held = await holdsARow(
           tx,
           "SELECT 1 FROM member WHERE workspace_id = $1 AND user_id = $2",

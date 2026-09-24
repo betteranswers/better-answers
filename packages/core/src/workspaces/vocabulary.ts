@@ -12,6 +12,15 @@ export const WORKSPACE_REFUSALS = declareRefusals("workspaces", {
   "slug-taken": "conflict",
   "workspace-exists": "conflict",
   "already-a-member": "conflict",
+
+  // A person is credited by name wherever they act, so nobody is let in without one.
+  "no-display-name": "precondition",
+
+  "display-name-empty": "malformed",
+  "display-name-not-one-line": "malformed",
+  "display-name-control-character": "malformed",
+  "display-name-angle-bracket": "malformed",
+  "display-name-too-long": "malformed",
 });
 
 export type WorkspaceRefusal<W extends RefusalWordFor<typeof WORKSPACE_REFUSALS>> = W;
