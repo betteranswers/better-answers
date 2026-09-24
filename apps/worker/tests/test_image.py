@@ -881,7 +881,7 @@ def test_the_image_carries_both_converters_at_the_versions_this_tier_pins(
     }
     assert [pinned.get(name) for name in CONVERTER_DISTRIBUTIONS] == [
         "firecrawl-anydoc==0.2.4",
-        "pdf-inspector==1.22.0",
+        "pdf-inspector==1.23.0",
     ]
 
 
