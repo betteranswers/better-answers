@@ -1,13 +1,13 @@
 # Dynamic — `ask` as plan, draft, record (S2)
 
-The answering act as T-113 re-seamed it — the review's one blocking finding: **an act that calls a model holds no transaction while it does.** Probe 2 (10/09/2026) fixed the wrapper's shape: an async-generator body under `workspaceProcedure` runs after the resolving transaction committed and released, so the plan runs in the resolver body, the returned iterable closes over no `Tx`, and the record opens its own transaction. **Planned: S2**, with `open` by locator and unmapped passages waiting on S1.
+The answering act as T-113 re-seamed it — the review's one blocking finding: **an act that calls a model holds no transaction while it does.** Probe 2 (10/09/2026) fixed the wrapper's shape: an async-generator body runs after the resolving transaction committed and released, so the plan runs in the resolver body, the returned iterable closes over no `Tx`, and the record opens its own transaction. The probe ran under `workspaceProcedure`, which the tRPC base has since replaced with three roads — `queryProcedure` in the resolving transaction, `mutationProcedure` under the held read, `ownTransactionProcedure` carrying the doors (`apps/api/src/trpc/base.ts`); the query road's middleware holds the transaction across the resolver body the way the probe's did. **Planned: S2.** `open` by locator landed with S1 (T-134); the unmapped passages are S2's. Today `ask` searches concepts term by term under the predicate and refuses, calling no model.
 
 ```mermaid
 C4Dynamic
   title Dynamic diagram — ask, from the question to the answer audit
 
   System_Ext(claude, "Claude, or the SPA", "The question, as the signed-in person")
-  Container(surface, "MCP entry or tRPC subscription", "queryProcedure", "Resolves the Principal; streams the answer, verdict first")
+  Container(surface, "MCP entry or tRPC subscription", "the MCP surface's withPrincipal; tRPC's queryProcedure", "Resolves the Principal; streams the answer, verdict first")
 
   Container_Boundary(core, "packages/core") {
     Component(plan, "planAnswer", "answering slice, in the resolving transaction", "The full-text hits, the walk from the set, the reuse decision; returns a plan holding no Tx")

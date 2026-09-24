@@ -1,13 +1,13 @@
 # Dynamic — the governed write and its reconciler
 
-One act that changes the bundle — a concept typed on Knowledge, an acceptance in Suggestions, a verification, a conflict's resolution — lands as **one commit and one transaction, in that order, under one lock** (ADR 0012). Every records block on the route goes through this flow; S2 adds the `tsvector`, S3 the owner arm and the unresolved-reference row, S5 the by-run revert.
+One act that changes the bundle — a concept typed on Knowledge, an acceptance in Suggestions, a verification, a conflict's resolution — lands as **one commit and one transaction, in that order, under one lock** (ADR 0012). Every records block on the route goes through this flow; S2 adds the `tsvector`, S3 the owner arm and the unresolved-reference row, S5 the by-run revert. The tRPC procedures in steps 1 and 2 arrive with those blocks — S3's Knowledge, S5's Suggestions, V1's verification. Today the same `writeConcept` is reached by `pnpm ops import-bundle`, the operator acting as a named member (T-307), and by the erasure rehearsal's synthetic concept.
 
 ```mermaid
 C4Dynamic
   title Dynamic diagram — one governed write, then the reconciler's tick
 
   Person(person, "Editor or Admin", "The git author of the act")
-  Container(trpc, "tRPC procedure", "mutationProcedure", "Resolves the Principal under the held read, opens the transaction, calls the slice")
+  Container(trpc, "tRPC procedure", "mutationProcedure; planned S3, S5, V1", "Resolves the Principal under the held read, opens the transaction, calls the slice")
 
   Container_Boundary(core, "packages/core") {
     Component(concepts, "concepts slice", "the act", "Authoring, acceptance, verification, revert; owns the transaction and the lock")
@@ -15,7 +15,7 @@ C4Dynamic
     Component(gitdoor, "store/git", "git binary", "Lock, precondition, commit with the Audit trailer")
     Component(pgdoor, "store/postgres", "pg", "The one transaction the rows land in")
     Component(graphdoor, "store/graph", "delta builder", "The map's delta under the predicate")
-    Component(reconciler, "reconcile", "the concepts slice, called by the api every 30 s", "Head against watermark; replay through the live handler")
+    Component(reconciler, "reconcile", "the concepts slice, called by the api's head check every 30 s", "Head against watermark; replay through the live handler")
   }
 
   ContainerDb(git, "Git store", "bare repository", "One per workspace")
@@ -26,7 +26,7 @@ C4Dynamic
   Rel(concepts, gitdoor, "3. Takes the per-repository lock; checks the hash precondition against the ref")
   Rel(concepts, audit, "4. Mints the audit_event id for the trailer")
   Rel(gitdoor, git, "5. Writes one commit: the person as author, the platform bot as committer, the Audit trailer", "git")
-  Rel(concepts, pgdoor, "6. Writes concept_index and its tsvector, concept_identity, evidence, bundle_commit; runs the audience cascade")
+  Rel(concepts, pgdoor, "6. Writes concept_index (its tsvector from S2), concept_identity, evidence, bundle_commit; runs the audience cascade")
   Rel(concepts, graphdoor, "7. Writes the delta into the same transaction, under the predicate")
   Rel(concepts, audit, "8. Books the ledger row, insert-only, under the id from step 4")
   Rel(pgdoor, postgres, "9. COMMIT; the lock releases after it, so bundle_commit is a prefix of git history", "pg")

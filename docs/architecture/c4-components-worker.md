@@ -1,70 +1,77 @@
 # Components — `apps/worker`
 
-Level 3. The Python tier today is a loop and two job kinds; T-113's verdict 2 is that it is **a host** — S1 gives it a registry of kinds and one `pipeline/` module that alone imports cocoindex, and none of that reshapes the loop. Components the route has not built are marked *planned* with their block.
+Level 3. The Python tier is **a host** (T-113, verdict 2): one loop, a registry of three kinds, one `pipeline/` package that alone imports cocoindex, and a `redaction/` package the pipeline calls. S1 built the host without reshaping the loop. Components the route has not built are marked *planned* with their block. The index run's steps in order are `c4-dynamic-index-run.md`.
 
 ```mermaid
 C4Component
-  title Component diagram — apps/worker, the loop and the host S1 makes of it
+  title Component diagram — apps/worker, the loop and the host
 
-  ContainerDb(postgres, "Postgres", "workspace-scoped role", "The queue, index.chunk, the graph tables, the schema stamp")
+  ContainerDb(postgres, "Postgres", "workspace-scoped role", "The queue, the stamps, finding, source_document, index.chunk, the graph tables")
   ContainerDb(git, "Git store", "read-only mount", "The bundle at the commit on the run row")
-  ContainerDb(objects, "Object store", "Garage, S3", "Landed documents; planned S1")
-  ContainerDb(lmdb, "Per-binding LMDB", "cocoindex Environment", "Memo and target state; planned S1")
+  ContainerDb(objects, "Object store", "Garage, S3", "Originals and normalised redacted copies")
+  ContainerDb(lmdb, "Per-binding LMDB", "cocoindex Environment", "binding/ and findings/, sibling stores")
   System_Ext(models, "Model provider", "The extraction route; planned S7")
 
   Container_Boundary(worker, "apps/worker") {
-    Component(loop, "loop.py", "the image's command", "One pass over every workspace per tick: claim and run one job, or schedule the audit that is due; refuses to claim on a schema-stamp mismatch")
-    Component(queue, "queue.py", "the queue agreement", "claim_job, heartbeat, finish, fail; the lease and its heartbeat; S1 passes the kinds this tier can run")
-    Component(kinds, "KINDS registry", "planned S1", "KINDS[kind](bootstrap, job) returns an Outcome; each kind opens the stores it needs; the host keeps claim, heartbeat, finish and fail")
-    Component(rebuild, "rebuild.py", "full-rebuild kind", "One workspace's graph made again as a new generation, flipped live by one row update; rebuild-equivalence keeps it honest")
-    Component(audit, "audit.py", "nightly", "The parser audit over every concept file, due once a day per workspace")
-    Component(bundle, "bundle.py, concept_file.py, links.py", "dulwich", "Reads the bundle at a commit; parses a concept file to the canonical text and hash the concept-file agreement pins; resolves links")
-    Component(chunker, "chunker.py", "the concept chunker", "Splits a concept's body only, never its frontmatter; S1's document splitter is cocoindex's")
-    Component(pipeline, "pipeline/", "planned S1, the one cocoindex importer", "index_binding(bootstrap, run) returns an IndexOutcome; one asyncpg pool per workspace with SET app.workspace_id; Environments in a bounded LRU; every target managed_by user")
-    Component(redaction, "the redaction seam", "planned S0", "One memoised function, conversion and the detector inside it, versioned rule_version and detector_pin; suppressions an argument; no memo holds an unredacted span")
-    Component(connectors, "connectors/", "planned S4", "Upload today; the website by URL prefix and SharePoint through Graph, each with its converter, the run key and stable ids")
+    Component(loop, "loop.py", "the image's command", "One pass over every workspace per tick: claim and run one job, or enqueue the nightly audit when due; claims nothing while the schema stamp or the contract digest differs")
+    Component(queue, "queue.py", "the queue agreement", "claim_job with the kinds, heartbeat, finish, fail; the lease kept alive beside the run")
+    Component(kinds, "kinds.py — KINDS", "the registry", "nightly-audit, full-rebuild, index: each a handler taking the bootstrap and the claimed job, answering an outcome row")
+    Component(rebuild, "rebuild.py", "full-rebuild", "One workspace's graph made again as a new generation, flipped live by one row update")
+    Component(audit, "audit.py", "nightly-audit", "The parser audit over every concept file")
+    Component(bundle, "bundle.py, concept_file.py, links.py, chunker.py", "dulwich", "Reads the bundle at a commit; the canonical text and hash the concept-file agreement pins; links; the concept chunker")
+    Component(host, "pipeline/host.py, run.py, rows.py", "cocoindex host", "index_binding: a per-workspace asyncpg pool, Environments in a bounded LRU, each binding's two stores, the chunk rows; empties binding/ on wiped or rule-change")
+    Component(landed, "pipeline/landed.py, converter.py, chunks.py", "coco.fn, unmemoised", "Per document under a ceiling by page count: convert — anydoc for docx, pdf-inspector for PDF, text passed through — or quarantine; then detect, redact and split into chunks")
+    Component(detected, "pipeline/detected.py", "coco.fn, memo=True", "detected(normalised_text, detection_key): the one memo, answering spans")
+    Component(redaction, "redaction/", "Presidio, GLiNER, spaCy", "The detector's recognisers and detection key; redact: the block rule, pseudonyms, withholdings, written spans")
+    Component(catalogue, "pipeline/catalogue.py", "psycopg", "Reads the binding and its documents' suppressions, restores and dismissals; records findings, reconciles the catalogue, quarantines")
     Component(extraction, "extraction", "planned S7", "Candidate concepts within the plan and the ceiling, proposed as concept_write_request rows; credentials injected per run")
-    Component(substrate, "schema_view.py, ids.py, health.py, log.py, config.py", "substrate", "The committed schema view drift-checked both ways; the ULID minter; the process probe; one JSON log shape; the box's limits")
+    Component(substrate, "schema_view.py, contract_stamp.py, ids.py, envelope.py, health.py, log.py, config.py", "substrate", "The committed schema view and baked contract digest; the ULID minter; the credential envelope; the process probe; one JSON log shape; the box's limits")
   }
 
-  Rel(loop, queue, "Claims and heartbeats through")
+  Rel(loop, queue, "Claims, heartbeats and enqueues the audit through")
   Rel(queue, postgres, "Calls the queue functions of", "psycopg")
-  Rel(loop, kinds, "Dispatches a claimed job to; planned S1")
-  Rel(kinds, rebuild, "Runs the full-rebuild kind")
-  Rel(kinds, pipeline, "Runs index, with a reason; planned S1. bind and prune are S4's kinds")
-  Rel(loop, audit, "Schedules when due")
-  Rel(rebuild, bundle, "Reads every concept through")
+  Rel(loop, substrate, "Checks both deploy stamps and reports health through")
+  Rel(loop, kinds, "Dispatches a claimed job to")
+  Rel(kinds, audit, "Runs nightly-audit")
+  Rel(kinds, rebuild, "Runs full-rebuild")
+  Rel(kinds, host, "Runs index with the binding and its reason")
   Rel(audit, bundle, "Parses every file through")
-  Rel(rebuild, chunker, "Chunks bodies through")
+  Rel(rebuild, bundle, "Reads and chunks every concept through")
   Rel(bundle, git, "Reads at a commit from", "dulwich")
   Rel(rebuild, postgres, "Writes the new generation into", "psycopg")
 
-  Rel(pipeline, connectors, "Enumerates and fetches through; planned S4")
-  Rel(pipeline, redaction, "Passes every span through before any store; planned S0")
-  Rel(pipeline, objects, "Reads the landed document from", "S3")
-  Rel(pipeline, lmdb, "Memoises in and syncs targets from", "cocoindex")
-  Rel(pipeline, postgres, "Writes index.chunk rows with the visibility columns into", "asyncpg")
+  Rel(host, catalogue, "Reads the binding, then records the run through")
+  Rel(host, landed, "Runs every document through")
+  Rel(landed, objects, "Reads originals from; writes the normalised redacted copy to", "boto3")
+  Rel(landed, detected, "Asks for spans of the normalised text")
+  Rel(detected, redaction, "Runs the detector of, on a memo miss")
+  Rel(landed, redaction, "Withholds and writes placeholders through")
+  Rel(detected, lmdb, "Memoises spans in findings/", "cocoindex")
+  Rel(host, lmdb, "Tracks chunk targets in binding/; removes it to empty a binding", "cocoindex")
+  Rel(catalogue, postgres, "Reads the binding; writes finding and source_document", "psycopg")
+  Rel(host, postgres, "Lands index.chunk rows, after the catalogue commits, through the chunks app", "asyncpg")
   Rel(extraction, models, "Calls per document within the ceiling", "fetch-shaped fake in tests")
   Rel(extraction, postgres, "Proposes concept_write_request rows into", "the concept-inbox agreement")
-  Rel(loop, substrate, "Checks the schema stamp and reports health through")
 
   UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
 ```
 
 ## What the diagram claims
 
-- **The loop stays the loop.** `tick` serves every workspace in turn: claim one job, run it in one transaction with a heartbeat beside it, or schedule the nightly audit. S1 replaces the body of `_run_claimed` with a registry lookup and nothing else in the loop (T-113, worker-host F3).
-- **The worker holds no git credential and writes no bundle.** It reads the bare repository at the commit on the run row over a read-only mount, with dulwich because the runtime image carries no git binary (ADR 0024). A concept it produces reaches the bundle as a `concept_write_request` row an Admin accepts (ADRs 0005, 0012).
-- **One module imports cocoindex.** `pipeline/` is the one importer, a ruff `TID251` entry refusing the import elsewhere; the worker composes the engine's blocks — memoisation, stable ids, target sync, `mount_each`, timeouts — and writes only what the engine has no block for: the run key, claim and lease, attempts and poison, the catalogue, retention, outcome rows, the landing (ADR 0036).
-- **The flow's rows land outside the job's transaction**, so `index.chunk` under row-level security needs a per-workspace pool with a session-level `SET app.workspace_id` set in asyncpg's `setup` hook — after the `RESET ALL` a returned connection gets, and so on every acquisition, never in `init`, which runs once and leaves the second checkout unscoped (corrected 2026-09-11; `pipeline/host.py`'s `open_pool`) — `min_size=0, max_size=2` (probe 4: asyncpg defaults to ten).
-- **A wipe is one act in order** — the binding's chunk rows deleted in the api's transaction, the directory removed, an `index` job enqueued — because `app.drop()` on a user-managed table keeps its rows (probe 4; ADR 0036, amended 2026-09-10).
+- **The loop stays the loop.** `tick` serves every workspace in turn: claim one job with `KINDS`' three kinds and run it with a heartbeat beside it, or, when none is claimable, enqueue the nightly audit if none ran in the last day and none is in flight. `_run_claimed` is a registry lookup and nothing else (T-113, worker-host F3). Before each pass the loop reads both deploy stamps — the newest migration against its committed schema view, `contract_stamp` against the digest baked into the image — and claims nothing while either differs, logging once per disagreement.
+- **The worker holds no git credential and writes no bundle.** It reads the bare repository at the commit on the run row over a read-only mount, with dulwich because the runtime image, `distroless/cc-debian13`, carries no git binary (ADR 0024). A concept it produces reaches the bundle as a `concept_write_request` row an Admin accepts (ADRs 0005, 0012).
+- **One package imports cocoindex.** `pipeline/` is the one importer, a ruff `TID251` entry refusing the import elsewhere; `redaction/` and the converter's libraries are plain Python the pipeline calls. The worker composes the engine's blocks — memoisation, stable ids, target sync, `mount_each`, timeouts — and writes only what the engine has no block for: the run key, claim and lease, attempts and poison, the catalogue, retention, outcome rows, the landing (ADR 0036).
+- **One memo, and it holds no text.** `detected(normalised_text, detection_key)` is the only memoised function; its value is spans — rule id, offsets, score. Conversion, the block rule, pseudonyms and the withholding run outside it on every run, so a fix to any of them reaches every document with no version to bump, and `CONVERTER_PIN` is in no memo key. The *detection key* is the digest of what the detector reads; the finding's version, `rule_version:detector_pin`, is what the seam writes on a finding, never the memo's key (ADR 0036, amended 2026-09-23; `CONTEXT.md`, *detection key*).
+- **Two stores per binding.** `binding/` holds the chunks app and its target-state tracking; `findings/` holds the landed app and the memo. Emptying a binding — reason `wiped` or `rule-change` — removes `binding/` as the run's first statement and spares `findings/`, so the next run re-lands every chunk without detecting a page afresh (the `emptying-a-binding` agreement).
+- **The run's rows land outside the job's transaction.** The catalogue writes commit first over psycopg, so a document's class is on its row before any chunk of it can be read (ADR 0044); the chunk rows land through the engine over asyncpg, on a per-workspace pool whose `setup` hook runs `set_config('app.workspace_id', …)` on every acquisition, `min_size=0, max_size=2` (`pipeline/host.py`'s `open_pool`). No chunk row carries visibility: the four columns left `index.chunk` (T-282, T-283).
 
 ## What each block adds
 
 | Block | Adds to the worker |
 | --- | --- |
-| S0 | The detector as one memoised function beside conversion; the pytest harness asserting every fixture span back against the text by offset |
-| S1 | `KINDS`, `pipeline/`, the per-workspace pool, the Environment LRU with the LMDB size as a signal, `RUST_LOG=warn` bridged into one log shape, the cross-tier document test with the worker as a real process |
-| S4 | A connector per provider with its converter, the estate-size probe, `MAX_CONCURRENT_RUNS=1` measured, citation repair on a gone document |
+| S0 | Landed — `redaction/`: the category descriptors, the recognisers over Presidio and GLiNER, the officer-block rule, pseudonyms, withholdings and written spans; the pytest harness asserting every fixture span back against the text by offset |
+| S1 | Landed — `KINDS`, `pipeline/`, the converter, the per-workspace pool, the Environment LRU with the LMDB size as a signal, `RUST_LOG=warn` bridged into one log shape, the cross-tier document test with the worker as a real process |
+| T-366 | Planned — a workspace-wide suppression the seam applies by exact case-folded match of the subject's identifiers (emails, names, other); today a suppression names one document, and the map finds none |
+| S4 | A connector per provider beside the converter, the estate-size probe, `MAX_CONCURRENT_RUNS=1` measured, citation repair on a gone document, what becomes of findings when a `content_hash` moves |
 | S7 | Extraction over the accepted plan and the ceiling, the template per document kind, conflicts raised never resolved |
 | S8 | *reserve* — the concept unit: the `concept-catch-up` kind, embedding on the fixed route with an `llm_call` per call |
