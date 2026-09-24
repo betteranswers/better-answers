@@ -7,7 +7,7 @@ dependencies = [
     # The bare repositories the worker reads at a commit (ADR 0024), in-process: the
     # runtime image is python:3.13-slim and carries no git binary, so a pure-Python git
     # implementation is one pinned library rather than a second toolchain to patch.
-    # Version read from PyPI's dulwich release metadata on 08/09/2026; Apache-2.0 under
+    # Version read from PyPI's dulwich release metadata on 24/09/2026; Apache-2.0 under
     # its dual licence, which is the arm this repository takes (ADR 0027).
     "dulwich==1.2.15",
     # The claim protocol and every read the two job kinds make. It was in the dev group
@@ -47,7 +47,7 @@ dependencies = [
     # beneath it is the single exception. The wheels are abi3 against CPython 3.11, so
     # one wheel serves this tier's 3.13, and `cp311-abi3` covers manylinux_2_28 on
     # x86_64 and aarch64 as well as macOS arm64, which is every machine this repository
-    # builds on. Version read from PyPI's release metadata on 11/09/2026; Apache-2.0,
+    # builds on. Version read from PyPI's release metadata on 24/09/2026; Apache-2.0,
     # which is the arm this repository takes (ADR 0027).
     #
     # The engine also calls home, and the value that refuses that call is proved
@@ -75,7 +75,7 @@ dependencies = [
     # The object store client the pipeline reads a landed copy with and writes the
     # normalised copy back through. It is this tier's own rather than the engine's S3
     # source, because the bytes are addressed by keys the document's catalogue row
-    # already holds and nothing here walks a bucket. Read from PyPI on 11/09/2026;
+    # already holds and nothing here walks a bucket. Read from PyPI on 24/09/2026;
     # Apache-2.0.
     "boto3==1.43.100",
     # The two converters, one per media type (ADR 0013, amended 20/09/2026). `anydoc`
@@ -89,7 +89,7 @@ dependencies = [
     # Each name and version joins the memoised function's version
     # (`pipeline/converter.py`), so a bump here misses the memo for its media type and is
     # a reprocess somebody chose. Versions read from PyPI's release metadata on
-    # 20/09/2026; both MIT, which is the arm this repository takes (ADR 0027). The wheels
+    # 24/09/2026; both MIT, which is the arm this repository takes (ADR 0027). The wheels
     # are abi3 — `cp310-abi3` for `anydoc` and `cp38-abi3` for `pdf-inspector` — over
     # manylinux_2_17 on x86_64 and aarch64 and macOS arm64, which is every machine this
     # repository builds on.
