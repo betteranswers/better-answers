@@ -219,7 +219,7 @@ export type KeepInTextRefusal =
 export type KeptInText = {
   readonly bindingId: string;
 
-  readonly findingIds: readonly string[];
+  readonly documentIds: readonly string[];
 
   readonly batchId: string | undefined;
 
@@ -257,6 +257,9 @@ const spansOfGroups = async (
   );
   return everyGroupHeld ? ok(spans) : err("no-such-finding");
 };
+
+const documentsHolding = (spans: readonly HeldSpan[]): readonly string[] =>
+  [...new Set(spans.map((span) => span.documentId))].toSorted();
 
 type CommandedSpans = { readonly acting: ActingOnBinding; readonly spans: readonly HeldSpan[] };
 
@@ -333,6 +336,7 @@ export const keepInText = async (
   const { admin, workspaceId, bindingId } = acting;
 
   const named = spans.map((span) => span.id);
+  // One ledger row per span, so the batch counts spans, not the documents the answer names.
   const batchId = named.length > 1 ? ulid() : undefined;
   for (const findingId of named) {
     const restored = await restoreFinding(admin, tx, {
@@ -348,7 +352,7 @@ export const keepInText = async (
   if (!reviewed.ok) return err(reviewed.error);
 
   const jobId = await indexRunQueued(acting, tx, "restored");
-  return ok({ bindingId, findingIds: named, batchId, jobId });
+  return ok({ bindingId, documentIds: documentsHolding(spans), batchId, jobId });
 };
 
 const REVIEW_ACTS = declareActs("sources", {
@@ -533,7 +537,7 @@ export const dismissAsNotSpecialCategory = async (
   );
   if (!reviewed.ok) return err(reviewed.error);
 
-  const documentIds = [...new Set(spans.map((span) => span.documentId))].toSorted();
+  const documentIds = documentsHolding(spans);
   const batchId = documentIds.length > 1 ? ulid() : undefined;
   for (const documentId of documentIds) {
     await record(admin, tx, {
