@@ -23,9 +23,9 @@ import {
 import { latestRunsOf, type SubjectRun } from "../runs/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
-export type BindingState = (typeof BINDING_STATES)[number];
+type BindingState = (typeof BINDING_STATES)[number];
 
-export type QuarantinedDocument = {
+type QuarantinedDocument = {
   readonly documentId: string;
   readonly title: string;
 

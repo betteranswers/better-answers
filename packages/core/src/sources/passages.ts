@@ -110,7 +110,7 @@ export type PassageHit = {
   readonly sensitivity: Sensitivity;
 };
 
-export const MAX_PASSAGE_HITS = 20;
+const MAX_PASSAGE_HITS = 20;
 
 const hitsAsked = (limit: number): number =>
   Math.min(Math.max(Math.trunc(limit), 0), MAX_PASSAGE_HITS);

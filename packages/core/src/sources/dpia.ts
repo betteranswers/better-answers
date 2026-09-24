@@ -50,7 +50,7 @@ const SUB_PROCESSORS = new Map<string, { readonly processor: string; readonly co
 
 const EXCLUDED_PURPOSE: LlmPurpose = "embedding";
 
-export type DpiaRoute = {
+type DpiaRoute = {
   readonly purpose: string;
   readonly provider: string;
   readonly model: string;
