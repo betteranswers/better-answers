@@ -15,11 +15,12 @@ import {
   rehearseErasure,
   seedSyntheticSubject,
   type ErasureRehearsed,
+  type SubjectIdentifiers,
 } from "@better-answers/core/erasure";
 import { ok, type UserPrincipal } from "@better-answers/core/kernel";
 import { bindUpload, bindUploadFields } from "@better-answers/core/sources";
 import { fileAtHead, head, initRepository } from "@better-answers/core/store/git";
-import { listObjects } from "@better-answers/core/store/objects";
+import { getObject, listObjects } from "@better-answers/core/store/objects";
 import {
   folded,
   openPostgres,
@@ -30,7 +31,7 @@ import {
 } from "@better-answers/core/store/postgres";
 import { inputOf } from "@better-answers/core/testing/input";
 import { SWEEPS, withSweepLock } from "@better-answers/core/sweeps";
-import { objectStoreForSuite } from "@better-answers/core/testing/objects";
+import { objectStoreForSuite, textOf } from "@better-answers/core/testing/objects";
 import {
   countWaitingOnLocks,
   until,
@@ -77,6 +78,9 @@ const FROM_THE_COPY_AT = new Date("2026-07-01T12:00:00.000Z");
 const FROM_THE_COPY_SINCE = "2026-06-15T00:00:00Z";
 
 const REPLAYED_AT = new Date("2026-07-15T09:00:00.000Z");
+
+const BEFORE_THE_FINDER_AT = new Date("2026-07-20T12:00:00.000Z");
+const BEFORE_THE_FINDER_SINCE = "2026-07-18T00:00:00Z";
 
 const REHEARSED_AT = new Date("2026-08-01T12:00:00.000Z");
 
@@ -275,6 +279,180 @@ const finishTheJob = async (app: TestApp, workspaceId: string, status: string): 
   throw new Error(`nothing was ever queued in ${workspaceId}`);
 };
 
+type QueuedIndexJob = { readonly id: string; readonly subject_id: string };
+
+const queuedIndexJob = async (app: TestApp, workspaceId: string): Promise<QueuedIndexJob> => {
+  let queued: QueuedIndexJob | undefined;
+  await until(async () => {
+    const found = await app.database.superuser.query<QueuedIndexJob>(
+      "SELECT id, subject_id FROM job WHERE workspace_id = $1 AND kind = 'index' AND status = 'queued'",
+      [workspaceId],
+    );
+    queued = found.rows[0];
+    return queued !== undefined;
+  });
+  if (queued === undefined) throw new Error(`no index job was ever queued in ${workspaceId}`);
+  return queued;
+};
+
+const theIndexJobEnded = async (
+  app: TestApp,
+  workspaceId: string,
+  jobId: string,
+  status: "done" | "failed",
+): Promise<void> => {
+  const outcome = status === "done" ? { chunks: 1, lmdb_bytes: 0 } : { error: "ConversionError" };
+  await app.database.superuser.query(
+    `UPDATE job SET status = $3, attempts = attempts + 1, finished_at = now(), outcome = $4
+      WHERE workspace_id = $1 AND id = $2`,
+    [workspaceId, jobId, status, outcome],
+  );
+};
+
+// This suite runs no worker, so it leaves the rows the worker's run would: each document's text in
+// one chunk, and the job done.
+const theIndexRunLanded = async (
+  app: TestApp,
+  workspaceId: string,
+  readerId: string,
+): Promise<void> => {
+  const run = await queuedIndexJob(app, workspaceId);
+  const reader = await principalOf(app, workspaceId, readerId);
+  const documents = await app.database.superuser.query<{ id: string; original_key: string }>(
+    "SELECT id, original_key FROM source_document WHERE workspace_id = $1 AND binding_id = $2",
+    [workspaceId, run.subject_id],
+  );
+  const client = await app.database.superuser.connect();
+  try {
+    for (const document of documents.rows) {
+      const original = await getObject(reader, objects().door, document.original_key);
+      if (!original.ok) throw new Error(`the original was not readable: ${original.error}`);
+      const content = await textOf(original.value);
+      await testData(client).chunk({
+        workspaceId,
+        bindingId: run.subject_id,
+        sourceDocumentId: document.id,
+        content,
+        locator: `${document.id}/chars:0-${content.length}`,
+        ordinal: 0,
+        charStart: 0,
+        charEnd: content.length,
+      });
+    }
+  } finally {
+    client.release();
+  }
+  await theIndexJobEnded(app, workspaceId, run.id, "done");
+};
+
+const theIndexRunFailed = async (app: TestApp, workspaceId: string): Promise<void> => {
+  const run = await queuedIndexJob(app, workspaceId);
+  await theIndexJobEnded(app, workspaceId, run.id, "failed");
+};
+
+const boundAndIndexed = async (
+  app: TestApp,
+  workspaceId: string,
+  adminId: string,
+  text: string,
+): Promise<void> => {
+  const admin = await principalOf(app, workspaceId, adminId);
+  const bytes = new TextEncoder().encode(text);
+  const bound = await bindUpload(
+    admin,
+    { postgres: app.doors.postgres, objects: objects().door },
+    {
+      ...inputOf(bindUploadFields, {
+        bindingId: ulid(),
+        name: "The claims handbook",
+        fileName: "claims-handbook.md",
+        mediaType: "text/markdown",
+        byteSize: bytes.byteLength,
+      }),
+      body: new Blob([bytes]).stream(),
+    },
+  );
+  if (!bound.ok) throw new Error(`the bind was refused: ${String(bound.error)}`);
+  await theIndexRunLanded(app, workspaceId, adminId);
+};
+
+// Completed while the documents finder answered nothing, so its run wiped no binding.
+const completedBeforeTheFinder = async (
+  app: TestApp,
+  workspaceId: string,
+  at: Date,
+  identifiers: SubjectIdentifiers,
+): Promise<string> => {
+  const client = await app.database.superuser.connect();
+  try {
+    const seed = testData(client);
+    const request = await seed.subjectRequest({
+      workspaceId,
+      kind: "erasure",
+      personId: null,
+      identifiers,
+      receivedAt: at,
+    });
+    const erasure = await seed.erasureRequest({
+      workspaceId,
+      subjectRequestId: request.id,
+      anchoredAt: at,
+      completedAt: at,
+      report: "the report its first run wrote",
+    });
+    return erasure.id;
+  } finally {
+    client.release();
+  }
+};
+
+const whatAReplayActsOn = async (app: TestApp, workspaceId: string) => ({
+  chunks: (
+    await app.database.superuser.query<{ id: string }>(
+      `SELECT id FROM "index".chunk WHERE workspace_id = $1 ORDER BY id`,
+      [workspaceId],
+    )
+  ).rows,
+  jobs: (
+    await app.database.superuser.query<{ kind: string; reason: string | null; status: string }>(
+      "SELECT kind, reason, status FROM job WHERE workspace_id = $1 ORDER BY enqueued_at, id",
+      [workspaceId],
+    )
+  ).rows,
+  erasures: (
+    await app.database.superuser.query<{ id: string; completed_at: Date; report: string }>(
+      "SELECT id, completed_at, report FROM erasure_request WHERE workspace_id = $1",
+      [workspaceId],
+    )
+  ).rows,
+  suppressions: (
+    await app.database.superuser.query<{ identifiers: unknown }>(
+      "SELECT identifiers FROM suppression WHERE workspace_id = $1",
+      [workspaceId],
+    )
+  ).rows,
+});
+
+const tokensTheChunksHold = async (
+  app: TestApp,
+  workspaceId: string,
+  tokens: readonly string[],
+): Promise<readonly string[]> => {
+  const found = await app.database.superuser.query<{ content: string }>(
+    `SELECT content FROM "index".chunk WHERE workspace_id = $1`,
+    [workspaceId],
+  );
+  return tokens.filter((token) => found.rows.some((row) => row.content.includes(token)));
+};
+
+const indexJobsIn = async (app: TestApp, workspaceId: string) => {
+  const found = await app.database.superuser.query<{ reason: string; status: string }>(
+    "SELECT reason, status FROM job WHERE workspace_id = $1 AND kind = 'index' ORDER BY enqueued_at, id",
+    [workspaceId],
+  );
+  return found.rows;
+};
+
 const principalOf = async (app: TestApp, workspaceId: string, userId: string) => {
   const principal = await withPrincipal(
     app.doors.postgres,
@@ -461,6 +639,71 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
+    it("wipes the binding of a bound document naming the subject of a completed request and queues its index run, and a second run changes nothing but the ledger", async () => {
+      const { workspaceId, admin } = await app().provision();
+      await initRepository(openTestGit(app()), workspaceId);
+      const identifiers: SubjectIdentifiers = {
+        emails: ["sam.okafor@meridianfenland.co.uk"],
+        names: ["Sam Okafor"],
+        other: [],
+      };
+      await boundAndIndexed(
+        app(),
+        workspaceId,
+        admin.id,
+        "Expense claims go to Sam Okafor at sam.okafor@meridianfenland.co.uk by Friday.\n",
+      );
+      const indexedBefore = await whatAReplayActsOn(app(), workspaceId);
+      const erasureRequestId = await completedBeforeTheFinder(
+        app(),
+        workspaceId,
+        BEFORE_THE_FINDER_AT,
+        identifiers,
+      );
+
+      const first = await opsWith(
+        app(),
+        ["replay-erasures", "--since", BEFORE_THE_FINDER_SINCE],
+        {},
+      );
+      const afterTheFirst = await whatAReplayActsOn(app(), workspaceId);
+      const second = await opsWith(
+        app(),
+        ["replay-erasures", "--since", BEFORE_THE_FINDER_SINCE],
+        {},
+      );
+
+      const replayedOnce = [
+        `replay-erasures: ${erasureRequestId} in workspace ${workspaceId} — ` +
+          "completed 2026-07-20T12:00:00.000Z, read from the restored rows",
+        "replay-erasures: done — replayed 1 erasure since 2026-07-18T00:00:00.000Z",
+      ];
+      expect(indexedBefore.chunks).toHaveLength(1);
+      expect([first.exitCode, first.lines]).toEqual([0, replayedOnce]);
+      expect(afterTheFirst).toEqual({
+        chunks: [],
+        jobs: [
+          { kind: "index", reason: "bound", status: "done" },
+          { kind: "index", reason: "wiped", status: "queued" },
+        ],
+        erasures: [
+          {
+            id: erasureRequestId,
+            completed_at: BEFORE_THE_FINDER_AT,
+            report: "the report its first run wrote",
+          },
+        ],
+        suppressions: [{ identifiers }],
+      });
+      expect([second.exitCode, second.lines]).toEqual([0, replayedOnce]);
+      expect(await whatAReplayActsOn(app(), workspaceId)).toEqual(afterTheFirst);
+      expect(
+        (await ledgerOf(app(), workspaceId)).filter(
+          (row) => row.act === "platform.erasure.replayed",
+        ),
+      ).toHaveLength(2);
+    });
+
     it("refuses without a repositories' root, because an erasure it cannot rewrite is not replayed", async () => {
       const run = await opsWith(app(), ["replay-erasures", "--since", "2026-09-01T02:05:00Z"], {
         doors: { git: undefined },
@@ -626,38 +869,140 @@ describe("pnpm ops — the restore scripts' commands", () => {
   });
 
   describe("erasure-rehearsal — the drill's proof that an erasure erases", () => {
-    it("seeds the synthetic subject and prints their tokens on its last line", async () => {
-      const { workspaceId } = await app().provision();
-      await initRepository(openTestGit(app()), workspaceId);
+    const pinned = { doors: { clock: { now: () => REHEARSED_AT } } };
 
-      const run = await opsWith(
-        app(),
-        ["erasure-rehearsal", "--workspace", workspaceId, "--synthetic", "--seed"],
-        { doors: { clock: { now: () => REHEARSED_AT } } },
-      );
+    const aWorkspaceToDrillIn = async () => {
+      const provisioned = await app().provision();
+      await initRepository(openTestGit(app()), provisioned.workspaceId);
+      return provisioned;
+    };
+
+    // Phase one waits on the worker's run over its document, and the suite plays the worker.
+    const seededBeside = async (workspaceId: string, worker: () => Promise<void>) => {
+      const [seed] = await Promise.all([
+        opsWith(
+          app(),
+          ["erasure-rehearsal", "--workspace", workspaceId, "--synthetic", "--seed"],
+          pinned,
+        ),
+        worker(),
+      ]);
+      return seed;
+    };
+
+    const seeded = (workspaceId: string, readerId: string) =>
+      seededBeside(workspaceId, () => theIndexRunLanded(app(), workspaceId, readerId));
+
+    it("seeds the synthetic subject, answers once the document naming them is indexed, and prints their tokens on its last line", async () => {
+      const { workspaceId, admin } = await aWorkspaceToDrillIn();
+
+      const run = await seeded(workspaceId, admin.id);
 
       expect(run.exitCode).toBe(0);
 
       const email = `subject-${workspaceId.toLowerCase()}@erasure-rehearsal.example.test`;
-      expect(run.lines.at(-1)).toBe(`${email},human:${email},Rehearsal subject ${workspaceId}`);
-      const seeded = await app().database.superuser.query(
+      expect(run.lines).toEqual([
+        `erasure-rehearsal: done — the synthetic subject of ${workspaceId} is seeded (a user row, an Admin membership, one concept file and one indexed document naming them); take the dump, then run phase two`,
+        `${email},human:${email},Rehearsal subject ${workspaceId}`,
+      ]);
+      const seededRow = await app().database.superuser.query(
         'SELECT 1 FROM "user" WHERE lower(email) = lower($1)',
         [email],
       );
-      expect(seeded.rowCount).toBe(1);
+      expect(seededRow.rowCount).toBe(1);
+    });
+
+    it("leaves the subject's work address and name in the chunk table after phase one and in no chunk after phase two, the document's binding queued to be indexed again", async () => {
+      const { workspaceId, admin } = await aWorkspaceToDrillIn();
+      const email = `subject-${workspaceId.toLowerCase()}@erasure-rehearsal.example.test`;
+      const name = `Rehearsal subject ${workspaceId}`;
+
+      const seed = await seeded(workspaceId, admin.id);
+      const tokens = (seed.lines.at(-1) ?? "").split(",");
+      const indexedBefore = await tokensTheChunksHold(app(), workspaceId, tokens);
+      const run = await opsWith(
+        app(),
+        [
+          "erasure-rehearsal",
+          "--workspace",
+          workspaceId,
+          "--synthetic",
+          "--run",
+          "--report",
+          await reportPath(),
+        ],
+        pinned,
+      );
+
+      expect(indexedBefore).toEqual([email, name]);
+      expect(run.exitCode).toBe(0);
+      expect(await tokensTheChunksHold(app(), workspaceId, tokens)).toEqual([]);
+      expect(await indexJobsIn(app(), workspaceId)).toEqual([
+        { reason: "bound", status: "done" },
+        { reason: "wiped", status: "queued" },
+      ]);
+    });
+
+    it("refuses phase one when the worker's run over the subject's document fails, since a dump would then find them in no chunk", async () => {
+      const { workspaceId } = await aWorkspaceToDrillIn();
+
+      const run = await seededBeside(workspaceId, () => theIndexRunFailed(app(), workspaceId));
+
+      const [indexRun] = await indexJobsIn(app(), workspaceId);
+      const jobs = await jobsOf(app(), workspaceId);
+      expect(run.exitCode).toBe(1);
+      expect(indexRun).toEqual({ reason: "bound", status: "failed" });
+      expect(run.lines).toEqual([
+        `erasure-rehearsal: REFUSED — the synthetic subject's document is not indexed: job ${jobs[0]?.id ?? ""} is failed after 1 attempt; the job's own row says what it found`,
+      ]);
+    });
+
+    it("refuses phase one when no worker indexes the subject's document within the seconds it was given", async () => {
+      const { workspaceId } = await aWorkspaceToDrillIn();
+
+      const run = await opsWith(
+        app(),
+        [
+          "erasure-rehearsal",
+          "--workspace",
+          workspaceId,
+          "--synthetic",
+          "--seed",
+          "--wait-seconds",
+          "1",
+        ],
+        {},
+      );
+
+      const jobs = await jobsOf(app(), workspaceId);
+      expect(run.exitCode).toBe(1);
+      expect(run.lines).toEqual([
+        `erasure-rehearsal: REFUSED — the synthetic subject's document is not indexed: job ${jobs[0]?.id ?? ""} is still queued after 1 second, so no worker has indexed it`,
+      ]);
+    });
+
+    it("answers usage to a wait that is not a whole number of seconds", async () => {
+      const run = await ops(app(), [
+        "erasure-rehearsal",
+        "--workspace",
+        "ws_synthetic",
+        "--synthetic",
+        "--seed",
+        "--wait-seconds",
+        "a minute",
+      ]);
+
+      expect(run.exitCode).toBe(2);
+      expect(run.lines).toEqual([
+        "erasure-rehearsal: --wait-seconds takes a whole number of seconds",
+      ]);
     });
 
     it("erases them, writes the routine's own report to the file, and prints the tokens again", async () => {
-      const { workspaceId } = await app().provision();
-      await initRepository(openTestGit(app()), workspaceId);
+      const { workspaceId, admin } = await aWorkspaceToDrillIn();
       const file = await reportPath();
-      const pinned = { doors: { clock: { now: () => REHEARSED_AT } } };
 
-      const seed = await opsWith(
-        app(),
-        ["erasure-rehearsal", "--workspace", workspaceId, "--synthetic", "--seed"],
-        pinned,
-      );
+      const seed = await seeded(workspaceId, admin.id);
 
       const run = await opsWith(
         app(),
@@ -688,14 +1033,8 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("leaves the operator the erasure's line in the tier's log, naming its request, its arm and what it deleted, and no address", async () => {
-      const { workspaceId } = await app().provision();
-      await initRepository(openTestGit(app()), workspaceId);
-      const pinned = { doors: { clock: { now: () => REHEARSED_AT } } };
-      await opsWith(
-        app(),
-        ["erasure-rehearsal", "--workspace", workspaceId, "--synthetic", "--seed"],
-        pinned,
-      );
+      const { workspaceId, admin } = await aWorkspaceToDrillIn();
+      await seeded(workspaceId, admin.id);
 
       const run = await opsWith(
         app(),
@@ -1225,6 +1564,21 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(run.exitCode).toBe(0);
       expect(run.lines).toEqual(["jane…st: present in 1 line(s) outside any COPY section"]);
+    });
+
+    it("names a chunk partition as pg_dump heads its section, which is the table the drill's grep before the erasure looks for", async () => {
+      const partitioned = [
+        'COPY index."chunk_01K5ZQ8WJ6T3M4N7P9R2S0V1X" (id, workspace_id, content) FROM stdin;',
+        "c1\t01K5ZQ8WJ6T3M4N7P9R2S0V1X\tClaims go to jane@example.test by Friday.",
+        "\\.",
+        "",
+      ].join("\n");
+
+      const run = await ops(app(), ["dump-grep", "--tokens", "jane@example.test"], partitioned);
+
+      expect(run.lines).toEqual([
+        'jane…st: present in 1 line(s) of table index."chunk_01K5ZQ8WJ6T3M4N7P9R2S0V1X"',
+      ]);
     });
 
     it("does not count the COPY header, whose column names are the schema and not a row", async () => {

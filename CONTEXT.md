@@ -659,8 +659,9 @@ to it by IRI and never restates it (ADR 0014).
 - **erasure rehearsal** — the *restore drill*'s proof that erasure erases, run against *staging* in
   two phases so a dump can be taken between them: a **synthetic subject** — a person the platform
   invented, addressed under a reserved domain that resolves nowhere — is seeded into a workspace
-  with a membership and a concept file naming them, and the erasure routine is then run over them
-  and answers with the real report. Its **tokens** are the values that subject is greppable by in a
+  with a membership, a concept file naming them and a bound document naming them by their address
+  and their name, which the first phase waits to see indexed; the erasure routine is then run over
+  them and answers with the real report. Its **tokens** are the values that subject is greppable by in a
   dump, each one a value the erasure removes; *token* here is `dump-grep --tokens`' sense of the
   word and never a credential (*personal token*, *agent token*).
 - **version (of a record)** — one state of a composition or a guide definition, kept for good with

@@ -55,9 +55,9 @@ The three dates are computed **from the timestamp of the last dump before the re
 
 A backup that restores proves the platform comes back. It does not prove that an erasure erased, which is the one claim a restore path cannot make for itself, so every third month the drill makes it on a synthetic subject, in **seven steps that each rest on the one before**:
 
-1. **Seed** the synthetic subject — a person, an Admin membership and one concept file naming them, in one commit. The command prints the subject's tokens (email, address, display name) on its last line.
+1. **Seed** the synthetic subject — a person, an Admin membership, one concept file naming them in one commit, and one bound document naming them by their work address and by name. The command waits for the worker to index the document, and refuses if the index job ends in anything but done or has not ended when the wait the drill gives it runs out. It prints the subject's tokens (email, address, display name) on its last line.
 2. **`pg_dump`** the whole staging database to plain SQL, on the host.
-3. **`dump-grep`** that dump for the tokens and **find them**. If they are not there the seed did not do what it says, and every step below would prove nothing.
+3. **`dump-grep`** that dump for the tokens and **find them, the index's chunk table among the tables that hold them**. If they are not there the seed did not do what it says, and every step below would prove nothing; if no chunk holds them, step 6 would prove nothing about the index.
 4. **Run the routine**, under the platform principal, writing the report the drill keeps.
 5. **`pg_dump` again**, the same database, whole.
 6. **`dump-grep` again** and find them gone — **from every table but two**.

@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { find, open, renderFind, renderOpen } from "../src/answering/index.ts";
+import { ERASURE, recordSubjectRequest, runErasure } from "../src/erasure/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { enqueueJob } from "../src/runs/index.ts";
 import {
@@ -20,6 +21,7 @@ import {
   reprocessBinding,
   reprocessBindingInput,
 } from "../src/sources/index.ts";
+import { getObject } from "../src/store/objects/index.ts";
 import type { Tx } from "../src/store/postgres/index.ts";
 import {
   bankDetailsGroupOf,
@@ -40,7 +42,7 @@ import {
 } from "./cross-tier-fixture.ts";
 import { groupNamed, seededBy } from "./sourced-concept.ts";
 import { inputOf } from "./suite-input.ts";
-import { objectStoreForSuite } from "./suite-objects.ts";
+import { objectStoreForSuite, textOf } from "./suite-objects.ts";
 import { answered, leaseLetLapse, readingAs, until } from "./suite-postgres.ts";
 import { lmdbRootUnder, runWorkerOnce } from "./worker-process.ts";
 import { suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
@@ -71,8 +73,8 @@ const acting = <T>(who: UserPrincipal, work: (principal: UserPrincipal, tx: Tx) 
 const runTheWorker = (workerId: string): Promise<void> =>
   runWorkerOnce(db().connectionUri, bundles().root, workerId, store());
 
-const boundHandbook = (scenario: Scenario, called?: string) =>
-  bindTheHandbook(scenario.admin, doorsOf(scenario), called);
+const boundHandbook = (scenario: Scenario, called?: string, text?: string) =>
+  bindTheHandbook(scenario.admin, doorsOf(scenario), called, text);
 
 type ChunkRow = {
   readonly id: string;
@@ -556,6 +558,126 @@ describe("one uploaded document, read back through both tiers", () => {
       expect(await chunksOf(scenario.workspaceId, kept.bindingId)).toEqual(before);
       expect(standing.byteLength).toBeGreaterThan(0);
       expect(standing.includes(THE_PLACEHOLDER)).toBe(false);
+    },
+    A_CROSS_TIER_ALLOWANCE_MS,
+  );
+});
+
+// A work address no detector rule raises, so only the erasure withholds it.
+const THE_WORK_ADDRESS = "ann.raman@meridianfenland.co.uk";
+const THE_NAME = "Ann Raman";
+const THE_SURNAME = "Raman";
+
+const THE_HANDBOOK_NAMING_ANN =
+  "# The depot handbook\n\n" +
+  "Overtime is paid at time and a quarter after the fortieth hour.\n\n" +
+  `Overtime claims go to ${THE_NAME} at ${THE_WORK_ADDRESS} by Friday.\n`;
+
+const THE_PASSAGE_ANN_ERASED_FROM =
+  "# The depot handbook\n\n" +
+  "Overtime is paid at time and a quarter after the fortieth hour.\n\n" +
+  "Overtime claims go to [withheld] at [withheld] by Friday.\n";
+
+const ASKED_AT = new Date("2026-09-24T09:00:00.000Z");
+const ERASED_AT = new Date("2026-09-24T10:00:00.000Z");
+const ERASED_AGAIN_AT = new Date("2026-09-24T11:00:00.000Z");
+
+const erasureRecordedAbout = async (scenario: Scenario): Promise<string> => {
+  const recorded = answered(
+    await acting(scenario.admin, (admin, tx) =>
+      recordSubjectRequest(admin, tx, {
+        kind: "erasure",
+        identifiers: { emails: [THE_WORK_ADDRESS], names: [THE_NAME], other: [] },
+        personId: null,
+        receivedAt: ASKED_AT,
+        clockStartedAt: ASKED_AT,
+      }),
+    ),
+  );
+  return recorded.requestId;
+};
+
+const erasing = async (scenario: Scenario, subjectRequestId: string, at: Date) => {
+  const run = await runErasure(
+    ERASURE,
+    {
+      git: scenario.git,
+      postgres: scenario.postgres,
+      objects: store().door,
+      clock: { now: () => at },
+      log: { info: () => undefined },
+    },
+    { workspaceId: scenario.workspaceId, subjectRequestId },
+  );
+  if (!run.ok) throw new Error(`the routine refused: ${String(run.error)}`);
+  return run.value;
+};
+
+const documentsTheMapFound = (run: Awaited<ReturnType<typeof erasing>>) =>
+  run.map.find((entry) => entry.family === "source-document")?.locations;
+
+const passagesFoundBy = async (who: UserPrincipal, query: string) => {
+  const found = answered(await finding(who, query));
+  const passages: string[] = [];
+  for (const hit of found.hits) {
+    if (hit.layer !== "sources") continue;
+    const opened = answered(await opening(who, hit.locator));
+    if (opened.found && opened.passage !== undefined) passages.push(opened.passage.text);
+  }
+  return passages;
+};
+
+const normalisedCopyOf = async (scenario: Scenario, documentId: string): Promise<string> => {
+  const read = await db().pool.query<{ normalised_key: string | null }>(
+    "SELECT normalised_key FROM source_document WHERE workspace_id = $1 AND id = $2",
+    [scenario.workspaceId, documentId],
+  );
+  const key = read.rows[0]?.normalised_key;
+  if (key == null) throw new Error("the run wrote no normalised copy");
+  const copy = await getObject(scenario.admin, store().door, key);
+  if (!copy.ok) throw new Error(`the normalised copy was not readable: ${copy.error}`);
+  return textOf(copy.value);
+};
+
+describe("an erasure over a bound document that names the subject, read back through both tiers", () => {
+  it(
+    "leaves find no passage and the normalised copy no word naming the subject by their work address or their name, and a second run over the request after the worker's finds no document, wipes nothing and queues no index run",
+    async () => {
+      const scenario = await arrange();
+      const bound = await boundHandbook(scenario, "claims-handbook.md", THE_HANDBOOK_NAMING_ANN);
+      await runTheWorker("cross-tier-6");
+      await publishedHandbook(scenario, bound.bindingId);
+      const namedBefore = await passagesFoundBy(scenario.viewer, THE_SURNAME);
+      const addressedBefore = await passagesFoundBy(scenario.viewer, THE_WORK_ADDRESS);
+      const copiedBefore = await normalisedCopyOf(scenario, bound.documentId);
+      const subjectRequestId = await erasureRecordedAbout(scenario);
+
+      const erased = await erasing(scenario, subjectRequestId, ERASED_AT);
+      await runTheWorker("cross-tier-6");
+
+      const namedBySurname = await passagesFoundBy(scenario.viewer, THE_SURNAME);
+      const namedByAddress = await passagesFoundBy(scenario.viewer, THE_WORK_ADDRESS);
+      const onTheTopic = await passagesFoundBy(scenario.viewer, THE_QUERY);
+      const copied = await normalisedCopyOf(scenario, bound.documentId);
+      const landed = await chunksOf(scenario.workspaceId, bound.bindingId);
+      const runs = await indexRunsOf(scenario.workspaceId, bound.bindingId);
+
+      const again = await erasing(scenario, subjectRequestId, ERASED_AGAIN_AT);
+
+      expect(namedBefore).toEqual([THE_HANDBOOK_NAMING_ANN]);
+      expect(addressedBefore).toEqual([THE_HANDBOOK_NAMING_ANN]);
+      expect(copiedBefore).toBe(THE_HANDBOOK_NAMING_ANN);
+      expect(documentsTheMapFound(erased)).toEqual([bound.documentId]);
+
+      expect(namedBySurname).toEqual([]);
+      expect(namedByAddress).toEqual([]);
+      expect(onTheTopic).toEqual([THE_PASSAGE_ANN_ERASED_FROM]);
+      expect(copied).toBe(THE_PASSAGE_ANN_ERASED_FROM);
+      expect(runs.map((run) => run.status)).toEqual(["done", "done"]);
+
+      expect(documentsTheMapFound(again)).toEqual([]);
+      expect(await chunksOf(scenario.workspaceId, bound.bindingId)).toEqual(landed);
+      expect(await indexRunsOf(scenario.workspaceId, bound.bindingId)).toEqual(runs);
     },
     A_CROSS_TIER_ALLOWANCE_MS,
   );

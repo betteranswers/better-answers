@@ -28,6 +28,23 @@ const deployScripts = (): readonly string[] =>
     .filter((file) => file.endsWith(".sh"))
     .sort();
 
+const fencedIn = (script: string, name: string): string | undefined => {
+  const opened = script.split(`>>> ${name}`)[1];
+  return opened?.slice(opened.indexOf("\n") + 1).split(`# <<< ${name}`)[0];
+};
+
+type BashRun = { readonly code: number; readonly output: string };
+
+const bashRan = (lines: readonly string[], input = ""): BashRun => {
+  const script = ["set -euo pipefail", 'say() { printf "%s\\n" "$*"; }', ...lines].join("\n");
+  try {
+    return { code: 0, output: execFileSync("bash", ["-c", script], { encoding: "utf8", input }) };
+  } catch (thrown) {
+    const failed: { status?: number; stdout?: string } = thrown ?? {};
+    return { code: failed.status ?? -1, output: failed.stdout ?? "" };
+  }
+};
+
 const renovateSchema = z.object({
   enabledManagers: z.array(z.string()),
   customManagers: z
@@ -328,27 +345,17 @@ describe("the deploy tree (T-005)", () => {
   it("fails the drill when the rehearsal's seed exits anything but the 3 that means not built", () => {
     const drill = read("deploy/restore-drill.sh");
 
-    const opened = drill.split(">>> seed status")[1];
-    const guard = opened?.slice(opened.indexOf("\n") + 1).split("# <<< seed status")[0];
+    const guard = fencedIn(drill, "seed status");
     expect({ markers: guard !== undefined }).toEqual({ markers: true });
 
-    const ran = (status: number): { readonly code: number; readonly output: string } => {
-      const script = [
-        "set -euo pipefail",
+    const ran = (status: number): BashRun =>
+      bashRan([
         "NOT_BUILT=3",
         'DRILL_WORKSPACE="a-workspace"',
-        'say() { printf "%s\\n" "$*"; }',
         `platform() { printf 'priya@example.invalid,1 High St,Priya Anand\\n'; return ${String(status)}; }`,
         guard ?? "",
         'say "the proof ran, subject=${subject}"',
-      ].join("\n");
-      try {
-        return { code: 0, output: execFileSync("bash", ["-c", script], { encoding: "utf8" }) };
-      } catch (thrown) {
-        const failed: { status?: number; stdout?: string } = thrown ?? {};
-        return { code: failed.status ?? -1, output: failed.stdout ?? "" };
-      }
-    };
+      ]);
 
     const seeded = ran(0);
     expect({ code: seeded.code, proved: seeded.output.includes("the proof ran") }).toEqual({
@@ -366,6 +373,42 @@ describe("the deploy tree (T-005)", () => {
     expect({ code: refused.code, failed: refused.output.includes("REHEARSAL FAILED") }).toEqual({
       code: 1,
       failed: true,
+    });
+  });
+
+  it("fails the drill when the pre-erasure dump holds the subject in no chunk, since the grep after the erasure would then prove nothing of the index", () => {
+    const drill = read("deploy/restore-drill.sh");
+
+    const check = fencedIn(drill, "found before");
+    expect({ markers: check !== undefined }).toEqual({ markers: true });
+
+    const ran = (grepped: readonly string[]): BashRun =>
+      bashRan(
+        [
+          'WORK="$(mktemp -d)"',
+          'cat > "${WORK}/pre-erasure.grep"',
+          check ?? "",
+          'say "the erasure ran"',
+        ],
+        `${grepped.join("\n")}\n`,
+      );
+
+    const inAChunk = ran([
+      "subj…st: present in 1 line(s) of table public.user",
+      'subj…st: present in 1 line(s) of table index."chunk_01K5ZQ8WJ6T3M4N7P9R2S0V1X"',
+    ]);
+    const inNoChunk = ran(["subj…st: present in 1 line(s) of table public.user"]);
+    const inNoTable = ran(["subj…st: absent"]);
+
+    expect(inAChunk).toEqual({ code: 0, output: "the erasure ran\n" });
+    expect(inNoChunk).toEqual({
+      code: 1,
+      output:
+        "REHEARSAL FAILED: the seeded subject is in no chunk of the pre-erasure dump, so the dump grep after would prove nothing of the index\n",
+    });
+    expect(inNoTable).toEqual({
+      code: 1,
+      output: "REHEARSAL FAILED: the seeded subject is in no table of the pre-erasure dump\n",
     });
   });
 

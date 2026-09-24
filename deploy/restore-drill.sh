@@ -146,7 +146,8 @@ if [ $(( $(date +%-m) % 3 )) -eq 0 ]; then
   # A fence: the deploy tree's suite lifts the lines between the markers and runs them.
   # >>> seed status
   seed_rc=0
-  subject=$(platform exec -T api pnpm --silent ops erasure-rehearsal --workspace "${DRILL_WORKSPACE}" --synthetic --seed | tail -n1) || seed_rc=$?
+  # The seed's index job queues behind whatever the restore left for the drill workspace.
+  subject=$(platform exec -T api pnpm --silent ops erasure-rehearsal --workspace "${DRILL_WORKSPACE}" --synthetic --seed --wait-seconds 600 | tail -n1) || seed_rc=$?
   if [ "${seed_rc}" -ne 0 ] && [ "${seed_rc}" -ne "${NOT_BUILT}" ]; then
     say "REHEARSAL FAILED: the synthetic seed exited ${seed_rc}, which is not the ${NOT_BUILT} that says the erasure slice has no tables"; exit 1
   fi
@@ -157,11 +158,18 @@ if [ $(( $(date +%-m) % 3 )) -eq 0 ]; then
 
     pg_dump --format=plain --dbname="${STAGING_DATABASE_URL}" > "${WORK}/pre-erasure.sql"
 
-    if platform exec -T api pnpm --silent ops dump-grep --tokens "${subject}" < "${WORK}/pre-erasure.sql" | tee -a "${REPORT}" | grep -q ': present in '; then
-      say "dump grep before: the subject is in the pre-erasure copy (expected; the report's expiry dates cover it)"
-    else
+    platform exec -T api pnpm --silent ops dump-grep --tokens "${subject}" < "${WORK}/pre-erasure.sql" > "${WORK}/pre-erasure.grep"
+    cat "${WORK}/pre-erasure.grep" >> "${REPORT}"
+    # >>> found before
+    if ! grep -q ': present in ' "${WORK}/pre-erasure.grep"; then
       say "REHEARSAL FAILED: the seeded subject is in no table of the pre-erasure dump"; exit 1
     fi
+    # A chunk table the subject was never in would pass the grep after the erasure without proving the index lets them go.
+    if ! grep -q -E ' of table index\."?chunk' "${WORK}/pre-erasure.grep"; then
+      say "REHEARSAL FAILED: the seeded subject is in no chunk of the pre-erasure dump, so the dump grep after would prove nothing of the index"; exit 1
+    fi
+    # <<< found before
+    say "dump grep before: the subject is in the pre-erasure copy, the index's chunk table among it (expected; the report's expiry dates cover it)"
 
     platform exec -T api pnpm --silent ops erasure-rehearsal --workspace "${DRILL_WORKSPACE}" --synthetic --run --report /tmp/erasure.md | tee -a "${REPORT}"
     platform exec -T api cat /tmp/erasure.md >> "${REPORT}"
