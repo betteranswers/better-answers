@@ -9,14 +9,24 @@ on:
         description: "Re-test every mutant (stryker --force); off reuses the previous run's results"
         type: boolean
         default: false
+      ceiling-minutes:
+        description: "Minutes before each leg is cancelled, its checkpoint kept; empty is 120, and 350 at most, since a hosted job is terminated at 360"
+        type: number
+
+# Overlapping runs would each start from the same checkpoint, and the later upload, however poorer, would win.
+concurrency:
+  group: mutation-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   stryker:
     runs-on: ubuntu-26.04
-    timeout-minutes: 120
+    # A dispatch hands its inputs over as strings, and the timeout refuses anything but a number.
+    timeout-minutes: ${{ fromJSON(inputs.ceiling-minutes || '120') }}
     strategy:
       fail-fast: false
       matrix:
@@ -40,38 +50,57 @@ jobs:
       - run: uv sync --frozen
         working-directory: apps/worker
       - uses: ./.github/actions/git-filter-repo
-      # Split, because the combined action saves only on success and so discards a
-      # cancelled leg's checkpoint.
+      # An artifact, not the Actions cache: the build's layers fill the cache, and it evicts a checkpoint read once a night.
       - name: the previous run's mutant results
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ matrix.path }}/reports/mutation/stryker-incremental.json
-          # An entry is written once, so the run id keeps the key new and the prefix restores.
-          key: stryker-incremental-${{ matrix.name }}-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: stryker-incremental-${{ matrix.name }}-
-      - name: the previous run's report, kept as the summary's baseline
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          ARTIFACT: stryker-incremental-${{ matrix.name }}
+          REPORTS: ${{ matrix.path }}/reports/mutation
+          # The head repository is checked because a fork's pull request can name its branch main.
+          NEWEST_CHECKPOINT: >-
+            [.[].artifacts[]
+            | select((.expired | not)
+            and .workflow_run.head_repository_id == .workflow_run.repository_id
+            and (.workflow_run.head_branch == "main" or .workflow_run.head_branch == env.BRANCH))]
+            | max_by(.created_at) // empty
+            | "\(.workflow_run.id) \(.created_at)"
         run: |
-          f=${{ matrix.path }}/reports/mutation/stryker-incremental.json
-          if [ -f "$f" ]; then cp "$f" "${{ matrix.path }}/reports/mutation/baseline.json"; fi
+          set -euo pipefail
+          if ! pages="$(gh api --paginate --slurp "repos/${REPOSITORY}/actions/artifacts?name=${ARTIFACT}&per_page=100")"; then
+            echo "::error::the artifacts API would not list ${ARTIFACT} to this run's token"
+            exit 1
+          fi
+          if ! newest="$(jq --raw-output "${NEWEST_CHECKPOINT}" <<<"${pages}")"; then
+            echo "::error::the artifacts API answered with something other than a list of ${ARTIFACT}"
+            exit 1
+          fi
+          if [ -z "${newest}" ]; then
+            echo "No run on main or ${BRANCH} has left ${ARTIFACT}, so this leg tests every mutant."
+            exit 0
+          fi
+          read -r run uploaded <<<"${newest}"
+          gh run download "${run}" --repo "${REPOSITORY}" --name "${ARTIFACT}" --dir "${REPORTS}"
+          cp "${REPORTS}/stryker-incremental.json" "${REPORTS}/baseline.json"
+          echo "Restored ${ARTIFACT} from run ${run}, uploaded ${uploaded}."
       # `exec` leaves one process from the step down, so cancellation reaches Stryker.
       - name: mutation
         working-directory: ${{ matrix.path }}
         run: exec node_modules/.bin/stryker run ${{ inputs.force && '--force' || '' }}
-      - name: this run's mutant results, whether or not it finished
-        if: always()
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ matrix.path }}/reports/mutation/stryker-incremental.json
-          key: stryker-incremental-${{ matrix.name }}-${{ github.run_id }}-${{ github.run_attempt }}
       - name: score and new survivors to the job summary
         if: always()
         run: |
           node scripts/mutation-summary.mjs --leg ${{ matrix.name }} \
             --report ${{ matrix.path }}/reports/mutation/mutation.json \
             --baseline ${{ matrix.path }}/reports/mutation/baseline.json >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      # The checkpoint rather than the report: a cancelled leg writes only the checkpoint.
+      - name: this run's mutant results, whether or not it finished
         if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: stryker-${{ matrix.name }}
-          path: ${{ matrix.path }}/reports/mutation/mutation.json
+          name: stryker-incremental-${{ matrix.name }}
+          path: ${{ matrix.path }}/reports/mutation/stryker-incremental.json
           retention-days: 14
+          # A re-run keeps the run id, so its first attempt's artifact may already hold this name.
+          overwrite: true
