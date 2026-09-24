@@ -162,13 +162,15 @@ const theBindingRowNowSays = async (
   );
 };
 
+// The schema refuses a class wider than the Admin's narrowing, so the narrowing goes with it.
 const theDocumentRowNowSays = async (
   workspaceId: string,
   documentId: string,
   sensitivity: Sensitivity | null,
 ): Promise<void> => {
   await db().pool.query(
-    "UPDATE source_document SET sensitivity = $3 WHERE workspace_id = $1 AND id = $2",
+    `UPDATE source_document SET sensitivity = $3, narrowed_to = NULL
+      WHERE workspace_id = $1 AND id = $2`,
     [workspaceId, documentId, sensitivity],
   );
 };
