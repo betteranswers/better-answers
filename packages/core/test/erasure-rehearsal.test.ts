@@ -207,8 +207,10 @@ describe("the rehearsal", () => {
         `${BEYOND_USE}.`,
     );
     expect(report).toContain(
-      "The object store is untouched: a company document that mentions a person is suppressed " +
-        "when it is next reprocessed, never deleted.",
+      "The original files in the object store are untouched; the identifiers named in this " +
+        "request are withheld from the text of every document in this workspace, those held now " +
+        "and those bound later, each time a document is indexed; and the documents found above " +
+        "are indexed again now.",
     );
     expect(report).toContain("Exports already issued are not recalled. None have been issued.");
   });

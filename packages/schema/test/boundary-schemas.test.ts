@@ -437,7 +437,6 @@ const acceptedRows = {
     {
       workspaceId: WS_ID,
       erasureRequestId: ERASURE_REQUEST_ID,
-      documentId: DOCUMENT_ID,
       identifiers: { emails: ["person@example.invalid"], names: ["A person"], other: [] },
     },
   ],

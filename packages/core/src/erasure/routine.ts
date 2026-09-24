@@ -30,7 +30,7 @@ import {
   type ErasureRecord,
 } from "./report.ts";
 import { monthsOn, type SubjectRequest } from "./requests.ts";
-import { suppressTheDocuments, type Suppressed } from "./suppressions.ts";
+import { suppressInTheWorkspace, type Suppressed } from "./suppressions.ts";
 
 const ERASURE_ACTOR = "process:better-answers-erasure";
 
@@ -75,7 +75,7 @@ const ERASURE_ACTS = declareActs("people", {
 
 type CompletedDetail = DetailOf<(typeof ERASURE_ACTS)["completed"]["detail"]>;
 
-export type ErasureRefusal = "malformed" | "no-such-request" | "not-an-erasure" | "no-address";
+export type RunErasureRefusal = "malformed" | "no-such-request" | "not-an-erasure" | "no-address";
 
 export type ErasureRun = {
   readonly workspaceId: string;
@@ -147,7 +147,7 @@ const openTheRoutine = async (
 
       readonly completedAt: Date | null;
     },
-    ErasureRefusal
+    RunErasureRefusal
   >
 > => {
   const found = await tx.query(
@@ -284,8 +284,8 @@ const withTheDocumentsStep = (
   ...actions,
   [SOURCE_DOCUMENT]: {
     ...actions[SOURCE_DOCUMENT],
-    suppressed: documents.suppressed,
-    bindings: documents.bindingsToReprocess.length,
+    bindingsReindexed: documents.bindingsToReprocess.length,
+    identifiersWithheld: documents.identifiersWithheld,
   },
 });
 
@@ -346,7 +346,7 @@ export const runErasure = async (
     readonly log: ErasureLog;
   },
   input: { readonly workspaceId: string; readonly subjectRequestId: string },
-): Promise<Result<ErasureRun, ErasureRefusal | Error>> => {
+): Promise<Result<ErasureRun, RunErasureRefusal | Error>> => {
   const workspace = boundarySchemas.workspace.select.shape.id.safeParse(input.workspaceId);
   const requestId = boundarySchemas.subjectRequest.select.shape.id.safeParse(
     input.subjectRequestId,
@@ -406,6 +406,20 @@ export const runErasure = async (
     );
     if (!rewritten.ok) return err(rewritten.error);
 
+    // Before the identity step, which pseudonymises the sign-in address: a rerun after it would
+    // read no address to add.
+    const suppressed = await attempt(() =>
+      withScope(platform, doors.postgres, workspaceId, (tx) =>
+        suppressInTheWorkspace(platform, tx, {
+          workspaceId,
+          erasureRequestId: erasure.id,
+          identifiers: request.identifiers,
+          signInAddresses: addresses.ofTheSubject,
+        }),
+      ),
+    );
+    if (!suppressed.ok) return err(suppressed.error);
+
     const identity = await attempt(() =>
       eraseFromTheIdentitySet(platform, doors.postgres, {
         workspaceId,
@@ -418,18 +432,6 @@ export const runErasure = async (
     // Logged as the step commits, not at completion: a run that dies after it leaves the next
     // run nothing left to count.
     doors.log.info(identityStepLineOf(platform, erasure.id, identity.value), IDENTITY_STEP_LOGGED);
-
-    const suppressed = await attempt(() =>
-      withScope(platform, doors.postgres, workspaceId, (tx) =>
-        suppressTheDocuments(platform, tx, {
-          workspaceId,
-          erasureRequestId: erasure.id,
-          identifiers: request.identifiers,
-          map,
-        }),
-      ),
-    );
-    if (!suppressed.ok) return err(suppressed.error);
 
     const rederived = await attempt(() =>
       rederiveAfterErasure(platform, doors.postgres, {

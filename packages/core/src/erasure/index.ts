@@ -8,9 +8,9 @@ export { replayCopiesSince } from "./replay.ts";
 export { replayableErasures, replayErasures } from "./replay-erasures.ts";
 export type { ReplayedErasure } from "./replay-erasures.ts";
 export { ERASURE, runErasure } from "./routine.ts";
-export type { ErasureLog, ErasureLogLine, ErasureRefusal, ErasureRun } from "./routine.ts";
+export type { ErasureLog, ErasureLogLine, ErasureRun, RunErasureRefusal } from "./routine.ts";
 export { deadlineOf, dueDateOf, recordSubjectRequest, subjectRequestFor } from "./requests.ts";
-export { suppressTheDocuments } from "./suppressions.ts";
+export { suppressInTheWorkspace } from "./suppressions.ts";
 export type {
   ReadSubjectRequestRefusal,
   RecordSubjectRequestInput,

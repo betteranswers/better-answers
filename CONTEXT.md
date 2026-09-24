@@ -629,11 +629,14 @@ to it by IRI and never restates it (ADR 0014).
   per-store finder over the request's identifier set, the one-month clock from its start;
   access answers with where the platform holds the person and under which categories, never
   a passage.
-- **suppression** — the entry that keeps a person's data out of every derived store when a
-  document is reprocessed; applied per document, linked to its erasure request.
+- **suppression** — the workspace's entry that keeps a person's identifiers out of every derived
+  store: one per *erasure request*, holding the request's identifier set, applied to every
+  document of the workspace on every index run, now and later.
 - **erasure map** — the per-store finder's answer for one *subject request*: every store family
   the platform holds and what in each of them names the person, found over the request's
-  identifier set. The *suppression* entries and the report are written from it.
+  identifier set. Its documents entry names the live documents whose indexed text holds an
+  identifier, and those choose which bindings are wiped now; the *suppression* is written from
+  the request's identifier set, not from the map.
 - **replay copy** — the completed *erasure request*'s copy in the object store — the request, its
   *erasure pseudonym*, the identifier set and the *erasure map* — that a restore reads to run the
   erasure again over a dump older than the request. Restricted personal data, as a *suppression* is.
