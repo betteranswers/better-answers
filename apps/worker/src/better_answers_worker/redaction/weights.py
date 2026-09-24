@@ -41,9 +41,15 @@ def carried_repositories() -> tuple[Path, ...]:
 def copy_out(target: Path) -> None:
     cache = Path(constants.HF_HUB_CACHE)
     for repository in carried_repositories():
-        shutil.copytree(
-            repository, target / cache.name / repository.name, symlinks=True
-        )
+        carried = target / cache.name / repository.name
+        shutil.copytree(repository, carried, symlinks=True)
+        # huggingface_hub 1.32 links a repository's Xet files into a store beside it,
+        # and the image carries no store.
+        for blob in carried.glob("blobs/*"):
+            if blob.is_symlink():
+                shared = (repository / "blobs" / blob.name).resolve()
+                blob.unlink()
+                shutil.copy2(shared, blob)
 
 
 if __name__ == "__main__":
