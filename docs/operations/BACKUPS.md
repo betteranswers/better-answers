@@ -82,6 +82,28 @@ Two boxes of 4 vCPU · 4 GB · 120 GB NVMe. VPC 1 runs all of production — the
 | a dump during the erasure routine | the routine holds `pg_advisory_lock(41)`; the hourly job skips while it is held |
 | a dump restored that predates an erasure | `replay-erasures --since` in every restore path |
 | the mirror push fails (VPC 2 down, key rotated) | `git push --mirror` fails → the nightly job fails → missed ping; the bundles in `dumps/git/` are the copy that does not depend on VPC 2 |
+| a job started without its variables | the image probe starts the image as compose does and reads what a job cron starts sees; at run time the job stops at its variable check, logs no closing line and misses its ping |
+| a workspace repository refused as another user's | the image trusts `/data/git/*`; the image probe's nightly run bundles a repository owned by the api's uid |
+
+## How the jobs run, and how to read the last one
+
+**cron hands a job `PATH=/usr/bin:/bin` and none of the container's variables.** Each line of the image's `/etc/cron.d/backup` therefore starts `backup.sh` through `backup-env` (`deploy/backup-env.sh`). `backup-env` clears whatever environment it was started with. It then reads the container's environment from PID 1, which only root can read, and passes on an allow-list: the names in the `backup` service's `environment:` block, plus `PATH` and `HOME`. No file ever holds a copy. The orchestrator hands the container every variable of the stores resource, but only the job's own names pass. `TUNNEL_TOKEN`, `GARAGE_RPC_SECRET`, `GARAGE_ADMIN_TOKEN` and the rest of the resource's variables never reach a job. A variable `backup.sh` starts reading goes into both the compose block and `backup-env`'s list; a test holds the two equal. Before 24/09/2026 (T-357) the jobs were started bare. Every scheduled run from 04/09 stopped at the script's variable check, and only the missed pings showed it. To run a job by hand with exactly the environment cron gives it, use `docker exec <backup container> /usr/local/bin/backup-env /usr/local/bin/backup.sh hourly`.
+
+**The nightly bundle is verified inside the repository it came from**, because `git bundle verify` refuses to run anywhere else. The api's uid owns the bare repositories and the job runs as root, so the image's git config trusts `/data/git/*`. The mount is read-only, so root cannot write into the repositories.
+
+**Every run ends with one line in the `backup` service's log**, carrying the same words as its ping: `backup.sh hourly: ok bytes=<n> took=<seconds>`, or `fail` in place of `ok`. The dead-man check's ping history shows the same body. If a run has no closing line, it stopped before it could ping, and the lines above it say where. The one exception is an hourly run skipped while the erasure lock is held: it logs that, and pings nothing. Two kinds of line appear in most runs and are expected. One is rclone's `Config file … not found` notice, once per call, because the remotes come from the environment. The other is psql's refusal followed by `backup_run row not written`, until ticket 42's table lands.
+
+**A file left in `/staging` clears itself.** Each run first deletes anything there older than 24 hours. The first scheduled run of an image that gets its variables therefore removes a leftover like 04/09's `globals-…sql.age`, and the health check (cron alive, nothing stale in `/staging`) turns healthy at its next interval.
+
+## Putting a new backup image on production
+
+`release.yml` promotes the api and worker digests; it never touches the backup image. After `build.yml` pushes a new one, the owner:
+
+1. copies the backup digest from `build.yml`'s run summary (`ghcr.io/betteranswers/backup@sha256:…`);
+2. sets `BACKUP_IMAGE_DIGEST` to it in the stores resource's environment in the orchestrator;
+3. redeploys the stores stack.
+
+To check, the `backup` container runs the new digest, and its first `:05` run logs `backup.sh hourly: ok …` and pings `pg-hourly` green. The first 02:00 run does the same for `nightly`.
 
 ## Signals (for ticket 42)
 
