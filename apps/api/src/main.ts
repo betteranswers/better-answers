@@ -7,6 +7,7 @@ import {
   readSweeps,
   requireBootstrap,
   requireIdentityBootstrap,
+  requireRunningImage,
 } from "./config.ts";
 import { openDoors } from "./doors.ts";
 import { logger } from "./logger.ts";
@@ -16,6 +17,7 @@ import { startSweeps, SWEEP_FIRST_PASS_MS, SWEEP_INTERVAL_MS } from "./sweeps.ts
 
 const bootstrap = requireBootstrap("the api");
 const identity = requireIdentityBootstrap("the api");
+const image = requireRunningImage("the api");
 const objectStore = readObjectStore();
 
 const doors = openDoors({
@@ -64,6 +66,7 @@ serve(
       authSecret: identity.authSecret,
       sendEmail,
       webRoot: bootstrap.webRoot,
+      imageDigest: image.digest,
     }).fetch,
     port: bootstrap.port,
   },

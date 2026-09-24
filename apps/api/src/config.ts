@@ -97,6 +97,13 @@ const headCheckSchema = z.object({
   HEALTHCHECKS_PING_URL_SCHEDULER: deadManPingUrl,
 });
 
+const runningImageSchema = z.object({
+  API_IMAGE_DIGEST: z
+    .string()
+    .regex(/^sha256:[0-9a-f]{64}$/, "must be a digest: sha256: followed by 64 hex characters")
+    .optional(),
+});
+
 export type Bootstrap = {
   readonly databaseUrl: string;
   readonly port: number;
@@ -121,6 +128,10 @@ export type SweepSettings = {
 
 export type HeadCheckSettings = {
   readonly pingUrl: string | undefined;
+};
+
+export type RunningImage = {
+  readonly digest: string | undefined;
 };
 
 const invalid = (parsed: z.ZodError, what = "bootstrap configuration"): Error =>
@@ -189,12 +200,24 @@ export function readHeadCheck(
   return ok({ pingUrl: parsed.data.HEALTHCHECKS_PING_URL_SCHEDULER });
 }
 
+export function readRunningImage(
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): Result<RunningImage> {
+  const parsed = runningImageSchema.safeParse(environment);
+  if (!parsed.success) return err(invalid(parsed.error, "the image the api runs"));
+  return ok({ digest: parsed.data.API_IMAGE_DIGEST });
+}
+
 export function requireBootstrap(processName: string): Bootstrap {
   return orExit(processName, readBootstrap());
 }
 
 export function requireIdentityBootstrap(processName: string): IdentityBootstrap {
   return orExit(processName, readIdentityBootstrap());
+}
+
+export function requireRunningImage(processName: string): RunningImage {
+  return orExit(processName, readRunningImage());
 }
 
 const orExit = <T>(processName: string, read: Result<T>): T => {

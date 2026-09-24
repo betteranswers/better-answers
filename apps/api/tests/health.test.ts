@@ -4,6 +4,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { startApp, type TestApp } from "./harness.ts";
 import { serverFor } from "./harness.ts";
 
+const PROMOTED = "sha256:4c0ffee5d1a7e2b9f8c3a6d0e1f2a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4";
+
 describe("the api's health endpoint", () => {
   let app: TestApp;
 
@@ -25,12 +27,38 @@ describe("the api's health endpoint", () => {
     });
   });
 
-  it("tells the deploy unit the api is unhealthy when the platform database cannot be reached", async () => {
+  it("names the image the api was started from, so a release can tell the build it promoted is the one answering", async () => {
+    const server = serverFor(app.database.pool, { imageDigest: PROMOTED });
+
+    const response = await server.request("/health");
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      status: "healthy",
+      database: "reachable",
+      identity: "ready",
+      image: PROMOTED,
+    });
+  });
+
+  it("says no image was named when the api was started without one, rather than inventing a digest", async () => {
+    const response = await app.server.request("/health");
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      status: "healthy",
+      database: "reachable",
+      identity: "ready",
+      image: null,
+    });
+  });
+
+  it("tells the deploy unit the api is unhealthy when the platform database cannot be reached, naming the image that is failing", async () => {
     const unreachable = new Pool({
       connectionString: "postgresql://nobody@127.0.0.1:1/nothing",
       connectionTimeoutMillis: 1_000,
     });
-    const server = serverFor(unreachable);
+    const server = serverFor(unreachable, { imageDigest: PROMOTED });
 
     const response = await server.request("/health");
 
@@ -38,6 +66,7 @@ describe("the api's health endpoint", () => {
     await expect(response.json()).resolves.toMatchObject({
       status: "unhealthy",
       database: "unreachable",
+      image: PROMOTED,
     });
     await unreachable.end();
   });

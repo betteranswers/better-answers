@@ -176,7 +176,10 @@ type DoorOptions = {
 export const doorsFor = (database: Pool | string, options: DoorOptions = {}): Doors =>
   openDoors({ database, ...options });
 
-export const serverFor = (pool: Pool): Hono =>
+export const serverFor = (
+  pool: Pool,
+  options: { readonly imageDigest?: string | undefined } = {},
+): Hono =>
   createServer({
     doors: doorsFor(pool),
     publicUrl: PUBLIC_URL,
@@ -185,6 +188,7 @@ export const serverFor = (pool: Pool): Hono =>
     sendEmail: async () => {},
     fetchClientMetadataResource: cimdFixture,
     logger: pino({ level: "silent" }),
+    imageDigest: options.imageDigest,
   });
 
 export const actingIn = async <T>(

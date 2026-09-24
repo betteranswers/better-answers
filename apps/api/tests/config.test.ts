@@ -5,6 +5,7 @@ import {
   readHeadCheck,
   readIdentityBootstrap,
   readObjectStore,
+  readRunningImage,
   readSweeps,
 } from "../src/config.ts";
 
@@ -275,6 +276,41 @@ describe("the head check's settings", () => {
     const reason = read.ok ? "" : read.error.message;
     expect(reason).toContain("HEALTHCHECKS_PING_URL_SCHEDULER");
     expect(reason).not.toContain("7c1d9e4a");
+  });
+});
+
+describe("the image the api runs", () => {
+  const DIGEST = "sha256:9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8d";
+
+  it("gives the api the digest the deploy unit pinned its image to", () => {
+    expect(readRunningImage({ API_IMAGE_DIGEST: DIGEST })).toEqual({
+      ok: true,
+      value: { digest: DIGEST },
+    });
+  });
+
+  it("names no image when the estate hands none, as the dev loop and the harness do", () => {
+    expect(readRunningImage({})).toEqual({ ok: true, value: { digest: undefined } });
+  });
+
+  it("never takes the worker's digest for the api's", () => {
+    expect(readRunningImage({ WORKER_IMAGE_DIGEST: DIGEST })).toEqual({
+      ok: true,
+      value: { digest: undefined },
+    });
+  });
+
+  it.each([
+    ["an empty value", ""],
+    ["a tag", "latest"],
+    ["a digest cut short", "sha256:9e8d7c6b5a4f"],
+    ["a digest in capitals", DIGEST.toUpperCase()],
+    ["the whole image reference", `ghcr.io/betteranswers/api@${DIGEST}`],
+  ])("refuses %s, which no pull by digest could have started", (_case, value) => {
+    const read = readRunningImage({ API_IMAGE_DIGEST: value });
+
+    expect(read.ok).toBe(false);
+    expect(read.ok ? "" : read.error.message).toContain("API_IMAGE_DIGEST");
   });
 });
 
