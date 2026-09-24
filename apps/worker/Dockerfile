@@ -1,5 +1,5 @@
 # The knowledge worker's image (ADR 0005). Built from `apps/worker/` — this tier is a uv
-# workspace, not a pnpm one, and it shares four stores with the app tier and never code, so
+# workspace, not a pnpm one, and it shares four stores with the api tier and never code, so
 # its image needs nothing from the rest of the repository.
 #
 # Versions read: `python:3.13.15-slim-trixie` from Docker Hub on 24/09/2026 — 3.13 is what
@@ -129,7 +129,7 @@ ENV HF_HOME=/data/worker/hf-cache \
     COCOINDEX_DISABLE_USAGE_TRACKING=1
 
 # The project is installed into the venv editable, so the tier's source is read from here —
-# including `schema_view.py`, the committed, generated view of the app's schema the worker
+# including `schema_view.py`, the committed, generated view of the api's schema the worker
 # reads and never migrates (ADR 0032).
 #
 # Last of this stage's copies, and on purpose (`T-223`). BuildKit re-runs every instruction
@@ -145,7 +145,7 @@ COPY src src
 USER worker
 
 # A process-level check, not an HTTP one, and deliberately: this tier exposes no HTTP
-# surface at all. It has no server, no port and no `/health` — the app↔worker control plane
+# surface at all. It has no server, no port and no `/health` — the api↔worker control plane
 # is rows in Postgres, never HTTP (ADR 0005) — so there is nothing to GET. What the probe
 # asks instead is the two halves of "is this worker working": it holds a claimed lease whose
 # heartbeat is fresh, or nothing anywhere has been waiting longer than a lease. Idle is

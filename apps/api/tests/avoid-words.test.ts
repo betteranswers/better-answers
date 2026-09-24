@@ -93,6 +93,11 @@ const WATCHED: readonly Watched[] = [
         written:
           /(?<![/:])\/app\b|\bapp\/|-app\b|\bapp-|\bapp\.\w|\b(?:const|let) app\b|\bHono app\b/gi,
       },
+      {
+        sense: "cocoindex's App: the class, a local or a memo's key holding one, one by its name",
+        written:
+          /\bcoco\.App\b|\bapp(?:: coco\.App)? = coco\.App\b|["']app["']: (?:\w+_APP\b|["'](?:landed|chunks)["'])|\b(?:landed|chunks) app\b/gi,
+      },
       { sense: "the glossary naming the word it avoids", written: /"the app"|_Avoid_: app\b/gi },
     ],
   },
@@ -125,7 +130,6 @@ const CARVED_OUT: readonly CarveOut[] = [
     holds: under("packages/design-system/"),
     why: "no tier-sense use: the word there is the SPA's own zone",
   },
-  { holds: under("apps/worker/"), why: "for now: T-214 sweeps it and removes this line" },
   { holds: under("packages/schema/"), why: "for now: T-215 sweeps it and removes this line" },
   { holds: under("packages/core/"), why: "for now: T-215 sweeps it and removes this line" },
   { holds: under("apps/api/"), why: "for now: T-216 sweeps it and removes this line" },
@@ -213,11 +217,11 @@ const THE_GLOSSARY = [
 
 let trees = 0;
 
-const findingsOver = (planted: string): readonly string[] => {
+const findingsOver = (planted: string, file = "docs/planted.md"): readonly string[] => {
   trees += 1;
   const root = throwawayRepository(path.join(scratch, `tree-${String(trees)}`));
   writeUnder(root, GLOSSARY, THE_GLOSSARY);
-  writeUnder(root, "docs/planted.md", `${planted}\n`);
+  writeUnder(root, file, `${planted}\n`);
   return avoidedSenseLines(root);
 };
 
@@ -229,6 +233,8 @@ describe("the sense a planted line is read in", () => {
     `Every restore replays the erasures before the ${WORD} turns healthy.`,
     `Nothing reaches the ${WORD}.`,
     `The ${WORD}'s own hostname list is the second fence.`,
+    `# The store is the target-state tracking: rows the ${WORD} deleted beside a store`,
+    `The ${WORD} landed the rows.`,
     `The tunnel routes to \`http://${WORD}:3000\` on the platform stack.`,
     `Every restore replays the erasures before \`${WORD}\` turns healthy.`,
   ])("refuses the tier: %s", (planted) => {
@@ -252,6 +258,13 @@ describe("the sense a planted line is read in", () => {
     `\`src/server.ts\` builds the tier's only Hono ${WORD}.`,
     `Read them against hostnames.ts: ${WORD} · agent · apex.`,
     `The nextjs-${WORD}-router skill, and the ${WORD}-router module.`,
+    `        ${WORD} = coco.App(self.${WORD}_config(run, CHUNKS_APP), declare_rows)`,
+    `    coco.App(`,
+    `        self.${WORD}: coco.App = coco.App(config, declare_nothing)`,
+    `        "${WORD}": LANDED_APP,`,
+    `        '${WORD}': "chunks",`,
+    `# The second store: the landed ${WORD} and the findings memo.`,
+    `# The binding's store: the chunks ${WORD} and its target-state tracking.`,
   ])("passes a permitted sense: %s", (planted) => {
     expect(findingsOver(planted)).toEqual([]);
   });
@@ -267,12 +280,18 @@ describe("the sense a planted line is read in", () => {
     writeUnder(root, "docs/adr/0001-planted.md", `The ${WORD} claims the job.\n`);
     writeUnder(root, "docs/specs/T-001.md", `The ${WORD} claims the job.\n`);
     writeUnder(root, "docs/specs/v01-route.md", `The ${WORD} claims the job.\n`);
-    writeUnder(root, "apps/worker/planted.py", `# The ${WORD} claims the job.\n`);
-    writeUnder(root, "apps/worker/CODING_RULES.md", `The ${WORD} claims the job.\n`);
+    writeUnder(root, "apps/web/src/planted.ts", `// The ${WORD} claims the job.\n`);
+    writeUnder(root, "apps/web/CODING_RULES.md", `The ${WORD} claims the job.\n`);
 
     expect(avoidedSenseLines(root)).toEqual([
-      `apps/worker/CODING_RULES.md:1: The ${WORD} claims the job.`,
+      `apps/web/CODING_RULES.md:1: The ${WORD} claims the job.`,
       `docs/specs/v01-route.md:1: The ${WORD} claims the job.`,
+    ]);
+  });
+
+  it("reads the worker's source, which no carve-out holds", () => {
+    expect(findingsOver(`# The ${WORD} claims the job.`, "apps/worker/src/planted.py")).toEqual([
+      `apps/worker/src/planted.py:1: # The ${WORD} claims the job.`,
     ]);
   });
 
