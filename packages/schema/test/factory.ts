@@ -171,8 +171,6 @@ const insertRow = async <TName extends keyof Registry>(
     domain[key] = typeof value === "string" && value.startsWith("[") ? JSON.parse(value) : value;
   }
 
-  // SAFETY: TypeScript loses the correlation on the generic indexed access; the registry
-  // guarantees it.
   // oxlint-disable-next-line typescript/consistent-type-assertions -- the registry correlates `select` with `TName` and TypeScript resolves neither side of a generic indexed access
   return select.parse(domain) as Row<TName>;
 };

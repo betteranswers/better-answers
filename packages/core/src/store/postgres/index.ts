@@ -66,7 +66,6 @@ const answersARefusal = <T>(answer: T): boolean => answersAResult(answer) && !an
 export const folded = <T>(opened: Opened<Foldable<T>>): Folded<T> => {
   if (!opened.ok) return err(opened.error);
   const answer = opened.value;
-  // SAFETY: the predicate reads the key the type reads, so each branch returns its own half.
   // oxlint-disable-next-line typescript/consistent-type-assertions -- `Folded<T>` is conditional on a `T` still open here, which no runtime predicate resolves for the compiler
   return (answersAResult(answer) ? answer : ok(answer)) as Folded<T>;
 };

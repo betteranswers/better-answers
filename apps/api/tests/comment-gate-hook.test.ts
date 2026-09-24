@@ -4,7 +4,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { commentGateRoots, rootScripts } from "@better-answers/devtools/root-commands";
+import { pythonGateRoots, rootScripts } from "@better-answers/devtools/root-commands";
 import { throwawayRepository, writeUnder } from "@better-answers/devtools/throwaway-tree";
 
 import { hookScript, runHook, scratchRoot, type HookRun } from "./worktree-hooks.ts";
@@ -15,17 +15,21 @@ const script = hookScript("comment-gate-hook");
 
 const scratch = scratchRoot("comment-gate-hook");
 
-// Borrowed, not rebuilt: a tree without the checkout's gate tooling answers silence.
+const ANTI_SLOP = "packages/devtools/lifts/anti-slop";
+
+/** Borrowed, not rebuilt: a tree without the checkout's gate tooling answers silence. */
 const treeWithTheGateTooling = (name: string): string => {
   const root = throwawayRepository(path.join(scratch, name));
-  symlinkSync(path.join(repositoryRoot, "node_modules"), path.join(root, "node_modules"));
-  mkdirSync(path.join(root, "packages/devtools"), { recursive: true });
-  // Each part on its own, so `lifts` stays a real directory this tree can write into.
-  for (const part of ["lint-rules", "python"]) {
-    symlinkSync(
-      path.join(repositoryRoot, "packages/devtools", part),
-      path.join(root, "packages/devtools", part),
-    );
+  // Each part on its own, so the lift's directory stays real and this tree can write into it.
+  mkdirSync(path.join(root, ANTI_SLOP), { recursive: true });
+  for (const part of [
+    ".oxlintrc.json",
+    "node_modules",
+    "packages/devtools/lint-rules",
+    "packages/devtools/python",
+    `${ANTI_SLOP}/index.ts`,
+  ]) {
+    symlinkSync(path.join(repositoryRoot, part), path.join(root, part));
   }
   return root;
 };
@@ -66,43 +70,33 @@ const pathIn = (command: string, pattern: RegExp): string => {
   return found;
 };
 
-const configPath = (): string =>
-  pathIn(rootScripts()["comment-gate:ts"] ?? "", /packages\/\S+\.oxlintrc\.json/);
-
 const checkerPath = (): string =>
   pathIn(rootScripts()["comment-gate:python"] ?? "", /packages\/\S+\.py/);
 
-const gateConfig = z.object({ ignorePatterns: z.array(z.string()).optional() });
+const CONFIG = ".oxlintrc.json";
 
-// The config is JSONC, so the comment lines go before the parse; reading its patterns here
-// stops hook and config drifting apart.
+const rootConfig = z.object({ ignorePatterns: z.array(z.string()).optional() });
+
+/** Read here rather than restated, so hook and config cannot drift apart. */
 const ignorePatterns = (): readonly string[] => {
-  const source = readFileSync(path.join(repositoryRoot, configPath()), "utf8")
-    .split("\n")
-    .filter((line) => !line.trimStart().startsWith("//"))
-    .join("\n");
-  const { ignorePatterns: patterns } = gateConfig.parse(JSON.parse(source));
+  const { ignorePatterns: patterns } = rootConfig.parse(
+    JSON.parse(readFileSync(path.join(repositoryRoot, CONFIG), "utf8")),
+  );
   if ((patterns ?? []).length === 0) {
-    throw new Error(`${configPath()} names no ignore pattern, so this reading proves nothing.`);
+    throw new Error(`${CONFIG} names no ignore pattern, so this reading proves nothing.`);
   }
   return patterns ?? [];
 };
 
-// A bare name is a directory at any depth; a path pattern is one place. Both reach the
-// gate only under its two roots.
-const probeUnder = (pattern: string): string | undefined => {
+/** A bare name is a directory at any depth, a double-star pattern a file anywhere, and any other one place. */
+const probeUnder = (pattern: string): string => {
   if (!pattern.includes("/")) return `packages/probe/${pattern}/probe.ts`;
-  const prefix = pattern.replace(/\*+$/, "");
-  return prefix.startsWith("apps/") || prefix.startsWith("packages/")
-    ? `${prefix}probe.ts`
-    : undefined;
+  if (pattern.startsWith("**/")) return `packages/probe/${pattern.slice(3).replaceAll("*", "x")}`;
+  return `${pattern.replace(/\*+$/, "")}probe.ts`;
 };
 
 const skippable = (): readonly (readonly [string, string])[] =>
-  ignorePatterns().flatMap((pattern) => {
-    const probe = probeUnder(pattern);
-    return probe === undefined ? [] : [[pattern, probe] as const];
-  });
+  ignorePatterns().map((pattern) => [pattern, probeUnder(pattern)] as const);
 
 // A silence below means nothing until the gate is known to be loud in this tree.
 const smoke = edit("packages/smoke/probe.ts", `// ${FORTY_WORDS}\nexport const keep = 1;\n`);
@@ -112,7 +106,7 @@ if (smoke.status !== 2 || !smoke.stderr.includes("runs to 40 words")) {
   );
 }
 
-const CASE_BLOCK = /case "\$RELATIVE" in\n([\s\S]*?)\nesac/;
+const CASE_BLOCK = /case "\$RELATIVE" in\n([\s\S]*?)\n\s*esac/;
 
 // The roots a `case` arm names, with the trailing glob off, so `scripts/*` reads as `scripts`.
 const rootsIn = (hook: string): readonly string[] => {
@@ -128,20 +122,20 @@ const rootsIn = (hook: string): readonly string[] => {
 const missingFrom = (named: readonly string[], read: readonly string[]): readonly string[] =>
   named.filter((root) => !read.includes(root)).sort();
 
-describe("the write-time hook and root `check` read one set of roots", () => {
-  it("names every root of its own in a gate command too", () => {
-    expect(missingFrom(rootsIn(hookText), commentGateRoots())).toEqual([]);
+describe("the write-time hook and the Python gate read one set of roots", () => {
+  it("names every root of its own in the Python gate's command too", () => {
+    expect(missingFrom(rootsIn(hookText), pythonGateRoots())).toEqual([]);
   });
 
-  it("reads every root a gate command names, so no rule is learnt a pull request late", () => {
-    expect(missingFrom(commentGateRoots(), rootsIn(hookText))).toEqual([]);
+  it("reads every root the Python gate names, so no rule is learnt a pull request late", () => {
+    expect(missingFrom(pythonGateRoots(), rootsIn(hookText))).toEqual([]);
   });
 
   it("reports a gap on either side, read off fixture text", () => {
-    const fixture = 'case "$RELATIVE" in\nnowhere/* | apps/*) ;;\n*) exit 0 ;;\nesac';
+    const fixture = '  case "$RELATIVE" in\n  nowhere/* | apps/*) ;;\n  *) exit 0 ;;\n  esac';
 
-    expect(missingFrom(rootsIn(fixture), commentGateRoots())).toEqual(["nowhere"]);
-    expect(missingFrom(commentGateRoots(), rootsIn(fixture))).toContain("packages");
+    expect(missingFrom(rootsIn(fixture), pythonGateRoots())).toEqual(["nowhere"]);
+    expect(missingFrom(pythonGateRoots(), rootsIn(fixture))).toContain("packages");
   });
 });
 
@@ -199,7 +193,7 @@ describe("the write-time hook is silent where the comment earns its place", () =
     [
       "a linter directive",
       "probe/directive.ts",
-      "// oxlint-disable no-console\nexport const x = 1;\n",
+      "// oxlint-disable-next-line no-console -- the runner prints\nconsole.log(1);\n",
     ],
     ["a why inside the ceiling", "probe/why.py", `# ${A_WHY_OF_TWENTY}\nKEEP = 1\n`],
     ["a type-checker escape", "probe/directive.py", "# type: ignore[attr-defined]\nKEEP = 1\n"],
@@ -226,10 +220,17 @@ describe("the write-time hook is silent where the comment earns its place", () =
 
 describe("the write-time hook speaks only for what root `check` gates", () => {
   it.each([
-    ["a file outside apps and packages", "tools/loose.ts"],
+    ["a Python file outside every root the Python gate walks", "tools/loose.py"],
     ["a file the gate has no reader for", "packages/probe/notes.md"],
   ])("walks past %s", (_what, file) => {
     expect(edit(file, `// ${FORTY_WORDS}\nexport const keep = 1;\n`).status).toBe(0);
+  });
+
+  it("refuses a TypeScript file outside every Python root, which root lint walks too", () => {
+    const run = edit("tools/loose.ts", `// ${FORTY_WORDS}\nexport const keep = 1;\n`);
+
+    expect(run.status).toBe(2);
+    expect(run.stderr).toContain("runs to 40 words");
   });
 
   it("walks past a path no checkout owns rather than refusing the edit", () => {
@@ -251,11 +252,53 @@ describe("the write-time hook speaks only for what root `check` gates", () => {
   it.each(skippable())("walks past %s, which the root run never reads", (_pattern, probe) => {
     expect(edit(probe, `// ${FORTY_WORDS}\nexport const keep = 1;\n`).status).toBe(0);
   });
+});
 
-  it("leaves no ignore pattern of the config's unaccounted for", () => {
-    const unreached = ignorePatterns().filter((pattern) => probeUnder(pattern) === undefined);
+describe("the write-time hook runs every comment rule the root config holds", () => {
+  it.each([
+    ["a TODO", "packages/probe/todo.ts", "// TODO: file the ticket\n", "no-warning-comments"],
+    ["`@ts-ignore`", "packages/probe/ignore.ts", "// @ts-ignore\n", "ban-ts-comment"],
+    [
+      "`@ts-ignore`, naming the directive to use",
+      "packages/probe/prefer.ts",
+      "// @ts-ignore\n",
+      "prefer-ts-expect-error",
+    ],
+    [
+      "a disable that names no rule",
+      "packages/probe/blanket.ts",
+      "/* eslint-disable */\n",
+      "no-abusive-eslint-disable",
+    ],
+    [
+      "a 40-word comment",
+      "packages/probe/long-named.ts",
+      `// ${FORTY_WORDS}\n`,
+      "comment-only-the-why",
+    ],
+    [
+      "a disable with no reason",
+      "packages/probe/bare.ts",
+      "// oxlint-disable-next-line no-console\nconsole.log(1);\n",
+      "gives no reason",
+    ],
+    [
+      "a disable that suppresses nothing",
+      "packages/probe/unused.ts",
+      "// oxlint-disable-next-line no-console -- the runner prints\n",
+      "Unused oxlint-disable directive",
+    ],
+    [
+      "a string citing a ticket",
+      "packages/probe/usage.ts",
+      'export const usage = "Ask the owner about T-243 first.";\n',
+      "string-cites-nothing",
+    ],
+  ])("refuses %s, as root lint does", (_what, file, source, named) => {
+    const run = edit(file, `${source}export const keep = 1;\n`);
 
-    expect(unreached.filter((p) => p.startsWith("apps/") || p.startsWith("packages/"))).toEqual([]);
+    expect(run.status).toBe(2);
+    expect(run.stderr).toContain(named);
   });
 });
 
@@ -265,6 +308,23 @@ describe("the write-time hook blames a comment only when the gate names one", ()
 
     expect(run.status).toBe(0);
     expect(run.stderr).toContain("without naming a comment");
+  });
+
+  it("lets a line another rule refuses through, which is not a comment's to fix", () => {
+    const run = edit("packages/probe/prints.ts", "console.log(1);\nexport const keep = 1;\n");
+
+    expect(run.status).toBe(0);
+    expect(run.stderr).toContain("without naming a comment");
+  });
+
+  it("hands back only the comment's line when another rule fails beside it", () => {
+    const run = edit(
+      "packages/probe/both.ts",
+      `// ${FORTY_WORDS}\nconsole.log(1);\nexport const keep = 1;\n`,
+    );
+
+    expect(run.status).toBe(2);
+    expect(run.stderr).not.toContain("no-console");
   });
 });
 
@@ -298,10 +358,6 @@ const branchSuffixes = (): readonly string[] => {
 };
 
 describe("the write-time hook runs the same gate the root check runs", () => {
-  it("names the config `comment-gate:ts` names", () => {
-    expect(hookText).toContain(configPath());
-  });
-
   it("dispatches to the checker on Python files alone", () => {
     expect(branchSuffixes()).toEqual([".py"]);
   });

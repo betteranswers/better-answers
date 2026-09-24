@@ -33,6 +33,18 @@
     "typescript/consistent-type-imports": "error",
     "typescript/no-non-null-assertion": "error",
     "typescript/consistent-type-assertions": ["error", { "assertionStyle": "never" }],
+    "typescript/ban-ts-comment": [
+      "error",
+      {
+        "ts-expect-error": "allow-with-description",
+        "ts-ignore": true,
+        "ts-nocheck": true,
+        "ts-check": false
+      }
+    ],
+    "typescript/prefer-ts-expect-error": "error",
+    "eslint/no-warning-comments": ["error", { "decoration": ["*"] }],
+    "unicorn/no-abusive-eslint-disable": "error",
     "oxc/no-async-await": "off",
     "anti-slop/no-chained-type-assertions": "error",
     "anti-slop/no-module-mocking": "error",
@@ -46,10 +58,11 @@
     "anti-slop/no-known-value-widening": "warn",
     "anti-slop/no-unknown-parameters": "warn",
     "anti-slop/no-unsafe-dictionary-type": "warn",
-    "anti-slop/require-safety-comment-for-type-assertion": "warn",
     "anti-slop/no-runtime-typeof": "off",
     "anti-slop/no-shape-in-symbol-names": "off",
     "better-answers/act-admits-before-await": "error",
+    "better-answers/comment-only-the-why": "error",
+    "better-answers/string-cites-nothing": "error",
     "better-answers/mcp-entry-annotations": "error",
     "better-answers/mcp-entry-no-workspace-argument": "error",
     "better-answers/import-direction": "error"
@@ -314,7 +327,6 @@
         "react/set-state-in-effect": "off",
         "react-doctor/effect-needs-cleanup": "off",
         "jsx-a11y/prefer-tag-over-role": "off",
-        "anti-slop/require-safety-comment-for-type-assertion": "off",
         "typescript/no-unnecessary-condition": "off"
       }
     },
@@ -331,8 +343,7 @@
         "anti-slop/no-unknown-returns": "off",
         "anti-slop/no-unknown-type-aliases": "off",
         "anti-slop/no-unsafe-dictionary-type": "off",
-        "anti-slop/no-widen-then-assert": "off",
-        "anti-slop/require-safety-comment-for-type-assertion": "off"
+        "anti-slop/no-widen-then-assert": "off"
       }
     },
     {
@@ -368,6 +379,7 @@
     ".venv",
     "packages/devtools/lifts/anti-slop/**",
     ".claude/worktrees/**",
+    ".claude/skills/**",
     "**/stryker-setup-*.js"
   ]
 }

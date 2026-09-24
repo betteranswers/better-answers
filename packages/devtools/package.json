@@ -17,7 +17,7 @@
   },
   "scripts": {
     "lint": "node ../../scripts/check.mjs lint:ts lint:python lint:python-format",
-    "lint:ts": "oxlint --config ../../.oxlintrc.json .",
+    "lint:ts": "oxlint --report-unused-disable-directives-severity=error --config ../../.oxlintrc.json .",
     "lint:python": "cd ../../apps/worker && uv run --frozen ruff check ../../packages/devtools/python",
     "lint:python-format": "cd ../../apps/worker && uv run --frozen ruff format --check ../../packages/devtools/python",
     "typecheck": "node ../../scripts/check.mjs typecheck:ts typecheck:python",

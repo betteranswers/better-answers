@@ -15,7 +15,7 @@
     "generate:worker-view": "node scripts/generate-worker-schema.ts",
     "generate:roles-surface": "node scripts/generate-roles-surface.ts",
     "generate:contract-stamp": "node scripts/generate-contract-stamp.ts",
-    "lint": "oxlint --config ../../.oxlintrc.json .",
+    "lint": "oxlint --report-unused-disable-directives-severity=error --config ../../.oxlintrc.json .",
     "typecheck": "tsc --noEmit",
     "check": "node ../../scripts/check.mjs typecheck test",
     "test": "vitest run"

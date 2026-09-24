@@ -166,10 +166,20 @@ describe("a directive's reason counts against the twenty-five words", () => {
   it.each([
     ["a noqa", "import os  # noqa: F401"],
     ["a type-checker escape", "KEEP: int = 1  # type: ignore[assignment]"],
-  ])("refuses %s whose reason runs to twenty-six words", (_what, line) => {
-    const output = run({ [FILE]: `${line}  # ${words(26)}\n` });
+  ])(
+    "refuses %s whose reason runs to twenty-six words, naming the directive rule",
+    (_what, line) => {
+      const output = run({ [FILE]: `${line}  # ${words(26)}\n` });
 
-    expect(output).toContain("runs to 26 words");
+      expect(output).toContain("reason runs to 26 words");
+      expect(output).toContain(tag("COMMENT", "3"));
+    },
+  );
+
+  it("holds a reason to its own directive, never to the comment above it", () => {
+    const source = `# ${words(20)}\n# type: ignore  # ${words(20)}\nKEEP = 1\n`;
+
+    expect(findings({ [FILE]: source })).toEqual([]);
   });
 
   it.each([

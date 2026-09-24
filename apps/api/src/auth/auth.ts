@@ -63,9 +63,7 @@ type WidenedAuthorize<P extends { readonly endpoints: object }> = Omit<P, "endpo
 };
 
 const widenAuthorize = <P extends { readonly endpoints: object }>(plugin: P): WidenedAuthorize<P> =>
-  // SAFETY: the endpoint is the library's own construction and satisfies this at runtime;
-  // only its declaration differs.
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- better-auth declares `oauth2Authorize`'s openapi metadata outside `Endpoint`, so the plugin is refused by `BetterAuthPlugin["endpoints"]` on its declaration alone; nothing at runtime can be read to narrow it
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- better-auth declares `oauth2Authorize`'s openapi metadata outside `Endpoint`, so its declaration alone fails `BetterAuthPlugin["endpoints"]`; nothing at runtime narrows it
   plugin as WidenedAuthorize<P>;
 
 export type EmailMessage = {

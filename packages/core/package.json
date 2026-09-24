@@ -31,7 +31,7 @@
     "./testing/cross-tier": "./test/cross-tier-fixture.ts"
   },
   "scripts": {
-    "lint": "oxlint --config ../../.oxlintrc.json .",
+    "lint": "oxlint --report-unused-disable-directives-severity=error --config ../../.oxlintrc.json .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "mutation": "stryker run",
