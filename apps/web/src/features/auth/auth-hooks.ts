@@ -4,6 +4,7 @@ import {
   useMutation,
   useQuery,
   useQueryClient,
+  type QueryClient,
 } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { BetterFetchError } from "better-auth/client";
@@ -12,6 +13,7 @@ import { z } from "zod";
 import { useTRPC } from "@/shared/api/trpc.ts";
 
 import { authClient } from "./auth-client.ts";
+import { nextAfterSignIn } from "./carried-flow.ts";
 import { forgetMembership } from "./membership.ts";
 
 const AUTH_KEYS = {
@@ -50,12 +52,49 @@ const sendVerificationOtpOptions = () =>
 
 export const useSendVerificationOtp = () => useMutation(sendVerificationOtpOptions());
 
+export const hasADisplayName = (name: string): boolean => name.trim() !== "";
+
+export type SignedIn = { readonly displayNameGiven: boolean };
+
 const signInEmailOtpOptions = () =>
-  mutationOptions<unknown, BetterFetchError, { email: string; otp: string }>({
-    mutationFn: (input) => unwrap(authClient.signIn.emailOtp(input)),
+  mutationOptions<SignedIn, BetterFetchError, { email: string; otp: string }>({
+    mutationFn: async (input) => {
+      const answer = await unwrap(authClient.signIn.emailOtp(input));
+      // An answer naming nobody sends the person to the display-name screen, whose own read
+      // decides.
+      return { displayNameGiven: answer !== null && hasADisplayName(answer.user.name) };
+    },
   });
 
 export const useSignInEmailOtp = () => useMutation(signInEmailOtpOptions());
+
+// Read before the display-name screen draws, so a person it has nothing to ask never sees it.
+export const displayNameDetour = async (
+  queryClient: QueryClient,
+  query: string,
+): Promise<string | undefined> => {
+  const session = await queryClient
+    .fetchQuery(sessionOptions())
+    // Left unread, the form stands, and a save refused for want of a session says so in words.
+    .catch(() => undefined);
+  if (session === undefined) return undefined;
+  if (session === null) return `/sign-in${query}`;
+  return hasADisplayName(session.user.name) ? nextAfterSignIn(query) : undefined;
+};
+
+export const useSetDisplayName = () => {
+  const api = useTRPC();
+  const queryClient = useQueryClient();
+  return useMutation(
+    api.person.setDisplayName.mutationOptions({
+      // Removed, not invalidated: no screen watches it here, so a stale answer would be the next
+      // screen's first read.
+      onSuccess: () => {
+        queryClient.removeQueries({ queryKey: AUTH_KEYS.session });
+      },
+    }),
+  );
+};
 
 const signOutOptions = () =>
   mutationOptions<unknown, BetterFetchError, void>({

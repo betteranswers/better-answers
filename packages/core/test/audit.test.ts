@@ -10,11 +10,18 @@ import {
   type ActName,
   declarations,
   declareActs,
+  declareIdentitySetActs,
   record,
   recordFor,
 } from "../src/audit/index.ts";
 import type { ActorId, PlatformPrincipal, UserPrincipal } from "../src/kernel/index.ts";
-import { withPrincipal, withScope, type PostgresDoor } from "../src/store/postgres/index.ts";
+import {
+  openPostgres,
+  withIdentityWrite,
+  withPrincipal,
+  withScope,
+  type PostgresDoor,
+} from "../src/store/postgres/index.ts";
 import { loadEveryEntryPoint } from "./entry-points.ts";
 import { bootstrap, principalOf, provisionedWorkspace } from "./platform.ts";
 import { coreSourceFiles, sourceTreeIsInstrumented } from "./source-tree.ts";
@@ -444,5 +451,99 @@ describe("the second door — recordFor, the platform naming the actor", () => {
   it("is not reachable from a user principal: the type refuses it, and the type is the one guard", () => {
     expectTypeOf(recordFor).parameter(0).toEqualTypeOf<PlatformPrincipal>();
     expectTypeOf<UserPrincipal>().not.toExtend<PlatformPrincipal>();
+  });
+});
+
+const IDENTITY_PROBE = declareIdentitySetActs("platform", {
+  noted: act("platform.probe.identity_noted", { confirmed: "flag" }),
+});
+
+const identityRowById = async (id: string) => {
+  const found = await db().pool.query(
+    "SELECT act, family, actor, subject_kind, subject_id, detail, batch_id FROM identity_audit_event WHERE id = $1",
+    [id],
+  );
+  return found.rows[0];
+};
+
+describe("the identity-set ledger — an act on the identity set, through either door", () => {
+  it("lands the platform's row booked to the actor it names, in no workspace's ledger", async () => {
+    const door = openPostgres(db().runtimePool);
+    const id = ulid();
+    const personId = ulid();
+
+    const written = await withIdentityWrite(bootstrap, door, (tx) =>
+      recordFor(bootstrap, tx, {
+        id,
+        actor: `human:${personId}`,
+        act: IDENTITY_PROBE.noted,
+        subjectId: personId,
+        detail: { confirmed: true },
+      }),
+    );
+
+    expect(written).toEqual({ id, actorId: `human:${personId}` });
+    expect(await identityRowById(id)).toEqual({
+      act: "platform.probe.identity_noted",
+      family: "platform",
+      actor: `human:${personId}`,
+      subject_kind: "probe",
+      subject_id: personId,
+      detail: { confirmed: true },
+      batch_id: null,
+    });
+    expect(await rowById(id)).toBeUndefined();
+  });
+
+  it("lands a person's row there from a workspace's transaction too, never in that workspace's ledger", async () => {
+    const { door, workspaceId, adminUserId } = await provisioned();
+    const id = ulid();
+
+    await withPrincipal(
+      door,
+      { workspaceId, userId: adminUserId, issuedAt: new Date() },
+      (principal, tx) =>
+        record(principal, tx, {
+          id,
+          act: IDENTITY_PROBE.noted,
+          subjectId: adminUserId,
+          detail: { confirmed: false },
+        }),
+    );
+
+    expect(await identityRowById(id)).toMatchObject({
+      actor: `human:${adminUserId}`,
+      subject_id: adminUserId,
+    });
+    expect(await rowById(id)).toBeUndefined();
+  });
+
+  it("holds the detail to the act's declared shape, as a workspace's ledger does", async () => {
+    const door = openPostgres(db().runtimePool);
+    const id = ulid();
+
+    await expect(
+      withIdentityWrite(bootstrap, door, (tx) =>
+        recordFor(bootstrap, tx, {
+          id,
+          actor: `human:${ulid()}`,
+          act: IDENTITY_PROBE.noted,
+          subjectId: ulid(),
+          // @ts-expect-error — the act names `confirmed` and nothing else; the runtime half.
+          detail: { confirmed: true, name: "Priya Shah" },
+        }),
+      ),
+    ).rejects.toThrow(/names a field the act does not: name/);
+    expect(await identityRowById(id)).toBeUndefined();
+  });
+
+  it("registers an identity-set act among the declared acts, so it is one slice's and declared once", () => {
+    expect(declarations()).toContainEqual({
+      family: "platform",
+      acts: ["platform.probe.identity_noted"],
+    });
+    expect(() =>
+      declareIdentitySetActs("platform", { again: act("platform.probe.identity_noted", {}) }),
+    ).toThrow(/declared twice/);
   });
 });

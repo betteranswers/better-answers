@@ -32,6 +32,7 @@ import {
   queryProcedure,
   router,
 } from "./base.ts";
+import { personRouter } from "./person.ts";
 import { descriptorOf, uploadDoorsOf } from "./upload.ts";
 
 export const appRouter = router({
@@ -40,6 +41,7 @@ export const appRouter = router({
       crossing(ctx, readMembership.name, readMembership(ctx.principal, ctx.tx)),
     ),
   }),
+  person: personRouter,
   routes: router({
     list: queryProcedure.query(({ ctx }) =>
       crossing(ctx, listRoutes.name, listRoutes(ctx.principal, ctx.tx)),

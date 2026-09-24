@@ -17,7 +17,7 @@ const NEEDS_A_PICK = "no-active-workspace";
 
 const REFUSED_CODE = -32_001;
 
-const A_SESSION = { session: { activeOrganizationId: "w" }, user: { id: "p" } };
+const A_SESSION = { session: { activeOrganizationId: "w" }, user: { id: "p", name: "Ada" } };
 
 const TWO_WORKSPACES = [
   { id: "w", name: "Northern Tooling" },

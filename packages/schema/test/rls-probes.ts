@@ -11,6 +11,12 @@ export const THE_FAMILY_AND_SUBJECT_IT_LANDS_IN = "RETURNING family, subject_kin
 
 export const THE_DETAIL_EDITED = `ON CONFLICT (id) DO UPDATE SET detail = '{"edited": true}'`;
 
+export const AN_IDENTITY_SET_LEDGER_ROW = `INSERT INTO identity_audit_event (id, act, actor, subject_id, detail)
+       VALUES ($1, $2, $3, $4, '{}')`;
+
+export const AN_IDENTITY_SET_LEDGER_ROW_WITH_ITS_FAMILY = `INSERT INTO identity_audit_event (id, act, family, actor, subject_id, detail)
+       VALUES ($1, $2, $3, $4, $5, '{}')`;
+
 export const A_LEDGER_ROW_WITH_ITS_FAMILY = `INSERT INTO audit_event (id, workspace_id, act, family, actor, subject_id, detail)
        VALUES ($1, $2, $3, $4, $5, $6, '{}')`;
 

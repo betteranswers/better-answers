@@ -219,7 +219,7 @@ The structured detail names a record by its id and a role by its word — Admin,
 
 ### [AUDIT6] Keep the ledger append-only in the database
 
-The migration that creates `audit_event` revokes `UPDATE` and `DELETE` from the api's role and grants the worker's role nothing, each refusal tested beside the path it serves.
+The migration that creates `audit_event` or `identity_audit_event` revokes `UPDATE` and `DELETE` from the api's role and grants the worker's role nothing, each refusal tested beside the path it serves.
 
 ### [AUDIT7] Mint the row's id before the write
 
@@ -227,7 +227,7 @@ The writer mints a ULID through the kernel minter and the column has no database
 
 ### [AUDIT8] Keep a read, a run and a health check out of the ledger
 
-A read writes no row, unless a decision names the view an act. An event with no workspace — a sign-in, a token issued or refused — is a log line, the ledger being a tenant table. Runs, the answer audit, signals, alerts, spend, backup runs and health checks are their own records.
+A read writes no row, unless a decision names the view an act. An event with no workspace — a sign-in, a token issued or refused — is a log line, the ledger being a tenant table; an act declared for the identity set is the one exception, a row in the identity-set ledger. Runs, the answer audit, signals, alerts, spend, backup runs and health checks are their own records.
 
 ## OKF
 

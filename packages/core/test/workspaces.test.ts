@@ -185,6 +185,38 @@ describe("provisioning a workspace", () => {
     expect(events.rowCount).toBe(0);
   });
 
+  it.each([
+    ["empty", ""],
+    ["spaces alone", "   "],
+  ])(
+    "refuses no-display-name for an Admin whose display name is %s, and leaves nothing behind",
+    async (_case, name) => {
+      const adminUserId = await seedPerson(db().pool, { name });
+      const door = openPostgres(db().runtimePool);
+      const id = ulid();
+
+      const provisioned = await provisionWorkspace(bootstrap, door, {
+        id,
+        name: "Unnamed",
+        slug: `unnamed-${id.toLowerCase()}`,
+        adminUserId,
+      });
+
+      expect(provisioned).toEqual({ ok: false, error: "no-display-name" });
+      const row = await db().pool.query("SELECT 1 FROM workspace WHERE id = $1", [id]);
+      expect(row.rowCount).toBe(0);
+      expect(await partitionExists(id)).toBe(false);
+      const memberships = await db().pool.query("SELECT 1 FROM member WHERE user_id = $1", [
+        adminUserId,
+      ]);
+      expect(memberships.rowCount).toBe(0);
+      const events = await db().pool.query("SELECT 1 FROM audit_event WHERE workspace_id = $1", [
+        id,
+      ]);
+      expect(events.rowCount).toBe(0);
+    },
+  );
+
   it("refuses a slug another workspace already holds", async () => {
     const adminUserId = await seedUser();
     const door = openPostgres(db().runtimePool);
@@ -833,6 +865,24 @@ describe("adding a member — the platform's act for a person who has signed in"
     ]);
     expect(await addedRowsOf(workspaceId)).toEqual([]);
   });
+
+  it.each([
+    ["empty", ""],
+    ["spaces alone", "   "],
+  ])(
+    "refuses no-display-name for a signed-in person whose display name is %s, writing nothing",
+    async (_case, name) => {
+      const { door, workspaceId } = await provisionedWorkspace(db(), "Unnamed");
+      const email = addressOf("unnamed");
+      const userId = await seedPerson(db().pool, { email, name });
+
+      const added = await addMember(bootstrap, door, { workspaceId, email, role: "Editor" });
+
+      expect(added).toEqual({ ok: false, error: "no-display-name" });
+      expect(await membershipsOf(workspaceId, userId)).toEqual([]);
+      expect(await addedRowsOf(workspaceId)).toEqual([]);
+    },
+  );
 
   it("refuses a repeat rather than changing the role, which is the Admin's act", async () => {
     const { door, workspaceId } = await provisionedWorkspace(db(), "Repeated");

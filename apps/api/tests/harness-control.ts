@@ -18,7 +18,11 @@ const provisioning = z.object({
   name: z.string().min(1).optional(),
   adminEmail: z.string().min(1).optional(),
 });
-const person = z.object({ email: z.string().min(1).optional() });
+// An empty display name is a person who has not given one yet, which a spec may want.
+const person = z.object({
+  email: z.string().min(1).optional(),
+  displayName: z.string().optional(),
+});
 const membership = z.object({
   workspaceId: z.string().min(1),
   userId: z.string().min(1),
@@ -54,7 +58,7 @@ export const harnessControl = (app: TestApp): Hono => {
 
   control.post(`${HARNESS_PREFIX}/people`, async (context) => {
     const asked = await readBody(context.req.raw, person);
-    return context.json(await app.person(asked.email));
+    return context.json(await app.person(asked.email, asked.displayName));
   });
 
   control.post(`${HARNESS_PREFIX}/members`, async (context) => {

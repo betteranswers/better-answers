@@ -1,15 +1,15 @@
 import type { BetterFetchError } from "better-auth/client";
 import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 
 import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 
-import { useSendVerificationOtp, useSignInEmailOtp } from "./auth-hooks.ts";
+import { useSendVerificationOtp, useSignInEmailOtp, type SignedIn } from "./auth-hooks.ts";
 import { AuthScreen, Outcome } from "./auth-screen.tsx";
-import { carriedFlow, safeReturnPath } from "./carried-flow.ts";
+import { leavingFor, nextAfterSignIn, pageQuery } from "./carried-flow.ts";
 
 const CODE_LIFETIME = "five minutes";
 
@@ -29,7 +29,6 @@ const didNotWork = (error: BetterFetchError): string =>
 export function SignInScreen() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const search = useRouterState({ select: (state) => state.location.searchStr });
   const [address, setAddress] = useState("");
   const [code, setCode] = useState("");
   const [sentTo, setSentTo] = useState<string | undefined>(undefined);
@@ -37,15 +36,13 @@ export function SignInScreen() {
   const sendCode = useSendVerificationOtp();
   const signIn = useSignInEmailOtp();
 
-  const landAfterSignIn = () => {
+  // The query rides along, a connector's signed one included, so that screen sends the person
+  // where this one would have.
+  const landAfterSignIn = (signedIn: SignedIn) => {
     queryClient.clear();
-    const carried = carriedFlow(search);
-    if (carried !== "") {
-      void navigate({ href: `/choose-workspace${carried}`, replace: true });
-      return;
-    }
-    const back = safeReturnPath(new URLSearchParams(search).get("redirect"));
-    void navigate({ href: back ?? "/", replace: true });
+    const query = pageQuery();
+    const next = signedIn.displayNameGiven ? nextAfterSignIn(query) : `/display-name${query}`;
+    void navigate(leavingFor(next));
   };
 
   const askForCode = (event: FormEvent) => {

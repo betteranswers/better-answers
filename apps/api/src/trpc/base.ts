@@ -110,12 +110,18 @@ export const router = trpc.router;
 
 const RESOLVER = "withPrincipal";
 
-const claimsOf = async (ctx: TrpcContext): Promise<Claims> => {
+type Session = NonNullable<Awaited<ReturnType<SessionReader>>>;
+
+const sessionOf = async (ctx: TrpcContext): Promise<Session> => {
   const read = await attempt(() => ctx.readSession(ctx.headers));
 
   if (!read.ok) throw failed(ctx.log, "readSession", read.error);
-  const session = read.value;
-  if (session === null) throw refused(ctx.log, "readSession", "no-session");
+  if (read.value === null) throw refused(ctx.log, "readSession", "no-session");
+  return read.value;
+};
+
+const claimsOf = async (ctx: TrpcContext): Promise<Claims> => {
+  const session = await sessionOf(ctx);
 
   const claims = await sessionClaims(async () => session, ctx.headers);
   if (claims === undefined) throw refused(ctx.log, "sessionClaims", "no-active-workspace");
@@ -160,4 +166,11 @@ export const ownTransactionProcedure = trpc.procedure.use(async ({ ctx, next }) 
   if (!resolved.value.ok) throw refused(ctx.log, RESOLVER, resolved.value.error);
 
   return next({ ctx: { principal: resolved.value.value, doors: ctx.doors } });
+});
+
+// An act on the person themselves needs no workspace; the person is the session's, never a
+// value the request names.
+export const personProcedure = trpc.procedure.use(async ({ ctx, next }) => {
+  const session = await sessionOf(ctx);
+  return next({ ctx: { personId: session.user.id, doors: ctx.doors } });
 });

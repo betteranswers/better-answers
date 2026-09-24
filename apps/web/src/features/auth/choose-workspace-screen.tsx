@@ -1,9 +1,10 @@
-import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/shared/ui/button.tsx";
 
 import {
+  hasADisplayName,
   useListOrganizations,
   useOAuthContinue,
   useSession,
@@ -11,7 +12,7 @@ import {
   type ResumeAnswer,
 } from "./auth-hooks.ts";
 import { AuthScreen, Outcome } from "./auth-screen.tsx";
-import { carriedFlow } from "./carried-flow.ts";
+import { carriedFlow, leavingFor, pageQuery } from "./carried-flow.ts";
 import { WORKSPACE_WORDS } from "./workspace-words.ts";
 
 const addressIn = (answer: ResumeAnswer): string | undefined => {
@@ -21,8 +22,7 @@ const addressIn = (answer: ResumeAnswer): string | undefined => {
 
 export function ChooseWorkspaceScreen() {
   const navigate = useNavigate();
-  const search = useRouterState({ select: (state) => state.location.searchStr });
-  const carried = carriedFlow(search);
+  const carried = carriedFlow(pageQuery());
 
   const session = useSession();
   const workspaces = useListOrganizations();
@@ -32,6 +32,8 @@ export function ChooseWorkspaceScreen() {
   const [wentNowhere, setWentNowhere] = useState(false);
 
   const signedOut = !session.isPending && (session.data === null || session.data === undefined);
+  const unnamed =
+    session.data !== null && session.data !== undefined && !hasADisplayName(session.data.user.name);
   const held = workspaces.data ?? [];
   const sole = held.length === 1 ? held[0] : undefined;
   const active = session.data?.session.activeOrganizationId ?? undefined;
@@ -72,7 +74,11 @@ export function ChooseWorkspaceScreen() {
   useEffect(() => {
     if (!decided) return;
     if (signedOut) {
-      void navigate({ href: `/sign-in${carried}`, replace: true });
+      void navigate(leavingFor(`/sign-in${carried}`));
+      return;
+    }
+    if (unnamed) {
+      void navigate(leavingFor(`/display-name${carried}`));
       return;
     }
 
@@ -85,7 +91,17 @@ export function ChooseWorkspaceScreen() {
     // Adding `openSoleWorkspace` to the deps re-runs this on every render and resumes a flow
     // that is already resuming.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [decided, signedOut, held.length, workspaces.isError, sole?.id, active, carried, navigate]);
+  }, [
+    decided,
+    signedOut,
+    unnamed,
+    held.length,
+    workspaces.isError,
+    sole?.id,
+    active,
+    carried,
+    navigate,
+  ]);
 
   const refused = pick.error !== null || resume.error !== null;
 

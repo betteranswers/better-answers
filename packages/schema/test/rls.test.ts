@@ -61,6 +61,8 @@ import {
   AN_EDGE,
   AN_EDGE_CARRYING_A_SENTENCE,
   AN_ERASURE_ROUTINE,
+  AN_IDENTITY_SET_LEDGER_ROW,
+  AN_IDENTITY_SET_LEDGER_ROW_WITH_ITS_FAMILY,
   AN_INVITATION,
   ONE_CALL_AGAINST_A_TOKEN,
   REFRESH_THE_READING,
@@ -444,6 +446,99 @@ describe("the ledger under app_rt", () => {
     const family = boundarySchemas.auditEvent.select.shape.family;
     expect(inCheck.map((word) => family.safeParse(word).success)).toEqual(inCheck.map(() => true));
     expect(family.safeParse("billing").success).toBe(false);
+  });
+});
+
+describe("the identity-set ledger", () => {
+  const PERSON_NAMED = "people.person.named";
+
+  it("lets the api record a person's act outside every scope and read it back, and never rewrite or remove one", async () => {
+    await withRollback(db.pool, async (client) => {
+      await client.query("SET LOCAL ROLE app_rt");
+      const id = ulid();
+      const personId = ulid();
+
+      const inserted = await client.query<{ family: string; subject_kind: string }>(
+        `${AN_IDENTITY_SET_LEDGER_ROW} ${THE_FAMILY_AND_SUBJECT_IT_LANDS_IN}`,
+        [id, PERSON_NAMED, `human:${personId}`, personId],
+      );
+      expect(inserted.rows).toEqual([{ family: "people", subject_kind: "person" }]);
+      const read = await client.query("SELECT id, actor, subject_id FROM identity_audit_event");
+      expect(read.rows).toEqual([{ id, actor: `human:${personId}`, subject_id: personId }]);
+
+      await refusesEach(client, [
+        [
+          "UPDATE identity_audit_event SET actor = 'process:better-answers-test'",
+          "a row the api could rewrite could book a person's act to someone else",
+        ],
+        [
+          `${AN_IDENTITY_SET_LEDGER_ROW} ${THE_DETAIL_EDITED}`,
+          "and an upsert is a rewrite by another road",
+          [id, PERSON_NAMED, `human:${personId}`, personId],
+        ],
+        [
+          "DELETE FROM identity_audit_event",
+          "and one it could remove could make an act look as if it never happened",
+        ],
+        ["TRUNCATE identity_audit_event", "nor empty the whole record at once"],
+        [
+          AN_IDENTITY_SET_LEDGER_ROW_WITH_ITS_FAMILY,
+          "nor write the family the act already names",
+          [ulid(), PERSON_NAMED, "platform", `human:${personId}`, personId],
+          /generated|non-DEFAULT/,
+        ],
+      ]);
+    });
+  });
+
+  it("refuses the worker every road to reading or recording a person's act", async () => {
+    await withRollback(db.pool, async (client) => {
+      const personId = ulid();
+      await client.query(AN_IDENTITY_SET_LEDGER_ROW, [
+        ulid(),
+        PERSON_NAMED,
+        `human:${personId}`,
+        personId,
+      ]);
+      expect(
+        Object.values(await privilegesHeld(client, "worker_rt", "identity_audit_event")),
+      ).not.toContain(true);
+      await client.query("SET LOCAL ROLE worker_rt");
+
+      await refusesEach(client, [
+        ["SELECT id FROM identity_audit_event", "the worker acts on no person's identity"],
+        [
+          AN_IDENTITY_SET_LEDGER_ROW,
+          "so it has no act of one to record",
+          [ulid(), PERSON_NAMED, "process:better-answers-worker", personId],
+        ],
+        ["UPDATE identity_audit_event SET detail = '{}'", "or rewrite"],
+        ["DELETE FROM identity_audit_event", "or remove"],
+      ]);
+    });
+  });
+
+  it("takes an act of the four families in the family.subject.verb shape, and refuses any other at the row", async () => {
+    await withRollback(db.pool, async (client) => {
+      const personId = ulid();
+      const landed = await client.query(AN_IDENTITY_SET_LEDGER_ROW, [
+        ulid(),
+        PERSON_NAMED,
+        `human:${personId}`,
+        personId,
+      ]);
+      expect(landed.rowCount).toBe(1);
+
+      await refusesEach(
+        client,
+        ["billing.person.named", "people.person", "People.Person.Named"].map((act) => [
+          AN_IDENTITY_SET_LEDGER_ROW,
+          `${act} is no act the ledgers name`,
+          [ulid(), act, "process:better-answers-test", ulid()],
+          /identity_audit_event_act_check|identity_audit_event_family_check/,
+        ]),
+      );
+    });
   });
 });
 

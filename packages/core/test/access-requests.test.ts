@@ -614,7 +614,7 @@ describe("who may decide", () => {
 
 describe("the actor-naming door", () => {
   it.skipIf(sourceTreeIsInstrumented())(
-    "is called by the request act and by nothing else in the tree",
+    "is called by the request act and a person's own display-name act, and by nothing else in the tree",
     async () => {
       const call = /\brecordFor\(/;
 
@@ -624,7 +624,10 @@ describe("the actor-naming door", () => {
 
       const callers = coreSourceFiles().filter((file) => call.test(readFileSync(file, "utf8")));
 
-      expect(asSliceRelative(callers).toSorted()).toEqual(["members/requests.ts"]);
+      expect(asSliceRelative(callers).toSorted()).toEqual([
+        "members/requests.ts",
+        "workspaces/display-name.ts",
+      ]);
     },
   );
 });

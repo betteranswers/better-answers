@@ -129,6 +129,24 @@ export const declareActs = <
   return acts;
 };
 
+const identitySetNames = new Set<string>();
+
+// Which ledger keeps an act is fixed where it is declared, so no caller can file a person's own
+// act in a workspace.
+export const declareIdentitySetActs = <
+  F extends Family,
+  const Acts extends Record<string, LedgerAct<ActName<F>>>,
+>(
+  family: F,
+  acts: Acts,
+): Acts => {
+  const registered = declareActs(family, acts);
+  for (const { name } of Object.values(acts)) identitySetNames.add(name);
+  return registered;
+};
+
 export const declarations = (): readonly Declaration[] => [...declared];
 
 export const isDeclared = (name: string): boolean => declaredNames.has(name);
+
+export const isIdentitySetAct = (name: string): boolean => identitySetNames.has(name);

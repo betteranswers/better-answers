@@ -10,7 +10,10 @@ import {
 } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
+import { displayNameDetour } from "@/features/auth/auth-hooks.ts";
+import { leavingFor, pageQuery } from "@/features/auth/carried-flow.ts";
 import { ChooseWorkspaceScreen } from "@/features/auth/choose-workspace-screen.tsx";
+import { DisplayNameScreen } from "@/features/auth/display-name-screen.tsx";
 import { membershipRefusal, NEEDS_A_PICK } from "@/features/auth/membership.ts";
 import { NoWorkspaceScreen } from "@/features/auth/no-workspace-screen.tsx";
 import { SignInScreen } from "@/features/auth/sign-in-screen.tsx";
@@ -44,6 +47,16 @@ const signInRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sign-in",
   component: SignInScreen,
+});
+
+const displayNameRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/display-name",
+  component: DisplayNameScreen,
+  beforeLoad: async ({ context }) => {
+    const elsewhere = await displayNameDetour(context.queryClient, pageQuery());
+    if (elsewhere !== undefined) throw redirect(leavingFor(elsewhere));
+  },
 });
 
 const chooseWorkspaceRoute = createRoute({
@@ -120,6 +133,7 @@ export const createAppRouter = (clients: AppClients, history?: RouterHistory) =>
   const options = {
     routeTree: rootRoute.addChildren([
       signInRoute,
+      displayNameRoute,
       chooseWorkspaceRoute,
       noWorkspaceRoute,
       shellRoute.addChildren([indexRoute, ...screenRoutes, ...viewRoutes]),

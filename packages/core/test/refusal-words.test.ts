@@ -4,7 +4,11 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { declareRefusals, REFUSAL_CLASSES, refusalRegister } from "../src/kernel/index.ts";
 import type { BindUploadRefusal, SourceRefusal } from "../src/sources/index.ts";
-import type { AddMemberRefusal, ProvisionRefusal } from "../src/workspaces/index.ts";
+import type {
+  AddMemberRefusal,
+  ProvisionRefusal,
+  SetDisplayNameRefusal,
+} from "../src/workspaces/index.ts";
 import { loadEveryEntryPoint } from "./entry-points.ts";
 import { coreSourceFiles, sourceTreeIsInstrumented } from "./source-tree.ts";
 
@@ -56,6 +60,12 @@ const REGISTER = {
   "slug-taken": "conflict by workspaces",
   "workspace-exists": "conflict by workspaces",
   "already-a-member": "conflict by workspaces",
+  "no-display-name": "precondition by workspaces",
+  "display-name-empty": "malformed by workspaces",
+  "display-name-not-one-line": "malformed by workspaces",
+  "display-name-control-character": "malformed by workspaces",
+  "display-name-angle-bracket": "malformed by workspaces",
+  "display-name-too-long": "malformed by workspaces",
 };
 
 type EveryRegisteredWord = keyof typeof REGISTER;
@@ -131,6 +141,7 @@ describe("the refusal-word walk", () => {
     expectTypeOf<BindUploadRefusal>().toExtend<EveryRegisteredWord | Error>();
     expectTypeOf<ProvisionRefusal>().toExtend<EveryRegisteredWord>();
     expectTypeOf<AddMemberRefusal>().toExtend<EveryRegisteredWord>();
+    expectTypeOf<SetDisplayNameRefusal>().toExtend<EveryRegisteredWord>();
     expectTypeOf<SourceRefusal<"no-such-binding"> | "invented">().not.toExtend<
       EveryRegisteredWord | Error
     >();

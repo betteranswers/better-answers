@@ -7,7 +7,7 @@ import {
   ACCESS_REQUEST_STATUSES,
 } from "./access-request-tables.ts";
 import { ACTOR_ID as ACTOR_ID_REGEX } from "./actor-id.ts";
-import { ACT, auditEvent, FAMILIES } from "./audit-tables.ts";
+import { ACT, auditEvent, FAMILIES, identityAuditEvent } from "./audit-tables.ts";
 import { composition, compositionInclude } from "./composition-tables.ts";
 import {
   bundleCommit,
@@ -293,9 +293,9 @@ const detail = z.union([
   z.null(),
 ]);
 
-const auditEventRefinements = {
+// One id space across both ledgers: an audit event's id, whichever ledger holds its row.
+const ledgerRefinements = {
   id: (schema: z.ZodString) => schema.regex(ULID).brand<"AuditEventId">(),
-  workspaceId,
   act: (schema: z.ZodString) =>
     schema.regex(ACT).pipe(z.templateLiteral([z.enum(FAMILIES), ".", z.string(), ".", z.string()])),
   actor: (schema: z.ZodString) => schema.regex(ACTOR_ID_REGEX),
@@ -304,13 +304,26 @@ const auditEventRefinements = {
   batchId: (schema: z.ZodString) => schema.regex(ULID),
 };
 
-export const auditEventSelect = createSelectSchema(auditEvent, {
-  ...auditEventRefinements,
+const ledgerDerivedRefinements = {
   family: (schema: z.ZodString) => schema.pipe(z.enum(FAMILIES)),
   subjectKind: (schema: z.ZodString) => schema.trim().min(1),
+};
+
+const auditEventRefinements = { ...ledgerRefinements, workspaceId };
+
+export const auditEventSelect = createSelectSchema(auditEvent, {
+  ...auditEventRefinements,
+  ...ledgerDerivedRefinements,
 });
 export const auditEventInsert = createInsertSchema(auditEvent, auditEventRefinements);
 export const auditEventUpdate = createUpdateSchema(auditEvent, auditEventRefinements);
+
+export const identityAuditEventSelect = createSelectSchema(identityAuditEvent, {
+  ...ledgerRefinements,
+  ...ledgerDerivedRefinements,
+});
+export const identityAuditEventInsert = createInsertSchema(identityAuditEvent, ledgerRefinements);
+export const identityAuditEventUpdate = createUpdateSchema(identityAuditEvent, ledgerRefinements);
 
 const accessRequestRefinements = {
   id: (schema: z.ZodString) => schema.regex(ULID).brand<"AccessRequestId">(),
@@ -829,6 +842,12 @@ export const boundarySchemas = {
     select: auditEventSelect,
     insert: auditEventInsert,
     update: auditEventUpdate,
+  },
+  identityAuditEvent: {
+    table: identityAuditEvent,
+    select: identityAuditEventSelect,
+    insert: identityAuditEventInsert,
+    update: identityAuditEventUpdate,
   },
   user: { table: user, select: userSelect, insert: userInsert, update: userUpdate },
   member: { table: member, select: memberSelect, insert: memberInsert, update: memberUpdate },

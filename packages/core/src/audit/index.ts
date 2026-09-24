@@ -11,11 +11,12 @@ import {
   type DetailShape,
   type DetailValue,
   isDeclared,
+  isIdentitySetAct,
   isOptionalKind,
   type LedgerAct,
 } from "./vocabulary.ts";
 
-export { act, declareActs, declarations } from "./vocabulary.ts";
+export { act, declareActs, declareIdentitySetActs, declarations } from "./vocabulary.ts";
 export type { ActName, LedgerAct, DetailOf } from "./vocabulary.ts";
 
 export type AuditEvent<A extends LedgerAct> = {
@@ -56,6 +57,11 @@ export const eventsOfAct = async (
 
 const eventInsert = boundarySchemas.auditEvent.insert.omit({ workspaceId: true });
 
+const identitySetInsert = boundarySchemas.identityAuditEvent.insert;
+
+// Both ledgers take the same row; only a workspace's ledger adds the workspace it belongs to.
+const ROW_COLUMNS = "id, act, actor, subject_id, detail, batch_id";
+
 const AN_KINDS: ReadonlySet<string> = new Set(["id", "iri", "audience"]);
 
 const kindRefusal = (kind: DetailKind): string => {
@@ -91,7 +97,8 @@ const write = async <A extends LedgerAct>(
   event: AuditEvent<A>,
 ): Promise<Recorded> => {
   if (!isDeclared(event.act.name)) throw new Error(`audit: ${event.act.name} was never declared`);
-  const row = eventInsert.safeParse({
+  const identitySet = isIdentitySetAct(event.act.name);
+  const row = (identitySet ? identitySetInsert : eventInsert).safeParse({
     id: event.id,
     act: event.act.name,
     actor,
@@ -105,19 +112,14 @@ const write = async <A extends LedgerAct>(
   const refusal = detailRefusal(event.act.detail, event.detail);
   if (refusal !== undefined) throw new Error(`audit: ${event.act.name} ${refusal}`);
 
+  const { data } = row;
+  const values = [data.id, data.act, data.actor, data.subjectId, data.detail, data.batchId];
   const inserted = await tx.query<{ id: string }>(
-    `INSERT INTO audit_event (id, workspace_id, act, actor, subject_id, detail, batch_id)
-     VALUES ($1, ${scopeClause(2)}, $3, $4, $5, $6, $7)
-     RETURNING id`,
-    [
-      row.data.id,
-      workspaceId,
-      row.data.act,
-      row.data.actor,
-      row.data.subjectId,
-      row.data.detail,
-      row.data.batchId,
-    ],
+    identitySet
+      ? `INSERT INTO identity_audit_event (${ROW_COLUMNS}) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
+      : `INSERT INTO audit_event (${ROW_COLUMNS}, workspace_id)
+         VALUES ($1, $2, $3, $4, $5, $6, ${scopeClause(7)}) RETURNING id`,
+    identitySet ? values : [...values, workspaceId],
   );
 
   const id = inserted.rows[0]?.id;

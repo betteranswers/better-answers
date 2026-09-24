@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0054_the-attached-partition"
+MIGRATION_ID = "0055_the-identity-set-ledger"
 
-MIGRATION_WHEN = 1790266038459
+MIGRATION_WHEN = 1790270219455
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -231,6 +231,17 @@ TABLES: dict[str, dict[str, str]] = {
         "group_id": "text NOT NULL",
         "user_id": "text NOT NULL",
         "added_at": "timestamp with time zone NOT NULL",
+    },
+    "public.identity_audit_event": {
+        "id": "text NOT NULL",
+        "act": "text NOT NULL",
+        "family": "text NOT NULL",
+        "actor": "text NOT NULL",
+        "subject_kind": "text NOT NULL",
+        "subject_id": "text NOT NULL",
+        "at": "timestamp with time zone NOT NULL",
+        "detail": "jsonb NOT NULL",
+        "batch_id": "text",
     },
     "public.ingress_counter": {
         "scope": "text NOT NULL",

@@ -174,6 +174,24 @@ describe("the flow, as claude.ai drives it", () => {
     expect(`${resumed.origin}${resumed.pathname}`).toBe(`${PUBLIC_URL}/choose-workspace`);
   });
 
+  it("holds a member of one workspace who has given no display name at the post-login page, and carries them on to consent once they give one", async () => {
+    const acme = await app.provision({ name: "Unnamed" });
+    const unnamed = await app.person(undefined, "");
+    await app.addMember(acme.workspaceId, unnamed.id, "Editor");
+    const client = app.client();
+
+    const asked = await driveToPage(app, client, unnamed);
+    expect(`${asked.origin}${asked.pathname}`).toBe(`${PUBLIC_URL}/choose-workspace`);
+    const stillAsked = await continueAfterPostLogin(client, asked.search);
+    expect(`${stillAsked.origin}${stillAsked.pathname}`).toBe(`${PUBLIC_URL}/choose-workspace`);
+
+    const given = await client.json("/trpc/person.setDisplayName", { displayName: "Una Named" });
+    expect(given.status).toBe(200);
+
+    const resumed = await continueAfterPostLogin(client, asked.search);
+    expect(`${resumed.origin}${resumed.pathname}`).toBe(`${PUBLIC_URL}/consent`);
+  });
+
   it("sends a person with no workspace nowhere: nothing to pick, and no token is minted", async () => {
     const nobody = await app.person();
     const client = app.client();
