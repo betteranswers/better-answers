@@ -1,0 +1,226 @@
+{
+  "description": "erasure-match (ADR 0020, ADR 0031, ADR 0036): what counts as an occurrence of a suppressed identifier in a document's normalised text, said once for both tiers. The worker's seam raises an erasure match at every occurrence of every identifier the workspace's suppressions hold, and withholds it with no finding, whatever rule is in force and whatever keep stands (apps/worker/tests/test_erasure_match_contract.py). The api records a request's identifiers and refuses one below the floor, and its erasure map names the documents whose indexed text holds an occurrence (packages/core/test/erasure-match.contract.test.ts). The two tiers must answer every case alike. A map that finds an occurrence the seam does not withhold re-wipes that document on every run, and a seam that withholds text the map never reported leaves an access answer short. An identifier and a text are compared after the same normalisation, and an occurrence is bounded, so a name never matches inside a longer word. Offsets are Unicode code points into the text as written, never into its normalised form: a character that folds to two, such as ß, is one character of the text and one of its occurrence. Neither tier holds the other's literals: each normalises, bounds and measures the floor in its own code, and each holds its own constants to this file.",
+  "offsets": "Unicode code points into the text, the start counted from zero and the end exclusive",
+  "floor": {
+    "characters": 3,
+    "name_words": 2,
+    "rule": "An identifier shorter than `characters` code points once normalised, or a name of fewer than `name_words` words once normalised, is below the floor. Words are the normalised name split at its spaces. Recording a request refuses such an identifier as `identifier-too-broad`, and one a request recorded before the floor existed raises no match: a case-folded match on a one-word name or a two-character code would withhold an ordinary word in every document of the workspace."
+  },
+  "normalisation": {
+    "rule": "An identifier and a text are compared after the same two steps. First, every run of whitespace becomes one space, and an identifier loses its leading and trailing whitespace. Whitespace is the code points listed under `whitespace`, and no other. Second, every character is replaced by its full Unicode case folding: the C and F mappings of CaseFolding.txt at Unicode 15.1, never the T (Turkic) ones. Folding is neither lower-casing, which keeps ß, nor lower-casing a whole word, which writes a final sigma as ς. Nothing else is folded: no accent is stripped, and no canonically equivalent sequence is composed.",
+    "whitespace": [
+      "\t",
+      "\n",
+      "\u000b",
+      "\f",
+      "\r",
+      "\u001c",
+      "\u001d",
+      "\u001e",
+      "\u001f",
+      " ",
+      "\u0085",
+      "\u00a0",
+      "\u1680",
+      "\u2000",
+      "\u2001",
+      "\u2002",
+      "\u2003",
+      "\u2004",
+      "\u2005",
+      "\u2006",
+      "\u2007",
+      "\u2008",
+      "\u2009",
+      "\u200a",
+      "\u2028",
+      "\u2029",
+      "\u202f",
+      "\u205f",
+      "\u3000"
+    ],
+    "cases": [
+      {
+        "identifier": " Priya \u00a0\n\tRAMAN\r\n",
+        "normalised": "priya raman",
+        "why": "Leading and trailing whitespace goes, and a run of it, a non-breaking space among it, is one space."
+      },
+      {
+        "identifier": "Jürgen Großmann",
+        "normalised": "jürgen grossmann",
+        "why": "ß lower-cases to itself and folds to ss, so a tier that lower-cases where it should fold answers ß here."
+      },
+      {
+        "identifier": "JÜRGEN GROẞMANN",
+        "normalised": "jürgen grossmann",
+        "why": "The capital ẞ lower-cases to ß and folds to ss: the name written in capitals is the same name."
+      },
+      {
+        "identifier": "ΟΔΥΣΣΕΑΣ ΕΛΥΤΗΣ",
+        "normalised": "οδυσσεασ ελυτησ",
+        "why": "Every sigma folds to σ wherever it stands. Lower-casing the words writes ς at the end of each, which is not the folded form."
+      },
+      {
+        "identifier": "Yıldız Aydın",
+        "normalised": "yıldız aydın",
+        "why": "The dotless ı is a letter of its own and folds to itself. Only the Turkic mappings, which neither tier applies, would join it to i."
+      },
+      {
+        "identifier": "ꮝꮟꮙꮿ",
+        "normalised": "ᏍᏏᏉᏯ",
+        "why": "Cherokee folds the other way: a small letter folds to its capital, so the capitals are the folded form."
+      }
+    ]
+  },
+  "boundary": {
+    "rule": "An occurrence is bounded. The character before it and the character after it, where the text has one, is not a word character, which is any code point of general category L, M or N (a letter, a mark or a number). An email address is bounded further, because an address carries on past a full stop or a hyphen. The occurrence is not one when the character after it is one of `address_joiners` and the character after that is a word character, or when the character before it is one of `address_joiners` and the character before that is a word character. A full stop that ends a sentence leaves an address bounded. An address that is the start or the end of a longer address is not an occurrence of it.",
+    "word_categories": ["L", "M", "N"],
+    "address_joiners": [".", "-", "_", "+"]
+  },
+  "cases": [
+    {
+      "kind": "emails",
+      "identifier": "priya.raman@meridianfenland.co.uk",
+      "text": "Send the signed copy to priya.raman@meridianfenland.co.uk before Friday.",
+      "clears_the_floor": true,
+      "occurrences": [{ "start": 24, "end": 57, "reads": "priya.raman@meridianfenland.co.uk" }],
+      "why": "A work address. No detector rule raises an address on a company's own domain, so the match alone withholds it."
+    },
+    {
+      "kind": "emails",
+      "identifier": "priya.raman@hotmail.co.uk",
+      "text": "Her own address, priya.raman@hotmail.co.uk, is on the form.",
+      "clears_the_floor": true,
+      "occurrences": [{ "start": 17, "end": 42, "reads": "priya.raman@hotmail.co.uk" }],
+      "why": "A consumer address, which the detector raises too. The match is raised all the same; where a withheld finding covers the same characters, the seam writes the finding's span and the match adds none."
+    },
+    {
+      "kind": "emails",
+      "identifier": "priya.raman@meridianfenland.co.uk",
+      "text": "Queries go to priya.raman@meridianfenland.co.uk. Copies go to priya.raman@meridianfenland.co.uk.",
+      "clears_the_floor": true,
+      "occurrences": [
+        { "start": 14, "end": 47, "reads": "priya.raman@meridianfenland.co.uk" },
+        { "start": 62, "end": 95, "reads": "priya.raman@meridianfenland.co.uk" }
+      ],
+      "why": "A full stop followed by a space, or by the end of the text, is the sentence's and not the address's, so each occurrence ends before it."
+    },
+    {
+      "kind": "emails",
+      "identifier": "priya.raman@meridianfenland.co",
+      "text": "Write to priya.raman@meridianfenland.co.uk, not to priya.raman@meridianfenland.co.",
+      "clears_the_floor": true,
+      "occurrences": [{ "start": 51, "end": 81, "reads": "priya.raman@meridianfenland.co" }],
+      "why": "An address followed by more address characters is another address: `.uk` makes the first a different mailbox. Only the second is an occurrence, because its full stop ends the sentence."
+    },
+    {
+      "kind": "emails",
+      "identifier": "raman@meridianfenland.co.uk",
+      "text": "Copy priya.raman@meridianfenland.co.uk and raman@meridianfenland.co.uk in.",
+      "clears_the_floor": true,
+      "occurrences": [{ "start": 43, "end": 70, "reads": "raman@meridianfenland.co.uk" }],
+      "why": "The same rule held the other way: an address that is the tail of a longer one is not an occurrence of it."
+    },
+    {
+      "kind": "names",
+      "identifier": "Priya Raman",
+      "text": "The lease was countersigned by Priya\n  Raman, and Priya\u00a0Raman initialled each page.",
+      "clears_the_floor": true,
+      "occurrences": [
+        { "start": 31, "end": 44, "reads": "Priya\n  Raman" },
+        { "start": 50, "end": 61, "reads": "Priya\u00a0Raman" }
+      ],
+      "why": "A converted document breaks its lines where the page did, so a name split across a line is still the name. The occurrence runs over the text's own whitespace, however much of it there is."
+    },
+    {
+      "kind": "names",
+      "identifier": "Ann Lee",
+      "text": "The Ann Leeson award went to Joann Lee this year.",
+      "clears_the_floor": true,
+      "occurrences": [],
+      "why": "A name inside a longer word is no occurrence: Ann Lee is not named by Ann Leeson, nor by Joann Lee. That is why an occurrence must be bounded."
+    },
+    {
+      "kind": "names",
+      "identifier": "Maria Jose",
+      "text": "Maria Jose\u0301 signed; Maria Jose countersigned.",
+      "clears_the_floor": true,
+      "occurrences": [{ "start": 20, "end": 30, "reads": "Maria Jose" }],
+      "why": "A combining mark belongs to the letter before it, so Maria José written with a combining accent is not Maria Jose: a mark is a word character."
+    },
+    {
+      "kind": "names",
+      "identifier": "Priya Raman",
+      "text": "PRIYA RAMAN signed, priya raman initialled and Priya RaMan witnessed.",
+      "clears_the_floor": true,
+      "occurrences": [
+        { "start": 0, "end": 11, "reads": "PRIYA RAMAN" },
+        { "start": 20, "end": 31, "reads": "priya raman" },
+        { "start": 47, "end": 58, "reads": "Priya RaMan" }
+      ],
+      "why": "Case is folded on both sides, so an occurrence is found however the document wrote it."
+    },
+    {
+      "kind": "names",
+      "identifier": "Jürgen Großmann",
+      "text": "Signed for the buyer by JÜRGEN GROẞMANN and witnessed by Jürgen Grossmann.",
+      "clears_the_floor": true,
+      "occurrences": [
+        { "start": 24, "end": 39, "reads": "JÜRGEN GROẞMANN" },
+        { "start": 57, "end": 73, "reads": "Jürgen Grossmann" }
+      ],
+      "why": "ß and ẞ each fold to ss, where lower-casing keeps ß, so the three spellings are one name. An occurrence is counted in the text's own characters, so the one written with ẞ is fifteen long and the one written with ss sixteen."
+    },
+    {
+      "kind": "other",
+      "identifier": "ß2",
+      "text": "Locker ß2 is hers, and so is locker SS2; locker ß21 is not.",
+      "clears_the_floor": true,
+      "occurrences": [
+        { "start": 7, "end": 9, "reads": "ß2" },
+        { "start": 36, "end": 39, "reads": "SS2" }
+      ],
+      "why": "The floor is measured on the normalised form. ß2 is two characters as written and three once folded, so it clears the floor where a tier measuring the lower-cased form would refuse it. A longer number that begins with it is not an occurrence."
+    },
+    {
+      "kind": "names",
+      "identifier": "Anna Gros",
+      "text": "Anna Groß signed and Anna Gros witnessed.",
+      "clears_the_floor": true,
+      "occurrences": [{ "start": 21, "end": 30, "reads": "Anna Gros" }],
+      "why": "A character that folds to two is one character of the text and is never split, so an occurrence never ends inside one: Groß folds to gross, which begins with gros but does not name her."
+    },
+    {
+      "kind": "other",
+      "identifier": "S21",
+      "text": "Lockers ß21 and S21 are both booked.",
+      "clears_the_floor": true,
+      "occurrences": [{ "start": 16, "end": 19, "reads": "S21" }],
+      "why": "Held at the other end: ß21 folds to ss21, which holds s21 from its second character, and an occurrence never starts inside a character of the text."
+    },
+    {
+      "kind": "other",
+      "identifier": "EMP-00417",
+      "text": "Payroll number EMP-00417 is closed; EMP-004171 is not hers.",
+      "clears_the_floor": true,
+      "occurrences": [{ "start": 15, "end": 24, "reads": "EMP-00417" }],
+      "why": "An identifier of another kind is bounded as a name is, so a longer number that begins with it is another number."
+    },
+    {
+      "kind": "names",
+      "identifier": "Priya",
+      "text": "Priya signed the lease.",
+      "clears_the_floor": false,
+      "occurrences": [],
+      "why": "A name of one word is below the floor, so it raises no match even where it stands bounded in the text. A request recorded before the floor existed never widens what is withheld."
+    },
+    {
+      "kind": "other",
+      "identifier": "HR",
+      "text": "Ask HR before Friday.",
+      "clears_the_floor": false,
+      "occurrences": [],
+      "why": "Two characters once normalised is below the floor, so it raises no match."
+    }
+  ]
+}

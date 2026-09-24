@@ -75,7 +75,24 @@ A_DELIVERY_NOTE_SUPPRESSED = (
 
 
 HER_ERASURE_REQUEST = suppression_of(
-    {"name": ("Priya Raman",), "email": ("priya.raman@example.test",)}
+    {
+        "emails": ("priya.raman@meridianfenland.co.uk",),
+        "names": ("Priya Raman",),
+        "other": (),
+    }
+)
+
+
+NOTHING_SWITCHABLE: Mapping[str, bool] = {"default_on": False, "default_off": False}
+
+
+A_ROTA_ID = "01M2Q3R4S5T6V7W8X9YZAB0008"
+A_ROTA = (
+    "Rota changes go to priya.raman@meridianfenland.co.uk by Thursday, and are\n"
+    "signed off by Priya\nRaman.\n"
+)
+A_ROTA_ERASED = (
+    "Rota changes go to [withheld] by Thursday, and are\nsigned off by [withheld].\n"
 )
 
 CONTRACTS = Path(__file__).resolve().parents[3] / "contracts"
@@ -427,6 +444,22 @@ def test_a_suppression_withholds_the_name_and_sends_the_detector_over_nothing(
     assert text_of(answer, AN_INVOICE_ID) == AN_INVOICE_REDACTED
 
 
+def test_an_erasure_after_the_first_run_withholds_her_work_address_on_the_next(
+    host: Host,
+) -> None:
+    rota = a_landed_document(A_ROTA_ID)
+    bucket = ABucket({rota.original_key: A_ROTA.encode()})
+    erased = a_landed_document(A_ROTA_ID, suppressions=(HER_ERASURE_REQUEST,))
+
+    first = read_the_copies(host, bucket, (rota,), rules_in_force=NOTHING_SWITCHABLE)
+    answer = read_the_copies(host, bucket, (erased,), rules_in_force=NOTHING_SWITCHABLE)
+
+    assert text_of(first, A_ROTA_ID) == A_ROTA
+    assert answer.detected_afresh == ()
+    assert text_of(answer, A_ROTA_ID) == A_ROTA_ERASED
+    assert answer.documents[0].redacted.findings == first.documents[0].redacted.findings
+
+
 def test_a_keep_puts_the_span_back_in_the_text_and_detects_nothing_afresh(
     host: Host,
 ) -> None:
@@ -446,6 +479,37 @@ def test_a_keep_puts_the_span_back_in_the_text_and_detects_nothing_afresh(
     assert answer.detected_afresh == ()
     assert text_of(answer, AN_INVOICE_ID) == AN_INVOICE
     assert text_of(answer, A_DELIVERY_NOTE_ID) == A_DELIVERY_NOTE
+
+
+AN_INVOICE_KEPT_BUT_ERASED = (
+    "Invoice 2026-041 is due on receipt.\n\n"
+    "The sort code is 00-00-00 and the account number is [withheld].\n\n"
+    "Delivery follows within ten working days of a signed order.\n"
+)
+
+
+def test_a_kept_span_naming_an_erased_identifier_keeps_that_identifier_withheld(
+    host: Host,
+) -> None:
+    bucket = a_bucket_holding_both()
+    kept = Restore(rule_id="UK_BANK_ACCOUNT", start=54, end=97)
+    her_account = suppression_of(
+        {"emails": (), "names": (), "other": (THE_ACCOUNT_NUMBER,)}
+    )
+
+    read_the_copies(host, bucket, (a_landed_document(AN_INVOICE_ID, restores=(kept,)),))
+    answer = read_the_copies(
+        host,
+        bucket,
+        (
+            a_landed_document(
+                AN_INVOICE_ID, suppressions=(her_account,), restores=(kept,)
+            ),
+        ),
+    )
+
+    assert answer.detected_afresh == ()
+    assert text_of(answer, AN_INVOICE_ID) == AN_INVOICE_KEPT_BUT_ERASED
 
 
 def test_a_run_under_a_moved_detection_key_detects_every_document_afresh(

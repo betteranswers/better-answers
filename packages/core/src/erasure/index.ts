@@ -1,4 +1,5 @@
 export type { IdentityArm } from "./identity.ts";
+export { floorNotCleared, normalisedIdentifier } from "./identifiers.ts";
 export { accessAnswerOf, ERASURE_FAMILIES, erasureMapOf } from "./map.ts";
 export type { AccessAnswer, ErasureFamily, ErasureFamilyDescriptor, ErasureMap } from "./map.ts";
 export { rederiveAfterErasure } from "./rederive.ts";
