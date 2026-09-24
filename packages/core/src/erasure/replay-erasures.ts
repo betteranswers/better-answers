@@ -63,7 +63,7 @@ type CompletedRow = {
   readonly completed_at: Date;
 };
 
-export const erasureRequestsSince = async (
+const erasureRequestsSince = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
   since: Date,
@@ -135,7 +135,7 @@ export const replayableErasures = async (
 
 const EMPTY_SET = { emails: [], names: [], other: [] };
 
-export const restoreFromReplayCopy = async (
+const restoreFromReplayCopy = async (
   platform: ErasurePrincipal,
   door: PostgresDoor,
   copy: ReplayCopy,
