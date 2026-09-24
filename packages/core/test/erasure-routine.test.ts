@@ -331,8 +331,14 @@ const checksIn = async (workspaceId: string) => {
 };
 
 const indexedIn = async (workspaceId: string) => {
-  const read = await db().pool.query<{ iri: string; content_hash: string; body: string }>(
-    "SELECT iri, content_hash, body FROM concept_index WHERE workspace_id = $1 ORDER BY iri",
+  const read = await db().pool.query<{
+    iri: string;
+    content_hash: string;
+    body: string;
+    frontmatter: string;
+  }>(
+    `SELECT iri, content_hash, body, frontmatter::text AS frontmatter
+       FROM concept_index WHERE workspace_id = $1 ORDER BY iri`,
     [workspaceId],
   );
   return read.rows;
@@ -1023,11 +1029,25 @@ describe("the checks the rewrite moved", () => {
     });
   });
 
+  it("rewrites the index's copy of a concept the rewrite touched only in the keys kept out of the hash, so no index row still names the erased person", async () => {
+    const { email, steadyIri, indexedBefore, indexedAfter } = await theBundleRewritten();
+    const steadyBefore = indexedBefore.find((row) => row.iri === steadyIri);
+    const steadyAfter = indexedAfter.find((row) => row.iri === steadyIri);
+
+    expect(steadyBefore?.frontmatter).toContain(email);
+    expect(
+      indexedAfter
+        .filter((row) => row.frontmatter.includes(email) || row.body.includes(email))
+        .map((row) => row.iri),
+    ).toEqual([]);
+    expect(steadyAfter?.content_hash).toEqual(steadyBefore?.content_hash);
+  });
+
   it("records what it moved in the report's actions, rather than reshaping them", async () => {
     const { actions } = await theBundleRewritten();
 
     expect(actions).toMatchObject({
-      "concept-file": { reindexed: 1 },
+      "concept-file": { reindexed: 2 },
       "concept-verification": { rehashed: 1 },
     });
   });

@@ -410,14 +410,18 @@ export const carryChecksOntoRewrite = async (
       throw new Error(`concepts: the bundle holds a file the platform cannot read: ${row.path}`);
     }
     const contentHash = contentHashOf(read.value.frontmatter, read.value.body, row.path);
-    if (contentHash === row.content_hash) continue;
 
-    await tx.query(
+    // The hash leaves out keys a rewrite touches, `verified` among them, so the stored copy is
+    // compared whole; checks move only with the hash.
+    const reindexed = await tx.query(
       `UPDATE concept_index SET frontmatter = $3, body = $4, content_hash = $5
-        WHERE workspace_id = ${scopeClause(1)} AND iri = $2`,
+        WHERE workspace_id = ${scopeClause(1)} AND iri = $2
+          AND (frontmatter IS DISTINCT FROM $3::jsonb OR body IS DISTINCT FROM $4
+               OR content_hash IS DISTINCT FROM $5)`,
       [scopeParameter(platform), row.iri, read.value.frontmatter, read.value.body, contentHash],
     );
-    concepts += 1;
+    concepts += reindexed.rowCount ?? 0;
+    if (contentHash === row.content_hash) continue;
     const moved = await tx.query(
       `UPDATE concept_verification SET content_hash = $3, origin = $4
         WHERE workspace_id = ${scopeClause(1)} AND iri = $2 AND content_hash IS NOT NULL`,

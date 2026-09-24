@@ -51,6 +51,8 @@ The three dates are computed **from the timestamp of the last dump before the re
 
 `restore-drill.sh` replays exactly this into staging on VPC 2 on the first of every month, records RTO and RPO, and ends by wiping staging. **`restore-production.sh` replays it into production** (`RUNBOOK.md` page 1): the same order, step 1's replay mandatory, no trap, and no wipe beyond the database it replaces in one transaction. Every step that needs a slice not yet built says so through its `pnpm ops` command's exit code (`apps/api/src/ops.ts`), so a drill before the graph exists records "not built" and never a false green. A restore anywhere is an `audit_event` (*restore*: by whom, from which copy) on the System screen.
 
+**The workspace the drill works on** (24/09/2026): steps 6 to 10 rebuild, count, smoke and rehearse on one workspace, `DRILL_WORKSPACE` in `/etc/better-answers/drill.env`. Every `pnpm ops` command refuses a workspace id that is not a ULID, so the drill refuses one before step 0. No production dump holds the synthetic fixture's workspace, `01M2SYNTHET1CAAAAAAAAAAAAA` (`deploy/seed-synthetic.sh --workspace-id`), so step 5b seeds it into every restored copy, with its chunk partition and an empty repository. `drill.env` names it until production holds a workspace the drill should rebuild instead.
+
 ## The drill's erasure rehearsal — step 10, every third month (ADR 0020, 0022)
 
 A backup that restores proves the platform comes back. It does not prove that an erasure erased, which is the one claim a restore path cannot make for itself, so every third month the drill makes it on a synthetic subject, in **seven steps that each rest on the one before**:

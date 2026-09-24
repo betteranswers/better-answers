@@ -7,7 +7,7 @@ import { describe, expect, it, onTestFinished } from "vitest";
 import { z } from "zod";
 
 import { GARAGE_IMAGE } from "@better-answers/core/store/objects";
-import { POSTGRES_IMAGE } from "@better-answers/schema";
+import { boundarySchemas, POSTGRES_IMAGE, ULID_PATTERN } from "@better-answers/schema";
 
 const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 const read = (relative: string): string =>
@@ -32,6 +32,12 @@ const deployScripts = (): readonly string[] =>
 const fencedIn = (script: string, name: string): string | undefined => {
   const opened = script.split(`>>> ${name}`)[1];
   return opened?.slice(opened.indexOf("\n") + 1).split(`# <<< ${name}`)[0];
+};
+
+const positionOf = (text: string, needle: string): number => {
+  const index = text.indexOf(needle);
+  expect({ needle, found: index >= 0 }).toEqual({ needle, found: true });
+  return index;
 };
 
 type BashRun = { readonly code: number; readonly output: string };
@@ -402,6 +408,60 @@ describe("the deploy tree (T-005)", () => {
     expect(drill).toContain("COUNTS DIFFER");
   });
 
+  it("gives the synthetic fixture's workspace one id every ops command reads as a workspace id, and names it in the drill.env template and BACKUPS.md", () => {
+    const workspaceId = execFileSync(
+      "bash",
+      [path.join(repositoryRoot, "deploy/seed-synthetic.sh"), "--workspace-id"],
+      { encoding: "utf8" },
+    ).trim();
+
+    expect(workspaceId).toEqual("01M2SYNTHET1CAAAAAAAAAAAAA");
+    expect(boundarySchemas.workspace.select.shape.id.safeParse(workspaceId).success).toBe(true);
+    expect(read("deploy/host-setup.sh")).toContain(`\nDRILL_WORKSPACE=${workspaceId}\n`);
+    expect(read(`${operationsDocuments}/BACKUPS.md`)).toContain(`\`${workspaceId}\``);
+  });
+
+  it("refuses a DRILL_WORKSPACE that is not a workspace id before step 0, by the pattern the schema holds, naming the synthetic fixture's", () => {
+    const drill = read("deploy/restore-drill.sh");
+
+    const guard = fencedIn(drill, "workspace id");
+    expect({ markers: guard !== undefined }).toEqual({ markers: true });
+    expect(drill.indexOf("# >>> workspace id")).toBeLessThan(drill.indexOf("## 0 wipe staging"));
+    expect(guard).toContain(`[[ "\${DRILL_WORKSPACE}" =~ ${ULID_PATTERN} ]]`);
+
+    const ran = (workspace: string): BashRun =>
+      bashRan([
+        `DEPLOY_DIR=${JSON.stringify(path.join(repositoryRoot, "deploy"))}`,
+        `DRILL_WORKSPACE=${JSON.stringify(workspace)}`,
+        guard ?? "",
+        'say "step 0"',
+      ]);
+
+    expect(ran("01M2SYNTHET1CAAAAAAAAAAAAA")).toEqual({ code: 0, output: "step 0\n" });
+    expect(ran("ws_synthetic")).toEqual({
+      code: 1,
+      output:
+        "REFUSED: DRILL_WORKSPACE ws_synthetic is not a workspace id; the synthetic fixture's is 01M2SYNTHET1CAAAAAAAAAAAAA\n",
+    });
+    expect(ran("01m2synthet1caaaaaaaaaaaaa").code).toEqual(1);
+  });
+
+  it("seeds the synthetic fixture into the restored copy with an empty repository, after the git store and before api starts", () => {
+    const drill = read("deploy/restore-drill.sh");
+    const at = (needle: string): number => positionOf(drill, needle);
+
+    const gitStore = at("git clone --quiet --bare");
+    const seeded = at('"${DEPLOY_DIR}/seed-synthetic.sh" | tee -a "${REPORT}"');
+    const repository = at(
+      `[ -d "/data/git/\${synthetic_workspace}.git" ] || sudo -u '#1000' git init --quiet --bare --initial-branch main "/data/git/\${synthetic_workspace}.git"`,
+    );
+    const apiUp = at("platform up -d --wait api");
+
+    expect([gitStore, seeded, repository, apiUp]).toEqual(
+      [gitStore, seeded, repository, apiUp].toSorted((left, right) => left - right),
+    );
+  });
+
   it("wipes staging without a graph special case: the graph is plain tables in `public` (ADR 0032)", () => {
     const drill = read("deploy/restore-drill.sh");
     expect(drill).not.toMatch(/ag_catalog|drop_graph|\bAGE\b/);
@@ -413,11 +473,7 @@ describe("the deploy tree (T-005)", () => {
 
   it("proves the rehearsal in seven steps, in order: seed · dump · found · erase · dump · gone · gone from git", () => {
     const drill = read("deploy/restore-drill.sh");
-    const at = (needle: string): number => {
-      const index = drill.indexOf(needle);
-      expect({ needle, found: index >= 0 }).toEqual({ needle, found: true });
-      return index;
-    };
+    const at = (needle: string): number => positionOf(drill, needle);
     const steps = [
       "--synthetic --seed",
       'pg_dump --format=plain --dbname="${STAGING_DATABASE_URL}" > "${WORK}/pre-erasure.sql"',

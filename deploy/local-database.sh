@@ -28,6 +28,11 @@ up() {
   fi
   compose up -d --wait --quiet-pull
   (cd "${repo}" && DATABASE_URL="$(owner_dsn "${port}")" pnpm --silent migrate)
+  # The seed keys its workspace by slug, so a fixture seeded under an earlier id would fail it on a foreign key.
+  synthetic="$("${deploy}/seed-synthetic.sh" --workspace-id)"
+  standing="$(in_database psql -qAt -U better_answers -d better_answers -c "SELECT id FROM workspace WHERE slug = 'synthetic'")"
+  [ -z "${standing}" ] || [ "${standing}" = "${synthetic}" ] \
+    || refuse "this database holds the synthetic fixture under ${standing}, and its workspace is ${synthetic} now — deploy/local-database.sh down --wipe, then up"
   in_database /repo/deploy/seed-synthetic.sh "$(owner_dsn 5432)"
   in_database psql -q -v ON_ERROR_STOP=1 -U better_answers -d better_answers -f /repo/deploy/browse-role.sql
   in_database psql -q -v ON_ERROR_STOP=1 -U better_answers -d better_answers -c "ALTER ROLE browse_ro PASSWORD 'browse_ro'"
