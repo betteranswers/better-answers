@@ -67,6 +67,7 @@ AGENTS.md.bak
 !.claude/skills/human-writing/
 !.claude/skills/mutation-testing/
 !.claude/skills/repo-quality-sweep/
+!.claude/skills/THIRD_PARTY_NOTICES.md
 .agents/
 tasks/AGENTS.md
 apps/api/.claude/skills/*

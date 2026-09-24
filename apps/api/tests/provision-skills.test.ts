@@ -378,6 +378,7 @@ describe("the skills this repository tracks (T-081, T-384)", () => {
     const ours = tracked(".claude/skills").map((file) => file.split("/")[2] ?? "");
 
     expect([...new Set(ours)].sort()).toEqual([
+      "THIRD_PARTY_NOTICES.md",
       "better-answers-design",
       "browser-suite",
       "code-comments",
