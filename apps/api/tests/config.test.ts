@@ -41,7 +41,7 @@ describe("the bootstrap configuration", () => {
     expect(read.ok).toBe(false);
   });
 
-  it("gives the app the bare repositories' root, so the head check has bundles to open", () => {
+  it("gives the api the bare repositories' root, so the head check has bundles to open", () => {
     const read = readBootstrap({ DATABASE_URL: "postgresql://x@db/x", GIT_STORE_DIR: "/data/git" });
 
     expect(read.ok && read.value.gitStoreDir).toBe("/data/git");
@@ -128,7 +128,7 @@ describe("the bootstrap configuration", () => {
     expect(read.ok).toBe(false);
   });
 
-  it("gives the app the one origin, normalised, its secret and the three hostnames", () => {
+  it("gives the api the one origin, normalised, its secret and the three hostnames", () => {
     const read = readIdentityBootstrap(
       identityEnvironment({ PUBLIC_URL: "https://app.example.test/" }),
     );
@@ -164,7 +164,7 @@ describe("the bootstrap configuration", () => {
     expect(readIdentityBootstrap(identityEnvironment({ AUTH_SECRET: "short" })).ok).toBe(false);
   });
 
-  it("gives the app its SMTP connection URL, so the sign-in code has a transport", () => {
+  it("gives the api its SMTP connection URL, so the sign-in code has a transport", () => {
     const read = readIdentityBootstrap(
       identityEnvironment({ SMTP_URL: "smtps://resend:key@smtp.example.test:465" }),
     );
@@ -236,7 +236,7 @@ describe("the three hostnames of the estate", () => {
     expect(readIdentityBootstrap(identityEnvironment({ [name]: undefined })).ok).toBe(false);
   });
 
-  it("ignores an APP_HOSTNAME the deploy unit still sets, because the app is PUBLIC_URL's host", () => {
+  it("ignores an APP_HOSTNAME the deploy unit still sets, because the app hostname is PUBLIC_URL's host", () => {
     const read = readIdentityBootstrap(identityEnvironment({ APP_HOSTNAME: "elsewhere.test" }));
 
     expect(read.ok && read.value.hostnames.app).toBe("app.example.test");

@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { startApp, type TestApp } from "./harness.ts";
 import { serverFor } from "./harness.ts";
 
-describe("the app's health endpoint", () => {
+describe("the api's health endpoint", () => {
   let app: TestApp;
 
   beforeAll(async () => {
@@ -15,7 +15,7 @@ describe("the app's health endpoint", () => {
     await app.stop();
   });
 
-  it("tells the deploy unit the app is healthy while the platform database answers", async () => {
+  it("tells the deploy unit the api is healthy while the platform database answers", async () => {
     const response = await app.server.request("/health");
 
     expect(response.status).toBe(200);
@@ -25,7 +25,7 @@ describe("the app's health endpoint", () => {
     });
   });
 
-  it("tells the deploy unit the app is unhealthy when the platform database cannot be reached", async () => {
+  it("tells the deploy unit the api is unhealthy when the platform database cannot be reached", async () => {
     const unreachable = new Pool({
       connectionString: "postgresql://nobody@127.0.0.1:1/nothing",
       connectionTimeoutMillis: 1_000,
@@ -42,7 +42,7 @@ describe("the app's health endpoint", () => {
     await unreachable.end();
   });
 
-  it("tells the deploy unit the app is unhealthy when the database answers but the identity provider could not start", async () => {
+  it("tells the deploy unit the api is unhealthy when the database answers but the identity provider could not start", async () => {
     await app.database.superuser.query("DROP DATABASE IF EXISTS unmigrated");
     await app.database.superuser.query("CREATE DATABASE unmigrated");
     const connection = new URL(String(app.database.superuser.options.connectionString));

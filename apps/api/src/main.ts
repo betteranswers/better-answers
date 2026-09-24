@@ -13,8 +13,8 @@ import { RECONCILER_INTERVAL_MS, startReconciler } from "./reconciler.ts";
 import { createServer } from "./server.ts";
 import { startSweeps, SWEEP_FIRST_PASS_MS, SWEEP_INTERVAL_MS } from "./sweeps.ts";
 
-const bootstrap = requireBootstrap("the app");
-const identity = requireIdentityBootstrap("the app");
+const bootstrap = requireBootstrap("the api");
+const identity = requireIdentityBootstrap("the api");
 const objectStore = readObjectStore();
 
 const doors = openDoors({
@@ -25,7 +25,7 @@ const doors = openDoors({
 if (doors.git?.ok === false) {
   logger.error(
     { reason: doors.git.error, git_store_dir: bootstrap.gitStoreDir },
-    "the app cannot start: the head check's repositories' root was refused",
+    "the api cannot start: the head check's repositories' root was refused",
   );
   process.exit(1);
 }
@@ -67,7 +67,7 @@ serve(
     port: bootstrap.port,
   },
   (address) => {
-    logger.info({ port: address.port }, "app listening");
+    logger.info({ port: address.port }, "api listening");
   },
 );
 
@@ -81,7 +81,7 @@ if (!reconciler.ok) {
   logger.info({ interval_ms: RECONCILER_INTERVAL_MS }, "head check running");
 }
 
-// A wrong setting stops the sweeps and not the app; their check's silence tells the operator.
+// A wrong setting stops the sweeps and not the api; their check's silence tells the operator.
 const sweepSettings = readSweeps();
 if (!sweepSettings.ok) {
   logger.error({ reason: sweepSettings.error.message }, "the sweeps are not running");

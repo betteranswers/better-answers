@@ -548,7 +548,7 @@ describe("the deploy tree (T-005)", () => {
     expect(build).not.toContain("COOLIFY_STAGING_APP_UUID");
   });
 
-  it("names the app's own fence beside the tunnel's rules, one rule per hostname role, and the two uptime paths", () => {
+  it("names the api's own fence beside the tunnel's rules, one rule per hostname role, and the two uptime paths", () => {
     const coolify = read(`${operationsDocuments}/coolify.md`);
     expect(coolify).toContain("apps/api/src/ingress/hostnames.ts");
     const unnamedRoles = ["app", "agent", "apex"].filter(

@@ -20,7 +20,7 @@ describe("the periodic head check", () => {
 
   const running = (logger: Parameters<typeof startReconciler>[0]["logger"]) => {
     const started = startReconciler({ doors: app().doors, logger });
-    if (!started.ok) throw new Error(`the app's own root was refused: ${started.error}`);
+    if (!started.ok) throw new Error(`the TestApp's own root was refused: ${started.error}`);
     return started.value;
   };
 

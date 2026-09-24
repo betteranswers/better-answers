@@ -17,7 +17,7 @@ const originArgument = (argument: string | undefined): string => {
   const parsed = URL.parse(argument);
   if (parsed === null || parsed.origin === "null") {
     throw new Error(
-      `the local loop's one argument is the origin the app is reached on, e.g. https://<name>.trycloudflare.com; got ${argument}`,
+      `the local loop's one argument is the origin the api is reached on, e.g. https://<name>.trycloudflare.com; got ${argument}`,
     );
   }
   return originOfUrl(argument);
