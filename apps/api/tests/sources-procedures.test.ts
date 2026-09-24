@@ -694,6 +694,31 @@ describe("the Sources procedures over the wire", () => {
     });
   });
 
+  it("widens a binding's class, and refuses one that is not wider in its own word", async () => {
+    const { workspace, api } = await anAdmin();
+    const { bindingId } = await unpublishedBinding(workspace.workspaceId);
+
+    const widened = await api.sources.widen.mutate({
+      bindingId,
+      sensitivity: "Public",
+      audience: "everyone",
+    });
+    const refused = await refusalOfCall(
+      api.sources.widen.mutate({ bindingId, sensitivity: "Internal", audience: "everyone" }),
+    );
+
+    expect(widened).toEqual({
+      bindingId,
+      auditEventId: expect.any(String),
+      visibility: { sensitivity: "Public", audience: "everyone", audienceGroups: null },
+      concepts: [],
+      compositions: [],
+    });
+    expect(refused).toMatchObject({
+      data: { httpStatus: 422, refusal: { word: "not-wider", class: "inapplicable" } },
+    });
+  });
+
   it("previews an unpublished binding's chunks to its Admin", async () => {
     const { workspace, api } = await anAdmin();
     const { bindingId, documentId } = await unpublishedBinding(workspace.workspaceId);

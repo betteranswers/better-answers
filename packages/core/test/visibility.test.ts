@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { conceptIriOf, ulid } from "@better-answers/schema";
+import type { TestData } from "@better-answers/schema/testing";
 import { bindingIdTakenAgain, conceptIriTakenAgain } from "@better-answers/schema/testing/probes";
 
 import { head } from "@better-answers/core/store/git";
@@ -21,6 +22,8 @@ import {
   narrowBindingInput,
   narrowDocuments,
   narrowDocumentsInput,
+  widenBinding,
+  widenBindingInput,
 } from "../src/sources/index.ts";
 import type { Folded, Tx } from "../src/store/postgres/index.ts";
 import { inputOf } from "./suite-input.ts";
@@ -57,6 +60,12 @@ const narrowingAsked = (
   tx: Parameters<typeof narrowBinding>[1],
   asked: NarrowingAsked,
 ) => narrowBinding(principal, tx, inputOf(narrowBindingInput, asked));
+
+const wideningAsked = (
+  principal: Parameters<typeof widenBinding>[0],
+  tx: Parameters<typeof widenBinding>[1],
+  asked: z.input<typeof widenBindingInput>,
+) => widenBinding(principal, tx, inputOf(widenBindingInput, asked));
 
 const RESTRICTED = { sensitivity: "Restricted" } as const;
 
@@ -117,6 +126,30 @@ const whileAChunkRowIsHeld = async <T>(
     holder.release();
   }
 };
+
+// A second binding under a held id fails the transaction after the act has landed every row.
+const landedThenTheTransactionFailed = (
+  scenario: Scenario,
+  bindingId: string,
+  act: (admin: UserPrincipal, tx: Tx) => Promise<{ readonly ok: boolean }>,
+) =>
+  expect(
+    reading(scenario.admin, async (admin, tx) => {
+      expect((await act(admin, tx)).ok).toBe(true);
+      await attempt(() =>
+        bindingIdTakenAgain(tx, scenario.workspaceId, {
+          bindingId,
+          name: "The handbook",
+          sensitivity: "Internal",
+        }),
+      );
+    }),
+  ).rejects.toThrow(/did not commit/);
+
+const widenedTo = (scenario: Scenario, bindingId: string, sensitivity: string) =>
+  reading(scenario.admin, (admin, tx) =>
+    wideningAsked(admin, tx, { bindingId, sensitivity, audience: "everyone" }),
+  );
 
 const overriddenTo = (scenario: Scenario, iri: string, sensitivity: string) =>
   reading(scenario.admin, (admin, tx) =>
@@ -1025,23 +1058,13 @@ describe("narrowing a binding", () => {
       charEnd: 53,
     });
 
-    await expect(
-      reading(scenario.admin, async (admin, tx) => {
-        const narrowed = await narrowingAsked(admin, tx, {
-          bindingId: binding.bindingId,
-          sensitivity: "Restricted",
-          audience: "everyone",
-        });
-        expect(narrowed.ok).toBe(true);
-        await attempt(() =>
-          bindingIdTakenAgain(tx, scenario.workspaceId, {
-            bindingId: binding.bindingId,
-            name: "The handbook",
-            sensitivity: "Internal",
-          }),
-        );
+    await landedThenTheTransactionFailed(scenario, binding.bindingId, (admin, tx) =>
+      narrowingAsked(admin, tx, {
+        bindingId: binding.bindingId,
+        sensitivity: "Restricted",
+        audience: "everyone",
       }),
-    ).rejects.toThrow(/did not commit/);
+    );
 
     expect(
       await visibilityHeld(db().pool, "source_binding", scenario.workspaceId, binding.bindingId),
@@ -1098,6 +1121,278 @@ describe("publishing a binding", () => {
     ).toMatchObject([
       { subject_id: binding.bindingId, detail: { sensitivity: "Internal", audience: "groups" } },
     ]);
+  });
+});
+
+const A_HEALTH_CUE = { category: "special-category", ruleId: "HEALTH_CUE", tier: "always" };
+
+type FindingSeeded = Omit<
+  NonNullable<Parameters<TestData["finding"]>[0]>,
+  "workspaceId" | "documentId"
+>;
+
+const findingIn = (scenario: Scenario, document: Sourced, finding: FindingSeeded) =>
+  seededBy(db(), (seed) =>
+    seed.finding({
+      workspaceId: scenario.workspaceId,
+      documentId: document.documentId,
+      ...finding,
+    }),
+  );
+
+// Reviewed, and the run that would lift the seam's verdict not yet run: the document keeps it.
+const dismissedBy = (scenario: Scenario) => ({
+  reviewState: "dismissed",
+  reviewedBy: `human:${scenario.admin.userId}`,
+  reviewedAt: now,
+  reviewReason: "Our engineers diagnose faults in pumps, never in people.",
+});
+
+const documentClassesUnder = async (workspaceId: string, bindingId: string) => {
+  const read = await db().pool.query<{ id: string; sensitivity: string | null }>(
+    "SELECT id, sensitivity FROM source_document WHERE workspace_id = $1 AND binding_id = $2",
+    [workspaceId, bindingId],
+  );
+  return Object.fromEntries(read.rows.map((row) => [row.id, row.sensitivity]));
+};
+
+describe("widening a binding", () => {
+  it("widens a published binding's class and audience, moves every concept citing its documents and every composition including one, and records the class and audience it moved from and to", async () => {
+    const scenario = await arrange();
+    const hr = await groupNamed(db(), scenario, "HR", []);
+    const binding = await bindingForGroups(db(), scenario.workspaceId, [hr], "Restricted");
+    const other = await bindingForGroups(db(), scenario.workspaceId, [hr], "Restricted");
+    const cited = await conceptCiting(scenario, scenario.admin, [binding.documentId]);
+    const untouched = await conceptCiting(scenario, scenario.admin, [other.documentId]);
+    const composition = await compositionIncluding(scenario.workspaceId, [cited.iri], {
+      sensitivity: "Restricted",
+      audienceGroups: [hr],
+    });
+    await chunkUnder(db(), scenario.workspaceId, binding, {
+      content: HOLIDAY,
+      ordinal: 0,
+      charStart: 0,
+      charEnd: 53,
+    });
+    const restrictedToHr = { sensitivity: "Restricted", audience: "groups", audience_groups: [hr] };
+    expect(await heldRow(scenario.workspaceId, cited.iri)).toEqual(restrictedToHr);
+
+    const widened = await widenedTo(scenario, binding.bindingId, "Internal");
+
+    expect(widened).toMatchObject({
+      ok: true,
+      value: {
+        bindingId: binding.bindingId,
+        visibility: { sensitivity: "Internal", audience: "everyone", audienceGroups: null },
+        concepts: [cited.iri],
+        compositions: [composition],
+      },
+    });
+    const internal = { sensitivity: "Internal", ...EVERYONE };
+    expect(
+      await visibilityHeld(db().pool, "source_binding", scenario.workspaceId, binding.bindingId),
+    ).toEqual(internal);
+    expect(await rowAndNode(scenario.workspaceId, cited.iri)).toEqual(bothAt(internal));
+    expect(
+      await visibilityHeld(db().pool, "composition", scenario.workspaceId, composition),
+    ).toEqual(internal);
+    expect(await chunkVisibilityOf(scenario.workspaceId, binding.documentId)).toEqual([internal]);
+    expect(await heldRow(scenario.workspaceId, untouched.iri)).toEqual(restrictedToHr);
+
+    expect(await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.widened")).toEqual([
+      {
+        id: widened.ok ? widened.value.auditEventId : "",
+        actor: `human:${scenario.admin.userId}`,
+        subject_id: binding.bindingId,
+        detail: {
+          bindingId: binding.bindingId,
+          fromSensitivity: "Restricted",
+          fromAudience: "groups",
+          sensitivity: "Internal",
+          audience: "everyone",
+        },
+      },
+    ]);
+  });
+
+  it("never widens a document past a class of its own — the seam's special-category verdict or an Admin's narrowing — nor a concept citing one", async () => {
+    const scenario = await arrange();
+    const binding = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
+    const verdict = await documentUnder(
+      db(),
+      scenario.workspaceId,
+      binding.bindingId,
+      "Restricted",
+    );
+    await findingIn(scenario, verdict, { ...A_HEALTH_CUE, ...dismissedBy(scenario) });
+    const narrowed = await seededBy(db(), async (seed) => {
+      const document = await seed.sourceDocument({
+        workspaceId: scenario.workspaceId,
+        bindingId: binding.bindingId,
+        sensitivity: "Internal",
+        narrowedTo: "Internal",
+      });
+      return { bindingId: binding.bindingId, documentId: document.id };
+    });
+    const onTheBinding = await conceptCiting(scenario, scenario.admin, [binding.documentId]);
+    const onTheVerdict = await conceptCiting(scenario, scenario.admin, [verdict.documentId]);
+    const onTheNarrowing = await conceptCiting(scenario, scenario.admin, [narrowed.documentId]);
+    for (const document of [binding, verdict, narrowed]) {
+      await chunkUnder(db(), scenario.workspaceId, document, {
+        content: HOLIDAY,
+        ordinal: 0,
+        charStart: 0,
+        charEnd: 53,
+      });
+    }
+    const widened = await widenedTo(scenario, binding.bindingId, "Public");
+
+    expect(widened.ok).toBe(true);
+    const at = (sensitivity: string) => ({ sensitivity, ...EVERYONE });
+    expect(await heldRow(scenario.workspaceId, onTheBinding.iri)).toEqual(at("Public"));
+    expect(await heldRow(scenario.workspaceId, onTheVerdict.iri)).toEqual(at("Restricted"));
+    expect(await heldRow(scenario.workspaceId, onTheNarrowing.iri)).toEqual(at("Internal"));
+    expect(await chunkVisibilityOf(scenario.workspaceId, binding.documentId)).toEqual([
+      at("Public"),
+    ]);
+    expect(await chunkVisibilityOf(scenario.workspaceId, verdict.documentId)).toEqual([
+      at("Restricted"),
+    ]);
+    expect(await chunkVisibilityOf(scenario.workspaceId, narrowed.documentId)).toEqual([
+      at("Internal"),
+    ]);
+    expect(await documentClassesUnder(scenario.workspaceId, binding.bindingId)).toEqual({
+      [binding.documentId]: null,
+      [verdict.documentId]: "Restricted",
+      [narrowed.documentId]: "Internal",
+    });
+  });
+
+  it("widens an unpublished binding's class without releasing it: a concept citing it stays Restricted until the publish", async () => {
+    const scenario = await arrange();
+    const binding = await bindingHolding(db(), scenario.workspaceId, {
+      sensitivity: "Restricted",
+      publishedAt: null,
+    });
+    const cited = await conceptCiting(scenario, scenario.admin, [binding.documentId]);
+
+    const widened = await widenedTo(scenario, binding.bindingId, "Internal");
+
+    expect(widened).toMatchObject({ ok: true, value: { concepts: [cited.iri] } });
+    expect(await heldRow(scenario.workspaceId, cited.iri)).toEqual({
+      sensitivity: "Restricted",
+      ...EVERYONE,
+    });
+    expect((await publishedOnceIndexed(db(), scenario.admin, binding.bindingId)).ok).toBe(true);
+    expect(await heldRow(scenario.workspaceId, cited.iri)).toEqual({
+      sensitivity: "Internal",
+      ...EVERYONE,
+    });
+  });
+
+  it("refuses while a document holds a special-category finding the last run raised that no Admin has reviewed, and moves nothing", async () => {
+    const scenario = await arrange();
+    const binding = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
+    const cited = await conceptCiting(scenario, scenario.admin, [binding.documentId]);
+    await findingIn(scenario, binding, A_HEALTH_CUE);
+    const reviewed = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
+    await findingIn(scenario, reviewed, { ...A_HEALTH_CUE, ...dismissedBy(scenario) });
+    await findingIn(scenario, reviewed, {});
+
+    const refused = await widenedTo(scenario, binding.bindingId, "Internal");
+    const widened = await widenedTo(scenario, reviewed.bindingId, "Internal");
+
+    expect(refused).toEqual({ ok: false, error: "special-category-unreviewed" });
+    expect(widened.ok).toBe(true);
+    expect(
+      await visibilityHeld(db().pool, "source_binding", scenario.workspaceId, binding.bindingId),
+    ).toEqual({ sensitivity: "Restricted", ...EVERYONE });
+    expect(await heldRow(scenario.workspaceId, cited.iri)).toEqual({
+      sensitivity: "Restricted",
+      ...EVERYONE,
+    });
+    expect(
+      await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.widened"),
+    ).toMatchObject([{ subject_id: reviewed.bindingId }]);
+  });
+
+  it("refuses a request that is not wider — the class and audience it holds, a narrower class, or a wider class for fewer groups — and moves nothing", async () => {
+    const scenario = await arrange();
+    const hr = await groupNamed(db(), scenario, "HR", []);
+    const sales = await groupNamed(db(), scenario, "Sales", []);
+    const forBoth = await bindingForGroups(db(), scenario.workspaceId, [hr, sales]);
+
+    const asks = [
+      { sensitivity: "Internal", audience: "groups", audienceGroups: [hr, sales] },
+      { sensitivity: "Restricted", audience: "groups", audienceGroups: [hr, sales] },
+      { sensitivity: "Public", audience: "groups", audienceGroups: [hr] },
+    ];
+    for (const asked of asks) {
+      const refused = await reading(scenario.admin, (admin, tx) =>
+        wideningAsked(admin, tx, { bindingId: forBoth.bindingId, ...asked }),
+      );
+      expect(refused).toEqual({ ok: false, error: "not-wider" });
+    }
+    expect(
+      await visibilityHeld(db().pool, "source_binding", scenario.workspaceId, forBoth.bindingId),
+    ).toEqual({ sensitivity: "Internal", audience: "groups", audience_groups: [hr, sales] });
+    expect(await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.widened")).toEqual(
+      [],
+    );
+  });
+
+  it("refuses a member who is not an Admin, a binding the workspace does not hold and a group it does not hold", async () => {
+    const scenario = await arrange();
+    const binding = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
+    const elsewhere = await arrange();
+    const theirGroup = await groupNamed(db(), elsewhere, "HR", []);
+    const toInternal = { sensitivity: "Internal", audience: "everyone" };
+
+    const refusals = await Promise.all([
+      reading(scenario.editor, (editor, tx) =>
+        wideningAsked(editor, tx, { bindingId: binding.bindingId, ...toInternal }),
+      ),
+      reading(scenario.admin, (admin, tx) =>
+        wideningAsked(admin, tx, { bindingId: ulid(), ...toInternal }),
+      ),
+      reading(scenario.admin, (admin, tx) =>
+        wideningAsked(admin, tx, {
+          bindingId: binding.bindingId,
+          sensitivity: "Internal",
+          audience: "groups",
+          audienceGroups: [theirGroup],
+        }),
+      ),
+    ]);
+
+    expect(refusals.map((refused) => (refused.ok ? "ok" : refused.error))).toEqual([
+      "role-forbids",
+      "no-such-binding",
+      "no-such-group",
+    ]);
+  });
+
+  it("leaves neither the widened row, nor the cascade, nor its ledger row when the transaction fails after it", async () => {
+    const scenario = await arrange();
+    const binding = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
+    const written = await conceptCiting(scenario, scenario.admin, [binding.documentId]);
+
+    await landedThenTheTransactionFailed(scenario, binding.bindingId, (admin, tx) =>
+      wideningAsked(admin, tx, {
+        bindingId: binding.bindingId,
+        sensitivity: "Public",
+        audience: "everyone",
+      }),
+    );
+
+    const restricted = { sensitivity: "Restricted", ...EVERYONE };
+    expect(
+      await visibilityHeld(db().pool, "source_binding", scenario.workspaceId, binding.bindingId),
+    ).toEqual(restricted);
+    expect(await heldRow(scenario.workspaceId, written.iri)).toEqual(restricted);
+    expect(await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.widened")).toEqual(
+      [],
+    );
   });
 });
 

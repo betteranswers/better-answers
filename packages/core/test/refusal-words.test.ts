@@ -41,11 +41,13 @@ const REGISTER = {
   "already-published": "conflict by sources",
   "not-indexed": "precondition by sources",
   "confirmation-missing": "precondition by sources",
+  "special-category-unreviewed": "precondition by sources",
   "media-type-refused": "inapplicable by sources",
   "too-large": "inapplicable by sources",
   "not-the-always-set": "inapplicable by sources",
   "not-special-category": "inapplicable by sources",
   "widening-refused": "inapplicable by sources",
+  "not-wider": "inapplicable by sources",
 
   "no-such-group": "absent by members",
   "no-such-member": "absent by members",

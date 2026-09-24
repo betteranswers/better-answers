@@ -13,9 +13,10 @@ import {
 
 import { ActDialog } from "./act-dialog.tsx";
 import { bindingHeadingId } from "./binding-list.tsx";
-import { outcomeOfFailure } from "./refusal.tsx";
+import { outcomeOfFailure, whyAndNextOf } from "./refusal.tsx";
 import {
   CLASSES,
+  EVERYONE,
   NARROWEST,
   useFindings,
   type ListedBinding,
@@ -50,6 +51,30 @@ type Confirmation = (typeof CONFIRMATIONS)[number]["field"];
 
 type Confirmations = Readonly<Record<Confirmation, boolean>>;
 
+function TheAuditRow(properties: {
+  readonly act: string;
+  readonly binding: ListedBinding;
+  readonly children: ReactNode;
+}) {
+  const headingId = useId();
+
+  return (
+    <section aria-labelledby={headingId}>
+      <h3 id={headingId} className="font-medium">
+        What the audit row will carry
+      </h3>
+      <dl className="mt-2 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
+        <SummaryRow term="Act">
+          <span className="font-mono">{properties.act}</span>
+        </SummaryRow>
+        <SummaryRow term="Binding">{properties.binding.name}</SummaryRow>
+        <SummaryRow term="By">You, at the instant the platform records it</SummaryRow>
+        {properties.children}
+      </dl>
+    </section>
+  );
+}
+
 function WhatTheRowCarries(properties: {
   readonly binding: ListedBinding;
   readonly ticked: ReadonlySet<Confirmation>;
@@ -61,37 +86,29 @@ function WhatTheRowCarries(properties: {
   }
 
   return (
-    <section aria-labelledby="the-audit-row">
-      <h3 id="the-audit-row" className="font-medium">
-        What the audit row will carry
-      </h3>
-      <dl className="mt-2 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
-        <SummaryRow term="Act">
-          <span className="font-mono">sources.binding.published</span>
+    <TheAuditRow act="sources.binding.published" binding={properties.binding}>
+      <SummaryRow term="Class">{properties.binding.sensitivity}</SummaryRow>
+      <SummaryRow term="Audience">{AUDIENCE_WORDS[properties.binding.audience]}</SummaryRow>
+      {CONFIRMATIONS.map((confirmation) => (
+        <SummaryRow key={confirmation.field} term={confirmation.said}>
+          {properties.ticked.has(confirmation.field) ? "Confirmed" : "Not yet confirmed"}
         </SummaryRow>
-        <SummaryRow term="Binding">{properties.binding.name}</SummaryRow>
-        <SummaryRow term="By">You, at the instant the platform records it</SummaryRow>
-        {CONFIRMATIONS.map((confirmation) => (
-          <SummaryRow key={confirmation.field} term={confirmation.said}>
-            {properties.ticked.has(confirmation.field) ? "Confirmed" : "Not yet confirmed"}
-          </SummaryRow>
-        ))}
-        {findings.data === undefined ? (
-          <SummaryRow term="Findings">
-            {findings.error === null ? "Still counting" : outcomeOfFailure(findings.error).words}
-          </SummaryRow>
-        ) : (
-          AUDITED_CATEGORIES.map((category) => (
-            <SummaryRow key={category} term={`Findings, ${spokenWord(category)}`}>
-              {totals.get(category) ?? 0}
-            </SummaryRow>
-          ))
-        )}
-        <SummaryRow term="DPIA input">
-          The hash of this binding's DPIA input, taken at the click
+      ))}
+      {findings.data === undefined ? (
+        <SummaryRow term="Findings">
+          {findings.error === null ? "Still counting" : outcomeOfFailure(findings.error).words}
         </SummaryRow>
-      </dl>
-    </section>
+      ) : (
+        AUDITED_CATEGORIES.map((category) => (
+          <SummaryRow key={category} term={`Findings, ${spokenWord(category)}`}>
+            {totals.get(category) ?? 0}
+          </SummaryRow>
+        ))
+      )}
+      <SummaryRow term="DPIA input">
+        The hash of this binding's DPIA input, taken at the click
+      </SummaryRow>
+    </TheAuditRow>
   );
 }
 
@@ -179,11 +196,45 @@ export const movedWords = (moved: {
   </>
 );
 
+function WordPicked<Word extends string>(properties: {
+  readonly label: string;
+  readonly value: Word;
+  readonly words: readonly Word[];
+  readonly said?: (word: Word) => string;
+  readonly onPick: (word: Word) => void;
+}) {
+  const { words, said = (word) => word } = properties;
+  const id = useId();
+
+  return (
+    <div className="grid gap-2">
+      <Label htmlFor={id}>{properties.label}</Label>
+      <Select
+        value={properties.value}
+        onValueChange={(value) => {
+          const picked = words.find((word) => word === value);
+          if (picked !== undefined) properties.onPick(picked);
+        }}
+      >
+        <SelectTrigger id={id}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {words.map((word) => (
+            <SelectItem key={word} value={word}>
+              {said(word)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 export function NarrowDialog(properties: DialogProperties<Sensitivity>) {
   const { binding, onClose, onConfirm } = properties;
   const narrower = narrowerThan(binding.sensitivity);
   const [sensitivity, setSensitivity] = useState<Sensitivity>(narrower[0] ?? NARROWEST);
-  const classId = useId();
 
   return (
     <ActDialog
@@ -191,7 +242,7 @@ export function NarrowDialog(properties: DialogProperties<Sensitivity>) {
       onOpenChange={closedBy(onClose)}
       content={{ onCloseAutoFocus: toTheBinding(binding.bindingId) }}
       title={`Narrow ${binding.name}`}
-      consequence="Every concept citing its documents, and every composition including one of those concepts, moves with it in the same act. A narrowing never widens, and this screen cannot undo it."
+      consequence="Every concept citing its documents, and every composition including one of those concepts, moves with it in the same act. A narrowing never widens; widening it back is an act of its own."
       commit={
         <Button
           onClick={() => {
@@ -202,31 +253,112 @@ export function NarrowDialog(properties: DialogProperties<Sensitivity>) {
         </Button>
       }
     >
-      <div className="grid gap-2">
-        <Label htmlFor={classId}>Class</Label>
-        <Select
-          value={sensitivity}
-          onValueChange={(value) => {
-            const picked = narrower.find((word) => word === value);
-            if (picked !== undefined) setSensitivity(picked);
+      <WordPicked label="Class" value={sensitivity} words={narrower} onPick={setSensitivity} />
+      <p className="text-sm text-muted-foreground">
+        It is {binding.sensitivity} now. Its audience stays{" "}
+        {AUDIENCE_WORDS[binding.audience].toLowerCase()}.
+      </p>
+    </ActDialog>
+  );
+}
+
+type Audience = ListedBinding["audience"];
+
+export type Widening = { readonly sensitivity: Sensitivity; readonly audience: Audience };
+
+const asWideOrWiderThan = (sensitivity: Sensitivity): readonly Sensitivity[] =>
+  CLASSES.slice(CLASSES.indexOf(sensitivity));
+
+// The dialog opens on a widening, so the one click it asks for is never refused as not wider.
+const firstWidening = (binding: ListedBinding): Widening => {
+  const wider = CLASSES[CLASSES.indexOf(binding.sensitivity) + 1];
+  return wider === undefined
+    ? { sensitivity: binding.sensitivity, audience: EVERYONE }
+    : { sensitivity: wider, audience: binding.audience };
+};
+
+// The dialog offers no narrower class and no other groups, so a wider term is the whole question.
+const asksWider = (binding: ListedBinding, asked: Widening): boolean =>
+  CLASSES.indexOf(asked.sensitivity) > CLASSES.indexOf(binding.sensitivity) ||
+  (asked.audience === EVERYONE && binding.audience !== EVERYONE);
+
+const WIDENING_CONSEQUENCE = {
+  published:
+    "Its passages reach more readers the moment you widen it, and every concept citing its documents, and every composition including one, moves with it in the same act.",
+  unpublished:
+    "Nobody but an Admin reads it until you publish it, and the publish then releases the class you choose here.",
+};
+
+const ITS_OWN_CLASS_STANDS = "A document with a narrower class of its own keeps it.";
+
+export const classAndAudienceWords = (widening: Widening): string =>
+  `${widening.sensitivity} for ${AUDIENCE_WORDS[widening.audience].toLowerCase()}`;
+
+export function WidenDialog(properties: DialogProperties<Widening>) {
+  const { binding, onClose, onConfirm } = properties;
+  const [asked, setAsked] = useState<Widening>(() => firstWidening(binding));
+  const hintId = useId();
+  const wider = asksWider(binding, asked);
+  const publication = binding.publishedAt === null ? "unpublished" : "published";
+
+  return (
+    <ActDialog
+      open
+      onOpenChange={closedBy(onClose)}
+      content={{
+        className: "max-h-[calc(100vh-2rem)] overflow-y-auto",
+        onCloseAutoFocus: toTheBinding(binding.bindingId),
+      }}
+      title={`Widen ${binding.name}`}
+      consequence={`${WIDENING_CONSEQUENCE[publication]} ${ITS_OWN_CLASS_STANDS}`}
+      commit={
+        <Button
+          disabled={!wider}
+          aria-describedby={hintId}
+          onClick={() => {
+            onConfirm(asked);
           }}
         >
-          <SelectTrigger id={classId}>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {narrower.map((word) => (
-              <SelectItem key={word} value={word}>
-                {word}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <p className="text-sm text-muted-foreground">
-          It is {binding.sensitivity} now. Its audience stays{" "}
-          {AUDIENCE_WORDS[binding.audience].toLowerCase()}.
-        </p>
-      </div>
+          Widen {binding.name} to {classAndAudienceWords(asked)}
+        </Button>
+      }
+    >
+      <WordPicked
+        label="Class"
+        value={asked.sensitivity}
+        words={asWideOrWiderThan(binding.sensitivity)}
+        onPick={(sensitivity) => {
+          setAsked({ ...asked, sensitivity });
+        }}
+      />
+
+      {binding.audience === EVERYONE ? null : (
+        <WordPicked
+          label="Audience"
+          value={asked.audience}
+          words={[binding.audience, EVERYONE]}
+          said={(audience) => AUDIENCE_WORDS[audience]}
+          onPick={(audience) => {
+            setAsked({ ...asked, audience });
+          }}
+        />
+      )}
+
+      <p className="text-sm text-muted-foreground">
+        It is {classAndAudienceWords(binding)} now
+        {binding.audience === EVERYONE ? ", and no audience is wider." : "."}
+      </p>
+
+      <TheAuditRow act="sources.binding.widened" binding={binding}>
+        <SummaryRow term="Class, from">{binding.sensitivity}</SummaryRow>
+        <SummaryRow term="Class, to">{asked.sensitivity}</SummaryRow>
+        <SummaryRow term="Audience, from">{AUDIENCE_WORDS[binding.audience]}</SummaryRow>
+        <SummaryRow term="Audience, to">{AUDIENCE_WORDS[asked.audience]}</SummaryRow>
+      </TheAuditRow>
+
+      <p id={hintId} className="text-sm text-muted-foreground">
+        {wider ? "One governed write, audited under your name." : whyAndNextOf("not-wider")}
+      </p>
     </ActDialog>
   );
 }

@@ -2,7 +2,7 @@ import { Badge } from "@/shared/ui/badge.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
 
-import { NARROWEST, type ListedBinding } from "./sources-api.ts";
+import { NARROWEST, widestAlready, type ListedBinding } from "./sources-api.ts";
 import { SOURCES_KEYSTROKES } from "./sources-state.ts";
 import { SummaryRow as Row } from "./summary-row.tsx";
 import {
@@ -21,6 +21,7 @@ export type BindingActs = {
   readonly onReview: (bindingId: string) => void;
   readonly onPublish: (binding: ListedBinding) => void;
   readonly onNarrow: (binding: ListedBinding) => void;
+  readonly onWiden: (binding: ListedBinding) => void;
 };
 
 export const bindingHeadingId = (bindingId: string): string => `binding-${bindingId.toLowerCase()}`;
@@ -153,6 +154,19 @@ function BindingItem(properties: { readonly binding: ListedBinding; readonly act
               }}
             >
               Narrow{named}
+            </Button>
+          )}
+          {widestAlready(binding) ? null : (
+            <Button
+              variant="outline"
+              size="sm"
+              aria-keyshortcuts={SOURCES_KEYSTROKES.widen.key}
+              onFocus={focused}
+              onClick={() => {
+                acts.onWiden(binding);
+              }}
+            >
+              Widen{named}
             </Button>
           )}
         </div>
