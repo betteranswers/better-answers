@@ -1,4 +1,3 @@
-import { testData } from "@better-answers/schema/testing";
 import { describe, expect, it } from "vitest";
 
 import type { Role, UserPrincipal } from "../src/kernel/index.ts";
@@ -15,6 +14,7 @@ import { inputOf } from "./suite-input.ts";
 import {
   countWaitingOnLocks,
   postgresForSuite,
+  seedingWith,
   until,
   whileWritesAreRefused,
 } from "./suite-postgres.ts";
@@ -23,17 +23,12 @@ const db = postgresForSuite();
 
 const ROLE_CHANGED = "people.member.role_changed";
 
-const joining = async (workspace: ProvisionedWorkspace, role: Role): Promise<string> => {
-  const client = await db().pool.connect();
-  try {
-    const seed = testData(client);
-    const person = await seed.user();
-    await seed.member({ workspaceId: workspace.workspaceId, userId: person.id, role });
-    return person.id;
-  } finally {
-    client.release();
-  }
-};
+const joining = (workspace: ProvisionedWorkspace, role: Role): Promise<string> =>
+  seedingWith(db().pool, async (seed) => {
+    const { id } = await seed.user();
+    await seed.member({ workspaceId: workspace.workspaceId, userId: id, role });
+    return id;
+  });
 
 /** As the transport holds a mutation's caller: their own member row `FOR SHARE` until commit. */
 const heldAs = async <T>(

@@ -35,6 +35,14 @@ const aWorkspaceOfThree = async () => {
   return { workspace, editor, viewer, seeded };
 };
 
+/** Signed in to a workspace of their own, with a session that names `workspaceId` instead. */
+const anAdminOfElsewherePointedAt = async (workspaceId: string) => {
+  const elsewhere = await app.provision();
+  const { api } = await webSignedIn(app, elsewhere.admin.email);
+  await sessionPointedAt(app, elsewhere.admin.id, workspaceId);
+  return api;
+};
+
 describe("the members list over tRPC", () => {
   it("lists each member's name, address, role, groups and when joined", async () => {
     const { workspace, editor, viewer, seeded } = await aWorkspaceOfThree();
@@ -113,9 +121,7 @@ describe("what the members list refuses", () => {
 
   it("refuses an Admin of another workspace pointed at this one", async () => {
     const workspace = await app.provision();
-    const elsewhere = await app.provision();
-    const { api } = await webSignedIn(app, elsewhere.admin.email);
-    await sessionPointedAt(app, elsewhere.admin.id, workspace.workspaceId);
+    const api = await anAdminOfElsewherePointedAt(workspace.workspaceId);
 
     const refused = await refusalOfCall(api.members.list.query());
 
@@ -247,9 +253,7 @@ describe("who may change a role", () => {
 
   it("refuses an Admin of another workspace pointed at this one", async () => {
     const { workspace, viewer } = await aWorkspaceOfThree();
-    const elsewhere = await app.provision();
-    const { api } = await webSignedIn(app, elsewhere.admin.email);
-    await sessionPointedAt(app, elsewhere.admin.id, workspace.workspaceId);
+    const api = await anAdminOfElsewherePointedAt(workspace.workspaceId);
 
     const refused = await refusalOfCall(
       api.members.changeRole.mutate({ personId: viewer.id, role: "Editor" }),
