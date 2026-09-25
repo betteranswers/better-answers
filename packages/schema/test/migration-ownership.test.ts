@@ -33,7 +33,7 @@ const FORBIDDEN_IN_GENERATED = [
 ];
 
 describe("the migration journal", () => {
-  it("has a file for every entry, and no .sql file the journal does not know", () => {
+  it("names exactly the .sql files in the migrations folder", () => {
     const journalFiles = journalMigrationFiles().map((file) => path.basename(file));
     const migrationsDir = path.dirname(journalMigrationFiles()[0] ?? "");
     const onDisk = readdirSync(migrationsDir).filter((name) => name.endsWith(".sql"));
@@ -41,7 +41,7 @@ describe("the migration journal", () => {
     expect(journalFiles.toSorted()).toEqual(onDisk.toSorted());
   });
 
-  it("reads a near-miss as a claim, and reads generated DDL as no claim at all", () => {
+  it("counts a near-miss as a claim, but not generated DDL", () => {
     for (const nearMiss of [
       "-- Custom migration (hand-written SQL; ADR 0031, ADR 0032).",
       "--Custom migration (hand-written SQL; ADR 0032).",
@@ -60,7 +60,7 @@ describe("the migration journal", () => {
     ).toBe(false);
   });
 
-  it("spells the marker exactly on every migration that claims to be hand-written", () => {
+  it("spells the marker exactly wherever a migration claims it", () => {
     for (const [position, file] of journalMigrationFiles().entries()) {
       const first = firstLineOf(readFileSync(file, "utf8"));
       if (!CLAIMS_TO_BE_HAND_WRITTEN.test(first)) continue;
@@ -72,7 +72,7 @@ describe("the migration journal", () => {
     }
   });
 
-  it("never touches `index` or the graph tables from a generated migration", () => {
+  it("never touches `index` or graph tables in a generated migration", () => {
     for (const [position, file] of journalMigrationFiles().entries()) {
       const sql = readFileSync(file, "utf8");
       if (firstLineOf(sql) === CUSTOM_MARKER) continue;
@@ -109,14 +109,14 @@ const aCopyWithAPlantedLink = (snapshotName: string): string => {
 };
 
 describe("the journal's meta folder", () => {
-  it("has a snapshot for every entry, an entry for every snapshot, and one chain through them", () => {
+  it("pairs entries with snapshots in one unbroken chain", () => {
     const read = journalSnapshots();
 
     expect(read.ok || read.error).toBe(true);
     expect(read.ok && read.value.at(0)).toBe("0000_snapshot.json");
   });
 
-  it("refuses a journal entry whose snapshot is not in the folder", () => {
+  it("refuses a journal entry whose snapshot is missing", () => {
     const meta = aCopyOfMeta();
     rmSync(path.join(meta, "0001_snapshot.json"));
 
@@ -137,14 +137,14 @@ describe("the journal's meta folder", () => {
     });
   });
 
-  it("refuses a snapshot whose prevId is not the id of the snapshot before it", () => {
+  it("refuses a snapshot whose prevId is not its predecessor's id", () => {
     expect(journalSnapshotsIn(aCopyWithAPlantedLink("0001_snapshot.json"))).toEqual({
       ok: false,
       error: { kind: "chain-broken", earlier: "0000_snapshot.json", later: "0001_snapshot.json" },
     });
   });
 
-  it("refuses a first snapshot that points at something rather than at nothing", () => {
+  it("refuses a first snapshot whose prevId points at something", () => {
     expect(journalSnapshotsIn(aCopyWithAPlantedLink("0000_snapshot.json"))).toEqual({
       ok: false,
       error: { kind: "chain-unrooted", snapshot: "0000_snapshot.json" },
@@ -176,7 +176,7 @@ describe("the journal's final newline", () => {
     );
   });
 
-  it("is left alone on a journal that already ends in one", () => {
+  it("is left alone on a journal already ending in one", () => {
     const folder = aFolderHoldingAJournalThatReads(`${A_JOURNAL_AS_DRIZZLE_KIT_WRITES_IT}\n`);
     restoreFinalNewline(folder);
 
@@ -198,7 +198,7 @@ const migrationIn = (folder: string): string =>
   readFileSync(path.join(folder, "0000_probe.sql"), "utf8");
 
 describe("the statement separator the generator writes", () => {
-  it("is on a statement's line in every tracked migration, so none reads as a comment line", () => {
+  it("is on a statement's line in every tracked migration", () => {
     const ownLine = journalMigrationFiles().filter((file) =>
       readFileSync(file, "utf8").split("\n").includes(SEPARATOR),
     );
@@ -206,7 +206,7 @@ describe("the statement separator the generator writes", () => {
     expect(ownLine).toEqual([]);
   });
 
-  it("is folded onto the statement above it where drizzle-kit wrote it on its own line", () => {
+  it("is folded from its own line onto the statement above", () => {
     const folder = aFolderHoldingAMigrationThatReads(
       `CREATE TABLE a (\n  id text\n);\n${SEPARATOR}\nCREATE TABLE b (id text);\n`,
     );
@@ -217,7 +217,7 @@ describe("the statement separator the generator writes", () => {
     );
   });
 
-  it("is left where it is when drizzle-kit already wrote it on the statement's line", () => {
+  it("is left in place when already on the statement's line", () => {
     const written = `CREATE TABLE a (id text);${SEPARATOR}\nCREATE TABLE b (id text);\n`;
     const folder = aFolderHoldingAMigrationThatReads(written);
 
@@ -225,7 +225,7 @@ describe("the statement separator the generator writes", () => {
     expect(migrationIn(folder)).toBe(written);
   });
 
-  it("leaves a separator with no statement above it alone rather than folding it onto nothing", () => {
+  it("is left alone with no statement above it", () => {
     const written = `${SEPARATOR}\nCREATE TABLE a (id text);\n`;
     const folder = aFolderHoldingAMigrationThatReads(written);
 
@@ -242,7 +242,7 @@ const theNewestSnapshot = (): DrizzleSnapshotJSON => {
   const newest = walked.ok ? walked.value.at(-1) : undefined;
   if (newest === undefined) throw new Error("there is no newest snapshot to diff against");
   const text = readFileSync(path.join(journalMetaFolder, newest), "utf8");
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- drizzle-kit exports no parser for its own snapshot, and the test hands the file to its differ whole
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- drizzle-kit exports no parser for its own snapshot
   return JSON.parse(text) as DrizzleSnapshotJSON;
 };
 
@@ -250,13 +250,13 @@ const theDeclarations = (prevId: string): DrizzleSnapshotJSON =>
   generateDrizzleJson(declarations, prevId, ["public"]);
 
 describe("the declarations and the DDL generated from them", () => {
-  it("leaves a generate run on this tree with nothing to propose", async () => {
+  it("leaves a generate run on this tree nothing to propose", async () => {
     const newest = theNewestSnapshot();
 
     expect(await generateMigration(newest, theDeclarations(newest.id))).toEqual([]);
   });
 
-  it("proposes the ALTER when a default is in the declarations and not in the DDL", async () => {
+  it("proposes the ALTER for a default missing from the DDL", async () => {
     const before = structuredClone(theNewestSnapshot());
     const column = before.tables["public.account"]?.columns["updated_at"];
     if (column === undefined) throw new Error("account.updated_at is not in the newest snapshot");
@@ -275,7 +275,7 @@ const inboxSubstrate = (): string => {
 };
 
 describe("what the inbox substrate copies from the schema package", () => {
-  it("bounds a set and a frontmatter at the numbers their constants hold", () => {
+  it("bounds a set and a frontmatter at their constants", () => {
     const sql = inboxSubstrate();
 
     expect(sql).toContain(`BETWEEN 1 AND ${SUGGESTION_SET_MAX}`);
@@ -286,7 +286,7 @@ describe("what the inbox substrate copies from the schema package", () => {
 });
 
 describe("what the audience substrate copies from the schema package", () => {
-  it("ties the word to the array on the graph tables with the one CHECK the declarations carry", () => {
+  it("uses the declared audience CHECK on both graph tables", () => {
     const file = journalMigrationFiles().find((name) => name.endsWith("audience-substrate.sql"));
     if (file === undefined) throw new Error("the audience substrate is not in the journal");
     const sql = readFileSync(file, "utf8");

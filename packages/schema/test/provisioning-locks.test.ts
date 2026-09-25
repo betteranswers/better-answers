@@ -18,7 +18,7 @@ const WS_WATCHED = "01J6TEEEEEEEEEEEEEEEEEEEEE";
 const PROVISION_SETTLES_WITHIN_MS = 10_000;
 const POLL_MS = 10;
 
-// A statement that conflicts with nothing never waits, so any bound tells waiting from not.
+/** A statement that conflicts with nothing never waits, so any bound tells waiting from not. */
 const SHORT_LOCK_WAIT_MS = 1_000;
 
 const outcomeOf = (statement: Promise<unknown>, done: string): Promise<string> =>
@@ -27,8 +27,10 @@ const outcomeOf = (statement: Promise<unknown>, done: string): Promise<string> =
 const scopeTo = (client: pg.PoolClient, workspaceId: string) =>
   client.query("SELECT set_config('app.workspace_id', $1, true)", [workspaceId]);
 
-// A connection of its own under app_rt, as each of the product's transactions has, so one can
-// wait on another.
+/**
+ * A connection of its own under app_rt, as each of the product's transactions has, so one can
+ * wait on another.
+ */
 const opened = async (): Promise<pg.PoolClient> => {
   const client = await db().runtimePool.connect();
   await client.query("BEGIN");
@@ -83,7 +85,7 @@ const aTenantAtWork = async (
   }
 };
 
-// The order a sign-up takes them in, so the wait below is the one a real sign-up would be in.
+/** The order a sign-up takes them in, so the wait below is the one a real sign-up would be in. */
 const provisionStarted = async (
   workspaceId: string,
 ): Promise<{ client: pg.PoolClient; provisioned: Promise<string> }> => {
@@ -112,8 +114,8 @@ const inAShortWait = async (
   return outcome;
 };
 
-describe("provisioning a workspace beside a transaction that writes documents and chunks", () => {
-  it("lets a writer that holds a document go on to write its chunk, and aborts neither the writer nor the sign-up", async () => {
+describe("provisioning beside a transaction writing documents and chunks", () => {
+  it("lets a document's writer add its chunk, aborting neither side", async () => {
     const { bindingId } = await aTenantAtWork(WS_WRITING);
 
     const writer = await opened();
@@ -141,7 +143,7 @@ describe("provisioning a workspace beside a transaction that writes documents an
     expect({ written, provisioned }).toEqual({ written: "written", provisioned: "provisioned" });
   });
 
-  it("holds up no read or keyed write of another tenant's chunks while it waits on a writer of documents", async () => {
+  it("blocks no other tenant's chunk reads or writes while waiting", async () => {
     const { bindingId, documentId } = await aTenantAtWork(WS_READ_BESIDE);
 
     const writer = await opened();
@@ -181,7 +183,7 @@ describe("provisioning a workspace beside a transaction that writes documents an
     });
   });
 
-  it("locks the chunk table in no mode a read or a write of it waits on, and the documents in none a read of them waits on", async () => {
+  it("locks in modes blocking no chunk access or document read", async () => {
     await withRollback(db().pool, async (client) => {
       await testData(client).workspace({ id: WS_WATCHED, name: "Watched" });
       await client.query("SET LOCAL ROLE app_rt");

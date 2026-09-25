@@ -417,12 +417,7 @@
         "packages/core/test/manifest.test.ts",
         "packages/core/test/reconciler.test.ts",
         "packages/core/test/suggestions.test.ts",
-        "packages/core/test/visibility.test.ts",
-        "packages/schema/test/migration-ownership.test.ts",
-        "packages/schema/test/provisioning-locks.test.ts",
-        "packages/schema/test/rls.test.ts",
-        "packages/schema/test/roles-surface.test.ts",
-        "packages/schema/test/table-ownership.test.ts"
+        "packages/core/test/visibility.test.ts"
       ],
       "rules": {
         "vitest/valid-title": ["error", {}]
