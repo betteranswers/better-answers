@@ -1,14 +1,7 @@
 import { sql } from "drizzle-orm";
-import {
-  check,
-  integer,
-  pgEnum,
-  primaryKey,
-  text,
-  timestamp,
-  uniqueIndex,
-} from "drizzle-orm/pg-core";
+import { check, integer, pgEnum, primaryKey, text, uniqueIndex } from "drizzle-orm/pg-core";
 
+import { stamp } from "./column-helpers.ts";
 import { withRLS } from "./with-rls.ts";
 import { workspace } from "./workspace-table.ts";
 
@@ -70,7 +63,7 @@ export const workspaceConfig = withRLS(
       .references(() => workspace.id),
     key: text("key").notNull(),
     value: text("value").notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    updatedAt: stamp("updated_at").notNull().defaultNow(),
   },
   "workspaceId",
   (table) => [primaryKey({ columns: [table.workspaceId, table.key] })],

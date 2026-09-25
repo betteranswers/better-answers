@@ -16,7 +16,7 @@ const folded = (sql: string): string => {
   return kept.join("\n");
 };
 
-// The line counter reads a directive alone on a line as a comment, which the ceiling pays for.
+/** The line counter reads a directive alone on a line as a comment, which the ceiling pays for. */
 export const foldSeparators = (migrationsFolder: string): readonly string[] => {
   const moved: string[] = [];
   for (const name of readdirSync(migrationsFolder).toSorted()) {

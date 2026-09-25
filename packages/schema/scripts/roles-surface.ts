@@ -2,6 +2,7 @@ import path from "node:path";
 
 import type pg from "pg";
 
+import { listed } from "../src/column-helpers.ts";
 import { DEFINER_REACH_NOTE } from "../src/definer-reach.ts";
 import { testData } from "../test/factory.ts";
 
@@ -15,8 +16,6 @@ const RUNTIME_ROLES = ["app_rt", "worker_rt"] as const;
 
 export const isRuntimeRole = (name: string): boolean => RUNTIME_ROLES.some((role) => role === name);
 
-const RELATION_KINDS = ["r", "p", "v", "m", "S", "f"] as const;
-
 const KIND_WORDS = new Map([
   ["r", "table"],
   ["p", "partitioned table"],
@@ -25,6 +24,8 @@ const KIND_WORDS = new Map([
   ["S", "sequence"],
   ["f", "foreign table"],
 ]);
+
+const RELATION_KINDS_LISTED = listed([...KIND_WORDS.keys()]);
 
 const NOTE = [
   "Generated from pg_catalog, never edited: pnpm --filter @better-answers/schema run generate:roles-surface.",
@@ -115,8 +116,10 @@ const GRANTEE = `CASE WHEN a.grantee = 0 THEN '${PUBLIC_GRANTEE}' ELSE pg_get_us
 
 const kindWord = (relkind: string): string => KIND_WORDS.get(relkind) ?? relkind;
 
-// The superuser's name differs between a container and a restore drill, so it is
-// normalised; two candidates and there is no one name to use.
+/**
+ * The superuser's name differs between a container and a restore drill, so it is
+ * normalised; two candidates and there is no one name to use.
+ */
 const migratorIn = (roles: readonly { readonly rolname: string }[]): string => {
   const others = roles.map((role) => role.rolname).filter((name) => !isRuntimeRole(name));
   const only = others[0];
@@ -128,16 +131,20 @@ const migratorIn = (roles: readonly { readonly rolname: string }[]): string => {
   return only;
 };
 
-// Without one the file is silent on the relation the estate makes at run time, and a
-// partition inheriting no ACL is the fact stated.
+/**
+ * Without one the file is silent on the relation the estate makes at run time, and a
+ * partition inheriting no ACL is the fact stated.
+ */
 export const oneWorkspacePartition = async (client: pg.PoolClient): Promise<void> => {
   const workspace = await testData(client).workspace();
   await client.query("SELECT set_config('app.workspace_id', $1, true)", [workspace.id]);
   await client.query("SELECT create_workspace_partition($1)", [workspace.id]);
 };
 
-// The scope the lifecycle function guards is set for a transaction, so there must be one;
-// a caller inside one takes the function above.
+/**
+ * The scope the lifecycle function guards is set for a transaction, so there must be one;
+ * a caller inside one takes the function above.
+ */
 export const withOneWorkspacePartition = async (client: pg.PoolClient): Promise<void> => {
   await client.query("BEGIN");
   try {
@@ -213,7 +220,7 @@ export const readRolesSurface = async (client: Client): Promise<RolesSurface> =>
        LEFT JOIN pg_namespace pn ON pn.oid = p.relnamespace,
             LATERAL aclexplode(c.relacl) AS a
       WHERE ${OURS} AND a.grantee <> c.relowner
-        AND c.relkind IN (${RELATION_KINDS.map((kind) => `'${kind}'`).join(", ")})`,
+        AND c.relkind IN (${RELATION_KINDS_LISTED})`,
   );
 
   const withoutAcl = await client.query<{
@@ -229,7 +236,7 @@ export const readRolesSurface = async (client: Client): Promise<RolesSurface> =>
        LEFT JOIN pg_class p ON p.oid = i.inhparent
        LEFT JOIN pg_namespace pn ON pn.oid = p.relnamespace
       WHERE c.relacl IS NULL AND ${OURS}
-        AND c.relkind IN (${RELATION_KINDS.map((kind) => `'${kind}'`).join(", ")})`,
+        AND c.relkind IN (${RELATION_KINDS_LISTED})`,
   );
 
   const columns = await client.query<{
@@ -285,7 +292,7 @@ export const readRolesSurface = async (client: Client): Promise<RolesSurface> =>
        LEFT JOIN pg_inherits i ON i.inhrelid = c.oid
        LEFT JOIN pg_class p ON p.oid = i.inhparent
        LEFT JOIN pg_namespace pn ON pn.oid = p.relnamespace
-      WHERE ${OURS} AND c.relkind IN (${RELATION_KINDS.map((kind) => `'${kind}'`).join(", ")})
+      WHERE ${OURS} AND c.relkind IN (${RELATION_KINDS_LISTED})
       GROUP BY 1, 2, 3, 4`,
   );
 
@@ -377,8 +384,10 @@ const block = (
   ];
 };
 
-// One object per line: pretty-printing spreads a privilege over five lines, so one
-// privilege gained would read as a brace count rather than a line.
+/**
+ * One object per line: pretty-printing spreads a privilege over five lines, so one
+ * privilege gained would read as a brace count rather than a line.
+ */
 export const renderRolesSurface = (surface: RolesSurface): string => {
   const rendered = [
     "{",

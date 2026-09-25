@@ -8,16 +8,14 @@ import {
   jsonb,
   pgTable,
   text,
-  timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
+import { listed, stamp } from "./column-helpers.ts";
 import { ROLES } from "./roles.ts";
 import { workspace } from "./workspace-table.ts";
 
-const roleList = ROLES.map((role) => `'${role}'`).join(", ");
-
-const stamp = (name: string) => timestamp(name, { withTimezone: true, mode: "date" });
+const roleList = listed(ROLES);
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),

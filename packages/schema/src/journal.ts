@@ -1,9 +1,8 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { z } from "zod";
 
-const migrationsFolder = fileURLToPath(new URL("../migrations", import.meta.url));
+import { migrationsFolder } from "./migrations-folder.ts";
 
 export const journalMetaFolder = path.join(migrationsFolder, "meta");
 
@@ -21,6 +20,10 @@ type Result<T, E> =
 
 type JournalDocument = z.input<typeof journalSchema>;
 
+/**
+ * Refuses the first entry whose instant does not follow the one before it.
+ * @throws when the document is not a journal.
+ */
 export const journalEntriesOf = (
   document: JournalDocument,
 ): Result<readonly JournalEntry[], JournalRefusal> => {
@@ -45,8 +48,10 @@ const entriesIn = (folder: string): readonly JournalEntry[] => {
   );
 };
 
+/** @throws when the journal does not parse, or an instant does not increase. */
 export const journalEntries = (): readonly JournalEntry[] => entriesIn(journalMetaFolder);
 
+/** Absolute paths, in the journal's order. */
 export const journalMigrationFiles = (): readonly string[] =>
   journalEntries().map((entry) => path.join(migrationsFolder, `${entry.tag}.sql`));
 
@@ -63,22 +68,30 @@ export type SnapshotRefusal =
   | { readonly kind: "chain-broken"; readonly earlier: string; readonly later: string }
   | { readonly kind: "chain-unrooted"; readonly snapshot: string };
 
-export const journalSnapshotsIn = (folder: string): Result<readonly string[], SnapshotRefusal> => {
-  const entries = entriesIn(folder);
+const unpairedIn = (
+  folder: string,
+  entries: readonly JournalEntry[],
+): SnapshotRefusal | undefined => {
   const named = new Set(entries.map(snapshotOf));
 
   for (const entry of entries) {
     const snapshot = snapshotOf(entry);
     if (!existsSync(path.join(folder, snapshot))) {
-      return { ok: false, error: { kind: "snapshot-missing", tag: entry.tag, snapshot } };
+      return { kind: "snapshot-missing", tag: entry.tag, snapshot };
     }
   }
   for (const snapshot of readdirSync(folder).toSorted()) {
     if (snapshot.endsWith("_snapshot.json") && !named.has(snapshot)) {
-      return { ok: false, error: { kind: "snapshot-orphaned", snapshot } };
+      return { kind: "snapshot-orphaned", snapshot };
     }
   }
+  return undefined;
+};
 
+const chainIn = (
+  folder: string,
+  entries: readonly JournalEntry[],
+): Result<readonly string[], SnapshotRefusal> => {
   const walked: string[] = [];
   let before: { readonly snapshot: string; readonly id: string } | undefined;
   for (const entry of entries) {
@@ -102,9 +115,22 @@ export const journalSnapshotsIn = (folder: string): Result<readonly string[], Sn
   return { ok: true, value: walked };
 };
 
+/**
+ * The snapshots in the journal's order, once each entry has one, each snapshot has an entry,
+ * and each names the one before as its parent. Otherwise the first refusal, checked in that
+ * order.
+ * @throws when the journal or a snapshot does not parse, or an instant does not increase.
+ */
+export const journalSnapshotsIn = (folder: string): Result<readonly string[], SnapshotRefusal> => {
+  const entries = entriesIn(folder);
+  const unpaired = unpairedIn(folder, entries);
+  return unpaired === undefined ? chainIn(folder, entries) : { ok: false, error: unpaired };
+};
+
 export const journalSnapshots = (): Result<readonly string[], SnapshotRefusal> =>
   journalSnapshotsIn(journalMetaFolder);
 
+/** @throws when the journal is empty. */
 export const lastMigration = (): JournalEntry => {
   const last = journalEntries().at(-1);
   if (last === undefined) throw new Error("the journal is empty");

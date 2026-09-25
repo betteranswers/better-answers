@@ -1,5 +1,3 @@
-import { fileURLToPath } from "node:url";
-
 export * from "./schema.ts";
 export * from "./graph-tables.ts";
 export * from "./index-tables.ts";
@@ -15,7 +13,4 @@ export * from "./bundle-manifest.ts";
 export * from "./contract-digest.ts";
 export * from "./contract-stamp.ts";
 export * from "./full-text-match.ts";
-
-// fileURLToPath, never URL.pathname: a percent-encoded space would hand the migrator a
-// directory that does not exist, and it would fail at deploy rather than here.
-export const migrationsFolder = fileURLToPath(new URL("../migrations", import.meta.url));
+export * from "./migrations-folder.ts";

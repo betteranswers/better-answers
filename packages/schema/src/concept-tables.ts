@@ -52,16 +52,17 @@ export type CitedSource = {
   readonly locator: string | null;
 };
 
-export const citedSourceOf = (
-  entry: Readonly<Record<string, string | number | boolean | null>> | string,
-): CitedSource | undefined => {
-  if (typeof entry === "string") {
-    const hash = entry.lastIndexOf("#");
-    const resource = (hash === -1 ? entry : entry.slice(0, hash)).trim();
-    return resource === ""
-      ? undefined
-      : { resource, locator: hash === -1 ? null : entry.slice(hash + 1) };
-  }
+type SourceEntry = Readonly<Record<string, string | number | boolean | null>>;
+
+const citedByText = (entry: string): CitedSource | undefined => {
+  const hash = entry.lastIndexOf("#");
+  const resource = (hash === -1 ? entry : entry.slice(0, hash)).trim();
+  return resource === ""
+    ? undefined
+    : { resource, locator: hash === -1 ? null : entry.slice(hash + 1) };
+};
+
+const citedByKeys = (entry: SourceEntry): CitedSource | undefined => {
   const resource = entry["resource"];
   if (typeof resource !== "string" || resource.trim() === "") return undefined;
   const locator = entry["locator"];
@@ -72,21 +73,35 @@ export const citedSourceOf = (
   };
 };
 
+/**
+ * Reads one `sources` entry: a string splits at its last `#`, and a record reads its `resource`
+ * and `locator` keys. Undefined means the resource is missing or blank; it is trimmed, the
+ * locator never. A record's locator is stringified, and one not given is null.
+ */
+export const citedSourceOf = (entry: SourceEntry | string): CitedSource | undefined =>
+  typeof entry === "string" ? citedByText(entry) : citedByKeys(entry);
+
 type SourcesValue =
   | string
   | number
   | boolean
   | null
   | readonly string[]
-  | readonly Readonly<Record<string, string | number | boolean | null>>[]
+  | readonly SourceEntry[]
   | undefined;
 
+/** A value that is not a list cites nothing, and an entry naming no resource is skipped. */
 export const citedSourcesOf = (value: SourcesValue): readonly CitedSource[] =>
   (Array.isArray(value) ? value : []).flatMap((entry) => {
     const cited = citedSourceOf(entry);
     return cited === undefined ? [] : [cited];
   });
 
+/**
+ * A URL, or a resource starting `//`, comes back unchanged. Any other resolves against the root
+ * when it starts with `/`, else against the directory of `from`, which must hold a `/`. The
+ * answer is rooted, with `.` and `..` folded; `..` stops at the root.
+ */
 export const resolvedResource = (resource: string, from: string): string => {
   if (resource.startsWith("//") || /^[a-z][a-z0-9+.-]*:/i.test(resource)) return resource;
   const directory = resource.startsWith("/") ? "" : from.slice(0, from.lastIndexOf("/"));
@@ -107,8 +122,10 @@ export const CONCEPT_STABLE_STATUS = "stable" satisfies (typeof PUBLISHED_STATUS
 
 export const CONTENT_HASH = /^[0-9a-f]{64}$/;
 
-// No CHECK over the stored jsonb: Postgres renders a numeric in full, so a bound there would
-// refuse payloads the boundary passed.
+/**
+ * No CHECK over the stored jsonb: Postgres renders a numeric in full, so a bound there would
+ * refuse payloads the boundary passed.
+ */
 export const CONCEPT_FRONTMATTER_MAX = 64_000;
 
 export const conceptIdentity = withRLS(
@@ -129,8 +146,10 @@ export const conceptIdentity = withRLS(
   ],
 );
 
-// Every cross-table key names the workspace beside the id: a foreign-key check bypasses
-// row-level security and would confirm another tenant's row.
+/**
+ * Every cross-table key names the workspace beside the id: a foreign-key check bypasses
+ * row-level security and would confirm another tenant's row.
+ */
 const identityKey = (
   table: { readonly workspaceId: AnyPgColumn; readonly iri: AnyPgColumn },
   name: string,

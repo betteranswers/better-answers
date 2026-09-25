@@ -294,7 +294,7 @@ const detail = z.union([
   z.null(),
 ]);
 
-// One id space across both ledgers: an audit event's id, whichever ledger holds its row.
+/** One id space across both ledgers: an audit event's id, whichever ledger holds its row. */
 const ledgerRefinements = {
   id: (schema: z.ZodString) => schema.regex(ULID).brand<"AuditEventId">(),
   act: (schema: z.ZodString) =>

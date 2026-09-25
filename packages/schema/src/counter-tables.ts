@@ -1,11 +1,13 @@
-import { integer, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
+import { integer, pgTable, primaryKey, text } from "drizzle-orm/pg-core";
+
+import { stamp } from "./column-helpers.ts";
 
 export const ingressCounter = pgTable(
   "ingress_counter",
   {
     scope: text("scope").notNull(),
     key: text("key").notNull(),
-    windowStart: timestamp("window_start", { withTimezone: true, mode: "date" }).notNull(),
+    windowStart: stamp("window_start").notNull(),
     count: integer("count").notNull(),
   },
   (table) => [primaryKey({ columns: [table.scope, table.key, table.windowStart] })],
@@ -17,7 +19,7 @@ export const mcpCallCounter = pgTable(
     workspaceId: text("workspace_id").notNull(),
 
     tokenId: text("token_id").notNull(),
-    windowStart: timestamp("window_start", { withTimezone: true, mode: "date" }).notNull(),
+    windowStart: stamp("window_start").notNull(),
     count: integer("count").notNull(),
   },
   (table) => [primaryKey({ columns: [table.workspaceId, table.tokenId, table.windowStart] })],
