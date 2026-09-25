@@ -79,22 +79,21 @@ read from the checkpoint it left instead. Its suite asserts the prose a reader s
 line, and runs the script over files.
 
 `src/land.ts` is the landing command behind `scripts/land.mjs` (`pnpm land --message "…"`): the
-working tree's changes and one sentence become a branch named from the message, a commit over
-`origin/main`'s fetched head, a push, a pull request opened with `gh pr create --fill` and an
-armed auto-merge, with the queue state read back over GraphQL and printed. It exists because a
-one-line docs change cost five commands and so was pushed straight to `main`, and a commit that
-reaches `main` outside the queue rebuilds every entry already in it. The rule it serves is
-`docs/agents/workflow.md`'s *The prose shape*, which says the shape once and states no list of
-refusals of its own — a message or a tree the command will not take comes back naming the
-condition it missed. The subject ceiling is the one part written twice, here and in
-`lefthook.yml`'s `commit-msg` hook, because nothing either could import binds a shell
-one-liner to a TypeScript constant: the suite reads both and fails when they disagree, and
-runs the hook's own command over a message file either side of the ceiling. A read-back that
-shows the pull request neither queued nor armed fails the
-run and prints the command that arms it, because a run that says nothing about the arming is
-the silence this package exists to refuse. Its suite spawns the script over a throwaway git
-repository whose `origin` is a bare repository on disk, with `git push` and the whole of `gh`
-stubbed on the path, so the fetch is real and no case can reach GitHub.
+working tree's changes and one message become a branch named from its `Refs:` footer and its
+summary, a commit over `origin/main`'s fetched head, a push, a pull request opened with
+`gh pr create --fill` and an armed auto-merge, with the queue state read back over GraphQL and
+printed. It exists because a one-line docs change cost five commands and so was pushed straight
+to `main`, and a commit that reaches `main` outside the queue rebuilds every entry already in
+it. The message goes through the root's commitlint and `commitlint.config.mjs`. Lefthook's
+`commit-msg` hook and the `pr-title` job in `check.yml` read the same config, so one config
+checks the form (`docs/agents/workflow.md`, *The commit's form*). A refused message comes back
+naming the rule it broke, and a refused tree naming the condition it missed.
+A read-back that shows the pull request neither queued nor armed fails the run and prints the
+command that arms it, because a run that says nothing about the arming is the silence this
+package exists to refuse. Its suite spawns the script over a throwaway git repository whose
+`origin` is a bare repository on disk, with `git push` and the whole of `gh` stubbed on the
+path, so the fetch is real and no case can reach GitHub; it also commits through the hook's
+own command in a throwaway repository, over the same messages.
 
 ## `lint-rules/` — the `better-answers` oxlint plugin
 

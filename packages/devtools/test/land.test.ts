@@ -1,11 +1,13 @@
-import { spawnSync } from "node:child_process";
+import { spawnSync, type SpawnSyncReturns } from "node:child_process";
 import {
   chmodSync,
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -20,22 +22,15 @@ const landScript = path.join(repositoryRoot, "scripts/land.mjs");
 
 const lefthook = readFileSync(path.join(repositoryRoot, "lefthook.yml"), "utf8");
 
-const subjectCeilingHook = (): string => {
-  const block = /\n {4}subject-ceiling:\n {6}run: \|\n(?<body>(?: {8}.*\n|\n)+)/.exec(lefthook);
-  const body = block?.groups?.["body"];
-  if (body === undefined) {
-    throw new Error("lefthook.yml declares no `subject-ceiling` command under `commit-msg`");
+const commitMsgHook = (): string => {
+  const command = /\ncommit-msg:\n {2}commands:\n {4}commitlint:\n {6}run: (?<run>.+)\n/.exec(
+    lefthook,
+  )?.groups?.["run"];
+  if (command === undefined) {
+    throw new Error("lefthook.yml declares no `commitlint` command under `commit-msg`");
   }
-  return body.replaceAll(/^ {8}/gm, "");
+  return command;
 };
-
-const ceilingIn = (command: string): number => {
-  const found = /-gt (?<ceiling>\d+)/.exec(command)?.groups?.["ceiling"];
-  if (found === undefined) throw new Error(`the hook compares against no number:\n${command}`);
-  return Number(found);
-};
-
-const CEILING_IN_LEFTHOOK = ceilingIn(subjectCeilingHook());
 
 const scratch = mkdtempSync(path.join(tmpdir(), "land-"));
 afterAll(() => {
@@ -60,6 +55,7 @@ type Answers = {
   readonly prList?: string;
   readonly prCreate?: string;
   readonly graphql?: string;
+  readonly pushFails?: boolean;
 };
 
 type Throwaway = { readonly root: string; readonly bin: string; readonly log: string };
@@ -98,7 +94,7 @@ const workspace = (name: string, answers: Answers = {}): Throwaway => {
 
   executable(
     path.join(bin, "git"),
-    `#!/bin/sh\nprintf '%s\\n' "git $*" >> "${log}"\nif [ "$1" = "push" ]; then exit 0; fi\nexec ${realGit} "$@"\n`,
+    `#!/bin/sh\nprintf '%s\\n' "git $*" >> "${log}"\nif [ "$1" = "push" ]; then exit ${answers.pushFails === true ? "1" : "0"}; fi\nexec ${realGit} "$@"\n`,
   );
   executable(
     path.join(bin, "gh"),
@@ -130,14 +126,20 @@ const linked = (tree: Throwaway, branch: string): Throwaway => {
 
 type Run = { readonly status: number | null; readonly stdout: string; readonly stderr: string };
 
-const landIn = (tree: Throwaway, argv: readonly string[]): Run => {
-  const result = spawnSync(process.execPath, [landScript, ...argv], {
-    cwd: tree.root,
-    encoding: "utf8",
-    env: { ...process.env, PATH: `${tree.bin}:${process.env["PATH"] ?? ""}` },
-  });
-  return { status: result.status, stdout: result.stdout, stderr: result.stderr };
-};
+const ranOf = (result: SpawnSyncReturns<string>): Run => ({
+  status: result.status,
+  stdout: result.stdout,
+  stderr: result.stderr,
+});
+
+const landIn = (tree: Throwaway, argv: readonly string[], script = landScript): Run =>
+  ranOf(
+    spawnSync(process.execPath, [script, ...argv], {
+      cwd: tree.root,
+      encoding: "utf8",
+      env: { ...process.env, PATH: `${tree.bin}:${process.env["PATH"] ?? ""}` },
+    }),
+  );
 
 const landWith = (tree: Throwaway, message: string): Run => landIn(tree, ["--message", message]);
 
@@ -147,43 +149,63 @@ const logOf = (tree: Throwaway): string =>
 const branchOf = (tree: Throwaway): string =>
   gitIn(tree.root, "rev-parse", "--abbrev-ref", "HEAD").trim();
 
-const subjectOf = (tree: Throwaway): string => gitIn(tree.root, "log", "-1", "--format=%s").trim();
+const messageOf = (tree: Throwaway): string => gitIn(tree.root, "log", "-1", "--format=%B").trim();
 
-const GOOD = "The land command takes a change through the queue [T-332]";
-const GOOD_BRANCH = "t-332-land-command-takes-a-change";
+const GOOD_SUBJECT = "feat(devtools): take a change through the queue";
+const GOOD = `${GOOD_SUBJECT}\n\nA paragraph saying what changed and why.\n\nRefs: T-332`;
+const GOOD_BRANCH = "t-332-take-a-change-through-the";
 
-const OVER_THE_CEILING = `The land command says what changed ${"and says it again ".repeat(4)}[T-332]`;
+const DECLARATIVE = "The land command takes a change through the queue";
+const TICKET_IN_THE_SUBJECT = `${GOOD_SUBJECT} [T-332]`;
+const OVER_THE_CEILING = `docs: say what changed${" and say it again".repeat(3)}`;
+const AT_THE_CEILING = OVER_THE_CEILING.slice(0, 72);
 
-const REFUSED_MESSAGES = [
+const REFUSED_BY_COMMITLINT = [
   {
-    shape: "a Conventional Commits label",
-    directory: "label",
-    message: "chore: update the api coding rules again",
-    named: "Conventional Commits",
+    shape: "a declarative subject",
+    directory: "declarative",
+    message: DECLARATIVE,
+    named: "[type-empty]",
   },
   {
-    shape: "a message too short to be a sentence",
-    directory: "short",
-    message: "Docs updated",
-    named: "at least eight",
+    shape: "a ticket id in the subject",
+    directory: "ticket-in-the-subject",
+    message: TICKET_IN_THE_SUBJECT,
+    named: "[header-names-no-ticket]",
   },
   {
-    shape: "a ticket id written anywhere but the end",
-    directory: "stray-ticket",
-    message: "T-332 lands a small change through the queue rather than around it",
-    named: "a ticket id goes last",
-  },
-  {
-    shape: "a message with no word a branch could carry",
-    directory: "nameless",
-    message: "— — — — — — — —",
-    named: "no word a branch could be named from",
-  },
-  {
-    shape: "a subject over the ceiling",
+    shape: "a subject over 72 characters",
     directory: "over-the-ceiling",
     message: OVER_THE_CEILING,
-    named: `this repository's ceiling is ${String(CEILING_IN_LEFTHOOK)}`,
+    named: "[header-max-length]",
+  },
+  {
+    shape: "a capital in the summary",
+    directory: "capital",
+    message: "docs: say how CI reads the title",
+    named: "[subject-case]",
+  },
+  {
+    shape: "a type off the list",
+    directory: "style",
+    message: "style: tidy the land command",
+    named: "[type-enum]",
+  },
+  {
+    shape: "a scope off the list",
+    directory: "unscoped",
+    message: "feat(land): take a change through the queue",
+    named: "[scope-enum]",
+  },
+] as const;
+
+const REFUSED_MESSAGES = [
+  ...REFUSED_BY_COMMITLINT,
+  {
+    shape: "a wordless summary",
+    directory: "nameless",
+    message: "docs: — — —",
+    named: "no word a branch could be named from",
   },
 ] as const;
 
@@ -201,7 +223,7 @@ describe("pnpm land over a throwaway repository", () => {
     expect(run.stdout).toContain("isInMergeQueue=false");
     expect(run.stdout).toContain("autoMergeRequest.enabledAt=2026-09-22T09:00:00Z");
     expect(branchOf(tree)).toBe(GOOD_BRANCH);
-    expect(subjectOf(tree)).toBe(GOOD);
+    expect(messageOf(tree)).toBe(GOOD);
     expect(logOf(tree)).toContain("git fetch origin main");
     expect(logOf(tree)).toContain(`git switch -c ${GOOD_BRANCH} FETCH_HEAD`);
     expect(logOf(tree)).toContain("git push");
@@ -209,29 +231,78 @@ describe("pnpm land over a throwaway repository", () => {
     expect(logOf(tree)).toContain("gh pr merge --auto --merge 131");
   });
 
-  it("names the branch from the message alone when the message carries no ticket", () => {
-    const tree = dirty(workspace("no-ticket"));
+  it.each([
+    {
+      shape: "a message with no footer",
+      directory: "no-footer",
+      message: "docs: say how a moved ref is pushed to origin",
+      branch: "say-how-a-moved-ref",
+    },
+    {
+      shape: "a backticked name and punctuation",
+      directory: "punctuated",
+      message: "docs: say it's `CI`'s (pull request) title check",
+      branch: "say-it-s-ci-s-pull-request",
+    },
+    {
+      shape: "a summary opening on punctuation",
+      directory: "opening-dash",
+      message: "docs: (re)state how `CI` reads the title",
+      branch: "re-state-how-ci-reads-the",
+    },
+    {
+      shape: "a passing mention in the body",
+      directory: "in-passing",
+      message: "docs: say how a moved ref is pushed\n\nThe old form put Refs: T-100 nowhere.",
+      branch: "say-how-a-moved-ref",
+    },
+    {
+      shape: "a footer under a wordless summary",
+      directory: "footer-alone",
+      message: "docs: — — —\n\nA paragraph saying what changed.\n\nRefs: T-332",
+      branch: "t-332",
+    },
+  ])("names the branch for $shape", ({ directory, message, branch }) => {
+    const tree = dirty(workspace(directory));
 
-    const run = landWith(tree, "The issue tracker note says how a moved ref is pushed to origin");
+    const run = landWith(tree, message);
 
+    expect(run.stderr).toBe("");
     expect(run.status).toBe(0);
-    expect(branchOf(tree)).toBe("issue-tracker-note-says-how");
+    expect(branchOf(tree)).toBe(branch);
   });
 
-  it.each(REFUSED_MESSAGES)(
-    "refuses $shape, naming it, and neither branches, commits nor pushes",
-    ({ directory, message, named }) => {
-      const tree = dirty(workspace(directory));
+  it("relays commitlint's warnings and lands the message anyway", () => {
+    const tree = dirty(workspace("warned"));
 
-      const run = landWith(tree, message);
+    const run = landWith(tree, `${GOOD_SUBJECT}\nA body with no blank line above it.`);
 
-      expect(run.status).not.toBe(0);
-      expect(run.stderr).toContain(named);
-      expect(branchOf(tree)).toBe("main");
-      expect(logOf(tree)).not.toContain("git commit");
-      expect(logOf(tree)).not.toContain("git push");
-    },
-  );
+    expect(run.status).toBe(0);
+    expect(run.stdout).toContain("[body-leading-blank]");
+    expect(branchOf(tree)).toBe("take-a-change-through-the");
+  });
+
+  it.each(REFUSED_MESSAGES)("refuses $shape and lands nothing", ({ directory, message, named }) => {
+    const tree = dirty(workspace(directory));
+
+    const run = landWith(tree, message);
+
+    expect(run.status).toBe(2);
+    expect(run.stderr).toContain(named);
+    expect(branchOf(tree)).toBe("main");
+    expect(logOf(tree)).not.toContain("git commit");
+    expect(logOf(tree)).not.toContain("git push");
+  });
+
+  it("stops at a failed push and opens no pull request", () => {
+    const tree = dirty(workspace("push-fails", { pushFails: true }));
+
+    const run = landWith(tree, GOOD);
+
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain(`git push -u origin ${GOOD_BRANCH} failed`);
+    expect(logOf(tree)).not.toContain("gh pr create");
+  });
 
   it("takes a linked worktree's uncommitted change, which can never stand on main", () => {
     const worktree = linked(dirty(workspace("a-worktree")), "a-branch-of-its-own");
@@ -243,7 +314,7 @@ describe("pnpm land over a throwaway repository", () => {
     expect(run.status).toBe(0);
     expect(run.stdout).toContain("docs/note.md");
     expect(branchOf(worktree)).toBe(GOOD_BRANCH);
-    expect(subjectOf(worktree)).toBe(GOOD);
+    expect(messageOf(worktree)).toBe(GOOD);
   });
 
   it("takes a detached head that is origin's main, naming no branch to stand on", () => {
@@ -255,7 +326,7 @@ describe("pnpm land over a throwaway repository", () => {
     expect(run.stderr).toBe("");
     expect(run.status).toBe(0);
     expect(branchOf(tree)).toBe(GOOD_BRANCH);
-    expect(subjectOf(tree)).toBe(GOOD);
+    expect(messageOf(tree)).toBe(GOOD);
   });
 
   it("commits a head behind origin's main onto the newer head it fetched", () => {
@@ -270,7 +341,7 @@ describe("pnpm land over a throwaway repository", () => {
 
     expect(run.stderr).toBe("");
     expect(run.status).toBe(0);
-    expect(subjectOf(tree)).toBe(GOOD);
+    expect(messageOf(tree)).toBe(GOOD);
     expect(gitIn(tree.root, "log", "-1", "--format=%s", "HEAD~1").trim()).toBe(newer);
   });
 
@@ -429,25 +500,29 @@ describe("pnpm land over a throwaway repository", () => {
     expect(run.stderr).toContain("could not be read back");
   });
 
-  it("holds every commit to the same ceiling through lefthook, over a message file both ways", () => {
-    const messages = path.join(scratch, "commit-msg");
-    mkdirSync(messages, { recursive: true });
-    const hook = subjectCeilingHook();
-    const over = `${OVER_THE_CEILING}\n\nA paragraph saying what changed and why.\n`;
-    const under = `${GOOD}\n\nA paragraph saying what changed and why.\n`;
+  it("names commitlint when it is not installed, and lands nothing", () => {
+    const checkout = path.join(scratch, "uninstalled-checkout");
+    for (const copied of [
+      "scripts/land.mjs",
+      "packages/devtools/package.json",
+      "packages/devtools/src",
+    ]) {
+      cpSync(path.join(repositoryRoot, copied), path.join(checkout, copied), { recursive: true });
+    }
+    symlinkSync(
+      path.join(repositoryRoot, "packages/devtools/node_modules"),
+      path.join(checkout, "packages/devtools/node_modules"),
+    );
+    const tree = dirty(workspace("uninstalled"));
 
-    const ranOver = path.join(messages, "over");
-    const ranUnder = path.join(messages, "under");
-    writeFileSync(ranOver, over);
-    writeFileSync(ranUnder, under);
-    const refused = spawnSync("sh", ["-c", hook.replace("{1}", ranOver)], { encoding: "utf8" });
-    const taken = spawnSync("sh", ["-c", hook.replace("{1}", ranUnder)], { encoding: "utf8" });
+    const run = landIn(tree, ["--message", GOOD], path.join(checkout, "scripts/land.mjs"));
 
-    expect(refused.status).toBe(1);
-    expect(refused.stdout).toContain(`ceiling is ${String(CEILING_IN_LEFTHOOK)}`);
-    expect(refused.stdout).toContain(String(OVER_THE_CEILING.length));
-    expect(taken.status).toBe(0);
-    expect(taken.stdout).toBe("");
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain("commitlint could not run from");
+    expect(run.stderr).toContain("node_modules/.bin/commitlint");
+    expect(run.stderr).toContain("pnpm install");
+    expect(logOf(tree)).not.toContain("git commit");
+    expect(logOf(tree)).not.toContain("git push");
   });
 
   it("says the pull request is queued when the read-back says so", () => {
@@ -459,4 +534,53 @@ describe("pnpm land over a throwaway repository", () => {
     expect(run.stdout).toContain("isInMergeQueue=true");
     expect(run.stdout).toContain("autoMergeRequest.enabledAt=none");
   });
+});
+
+/** lefthook runs a command from the repository root, `{1}` standing for the message file's path. */
+const hooked = (name: string): string => {
+  const root = throwawayRepository(path.join(scratch, name));
+  const hooks = path.join(scratch, `${name}-hooks`);
+  mkdirSync(hooks, { recursive: true });
+  executable(
+    path.join(hooks, "commit-msg"),
+    `#!/bin/sh
+message="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
+cd '${repositoryRoot}' || exit 1
+${commitMsgHook().replaceAll("{1}", '"$message"')}
+`,
+  );
+  gitIn(root, "config", "core.hooksPath", hooks);
+  writeUnder(root, "README.md", "tracked\n");
+  gitIn(root, "add", "-A");
+  return root;
+};
+
+const commitIn = (root: string, message: string): Run =>
+  ranOf(spawnSync("git", ["-C", root, "commit", "-q", "-m", message], { encoding: "utf8" }));
+
+describe("lefthook's commit-msg hook over a throwaway repository", () => {
+  it.each([
+    { shape: "a Conventional message with a footer", directory: "hook-good", message: GOOD },
+    { shape: "a subject of 72 characters", directory: "hook-at", message: AT_THE_CEILING },
+  ])("commits $shape", ({ directory, message }) => {
+    const root = hooked(directory);
+
+    const run = commitIn(root, message);
+
+    expect(run.status, `${run.stdout}${run.stderr}`).toBe(0);
+    expect(gitIn(root, "log", "-1", "--format=%B").trim()).toBe(message);
+  });
+
+  it.each(REFUSED_BY_COMMITLINT)(
+    "refuses $shape, naming its rule",
+    ({ directory, message, named }) => {
+      const root = hooked(`hook-${directory}`);
+
+      const run = commitIn(root, message);
+
+      expect(run.status).not.toBe(0);
+      expect(`${run.stdout}${run.stderr}`).toContain(named);
+      expect(gitIn(root, "rev-list", "--all", "--count").trim()).toBe("0");
+    },
+  );
 });

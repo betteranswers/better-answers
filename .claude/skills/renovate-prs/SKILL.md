@@ -33,7 +33,7 @@ gh pr checks <n>                                   # the run and job ids are in 
 gh run view <run> --job <job> --log-failed > /tmp/pr<n>.log
 ```
 
-Find the first failing assertion or error line. A merge-group failure whose only red is a browser spec the pull request did not touch is a flake to re-arm (`docs/agents/workflow.md`, *The prose shape*). A red that the latest queue run also shows (`gh run list --workflow check.yml --event merge_group --limit 3`) is not this pull request's.
+Find the first failing assertion or error line. A merge-group failure whose only red is a browser spec the pull request did not touch is a flake to re-arm. A red that the latest queue run also shows (`gh run list --workflow check.yml --event merge_group --limit 3`) is not this pull request's.
 
 **Done when** every red pull request has a cause quoted from a log line, never inferred from a check's name.
 
@@ -54,7 +54,7 @@ The test between the first two: check the fix out on `main` and run the suite. G
 
 Order matters because Renovate **regenerates** a branch when its rebase box is ticked, force-pushing its own commit and dropping everyone else's.
 
-1. **Main first and rules land.** `pnpm land --message "<subject>\n\n<paragraph>"` from a tree on `origin/main`, in the prose shape (`docs/agents/workflow.md`, *The queue*). Wait for each to merge.
+1. **Main first and rules land.** `pnpm land --message "<type(scope): summary>\n\n<body>"` from a tree on `origin/main`, in the commit's form (`docs/agents/workflow.md`, *The commit's form*). Wait for each to merge.
 2. **Tick the rebase box** on every pull request they touch, so Renovate regenerates it over the new `main`:
 
    ```bash
@@ -71,7 +71,7 @@ What a fix owes, whichever route:
 - **Every file still naming the old version**: `git grep -nF '<old version>' -- ':!*.lock' ':!pnpm-lock.yaml'`. jCodeMunch's index leaves Dockerfiles out, so its answer is not evidence here. A test comparing the manifest's pin to a literal moves with the pin; a literal handed to a function as input stays.
 - **The comment above each moved pin** in `apps/worker/pyproject.toml` and the Dockerfiles. Many carry a dated reading (licence, wheel tags, digest) and say what a bump owes: a probe to re-run, a reading to re-date. Re-read the licence and wheels at the source (`curl -s https://pypi.org/pypi/<name>/<version>/json`), re-date, run what it names.
 - **Suites by file**: the first row of *What `check` runs where* in `docs/agents/workflow.md`. That row sets `IMAGE_PROBE_DEFERRED=true`, which skips the image suites; when the red line is in one (`apps/worker/tests/test_image.py`, `apps/api/tests/image.test.ts`), run the failing test by its node id without it. The suite builds its image by id, so it is safe beside other sessions, and the worker's takes about three minutes. CI's affected lane and the queue's full run are the arbiters.
-- **Review**: `impact` before an edit and `detect_changes` before each commit (`docs/agents/code-review.md`; Cubic is paused). GitNexus leaves test files out, so `impact` on a test answers *not found*, and the blast radius is the assertion itself. One commit per fix, in the prose shape; a branch fix has no ticket id.
+- **Review**: `impact` before an edit and `detect_changes` before each commit (`docs/agents/code-review.md`; Cubic is paused). GitNexus leaves test files out, so `impact` on a test answers *not found*, and the blast radius is the assertion itself. One commit per fix, in the commit's form; a branch fix has no `Refs:` footer.
 - **A ticket**, when the route says so: `ordna create`, pushed origin first (`docs/agents/issue-tracker.md`), with the pull request's number and the log line in its Notes. When the fix cannot land ahead of the new version, the ticket carries the bump too, and the Renovate pull request closes as redundant once it lands (T-356 carries #211's).
 
 **Done when** every pull request on the first three routes has a head whose red leg's failing line is gone from a local run of that suite.

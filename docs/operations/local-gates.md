@@ -34,9 +34,9 @@ The root `prepare` script runs `lefthook install`, and pnpm runs `prepare` after
 - `actionlint` is a Homebrew binary, not an npm package, so a clone may not have it. A warning and a pass, never a failure: a tool nobody installed must not block a commit.
 - The five `*-typecheck` commands are every workspace with a `typecheck` script but the design system, which has neither a `tsconfig.json` nor a `scripts` block. `root:` is what scopes each command to its own workspace's staged files, so these five never see each other's changes.
 
-## The commit-message ceiling
+## The commit-message hook
 
-The `commit-msg` hook holds every commit's subject to 72 characters, not just `pnpm land`'s. The number is written twice — in `lefthook.yml` and in `packages/devtools/src/land.ts` — because nothing either could import binds a shell one-liner to a TypeScript constant. What holds them to one number is `packages/devtools/test/land.test.ts`, which reads both and fails when they disagree; it also runs the command over a message file both ways.
+The `commit-msg` hook runs commitlint over every commit's message, not just `pnpm land`'s. Its config, `commitlint.config.mjs` at the root, is the one `pnpm land` and the `pr-title` job in `check.yml` read too, so one config checks the form everywhere (`docs/agents/workflow.md`, *The commit's form*). `packages/devtools/test/land.test.ts` commits through the hook's own command in a throwaway repository: a Conventional message goes in, and a declarative subject, a subject naming its ticket and one over 72 characters are each refused.
 
 ## The Claude Code hooks
 

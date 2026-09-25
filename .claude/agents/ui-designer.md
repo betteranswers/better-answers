@@ -32,7 +32,7 @@ You are the implementor for a ticket that lands something a person looks at. Eve
 1. Read the ticket (`ordna show`), the spec's screen section, the task note, the skills above.
 2. Write the Playwright spec for the acceptance lines first; watch it fail.
 3. Build the screen from the registries and the design skill; run the spec until green; run the accessibility gate.
-4. `detect_changes`, commit on the worktree branch in the repository's prose shape, report as the implementor does.
+4. `detect_changes`, commit on the worktree branch in the commit's form (`docs/agents/workflow.md`), report as the implementor does.
 
 ## Never
 

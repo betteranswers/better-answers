@@ -1,5 +1,14 @@
-import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { spawnSync, type SpawnSyncReturns } from "node:child_process";
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { parse } from "yaml";
@@ -378,6 +387,9 @@ const LANE = "lane";
 // The branch ruleset's required context, and the job build.yml's `image` waits on.
 const FAN_IN = "check";
 
+/** No lane's leg: a pull request's title is read whichever lane its paths chose. */
+const TITLE_JOB = "pr-title";
+
 const checkJobs = (): Readonly<Record<string, Job>> => workflow("check.yml").jobs;
 
 // The fan-in reads the prefix to decide what it requires, so it is load-bearing, not tidiness.
@@ -464,7 +476,9 @@ describe("the lane inside check.yml (the process review, 21/09/2026)", () => {
   });
 
   it("names every leg for the lane it runs on, which is the condition it runs on", () => {
-    const legs = Object.entries(checkJobs()).filter(([job]) => job !== LANE && job !== FAN_IN);
+    const legs = Object.entries(checkJobs()).filter(
+      ([job]) => job !== LANE && job !== FAN_IN && job !== TITLE_JOB,
+    );
 
     expect(legs.map(([job]) => job)).toEqual([
       ...legsOf("docs"),
@@ -521,9 +535,10 @@ const SETUP: readonly Setup[] = [
       "full-web",
       "affected-gates",
       "affected-workspaces",
+      TITLE_JOB,
     ],
     because:
-      "every leg that runs a pnpm workspace's own gates needs the tree installed; the worker's gates are uv's and its legs only spawn the runner",
+      "every leg that runs a pnpm workspace's own gates needs the tree installed, as does the title's commitlint; the worker's gates are uv's and its legs only spawn the runner",
   },
   {
     tool: "astral-sh/setup-uv@",
@@ -751,6 +766,128 @@ describe("the one verdict check.yml reports (T-333)", () => {
       verdict,
       "the verdict splices a context into the shell rather than reading it from the environment",
     ).not.toContain("${{");
+  });
+
+  it("wants the title job's success exactly where it runs", () => {
+    const runsOn = /^\$\{\{ (?<condition>.+) \}\}$/.exec(checkJobs()[TITLE_JOB]?.if ?? "")
+      ?.groups?.["condition"];
+    const env = stepsOfJob(FAN_IN).flatMap((step) => Object.entries(step.env ?? {}));
+
+    expect(runsOn, "the title job runs on no condition this reading can find").toBeDefined();
+    expect(Object.fromEntries(env)["TITLE_WANTED"]).toEqual(
+      `\${{ (${runsOn ?? ""}) && 'success' || 'skipped' }}`,
+    );
+  });
+
+  it.each([
+    { verdict: "passes", event: "a pull request", wanted: "success", title: "success" },
+    { verdict: "fails", event: "a merge group", wanted: "success", title: "failure" },
+    { verdict: "passes", event: "a push", wanted: "skipped", title: "skipped" },
+  ])("$verdict on $event whose title job ended $title", ({ verdict, wanted, title }) => {
+    const legs = Object.fromEntries(
+      Object.keys(checkJobs())
+        .filter((job) => job !== FAN_IN)
+        .map((job) => [job, { result: job.startsWith("docs-") ? "success" : "skipped" }]),
+    );
+    const ran = spawnSync("bash", ["-e", "-c", stepsOfJob(FAN_IN)[0]?.run ?? "exit 9"], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        LANE: "docs",
+        LEGS: JSON.stringify({
+          ...legs,
+          [LANE]: { result: "success" },
+          [TITLE_JOB]: { result: title },
+        }),
+        TITLE_WANTED: wanted,
+      },
+    });
+
+    expect(ran.status === 0 ? "passes" : "fails", `${ran.stdout}${ran.stderr}`).toEqual(verdict);
+    expect(ran.stdout).toContain(`${TITLE_JOB}: ${title} (this lane wants ${wanted})`);
+  });
+});
+
+describe("the pull request's title, read by check.yml", () => {
+  const TITLE_COMMAND = "pnpm exec commitlint";
+  const PULL_REQUEST = "7";
+  const REPOSITORY = "betteranswers/better-answers";
+  const CONVENTIONAL = "ci: check the pull request's title with commitlint";
+  const FROM_A_PULL_REQUEST = { PULL_REQUEST, QUEUED_REF: "" };
+
+  const titleStep = (): Step | undefined =>
+    stepsOfJob(TITLE_JOB).find((one) => (one.run ?? "").includes(TITLE_COMMAND));
+
+  /** gh answers the one question the step should ask, and fails any other. */
+  const titleStepWith = (
+    title: string,
+    event: { readonly PULL_REQUEST: string; readonly QUEUED_REF: string },
+  ): SpawnSyncReturns<string> => {
+    const bin = mkdtempSync(path.join(tmpdir(), "pr-title-"));
+    writeFileSync(
+      path.join(bin, "gh"),
+      `#!/bin/sh\n[ "$*" = "api repos/${REPOSITORY}/pulls/${PULL_REQUEST} --jq .title" ] || exit 3\nprintf '%s\\n' "$TITLE"\n`,
+    );
+    chmodSync(path.join(bin, "gh"), 0o755);
+    const ran = spawnSync("bash", ["-e", "-c", titleStep()?.run ?? "exit 9"], {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PATH: `${bin}:${process.env["PATH"] ?? ""}`,
+        GITHUB_REPOSITORY: REPOSITORY,
+        ...event,
+        TITLE: title,
+      },
+    });
+    rmSync(bin, { recursive: true, force: true });
+    return ran;
+  };
+
+  it("reads every event field from the environment, never spliced", () => {
+    expect(titleStep()?.run ?? "").toContain(TITLE_COMMAND);
+    expect(titleStep()?.run ?? "").not.toContain("${{");
+  });
+
+  it("passes a Conventional title", () => {
+    const run = titleStepWith(CONVENTIONAL, FROM_A_PULL_REQUEST);
+
+    expect(run.status, `${run.stdout}${run.stderr}`).toBe(0);
+  });
+
+  it("reads the pull request's number off a merge group's ref", () => {
+    const run = titleStepWith(CONVENTIONAL, {
+      PULL_REQUEST: "",
+      QUEUED_REF: `refs/heads/gh-readonly-queue/main/pr-${PULL_REQUEST}-0123456789abcdef`,
+    });
+
+    expect(run.status, `${run.stdout}${run.stderr}`).toBe(0);
+  });
+
+  it("fails an event that names no pull request", () => {
+    const run = titleStepWith(CONVENTIONAL, { PULL_REQUEST: "", QUEUED_REF: "refs/heads/main" });
+
+    expect(run.status).not.toBe(0);
+    expect(run.stdout).toContain("no pull request number in this event");
+  });
+
+  it.each([
+    { shape: "a declarative title", title: "The title check runs in CI", named: "[type-empty]" },
+    {
+      shape: "a title naming its ticket",
+      title: "ci: check the pull request's title [T-386]",
+      named: "[header-names-no-ticket]",
+    },
+    {
+      shape: "a title over 72 characters",
+      title: `ci: check the title${" and check it again".repeat(3)}`,
+      named: "[header-max-length]",
+    },
+  ])("fails $shape, naming the rule", ({ title, named }) => {
+    const run = titleStepWith(title, FROM_A_PULL_REQUEST);
+
+    expect(run.status).not.toBe(0);
+    expect(`${run.stdout}${run.stderr}`).toContain(named);
   });
 });
 

@@ -2,15 +2,8 @@
 # docs/operations/local-gates.md
 commit-msg:
   commands:
-    subject-ceiling:
-      run: |
-        subject=$(head -n 1 "{1}")
-        if [ "${#subject}" -gt 72 ]; then
-          echo "commit-msg: the subject is ${#subject} characters and this repository's ceiling is 72."
-          echo "Say what is now true in one clause ending with the ticket id in brackets, and put the"
-          echo "paragraph in the body, after a blank line. docs/agents/workflow.md, The prose shape."
-          exit 1
-        fi
+    commitlint:
+      run: pnpm exec commitlint --edit {1}
 
 pre-commit:
   parallel: true
