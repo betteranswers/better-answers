@@ -392,10 +392,7 @@
         "packages/core/src/concepts/reconciler.ts",
         "packages/core/src/concepts/visibility.ts",
         "packages/core/test/bundle.ts",
-        "packages/core/test/queue.contract.test.ts",
-        "packages/schema/test/finding-factory.test.ts",
-        "packages/schema/test/null-safe-checks.test.ts",
-        "packages/schema/test/readable-chunk.test.ts"
+        "packages/core/test/queue.contract.test.ts"
       ],
       "rules": {
         "complexity": "off"
@@ -444,26 +441,11 @@
         "packages/core/test/visibility.test.ts",
         "packages/core/test/warm-objects.test.ts",
         "packages/core/test/workspaces.test.ts",
-        "packages/schema/test/account-key.test.ts",
-        "packages/schema/test/boundary-schemas.test.ts",
-        "packages/schema/test/bundle-manifest.test.ts",
-        "packages/schema/test/chunk-columns.test.ts",
-        "packages/schema/test/contract-digest.test.ts",
-        "packages/schema/test/finding-factory.test.ts",
-        "packages/schema/test/full-text-match.test.ts",
-        "packages/schema/test/job-kinds.test.ts",
         "packages/schema/test/migration-ownership.test.ts",
-        "packages/schema/test/null-safe-checks.test.ts",
         "packages/schema/test/provisioning-locks.test.ts",
-        "packages/schema/test/readable-chunk.test.ts",
         "packages/schema/test/rls.test.ts",
         "packages/schema/test/roles-surface.test.ts",
-        "packages/schema/test/source-catalogue.test.ts",
-        "packages/schema/test/suppression.test.ts",
-        "packages/schema/test/table-ownership.test.ts",
-        "packages/schema/test/ulid.test.ts",
-        "packages/schema/test/warm-postgres.test.ts",
-        "packages/schema/test/worker-schema-view.test.ts"
+        "packages/schema/test/table-ownership.test.ts"
       ],
       "rules": {
         "vitest/valid-title": ["error", {}]

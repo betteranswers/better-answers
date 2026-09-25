@@ -127,6 +127,10 @@ const runningTestFile = (): string => {
   return testPath;
 };
 
+/**
+ * A fresh copy of the warm template, named after `databaseKey` or the running test file; `stop`
+ * drops it. Without a warm cluster, starts a container.
+ */
 export const openMigratedPostgres = async (databaseKey?: string): Promise<MigratedPostgres> => {
   const warm = providedWarmPostgres();
   if (warm === undefined) return startMigratedPostgres();

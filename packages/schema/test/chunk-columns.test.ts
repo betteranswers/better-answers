@@ -74,7 +74,7 @@ const firstSpanOf = (documentId: string) => ({
 });
 
 describe("the chunk's columns, on the parent and on a partition", () => {
-  it("carries the document, the span and the full-text column on a partition made after them", async () => {
+  it("carries document, span and full text on a later partition", async () => {
     await withRollback(db().pool, async (client) => {
       const { seed } = await seedOneDocument(client, WS_A);
       await seed.chunk({ workspaceId: WS_A });
@@ -100,7 +100,7 @@ describe("the chunk's columns, on the parent and on a partition", () => {
     });
   });
 
-  it("propagates an ALTER on the parent to a partition that already exists, and to one made after", async () => {
+  it("propagates a parent ALTER to existing and later partitions", async () => {
     await withRollback(db().pool, async (client) => {
       const { seed } = await seedOneDocument(client, WS_A);
       await seed.chunk({ workspaceId: WS_A });
@@ -148,7 +148,7 @@ describe("the chunk's columns, on the parent and on a partition", () => {
 });
 
 describe("the embedding and the route it came from", () => {
-  it("refuses a vector without its route and a route without its vector, and admits both whole shapes", async () => {
+  it("refuses a vector or route alone, admitting neither or both", async () => {
     await withRollback(db().pool, async (client) => {
       const { seed } = await seedOneDocument(client, WS_A);
       await seed.chunk({ workspaceId: WS_A });
@@ -173,7 +173,7 @@ describe("the embedding and the route it came from", () => {
 });
 
 describe("the full-text column", () => {
-  it("is the database's own work, and refused to both runtime roles", async () => {
+  it("is computed by the database, refused to both runtime roles", async () => {
     await withRollback(db().pool, async (client) => {
       const { seed } = await seedOneDocument(client, WS_A);
       await seed.chunk({ workspaceId: WS_A, content: "the handbook's holiday policy" });
@@ -202,7 +202,7 @@ describe("the full-text column", () => {
 });
 
 describe("a partition's indexes", () => {
-  it("gives a new partition its full-text index and no vector index", async () => {
+  it("gives a new partition a full-text index, no vector index", async () => {
     await withRollback(db().pool, async (client) => {
       const { seed } = await seedOneDocument(client, WS_A);
       await seed.chunk({ workspaceId: WS_A });
@@ -214,7 +214,7 @@ describe("a partition's indexes", () => {
     });
   });
 
-  it("gives a partition that predates the migration the same pair, through the migration's own loop", async () => {
+  it("gives an older partition the same pair through the migration", async () => {
     await withRollback(db().pool, async (client) => {
       await client.query(
         `CREATE TABLE "index"."chunk_${WS_A}" PARTITION OF "index".chunk FOR VALUES IN ('${WS_A}')`,
@@ -236,7 +236,7 @@ describe("a partition's indexes", () => {
 });
 
 describe("the chunk and the document it locates into", () => {
-  it("goes when the document goes, and leaves another document's chunks standing", async () => {
+  it("goes with its document, leaving another document's chunks standing", async () => {
     await withRollback(db().pool, async (client) => {
       const { seed, binding, document } = await seedOneDocument(client, WS_A);
       const sibling = await seed.sourceDocument({ workspaceId: WS_A, bindingId: binding.id });
@@ -276,7 +276,7 @@ describe("the chunk and the document it locates into", () => {
 });
 
 describe("the worker on the chunk index", () => {
-  it("writes a chunk row through the parent and is refused the partition itself", async () => {
+  it("writes chunks through the parent and is refused the partition", async () => {
     await withRollback(db().pool, async (client) => {
       const { seed, document } = await seedOneDocument(client, WS_A);
       await seed.chunk({ workspaceId: WS_A });

@@ -12,13 +12,13 @@ import {
 import { CONTRACT_DIGEST } from "../src/contract-stamp.ts";
 
 describe("the api tier's contract digest", () => {
-  it("is byte-identical to a regeneration, so a hand-edited constant fails this workspace", () => {
+  it("is byte-identical to a regeneration, so hand edits fail", () => {
     expect(readFileSync(CONTRACT_STAMP_MODULE, "utf8")).toBe(
       renderContractStamp(contractDigest(CONTRACTS_ROOT)),
     );
   });
 
-  it("names the command that writes it, so a reader who finds it stale knows what to run", () => {
+  it("names the command that regenerates it", () => {
     expect(readFileSync(CONTRACT_STAMP_MODULE, "utf8")).toContain(
       "pnpm --filter @better-answers/schema run generate:contract-stamp",
     );

@@ -86,7 +86,7 @@ const withWorkspace = async (fn: (client: pg.PoolClient) => Promise<void>): Prom
 };
 
 describe("a binding nobody configured", () => {
-  it("feeds the upload's two destinations, is kept by the platform, and has only landed", async () => {
+  it("feeds both upload destinations, is kept, and has only landed", async () => {
     await withWorkspace(async (client) => {
       await seedBindingOfAConnectorAlone(client, WORKSPACE, UPLOAD_BINDING);
 
@@ -155,7 +155,7 @@ describe("the four closed word sets a binding carries", () => {
     });
   });
 
-  it("refuses a word outside each set, an empty destination and a NULL among the destinations", async () => {
+  it("refuses stray words, empty destinations and a NULL destination", async () => {
     await withWorkspace(async (client) => {
       const refusals = [
         await attemptBindingOf(
@@ -200,7 +200,7 @@ describe("the four closed word sets a binding carries", () => {
 });
 
 describe("the catalogue a run reconciles", () => {
-  it("keeps every column it was given, and leaves a document no run has seen with nothing to say", async () => {
+  it("keeps every column given and leaves run columns empty", async () => {
     await withBindings(async (client) => {
       await seedCataloguedDocument(client, THE_HANDBOOK);
       const landed = await client.query(
@@ -254,7 +254,7 @@ describe("the catalogue a run reconciles", () => {
     });
   });
 
-  it("admits one item once per binding and refuses it twice, and admits it again under another binding", async () => {
+  it("admits an item once per binding, and under another binding", async () => {
     await withBindings(
       async (client) => {
         await seedCataloguedDocument(client, THE_HANDBOOK);
@@ -277,7 +277,7 @@ describe("the catalogue a run reconciles", () => {
     );
   });
 
-  it("admits every class and outcome it declares, and refuses a word outside either", async () => {
+  it("admits every declared class and outcome, and refuses others", async () => {
     await withBindings(async (client) => {
       const landed: string[] = [];
       for (const sensitivity of SENSITIVITIES) {
@@ -305,7 +305,7 @@ describe("the catalogue a run reconciles", () => {
     });
   });
 
-  it("carries a quarantine error only on a document it also calls quarantined", async () => {
+  it("carries a quarantine error only on a quarantined document", async () => {
     await withBindings(async (client) => {
       const quarantined = admitting(
         await attemptQuarantinePair(client, UNDER_THE_UPLOAD, "quarantined", "NeedsOcrError"),
@@ -332,7 +332,7 @@ describe("the catalogue a run reconciles", () => {
 });
 
 describe("the key from evidence to the document it locates into", () => {
-  it("refuses a cited document's deletion, and admits it once nothing cites it", async () => {
+  it("refuses a cited document's deletion until nothing cites it", async () => {
     await withBindings(async (client) => {
       await seedCataloguedDocument(client, THE_HANDBOOK);
       await citeDocument(client, WORKSPACE, HANDBOOK);
@@ -364,7 +364,7 @@ describe("the key from evidence to the document it locates into", () => {
     });
   });
 
-  it("refuses a binding's deletion while one of its documents is cited, because the cascade meets the key", async () => {
+  it("refuses a binding's deletion while its document is cited", async () => {
     await withBindings(async (client) => {
       await seedCataloguedDocument(client, THE_HANDBOOK);
       await citeDocument(client, WORKSPACE, HANDBOOK);
@@ -380,7 +380,7 @@ describe("the key from evidence to the document it locates into", () => {
     });
   });
 
-  it("refuses evidence naming a document nobody catalogued, and another tenant's document", async () => {
+  it("refuses evidence on an uncatalogued or another tenant's document", async () => {
     await withWorkspace(async (client) => {
       const theirs = await testData(client).sourceDocument();
       const refusals = [
@@ -401,7 +401,7 @@ describe("the ledger's unique pair", () => {
     });
   };
 
-  it("is a target a later row's composite key can point at", async () => {
+  it("is a target for a later composite foreign key", async () => {
     await withLedgerRow(async (client, id) => {
       await client.query(
         `CREATE TABLE keyed_to_the_ledger (
@@ -432,8 +432,8 @@ const THE_DISMISSAL_READ = "0052_the-dismissal-read.sql";
 
 const OTHER_WORKSPACE = "01J6CEEEEEEEEEEEEEEEEEEEEE";
 
-describe("the migration that keeps an Admin's narrowing apart from the seam's verdict", () => {
-  it("gives each document an Admin narrowed its last narrowing off the ledger, in every workspace, and none to a document only the seam narrowed", async () => {
+describe("the migration separating an Admin's narrowing from the seam's verdict", () => {
+  it("backfills an Admin's last narrowing everywhere, never the seam's", async () => {
     await withWorkspace(async (client) => {
       const seed = testData(client);
       await seed.workspace({ id: OTHER_WORKSPACE, name: "The catalogue's other workspace" });

@@ -22,21 +22,32 @@ const testTreeFiles = (): readonly string[] =>
     .filter((under) => under.endsWith(".ts") && under !== path.basename(import.meta.filename))
     .map((under) => path.join(import.meta.dirname, under));
 
+const quotedAfter = (character: string, quoted: boolean): boolean =>
+  quoted ? character !== "'" : character === "'";
+
+const depthAfter = (character: string, depth: number): number | "closed" => {
+  if (character === "(") return depth + 1;
+  if (character !== ")") return depth;
+  return depth > 0 ? depth - 1 : "closed";
+};
+
 const rowItems = (afterTheOpeningBracket: string): readonly string[] => {
   const items: string[] = [];
   let item = "";
   let depth = 0;
   let quoted = false;
   for (const character of afterTheOpeningBracket) {
-    if (quoted) quoted = character !== "'";
-    else if (character === "'") quoted = true;
-    else if (character === "(") depth += 1;
-    else if (character === ")" && depth > 0) depth -= 1;
-    else if (character === ")") return [...items, item];
-    else if (character === "," && depth === 0) {
-      items.push(item);
-      item = "";
-      continue;
+    const inAString = quoted || character === "'";
+    quoted = quotedAfter(character, quoted);
+    if (!inAString) {
+      const next = depthAfter(character, depth);
+      if (next === "closed") return [...items, item];
+      if (character === "," && depth === 0) {
+        items.push(item);
+        item = "";
+        continue;
+      }
+      depth = next;
     }
     item += character;
   }
@@ -50,7 +61,7 @@ const SQL_STRING = /^'(.*)'$/;
 const PLANTED_CATEGORY = "sort-code";
 const FINDING_TABLE = "finding";
 
-// The table is named apart so the tree's scan for raw inserts reads this sample as the text it is.
+/** The table is named apart so the tree's scan for raw inserts reads this sample as text. */
 const plantedCategoryWords = (): string =>
   `{ ...row, category: "${PLANTED_CATEGORY}", tier: "always" },
        INSERT INTO ${FINDING_TABLE} (workspace_id, id, category, tier, rule_id)
@@ -103,7 +114,7 @@ describe("the finding factory's default category", () => {
 });
 
 describe("the finding factory's default span", () => {
-  it("gives each document's findings spans of their own from nought, whatever the file seeded before it, so a filtered run seeds what the whole file does", async () => {
+  it("starts each document's spans at nought, whatever was seeded before", async () => {
     const spans = await withRollback(db.pool, async (client) => {
       const seed = testData(client);
       const first = await seed.finding();
@@ -122,7 +133,7 @@ describe("the finding factory's default span", () => {
     ]);
   });
 
-  it("lands past every span its document already holds, so a span written by hand before it is never taken", async () => {
+  it("lands past every span its document already holds", async () => {
     const spans = await withRollback(db.pool, async (client) => {
       const seed = testData(client);
       const byHand = await seed.finding({ charStart: 8, charEnd: 16 });
@@ -141,14 +152,14 @@ describe("the finding factory's default span", () => {
 });
 
 describe("the category words this package's tests spell by hand", () => {
-  it("names only categories the redaction agreement declares, in every file of the test tree", () => {
+  it("names only declared categories, in every file of the tree", () => {
     const written = categoryWordsInTheTestTree();
 
     expect(written.length).toBeGreaterThanOrEqual(CATEGORY_WORDS_IN_THE_TREE);
     expect(undeclared(written)).toEqual([]);
   });
 
-  it("names an undeclared word written either way, which is what the walk's silence rests on", () => {
+  it("names an undeclared word written either way", () => {
     const planted = categoryWordsIn(plantedCategoryWords(), "planted.ts");
 
     expect(undeclared(planted)).toEqual([

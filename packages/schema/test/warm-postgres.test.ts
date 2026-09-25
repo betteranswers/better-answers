@@ -66,7 +66,7 @@ const DURABILITY_OFF: Durability = {
 };
 
 describe("the warm harness", () => {
-  it("hands back a cluster that was started with its three durability costs off", async () => {
+  it("hands back a cluster with its three durability costs off", async () => {
     const db = await openMigratedPostgres("durability");
     try {
       expect(await durabilityOf(db)).toEqual(DURABILITY_OFF);
@@ -75,7 +75,7 @@ describe("the warm harness", () => {
     }
   });
 
-  it("gives each file a database of its own — a route written through one is not there through the other", async () => {
+  it("gives each file a database of its own", async () => {
     const one = await openMigratedPostgres("one-file");
     const another = await openMigratedPostgres("another-file");
     try {
@@ -90,7 +90,7 @@ describe("the warm harness", () => {
     }
   });
 
-  it("hands the copy back on the api's own footing, with the unscoped read still refused", async () => {
+  it("hands the copy back as app_rt, the unscoped read refused", async () => {
     const db = await openMigratedPostgres();
     try {
       await writeRoute(db);
@@ -108,7 +108,7 @@ describe("the warm harness", () => {
     }
   });
 
-  it("carries the policies and the runtime role's grants onto the copy", async () => {
+  it("carries the policies and runtime grants onto the copy", async () => {
     const db = await openMigratedPostgres("grants");
     try {
       const catalogue = await db.pool.query(
@@ -128,7 +128,7 @@ describe("the warm harness", () => {
     }
   });
 
-  it("drops a file's database when it stops, and leaves the cluster up for the files after it", async () => {
+  it("drops a file's database on stop, leaving the cluster up", async () => {
     const stopped = await openMigratedPostgres("stopped");
     const name = await databaseNameOf(stopped);
     await stopped.stop();
@@ -144,7 +144,7 @@ describe("the warm harness", () => {
     }
   });
 
-  it("still drops a file's database when a session it does not own stays on it", async () => {
+  it("drops a file's database despite a stray session on it", async () => {
     const warm = inject("warmPostgres");
     if (warm === undefined) throw new Error("this run provided no warm cluster");
     const held = await openMigratedPostgres("held-open");
@@ -170,7 +170,7 @@ describe("the warm harness", () => {
     }
   });
 
-  it("re-opens a key onto a fresh database, so a run that bailed cannot leave one behind", async () => {
+  it("re-opens a key onto a fresh database", async () => {
     const bailed = await openMigratedPostgres("re-run");
     await writeRoute(bailed);
     const name = await databaseNameOf(bailed);
@@ -189,7 +189,7 @@ describe("the warm harness", () => {
     }
   });
 
-  it("starts a database of its own where nothing provided a warm cluster", async () => {
+  it("starts a database of its own without a warm cluster", async () => {
     const script = [
       `import { openMigratedPostgres } from ${JSON.stringify(warmPostgresModule)};`,
       "const db = await openMigratedPostgres();",

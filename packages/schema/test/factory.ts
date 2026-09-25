@@ -171,7 +171,7 @@ const insertRow = async <TName extends keyof Registry>(
     domain[key] = typeof value === "string" && value.startsWith("[") ? JSON.parse(value) : value;
   }
 
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- the registry correlates `select` with `TName` and TypeScript resolves neither side of a generic indexed access
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- TypeScript cannot correlate `select` with `TName` through a generic indexed access
   return select.parse(domain) as Row<TName>;
 };
 
@@ -185,6 +185,10 @@ const partitionExists = async (client: pg.PoolClient, workspaceId: string): Prom
 
 const SEEDED_SPAN_LENGTH = 8;
 
+/**
+ * Each method writes one row, filling what `overrides` leave out and seeding the parent rows its
+ * keys need; `chunk` also makes the workspace's partition.
+ */
 export const testData = (client: pg.PoolClient): TestData => {
   const workspace: TestData["workspace"] = (overrides = {}) => {
     const id = overrides.id ?? ulid();

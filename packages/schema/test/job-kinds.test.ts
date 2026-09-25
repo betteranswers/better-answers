@@ -47,8 +47,10 @@ const THE_MIGRATION_IT_REPLACED = "0034_the-job-subject-and-the-run-key.sql";
 
 const ADDS_THE_REASON_CHECK = 'ADD CONSTRAINT "job_reason_check"';
 
-// Replayed from the journal rather than copied, so the rows seeded under it are ones a real
-// database held.
+/**
+ * Replayed from the journal rather than copied, so the rows seeded under it are ones a real
+ * database held.
+ */
 const theCheckItReplaced = (): string =>
   migrationStatementSaying(THE_MIGRATION_IT_REPLACED, ADDS_THE_REASON_CHECK);
 
@@ -122,7 +124,7 @@ const withWorkspace = async (fn: (client: pg.PoolClient) => Promise<void>): Prom
 };
 
 describe("the job kind descriptors", () => {
-  it("declares the queue's two original kinds and index, with what each one is", () => {
+  it("declares nightly-audit, full-rebuild and index, with what each is", () => {
     expect(JOB_KIND_DESCRIPTORS).toEqual([
       {
         kind: "nightly-audit",
@@ -148,11 +150,11 @@ describe("the job kind descriptors", () => {
     ]);
   });
 
-  it("is where the kind list comes from, so neither can gain a word without the other", () => {
+  it("is where the kind list comes from", () => {
     expect([...JOB_KINDS]).toEqual(["nightly-audit", "full-rebuild", "index"]);
   });
 
-  it("names the reasons that empty a binding, each of them an index reason", () => {
+  it("names the binding-emptying reasons, each an index reason", () => {
     expect([...REASONS_EMPTYING_THE_BINDING]).toEqual(["rule-change", "wiped"]);
     const emptying: readonly string[] = REASONS_EMPTYING_THE_BINDING;
     expect(INDEX_REASONS.filter((reason) => emptying.includes(reason))).toEqual([
@@ -183,7 +185,7 @@ describe("the kind CHECK", () => {
 });
 
 describe("the subject CHECK", () => {
-  it("requires a subject of the kinds whose descriptor names one, and refuses one on the rest", async () => {
+  it("requires a subject exactly where the descriptor names one", async () => {
     await withWorkspace(async (client) => {
       for (const descriptor of DESCRIBED) {
         expect(await admitted(client, rowFor(descriptor))).toContain(
@@ -233,7 +235,7 @@ describe("the reason CHECK", () => {
     });
   });
 
-  it("refuses another kind's reason, because the rule is the pair and not the word", async () => {
+  it("refuses another kind's reason, since the rule is the pair", async () => {
     await withWorkspace(async (client) => {
       for (const descriptor of DESCRIBED) {
         const alien = everyReason.filter((reason) => !descriptor.reasons.includes(reason));
@@ -250,7 +252,7 @@ describe("the reason CHECK", () => {
     });
   });
 
-  it("refuses the retired word, which no descriptor declares and no act writes", async () => {
+  it("refuses the retired word, which no descriptor declares", async () => {
     await withWorkspace(async (client) => {
       expect(
         await refusedBy(client, { kind: "index", reason: RETIRED_REASON, subjectId: BINDING }),
@@ -258,7 +260,7 @@ describe("the reason CHECK", () => {
     });
   });
 
-  it("refuses a reasonless row of every kind that has reasons, and admits one of the kind that has none", async () => {
+  it("refuses a reasonless row only where the kind has reasons", async () => {
     await withWorkspace(async (client) => {
       const outcomes: string[] = [];
       for (const descriptor of DESCRIBED) {
@@ -292,7 +294,7 @@ describe("the run key", () => {
     });
   });
 
-  it("admits the next job for a subject whose last one is over", async () => {
+  it("admits the next job once the subject's last is over", async () => {
     await withWorkspace(async (client) => {
       const first = await seedQueuedJob(client, WS, {
         kind: "index",
@@ -310,7 +312,7 @@ describe("the run key", () => {
     });
   });
 
-  it("leaves the subjectless kinds alone, because a NULL subject is distinct from a NULL subject", async () => {
+  it("leaves subjectless kinds alone, as NULL subjects are distinct", async () => {
     await withWorkspace(async (client) => {
       const landed: string[] = [];
       for (const descriptor of DESCRIBED.filter((one) => !one.namesASubject)) {
@@ -327,7 +329,7 @@ describe("the run key", () => {
 });
 
 describe("the claim's sibling check", () => {
-  it("passes over a job whose subject already has a run under a live lease", async () => {
+  it("skips a job whose subject runs under a live lease", async () => {
     await withWorkspace(async (client) => {
       await seedClaimedJob(
         client,
@@ -355,7 +357,7 @@ describe("the claim's sibling check", () => {
     });
   });
 
-  it("hands a subject's work out again once the lease it was waiting on lapses", async () => {
+  it("hands the subject's work out once the lease lapses", async () => {
     await withWorkspace(async (client) => {
       const running = await seedClaimedJob(
         client,
@@ -379,7 +381,7 @@ describe("the claim's sibling check", () => {
     });
   });
 
-  it("leaves the subjectless kinds alone, because a NULL subject is nobody's sibling", async () => {
+  it("leaves subjectless kinds alone, as NULL is nobody's sibling", async () => {
     await withWorkspace(async (client) => {
       await seedClaimedJob(client, WS, { kind: "nightly-audit", enqueuedAgoSeconds: 60 }, 120);
       const second = await seedQueuedJob(client, WS, {
@@ -409,7 +411,7 @@ const withTheRetiredWordAdmitted = async (
 };
 
 describe("the migration that retired a run reason", () => {
-  it("takes every job row carrying the word, whatever its status or workspace, run as the owner the policy binds", async () => {
+  it("deletes every row with the word, any status, any workspace", async () => {
     await withTheRetiredWordAdmitted(async (client) => {
       await seedQueuedJob(client, WS, { ...RETIRED, subjectId: BINDING });
       await seedClaimedJob(client, WS, { ...RETIRED, subjectId: ANOTHER_BINDING }, 120);
@@ -435,7 +437,7 @@ describe("the migration that retired a run reason", () => {
     });
   });
 
-  it("reaches no row with a bare DELETE under that owner, so the loop over workspaces is what takes them", async () => {
+  it("needs its workspace loop: a bare DELETE reaches no row", async () => {
     await withTheRetiredWordAdmitted(async (client) => {
       const inOne = await seedQueuedJob(client, WS, { ...RETIRED, subjectId: BINDING });
       const inTheOther = await seedQueuedJob(client, ANOTHER_WS, {

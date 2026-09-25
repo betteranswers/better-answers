@@ -15,13 +15,13 @@ const leakproofFunctions = async (client: pg.PoolClient): Promise<readonly strin
 };
 
 describe("the full-text match `find` filters a chunk by", () => {
-  it("is leakproof in a database migrated as a deploy migrates, so the planner may take it beneath the chunk's policy", async () => {
+  it("is leakproof once migrated as a deploy migrates", async () => {
     await withRollback(db().pool, async (client) => {
       expect(await matchIsLeakproof(client)).toBe(true);
     });
   });
 
-  it("is marked again by migrate's mark where a restore left it unmarked, and marking twice changes nothing", async () => {
+  it("is marked again after a restore, and twice changes nothing", async () => {
     await withRollback(db().pool, async (client) => {
       await client.query(UNMARK_THE_MATCH);
       const restored = await matchIsLeakproof(client);
@@ -38,7 +38,7 @@ describe("the full-text match `find` filters a chunk by", () => {
     });
   });
 
-  it("is the one function migrate's mark touches, and no other is unmarked by it", async () => {
+  it("is the only function migrate's mark changes", async () => {
     await withRollback(db().pool, async (client) => {
       await client.query(UNMARK_THE_MATCH);
       const before = await leakproofFunctions(client);
@@ -53,7 +53,7 @@ describe("the full-text match `find` filters a chunk by", () => {
     });
   });
 
-  it("is refused to both runtime roles either way, and the mark stands", async () => {
+  it("is refused to both runtime roles, and the mark stands", async () => {
     await withRollback(db().pool, async (client) => {
       for (const role of ["app_rt", "worker_rt"]) {
         await client.query("RESET ROLE");
