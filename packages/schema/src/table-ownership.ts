@@ -101,35 +101,42 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "workspaces",
     access: "read and write",
     reason:
-      "Provisioning inserts the row and its config in one transaction, and the membership read looks up the workspace's name; Better Auth owns the table as its organisation model, the workspaces slice owns the tenant's lifecycle over it.",
+      "Provisioning inserts the row and its config in one transaction, and the membership read looks up the workspace's name, as the operator's lists of people and workspaces do; Better Auth owns the table as its organisation model, the workspaces slice owns the tenant's lifecycle over it.",
   },
   {
     table: "public.member",
     by: "workspaces",
     access: "read and write",
     reason:
-      "Provisioning writes the first Admin membership in the same transaction as the workspace, and the slice reads the workspaces one person holds by their person id — the picker's cross-workspace read, which runs before any workspace is known.",
+      "Provisioning writes the first Admin membership in the same transaction as the workspace, and the slice reads the workspaces one person holds by their person id — the picker's cross-workspace read, which runs before any workspace is known. The operator's lists read every membership: the one cross-workspace read after authentication, admitted to the operator alone.",
   },
   {
     table: "public.user",
     by: "workspaces",
     access: "read and write",
     reason:
-      "Revoking a person's credentials writes the instant every later claim is refused against; the person's own act writes their display name under its one rule, and adding a member or provisioning reads it to refuse a person with none; and the membership read looks up the person's name and address for the shell.",
+      "Revoking a person's credentials writes the instant every later claim is refused against; the person's own act writes their display name under its one rule, and adding a member or provisioning reads it to refuse a person with none; and the membership read looks up the person's name and address for the shell, as the operator's list of people does for every person, with their revocation instant.",
   },
   {
     table: "public.session",
     by: "workspaces",
-    access: "write",
+    access: "read and write",
     reason:
-      "Revoking everywhere ends every browser session created before the instant, in the same transaction that wrote it.",
+      "Revoking everywhere ends every browser session created before the instant, in the same transaction that wrote it; the operator's inspection of a person reads when each of their sessions began, was last extended and ends.",
   },
   {
     table: "public.oauth_refresh_token",
     by: "workspaces",
-    access: "write",
+    access: "read and write",
     reason:
-      "Revocation's two scopes end the refresh tokens minted before the instant — every one of the person's, or only those whose consented workspace is this one.",
+      "Revocation's two scopes end the refresh tokens minted before the instant — every one of the person's, or only those whose consented workspace is this one. The operator's inspection of a person reads each grant as its line of rotated refresh tokens.",
+  },
+  {
+    table: "public.oauth_client",
+    by: "workspaces",
+    access: "read",
+    reason:
+      "The operator's inspection of a person names the client each grant was issued to, by the name its metadata document gave.",
   },
   {
     table: "public.oauth_access_token",

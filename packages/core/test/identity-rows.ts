@@ -47,6 +47,20 @@ export const verificationCodeFor = async (pool: pg.Pool, identifier: string): Pr
   return verificationId;
 };
 
+export const sessionFor = async (
+  pool: pg.Pool,
+  userId: string,
+  at: { readonly createdAt: Date; readonly lastUsedAt: Date; readonly expiresAt: Date },
+): Promise<string> => {
+  const sessionId = ulid();
+  await pool.query(
+    `INSERT INTO session (id, expires_at, token, created_at, updated_at, user_id)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [sessionId, at.expiresAt, `token-${sessionId}`, at.createdAt, at.lastUsedAt, userId],
+  );
+  return sessionId;
+};
+
 type CredentialPair = {
   readonly earlier: string;
   readonly later: string;

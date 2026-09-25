@@ -41,6 +41,7 @@ export {
 export type { SetDisplayNameRefusal } from "./display-name.ts";
 export { listWorkspaces } from "./listing.ts";
 export { setOperatorMark, standingAsOperator } from "./operator.ts";
+export { inspectPerson, inspectPersonInput, listPeople, listPeopleInput } from "./people.ts";
 export { recordConsent, recordSignIn } from "./sign-in-and-consent.ts";
 
 export const TOOLS_LIST_TTL_MS_DEFAULT = 300_000;
