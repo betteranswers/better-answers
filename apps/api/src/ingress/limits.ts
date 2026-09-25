@@ -11,14 +11,8 @@ import {
 
 import { CLIENT_IP_HEADER, UNKNOWN_CLIENT_IP } from "../auth/constants.ts";
 
-export const clientKeyOf = (address: string): string => {
-  const bare = address.replace(/^\[|\]$/g, "").split("%")[0] ?? "";
-  if (!isIPv6(bare)) return address;
-
-  const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(bare);
-  if (mapped?.[1] !== undefined) return mapped[1];
-
-  const canonical = new URL(`http://[${bare}]`).hostname.replace(/^\[|\]$/g, "");
+const prefix64Of = (ipv6: string): string => {
+  const canonical = new URL(`http://[${ipv6}]`).hostname.replace(/^\[|\]$/g, "");
   const [head = "", tail = ""] = canonical.split("::");
   const groups = head === "" ? [] : head.split(":");
   const tailGroups = tail === "" ? [] : tail.split(":");
@@ -30,6 +24,18 @@ export const clientKeyOf = (address: string): string => {
   return `${expanded.slice(0, 4).join(":")}::/64`;
 };
 
+/** An IPv6 address keys as its /64, an IPv4-mapped one as that IPv4, anything else as given. */
+export const clientKeyOf = (address: string): string => {
+  const bare = address.replace(/^\[|\]$/g, "").split("%")[0] ?? "";
+  if (!isIPv6(bare)) return address;
+
+  const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(bare);
+  if (mapped?.[1] !== undefined) return mapped[1];
+
+  return prefix64Of(bare);
+};
+
+/** The key of the address the edge names; every request naming none shares `UNKNOWN_CLIENT_IP`. */
 export const clientIpOf = (headers: Headers): string => {
   const address = headers.get(CLIENT_IP_HEADER)?.trim();
   return address === undefined || address === "" ? UNKNOWN_CLIENT_IP : clientKeyOf(address);

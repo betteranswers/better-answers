@@ -75,9 +75,9 @@ serve(
   },
 );
 
+const headCheck = readHeadCheck();
 // A wrong setting leaves the head check running unwatched rather than stopping it; the scheduler
 // check's silence tells the operator.
-const headCheck = readHeadCheck();
 if (!headCheck.ok) {
   logger.error({ reason: headCheck.error.message }, "the scheduler check will not be pinged");
 }
@@ -98,8 +98,8 @@ if (!reconciler.ok) {
   );
 }
 
-// A wrong setting stops the sweeps and not the api; their check's silence tells the operator.
 const sweepSettings = readSweeps();
+// A wrong setting stops the sweeps and not the api; their check's silence tells the operator.
 if (!sweepSettings.ok) {
   logger.error({ reason: sweepSettings.error.message }, "the sweeps are not running");
 } else {

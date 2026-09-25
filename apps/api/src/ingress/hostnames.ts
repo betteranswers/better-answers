@@ -66,6 +66,7 @@ const withoutRootDot = (hostname: string): string => hostname.replace(/\.$/, "")
 
 const bareForm = (hostname: string): string => withoutRootDot(hostname.replace(/^\[|\]$/g, ""));
 
+/** Without IPv6 brackets or a root dot: the form a configured hostname is compared in. */
 export const hostnameOfUrl = (url: string): string => bareForm(new URL(url).hostname);
 
 export const originOfUrl = (url: string): string => {

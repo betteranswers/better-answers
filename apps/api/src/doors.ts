@@ -10,12 +10,16 @@ import {
 } from "@better-answers/core/store/objects";
 import { openPostgres, type PostgresDoor } from "@better-answers/core/store/postgres";
 
-// One budget for every pool this root opens: requests, the MCP surface, sign-in, the tick and a
-// sweep pass, whose lock holds a connection throughout.
+/**
+ * One budget for every pool this root opens: requests, the MCP surface, sign-in, the tick and a
+ * sweep pass, whose lock holds a connection throughout.
+ */
 export const POSTGRES_POOL_MAX = 10;
 
-// Absent is a store nothing configured; a refusal is one configured that would not open, said
-// as its operator needs it.
+/**
+ * Absent is a store nothing configured; a refusal is one configured that would not open, said
+ * as its operator needs it.
+ */
 export type DoorTold<T> = Result<T, string> | undefined;
 
 export type Doors = {
@@ -68,5 +72,6 @@ export const closeDoors = async (doors: Doors): Promise<void> => {
   await doors.postgres.pool.end();
 };
 
+/** `absent` is the refusal said when nothing configured the store. */
 export const doorTold = <T>(told: DoorTold<T>, absent: string): Result<T, string> =>
   told === undefined ? err(absent) : told;

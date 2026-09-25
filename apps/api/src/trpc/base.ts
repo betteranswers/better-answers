@@ -11,6 +11,7 @@ import {
   type Malformed,
   type RefusalClass,
   type Result,
+  type UserPrincipal,
 } from "@better-answers/core/kernel";
 import {
   consumeIngress,
@@ -18,6 +19,7 @@ import {
   withOperator,
   withPrincipal,
   type CounterRule,
+  type Tx,
 } from "@better-answers/core/store/postgres";
 
 import { sessionClaims, type SessionReader } from "../auth/verify.ts";
@@ -32,7 +34,7 @@ type TrpcContext = {
   readonly log: Logger;
 };
 
-// Spelled here because tRPC exports the Standard Schema type only from a path it marks internal.
+/** Spelled here because tRPC exports the Standard Schema type only from a path it marks internal. */
 type StandardParser<Input, Output> = {
   readonly "~standard": {
     readonly version: 1;
@@ -43,8 +45,10 @@ type StandardParser<Input, Output> = {
   };
 };
 
-// A refusal rides through as the input too, so a malformed input crosses, and is logged, where
-// every other refusal is.
+/**
+ * A refusal rides through as the input too, so a malformed input crosses, and is logged, where
+ * every other refusal is.
+ */
 export const parsedBy = <Schema extends z.ZodType>(
   schema: Schema,
 ): StandardParser<z.input<Schema>, Result<z.output<Schema>, Malformed>> => ({
@@ -61,7 +65,7 @@ export const given = <Input, Value, Refused>(
 ): Promise<Result<Value, Refused | Malformed>> =>
   parsed.ok ? run(parsed.value) : Promise.resolve(err(parsed.error));
 
-// The seven classes sort a word by what its caller can do, which is why each falls on one status.
+/** The seven classes sort a word by what its caller can do, which is why each falls on one status. */
 const CODE_OF_CLASS = {
   unauthenticated: "UNAUTHORIZED",
   forbidden: "FORBIDDEN",
@@ -87,13 +91,15 @@ const failed = (log: Logger, act: string, cause: Error): TRPCError => {
   return new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `${act} failed`, cause });
 };
 
+/**
+ * Throws a TRPCError for a refusal or failure. A rejection is caught here, not by tRPC, so it is
+ * logged once.
+ */
 export const crossing = async <Value>(
   ctx: { readonly log: Logger },
   act: string,
   running: Promise<Result<Value, RefusalAnswer | Error>>,
 ): Promise<Value> => {
-  // A rejection is caught here, not by the protocol's own handler, so that every failure is
-  // logged once and in one place.
   const ran = await attempt(() => running);
   const answered = ran.ok ? ran.value : ran;
 
@@ -101,6 +107,37 @@ export const crossing = async <Value>(
   if (answered.error instanceof Error) throw failed(ctx.log, act, answered.error);
   throw refused(ctx.log, act, answered.error);
 };
+
+type InTheTransaction = {
+  readonly log: Logger;
+  readonly principal: UserPrincipal;
+  readonly tx: Tx;
+};
+
+/**
+ * Answers a procedure with one act, as the resolved member in its transaction. The act's function
+ * name labels its logs; never pass an anonymous one.
+ */
+export const answeredBy =
+  <Input, Value>(
+    act: (
+      principal: UserPrincipal,
+      tx: Tx,
+      input: Input,
+    ) => Promise<Result<Value, RefusalAnswer | Error>>,
+  ) =>
+  ({
+    ctx,
+    input,
+  }: {
+    readonly ctx: InTheTransaction;
+    readonly input: Result<Input, Malformed>;
+  }): Promise<Value> =>
+    crossing(
+      ctx,
+      act.name,
+      given(input, (asked) => act(ctx.principal, ctx.tx, asked)),
+    );
 
 /** A ceiling's answer carries this as its cause, so the wire can say when to ask again. */
 export class CeilingMet extends Error {
@@ -192,8 +229,10 @@ export const queryProcedure = inTheResolversTransaction(withPrincipal);
 
 export const mutationProcedure = inTheResolversTransaction(withHeldPrincipal);
 
-// A Principal outlives the transaction that resolved it only here; never the request, and the
-// act's own door re-judges it.
+/**
+ * A Principal outlives the transaction that resolved it only here; never the request, and the
+ * act's own door re-judges it.
+ */
 export const ownTransactionProcedure = trpc.procedure.use(async ({ ctx, next }) => {
   const claims = await claimsOf(ctx);
 
@@ -206,8 +245,10 @@ export const ownTransactionProcedure = trpc.procedure.use(async ({ ctx, next }) 
   return next({ ctx: { principal: resolved.value.value, doors: ctx.doors } });
 });
 
-// An act on the person themselves needs no workspace; the person is the session's, never a
-// value the request names.
+/**
+ * An act on the person themselves needs no workspace; the person is the session's, never a
+ * value the request names.
+ */
 export const personProcedure = trpc.procedure.use(async ({ ctx, next }) => {
   const session = await sessionOf(ctx);
   return next({ ctx: { personId: session.user.id, doors: ctx.doors } });

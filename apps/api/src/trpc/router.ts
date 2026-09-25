@@ -26,6 +26,7 @@ import {
 import { readMembership } from "@better-answers/core/workspaces";
 
 import {
+  answeredBy,
   crossing,
   given,
   mutationProcedure,
@@ -66,38 +67,14 @@ export const appRouter = router({
         }),
       ),
     ),
-    findings: queryProcedure.input(parsedBy(findingsOfInput)).query(({ ctx, input }) =>
-      crossing(
-        ctx,
-        findingsOf.name,
-        given(input, (asked) => findingsOf(ctx.principal, ctx.tx, asked)),
-      ),
-    ),
-    keepInText: mutationProcedure.input(parsedBy(keepInTextInput)).mutation(({ ctx, input }) =>
-      crossing(
-        ctx,
-        keepInText.name,
-        given(input, (asked) => keepInText(ctx.principal, ctx.tx, asked)),
-      ),
-    ),
+    findings: queryProcedure.input(parsedBy(findingsOfInput)).query(answeredBy(findingsOf)),
+    keepInText: mutationProcedure.input(parsedBy(keepInTextInput)).mutation(answeredBy(keepInText)),
     narrowDocuments: mutationProcedure
       .input(parsedBy(narrowDocumentsInput))
-      .mutation(({ ctx, input }) =>
-        crossing(
-          ctx,
-          narrowDocuments.name,
-          given(input, (asked) => narrowDocuments(ctx.principal, ctx.tx, asked)),
-        ),
-      ),
+      .mutation(answeredBy(narrowDocuments)),
     dismissAsNotSpecialCategory: mutationProcedure
       .input(parsedBy(dismissAsNotSpecialCategoryInput))
-      .mutation(({ ctx, input }) =>
-        crossing(
-          ctx,
-          dismissAsNotSpecialCategory.name,
-          given(input, (asked) => dismissAsNotSpecialCategory(ctx.principal, ctx.tx, asked)),
-        ),
-      ),
+      .mutation(answeredBy(dismissAsNotSpecialCategory)),
     publish: mutationProcedure.input(parsedBy(publishBindingInput)).mutation(({ ctx, input }) =>
       crossing(
         ctx,
@@ -107,36 +84,14 @@ export const appRouter = router({
         ),
       ),
     ),
-    narrow: mutationProcedure.input(parsedBy(narrowBindingInput)).mutation(({ ctx, input }) =>
-      crossing(
-        ctx,
-        narrowBinding.name,
-        given(input, (asked) => narrowBinding(ctx.principal, ctx.tx, asked)),
-      ),
-    ),
-    widen: mutationProcedure.input(parsedBy(widenBindingInput)).mutation(({ ctx, input }) =>
-      crossing(
-        ctx,
-        widenBinding.name,
-        given(input, (asked) => widenBinding(ctx.principal, ctx.tx, asked)),
-      ),
-    ),
-    preview: queryProcedure.input(parsedBy(previewChunksInput)).query(({ ctx, input }) =>
-      crossing(
-        ctx,
-        previewChunks.name,
-        given(input, (asked) => previewChunks(ctx.principal, ctx.tx, asked)),
-      ),
-    ),
+    narrow: mutationProcedure
+      .input(parsedBy(narrowBindingInput))
+      .mutation(answeredBy(narrowBinding)),
+    widen: mutationProcedure.input(parsedBy(widenBindingInput)).mutation(answeredBy(widenBinding)),
+    preview: queryProcedure.input(parsedBy(previewChunksInput)).query(answeredBy(previewChunks)),
   }),
   runs: router({
-    ofSubject: queryProcedure.input(parsedBy(runsOfSubjectInput)).query(({ ctx, input }) =>
-      crossing(
-        ctx,
-        runsOfSubject.name,
-        given(input, (asked) => runsOfSubject(ctx.principal, ctx.tx, asked)),
-      ),
-    ),
+    ofSubject: queryProcedure.input(parsedBy(runsOfSubjectInput)).query(answeredBy(runsOfSubject)),
   }),
 });
 

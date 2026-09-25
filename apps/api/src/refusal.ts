@@ -24,7 +24,7 @@ const REFUSALS = {
 
 export type RefusalWord = keyof typeof REFUSALS;
 
-// A malformed input is the kernel parse's own answer, which says which field and never the value.
+/** A malformed input is the kernel parse's own answer, which says which field and never the value. */
 export type RefusalAnswer = RefusalWord | Malformed;
 
 export type Refusal = {
@@ -47,6 +47,7 @@ export const refusalLogged = (refusal: Refusal) => ({
   class: refusal.class,
 });
 
+/** Empty without fields; otherwise a sentence with its leading space, to append to a message. */
 export const fieldsSaid = (refusal: Refusal): string =>
   refusal.fields === undefined
     ? ""
@@ -54,8 +55,10 @@ export const fieldsSaid = (refusal: Refusal): string =>
         .map(([path, issue]) => `${path} ${issue}`)
         .join(", ")}.`;
 
-// The refusal rides the protocol error's cause, the one field handed back untouched; a message
-// alone would lose a malformed input's fields.
+/**
+ * The refusal rides the protocol error's cause, the one field handed back untouched; a message
+ * alone would lose a malformed input's fields.
+ */
 export class RefusedError extends Error {
   readonly refusal: Refusal;
 

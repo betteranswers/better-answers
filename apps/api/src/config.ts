@@ -79,7 +79,7 @@ const objectStoreSchema = z.object({
   S3_SECRET_KEY: z.string().min(1),
 });
 
-// fetch refuses a URL with credentials in an error that quotes it whole, and that error is logged.
+/** fetch refuses a URL with credentials in an error that quotes it whole, and that error is logged. */
 const deadManPingUrl = z
   .url({ protocol: /^https?$/, abort: true })
   .refine((value) => {

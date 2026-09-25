@@ -11,8 +11,10 @@ import { reasonOf } from "./ops/index.ts";
 
 export const SWEEP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
-// Soon after a start, not a day after: releases more often than daily would restart the wait
-// before any pass ran.
+/**
+ * Soon after a start, not a day after: releases more often than daily would restart the wait
+ * before any pass ran.
+ */
 export const SWEEP_FIRST_PASS_MS = 10 * 60 * 1000;
 
 export type SweepsDependencies = {
@@ -41,7 +43,7 @@ const refusalsOf = (pass: SweepPass) =>
       : [{ workspace_id: workspaceId, sweep: "graph", reason: reasonOf(graph.error) }]),
   ]);
 
-// Counts, never a workspace, a key or an error.
+/** Counts, never a workspace, a key or an error. */
 const sizesOf = (pass: SweepPass): string => {
   const { workspaces, refused, found, removed, generations } = pass.totals;
   return `workspaces=${workspaces} refused=${refused} upload_sweep=${pass.uploadSweep} found=${found} removed=${removed} generations=${generations}`;

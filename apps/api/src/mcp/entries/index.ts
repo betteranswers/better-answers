@@ -11,6 +11,7 @@ import {
   renderFeedback,
   renderFind,
   renderOpen,
+  type FeedbackReason,
 } from "@better-answers/core/answering";
 import { parse } from "@better-answers/core/kernel";
 
@@ -172,16 +173,28 @@ const openEntry = defineEntry({
   render: renderOpen,
 });
 
+const FLAG_REASONS = [
+  "wrong",
+  "out-of-date",
+  "incomplete",
+  "should-not-have-shown",
+] as const satisfies readonly FeedbackReason[];
+
+const feedbackIri = z.string().min(1).describe("The concept or answer the feedback is about.");
+
+const feedbackDetail = z
+  .string()
+  .max(2000)
+  .optional()
+  .describe("What was wrong, in the person's words.");
+
 const feedbackInput = z.discriminatedUnion("verdict", [
+  z.object({ iri: feedbackIri, verdict: z.literal("helpful") }),
   z.object({
-    iri: z.string().min(1).describe("The concept or answer the feedback is about."),
-    verdict: z.literal("helpful"),
-  }),
-  z.object({
-    iri: z.string().min(1).describe("The concept or answer the feedback is about."),
+    iri: feedbackIri,
     verdict: z.literal("flag"),
-    reason: z.enum(["wrong", "out-of-date", "incomplete", "should-not-have-shown"]),
-    detail: z.string().max(2000).optional().describe("What was wrong, in the person's words."),
+    reason: z.enum(FLAG_REASONS),
+    detail: feedbackDetail,
   }),
 ]);
 
@@ -193,13 +206,10 @@ const giveFeedbackEntry = defineEntry({
   scopes: ["knowledge:read", "feedback:write"],
   // A flag with no reason is the act's own refusal, not a rule the flat wire shape could carry.
   input: z.object({
-    iri: z.string().min(1).describe("The concept or answer the feedback is about."),
+    iri: feedbackIri,
     verdict: z.enum(["helpful", "flag"]).describe("Helpful, or a flag with a reason."),
-    reason: z
-      .enum(["wrong", "out-of-date", "incomplete", "should-not-have-shown"])
-      .optional()
-      .describe("Required with a flag."),
-    detail: z.string().max(2000).optional().describe("What was wrong, in the person's words."),
+    reason: z.enum(FLAG_REASONS).optional().describe("Required with a flag."),
+    detail: feedbackDetail,
   }),
   output: z.object({
     outcome: z.literal("received"),

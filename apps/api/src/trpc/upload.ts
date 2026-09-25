@@ -15,8 +15,10 @@ import type { PostgresDoor } from "@better-answers/core/store/postgres";
 
 import { doorTold, type Doors } from "../doors.ts";
 
-// Outside the router's types: the web's wrapper is kept in step by hand, and the api harness
-// holds the pair.
+/**
+ * Outside the router's types: the web's wrapper is kept in step by hand, and the api harness
+ * holds the pair.
+ */
 export const UPLOAD_DESCRIPTOR_HEADERS = {
   bindingId: "x-upload-binding-id",
   name: "x-upload-name",
@@ -28,7 +30,7 @@ export const UPLOAD_DESCRIPTOR_HEADERS = {
   audienceGroups: "x-upload-audience-groups",
 } as const satisfies Record<keyof z.input<typeof bindUploadFields>, string>;
 
-// A header carries bytes and a name may not be one, so each value is its JSON, percent-encoded.
+/** A header carries bytes and a name may not be one, so each value is its JSON, percent-encoded. */
 const decoded = (sent: string): Result<z.JSONType, IssueWord> => {
   try {
     const value: z.JSONType = JSON.parse(decodeURIComponent(sent));
@@ -39,6 +41,7 @@ const decoded = (sent: string): Result<z.JSONType, IssueWord> => {
   }
 };
 
+/** An absent header is an absent field; one never encoded joins the schema's own refusals. */
 export const descriptorOf = (headers: Headers): Result<BindUploadFields, Malformed> => {
   const gathered: Record<string, z.JSONType> = {};
   const unreadable: Record<string, IssueWord> = {};
