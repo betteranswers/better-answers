@@ -1,10 +1,10 @@
 import { testData } from "@better-answers/schema/testing";
 import { describe, expect, it } from "vitest";
 
-import type { Role } from "../src/kernel/index.ts";
+import type { Result, Role } from "../src/kernel/index.ts";
 import { listMembers } from "../src/members/index.ts";
 import { provisionedWorkspace, type ProvisionedWorkspace } from "./platform.ts";
-import { postgresForSuite, readingAs } from "./suite-postgres.ts";
+import { abortTheTransaction, postgresForSuite, readingAs } from "./suite-postgres.ts";
 
 const db = postgresForSuite();
 
@@ -116,6 +116,21 @@ describe("the member list", () => {
     const { person } = await joining(workspace, "Una Member", role);
 
     expect(await listedAs(workspace, person.id)).toEqual({ ok: false, error: "role-forbids" });
+  });
+
+  it("answers the store's own failure rather than an empty list", async () => {
+    const workspace = await provisionedWorkspace(db(), "Unlisted");
+    const admin = { workspaceId: workspace.workspaceId, userId: workspace.adminUserId };
+    let listed: Result<unknown, unknown> | undefined;
+
+    await expect(
+      readingAs(db().runtimePool, admin, async (principal, tx) => {
+        await abortTheTransaction(tx);
+        listed = await listMembers(principal, tx);
+      }),
+    ).rejects.toThrow(/did not commit/);
+
+    expect(listed).toEqual({ ok: false, error: expect.any(Error) });
   });
 
   it("never lists a member of another workspace", async () => {
