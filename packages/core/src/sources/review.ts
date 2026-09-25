@@ -12,7 +12,7 @@ import {
 import { z } from "zod";
 
 import { narrower, type Sensitivity } from "../access/index.ts";
-import { act, declareActs, record } from "../audit/index.ts";
+import { act, declareActs, record, type DetailOf, type LedgerAct } from "../audit/index.ts";
 import { openingACascadeOverHeldGroups } from "../concepts/index.ts";
 import {
   actorIdOf,
@@ -20,6 +20,7 @@ import {
   err,
   ok,
   ulid,
+  type AdminUserPrincipal,
   type Result,
   type UserPrincipal,
 } from "../kernel/index.ts";
@@ -291,7 +292,7 @@ type SpansRefusal<GroupRefusal> =
   | SourceRefusal<"role-forbids" | "no-such-binding" | "no-such-finding">
   | Error;
 
-// Every group is judged before the first read, so a refused one lands nothing beside it.
+/** Every group is judged before the first read, so a refused one lands nothing beside it. */
 const spansCommanded = async <GroupRefusal extends string>(
   principal: UserPrincipal,
   tx: Tx,
@@ -339,13 +340,20 @@ const indexRunQueued = async (
 
 const KEPT_IN_TEXT = "kept-in-text" satisfies (typeof FINDING_REVIEW_STATES)[number];
 
-// A later keep does not revise what a dismissal said the span is; the keep has the restore
-// columns.
+/**
+ * A later keep does not revise what a dismissal said the span is; the keep has the restore
+ * columns.
+ */
 const KEPT_IN_TEXT_REVIEW = `UPDATE finding
         SET review_state = $3, reviewed_by = restored_by,
             reviewed_at = restored_at, review_reason = restore_reason
       WHERE workspace_id = $1 AND id = ANY($2::text[]) AND review_state <> $4`;
 
+/**
+ * Restores each span the document's last redaction raised in the groups, marks those not
+ * dismissed as kept in text, and queues an index run. A group outside the always tier refuses the
+ * whole command.
+ */
 export const keepInText = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -359,7 +367,7 @@ export const keepInText = async (
   const { admin, workspaceId, bindingId } = acting;
 
   const named = spans.map((span) => span.id);
-  // One ledger row per span, so the batch counts spans, not the documents the answer names.
+  /** One ledger row per span, so the batch counts spans, not the documents the answer names. */
   const batchId = named.length > 1 ? ulid() : undefined;
   for (const findingId of named) {
     const restored = await restoreFinding(admin, tx, {
@@ -390,6 +398,26 @@ const REVIEW_ACTS = declareActs("sources", {
     findingCount: "count",
   }),
 });
+
+const recordEachDocument = async <A extends LedgerAct>(
+  admin: AdminUserPrincipal,
+  tx: Tx,
+  ledgerAct: A,
+  documentIds: readonly string[],
+  detailOf: (documentId: string) => DetailOf<A["detail"]>,
+): Promise<string | undefined> => {
+  const batchId = documentIds.length > 1 ? ulid() : undefined;
+  for (const documentId of documentIds) {
+    await record(admin, tx, {
+      id: ulid(),
+      act: ledgerAct,
+      subjectId: documentId,
+      detail: detailOf(documentId),
+      batchId,
+    });
+  }
+  return batchId;
+};
 
 export const narrowDocumentsInput = z.object({
   bindingId: BINDING_ID,
@@ -436,6 +464,38 @@ const NARROWED_REVIEW = `UPDATE finding f
         AND d.workspace_id = f.workspace_id AND d.id = f.document_id
         AND ${raisedByTheLastRun("f", "d")}`;
 
+const documentsToNarrow = async (
+  acting: ActingOnBinding,
+  tx: Tx,
+  named: readonly string[],
+  next: Sensitivity,
+): Promise<Result<readonly DocumentRow[], NarrowDocumentsRefusal>> => {
+  const binding = await bindingNamed<{ readonly sensitivity: string }>(acting, tx, {
+    columns: "sensitivity",
+    lock: "for-update",
+  });
+  if (!binding.ok) return err(binding.error);
+
+  const documents = await attempt(() =>
+    tx.query<DocumentRow>(DOCUMENTS_UNDER, [acting.workspaceId, acting.bindingId, named]),
+  );
+  if (!documents.ok) return err(documents.error);
+  const rows = documents.value.rows;
+  if (rows.length !== named.length) return err("no-such-document");
+
+  for (const row of rows) {
+    const effective = effectiveClass(row.sensitivity, binding.value.sensitivity);
+    if (effective === undefined) return err(BROKEN_CLASS);
+    if (narrower(next, effective) !== next) return err("widening-refused");
+  }
+  return ok(rows);
+};
+
+/**
+ * Sets each named document's class, marks the groups' unreviewed findings narrowed, and recomputes
+ * the visibility of what those documents source. A class wider than one document's effective
+ * class, the narrower of its own and its binding's, refuses the whole command.
+ */
 export const narrowDocuments = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -452,24 +512,8 @@ export const narrowDocuments = async (
   const opened = await openingACascadeOverHeldGroups(admin, tx, []);
   if (!opened.ok) return err(opened.error);
 
-  const binding = await bindingNamed<{ readonly sensitivity: string }>(acting.value, tx, {
-    columns: "sensitivity",
-    lock: "for-update",
-  });
-  if (!binding.ok) return err(binding.error);
-
-  const documents = await attempt(() =>
-    tx.query<DocumentRow>(DOCUMENTS_UNDER, [workspaceId, bindingId, named]),
-  );
+  const documents = await documentsToNarrow(acting.value, tx, named, next);
   if (!documents.ok) return err(documents.error);
-  const rows = documents.value.rows;
-  if (rows.length !== named.length) return err("no-such-document");
-
-  for (const row of rows) {
-    const effective = effectiveClass(row.sensitivity, binding.value.sensitivity);
-    if (effective === undefined) return err(BROKEN_CLASS);
-    if (narrower(next, effective) !== next) return err("widening-refused");
-  }
 
   const narrowed = await attempt(() =>
     tx.query(
@@ -491,17 +535,14 @@ export const narrowDocuments = async (
   );
   if (!reviewed.ok) return err(reviewed.error);
 
-  const documentIds = rows.map((row) => row.id);
-  const batchId = documentIds.length > 1 ? ulid() : undefined;
-  for (const documentId of documentIds) {
-    await record(admin, tx, {
-      id: ulid(),
-      act: REVIEW_ACTS.narrowed,
-      subjectId: documentId,
-      detail: { documentId, bindingId, sensitivity: next },
-      batchId,
-    });
-  }
+  const documentIds = documents.value.map((row) => row.id);
+  const batchId = await recordEachDocument(
+    admin,
+    tx,
+    REVIEW_ACTS.narrowed,
+    documentIds,
+    (documentId) => ({ documentId, bindingId, sensitivity: next }),
+  );
 
   const cascaded = await attempt(() => cascadeOverEvidence(admin, tx, { bindingId, documentIds }));
   if (!cascaded.ok) return err(cascaded.error);
@@ -537,6 +578,11 @@ const DISMISSED_REVIEW = `UPDATE finding
         SET review_state = $3, reviewed_by = $4, reviewed_at = now(), review_reason = $5
       WHERE workspace_id = $1 AND id = ANY($2::text[])`;
 
+/**
+ * Dismisses each finding the document's last redaction raised in the groups, with a ledger row per
+ * document, and queues an index run. A group outside the special category refuses the whole
+ * command.
+ */
 export const dismissAsNotSpecialCategory = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -561,20 +607,17 @@ export const dismissAsNotSpecialCategory = async (
   if (!reviewed.ok) return err(reviewed.error);
 
   const documentIds = documentsHolding(spans);
-  const batchId = documentIds.length > 1 ? ulid() : undefined;
-  for (const documentId of documentIds) {
-    await record(admin, tx, {
-      id: ulid(),
-      act: REVIEW_ACTS.dismissed,
-      subjectId: documentId,
-      detail: {
-        documentId,
-        bindingId,
-        findingCount: spans.filter((span) => span.documentId === documentId).length,
-      },
-      batchId,
-    });
-  }
+  const batchId = await recordEachDocument(
+    admin,
+    tx,
+    REVIEW_ACTS.dismissed,
+    documentIds,
+    (documentId) => ({
+      documentId,
+      bindingId,
+      findingCount: spans.filter((span) => span.documentId === documentId).length,
+    }),
+  );
 
   const jobId = await indexRunQueued(acting, tx, "dismissed");
   return ok({ bindingId, documentIds, batchId, jobId });

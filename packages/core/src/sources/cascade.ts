@@ -3,6 +3,10 @@ import { recomputeCompositionsIncluding } from "../guides/index.ts";
 import type { AdminUserPrincipal } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
+/**
+ * Returns every indexed concept citing the documents, each recomputed, and the compositions
+ * recomputed over them. Without `documentIds`, every document in the binding counts.
+ */
 export const cascadeOverEvidence = async (
   admin: AdminUserPrincipal,
   tx: Tx,
