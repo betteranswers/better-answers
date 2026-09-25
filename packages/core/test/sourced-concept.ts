@@ -16,6 +16,7 @@ import { inputOf } from "./suite-input.ts";
 import { answered, readingAs } from "./suite-postgres.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
+/** A suite over bundles whose `reading` works as a principal under row-level security. */
 export const visibilitySuite = () => {
   const { db, arrange } = suiteWithBundles();
   return {
@@ -28,6 +29,7 @@ export const visibilitySuite = () => {
   };
 };
 
+/** Seeds rows straight into the tables on the privileged pool; no act runs. */
 export const seededBy = async <T>(
   db: MigratedPostgres,
   work: (seed: TestData) => Promise<T>,
@@ -52,6 +54,7 @@ export type Sourced = {
   readonly documentId: string;
 };
 
+/** A binding of one document; unset `shape` fields default to published, Internal, everyone. */
 export const bindingHolding = (
   db: MigratedPostgres,
   workspaceId: string,
@@ -70,6 +73,7 @@ export const bindingHolding = (
 const INDEXED_AT = new Date("2026-09-24T09:00:00.000Z");
 const PUBLISHED_AT = new Date("2026-09-24T10:00:00.000Z");
 
+/** Seeds a finished index run, then publishes as `admin`; the act's answer comes back unchecked. */
 export const publishedOnceIndexed = async (
   db: MigratedPostgres,
   admin: UserPrincipal,
@@ -114,6 +118,7 @@ export const bindingForGroups = (
 ): Promise<Sourced> =>
   bindingHolding(db, workspaceId, { sensitivity, audience: "groups", audienceGroups: groups });
 
+/** `sensitivity` is the document's own class; `null` leaves it at its binding's. */
 export const documentUnder = (
   db: MigratedPostgres,
   workspaceId: string,
@@ -137,6 +142,7 @@ export type ChunkShape = {
   readonly charEnd: number;
 };
 
+/** The row's locator holds the span alone, without the document id. */
 export const chunkUnder = (
   db: MigratedPostgres,
   workspaceId: string,
@@ -159,6 +165,7 @@ export const chunkUnder = (
     return row.id;
   });
 
+/** Each chunk row's `xmin`, in id order: it moves whenever the row is rewritten. */
 export const chunkVersionsOf = async (
   db: MigratedPostgres,
   workspaceId: string,
@@ -172,6 +179,7 @@ export const chunkVersionsOf = async (
   return read.rows.map((row) => row.version);
 };
 
+/** Documents under a Restricted and an Internal binding, and a Restricted one under Internal. */
 export const restrictedAndInternal = async (
   db: MigratedPostgres,
   workspaceId: string,
@@ -215,6 +223,7 @@ export type SourcedConcept = ConceptWritten & {
 
 let sequence = 0;
 
+/** Writes a stable Note citing each document once, through the act; throws on a refusal. */
 export const conceptCiting = async (
   scenario: Scenario,
   writer: UserPrincipal,
@@ -247,6 +256,7 @@ export const conceptCiting = async (
   return { ...written.value, path, mergeKey, title };
 };
 
+/** Makes a group of `people` and returns its id; throws when the create or an add is refused. */
 export const groupNamed = async (
   db: MigratedPostgres,
   scenario: Scenario,
@@ -268,6 +278,7 @@ export const groupNamed = async (
     }),
   );
 
+/** Makes a group of `people`, and a concept citing the one document of a binding for it alone. */
 export const conceptForGroup = async (
   db: MigratedPostgres,
   scenario: Scenario,

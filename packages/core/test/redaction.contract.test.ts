@@ -47,11 +47,11 @@ const fixtureSchema = z.object({
 const fixture = contractFixture("redaction", fixtureSchema);
 
 describe("the redaction agreement's tiers", () => {
-  it("names the three tiers this tier writes on a finding, and no fourth", () => {
+  it("names the three tiers a finding carries, and no fourth", () => {
     expect(fixture.tiers.map((tier) => tier.tier)).toEqual([...REDACTION_TIERS]);
   });
 
-  it("names a tier this tier's boundary takes on a finding row, for every tier it names", () => {
+  it("names tiers this tier's boundary takes on a finding row", () => {
     const onARow = boundarySchemas.finding.select.shape.tier;
 
     for (const { tier } of fixture.tiers) {
@@ -59,7 +59,7 @@ describe("the redaction agreement's tiers", () => {
     }
   });
 
-  it("switches every tier but the always set, which is the one no binding may switch", () => {
+  it("lets a binding switch every tier but the always set", () => {
     expect(fixture.tiers.filter((tier) => !tier.switchable).map((tier) => tier.tier)).toEqual([
       REDACTION_ALWAYS_TIER,
     ]);
@@ -72,7 +72,7 @@ describe("the redaction agreement's tiers", () => {
     ).toEqual([...RULES_IN_FORCE_KEYS]);
   });
 
-  it("writes a binding's rules in force in keys this tier's boundary takes, and is refused one it does not", () => {
+  it("writes rules in force the boundary takes; always is refused", () => {
     const switchable = fixture.tiers.flatMap((tier) =>
       tier.binding_key === null ? [] : [tier.binding_key],
     );
@@ -97,7 +97,7 @@ describe("the redaction agreement's tiers", () => {
 });
 
 describe("the redaction agreement's categories", () => {
-  it("gives every category a tier the agreement names, and names each category once", () => {
+  it("gives each category a named tier, and names it once", () => {
     const tiers = fixture.tiers.map((tier) => tier.tier);
 
     for (const { category: named, tier } of fixture.categories) {
@@ -108,7 +108,7 @@ describe("the redaction agreement's categories", () => {
     );
   });
 
-  it("withholds the always set under one neutral word, and never uses that word elsewhere", () => {
+  it("gives the always set, and only it, one neutral placeholder", () => {
     for (const { category: named, tier, placeholder } of fixture.categories) {
       expect({ named, placeholder }).toEqual({
         named,
@@ -121,7 +121,7 @@ describe("the redaction agreement's categories", () => {
     }
   });
 
-  it("writes every placeholder as a bracketed word, so a reader never reads one as the text", () => {
+  it("writes every placeholder as a bracketed word", () => {
     const shape = new RegExp(fixture.placeholder_shape);
 
     expect(shape.test(fixture.always_placeholder)).toBe(true);
@@ -130,7 +130,7 @@ describe("the redaction agreement's categories", () => {
     }
   });
 
-  it("narrows a document to Restricted for a special-category finding and for no other", () => {
+  it("narrows to Restricted for a special-category finding and no other", () => {
     expect(SENSITIVITIES).toContain(fixture.narrows_to);
     expect(
       boundarySchemas.sourceBinding.select.shape.sensitivity.safeParse(fixture.narrows_to).success,
@@ -146,7 +146,7 @@ describe("the redaction agreement's categories", () => {
 });
 
 describe("the category list the api declares and the agreement's own", () => {
-  it("declares every category the agreement names, at the tier and the flag the agreement gives it", () => {
+  it("declares each named category at the agreement's tier and flag", () => {
     for (const { category, tier, special_category } of fixture.categories) {
       const declared = REDACTION_CATEGORIES.find((entry) => entry.category === category);
 
@@ -157,7 +157,7 @@ describe("the category list the api declares and the agreement's own", () => {
     }
   });
 
-  it("declares no category the agreement does not name, so the two lists are one list", () => {
+  it("declares no category the agreement does not name", () => {
     expect(REDACTION_CATEGORIES.map((entry) => entry.category).toSorted()).toEqual(
       fixture.categories.map((entry) => entry.category).toSorted(),
     );
@@ -165,7 +165,7 @@ describe("the category list the api declares and the agreement's own", () => {
 });
 
 describe("the redaction agreement's version string", () => {
-  it("parses every version string the agreement says both tiers must read", () => {
+  it("parses every must-parse string and no must-not-parse one", () => {
     const pattern = new RegExp(fixture.version_string.pattern);
 
     for (const { value, why } of fixture.version_string.must_parse) {
@@ -176,7 +176,7 @@ describe("the redaction agreement's version string", () => {
     }
   });
 
-  it("is the two columns a finding carries, joined by the separator the agreement names", () => {
+  it("joins a finding's two columns with the agreement's separator", () => {
     const row = { ruleVersion: "3", detectorPin: "presidio-2.2.364+gliner-multi-pii-v1" };
     const parsed = boundarySchemas.finding.insert
       .pick({ ruleVersion: true, detectorPin: true })

@@ -4,6 +4,7 @@ import { z } from "zod";
 
 const contractsDir = path.resolve(import.meta.dirname, "../../../contracts");
 
+/** Parses `contracts/<agreement>/<file>` with `schema`, throwing when the file no longer fits. */
 export const contractFixture = <Schema extends z.ZodType>(
   agreement: string,
   schema: Schema,
