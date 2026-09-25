@@ -62,7 +62,7 @@ const rowById = async (id: string) => {
 };
 
 describe("the declared-acts walk", () => {
-  it("holds every slice's acts to the four families, the prefix checked both ways", async () => {
+  it("holds every slice's acts to the four families by prefix", async () => {
     await loadEveryEntryPoint();
     const walked = declarations();
     expect(walked.length).toBeGreaterThan(0);
@@ -80,7 +80,7 @@ describe("the declared-acts walk", () => {
   });
 
   it.skipIf(sourceTreeIsInstrumented())(
-    "reaches every act declared in the tree, and every act it reached is declared in the tree",
+    "reaches every act declared in the tree, and no other",
     async () => {
       await loadEveryEntryPoint();
       const registered = new Set<string>(declarations().flatMap((declaration) => declaration.acts));
@@ -95,14 +95,14 @@ describe("the declared-acts walk", () => {
     },
   );
 
-  it("answers the act it was handed — its name and the shape of the detail every row carries", () => {
+  it("answers the act's name and its rows' detail shape", () => {
     expect(act("platform.probe.shaped", { adminUserId: "id", confirmed: "flag" })).toEqual({
       name: "platform.probe.shaped",
       detail: { adminUserId: "id", confirmed: "flag" },
     });
   });
 
-  it("registers exactly the acts it was given, and hands them back to the slice", () => {
+  it("registers exactly the acts given and hands them back", () => {
     const registered = declareActs("platform", {
       accepted: act("platform.probe.accepted", { confirmed: "flag" }),
     });
@@ -116,14 +116,14 @@ describe("the declared-acts walk", () => {
     });
   });
 
-  it("refuses an act declared under a family that is not its first word", () => {
+  it("refuses an act declared under a family not its prefix", () => {
     expect(() =>
       // @ts-expect-error — the runtime half of what the type already refuses.
       declareActs("platform", { added: act("people.member.added", {}) }),
     ).toThrow(/not a platform act/);
   });
 
-  it("refuses a fifth family, in the type and at the row", () => {
+  it("refuses a fifth family, in the type and at runtime", () => {
     expectTypeOf<"billing.invoice.sent">().not.toExtend<ActName>();
     expect(() =>
       // @ts-expect-error — the family set is the one closed list.
@@ -131,7 +131,7 @@ describe("the declared-acts walk", () => {
     ).toThrow(/not a billing act/);
   });
 
-  it("refuses an act whose subject names a record that is never a ledger row", () => {
+  it("refuses an act whose subject is never a ledger row", () => {
     const neverASubject = [
       "run",
       "answer_audit",
@@ -162,7 +162,7 @@ describe("the declared-acts walk", () => {
     );
   });
 
-  it("refuses an act declared twice, so an act belongs to one slice", () => {
+  it("refuses an act declared twice, so each has one slice", () => {
     declareActs("platform", { first: act("platform.probe.twice", {}) });
     expect(() => declareActs("platform", { again: act("platform.probe.twice", {}) })).toThrow(
       /declared twice/,
@@ -170,7 +170,7 @@ describe("the declared-acts walk", () => {
   });
 
   it.skipIf(sourceTreeIsInstrumented())(
-    "finds no door call wrapped in attempt anywhere in the tree",
+    "finds no door call wrapped in attempt anywhere in core",
     () => {
       const wrapped =
         /attempt\(\s*(?:async\s+)?\(\s*\)\s*=>\s*(?:\{(?:(?!with[A-Z])[^])*?)?(?:return\s+)?(?:await\s+|void\s+)?record(?:For)?\(/;
@@ -213,8 +213,8 @@ const PROBE = declareActs("platform", {
   optional: act("platform.probe.optional", { adminUserId: "id?", confirmed: "flag" }),
 });
 
-describe("the first door — record, the actor derived from the Principal", () => {
-  it("lands a row with the supplied id verbatim under a user principal, booked to the person", async () => {
+describe("the first door — record, the actor from the Principal", () => {
+  it("lands a person's row booked to them, the id verbatim", async () => {
     const { door, workspaceId, adminUserId } = await provisioned();
     const id = ulid();
 
@@ -246,7 +246,7 @@ describe("the first door — record, the actor derived from the Principal", () =
     });
   });
 
-  it("lands the platform's row in the workspace the transaction is scoped to, with its batch id", async () => {
+  it("lands the platform's batched row in the scoped workspace", async () => {
     const { door, workspaceId } = await provisioned();
     const id = ulid();
     const batchId = ulid();
@@ -270,7 +270,7 @@ describe("the first door — record, the actor derived from the Principal", () =
     });
   });
 
-  it("lands nothing for the platform outside a workspace scope — the ledger is a tenant table", async () => {
+  it("lands nothing for the platform outside a workspace scope", async () => {
     const { door } = await provisioned();
     const id = ulid();
 
@@ -287,7 +287,7 @@ describe("the first door — record, the actor derived from the Principal", () =
     expect(await rowById(id)).toBeUndefined();
   });
 
-  it("writes the person's own workspace on the row, so a transaction scoped elsewhere is refused", async () => {
+  it("writes the person's own workspace, refusing a scope elsewhere", async () => {
     const here = await provisioned();
     const there = await provisionedWorkspace(db(), "Elsewhere");
 
@@ -314,7 +314,7 @@ describe("the first door — record, the actor derived from the Principal", () =
     });
   });
 
-  it("lands a row whose optional field is given, and one the act left it out of", async () => {
+  it("lands a row with its optional field and one without", async () => {
     const { door, workspaceId, adminUserId } = await provisioned();
     const named = ulid();
     const left = ulid();
@@ -340,7 +340,7 @@ describe("the first door — record, the actor derived from the Principal", () =
     expect(await rowById(left)).toMatchObject({ detail: { confirmed: true } });
   });
 
-  it("rejects a required field the detail leaves out, and an optional one holding an email", async () => {
+  it("rejects missing fields and an email for an optional id", async () => {
     const { door, workspaceId, adminUserId } = await provisioned();
     const write = writingIn(door, workspaceId);
 
@@ -363,7 +363,7 @@ describe("the first door — record, the actor derived from the Principal", () =
     ).rejects.toThrow(/adminUserId is not an id, or absent/);
   });
 
-  it("rejects a detail that names a field the act does not, before any row exists", async () => {
+  it("rejects a detail naming a field the act does not", async () => {
     const { door, workspaceId, adminUserId } = await provisioned();
     const id = ulid();
 
@@ -381,7 +381,7 @@ describe("the first door — record, the actor derived from the Principal", () =
     expect(await rowById(id)).toBeUndefined();
   });
 
-  it("rejects an id-kind field holding an email, a detail short of a field, an act nobody declared, and an id not the minter's", async () => {
+  it("rejects email ids, missing fields, undeclared acts and unminted ids", async () => {
     const { door, workspaceId, adminUserId } = await provisioned();
     const write = writingIn(door, workspaceId);
 
@@ -428,7 +428,7 @@ describe("the first door — record, the actor derived from the Principal", () =
 });
 
 describe("the second door — recordFor, the platform naming the actor", () => {
-  it("lands a row booked to the actor named, not to the platform", async () => {
+  it("books the row to the named actor, not the platform", async () => {
     const { door, workspaceId } = await provisioned();
     const id = ulid();
 
@@ -448,7 +448,7 @@ describe("the second door — recordFor, the platform naming the actor", () => {
     expect(await rowById(id)).toMatchObject({ actor: requester, workspace_id: workspaceId });
   });
 
-  it("is not reachable from a user principal: the type refuses it, and the type is the one guard", () => {
+  it("is unreachable from a user principal, by type alone", () => {
     expectTypeOf(recordFor).parameter(0).toEqualTypeOf<PlatformPrincipal>();
     expectTypeOf<UserPrincipal>().not.toExtend<PlatformPrincipal>();
   });
@@ -466,8 +466,8 @@ const identityRowById = async (id: string) => {
   return found.rows[0];
 };
 
-describe("the identity-set ledger — an act on the identity set, through either door", () => {
-  it("lands the platform's row booked to the actor it names, in no workspace's ledger", async () => {
+describe("the identity-set ledger, reached through either door", () => {
+  it("books the platform's row to its named actor, outside workspaces", async () => {
     const door = openPostgres(db().runtimePool);
     const id = ulid();
     const personId = ulid();
@@ -495,7 +495,7 @@ describe("the identity-set ledger — an act on the identity set, through either
     expect(await rowById(id)).toBeUndefined();
   });
 
-  it("lands a person's row there from a workspace's transaction too, never in that workspace's ledger", async () => {
+  it("lands a person's row here, not in their workspace's ledger", async () => {
     const { door, workspaceId, adminUserId } = await provisioned();
     const id = ulid();
 
@@ -518,7 +518,7 @@ describe("the identity-set ledger — an act on the identity set, through either
     expect(await rowById(id)).toBeUndefined();
   });
 
-  it("holds the detail to the act's declared shape, as a workspace's ledger does", async () => {
+  it("holds the detail to the act's declared shape", async () => {
     const door = openPostgres(db().runtimePool);
     const id = ulid();
 
@@ -537,7 +537,7 @@ describe("the identity-set ledger — an act on the identity set, through either
     expect(await identityRowById(id)).toBeUndefined();
   });
 
-  it("registers an identity-set act among the declared acts, so it is one slice's and declared once", () => {
+  it("registers an identity-set act once, among the declared acts", () => {
     expect(declarations()).toContainEqual({
       family: "platform",
       acts: ["platform.probe.identity_noted"],

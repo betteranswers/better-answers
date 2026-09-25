@@ -59,13 +59,13 @@ const listAs = async (seeded: Seeded) => {
 };
 
 describe("a workspace's model routes", () => {
-  it("answers one row per purpose in the purpose order, whatever the workspace has configured", async () => {
+  it("answers one row per purpose, in purpose order", async () => {
     const seeded = await seedWorkspace(CONFIGURED_LLM_ROUTES);
 
     expect(await listAs(seeded)).toEqual(LISTED_LLM_ROUTES);
   });
 
-  it("says a workspace that has chosen nothing has chosen nothing, the embedding route included", async () => {
+  it("shows every route empty for a workspace that chose nothing", async () => {
     const seeded = await seedWorkspace([]);
 
     const listed = await listAs(seeded);
@@ -83,7 +83,7 @@ describe("a workspace's model routes", () => {
     ).toBe(true);
   });
 
-  it("reads back the retention tail a route carries, in the provider's own words", async () => {
+  it("reads back a route's retention tail in the provider's words", async () => {
     const tail = "Prompts and outputs are deleted within 30 days; no training on customer data.";
     const seeded = await seedWorkspace([
       {
@@ -99,7 +99,7 @@ describe("a workspace's model routes", () => {
     });
   });
 
-  it("says a route nobody read the provider's terms for has no tail, rather than inventing one", async () => {
+  it("answers no tail for a route whose terms nobody read", async () => {
     const seeded = await seedWorkspace([
       { purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" },
     ]);
@@ -110,7 +110,7 @@ describe("a workspace's model routes", () => {
     });
   });
 
-  it("shows a member of one workspace their own routes and never another workspace's", async () => {
+  it("shows a member their own workspace's routes, never another's", async () => {
     const first = await seedWorkspace([
       { purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" },
     ]);
@@ -131,7 +131,7 @@ describe("a workspace's model routes", () => {
     });
   });
 
-  it("is kept to one workspace by row-level security, not by the statement's predicate alone", async () => {
+  it("stays in one workspace by row-level security, not a predicate", async () => {
     const mine = await seedWorkspace([
       { purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" },
     ]);
@@ -149,7 +149,7 @@ describe("a workspace's model routes", () => {
     expect(visible).toEqual({ ok: true, value: [mine.workspaceId] });
   });
 
-  it("hands a caller a store failure to read, and the aborted transaction never commits", async () => {
+  it("hands back a store failure, and the transaction never commits", async () => {
     const seeded = await seedWorkspace([]);
     let read: Awaited<ReturnType<typeof listRoutes>> | undefined;
 

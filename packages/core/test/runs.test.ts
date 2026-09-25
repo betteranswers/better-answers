@@ -74,7 +74,7 @@ const finishedAudit = async (
 };
 
 describe("what the api puts on the worker's queue", () => {
-  it("queues a rebuild for one of the six reasons, and answers the id it queued", async () => {
+  it("queues a rebuild for a reason and answers its id", async () => {
     const scenario = await arrange();
 
     const queued = await enqueueJob(scenario.admin, scenario.postgres, {
@@ -116,7 +116,7 @@ describe("what the api puts on the worker's queue", () => {
     expect(rows.rows).toEqual([{ reason: null }]);
   });
 
-  it("queues for the platform, which names the workspace because it holds none of its own", async () => {
+  it("queues for the platform in the workspace it names", async () => {
     const scenario = await arrange();
 
     const queued = await enqueueJob(graphMaintenance, scenario.postgres, {
@@ -133,7 +133,7 @@ describe("what the api puts on the worker's queue", () => {
     expect(rows.rows).toEqual([{ id: queued.value.jobId, reason: "reconciler" }]);
   });
 
-  it("refuses a person who names another tenant's workspace, rather than quietly using their own", async () => {
+  it("refuses a person naming another tenant's workspace, queuing nothing", async () => {
     const scenario = await arrange();
     const elsewhere = await arrange();
 
@@ -149,10 +149,10 @@ describe("what the api puts on the worker's queue", () => {
     expect(rows.rowCount).toBe(0);
   });
 
-  it("refuses a rebuild with no reason and an audit that carries one, before any statement", async () => {
+  it("refuses a reasonless rebuild and an audit carrying a reason", async () => {
     const scenario = await arrange();
 
-    // @ts-expect-error a rebuild without its reason is outside the input on purpose; the refusal under test is the queue's own
+    // @ts-expect-error a rebuild without its reason is outside the input, on purpose
     const noReason = await enqueueJob(graphMaintenance, scenario.postgres, {
       workspaceId: scenario.workspaceId,
       kind: "full-rebuild",
@@ -160,7 +160,7 @@ describe("what the api puts on the worker's queue", () => {
     const spuriousReason = await enqueueJob(graphMaintenance, scenario.postgres, {
       workspaceId: scenario.workspaceId,
       kind: "nightly-audit",
-      // @ts-expect-error an audit carries no reason; the refusal under test is the queue's own
+      // @ts-expect-error an audit carries no reason, on purpose
       reason: "drill",
     });
 
@@ -170,7 +170,7 @@ describe("what the api puts on the worker's queue", () => {
     ]);
   });
 
-  it("refuses an Editor and a Viewer, because a rebuild is an act over the whole workspace", async () => {
+  it("refuses a rebuild to an Editor and a Viewer", async () => {
     const scenario = await arrange();
 
     for (const person of [scenario.editor, scenario.viewer]) {
@@ -217,8 +217,8 @@ const queuedBound = async (scenario: Scenario): Promise<string> => {
 const reasonsIn = async (workspaceId: string): Promise<readonly string[]> =>
   (await jobsIn(workspaceId)).map((row: { reason: string }) => row.reason);
 
-describe("an act that lands its rows and its job in one transaction", () => {
-  it("rolls back with the act it rode in, so nothing is queued for work that never landed", async () => {
+describe("an act landing its rows and job in one transaction", () => {
+  it("rolls back with the act it rode in, queuing nothing", async () => {
     const scenario = await arrange();
 
     const act = actOf(scenario, async (tx) => {
@@ -232,7 +232,7 @@ describe("an act that lands its rows and its job in one transaction", () => {
     expect(await jobsIn(scenario.workspaceId)).toEqual([]);
   });
 
-  it("answers the first job's id for a binding already queued, and the act it rides in still commits", async () => {
+  it("answers an already-queued binding's job id, and the act commits", async () => {
     const scenario = await arrange();
     const firstJobId = await queuedBound(scenario);
 
@@ -262,7 +262,7 @@ describe("an act that lands its rows and its job in one transaction", () => {
     ["rule-change", "wiped"],
     ["wiped", "rule-change"],
   ] as const)(
-    "takes %s onto the job already queued, and keeps it there when a later reason arrives, %s among them",
+    "takes %s onto the queued job, keeping it past %s",
     async (emptying, alsoEmptying) => {
       const scenario = await arrange();
       const firstJobId = await queuedBound(scenario);
@@ -283,7 +283,7 @@ describe("an act that lands its rows and its job in one transaction", () => {
     },
   );
 
-  it("queues a second binding on its own, because the run key is one per subject", async () => {
+  it("queues a second binding separately, one run key per subject", async () => {
     const scenario = await arrange();
 
     const firstJobId = await queuedBound(scenario);
@@ -321,12 +321,12 @@ describe("an act that lands its rows and its job in one transaction", () => {
     ["a rebuild reason on an index job", { kind: "index", subjectId: BINDING, reason: "drill" }],
     ["a kind the queue does not carry", { kind: "prune", subjectId: BINDING }],
   ])(
-    "refuses %s with the word malformed, rather than aborting the act with a CHECK",
+    "refuses %s as malformed, rather than aborting the act's transaction",
     async (_what, asked) => {
       const scenario = await arrange();
 
       const refused = await actOf(scenario, (tx) =>
-        // @ts-expect-error each row is a shape the queue's input does not carry, on purpose; the refusal under test is the queue's own
+        // @ts-expect-error each row is outside the queue's input, on purpose
         enqueueJobIn(graphMaintenance, tx, {
           workspaceId: scenario.workspaceId,
           ...asked,
@@ -357,7 +357,7 @@ describe("an act that lands its rows and its job in one transaction", () => {
     expect((await jobsIn(scenario.workspaceId)).length).toBe(1);
   });
 
-  it("is what the door form calls, so a job queued through the door lands with its subject", async () => {
+  it("lands a job queued through the door with its subject", async () => {
     const scenario = await arrange();
 
     const queued = await enqueueJob(
@@ -380,7 +380,7 @@ describe("an act that lands its rows and its job in one transaction", () => {
 });
 
 describe("waiting on a job somebody queued", () => {
-  it("answers the job's status and its outcome, so a caller can poll the one it queued", async () => {
+  it("answers the job's status and outcome to a polling caller", async () => {
     const scenario = await arrange();
     const queued = await enqueueJob(graphMaintenance, scenario.postgres, {
       workspaceId: scenario.workspaceId,
@@ -422,7 +422,7 @@ describe("waiting on a job somebody queued", () => {
     expect(over.ok && over.value.outcome).toEqual({ checked: 2, mismatched: [] });
   });
 
-  it("hands back the store's failure, never the value, for a finished job whose outcome is not the shape the queue agreement admits", async () => {
+  it("answers a failure for an outcome outside the queue agreement", async () => {
     const scenario = await arrange();
     const jobId = await auditQueuedByCron(scenario);
     await finishedAudit(
@@ -445,7 +445,7 @@ describe("waiting on a job somebody queued", () => {
     expect(read.ok ? "" : String(read.error)).toContain("queue agreement");
   });
 
-  it("answers a person polling in their own workspace, whichever road queued the job", async () => {
+  it("answers a person polling their own workspace, whoever queued it", async () => {
     const scenario = await arrange();
     const jobId = await auditQueuedByCron(scenario);
 
@@ -464,7 +464,7 @@ describe("waiting on a job somebody queued", () => {
     });
   });
 
-  it("refuses a Viewer and an Editor, because an audit's outcome names the bundle's files", async () => {
+  it("refuses a Viewer and an Editor the audit's outcome", async () => {
     const scenario = await arrange();
     const asking = { workspaceId: scenario.workspaceId, jobId: await auditQueuedByCron(scenario) };
 
@@ -480,7 +480,7 @@ describe("waiting on a job somebody queued", () => {
     expect((await jobById(graphMaintenance, scenario.postgres, asking)).ok).toBe(true);
   });
 
-  it("says no-such-job for an id this workspace never held, rather than an empty answer", async () => {
+  it("says no-such-job for an id this workspace never held", async () => {
     const scenario = await arrange();
     const elsewhere = await arrange();
     const queued = await enqueueJob(graphMaintenance, elsewhere.postgres, {
@@ -518,7 +518,7 @@ describe("what the platform can say about the two parsers agreeing", () => {
     expect(health).toEqual({ ok: true, value: "never-audited" });
   });
 
-  it("says healthy when the last audit found nothing in any of its four lists", async () => {
+  it("says healthy when the last audit found nothing", async () => {
     const scenario = await arrange();
 
     await foundNothingOn(scenario.workspaceId, "2026-09-07T02:00:00Z");
@@ -535,7 +535,7 @@ describe("what the platform can say about the two parsers agreeing", () => {
     ["a file the index does not know", { missing_row: ["knowledge/new.md"] }],
     ["a row whose file is gone", { missing_file: ["knowledge/gone.md"] }],
   ])(
-    "says mismatched over %s — every finding is the repository and the index disagreeing",
+    "says mismatched over %s, the repository and the index disagreeing",
     async (_finding, found) => {
       const scenario = await arrange();
       await finishedAudit(
@@ -559,7 +559,7 @@ describe("what the platform can say about the two parsers agreeing", () => {
       { ...NOTHING_FOUND, mismatched: [{ deep: { path: "x" } }] },
     ],
   ])(
-    "says mismatched, never healthy, over an outcome it cannot read as clean — %s",
+    "says mismatched, never healthy, over an unreadable audit outcome: %s",
     async (_shape, outcome) => {
       const scenario = await arrange();
       const jobId = await auditQueuedByCron(scenario);
@@ -578,7 +578,7 @@ describe("what the platform can say about the two parsers agreeing", () => {
     },
   );
 
-  it("reads the latest finished audit, so a mismatch put right stops being one", async () => {
+  it("reads the latest finished audit, so a fixed mismatch clears", async () => {
     const scenario = await arrange();
     await finishedAudit(
       scenario.workspaceId,
@@ -599,7 +599,7 @@ describe("what the platform can say about the two parsers agreeing", () => {
     });
   });
 
-  it("refuses a reader who is not an Admin, because health is the workspace's own state", async () => {
+  it("refuses health to a reader who is not an Admin", async () => {
     const scenario = await arrange();
     await finishedAudit(
       scenario.workspaceId,

@@ -72,7 +72,7 @@ const unchecked: Trust = {
 };
 
 describe("the trust words", () => {
-  it("names the tier for a current unit, with the person, the date and a rider where there is one", () => {
+  it("names a current unit's tier, checker, date and any rider", () => {
     expect(
       trustWords({
         tier: "human-reviewed",
@@ -103,7 +103,7 @@ describe("the trust words", () => {
     expect(trustWords(unchecked)).toBe("Unchecked");
   });
 
-  it("says a person checked it without naming one, and without a date, where the check has neither", () => {
+  it("says a person checked, omitting a missing name or date", () => {
     expect(
       trustWords({
         tier: "human-reviewed",
@@ -124,7 +124,7 @@ describe("the trust words", () => {
     ).toBe("Checked by a person");
   });
 
-  it("shows a date it cannot read back as the file wrote it, never as an invalid date", () => {
+  it("shows an unreadable date as the file wrote it", () => {
     expect(
       trustWords({
         tier: "human-reviewed",
@@ -139,7 +139,7 @@ describe("the trust words", () => {
     );
   });
 
-  it("names the status when it is not current, whatever the tier", () => {
+  it("names any status but current, whatever the tier", () => {
     const base = {
       tier: "human-reviewed" as const,
       checkedBy: "A",
@@ -154,7 +154,7 @@ describe("the trust words", () => {
 });
 
 describe("the answer's rendering", () => {
-  it("puts the verdict first and the map's line second, for each of the map's three states", () => {
+  it("puts the verdict first and the map's line second", () => {
     expect(renderAnswer(answer({})).split("\n").slice(0, 2)).toEqual([
       "**Answered from the company's knowledge.**",
       "_map as of now_",
@@ -170,7 +170,7 @@ describe("the answer's rendering", () => {
     ).toContain("_map unavailable since 1 September 2026_");
   });
 
-  it("puts an answer's own text after the map line, then its citations, numbered from one", () => {
+  it("puts the text after the map line, then numbered citations", () => {
     expect(
       renderAnswer(
         answer({
@@ -193,7 +193,7 @@ describe("the answer's rendering", () => {
     );
   });
 
-  it("warns for the caller's role in the verdict line, and answers as it otherwise would", () => {
+  it("warns for the caller's role in the verdict line alone", () => {
     expect(renderAnswer(answer({ verdict: "warn", citations: [] }))).toBe(
       [
         "**Answered with a warning for your role.**",
@@ -204,7 +204,7 @@ describe("the answer's rendering", () => {
     );
   });
 
-  it("renders a refusal as the one sentence, with no prose, no citations and its unmapped passages", () => {
+  it("renders a refusal as the one sentence plus unmapped passages", () => {
     expect(
       renderAnswer(
         answer({
@@ -245,7 +245,7 @@ describe("the answer's rendering", () => {
 });
 
 describe("the preview's rendering", () => {
-  it("says nothing matches where there are no hits, and one line per hit where there are", () => {
+  it("says nothing matches without hits, else one line per hit", () => {
     expect(renderFind({ query: "expenses", hits: [] })).toBe(
       "Nothing in the company's knowledge matches that.",
     );
@@ -289,7 +289,7 @@ describe("the preview's rendering", () => {
 });
 
 describe("open's and feedback's renderings", () => {
-  it("renders a passage as a quotation with its source, locator and sensitivity word", () => {
+  it("quotes a passage with its source, locator and sensitivity word", () => {
     expect(
       renderOpen({
         found: true,
@@ -304,7 +304,7 @@ describe("open's and feedback's renderings", () => {
     expect(renderOpen({ found: false, locator: "p.9" })).toBe("No passage at p.9.");
   });
 
-  it("renders a concept as its title, its body, its trust caption and the evidence it cites", () => {
+  it("renders a concept's title, body, trust caption and cited evidence", () => {
     expect(
       renderOpen({
         found: true,
@@ -335,7 +335,7 @@ describe("open's and feedback's renderings", () => {
     );
   });
 
-  it("heads a concept with its IRI where the file names no title, and leaves the evidence block out where it cites none", () => {
+  it("heads an untitled concept with its IRI, omitting empty evidence", () => {
     expect(
       renderOpen({
         found: true,
@@ -365,7 +365,7 @@ describe("open's and feedback's renderings", () => {
     );
   });
 
-  it("names what was asked for where there is nothing to show", () => {
+  it("names what was asked where there is nothing to show", () => {
     expect(renderOpen({ found: false, iri: "https://better-answers.com/c/01C" })).toBe(
       "No concept at https://better-answers.com/c/01C.",
     );
@@ -374,7 +374,7 @@ describe("open's and feedback's renderings", () => {
     expect(renderOpen({ found: true })).toBe("Nothing to show.");
   });
 
-  it("renders feedback in words, never the wire token, and names every reason a reader may flag for", () => {
+  it("renders feedback and each flag reason in words, not tokens", () => {
     const iri = "https://better-answers.com/c/01A";
     const received = (what: string): string =>
       `Received: ${iri} marked ${what}. It reaches the owner's queue when the Suggestions screen ships.`;
@@ -401,14 +401,14 @@ describe("open's and feedback's renderings", () => {
 describe("what the slice's four acts answer", () => {
   const now = new Date("2026-09-08T12:00:00.000Z");
 
-  it("hands every caller an outcome to read, never one to catch", () => {
+  it("hands every caller an outcome to read, not to catch", () => {
     expectTypeOf(find).returns.resolves.toEqualTypeOf<Result<FindResult, Error>>();
     expectTypeOf(open).returns.resolves.toEqualTypeOf<Result<OpenResult, Error>>();
     expectTypeOf(ask).returns.resolves.toEqualTypeOf<Result<AnswerResult, Error>>();
     expectTypeOf(giveFeedback).returns.resolves.toEqualTypeOf<Result<FeedbackReceipt, never>>();
   });
 
-  it("answers a search with the query it was asked and no hits, where neither arm matches", async () => {
+  it("answers the query and no hits where neither arm matches", async () => {
     const reader = await arrange();
 
     const found = await acting(reader, (principal, tx) =>
@@ -418,7 +418,7 @@ describe("what the slice's four acts answer", () => {
     expect(found).toEqual({ ok: true, value: { query: "expenses", hits: [] } });
   });
 
-  it("refuses every question with the one sentence, over a map that is live", async () => {
+  it("refuses every question with the one sentence, the map live", async () => {
     const reader = await arrange();
 
     const answered = await acting(reader, (principal, tx) =>
@@ -439,7 +439,7 @@ describe("what the slice's four acts answer", () => {
     });
   });
 
-  it("hands a reader back a receipt for the feedback they gave, in their own words", async () => {
+  it("hands a reader a receipt echoing their feedback", async () => {
     const reader = await arrange();
     const feedback = {
       iri: "https://better-answers.com/c/01A",
@@ -453,7 +453,7 @@ describe("what the slice's four acts answer", () => {
     expect(receipt).toEqual({ ok: true, value: { outcome: "received", feedback } });
   });
 
-  it("answers a locator that is no address as not found, echoing back what it was asked with", async () => {
+  it("answers a locator that is no address as not found", async () => {
     const reader = await arrange();
 
     const opened = await acting(reader, (principal, tx) =>
@@ -463,7 +463,7 @@ describe("what the slice's four acts answer", () => {
     expect(opened).toEqual({ ok: true, value: { found: false, locator: "p.4" } });
   });
 
-  it("hands a read that failed back as an error, never as a concept nobody minted", async () => {
+  it("answers a failed read as an error, never a concept", async () => {
     const reader = await arrange();
     let answered: Result<OpenResult, Error> | undefined;
 
@@ -546,7 +546,7 @@ describe("the two knowledge layers a search and a fetch reach", () => {
     return { invoice, handbook, iri: await conceptResting(reader.workspaceId, handbook) };
   };
 
-  it("previews a document on its own line, marked as what it is, beside the concept that has an answer", async () => {
+  it("previews a document marked not company knowledge, beside the concept", async () => {
     const reader = await arrange();
     const { invoice, iri } = await aDocumentEachWay(reader);
 
@@ -584,7 +584,7 @@ describe("the two knowledge layers a search and a fetch reach", () => {
     );
   });
 
-  it("hands back the number of hits it was asked for and never that many per layer, the concepts taking the room first", async () => {
+  it("caps hits at the limit across both layers, concepts first", async () => {
     const reader = await arrange();
     const { invoice, iri } = await aDocumentEachWay(reader);
 
@@ -599,7 +599,7 @@ describe("the two knowledge layers a search and a fetch reach", () => {
     ]);
   });
 
-  it("opens the passage a hit's own locator addresses, with the document it is in and the word it is held under", async () => {
+  it("opens a hit's passage with its document and sensitivity word", async () => {
     const reader = await arrange();
     const invoice = await documentHolding(reader.workspaceId, {
       title: INVOICE_TITLE,
@@ -629,7 +629,7 @@ describe("the two knowledge layers a search and a fetch reach", () => {
     );
   });
 
-  it("answers a withheld, an unpublished, a malformed and an out-of-range locator with the one word, and offers none of them as a hit", async () => {
+  it("answers withheld, unpublished, malformed and out-of-range locators as not found", async () => {
     const reader = await arrange();
     const visible = await documentHolding(reader.workspaceId, {
       title: INVOICE_TITLE,
@@ -683,7 +683,7 @@ describe("the two knowledge layers a search and a fetch reach", () => {
     ]);
   });
 
-  it("renders each evidence item's wire locator when a concept is opened, and opens the passage at it", async () => {
+  it("renders an opened concept's evidence locators, each opening its passage", async () => {
     const reader = await arrange();
     const handbook = await documentHolding(reader.workspaceId, {
       title: HANDBOOK_TITLE,

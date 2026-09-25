@@ -10,7 +10,7 @@ const db = postgresForSuite();
 
 const HUNDRED = "a".repeat(100);
 
-// A code point past the Basic Multilingual Plane is two UTF-16 units and one character.
+/** A code point past the Basic Multilingual Plane is two UTF-16 units and one character. */
 const HUNDRED_ASTRAL = "𝐀".repeat(100);
 
 describe("the display-name rule", () => {
@@ -87,7 +87,7 @@ describe("setting one's own display name", () => {
     return found.rowCount ?? 0;
   };
 
-  it("writes the name the rule takes onto the person's own row and answers it", async () => {
+  it("writes and answers the name the rule takes", async () => {
     const personId = await seedPerson(db().pool, { name: "" });
     const door = openPostgres(db().runtimePool);
 
@@ -100,7 +100,7 @@ describe("setting one's own display name", () => {
     expect(await displayNameHeld(personId)).toBe("Priya Shah");
   });
 
-  it("replaces a name the person gave before, and touches no one else's", async () => {
+  it("replaces the person's earlier name and touches no one else's", async () => {
     const personId = await seedPerson(db().pool, { name: "Priya" });
     const someoneElse = await seedPerson(db().pool, { name: "Sam Okoro" });
     const door = openPostgres(db().runtimePool);
@@ -114,7 +114,7 @@ describe("setting one's own display name", () => {
     ]);
   });
 
-  it("refuses a name the rule refuses, in the rule's word, and leaves the row as it was — so a name cannot be blanked", async () => {
+  it("refuses what the rule refuses and keeps the old name", async () => {
     const personId = await seedPerson(db().pool, { name: "Priya Shah" });
     const door = openPostgres(db().runtimePool);
 
@@ -133,7 +133,7 @@ describe("setting one's own display name", () => {
     expect(await identitySetRowsFor(personId)).toEqual([]);
   });
 
-  it("refuses person-gone when the row a session stood on is no longer there, and records nothing", async () => {
+  it("refuses person-gone for a person no longer there, recording nothing", async () => {
     const door = openPostgres(db().runtimePool);
     const personId = ulid();
 
@@ -154,7 +154,7 @@ describe("setting one's own display name", () => {
     expect(set).toEqual({ ok: false, error: "malformed" });
   });
 
-  it("writes one row to the identity-set ledger, the person its actor and subject by person id, and no workspace's ledger", async () => {
+  it("writes one identity-set row and nothing to a workspace's ledger", async () => {
     const { door, workspaceId, adminUserId } = await provisionedWorkspace(db(), "Named", {
       name: "Held",
     });
@@ -184,7 +184,7 @@ describe("setting one's own display name", () => {
     expect(ledgerAfter.rows).toEqual(ledgerBefore.rows);
   });
 
-  it("carries the name in no row of either ledger, so erasure has the one copy on the person's row to blank", async () => {
+  it("carries the name in no row of either ledger", async () => {
     const personId = await seedPerson(db().pool, { name: "" });
     const door = openPostgres(db().runtimePool);
     const displayName = `Distinct ${ulid()}`;

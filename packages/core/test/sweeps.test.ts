@@ -68,7 +68,7 @@ const passesRecorded = async () => {
 const A_PASS_ID = expect.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/);
 
 describe("a sweep pass over every workspace", () => {
-  it("removes each workspace's orphaned uploads past the grace and its map's leftovers, and totals them", async () => {
+  it("removes orphaned uploads past the grace and the map's leftovers", async () => {
     const first = await workspaceWithLeftovers("First");
     const second = await workspaceWithLeftovers("Second");
     await provisionedWorkspace(db(), "Clean");
@@ -103,7 +103,7 @@ describe("a sweep pass over every workspace", () => {
     ]);
   });
 
-  it("counts the orphaned uploads and removes none when it is list-only, while the map's leftovers still go", async () => {
+  it("counts but keeps orphaned uploads when list-only; leftovers still go", async () => {
     const workspace = await workspaceWithLeftovers("Listed");
 
     const pass = await sweepEveryWorkspace(SWEEPS, doors(), { uploadSweep: "list" });
@@ -122,7 +122,7 @@ describe("a sweep pass over every workspace", () => {
     expect(await generationsOf(workspace.workspaceId)).toEqual([1]);
   });
 
-  it("goes on past a workspace whose sweep is refused, and names the one it could not sweep", async () => {
+  it("goes on past a refused workspace and names it", async () => {
     const stuck = await workspaceWithLeftovers("Stuck");
     const orphaned = await provisionedWorkspace(db(), "Orphaned");
     const orphan = `uploads/${ulid().toLowerCase()}/original`;
@@ -160,7 +160,7 @@ describe("a sweep pass over every workspace", () => {
     ]);
   });
 
-  it("answers a failure when its row cannot be written, the sweeping done", async () => {
+  it("still sweeps, but fails when its row cannot be written", async () => {
     const workspace = await workspaceWithLeftovers("Unrecorded");
 
     const pass = await whileWritesAreRefused(db().pool, "sweep_pass", () =>
@@ -172,7 +172,7 @@ describe("a sweep pass over every workspace", () => {
     expect(await storedIn(workspace)).toEqual({ ok: true, value: [] });
   });
 
-  it("finds nothing to do over workspaces with nothing left behind, and still leaves its row", async () => {
+  it("finds nothing over tidy workspaces and still leaves its row", async () => {
     await provisionedWorkspace(db(), "Tidy");
 
     const pass = await sweepEveryWorkspace(SWEEPS, doors(), { uploadSweep: "remove" });
@@ -235,7 +235,7 @@ describe("a sweep pass while another holder has the sweeps' lock", () => {
 });
 
 describe("a sweep by hand", () => {
-  it("waits while another holder has the sweeps' lock, and runs when it lets go", async () => {
+  it("waits while another holder has the lock, then runs", async () => {
     const order: string[] = [];
     let letGo = (): void => undefined;
     const holding = new Promise<void>((resolve) => {

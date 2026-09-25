@@ -33,7 +33,7 @@ const fixture = contractFixture("llm-routing", fixtureSchema);
 const db = postgresForSuite();
 
 describe("the llm-routing agreement", () => {
-  it("resolves every fixtured call to exactly the route the fixture expects", async () => {
+  it("resolves every fixtured call to the route the fixture expects", async () => {
     await withRollback(db().pool, async (client) => {
       const seed = testData(client);
       for (const workspace of fixture.workspaces) {
