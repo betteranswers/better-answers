@@ -10,14 +10,16 @@ const asToolError = (text: string): CallToolResult => ({
   isError: true,
 });
 
+/**
+ * An act's refusal or failure answers as a tool error. Its rejection is caught here, not by the
+ * protocol, so it is logged once.
+ */
 export const crossing = async <Value>(
   log: Logger,
   entry: string,
   running: () => Promise<Result<Value, RefusalAnswer | Error>>,
   render: (value: Value) => string,
 ): Promise<CallToolResult> => {
-  // A rejection is caught here, not by the protocol's own handler, so that every failure is
-  // logged once and in one place.
   const ran = await attempt(running);
   const answered = ran.ok ? ran.value : ran;
 

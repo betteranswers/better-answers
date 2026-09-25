@@ -53,10 +53,15 @@ const THE_BEARER = "the bearer";
 const CEILING_MESSAGE =
   "This connection has made too many calls this minute; an Admin can raise the ceiling in System.";
 
-// The bearer gate's reason stays off the wire; the word and class an agent reads are the tool's,
-// past the gate.
+/**
+ * The bearer gate's reason stays off the wire; the word and class an agent reads are the tool's,
+ * past the gate.
+ */
 const refused = (): OAuthError =>
   new OAuthError(OAuthErrorCode.InvalidToken, "the bearer was refused");
+
+const toolsListTtlOf = (authInfo: AuthInfo | undefined): number =>
+  Number(authInfo?.extra?.["toolsListTtlMs"] ?? TOOLS_LIST_TTL_MS_DEFAULT);
 
 export const createMcpSurface = (
   deps: McpSurfaceDependencies,
@@ -67,7 +72,7 @@ export const createMcpSurface = (
 
   const buildServer = (context: McpRequestContext): McpServer => {
     const bearer = context.authInfo === undefined ? undefined : bearerOf(context.authInfo);
-    const ttlMs = Number(context.authInfo?.extra?.["toolsListTtlMs"] ?? TOOLS_LIST_TTL_MS_DEFAULT);
+    const ttlMs = toolsListTtlOf(context.authInfo);
     const scopes = new Set(context.authInfo?.scopes ?? []);
 
     const server = new McpServer(
@@ -89,7 +94,7 @@ export const createMcpSurface = (
         {
           title: entry.title,
           description: entry.description,
-          // oxlint-disable-next-line better-answers/mcp-entry-no-workspace-argument -- the one mount over ENTRIES: each shape is checked inline at its defineEntry, and at runtime by tests/mcp-surface.test.ts
+          // oxlint-disable-next-line better-answers/mcp-entry-no-workspace-argument -- the one mount over ENTRIES; each input is checked at its own defineEntry
           inputSchema: entry.input,
           outputSchema: entry.output,
           annotations: entry.annotations,
@@ -130,7 +135,7 @@ export const createMcpSurface = (
     return flood.allowed ? undefined : tooManyRequests(flood.retryAfterSeconds, CEILING_MESSAGE);
   };
 
-  return async (request: Request): Promise<Response> => {
+  const authenticated = async (request: Request): Promise<AuthInfo | Response> => {
     const authorization = request.headers.get("authorization");
     if (authorization === null || !/^Bearer\s+\S+$/i.test(authorization)) {
       return (
@@ -142,15 +147,19 @@ export const createMcpSurface = (
       );
     }
 
-    let authInfo: AuthInfo;
     try {
-      authInfo = await verifyBearerToken(authorization, {
+      return await verifyBearerToken(authorization, {
         verifier: deps.verifier,
         requiredScopes: [MCP_REQUIRED_SCOPE],
       });
     } catch (cause) {
       return (await flooded(request)) ?? bearerAuthChallengeResponse(cause, challengeOptions);
     }
+  };
+
+  return async (request: Request): Promise<Response> => {
+    const authInfo = await authenticated(request);
+    if (authInfo instanceof Response) return authInfo;
 
     const bearer = bearerOf(authInfo);
     if (bearer === undefined) return bearerAuthChallengeResponse(refused(), challengeOptions);

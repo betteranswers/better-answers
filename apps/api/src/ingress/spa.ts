@@ -12,6 +12,7 @@ export type SpaBuild = {
 export type SpaServing = {
   readonly assets: MiddlewareHandler;
 
+  /** `undefined` without a build, or for anything but a read of a screen on the product's hostname. */
   readonly shell: (context: Context) => Promise<Response | undefined>;
 };
 
