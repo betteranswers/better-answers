@@ -37,19 +37,17 @@ const RIDER_WORDS = {
   "source-moved-on": " · source moved on",
 } satisfies Record<TrustRider, string>;
 
-export const trustWords = (trust: Trust): string => {
-  switch (trust.status) {
-    case "changed-since-checked":
-      return "Changed since checked";
-    case "out-of-date":
-      return "Out of date";
-    case "draft":
-      return "Draft";
-    case "deprecated":
-      return "Deprecated";
-    case "current":
-      break;
-  }
+const STATUS_WORDS = {
+  "changed-since-checked": "Changed since checked",
+  "out-of-date": "Out of date",
+  draft: "Draft",
+  deprecated: "Deprecated",
+} satisfies Record<Exclude<TrustStatus, "current">, string>;
+
+export const trustWords = (trust: Trust): string =>
+  trust.status === "current" ? checkWords(trust) : STATUS_WORDS[trust.status];
+
+const checkWords = (trust: Trust): string => {
   const rider = trust.rider === null ? "" : RIDER_WORDS[trust.rider];
   switch (trust.tier) {
     case "human-reviewed":
@@ -177,6 +175,10 @@ const tagsOf = (frontmatter: Frontmatter): readonly string[] => {
   return Array.isArray(tags) ? tags.filter((tag) => typeof tag === "string") : [];
 };
 
+/**
+ * Concepts come first, up to `limit`; passages fill the room they leave. `now` decides which
+ * concepts are past their shelf life.
+ */
 export const find = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -212,31 +214,27 @@ export const find = async (
 };
 
 const trustOf = (concept: OpenedConcept, now: Date): Trust => {
-  const { check } = concept;
-  const checkedAt = check === undefined ? null : check.at.toISOString();
-  const tier: TrustTier =
-    check === undefined
-      ? "unverified"
-      : isPersonActor(check.actor)
-        ? "human-reviewed"
-        : "machine-confirmed";
-  const rider: TrustRider | null = check?.contentHash === null ? "imported" : null;
-  const moved = check?.contentHash != null && check.contentHash !== concept.contentHash;
-  const status: TrustStatus =
-    concept.status === "deprecated"
-      ? "deprecated"
-      : pastShelfLife(concept.frontmatter["stale_after"], now)
-        ? "out-of-date"
-        : moved
-          ? "changed-since-checked"
-          : "current";
-  return {
-    tier,
-    status,
-    checkedBy: check === undefined ? null : (check.memberName ?? check.actor),
-    checkedAt,
-    rider,
-  };
+  const { tier, checkedBy, checkedAt, rider } = trustOfCheck(concept.check);
+  return { tier, status: trustStatusOf(concept, now), checkedBy, checkedAt, rider };
+};
+
+const trustOfCheck = (check: OpenedConcept["check"]): Omit<Trust, "status"> =>
+  check === undefined
+    ? { tier: "unverified", checkedBy: null, checkedAt: null, rider: null }
+    : {
+        tier: isPersonActor(check.actor) ? "human-reviewed" : "machine-confirmed",
+        checkedBy: check.memberName ?? check.actor,
+        checkedAt: check.at.toISOString(),
+        rider: check.contentHash === null ? "imported" : null,
+      };
+
+const trustStatusOf = (concept: OpenedConcept, now: Date): TrustStatus => {
+  if (concept.status === "deprecated") return "deprecated";
+  if (pastShelfLife(concept.frontmatter["stale_after"], now)) return "out-of-date";
+  const checkedHash = concept.check?.contentHash;
+  return checkedHash != null && checkedHash !== concept.contentHash
+    ? "changed-since-checked"
+    : "current";
 };
 
 const CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -289,6 +287,7 @@ const evidenceOf = (concept: OpenedConcept): ConceptView["evidence"] => {
   });
 };
 
+/** A concept or passage that is not there answers `found: false`, not an error. */
 export const open = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -334,6 +333,10 @@ const termsOf = (question: string): readonly string[] =>
 const ASK_TERMS_AT_MOST = 8;
 const ASK_HITS_PER_TERM = 5;
 
+/**
+ * Answers no question: the verdict is always `refuse`, and the citations are the concepts its
+ * words find.
+ */
 export const ask = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -361,6 +364,7 @@ export const ask = async (
   });
 };
 
+/** Keeps nothing: the receipt echoes the input. */
 export const giveFeedback = async (
   _principal: UserPrincipal,
   _tx: Tx,

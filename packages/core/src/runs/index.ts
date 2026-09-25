@@ -129,7 +129,7 @@ export const enqueueJobInput = z.discriminatedUnion("kind", [
 ]);
 
 export const enqueueJobAct = declareAct({
-  // The level is the kind's own, and a kind with no descriptor is left to the highest role.
+  /** The level is the kind's own, and a kind with no descriptor is left to the highest role. */
   admits: (input: z.output<typeof enqueueJobInput>) => ({
     role: descriptorOf(input.kind)?.enqueuedBy ?? ROLES[0],
     purposes: EVERY_PURPOSE,
@@ -165,6 +165,56 @@ const ENQUEUE = `WITH inserted AS (
 export const indexRunRefused = (refusal: EnqueueJobRefusal): Error =>
   new Error(`runs: the index run was refused (${refusal})`);
 
+const fitsTheKind = (
+  descriptor: JobKindDescriptor,
+  subjectId: string | null,
+  reason: string | null,
+): boolean => {
+  const namesASubject = subjectId !== null && subjectId.trim() !== "";
+  if (descriptor.namesASubject !== namesASubject) return false;
+  if (descriptor.reasons.length > 0 !== (reason !== null)) return false;
+  return reason === null || descriptor.reasons.includes(reason);
+};
+
+type JobInsert = Pick<
+  z.output<typeof boundarySchemas.job.insert>,
+  "id" | "kind" | "subjectId" | "reason"
+>;
+
+const jobInsertOf = (
+  descriptor: JobKindDescriptor,
+  input: EnqueueJobInput,
+): JobInsert | undefined => {
+  const subjectId = "subjectId" in input ? input.subjectId : null;
+  const reason = "reason" in input ? input.reason : null;
+  if (!fitsTheKind(descriptor, subjectId, reason)) return undefined;
+  const parsed = boundarySchemas.job.insert
+    .pick({ id: true, kind: true, subjectId: true, reason: true })
+    .safeParse({ id: ulid(), kind: input.kind, subjectId, reason });
+  return parsed.success ? parsed.data : undefined;
+};
+
+const landJob = async (tx: Tx, workspaceId: string, job: JobInsert): Promise<string> => {
+  const landed = await tx.query<{ id: string }>(ENQUEUE, [
+    workspaceId,
+    job.id,
+    job.kind,
+    job.subjectId ?? null,
+    job.reason ?? null,
+    REASONS_EMPTYING_THE_BINDING,
+  ]);
+  const answered = landed.rows[0]?.id;
+  if (answered === undefined) {
+    throw new Error("another act queued this subject while this one was enqueueing it");
+  }
+  return answered;
+};
+
+/**
+ * Reuses a job already queued for the subject and answers its id; a reason that empties the
+ * binding replaces a queued reason that does not. Refuses `malformed` for input its kind does not
+ * take, or another workspace's. Rejects when another act queues the subject meanwhile.
+ */
 export const enqueueJobIn = async (
   principal: Principal,
   tx: Tx,
@@ -173,43 +223,19 @@ export const enqueueJobIn = async (
   const descriptor = descriptorOf(input.kind);
   if (descriptor === undefined) return err("malformed");
 
-  // Both ways into the enqueue pass here, so the gate stands where the door has not yet opened.
+  /** Both ways into the enqueue pass here, so the gate stands where the door has not yet opened. */
   const admitted = admit(enqueueJobAct, principal, input);
   if (!admitted.ok) return err(admitted.error);
   if (principal.kind !== "platform" && input.workspaceId !== principal.workspaceId) {
     return err("malformed");
   }
 
-  const subjectId = "subjectId" in input ? input.subjectId : null;
-  const reason = "reason" in input ? input.reason : null;
-
-  const namesASubject = subjectId !== null && subjectId.trim() !== "";
-  if (descriptor.namesASubject !== namesASubject) return err("malformed");
-  if (descriptor.reasons.length > 0 !== (reason !== null)) return err("malformed");
-  if (reason !== null && !descriptor.reasons.includes(reason)) return err("malformed");
-
-  const jobId = ulid();
-  const parsed = boundarySchemas.job.insert
-    .pick({ id: true, kind: true, subjectId: true, reason: true })
-    .safeParse({ id: jobId, kind: input.kind, subjectId, reason });
-
-  if (!parsed.success) return err("malformed");
-
-  const landed = await tx.query<{ id: string }>(ENQUEUE, [
-    input.workspaceId,
-    parsed.data.id,
-    parsed.data.kind,
-    parsed.data.subjectId ?? null,
-    parsed.data.reason ?? null,
-    REASONS_EMPTYING_THE_BINDING,
-  ]);
-  const answered = landed.rows[0]?.id;
-  if (answered === undefined) {
-    throw new Error("another act queued this subject while this one was enqueueing it");
-  }
-  return ok({ jobId: answered });
+  const job = jobInsertOf(descriptor, input);
+  if (job === undefined) return err("malformed");
+  return ok({ jobId: await landJob(tx, input.workspaceId, job) });
 };
 
+/** As `enqueueJobIn`, in a transaction of its own. */
 export const enqueueJob = async (
   principal: Principal,
   door: PostgresDoor,
@@ -217,6 +243,7 @@ export const enqueueJob = async (
 ): Promise<Result<{ readonly jobId: string }, EnqueueJobRefusal | PrincipalRefusal | Error>> =>
   inWorkspace(principal, door, input.workspaceId, (tx) => enqueueJobIn(principal, tx, input));
 
+/** A job in another workspace answers `no-such-job`, as a missing one does. */
 export const jobById = async (
   principal: Principal,
   door: PostgresDoor,
@@ -251,6 +278,7 @@ export const jobById = async (
 
 type OutcomeRow = { readonly outcome: OutcomeColumn };
 
+/** The outcome of the binding's newest `done` index run; null when there is none or it has none. */
 export const latestIndexOutcomeIn = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -322,6 +350,7 @@ const subjectRunsOf = (
   return ok(runs);
 };
 
+/** Newest first. */
 export const runsOfSubject = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -343,6 +372,7 @@ export const runsOfSubject = async (
   return runs.ok ? ok(runs.value.map(([, run]) => run)) : runs;
 };
 
+/** Each subject's newest run; a subject with no run is absent from the map. */
 export const latestRunsOf = async (
   admin: AdminUserPrincipal,
   tx: Tx,
@@ -363,6 +393,7 @@ export const latestRunsOf = async (
 
 const AUDIT_FINDINGS = ["mismatched", "unparsed", "missing_row", "missing_file"] as const;
 
+/** Read from the newest `done` nightly audit; an outcome that cannot be read is `mismatched`. */
 export const bundleHealth = async (
   principal: UserPrincipal,
   door: PostgresDoor,

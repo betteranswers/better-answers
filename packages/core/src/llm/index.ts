@@ -28,6 +28,19 @@ type RouteRow = {
   readonly retentionTail: string | null;
 };
 
+const routeOf = (purpose: LlmPurpose, row: RouteRow | undefined): WorkspaceRoute =>
+  row === undefined
+    ? { purpose, provider: null, model: null, dimensions: null, fixed: false, retentionTail: null }
+    : {
+        purpose,
+        provider: row.provider,
+        model: row.model,
+        dimensions: row.dimensions,
+        fixed: purpose === FIXED_PURPOSE,
+        retentionTail: row.retentionTail,
+      };
+
+/** One route per purpose, in `LLM_PURPOSES` order; a purpose with no route configured has nulls. */
 export const listRoutes = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -41,17 +54,5 @@ export const listRoutes = async (
   );
   if (!configured.ok) return err(configured.error);
   const byPurpose = new Map(configured.value.rows.map((row) => [row.purpose, row]));
-  return ok(
-    LLM_PURPOSES.map((purpose) => {
-      const row = byPurpose.get(purpose);
-      return {
-        purpose,
-        provider: row?.provider ?? null,
-        model: row?.model ?? null,
-        dimensions: row?.dimensions ?? null,
-        fixed: row !== undefined && purpose === FIXED_PURPOSE,
-        retentionTail: row?.retentionTail ?? null,
-      };
-    }),
-  );
+  return ok(LLM_PURPOSES.map((purpose) => routeOf(purpose, byPurpose.get(purpose))));
 };
