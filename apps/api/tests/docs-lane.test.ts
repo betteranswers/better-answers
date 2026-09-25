@@ -58,6 +58,9 @@ type LaneCase = {
 
   readonly worker: string;
 
+  /** Names the change in the test's title; `because` holds the reason, printed on failure. */
+  readonly diff: string;
+
   readonly because: string;
 };
 
@@ -67,12 +70,14 @@ const LANES: readonly LaneCase[] = [
     changed: ["apps/web/src/app.tsx"],
     lane: "affected",
     worker: "no",
+    diff: "a web-only change",
     because: "a web-only change: the filter names apps/web, and nothing depends on the SPA",
   },
   {
     changed: ["packages/core/src/kernel/actor.ts"],
     lane: "affected",
     worker: "no",
+    diff: "a core change",
     because:
       "a core change: apps/api imports it and apps/web imports apps/api, so the filter's `...[` prefix brings both of them with it",
   },
@@ -80,6 +85,7 @@ const LANES: readonly LaneCase[] = [
     changed: ["apps/worker/src/better_answers_worker/work_loop.py"],
     lane: "affected",
     worker: "yes",
+    diff: "a worker-only change",
     because:
       "a worker-only change: no pnpm workspace owns apps/worker, so the filter selects nothing and the worker's own leg is what runs",
   },
@@ -87,6 +93,7 @@ const LANES: readonly LaneCase[] = [
     changed: ["package.json"],
     lane: "full",
     worker: "no",
+    diff: "an unowned root file",
     because:
       "a root file no workspace owns: pnpm reads it as the workspace root's own and would run the root `check`, which is the whole run by another name",
   },
@@ -94,12 +101,14 @@ const LANES: readonly LaneCase[] = [
     changed: ["pnpm-lock.yaml"],
     lane: "full",
     worker: "no",
+    diff: "a lockfile change",
     because: "a lockfile change is every workspace's dependencies, whatever the diff touched",
   },
   {
     changed: ["contracts/manifest.json"],
     lane: "full",
     worker: "yes",
+    diff: "a tier contract change",
     because:
       "both tiers read the contract and no pnpm workspace owns a line of contracts/, so the TypeScript half — packages/core/test/tier-contract.test.ts — would not run on the filter's answer",
   },
@@ -107,12 +116,14 @@ const LANES: readonly LaneCase[] = [
     changed: [".github/workflows/check.yml"],
     lane: "full",
     worker: "no",
+    diff: "a workflow change",
     because: "this workflow is held by suites in apps/api and apps/worker that no filter names",
   },
   {
     changed: ["apps/docs-site/index.ts"],
     lane: "full",
     worker: "no",
+    diff: "a lookalike app directory",
     because:
       "a directory that only looks like a workspace: pnpm would map it to the workspace root, the exclusion would drop that, and the leg would pass having run nothing",
   },
@@ -120,27 +131,33 @@ const LANES: readonly LaneCase[] = [
     changed: ["packages/not-a-workspace/index.ts"],
     lane: "full",
     worker: "no",
+    diff: "a lookalike package directory",
     because: "the same hole one level down, and the same answer",
   },
   {
     changed: ["docs/vision.md", "CONTEXT.md"],
     lane: "docs",
     worker: "no",
+    diff: "a prose-only change",
     because: "every changed path is prose, which is the docs lane's whole rule",
   },
   {
     changed: ["docs/vision.md", "apps/web/src/app.tsx"],
     lane: "full",
     worker: "no",
+    diff: "prose mixed with code",
     because:
       "prose with code: the suites that read this repository's documents live in apps/api and packages/core, and a filter that named apps/web would run every gate except the coupled one",
   },
 ];
 
 describe("which paths reach which lane", () => {
-  it.each(LANES)("$lane: $because", ({ changed, lane, worker }: LaneCase) => {
-    expect(decide(changed)).toEqual({ lane, worker });
-  });
+  it.each(LANES)(
+    "picks the $lane lane for $diff",
+    ({ changed, lane, worker, because }: LaneCase) => {
+      expect(decide(changed), `${changed.join(", ")}: ${because}`).toEqual({ lane, worker });
+    },
+  );
 
   it("treats no directory the repository stopped installing as a workspace", () => {
     const known = new Set([...workspacePackages(), "apps/worker"]);
