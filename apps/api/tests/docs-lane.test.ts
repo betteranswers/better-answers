@@ -123,7 +123,7 @@ const LANES: readonly LaneCase[] = [
     changed: ["apps/docs-site/index.ts"],
     lane: "full",
     worker: "no",
-    diff: "a lookalike app directory",
+    diff: "a lookalike directory in apps",
     because:
       "a directory that only looks like a workspace: pnpm would map it to the workspace root, the exclusion would drop that, and the leg would pass having run nothing",
   },
@@ -131,7 +131,7 @@ const LANES: readonly LaneCase[] = [
     changed: ["packages/not-a-workspace/index.ts"],
     lane: "full",
     worker: "no",
-    diff: "a lookalike package directory",
+    diff: "a lookalike directory in packages",
     because: "the same hole one level down, and the same answer",
   },
   {
