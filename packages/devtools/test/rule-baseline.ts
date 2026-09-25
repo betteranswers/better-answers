@@ -9,9 +9,12 @@ import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
 type RuleBaseline = {
   readonly listed: readonly string[];
+  /** The first listed file; fails the calling test when the list is empty. */
   readonly onTheList: () => string;
   readonly refusedFiles: (tree: Tree) => readonly string[];
+  /** Listed files the tree no longer has. */
   readonly gone: () => readonly string[];
+  /** Listed files the rule would no longer refuse if they were unlisted. */
   readonly cleared: () => readonly string[];
 };
 
@@ -25,6 +28,7 @@ const partsOf = (rule: string): { readonly plugin: string; readonly name: string
     : { plugin: rule.slice(0, slash), name: rule.slice(slash + 1) };
 };
 
+/** Lints fixture trees under `rule` as the root config sets it, baseline overrides included. */
 export const ruleBaseline = (rule: string, smoke: Smoke): RuleBaseline => {
   const { plugin, name } = partsOf(rule);
   const config = readOxlintConfig();

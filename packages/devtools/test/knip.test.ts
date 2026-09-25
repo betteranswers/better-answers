@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { repositoryRoot } from "@better-answers/devtools/oxlint-config";
 import { knipOver } from "@better-answers/devtools/throwaway-tree";
 import type { KnipFinding, KnipRunner, Tree } from "@better-answers/devtools/throwaway-tree";
 
@@ -39,7 +40,7 @@ const knip = knipOver(scaffold, {
 const namesOf = (findings: readonly KnipFinding[]): readonly string[] =>
   findings.map((finding) => `${finding.kind}:${finding.file}:${finding.name}`);
 
-describe("knip over a throwaway tree (T-066)", () => {
+describe("knip over a throwaway tree", () => {
   it("names an export nothing imports", () => {
     const findings = knip.findings({
       "src/main.ts": MAIN,
@@ -72,13 +73,13 @@ describe("knip over a throwaway tree (T-066)", () => {
     expect(namesOf(findings)).toEqual(["files:src/orphan.ts:src/orphan.ts"]);
   });
 
-  it("stays silent over a tree whose every file and export is reached", () => {
+  it("stays silent when every file and export is reached", () => {
     const findings = knip.findings({ "src/main.ts": MAIN, "src/reached.ts": REACHED });
 
     expect(findings).toEqual([]);
   });
 
-  it("stays silent about an unreached file that sits under a configured entry directory", () => {
+  it("stays silent about an unreached file under an entry directory", () => {
     const findings = knip.findings({
       "src/main.ts": MAIN,
       "src/reached.ts": REACHED,
@@ -89,15 +90,11 @@ describe("knip over a throwaway tree (T-066)", () => {
   });
 });
 
-describe("the knip gate is a step of the root check (T-066)", () => {
-  it("is named in the root check, so CI runs it with no workflow change", () => {
+describe("the knip gate in the root check", () => {
+  it("runs under the root check, which CI already runs", () => {
     const root = z
       .object({ scripts: z.record(z.string(), z.string()).optional() })
-      .parse(
-        JSON.parse(
-          readFileSync(path.resolve(import.meta.dirname, "../../../package.json"), "utf8"),
-        ),
-      );
+      .parse(JSON.parse(readFileSync(path.join(repositoryRoot, "package.json"), "utf8")));
     const scripts = root.scripts ?? {};
 
     expect(scripts["knip"], "the root declares no knip script").toBeDefined();
@@ -115,20 +112,20 @@ describe("the knip gate is a step of the root check (T-066)", () => {
 describe("knip never reads a directory `.git/info/exclude` names", () => {
   const TREE = { "src/main.ts": MAIN, "src/reached.ts": REACHED, ".gitnexus/probe.ts": ALONE };
 
-  it("stays silent about an unreached file under a directory the exclude file names", () => {
+  it("stays silent about an unreached file in an excluded directory", () => {
     const findings = knip.findings({ ...TREE, ".git/info/exclude": ".gitnexus/\n" });
 
     expect(findings).toEqual([]);
   });
 
-  it("names the same file when the exclude file does not name its directory", () => {
+  it("names the same file when its directory is not excluded", () => {
     const findings = knip.findings({ ...TREE, ".git/info/exclude": ".elsewhere/\n" });
 
     expect(namesOf(findings)).toEqual(["files:.gitnexus/probe.ts:.gitnexus/probe.ts"]);
   });
 });
 
-describe("a slice's barrel export nothing imports is named where the config gates entry exports", () => {
+describe("a slice's unused barrel export where entry exports are gated", () => {
   const SLICE_MANIFEST = JSON.stringify({
     ...PACKAGE,
     exports: { "./slice": "./src/slice/index.ts" },
@@ -143,7 +140,7 @@ describe("a slice's barrel export nothing imports is named where the config gate
     "src/slice/index.ts": barrel,
   });
 
-  // A workspace's own value wins over the top-level one, the order knip reads them in.
+  /** A workspace's own value wins over the top-level one, the order knip reads them in. */
   const entryExportsIn = (workspace: string): boolean => {
     if (typeof knipConfig === "function") {
       throw new Error("the repository's knip config is a plain object, never the function form");
@@ -178,7 +175,7 @@ describe("a slice's barrel export nothing imports is named where the config gate
     "packages/design-system",
     "packages/devtools",
     "packages/schema",
-  ])("names it, and the source export it passes on, in %s", (workspace) => {
+  ])("names it and the source export it re-exports in %s", (workspace) => {
     const findings = knipConfiguredAs(workspace).findings(sliceTree(BOTH_NAMES, REACHED_AND_SPARE));
 
     expect(namesOf(findings)).toEqual([
@@ -187,7 +184,7 @@ describe("a slice's barrel export nothing imports is named where the config gate
     ]);
   });
 
-  it("stays silent about it in apps/web, whose registry is installed ahead of its callers", () => {
+  it("stays silent in apps/web, whose registry lands before its callers", () => {
     const findings = knipConfiguredAs("apps/web").findings(
       sliceTree(BOTH_NAMES, REACHED_AND_SPARE),
     );
@@ -195,7 +192,7 @@ describe("a slice's barrel export nothing imports is named where the config gate
     expect(findings).toEqual([]);
   });
 
-  it("stays silent about one tagged `@public` for the block that will wire it", () => {
+  it("stays silent about one tagged `@public` for a later block", () => {
     const tagged = `${ONE_NAME}/** @public S3 */\nexport { spare } from "./reached.ts";\n`;
 
     const findings = knipConfiguredAs("packages/core").findings(

@@ -10,16 +10,17 @@ import {
   SCAN_EXECUTABLE,
   WHERE_THE_LIST_LIVES,
 } from "@better-answers/devtools/insert-scan";
+import { repositoryRoot } from "@better-answers/devtools/oxlint-config";
 import { runsOverThrowawayTree } from "@better-answers/devtools/throwaway-tree";
 import { describe, expect, it } from "vitest";
+
+import { tag } from "./fixture-text.ts";
 
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
 const WORKSPACE = "packages/probe";
 
-const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
-
-// Spelled in two halves, so the scan does not read this suite's own fixtures as violations.
+/** Spelled in two halves, so the scan does not read this suite's own fixtures as violations. */
 const insert = (table: string): string => `INSERT ${"INTO"} ${table} (id) VALUES (1)`;
 
 const typescriptTest = `it("keeps a row", async () => {\n  await q(\`${insert("workspace")}\`);\n});\n`;
@@ -71,7 +72,7 @@ describe("the territory the scan reads", () => {
     expect(isSuiteFile(file)).toBe(expected);
   });
 
-  it("reads a module beside a suite as territory, so a new file cannot become a factory", () => {
+  it("scans a module beside a suite, which is no factory", () => {
     expect(isSuiteFile("packages/core/test/helpers.ts")).toBe(true);
     expect(isFactoryModule("packages/core/test/helpers.ts")).toBe(false);
     expect(isScanned("packages/core/test/helpers.ts")).toBe(true);
@@ -107,13 +108,13 @@ describe("the named list of factory modules", () => {
     return existsSync(found) ? rawInsertsIn(file, readFileSync(found, "utf8")) : [];
   };
 
-  it("names only files the tree has, so no entry is a hole a rename opened", () => {
+  it("names only files the tree has", () => {
     expect(FACTORY_MODULES.filter((file) => !existsSync(path.join(repositoryRoot, file)))).toEqual(
       [],
     );
   });
 
-  it("names only files that carry one, so the list stays as short as the rule needs", () => {
+  it("names only files that carry a raw insert", () => {
     expect(FACTORY_MODULES.filter((file) => holding(file).length === 0)).toEqual([]);
   });
 
@@ -123,14 +124,14 @@ describe("the named list of factory modules", () => {
 });
 
 describe("the scan over a throwaway tree", () => {
-  it("fails on a TypeScript test carrying a raw insert, naming the line and its rule", () => {
+  it("fails on a TypeScript raw insert, naming line and rule", () => {
     const output = scan(withTypescriptInsert());
 
     expect(output).toContain(`${WORKSPACE}/test/one.test.ts:2:`);
-    expect(output).toContain(`[TEST${"4"}]`);
+    expect(output).toContain(tag("TEST", "4"));
   });
 
-  it("names where the list of factory modules lives, so a reader can add one", () => {
+  it("names where the list of factory modules lives", () => {
     expect(scan(withTypescriptInsert())).toContain(WHERE_THE_LIST_LIVES);
   });
 
@@ -140,7 +141,7 @@ describe("the scan over a throwaway tree", () => {
     ]);
   });
 
-  it("fails on an unnamed module beside the suite, which is the way round a gate", () => {
+  it("fails on an unnamed module beside the suite", () => {
     const tree = {
       ...CLEAN,
       [`${WORKSPACE}/test/rows.ts`]: `const q = \`${insert("workspace")}\`;\n`,
@@ -185,7 +186,7 @@ describe("the scan over a throwaway tree", () => {
     expect(scan(tree)).toContain("no raw insert");
   });
 
-  it("refuses a run that read no suite file rather than calling it clean", () => {
+  it("refuses a run that read no suite file", () => {
     const noSuite = {
       [`${WORKSPACE}/src/one.ts`]: "export const one = 1;\n",
       [`${PYTHON_WORKSPACE}/src/one.py`]: "ONE = 1\n",

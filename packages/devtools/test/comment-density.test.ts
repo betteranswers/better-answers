@@ -45,8 +45,10 @@ const workspaceTree = (source: string, test: string): Tree => ({
 const UNDER = workspaceTree(withRatio(1, 40), withRatio(1, 40));
 const OVER = workspaceTree(withRatio(20, 40), withRatio(1, 40));
 
-// The shape the measurement found: SQL mostly comment beside TypeScript ten times its size,
-// which reads under the ceiling while the two share one number.
+/**
+ * SQL that is mostly comment, beside ten times as much TypeScript, reads under the ceiling
+ * when the two share one number.
+ */
 const diluting = (sql: string): Tree => ({
   [`${WORKSPACE}/package.json`]: JSON.stringify({ name: "@better-answers/probe" }),
   [`${WORKSPACE}/src/one.ts`]: withRatio(1, 400),
@@ -66,7 +68,7 @@ const yamlWithRatio = (comments: number, code: number): string =>
   Array.from({ length: code }, (_, index) => yamlLine(index)).join("");
 
 describe("the line counter reads what the ceiling is measured on", () => {
-  it("counts a Python docstring as a comment, which the ceiling leans on", () => {
+  it("counts a Python docstring as a comment", () => {
     const counted = cloc({
       [`${WORKSPACE}/package.json`]: "{}",
       [`${WORKSPACE}/one.py`]: '"""A docstring."""\n\n\ndef g() -> int:\n    return 1\n',
@@ -76,7 +78,7 @@ describe("the line counter reads what the ceiling is measured on", () => {
     expect(counted[0]?.code).toBe(2);
   });
 
-  it("counts a SQL line comment, which is what gives the migrations a number of their own", () => {
+  it("counts a SQL line comment, giving migrations their own number", () => {
     const counted = cloc({
       [`${WORKSPACE}/package.json`]: "{}",
       [`${MIGRATIONS}/0000_substrate.sql`]: sqlWithRatio(2, 1),
@@ -87,11 +89,11 @@ describe("the line counter reads what the ceiling is measured on", () => {
     expect(counted[0]?.code).toBe(1);
   });
 
-  it("gives the counter no per-file guard, which drops the file it fires on and breaks the JSON", () => {
+  it("runs cloc without the per-file timeout that breaks its JSON", () => {
     expect(clocArgv(["packages"]).join(" ")).toContain("--timeout 0");
   });
 
-  it("walks past a workspace's markdown and JSON, which the strip never touched", () => {
+  it("walks past a workspace's markdown and JSON", () => {
     const counted = cloc({
       [`${WORKSPACE}/package.json`]: JSON.stringify({ name: "@better-answers/probe" }),
       [`${WORKSPACE}/README.md`]: "# a heading\n\nsome prose\n",
@@ -115,13 +117,13 @@ describe("the arm a file is measured under", () => {
     expect(armOf(file)).toBe(arm);
   });
 
-  it("holds a test arm to the tighter of the two ceilings", () => {
+  it("holds a test arm to the tighter ceiling", () => {
     expect(CEILING.test).toBeLessThan(CEILING.source);
   });
 });
 
 describe("the ceiling over a throwaway tree", () => {
-  it("names the workspace, the arm and the measured ratio when an arm is over", () => {
+  it("names workspace, arm and ratio when an arm is over", () => {
     const over = overTheCeiling(measure(cloc(OVER), [asWorkspace]));
 
     expect(over).toHaveLength(1);
@@ -136,7 +138,7 @@ describe("the ceiling over a throwaway tree", () => {
     expect(overTheCeiling(measure(cloc(UNDER), [asWorkspace]))).toEqual([]);
   });
 
-  it("holds a test arm to its own ceiling, not the source one", () => {
+  it("holds a test arm to its own ceiling", () => {
     const over = overTheCeiling(
       measure(cloc(workspaceTree(withRatio(1, 40), withRatio(4, 40))), [asWorkspace]),
     );
@@ -146,7 +148,7 @@ describe("the ceiling over a throwaway tree", () => {
 });
 
 describe("a directory measured as one unit", () => {
-  it("makes a directory one number under the source ceiling, not two arms", () => {
+  it("measures a directory as one number under the source ceiling", () => {
     const measured = measure(
       cloc({
         [`${WORKSPACE}/package.json`]: "{}",
@@ -161,7 +163,7 @@ describe("a directory measured as one unit", () => {
     expect(overTheCeiling(measured)).toEqual([]);
   });
 
-  it("measures the migrations apart from the workspace whose TypeScript dilutes them", () => {
+  it("measures the migrations apart from the workspace that dilutes them", () => {
     const measured = measure(cloc(DILUTED_OVER), [asWorkspace, asDirectory]);
     const over = overTheCeiling(measured);
 
@@ -170,7 +172,7 @@ describe("a directory measured as one unit", () => {
     expect(measured.find((one) => one.unit === WORKSPACE)?.code).toBe(400);
   });
 
-  it("leaves a workspace blind to the SQL beside it, so the seven workspaces do not move", () => {
+  it("leaves a workspace blind to the SQL beside it", () => {
     const measured = measure(cloc(DILUTED_OVER), [asWorkspace]);
 
     expect(measured.map((one) => one.unit)).toEqual([WORKSPACE]);
@@ -187,7 +189,7 @@ describe("the ceiling's wrapper, run as the root manifest runs it", () => {
     smoke: { tree: OVER, reports: (output) => output.includes("over the 0.10 ceiling") },
   });
 
-  it("fails with the workspace and the ratio named when an arm is over the ceiling", () => {
+  it("fails naming the workspace and ratio over the ceiling", () => {
     expect(wrapper(OVER)).toContain(`${WORKSPACE} source: 0.50 comment lines per code line`);
   });
 
@@ -195,7 +197,7 @@ describe("the ceiling's wrapper, run as the root manifest runs it", () => {
     expect(wrapper(UNDER)).toContain("under the ceiling");
   });
 
-  it("refuses a run that measured nothing rather than calling it clean", () => {
+  it("refuses a run that measured nothing", () => {
     expect(() => wrapper({ [`${WORKSPACE}/package.json`]: "{}" })).toThrow(
       /measured no file it understands/,
     );
@@ -210,7 +212,7 @@ describe("the ceiling's wrapper over a directory named as one unit", () => {
     smoke: { tree: DILUTED_OVER, reports: (output) => output.includes(`${MIGRATIONS} source:`) },
   });
 
-  it("fails with the directory named, where the workspace holding it stays under", () => {
+  it("fails naming the directory while its workspace stays under", () => {
     const output = wrapper(DILUTED_OVER);
 
     expect(output).toContain(`${MIGRATIONS} source: 0.75 comment lines per code line`);
@@ -221,11 +223,11 @@ describe("the ceiling's wrapper over a directory named as one unit", () => {
     expect(wrapper(DILUTED_UNDER)).toContain("under the ceiling");
   });
 
-  it("refuses a named directory the tree does not hold, rather than measuring what is left", () => {
+  it("refuses a named directory the tree does not hold", () => {
     expect(() => wrapper(UNDER)).toThrow(new RegExp(`no directory at ${MIGRATIONS}`));
   });
 
-  it("refuses a named directory it read nothing in, though the workspaces beside it are green", () => {
+  it("refuses a named directory it read nothing in", () => {
     expect(() =>
       wrapper({
         ...UNDER,
@@ -267,7 +269,7 @@ const asNamed: Unit = { name: NAMED, kind: "directory", holds: [...CONFIG_FILES]
 const clocConfig = clocOver([...CONFIG_FILES], { tree: configTree(1), counted: 2 });
 
 describe("a set of files measured as one named unit", () => {
-  it("adds the files up under the name rather than each on its own", () => {
+  it("adds the files up under one name, not each alone", () => {
     const measured = measure(clocConfig(configTree(1)), [asNamed]);
 
     expect(measured).toHaveLength(1);
@@ -276,7 +278,7 @@ describe("a set of files measured as one named unit", () => {
     expect(overTheCeiling(measured)).toEqual([]);
   });
 
-  it("fails under the one name when the set as a whole is over the ceiling", () => {
+  it("fails under one name when the whole set is over", () => {
     const over = overTheCeiling(measure(clocConfig(configTree(6)), [asNamed]));
 
     expect(over.map((one) => one.unit)).toEqual([NAMED]);
@@ -291,7 +293,7 @@ describe("the ceiling's wrapper over a set named as one unit", () => {
     smoke: { tree: configTree(6), reports: (output) => output.includes(`${NAMED} source:`) },
   });
 
-  it("names the set, not the files, when it is over the ceiling", () => {
+  it("names the set, not its files, when over the ceiling", () => {
     const output = wrapper(configTree(6));
 
     expect(output).toContain(`${NAMED} source:`);
@@ -302,7 +304,7 @@ describe("the ceiling's wrapper over a set named as one unit", () => {
     expect(wrapper(configTree(1))).toContain("under the ceiling");
   });
 
-  it("refuses a named file the tree does not hold, rather than measuring what is left", () => {
+  it("refuses a named file the tree does not hold", () => {
     expect(() =>
       wrapper({ [`${WORKSPACE}/package.json`]: "{}", [CONFIG_FILES[0]]: "keep: 1\n" }),
     ).toThrow(new RegExp(`${NAMED} names no ${CONFIG_FILES[1]}`));
@@ -320,7 +322,7 @@ describe("the ceiling's wrapper over a set named as one unit", () => {
   });
 });
 
-describe("the root manifest names each config root as a unit of its own", () => {
+describe("the root manifest makes each config root its own unit", () => {
   it.each([
     "--directory packages/schema/migrations",
     "--directory .claude/hooks",
