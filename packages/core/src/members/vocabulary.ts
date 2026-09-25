@@ -10,6 +10,9 @@ export const MEMBER_REFUSALS = declareRefusals("members", {
   "name-taken": "conflict",
   "already-in-group": "conflict",
   "already-decided": "conflict",
+
+  // Someone else is made an Admin first.
+  "last-admin": "precondition",
 });
 
 export type MemberRefusal<W extends RefusalWordFor<typeof MEMBER_REFUSALS>> = W;

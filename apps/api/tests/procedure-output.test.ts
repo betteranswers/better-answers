@@ -29,6 +29,7 @@ describe("what a procedure may answer the wire", () => {
     expect(Object.keys(appRouter._def.procedures).sort()).toEqual([
       "console.people.revokeCredentials",
       "console.workspaces.list",
+      "members.changeRole",
       "members.list",
       "person.requestAccess",
       "person.setDisplayName",
@@ -55,6 +56,7 @@ describe("what a procedure may answer the wire", () => {
       | "console.people.revokeCredentials"
       | "console.workspaces.list"
       | "members.list"
+      | "members.changeRole"
       | "routes.list"
       | "sources.list"
       | "sources.bind"

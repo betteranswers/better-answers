@@ -1,7 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { until, whileWritesAreRefused } from "@better-answers/core/testing/postgres";
+
 import { startApp, type TestApp } from "./harness.ts";
-import { seededIn, sessionPointedAt } from "./provoke.ts";
+import { revocationHeldOpen, seededIn, sessionPointedAt, someoneWaitsOnALock } from "./provoke.ts";
 import { refusalOfCall, webSignedIn } from "./web-client.ts";
 
 let app: TestApp;
@@ -120,5 +122,202 @@ describe("what the members list refuses", () => {
     expect(refused).toMatchObject({
       data: { httpStatus: 401, refusal: { word: "not-a-member", class: "unauthenticated" } },
     });
+  });
+});
+
+const ROLE_CHANGED = "people.member.role_changed";
+
+const roleHeldBy = async (workspaceId: string, personId: string): Promise<string | undefined> => {
+  const held = await app.database.superuser.query<{ role: string }>(
+    "SELECT role FROM member WHERE workspace_id = $1 AND user_id = $2",
+    [workspaceId, personId],
+  );
+  return held.rows[0]?.role;
+};
+
+const roleChangesIn = async (workspaceId: string) => {
+  const rows = await app.database.superuser.query<{
+    actor: string;
+    subject_id: string;
+    detail: Readonly<Record<string, string>>;
+  }>(
+    "SELECT actor, subject_id, detail FROM audit_event WHERE workspace_id = $1 AND act = $2 ORDER BY id",
+    [workspaceId, ROLE_CHANGED],
+  );
+  return rows.rows;
+};
+
+describe("changing a member's role over tRPC", () => {
+  it("moves a member to the asked role and records it", async () => {
+    const { workspace, viewer } = await aWorkspaceOfThree();
+    const { api } = await webSignedIn(app, workspace.admin.email);
+
+    const changed = await api.members.changeRole.mutate({ personId: viewer.id, role: "Editor" });
+
+    expect(changed).toEqual({ personId: viewer.id, previousRole: "Viewer", role: "Editor" });
+    expect(await roleHeldBy(workspace.workspaceId, viewer.id)).toBe("Editor");
+    expect(await roleChangesIn(workspace.workspaceId)).toEqual([
+      {
+        actor: `human:${workspace.admin.id}`,
+        subject_id: viewer.id,
+        detail: { previousRole: "Viewer", role: "Editor" },
+      },
+    ]);
+  });
+
+  it("holds from the member's next request, as their membership says", async () => {
+    const workspace = await app.provision();
+    const second = await app.person();
+    await app.addMember(workspace.workspaceId, second.id, "Admin");
+    const { api: theirs } = await webSignedIn(app, second.email);
+    const { api: mine } = await webSignedIn(app, workspace.admin.email);
+    expect((await theirs.session.membership.query()).role).toBe("Admin");
+
+    await mine.members.changeRole.mutate({ personId: second.id, role: "Viewer" });
+
+    expect((await theirs.session.membership.query()).role).toBe("Viewer");
+    expect(await refusalOfCall(theirs.members.list.query())).toMatchObject({
+      data: { httpStatus: 403, refusal: { word: "role-forbids", class: "forbidden" } },
+    });
+  });
+
+  it("refuses a role outside the three, no-such-role, recording nothing", async () => {
+    const { workspace, viewer } = await aWorkspaceOfThree();
+    const { api } = await webSignedIn(app, workspace.admin.email);
+
+    const refused = await refusalOfCall(
+      api.members.changeRole.mutate({ personId: viewer.id, role: "Owner" }),
+    );
+
+    expect(refused).toMatchObject({
+      data: { httpStatus: 404, refusal: { word: "no-such-role", class: "absent" } },
+    });
+    expect(await roleHeldBy(workspace.workspaceId, viewer.id)).toBe("Viewer");
+    expect(await roleChangesIn(workspace.workspaceId)).toEqual([]);
+  });
+
+  it("refuses demoting the only Admin, last-admin, recording nothing", async () => {
+    const workspace = await app.provision();
+    const { api } = await webSignedIn(app, workspace.admin.email);
+
+    const refused = await refusalOfCall(
+      api.members.changeRole.mutate({ personId: workspace.admin.id, role: "Editor" }),
+    );
+
+    expect(refused).toMatchObject({
+      data: { httpStatus: 412, refusal: { word: "last-admin", class: "precondition" } },
+    });
+    expect(await roleHeldBy(workspace.workspaceId, workspace.admin.id)).toBe("Admin");
+    expect(await roleChangesIn(workspace.workspaceId)).toEqual([]);
+  });
+
+  it("lets one of two Admins demote themself", async () => {
+    const workspace = await app.provision();
+    const second = await app.person();
+    await app.addMember(workspace.workspaceId, second.id, "Admin");
+    const { api } = await webSignedIn(app, workspace.admin.email);
+
+    await api.members.changeRole.mutate({ personId: workspace.admin.id, role: "Editor" });
+
+    expect(await roleHeldBy(workspace.workspaceId, workspace.admin.id)).toBe("Editor");
+    expect(await roleHeldBy(workspace.workspaceId, second.id)).toBe("Admin");
+  });
+});
+
+describe("who may change a role", () => {
+  it.each(["Editor", "Viewer"] as const)(
+    "refuses a member at %s, role-forbids, recording nothing",
+    async (role) => {
+      const { workspace, viewer } = await aWorkspaceOfThree();
+      const actor = await app.person();
+      await app.addMember(workspace.workspaceId, actor.id, role);
+      const { api } = await webSignedIn(app, actor.email);
+
+      const refused = await refusalOfCall(
+        api.members.changeRole.mutate({ personId: viewer.id, role: "Editor" }),
+      );
+
+      expect(refused).toMatchObject({
+        data: { httpStatus: 403, refusal: { word: "role-forbids", class: "forbidden" } },
+      });
+      expect(await roleHeldBy(workspace.workspaceId, viewer.id)).toBe("Viewer");
+      expect(await roleChangesIn(workspace.workspaceId)).toEqual([]);
+    },
+  );
+
+  it("refuses an Admin of another workspace pointed at this one", async () => {
+    const { workspace, viewer } = await aWorkspaceOfThree();
+    const elsewhere = await app.provision();
+    const { api } = await webSignedIn(app, elsewhere.admin.email);
+    await sessionPointedAt(app, elsewhere.admin.id, workspace.workspaceId);
+
+    const refused = await refusalOfCall(
+      api.members.changeRole.mutate({ personId: viewer.id, role: "Editor" }),
+    );
+
+    expect(refused).toMatchObject({
+      data: { httpStatus: 401, refusal: { word: "not-a-member", class: "unauthenticated" } },
+    });
+    expect(await roleHeldBy(workspace.workspaceId, viewer.id)).toBe("Viewer");
+    expect(await roleChangesIn(workspace.workspaceId)).toEqual([]);
+  });
+
+  it("refuses a member of another workspace as no member here", async () => {
+    const mine = await app.provision();
+    const theirs = await app.provision();
+    const stranger = await app.person();
+    await app.addMember(theirs.workspaceId, stranger.id, "Viewer");
+    const { api } = await webSignedIn(app, mine.admin.email);
+
+    const refused = await refusalOfCall(
+      api.members.changeRole.mutate({ personId: stranger.id, role: "Admin" }),
+    );
+
+    expect(refused).toMatchObject({
+      data: { httpStatus: 404, refusal: { word: "no-such-member", class: "absent" } },
+    });
+    expect(await roleHeldBy(theirs.workspaceId, stranger.id)).toBe("Viewer");
+    expect(await roleChangesIn(theirs.workspaceId)).toEqual([]);
+  });
+});
+
+describe("a role change that fails partway", () => {
+  it("leaves no rows when its audit event cannot land", async () => {
+    const { workspace, viewer } = await aWorkspaceOfThree();
+    const { api } = await webSignedIn(app, workspace.admin.email);
+
+    const failed = await whileWritesAreRefused(app.database.superuser, "audit_event", () =>
+      refusalOfCall(api.members.changeRole.mutate({ personId: viewer.id, role: "Editor" })),
+    );
+
+    expect(failed).toHaveProperty("message", "changeRole failed");
+    expect(failed).toHaveProperty("data.httpStatus", 500);
+    expect(failed).not.toHaveProperty("data.refusal");
+    expect(await roleHeldBy(workspace.workspaceId, viewer.id)).toBe("Viewer");
+    expect(await roleChangesIn(workspace.workspaceId)).toEqual([]);
+  });
+
+  it("refuses the change when a revocation lands while it waits", async () => {
+    const { workspace, viewer } = await aWorkspaceOfThree();
+    const { api } = await webSignedIn(app, workspace.admin.email);
+    const revocation = await revocationHeldOpen(app, workspace.admin.id);
+    try {
+      const changing = refusalOfCall(
+        api.members.changeRole.mutate({ personId: viewer.id, role: "Editor" }),
+      );
+      await until(() => someoneWaitsOnALock(app));
+      await revocation.land();
+
+      expect(await changing).toMatchObject({
+        data: {
+          httpStatus: 401,
+          refusal: { word: "credentials-revoked", class: "unauthenticated" },
+        },
+      });
+    } finally {
+      await revocation.abandon();
+    }
+    expect(await roleHeldBy(workspace.workspaceId, viewer.id)).toBe("Viewer");
+    expect(await roleChangesIn(workspace.workspaceId)).toEqual([]);
   });
 });
