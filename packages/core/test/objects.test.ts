@@ -31,7 +31,7 @@ const streamOf = (text: string): ReadableStream<Uint8Array> =>
   });
 
 describe("the object door keeps a workspace's bytes", () => {
-  it("gives back exactly the bytes that were put, over a stream", async () => {
+  it("gives back exactly the bytes put, over a stream", async () => {
     const workspace = someone();
     const written = "Grüße, Ada — €5 𝄞";
 
@@ -43,7 +43,7 @@ describe("the object door keeps a workspace's bytes", () => {
     expect(await textOf(got.value)).toEqual("Grüße, Ada — €5 𝄞");
   });
 
-  it("answers a list with the keys under the prefix asked for and no key outside it", async () => {
+  it("lists only the keys under the prefix asked for", async () => {
     const workspace = someone();
     for (const key of ["documents/a.txt", "documents/b.txt", "findings/c.txt", "documents"]) {
       const put = await putObject(workspace, store().door, key, streamOf(key));
@@ -60,7 +60,7 @@ describe("the object door keeps a workspace's bytes", () => {
     });
   });
 
-  it("keeps one workspace's key out of another's reach, and the other's out of the first's", async () => {
+  it("keeps each workspace's keys out of the other's reach", async () => {
     const first = someone();
     const second = someone();
     await putObject(first, store().door, "notes.txt", streamOf("the first workspace's notes"));
@@ -93,8 +93,8 @@ describe("the object door keeps a workspace's bytes", () => {
   });
 });
 
-describe("the object door keeps the platform's own bytes apart from every workspace's", () => {
-  it("puts a replay copy where no workspace can address it, and lists it there alone", async () => {
+describe("the object door keeps platform bytes apart from every workspace's", () => {
+  it("puts a replay copy beyond workspaces, and lists it alone", async () => {
     const workspace = someone();
     const key = `erasures/${ulid()}.json`;
     const copy = '{"pseudonym":"erased-person-01","identifiers":["ada@example.invalid"]}';
@@ -129,7 +129,7 @@ describe("the object door keeps the platform's own bytes apart from every worksp
   });
 });
 
-describe("the object door refuses a key that names nothing inside a prefix", () => {
+describe("the object door refuses keys naming nothing inside a prefix", () => {
   it.each([
     ["nothing at all", ""],
     ["an absolute path", "/documents/notice.txt"],
@@ -152,7 +152,7 @@ describe("the object door refuses a key that names nothing inside a prefix", () 
     });
   });
 
-  it("takes an empty listing prefix, which names everything under the workspace prefix", async () => {
+  it("takes an empty listing prefix as everything under the workspace", async () => {
     const workspace = someone();
     expect(await listObjects(workspace, store().door, "")).toEqual({ ok: true, value: [] });
     expect(await listObjects(workspace, store().door, "../elsewhere/")).toEqual({

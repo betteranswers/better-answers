@@ -9,7 +9,7 @@ import { z } from "zod";
 
 const run = promisify(execFile);
 
-// What `execFile` hangs on its rejection: the spawn's streams and the error's own line.
+/** What `execFile` hangs on its rejection: the spawn's streams and the error's own line. */
 const execFailure = z.object({
   stderr: z.string().optional(),
   stdout: z.string().optional(),
@@ -25,8 +25,10 @@ const workerDsn = (connectionUri: string): string => {
   return uri.toString();
 };
 
-// The deploy order in a fixture. As the owner, not through `workerDsn`: the worker is refused
-// this write.
+/**
+ * The deploy order in a fixture. As the owner, not through `workerDsn`: the worker is refused
+ * this write.
+ */
 const stampTheContract = async (connectionUri: string): Promise<void> => {
   const client = new pg.Client({ connectionString: connectionUri });
   await client.connect();
@@ -45,7 +47,7 @@ export type WorkerObjectStore = {
   readonly secretAccessKey: string;
 };
 
-// A suite whose jobs read no original still has to give the worker a bucket to open.
+/** A suite whose jobs read no original still has to give the worker a bucket to open. */
 const AN_UNREACHABLE_STORE: WorkerObjectStore = {
   endpoint: "http://objectstore.invalid:3900",
   bucket: "better-answers",
@@ -56,6 +58,7 @@ const AN_UNREACHABLE_STORE: WorkerObjectStore = {
 
 export const lmdbRootUnder = (bundleRoot: string): string => path.join(bundleRoot, "lmdb");
 
+/** Stamps the contract, then runs one pass as `worker_rt`; throws on a failure or a traceback. */
 export const runWorkerOnce = async (
   connectionUri: string,
   bundleRoot: string,

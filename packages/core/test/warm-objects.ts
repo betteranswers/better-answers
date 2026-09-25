@@ -82,6 +82,7 @@ const startGarage = async (): Promise<StartedGarage> => {
   };
 };
 
+/** Vitest's global setup: starts one Garage, and only when a collected file names the harness. */
 const startWarmObjects = async (
   project: TestProject,
 ): Promise<(() => Promise<void>) | undefined> => {
@@ -158,8 +159,10 @@ const bucketIdFor = async (warm: WarmObjects, name: string): Promise<string> => 
   if (created.ok) return (await answerOf("CreateBucket", created, bucketShape)).id;
   const refused = await refusalOf("CreateBucket", created);
 
-  // A mutation run re-enters a file's `beforeAll` against the Garage the run before it left, so
-  // the alias it wants is already standing.
+  /**
+   * A mutation run re-enters a file's `beforeAll` against the Garage the run before it left, so
+   * the alias it wants is already standing.
+   */
   const found = await askAdmin(
     warm,
     "GET",
@@ -169,6 +172,7 @@ const bucketIdFor = async (warm: WarmObjects, name: string): Promise<string> => 
   return (await answerOf("GetBucketInfo", found, bucketShape)).id;
 };
 
+/** The first listing page alone: up to 1,000 keys. */
 export const keysIn = async (door: ObjectDoor): Promise<readonly string[]> => {
   const listed = await door.client.send(new ListObjectsV2Command({ Bucket: door.bucket }));
   return (listed.Contents ?? []).flatMap((held) => (held.Key === undefined ? [] : [held.Key]));
@@ -227,13 +231,19 @@ const storeOver = async (
 
 const NOTHING_TO_STOP = async (): Promise<void> => {};
 
+/**
+ * An emptied bucket named for `storeKey`, else the running test file; with no warm Garage, it
+ * starts its own, which `stop` ends.
+ */
 export const openObjectStore = async (storeKey?: string): Promise<ObjectStore> => {
   const name = storeNameFor(storeKey ?? runningTestFile());
   const warm = providedWarmObjects();
   if (warm !== undefined) return storeOver(warm, name, NOTHING_TO_STOP);
 
-  // Vitest takes its `globalSetup` once a process, so a watch or mutation session that opened
-  // on other files has none to hand out.
+  /**
+   * Vitest takes its `globalSetup` once a process, so a watch or mutation session that opened
+   * on other files has none to hand out.
+   */
   const started = await startGarage();
   try {
     return await storeOver(started.warm, name, started.stop);

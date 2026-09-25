@@ -50,7 +50,7 @@ const uidsByDepth = (steps: readonly WalkStep[]): readonly (readonly [string, nu
   steps.map((step) => [step.uid, step.depth]);
 
 describe("a graph walk", () => {
-  it("reaches everything within four hops of the entry, and nothing past the template's cap", async () => {
+  it("reaches everything within four hops of the entry, no further", async () => {
     const scenario = await arrange();
     const uids = await seeded(async (seed) => {
       const chain: string[] = [];
@@ -86,7 +86,7 @@ describe("a graph walk", () => {
     ["an unpublished middle concept", { node: { publishedAt: null }, adminSees: false }],
   ];
 
-  it.each(WITHHELD)("excludes every path through %s, for the whole path", async (_what, shape) => {
+  it.each(WITHHELD)("excludes every path through %s", async (_what, shape) => {
     const scenario = await arrange();
     const { entry, middle, far } = await seeded(async (seed) => {
       const a = await seed.graphNode({ workspaceId: scenario.workspaceId });
@@ -110,7 +110,7 @@ describe("a graph walk", () => {
     expect(admin.map((step) => step.uid).includes(middle)).toBe(shape.adminSees);
   });
 
-  it("answers a withheld entry exactly as it answers one nobody mapped", async () => {
+  it("answers a withheld entry exactly as one nobody mapped", async () => {
     const scenario = await arrange();
     const restricted = await seeded((seed) =>
       seed.graphNode({ workspaceId: scenario.workspaceId, sensitivity: "Restricted" }),
@@ -126,7 +126,7 @@ describe("a graph walk", () => {
     expect(absent).toEqual([]);
   });
 
-  it("never answers across workspaces, even through an edge that names another tenant's node", async () => {
+  it("never crosses workspaces, even through an edge naming another's node", async () => {
     const ours = await arrange();
     const theirs = await arrange();
     const { home, theirEntry, theirFar } = await seeded(async (seed) => {
@@ -155,7 +155,7 @@ describe("a graph walk", () => {
     ]);
   });
 
-  it("binds the live generation on every element, so a rebuild is one row update and source entities walk beside it", async () => {
+  it("walks only the live generation, with source entities beside it", async () => {
     const scenario = await arrange();
     const { entry, liveFar, nextFar, entity } = await seeded(async (seed) => {
       const a = await seed.graphNode({ workspaceId: scenario.workspaceId });
@@ -206,7 +206,7 @@ describe("a graph walk", () => {
     expect(after.map((step) => step.uid)).not.toContain(liveFar);
   });
 
-  it("caps a walk's answer at the template's row limit, so a dense map cannot demand unbounded work", async () => {
+  it("caps a walk's answer at the template's row limit", async () => {
     const scenario = await arrange();
     const uids = await seeded(async (seed) => {
       const nodes: string[] = [];
@@ -227,7 +227,7 @@ describe("a graph walk", () => {
     expect(steps.length).toBe(GRAPH_WALK_ROW_LIMIT);
   });
 
-  it("answers with the path's node fields alone — nothing off an edge reaches a reader", async () => {
+  it("answers the path's node fields alone, nothing off an edge", async () => {
     const scenario = await arrange();
     const entry = await seeded(async (seed) => {
       const a = await seed.graphNode({ workspaceId: scenario.workspaceId });
@@ -323,7 +323,7 @@ const linkedPair = async (): Promise<{
 };
 
 describe("the delta a second commit runs", () => {
-  it("takes a link the edit removed off the map, rather than leaving a phantom edge", async () => {
+  it("takes a link the edit removed off the map", async () => {
     const { scenario, product, policy } = await linkedPair();
     await land(scenario, deltaOf(policy));
     expect(await edgesFrom(scenario, policy.iri)).toEqual([
@@ -337,7 +337,7 @@ describe("the delta a second commit runs", () => {
     expect(await edgesFrom(scenario, policy.iri)).toEqual([]);
   });
 
-  it("keeps an inbound link's denormalised kind in step when the target's own kind moves", async () => {
+  it("moves an inbound link's denormalised kind with its target's kind", async () => {
     const { scenario, product, policy } = await linkedPair();
 
     // The target lands first: a newly mapped concept re-derives every file naming it, which
@@ -353,7 +353,7 @@ describe("the delta a second commit runs", () => {
     ]);
   });
 
-  it("leaves a citer's lineage where it is until the cited concept is actually deprecated", async () => {
+  it("leaves a citer's lineage alone until the cited concept's deprecation", async () => {
     const scenario = await arrange();
     const cited = await conceptIn(scenario, { path: "knowledge/expenses.md", kind: "Policy" });
     const successor = await conceptIn(scenario, {
@@ -379,7 +379,7 @@ describe("the delta a second commit runs", () => {
     ]);
   });
 
-  it("derives a derivation over a deprecated concept of another kind, never a succession", async () => {
+  it("derives from a deprecated concept of another kind, never supersedes", async () => {
     const scenario = await arrange();
 
     const retired = await conceptIn(scenario, {
@@ -431,7 +431,7 @@ const reached = (links: readonly LinkFacts[]): readonly string[] =>
   links.map((edge) => edge.to_uid);
 
 describe("what a body's markdown makes an edge of", () => {
-  it("quotes the sentence around the link, cut from its own paragraph at the terminators either side", async () => {
+  it("quotes the link's sentence, cut at the terminators either side", async () => {
     const { target, links } = await derived(
       [
         "# Expenses",
@@ -447,7 +447,7 @@ describe("what a body's markdown makes an edge of", () => {
     ]);
   });
 
-  it("reads a link in the file's first paragraph, which has no blank line above it", async () => {
+  it("reads a link in the file's first paragraph", async () => {
     const { target, links } = await derived("See [the product](./product.md) for tiers.");
 
     expect(links).toEqual([
@@ -455,7 +455,7 @@ describe("what a body's markdown makes an edge of", () => {
     ]);
   });
 
-  it("ends a sentence with no terminator at its own paragraph, never at the next one's", async () => {
+  it("ends an unterminated sentence at its own paragraph's end", async () => {
     const { target, links } = await derived(
       "See [the product](./product.md) for tiers\n\nReceipts are kept for six years.",
     );
@@ -465,7 +465,7 @@ describe("what a body's markdown makes an edge of", () => {
     ]);
   });
 
-  it("names the nearest heading above the link its section, at any level and trimmed", async () => {
+  it("takes the nearest heading, any level, trimmed, as its section", async () => {
     const { target, links } = await derived(
       [
         "# Expenses",
@@ -489,7 +489,7 @@ describe("what a body's markdown makes an edge of", () => {
     ]);
   });
 
-  it("derives nothing from a link inside quoted code, and keeps the prose around it where it was", async () => {
+  it("derives nothing from quoted code, keeping the prose around it", async () => {
     const { target, links } = await derived(
       [
         "# Expenses",
@@ -508,7 +508,7 @@ describe("what a body's markdown makes an edge of", () => {
     ]);
   });
 
-  it("closes a fence at its own closing line, and at no line that merely holds one", async () => {
+  it("closes a fence only at its own closing line", async () => {
     const { target, links } = await derived(
       [
         "# Expenses",
@@ -528,7 +528,7 @@ describe("what a body's markdown makes an edge of", () => {
     ]);
   });
 
-  it("leaves an unpaired backtick run as the literal text it is", async () => {
+  it("leaves an unpaired backtick run as literal text", async () => {
     const { target, links } = await derived(
       [
         "A ` stray tick is literal text.",
@@ -544,7 +544,7 @@ describe("what a body's markdown makes an edge of", () => {
     ]);
   });
 
-  it("never closes a run with one of another length, so a link between the two stays prose", async () => {
+  it("closes a backtick run only with one of its length", async () => {
     const { target, links } = await derived("See ``[the product](./product.md)` for tiers.");
 
     expect(links).toEqual([
@@ -552,7 +552,7 @@ describe("what a body's markdown makes an edge of", () => {
     ]);
   });
 
-  it("takes a definition from a line of its own, however it spaces the colon, and from nowhere else", async () => {
+  it("takes a definition only from its own line, however spaced", async () => {
     const { target, links } = await derived(
       [
         "Details in [tight] and nothing in [aside].",
@@ -567,7 +567,7 @@ describe("what a body's markdown makes an edge of", () => {
     expect(reached(links)).toEqual([target.iri]);
   });
 
-  it("resolves a full reference through a definition whose label differs by case and spacing", async () => {
+  it("resolves a full reference's label ignoring case and extra spacing", async () => {
     const { target, links } = await derived(
       [
         "Details in [the product][  Price  Book  ].",
@@ -582,7 +582,7 @@ describe("what a body's markdown makes an edge of", () => {
     expect(reached(links)).toEqual([target.iri]);
   });
 
-  it("reads a collapsed reference as naming itself, and makes nothing of an empty target", async () => {
+  it("resolves a collapsed reference via its label, skipping empty targets", async () => {
     const { target, links } = await derived(
       [
         "Collapsed: [price book][].",
@@ -596,7 +596,7 @@ describe("what a body's markdown makes an edge of", () => {
     expect(reached(links)).toEqual([target.iri]);
   });
 
-  it("reads a colon inside a filename as part of the path, never as a scheme", async () => {
+  it("reads a filename's colon as path, never a scheme", async () => {
     const { target, links } = await derived(
       "Hosted at [the vendor](//example.test/product), and detailed in [the annexe](./a:b.md).",
       ["knowledge/a:b.md"],
@@ -605,7 +605,7 @@ describe("what a body's markdown makes an edge of", () => {
     expect(reached(links)).toEqual([target.iri]);
   });
 
-  it("makes one lineage edge per cited concept, and none for a citation that names no concept", async () => {
+  it("makes one lineage edge per cited concept, none for others", async () => {
     const scenario = await arrange();
     const cited = await conceptIn(scenario, { path: "knowledge/expenses.md", kind: "Policy" });
 
@@ -634,7 +634,7 @@ describe("what a body's markdown makes an edge of", () => {
     ).toEqual([cited.iri, unwritten].toSorted());
   });
 
-  it("backfills a link written before its target landed, at any depth in the bundle", async () => {
+  it("backfills a link written before its target landed, however deep", async () => {
     const scenario = await arrange();
     const author = await authorOf(
       scenario,

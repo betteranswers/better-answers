@@ -35,8 +35,10 @@ export const postgresForSuite = (): (() => MigratedPostgres) => {
   };
 };
 
-// For an act that reads every workspace the database holds, whose totals another case's rows
-// would change.
+/**
+ * For an act that reads every workspace the database holds, whose totals another case's rows
+ * would change.
+ */
 export const postgresForEachCase = (): (() => MigratedPostgres) => {
   let db: MigratedPostgres | undefined;
   let cases = 0;
@@ -74,6 +76,7 @@ export const seedingWith = async <T>(
   }
 };
 
+/** Runs `work` as the member `reader`, in one transaction under row-level security; it may write. */
 export const readingAs = async <T>(
   pool: pg.Pool,
   reader: { readonly workspaceId: string; readonly userId: string },
@@ -92,6 +95,7 @@ export const answered = <Value, Refusal>(read: Result<Value, Refusal>): Value =>
   return read.value;
 };
 
+/** Polls 1,800 times, 25 ms apart: at least 45 seconds before it throws. */
 export const until = async (condition: () => Promise<boolean>): Promise<void> => {
   for (let turn = 0; turn < 1_800; turn += 1) {
     if (await condition()) return;
@@ -100,8 +104,10 @@ export const until = async (condition: () => Promise<boolean>): Promise<void> =>
   throw new Error("the condition never held");
 };
 
-// No test can end a worker mid-run, so the row a departed claimant would have left is
-// written instead, as the queue contract's `lapse_first` does.
+/**
+ * No test can end a worker mid-run, so the row a departed claimant would have left is
+ * written instead, as the queue contract's `lapse_first` does.
+ */
 export const leaseLetLapse = async (
   pool: pg.Pool,
   job: { readonly workspaceId: string; readonly jobId: string },
@@ -124,6 +130,7 @@ export const isBlockedOnTable = async (pool: pg.Pool, table: string): Promise<bo
   return (found.rowCount ?? 0) > 0;
 };
 
+/** Holds an ACCESS EXCLUSIVE lock on `table`, from a connection of its own, while `work` runs. */
 export const holdingTable = async <T>(
   pool: pg.Pool,
   table: string,
@@ -149,6 +156,7 @@ export const abortTheTransaction = async (tx: Tx): Promise<void> => {
   }
 };
 
+/** Each `event` on `table` blocks until `work` calls `release` or ends. */
 export const whileActsWaitAt = async <T>(
   pool: pg.Pool,
   table: string,
