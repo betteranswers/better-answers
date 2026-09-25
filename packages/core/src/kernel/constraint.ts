@@ -1,3 +1,7 @@
+/**
+ * The refusal `byConstraint` gives the driver's `constraint` field, else the first key the message
+ * contains, which may be only part of the violated name. The error itself when neither matches.
+ */
 export const refusalFor = <Refusal extends string>(
   error: Error,
   byConstraint: Readonly<Record<string, Refusal>>,

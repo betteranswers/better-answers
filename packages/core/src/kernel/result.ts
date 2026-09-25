@@ -10,14 +10,21 @@ export function err<E>(error: E): Result<never, E> {
   return { ok: false, error };
 }
 
+/**
+ * An Error as it came, a string as an Error's message, and anything else as an Error that names
+ * its type and keeps it as `cause`.
+ */
 export function normalizeError(cause: unknown): Error {
   if (cause instanceof Error) return cause;
   if (typeof cause === "string") return new Error(cause);
   return new Error(`non-Error thrown: ${Object.prototype.toString.call(cause)}`, { cause });
 }
 
-// After an act's first write, anything it calls rejects: a word it might not read commits the act
-// without its step.
+/**
+ * What `operation` resolves to, or its rejection as a normalised Error; it never rejects itself.
+ * After an act's first write, anything the act calls rejects: a word it might not read commits the
+ * act without its step.
+ */
 export async function attempt<T>(operation: () => Promise<T>): Promise<Result<T>> {
   try {
     return ok(await operation());

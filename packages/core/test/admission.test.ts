@@ -68,8 +68,8 @@ const erasureOnly = declareAct({
 const classOf = (word: string): string | undefined =>
   refusalRegister().find((entry) => entry.word === word)?.class;
 
-describe("what an act admits, judged from the principal and the input alone", () => {
-  it("admits an Admin and refuses an Editor and a Viewer where the level is Admin", () => {
+describe("what an act admits, from the principal and input alone", () => {
+  it("admits only an Admin where the level is Admin", () => {
     const answered = (["Admin", "Editor", "Viewer"] as const).map(
       (role) => admit(adminsOnly, person(role), {}).ok,
     );
@@ -77,7 +77,7 @@ describe("what an act admits, judged from the principal and the input alone", ()
     expect(answered).toEqual([true, false, false]);
   });
 
-  it("reads the role as a level: the lowest one named admits every role above it too", () => {
+  it("reads a role as a level admitting every role above", () => {
     const answered = (["Admin", "Editor", "Viewer"] as const).map(
       (role) => admit(everyone, person(role), {}).ok,
     );
@@ -85,7 +85,7 @@ describe("what an act admits, judged from the principal and the input alone", ()
     expect(answered).toEqual([true, true, true]);
   });
 
-  it("keys a platform principal off the purpose in its process actor id", () => {
+  it("keys a platform principal off its actor id's purpose", () => {
     expect([
       admit(erasureOnly, processActor("erasure"), {}).ok,
       admit(erasureOnly, processActor("reconciler"), {}).ok,
@@ -93,11 +93,11 @@ describe("what an act admits, judged from the principal and the input alone", ()
     ]).toEqual([true, false, true]);
   });
 
-  it("refuses a platform principal for an act that names no purpose at all", () => {
+  it("refuses a platform principal where an act names no purpose", () => {
     expect(admit(adminsOnly, processActor("erasure"), {}).ok).toBe(false);
   });
 
-  it("hands the narrowed principal back, so the body holds the proof and not the ask", () => {
+  it("hands back the principal narrowed to the admitted role", () => {
     const admitted = admit(adminsOnly, person("Admin"), {});
 
     if (!admitted.ok) throw new Error(`an Admin was refused: ${admitted.error}`);
@@ -105,7 +105,7 @@ describe("what an act admits, judged from the principal and the input alone", ()
     expectTypeOf(admitted.value).toExtend<UserPrincipal & { role: "Admin" }>();
   });
 
-  it("refuses in a word of the forbidden class, which is what a caller can act on", () => {
+  it("refuses in role-forbids, a word of the forbidden class", () => {
     const refused = admit(adminsOnly, person("Viewer"), {});
 
     expect(refused).toEqual({ ok: false, error: "role-forbids" });
@@ -113,7 +113,7 @@ describe("what an act admits, judged from the principal and the input alone", ()
     expectTypeOf<"role-forbids">().toExtend<AdmissionRefusal>();
   });
 
-  it("holds an admission's word to the two classes, so no shape or absence crosses as one", () => {
+  it("holds an admission's word to the forbidden and unauthenticated classes", () => {
     expectTypeOf<"role-forbids">().toExtend<AdmissionRefusal>();
     expectTypeOf<"credentials-revoked">().toExtend<AdmissionRefusal>();
     expectTypeOf<"malformed">().not.toExtend<AdmissionRefusal>();
@@ -124,7 +124,7 @@ describe("what an act admits, judged from the principal and the input alone", ()
 });
 
 describe("what a declaration will not let an act say", () => {
-  it("refuses a word listed twice, so no act's union counts one word as two", () => {
+  it("refuses an act declaring one word twice", () => {
     expect(() =>
       declareAct({
         admits: { role: "Admin", purposes: [] },
@@ -149,7 +149,7 @@ describe("the two acts that carry a declaration today", () => {
     });
   });
 
-  it("admits an Admin and the erasure's process to reprocess a binding, and refuses every other role and purpose in the forbidden word", () => {
+  it("admits only an Admin and the erasure process to reprocess", () => {
     const wipe = reprocessBindingInput.parse({
       workspaceId: "01JQ0000000000000000000WSP",
       bindingId: "01J6NNNNNNNNNNNNNNNNNNNNN1",
@@ -174,7 +174,7 @@ describe("the two acts that carry a declaration today", () => {
     });
   });
 
-  it("derives the act's input and refusal types from its declaration and nothing else", () => {
+  it("derives the act's input and refusal types from its declaration", () => {
     expectTypeOf<InputOf<typeof reprocessBindingAct>>().toEqualTypeOf<ReprocessBindingInput>();
     expectTypeOf<RefusalOf<typeof reprocessBindingAct>>().toEqualTypeOf<
       "role-forbids" | "no-such-binding"
@@ -186,7 +186,7 @@ describe("the two acts that carry a declaration today", () => {
     expectTypeOf<PlatformPrincipal>().toExtend<AdmittedOf<typeof reprocessBindingAct>>();
   });
 
-  it("lets the platform reprocess a binding and keeps it from publishing one, reading its DPIA input, previewing its chunks or standing as its Admin", () => {
+  it("lets the platform reprocess but not publish, preview or administer", () => {
     expectTypeOf<PlatformPrincipal>().toExtend<Parameters<typeof reprocessBinding>[0]>();
     expectTypeOf<PlatformPrincipal>().not.toExtend<Parameters<typeof publishBinding>[0]>();
     expectTypeOf<PlatformPrincipal>().not.toExtend<Parameters<typeof dpiaInputFor>[0]>();
@@ -194,7 +194,7 @@ describe("the two acts that carry a declaration today", () => {
     expectTypeOf<PlatformPrincipal>().not.toExtend<Parameters<typeof adminOnBinding>[0]>();
   });
 
-  it("reads the enqueue's level off the kind's descriptor rather than restating it", () => {
+  it("reads the enqueue's level off the kind's descriptor", () => {
     const audit = enqueueJobInput.parse({
       workspaceId: "01JQ0000000000000000000WSP",
       kind: "nightly-audit",
@@ -207,7 +207,7 @@ describe("the two acts that carry a declaration today", () => {
     });
   });
 
-  it("admits the platform for the enqueue whatever purpose it acts for", () => {
+  it("admits the platform to the enqueue for any purpose", () => {
     const audit = enqueueJobInput.parse({
       workspaceId: "01JQ0000000000000000000WSP",
       kind: "nightly-audit",
@@ -220,7 +220,7 @@ describe("the two acts that carry a declaration today", () => {
     ]).toEqual([true, true, false]);
   });
 
-  it("says the enqueue writes and reprocessing writes, which no signature states", () => {
+  it("declares both the enqueue and reprocessing as writes", () => {
     expect([enqueueJobAct.effect, reprocessBindingAct.effect]).toEqual(["write", "write"]);
   });
 });

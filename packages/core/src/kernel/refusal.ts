@@ -36,6 +36,12 @@ const declarationRefusal = (word: string): string | undefined => {
   return undefined;
 };
 
+/**
+ * Registers every word under `owner` and hands `words` back for a union to be built from. Nothing
+ * registers unless every word does.
+ *
+ * @throws on a word that is not lower case and hyphenated, or one any owner already declared.
+ */
 export const declareRefusals = <const V extends Vocabulary>(owner: RefusalOwner, words: V): V => {
   for (const word of Object.keys(words)) {
     const refusal = declarationRefusal(word);
@@ -47,4 +53,8 @@ export const declareRefusals = <const V extends Vocabulary>(owner: RefusalOwner,
   return words;
 };
 
+/**
+ * Every word declared so far, in the order declared. A slice's words are there only once its
+ * module has loaded.
+ */
 export const refusalRegister = (): readonly RegisteredRefusal[] => [...registered.values()];

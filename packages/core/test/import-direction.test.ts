@@ -163,13 +163,13 @@ describe("the rule fires, naming the ADR 0029 rule it holds", () => {
     expect(output).toContain(`ADR 0029 rule ${rule}`);
   });
 
-  it("says which entry to export when the face is one the map does not name", () => {
+  it("says which entry to export for an unmapped face", () => {
     const output = lint.output(importing(SLICE, "../store/objects/index.ts"));
 
     expect(output).toContain("`./store/objects`");
   });
 
-  it("reads a nested index.ts inside a sibling as one of its internals, not as a face to export", () => {
+  it("reads a sibling's nested index.ts as internal, not a face", () => {
     const output = lint.output(importing(SLICE, "../guides/internal/index.ts"));
 
     expect(output).toContain("never `internal/index.ts`");
@@ -241,7 +241,7 @@ describe("the rule stays silent where the ADR allows the import", () => {
     expect(lint.flagged(importing(file, specifier))).toEqual([]);
   });
 
-  it("keys on the manifest's name, not on a path segment: another package under packages/core is silent, core under any path fires", () => {
+  it("keys on the manifest's name, not on a path segment", () => {
     const elsewhere = "libs/knowledge/src/kernel/actor.ts";
 
     expect(
@@ -317,7 +317,7 @@ describe("the zones and the real tree", () => {
     );
   };
 
-  it("lints the tree as committed clean — every import in packages/core obeys all five rules", () => {
+  it("lints every committed import in packages/core clean", () => {
     expect(lint.flagged(committedCore())).toEqual([]);
   });
 });
@@ -339,7 +339,7 @@ describe("the base import bans reach packages/core unrestated", () => {
   });
 
   it.each(["drizzle-zod", "better-auth", "@better-auth/oauth-provider"])(
-    "refuses %s in a core file through the base override alone",
+    "refuses %s in core through the base override alone",
     (specifier) => {
       expect(lintBase.flagged({ [probe]: importOf(specifier) })).toEqual([probe]);
     },

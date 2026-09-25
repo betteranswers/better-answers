@@ -19,6 +19,7 @@ export const isActorId = (value: string): value is ActorId => ACTOR_ID.test(valu
 
 export const isPersonActor = (actor: ActorId): boolean => actor.startsWith(PERSON_PREFIX);
 
+/** The person an actor id names; undefined for another actor or a person id that fails to parse. */
 export const personOfActor = (actor: ActorId): UserId | undefined => {
   if (!isPersonActor(actor)) return undefined;
   const parsed = boundarySchemas.user.select.shape.id.safeParse(actor.slice(PERSON_PREFIX.length));
