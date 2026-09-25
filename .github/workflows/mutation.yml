@@ -70,7 +70,7 @@ jobs:
       - run: uv sync --frozen
         working-directory: apps/worker
       - uses: ./.github/actions/git-filter-repo
-      # The whole leg's results, not this shard's: a file a new file moves to another shard keeps them.
+      # The whole leg's results, not this shard's: a file the slicing moves to another shard keeps them.
       - name: the previous run's mutant results
         uses: ./.github/actions/mutation-baseline
         with:
@@ -84,7 +84,8 @@ jobs:
           SHARD: ${{ matrix.shard }}
           OF: ${{ matrix.of }}
         run: |
-          slice="$(node ../../scripts/mutation-shards.mjs slice --leg "${LEG}" --shard "${SHARD}" --of "${OF}")"
+          slice="$(node ../../scripts/mutation-shards.mjs slice --leg "${LEG}" --shard "${SHARD}" --of "${OF}" \
+            --baseline reports/mutation/baseline.json)"
           exec node_modules/.bin/stryker run --mutate "${slice}" ${{ inputs.force && '--force' || '' }}
       # Named for the shard, so the leg's summary gathers every shard into one directory.
       - name: this shard's mutant results, whether or not it finished

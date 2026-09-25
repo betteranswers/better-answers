@@ -134,6 +134,13 @@ const A_FORK_CALLING_ITS_BRANCH_MAIN = {
 };
 const ANOTHER_BRANCH = { run: 35_991_007_520, createdAt: "2026-09-24T12:40:03Z", branch: "t-400" };
 const THIS_BRANCH = { run: 35_990_560_931, createdAt: "2026-09-24T11:30:52Z", branch: "t-229" };
+const THIS_RUN = 36_060_418_207;
+const THIS_RUN_BEGAN = "2026-09-24T13:00:00Z";
+const AFTER_THIS_RUN_BEGAN = {
+  run: 36_060_512_880,
+  createdAt: "2026-09-24T13:31:09Z",
+  branch: "main",
+};
 
 type Restored = {
   readonly status: number | null;
@@ -149,7 +156,11 @@ const contentsOf = (file: string): string | undefined =>
 
 const REFUSED = Symbol("the artifacts API refuses the token");
 
-const restoreAgainst = (answer: unknown, branch = "main"): Restored => {
+const restoreAgainst = (
+  answer: unknown,
+  branch = "main",
+  runs: "answers" | "refuses" = "answers",
+): Restored => {
   const step = restoreStep();
   const directory = mkdtempSync(path.join(tmpdir(), "mutation-restore-"));
   const file = (name: string) => path.join(directory, name);
@@ -166,9 +177,12 @@ const restoreAgainst = (answer: unknown, branch = "main"): Restored => {
       [
         "#!/bin/sh",
         `printf '%s\\n' "$*" >> '${file("asked")}'`,
-        'case "$1" in',
-        `  api) ${listing} ;;`,
-        '  run) run="$3"',
+        'case "$1 $2" in',
+        runs === "answers"
+          ? `  "api repos/${REPOSITORY}/actions/runs/${String(THIS_RUN)}") echo '${THIS_RUN_BEGAN}' ;;`
+          : `  "api repos/${REPOSITORY}/actions/runs/${String(THIS_RUN)}") echo 'HTTP 403' >&2; exit 1 ;;`,
+        `  api*) ${listing} ;;`,
+        '  run*) run="$3"',
         '    while [ "$#" -gt 0 ]; do [ "$1" = "--dir" ] && dir="$2"; shift; done',
         '    mkdir -p "$dir"',
         `    printf '{"uploadedBy":%s}' "$run" > "$dir/stryker-incremental.json" ;;`,
@@ -183,6 +197,7 @@ const restoreAgainst = (answer: unknown, branch = "main"): Restored => {
         PATH: `${directory}${path.delimiter}${process.env["PATH"] ?? ""}`,
         REPOSITORY,
         BRANCH: branch,
+        RUN: String(THIS_RUN),
         ARTIFACT,
         REPORTS: reports,
         [NEWEST_CHECKPOINT_VARIABLE]: step.env?.[NEWEST_CHECKPOINT_VARIABLE] ?? "",
@@ -201,6 +216,8 @@ const restoreAgainst = (answer: unknown, branch = "main"): Restored => {
     rmSync(directory, { recursive: true, force: true });
   }
 };
+
+const BEGAN = `api repos/${REPOSITORY}/actions/runs/${String(THIS_RUN)} --jq .created_at`;
 
 const LISTED = `api --paginate --slurp repos/${REPOSITORY}/actions/artifacts?name=${ARTIFACT}&per_page=100`;
 
@@ -226,7 +243,7 @@ describe("the nightly mutation run's baseline, kept as the previous run's artifa
     ]);
 
     expect(restored.status, `the step went red: ${restored.log}`).toBe(0);
-    expect(restored.asked).toEqual([LISTED, downloaded(35_970_714_712, restored.reports)]);
+    expect(restored.asked).toEqual([BEGAN, LISTED, downloaded(35_970_714_712, restored.reports)]);
     expect(restored.checkpoint).toEqual('{"uploadedBy":35970714712}');
     expect(restored.baseline).toEqual('{"uploadedBy":35970714712}');
     expect(restored.log).toContain("from run 35970714712");
@@ -242,7 +259,7 @@ describe("the nightly mutation run's baseline, kept as the previous run's artifa
     const restored = restoreAgainst(pages);
 
     expect(restored.status, `the step went red: ${restored.log}`).toBe(0);
-    expect(restored.asked).toEqual([LISTED]);
+    expect(restored.asked).toEqual([BEGAN, LISTED]);
     expect(restored.checkpoint).toBeUndefined();
     expect(restored.baseline).toBeUndefined();
     expect(restored.log).toContain("tests every mutant");
@@ -255,8 +272,32 @@ describe("the nightly mutation run's baseline, kept as the previous run's artifa
       "t-229",
     );
 
-    expect(ownIsNewer.asked).toEqual([LISTED, downloaded(35_990_560_931, ownIsNewer.reports)]);
-    expect(mainIsNewer.asked).toEqual([LISTED, downloaded(35_970_714_712, mainIsNewer.reports)]);
+    expect(ownIsNewer.asked).toEqual([
+      BEGAN,
+      LISTED,
+      downloaded(35_990_560_931, ownIsNewer.reports),
+    ]);
+    expect(mainIsNewer.asked).toEqual([
+      BEGAN,
+      LISTED,
+      downloaded(35_970_714_712, mainIsNewer.reports),
+    ]);
+  });
+
+  it("takes nothing uploaded after this run began, so every job of the run, a re-run's too, restores the same results", () => {
+    const restored = restoreAgainst([page(LAST_NIGHT, AFTER_THIS_RUN_BEGAN)]);
+
+    expect(restored.status, `the step went red: ${restored.log}`).toBe(0);
+    expect(restored.asked).toEqual([BEGAN, LISTED, downloaded(35_970_714_712, restored.reports)]);
+  });
+
+  it("goes red when the runs API will not say when this run began", () => {
+    const restored = restoreAgainst([page(LAST_NIGHT)], "main", "refuses");
+
+    expect(restored.status).toBe(1);
+    expect(restored.asked).toEqual([BEGAN]);
+    expect(restored.checkpoint).toBeUndefined();
+    expect(restored.log).toContain(`would not say when run ${String(THIS_RUN)} began`);
   });
 
   it.each([
@@ -270,7 +311,7 @@ describe("the nightly mutation run's baseline, kept as the previous run's artifa
     const restored = restoreAgainst(answer);
 
     expect(restored.status).toBe(1);
-    expect(restored.asked).toEqual([LISTED]);
+    expect(restored.asked).toEqual([BEGAN, LISTED]);
     expect(restored.checkpoint).toBeUndefined();
     expect(restored.log).toContain(says);
   });
@@ -398,6 +439,8 @@ describe("each mutation leg, run as shards and summed up once (T-381)", () => {
             String(index + 1),
             "--of",
             String(of),
+            "--baseline",
+            path.join(repositoryRoot, "no-previous-run.json"),
           ],
           { encoding: "utf8" },
         );
@@ -433,6 +476,23 @@ describe("each mutation leg, run as shards and summed up once (T-381)", () => {
     });
     expect(stepRunning(summary.steps, "mutation-shards.mjs merge", "summary").run).toContain(
       '--shards "${RUNNER_TEMP}/shards"',
+    );
+  });
+
+  it("slices every shard, and merges the leg, by the one previous run the restore leaves each job", () => {
+    const { stryker, summary } = mutationWorkflow().jobs;
+
+    expect(onlyStep(stryker.steps, BASELINE_ACTION, "stryker").with?.["reports"]).toEqual(
+      "${{ matrix.path }}/reports/mutation",
+    );
+    expect(stepRunning(stryker.steps, "mutation-shards.mjs slice", "stryker").run).toContain(
+      "--baseline reports/mutation/baseline.json",
+    );
+    expect(onlyStep(summary.steps, BASELINE_ACTION, "summary").with?.["reports"]).toEqual(
+      "${{ runner.temp }}/baseline",
+    );
+    expect(stepRunning(summary.steps, "mutation-shards.mjs merge", "summary").run).toContain(
+      '--baseline "${RUNNER_TEMP}/baseline/baseline.json"',
     );
   });
 

@@ -80,11 +80,14 @@ line, and runs the script over files.
 
 `src/mutation-shards.ts` cuts a mutation leg into shards and puts the leg back together, behind
 `scripts/mutation-shards.mjs`, which reads each leg's `mutate` patterns from its Stryker config.
-`slice --leg … --shard … --of …` prints one shard's files for `stryker run --mutate`: the
-patterns resolved in order as Stryker resolves them, then each file, biggest first, onto the
-lightest shard so far. Size is the one measure of a file's mutants the tree carries before
-Stryker runs, and ties break by path, so every job of a run cuts the same slices. `merge --leg …
---of … --shards … --baseline … --out …` takes each file from the shard that owned it,
+`slice --leg … --shard … --of … --baseline …` prints one shard's files for `stryker run
+--mutate`: the patterns resolved in order as Stryker resolves them, then each file, heaviest
+first, onto the lightest shard so far. A file weighs what its mutants cost the previous run, in
+seconds of a worker fitted to a forced run of every shard, a timed-out mutant far above the rest;
+a file that run did not hold is priced by size at its seconds a byte, and with no previous run
+size is all there is. Ties keep path order, so every job of a run, reading the same previous run,
+cuts the same slices. `merge --leg … --of … --shards … --baseline … --out …` takes each file from
+the shard that owned it,
 renumbering the tests each shard numbered on its own. A shard that stopped leaves out what it
 never reached, so a forced run's gaps are not refilled with the results it was replacing; only
 a shard that left nothing is filled from the previous run, so a lost shard never leaves the leg

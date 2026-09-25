@@ -14,6 +14,8 @@ const test = z.looseObject({
 });
 
 const mutant = z.looseObject({
+  status: z.string(),
+  static: z.boolean().optional(),
   coveredBy: z.array(z.string()).optional(),
   killedBy: z.array(z.string()).optional(),
 });
@@ -38,7 +40,7 @@ export type Leg = {
 };
 
 const USAGE = [
-  "usage: mutation-shards slice --leg <name> --shard <n> --of <count>",
+  "usage: mutation-shards slice --leg <name> --shard <n> --of <count> --baseline <path>",
   "       mutation-shards merge --leg <name> --of <count> --shards <directory> --baseline <path> --out <directory>",
 ].join("\n");
 
@@ -59,22 +61,57 @@ export const mutateSet = (root: string, patterns: readonly string[]): readonly s
   return [...chosen].toSorted();
 };
 
-type Load = { weight: number; readonly files: string[] };
+// Seconds of a worker, fitted to a forced run of every shard. A timeout waits out the whole
+// related suite.
+const ORDINARY_SECONDS = 10;
+const STATIC_SECONDS = 13;
+const TIMEOUT_SECONDS = 370;
 
-// Size is the tree's one measure of a file's mutants before Stryker runs. A stable sort over
-// sorted paths gives every job the same slices.
-export const shardSlices = (
+const secondsOf = (found: Mutant): number => {
+  if (found.status === "Timeout") return TIMEOUT_SECONDS;
+  if (found.status === "NoCoverage") return 0;
+  return found.static === true ? STATIC_SECONDS : ORDINARY_SECONDS;
+};
+
+const sum = (values: readonly number[]): number =>
+  values.reduce((total, value) => total + value, 0);
+
+// Unmeasured, a file is priced by size at the previous run's seconds a byte; with no previous
+// run, by size alone.
+export const weightsOf = (
   root: string,
   files: readonly string[],
+  previous: Results | undefined,
+): ReadonlyMap<string, number> => {
+  const bytes = new Map(files.map((file) => [file, statSync(path.join(root, file)).size] as const));
+  const measured = new Map(
+    files.flatMap((file) => {
+      const entry = previous?.files[file];
+      return entry === undefined ? [] : [[file, sum(entry.mutants.map(secondsOf))] as const];
+    }),
+  );
+  const measuredBytes = sum([...measured.keys()].map((file) => bytes.get(file) ?? 0));
+  const perByte = measuredBytes === 0 ? 1 : sum([...measured.values()]) / measuredBytes;
+  return new Map(
+    files.map((file) => [file, measured.get(file) ?? (bytes.get(file) ?? 0) * perByte] as const),
+  );
+};
+
+type Load = { weight: number; readonly files: string[] };
+
+// The heaviest file first, each onto the lightest shard so far. A stable sort over files in path
+// order gives every job the same slices.
+export const shardSlices = (
+  weights: ReadonlyMap<string, number>,
   of: number,
 ): readonly (readonly string[])[] => {
-  if (of > files.length) {
+  if (of > weights.size) {
     throw new Error(
-      `a leg of ${String(files.length)} files cannot be cut into ${String(of)} shards: each needs a file to mutate`,
+      `a leg of ${String(weights.size)} files cannot be cut into ${String(of)} shards: each needs a file to mutate`,
     );
   }
-  const weighed = files
-    .map((file) => ({ file, weight: statSync(path.join(root, file)).size }))
+  const weighed = [...weights]
+    .map(([file, weight]) => ({ file, weight }))
     .toSorted((left, right) => right.weight - left.weight);
   const loads: Load[] = Array.from({ length: of }, () => ({ weight: 0, files: [] }));
   for (const { file, weight } of weighed) {
@@ -267,7 +304,10 @@ export const mutationShardsFromArgv = (
   if (named === undefined) throw new Error(USAGE);
   const [leg, { root, mutate }] = named;
   const of = positive(values.get("of"), "of");
-  const slices = shardSlices(root, mutateSet(root, mutate), of);
+  const baselineFile = values.get("baseline");
+  if (baselineFile === undefined) throw new Error(USAGE);
+  const baseline = readResults(baselineFile);
+  const slices = shardSlices(weightsOf(root, mutateSet(root, mutate), baseline), of);
   if (command === "slice") {
     const shard = positive(values.get("shard"), "shard");
     const slice = slices[shard - 1];
@@ -275,14 +315,8 @@ export const mutationShardsFromArgv = (
     return slice.join(",");
   }
   const shardsDirectory = values.get("shards");
-  const baseline = values.get("baseline");
   const out = values.get("out");
-  if (
-    command !== "merge" ||
-    shardsDirectory === undefined ||
-    baseline === undefined ||
-    out === undefined
-  ) {
+  if (command !== "merge" || shardsDirectory === undefined || out === undefined) {
     throw new Error(USAGE);
   }
   const shards = new Map(
@@ -302,7 +336,7 @@ export const mutationShardsFromArgv = (
     files: ownersOf(slices),
     of,
     shards,
-    baseline: readResults(baseline),
+    baseline,
   });
   mkdirSync(out, { recursive: true });
   if (merged.checkpoint !== undefined) {

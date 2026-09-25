@@ -16,6 +16,7 @@ import {
   mutateSet,
   mutationShardsFromArgv,
   shardSlices,
+  weightsOf,
 } from "@better-answers/devtools/mutation-shards";
 import type { Leg, ShardResults } from "@better-answers/devtools/mutation-shards";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -64,12 +65,12 @@ describe("a leg's mutate set, cut into shards", () => {
     expect(mutateSet(root, [...PATTERNS, "src/main.ts"])).toContain("src/main.ts");
   });
 
-  it("cuts disjoint slices that together are the set, each file onto the lightest shard, the biggest first", () => {
-    expect(shardSlices(root, mutateSet(root, PATTERNS), 2)).toEqual([
+  it("cuts disjoint slices that together are the set, weighing each file by its size when there was no previous run, the biggest first onto the lightest shard", () => {
+    expect(shardSlices(weightsOf(root, mutateSet(root, PATTERNS), undefined), 2)).toEqual([
       ["src/access/index.ts", "src/audit/index.ts"],
       ["src/access/vocabulary.ts", "src/kernel/legacy.ts/index.ts", "src/kernel/parse.ts"],
     ]);
-    expect(shardSlices(root, mutateSet(root, PATTERNS), 3)).toEqual([
+    expect(shardSlices(weightsOf(root, mutateSet(root, PATTERNS), undefined), 3)).toEqual([
       ["src/access/index.ts"],
       ["src/access/vocabulary.ts", "src/kernel/legacy.ts/index.ts"],
       ["src/audit/index.ts", "src/kernel/parse.ts"],
@@ -84,7 +85,7 @@ describe("a leg's mutate set, cut into shards", () => {
       "src/d.ts": 100,
     });
 
-    expect(shardSlices(tied, mutateSet(tied, ["src/**/*.ts"]), 2)).toEqual([
+    expect(shardSlices(weightsOf(tied, mutateSet(tied, ["src/**/*.ts"]), undefined), 2)).toEqual([
       ["src/a.ts", "src/c.ts"],
       ["src/b.ts", "src/d.ts"],
     ]);
@@ -100,7 +101,7 @@ describe("a leg's mutate set, cut into shards", () => {
     });
     const holds = (of: number): void => {
       const set = mutateSet(grown, ["src/**/*.ts"]);
-      const slices = shardSlices(grown, set, of);
+      const slices = shardSlices(weightsOf(grown, set, undefined), of);
       const flat = slices.flat();
 
       expect(slices.every((slice) => slice.length > 0)).toBe(true);
@@ -117,8 +118,8 @@ describe("a leg's mutate set, cut into shards", () => {
   });
 
   it("refuses more shards than files, since a shard with nothing to mutate cannot run", () => {
-    expect(shardSlices(root, mutateSet(root, PATTERNS), 5)).toHaveLength(5);
-    expect(() => shardSlices(root, mutateSet(root, PATTERNS), 6)).toThrow(
+    expect(shardSlices(weightsOf(root, mutateSet(root, PATTERNS), undefined), 5)).toHaveLength(5);
+    expect(() => shardSlices(weightsOf(root, mutateSet(root, PATTERNS), undefined), 6)).toThrow(
       new Error("a leg of 5 files cannot be cut into 6 shards: each needs a file to mutate"),
     );
   });
@@ -344,11 +345,55 @@ describe("a leg's results, merged from its shards", () => {
   });
 });
 
+const ordinary = (id: string): Found => ({ id, mutatorName: "ArrowFunction", status: "Killed" });
+
+describe("a leg's files, weighed by what they cost the previous run", () => {
+  it("weighs a measured file by its mutants, a timeout far above the rest, and prices a new one by size at the previous run's rate", () => {
+    const root = treeOf("weighed", {
+      "src/big.ts": 800,
+      "src/new.ts": 300,
+      "src/quiet.ts": 106,
+      "src/small.ts": 100,
+    });
+    const previous = results(
+      {
+        "src/big.ts": [
+          { ...ordinary("1"), static: true },
+          ...Array.from({ length: 10 }, (_, index) => ordinary(`big-${String(index)}`)),
+        ],
+        "src/quiet.ts": [
+          { id: "2", mutatorName: "StringLiteral", status: "NoCoverage" },
+          ordinary("3"),
+        ],
+        "src/small.ts": [
+          { id: "4", mutatorName: "BlockStatement", status: "Timeout" },
+          { ...ordinary("5"), status: "Survived" },
+        ],
+      },
+      {},
+    );
+    const weights = weightsOf(root, mutateSet(root, ["src/**/*.ts"]), previous);
+
+    expect(weights).toEqual(
+      new Map([
+        ["src/big.ts", 113],
+        ["src/new.ts", 150],
+        ["src/quiet.ts", 10],
+        ["src/small.ts", 380],
+      ]),
+    );
+    expect(shardSlices(weights, 2)).toEqual([
+      ["src/small.ts"],
+      ["src/big.ts", "src/new.ts", "src/quiet.ts"],
+    ]);
+  });
+});
+
 const legs = (root: string): ReadonlyMap<string, Leg> =>
   new Map([["core", { root, mutate: PATTERNS }]]);
 
 const USAGE = [
-  "usage: mutation-shards slice --leg <name> --shard <n> --of <count>",
+  "usage: mutation-shards slice --leg <name> --shard <n> --of <count> --baseline <path>",
   "       mutation-shards merge --leg <name> --of <count> --shards <directory> --baseline <path> --out <directory>",
 ].join("\n");
 
@@ -403,12 +448,43 @@ describe("the shards command", () => {
     );
 
   it("prints a shard's slice as the list `stryker run --mutate` takes", () => {
+    const noPrevious = path.join(scratch, "no-previous-run.json");
+
     expect(
-      mutationShardsFromArgv(["slice", "--leg", "core", "--shard", "1", "--of", "2"], legs(root)),
+      mutationShardsFromArgv(
+        ["slice", "--leg", "core", "--shard", "1", "--of", "2", "--baseline", noPrevious],
+        legs(root),
+      ),
     ).toBe("src/a.ts");
     expect(
-      mutationShardsFromArgv(["slice", "--leg", "core", "--of", "2", "--shard", "2"], legs(root)),
+      mutationShardsFromArgv(
+        ["slice", "--leg", "core", "--of", "2", "--baseline", noPrevious, "--shard", "2"],
+        legs(root),
+      ),
     ).toBe("src/b.ts,src/c.ts");
+  });
+
+  it("cuts the slices by what each file cost the previous run it is given", () => {
+    const previous = path.join(scratch, "costed.json");
+    writeFileSync(
+      previous,
+      JSON.stringify(
+        results(
+          {
+            "src/a.ts": [{ id: "1", mutatorName: "StringLiteral", status: "NoCoverage" }],
+            "src/b.ts": [{ id: "2", mutatorName: "StringLiteral", status: "Timeout" }],
+          },
+          {},
+        ),
+      ),
+    );
+    const slice = (shard: string): string =>
+      mutationShardsFromArgv(
+        ["slice", "--leg", "core", "--shard", shard, "--of", "2", "--baseline", previous],
+        legs(root),
+      );
+
+    expect([slice("1"), slice("2")]).toEqual(["src/b.ts", "src/a.ts,src/c.ts"]);
   });
 
   it("merges the shards' files into the leg's checkpoint, and writes no report while a shard is missing", () => {
@@ -428,6 +504,7 @@ describe("the shards command", () => {
     expect(writtenTo(out)).toEqual({ files: ["src/a.ts"], report: false });
   });
 
+  // The previous run priced every file alike, so the slices are [a, c] and [b].
   it("reads a stopped shard's checkpoint, and fills a shard that left nothing from the baseline it is given", () => {
     const out = path.join(scratch, "merged-two");
     const baseline = path.join(scratch, "previous.json");
@@ -442,7 +519,7 @@ describe("the shards command", () => {
     expect(summary).toBe(
       "### core shards: 0 of 2 finished\n- stopped before writing a report, what they had not tested waiting for the next run: 1\n- left no results, their files keeping the previous run's: 2\n",
     );
-    expect(writtenTo(out)).toEqual({ files: ["src/a.ts", "src/b.ts", "src/c.ts"], report: false });
+    expect(writtenTo(out)).toEqual({ files: ["src/a.ts", "src/b.ts"], report: false });
   });
 
   it("writes the report beside the checkpoint once every shard finished", () => {
@@ -500,6 +577,11 @@ describe("the shards command", () => {
 
   it.each([
     { what: "a leg it does not know", argv: ["slice", "--leg", "web"], says: USAGE },
+    {
+      what: "a slice without the previous run's results",
+      argv: ["slice", "--leg", "core", "--shard", "1", "--of", "2"],
+      says: USAGE,
+    },
     { what: "a flag without its value", argv: ["slice", "--leg"], says: USAGE },
     {
       what: "a command it does not have",
@@ -535,27 +617,27 @@ describe("the shards command", () => {
     },
     {
       what: "no shards",
-      argv: ["slice", "--leg", "core", "--shard", "1", "--of", "0"],
+      argv: ["slice", "--leg", "core", "--shard", "1", "--of", "0", "--baseline", "."],
       says: `--of takes a whole number from 1\n${USAGE}`,
     },
     {
       what: "part of a shard",
-      argv: ["slice", "--leg", "core", "--shard", "1", "--of", "1.5"],
+      argv: ["slice", "--leg", "core", "--shard", "1", "--of", "1.5", "--baseline", "."],
       says: `--of takes a whole number from 1\n${USAGE}`,
     },
     {
       what: "a count that is not a number",
-      argv: ["slice", "--leg", "core", "--shard", "1", "--of", "two"],
+      argv: ["slice", "--leg", "core", "--shard", "1", "--of", "two", "--baseline", "."],
       says: `--of takes a whole number from 1\n${USAGE}`,
     },
     {
       what: "shard nought",
-      argv: ["slice", "--leg", "core", "--shard", "0", "--of", "2"],
+      argv: ["slice", "--leg", "core", "--shard", "0", "--of", "2", "--baseline", "."],
       says: `--shard takes a whole number from 1\n${USAGE}`,
     },
     {
       what: "a shard past the count",
-      argv: ["slice", "--leg", "core", "--shard", "3", "--of", "2"],
+      argv: ["slice", "--leg", "core", "--shard", "3", "--of", "2", "--baseline", "."],
       says: "--shard 3 is past --of 2",
     },
   ])("refuses $what, saying what it takes", ({ argv, says }) => {
@@ -676,7 +758,17 @@ describe("a leg run as shards by Stryker, over a throwaway workspace", () => {
   const reports = path.join(root, "reports");
   const slice = (shard: number, of: number): string =>
     mutationShardsFromArgv(
-      ["slice", "--leg", "throwaway", "--shard", String(shard), "--of", String(of)],
+      [
+        "slice",
+        "--leg",
+        "throwaway",
+        "--shard",
+        String(shard),
+        "--of",
+        String(of),
+        "--baseline",
+        path.join(scratch, "no-previous-run.json"),
+      ],
       leg,
     );
   let whole: readonly Verdict[] = [];
