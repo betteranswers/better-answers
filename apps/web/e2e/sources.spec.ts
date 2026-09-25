@@ -17,7 +17,7 @@ import {
 
 const LIST_BUDGET_MS = 1000;
 
-// Any id the platform mints: the screen shows none, a finding's least of all.
+/** Any id the platform mints: the screen shows none, a finding's least of all. */
 const AN_ID = /\b[0-9A-HJKMNP-TV-Z]{26}\b/;
 
 const rail = (page: Page) => page.getByRole("navigation", { name: "Control Centre" });
@@ -29,7 +29,7 @@ const bindingNamed = (page: Page, name: string): Locator =>
     .getByRole("listitem")
     .filter({ has: page.getByRole("heading", { level: 3, name, exact: true }) });
 
-// The lead's one definition a term names, read the way a screen reader pairs them.
+/** The lead's one definition a term names, read the way a screen reader pairs them. */
 const leadOf = (page: Page, name: string, term: string): Locator =>
   bindingNamed(page, name)
     .getByRole("term")
@@ -43,7 +43,7 @@ const lastRunOf = (page: Page, name: string) => leadOf(page, name, "Last run");
 
 const classOf = (page: Page, name: string) => leadOf(page, name, "Class");
 
-// An Admin of a fresh workspace, signed in on the product's own screen and standing on Sources.
+/** An Admin of a fresh workspace, signed in on the product's own screen and standing on Sources. */
 const anAdminAtSources = async (
   page: Page,
   api: APIRequestContext,
@@ -62,7 +62,7 @@ const anAdminAtSources = async (
   return { workspace, seeded };
 };
 
-// An absence asserted straight after a key would pass before React drew what the key did.
+/** An absence asserted straight after a key would pass before React drew what the key did. */
 const twoFramesDrawn = (page: Page) =>
   page.evaluate(
     () =>
@@ -84,10 +84,7 @@ const indexed = (name: string, overrides: Partial<SeedBinding> = {}): SeedBindin
 });
 
 test.describe("the Sources screen's list of bindings", () => {
-  test("lists ten bindings to an Admin within a second, each leading with what judges it and the rest one disclosure in", async ({
-    page,
-    request,
-  }) => {
+  test("lists an Admin ten bindings in a second, details folded", async ({ page, request }) => {
     const ten: SeedBinding[] = [
       indexed("Bid library"),
       indexed("Case studies", { published: true }),
@@ -153,7 +150,7 @@ test.describe("the Sources screen's list of bindings", () => {
     await expect(page.locator("main")).not.toContainText(AN_ID);
   });
 
-  test("tells an Admin why each document was quarantined, and how many of the binding's want OCR", async ({
+  test("tells an Admin why documents are quarantined, counting OCR ones", async ({
     page,
     request,
   }) => {
@@ -184,10 +181,7 @@ test.describe("the Sources screen's list of bindings", () => {
     ]);
   });
 
-  test("tells a member who is not an Admin the refusal in its own word, with who can act", async ({
-    page,
-    request,
-  }) => {
+  test("refuses a non-Admin in its word, naming who can act", async ({ page, request }) => {
     const workspace = await provision(request, { name: "Pennine Fabrication" });
     await seedBindings(request, {
       workspaceId: workspace.workspaceId,
@@ -225,7 +219,7 @@ test.describe("the Sources screen's list of bindings", () => {
 });
 
 test.describe("binding a document on the Sources screen", () => {
-  test("an Admin binds a document by keyboard and watches its state move landed, indexing, indexed as the worker runs", async ({
+  test("an Admin binds by keyboard and sees landed, indexing, indexed", async ({
     page,
     request,
   }) => {
@@ -292,10 +286,7 @@ test.describe("binding a document on the Sources screen", () => {
     await expect(lastRunOf(page, "The staff handbook")).toContainText("Index run done");
   });
 
-  test("refuses an Admin's file of a kind the platform does not convert before a byte leaves, in its own word", async ({
-    page,
-    request,
-  }) => {
+  test("refuses an Admin's unconvertible file in its own word", async ({ page, request }) => {
     await anAdminAtSources(page, request, { workspace: "Ryburn Signs" });
 
     await page.keyboard.press("b");
@@ -337,8 +328,10 @@ const HEALTH_CUE_BOX = "Select special category by HEALTH_CUE in Staff survey";
 const A_DISMISSED_SPAN =
   "Dismissed 1 span as not special category. The seam's verdict passes over a dismissed span, which stays withheld unless kept in text.";
 
-// Two documents as a run leaves them after a dismissal: one lifted to its binding's class, one
-// still holding a span nobody dismissed.
+/**
+ * Two documents as a run leaves them after a dismissal: one lifted to its binding's class, one
+ * still holding a span nobody dismissed.
+ */
 const SERVICE_RECORDS: SeedBinding = indexed("Service records", {
   documents: [
     {
@@ -376,10 +369,7 @@ const findingRow = (page: Page, name: string, document: string, rule: string) =>
   reviewOf(page, name).getByRole("row").filter({ hasText: document }).filter({ hasText: rule });
 
 test.describe("reviewing a binding's findings", () => {
-  test("shows an Admin findings per category and rule with counts and no value, a special category document already narrowed", async ({
-    page,
-    request,
-  }) => {
+  test("shows an Admin findings by category and rule, counts only", async ({ page, request }) => {
     await anAdminAtSources(page, request, {
       workspace: "Colne Valley Metals",
       bindings: [SUPPLIER_FORMS],
@@ -435,10 +425,7 @@ test.describe("reviewing a binding's findings", () => {
     await expect(page.locator("body")).not.toContainText(AN_ID);
   });
 
-  test("an Admin keeps the selected always-set groups in text and narrows the documents others sit in, never naming a finding", async ({
-    page,
-    request,
-  }) => {
+  test("lets an Admin keep groups in text and narrow documents", async ({ page, request }) => {
     await anAdminAtSources(page, request, {
       workspace: "Hebden Plastics",
       bindings: [SUPPLIER_FORMS],
@@ -513,10 +500,7 @@ test.describe("reviewing a binding's findings", () => {
     await expect(page.locator("body")).not.toContainText(AN_ID);
   });
 
-  test("an Admin dismisses a selected special category group as not special category with a reason, and the row and its index run say so", async ({
-    page,
-    request,
-  }) => {
+  test("dismisses a special category group, row and run saying so", async ({ page, request }) => {
     const { workspace } = await anAdminAtSources(page, request, {
       workspace: "Ripponden Pumps",
       bindings: [SUPPLIER_FORMS],
@@ -590,10 +574,7 @@ test.describe("reviewing a binding's findings", () => {
     ).toContainText(A_DISMISSED_SPAN);
   });
 
-  test("shows an Admin a document whose every special category span is dismissed at its binding's class, and one still holding an undismissed span as already narrowed", async ({
-    page,
-    request,
-  }) => {
+  test("shows an Admin which dismissed documents are still narrowed", async ({ page, request }) => {
     await anAdminAtSources(page, request, {
       workspace: "Sowerby Hydraulics",
       bindings: [SERVICE_RECORDS],
@@ -629,10 +610,7 @@ test.describe("reviewing a binding's findings", () => {
     `);
   });
 
-  test("shows an Admin a kept group an erasure overrides as still withheld, and says why", async ({
-    page,
-    request,
-  }) => {
+  test("shows an Admin a kept group an erasure still withholds", async ({ page, request }) => {
     await anAdminAtSources(page, request, {
       workspace: "Wharfe Catering",
       bindings: [
@@ -695,10 +673,7 @@ test.describe("reviewing a binding's findings", () => {
     ]);
   });
 
-  test("scrolls nothing sideways for an Admin at 320 pixels with the review open and the longest act named, the table holding its own width", async ({
-    page,
-    request,
-  }) => {
+  test("scrolls nothing sideways at 320 pixels with the review open", async ({ page, request }) => {
     await anAdminAtSources(page, request, {
       workspace: "Marsden Mills",
       bindings: [SUPPLIER_FORMS],
@@ -726,7 +701,7 @@ test.describe("reviewing a binding's findings", () => {
 });
 
 test.describe("publishing, narrowing and widening a binding", () => {
-  test("the publish dialog states an Admin's three confirmations and the audit row before the click, and the act lands within 100 ms", async ({
+  test("publishes within 100 ms after stating confirmations and audit row", async ({
     page,
     request,
   }) => {
@@ -829,7 +804,7 @@ test.describe("publishing, narrowing and widening a binding", () => {
     await expect(page.getByRole("heading", { level: 3, name: "Staff handbook" })).toBeFocused();
   });
 
-  test("an Admin's narrowing of a published binding moves every concept citing it and every composition including one", async ({
+  test("narrows a published binding with its citing concepts and compositions", async ({
     page,
     request,
   }) => {
@@ -863,7 +838,7 @@ test.describe("publishing, narrowing and widening a binding", () => {
     await expect(page.getByText(citedBy?.iri ?? "")).toBeVisible();
   });
 
-  test("an Admin widens a binding published at Restricted by keyboard, told the consequence and the audit row before the click, and it lands within 100 ms with every concept citing it", async ({
+  test("widens by keyboard within 100 ms, audit row shown first", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -950,7 +925,7 @@ test.describe("publishing, narrowing and widening a binding", () => {
     await expect(page.getByRole("heading", { level: 3, name: "Tender answers" })).toBeFocused();
   });
 
-  test("an Admin widens a Public binding's named groups to everyone in the workspace, and is told once nothing is wider", async ({
+  test("widens a Public binding's audience, then says nothing is wider", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -1010,10 +985,7 @@ test.describe("publishing, narrowing and widening a binding", () => {
     );
   });
 
-  test("tells an Admin the widening block in its own word, with what to do next, when a special category finding is unreviewed", async ({
-    page,
-    request,
-  }) => {
+  test("refuses widening with a special category finding unreviewed", async ({ page, request }) => {
     await anAdminAtSources(page, request, {
       workspace: "Mytholmroyd Pumps",
       bindings: [{ ...SERVICE_RECORDS, sensitivity: "Restricted", published: true }],
@@ -1037,10 +1009,7 @@ test.describe("publishing, narrowing and widening a binding", () => {
 });
 
 test.describe("the Sources screen's keystrokes", () => {
-  test("? lists an Admin every keystroke, b binds from anywhere on the screen, and one switch turns them off", async ({
-    page,
-    request,
-  }) => {
+  test("lists keystrokes on ?, and one switch turns them off", async ({ page, request }) => {
     await anAdminAtSources(page, request, { workspace: "Luddenden Weaving" });
 
     await page.keyboard.press("?");
