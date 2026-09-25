@@ -22,7 +22,7 @@ import {
   withScope,
   type PostgresDoor,
 } from "../store/postgres/index.ts";
-import { recordSubjectRequest } from "./requests.ts";
+import { recordSubjectRequest, type RecordSubjectRequestRefusal } from "./requests.ts";
 import { runErasure, type ErasureLog, type ErasurePrincipal } from "./routine.ts";
 
 const REHEARSAL_ACTS = declareActs("platform", {
@@ -89,13 +89,17 @@ const CONCEPT_BODY =
 
 const DOCUMENT_BINDING = "Erasure rehearsal";
 
-// Named for the subject, so a re-run finds its binding and a subject seeded after an erasure
-// gets a document naming them.
+/**
+ * Named for the subject, so a re-run finds its binding and a subject seeded after an erasure
+ * gets a document naming them.
+ */
 const documentFileOf = (subject: SyntheticSubject): string =>
   `erasure-rehearsal-${subject.personId.toLowerCase()}.md`;
 
-// A work address and a name, neither of which a rule in force raises: the index holds both
-// until the erasure withholds them.
+/**
+ * A work address and a name, neither of which a rule in force raises: the index holds both
+ * until the erasure withholds them.
+ */
 const documentNaming = (subject: SyntheticSubject): string =>
   "# Erasure rehearsal\n\n" +
   `The drill's synthetic document. It names the rehearsal's subject, ${subject.name}, ` +
@@ -257,6 +261,7 @@ const documentSeeded = async (
 };
 
 /* jscpd:ignore-start */
+/** A rerun finds the person, membership, concept and binding the first run seeded. */
 export const seedSyntheticSubject = async (
   platform: ErasurePrincipal,
   doors: RehearsalDoors,
@@ -314,6 +319,10 @@ const recordTheRehearsal = async (
   return auditEventId;
 };
 
+/** A too-broad refusal's word, never its sentence, which quotes the identifier. */
+const refusalWordOf = (refused: RecordSubjectRequestRefusal): string =>
+  typeof refused === "string" || refused instanceof Error ? String(refused) : refused.word;
+
 /* jscpd:ignore-start */
 export const rehearseErasure = async (
   platform: ErasurePrincipal,
@@ -358,10 +367,7 @@ export const rehearseErasure = async (
   }
   const recorded = opened.value;
   if (!recorded.ok) {
-    // The word and never the sentence, which quotes the identifier it refused.
-    const refused = recorded.error;
-    const word =
-      typeof refused === "string" || refused instanceof Error ? String(refused) : refused.word;
+    const word = refusalWordOf(recorded.error);
     return err(new Error(`erasure: the rehearsal's request was refused: ${word}`));
   }
   const subjectRequestId = recorded.value.requestId;

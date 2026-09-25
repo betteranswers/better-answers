@@ -12,8 +12,10 @@ const SPACE = " ";
 
 const EMAILS: IdentifierKind = "emails";
 
-// The worker splits on Python's whitespace, which is not JavaScript's `\s`: it holds the
-// four separator controls and NEL, and not the byte-order mark.
+/**
+ * The worker splits on Python's whitespace, which is not JavaScript's `\s`: it holds the
+ * four separator controls and NEL, and not the byte-order mark.
+ */
 const WHITESPACE_RANGES: readonly (readonly [number, number])[] = [
   [0x09, 0x0d],
   [0x1c, 0x20],
@@ -33,8 +35,10 @@ const WHITESPACE = new Set(
   ),
 );
 
-// Node's Unicode postdates the worker's 15.1, where these code points do not exist; the
-// agreement's digests fail when Node's Unicode moves.
+/**
+ * Node's Unicode postdates the worker's 15.1, where these code points do not exist; the
+ * agreement's digests fail when Node's Unicode moves.
+ */
 const ASSIGNED_AFTER_UNICODE_15_1 = `
   88F 897 C5C CDC 1ACF-1ADD 1AE0-1AEB 1B4E-1B4F 1B7F 1C89-1C8A 20C1 2427-2429 2B96 31E4-31E5
   A7CB-A7CF A7D2 A7D4 A7DA-A7DC A7F1 FBC3-FBD2 FD90-FD91 FDC8-FDCE 105C0-105F3 10940-10959
@@ -68,7 +72,7 @@ const DOTLESS_I = "\u0131";
 const CHEROKEE_SMALL_LETTERS = { from: 0xab70, to: 0xabbf, capital: 0x13a0 };
 const CHEROKEE_SMALL_LETTERS_BEYOND = { from: 0x13f8, to: 0x13fd, capital: 0x13f0 };
 
-// Cherokee folds a small letter to its capital, where lower-casing goes the other way.
+/** Cherokee folds a small letter to its capital, where lower-casing goes the other way. */
 const cherokeeCapitalOf = (character: string): string => {
   const point = character.codePointAt(0) ?? 0;
   const range = [CHEROKEE_SMALL_LETTERS, CHEROKEE_SMALL_LETTERS_BEYOND].find(
@@ -77,14 +81,16 @@ const cherokeeCapitalOf = (character: string): string => {
   return range === undefined ? character : String.fromCodePoint(range.capital + point - range.from);
 };
 
-// Per character, so no final sigma is written; down, up and down again fully folds all but
-// dotless i, Cherokee and what 15.1 lacks.
+/**
+ * Per character, so no final sigma is written; down, up and down again fully folds all but
+ * dotless i, Cherokee and what 15.1 lacks.
+ */
 const foldedCharacter = (character: string): string =>
   character === DOTLESS_I || !knownToUnicode15_1(character)
     ? character
     : Array.from(character.toLowerCase().toUpperCase().toLowerCase(), cherokeeCapitalOf).join("");
 
-// A folded character is never a space, so the words are found after folding.
+/** A folded character is never a space, so the words are found after folding. */
 const spacedAs = (identifier: string, written: (character: string) => string): string =>
   Array.from(identifier, (character) => (WHITESPACE.has(character) ? SPACE : written(character)))
     .join("")
@@ -92,9 +98,11 @@ const spacedAs = (identifier: string, written: (character: string) => string): s
     .filter((word) => word !== "")
     .join(SPACE);
 
+/** Folded as the worker folds, with each run of whitespace one space and none at either end. */
 export const normalisedIdentifier = (identifier: string): string =>
   spacedAs(identifier, foldedCharacter);
 
+/** The first floor the identifier falls below, `characters` before `name-words`. */
 export const floorNotCleared = (kind: IdentifierKind, identifier: string): Floor | undefined => {
   const normalised = normalisedIdentifier(identifier);
   if (Array.from(normalised).length < SUBJECT_IDENTIFIER_FLOOR) return "characters";
@@ -107,13 +115,19 @@ export const floorNotCleared = (kind: IdentifierKind, identifier: string): Floor
 export type SoughtIdentifier = {
   readonly normalised: string;
 
-  // Spaced as the agreement spaces it and never folded: the full-text index lower-cases and
-  // keeps ß, so it holds the spelling the request recorded.
+  /**
+   * Spaced as the agreement spaces it and never folded: the full-text index lower-cases and
+   * keeps ß, so it holds the spelling the request recorded.
+   */
   readonly recorded: string;
 
   readonly anAddress: boolean;
 };
 
+/**
+ * Skips an identifier below a floor. A spelling repeated among the emails, or among the names and
+ * other identifiers, is sought once.
+ */
 export const soughtIdentifiersOf = (
   set: Readonly<Record<IdentifierKind, readonly string[]>> | null,
 ): readonly SoughtIdentifier[] => {
@@ -130,13 +144,16 @@ export const soughtIdentifiersOf = (
   return [...sought.values()];
 };
 
+/** Offsets count code points, not UTF-16 units; `end` is exclusive. */
 export type ErasureMatch = {
   readonly start: number;
   readonly end: number;
 };
 
-// Each folded code unit keeps the text character it came from: ß folds to two, and an
-// occurrence counts the text's own characters.
+/**
+ * Each folded code unit keeps the text character it came from: ß folds to two, and an
+ * occurrence counts the text's own characters.
+ */
 type Folded = {
   readonly text: string;
   readonly origins: readonly number[];
@@ -158,7 +175,7 @@ const foldedOf = (characters: readonly string[]): Folded => {
   return { text: pieces.join(""), origins };
 };
 
-// A match starting or ending between the two letters ß folds to names nothing the text wrote.
+/** A match starting or ending between the two letters ß folds to names nothing the text wrote. */
 const occurrencesOf = (folded: Folded, normalised: string): readonly ErasureMatch[] => {
   const { text, origins } = folded;
   const found: ErasureMatch[] = [];
@@ -192,6 +209,7 @@ const bounded = (
   );
 };
 
+/** Whole-word matches, each span once, sorted by start and then end. */
 export const erasureMatchesIn = (
   text: string,
   sought: readonly SoughtIdentifier[],

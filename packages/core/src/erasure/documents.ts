@@ -2,8 +2,10 @@ import type { PlatformPrincipal } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import { erasureMatchesIn, type SoughtIdentifier } from "./identifiers.ts";
 
-// Any one word makes a candidate, since a name split between two chunks leaves no chunk holding
-// all its words.
+/**
+ * Any one word makes a candidate, since a name split between two chunks leaves no chunk holding
+ * all its words.
+ */
 const PROBE = `SELECT string_agg(probe::text, ' | ') AS probe
      FROM (SELECT plainto_tsquery('english', word) AS probe
              FROM unnest($1::text[]) AS word) AS words
@@ -18,7 +20,7 @@ const LIVE_DOCUMENTS_PROBED = `SELECT DISTINCT c.source_document_id AS id ${LIVE
 
 const EVERY_LIVE_DOCUMENT = `SELECT DISTINCT c.source_document_id AS id ${LIVE}`;
 
-// Chunks are contiguous slices, so joined in order they are the document's indexed text.
+/** Chunks are contiguous slices, so joined in order they are the document's indexed text. */
 const INDEXED_TEXT = `SELECT string_agg(content, '' ORDER BY ordinal) AS text
      FROM "index".chunk
     WHERE workspace_id = $1 AND source_document_id = $2`;

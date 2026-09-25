@@ -52,8 +52,10 @@ export type ErasureLogLine = {
   readonly invitations_deleted: number;
 };
 
-// The row and the report are the erasing workspace's to read, so what varies with another
-// workspace's records goes to the tier's log.
+/**
+ * The row and the report are the erasing workspace's to read, so what varies with another
+ * workspace's records goes to the tier's log.
+ */
 export type ErasureLog = {
   readonly info: (line: ErasureLogLine, message: string) => void;
 };
@@ -61,8 +63,10 @@ export type ErasureLog = {
 const IDENTITY_STEP_LOGGED =
   "erasure: the identity step's arm, and what it pseudonymised and deleted";
 
-// deploy/backup.sh takes the same advisory lock by this number; change one and a dump runs
-// beside an erasure.
+/**
+ * deploy/backup.sh takes the same advisory lock by this number; change one and a dump runs
+ * beside an erasure.
+ */
 const DUMP_LOCK = 41;
 
 const ERASURE_ACTS = declareActs("people", {
@@ -94,8 +98,10 @@ export type ErasureRun = {
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 
-// Months are calendar months, as deploy/backup.sh's interval writes them;
-// packages/schema/test/factory.ts spells the same four and moves with this.
+/**
+ * Months are calendar months, as deploy/backup.sh's interval writes them;
+ * packages/schema/test/factory.ts spells the same four and moves with this.
+ */
 const BEYOND_USE = { hourlyHours: 48, dailyDays: 30, weeklyWeeks: 8, monthlyMonths: 6 } as const;
 
 export const beyondUseFrom = (anchoredAt: Date) => ({
@@ -252,8 +258,10 @@ const withTheChecksMoved = (
   [CONCEPT_VERIFICATION]: { ...actions[CONCEPT_VERIFICATION], rehashed: carried.checks },
 });
 
-// The arm, pseudonymisation and deletes go to the operator's log line: on this workspace's row
-// they would say whether another workspace holds the person.
+/**
+ * The arm, pseudonymisation and deletes go to the operator's log line: on this workspace's row
+ * they would say whether another workspace holds the person.
+ */
 const withTheIdentityStep = (actions: ErasureActions, swept: IdentitySwept): ErasureActions => ({
   ...actions,
   "identity-user": { ...actions["identity-user"], membershipsEnded: swept.membershipsEnded },
@@ -336,15 +344,141 @@ const detailOf = (request: SubjectRequest, map: ErasureMap): CompletedDetail => 
 
 type CompletionRow = { readonly completed_at: Date | null; readonly report: string | null };
 
+type ErasureDoors = {
+  readonly git: GitDoor;
+  readonly postgres: PostgresDoor;
+  readonly objects: ObjectDoor;
+  readonly clock: Clock;
+  readonly log: ErasureLog;
+};
+
+type ErasureOpened = {
+  readonly request: SubjectRequest;
+  readonly erasure: ErasureRecord;
+  readonly pseudonym: string;
+  readonly standingCompletion: Date | null;
+  readonly map: ErasureMap;
+  readonly concepts: readonly string[];
+  readonly addresses: SubjectAddresses;
+};
+
+const openTheRequest = async (
+  platform: ErasurePrincipal,
+  doors: ErasureDoors,
+  workspaceId: string,
+  subjectRequestId: string,
+  lockedAt: Date,
+): Promise<Result<ErasureOpened, RunErasureRefusal | Error>> => {
+  const opened = await attempt(() =>
+    withScope(platform, doors.postgres, workspaceId, (tx) =>
+      openTheRoutine(tx, workspaceId, subjectRequestId, lockedAt),
+    ),
+  );
+  if (!opened.ok) return err(opened.error);
+  if (!opened.value.ok) return err(opened.value.error);
+  const { request, erasure, pseudonym, completedAt: standingCompletion } = opened.value.value;
+
+  const searched = await attempt(() =>
+    withScope(platform, doors.postgres, workspaceId, async (tx) => {
+      const map = await erasureMapOf(platform, tx, doors.git, request);
+      return {
+        map,
+        concepts: await conceptsNaming(tx, workspaceId, map),
+
+        addresses: await addressesOfTheSubject(tx, {
+          personIds: [personTheMapFound(map), request.personId],
+          requested: request.identifiers?.emails ?? [],
+        }),
+      };
+    }),
+  );
+  if (!searched.ok) return err(searched.error);
+  const { map, concepts, addresses } = searched.value;
+
+  if (namedInTheBundle(map) && addresses.inTheBundle.length === 0) return err("no-address");
+  return ok({ request, erasure, pseudonym, standingCompletion, map, concepts, addresses });
+};
+
+const completeTheRequest = async (
+  platform: ErasurePrincipal,
+  doors: ErasureDoors,
+  workspaceId: string,
+  opened: ErasureOpened,
+  actions: ErasureActions,
+): Promise<Result<ErasureRun, Error>> => {
+  const { request, erasure, pseudonym, standingCompletion, map, concepts } = opened;
+  const report = erasureReportOf({ request, erasure, actions, map, concepts });
+  const completedAt = doors.clock.now();
+
+  const standsAt = standingCompletion ?? completedAt;
+
+  /**
+   * Written before the completion commits: a run that leaves no copy loses the erasure to
+   * every restore from a dump older than the request.
+   */
+  const copied = await attempt(() =>
+    writeReplayCopy(platform, doors.objects, {
+      workspaceId,
+      subjectRequestId: request.id,
+      erasureRequestId: erasure.id,
+      personId: personTheMapFound(map),
+      pseudonym,
+      completedAt: standsAt,
+      identifiers: request.identifiers,
+      map,
+    }),
+  );
+  if (!copied.ok) return err(copied.error);
+
+  const completed = await attempt(() =>
+    withScope(platform, doors.postgres, workspaceId, async (tx) => {
+      await tx.query(
+        `UPDATE erasure_request
+            SET actions = $3, completed_at = $4, report = $5
+          WHERE workspace_id = $1 AND id = $2 AND completed_at IS NULL`,
+        [workspaceId, erasure.id, actions, completedAt, report],
+      );
+      const standing = await tx.query<CompletionRow>(
+        "SELECT completed_at, report FROM erasure_request WHERE workspace_id = $1 AND id = $2",
+        [workspaceId, erasure.id],
+      );
+      const row = standing.rows[0];
+      if (row?.completed_at == null || row.report === null) {
+        throw new Error("erasure: the routine did not complete the request it opened");
+      }
+      const auditEventId = ulid();
+
+      await record(platform, tx, {
+        id: auditEventId,
+        act: ERASURE_ACTS.completed,
+        subjectId: erasure.id,
+        detail: detailOf(request, map),
+      });
+      return { completedAt: row.completed_at, report: row.report, auditEventId };
+    }),
+  );
+  if (!completed.ok) return err(completed.error);
+
+  return ok({
+    workspaceId,
+    subjectRequestId: request.id,
+    erasureRequestId: erasure.id,
+    anchoredAt: erasure.anchoredAt,
+    completedAt: completed.value.completedAt,
+    report: completed.value.report,
+    map,
+    auditEventId: completed.value.auditEventId,
+  });
+};
+
+/**
+ * Waits on the backup dump's lock. A rerun is safe, and answers the first completion's time and
+ * report. Refuses `no-address` when the bundle names the person but no address to rewrite is known.
+ * A step that fails answers its error, and the steps before it stay applied.
+ */
 export const runErasure = async (
   platform: ErasurePrincipal,
-  doors: {
-    readonly git: GitDoor;
-    readonly postgres: PostgresDoor;
-    readonly objects: ObjectDoor;
-    readonly clock: Clock;
-    readonly log: ErasureLog;
-  },
+  doors: ErasureDoors,
   input: { readonly workspaceId: string; readonly subjectRequestId: string },
 ): Promise<Result<ErasureRun, RunErasureRefusal | Error>> => {
   const workspace = boundarySchemas.workspace.select.shape.id.safeParse(input.workspaceId);
@@ -357,33 +491,9 @@ export const runErasure = async (
   return withSessionLock(platform, doors.postgres, DUMP_LOCK, async () => {
     const lockedAt = doors.clock.now();
 
-    const opened = await attempt(() =>
-      withScope(platform, doors.postgres, workspaceId, (tx) =>
-        openTheRoutine(tx, workspaceId, requestId.data, lockedAt),
-      ),
-    );
+    const opened = await openTheRequest(platform, doors, workspaceId, requestId.data, lockedAt);
     if (!opened.ok) return err(opened.error);
-    if (!opened.value.ok) return err(opened.value.error);
-    const { request, erasure, pseudonym, completedAt: standingCompletion } = opened.value.value;
-
-    const searched = await attempt(() =>
-      withScope(platform, doors.postgres, workspaceId, async (tx) => {
-        const map = await erasureMapOf(platform, tx, doors.git, request);
-        return {
-          map,
-          concepts: await conceptsNaming(tx, workspaceId, map),
-
-          addresses: await addressesOfTheSubject(tx, {
-            personIds: [personTheMapFound(map), request.personId],
-            requested: request.identifiers?.emails ?? [],
-          }),
-        };
-      }),
-    );
-    if (!searched.ok) return err(searched.error);
-    const { map, concepts, addresses } = searched.value;
-
-    if (namedInTheBundle(map) && addresses.inTheBundle.length === 0) return err("no-address");
+    const { request, erasure, pseudonym, standingCompletion, map, addresses } = opened.value;
 
     const rewritten = await attempt(() =>
       // The lock spans the rewrite and the rows naming its commits: a reconciler tick between
@@ -406,8 +516,10 @@ export const runErasure = async (
     );
     if (!rewritten.ok) return err(rewritten.error);
 
-    // Before the identity step, which pseudonymises the sign-in address: a rerun after it would
-    // read no address to add.
+    /**
+     * Before the identity step, which pseudonymises the sign-in address: a rerun after it would
+     * read no address to add.
+     */
     const suppressed = await attempt(() =>
       withScope(platform, doors.postgres, workspaceId, (tx) =>
         suppressInTheWorkspace(platform, tx, {
@@ -452,65 +564,6 @@ export const runErasure = async (
       ),
       { ...suppressed.value, bindingsToReprocess: rederived.value.bindingsToReprocess },
     );
-    const report = erasureReportOf({ request, erasure, actions, map, concepts });
-    const completedAt = doors.clock.now();
-
-    const standsAt = standingCompletion ?? completedAt;
-
-    // Written before the completion commits: a run that leaves no copy loses the erasure to
-    // every restore from a dump older than the request.
-    const copied = await attempt(() =>
-      writeReplayCopy(platform, doors.objects, {
-        workspaceId,
-        subjectRequestId: request.id,
-        erasureRequestId: erasure.id,
-        personId: personTheMapFound(map),
-        pseudonym,
-        completedAt: standsAt,
-        identifiers: request.identifiers,
-        map,
-      }),
-    );
-    if (!copied.ok) return err(copied.error);
-
-    const completed = await attempt(() =>
-      withScope(platform, doors.postgres, workspaceId, async (tx) => {
-        await tx.query(
-          `UPDATE erasure_request
-              SET actions = $3, completed_at = $4, report = $5
-            WHERE workspace_id = $1 AND id = $2 AND completed_at IS NULL`,
-          [workspaceId, erasure.id, actions, completedAt, report],
-        );
-        const standing = await tx.query<CompletionRow>(
-          "SELECT completed_at, report FROM erasure_request WHERE workspace_id = $1 AND id = $2",
-          [workspaceId, erasure.id],
-        );
-        const row = standing.rows[0];
-        if (row?.completed_at == null || row.report === null) {
-          throw new Error("erasure: the routine did not complete the request it opened");
-        }
-        const auditEventId = ulid();
-
-        await record(platform, tx, {
-          id: auditEventId,
-          act: ERASURE_ACTS.completed,
-          subjectId: erasure.id,
-          detail: detailOf(request, map),
-        });
-        return { completedAt: row.completed_at, report: row.report, auditEventId };
-      }),
-    );
-    if (!completed.ok) return err(completed.error);
-
-    return ok({
-      workspaceId,
-      subjectRequestId: request.id,
-      erasureRequestId: erasure.id,
-      anchoredAt: erasure.anchoredAt,
-      completedAt: completed.value.completedAt,
-      report: completed.value.report,
-      map,
-      auditEventId: completed.value.auditEventId,
-    });
+    return completeTheRequest(platform, doors, workspaceId, opened.value, actions);
   });
 };

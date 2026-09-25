@@ -45,7 +45,9 @@ const ANCHOR_NAMED =
   "last dump before it: no backup run is recorded, so the last dump precedes the anchor and " +
   "every date above is the latest a copy can expire.";
 
-// Both printed on every arm, with no count: printed on one arm alone, either would say which ran.
+/**
+ * Both printed on every arm, with no count: printed on one arm alone, either would say which ran.
+ */
 const SIGN_IN_IDENTITY_REMOVED =
   "A person's sign-in identity is removed from the platform by the request that ends their " +
   "last membership.";
