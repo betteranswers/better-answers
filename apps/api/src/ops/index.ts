@@ -55,6 +55,7 @@ import {
   principalOfMember,
   provisionWorkspace,
   renameWorkspace,
+  setOperatorMark,
   type AddMemberRefusal,
   type ProvisionRefusal,
   type RenameRefusal,
@@ -62,6 +63,7 @@ import {
 import { REBUILD_REASONS, ROLES, SENSITIVITIES, ulid } from "@better-answers/schema";
 
 import { doorTold, type Doors } from "../doors.ts";
+import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
 
 import { isRefusalWord, refusalOf } from "../refusal.ts";
 
@@ -177,6 +179,7 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
                                                             a signed-in person made a member of the workspace; a repeat is refused and never changes a role
   rename-workspace --workspace <id> [--name <name>] [--slug <slug>]
                                                             the workspace's name, its slug, or both; at least one is named, and the other kept
+  operator --email <email> --grant|--revoke                 a signed-in person made the platform's operator, or no longer; each change on the identity-set audit log
   import-bundle --workspace <id> --from <directory> --as <member email> [--sensitivity <class>] [--dry-run]
                                                             the company's bundle landed through the governed write, its checks imported, its links rewritten to iris
     --sensitivity  one of ${SENSITIVITIES.join(" · ")} (default ${IMPORT_SENSITIVITY_DEFAULT})
@@ -1090,6 +1093,35 @@ const renameWorkspaceCommand = async (doors: Doors, flags: Flags, io: OpsIo): Pr
   return DONE;
 };
 
+const OPERATOR_USAGE = "operator: --email <email> and one of --grant or --revoke are required";
+
+const MARK_SAID = {
+  grant: { changed: "is the operator", unchanged: "was already the operator; nothing written" },
+  revoke: {
+    changed: "is no longer the operator",
+    unchanged: "was not the operator; nothing written",
+  },
+} as const;
+
+const operatorCommand = async (doors: Doors, flags: Flags, io: OpsIo): Promise<number> => {
+  const email = flagValue(flags, "email");
+  const granting = flags.has("grant");
+  if (email === undefined || granting === flags.has("revoke")) {
+    io.say(OPERATOR_USAGE);
+    return USAGE;
+  }
+  const change = granting ? "grant" : "revoke";
+  const marked = await setOperatorMark(IDENTITY_PRINCIPAL, doors.postgres, { email, change });
+  if (!marked.ok) {
+    const reason = marked.error === "no-such-user" ? notSignedIn(email) : marked.error.message;
+    io.say(`operator: REFUSED — ${reason}`);
+    return REFUSED;
+  }
+  const said = MARK_SAID[change][marked.value.changed ? "changed" : "unchanged"];
+  io.say(`operator: done — ${email} ${said}`);
+  return DONE;
+};
+
 const SLICELESS_COMMANDS = new Map<
   string,
   (doors: Doors, flags: Flags, io: OpsIo) => Promise<number>
@@ -1100,6 +1132,7 @@ const SLICELESS_COMMANDS = new Map<
   ["provision-workspace", provisionWorkspaceCommand],
   ["add-member", addMemberCommand],
   ["rename-workspace", renameWorkspaceCommand],
+  ["operator", operatorCommand],
 ]);
 
 /**

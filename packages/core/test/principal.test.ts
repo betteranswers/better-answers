@@ -3,8 +3,9 @@ import { testData } from "@better-answers/schema/testing";
 import { configProbeWritten } from "@better-answers/schema/testing/probes";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
-import { act, declareActs, record } from "../src/audit/index.ts";
+import { act, declareActs, declareIdentitySetActs, record, recordFor } from "../src/audit/index.ts";
 import {
+  actorIdOfPerson,
   attempt,
   err,
   ok,
@@ -22,6 +23,7 @@ import {
   readWorkspaceConfig,
   tablesPresent,
   withMembership,
+  withOperator,
   withPrincipal,
   withScope,
   type Answered,
@@ -109,6 +111,10 @@ const PROBE_ACTS = declareActs("platform", {
 });
 
 const PROVOKED = "provoked" as const;
+
+const IDENTITY_PROBE = declareIdentitySetActs("people", {
+  written: act("people.probe.written", {}),
+});
 
 const answeringAfterThreeWrites =
   <Answer>(key: string, answer: Answer) =>
@@ -623,5 +629,100 @@ describe("the counters", () => {
     const otherScope = await consumeIngress(door, "email", key, rule, now);
 
     expect([first.allowed, second.allowed, otherScope.allowed]).toEqual([true, false, true]);
+  });
+});
+
+describe("the operator resolver", () => {
+  const aPerson = async (overrides: { operator?: boolean; revokedAt?: Date } = {}) => {
+    const client = await db().pool.connect();
+    try {
+      return await testData(client).user({
+        operator: overrides.operator ?? false,
+        credentialsRevokedAt: overrides.revokedAt ?? null,
+      });
+    } finally {
+      client.release();
+    }
+  };
+
+  const resolving = (userId: string, issuedAt = new Date()) =>
+    withOperator(openPostgres(db().runtimePool), { userId, issuedAt }, async (operator, tx) => {
+      const scope = await tx.query<{ scope: string | null }>(
+        "SELECT current_workspace_id() AS scope",
+      );
+      return { operator, scope: scope.rows[0]?.scope };
+    });
+
+  it("resolves a marked person to the operator, in no workspace", async () => {
+    const person = await aPerson({ operator: true });
+    const issuedAt = new Date("2026-09-25T09:00:00.000Z");
+
+    expect(await resolving(person.id, issuedAt)).toEqual({
+      ok: true,
+      value: {
+        operator: {
+          kind: "operator",
+          userId: person.id,
+          credentialIssuedAtMs: Date.parse("2026-09-25T09:00:00.000Z"),
+        },
+        scope: null,
+      },
+    });
+  });
+
+  it("refuses a person without the mark", async () => {
+    const person = await aPerson();
+
+    expect(await resolving(person.id)).toEqual({ ok: false, error: "not-the-operator" });
+  });
+
+  it("refuses the operator's credentials issued before their revocation", async () => {
+    const person = await aPerson({
+      operator: true,
+      revokedAt: new Date("2026-09-25T10:00:00.000Z"),
+    });
+
+    expect([
+      await resolving(person.id, new Date("2026-09-25T09:59:59.999Z")),
+      (await resolving(person.id, new Date("2026-09-25T10:00:00.000Z"))).ok,
+    ]).toEqual([{ ok: false, error: "not-the-operator" }, true]);
+  });
+
+  it("rolls a refusal's writes back and commits a value's", async () => {
+    const person = await aPerson({ operator: true });
+    const writingThen = <Answer>(answer: Answer) =>
+      withOperator(
+        openPostgres(db().runtimePool),
+        { userId: person.id, issuedAt: new Date() },
+        async (_operator, tx) => {
+          await recordFor(bootstrap, tx, {
+            id: ulid(),
+            actor: actorIdOfPerson(person.id),
+            act: IDENTITY_PROBE.written,
+            subjectId: person.id,
+            detail: {},
+          });
+          return answer;
+        },
+      );
+
+    const answers = [await writingThen(err(PROVOKED)), await writingThen(ok("landed"))];
+
+    const written = await db().pool.query(
+      "SELECT 1 FROM identity_audit_event WHERE subject_id = $1 AND act = $2",
+      [person.id, IDENTITY_PROBE.written.name],
+    );
+    expect(written.rowCount).toBe(1);
+    expect(answers).toEqual([
+      { ok: true, value: { ok: false, error: PROVOKED } },
+      { ok: true, value: { ok: true, value: "landed" } },
+    ]);
+  });
+
+  it("refuses an id nobody holds, and a malformed one", async () => {
+    expect([await resolving(ulid()), await resolving("not-a-person")]).toEqual([
+      { ok: false, error: "not-the-operator" },
+      { ok: false, error: "not-the-operator" },
+    ]);
   });
 });

@@ -1244,6 +1244,7 @@ describe("5 — the inferred type is pinned", () => {
         createdAt: Date;
         updatedAt: Date;
         credentialsRevokedAt: Date | null;
+        operator: boolean;
       }
     >
   >;

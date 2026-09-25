@@ -284,6 +284,8 @@ export const createAuth = (deps: AuthDependencies) => {
     user: {
       additionalFields: {
         credentialsRevokedAt: { type: "date", required: false, input: false },
+        /** Undeclared, the library would hand the column back on every session it answers. */
+        operator: { type: "boolean", required: false, input: false, returned: false },
       },
     },
     rateLimit: {

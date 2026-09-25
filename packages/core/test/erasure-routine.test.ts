@@ -33,7 +33,7 @@ import {
   type RunErasureRefusal,
 } from "../src/erasure/index.ts";
 import { actorIdOfPerson, type Result, type UserPrincipal } from "../src/kernel/index.ts";
-import { setDisplayName } from "../src/workspaces/index.ts";
+import { setDisplayName, setOperatorMark } from "../src/workspaces/index.ts";
 import { authorLinesOf, bundleHistory, everyObjectOf, objectPresent } from "./bundle.ts";
 import { erasureDoorsFor } from "./erasure-doors.ts";
 import { identityRowsFor, verificationCodeFor } from "./identity-rows.ts";
@@ -492,6 +492,20 @@ const userRowOf = async (userId: string) => {
     image: string | null;
   }>(`SELECT id, name, email, email_verified, image FROM "user" WHERE id = $1`, [userId]);
   return read.rows[0];
+};
+
+const operatorMarkOf = async (userId: string): Promise<boolean | undefined> => {
+  const read = await db().pool.query<{ operator: boolean }>(
+    'SELECT operator FROM "user" WHERE id = $1',
+    [userId],
+  );
+  return read.rows[0]?.operator;
+};
+
+/** @throws when the platform refuses the mark. */
+const theOperator = async (scenario: Scenario, email: string): Promise<void> => {
+  const marked = await setOperatorMark(bootstrap, scenario.postgres, { email, change: "grant" });
+  if (!marked.ok || !marked.value.changed) throw new Error(`the mark was not set on ${email}`);
 };
 
 const workspacesMemberOf = async (userId: string): Promise<readonly string[]> => {
@@ -1085,6 +1099,15 @@ describe("the identity set on the person's last membership", () => {
     expect(await personNamedBy(scenario.workspaceId, acted.id)).toEqual(person.id);
   });
 
+  it("clears the operator mark with the rest of the identity", async () => {
+    const { scenario, person, email, subjectRequestId } = await workspaceWithAnErasureRequest();
+    await theOperator(scenario, email);
+
+    await completing(scenario, subjectRequestId);
+
+    expect(await operatorMarkOf(person.id)).toBe(false);
+  });
+
   it("deletes the person's sessions, verification rows, invitations and linked accounts", async () => {
     const { scenario, person, email, subjectRequestId } = await workspaceWithAnErasureRequest();
     await identityRowsFor(db().pool, { userId: person.id, email });
@@ -1137,12 +1160,14 @@ describe("the identity set on the person's last membership", () => {
       seed.member({ workspaceId: elsewhere.workspaceId, userId: person.id, role: "Editor" }),
     );
     await identityRowsFor(db().pool, { userId: person.id, email });
+    await theOperator(scenario, email);
     const subjectRequestId = await erasureRequestAbout(scenario.workspaceId, person.id, email);
 
     await completing(scenario, subjectRequestId);
 
     const after = await userRowOf(person.id);
     expect({ email: after?.email, name: after?.name }).toEqual({ email, name: "Priya Anand" });
+    expect(await operatorMarkOf(person.id)).toBe(true);
     expect(await identityRowCountsFor(scenario.workspaceId, person.id, email)).toMatchObject({
       sessions: 1,
       accounts: 1,

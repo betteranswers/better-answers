@@ -64,7 +64,7 @@ const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) =
 
   const pseudonymised = await tx.query(
     `UPDATE "user"
-        SET email = $2, email_verified = false, name = '', image = NULL
+        SET email = $2, email_verified = false, name = '', image = NULL, operator = false
       WHERE id = $1`,
     [subject.personId, tombstone],
   );
@@ -81,8 +81,8 @@ const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) =
 
 /**
  * Does nothing without a person. Otherwise ends the membership here, and only when it was the
- * person's last deletes their sessions, accounts, verifications and invitations and pseudonymises
- * them. Throws when their memberships cannot be read.
+ * person's last deletes their sessions, accounts, verifications and invitations, pseudonymises
+ * them and clears any operator mark. Throws when their memberships cannot be read.
  */
 export const eraseFromTheIdentitySet = async (
   platform: PlatformPrincipal,

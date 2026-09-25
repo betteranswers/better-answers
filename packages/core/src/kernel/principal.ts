@@ -37,6 +37,17 @@ export type PlatformPrincipal = {
 
 export type Principal = UserPrincipal | PlatformPrincipal;
 
+/**
+ * Kept out of `Principal`, so no act over a workspace's data can be handed a caller who belongs
+ * to none of them.
+ */
+export type OperatorPrincipal = {
+  readonly kind: "operator";
+  readonly userId: UserId;
+
+  readonly credentialIssuedAtMs: number;
+};
+
 export type Claims = {
   readonly workspaceId: string;
   readonly userId: string;
@@ -47,3 +58,5 @@ export type Claims = {
 export type PrincipalRefusal = KernelRefusal<
   "not-a-member" | "credentials-revoked" | "role-disagrees" | "role-unknown" | "malformed-claims"
 >;
+
+export type OperatorRefusal = KernelRefusal<"not-the-operator">;

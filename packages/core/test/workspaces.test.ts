@@ -4,23 +4,31 @@ import { describe, expect, it } from "vitest";
 
 import { boundarySchemas, ulid } from "@better-answers/schema";
 
-import { attempt, type Claims, type UserPrincipal } from "../src/kernel/index.ts";
+import {
+  attempt,
+  type Claims,
+  type OperatorPrincipal,
+  type UserPrincipal,
+} from "../src/kernel/index.ts";
 import { issuedCredentialsFor } from "./identity-rows.ts";
 import { bootstrap, principalOf, provisionedWorkspace, seedPerson } from "./platform.ts";
 import {
   openPostgres,
   type PostgresDoor,
+  withOperator,
   withPrincipal,
   withScope,
 } from "../src/store/postgres/index.ts";
 import {
   addMember,
+  listWorkspaces,
   personIdByEmail,
   provisionWorkspace,
   readMembership,
   renameWorkspace,
   revokeCredentials,
   revokeWorkspaceTokens,
+  setOperatorMark,
   TOOLS_LIST_TTL_CONFIG_KEY,
   TOOLS_LIST_TTL_MS_DEFAULT,
   workspaceIdBySlug,
@@ -719,6 +727,10 @@ describe("what the slice answers when the store cannot be reached", () => {
         "renameWorkspace",
         await renameWorkspace(bootstrap, door, { workspaceId: ulid(), name: "Acme" }),
       ],
+      [
+        "setOperatorMark",
+        await setOperatorMark(bootstrap, door, { email: "acme@example.invalid", change: "grant" }),
+      ],
     ];
 
     for (const [name, answered] of answers) {
@@ -727,6 +739,21 @@ describe("what the slice answers when the store cannot be reached", () => {
         answered: { ok: false, error: expect.any(Error) },
       });
     }
+  });
+
+  it("hands back the store's Error from the operator's list", async () => {
+    const closed = await db().runtimePool.connect();
+    closed.release(true);
+    const operator: OperatorPrincipal = {
+      kind: "operator",
+      userId: boundarySchemas.user.select.shape.id.parse(ulid()),
+      credentialIssuedAtMs: Date.now(),
+    };
+
+    expect(await listWorkspaces(operator, closed)).toEqual({
+      ok: false,
+      error: expect.any(Error),
+    });
   });
 
   it("refuses an argument the boundary will not accept before it reaches for a statement", async () => {
@@ -1062,6 +1089,104 @@ describe("the person behind an email", () => {
     expect(await personIdByEmail(bootstrap, door, addressOf("nobody"))).toEqual({
       ok: true,
       value: undefined,
+    });
+  });
+});
+
+describe("the operator mark, set and cleared by the platform", () => {
+  const markOf = async (personId: string) => {
+    const found = await db().pool.query<{ operator: boolean }>(
+      'SELECT operator FROM "user" WHERE id = $1',
+      [personId],
+    );
+    return found.rows[0]?.operator;
+  };
+
+  const identityRowsAbout = async (personId: string) => {
+    const found = await db().pool.query(
+      "SELECT act, actor, detail FROM identity_audit_event WHERE subject_id = $1 ORDER BY at, id",
+      [personId],
+    );
+    return found.rows;
+  };
+
+  const marking = (email: string, change: "grant" | "revoke") =>
+    setOperatorMark(bootstrap, openPostgres(db().runtimePool), { email, change });
+
+  it("sets the mark by address, recorded under the platform's actor", async () => {
+    const email = addressOf("owner");
+    const personId = await seedPerson(db().pool, { email });
+
+    const marked = await marking(email.toUpperCase(), "grant");
+
+    expect(marked).toEqual({ ok: true, value: { personId, changed: true } });
+    expect(await markOf(personId)).toBe(true);
+    expect(await identityRowsAbout(personId)).toEqual([
+      { act: "people.operator.granted", actor: "process:better-answers-bootstrap", detail: {} },
+    ]);
+  });
+
+  it("clears the mark, recording the clearing as its own act", async () => {
+    const email = addressOf("leaver");
+    const personId = await seedPerson(db().pool, { email, operator: true });
+
+    const cleared = await marking(email, "revoke");
+
+    expect(cleared.ok && cleared.value.changed).toBe(true);
+    expect(await markOf(personId)).toBe(false);
+    expect(await identityRowsAbout(personId)).toEqual([
+      { act: "people.operator.revoked", actor: "process:better-answers-bootstrap", detail: {} },
+    ]);
+  });
+
+  it("writes nothing for a person already standing as asked", async () => {
+    const plain = addressOf("plain");
+    const marked = addressOf("marked");
+    const plainId = await seedPerson(db().pool, { email: plain });
+    const markedId = await seedPerson(db().pool, { email: marked, operator: true });
+
+    const answers = [await marking(plain, "revoke"), await marking(marked, "grant")];
+
+    expect(answers.map((answer) => answer.ok && answer.value.changed)).toEqual([false, false]);
+    expect([await markOf(plainId), await markOf(markedId)]).toEqual([false, true]);
+    expect([...(await identityRowsAbout(plainId)), ...(await identityRowsAbout(markedId))]).toEqual(
+      [],
+    );
+  });
+
+  it("refuses an address nobody has signed in with", async () => {
+    expect(await marking(addressOf("nobody"), "grant")).toEqual({
+      ok: false,
+      error: "no-such-user",
+    });
+  });
+});
+
+describe("the operator's list of every workspace", () => {
+  it("names each workspace with its slug, members and creation", async () => {
+    const acme = await provisionedWorkspace(db(), "Acme");
+    const second = addressOf("second");
+    await seedPerson(db().pool, { email: second });
+    await addMember(bootstrap, acme.door, {
+      workspaceId: acme.workspaceId,
+      email: second,
+      role: "Viewer",
+    });
+    const operatorId = await seedPerson(db().pool, { operator: true });
+
+    const listed = await withOperator(
+      acme.door,
+      { userId: operatorId, issuedAt: new Date() },
+      (operator, tx) => listWorkspaces(operator, tx),
+    );
+
+    const workspaces = listed.ok && listed.value.ok ? listed.value.value : [];
+    expect(workspaces.find((workspace) => workspace.id === acme.workspaceId)).toEqual({
+      id: acme.workspaceId,
+      name: "Acme",
+      slug: `acme-${acme.workspaceId.toLowerCase()}`,
+      memberCount: 2,
+      createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/),
     });
   });
 });
