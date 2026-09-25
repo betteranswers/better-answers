@@ -107,7 +107,10 @@ const chunkRowsAreHeld = async (workspaceId: string, bindingId: string): Promise
   }
 };
 
-// No act under test holds a chunk row, so the probe's `true` branch needs this control to stay honest.
+/**
+ * No act under test holds a chunk row, so the probe's `true` branch needs this control to stay
+ * honest.
+ */
 const whileAChunkRowIsHeld = async <T>(
   workspaceId: string,
   bindingId: string,
@@ -127,7 +130,7 @@ const whileAChunkRowIsHeld = async <T>(
   }
 };
 
-// A second binding under a held id fails the transaction after the act has landed every row.
+/** A second binding under a held id fails the transaction after the act has landed every row. */
 const landedThenTheTransactionFailed = (
   scenario: Scenario,
   bindingId: string,
@@ -241,8 +244,8 @@ const compositionIncluding = (
     return composition.id;
   });
 
-describe("what a governed write derives from the bindings of what it cites", () => {
-  it("lands the most restrictive class among them, on the row and on the map alike", async () => {
+describe("what a governed write derives from its cited bindings", () => {
+  it("lands the most restrictive class on both row and map", async () => {
     const scenario = await arrange();
     const { written } = await conceptOnBoth(db(), scenario);
 
@@ -288,7 +291,7 @@ describe("what a governed write derives from the bindings of what it cites", () 
     });
   });
 
-  it("forces a concept Restricted when the audiences share nobody, and never stores an empty list", async () => {
+  it("forces Restricted, not an empty list, when audiences share nobody", async () => {
     const scenario = await arrange();
     const hr = await groupNamed(db(), scenario, "HR", [scenario.viewer]);
     const sales = await groupNamed(db(), scenario, "Sales", []);
@@ -330,7 +333,7 @@ describe("what a governed write derives from the bindings of what it cites", () 
     });
   });
 
-  it("refuses a citation of an uncatalogued document by name and lands nothing", async () => {
+  it("refuses citing an uncatalogued document by name, landing nothing", async () => {
     const scenario = await arrange();
     const uncatalogued = ulid();
     const path = "knowledge/cites-an-uncatalogued-document.md";
@@ -358,7 +361,7 @@ describe("what a governed write derives from the bindings of what it cites", () 
     });
   });
 
-  it("keeps the writer's word for a concept citing no source-derived evidence at all", async () => {
+  it("keeps the writer's word when a concept cites no source", async () => {
     const scenario = await arrange();
 
     const written = await conceptCiting(scenario, scenario.editor, [], {
@@ -371,7 +374,7 @@ describe("what a governed write derives from the bindings of what it cites", () 
     });
   });
 
-  it("keeps a re-write's audience when it drops the citations that named it, rather than widening", async () => {
+  it("keeps the audience of a re-write that drops its citations", async () => {
     const scenario = await arrange();
 
     const { groupId: hr, written } = await conceptForGroup(db(), scenario, "HR", [scenario.editor]);
@@ -389,7 +392,7 @@ describe("what a governed write derives from the bindings of what it cites", () 
     });
   });
 
-  it("lets a creation and a re-write cite a document whose binding is unpublished, landing the citation at Restricted whatever class the binding waits to release", async () => {
+  it("lets a write cite an unpublished binding, landing at Restricted", async () => {
     const scenario = await arrange();
     const hr = await groupNamed(db(), scenario, "HR", [scenario.editor]);
     const unpublished = await bindingHolding(db(), scenario.workspaceId, {
@@ -452,8 +455,8 @@ const rewriteCiting = async (
     ...overrides,
   });
 
-describe("what a re-write may not do to the class a concept holds", () => {
-  it("refuses a re-write whose new citations would widen the class or audience the concept holds, and makes no commit", async () => {
+describe("what a re-write may not do to a concept's class", () => {
+  it("refuses citations that widen the class or audience, committing nothing", async () => {
     const scenario = await arrange();
     const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
     const hr = await groupNamed(db(), scenario, "HR", [scenario.editor]);
@@ -484,7 +487,7 @@ describe("what a re-write may not do to the class a concept holds", () => {
     });
   });
 
-  it("an Editor cannot re-write a concept the predicate withholds from them, even one they wrote", async () => {
+  it("refuses an Editor re-writing a withheld concept, even their own", async () => {
     const scenario = await arrange();
     const restricted = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
     const board = await groupNamed(db(), scenario, "Board", []);
@@ -510,7 +513,7 @@ describe("what a re-write may not do to the class a concept holds", () => {
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(before.length + 1);
   });
 
-  it("answers an Editor's re-write of a withheld IRI word for word as one of an IRI nobody minted, and refuses a creation onto a withheld concept's merge key before any commit", async () => {
+  it("answers a withheld IRI as unminted, refusing its merge key", async () => {
     const scenario = await arrange();
     const restricted = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
     const withheld = await conceptCiting(scenario, scenario.editor, [restricted.documentId], {
@@ -546,7 +549,7 @@ describe("what a re-write may not do to the class a concept holds", () => {
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual(before);
   });
 
-  it("a re-write that narrows a concept takes its compositions with it, on the write road as on the narrowing's", async () => {
+  it("takes the compositions along when a re-write narrows a concept", async () => {
     const scenario = await arrange();
     const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
     const written = await conceptCiting(scenario, scenario.editor, [internal.documentId]);
@@ -583,7 +586,7 @@ const workspaceWithHrBinding = async () => {
 };
 
 describe("narrowing a binding", () => {
-  it("recomputes the concepts citing its documents and the compositions including them, in its own transaction, with its ledger row", async () => {
+  it("cascades to citing concepts and compositions, writing one audit event", async () => {
     const scenario = await arrange();
     const binding = await bindingHolding(db(), scenario.workspaceId);
     const other = await bindingHolding(db(), scenario.workspaceId);
@@ -645,7 +648,7 @@ describe("narrowing a binding", () => {
     );
   });
 
-  it("touches the chunk row of no document under it, whatever class that document holds of its own", async () => {
+  it("touches no document's chunk row, whatever its own class", async () => {
     const { scenario, hr, binding } = await workspaceWithHrBinding();
 
     const narrowed = await documentUnder(
@@ -693,7 +696,7 @@ describe("narrowing a binding", () => {
     ]);
   });
 
-  it("holds no chunk row while it waits on the concept index, its own binding's or another's", async () => {
+  it("holds no chunk row while waiting on the concept index", async () => {
     const scenario = await arrange();
     const binding = await bindingHolding(db(), scenario.workspaceId);
     const elsewhere = await bindingHolding(db(), scenario.workspaceId);
@@ -736,7 +739,7 @@ describe("narrowing a binding", () => {
     ]);
   });
 
-  it("narrows an audience to named groups, and the Viewer outside them loses the concept at once", async () => {
+  it("narrows to named groups; an outside Viewer loses the concept", async () => {
     const { scenario, hr, binding } = await workspaceWithHrBinding();
     const written = await conceptCiting(scenario, scenario.editor, [binding.documentId]);
     const composition = await compositionIncluding(scenario.workspaceId, [written.iri]);
@@ -769,7 +772,7 @@ describe("narrowing a binding", () => {
   });
 
   // A shape says nothing of a tenant's state, so refusing it ahead of the role leaks nothing.
-  it("tells a Viewer and an Editor asking with nonsense which field is wrong before it weighs their role — shape is refused before role (ADR 0043) — and moves nothing", async () => {
+  it("names a malformed field before weighing role, and moves nothing", async () => {
     const scenario = await arrange();
     const binding = await bindingHolding(db(), scenario.workspaceId);
 
@@ -799,7 +802,7 @@ describe("narrowing a binding", () => {
     });
   });
 
-  it("refuses a move that would widen on any term — the class, everyone where groups were named, or a group the list did not hold", async () => {
+  it("refuses a move widening the class, audience or group list", async () => {
     const scenario = await arrange();
     const hr = await groupNamed(db(), scenario, "HR", []);
     const sales = await groupNamed(db(), scenario, "Sales", []);
@@ -832,7 +835,7 @@ describe("narrowing a binding", () => {
     expect(kept.ok).toBe(true);
   });
 
-  it("refuses a group this workspace does not hold and a binding it does not hold", async () => {
+  it("refuses a group or binding this workspace does not hold", async () => {
     const scenario = await arrange();
     const binding = await bindingHolding(db(), scenario.workspaceId);
     const elsewhere = await arrange();
@@ -874,7 +877,7 @@ describe("narrowing a binding", () => {
     expect(outcome).toMatchObject({ ok: true });
   };
 
-  it("holds a write landing beside it until it has committed, so the write derives from the narrowed binding and never lands wider", async () => {
+  it("makes a concurrent write wait, so it never lands wider", async () => {
     const scenario = await arrange();
     const binding = await bindingHolding(db(), scenario.workspaceId);
     const written = await conceptCiting(scenario, scenario.editor, [binding.documentId]);
@@ -888,7 +891,7 @@ describe("narrowing a binding", () => {
     );
   });
 
-  it("clamps a re-write that swapped its evidence to the pair the row holds when it lands, when a cascade narrowed the row between the write's check and its landing", async () => {
+  it("clamps a swapped-evidence re-write to the row a cascade narrowed", async () => {
     const scenario = await arrange();
     const cited = await bindingHolding(db(), scenario.workspaceId);
     const other = await bindingHolding(db(), scenario.workspaceId);
@@ -903,7 +906,7 @@ describe("narrowing a binding", () => {
     );
   });
 
-  it("counts an include whose concept has no row as Restricted, so a composition never widens over a concept nobody can yet say the class of", async () => {
+  it("counts an include with no concept row as Restricted", async () => {
     const scenario = await arrange();
     const binding = await bindingHolding(db(), scenario.workspaceId);
     const written = await conceptCiting(scenario, scenario.editor, [binding.documentId]);
@@ -957,7 +960,7 @@ describe("narrowing a binding", () => {
     });
   };
 
-  it("re-derives a concept from what it cites after waiting on a re-write's row, so a narrowing of the citation the re-write dropped never overwrites what the re-write landed", async () => {
+  it("re-derives after waiting on a re-write, ignoring its dropped citation", async () => {
     const scenario = await arrange();
     const dropped = await bindingHolding(db(), scenario.workspaceId);
     const kept = await bindingHolding(db(), scenario.workspaceId);
@@ -976,7 +979,7 @@ describe("narrowing a binding", () => {
     );
   });
 
-  it("recomputes a composition two acts reach one after the other, so two disjoint audiences intersect to nobody rather than to the last writer's groups", async () => {
+  it("recomputes a composition two acts reach, intersecting audiences to nobody", async () => {
     const scenario = await arrange();
     const hr = await groupNamed(db(), scenario, "HR", [scenario.editor]);
     const sales = await groupNamed(db(), scenario, "Sales", [scenario.viewer]);
@@ -1008,7 +1011,7 @@ describe("narrowing a binding", () => {
     ).toEqual({ sensitivity: "Restricted", ...EVERYONE });
   });
 
-  it("lands two narrowings of two bindings one concept cites one after the other, never as a deadlock", async () => {
+  it("serialises narrowings of two bindings one concept cites, never deadlocking", async () => {
     const scenario = await arrange();
     const first = await bindingHolding(db(), scenario.workspaceId);
     const second = await bindingHolding(db(), scenario.workspaceId);
@@ -1047,7 +1050,7 @@ describe("narrowing a binding", () => {
     ).toHaveLength(2);
   });
 
-  it("leaves neither the narrowed row, nor the class its chunks are read at, nor the cascade, nor its ledger row when the transaction fails after it", async () => {
+  it("leaves nothing, chunks included, when the transaction fails after it", async () => {
     const scenario = await arrange();
     const binding = await bindingHolding(db(), scenario.workspaceId);
     const written = await conceptCiting(scenario, scenario.editor, [binding.documentId]);
@@ -1087,7 +1090,7 @@ describe("narrowing a binding", () => {
 });
 
 describe("publishing a binding", () => {
-  it("releases the class its ledger row records to every concept citing its documents and every composition including them, and to nothing citing another binding", async () => {
+  it("releases its recorded class to citing concepts and compositions only", async () => {
     const scenario = await arrange();
     const hr = await groupNamed(db(), scenario, "HR", []);
     const unpublishedForHr = {
@@ -1140,7 +1143,7 @@ const findingIn = (scenario: Scenario, document: Sourced, finding: FindingSeeded
     }),
   );
 
-// Reviewed, and the run that would lift the seam's verdict not yet run: the document keeps it.
+/** Reviewed, and the run that would lift the seam's verdict not yet run: the document keeps it. */
 const dismissedBy = (scenario: Scenario) => ({
   reviewState: "dismissed",
   reviewedBy: `human:${scenario.admin.userId}`,
@@ -1157,7 +1160,7 @@ const documentClassesUnder = async (workspaceId: string, bindingId: string) => {
 };
 
 describe("widening a binding", () => {
-  it("widens a published binding's class and audience, moves every concept citing its documents and every composition including one, and records the class and audience it moved from and to", async () => {
+  it("widens a published binding and cascade, recording from and to", async () => {
     const scenario = await arrange();
     const hr = await groupNamed(db(), scenario, "HR", []);
     const binding = await bindingForGroups(db(), scenario.workspaceId, [hr], "Restricted");
@@ -1215,7 +1218,7 @@ describe("widening a binding", () => {
     ]);
   });
 
-  it("never widens a document past a class of its own — the seam's special-category verdict or an Admin's narrowing — nor a concept citing one", async () => {
+  it("never widens a document or concept past the document's class", async () => {
     const scenario = await arrange();
     const binding = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
     const verdict = await documentUnder(
@@ -1268,7 +1271,7 @@ describe("widening a binding", () => {
     });
   });
 
-  it("widens an unpublished binding's class without releasing it: a concept citing it stays Restricted until the publish", async () => {
+  it("widens an unpublished binding, releasing nothing until the publish", async () => {
     const scenario = await arrange();
     const binding = await bindingHolding(db(), scenario.workspaceId, {
       sensitivity: "Restricted",
@@ -1290,7 +1293,7 @@ describe("widening a binding", () => {
     });
   });
 
-  it("refuses while a document holds a special-category finding the last run raised that no Admin has reviewed, and moves nothing", async () => {
+  it("refuses over an unreviewed special-category finding, and moves nothing", async () => {
     const scenario = await arrange();
     const binding = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
     const cited = await conceptCiting(scenario, scenario.admin, [binding.documentId]);
@@ -1316,7 +1319,7 @@ describe("widening a binding", () => {
     ).toMatchObject([{ subject_id: reviewed.bindingId }]);
   });
 
-  it("refuses a request that is not wider — the class and audience it holds, a narrower class, or a wider class for fewer groups — and moves nothing", async () => {
+  it("refuses a request that is not wider, and moves nothing", async () => {
     const scenario = await arrange();
     const hr = await groupNamed(db(), scenario, "HR", []);
     const sales = await groupNamed(db(), scenario, "Sales", []);
@@ -1341,7 +1344,7 @@ describe("widening a binding", () => {
     );
   });
 
-  it("refuses a member who is not an Admin, a binding the workspace does not hold and a group it does not hold", async () => {
+  it("refuses a non-Admin, an unknown binding and a foreign group", async () => {
     const scenario = await arrange();
     const binding = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
     const elsewhere = await arrange();
@@ -1372,7 +1375,7 @@ describe("widening a binding", () => {
     ]);
   });
 
-  it("leaves neither the widened row, nor the cascade, nor its ledger row when the transaction fails after it", async () => {
+  it("leaves nothing, cascade included, when the transaction fails after it", async () => {
     const scenario = await arrange();
     const binding = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
     const written = await conceptCiting(scenario, scenario.admin, [binding.documentId]);
@@ -1428,7 +1431,7 @@ describe("narrowing documents", () => {
     return beside.outcome;
   };
 
-  it("holds a concept landing beside it until it has committed, so a concept new to the document lands at the class the narrowing gave it, never the one it held before", async () => {
+  it("holds a concurrent concept, which lands at the narrowed class", async () => {
     const scenario = await arrange();
     const handbook = await bindingHolding(db(), scenario.workspaceId);
     // A shared evidence row: a new one's foreign key would wait on the narrowed document before
@@ -1444,7 +1447,7 @@ describe("narrowing documents", () => {
     );
   });
 
-  it("holds a re-write's check beside it until it has committed, so the check weighs the document at its narrowed class and lets through a re-write that does not widen", async () => {
+  it("holds a re-write's check so it weighs the narrowed class", async () => {
     const scenario = await arrange();
     const restricted = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
     const handbook = await bindingHolding(db(), scenario.workspaceId);
@@ -1463,7 +1466,7 @@ describe("narrowing documents", () => {
     );
   });
 
-  it("holds a narrowing of another binding at the cascade's head until it has committed, so the concept it recomputes rests on the document at its narrowed class", async () => {
+  it("holds another binding's cascade, which then sees the narrowed document", async () => {
     const scenario = await arrange();
     const handbook = await bindingHolding(db(), scenario.workspaceId);
     const brochure = await bindingHolding(db(), scenario.workspaceId, { sensitivity: "Public" });
@@ -1494,7 +1497,7 @@ describe("narrowing documents", () => {
 });
 
 describe("an Admin's recorded override", () => {
-  it("widens past the floor and the evidence, names the Admin on the row and the ledger, and cascades to the compositions", async () => {
+  it("widens past floor and evidence, names the Admin, and cascades", async () => {
     const scenario = await arrange();
     const restricted = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
     const person = await conceptCiting(scenario, scenario.editor, [restricted.documentId], {
@@ -1548,7 +1551,7 @@ describe("an Admin's recorded override", () => {
     expect(seen.ok && seen.value.found).toBe(true);
   });
 
-  it("stands when the binding is narrowed afterwards, because it outranks the evidence", async () => {
+  it("stands when the binding is later narrowed, outranking the evidence", async () => {
     const scenario = await arrange();
     const binding = await bindingHolding(db(), scenario.workspaceId);
     const written = await conceptCiting(scenario, scenario.editor, [binding.documentId]);
@@ -1569,7 +1572,7 @@ describe("an Admin's recorded override", () => {
     });
   });
 
-  it("refuses an Editor, a concept nobody minted, a group the workspace does not hold, and a pair that is not an audience", async () => {
+  it("refuses an Editor, unknown concepts and groups, and malformed audiences", async () => {
     const scenario = await arrange();
     const written = await conceptCiting(scenario, scenario.editor, []);
     const override = { iri: written.iri, sensitivity: "Internal", audience: "everyone" };
@@ -1600,7 +1603,7 @@ describe("an Admin's recorded override", () => {
     ).toEqual([]);
   });
 
-  it("leaves neither the override nor its ledger row when the transaction fails after it", async () => {
+  it("leaves no override or audit event when the transaction fails", async () => {
     const scenario = await arrange();
     const restricted = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
     const written = await conceptCiting(scenario, scenario.editor, [restricted.documentId]);
@@ -1637,7 +1640,7 @@ describe("the evidence pane", () => {
   const paneFor = (person: UserPrincipal, iri: string) =>
     reading(person, (reader, tx) => evidencePaneOf(reader, tx, iri));
 
-  it("answers nothing for a concept the reader may not see, exactly as for one nobody minted", async () => {
+  it("answers a withheld concept exactly as one nobody minted", async () => {
     const scenario = await arrange();
     const restricted = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
     const written = await conceptCiting(scenario, scenario.editor, [restricted.documentId]);
@@ -1649,7 +1652,7 @@ describe("the evidence pane", () => {
     expect(absent).toEqual(withheld);
   });
 
-  it("leads with the reader's access and lists every piece they may open", async () => {
+  it("leads with the reader's access and lists every openable piece", async () => {
     const scenario = await arrange();
     const { written } = await conceptOnBoth(db(), scenario);
 
@@ -1670,7 +1673,7 @@ describe("the evidence pane", () => {
     });
   });
 
-  it("names the overriding Admin and shows nothing of the evidence when the override outruns all of it", async () => {
+  it("names the overriding Admin and hides evidence the override outruns", async () => {
     const scenario = await arrange();
     const restricted = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
     const written = await conceptCiting(scenario, scenario.editor, [restricted.documentId], {
@@ -1693,7 +1696,7 @@ describe("the evidence pane", () => {
     expect(JSON.stringify(pane)).not.toContain("Document 1");
   });
 
-  it("lists only what the reader may open when some of the evidence is withheld", async () => {
+  it("lists only the openable evidence when some is withheld", async () => {
     const scenario = await arrange();
     const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
     const written = await conceptCiting(scenario, scenario.editor, [
@@ -1712,7 +1715,7 @@ describe("the evidence pane", () => {
     });
   });
 
-  it("says nothing is withheld for a concept that cites no source, and names no Admin when nothing is withheld", async () => {
+  it("names no Admin when nothing is withheld, sourced or not", async () => {
     const scenario = await arrange();
     const unsourced = await conceptCiting(scenario, scenario.editor, [], {
       sensitivity: "Internal",
@@ -1770,7 +1773,7 @@ const expensesNotes = async (scenario: Scenario) => {
 };
 
 describe("find", () => {
-  it("previews the concepts the reader may see whose title or body holds the query, and never a withheld one", async () => {
+  it("previews matching concepts the reader may see, never withheld ones", async () => {
     const scenario = await arrange();
     const { visible, withheld, internal } = await expensesNotes(scenario);
     await conceptCiting(scenario, scenario.editor, [internal.documentId], {
@@ -1815,7 +1818,7 @@ describe("find", () => {
     ).toEqual([visible.iri, withheld.iri].toSorted());
   });
 
-  it("lets ask name the concepts the reader may see that its question's terms resolve to, and never a withheld one — as a refusal, since nothing drafts yet", async () => {
+  it("refuses a question, citing only concepts the reader may see", async () => {
     const scenario = await arrange();
     const { visible, withheld } = await expensesNotes(scenario);
     const question = { question: "How are expenses claimed?" };
@@ -1844,7 +1847,7 @@ describe("find", () => {
     expect(unrelated.ok && unrelated.value.citations).toEqual([]);
   });
 
-  it("keeps the limit, reads the query as text and never as a pattern, and answers nothing to nothing", async () => {
+  it("keeps the limit, reads queries literally, answers nothing to nothing", async () => {
     const scenario = await arrange();
     const internal = await bindingHolding(db(), scenario.workspaceId);
     for (const title of ["Alpha note", "Beta note", "Gamma note"]) {

@@ -29,8 +29,10 @@ const PUBLISHED = new Date("2026-09-11T09:00:00.000Z");
 const RUN_FINISHED_AT = new Date("2026-09-11T08:30:00.000Z");
 const NOW = new Date("2026-09-11T12:00:00.000Z");
 
-// Every document below answers this query, so an absent hit is the read predicate and never an
-// unmatched term.
+/**
+ * Every document below answers this query, so an absent hit is the read predicate and never an
+ * unmatched term.
+ */
 const QUERY = "holiday policy";
 
 const HANDBOOK = "The holiday policy grants twenty-eight days.";
@@ -139,8 +141,10 @@ const aFinishedRun = (workspaceId: string, bindingId: string): Promise<void> =>
     });
   });
 
-// Every act refuses a widening, so the restoring half of each pair can only be written onto
-// the source row itself.
+/**
+ * Every act refuses a widening, so the restoring half of each pair can only be written onto
+ * the source row itself.
+ */
 const theBindingRowNowSays = async (
   workspaceId: string,
   bindingId: string,
@@ -162,7 +166,7 @@ const theBindingRowNowSays = async (
   );
 };
 
-// The schema refuses a class wider than the Admin's narrowing, so the narrowing goes with it.
+/** The schema refuses a class wider than the Admin's narrowing, so the narrowing goes with it. */
 const theDocumentRowNowSays = async (
   workspaceId: string,
   documentId: string,
@@ -291,8 +295,8 @@ const publishingTheBinding = (scenario: Scenario, bindingId: string) =>
     }),
   );
 
-describe("the answer a reader gets, as the Admin's acts move the source rows", () => {
-  it("takes a binding's passages from a Viewer the instant the narrowing commits, and hands them back when the row widens again", async () => {
+describe("a reader's answer as the Admin's acts move source rows", () => {
+  it("withholds a binding's passages when narrowed, restoring them once widened", async () => {
     const scenario = await arrange();
     const where = await aBindingHoldingOneDocument(scenario.workspaceId, {
       title: "The staff handbook",
@@ -314,7 +318,7 @@ describe("the answer a reader gets, as the Admin's acts move the source rows", (
     });
   });
 
-  it("takes every chunk of a narrowed document and leaves its sibling under the same binding alone, both ways", async () => {
+  it("withholds a narrowed document's chunks, sparing its sibling, both ways", async () => {
     const scenario = await arrange();
     const theOne = await aBindingHoldingOneDocument(scenario.workspaceId, {
       title: "The staff handbook",
@@ -350,7 +354,7 @@ describe("the answer a reader gets, as the Admin's acts move the source rows", (
     });
   });
 
-  it("hands an unpublished binding's passages to a Viewer the instant the publish commits, and takes them back when the row is unpublished again", async () => {
+  it("reveals a binding's passages when published, withholding them once unpublished", async () => {
     const scenario = await arrange();
     const where = await aBindingHoldingOneDocument(scenario.workspaceId, {
       title: "The board's minutes",
@@ -391,7 +395,7 @@ const jobsOf = async (workspaceId: string): Promise<readonly JobRow[]> =>
   ).rows;
 
 describe("a narrowing queues no run", () => {
-  it("puts no job on the queue, whether the Admin narrows a binding or its documents", async () => {
+  it("adds no job when an Admin narrows bindings or documents", async () => {
     const scenario = await arrange();
     const theBinding = await aBindingHoldingOneDocument(scenario.workspaceId, {
       title: "The staff handbook",
@@ -429,8 +433,10 @@ describe("a narrowing queues no run", () => {
 
 type HeldNarrowing = { readonly commit: () => Promise<void> };
 
-// The act's work does not return until `commit` is called, so its transaction stays open with
-// the narrowing applied and uncommitted.
+/**
+ * The act's work does not return until `commit` is called, so its transaction stays open with
+ * the narrowing applied and uncommitted.
+ */
 const aNarrowingHeldUncommitted = async (
   scenario: Scenario,
   bindingId: string,
@@ -455,8 +461,8 @@ const aNarrowingHeldUncommitted = async (
   };
 };
 
-describe("the race a narrowing in flight used to leave open", () => {
-  it("reads rows landed against an uncommitted narrowing until it commits, and never after, with no other statement run", async () => {
+describe("the race with a narrowing in flight", () => {
+  it("reads rows landed under an open narrowing until it commits", async () => {
     const scenario = await arrange();
     const where = await aBindingHoldingOneDocument(scenario.workspaceId, {
       title: "The staff handbook",
@@ -477,7 +483,7 @@ describe("the race a narrowing in flight used to leave open", () => {
     });
   });
 
-  it("withholds rows landed during the uncommitted narrowing on the same terms as rows landed long before it, the act having written neither", async () => {
+  it("withholds rows landed during a narrowing as those landed before", async () => {
     const scenario = await arrange();
     const theOld = await aBindingHoldingOneDocument(scenario.workspaceId, {
       title: "The staff handbook",
@@ -503,7 +509,7 @@ describe("the race a narrowing in flight used to leave open", () => {
 describe("a passage whose rows do not all name one binding", () => {
   // The binding id has no foreign key, so one document's rows can name two bindings — which is
   // what keeps `passageAt`'s fold reachable.
-  it("is opened at the narrower of the two bindings, and withheld whole from the reader either one refuses", async () => {
+  it("is opened at the narrower binding, withheld whole from Viewers", async () => {
     const scenario = await arrange();
     const wide = await aBindingHoldingOneDocument(scenario.workspaceId, {
       title: "The staff handbook",
@@ -531,7 +537,7 @@ describe("a passage whose rows do not all name one binding", () => {
 
 describe("a chunk whose binding row is absent", () => {
   // The chunk's binding id carries no foreign key, so only the read closes this shape.
-  it("is read and listed by nobody, while a neighbour chunk under a live binding is read and listed", async () => {
+  it("is read and listed by nobody, unlike a live neighbour", async () => {
     const scenario = await arrange();
     const absent = ulid();
     const neighbour = await aBindingHoldingOneDocument(scenario.workspaceId, {
