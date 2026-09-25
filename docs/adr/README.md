@@ -4,6 +4,8 @@ The **live conclusion** of every ADR — the state after its amendments, not its
 
 **A row is what is true now**, in a sentence or two, carrying one date — the newest amendment it accounts for, else the decision's own — which `apps/api/tests/adr-index.test.ts` holds it to. The amendment history, the struck-through text and the ticket ids stay in the ADR, the one place they are read in order: a row that instead grows a clause per amendment is a line any two tickets amending that ADR conflict on. A row in that shape is rewritten to this one when its ADR is next amended, not in a sweep.
 
+**An ADR's file is named `NNNN-short-slug.md`**, with a slug of six words at most, and the same test holds it to that. The full decision sentence is the file's title, not its name.
+
 **Maintenance rule: a PR that adds an ADR, or an amendment that changes a conclusion, updates the matching line here in the same commit.**
 
 | ADR | Live conclusion |

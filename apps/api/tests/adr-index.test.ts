@@ -7,11 +7,13 @@ const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 const adrDirectory = path.join(repositoryRoot, "docs", "adr");
 const indexPath = path.join(adrDirectory, "README.md");
 
-const ADR_FILE = /^(?<number>\d{4})-.+\.md$/;
+const ADR_FILE = /^(?<number>\d{4})-(?<slug>.+)\.md$/;
 
 const INDEX_ROW = /^\|\s*(?<number>\d{4})\s*\|(?<conclusion>.*)\|\s*$/;
 
 const AMENDMENT_HEADING = /^##\s+Amendment\b.*$/gm;
+
+const SLUG_WORD_CAP = 6;
 
 const datesIn = (text: string): readonly string[] => [
   ...[...text.matchAll(/\d{4}-\d{2}-\d{2}/g)].map((match) => match[0]),
@@ -25,15 +27,17 @@ const datesIn = (text: string): readonly string[] => [
 
 const latestDateIn = (text: string): string | undefined => [...datesIn(text)].sort().at(-1);
 
-type Adr = { readonly number: string; readonly file: string };
+type Adr = { readonly number: string; readonly slug: string; readonly file: string };
 
 type Row = { readonly number: string; readonly conclusion: string };
 
 const adrs = (): readonly Adr[] =>
   readdirSync(adrDirectory)
     .flatMap((file) => {
-      const number = ADR_FILE.exec(file)?.groups?.["number"];
-      return number === undefined ? [] : [{ number, file }];
+      const groups = ADR_FILE.exec(file)?.groups;
+      const number = groups?.["number"];
+      const slug = groups?.["slug"];
+      return number === undefined || slug === undefined ? [] : [{ number, slug, file }];
     })
     .sort((left, right) => left.number.localeCompare(right.number));
 
@@ -102,5 +106,18 @@ describe("the ADR index against the ADRs it indexes (T-040)", () => {
     ).toEqual([]);
     expect(rows().length).toBeGreaterThan(0);
     expect(adrs().filter((adr) => amendedOn(adr) !== undefined).length).toBeGreaterThan(0);
+  });
+});
+
+describe("the ADR file names", () => {
+  it("keeps every slug to six words at most", () => {
+    const long = adrs()
+      .filter((adr) => adr.slug.split("-").length > SLUG_WORD_CAP)
+      .map((adr) => adr.file);
+
+    expect(
+      long,
+      `an ADR file name's slug runs past ${SLUG_WORD_CAP} words. Name it \`NNNN-short-slug.md\`; the full decision sentence is the file's title and its row in docs/adr/README.md.`,
+    ).toEqual([]);
   });
 });
