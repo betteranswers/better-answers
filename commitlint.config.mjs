@@ -37,6 +37,9 @@ export default {
         "deploy",
         "ci",
         "docs",
+        "auth",
+        "people",
+        "ops",
         // Renovate's, for its `chore(deps)` subjects.
         "deps",
       ],
