@@ -26,6 +26,7 @@
     "node/no-process-env": "error",
     "import/no-cycle": "error",
     "no-empty": ["error", { "allowEmptyCatch": false }],
+    "no-param-reassign": ["error", { "props": true }],
     "vitest/no-identical-title": "error",
     "vitest/valid-title": [
       "error",

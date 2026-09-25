@@ -139,6 +139,39 @@ describe("no empty block; a swallowed error carries its comment", () => {
   });
 });
 
+const renames = (body: string): string =>
+  `type Member = { name: string };\n\nexport const rename = (member: Member, name: string): Member => {\n  ${body}\n};\n`;
+
+describe("no parameter mutated: a function returns a new value", () => {
+  const written: Tree = { "src/written.ts": renames("member.name = name;\n  return member;") };
+  const lintParameters = ruleRunner("no-param-reassign", {
+    tree: written,
+    flagged: ["src/written.ts"],
+  });
+
+  it("fires on a write to a parameter's property", () => {
+    const output = lintParameters(written);
+
+    expect(output).toContain("src/written.ts");
+    expect(output).toContain("no-param-reassign");
+  });
+
+  it("fires on a parameter assigned a new value", () => {
+    const output = lintParameters({
+      "src/rebound.ts": renames("member = { name };\n  return member;"),
+    });
+
+    expect(output).toContain("src/rebound.ts");
+    expect(output).toContain("no-param-reassign");
+  });
+
+  it("stays silent on a copy that carries the change", () => {
+    const output = lintParameters({ "src/copied.ts": renames("return { ...member, name };") });
+
+    expect(output).not.toContain("src/copied.ts");
+  });
+});
+
 /**
  * tsgolint types what it lints from this tsconfig; without one a type-aware rule is silent and
  * every case asserting silence passes.
