@@ -33,4 +33,4 @@ The TypeScript comment gates are now one lint config, `.oxlintrc.json`. So `pnpm
 - **A `.py`-only Python gate** holds the same caps in Python and nothing else.
 - **The density ceiling** stays as the volume backstop. It is the only gate on a config file's comments.
 
-The complexity cap and the test-title rule go into the same config as stock rules. The complexity cap is there now: oxlint's `complexity` and, in Python, ruff's `C901` hold a function to 8, and the files over it when it landed are listed by path in an exemption that only shrinks (T-385).
+The complexity cap and the test-title rule go into the same config as stock rules. The complexity cap is there now: oxlint's `complexity` and, in Python, ruff's `C901` hold a function to 8, and the files over it when it landed are listed by path in an exemption that only shrinks (T-385). The test-title rule is there too: oxlint's stock `vitest/valid-title` refuses a title of 11 words or more, or one that says "should", and the files holding one when it landed are listed the same way (T-387).

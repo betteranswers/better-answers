@@ -1,25 +1,6 @@
-import { existsSync, readFileSync } from "node:fs";
-import path from "node:path";
-
-import { readOxlintConfig, repositoryRoot } from "@better-answers/devtools/oxlint-config";
-import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 import { describe, expect, it } from "vitest";
 
-import type { Tree } from "@better-answers/devtools/throwaway-tree";
-
-const RULE = "complexity";
-
-const config = readOxlintConfig();
-
-const baseline = config.overrides.flatMap((override) => {
-  const setting = override.rules?.[RULE];
-  return setting === undefined ? [] : [{ files: override.files ?? [], rules: { [RULE]: setting } }];
-});
-
-const LISTED = baseline.flatMap((override) => override.files);
-
-/** Read off the root config, so a cap it raises, softens or stops exempting fails here. */
-const CONFIG = JSON.stringify({ rules: { [RULE]: config.rules[RULE] }, overrides: baseline });
+import { ruleBaseline } from "./rule-baseline.ts";
 
 const OFF_THE_LIST = "packages/core/src/probe.ts";
 
@@ -32,22 +13,10 @@ const ofComplexity = (complexity: number): string => {
   return `export const decide = (value) => {\n${branches}  return -1;\n};\n`;
 };
 
-const lint = oxlintOver(CONFIG, {
+const baseline = ruleBaseline("complexity", {
   tree: { [OFF_THE_LIST]: ofComplexity(9) },
   flagged: [OFF_THE_LIST],
 });
-
-const REFUSED = new RegExp(`^(?<file>[^\\s:]+):\\d+:\\d+: .*\\[Error/eslint\\(${RULE}\\)\\]$`);
-
-const refusedFiles = (tree: Tree): readonly string[] =>
-  [
-    ...new Set(
-      lint
-        .output(tree)
-        .split("\n")
-        .flatMap((line) => REFUSED.exec(line)?.groups?.["file"] ?? []),
-    ),
-  ].sort();
 
 describe("the complexity cap holds every function to 8", () => {
   it.each([
@@ -56,44 +25,31 @@ describe("the complexity cap holds every function to 8", () => {
     ["an unlisted component", "apps/web/src/shared/ui/probe.tsx"],
     ["an unlisted root script", "scripts/probe.mjs"],
   ])("refuses a function of 9 in %s", (_what, file) => {
-    expect(refusedFiles({ [file]: ofComplexity(9) })).toEqual([file]);
+    expect(baseline.refusedFiles({ [file]: ofComplexity(9) })).toEqual([file]);
   });
 
   it("accepts a function of 8 in an unlisted file", () => {
-    expect(lint.flagged({ [OFF_THE_LIST]: ofComplexity(8) })).toEqual([]);
+    expect(baseline.refusedFiles({ [OFF_THE_LIST]: ofComplexity(8) })).toEqual([]);
   });
 
   it("accepts a function of 9 in a listed file", () => {
-    const [onTheList] = LISTED;
-    expect(
-      onTheList,
-      "the baseline list is empty: delete its override from .oxlintrc.json and this case with it.",
-    ).toBeDefined();
+    const file = baseline.onTheList();
 
-    expect(lint.flagged({ [onTheList ?? ""]: ofComplexity(9) })).toEqual([]);
+    expect(baseline.refusedFiles({ [file]: ofComplexity(9) })).toEqual([]);
   });
 });
 
 describe("the baseline list names only files still over the cap", () => {
-  const present = (file: string): boolean => existsSync(path.join(repositoryRoot, file));
-
   it("names only files the tree still has", () => {
-    const gone = LISTED.filter((file) => !present(file));
-
-    expect(gone, "a listed file was moved or deleted: drop its line from the list.").toEqual([]);
+    expect(
+      baseline.gone(),
+      "a listed file was moved or deleted: drop its line from the list.",
+    ).toEqual([]);
   });
 
   it("names only files holding a function over 8", () => {
-    const moved = (file: string): string => path.posix.join("unlisted", file);
-    const kept = LISTED.filter(present);
-    const tree = Object.fromEntries(
-      kept.map((file) => [moved(file), readFileSync(path.join(repositoryRoot, file), "utf8")]),
-    );
-    const refused = refusedFiles(tree);
-    const underTheCap = kept.filter((file) => !refused.includes(moved(file)));
-
     expect(
-      underTheCap,
+      baseline.cleared(),
       "a listed file holds no function over 8 any more: drop its line from the list, which only shrinks.",
     ).toEqual([]);
   });
