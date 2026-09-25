@@ -170,8 +170,8 @@ const LISTED = `api --paginate --slurp repos/${REPOSITORY}/actions/artifacts?nam
 const downloaded = (run: number, reports: string) =>
   `run download ${String(run)} --repo ${REPOSITORY} --name ${ARTIFACT} --dir ${reports}`;
 
-describe("the nightly mutation run's baseline, kept as the previous run's artifact (T-229)", () => {
-  it("restores the newest checkpoint a run on main uploaded for this leg, into the file Stryker reads back and the summary compares against", () => {
+describe("the nightly mutation baseline, kept as the previous run's artifact", () => {
+  it("restores main's newest checkpoint for this leg, and the baseline", () => {
     const restored = restoreAgainst([
       page(EXPIRED_ON_MAIN, A_FORK_CALLING_ITS_BRANCH_MAIN, ANOTHER_BRANCH),
       page(NIGHT_BEFORE_LAST, LAST_NIGHT),
@@ -190,7 +190,7 @@ describe("the nightly mutation run's baseline, kept as the previous run's artifa
       left: "only an expired upload, a fork's pull request's and another branch's",
       pages: [page(EXPIRED_ON_MAIN, A_FORK_CALLING_ITS_BRANCH_MAIN, ANOTHER_BRANCH)],
     },
-  ])("tests every mutant, and stays green, when the runs before it left $left", ({ pages }) => {
+  ])("tests every mutant, staying green, when earlier runs left $left", ({ pages }) => {
     const restored = restoreAgainst(pages);
 
     expect(restored.status, `the step went red: ${restored.log}`).toBe(0);
@@ -200,7 +200,7 @@ describe("the nightly mutation run's baseline, kept as the previous run's artifa
     expect(restored.log).toContain("tests every mutant");
   });
 
-  it("starts a branch run from its own last checkpoint when that is newer than main's, and from main's when it is not", () => {
+  it("starts a branch run from whichever checkpoint is newer", () => {
     const ownIsNewer = restoreAgainst([page(ANOTHER_BRANCH, THIS_BRANCH, LAST_NIGHT)], "t-229");
     const mainIsNewer = restoreAgainst(
       [page({ ...THIS_BRANCH, createdAt: "2026-09-24T09:12:08Z" }, LAST_NIGHT)],
@@ -227,7 +227,7 @@ describe("the nightly mutation run's baseline, kept as the previous run's artifa
     expect(restored.log).toContain(says);
   });
 
-  it("reads each leg's checkpoint from the artifact its own upload names", () => {
+  it("reads each leg's checkpoint from the artifact its upload names", () => {
     const restore = restoreStep();
 
     expect(uploadStep().with?.["name"]).toEqual("stryker-incremental-${{ matrix.name }}");
@@ -236,7 +236,7 @@ describe("the nightly mutation run's baseline, kept as the previous run's artifa
     expect(restore.env?.["BRANCH"]).toEqual("${{ github.ref_name }}");
   });
 
-  it("uploads the file Stryker writes and reads back, whether or not the leg finished, and a re-run replaces its first attempt's", () => {
+  it("always uploads Stryker's incremental file, overwriting on a re-run", () => {
     const upload = uploadStep();
     const configs = new Map([
       ["apps/api", apiStrykerConfig],
@@ -263,20 +263,20 @@ describe("the nightly mutation run's baseline, kept as the previous run's artifa
     }
   });
 
-  it("holds a scheduled night to 120 minutes, and a dispatched run to the minutes it names, as the number the timeout takes", () => {
+  it("caps a night at 120 minutes, a dispatch as asked", () => {
     expect(mutationWorkflow().jobs.stryker["timeout-minutes"]).toEqual(
       "${{ fromJSON(inputs.ceiling-minutes || '120') }}",
     );
   });
 
-  it("makes a run on a branch wait for the one before it, so it starts from the checkpoint that one leaves", () => {
+  it("queues a branch's runs, each starting from the last checkpoint", () => {
     expect(mutationWorkflow().concurrency).toEqual({
       group: "mutation-${{ github.ref }}",
       "cancel-in-progress": false,
     });
   });
 
-  it("asks for nothing beyond reading the tree and listing and downloading this repository's artifacts", () => {
+  it("asks only to read the tree and this repository's artifacts", () => {
     expect(mutationWorkflow().permissions).toEqual({ contents: "read", actions: "read" });
     expect(mutationWorkflow().jobs.stryker.permissions).toBeUndefined();
   });
