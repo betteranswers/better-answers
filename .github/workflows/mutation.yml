@@ -45,22 +45,26 @@ jobs:
           - { name: api, path: apps/api, shard: 3, of: 5 }
           - { name: api, path: apps/api, shard: 4, of: 5 }
           - { name: api, path: apps/api, shard: 5, of: 5 }
-          - { name: core, path: packages/core, shard: 1, of: 16 }
-          - { name: core, path: packages/core, shard: 2, of: 16 }
-          - { name: core, path: packages/core, shard: 3, of: 16 }
-          - { name: core, path: packages/core, shard: 4, of: 16 }
-          - { name: core, path: packages/core, shard: 5, of: 16 }
-          - { name: core, path: packages/core, shard: 6, of: 16 }
-          - { name: core, path: packages/core, shard: 7, of: 16 }
-          - { name: core, path: packages/core, shard: 8, of: 16 }
-          - { name: core, path: packages/core, shard: 9, of: 16 }
-          - { name: core, path: packages/core, shard: 10, of: 16 }
-          - { name: core, path: packages/core, shard: 11, of: 16 }
-          - { name: core, path: packages/core, shard: 12, of: 16 }
-          - { name: core, path: packages/core, shard: 13, of: 16 }
-          - { name: core, path: packages/core, shard: 14, of: 16 }
-          - { name: core, path: packages/core, shard: 15, of: 16 }
-          - { name: core, path: packages/core, shard: 16, of: 16 }
+          - { name: core, path: packages/core, shard: 1, of: 20 }
+          - { name: core, path: packages/core, shard: 2, of: 20 }
+          - { name: core, path: packages/core, shard: 3, of: 20 }
+          - { name: core, path: packages/core, shard: 4, of: 20 }
+          - { name: core, path: packages/core, shard: 5, of: 20 }
+          - { name: core, path: packages/core, shard: 6, of: 20 }
+          - { name: core, path: packages/core, shard: 7, of: 20 }
+          - { name: core, path: packages/core, shard: 8, of: 20 }
+          - { name: core, path: packages/core, shard: 9, of: 20 }
+          - { name: core, path: packages/core, shard: 10, of: 20 }
+          - { name: core, path: packages/core, shard: 11, of: 20 }
+          - { name: core, path: packages/core, shard: 12, of: 20 }
+          - { name: core, path: packages/core, shard: 13, of: 20 }
+          - { name: core, path: packages/core, shard: 14, of: 20 }
+          - { name: core, path: packages/core, shard: 15, of: 20 }
+          - { name: core, path: packages/core, shard: 16, of: 20 }
+          - { name: core, path: packages/core, shard: 17, of: 20 }
+          - { name: core, path: packages/core, shard: 18, of: 20 }
+          - { name: core, path: packages/core, shard: 19, of: 20 }
+          - { name: core, path: packages/core, shard: 20, of: 20 }
     steps:
       # A shard named wrongly would run nothing, and the run would come back green having tested nothing.
       - name: the shards the dispatch names
@@ -157,7 +161,7 @@ jobs:
       matrix:
         include:
           - { name: api, of: 5 }
-          - { name: core, of: 16 }
+          - { name: core, of: 20 }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
