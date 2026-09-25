@@ -32,6 +32,8 @@ def suppressed_among(
     text: str,
     suppressions: Sequence[Mapping[str, Sequence[str]]],
 ) -> frozenset[Finding]:
+    """Findings whose whole text, `normalised`, is an identifier an
+    erasure named. Unlike `erasure_matches_in`, no length floor applies."""
     named = _identifiers_in(suppressions)
     return frozenset(
         finding
@@ -41,6 +43,8 @@ def suppressed_among(
 
 
 def clears_the_floor(kind: str, identifier: str) -> bool:
+    """Whether an identifier is long enough to search a whole workspace for:
+    `IDENTIFIER_FLOOR` characters, and `NAME_WORDS_FLOOR` words for a name."""
     folded = normalised(identifier)
     if len(folded) < IDENTIFIER_FLOOR:
         return False
@@ -50,6 +54,9 @@ def clears_the_floor(kind: str, identifier: str) -> bool:
 def erasure_matches_in(
     text: str, suppressions: Sequence[Mapping[str, Sequence[str]]]
 ) -> tuple[ErasureMatch, ...]:
+    """Each whole-word, case-folded occurrence of an erased
+    identifier that clears the floor, in the text's own offsets.
+    An email address must not run on into a longer one."""
     sought = {
         (normalised(identifier), kind == EMAILS)
         for suppression in suppressions

@@ -35,6 +35,9 @@ class OverriddenRestore:
 
 @dataclass(frozen=True, slots=True)
 class IndexOutcome:
+    """`lmdb_bytes` is what the binding's stores hold on disk after the run;
+    `restores_overridden_by_erasure` names restored spans an erasure withholds again."""
+
     documents: int
     chunks: int
     lmdb_bytes: int
@@ -66,6 +69,9 @@ def index_binding(
     ms_per_page: int = SEAM_MS_PER_PAGE,
     margin_ms: int = TIMEOUT_MARGIN_MS,
 ) -> IndexOutcome:
+    """Redacts and chunks the binding's live documents and lands their chunk rows.
+    A `wiped` or `rule-change` run first empties the binding's store; a binding
+    that is gone lands nothing. `copies` defaults to the workspace's bucket."""
     with Host(bootstrap) as host:
         if run.reason in REASONS_EMPTYING_THE_BINDING:
             host.remove_binding_store(run)

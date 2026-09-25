@@ -12,6 +12,9 @@ THE_MEMOS_VERSION = 1
 
 @dataclass(frozen=True, slots=True)
 class Raised:
+    """`afresh` is True when the detector read
+    the text, and False when the memo answered."""
+
     spans: tuple[Span, ...]
     afresh: bool
 
@@ -30,6 +33,8 @@ def detected(normalised_text: str, detection_key: str) -> tuple[Span, ...]:
 
 
 def raised_by_the_detector(normalised_text: str, detection_key: str) -> Raised:
+    """`detection_key` is never read by the detector: it
+    keys the memo, so moving it detects every text afresh."""
     # A missed body runs inline on this thread, so it appends here; a hit leaves it
     # empty.
     read: list[bool] = []

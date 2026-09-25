@@ -29,6 +29,8 @@ class BindingRun:
 
 
 def read_binding(cursor: Cursor[Any], run: IndexRun) -> BindingRun | None:
+    """None when the binding is gone. Only live documents are read, each carrying
+    the workspace's suppressions and its own restored and dismissed findings."""
     cursor.execute(
         "SELECT rules_in_force FROM source_binding WHERE id = %s",
         (run.binding_id,),
@@ -124,6 +126,8 @@ def record_findings(
     *,
     mint: Callable[[], str] = ulid,
 ) -> int:
+    """Upserts a row per withholding and answers how many rows changed;
+    a restored finding keeps its tier. `mint` makes each new row's id."""
     rows = [
         (
             run.workspace_id,
@@ -186,6 +190,9 @@ def quarantine_catalogue(
 
 
 def reconcile_catalogue(cursor: Cursor[Any], documents: Sequence[ReadDocument]) -> None:
+    """Marks each document converted with its hash, key and
+    version. Its sensitivity only narrows, except that a
+    lifted verdict returns it to the Admin's own narrowing."""
     for document in documents:
         cursor.execute(
             "UPDATE source_document SET content_hash = %(content_hash)s,"

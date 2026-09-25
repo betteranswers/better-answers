@@ -37,6 +37,8 @@ def locator_of(source_document_id: str, char_start: int, char_end: int) -> str:
 def split_into_chunks(
     source_document_id: str, text: str, *, chunk_size: int = CHUNK_SIZE_BYTES
 ) -> tuple[Chunk, ...]:
+    """Chunks that tile `text` with no gap, each ending where the next
+    begins, so one may run past `chunk_size`. Offsets are in characters."""
     splitter = RecursiveSplitter()
     starts = [chunk.start.char_offset for chunk in splitter.split(text, chunk_size)]
     if not starts:

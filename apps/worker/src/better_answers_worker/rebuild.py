@@ -61,6 +61,7 @@ def _records(cursor: psycopg.Cursor, workspace_id: str) -> list[ConceptRecord]:
 
 
 def live_generation(cursor: psycopg.Cursor, workspace_id: str) -> int:
+    """The workspace's live graph generation, first created at 1 when it has none."""
     cursor.execute(
         "INSERT INTO graph_generation (workspace_id, live_gen) VALUES (%s, 1)"
         " ON CONFLICT (workspace_id) DO UPDATE SET live_gen = graph_generation.live_gen"
@@ -76,6 +77,9 @@ def live_generation(cursor: psycopg.Cursor, workspace_id: str) -> int:
 def run_rebuild(
     cursor: psycopg.Cursor, git_store_dir: str, workspace_id: str
 ) -> RebuildOutcome:
+    """Writes the whole graph as the generation after the live one and makes it live,
+    leaving older generations for the api's sweep. Nodes come from `concept_index` rows
+    and edges from the files at head, each hash checked as `run_audit` checks it."""
     outcome = RebuildOutcome()
 
     live = live_generation(cursor, workspace_id)

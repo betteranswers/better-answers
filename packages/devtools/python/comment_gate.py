@@ -274,6 +274,8 @@ def _under(root: Path) -> Iterable[Path]:
 
 
 def main(argv: list[str]) -> int:
+    """Answers 0 when clean, 1 with findings printed, and 2 when no
+    path is named or a file cannot be decoded or parsed."""
     if not argv:
         print("comment_gate: name at least one path to read", file=sys.stderr)
         return 2

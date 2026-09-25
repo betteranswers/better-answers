@@ -30,6 +30,8 @@ class ClaimedJob:
 def scoped(
     connection: psycopg.Connection, workspace_id: str
 ) -> Iterator[psycopg.Cursor]:
+    """A cursor inside one transaction, scoped to the workspace
+    by row-level security until the transaction ends."""
     with connection.transaction(), connection.cursor() as cursor:
         cursor.execute(
             "SELECT set_config('app.workspace_id', %s, true)", (workspace_id,)
@@ -38,6 +40,8 @@ def scoped(
 
 
 def connected(database_url: str) -> psycopg.Connection:
+    """In autocommit, so each `scoped` block is
+    its own transaction rather than a savepoint."""
     return psycopg.connect(database_url, autocommit=True)
 
 
@@ -50,6 +54,9 @@ def workspace_ids(connection: psycopg.Connection) -> list[str]:
 def claim(
     cursor: psycopg.Cursor, workspace_id: str, worker_id: str, kinds: Sequence[str]
 ) -> ClaimedJob | None:
+    """`cursor` must be `scoped` to `workspace_id`: row-level
+    security picks the job's workspace, and `workspace_id` only
+    labels the answer. None when no job of `kinds` is claimable."""
     cursor.execute(
         "SELECT id, kind, reason, subject_id, attempts"
         " FROM claim_job(%s, %s::interval, %s)",
@@ -69,6 +76,8 @@ def claim(
 
 
 def heartbeat(cursor: psycopg.Cursor, job_id: str, worker_id: str) -> bool:
+    """Renews the lease to `LEASE_SECONDS` from now. False once the job
+    has ended or its lease lapsed: a lapse revokes the claimant."""
     cursor.execute(
         "SELECT heartbeat_job(%s, %s, %s::interval)",
         (job_id, worker_id, f"{LEASE_SECONDS} seconds"),
@@ -84,6 +93,9 @@ def keeping_alive(
     worker_id: str,
     every_seconds: float = HEARTBEAT_SECONDS,
 ) -> Iterator[None]:
+    """Heartbeats the job every `every_seconds` on a connection of its own while
+    the block runs. A lost lease stops the beat silently and a database error
+    with a warning; neither interrupts the block."""
     stop = threading.Event()
 
     def beat() -> None:
@@ -108,6 +120,7 @@ def keeping_alive(
 def finish(
     cursor: psycopg.Cursor, job_id: str, worker_id: str, outcome: Mapping[str, Any]
 ) -> bool:
+    """False when the job has ended or its lease lapsed, and nothing is recorded."""
     cursor.execute(
         "SELECT finish_job(%s, %s, %s::jsonb)", (job_id, worker_id, json.dumps(outcome))
     )
@@ -118,6 +131,7 @@ def finish(
 def fail(
     cursor: psycopg.Cursor, job_id: str, worker_id: str, outcome: Mapping[str, Any]
 ) -> bool:
+    """False when the job has ended or its lease lapsed, and nothing is recorded."""
     cursor.execute(
         "SELECT fail_job(%s, %s, %s::jsonb)", (job_id, worker_id, json.dumps(outcome))
     )
@@ -128,6 +142,7 @@ def fail(
 def enqueue(
     cursor: psycopg.Cursor, job_id: str, kind: str, reason: str | None = None
 ) -> None:
+    """Into the workspace `cursor` is `scoped` to; `job_id` is the caller's to mint."""
     cursor.execute(
         "INSERT INTO job (workspace_id, id, kind, reason)"
         " VALUES ((SELECT current_workspace_id()), %s, %s, %s)",

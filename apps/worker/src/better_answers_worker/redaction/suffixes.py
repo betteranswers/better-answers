@@ -13,6 +13,8 @@ CACHE_ENTRY_SUFFIX: Final = ".tldextract.json"
 
 
 def fetch() -> None:
+    """Extracting one name makes tldextract
+    download the public suffix list into its cache."""
     tldextract.extract(A_NAME_TO_WARM_IT_WITH)
 
 
@@ -22,6 +24,8 @@ def warmed_entries() -> tuple[Path, ...]:
 
 
 def copy_out(target: Path) -> None:
+    """Copies the warmed cache under `target`, keeping its
+    layout. Raises `RuntimeError` when `fetch` has not run."""
     cache = Path(get_cache_dir())
     entries = warmed_entries()
     if not entries:

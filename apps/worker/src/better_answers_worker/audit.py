@@ -16,6 +16,9 @@ class IndexedConcept:
 
 @dataclass
 class ParseFindings:
+    """`missing_row` holds files at head with no `concept_index` row; `missing_file`
+    holds rows whose file is gone; `unparsed` holds files that would not parse."""
+
     checked: int = 0
     mismatched: list[dict[str, str]] = field(default_factory=list)
     unparsed: list[str] = field(default_factory=list)
@@ -52,6 +55,9 @@ def indexed_concepts(cursor: psycopg.Cursor) -> list[IndexedConcept]:
 def run_audit(
     cursor: psycopg.Cursor, git_store_dir: str, workspace_id: str
 ) -> AuditOutcome:
+    """Checks each concept file at the bundle's head against its
+    `concept_index` row by content hash, and writes nothing. A workspace with
+    no bundle audits as one with no files, so every row is `missing_file`."""
     outcome = AuditOutcome()
     try:
         blobs = concepts_at_head(git_store_dir, workspace_id)

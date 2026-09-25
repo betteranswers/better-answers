@@ -60,6 +60,7 @@ class Suppression:
 
 
 def suppression_of(identifiers: Mapping[str, Sequence[str]]) -> Suppression:
+    """Kinds in sorted order, so the order they arrive in never changes the value."""
     return Suppression(
         identifiers=tuple(
             (kind, tuple(named)) for kind, named in sorted(identifiers.items())
@@ -82,6 +83,9 @@ class LandedDocument:
 
 @dataclass(frozen=True, slots=True)
 class RedactedDocument:
+    """`content_hash` is of the converted text before redaction;
+    `version` is the rule version and detector pin, colon-joined."""
+
     text: str
     findings: tuple[Finding, ...]
     withholdings: tuple[Withholding, ...]
@@ -104,6 +108,9 @@ class ReadDocument:
 
 @dataclass(frozen=True, slots=True)
 class QuarantinedDocument:
+    """`error` is the refusal's name, such as `NeedsOcrError`
+    or `DeadlineExceededError`, never its message."""
+
     source_document_id: str
     error: str
 
@@ -142,6 +149,8 @@ def landed(
     seed: str,
     detection_key: str,
 ) -> RedactedDocument:
+    """Converts, detects and redacts one document. Raises `UnreadableError`
+    when it cannot be converted; `seed` fixes the pseudonym letters."""
     # Unmemoised, so a fix to the conversion, the block rule or the withholding reaches
     # every document on its next run with no version to remember.
     normalised = converted(body, media_type)
@@ -258,6 +267,9 @@ def redact_landed_copies(
     ms_per_page: int = SEAM_MS_PER_PAGE,
     margin_ms: int = TIMEOUT_MARGIN_MS,
 ) -> LandedRun:
+    """Writes each document's redacted text to its `normalised_key`; one that
+    cannot be converted or runs past its time is quarantined rather than raised.
+    `detection_key` defaults to the detector's own, which loads presidio."""
     # Reading the key builds a recogniser of every rule, so presidio arrives with it. A
     # spawn that lands nothing must not pay that.
     from ..redaction.detection_key import detection_key as the_detection_key

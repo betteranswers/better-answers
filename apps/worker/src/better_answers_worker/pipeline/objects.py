@@ -12,6 +12,8 @@ def object_key_of(workspace_id: str, key: str) -> str:
 
 
 class LandedCopies(Protocol):
+    """Objects by the catalogue's key, which is relative to one workspace's prefix."""
+
     def read(self, key: str) -> bytes: ...
 
     def write(self, key: str, body: bytes) -> None: ...

@@ -22,6 +22,7 @@ DIFFERS = "differs"
 
 
 def schema_stamp_matches(connection: psycopg.Connection) -> bool:
+    """Whether the database's last migration is the one `schema_view` was made from."""
     with connection.cursor() as cursor:
         cursor.execute(
             "SELECT created_at FROM drizzle.__drizzle_migrations"
@@ -32,14 +33,15 @@ def schema_stamp_matches(connection: psycopg.Connection) -> bool:
 
 
 def contract_stamp_matches(connection: psycopg.Connection) -> bool:
+    """Whether the `contract_stamp` row holds this build's digest of `contracts/`."""
     with connection.cursor() as cursor:
         cursor.execute("SELECT digest FROM contract_stamp")
         row = cursor.fetchone()
     return row is not None and str(row[0]) == CONTRACT_DIGEST
 
 
-# One line must tell an operator which of the two disagreed, so the words are the log's.
 def deploy_stamps(connection: psycopg.Connection) -> dict[str, str]:
+    """The log's own words, so one line tells an operator which stamp disagreed."""
     return {
         "schema_stamp": MATCHES if schema_stamp_matches(connection) else DIFFERS,
         "contract_stamp": MATCHES if contract_stamp_matches(connection) else DIFFERS,
@@ -142,6 +144,7 @@ def _serve_workspace(
 
 
 def outcome_counts(outcome: dict[str, Any]) -> dict[str, int]:
+    """A list counts as its length and an int as itself; anything else is dropped."""
     return {
         key: len(value) if isinstance(value, list) else value
         for key, value in outcome.items()
@@ -155,6 +158,8 @@ def tick(
     *,
     heartbeat_every_seconds: float = queue.HEARTBEAT_SECONDS,
 ) -> bool:
+    """One pass over every workspace, running at most one job in each and
+    enqueuing a nightly audit where one is due. True when any job ran."""
     worked = False
     for workspace_id in queue.workspace_ids(connection):
         served = _serve_workspace(
@@ -177,6 +182,8 @@ def warm_the_detectors_stack(worker_id: str) -> None:
 
 
 def run(bootstrap: Bootstrap, *, once: bool) -> int:
+    """With `once`, answers 1 when a deploy stamp differs and 0
+    after one pass; without it, runs until the process is stopped."""
     # The daemon's first job would otherwise pay the stack; a `--once` spawn may never
     # pay it at all.
     if not once:

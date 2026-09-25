@@ -4,6 +4,9 @@ CHUNK_MAX_CHARACTERS = 1200
 
 
 def chunks_of(file_text: str) -> list[str]:
+    """The body's paragraphs packed into chunks of at most
+    `CHUNK_MAX_CHARACTERS`; a longer paragraph is cut at that length,
+    mid-word. Raises `MalformedConceptFileError` as `parse_concept_file` does."""
     _, body = parse_concept_file(file_text)
 
     chunks: list[str] = []
