@@ -3,10 +3,12 @@ import { expect, test as base, type Page } from "@playwright/test";
 
 let issued = 0;
 
-// `CLIENT_IP_HEADER`, named not imported: `apps/web` takes nothing from `apps/api` at runtime.
+/** `CLIENT_IP_HEADER`, named not imported: `apps/web` takes nothing from `apps/api` at runtime. */
 const CLIENT_IP_HEADER = "cf-connecting-ip";
 
-// RFC 2544's benchmarking block. A caller with no address shares the bucket Better Auth warns of.
+/**
+ * RFC 2544's benchmarking block. A caller with no address shares the bucket Better Auth warns of.
+ */
 const anAddress = (workerIndex: number): string => {
   issued += 1;
   return `198.18.${workerIndex % 250}.${issued % 250}`;
@@ -23,6 +25,10 @@ export type BrowserFixtures = {
   readonly passesTheAccessibilityGate: () => Promise<void>;
 };
 
+/**
+ * Playwright's `test`, with a client address for the page and another for `request`, and an
+ * axe audit no passing test can skip.
+ */
 export const test = base.extend<BrowserFixtures>({
   context: async ({ browser }, use, testInfo) => {
     const context = await browser.newContext({
@@ -35,7 +41,9 @@ export const test = base.extend<BrowserFixtures>({
     await use(await context.newPage());
   },
 
-  // Its own address, not the page's: a flood here leaves the page to meet the per-email ceiling.
+  /**
+   * Its own address, not the page's: a flood here leaves the page to meet the per-email ceiling.
+   */
   request: async ({ playwright, baseURL }, use, testInfo) => {
     const api = await playwright.request.newContext({
       ...(baseURL === undefined ? {} : { baseURL }),

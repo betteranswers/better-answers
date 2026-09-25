@@ -48,7 +48,7 @@ const openSystemWithABrokenRead = async () => {
 };
 
 describe("a screen that throws", () => {
-  it("leaves the rail, the secondary nav, the top bar and the content standing", async () => {
+  it("leaves the rail, secondary nav, top bar and content standing", async () => {
     await openSystemWithABrokenRead();
 
     expect(screen.getByRole("banner")).toBeDefined();
@@ -61,7 +61,7 @@ describe("a screen that throws", () => {
     expect(screen.getByRole("main").contains(screen.getByRole("alert"))).toBe(true);
   });
 
-  it("says the screen could not be shown, and announces it to assistive technology", async () => {
+  it("says the screen could not be shown, as an alert", async () => {
     await openSystemWithABrokenRead();
 
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
@@ -71,7 +71,7 @@ describe("a screen that throws", () => {
     expect(screen.getByRole("alert").textContent).toContain("failed while it was being drawn");
   });
 
-  it("shows a reader nothing of what threw — no message, no name, no stack", async () => {
+  it("shows no message, name or stack from what threw", async () => {
     const { container } = await openSystemWithABrokenRead();
 
     const shown = container.textContent;
@@ -130,7 +130,7 @@ describe("a screen that throws", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("leaves an address that is no screen to the screen that already says so", async () => {
+  it("leaves an unknown address to the not-found screen", async () => {
     vi.stubGlobal("fetch", answerTrpc);
 
     await openApp("/not-a-screen");

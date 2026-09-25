@@ -392,24 +392,6 @@
       "rules": {
         "complexity": "off"
       }
-    },
-    {
-      "files": [
-        "apps/web/test/api-client.test.tsx",
-        "apps/web/test/browser-suite-skill.test.ts",
-        "apps/web/test/failed-screen.test.tsx",
-        "apps/web/test/folder-case.test.ts",
-        "apps/web/test/frame.test.tsx",
-        "apps/web/test/lint-rules.test.ts",
-        "apps/web/test/membership-redirect.test.tsx",
-        "apps/web/test/refusal.test.ts",
-        "apps/web/test/secondary-nav-showing.test.tsx",
-        "apps/web/test/sources-acts.test.tsx",
-        "apps/web/test/toolbar.test.tsx"
-      ],
-      "rules": {
-        "vitest/valid-title": ["error", {}]
-      }
     }
   ],
   "ignorePatterns": [

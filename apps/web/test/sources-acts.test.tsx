@@ -47,7 +47,7 @@ const HEALTH_CUE: FindingGroup = {
 const NOT_SPECIAL_CATEGORY =
   "Only a special category finding group can be dismissed as not special category. Untick the groups of another category.";
 
-// The review's half of the slot, standing in for the findings table a click writes through.
+/** The review's half of the slot, standing in for the findings table a click writes through. */
 function TicksIn(properties: { readonly bindingId: string }) {
   const [, tick] = useTickedGroups();
   const ticking = (groups: readonly FindingGroup[]) => () => {
@@ -83,7 +83,7 @@ const reviewing = (bindingId: string, tickedIn: string) =>
 const act = (name: string) => screen.getByRole<HTMLButtonElement>("button", { name });
 
 describe("the review's three bulk acts", () => {
-  it("stand inert, and read as such, until the review ticks a finding group", () => {
+  it("stand disabled until the review ticks a finding group", () => {
     reviewing(THE_BINDING, THE_BINDING);
 
     expect(act("Keep in text").disabled).toBe(true);
@@ -92,7 +92,7 @@ describe("the review's three bulk acts", () => {
     expect(screen.queryByText(NOT_SPECIAL_CATEGORY)).toBeNull();
   });
 
-  it("read what the review ticked, naming the groups kept and the documents narrowed", () => {
+  it("name the ticked groups kept and documents narrowed", () => {
     reviewing(THE_BINDING, THE_BINDING);
 
     fireEvent.click(act("Tick bank details"));
@@ -122,7 +122,7 @@ describe("the dismissal as not special category", () => {
     expect(screen.queryByText(NOT_SPECIAL_CATEGORY)).toBeNull();
   });
 
-  it("stands inert over a selection holding a group of another category, and says why", () => {
+  it("stands disabled over a mixed selection, and says why", () => {
     reviewing(THE_BINDING, THE_BINDING);
 
     fireEvent.click(act("Tick both"));
@@ -135,7 +135,7 @@ describe("the dismissal as not special category", () => {
     expect(act("Keep 2 finding groups in text").disabled).toBe(false);
   });
 
-  it("opens on s over the ticked groups, asking a reason and naming no finding", () => {
+  it("opens on s, asking a reason and naming no finding", () => {
     reviewing(THE_BINDING, THE_BINDING);
     fireEvent.click(act("Tick the health cue"));
 
@@ -151,7 +151,7 @@ describe("the dismissal as not special category", () => {
     expect(dialog.textContent).not.toMatch(/\b[0-9A-HJKMNP-TV-Z]{26}\b/);
   });
 
-  it("gives the api's refusal of a group outside the special category in its own word, with what to do next", () => {
+  it("words the api's not-special-category refusal, with the next step", () => {
     const { container } = render(<p>{refusedFor("not-special-category", "inapplicable").words}</p>);
 
     expect(container.textContent).toBe(

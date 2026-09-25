@@ -27,10 +27,7 @@ const memberOfTwoWorkspaces = async (
   return { first, second };
 };
 
-test("a member of one workspace lands in the shell, which names the workspace, the person and the role", async ({
-  page,
-  request,
-}) => {
+test("lands a sole member in the shell: workspace, person, role", async ({ page, request }) => {
   const email = anAddress("sole");
   const workspace = await provision(request, { name: "Acme Joinery", adminEmail: email });
 
@@ -49,7 +46,7 @@ test("a member of one workspace lands in the shell, which names the workspace, t
   await expect(page.getByRole("link", { name: /create/i })).toHaveCount(0);
 });
 
-test("a member of two workspaces picks one, and everything after is scoped to the pick", async ({
+test("scopes everything to the workspace a two-workspace member picks", async ({
   page,
   request,
 }) => {
@@ -76,7 +73,7 @@ test("a member of two workspaces picks one, and everything after is scoped to th
   await expect(bar.getByText(first.name)).toHaveCount(0);
 });
 
-test("a signed-in person with no membership is refused, can sign out, and is offered no workspace to create", async ({
+test("refuses a person with no membership, offering sign-out, not creation", async ({
   page,
   request,
 }) => {
@@ -96,10 +93,7 @@ test("a signed-in person with no membership is refused, can sign out, and is off
   await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
 });
 
-test("the sign-in screen says when a code was sent, when it did not work, and when too many were asked for", async ({
-  page,
-  request,
-}) => {
+test("says a code is sent, wrong, or asked too often", async ({ page, request }) => {
   const email = anAddress("words");
   await provision(request, { name: "Words", adminEmail: email });
 
@@ -130,10 +124,7 @@ test("the sign-in screen says when a code was sent, when it did not work, and wh
   await expect(page.getByRole("alert")).toContainText("Too many codes have been asked for");
 });
 
-test("a member of one workspace whose session predates the membership is still never asked to pick", async ({
-  page,
-  request,
-}) => {
+test("skips the picker when the membership postdates the session", async ({ page, request }) => {
   /* jscpd:ignore-start */
   const email = anAddress("later");
   const who = await person(request, email);
@@ -153,10 +144,7 @@ test("a member of one workspace whose session predates the membership is still n
   await expect(page.getByRole("heading", { level: 1, name: "Choose a workspace" })).toHaveCount(0);
 });
 
-test("a pick of a workspace the person no longer belongs to is refused in words", async ({
-  page,
-  request,
-}) => {
+test("refuses, in words, a workspace the person was removed from", async ({ page, request }) => {
   const email = anAddress("removed");
   const { first, second } = await memberOfTwoWorkspaces(request, email, {
     first: "Still Mine",
@@ -174,10 +162,7 @@ test("a pick of a workspace the person no longer belongs to is refused in words"
   await expect(page.getByRole("heading", { level: 1, name: "Choose a workspace" })).toBeVisible();
 });
 
-test("the picker sends a person who is a member of nothing to the refused screen", async ({
-  page,
-  request,
-}) => {
+test("sends a non-member from the picker to the refused screen", async ({ page, request }) => {
   const email = anAddress("none");
   await person(request, email);
   await page.goto("/sign-in");
@@ -189,7 +174,7 @@ test("the picker sends a person who is a member of nothing to the refused screen
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
 });
 
-test("the picker says when the workspace list could not be read, distinct from no membership, and a retry carries the person on (T-062)", async ({
+test("separates an unread workspace list from no membership, offering retry", async ({
   page,
   request,
 }) => {
@@ -221,7 +206,7 @@ test("the picker says when the workspace list could not be read, distinct from n
   /* jscpd:ignore-end */
 });
 
-test("the three screens outside the shell are keyboard-operable, landmarked and labelled", async ({
+test("makes the screens outside the shell keyboard-operable, landmarked and labelled", async ({
   page,
   request,
 }) => {

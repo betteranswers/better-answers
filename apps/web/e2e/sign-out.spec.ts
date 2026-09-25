@@ -17,7 +17,7 @@ test("sign-out from the shell ends the session", async ({ page, request }) => {
   await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
 });
 
-test("an ended session sends the person to sign-in and returns them where they were", async ({
+test("brings an ended session through sign-in back to its screen", async ({
   page,
   context,
   request,
@@ -39,10 +39,7 @@ test("an ended session sends the person to sign-in and returns them where they w
   await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
 });
 
-test("credentials revoked through the harness are refused on the next request", async ({
-  page,
-  request,
-}) => {
+test("refuses revoked credentials on the next request", async ({ page, request }) => {
   const email = anAddress("revoked");
   const workspace = await provision(request, { name: "Revoked", adminEmail: email });
   await page.goto("/sign-in");

@@ -71,7 +71,7 @@ workspace = seed_workspace(cursor, name="Acme")
 
 ### [TEST5] Title a test by what the system does, in 10 words at most
 
-A title is a short present-tense phrase. It says what the system does, not which function it calls: "refuses a name over 100 characters". It has 10 words at most and never says "should". The `describe` block names the unit under test. A Python test's name takes the same shape: `test_refuses_long_name`. Files with a longer title when this arrived are listed. The list only shrinks.
+A title is a short present-tense phrase. It says what the system does, not which function it calls: "refuses a name over 100 characters". It has 10 words at most and never says "should". The `describe` block names the unit under test. A Python test's name takes the same shape: `test_refuses_long_name`.
 
 Reviewer: only a person reads a title's subject or counts a Python test name's words.
 

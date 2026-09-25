@@ -24,7 +24,7 @@ describe("the refusal the api sends the web", () => {
     expect(read).toEqual({ word: "no-such-binding", class: "absent" });
   });
 
-  it("reads the fields a malformed input names, so a form can say which one was wrong", () => {
+  it("reads which fields a malformed input names", () => {
     const read = refusalOf(
       carrying({
         refusal: { word: "malformed", class: "malformed", fields: { sensitivity: "not-a-word" } },
@@ -34,12 +34,12 @@ describe("the refusal the api sends the web", () => {
     expect(read?.fields).toEqual({ sensitivity: "not-a-word" });
   });
 
-  it("reads nothing off a failure that carried no refusal, which is the shell's to report", () => {
+  it("reads nothing off a failure carrying no refusal", () => {
     expect(refusalOf(carrying({ code: "INTERNAL_SERVER_ERROR" }))).toBeUndefined();
     expect(refusalOf(new Error("the network went away"))).toBeUndefined();
   });
 
-  it("knows every word the api registered, inferred from the router and held nowhere else", () => {
+  it("infers every word the api registered from the router", () => {
     expectTypeOf<"no-session">().toExtend<RefusalWord>();
     expectTypeOf<"no-active-workspace">().toExtend<RefusalWord>();
     expectTypeOf<"no-such-workspace">().toExtend<RefusalWord>();
@@ -47,7 +47,7 @@ describe("the refusal the api sends the web", () => {
     expectTypeOf<"role-forbids">().toExtend<RefusalWord>();
     expectTypeOf<"widening-refused">().toExtend<RefusalWord>();
     expectTypeOf<"no-such-group">().toExtend<RefusalWord>();
-    // @ts-expect-error — a word no slice declared never crosses, so the web cannot switch on it.
+    // @ts-expect-error — a word no slice declared never crosses to the web.
     expectTypeOf<"no-such-thing">().toExtend<RefusalWord>();
   });
 

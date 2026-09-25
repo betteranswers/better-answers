@@ -12,7 +12,7 @@ const NAMED_PATH = /`(?<file>apps\/[\w./-]+\.(?:tsx?|json))`/g;
 const skill = readFileSync(path.join(repositoryRoot, skillPath), "utf8");
 const named = [...skill.matchAll(NAMED_PATH)].map((match) => match.groups?.["file"] ?? "");
 
-describe("the browser-suite skill (T-071)", () => {
+describe("the browser-suite skill", () => {
   it("points at files that are in the tree", () => {
     const missing = [...new Set(named)].filter(
       (file) => !existsSync(path.join(repositoryRoot, file)),
@@ -20,7 +20,7 @@ describe("the browser-suite skill (T-071)", () => {
     expect(missing, `${skillPath} names files that do not exist`).toEqual([]);
   });
 
-  it("names the suite's own modules, so the check above has something to hold", () => {
+  it("names the suite's own modules, so the check holds something", () => {
     expect(named).toEqual(
       expect.arrayContaining([
         "apps/web/e2e/browser.ts",
