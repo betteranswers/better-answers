@@ -158,7 +158,7 @@ PROBE_RUNS_IN_THE_JOB_THAT_PUSHES = os.environ.get(PROBE_DEFERRAL_VARIABLE) == "
 IMAGE_ID_VARIABLE = "IMAGE_ID"
 
 
-def _matrix_legs() -> list[dict[str, str]]:
+def _lines_under_include() -> list[str]:
     lines = BUILD_WORKFLOW.read_text("utf-8").splitlines()
     starts = [index for index, line in enumerate(lines) if line.strip() == "include:"]
     if len(starts) != 1:
@@ -169,13 +169,20 @@ def _matrix_legs() -> list[dict[str, str]]:
     start = starts[0]
     depth = len(lines[start]) - len(lines[start].lstrip())
 
-    legs: list[dict[str, str]] = []
+    nested: list[str] = []
     for line in lines[start + 1 :]:
         body = line.strip()
         if not body:
             continue
         if len(line) - len(line.lstrip()) <= depth:
             break
+        nested.append(body)
+    return nested
+
+
+def _matrix_legs() -> list[dict[str, str]]:
+    legs: list[dict[str, str]] = []
+    for body in _lines_under_include():
         if body.startswith("#"):
             continue
         if body.startswith("- "):
