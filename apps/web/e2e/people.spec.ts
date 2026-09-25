@@ -295,7 +295,7 @@ test.describe("the People screen's Members view", () => {
 });
 
 test.describe("a member, opened as a sheet", () => {
-  test("shows an Admin a member's role, groups and each role's meaning", async ({
+  test("shows a member's role, groups and each role's meaning", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -351,10 +351,7 @@ test.describe("a member, opened as a sheet", () => {
     await expect(memberButton(page, "Priya Shah")).toBeFocused();
   });
 
-  test("changes a member's role within the act's budget, and it holds", async ({
-    page,
-    request,
-  }) => {
+  test("changes a member's role within its budget, and it holds", async ({ page, request }) => {
     await anAdminAtPeople(page, request, "Nidd Valley Casting");
 
     await memberButton(page, "Sam Okoro").click();
@@ -380,7 +377,7 @@ test.describe("a member, opened as a sheet", () => {
     await expect(rowOf(page, "Sam Okoro").getByRole("cell").nth(1)).toHaveText("Editor");
   });
 
-  test("refuses demoting the last Admin in its own word, and says what next", async ({
+  test("refuses demoting the last Admin, and says what comes next", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -430,10 +427,7 @@ test.describe("a member, opened as a sheet", () => {
     await expect(membersRegion(page).getByRole("alert")).toContainText("Refused: role-forbids.");
   });
 
-  test("lets an Admin open a member and change their role by keyboard alone", async ({
-    page,
-    request,
-  }) => {
+  test("opens a member and changes their role by keyboard alone", async ({ page, request }) => {
     await anAdminAtPeople(page, request, "Calder Rolling");
     await page.goto(MEMBERS_VIEW);
     await expect(memberRows(page)).toHaveCount(3);
