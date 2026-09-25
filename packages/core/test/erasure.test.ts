@@ -74,7 +74,7 @@ const workspaceWithARequest = async () => {
 };
 
 describe("recording a subject request", () => {
-  it("lands the request and its ledger row together, the detail naming the person and how many identifiers, never one of them", async () => {
+  it("lands the request and its ledger row, counting the identifiers", async () => {
     const { scenario, subject, recorded, requestId } = await workspaceWithARequest();
 
     const auditEventId = recorded.ok ? recorded.value.auditEventId : "";
@@ -106,7 +106,7 @@ describe("recording a subject request", () => {
     ]);
   });
 
-  it("records a request for a person the company's files name who never signed in, the detail carrying no person id", async () => {
+  it("records a request for someone who never signed in", async () => {
     const scenario = await arrange();
 
     const recorded = await recordingAs(
@@ -126,7 +126,7 @@ describe("recording a subject request", () => {
     ).toMatchObject([{ detail: { identifierCount: 2 } }]);
   });
 
-  it("writes the identifier set the boundary parsed, so one given with spaces around it is the one every finder matches", async () => {
+  it("writes the identifier set the boundary parsed, trimmed of spaces", async () => {
     const scenario = await arrange();
 
     const recorded = await recordingAs(
@@ -173,7 +173,7 @@ describe("recording a subject request", () => {
     expect(await requestRowsIn(scenario.workspaceId)).toEqual([]);
   });
 
-  it("refuses a kind the closed pair does not name, before a row exists", async () => {
+  it("refuses an unknown kind before a row exists", async () => {
     const scenario = await arrange();
 
     expect(await recordingAs(scenario.admin, requestOf({ kind: "portability" }))).toEqual({
@@ -183,7 +183,7 @@ describe("recording a subject request", () => {
     expect(await requestRowsIn(scenario.workspaceId)).toEqual([]);
   });
 
-  it("refuses a name of one word as too broad to withhold, saying which and why in one sentence, and records nothing", async () => {
+  it("refuses a one-word name as too broad, recording nothing", async () => {
     const scenario = await arrange();
 
     const recorded = await recordingAs(
@@ -211,7 +211,7 @@ describe("recording a subject request", () => {
     ["a name", { emails: [], names: ["Al"], other: [] }, "Al"],
     ["another identifier", { emails: [], names: [], other: ["7\n "] }, "7"],
   ])(
-    "refuses %s under three characters, named without the spaces around it, and records nothing",
+    "refuses %s under three characters, trimmed, recording nothing",
     async (_kind, identifiers, refused) => {
       const scenario = await arrange();
 
@@ -233,7 +233,7 @@ describe("recording a subject request", () => {
     },
   );
 
-  it("records a name of two words and another identifier of three characters, which clear the floor", async () => {
+  it("records a two-word name and a three-character identifier", async () => {
     const scenario = await arrange();
     const identifiers = { emails: [], names: ["Jo Li"], other: ["A 1"] };
 
@@ -243,7 +243,7 @@ describe("recording a subject request", () => {
     expect(await requestRowsIn(scenario.workspaceId)).toMatchObject([{ identifiers }]);
   });
 
-  it("lands nothing for a clock started before the request arrived, and answers a failure to log rather than a word to act on", async () => {
+  it("answers an error, landing nothing, for a clock started early", async () => {
     const scenario = await arrange();
 
     const recorded = await recordingAs(
@@ -259,7 +259,7 @@ describe("recording a subject request", () => {
 });
 
 describe("the clock", () => {
-  it("is one month from its start, across a month's end and a year's", () => {
+  it("is one month on across month and year ends", () => {
     expect(dueDateOf(new Date("2026-04-02T11:00:00.000Z"))).toEqual(
       new Date("2026-05-02T11:00:00.000Z"),
     );
@@ -268,7 +268,7 @@ describe("the clock", () => {
     );
   });
 
-  it("answers the target month's last day where that month has no such day", () => {
+  it("clamps to the target month's last day", () => {
     expect(dueDateOf(new Date("2026-01-31T09:00:00.000Z"))).toEqual(
       new Date("2026-02-28T09:00:00.000Z"),
     );
@@ -281,7 +281,7 @@ describe("the clock", () => {
     );
   });
 
-  it("answers the 29th in a leap February, which a clamp written against 28 would miss", () => {
+  it("answers the 29th in a leap February", () => {
     expect(dueDateOf(new Date("2028-01-31T09:00:00.000Z"))).toEqual(
       new Date("2028-02-29T09:00:00.000Z"),
     );
@@ -290,7 +290,7 @@ describe("the clock", () => {
     );
   });
 
-  it("answers the month until an extension is taken, and the extension once it is", async () => {
+  it("answers the extension once taken, and the month before", async () => {
     const scenario = await arrange();
     const extended = new Date("2026-07-02T11:00:00.000Z");
 
@@ -317,7 +317,7 @@ describe("the clock", () => {
 });
 
 describe("reading a subject request", () => {
-  it("hands the Admin the row with its identifier set, and refuses an Editor and a Viewer", async () => {
+  it("hands the Admin the row, refusing an Editor and Viewer", async () => {
     const { scenario, subject, requestId } = await workspaceWithARequest();
 
     expect(await readingRequestAs(scenario.admin, requestId)).toEqual({
@@ -345,7 +345,7 @@ describe("reading a subject request", () => {
     }
   });
 
-  it("says so when no request of that id is held here, and refuses an id that is not the minter's", async () => {
+  it("finds no request held elsewhere and refuses a malformed id", async () => {
     const scenario = await arrange();
     const elsewhere = await arrange();
     const theirs = await recordingAs(elsewhere.admin, requestOf());

@@ -10,6 +10,7 @@ import {
   runErasure,
   type ReplayedErasure,
 } from "../src/erasure/index.ts";
+import { erasureDoorsFor } from "./erasure-doors.ts";
 import { ledgerRowsOf } from "./sourced-concept.ts";
 import { objectStoreForSuite } from "./suite-objects.ts";
 import { addressOf, seedingWith } from "./suite-postgres.ts";
@@ -61,13 +62,7 @@ const REPLAYED = "platform.erasure.replayed";
 const FIRST_ID = "01K0000000000000000000000A";
 const SECOND_ID = "01K0000000000000000000000B";
 
-const doorsFor = (scenario: Scenario, at: Date) => ({
-  git: scenario.git,
-  postgres: scenario.postgres,
-  objects: objects().door,
-  clock: { now: () => at },
-  log: { info: () => undefined },
-});
+const doorsFor = (scenario: Scenario, at: Date) => erasureDoorsFor(scenario, objects().door, at);
 
 type Erased = {
   readonly subjectRequestId: string;
@@ -188,7 +183,7 @@ const idsFor = (
   set.filter((entry) => entry.workspaceId === workspaceId).map((entry) => entry.erasureRequestId);
 
 describe("the set of erasures a restore must replay", () => {
-  it("names none when every completion is behind the window, and the replay answers nothing", async () => {
+  it("names and replays none when every completion predates the window", async () => {
     const scenario = await arrange();
     await completedInTheRows(scenario.workspaceId, BEHIND_THE_WINDOW);
 
@@ -206,7 +201,7 @@ describe("the set of erasures a restore must replay", () => {
     expect(await ledgerRowsOf(db().pool, scenario.workspaceId, REPLAYED)).toEqual([]);
   });
 
-  it("names one the restored rows hold, and runs it under the platform's own actor", async () => {
+  it("replays one the restored rows hold under the platform actor", async () => {
     const scenario = await arrange();
     const erased = await completedInTheRows(scenario.workspaceId, FROM_THE_ROWS_AT);
 
@@ -240,7 +235,7 @@ describe("the set of erasures a restore must replay", () => {
     ]);
   });
 
-  it("answers oldest completion first, and by id where two completed at one instant", async () => {
+  it("answers oldest completion first, then by id on a tie", async () => {
     const scenario = await arrange();
 
     await completedInTheRows(scenario.workspaceId, IN_ORDER_SECOND_AT);
@@ -261,7 +256,7 @@ describe("the set of erasures a restore must replay", () => {
     expect(named).toHaveLength(3);
   });
 
-  it("counts a request the rows and the copies both name once", async () => {
+  it("counts once a request both the rows and copies name", async () => {
     const scenario = await arrange();
     const erased = await completedInTheRows(scenario.workspaceId, IN_BOTH_AT);
     await leavingAReplayCopy(scenario, erased, IN_BOTH_AT);
@@ -280,7 +275,7 @@ describe("the set of erasures a restore must replay", () => {
 });
 
 describe("a request whose rows the dump predates", () => {
-  it("is re-created from the copy alone, with the copy's own pseudonym", async () => {
+  it("is re-created from the copy with its own pseudonym", async () => {
     const scenario = await arrange();
     const erased = await completedInTheRows(scenario.workspaceId, FROM_THE_COPY_AT);
     await leavingAReplayCopy(scenario, erased, FROM_THE_COPY_AT);
@@ -293,24 +288,24 @@ describe("a request whose rows the dump predates", () => {
     expect(replayed[0]?.fromReplayCopy).toBe(true);
 
     const [row] = await erasureRowsIn(scenario.workspaceId);
-    expect(row?.id).toEqual(erased.erasureRequestId);
-    expect(row?.subject_request_id).toEqual(erased.subjectRequestId);
-    expect(row?.pseudonym).toEqual(erased.pseudonym);
+    expect(row).toMatchObject({
+      id: erased.erasureRequestId,
+      subject_request_id: erased.subjectRequestId,
+      pseudonym: erased.pseudonym,
+    });
     expect(row?.completed_at).not.toBeNull();
     const [subject] = await subjectRowsIn(scenario.workspaceId);
-    expect(subject?.id).toEqual(erased.subjectRequestId);
-    expect(subject?.kind).toEqual("erasure");
+    expect(subject).toMatchObject({ id: erased.subjectRequestId, kind: "erasure" });
     expect(subject?.identifiers).toEqual({
       emails: [erased.email],
       names: ["Priya Anand"],
       other: [],
     });
 
-    expect(subject?.answered_at).toBeNull();
-    expect(subject?.received_at).toEqual(FROM_THE_COPY_AT);
+    expect(subject).toMatchObject({ answered_at: null, received_at: FROM_THE_COPY_AT });
   });
 
-  it("re-creates a request for a subject who never signed in with no person id", async () => {
+  it("is re-created with no person id for a never-signed-in subject", async () => {
     const scenario = await arrange();
     const erased = await completedInTheRows(scenario.workspaceId, NO_LOGIN_AT, {
       subject: NEVER_SIGNED_IN,
@@ -353,7 +348,7 @@ describe("an object store a restore cannot read", () => {
       const copies = await replayCopiesSince(ERASURE, unreachable.value, UNREACHABLE_SINCE);
       const replayed = await replayErasures(
         ERASURE,
-        { ...doorsFor(scenario, UNREACHABLE_AT), objects: unreachable.value },
+        erasureDoorsFor(scenario, unreachable.value, UNREACHABLE_AT),
         { since: UNREACHABLE_SINCE },
       );
 
@@ -397,7 +392,7 @@ describe("a second replay of the same request", () => {
 });
 
 describe("a request whose routine will not run", () => {
-  it("stops the replay where it stands, rather than carrying on to the ones behind it", async () => {
+  it("stops the replay there, not carrying on to those behind", async () => {
     const scenario = await arrange();
 
     const stranded = await seedingWith(db().pool, (seed) => seed.workspace());
@@ -423,7 +418,7 @@ describe("a request whose routine will not run", () => {
 });
 
 describe("the replay copy for a request named by address alone", () => {
-  it("carries the person the map found, and not the nobody the request's own column names", async () => {
+  it("carries the person the map found, not the request's null", async () => {
     const scenario = await arrange();
     const email = addressOf("priya");
     const person = await memberOf(db().pool, scenario.workspaceId, email);
@@ -514,7 +509,7 @@ const whatTheReplayLeft = async (workspaceId: string) => ({
 });
 
 describe("a restore from a dump older than the request", () => {
-  it("re-creates the workspace's suppression and wipes the binding whose restored index names the subject, queueing its index run, and leaves the binding beside it alone", async () => {
+  it("re-creates the suppression, wiping only the binding naming the subject", async () => {
     const scenario = await arrange();
     const workspaceId = scenario.workspaceId;
     const naming = await aBindingIndexing(

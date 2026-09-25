@@ -83,7 +83,7 @@ describe("an identifier as the erasure-match agreement normalises it", () => {
     }
   });
 
-  it("treats as whitespace every code point the agreement lists and no other", () => {
+  it("treats as whitespace exactly the code points the agreement lists", () => {
     const spaced = [...everyCharacter()].filter(
       (character) => normalisedIdentifier(`a${character}b`) === "a b",
     );
@@ -117,7 +117,7 @@ const matchesOf = (kind: (typeof SUBJECT_IDENTIFIER_KINDS)[number], identifier: 
 
 let theWordCharacters: ReadonlySet<string> | undefined;
 
-// Read once for the two tests that need it: a walk of every code point takes seconds.
+/** Read once for the two tests that need it: a walk of every code point takes seconds. */
 const wordCharacters = (): ReadonlySet<string> => {
   if (theWordCharacters !== undefined) return theWordCharacters;
   const ofABC = matchesOf("other", "abc");
@@ -128,7 +128,7 @@ const wordCharacters = (): ReadonlySet<string> => {
 };
 
 describe("an occurrence as the erasure-match agreement answers it", () => {
-  it("is found at every place every case of the agreement names, and at no other", () => {
+  it("is found exactly where each agreement case names, nowhere else", () => {
     for (const { kind, identifier, text, occurrences, why } of fixture.cases) {
       const characters = Array.from(text);
       const matches = matchesOf(kind, identifier)(text);
@@ -142,7 +142,7 @@ describe("an occurrence as the erasure-match agreement answers it", () => {
     }
   });
 
-  it("folds every code point as the agreement's digest says Unicode 15.1 folds it", () => {
+  it("folds each code point as the agreement's Unicode 15.1 digest", () => {
     const lines = function* () {
       for (const character of charactersTheDigestsRead()) {
         const folded = normalisedIdentifier(character);
@@ -153,13 +153,13 @@ describe("an occurrence as the erasure-match agreement answers it", () => {
     expect(digestOf(lines())).toBe(fixture.digests.folding.sha256);
   });
 
-  it("is not bounded by every word character the agreement's digest names, and is by every other", () => {
+  it("is unbounded by exactly the word characters the digest names", () => {
     const lines = [...wordCharacters()].map((character) => `${hexOf(character)}\n`);
 
     expect(digestOf(lines)).toBe(fixture.digests.word_characters.sha256);
   });
 
-  it("is not bounded, for an address, by every joiner the agreement lists before a word character, and is by every other", () => {
+  it("is unbounded for an address by exactly the listed joiners", () => {
     const ofTheAddress = matchesOf("emails", "ab@cd.ef");
     const words = wordCharacters();
     const joiners = [...charactersTheDigestsRead()].filter(
@@ -178,7 +178,7 @@ describe("the floor the erasure-match agreement states", () => {
     }).toEqual({ characters: fixture.floor.characters, nameWords: fixture.floor.name_words });
   });
 
-  it("is cleared by every identifier the agreement says clears it, and by no other", () => {
+  it("is cleared by exactly the identifiers the agreement names", () => {
     for (const { kind, identifier, clears_the_floor: clears, why } of fixture.cases) {
       expect({ why, clears: floorNotCleared(kind, identifier) === undefined }).toEqual({
         why,
