@@ -1,6 +1,5 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
-import { ROLE_MEANINGS } from "@/features/people/role-meanings.ts";
 import { screenById, viewsOf } from "@/shared/screens.ts";
 
 import { expect, test } from "./browser.ts";
@@ -44,6 +43,12 @@ const memberButton = (page: Page, name: string): Locator =>
 const sheetOf = (page: Page, name: string): Locator => page.getByRole("dialog", { name });
 
 const rolePicker = (sheet: Locator): Locator => sheet.getByRole("radiogroup", { name: "Role" });
+
+const EACH_ROLE_MEANS = {
+  Admin: "Manages people and sources, and does everything an Editor does.",
+  Editor: "Checks concepts, runs question sets and saves Answers.",
+  Viewer: "Asks questions, flags answers and suggests changes.",
+};
 
 /** Timed in the page, from the key to the count that says it: a matcher polls too coarsely. */
 const clockTheSearch = (page: Page, saying: string) =>
@@ -306,7 +311,7 @@ test.describe("a member, opened as a sheet", () => {
     await expect(sheet.getByRole("heading", { level: 2, name: "Priya Shah" })).toBeFocused();
     await expect(sheet).toContainText(priya.email);
     await expect(rolePicker(sheet).getByRole("radio")).toHaveCount(3);
-    for (const [role, meaning] of Object.entries(ROLE_MEANINGS)) {
+    for (const [role, meaning] of Object.entries(EACH_ROLE_MEANS)) {
       await expect(
         sheet.getByRole("radio", { name: role, exact: true }),
       ).toHaveAccessibleDescription(meaning);
@@ -394,6 +399,35 @@ test.describe("a member, opened as a sheet", () => {
     await passesTheAccessibilityGate();
     await page.keyboard.press("Escape");
     await expect(rowOf(page, "Test person").getByRole("cell").nth(1)).toHaveText("Admin");
+  });
+
+  test("an Admin demoting themself sees their new role at once", async ({ page, request }) => {
+    const admin = anAddress("admin");
+    const workspace = await provision(request, { name: "Esk Presswork", adminEmail: admin });
+    const successor = await person(request, anAddress("ada"), { displayName: "Ada Hartley" });
+    await addMember(request, {
+      workspaceId: workspace.workspaceId,
+      userId: successor.id,
+      role: "Admin",
+    });
+    await page.goto(MEMBERS_VIEW);
+    await signIn(page, request, admin);
+    await expect(memberRows(page)).toHaveCount(2);
+    const bar = page.getByRole("banner");
+    await expect(bar).toContainText("Admin");
+
+    await memberButton(page, "Test person").click();
+    const sheet = sheetOf(page, "Test person");
+    await sheet.getByRole("radio", { name: "Editor", exact: true }).click();
+    await sheet.getByRole("button", { name: "Make Test person an Editor" }).click();
+    await expect(sheet.getByRole("status")).toHaveText(
+      "Test person is an Editor now, from their next request.",
+    );
+    await page.keyboard.press("Escape");
+
+    await expect(bar).toContainText("Editor");
+    await expect(bar).not.toContainText("Admin");
+    await expect(membersRegion(page).getByRole("alert")).toContainText("Refused: role-forbids.");
   });
 
   test("lets an Admin open a member and change their role by keyboard alone", async ({

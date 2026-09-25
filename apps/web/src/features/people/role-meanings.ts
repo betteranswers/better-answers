@@ -9,4 +9,6 @@ export const ROLE_MEANINGS = {
   Viewer: "Asks questions, flags answers and suggests changes.",
 } as const satisfies Readonly<Record<Role, string>>;
 
+export const roleOf = (word: string): Role | undefined => ROLES.find((role) => role === word);
+
 export const aRole = (role: Role): string => `${role === "Viewer" ? "a" : "an"} ${role}`;

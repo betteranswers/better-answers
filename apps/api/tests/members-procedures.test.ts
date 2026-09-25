@@ -1,9 +1,16 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { z } from "zod";
 
-import { until, whileWritesAreRefused } from "@better-answers/core/testing/postgres";
+import { until } from "@better-answers/core/testing/postgres";
 
 import { startApp, type TestApp } from "./harness.ts";
-import { revocationHeldOpen, seededIn, sessionPointedAt, someoneWaitsOnALock } from "./provoke.ts";
+import {
+  revocationHeldOpen,
+  seededIn,
+  sessionPointedAt,
+  someoneWaitsOnALock,
+  type HeldRevocation,
+} from "./provoke.ts";
 import { refusalOfCall, webSignedIn } from "./web-client.ts";
 
 let app: TestApp;
@@ -285,43 +292,108 @@ describe("who may change a role", () => {
   });
 });
 
+/**
+ * The insert lands no row and raises nothing, so Postgres leaves the transaction open: only the
+ * transport's rollback can undo the write before it.
+ */
+const whileAuditRowsVanish = async <T>(work: () => Promise<T>): Promise<T> => {
+  const { superuser } = app.database;
+  await superuser.query(
+    `CREATE FUNCTION test_audit_row_vanishes() RETURNS trigger LANGUAGE plpgsql AS $$
+     BEGIN RETURN NULL; END $$`,
+  );
+  await superuser.query(
+    `CREATE TRIGGER test_audit_row_vanishes BEFORE INSERT ON audit_event
+     FOR EACH ROW EXECUTE FUNCTION test_audit_row_vanishes()`,
+  );
+  try {
+    return await work();
+  } finally {
+    await superuser.query("DROP TRIGGER test_audit_row_vanishes ON audit_event");
+    await superuser.query("DROP FUNCTION test_audit_row_vanishes()");
+  }
+};
+
+const FAILED = z.object({
+  message: z.string(),
+  data: z.object({ httpStatus: z.number(), refusal: z.unknown().optional() }),
+});
+
+const failureOf = (failed: unknown) => {
+  const { message, data } = FAILED.parse(failed);
+  return { message, httpStatus: data.httpStatus, refusal: data.refusal };
+};
+
+const NOTHING_LANDED = { role: "Viewer", changes: [] };
+
+const whatLanded = async (workspaceId: string, personId: string) => ({
+  role: await roleHeldBy(workspaceId, personId),
+  changes: await roleChangesIn(workspaceId),
+});
+
+/** `meanwhile` runs while the Admin's change waits to read their membership, held under a lock. */
+const aChangeWaitingOnARevocation = async (
+  meanwhile: (revocation: HeldRevocation) => Promise<unknown>,
+) => {
+  const { workspace, viewer } = await aWorkspaceOfThree();
+  const { api } = await webSignedIn(app, workspace.admin.email);
+  const revocation = await revocationHeldOpen(app, workspace.admin.id);
+  try {
+    const changing = refusalOfCall(
+      api.members.changeRole.mutate({ personId: viewer.id, role: "Editor" }),
+    );
+    await until(() => someoneWaitsOnALock(app));
+    await meanwhile(revocation);
+    return { answered: await changing, workspaceId: workspace.workspaceId, viewerId: viewer.id };
+  } finally {
+    await revocation.abandon();
+  }
+};
+
 describe("a role change that fails partway", () => {
-  it("leaves no rows when its audit event cannot land", async () => {
+  it("leaves no rows when its audit event lands none", async () => {
     const { workspace, viewer } = await aWorkspaceOfThree();
     const { api } = await webSignedIn(app, workspace.admin.email);
 
-    const failed = await whileWritesAreRefused(app.database.superuser, "audit_event", () =>
+    const failed = await whileAuditRowsVanish(() =>
       refusalOfCall(api.members.changeRole.mutate({ personId: viewer.id, role: "Editor" })),
     );
 
-    expect(failed).toHaveProperty("message", "changeRole failed");
-    expect(failed).toHaveProperty("data.httpStatus", 500);
-    expect(failed).not.toHaveProperty("data.refusal");
-    expect(await roleHeldBy(workspace.workspaceId, viewer.id)).toBe("Viewer");
-    expect(await roleChangesIn(workspace.workspaceId)).toEqual([]);
+    expect(failureOf(failed)).toEqual({
+      message: "changeRole failed",
+      httpStatus: 500,
+      refusal: undefined,
+    });
+    expect(await whatLanded(workspace.workspaceId, viewer.id)).toEqual(NOTHING_LANDED);
+  });
+
+  it("answers a failed held membership read as failure, not signed-out", async () => {
+    const { answered, workspaceId, viewerId } = await aChangeWaitingOnARevocation(async () => {
+      await app.database.superuser.query(
+        `SELECT pg_cancel_backend(pid) FROM pg_stat_activity
+          WHERE datname = current_database() AND wait_event_type = 'Lock'`,
+      );
+    });
+
+    expect(failureOf(answered)).toEqual({
+      message: "withPrincipal failed",
+      httpStatus: 500,
+      refusal: undefined,
+    });
+    expect(await whatLanded(workspaceId, viewerId)).toEqual(NOTHING_LANDED);
   });
 
   it("refuses the change when a revocation lands while it waits", async () => {
-    const { workspace, viewer } = await aWorkspaceOfThree();
-    const { api } = await webSignedIn(app, workspace.admin.email);
-    const revocation = await revocationHeldOpen(app, workspace.admin.id);
-    try {
-      const changing = refusalOfCall(
-        api.members.changeRole.mutate({ personId: viewer.id, role: "Editor" }),
-      );
-      await until(() => someoneWaitsOnALock(app));
-      await revocation.land();
+    const { answered, workspaceId, viewerId } = await aChangeWaitingOnARevocation((revocation) =>
+      revocation.land(),
+    );
 
-      expect(await changing).toMatchObject({
-        data: {
-          httpStatus: 401,
-          refusal: { word: "credentials-revoked", class: "unauthenticated" },
-        },
-      });
-    } finally {
-      await revocation.abandon();
-    }
-    expect(await roleHeldBy(workspace.workspaceId, viewer.id)).toBe("Viewer");
-    expect(await roleChangesIn(workspace.workspaceId)).toEqual([]);
+    expect(answered).toMatchObject({
+      data: {
+        httpStatus: 401,
+        refusal: { word: "credentials-revoked", class: "unauthenticated" },
+      },
+    });
+    expect(await whatLanded(workspaceId, viewerId)).toEqual(NOTHING_LANDED);
   });
 });

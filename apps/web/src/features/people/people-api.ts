@@ -3,7 +3,7 @@ import type { inferOutput } from "@trpc/tanstack-react-query";
 
 import { useTRPC } from "@/shared/api/trpc.ts";
 
-import { ROLES } from "./role-meanings.ts";
+import { roleOf } from "./role-meanings.ts";
 
 type Api = ReturnType<typeof useTRPC>;
 
@@ -18,28 +18,35 @@ export const useMembers = () => {
   return useQuery(api.members.list.queryOptions());
 };
 
-/** The row takes the role before the api answers, so the act reads as done within 100 ms. */
+/**
+ * The row takes the role before the api answers, so the act lands within 100 ms. The reader's
+ * own role may be the one changed.
+ */
 export const useChangeRole = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
-  const queryKey = api.members.list.queryKey();
+  const listKey = api.members.list.queryKey();
   return useMutation(
     api.members.changeRole.mutationOptions({
       onMutate: async (asked) => {
-        await queryClient.cancelQueries({ queryKey });
-        const before = queryClient.getQueryData(queryKey);
-        const role = ROLES.find((held) => held === asked.role);
-        queryClient.setQueryData(queryKey, (held) =>
-          held?.map((member) =>
+        await queryClient.cancelQueries({ queryKey: listKey });
+        const before = queryClient.getQueryData(listKey);
+        const role = roleOf(asked.role);
+        queryClient.setQueryData(listKey, (listed) =>
+          listed?.map((member) =>
             member.personId === asked.personId && role !== undefined ? { ...member, role } : member,
           ),
         );
         return { before };
       },
-      onError: (_refusal, _asked, held) => {
-        queryClient.setQueryData(queryKey, held?.before);
+      onError: (_refusal, _asked, taken) => {
+        queryClient.setQueryData(listKey, taken?.before);
       },
-      onSettled: () => queryClient.invalidateQueries({ queryKey }),
+      onSettled: () =>
+        Promise.all([
+          queryClient.invalidateQueries({ queryKey: listKey }),
+          queryClient.invalidateQueries({ queryKey: api.session.membership.queryKey() }),
+        ]),
     }),
   );
 };

@@ -17,9 +17,9 @@ import {
 } from "@/shared/ui/sheet.tsx";
 
 import { useChangeRole, type ListedMember, type Role, type RoleChanged } from "./people-api.ts";
-import { aRole, ROLE_MEANINGS, ROLES } from "./role-meanings.ts";
+import { aRole, ROLE_MEANINGS, roleOf, ROLES } from "./role-meanings.ts";
 import { outcomeOfFailure } from "./refusal.tsx";
-import { GroupPills, LONG_UK_DATE, nameOf } from "./words.tsx";
+import { GroupPills, JoinedOn, nameOf } from "./words.tsx";
 
 /** Where focus lands when the sheet opens: on who the member is, or straight on their role. */
 export type OpenedAt = "member" | "role";
@@ -50,21 +50,19 @@ function Membership(properties: { readonly member: ListedMember }) {
           <GroupPills groups={member.groups} />
         </SummaryRow>
         <SummaryRow term="Joined">
-          <span className="tabular-nums">{LONG_UK_DATE.format(new Date(member.joinedAt))}</span>
+          <JoinedOn instant={member.joinedAt} />
         </SummaryRow>
       </dl>
     </section>
   );
 }
 
-const roleOf = (value: string): Role | undefined => ROLES.find((role) => role === value);
-
 function RolePicker(properties: {
   readonly member: ListedMember;
   readonly pickerRef: RefObject<HTMLDivElement | null>;
 }) {
   const { member, pickerRef } = properties;
-  const [draft, setDraft] = useState<Role>(member.role);
+  const [picked, setPicked] = useState<Role>(member.role);
   const [outcome, setOutcome] = useState<Outcome>();
   const changeRole = useChangeRole();
   const headingId = useId();
@@ -72,12 +70,15 @@ function RolePicker(properties: {
   const itemId = useId();
   const name = nameOf(member);
 
-  // Focus stays on the picker, since the button it left is disabled once the row takes the role.
+  /**
+   * Focus moves to the picker first: the button it leaves is disabled once the row takes the
+   * role.
+   */
   const commit = () => {
-    pickerRef.current?.querySelector<HTMLElement>(`[value="${draft}"]`)?.focus();
+    pickerRef.current?.querySelector<HTMLElement>(`[value="${picked}"]`)?.focus();
     setOutcome(undefined);
     changeRole.mutate(
-      { personId: member.personId, role: draft },
+      { personId: member.personId, role: picked },
       {
         onSuccess: (changed: RoleChanged) => {
           setOutcome({
@@ -92,7 +93,7 @@ function RolePicker(properties: {
     );
   };
 
-  const unchanged = draft === member.role;
+  const unchanged = picked === member.role;
 
   return (
     <section aria-labelledby={headingId} className="border border-border">
@@ -103,9 +104,9 @@ function RolePicker(properties: {
         <RadioGroup
           ref={pickerRef}
           aria-labelledby={headingId}
-          value={draft}
+          value={picked}
           onValueChange={(value) => {
-            setDraft(roleOf(value) ?? draft);
+            setPicked(roleOf(value) ?? picked);
           }}
         >
           {ROLES.map((role) => (
@@ -130,12 +131,12 @@ function RolePicker(properties: {
 
         <div className="flex flex-col items-start gap-2">
           <Button disabled={unchanged} aria-describedby={hintId} onClick={commit}>
-            Make {name} {aRole(draft)}
+            Make {name} {aRole(picked)}
           </Button>
           <p id={hintId} className="text-sm text-muted-foreground">
             {unchanged
               ? `${name} is ${aRole(member.role)}. Pick another role to change it.`
-              : "One governed write, audited under your name. It holds from their next request."}
+              : "Recorded on the audit log under your name. It holds from their next request."}
           </p>
         </div>
 
@@ -145,7 +146,6 @@ function RolePicker(properties: {
   );
 }
 
-/** Block 2 of the external People UI, its plural roles folded to the one role a member holds. */
 export function MemberSheet(properties: {
   readonly member: ListedMember;
   readonly openedAt: OpenedAt;

@@ -2,7 +2,7 @@ import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
 import type { ListedMember } from "./people-api.ts";
 
-export const LONG_UK_DATE = new Intl.DateTimeFormat("en-GB", {
+const LONG_UK_DATE = new Intl.DateTimeFormat("en-GB", {
   day: "numeric",
   month: "long",
   year: "numeric",
@@ -12,6 +12,10 @@ export const LONG_UK_DATE = new Intl.DateTimeFormat("en-GB", {
 /** A member who has given no display name yet is named by their address. */
 export const nameOf = (member: ListedMember): string =>
   member.displayName === "" ? member.address : member.displayName;
+
+export function JoinedOn(properties: { readonly instant: string }) {
+  return <span className="tabular-nums">{LONG_UK_DATE.format(new Date(properties.instant))}</span>;
+}
 
 export function GroupPills(properties: { readonly groups: ListedMember["groups"] }) {
   if (properties.groups.length === 0) {

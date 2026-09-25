@@ -21,7 +21,7 @@ import { MemberSheet, memberButtonId, type OpenedAt } from "./member-sheet.tsx";
 import { useMembers, type ListedMember } from "./people-api.ts";
 import { PEOPLE_KEYSTROKES } from "./people-state.ts";
 import { outcomeOfFailure } from "./refusal.tsx";
-import { GroupPills, LONG_UK_DATE } from "./words.tsx";
+import { GroupPills, JoinedOn } from "./words.tsx";
 
 const features = tableFeatures({
   columnFilteringFeature,
@@ -45,7 +45,7 @@ const countOfPeople = (count: number): string => (count === 1 ? "1 person" : `${
 
 type MemberActs = {
   readonly open: (personId: string) => void;
-  readonly focused: (personId: string) => void;
+  readonly focusedOn: (personId: string) => void;
 };
 
 function PersonCell(properties: { readonly member: ListedMember; readonly acts: MemberActs }) {
@@ -59,7 +59,7 @@ function PersonCell(properties: { readonly member: ListedMember; readonly acts: 
         aria-haspopup="dialog"
         className="h-auto p-0 text-left font-medium whitespace-normal text-foreground"
         onFocus={() => {
-          acts.focused(personId);
+          acts.focusedOn(personId);
         }}
         onClick={() => {
           acts.open(personId);
@@ -94,9 +94,7 @@ const columnsFor = (acts: MemberActs) =>
     }),
     column.accessor("joinedAt", {
       header: "Joined",
-      cell: ({ getValue }) => (
-        <span className="tabular-nums">{LONG_UK_DATE.format(new Date(getValue()))}</span>
-      ),
+      cell: ({ getValue }) => <JoinedOn instant={getValue()} />,
     }),
   ]);
 
@@ -134,7 +132,7 @@ function MemberList(properties: { readonly members: readonly ListedMember[] }) {
         open: (personId) => {
           setOpened({ personId, at: "member" });
         },
-        focused: setInFocus,
+        focusedOn: setInFocus,
       }),
     [],
   );

@@ -217,7 +217,7 @@ describe("the last Admin", () => {
     const other = await joining(workspace, "Admin");
     const firstActed = Promise.withResolvers<undefined>();
 
-    // The first commits only once the second waits on it, so the second's count comes after.
+    /** It commits only once the second waits on it, so the second's count comes after. */
     const demotingTheOther = heldAs(workspace, adminUserId, async (principal, tx) => {
       const changed = await changing(principal, tx, other, "Viewer");
       firstActed.resolve(undefined);
@@ -257,7 +257,7 @@ describe("the last Admin", () => {
     const bothHold = Promise.withResolvers<undefined>();
     let holding = 0;
 
-    // Each waits until both hold their own member row, so each then waits on the other's.
+    /** Each waits until both hold their own member row, so each then waits on the other's. */
     const demotingOnceBothHold = (actor: string, target: string) =>
       heldAs(workspace, actor, async (principal, tx) => {
         holding += 1;
