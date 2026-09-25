@@ -121,7 +121,7 @@ const oneGroupOnePerson = async (
 };
 
 describe("making a group", () => {
-  it("gives an Admin a group to list, and writes the act on the ledger beside it", async () => {
+  it("gives an Admin a listed group and writes the act", async () => {
     const workspace = await provisioned("Acme");
 
     const groupId = await madeGroup(workspace, "HR team");
@@ -142,7 +142,7 @@ describe("making a group", () => {
     ]);
   });
 
-  it("refuses a name the workspace already holds, and leaves no second group and no ledger row", async () => {
+  it("refuses a taken name, adding neither group nor ledger row", async () => {
     const workspace = await provisioned("Beta");
     await madeGroup(workspace, "HR team");
 
@@ -155,7 +155,7 @@ describe("making a group", () => {
     expect(await peopleActs(workspace.workspaceId)).toHaveLength(1);
   });
 
-  it("refuses a name that is blank once trimmed, before any row exists", async () => {
+  it("refuses a name blank once trimmed, writing no row", async () => {
     const workspace = await provisioned("Gamma");
 
     const made = await asAdmin(workspace, (principal, tx) =>
@@ -168,7 +168,7 @@ describe("making a group", () => {
 });
 
 describe("renaming a group", () => {
-  it("keeps its id and its membership, so an audience naming it still names the same people", async () => {
+  it("keeps its id and its members under the new name", async () => {
     const { workspace, groupId } = await oneGroupOnePerson("Delta");
 
     const renamed = await asAdmin(workspace, (principal, tx) =>
@@ -183,7 +183,7 @@ describe("renaming a group", () => {
     });
   });
 
-  it("refuses a name another group in the workspace already holds, and renames nothing", async () => {
+  it("refuses a name another group holds, and renames nothing", async () => {
     const workspace = await provisioned("Epsilon");
     const groupId = await madeGroup(workspace, "HR team");
     await madeGroup(workspace, "Sales executives");
@@ -246,7 +246,7 @@ describe("deleting a group", () => {
 });
 
 describe("who is in a group", () => {
-  it("lets one person sit in several groups at once, each act naming the group and the person", async () => {
+  it("puts one person in several groups, each act naming both", async () => {
     const workspace = await provisioned("Iota");
     const person = await seedMemberAt(workspace, "Viewer");
     const hr = await madeGroup(workspace, "HR team");
@@ -277,7 +277,7 @@ describe("who is in a group", () => {
     ]);
   });
 
-  it("refuses a person who is not a member of the workspace, and adds nobody", async () => {
+  it("refuses a person outside the workspace, and adds nobody", async () => {
     const workspace = await provisioned("Kappa");
     const groupId = await madeGroup(workspace, "HR team");
     const stranger = await seedPerson(db().pool);
@@ -291,7 +291,7 @@ describe("who is in a group", () => {
     expect(memberships.rowCount).toBe(0);
   });
 
-  it("refuses a second add of the same person, so the ledger never says it happened twice", async () => {
+  it("refuses a repeat add, so the ledger records one", async () => {
     const { workspace, person, groupId } = await oneGroupOnePerson("Lambda");
 
     const again = await putInGroup(workspace, groupId, person);
@@ -323,7 +323,7 @@ describe("who is in a group", () => {
     ]);
   });
 
-  it("refuses a group id nobody holds when taking a person out", async () => {
+  it("refuses removal from a group id nobody holds", async () => {
     const workspace = await provisioned("Nu");
     const person = await seedMemberAt(workspace, "Viewer");
 
@@ -364,6 +364,18 @@ const namingAPerson = (verbs: readonly Verb[]): readonly Verb[] =>
 
 type VerbOutcome = { readonly verb: string; readonly outcome: unknown };
 
+const outcomesOf = async (
+  verbs: readonly Verb[],
+  principal: UserPrincipal,
+  tx: Tx,
+): Promise<VerbOutcome[]> => {
+  const outcomes: VerbOutcome[] = [];
+  for (const verb of verbs) {
+    outcomes.push({ verb: verb.name, outcome: await verb.run(principal, tx) });
+  }
+  return outcomes;
+};
+
 const eachVerb = async (
   workspace: Workspace,
   verbs: readonly Verb[],
@@ -372,9 +384,7 @@ const eachVerb = async (
 ): Promise<void> => {
   await asPerson(workspace, workspace.adminUserId, async (principal, tx) => {
     await before(tx);
-    for (const verb of verbs) {
-      outcomes.push({ verb: verb.name, outcome: await verb.run(principal, tx) });
-    }
+    outcomes.push(...(await outcomesOf(verbs, principal, tx)));
   });
 };
 
@@ -391,7 +401,7 @@ const whileTheTableIsGone = async <T>(table: string, work: () => Promise<T>): Pr
 };
 
 describe("what a group act refuses before it reads anything", () => {
-  it("refuses a group id of no known form to every verb that names one", async () => {
+  it("refuses a malformed group id to every verb naming one", async () => {
     const workspace = await provisioned("Shapeless");
     const person = await seedMemberAt(workspace, "Viewer");
     const verbs = namingAGroup(everyVerb("' OR true --", person));
@@ -403,7 +413,7 @@ describe("what a group act refuses before it reads anything", () => {
     expect(await groupRowCount(workspace.workspaceId)).toBe(0);
   });
 
-  it("refuses a person id of no known form to both verbs that name one", async () => {
+  it("refuses a malformed person id to both verbs naming one", async () => {
     const { workspace, groupId } = await oneGroupOnePerson("Nameless");
     const verbs = namingAPerson(everyVerb(groupId, "' OR true --"));
     const outcomes: VerbOutcome[] = [];
@@ -413,7 +423,7 @@ describe("what a group act refuses before it reads anything", () => {
     expect(outcomes).toEqual(refusedAlike(verbs, "malformed"));
   });
 
-  it("refuses a rename to a name that is blank once trimmed, and renames nothing", async () => {
+  it("refuses a rename to a blank name, renaming nothing", async () => {
     const { workspace, groupId } = await oneGroupOnePerson("Blank");
 
     const renamed = await asAdmin(workspace, (principal, tx) =>
@@ -429,7 +439,7 @@ describe("what a group act refuses before it reads anything", () => {
 });
 
 describe("an act whose statement the store refuses", () => {
-  it("hands the caller the store's own failure from every verb, and writes nothing", async () => {
+  it("hands back the store's failure from every verb, writing nothing", async () => {
     const { workspace, person, groupId } = await oneGroupOnePerson("Failing");
     const verbs = everyVerb(groupId, person);
     const outcomes: VerbOutcome[] = [];
@@ -446,7 +456,7 @@ describe("an act whose statement the store refuses", () => {
     ]);
   });
 
-  it("hands the caller the store's own failure rather than a membership it never wrote", async () => {
+  it("answers the store's failure, not a membership it never wrote", async () => {
     const workspace = await provisioned("Unwritten");
     const person = await seedMemberAt(workspace, "Viewer");
     const groupId = await madeGroup(workspace, "HR team");
@@ -467,7 +477,7 @@ describe("an act whose statement the store refuses", () => {
     });
   });
 
-  it("hands the caller the store's own failure rather than a word for a statement that changed nothing", async () => {
+  it("answers the store's failure, not a refusal word", async () => {
     const { workspace, person } = await oneGroupOnePerson("Wordless");
     let removed: unknown;
 
@@ -485,7 +495,7 @@ describe("an act whose statement the store refuses", () => {
 
 describe("a role that may not shape who sees what", () => {
   it.each(["Editor", "Viewer"] as const)(
-    "refuses a %s the question of which groups the workspace holds, before the table is read, and answers it to the Admin",
+    "refuses a %s the held-groups check, but answers the Admin",
     async (role) => {
       const { workspace, person, groupId } = await oneGroupOnePerson(`Asking${role}`, role);
       const asked = boundarySchemas.group.select.shape.id.parse(groupId);
@@ -503,26 +513,17 @@ describe("a role that may not shape who sees what", () => {
   );
 
   it.each(["Editor", "Viewer"] as const)(
-    "refuses every verb to a %s, with the one word, even from inside the group",
+    "refuses every verb to a %s inside the group",
     async (role) => {
       const { workspace, person, groupId } = await oneGroupOnePerson(`Refused${role}`, role);
 
-      const outcomes = await asPerson(workspace, person, async (principal, tx) => {
-        const refused: { verb: string; outcome: unknown }[] = [];
-        for (const verb of everyVerb(groupId, person)) {
-          refused.push({ verb: verb.name, outcome: await verb.run(principal, tx) });
-        }
-        return refused;
-      });
+      const outcomes = await asPerson(workspace, person, (principal, tx) =>
+        outcomesOf(everyVerb(groupId, person), principal, tx),
+      );
 
       expect(outcomes.ok).toBe(true);
       if (!outcomes.ok) return;
-      expect(outcomes.value).toEqual(
-        everyVerb(groupId, person).map((verb) => ({
-          verb: verb.name,
-          outcome: { ok: false, error: "role-forbids" },
-        })),
-      );
+      expect(outcomes.value).toEqual(refusedAlike(everyVerb(groupId, person), "role-forbids"));
 
       expect((await peopleActs(workspace.workspaceId)).map((event) => event.act)).toEqual([
         "people.group.created",
@@ -533,26 +534,19 @@ describe("a role that may not shape who sees what", () => {
 });
 
 describe("an Admin of another workspace", () => {
-  it("reaches no verb of this workspace's groups, and sees none of them in its own list", async () => {
+  it("reaches and lists none of this workspace's groups", async () => {
     const { workspace: ours, person: ourPerson, groupId } = await oneGroupOnePerson("Ours");
     const theirs = await provisioned("Theirs");
 
-    const naming = everyVerb(groupId, ourPerson).filter(
-      (verb) => verb.name !== "make" && verb.name !== "list",
-    );
+    const naming = namingAGroup(everyVerb(groupId, ourPerson));
     const outcomes = answered(
-      await asAdmin(theirs, async (principal, tx) => {
-        const attempted: { verb: string; outcome: unknown }[] = [];
-        for (const verb of naming) {
-          attempted.push({ verb: verb.name, outcome: await verb.run(principal, tx) });
-        }
-        return { attempted, listed: await listGroups(principal, tx) };
-      }),
+      await asAdmin(theirs, async (principal, tx) => ({
+        attempted: await outcomesOf(naming, principal, tx),
+        listed: await listGroups(principal, tx),
+      })),
     );
 
-    expect(outcomes.attempted).toEqual(
-      naming.map((verb) => ({ verb: verb.name, outcome: { ok: false, error: "no-such-group" } })),
-    );
+    expect(outcomes.attempted).toEqual(refusedAlike(naming, "no-such-group"));
     expect(outcomes.listed).toEqual({ ok: true, value: [] });
 
     expect(await asAdmin(ours, listGroups)).toEqual({
@@ -563,7 +557,7 @@ describe("an Admin of another workspace", () => {
     expect(await peopleActs(theirs.workspaceId)).toEqual([]);
   });
 
-  it("may make a group of its own under a name another workspace already holds", async () => {
+  it("makes its own group under a name another workspace holds", async () => {
     const ours = await provisioned("Named");
     const theirs = await provisioned("AlsoNamed");
     await madeGroup(ours, "HR team");

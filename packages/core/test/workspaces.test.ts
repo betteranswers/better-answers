@@ -38,6 +38,8 @@ import { addressOf, postgresForSuite, readingAs, whileWritesAreRefused } from ".
 
 const db = postgresForSuite();
 
+const ULID_SHAPE = /^[0-9A-HJKMNP-TV-Z]{26}$/;
+
 const seedUser = (): Promise<string> => seedPerson(db().pool);
 
 const partitionExists = async (workspaceId: string): Promise<boolean> => {
@@ -66,7 +68,7 @@ const tokenState = async (
 };
 
 describe("provisioning a workspace", () => {
-  it("creates the workspace, its chunk partition, its first Admin and its config row in one act", async () => {
+  it("creates the workspace with partition, first Admin and config row", async () => {
     const adminUserId = await seedUser();
     const door = openPostgres(db().runtimePool);
     const id = ulid();
@@ -109,7 +111,7 @@ describe("provisioning a workspace", () => {
     expect(written.rows).toEqual([{ key: "mcp.tools_list_ttl_ms" }]);
   });
 
-  it("writes the first act on the ledger beside the rows it describes — the platform's, in the workspace it created", async () => {
+  it("writes the platform's provisioning act beside the rows it describes", async () => {
     const adminUserId = await seedUser();
     const door = openPostgres(db().runtimePool);
     const id = ulid();
@@ -138,7 +140,7 @@ describe("provisioning a workspace", () => {
 
     expect(events.rows).toEqual([
       {
-        id: expect.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/),
+        id: expect.stringMatching(ULID_SHAPE),
         act: "platform.workspace.provisioned",
         family: "platform",
         actor: "process:better-answers-bootstrap",
@@ -150,7 +152,7 @@ describe("provisioning a workspace", () => {
     ]);
   });
 
-  it("gives the first Admin's membership an id in the one shape the platform mints, composed from nothing", async () => {
+  it("mints the first Admin's membership id, composed from nothing", async () => {
     const adminUserId = await seedUser();
     const door = openPostgres(db().runtimePool);
     const id = ulid();
@@ -173,7 +175,7 @@ describe("provisioning a workspace", () => {
     expect(memberId).not.toContain(adminUserId);
   });
 
-  it("leaves nothing behind when the admin does not exist — no workspace without its partition", async () => {
+  it("leaves nothing, partition included, when the admin does not exist", async () => {
     const door = openPostgres(db().runtimePool);
     const id = ulid();
 
@@ -198,7 +200,7 @@ describe("provisioning a workspace", () => {
     ["empty", ""],
     ["spaces alone", "   "],
   ])(
-    "refuses no-display-name for an Admin whose display name is %s, and leaves nothing behind",
+    "refuses no-display-name when the Admin's name is %s, leaving nothing",
     async (_case, name) => {
       const adminUserId = await seedPerson(db().pool, { name });
       const door = openPostgres(db().runtimePool);
@@ -289,7 +291,7 @@ describe("provisioning a workspace", () => {
     expect(provisioned).toEqual({ ok: false, error: "malformed" });
   });
 
-  it("hands a caller the store's own failure rather than a refusal it could act on", async () => {
+  it("hands back the store's own failure, not an actionable refusal", async () => {
     const provisioned = await provisionWorkspace(bootstrap, await unreachableDoor(), {
       id: ulid(),
       name: "Unreachable",
@@ -304,7 +306,7 @@ describe("provisioning a workspace", () => {
 });
 
 describe("revoking a person's credentials", () => {
-  it("writes the instant, ends the earlier sessions and revokes the earlier refresh tokens in one act", async () => {
+  it("writes the instant and ends earlier sessions and tokens together", async () => {
     const adminUserId = await seedUser();
     const door = openPostgres(db().runtimePool);
     const id = ulid();
@@ -368,7 +370,7 @@ describe("revoking a person's credentials", () => {
     expect(kept.rows[0]?.credentials_revoked_at).toEqual(at);
   });
 
-  it("refuses a person who does not exist and leaves nothing behind", async () => {
+  it("refuses a person who does not exist, leaving nothing", async () => {
     const door = openPostgres(db().runtimePool);
     const revoked = await revokeCredentials(bootstrap, door, {
       userId: "user-missing",
@@ -396,7 +398,7 @@ describe("revoking a person's credentials", () => {
 });
 
 describe("reading the current membership", () => {
-  it("answers the workspace the Principal names, the person it names, and the role it carries", async () => {
+  it("answers the Principal's workspace, person and role", async () => {
     const here = await provisionedWorkspace(db(), "Acme", {
       name: "Priya Shah",
       email: "priya@example.invalid",
@@ -434,7 +436,7 @@ describe("reading the current membership", () => {
     });
   });
 
-  it("refuses a session pointing at a workspace or a person whose row is gone", async () => {
+  it("refuses a session whose workspace or person row is gone", async () => {
     const { door, workspaceId, adminUserId } = await provisionedWorkspace(db(), "Stale");
 
     const gone = ulid();
@@ -451,7 +453,7 @@ describe("reading the current membership", () => {
     });
   });
 
-  it("reads the role off the Principal rather than the member row, which the resolver already held", async () => {
+  it("reads the role off the Principal, not the member row", async () => {
     const { door, workspaceId } = await provisionedWorkspace(db(), "Trusted");
     const stranger = await seedPerson(db().pool, {
       name: "Sam Okoro",
@@ -472,7 +474,7 @@ describe("reading the current membership", () => {
     });
   });
 
-  it("hands a caller a store failure to read, and the aborted transaction never commits", async () => {
+  it("hands back a store failure, and the transaction never commits", async () => {
     const adminUserId = await seedUser();
     const door = openPostgres(db().runtimePool);
     const id = ulid();
@@ -497,7 +499,7 @@ describe("reading the current membership", () => {
     expect(read).toMatchObject({ ok: false, error: expect.any(Error) });
   });
 
-  it("reads a failure of the person's row as the store's, never as a person who is not there", async () => {
+  it("answers a locked person's row as a failure, not person-gone", async () => {
     const { door, workspaceId, adminUserId } = await provisionedWorkspace(db(), "Held");
     const holder = await db().pool.connect();
     let read: Awaited<ReturnType<typeof readMembership>> | undefined;
@@ -595,7 +597,7 @@ describe("revoking a person's tokens in one workspace", () => {
     return rows.rows.map((row) => seeded.grants.get(row.id) ?? row.id).toSorted();
   };
 
-  it("ends the refresh and access tokens consented to this workspace before the instant, and no others", async () => {
+  it("ends only this workspace's tokens from before the instant", async () => {
     const seeded = await seedTwoWorkspaces();
 
     const ended = await endTokens({ workspaceId: seeded.here, userId: seeded.userId, at });
@@ -613,7 +615,7 @@ describe("revoking a person's tokens in one workspace", () => {
     expect(await endedGrants(seeded)).toEqual(["access here-old", "refresh here-old"]);
   });
 
-  it("cannot reach the other workspace's tokens even when the instant is now", async () => {
+  it("never reaches another workspace's tokens, even with a later instant", async () => {
     const seeded = await seedTwoWorkspaces();
 
     const ended = await endTokens({
@@ -632,7 +634,7 @@ describe("revoking a person's tokens in one workspace", () => {
     ]);
   });
 
-  it("refuses a workspace id or a person id that is not one, and ends nothing", async () => {
+  it("refuses a malformed workspace or person id, ending nothing", async () => {
     const seeded = await seedTwoWorkspaces();
 
     const malformed = await endTokens({
@@ -647,7 +649,7 @@ describe("revoking a person's tokens in one workspace", () => {
 });
 
 describe("the workspaces a person holds", () => {
-  it("answers that person's workspace ids in id order, and nothing about anybody else", async () => {
+  it("answers only that person's workspace ids, in id order", async () => {
     const door = openPostgres(db().runtimePool);
     const person = await seedUser();
     const colleague = await seedUser();
@@ -681,7 +683,7 @@ describe("the workspaces a person holds", () => {
     });
   });
 
-  it("answers an empty list for a person who holds none, rather than a refusal to handle", async () => {
+  it("answers an empty list for a person who holds none", async () => {
     const door = openPostgres(db().runtimePool);
 
     expect(await workspacesHeldBy(bootstrap, door, await seedUser())).toEqual({
@@ -690,7 +692,7 @@ describe("the workspaces a person holds", () => {
     });
   });
 
-  it("refuses an id that is not a person id, so no argument of another shape reaches the statement", async () => {
+  it("refuses a malformed person id before the statement", async () => {
     const door = openPostgres(db().runtimePool);
 
     expect(await workspacesHeldBy(bootstrap, door, "' OR true --")).toEqual({
@@ -703,7 +705,7 @@ describe("the workspaces a person holds", () => {
 describe("what the slice answers when the store cannot be reached", () => {
   const at = new Date("2026-09-05T12:00:00Z");
 
-  it("hands back the store's Error from every act, rather than a word or a partial answer", async () => {
+  it("answers the store's Error from every act, never a word", async () => {
     const door = await unreachableDoor();
     const userId = ulid();
     const answers: readonly (readonly [string, unknown])[] = [
@@ -756,7 +758,7 @@ describe("what the slice answers when the store cannot be reached", () => {
     });
   });
 
-  it("refuses an argument the boundary will not accept before it reaches for a statement", async () => {
+  it("refuses what the boundary will not accept before any statement", async () => {
     const door = await unreachableDoor();
 
     expect(await revokeCredentials(bootstrap, door, { userId: "not-a-ulid", at })).toEqual({
@@ -793,9 +795,7 @@ describe("what the slice answers when the store cannot be reached", () => {
   });
 });
 
-const ULID_SHAPE = /^[0-9A-HJKMNP-TV-Z]{26}$/;
-
-describe("adding a member — the platform's act for a person who has signed in", () => {
+describe("adding a signed-in person as a member, the platform's act", () => {
   const membershipsOf = async (workspaceId: string, userId: string) => {
     const found = await db().pool.query<{ id: string; role: string }>(
       "SELECT id, role FROM member WHERE workspace_id = $1 AND user_id = $2",
@@ -826,7 +826,7 @@ describe("adding a member — the platform's act for a person who has signed in"
   };
 
   it.each(["Admin", "Editor", "Viewer"] as const)(
-    "makes a signed-in person a %s of the workspace by their email, however cased, with a membership id minted from nothing, and the resolver reads that role back",
+    "makes a signed-in person a %s by email, however cased",
     async (role) => {
       const { door, workspaceId } = await provisionedWorkspace(db(), "Joined");
       const { email, userId } = await signedIn();
@@ -854,7 +854,7 @@ describe("adding a member — the platform's act for a person who has signed in"
     },
   );
 
-  it("writes one people.member.added row in the workspace's own ledger — the platform's actor, the person as its subject, the person id and the role word in the detail and no third field", async () => {
+  it("writes one people.member.added row to the workspace's own ledger", async () => {
     const { door, workspaceId } = await provisionedWorkspace(db(), "Ledgered");
     const { email, userId } = await signedIn();
 
@@ -886,7 +886,7 @@ describe("adding a member — the platform's act for a person who has signed in"
     expect(await membershipsOf(workspaceId, userId)).toEqual([]);
   });
 
-  it("refuses a workspace that is not there, a person who has not signed in, and a person the workspace already holds — writing nothing", async () => {
+  it("refuses a missing workspace, an unknown person, an existing member", async () => {
     const admin = { name: "Priya Shah", email: addressOf("priya") };
     const { door, workspaceId, adminUserId } = await provisionedWorkspace(db(), "Refusing", admin);
     const { email } = await signedIn();
@@ -913,7 +913,7 @@ describe("adding a member — the platform's act for a person who has signed in"
     ["empty", ""],
     ["spaces alone", "   "],
   ])(
-    "refuses no-display-name for a signed-in person whose display name is %s, writing nothing",
+    "refuses no-display-name when the person's name is %s, writing nothing",
     async (_case, name) => {
       const { door, workspaceId } = await provisionedWorkspace(db(), "Unnamed");
       const email = addressOf("unnamed");
@@ -927,7 +927,7 @@ describe("adding a member — the platform's act for a person who has signed in"
     },
   );
 
-  it("refuses a repeat rather than changing the role, which is the Admin's act", async () => {
+  it("refuses a repeat add rather than changing the role", async () => {
     const { door, workspaceId } = await provisionedWorkspace(db(), "Repeated");
     const { email, userId } = await signedIn();
     const first = await addMember(bootstrap, door, { workspaceId, email, role: "Editor" });
@@ -1001,7 +1001,7 @@ describe("renaming a workspace — the platform's act", () => {
     ]);
   });
 
-  it("keeps the field left out, recording only the other as changed", async () => {
+  it("keeps an omitted field, recording only the other as changed", async () => {
     const named = await provisionedWorkspace(db(), "Named");
     const slugged = await provisionedWorkspace(db(), "Slugged");
     const newSlug = `moved-${slugged.workspaceId.toLowerCase()}`;
@@ -1077,7 +1077,7 @@ describe("renaming a workspace — the platform's act", () => {
 });
 
 describe("the person behind an email", () => {
-  it("answers the person id for the email however it is cased, and nothing for an email nobody has signed in with", async () => {
+  it("answers the id for an email however cased, or nothing", async () => {
     const door = openPostgres(db().runtimePool);
     const email = addressOf("casey");
     const userId = await seedPerson(db().pool, { email });

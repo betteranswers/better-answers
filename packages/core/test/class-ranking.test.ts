@@ -17,8 +17,8 @@ const THE_RANKING = [
   { one: "Public", other: "Public", narrower: "Public" },
 ] as const;
 
-describe("the rank an act refuses a widening by, and the database's one statement of it", () => {
-  it("both answer the narrower class the ranking names, for every pair and in both orders", async () => {
+describe("the class ranking, in the TypeScript tier and the database", () => {
+  it("both answer the ranking's narrower class for every ordered pair", async () => {
     const answered = await db().runtimePool.query<{ narrower: string }>(
       `SELECT narrower_class(pair.a, pair.b) AS narrower
          FROM unnest($1::text[], $2::text[]) WITH ORDINALITY AS pair(a, b, at)

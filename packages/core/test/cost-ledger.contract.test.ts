@@ -41,14 +41,14 @@ const WORDS_A_PROMPT_OR_A_COMPLETION_SITS_UNDER = [
   "body",
 ];
 
-describe("cost-ledger, the golden rows the ledger of model calls will be written in", () => {
-  it("gives every row every column the ledger's row is fixed to, and no column besides", () => {
+describe("cost-ledger, golden rows for the ledger of model calls", () => {
+  it("gives every row exactly the columns the ledger fixes", () => {
     expect(fixture.rows.map((row) => Object.keys(row).toSorted())).toEqual(
       fixture.rows.map(() => recordedColumns),
     );
   });
 
-  it("records no column a prompt or a completion could sit under", () => {
+  it("records no column a prompt or completion could sit under", () => {
     expect(
       recordedColumns.filter((column) =>
         WORDS_A_PROMPT_OR_A_COMPLETION_SITS_UNDER.some((word) => column.includes(word)),
@@ -56,12 +56,12 @@ describe("cost-ledger, the golden rows the ledger of model calls will be written
     ).toEqual([]);
   });
 
-  it("uses exactly the purposes this tier speaks, so a purpose on either side alone is red", () => {
+  it("uses exactly the purposes this tier and the schema speak", () => {
     expect(purposesTheRowsUse).toEqual([...LLM_PURPOSES].toSorted());
     expect(purposesTheRowsUse).toEqual([...llmPurpose.enumValues].toSorted());
   });
 
-  it("puts a row behind every outcome word it records, and a failure behind at least one", () => {
+  it("puts a row behind every outcome, a failure among them", () => {
     const wordsTheRowsUse = [...new Set(fixture.rows.map((row) => row.outcome))].toSorted();
 
     expect(wordsTheRowsUse).toEqual(recordedOutcomes);
@@ -70,7 +70,7 @@ describe("cost-ledger, the golden rows the ledger of model calls will be written
     ).toBeGreaterThan(0);
   });
 
-  it("names the run or the answer each call served, never both and never neither", () => {
+  it("names exactly one of the run or the answer served", () => {
     expect(
       fixture.rows.map(
         (row) => [row.run_id, row.answer_id].filter((served) => served !== null).length,
