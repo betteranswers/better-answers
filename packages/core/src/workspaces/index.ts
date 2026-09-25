@@ -103,6 +103,10 @@ const credited = (person: NamedPerson | undefined): Credited => {
   return ok(person);
 };
 
+/**
+ * Creates the workspace with its partition, its default config and the admin's membership at
+ * `CREATOR_ROLE`. The admin must already exist and have a display name.
+ */
 export const provisionWorkspace = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -163,6 +167,7 @@ const personByEmail = async (tx: Tx, email: string): Promise<NamedPerson | undef
   return row === undefined ? undefined : personOf(row);
 };
 
+/** Matches the address case-insensitively; undefined when no person holds it. */
 export const personIdByEmail = (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -198,6 +203,7 @@ type MembershipRefusal = WorkspaceRefusal<
   "no-such-workspace" | "no-such-user" | "no-display-name" | "already-a-member"
 >;
 
+/** Finds the person by address, case-insensitively; they must already have a display name. */
 export const addMember = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -254,6 +260,11 @@ export type RevokeCredentialsInput = {
   readonly at: Date;
 };
 
+/**
+ * Ends the person's sessions and OAuth tokens created before the revocation instant, in every
+ * workspace. The instant only moves forward: an `at` before the one held keeps the held one. A
+ * malformed id answers `no-such-user`.
+ */
 export const revokeCredentials = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -299,8 +310,11 @@ export type RevokeWorkspaceTokensInput = {
   readonly at: Date;
 };
 
-// Sessions are deliberately untouched: a browser session belongs to the person, not to one
-// workspace, so ending it would reach another tenant.
+/**
+ * Ends the person's OAuth tokens for this workspace issued before `at`. Sessions are deliberately
+ * untouched: a browser session belongs to the person, not to one workspace, so ending it would
+ * reach another tenant.
+ */
 export const revokeWorkspaceTokens = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -347,6 +361,7 @@ export const revokeWorkspaceTokens = async (
   });
 };
 
+/** In id order; empty, not refused, for an id no person holds. */
 export const workspacesHeldBy = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -386,6 +401,7 @@ export const workspaceIds = async (
   return ok(listed.value);
 };
 
+/** Undefined for a malformed slug, as for one no workspace holds. */
 export const workspaceIdBySlug = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -443,6 +459,10 @@ export const readMembership = async (
   });
 };
 
+/**
+ * Resolves the member by address, case-insensitively, as a credential issued at `at` would be: a
+ * revocation after `at` refuses it.
+ */
 export const principalOfMember = async (
   door: PostgresDoor,
   input: { readonly workspaceId: string; readonly email: string; readonly at: Date },

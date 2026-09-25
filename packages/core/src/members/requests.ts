@@ -37,6 +37,7 @@ const REQUEST_ACTS = declareActs("people", {
   declined: act("people.request.declined", { requesterId: "id" }),
 });
 
+/** The role an approval grants when it names none. */
 export const REQUEST_ROLE_DEFAULT = "Viewer" satisfies Role;
 
 export type Acknowledgement = { readonly acknowledged: true };
@@ -58,6 +59,11 @@ const NEUTRAL_CONSTRAINTS = {
   access_request_requester_id_user_id_fk: "no-such-person",
 } as const;
 
+/**
+ * Acknowledges alike whether a request was written, one already waits, the requester is a member
+ * or unknown, or no workspace has the slug, so the answer reveals none of these. Only a malformed
+ * requester or reason is refused.
+ */
 export const requestAccess = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -186,6 +192,11 @@ export type Approved = {
   readonly role: Role;
 };
 
+/**
+ * Mints an invitation to the requester's address at `role`, or `REQUEST_ROLE_DEFAULT`, expiring
+ * `INVITATION_EXPIRY_SECONDS` after `now`. The request row is locked, so of two decisions at once
+ * the second answers `already-decided`.
+ */
 export const approveRequest = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -272,6 +283,7 @@ export type WaitingRequest = {
   readonly askedAt: Date;
 };
 
+/** Oldest first. */
 export const listWaitingRequests = async (
   principal: UserPrincipal,
   tx: Tx,
