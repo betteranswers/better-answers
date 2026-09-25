@@ -28,6 +28,7 @@ describe("what a procedure may answer the wire", () => {
   it("reaches every router procedure by the path its caller names", () => {
     expect(Object.keys(appRouter._def.procedures).sort()).toEqual([
       "console.workspaces.list",
+      "members.list",
       "person.requestAccess",
       "person.setDisplayName",
       "routes.list",
@@ -49,6 +50,7 @@ describe("what a procedure may answer the wire", () => {
       | "person.setDisplayName"
       | "person.requestAccess"
       | "console.workspaces.list"
+      | "members.list"
       | "routes.list"
       | "sources.list"
       | "sources.bind"
