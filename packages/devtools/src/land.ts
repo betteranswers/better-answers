@@ -1,29 +1,27 @@
 import { spawnSync } from "node:child_process";
+import path from "node:path";
 
 import { z } from "zod";
 
 import { flagValues } from "./flags.ts";
 
 const USAGE =
-  'usage: land --message "<a sentence saying what changed, a ticket id last in brackets>"';
+  'usage: land --message "<type>(<scope>): <summary>", then a blank line, the body and a "Refs: T-nnn" footer';
 
-const MINIMUM_WORDS = 8;
 const SLUG_WORDS = 5;
-
-// Held twice, here and by lefthook's commit-msg hook, which every commit passes through.
-// packages/devtools/test/land.test.ts holds the two to one number.
-const SUBJECT_CEILING = 72;
 const BASE = "main";
+
+/** This checkout's config and binary, whichever tree the command lands from. */
+const REPOSITORY = path.resolve(import.meta.dirname, "../../..");
+const COMMITLINT = path.join(REPOSITORY, "node_modules", ".bin", "commitlint");
 
 // The repository tracks content of its own under these — hooks, agents, two skills — so only
 // what git has never seen is a session's.
 const KEPT_BY_THE_SESSION = [".claude/", ".scratch/"];
 const UNTRACKED = "??";
 
-const CONVENTIONAL_LABEL = /^[a-z]+(\([^)]*\))?!?:/;
-const TICKET_ANYWHERE = /\bT-\d+\b/;
-const TICKET_AT_THE_END = /\s\[(T-\d+)\]$/;
-const LEADING_ARTICLE = /^(the|a|an)$/i;
+const REFS_FOOTER = /^Refs: (T-\d+)\b/m;
+const TYPE_AND_SCOPE = /^[^:]*:/;
 
 const PULL_REQUEST_ADDRESS = /(https:\/\/\S*?\/pull\/(\d+))/g;
 
@@ -46,38 +44,36 @@ const complain = (line: string): void => {
 
 const commitsWord = (count: string): string => (count === "1" ? "1 commit" : `${count} commits`);
 
-const wordsOf = (subject: string): readonly string[] =>
-  subject.split(/\s+/).filter((word) => word.length > 0);
-
-const proseRefusal = (subject: string): string | undefined => {
-  if (CONVENTIONAL_LABEL.test(subject)) {
-    return `the message opens with a Conventional Commits label; this repository writes a sentence saying what changed — ${USAGE}`;
+const commitlintRefusal = (message: string): number | undefined => {
+  const ran = spawnSync(COMMITLINT, [], { cwd: REPOSITORY, input: message, encoding: "utf8" });
+  if (ran.error !== undefined) {
+    complain(
+      `commitlint could not run from ${COMMITLINT}: ${ran.error.message}; pnpm install puts it there`,
+    );
+    return 1;
   }
-  const words = wordsOf(subject);
-  if (words.length < MINIMUM_WORDS) {
-    return `the message is ${String(words.length)} words; a sentence saying what changed runs to at least eight`;
+  const said = `${ran.stdout}${ran.stderr}`;
+  if (ran.status === 0) {
+    process.stdout.write(said);
+    return undefined;
   }
-  if (subject.length > SUBJECT_CEILING) {
-    return `the subject is ${String(subject.length)} characters and this repository's ceiling is ${String(SUBJECT_CEILING)}; say what is now true in one clause, and put the paragraph in the body after a blank line`;
-  }
-  if (TICKET_ANYWHERE.test(subject) && !TICKET_AT_THE_END.test(subject)) {
-    return "the message names a ticket somewhere other than its end; a ticket id goes last, in brackets, so the merge commit and the branch can both be read off it";
-  }
-  return undefined;
+  complain(`commitlint refused the message:\n${said}`);
+  return 2;
 };
 
-const branchFor = (subject: string): string => {
-  const ticket = TICKET_AT_THE_END.exec(subject)?.[1];
-  const words = wordsOf(subject.replace(TICKET_AT_THE_END, ""));
-  const first = words[0];
-  const named = first !== undefined && LEADING_ARTICLE.test(first) ? words.slice(1) : words;
-  const slug = named
+const branchFor = (message: string): string => {
+  const [subject = "", ...body] = message.split("\n");
+  const ticket = REFS_FOOTER.exec(body.join("\n"))?.[1]?.toLowerCase() ?? "";
+  const slug = subject
+    .replace(TYPE_AND_SCOPE, "")
+    .split(/\s+/)
+    .filter((word) => word.length > 0)
     .slice(0, SLUG_WORDS)
     .join("-")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return ticket === undefined ? slug : `${ticket.toLowerCase()}-${slug}`;
+    .replace(/^-|-$/g, "");
+  return [ticket, slug].filter((part) => part.length > 0).join("-");
 };
 
 type Ran = { readonly status: number | null; readonly out: string; readonly err: string };
@@ -188,38 +184,46 @@ const queueStateIn = (output: string): QueueState | undefined => {
   }
 };
 
-export const land = (argv: readonly string[]): number => {
+type Landing = { readonly message: string; readonly branch: string };
+
+const landingFrom = (argv: readonly string[]): Landing | number => {
   const message = flagValues(argv)?.get("message");
   if (message === undefined) {
     complain(USAGE);
     return 2;
   }
-  const subject = message.split("\n")[0] ?? "";
-  const refused = proseRefusal(subject);
-  if (refused !== undefined) {
-    complain(refused);
-    return 2;
-  }
-  const branch = branchFor(subject);
+  const refused = commitlintRefusal(message);
+  if (refused !== undefined) return refused;
+  const branch = branchFor(message);
   if (branch.length === 0) {
     complain("the message carries no word a branch could be named from");
     return 2;
   }
+  return { message, branch };
+};
 
-  // Fetched here rather than beside the switch: what HEAD carries is measured against
-  // origin's head, which no branch name could stand in for.
+/**
+ * Fetches origin's head for the whole run: HEAD is measured against it here, and the later
+ * switch cuts the branch from it.
+ */
+const headRefusal = (): number | undefined => {
   if (runOrComplain("git", ["fetch", "origin", BASE]) === undefined) return 1;
-  if (run("git", ["merge-base", "--is-ancestor", "HEAD", "FETCH_HEAD"]).status !== 0) {
-    const counted = runOrComplain("git", ["rev-list", "--count", "FETCH_HEAD..HEAD"]);
-    if (counted === undefined) return 1;
-    complain(
-      `HEAD carries ${commitsWord(counted.out.trim())} that origin/${BASE} has not; land takes an uncommitted change, so the branch it makes carries this change and nothing else`,
-    );
-    return 2;
+  if (run("git", ["merge-base", "--is-ancestor", "HEAD", "FETCH_HEAD"]).status === 0) {
+    return undefined;
   }
+  const counted = runOrComplain("git", ["rev-list", "--count", "FETCH_HEAD..HEAD"]);
+  if (counted === undefined) return 1;
+  complain(
+    `HEAD carries ${commitsWord(counted.out.trim())} that origin/${BASE} has not; land takes an uncommitted change, so the branch it makes carries this change and nothing else`,
+  );
+  return 2;
+};
 
-  // The default collapses a new directory to one line, and a path this never sees is one it
-  // can neither show nor keep out.
+const treeRefusal = (branch: string): number | undefined => {
+  /**
+   * The default collapses a new directory to one line, and a path this never sees is one it
+   * can neither show nor keep out.
+   */
   const working = runOrComplain("git", ["status", "--porcelain", "--untracked-files=all"]);
   if (working === undefined) return 1;
   const changes = changesIn(working.out);
@@ -238,7 +242,10 @@ export const land = (argv: readonly string[]): number => {
   }
   say(`landing ${String(changes.length)} paths on a branch named ${branch}:`);
   for (const one of changes) say(`  ${one.path}`);
+  return undefined;
+};
 
+const branchRefusal = (branch: string): number | undefined => {
   if (run("git", ["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`]).status === 0) {
     complain(`branch ${branch} already stands here; delete it, or say it in other words`);
     return 2;
@@ -260,13 +267,14 @@ export const land = (argv: readonly string[]): number => {
     return 1;
   }
   const already = numbers.open[0];
-  if (already !== undefined) {
-    complain(
-      `branch ${branch} already has an open pull request (#${String(already)}); land that one or close it first`,
-    );
-    return 2;
-  }
+  if (already === undefined) return undefined;
+  complain(
+    `branch ${branch} already has an open pull request (#${String(already)}); land that one or close it first`,
+  );
+  return 2;
+};
 
+const commitFailure = ({ message, branch }: Landing): number | undefined => {
   const switched = run("git", ["switch", "-c", branch, "FETCH_HEAD"]);
   if (switched.status !== 0) {
     complain(
@@ -279,22 +287,11 @@ export const land = (argv: readonly string[]): number => {
     ["git", "commit", "-m", message],
     ["git", "push", "-u", "origin", branch],
   ]);
-  if (!went) return 1;
+  return went ? undefined : 1;
+};
 
-  const created = runOrComplain("gh", ["pr", "create", "--fill"]);
-  if (created === undefined) return 1;
-  const pull = addressIn(created.out);
-  if (pull === undefined) {
-    complain(`gh pr create printed no pull request address:\n${created.out}`);
-    return 1;
-  }
+const queueReadBack = (pull: PullRequest): number => {
   const arming = `gh pr merge ${String(pull.number)} --auto --merge`;
-  if (
-    runOrComplain("gh", ["pr", "merge", "--auto", "--merge", String(pull.number)]) === undefined
-  ) {
-    return 1;
-  }
-
   const read = run("gh", [
     "api",
     "graphql",
@@ -331,4 +328,32 @@ export const land = (argv: readonly string[]): number => {
     return 1;
   }
   return 0;
+};
+
+const openAndArm = (): number => {
+  const created = runOrComplain("gh", ["pr", "create", "--fill"]);
+  if (created === undefined) return 1;
+  const pull = addressIn(created.out);
+  if (pull === undefined) {
+    complain(`gh pr create printed no pull request address:\n${created.out}`);
+    return 1;
+  }
+  if (
+    runOrComplain("gh", ["pr", "merge", "--auto", "--merge", String(pull.number)]) === undefined
+  ) {
+    return 1;
+  }
+  return queueReadBack(pull);
+};
+
+export const land = (argv: readonly string[]): number => {
+  const landing = landingFrom(argv);
+  if (typeof landing === "number") return landing;
+  return (
+    headRefusal() ??
+    treeRefusal(landing.branch) ??
+    branchRefusal(landing.branch) ??
+    commitFailure(landing) ??
+    openAndArm()
+  );
 };

@@ -428,7 +428,6 @@
         "packages/core/test/tier-contract.test.ts",
         "packages/devtools/lint-rules/rules/import-direction.ts",
         "packages/devtools/lint-rules/rules/mcp-entry-no-workspace-argument.ts",
-        "packages/devtools/src/land.ts",
         "packages/devtools/src/mutant-probe.ts",
         "packages/devtools/src/throwaway-tree.ts",
         "packages/schema/src/concept-tables.ts",

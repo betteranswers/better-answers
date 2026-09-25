@@ -29,11 +29,15 @@ IDs have 3-digit padding with prefix `T` → `T-001`, `T-002`, …, `T-1000`. Ea
 | -d, --depends-on <id...> | one or more dependency IDs |
 | -s, --status <status> | <todo|doing|done> |
 
+### Titles
+
+A ticket's title takes the commit's form (`docs/agents/workflow.md`, *The commit's form*): `type(scope): summary`, 72 characters at most, the summary imperative and lower-case with no full stop. The title names no ticket id, its own included, and the detail goes in the body. No hook reads a title, so check one before it is written: `printf '%s\n' "<title>" | pnpm exec commitlint`. To retitle a ticket, edit the `title:` line of its frontmatter as a body edit, below.
+
 ### Examples
 
 ```bash
-ordna create "Implement payment flow" -p high -t payments
-ordna create "Write tests" -d T-001              # depends on T-001
+ordna create "feat(api): take a payment through the checkout" -p high -t payments
+ordna create "test(api): cover the checkout's refusals" -d T-001   # depends on T-001
 ordna list -s todo
 ordna move T-001 doing
 ordna show T-001
@@ -62,7 +66,7 @@ ordna show T-004                                             # confirm the edit 
 
 ### When a skill says "publish to the issue tracker"
 
-`ordna create` a task. Give it a `## Goal`, an `## Acceptance Criteria` checklist and `## Notes`. Set `-d` for every task it genuinely depends on; the CLI enforces it later.
+`ordna create` a task, titled as *Titles* above says. Give it a `## Goal`, an `## Acceptance Criteria` checklist and `## Notes`. Set `-d` for every task it genuinely depends on; the CLI enforces it later.
 
 **Body sections:**
 

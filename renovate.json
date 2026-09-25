@@ -1,7 +1,15 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", ":semanticCommitsDisabled", "schedule:weekends"],
+  "extends": [
+    "config:recommended",
+    ":semanticCommits",
+    ":semanticCommitTypeAll(chore)",
+    ":semanticCommitScope(deps)",
+    "schedule:weekends"
+  ],
+  "commitMessageTopic": "{{depName}}",
   "description": [
+    "`commitMessageTopic` drops Renovate's word `dependency`, so the longest scoped package name here still fits the 72-character subject the pull-request title check holds",
     "No digest-pinning preset is extended: `:pinDigests` never existed (its absence rejected this whole file, GitHub issue #1), and `docker:pinDigests` plus `helpers:pinGitHubActionDigests` would only restate the `pinDigests: true` the images and actions `packageRules` below already carry for every enabled manager that has a digest",
     "THE AGE RULE IS pnpm's, READ BACK. pnpm 11 refuses to install a release younger than one day (`ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION`), so a Renovate that proposes the newest version opens a pull request every leg of which dies on `pnpm install --frozen-lockfile` — jsdom@30.1.1, published 22/09/2026 and two hours inside the cutoff, killed pull request #25 whole (run 35775980034). `minimumReleaseAge` here is the same day, so Renovate proposes only what pnpm will accept; `internalChecksFilter: strict` is what makes it a filter rather than a delay, holding a pending version back from the branch instead of opening a pull request that waits for it. It is written once at the top rather than per manager: every manager this repository enables resolves through a lockfile somebody has to install"
   ],
