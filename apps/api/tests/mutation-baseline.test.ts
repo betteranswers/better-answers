@@ -20,11 +20,17 @@ const shardSchema = z.object({
 });
 
 const mutationWorkflowSchema = z.object({
+  on: z.object({
+    workflow_dispatch: z.object({
+      inputs: z.record(z.string(), z.object({ description: z.string(), type: z.string() })),
+    }),
+  }),
   concurrency: z.object({ group: z.string(), "cancel-in-progress": z.boolean() }).optional(),
   permissions: z.record(z.string(), z.string()),
   jobs: z.object({
     stryker: z.object({
       "timeout-minutes": z.union([z.number(), z.string()]),
+      env: z.record(z.string(), z.string()).optional(),
       permissions: z.record(z.string(), z.string()).optional(),
       strategy: z.object({
         "max-parallel": z.number(),
@@ -340,9 +346,9 @@ describe("the nightly mutation run's baseline, kept as the previous run's artifa
     expect(onlyStep(stryker.steps, BASELINE_ACTION, "stryker").with?.["reports"]).toEqual(
       "${{ matrix.path }}/reports/mutation",
     );
-    expect(gather.if).toEqual("always()");
+    expect(gather.if).toEqual("always() && env.SELECTED == 'true'");
     expect(gather.env?.["REPORTS"]).toEqual("${{ matrix.path }}/reports/mutation");
-    expect(upload.if).toEqual("always()");
+    expect(upload.if).toEqual("always() && env.SELECTED == 'true'");
     expect(upload.with?.["overwrite"]).toBe(true);
     expect(
       [...new Set(stryker.strategy.matrix.include.map((shard) => shard.path))].toSorted(),
@@ -423,7 +429,7 @@ describe("each mutation leg, run as shards and summed up once (T-381)", () => {
     }
   });
 
-  it("cuts each leg into slices that are disjoint, none empty, and together exactly the leg's mutate set", () => {
+  it("cuts each leg into slices that are disjoint, none empty, and together exactly the leg's mutate set, a file cut by line in pieces that run from its first line to its last", () => {
     for (const { name, of } of mutationWorkflow().jobs.summary.strategy.matrix.include) {
       const root = legRoots.get(name) ?? "";
       const config = configSchema.parse(CONFIGS.get(root));
@@ -450,11 +456,38 @@ describe("each mutation leg, run as shards and summed up once (T-381)", () => {
         ).toBe(0);
         return run.stdout.split(",");
       });
-      const flat = slices.flat();
+      const parts = slices.flat().map((part) => {
+        const [, file = part, from, to] = /^(.+):(\d+)-(\d+)$/u.exec(part) ?? [];
+        return {
+          file,
+          lines: from === undefined ? undefined : { from: Number(from), to: Number(to) },
+        };
+      });
+      const whole = parts.flatMap(({ file, lines }) => (lines === undefined ? [file] : []));
+      const cut = Map.groupBy(
+        parts.flatMap(({ file, lines }) => (lines === undefined ? [] : [{ file, lines }])),
+        ({ file }) => file,
+      );
 
       expect(slices.every((slice) => slice.length > 0 && slice[0] !== "")).toBe(true);
-      expect(new Set(flat).size, `${name}'s slices share a file`).toBe(flat.length);
-      expect(flat.toSorted()).toEqual(mutateSet(path.join(repositoryRoot, root), config.mutate));
+      expect(new Set(whole).size, `${name}'s slices share a file`).toBe(whole.length);
+      expect([...whole, ...cut.keys()].toSorted()).toEqual(
+        mutateSet(path.join(repositoryRoot, root), config.mutate),
+      );
+      for (const [file, pieces] of cut) {
+        const text = readFileSync(path.join(repositoryRoot, root, file), "utf8");
+        const last = text.trimEnd().split("\n").length;
+        const ranges = pieces
+          .map(({ lines }) => lines)
+          .toSorted((left, right) => left.from - right.from);
+
+        expect(whole, `${file} is both cut and whole`).not.toContain(file);
+        expect(
+          ranges.map(({ from }) => from),
+          `${name}'s pieces of ${file} leave a gap or overlap`,
+        ).toEqual([1, ...ranges.slice(0, -1).map(({ to }) => to + 1)]);
+        expect(ranges.at(-1)?.to).toBe(last);
+      }
     }
   });
 
@@ -501,6 +534,64 @@ describe("each mutation leg, run as shards and summed up once (T-381)", () => {
 
     expect(summary.needs).toEqual("stryker");
     expect(summary.if).toEqual("always()");
+  });
+
+  it("runs, when a dispatch names shards, only those, every step of every other shard skipped so it leaves nothing and the merge keeps its files' previous results", () => {
+    const workflow = mutationWorkflow();
+    const { stryker } = workflow.jobs;
+
+    expect(workflow.on.workflow_dispatch.inputs["shards"]?.type).toEqual("string");
+    expect(stryker.env?.["SELECTED"]).toEqual(
+      "${{ !inputs.shards || contains(format(',{0},', inputs.shards), format(',{0}-{1},', matrix.name, matrix.shard)) }}",
+    );
+    const [check, ...rest] = stryker.steps;
+
+    expect(check?.if).toEqual("inputs.shards");
+    expect(rest.map((step) => step.if?.replace("always() && ", "") ?? "no condition")).toEqual(
+      rest.map(() => "env.SELECTED == 'true'"),
+    );
+  });
+
+  // A shard named wrongly would run nothing, and the run would come back green having tested
+  // nothing.
+  it.each([
+    { shards: "core-1,api-2", leg: "core", of: 16, refused: false },
+    { shards: "api-6", leg: "core", of: 16, refused: false },
+    { shards: "api-6", leg: "api", of: 5, refused: true },
+    { shards: "core-17", leg: "core", of: 16, refused: true },
+    { shards: "core-1, api-2", leg: "core", of: 16, refused: true },
+    { shards: "core4", leg: "core", of: 16, refused: true },
+    { shards: "core-0", leg: "core", of: 16, refused: true },
+    { shards: "web-1", leg: "core", of: 16, refused: true },
+  ])(
+    "reads a dispatch naming $shards in a $leg shard as refused: $refused",
+    ({ shards, leg, of, refused }) => {
+      const [check] = mutationWorkflow().jobs.stryker.steps;
+      const run = spawnSync("bash", ["-c", check?.run ?? "exit 2"], {
+        encoding: "utf8",
+        env: { ...process.env, SHARDS: shards, LEG: leg, OF: String(of) },
+      });
+
+      expect({ refused: run.status !== 0, said: run.stdout.startsWith("::error::") }).toEqual({
+        refused,
+        said: refused,
+      });
+      expect(check?.env).toEqual({
+        SHARDS: "${{ inputs.shards }}",
+        LEG: "${{ matrix.name }}",
+        OF: "${{ matrix.of }}",
+      });
+    },
+  );
+
+  it("knows a shard's leg by the matrix's own names", () => {
+    const { stryker } = mutationWorkflow().jobs;
+    const [check] = stryker.steps;
+    const legs = /\^\(([a-z|]+)\)-/u.exec(check?.run ?? "")?.[1]?.split("|") ?? [];
+
+    expect(legs.toSorted()).toEqual(
+      [...new Set(stryker.strategy.matrix.include.map((shard) => shard.name))].toSorted(),
+    );
   });
 
   it("runs no more shards at once than leave a merge group's legs and a pull request's room", () => {

@@ -31,6 +31,7 @@
     "@better-answers/devtools": "workspace:*",
     "@oxlint/plugins": "1.85.0",
     "@stryker-mutator/core": "10.0.0",
+    "@stryker-mutator/instrumenter": "10.0.0",
     "@stryker-mutator/vitest-runner": "10.0.0",
     "@types/node": "24.13.6",
     "cloc": "2.6.0-cloc",

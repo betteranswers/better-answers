@@ -12,6 +12,9 @@ on:
       ceiling-minutes:
         description: "Minutes before each shard is cancelled, its checkpoint kept; empty is 120, and 350 at most, since a hosted job is terminated at 360"
         type: number
+      shards:
+        description: "The shards to run, as leg-number pairs with commas and no spaces, such as core-1,api-2; empty runs every shard, and a shard not named keeps its files' previous results"
+        type: string
 
 # Overlapping runs would each start from the same checkpoint, and the later upload, however poorer, would win.
 concurrency:
@@ -28,6 +31,9 @@ jobs:
     runs-on: ubuntu-26.04
     # A dispatch hands its inputs over as strings, and the timeout refuses anything but a number.
     timeout-minutes: ${{ fromJSON(inputs.ceiling-minutes || '120') }}
+    # A job's `if` cannot read the matrix, so a shard a dispatch did not name skips every step.
+    env:
+      SELECTED: ${{ !inputs.shards || contains(format(',{0},', inputs.shards), format(',{0}-{1},', matrix.name, matrix.shard)) }}
     strategy:
       fail-fast: false
       # The plan runs 20 jobs at once; 8 stay free for a merge group's four legs, a pull request's three and a lane job.
@@ -56,28 +62,56 @@ jobs:
           - { name: core, path: packages/core, shard: 15, of: 16 }
           - { name: core, path: packages/core, shard: 16, of: 16 }
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      # A shard named wrongly would run nothing, and the run would come back green having tested nothing.
+      - name: the shards the dispatch names
+        if: inputs.shards
+        env:
+          SHARDS: ${{ inputs.shards }}
+          LEG: ${{ matrix.name }}
+          OF: ${{ matrix.of }}
+        run: |
+          IFS=, read -ra named <<<"${SHARDS}"
+          for shard in "${named[@]}"; do
+            if [[ ! "${shard}" =~ ^(api|core)-([1-9][0-9]*)$ ]]; then
+              echo "::error::${shard} names no shard: a leg, a hyphen and a number, with commas and no spaces between, as core-1,api-2"
+              exit 1
+            fi
+            if [[ "${BASH_REMATCH[1]}" == "${LEG}" && "${BASH_REMATCH[2]}" -gt "${OF}" ]]; then
+              echo "::error::${shard} is past the ${OF} shards of ${LEG}"
+              exit 1
+            fi
+          done
+      - if: env.SELECTED == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - if: env.SELECTED == 'true'
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - if: env.SELECTED == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
           cache: pnpm
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - if: env.SELECTED == 'true'
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           version-file: apps/worker/.tool-versions
           enable-cache: true
-      - run: pnpm install --frozen-lockfile
-      - run: uv sync --frozen
+      - if: env.SELECTED == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: env.SELECTED == 'true'
+        run: uv sync --frozen
         working-directory: apps/worker
-      - uses: ./.github/actions/git-filter-repo
+      - if: env.SELECTED == 'true'
+        uses: ./.github/actions/git-filter-repo
       # The whole leg's results, not this shard's: a file the slicing moves to another shard keeps them.
       - name: the previous run's mutant results
+        if: env.SELECTED == 'true'
         uses: ./.github/actions/mutation-baseline
         with:
           leg: ${{ matrix.name }}
           reports: ${{ matrix.path }}/reports/mutation
       # `exec` leaves one process from the step down, so cancellation reaches Stryker.
       - name: mutation
+        if: env.SELECTED == 'true'
         working-directory: ${{ matrix.path }}
         env:
           LEG: ${{ matrix.name }}
@@ -89,7 +123,7 @@ jobs:
           exec node_modules/.bin/stryker run --mutate "${slice}" ${{ inputs.force && '--force' || '' }}
       # Named for the shard, so the leg's summary gathers every shard into one directory.
       - name: this shard's mutant results, whether or not it finished
-        if: always()
+        if: always() && env.SELECTED == 'true'
         env:
           REPORTS: ${{ matrix.path }}/reports/mutation
           SHARD: ${{ matrix.shard }}
@@ -102,7 +136,7 @@ jobs:
           if [ -f "${REPORTS}/mutation.json" ]; then
             cp "${REPORTS}/mutation.json" "${GATHERED}/${SHARD}.report.json"
           fi
-      - if: always()
+      - if: always() && env.SELECTED == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: stryker-shard-${{ matrix.name }}-${{ matrix.shard }}

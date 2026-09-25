@@ -1,6 +1,7 @@
 import { globSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
+import { Instrumenter } from "@stryker-mutator/instrumenter";
 import { z } from "zod";
 
 import { flagValues } from "./flags.ts";
@@ -13,14 +14,20 @@ const test = z.looseObject({
   location: z.looseObject({ start: position }).optional(),
 });
 
+const place = z.looseObject({ start: position, end: position });
+type Place = z.infer<typeof place>;
+
 const mutant = z.looseObject({
+  mutatorName: z.string().optional(),
+  replacement: z.string().optional(),
   status: z.string(),
   static: z.boolean().optional(),
   coveredBy: z.array(z.string()).optional(),
   killedBy: z.array(z.string()).optional(),
+  location: place.optional(),
 });
 
-const fileResult = z.looseObject({ mutants: z.array(mutant) });
+const fileResult = z.looseObject({ source: z.string().optional(), mutants: z.array(mutant) });
 
 const testFile = z.looseObject({ tests: z.array(test) });
 
@@ -37,6 +44,8 @@ type Mutant = z.infer<typeof mutant>;
 export type Leg = {
   readonly root: string;
   readonly mutate: readonly string[];
+  // No count of shards moves the floor one heavy file sets, so such a file is cut by line.
+  readonly split?: ReadonlyMap<string, number>;
 };
 
 const USAGE = [
@@ -122,8 +131,183 @@ export const shardSlices = (
   return loads.map((load) => load.files.toSorted());
 };
 
-const ownersOf = (slices: readonly (readonly string[])[]): ReadonlyMap<string, number> =>
-  new Map(slices.flatMap((slice, index) => slice.map((file) => [file, index + 1] as const)));
+export type Lines = { readonly from: number; readonly to: number };
+
+type Span = { readonly start: number; readonly end: number; readonly seconds: number };
+
+const never = (): boolean => false;
+const nothing = (): void => undefined;
+
+const SILENT: ConstructorParameters<typeof Instrumenter>[0] = {
+  isTraceEnabled: never,
+  isDebugEnabled: never,
+  isInfoEnabled: never,
+  isWarnEnabled: never,
+  isErrorEnabled: never,
+  isFatalEnabled: never,
+  trace: nothing,
+  debug: nothing,
+  info: nothing,
+  warn: nothing,
+  error: nothing,
+  fatal: nothing,
+};
+
+// A place as Stryker reports it: lines and columns from 1, the end column past the text.
+const textAt = (source: string, { start, end }: Place): string => {
+  const rows = source.split("\n");
+  const offset = ({ line, column }: Place["start"]): number =>
+    sum(rows.slice(0, line - 1).map((text) => text.length + 1)) + column - 1;
+  return source.slice(offset(start), offset(end));
+};
+
+const mutantKey = (
+  mutatorName: string | undefined,
+  replacement: string | undefined,
+  text: string,
+) => JSON.stringify([mutatorName, replacement, text]);
+
+// Known by what it mutates, not where, so a mutant keeps its price when its file moves it. Two
+// alike pair in line order.
+const pricesIn = (entry: FileResult | undefined): ReadonlyMap<string, number[]> => {
+  const prices = new Map<string, number[]>();
+  if (entry?.source === undefined) return prices;
+  const { source } = entry;
+  const placed = entry.mutants.flatMap((found) =>
+    found.location === undefined ? [] : [{ found, location: found.location }],
+  );
+  for (const { found, location } of placed.toSorted(
+    (left, right) => left.location.start.line - right.location.start.line,
+  )) {
+    const key = mutantKey(found.mutatorName, found.replacement, textAt(source, location));
+    prices.set(key, [...(prices.get(key) ?? []), secondsOf(found)]);
+  }
+  return prices;
+};
+
+// Stryker's own instrumenter, with its default options, lists the mutants a run makes. Its
+// lines and columns count from 0.
+const spansIn = async (
+  name: string,
+  content: string,
+  previous: FileResult | undefined,
+): Promise<readonly Span[]> => {
+  const { mutants } = await new Instrumenter(SILENT).instrument([{ name, content, mutate: true }], {
+    plugins: null,
+    excludedMutations: [],
+    ignorers: [],
+  });
+  const prices = pricesIn(previous);
+  return mutants.map((found) => {
+    const { start, end } = found.location;
+    const location = {
+      start: { line: start.line + 1, column: start.column + 1 },
+      end: { line: end.line + 1, column: end.column + 1 },
+    };
+    const key = mutantKey(found.mutatorName, found.replacement, textAt(content, location));
+    return {
+      start: location.start.line,
+      end: location.end.line,
+      seconds: prices.get(key)?.shift() ?? ORDINARY_SECONDS,
+    };
+  });
+};
+
+// Stryker mutates only what a range holds whole, so a mutant across a cut would be in neither
+// piece.
+const cutsBetween = (spans: readonly Span[], lastLine: number): readonly number[] => {
+  // Of the cuts leaving the same mutants either side, the first stands for all.
+  const held = new Set<number>();
+  return Array.from({ length: lastLine - 1 }, (_, index) => index + 1).filter((after) => {
+    if (spans.some((span) => span.start <= after && after < span.end)) return false;
+    const before = spans.filter((span) => span.start <= after).length;
+    if (before === 0 || before === spans.length || held.has(before)) return false;
+    held.add(before);
+    return true;
+  });
+};
+
+const costBefore = (spans: readonly Span[], after: number): number =>
+  sum(spans.filter((span) => span.start <= after).map((span) => span.seconds));
+
+// Nearest its share, but never so late that a later piece is left without a cut.
+const chosenCuts = (spans: readonly Span[], cuts: readonly number[], count: number) => {
+  const total = sum(spans.map((span) => span.seconds));
+  const chosen: number[] = [];
+  for (let piece = 1; piece < count; piece += 1) {
+    const share = (total * piece) / count;
+    const open = cuts.filter(
+      (after, index) => after > (chosen.at(-1) ?? 0) && cuts.length - index >= count - piece,
+    );
+    const distance = (after: number): number => Math.abs(costBefore(spans, after) - share);
+    chosen.push(open.reduce((best, after) => (distance(after) < distance(best) ? after : best)));
+  }
+  return chosen;
+};
+
+// Line ranges as `stryker run --mutate` takes them, covering the file end to end.
+export const piecesOf = async (
+  root: string,
+  file: string,
+  count: number,
+  previous: Results | undefined,
+): Promise<readonly Lines[]> => {
+  const name = path.join(root, file);
+  const content = readFileSync(name, "utf8");
+  const lastLine = content.replace(/\n$/u, "").split("\n").length;
+  const spans = await spansIn(name, content, previous?.files[file]);
+  const safe = cutsBetween(spans, lastLine);
+  if (safe.length < count - 1) {
+    throw new Error(
+      `${file} cannot be cut into ${String(count)} pieces: its mutants leave room for ${String(safe.length + 1)} at most`,
+    );
+  }
+  const cuts = chosenCuts(spans, safe, count);
+  return [0, ...cuts].map((after, index) => ({ from: after + 1, to: cuts[index] ?? lastLine }));
+};
+
+type Part = { readonly file: string; readonly lines?: Lines | undefined };
+
+const partName = ({ file, lines }: Part): string =>
+  lines === undefined ? file : `${file}:${String(lines.from)}-${String(lines.to)}`;
+
+// A shard apiece for the pieces, so cutting a file that had a shard to itself leaves the others'
+// slices as they were.
+const legSlices = async (
+  name: string,
+  { root, mutate, split = new Map<string, number>() }: Leg,
+  of: number,
+  baseline: Results | undefined,
+): Promise<readonly (readonly Part[])[]> => {
+  const files = mutateSet(root, mutate);
+  const pieces: Part[][] = [];
+  for (const [file, count] of split) {
+    if (!files.includes(file)) {
+      throw new Error(`${file} is named to be cut, but the ${name} leg does not mutate it`);
+    }
+    for (const lines of await piecesOf(root, file, count, baseline)) pieces.push([{ file, lines }]);
+  }
+  const rest = files.filter((file) => !split.has(file));
+  if (rest.length > 0 && of <= pieces.length) {
+    throw new Error(
+      `a leg whose cut files take ${String(pieces.length)} shards cannot be cut into ${String(of)}: its other ${String(rest.length)} files need at least one`,
+    );
+  }
+  const dealt = shardSlices(weightsOf(root, rest, baseline), of - pieces.length);
+  return [...pieces, ...dealt.map((slice) => slice.map((file) => ({ file })))];
+};
+
+export type Owner = { readonly shard: number; readonly lines?: Lines | undefined };
+
+const ownersOf = (slices: readonly (readonly Part[])[]): ReadonlyMap<string, readonly Owner[]> => {
+  const owners = new Map<string, Owner[]>();
+  slices.forEach((slice, index) => {
+    for (const { file, lines } of slice) {
+      owners.set(file, [...(owners.get(file) ?? []), { shard: index + 1, lines }]);
+    }
+  });
+  return owners;
+};
 
 export type ShardResults = {
   readonly checkpoint: Results | undefined;
@@ -229,6 +413,14 @@ const shardLines = (
   ];
 };
 
+// A piece's shard holds the whole file, the rest carried forward, so each mutant comes from the
+// piece holding its first line.
+const heldBy = (lines: Lines | undefined, found: Mutant): boolean => {
+  if (lines === undefined) return true;
+  const line = found.location?.start.line ?? 0;
+  return lines.from <= line && line <= lines.to;
+};
+
 // A stopped shard's gaps stay out, or a forced run's would refill with what it was replacing.
 // Only a shard that left nothing is filled.
 export const mergeShards = ({
@@ -239,25 +431,37 @@ export const mergeShards = ({
   baseline,
 }: {
   readonly leg: string;
-  readonly files: ReadonlyMap<string, number>;
+  readonly files: ReadonlyMap<string, readonly Owner[]>;
   readonly of: number;
   readonly shards: ReadonlyMap<number, ShardResults>;
   readonly baseline: Results | undefined;
 }): Merged => {
   const summary = `${shardLines(leg, of, shards).join("\n")}\n`;
-  const sourceOf = (shard: number): Results | undefined => leftBy(shards, shard) ?? baseline;
   const fromShards = numbered(of).flatMap((shard) => leftBy(shards, shard) ?? []);
-  const fills = [...files.values()].some((shard) => leftBy(shards, shard) === undefined);
+  const fills = [...files.values()].flat().some(({ shard }) => leftBy(shards, shard) === undefined);
   // This run's shards first, so a test file's source is this run's wherever one holds it.
   const sources = fills && baseline !== undefined ? [...fromShards, baseline] : fromShards;
   const [first] = sources;
   if (first === undefined) return { checkpoint: undefined, report: undefined, summary };
   const tests = testTableOf(sources);
-  const entries = [...files].flatMap(([file, shard]) => {
-    const source = sourceOf(shard);
-    if (source === undefined) return [];
-    const entry = source.files[file];
-    return entry === undefined ? [] : [[file, renumbered(entry, source, tests.idByKey)] as const];
+  const entries = [...files].flatMap(([file, owners]) => {
+    // A piece's shard carried the rest of its file forward onto the text as it now stands,
+    // which the previous run's lines may not match.
+    const sibling = owners
+      .map(({ shard }) => leftBy(shards, shard))
+      .find((left) => left !== undefined);
+    const held = owners.flatMap(({ shard, lines }) => {
+      const source = leftBy(shards, shard) ?? sibling ?? baseline;
+      if (source === undefined) return [];
+      const entry = source.files[file];
+      if (entry === undefined) return [];
+      const carried = renumbered(entry, source, tests.idByKey);
+      return [{ ...carried, mutants: carried.mutants.filter((found) => heldBy(lines, found)) }];
+    });
+    const [kept] = held;
+    return kept === undefined
+      ? []
+      : [[file, { ...kept, mutants: held.flatMap((piece) => piece.mutants) }] as const];
   });
   // A shard's `config` names its own slice as `mutate`, which the merged file is not.
   const kept = Object.entries(first).filter(([key]) => key !== "config");
@@ -294,25 +498,25 @@ const positive = (value: string | undefined, name: string): number => {
 const CHECKPOINT = "checkpoint.json";
 const REPORT = "report.json";
 
-export const mutationShardsFromArgv = (
+export const mutationShardsFromArgv = async (
   argv: readonly string[],
   legs: ReadonlyMap<string, Leg>,
-): string => {
+): Promise<string> => {
   const [command, ...rest] = argv;
   const values = flagValues(rest) ?? new Map<string, string>();
   const named = [...legs].find(([name]) => name === values.get("leg"));
   if (named === undefined) throw new Error(USAGE);
-  const [leg, { root, mutate }] = named;
+  const [leg, config] = named;
   const of = positive(values.get("of"), "of");
   const baselineFile = values.get("baseline");
   if (baselineFile === undefined) throw new Error(USAGE);
   const baseline = readResults(baselineFile);
-  const slices = shardSlices(weightsOf(root, mutateSet(root, mutate), baseline), of);
+  const slices = await legSlices(leg, config, of, baseline);
   if (command === "slice") {
     const shard = positive(values.get("shard"), "shard");
     const slice = slices[shard - 1];
     if (slice === undefined) throw new Error(`--shard ${String(shard)} is past --of ${String(of)}`);
-    return slice.join(",");
+    return slice.map(partName).join(",");
   }
   const shardsDirectory = values.get("shards");
   const out = values.get("out");

@@ -11,4 +11,4 @@ const legs = new Map([
   ["core", { root: path.join(repositoryRoot, "packages/core"), mutate: coreStryker.mutate }],
 ]);
 
-process.stdout.write(mutationShardsFromArgv(process.argv.slice(2), legs));
+process.stdout.write(await mutationShardsFromArgv(process.argv.slice(2), legs));
