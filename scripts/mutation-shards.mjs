@@ -6,14 +6,15 @@ import coreStryker from "../packages/core/stryker.config.mjs";
 
 const repositoryRoot = path.resolve(import.meta.dirname, "..");
 
-const legs = new Map([
+/** @type {ReadonlyMap<string, import("../packages/devtools/src/mutation-shards.ts").Leg>} */
+export const legs = new Map([
   ["api", { root: path.join(repositoryRoot, "apps/api"), mutate: apiStryker.mutate }],
   [
     "core",
     {
       root: path.join(repositoryRoot, "packages/core"),
       mutate: coreStryker.mutate,
-      // Each alone took past the 120-minute ceiling in the forced run of 25/09/2026.
+      // Each of these files alone outruns a shard's 120-minute ceiling.
       split: new Map([
         ["src/store/git/index.ts", 4],
         ["src/store/graph/index.ts", 2],
@@ -22,4 +23,6 @@ const legs = new Map([
   ],
 ]);
 
-process.stdout.write(await mutationShardsFromArgv(process.argv.slice(2), legs));
+if (import.meta.main) {
+  process.stdout.write(await mutationShardsFromArgv(process.argv.slice(2), legs));
+}

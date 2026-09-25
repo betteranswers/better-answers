@@ -3,12 +3,13 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { mutateSet } from "@better-answers/devtools/mutation-shards";
+import { mutateSet, mutationShardsFromArgv } from "@better-answers/devtools/mutation-shards";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { z } from "zod";
 
 import coreStrykerConfig from "../../../packages/core/stryker.config.mjs";
+import { legs } from "../../../scripts/mutation-shards.mjs";
 import apiStrykerConfig from "../stryker.config.mjs";
 import { type ImageStep, readWorkflow, repositoryRoot, workflowStepSchema } from "./image-probe.ts";
 
@@ -414,6 +415,18 @@ const legRoots = new Map([
   ["core", "packages/core"],
 ]);
 
+const sliceArgv = (leg: string, shard: number, of: number): readonly string[] => [
+  "slice",
+  "--leg",
+  leg,
+  "--shard",
+  String(shard),
+  "--of",
+  String(of),
+  "--baseline",
+  path.join(repositoryRoot, "no-previous-run.json"),
+];
+
 describe("each mutation leg, run as shards and summed once", () => {
   it("runs shards 1 to N once, summed by one summary", () => {
     const { stryker, summary } = mutationWorkflow().jobs;
@@ -432,33 +445,21 @@ describe("each mutation leg, run as shards and summed once", () => {
     }
   });
 
-  it("cuts each leg into slices that tile its mutate set", () => {
+  it("cuts each leg into slices that tile its mutate set", async () => {
     for (const { name, of } of mutationWorkflow().jobs.summary.strategy.matrix.include) {
       const root = legRoots.get(name) ?? "";
       const config = configSchema.parse(CONFIGS.get(root));
-      const slices = Array.from({ length: of }, (_, index) => {
-        const run = spawnSync(
-          process.execPath,
-          [
-            path.join(repositoryRoot, "scripts/mutation-shards.mjs"),
-            "slice",
-            "--leg",
-            name,
-            "--shard",
-            String(index + 1),
-            "--of",
-            String(of),
-            "--baseline",
-            path.join(repositoryRoot, "no-previous-run.json"),
-          ],
-          { encoding: "utf8" },
-        );
-        expect(
-          run.status,
-          `${name} shard ${String(index + 1)} printed no slice: ${run.stderr}`,
-        ).toBe(0);
-        return run.stdout.split(",");
-      });
+      const printed = await Promise.all(
+        Array.from({ length: of }, (_, index) =>
+          mutationShardsFromArgv(sliceArgv(name, index + 1, of), legs),
+        ),
+      );
+      const script = spawnSync(
+        process.execPath,
+        [path.join(repositoryRoot, "scripts/mutation-shards.mjs"), ...sliceArgv(name, of, of)],
+        { encoding: "utf8" },
+      );
+      const slices = printed.map((slice) => slice.split(","));
       const parts = slices.flat().map((part) => {
         const [, file = part, from, to] = /^(.+):(\d+)-(\d+)$/u.exec(part) ?? [];
         return {
@@ -472,6 +473,9 @@ describe("each mutation leg, run as shards and summed once", () => {
         ({ file }) => file,
       );
 
+      expect(script.stdout, `${name}'s script printed another slice: ${script.stderr}`).toBe(
+        printed.at(-1),
+      );
       expect(slices.every((slice) => slice.length > 0 && slice[0] !== "")).toBe(true);
       expect(new Set(whole).size, `${name}'s slices share a file`).toBe(whole.length);
       expect([...whole, ...cut.keys()].toSorted()).toEqual(
