@@ -216,6 +216,10 @@ pictographs. Glyphs actually used: `magnifying-glass`, `tray`, `database`, `grap
 `clock-counter-clockwise`, `keyboard`, `arrow-square-out`. The `Icon` component is the only
 way to render one.
 
+**The one exception is `lucide-react`, inside the vendored registry primitives under
+`apps/web/src/shared/ui/` and nowhere else**, because a chevron inside a `Select` is behaviour,
+not meaning (ADR 0033).
+
 **Logo: there is none yet.** The source contains no logo, wordmark file or brand mark, so
 none was drawn. Wherever a mark would go, the name is set in type — **Geist Mono 500,
 −0.02em, lower case: `better-answers`**. One word, hyphenated, always lower case: the mark,

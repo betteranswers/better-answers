@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { declareRefusals, REFUSAL_CLASSES, refusalRegister } from "../src/kernel/index.ts";
+import type { ApproveRefusal, DecideRefusal, RequestAccessRefusal } from "../src/members/index.ts";
 import type { BindUploadRefusal, SourceRefusal } from "../src/sources/index.ts";
 import type {
   AddMemberRefusal,
@@ -55,6 +56,9 @@ const REGISTER = {
   "not-in-group": "absent by members",
   "name-taken": "conflict by members",
   "already-in-group": "conflict by members",
+  "no-such-request": "absent by members",
+  "no-such-role": "absent by members",
+  "already-decided": "conflict by members",
 
   "no-such-user": "absent by workspaces",
   "no-such-workspace": "absent by workspaces",
@@ -147,6 +151,9 @@ describe("the refusal-word walk", () => {
     expectTypeOf<ProvisionRefusal>().toExtend<EveryRegisteredWord>();
     expectTypeOf<AddMemberRefusal>().toExtend<EveryRegisteredWord>();
     expectTypeOf<SetDisplayNameRefusal>().toExtend<EveryRegisteredWord>();
+    expectTypeOf<RequestAccessRefusal>().toExtend<EveryRegisteredWord>();
+    expectTypeOf<DecideRefusal>().toExtend<EveryRegisteredWord>();
+    expectTypeOf<ApproveRefusal>().toExtend<EveryRegisteredWord>();
     expectTypeOf<SourceRefusal<"no-such-binding"> | "invented">().not.toExtend<
       EveryRegisteredWord | Error
     >();

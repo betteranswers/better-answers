@@ -3,6 +3,7 @@ import {
   Database,
   Graph,
   List,
+  MagnifyingGlass,
   Pulse,
   Question,
   SidebarSimple,
@@ -22,6 +23,7 @@ export type IconName =
   | "people"
   | "pulse"
   | "question"
+  | "search"
   | "secondary-nav"
   | "tray";
 
@@ -37,6 +39,7 @@ const GLYPHS = {
   people: Users,
   pulse: Pulse,
   question: Question,
+  search: MagnifyingGlass,
   "secondary-nav": SidebarSimple,
   tray: Tray,
 } satisfies Readonly<Record<IconName, PhosphorGlyph>>;

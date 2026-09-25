@@ -26,6 +26,7 @@ import {
 } from "../kernel/index.ts";
 import { type PostgresDoor, type Tx, withScope } from "../store/postgres/index.ts";
 import { workspaceIdBySlug } from "../workspaces/index.ts";
+import type { MemberRefusal } from "./vocabulary.ts";
 
 const REQUEST_ACTS = declareActs("people", {
   asked: act("people.request.asked", { requesterId: "id" }),
@@ -55,7 +56,7 @@ export type RequestAccessInput = {
   readonly reason: string;
 };
 
-export type RequestAccessRefusal = "malformed";
+export type RequestAccessRefusal = MemberRefusal<"malformed">;
 
 const NEUTRAL_CONSTRAINTS = {
   access_request_waiting_uidx: "already-waiting",
@@ -111,9 +112,11 @@ export const requestAccess = async (
 
 type AccessRequestStatus = z.infer<typeof boundarySchemas.accessRequest.select>["status"];
 
-export type DecideRefusal = RoleRefusal | "malformed" | "no-such-request" | "already-decided";
+export type DecideRefusal = MemberRefusal<
+  "role-forbids" | "malformed" | "no-such-request" | "already-decided"
+>;
 
-export type ApproveRefusal = DecideRefusal | "no-such-role";
+export type ApproveRefusal = DecideRefusal | MemberRefusal<"no-such-role">;
 
 type Claim = {
   readonly admin: AdminUserPrincipal;

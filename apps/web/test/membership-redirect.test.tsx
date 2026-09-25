@@ -90,16 +90,16 @@ describe("a person the api will not answer about", () => {
   it("meets the sign-in screen, which is told the address they were asking for", async () => {
     vi.stubGlobal("fetch", answering(NO_SESSION));
 
-    const router = await openAt("/people/roles");
+    const router = await openAt("/people/thresholds");
 
     expect(heading()).toBe("Sign in");
-    expect(router.state.location.href).toBe("/sign-in?redirect=%2Fpeople%2Froles");
+    expect(router.state.location.href).toBe("/sign-in?redirect=%2Fpeople%2Fthresholds");
   });
 
   it("meets the picker instead when the session names no workspace", async () => {
     vi.stubGlobal("fetch", answering(NEEDS_A_PICK));
 
-    const router = await openAt("/people/roles");
+    const router = await openAt("/people/thresholds");
 
     expect(screen.getByText("Reading your workspaces.")).toBeDefined();
     expect(router.state.location.href).toBe("/choose-workspace");
@@ -120,19 +120,19 @@ describe("a person the api will not answer about", () => {
     // The shell's own read is batched and retried past the end of this test, onto the next stub.
     clients.queryClient.setDefaultOptions({ queries: { retry: false } });
 
-    const router = await openAt("/people/roles", clients);
+    const router = await openAt("/people/thresholds", clients);
     await vi.waitFor(() => expect(clients.queryClient.isFetching()).toBe(0));
 
     expect(heading()).toBe("People");
     expect(screen.getByRole("navigation", { name: "Control Centre" })).toBeDefined();
-    expect(router.state.location.pathname).toBe("/people/roles");
+    expect(router.state.location.pathname).toBe("/people/thresholds");
   });
 });
 
 describe("the membership the shell and its redirect both read", () => {
   it("is one read, so drawing the shell and moving between views asks the api nothing more", async () => {
     vi.stubGlobal("fetch", answering());
-    const router = await openAt("/people/roles");
+    const router = await openAt("/people/thresholds");
     await screen.findByText("Northern Tooling", { exact: false });
     expect(membershipAsks()).toBe(1);
 
