@@ -5,7 +5,7 @@ import { historyNaming, type GitDoor } from "../store/git/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import { documentsNaming } from "./documents.ts";
 import { soughtIdentifiersOf, type SoughtIdentifier } from "./identifiers.ts";
-import type { SubjectRequest } from "./requests.ts";
+import type { SubjectIdentifiers, SubjectRequest } from "./requests.ts";
 
 export const ERASURE_FAMILIES = [
   "concept-file",
@@ -98,8 +98,10 @@ const MEMBER_HERE = `SELECT u.id AS location
     WHERE m.workspace_id = $1 AND (u.id = $2 OR lower(u.email) = ANY($3))
     LIMIT 1`;
 
-// The suppression adds the addresses the person signs in with, so the documents naming them are
-// the ones its erasure re-indexes.
+/**
+ * The suppression adds the addresses the person signs in with, so the documents naming them are
+ * the ones its erasure re-indexes.
+ */
 const SIGN_IN_ADDRESSES = `SELECT email AS location FROM "user" WHERE id = ANY($1::text[])`;
 
 const ERASURE_FAMILY_DESCRIPTORS = {
@@ -183,12 +185,17 @@ const ERASURE_FAMILY_DESCRIPTORS = {
   },
 } satisfies Record<ErasureFamily, ErasureFamilyDescriptor>;
 
-export const erasureMapOf = async (
-  platform: PlatformPrincipal,
-  tx: Tx,
-  door: GitDoor,
-  request: SubjectRequest,
-): Promise<ErasureMap> => {
+const soughtWithTheSignInAddresses = (
+  identifiers: SubjectIdentifiers | null,
+  signInAddresses: readonly string[],
+): readonly SoughtIdentifier[] =>
+  soughtIdentifiersOf({
+    emails: [...(identifiers?.emails ?? []), ...signInAddresses],
+    names: identifiers?.names ?? [],
+    other: identifiers?.other ?? [],
+  });
+
+const subjectHereOf = async (tx: Tx, request: SubjectRequest): Promise<SubjectHere> => {
   const emails = (request.identifiers?.emails ?? []).map((email) => email.trim().toLowerCase());
 
   const personId =
@@ -197,19 +204,25 @@ export const erasureMapOf = async (
   const signInAddresses = await located(tx, SIGN_IN_ADDRESSES, [
     [memberId, personId].filter((id) => id !== null),
   ]);
-  const subject: SubjectHere = {
+  return {
     workspaceId: request.workspaceId,
     emails,
     actor: personId === null ? null : actorIdOfPerson(personId),
     memberId,
 
     needles: personId === null ? emails : [...emails, personId],
-    identifiers: soughtIdentifiersOf({
-      emails: [...(request.identifiers?.emails ?? []), ...signInAddresses],
-      names: request.identifiers?.names ?? [],
-      other: request.identifiers?.other ?? [],
-    }),
+    identifiers: soughtWithTheSignInAddresses(request.identifiers, signInAddresses),
   };
+};
+
+/** Reads only. One entry per family, in `ERASURE_FAMILIES` order, its locations sorted. */
+export const erasureMapOf = async (
+  platform: PlatformPrincipal,
+  tx: Tx,
+  door: GitDoor,
+  request: SubjectRequest,
+): Promise<ErasureMap> => {
+  const subject = await subjectHereOf(tx, request);
 
   const entries: ErasureMapEntry[] = [];
   for (const family of ERASURE_FAMILIES) {
@@ -232,6 +245,7 @@ export type AccessAnswer = {
   readonly locations: readonly AccessAnswerLocation[];
 };
 
+/** Only the categories some location holds, in `PERSONAL_DATA_CATEGORIES` order. */
 export const accessAnswerOf = (map: ErasureMap): AccessAnswer => {
   const locations = map.flatMap((entry) =>
     entry.locations.map((location) => ({

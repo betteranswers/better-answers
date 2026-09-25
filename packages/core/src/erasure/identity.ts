@@ -15,8 +15,10 @@ export type IdentitySwept = {
   readonly accounts: number;
   readonly invitationsHere: number;
 
-  // The delete reaches every workspace, so this count varies with records the erasing one may
-  // not read: it is the operator's, and never the report's.
+  /**
+   * The delete reaches every workspace, so this count varies with records the erasing one may
+   * not read: it is the operator's, and never the report's.
+   */
   readonly invitationsEverywhere: number;
 };
 
@@ -35,8 +37,10 @@ export type ErasureSubject = {
 
   readonly personId: string | null;
 
-  // The subject's own resolved addresses, never the identifiers an Admin typed: the deletes
-  // keyed by these reach past every fence.
+  /**
+   * The subject's own resolved addresses, never the identifiers an Admin typed: the deletes
+   * keyed by these reach past every fence.
+   */
   readonly emails: readonly string[];
 
   readonly pseudonym: string;
@@ -75,6 +79,11 @@ const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) =
   };
 };
 
+/**
+ * Does nothing without a person. Otherwise ends the membership here, and only when it was the
+ * person's last deletes their sessions, accounts, verifications and invitations and pseudonymises
+ * them. Throws when their memberships cannot be read.
+ */
 export const eraseFromTheIdentitySet = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

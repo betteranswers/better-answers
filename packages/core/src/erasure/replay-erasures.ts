@@ -101,6 +101,7 @@ const erasureRequestsSince = async (
   return ok(found);
 };
 
+/** Oldest completion first. A request's own row wins over its replay copy. */
 export const replayableErasures = async (
   platform: PlatformPrincipal,
   doors: Pick<ReplayDoors, "postgres" | "objects">,
@@ -206,6 +207,7 @@ const recordTheReplay = async (
   return auditEventId;
 };
 
+/** Stops at the first erasure that fails, naming it and how many were replayed before it. */
 export const replayErasures = async (
   platform: ErasurePrincipal,
   doors: ReplayDoors,
