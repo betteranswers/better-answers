@@ -5,10 +5,10 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
+import { repositoryRoot } from "@better-answers/devtools/oxlint-config";
 import { gitIn, throwawayRepository, writeUnder } from "@better-answers/devtools/throwaway-tree";
 import { afterAll, describe, expect, it } from "vitest";
 
-const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 const script = path.join(repositoryRoot, "scripts/mutant-probe.mjs");
 
 const scratch = mkdtempSync(path.join(tmpdir(), "mutant-probe-"));
@@ -112,8 +112,8 @@ const exited = (run: Run, status: number): void => {
   }
 };
 
-describe("the mutant probe over a throwaway workspace (T-098)", () => {
-  it("says killed when the suite fails under the mutation, and restores the file", () => {
+describe("the mutant probe over a throwaway workspace", () => {
+  it("says killed when the suite fails, and restores the file", () => {
     const root = workspace("killed");
 
     const run = probe(root, { line: 1, from: "n + 1", to: "n - 1" });
@@ -123,7 +123,7 @@ describe("the mutant probe over a throwaway workspace (T-098)", () => {
     expect(source(root)).toBe(SOURCE);
   });
 
-  it("says survived when the suite stays green under the mutation, and restores the file", () => {
+  it("says survived when the suite passes, and restores the file", () => {
     const root = workspace("survived");
 
     const run = probe(root, { line: 2, from: '"answer"', to: '""' });
@@ -133,7 +133,7 @@ describe("the mutant probe over a throwaway workspace (T-098)", () => {
     expect(source(root)).toBe(SOURCE);
   });
 
-  it("says timed out when the suite outlives the budget, and restores the file", () => {
+  it("says timed out past the budget, and restores the file", () => {
     const root = workspace("timed-out");
 
     const run = probe(root, {
@@ -148,7 +148,7 @@ describe("the mutant probe over a throwaway workspace (T-098)", () => {
     expect(source(root)).toBe(SOURCE);
   });
 
-  it("prints the src diff-stat against HEAD after the run, and says when there is none", () => {
+  it("says src is clean against HEAD after the run", () => {
     const root = workspace("clean");
 
     const run = probe(root, { line: 1, from: "n + 1", to: "n - 1" });
@@ -157,7 +157,7 @@ describe("the mutant probe over a throwaway workspace (T-098)", () => {
     expect(run.stdout).toContain("src: clean against HEAD");
   });
 
-  it("restores the file when it is interrupted mid-run, and exits as interrupted", async () => {
+  it("restores the file on an interrupt, and exits as interrupted", async () => {
     const root = workspace("interrupted", SLOW_SUITE);
     const file = path.join(root, "src/answer.ts");
     const child: ChildProcess = spawn(
@@ -194,7 +194,7 @@ describe("the mutant probe over a throwaway workspace (T-098)", () => {
     expect(stderr).toContain("restored");
   }, 90_000);
 
-  it("restores the file when the suite crashes rather than runs, and refuses a verdict", () => {
+  it("restores the file and refuses a verdict on a crash", () => {
     const root = workspace(
       "crashed",
       'import { answer } from "../src/answer.ts";\nthis is not a test\n',
@@ -208,7 +208,7 @@ describe("the mutant probe over a throwaway workspace (T-098)", () => {
     expect(source(root)).toBe(SOURCE);
   });
 
-  it("refuses a verdict when one test file failed to run, even though every test that ran passed", () => {
+  it("refuses a verdict when one test file failed to run", () => {
     const root = workspace("half-ran", SUITE, "this is not a test\n");
 
     const run = probe(root, { line: 2, from: '"answer"', to: '""' });
@@ -219,7 +219,7 @@ describe("the mutant probe over a throwaway workspace (T-098)", () => {
     expect(source(root)).toBe(SOURCE);
   });
 
-  it("refuses to start over a file that already has an unstaged change", () => {
+  it("refuses to start over a file with an unstaged change", () => {
     const root = workspace("dirty");
     const edited = `${SOURCE}export const extra = 1;\n`;
     writeFileSync(path.join(root, "src/answer.ts"), edited);
@@ -233,7 +233,7 @@ describe("the mutant probe over a throwaway workspace (T-098)", () => {
     expect(source(root)).toBe(edited);
   });
 
-  it("refuses a mutation whose text is not on the line it names, so a probe pins to the source", () => {
+  it("refuses a mutation whose text is not on its line", () => {
     const root = workspace("misanchored");
 
     const run = probe(root, { line: 2, from: "n + 1", to: "n - 1" });

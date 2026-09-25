@@ -1,6 +1,8 @@
 import { runsOverThrowawayTree } from "@better-answers/devtools/throwaway-tree";
 import { describe, expect, it } from "vitest";
 
+import { tag, wordsOf } from "./fixture-text.ts";
+
 import type { Tool, Tree } from "@better-answers/devtools/throwaway-tree";
 
 const FILE = "probe.py";
@@ -20,16 +22,10 @@ const A_WHY_AT_THE_CEILING = `${A_WHY_OF_TWENTY} until the next release lands`;
 
 const TOO_LONG = `# ${OVER_THE_CEILING}\n`;
 
-const words = (count: number): string =>
-  Array.from({ length: count }, (_, index) => `word${String(index + 1)}`).join(" ");
-
 const WORKER_MODULE = "apps/worker/src/better_answers_worker/probe.py";
 
 const documented = (signature: string, count: number): string =>
-  `${signature}\n    """${words(count)}"""\n    return 1\n`;
-
-// Spelled in two halves, so the tag scan does not read a fixture as a citation.
-const tag = (family: string, number: string): string => `[${family}${number}]`;
+  `${signature}\n    """${wordsOf(count)}"""\n    return 1\n`;
 
 const gate: Tool = {
   executable: { package: "@better-answers/devtools", path: ["python", "comment_gate.py"] },
@@ -45,15 +41,15 @@ const findings = (tree: Tree): readonly string[] =>
     .split("\n")
     .filter((line) => line !== "");
 
-describe("the Python check fires on the two shapes a tool can read", () => {
-  it("refuses a comment over the ceiling, naming the count and its rule", () => {
+describe("the Python check fires on a long or citing comment", () => {
+  it("refuses a comment over the ceiling, naming count and rule", () => {
     const output = run(holding(TOO_LONG));
 
     expect(output).toContain("runs to 29 words");
     expect(output).toContain(tag("COMMENT", "1"));
   });
 
-  it("counts a docstring as a comment, which no ruff rule does", () => {
+  it("counts a docstring as a comment, unlike any ruff rule", () => {
     const module = { [FILE]: `"""${OVER_THE_CEILING}"""\n\nKEEP = 1\n` };
 
     expect(findings(module)).toHaveLength(1);
@@ -87,8 +83,8 @@ describe("the Python check fires on the two shapes a tool can read", () => {
     expect(findings(holding(eightShortLines))).toHaveLength(1);
   });
 
-  it("counts a paragraph broken by a bare `#` line as one block", () => {
-    const broken = `# ${words(13)}\n#\n# ${words(13)}\n`;
+  it("reads a bare `#` line as part of its paragraph", () => {
+    const broken = `# ${wordsOf(13)}\n#\n# ${wordsOf(13)}\n`;
 
     expect(run(holding(broken))).toContain("runs to 26 words");
   });
@@ -105,7 +101,7 @@ describe("the Python check fires on the two shapes a tool can read", () => {
     expect(findings({ [FILE]: below })).toEqual([]);
   });
 
-  it("reports a long comment that cites a ticket once, for the citation", () => {
+  it("reports a long, citing comment once, for the citation", () => {
     const output = run(holding(`# ${OVER_THE_CEILING} under T-243\n`));
 
     expect(output.trim().split("\n")).toHaveLength(1);
@@ -113,7 +109,7 @@ describe("the Python check fires on the two shapes a tool can read", () => {
   });
 });
 
-describe("the Python check stays silent where a comment earns its place", () => {
+describe("the Python check's exemptions", () => {
   it.each([
     ["a why inside the ceiling", "# Deleting this changes what the engine memoises.\n"],
     ["a type-checker escape", "# type: ignore[attr-defined]\n"],
@@ -131,7 +127,7 @@ describe("the Python check stays silent where a comment earns its place", () => 
     expect(findings({ [FILE]: notice })).toEqual([]);
   });
 
-  it("holds a docstring that opens with a directive's word to the ceiling", () => {
+  it("holds a docstring opening with `noqa` to the ceiling", () => {
     const opening = `"""noqa ${OVER_THE_CEILING}"""\n\nKEEP = 1\n`;
 
     expect(findings({ [FILE]: opening })).toHaveLength(1);
@@ -145,15 +141,15 @@ describe("the Python check stays silent where a comment earns its place", () => 
     expect(findings(holding(`# fmt: off\n# ${A_WHY_AT_THE_CEILING}\n`))).toEqual([]);
   });
 
-  it("does not lend a directive's exemption to the paragraph under it", () => {
+  it("keeps a directive's exemption off the paragraph under it", () => {
     expect(findings(holding(`# type: ignore[attr-defined]\n${TOO_LONG}`))).toHaveLength(1);
   });
 
-  it("stays silent over a tree whose comments are all short and cite nothing", () => {
+  it("stays silent over short comments that cite nothing", () => {
     expect(findings(holding("# Deleting this changes what the engine memoises.\n"))).toEqual([]);
   });
 
-  it("counts the words after the marker, however many open the comment", () => {
+  it("counts the words after a marker of any length", () => {
     expect(findings(holding(`## ${A_WHY_AT_THE_CEILING}\n`))).toEqual([]);
   });
 
@@ -166,18 +162,15 @@ describe("a directive's reason counts against the twenty-five words", () => {
   it.each([
     ["a noqa", "import os  # noqa: F401"],
     ["a type-checker escape", "KEEP: int = 1  # type: ignore[assignment]"],
-  ])(
-    "refuses %s whose reason runs to twenty-six words, naming the directive rule",
-    (_what, line) => {
-      const output = run({ [FILE]: `${line}  # ${words(26)}\n` });
+  ])("refuses %s with a twenty-six-word reason, naming the directive rule", (_what, line) => {
+    const output = run({ [FILE]: `${line}  # ${wordsOf(26)}\n` });
 
-      expect(output).toContain("reason runs to 26 words");
-      expect(output).toContain(tag("COMMENT", "3"));
-    },
-  );
+    expect(output).toContain("reason runs to 26 words");
+    expect(output).toContain(tag("COMMENT", "3"));
+  });
 
-  it("holds a reason to its own directive, never to the comment above it", () => {
-    const source = `# ${words(20)}\n# type: ignore  # ${words(20)}\nKEEP = 1\n`;
+  it("counts a reason apart from the comment above it", () => {
+    const source = `# ${wordsOf(20)}\n# type: ignore  # ${wordsOf(20)}\nKEEP = 1\n`;
 
     expect(findings({ [FILE]: source })).toEqual([]);
   });
@@ -186,7 +179,7 @@ describe("a directive's reason counts against the twenty-five words", () => {
     ["a noqa", "import os  # noqa: F401, E501"],
     ["a type-checker escape", "KEEP: int = 1  # type: ignore[assignment]"],
   ])("refuses %s whose reason follows on with no second marker", (_what, line) => {
-    const output = run({ [FILE]: `${line} - ${words(26)}\n` });
+    const output = run({ [FILE]: `${line} - ${wordsOf(26)}\n` });
 
     expect(output).toContain("runs to 26 words");
   });
@@ -230,18 +223,18 @@ describe("a public worker function's docstring may run to fifty words", () => {
     [
       "a method, which is a member",
       WORKER_MODULE,
-      `class Reader:\n    def reads(self) -> int:\n        """${words(26)}"""\n        return 1\n`,
+      `class Reader:\n    def reads(self) -> int:\n        """${wordsOf(26)}"""\n        return 1\n`,
     ],
     [
       "a function nested in a public one",
       WORKER_MODULE,
-      `def reads() -> int:\n    def inner() -> int:\n        """${words(26)}"""\n        return 1\n    return inner()\n`,
+      `def reads() -> int:\n    def inner() -> int:\n        """${wordsOf(26)}"""\n        return 1\n    return inner()\n`,
     ],
-    ["the worker module itself", WORKER_MODULE, `"""${words(26)}"""\n\nKEEP = 1\n`],
+    ["the worker module itself", WORKER_MODULE, `"""${wordsOf(26)}"""\n\nKEEP = 1\n`],
     [
       "a line comment above a public function",
       WORKER_MODULE,
-      `# ${words(26)}\ndef reads() -> int:\n    return 1\n`,
+      `# ${wordsOf(26)}\ndef reads() -> int:\n    return 1\n`,
     ],
     [
       "a public function in the worker's tests",
@@ -292,14 +285,14 @@ describe("the Python check reads Python files and nothing else", () => {
     expect(output).not.toContain("probe.toml");
   });
 
-  it("walks past a skill, which is prose and is read by no gate", () => {
+  it("walks past a skill, which is prose no gate reads", () => {
     const skill = { "packages/devtools/.claude/skills/probe/example.py": TOO_LONG };
 
     expect(findings(skill)).toEqual([]);
   });
 });
 
-describe("the Python check refuses what a reader cannot open from where they read it", () => {
+describe("the Python check refuses a citation a reader cannot open", () => {
   const saying = (text: string): Tree => ({ [FILE]: `USAGE = "${text}"\n` });
 
   it.each([
@@ -311,7 +304,7 @@ describe("the Python check refuses what a reader cannot open from where they rea
     expect(findings(saying(text))).toHaveLength(1);
   });
 
-  it("refuses a rule tag in a string, which a comment scan never reached", () => {
+  it("refuses a rule tag in a string too", () => {
     expect(findings(saying(`A raw insert lives in a factory (${tag("TEST", "4")}).`))).toHaveLength(
       1,
     );
@@ -321,11 +314,11 @@ describe("the Python check refuses what a reader cannot open from where they rea
     expect(findings({ [FILE]: `"""Kept under T-243."""\n\nKEEP = 1\n` })).toHaveLength(1);
   });
 
-  it("stays silent over a string that names what the reader can do", () => {
+  it("stays silent over a string saying what to do", () => {
     expect(findings(saying("Name a workspace this person belongs to."))).toEqual([]);
   });
 
-  it("walks past a value with no prose in it, which no reader reads as a sentence", () => {
+  it("walks past a value with no prose in it", () => {
     expect(findings({ [FILE]: 'READ_ON = "2026-09-11"\n' })).toEqual([]);
   });
 
@@ -335,7 +328,7 @@ describe("the Python check refuses what a reader cannot open from where they rea
     expect(findings(inATest)).toEqual([]);
   });
 
-  it("walks past the same string in the gate that prints its own tag", () => {
+  it("walks past the same string in the tag-printing gate", () => {
     const inAGate = {
       "packages/devtools/python/comment_gate.py": `SAID = "A raw insert lives in a factory (${tag("TEST", "4")})."\n`,
     };
@@ -344,8 +337,8 @@ describe("the Python check refuses what a reader cannot open from where they rea
   });
 });
 
-describe("the check refuses to answer for a file it could not read", () => {
-  it("exits on a file it cannot parse rather than reporting a clean tree", () => {
+describe("the check refuses to judge a file it cannot read", () => {
+  it("exits on an unparseable file rather than reporting it clean", () => {
     expect(() => run({ [FILE]: "def broken(\n" })).toThrow(/could not be read/);
   });
 });

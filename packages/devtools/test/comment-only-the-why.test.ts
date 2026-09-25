@@ -7,6 +7,8 @@ import { executableOf, oxlintOver, writeUnder } from "@better-answers/devtools/t
 import { pluginConfigFor } from "@better-answers/devtools/oxlint-config";
 import { describe, expect, it } from "vitest";
 
+import { tag, wordsOf } from "./fixture-text.ts";
+
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
 const RULE = "better-answers/comment-only-the-why";
@@ -24,18 +26,12 @@ const holding = (comment: string, code = "export const keep = 1;\n"): Tree => ({
 /** Split so vitest does not read this suite's own environment off the fixture. */
 const ENVIRONMENT_DOCBLOCK = `/** @vitest-${"environment"} happy-dom */\n`;
 
-/** Spelled in two halves, so the tag scan does not read a fixture as a citation. */
-const tag = (family: string, number: string): string => `[${family}${number}]`;
-
-const wordsOf = (count: number): string =>
-  Array.from({ length: count }, (_unused, index) => `word${String(index + 1)}`).join(" ");
-
 const TOO_LONG = `// ${wordsOf(29)}\n`;
 
 const lint = oxlintOver(CONFIG, { tree: holding(TOO_LONG), flagged: [FILE] });
 
-describe("the comment rule fires on the two shapes a tool can read", () => {
-  it("refuses a block over the ceiling, naming the count and its rule", () => {
+describe("the comment rule fires on a long or citing comment", () => {
+  it("refuses a block over the ceiling, naming count and rule", () => {
     const output = lint.output(holding(TOO_LONG));
 
     expect(output).toContain("runs to 29 words");
@@ -63,7 +59,7 @@ describe("the comment rule fires on the two shapes a tool can read", () => {
     expect(lint.flagged(holding(eightShortLines))).toEqual([FILE]);
   });
 
-  it("counts two line comments a blank line apart as two blocks", () => {
+  it("counts line comments a blank line apart as two blocks", () => {
     const apart = `// ${wordsOf(20)}\n\n// ${wordsOf(20)}\n`;
 
     expect(lint.flagged(holding(apart))).toEqual([]);
@@ -90,7 +86,7 @@ describe("the comment rule fires on the two shapes a tool can read", () => {
     expect(lint.flagged({ [FILE]: indented })).toEqual([FILE]);
   });
 
-  it("counts the words of a doc block over many lines, never its asterisks", () => {
+  it("counts a multi-line doc block's words, never its asterisks", () => {
     const lines = Array.from({ length: 5 }, () => ` * ${wordsOf(5)}\n`).join("");
 
     expect(lint.flagged(holding(`/**\n${lines} */\n`))).toEqual([]);
@@ -100,7 +96,7 @@ describe("the comment rule fires on the two shapes a tool can read", () => {
     expect(lint.flagged(holding(`/*****\n * ${wordsOf(25)}\n *****/\n`))).toEqual([]);
   });
 
-  it("keeps the words of a block apart across its line breaks", () => {
+  it("keeps a block's words apart across its line breaks", () => {
     const lines = Array.from({ length: 26 }, (_unused, index) => `word${String(index)}\n`).join("");
 
     expect(lint.flagged(holding(`/*\n${lines}*/\n`))).toEqual([FILE]);
@@ -129,7 +125,7 @@ describe("the comment rule fires on the two shapes a tool can read", () => {
     expect(lint.flagged(holding(source))).toEqual([]);
   });
 
-  it("refuses a comment inside JSX, which the line counter cannot see", () => {
+  it("refuses a comment inside JSX, which the line counter misses", () => {
     const tsx = {
       "screen.tsx": `export const Screen = () => (\n  <div>{/* ${wordsOf(29)} */}</div>\n);\n`,
     };
@@ -138,7 +134,7 @@ describe("the comment rule fires on the two shapes a tool can read", () => {
   });
 });
 
-describe("the comment rule stays silent where a comment earns its place", () => {
+describe("the comment rule's exemptions", () => {
   it.each([
     ["a why inside the ceiling", "// Deleting this changes what knip answers.\n"],
     ["a why of exactly 25 words", `// ${wordsOf(25)}\n`],
@@ -155,14 +151,14 @@ describe("the comment rule stays silent where a comment earns its place", () => 
     expect(lint.flagged({ [FILE]: "#!/usr/bin/env node\nexport const keep = 1;\n" })).toEqual([]);
   });
 
-  it("does not lend a directive's exemption to the paragraph under it", () => {
+  it("keeps a directive's exemption off the paragraph under it", () => {
     const both = `// oxlint-disable-next-line no-console -- the runner prints\n${TOO_LONG}`;
 
     expect(lint.flagged(holding(both))).toEqual([FILE]);
   });
 });
 
-describe("the comment rule holds a directive to a reason on the same line", () => {
+describe("the comment rule holds a directive to a same-line reason", () => {
   it.each([
     ["an oxlint disable", "// oxlint-disable-next-line no-console\n"],
     ["an ESLint disable in a block", "/* eslint-disable no-console */\n"],
@@ -188,7 +184,7 @@ describe("the comment rule holds a directive to a reason on the same line", () =
     ["an oxlint disable", `// oxlint-disable-next-line no-console -- ${wordsOf(26)}\n`],
     ["a Stryker disable", `// Stryker disable next-line all: ${wordsOf(26)}\n`],
     ["a type-checker escape", `// @ts-expect-error ${wordsOf(26)}\n`],
-  ])("refuses %s whose reason runs over 25 words, naming the count", (_what, directive) => {
+  ])("refuses %s whose reason exceeds 25 words, naming the count", (_what, directive) => {
     const output = lint.output(holding(directive));
 
     expect(output).toContain("reason runs to 26 words");
@@ -223,7 +219,7 @@ describe("the comment rule holds a directive to a reason on the same line", () =
   });
 });
 
-describe("the comment rule allows a longer doc block on an exported function", () => {
+describe("the comment rule allows an exported function a longer block", () => {
   const inCore = (source: string, file = CORE): Tree => ({ [file]: source });
 
   it.each([
@@ -260,7 +256,7 @@ describe("the comment rule allows a longer doc block on an exported function", (
     expect(lint.flagged(inCore(source, schema))).toEqual([]);
   });
 
-  it("refuses a 51-word block on an export, naming the 50-word ceiling", () => {
+  it("refuses a 51-word export block, naming the 50-word ceiling", () => {
     const source = `/** ${wordsOf(51)} */\nexport const wait = (count: number): number => count;\n`;
     const output = lint.output(inCore(source));
 
@@ -282,7 +278,7 @@ describe("the comment rule allows a longer doc block on an exported function", (
     expect(lint.output(inCore(`/** ${wordsOf(26)} */\n${code}`))).toContain("runs to 26 words");
   });
 
-  it("refuses a 26-word run of line comments on an exported function", () => {
+  it("refuses 26 words of line comments on an exported function", () => {
     const lines = `// ${wordsOf(13)}\n// ${wordsOf(13)}\n`;
     const source = `${lines}export const wait = (count: number): number => count;\n`;
 
@@ -304,7 +300,7 @@ describe("the comment rule allows a longer doc block on an exported function", (
     expect(lint.flagged(inCore(source, file))).toEqual([file]);
   });
 
-  it("gives the longer ceiling to the block next to the export, never one above it", () => {
+  it("gives the longer ceiling only to the export's own block", () => {
     const source = `/** ${wordsOf(26)} */\nconst limit = 1;\n/** short */\nexport const wait = (count: number): number => count + limit;\n`;
 
     expect(lint.flagged(inCore(source))).toEqual([CORE]);

@@ -2,13 +2,12 @@ import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 import { pluginConfigFor } from "@better-answers/devtools/oxlint-config";
 import { describe, expect, it } from "vitest";
 
+import { tag } from "./fixture-text.ts";
+
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
 const RULE = "better-answers/string-cites-nothing";
 const FILE = "probe.ts";
-
-/** Spelled in two halves, so the tag scan does not read a fixture as a citation. */
-const tag = (family: string, number: string): string => `[${family}${number}]`;
 
 const saying = (text: string): Tree => ({ [FILE]: `export const usage = "${text}";\n` });
 
@@ -17,7 +16,7 @@ const lint = oxlintOver(pluginConfigFor({ [RULE]: "error" }), {
   flagged: [FILE],
 });
 
-describe("the string rule refuses what a reader cannot open from where they read it", () => {
+describe("the string rule refuses a citation a reader cannot open", () => {
   it("names what the string cites and the rule it breaks", () => {
     const output = lint.output(saying("Ask the owner about T-243 first."));
 
@@ -50,16 +49,16 @@ describe("the string rule refuses what a reader cannot open from where they read
   });
 });
 
-describe("the string rule walks past a string that sends no one elsewhere", () => {
-  it("stays silent over a string that names what the reader can do", () => {
+describe("the string rule walks past a string citing nothing", () => {
+  it("stays silent over a string saying what to do", () => {
     expect(lint.flagged(saying("Name a workspace this person belongs to."))).toEqual([]);
   });
 
-  it("walks past a value with no prose in it, which no reader reads as a sentence", () => {
+  it("walks past a value with no prose in it", () => {
     expect(lint.flagged({ [FILE]: 'export const profile = "mcp-2026-07-28";\n' })).toEqual([]);
   });
 
-  it("walks past a regular expression, which no reader reads as a sentence", () => {
+  it("walks past a regular expression, which is not prose", () => {
     expect(lint.flagged({ [FILE]: "export const moved = /moved under T-243 here/;\n" })).toEqual(
       [],
     );
@@ -81,7 +80,7 @@ describe("the string rule walks past a string that sends no one elsewhere", () =
     expect(lint.flagged(inATest)).toEqual([]);
   });
 
-  it("walks past the same string in a gate that prints its own tag", () => {
+  it("walks past the same string in a tag-printing gate", () => {
     const inAGate = {
       "packages/devtools/src/insert-scan.ts": `export const said = "A raw insert lives in a factory (${tag("TEST", "4")}).";\n`,
     };

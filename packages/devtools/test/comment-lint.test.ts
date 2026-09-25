@@ -5,6 +5,8 @@ import { lintFlags } from "@better-answers/devtools/root-commands";
 import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 import { describe, expect, it } from "vitest";
 
+import { tag, wordsOf } from "./fixture-text.ts";
+
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
 const COMMENT_RULES = [
@@ -39,9 +41,6 @@ const CONFIG = JSON.stringify({
 const FILE = "apps/api/src/probe.ts";
 const EXPORTED = "packages/core/src/probe.ts";
 
-const wordsOf = (count: number): string =>
-  Array.from({ length: count }, (_unused, index) => `word${String(index + 1)}`).join(" ");
-
 const holding = (comment: string, code = "export const keep = 1;\n"): Tree => ({
   [FILE]: `${comment}${code}`,
 });
@@ -58,10 +57,7 @@ const lint = oxlintOver(
   lintFlags(),
 );
 
-/** Spelled in two halves, so the tag scan does not read a fixture as a citation. */
-const tag = (family: string, number: string): string => `[${family}${number}]`;
-
-describe("the one lint config refuses a comment that breaks a comment rule", () => {
+describe("the one lint config refuses a comment breaking a rule", () => {
   it.each([
     [
       "a 26-word line comment",
@@ -118,7 +114,7 @@ describe("the one lint config refuses a comment that breaks a comment rule", () 
     expect(output).toMatch(/Unused oxlint-disable directive.*\[Error\]/);
   });
 
-  it("refuses a 26-word block on an internal function, however exported its neighbours", () => {
+  it("refuses a 26-word block on an internal function beside exports", () => {
     const internal = {
       [EXPORTED]: `/** ${wordsOf(26)} */\nconst halve = (count: number): number => count / 2;\nexport const quarter = (count: number): number => halve(halve(count));\n`,
     };
@@ -126,7 +122,7 @@ describe("the one lint config refuses a comment that breaks a comment rule", () 
     expect(lint.output(internal)).toContain("[Error/better-answers(comment-only-the-why)]");
   });
 
-  it("refuses a 26-word block on an export outside the documented packages", () => {
+  it("refuses a 26-word export block outside the documented packages", () => {
     const inTheApi = {
       [FILE]: `/** ${wordsOf(26)} */\nexport const waitMs = (count: number): number => count * 1000;\n`,
     };
@@ -140,14 +136,14 @@ describe("the one lint config refuses a comment that breaks a comment rule", () 
     expect(output).toContain(tag("COMMENT", "3"));
   });
 
-  it("refuses a 26-word comment in a root script, which the root command walks too", () => {
+  it("refuses a 26-word comment in a root script", () => {
     const script = { "scripts/probe.mjs": `// ${wordsOf(26)}\nexport const keep = 1;\n` };
 
     expect(lint.flagged(script)).toEqual(["scripts/probe.mjs"]);
   });
 });
 
-describe("the one lint config accepts a comment that keeps the rules", () => {
+describe("the one lint config accepts a comment keeping the rules", () => {
   it.each([
     ["a 25-word line comment", holding(`// ${wordsOf(25)}\n`)],
     ["a `/** */` on a declaration", holding("/** Deleting this changes what knip answers. */\n")],
