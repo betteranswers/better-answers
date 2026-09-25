@@ -31,7 +31,7 @@ type DialogProperties<Asked> = {
   readonly onConfirm: (asked: Asked) => void;
 };
 
-// The act's own row may lose the control that opened it, so focus goes back to the binding.
+/** The act's own row may lose the control that opened it, so focus goes back to the binding. */
 const toTheBinding = (bindingId: string) => (event: Event) => {
   event.preventDefault();
   document.getElementById(bindingHeadingId(bindingId))?.focus();
@@ -269,7 +269,7 @@ export type Widening = { readonly sensitivity: Sensitivity; readonly audience: A
 const asWideOrWiderThan = (sensitivity: Sensitivity): readonly Sensitivity[] =>
   CLASSES.slice(CLASSES.indexOf(sensitivity));
 
-// The dialog opens on a widening, so the one click it asks for is never refused as not wider.
+/** The dialog opens on a widening, so the one click it asks for is never refused as not wider. */
 const firstWidening = (binding: ListedBinding): Widening => {
   const wider = CLASSES[CLASSES.indexOf(binding.sensitivity) + 1];
   return wider === undefined
@@ -277,7 +277,10 @@ const firstWidening = (binding: ListedBinding): Widening => {
     : { sensitivity: wider, audience: binding.audience };
 };
 
-// The dialog offers no narrower class and no other groups, so a wider term is the whole question.
+/**
+ * The dialog offers no narrower class and no other groups, so a wider term is the whole
+ * question.
+ */
 const asksWider = (binding: ListedBinding, asked: Widening): boolean =>
   CLASSES.indexOf(asked.sensitivity) > CLASSES.indexOf(binding.sensitivity) ||
   (asked.audience === EVERYONE && binding.audience !== EVERYONE);

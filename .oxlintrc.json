@@ -383,8 +383,6 @@
     },
     {
       "files": [
-        "apps/web/src/features/sources/bindings-view.tsx",
-        "apps/web/src/shared/api/upload-progress.ts",
         "packages/core/src/concepts/file.ts",
         "packages/core/src/concepts/landing.ts",
         "packages/core/src/concepts/loader.ts",

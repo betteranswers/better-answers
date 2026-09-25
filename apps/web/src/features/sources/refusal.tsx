@@ -79,7 +79,10 @@ const SAID_OF_WORD = {
 
 const SOURCE_WORDS = new Map<string, Said>(Object.entries(SAID_OF_WORD));
 
-// Where the screen can tell before the click, it says what the api would refuse in the same words.
+/**
+ * Where the screen can tell before the click, it says what the api would refuse in the same
+ * words.
+ */
 export const whyAndNextOf = (word: keyof typeof SAID_OF_WORD): string =>
   `${SAID_OF_WORD[word].why} ${SAID_OF_WORD[word].next}`;
 
@@ -110,7 +113,7 @@ const UNANSWERED: Outcome = {
   words: "The platform did not answer, so nothing changed. Try again in a moment.",
 };
 
-// A failure with no refusal word is the network's or the platform's, never the reader's to fix.
+/** A failure with no refusal word is the network's or the platform's, never the reader's to fix. */
 export const outcomeOfFailure = (failure: Error | ApiError): Outcome => {
   const refusal = refusalOf(failure);
   return refusal === undefined ? UNANSWERED : refusedFor(refusal.word, refusal.class);

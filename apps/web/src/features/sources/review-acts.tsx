@@ -37,8 +37,10 @@ type Settled<Answer> = {
 
 const takesAnyGroup = (): boolean => true;
 
-// Inert until this binding's review has ticked groups the act takes: an act over nothing is
-// disabled and reads as such.
+/**
+ * Inert until this binding's review has ticked groups the act takes: an act over nothing is
+ * disabled and reads as such.
+ */
 const useBulkAct = (bindingId: string, takes: (group: FindingGroup) => boolean = takesAnyGroup) => {
   const [ticked, tick] = useTickedGroups();
   const [open, setOpen] = useState(false);
@@ -54,8 +56,10 @@ const useBulkAct = (bindingId: string, takes: (group: FindingGroup) => boolean =
     setOpen(true);
   };
 
-  // The act's own button is disabled once the selection is spent, so focus it cannot take goes to
-  // the review.
+  /**
+   * The act's own button is disabled once the selection is spent, so focus it cannot take goes to
+   * the review.
+   */
   const returnFocus = (event: Event) => {
     event.preventDefault();
     opener.current?.focus();
@@ -64,8 +68,10 @@ const useBulkAct = (bindingId: string, takes: (group: FindingGroup) => boolean =
     }
   };
 
-  // A command must read as taken within a tenth of a second, so the dialog closes and the
-  // selection is spent before the api answers.
+  /**
+   * A command must read as taken within a tenth of a second, so the dialog closes and the
+   * selection is spent before the api answers.
+   */
   const command = <Answer,>(said: {
     readonly pending: string;
     readonly done: (answer: Answer) => ReactNode;
@@ -141,8 +147,10 @@ function TickedList(properties: { readonly groups: readonly FindingGroup[] }) {
   );
 }
 
-// Both reasoned acts land the reason on the ledger beside the Admin who gave it, so they ask for it
-// alike.
+/**
+ * Both reasoned acts land the reason on the ledger beside the Admin who gave it, so they ask for
+ * it alike.
+ */
 function ReasonedDialog(properties: {
   readonly act: BulkActState;
   readonly title: string;
@@ -186,7 +194,7 @@ export function KeepInTextAct(properties: { readonly bindingId: string }) {
   const keep = useKeepInText();
   const groups = act.ready?.groups ?? [];
   const named = counted(groups.length, "finding group", "finding groups");
-  // Counted off the groups the review listed, so the screen reads nothing of the spans kept.
+  /** Counted off the groups the review listed, so the screen reads nothing of the spans kept. */
   const spans = counted(
     groups.reduce((sum, group) => sum + group.found, 0),
     "span",
@@ -274,7 +282,7 @@ export function NarrowDocumentsAct(properties: { readonly bindingId: string }) {
   );
 }
 
-// A ulid sorts by when it was minted, so a run at or past the act's own is one that reads it.
+/** A ulid sorts by when it was minted, so a run at or past the act's own is one that reads it. */
 function RunStatus(properties: { readonly bindingId: string; readonly jobId: string }) {
   const bindings = useBindings();
   const run = bindings.data?.find((binding) => binding.bindingId === properties.bindingId)?.lastRun;

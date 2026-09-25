@@ -19,7 +19,7 @@ export const SOURCES_KEYSTROKES = {
 
 export const REVIEW_HEADING = "review-of-the-binding";
 
-// The groups as the review listed them: what the acts hand back is a group, never a finding.
+/** The groups as the review listed them: what the acts hand back is a group, never a finding. */
 export type TickedGroups = {
   readonly bindingId: string;
   readonly groups: readonly FindingGroup[];

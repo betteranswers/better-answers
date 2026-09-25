@@ -57,14 +57,18 @@ const RETENTIONS = new Map<string, Meaning>([
   ],
 ]);
 
-// A word the vocabulary has not met is shown as itself rather than dropped.
-export const destinationOf = (word: string): Meaning =>
-  DESTINATIONS.get(word) ?? { word, means: "" };
+/** A word the vocabulary has not met is shown as itself rather than dropped. */
+const meaningIn = (vocabulary: ReadonlyMap<string, Meaning>, word: string): Meaning =>
+  vocabulary.get(word) ?? { word, means: "" };
 
-export const retentionOf = (word: string): Meaning => RETENTIONS.get(word) ?? { word, means: "" };
+export const destinationOf = (word: string): Meaning => meaningIn(DESTINATIONS, word);
 
-// The api's cap, stated not imported: the web takes nothing from the api at runtime, and the api
-// refuses a larger file alike.
+export const retentionOf = (word: string): Meaning => meaningIn(RETENTIONS, word);
+
+/**
+ * The api's cap, stated not imported: the web takes nothing from the api at runtime, and the api
+ * refuses a larger file alike.
+ */
 export const UPLOAD_CAP_MB = 64;
 
 export const NEEDS_OCR = "NeedsOcrError";
@@ -77,7 +81,7 @@ const QUARANTINE_WORDS = new Map([
 export const quarantineWordOf = (error: string): string =>
   QUARANTINE_WORDS.get(error) ?? "could not be read";
 
-// The publish row carries one count per category the seam can raise, a zero included.
+/** The publish row carries one count per category the seam can raise, a zero included. */
 export const AUDITED_CATEGORIES = [
   "special-category",
   "bank-details",
@@ -89,13 +93,14 @@ export const AUDITED_CATEGORIES = [
   "job-title",
 ] as const;
 
-// A category's or a tier's word is kebab-case on the row and spaced on the screen.
+/** A category's or a tier's word is kebab-case on the row and spaced on the screen. */
 export const spokenWord = (word: string): string => word.replaceAll("-", " ");
 
 const DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" });
 
 const TIME = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit" });
 
+/** In the reader's own time zone: `14:05 · 25 September 2026`. */
 export const instantWords = (iso: string): string => {
   const at = new Date(iso);
   return `${TIME.format(at)} · ${DAY.format(at)}`;

@@ -35,8 +35,10 @@ import { AUDIENCE_WORDS } from "./words.ts";
 
 const sources = screenById("sources");
 
-// The three bulk acts sit beside the findings they command, in the review: five acts in the band
-// scroll a 320px screen sideways.
+/**
+ * The three bulk acts sit beside the findings they command, in the review: five acts in the band
+ * scroll a 320px screen sideways.
+ */
 export const BINDINGS_TOOLBAR: ViewToolbar = {
   acts: (
     <>
@@ -69,6 +71,22 @@ const nothingWider = (binding: ListedBinding): Outcome => ({
   words: `“${binding.name}” is ${classAndAudienceWords(binding)}, and no class or audience is wider.`,
 });
 
+function ListStatus(properties: { readonly bindings: ReturnType<typeof useBindings> }) {
+  const { bindings } = properties;
+  return (
+    <div aria-live="polite" className="mt-2">
+      {bindings.isPending ? <p>The bindings are still loading.</p> : null}
+      {bindings.error === null ? null : <p>{outcomeOfFailure(bindings.error).words}</p>}
+      {bindings.data?.length === 0 ? (
+        <p>
+          No document is bound yet. Bind one with Bind a document, or{" "}
+          <kbd className="font-mono">{SOURCES_KEYSTROKES.bind.key}</kbd>.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function BindingsView() {
   const bindings = useBindings();
   const listId = useId();
@@ -95,7 +113,7 @@ export function BindingsView() {
     },
   });
 
-  // The review opens below the list, out of the reader's sight, so focus follows it there.
+  /** The review opens below the list, out of the reader's sight, so focus follows it there. */
   const review = (bindingId: string) => {
     flushSync(() => {
       setReviewing(bindingId);
@@ -118,8 +136,10 @@ export function BindingsView() {
     else setWidening(binding.bindingId);
   };
 
-  // A letter pressed outside the list still needs a binding, so the one whose row last held
-  // focus stands.
+  /**
+   * A letter pressed outside the list still needs a binding, so the one whose row last held
+   * focus stands.
+   */
   const bindingInFocusOrTell = (): ListedBinding | undefined => {
     const binding = bindingOf(inFocus);
     if (binding === undefined) setOutcome(NOTHING_IN_FOCUS);
@@ -156,16 +176,7 @@ export function BindingsView() {
         <h2 id={listId}>Bindings</h2>
         <OutcomeLine outcome={outcome} className="mt-2" />
 
-        <div aria-live="polite" className="mt-2">
-          {bindings.isPending ? <p>The bindings are still loading.</p> : null}
-          {bindings.error === null ? null : <p>{outcomeOfFailure(bindings.error).words}</p>}
-          {bindings.data?.length === 0 ? (
-            <p>
-              No document is bound yet. Bind one with Bind a document, or{" "}
-              <kbd className="font-mono">{SOURCES_KEYSTROKES.bind.key}</kbd>.
-            </p>
-          ) : null}
-        </div>
+        <ListStatus bindings={bindings} />
 
         <BindingList
           bindings={listed}
