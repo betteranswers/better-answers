@@ -12,6 +12,8 @@ GENERATE = "cd apps/worker && uv run --frozen generate-contract-stamp"
 
 
 def contract_files(root: Path) -> list[str]:
+    """Paths under `root`, relative and `/`-joined, in UTF-8 byte order.
+    Links, dot-named paths and the top-level `README.md` are left out."""
     found: list[str] = []
     for file in root.rglob("*"):
         # A link is a path, not content. Said here because `is_file` follows one.
@@ -26,9 +28,10 @@ def contract_files(root: Path) -> list[str]:
     return sorted(found, key=lambda relative: relative.encode("utf-8"))
 
 
-# Length-prefixed so a boundary cannot be forged: without it, content holding a
-# newline and a plausible path could pose as a second file.
 def contract_digest(root: Path) -> str:
+    """Hex SHA-256 over each file's path, length and bytes.
+    Length-prefixed so a boundary cannot be forged: without it, content
+    holding a newline and a plausible path could pose as a second file."""
     stream = hashlib.sha256()
     for relative in contract_files(root):
         # Bytes, never decoded or newline-normalised: a CRLF checkout is a different

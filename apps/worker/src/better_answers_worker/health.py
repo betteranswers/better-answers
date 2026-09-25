@@ -24,6 +24,8 @@ SELECT count(*) FILTER (
 
 
 def is_healthy(connection: psycopg.Connection, worker_id: str) -> bool:
+    """Healthy while this worker holds a claimed job with a fresh
+    heartbeat, or while no claimable job has waited longer than a lease."""
     stale = f"{STALE_HEARTBEAT_SECONDS} seconds"
     lease = f"{LEASE_SECONDS} seconds"
     waiting = 0

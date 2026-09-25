@@ -70,6 +70,8 @@ def refuse_unreachable_entities(
     entity_table: Mapping[str, CategoryDescriptor],
     labels: Mapping[str, str],
 ) -> None:
+    """Raises `ValueError` naming each entity nothing
+    raises and each model label no descriptor declares."""
     # Only the builder below and its suite ask this, so the stack arrives here rather
     # than at the top.
     from .detector import RECOGNISERS
@@ -99,6 +101,8 @@ def refuse_unreachable_entities(
 
 
 def build_analyzer(model_id: str = GLINER_MODEL_ID) -> "AnalyzerEngine":
+    """A new engine each call, loading spaCy and the
+    model; `analyzer` holds one for the process."""
     from presidio_analyzer import AnalyzerEngine, RecognizerRegistry
     from presidio_analyzer.nlp_engine import NlpEngineProvider
 
@@ -144,6 +148,8 @@ def analyzer() -> "AnalyzerEngine":
 
 
 def spans_detected(text: str) -> tuple[Span, ...]:
+    """Spans at or above their rule's threshold, in offset
+    order. The first call loads the detector's stack."""
     # No category and no tier: caching a pure function of the rule id would put the
     # category table in the memo's key.
     raised = [

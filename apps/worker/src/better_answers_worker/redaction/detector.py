@@ -57,6 +57,9 @@ RECOGNISERS: Mapping[str, Callable[[CategoryDescriptor], EntityRecognizer]] = (
 
 
 class AnchoredWindows(CharacterBasedTextChunker):
+    """Windows that start at each heading outside a fence; a run over twice
+    `chunk_size` is split at paragraphs, then stepped through with overlap."""
+
     def chunk(self, text: str) -> list[TextChunk]:
         if not text:
             return []
@@ -139,9 +142,7 @@ class ModelRecogniser(EntityRecognizer):
     def __init__(
         self, labels: Mapping[str, str], model_name: str, threshold: float
     ) -> None:
-        # torch installs `patch` on its config modules at runtime, and this one never
-        # imports the stub that declares it.
-        with torch.utils.serialization.config.patch(  # type: ignore[attr-defined]
+        with torch.utils.serialization.config.patch(  # type: ignore[attr-defined]  # torch installs `patch` at runtime; this module never imports the stub declaring it
             "load.mmap", True
         ):
             # Mapped, and assigned in place on the meta device, the weights are file

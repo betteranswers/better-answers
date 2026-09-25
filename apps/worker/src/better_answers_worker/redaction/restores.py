@@ -6,6 +6,9 @@ from .engine import Finding
 
 @dataclass(frozen=True, slots=True)
 class Restore:
+    """Matched to a finding by rule and exact offsets,
+    so a span that moves is no longer restored."""
+
     rule_id: str
     start: int
     end: int

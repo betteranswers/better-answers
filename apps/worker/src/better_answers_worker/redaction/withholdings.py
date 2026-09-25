@@ -47,6 +47,9 @@ class Policy:
 
 @dataclass(frozen=True, slots=True)
 class Withholding:
+    """`tier` is `always` when an erasure names the finding, and the
+    finding's own otherwise; `reason` is a key of `WITHHELD_FOR`."""
+
     finding: Finding
     withheld: bool
     tier: str
@@ -63,6 +66,8 @@ class WrittenSpan:
 def withholdings_over(
     findings: Sequence[Finding], text: str, policy: Policy
 ) -> tuple[Withholding, ...]:
+    """One per finding, in order. An erasure outranks an
+    Admin's restore, which outranks the binding's switches."""
     erased = suppressed_among(findings, text, policy.suppressions)
     restored = restored_among(findings, policy.restores)
     return tuple(
@@ -74,6 +79,8 @@ def withholdings_over(
 def written_spans_of(
     withholdings: Sequence[Withholding], erasure_matches: Sequence[ErasureMatch]
 ) -> tuple[WrittenSpan, ...]:
+    """The spans to overwrite, in offset order and never overlapping. A span inside
+    a longer one gives way; an overlap goes by tier, then length, then score."""
     withheld = tuple(_competitor_of(one) for one in withholdings if one.withheld)
     # How a finding was written is read off the spans, so a finding keeps its own span
     # from a match it already covers.
@@ -88,6 +95,7 @@ def written_spans_of(
 
 
 def overridden_in(withholdings: Sequence[Withholding]) -> tuple[Finding, ...]:
+    """The restored findings an erasure withholds again."""
     return tuple(
         one.finding for one in withholdings if one.reason == OVERRIDDEN_BY_THE_ERASURE
     )

@@ -74,6 +74,8 @@ def _blanked_spans(body: str) -> str:
 
 
 def prose_of(body: str) -> str:
+    """The body with fenced blocks and code spans blanked to spaces,
+    newlines kept, so an offset into it is an offset into the body."""
     return _blanked_spans(_FENCED_BLOCK.sub(lambda found: _blank(found.group(0)), body))
 
 
@@ -160,6 +162,9 @@ def _sentence_at(body: str, index: int) -> str:
 
 
 class OutgoingReference:
+    """`target` is `('iri', iri)` or `('path', bundle path)`;
+    `section` and `sentence` are None for lineage."""
+
     __slots__ = ("ordinal", "relation", "section", "sentence", "target")
 
     def __init__(
@@ -180,6 +185,9 @@ class OutgoingReference:
 def references_of(
     body: str, frontmatter: Frontmatter, path: str
 ) -> list[OutgoingReference]:
+    """The body's links, images left out, then the `sources` entries
+    as lineage; a URL other than a concept IRI is dropped. A link's
+    ordinal counts every link in the prose, the dropped ones too."""
     prose = prose_of(body)
     definitions = _definitions_of(prose)
 
@@ -255,6 +263,9 @@ def outgoing_edges(
     by_path: dict[str, ResolvedTarget],
     by_iri: dict[str, ResolvedTarget],
 ) -> list[OutgoingEdge]:
+    """A path that names no concept is dropped, while an IRI that names
+    none still makes an edge, with no kind. Each cited concept gives one
+    lineage edge, `SUPERSEDES` when it is deprecated and of the same kind."""
     edges: list[OutgoingEdge] = []
     cited: set[str] = set()
     for reference in references_of(body, frontmatter, path):

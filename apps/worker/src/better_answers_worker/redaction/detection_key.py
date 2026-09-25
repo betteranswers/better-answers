@@ -146,4 +146,7 @@ def detection_key_of(reading: DetectorReading) -> str:
 
 @cache
 def detection_key() -> str:
+    """Hex SHA-256 of everything the detector's answer depends on, cached for the
+    process. It keys the detector's memo, so a change to any of it detects every
+    text afresh. Reading it builds a recogniser of every rule."""
     return detection_key_of(what_the_detector_reads())

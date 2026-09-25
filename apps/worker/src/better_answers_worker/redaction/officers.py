@@ -13,6 +13,9 @@ ANY_HEADING = re.compile(r"^#{1,6}\s", re.MULTILINE)
 
 
 def officer_blocks(text: str) -> tuple[tuple[int, int], ...]:
+    """`(start, end)` of each section whose heading names
+    officers, directors, signatories or persons with
+    significant control, up to the next heading of any level."""
     blocks: list[tuple[int, int]] = []
     for heading in AN_OFFICER_HEADING.finditer(text):
         following = ANY_HEADING.search(text, heading.end())
@@ -23,6 +26,7 @@ def officer_blocks(text: str) -> tuple[tuple[int, int], ...]:
 def raised_by_the_block_rule(
     findings: Sequence[Finding], text: str
 ) -> tuple[Finding, ...]:
+    """A person's name inside an officer block moves to the `always` tier."""
     blocks = officer_blocks(text)
     return raised_to_always(
         findings,

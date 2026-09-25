@@ -39,6 +39,9 @@ class ObjectStore:
 
 @dataclass(frozen=True, slots=True)
 class Engine:
+    """`lmdb_map_bytes` is one binding's cap across
+    both its stores; `concurrent_runs` is always one."""
+
     lmdb_dir: str
     lmdb_map_bytes: int = LMDB_MAP_BYTES
     max_inflight_components: int = MAX_INFLIGHT_COMPONENTS
@@ -88,6 +91,9 @@ def _positive_bytes(source: Mapping[str, str], name: str, fallback: int) -> int:
 
 
 def read_bootstrap(environment: Mapping[str, str] | None = None) -> Bootstrap:
+    """Reads `os.environ` when `environment` is None; `WORKER_ID` falls back to
+    the host name. Raises `BootstrapError` naming every missing variable, or for
+    a size that is not a positive number or `MAX_CONCURRENT_RUNS` other than one."""
     source = environ if environment is None else environment
 
     missing = [name for name in REQUIRED if not source.get(name)]

@@ -22,6 +22,8 @@ _PATTERNS = _compiled()
 
 
 def citation_in(prose: str) -> tuple[str, str] | None:
+    """The first pattern in `contracts/citation/cases.json` the prose
+    matches, as its name and the matched text; None when it cites nothing."""
     for what, pattern in _PATTERNS:
         found = pattern.search(prose)
         if found is not None:

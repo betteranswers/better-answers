@@ -56,6 +56,8 @@ class IndexRun:
 async def open_pool(
     database_url: str, workspace_id: str, *, max_size: int = POOL_MAX_SIZE
 ) -> asyncpg.Pool:
+    """Every connection is scoped to the workspace for its
+    whole life, since the setting is made per session."""
 
     async def scope(connection: asyncpg.Connection) -> None:
         await connection.execute(
@@ -97,6 +99,9 @@ class _Loop:
 
 
 class Host:
+    """One pool per workspace and each binding's two engine stores, closing the least
+    recently used binding's once more than `environments_held` handles are open."""
+
     def __init__(
         self, bootstrap: Bootstrap, *, environments_held: int = ENVIRONMENTS_HELD
     ) -> None:
@@ -168,6 +173,7 @@ class Host:
             self._environment(run, store)
 
     def held_bindings(self) -> tuple[str, ...]:
+        """Binding ids with a store open, least recently used first."""
         return tuple(self._environments)
 
     def _evict(self, run: IndexRun, store: str) -> None:
@@ -221,6 +227,8 @@ class Host:
     def land_rows(
         self, run: IndexRun, table: Table, rows: Sequence[Mapping[str, Any]]
     ) -> int:
+        """A row the store tracks as landed is not written
+        again, and one it tracked that `rows` omits is deleted."""
         declared = tuple(rows)
         app = coco.App(self.app_config(run, CHUNKS_APP), declare_rows, table, declared)
         # From the caller's thread, never the host's loop: the blocking form of an
@@ -229,6 +237,8 @@ class Host:
         return int(landed) if isinstance(landed, int) else len(declared)
 
     def drop_binding(self, run: IndexRun) -> None:
+        """Drops the engine's record of the binding's chunks,
+        leaving the table, its indexes and every row it landed."""
         coco.App(self.app_config(run, CHUNKS_APP), declare_nothing).drop_blocking()
 
     def close(self) -> None:

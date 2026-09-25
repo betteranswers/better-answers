@@ -17,11 +17,14 @@ _ENCODER_KEY: Final = "model_name"
 
 
 def fetch() -> None:
+    """Building the analyzer downloads each model's weights into the hub cache."""
     for model_id in WEIGHTS:
         build_analyzer(model_id)
 
 
 def carried_repositories() -> tuple[Path, ...]:
+    """The hub cache directory of each model and of the encoder its config names,
+    where its tokenizer comes from. Offline: raises when `fetch` has not run."""
     found: dict[str, Path] = {}
     for model_id in WEIGHTS:
         snapshot = Path(snapshot_download(model_id, local_files_only=True))

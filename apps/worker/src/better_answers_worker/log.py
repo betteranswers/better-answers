@@ -17,6 +17,8 @@ structlog.configure(
 
 
 def bridge_standard_library() -> None:
+    """Replaces the root logger's handlers, so a library's
+    records reach stdout as the same JSON, at INFO and above."""
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(
         structlog.stdlib.ProcessorFormatter(

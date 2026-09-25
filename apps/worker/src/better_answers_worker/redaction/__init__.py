@@ -34,6 +34,9 @@ ALWAYS_PLACEHOLDER = next(
 
 @dataclass(frozen=True, slots=True)
 class Redaction:
+    """`verdict` is the class the document narrows to, None when nothing
+    narrows it; `lifted` is True when every narrowing finding was dismissed."""
+
     text: str
     findings: tuple[Finding, ...]
     withholdings: tuple[Withholding, ...]
@@ -54,6 +57,9 @@ def redact(
     restores: Sequence[Restore] = (),
     dismissals: Sequence[Dismissal] = (),
 ) -> Redaction:
+    """Writes a placeholder over every withheld span, and over each erased
+    identifier that clears the length floor wherever it appears, raised or not.
+    A name's placeholder carries a letter drawn from `seed`, one per name."""
 
     policy = Policy(
         rules_in_force=rules_in_force,

@@ -14,14 +14,17 @@ _SHORTEST_FRAME = ENVELOPE_VERSION_BYTES + ENVELOPE_NONCE_BYTES + ENVELOPE_TAG_B
 
 
 class UnopenableError(Exception):
+    """`name` is the refusal word: `envelope-malformed`,
+    `envelope-version-unknown` or `envelope-not-authentic`."""
+
     def __init__(self, name: str, message: str) -> None:
         super().__init__(message)
         self.name = name
 
 
-# A wrong key length is the caller's defect: a refusal word here would let a
-# mis-provisioned key read as somebody's bad envelope.
 def _keyed(key: bytes) -> AESGCM:
+    """A wrong key length is the caller's defect: a refusal word here
+    would let a mis-provisioned key read as somebody's bad envelope."""
     if len(key) != ENVELOPE_KEY_BYTES:
         message = f"envelope: a key is {ENVELOPE_KEY_BYTES} bytes, not {len(key)}"
         raise ValueError(message)
@@ -29,6 +32,9 @@ def _keyed(key: bytes) -> AESGCM:
 
 
 def sealed(key: bytes, plaintext: bytes) -> bytes:
+    """One version byte, a random 12-byte nonce, then the AES-256-GCM
+    ciphertext and tag, with the version byte as associated data.
+    Raises `ValueError` for a key that is not 32 bytes."""
     cipher = _keyed(key)
     version = bytes([ENVELOPE_VERSION])
     # Never a counter: two processes share the key and would hand out one number
@@ -39,6 +45,8 @@ def sealed(key: bytes, plaintext: bytes) -> bytes:
 
 
 def opened(key: bytes, frame: bytes) -> bytes:
+    """Raises `UnopenableError` for a frame that is too short, of a version this tier
+    cannot read, or not authentic, and `ValueError` for a key that is not 32 bytes."""
     cipher = _keyed(key)
     if not frame:
         raise UnopenableError("envelope-malformed", "envelope: a frame has no version")

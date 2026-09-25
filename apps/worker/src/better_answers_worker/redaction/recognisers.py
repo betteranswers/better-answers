@@ -141,6 +141,8 @@ class HomeAddressRecogniser(SeamRecogniser):
 
 
 class ConsumerEmailRecogniser(SeamRecogniser):
+    """Raises an address only at a consumer mail domain; any other address passes."""
+
     def __init__(self, descriptor: CategoryDescriptor, entity: str) -> None:
         super().__init__(descriptor, entity)
         self.built_in = EmailRecognizer(context=list(descriptor.context))
@@ -155,6 +157,8 @@ class ConsumerEmailRecogniser(SeamRecogniser):
 
 
 def sentence_around(text: str, at: int) -> tuple[int, int]:
+    """`(start, end)` of the sentence holding offset `at`, whitespace
+    trimmed; a blank line ends a sentence as a full stop does."""
     start = 0
     end = len(text)
     for like_a_full_stop in A_SENTENCE_BREAK.finditer(text):
