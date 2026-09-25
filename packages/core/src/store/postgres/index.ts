@@ -19,9 +19,14 @@ export type PostgresDoor = {
 
 export const openPostgres = (pool: pg.Pool): PostgresDoor => ({ pool });
 
+/**
+ * A SQL expression for the workspace in parameter `$at`, or for the transaction's own scope when
+ * that parameter is null.
+ */
 export const scopeClause = (at: number): string =>
   `COALESCE($${at}::text, (select current_workspace_id()))`;
 
+/** Null for the platform, so that scopeClause falls back to the transaction's scope. */
 export const scopeParameter = (principal: Principal): string | null =>
   principal.kind === "user" ? principal.workspaceId : null;
 
@@ -39,8 +44,10 @@ type Unwrapped<T> = T extends { readonly ok: true; readonly value: infer Value }
 
 type Refused<T> = T extends { readonly ok: false; readonly error: infer Refusal } ? Refusal : never;
 
-// A union only partly a Result has no answer to fold: its Result members would reach the caller as
-// values, a refusal among them.
+/**
+ * A union only partly a Result has no answer to fold: its Result members would reach the caller
+ * as values, a refusal among them.
+ */
 type OnlyPartlyAResult<T> = WhollyAResult<T> extends true ? false : PartlyAResult<T>;
 
 export type Answered<T> =
@@ -63,10 +70,14 @@ const answersAResult = <T>(answer: T): answer is T & AnyResult =>
 
 const answersARefusal = <T>(answer: T): boolean => answersAResult(answer) && !answer.ok;
 
+/**
+ * One Result for an opened work: the principal's refusal, the Result the work answered, or else
+ * the work's answer as the value.
+ */
 export const folded = <T>(opened: Opened<Foldable<T>>): Folded<T> => {
   if (!opened.ok) return err(opened.error);
   const answer = opened.value;
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- `Folded<T>` is conditional on a `T` still open here, which no runtime predicate resolves for the compiler
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- `Folded<T>` turns on a `T` still open here, which no runtime check narrows
   return (answersAResult(answer) ? answer : ok(answer)) as Folded<T>;
 };
 
@@ -88,8 +99,10 @@ const commit = async (client: pg.PoolClient): Promise<void> => {
   }
 };
 
-// Every door opens its transaction here, so a refusal after a write leaves nothing behind whichever
-// door the work came through.
+/**
+ * Every door opens its transaction here, so a refusal after a write leaves nothing behind
+ * whichever door the work came through.
+ */
 const transaction = async <T>(
   door: PostgresDoor,
   work: (client: pg.PoolClient) => Promise<T>,
@@ -114,6 +127,10 @@ const scopeTo = async (tx: Tx, workspaceId: string): Promise<void> => {
   await tx.query("SELECT set_config('app.workspace_id', $1, true)", [workspaceId]);
 };
 
+/**
+ * Runs `work` in one transaction scoped to `workspaceId`. It rolls back when `work` throws or
+ * answers a refused Result.
+ */
 export const withScope = async <T>(
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -125,54 +142,71 @@ export const withScope = async <T>(
     return work(client, platform);
   });
 
-// A session lock outlives the connection's return to the pool, so it takes its own connection
-// and an explicit unlock.
+/** A session lock outlives the connection's return to the pool, so it holds a connection alone. */
+const onOwnConnection = async <T>(
+  door: PostgresDoor,
+  use: (holder: pg.PoolClient) => Promise<T>,
+): Promise<T> => {
+  const holder = await door.pool.connect();
+  try {
+    return await use(holder);
+  } finally {
+    holder.release();
+  }
+};
+
+const unlockingAfter = async <T>(
+  holder: pg.PoolClient,
+  key: number,
+  work: () => Promise<T>,
+): Promise<T> => {
+  try {
+    return await work();
+  } finally {
+    await holder.query("SELECT pg_advisory_unlock($1)", [key]);
+  }
+};
+
+/**
+ * Waits for the session lock on `key`, runs `work` outside any transaction, and unlocks once
+ * `work` settles, failed or not.
+ */
 export const withSessionLock = async <T>(
   platform: PlatformPrincipal,
   door: PostgresDoor,
   key: number,
   work: (platform: PlatformPrincipal) => Promise<T>,
-): Promise<T> => {
-  const holder = await door.pool.connect();
-  try {
+): Promise<T> =>
+  onOwnConnection(door, async (holder) => {
     await holder.query("SELECT pg_advisory_lock($1)", [key]);
-    try {
-      return await work(platform);
-    } finally {
-      await holder.query("SELECT pg_advisory_unlock($1)", [key]);
-    }
-  } finally {
-    holder.release();
-  }
-};
+    return unlockingAfter(holder, key, () => work(platform));
+  });
 
 export type LockHeld = "held";
 
-// The try answers at once, so a second holder skips its work rather than queueing behind the
-// first.
+/**
+ * As withSessionLock, but `held` at once while another session holds `key`, so a second holder
+ * skips its work rather than queueing behind the first.
+ */
 export const withSessionTryLock = async <T>(
   platform: PlatformPrincipal,
   door: PostgresDoor,
   key: number,
   work: (platform: PlatformPrincipal) => Promise<T>,
-): Promise<Result<T, LockHeld>> => {
-  const holder = await door.pool.connect();
-  try {
+): Promise<Result<T, LockHeld>> =>
+  onOwnConnection(door, async (holder): Promise<Result<T, LockHeld>> => {
     const tried = await holder.query<{ taken: boolean }>(
       "SELECT pg_try_advisory_lock($1) AS taken",
       [key],
     );
     if (tried.rows[0]?.taken !== true) return err("held");
-    try {
-      return ok(await work(platform));
-    } finally {
-      await holder.query("SELECT pg_advisory_unlock($1)", [key]);
-    }
-  } finally {
-    holder.release();
-  }
-};
+    return ok(await unlockingAfter(holder, key, () => work(platform)));
+  });
 
+/**
+ * Runs `work` in one transaction with no workspace scope. It rolls back when `work` throws or
+ * answers a refused Result.
+ */
 export const withIdentityWrite = async <T>(
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -180,6 +214,7 @@ export const withIdentityWrite = async <T>(
 ): Promise<T> => transaction(door, (client) => work(client, platform));
 
 /* jscpd:ignore-start */
+/** The same transaction as withIdentityWrite: nothing stops its work from writing. */
 export const withIdentityRead = async <T>(
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -197,8 +232,10 @@ const MEMBERSHIP_QUERY = `SELECT m.role AS role, u.credentials_revoked_at AS per
      JOIN "user" u ON u.id = m.user_id
     WHERE m.workspace_id = $1 AND m.user_id = $2`;
 
-// Both rows held, or a revocation lands between the read and the commit; never on the
-// boundary read, which every request runs.
+/**
+ * Both rows held, or a revocation lands between the read and the commit; never on the boundary
+ * read, which every request runs.
+ */
 const MEMBERSHIP_QUERY_HELD = `${MEMBERSHIP_QUERY} FOR SHARE OF m, u`;
 
 const isRole = (value: string): value is Role => ROLES.some((role) => role === value);
@@ -240,18 +277,32 @@ const resolveClaims = async <T>(
   );
 };
 
+/**
+ * Resolves `claims` to a member of the workspace they name, then runs `work` as that member in one
+ * transaction scoped to it. Refuses malformed claims, a non-member, an unknown role, credentials
+ * issued before a revocation, and a role the claims name that the member row does not hold.
+ */
 export const withPrincipal = async <T>(
   door: PostgresDoor,
   claims: Claims,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
 ): Promise<Opened<T>> => resolveClaims(door, claims, work, MEMBERSHIP_QUERY);
 
+/**
+ * As withPrincipal, but the member and user rows stay held until commit, so a revocation cannot
+ * land between the read and the commit.
+ */
 export const withHeldPrincipal = async <T>(
   door: PostgresDoor,
   claims: Claims,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
 ): Promise<Opened<T>> => resolveClaims(door, claims, work, MEMBERSHIP_QUERY_HELD);
 
+/**
+ * Reads the principal's member row again, held as withHeldPrincipal holds it, and runs `work` as
+ * the principal read back, groups included. Refuses a non-member, an unknown role, revoked
+ * credentials, and a role that has moved.
+ */
 export const withMembership = async <T>(
   principal: UserPrincipal,
   door: PostgresDoor,
@@ -346,49 +397,59 @@ const outcome = (count: number, rule: CounterRule, start: Date, now: Date): Coun
   ),
 });
 
+const countInWindow = async (
+  rule: CounterRule,
+  now: Date,
+  increment: (start: Date) => Promise<pg.QueryResult<{ count: number }>>,
+): Promise<CounterOutcome> => {
+  const start = windowStart(rule, now);
+  const counted = await increment(start);
+  return outcome(counted.rows[0]?.count ?? 1, rule, start, now);
+};
+
+/**
+ * Counts one attempt against `scope` and `key` in the fixed window `now` falls in, and drops the
+ * pair's earlier windows. It commits at once. `retryAfterSeconds` runs to the window's end, 1 at
+ * least.
+ */
 export const consumeIngress = async (
   door: PostgresDoor,
   scope: "ip" | "email",
   key: string,
   rule: CounterRule,
   now: Date,
-): Promise<CounterOutcome> => {
-  const start = windowStart(rule, now);
-
-  const counted = await door.pool.query<{ count: number }>(
-    `WITH swept AS (
-       DELETE FROM ingress_counter WHERE scope = $1 AND key = $2 AND window_start < $3
-     )
-     INSERT INTO ingress_counter (scope, key, window_start, count) VALUES ($1, $2, $3, 1)
-     ON CONFLICT (scope, key, window_start) DO UPDATE SET count = ingress_counter.count + 1
-     RETURNING count`,
-    [scope, key, start],
+): Promise<CounterOutcome> =>
+  countInWindow(rule, now, (start) =>
+    door.pool.query<{ count: number }>(
+      `WITH swept AS (
+         DELETE FROM ingress_counter WHERE scope = $1 AND key = $2 AND window_start < $3
+       )
+       INSERT INTO ingress_counter (scope, key, window_start, count) VALUES ($1, $2, $3, 1)
+       ON CONFLICT (scope, key, window_start) DO UPDATE SET count = ingress_counter.count + 1
+       RETURNING count`,
+      [scope, key, start],
+    ),
   );
 
-  return outcome(counted.rows[0]?.count ?? 1, rule, start, now);
-};
-
+/** As consumeIngress, for one call on the token `tokenId`, inside the caller's transaction. */
 export const consumeCall = async (
   principal: UserPrincipal,
   tx: Tx,
   tokenId: string,
   rule: CounterRule,
   now: Date,
-): Promise<CounterOutcome> => {
-  const start = windowStart(rule, now);
-
-  const counted = await tx.query<{ count: number }>(
-    `WITH swept AS (
-       DELETE FROM mcp_call_counter WHERE token_id = $2 AND window_start < $3
-     )
-     INSERT INTO mcp_call_counter (workspace_id, token_id, window_start, count) VALUES ($1, $2, $3, 1)
-     ON CONFLICT (workspace_id, token_id, window_start) DO UPDATE SET count = mcp_call_counter.count + 1
-     RETURNING count`,
-    [principal.workspaceId, tokenId, start],
+): Promise<CounterOutcome> =>
+  countInWindow(rule, now, (start) =>
+    tx.query<{ count: number }>(
+      `WITH swept AS (
+         DELETE FROM mcp_call_counter WHERE token_id = $2 AND window_start < $3
+       )
+       INSERT INTO mcp_call_counter (workspace_id, token_id, window_start, count) VALUES ($1, $2, $3, 1)
+       ON CONFLICT (workspace_id, token_id, window_start) DO UPDATE SET count = mcp_call_counter.count + 1
+       RETURNING count`,
+      [principal.workspaceId, tokenId, start],
+    ),
   );
-
-  return outcome(counted.rows[0]?.count ?? 1, rule, start, now);
-};
 
 export const readWorkspaceConfig = async (
   principal: UserPrincipal,
@@ -402,6 +463,10 @@ export const readWorkspaceConfig = async (
   return found.rows[0]?.value;
 };
 
+/**
+ * Those of `names` that `information_schema.tables` lists in `public`, in no set order: a view
+ * counts, and a table the role holds no privilege on does not.
+ */
 export const tablesPresent = async (
   door: PostgresDoor,
   names: readonly string[],
