@@ -613,7 +613,7 @@ describe("refresh and revocation", () => {
 });
 
 describe("the audit logs", () => {
-  it("emits six auth events with audit fields, never a secret", async () => {
+  it("logs picks and token events, not sign-ins or secrets", async () => {
     const one = await app.provision({ name: "Logged" });
     const two = await app.provision({ name: "Logged too" });
     await app.addMember(two.workspaceId, one.admin.id, "Viewer");
@@ -631,13 +631,11 @@ describe("the audit logs", () => {
     const events = app.logs.slice(before).filter((line) => line["module"] === "auth");
     const byEvent = (name: string) => events.filter((line) => line["event"] === name);
 
-    expect(byEvent("auth.sign_in")).toMatchObject([{ principal: one.admin.id, outcome: "ok" }]);
+    expect(byEvent("auth.sign_in")).toEqual([]);
     expect(byEvent("auth.workspace_pick")).toMatchObject([
       { principal: one.admin.id, workspace: two.workspaceId, outcome: "ok" },
     ]);
-    expect(byEvent("auth.consent")).toMatchObject([
-      { principal: one.admin.id, client_id: CLAUDE_CLIENT_ID, outcome: "ok" },
-    ]);
+    expect(byEvent("auth.consent")).toEqual([]);
     expect(byEvent("auth.token_issue")).toMatchObject([
       {
         principal: one.admin.id,
