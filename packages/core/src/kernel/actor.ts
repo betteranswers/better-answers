@@ -1,6 +1,6 @@
 import { ACTOR_ID, boundarySchemas } from "@better-answers/schema";
 
-import type { Principal, UserId } from "./principal.ts";
+import type { OperatorPrincipal, Principal, UserId } from "./principal.ts";
 
 export const PERSON_PREFIX = "human:";
 
@@ -12,7 +12,7 @@ export type ActorId = `human:${string}` | ProcessActorId | `better-answers-${str
 
 export const actorIdOfPerson = (personId: UserId): ActorId => `${PERSON_PREFIX}${personId}`;
 
-export const actorIdOf = (principal: Principal): ActorId =>
+export const actorIdOf = (principal: Principal | OperatorPrincipal): ActorId =>
   principal.kind === "platform" ? principal.actorId : actorIdOfPerson(principal.userId);
 
 export const isActorId = (value: string): value is ActorId => ACTOR_ID.test(value);

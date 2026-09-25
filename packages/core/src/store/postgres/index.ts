@@ -28,8 +28,11 @@ export const openPostgres = (pool: pg.Pool): PostgresDoor => ({ pool });
 export const scopeClause = (at: number): string =>
   `COALESCE($${at}::text, (select current_workspace_id()))`;
 
-/** Null for the platform, so that scopeClause falls back to the transaction's scope. */
-export const scopeParameter = (principal: Principal): string | null =>
+/**
+ * Null for the platform and the operator, so that scopeClause falls back to the transaction's
+ * scope; the operator's holds none, so no row of a workspace's lands under them.
+ */
+export const scopeParameter = (principal: Principal | OperatorPrincipal): string | null =>
   principal.kind === "user" ? principal.workspaceId : null;
 
 export type Tx = Pick<pg.PoolClient, "query">;

@@ -5,22 +5,46 @@ import { z } from "zod";
 import type { OperatorPrincipal, Principal } from "@better-answers/core/kernel";
 import type { Tx } from "@better-answers/core/store/postgres";
 import { setOperatorMark } from "@better-answers/core/workspaces";
+import { ulid } from "@better-answers/schema";
 
 import { runOps } from "../src/ops/index.ts";
 import type { operatorProcedure } from "../src/trpc/base.ts";
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
-import { connectAsHost, signIn } from "./flow.ts";
+import { appRouter } from "../src/trpc/router.ts";
+import { connectAsHost, refresh, signIn } from "./flow.ts";
 import { capturingLogger, type TestApp } from "./harness.ts";
+import { callMcp } from "./mcp-call.ts";
+import { sessionsSignedInOverAnHourAgo } from "./provoke.ts";
 import { appForSuite } from "./suite-app.ts";
 import { refusalOfCall, webSignedIn } from "./web-client.ts";
 
 const app = appForSuite();
 
-const LIST_WORKSPACES = `${TRPC_ENDPOINT}/console.workspaces.list`;
-
 const IDENTITY_ACTOR = "process:better-answers-identity";
 
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+
 type OperatorContext = inferProcedureBuilderResolverOptions<typeof operatorProcedure>["ctx"];
+
+type WebApi = Awaited<ReturnType<typeof webSignedIn>>["api"];
+
+/** Every console procedure, each asked with an input it would take from the operator. */
+const CONSOLE_CALLS: readonly (readonly [string, (api: WebApi) => Promise<unknown>])[] = [
+  ["console.workspaces.list", (api) => api.console.workspaces.list.query()],
+  [
+    "console.people.revokeCredentials",
+    (api) => api.console.people.revokeCredentials.mutate({ personId: ulid() }),
+  ],
+];
+
+/** The same procedures as a client holding only a bearer asks for them. */
+const BEARER_ASKS: readonly (readonly [string, RequestInit])[] = [
+  ["console.workspaces.list", {}],
+  [
+    "console.people.revokeCredentials",
+    { method: "POST", body: JSON.stringify({ personId: ulid() }) },
+  ],
+];
 
 const answeredUser = z.object({ user: z.looseObject({ id: z.string() }) });
 
@@ -240,11 +264,20 @@ describe("the console's list of every workspace, the operator's alone", () => {
       name: "Acme Holdings",
       slug: `ws-${acme.workspaceId.toLowerCase()}`,
       memberCount: 2,
-      createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/),
+      createdAt: expect.stringMatching(ISO_INSTANT),
     });
   });
 
-  it("refuses an Admin, an Editor and a Viewer not-the-operator", async () => {
+  it("refuses every console procedure the router serves, none left out", () => {
+    const consoleProcedures = Object.keys(appRouter._def.procedures)
+      .filter((path) => path.startsWith("console."))
+      .sort();
+
+    expect(CONSOLE_CALLS.map(([path]) => path).toSorted()).toEqual(consoleProcedures);
+    expect(BEARER_ASKS.map(([path]) => path).toSorted()).toEqual(consoleProcedures);
+  });
+
+  it.each(CONSOLE_CALLS)("refuses %s to Admin, Editor and Viewer", async (_path, call) => {
     const workspace = await app().provision();
     const editor = await app().person();
     const viewer = await app().person();
@@ -254,7 +287,7 @@ describe("the console's list of every workspace, the operator's alone", () => {
     const refusals: unknown[] = [];
     for (const email of [workspace.admin.email, editor.email, viewer.email]) {
       const { api } = await webSignedIn(app(), email);
-      refusals.push(await refusalOfCall(api.console.workspaces.list.query()));
+      refusals.push(await refusalOfCall(call(api)));
     }
 
     expect(refusals).toEqual(
@@ -269,13 +302,16 @@ describe("the console's list of every workspace, the operator's alone", () => {
     );
   });
 
-  it("refuses the operator's own OAuth bearer, which holds no session", async () => {
+  it.each(BEARER_ASKS)("refuses %s to the operator's own OAuth bearer", async (path, init) => {
     const { workspace } = await theOperatorOnTheWeb();
     const { accessToken } = await connectAsHost(app(), app().client(), workspace.admin);
 
     const response = await app()
       .client()
-      .fetch(LIST_WORKSPACES, { headers: { authorization: `Bearer ${accessToken}` } });
+      .fetch(`${TRPC_ENDPOINT}/${path}`, {
+        ...init,
+        headers: { "content-type": "application/json", authorization: `Bearer ${accessToken}` },
+      });
 
     expect({ status: response.status, answer: await response.json() }).toMatchObject({
       status: 401,
@@ -292,5 +328,147 @@ describe("the console's list of every workspace, the operator's alone", () => {
     expect(await refusalOfCall(api.console.workspaces.list.query())).toMatchObject({
       data: { refusal: { word: "not-the-operator", class: "forbidden" } },
     });
+  });
+});
+
+describe("revoking a person's credentials everywhere, from the console", () => {
+  const revocationRowsOf = async (personId: string) => {
+    const found = await app().database.superuser.query(
+      `SELECT act, actor, subject_id, detail FROM identity_audit_event
+        WHERE subject_id = $1 AND act = 'people.person.credentials_revoked'`,
+      [personId],
+    );
+    return found.rows;
+  };
+
+  const sessionsHeldBy = async (personId: string): Promise<number | undefined> => {
+    const found = await app().database.superuser.query<{ held: number }>(
+      "SELECT count(*)::int AS held FROM session WHERE user_id = $1",
+      [personId],
+    );
+    return found.rows[0]?.held;
+  };
+
+  const refreshTokensOf = async (personId: string) => {
+    const found = await app().database.superuser.query(
+      `SELECT reference_id AS workspace_id, revoked IS NOT NULL AS revoked FROM oauth_refresh_token
+        WHERE user_id = $1 ORDER BY reference_id`,
+      [personId],
+    );
+    return found.rows;
+  };
+
+  const revokedAtOf = async (personId: string) => {
+    const found = await app().database.superuser.query(
+      'SELECT credentials_revoked_at FROM "user" WHERE id = $1',
+      [personId],
+    );
+    return found.rows;
+  };
+
+  it("ends a person's sessions and tokens in both their workspaces", async () => {
+    const { workspace: operators, api } = await theOperatorOnTheWeb();
+    const acme = await app().provision({ name: "Acme" });
+    const beta = await app().provision({ name: "Beta" });
+    const person = acme.admin;
+    await app().addMember(beta.workspaceId, person.id, "Editor");
+    const inAcme = await connectAsHost(app(), app().client(), person, { pick: acme.workspaceId });
+    const inBeta = await connectAsHost(app(), app().client(), person, { pick: beta.workspaceId });
+    const host = app().client();
+    expect(await sessionsHeldBy(person.id)).toBe(2);
+    expect([
+      (await callMcp(host, inAcme.accessToken, "tools/list")).status,
+      (await callMcp(host, inBeta.accessToken, "tools/list")).status,
+    ]).toEqual([200, 200]);
+
+    const revoked = await api.console.people.revokeCredentials.mutate({ personId: person.id });
+
+    expect(revoked).toEqual({ personId: person.id, revokedAt: expect.stringMatching(ISO_INSTANT) });
+    expect(await sessionsHeldBy(person.id)).toBe(0);
+    expect(await refreshTokensOf(person.id)).toEqual(
+      [acme.workspaceId, beta.workspaceId]
+        .toSorted()
+        .map((workspaceId) => ({ workspace_id: workspaceId, revoked: true })),
+    );
+    expect([
+      (await callMcp(host, inAcme.accessToken, "tools/list")).status,
+      (await callMcp(host, inBeta.accessToken, "tools/list")).status,
+      (await refresh(host, inAcme.refreshToken ?? "")).status,
+      (await refresh(host, inBeta.refreshToken ?? "")).status,
+    ]).toEqual([401, 401, 400, 400]);
+    expect(await revocationRowsOf(person.id)).toEqual([
+      {
+        act: "people.person.credentials_revoked",
+        actor: `human:${operators.admin.id}`,
+        subject_id: person.id,
+        detail: {},
+      },
+    ]);
+
+    // Consent resolves the person in the workspace picked, so reaching the code at the client's
+    // redirect is a fresh sign-in admitted there.
+    for (const workspaceId of [acme.workspaceId, beta.workspaceId]) {
+      await connectAsHost(app(), app().client(), person, { pick: workspaceId });
+    }
+  });
+
+  it("admits the person's fresh sign-in once the revocation lands", async () => {
+    const { api } = await theOperatorOnTheWeb();
+    const acme = await app().provision();
+    const before = await webSignedIn(app(), acme.admin.email);
+    await api.console.people.revokeCredentials.mutate({ personId: acme.admin.id });
+
+    const again = await webSignedIn(app(), acme.admin.email);
+
+    expect(await refusalOfCall(before.api.session.membership.query())).toMatchObject({
+      data: { refusal: { word: "no-session" } },
+    });
+    expect(await again.api.session.membership.query()).toMatchObject({
+      workspace: { id: acme.workspaceId },
+      person: { id: acme.admin.id },
+      role: "Admin",
+    });
+  });
+
+  it("refuses the operator's sign-in over an hour old, writing nothing", async () => {
+    const { workspace, api } = await theOperatorOnTheWeb();
+    const person = await app().person();
+    await sessionsSignedInOverAnHourAgo(app(), workspace.admin.id);
+
+    const refused = await refusalOfCall(
+      api.console.people.revokeCredentials.mutate({ personId: person.id }),
+    );
+
+    expect(refused).toMatchObject({
+      data: { httpStatus: 401, refusal: { word: "sign-in-too-old", class: "unauthenticated" } },
+    });
+    expect(await revokedAtOf(person.id)).toEqual([{ credentials_revoked_at: null }]);
+    expect(await revocationRowsOf(person.id)).toEqual([]);
+  });
+
+  it("admits the operator again after a fresh sign-in", async () => {
+    const { workspace } = await theOperatorOnTheWeb();
+    const person = await app().person();
+    await sessionsSignedInOverAnHourAgo(app(), workspace.admin.id);
+
+    const { api } = await webSignedIn(app(), workspace.admin.email);
+    const revoked = await api.console.people.revokeCredentials.mutate({ personId: person.id });
+
+    expect(revoked.personId).toBe(person.id);
+    expect(await revocationRowsOf(person.id)).toHaveLength(1);
+  });
+
+  it("refuses a person nobody holds, writing nothing", async () => {
+    const { api } = await theOperatorOnTheWeb();
+    const nobody = ulid();
+
+    const refused = await refusalOfCall(
+      api.console.people.revokeCredentials.mutate({ personId: nobody }),
+    );
+
+    expect(refused).toMatchObject({
+      data: { httpStatus: 404, refusal: { word: "no-such-user", class: "absent" } },
+    });
+    expect(await revocationRowsOf(nobody)).toEqual([]);
   });
 });

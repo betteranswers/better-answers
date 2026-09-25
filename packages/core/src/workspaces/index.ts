@@ -1,8 +1,18 @@
 import { boundarySchemas, CREATOR_ROLE } from "@better-answers/schema";
+import { z } from "zod";
 
-import { act, declareActs, record } from "../audit/index.ts";
-import { attempt, err, ok, refusalFor, type Result, ulid } from "../kernel/index.ts";
+import { act, declareActs, declareIdentitySetActs, record } from "../audit/index.ts";
+import {
+  attempt,
+  err,
+  ok,
+  refusalFor,
+  requireFreshSignIn,
+  type Result,
+  ulid,
+} from "../kernel/index.ts";
 import type {
+  OperatorPrincipal,
   PlatformPrincipal,
   PrincipalRefusal,
   Role,
@@ -330,53 +340,72 @@ export const addMember = async (
   });
 };
 
-export type RevokeCredentialsInput = {
-  readonly userId: string;
+const CREDENTIAL_ACTS = declareIdentitySetActs("people", {
+  revoked: act("people.person.credentials_revoked", {}),
+});
 
+export const revokeCredentialsInput = z.object({ personId: z.string() });
+
+type RevokeCredentialsInput = z.output<typeof revokeCredentialsInput> & {
+  /** When the act happens: the sign-in's age is judged against it, and it is the revocation's. */
   readonly at: Date;
 };
 
+type CredentialsRevoked = {
+  readonly personId: UserId;
+
+  /** Later than the `at` asked for where an earlier revocation already held a later instant. */
+  readonly revokedAt: string;
+};
+
+export type RevokeCredentialsRefusal = WorkspaceRefusal<"no-such-user" | "sign-in-too-old">;
+
+/** Undefined, having changed nothing, when no person holds the id. */
+const endingCredentials = async (tx: Tx, personId: UserId, at: Date): Promise<Date | undefined> => {
+  const person = await tx.query<{ at: Date }>(
+    'UPDATE "user" SET credentials_revoked_at = GREATEST(COALESCE(credentials_revoked_at, $2), $2), updated_at = now() WHERE id = $1 RETURNING credentials_revoked_at AS at',
+    [personId, at],
+  );
+  const held = person.rows[0]?.at;
+  if (held === undefined) return undefined;
+  await tx.query("DELETE FROM session WHERE user_id = $1 AND created_at < $2", [personId, held]);
+  await tx.query(
+    "UPDATE oauth_refresh_token SET revoked = now() WHERE user_id = $1 AND created_at < $2 AND revoked IS NULL",
+    [personId, held],
+  );
+  await tx.query(
+    "UPDATE oauth_access_token SET revoked = now() WHERE user_id = $1 AND created_at < $2 AND revoked IS NULL",
+    [personId, held],
+  );
+  return held;
+};
+
 /**
- * Ends the person's sessions and OAuth tokens created before the revocation instant, in every
- * workspace. The instant only moves forward: an `at` before the one held keeps the held one. A
- * malformed id answers `no-such-user`.
+ * Ends every session and OAuth token the person was issued before the revocation instant, in every
+ * workspace, and records the act under the operator. The instant only moves forward: an `at`
+ * before the one held keeps the held one. A malformed id answers `no-such-user`.
  */
 export const revokeCredentials = async (
-  platform: PlatformPrincipal,
-  door: PostgresDoor,
+  operator: OperatorPrincipal,
+  tx: Tx,
   input: RevokeCredentialsInput,
-): Promise<
-  Result<{ userId: string; actorId: PlatformPrincipal["actorId"] }, "no-such-user" | Error>
-> => {
-  const userId = boundarySchemas.user.select.shape.id.safeParse(input.userId);
-  if (!userId.success) return err("no-such-user");
-  const revoked = await attempt(() =>
-    withIdentityWrite(platform, door, async (tx) => {
-      const person = await tx.query<{ at: Date }>(
-        'UPDATE "user" SET credentials_revoked_at = GREATEST(COALESCE(credentials_revoked_at, $2), $2), updated_at = now() WHERE id = $1 RETURNING credentials_revoked_at AS at',
-        [userId.data, input.at],
-      );
-      const at = person.rows[0]?.at;
-      if (at === undefined) return undefined;
-      await tx.query("DELETE FROM session WHERE user_id = $1 AND created_at < $2", [
-        userId.data,
-        at,
-      ]);
-      await tx.query(
-        "UPDATE oauth_refresh_token SET revoked = now() WHERE user_id = $1 AND created_at < $2 AND revoked IS NULL",
-        [userId.data, at],
-      );
-      await tx.query(
-        "UPDATE oauth_access_token SET revoked = now() WHERE user_id = $1 AND created_at < $2 AND revoked IS NULL",
-        [userId.data, at],
-      );
-      return at;
-    }),
-  );
+): Promise<Result<CredentialsRevoked, RevokeCredentialsRefusal | Error>> => {
+  const fresh = requireFreshSignIn(operator, input.at);
+  if (!fresh.ok) return err(fresh.error);
+  const personId = boundarySchemas.user.select.shape.id.safeParse(input.personId);
+  if (!personId.success) return err("no-such-user");
 
-  if (!revoked.ok) return err(revoked.error);
-  if (revoked.value === undefined) return err("no-such-user");
-  return ok({ userId: userId.data, actorId: platform.actorId });
+  const ended = await attempt(() => endingCredentials(tx, personId.data, input.at));
+  if (!ended.ok) return err(ended.error);
+  if (ended.value === undefined) return err("no-such-user");
+
+  await record(fresh.value, tx, {
+    id: ulid(),
+    act: CREDENTIAL_ACTS.revoked,
+    subjectId: personId.data,
+    detail: {},
+  });
+  return ok({ personId: personId.data, revokedAt: ended.value.toISOString() });
 };
 
 export type RevokeWorkspaceTokensInput = {

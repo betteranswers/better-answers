@@ -97,6 +97,17 @@ export const someoneWaitsOnALock = async (app: TestApp): Promise<boolean> => {
   return (found.rows[0]?.waiting ?? 0) > 0;
 };
 
+/** Moves every session `userId` holds to a sign-in 61 minutes ago, behind the api's back. */
+export const sessionsSignedInOverAnHourAgo = async (
+  app: TestApp,
+  userId: string,
+): Promise<void> => {
+  await app.database.superuser.query(
+    "UPDATE session SET created_at = now() - interval '61 minutes' WHERE user_id = $1",
+    [userId],
+  );
+};
+
 /** Points every session `userId` holds at the workspace, behind the api's back. */
 export const sessionPointedAt = async (
   app: TestApp,

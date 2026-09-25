@@ -28,6 +28,7 @@ const REGISTER = {
   "role-forbids": "forbidden by kernel",
   "not-found": "absent by kernel",
   "not-the-operator": "forbidden by kernel",
+  "sign-in-too-old": "unauthenticated by kernel",
   "not-a-member": "unauthenticated by kernel",
   "credentials-revoked": "unauthenticated by kernel",
   "role-disagrees": "unauthenticated by kernel",

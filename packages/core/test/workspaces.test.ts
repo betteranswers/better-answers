@@ -1,6 +1,6 @@
 import { testData } from "@better-answers/schema/testing";
 import pg from "pg";
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { boundarySchemas, ulid } from "@better-answers/schema";
 
@@ -8,10 +8,17 @@ import {
   attempt,
   type Claims,
   type OperatorPrincipal,
+  type PlatformPrincipal,
   type UserPrincipal,
 } from "../src/kernel/index.ts";
 import { issuedCredentialsFor } from "./identity-rows.ts";
-import { bootstrap, principalOf, provisionedWorkspace, seedPerson } from "./platform.ts";
+import {
+  asANewOperator,
+  bootstrap,
+  principalOf,
+  provisionedWorkspace,
+  seedPerson,
+} from "./platform.ts";
 import {
   openPostgres,
   type PostgresDoor,
@@ -65,6 +72,14 @@ const tokenState = async (
     [userId],
   );
   return rows.rows;
+};
+
+const identityRowsAbout = async (personId: string) => {
+  const found = await db().pool.query(
+    "SELECT act, actor, detail FROM identity_audit_event WHERE subject_id = $1 ORDER BY at, id",
+    [personId],
+  );
+  return found.rows;
 };
 
 describe("provisioning a workspace", () => {
@@ -305,20 +320,19 @@ describe("provisioning a workspace", () => {
   });
 });
 
-describe("revoking a person's credentials", () => {
-  it("writes the instant and ends earlier sessions and tokens together", async () => {
-    const adminUserId = await seedUser();
-    const door = openPostgres(db().runtimePool);
-    const id = ulid();
-    await provisionWorkspace(bootstrap, door, {
-      id,
-      name: "Acme",
-      slug: `acme-${id.toLowerCase()}`,
-      adminUserId,
-    });
-    const at = new Date("2026-09-02T12:00:00Z");
+describe("revoking a person's credentials everywhere, as the operator", () => {
+  const AT = new Date("2026-09-02T12:00:00.000Z");
 
-    await issuedCredentialsFor(db().pool, adminUserId, {
+  const revoking = (input: { personId: string; at: Date }, signedInAt = input.at) =>
+    asANewOperator(db(), signedInAt, (operator, tx) => revokeCredentials(operator, tx, input));
+
+  const revokedAtOf = async (personId: string) =>
+    (await db().pool.query('SELECT credentials_revoked_at FROM "user" WHERE id = $1', [personId]))
+      .rows;
+
+  it("ends the earlier sessions and tokens, recorded under the operator", async () => {
+    const personId = await seedUser();
+    await issuedCredentialsFor(db().pool, personId, {
       sessions: { earlier: "s-old", later: "s-new" },
       refreshTokens: { earlier: "r-old", later: "r-new" },
       accessTokens: { earlier: "a-old", later: "a-new" },
@@ -327,73 +341,101 @@ describe("revoking a person's credentials", () => {
         later: new Date("2026-09-02T13:00:00Z"),
       },
     });
-
     const beforeUpdatedAt =
       (
-        await db().pool.query('SELECT updated_at FROM "user" WHERE id = $1', [adminUserId])
+        await db().pool.query('SELECT updated_at FROM "user" WHERE id = $1', [personId])
       ).rows[0]?.updated_at.getTime() ?? 0;
 
-    const revoked = await revokeCredentials(bootstrap, door, { userId: adminUserId, at });
+    const { operatorId, answered } = await revoking({ personId, at: AT });
 
-    expect(revoked).toEqual({
+    expect(answered).toEqual({
       ok: true,
-      value: { userId: adminUserId, actorId: "process:better-answers-bootstrap" },
+      value: { ok: true, value: { personId, revokedAt: "2026-09-02T12:00:00.000Z" } },
     });
     const after = await db().pool.query(
       'SELECT credentials_revoked_at, updated_at FROM "user" WHERE id = $1',
-      [adminUserId],
+      [personId],
     );
-    expect(after.rows[0]?.credentials_revoked_at).toEqual(at);
+    expect(after.rows[0]?.credentials_revoked_at).toEqual(AT);
     expect(after.rows[0]?.updated_at.getTime() ?? 0).toBeGreaterThan(beforeUpdatedAt);
     const sessions = await db().pool.query(
       "SELECT id FROM session WHERE user_id = $1 ORDER BY id",
-      [adminUserId],
+      [personId],
     );
     expect(sessions.rows).toEqual([{ id: "s-new" }]);
-    expect(await tokenState("oauth_refresh_token", adminUserId)).toEqual([
+    expect(await tokenState("oauth_refresh_token", personId)).toEqual([
       { id: "r-new", revoked: false },
       { id: "r-old", revoked: true },
     ]);
-    expect(await tokenState("oauth_access_token", adminUserId)).toEqual([
+    expect(await tokenState("oauth_access_token", personId)).toEqual([
       { id: "a-new", revoked: false },
       { id: "a-old", revoked: true },
     ]);
-
-    const earlier = await revokeCredentials(bootstrap, door, {
-      userId: adminUserId,
-      at: new Date("2026-09-02T10:00:00Z"),
-    });
-    expect(earlier.ok).toBe(true);
-    const kept = await db().pool.query('SELECT credentials_revoked_at FROM "user" WHERE id = $1', [
-      adminUserId,
+    expect(await identityRowsAbout(personId)).toEqual([
+      { act: "people.person.credentials_revoked", actor: `human:${operatorId}`, detail: {} },
     ]);
-    expect(kept.rows[0]?.credentials_revoked_at).toEqual(at);
   });
 
-  it("refuses a person who does not exist, leaving nothing", async () => {
-    const door = openPostgres(db().runtimePool);
-    const revoked = await revokeCredentials(bootstrap, door, {
-      userId: "user-missing",
-      at: new Date(),
-    });
-    expect(revoked).toEqual({ ok: false, error: "no-such-user" });
+  it("keeps the later instant when asked for an earlier one", async () => {
+    const personId = await seedUser();
+    await revoking({ personId, at: AT });
 
+    const { answered } = await revoking({ personId, at: new Date("2026-09-02T10:00:00.000Z") });
+
+    expect(answered).toEqual({
+      ok: true,
+      value: { ok: true, value: { personId, revokedAt: "2026-09-02T12:00:00.000Z" } },
+    });
+    expect(await revokedAtOf(personId)).toEqual([{ credentials_revoked_at: AT }]);
+    expect((await identityRowsAbout(personId)).map((row) => row.act)).toEqual([
+      "people.person.credentials_revoked",
+      "people.person.credentials_revoked",
+    ]);
+  });
+
+  it("lands the revocation and its row together, or neither", async () => {
+    const personId = await seedUser();
+
+    await expect(
+      whileWritesAreRefused(db().pool, "identity_audit_event", () =>
+        revoking({ personId, at: AT }),
+      ),
+    ).rejects.toThrow("the store refused a write to identity_audit_event");
+    expect(await revokedAtOf(personId)).toEqual([{ credentials_revoked_at: null }]);
+  });
+
+  it("refuses a person who does not exist, writing nothing", async () => {
     const nobody = ulid();
-    expect(await revokeCredentials(bootstrap, door, { userId: nobody, at: new Date() })).toEqual({
-      ok: false,
-      error: "no-such-user",
-    });
-    const person = await db().pool.query('SELECT 1 FROM "user" WHERE id = $1', [nobody]);
-    expect(person.rowCount).toBe(0);
+
+    const answers = [
+      (await revoking({ personId: "user-missing", at: AT })).answered,
+      (await revoking({ personId: nobody, at: AT })).answered,
+    ];
+
+    expect(answers).toEqual([
+      { ok: true, value: { ok: false, error: "no-such-user" } },
+      { ok: true, value: { ok: false, error: "no-such-user" } },
+    ]);
+    expect(await revokedAtOf(nobody)).toEqual([]);
+    expect(await identityRowsAbout(nobody)).toEqual([]);
   });
 
-  it("is not reachable from a workspace Admin's own principal", () => {
-    const door = openPostgres(db().runtimePool);
-    const admin: UserPrincipal = principalOf(ulid(), ulid(), "Admin");
+  it("refuses a sign-in over an hour old, ending nothing", async () => {
+    const personId = await seedUser();
 
-    // @ts-expect-error a user principal is not a platform principal
-    void (() => revokeCredentials(admin, door, { userId: admin.userId, at: new Date() }));
-    expect(admin.role).toBe("Admin");
+    const { answered } = await revoking({ personId, at: AT }, new Date("2026-09-02T10:59:59.999Z"));
+
+    expect(answered).toEqual({ ok: true, value: { ok: false, error: "sign-in-too-old" } });
+    expect(await revokedAtOf(personId)).toEqual([{ credentials_revoked_at: null }]);
+    expect(await identityRowsAbout(personId)).toEqual([]);
+  });
+
+  it("admits the operator alone, never an Admin or the platform", () => {
+    type Revoker = Parameters<typeof revokeCredentials>[0];
+
+    expectTypeOf<OperatorPrincipal>().toExtend<Revoker>();
+    expectTypeOf<UserPrincipal>().not.toExtend<Revoker>();
+    expectTypeOf<PlatformPrincipal>().not.toExtend<Revoker>();
   });
 });
 
@@ -709,7 +751,6 @@ describe("what the slice answers when the store cannot be reached", () => {
     const door = await unreachableDoor();
     const userId = ulid();
     const answers: readonly (readonly [string, unknown])[] = [
-      ["revokeCredentials", await revokeCredentials(bootstrap, door, { userId, at })],
       [
         "revokeWorkspaceTokens",
         await revokeWorkspaceTokens(bootstrap, door, { workspaceId: ulid(), userId, at }),
@@ -743,28 +784,40 @@ describe("what the slice answers when the store cannot be reached", () => {
     }
   });
 
-  it("hands back the store's Error from the operator's list", async () => {
+  const closedTransaction = async () => {
     const closed = await db().runtimePool.connect();
     closed.release(true);
-    const operator: OperatorPrincipal = {
-      kind: "operator",
-      userId: boundarySchemas.user.select.shape.id.parse(ulid()),
-      credentialIssuedAtMs: Date.now(),
-    };
+    return closed;
+  };
 
-    expect(await listWorkspaces(operator, closed)).toEqual({
-      ok: false,
-      error: expect.any(Error),
-    });
+  const operatorSignedInAt = (signedIn: Date): OperatorPrincipal => ({
+    kind: "operator",
+    userId: boundarySchemas.user.select.shape.id.parse(ulid()),
+    credentialIssuedAtMs: signedIn.getTime(),
+  });
+
+  it("hands back the store's Error from the operator's acts", async () => {
+    const closed = await closedTransaction();
+    const operator = operatorSignedInAt(at);
+
+    expect([
+      await listWorkspaces(operator, closed),
+      await revokeCredentials(operator, closed, { personId: ulid(), at }),
+    ]).toEqual([
+      { ok: false, error: expect.any(Error) },
+      { ok: false, error: expect.any(Error) },
+    ]);
   });
 
   it("refuses what the boundary will not accept before any statement", async () => {
     const door = await unreachableDoor();
 
-    expect(await revokeCredentials(bootstrap, door, { userId: "not-a-ulid", at })).toEqual({
-      ok: false,
-      error: "no-such-user",
-    });
+    expect(
+      await revokeCredentials(operatorSignedInAt(at), await closedTransaction(), {
+        personId: "not-a-ulid",
+        at,
+      }),
+    ).toEqual({ ok: false, error: "no-such-user" });
     expect(
       await revokeWorkspaceTokens(bootstrap, door, { workspaceId: "not-a-ulid", userId: "x", at }),
     ).toEqual({ ok: false, error: "malformed" });
@@ -1100,14 +1153,6 @@ describe("the operator mark, set and cleared by the platform", () => {
       [personId],
     );
     return found.rows[0]?.operator;
-  };
-
-  const identityRowsAbout = async (personId: string) => {
-    const found = await db().pool.query(
-      "SELECT act, actor, detail FROM identity_audit_event WHERE subject_id = $1 ORDER BY at, id",
-      [personId],
-    );
-    return found.rows;
   };
 
   const marking = (email: string, change: "grant" | "revoke") =>

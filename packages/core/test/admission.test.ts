@@ -8,6 +8,7 @@ import {
   EVERY_PURPOSE,
   OPERATOR_ALONE,
   refusalRegister,
+  requireFreshSignIn,
   type AdmissionRefusal,
   type AdmittedOf,
   type InputOf,
@@ -173,6 +174,32 @@ describe("what an act admits of the operator", () => {
       Result<OperatorPrincipal, "not-the-operator">
     >();
     expect(classOf("not-the-operator")).toBe("forbidden");
+  });
+});
+
+describe("how fresh a sign-in the operator's writes ask for", () => {
+  const signedInAt = (): OperatorPrincipal => ({
+    ...theOperator(),
+    credentialIssuedAtMs: Date.parse("2026-09-25T09:00:00.000Z"),
+  });
+
+  it("admits a sign-in an hour old, refusing one older", () => {
+    const operator = signedInAt();
+
+    expect([
+      requireFreshSignIn(operator, new Date("2026-09-25T09:00:00.000Z")),
+      requireFreshSignIn(operator, new Date("2026-09-25T10:00:00.000Z")),
+      requireFreshSignIn(operator, new Date("2026-09-25T10:00:00.001Z")),
+    ]).toEqual([
+      { ok: true, value: operator },
+      { ok: true, value: operator },
+      { ok: false, error: "sign-in-too-old" },
+    ]);
+  });
+
+  it("refuses in a word whose remedy is signing in again", () => {
+    expect(classOf("sign-in-too-old")).toBe("unauthenticated");
+    expectTypeOf<"sign-in-too-old">().toExtend<AdmissionRefusal>();
   });
 });
 
