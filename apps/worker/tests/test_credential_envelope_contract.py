@@ -30,7 +30,7 @@ FIXTURE = read_credential_envelope()
 KEY = bytes.fromhex(FIXTURE["key"])
 
 
-def test_the_cipher_the_version_and_the_widths_are_the_agreements_own() -> None:
+def test_the_cipher_version_and_widths_match_the_agreement() -> None:
     fixture = read_credential_envelope()
 
     spoken = {
@@ -49,12 +49,12 @@ def test_the_cipher_the_version_and_the_widths_are_the_agreements_own() -> None:
     }
 
 
-def test_the_key_this_tier_opens_with_is_the_agreements_own_test_key() -> None:
+def test_opens_with_the_agreements_test_key() -> None:
     assert len(KEY) == read_credential_envelope()["frame"]["key_bytes"]
 
 
 @pytest.mark.parametrize("vector", FIXTURE["opens"], ids=lambda vector: vector["name"])
-def test_every_frame_the_agreement_carries_opens_to_its_plaintext_byte_for_byte(
+def test_opens_every_agreed_frame_to_its_exact_plaintext(
     vector: dict[str, str],
 ) -> None:
     assert opened(KEY, bytes.fromhex(vector["frame"])) == bytes.fromhex(
@@ -65,7 +65,7 @@ def test_every_frame_the_agreement_carries_opens_to_its_plaintext_byte_for_byte(
 @pytest.mark.parametrize(
     "vector", FIXTURE["refuses"], ids=lambda vector: vector["name"]
 )
-def test_every_frame_the_agreement_refuses_is_refused_in_the_word_it_names(
+def test_refuses_each_bad_frame_in_the_word_the_agreement_names(
     vector: dict[str, str],
 ) -> None:
     with pytest.raises(UnopenableError) as refused:
@@ -74,7 +74,7 @@ def test_every_frame_the_agreement_refuses_is_refused_in_the_word_it_names(
     assert refused.value.name == vector["refusal"]
 
 
-def test_a_frame_is_carried_for_every_word_this_tier_can_answer() -> None:
+def test_the_agreement_carries_a_frame_for_every_refusal_word() -> None:
     fixture = read_credential_envelope()
 
     assert fixture["opens"]
@@ -86,7 +86,7 @@ def test_a_frame_is_carried_for_every_word_this_tier_can_answer() -> None:
 
 
 @pytest.mark.parametrize("vector", FIXTURE["opens"], ids=lambda vector: vector["name"])
-def test_a_frame_this_tier_writes_has_the_agreements_widths_and_its_version_first(
+def test_writes_a_frame_with_the_agreed_widths_and_version_first(
     vector: dict[str, str],
 ) -> None:
     fixture = read_credential_envelope()
@@ -104,7 +104,7 @@ def test_a_frame_this_tier_writes_has_the_agreements_widths_and_its_version_firs
 
 
 @pytest.mark.parametrize("vector", FIXTURE["opens"], ids=lambda vector: vector["name"])
-def test_a_plaintext_this_tier_sealed_itself_comes_back_byte_for_byte(
+def test_opens_its_own_sealed_plaintext_byte_for_byte(
     vector: dict[str, str],
 ) -> None:
     plaintext = bytes.fromhex(vector["plaintext"])
@@ -113,7 +113,7 @@ def test_a_plaintext_this_tier_sealed_itself_comes_back_byte_for_byte(
 
 
 @pytest.mark.parametrize("vector", FIXTURE["opens"], ids=lambda vector: vector["name"])
-def test_a_fresh_nonce_per_seal_makes_one_plaintext_two_different_frames(
+def test_a_fresh_nonce_makes_each_seal_a_different_frame(
     vector: dict[str, str],
 ) -> None:
     plaintext = bytes.fromhex(vector["plaintext"])
@@ -121,7 +121,7 @@ def test_a_fresh_nonce_per_seal_makes_one_plaintext_two_different_frames(
     assert len({sealed(KEY, plaintext) for _ in range(16)}) == 16
 
 
-def test_a_key_of_another_length_is_the_callers_defect_not_a_refusal() -> None:
+def test_a_wrong_length_key_raises_a_defect_not_a_refusal() -> None:
     short = KEY[1:]
 
     with pytest.raises(ValueError, match="envelope: a key is"):

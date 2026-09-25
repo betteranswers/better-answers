@@ -24,9 +24,7 @@ COMPLETE = {
 }
 
 
-def test_the_bootstrap_carries_the_object_store_the_compose_file_hands_both_tiers() -> (
-    None
-):
+def test_the_bootstrap_carries_the_object_store_both_tiers_share() -> None:
     read = read_bootstrap(COMPLETE)
 
     assert read.object_store.endpoint == "http://objectstore:3900"
@@ -36,7 +34,7 @@ def test_the_bootstrap_carries_the_object_store_the_compose_file_hands_both_tier
     assert read.object_store.region == "garage"
 
 
-def test_the_engines_defaults_come_from_the_box_and_not_from_the_engine() -> None:
+def test_engine_defaults_come_from_the_box_not_the_engine() -> None:
     read = read_bootstrap({**COMPLETE, "LMDB_MAX_BYTES_PER_BINDING": "4294967296"})
 
     assert read.engine.lmdb_dir == "/data/worker/lmdb"
@@ -51,7 +49,7 @@ def test_the_constants_are_the_numbers_this_tier_settled_on() -> None:
     assert CONCURRENT_RUNS == 1
 
 
-def test_more_than_one_concurrent_run_is_refused_rather_than_quietly_reduced() -> None:
+def test_refuses_two_concurrent_runs_rather_than_quietly_reducing() -> None:
     with pytest.raises(BootstrapError) as refusal:
         read_bootstrap({**COMPLETE, "MAX_CONCURRENT_RUNS": "2"})
 
@@ -79,7 +77,7 @@ def test_a_missing_bootstrap_value_is_named_rather_than_implied() -> None:
         assert owed in named
 
 
-def test_the_compose_file_gives_the_worker_the_variable_this_wave_reads() -> None:
+def test_the_compose_file_gives_the_worker_its_lmdb_directory() -> None:
     worker = worker_service()
 
     assert re.search(r"^\s+LMDB_DIR:\s+/data/worker/lmdb\s", worker, re.M) is not None

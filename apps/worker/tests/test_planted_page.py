@@ -22,14 +22,14 @@ def test_every_span_the_declaration_plants_is_on_the_page_once() -> None:
         assert page.count(planted) == 1, f"{category}: {planted!r}"
 
 
-def test_the_sentence_planted_to_be_kept_is_on_the_page_once() -> None:
+def test_the_page_holds_the_kept_sentence_once() -> None:
 
     page = FIXTURE_PAGE.read_text(encoding="utf-8")
 
     assert page.count(A_HEALTH_AND_SAFETY_SENTENCE) == 1
 
 
-def test_a_span_goes_when_its_binding_switches_its_tier_on_and_not_before() -> None:
+def test_a_span_goes_only_when_its_tier_is_switched_on() -> None:
 
     unconfigured = spans_withheld_under(THE_SAFE_SET)
 
@@ -38,7 +38,7 @@ def test_a_span_goes_when_its_binding_switches_its_tier_on_and_not_before() -> N
     assert A_PLANTED_JOB_TITLE in spans_withheld_under(AN_HR_SHAPED_BINDING)
 
 
-def test_a_binding_writes_a_typed_word_for_each_switchable_tier_it_has_on() -> None:
+def test_writes_a_typed_word_for_each_switched_on_tier() -> None:
 
     assert set(typed_placeholders_under(THE_SAFE_SET)) == {
         "[date of birth withheld]",
@@ -49,7 +49,7 @@ def test_a_binding_writes_a_typed_word_for_each_switchable_tier_it_has_on() -> N
     assert typed_placeholders_under(NOTHING_SWITCHABLE) == {}
 
 
-def test_a_binding_whose_tier_this_page_carries_no_count_for_is_refused() -> None:
+def test_refuses_a_binding_whose_tier_the_page_cannot_count() -> None:
 
     with pytest.raises(RuntimeError, match="no count"):
         typed_placeholders_under(AN_HR_SHAPED_BINDING)

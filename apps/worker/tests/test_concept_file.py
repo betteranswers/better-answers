@@ -105,7 +105,7 @@ def test_reduces_a_citation_to_its_resolved_resource_and_locator() -> None:
     ) == canonical_frontmatter(relative, "knowledge/expenses.md")
 
 
-def test_writes_a_numeric_locator_the_way_the_other_tier_writes_it() -> None:
+def test_writes_a_numeric_locator_as_the_other_tier_does() -> None:
 
     page_four: list[SourceEntry] = [{"resource": "/a.md", "locator": 4}]
     numeric: Frontmatter = {"sources": page_four}
@@ -115,7 +115,7 @@ def test_writes_a_numeric_locator_the_way_the_other_tier_writes_it() -> None:
     )
 
 
-def test_hashes_a_list_of_objects_whichever_order_their_keys_came_in() -> None:
+def test_hashes_listed_objects_whatever_their_key_order() -> None:
 
     body = "Expenses are claimed within thirty days."
     as_written: list[SourceEntry] = [

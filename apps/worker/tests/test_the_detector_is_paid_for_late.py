@@ -39,7 +39,7 @@ def test_importing_the_work_loop_loads_none_of_the_detectors_stack() -> None:
     assert stack_loaded_by("import better_answers_worker.loop") == []
 
 
-def test_a_pass_that_reads_the_detection_key_loads_the_stack_then() -> None:
+def test_reading_the_detection_key_loads_the_stack() -> None:
     loaded = stack_loaded_by(
         "import better_answers_worker.loop\n"
         "from better_answers_worker.redaction.detection_key import detection_key\n"

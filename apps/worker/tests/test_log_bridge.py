@@ -25,7 +25,7 @@ def lines_of(script: str) -> list[dict[str, Any]]:
     return [json.loads(line) for line in finished.stdout.splitlines() if line.strip()]
 
 
-def test_a_library_line_and_a_worker_line_leave_as_the_same_json_object() -> None:
+def test_library_and_worker_lines_leave_in_the_same_json_shape() -> None:
     written = lines_of(WRITES_BOTH_WAYS)
 
     assert len(written) == 2
@@ -43,7 +43,7 @@ def test_a_library_line_and_a_worker_line_leave_as_the_same_json_object() -> Non
     assert theirs["timestamp"].endswith("Z")
 
 
-def test_a_library_that_configured_its_own_handler_first_still_prints_once() -> None:
+def test_a_library_with_its_own_handler_still_prints_once() -> None:
     written = lines_of(
         "import logging\n"
         "logging.basicConfig(level=logging.INFO)\n"

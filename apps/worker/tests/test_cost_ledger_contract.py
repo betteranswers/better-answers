@@ -30,20 +30,20 @@ def purposes_the_rows_use() -> list[str]:
     return sorted({row["purpose"] for row in read_cost_ledger()["rows"]})
 
 
-def test_every_row_carries_the_columns_the_row_is_fixed_to_and_no_other() -> None:
+def test_every_row_carries_exactly_the_recorded_columns() -> None:
     columns = recorded_columns()
 
     for row in read_cost_ledger()["rows"]:
         assert sorted(row) == columns, row
 
 
-def test_no_column_recorded_is_one_a_prompt_or_a_completion_sits_under() -> None:
+def test_records_no_column_a_prompt_or_completion_sits_under() -> None:
     for column in recorded_columns():
         for word in WORDS_A_PROMPT_OR_A_COMPLETION_SITS_UNDER:
             assert word not in column, column
 
 
-def test_this_tier_resolves_a_route_for_every_purpose_and_knows_no_other() -> None:
+def test_resolves_a_route_for_every_purpose_and_no_other() -> None:
     from factories import EMBEDDING_DIMENSIONS, seed_llm_route, seed_workspace
     from pg_harness import migrated_postgres
 
@@ -82,7 +82,7 @@ def test_this_tier_resolves_a_route_for_every_purpose_and_knows_no_other() -> No
         connection.rollback()
 
 
-def test_every_outcome_word_has_a_row_and_one_of_them_is_a_failure() -> None:
+def test_every_outcome_has_a_row_and_one_is_a_failure() -> None:
     fixture = read_cost_ledger()
 
     assert sorted({row["outcome"] for row in fixture["rows"]}) == sorted(
@@ -95,7 +95,7 @@ def test_every_outcome_word_has_a_row_and_one_of_them_is_a_failure() -> None:
     assert [row for row in fixture["rows"] if row["outcome"] in failures]
 
 
-def test_every_row_serves_a_run_or_an_answer_never_both_and_never_neither() -> None:
+def test_every_row_serves_exactly_one_run_or_answer() -> None:
     rows = read_cost_ledger()["rows"]
 
     for row in rows:

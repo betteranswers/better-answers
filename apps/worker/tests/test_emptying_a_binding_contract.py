@@ -14,7 +14,7 @@ def read_emptying_a_binding() -> dict[str, Any]:
     return cast("dict[str, Any]", json.loads(raw))
 
 
-def test_a_run_empties_its_binding_on_the_reasons_agreed_and_no_other() -> None:
+def test_empties_a_binding_for_the_agreed_reasons_alone() -> None:
     reasons = read_emptying_a_binding()["reasons"]
 
     assert sorted(REASONS_EMPTYING_THE_BINDING) == sorted(reasons)

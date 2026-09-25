@@ -54,7 +54,7 @@ def _a_cache_holding_a_shared_blob(hub: Path) -> None:
     _a_repository(hub, AN_ENCODER, {"spm.model": b"the tokenizer"}, {})
 
 
-def test_the_table_fetches_the_model_the_seam_runs_and_nothing_beside_it() -> None:
+def test_the_table_fetches_only_the_model_the_seam_runs() -> None:
 
     assert WEIGHTS == (GLINER_MODEL_ID,)
     assert GLINER_MODEL_ID_MEASURED not in WEIGHTS
@@ -94,9 +94,7 @@ def test_the_copy_carries_a_blob_the_cache_shares_across_repositories(
     assert leaving == []
 
 
-def test_the_build_fetches_the_weights_by_running_the_module_that_declares_them() -> (
-    None
-):
+def test_the_build_fetches_weights_through_the_declaring_module() -> None:
 
     dockerfile = DOCKERFILE.read_text("utf-8")
 

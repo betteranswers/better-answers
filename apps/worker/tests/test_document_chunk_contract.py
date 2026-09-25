@@ -52,7 +52,7 @@ def parse_locator(wire: str) -> tuple[str, int, int] | str:
     return (document, int(start), int(end))
 
 
-def test_the_chunk_id_is_derived_from_the_document_and_the_ordinal() -> None:
+def test_derives_the_chunk_id_from_the_document_and_ordinal() -> None:
     fixture = read_document_chunk()
     digits = fixture["chunk_id"]["ordinal_digits"]
 
@@ -71,9 +71,7 @@ def test_every_chunk_row_carries_the_id_its_address_derives() -> None:
         assert derived == row["id"], row["ordinal"]
 
 
-def test_a_derived_id_sorts_by_ordinal_and_is_never_the_shape_the_platform_mints() -> (
-    None
-):
+def test_a_derived_id_sorts_by_ordinal_and_never_looks_minted() -> None:
     fixture = read_document_chunk()
     shape = re.compile(fixture["chunk_id"]["pattern"])
     ids = [case["id"] for case in fixture["chunk_id"]["cases"]]
@@ -88,7 +86,7 @@ def test_a_derived_id_sorts_by_ordinal_and_is_never_the_shape_the_platform_mints
     assert document_ids == sorted(document_ids)
 
 
-def test_the_wire_locator_reads_the_document_and_the_span_the_agreement_names() -> None:
+def test_parses_a_wire_locator_to_its_document_and_span() -> None:
     fixture = read_document_chunk()
 
     for case in fixture["locator"]["must_parse"]:
@@ -100,7 +98,7 @@ def test_the_wire_locator_reads_the_document_and_the_span_the_agreement_names() 
         ), case["why"]
 
 
-def test_the_wire_locator_refuses_every_shape_the_agreement_says_is_not_one() -> None:
+def test_refuses_every_wire_locator_shape_the_agreement_rejects() -> None:
     fixture = read_document_chunk()
 
     for case in fixture["locator"]["must_not_parse"]:
@@ -109,7 +107,7 @@ def test_the_wire_locator_refuses_every_shape_the_agreement_says_is_not_one() ->
         ]
 
 
-def test_a_chunk_rows_own_locator_reads_back_to_the_span_it_carries() -> None:
+def test_a_chunk_rows_locator_reads_back_to_its_own_span() -> None:
     fixture = read_document_chunk()
     document = fixture["document"]
 
@@ -121,7 +119,7 @@ def test_a_chunk_rows_own_locator_reads_back_to_the_span_it_carries() -> None:
         ), row["ordinal"]
 
 
-def test_the_text_is_counted_in_code_points_and_is_longer_in_utf16_units() -> None:
+def test_counts_code_points_where_utf16_units_run_longer() -> None:
     fixture = read_document_chunk()
     document = fixture["document"]
     text = document["normalised_text"]
@@ -136,9 +134,7 @@ def test_the_text_is_counted_in_code_points_and_is_longer_in_utf16_units() -> No
     assert ord(astral["character"]) == int(astral["code_point"].removeprefix("U+"), 16)
 
 
-def test_the_chunk_rows_partition_the_text_so_a_straddling_span_has_one_answer() -> (
-    None
-):
+def test_the_agreed_chunk_rows_partition_the_text() -> None:
     fixture = read_document_chunk()
     document = fixture["document"]
     text = document["normalised_text"]
@@ -154,7 +150,7 @@ def test_the_chunk_rows_partition_the_text_so_a_straddling_span_has_one_answer()
     assert at == document["code_points"]
 
 
-def test_the_passage_a_locator_opens_is_the_span_cut_out_of_the_text() -> None:
+def test_a_locator_opens_the_span_cut_from_the_text() -> None:
     fixture = read_document_chunk()
     document = fixture["document"]
     text = document["normalised_text"]
@@ -168,7 +164,7 @@ def test_the_passage_a_locator_opens_is_the_span_cut_out_of_the_text() -> None:
         assert text[start:end] == case["passage"], case["why"]
 
 
-def test_a_passage_is_the_same_text_cut_from_the_rows_it_covers() -> None:
+def test_a_passage_matches_the_text_of_the_rows_it_covers() -> None:
 
     fixture = read_document_chunk()
     document = fixture["document"]
@@ -204,7 +200,7 @@ def test_a_malformed_locator_is_refused_before_anything_is_read() -> None:
         ]
 
 
-def test_a_well_shaped_locator_is_left_for_the_read_to_refuse() -> None:
+def test_leaves_a_well_shaped_locator_for_the_read_to_refuse() -> None:
 
     fixture = read_document_chunk()
     document = fixture["document"]
@@ -224,7 +220,7 @@ def test_a_well_shaped_locator_is_left_for_the_read_to_refuse() -> None:
             assert named != document["source_document_id"], case["case"]
 
 
-def test_the_workers_splitter_cuts_the_agreements_text_into_the_rows_it_names() -> None:
+def test_the_workers_splitter_cuts_the_rows_the_agreement_names() -> None:
     document = read_document_chunk()["document"]
 
     cut = split_into_chunks(
@@ -246,9 +242,7 @@ def test_the_workers_splitter_cuts_the_agreements_text_into_the_rows_it_names() 
     ] == document["chunks"]
 
 
-def test_the_workers_offsets_are_code_points_and_the_astral_case_is_what_says_so() -> (
-    None
-):
+def test_the_workers_offsets_count_code_points_past_an_astral_character() -> None:
     document = read_document_chunk()["document"]
     text = document["normalised_text"]
 
@@ -266,9 +260,7 @@ def test_the_workers_offsets_are_code_points_and_the_astral_case_is_what_says_so
     assert cut[0].locator == "01M2Q3R4S5T6V7W8X9YZAB0001/chars:0-39"
 
 
-def test_the_workers_rows_partition_the_text_so_a_straddling_span_has_one_answer() -> (
-    None
-):
+def test_the_workers_chunks_partition_the_text() -> None:
     document = read_document_chunk()["document"]
     text = document["normalised_text"]
 
@@ -299,7 +291,7 @@ def test_the_workers_id_derivation_answers_every_case_the_agreement_names() -> N
     )
 
 
-def test_the_worker_writes_the_whole_wire_locator_and_never_the_span_alone() -> None:
+def test_writes_the_whole_wire_locator_never_the_span_alone() -> None:
     assert the_workers_locator("01M2Q3R4S5T6V7W8X9YZAB0001", 39, 106) == (
         "01M2Q3R4S5T6V7W8X9YZAB0001/chars:39-106"
     )
@@ -308,7 +300,7 @@ def test_the_worker_writes_the_whole_wire_locator_and_never_the_span_alone() -> 
     )
 
 
-def test_what_the_worker_writes_is_what_this_tiers_reading_parses_back() -> None:
+def test_parses_back_every_locator_the_worker_writes() -> None:
     document = read_document_chunk()["document"]
 
     for row in document["chunks"]:
@@ -323,6 +315,6 @@ def test_what_the_worker_writes_is_what_this_tiers_reading_parses_back() -> None
         )
 
 
-def test_the_size_a_run_splits_at_is_stated_and_is_not_the_fixtures() -> None:
+def test_a_run_splits_at_a_stated_size_not_the_fixtures() -> None:
     assert CHUNK_SIZE_BYTES == 1200
     assert read_document_chunk()["document"]["chunk_size"] == 80

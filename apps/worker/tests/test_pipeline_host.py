@@ -120,7 +120,7 @@ def chunk_indexes(connection: psycopg.Connection, workspace_id: str) -> list[str
         return [str(row[0]) for row in cursor.fetchall()]
 
 
-def test_the_pools_scope_lets_a_chunk_row_land_and_a_pool_without_it_is_refused(
+def test_lands_a_chunk_row_only_through_a_scoped_pool(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -156,7 +156,7 @@ def test_the_pools_scope_lets_a_chunk_row_land_and_a_pool_without_it_is_refused(
         asyncio.run(refused())
 
 
-def test_dropping_one_bindings_state_leaves_the_table_its_indexes_and_every_row(
+def test_dropping_a_bindings_state_keeps_the_table_indexes_and_rows(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -207,7 +207,7 @@ def a_run_on(binding_id: str) -> IndexRun:
     )
 
 
-def test_the_environment_cache_holds_its_bound_and_drops_the_oldest_binding(
+def test_the_environment_cache_drops_the_oldest_binding_at_its_bound(
     tmp_path: Path,
 ) -> None:
     touched = ("binding-one", "binding-two", "binding-one", "binding-three")
@@ -222,7 +222,7 @@ def test_the_environment_cache_holds_its_bound_and_drops_the_oldest_binding(
         assert host.held_bindings() == ("binding-one", "binding-three")
 
 
-def test_the_default_bound_counts_eight_handles_and_sheds_the_oldest_binding_whole(
+def test_the_default_bound_holds_eight_handles_and_sheds_whole_bindings(
     tmp_path: Path,
 ) -> None:
     whole = bootstrap_for("postgresql://unreached/unreached", tmp_path / "whole")
@@ -252,7 +252,7 @@ def test_the_default_bound_counts_eight_handles_and_sheds_the_oldest_binding_who
     )
 
 
-def test_a_bound_too_small_for_one_bindings_two_handles_is_refused(
+def test_refuses_a_bound_below_one_bindings_two_handles(
     tmp_path: Path,
 ) -> None:
     bootstrap = bootstrap_for("postgresql://unreached/unreached", tmp_path)
@@ -266,7 +266,7 @@ def test_a_bound_too_small_for_one_bindings_two_handles_is_refused(
         assert host.held_bindings() == ("binding-one",)
 
 
-def test_the_seam_answers_an_outcome_of_plain_numbers_and_opens_the_bindings_store(
+def test_the_seam_answers_plain_numbers_and_opens_the_bindings_store(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -285,7 +285,7 @@ def test_the_seam_answers_an_outcome_of_plain_numbers_and_opens_the_bindings_sto
     assert (tmp_path / workspace_id / "binding-one").is_dir()
 
 
-def test_the_operators_per_binding_cap_is_what_both_its_stores_hold_together(
+def test_a_bindings_two_stores_share_the_operators_per_binding_cap(
     tmp_path: Path,
 ) -> None:
     bootstrap = bootstrap_for("postgresql://unreached/unreached", tmp_path)
@@ -297,7 +297,7 @@ def test_the_operators_per_binding_cap_is_what_both_its_stores_hold_together(
     assert len(STORES_A_BINDING_HOLDS) == 2
 
 
-def test_a_bindings_two_stores_sit_at_sibling_paths_under_its_own_directory(
+def test_a_bindings_stores_sit_at_sibling_paths_in_its_directory(
     tmp_path: Path,
 ) -> None:
     run = IndexRun(

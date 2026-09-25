@@ -17,13 +17,13 @@ def read_redaction() -> dict[str, Any]:
     return cast("dict[str, Any]", json.loads(raw))
 
 
-def test_the_three_tiers_are_the_ones_this_tier_writes_on_a_finding() -> None:
+def test_writes_the_three_agreed_tiers_on_a_finding() -> None:
     fixture = read_redaction()
 
     assert [tier["tier"] for tier in fixture["tiers"]] == SPOKEN_TIERS
 
 
-def test_the_always_tier_is_unswitchable_and_the_one_without_a_key() -> None:
+def test_the_always_tier_alone_is_unswitchable_and_keyless() -> None:
     fixture = read_redaction()
 
     unswitchable = [tier["tier"] for tier in fixture["tiers"] if not tier["switchable"]]
@@ -32,7 +32,7 @@ def test_the_always_tier_is_unswitchable_and_the_one_without_a_key() -> None:
     assert keyless == [SPOKEN_ALWAYS_TIER]
 
 
-def test_a_switchable_tiers_key_goes_in_the_column_this_tier_reads() -> None:
+def test_a_switchable_tiers_key_fits_the_column_this_tier_reads() -> None:
 
     fixture = read_redaction()
 
@@ -42,9 +42,7 @@ def test_a_switchable_tiers_key_goes_in_the_column_this_tier_reads() -> None:
         assert key is None or (key and " " not in key), tier["tier"]
 
 
-def test_every_category_names_a_tier_the_agreement_names_and_names_itself_once() -> (
-    None
-):
+def test_every_category_names_an_agreed_tier_and_appears_once() -> None:
     fixture = read_redaction()
 
     tiers = {tier["tier"] for tier in fixture["tiers"]}
@@ -54,7 +52,7 @@ def test_every_category_names_a_tier_the_agreement_names_and_names_itself_once()
     assert sorted(named) == sorted(set(named))
 
 
-def test_the_always_set_is_withheld_under_a_word_no_other_category_uses() -> None:
+def test_withholds_the_always_set_under_its_own_word() -> None:
 
     fixture = read_redaction()
     neutral = fixture["always_placeholder"]
@@ -64,7 +62,7 @@ def test_the_always_set_is_withheld_under_a_word_no_other_category_uses() -> Non
         assert (category["placeholder"] == neutral) is is_always, category["category"]
 
 
-def test_every_placeholder_is_a_bracketed_word_so_it_never_reads_as_the_text() -> None:
+def test_every_placeholder_is_bracketed_so_it_never_reads_as_text() -> None:
     fixture = read_redaction()
     shape = re.compile(fixture["placeholder_shape"])
 
@@ -75,9 +73,7 @@ def test_every_placeholder_is_a_bracketed_word_so_it_never_reads_as_the_text() -
         ]
 
 
-def test_a_special_category_finding_narrows_the_document_and_no_other_kind_does() -> (
-    None
-):
+def test_only_a_special_category_finding_narrows_the_document() -> None:
 
     fixture = read_redaction()
 
@@ -96,9 +92,7 @@ def test_the_version_string_parses_and_refuses_what_the_agreement_says() -> None
         assert pattern.fullmatch(case["value"]) is None, case["why"]
 
 
-def test_the_version_string_is_the_two_columns_this_tier_writes_a_finding_with() -> (
-    None
-):
+def test_the_version_string_joins_a_findings_two_columns() -> None:
 
     fixture = read_redaction()
     separator = fixture["version_string"]["separator"]

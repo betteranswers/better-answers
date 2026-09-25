@@ -88,11 +88,11 @@ def a_workspace_holding_one_job(
     return str(workspace)
 
 
-def test_the_worker_runs_exactly_the_kinds_its_registry_holds_a_handler_for() -> None:
+def test_runs_exactly_the_kinds_its_registry_has_handlers_for() -> None:
     assert tuple(KINDS) == ("nightly-audit", "full-rebuild", "index")
 
 
-def test_the_loop_runs_both_its_kinds_through_the_registry_one_job_at_a_time(
+def test_the_loop_runs_each_kind_one_job_at_a_time(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace = seed_workspace(database.cursor())["id"]
@@ -147,7 +147,7 @@ def an_index_job_older_than_an_audit(database: psycopg.Connection) -> tuple[str,
     return workspace, binding_id
 
 
-def test_a_claim_leaves_a_kind_its_caller_did_not_name_queued_and_unpoisoned(
+def test_a_claim_leaves_unnamed_kinds_queued_and_unpoisoned(
     database: psycopg.Connection,
 ) -> None:
     workspace, binding_id = an_index_job_older_than_an_audit(database)
@@ -194,7 +194,7 @@ def test_a_claim_hands_the_handler_what_the_job_is_about(
     assert auditing.subject_id is None
 
 
-def test_the_loop_claims_runs_and_finishes_a_nightly_audit_it_scheduled_itself(
+def test_the_loop_runs_a_nightly_audit_it_scheduled_itself(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace = seed_workspace(database.cursor())["id"]
@@ -222,7 +222,7 @@ def test_the_loop_claims_runs_and_finishes_a_nightly_audit_it_scheduled_itself(
     assert outcome["mismatched"] == []
 
 
-def test_a_job_commits_as_it_goes_and_another_connection_sees_it_finish_after_the_claim(
+def test_another_connection_sees_a_claimed_job_commit_and_finish(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace = seed_workspace(database.cursor())["id"]
@@ -242,7 +242,7 @@ def test_a_job_commits_as_it_goes_and_another_connection_sees_it_finish_after_th
             assert cursor.fetchall() == [("done", True)]
 
 
-def test_a_claim_is_visible_and_the_lease_moves_while_a_job_runs_through_the_loop(
+def test_a_running_jobs_claim_is_visible_and_its_lease_moves(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace = a_workspace_holding_one_job(
@@ -292,7 +292,7 @@ def test_a_claim_is_visible_and_the_lease_moves_while_a_job_runs_through_the_loo
     assert (finished[0], finished[2]) == ("done", True)
 
 
-def test_a_failed_audit_counts_as_run_so_the_loop_queues_no_other_every_idle_tick(
+def test_a_failed_audit_counts_so_idle_ticks_queue_no_other(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace = seed_workspace(database.cursor())["id"]
@@ -314,7 +314,7 @@ def test_a_failed_audit_counts_as_run_so_the_loop_queues_no_other_every_idle_tic
         assert cursor.fetchall() == [("failed",)]
 
 
-def test_refuses_a_workspace_id_that_is_not_one_before_it_touches_the_store(
+def test_refuses_a_malformed_workspace_id_before_touching_the_store(
     tmp_path: Path,
 ) -> None:
 
@@ -335,7 +335,7 @@ def test_refuses_a_workspace_id_that_is_not_one_before_it_touches_the_store(
         concepts_at_head(str(tmp_path / "store"), workspace)
 
 
-def test_a_rebuild_holds_the_generation_row_before_it_reads_so_a_write_beside_it_lands(
+def test_a_rebuild_holds_the_generation_row_first_so_writes_land(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace = seed_workspace(database.cursor())["id"]
@@ -402,7 +402,7 @@ def test_a_rebuild_holds_the_generation_row_before_it_reads_so_a_write_beside_it
         assert cursor.fetchall() == [(IRI,), (OTHER_IRI,)]
 
 
-def test_the_audit_reports_a_mismatch_as_a_state_and_never_as_a_refusal(
+def test_the_audit_reports_a_mismatch_as_state_not_refusal(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
 
@@ -426,7 +426,7 @@ def test_the_audit_reports_a_mismatch_as_a_state_and_never_as_a_refusal(
     assert outcome.unparsed == []
 
 
-def test_the_audit_counts_a_file_it_cannot_parse_and_a_row_whose_file_is_gone(
+def test_the_audit_counts_unparseable_files_and_rows_without_files(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace = seed_workspace(database.cursor())["id"]
@@ -452,7 +452,7 @@ def test_the_audit_counts_a_file_it_cannot_parse_and_a_row_whose_file_is_gone(
     assert outcome.missing_file == ["knowledge/gone.md"]
 
 
-def test_a_rebuild_writes_the_next_generation_beside_the_live_one_and_flips_it(
+def test_a_rebuild_writes_the_next_generation_aside_then_flips_it(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace = seed_workspace(database.cursor())["id"]
@@ -543,7 +543,7 @@ def refusals_in(
 REFUSES = "a deploy stamp does not match; claiming nothing"
 
 
-def test_the_loop_claims_nothing_and_exits_one_when_its_schema_stamp_does_not_match(
+def test_a_mismatched_schema_stamp_claims_nothing_and_exits_one(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace = a_workspace_with_a_queued_audit(database, tmp_path)
@@ -563,7 +563,7 @@ def test_the_loop_claims_nothing_and_exits_one_when_its_schema_stamp_does_not_ma
     assert audit_job(database, workspace) == ("queued", None)
 
 
-def test_the_loop_claims_nothing_and_exits_one_when_its_contract_digest_does_not_match(
+def test_a_mismatched_contract_digest_claims_nothing_and_exits_one(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace = a_workspace_with_a_queued_audit(database, tmp_path)
@@ -578,7 +578,7 @@ def test_the_loop_claims_nothing_and_exits_one_when_its_contract_digest_does_not
     assert audit_job(database, workspace) == ("queued", None)
 
 
-def test_a_worker_whose_two_stamps_both_match_claims_and_runs_what_is_queued(
+def test_a_worker_with_matching_stamps_runs_what_is_queued(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace = a_workspace_with_a_queued_audit(database, tmp_path)
@@ -593,7 +593,7 @@ def test_a_worker_whose_two_stamps_both_match_claims_and_runs_what_is_queued(
     assert audit_job(database, workspace) == ("done", WORKER)
 
 
-def test_the_refusal_is_said_once_and_lifts_by_itself_when_the_deploy_finishes(
+def test_the_refusal_logs_once_and_lifts_when_the_deploy_finishes(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace = a_workspace_with_a_queued_audit(database, tmp_path)
@@ -627,7 +627,7 @@ def test_the_refusal_is_said_once_and_lifts_by_itself_when_the_deploy_finishes(
     assert refusals_in(written) == [(REFUSES, "matches", "differs")]
 
 
-def test_a_worker_holding_a_fresh_lease_is_healthy_and_a_queue_left_waiting_is_not(
+def test_healthy_with_a_fresh_lease_unhealthy_with_a_waiting_queue(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace = seed_workspace(database.cursor())["id"]
@@ -665,7 +665,7 @@ def test_a_worker_holding_a_fresh_lease_is_healthy_and_a_queue_left_waiting_is_n
     assert health.is_healthy(database, WORKER) is False
 
 
-def test_a_long_run_keeps_its_lease_from_a_connection_of_its_own(
+def test_a_long_run_keeps_its_lease_on_its_own_connection(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
     workspace = a_workspace_holding_one_job(database, kind="nightly-audit")

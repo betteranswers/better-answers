@@ -82,7 +82,7 @@ def constants_of(module: object) -> set[str]:
 THE_FIRST_CATEGORY = DESCRIPTORS[0]
 
 
-def test_the_key_is_pinned_beside_the_rule_version_it_implies_a_move_of() -> None:
+def test_pins_the_key_beside_the_rule_version() -> None:
 
     assert detection_key() == (
         "a1db6adae80d0dfd17b4589ac15842c84065f04d95cfce575260315764c467ac"
@@ -90,7 +90,7 @@ def test_the_key_is_pinned_beside_the_rule_version_it_implies_a_move_of() -> Non
     assert RULE_VERSION == "6"
 
 
-def test_every_field_a_category_declares_is_the_detector_s_or_policy_s_alone() -> None:
+def test_each_category_field_belongs_to_the_detector_or_policy_alone() -> None:
 
     declared = {field.name for field in fields(CategoryDescriptor)}
 
@@ -118,7 +118,7 @@ def test_rewording_a_placeholder_re_reads_no_page() -> None:
     assert key_over(the_table_with(moved)) == detection_key()
 
 
-def test_changing_what_a_category_narrows_a_document_to_re_reads_no_page() -> None:
+def test_changing_a_categorys_narrowing_re_reads_no_page() -> None:
 
     moved = replace(THE_FIRST_CATEGORY, narrows_to="Internal")
 
@@ -163,7 +163,7 @@ def test_moving_a_cue_re_reads_every_page() -> None:
     assert key_over(the_table_with(reordered)) == detection_key()
 
 
-def test_a_lemma_the_model_is_never_handed_re_reads_no_page() -> None:
+def test_a_lemma_the_model_never_sees_re_reads_no_page() -> None:
     job_title = category_called("job-title")
     raised = {item.rule_id: item for item in what_the_detector_reads().rules}
 
@@ -183,7 +183,7 @@ def test_moving_the_consumer_domain_list_re_reads_every_page() -> None:
     )
 
 
-def test_swapping_the_recogniser_a_rule_is_raised_by_re_reads_every_page() -> None:
+def test_swapping_a_rules_recogniser_re_reads_every_page() -> None:
 
     moved = replace(THE_FIRST_CATEGORY, raised_by=("PERSON",))
 
@@ -217,7 +217,7 @@ def test_the_converter_pin_is_in_no_detection_key() -> None:
     assert "pdf-inspector" not in read
 
 
-def test_every_literal_a_recogniser_holds_is_read_but_the_officers_blocks_own() -> None:
+def test_reads_every_recogniser_literal_except_the_officers_own() -> None:
     named = {name for name, _ in DETECTOR_LITERALS}
 
     held = constants_of(recognisers)
@@ -227,7 +227,7 @@ def test_every_literal_a_recogniser_holds_is_read_but_the_officers_blocks_own() 
     assert named.isdisjoint(RAISED_AFTER_THE_DETECTOR)
 
 
-def test_every_constant_the_engine_holds_is_placed_on_one_side_of_the_key() -> None:
+def test_places_every_engine_constant_on_one_side_of_the_key() -> None:
     held = constants_of(engine)
     in_the_key = {name for name, _ in DETECTOR_LITERALS} | {
         name for name, _ in what_the_detector_reads().window_rule
@@ -247,7 +247,7 @@ def test_every_constant_the_engine_holds_is_placed_on_one_side_of_the_key() -> N
     )
 
 
-def test_every_constant_the_detector_holds_is_placed_on_one_side_of_the_key() -> None:
+def test_places_every_detector_constant_on_one_side_of_the_key() -> None:
     held = constants_of(detector)
     in_the_key = {name for name, _ in DETECTOR_LITERALS} | {
         name for name, _ in what_the_detector_reads().window_rule

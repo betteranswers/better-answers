@@ -105,7 +105,7 @@ def test_the_descriptors_and_the_agreement_name_the_same_categories() -> None:
     assert declared == agreed
 
 
-def test_each_descriptor_takes_its_tier_word_and_narrowing_from_the_agreement() -> None:
+def test_descriptors_take_tier_placeholder_and_narrowing_from_the_agreement() -> None:
     by_category = {descriptor.category: descriptor for descriptor in DESCRIPTORS}
 
     for category in agreement()["categories"]:
@@ -115,7 +115,7 @@ def test_each_descriptor_takes_its_tier_word_and_narrowing_from_the_agreement() 
         assert descriptor.narrows_to == category["narrows_to"], descriptor.category
 
 
-def test_the_entity_table_is_the_inverse_of_what_raises_each_category() -> None:
+def test_the_entity_table_inverts_what_raises_each_category() -> None:
 
     raised = [
         (entity, descriptor.category)
@@ -127,7 +127,7 @@ def test_the_entity_table_is_the_inverse_of_what_raises_each_category() -> None:
     assert len(raised) == len({entity for entity, _ in raised})
 
 
-def test_the_always_set_is_raised_at_least_as_readily_as_a_switchable_one() -> None:
+def test_the_always_set_has_the_lowest_thresholds() -> None:
 
     always = [item.threshold for item in DESCRIPTORS if item.tier == "always"]
     switchable = [item.threshold for item in DESCRIPTORS if item.tier != "always"]
@@ -137,9 +137,7 @@ def test_the_always_set_is_raised_at_least_as_readily_as_a_switchable_one() -> N
         assert 0.0 < descriptor.threshold <= 1.0, descriptor.category
 
 
-def test_only_a_category_a_pattern_raises_declares_words_its_enhancer_boosts_on() -> (
-    None
-):
+def test_only_pattern_raised_categories_declare_enhancer_words() -> None:
     without_context = [
         descriptor.category for descriptor in DESCRIPTORS if not descriptor.context
     ]
@@ -149,9 +147,7 @@ def test_only_a_category_a_pattern_raises_declares_words_its_enhancer_boosts_on(
     assert without_context == ["special-category", "person-name", "job-title"]
 
 
-def test_the_special_category_row_alone_declares_cues_and_they_are_what_withholds() -> (
-    None
-):
+def test_only_the_special_category_row_declares_cues_that_withhold() -> None:
     with_cues = {
         descriptor.category: descriptor.cues
         for descriptor in DESCRIPTORS
@@ -163,9 +159,7 @@ def test_the_special_category_row_alone_declares_cues_and_they_are_what_withhold
     }
 
 
-def test_the_analyzer_is_asked_for_exactly_the_entities_the_descriptors_declare() -> (
-    None
-):
+def test_asks_the_analyzer_for_exactly_the_declared_entities() -> None:
 
     registry = build_analyzer().registry
 
@@ -178,7 +172,7 @@ def test_the_analyzer_is_asked_for_exactly_the_entities_the_descriptors_declare(
     assert sorted(answered_for) == sorted(CATEGORY_BY_ENTITY)
 
 
-def test_a_category_nothing_can_raise_is_refused_before_an_analyzer_is_built() -> None:
+def test_refuses_an_unraisable_category_before_building_an_analyzer() -> None:
 
     refuse_unreachable_entities(DESCRIPTOR_BY_ENTITY, GLINER_LABELS)
     asking_the_model_for_something_else = {"vehicle": "VEHICLE_REGISTRATION"}
@@ -193,9 +187,7 @@ def test_a_category_nothing_can_raise_is_refused_before_an_analyzer_is_built() -
     assert "EMAIL_ADDRESS" not in str(refusal.value)
 
 
-def test_a_label_no_descriptor_declares_is_refused_before_an_analyzer_is_built() -> (
-    None
-):
+def test_refuses_an_undeclared_label_before_building_an_analyzer() -> None:
 
     the_two_the_model_raises = {"person": "PERSON", "job title": "JOB_TITLE"}
 
@@ -227,7 +219,7 @@ def test_the_twenty_seventh_name_keeps_the_shape_the_agreement_pins() -> None:
     assert shape.fullmatch(written_as(twenty_seventh, "[person A]")) is not None
 
 
-def test_the_version_string_is_the_rule_version_and_the_detector_pin() -> None:
+def test_the_version_string_joins_rule_version_and_detector_pin() -> None:
     written = VERSION_STRING
 
     assert written == (
@@ -245,7 +237,7 @@ def test_the_version_string_is_written_the_way_the_agreement_says() -> None:
     assert pattern.fullmatch(VERSION_STRING) is not None
 
 
-def test_the_rule_version_is_bumped_with_the_table_it_stands_for() -> None:
+def test_bumps_the_rule_version_with_its_table() -> None:
 
     digest = "e2244c397c2677efaa5017848d17d8d7a499394902b73585bb67f090231b4d8d"
 
@@ -278,14 +270,14 @@ def test_every_pin_is_the_version_the_installer_pins() -> None:
     assert pins["torch"] == TORCH_VERSION
 
 
-def test_the_spacy_pipeline_is_pinned_by_the_url_it_is_downloaded_from() -> None:
+def test_pins_the_spacy_pipeline_by_its_download_url() -> None:
 
     source = manifest()["tool"]["uv"]["sources"]["en-core-web-sm"]
 
     assert f"{SPACY_MODEL}-{SPACY_MODEL_VERSION}" in str(source["url"])
 
 
-def test_the_local_version_segment_a_wheel_reports_never_moves_the_pin() -> None:
+def test_a_wheels_local_version_segment_never_moves_the_pin() -> None:
 
     assert _public_version("2.14.0+cpu") == TORCH_VERSION
     assert _public_version("2.14.0") == TORCH_VERSION
@@ -307,7 +299,7 @@ def test_every_pin_is_the_version_the_interpreter_reports() -> None:
         assert _public_version(installed_version(distribution)) == pinned, distribution
 
 
-def test_the_check_workflow_caches_the_weights_where_the_detector_reads_them() -> None:
+def test_the_check_workflow_caches_weights_where_the_detector_reads() -> None:
 
     workflow = CHECK_WORKFLOW.read_text(encoding="utf-8")
 

@@ -22,7 +22,7 @@ def test_the_dispatch_converts_every_admitted_type_and_no_other() -> None:
     assert sorted(CONVERTERS) == sorted(admitted)
 
 
-def test_the_agreement_places_no_type_on_both_sides_of_the_list() -> None:
+def test_no_type_sits_on_both_sides_of_the_list() -> None:
 
     fixture = read_upload_media_types()
 
@@ -35,7 +35,7 @@ def test_the_agreement_places_no_type_on_both_sides_of_the_list() -> None:
     "media_type",
     [outside["media_type"] for outside in read_upload_media_types()["outside"]],
 )
-def test_a_type_outside_the_list_reaches_no_converter_whatever_its_bytes_resemble(
+def test_a_type_outside_the_list_reaches_no_converter(
     media_type: str,
 ) -> None:
     with pytest.raises(UnreadableError) as refused:
