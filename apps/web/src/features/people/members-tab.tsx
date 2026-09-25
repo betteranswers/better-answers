@@ -7,19 +7,21 @@ import {
   tableFeatures,
   useTable,
 } from "@tanstack/react-table";
-import { useId, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 
 import { Icon } from "@/shared/icon.tsx";
 import { useKeystroke } from "@/shared/keystrokes.tsx";
-import { OutcomeLine } from "@/shared/outcome.tsx";
+import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
 import { GridTable } from "./grid-table.tsx";
+import { MemberSheet, memberButtonId, type OpenedAt } from "./member-sheet.tsx";
 import { useMembers, type ListedMember } from "./people-api.ts";
 import { PEOPLE_KEYSTROKES } from "./people-state.ts";
 import { outcomeOfFailure } from "./refusal.tsx";
+import { GroupPills, LONG_UK_DATE } from "./words.tsx";
 
 const features = tableFeatures({
   columnFilteringFeature,
@@ -34,63 +36,69 @@ const PERSON = "person";
 
 const SEARCH_LABEL = "Search by name or address";
 
-const LONG_UK_DATE = new Intl.DateTimeFormat("en-GB", {
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-  timeZone: "Europe/London",
-});
+const NOTHING_IN_FOCUS: Outcome = {
+  tone: "said",
+  words: "Move focus to a member first: the keystroke acts on the member in focus.",
+};
 
 const countOfPeople = (count: number): string => (count === 1 ? "1 person" : `${count} people`);
 
-function PersonCell(properties: { readonly member: ListedMember }) {
-  const { displayName, address } = properties.member;
+type MemberActs = {
+  readonly open: (personId: string) => void;
+  readonly focused: (personId: string) => void;
+};
+
+function PersonCell(properties: { readonly member: ListedMember; readonly acts: MemberActs }) {
+  const { member, acts } = properties;
+  const { personId, displayName, address } = member;
   return (
-    <span className="flex min-w-0 flex-col leading-tight">
-      {displayName === "" ? (
-        <span className="text-muted-foreground">No display name yet</span>
-      ) : (
-        <span className="font-medium text-foreground">{displayName}</span>
-      )}
+    <span className="flex min-w-0 flex-col items-start leading-tight">
+      <Button
+        id={memberButtonId(personId)}
+        variant="link"
+        aria-haspopup="dialog"
+        className="h-auto p-0 text-left font-medium whitespace-normal text-foreground"
+        onFocus={() => {
+          acts.focused(personId);
+        }}
+        onClick={() => {
+          acts.open(personId);
+        }}
+      >
+        {displayName === "" ? (
+          <span className="text-muted-foreground">No display name yet</span>
+        ) : (
+          displayName
+        )}
+      </Button>
       <span className="text-xs text-muted-foreground wrap-anywhere">{address}</span>
     </span>
   );
 }
 
-function GroupPills(properties: { readonly groups: ListedMember["groups"] }) {
-  if (properties.groups.length === 0) {
-    return <span className="text-muted-foreground">No group</span>;
-  }
-  return (
-    <span className="flex flex-wrap gap-1">
-      {properties.groups.map((group) => (
-        <Pill key={group.groupId}>{group.name}</Pill>
-      ))}
-    </span>
-  );
-}
-
-const COLUMNS = column.columns([
-  column.accessor((member) => `${member.displayName} ${member.address}`, {
-    id: PERSON,
-    header: "Person",
-    cell: ({ row }) => <PersonCell member={row.original} />,
-  }),
-  column.accessor("role", {
-    header: "Role",
-    cell: ({ getValue }) => <Pill>{getValue()}</Pill>,
-  }),
-  column.accessor("groups", {
-    header: "Groups",
-    cell: ({ getValue }) => <GroupPills groups={getValue()} />,
-  }),
-  column.accessor("joinedAt", {
-    header: "Joined",
-    cell: ({ getValue }) => (
-      <span className="tabular-nums">{LONG_UK_DATE.format(new Date(getValue()))}</span>
-    ),
-  }),
-]);
+/** The person's own cell opens them, so its acts ride into the columns. */
+const columnsFor = (acts: MemberActs) =>
+  column.columns([
+    column.accessor((member) => `${member.displayName} ${member.address}`, {
+      id: PERSON,
+      header: "Person",
+      cell: ({ row }) => <PersonCell member={row.original} acts={acts} />,
+    }),
+    column.accessor("role", {
+      header: "Role",
+      cell: ({ getValue }) => <Pill>{getValue()}</Pill>,
+    }),
+    column.accessor("groups", {
+      header: "Groups",
+      cell: ({ getValue }) => <GroupPills groups={getValue()} />,
+    }),
+    column.accessor("joinedAt", {
+      header: "Joined",
+      cell: ({ getValue }) => (
+        <span className="tabular-nums">{LONG_UK_DATE.format(new Date(getValue()))}</span>
+      ),
+    }),
+  ]);
 
 function NoOneMatches(properties: {
   readonly search: string;
@@ -110,14 +118,30 @@ function NoOneMatches(properties: {
   );
 }
 
+type Opened = { readonly personId: string; readonly at: OpenedAt };
+
 function MemberList(properties: { readonly members: readonly ListedMember[] }) {
   const { members } = properties;
   const [search, setSearch] = useState("");
+  const [inFocus, setInFocus] = useState<string>();
+  const [opened, setOpened] = useState<Opened>();
+  const [outcome, setOutcome] = useState<Outcome>();
   const searchRef = useRef<HTMLInputElement>(null);
+
+  const columns = useMemo(
+    () =>
+      columnsFor({
+        open: (personId) => {
+          setOpened({ personId, at: "member" });
+        },
+        focused: setInFocus,
+      }),
+    [],
+  );
 
   const table = useTable({
     features,
-    columns: COLUMNS,
+    columns,
     data: members,
     getRowId: (member) => member.personId,
     globalFilterFn: "includesString",
@@ -125,8 +149,24 @@ function MemberList(properties: { readonly members: readonly ListedMember[] }) {
     state: { globalFilter: search },
   });
 
+  const memberOf = (personId: string | undefined) =>
+    members.find((member) => member.personId === personId);
+
+  /** A letter pressed outside the list still needs a member, so the one last in focus stands. */
+  const openInFocus = (at: OpenedAt) => {
+    const member = memberOf(inFocus);
+    setOutcome(member === undefined ? NOTHING_IN_FOCUS : undefined);
+    if (member !== undefined) setOpened({ personId: member.personId, at });
+  };
+
   useKeystroke(PEOPLE_KEYSTROKES.search, () => {
     searchRef.current?.focus();
+  });
+  useKeystroke(PEOPLE_KEYSTROKES.open, () => {
+    openInFocus("member");
+  });
+  useKeystroke(PEOPLE_KEYSTROKES.changeRole, () => {
+    openInFocus("role");
   });
 
   const clear = () => {
@@ -139,10 +179,12 @@ function MemberList(properties: { readonly members: readonly ListedMember[] }) {
     search === ""
       ? countOfPeople(members.length)
       : `${shown} of ${countOfPeople(members.length)} match “${search}”.`;
+  const openedMember = memberOf(opened?.personId);
 
   return (
     <>
       <output className="mt-1 block text-muted-foreground">{said}</output>
+      <OutcomeLine outcome={outcome} className="mt-2" />
 
       <div className="mt-4 border border-border bg-card">
         <div className="flex flex-wrap items-center gap-2 border-b border-border p-3">
@@ -173,10 +215,21 @@ function MemberList(properties: { readonly members: readonly ListedMember[] }) {
 
         <GridTable
           table={table}
-          caption="Members of this workspace, each with their address, role, groups and the day they joined."
+          caption="Members of this workspace, each with their address, role, groups and the day they joined. A member's name opens them."
           empty={<NoOneMatches search={search} total={members.length} onClear={clear} />}
         />
       </div>
+
+      {opened === undefined || openedMember === undefined ? null : (
+        <MemberSheet
+          key={opened.personId}
+          member={openedMember}
+          openedAt={opened.at}
+          onClose={() => {
+            setOpened(undefined);
+          }}
+        />
+      )}
     </>
   );
 }

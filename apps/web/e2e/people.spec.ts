@@ -1,15 +1,18 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { ROLE_MEANINGS } from "@/features/people/role-meanings.ts";
 import { screenById, viewsOf } from "@/shared/screens.ts";
 
 import { expect, test } from "./browser.ts";
 import {
   addMember,
   anAddress,
+  clockTheNextKey,
   person,
   provision,
   signIn,
   skipLinkReachesTheScreen,
+  theActLandedWithinItsBudget,
 } from "./harness.ts";
 
 const LIST_BUDGET_MS = 1000;
@@ -34,6 +37,13 @@ const memberRows = (page: Page): Locator =>
     .filter({ has: page.getByRole("cell") });
 
 const rowOf = (page: Page, name: string): Locator => memberRows(page).filter({ hasText: name });
+
+const memberButton = (page: Page, name: string): Locator =>
+  membersRegion(page).getByRole("button", { name, exact: true });
+
+const sheetOf = (page: Page, name: string): Locator => page.getByRole("dialog", { name });
+
+const rolePicker = (sheet: Locator): Locator => sheet.getByRole("radiogroup", { name: "Role" });
 
 /** Timed in the page, from the key to the count that says it: a matcher polls too coarsely. */
 const clockTheSearch = (page: Page, saying: string) =>
@@ -256,23 +266,177 @@ test.describe("the People screen's Members view", () => {
               - columnheader "Joined"
           - rowgroup:
             - row /Priya Shah/:
-              - cell /Priya Shah/
+              - cell /Priya Shah/:
+                - button "Priya Shah"
               - cell "Editor"
               - cell "No group"
               - cell /\\d{4}/
             - row /Sam Okoro/:
-              - cell /Sam Okoro/
+              - cell /Sam Okoro/:
+                - button "Sam Okoro"
               - cell "Viewer"
               - cell "No group"
               - cell /\\d{4}/
             - row /Test person/:
-              - cell /Test person/
+              - cell /Test person/:
+                - button "Test person"
               - cell "Admin"
               - cell "No group"
               - cell /\\d{4}/
     `);
 
     await passesTheAccessibilityGate();
+  });
+});
+
+test.describe("a member, opened as a sheet", () => {
+  test("shows an Admin a member's role, groups and each role's meaning", async ({
+    page,
+    request,
+    passesTheAccessibilityGate,
+  }) => {
+    const { joined } = await anAdminAtPeople(page, request, "Swale Forge");
+    const priya = joined.find((member) => member.displayName === "Priya Shah");
+    if (priya === undefined) throw new Error("Priya Shah was joined");
+
+    await memberButton(page, "Priya Shah").click();
+
+    const sheet = sheetOf(page, "Priya Shah");
+    await expect(sheet).toBeVisible();
+    await expect(sheet.getByRole("heading", { level: 2, name: "Priya Shah" })).toBeFocused();
+    await expect(sheet).toContainText(priya.email);
+    await expect(rolePicker(sheet).getByRole("radio")).toHaveCount(3);
+    for (const [role, meaning] of Object.entries(ROLE_MEANINGS)) {
+      await expect(
+        sheet.getByRole("radio", { name: role, exact: true }),
+      ).toHaveAccessibleDescription(meaning);
+    }
+    await expect(sheet.getByRole("radio", { name: "Editor", exact: true })).toBeChecked();
+    await expect(sheet.getByRole("button", { name: "Make Priya Shah an Editor" })).toBeDisabled();
+
+    await expect(sheet).toMatchAriaSnapshot(`
+      - dialog "Priya Shah":
+        - heading "Priya Shah" [level=2]
+        - paragraph: /@/
+        - region "Membership":
+          - heading "Membership" [level=3]
+          - term: Role
+          - definition: Editor
+          - term: Groups
+          - definition: No group
+          - term: Joined
+          - definition: /\\d{4}/
+        - region "Role":
+          - heading "Role" [level=3]
+          - radiogroup "Role":
+            - radio "Admin"
+            - text: Admin Manages people and sources, and does everything an Editor does.
+            - radio "Editor" [checked]
+            - text: Editor Checks concepts, runs question sets and saves Answers.
+            - radio "Viewer"
+            - text: Viewer Asks questions, flags answers and suggests changes.
+          - button "Make Priya Shah an Editor" [disabled]
+          - paragraph: Priya Shah is an Editor. Pick another role to change it.
+        - button "Close"
+    `);
+    await passesTheAccessibilityGate();
+
+    await page.keyboard.press("Escape");
+    await expect(sheet).toHaveCount(0);
+    await expect(memberButton(page, "Priya Shah")).toBeFocused();
+  });
+
+  test("changes a member's role within the act's budget, and it holds", async ({
+    page,
+    request,
+  }) => {
+    await anAdminAtPeople(page, request, "Nidd Valley Casting");
+
+    await memberButton(page, "Sam Okoro").click();
+    const sheet = sheetOf(page, "Sam Okoro");
+    await sheet.getByRole("radio", { name: "Editor", exact: true }).click();
+    const commit = sheet.getByRole("button", { name: "Make Sam Okoro an Editor" });
+    await commit.focus();
+    await clockTheNextKey(page, {
+      at: "//tr[.//button[normalize-space(.)='Sam Okoro']]/td[2]",
+      reads: "Editor",
+    });
+    await page.keyboard.press("Enter");
+
+    await expect(sheet.getByRole("status")).toHaveText(
+      "Sam Okoro is an Editor now, from their next request.",
+    );
+    await theActLandedWithinItsBudget(page, "role change");
+    await expect(sheet.getByRole("radio", { name: "Editor", exact: true })).toBeFocused();
+    await expect(sheet.getByRole("region", { name: "Membership" })).toContainText("Editor");
+
+    await page.keyboard.press("Escape");
+    await page.reload();
+    await expect(rowOf(page, "Sam Okoro").getByRole("cell").nth(1)).toHaveText("Editor");
+  });
+
+  test("refuses demoting the last Admin in its own word, and says what next", async ({
+    page,
+    request,
+    passesTheAccessibilityGate,
+  }) => {
+    await anAdminAtPeople(page, request, "Ure Mill Tools");
+
+    await memberButton(page, "Test person").click();
+    const sheet = sheetOf(page, "Test person");
+    await sheet.getByRole("radio", { name: "Viewer", exact: true }).click();
+    await sheet.getByRole("button", { name: "Make Test person a Viewer" }).click();
+
+    const refused = sheet.getByRole("alert");
+    await expect(refused).toContainText("Refused: last-admin.");
+    await expect(refused).toContainText("Make someone else an Admin first.");
+    await expect(sheet.getByRole("region", { name: "Membership" })).toContainText("Admin");
+    await passesTheAccessibilityGate();
+    await page.keyboard.press("Escape");
+    await expect(rowOf(page, "Test person").getByRole("cell").nth(1)).toHaveText("Admin");
+  });
+
+  test("lets an Admin open a member and change their role by keyboard alone", async ({
+    page,
+    request,
+  }) => {
+    await anAdminAtPeople(page, request, "Calder Rolling");
+    await page.goto(MEMBERS_VIEW);
+    await expect(memberRows(page)).toHaveCount(3);
+
+    await page.keyboard.press("c");
+    await expect(membersRegion(page)).toContainText(
+      "Move focus to a member first: the keystroke acts on the member in focus.",
+    );
+
+    await page.keyboard.press("?");
+    const keystrokes = page.getByRole("dialog", { name: "Keystrokes on People" });
+    await expect(keystrokes).toContainText("Open the member in focus");
+    await expect(keystrokes).toContainText("Change the role of the member in focus");
+    await page.keyboard.press("Escape");
+
+    await memberButton(page, "Priya Shah").focus();
+    await page.keyboard.press("o");
+    const sheet = sheetOf(page, "Priya Shah");
+    await expect(sheet.getByRole("heading", { level: 2, name: "Priya Shah" })).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(memberButton(page, "Priya Shah")).toBeFocused();
+
+    await page.keyboard.press("c");
+    await expect(sheet.getByRole("radio", { name: "Editor", exact: true })).toBeFocused();
+    // The group checks the radio it moves to only while the arrow is held, as a person's is.
+    await page.keyboard.press("ArrowDown", { delay: 50 });
+    await expect(sheet.getByRole("radio", { name: "Viewer", exact: true })).toBeChecked();
+    await page.keyboard.press("Tab");
+    await expect(sheet.getByRole("button", { name: "Make Priya Shah a Viewer" })).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(sheet.getByRole("status")).toHaveText(
+      "Priya Shah is a Viewer now, from their next request.",
+    );
+
+    await page.keyboard.press("Escape");
+    await expect(memberButton(page, "Priya Shah")).toBeFocused();
+    await expect(rowOf(page, "Priya Shah").getByRole("cell").nth(1)).toHaveText("Viewer");
   });
 });
 
@@ -299,5 +463,12 @@ test.describe("the People screen's words", () => {
       await page.getByRole("tab", { name: tab }).click();
       await said(`${MEMBERS_VIEW}, the ${tab} tab`);
     }
+
+    await page.getByRole("tab", { name: "Members" }).click();
+    await memberButton(page, "Priya Shah").click();
+    const sheet = sheetOf(page, "Priya Shah");
+    await expect(sheet).toBeVisible();
+    await expect(page.locator("body"), "a member's sheet").not.toContainText(organisation);
+    expect(await sheet.ariaSnapshot(), "a member's sheet").not.toMatch(organisation);
   });
 });
