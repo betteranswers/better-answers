@@ -1,6 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { mkdtempSync, readdirSync, realpathSync, rmSync, utimesSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
-import { oxlintOver, runsOverThrowawayTree } from "@better-answers/devtools/throwaway-tree";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
+
+import {
+  oxlintOver,
+  runsOverThrowawayTree,
+  writeUnder,
+} from "@better-answers/devtools/throwaway-tree";
 import type { Tool, Tree } from "@better-answers/devtools/throwaway-tree";
 
 const oxlint: Tool["executable"] = { package: "oxlint", path: ["bin", "oxlint"] };
@@ -17,6 +25,8 @@ const kebabCaseConfig = JSON.stringify({
 const smokeTree: Tree = { [CAMEL_CASE_FILE]: SOURCE };
 
 const FOUND_SOMETHING = [1];
+
+const MINUTE_MS = 60_000;
 
 const reportsAFileAndPosition = (output: string): boolean => /^[^\s:]+:\d+:\d+:/m.test(output);
 
@@ -56,6 +66,13 @@ describe("runsOverThrowawayTree over a tool that cannot run", () => {
     expect(() => runsOverThrowawayTree(oxlintTool({ foundSomething: [] }))).toThrow(
       /exit 1[\s\S]*filename-case/,
     );
+  });
+
+  it("refuses a time limit that reaches the sweep's hour", () => {
+    expect(() => runsOverThrowawayTree(oxlintTool({ timeoutMs: 60 * MINUTE_MS }))).toThrow(
+      /3600000 ms/,
+    );
+    expect(() => runsOverThrowawayTree(oxlintTool({ timeoutMs: 59 * MINUTE_MS }))).not.toThrow();
   });
 });
 
@@ -123,5 +140,107 @@ describe("oxlintOver", () => {
     expect(() =>
       oxlintOver(kebabCaseConfig, { tree: smokeTree, flagged: [KEBAB_CASE_FILE] }),
     ).toThrow(/smoke/i);
+  });
+});
+
+// Resolved because oxlint names a tree by its real path, and macOS's temp directory is a link.
+const scratch = realpathSync(mkdtempSync(path.join(tmpdir(), "throwaway-tree-test-")));
+
+afterAll(() => {
+  rmSync(scratch, { recursive: true, force: true });
+});
+
+const TREES = "better-answers-throwaway-trees";
+
+const ANOTHER_RUNS_TREE = "tree-another-run";
+
+/** `os.tmpdir()` reads `TMPDIR` on every call, so the runner's folder moves into this one. */
+const ownTemp = (): string => {
+  const temp = mkdtempSync(path.join(scratch, "temp-"));
+  vi.stubEnv("TMPDIR", temp);
+  return temp;
+};
+
+const plantTree = (temp: string, name: string, ageMs = 0): void => {
+  const tree = path.join(temp, TREES, name);
+  writeUnder(tree, KEBAB_CASE_FILE, SOURCE);
+  const modifiedSeconds = (Date.now() - ageMs) / 1000;
+  utimesSync(tree, modifiedSeconds, modifiedSeconds);
+};
+
+const treesIn = (temp: string): readonly string[] => readdirSync(path.join(temp, TREES)).sort();
+
+/** The last two end in the smoke run, which is a run like any other. */
+const runEndings: readonly { readonly ending: string; readonly run: () => void }[] = [
+  {
+    ending: "a finding",
+    run: () => {
+      expect(runsOverThrowawayTree(oxlintTool())(smokeTree)).toContain(CAMEL_CASE_FILE);
+    },
+  },
+  {
+    ending: "a clean pass",
+    run: () => {
+      expect(runsOverThrowawayTree(oxlintTool())({ [KEBAB_CASE_FILE]: SOURCE })).toBe("");
+    },
+  },
+  {
+    ending: "a tool failure",
+    run: () => {
+      expect(() => runsOverThrowawayTree(oxlintTool({ foundSomething: [] }))).toThrow(/exit 1/);
+    },
+  },
+  {
+    ending: "a timeout",
+    run: () => {
+      expect(() => runsOverThrowawayTree(oxlintTool({ timeoutMs: 1 }))).toThrow(
+        /stopped after 1 ms/,
+      );
+    },
+  },
+];
+
+describe("runsOverThrowawayTree's trees", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("runs each tool in a tree under one temp folder", () => {
+    const temp = ownTemp();
+
+    expect(() =>
+      runsOverThrowawayTree(oxlintTool({ scaffold: { ".oxlintrc.json": "{ not json" } })),
+    ).toThrow(path.join(temp, TREES, "tree-"));
+    expect(readdirSync(temp)).toEqual([TREES]);
+  });
+
+  it.each(runEndings)("removes only its own tree after $ending", ({ run }) => {
+    const temp = ownTemp();
+    plantTree(temp, ANOTHER_RUNS_TREE);
+    expect(treesIn(temp)).toEqual([ANOTHER_RUNS_TREE]);
+
+    run();
+
+    expect(treesIn(temp)).toEqual([ANOTHER_RUNS_TREE]);
+  });
+
+  it("sweeps only trees over an hour old on first use", () => {
+    const temp = ownTemp();
+    plantTree(temp, "tree-61-minutes-old", 61 * MINUTE_MS);
+    plantTree(temp, "tree-59-minutes-old", 59 * MINUTE_MS);
+
+    runsOverThrowawayTree(oxlintTool());
+
+    expect(treesIn(temp)).toEqual(["tree-59-minutes-old"]);
+  });
+
+  it("sweeps once a process, so later stale trees stay", () => {
+    const temp = ownTemp();
+    runsOverThrowawayTree(oxlintTool());
+    plantTree(temp, "tree-61-minutes-old", 61 * MINUTE_MS);
+
+    runsOverThrowawayTree(oxlintTool());
+
+    expect(treesIn(temp)).toEqual(["tree-61-minutes-old"]);
   });
 });

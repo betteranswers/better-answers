@@ -15,6 +15,14 @@ stayed silent" then passes while enforcing nothing. So only the tool's own "I fo
 something" exit is tolerated, every other exit is re-thrown with both of the tool's streams,
 and a smoke case proves the reporter's shape before any caller is allowed to read a silence.
 
+Every tree sits in one folder, `better-answers-throwaway-trees/` in the OS temp directory, and
+a run removes its tree in a `finally`. A finding, a clean pass, a tool that failed and a run
+past its time limit all leave nothing behind. The limit is five minutes unless the tool sets
+`timeoutMs`, because a test's timeout cannot interrupt a synchronous run. A killed run never
+reaches its `finally`, so the first run in each process also removes any tree in the folder
+that is more than an hour old. A live tree lasts one run, inside the limit, so the sweep cannot
+reach another session's live tree. That is why the runner refuses a limit of an hour or more.
+
 The tool is a parameter — which package holds the binary, the command line, the exits that
 mean a finding, the environment it runs in, and the smoke case — so a second and a third tool
 run through this helper rather than each writing its own. Three tools run through it today,

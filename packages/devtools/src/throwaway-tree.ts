@@ -1,5 +1,13 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -12,9 +20,16 @@ import { z } from "zod";
  */
 const spawnFailure = z.object({
   status: z.number().nullish(),
+  code: z.string().nullish(),
   stdout: z.string().nullish(),
   stderr: z.string().nullish(),
 });
+
+/** A test's own timeout cannot interrupt a synchronous run, so this is the one a hung tool meets. */
+const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
+
+/** A live tree lasts one run, inside the time limit, so a tree this old outlived a killed run. */
+const STALE_AFTER_MS = 60 * 60 * 1000;
 
 export type Tree = Readonly<Record<string, string>>;
 
@@ -32,6 +47,9 @@ export type Tool = {
 
   /** The exits that mean the tool ran and reported something; any other non-zero exit throws. */
   readonly foundSomething: readonly number[];
+
+  /** Under an hour, or the sweep could take a live tree for one a killed run left. */
+  readonly timeoutMs?: number;
 
   /** A tree the tool must report on, run once when the runner is made. */
   readonly smoke: { readonly tree: Tree; readonly reports: (output: string) => boolean };
@@ -113,7 +131,22 @@ const failureOf = (cause: unknown): z.infer<typeof spawnFailure> => {
   return read.success ? read.data : {};
 };
 
-const reportOrThrow = (tool: Tool, binary: string, cause: unknown): string => {
+const timeoutMsFor = (tool: Tool): number => {
+  const timeoutMs = tool.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  if (timeoutMs >= STALE_AFTER_MS) {
+    throw new Error(
+      `${tool.executable.package}: a time limit of ${String(timeoutMs)} ms lets a live tree reach the age at which the sweep removes it; keep it under ${String(STALE_AFTER_MS)} ms.`,
+    );
+  }
+  return timeoutMs;
+};
+
+const howItStopped = (failure: z.infer<typeof spawnFailure>, timeoutMs: number): string =>
+  failure.code === "ETIMEDOUT"
+    ? `did not finish: stopped after ${String(timeoutMs)} ms`
+    : `did not run: exit ${String(failure.status)}`;
+
+const reportOrThrow = (tool: Tool, binary: string, timeoutMs: number, cause: unknown): string => {
   const failure = failureOf(cause);
   const status = failure.status;
   if (status !== null && status !== undefined && tool.foundSomething.includes(status)) {
@@ -121,31 +154,64 @@ const reportOrThrow = (tool: Tool, binary: string, cause: unknown): string => {
   }
 
   throw new Error(
-    `${tool.executable.package} (${binary}) did not run: exit ${String(status)}\n${String(failure.stdout ?? "")}\n${String(failure.stderr ?? cause)}`,
+    `${tool.executable.package} (${binary}) ${howItStopped(failure, timeoutMs)}\n${String(failure.stdout ?? "")}\n${String(failure.stderr ?? cause)}`,
   );
 };
 
+/** Keyed by folder, not a flag, because the temp directory is read afresh on every run. */
+const sweptFolders = new Set<string>();
+
+const sweepStaleTrees = (folder: string): void => {
+  if (sweptFolders.has(folder)) return;
+  sweptFolders.add(folder);
+  const staleBeforeMs = Date.now() - STALE_AFTER_MS;
+  for (const entry of readdirSync(folder)) {
+    const tree = path.join(folder, entry);
+    const modifiedMs = statSync(tree, { throwIfNoEntry: false })?.mtimeMs;
+    if (modifiedMs !== undefined && modifiedMs < staleBeforeMs) {
+      rmSync(tree, { recursive: true, force: true });
+    }
+  }
+};
+
+const sweptTreesFolder = (): string => {
+  const folder = path.join(tmpdir(), "better-answers-throwaway-trees");
+  mkdirSync(folder, { recursive: true });
+  sweepStaleTrees(folder);
+  return folder;
+};
+
 /**
- * Resolves the binary and runs the smoke case now, throwing if either fails. Each run returns
- * stdout from a fresh temporary directory it leaves behind.
+ * Resolves the binary and runs the smoke case now, throwing if either fails or the time limit is
+ * an hour or more.
  */
 export const runsOverThrowawayTree = (tool: Tool): RunOverTree => {
   const binary = executableOf(tool.executable);
+  const timeoutMs = timeoutMsFor(tool);
 
-  const run: RunOverTree = (tree) => {
-    const directory = mkdtempSync(path.join(tmpdir(), "throwaway-tree-"));
-    writeTree(directory, tool.scaffold ?? {});
-    writeTree(directory, tree);
+  const runIn = (directory: string): string => {
     try {
       return execFileSync(binary, [...tool.argv], {
         cwd: directory,
         encoding: "utf8",
         stdio: ["ignore", "pipe", "pipe"],
+        timeout: timeoutMs,
 
         env: { ...process.env, ...tool.env },
       });
     } catch (cause) {
-      return reportOrThrow(tool, binary, cause);
+      return reportOrThrow(tool, binary, timeoutMs, cause);
+    }
+  };
+
+  const run: RunOverTree = (tree) => {
+    const directory = mkdtempSync(path.join(sweptTreesFolder(), "tree-"));
+    try {
+      writeTree(directory, tool.scaffold ?? {});
+      writeTree(directory, tree);
+      return runIn(directory);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
     }
   };
 
