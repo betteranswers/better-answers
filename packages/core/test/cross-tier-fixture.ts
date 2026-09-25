@@ -68,10 +68,12 @@ export type BindingDoors = {
   readonly objects: ObjectDoor;
 };
 
+/** Binds `text` as an Internal Markdown upload of a file named `called`; throws when refused. */
 export const bindTheHandbook = async (
   admin: UserPrincipal,
   doors: BindingDoors,
   called = THE_TITLE,
+  text = THE_HANDBOOK,
 ) => {
   const bound = await bindUpload(admin, doors, {
     ...inputOf(bindUploadFields, {
@@ -79,10 +81,10 @@ export const bindTheHandbook = async (
       name: `${THE_BINDING} · ${called}`,
       fileName: called,
       mediaType: "text/markdown",
-      byteSize: new TextEncoder().encode(THE_HANDBOOK).length,
+      byteSize: new TextEncoder().encode(text).length,
       sensitivity: "Internal",
     }),
-    body: bodyOf(THE_HANDBOOK),
+    body: bodyOf(text),
   });
   if (!bound.ok) throw new Error(`the bind was refused: ${String(bound.error)}`);
   return bound.value;

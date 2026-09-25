@@ -119,7 +119,7 @@ Where a unit lives is decided by **minting**.
   handler under the reconciler's platform principal. Every thirty seconds, one tick at a time,
   quiet when it finds nothing; `pnpm ops reconcile-watermark` is the same pass on demand, the
   restore path (ADR 0012). _Avoid_: poll, sync (for this pass).
-- **reconciler hit** — one commit the reconciler replayed: the ledger row
+- **reconciler hit** — one commit the reconciler replayed: the audit event
   `platform.reconciler.replayed`, written under the commit's own `Audit:` id, a bulk replay's rows
   sharing one batch id. The *signal* ADR 0012 names, in ADR 0025's sense — a query over those rows,
   never a metric. A hit is a crash window that was recovered, so a run of them is a fact worth
@@ -168,7 +168,7 @@ Where a unit lives is decided by **minting**.
 - **export** — the company taking its knowledge out of the platform: a *bundle snapshot* (the
   bundle's files at one commit, readable by any OKF tool), a *repository export* (the whole
   workspace repository with its history), a *records export* (the records about its concepts —
-  verifications, owners, usage, conflicts — with the audit ledger and the publish confirmations)
+  verifications, owners, usage, conflicts — with the audit log and the publish confirmations)
   or a *guide snapshot* (a guide's prose as markdown, labelled with its date and "not
   maintained"). An Admin act with an audit row.
   The only way anyone but the platform reaches the repository.
@@ -210,13 +210,13 @@ Where a unit lives is decided by **minting**.
 - **keep in text** — an Admin's bulk act over named *finding groups* of one binding: every span
   of each group restored with one reason because it is the company's own business fact and
   reviewed as *kept in text*, and the run that lets them back into the document queued with
-  them. The always set alone, one ledger row per span. An *erasure request* outranks it: a kept
+  them. The always set alone, one audit event per span. An *erasure request* outranks it: a kept
   span a request names is **overridden by the erasure** — it stays withheld, and the review says
   so beside its group. (Not a *class override*, which is an Admin's act on a concept's class.)
 - **narrow these documents** — an Admin's bulk act over named *finding groups* of one binding,
   taken on the *source documents* they sit in: each document takes a class of its own; the named
   groups' unreviewed findings are reviewed as *narrowed* — and no finding the Admin was not
-  shown — and the *cascade* runs from the concepts citing the documents. One ledger row per
+  shown — and the *cascade* runs from the concepts citing the documents. One audit event per
   document; it never widens.
 - **dismiss as not special category** — an Admin's bulk act over named special-category *finding
   groups* of one binding: every span of each group is reviewed as **dismissed** under one reason,
@@ -225,7 +225,7 @@ Where a unit lives is decided by **minting**.
   and does not let the span be shown: the span stays withheld unless it is also *kept in text*,
   and a later keep leaves the dismissal standing. On that run, a document whose every
   special-category finding is dismissed has its **verdict lifted**, and the document's own class
-  goes back to the Admin's narrowing, or to the binding's class if there is none. One ledger row
+  goes back to the Admin's narrowing, or to the binding's class if there is none. One audit event
   per document. It is the one road by which a document's class widens. (Not *keep in text*, which
   lets a span back into the text and lifts no class.)
 - **cue** — a word which, found in a sentence in any of its forms, withholds that sentence whole
@@ -250,10 +250,11 @@ Where a unit lives is decided by **minting**.
   the text*, at a tier, for one **reason**, the first of these that holds — *overridden by the
   erasure* (a request names it and an Admin had kept it) · *erasure* (a request names it) ·
   *restored* · *switched off* · *in force*. It says nothing of where a placeholder lands; the
-  *written spans* do. A finding is never rewritten by a withholding. _Avoid_: decision, detection.
+  *written spans* do. A finding is never rewritten by a withholding. An *erasure match* is the
+  one withholding with no finding: always withheld, at the always tier. _Avoid_: decision, detection.
 - **written span** — the run of characters one placeholder is written over, naming the
-  *withholding* it writes for. Every character of a withheld finding lies under exactly one, so a
-  finding that loses part of its run to another keeps its own word over the rest. How a finding
+  *withholding* it writes for. Every character of a withheld finding or an *erasure match* lies
+  under exactly one, so a finding that loses part of its run to another keeps its own word over the rest. How a finding
   was **written** is read off the spans: under its own placeholder where one names it, under
   another finding's where others cover every character of it, not at all otherwise.
 - **emptying a binding** — deleting a binding's derived rows in the api's transaction and
@@ -378,20 +379,30 @@ Where a unit lives is decided by **minting**.
   suggestions. Its audit row carries the Admin's confirmations (lawful basis recorded, privacy
   information updated, DPIA reference). Unpublished content is seen by Admins, in Control Centre
   only, and a concept citing it counts as Restricted until the publish releases the binding's class.
+- **widen (a binding)** — an Admin's recorded act that moves a binding to a wider class, a wider
+  audience or both, published or not, with the *cascade* run inside the same act. Its audit row
+  carries the class and audience it moved from and to. A request that widens no term, or narrows
+  any, is refused, and so is any widening while a special-category *finding* the last run raised
+  is unreviewed. A document's own class stays where it is, since the *effective class* is the
+  narrower of the two. The one road by which a binding's class widens. _Avoid_: reclassify,
+  unrestrict.
 - **audience** — who a binding's content is for: everyone in the workspace, or named groups (plus,
   if needed, named individuals). Set on the binding, carried with sensitivity onto every source
   entity and read from the binding for a chunk, and applied with *published* on every read and
   traversal hop. Distinct from sensitivity (how confidential) and from trust (how reliable).
 - **cascade** — the re-derivation an Admin's narrowing of a binding or of named documents of one,
-  publish of a binding, or override of a concept's class sets off inside the same act: first every
-  concept citing the evidence that moved, then every composition including one of those concepts —
-  two levels, the second reading what the first wrote, never a third — so a guide never reaches a
-  reader its includes would not. _Avoid_: recompute (one level's work, not the whole), propagation.
+  widening or publish of a binding, or override of a concept's class sets off inside the same act:
+  first every concept citing the evidence that moved, then every composition including one of those
+  concepts — two levels, the second reading what the first wrote, never a third — so a guide never
+  reaches a reader its includes would not. _Avoid_: recompute (one level's work, not the whole),
+  propagation.
 - **class override** — an Admin's recorded act that sets a concept's class — sensitivity and
   audience — whatever its evidence and its kind's floor derive: one row per concept, the latest
   standing, one audit event, and the *cascade* run inside the same act. The one act that may widen
-  a class; where it widens past the evidence, a reader is in the *shared beyond its evidence* state
-  and the *evidence pane* names the Admin (ADR 0039). _Avoid_: exception, exemption, allow-list.
+  a concept's class past what its evidence derives (a binding's widens by *widen (a binding)*, and
+  its concepts follow their evidence); where it does, a reader is in the *shared beyond its
+  evidence* state and the *evidence pane* names the Admin (ADR 0039). _Avoid_: exception,
+  exemption, allow-list.
 - **group** — a named set of members of one workspace: the one grouping concept, and the unit an
   *audience* names when a binding is not for everyone. Groups are flat, and a person may belong to
   several. A group may represent a team ("HR team", "Sales executives") — that is its name, not a
@@ -554,7 +565,7 @@ to it by IRI and never restates it (ADR 0014).
 - **actor id** — who a `generated.by` or `verified[].by` names: a person as `human:<email>` (as
   Google's samples), the platform's agents as `better-answers-<purpose>/<version>`, a process as
   `process:better-answers-<purpose>`. Verifier and generator must differ on the producer part. On
-  a record the platform keeps — the *ledger*, a commit trailer, a suggestion's proposer — a person
+  a record the platform keeps — the *audit log*, a commit trailer, a suggestion's proposer — a person
   is `human:<person id>`; the file forms stand.
 - **actor alias** — an Admin's mapping of an imported actor id to a member, so *Checked by* can
   name them; the file is never rewritten.
@@ -564,9 +575,10 @@ to it by IRI and never restates it (ADR 0014).
   `human:<email>` (ADR 0019). _Avoid_: member id (retired 05/09/2026 — the member row's key names
   nothing), user id (on a screen).
 - **display name** — the one line a person is credited by wherever the platform names them:
-  *Checked by*, a commit's author, a member list. The person states it themselves; an Admin or the
-  operator corrects an inappropriate one. Not a *Person* concept's name, which the company
-  publishes. _Avoid_: person's name, full name, username.
+  *Checked by*, a commit's author, a member list. The person states it themselves; an Admin flags
+  an inappropriate one and the *operator* corrects it, since one name is shown in every workspace
+  the person belongs to and no workspace's Admin may learn of the others. Not a *Person* concept's
+  name, which the company publishes. _Avoid_: person's name, full name, username.
 - **minter** — the kernel's one function that mints every id the platform writes, a time-ordered
   ULID; Better Auth is handed it too, so every identity id has the same shape (ADR 0035). Not the
   *minting* rule, which decides where a unit of knowledge lives (ADR 0011). _Avoid_: id generator.
@@ -588,7 +600,7 @@ to it by IRI and never restates it (ADR 0014).
 - **answer audit** — the retained record of every answer the platform gave: who asked, on which
   surface, what was answered, what it cited and how trusted that was at the time, the predicate
   that applied and, on reuse, the matched `Answer` and the judge's verdict; with the feedback and
-  corrections it received. Not part of the audit ledger. Content is kept twelve months by default, then thinned to the
+  corrections it received. Not part of the audit log. Content is kept twelve months by default, then thinned to the
   skeleton — citations, trust then, verdicts, feedback and corrections — kept for good (ADR 0017).
 - **feedback** — a reader's verdict on one answer, never the platform's: *helpful*, or a **flag**
   with a reason — *wrong* · *out of date* · *incomplete* · *should not have shown* — that becomes
@@ -602,21 +614,28 @@ to it by IRI and never restates it (ADR 0014).
   *stale* when a concept it names is deprecated. _Avoid_: eval (on any screen).
 - **audit event** — the record of one act by an Admin, the platform or a person acting on their own
   identity — what was done, to what, by whom, when, with what confirmations — in the one
-  append-only *ledger* a workspace keeps, or in the *identity-set ledger* when the act belongs to
-  no workspace. Every event belongs to
-  one of four families — **people**, **knowledge**, **sources**, **platform** — named as the first
-  word of its *ledger act*, `family.subject.verb`; runs, the *answer audit*, *signals* and spend are
-  their own records and never audit events. _Avoid_: log.
-- **ledger act** — the name an *audit event* is recorded under, `family.subject.verb`
+  append-only *audit log* a workspace keeps, or in the *identity-set audit log* when the act
+  belongs to no workspace. Every event belongs to one of four families — **people**,
+  **knowledge**, **sources**, **platform** — named as the first word of its *audit act*,
+  `family.subject.verb`; runs, the *answer audit*, *signals* and spend are their own records and
+  never audit events. _Avoid_: log line, log entry.
+- **audit act** — the name an *audit event* is recorded under, `family.subject.verb`
   (`sources.binding.published`), declared by the part of the platform that performs it and never a
   free string. One *act* may write more than one, and a read writes none (ADR 0043).
-  _Avoid_: event type, action name.
-- **ledger** — the one append-only record of every *audit event* a workspace keeps, written in
-  the same act it records. _Avoid_: audit log, event log.
-- **identity-set ledger** — the append-only record of the acts that belong to no workspace
-  because they act on a person's identity itself, such as a person giving their own *display
-  name*. It sits beside the *ledger* and uses the same *ledger acts*. A person appears in it by
-  *person id*, never by name or address, and no row is ever rewritten.
+  _Avoid_: ledger act (retired 24/09/2026), event type, action name.
+- **audit log** — the one append-only record of every *audit event* a workspace keeps, written in
+  the same act it records; an Admin reads their workspace's own on People's *Audit log* view, and
+  never another's. Not the *answer audit*, which records answers. _Avoid_: ledger (retired
+  24/09/2026 for the word an Admin looks for), event log, log (alone).
+- **identity-set audit log** — the append-only record of the acts that belong to no workspace
+  because they act on a person's identity itself: a person giving their own *display name*, a
+  sign-in, and every write the *operator* makes. It sits beside the *audit log* and uses the same
+  *audit acts*. A person appears in it by *person id*, never by name or address, and no row is ever
+  rewritten. Only the operator reads it; no workspace's Admin ever does.
+- **log line** — one line the running platform writes to its operational log for whoever runs
+  it: a token refresh, a workspace picked, a failure. Never a record: nothing reads it back as
+  evidence of an act, and an act that must be answerable for is an *audit event*, not a log line.
+  _Avoid_: log (alone), audit line.
 - **erasure request** — a person's request that their personal data leave the platform: what was
   done in every store, when, and when the backups are beyond use. A valid one reaching the bundle
   runs the history-rewrite routine (ADR 0020) and carries the *erasure pseudonym* it minted.
@@ -629,19 +648,28 @@ to it by IRI and never restates it (ADR 0014).
   per-store finder over the request's identifier set, the one-month clock from its start;
   access answers with where the platform holds the person and under which categories, never
   a passage.
-- **suppression** — the entry that keeps a person's data out of every derived store when a
-  document is reprocessed; applied per document, linked to its erasure request.
+- **suppression** — the workspace's entry that keeps a person's identifiers out of every derived
+  store: one per *erasure request*, holding the request's identifier set, applied to every
+  document of the workspace on every index run, now and later.
+- **erasure match** — a bounded, case-folded occurrence of a *suppression*'s identifier in a
+  document's normalised text, which the *redaction seam* withholds. It is a withholding and never
+  a *finding*: no finding row holds it, no review reaches it and no *keep in text* releases it. An
+  identifier below the **identifier floor** — under three characters once normalised, or a name of
+  one word — raises none, and recording a *subject request* refuses it as too broad to withhold.
 - **erasure map** — the per-store finder's answer for one *subject request*: every store family
   the platform holds and what in each of them names the person, found over the request's
-  identifier set. The *suppression* entries and the report are written from it.
+  identifier set. Its documents entry names the live documents whose indexed text holds an
+  identifier, and those choose which bindings are wiped now; the *suppression* is written from
+  the request's identifier set, not from the map.
 - **replay copy** — the completed *erasure request*'s copy in the object store — the request, its
   *erasure pseudonym*, the identifier set and the *erasure map* — that a restore reads to run the
   erasure again over a dump older than the request. Restricted personal data, as a *suppression* is.
 - **erasure rehearsal** — the *restore drill*'s proof that erasure erases, run against *staging* in
   two phases so a dump can be taken between them: a **synthetic subject** — a person the platform
   invented, addressed under a reserved domain that resolves nowhere — is seeded into a workspace
-  with a membership and a concept file naming them, and the erasure routine is then run over them
-  and answers with the real report. Its **tokens** are the values that subject is greppable by in a
+  with a membership, a concept file naming them and a bound document naming them by their address
+  and their name, which the first phase waits to see indexed; the erasure routine is then run over
+  them and answers with the real report. Its **tokens** are the values that subject is greppable by in a
   dump, each one a value the erasure removes; *token* here is `dump-grep --tokens`' sense of the
   word and never a credential (*personal token*, *agent token*).
 - **version (of a record)** — one state of a composition or a guide definition, kept for good with
@@ -728,14 +756,14 @@ to it by IRI and never restates it (ADR 0014).
   principal, never under a live user session.
   _Avoid_: user (in code), session, caller, actor (which is the *id* on a file, not the principal).
 - **operator** — the platform's own administrator over every workspace: a real person on the
-  identity set with the platform-level role, a third principal kind beside a user and the
-  platform, audited under their own id. Never a workspace *role*; *Admin* is the highest role a
-  workspace has.
+  identity set, made the operator only by the platform's own tooling and never from a screen, a
+  third principal kind beside a user and the platform, audited under their own id. Never a
+  workspace *role*; *Admin* is the highest role a workspace has.
 - **act** — what an entry — a screen's call, an MCP entry, an ops command, the reconciler's tick —
   may ask the platform to do as a *principal*: one thing, a **read** or a **write**, answered with
   its value or with a *refusal*. Reading a binding's findings is an act as much as publishing the
-  binding is. Where the *ledger* records an act, its *audit event* lands with it, under its
-  *ledger act* (ADR 0043). _Avoid_: action, operation, command, use case; endpoint and procedure
+  binding is. Where the *audit log* records an act, its *audit event* lands with it, under its
+  *audit act* (ADR 0043). _Avoid_: action, operation, command, use case; endpoint and procedure
   (a transport's words for how an act is reached).
 - **step (of an act)** — a part of an act that runs only inside the act that called it and never
   on its own: writing the *audit event*, queueing a *job*, reading whether a person holds every
@@ -786,7 +814,22 @@ to it by IRI and never restates it (ADR 0014).
   role label.
 - **access request** — a signed-in person's recorded ask to join one workspace, with a reason;
   decided by an Admin — approved (which mints the invitation) or declined — each decision on the
-  *ledger*. Not a *subject request*.
+  *audit log*. Not a *subject request*.
+- **membership** — a person's place in one workspace: the one *role* they hold there, the *groups*
+  they belong to in it, and the instant their credentials there were last revoked. It begins when
+  the person accepts an *invitation*, or when the platform provisions the workspace or adds them;
+  it ends when an Admin removes the member, which leaves the person and their *display name* as
+  they were, or when an *erasure request* is carried out; either way every *audit event* naming
+  the person stands. A workspace keeps at least one
+  Admin: no role change or removal may leave it with none — erasure alone may, since the right
+  outranks the rule, and the operator then adds an Admin. A **member** is a person holding a membership of the
+  workspace in question. _Avoid_: seat, account, user (on a screen), organisation member.
+- **invitation** — an Admin's offer of a *membership* with one *role* to one email address, sent
+  to that address and good for seven days; accepted only by a person signed in with exactly that
+  address, which is when the membership begins. Approving an *access request* mints one; a new
+  invitation to an address with one waiting replaces it. Whether the address already belongs to a
+  person on the platform never changes what the Admin is told. _Avoid_: invite (as a noun), join
+  link.
 
 ## Platform surfaces
 
@@ -800,10 +843,16 @@ to it by IRI and never restates it (ADR 0014).
   impact, agent tokens, the ceiling), **Suggestions** (every waiting suggestion, one queue),
   **Knowledge** (the review table over every concept and composition; conflicts and
   verification requests as saved filters; exports), **Questions** (the answer audit, flagged
-  first, with the promotions and the answer tests), **People** (roles, owners, thresholds,
-  erasure and suppression, tokens), **System** (signals, health, routes and spend, backups)
-  (ADR 0017, ticket 37). "Proposal" is the bid document a company completes and is never a
-  screen (Liam, 26/08/2026). _Avoid_: section (a guide's node), "Mission Control".
+  first, with the promotions and the answer tests), **People** (members, groups, owners,
+  thresholds, erasure and suppression, tokens, audit log), **System** (signals, health, routes and
+  spend, backups) (ADR 0017, ticket 37). "Proposal" is the bid document a company completes and is
+  never a screen (Liam, 26/08/2026). _Avoid_: section (a guide's node), "Mission Control".
+- **console** — the *operator*'s surface over every workspace, outside any one of them and never
+  a screen of Control Centre: **People** (every person, the workspaces they belong to and their
+  role in each, their sessions and grants; revoke everywhere, correct a display name) and
+  **Workspaces** (each with its member count, read-only). Shown to the operator alone and reached
+  only from a signed-in session, never from a token. _Avoid_: admin panel, platform console,
+  back office.
 - **screen (of Control Centre)** — one of its six: Sources, Suggestions, Knowledge, Questions,
   People, System.
 - **view (of a screen)** — one of the parts a screen of Control Centre is divided into: the parts

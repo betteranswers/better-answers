@@ -39,12 +39,14 @@ const fixture = z
   })
   .parse(readJson("contracts/document-chunk/cases.json"));
 
-// Its own project and port, so a developer's own local database is never the one this stops.
+const SYNTHETIC_WORKSPACE = "01M2SYNTHET1CAAAAAAAAAAAAA";
+
+/** Its own project and port, so a developer's own local database is never the one this stops. */
 const project = `ba-local-database-test-${String(process.pid)}`;
 
 type Run = { readonly status: number | null; readonly stdout: string; readonly stderr: string };
 
-// Compose narrates to stderr on success, so it is read only when the run failed.
+/** Compose narrates to stderr on success, so it is read only when the run failed. */
 const outcomeOf = (run: Run): string =>
   run.status === 0 ? "ran" : `exited ${String(run.status)}: ${run.stderr}`;
 
@@ -101,11 +103,17 @@ afterAll(() => {
 });
 
 describe("the local database", () => {
-  it("comes up on the loopback port it names, and says how to stop it", () => {
+  it("starts on its loopback port, saying how to stop it", () => {
     expect(outcomeOf(upFirst)).toEqual("ran");
     expect(upFirst.stdout).toContain(`127.0.0.1:${String(port)}`);
     expect(upFirst.stdout).toContain("deploy/local-database.sh down");
     expect(upFirst.stdout).toContain("--wipe");
+  });
+
+  it("names the synthetic workspace's id as it seeds it", () => {
+    expect(upFirst.stdout).toContain(
+      `synthetic fixture present: workspace ${SYNTHETIC_WORKSPACE}, slug synthetic`,
+    );
   });
 
   it("runs the one pinned image, by digest", () => {
@@ -117,7 +125,7 @@ describe("the local database", () => {
     expect(images).toEqual([POSTGRES_IMAGE]);
   });
 
-  it("has the whole migration journal applied, and the contract stamped as migrate stamps it", async () => {
+  it("applies every migration and stamps the contract as `migrate` does", async () => {
     const owner = signedInAs("better_answers", "better_answers");
     try {
       const applied = await owner.query<{ migrations: number }>(
@@ -131,7 +139,7 @@ describe("the local database", () => {
     }
   });
 
-  describe("read as a GUI profile reads it, through the browsing role", () => {
+  describe("read through the browsing role, as a GUI profile reads", () => {
     let browse: pg.Pool;
 
     beforeAll(() => {
@@ -145,7 +153,8 @@ describe("the local database", () => {
     it("holds one binding in the synthetic workspace, indexed and unpublished", async () => {
       const bindings = await browse.query(
         `SELECT id, connector, state, published_at FROM source_binding
-          WHERE workspace_id = 'ws_synthetic'`,
+          WHERE workspace_id = $1`,
+        [SYNTHETIC_WORKSPACE],
       );
       expect(bindings.rows).toEqual([
         {
@@ -157,10 +166,11 @@ describe("the local database", () => {
       ]);
     });
 
-    it("holds the binding's one markdown document, converted, with no landed copy named", async () => {
+    it("holds one converted markdown document, naming no landed copy", async () => {
       const documents = await browse.query(
         `SELECT id, binding_id, media_type, outcome, normalised_key, content_hash
-           FROM source_document WHERE workspace_id = 'ws_synthetic'`,
+           FROM source_document WHERE workspace_id = $1`,
+        [SYNTHETIC_WORKSPACE],
       );
       expect(documents.rows).toEqual([
         {
@@ -174,10 +184,11 @@ describe("the local database", () => {
       ]);
     });
 
-    it("holds the document's chunk rows as the document-chunk agreement's redacted case cuts them", async () => {
+    it("holds the chunks the document-chunk agreement's redacted case cuts", async () => {
       const chunks = await browse.query(
         `SELECT id, binding_id, source_document_id, ordinal, char_start, char_end, locator, content
-           FROM "index".chunk WHERE workspace_id = 'ws_synthetic' ORDER BY ordinal`,
+           FROM "index".chunk WHERE workspace_id = $1 ORDER BY ordinal`,
+        [SYNTHETIC_WORKSPACE],
       );
       expect(chunks.rows).toEqual(
         fixture.document.chunks.map((chunk) => ({
@@ -188,12 +199,13 @@ describe("the local database", () => {
       );
     });
 
-    it("holds the redaction's placeholder where the sort code was, and no sort code anywhere", async () => {
+    it("holds the redaction's placeholder and no sort code anywhere", async () => {
       const held = await browse.query<{ text: string }>(
-        `SELECT content AS text FROM "index".chunk WHERE workspace_id = 'ws_synthetic'
+        `SELECT content AS text FROM "index".chunk WHERE workspace_id = $1
          UNION ALL
          SELECT concat_ws(' ', title, source_system_id, original_key) FROM source_document
-          WHERE workspace_id = 'ws_synthetic'`,
+          WHERE workspace_id = $1`,
+        [SYNTHETIC_WORKSPACE],
       );
       const text = held.rows.map((row) => row.text).join("\n");
       expect(text).toContain("The sort code is [withheld]");
@@ -202,7 +214,7 @@ describe("the local database", () => {
   });
 
   describe("the synthetic seed, run where the local database runs it", () => {
-    it("seeds from the drill's call, the owner DSN in STAGING_DATABASE_URL and no argument, adding no second copy", () => {
+    it("seeds from the drill's call without adding a second copy", () => {
       const [container] = containersOf(project);
       const seeded = spawnSync(
         "docker",
@@ -217,12 +229,12 @@ describe("the local database", () => {
       );
       expect({ status: seeded.status, stderr: seeded.stderr }).toEqual({ status: 0, stderr: "" });
       expect(seeded.stdout).toContain(
-        "synthetic fixture present: workspace slug=synthetic, 1 binding, 1 document, 3 chunks",
+        `synthetic fixture present: workspace ${SYNTHETIC_WORKSPACE}, slug synthetic, 1 binding, 1 document, 3 chunks`,
       );
     });
   });
 
-  it("keeps what it holds across a stop and a start, and a second up seeds no second copy", async () => {
+  it("keeps its data across a restart, seeding no second copy", async () => {
     const owner = signedInAs("better_answers", "better_answers");
     let marker: string;
     const client = await owner.connect();
@@ -245,10 +257,10 @@ describe("the local database", () => {
     try {
       const held = await reopened.query(
         `SELECT (SELECT count(*)::int FROM workspace WHERE id = $1) AS marker,
-                (SELECT count(*)::int FROM source_binding WHERE workspace_id = 'ws_synthetic') AS bindings,
-                (SELECT count(*)::int FROM source_document WHERE workspace_id = 'ws_synthetic') AS documents,
-                (SELECT count(*)::int FROM "index".chunk WHERE workspace_id = 'ws_synthetic') AS chunks`,
-        [marker],
+                (SELECT count(*)::int FROM source_binding WHERE workspace_id = $2) AS bindings,
+                (SELECT count(*)::int FROM source_document WHERE workspace_id = $2) AS documents,
+                (SELECT count(*)::int FROM "index".chunk WHERE workspace_id = $2) AS chunks`,
+        [marker, SYNTHETIC_WORKSPACE],
       );
       expect(held.rows).toEqual([{ marker: 1, bindings: 1, documents: 1, chunks: 3 }]);
     } finally {
@@ -256,7 +268,7 @@ describe("the local database", () => {
     }
   }, 180_000);
 
-  it("refuses a port something else already listens on, and starts nothing", async () => {
+  it("refuses a port already in use, and starts nothing", async () => {
     const held = await heldPort();
     const taken = held.port;
     const elsewhere = `${project}-taken`;
@@ -271,6 +283,29 @@ describe("the local database", () => {
       await released(held);
     }
   });
+
+  it("refuses a fixture left under another id, saying to wipe", async () => {
+    const owner = signedInAs("better_answers", "better_answers");
+    const client = await owner.connect();
+    let earlier: string;
+    try {
+      await client.query("UPDATE workspace SET slug = 'synthetic-now' WHERE id = $1", [
+        SYNTHETIC_WORKSPACE,
+      ]);
+      earlier = (await testData(client).workspace({ slug: "synthetic" })).id;
+    } finally {
+      client.release();
+      await owner.end();
+    }
+
+    const again = localDatabase(port, ["up"]);
+    expect({ status: again.status, stderr: again.stderr }).toEqual({
+      status: 1,
+      stderr: expect.stringContaining(
+        `local-database: REFUSED — this database holds the synthetic fixture under ${earlier}, and its workspace is ${SYNTHETIC_WORKSPACE} now — deploy/local-database.sh down --wipe, then up`,
+      ),
+    });
+  }, 180_000);
 
   it("drops its data only when told to wipe it", () => {
     expect(volumesOf(project)).toHaveLength(1);

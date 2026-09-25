@@ -1,6 +1,8 @@
 import { runsOverThrowawayTree } from "@better-answers/devtools/throwaway-tree";
 import { describe, expect, it } from "vitest";
 
+import { tag, wordsOf } from "./fixture-text.ts";
+
 import type { Tool, Tree } from "@better-answers/devtools/throwaway-tree";
 
 const FILE = "probe.py";
@@ -18,12 +20,12 @@ const A_WHY_OF_TWENTY =
 
 const A_WHY_AT_THE_CEILING = `${A_WHY_OF_TWENTY} until the next release lands`;
 
-const CITING = "Kept because the claim protocol changed under T-243.";
-
 const TOO_LONG = `# ${OVER_THE_CEILING}\n`;
 
-// Spelled in two halves, so the tag scan does not read a fixture as a citation.
-const tag = (family: string, number: string): string => `[${family}${number}]`;
+const WORKER_MODULE = "apps/worker/src/better_answers_worker/probe.py";
+
+const documented = (signature: string, count: number): string =>
+  `${signature}\n    """${wordsOf(count)}"""\n    return 1\n`;
 
 const gate: Tool = {
   executable: { package: "@better-answers/devtools", path: ["python", "comment_gate.py"] },
@@ -39,15 +41,15 @@ const findings = (tree: Tree): readonly string[] =>
     .split("\n")
     .filter((line) => line !== "");
 
-describe("the Python check fires on the two shapes a tool can read", () => {
-  it("refuses a comment over the ceiling, naming the count and its rule", () => {
+describe("the Python check fires on a long or citing comment", () => {
+  it("refuses a comment over the ceiling, naming count and rule", () => {
     const output = run(holding(TOO_LONG));
 
     expect(output).toContain("runs to 29 words");
     expect(output).toContain(tag("COMMENT", "1"));
   });
 
-  it("counts a docstring as a comment, which no ruff rule does", () => {
+  it("counts a docstring as a comment, unlike any ruff rule", () => {
     const module = { [FILE]: `"""${OVER_THE_CEILING}"""\n\nKEEP = 1\n` };
 
     expect(findings(module)).toHaveLength(1);
@@ -80,9 +82,34 @@ describe("the Python check fires on the two shapes a tool can read", () => {
 
     expect(findings(holding(eightShortLines))).toHaveLength(1);
   });
+
+  it("reads a bare `#` line as part of its paragraph", () => {
+    const broken = `# ${wordsOf(13)}\n#\n# ${wordsOf(13)}\n`;
+
+    expect(run(holding(broken))).toContain("runs to 26 words");
+  });
+
+  it("keeps a trailing comment out of the block above it", () => {
+    const above = `# ${A_WHY_OF_TWENTY}\nKEEP = 1  # ${A_WHY_OF_TWENTY}\n`;
+
+    expect(findings({ [FILE]: above })).toEqual([]);
+  });
+
+  it("keeps a trailing comment out of the block below it", () => {
+    const below = `KEEP = 1  # ${A_WHY_OF_TWENTY}\n# ${A_WHY_OF_TWENTY}\nMORE = 2\n`;
+
+    expect(findings({ [FILE]: below })).toEqual([]);
+  });
+
+  it("reports a long, citing comment once, for the citation", () => {
+    const output = run(holding(`# ${OVER_THE_CEILING} under T-243\n`));
+
+    expect(output.trim().split("\n")).toHaveLength(1);
+    expect(output).toContain("cites a ticket id");
+  });
 });
 
-describe("the Python check stays silent where a comment earns its place", () => {
+describe("the Python check's exemptions", () => {
   it.each([
     ["a why inside the ceiling", "# Deleting this changes what the engine memoises.\n"],
     ["a type-checker escape", "# type: ignore[attr-defined]\n"],
@@ -94,16 +121,36 @@ describe("the Python check stays silent where a comment earns its place", () => 
     expect(findings(holding(comment))).toEqual([]);
   });
 
+  it("walks past a licence notice held in a module docstring", () => {
+    const notice = `"""Copyright 2026 the authors. ${OVER_THE_CEILING}"""\n\nKEEP = 1\n`;
+
+    expect(findings({ [FILE]: notice })).toEqual([]);
+  });
+
+  it("holds a docstring opening with `noqa` to the ceiling", () => {
+    const opening = `"""noqa ${OVER_THE_CEILING}"""\n\nKEEP = 1\n`;
+
+    expect(findings({ [FILE]: opening })).toHaveLength(1);
+  });
+
   it("walks past a hashbang, which deleting would break a command", () => {
     expect(findings({ [FILE]: "#!/usr/bin/env python3\nKEEP = 1\n" })).toEqual([]);
   });
 
-  it("does not lend a directive's exemption to the paragraph under it", () => {
+  it("keeps a directive's words out of the paragraph under it", () => {
+    expect(findings(holding(`# fmt: off\n# ${A_WHY_AT_THE_CEILING}\n`))).toEqual([]);
+  });
+
+  it("keeps a directive's exemption off the paragraph under it", () => {
     expect(findings(holding(`# type: ignore[attr-defined]\n${TOO_LONG}`))).toHaveLength(1);
   });
 
-  it("stays silent over a tree whose comments are all short and cite nothing", () => {
+  it("stays silent over short comments that cite nothing", () => {
     expect(findings(holding("# Deleting this changes what the engine memoises.\n"))).toEqual([]);
+  });
+
+  it("counts the words after a marker of any length", () => {
+    expect(findings(holding(`## ${A_WHY_AT_THE_CEILING}\n`))).toEqual([]);
   });
 
   it("reads a `#` inside a string as a string", () => {
@@ -111,172 +158,141 @@ describe("the Python check stays silent where a comment earns its place", () => 
   });
 });
 
-type Language = readonly [
-  name: string,
-  file: string,
-  marker: string,
-  keep: string,
-  directive: string,
-];
-
-const LANGUAGES: readonly Language[] = [
-  [
-    "YAML",
-    "probe.yml",
-    "#",
-    "keep: 1\n",
-    "# yaml-language-server: $schema=https://cubic.dev/schema/cubic-repository-config.schema.json\n",
-  ],
-  ["shell", "probe.sh", "#", "KEEP=1\n", "# shellcheck disable=SC2016\n"],
-  [
-    "TOML",
-    "probe.toml",
-    "#",
-    "keep = 1\n",
-    "# renovate: datasource=github-tags depName=rclone/rclone\n",
-  ],
-  ["SQL", "probe.sql", "--", "SELECT 1;\n", "--> statement-breakpoint\n"],
-  ["Python", "probe.py", "#", "KEEP = 1\n", "# type: ignore[attr-defined]\n"],
-];
-
-describe.each(LANGUAGES)(
-  "the check reads a comment in %s, on the two conditions the code tree holds",
-  (_name, file, marker, keep, directive) => {
-    const saying = (prose: string): Tree => ({ [file]: `${marker} ${prose}\n${keep}` });
-
-    it("refuses a comment of forty words", () => {
-      expect(findings(saying(FORTY_WORDS))).toHaveLength(1);
-    });
-
-    it("refuses a comment citing a ticket", () => {
-      expect(findings(saying(CITING))).toHaveLength(1);
-    });
-
-    it("walks past a directive", () => {
-      expect(findings({ [file]: `${directive}${keep}` })).toEqual([]);
-    });
-
-    it("walks past a why of twenty words", () => {
-      expect(findings(saying(A_WHY_OF_TWENTY))).toEqual([]);
-    });
-
-    it("counts the words after the marker, however many characters open the comment", () => {
-      const doubled = { [file]: `${marker}${marker} ${A_WHY_AT_THE_CEILING}\n${keep}` };
-
-      expect(findings(doubled)).toEqual([]);
-    });
-  },
-);
-
-describe("the check walks past a directive, which is machinery and not prose", () => {
+describe("a directive's reason counts against the twenty-five words", () => {
   it.each([
-    ["a shebang", "probe.sh", "#!/usr/bin/env bash\nKEEP=1\n"],
-    ["a shellcheck line", "probe.sh", "# shellcheck disable=SC2016\nKEEP=1\n"],
-    [
-      "a renovate line",
-      "probe.yml",
-      "# renovate: datasource=github-tags depName=rclone/rclone\nkeep: 1\n",
-    ],
-    [
-      "a yaml-language-server line",
-      "probe.yml",
-      "# yaml-language-server: $schema=https://cubic.dev/schema/cubic-repository-config.schema.json\nkeep: 1\n",
-    ],
-    ["a noqa line", "probe.py", "# noqa: E501\nKEEP = 1\n"],
-    [
-      "a pin tag beside a uses line",
-      "probe.yml",
-      "steps:\n  - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n",
-    ],
-    [
-      "a compose key comment naming a version",
-      "probe.yml",
-      "services:\n  cache:\n    image: alpine:3.23.5 # alpine 3.23.5\n",
-    ],
-    [
-      "a lefthook key comment naming a version",
-      "probe.yml",
-      "pre-commit:\n  commands:\n    lint:\n      run: oxlint # oxlint 1.42.0\n",
-    ],
-    [
-      "the migrations' separator on its own line",
-      "probe.sql",
-      "SELECT 1;\n--> statement-breakpoint\nSELECT 2;\n",
-    ],
-    [
-      "the migrations' separator on a statement line",
-      "probe.sql",
-      "SELECT 1;--> statement-breakpoint\nSELECT 2;\n",
-    ],
-    [
-      "the migrations' hand-written marker",
-      "probe.sql",
-      "-- Custom migration (hand-written SQL; ADR 0032).\nSELECT 1;\n",
-    ],
-  ])("walks past %s", (_what, file, source) => {
-    expect(findings({ [file]: source })).toEqual([]);
+    ["a noqa", "import os  # noqa: F401"],
+    ["a type-checker escape", "KEEP: int = 1  # type: ignore[assignment]"],
+  ])("refuses %s with a twenty-six-word reason, naming the directive rule", (_what, line) => {
+    const output = run({ [FILE]: `${line}  # ${wordsOf(26)}\n` });
+
+    expect(output).toContain("reason runs to 26 words");
+    expect(output).toContain(tag("COMMENT", "3"));
   });
 
-  it("reads a marker that is not the migrations' own as the citation it carries", () => {
-    const near = "-- Custom migration (hand-written SQL; ADR 0033).\nSELECT 1;\n";
+  it("counts a reason apart from the comment above it", () => {
+    const source = `# ${wordsOf(20)}\n# type: ignore  # ${wordsOf(20)}\nKEEP = 1\n`;
 
-    expect(findings({ "probe.sql": near })).toHaveLength(1);
+    expect(findings({ [FILE]: source })).toEqual([]);
+  });
+
+  it.each([
+    ["a noqa", "import os  # noqa: F401, E501"],
+    ["a type-checker escape", "KEEP: int = 1  # type: ignore[assignment]"],
+  ])("refuses %s whose reason follows on with no second marker", (_what, line) => {
+    const output = run({ [FILE]: `${line} - ${wordsOf(26)}\n` });
+
+    expect(output).toContain("runs to 26 words");
+  });
+
+  it("counts none of the directive's own words", () => {
+    const codes = Array.from({ length: 30 }, (_, index) => `E${String(index + 100)}`).join(", ");
+
+    expect(findings({ [FILE]: `KEEP = 1  # noqa: ${codes}\n` })).toEqual([]);
+  });
+
+  it("accepts a noqa whose reason fits the ceiling", () => {
+    expect(findings({ [FILE]: `import os  # noqa: F401  # ${A_WHY_AT_THE_CEILING}\n` })).toEqual(
+      [],
+    );
+  });
+
+  it("refuses a directive's reason that cites a ticket", () => {
+    const citing = "import os  # noqa: F401  # the loader changed under T-243\n";
+
+    expect(findings({ [FILE]: citing })).toHaveLength(1);
   });
 });
 
-describe("the check reads what a language calls code as code", () => {
+describe("a public worker function's docstring may run to fifty words", () => {
   it.each([
-    ["a quoted scalar in YAML", "probe.yml", `keep: "# ${FORTY_WORDS}"\n`],
-    ["a quoted word in shell", "probe.sh", `echo "# ${FORTY_WORDS}"\n`],
-    ["a basic string in TOML", "probe.toml", `keep = "# ${FORTY_WORDS}"\n`],
-    ["a string in SQL", "probe.sql", `SELECT '-- ${FORTY_WORDS}';\n`],
-    ["an escaped string in SQL", "probe.sql", `SELECT E'-- ${FORTY_WORDS}';\n`],
-    ["a quoted identifier in SQL", "probe.sql", `SELECT 1 AS "-- ${FORTY_WORDS}";\n`],
-    [
-      "a dollar-quoted body in SQL",
-      "probe.sql",
-      `CREATE FUNCTION f() RETURNS int AS $$\nBEGIN\n  -- ${FORTY_WORDS}\n  RETURN 1;\nEND;\n$$ LANGUAGE plpgsql;\n`,
-    ],
-    [
-      "a tagged dollar-quoted body in SQL",
-      "probe.sql",
-      `CREATE FUNCTION f() RETURNS int AS $body$\n  -- ${FORTY_WORDS}\n  SELECT 1;\n$body$ LANGUAGE sql;\n`,
-    ],
-  ])("says nothing about %s", (_what, file, source) => {
-    expect(findings({ [file]: source })).toEqual([]);
+    ["a public worker function", "def reads() -> int:"],
+    ["a public async worker function", "async def reads() -> int:"],
+  ])("accepts a fifty-word docstring on %s", (_what, signature) => {
+    expect(findings({ [WORKER_MODULE]: documented(signature, 50) })).toEqual([]);
   });
 
-  it("lexes a SQL line comment before a slash-star, so a glob closes at the line", () => {
-    const glob = `-- the redirect covers /oauth2/*\nSELECT 1;\n-- ${FORTY_WORDS}\nSELECT 2;\n`;
+  it("refuses a fifty-one-word docstring on a public worker function", () => {
+    const output = run({ [WORKER_MODULE]: documented("def reads() -> int:", 51) });
 
-    expect(findings({ "probe.sql": glob })).toHaveLength(1);
+    expect(output).toContain("runs to 51 words");
+    expect(output).toContain("in 50 at most");
+  });
+
+  it.each([
+    ["an internal worker function", WORKER_MODULE, documented("def _reads() -> int:", 26)],
+    [
+      "a method, which is a member",
+      WORKER_MODULE,
+      `class Reader:\n    def reads(self) -> int:\n        """${wordsOf(26)}"""\n        return 1\n`,
+    ],
+    [
+      "a function nested in a public one",
+      WORKER_MODULE,
+      `def reads() -> int:\n    def inner() -> int:\n        """${wordsOf(26)}"""\n        return 1\n    return inner()\n`,
+    ],
+    ["the worker module itself", WORKER_MODULE, `"""${wordsOf(26)}"""\n\nKEEP = 1\n`],
+    [
+      "a line comment above a public function",
+      WORKER_MODULE,
+      `# ${wordsOf(26)}\ndef reads() -> int:\n    return 1\n`,
+    ],
+    [
+      "a public function in the worker's tests",
+      "apps/worker/tests/test_probe.py",
+      documented("def test_reads() -> int:", 26),
+    ],
+    [
+      "a public function outside the worker",
+      "packages/devtools/python/probe.py",
+      documented("def reads() -> int:", 26),
+    ],
+  ])("holds %s to twenty-five words", (_what, file, source) => {
+    const output = run({ [file]: source });
+
+    expect(output).toContain("runs to 26 words");
+    expect(output).toContain("in 25 at most");
   });
 });
 
-describe("the check speaks only for a root the strip has wired", () => {
+describe("the Python check reads Python files and nothing else", () => {
   it.each([
+    ["YAML", "probe.yml", `# ${FORTY_WORDS}\nkeep: 1\n`],
+    ["shell", "probe.sh", `# ${FORTY_WORDS}\nKEEP=1\n`],
+    ["TOML", "probe.toml", `# ${FORTY_WORDS}\nkeep = 1\n`],
+    ["SQL", "probe.sql", `-- ${FORTY_WORDS}\nSELECT 1;\n`],
     [
-      "a workspace's tool configuration, which no root covers",
+      "a workspace's tool configuration",
       "apps/worker/pyproject.toml",
       `# ${FORTY_WORDS}\nkeep = 1\n`,
     ],
-    [
-      "a skill, which is prose and is read by no gate",
-      "packages/devtools/.claude/skills/probe/example.yml",
-      `# ${FORTY_WORDS}\nkeep: 1\n`,
-    ],
-  ])("walks past %s", (_what, file, source) => {
+    ["markdown", "probe.md", `# ${FORTY_WORDS}\n`],
+  ])("walks past a forty-word comment in %s", (_what, file, source) => {
     expect(findings({ [file]: source })).toEqual([]);
   });
 
-  it("judges the migrations, whose strip has landed", () => {
-    const migration = `-- ${FORTY_WORDS}\nSELECT 1;\n`;
+  it("walks past a config file named on its command line", () => {
+    const named = runsOverThrowawayTree({
+      ...gate,
+      argv: ["probe.toml", FILE],
+      smoke: {
+        tree: { ...holding(TOO_LONG), "probe.toml": "keep = 1\n" },
+        reports: (output) => output.includes(`${FILE}:`),
+      },
+    });
 
-    expect(findings({ "packages/schema/migrations/0000_probe.sql": migration })).toHaveLength(1);
+    const output = named({ ...holding(TOO_LONG), "probe.toml": `# ${FORTY_WORDS}\nkeep = 1\n` });
+
+    expect(output).not.toContain("probe.toml");
+  });
+
+  it("walks past a skill, which is prose no gate reads", () => {
+    const skill = { "packages/devtools/.claude/skills/probe/example.py": TOO_LONG };
+
+    expect(findings(skill)).toEqual([]);
   });
 });
 
-describe("the Python check refuses what a reader cannot open from where they read it", () => {
+describe("the Python check refuses a citation a reader cannot open", () => {
   const saying = (text: string): Tree => ({ [FILE]: `USAGE = "${text}"\n` });
 
   it.each([
@@ -288,7 +304,7 @@ describe("the Python check refuses what a reader cannot open from where they rea
     expect(findings(saying(text))).toHaveLength(1);
   });
 
-  it("refuses a rule tag in a string, which a comment scan never reached", () => {
+  it("refuses a rule tag in a string too", () => {
     expect(findings(saying(`A raw insert lives in a factory (${tag("TEST", "4")}).`))).toHaveLength(
       1,
     );
@@ -298,11 +314,11 @@ describe("the Python check refuses what a reader cannot open from where they rea
     expect(findings({ [FILE]: `"""Kept under T-243."""\n\nKEEP = 1\n` })).toHaveLength(1);
   });
 
-  it("stays silent over a string that names what the reader can do", () => {
+  it("stays silent over a string saying what to do", () => {
     expect(findings(saying("Name a workspace this person belongs to."))).toEqual([]);
   });
 
-  it("walks past a value with no prose in it, which no reader reads as a sentence", () => {
+  it("walks past a value with no prose in it", () => {
     expect(findings({ [FILE]: 'READ_ON = "2026-09-11"\n' })).toEqual([]);
   });
 
@@ -312,7 +328,7 @@ describe("the Python check refuses what a reader cannot open from where they rea
     expect(findings(inATest)).toEqual([]);
   });
 
-  it("walks past the same string in the gate that prints its own tag", () => {
+  it("walks past the same string in the tag-printing gate", () => {
     const inAGate = {
       "packages/devtools/python/comment_gate.py": `SAID = "A raw insert lives in a factory (${tag("TEST", "4")})."\n`,
     };
@@ -321,12 +337,8 @@ describe("the Python check refuses what a reader cannot open from where they rea
   });
 });
 
-describe("the check refuses to answer for a file it could not read", () => {
-  it("exits on a file it cannot parse rather than reporting a clean tree", () => {
+describe("the check refuses to judge a file it cannot read", () => {
+  it("exits on an unparseable file rather than reporting it clean", () => {
     expect(() => run({ [FILE]: "def broken(\n" })).toThrow(/could not be read/);
-  });
-
-  it("walks past a file its syntax table has no reader for", () => {
-    expect(findings({ "probe.md": `# ${FORTY_WORDS}\n` })).toEqual([]);
   });
 });

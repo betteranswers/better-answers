@@ -22,6 +22,7 @@ export const displayNameHeldBy = async (
 
 type TestData = ReturnType<typeof testData>;
 
+/** Runs `work` over one superuser connection, past row-level security. */
 export const seededIn = async <T>(app: TestApp, work: (seed: TestData) => Promise<T>) => {
   const client = await app.database.superuser.connect();
   try {
@@ -31,12 +32,14 @@ export const seededIn = async <T>(app: TestApp, work: (seed: TestData) => Promis
   }
 };
 
+/** The confirmations `sources.publish` asks for, each given. */
 export const THE_THREE_CONFIRMATIONS = {
   lawfulBasisRecorded: true,
   privacyInformationUpdated: true,
   dpiaReferenced: true,
 } as const;
 
+/** @throws when no constraint has the name. */
 export const constraintDefinition = async (app: TestApp, name: string): Promise<string> => {
   const found = await app.database.superuser.query<{ definition: string }>(
     "SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conname = $1",
@@ -47,6 +50,7 @@ export const constraintDefinition = async (app: TestApp, name: string): Promise<
   return definition;
 };
 
+/** Signed in as a Viewer of two new workspaces, with neither chosen as the active one. */
 export const memberOfTwoWorkspaces = async (app: TestApp): Promise<TestClient> => {
   const first = await app.provision();
   const second = await app.provision();
@@ -61,8 +65,10 @@ export type HeldRevocation = {
   abandon(): Promise<void>;
 };
 
-// The row is written and locked with its commit still to come: the moment a held membership read
-// must wait out.
+/**
+ * The row is written and locked with its commit still to come: the moment a held membership read
+ * must wait out.
+ */
 export const revocationHeldOpen = async (app: TestApp, userId: string): Promise<HeldRevocation> => {
   const revoking = await app.database.superuser.connect();
   await revoking.query("BEGIN");
@@ -91,6 +97,7 @@ export const someoneWaitsOnALock = async (app: TestApp): Promise<boolean> => {
   return (found.rows[0]?.waiting ?? 0) > 0;
 };
 
+/** Points every session `userId` holds at the workspace, behind the api's back. */
 export const sessionPointedAt = async (
   app: TestApp,
   userId: string,

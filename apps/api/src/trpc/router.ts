@@ -20,6 +20,8 @@ import {
   previewChunksInput,
   publishBinding,
   publishBindingInput,
+  widenBinding,
+  widenBindingInput,
 } from "@better-answers/core/sources";
 import { readMembership } from "@better-answers/core/workspaces";
 
@@ -108,6 +110,13 @@ export const appRouter = router({
         ctx,
         narrowBinding.name,
         given(input, (asked) => narrowBinding(ctx.principal, ctx.tx, asked)),
+      ),
+    ),
+    widen: mutationProcedure.input(parsedBy(widenBindingInput)).mutation(({ ctx, input }) =>
+      crossing(
+        ctx,
+        widenBinding.name,
+        given(input, (asked) => widenBinding(ctx.principal, ctx.tx, asked)),
       ),
     ),
     preview: queryProcedure.input(parsedBy(previewChunksInput)).query(({ ctx, input }) =>

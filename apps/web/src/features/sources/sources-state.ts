@@ -10,6 +10,7 @@ export const SOURCES_KEYSTROKES = {
   review: { key: "r", act: "Review the binding in focus" },
   publish: { key: "p", act: "Publish the binding in focus" },
   narrow: { key: "n", act: "Narrow the binding in focus" },
+  widen: { key: "w", act: "Widen the binding in focus" },
   select: { key: "x", act: "Select or clear the finding group in focus" },
   keep: { key: "k", act: "Keep the selected finding groups in text" },
   narrowDocuments: { key: "d", act: "Narrow the documents the selected finding groups sit in" },

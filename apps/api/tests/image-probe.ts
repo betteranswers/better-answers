@@ -62,7 +62,8 @@ const INSPECT_ALLOWANCE = 60_000;
 
 type BuildEnvironment = Readonly<Record<string, string | undefined>>;
 
-export const builderThatCanExport = (inspected: string): string | undefined => {
+/** An indented line belongs to one of the builder's nodes, not to the builder. */
+const topLevelFieldsOf = (inspected: string): ReadonlyMap<string, string> => {
   const read = new Map<string, string>();
   for (const line of inspected.split("\n")) {
     const separator = line.indexOf(":");
@@ -70,12 +71,19 @@ export const builderThatCanExport = (inspected: string): string | undefined => {
     const name = line.slice(0, separator).trim();
     if (!read.has(name)) read.set(name, line.slice(separator + 1).trim());
   }
+  return read;
+};
+
+/** The builder `docker buildx inspect` names, or undefined unless it names one that can export. */
+export const builderThatCanExport = (inspected: string): string | undefined => {
+  const read = topLevelFieldsOf(inspected);
   const named = read.get("Name") ?? "";
   const driver = read.get("Driver") ?? "";
   if (named === "" || driver === "" || driver === DRIVER_WITHOUT_AN_EXPORT) return undefined;
   return named;
 };
 
+/** Undefined, and the daemon never asked, unless the environment holds the cache's credentials. */
 export const sharedCacheBuilder = async (
   environment: BuildEnvironment,
   inspectTheBuilder: () => Promise<string | undefined>,
@@ -86,6 +94,7 @@ export const sharedCacheBuilder = async (
   return inspected === undefined ? undefined : builderThatCanExport(inspected);
 };
 
+/** Without a builder the plain build prints the image's id, and `iidfile` goes unused. */
 export const buildCommand = (
   image: ImageUnderTest,
   choice: { readonly builder: string | undefined; readonly iidfile: string },
@@ -163,8 +172,10 @@ const discardIfBuiltHere = async (image: ImageToRun): Promise<void> => {
 
 type Environment = Readonly<Record<string, string>>;
 
-// Names on the command line and values through the client's environment, so no value is
-// in the argv a process listing shows.
+/**
+ * Names on the command line and values through the client's environment, so no value is in the
+ * argv a process listing shows.
+ */
 const docker = async (
   subcommand: "run" | "exec",
   argv: readonly string[],
@@ -182,6 +193,10 @@ const docker = async (
   return stdout;
 };
 
+/**
+ * Runs the image built here, or the one `IMAGE_ID` names; an image built here is removed after.
+ * @throws when no Docker daemon answers.
+ */
 export const readTheImage = async (
   image: ImageUnderTest,
   container: ContainerRun,
@@ -200,6 +215,7 @@ export interface StartedContainer {
   readonly stop: () => Promise<void>;
 }
 
+/** As `readTheImage`, detached; `stop` removes the container, and the image when built here. */
 export const startTheImage = async (
   image: ImageUnderTest,
   environment: Environment,
@@ -282,6 +298,7 @@ export const buildWorkflow = (): z.infer<typeof buildWorkflowSchema> =>
 export const imageJob = () => buildWorkflow().jobs.image;
 export const matrixLegs = (): readonly MatrixLeg[] => imageJob().strategy.matrix.include;
 
+/** @throws when build.yml's image job builds no leg for the tier. */
 export const legFor = (tier: string): MatrixLeg => {
   const leg = matrixLegs().find((candidate) => candidate.tier === tier);
   if (leg === undefined) {

@@ -1,11 +1,13 @@
 {
-  "description": "The files the string check walks past, said once for both gates. A gate prints the rule it holds in the message a reader hits, so the reader reaches the rule without asking, and that message is a string in source — which the string check would otherwise refuse. The oxlint rule reads this through packages/devtools/src/tag-printing-gates.ts and the Python check reads it directly, so a new gate is one edit here rather than one per tier. The tag test in apps/api/tests/coding-rules-tags.test.ts holds the same set for the tag walk and pairs it against the files that still cite a tag; a file listed here that no longer prints one is a line to delete from both.",
+  "description": "The files the string check walks past, said once for both gates and the tag test. A gate prints the rule it holds in the message a reader hits, so the reader reaches the rule without asking, and that message is a string in source — which the string check would otherwise refuse. The oxlint rule reads this through packages/devtools/src/tag-printing-gates.ts, the Python check and apps/api/tests/coding-rules-tags.test.ts read it directly, so a new gate is one edit here. The tag test pairs it against the files that still cite a tag; a file listed here that no longer prints one is a line to delete.",
   "gates": [
+    ".oxlintrc.json",
     "apps/worker/tests/conftest.py",
     "packages/devtools/lint-rules/rules/act-admits-before-await.ts",
     "packages/devtools/lint-rules/rules/comment-only-the-why.ts",
     "packages/devtools/lint-rules/rules/import-direction.ts",
     "packages/devtools/lint-rules/rules/mcp-entry-no-workspace-argument.ts",
+    "packages/devtools/lint-rules/rules/string-cites-nothing.ts",
     "packages/devtools/python/comment_gate.py",
     "packages/devtools/src/comment-density.ts",
     "packages/devtools/src/insert-scan.ts"

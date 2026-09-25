@@ -7,7 +7,7 @@ export const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 
 const ruleSetting = z.union([z.string(), z.tuple([z.string()], z.unknown())]);
 
-// The keys the suites read; a key that stopped being there fails here, by name.
+/** The keys the suites read; a key that stopped being there fails here, by name. */
 const oxlintConfig = z.object({
   rules: z.record(z.string(), ruleSetting),
   overrides: z.array(
@@ -38,8 +38,10 @@ export const readOxlintConfig = (): OxlintConfig =>
     ),
   );
 
-// The specifier is read off the real config, so a plugin that stopped loading fails the case
-// rather than leaving every rule under it silent.
+/**
+ * The specifier is read off the real config, so a plugin that stopped loading fails the case
+ * rather than leaving every rule under it silent.
+ */
 export const pluginConfigFor = (rules: Readonly<Record<string, string>>): string => {
   const plugin = readOxlintConfig().jsPlugins.find((one) => one.name === "better-answers");
   if (plugin === undefined) {
@@ -55,6 +57,7 @@ type GlobbedOverride = OxlintConfig["overrides"][number] & {
   readonly files: readonly string[];
 };
 
+/** The first override whose `files` holds `glob` verbatim; throws when none does. */
 export const oxlintOverrideFor = (glob: string): GlobbedOverride => {
   const found = readOxlintConfig().overrides.find(
     (override): override is GlobbedOverride => override.files?.includes(glob) === true,

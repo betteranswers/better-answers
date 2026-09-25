@@ -79,7 +79,7 @@ describe("the periodic head check", () => {
     vi.useRealTimers();
   });
 
-  it("asks every workspace on the interval, says what each tick found, and stops when told", async () => {
+  it("asks every workspace each interval, logs each tick, and stops", async () => {
     const held = await app().provision();
     const bare = await app().provision();
     await initRepository(openTestGit(app()), held.workspaceId);
@@ -102,7 +102,7 @@ describe("the periodic head check", () => {
     expect(ticks(head.logs)).toHaveLength(1);
   });
 
-  it("never starts a tick while one is running: it says so and waits for the interval after", async () => {
+  it("never overlaps a tick, logging the skip and waiting", async () => {
     const head = watched({ pingUrl: undefined });
 
     vi.advanceTimersByTime(RECONCILER_INTERVAL_MS);
@@ -116,7 +116,7 @@ describe("the periodic head check", () => {
     expect(skips(head.logs)).toHaveLength(1);
   });
 
-  it("pings the scheduler check once a minute, on every second tick, with the outcome word alone", async () => {
+  it("pings the scheduler check every minute, with the outcome alone", async () => {
     const head = watched();
 
     await head.tickTimes(5);
@@ -128,7 +128,7 @@ describe("the periodic head check", () => {
     ]);
   });
 
-  it("lets go of every answer the check gives, so no ping holds a connection open", async () => {
+  it("consumes every ping's answer, so no connection stays open", async () => {
     const head = watched();
 
     await head.tickTimes(2);
@@ -137,7 +137,7 @@ describe("the periodic head check", () => {
     expect(head.answers.map((answered) => answered.bodyUsed)).toEqual([true]);
   });
 
-  it("pings the check's failure for a minute in which a tick failed, and its success once the ticks go well again", async () => {
+  it("pings failure for a failed minute, then success once recovered", async () => {
     const runtimeRole = app().database.pool.options;
     const pool = new Pool({ ...runtimeRole, max: 1, connectionTimeoutMillis: 250 });
     const holder = await pool.connect();
@@ -168,7 +168,7 @@ describe("the periodic head check", () => {
     }
   });
 
-  it("never waits on a slow ping: the ticks go on, and the next minute's ping is sent while the last one hangs", async () => {
+  it("never waits on a slow ping; ticks and pings continue", async () => {
     const hanging = Promise.withResolvers<Response>();
     const head = watched({ answer: async () => hanging.promise });
 
@@ -181,7 +181,7 @@ describe("the periodic head check", () => {
     await head.stop();
   });
 
-  it("goes on past a ping that could not be sent, says so once, and never names the check's URL", async () => {
+  it("goes past an unsent ping, logging once without the URL", async () => {
     const head = watched({
       answer: async (nth) => {
         if (nth === 0) throw new TypeError("fetch failed");
@@ -199,7 +199,7 @@ describe("the periodic head check", () => {
     expect(JSON.stringify(head.logs)).not.toContain(CHECK_UUID);
   });
 
-  it("says once, with its status, that the check refused a ping, so a re-created check's 404 shows in the log", async () => {
+  it("logs a refused ping's status once, so a 404 shows", async () => {
     const head = watched({
       answer: async (nth) =>
         nth === 0 ? new Response("not found", { status: 404 }) : answeredOk(),
@@ -215,7 +215,7 @@ describe("the periodic head check", () => {
     expect(JSON.stringify(head.logs)).not.toContain(CHECK_UUID);
   });
 
-  it("still ticks, and pings nothing, when the estate names no check", async () => {
+  it("still ticks, pinging nothing, when the estate names no check", async () => {
     const head = watched({ pingUrl: undefined });
 
     await head.tickTimes(2);
@@ -225,7 +225,7 @@ describe("the periodic head check", () => {
     expect(head.pinged).toEqual([]);
   });
 
-  it("does not start when the image was never told a repositories' root, and says nothing of its own", () => {
+  it("refuses to start without a repositories' root, logging nothing", () => {
     const { logger, logs } = capturingLogger();
 
     const refused = startReconciler({

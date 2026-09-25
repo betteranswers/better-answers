@@ -498,6 +498,36 @@ const positive = (value: string | undefined, name: string): number => {
 const CHECKPOINT = "checkpoint.json";
 const REPORT = "report.json";
 
+const shardsIn = (directory: string, of: number): ReadonlyMap<number, ShardResults> =>
+  new Map(
+    numbered(of).map((shard) => [
+      shard,
+      {
+        checkpoint: readResults(path.join(directory, `${String(shard)}.${CHECKPOINT}`)),
+        report: readResults(path.join(directory, `${String(shard)}.${REPORT}`)),
+      },
+    ]),
+  );
+
+const writtenMerge = (merged: Merged, out: string): string => {
+  mkdirSync(out, { recursive: true });
+  if (merged.checkpoint !== undefined) {
+    writeFileSync(path.join(out, "stryker-incremental.json"), JSON.stringify(merged.checkpoint));
+  }
+  if (merged.report !== undefined) {
+    writeFileSync(path.join(out, "mutation.json"), JSON.stringify(merged.report));
+  }
+  return merged.summary;
+};
+
+const sliceNamed = (slices: readonly (readonly Part[])[], shard: number): string => {
+  const slice = slices[shard - 1];
+  if (slice === undefined) {
+    throw new Error(`--shard ${String(shard)} is past --of ${String(slices.length)}`);
+  }
+  return slice.map(partName).join(",");
+};
+
 export const mutationShardsFromArgv = async (
   argv: readonly string[],
   legs: ReadonlyMap<string, Leg>,
@@ -512,42 +542,12 @@ export const mutationShardsFromArgv = async (
   if (baselineFile === undefined) throw new Error(USAGE);
   const baseline = readResults(baselineFile);
   const slices = await legSlices(leg, config, of, baseline);
-  if (command === "slice") {
-    const shard = positive(values.get("shard"), "shard");
-    const slice = slices[shard - 1];
-    if (slice === undefined) throw new Error(`--shard ${String(shard)} is past --of ${String(of)}`);
-    return slice.map(partName).join(",");
-  }
+  if (command === "slice") return sliceNamed(slices, positive(values.get("shard"), "shard"));
   const shardsDirectory = values.get("shards");
   const out = values.get("out");
   if (command !== "merge" || shardsDirectory === undefined || out === undefined) {
     throw new Error(USAGE);
   }
-  const shards = new Map(
-    Array.from({ length: of }, (_, index) => {
-      const shard = index + 1;
-      return [
-        shard,
-        {
-          checkpoint: readResults(path.join(shardsDirectory, `${String(shard)}.${CHECKPOINT}`)),
-          report: readResults(path.join(shardsDirectory, `${String(shard)}.${REPORT}`)),
-        },
-      ] as const;
-    }),
-  );
-  const merged = mergeShards({
-    leg,
-    files: ownersOf(slices),
-    of,
-    shards,
-    baseline,
-  });
-  mkdirSync(out, { recursive: true });
-  if (merged.checkpoint !== undefined) {
-    writeFileSync(path.join(out, "stryker-incremental.json"), JSON.stringify(merged.checkpoint));
-  }
-  if (merged.report !== undefined) {
-    writeFileSync(path.join(out, "mutation.json"), JSON.stringify(merged.report));
-  }
-  return merged.summary;
+  const shards = shardsIn(shardsDirectory, of);
+  return writtenMerge(mergeShards({ leg, files: ownersOf(slices), of, shards, baseline }), out);
 };

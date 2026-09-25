@@ -112,6 +112,10 @@ const declarationRefusal = (family: Family, name: string): string | undefined =>
   return undefined;
 };
 
+/**
+ * Declares every act or none: throws when a name is not of the family's form, names a record never
+ * kept as a ledger row, or is already declared.
+ */
 export const declareActs = <
   F extends Family,
   const Acts extends Record<string, LedgerAct<ActName<F>>>,
@@ -131,8 +135,10 @@ export const declareActs = <
 
 const identitySetNames = new Set<string>();
 
-// Which ledger keeps an act is fixed where it is declared, so no caller can file a person's own
-// act in a workspace.
+/**
+ * Which ledger keeps an act is fixed where it is declared, so no caller can file a person's own
+ * act in a workspace.
+ */
 export const declareIdentitySetActs = <
   F extends Family,
   const Acts extends Record<string, LedgerAct<ActName<F>>>,

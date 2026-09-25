@@ -8,7 +8,7 @@ import {
 } from "../src/ingress/hostnames.ts";
 import { AGENT_HOSTNAME, APEX_HOSTNAME, APP_HOSTNAME, startApp, type TestApp } from "./harness.ts";
 
-describe("each hostname reaches only its documented surface (ADR 0022, ADR 0034)", () => {
+describe("each hostname reaches only its documented surface", () => {
   let app: TestApp;
 
   beforeAll(async () => {
@@ -22,14 +22,14 @@ describe("each hostname reaches only its documented surface (ADR 0022, ADR 0034)
   const refusals = (): readonly Readonly<Record<string, unknown>>[] =>
     app.logs.filter((line) => line["event"] === "ingress.hostname_refused");
 
-  it("answers the health check on app., where the uptime check reaches it", async () => {
+  it("answers the health check on app., for the uptime check", async () => {
     const response = await app.client().fetch("/health");
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ status: "healthy" });
   });
 
-  it("answers the health check on the loopback, where the container's own probe reaches it", async () => {
+  it("answers the health check on loopback for the container's probe", async () => {
     for (const loopback of LOOPBACK_HOSTNAMES) {
       const host = loopback.includes(":") ? `[${loopback}]` : loopback;
       const response = await app.server.request(new Request(`http://${host}/health`));
@@ -38,7 +38,7 @@ describe("each hostname reaches only its documented surface (ADR 0022, ADR 0034)
     }
   });
 
-  it("carries the MCP endpoint on app., the origin every token's audience names", async () => {
+  it("carries the MCP endpoint on app., the origin tokens name", async () => {
     const response = await app.client().fetch("/mcp", { method: "POST" });
 
     expect(response.status).toBe(401);
@@ -62,7 +62,7 @@ describe("each hostname reaches only its documented surface (ADR 0022, ADR 0034)
     expect(refusals().some((line) => String(line["path"]).startsWith("/oauth2/"))).toBe(false);
   });
 
-  it("carries the resume, the product's screens and consent on app., one origin end to end", async () => {
+  it("carries the resume, screens and consent on app., one origin", async () => {
     const product = app.client();
 
     for (const path of ["/sign-in", "/choose-workspace", "/consent"]) {
@@ -74,7 +74,7 @@ describe("each hostname reaches only its documented surface (ADR 0022, ADR 0034)
     expect(refusals().some((line) => line["path"] === "/oauth2/continue")).toBe(false);
   });
 
-  it("refuses the identity provider's admin endpoints on the one hostname that answers", async () => {
+  it("refuses the identity provider's admin endpoints on app.", async () => {
     const client = app.client();
     for (const path of [
       "/admin/oauth2/create-client",
@@ -93,7 +93,7 @@ describe("each hostname reaches only its documented surface (ADR 0022, ADR 0034)
     expect(refusals().at(-1)).toMatchObject({ path: "/agent/v1/files", role: "app" });
   });
 
-  it("routes the share agent's surface on agent., and refuses every other path there", async () => {
+  it("routes the share agent's surface on agent., refusing other paths", async () => {
     const agent = app.client(undefined, AGENT_HOSTNAME);
 
     const routed = await agent.fetch("/agent/v1/upload");
@@ -108,7 +108,7 @@ describe("each hostname reaches only its documented surface (ADR 0022, ADR 0034)
     }
   });
 
-  it("refuses every path on the apex, which the edge answers with 404 anyway", async () => {
+  it("refuses every path on the apex, as the edge does", async () => {
     const apex = app.client(undefined, APEX_HOSTNAME);
 
     for (const path of ["/health", "/mcp", "/me", "/sign-in", "/agent/v1/files", "/c/anything"]) {
@@ -126,7 +126,7 @@ describe("each hostname reaches only its documented surface (ADR 0022, ADR 0034)
     });
   });
 
-  it("refuses the hostname the estate had before T-045, which the deploy unit no longer names", async () => {
+  it("refuses the retired mcp. hostname the deploy unit dropped", async () => {
     const response = await app
       .client(undefined, "mcp.example.test")
       .fetch("/.well-known/oauth-protected-resource/mcp");
@@ -144,7 +144,7 @@ describe("each hostname reaches only its documented surface (ADR 0022, ADR 0034)
     expect(refusals().at(-1)).toMatchObject({ path: "/mcp", role: "agent" });
   });
 
-  it("refuses a path that walks out of the share agent's surface, in either spelling", async () => {
+  it("refuses a path escaping the share agent's surface, either spelling", async () => {
     const agent = app.client(undefined, AGENT_HOSTNAME);
 
     for (const walk of ["/agent/v1/../../mcp", "/agent/v1/%2e%2e/%2e%2e/mcp"]) {
@@ -157,7 +157,7 @@ describe("each hostname reaches only its documented surface (ADR 0022, ADR 0034)
     }
   });
 
-  it("reads a hostname the way DNS does, so a resolver's trailing dot still reaches its surface", async () => {
+  it("reads a hostname as DNS does, trailing dot and all", async () => {
     const response = await app
       .client(undefined, `${APP_HOSTNAME}.`)
       .fetch("/.well-known/oauth-protected-resource/mcp");
@@ -185,7 +185,7 @@ describe("each hostname reaches only its documented surface (ADR 0022, ADR 0034)
     expect(counted.rows[0]?.n).toBe(0);
   });
 
-  it("answers one generic sentence and keeps the reason in the log", async () => {
+  it("answers one generic sentence, keeping the reason in the log", async () => {
     const response = await app.client(undefined, AGENT_HOSTNAME).fetch("/oauth2/token", {
       method: "POST",
     });
@@ -205,7 +205,7 @@ describe("each hostname reaches only its documented surface (ADR 0022, ADR 0034)
     });
   });
 
-  it("names a surface for every hostname role, and a known role in every surface", () => {
+  it("maps every hostname role to a surface, and back", () => {
     const named = new Set<string>(HOSTNAME_SURFACES.flatMap((surface) => [...surface.hosts]));
     const roles = new Set<string>(HOSTNAME_ROLES);
 
@@ -214,7 +214,7 @@ describe("each hostname reaches only its documented surface (ADR 0022, ADR 0034)
     for (const surface of HOSTNAME_SURFACES) expect(surface.reason.length).toBeGreaterThan(0);
   });
 
-  it("tells a builder where the issuer's surface is: its paths and consent named on app. ahead of the catch-all", () => {
+  it("places the issuer's paths and consent on app., catch-all last", () => {
     const entryFor = (path: string) =>
       HOSTNAME_SURFACES.find((surface) => surface.paths.includes(path));
 

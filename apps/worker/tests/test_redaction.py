@@ -5,6 +5,7 @@ import pytest
 from better_answers_worker.redaction import Dismissal, Redaction, Restore, redact
 from better_answers_worker.redaction.engine import Finding, Span, spans_detected
 from better_answers_worker.redaction.pins import VERSION_STRING
+from better_answers_worker.redaction.suppressions import ErasureMatch
 from better_answers_worker.redaction.withholdings import (
     AN_ERASURE,
     IN_FORCE,
@@ -69,6 +70,14 @@ ONE_NAME_SUPPRESSED: Sequence[Mapping[str, Sequence[str]]] = (
 A_COMPANY_ADDRESS = "callum.whitcombe@meridianfenland.co.uk"
 
 
+HIS_ERASURE: Sequence[Mapping[str, Sequence[str]]] = (
+    {"emails": (A_COMPANY_ADDRESS,), "names": ("Callum Whitcombe",), "other": ()},
+)
+
+
+AN_ERASURE_MATCH = "an-erasure-match"
+
+
 A_FOURTH_OFFICER = "Oliver Denbigh"
 
 
@@ -113,10 +122,15 @@ def redacted_over(
     return redact(text, spans, rules_in_force, NO_SUPPRESSIONS, SEED)
 
 
+def written_for(span: WrittenSpan) -> str:
+    if isinstance(span.withholding, ErasureMatch):
+        return AN_ERASURE_MATCH
+    return span.withholding.finding.rule_id
+
+
 def written_runs(found: Redaction, text: str) -> list[tuple[str, str]]:
     return [
-        (text[span.start : span.end], span.withholding.finding.rule_id)
-        for span in found.written_spans
+        (text[span.start : span.end], written_for(span)) for span in found.written_spans
     ]
 
 
@@ -153,6 +167,11 @@ def under_another_seed(page: str, spans: tuple[Span, ...]) -> Redaction:
 @pytest.fixture(scope="module")
 def with_one_name_suppressed(page: str, spans: tuple[Span, ...]) -> Redaction:
     return redact(page, spans, AN_HR_SHAPED_BINDING, ONE_NAME_SUPPRESSED, SEED)
+
+
+@pytest.fixture(scope="module")
+def with_his_erasure(page: str, spans: tuple[Span, ...]) -> Redaction:
+    return redact(page, spans, THE_SAFE_SET, HIS_ERASURE, SEED)
 
 
 @pytest.fixture(scope="module")
@@ -577,6 +596,137 @@ def test_a_suppression_withholds_the_named_person_at_the_always_tier_and_rewrite
     }
 
 
+@pytest.mark.parametrize(
+    "rules_in_force",
+    [THE_SAFE_SET, NOTHING_SWITCHABLE, AN_HR_SHAPED_BINDING],
+    ids=["the safe set", "nothing switchable on", "an HR-shaped binding"],
+)
+def test_an_erased_work_address_and_name_are_withheld_whatever_rule_is_in_force(
+    page: str, spans: tuple[Span, ...], rules_in_force: Mapping[str, bool]
+) -> None:
+
+    found = redact(page, spans, rules_in_force, HIS_ERASURE, SEED)
+
+    assert A_COMPANY_ADDRESS in page
+    assert "Callum Whitcombe" in page
+    assert A_COMPANY_ADDRESS not in found.text
+    assert "Callum Whitcombe" not in found.text
+    assert "[withheld] stays on as our " in found.text
+    assert "our own company address, [withheld]. Data" in found.text
+
+
+def test_an_erasure_match_is_no_finding_and_moves_no_count_or_verdict(
+    on_a_plain_binding: Redaction, with_his_erasure: Redaction, page: str
+) -> None:
+
+    at = page.index(A_COMPANY_ADDRESS)
+
+    assert (
+        ErasureMatch(at, at + len(A_COMPANY_ADDRESS))
+        in with_his_erasure.erasure_matches
+    )
+    assert with_his_erasure.findings == on_a_plain_binding.findings
+    assert [one.finding for one in with_his_erasure.withholdings] == list(
+        with_his_erasure.findings
+    )
+    assert with_his_erasure.counts == on_a_plain_binding.counts
+    assert with_his_erasure.verdict == on_a_plain_binding.verdict
+    assert A_COMPANY_ADDRESS not in spans_under(
+        with_his_erasure, page, "personal-contact"
+    )
+
+
+HER_ERASURE: Sequence[Mapping[str, Sequence[str]]] = (
+    {"emails": (), "names": ("Imogen Sarkar",), "other": ()},
+)
+
+
+A_PAYMENT_TO_HER = "Imogen Sarkar, 12 Acacia Avenue, Leeds LS1 4AB 20-45-77 41234567"
+
+
+def test_a_kept_span_naming_an_erased_person_keeps_her_withheld() -> None:
+
+    text = AN_ADDRESS_THE_BANK_RULE_RAN_INTO
+    payment = span_over(text, "UK_BANK_ACCOUNT", A_PAYMENT_TO_HER)
+    kept = Restore(rule_id=payment.rule_id, start=payment.start, end=payment.end)
+
+    restored = redact(text, (payment,), THE_SAFE_SET, NO_SUPPRESSIONS, SEED, [kept])
+    erased = redact(text, (payment,), THE_SAFE_SET, HER_ERASURE, SEED, [kept])
+
+    assert restored.text == text
+    assert erased.text == (
+        "Pay [withheld], 12 Acacia Avenue, Leeds LS1 4AB 20-45-77 41234567 today"
+    )
+    assert [one.reason for one in erased.withholdings] == [RESTORED]
+
+
+def test_a_switched_off_rule_does_not_release_an_erased_name_inside_its_span() -> None:
+
+    text = AN_ADDRESS_THE_BANK_RULE_RAN_INTO
+    claims = (("UK_HOME_ADDRESS", "Imogen Sarkar, 12 Acacia Avenue, Leeds LS1 4AB"),)
+    spans = tuple(span_over(text, rule_id, run) for rule_id, run in claims)
+
+    found = redact(text, spans, NOTHING_SWITCHABLE, HER_ERASURE, SEED)
+
+    assert [one.reason for one in found.withholdings] == [SWITCHED_OFF]
+    assert found.text == (
+        "Pay [withheld], 12 Acacia Avenue, Leeds LS1 4AB 20-45-77 41234567 today"
+    )
+
+
+def test_a_match_a_withheld_finding_covers_adds_no_span_of_its_own(
+    page: str, spans: tuple[Span, ...]
+) -> None:
+
+    at = page.index(A_CONSUMER_ADDRESS)
+    her_address = ({"emails": (A_CONSUMER_ADDRESS,), "names": (), "other": ()},)
+
+    found = redact(page, spans, THE_SAFE_SET, her_address, SEED)
+
+    assert found.erasure_matches == (ErasureMatch(at, at + len(A_CONSUMER_ADDRESS)),)
+    assert A_CONSUMER_ADDRESS not in found.text
+    assert not any(
+        isinstance(span.withholding, ErasureMatch) for span in found.written_spans
+    )
+
+
+def test_a_match_inside_a_withheld_finding_is_written_under_the_findings_word() -> None:
+
+    text = AN_ADDRESS_THE_BANK_RULE_RAN_INTO
+    payment = (span_over(text, "UK_BANK_ACCOUNT", A_PAYMENT_TO_HER),)
+
+    found = redact(text, payment, THE_SAFE_SET, HER_ERASURE, SEED)
+
+    assert written_runs(found, text) == [(A_PAYMENT_TO_HER, "UK_BANK_ACCOUNT")]
+    assert found.text == "Pay [withheld] today"
+
+
+def test_an_erasure_match_takes_its_characters_from_a_lower_tier_it_overlaps() -> None:
+
+    text = "Deliveries go to Imogen Sarkar, 9 Kestrel Lane, Wetherby LS22 4TD"
+    spans = (
+        span_over(text, "UK_HOME_ADDRESS", "Sarkar, 9 Kestrel Lane, Wetherby LS22 4TD"),
+    )
+
+    found = redact(text, spans, THE_SAFE_SET, HER_ERASURE, SEED)
+
+    assert written_runs(found, text) == [
+        ("Imogen Sarkar", AN_ERASURE_MATCH),
+        (", 9 Kestrel Lane, Wetherby LS22 4TD", "UK_HOME_ADDRESS"),
+    ]
+    assert found.text == "Deliveries go to [withheld][home address withheld]"
+
+
+def test_a_one_word_name_is_below_the_floor_and_withholds_nothing() -> None:
+
+    text = "Imogen signed the lease for Imogen Sarkar."
+    one_word = ({"emails": (), "names": ("Imogen",), "other": ()},)
+
+    found = redact(text, (), THE_SAFE_SET, one_word, SEED)
+
+    assert (found.text, found.erasure_matches) == (text, ())
+
+
 def test_the_same_inputs_twice_give_identical_output(
     on_an_hr_shaped_binding: Redaction,
     page: str,
@@ -946,6 +1096,7 @@ def test_each_withheld_character_lies_under_one_written_span_and_a_kept_one_writ
     on_an_hr_shaped_binding: Redaction,
     under_another_seed: Redaction,
     with_one_name_suppressed: Redaction,
+    with_his_erasure: Redaction,
     with_a_partial_overlap: Redaction,
 ) -> None:
 
@@ -955,22 +1106,34 @@ def test_each_withheld_character_lies_under_one_written_span_and_a_kept_one_writ
         on_an_hr_shaped_binding,
         under_another_seed,
         with_one_name_suppressed,
+        with_his_erasure,
         with_a_partial_overlap,
     ):
         assert found.written_spans
         for span in found.written_spans:
-            finding = span.withholding.finding
-            assert span.withholding in found.withholdings, span
-            assert span.withholding.withheld, span
-            assert finding.start <= span.start < span.end <= finding.end, span
-        for withholding in found.withholdings:
-            finding = withholding.finding
-            if withholding.withheld:
-                assert [
-                    offset
-                    for offset in range(finding.start, finding.end)
-                    if len(written_over(found, offset)) != 1
-                ] == [], (withholding.reason, finding)
+            start, end = extent_written_for(found, span)
+            assert start <= span.start < span.end <= end, span
+        withheld = [
+            (withholding.finding.start, withholding.finding.end)
+            for withholding in found.withholdings
+            if withholding.withheld
+        ]
+        matched = [(match.start, match.end) for match in found.erasure_matches]
+        for start, end in (*withheld, *matched):
+            assert [
+                offset
+                for offset in range(start, end)
+                if len(written_over(found, offset)) != 1
+            ] == [], (start, end)
+
+
+def extent_written_for(found: Redaction, span: WrittenSpan) -> tuple[int, int]:
+    if isinstance(span.withholding, ErasureMatch):
+        assert span.withholding in found.erasure_matches, span
+        return span.withholding.start, span.withholding.end
+    assert span.withholding in found.withholdings, span
+    assert span.withholding.withheld, span
+    return span.withholding.finding.start, span.withholding.finding.end
 
 
 def test_a_loser_of_a_partial_overlap_gives_up_only_the_characters_the_winner_takes(

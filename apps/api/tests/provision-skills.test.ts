@@ -111,8 +111,8 @@ const ready = (run: Run): void => {
   }
 };
 
-describe("the skills stage of worktree provisioning (T-083)", () => {
-  it("copies the installed tooling from the primary checkout into the worktree", () => {
+describe("the skills stage of worktree provisioning", () => {
+  it("copies the primary checkout's installed tooling into the worktree", () => {
     const primary = primaryCheckout("copies-primary", true);
     const worktree = worktreeOf(primary, "copies-worktree");
     expect(existsSync(path.join(worktree, ".agents"))).toBe(false);
@@ -132,7 +132,7 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
     expect(run.stderr).toContain("skills:");
   });
 
-  it("copies a skill link as a link, still relative, resolving inside the worktree", () => {
+  it("copies a skill link, still relative, resolving in the worktree", () => {
     const primary = primaryCheckout("links-primary", true);
 
     linkSkill(primary, "guide", "../../.agents/skills/hono/SKILL.md");
@@ -150,7 +150,7 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
     expect(isSymlink(path.join(worktree, ".claude/skills/guide"))).toBe(true);
   });
 
-  it("copies each workspace's co-located skills too, a link among them resolving inside the worktree", () => {
+  it("copies each workspace's co-located skills, links resolving inside the worktree", () => {
     const primary = primaryCheckout("workspaces-primary", true);
     const worktree = worktreeOf(primary, "workspaces-worktree");
     expect(existsSync(path.join(worktree, "apps/api/.claude/skills"))).toBe(false);
@@ -198,7 +198,7 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
     );
   });
 
-  it("carries a skill installed in the primary after the worktree was provisioned", () => {
+  it("carries a skill the primary installed after provisioning", () => {
     const primary = primaryCheckout("later-primary", true);
     const worktree = worktreeOf(primary, "later-worktree");
     ready(provision(worktree));
@@ -234,7 +234,7 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
     expect(again.stderr).toContain("nothing to copy");
   });
 
-  it("fails, naming the link, when a skill link would not resolve inside the worktree", () => {
+  it("fails, naming the link, when it resolves outside the worktree", () => {
     const primary = primaryCheckout("absolute-primary", true);
 
     linkSkill(primary, "absolute", path.join(primary, ".agents/skills/hono"));
@@ -303,7 +303,7 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
       expect(isSymlink(path.join(worktree, ".claude/skills/hono"))).toBe(true);
     });
 
-    it("does not read an installer's zero exit as skills when it installed none", () => {
+    it("fails when the installer exits zero but installs nothing", () => {
       const { run } = bare("empty", "installs nothing");
 
       expect(run.status).not.toBe(0);
@@ -311,7 +311,7 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
       expect(run.stderr).toContain(".agents/skills empty");
     });
 
-    it("still copies what the primary does have before reinstalling the rest", () => {
+    it("copies what the primary has before reinstalling the rest", () => {
       const primary = primaryCheckout("partial-primary", false);
       write(primary, ".claude/skills/gitnexus/SKILL.md", "# gitnexus\n");
       const worktree = worktreeOf(primary, "partial-worktree");
@@ -326,7 +326,7 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
       expect(isSymlink(path.join(worktree, ".claude/skills/hono"))).toBe(true);
     });
 
-    it("says plainly that it could not, and exits non-zero, when the reinstall fails", () => {
+    it("exits non-zero and says so when the reinstall fails", () => {
       const { run } = bare("refused", "refuses");
 
       expect(run.status).not.toBe(0);
@@ -336,7 +336,7 @@ describe("the skills stage of worktree provisioning (T-083)", () => {
   });
 });
 
-describe("the skills this repository wrote (T-081)", () => {
+describe("the skills this repository tracks", () => {
   const tracked = (directory: string): readonly string[] => {
     const listed = spawnSync("git", ["-C", repositoryRoot, "ls-files", directory], {
       encoding: "utf8",
@@ -345,7 +345,7 @@ describe("the skills this repository wrote (T-081)", () => {
     return listed.stdout.split("\n").filter((line) => line !== "");
   };
 
-  it("offers the design system's skill through a link that resolves inside the checkout", () => {
+  it("links the design system's skill, resolving inside the checkout", () => {
     const link = path.join(repositoryRoot, ".claude/skills/better-answers-design");
 
     expect(isSymlink(link)).toBe(true);
@@ -356,7 +356,7 @@ describe("the skills this repository wrote (T-081)", () => {
     );
   });
 
-  it("tracks all three, so a clone that runs no installer is still offered them", () => {
+  it("tracks its own three skills, for clones without an installer", () => {
     const skills = tracked(".claude/skills");
 
     expect(skills).toContain(".claude/skills/better-answers-design");
@@ -364,13 +364,29 @@ describe("the skills this repository wrote (T-081)", () => {
     expect(skills).toContain(".claude/skills/renovate-prs/SKILL.md");
   });
 
-  it("tracks nothing else there, because the rest is third-party content (ADR 0027)", () => {
+  it("tracks five third-party skills, so every agent loads one copy", () => {
+    const skills = tracked(".claude/skills");
+
+    expect(skills).toContain(".claude/skills/code-comments/SKILL.md");
+    expect(skills).toContain(".claude/skills/complexity-gate/SKILL.md");
+    expect(skills).toContain(".claude/skills/human-writing/SKILL.md");
+    expect(skills).toContain(".claude/skills/mutation-testing/SKILL.md");
+    expect(skills).toContain(".claude/skills/repo-quality-sweep/SKILL.md");
+  });
+
+  it("tracks nothing else, since every other skill installs per checkout", () => {
     const ours = tracked(".claude/skills").map((file) => file.split("/")[2] ?? "");
 
     expect([...new Set(ours)].sort()).toEqual([
+      "THIRD_PARTY_NOTICES.md",
       "better-answers-design",
       "browser-suite",
+      "code-comments",
+      "complexity-gate",
+      "human-writing",
+      "mutation-testing",
       "renovate-prs",
+      "repo-quality-sweep",
     ]);
   });
 });

@@ -177,7 +177,7 @@ const leftBehindBy = async (
 ) => ({ bodyRead: upload.state.read, stored: await storedFor(by) });
 
 describe("an Admin binds an upload", () => {
-  it("the bind lands the binding, the document, the ledger row and the index job together, and the object holds the bytes under the workspace's prefix", async () => {
+  it("lands the binding, document, ledger row, job and object together", async () => {
     const scenario = await arrange();
     const { input } = handbookOffered();
 
@@ -249,12 +249,14 @@ describe("an Admin binds an upload", () => {
     });
   });
 
-  it("the bind lands no row at all when the queue refuses its job, leaving only the object the sweep collects", async () => {
+  it("leaves only the object when the queue refuses its job", async () => {
     const scenario = await arrange();
     const { input } = handbookOffered();
 
-    // The job is the transaction's last statement, so refusing it fails the act with three
-    // rows written: only that tells one transaction from four statements.
+    /**
+     * The job is the transaction's last statement, so refusing it fails the act with three rows
+     * written: only that tells one transaction from four statements.
+     */
     const bound = await whileWritesAreRefused(db().pool, "job", () =>
       bindUpload(scenario.admin, doorsOf(scenario), input),
     );
@@ -270,7 +272,7 @@ describe("an Admin binds an upload", () => {
     expect(left.value.length).toEqual(1);
   });
 
-  it("refuses an Editor the bind, and puts no bytes for them", async () => {
+  it("refuses an Editor the bind and stores no bytes", async () => {
     const scenario = await arrange();
     const { upload, input } = handbookOffered();
 
@@ -305,14 +307,14 @@ describe("an Admin binds an upload", () => {
     ],
     ["a size that is not a whole number of bytes", { byteSize: 12.5 }, { byteSize: "wrong-type" }],
     ["a media type of nothing at all", { mediaType: "   " }, { mediaType: "too-small" }],
-  ])("names the field of %s, so the bind is handed no such shape", (_case, override, fields) => {
+  ])("names the field of %s", (_case, override, fields) => {
     expect(parse(bindUploadFields, handbookAsked(override))).toEqual({
       ok: false,
       error: { word: "malformed", fields },
     });
   });
 
-  it("refuses an audience naming a group this workspace does not hold", async () => {
+  it("refuses an audience naming a group the workspace lacks", async () => {
     const scenario = await arrange();
     const { upload, input } = handbookOffered({
       audience: "groups",
@@ -325,7 +327,7 @@ describe("an Admin binds an upload", () => {
     expect(await leftBehindBy(scenario.admin, upload)).toEqual({ bodyRead: false, stored: [] });
   });
 
-  it("binds for a group this workspace does hold, and the binding wears that audience", async () => {
+  it("binds for a held group, the binding wearing that audience", async () => {
     const scenario = await arrange();
     const groupId = await groupNamed(db(), scenario, "Finance", [scenario.viewer]);
     const { input } = handbookOffered({ audience: "groups", audienceGroups: [groupId] });
@@ -349,20 +351,17 @@ describe("an Admin binds an upload", () => {
       `${outside.media_type}, which the agreement both tiers read places outside the list`,
       outside.media_type,
     ]),
-  ])(
-    "refuses %s, a media type outside the allow-list, before a byte is read",
-    async (_case, mediaType) => {
-      const scenario = await arrange();
-      const { upload, input } = handbookOffered({ mediaType });
+  ])("refuses %s, outside the allow-list, before reading a byte", async (_case, mediaType) => {
+    const scenario = await arrange();
+    const { upload, input } = handbookOffered({ mediaType });
 
-      const bound = await bindUpload(scenario.admin, doorsOf(scenario), input);
+    const bound = await bindUpload(scenario.admin, doorsOf(scenario), input);
 
-      expect(bound).toEqual({ ok: false, error: "media-type-refused" });
-      expect(await leftBehindBy(scenario.admin, upload)).toEqual({ bodyRead: false, stored: [] });
-    },
-  );
+    expect(bound).toEqual({ ok: false, error: "media-type-refused" });
+    expect(await leftBehindBy(scenario.admin, upload)).toEqual({ bodyRead: false, stored: [] });
+  });
 
-  it("refuses a file whose declared size is over the cap, before a byte is read", async () => {
+  it("refuses a declared size over the cap, reading no byte", async () => {
     const scenario = await arrange();
     const { upload, input } = handbookOffered({ byteSize: UPLOAD_BYTE_CAP + 1 });
 
@@ -381,7 +380,7 @@ describe("an Admin binds an upload", () => {
     expect(bound.ok).toEqual(true);
   });
 
-  it("refuses a body that passes the cap whatever size was declared, and stores none of it", async () => {
+  it("refuses a body past the cap, whatever its declared size", async () => {
     const scenario = await arrange();
     const asked = handbookAsked();
     const input = { ...inputOf(bindUploadFields, asked), body: pastTheCap() };
@@ -393,7 +392,7 @@ describe("an Admin binds an upload", () => {
     expect(await countsIn(db().pool, scenario.workspaceId)).toEqual({ bindings: 0, documents: 0 });
   });
 
-  it("answers the first outcome to a repeat under the caller's binding id, leaving one of each", async () => {
+  it("answers a repeated binding id with the first outcome", async () => {
     const scenario = await arrange();
     const bindingId = ulid();
 
@@ -419,7 +418,7 @@ describe("an Admin binds an upload", () => {
     });
   });
 
-  it("caps one upload under the edge's own limit, with room for what the edge wraps it in", () => {
+  it("caps one upload below the edge's own limit", () => {
     expect(UPLOAD_BYTE_CAP).toEqual(67108864);
     expect(UPLOAD_BYTE_CAP).toBeLessThan(104857600);
   });
@@ -462,7 +461,7 @@ describe("the sweep collects the originals a failed bind left", () => {
     });
   });
 
-  it("removes the original no document names once the grace has passed, and keeps the named one", async () => {
+  it("removes an unnamed original after the grace, keeping named ones", async () => {
     const scenario = await arrange();
     const named = await boundHandbook(scenario);
     await aFailedBind(scenario);
@@ -477,7 +476,7 @@ describe("the sweep collects the originals a failed bind left", () => {
     });
   });
 
-  it("names the bind each removed original belonged to in the ledger, and never its key", async () => {
+  it("records each removed original's bind, but never its key", async () => {
     const scenario = await arrange();
     const orphaned = await aFailedBind(scenario);
 
@@ -497,7 +496,7 @@ describe("the sweep collects the originals a failed bind left", () => {
     expect(JSON.stringify(rows)).not.toContain("uploads/");
   });
 
-  it("leaves a key under the prefix that no bind could have written", async () => {
+  it("leaves a key under the prefix no bind writes", async () => {
     const scenario = await arrange();
     const stray = "uploads/a-note-from-somewhere-else/original";
     await putObject(scenario.admin, store().door, stray, uploadOf("not an original").body);
@@ -508,7 +507,7 @@ describe("the sweep collects the originals a failed bind left", () => {
     expect(await storedFor(scenario.admin)).toContain(stray);
   });
 
-  it("counts the originals a run would remove and removes none when it is asked only to look", async () => {
+  it("counts what a list-only sweep would remove, removing none", async () => {
     const scenario = await arrange();
     await boundHandbook(scenario);
     const orphaned = await aFailedBind(scenario);
@@ -520,7 +519,7 @@ describe("the sweep collects the originals a failed bind left", () => {
     expect(await storedFor(scenario.admin)).toContain(orphaned);
   });
 
-  it("refuses a workspace that is not an id, before it removes anything", async () => {
+  it("refuses a malformed workspace id before removing anything", async () => {
     const scenario = await arrange();
     const orphaned = await aFailedBind(scenario);
 
@@ -690,8 +689,16 @@ const publishedHandbook = async (scenario: Scenario, bindingId: string) => {
   return published.value;
 };
 
+const dpiaHashOf = async (scenario: Scenario, bindingId: string) => {
+  const input = await asAdmin(scenario, (admin, tx) =>
+    dpiaInputFor(admin, tx, inputOf(dpiaReadInput, { bindingId })),
+  );
+  if (!input.ok) throw new Error(`the DPIA input was refused: ${String(input.error)}`);
+  return input.value.hash;
+};
+
 describe("an Admin publishes a binding", () => {
-  it("publishes the binding, touches no chunk row of it, and its ledger row carries the confirmations, the totals by category, the DPIA hash and the class and audience it releases", async () => {
+  it("publishes, recording confirmations, counts, DPIA hash, class and audience", async () => {
     const scenario = await arrange();
     const { bindingId, documentId, jobId } = await boundHandbook(scenario, {
       sensitivity: "Internal",
@@ -771,14 +778,10 @@ describe("an Admin publishes a binding", () => {
     });
 
     expect(row?.detail["dpiaHash"]).toMatch(SHA256_HEX);
-    const input = await asAdmin(scenario, (admin, tx) =>
-      dpiaInputFor(admin, tx, inputOf(dpiaReadInput, { bindingId })),
-    );
-    if (!input.ok) throw new Error(`the DPIA input was refused: ${String(input.error)}`);
-    expect(row?.detail["dpiaHash"]).toEqual(input.value.hash);
+    expect(row?.detail["dpiaHash"]).toEqual(await dpiaHashOf(scenario, bindingId));
   });
 
-  it("publishes when the latest run is done even though an earlier run over the same binding failed", async () => {
+  it("publishes once the latest run is done, despite earlier failures", async () => {
     const scenario = await arrange();
     const { bindingId, jobId } = await boundHandbook(scenario);
     await runEndedAt(scenario.workspaceId, bindingId, jobId, "failed", RUN_FAILED_AT);
@@ -802,43 +805,40 @@ describe("an Admin publishes a binding", () => {
     ["claimed", RUN_FINISHED_AT],
     ["failed", RUN_FINISHED_AT],
     ["poisoned", RUN_FINISHED_AT],
-  ])(
-    "refuses the publish as not-indexed while the binding's latest run is %s, and writes nothing",
-    async (status, at) => {
-      const scenario = await arrange();
-      const { bindingId, documentId, jobId } = await boundHandbook(scenario);
-      await runEndedAt(scenario.workspaceId, bindingId, jobId, status, at);
-      await chunkUnder(
-        db(),
-        scenario.workspaceId,
-        { bindingId, documentId },
-        {
-          content: HOLIDAY,
-          ordinal: 0,
-          charStart: 0,
-          charEnd: 53,
-        },
-      );
+  ])("refuses as not-indexed while the latest run is %s", async (status, at) => {
+    const scenario = await arrange();
+    const { bindingId, documentId, jobId } = await boundHandbook(scenario);
+    await runEndedAt(scenario.workspaceId, bindingId, jobId, status, at);
+    await chunkUnder(
+      db(),
+      scenario.workspaceId,
+      { bindingId, documentId },
+      {
+        content: HOLIDAY,
+        ordinal: 0,
+        charStart: 0,
+        charEnd: 53,
+      },
+    );
 
-      const published = await publishing(scenario, {
-        bindingId,
-        publishedAt: PUBLISHED_AT,
-        confirmations: CONFIRMED,
-      });
+    const published = await publishing(scenario, {
+      bindingId,
+      publishedAt: PUBLISHED_AT,
+      confirmations: CONFIRMED,
+    });
 
-      expect(published).toEqual({ ok: false, error: "not-indexed" });
-      expect(await publishStateOf(db().pool, scenario.workspaceId, bindingId)).toEqual({
-        published_at: null,
-        state: "landed",
-      });
-      expect(await chunkStampsOf(db().pool, scenario.workspaceId, bindingId)).toEqual([null]);
-      expect(
-        await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.published"),
-      ).toEqual([]);
-    },
-  );
+    expect(published).toEqual({ ok: false, error: "not-indexed" });
+    expect(await publishStateOf(db().pool, scenario.workspaceId, bindingId)).toEqual({
+      published_at: null,
+      state: "landed",
+    });
+    expect(await chunkStampsOf(db().pool, scenario.workspaceId, bindingId)).toEqual([null]);
+    expect(
+      await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.published"),
+    ).toEqual([]);
+  });
 
-  it("refuses the publish as not-indexed when no run has ever been queued over the binding", async () => {
+  it("refuses as not-indexed when no run was ever queued", async () => {
     const scenario = await arrange();
     const { bindingId, jobId } = await boundHandbook(scenario);
     await db().pool.query("DELETE FROM job WHERE workspace_id = $1 AND id = $2", [
@@ -855,7 +855,7 @@ describe("an Admin publishes a binding", () => {
     expect(published).toEqual({ ok: false, error: "not-indexed" });
   });
 
-  it("refuses a second publish of a binding that is already published, and leaves the first instant standing", async () => {
+  it("refuses a second publish, keeping the first instant", async () => {
     const scenario = await arrange();
     const { bindingId, jobId } = await boundHandbook(scenario);
     await runEndedAt(scenario.workspaceId, bindingId, jobId, "done", RUN_FINISHED_AT);
@@ -928,7 +928,7 @@ describe("an Admin publishes a binding", () => {
     });
   });
 
-  it("refuses the publish of a binding this workspace does not hold", async () => {
+  it("refuses to publish a binding the workspace does not hold", async () => {
     const scenario = await arrange();
 
     const published = await publishing(scenario, {
@@ -940,7 +940,7 @@ describe("an Admin publishes a binding", () => {
     expect(published).toEqual({ ok: false, error: "no-such-binding" });
   });
 
-  it("names the binding id when it is not one the platform mints", () => {
+  it("names a binding id the platform does not mint", () => {
     expect(parse(publishBindingInput, { bindingId: "  ", confirmations: CONFIRMED })).toEqual({
       ok: false,
       error: { word: "malformed", fields: { bindingId: "bad-format" } },
@@ -960,21 +960,10 @@ const financeHandbook = async (scenario: Scenario, inTheGroup: readonly UserPrin
 };
 
 describe("a Viewer inside the audience", () => {
-  it("reads nothing of the binding before the publish, and its passages on the next read after it", async () => {
+  it("reads the binding's passages only after the publish", async () => {
     const scenario = await arrange();
     const { bindingId, documentId } = await financeHandbook(scenario, [scenario.viewer]);
-
-    for (const [ordinal, content, charStart, charEnd] of [
-      [0, HOLIDAY, 0, 53],
-      [1, NOTICE, 54, 101],
-    ] as const) {
-      await chunkUnder(
-        db(),
-        scenario.workspaceId,
-        { bindingId, documentId },
-        { content, ordinal, charStart, charEnd },
-      );
-    }
+    await chunksOfTheHandbook(scenario.workspaceId, { bindingId, documentId });
 
     expect(await passagesReadableBy(scenario.viewer, documentId)).toEqual([]);
 
@@ -986,7 +975,7 @@ describe("a Viewer inside the audience", () => {
     ]);
   });
 
-  it("reads nothing of a published binding whose audience names a group they are not in", async () => {
+  it("reads nothing published to a group they are not in", async () => {
     const scenario = await arrange();
     const { bindingId, documentId } = await financeHandbook(scenario, []);
     await chunkUnder(
@@ -1013,7 +1002,7 @@ const AS_IT_WAS_INDEXED = {
 };
 
 describe("an Admin reprocesses a binding", () => {
-  it("the reprocess takes away every chunk row of the binding and queues one index run carrying the reason it was given", async () => {
+  it("empties the binding and queues one run carrying the reason", async () => {
     const scenario = await arrange();
     const { bindingId, documentId } = await indexedHandbook(scenario);
 
@@ -1046,7 +1035,7 @@ describe("an Admin reprocesses a binding", () => {
     });
   });
 
-  it("the reprocess takes no chunk row away, and rejects rather than answering a word, when the queue will not hold its run", async () => {
+  it("rejects, keeping the chunks, when the queue refuses its run", async () => {
     const scenario = await arrange();
     const { bindingId } = await indexedHandbook(scenario);
 
@@ -1069,7 +1058,7 @@ describe("an Admin reprocesses a binding", () => {
     expect(await bindingHolds(scenario.workspaceId, bindingId)).toEqual(AS_IT_WAS_INDEXED);
   });
 
-  it("the reprocess leaves the chunk rows and queues nothing when the act it rode in fails after it", async () => {
+  it("keeps chunks and queues nothing when its act later fails", async () => {
     const scenario = await arrange();
     const { bindingId } = await indexedHandbook(scenario);
 
@@ -1098,7 +1087,7 @@ describe("an Admin reprocesses a binding", () => {
     expect(await bindingHolds(scenario.workspaceId, bindingId)).toEqual(AS_IT_WAS_INDEXED);
   });
 
-  it("rejects a reason no index run carries, which only a caller past the type can ask for, and takes no chunk row away", async () => {
+  it("rejects a reason no index run carries, keeping the chunks", async () => {
     const scenario = await arrange();
     const { bindingId } = await indexedHandbook(scenario);
 
@@ -1110,7 +1099,7 @@ describe("an Admin reprocesses a binding", () => {
             bindingId,
             reason: "rule-change",
           }),
-          // @ts-expect-error a reason the queue does not carry, on purpose; the refusal under test is the run's own
+          // @ts-expect-error a reason no index run carries, to reach the run's own refusal
           reason: "spring-clean",
         }),
       ),
@@ -1119,7 +1108,7 @@ describe("an Admin reprocesses a binding", () => {
     expect(await bindingHolds(scenario.workspaceId, bindingId)).toEqual(AS_IT_WAS_INDEXED);
   });
 
-  it("refuses the reprocess of a Viewer and an Editor and of a binding this workspace does not hold, names the field of an id the platform does not mint and of a reason no index run carries, and leaves the chunk rows standing", async () => {
+  it("refuses Viewers, Editors, foreign bindings and bad input, keeping chunks", async () => {
     const scenario = await arrange();
     const { bindingId } = await indexedHandbook(scenario);
 
@@ -1181,7 +1170,7 @@ describe("an Admin reprocesses a binding", () => {
     });
   });
 
-  it("refuses an Admin naming a workspace other than its own, which reaches no binding there nor its own under that name", async () => {
+  it("refuses an Admin naming another workspace, reaching no binding", async () => {
     const scenario = await arrange();
     const other = await arrange();
     const ours = await indexedHandbook(scenario);
@@ -1227,7 +1216,7 @@ const reprocessingAs = (
   );
 
 describe("the erasure reprocesses a binding as the platform", () => {
-  it("takes away every chunk row of a binding in the workspace the erasure names and queues its index run with the wipe's reason", async () => {
+  it("empties the binding and queues its run for the wipe", async () => {
     const scenario = await arrange();
     const { bindingId, documentId } = await indexedHandbook(scenario);
 
@@ -1249,7 +1238,7 @@ describe("the erasure reprocesses a binding as the platform", () => {
     });
   });
 
-  it("refuses the platform acting for any purpose but the erasure, in the forbidden word, and leaves the chunk rows standing", async () => {
+  it("refuses the platform any purpose but erasure, keeping the chunks", async () => {
     const scenario = await arrange();
     const { bindingId } = await indexedHandbook(scenario);
 
@@ -1265,7 +1254,7 @@ describe("the erasure reprocesses a binding as the platform", () => {
     });
   });
 
-  it("refuses the erasure naming a workspace that does not hold the binding, deleting nothing and queueing nothing in either", async () => {
+  it("refuses an erasure naming the wrong workspace, touching neither", async () => {
     const scenario = await arrange();
     const other = await arrange();
     const { bindingId } = await indexedHandbook(scenario);

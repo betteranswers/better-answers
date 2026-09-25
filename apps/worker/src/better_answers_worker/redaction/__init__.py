@@ -15,6 +15,7 @@ from .officers import raised_by_the_block_rule
 from .pins import VERSION_STRING
 from .pseudonyms import normalised, pseudonyms_for, written_as
 from .restores import Restore
+from .suppressions import ErasureMatch, erasure_matches_in
 from .withholdings import (
     Policy,
     Withholding,
@@ -36,6 +37,7 @@ class Redaction:
     text: str
     findings: tuple[Finding, ...]
     withholdings: tuple[Withholding, ...]
+    erasure_matches: tuple[ErasureMatch, ...]
     written_spans: tuple[WrittenSpan, ...]
     counts: Mapping[str, int]
     verdict: str | None
@@ -60,19 +62,21 @@ def redact(
         seed=seed,
     )
 
-    # Both outside the detector's memo, so a fix to either re-detects nothing.
+    # All three outside the detector's memo, so a fix to any re-detects nothing.
     findings = raised_by_the_block_rule(findings_of(spans), text)
+    erasure_matches = erasure_matches_in(text, policy.suppressions)
 
     letters = pseudonyms_for(_names_in(text, findings), policy.seed)
 
     withholdings = withholdings_over(findings, text, policy)
-    written_spans = written_spans_of(withholdings)
+    written_spans = written_spans_of(withholdings, erasure_matches)
     narrowing = _findings_that_narrow(findings)
     dismissed = dismissed_among(narrowing, dismissals)
     return Redaction(
         text=_written(text, written_spans, letters),
         findings=findings,
         withholdings=withholdings,
+        erasure_matches=erasure_matches,
         written_spans=written_spans,
         counts=_counted(findings),
         verdict=_verdict_of(narrowing, dismissed),
@@ -91,13 +95,15 @@ def _names_in(text: str, findings: Sequence[Finding]) -> tuple[str, ...]:
 
 
 def _placeholder_of(
-    withholding: Withholding, name: str, letters: Mapping[str, str]
+    withholding: Withholding | ErasureMatch, text: str, letters: Mapping[str, str]
 ) -> str:
-    if withholding.tier == ALWAYS_TIER:
+    if isinstance(withholding, ErasureMatch) or withholding.tier == ALWAYS_TIER:
         return ALWAYS_PLACEHOLDER
-    descriptor = DESCRIPTOR_BY_CATEGORY[withholding.finding.category]
+    finding = withholding.finding
+    descriptor = DESCRIPTOR_BY_CATEGORY[finding.category]
     if descriptor.category != A_PERSON_NAME:
         return descriptor.placeholder
+    name = text[finding.start : finding.end]
     return written_as(letters[normalised(name)], descriptor.placeholder)
 
 
@@ -109,12 +115,9 @@ def _written(
     # offset true of the text being rewritten.
     redacted = text
     for span in reversed(written_spans):
-        finding = span.withholding.finding
         redacted = (
             redacted[: span.start]
-            + _placeholder_of(
-                span.withholding, text[finding.start : finding.end], letters
-            )
+            + _placeholder_of(span.withholding, text, letters)
             + redacted[span.end :]
         )
     return redacted

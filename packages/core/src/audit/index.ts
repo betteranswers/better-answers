@@ -35,6 +35,7 @@ export type Recorded = {
 
 export type LedgerRow = z.infer<typeof boundarySchemas.auditEvent.select>;
 
+/** Oldest first; `since` is inclusive. */
 export const eventsOfAct = async (
   principal: Principal,
   tx: Tx,
@@ -59,7 +60,7 @@ const eventInsert = boundarySchemas.auditEvent.insert.omit({ workspaceId: true }
 
 const identitySetInsert = boundarySchemas.identityAuditEvent.insert;
 
-// Both ledgers take the same row; only a workspace's ledger adds the workspace it belongs to.
+/** Both ledgers take the same row; only a workspace's ledger adds the workspace it belongs to. */
 const ROW_COLUMNS = "id, act, actor, subject_id, detail, batch_id";
 
 const AN_KINDS: ReadonlySet<string> = new Set(["id", "iri", "audience"]);
@@ -90,15 +91,13 @@ const detailRefusal = (
   return undefined;
 };
 
-const write = async <A extends LedgerAct>(
-  tx: Tx,
-  workspaceId: string | null,
+const rowToInsert = <A extends LedgerAct>(
+  ledger: typeof eventInsert | typeof identitySetInsert,
   actor: ActorId,
   event: AuditEvent<A>,
-): Promise<Recorded> => {
+) => {
   if (!isDeclared(event.act.name)) throw new Error(`audit: ${event.act.name} was never declared`);
-  const identitySet = isIdentitySetAct(event.act.name);
-  const row = (identitySet ? identitySetInsert : eventInsert).safeParse({
+  const row = ledger.safeParse({
     id: event.id,
     act: event.act.name,
     actor,
@@ -111,8 +110,17 @@ const write = async <A extends LedgerAct>(
   }
   const refusal = detailRefusal(event.act.detail, event.detail);
   if (refusal !== undefined) throw new Error(`audit: ${event.act.name} ${refusal}`);
+  return row.data;
+};
 
-  const { data } = row;
+const write = async <A extends LedgerAct>(
+  tx: Tx,
+  workspaceId: string | null,
+  actor: ActorId,
+  event: AuditEvent<A>,
+): Promise<Recorded> => {
+  const identitySet = isIdentitySetAct(event.act.name);
+  const data = rowToInsert(identitySet ? identitySetInsert : eventInsert, actor, event);
   const values = [data.id, data.act, data.actor, data.subjectId, data.detail, data.batchId];
   const inserted = await tx.query<{ id: string }>(
     identitySet
@@ -127,12 +135,17 @@ const write = async <A extends LedgerAct>(
   return { id: boundarySchemas.auditEvent.select.shape.id.parse(id), actorId: actor };
 };
 
+/**
+ * Writes the event to the ledger its act was declared for. Rejects when the act was never
+ * declared, or the event does not fit the ledger's row or its act's detail shape.
+ */
 export const record = <A extends LedgerAct>(
   principal: Principal,
   tx: Tx,
   event: AuditEvent<A>,
 ): Promise<Recorded> => write(tx, scopeParameter(principal), actorIdOf(principal), event);
 
+/** As `record`, but the event's own `actor` is recorded rather than the platform. */
 export const recordFor = <A extends LedgerAct>(
   platform: PlatformPrincipal,
   tx: Tx,

@@ -1,46 +1,52 @@
 import type { PlatformPrincipal } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
-import type { ErasureFamily, ErasureMap } from "./map.ts";
-import type { SubjectIdentifiers } from "./requests.ts";
-
-const SOURCE_DOCUMENT: ErasureFamily = "source-document";
-
-export const documentsTheMapFound = (map: ErasureMap): readonly string[] => [
-  ...new Set(map.find((entry) => entry.family === SOURCE_DOCUMENT)?.locations ?? []),
-];
+import { identifierCountOf, type SubjectIdentifiers } from "./requests.ts";
 
 export type Suppressed = {
-  readonly suppressed: number;
+  readonly identifiersWithheld: number;
 };
 
-const holdsAnIdentifier = (identifiers: SubjectIdentifiers | null): boolean =>
-  identifiers !== null && Object.values(identifiers).some((named) => named.length > 0);
+const NAMES_NOBODY: SubjectIdentifiers = { emails: [], names: [], other: [] };
 
-export const suppressTheDocuments = async (
+// A member's request may name them by person id alone, and the address they sign in with is the
+// one a company document holds.
+const withTheSignInAddresses = (
+  identifiers: SubjectIdentifiers,
+  signInAddresses: readonly string[],
+): SubjectIdentifiers => {
+  const named = new Set(identifiers.emails.map((email) => email.toLowerCase()));
+  const added = [...new Set(signInAddresses.map((address) => address.toLowerCase()))].filter(
+    (address) => !named.has(address),
+  );
+  return { ...identifiers, emails: [...identifiers.emails, ...added] };
+};
+
+export const suppressInTheWorkspace = async (
   platform: PlatformPrincipal,
   tx: Tx,
   input: {
     readonly workspaceId: string;
     readonly erasureRequestId: string;
     readonly identifiers: SubjectIdentifiers | null;
-    readonly map: ErasureMap;
+
+    readonly signInAddresses: readonly string[];
   },
 ): Promise<Suppressed> => {
-  const documents = documentsTheMapFound(input.map);
-  if (documents.length > 0 && holdsAnIdentifier(input.identifiers)) {
+  const set = withTheSignInAddresses(input.identifiers ?? NAMES_NOBODY, input.signInAddresses);
+  if (identifierCountOf(set) > 0) {
     await tx.query(
-      `INSERT INTO suppression (workspace_id, erasure_request_id, document_id, identifiers)
-       SELECT $1, $2, named.document_id, $4
-         FROM unnest($3::text[]) AS named(document_id)
-       ON CONFLICT (workspace_id, erasure_request_id, document_id) DO NOTHING`,
-      [input.workspaceId, input.erasureRequestId, [...documents], input.identifiers],
+      `INSERT INTO suppression (workspace_id, erasure_request_id, identifiers)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (workspace_id, erasure_request_id) DO NOTHING`,
+      [input.workspaceId, input.erasureRequestId, set],
     );
   }
 
-  const standing = await tx.query<{ suppressed: number }>(
-    `SELECT count(*)::int AS suppressed
+  const standing = await tx.query<{ withheld: number }>(
+    `SELECT jsonb_array_length(identifiers -> 'emails') + jsonb_array_length(identifiers -> 'names')
+            + jsonb_array_length(identifiers -> 'other') AS withheld
        FROM suppression WHERE workspace_id = $1 AND erasure_request_id = $2`,
     [input.workspaceId, input.erasureRequestId],
   );
-  return { suppressed: standing.rows[0]?.suppressed ?? 0 };
+  return { identifiersWithheld: standing.rows[0]?.withheld ?? 0 };
 };

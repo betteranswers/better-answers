@@ -37,7 +37,7 @@ const deferralAt = (steps: readonly ImageStep[]): number =>
 const legsCarryingTheDeferral = (): readonly string[] =>
   checkLegs().flatMap(([job, steps]) => (deferralAt(steps) === -1 ? [] : [job]));
 
-// Tracked files only, which is what a leg would have checked out.
+/** Tracked files only, which is what a leg would have checked out. */
 const workspacesReadingTheDeferral = (): ReadonlySet<string> => {
   const found = spawnSync(
     "git",
@@ -74,7 +74,7 @@ const probeStepAt = (steps: readonly ImageStep[]): number =>
   steps.findIndex((step) => step.env?.[IMAGE_ID_VARIABLE] !== undefined);
 
 describe("the job that probes every image it pushes", () => {
-  it("reads every image it pushes, so no leg ships bytes nothing looked at", () => {
+  it("probes every image it pushes", () => {
     const unprobed = matrixLegs()
       .filter((leg) => leg.probe === undefined)
       .map((leg) => leg.tier);
@@ -83,7 +83,7 @@ describe("the job that probes every image it pushes", () => {
     expect(unprobed).toEqual([]);
   });
 
-  it("installs the toolchain each probe needs, and names no tier to decide it", () => {
+  it("installs each probe's toolchain without deciding by tier", () => {
     const steps = imageJob().steps;
 
     const installed = new Set(
@@ -105,7 +105,7 @@ describe("the job that probes every image it pushes", () => {
     expect(steps.filter((step) => (step.if ?? "").includes("matrix.tier"))).toEqual([]);
   });
 
-  it("installs for a node probe the workspace it runs in, and nothing beside it", () => {
+  it("installs only the workspace a node probe runs in", () => {
     const install = imageJob().steps.find((step) => (step.run ?? "").startsWith("pnpm install"));
     const installed = /--filter (\S+?)\.\.\.(?:\s|$)/.exec(install?.run ?? "")?.[1];
     const probedIn = new Set(
@@ -120,7 +120,7 @@ describe("the job that probes every image it pushes", () => {
     expect([...probedIn]).toEqual([installed]);
   });
 
-  it("hands every probe the id of the build it loaded, under the name every probe reads", () => {
+  it("hands every probe the loaded build's id under one name", () => {
     const steps = imageJob().steps;
     const probed = steps[probeStepAt(steps)];
 
@@ -131,7 +131,7 @@ describe("the job that probes every image it pushes", () => {
     expect(probed?.env?.[IMAGE_ID_VARIABLE]).toContain("outputs.imageid");
   });
 
-  it("exports the build twice on the same terms, so the digest probed is the digest pushed", () => {
+  it("exports the probed and pushed builds on the same terms", () => {
     const exported = imageJob().steps.filter((step) => input(step, "outputs") !== "");
     const mediaTypes = new Set(
       exported.map((step) => /oci-mediatypes=\w+/.exec(input(step, "outputs"))?.[0]),
@@ -145,7 +145,7 @@ describe("the job that probes every image it pushes", () => {
     ]);
   });
 
-  it("attests the digest it pushed beside the image, never around it", () => {
+  it("attests the pushed digest beside the image, never around it", () => {
     const steps = imageJob().steps;
     const pushed = steps.find((step) => input(step, "outputs").includes("push=true"));
     const attested = steps.at(-1);
@@ -166,7 +166,7 @@ describe("the job that probes every image it pushes", () => {
     expect(attested?.if).toBeUndefined();
   });
 
-  it("keeps each leg's layers under a scope of its own, so no leg evicts another", () => {
+  it("caches each leg's layers under a scope of its own", () => {
     const halves = imageJob().steps.flatMap((step) =>
       ["cache-from", "cache-to"].flatMap((name) => {
         const value = input(step, name);
@@ -182,7 +182,7 @@ describe("the job that probes every image it pushes", () => {
     expect(unscoped).toEqual([]);
   });
 
-  it("gives the registry token to the job that pushes, and leaves no git credential beside it", () => {
+  it("writes packages from its job alone, keeping no git credential", () => {
     const checkout = stepUsing("actions/checkout");
 
     expect(buildWorkflow().permissions).toEqual({ contents: "read" });
@@ -195,7 +195,7 @@ describe("the job that probes every image it pushes", () => {
     expect(checkout?.with?.["persist-credentials"]).toBe(false);
   });
 
-  it("builds every commit in a group of its own, under the one tag no other run writes", () => {
+  it("gives each commit's build its own group and tag", () => {
     const meta = stepUsing("docker/metadata-action");
     const tags = (meta === undefined ? "" : input(meta, "tags"))
       .split("\n")
@@ -206,7 +206,7 @@ describe("the job that probes every image it pushes", () => {
     expect(tags).toEqual(["type=sha,prefix=sha-"]);
   });
 
-  it("lets the `check` a commit's build calls neither wait on nor displace another commit's", () => {
+  it("keeps each build's `check` apart from other commits' runs", () => {
     const group = checkWorkflow().concurrency.group;
 
     expect(group).toEqual(
@@ -215,7 +215,7 @@ describe("the job that probes every image it pushes", () => {
     expect(group).not.toEqual(buildWorkflow().concurrency.group);
   });
 
-  it("stands the probes down only where the caller of `check.yml` probes the images itself", () => {
+  it("defers the probes only when `check.yml`'s caller probes the images", () => {
     const check = checkWorkflow();
     const named = new Set(
       checkLegs()
@@ -234,7 +234,7 @@ describe("the job that probes every image it pushes", () => {
     expect(buildWorkflow().jobs.check.with?.[only ?? ""]).toBe(true);
   });
 
-  it("hands the deferral to every leg whose suites read it, and to no leg that runs none", () => {
+  it("hands the deferral to exactly the legs reading it", () => {
     const reading = workspacesReadingTheDeferral();
     const wanted = checkLegs().flatMap(([job, steps]) =>
       workspacesUnder(steps).some((workspace) => reading.has(workspace)) ? [job] : [],
@@ -249,7 +249,7 @@ describe("the job that probes every image it pushes", () => {
     ).toEqual(wanted);
   });
 
-  it("gives every leg that builds an image a builder and the cache credentials first", () => {
+  it("readies a builder and the cache credentials before building images", () => {
     const building = checkLegs().filter(([job]) => legsCarryingTheDeferral().includes(job));
 
     expect(
@@ -272,7 +272,7 @@ describe("the job that probes every image it pushes", () => {
     }
   });
 
-  it("loads before it probes and pushes after, never the other way round", () => {
+  it("loads, then probes, then pushes", () => {
     const steps = imageJob().steps;
     const loadedAt = steps.findIndex((step) => input(step, "outputs").includes("type=docker"));
     const probedAt = probeStepAt(steps);

@@ -44,7 +44,7 @@ def read_binding(cursor: Cursor[Any], run: IndexRun) -> BindingRun | None:
     )
     catalogued = cursor.fetchall()
     document_ids = [str(row[0]) for row in catalogued]
-    suppressions = _suppressions_by_document(cursor, document_ids)
+    suppressions = _suppressions_of_the_workspace(cursor, run.workspace_id)
     restores = _spans_by_document(cursor, document_ids, _RESTORED, Restore)
     dismissals = _spans_by_document(cursor, document_ids, _DISMISSED, Dismissal)
 
@@ -58,7 +58,7 @@ def read_binding(cursor: Cursor[Any], run: IndexRun) -> BindingRun | None:
                 normalised_key=(
                     normalised_key_of(str(row[0])) if row[3] is None else str(row[3])
                 ),
-                suppressions=suppressions.get(str(row[0]), ()),
+                suppressions=suppressions,
                 restores=restores.get(str(row[0]), ()),
                 dismissals=dismissals.get(str(row[0]), ()),
             )
@@ -71,26 +71,23 @@ def normalised_key_of(document_id: str) -> str:
     return f"documents/{document_id.lower()}/{NORMALISED_KEY_SUFFIX}"
 
 
-def _suppressions_by_document(
-    cursor: Cursor[Any], document_ids: Sequence[str]
-) -> Mapping[str, tuple[Suppression, ...]]:
-    if not document_ids:
-        return {}
+def _suppressions_of_the_workspace(
+    cursor: Cursor[Any], workspace_id: str
+) -> tuple[Suppression, ...]:
     cursor.execute(
-        "SELECT document_id, identifiers FROM suppression WHERE document_id = ANY(%s)"
-        " ORDER BY document_id, erasure_request_id",
-        (list(document_ids),),
+        "SELECT identifiers FROM suppression WHERE workspace_id = %s"
+        " ORDER BY erasure_request_id",
+        (workspace_id,),
     )
-    gathered: dict[str, tuple[Suppression, ...]] = {}
-    for document_id, identifiers in cursor.fetchall():
-        named = suppression_of(
+    return tuple(
+        suppression_of(
             {
                 str(kind): [str(value) for value in values]
                 for kind, values in dict(identifiers).items()
             }
         )
-        gathered[str(document_id)] = (*gathered.get(str(document_id), ()), named)
-    return gathered
+        for (identifiers,) in cursor.fetchall()
+    )
 
 
 DISMISSED_REVIEW_STATE = "dismissed"

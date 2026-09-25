@@ -2,6 +2,10 @@ const BLOCK = "198.51.100";
 
 const LAST_HOST = 254;
 
+/**
+ * Each call of the returned function issues the next host in the block.
+ * @throws on the 255th call.
+ */
 export const defaultClientAddresses = (): (() => string) => {
   let issued = 0;
   return () => {

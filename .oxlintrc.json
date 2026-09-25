@@ -22,10 +22,20 @@
   },
   "rules": {
     "no-console": "error",
+    "complexity": ["error", { "max": 8 }],
     "node/no-process-env": "error",
     "import/no-cycle": "error",
     "no-empty": ["error", { "allowEmptyCatch": false }],
     "vitest/no-identical-title": "error",
+    "vitest/valid-title": [
+      "error",
+      {
+        "mustNotMatch": [
+          "/(?i:\\bshould\\b)|(?:\\S+\\s+){10}\\S/",
+          "A test title is a present-tense phrase of 10 words at most, never \"should\" [TEST5]"
+        ]
+      }
+    ],
     "typescript/no-floating-promises": ["error", { "ignoreVoid": true }],
     "typescript/no-unnecessary-condition": "error",
     "typescript/require-array-sort-compare": "off",
@@ -33,6 +43,18 @@
     "typescript/consistent-type-imports": "error",
     "typescript/no-non-null-assertion": "error",
     "typescript/consistent-type-assertions": ["error", { "assertionStyle": "never" }],
+    "typescript/ban-ts-comment": [
+      "error",
+      {
+        "ts-expect-error": "allow-with-description",
+        "ts-ignore": true,
+        "ts-nocheck": true,
+        "ts-check": false
+      }
+    ],
+    "typescript/prefer-ts-expect-error": "error",
+    "eslint/no-warning-comments": ["error", { "decoration": ["*"] }],
+    "unicorn/no-abusive-eslint-disable": "error",
     "oxc/no-async-await": "off",
     "anti-slop/no-chained-type-assertions": "error",
     "anti-slop/no-module-mocking": "error",
@@ -46,10 +68,11 @@
     "anti-slop/no-known-value-widening": "warn",
     "anti-slop/no-unknown-parameters": "warn",
     "anti-slop/no-unsafe-dictionary-type": "warn",
-    "anti-slop/require-safety-comment-for-type-assertion": "warn",
     "anti-slop/no-runtime-typeof": "off",
     "anti-slop/no-shape-in-symbol-names": "off",
     "better-answers/act-admits-before-await": "error",
+    "better-answers/comment-only-the-why": "error",
+    "better-answers/string-cites-nothing": "error",
     "better-answers/mcp-entry-annotations": "error",
     "better-answers/mcp-entry-no-workspace-argument": "error",
     "better-answers/import-direction": "error"
@@ -314,7 +337,6 @@
         "react/set-state-in-effect": "off",
         "react-doctor/effect-needs-cleanup": "off",
         "jsx-a11y/prefer-tag-over-role": "off",
-        "anti-slop/require-safety-comment-for-type-assertion": "off",
         "typescript/no-unnecessary-condition": "off"
       }
     },
@@ -331,8 +353,7 @@
         "anti-slop/no-unknown-returns": "off",
         "anti-slop/no-unknown-type-aliases": "off",
         "anti-slop/no-unsafe-dictionary-type": "off",
-        "anti-slop/no-widen-then-assert": "off",
-        "anti-slop/require-safety-comment-for-type-assertion": "off"
+        "anti-slop/no-widen-then-assert": "off"
       }
     },
     {
@@ -358,6 +379,122 @@
       "rules": {
         "node/no-process-env": "off"
       }
+    },
+    {
+      "files": [
+        "apps/api/src/ingress/limits.ts",
+        "apps/api/src/mcp/surface.ts",
+        "apps/api/src/ops/index.ts",
+        "apps/web/src/app/frame.tsx",
+        "apps/web/src/features/auth/choose-workspace-screen.tsx",
+        "apps/web/src/features/sources/bindings-view.tsx",
+        "apps/web/src/shared/api/upload-progress.ts",
+        "packages/core/src/concepts/file.ts",
+        "packages/core/src/concepts/index.ts",
+        "packages/core/src/concepts/landing.ts",
+        "packages/core/src/concepts/loader.ts",
+        "packages/core/src/concepts/reconciler.ts",
+        "packages/core/src/concepts/visibility.ts",
+        "packages/core/src/erasure/map.ts",
+        "packages/core/src/erasure/rehearsal.ts",
+        "packages/core/src/erasure/routine.ts",
+        "packages/core/test/bundle.ts",
+        "packages/core/test/erasure-replay.test.ts",
+        "packages/core/test/erasure-routine.test.ts",
+        "packages/core/test/queue.contract.test.ts",
+        "packages/core/test/tier-contract.test.ts",
+        "packages/schema/src/concept-tables.ts",
+        "packages/schema/src/journal.ts",
+        "packages/schema/test/finding-factory.test.ts",
+        "packages/schema/test/null-safe-checks.test.ts",
+        "packages/schema/test/readable-chunk.test.ts"
+      ],
+      "rules": {
+        "complexity": "off"
+      }
+    },
+    {
+      "files": [
+        "apps/web/test/api-client.test.tsx",
+        "apps/web/test/browser-suite-skill.test.ts",
+        "apps/web/test/failed-screen.test.tsx",
+        "apps/web/test/folder-case.test.ts",
+        "apps/web/test/frame.test.tsx",
+        "apps/web/test/lint-rules.test.ts",
+        "apps/web/test/membership-redirect.test.tsx",
+        "apps/web/test/refusal.test.ts",
+        "apps/web/test/secondary-nav-showing.test.tsx",
+        "apps/web/test/sources-acts.test.tsx",
+        "apps/web/test/toolbar.test.tsx",
+        "packages/core/test/access-requests.test.ts",
+        "packages/core/test/admission.test.ts",
+        "packages/core/test/answering.test.ts",
+        "packages/core/test/audit.test.ts",
+        "packages/core/test/bundle-root.test.ts",
+        "packages/core/test/chunk-visibility.test.ts",
+        "packages/core/test/class-ranking.test.ts",
+        "packages/core/test/concept-file.contract.test.ts",
+        "packages/core/test/concept-inbox.contract.test.ts",
+        "packages/core/test/concepts.test.ts",
+        "packages/core/test/cost-ledger.contract.test.ts",
+        "packages/core/test/credential-envelope.contract.test.ts",
+        "packages/core/test/display-name.test.ts",
+        "packages/core/test/environment-lint.test.ts",
+        "packages/core/test/erasure-map.test.ts",
+        "packages/core/test/erasure-match.contract.test.ts",
+        "packages/core/test/erasure-rehearsal.test.ts",
+        "packages/core/test/erasure-replay.test.ts",
+        "packages/core/test/erasure-routine.test.ts",
+        "packages/core/test/erasure.test.ts",
+        "packages/core/test/git.test.ts",
+        "packages/core/test/graph-budget.test.ts",
+        "packages/core/test/graph-ops.test.ts",
+        "packages/core/test/graph.test.ts",
+        "packages/core/test/import-bundle.test.ts",
+        "packages/core/test/import-direction.test.ts",
+        "packages/core/test/kernel.test.ts",
+        "packages/core/test/llm-routes.test.ts",
+        "packages/core/test/llm-routing.contract.test.ts",
+        "packages/core/test/manifest.test.ts",
+        "packages/core/test/members.test.ts",
+        "packages/core/test/objects.test.ts",
+        "packages/core/test/parse.test.ts",
+        "packages/core/test/principal.test.ts",
+        "packages/core/test/queue.contract.test.ts",
+        "packages/core/test/rebuild-equivalence.test.ts",
+        "packages/core/test/reconciler.test.ts",
+        "packages/core/test/refusal-words.test.ts",
+        "packages/core/test/runs.test.ts",
+        "packages/core/test/suggestions.test.ts",
+        "packages/core/test/sweeps.test.ts",
+        "packages/core/test/tier-contract.test.ts",
+        "packages/core/test/visibility.test.ts",
+        "packages/core/test/warm-objects.test.ts",
+        "packages/core/test/workspaces.test.ts",
+        "packages/schema/test/account-key.test.ts",
+        "packages/schema/test/boundary-schemas.test.ts",
+        "packages/schema/test/bundle-manifest.test.ts",
+        "packages/schema/test/chunk-columns.test.ts",
+        "packages/schema/test/contract-digest.test.ts",
+        "packages/schema/test/finding-factory.test.ts",
+        "packages/schema/test/full-text-match.test.ts",
+        "packages/schema/test/job-kinds.test.ts",
+        "packages/schema/test/migration-ownership.test.ts",
+        "packages/schema/test/null-safe-checks.test.ts",
+        "packages/schema/test/provisioning-locks.test.ts",
+        "packages/schema/test/readable-chunk.test.ts",
+        "packages/schema/test/rls.test.ts",
+        "packages/schema/test/roles-surface.test.ts",
+        "packages/schema/test/source-catalogue.test.ts",
+        "packages/schema/test/suppression.test.ts",
+        "packages/schema/test/table-ownership.test.ts",
+        "packages/schema/test/ulid.test.ts",
+        "packages/schema/test/warm-postgres.test.ts",
+        "packages/schema/test/worker-schema-view.test.ts"
+      ],
+      "rules": {
+        "vitest/valid-title": ["error", {}]
+      }
     }
   ],
   "ignorePatterns": [
@@ -368,6 +505,7 @@
     ".venv",
     "packages/devtools/lifts/anti-slop/**",
     ".claude/worktrees/**",
+    ".claude/skills/**",
     "**/stryker-setup-*.js"
   ]
 }

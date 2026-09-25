@@ -2,6 +2,7 @@ import { rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { readUnder, repositoryRoot, treeFiles } from "./tree-walk.ts";
 
@@ -12,12 +13,16 @@ const read = (file: string): string => readUnder(repositoryRoot, file);
 
 const isRulesFile = (file: string): boolean => path.basename(file) === "CODING_RULES.md";
 
-// Exempt only inside the string the gate prints, so a tag in a comment or a name in the
-// same file still fails.
+/**
+ * Exempt only inside the string the gate prints, so a tag in a comment or a name in the same
+ * file still fails.
+ */
 const QUOTES = new Set(['"', "'", "`"]);
 
-// Only a closed pair is a string, so an apostrophe in prose opens nothing — though two
-// bracketing a tag still read as one.
+/**
+ * Only a closed pair is a string, so an apostrophe in prose opens nothing — though two bracketing
+ * a tag still read as one.
+ */
 const quotedSpansOf = (text: string): readonly (readonly [number, number])[] => {
   const spans: [number, number][] = [];
   let open: string | undefined;
@@ -43,18 +48,12 @@ const quotedSpansOf = (text: string): readonly (readonly [number, number])[] => 
 const insideAString = (text: string, at: number): boolean =>
   quotedSpansOf(text).some(([from, to]) => from < at && at < to);
 
-// Each of these prints the rule it holds in the message a reader hits, so the reader reaches
-// the rule without asking.
-const GATES_PRINTING_A_TAG: readonly string[] = [
-  "apps/worker/tests/conftest.py",
-  "packages/devtools/lint-rules/rules/act-admits-before-await.ts",
-  "packages/devtools/lint-rules/rules/comment-only-the-why.ts",
-  "packages/devtools/lint-rules/rules/import-direction.ts",
-  "packages/devtools/lint-rules/rules/mcp-entry-no-workspace-argument.ts",
-  "packages/devtools/python/comment_gate.py",
-  "packages/devtools/src/comment-density.ts",
-  "packages/devtools/src/insert-scan.ts",
-];
+const gatesList = z.object({ gates: z.array(z.string()) });
+
+/** The list the string check walks past, so a gate the tag walk exempts is the one it names. */
+const GATES_PRINTING_A_TAG: readonly string[] = gatesList.parse(
+  JSON.parse(read("packages/devtools/gates-printing-a-tag.json")),
+).gates;
 
 type Citation = {
   readonly file: string;
@@ -91,8 +90,10 @@ const cite = ({ file, line, tag }: Citation): string => `${file}:${line} cites [
 const isAllowedCitation = ({ file, text, at }: Citation): boolean =>
   isRulesFile(file) || (GATES_PRINTING_A_TAG.includes(file) && insideAString(text, at));
 
-// The walk reads `git ls-files --others`, so a written file is seen as a committed one; the
-// `finally` keeps the next suite from reading it.
+/**
+ * The walk reads `git ls-files --others`, so a written file is seen as a committed one; the
+ * `finally` keeps the next suite from reading it.
+ */
 const whileAFileNamed = <T>(relative: string, contents: string, taken: () => T): T => {
   const written = path.join(repositoryRoot, relative);
   writeFileSync(written, contents);
@@ -128,7 +129,7 @@ const aCitingLine = (tag: string): string =>
 
 // The rule names three places; a review finding is no file, so a walk of the tree sees two.
 describe("where a rule tag may be written", () => {
-  it("finds one only in a rules file or a gate's failure message", () => {
+  it("finds one only in rules files and gates' failure messages", () => {
     const stray = treeFiles()
       .flatMap(citationsIn)
       .filter((citation) => !isAllowedCitation(citation));
@@ -139,7 +140,7 @@ describe("where a rule tag may be written", () => {
     ).toEqual([]);
   });
 
-  it("passes a tag a rules file the tree has just gained writes", () => {
+  it("passes a tag written in a newly added rules file", () => {
     const [aDefinedTag] = [...definedTags().keys()];
     expect(aDefinedTag).toBeDefined();
 
@@ -148,7 +149,7 @@ describe("where a rule tag may be written", () => {
     ).toEqual([]);
   });
 
-  it("refuses a tag an architecture decision record the tree has just gained writes", () => {
+  it("refuses a tag written in a newly added decision record", () => {
     const [aDefinedTag] = [...definedTags().keys()];
     expect(aDefinedTag).toBeDefined();
 
@@ -157,7 +158,7 @@ describe("where a rule tag may be written", () => {
     ).toEqual(["docs/adr/tag-location-proof.md"]);
   });
 
-  it("refuses a tag a spec the tree has just gained writes", () => {
+  it("refuses a tag written in a newly added spec", () => {
     const [aDefinedTag] = [...definedTags().keys()];
     expect(aDefinedTag).toBeDefined();
 
@@ -167,7 +168,7 @@ describe("where a rule tag may be written", () => {
   });
 });
 
-describe("the tags a gate prints and the rules files that define them", () => {
+describe("the tags gates print and the rules files defining them", () => {
   it("defines every tag a gate's failure message names", () => {
     const defined = definedTags();
     const printed = GATES_PRINTING_A_TAG.flatMap(citationsIn);
@@ -179,7 +180,7 @@ describe("the tags a gate prints and the rules files that define them", () => {
     ).toEqual([]);
   });
 
-  it("defines every tag a rules file cites in another rule's body", () => {
+  it("defines every tag that a rule's body cites", () => {
     const defined = definedTags();
     const cited = treeFiles().filter(isRulesFile).flatMap(citationsIn);
 
@@ -189,7 +190,7 @@ describe("the tags a gate prints and the rules files that define them", () => {
     ).toEqual([]);
   });
 
-  it("exempts a gate only where the tag sits inside the string it prints", () => {
+  it("exempts a gate's tag only inside the string it prints", () => {
     const [aGate] = GATES_PRINTING_A_TAG;
     expect(aGate).toBeDefined();
     const spelled = `[${"TEST"}${"3"}]`;
@@ -221,7 +222,7 @@ describe("the tags a gate prints and the rules files that define them", () => {
     expect(files).toContain("deploy/CODING_RULES.md");
   });
 
-  it("reads a well-formed heading outside a rules file as no definition at all", () => {
+  it("reads no definition from a heading outside a rules file", () => {
     const before = new Set(definedTags().keys());
     const after = whileADocumentHolds(
       `## [${"PROBE"}${"1"}] A heading in the right shape, in the wrong file\n\n`,
@@ -231,7 +232,7 @@ describe("the tags a gate prints and the rules files that define them", () => {
     expect([...after].filter((tag) => !before.has(tag))).toEqual([]);
   });
 
-  it("reads a well-formed heading as a definition and a malformed one as none", () => {
+  it("reads well-formed headings as definitions and malformed ones as none", () => {
     const heading = (tag: string, title: string): string => `## [${tag}] ${title}\n\n`;
     const before = new Set(definedTags().keys());
     const after = whileARulesFileHolds(
@@ -261,7 +262,7 @@ describe("the gates this walk reads a tag past", () => {
     ).toEqual([]);
   });
 
-  it("names a file that still prints a tag in every entry", () => {
+  it("names a file still printing a tag in every entry", () => {
     expect(
       printingNothing(GATES_PRINTING_A_TAG),
       "a listed gate prints no tag any more. Remove its entry in the commit that rewrote the message: an exemption no message needs is one a later citation hides behind.",

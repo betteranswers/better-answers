@@ -1,12 +1,13 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
+import { repositoryRoot } from "@better-answers/devtools/oxlint-config";
 import { describe, expect, it } from "vitest";
 
-const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
-
-// Text, never imported: one half is Python, and importing either asks one language to answer
-// for the other.
+/**
+ * Text, never imported: one half is Python, and importing either asks one language to answer
+ * for the other.
+ */
 const TIER_STAMPS = {
   "the api tier": "packages/schema/src/contract-stamp.ts",
   "the worker tier": "apps/worker/src/better_answers_worker/contract_stamp.py",
@@ -15,7 +16,7 @@ const TIER_STAMPS = {
 const WHOLE_HASH = /CONTRACT_DIGEST = "([0-9a-f]{64})"/;
 
 const digestIn = (relative: string): string => {
-  const source = readFileSync(path.join(REPO_ROOT, relative), "utf8");
+  const source = readFileSync(path.join(repositoryRoot, relative), "utf8");
   const found = WHOLE_HASH.exec(source);
   if (found?.[1] === undefined) {
     throw new Error(
@@ -26,7 +27,7 @@ const digestIn = (relative: string): string => {
 };
 
 describe("the contract's digest, across the two tiers", () => {
-  it("is the same hash in both, which is the proof the two languages read one directory alike", () => {
+  it("is the same hash in both tiers", () => {
     const read = Object.entries(TIER_STAMPS).map(([tier, relative]) => ({
       tier,
       digest: digestIn(relative),

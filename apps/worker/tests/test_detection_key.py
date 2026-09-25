@@ -87,7 +87,7 @@ def test_the_key_is_pinned_beside_the_rule_version_it_implies_a_move_of() -> Non
     assert detection_key() == (
         "a1db6adae80d0dfd17b4589ac15842c84065f04d95cfce575260315764c467ac"
     )
-    assert RULE_VERSION == "5"
+    assert RULE_VERSION == "6"
 
 
 def test_every_field_a_category_declares_is_the_detector_s_or_policy_s_alone() -> None:

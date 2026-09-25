@@ -27,7 +27,7 @@ const reportMutant = z.object({
 });
 export type ReportMutant = z.infer<typeof reportMutant>;
 
-// Stryker's mutation-testing report, read as far as the summary needs it.
+/** Stryker's mutation-testing report, read as far as the summary needs it. */
 const report = z.object({
   files: z
     .record(z.string(), z.object({ source: z.string(), mutants: z.array(reportMutant).readonly() }))
@@ -193,7 +193,7 @@ const FAULT_CONSEQUENCE =
 
 const FROM_CHECKPOINT = ", read from the checkpoint since the run wrote no report";
 
-// A mutant that ran no test, or a leg that killed none, is a broken runner: never a low score.
+/** A mutant that ran no test, or a leg that killed none, is a broken runner: never a low score. */
 const runnerFault = (report: Report): string | undefined => {
   const mutants = mutantsOf(report);
   const covered = mutants.filter((mutant) => killed(mutant) || mutant.status === "Survived");
@@ -206,7 +206,10 @@ const runnerFault = (report: Report): string | undefined => {
   return undefined;
 };
 
-// The checkpoint is read only when there is no report: a leg cancelled at its ceiling writes none.
+/**
+ * The checkpoint is read only when there is no report: a leg cancelled at its ceiling
+ * writes none.
+ */
 const faultOf = (
   leg: string,
   report: Report | undefined,
@@ -220,10 +223,14 @@ const faultOf = (
 
 type SummaryRun = {
   readonly summary: string;
-  // Set when the leg must fail, and named first in the summary.
+  /** Set when the leg must fail, and named first in the summary. */
   readonly fault: string | undefined;
 };
 
+/**
+ * An undefined `report` is a run that wrote none; `checkpoint` then stands in for it only to
+ * find a runner fault.
+ */
 export const mutationSummary = (
   leg: string,
   report: Report | undefined,
@@ -243,7 +250,7 @@ export const mutationSummary = (
   return { summary: `${[...faultLines, ...lines].join("\n")}\n`, fault };
 };
 
-// A file that is not a report, or not JSON, reads as no report.
+/** A file that is not a report, or not JSON, reads as no report. */
 const readReport = (file: string): Report | undefined => {
   if (!existsSync(file)) return undefined;
   try {
@@ -257,6 +264,10 @@ const readReport = (file: string): Report | undefined => {
 const readOptional = (file: string | undefined): Report | undefined =>
   file === undefined ? undefined : readReport(file);
 
+/**
+ * Throws the usage line unless the flags pair and name `--leg` and `--report`; an absent or
+ * unreadable file reads as no report.
+ */
 export const mutationSummaryFromArgv = (argv: readonly string[]): SummaryRun => {
   const values = flagValues(argv);
   const leg = values?.get("leg");

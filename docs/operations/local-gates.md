@@ -29,13 +29,14 @@ The root `prepare` script runs `lefthook install`, and pnpm runs `prepare` after
 ### What each command is for
 
 - `oxfmt` writes, and `stage_fixed` puts what it wrote into the commit, so a formatting-only CI failure cannot happen and no second commit is needed to fix it. `--no-error-on-unmatched-pattern` is what makes handing over the whole staged set safe.
+- `oxlint` runs the one lint config over the staged TypeScript, with the flag root `lint` passes, so a disable that suppresses nothing is refused at commit too.
 - `ruff-format` and `ruff-check` give both tiers the same first word. `root: apps/worker/` makes the staged paths relative to the worker, which is where `uv` finds the locked environment ruff lives in. `--only-group dev` syncs ruff's group and not the worker's own dependencies, so a commit never fetches torch: on Linux that comes from PyTorch's CPU wheel host, which a sandboxed clone may not reach.
 - `actionlint` is a Homebrew binary, not an npm package, so a clone may not have it. A warning and a pass, never a failure: a tool nobody installed must not block a commit.
 - The five `*-typecheck` commands are every workspace with a `typecheck` script but the design system, which has neither a `tsconfig.json` nor a `scripts` block. `root:` is what scopes each command to its own workspace's staged files, so these five never see each other's changes.
 
-## The commit-message ceiling
+## The commit-message hook
 
-The `commit-msg` hook holds every commit's subject to 72 characters, not just `pnpm land`'s. The number is written twice — in `lefthook.yml` and in `packages/devtools/src/land.ts` — because nothing either could import binds a shell one-liner to a TypeScript constant. What holds them to one number is `packages/devtools/test/land.test.ts`, which reads both and fails when they disagree; it also runs the command over a message file both ways.
+The `commit-msg` hook runs commitlint over every commit's message, not just `pnpm land`'s. Its config, `commitlint.config.mjs` at the root, is the one `pnpm land` and the `pr-title` job in `check.yml` read too, so one config checks the form everywhere (`docs/agents/workflow.md`, *The commit's form*). `packages/devtools/test/land.test.ts` commits through the hook's own command in a throwaway repository: a Conventional message goes in, and a declarative subject, a subject naming its ticket and one over 72 characters are each refused.
 
 ## The Claude Code hooks
 
@@ -43,9 +44,11 @@ The `commit-msg` hook holds every commit's subject to 72 characters, not just `p
 
 ### The write-time comment gate
 
-`comment-gate-hook.sh` runs the same comment gate root `check` runs over the one file an agent has just written, and forwards the gate's own message rather than restating it. Exit 2 is the only code whose stderr reaches the model; every other outcome exits 0, so a machine without the tooling refuses no edit.
+`comment-gate-hook.sh` runs the comment gates root `check` runs over the one file an agent has just written. It forwards each gate's own message rather than restating it. Exit 2 is the only code whose stderr reaches the model; every other outcome exits 0, so a machine without the tooling refuses no edit.
 
-It reads every root root `check` gates and no other: `apps/`, `packages/`, `scripts/`, `.claude/hooks/`, `.github/`, `deploy/` and the five root tool-configuration files. `apps/api/tests/comment-gate-hook.test.ts` holds the two lists to each other in both directions, off the hook's own `case` arms and the gate commands in the root manifest, so neither a root added here that CI would accept nor a root gated in CI and missed here can stand.
+For a TypeScript file it runs root `lint`: the root config, `.oxlintrc.json`, with the `lint` script's flag, over any file the root run walks. It refuses the edit only on a comment rule's line, and leaves another rule's finding to `check`. For a Python file it runs the Python gate, over the roots that gate walks: `apps/`, `packages/`, `scripts/`, `.claude/hooks/`, `.github/`, `deploy/` and three root tool-configuration files.
+
+`apps/api/tests/comment-gate-hook.test.ts` holds the hook's roots to the Python gate's command in both directions. It also proves, through the hook, each comment rule the root config holds.
 
 ### Creating and removing a worktree
 
@@ -116,7 +119,7 @@ An export is kept ahead of its caller only when the act it belongs to has no tra
 
 **`pnpm-workspace.yaml`** is the workspace manifest. `apps/worker/` is a uv workspace, not a pnpm one, and a documentation site would join the `packages:` list the day one is lifted in.
 
-`allowBuilds` runs postinstall scripts for two packages, each because the script is what puts a platform binary where the caller reaches it — esbuild for vite and drizzle-kit, ast-grep for the strip script. The other three are optional native accelerations we do not take. lefthook is `false` for the reason above. `false` rather than no entry at all, because pnpm 11 makes an undecided build script a hard error and silence would fail every fresh install.
+`allowBuilds` runs one package's postinstall script, esbuild's, because that script puts the platform binary where vite and drizzle-kit reach it. The other three are optional native accelerations we do not take. lefthook is `false` for the reason above. `false` rather than no entry at all, because pnpm 11 makes an undecided build script a hard error and silence would fail every fresh install.
 
 `minimumReleaseAgeExclude` names the releases taken at their current version deliberately, read from the registry on the day, against pnpm 11's hold on releases younger than its minimum age.
 

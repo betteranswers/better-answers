@@ -38,6 +38,7 @@ import {
   SUBJECT_REQUEST_KINDS,
   subjectRequest,
   suppression,
+  SUPPRESSION_SIGN_IN_ADDRESSES_MAX,
 } from "./erasure-tables.ts";
 import {
   finding,
@@ -588,15 +589,17 @@ export const findingUpdate = createUpdateSchema(finding, findingRefinements);
 
 const subjectIdentifier = z.string().trim().min(1).max(SUBJECT_IDENTIFIER_MAX);
 const subjectIdentifierList = z.array(subjectIdentifier).max(SUBJECT_IDENTIFIERS_MAX);
-const subjectIdentifiers = z.union([
-  // As above: the tuple's members, each spelled out and checked against it.
-  z.strictObject({
-    emails: subjectIdentifierList,
-    names: subjectIdentifierList,
-    other: subjectIdentifierList,
-  } satisfies Record<(typeof SUBJECT_IDENTIFIER_KINDS)[number], typeof subjectIdentifierList>),
-  z.null(),
-]);
+const identifierSetOf = (emailsMax: number) =>
+  z.union([
+    // As above: the tuple's members, each spelled out and checked against it.
+    z.strictObject({
+      emails: z.array(subjectIdentifier).max(emailsMax),
+      names: subjectIdentifierList,
+      other: subjectIdentifierList,
+    } satisfies Record<(typeof SUBJECT_IDENTIFIER_KINDS)[number], typeof subjectIdentifierList>),
+    z.null(),
+  ]);
+const subjectIdentifiers = identifierSetOf(SUBJECT_IDENTIFIERS_MAX);
 
 const subjectRequestRefinements = {
   workspaceId,
@@ -630,11 +633,14 @@ export const erasureRequestSelect = createSelectSchema(erasureRequest, erasureRe
 export const erasureRequestInsert = createInsertSchema(erasureRequest, erasureRequestRefinements);
 export const erasureRequestUpdate = createUpdateSchema(erasureRequest, erasureRequestRefinements);
 
+const suppressionIdentifiers = identifierSetOf(
+  SUBJECT_IDENTIFIERS_MAX + SUPPRESSION_SIGN_IN_ADDRESSES_MAX,
+);
+
 const suppressionRefinements = {
   workspaceId,
   erasureRequestId: (schema: z.ZodString) => schema.regex(ULID),
-  documentId: (schema: z.ZodString) => schema.trim().min(1),
-  identifiers: (schema: z.ZodType) => schema.pipe(subjectIdentifiers),
+  identifiers: (schema: z.ZodType) => schema.pipe(suppressionIdentifiers),
 };
 
 export const suppressionSelect = createSelectSchema(suppression, suppressionRefinements);

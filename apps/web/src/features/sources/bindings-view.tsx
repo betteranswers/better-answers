@@ -8,16 +8,26 @@ import { screenById } from "@/shared/screens.ts";
 import type { ViewToolbar } from "@/shared/view-toolbar.tsx";
 
 import { BindAct } from "./bind-act.tsx";
-import { movedWords, NarrowDialog, PublishDialog } from "./binding-dialogs.tsx";
+import {
+  classAndAudienceWords,
+  movedWords,
+  NarrowDialog,
+  PublishDialog,
+  WidenDialog,
+} from "./binding-dialogs.tsx";
 import { BindingList } from "./binding-list.tsx";
 import { outcomeOfFailure } from "./refusal.tsx";
 import { Review } from "./review.tsx";
 import {
+  EVERYONE,
   NARROWEST,
   useBindings,
   useNarrowBinding,
   usePublish,
+  useWidenBinding,
+  widestAlready,
   type BindingNarrowed,
+  type BindingWidened,
   type ListedBinding,
 } from "./sources-api.ts";
 import { REVIEW_HEADING, SOURCES_KEYSTROKES } from "./sources-state.ts";
@@ -54,6 +64,11 @@ const narrowestAlready = (binding: ListedBinding): Outcome => ({
   words: `“${binding.name}” is ${binding.sensitivity}, and no class is narrower.`,
 });
 
+const nothingWider = (binding: ListedBinding): Outcome => ({
+  tone: "said",
+  words: `“${binding.name}” is ${classAndAudienceWords(binding)}, and no class or audience is wider.`,
+});
+
 export function BindingsView() {
   const bindings = useBindings();
   const listId = useId();
@@ -61,9 +76,11 @@ export function BindingsView() {
   const [reviewing, setReviewing] = useState<string>();
   const [publishing, setPublishing] = useState<string>();
   const [narrowing, setNarrowing] = useState<string>();
+  const [widening, setWidening] = useState<string>();
   const [outcome, setOutcome] = useState<Outcome>();
   const publishAct = usePublish();
   const narrowAct = useNarrowBinding();
+  const widenAct = useWidenBinding();
 
   const listed = bindings.data ?? [];
   const bindingOf = (bindingId: string | undefined) =>
@@ -96,6 +113,11 @@ export function BindingsView() {
     else setNarrowing(binding.bindingId);
   };
 
+  const widen = (binding: ListedBinding) => {
+    if (widestAlready(binding)) setOutcome(nothingWider(binding));
+    else setWidening(binding.bindingId);
+  };
+
   // A letter pressed outside the list still needs a binding, so the one whose row last held
   // focus stands.
   const bindingInFocusOrTell = (): ListedBinding | undefined => {
@@ -115,10 +137,15 @@ export function BindingsView() {
     const binding = bindingInFocusOrTell();
     if (binding !== undefined) narrow(binding);
   });
+  useKeystroke(SOURCES_KEYSTROKES.widen, () => {
+    const binding = bindingInFocusOrTell();
+    if (binding !== undefined) widen(binding);
+  });
 
   const underReview = bindingOf(reviewing);
   const toPublish = bindingOf(publishing);
   const toNarrow = bindingOf(narrowing);
+  const toWiden = bindingOf(widening);
 
   return (
     <>
@@ -147,6 +174,7 @@ export function BindingsView() {
             onReview: review,
             onPublish: publish,
             onNarrow: narrow,
+            onWiden: widen,
           }}
         />
       </section>
@@ -194,6 +222,31 @@ export function BindingsView() {
                 <>
                   Narrowed “{toNarrow.name}” to {narrowed.visibility.sensitivity}.{" "}
                   {movedWords(narrowed)}
+                </>
+              )),
+            );
+          }}
+        />
+      )}
+      {toWiden === undefined ? null : (
+        <WidenDialog
+          key={toWiden.bindingId}
+          binding={toWiden}
+          onClose={() => {
+            setWidening(undefined);
+          }}
+          onConfirm={(asked) => {
+            setWidening(undefined);
+            widenAct.mutate(
+              {
+                bindingId: toWiden.bindingId,
+                ...asked,
+                audienceGroups: asked.audience === EVERYONE ? null : toWiden.audienceGroups,
+              },
+              settledSaying((widened: BindingWidened) => (
+                <>
+                  Widened “{toWiden.name}” to {classAndAudienceWords(widened.visibility)}.{" "}
+                  {movedWords(widened)}
                 </>
               )),
             );

@@ -78,15 +78,19 @@ const BINDINGS = `SELECT b.id, b.name, b.connector, b.sensitivity, b.audience,
       WHERE b.workspace_id = $1
       ORDER BY b.name, b.id`;
 
-// The error is the converter's own name for why, so an Admin is told without a log being read.
+/**
+ * The error is the converter's own name for why, so an Admin is told without a log being read.
+ */
 const QUARANTINED = `SELECT binding_id, id, title, quarantine_error FROM source_document
       WHERE workspace_id = $1 AND outcome = $2 AND quarantine_error IS NOT NULL
       ORDER BY binding_id, title, id`;
 
 const UNREADABLE_BINDING = new Error("a source binding's row is not the shape its table admits");
 
-// The worker cannot write the binding's state column, so everything short of a publish is read
-// off the binding's latest run.
+/**
+ * The worker cannot write the binding's state column, so everything short of a publish is read
+ * off the binding's latest run.
+ */
 const stateOf = (publishedAt: Date | null, lastRun: SubjectRun | null): BindingState => {
   if (publishedAt !== null) return BINDING_PUBLISHED_STATE;
   if (lastRun?.status === JOB_DONE_STATUS) return BINDING_INDEXED_STATE;

@@ -13,8 +13,10 @@ import { answered, readingAs } from "./suite-postgres.ts";
 
 const { db, arrange } = visibilitySuite();
 
-// auto_explain plans the statement the call itself ran; at test size a sequential scan beats
-// every index, so it is switched off.
+/**
+ * auto_explain plans the statement the call itself ran; at test size a sequential scan beats
+ * every index, so it is switched off.
+ */
 const PLANNED_AS_THE_APP = [
   "-c role=app_rt",
   "-c session_preload_libraries=auto_explain",
@@ -60,8 +62,10 @@ const HANDBOOK = {
   charEnd: 44,
 } as const;
 
-// Any other path reads a partition or binding whole: cheaper than a GIN probe below about a
-// hundred rows, dearer at this many.
+/**
+ * Any other path reads a partition or binding whole: cheaper than a GIN probe below about a
+ * hundred rows, dearer at this many.
+ */
 const INVOICE_LINES = 500;
 
 type Arranged = {
@@ -160,7 +164,7 @@ describe("find's plan, as the api and under the chunk's policy", () => {
     expect(found.indexes).toContain(`chunk_${arranged.workspaceId}_search_gin`);
   });
 
-  it("cannot take the GIN index beneath the policy while the match is not leakproof", async () => {
+  it("cannot use the GIN index unless the match is leakproof", async () => {
     const arranged = await arrangedWithInvoices();
 
     await db().pool.query(UNMARK_THE_MATCH);
@@ -174,7 +178,7 @@ describe("find's plan, as the api and under the chunk's policy", () => {
 });
 
 describe("previewChunks' plan, as the api and under the chunk's policy", () => {
-  it("lists a binding's chunks through the index that leads with the binding", async () => {
+  it("lists a binding's chunks through the binding-first index", async () => {
     const arranged = await arrangedWithInvoices();
 
     const previewed = await planned(arranged.admin, (admin, tx) =>

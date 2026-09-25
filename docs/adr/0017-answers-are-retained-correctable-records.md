@@ -44,3 +44,7 @@ Three sweeps, none reopening this ADR.
 - **The repository export is a System act, and stays there.** Control Centre's **System** screen carries the whole-repository export (`git bundle`), as this ADR already lists it; **Knowledge's** toolbar exports are *knowledge* exports — concepts, compositions and the records over them. The distinction is the minting rule (ADR 0011): a knowledge export takes what the company knows, a repository export takes the store it is kept in.
 
 Everything else in this ADR and its amendments stands.
+
+## Amendment — 2026-09-24 (the T-027 and T-028 grill), People's views and the operator's console
+
+People's views are *members, groups, owners, thresholds, erasure and suppression, tokens, audit log*. *Roles* becomes *members* — `/people/roles` becoming `/people/members` and the screen's default view — the list where a person's role is set, since the three roles are fixed and ADR 0038 adopts no custom roles; each role's one-line meaning is shown where the role is chosen. *Groups* and *audit log* are added: the audit log view is the workspace's own audit events and never the identity-set audit log. The operator's console is a surface of its own outside Control Centre, with its own rail (ADR 0009, amended today); the six screens stand. Everything else stands.

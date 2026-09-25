@@ -97,8 +97,8 @@ const rowAt = (
   return found;
 };
 
-describe("the vitest runner's patch, run over a throwaway workspace (T-107, T-372)", () => {
-  it("kills a mutant that throws while its module loads, and one that only its test inside a describe reaches, beside a plain kill and a survivor", () => {
+describe("the vitest runner's patch over a throwaway workspace", () => {
+  it("kills load-time and nested-only mutants, and keeps a survivor", () => {
     const root = workspace();
     try {
       runStryker(root);

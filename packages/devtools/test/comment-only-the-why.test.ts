@@ -3,47 +3,35 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import {
-  executableOf,
-  oxlintOver,
-  runsOverThrowawayTree,
-  writeUnder,
-} from "@better-answers/devtools/throwaway-tree";
-import { pluginConfigFor, repositoryRoot } from "@better-answers/devtools/oxlint-config";
-import {
-  commentGateRoots,
-  typeScriptGateArgv,
-  typeScriptGateConfig,
-} from "@better-answers/devtools/root-commands";
+import { executableOf, oxlintOver, writeUnder } from "@better-answers/devtools/throwaway-tree";
+import { pluginConfigFor } from "@better-answers/devtools/oxlint-config";
 import { describe, expect, it } from "vitest";
-import { z } from "zod";
+
+import { tag, wordsOf } from "./fixture-text.ts";
 
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
 const RULE = "better-answers/comment-only-the-why";
 const FILE = "probe.ts";
+const CORE = "packages/core/src/probe.ts";
 
 const OXLINT = { package: "oxlint", path: ["bin", "oxlint"] } as const;
 
 const CONFIG = pluginConfigFor({ [RULE]: "error" });
 
-const holding = (comment: string): Tree => ({ [FILE]: `${comment}export const keep = 1;\n` });
+const holding = (comment: string, code = "export const keep = 1;\n"): Tree => ({
+  [FILE]: `${comment}${code}`,
+});
 
-// Split so vitest does not read this suite's own environment off the fixture.
+/** Split so vitest does not read this suite's own environment off the fixture. */
 const ENVIRONMENT_DOCBLOCK = `/** @vitest-${"environment"} happy-dom */\n`;
 
-// Spelled in two halves, so the tag scan does not read a fixture as a citation.
-const tag = (family: string, number: string): string => `[${family}${number}]`;
-
-const OVER_THE_CEILING =
-  "one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty then ten more words after that one here now";
-
-const TOO_LONG = `// ${OVER_THE_CEILING}\n`;
+const TOO_LONG = `// ${wordsOf(29)}\n`;
 
 const lint = oxlintOver(CONFIG, { tree: holding(TOO_LONG), flagged: [FILE] });
 
-describe("the comment rule fires on the two shapes a tool can read", () => {
-  it("refuses a block over the ceiling, naming the count and its rule", () => {
+describe("the comment rule fires on a long or citing comment", () => {
+  it("refuses a block over the ceiling, naming count and rule", () => {
     const output = lint.output(holding(TOO_LONG));
 
     expect(output).toContain("runs to 29 words");
@@ -71,30 +59,90 @@ describe("the comment rule fires on the two shapes a tool can read", () => {
     expect(lint.flagged(holding(eightShortLines))).toEqual([FILE]);
   });
 
-  it("refuses a comment inside JSX, which the line counter cannot see", () => {
+  it("counts line comments a blank line apart as two blocks", () => {
+    const apart = `// ${wordsOf(20)}\n\n// ${wordsOf(20)}\n`;
+
+    expect(lint.flagged(holding(apart))).toEqual([]);
+  });
+
+  it.each([
+    [
+      "a line comment under a trailing one",
+      `export const a = 1; // ${wordsOf(20)}\n// ${wordsOf(20)}\n`,
+    ],
+    [
+      "a trailing comment under a line one",
+      `// ${wordsOf(20)}\nexport const a = 1; // ${wordsOf(20)}\n`,
+    ],
+    ["a block comment under a line one", `// ${wordsOf(20)}\n/* ${wordsOf(20)} */\n`],
+    ["a line comment under a block one", `/* ${wordsOf(20)} */\n// ${wordsOf(20)}\n`],
+  ])("counts %s as a block of its own", (_what, source) => {
+    expect(lint.flagged(holding(source))).toEqual([]);
+  });
+
+  it("counts a run of indented line comments as one block", () => {
+    const indented = `export const f = (): number => {\n  // ${wordsOf(13)}\n  // ${wordsOf(13)}\n  return 1;\n};\n`;
+
+    expect(lint.flagged({ [FILE]: indented })).toEqual([FILE]);
+  });
+
+  it("counts a multi-line doc block's words, never its asterisks", () => {
+    const lines = Array.from({ length: 5 }, () => ` * ${wordsOf(5)}\n`).join("");
+
+    expect(lint.flagged(holding(`/**\n${lines} */\n`))).toEqual([]);
+  });
+
+  it("counts no words in a banner of asterisks", () => {
+    expect(lint.flagged(holding(`/*****\n * ${wordsOf(25)}\n *****/\n`))).toEqual([]);
+  });
+
+  it("keeps a block's words apart across its line breaks", () => {
+    const lines = Array.from({ length: 26 }, (_unused, index) => `word${String(index)}\n`).join("");
+
+    expect(lint.flagged(holding(`/*\n${lines}*/\n`))).toEqual([FILE]);
+  });
+
+  it.each([
+    ["an oxlint disable", "the oxlint-disable-next-line form"],
+    ["an enable", "the eslint-enable form"],
+    ["a Stryker restore", "the Stryker restore form"],
+    ["a type-checker escape", "the @ts-expect-error form"],
+    ["a notice", "the SPDX-License-Identifier line"],
+  ])("reads %s named mid-sentence as prose, not as a directive", (_what, named) => {
+    const source = `// ${wordsOf(12)}\n// ${named} is named here\n// ${wordsOf(12)}\n`;
+
+    expect(lint.flagged(holding(source))).toEqual([FILE]);
+  });
+
+  it.each([
+    ["a triple-slash reference", '/// <reference types="node" />'],
+    ["a triple-slash reference with no space", '///<reference types="node" />'],
+    ["a Stryker restore", "// Stryker restore all"],
+    ["a coverage directive", "// v8 ignore next"],
+  ])("ends a block at %s", (_what, notice) => {
+    const source = `// ${wordsOf(20)}\n${notice}\n// ${wordsOf(20)}\n`;
+
+    expect(lint.flagged(holding(source))).toEqual([]);
+  });
+
+  it("refuses a comment inside JSX, which the line counter misses", () => {
     const tsx = {
-      "screen.tsx": `export const Screen = () => (\n  <div>{/* ${OVER_THE_CEILING} */}</div>\n);\n`,
+      "screen.tsx": `export const Screen = () => (\n  <div>{/* ${wordsOf(29)} */}</div>\n);\n`,
     };
 
     expect(lint.flagged(tsx)).toEqual(["screen.tsx"]);
   });
 });
 
-describe("the comment rule stays silent where a comment earns its place", () => {
+describe("the comment rule's exemptions", () => {
   it.each([
     ["a why inside the ceiling", "// Deleting this changes what knip answers.\n"],
-    [
-      "a lint disable with its reason",
-      "// eslint-disable-next-line no-console -- the check runner prints\n",
-    ],
-    [
-      "a type-checker escape",
-      "// @ts-expect-error the fixture is deliberately the wrong shape for T-243\n",
-    ],
+    ["a why of exactly 25 words", `// ${wordsOf(25)}\n`],
     ["a copy-detection fence", "/* jscpd:ignore-start */\n/* jscpd:ignore-end */\n"],
     ["a test environment docblock", ENVIRONMENT_DOCBLOCK],
     ["a triple-slash reference", '/// <reference types="node" />\n'],
     ["a licence notice", "// SPDX-License-Identifier: MIT\n"],
+    ["an enable, which suppresses nothing to explain", "// oxlint-enable no-console\n"],
   ])("walks past %s", (_what, comment) => {
     expect(lint.flagged(holding(comment))).toEqual([]);
   });
@@ -103,67 +151,159 @@ describe("the comment rule stays silent where a comment earns its place", () => 
     expect(lint.flagged({ [FILE]: "#!/usr/bin/env node\nexport const keep = 1;\n" })).toEqual([]);
   });
 
-  it("does not lend a directive's exemption to the paragraph under it", () => {
-    const both = `// oxlint-disable-next-line no-console\n${TOO_LONG}`;
+  it("keeps a directive's exemption off the paragraph under it", () => {
+    const both = `// oxlint-disable-next-line no-console -- the runner prints\n${TOO_LONG}`;
 
     expect(lint.flagged(holding(both))).toEqual([FILE]);
   });
+});
 
-  it("stays silent over a tree whose comments are all short and cite nothing", () => {
-    expect(lint.flagged(holding("// Deleting this changes what knip answers.\n"))).toEqual([]);
+describe("the comment rule holds a directive to a same-line reason", () => {
+  it.each([
+    ["an oxlint disable", "// oxlint-disable-next-line no-console\n"],
+    ["an ESLint disable in a block", "/* eslint-disable no-console */\n"],
+    ["a disable whose separator carries nothing", "// eslint-disable-line no-console --\n"],
+    ["a Stryker disable", "// Stryker disable next-line all\n"],
+  ])("refuses %s with no reason, naming the directive rule", (_what, directive) => {
+    const output = lint.output(holding(directive));
+
+    expect(output).toContain("gives no reason");
+    expect(output).toContain(tag("COMMENT", "3"));
+  });
+
+  it.each([
+    ["an oxlint disable", "// oxlint-disable-next-line no-console -- the runner prints\n"],
+    ["a disable in a block", "/* eslint-disable no-console -- the runner prints */\n"],
+    ["a Stryker disable", "// Stryker disable next-line all: the fixture is the oracle\n"],
+    ["a type-checker escape", "// @ts-expect-error the fixture is the wrong shape\n"],
+  ])("walks past %s with its reason", (_what, directive) => {
+    expect(lint.flagged(holding(directive))).toEqual([]);
+  });
+
+  it.each([
+    ["an oxlint disable", `// oxlint-disable-next-line no-console -- ${wordsOf(26)}\n`],
+    ["a Stryker disable", `// Stryker disable next-line all: ${wordsOf(26)}\n`],
+    ["a type-checker escape", `// @ts-expect-error ${wordsOf(26)}\n`],
+  ])("refuses %s whose reason exceeds 25 words, naming the count", (_what, directive) => {
+    const output = lint.output(holding(directive));
+
+    expect(output).toContain("reason runs to 26 words");
+    expect(output).toContain(tag("COMMENT", "3"));
+  });
+
+  it.each([
+    ["a disable", "oxlint-disable-next-line"],
+    ["an enable", "oxlint-enable"],
+  ])("walks past %s whose reason runs to exactly 25 words", (_what, directive) => {
+    expect(lint.flagged(holding(`// ${directive} no-console -- ${wordsOf(25)}\n`))).toEqual([]);
+  });
+
+  it("refuses an enable whose reason runs over 25 words", () => {
+    const directive = `// oxlint-enable no-console -- ${wordsOf(26)}\n`;
+
+    expect(lint.output(holding(directive))).toContain("reason runs to 26 words");
+  });
+
+  it("counts only the reason, never the rules a disable names", () => {
+    const rules = Array.from({ length: 30 }, (_unused, index) => `rule-${String(index)}`).join(
+      ", ",
+    );
+
+    expect(lint.flagged(holding(`// oxlint-disable ${rules} -- the runner prints\n`))).toEqual([]);
+  });
+
+  it("refuses a reason citing a ticket", () => {
+    const directive = "// @ts-expect-error the fixture is the wrong shape for T-243\n";
+
+    expect(lint.output(holding(directive))).toContain("cites a ticket id");
   });
 });
 
-describe("the string check refuses what a reader cannot open from where they read it", () => {
-  const saying = (text: string): Tree => ({ [FILE]: `export const usage = "${text}";\n` });
+describe("the comment rule allows an exported function a longer block", () => {
+  const inCore = (source: string, file = CORE): Tree => ({ [file]: source });
 
   it.each([
-    ["a ticket id", "Ask the owner about T-243 first."],
-    ["an ADR number", "The graph is Postgres under ADR 0021."],
-    ["an ISO date", "The registry moved on 2026-09-21."],
-    ["a slashed date", "The registry moved on 21/09/2026."],
-  ])("refuses a string citing %s", (_what, text) => {
-    expect(lint.flagged(saying(text))).toEqual([FILE]);
+    ["an arrow function", "export const wait = (count: number): number => count;\n"],
+    [
+      "a function expression",
+      "export const wait = function (count: number): number {\n  return count;\n};\n",
+    ],
+    [
+      "a function declaration",
+      "export function wait(count: number): number {\n  return count;\n}\n",
+    ],
+    [
+      "an async function",
+      "export async function wait(count: number): Promise<number> {\n  return count;\n}\n",
+    ],
+    [
+      "a default function",
+      "export default function wait(count: number): number {\n  return count;\n}\n",
+    ],
+    ["a default arrow", "export default (count: number): number => count;\n"],
+    [
+      "an overload's signature",
+      "export function wait(count: number): number;\nexport function wait(count: number): number {\n  return count;\n}\n",
+    ],
+  ])("walks past a 50-word block on %s in packages/core", (_what, code) => {
+    expect(lint.flagged(inCore(`/** ${wordsOf(50)} */\n${code}`))).toEqual([]);
   });
 
-  it("refuses a rule tag in a string, which a comment scan never reached", () => {
-    expect(lint.flagged(saying(`A raw insert lives in a factory (${tag("TEST", "4")}).`))).toEqual([
-      FILE,
-    ]);
+  it("walks past a 50-word block on an export in packages/schema", () => {
+    const schema = "packages/schema/src/probe.ts";
+    const source = `/** ${wordsOf(50)} */\nexport const wait = (count: number): number => count;\n`;
+
+    expect(lint.flagged(inCore(source, schema))).toEqual([]);
   });
 
-  it("refuses a citation in a template literal's text", () => {
-    const template = {
-      [FILE]: "export const usage = (id: string): string => `${id} landed under T-243.`;\n",
-    };
+  it("refuses a 51-word export block, naming the 50-word ceiling", () => {
+    const source = `/** ${wordsOf(51)} */\nexport const wait = (count: number): number => count;\n`;
+    const output = lint.output(inCore(source));
 
-    expect(lint.flagged(template)).toEqual([FILE]);
+    expect(output).toContain("runs to 51 words");
+    expect(output).toContain("in 50 at most");
   });
 
-  it("stays silent over a string that names what the reader can do", () => {
-    expect(lint.flagged(saying("Name a workspace this person belongs to."))).toEqual([]);
+  it.each([
+    ["an exported value", "export const limit = 50;\n"],
+    ["an exported value beside a function", "export const limit = 50, wait = (): number => 1;\n"],
+    [
+      "an internal function",
+      "const wait = (count: number): number => count;\nexport const keep = wait(1);\n",
+    ],
+    ["an exported type", "export type Wait = number;\n"],
+    ["an exported binding with no value yet", "export let later: number | undefined;\n"],
+    ["a re-export of a function", "export { wait } from './wait.ts';\n"],
+  ])("refuses a 26-word block on %s", (_what, code) => {
+    expect(lint.output(inCore(`/** ${wordsOf(26)} */\n${code}`))).toContain("runs to 26 words");
   });
 
-  it("walks past a value with no prose in it, which no reader reads as a sentence", () => {
-    const profile = { [FILE]: 'export const profile = "mcp-2026-07-28";\n' };
+  it("refuses 26 words of line comments on an exported function", () => {
+    const lines = `// ${wordsOf(13)}\n// ${wordsOf(13)}\n`;
+    const source = `${lines}export const wait = (count: number): number => count;\n`;
 
-    expect(lint.flagged(profile)).toEqual([]);
+    expect(lint.flagged(inCore(source))).toEqual([CORE]);
   });
 
-  it("walks past the same string in a test", () => {
-    const inATest = {
-      "tests/probe.ts": 'export const usage = "The graph is Postgres under ADR 0021.";\n',
-    };
+  it("refuses a 26-word plain block comment on an exported function", () => {
+    const source = `/* ${wordsOf(26)} */\nexport const wait = (count: number): number => count;\n`;
 
-    expect(lint.flagged(inATest)).toEqual([]);
+    expect(lint.flagged(inCore(source))).toEqual([CORE]);
   });
 
-  it("walks past the same string in a gate that prints its own tag", () => {
-    const inAGate = {
-      "packages/devtools/src/insert-scan.ts": `export const said = "A raw insert lives in a factory (${tag("TEST", "4")}).";\n`,
-    };
+  it.each([
+    ["outside the two packages", "apps/api/src/probe.ts"],
+    ["in a package's tests", "packages/core/test/probe.ts"],
+  ])("refuses a 26-word block on an exported function %s", (_where, file) => {
+    const source = `/** ${wordsOf(26)} */\nexport const wait = (count: number): number => count;\n`;
 
-    expect(lint.flagged(inAGate)).toEqual([]);
+    expect(lint.flagged(inCore(source, file))).toEqual([file]);
+  });
+
+  it("gives the longer ceiling only to the export's own block", () => {
+    const source = `/** ${wordsOf(26)} */\nconst limit = 1;\n/** short */\nexport const wait = (count: number): number => count + limit;\n`;
+
+    expect(lint.flagged(inCore(source))).toEqual([CORE]);
   });
 });
 
@@ -183,91 +323,21 @@ describe("the rule's fix", () => {
   it("removes the offending comment and leaves the code", () => {
     const after = fixed(holding(TOO_LONG));
 
-    expect(after).not.toContain(OVER_THE_CEILING);
+    expect(after).not.toContain(wordsOf(29));
     expect(after).toContain("export const keep = 1;");
   });
 
   it("leaves a directive alone", () => {
-    const directive = "// oxlint-disable-next-line no-console\n";
+    const directive = "// oxlint-disable-next-line no-console -- the runner prints\n";
     const after = fixed(holding(`${directive}${TOO_LONG}`));
 
     expect(after).toContain("oxlint-disable-next-line no-console");
-    expect(after).not.toContain(OVER_THE_CEILING);
-  });
-});
-
-const FORTY_WORDS =
-  "one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty twentyone twentytwo twentythree twentyfour twentyfive twentysix twentyseven twentyeight twentynine thirty thirtyone thirtytwo thirtythree thirtyfour thirtyfive thirtysix thirtyseven thirtyeight thirtynine forty";
-
-const A_WHY_OF_TWENTY =
-  "The strip reads this file, so a comment left here is one the next run of it would silently take away again";
-
-const A_ROOT_SCRIPT = "scripts/probe.mjs";
-
-const jsonConfig = z.looseObject({
-  jsPlugins: z.array(z.looseObject({ specifier: z.string() })),
-});
-
-// The gate's own config, JSONC, with its plugin resolved to this checkout's so the throwaway
-// tree needs no dependencies of its own.
-const gateConfig = (): string => {
-  const relative = typeScriptGateConfig();
-  const source = readFileSync(path.join(repositoryRoot, relative), "utf8")
-    .split("\n")
-    .filter((line) => !line.trimStart().startsWith("//"))
-    .join("\n");
-  const parsed = jsonConfig.parse(JSON.parse(source));
-  return JSON.stringify({
-    ...parsed,
-    jsPlugins: parsed.jsPlugins.map((one) => ({
-      ...one,
-      specifier: path.resolve(repositoryRoot, path.dirname(relative), one.specifier),
-    })),
-  });
-};
-
-// Something clean at every root the command names, so a run fails on the probe and never on a
-// path this tree does not hold.
-const scaffold = (): Tree =>
-  Object.fromEntries([
-    [typeScriptGateConfig(), gateConfig()],
-    ...commentGateRoots().map((root) =>
-      /\.[cm]?[jt]sx?$/.test(root)
-        ? [root, "export const keep = 1;\n"]
-        : [`${root}/keep.ts`, "export const keep = 1;\n"],
-    ),
-  ]);
-
-const scriptHolding = (comment: string): Tree => ({
-  [A_ROOT_SCRIPT]: `${comment}export const keep = 1;\n`,
-});
-
-const OVER_IN_A_SCRIPT = scriptHolding(`// ${FORTY_WORDS}\n`);
-
-describe("the gate's own command reaches the root scripts directory", () => {
-  const gate = runsOverThrowawayTree({
-    executable: OXLINT,
-    // Pinned, as the rule's own runner pins it: a reporter that names no file reads as silence.
-    argv: [...typeScriptGateArgv(), "--format=unix"],
-    scaffold: scaffold(),
-    foundSomething: [1],
-    // Smoked under a root the command has always named, so dropping `scripts` fails the case
-    // below by its own assertion, not this runner.
-    smoke: {
-      tree: { "packages/devtools/probe.ts": `// ${FORTY_WORDS}\nexport const keep = 1;\n` },
-      reports: (output) => output.includes("runs to 40 words"),
-    },
+    expect(after).not.toContain(wordsOf(29));
   });
 
-  it("refuses a 40-word comment in a root script, naming the file, the count and the rule", () => {
-    const output = gate(OVER_IN_A_SCRIPT);
+  it("removes every line of a run of touching line comments", () => {
+    const after = fixed(holding(`// ${wordsOf(9)}\n// ${wordsOf(9)}\n// ${wordsOf(9)}\n`));
 
-    expect(output).toContain(`${A_ROOT_SCRIPT}:`);
-    expect(output).toContain("runs to 40 words");
-    expect(output).toContain(tag("COMMENT", "1"));
-  });
-
-  it("stays silent over a why of twenty words in the same script", () => {
-    expect(gate(scriptHolding(`// ${A_WHY_OF_TWENTY}\n`))).toBe("");
+    expect(after).toBe("\nexport const keep = 1;\n");
   });
 });

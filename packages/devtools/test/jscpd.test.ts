@@ -31,14 +31,14 @@ const twoFilesOneClone: Tree = { "left.ts": CLONE, "right.ts": CLONE };
 const jscpd = jscpdOver(overATree, { tree: twoFilesOneClone, clones: 1 });
 
 describe("the copy-paste gate over a throwaway tree", () => {
-  it("names both files when a block is copied from one into another", () => {
+  it("names both files when a block is copied between them", () => {
     const clones = jscpd(twoFilesOneClone);
 
     expect(clones).toHaveLength(1);
     expect([clones[0]?.left, clones[0]?.right].sort()).toEqual(["left.ts", "right.ts"]);
   });
 
-  it("stays silent on the same copy when one half is fenced by a named exception", () => {
+  it("stays silent when one half is fenced as an exception", () => {
     const clones = jscpd({
       "left.ts": CLONE,
       "right.ts": `/* jscpd:ignore-start */\n${CLONE}/* jscpd:ignore-end */\n`,
@@ -51,7 +51,7 @@ describe("the copy-paste gate over a throwaway tree", () => {
     expect(jscpd({ "left.ts": CLONE, "right.ts": NOT_A_CLONE })).toEqual([]);
   });
 
-  it("reads Python the way it reads TypeScript, so the worker is held to the same line", () => {
+  it("names a Python clone as it names a TypeScript one", () => {
     const python = [
       "def shape(value: str) -> str:",
       "    trimmed = value.strip()",
@@ -71,7 +71,7 @@ describe("the copy-paste gate over a throwaway tree", () => {
 });
 
 describe("the gate's configuration, as the root script runs it", () => {
-  it("refuses any duplication at all, over both halves of the tree, at five lines", () => {
+  it("refuses any five-line clone over both halves of the tree", () => {
     const argv = jscpdArgv(jscpdConfig).join(" ");
 
     expect(argv).toContain("--threshold 0");
@@ -81,7 +81,7 @@ describe("the gate's configuration, as the root script runs it", () => {
     expect(argv.endsWith("apps packages")).toBe(true);
   });
 
-  it("walks past what this repository did not write, each exclusion where its reason is", () => {
+  it("walks past files this repository did not write", () => {
     expect(jscpdConfig.ignore).toContain("apps/web/src/shared/ui/**");
     expect(jscpdConfig.ignore).toContain("**/lifts/**");
     expect(jscpdConfig.ignore).toContain("apps/worker/src/better_answers_worker/schema_view.py");

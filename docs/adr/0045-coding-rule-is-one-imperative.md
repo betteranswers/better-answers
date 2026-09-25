@@ -22,3 +22,15 @@ A tag is written in three places: a rules file, a review finding, a gate's failu
 ## Holders and review
 
 `apps/api/tests/coding-rules-form.test.ts` holds the form and `coding-rules-tags.test.ts` the three places, each proving its parser on fixture text. The comment gates hold the same bans inside code, and this repository's review pass read the new text.
+
+## Amendment — 2026-09-24, the comment gates are one lint config (T-384)
+
+The TypeScript comment gates are now one lint config, `.oxlintrc.json`. So `pnpm lint`, the pre-commit hook and an editor all show a breach as it is written. The separate comment-gate config is gone.
+
+- **Stock rules first.** oxlint refuses `@ts-ignore`, a bare `@ts-expect-error`, a TODO and a blanket disable. `--report-unused-disable-directives` refuses a disable that suppresses nothing. In the worker, ruff's stock rules do the same.
+- **One custom comment rule.** `comment-only-the-why` keeps the 25-word cap and the citation ban. A doc block on an exported function may run to 50 words. A disable needs a reason, and the reason counts against the cap.
+- **The string check is its own rule**, `string-cites-nothing`, because it polices text a person reads, not comments.
+- **A `.py`-only Python gate** holds the same caps in Python and nothing else.
+- **The density ceiling** stays as the volume backstop. It is the only gate on a config file's comments.
+
+The complexity cap and the test-title rule go into the same config as stock rules. The complexity cap is there now: oxlint's `complexity` and, in Python, ruff's `C901` hold a function to 8, and the files over it when it landed are listed by path in an exemption that only shrinks (T-385). The test-title rule is there too: oxlint's stock `vitest/valid-title` refuses a title of 11 words or more, or one that says "should", and the files holding one when it landed are listed the same way (T-387).

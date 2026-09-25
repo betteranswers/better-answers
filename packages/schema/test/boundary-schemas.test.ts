@@ -437,7 +437,6 @@ const acceptedRows = {
     {
       workspaceId: WS_ID,
       erasureRequestId: ERASURE_REQUEST_ID,
-      documentId: DOCUMENT_ID,
       identifiers: { emails: ["person@example.invalid"], names: ["A person"], other: [] },
     },
   ],
@@ -1093,6 +1092,22 @@ describe("the rules in force a binding carries", () => {
       boundarySchemas.sourceBinding.select.shape.rulesInForce.safeParse(RULES_IN_FORCE_DEFAULT)
         .success,
     ).toBe(true);
+  });
+});
+
+describe("the emails a suppression holds", () => {
+  const holding = (count: number) =>
+    boundarySchemas.suppression.insert.safeParse({
+      ...acceptedRows.suppression[0],
+      identifiers: {
+        emails: Array.from({ length: count }, (_, at) => `p${at}@x.invalid`),
+        names: [],
+        other: [],
+      },
+    }).success;
+
+  it("are a full request's fifty and the two sign-in addresses an erasure adds, and no more", () => {
+    expect([holding(52), holding(53)]).toEqual([true, false]);
   });
 });
 

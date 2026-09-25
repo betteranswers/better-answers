@@ -13,11 +13,11 @@ const fixtureSchema = z.object({
 const fixture = contractFixture("emptying-a-binding", fixtureSchema);
 
 describe("the reasons the emptying-a-binding agreement says empty a binding", () => {
-  it("are the reasons this tier empties a binding on: every one it names and no other", () => {
+  it("are this tier's reasons: every named reason and no other", () => {
     expect([...REASONS_EMPTYING_THE_BINDING].toSorted()).toEqual(fixture.reasons.toSorted());
   });
 
-  it("are each written once, so a list of two is two reasons", () => {
+  it("are each written once", () => {
     expect(new Set(fixture.reasons).size).toBe(fixture.reasons.length);
   });
 });

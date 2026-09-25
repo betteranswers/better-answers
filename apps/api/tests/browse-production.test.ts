@@ -84,7 +84,7 @@ describe("the production browsing helper", () => {
     opened = browse({ ESTATE_FILE: everyValue, BROWSE_PORT: String(port) });
   });
 
-  it("opens a loopback forward to the database's published port over SSH, with keepalives", () => {
+  it("opens a loopback SSH forward to the database, with keepalives", () => {
     expect({ status: opened.status, stderr: opened.stderr }).toEqual({ status: 0, stderr: "" });
     const argv = opened.sshArgv ?? "";
     expect(argv).toContain(`-L 127.0.0.1:${String(port)}:127.0.0.1:5999`);
@@ -95,14 +95,14 @@ describe("the production browsing helper", () => {
     expect(argv.endsWith(" operator@vpc1.example.invalid")).toBe(true);
   });
 
-  it("says where a GUI profile points and that Ctrl-C closes it", () => {
+  it("says where a GUI points and that Ctrl-C closes it", () => {
     expect(opened.stdout).toContain(`127.0.0.1:${String(port)}`);
     expect(opened.stdout).toContain("browse_ro");
     expect(opened.stdout).toContain("better_answers");
     expect(opened.stdout).toContain("Ctrl-C closes it");
   });
 
-  it("states neither the address, the SSH user, the key nor the published port it read", () => {
+  it("states neither the address, SSH user, key nor published port", () => {
     const said = `${opened.stdout}${opened.stderr}`;
     const stated = ["vpc1.example.invalid", "operator", key].filter((value) =>
       said.includes(value),
@@ -113,7 +113,7 @@ describe("the production browsing helper", () => {
     });
   });
 
-  it("leaves the key to ssh's own configuration when the private file names none", async () => {
+  it("leaves the key to ssh when the file names none", async () => {
     const run = browse({
       ESTATE_FILE: estateFile("no-key", [
         `VPC1_SSH_TARGET=${TARGET}`,
@@ -126,7 +126,7 @@ describe("the production browsing helper", () => {
     expect(run.sshArgv).not.toContain("IdentitiesOnly");
   });
 
-  it("reads the main checkout's private file when told no other, from the checkout and from a worktree of it", async () => {
+  it("defaults to the main checkout's private file, even in worktrees", async () => {
     const checkout = repositoryHolding(path.join(scratch, "checkout"), {
       "deploy/browse-production.sh": readFileSync(helper, "utf8"),
     });
@@ -167,14 +167,14 @@ describe("the production browsing helper", () => {
       expect(run.stderr).toContain(`127.0.0.1:${String(taken.port)} is taken`);
     });
 
-    it("refuses when there is no private file, naming where it looked", async () => {
+    it("refuses a missing private file, naming where it looked", async () => {
       const nowhere = path.join(scratch, "no-such-estate.md");
       const run = browse({ ESTATE_FILE: nowhere, BROWSE_PORT: String(await freePort()) });
       expect({ status: run.status, ssh: run.sshArgv }).toEqual({ status: 1, ssh: undefined });
       expect(run.stderr).toContain(nowhere);
     });
 
-    it("refuses a private file missing a value, naming the value and nothing the file holds", async () => {
+    it("refuses a missing value by name, leaking nothing else", async () => {
       const run = browse({
         ESTATE_FILE: estateFile("no-port", [`VPC1_SSH_TARGET=${TARGET}`, `VPC1_SSH_KEY=${key}`]),
         BROWSE_PORT: String(await freePort()),
@@ -184,7 +184,7 @@ describe("the production browsing helper", () => {
       expect(run.stderr).not.toContain("vpc1.example.invalid");
     });
 
-    it("refuses a value written twice, since either could be the one meant", async () => {
+    it("refuses a value written twice, as either could be meant", async () => {
       const run = browse({
         ESTATE_FILE: estateFile("twice", [
           `VPC1_SSH_TARGET=${TARGET}`,
@@ -198,7 +198,7 @@ describe("the production browsing helper", () => {
       expect(run.stderr).not.toContain("elsewhere");
     });
 
-    it("refuses a value that is not the shape it must be, naming the value", async () => {
+    it("refuses a value of the wrong shape, naming the value", async () => {
       const shapes = [
         ["VPC1_DATABASE_PORT", [`VPC1_SSH_TARGET=${TARGET}`, "VPC1_DATABASE_PORT=5999; true"]],
         ["VPC1_DATABASE_PORT", [`VPC1_SSH_TARGET=${TARGET}`, "VPC1_DATABASE_PORT=70000"]],

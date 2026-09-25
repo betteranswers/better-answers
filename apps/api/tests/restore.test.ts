@@ -62,8 +62,10 @@ const inTheContainer = (
   return { code: ran.status, said: `${ran.stdout}${ran.stderr}` };
 };
 
-// Production's `tool` runs a command in the backup image with the work directory at /work; the
-// database's own image carries the same PostgreSQL client.
+/**
+ * Production's `tool` runs a command in the backup image with the work directory at /work; the
+ * database's own image carries the same PostgreSQL client.
+ */
 const replacing = (database: string): Ran =>
   inTheContainer(
     [
@@ -77,8 +79,10 @@ const replacing = (database: string): Ran =>
     { DATABASE_URL: insideUriFor(database), REPO_DIR: CHECKOUT },
   );
 
-// The drill runs its psql and pg_restore on VPC 2's host rather than in the backup image, so no
-// `tool` stands in.
+/**
+ * The drill runs its psql and pg_restore on VPC 2's host rather than in the backup image, so no
+ * `tool` stands in.
+ */
 const drilling = (database: string): Ran =>
   inTheContainer(
     [
@@ -137,8 +141,10 @@ const GRANTEE = "CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.gr
 
 const surfaceSchema = z.array(z.object({ line: z.string() }));
 
-// Every partition of one parent reads as one, so databases holding different workspaces compare
-// on what a partition is given, not its name.
+/**
+ * Every partition of one parent reads as one, so databases holding different workspaces compare
+ * on what a partition is given, not its name.
+ */
 const securitySurface = async (pool: pg.Pool): Promise<readonly string[]> => {
   const read = await pool.query(
     `WITH relation AS (
@@ -290,7 +296,7 @@ afterAll(async () => {
   if (container !== "") docker(["rm", "--force", container]);
 });
 
-describe("the production restore, handed a dump that cannot be read whole", () => {
+describe("the production restore, given a dump it cannot read whole", () => {
   let before: Readonly<Record<string, number>>;
   let replaced: Ran;
 
@@ -304,7 +310,7 @@ describe("the production restore, handed a dump that cannot be read whole", () =
     replaced = replacing("untouched");
   });
 
-  it("refuses before it drops anything, so every table keeps the rows it held", async () => {
+  it("refuses before dropping anything, so every table keeps its rows", async () => {
     expect(replaced).toMatchObject({ code: 1, said: expect.stringContaining("REFUSED") });
     const after = await rowCounts(untouched);
     expect(after).toEqual(before);
@@ -312,7 +318,7 @@ describe("the production restore, handed a dump that cannot be read whole", () =
   });
 });
 
-describe("the production restore, handed a dump that reads whole and fails part-way through", () => {
+describe("the production restore, given a whole dump that fails part-way", () => {
   const GONE = "gone_before_the_restore";
   let before: Readonly<Record<string, number>>;
   let replaced: Ran;
@@ -333,7 +339,7 @@ describe("the production restore, handed a dump that reads whole and fails part-
     replaced = replacing("untouched");
   });
 
-  it("rolls the whole replacement back, so every table keeps the rows it held", async () => {
+  it("rolls the whole replacement back, keeping every table's rows", async () => {
     expect(replaced).toMatchObject({
       code: 3,
       said: expect.stringContaining(`role "${GONE}" does not exist`),
@@ -348,7 +354,7 @@ describe("the production restore, handed a dump that reads whole and fails part-
   });
 });
 
-describe("the production restore, over a database that already holds the schema and rows", () => {
+describe("the production restore, over a database holding schema and rows", () => {
   let replaced: Ran;
   let counted: Readonly<Record<string, number>>;
   let migratedAfter: Ran;
@@ -360,7 +366,7 @@ describe("the production restore, over a database that already holds the schema 
     migratedAfter = migrating("production");
   }, 120_000);
 
-  it("completes, and every table holds the rows the dump holds, with no table the dump lacks", () => {
+  it("completes with exactly the dump's tables and rows", () => {
     expect(replaced).toEqual({ code: 0, said: "" });
     expect(counted).toEqual(atTheDump);
     expect(counted).toMatchObject({ "public.workspace": 1, "public.oauth_refresh_token": 1 });
@@ -375,7 +381,7 @@ describe("the production restore, over a database that already holds the schema 
     });
   });
 
-  it("leaves row-level security and every grant as a fresh `migrate` makes them", async () => {
+  it("leaves row-level security and grants as fresh `migrate` makes them", async () => {
     const restored = await securitySurface(production);
 
     expect(restored).toEqual(await securitySurface(fresh));
@@ -386,7 +392,7 @@ describe("the production restore, over a database that already holds the schema 
   });
 });
 
-describe("the drill's restore, over staging as the last drill left it: migrated and seeded", () => {
+describe("the drill's restore, over staging left migrated and seeded", () => {
   let drilled: Ran;
   let counted: Readonly<Record<string, number>>;
 
@@ -396,13 +402,13 @@ describe("the drill's restore, over staging as the last drill left it: migrated 
     counted = await rowCounts(staging);
   }, 120_000);
 
-  it("completes, and every table holds the rows the dump holds and none of staging's own", () => {
+  it("completes with the dump's rows and none of staging's own", () => {
     expect(drilled).toEqual({ code: 0, said: "" });
     expect(counted).toEqual(atTheDump);
     expect(counted).toMatchObject({ "public.workspace": 1, "public.oauth_refresh_token": 1 });
   });
 
-  it("leaves row-level security and every grant as a fresh `migrate` makes them, as the production restore does", async () => {
+  it("leaves row-level security and grants as fresh `migrate` makes them", async () => {
     const restored = await securitySurface(staging);
 
     expect(restored).toEqual(await securitySurface(fresh));

@@ -1,12 +1,13 @@
 import { execFileSync } from "node:child_process";
-import { readdirSync, readFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, onTestFinished } from "vitest";
 import { z } from "zod";
 
 import { GARAGE_IMAGE } from "@better-answers/core/store/objects";
-import { POSTGRES_IMAGE } from "@better-answers/schema";
+import { boundarySchemas, POSTGRES_IMAGE, ULID_PATTERN } from "@better-answers/schema";
 
 const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 const read = (relative: string): string =>
@@ -19,7 +20,7 @@ const liveLines = (relative: string): readonly string[] =>
 
 const operationsDocuments = "docs/operations";
 
-// One workflow step's block, so an assertion about it cannot pass on a neighbour's text.
+/** One workflow step's block, so an assertion about it cannot pass on a neighbour's text. */
 const stepNamed = (workflow: string, name: string): string =>
   workflow.split(/^ {6}- name: /m).find((block) => block.startsWith(name)) ?? "";
 
@@ -27,6 +28,29 @@ const deployScripts = (): readonly string[] =>
   readdirSync(path.join(repositoryRoot, "deploy"))
     .filter((file) => file.endsWith(".sh"))
     .sort();
+
+const fencedIn = (script: string, name: string): string | undefined => {
+  const opened = script.split(`>>> ${name}`)[1];
+  return opened?.slice(opened.indexOf("\n") + 1).split(`# <<< ${name}`)[0];
+};
+
+const positionOf = (text: string, needle: string): number => {
+  const index = text.indexOf(needle);
+  expect({ needle, found: index >= 0 }).toEqual({ needle, found: true });
+  return index;
+};
+
+type BashRun = { readonly code: number; readonly output: string };
+
+const bashRan = (lines: readonly string[], input = ""): BashRun => {
+  const script = ["set -euo pipefail", 'say() { printf "%s\\n" "$*"; }', ...lines].join("\n");
+  try {
+    return { code: 0, output: execFileSync("bash", ["-c", script], { encoding: "utf8", input }) };
+  } catch (thrown) {
+    const failed: { status?: number; stdout?: string } = thrown ?? {};
+    return { code: failed.status ?? -1, output: failed.stdout ?? "" };
+  }
+};
 
 const renovateSchema = z.object({
   enabledManagers: z.array(z.string()),
@@ -41,6 +65,22 @@ const renovateSchema = z.object({
     .default([]),
 });
 
+const groupOf = (match: RegExpMatchArray, name: string): string => match.groups?.[name] ?? "";
+
+const composeModelSchema = z.object({
+  services: z.record(
+    z.string(),
+    z.object({
+      networks: z
+        .record(z.string(), z.object({ aliases: z.array(z.string()).optional() }).nullable())
+        .default({}),
+    }),
+  ),
+  networks: z
+    .record(z.string(), z.object({ name: z.string(), external: z.boolean().optional() }))
+    .default({}),
+});
+
 const composeServices = (file: string): readonly { name: string; body: string }[] => {
   const after = file.split(/^services:\s*$/m)[1] ?? "";
   const blocks = after
@@ -52,7 +92,7 @@ const composeServices = (file: string): readonly { name: string; body: string }[
   }));
 };
 
-describe("the deploy tree (T-005)", () => {
+describe("the deploy tree", () => {
   it("has a script tree that parses, every file", () => {
     for (const script of deployScripts()) {
       expect(() =>
@@ -78,7 +118,7 @@ describe("the deploy tree (T-005)", () => {
     );
   });
 
-  it("carries no `<read on the day>` placeholder in a field that must parse", () => {
+  it("carries no `<read on the day>` placeholder in parsed fields", () => {
     for (const file of [
       "deploy/backup.Dockerfile",
       "deploy/stores.compose.yaml",
@@ -93,7 +133,7 @@ describe("the deploy tree (T-005)", () => {
     }
   });
 
-  it("installs the backup image's PostgreSQL client at the database image's major, so pg_dump never skews from the server", () => {
+  it("installs the backup image's PostgreSQL client at the database's major", () => {
     const serverMajor = /-pg(\d+)-/.exec(POSTGRES_IMAGE)?.[1];
     const clientMajors = liveLines("deploy/backup.Dockerfile")
       .flatMap((line) => [...line.matchAll(/\bpostgresql-client-(\d+)\b/g)])
@@ -103,14 +143,14 @@ describe("the deploy tree (T-005)", () => {
     expect(clientMajors).toEqual([serverMajor]);
   });
 
-  it("builds the backup image from a base pinned by digest, so a rebuild cannot pick up another", () => {
+  it("builds the backup image from a base pinned by digest", () => {
     const bases = liveLines("deploy/backup.Dockerfile").filter((line) => line.startsWith("FROM "));
 
     expect(bases).toHaveLength(1);
     expect(bases[0]).toMatch(/^FROM \S+:\S+@sha256:[0-9a-f]{64}$/);
   });
 
-  it("runs the backup service by digest from the image build.yml pushes, not from a host build", () => {
+  it("runs the backup service by the digest build.yml pushes", () => {
     const stores = read("deploy/stores.compose.yaml");
     expect(stores).toContain("ghcr.io/betteranswers/backup@${BACKUP_IMAGE_DIGEST:?");
     expect(stores).not.toMatch(/^\s+build:/m);
@@ -119,14 +159,14 @@ describe("the deploy tree (T-005)", () => {
     );
   });
 
-  it("runs the object store on the one pinned Garage image, so the estate and the harness cannot skew", () => {
+  it("runs the object store on the one pinned Garage image", () => {
     const objectstore = composeServices(read("deploy/stores.compose.yaml")).find(
       (service) => service.name === "objectstore",
     );
     expect(objectstore?.body).toContain(`image: ${GARAGE_IMAGE}`);
   });
 
-  it("gives Garage its secrets from the environment and names no `*_file` key", () => {
+  it("gives Garage its secrets from the environment, no `*_file` key", () => {
     const garage = read("deploy/garage.toml");
     expect(garage).not.toMatch(/^\s*(rpc_secret_file|admin_token_file)/m);
     const objectstore = composeServices(read("deploy/stores.compose.yaml")).find(
@@ -136,7 +176,7 @@ describe("the deploy tree (T-005)", () => {
     expect(objectstore?.body).toContain("GARAGE_ADMIN_TOKEN:");
   });
 
-  it("puts an explicit memory limit on every VPC 1 service, and a swap allowance on the worker", () => {
+  it("limits every VPC 1 service's memory, and the worker's swap", () => {
     for (const file of ["deploy/stores.compose.yaml", "deploy/platform.compose.yaml"]) {
       const services = composeServices(read(file));
       expect(services.length).toBeGreaterThan(1);
@@ -151,7 +191,7 @@ describe("the deploy tree (T-005)", () => {
     expect(read("deploy/platform.compose.yaml")).toMatch(/^\s+memswap_limit: 3072m/m);
   });
 
-  it("keeps the production restore free of the drill's traps: no wipe, no exit trap, no second DSN, the replay mandatory", () => {
+  it("keeps the drill's traps out of the production restore", () => {
     const script = read("deploy/restore-production.sh");
     expect(script).not.toMatch(/wipe_staging|trap .*EXIT|PROD_DATABASE_URL/);
     expect(script).not.toMatch(/rm -rf \/data/);
@@ -160,7 +200,7 @@ describe("the deploy tree (T-005)", () => {
     expect(read(`${operationsDocuments}/RUNBOOK.md`)).toContain("restore-production.sh");
   });
 
-  it("stops the backup service before the production restore's first change and starts it only once api answers, so no dump races the restore", () => {
+  it("pauses backups from the restore's first change until api answers", () => {
     const lines = liveLines("deploy/restore-production.sh").map((line) => line.trim());
     const linesMatching = (pattern: RegExp): readonly number[] =>
       lines.flatMap((line, index) => (pattern.test(line) ? [index] : []));
@@ -182,7 +222,7 @@ describe("the deploy tree (T-005)", () => {
     });
   });
 
-  it("runs the replay after the object store and the git store, and before api, in both restore scripts", () => {
+  it("runs the replay after both stores and before api", () => {
     for (const file of ["deploy/restore-production.sh", "deploy/restore-drill.sh"]) {
       const script = read(file);
       const at = (needle: string): number => {
@@ -206,7 +246,7 @@ describe("the deploy tree (T-005)", () => {
     }
   });
 
-  it("runs the replay's one-shot on the one service that carries the git store and the object store", () => {
+  it("runs the replay's one-shot on the service holding both stores", () => {
     const services = composeServices(read("deploy/platform.compose.yaml"));
     const api = services.find((service) => service.name === "api");
     const migrate = services.find((service) => service.name === "migrate");
@@ -227,7 +267,7 @@ describe("the deploy tree (T-005)", () => {
     }
   });
 
-  it("gives the api the object-store settings its door reads, the bucket named and the region matching garage.toml", () => {
+  it("gives the api its object-store settings, matching garage.toml's region", () => {
     const anchor =
       read("deploy/platform.compose.yaml")
         .split("x-bootstrap: &bootstrap")[1]
@@ -240,7 +280,90 @@ describe("the deploy tree (T-005)", () => {
     expect(read("deploy/garage.toml")).toContain('s3_region = "garage"');
   });
 
-  it("hands the api the digest its own image is pinned to, so /health names the build that answers", () => {
+  it("joins staging's projects on an internal network made first", () => {
+    const drill = read("deploy/restore-drill.sh");
+    const projects = fencedIn(drill, "the staging projects");
+    expect({ markers: projects !== undefined }).toEqual({ markers: true });
+
+    const work = mkdtempSync(path.join(tmpdir(), "staging-projects-"));
+    onTestFinished(() => {
+      rmSync(work, { recursive: true, force: true });
+    });
+    const required = new Set(
+      ["deploy/stores.compose.yaml", "deploy/platform.compose.yaml"].flatMap((file) =>
+        [...read(file).matchAll(/\$\{(\w+):\?/g)].map((match) => match[1] ?? ""),
+      ),
+    );
+    writeFileSync(
+      path.join(work, "staging.env"),
+      [...required].map((key) => `${key}=staging\n`).join(""),
+    );
+    const drillRan = (lines: readonly string[]): BashRun =>
+      bashRan([
+        `REPO_DIR='${repositoryRoot}'`,
+        `STAGING_ENV_FILE='${work}/staging.env'`,
+        projects ?? "",
+        ...lines,
+      ]);
+
+    const composed = (project: "stores" | "platform"): readonly string[] => {
+      const ran = drillRan([`${project} config --format json`]);
+      expect({ project, code: ran.code }).toEqual({ project, code: 0 });
+      const model = composeModelSchema.parse(JSON.parse(ran.output));
+      return Object.entries(model.services).flatMap(([service, { networks }]) =>
+        Object.entries(networks).map(([key, attached]) => {
+          const network = model.networks[key];
+          const external = network?.external === true ? " external" : "";
+          const aliases = (attached?.aliases ?? []).map((alias) => ` as ${alias}`).join("");
+          return `${service} on ${network?.name ?? key}${external}${aliases}`;
+        }),
+      );
+    };
+
+    expect([...composed("stores")].sort()).toEqual([
+      "backup on better-answers-stores-staging_default",
+      "cloudflared on better-answers-stores-staging_default",
+      "init on better-answers-stores-staging_default",
+      "objectstore on better-answers-staging-shared external as objectstore",
+      "objectstore on better-answers-stores-staging_default",
+    ]);
+    expect([...composed("platform")].sort()).toEqual([
+      "api on better-answers-staging-shared external",
+      "api on better-answers-staging_default",
+      "migrate on better-answers-staging-shared external",
+      "migrate on better-answers-staging_default",
+      "worker on better-answers-staging-shared external",
+      "worker on better-answers-staging_default",
+    ]);
+
+    const dockerCalls = (inspectStatus: number): BashRun =>
+      drillRan([
+        `docker() { printf '%s\\n' "$*" >> '${work}/docker-${String(inspectStatus)}.log'; [ "$1 $2" != "network inspect" ] || return ${String(inspectStatus)}; }`,
+        "ensure_staging_network",
+        `cat '${work}/docker-${String(inspectStatus)}.log'`,
+      ]);
+    expect(dockerCalls(1)).toEqual({
+      code: 0,
+      output:
+        "network inspect better-answers-staging-shared\nnetwork create --internal better-answers-staging-shared\n",
+    });
+    expect(dockerCalls(0)).toEqual({
+      code: 0,
+      output: "network inspect better-answers-staging-shared\n",
+    });
+    expect(drill).toMatch(/^say "## 0 [^"\n]*"; ensure_staging_network; wipe_staging$/m);
+  });
+
+  it("gives the production compose files no network of their own", () => {
+    for (const file of ["deploy/stores.compose.yaml", "deploy/platform.compose.yaml"]) {
+      expect({ file, networks: /^\s*networks:/m.test(read(file)) }).toEqual({
+        file,
+        networks: false,
+      });
+    }
+  });
+
+  it("hands the api its own image's pinned digest", () => {
     const api = composeServices(read("deploy/platform.compose.yaml")).find(
       (service) => service.name === "api",
     );
@@ -252,7 +375,7 @@ describe("the deploy tree (T-005)", () => {
     expect(api?.body).toMatch(/^ {6}API_IMAGE_DIGEST: \$\{API_IMAGE_DIGEST:\?\}$/m);
   });
 
-  it("creates Garage's root key and the platform's bucket — the wizard for production, the drill for staging", () => {
+  it("creates Garage's key and bucket in the wizard and drill", () => {
     const wizard = read("deploy/wizard-41.sh");
     expect(wizard).toContain("key create platform-root");
     expect(wizard).toContain("bucket create $S3_BUCKET");
@@ -271,7 +394,7 @@ describe("the deploy tree (T-005)", () => {
     expect(read("deploy/host-setup.sh")).toContain("STAGING_S3_BUCKET=");
   });
 
-  it("runs the four graph commands the way each of them answers, and records counts it has nothing to diff", () => {
+  it("runs each graph command as it answers, and records counts", () => {
     const drill = read("deploy/restore-drill.sh");
 
     expect(drill).toContain('ops graph-rebuild --workspace "${DRILL_WORKSPACE}" --wait');
@@ -287,7 +410,61 @@ describe("the deploy tree (T-005)", () => {
     expect(drill).toContain("COUNTS DIFFER");
   });
 
-  it("wipes staging without a graph special case: the graph is plain tables in `public` (ADR 0032)", () => {
+  it("pins the synthetic workspace's id in drill.env and BACKUPS.md", () => {
+    const workspaceId = execFileSync(
+      "bash",
+      [path.join(repositoryRoot, "deploy/seed-synthetic.sh"), "--workspace-id"],
+      { encoding: "utf8" },
+    ).trim();
+
+    expect(workspaceId).toEqual("01M2SYNTHET1CAAAAAAAAAAAAA");
+    expect(boundarySchemas.workspace.select.shape.id.safeParse(workspaceId).success).toBe(true);
+    expect(read("deploy/host-setup.sh")).toContain(`\nDRILL_WORKSPACE=${workspaceId}\n`);
+    expect(read(`${operationsDocuments}/BACKUPS.md`)).toContain(`\`${workspaceId}\``);
+  });
+
+  it("refuses a DRILL_WORKSPACE that is not a workspace id", () => {
+    const drill = read("deploy/restore-drill.sh");
+
+    const guard = fencedIn(drill, "workspace id");
+    expect({ markers: guard !== undefined }).toEqual({ markers: true });
+    expect(drill.indexOf("# >>> workspace id")).toBeLessThan(drill.indexOf("## 0 wipe staging"));
+    expect(guard).toContain(`[[ "\${DRILL_WORKSPACE}" =~ ${ULID_PATTERN} ]]`);
+
+    const ran = (workspace: string): BashRun =>
+      bashRan([
+        `DEPLOY_DIR=${JSON.stringify(path.join(repositoryRoot, "deploy"))}`,
+        `DRILL_WORKSPACE=${JSON.stringify(workspace)}`,
+        guard ?? "",
+        'say "step 0"',
+      ]);
+
+    expect(ran("01M2SYNTHET1CAAAAAAAAAAAAA")).toEqual({ code: 0, output: "step 0\n" });
+    expect(ran("ws_synthetic")).toEqual({
+      code: 1,
+      output:
+        "REFUSED: DRILL_WORKSPACE ws_synthetic is not a workspace id; the synthetic fixture's is 01M2SYNTHET1CAAAAAAAAAAAAA\n",
+    });
+    expect(ran("01m2synthet1caaaaaaaaaaaaa").code).toEqual(1);
+  });
+
+  it("seeds the synthetic fixture between the git store and api", () => {
+    const drill = read("deploy/restore-drill.sh");
+    const at = (needle: string): number => positionOf(drill, needle);
+
+    const gitStore = at("git clone --quiet --bare");
+    const seeded = at('"${DEPLOY_DIR}/seed-synthetic.sh" | tee -a "${REPORT}"');
+    const repository = at(
+      `[ -d "/data/git/\${synthetic_workspace}.git" ] || sudo -u '#1000' git init --quiet --bare --initial-branch main "/data/git/\${synthetic_workspace}.git"`,
+    );
+    const apiUp = at("platform up -d --wait api");
+
+    expect([gitStore, seeded, repository, apiUp]).toEqual(
+      [gitStore, seeded, repository, apiUp].toSorted((left, right) => left - right),
+    );
+  });
+
+  it("wipes staging with no special case for the graph", () => {
     const drill = read("deploy/restore-drill.sh");
     expect(drill).not.toMatch(/ag_catalog|drop_graph|\bAGE\b/);
     expect(drill).toContain('-f "${DEPLOY_DIR}/empty-database.sql"');
@@ -296,13 +473,9 @@ describe("the deploy tree (T-005)", () => {
     expect(drill).toContain("seed-synthetic.sh");
   });
 
-  it("proves the rehearsal in seven steps, in order: seed · dump · found · erase · dump · gone · gone from git", () => {
+  it("proves the rehearsal in its seven steps, in order", () => {
     const drill = read("deploy/restore-drill.sh");
-    const at = (needle: string): number => {
-      const index = drill.indexOf(needle);
-      expect({ needle, found: index >= 0 }).toEqual({ needle, found: true });
-      return index;
-    };
+    const at = (needle: string): number => positionOf(drill, needle);
     const steps = [
       "--synthetic --seed",
       'pg_dump --format=plain --dbname="${STAGING_DATABASE_URL}" > "${WORK}/pre-erasure.sql"',
@@ -325,30 +498,20 @@ describe("the deploy tree (T-005)", () => {
     expect(drill).toContain("the seed added no commit");
   });
 
-  it("fails the drill when the rehearsal's seed exits anything but the 3 that means not built", () => {
+  it("fails the drill unless the seed exits 0 or 3", () => {
     const drill = read("deploy/restore-drill.sh");
 
-    const opened = drill.split(">>> seed status")[1];
-    const guard = opened?.slice(opened.indexOf("\n") + 1).split("# <<< seed status")[0];
+    const guard = fencedIn(drill, "seed status");
     expect({ markers: guard !== undefined }).toEqual({ markers: true });
 
-    const ran = (status: number): { readonly code: number; readonly output: string } => {
-      const script = [
-        "set -euo pipefail",
+    const ran = (status: number): BashRun =>
+      bashRan([
         "NOT_BUILT=3",
         'DRILL_WORKSPACE="a-workspace"',
-        'say() { printf "%s\\n" "$*"; }',
         `platform() { printf 'priya@example.invalid,1 High St,Priya Anand\\n'; return ${String(status)}; }`,
         guard ?? "",
         'say "the proof ran, subject=${subject}"',
-      ].join("\n");
-      try {
-        return { code: 0, output: execFileSync("bash", ["-c", script], { encoding: "utf8" }) };
-      } catch (thrown) {
-        const failed: { status?: number; stdout?: string } = thrown ?? {};
-        return { code: failed.status ?? -1, output: failed.stdout ?? "" };
-      }
-    };
+      ]);
 
     const seeded = ran(0);
     expect({ code: seeded.code, proved: seeded.output.includes("the proof ran") }).toEqual({
@@ -369,7 +532,43 @@ describe("the deploy tree (T-005)", () => {
     });
   });
 
-  it("prunes the mirror after a --mirror push that replaced refs, and only then", () => {
+  it("fails the drill when no pre-erasure chunk holds the subject", () => {
+    const drill = read("deploy/restore-drill.sh");
+
+    const check = fencedIn(drill, "found before");
+    expect({ markers: check !== undefined }).toEqual({ markers: true });
+
+    const ran = (grepped: readonly string[]): BashRun =>
+      bashRan(
+        [
+          'WORK="$(mktemp -d)"',
+          'cat > "${WORK}/pre-erasure.grep"',
+          check ?? "",
+          'say "the erasure ran"',
+        ],
+        `${grepped.join("\n")}\n`,
+      );
+
+    const inAChunk = ran([
+      "subj…st: present in 1 line(s) of table public.user",
+      'subj…st: present in 1 line(s) of table index."chunk_01K5ZQ8WJ6T3M4N7P9R2S0V1X"',
+    ]);
+    const inNoChunk = ran(["subj…st: present in 1 line(s) of table public.user"]);
+    const inNoTable = ran(["subj…st: absent"]);
+
+    expect(inAChunk).toEqual({ code: 0, output: "the erasure ran\n" });
+    expect(inNoChunk).toEqual({
+      code: 1,
+      output:
+        "REHEARSAL FAILED: the seeded subject is in no chunk of the pre-erasure dump, so the dump grep after would prove nothing of the index\n",
+    });
+    expect(inNoTable).toEqual({
+      code: 1,
+      output: "REHEARSAL FAILED: the seeded subject is in no table of the pre-erasure dump\n",
+    });
+  });
+
+  it("prunes the mirror only after a push that replaced refs", () => {
     const backup = read("deploy/backup.sh");
     expect(backup).toContain("push --mirror --porcelain");
     expect(backup).not.toContain("push --mirror --quiet");
@@ -377,7 +576,7 @@ describe("the deploy tree (T-005)", () => {
     expect(backup).toContain('prune-repo "${ws}"');
   });
 
-  it("lets the mirror key run init-repo, git-receive-pack and prune-repo, and nothing else", () => {
+  it("lets the mirror key run init-repo, git-receive-pack and prune-repo only", () => {
     const shell = read("deploy/mirror-shell.sh");
     expect(shell).toContain('"init-repo "*)');
     expect(shell).toContain('"git-receive-pack "*)');
@@ -396,14 +595,14 @@ describe("the deploy tree (T-005)", () => {
     expect(read("deploy/backup.sh")).toContain("init-repo");
   });
 
-  it("matches each promoted digest on its own through env, and carries Q7's switch", () => {
+  it("matches each digest alone through env, with the client-data switch", () => {
     const release = read(".github/workflows/release.yml");
     expect(release).toContain("^sha256:[0-9a-f]{64}$");
     expect(release).toMatch(
       /env:\n\s+API_DIGEST: \$\{\{ steps\.d\.outputs\.api \}\}\n\s+WORKER_DIGEST: \$\{\{ steps\.d\.outputs\.worker \}\}/,
     );
 
-    // Every workflow expression is a binding, never a token spliced into a shell line.
+    /** Every workflow expression is a binding, never a token spliced into a shell line. */
     const spliced = release
       .split("\n")
       .map((line) => line.trim())
@@ -414,7 +613,7 @@ describe("the deploy tree (T-005)", () => {
     expect(release).toContain("CLIENT_DATA_ON_BOX");
   });
 
-  it("records a promotion as one annotated release tag, pushes no branch, and smokes after it", () => {
+  it("tags each promotion once, pushes no branch, and smokes afterwards", () => {
     const release = read(".github/workflows/release.yml");
 
     // The record is a tag and nothing else: `main` is merge-queue-only, so a push to it
@@ -432,9 +631,11 @@ describe("the deploy tree (T-005)", () => {
     expect(release).not.toContain("HEAD:main");
     expect(release).not.toContain("git commit");
 
-    // Against the tag's own message, not the step: the step summary echoes four of these
-    // and would satisfy a message that carried none of them.
     const record = stepNamed(release, "record the promotion");
+    /**
+     * Against the tag's own message, not the step: the step summary echoes four of these and would
+     * satisfy a message that carried none of them.
+     */
     const message = /message="\$\(printf[\s\S]*?\)"/.exec(record)?.[0] ?? "";
     expect(message).not.toEqual("");
     for (const field of [
@@ -449,16 +650,16 @@ describe("the deploy tree (T-005)", () => {
       expect(message).toContain(field);
     }
 
-    // The smoke follows the record, so a promotion whose smoke fails still has its tag.
     const stepAt = (name: string): number => {
       const index = release.indexOf(`- name: ${name}`);
       expect(index).toBeGreaterThan(-1);
       return index;
     };
+    // The smoke follows the record, so a promotion whose smoke fails still has its tag.
     expect(stepAt("record the promotion")).toBeLessThan(stepAt("post-deploy smoke"));
   });
 
-  it("smokes until /health names the api digest this release resolved, and reads discovery after it", () => {
+  it("smokes until /health names this release's digest, then reads discovery", () => {
     const smoke = stepNamed(read(".github/workflows/release.yml"), "post-deploy smoke");
 
     expect(smoke).toMatch(/env:\n\s+API_DIGEST: \$\{\{ steps\.d\.outputs\.api \}\}\n/);
@@ -466,14 +667,17 @@ describe("the deploy tree (T-005)", () => {
     expect(waits).toBeGreaterThan(-1);
     expect(smoke.indexOf("/.well-known/oauth-protected-resource/mcp")).toBeGreaterThan(waits);
 
-    // The build being replaced answers 200 until the swap, so a request that reads the status alone passes on it.
+    /**
+     * The build being replaced answers 200 until the swap, so a request that reads the status alone
+     * passes on it.
+     */
     const readsTheStatusAlone = smoke
       .split("\n")
       .filter((line) => line.includes("curl") && line.includes("/health"));
     expect(readsTheStatusAlone).toEqual([]);
   });
 
-  it("waits out the pull it was sized against, and gives up inside the job's timeout", () => {
+  it("waits out the pull, within the job's timeout", () => {
     const script = read("deploy/await-release.sh");
     const polls = Number(/AWAIT_RELEASE_POLLS:-(\d+)/.exec(script)?.[1]);
     const delaySeconds = Number(/AWAIT_RELEASE_DELAY_SECONDS:-(\d+)/.exec(script)?.[1]);
@@ -487,7 +691,7 @@ describe("the deploy tree (T-005)", () => {
     expect(polls * pollSeconds + (polls - 1) * delaySeconds).toBeLessThan(jobMinutes * 60);
   });
 
-  it("says per digest whether the tag's commit resolved it or a rollback passed it in", () => {
+  it("says per digest whether it was resolved or passed in", () => {
     const record = stepNamed(read(".github/workflows/release.yml"), "record the promotion");
 
     // Four dispatch shapes, and the tag's message is true of each digest in all of them.
@@ -507,7 +711,7 @@ describe("the deploy tree (T-005)", () => {
     expect(points.filter((sentence) => sentence.includes("were passed in"))).toHaveLength(1);
   });
 
-  it("lets no workflow commit to a branch, which is what makes the record a tag", () => {
+  it("lets no workflow commit to a branch", () => {
     const workflows = readdirSync(path.join(repositoryRoot, ".github/workflows"))
       .filter((file) => file.endsWith(".yml"))
       .sort();
@@ -523,7 +727,7 @@ describe("the deploy tree (T-005)", () => {
     expect(writes).toEqual(['release.yml: git push origin "refs/tags/${tag}"']);
   });
 
-  it("freezes RELEASES.md at the rows it holds and points every later promotion at its tag", () => {
+  it("freezes RELEASES.md and points later promotions at their tags", () => {
     const releases = read("deploy/RELEASES.md");
     expect(releases).toContain("| When (UTC) | By | api | worker | Rode on |");
     expect(releases).toContain("release/<UTC stamp>-<short commit>");
@@ -533,18 +737,17 @@ describe("the deploy tree (T-005)", () => {
     expect(releases).toContain("Access debt recorded 04/09/2026");
     expect(releases).toContain('git push origin "refs/tags/${tag}"');
 
-    // Nothing appends to the table again, so its last row stays the last promotion in it.
     const rows = releases.split("\n").filter((line) => /^\| 20\d\d-/.test(line));
+    // Nothing appends to the table again, so its last row stays the last promotion in it.
     expect(rows.at(-1)).toContain("2026-09-23T04:26:58Z");
     expect(read(".github/workflows/release.yml")).not.toContain("deploy/RELEASES.md");
 
-    // The rollback reads the tags, and says with which command.
     const runbook = read(`${operationsDocuments}/RUNBOOK.md`);
     expect(runbook).toContain("git tag --list 'release/*' --sort=-creatordate");
     expect(runbook).toContain("release/*` tags (failed, rolled back to)");
   });
 
-  it("promotes the image of main's head commit, and refuses by name when that commit has none", () => {
+  it("promotes main's head image, and refuses by name without one", () => {
     const release = read(".github/workflows/release.yml");
     const build = read(".github/workflows/build.yml");
 
@@ -563,7 +766,7 @@ describe("the deploy tree (T-005)", () => {
     expect(read("deploy/RELEASES.md")).toContain("`sha-<short>`");
   });
 
-  it("annotates every version an image fetches by name, so Renovate's custom manager reads it", () => {
+  it("annotates every version an image fetches for Renovate to read", () => {
     const renovate = renovateSchema.parse(JSON.parse(read("renovate.json")));
     const manager = renovate.customManagers.find((candidate) => candidate.customType === "regex");
 
@@ -585,8 +788,8 @@ describe("the deploy tree (T-005)", () => {
       selects.some((pattern) => pattern.test(file))
         ? (manager?.matchStrings ?? []).flatMap((matchString) =>
             [...read(file).matchAll(new RegExp(matchString, "g"))].map((match) => ({
-              pin: `${file}: ${/ARG (\w+_VERSION)=/.exec(match[0])?.[1] ?? ""}=${match.groups?.["currentValue"] ?? ""}`,
-              from: `${match.groups?.["datasource"] ?? ""} ${match.groups?.["depName"] ?? ""}`,
+              pin: `${file}: ${/ARG (\w+_VERSION)=/.exec(match[0])?.[1] ?? ""}=${groupOf(match, "currentValue")}`,
+              from: `${groupOf(match, "datasource")} ${groupOf(match, "depName")}`,
             })),
           )
         : [],
@@ -607,13 +810,13 @@ describe("the deploy tree (T-005)", () => {
     ]);
   });
 
-  it("has no staging job in build.yml: staging is brought up by the drill procedure", () => {
+  it("leaves staging to the drill, with no build.yml job", () => {
     const build = read(".github/workflows/build.yml");
     expect(build).not.toMatch(/^\s+staging:\s*$/m);
     expect(build).not.toContain("COOLIFY_STAGING_APP_UUID");
   });
 
-  it("names the api's own fence beside the tunnel's rules, one rule per hostname role, and the two uptime paths", () => {
+  it("names the api fence, hostname roles and both uptime paths", () => {
     const coolify = read(`${operationsDocuments}/coolify.md`);
     expect(coolify).toContain("apps/api/src/ingress/hostnames.ts");
     const unnamedRoles = ["app", "agent", "apex"].filter(
@@ -626,7 +829,7 @@ describe("the deploy tree (T-005)", () => {
     expect(coolify).not.toMatch(/\bmcp\.\b/);
   });
 
-  it("says where the backup identity lives and what a VPC 2 compromise means, in both files", () => {
+  it("documents the backup identity's home and a VPC 2 compromise", () => {
     const silent = [
       `${operationsDocuments}/SECRETS.md`,
       `${operationsDocuments}/RUNBOOK.md`,

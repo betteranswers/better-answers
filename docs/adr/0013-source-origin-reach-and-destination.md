@@ -115,3 +115,19 @@ Ruled by the owner on 24/09/2026, at the review of the class an Admin types at t
 Not ruled, so left as it is: whether choosing Public needs a confirmation of its own at the publish. Internal and Public read identically today.
 
 Everything else in this ADR and its amendments stands.
+
+## Amendment — 2026-09-24, an Admin widens a binding by a recorded act that cascades (T-371)
+
+Ruled by the owner on 24/09/2026, at the same review: widening is built before C1 rather than left to S4.
+
+**No act widened a binding.** `narrowBinding` and `narrowDocuments` refuse `widening-refused`, so an Admin who published at the safe default, Restricted, could open the binding to members only by binding the file again. That was a one-way door, placed where the platform steers Admins.
+
+**`widenBinding` is the one road by which a binding's class widens.** It is an Admin-only act in the `sources` slice. It moves a binding, published or not, to a wider class, a wider audience or both. In its own transaction it writes `sources.binding.widened`, whose row carries `bindingId`, the class and audience the binding moved from (`fromSensitivity`, `fromAudience`) and the pair it moved to (`sensitivity`, `audience`), in the form the publish's row uses: the audience word and not the group ids, because a detail field holds no list. It then runs the cascade the narrowing and the publish run, so every concept citing the binding's documents and every composition including one moves with it. An unpublished binding still derives as Restricted, and its publish releases the widened class.
+
+**It refuses in words.** `role-forbids`; `no-such-binding`; `no-such-group` for a group the workspace does not hold; `not-wider` for a request that widens no term or narrows any; and `special-category-unreviewed`. The last is this ADR's widening block of 27/08, read by an act for the first time: a binding does not widen while it holds a special-category finding that its last run raised and no Admin has reviewed. A dismissed finding counts as reviewed, as the T-220 amendment above says.
+
+**A document's own class still wins.** The derivation reads the narrower of the binding's class and the document's, so a widening never moves a document that the seam's special-category verdict or an Admin's narrowing holds narrower, and the concepts citing it stay where the document holds them. The act writes no document row.
+
+Not ruled, so left open for S4: for a connector indexed on every run, whether a widening after the publish must first review the findings raised since then. C1 binds uploads only.
+
+Everything else in this ADR and its amendments stands.

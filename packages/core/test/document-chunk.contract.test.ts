@@ -71,14 +71,14 @@ const fixtureSchema = z.object({
 const fixture = contractFixture("document-chunk", fixtureSchema);
 const { document } = fixture;
 
-describe("the chunk id the fixture derives from a document and an ordinal", () => {
-  it("derives the id the agreement names, for every document and ordinal it names one for", () => {
+describe("the chunk id derived from a document and an ordinal", () => {
+  it("derives the id the agreement names for each case", () => {
     for (const { source_document_id, ordinal, id } of fixture.chunk_id.cases) {
       expect({ ordinal, id: chunkIdOf(source_document_id, ordinal) }).toEqual({ ordinal, id });
     }
   });
 
-  it("derives the id every chunk row of the fixture's document already carries", () => {
+  it("derives the id each of the document's chunk rows carries", () => {
     for (const row of document.chunks) {
       expect({
         ordinal: row.ordinal,
@@ -87,13 +87,13 @@ describe("the chunk id the fixture derives from a document and an ordinal", () =
     }
   });
 
-  it("pads the ordinal so a document's chunks sort by it as text, in the order the splitter cut them", () => {
+  it("pads the ordinal so ids sort in the splitter's order", () => {
     const ids = document.chunks.map((row) => chunkIdOf(document.source_document_id, row.ordinal));
 
     expect(ids).toEqual(ids.toSorted());
   });
 
-  it("derives an id in the fixture's shape, and never one this tier would take for a minted id", () => {
+  it("derives ids in the agreed shape, never a minted one", () => {
     const pattern = new RegExp(fixture.chunk_id.pattern);
 
     for (const { source_document_id, id } of fixture.chunk_id.cases) {
@@ -108,7 +108,7 @@ describe("the chunk id the fixture derives from a document and an ordinal", () =
 });
 
 describe("the wire locator", () => {
-  it("reads the document and the span out of every locator the agreement says parses", () => {
+  it("reads the document and span from every locator that parses", () => {
     for (const { wire, source_document_id, char_start, char_end } of fixture.locator.must_parse) {
       const parsed = parseLocator(wire);
 
@@ -119,7 +119,7 @@ describe("the wire locator", () => {
     }
   });
 
-  it("refuses every malformed locator with the one word a withheld passage answers to", () => {
+  it("answers a malformed locator as it answers a withheld passage", () => {
     for (const { wire, why } of fixture.locator.must_not_parse) {
       const parsed = parseLocator(wire);
 
@@ -130,7 +130,7 @@ describe("the wire locator", () => {
     }
   });
 
-  it("reads a chunk row's own locator back to the span that row carries in two columns", () => {
+  it("reads each chunk row's locator back to the row's span", () => {
     for (const row of document.chunks) {
       const parsed = parseLocator(row.locator);
 
@@ -147,7 +147,7 @@ describe("the wire locator", () => {
 });
 
 describe("the normalised text the offsets are counted in", () => {
-  it("is longer in UTF-16 units than in code points, which is the whole reason this file exists", () => {
+  it("is longer in UTF-16 units than in code points", () => {
     expect({
       codePoints: Array.from(document.normalised_text).length,
       utf16Units: document.normalised_text.length,
@@ -155,14 +155,14 @@ describe("the normalised text the offsets are counted in", () => {
     expect(document.utf16_units).toBeGreaterThan(document.code_points);
   });
 
-  it("carries the astral character the agreement names, at the code point it names", () => {
+  it("carries the named astral character at the named code point", () => {
     expect(Array.from(document.normalised_text)[document.astral.at]).toBe(
       document.astral.character,
     );
     expect(document.astral.character.length).toBe(document.astral.utf16_units);
   });
 
-  it("is partitioned by its chunk rows, so a span straddling two of them has one answer", () => {
+  it("is partitioned by its chunk rows", () => {
     let at = 0;
     for (const row of document.chunks) {
       expect({ ordinal: row.ordinal, start: row.char_start }).toEqual({
@@ -179,7 +179,7 @@ describe("the normalised text the offsets are counted in", () => {
 });
 
 describe("the passage a locator opens", () => {
-  it("cuts the span the agreement names out of the text, for every locator it answers a passage to", () => {
+  it("cuts the agreed passage from the text for each locator", () => {
     for (const answered of fixture.open.filter((each) => each.expect === "passage")) {
       const parsed = parseLocator(answered.wire);
       const passage = parsed.ok ? spanText(document.normalised_text, parsed.value) : parsed;
@@ -191,7 +191,7 @@ describe("the passage a locator opens", () => {
     }
   });
 
-  it("cuts by code points, where this tier's own slice would take the wrong characters", () => {
+  it("cuts by code points, where a UTF-16 slice goes wrong", () => {
     const cited = fixture.open.filter(
       (each) => each.expect === "passage" && each.passage !== undefined,
     );
@@ -210,7 +210,7 @@ describe("the passage a locator opens", () => {
     }
   });
 
-  it("names the rows a passage is cut from, and they are the rows whose spans it overlaps", () => {
+  it("covers exactly the chunk rows its span overlaps", () => {
     for (const answered of fixture.open.filter((each) => each.covers_ordinals !== undefined)) {
       const parsed = parseLocator(answered.wire);
 
@@ -228,7 +228,7 @@ describe("the passage a locator opens", () => {
     }
   });
 
-  it("answers not found to a malformed locator at the parser, before anything is read", () => {
+  it("answers not found to a malformed locator before any read", () => {
     const atTheParser = fixture.open.filter((each) => each.refused_by === "the parser");
 
     expect(atTheParser.length).toBeGreaterThan(0);
@@ -242,7 +242,7 @@ describe("the passage a locator opens", () => {
     }
   });
 
-  it("leaves a well-shaped locator for the read to refuse, and never guesses at the parser", () => {
+  it("leaves a well-shaped locator for the read to refuse", () => {
     const atTheRead = fixture.open.filter((each) => each.refused_by === "the read");
 
     expect(atTheRead.length).toBeGreaterThan(0);

@@ -1,6 +1,6 @@
 # Deployment — two boxes, two stacks, one tunnel
 
-The estate ADRs 0022 and 0024 fix: two IONOS boxes of 4 vCPU · 4 GB · 120 GB NVMe, production on one, Coolify and the mirror on the other, every image deployed by digest, every irreplaceable byte encrypted off-host. The files are `deploy/stores.compose.yaml`, `deploy/platform.compose.yaml` and, for staging only, `deploy/staging.override.yaml`; the release is `.github/workflows/release.yml`; the operations documents are under `docs/operations/`. What runs on a schedule and who watches it is `c4-dynamic-scheduled-work.md`.
+The estate ADRs 0022 and 0024 fix: two IONOS boxes of 4 vCPU · 4 GB · 120 GB NVMe, production on one, Coolify and the mirror on the other, every image deployed by digest, every irreplaceable byte encrypted off-host. The files are `deploy/stores.compose.yaml`, `deploy/platform.compose.yaml` and, for staging only, `deploy/staging.override.yaml` and `deploy/staging.platform.override.yaml`; the release is `.github/workflows/release.yml`; the operations documents are under `docs/operations/`. What runs on a schedule and who watches it is `c4-dynamic-scheduled-work.md`.
 
 ```mermaid
 C4Deployment
@@ -35,7 +35,7 @@ C4Deployment
   Deployment_Node(vpc2, "VPC 2", "IONOS VPS, 4 GB", "Coolify, the mirror, two host crons, a restore target that exists only during a drill") {
     Container(coolify, "Coolify", "pinned, auto-update off", "Deploys VPC 1 over SSH on a PATCHed digest and a deploy call")
     ContainerDb(mirror, "Git mirror", "/data/mirror, SSH", "The push mirror of every bare repository, nightly")
-    Container(staging, "Restore target", "the two compose files and staging.override.yaml, on demand", "restore-drill.sh by host cron at 03:00 on the 1st: restored, erasures replayed, smoke-tested, wiped and re-seeded")
+    Container(staging, "Restore target", "the two compose files and their two staging overrides, on demand", "restore-drill.sh by host cron at 03:00 on the 1st: restored, erasures replayed, smoke-tested, wiped and re-seeded; its two projects meet on the better-answers-staging-shared network")
     Container(probe, "uptime-probe.sh", "host cron, every 5 min, Free plan", "Two paths on app. through the public edge; its own silence covers VPC 2")
   }
 
@@ -78,7 +78,7 @@ C4Deployment
 - **Three product hostnames, not four, and none behind Access.** `app.` carries the SPA, sign-in, consent, `/oauth2/*`, discovery, `/jwks` and `/mcp`; `agent.` is routed only to `/agent/v1/*`, unbuilt; the apex answers 404. `mcp.` is gone and `docs.` struck (ADR 0034; ADR 0022, amended 2026-09-03). The api derives `app.` from `PUBLIC_URL` and refuses to start unless all three differ. Cloudflare Access guards only the orchestrator's API the release calls; its hostname is estate configuration, in the private file.
 - **What is never backed up**: every per-binding LMDB store (disposable, rebuilt by the next run), the worker's working trees and caches. The graph rides every dump and every restore as ordinary tables (ADR 0032).
 - **Every dump is a personal-data copy**, so every restore replays the erasures completed after the dump before `api` turns healthy — `pnpm ops replay-erasures --since <dump>`, step 5 of `restore-drill.sh` and step 6 of `restore-production.sh` — and the erasure report's dates are computed from the last dump before the rewrite (ADRs 0020, 0022).
-- **Staging is the same two compose files plus one override.** `staging.override.yaml` publishes the object store's S3 port on the loopback, because the drill runs on the host; nothing else differs, and staging stands only for a drill or a rehearsal (ADR 0024).
+- **Staging is the same two compose files plus an override each.** In production Coolify puts every service on its shared `coolify` network, which is how `api` and `worker` resolve the stores stack's `objectstore`. Staging runs under plain `docker compose` with nothing in Coolify's place, so `staging.override.yaml` puts `objectstore` on the external network `better-answers-staging-shared` under that alias, and `staging.platform.override.yaml` puts `migrate`, `api` and `worker` on it too. `restore-drill.sh` creates the network before either project starts, internal so that every service keeps its route out on its own project's network. `staging.override.yaml` also publishes the S3 port on the loopback, because the drill runs on the host. Nothing else differs, and staging stands only for a drill or a rehearsal (ADR 0024).
 - **The growth steps are named**: A — split the stores to VPC 2 over WireGuard if the swap-in rate during the first index says so; E — a third contract, brought forward to the day a workspace asks for local embedding (ADR 0024).
 
 ## Memory on VPC 1

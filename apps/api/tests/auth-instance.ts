@@ -6,6 +6,10 @@ import { AUTH_SECRET, doorsFor, MCP_URL, PUBLIC_URL } from "./harness.ts";
 
 type BuiltAuth = { readonly auth: ReturnType<typeof createAuth>; readonly database: Pool };
 
+/**
+ * Over a pool that reaches no database, so fit for reading the instance's shape alone. The caller
+ * ends `database`.
+ */
 export const authAsServerBuildsIt = (): BuiltAuth => {
   const doors = doorsFor("postgresql://unused@127.0.0.1:1/unused");
   const database = doors.postgres.pool;

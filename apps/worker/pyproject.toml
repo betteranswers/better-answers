@@ -191,7 +191,13 @@ target-version = "py313"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF", "ANN", "T20", "TID251"]
+select = [
+    "E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF", "ANN", "T20", "TID251",
+    "PGH003", "PGH004", "FIX001", "FIX002", "FIX003", "FIX004", "RUF100", "C901",
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 8
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 # The other half of the conftest guard: the guard wraps the `monkeypatch` fixture, and

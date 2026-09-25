@@ -95,7 +95,8 @@ STAGING_OBJECTSTORE_ROOT_SECRET=
 STAGING_S3_BUCKET=better-answers
 # Named by the database resource's UUID, not its display name. No Postgres port is open to the internet.
 PROD_PSQL="ssh -o BatchMode=yes root@${prod_host:-<VPC1 IP>} docker exec -i <pg-resource-uuid> psql -U postgres -d better_answers"
-DRILL_WORKSPACE=
+# The synthetic fixture's workspace (seed-synthetic.sh --workspace-id), which the drill seeds into every restored copy; a production workspace's id drills that one instead.
+DRILL_WORKSPACE=01M2SYNTHET1CAAAAAAAAAAAAA
 HEALTHCHECKS_PING_URL_DRILL=
 HEALTHCHECKS_PING_URL_STAGING_WIPED=
 # The write-and-list credential: the report upload is the one write the drill makes.

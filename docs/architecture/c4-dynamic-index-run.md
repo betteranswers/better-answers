@@ -14,7 +14,7 @@ C4Dynamic
     Component(landed, "landed.py — landed", "coco.fn, unmemoised, one component per document", "Converts, asks for spans, redacts, splits into chunks")
     Component(converter, "converter.py", "anydoc 0.2.4, pdf-inspector 1.24.0", "docx and PDF to normalised text, text passed through; UnreadableError otherwise")
     Component(detected, "detected.py — detected", "coco.fn, memo=True, version 1", "Spans for one normalised text under one detection key")
-    Component(redaction, "redaction/", "Presidio, GLiNER, spaCy", "spans_detected; redact — the block rule, pseudonyms, withholdings, written spans")
+    Component(redaction, "redaction/", "Presidio, GLiNER, spaCy", "spans_detected; redact — the block rule, erasure matches, pseudonyms, withholdings, written spans")
     Component(rows, "rows.py and host.land_rows", "cocoindex chunks app, managed_by user", "index.chunk rows keyed by document and ordinal")
   }
 
@@ -25,7 +25,7 @@ C4Dynamic
   Rel(loop, postgres, "1. claim_job for nightly-audit, full-rebuild and index; a lease kept alive by heartbeat", "SKIP LOCKED")
   Rel(loop, run, "2. KINDS[index] calls index_binding with the workspace, the binding and the reason")
   Rel(run, lmdb, "3. Reason wiped or rule-change: removes binding/ before anything else; findings/ is spared")
-  Rel(catalogue, postgres, "4. read_binding: the rules in force; each document not gone, with its suppressions, restores and dismissals", "psycopg, SET app.workspace_id")
+  Rel(catalogue, postgres, "4. read_binding: the rules in force; the workspace's suppressions; each document not gone, with its restores and dismissals", "psycopg, SET app.workspace_id")
   Rel(landed, objects, "5. Reads each original", "boto3")
   Rel(landed, converter, "6. Counts pages, then converts, outside every memo; an unreadable document, or one past its ceiling, is quarantined")
   Rel(landed, detected, "7. Asks for the spans of the normalised text under the detection key")
@@ -47,4 +47,4 @@ C4Dynamic
 - **A document's class is on its row before any chunk of it lands.** Step 12 commits before step 13: the seam's special-category verdict only narrows the document, through `narrower_class`, and a verdict every one of whose findings an Admin dismissed is lifted back to the Admin's own narrowing or the binding's class (ADR 0044). No chunk row carries visibility.
 - **Quarantine is an outcome, never a failure.** A page with no text layer, an encrypted file, a truncated upload, a type with no converter and a conversion past its ceiling — 6,453 ms a page plus 93 s — all land as *quarantined* with a *quarantine error* naming what refused it; the run lands the binding's other documents and finishes (`CONTEXT.md`, *quarantined*).
 - **Emptying a binding is two halves.** The act that queued a `wiped` or `rule-change` run deleted the binding's chunk rows in its own transaction; step 3 removes `binding/`, the engine's record of what it landed, so step 13 lands every row again (the `emptying-a-binding` agreement).
-- **An erasure outranks an Admin's keep.** A suppression names identifiers the seam withholds in its document whatever the review said, and a kept span it names is *overridden by the erasure* and counted in the outcome. Today a suppression names one document, written from the erasure map, whose `source-document` finder answers none. **Planned** (T-366): a workspace-wide suppression the seam applies by exact case-folded match of the subject's identifiers — emails, names, other.
+- **An erasure outranks an Admin's keep.** A suppression names identifiers the seam withholds whatever the review said, and a kept span it names is *overridden by the erasure* and counted in the outcome. Since T-375 a suppression is the workspace's, one row per request, read for every document; since T-376 the seam withholds every exact, case-folded occurrence of its identifiers, detected or not, as an erasure match: always tier, no finding row, no review and no keep that releases it.

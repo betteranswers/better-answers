@@ -43,7 +43,7 @@ const CONFIRMED = {
 
 describe("one uploaded document, read back over the MCP surface", () => {
   it(
-    "answers the find and open tools with the passage the worker landed, the sort code withheld",
+    "finds and opens the landed passage, its sort code withheld",
     async () => {
       const workspace = await app.provision();
       const viewer = await app.person();

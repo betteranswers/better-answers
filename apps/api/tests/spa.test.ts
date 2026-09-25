@@ -6,10 +6,10 @@ import { servedApp } from "./suite-app.ts";
 
 const asABrowserNavigates = { headers: { accept: "text/html,application/xhtml+xml" } };
 
-describe("the api serves the shell on app. (ADR 0006)", () => {
+describe("the api serves the shell on app.", () => {
   const app = servedApp();
 
-  it("answers a screen's address with the shell, so a bookmark opens the product", async () => {
+  it("answers a screen's address with the shell, so bookmarks work", async () => {
     const response = await app()
       .client(undefined, APP_HOSTNAME)
       .fetch("/system", asABrowserNavigates);
@@ -26,7 +26,7 @@ describe("the api serves the shell on app. (ADR 0006)", () => {
     await expect(response.text()).resolves.toContain(`<div id="root">`);
   });
 
-  it("refuses to be framed by another site — sign-in and the picker as much as any screen", async () => {
+  it("refuses framing by another site on every screen, sign-in included", async () => {
     for (const screen of ["/sign-in", "/choose-workspace", "/system", "/"]) {
       const response = await app()
         .client(undefined, APP_HOSTNAME)
@@ -46,7 +46,7 @@ describe("the api serves the shell on app. (ADR 0006)", () => {
     await expect(response.text()).resolves.toContain("the screen");
   });
 
-  it("does not answer a missing asset with the shell, which would be an unreadable script error", async () => {
+  it("answers a missing asset with 404, not the shell", async () => {
     const response = await app()
       .client(undefined, APP_HOSTNAME)
       .fetch("/assets/gone.js", asABrowserNavigates);
@@ -55,7 +55,7 @@ describe("the api serves the shell on app. (ADR 0006)", () => {
     await expect(response.text()).resolves.not.toContain(`<div id="root">`);
   });
 
-  it("leaves the health check answering the health check, not the shell", async () => {
+  it("leaves the health check answering itself, not the shell", async () => {
     const response = await app()
       .client(undefined, APP_HOSTNAME)
       .fetch("/health", asABrowserNavigates);
@@ -70,7 +70,7 @@ describe("the api serves the shell on app. (ADR 0006)", () => {
     expect(response.headers.get("content-type")).not.toContain("text/html");
   });
 
-  it("leaves the product's own transport answering on app., not the shell", async () => {
+  it("leaves the product's transport answering on app., not the shell", async () => {
     const response = await app()
       .client(undefined, APP_HOSTNAME)
       .fetch(`${TRPC_ENDPOINT}/routes.list`, asABrowserNavigates);
@@ -79,7 +79,7 @@ describe("the api serves the shell on app. (ADR 0006)", () => {
     await expect(response.text()).resolves.not.toContain(`<div id="root">`);
   });
 
-  it("answers a screen's address on a hostname the fence spells with a trailing dot", async () => {
+  it("answers a screen's address on a trailing-dot hostname", async () => {
     const response = await app().server.request(
       new Request(`https://${APP_HOSTNAME}./system`, asABrowserNavigates),
     );
@@ -88,7 +88,7 @@ describe("the api serves the shell on app. (ADR 0006)", () => {
     await expect(response.text()).resolves.toContain(`<div id="root">`);
   });
 
-  it("serves the shell on app. and nowhere else, so agent. and the apex are unchanged", async () => {
+  it("serves the shell on app. only, never agent. or apex", async () => {
     for (const hostname of [AGENT_HOSTNAME, APEX_HOSTNAME]) {
       const response = await app()
         .client(undefined, hostname)
@@ -99,7 +99,7 @@ describe("the api serves the shell on app. (ADR 0006)", () => {
     }
   });
 
-  it("leaves the protected-resource document answering as itself on app., not as the shell", async () => {
+  it("leaves the protected-resource document answering as itself on app.", async () => {
     const response = await app()
       .client(undefined, APP_HOSTNAME)
       .fetch("/.well-known/oauth-protected-resource", asABrowserNavigates);

@@ -1,3 +1,4 @@
+/** `--name value` pairs, keyed by `name`; undefined when any argument breaks the pairing. */
 export const flagValues = (argv: readonly string[]): ReadonlyMap<string, string> | undefined => {
   const values = new Map<string, string>();
   for (let index = 0; index < argv.length; index += 2) {

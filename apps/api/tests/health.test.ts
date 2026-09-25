@@ -17,7 +17,7 @@ describe("the api's health endpoint", () => {
     await app.stop();
   });
 
-  it("tells the deploy unit the api is healthy while the platform database answers", async () => {
+  it("reports healthy while the platform database answers", async () => {
     const response = await app.server.request("/health");
 
     expect(response.status).toBe(200);
@@ -27,7 +27,7 @@ describe("the api's health endpoint", () => {
     });
   });
 
-  it("names the image the api was started from, so a release can tell the build it promoted is the one answering", async () => {
+  it("names its image, so a release sees the promoted build", async () => {
     const server = serverFor(app.database.pool, { imageDigest: PROMOTED });
 
     const response = await server.request("/health");
@@ -41,7 +41,7 @@ describe("the api's health endpoint", () => {
     });
   });
 
-  it("says no image was named when the api was started without one, rather than inventing a digest", async () => {
+  it("says no image was named rather than inventing a digest", async () => {
     const response = await app.server.request("/health");
 
     expect(response.status).toBe(200);
@@ -53,7 +53,7 @@ describe("the api's health endpoint", () => {
     });
   });
 
-  it("tells the deploy unit the api is unhealthy when the platform database cannot be reached, naming the image that is failing", async () => {
+  it("reports unhealthy, naming the image, when the database is unreachable", async () => {
     const unreachable = new Pool({
       connectionString: "postgresql://nobody@127.0.0.1:1/nothing",
       connectionTimeoutMillis: 1_000,
@@ -71,7 +71,7 @@ describe("the api's health endpoint", () => {
     await unreachable.end();
   });
 
-  it("tells the deploy unit the api is unhealthy when the database answers but the identity provider could not start", async () => {
+  it("reports unhealthy when the identity provider could not start", async () => {
     await app.database.superuser.query("DROP DATABASE IF EXISTS unmigrated");
     await app.database.superuser.query("CREATE DATABASE unmigrated");
     const connection = new URL(String(app.database.superuser.options.connectionString));

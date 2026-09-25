@@ -48,6 +48,8 @@ const SUB_PROCESSORS = new Map<string, { readonly processor: string; readonly co
   ["local", { processor: "no sub-processor", country: "the platform's own estate" }],
 ]);
 
+const UNNAMED_PROCESSOR = { processor: NOT_RECORDED, country: NOT_RECORDED };
+
 const EXCLUDED_PURPOSE: LlmPurpose = "embedding";
 
 type DpiaRoute = {
@@ -123,6 +125,10 @@ const canonical = (value: Canonical): string => {
   return JSON.stringify(value);
 };
 
+/**
+ * The hash is SHA-256, in hex, over the document's JSON with its keys sorted at every depth, so
+ * the same answers hash the same whatever order they were built in.
+ */
 export const dpiaInputFor = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -162,14 +168,14 @@ export const dpiaInputFor = async (
     routes: listed.value.flatMap((route) => {
       if (route.purpose === EXCLUDED_PURPOSE) return [];
       if (route.provider === null || route.model === null) return [];
-      const named = SUB_PROCESSORS.get(route.provider);
+      const named = SUB_PROCESSORS.get(route.provider) ?? UNNAMED_PROCESSOR;
       return [
         {
           purpose: route.purpose,
           provider: route.provider,
           model: route.model,
-          processor: named?.processor ?? NOT_RECORDED,
-          country: named?.country ?? NOT_RECORDED,
+          processor: named.processor,
+          country: named.country,
           retentionTail: route.retentionTail ?? NOT_RECORDED,
         },
       ];

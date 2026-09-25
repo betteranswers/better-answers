@@ -162,6 +162,31 @@ const contentsOf = (file: string): string | undefined =>
 
 const REFUSED = Symbol("the artifacts API refuses the token");
 
+// Answers the runs API as asked, lists `pages.json` as the artifacts API, and downloads a run's
+// checkpoint as one naming that run.
+const fakeGh = (
+  file: (name: string) => string,
+  answer: unknown,
+  runs: "answers" | "refuses",
+): string =>
+  [
+    "#!/bin/sh",
+    `printf '%s\\n' "$*" >> '${file("asked")}'`,
+    'case "$1 $2" in',
+    runs === "answers"
+      ? `  "api repos/${REPOSITORY}/actions/runs/${String(THIS_RUN)}") echo '${THIS_RUN_BEGAN}' ;;`
+      : `  "api repos/${REPOSITORY}/actions/runs/${String(THIS_RUN)}") echo 'HTTP 403' >&2; exit 1 ;;`,
+    answer === REFUSED
+      ? "  api*) echo 'HTTP 403: Resource not accessible by integration' >&2; exit 1 ;;"
+      : `  api*) cat '${file("pages.json")}' ;;`,
+    '  run*) run="$3"',
+    '    while [ "$#" -gt 0 ]; do [ "$1" = "--dir" ] && dir="$2"; shift; done',
+    '    mkdir -p "$dir"',
+    `    printf '{"uploadedBy":%s}' "$run" > "$dir/stryker-incremental.json" ;;`,
+    "esac",
+    "",
+  ].join("\n");
+
 const restoreAgainst = (
   answer: unknown,
   branch = "main",
@@ -174,29 +199,7 @@ const restoreAgainst = (
   try {
     writeFileSync(file("pages.json"), answer === REFUSED ? "" : JSON.stringify(answer));
     writeFileSync(file("asked"), "");
-    const listing =
-      answer === REFUSED
-        ? "echo 'HTTP 403: Resource not accessible by integration' >&2; exit 1"
-        : `cat '${file("pages.json")}'`;
-    writeFileSync(
-      file("gh"),
-      [
-        "#!/bin/sh",
-        `printf '%s\\n' "$*" >> '${file("asked")}'`,
-        'case "$1 $2" in',
-        runs === "answers"
-          ? `  "api repos/${REPOSITORY}/actions/runs/${String(THIS_RUN)}") echo '${THIS_RUN_BEGAN}' ;;`
-          : `  "api repos/${REPOSITORY}/actions/runs/${String(THIS_RUN)}") echo 'HTTP 403' >&2; exit 1 ;;`,
-        `  api*) ${listing} ;;`,
-        '  run*) run="$3"',
-        '    while [ "$#" -gt 0 ]; do [ "$1" = "--dir" ] && dir="$2"; shift; done',
-        '    mkdir -p "$dir"',
-        `    printf '{"uploadedBy":%s}' "$run" > "$dir/stryker-incremental.json" ;;`,
-        "esac",
-        "",
-      ].join("\n"),
-      { mode: 0o755 },
-    );
+    writeFileSync(file("gh"), fakeGh(file, answer, runs), { mode: 0o755 });
     const ran = spawnSync("bash", ["--noprofile", "--norc", "-e", "-c", step.run ?? ""], {
       encoding: "utf8",
       env: {
@@ -241,8 +244,8 @@ const configSchema = z.object({
   incrementalFile: z.string(),
 });
 
-describe("the nightly mutation run's baseline, kept as the previous run's artifact (T-229)", () => {
-  it("restores the newest checkpoint a run on main uploaded for this leg, into the file Stryker reads back and the summary compares against", () => {
+describe("the nightly mutation baseline, kept as the previous run's artifact", () => {
+  it("restores main's newest checkpoint for this leg, and the baseline", () => {
     const restored = restoreAgainst([
       page(EXPIRED_ON_MAIN, A_FORK_CALLING_ITS_BRANCH_MAIN, ANOTHER_BRANCH),
       page(NIGHT_BEFORE_LAST, LAST_NIGHT),
@@ -261,7 +264,7 @@ describe("the nightly mutation run's baseline, kept as the previous run's artifa
       left: "only an expired upload, a fork's pull request's and another branch's",
       pages: [page(EXPIRED_ON_MAIN, A_FORK_CALLING_ITS_BRANCH_MAIN, ANOTHER_BRANCH)],
     },
-  ])("tests every mutant, and stays green, when the runs before it left $left", ({ pages }) => {
+  ])("tests every mutant, staying green, when earlier runs left $left", ({ pages }) => {
     const restored = restoreAgainst(pages);
 
     expect(restored.status, `the step went red: ${restored.log}`).toBe(0);
@@ -271,7 +274,7 @@ describe("the nightly mutation run's baseline, kept as the previous run's artifa
     expect(restored.log).toContain("tests every mutant");
   });
 
-  it("starts a branch run from its own last checkpoint when that is newer than main's, and from main's when it is not", () => {
+  it("starts a branch run from whichever checkpoint is newer", () => {
     const ownIsNewer = restoreAgainst([page(ANOTHER_BRANCH, THIS_BRANCH, LAST_NIGHT)], "t-229");
     const mainIsNewer = restoreAgainst(
       [page({ ...THIS_BRANCH, createdAt: "2026-09-24T09:12:08Z" }, LAST_NIGHT)],
@@ -290,14 +293,14 @@ describe("the nightly mutation run's baseline, kept as the previous run's artifa
     ]);
   });
 
-  it("takes nothing uploaded after this run began, so every job of the run, a re-run's too, restores the same results", () => {
+  it("takes nothing uploaded after this run began", () => {
     const restored = restoreAgainst([page(LAST_NIGHT, AFTER_THIS_RUN_BEGAN)]);
 
     expect(restored.status, `the step went red: ${restored.log}`).toBe(0);
     expect(restored.asked).toEqual([BEGAN, LISTED, downloaded(35_970_714_712, restored.reports)]);
   });
 
-  it("goes red when the runs API will not say when this run began", () => {
+  it("goes red when the runs API hides this run's start", () => {
     const restored = restoreAgainst([page(LAST_NIGHT)], "main", "refuses");
 
     expect(restored.status).toBe(1);
@@ -322,7 +325,7 @@ describe("the nightly mutation run's baseline, kept as the previous run's artifa
     expect(restored.log).toContain(says);
   });
 
-  it("restores, in every shard and in the leg's summary, the artifact the summary uploads for that leg", () => {
+  it("reads each leg's checkpoint from the artifact its upload names", () => {
     const { stryker, summary } = mutationWorkflow().jobs;
     const restore = restoreStep();
     const shardRestore = onlyStep(stryker.steps, BASELINE_ACTION, "stryker");
@@ -338,7 +341,7 @@ describe("the nightly mutation run's baseline, kept as the previous run's artifa
     );
   });
 
-  it("hands each shard the whole leg's results in the file Stryker reads back, and gathers the file it writes whether or not it finished", () => {
+  it("hands each shard the leg's results, and gathers its own", () => {
     const { stryker } = mutationWorkflow().jobs;
     const gather = stepRunning(stryker.steps, "stryker-incremental.json", "stryker");
     const upload = onlyStep(stryker.steps, "actions/upload-artifact@", "stryker");
@@ -366,7 +369,7 @@ describe("the nightly mutation run's baseline, kept as the previous run's artifa
     }
   });
 
-  it("uploads the leg's merged results whether or not the leg went red, but never after a merge that failed", () => {
+  it("uploads a leg's merged results unless its merge failed", () => {
     const upload = onlyStep(
       mutationWorkflow().jobs.summary.steps,
       "actions/upload-artifact@",
@@ -379,20 +382,20 @@ describe("the nightly mutation run's baseline, kept as the previous run's artifa
     expect(upload.with?.["overwrite"]).toBe(true);
   });
 
-  it("holds a scheduled night to 120 minutes a shard, and a dispatched run to the minutes it names, as the number the timeout takes", () => {
+  it("caps a night at 120 minutes, a dispatch as asked", () => {
     expect(mutationWorkflow().jobs.stryker["timeout-minutes"]).toEqual(
       "${{ fromJSON(inputs.ceiling-minutes || '120') }}",
     );
   });
 
-  it("makes a run on a branch wait for the one before it, so it starts from the checkpoint that one leaves", () => {
+  it("queues a branch's runs, each starting from the last checkpoint", () => {
     expect(mutationWorkflow().concurrency).toEqual({
       group: "mutation-${{ github.ref }}",
       "cancel-in-progress": false,
     });
   });
 
-  it("asks for nothing beyond reading the tree and listing and downloading this repository's artifacts", () => {
+  it("asks only to read the tree and this repository's artifacts", () => {
     expect(mutationWorkflow().permissions).toEqual({ contents: "read", actions: "read" });
     expect(mutationWorkflow().jobs.stryker.permissions).toBeUndefined();
     expect(mutationWorkflow().jobs.summary.permissions).toBeUndefined();
@@ -411,8 +414,8 @@ const legRoots = new Map([
   ["core", "packages/core"],
 ]);
 
-describe("each mutation leg, run as shards and summed up once (T-381)", () => {
-  it("runs each leg as shards 1 to N, each once, and sums it up in one summary that knows the same N", () => {
+describe("each mutation leg, run as shards and summed once", () => {
+  it("runs shards 1 to N once, summed by one summary", () => {
     const { stryker, summary } = mutationWorkflow().jobs;
     const shards = stryker.strategy.matrix.include;
 
@@ -429,7 +432,7 @@ describe("each mutation leg, run as shards and summed up once (T-381)", () => {
     }
   });
 
-  it("cuts each leg into slices that are disjoint, none empty, and together exactly the leg's mutate set, a file cut by line in pieces that run from its first line to its last", () => {
+  it("cuts each leg into slices that tile its mutate set", () => {
     for (const { name, of } of mutationWorkflow().jobs.summary.strategy.matrix.include) {
       const root = legRoots.get(name) ?? "";
       const config = configSchema.parse(CONFIGS.get(root));
@@ -491,7 +494,7 @@ describe("each mutation leg, run as shards and summed up once (T-381)", () => {
     }
   });
 
-  it("gathers each shard's two files under the names the merge reads, into the one directory the summary downloads them to", () => {
+  it("gathers each shard's files where the summary downloads them", () => {
     const { stryker, summary } = mutationWorkflow().jobs;
     const gather = stepRunning(stryker.steps, "stryker-incremental.json", "stryker");
     const upload = onlyStep(stryker.steps, "actions/upload-artifact@", "stryker");
@@ -512,7 +515,7 @@ describe("each mutation leg, run as shards and summed up once (T-381)", () => {
     );
   });
 
-  it("slices every shard, and merges the leg, by the one previous run the restore leaves each job", () => {
+  it("slices and merges by the one run the restore reads", () => {
     const { stryker, summary } = mutationWorkflow().jobs;
 
     expect(onlyStep(stryker.steps, BASELINE_ACTION, "stryker").with?.["reports"]).toEqual(
@@ -529,14 +532,14 @@ describe("each mutation leg, run as shards and summed up once (T-381)", () => {
     );
   });
 
-  it("sums a leg up after every shard, whatever each shard's outcome, so a shard cut at its ceiling is carried forward", () => {
+  it("sums a leg up after every shard, whatever each did", () => {
     const { summary } = mutationWorkflow().jobs;
 
     expect(summary.needs).toEqual("stryker");
     expect(summary.if).toEqual("always()");
   });
 
-  it("runs, when a dispatch names shards, only those, every step of every other shard skipped so it leaves nothing and the merge keeps its files' previous results", () => {
+  it("runs only the shards a dispatch names, skipping the rest", () => {
     const workflow = mutationWorkflow();
     const { stryker } = workflow.jobs;
 
@@ -563,26 +566,23 @@ describe("each mutation leg, run as shards and summed up once (T-381)", () => {
     { shards: "core4", leg: "core", of: 16, refused: true },
     { shards: "core-0", leg: "core", of: 16, refused: true },
     { shards: "web-1", leg: "core", of: 16, refused: true },
-  ])(
-    "reads a dispatch naming $shards in a $leg shard as refused: $refused",
-    ({ shards, leg, of, refused }) => {
-      const [check] = mutationWorkflow().jobs.stryker.steps;
-      const run = spawnSync("bash", ["-c", check?.run ?? "exit 2"], {
-        encoding: "utf8",
-        env: { ...process.env, SHARDS: shards, LEG: leg, OF: String(of) },
-      });
+  ])("refuses $shards in a $leg shard: $refused", ({ shards, leg, of, refused }) => {
+    const [check] = mutationWorkflow().jobs.stryker.steps;
+    const run = spawnSync("bash", ["-c", check?.run ?? "exit 2"], {
+      encoding: "utf8",
+      env: { ...process.env, SHARDS: shards, LEG: leg, OF: String(of) },
+    });
 
-      expect({ refused: run.status !== 0, said: run.stdout.startsWith("::error::") }).toEqual({
-        refused,
-        said: refused,
-      });
-      expect(check?.env).toEqual({
-        SHARDS: "${{ inputs.shards }}",
-        LEG: "${{ matrix.name }}",
-        OF: "${{ matrix.of }}",
-      });
-    },
-  );
+    expect({ refused: run.status !== 0, said: run.stdout.startsWith("::error::") }).toEqual({
+      refused,
+      said: refused,
+    });
+    expect(check?.env).toEqual({
+      SHARDS: "${{ inputs.shards }}",
+      LEG: "${{ matrix.name }}",
+      OF: "${{ matrix.of }}",
+    });
+  });
 
   it("knows a shard's leg by the matrix's own names", () => {
     const { stryker } = mutationWorkflow().jobs;
@@ -594,7 +594,7 @@ describe("each mutation leg, run as shards and summed up once (T-381)", () => {
     );
   });
 
-  it("runs no more shards at once than leave a merge group's legs and a pull request's room", () => {
+  it("leaves room for a merge group and a pull request", () => {
     expect(mutationWorkflow().jobs.stryker.strategy["max-parallel"]).toBeLessThanOrEqual(
       CONCURRENT_JOBS - MERGE_GROUP_LEGS - PULL_REQUEST_LEGS - A_LANE_JOB,
     );

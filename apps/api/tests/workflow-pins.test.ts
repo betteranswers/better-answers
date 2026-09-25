@@ -49,7 +49,7 @@ const distinctPer = (key: (pin: Pin) => string, value: (pin: Pin) => string) => 
   return seen;
 };
 
-describe("what the workflows are allowed to run (T-040)", () => {
+describe("what the workflows are allowed to run", () => {
   it("runs no third-party action from a moving reference", () => {
     const unpinned = usesLines()
       .filter(({ line }) => !LOCAL_USES.test(line) && !PINNED_USES.test(line))
@@ -83,7 +83,7 @@ describe("what the workflows are allowed to run (T-040)", () => {
     expect(tagsPerSha, "one pinned commit is labelled with two different tags.").toEqual([]);
   });
 
-  it("keeps enough actions under the check that an empty read would show", () => {
+  it("reads enough pins that an empty read would show", () => {
     expect(workflowFiles().length).toBeGreaterThan(0);
     expect(pins().length).toBeGreaterThan(0);
     expect(pins().length).toEqual(usesLines().filter(({ line }) => !LOCAL_USES.test(line)).length);

@@ -20,18 +20,17 @@ describe("the three roads a procedure takes", () => {
     expect(roads.size).toBe(3);
   });
 
-  it("keeps every door from a procedure that runs inside the resolver's transaction", () => {
+  it("keeps every door from a procedure inside the resolver's transaction", () => {
     expectTypeOf<QueryContext["tx"]>().toEqualTypeOf<Tx>();
     expectTypeOf<QueryContext["doors"]>().toEqualTypeOf<undefined>();
     expectTypeOf<MutationContext["tx"]>().toEqualTypeOf<Tx>();
     expectTypeOf<MutationContext["doors"]>().toEqualTypeOf<undefined>();
 
-    // @ts-expect-error — a context holding a transaction reaches no door, so this pairing
-    // does not compile.
+    // @ts-expect-error — a context holding a transaction reaches no door.
     expectTypeOf<QueryContext["doors"]["postgres"]>().toBeUnknown();
   });
 
-  it("hands the doors, and no transaction, to a procedure whose act opens its own", () => {
+  it("hands the doors and no transaction to the own-transaction road", () => {
     expectTypeOf<OwnTransactionContext["doors"]>().toEqualTypeOf<Doors>();
     expectTypeOf<OwnTransactionContext>().not.toHaveProperty("tx");
   });

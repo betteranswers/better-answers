@@ -1,5 +1,6 @@
-import { ulid } from "@better-answers/schema";
+import { SUBJECT_IDENTIFIER_KINDS, ulid } from "@better-answers/schema";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { commit, type GitDoor } from "@better-answers/core/store/git";
 
@@ -18,6 +19,7 @@ import {
 import { actorIdOfPerson, type UserPrincipal } from "../src/kernel/index.ts";
 import { withScope } from "../src/store/postgres/index.ts";
 import { identityRowsFor, verificationCodeFor } from "./identity-rows.ts";
+import { contractFixture } from "./contract-fixture.ts";
 import { bootstrap } from "./platform.ts";
 import { addressOf, readingAs, seedingWith } from "./suite-postgres.ts";
 import {
@@ -283,6 +285,190 @@ describe("the erasure map in one workspace's scope", () => {
     for (const theirsOwn of [theirs.ledger.sha, theirs.check.id, theirs.invite.id, shaElsewhere]) {
       expect(named).not.toContain(theirsOwn);
     }
+  });
+});
+
+const WORK_ADDRESS = "ann.raman@meridianfenland.co.uk";
+
+const GONE_AT = new Date("2026-09-01T09:00:00.000Z");
+
+const documentHolding = (
+  workspaceId: string,
+  chunks: readonly string[],
+  shape: { readonly goneAt?: Date } = {},
+): Promise<string> =>
+  seedingWith(db().pool, async (seed) => {
+    const binding = await seed.sourceBinding({ workspaceId });
+    const document = await seed.sourceDocument({
+      workspaceId,
+      bindingId: binding.id,
+      goneAt: shape.goneAt ?? null,
+    });
+    const lengths = chunks.map((content) => Array.from(content).length);
+    for (const [ordinal, content] of chunks.entries()) {
+      const charStart = lengths.slice(0, ordinal).reduce((sum, length) => sum + length, 0);
+      const charEnd = charStart + (lengths[ordinal] ?? 0);
+      await seed.chunk({
+        workspaceId,
+        bindingId: binding.id,
+        sourceDocumentId: document.id,
+        content,
+        locator: `${document.id}/chars:${charStart}-${charEnd}`,
+        ordinal,
+        charStart,
+        charEnd,
+      });
+    }
+    return document.id;
+  });
+
+const AGREEMENT_CASES = contractFixture(
+  "erasure-match",
+  z.object({
+    cases: z.array(
+      z.object({
+        kind: z.enum(SUBJECT_IDENTIFIER_KINDS),
+        identifier: z.string().min(1),
+        text: z.string().min(1),
+        occurrences: z.array(z.unknown()),
+        why: z.string().min(1),
+      }),
+    ),
+  }),
+).cases;
+
+const documentsFoundFor = async (
+  scenario: Scenario,
+  identifiers: SubjectIdentifiers,
+): Promise<readonly string[] | undefined> => {
+  const request = await requestFor(scenario, { personId: null, identifiers });
+  const map = await mapOf(scenario, request);
+  return map.find((entry) => entry.family === "source-document")?.locations;
+};
+
+describe("the erasure map's documents", () => {
+  it("names the live documents whose indexed text holds the subject by a work address or by a name split across two chunks, and none that says Annual, holds them withheld or is gone", async () => {
+    const scenario = await arrange();
+    const workspaceId = scenario.workspaceId;
+    const byTheWorkAddress = await documentHolding(workspaceId, [
+      `Send the signed lease to ${WORK_ADDRESS} before Friday.`,
+    ]);
+    const byTheNameSplit = await documentHolding(workspaceId, [
+      "The lease was countersigned by Ann",
+      " Raman on 3 March.",
+    ]);
+    await documentHolding(workspaceId, ["The Annual Raman lecture is on Friday."]);
+    await documentHolding(workspaceId, [
+      "The lease was countersigned by [withheld]; write to [withheld] with any query.",
+    ]);
+    await documentHolding(workspaceId, [`Ann Raman signed; write to ${WORK_ADDRESS}.`], {
+      goneAt: GONE_AT,
+    });
+    const request = await requestFor(scenario, {
+      personId: null,
+      identifiers: { emails: [WORK_ADDRESS], names: ["Ann Raman"], other: [] },
+    });
+
+    const map = await mapOf(scenario, request);
+
+    expect(map.find((entry) => entry.family === "source-document")).toEqual({
+      family: "source-document",
+      categories: ["document-text"],
+      locations: [byTheWorkAddress, byTheNameSplit].sort(),
+    });
+    expect(accessAnswerOf(map).categories).toEqual(["document-text"]);
+  });
+
+  it("names a document holding the subject's other identifier, and not one holding a longer number that begins with it", async () => {
+    const scenario = await arrange();
+    const byTheNumber = await documentHolding(scenario.workspaceId, [
+      "Payroll number EMP-00417 is closed.",
+    ]);
+    await documentHolding(scenario.workspaceId, ["Payroll number EMP-004171 is open."]);
+
+    expect(
+      await documentsFoundFor(scenario, { emails: [], names: [], other: ["EMP-00417"] }),
+    ).toEqual([byTheNumber]);
+  });
+
+  it("searches for no identifier below the floor, which a request recorded before the floor may hold", async () => {
+    const scenario = await arrange();
+    await documentHolding(scenario.workspaceId, ["Ann asked HR about her leave."]);
+
+    expect(
+      await documentsFoundFor(scenario, { emails: [], names: ["Ann"], other: ["HR"] }),
+    ).toEqual([]);
+  });
+
+  it("names a document that writes the name as the request recorded it, though no word of it is written as it folds", async () => {
+    const scenario = await arrange();
+    const asRecorded = await documentHolding(scenario.workspaceId, [
+      "The deed was witnessed by Νίκος Παππάς.",
+    ]);
+
+    expect(
+      await documentsFoundFor(scenario, { emails: [], names: ["Νίκος Παππάς"], other: [] }),
+    ).toEqual([asRecorded]);
+  });
+
+  it("names a document holding the address a member signs in with, for a request recorded by their person id alone", async () => {
+    const scenario = await arrange();
+    const email = addressOf("priya");
+    const person = await memberOf(db().pool, scenario.workspaceId, email);
+    const byTheSignIn = await documentHolding(scenario.workspaceId, [
+      `Claims go to ${email} for approval.`,
+    ]);
+    const request = await requestFor(scenario, {
+      personId: person.id,
+      identifiers: { emails: [], names: [], other: [] },
+    });
+
+    const map = await mapOf(scenario, request);
+
+    expect(map.find((entry) => entry.family === "source-document")?.locations).toEqual([
+      byTheSignIn,
+    ]);
+  });
+
+  it("names a document holding a name made only of words the full-text index drops", async () => {
+    const scenario = await arrange();
+    const byTheName = await documentHolding(scenario.workspaceId, [
+      "Tickets for The Who sold out.",
+    ]);
+    await documentHolding(scenario.workspaceId, ["Who is the owner of the lease?"]);
+
+    expect(
+      await documentsFoundFor(scenario, { emails: [], names: ["The Who"], other: [] }),
+    ).toEqual([byTheName]);
+  });
+
+  it("names a document holding each case's text of the erasure-match agreement exactly where the agreement finds an occurrence", async () => {
+    const scenario = await arrange();
+    for (const { kind, identifier, text, occurrences, why } of AGREEMENT_CASES) {
+      const document = await documentHolding(scenario.workspaceId, [text]);
+
+      const found = await documentsFoundFor(scenario, {
+        emails: [],
+        names: [],
+        other: [],
+        [kind]: [identifier],
+      });
+
+      expect({ why, named: found?.includes(document) }).toEqual({
+        why,
+        named: occurrences.length > 0,
+      });
+    }
+  });
+
+  it("names nothing another workspace holds", async () => {
+    const here = await arrange();
+    const elsewhere = await arrange();
+    await documentHolding(elsewhere.workspaceId, [`Ann Raman signed; write to ${WORK_ADDRESS}.`]);
+
+    expect(
+      await documentsFoundFor(here, { emails: [WORK_ADDRESS], names: ["Ann Raman"], other: [] }),
+    ).toEqual([]);
   });
 });
 

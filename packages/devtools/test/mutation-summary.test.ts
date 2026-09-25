@@ -8,9 +8,9 @@ import {
   mutationSummaryFromArgv,
 } from "@better-answers/devtools/mutation-summary";
 import type { Report, ReportMutant } from "@better-answers/devtools/mutation-summary";
+import { repositoryRoot } from "@better-answers/devtools/oxlint-config";
 import { afterAll, describe, expect, it } from "vitest";
 
-const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 const script = path.join(repositoryRoot, "scripts/mutation-summary.mjs");
 
 const scratch = mkdtempSync(path.join(tmpdir(), "mutation-summary-"));
@@ -60,8 +60,8 @@ const report = (source: string, mutants: readonly ReportMutant[]): Report => ({
   files: { "src/answer.ts": { source, mutants } },
 });
 
-describe("the mutation summary (T-090)", () => {
-  it("names the mutants that survive here and did not survive in the baseline", () => {
+describe("the mutation summary", () => {
+  it("names mutants that survive here but not in the baseline", () => {
     const baseline = report(SOURCE, [
       mutant("ArithmeticOperator", "n - 1", PLUS, "Killed", 1),
       mutant("StringLiteral", '""', LABEL, "Killed", 1),
@@ -118,7 +118,7 @@ describe("the mutation summary (T-090)", () => {
     );
   });
 
-  it("pairs two identical spans by where they sit, whatever order the report lists them in", () => {
+  it("pairs two identical spans by position, whatever the report's order", () => {
     const baseline = report(SOURCE_TWICE, [
       mutant("StringLiteral", '""', FIRST_USER, "Killed", 1),
       mutant("StringLiteral", '""', SECOND_USER, "Survived", 1),
@@ -133,7 +133,7 @@ describe("the mutation summary (T-090)", () => {
     );
   });
 
-  it("matches a mutant by its text when the file gained lines above it", () => {
+  it("matches a mutant by its text, not its line number", () => {
     const baseline = report(SOURCE, [
       mutant("ArithmeticOperator", "n - 1", PLUS, "Killed", 1),
       mutant("StringLiteral", '""', LABEL, "Survived", 1),
@@ -150,7 +150,7 @@ describe("the mutation summary (T-090)", () => {
     expect(summary).not.toContain("src/answer.ts:3");
   });
 
-  it("counts a mutant the baseline never held as new, and says so", () => {
+  it("marks a mutant the baseline never held as new", () => {
     const baseline = report(SOURCE, [mutant("ArithmeticOperator", "n - 1", PLUS, "Killed", 1)]);
     const current = report(SOURCE, [
       mutant("ArithmeticOperator", "n - 1", PLUS, "Killed", 1),
@@ -162,7 +162,7 @@ describe("the mutation summary (T-090)", () => {
     );
   });
 
-  it("lists a row the runner never tested as a runner fault, never as a survivor", () => {
+  it("calls an untested row a runner fault, not a survivor", () => {
     const baseline = report(SOURCE, [
       mutant("StringLiteral", '""', LABEL, "Survived", 0),
       mutant("StringLiteral", '""', OTHER, "Survived", 0),
@@ -186,7 +186,7 @@ describe("the mutation summary (T-090)", () => {
     );
   });
 
-  it("names a leg that ran no test for one mutant a runner fault, however many it killed", () => {
+  it("names a runner fault if one mutant ran no test", () => {
     const current = report(SOURCE, [
       mutant("ArithmeticOperator", "n - 1", PLUS, "Killed", 4),
       mutant("StringLiteral", '""', LABEL, "Timeout", 2),
@@ -201,7 +201,7 @@ describe("the mutation summary (T-090)", () => {
     expect(summary.startsWith(`### ${fault ?? ""}\n### api mutation score: 66.7%`)).toBe(true);
   });
 
-  it("names a leg that killed none of its mutants a runner fault, not a low score", () => {
+  it("names a runner fault when a leg killed no mutant", () => {
     const current = report(SOURCE, [
       mutant("ArithmeticOperator", "n - 1", PLUS, "Survived", 2),
       mutant("StringLiteral", '""', LABEL, "Survived", 1),
@@ -219,7 +219,7 @@ describe("the mutation summary (T-090)", () => {
     );
   });
 
-  it("names no runner fault for a leg that killed one mutant and ran a test for every other", () => {
+  it("names no fault when every covered mutant ran a test", () => {
     const current = report(SOURCE, [
       mutant("ArithmeticOperator", "n - 1", PLUS, "Timeout", 1),
       mutant("StringLiteral", '""', LABEL, "Survived", 1),
@@ -232,7 +232,7 @@ describe("the mutation summary (T-090)", () => {
     expect(summary).not.toContain("runner fault");
   });
 
-  it("names no runner fault for a leg with no mutants at all", () => {
+  it("names no runner fault for a leg with no mutants", () => {
     const { summary, fault } = mutationSummary("core", report(SOURCE, []), undefined);
 
     expect(fault).toBeUndefined();
@@ -246,7 +246,7 @@ describe("the mutation summary (T-090)", () => {
     );
   });
 
-  it("marks a survivor the baseline ignored as one with no verdict, not as drift", () => {
+  it("marks a survivor the baseline ignored as having no verdict", () => {
     const baseline = report(SOURCE, [mutant("StringLiteral", '""', LABEL, "Ignored")]);
     const current = report(SOURCE, [mutant("StringLiteral", '""', LABEL, "Survived", 1)]);
 
@@ -276,7 +276,7 @@ const run = (...argv: readonly string[]): Run => {
   return { status: result.status, stdout: result.stdout, stderr: result.stderr };
 };
 
-describe("the mutation summary script over files (T-090)", () => {
+describe("the mutation summary script over files", () => {
   const reportFile = path.join(scratch, "mutation.json");
   const baselineFile = path.join(scratch, "baseline.json");
   writeFileSync(
@@ -293,7 +293,7 @@ describe("the mutation summary script over files (T-090)", () => {
     JSON.stringify(report(SOURCE, [mutant("ArithmeticOperator", "n - 1", PLUS, "Killed", 1)])),
   );
 
-  it("prints the summary for the report against the baseline and exits zero", () => {
+  it("prints the report's summary against the baseline and exits zero", () => {
     const result = run("--leg", "api", "--report", reportFile, "--baseline", baselineFile);
 
     expect(result.status).toBe(0);
@@ -309,7 +309,7 @@ describe("the mutation summary script over files (T-090)", () => {
     );
   });
 
-  it("says no baseline when the baseline file is absent, and no report when the report is", () => {
+  it("says no baseline or no report for an absent file", () => {
     const noBaseline = run(
       "--leg",
       "api",
@@ -326,7 +326,7 @@ describe("the mutation summary script over files (T-090)", () => {
     expect(noReport.stdout).toBe("### core mutation score: no report\n");
   });
 
-  it("reads a baseline it cannot parse as no baseline, never as an error", () => {
+  it("reads an unparseable baseline as no baseline, never an error", () => {
     const halfWritten = path.join(scratch, "half.json");
     writeFileSync(halfWritten, '{"files": {');
 
@@ -343,7 +343,7 @@ describe("the mutation summary script over files (T-090)", () => {
   });
 });
 
-describe("a leg with a mutant that ran no test, or with no kill, fails and says why (T-372)", () => {
+describe("the summary script over a runner fault and its checkpoint", () => {
   const untestedFile = path.join(scratch, "untested.json");
   writeFileSync(
     untestedFile,
@@ -358,7 +358,7 @@ describe("a leg with a mutant that ran no test, or with no kill, fails and says 
   const FAULT =
     "core runner fault: 2 of its 2 covered mutants ran no test — no verdict in this report can be trusted, so the leg fails until the runner is fixed and a run with `force` tests every mutant again";
 
-  it("exits non-zero, the summary and the error both naming the fault", () => {
+  it("exits non-zero, naming the fault in summary and error", () => {
     const result = run("--leg", "core", "--report", untestedFile);
 
     expect(result.status).toBe(1);
@@ -366,7 +366,7 @@ describe("a leg with a mutant that ran no test, or with no kill, fails and says 
     expect(result.stderr).toBe(`${FAULT}\n`);
   });
 
-  it("reads the checkpoint when the run wrote no report, as a leg cut short at its ceiling does", () => {
+  it("reads the checkpoint when a cut-short run wrote no report", () => {
     const result = run(
       "--leg",
       "core",
@@ -385,7 +385,7 @@ describe("a leg with a mutant that ran no test, or with no kill, fails and says 
     expect(result.stderr).toBe(`${fromCheckpoint}\n`);
   });
 
-  it("reads the report and not the checkpoint when the run wrote one", () => {
+  it("prefers the report over the checkpoint when both exist", () => {
     const testedFile = path.join(scratch, "tested.json");
     writeFileSync(
       testedFile,
@@ -410,7 +410,7 @@ describe("a leg with a mutant that ran no test, or with no kill, fails and says 
     expect(tested.summary).toContain("### core mutation score: 50% (1/2 mutants killed)\n");
   });
 
-  it("passes a leg with no report and no checkpoint, which has nothing to read", () => {
+  it("passes a leg with no report and no checkpoint", () => {
     const result = run(
       "--leg",
       "api",

@@ -106,7 +106,7 @@ export function DisplayNameScreen() {
           name="displayName"
           autoComplete="name"
           required
-          // oxlint-disable-next-line jsx-a11y/no-autofocus -- the code step that led here is gone with its field, and this one field is the reader's next act, so focus lands on it rather than on the page
+          // oxlint-disable-next-line jsx-a11y/no-autofocus -- the code step's field is gone, and this field is the reader's next act, so focus lands here and not on the page
           autoFocus
           aria-describedby={failure === null ? HINT : `${HINT} ${REFUSED}`}
           aria-invalid={refusedAs === "malformed"}

@@ -31,19 +31,19 @@ const memberSchema = (): { additionalFields?: Record<string, Declared> } | undef
 };
 
 describe("the revocation instants the identity provider carries", () => {
-  it("gives a person one instant on their user row, which the person cannot set", () => {
+  it("gives a person one user-row instant the person cannot set", () => {
     const fields: Record<string, Declared> = auth.options.user.additionalFields;
 
     expect(platformWritten(fields["credentialsRevokedAt"])).toEqual(PLATFORM_DATE);
   });
 
-  it("gives a membership its own instant, so one workspace's revocation stays there", () => {
+  it("gives a membership its own instant, kept to one workspace", () => {
     const fields = memberSchema()?.additionalFields ?? {};
 
     expect(platformWritten(fields["credentialsRevokedAt"])).toEqual(PLATFORM_DATE);
   });
 
-  it("keeps the membership instant out of what a colleague is shown", () => {
+  it("keeps the membership instant from what a colleague sees", () => {
     const fields = memberSchema()?.additionalFields ?? {};
 
     expect(fields["credentialsRevokedAt"]?.returned).toBe(false);

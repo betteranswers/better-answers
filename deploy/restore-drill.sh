@@ -24,11 +24,19 @@ STAMP=$(date -u +%Y%m%dT%H%M%SZ); WORK=$(mktemp -d); REPORT="${WORK}/drill-${STA
 started=$(date -u +%FT%TZ); T0=$(date +%s)
 say() { printf '%s %s\n' "$(date -u +%T)" "$*" | tee -a "${REPORT}"; }
 aside() { printf '%s %s\n' "$(date -u +%T)" "$*" | tee -a "${REPORT}" >&2; }
+# >>> the staging projects
 DEPLOY_DIR="${REPO_DIR}/deploy"
 # The -f paths are absolute: compose resolves them against the caller's cwd.
 compose() { docker compose --project-directory "${DEPLOY_DIR}" --env-file "${STAGING_ENV_FILE}" "$@"; }
 stores()   { compose -f "${DEPLOY_DIR}/stores.compose.yaml" -f "${DEPLOY_DIR}/staging.override.yaml" -p better-answers-stores-staging "$@"; }
-platform() { compose -f "${DEPLOY_DIR}/platform.compose.yaml" -p better-answers-staging "$@"; }
+platform() { compose -f "${DEPLOY_DIR}/platform.compose.yaml" -f "${DEPLOY_DIR}/staging.platform.override.yaml" -p better-answers-staging "$@"; }
+# Both overrides name it external, and compose refuses to start a service on one that does not exist.
+STAGING_NETWORK=better-answers-staging-shared
+# --internal: a plain bridge sorts first by name, so it would carry every member's default route in place of its project's network.
+ensure_staging_network() {
+  docker network inspect "${STAGING_NETWORK}" >/dev/null 2>&1 || docker network create --internal "${STAGING_NETWORK}" >/dev/null
+}
+# <<< the staging projects
 ops() {
   local rc=0; platform exec -T api pnpm --silent ops "$@" || rc=$?
   if [ "${rc}" -eq "${NOT_BUILT}" ]; then aside "  -> not built yet: 'pnpm ops $1' found no tables for its slice (recorded, not failed)"; return 0; fi
@@ -58,8 +66,15 @@ on_exit() { rc=$?
 trap on_exit EXIT
 
 say "# Restore drill ${STAMP} — workspace ${DRILL_WORKSPACE}"
+# >>> workspace id
+synthetic_workspace=$("${DEPLOY_DIR}/seed-synthetic.sh" --workspace-id)
+# Every ops command refuses a workspace id that is not a ULID, and the first reads it half an hour in.
+if ! [[ "${DRILL_WORKSPACE}" =~ ^[0-9A-HJKMNP-TV-Z]{26}$ ]]; then
+  say "REFUSED: DRILL_WORKSPACE ${DRILL_WORKSPACE} is not a workspace id; the synthetic fixture's is ${synthetic_workspace}"; exit 1
+fi
+# <<< workspace id
 
-say "## 0 wipe staging (starts from nothing)"; wipe_staging
+say "## 0 wipe staging (starts from nothing)"; ensure_staging_network; wipe_staging
 say "## 1 postgres — latest daily dump"
 latest=$(rclone lsf "dumps:${BACKUP_DUMPS_BUCKET}/pg/daily/" | grep '^pg-' | sort | tail -n1)
 globals=$(rclone lsf "dumps:${BACKUP_DUMPS_BUCKET}/pg/daily/" | grep '^globals-' | sort | tail -n1)
@@ -98,6 +113,11 @@ done
 
 say "## 5 REPLAY ERASURES completed after the dump (ADR 0020 — beyond use, made honest)"
 platform run --rm --no-deps api pnpm --silent ops replay-erasures --since "${dump_at}" | tee -a "${REPORT}"
+
+say "## 5b the synthetic fixture joins the restored copy: its workspace's rows, chunk partition and an empty repository"
+# No production dump holds it, and it is the one workspace the drill may always rebuild, seed a subject into and erase.
+STAGING_DATABASE_URL="${STAGING_DATABASE_URL}" "${DEPLOY_DIR}/seed-synthetic.sh" | tee -a "${REPORT}"
+[ -d "/data/git/${synthetic_workspace}.git" ] || sudo -u '#1000' git init --quiet --bare --initial-branch main "/data/git/${synthetic_workspace}.git"
 
 platform up -d --wait api worker
 say "api up — RTO so far $(( ( $(date +%s) - T0 ) / 60 )) min"
@@ -146,7 +166,8 @@ if [ $(( $(date +%-m) % 3 )) -eq 0 ]; then
   # A fence: the deploy tree's suite lifts the lines between the markers and runs them.
   # >>> seed status
   seed_rc=0
-  subject=$(platform exec -T api pnpm --silent ops erasure-rehearsal --workspace "${DRILL_WORKSPACE}" --synthetic --seed | tail -n1) || seed_rc=$?
+  # The seed's index job queues behind whatever the restore left for the drill workspace.
+  subject=$(platform exec -T api pnpm --silent ops erasure-rehearsal --workspace "${DRILL_WORKSPACE}" --synthetic --seed --wait-seconds 600 | tail -n1) || seed_rc=$?
   if [ "${seed_rc}" -ne 0 ] && [ "${seed_rc}" -ne "${NOT_BUILT}" ]; then
     say "REHEARSAL FAILED: the synthetic seed exited ${seed_rc}, which is not the ${NOT_BUILT} that says the erasure slice has no tables"; exit 1
   fi
@@ -157,11 +178,18 @@ if [ $(( $(date +%-m) % 3 )) -eq 0 ]; then
 
     pg_dump --format=plain --dbname="${STAGING_DATABASE_URL}" > "${WORK}/pre-erasure.sql"
 
-    if platform exec -T api pnpm --silent ops dump-grep --tokens "${subject}" < "${WORK}/pre-erasure.sql" | tee -a "${REPORT}" | grep -q ': present in '; then
-      say "dump grep before: the subject is in the pre-erasure copy (expected; the report's expiry dates cover it)"
-    else
+    platform exec -T api pnpm --silent ops dump-grep --tokens "${subject}" < "${WORK}/pre-erasure.sql" > "${WORK}/pre-erasure.grep"
+    cat "${WORK}/pre-erasure.grep" >> "${REPORT}"
+    # >>> found before
+    if ! grep -q ': present in ' "${WORK}/pre-erasure.grep"; then
       say "REHEARSAL FAILED: the seeded subject is in no table of the pre-erasure dump"; exit 1
     fi
+    # A chunk table the subject was never in would pass the grep after the erasure without proving the index lets them go.
+    if ! grep -q -E ' of table index\."?chunk' "${WORK}/pre-erasure.grep"; then
+      say "REHEARSAL FAILED: the seeded subject is in no chunk of the pre-erasure dump, so the dump grep after would prove nothing of the index"; exit 1
+    fi
+    # <<< found before
+    say "dump grep before: the subject is in the pre-erasure copy, the index's chunk table among it (expected; the report's expiry dates cover it)"
 
     platform exec -T api pnpm --silent ops erasure-rehearsal --workspace "${DRILL_WORKSPACE}" --synthetic --run --report /tmp/erasure.md | tee -a "${REPORT}"
     platform exec -T api cat /tmp/erasure.md >> "${REPORT}"

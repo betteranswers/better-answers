@@ -4,7 +4,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { commentGateRoots, rootScripts } from "@better-answers/devtools/root-commands";
+import { pythonGateRoots, rootScripts } from "@better-answers/devtools/root-commands";
 import { throwawayRepository, writeUnder } from "@better-answers/devtools/throwaway-tree";
 
 import { hookScript, runHook, scratchRoot, type HookRun } from "./worktree-hooks.ts";
@@ -15,17 +15,21 @@ const script = hookScript("comment-gate-hook");
 
 const scratch = scratchRoot("comment-gate-hook");
 
-// Borrowed, not rebuilt: a tree without the checkout's gate tooling answers silence.
+const ANTI_SLOP = "packages/devtools/lifts/anti-slop";
+
+/** Borrowed, not rebuilt: a tree without the checkout's gate tooling answers silence. */
 const treeWithTheGateTooling = (name: string): string => {
   const root = throwawayRepository(path.join(scratch, name));
-  symlinkSync(path.join(repositoryRoot, "node_modules"), path.join(root, "node_modules"));
-  mkdirSync(path.join(root, "packages/devtools"), { recursive: true });
-  // Each part on its own, so `lifts` stays a real directory this tree can write into.
-  for (const part of ["lint-rules", "python"]) {
-    symlinkSync(
-      path.join(repositoryRoot, "packages/devtools", part),
-      path.join(root, "packages/devtools", part),
-    );
+  // Each part on its own, so the lift's directory stays real and this tree can write into it.
+  mkdirSync(path.join(root, ANTI_SLOP), { recursive: true });
+  for (const part of [
+    ".oxlintrc.json",
+    "node_modules",
+    "packages/devtools/lint-rules",
+    "packages/devtools/python",
+    `${ANTI_SLOP}/index.ts`,
+  ]) {
+    symlinkSync(path.join(repositoryRoot, part), path.join(root, part));
   }
   return root;
 };
@@ -51,7 +55,7 @@ const FORTY_WORDS =
 const A_WHY_OF_TWENTY =
   "Deleting this line changes what the engine memoises, and every caller below then reads a value the store never wrote";
 
-// Spelled in two halves, so the tag scan does not read a fixture as a citation.
+/** Spelled in two halves, so the tag scan does not read a fixture as a citation. */
 const tag = (family: string, number: string): string => `[${family}${number}]`;
 
 const hookText = readFileSync(script, "utf8");
@@ -66,45 +70,38 @@ const pathIn = (command: string, pattern: RegExp): string => {
   return found;
 };
 
-const configPath = (): string =>
-  pathIn(rootScripts()["comment-gate:ts"] ?? "", /packages\/\S+\.oxlintrc\.json/);
-
 const checkerPath = (): string =>
   pathIn(rootScripts()["comment-gate:python"] ?? "", /packages\/\S+\.py/);
 
-const gateConfig = z.object({ ignorePatterns: z.array(z.string()).optional() });
+const CONFIG = ".oxlintrc.json";
 
-// The config is JSONC, so the comment lines go before the parse; reading its patterns here
-// stops hook and config drifting apart.
+const rootConfig = z.object({ ignorePatterns: z.array(z.string()).optional() });
+
+/** Read here rather than restated, so hook and config cannot drift apart. */
 const ignorePatterns = (): readonly string[] => {
-  const source = readFileSync(path.join(repositoryRoot, configPath()), "utf8")
-    .split("\n")
-    .filter((line) => !line.trimStart().startsWith("//"))
-    .join("\n");
-  const { ignorePatterns: patterns } = gateConfig.parse(JSON.parse(source));
+  const { ignorePatterns: patterns } = rootConfig.parse(
+    JSON.parse(readFileSync(path.join(repositoryRoot, CONFIG), "utf8")),
+  );
   if ((patterns ?? []).length === 0) {
-    throw new Error(`${configPath()} names no ignore pattern, so this reading proves nothing.`);
+    throw new Error(`${CONFIG} names no ignore pattern, so this reading proves nothing.`);
   }
   return patterns ?? [];
 };
 
-// A bare name is a directory at any depth; a path pattern is one place. Both reach the
-// gate only under its two roots.
-const probeUnder = (pattern: string): string | undefined => {
+/**
+ * A bare name is a directory at any depth, a double-star pattern a file anywhere, and any other
+ * one place.
+ */
+const probeUnder = (pattern: string): string => {
   if (!pattern.includes("/")) return `packages/probe/${pattern}/probe.ts`;
-  const prefix = pattern.replace(/\*+$/, "");
-  return prefix.startsWith("apps/") || prefix.startsWith("packages/")
-    ? `${prefix}probe.ts`
-    : undefined;
+  if (pattern.startsWith("**/")) return `packages/probe/${pattern.slice(3).replaceAll("*", "x")}`;
+  return `${pattern.replace(/\*+$/, "")}probe.ts`;
 };
 
 const skippable = (): readonly (readonly [string, string])[] =>
-  ignorePatterns().flatMap((pattern) => {
-    const probe = probeUnder(pattern);
-    return probe === undefined ? [] : [[pattern, probe] as const];
-  });
+  ignorePatterns().map((pattern) => [pattern, probeUnder(pattern)] as const);
 
-// A silence below means nothing until the gate is known to be loud in this tree.
+/** A silence below means nothing until the gate is known to be loud in this tree. */
 const smoke = edit("packages/smoke/probe.ts", `// ${FORTY_WORDS}\nexport const keep = 1;\n`);
 if (smoke.status !== 2 || !smoke.stderr.includes("runs to 40 words")) {
   throw new Error(
@@ -112,9 +109,9 @@ if (smoke.status !== 2 || !smoke.stderr.includes("runs to 40 words")) {
   );
 }
 
-const CASE_BLOCK = /case "\$RELATIVE" in\n([\s\S]*?)\nesac/;
+const CASE_BLOCK = /case "\$RELATIVE" in\n([\s\S]*?)\n\s*esac/;
 
-// The roots a `case` arm names, with the trailing glob off, so `scripts/*` reads as `scripts`.
+/** The roots a `case` arm names, with the trailing glob off, so `scripts/*` reads as `scripts`. */
 const rootsIn = (hook: string): readonly string[] => {
   const block = CASE_BLOCK.exec(hook)?.[1];
   if (block === undefined) throw new Error("the hook holds no `$RELATIVE` case block to read");
@@ -128,25 +125,25 @@ const rootsIn = (hook: string): readonly string[] => {
 const missingFrom = (named: readonly string[], read: readonly string[]): readonly string[] =>
   named.filter((root) => !read.includes(root)).sort();
 
-describe("the write-time hook and root `check` read one set of roots", () => {
-  it("names every root of its own in a gate command too", () => {
-    expect(missingFrom(rootsIn(hookText), commentGateRoots())).toEqual([]);
+describe("the write-time hook and the Python gate share roots", () => {
+  it("finds every hook root in the Python gate's command", () => {
+    expect(missingFrom(rootsIn(hookText), pythonGateRoots())).toEqual([]);
   });
 
-  it("reads every root a gate command names, so no rule is learnt a pull request late", () => {
-    expect(missingFrom(commentGateRoots(), rootsIn(hookText))).toEqual([]);
+  it("reads every Python gate root, so rules bind before CI", () => {
+    expect(missingFrom(pythonGateRoots(), rootsIn(hookText))).toEqual([]);
   });
 
   it("reports a gap on either side, read off fixture text", () => {
-    const fixture = 'case "$RELATIVE" in\nnowhere/* | apps/*) ;;\n*) exit 0 ;;\nesac';
+    const fixture = '  case "$RELATIVE" in\n  nowhere/* | apps/*) ;;\n  *) exit 0 ;;\n  esac';
 
-    expect(missingFrom(rootsIn(fixture), commentGateRoots())).toEqual(["nowhere"]);
-    expect(missingFrom(commentGateRoots(), rootsIn(fixture))).toContain("packages");
+    expect(missingFrom(rootsIn(fixture), pythonGateRoots())).toEqual(["nowhere"]);
+    expect(missingFrom(pythonGateRoots(), rootsIn(fixture))).toContain("packages");
   });
 });
 
-describe("the write-time hook hands back the comment rule the edit broke", () => {
-  it("refuses a 40-word TypeScript comment, naming the count and its rule", () => {
+describe("the write-time hook hands back the broken comment rule", () => {
+  it("refuses a 40-word TypeScript comment, naming count and rule", () => {
     const run = edit("packages/probe/long.ts", `// ${FORTY_WORDS}\nexport const keep = 1;\n`);
 
     expect(run.status).toBe(2);
@@ -154,7 +151,7 @@ describe("the write-time hook hands back the comment rule the edit broke", () =>
     expect(run.stderr).toContain(tag("COMMENT", "1"));
   });
 
-  it("refuses a 40-word Python comment, naming the count and its rule", () => {
+  it("refuses a 40-word Python comment, naming count and rule", () => {
     const run = edit("packages/probe/long.py", `# ${FORTY_WORDS}\nKEEP = 1\n`);
 
     expect(run.status).toBe(2);
@@ -162,25 +159,18 @@ describe("the write-time hook hands back the comment rule the edit broke", () =>
     expect(run.stderr).toContain(tag("COMMENT", "1"));
   });
 
-  it.each([
-    ["a YAML file", "packages/probe/long.yml", `# ${FORTY_WORDS}\nkeep: 1\n`],
-    ["a shell file", "packages/probe/long.sh", `# ${FORTY_WORDS}\nKEEP=1\n`],
-    ["a TOML file", "packages/probe/long.toml", `# ${FORTY_WORDS}\nkeep = 1\n`],
-    ["a SQL file", "packages/probe/long.sql", `-- ${FORTY_WORDS}\nSELECT 1;\n`],
-    ["a root script", "scripts/long.mjs", `// ${FORTY_WORDS}\nexport const keep = 1;\n`],
-    ["a hook script", ".claude/hooks/long.sh", `# ${FORTY_WORDS}\nKEEP=1\n`],
-    ["a root configuration file", "lefthook.yml", `# ${FORTY_WORDS}\nkeep: 1\n`],
-    ["a workflow", ".github/workflows/probe.yml", `# ${FORTY_WORDS}\nname: probe\n`],
-    ["a deployment script", "deploy/probe.sh", `# ${FORTY_WORDS}\nKEEP=1\n`],
-  ])("refuses a 40-word comment in %s, naming the count and its rule", (_what, file, source) => {
-    const run = edit(file, source);
+  it.each([["a root script", "scripts/long.mjs", `// ${FORTY_WORDS}\nexport const keep = 1;\n`]])(
+    "refuses a 40-word comment in %s, naming count and rule",
+    (_what, file, source) => {
+      const run = edit(file, source);
 
-    expect(run.status).toBe(2);
-    expect(run.stderr).toContain("runs to 40 words");
-    expect(run.stderr).toContain(tag("COMMENT", "1"));
-  });
+      expect(run.status).toBe(2);
+      expect(run.stderr).toContain("runs to 40 words");
+      expect(run.stderr).toContain(tag("COMMENT", "1"));
+    },
+  );
 
-  it("reads a relative path against the session's directory, as the docs write one", () => {
+  it("reads a relative path against the session's directory", () => {
     const file = "packages/probe/relative.ts";
     writeUnder(tree, file, `// ${FORTY_WORDS}\nexport const keep = 1;\n`);
 
@@ -192,7 +182,7 @@ describe("the write-time hook hands back the comment rule the edit broke", () =>
     expect(run.status).toBe(2);
   });
 
-  it("refuses a comment citing a ticket, which is the gate's other condition", () => {
+  it("refuses a comment citing a ticket, the gate's other condition", () => {
     const citing =
       "// Kept because the claim protocol changed under T-243.\nexport const keep = 1;\n";
 
@@ -200,28 +190,16 @@ describe("the write-time hook hands back the comment rule the edit broke", () =>
   });
 });
 
-describe("the write-time hook is silent where the comment earns its place", () => {
+describe("the write-time hook passes a comment that earns its place", () => {
   it.each([
     ["a why inside the ceiling", "probe/why.ts", `// ${A_WHY_OF_TWENTY}\nexport const keep = 1;\n`],
     [
       "a linter directive",
       "probe/directive.ts",
-      "// oxlint-disable no-console\nexport const x = 1;\n",
+      "// oxlint-disable-next-line no-console -- the runner prints\nconsole.log(1);\n",
     ],
     ["a why inside the ceiling", "probe/why.py", `# ${A_WHY_OF_TWENTY}\nKEEP = 1\n`],
     ["a type-checker escape", "probe/directive.py", "# type: ignore[attr-defined]\nKEEP = 1\n"],
-    ["a why inside the ceiling", "probe/why.yml", `# ${A_WHY_OF_TWENTY}\nkeep: 1\n`],
-    [
-      "an editor schema line",
-      "probe/directive.yml",
-      "# yaml-language-server: $schema=x\nkeep: 1\n",
-    ],
-    ["a why inside the ceiling", "probe/why.sh", `# ${A_WHY_OF_TWENTY}\nKEEP=1\n`],
-    ["a shellcheck directive", "probe/directive.sh", "# shellcheck disable=SC2016\nKEEP=1\n"],
-    ["a why inside the ceiling", "probe/why.toml", `# ${A_WHY_OF_TWENTY}\nkeep = 1\n`],
-    ["a renovate directive", "probe/directive.toml", "# renovate: datasource=docker\nkeep = 1\n"],
-    ["a why inside the ceiling", "probe/why.sql", `-- ${A_WHY_OF_TWENTY}\nSELECT 1;\n`],
-    ["a migration separator", "probe/directive.sql", "SELECT 1;\n--> statement-breakpoint\n"],
   ])("lets %s through", (_what, file, source) => {
     const run = edit(`packages/${file}`, source);
 
@@ -230,9 +208,12 @@ describe("the write-time hook is silent where the comment earns its place", () =
   });
 
   it.each([
-    ["a workflow", ".github/workflows/why.yml", `# ${A_WHY_OF_TWENTY}\nname: probe\n`],
-    ["a deployment script", "deploy/why.sh", `# ${A_WHY_OF_TWENTY}\nKEEP=1\n`],
-  ])("lets a why of twenty words through in %s", (_what, file, source) => {
+    ["a YAML file", "packages/probe/long.yml", `# ${FORTY_WORDS}\nkeep: 1\n`],
+    ["a shell file", "packages/probe/long.sh", `# ${FORTY_WORDS}\nKEEP=1\n`],
+    ["a TOML file", "packages/probe/long.toml", `# ${FORTY_WORDS}\nkeep = 1\n`],
+    ["a SQL file", "packages/probe/long.sql", `-- ${FORTY_WORDS}\nSELECT 1;\n`],
+    ["a workflow", ".github/workflows/long.yml", `# ${FORTY_WORDS}\nname: probe\n`],
+  ])("lets a 40-word comment in %s through, being no Python", (_what, file, source) => {
     const run = edit(file, source);
 
     expect(run.status).toBe(0);
@@ -242,13 +223,20 @@ describe("the write-time hook is silent where the comment earns its place", () =
 
 describe("the write-time hook speaks only for what root `check` gates", () => {
   it.each([
-    ["a file outside apps and packages", "tools/loose.ts"],
+    ["a Python file outside every root the Python gate walks", "tools/loose.py"],
     ["a file the gate has no reader for", "packages/probe/notes.md"],
   ])("walks past %s", (_what, file) => {
     expect(edit(file, `// ${FORTY_WORDS}\nexport const keep = 1;\n`).status).toBe(0);
   });
 
-  it("walks past a path no checkout owns rather than refusing the edit", () => {
+  it("refuses TypeScript outside the Python roots, which lint walks too", () => {
+    const run = edit("tools/loose.ts", `// ${FORTY_WORDS}\nexport const keep = 1;\n`);
+
+    expect(run.status).toBe(2);
+    expect(run.stderr).toContain("runs to 40 words");
+  });
+
+  it("walks past a path no checkout owns", () => {
     const loose = path.join(scratch, "unowned.ts");
     writeUnder(scratch, "unowned.ts", `// ${FORTY_WORDS}\nexport const keep = 1;\n`);
 
@@ -267,24 +255,83 @@ describe("the write-time hook speaks only for what root `check` gates", () => {
   it.each(skippable())("walks past %s, which the root run never reads", (_pattern, probe) => {
     expect(edit(probe, `// ${FORTY_WORDS}\nexport const keep = 1;\n`).status).toBe(0);
   });
+});
 
-  it("leaves no ignore pattern of the config's unaccounted for", () => {
-    const unreached = ignorePatterns().filter((pattern) => probeUnder(pattern) === undefined);
+describe("the write-time hook runs the root config's comment rules", () => {
+  it.each([
+    ["a TODO", "packages/probe/todo.ts", "// TODO: file the ticket\n", "no-warning-comments"],
+    ["`@ts-ignore`", "packages/probe/ignore.ts", "// @ts-ignore\n", "ban-ts-comment"],
+    [
+      "`@ts-ignore`, naming the directive to use",
+      "packages/probe/prefer.ts",
+      "// @ts-ignore\n",
+      "prefer-ts-expect-error",
+    ],
+    [
+      "a disable that names no rule",
+      "packages/probe/blanket.ts",
+      "/* eslint-disable */\n",
+      "no-abusive-eslint-disable",
+    ],
+    [
+      "a 40-word comment",
+      "packages/probe/long-named.ts",
+      `// ${FORTY_WORDS}\n`,
+      "comment-only-the-why",
+    ],
+    [
+      "a disable with no reason",
+      "packages/probe/bare.ts",
+      "// oxlint-disable-next-line no-console\nconsole.log(1);\n",
+      "gives no reason",
+    ],
+    [
+      "a disable that suppresses nothing",
+      "packages/probe/unused.ts",
+      "// oxlint-disable-next-line no-console -- the runner prints\n",
+      "Unused oxlint-disable directive",
+    ],
+    [
+      "a string citing a ticket",
+      "packages/probe/usage.ts",
+      'export const usage = "Ask the owner about T-243 first.";\n',
+      "string-cites-nothing",
+    ],
+  ])("refuses %s, as root lint does", (_what, file, source, named) => {
+    const run = edit(file, `${source}export const keep = 1;\n`);
 
-    expect(unreached.filter((p) => p.startsWith("apps/") || p.startsWith("packages/"))).toEqual([]);
+    expect(run.status).toBe(2);
+    expect(run.stderr).toContain(named);
   });
 });
 
-describe("the write-time hook blames a comment only when the gate names one", () => {
-  it("lets a half-written file through rather than calling a parse error a comment", () => {
+describe("the write-time hook blames only a comment the gate names", () => {
+  it("lets a half-written file through without blaming a comment", () => {
     const run = edit("packages/probe/broken.ts", "export const broken = (\n");
 
     expect(run.status).toBe(0);
     expect(run.stderr).toContain("without naming a comment");
   });
+
+  it("lets through a line only another rule refuses", () => {
+    const run = edit("packages/probe/prints.ts", "console.log(1);\nexport const keep = 1;\n");
+
+    expect(run.status).toBe(0);
+    expect(run.stderr).toContain("without naming a comment");
+  });
+
+  it("hands back only the comment's line beside another failing rule", () => {
+    const run = edit(
+      "packages/probe/both.ts",
+      `// ${FORTY_WORDS}\nconsole.log(1);\nexport const keep = 1;\n`,
+    );
+
+    expect(run.status).toBe(2);
+    expect(run.stderr).not.toContain("no-console");
+  });
 });
 
-describe("the write-time hook refuses nothing when it cannot run the gate", () => {
+describe("the write-time hook refuses nothing when the gate cannot run", () => {
   const bare = throwawayRepository(path.join(scratch, "bare"));
 
   it.each([
@@ -303,16 +350,6 @@ describe("the write-time hook refuses nothing when it cannot run the gate", () =
   });
 });
 
-// Two readings of one list, each read here rather than restated, so neither drifts.
-const tableSuffixes = (): readonly string[] => {
-  const source = readFileSync(path.join(repositoryRoot, checkerPath()), "utf8");
-  const table = /SYNTAX[^{]*\{(?<body>[^}]*)\}/.exec(source)?.groups?.["body"];
-  if (table === undefined) {
-    throw new Error(`${checkerPath()} carries no syntax table this reading can find.`);
-  }
-  return [...table.matchAll(/"(?<suffix>\.\w+)"/g)].map((found) => found.groups?.["suffix"] ?? "");
-};
-
 const branchSuffixes = (): readonly string[] => {
   const branch = [...hookText.matchAll(/^(?<case>\*\..*)\)$/gm)]
     .map((found) => found.groups?.["case"] ?? "")
@@ -323,13 +360,9 @@ const branchSuffixes = (): readonly string[] => {
   return branch.split("|").map((one) => one.trim().replace(/^\*/, ""));
 };
 
-describe("the write-time hook runs the same gate the root check runs", () => {
-  it("names the config `comment-gate:ts` names", () => {
-    expect(hookText).toContain(configPath());
-  });
-
-  it("dispatches to the checker on every file type its syntax table reads", () => {
-    expect([...branchSuffixes()].sort()).toEqual([...tableSuffixes()].sort());
+describe("the write-time hook runs the root check's own gate", () => {
+  it("dispatches to the checker on Python files alone", () => {
+    expect(branchSuffixes()).toEqual([".py"]);
   });
 
   it("names the checker `comment-gate:python` names", () => {
@@ -357,12 +390,12 @@ const wiring = (): readonly { matcher: string | undefined; timeout: number | und
   );
 };
 
-describe("the write-time hook is wired where the project's other hooks are", () => {
+describe("the write-time hook is wired beside the project's other hooks", () => {
   it("runs after an edit and after a write, once", () => {
     expect(wiring().map((entry) => entry.matcher)).toEqual(["Edit|Write"]);
   });
 
-  it("carries a timeout, because an unbounded gate would hang the edit", () => {
+  it("carries a timeout, since an unbounded gate hangs the edit", () => {
     expect(wiring().map((entry) => entry.timeout)).toEqual([15]);
   });
 });

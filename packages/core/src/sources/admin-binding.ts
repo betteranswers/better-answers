@@ -20,13 +20,19 @@ export const BINDING_ID = boundarySchemas.sourceBinding.select.shape.id;
 
 export type BindingId = z.output<typeof BINDING_ID>;
 
+export const BINDING_VISIBILITY = boundarySchemas.sourceBinding.select.pick({
+  sensitivity: true,
+  audience: true,
+  audienceGroups: true,
+});
+
 export type ActingOnBinding = {
   readonly admin: AdminUserPrincipal;
   readonly workspaceId: WorkspaceId;
   readonly bindingId: BindingId;
 };
 
-// The platform carries no workspace, so its standing names the one its act was asked for.
+/** The platform carries no workspace, so its standing names the one its act was asked for. */
 export type PlatformOnBinding = {
   readonly platform: PlatformPrincipal;
   readonly workspaceId: WorkspaceId;
@@ -50,6 +56,10 @@ type BindingRead = {
 
 type BindingNamedRefusal = SourceRefusal<"no-such-binding"> | Error;
 
+/**
+ * `columns` is spliced into the SQL unescaped, so it takes a literal list, never input.
+ * `for-update` holds the row until the transaction ends.
+ */
 export const bindingNamed = async <Row extends TxRow>(
   acting: ActingOnBinding | PlatformOnBinding,
   tx: Tx,

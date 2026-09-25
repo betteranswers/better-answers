@@ -19,13 +19,13 @@ describe("the ambient-clock scan itself", () => {
     expect(ambientClockReadsIn("const ms = Date.now();")).toEqual(["Date.now()"]);
   });
 
-  it("stays silent on a `Date` built from an argument, however it is spaced", () => {
+  it("stays silent on a `Date` built from an argument", () => {
     expect(ambientClockReadsIn("const at = new Date(iso);")).toEqual([]);
     expect(ambientClockReadsIn("const epoch = new Date(0);")).toEqual([]);
     expect(ambientClockReadsIn("const from = new Date(request.at);")).toEqual([]);
   });
 
-  it("stays silent on a `now()` this file did not name `Date`", () => {
+  it("stays silent on a `now()` not called on `Date`", () => {
     expect(ambientClockReadsIn("const at = clock.now();")).toEqual([]);
     expect(ambientClockReadsIn("const at = now();")).toEqual([]);
   });
@@ -40,7 +40,7 @@ const CLOCK_CONSTRUCTOR = "packages/core/src/kernel/clock.ts";
 
 const ULID_MINTER = "packages/schema/src/ulid.ts";
 
-describe("no ambient clock read outside its two named exemptions (ADR 0040)", () => {
+describe("no ambient clock read outside its two named exemptions", () => {
   it("finds none in packages/core/src, apps/api/src or packages/schema/src", () => {
     const files = [
       ...tsFilesUnder(path.join(repositoryRoot, "packages/core/src")),
@@ -56,12 +56,12 @@ describe("no ambient clock read outside its two named exemptions (ADR 0040)", ()
     expect(findings).toEqual([]);
   });
 
-  it("the kernel's constructor is one of the two files this scan does not cover, and it is the one that reads the clock", () => {
+  it("finds the clock read in the kernel's exempt constructor", () => {
     const source = readFileSync(path.join(repositoryRoot, CLOCK_CONSTRUCTOR), "utf8");
     expect(ambientClockReadsIn(source)).toEqual(["new Date()"]);
   });
 
-  it("the ULID minter is the other file this scan does not cover, and it is the one that reads the clock", () => {
+  it("finds the clock read in the exempt ULID minter", () => {
     const source = readFileSync(path.join(repositoryRoot, ULID_MINTER), "utf8");
     expect(ambientClockReadsIn(source)).toEqual(["Date.now()"]);
   });

@@ -10,7 +10,13 @@ import {
 } from "@better-answers/schema";
 import { z } from "zod";
 
-import { readableClause, readableParameters, readsSensitivity, widens } from "../access/index.ts";
+import {
+  readableClause,
+  readableParameters,
+  readsSensitivity,
+  widens,
+  type Visibility,
+} from "../access/index.ts";
 import { act, declareActs, record } from "../audit/index.ts";
 import {
   actorIdOf,
@@ -39,6 +45,7 @@ import {
   withRepositoryLock,
   type CommitAuthor,
   type CommitRefusal,
+  type Committed,
   type GitDoor,
 } from "../store/git/index.ts";
 import { withMembership, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
@@ -47,6 +54,7 @@ import {
   renderConceptFile,
   type Frontmatter,
   type FrontmatterSource,
+  type HashedSource,
 } from "./file.ts";
 import {
   payloadFor,
@@ -65,6 +73,7 @@ import {
   indexRowOf,
   landRows,
   WRITE_CONSTRAINTS,
+  type Held,
 } from "./landing.ts";
 import {
   authorOf,
@@ -176,6 +185,10 @@ type EvidenceInput = {
   readonly contentVersion?: string;
 };
 
+/**
+ * `head` expects the bundle's head commit, `null` for an empty bundle; `base` expects the
+ * standing concept's content hash, `null` for a new concept.
+ */
 type WritePrecondition = { readonly head: string | null } | { readonly base: string | null };
 
 export type Acceptance = {
@@ -247,18 +260,31 @@ const fileFrontmatterOf = (input: WriteConceptInput, iri: string) => {
   return named;
 };
 
+type WriteDoors = { readonly git: GitDoor; readonly postgres: PostgresDoor; readonly clock: Clock };
+
+const requestRefusalOf = (
+  principal: UserPrincipal,
+  input: WriteConceptInput,
+): WriteConceptRefusal | undefined => {
+  if (!mayWrite(principal)) return "role-forbids";
+  if (input.acceptance === undefined) return undefined;
+  const admin = requireAdmin(principal);
+  if (!admin.ok) return admin.error;
+  return "base" in input.expects ? undefined : "malformed";
+};
+
+/**
+ * Commits one concept file under the repository lock, then writes its rows and audit event in
+ * one transaction. An `iri` edits a concept that must already stand; an `acceptance` asks for
+ * an Admin and a `base` precondition.
+ */
 export const writeConcept = async (
   principal: UserPrincipal,
-  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor; readonly clock: Clock },
+  doors: WriteDoors,
   input: WriteConceptInput,
 ): Promise<Result<ConceptWritten, WriteConceptRefusal | Error>> => {
-  if (!mayWrite(principal)) return err("role-forbids");
-
-  if (input.acceptance !== undefined) {
-    const admin = requireAdmin(principal);
-    if (!admin.ok) return err(admin.error);
-    if (!("base" in input.expects)) return err("malformed");
-  }
+  const refused = requestRefusalOf(principal, input);
+  if (refused !== undefined) return err(refused);
 
   const iri = input.iri ?? conceptIriOf(ulid());
   const frontmatter = fileFrontmatterOf(input, iri);
@@ -278,157 +304,235 @@ export const writeConcept = async (
 
   const auditEventId = ulid();
 
-  return withRepositoryLock(principal, doors.git, async () => {
-    const existing = await attempt(() =>
-      withMembership(principal, doors.postgres, async (fresh, tx) => {
-        const held = await heldByIri(fresh, tx, iri);
-        return {
-          held,
+  return withRepositoryLock(principal, doors.git, () =>
+    writeUnderLock(principal, doors, {
+      input,
+      iri,
+      frontmatter,
+      contentHash,
+      sources,
+      mergeKey: mergeKey.data,
+      evidence: evidence.data,
+      auditEventId,
+    }),
+  );
+};
 
-          derived:
-            held === undefined
-              ? undefined
-              : await conceptVisibilityFrom(fresh, tx, {
-                  iri,
-                  kind: foldKind(input.kind),
-                  fallback: heldVisibilityOf(held),
-                  citing: evidence.data.map((piece) => piece.sourceDocumentId),
-                }),
+type ParsedWrite = {
+  readonly input: WriteConceptInput;
+  readonly iri: string;
+  readonly frontmatter: Frontmatter;
+  readonly contentHash: string;
+  readonly sources: readonly HashedSource[];
+  readonly mergeKey: string;
+  readonly evidence: readonly z.infer<typeof boundarySchemas.evidence.insert>[];
+  readonly auditEventId: string;
+};
 
-          catalogued: await holdsEveryDocument(
-            fresh,
-            tx,
-            evidence.data.map((piece) => piece.sourceDocumentId),
-          ),
+type Existing = {
+  readonly held: Held | undefined;
+  readonly derived: Visibility | undefined;
+  readonly catalogued: boolean;
+  readonly resolved: string | undefined;
+  readonly holder: string | undefined;
+  readonly waiting: boolean;
+};
 
-          resolved: await targetOfMergeKey(fresh, tx, input.mergeKey),
-          holder: await holderOfPath(fresh, tx, input.path),
-          waiting:
-            input.acceptance === undefined ||
-            (await suggestionIsWaiting(fresh, tx, input.acceptance.suggestionId)),
-        };
-      }),
-    );
-    if (!existing.ok) return err(existing.error);
-    if (!existing.value.ok) return err(existing.value.error);
-    const { held, derived, resolved, holder, waiting, catalogued } = existing.value.value;
+type IndexRow = Extract<ReturnType<typeof indexRowOf>, { readonly success: true }>["data"];
 
-    if (input.iri !== undefined && held === undefined) return err("no-such-concept");
+const writeUnderLock = async (
+  principal: UserPrincipal,
+  doors: WriteDoors,
+  write: ParsedWrite,
+): Promise<Result<ConceptWritten, WriteConceptRefusal | Error>> => {
+  const existing = await existingOf(principal, doors.postgres, write);
+  if (!existing.ok) return err(existing.error);
+  if (!existing.value.ok) return err(existing.value.error);
+  const refusal = writeRefusalOf(write, existing.value.value);
+  if (refusal !== undefined) return err(refusal);
 
-    if (!catalogued) return err("no-such-document");
+  const now = doors.clock.now();
+  const parsed = indexRowOf(
+    {
+      workspaceId: principal.workspaceId,
+      iri: write.iri,
+      path: write.input.path,
+      kind: write.input.kind,
+      title: write.input.title,
+      frontmatter: write.frontmatter,
+      body: write.input.body,
+      contentHash: write.contentHash,
+      status: write.input.status,
+      sensitivity: write.input.sensitivity,
+    },
+    existing.value.value.held,
+    now,
+  );
+  if (!parsed.success) return err("malformed");
+  const row = parsed.data;
 
-    if (!waiting) return err("already-decided");
+  const committed = await commitWrite(principal, doors.git, write, row.path, now);
+  if (!committed.ok) return err(committed.error);
 
-    if (resolved !== undefined && resolved !== iri) return err("merge-key-taken");
+  const landed = await landWrite(principal, doors.postgres, write, row, committed.value);
+  if (!landed.ok) return err(landed.error);
 
-    if (input.acceptance !== undefined && input.iri !== undefined && resolved !== iri) {
-      return err("resolution-moved");
-    }
+  return ok({
+    iri: row.iri,
+    sha: committed.value.sha,
+    auditEventId: write.auditEventId,
+    contentHash: write.contentHash,
+  });
+};
 
-    if ("base" in input.expects && (held?.contentHash ?? null) !== input.expects.base) {
-      return err("stale-precondition");
-    }
-    if (held !== undefined && held.path !== input.path) return err("rename-refused");
-    if (holder !== undefined && holder !== iri) return err("path-taken");
-    if (
+const existingOf = (principal: UserPrincipal, postgres: PostgresDoor, write: ParsedWrite) =>
+  attempt(() =>
+    withMembership(principal, postgres, async (fresh, tx): Promise<Existing> => {
+      const { input, iri } = write;
+      const held = await heldByIri(fresh, tx, iri);
+      return {
+        held,
+
+        derived:
+          held === undefined
+            ? undefined
+            : await conceptVisibilityFrom(fresh, tx, {
+                iri,
+                kind: foldKind(input.kind),
+                fallback: heldVisibilityOf(held),
+                citing: write.evidence.map((piece) => piece.sourceDocumentId),
+              }),
+
+        catalogued: await holdsEveryDocument(
+          fresh,
+          tx,
+          write.evidence.map((piece) => piece.sourceDocumentId),
+        ),
+
+        resolved: await targetOfMergeKey(fresh, tx, input.mergeKey),
+        holder: await holderOfPath(fresh, tx, input.path),
+        waiting:
+          input.acceptance === undefined ||
+          (await suggestionIsWaiting(fresh, tx, input.acceptance.suggestionId)),
+      };
+    }),
+  );
+
+/** Order is precedence: the first entry that holds is the word the caller reads. */
+const WRITE_REFUSALS: readonly (readonly [
+  WriteConceptRefusal,
+  (write: ParsedWrite, existing: Existing) => boolean,
+])[] = [
+  ["no-such-concept", ({ input }, { held }) => input.iri !== undefined && held === undefined],
+  ["no-such-document", (_, { catalogued }) => !catalogued],
+  ["already-decided", (_, { waiting }) => !waiting],
+  ["merge-key-taken", ({ iri }, { resolved }) => resolved !== undefined && resolved !== iri],
+  [
+    "resolution-moved",
+    ({ input, iri }, { resolved }) =>
+      input.acceptance !== undefined && input.iri !== undefined && resolved !== iri,
+  ],
+  [
+    "stale-precondition",
+    ({ input }, { held }) =>
+      "base" in input.expects && (held?.contentHash ?? null) !== input.expects.base,
+  ],
+  ["rename-refused", ({ input }, { held }) => held !== undefined && held.path !== input.path],
+  ["path-taken", ({ iri }, { holder }) => holder !== undefined && holder !== iri],
+  [
+    "reclassification-refused",
+    ({ input }, { held }) =>
       held !== undefined &&
       input.sensitivity !== undefined &&
-      input.sensitivity !== held.sensitivity
-    ) {
-      return err("reclassification-refused");
-    }
+      input.sensitivity !== held.sensitivity,
+  ],
+  [
+    "widening-refused",
+    (_, { held, derived }) =>
+      held !== undefined && derived !== undefined && widens(heldVisibilityOf(held), derived),
+  ],
+];
 
-    if (held !== undefined && derived !== undefined && widens(heldVisibilityOf(held), derived)) {
-      return err("widening-refused");
-    }
+const writeRefusalOf = (write: ParsedWrite, existing: Existing): WriteConceptRefusal | undefined =>
+  WRITE_REFUSALS.find(([, refuses]) => refuses(write, existing))?.[0];
 
-    const now = doors.clock.now();
-    const parsed = indexRowOf(
-      {
-        workspaceId: principal.workspaceId,
-        iri,
-        path: input.path,
-        kind: input.kind,
-        title: input.title,
-        frontmatter,
-        body: input.body,
-        contentHash,
-        status: input.status,
-        sensitivity: input.sensitivity,
-      },
-      held,
-      now,
-    );
-    if (!parsed.success) return err("malformed");
-    const row = parsed.data;
+const commitWrite = async (
+  principal: UserPrincipal,
+  git: GitDoor,
+  write: ParsedWrite,
+  path: string,
+  at: Date,
+) => {
+  const { input } = write;
+  return commitToBundle(principal, git, {
+    path,
+    content: renderConceptFile(write.frontmatter, input.body),
+    message: input.message,
+    author: input.author,
+    trailers: {
+      actor: actorIdOf(principal),
+      audit: write.auditEventId,
 
-    const committed = await commitToBundle(principal, doors.git, {
-      path: row.path,
-      content: renderConceptFile(frontmatter, input.body),
-      message: input.message,
-      author: input.author,
-      trailers: {
-        actor: actorIdOf(principal),
-        audit: auditEventId,
+      suggestion: input.acceptance?.suggestionId,
+    },
 
-        suggestion: input.acceptance?.suggestionId,
-      },
-
-      expectedHead: "head" in input.expects ? input.expects.head : await head(principal, doors.git),
-      at: now,
-    });
-    if (!committed.ok) return err(committed.error);
-
-    const landed = await attempt(() =>
-      withMembership(principal, doors.postgres, async (fresh, tx) => {
-        const acceptance = input.acceptance;
-        if (acceptance === undefined) {
-          await record(fresh, tx, {
-            id: auditEventId,
-            act: CONCEPT_ACTS.committed,
-            subjectId: row.iri,
-            detail: {
-              iri: row.iri,
-              commitSha: committed.value.sha,
-              contentHash,
-              evidenceCount: evidence.data.length,
-            },
-          });
-        } else {
-          await record(fresh, tx, {
-            id: auditEventId,
-            act: CONCEPT_ACTS.accepted,
-            subjectId: acceptance.suggestionId,
-            batchId: acceptance.batchId,
-            detail: {
-              iri: row.iri,
-              commitSha: committed.value.sha,
-              contentHash,
-              setId: acceptance.setId,
-            },
-          });
-        }
-        await landRows(fresh, tx, {
-          ...row,
-          mergeKey: mergeKey.data,
-          commit: committed.value,
-          actor: actorIdOf(fresh),
-          auditEventId,
-          sources,
-          evidence: evidence.data,
-          restsAlsoOn: [],
-          acceptance,
-        });
-      }),
-    );
-    if (!landed.ok) {
-      const named = refusalFor(landed.error, WRITE_CONSTRAINTS);
-      return err(typeof named === "string" ? named : landed.error);
-    }
-    if (!landed.value.ok) return err(landed.value.error);
-
-    return ok({ iri: row.iri, sha: committed.value.sha, auditEventId, contentHash });
+    expectedHead: "head" in input.expects ? input.expects.head : await head(principal, git),
+    at,
   });
+};
+
+const landWrite = async (
+  principal: UserPrincipal,
+  postgres: PostgresDoor,
+  write: ParsedWrite,
+  row: IndexRow,
+  committed: Committed,
+): Promise<Result<void, WriteConceptRefusal | Error>> => {
+  const landed = await attempt(() =>
+    withMembership(principal, postgres, async (fresh, tx) => {
+      const acceptance = write.input.acceptance;
+      if (acceptance === undefined) {
+        await record(fresh, tx, {
+          id: write.auditEventId,
+          act: CONCEPT_ACTS.committed,
+          subjectId: row.iri,
+          detail: {
+            iri: row.iri,
+            commitSha: committed.sha,
+            contentHash: write.contentHash,
+            evidenceCount: write.evidence.length,
+          },
+        });
+      } else {
+        await record(fresh, tx, {
+          id: write.auditEventId,
+          act: CONCEPT_ACTS.accepted,
+          subjectId: acceptance.suggestionId,
+          batchId: acceptance.batchId,
+          detail: {
+            iri: row.iri,
+            commitSha: committed.sha,
+            contentHash: write.contentHash,
+            setId: acceptance.setId,
+          },
+        });
+      }
+      await landRows(fresh, tx, {
+        ...row,
+        mergeKey: write.mergeKey,
+        commit: committed,
+        actor: actorIdOf(fresh),
+        auditEventId: write.auditEventId,
+        sources: write.sources,
+        evidence: write.evidence,
+        restsAlsoOn: [],
+        acceptance,
+      });
+    }),
+  );
+  if (landed.ok) return landed.value;
+  const named = refusalFor(landed.error, WRITE_CONSTRAINTS);
+  return err(typeof named === "string" ? named : landed.error);
 };
 
 export type AcceptanceDecision = {
@@ -935,6 +1039,7 @@ const openedOf = (row: ConceptRow): OpenedConcept => ({
   check: checkOf(row),
 });
 
+/** `undefined` both when no concept holds the iri and when this principal may not read it. */
 export const conceptByIri = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -954,6 +1059,10 @@ export const conceptByIri = async (
 
 const likeEscaped = (text: string): string => text.replaceAll(/[\\%_]/g, String.raw`\$&`);
 
+/**
+ * Matches the trimmed query as literal text, ignoring case, in a readable concept's title or
+ * body, ordered by title. A blank query or a `limit` under 1 finds nothing.
+ */
 export const findConcepts = async (
   principal: UserPrincipal,
   tx: Tx,

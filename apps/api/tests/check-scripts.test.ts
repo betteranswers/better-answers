@@ -13,7 +13,7 @@ const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 const read = (relative: string): string =>
   readFileSync(path.join(repositoryRoot, relative), "utf8");
 
-// A manifest without `scripts` reads as a workspace with none.
+/** A manifest without `scripts` reads as a workspace with none. */
 const manifest = z.object({ scripts: z.record(z.string(), z.string()).optional() });
 type Manifest = z.infer<typeof manifest>;
 
@@ -30,11 +30,11 @@ const scriptsOf = (directory: string): Readonly<Record<string, string>> =>
 
 const NO_CHECK: Readonly<Record<string, string>> = {
   "packages/design-system":
-    "CSS tokens, a stylesheet and guideline cards as HTML — nothing executable to lint, type or test; the workspace exists so apps/web can import the stylesheet by name (ADR 0029)",
+    "CSS tokens, a stylesheet and guideline cards as HTML — nothing executable to lint, type or test; the workspace exists so apps/web can import the stylesheet by name",
 };
 
-describe("the workspaces' scripts (T-068)", () => {
-  it("holds every workspace the repository installs, not a list that ages alone", () => {
+describe("the workspaces' scripts", () => {
+  it("reads every workspace the repository installs, not a fixed list", () => {
     const directories = workspacePackages();
 
     expect(directories.length).toBeGreaterThan(0);
@@ -44,7 +44,7 @@ describe("the workspaces' scripts (T-068)", () => {
     expect(directories).toContain("packages/schema");
   });
 
-  it("has no test script that passes when it finds no tests", () => {
+  it("has no test script that passes with no tests", () => {
     const passing = workspacePackages().flatMap((directory) => {
       const test = scriptsOf(directory)["test"];
       return test !== undefined && test.includes("--passWithNoTests")
@@ -58,7 +58,7 @@ describe("the workspaces' scripts (T-068)", () => {
     ).toEqual([]);
   });
 
-  it("gates every workspace, or names the one it does not and why", () => {
+  it("gates every workspace, or names why one has no check", () => {
     const withoutCheck = workspacePackages()
       .filter((directory) => scriptsOf(directory)["check"] === undefined)
       .sort();
@@ -74,7 +74,7 @@ describe("the workspaces' scripts (T-068)", () => {
     ).toEqual([]);
   });
 
-  it("keeps the root check running a workspace that has a check and skipping one that has none", () => {
+  it("runs each workspace's check from the root, skipping one without", () => {
     const recursive = Object.values(scriptsOf(".")).filter(
       (script) => script.includes("-r ") && script.includes("run check"),
     );
@@ -85,8 +85,10 @@ describe("the workspaces' scripts (T-068)", () => {
   });
 });
 
-// The tree's oxlint runs once from the root; a workspace copy would annotate every warning
-// twice, on paths CI cannot place on a diff.
+/**
+ * The tree's oxlint runs once from the root; a workspace copy would annotate every warning
+ * twice, on paths CI cannot place on a diff.
+ */
 const GATE_STEPS = ["lint:python", "lint:python-format", "typecheck", "test", "e2e"] as const;
 
 const RUNNER = /^node\s+(?:\.\.\/)*scripts\/check\.mjs\s+(?<steps>.+)$/;
@@ -94,8 +96,8 @@ const RUNNER = /^node\s+(?:\.\.\/)*scripts\/check\.mjs\s+(?<steps>.+)$/;
 const stepsOf = (check: string): readonly string[] =>
   (RUNNER.exec(check)?.groups?.["steps"] ?? "").split(/\s+/).filter((step) => step.length > 0);
 
-describe("one run of check names every failure (T-068)", () => {
-  it("runs a workspace's every gate through the runner rather than chaining them", () => {
+describe("one run of check names every failure", () => {
+  it("runs a workspace's gates through the runner, never chained", () => {
     const chained = workspacePackages().flatMap((directory) => {
       const check = scriptsOf(directory)["check"];
 
@@ -110,7 +112,7 @@ describe("one run of check names every failure (T-068)", () => {
     ).toEqual([]);
   });
 
-  it("names each of a workspace's gates as a step, and nothing that is not a script", () => {
+  it("names exactly a workspace's gates as its steps", () => {
     for (const directory of workspacePackages()) {
       const scripts = scriptsOf(directory);
       const check = scripts["check"];
@@ -123,7 +125,7 @@ describe("one run of check names every failure (T-068)", () => {
     }
   });
 
-  it("runs the root's own steps the same way, so a step is added by naming it", () => {
+  it("runs the root's own steps through the same runner", () => {
     const scripts = scriptsOf(".");
     const steps = stepsOf(scripts["check"] ?? "");
 
@@ -135,10 +137,10 @@ describe("one run of check names every failure (T-068)", () => {
   });
 });
 
-describe("the gates a branch never narrows (T-099)", () => {
-  it("are the root check's own steps ahead of check:workspaces, each a tool over the whole tree", () => {
+describe("the gates a branch never narrows", () => {
+  it("come before the tiers, each running over the whole tree", () => {
     const scripts = scriptsOf(".");
-    // Expanded, because the root check names `check:gates` and the gates are that script's.
+    /** Expanded, because the root check names `check:gates` and the gates are that script's. */
     const steps = gatesNamed(scripts["check"] ?? "");
     const tiers = steps.indexOf("check:workspaces");
     const gates = steps.slice(0, tiers);
@@ -159,8 +161,8 @@ const throwaway = mkdtempSync(path.join(tmpdir(), "check-runner-"));
 
 afterAll(() => rmSync(throwaway, { recursive: true, force: true }));
 
-describe("the check runner (T-068)", () => {
-  it("runs every step it was given, and ends by naming the ones that failed", () => {
+describe("the check runner", () => {
+  it("runs every step given, then names the ones that failed", () => {
     writeFileSync(
       path.join(throwaway, "package.json"),
       JSON.stringify({

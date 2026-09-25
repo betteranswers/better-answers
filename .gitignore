@@ -62,6 +62,12 @@ AGENTS.md.bak
 !.claude/skills/browser-suite/
 !.claude/skills/renovate-prs/
 !.claude/skills/better-answers-design
+!.claude/skills/code-comments/
+!.claude/skills/complexity-gate/
+!.claude/skills/human-writing/
+!.claude/skills/mutation-testing/
+!.claude/skills/repo-quality-sweep/
+!.claude/skills/THIRD_PARTY_NOTICES.md
 .agents/
 tasks/AGENTS.md
 apps/api/.claude/skills/*

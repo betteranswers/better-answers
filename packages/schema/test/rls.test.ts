@@ -3050,23 +3050,18 @@ describe("the suppression under both runtime roles", () => {
       ]);
 
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
-      const gathered = await client.query<{ document_id: string; identifiers: unknown }>(
-        "SELECT document_id, identifiers FROM suppression",
+      const gathered = await client.query<{ erasure_request_id: string; identifiers: unknown }>(
+        "SELECT erasure_request_id, identifiers FROM suppression",
       );
       expect(gathered.rows).toEqual([
-        { document_id: suppression.documentId, identifiers: suppression.identifiers },
+        { erasure_request_id: suppression.erasureRequestId, identifiers: suppression.identifiers },
       ]);
 
       await refusesEach(client, [
         [
           A_SUPPRESSION,
-          "the routine writes suppressions under the platform principal, so a worker that could insert one could suppress a document nobody asked about",
-          [
-            WS_A,
-            suppression.erasureRequestId,
-            suppression.documentId,
-            '{"emails": ["x@y.invalid"], "names": [], "other": []}',
-          ],
+          "the routine writes suppressions under the platform principal, so a worker that could insert one could withhold a person nobody asked about",
+          [WS_A, ulid(), '{"emails": ["x@y.invalid"], "names": [], "other": []}'],
         ],
         [
           `UPDATE suppression SET identifiers = '{"emails": [], "names": [], "other": []}'::jsonb`,
@@ -3088,11 +3083,10 @@ describe("the suppression under both runtime roles", () => {
     });
   });
 
-  it("refuses a suppression that keeps nothing out, and one naming another tenant's rows", async () => {
+  it("refuses a suppression that keeps nothing out, a second for one erasure request, and one naming another tenant's request", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const mine = await seed.suppression({ workspaceId: WS_A });
-      const theirDocument = await seed.sourceDocument({ workspaceId: WS_B });
       const theirRoutine = await seed.erasureRequest({ workspaceId: WS_B });
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
@@ -3103,13 +3097,17 @@ describe("the suppression under both runtime roles", () => {
 
       const rows: readonly [string, readonly unknown[], string][] = [
         [
-          `UPDATE suppression SET identifiers = '${empty}'::jsonb WHERE document_id = $1`,
-          [mine.documentId],
+          `UPDATE suppression SET identifiers = '${empty}'::jsonb WHERE erasure_request_id = $1`,
+          [mine.erasureRequestId],
           "suppression_identifiers_check",
         ],
 
-        [insert, [WS_A, mine.erasureRequestId, theirDocument.id, set], "suppression_document_fk"],
-        [insert, [WS_A, theirRoutine.id, mine.documentId, set], "suppression_erasure_request_fk"],
+        [
+          insert,
+          [WS_A, mine.erasureRequestId, set],
+          "suppression_workspace_id_erasure_request_id_pk",
+        ],
+        [insert, [WS_A, theirRoutine.id, set], "suppression_erasure_request_fk"],
       ];
       for (const [statement, parameters, constraint] of rows) {
         await client.query("SAVEPOINT suppression_row");

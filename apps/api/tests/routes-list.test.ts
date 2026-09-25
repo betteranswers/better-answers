@@ -54,7 +54,7 @@ const messageOf = async (response: Response): Promise<string> =>
 const MEMBER_ROLE_CHECK = "member_role_check";
 
 describe("the routes list over the wire", () => {
-  it("answers a workspace member one route per purpose, with the embedding route fixed at its dimensions", async () => {
+  it("answers one route per purpose, embedding fixed at its dimensions", async () => {
     const workspace = await app.provision();
     await seedRoutes(workspace.workspaceId);
 
@@ -65,7 +65,7 @@ describe("the routes list over the wire", () => {
   });
 
   it.each(["Admin", "Editor", "Viewer"] as const)(
-    "lets a member at %s read the list — the screen is read-only and no role is gated out of it",
+    "lets a member at %s read the list",
     async (role) => {
       const workspace = await app.provision();
       await seedRoutes(workspace.workspaceId);
@@ -111,14 +111,14 @@ describe("what the routes list refuses", () => {
     expect(await messageOf(response)).toBe("no-session");
   });
 
-  it("refuses a signed-in person who has not yet picked a workspace", async () => {
+  it("refuses a signed-in person with no workspace picked yet", async () => {
     const response = await listRoutes(await memberOfTwoWorkspaces(app));
 
     expect(response.status).toBe(401);
     expect(await messageOf(response)).toBe("no-active-workspace");
   });
 
-  it("refuses a person whose membership ended while their session was still live", async () => {
+  it("refuses a person whose membership ended mid-session", async () => {
     const workspace = await app.provision();
     const client = await signedInClient(app, workspace.admin.email);
     await app.removeMember(workspace.workspaceId, workspace.admin.id);
@@ -141,7 +141,7 @@ describe("what the routes list refuses", () => {
     expect(await messageOf(response)).toBe("credentials-revoked");
   });
 
-  it("refuses a member row whose role is not one of the platform's three", async () => {
+  it("refuses a member role outside the platform's three", async () => {
     const workspace = await app.provision();
     const client = await signedInClient(app, workspace.admin.email);
     const { superuser } = app.database;
@@ -166,7 +166,7 @@ describe("what the routes list refuses", () => {
     expect(await constraintDefinition(app, MEMBER_ROLE_CHECK)).toBe(definition);
   });
 
-  it("refuses a flood from one address before it can spend a session lookup each", async () => {
+  it("refuses one address's flood before each request spends a lookup", async () => {
     const client = app.client("203.0.113.60");
     const statuses: number[] = [];
 
@@ -183,7 +183,7 @@ describe("what the routes list refuses", () => {
     expect((await listRoutes(app.client("203.0.113.61"))).status).toBe(401);
   });
 
-  it("refuses a session whose active workspace is not a workspace id", async () => {
+  it("refuses a session whose active workspace is no workspace id", async () => {
     const workspace = await app.provision();
     const client = await signedInClient(app, workspace.admin.email);
     await sessionPointedAt(app, workspace.admin.id, "not-a-workspace-id");

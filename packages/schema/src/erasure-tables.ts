@@ -1,17 +1,8 @@
 import { sql } from "drizzle-orm";
-import {
-  check,
-  foreignKey,
-  index,
-  jsonb,
-  primaryKey,
-  text,
-  uniqueIndex,
-} from "drizzle-orm/pg-core";
+import { check, foreignKey, jsonb, primaryKey, text, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { listed, stamp } from "./column-helpers.ts";
 import { user } from "./identity-tables.ts";
-import { sourceDocument } from "./source-tables.ts";
 import { withRLS } from "./with-rls.ts";
 import { workspace } from "./workspace-table.ts";
 
@@ -21,6 +12,15 @@ export const SUBJECT_IDENTIFIER_KINDS = ["emails", "names", "other"] as const;
 
 export const SUBJECT_IDENTIFIER_MAX = 320;
 export const SUBJECT_IDENTIFIERS_MAX = 50;
+
+// An erasure adds to a suppression's emails the sign-in addresses of the two people it can
+// name: the request's and its map's.
+export const SUPPRESSION_SIGN_IN_ADDRESSES_MAX = 2;
+
+// A suppression withholds every case-folded occurrence workspace-wide, so an identifier below
+// either floor would withhold ordinary words.
+export const SUBJECT_IDENTIFIER_FLOOR = 3;
+export const SUBJECT_NAME_WORDS_FLOOR = 2;
 
 const identifierSetIsShaped = [
   `jsonb_typeof(identifiers) = 'object'`,
@@ -141,26 +141,18 @@ export const suppression = withRLS(
   {
     workspaceId: text("workspace_id").notNull(),
     erasureRequestId: text("erasure_request_id").notNull(),
-    documentId: text("document_id").notNull(),
 
     identifiers: jsonb("identifiers").notNull(),
   },
   "workspaceId",
   (table) => [
-    primaryKey({ columns: [table.workspaceId, table.erasureRequestId, table.documentId] }),
+    primaryKey({ columns: [table.workspaceId, table.erasureRequestId] }),
 
     foreignKey({
       columns: [table.workspaceId, table.erasureRequestId],
       foreignColumns: [erasureRequest.workspaceId, erasureRequest.id],
       name: "suppression_erasure_request_fk",
     }).onDelete("cascade"),
-    foreignKey({
-      columns: [table.workspaceId, table.documentId],
-      foreignColumns: [sourceDocument.workspaceId, sourceDocument.id],
-      name: "suppression_document_fk",
-    }).onDelete("cascade"),
-
-    index("suppression_workspace_id_document_id_idx").on(table.workspaceId, table.documentId),
 
     check(
       "suppression_identifiers_check",

@@ -30,7 +30,7 @@ const store = objectStoreForSuite();
 
 const PINNED_AT = new Date("2026-09-23T09:00:00.000Z");
 
-// The api's own pool size, so ten uploads each holding two would have found it full.
+/** The api's own pool size, so ten uploads each holding two would have found it full. */
 const UPLOADS_AT_ONCE = POSTGRES_POOL_MAX;
 
 let app: TestApp;
@@ -139,8 +139,10 @@ const refusalIn = async (response: Response) =>
 const FIRST_PART = new TextEncoder().encode("The handbook says ");
 const LAST_PART = new TextEncoder().encode("what the company decided.");
 
-// Each read of this body past its first part waits for the test, so the act can be caught
-// mid-stream.
+/**
+ * Each read of this body past its first part waits for the test, so the act can be caught
+ * mid-stream.
+ */
 const heldOpenBody = () => {
   const held = { asked: 0, ended: false };
   const gate = Promise.withResolvers<void>();
@@ -185,13 +187,13 @@ const pastTheCap = () => {
 };
 
 describe("the upload, one mutation over the split link", () => {
-  it("names each descriptor field by the same header on the web's side and the api's", () => {
+  it("names each descriptor field by one header on both sides", () => {
     expect(Object.entries(UPLOAD_HEADER_OF_FIELD).sort()).toEqual(
       Object.entries(UPLOAD_DESCRIPTOR_HEADERS).sort(),
     );
   });
 
-  it("lands a binding, its document and its index job from the web's own link and descriptor", async () => {
+  it("lands a binding with its document and index job", async () => {
     const { workspace, api, sent } = await anAdmin();
     const finance = await seededIn(app, (seed) =>
       seed.group({ workspaceId: workspace.workspaceId }),
@@ -242,7 +244,7 @@ describe("the upload, one mutation over the split link", () => {
     ]);
   });
 
-  it("sends a descriptor's non-ASCII name intact, as the header carries it encoded", async () => {
+  it("keeps a descriptor's non-ASCII name intact through the encoded header", async () => {
     const { workspace, api } = await anAdmin();
     const described = handbookDescribed({ name: "Llawlyfr y staff — ŵ" });
 
@@ -267,7 +269,7 @@ describe("the upload, one mutation over the split link", () => {
     ]);
   });
 
-  it("refuses a file declared over the cap while its body is still open, so no one read it first", async () => {
+  it("refuses a declared oversize file before its body is read", async () => {
     const { workspace, client } = await anAdmin();
     const { held, body } = heldOpenBody();
 
@@ -283,7 +285,7 @@ describe("the upload, one mutation over the split link", () => {
     expect(await bindingsIn(workspace.workspaceId)).toBe(0);
   });
 
-  it("refuses a body that passes the cap as it streams, before the body is read to its end", async () => {
+  it("refuses a body passing the cap mid-stream, before its end", async () => {
     const { workspace, client } = await anAdmin();
     const { body, sent, total } = pastTheCap();
 
@@ -295,7 +297,7 @@ describe("the upload, one mutation over the split link", () => {
     expect(await bindingsIn(workspace.workspaceId)).toBe(0);
   }, 180_000);
 
-  it("refuses a descriptor a field is missing from or unreadable in, naming each and no value", async () => {
+  it("refuses missing or unreadable descriptor fields by name alone", async () => {
     const { workspace, client } = await anAdmin();
     const headers = uploadHeaders(handbookDescribed());
     headers.delete("x-upload-file-name");
@@ -317,8 +319,8 @@ describe("the upload, one mutation over the split link", () => {
   });
 });
 
-describe("ten uploads at once, through the procedure whose act opens its own transaction", () => {
-  it("never holds more than one pooled connection each, and none while the bodies stream", async () => {
+describe("ten concurrent uploads, whose act opens its own transaction", () => {
+  it("holds at most one pooled connection each, none while streaming", async () => {
     const { client } = await anAdmin();
     const { pool } = app.doors.postgres;
     const watched = { held: 0, peak: 0 };
@@ -354,7 +356,7 @@ describe("ten uploads at once, through the procedure whose act opens its own tra
 });
 
 describe("a revocation landed while a mutation runs", () => {
-  it("is refused by the mutation, whose membership read waits for it and reads it", async () => {
+  it("refuses the mutation, whose membership read waits on it", async () => {
     const { workspace, api } = await anAdmin();
     const { bindingId } = await unpublishedBinding(workspace.workspaceId);
     const revocation = await revocationHeldOpen(app, workspace.admin.id);
@@ -384,7 +386,7 @@ describe("a revocation landed while a mutation runs", () => {
     expect(binding.rows).toEqual([{ sensitivity: "Internal" }]);
   });
 
-  it("is not waited for by a read, which resolves its membership unheld", async () => {
+  it("does not hold up a read, which resolves membership unheld", async () => {
     const { workspace, api } = await anAdmin();
     await unpublishedBinding(workspace.workspaceId);
     const revocation = await revocationHeldOpen(app, workspace.admin.id);
@@ -410,7 +412,7 @@ const anAdminWhoseBindingHoldsAHealthCue = async () => {
 };
 
 describe("the Sources procedures over the wire", () => {
-  it("lists an upload with its state, counts and last run, and says why a document was quarantined", async () => {
+  it("lists an upload's state, counts, last run and quarantine reason", async () => {
     const { workspace, api } = await anAdmin();
     const described = handbookDescribed();
     const bound = await api.sources.bind.mutate(new Blob([HANDBOOK]), uploadOptions(described));
@@ -502,7 +504,7 @@ describe("the Sources procedures over the wire", () => {
     ]);
   });
 
-  it("reads a binding's findings by group, saying how many kept spans an erasure overrides", async () => {
+  it("reads findings by group, counting kept spans an erasure overrides", async () => {
     const { workspace, api } = await anAdmin();
     const { bindingId, documentId } = await unpublishedBinding(workspace.workspaceId);
     const kept = await seededIn(app, async (seed) => {
@@ -546,7 +548,7 @@ describe("the Sources procedures over the wire", () => {
     ]);
   });
 
-  it("keeps a finding group in text, answering the documents it restored and no finding's id, and queues the run that lets it back in", async () => {
+  it("keeps findings in text, hiding finding ids, queuing a run", async () => {
     const { workspace, api } = await anAdmin();
     const { bindingId, documentId } = await unpublishedBinding(workspace.workspaceId);
     const { one, other } = await seededIn(app, async (seed) => ({
@@ -587,7 +589,7 @@ describe("the Sources procedures over the wire", () => {
     ]);
   });
 
-  it("dismisses a special-category finding group as not special category and queues the run that reads it", async () => {
+  it("dismisses a special-category group and queues the run reading it", async () => {
     const { api, bindingId, documentId } = await anAdminWhoseBindingHoldsAHealthCue();
 
     const dismissed = await api.sources.dismissAsNotSpecialCategory.mutate({
@@ -603,7 +605,7 @@ describe("the Sources procedures over the wire", () => {
     ]);
   });
 
-  it("refuses to dismiss a finding group that is not special category, and the word crosses as itself", async () => {
+  it("refuses to dismiss a non-special-category group in its own word", async () => {
     const { workspace, api } = await anAdmin();
     const { bindingId, documentId } = await unpublishedBinding(workspace.workspaceId);
 
@@ -656,7 +658,7 @@ describe("the Sources procedures over the wire", () => {
     });
   });
 
-  it("publishes an indexed binding at the instant the api's Clock gives", async () => {
+  it("publishes an indexed binding at the instant the Clock gives", async () => {
     const { workspace, api } = await anAdmin();
     const { bindingId } = await unpublishedBinding(workspace.workspaceId);
     await finishedRun(workspace.workspaceId, bindingId, { documents: 1, chunks: 1 });
@@ -691,6 +693,31 @@ describe("the Sources procedures over the wire", () => {
       visibility: { sensitivity: "Restricted", audience: "everyone", audienceGroups: null },
       concepts: [],
       compositions: [],
+    });
+  });
+
+  it("widens a binding's class, refusing a non-wider one", async () => {
+    const { workspace, api } = await anAdmin();
+    const { bindingId } = await unpublishedBinding(workspace.workspaceId);
+
+    const widened = await api.sources.widen.mutate({
+      bindingId,
+      sensitivity: "Public",
+      audience: "everyone",
+    });
+    const refused = await refusalOfCall(
+      api.sources.widen.mutate({ bindingId, sensitivity: "Internal", audience: "everyone" }),
+    );
+
+    expect(widened).toEqual({
+      bindingId,
+      auditEventId: expect.any(String),
+      visibility: { sensitivity: "Public", audience: "everyone", audienceGroups: null },
+      concepts: [],
+      compositions: [],
+    });
+    expect(refused).toMatchObject({
+      data: { httpStatus: 422, refusal: { word: "not-wider", class: "inapplicable" } },
     });
   });
 

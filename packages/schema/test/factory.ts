@@ -171,8 +171,6 @@ const insertRow = async <TName extends keyof Registry>(
     domain[key] = typeof value === "string" && value.startsWith("[") ? JSON.parse(value) : value;
   }
 
-  // SAFETY: TypeScript loses the correlation on the generic indexed access; the registry
-  // guarantees it.
   // oxlint-disable-next-line typescript/consistent-type-assertions -- the registry correlates `select` with `TName` and TypeScript resolves neither side of a generic indexed access
   return select.parse(domain) as Row<TName>;
 };
@@ -762,13 +760,11 @@ export const testData = (client: pg.PoolClient): TestData => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
     const erasureRequestId =
       overrides.erasureRequestId ?? (await erasureRequest({ workspaceId })).id;
-    const documentId = overrides.documentId ?? (await sourceDocument({ workspaceId })).id;
     return insertRow(client, "suppression", {
       identifiers: { emails: ["subject@example.invalid"], names: [], other: [] },
       ...overrides,
       workspaceId,
       erasureRequestId,
-      documentId,
     });
   };
 

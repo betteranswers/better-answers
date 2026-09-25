@@ -223,3 +223,7 @@ apart. `folded` refuses, in the type, a work whose answer is only partly a `Resu
 `Result` members of such a union would reach the caller as values.
 
 Nothing else in the decision moves.
+
+## Amendment — 2026-09-24 (the T-027 and T-028 grill), *ledger act* is *audit act*
+
+The word *ledger* is retired for *audit log* and *ledger act* for *audit act* (owner, 24/09/2026; ADR 0038 amended today). The Consequences' "the rename of the code's `Act` type to say *ledger act*" reads *audit act*. This record's body keeps the old word as written. Everything else stands.

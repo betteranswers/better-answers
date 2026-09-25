@@ -7,13 +7,17 @@ export const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 const NOT_TEXT = /\.(png|jpe?g|gif|webp|ico|woff2?|ttf|otf|pdf|zip|gz|sqlite)$/i;
 const OUTSIDE = [".scratch/", ".cubic/"];
 
-// Reading a tracked symlink would follow it to a directory and throw; whatever it points at
-// is walked on its own account.
+/**
+ * Reading a tracked symlink would follow it to a directory and throw; whatever it points at is
+ * walked on its own account.
+ */
 const isLinkUnder = (root: string, file: string): boolean =>
   lstatSync(path.join(root, file)).isSymbolicLink();
 
-// `--others --exclude-standard` sees a new file before it is added, so the walk reads the
-// tree a commit would carry.
+/**
+ * The files a commit would carry, untracked ones included, less non-text files, symlinks,
+ * `.scratch/` and `.cubic/`.
+ */
 export const treeFilesUnder = (root: string): readonly string[] =>
   execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], {
     cwd: root,

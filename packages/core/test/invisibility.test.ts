@@ -69,7 +69,7 @@ const chunkOf = async (workspaceId: string, document: Sourced): Promise<string> 
 };
 
 describe("the audience arm of the read predicate", () => {
-  it("withholds a named-group unit from a Viewer in no group, and hands it to one the group holds", async () => {
+  it("withholds a group's unit until the Viewer joins the group", async () => {
     const scenario = await arrange();
     const { groupId: hr, written } = await conceptForGroup(db(), scenario, "HR", []);
 
@@ -82,7 +82,7 @@ describe("the audience arm of the read predicate", () => {
     expect(await reaches(scenario.viewer, written.iri)).toBe(true);
   });
 
-  it("withholds a unit whose named group was deleted, from everyone, while the row still names it", async () => {
+  it("withholds a deleted group's unit from everyone, the row unchanged", async () => {
     const scenario = await arrange();
     const { groupId: hr, written } = await conceptForGroup(db(), scenario, "HR", [
       scenario.viewer,
@@ -103,7 +103,7 @@ describe("the audience arm of the read predicate", () => {
     });
   });
 
-  it("cannot hold a unit that says groups over an empty or missing list, or everyone over a list", async () => {
+  it("cannot hold groups without a list, or everyone with one", async () => {
     const scenario = await arrange();
     const written = await conceptCiting(scenario, scenario.editor, []);
     const rewrite = (audience: string, groups: string) =>
@@ -122,7 +122,7 @@ describe("the audience arm of the read predicate", () => {
     );
   });
 
-  it("reaches Admins alone on a Restricted unit, and narrows Admins by audience on one too", async () => {
+  it("shows a Restricted unit to Admins alone, narrowed by audience", async () => {
     const scenario = await arrange();
     const board = await groupNamed(db(), scenario, "Board", [scenario.viewer]);
     const { restricted } = await restrictedAndInternal(db(), scenario.workspaceId);
@@ -146,7 +146,7 @@ describe("the audience arm of the read predicate", () => {
 });
 
 describe("a Restricted-sourced concept, to a Viewer", () => {
-  it("is invisible through the graph walk from either end, exactly as one nobody mapped", async () => {
+  it("is invisible to either graph walk, as if never mapped", async () => {
     const scenario = await arrange();
     const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
     const withheld = await conceptCiting(scenario, scenario.editor, [restricted.documentId]);
@@ -178,7 +178,7 @@ describe("a Restricted-sourced concept, to a Viewer", () => {
     expect(admin.map((step) => step.uid).toSorted()).toEqual([entry.iri, withheld.iri].toSorted());
   });
 
-  it("is invisible through a guide's footnotes, with no gap where it was, and takes the composition with it when the cascade has run", async () => {
+  it("leaves no gap in footnotes and hides its narrowed composition", async () => {
     const scenario = await arrange();
     const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
     const withheld = await conceptCiting(scenario, scenario.editor, [restricted.documentId]);
@@ -240,7 +240,7 @@ describe("a Restricted-sourced concept, to a Viewer", () => {
 });
 
 describe("a document narrowed under a binding its siblings stand under", () => {
-  it("leaves a concept whose documents carry no class of their own exactly where its bindings put it", async () => {
+  it("leaves a concept at its bindings' class without document classes", async () => {
     const scenario = await arrange();
     const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
     const onInternal = await conceptCiting(scenario, scenario.editor, [internal.documentId]);
@@ -271,7 +271,7 @@ describe("a document narrowed under a binding its siblings stand under", () => {
     ]).toEqual([true, false, false, true, true, true]);
   });
 
-  it("withholds its chunk rows from a Viewer exactly as a document nobody holds, while its sibling's stand", async () => {
+  it("withholds its chunks from a Viewer exactly as absent ones", async () => {
     const scenario = await arrange();
     const { internal, narrowedUnderInternal } = await restrictedAndInternal(
       db(),
@@ -293,7 +293,7 @@ describe("a document narrowed under a binding its siblings stand under", () => {
     expect(await chunksReadableBy(scenario.admin, internal.documentId)).toEqual([siblingChunk]);
   });
 
-  it("derives Restricted for the concept citing it and Internal for the one citing its sibling", async () => {
+  it("derives Restricted for its citing concept, Internal for its sibling's", async () => {
     const scenario = await arrange();
     const { internal, narrowedUnderInternal } = await restrictedAndInternal(
       db(),
@@ -326,7 +326,7 @@ describe("a document narrowed under a binding its siblings stand under", () => {
     ]).toEqual([false, true, true, true]);
   });
 
-  it("cannot widen what its binding decided: an Internal document of a Restricted binding stays Restricted", async () => {
+  it("cannot exceed its binding's class: Internal under Restricted stays Restricted", async () => {
     const scenario = await arrange();
     const { restricted } = await restrictedAndInternal(db(), scenario.workspaceId);
     const wider = await documentUnder(db(), scenario.workspaceId, restricted.bindingId, "Internal");

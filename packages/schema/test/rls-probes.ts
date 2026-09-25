@@ -150,7 +150,10 @@ export const AN_ERASURE_ROUTINE = `INSERT INTO erasure_request (workspace_id, id
                    now() + interval '30 days', now() + interval '8 weeks',
                    now() + interval '6 months')`;
 
-export const A_SUPPRESSION = `INSERT INTO suppression (workspace_id, erasure_request_id, document_id, identifiers)
+export const A_SUPPRESSION = `INSERT INTO suppression (workspace_id, erasure_request_id, identifiers)
+                      VALUES ($1, $2, $3::jsonb)`;
+
+export const A_SUPPRESSION_OF_A_DOCUMENT = `INSERT INTO suppression (workspace_id, erasure_request_id, document_id, identifiers)
                       VALUES ($1, $2, $3, $4::jsonb)`;
 
 export const A_MIGRATION_STAMP =

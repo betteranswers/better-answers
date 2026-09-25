@@ -14,7 +14,7 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
   throw new Error("the browser suite's api needs a port as its one argument");
 }
 
-// The Sources screen binds a document, and a bind puts its bytes in the object store first.
+/** The Sources screen binds a document, and a bind puts its bytes in the object store first. */
 const objects = await openObjectStore("browser-suite");
 
 const app = await startApp({

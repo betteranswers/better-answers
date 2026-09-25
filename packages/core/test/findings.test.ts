@@ -62,7 +62,7 @@ const restoreEventsOf = async (pool: pg.Pool, workspaceId: string) => {
 };
 
 describe("an Admin's restore of one always-set span", () => {
-  it("writes the instant, the Admin's actor id and the reason on the finding, with its ledger row", async () => {
+  it("writes the instant, actor and reason, with a ledger row", async () => {
     const scenario = await arrange();
     const { findingId } = await findingIn(scenario);
 
@@ -95,7 +95,7 @@ describe("an Admin's restore of one always-set span", () => {
     ]);
   });
 
-  it("lets an Admin correct a reason by restoring again, and the ledger keeps both acts", async () => {
+  it("corrects a reason on restoring again, keeping both ledger rows", async () => {
     const scenario = await arrange();
     const { findingId } = await findingIn(scenario);
     const corrected = "The account is the company's own; the supplier form prints it in full.";
@@ -113,7 +113,7 @@ describe("an Admin's restore of one always-set span", () => {
     ).toEqual([findingId, findingId]);
   });
 
-  it("restores a name the officer-block rule raised at the always tier, whatever its category says", async () => {
+  it("restores an always-tier name whatever its category says", async () => {
     const scenario = await arrange();
     const { findingId } = await findingIn(scenario, {
       tier: REDACTION_ALWAYS_TIER,
@@ -160,7 +160,7 @@ describe("what the restore act refuses", () => {
     },
   );
 
-  it("names the reason when it is blank — a restore is the reason it was made for", async () => {
+  it("names a blank reason", async () => {
     const scenario = await arrange();
     const { findingId } = await findingIn(scenario);
 
@@ -172,7 +172,7 @@ describe("what the restore act refuses", () => {
     expect(await restoreEventsOf(db().pool, scenario.workspaceId)).toEqual([]);
   });
 
-  it("names an absent reason, which the column's own schema would have admitted", async () => {
+  it("names a null or missing reason", async () => {
     const scenario = await arrange();
     const { findingId } = await findingIn(scenario);
 
@@ -187,14 +187,14 @@ describe("what the restore act refuses", () => {
     expect(await restoreEventsOf(db().pool, scenario.workspaceId)).toEqual([]);
   });
 
-  it("names the id when it is not the minter's shape, and no read is reached", () => {
+  it("names an id that is not the minter's shape", () => {
     expect(parse(restoreFindingInput, { findingId: "not-an-id", reason: BUSINESS_FACT })).toEqual({
       ok: false,
       error: { word: "malformed", fields: { findingId: "bad-format" } },
     });
   });
 
-  it("says no-such-finding for another workspace's finding, and leaves it as it was", async () => {
+  it("says no-such-finding for another workspace's finding, leaving it unchanged", async () => {
     const mine = await arrange();
     const theirs = await arrange();
     const { findingId } = await findingIn(theirs);

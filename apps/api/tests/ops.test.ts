@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
 
 import { Pool } from "pg";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { find, open, trustWords } from "@better-answers/core/answering";
 import { writeConcept, writeManifest } from "@better-answers/core/concepts";
@@ -15,11 +15,12 @@ import {
   rehearseErasure,
   seedSyntheticSubject,
   type ErasureRehearsed,
+  type SubjectIdentifiers,
 } from "@better-answers/core/erasure";
 import { ok, type UserPrincipal } from "@better-answers/core/kernel";
 import { bindUpload, bindUploadFields } from "@better-answers/core/sources";
 import { fileAtHead, head, initRepository } from "@better-answers/core/store/git";
-import { listObjects } from "@better-answers/core/store/objects";
+import { getObject, listObjects } from "@better-answers/core/store/objects";
 import {
   folded,
   openPostgres,
@@ -30,7 +31,7 @@ import {
 } from "@better-answers/core/store/postgres";
 import { inputOf } from "@better-answers/core/testing/input";
 import { SWEEPS, withSweepLock } from "@better-answers/core/sweeps";
-import { objectStoreForSuite } from "@better-answers/core/testing/objects";
+import { objectStoreForSuite, textOf } from "@better-answers/core/testing/objects";
 import {
   countWaitingOnLocks,
   until,
@@ -69,14 +70,19 @@ type Run = {
   readonly logs: readonly LogLine[];
 };
 
-// A replay reads every workspace, so each case erases at an instant of its own and asks
-// for the window holding only that one.
+/**
+ * A replay reads every workspace, so each case erases at an instant of its own and asks for the
+ * window holding only that one.
+ */
 const FROM_THE_ROWS_AT = new Date("2026-06-01T12:00:00.000Z");
 const FROM_THE_ROWS_SINCE = "2026-05-31T00:00:00Z";
 const FROM_THE_COPY_AT = new Date("2026-07-01T12:00:00.000Z");
 const FROM_THE_COPY_SINCE = "2026-06-15T00:00:00Z";
 
 const REPLAYED_AT = new Date("2026-07-15T09:00:00.000Z");
+
+const BEFORE_THE_FINDER_AT = new Date("2026-07-20T12:00:00.000Z");
+const BEFORE_THE_FINDER_SINCE = "2026-07-18T00:00:00Z";
 
 const REHEARSED_AT = new Date("2026-08-01T12:00:00.000Z");
 
@@ -275,6 +281,182 @@ const finishTheJob = async (app: TestApp, workspaceId: string, status: string): 
   throw new Error(`nothing was ever queued in ${workspaceId}`);
 };
 
+type QueuedIndexJob = { readonly id: string; readonly subject_id: string };
+
+const queuedIndexJob = async (app: TestApp, workspaceId: string): Promise<QueuedIndexJob> => {
+  let queued: QueuedIndexJob | undefined;
+  await until(async () => {
+    const found = await app.database.superuser.query<QueuedIndexJob>(
+      "SELECT id, subject_id FROM job WHERE workspace_id = $1 AND kind = 'index' AND status = 'queued'",
+      [workspaceId],
+    );
+    queued = found.rows[0];
+    return queued !== undefined;
+  });
+  if (queued === undefined) throw new Error(`no index job was ever queued in ${workspaceId}`);
+  return queued;
+};
+
+const theIndexJobEnded = async (
+  app: TestApp,
+  workspaceId: string,
+  jobId: string,
+  status: "done" | "failed",
+): Promise<void> => {
+  const outcome = status === "done" ? { chunks: 1, lmdb_bytes: 0 } : { error: "ConversionError" };
+  await app.database.superuser.query(
+    `UPDATE job SET status = $3, attempts = attempts + 1, finished_at = now(), outcome = $4
+      WHERE workspace_id = $1 AND id = $2`,
+    [workspaceId, jobId, status, outcome],
+  );
+};
+
+/**
+ * This suite runs no worker, so it leaves the rows the worker's run would: each document's text in
+ * one chunk, and the job done.
+ */
+const theIndexRunLanded = async (
+  app: TestApp,
+  workspaceId: string,
+  readerId: string,
+): Promise<void> => {
+  const run = await queuedIndexJob(app, workspaceId);
+  const reader = await principalOf(app, workspaceId, readerId);
+  const documents = await app.database.superuser.query<{ id: string; original_key: string }>(
+    "SELECT id, original_key FROM source_document WHERE workspace_id = $1 AND binding_id = $2",
+    [workspaceId, run.subject_id],
+  );
+  const client = await app.database.superuser.connect();
+  try {
+    for (const document of documents.rows) {
+      const original = await getObject(reader, objects().door, document.original_key);
+      if (!original.ok) throw new Error(`the original was not readable: ${original.error}`);
+      const content = await textOf(original.value);
+      await testData(client).chunk({
+        workspaceId,
+        bindingId: run.subject_id,
+        sourceDocumentId: document.id,
+        content,
+        locator: `${document.id}/chars:0-${content.length}`,
+        ordinal: 0,
+        charStart: 0,
+        charEnd: content.length,
+      });
+    }
+  } finally {
+    client.release();
+  }
+  await theIndexJobEnded(app, workspaceId, run.id, "done");
+};
+
+const theIndexRunFailed = async (app: TestApp, workspaceId: string): Promise<void> => {
+  const run = await queuedIndexJob(app, workspaceId);
+  await theIndexJobEnded(app, workspaceId, run.id, "failed");
+};
+
+const boundAndIndexed = async (
+  app: TestApp,
+  workspaceId: string,
+  adminId: string,
+  text: string,
+): Promise<void> => {
+  const admin = await principalOf(app, workspaceId, adminId);
+  const bytes = new TextEncoder().encode(text);
+  const bound = await bindUpload(
+    admin,
+    { postgres: app.doors.postgres, objects: objects().door },
+    {
+      ...inputOf(bindUploadFields, {
+        bindingId: ulid(),
+        name: "The claims handbook",
+        fileName: "claims-handbook.md",
+        mediaType: "text/markdown",
+        byteSize: bytes.byteLength,
+      }),
+      body: new Blob([bytes]).stream(),
+    },
+  );
+  if (!bound.ok) throw new Error(`the bind was refused: ${String(bound.error)}`);
+  await theIndexRunLanded(app, workspaceId, adminId);
+};
+
+/** Completed while the documents finder answered nothing, so its run wiped no binding. */
+const completedBeforeTheFinder = async (
+  app: TestApp,
+  workspaceId: string,
+  at: Date,
+  identifiers: SubjectIdentifiers,
+): Promise<string> => {
+  const client = await app.database.superuser.connect();
+  try {
+    const seed = testData(client);
+    const request = await seed.subjectRequest({
+      workspaceId,
+      kind: "erasure",
+      personId: null,
+      identifiers,
+      receivedAt: at,
+    });
+    const erasure = await seed.erasureRequest({
+      workspaceId,
+      subjectRequestId: request.id,
+      anchoredAt: at,
+      completedAt: at,
+      report: "the report its first run wrote",
+    });
+    return erasure.id;
+  } finally {
+    client.release();
+  }
+};
+
+const whatAReplayActsOn = async (app: TestApp, workspaceId: string) => ({
+  chunks: (
+    await app.database.superuser.query<{ id: string }>(
+      `SELECT id FROM "index".chunk WHERE workspace_id = $1 ORDER BY id`,
+      [workspaceId],
+    )
+  ).rows,
+  jobs: (
+    await app.database.superuser.query<{ kind: string; reason: string | null; status: string }>(
+      "SELECT kind, reason, status FROM job WHERE workspace_id = $1 ORDER BY enqueued_at, id",
+      [workspaceId],
+    )
+  ).rows,
+  erasures: (
+    await app.database.superuser.query<{ id: string; completed_at: Date; report: string }>(
+      "SELECT id, completed_at, report FROM erasure_request WHERE workspace_id = $1",
+      [workspaceId],
+    )
+  ).rows,
+  suppressions: (
+    await app.database.superuser.query<{ identifiers: unknown }>(
+      "SELECT identifiers FROM suppression WHERE workspace_id = $1",
+      [workspaceId],
+    )
+  ).rows,
+});
+
+const tokensTheChunksHold = async (
+  app: TestApp,
+  workspaceId: string,
+  tokens: readonly string[],
+): Promise<readonly string[]> => {
+  const found = await app.database.superuser.query<{ content: string }>(
+    `SELECT content FROM "index".chunk WHERE workspace_id = $1`,
+    [workspaceId],
+  );
+  return tokens.filter((token) => found.rows.some((row) => row.content.includes(token)));
+};
+
+const indexJobsIn = async (app: TestApp, workspaceId: string) => {
+  const found = await app.database.superuser.query<{ reason: string; status: string }>(
+    "SELECT reason, status FROM job WHERE workspace_id = $1 AND kind = 'index' ORDER BY enqueued_at, id",
+    [workspaceId],
+  );
+  return found.rows;
+};
+
 const principalOf = async (app: TestApp, workspaceId: string, userId: string) => {
   const principal = await withPrincipal(
     app.doors.postgres,
@@ -340,27 +522,27 @@ const lostInTheWindow = async (
 describe("pnpm ops — the restore scripts' commands", () => {
   const app = servedApp();
 
-  it("reads a dump stamp and an ISO instant as the same moment", () => {
+  it("reads a dump stamp and an ISO instant alike", () => {
     expect(parseSince("20260903T020500Z")?.toISOString()).toBe("2026-09-03T02:05:00.000Z");
     expect(parseSince("2026-09-03T02:05:00Z")?.toISOString()).toBe("2026-09-03T02:05:00.000Z");
     expect(parseSince("yesterday")).toBeUndefined();
   });
 
-  it("answers usage, not a guess, to no command or an unknown one", async () => {
+  it("answers usage to a missing or unknown command, never guessing", async () => {
     expect((await ops(app(), [])).exitCode).toBe(2);
     expect((await ops(app(), ["make-it-so"])).exitCode).toBe(2);
     expect((await ops(app(), ["graph-counts"])).exitCode).toBe(2);
     expect((await ops(app(), ["replay-erasures"])).exitCode).toBe(2);
   });
 
-  it("prints the word a refusal carries and exits with the code its class holds", async () => {
+  it("prints a refusal's word and exits with its class's code", async () => {
     const run = await ops(app(), ["graph-counts", "--workspace", "not-a-workspace-id"]);
 
     expect(run.exitCode).toBe(2);
     expect(run.lines.join("\n")).toContain("REFUSED — malformed");
   });
 
-  it("gives each class a code of its own, so a wrapper can tell one refusal from another", () => {
+  it("gives each class its own code, telling refusals apart", () => {
     const codes = Object.values(EXIT_OF_CLASS);
 
     expect(EXIT_OF_CLASS).toEqual({
@@ -376,7 +558,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     expect(codes).not.toContain(0);
   });
 
-  it("reads through the -- separator pnpm forwards, and does not read it as a command", async () => {
+  it("skips pnpm's -- separator, which is not a command", async () => {
     const run = await opsBeforeTheJournal(app(), [
       "--",
       "replay-erasures",
@@ -390,7 +572,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
   });
 
   describe("replay-erasures — mandatory in every restore, never quietly a no-op", () => {
-    it("proves there is nothing to replay against a database the journal has not reached", async () => {
+    it("proves there is nothing to replay on a pre-journal database", async () => {
       const run = await opsBeforeTheJournal(app(), [
         "replay-erasures",
         "--since",
@@ -402,7 +584,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines.join("\n")).toContain("no erasure_request table");
     });
 
-    it("is done with nothing replayed when the table is there and no erasure followed the dump", async () => {
+    it("is done, replaying nothing, when no erasure followed the dump", async () => {
       const run = await opsWith(app(), ["replay-erasures", "--since", "2026-12-01T00:00:00Z"], {});
 
       expect(run.exitCode).toBe(0);
@@ -411,7 +593,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("re-applies an erasure the dump undid, reading it from the rows the restore brought back", async () => {
+    it("re-applies an erasure the dump undid, from the restored rows", async () => {
       const erased = await erasedAt(app(), FROM_THE_ROWS_AT);
 
       const run = await opsWith(app(), ["replay-erasures", "--since", FROM_THE_ROWS_SINCE], {});
@@ -430,7 +612,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       });
     });
 
-    it("re-applies one the restored rows do not hold at all, from its replay copy alone", async () => {
+    it("re-applies an erasure the rows lack, from its replay copy", async () => {
       const erased = await erasedAt(app(), FROM_THE_COPY_AT);
 
       await app().database.superuser.query("DELETE FROM erasure_request WHERE workspace_id = $1", [
@@ -461,7 +643,72 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("refuses without a repositories' root, because an erasure it cannot rewrite is not replayed", async () => {
+    it("wipes and requeues the subject's binding; a rerun only logs", async () => {
+      const { workspaceId, admin } = await app().provision();
+      await initRepository(openTestGit(app()), workspaceId);
+      const identifiers: SubjectIdentifiers = {
+        emails: ["sam.okafor@meridianfenland.co.uk"],
+        names: ["Sam Okafor"],
+        other: [],
+      };
+      await boundAndIndexed(
+        app(),
+        workspaceId,
+        admin.id,
+        "Expense claims go to Sam Okafor at sam.okafor@meridianfenland.co.uk by Friday.\n",
+      );
+      const indexedBefore = await whatAReplayActsOn(app(), workspaceId);
+      const erasureRequestId = await completedBeforeTheFinder(
+        app(),
+        workspaceId,
+        BEFORE_THE_FINDER_AT,
+        identifiers,
+      );
+
+      const first = await opsWith(
+        app(),
+        ["replay-erasures", "--since", BEFORE_THE_FINDER_SINCE],
+        {},
+      );
+      const afterTheFirst = await whatAReplayActsOn(app(), workspaceId);
+      const second = await opsWith(
+        app(),
+        ["replay-erasures", "--since", BEFORE_THE_FINDER_SINCE],
+        {},
+      );
+
+      const replayedOnce = [
+        `replay-erasures: ${erasureRequestId} in workspace ${workspaceId} — ` +
+          "completed 2026-07-20T12:00:00.000Z, read from the restored rows",
+        "replay-erasures: done — replayed 1 erasure since 2026-07-18T00:00:00.000Z",
+      ];
+      expect(indexedBefore.chunks).toHaveLength(1);
+      expect([first.exitCode, first.lines]).toEqual([0, replayedOnce]);
+      expect(afterTheFirst).toEqual({
+        chunks: [],
+        jobs: [
+          { kind: "index", reason: "bound", status: "done" },
+          { kind: "index", reason: "wiped", status: "queued" },
+        ],
+        erasures: [
+          {
+            id: erasureRequestId,
+            completed_at: BEFORE_THE_FINDER_AT,
+            report: "the report its first run wrote",
+          },
+        ],
+        suppressions: [{ identifiers }],
+      });
+      expect([second.exitCode, second.lines]).toEqual([0, replayedOnce]);
+      expect(await whatAReplayActsOn(app(), workspaceId)).toEqual(afterTheFirst);
+      expect(
+        (await ledgerOf(app(), workspaceId)).filter(
+          (row) => row.act === "platform.erasure.replayed",
+        ),
+      ).toHaveLength(2);
+    });
+
+    it("refuses without a repositories' root, which the rewrite needs", async () => {
       const run = await opsWith(app(), ["replay-erasures", "--since", "2026-09-01T02:05:00Z"], {
         doors: { git: undefined },
       });
@@ -471,7 +718,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines.join("\n")).toContain("do not start api");
     });
 
-    it("refuses when the image was never told about an object store", async () => {
+    it("refuses when the image names no object store", async () => {
       const run = await opsWith(app(), ["replay-erasures", "--since", "2026-09-01T02:05:00Z"], {
         doors: { objects: undefined },
       });
@@ -481,7 +728,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines.join("\n")).toContain("do not start api");
     });
 
-    it("refuses an object store that will not answer, rather than reading silence as nothing owed", async () => {
+    it("refuses an unreachable object store, not assuming nothing is owed", async () => {
       const unreachable = doorsFor(app().database.pool, {
         objectStore: {
           endpoint: "http://127.0.0.1:1",
@@ -504,7 +751,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
   describe("the slice-owned commands", () => {
     it.each(["erasure-rehearsal", "object-store-orphans", "import-bundle"])(
-      "%s says `not built` — exit 3 — against a schema its slice's tables are absent from",
+      "%s says `not built`, exit 3, without its slice's tables",
       async (command) => {
         const run = await opsBeforeTheJournal(app(), [
           command,
@@ -518,7 +765,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         expect(run.lines.join("\n")).toContain("not built");
       },
     );
-    it("answers in nobody else's name, so no command can be doing another's work", async () => {
+    it("answers in its own name, never another command's", async () => {
       const { workspaceId } = await app().provision();
 
       for (const command of SLICE_COMMANDS) {
@@ -530,11 +777,76 @@ describe("pnpm ops — the restore scripts' commands", () => {
         expect({ command, others }).toEqual({ command, others: [] });
       }
     });
+
+    describe("on the synthetic fixture's workspace, as the drill leaves it", () => {
+      const synthetic = "01M2SYNTHET1CAAAAAAAAAAAAA";
+
+      beforeAll(async () => {
+        const client = await app().database.superuser.connect();
+        try {
+          await testData(client).workspace({ id: synthetic });
+        } finally {
+          client.release();
+        }
+        await initRepository(openTestGit(app()), synthetic);
+      });
+
+      it.each([
+        {
+          command: "reconcile-watermark",
+          flags: [],
+          exitCode: 0,
+          first:
+            "reconcile-watermark: done — head none, watermark none, replayed 0, already landed 0",
+        },
+        {
+          command: "graph-rebuild",
+          flags: [],
+          exitCode: 0,
+          first: expect.stringMatching(/^graph-rebuild: done — enqueued [0-9A-HJKMNP-TV-Z]{26}$/),
+        },
+        {
+          command: "graph-sweep",
+          flags: [],
+          exitCode: 0,
+          first: "graph-sweep: done — nothing to sweep",
+        },
+        {
+          command: "object-store-orphans",
+          flags: ["--list"],
+          exitCode: 0,
+          first:
+            "object-store-orphans: done — 0 objects past the 24-hour grace no document names, removed none",
+        },
+        {
+          command: "graph-counts",
+          flags: [],
+          exitCode: 0,
+          first: '{"live_gen":null,"nodes":{},"edges":{}}',
+        },
+        {
+          command: "erasure-rehearsal",
+          flags: ["--synthetic", "--run", "--report", "/dev/null"],
+          exitCode: 1,
+          first:
+            "erasure-rehearsal: REFUSED — no synthetic subject stands in this workspace — phase one (--seed) has not been run here, or its subject has already been erased",
+        },
+      ])(
+        "$command, run as the drill does, takes the synthetic id",
+        async ({ command, flags, exitCode, first }) => {
+          const run = await ops(app(), [command, "--workspace", synthetic, ...flags]);
+
+          expect({ exitCode: run.exitCode, first: run.lines[0] }).toEqual({ exitCode, first });
+        },
+      );
+    });
   });
 
   describe("object-store-orphans — the bytes a failed bind left", () => {
-    // The store stamps an object with its own clock, so the instant the grace is judged from
-    // is the suite's own, moved on.
+    /**
+     * The store stamps an object with its own clock, so the instant the grace is judged from is
+     * the suite's own, moved on.
+     */
     const aDayOn = (): Date => new Date(Date.now() + 25 * 60 * 60 * 1000);
 
     const handbook = () => ({
@@ -555,8 +867,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const bound = await bindUpload(admin, doors, handbook());
       if (!bound.ok) throw new Error(`the bind was refused: ${String(bound.error)}`);
 
-      // The job is the transaction's last statement, so refusing it leaves the object the act
-      // put before it and no row that names the object.
+      /**
+       * The job is the transaction's last statement, so refusing it leaves the object the act put
+       * before it and no row that names the object.
+       */
       const failed = await whileWritesAreRefused(app().database.superuser, "job", () =>
         bindUpload(admin, doors, handbook()),
       );
@@ -564,7 +878,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       return { admin, named: bound.value.originalKey };
     };
 
-    it("removes the original no document names once the grace has passed, and keeps the named one", async () => {
+    it("removes only the original no document names, once past grace", async () => {
       const { workspaceId, admin: person } = await app().provision();
       const { admin, named } = await bindingsOf(workspaceId, person.id);
 
@@ -601,7 +915,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("crosses its refusal as the word and the class's code, removing nothing", async () => {
+    it("crosses its refusal as word and class code, removing nothing", async () => {
       const run = await ops(app(), ["object-store-orphans", "--workspace", "ws_synthetic"]);
 
       expect(run.exitCode).toBe(EXIT_OF_CLASS.malformed);
@@ -610,7 +924,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("refuses when this image was given no object store to sweep", async () => {
+    it("refuses when the image has no object store to sweep", async () => {
       const { workspaceId } = await app().provision();
 
       const run = await opsWith(
@@ -626,38 +940,140 @@ describe("pnpm ops — the restore scripts' commands", () => {
   });
 
   describe("erasure-rehearsal — the drill's proof that an erasure erases", () => {
-    it("seeds the synthetic subject and prints their tokens on its last line", async () => {
-      const { workspaceId } = await app().provision();
-      await initRepository(openTestGit(app()), workspaceId);
+    const pinned = { doors: { clock: { now: () => REHEARSED_AT } } };
 
-      const run = await opsWith(
-        app(),
-        ["erasure-rehearsal", "--workspace", workspaceId, "--synthetic", "--seed"],
-        { doors: { clock: { now: () => REHEARSED_AT } } },
-      );
+    const aWorkspaceToDrillIn = async () => {
+      const provisioned = await app().provision();
+      await initRepository(openTestGit(app()), provisioned.workspaceId);
+      return provisioned;
+    };
+
+    /** Phase one waits on the worker's run over its document, and the suite plays the worker. */
+    const seededBeside = async (workspaceId: string, worker: () => Promise<void>) => {
+      const [seed] = await Promise.all([
+        opsWith(
+          app(),
+          ["erasure-rehearsal", "--workspace", workspaceId, "--synthetic", "--seed"],
+          pinned,
+        ),
+        worker(),
+      ]);
+      return seed;
+    };
+
+    const seeded = (workspaceId: string, readerId: string) =>
+      seededBeside(workspaceId, () => theIndexRunLanded(app(), workspaceId, readerId));
+
+    it("seeds the subject, answers once indexed, prints their tokens last", async () => {
+      const { workspaceId, admin } = await aWorkspaceToDrillIn();
+
+      const run = await seeded(workspaceId, admin.id);
 
       expect(run.exitCode).toBe(0);
 
       const email = `subject-${workspaceId.toLowerCase()}@erasure-rehearsal.example.test`;
-      expect(run.lines.at(-1)).toBe(`${email},human:${email},Rehearsal subject ${workspaceId}`);
-      const seeded = await app().database.superuser.query(
+      expect(run.lines).toEqual([
+        `erasure-rehearsal: done — the synthetic subject of ${workspaceId} is seeded (a user row, an Admin membership, one concept file and one indexed document naming them); take the dump, then run phase two`,
+        `${email},human:${email},Rehearsal subject ${workspaceId}`,
+      ]);
+      const seededRow = await app().database.superuser.query(
         'SELECT 1 FROM "user" WHERE lower(email) = lower($1)',
         [email],
       );
-      expect(seeded.rowCount).toBe(1);
+      expect(seededRow.rowCount).toBe(1);
     });
 
-    it("erases them, writes the routine's own report to the file, and prints the tokens again", async () => {
-      const { workspaceId } = await app().provision();
-      await initRepository(openTestGit(app()), workspaceId);
-      const file = await reportPath();
-      const pinned = { doors: { clock: { now: () => REHEARSED_AT } } };
+    it("wipes the subject's chunks in phase two, requeueing the binding", async () => {
+      const { workspaceId, admin } = await aWorkspaceToDrillIn();
+      const email = `subject-${workspaceId.toLowerCase()}@erasure-rehearsal.example.test`;
+      const name = `Rehearsal subject ${workspaceId}`;
 
-      const seed = await opsWith(
+      const seed = await seeded(workspaceId, admin.id);
+      const tokens = (seed.lines.at(-1) ?? "").split(",");
+      const indexedBefore = await tokensTheChunksHold(app(), workspaceId, tokens);
+      const run = await opsWith(
         app(),
-        ["erasure-rehearsal", "--workspace", workspaceId, "--synthetic", "--seed"],
+        [
+          "erasure-rehearsal",
+          "--workspace",
+          workspaceId,
+          "--synthetic",
+          "--run",
+          "--report",
+          await reportPath(),
+        ],
         pinned,
       );
+
+      expect(indexedBefore).toEqual([email, name]);
+      expect(run.exitCode).toBe(0);
+      expect(await tokensTheChunksHold(app(), workspaceId, tokens)).toEqual([]);
+      expect(await indexJobsIn(app(), workspaceId)).toEqual([
+        { reason: "bound", status: "done" },
+        { reason: "wiped", status: "queued" },
+      ]);
+    });
+
+    it("refuses phase one when indexing the subject's document fails", async () => {
+      const { workspaceId } = await aWorkspaceToDrillIn();
+
+      const run = await seededBeside(workspaceId, () => theIndexRunFailed(app(), workspaceId));
+
+      const [indexRun] = await indexJobsIn(app(), workspaceId);
+      const jobs = await jobsOf(app(), workspaceId);
+      expect(run.exitCode).toBe(1);
+      expect(indexRun).toEqual({ reason: "bound", status: "failed" });
+      expect(run.lines).toEqual([
+        `erasure-rehearsal: REFUSED — the synthetic subject's document is not indexed: job ${jobs[0]?.id ?? ""} is failed after 1 attempt; the job's own row says what it found`,
+      ]);
+    });
+
+    it("refuses phase one when no worker indexes in time", async () => {
+      const { workspaceId } = await aWorkspaceToDrillIn();
+
+      const run = await opsWith(
+        app(),
+        [
+          "erasure-rehearsal",
+          "--workspace",
+          workspaceId,
+          "--synthetic",
+          "--seed",
+          "--wait-seconds",
+          "1",
+        ],
+        {},
+      );
+
+      const jobs = await jobsOf(app(), workspaceId);
+      expect(run.exitCode).toBe(1);
+      expect(run.lines).toEqual([
+        `erasure-rehearsal: REFUSED — the synthetic subject's document is not indexed: job ${jobs[0]?.id ?? ""} is still queued after 1 second, so no worker has indexed it`,
+      ]);
+    });
+
+    it("answers usage to a wait that is not whole seconds", async () => {
+      const run = await ops(app(), [
+        "erasure-rehearsal",
+        "--workspace",
+        "ws_synthetic",
+        "--synthetic",
+        "--seed",
+        "--wait-seconds",
+        "a minute",
+      ]);
+
+      expect(run.exitCode).toBe(2);
+      expect(run.lines).toEqual([
+        "erasure-rehearsal: --wait-seconds takes a whole number of seconds",
+      ]);
+    });
+
+    it("erases the subject, writes the routine's report, reprints the tokens", async () => {
+      const { workspaceId, admin } = await aWorkspaceToDrillIn();
+      const file = await reportPath();
+
+      const seed = await seeded(workspaceId, admin.id);
 
       const run = await opsWith(
         app(),
@@ -687,15 +1103,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
       });
     });
 
-    it("leaves the operator the erasure's line in the tier's log, naming its request, its arm and what it deleted, and no address", async () => {
-      const { workspaceId } = await app().provision();
-      await initRepository(openTestGit(app()), workspaceId);
-      const pinned = { doors: { clock: { now: () => REHEARSED_AT } } };
-      await opsWith(
-        app(),
-        ["erasure-rehearsal", "--workspace", workspaceId, "--synthetic", "--seed"],
-        pinned,
-      );
+    it("logs the erasure's request, arm and deletions, and no address", async () => {
+      const { workspaceId, admin } = await aWorkspaceToDrillIn();
+      await seeded(workspaceId, admin.id);
 
       const run = await opsWith(
         app(),
@@ -734,7 +1144,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(JSON.stringify(run.logs)).not.toContain("@");
     });
 
-    it("refuses phase two in a workspace phase one never ran in, rather than erasing whoever is there", async () => {
+    it("refuses phase two where phase one never ran, erasing nobody", async () => {
       const { workspaceId } = await app().provision();
       await initRepository(openTestGit(app()), workspaceId);
       const file = await reportPath();
@@ -749,14 +1159,14 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines.join("\n")).toContain("no synthetic subject stands in this workspace");
     });
 
-    it("answers usage without --synthetic, which is the caller saying this may happen here", async () => {
+    it("answers usage without --synthetic, the caller's consent to run here", async () => {
       const run = await ops(app(), ["erasure-rehearsal", "--workspace", "ws_synthetic", "--seed"]);
 
       expect(run.exitCode).toBe(2);
       expect(run.lines.join("\n")).toContain("--synthetic is required");
     });
 
-    it("answers usage to neither phase and to both at once, because the dump goes between them", async () => {
+    it("answers usage to neither or both phases at once", async () => {
       const both = await ops(app(), [
         "erasure-rehearsal",
         "--workspace",
@@ -776,7 +1186,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(both.lines.join("\n")).toContain("exactly one of --seed");
     });
 
-    it("answers usage to a run with nowhere to put its report, which would prove nothing", async () => {
+    it("answers usage to a reportless run, which would prove nothing", async () => {
       const run = await ops(app(), [
         "erasure-rehearsal",
         "--workspace",
@@ -791,7 +1201,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
   });
 
   describe("graph-rebuild — the map made again, on the worker's queue", () => {
-    it("queues a full rebuild for the drill and answers the id of the job it queued", async () => {
+    it("queues a drill's full rebuild and answers the job's id", async () => {
       const { workspaceId } = await app().provision();
 
       const run = await ops(app(), ["graph-rebuild", "--workspace", workspaceId]);
@@ -805,7 +1215,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual([`graph-rebuild: done — enqueued ${queued[0]?.id}`]);
     });
 
-    it("takes one of ADR 0023's six reasons when the caller names one", async () => {
+    it("takes the caller's reason from among the six", async () => {
       const { workspaceId } = await app().provision();
 
       const run = await ops(app(), [
@@ -820,7 +1230,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect((await jobsOf(app(), workspaceId))[0]?.reason).toBe("upgrade");
     });
 
-    it("answers usage to a reason that is not one of the six, and queues nothing", async () => {
+    it("answers usage to a reason outside the six, queueing nothing", async () => {
       const { workspaceId } = await app().provision();
 
       const run = await ops(app(), [
@@ -835,7 +1245,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await jobsOf(app(), workspaceId)).toEqual([]);
     });
 
-    it("refuses a workspace that is not an id as malformed, naming the flag it came in", async () => {
+    it("refuses a non-id workspace as malformed, naming its flag", async () => {
       const run = await ops(app(), ["graph-rebuild", "--workspace", "ws_synthetic"]);
 
       expect(run.exitCode).toBe(2);
@@ -857,7 +1267,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await jobsOf(app(), workspaceId)).toEqual([]);
     });
 
-    it("waits the rebuild's own budget by default — ADR 0032's two minutes — and says so in its usage", async () => {
+    it("waits two minutes by default, as its usage says", async () => {
       const run = await ops(app(), ["help"]);
 
       expect(run.exitCode).toBe(0);
@@ -867,7 +1277,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines.join("\n")).toContain("--wait-seconds <n>");
     });
 
-    it("waits for the job it queued and is done once the worker has finished it", async () => {
+    it("waits for its job, done once the worker finishes it", async () => {
       const { workspaceId } = await app().provision();
 
       const waiting = ops(app(), ["graph-rebuild", "--workspace", workspaceId, "--wait"]);
@@ -879,7 +1289,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it.each(["failed", "poisoned"])(
-      "refuses — so the restore stops — when the job it waited for is %s",
+      "refuses, stopping the restore, when the awaited job is %s",
       async (status) => {
         const { workspaceId } = await app().provision();
 
@@ -893,7 +1303,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       },
     );
 
-    it("refuses when the job is still queued at the end of the wait it was given", async () => {
+    it("refuses when the job is still queued after the wait", async () => {
       const { workspaceId } = await app().provision();
 
       const run = await ops(app(), [
@@ -910,8 +1320,8 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
   });
 
-  describe("graph-counts — nodes per label and edges, as JSON, for the drill's diff", () => {
-    it("answers the live generation and the source entities beside it, on one line a diff can read", async () => {
+  describe("graph-counts — nodes per label and edges, as JSON", () => {
+    it("answers the live generation's counts on one diffable line", async () => {
       const { workspaceId } = await app().provision();
       await mapped(app(), workspaceId);
 
@@ -927,7 +1337,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       });
     });
 
-    it("is done over a workspace nobody has mapped, answering zero of everything rather than refusing", async () => {
+    it("answers zero of everything for an unmapped workspace, never refusing", async () => {
       const { workspaceId } = await app().provision();
 
       const run = await ops(app(), ["graph-counts", "--workspace", workspaceId]);
@@ -936,7 +1346,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(answered(run)).toEqual({ live_gen: null, nodes: {}, edges: {} });
     });
 
-    it("answers usage to a workspace that is not an id, before it reads anything", async () => {
+    it("answers usage to a non-id workspace before reading anything", async () => {
       const run = await ops(app(), ["graph-counts", "--workspace", "ws_synthetic"]);
 
       expect(run.exitCode).toBe(2);
@@ -944,7 +1354,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
   });
 
   describe("graph-sweep — the generations a finished rebuild left behind", () => {
-    it("removes every generation but the live one and says which, with what each held", async () => {
+    it("sweeps all but the live generation, saying what each held", async () => {
       const { workspaceId } = await app().provision();
       await mapped(app(), workspaceId);
 
@@ -961,7 +1371,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       });
     });
 
-    it("is done with nothing to sweep over a workspace whose map is only its live generation", async () => {
+    it("sweeps nothing when only the live generation stands", async () => {
       const { workspaceId } = await app().provision();
 
       const run = await ops(app(), ["graph-sweep", "--workspace", workspaceId]);
@@ -970,7 +1380,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual(["graph-sweep: done — nothing to sweep"]);
     });
 
-    it("answers usage to a workspace that is not an id, before it deletes anything", async () => {
+    it("answers usage to a non-id workspace before deleting anything", async () => {
       const run = await ops(app(), ["graph-sweep", "--workspace", "ws_synthetic"]);
 
       expect(run.exitCode).toBe(2);
@@ -984,38 +1394,35 @@ describe("pnpm ops — the restore scripts' commands", () => {
         "object-store-orphans",
         "object-store-orphans: done — removed 0 objects past the 24-hour grace no document names",
       ],
-    ])(
-      "%s waits while a pass holds the sweeps' lock, and runs once it lets go",
-      async (command, done) => {
-        const { workspaceId } = await app().provision();
-        let letGo = (): void => undefined;
-        const holding = new Promise<void>((resolve) => {
-          letGo = resolve;
-        });
-        let taken = false;
-        const pass = withSweepLock(SWEEPS, openPostgres(app().database.pool), async () => {
-          taken = true;
-          await holding;
-        });
-        await until(async () => taken);
+    ])("%s waits for the pass's sweep lock, then runs", async (command, done) => {
+      const { workspaceId } = await app().provision();
+      let letGo = (): void => undefined;
+      const holding = new Promise<void>((resolve) => {
+        letGo = resolve;
+      });
+      let taken = false;
+      const pass = withSweepLock(SWEEPS, openPostgres(app().database.pool), async () => {
+        taken = true;
+        await holding;
+      });
+      await until(async () => taken);
 
-        let settled = false;
-        const run = ops(app(), [command, "--workspace", workspaceId]).finally(() => {
-          settled = true;
-        });
-        await until(async () => (await countWaitingOnLocks(app().database.superuser)) > 0);
-        expect(settled).toBe(false);
+      let settled = false;
+      const run = ops(app(), [command, "--workspace", workspaceId]).finally(() => {
+        settled = true;
+      });
+      await until(async () => (await countWaitingOnLocks(app().database.superuser)) > 0);
+      expect(settled).toBe(false);
 
-        letGo();
-        await pass;
+      letGo();
+      await pass;
 
-        expect(await run).toEqual({ exitCode: 0, lines: [done], logs: [] });
-      },
-    );
+      expect(await run).toEqual({ exitCode: 0, lines: [done], logs: [] });
+    });
   });
 
-  describe("reconcile-watermark — the reconciler on demand, which is the restore path", () => {
-    it("refuses without a repositories' root, because a bundle it cannot open is nothing to reconcile against", async () => {
+  describe("reconcile-watermark — the reconciler on demand, the restore's path", () => {
+    it("refuses without a repositories' root, having no bundle to reconcile", async () => {
       const { workspaceId } = await app().provision();
 
       const run = await opsWith(
@@ -1031,7 +1438,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("refuses a repositories' root that names a missing directory, naming the root it was given", async () => {
+    it("refuses a missing repositories' root directory, naming it", async () => {
       const { workspaceId } = await app().provision();
       const missing = `${app().gitStoreDir}/does-not-exist`;
 
@@ -1048,13 +1455,13 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("answers usage to a workspace that is not an id, before it opens anything", async () => {
+    it("answers usage to a non-id workspace before opening anything", async () => {
       const run = await ops(app(), ["reconcile-watermark", "--workspace", "ws_synthetic"]);
 
       expect(run.exitCode).toBe(2);
     });
 
-    it("refuses a workspace whose repository is not there, which on a restore is a store that was not restored", async () => {
+    it("refuses a missing repository, which means an unrestored store", async () => {
       const { workspaceId } = await app().provision();
 
       const run = await ops(app(), ["reconcile-watermark", "--workspace", workspaceId]);
@@ -1063,7 +1470,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual(["reconcile-watermark: REFUSED — no-such-repository"]);
     });
 
-    it("is done — exit 0 — once the rows and the bundle agree, and says what the run found", async () => {
+    it("exits 0 when rows and bundle agree, reporting its findings", async () => {
       const { workspaceId } = await app().provision();
       await initRepository(openTestGit(app()), workspaceId);
 
@@ -1075,7 +1482,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("is done — exit 0 — after replaying the commit a bundle's rows missed, and the concept's row has landed", async () => {
+    it("replays a missed commit and lands its concept's row", async () => {
       const { workspaceId, sha } = await replayedAfterTheWindow(app(), (principal, doors, admin) =>
         writeConcept(principal, doors, {
           mergeKey: "note:restore-drill",
@@ -1098,7 +1505,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(landed.rows).toEqual([{ path: "knowledge/restore-drill.md", commit_sha: sha }]);
     });
 
-    it("is done — exit 0 — after replaying a manifest commit a bundle's rows missed: its commit row lands, no concept does, and it stops nowhere", async () => {
+    it("replays a missed manifest commit, landing its row, no concept", async () => {
       const { workspaceId, admin, sha } = await replayedAfterTheWindow(
         app(),
         (principal, doors, author) =>
@@ -1137,7 +1544,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
   });
 
   describe("smoke — the platform answers through its interface", () => {
-    it("passes against the running api: health, the protected-resource document, the bearer challenge, the shell", async () => {
+    it("passes against the running api's health, metadata, challenge and shell", async () => {
       const run = await ops(app(), ["smoke", "--url", PUBLIC_URL, "--find", "--guide", "--ask"]);
 
       expect(run.lines.filter((line) => line.startsWith("FAIL"))).toEqual([]);
@@ -1147,7 +1554,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines.filter((line) => line.startsWith("note "))).toHaveLength(3);
     });
 
-    it("passes on the loopback the way the drill reaches it, by sending the app hostname as Host through node:http", async () => {
+    it("passes on the loopback, sending the app hostname as Host", async () => {
       let listener: ReturnType<typeof serve> | undefined;
       const port = await new Promise<number>((resolve) => {
         listener = serve({ fetch: app().server.fetch, port: 0, hostname: "127.0.0.1" }, (info) =>
@@ -1176,7 +1583,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
   });
 
-  describe("dump-grep — which table holds a token and in how many lines, never the line", () => {
+  describe("dump-grep — a token's tables and counts, never its lines", () => {
     const dump = [
       "SET search_path = public;",
       "COPY public.person (id, email) FROM stdin;",
@@ -1193,7 +1600,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       "",
     ].join("\n");
 
-    it("names every table a token is in with its count, and says absent for one in none", async () => {
+    it("names each table holding a token, with counts, or absent", async () => {
       const run = await ops(
         app(),
         ["dump-grep", "--tokens", "jane@example.test,nobody@example.test"],
@@ -1211,7 +1618,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines.join("\n")).not.toContain("other@example.test");
     });
 
-    it("reports a match outside every COPY section as exactly that, because schema is not rows", async () => {
+    it("reports a match outside any COPY section as just that", async () => {
       const outside = [
         "SET search_path = public;",
         "CREATE FUNCTION greet() RETURNS text AS $$ select 'jane@example.test' $$;",
@@ -1227,7 +1634,22 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual(["jane…st: present in 1 line(s) outside any COPY section"]);
     });
 
-    it("does not count the COPY header, whose column names are the schema and not a row", async () => {
+    it("names a chunk partition as pg_dump heads its section", async () => {
+      const partitioned = [
+        'COPY index."chunk_01K5ZQ8WJ6T3M4N7P9R2S0V1X" (id, workspace_id, content) FROM stdin;',
+        "c1\t01K5ZQ8WJ6T3M4N7P9R2S0V1X\tClaims go to jane@example.test by Friday.",
+        "\\.",
+        "",
+      ].join("\n");
+
+      const run = await ops(app(), ["dump-grep", "--tokens", "jane@example.test"], partitioned);
+
+      expect(run.lines).toEqual([
+        'jane…st: present in 1 line(s) of table index."chunk_01K5ZQ8WJ6T3M4N7P9R2S0V1X"',
+      ]);
+    });
+
+    it("never counts the COPY header's column names as a row", async () => {
       const run = await ops(app(), ["dump-grep", "--tokens", "id"], dump);
 
       expect(run.exitCode).toBe(0);
@@ -1235,7 +1657,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
   });
 
-  describe("provision-workspace — a client's workspace with its first Admin, from the command line", () => {
+  describe("provision-workspace — a client's workspace and its first Admin", () => {
     const standingOf = async (app: TestApp, id: string) => {
       const found = await app.database.superuser.query<Record<string, unknown>>(
         `SELECT w.name, w.slug,
@@ -1249,7 +1671,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       return found.rows;
     };
 
-    it("is done with the id first on its line, and the workspace, its partition, the Admin's membership, its configuration row, its ledger row and its bundle repository all stand", async () => {
+    it("stands up the workspace, partition, membership, config, ledger and repository", async () => {
       const admin = await app().person(undefined, "Priya Shah");
       const slug = aSlug();
 
@@ -1286,7 +1708,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("resolves the Admin's email without regard to case, as sign-in does", async () => {
+    it("resolves the Admin's email regardless of case, as sign-in does", async () => {
       const admin = await app().person("Priya.Shah@Acme.Invalid");
 
       const run = await provisioning(app(), [
@@ -1304,7 +1726,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("refuses no-such-user for a person who has not signed in, says what to do next, and writes nothing", async () => {
+    it("refuses no-such-user, says what to do next, writes nothing", async () => {
       const slug = aSlug();
 
       const run = await provisioning(app(), [
@@ -1323,7 +1745,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await workspacesWithSlug(app(), slug)).toBe(0);
     });
 
-    it("refuses no-display-name for a person who has signed in and given no display name, says what to do next, and writes nothing", async () => {
+    it("refuses no-display-name, says what to do next, writes nothing", async () => {
       const admin = await app().person(undefined, "");
       const slug = aSlug();
 
@@ -1344,7 +1766,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await membershipsHeldBy(app(), admin.id)).toBe(0);
     });
 
-    it("refuses slug-taken for a slug another workspace holds, and writes nothing", async () => {
+    it("refuses slug-taken for a held slug, and writes nothing", async () => {
       const first = await app().person();
       const second = await app().person();
       const slug = aSlug();
@@ -1375,7 +1797,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await membershipsHeldBy(app(), second.id)).toBe(0);
     });
 
-    it("refuses malformed for a blank name or slug, and writes nothing", async () => {
+    it("refuses malformed for a blank name or slug, writing nothing", async () => {
       const admin = await app().person();
 
       const run = await provisioning(app(), [
@@ -1394,7 +1816,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await membershipsHeldBy(app(), admin.id)).toBe(0);
     });
 
-    it("refuses without a repositories' root before it writes anything, since a workspace with no bundle repository can take no import", async () => {
+    it("refuses without a repositories' root, before writing anything", async () => {
       const admin = await app().person();
       const slug = aSlug();
 
@@ -1435,9 +1857,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
   });
 
-  describe("add-member — a signed-in person made a member of a workspace, from the command line", () => {
+  describe("add-member — a signed-in person made a workspace's member", () => {
     it.each(["Admin", "Editor", "Viewer"])(
-      "is done making a signed-in person a %s, the membership row and its ledger row standing together",
+      "makes a person a %s, writing membership and ledger rows",
       async (role) => {
         const { workspaceId } = await app().provision();
         const person = await app().person();
@@ -1469,7 +1891,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("refuses no-such-user for a person who has not signed in, says what to do next, and writes nothing", async () => {
+    it("refuses no-such-user, says what to do next, writes nothing", async () => {
       const { workspaceId } = await app().provision();
 
       const run = await adding(app(), workspaceId, "nobody@acme.invalid", "Editor");
@@ -1481,7 +1903,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await rowsOfAct(app(), workspaceId, "people.member.added")).toEqual([]);
     });
 
-    it("refuses no-display-name for a person who has signed in and given no display name, says what to do next, and writes nothing", async () => {
+    it("refuses no-display-name, says what to do next, writes nothing", async () => {
       const { workspaceId } = await app().provision();
       const person = await app().person(undefined, "");
 
@@ -1495,7 +1917,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await rowsOfAct(app(), workspaceId, "people.member.added")).toEqual([]);
     });
 
-    it("refuses no-such-workspace for an id no workspace has, and writes nothing", async () => {
+    it("refuses no-such-workspace for an unknown id, and writes nothing", async () => {
       const person = await app().person();
       const nowhere = ulid();
 
@@ -1509,7 +1931,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await ledgerOf(app(), nowhere)).toEqual([]);
     });
 
-    it("refuses already-a-member on a repeat — the person just added, or the Admin provisioning made — and never changes a role", async () => {
+    it("refuses already-a-member on any repeat, never changing a role", async () => {
       const { workspaceId, admin } = await app().provision();
       const person = await app().person();
       expect((await adding(app(), workspaceId, person.email, "Editor")).exitCode).toBe(0);
@@ -1541,7 +1963,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await membershipsOf(app(), workspaceId, person.id)).toEqual([]);
     });
 
-    it("answers usage to a workspace that is not an id, and to a missing flag, before it reads anything", async () => {
+    it("answers usage to a non-id workspace or a missing flag", async () => {
       const notAnId = await ops(app(), [
         "add-member",
         "--workspace",
@@ -1575,8 +1997,10 @@ describe("pnpm ops — the restore scripts' commands", () => {
       "knowledge/product/tiers/standard-plan.md",
     ] as const;
 
-    // The fixture names its verifiers by a fixed address, so one person row serves every
-    // workspace the block provisions.
+    /**
+     * The fixture names its verifiers by a fixed address, so one person row serves every workspace
+     * the block provisions.
+     */
     const verifierIds = new Map<string, string>();
 
     const verifierOf = async (app: TestApp, email: string, name: string): Promise<string> => {
@@ -1703,7 +2127,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       return files;
     };
 
-    it("lands the fixture bundle and says what it did, one line per concept in path order, then one per file whose links it rewrote", async () => {
+    it("lands the fixture, saying each concept, then each rewritten file", async () => {
       const { workspaceId, admin } = await bundleWorkspace(app());
 
       const run = await importing(app(), workspaceId, admin.email);
@@ -1717,7 +2141,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("writes the manifest as the first commit and every concept as its own commit after it, the rows landed with kind, title, status and the class given", async () => {
+    it("commits the manifest first, then each concept, landing their rows", async () => {
       const { workspaceId, admin } = await bundleWorkspace(app());
 
       await importing(app(), workspaceId, admin.email);
@@ -1747,7 +2171,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       );
     });
 
-    it("leaves the manifest in the platform's own form, every link an iri across domains and between split concepts, and no relative link or email in any concept file", async () => {
+    it("normalises the manifest, rewrites links as IRIs, leaves no email", async () => {
       const { workspaceId, admin, mona } = await bundleWorkspace(app());
 
       await importing(app(), workspaceId, admin.email);
@@ -1797,7 +2221,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(to.concept?.frontmatter["title"]).toBe("Advanced plan");
     });
 
-    it("records each verified event as an imported check with a null hash and one audit event, so find and open say Checked by the member's name · imported", async () => {
+    it("imports verified events as checks that find and open show", async () => {
       const { workspaceId, admin, mona, theo } = await bundleWorkspace(app());
 
       await importing(app(), workspaceId, admin.email);
@@ -1868,7 +2292,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("renders an imported concept's evidence over MCP with the locator a source carries, and no parenthesis after a source that carries none", async () => {
+    it("renders imported evidence over MCP, a locator only where given", async () => {
       const { workspaceId, admin } = await bundleWorkspace(app());
       const from = await mkdtemp(path.join(tmpdir(), "bundle-"));
       await mkdir(path.join(from, "company", "answers"), { recursive: true });
@@ -1915,7 +2339,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("skips every landed concept and every present check on a rerun, rewrites no link, and says so", async () => {
+    it("skips what already landed on a rerun, and says so", async () => {
       const { workspaceId, admin } = await bundleWorkspace(app());
       await importing(app(), workspaceId, admin.email);
 
@@ -1931,7 +2355,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await checkRowsOf(app(), workspaceId)).toHaveLength(7);
     });
 
-    it("is reconciled once landed: the watermark is the head and a replay finds nothing to do", async () => {
+    it("leaves the watermark at the head, with nothing to replay", async () => {
       const { workspaceId, admin } = await bundleWorkspace(app());
       await importing(app(), workspaceId, admin.email);
       const sha = await head(await principalOf(app(), workspaceId, admin.id), openTestGit(app()));
@@ -1944,7 +2368,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("reports what a run would do on a dry run and writes nothing", async () => {
+    it("reports what a dry run would do, writing nothing", async () => {
       const { workspaceId, admin } = await bundleWorkspace(app());
 
       const run = await importing(app(), workspaceId, admin.email, { flags: ["--dry-run"] });
@@ -1970,7 +2394,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ).toEqual(new Set(["Restricted"]));
     });
 
-    it("refuses a Viewer as the member it runs as, and writes nothing", async () => {
+    it("refuses to run as a Viewer, and writes nothing", async () => {
       const { workspaceId } = await bundleWorkspace(app());
       const viewer = await app().person();
       await app().addMember(workspaceId, viewer.id, "Viewer");
@@ -1984,7 +2408,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await commitsOf(app(), workspaceId)).toEqual([]);
     });
 
-    it("refuses an Editor asked to land the bundle Restricted, which only an Admin could read back, and writes nothing", async () => {
+    it("refuses an Editor landing Restricted, which only Admins read back", async () => {
       const { workspaceId } = await bundleWorkspace(app());
 
       const run = await importing(app(), workspaceId, MONA, {
@@ -1998,7 +2422,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await commitsOf(app(), workspaceId)).toEqual([]);
     });
 
-    it("refuses a member email nobody in the workspace has, telling the operator to invite them", async () => {
+    it("refuses a non-member's email, telling the operator to invite them", async () => {
       const { workspaceId } = await bundleWorkspace(app());
 
       const run = await importing(app(), workspaceId, "nobody@acme.invalid");
@@ -2050,7 +2474,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.exitCode).toBe(2);
     });
 
-    it("lands the bundle in a workspace the two commands stood up — provision-workspace for the running Admin, add-member for each verifier — and find reads back Checked by the verifier's name · imported", async () => {
+    it("lands in a workspace provision-workspace and add-member stood up", async () => {
       const owner = await app().person(undefined, "Liam Owner");
       const provisioned = await provisioning(app(), [
         "--name",

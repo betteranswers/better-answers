@@ -71,7 +71,7 @@ afterAll(async () => {
   await database.end();
 });
 
-describe("what Better Auth mounts behind the fence's catch-all (ADR 0022, T-039)", () => {
+describe("what Better Auth mounts behind the fence's catch-all", () => {
   it("mounts exactly the set the committed snapshot names", () => {
     const mounted = mountedPaths(auth);
 
@@ -95,7 +95,7 @@ describe("what Better Auth mounts behind the fence's catch-all (ADR 0022, T-039)
     ).toEqual({ added: [], removed: [] });
   });
 
-  it("refuses to agree with an empty snapshot, so a build that mounts nothing cannot pass", () => {
+  it("refuses an empty snapshot, so mounting nothing cannot pass", () => {
     const mounted = mountedPaths(auth);
 
     expect(mounted.length).toBeGreaterThan(0);
@@ -103,13 +103,13 @@ describe("what Better Auth mounts behind the fence's catch-all (ADR 0022, T-039)
     for (const path of DRIVEN_BY_THE_FLOW) expect(mounted).toContain(path);
   });
 
-  it("mounts nothing under the share agent's surface, which the catch-all never reaches", () => {
+  it("mounts nothing under the share agent's surface", () => {
     for (const mounted of [...readSnapshot(), ...mountedPaths(auth)]) {
       expect(mounted.startsWith("/agent/v1")).toBe(false);
     }
   });
 
-  it("is named by the catch-all entry it reviews, and names that entry back", () => {
+  it("names the catch-all entry it reviews, which names it back", () => {
     expect(CATCH_ALL?.paths).toEqual(["/*"]);
     expect(CATCH_ALL?.reason).toContain("better-auth-endpoints.txt");
     expect(readFileSync(SNAPSHOT, "utf8")).toContain("ingress/hostnames.ts");

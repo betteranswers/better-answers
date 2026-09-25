@@ -739,7 +739,7 @@ def test_a_document_quarantined_by_one_run_and_read_by_the_next_loses_its_error(
     ]
 
 
-def test_a_suppression_standing_over_a_document_is_read_off_the_table_and_kept_out(
+def test_a_suppression_the_workspace_holds_is_read_off_the_table_and_kept_out(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -750,9 +750,7 @@ def test_a_suppression_standing_over_a_document_is_read_off_the_table_and_kept_o
     kept = [row["content"] for row in chunk_rows_of(connection, workspace_id)]
 
     with connection.cursor() as cursor:
-        seed_suppression(
-            cursor, workspace_id=workspace_id, document_id=A_DELIVERY_NOTE_ID
-        )
+        seed_suppression(cursor, workspace_id=workspace_id)
     connection.commit()
 
     index_binding(
@@ -765,6 +763,73 @@ def test_a_suppression_standing_over_a_document_is_read_off_the_table_and_kept_o
     assert [row["content"] for row in chunk_rows_of(connection, workspace_id)] == [
         A_DELIVERY_NOTE_SUPPRESSED
     ]
+
+
+ANOTHER_DELIVERY_NOTE_ID = "01M2Q3R4S5T6V7W8X9YZAB0004"
+
+
+def test_a_suppression_written_before_a_binding_reaches_every_document_it_holds(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    connection, dsn = database
+    workspace_id = seed_the_binding(
+        connection, documents=(A_DELIVERY_NOTE_ID, ANOTHER_DELIVERY_NOTE_ID)
+    )
+    with connection.cursor() as cursor:
+        seed_suppression(cursor, workspace_id=workspace_id)
+    connection.commit()
+    both_notes = ABucket(
+        {
+            original_key_of(A_DELIVERY_NOTE_ID): A_DELIVERY_NOTE.encode(),
+            original_key_of(ANOTHER_DELIVERY_NOTE_ID): A_DELIVERY_NOTE.encode(),
+        }
+    )
+
+    index_binding(
+        bootstrap_for(dsn, tmp_path), run_for(workspace_id), copies=both_notes
+    )
+
+    assert [
+        (row["source_document_id"], row["content"])
+        for row in chunk_rows_of(connection, workspace_id)
+    ] == [
+        (A_DELIVERY_NOTE_ID, A_DELIVERY_NOTE_SUPPRESSED),
+        (ANOTHER_DELIVERY_NOTE_ID, A_DELIVERY_NOTE_SUPPRESSED),
+    ]
+
+
+A_ROTA_ID = "01M2Q3R4S5T6V7W8X9YZAB0009"
+A_ROTA = "Rota changes go to priya.raman@meridianfenland.co.uk by Thursday.\n"
+A_ROTA_ERASED = "Rota changes go to [withheld] by Thursday.\n"
+
+
+def test_an_erased_work_address_is_withheld_on_the_next_run_and_is_never_a_finding(
+    database: tuple[psycopg.Connection, str], tmp_path: Path
+) -> None:
+    connection, dsn = database
+    workspace_id = seed_the_binding(connection, documents=(A_ROTA_ID,))
+    bootstrap = bootstrap_for(dsn, tmp_path)
+    rota = ABucket({original_key_of(A_ROTA_ID): A_ROTA.encode()})
+
+    index_binding(bootstrap, run_for(workspace_id), copies=rota)
+    before = finding_rows_of(connection, workspace_id)
+    with connection.cursor() as cursor:
+        seed_suppression(
+            cursor,
+            workspace_id=workspace_id,
+            identifiers={
+                "emails": ["priya.raman@meridianfenland.co.uk"],
+                "names": [],
+                "other": [],
+            },
+        )
+    connection.commit()
+    index_binding(bootstrap, run_for(workspace_id, "wiped"), copies=rota)
+
+    assert [row["content"] for row in chunk_rows_of(connection, workspace_id)] == [
+        A_ROTA_ERASED
+    ]
+    assert finding_rows_of(connection, workspace_id) == before
 
 
 def marked_rows_of(
@@ -940,9 +1005,7 @@ def test_a_name_an_erasure_has_since_raised_reads_always_after_the_next_run(
             document_id=A_DELIVERY_NOTE_ID,
             **HER_NAME,
         )
-        seed_suppression(
-            cursor, workspace_id=workspace_id, document_id=A_DELIVERY_NOTE_ID
-        )
+        seed_suppression(cursor, workspace_id=workspace_id)
     connection.commit()
     index_binding(
         bootstrap,
@@ -1318,7 +1381,6 @@ def test_a_kept_span_an_erasure_names_stays_withheld_and_the_run_says_which(
         seed_suppression(
             cursor,
             workspace_id=workspace_id,
-            document_id=AN_INVOICE_ID,
             identifiers={
                 "emails": [],
                 "names": [],

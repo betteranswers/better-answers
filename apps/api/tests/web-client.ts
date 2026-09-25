@@ -22,8 +22,19 @@ type Sent = {
   readonly contentType: string | null;
 };
 
-// The web's own link and wrapper, never a copy, so a field renamed on one side alone refuses
-// the upload here.
+type LinkInit = Parameters<NonNullable<Parameters<typeof apiLink>[0]["fetch"]>>[1];
+
+const forwarded = (init: LinkInit): RequestInit => ({
+  method: init?.method ?? "GET",
+  headers: new Headers(init?.headers),
+  body: init?.body ?? null,
+  signal: init?.signal ?? null,
+});
+
+/**
+ * The web's own link and wrapper, never a copy, so a field renamed on one side alone refuses the
+ * upload here.
+ */
 const webClientOf = (client: TestClient) => {
   const sent: Sent[] = [];
   const api = createTRPCClient<AppRouter>({
@@ -37,12 +48,7 @@ const webClientOf = (client: TestClient) => {
             batched: asked.searchParams.get("batch") === "1",
             contentType: new Headers(init?.headers).get("content-type"),
           });
-          return client.fetch(asked.href, {
-            method: init?.method ?? "GET",
-            headers: new Headers(init?.headers),
-            body: init?.body ?? null,
-            signal: init?.signal ?? null,
-          });
+          return client.fetch(asked.href, forwarded(init));
         },
       }),
     ],
@@ -50,6 +56,10 @@ const webClientOf = (client: TestClient) => {
   return { api, sent };
 };
 
+/**
+ * `api` is the web's own tRPC client over the signed-in `client`; `sent` records each request
+ * `api` made.
+ */
 export const webSignedIn = async (app: TestApp, email: string) => {
   const client = await signedInClient(app, email);
   return { client, ...webClientOf(client) };

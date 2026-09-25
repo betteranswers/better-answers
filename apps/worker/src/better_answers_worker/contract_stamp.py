@@ -1,3 +1,3 @@
 # Generated, never edited: cd apps/worker && uv run --frozen generate-contract-stamp
 
-CONTRACT_DIGEST = "11214b92cba9c163296e960c4cfec6adaa0e47deab49372ed9ada616f88f1907"
+CONTRACT_DIGEST = "87155c20c5625245735d8ac8446e63ac63a0a7c4d765adf3cdb93e464f9e6e4a"

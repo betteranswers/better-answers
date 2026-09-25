@@ -13,7 +13,7 @@ const isPlatformId = (value: string | undefined): boolean =>
 const anAddress = () => `${ulid().toLowerCase()}@example.invalid`;
 
 describe("the id a person gets", () => {
-  it("gives a person signing in for the first time a user id in the one shape the platform mints", async () => {
+  it("mints a new person's user id in the platform's shape", async () => {
     const email = anAddress();
 
     await signIn(app(), app().client(), email);
@@ -25,7 +25,7 @@ describe("the id a person gets", () => {
     expect(isPlatformId(row.rows[0]?.id)).toBe(true);
   });
 
-  it("gives that person's browser session an id in the same shape", async () => {
+  it("gives that person's session an id in the same shape", async () => {
     /* jscpd:ignore-start */
     const email = anAddress();
 
@@ -39,7 +39,7 @@ describe("the id a person gets", () => {
     /* jscpd:ignore-end */
   });
 
-  it("gives a provisioned workspace's first Admin membership an id in the same shape", async () => {
+  it("gives a workspace's first Admin membership the same id shape", async () => {
     const workspace = await app().provision({ name: "Acme" });
 
     const row = await app().database.superuser.query<{ id: string }>(
@@ -51,7 +51,7 @@ describe("the id a person gets", () => {
 });
 
 describe("an invitation read by its id", () => {
-  it("is refused to the invited person until their email is verified, and read once it is", async () => {
+  it("refuses the invited person until their email is verified", async () => {
     const acme = await app().provision({ name: "Acme" });
     const email = anAddress();
     const client = app().client();

@@ -41,11 +41,13 @@ const REGISTER = {
   "already-published": "conflict by sources",
   "not-indexed": "precondition by sources",
   "confirmation-missing": "precondition by sources",
+  "special-category-unreviewed": "precondition by sources",
   "media-type-refused": "inapplicable by sources",
   "too-large": "inapplicable by sources",
   "not-the-always-set": "inapplicable by sources",
   "not-special-category": "inapplicable by sources",
   "widening-refused": "inapplicable by sources",
+  "not-wider": "inapplicable by sources",
 
   "no-such-group": "absent by members",
   "no-such-member": "absent by members",
@@ -66,12 +68,14 @@ const REGISTER = {
   "display-name-control-character": "malformed by workspaces",
   "display-name-angle-bracket": "malformed by workspaces",
   "display-name-too-long": "malformed by workspaces",
+
+  "identifier-too-broad": "inapplicable by erasure",
 };
 
 type EveryRegisteredWord = keyof typeof REGISTER;
 
 const ALIAS = /\btype \w+ =([^;]*);/g;
-const BUILT_FROM_A_VOCABULARY = /\b(?:Kernel|Member|Source|Workspace)Refusal</;
+const BUILT_FROM_A_VOCABULARY = /\b(?:Kernel|Member|Source|Workspace|Erasure)Refusal</;
 const QUOTED = /"([a-z][a-z0-9-]*)"/g;
 
 const wordsInConvertedUnions = (files: readonly string[]): ReadonlySet<string> => {
