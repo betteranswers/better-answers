@@ -87,7 +87,7 @@ the side that counts. Read the numbers off those files rather than from here.
 State is built through the api's harness over HTTP, from `apps/web/e2e/harness.ts`, using the
 `request` fixture. Nothing writes a row itself and nothing sets a cookie from outside. Nine acts
 call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources two from
-`apps/api/tests/harness-sources.ts`:
+`apps/api/tests/harness-sources.ts` and the People one from `apps/api/tests/harness-people.ts`:
 
 | Act | What it does |
 | --- | --- |
@@ -100,15 +100,18 @@ call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources
 | `seedRoutes` | The routes a workspace has chosen; a purpose left out of the list has no route, which the screen must show rather than omit |
 | `seedBindings` | Source bindings as their acts and the worker leave them — documents, findings kept or overridden by an erasure, quarantined documents, chunks, an index run at any status, a concept and composition citing a document — answering each binding's and document's id |
 | `moveTheIndexRun` | The worker's two steps over the workspace's one index run, claimed then done, through the queue's own functions under the worker's role — how a spec watches a state word move without a worker process |
+| `makeGroups` | Groups made by a named member through the members slice's own act, one transaction each — the member's own acts on the audit log, until groups have a screen |
 
-Six more helpers in the same module drive the browser rather than the harness:
+Eight more helpers in the same module drive the browser rather than the harness:
 
 | Helper | What it does |
 | --- | --- |
 | `anAddress` | An email address nobody else in the run will use, so a code read back is this test's |
 | `signIn` | Signs a person in **through the product's own screen** — fill the address, send, read the six-digit code back from the captured transport, fill it, submit, and wait for the code field to be gone rather than for the click |
+| `aMemberSignedInAt` | A new workspace's Editor or Viewer, signed in having asked for a path first, so sign-in carries them back to it — where a refused screen is proved |
 | `signOutFromTheShell` | Opens the top bar's menu, then signs out, because sign-out is one disclosure in |
 | `skipLinkReachesTheScreen` | Tab, the skip link has focus, Enter, `main` has focus — where a shell spec's keyboard traversal starts |
+| `keystrokesListed` | Presses `?` and answers the screen's list of keystrokes once it is open |
 | `clockTheNextKey` | Starts the act's clock in the page: from the next key to the node an XPath names reading a given text |
 | `theActLandedWithinItsBudget` | Reads that clock, annotates the test with it and asserts it under the act's 100 ms |
 

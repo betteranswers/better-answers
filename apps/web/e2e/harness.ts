@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 import { z } from "zod";
 
 import type { REDACTION_TIERS, SENSITIVITIES } from "@better-answers/schema";
@@ -140,6 +140,14 @@ export const moveTheIndexRun = (
   input: { workspaceId: string; to: "claimed" | "done" },
 ) => ask(api, "/index-runs", input, indexRunMoved);
 
+const groupsMade = z.object({ made: z.number() });
+
+/** Groups have no screen yet, so a spec wanting a member's own acts on the audit log asks here. */
+export const makeGroups = (
+  api: APIRequestContext,
+  input: { workspaceId: string; userId: string; names: readonly string[] },
+) => ask(api, "/groups", input, groupsMade);
+
 /** The code the api captured for this address, in place of the email nobody receives. */
 export const codeSentTo = async (api: APIRequestContext, email: string): Promise<string> => {
   const sent = await api.get(`${HARNESS}/codes?email=${encodeURIComponent(email)}`);
@@ -181,6 +189,32 @@ export const signIn = async (page: Page, api: APIRequestContext, email: string):
   // Wait for the screen to be left, not just the click: navigating away cancels the request
   // in flight and no session is set.
   await expect(code).toHaveCount(0);
+};
+
+// Asked for before signing in, so the sign-in screen carries the member back to it.
+export const aMemberSignedInAt = async (
+  page: Page,
+  api: APIRequestContext,
+  role: "Editor" | "Viewer",
+  path: string,
+) => {
+  const email = anAddress(role.toLowerCase());
+  const member = await person(api, email, { displayName: `A ${role}` });
+  const workspace = await provision(api, { name: `A workspace of ${role}s` });
+  await addMember(api, { role, userId: member.id, workspaceId: workspace.workspaceId });
+
+  await page.goto(path);
+  await signIn(page, api, email);
+  await expect(page).toHaveURL(new RegExp(`${path}$`));
+  return workspace;
+};
+
+// `?` opens a screen's keystrokes from anywhere on it outside a field.
+export const keystrokesListed = async (page: Page, screen: string): Promise<Locator> => {
+  await page.keyboard.press("?");
+  const listed = page.getByRole("dialog", { name: `Keystrokes on ${screen}` });
+  await expect(listed).toBeVisible();
+  return listed;
 };
 
 const ACT_BUDGET_MS = 100;

@@ -31,6 +31,7 @@ describe("what a procedure may answer the wire", () => {
       "console.people.list",
       "console.people.revokeCredentials",
       "console.workspaces.list",
+      "members.auditLog",
       "members.changeRole",
       "members.list",
       "person.requestAccess",
@@ -61,6 +62,7 @@ describe("what a procedure may answer the wire", () => {
       | "console.workspaces.list"
       | "members.list"
       | "members.changeRole"
+      | "members.auditLog"
       | "routes.list"
       | "sources.list"
       | "sources.bind"
