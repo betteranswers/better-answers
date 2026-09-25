@@ -88,8 +88,10 @@ const repositoryPath = (door: GitDoor, workspaceId: string): string =>
 const bundleOf = (door: GitDoor, principal: UserPrincipal): string =>
   repositoryPath(door, principal.workspaceId);
 
-// `env` replaces rather than extends, so the spread keeps PATH; `LC_ALL=C` keeps git's
-// messages English for the compare-and-swap match below.
+/**
+ * `env` replaces rather than extends, so the spread keeps PATH; `LC_ALL=C` keeps git's messages
+ * English for the compare-and-swap match below.
+ */
 const childEnvironment = (added: Readonly<Record<string, string>> = {}): NodeJS.ProcessEnv => ({
   ...process.env,
   ...added,
@@ -129,12 +131,25 @@ const stderrOf = (cause: unknown): string => {
   return typeof stderr === "string" ? stderr.trim() : "";
 };
 
+const hasRepository = async (gitDir: string): Promise<boolean> => {
+  try {
+    await run("git", ["--git-dir", gitDir, "rev-parse", "--git-dir"]);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export const initRepository = async (door: GitDoor, workspaceId: string): Promise<string> => {
   const gitDir = repositoryPath(door, workspaceId);
   await run("git", ["init", "--bare", "--initial-branch", "main", gitDir]);
   return gitDir;
 };
 
+/**
+ * The bundle's `main` commit, or null when git cannot read one, as in a missing or empty
+ * repository.
+ */
 export const head = (principal: UserPrincipal, door: GitDoor): Promise<string | null> =>
   headOf(bundleOf(door, principal));
 
@@ -168,6 +183,54 @@ const trailerLines = (trailers: CommitTrailers): readonly string[] | undefined =
 const messageWith = (message: string, lines: readonly string[]): string =>
   `${message}\n\n${lines.join("\n")}\n`;
 
+const danglingCommit = async (
+  gitDir: string,
+  indexFile: string,
+  parent: string | null,
+  request: CommitRequest,
+  message: string,
+): Promise<string> => {
+  const env = { GIT_INDEX_FILE: indexFile };
+
+  if (parent !== null) await git(gitDir, ["read-tree", parent], { env });
+
+  const blob = await git(gitDir, ["hash-object", "-w", "--stdin"], { input: request.content });
+  await git(gitDir, ["update-index", "--add", "--cacheinfo", `100644,${blob},${request.path}`], {
+    env,
+  });
+  const tree = await git(gitDir, ["write-tree"], { env });
+
+  const at = request.at.toISOString();
+  return git(
+    gitDir,
+    ["commit-tree", tree, ...(parent === null ? [] : ["-p", parent]), "-m", message],
+    {
+      env: {
+        ...env,
+
+        GIT_AUTHOR_NAME: request.author.name,
+        GIT_AUTHOR_EMAIL: request.author.email,
+        GIT_AUTHOR_DATE: at,
+        GIT_COMMITTER_NAME: PLATFORM_BOT.name,
+        GIT_COMMITTER_EMAIL: PLATFORM_BOT.email,
+        GIT_COMMITTER_DATE: at,
+      },
+    },
+  );
+};
+
+const commitFailure = (cause: unknown): "stale-precondition" | Error => {
+  const message = cause instanceof Error ? cause.message : String(cause);
+  if (/cannot lock ref|reference already exists|but expected/i.test(message)) {
+    return "stale-precondition";
+  }
+  return cause instanceof Error ? cause : new Error(message);
+};
+
+/**
+ * Writes one file as one commit on `main`, compare-and-swap against `expectedHead`, which is null
+ * for the first commit. The committer is always the platform bot; the author is the request's.
+ */
 export const commit = async (
   principal: UserPrincipal,
   door: GitDoor,
@@ -177,61 +240,19 @@ export const commit = async (
   const trailers = trailerLines(request.trailers);
   if (!isSubjectLine(request.message) || trailers === undefined) return err("malformed-message");
   const gitDir = bundleOf(door, principal);
-
-  try {
-    await run("git", ["--git-dir", gitDir, "rev-parse", "--git-dir"]);
-  } catch {
-    return err("no-such-repository");
-  }
+  if (!(await hasRepository(gitDir))) return err("no-such-repository");
 
   const parent = await head(principal, door);
   if (parent !== request.expectedHead) return err("stale-precondition");
 
   const index = await mkdtemp(path.join(tmpdir(), "better-answers-index-"));
   try {
-    const indexFile = path.join(index, "index");
-    const env = { GIT_INDEX_FILE: indexFile };
-
-    if (parent !== null) await git(gitDir, ["read-tree", parent], { env });
-
-    const blob = await git(gitDir, ["hash-object", "-w", "--stdin"], { input: request.content });
-    await git(gitDir, ["update-index", "--add", "--cacheinfo", `100644,${blob},${request.path}`], {
-      env,
-    });
-    const tree = await git(gitDir, ["write-tree"], { env });
-
-    const at = request.at.toISOString();
-    const sha = await git(
-      gitDir,
-      [
-        "commit-tree",
-        tree,
-        ...(parent === null ? [] : ["-p", parent]),
-        "-m",
-        messageWith(request.message, trailers),
-      ],
-      {
-        env: {
-          ...env,
-
-          GIT_AUTHOR_NAME: request.author.name,
-          GIT_AUTHOR_EMAIL: request.author.email,
-          GIT_AUTHOR_DATE: at,
-          GIT_COMMITTER_NAME: PLATFORM_BOT.name,
-          GIT_COMMITTER_EMAIL: PLATFORM_BOT.email,
-          GIT_COMMITTER_DATE: at,
-        },
-      },
-    );
-
+    const message = messageWith(request.message, trailers);
+    const sha = await danglingCommit(gitDir, path.join(index, "index"), parent, request, message);
     await git(gitDir, ["update-ref", BUNDLE_REF, sha, parent ?? ""]);
     return ok({ sha, parent });
   } catch (cause) {
-    const message = cause instanceof Error ? cause.message : String(cause);
-    if (/cannot lock ref|reference already exists|but expected/i.test(message)) {
-      return err("stale-precondition");
-    }
-    return err(cause instanceof Error ? cause : new Error(message));
+    return err(commitFailure(cause));
   } finally {
     await rm(index, { recursive: true, force: true });
   }
@@ -239,12 +260,17 @@ export const commit = async (
 
 const locks = new Map<string, Promise<unknown>>();
 
+/**
+ * Runs `work` once every earlier holder's work on the same repository has settled, failed or
+ * not. The lock holds within this process only.
+ */
 export const withRepositoryLock = <T>(
   principal: UserPrincipal,
   door: GitDoor,
   work: () => Promise<T>,
 ): Promise<T> => lockedRepository(bundleOf(door, principal), work);
 
+/** Shares withRepositoryLock's lock, so user and platform work on one repository queue together. */
 export const withRepositoryLockAs = <T>(
   platform: PlatformPrincipal,
   door: GitDoor,
@@ -265,6 +291,10 @@ const lockedRepository = async <T>(key: string, work: () => Promise<T>): Promise
   }
 };
 
+/**
+ * The commits on `main` after `since`, oldest first, or all of them when `since` is null.
+ * `history-diverged` when the head no longer descends from `since`.
+ */
 export const commitsAfter = async (
   platform: PlatformPrincipal,
   door: GitDoor,
@@ -277,11 +307,7 @@ export const commitsAfter = async (
   >
 > => {
   const gitDir = repositoryPath(door, workspaceId);
-  try {
-    await run("git", ["--git-dir", gitDir, "rev-parse", "--git-dir"]);
-  } catch {
-    return err("no-such-repository");
-  }
+  if (!(await hasRepository(gitDir))) return err("no-such-repository");
   const head = await headOf(gitDir);
   if (head === null) return since === null ? ok({ head, missed: [] }) : err("history-diverged");
   if (since !== null) {
@@ -312,8 +338,10 @@ const carries = (line: string, needles: readonly string[]): boolean => {
   return needles.some((needle) => lowered.includes(needle.toLowerCase()));
 };
 
-// git grep exits 1 both for no match and for an object it could not read; only the silent one
-// means nobody is named.
+/**
+ * git grep exits 1 both for no match and for an object it could not read; only the silent one
+ * means nobody is named.
+ */
 const blobsNaming = async (
   gitDir: string,
   needles: readonly string[],
@@ -351,6 +379,13 @@ const authorsNaming = async (
   });
 };
 
+const allCommits = async (gitDir: string): Promise<readonly string[]> =>
+  (await git(gitDir, ["rev-list", "--all"])).split("\n").filter((sha) => sha !== "");
+
+/**
+ * Each commit's text files that carry one of `needles`, and each commit whose author does, matched
+ * without case across all refs. `authors` holds commit shas. Blank needles are dropped.
+ */
 export const historyNaming = async (
   platform: PlatformPrincipal,
   door: GitDoor,
@@ -360,9 +395,7 @@ export const historyNaming = async (
   const wanted = needles.filter((needle) => needle.trim() !== "");
   if (wanted.length === 0) return NAMES_NOBODY;
   const gitDir = repositoryPath(door, workspaceId);
-  const history = (await git(gitDir, ["rev-list", "--all"]))
-    .split("\n")
-    .filter((sha) => sha !== "");
+  const history = await allCommits(gitDir);
 
   if (history.length === 0) return NAMES_NOBODY;
   return {
@@ -381,9 +414,11 @@ export type CommitRead = {
 
 const TRAILER_LINE = /^([A-Za-z][A-Za-z-]*): (.+)$/;
 
+/**
+ * The last paragraph, never the first match: isSubjectLine keeps a forged trailer out at the
+ * write door, and this is the read half.
+ */
 const trailersOf = (message: string) => {
-  // The last paragraph, never the first match: isSubjectLine keeps a forged trailer out at the
-  // write door, and this is the read half.
   const block = message.trimEnd().split("\n\n").at(-1) ?? "";
   return Object.fromEntries(
     block.split("\n").flatMap((line) => {
@@ -395,6 +430,43 @@ const trailersOf = (message: string) => {
   );
 };
 
+const soleParentOf = (parents: string): string | null => {
+  const parentList = parents.split(" ").filter((parent) => parent !== "");
+  return parentList.length === 1 ? (parentList[0] ?? null) : null;
+};
+
+const addedOrModified = (changed: string): readonly string[] => {
+  const fields = changed.split("\0");
+  const files: string[] = [];
+  for (let at = 0; at + 1 < fields.length; at += 2) {
+    const [status, file] = [fields[at], fields[at + 1]];
+
+    if ((status === "A" || status === "M") && file !== undefined && file !== "") files.push(file);
+  }
+  return files;
+};
+
+const changeIn = async (gitDir: string, sha: string): Promise<CommitRead["change"]> => {
+  const changed = await git(gitDir, [
+    "diff-tree",
+    "--root",
+    "--no-commit-id",
+    "--name-status",
+    "-r",
+    "-z",
+    sha,
+  ]);
+  const files = addedOrModified(changed);
+  const file = files[0];
+  return files.length === 1 && file !== undefined
+    ? { path: file, content: await git(gitDir, ["show", `${sha}:${file}`], { raw: true }) }
+    : undefined;
+};
+
+/**
+ * `parent` is null for a root or a merge commit. `change` is set only when the commit adds or
+ * modifies exactly one file.
+ */
 export const readCommit = async (
   platform: PlatformPrincipal,
   door: GitDoor,
@@ -405,32 +477,10 @@ export const readCommit = async (
 
   const shown = await git(gitDir, ["show", "-s", "--format=%H%x00%P%x00%B", sha]);
   const [id = "", parents = "", ...message] = shown.split("\0");
-  const parentList = parents.split(" ").filter((parent) => parent !== "");
-
-  const changed = await git(gitDir, [
-    "diff-tree",
-    "--root",
-    "--no-commit-id",
-    "--name-status",
-    "-r",
-    "-z",
-    sha,
-  ]);
-  const fields = changed.split("\0");
-  const files: string[] = [];
-  for (let at = 0; at + 1 < fields.length; at += 2) {
-    const [status, file] = [fields[at], fields[at + 1]];
-
-    if ((status === "A" || status === "M") && file !== undefined && file !== "") files.push(file);
-  }
-  const file = files[0];
-  const change =
-    files.length === 1 && file !== undefined
-      ? { path: file, content: await git(gitDir, ["show", `${sha}:${file}`], { raw: true }) }
-      : undefined;
+  const change = await changeIn(gitDir, sha);
   return {
     sha: id,
-    parent: parentList.length === 1 ? (parentList[0] ?? null) : null,
+    parent: soleParentOf(parents),
     trailers: trailersOf(message.join("\0")),
     change,
   };
@@ -450,6 +500,9 @@ const fileIn = async (
   }
 };
 
+/**
+ * Null when the path is not portable or the commit holds no such file; any other failure throws.
+ */
 export const fileAt = async (
   platform: PlatformPrincipal,
   door: GitDoor,
@@ -459,6 +512,7 @@ export const fileAt = async (
 ): Promise<string | null> =>
   isPortablePath(filePath) ? fileIn(repositoryPath(door, workspaceId), sha, filePath) : null;
 
+/** Null when the path is not portable, `head` would answer null, or `main` holds no such file. */
 export const fileAtHead = async (
   principal: UserPrincipal,
   door: GitDoor,
@@ -495,6 +549,14 @@ const replacementsFor = (addresses: readonly string[], pseudonym: string): strin
     )
     .join("");
 
+const identitiesOf = (line: string): readonly (readonly [string, string])[] => {
+  const [author = "", authorAddress = "", committer = "", committerAddress = ""] = line.split("\0");
+  return [
+    [author, authorAddress],
+    [committer, committerAddress],
+  ];
+};
+
 const identitiesNaming = async (
   gitDir: string,
   needles: readonly string[],
@@ -503,12 +565,7 @@ const identitiesNaming = async (
 
   const found = new Map<string, string>();
   for (const line of logged.split("\n")) {
-    const [author = "", authorAddress = "", committer = "", committerAddress = ""] =
-      line.split("\0");
-    for (const [name, address] of [
-      [author, authorAddress],
-      [committer, committerAddress],
-    ] as const) {
+    for (const [name, address] of identitiesOf(line)) {
       if (address !== "" && carries(`${name} <${address}>`, needles)) {
         found.set(address.toLowerCase(), address);
       }
@@ -534,17 +591,22 @@ const DROPPED = "0".repeat(40);
 
 const COMMIT_MAP_LINE = /^([0-9a-f]{40})\s+([0-9a-f]{40})$/;
 
+const commitMapPairs = (mapped: string): readonly (readonly [string, string])[] =>
+  mapped.split("\n").flatMap((line) => {
+    const match = COMMIT_MAP_LINE.exec(line.trim());
+    const before = match?.[1];
+    const after = match?.[2];
+    return before === undefined || after === undefined ? [] : [[before, after] as const];
+  });
+
 const commitMapOf = async (
   gitDir: string,
   started: ReadonlySet<string>,
 ): Promise<readonly (readonly [string, string])[]> => {
   const mapped = await readFile(path.join(gitDir, "filter-repo", "commit-map"), "utf8");
   const moved: (readonly [string, string])[] = [];
-  for (const line of mapped.split("\n")) {
-    const match = COMMIT_MAP_LINE.exec(line.trim());
-    const before = match?.[1];
-    const after = match?.[2];
-    if (before === undefined || after === undefined || !started.has(before)) continue;
+  for (const [before, after] of commitMapPairs(mapped)) {
+    if (!started.has(before)) continue;
     if (after === DROPPED) {
       throw new Error(`git: the history rewrite dropped commit ${before} rather than moving it`);
     }
@@ -553,6 +615,11 @@ const commitMapOf = async (
   return moved;
 };
 
+/**
+ * Only when a file or an author names an address, rewrites every ref: each actor id naming one,
+ * in files and messages, and each author or committer carrying one, takes the pseudonym, and old
+ * objects are pruned. `moved` holds the commits whose sha changed; a dropped one throws.
+ */
 export const rewriteHistory = async (
   platform: PlatformPrincipal,
   door: GitDoor,
@@ -567,9 +634,7 @@ export const rewriteHistory = async (
   if (naming.blobs.length === 0 && naming.authors.length === 0) return NOTHING_MOVED;
 
   const gitDir = repositoryPath(door, workspaceId);
-  const started = new Set(
-    (await git(gitDir, ["rev-list", "--all"])).split("\n").filter((sha) => sha !== ""),
-  );
+  const started = new Set(await allCommits(gitDir));
   const signed = await identitiesNaming(gitDir, addresses);
   const written = await mkdtemp(path.join(tmpdir(), "better-answers-rewrite-"));
   try {
