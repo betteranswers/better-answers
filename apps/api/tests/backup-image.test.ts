@@ -78,8 +78,10 @@ const contentsSchema = z.object({
 
 type ImageContents = z.infer<typeof contentsSchema>;
 
-// String.raw keeps \t and \n as the characters printf interprets; a plain literal makes
-// them a real tab and newline.
+/**
+ * String.raw keeps \t and \n as the characters printf interprets; a plain literal makes them a
+ * real tab and newline.
+ */
 const probe = String.raw`
 printf 'pgDump\t%s\n' "$(pg_dump --version 2>&1)"
 for tool in ${REQUIRED_TOOLS.join(" ")}; do
@@ -95,15 +97,20 @@ if [ -f /etc/cron.d/backup ]; then
 fi
 `;
 
+const fieldsOf = (line: string): readonly [string, string, string] => {
+  const [key = "", first = "", second = ""] = line.split("\t");
+  return [key, first, second];
+};
+
 const readContents = (stdout: string): ImageContents => {
   const resolved: Record<string, string> = {};
   const cronEntries: string[] = [];
   const single: Record<string, string> = {};
   for (const line of stdout.split("\n").filter((candidate) => candidate.length > 0)) {
-    const [key, first, second] = line.split("\t");
-    if (key === "resolved") resolved[first ?? ""] = second ?? "";
-    else if (key === "cronEntries") cronEntries.push(first ?? "");
-    else single[key ?? ""] = first ?? "";
+    const [key, first, second] = fieldsOf(line);
+    if (key === "resolved") resolved[first] = second;
+    else if (key === "cronEntries") cronEntries.push(first);
+    else single[key] = first;
   }
   return contentsSchema.parse({
     pgDump: single["pgDump"],
@@ -127,11 +134,11 @@ describe.skipIf(nothingToProbeHere)("the backup image", () => {
     );
   }, IMAGE_PROBE_ALLOWANCE);
 
-  it("answers with a `pg_dump` of the database's own major version, so a restore is never refused", () => {
+  it("carries a `pg_dump` of the database's own major version", () => {
     expect(clientMajor(contents.pgDump)).toEqual(serverMajor());
   });
 
-  it("resolves every tool beyond Debian's base that the backup jobs, their health check and the production restore call", () => {
+  it("resolves every non-base tool the jobs, check and restore call", () => {
     const missing = Object.entries(contents.resolved)
       .filter(([, where]) => where === "")
       .map(([tool]) => tool);
@@ -140,7 +147,7 @@ describe.skipIf(nothingToProbeHere)("the backup image", () => {
     expect(missing).toEqual([]);
   });
 
-  it("carries the backup script itself, executable, where its schedule looks for it", () => {
+  it("carries the backup script, executable, where its schedule looks", () => {
     expect(contents.scriptIsThere).toBe(true);
     expect(contents.scriptIsExecutable).toBe(true);
 
@@ -148,7 +155,7 @@ describe.skipIf(nothingToProbeHere)("the backup image", () => {
     expect(contents.cronEntries.every((entry) => entry.includes(scriptPath()))).toBe(true);
   });
 
-  it("schedules exactly the jobs the script answers to, and each of them once", () => {
+  it("schedules exactly the script's jobs, each once", () => {
     const scheduled = contents.cronEntries
       .map((entry) => /backup\.sh\s+(\w+)/.exec(entry)?.[1] ?? "")
       .sort();
@@ -170,8 +177,10 @@ const handedToTheBackup = (): readonly string[] =>
     composeSchema.parse(parse(read("deploy/stores.compose.yaml"))).services.backup.environment,
   ).sort();
 
-// The orchestrator hands a stack's containers every variable of its resource, and the
-// resource's variables are the ones the compose file interpolates.
+/**
+ * The orchestrator hands a stack's containers every variable of its resource, and the resource's
+ * variables are the ones the compose file interpolates.
+ */
 const storesResourceVariables = (): readonly string[] =>
   [
     ...new Set(
@@ -258,6 +267,15 @@ interface WhatAJobSaw {
   readonly resolves: Record<string, string>;
 }
 
+const noteWhatAJobSaw = (saw: WhatAJobSaw, key: string, rest: string): void => {
+  if (key === "env") {
+    Object.assign(saw.environment, environmentOf([rest]));
+  } else if (key === "resolves") {
+    const [tool, where] = fieldsOf(rest);
+    saw.resolves[tool] = where;
+  }
+};
+
 const readWhatJobsSaw = (stdout: string): ReadonlyMap<string, WhatAJobSaw> => {
   const seen = new Map<string, WhatAJobSaw>();
   let current: WhatAJobSaw | undefined;
@@ -268,11 +286,8 @@ const readWhatJobsSaw = (stdout: string): ReadonlyMap<string, WhatAJobSaw> => {
     if (key === "job") {
       current = { environment: {}, resolves: {} };
       seen.set(rest, current);
-    } else if (key === "env" && current !== undefined) {
-      Object.assign(current.environment, environmentOf([rest]));
-    } else if (key === "resolves" && current !== undefined) {
-      const [tool = "", where = ""] = rest.split("\t");
-      current.resolves[tool] = where;
+    } else if (current !== undefined) {
+      noteWhatAJobSaw(current, key, rest);
     }
   }
   return seen;
@@ -345,7 +360,7 @@ describe.skipIf(nothingToProbeHere)("the backup image, started as compose starts
     expect([...seen.keys()].sort()).toEqual(scriptModes());
   });
 
-  it("hands each job cron starts the variables compose gives the backup, and a PATH that finds its tools", () => {
+  it("gives each cron job compose's variables and a tool-finding PATH", () => {
     for (const [mode, saw] of seen) {
       expect({ mode, handed: pick(saw.environment, handed) }).toEqual({
         mode,
@@ -362,7 +377,7 @@ describe.skipIf(nothingToProbeHere)("the backup image, started as compose starts
     }
   });
 
-  it("keeps the rest of the stores resource's variables, its tunnel and Garage secrets among them, from every job", () => {
+  it("keeps the stores resource's other variables from every job", () => {
     expect(restOfTheResource).toEqual(
       expect.arrayContaining(["TUNNEL_TOKEN", "GARAGE_ADMIN_TOKEN", "GARAGE_RPC_SECRET"]),
     );
@@ -377,26 +392,26 @@ describe.skipIf(nothingToProbeHere)("the backup image, started as compose starts
     }
   });
 
-  it("gives a run by hand through the jobs' own wrapper the same variables, and none of the rest", () => {
+  it("gives a manual wrapper run the jobs' variables alone", () => {
     expect(pick(byHand, handed)).toEqual(pick(standIns, handed));
     expect(restOfTheResource.filter((name) => name in byHand)).toEqual([]);
   });
 
-  it("leaves no copy of a variable's value in a file or the container's log", () => {
+  it("leaves no variable's value in a file or the log", () => {
     expect(copies).toEqual([]);
     expect(Object.values(standIns).filter((value) => logged.includes(value))).toEqual([]);
   });
 });
 
 describe("the backup jobs' allow-list", () => {
-  it("passes exactly the variables compose hands the backup, with PATH and HOME", () => {
+  it("passes exactly compose's backup variables, with PATH and HOME", () => {
     expect(jobVariables()).toEqual([...handedToTheBackup(), "HOME", "PATH"].sort());
   });
 });
 
 const WORKSPACE = "ws-probe";
 const LEFT_BY_A_FAILED_RUN = "/staging/globals-20260904T143652Z.sql.age";
-// The stores stack's init hands /data/git to this uid, the one the api writes as.
+/** The stores stack's init hands /data/git to this uid, the one the api writes as. */
 const API_UID = 1000;
 
 const nightlyRun = (script: string): string => String.raw`
@@ -445,7 +460,7 @@ describe.skipIf(nothingToProbeHere)("the backup image's nightly job", () => {
     files = tagged("file");
   }, IMAGE_PROBE_ALLOWANCE);
 
-  it("writes, verifies and uploads a bundle of a workspace repository the api owns", () => {
+  it("writes, verifies and uploads a bundle of an api-owned repository", () => {
     const bundles = files.filter((file) => file.startsWith(`/buckets/dumps/git/${WORKSPACE}/`));
 
     // The log rides along so a failure shows where the run stopped.
@@ -460,22 +475,22 @@ describe.skipIf(nothingToProbeHere)("the backup image's nightly job", () => {
     });
   });
 
-  it("clears what a failed run left in staging a day before, so the health check passes again", () => {
+  it("clears what an earlier failed run left in staging", () => {
     expect(files.filter((file) => file.startsWith("/staging/"))).toEqual([]);
   });
 
-  it("keeps the workspace out of its log when the bundle passes", () => {
+  it("logs nothing of the workspace when its bundle passes", () => {
     expect(log.filter((line) => line.includes(WORKSPACE))).toEqual([]);
   });
 
-  it("ends its log with the words its ping carries, so the log alone says how the run ended", () => {
+  it("ends its log with the words its ping carries", () => {
     // No mirror host answers here, so the run fails at the push, after the bundles.
     expect(log.at(-1)).toBe("backup.sh nightly: fail bytes=0 took=0");
   });
 });
 
 describe("the backup leg of the image job", () => {
-  it("names this file as its probe, so the file cannot move without the workflow", () => {
+  it("names this file as its probe", () => {
     const backup = legFor("backup");
 
     expect(backup.probe).toContain("@better-answers/api");

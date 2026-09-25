@@ -6,7 +6,7 @@ const API = { tier: "api", dockerfile: "apps/api/Dockerfile", context: "." };
 const BACKUP = { tier: "backup", dockerfile: "deploy/backup.Dockerfile", context: "deploy" };
 
 describe("the build an image probe runs", () => {
-  it("goes through buildx on a runner and builds as it always did on a laptop", () => {
+  it("uses buildx on a runner and a plain build elsewhere", () => {
     const writtenTo = "/tmp/the-id-this-build-wrote";
 
     expect(buildCommand(API, { builder: "the-container-builder", iidfile: writtenTo })).toEqual([
@@ -35,7 +35,7 @@ describe("the build an image probe runs", () => {
     ]);
   });
 
-  it("keeps each image's layers under a scope of its own, so neither evicts the other", () => {
+  it("caches each image's layers under a scope of its own", () => {
     const cached = { builder: "the-container-builder", iidfile: "/tmp/the-id-this-build-wrote" };
 
     expect(buildCommand(BACKUP, cached)).toContain("type=gha,scope=backup");
@@ -62,7 +62,7 @@ describe("the build an image probe runs", () => {
     ]);
   });
 
-  it("refuses the daemon's own builder for a cached build and takes a container one", () => {
+  it("refuses the daemon's own builder, taking a container one", () => {
     expect(
       builderThatCanExport(
         "Name:          builder-1c0ffee\n" +
@@ -89,7 +89,7 @@ describe("the build an image probe runs", () => {
     ).toBeUndefined();
   });
 
-  it("asks the daemon nothing on a machine without the cache credentials", async () => {
+  it("asks the daemon nothing without the cache credentials", async () => {
     const refuseToAsk = (): Promise<string | undefined> => {
       throw new Error("the probe asked the daemon for a builder it could not have used");
     };

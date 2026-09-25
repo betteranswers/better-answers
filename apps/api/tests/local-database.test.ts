@@ -41,12 +41,12 @@ const fixture = z
 
 const SYNTHETIC_WORKSPACE = "01M2SYNTHET1CAAAAAAAAAAAAA";
 
-// Its own project and port, so a developer's own local database is never the one this stops.
+/** Its own project and port, so a developer's own local database is never the one this stops. */
 const project = `ba-local-database-test-${String(process.pid)}`;
 
 type Run = { readonly status: number | null; readonly stdout: string; readonly stderr: string };
 
-// Compose narrates to stderr on success, so it is read only when the run failed.
+/** Compose narrates to stderr on success, so it is read only when the run failed. */
 const outcomeOf = (run: Run): string =>
   run.status === 0 ? "ran" : `exited ${String(run.status)}: ${run.stderr}`;
 
@@ -103,14 +103,14 @@ afterAll(() => {
 });
 
 describe("the local database", () => {
-  it("comes up on the loopback port it names, and says how to stop it", () => {
+  it("starts on its loopback port, saying how to stop it", () => {
     expect(outcomeOf(upFirst)).toEqual("ran");
     expect(upFirst.stdout).toContain(`127.0.0.1:${String(port)}`);
     expect(upFirst.stdout).toContain("deploy/local-database.sh down");
     expect(upFirst.stdout).toContain("--wipe");
   });
 
-  it("names the synthetic workspace by its id as it seeds it, so an ops command can be pointed at it", () => {
+  it("names the synthetic workspace's id as it seeds it", () => {
     expect(upFirst.stdout).toContain(
       `synthetic fixture present: workspace ${SYNTHETIC_WORKSPACE}, slug synthetic`,
     );
@@ -125,7 +125,7 @@ describe("the local database", () => {
     expect(images).toEqual([POSTGRES_IMAGE]);
   });
 
-  it("has the whole migration journal applied, and the contract stamped as migrate stamps it", async () => {
+  it("applies every migration and stamps the contract as `migrate` does", async () => {
     const owner = signedInAs("better_answers", "better_answers");
     try {
       const applied = await owner.query<{ migrations: number }>(
@@ -139,7 +139,7 @@ describe("the local database", () => {
     }
   });
 
-  describe("read as a GUI profile reads it, through the browsing role", () => {
+  describe("read through the browsing role, as a GUI profile reads", () => {
     let browse: pg.Pool;
 
     beforeAll(() => {
@@ -166,7 +166,7 @@ describe("the local database", () => {
       ]);
     });
 
-    it("holds the binding's one markdown document, converted, with no landed copy named", async () => {
+    it("holds one converted markdown document, naming no landed copy", async () => {
       const documents = await browse.query(
         `SELECT id, binding_id, media_type, outcome, normalised_key, content_hash
            FROM source_document WHERE workspace_id = $1`,
@@ -184,7 +184,7 @@ describe("the local database", () => {
       ]);
     });
 
-    it("holds the document's chunk rows as the document-chunk agreement's redacted case cuts them", async () => {
+    it("holds the chunks the document-chunk agreement's redacted case cuts", async () => {
       const chunks = await browse.query(
         `SELECT id, binding_id, source_document_id, ordinal, char_start, char_end, locator, content
            FROM "index".chunk WHERE workspace_id = $1 ORDER BY ordinal`,
@@ -199,7 +199,7 @@ describe("the local database", () => {
       );
     });
 
-    it("holds the redaction's placeholder where the sort code was, and no sort code anywhere", async () => {
+    it("holds the redaction's placeholder and no sort code anywhere", async () => {
       const held = await browse.query<{ text: string }>(
         `SELECT content AS text FROM "index".chunk WHERE workspace_id = $1
          UNION ALL
@@ -214,7 +214,7 @@ describe("the local database", () => {
   });
 
   describe("the synthetic seed, run where the local database runs it", () => {
-    it("seeds from the drill's call, the owner DSN in STAGING_DATABASE_URL and no argument, adding no second copy", () => {
+    it("seeds from the drill's call without adding a second copy", () => {
       const [container] = containersOf(project);
       const seeded = spawnSync(
         "docker",
@@ -234,7 +234,7 @@ describe("the local database", () => {
     });
   });
 
-  it("keeps what it holds across a stop and a start, and a second up seeds no second copy", async () => {
+  it("keeps its data across a restart, seeding no second copy", async () => {
     const owner = signedInAs("better_answers", "better_answers");
     let marker: string;
     const client = await owner.connect();
@@ -268,7 +268,7 @@ describe("the local database", () => {
     }
   }, 180_000);
 
-  it("refuses a port something else already listens on, and starts nothing", async () => {
+  it("refuses a port already in use, and starts nothing", async () => {
     const held = await heldPort();
     const taken = held.port;
     const elsewhere = `${project}-taken`;
@@ -284,7 +284,7 @@ describe("the local database", () => {
     }
   });
 
-  it("refuses to seed over a synthetic fixture an earlier seed left under another id, and says to wipe", async () => {
+  it("refuses a fixture left under another id, saying to wipe", async () => {
     const owner = signedInAs("better_answers", "better_answers");
     const client = await owner.connect();
     let earlier: string;
