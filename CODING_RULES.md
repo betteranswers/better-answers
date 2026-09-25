@@ -288,9 +288,9 @@ The migration that creates `audit_event` or `identity_audit_event` revokes `UPDA
 
 The writer mints a ULID through the kernel minter, and the column has no database default. So a governed write mints its id before its git commit, and a ledger row and a commit join on one id.
 
-### [AUDIT8] Keep a read, a run and a health check out of the ledger
+### [AUDIT8] Keep a read, a run and a health check out of the audit log
 
-A read writes no row, unless a decision names the view an act. An event with no workspace is a log line, because the ledger is a tenant table. A sign-in, or a token issued or refused, is such an event. The one exception is an act declared for the identity set: it is a row in the identity-set ledger. Runs, the answer audit, signals, alerts, spend, backup runs and health checks are their own records.
+A read writes no row, unless a decision names the view an act. An event with no workspace, like a token issued or a workspace pick, is a log line, unless declared for the identity-set audit log, as a sign-in is. A consent lands in its workspace's. Both land after the library's commit: a failed row is a log line, never a refusal. Runs, the answer audit, signals, alerts, spend, backup runs and health checks are their own records.
 
 ## OKF
 

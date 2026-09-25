@@ -28,6 +28,7 @@ export const authorizeUrl = (params: {
   readonly resource?: string;
 
   readonly clientId?: string;
+  readonly prompt?: string;
 }): string => {
   const query = new URLSearchParams({
     client_id: params.clientId ?? CLAUDE_CLIENT_ID,
@@ -36,7 +37,7 @@ export const authorizeUrl = (params: {
     code_challenge: params.challenge,
     code_challenge_method: "S256",
     resource: params.resource ?? MCP_URL,
-    prompt: "consent",
+    prompt: params.prompt ?? "consent",
     scope: params.scope,
     state: params.state ?? "state-from-the-host",
   });

@@ -11,9 +11,14 @@ import type pg from "pg";
 import type { Logger } from "pino";
 import { z } from "zod";
 
-import { ulid } from "@better-answers/core/kernel";
+import { err, type Result, ulid } from "@better-answers/core/kernel";
 import { withIdentityWrite, type PostgresDoor } from "@better-answers/core/store/postgres";
-import { hasNoDisplayName, workspacesHeldBy } from "@better-answers/core/workspaces";
+import {
+  hasNoDisplayName,
+  recordConsent,
+  recordSignIn,
+  workspacesHeldBy,
+} from "@better-answers/core/workspaces";
 
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
 import {
@@ -160,6 +165,14 @@ const signedInUser = z
   .object({ user: z.object({ id: z.string() }) })
   .optional()
   .catch(undefined);
+const redirectedTo = z.object({ url: z.string() }).optional().catch(undefined);
+
+/**
+ * A consent the library defers to a fresh sign-in answers a redirect too, but only the one it
+ * wrote carries a code.
+ */
+const carriesACode = (redirect: z.infer<typeof redirectedTo>): boolean =>
+  redirect !== undefined && (URL.parse(redirect.url)?.searchParams.has("code") ?? false);
 
 const clientIdOfQuery = (query: string | undefined): string | undefined =>
   query === undefined ? undefined : (new URLSearchParams(query).get("client_id") ?? undefined);
@@ -171,9 +184,10 @@ type AuditedCall = {
   readonly refused: boolean;
   readonly issued: z.infer<typeof tokenResponse>;
   readonly signedIn: z.infer<typeof signedInUser>;
+  readonly redirect: z.infer<typeof redirectedTo>;
 };
 
-type Outcome = "refused" | "declined" | "ok";
+type Outcome = "refused" | "declined" | "deferred" | "ok";
 
 type AuditLine = {
   readonly event: AuditEvent;
@@ -231,7 +245,9 @@ const auditLineOf = (line: AuditLine, call: AuditedCall): AuditLine => {
 
 const outcomeOf = (event: AuditEvent, call: AuditedCall): Outcome => {
   if (call.refused) return "refused";
-  return event === "auth.consent" && call.fields.accept === false ? "declined" : "ok";
+  if (event !== "auth.consent") return "ok";
+  if (call.fields.accept === false) return "declined";
+  return carriesACode(call.redirect) ? "ok" : "deferred";
 };
 
 const auditRecord = (line: AuditLine, outcome: Outcome) => ({
@@ -243,9 +259,16 @@ const auditRecord = (line: AuditLine, outcome: Outcome) => ({
   token_id: line.tokenId ?? null,
 });
 
+type Written = Result<undefined, string | Error>;
+
+type Recorder = (line: AuditLine, session: Session | undefined) => Promise<Written>;
+
+const reasonOf = (error: string | Error): string =>
+  error instanceof Error ? error.message : error;
+
 /**
- * Each sign-in, workspace pick, consent, token issue or refresh and revocation writes an audit
- * line to `logger`.
+ * A sign-in or a consent is an audit event; anything else, and anything refused, declined or
+ * deferred, is a log line to `logger`.
  */
 export const createAuth = (deps: AuthDependencies) => {
   const audit = deps.logger.child({ module: "auth" });
@@ -265,6 +288,49 @@ export const createAuth = (deps: AuthDependencies) => {
     held.length === 1 ? held[0] : undefined;
   const soleMembershipOf = async (userId: string): Promise<string | undefined> =>
     soleOf(await membershipsOf(userId));
+
+  const consentedWorkspaceOf = (session: Session, held: readonly string[]): string | undefined => {
+    const stillActive = activeWorkspaceOf(session);
+    return stillActive !== undefined && held.includes(stillActive) ? stillActive : soleOf(held);
+  };
+
+  const recordConsentOf: Recorder = async (line, session) => {
+    const personId = line.principal ?? "";
+    const held = await workspacesHeldBy(IDENTITY_PRINCIPAL, deps.door, personId);
+    if (!held.ok) return held;
+    const workspaceId =
+      session === undefined ? undefined : consentedWorkspaceOf(session, held.value);
+    if (workspaceId === undefined) return err("no-consented-workspace");
+    return recordConsent(IDENTITY_PRINCIPAL, deps.door, {
+      personId,
+      workspaceId,
+      clientId: line.clientId ?? "",
+    });
+  };
+
+  /** A token's issue, refusal or refresh and a workspace pick stay log lines for good. */
+  const recorders = new Map<AuditEvent, Recorder>([
+    ["auth.sign_in", (line) => recordSignIn(IDENTITY_PRINCIPAL, deps.door, line.principal ?? "")],
+    ["auth.consent", recordConsentOf],
+  ]);
+
+  /**
+   * Outside the library's transaction, once its write has landed: a failed row is a log line,
+   * never a refusal the person meets.
+   */
+  const recordOnAuditLog = async (
+    recorder: Recorder,
+    line: AuditLine,
+    session: Session | undefined,
+  ): Promise<void> => {
+    const written = await recorder(line, session);
+    if (written.ok) return;
+    audit.error(
+      { ...auditRecord(line, "ok"), recorded: false, reason: reasonOf(written.error) },
+      line.event,
+    );
+  };
+
   const db = drizzle(deps.database, { schema: identitySchema });
 
   return betterAuth({
@@ -334,11 +400,15 @@ export const createAuth = (deps: AuthDependencies) => {
           refused: returned instanceof Error && !isRedirect(returned),
           issued: tokenResponse.parse(returned),
           signedIn: signedInUser.parse(returned),
+          redirect: redirectedTo.parse(returned),
         };
         const session = ctx.context.session ?? (await getSessionFromCtx(ctx));
 
         const line = auditLineOf(openedLine(event, session?.user.id, call.fields), call);
-        audit.info(auditRecord(line, outcomeOf(event, call)), line.event);
+        const outcome = outcomeOf(event, call);
+        const recorder = outcome === "ok" ? recorders.get(line.event) : undefined;
+        if (recorder === undefined) audit.info(auditRecord(line, outcome), line.event);
+        else await recordOnAuditLog(recorder, line, session?.session);
       }),
     },
     plugins: [
@@ -409,12 +479,7 @@ export const createAuth = (deps: AuthDependencies) => {
             page: `${deps.publicUrl}/choose-workspace`,
 
             consentReferenceId: async ({ session, user: person }) => {
-              const held = await membershipsOf(person.id);
-              const stillActive = activeWorkspaceOf(session);
-              const active =
-                stillActive !== undefined && held.includes(stillActive)
-                  ? stillActive
-                  : soleOf(held);
+              const active = consentedWorkspaceOf(session, await membershipsOf(person.id));
               if (active === undefined) {
                 throw new APIError("BAD_REQUEST", {
                   error: "set_workspace",
