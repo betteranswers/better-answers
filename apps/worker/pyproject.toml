@@ -57,7 +57,7 @@ dependencies = [
     # three places that set it — image, deploy unit and CI runner — to each other. The
     # run that proved the value, with its date, the engine version and both arms, is
     # the docblock on `apps/worker/tests/test_image.py`'s
-    # `test_the_image_stops_the_engine_calling_its_gateway_and_the_deploy_unit_agrees`.
+    # `test_the_image_and_deploy_unit_refuse_the_engines_gateway_call`.
     # A process none of the three started — this tier's gate on a laptop — is covered by
     # the pipeline package setting it ahead of its import of the engine, because the
     # core looks once, as it is imported, and reads `RUST_LOG` the same way; the run
@@ -98,7 +98,7 @@ dependencies = [
     #
     # Bumping either pin re-runs the first act on the worker image and re-dates its
     # readings: `apps/worker/tests/test_image.py`'s
-    # `test_both_converters_hold_on_the_image_under_the_engines_own_runtime`.
+    # `test_both_converters_hold_on_the_image_under_the_engines_runtime`.
     "firecrawl-anydoc==0.2.4",
     "pdf-inspector==1.24.0",
     # The AEAD the credential envelope is sealed and opened under, AES-256-GCM (ADR 0005,

@@ -272,7 +272,7 @@ def text_of(answer: LandedRun, document_id: str) -> str:
     )
 
 
-def test_a_landed_copy_comes_back_with_what_its_binding_withholds_written_out_of_it(
+def test_a_landed_copy_returns_with_its_withheld_spans_written_out(
     host: Host,
 ) -> None:
     bucket = a_bucket_holding_both()
@@ -368,7 +368,7 @@ THE_RULE_THE_MEMO_STORES = b"UK_BANK_ACCOUNT"
 HER_NAME = b"Priya Raman"
 
 
-def test_neither_store_is_ever_found_holding_the_text_or_a_span_the_seam_withheld(
+def test_neither_store_holds_any_text_the_seam_withheld(
     host: Host, tmp_path: Path
 ) -> None:
     bucket = a_bucket_holding_both()
@@ -389,7 +389,7 @@ def test_neither_store_is_ever_found_holding_the_text_or_a_span_the_seam_withhel
         assert A_SENTENCE_OF_THE_INVOICE not in held
 
 
-def test_a_wipe_takes_the_bindings_store_leaves_the_memo_and_erases_the_named_person(
+def test_a_wipe_spares_the_memo_and_erases_the_named_person(
     host: Host,
 ) -> None:
     bucket = a_bucket_holding_both()
@@ -426,7 +426,7 @@ def test_a_second_run_over_an_unchanged_document_detects_nothing_afresh(
     assert text_of(again, A_DELIVERY_NOTE_ID) == A_DELIVERY_NOTE
 
 
-def test_a_suppression_withholds_the_name_and_sends_the_detector_over_nothing(
+def test_a_suppression_withholds_the_name_without_rerunning_the_detector(
     host: Host,
 ) -> None:
     bucket = a_bucket_holding_both()
@@ -444,7 +444,7 @@ def test_a_suppression_withholds_the_name_and_sends_the_detector_over_nothing(
     assert text_of(answer, AN_INVOICE_ID) == AN_INVOICE_REDACTED
 
 
-def test_an_erasure_after_the_first_run_withholds_her_work_address_on_the_next(
+def test_a_later_erasure_withholds_her_work_address_next_run(
     host: Host,
 ) -> None:
     rota = a_landed_document(A_ROTA_ID)
@@ -460,7 +460,7 @@ def test_an_erasure_after_the_first_run_withholds_her_work_address_on_the_next(
     assert answer.documents[0].redacted.findings == first.documents[0].redacted.findings
 
 
-def test_a_keep_puts_the_span_back_in_the_text_and_detects_nothing_afresh(
+def test_a_keep_restores_the_span_and_detects_nothing_afresh(
     host: Host,
 ) -> None:
     bucket = a_bucket_holding_both()
@@ -488,7 +488,7 @@ AN_INVOICE_KEPT_BUT_ERASED = (
 )
 
 
-def test_a_kept_span_naming_an_erased_identifier_keeps_that_identifier_withheld(
+def test_a_kept_span_keeps_an_erased_identifier_inside_withheld(
     host: Host,
 ) -> None:
     bucket = a_bucket_holding_both()
@@ -512,7 +512,7 @@ def test_a_kept_span_naming_an_erased_identifier_keeps_that_identifier_withheld(
     assert text_of(answer, AN_INVOICE_ID) == AN_INVOICE_KEPT_BUT_ERASED
 
 
-def test_a_run_under_a_moved_detection_key_detects_every_document_afresh(
+def test_a_moved_detection_key_detects_every_document_afresh(
     host: Host,
 ) -> None:
     bucket = a_bucket_holding_both()
@@ -571,9 +571,7 @@ def test_another_converter_over_the_same_normalised_text_detects_nothing_afresh(
     assert text_of(answer, AN_INVOICE_ID) == AN_INVOICE_REDACTED
 
 
-def test_the_memoised_functions_identity_is_six_facts_and_a_move_is_a_reprocess() -> (
-    None
-):
+def test_the_memoised_functions_identity_is_six_facts() -> None:
     assert dict(THE_MEMOS_IDENTITY) == {
         "app": "landed",
         "directory": "findings",
@@ -604,7 +602,7 @@ def test_the_detector_is_the_only_function_the_estate_memoises() -> None:
     ]
 
 
-def test_nothing_but_the_text_and_the_detection_key_reaches_the_memos_key() -> None:
+def test_only_the_text_and_detection_key_reach_the_memos_key() -> None:
     assert list(signature(raised_by_the_detector).parameters) == [
         "normalised_text",
         "detection_key",
@@ -652,7 +650,7 @@ def test_markdown_and_plain_text_pass_through_as_the_normalised_text(
     assert text_of(answer, AN_INVOICE_ID) == AN_INVOICE_REDACTED
 
 
-def test_plain_text_lands_as_its_own_bytes_redacted_and_cut_into_more_than_one_chunk(
+def test_plain_text_lands_redacted_and_cut_into_several_chunks(
     host: Host,
 ) -> None:
     terms = a_landed_document(A_TERMS_ID, media_type="text/plain")
@@ -673,7 +671,7 @@ def test_plain_text_lands_as_its_own_bytes_redacted_and_cut_into_more_than_one_c
     assert chunks[1].char_start == chunks[0].char_end
 
 
-def test_a_docx_converts_to_markdown_with_its_table_and_the_seam_reads_what_it_wrote(
+def test_redacts_a_docx_converted_to_markdown_with_its_table(
     host: Host,
 ) -> None:
     policy = a_landed_document(A_POLICY_ID, media_type=DOCX_MEDIA_TYPE)
@@ -705,7 +703,7 @@ def test_a_pdf_converts_to_markdown_with_its_table(host: Host) -> None:
     )
 
 
-def test_a_pdf_with_a_page_that_has_no_text_layer_is_quarantined_whole(
+def test_a_pdf_with_a_textless_page_is_quarantined_whole(
     host: Host,
 ) -> None:
     scan = a_landed_document(A_SCAN_ID, media_type=PDF_MEDIA_TYPE)
@@ -725,7 +723,7 @@ def test_a_pdf_with_a_page_that_has_no_text_layer_is_quarantined_whole(
     assert bucket.writes == [THE_DELIVERY_NOTE.normalised_key]
 
 
-def test_a_document_the_converter_cannot_read_takes_no_neighbour_with_it(
+def test_an_unreadable_document_takes_no_neighbour_with_it(
     host: Host,
 ) -> None:
     truncated = a_landed_document(A_TRUNCATED_ID, media_type=DOCX_MEDIA_TYPE)
@@ -744,7 +742,7 @@ def test_a_document_the_converter_cannot_read_takes_no_neighbour_with_it(
     assert bucket.writes == [THE_DELIVERY_NOTE.normalised_key]
 
 
-def test_a_media_type_outside_the_allow_list_is_quarantined_and_never_guessed_at(
+def test_quarantines_an_unlisted_media_type_without_guessing(
     host: Host,
 ) -> None:
     spreadsheet = a_landed_document(A_TRUNCATED_ID, media_type="application/zip")
@@ -756,7 +754,7 @@ def test_a_media_type_outside_the_allow_list_is_quarantined_and_never_guessed_at
     assert answer.documents == ()
 
 
-def test_anydoc_is_told_to_reject_ocr_so_no_unredacted_byte_leaves_the_worker(
+def test_tells_anydoc_to_reject_ocr_so_nothing_unredacted_leaves(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     import anydoc
@@ -777,14 +775,14 @@ def test_anydoc_is_told_to_reject_ocr_so_no_unredacted_byte_leaves_the_worker(
     assert asked == [("docx", "reject", {})]
 
 
-def test_the_converter_pin_reads_its_two_libraries_and_is_in_no_memos_key() -> None:
+def test_the_converter_pin_names_both_libraries_outside_the_memos_key() -> None:
     assert converter_pin_of("0.2.4", "1.22.0") == "anydoc-0.2.4+pdf-inspector-1.22.0"
     assert converter_pin_of("0.2.5", "1.22.0") != converter_pin_of("0.2.4", "1.22.0")
     assert converter_pin_of("0.2.4", "1.23.0") != converter_pin_of("0.2.4", "1.22.0")
     assert CONVERTER_PIN not in THE_MEMOS_IDENTITY.values()
 
 
-def test_the_document_row_keeps_the_seams_version_and_not_the_converters(
+def test_the_document_row_keeps_the_seams_version_not_the_converters(
     host: Host,
 ) -> None:
     bucket = a_bucket_holding_both()
@@ -795,7 +793,7 @@ def test_the_document_row_keeps_the_seams_version_and_not_the_converters(
     assert CONVERTER_PIN not in answer.documents[0].redacted.version
 
 
-def test_the_timeout_is_the_seams_ms_per_page_times_the_pages_and_a_margin() -> None:
+def test_the_timeout_is_per_page_cost_times_pages_plus_margin() -> None:
     assert SEAM_MS_PER_PAGE == 6453
     assert TIMEOUT_MARGIN_MS == 93_000
     assert timeout_for(1).total_seconds() == pytest.approx(99.453)
@@ -803,7 +801,7 @@ def test_the_timeout_is_the_seams_ms_per_page_times_the_pages_and_a_margin() -> 
     assert timeout_for(12) - timeout_for(11) == timeout_for(1) - timeout_for(0)
 
 
-def test_a_pdfs_pages_are_read_and_the_other_types_measured_against_s0s_page() -> None:
+def test_reads_pdf_pages_and_measures_other_types_by_s0s_page() -> None:
     assert pages_of(fixture_bytes("rate-card.pdf"), PDF_MEDIA_TYPE) == 1
     assert pages_of(b"", "text/markdown") == 1
     assert pages_of(b"a" * 3107, "text/markdown") == 1
@@ -812,7 +810,7 @@ def test_a_pdfs_pages_are_read_and_the_other_types_measured_against_s0s_page() -
     assert pages_of(fixture_bytes("expenses-policy.docx"), DOCX_MEDIA_TYPE) == 12
 
 
-def test_a_document_that_runs_past_its_ceiling_is_quarantined_and_the_run_finishes(
+def test_quarantines_a_document_past_its_ceiling_and_finishes_the_run(
     host: Host,
 ) -> None:
     bucket = a_bucket_holding_both()
@@ -833,7 +831,7 @@ def test_the_same_document_under_the_shipped_ceiling_lands(host: Host) -> None:
     assert text_of(answer, AN_INVOICE_ID) == AN_INVOICE_REDACTED
 
 
-def test_a_documents_chunks_are_cut_out_of_the_redacted_text_and_never_the_original(
+def test_cuts_chunks_from_the_redacted_text_never_the_original(
     host: Host,
 ) -> None:
     bucket = a_bucket_holding_both()
@@ -847,7 +845,7 @@ def test_a_documents_chunks_are_cut_out_of_the_redacted_text_and_never_the_origi
     assert chunks[0].locator.startswith(f"{AN_INVOICE_ID}/chars:0-")
 
 
-def test_a_suppression_is_held_as_sorted_pairs_so_one_set_has_one_key() -> None:
+def test_a_suppression_holds_sorted_pairs_giving_one_key_per_set() -> None:
     one = suppression_of({"name": ("Priya Raman",), "email": ("p@example.test",)})
     other = suppression_of({"email": ("p@example.test",), "name": ("Priya Raman",)})
 
