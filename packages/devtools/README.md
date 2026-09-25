@@ -214,6 +214,18 @@ clone can run it before `uv sync`. ruff reads it under `python/ruff.toml` and my
 `--strict`, through this workspace's `lint:python` and `typecheck:python`, run from the
 worker's locked environment — the one Python toolchain the repository installs.
 
+## The complexity cap — stock rules, in root `check`
+
+oxlint's `complexity` rule holds every function to 8 at error, and ruff's `C901` holds the
+same 8 in the worker and in `python/ruff.toml`. The files over the cap when it landed are
+listed by path: in one `.oxlintrc.json` override, and in the worker's `per-file-ignores`. The
+list only shrinks.
+
+`test/complexity-cap.test.ts` runs oxlint over a throwaway tree at the root config's setting.
+A function of 9 is refused off the list and accepted on it, and a function of 8 is accepted.
+Every listed file must still hold a function over 8, so a file brought under drops its line.
+`apps/worker/tests/test_complexity_cap.py` holds the same cases for both ruff configs.
+
 ## `src/insert-scan.ts` — the insert scan
 
 The setup rule's holder: a raw `INSERT` appears inside a factory module and nowhere else.

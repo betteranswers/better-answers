@@ -29,6 +29,10 @@ if (!isRole(row.role)) return unknownRole();
 const row: MembershipRow & { role: Role } = refuse(member);
 ```
 
+### [DESIGN6] Keep a function's complexity at 8 or under
+
+Each branch, loop, `catch`, `case` and boolean operator adds one to a function's cyclomatic complexity, in both tiers, tests included. Split a function before it passes 8. The files over the cap when it arrived are listed by path in `.oxlintrc.json` and the worker's ruff config, and the list only shrinks: no file joins it, and an agent touching a listed file may bring it under and drop it from the list.
+
 ## TEST
 
 ### [TEST1] Test through the interface a caller crosses

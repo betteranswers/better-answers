@@ -1,7 +1,10 @@
 target-version = "py313"
 
 [lint]
-select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF", "ANN", "T20"]
+select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF", "ANN", "T20", "C901"]
+
+[lint.mccabe]
+max-complexity = 8
 
 [lint.per-file-ignores]
 # The gate is a script, and what it prints is the finding a reader acts on.
