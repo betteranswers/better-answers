@@ -3,7 +3,12 @@ import { readFileSync } from "node:fs";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { declareRefusals, REFUSAL_CLASSES, refusalRegister } from "../src/kernel/index.ts";
-import type { ApproveRefusal, DecideRefusal, RequestAccessRefusal } from "../src/members/index.ts";
+import type {
+  ApproveRefusal,
+  ChangeRoleRefusal,
+  DecideRefusal,
+  RequestAccessRefusal,
+} from "../src/members/index.ts";
 import type { BindUploadRefusal, SourceRefusal } from "../src/sources/index.ts";
 import type {
   AddMemberRefusal,
@@ -29,6 +34,7 @@ const REGISTER = {
   "not-found": "absent by kernel",
   "not-the-operator": "forbidden by kernel",
   "sign-in-too-old": "unauthenticated by kernel",
+  "changed-meanwhile": "conflict by kernel",
   "not-a-member": "unauthenticated by kernel",
   "credentials-revoked": "unauthenticated by kernel",
   "role-disagrees": "unauthenticated by kernel",
@@ -60,6 +66,7 @@ const REGISTER = {
   "no-such-request": "absent by members",
   "no-such-role": "absent by members",
   "already-decided": "conflict by members",
+  "last-admin": "precondition by members",
 
   "no-such-user": "absent by workspaces",
   "no-such-workspace": "absent by workspaces",
@@ -155,6 +162,7 @@ describe("the refusal-word walk", () => {
     expectTypeOf<RequestAccessRefusal>().toExtend<EveryRegisteredWord>();
     expectTypeOf<DecideRefusal>().toExtend<EveryRegisteredWord>();
     expectTypeOf<ApproveRefusal>().toExtend<EveryRegisteredWord>();
+    expectTypeOf<ChangeRoleRefusal>().toExtend<EveryRegisteredWord | Error>();
     expectTypeOf<SourceRefusal<"no-such-binding"> | "invented">().not.toExtend<
       EveryRegisteredWord | Error
     >();

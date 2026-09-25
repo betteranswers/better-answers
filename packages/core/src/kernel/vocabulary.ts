@@ -15,6 +15,10 @@ export const KERNEL_REFUSALS = declareRefusals("kernel", {
   // The operator's writes ask for a recent sign-in; signing in again is the whole remedy.
   "sign-in-too-old": "unauthenticated",
 
+  // The act Postgres aborted to end a deadlock did nothing wrong: reading again and deciding
+  // again is the whole remedy.
+  "changed-meanwhile": "conflict",
+
   // The resolver's five: the remedy is a fresh sign-in, which `role-forbids` never is.
   "not-a-member": "unauthenticated",
   "credentials-revoked": "unauthenticated",

@@ -26,6 +26,11 @@ T-397 added `avatar` and Kibo UI's `pill` on **25 September 2026** with the same
 25/09/2026), and `avatar` is the registry dependency it names beside `badge` and `button`. Their
 two digests were taken that day and their arrival edits are listed below with the others.
 
+T-399 added `radio-group` on **25 September 2026** with the same CLI, `shadcn@4.20.1`, for the
+role picker on a member's sheet. The CLI served it from the `new-york-v4` style, whose item
+imports `radix-ui` as this directory's other primitives do, so the table names that URL. Its two
+digests were taken that day and its arrival edits are listed below with the others.
+
 This file records vendored source only. The npm packages those items stand on are ordinary
 dependencies with lockfile entries; their versions live in `apps/web/package.json` and the
 lockfile, which is where a reader reads them and where Renovate moves them.
@@ -72,6 +77,7 @@ the pin.
 | `progress.tsx` | https://ui.shadcn.com/r/styles/new-york/progress.json | `5b99e42b997efaef` | `7b166fa8e9810e4d` |
 | `avatar.tsx` | https://ui.shadcn.com/r/styles/new-york/avatar.json | `4fdcb3d39aa70de7` | `55160fb2558f506a` |
 | `kibo-ui/pill.tsx` | https://www.kibo-ui.com/r/pill.json | `c1dd3d46048b0d5f` | `9b0c909d9043c5fc` |
+| `radio-group.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/radio-group.json | `299fa36d5c5df3ae` | `3e0591dd59910958` |
 
 `components.json` writes `https://ui.shadcn.com/r/{name}.json` for the primitives because that is
 the CLI's own default form; the table records the style-qualified URL the CLI resolves it to,
@@ -153,6 +159,12 @@ T-397's arrival edits, on the two items it added:
   within the complexity cap.
 - The pill's `themed` prop, which upstream takes only to keep it off the badge, is bound to
   `_themed`, the name the unused-variable rule reads as deliberate.
+
+T-399's arrival edits, on the one item it added:
+
+- The `cn` import repointed at `@/shared/lib/utils.ts` and the dependency on `cn` dropped, as
+  every arrival since the tooltip's has needed, and the file given this repository's format.
+- Its `rounded-full` stays: a radio is one of the two controls the design system lets be round.
 
 Everything else is upstream's, unedited. Their behaviour — keyboard handling, focus, ARIA
 wiring, virtualisation — is theirs by ADR 0033; the screens that use them carry the WCAG 2.2 AA

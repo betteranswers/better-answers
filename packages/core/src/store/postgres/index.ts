@@ -4,6 +4,7 @@ import type pg from "pg";
 import { err, ok, type Result } from "../../kernel/index.ts";
 import type {
   Claims,
+  KernelRefusal,
   OperatorPrincipal,
   OperatorRefusal,
   PlatformPrincipal,
@@ -131,6 +132,15 @@ const transaction = async <T>(
     client.release();
   }
 };
+
+const DEADLOCK_DETECTED = "40P01";
+
+/**
+ * Two acts each waiting on a lock the other holds: Postgres aborts one, and that act answers
+ * `changed-meanwhile` rather than failing. Any other error is itself.
+ */
+export const refusalOfDeadlock = (error: Error): KernelRefusal<"changed-meanwhile"> | Error =>
+  "code" in error && error.code === DEADLOCK_DETECTED ? "changed-meanwhile" : error;
 
 const scopeTo = async (tx: Tx, workspaceId: string): Promise<void> => {
   await tx.query("SELECT set_config('app.workspace_id', $1, true)", [workspaceId]);

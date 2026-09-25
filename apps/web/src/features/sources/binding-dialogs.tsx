@@ -1,5 +1,6 @@
 import { useId, useState, type ReactNode } from "react";
 
+import { SummaryRow } from "@/shared/summary-row.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Checkbox } from "@/shared/ui/checkbox.tsx";
 import { Label } from "@/shared/ui/label.tsx";
@@ -23,7 +24,6 @@ import {
   type ListedBinding,
   type Sensitivity,
 } from "./sources-api.ts";
-import { SummaryRow } from "./summary-row.tsx";
 import { AUDIENCE_WORDS, AUDITED_CATEGORIES, spokenWord } from "./words.ts";
 
 type DialogProperties<Asked> = {
