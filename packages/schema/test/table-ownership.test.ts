@@ -36,18 +36,18 @@ const ownersNamed = (): string[] => [
 ];
 
 describe("the table-ownership map", () => {
-  it("names an owner for every table the schema package declares, and names no other table", () => {
+  it("names an owner for exactly the tables the schema declares", () => {
     expect(Object.keys(TABLE_OWNERS).toSorted()).toEqual([...declaredTableNames()].toSorted());
   });
 
-  it("gives the identity provider exactly the identity set, so the one copied list cannot drift", () => {
+  it("gives the identity provider exactly the identity set", () => {
     const provided = Object.entries(TABLE_OWNERS)
       .filter(([, owner]) => owner === IDENTITY_PROVIDER)
       .map(([table]) => table);
     expect(provided.toSorted()).toEqual([...IDENTITY_SET].toSorted());
   });
 
-  it("gives a reader a reason for every cross-owner read and write, against a declared table", () => {
+  it("gives every cross-owner access a reason and a declared table", () => {
     for (const entry of CROSS_OWNER_TABLE_ACCESS) {
       expect({
         table: entry.table,
@@ -57,7 +57,7 @@ describe("the table-ownership map", () => {
     }
   });
 
-  it("records a cross-owner entry only where the reader is not the table's owner", () => {
+  it("never records a table's owner as its cross-owner reader", () => {
     for (const entry of CROSS_OWNER_TABLE_ACCESS) {
       expect({ table: entry.table, by: entry.by }).not.toEqual({
         table: entry.table,
@@ -68,7 +68,7 @@ describe("the table-ownership map", () => {
 });
 
 describe("every owner the map names", () => {
-  it("reaches a module a reader can open — a directory under packages/core/src, or a path to one outside it", () => {
+  it("is a core directory, or a listed outside directory", () => {
     const inCore = coreDirectories();
     for (const owner of ownersNamed()) {
       const opens = OWNERS_OUTSIDE_CORE.some((known) => known === owner)
@@ -78,7 +78,7 @@ describe("every owner the map names", () => {
     }
   });
 
-  it("is one the map still uses, so a path admitted for an owner that left cannot linger", () => {
+  it("keeps no outside path for an owner that left", () => {
     const named = new Set(ownersNamed());
     for (const owner of OWNERS_OUTSIDE_CORE) {
       expect({ owner, used: named.has(owner) }).toEqual({ owner, used: true });

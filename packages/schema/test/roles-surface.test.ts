@@ -20,8 +20,10 @@ import { withRollback } from "./harness.ts";
 import { A_GRAPH_NODE } from "./rls-probes.ts";
 import { postgresForSuite, privilegesHeld, refusesEach } from "./probes.ts";
 
-// Read from the database, not parsed back out of the file: the drift test ties the two, so
-// nothing else has to trust the bytes.
+/**
+ * Read from the database, not parsed back out of the file: the drift test ties the two, so
+ * nothing else has to trust the bytes.
+ */
 let surface: RolesSurface;
 
 const NOTHING_OF_THE_EIGHT = {
@@ -88,13 +90,13 @@ beforeAll(async () => {
 });
 
 describe("the roles' surface", () => {
-  it("is byte-identical to a regeneration over a fresh migrated database carrying a partition", async () => {
+  it("is byte-identical to a regeneration over a fresh partitioned database", async () => {
     const regenerated = renderRolesSurface(await readRolesSurface(db().pool));
 
     expect(readFileSync(rolesSurfacePath, "utf8")).toBe(regenerated);
   });
 
-  it("names every role the catalogue holds and no other, and every grantee it names is one of them", async () => {
+  it("names exactly the catalogue's roles, and no grantee beyond them", async () => {
     const catalogued = await db().pool.query<{ rolname: string }>(
       String.raw`SELECT rolname FROM pg_roles WHERE rolname NOT LIKE 'pg\_%'`,
     );
@@ -115,13 +117,13 @@ describe("the roles' surface", () => {
     expect([...new Set(grantees)].filter((grantee) => !named.has(grantee))).toEqual([]);
   });
 
-  it("holds PUBLIC's own schema USAGE, which a generator that lost every PUBLIC row could not", () => {
+  it("holds PUBLIC's own schema USAGE", () => {
     expect(readFileSync(rolesSurfacePath, "utf8")).toContain(
       '{"role":"PUBLIC","object":"public","privilege":"USAGE","grantable":false,"owner":"pg_database_owner"}',
     );
   });
 
-  it("carries neither rolbypassrls nor rolsuper on either runtime role, so the tenancy proofs are not vacuous", () => {
+  it("carries neither rolbypassrls nor rolsuper on either runtime role", () => {
     expect(
       surface.roles
         .filter((role) => isRuntimeRole(role.role))
@@ -132,7 +134,7 @@ describe("the roles' surface", () => {
     ]);
   });
 
-  it("is the same file after a second tenant signs up, so a restore drill's diff is about the restore", async () => {
+  it("is the same file after a second tenant signs up", async () => {
     await withRollback(db().pool, async (client) => {
       await oneWorkspacePartition(client);
 
@@ -142,7 +144,7 @@ describe("the roles' surface", () => {
     });
   });
 
-  it("collapses a partition that carries a grant of its own to one token naming its parent", async () => {
+  it("collapses a granted partition to one token naming its parent", async () => {
     await withRollback(db().pool, async (client) => {
       await client.query(`GRANT SELECT ON ${await thePartition(client)} TO worker_rt`);
 
@@ -164,7 +166,7 @@ describe("the roles' surface", () => {
 });
 
 describe("the two statements that make the flip", () => {
-  it("move no existing relation's ACL, because a default privilege lives in pg_default_acl alone", async () => {
+  it("move no existing relation's ACL", async () => {
     await withRollback(db().pool, async (client) => {
       const before = (await readRolesSurface(client)).relations;
 
@@ -176,7 +178,7 @@ describe("the two statements that make the flip", () => {
 });
 
 describe("a table created after the flip", () => {
-  it("gives worker_rt no privilege of the eight and app_rt the four verbs, in either schema", async () => {
+  it("gives worker_rt nothing and app_rt four verbs in either schema", async () => {
     await withRollback(db().pool, async (client) => {
       await client.query("CREATE TABLE public.after_the_flip (id text PRIMARY KEY)");
       await client.query('CREATE TABLE "index".after_the_flip (id text PRIMARY KEY)');
@@ -194,7 +196,7 @@ describe("a table created after the flip", () => {
     });
   });
 
-  it("refuses the worker on the statement and serves the api, so a mistake is an error and not a silent zero rows", async () => {
+  it("refuses the worker with an error and serves the api", async () => {
     await withRollback(db().pool, async (client) => {
       await client.query("CREATE TABLE public.after_the_flip (id text PRIMARY KEY)");
       await client.query("SET LOCAL ROLE worker_rt");
@@ -225,7 +227,7 @@ describe("a table created after the flip", () => {
 });
 
 describe("what worker_rt reaches after the flip", () => {
-  it("is exactly what a GRANT in the journal names, table by table", async () => {
+  it("is exactly what the journal's GRANTs name, table by table", async () => {
     await withRollback(db().pool, async (client) => {
       expect({
         job: await privilegesHeld(client, "worker_rt", "public.job"),
@@ -243,7 +245,7 @@ describe("what worker_rt reaches after the flip", () => {
     });
   });
 
-  it("is a column set on the finding, where the table-level answer is false and the column-level one is not", async () => {
+  it("is a column set on the finding, and nothing table-wide", async () => {
     await withRollback(db().pool, async (client) => {
       expect({
         table: await privilegesHeld(client, "worker_rt", "public.finding"),
@@ -284,7 +286,7 @@ describe("what worker_rt reaches after the flip", () => {
     });
   });
 
-  it("is a column set on the document for what a run writes back, and the whole table for what it reads", async () => {
+  it("is the whole document to read, write-back columns to update", async () => {
     await withRollback(db().pool, async (client) => {
       expect({
         table: await privilegesHeld(client, "worker_rt", "public.source_document"),
@@ -306,7 +308,7 @@ describe("what worker_rt reaches after the flip", () => {
 });
 
 describe("the functions the journal installs", () => {
-  it("refuse the roles the migration did not name, now that PUBLIC no longer holds EXECUTE", async () => {
+  it("refuse the roles the migration did not name", async () => {
     await withRollback(db().pool, async (client) => {
       await client.query("SET LOCAL ROLE worker_rt");
       await refusesEach(client, [
@@ -347,7 +349,7 @@ describe("the functions the journal installs", () => {
     expect(surface.functions.filter((row) => row.role === PUBLIC_GRANTEE)).toEqual([]);
   });
 
-  it("would show a PUBLIC EXECUTE the moment one arrived, because a null proacl is materialised", async () => {
+  it("would show a PUBLIC EXECUTE the moment one arrived", async () => {
     await withRollback(db().pool, async (client) => {
       await client.query(
         "CREATE FUNCTION public.granted_to_nobody() RETURNS int LANGUAGE sql AS $$ SELECT 1 $$",
@@ -370,7 +372,7 @@ describe("the functions the journal installs", () => {
     });
   });
 
-  it("are the journal's alone: an extension's own functions are left out, PUBLIC EXECUTE and all", async () => {
+  it("are the journal's alone, leaving out an extension's own functions", async () => {
     const shipped = await db().pool.query<{ n: number }>(
       "SELECT count(*)::int AS n FROM pg_proc WHERE proname = 'vector_dims'",
     );
@@ -381,7 +383,7 @@ describe("the functions the journal installs", () => {
     }).toEqual({ inTheImage: true, inTheFile: false });
   });
 
-  it("still fire as triggers, though EXECUTE on each of the three went to nobody", async () => {
+  it("still fire as triggers, though nobody holds EXECUTE on them", async () => {
     await withRollback(db().pool, async (client) => {
       const seed = testData(client);
       const workspace = await seed.workspace();
@@ -422,7 +424,7 @@ describe("the functions the journal installs", () => {
 });
 
 describe("the declared note over the SECURITY DEFINER functions", () => {
-  it("names the set the catalogue holds, and the catalogue holds the set it names", async () => {
+  it("names exactly the set the catalogue holds", async () => {
     const catalogued = await db().pool.query<{ fn: string; args: string }>(
       String.raw`SELECT n.nspname || '.' || p.proname AS fn,
                         pg_get_function_identity_arguments(p.oid) AS args
@@ -439,7 +441,7 @@ describe("the declared note over the SECURITY DEFINER functions", () => {
     expect(identities(catalogued.rows)).toEqual(identities(SECURITY_DEFINER_REACH));
   });
 
-  it("gives each one a reason and tables the schema package declares, some of which the surface is silent on", () => {
+  it("names a reason and declared tables, some the surface omits", () => {
     const declared = declaredTableNames();
     const stated = new Set(surface.relations.map((row) => row.object));
 
@@ -457,7 +459,7 @@ describe("the declared note over the SECURITY DEFINER functions", () => {
     expect([...new Set(silent)]).toEqual(["public.concept_write_request"]);
   });
 
-  it("is carried into the surface itself, so a definer row reads as a reach the file does not state", () => {
+  it("matches the definer rows in the surface itself", () => {
     const definers = surface.functions
       .filter((row) => row.security_definer)
       .map((row) => identityOf({ fn: row.object, args: row.args }));

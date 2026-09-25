@@ -118,7 +118,7 @@ const rlsFlags = async (qualified: string) => {
 };
 
 describe("the seam function", () => {
-  it("returns NULL when no scope was set, and NULL on an empty one", async () => {
+  it("returns NULL on no scope and on an empty one", async () => {
     await withRollback(db.pool, async (client) => {
       const unset = await client.query("SELECT current_workspace_id() AS ws");
       expect(unset.rows[0]?.ws).toBeNull();
@@ -139,7 +139,7 @@ describe("the seam function", () => {
 });
 
 describe("the exemption list", () => {
-  it("names the same tables the two source arrays do, and carries a reason for each", () => {
+  it("names the two source arrays' tables, each with a reason", () => {
     expect(Object.keys(RLS_EXEMPTIONS).toSorted()).toEqual([...EXEMPT_TABLE_NAMES].toSorted());
     for (const [table, reason] of Object.entries(RLS_EXEMPTIONS)) {
       expect({ table, reasoned: reason.trim().length > 0 }).toEqual({ table, reasoned: true });
@@ -172,7 +172,7 @@ describe("every tenant table", () => {
     }
   });
 
-  it("calls the one seam function in its policy, never a literal or a second function", async () => {
+  it("calls only the seam function in its policy", async () => {
     for (const qualified of tenantTableNames()) {
       const [schema, table] = qualified.split(".");
       const policy = await db.pool.query(
@@ -189,7 +189,7 @@ describe("every tenant table", () => {
 });
 
 describe("the identity set", () => {
-  it("names every declared table that carries no policy, and nothing else", async () => {
+  it("names exactly the declared tables that carry no policy", async () => {
     const unpolicied: string[] = [];
     for (const qualified of declaredTableNames()) {
       const flags = await rlsFlags(qualified);
@@ -213,7 +213,7 @@ describe("the identity set", () => {
     }
   });
 
-  it("is readable by app_rt with no scope set — the picker reads it before any workspace exists", async () => {
+  it("lets app_rt read every workspace with no scope set", async () => {
     await withRollback(db.pool, async (client) => {
       await seedTwoWorkspaces(client);
       await client.query("SET LOCAL ROLE app_rt");
@@ -223,7 +223,7 @@ describe("the identity set", () => {
     });
   });
 
-  it("keeps the two counters UNLOGGED — the limiter cannot become the load it sheds", async () => {
+  it("keeps the two counters UNLOGGED", async () => {
     const persistence = await db.pool.query(
       "SELECT relname, relpersistence FROM pg_class WHERE relname IN ('ingress_counter', 'mcp_call_counter') ORDER BY relname",
     );
@@ -233,7 +233,7 @@ describe("the identity set", () => {
     ]);
   });
 
-  it("refuses the worker role on every identity-set table and the counters (migration 0005)", async () => {
+  it("refuses the worker role on every identity-set table and counter", async () => {
     const refused = [
       ...IDENTITY_SET.filter((name) => name !== "public.workspace"),
       "public.ingress_counter",
@@ -254,7 +254,7 @@ describe("the identity set", () => {
     });
   });
 
-  it("lets the worker read the workspace table, never write it, and never reach the config at all (migration 0043)", async () => {
+  it("lets the worker only read workspace, and never reach config", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       await seed.workspaceConfig({ workspaceId: WS_A });
@@ -277,7 +277,7 @@ describe("the identity set", () => {
 });
 
 describe("the role CHECK on the identity set", () => {
-  it("holds member_role_check to the same three words the boundary narrows to, both ways", async () => {
+  it("holds member_role_check to exactly the boundary's three words", async () => {
     const constraint = await db.pool.query<{ definition: string }>(
       "SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conname = 'member_role_check'",
     );
@@ -290,7 +290,7 @@ describe("the role CHECK on the identity set", () => {
     expect(role.safeParse("Owner").success).toBe(false);
   });
 
-  it("refuses a member or invitation role outside Admin, Editor and Viewer", async () => {
+  it("refuses member and invitation roles outside Admin, Editor and Viewer", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const person = await seed.user();
@@ -319,7 +319,7 @@ const ledgerRowAsApp = async (client: pg.PoolClient) => {
 };
 
 describe("the ledger under app_rt", () => {
-  it("returns zero rows on a missing scope and only the scoped tenant's rows otherwise", async () => {
+  it("returns none unscoped and only the scoped tenant's rows", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const inA = await seed.auditEvent({ workspaceId: WS_A });
@@ -335,7 +335,7 @@ describe("the ledger under app_rt", () => {
     });
   });
 
-  it("lets the api's role read and insert a row, and refuses it UPDATE and DELETE (migration 0009)", async () => {
+  it("lets the api read and insert, never UPDATE or DELETE", async () => {
     await withRollback(db.pool, async (client) => {
       const row = await ledgerRowAsApp(client);
 
@@ -359,7 +359,7 @@ describe("the ledger under app_rt", () => {
     });
   });
 
-  it("refuses the api's role every other road to a changed row: an upsert, a cross-tenant insert, a derived column written", async () => {
+  it("refuses the api upserts, cross-tenant inserts and derived-column writes", async () => {
     await withRollback(db.pool, async (client) => {
       const row = await ledgerRowAsApp(client);
 
@@ -397,7 +397,7 @@ describe("the ledger under app_rt", () => {
     });
   });
 
-  it("refuses the worker role on the ledger, reading and writing alike (migration 0009)", async () => {
+  it("refuses the worker the ledger, reading and writing alike", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       await seed.auditEvent({ workspaceId: WS_A });
@@ -421,7 +421,7 @@ describe("the ledger under app_rt", () => {
     });
   });
 
-  it("refuses an act outside the four families or the family.subject.verb shape at the row", async () => {
+  it("refuses an act outside the four families or family.subject.verb", async () => {
     await withRollback(db.pool, async (client) => {
       await seedTwoWorkspaces(client);
       for (const act of ["billing.invoice.sent", "people.member", "People.Member.Added"]) {
@@ -434,7 +434,7 @@ describe("the ledger under app_rt", () => {
     });
   });
 
-  it("holds the family CHECK to the same four words the boundary narrows to, both ways", async () => {
+  it("holds the family CHECK to exactly the boundary's four words", async () => {
     const constraint = await db.pool.query<{ definition: string }>(
       "SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conname = 'audit_event_family_check'",
     );
@@ -452,7 +452,7 @@ describe("the ledger under app_rt", () => {
 describe("the identity-set ledger", () => {
   const PERSON_NAMED = "people.person.named";
 
-  it("lets the api record a person's act outside every scope and read it back, and never rewrite or remove one", async () => {
+  it("lets the api record and read unscoped acts, nothing more", async () => {
     await withRollback(db.pool, async (client) => {
       await client.query("SET LOCAL ROLE app_rt");
       const id = ulid();
@@ -491,7 +491,7 @@ describe("the identity-set ledger", () => {
     });
   });
 
-  it("refuses the worker every road to reading or recording a person's act", async () => {
+  it("refuses the worker reading or recording a person's act", async () => {
     await withRollback(db.pool, async (client) => {
       const personId = ulid();
       await client.query(AN_IDENTITY_SET_LEDGER_ROW, [
@@ -518,7 +518,7 @@ describe("the identity-set ledger", () => {
     });
   });
 
-  it("takes an act of the four families in the family.subject.verb shape, and refuses any other at the row", async () => {
+  it("takes only acts of the four families in family.subject.verb shape", async () => {
     await withRollback(db.pool, async (client) => {
       const personId = ulid();
       const landed = await client.query(AN_IDENTITY_SET_LEDGER_ROW, [
@@ -567,7 +567,7 @@ const groupIdsHeldBy = async (client: pg.PoolClient, userId: string): Promise<st
 };
 
 describe("the group tables under app_rt", () => {
-  it("returns zero rows on a missing scope and only the scoped tenant's groups otherwise", async () => {
+  it("returns none unscoped and only the scoped tenant's groups", async () => {
     await withRollback(db.pool, async (client) => {
       const { hr, sales, theirs } = await groupsAsApp(client);
 
@@ -585,7 +585,7 @@ describe("the group tables under app_rt", () => {
     });
   });
 
-  it("refuses a group written into another tenant, and a membership naming another tenant's group", async () => {
+  it("refuses a group or membership reaching into another tenant", async () => {
     await withRollback(db.pool, async (client) => {
       const { theirs, person } = await groupsAsApp(client);
 
@@ -607,7 +607,7 @@ describe("the group tables under app_rt", () => {
     });
   });
 
-  it("takes a person out of every group in the workspace when their membership ends", async () => {
+  it("drops a person from every group when their membership ends", async () => {
     await withRollback(db.pool, async (client) => {
       const { person, hr, sales } = await groupsAsApp(client);
       expect(await groupIdsHeldBy(client, person.id)).toEqual([hr.id, sales.id].toSorted());
@@ -624,7 +624,7 @@ describe("the group tables under app_rt", () => {
     });
   });
 
-  it("deletes a group's memberships with the group, and leaves every other group's alone", async () => {
+  it("deletes a group's memberships with it, and no other group's", async () => {
     await withRollback(db.pool, async (client) => {
       const { person, hr, sales } = await groupsAsApp(client);
 
@@ -634,7 +634,7 @@ describe("the group tables under app_rt", () => {
     });
   });
 
-  it("refuses the worker role on both group tables, reading and writing alike (migration 0011)", async () => {
+  it("refuses the worker both group tables, reading and writing alike", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       await seed.group({ workspaceId: WS_A });
@@ -657,7 +657,7 @@ describe("the group tables under app_rt", () => {
 });
 
 describe("access requests under app_rt", () => {
-  it("returns zero rows on a missing scope and only the scoped tenant's rows otherwise", async () => {
+  it("returns none unscoped and only the scoped tenant's rows", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const inA = await seed.accessRequest({ workspaceId: WS_A });
@@ -673,7 +673,7 @@ describe("access requests under app_rt", () => {
     });
   });
 
-  it("refuses the worker role on the access-request queue, reading and writing alike (migration 0013)", async () => {
+  it("refuses the worker the access-request queue, reading and writing alike", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const person = await seed.user();
@@ -692,7 +692,7 @@ describe("access requests under app_rt", () => {
     });
   });
 
-  it("holds one open request per workspace and person, and counts only the waiting ones", async () => {
+  it("holds one waiting request per workspace and person", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const person = await seed.user();
@@ -714,7 +714,7 @@ describe("access requests under app_rt", () => {
     });
   });
 
-  it("refuses a fourth status and a decision that only half happened, at the row", async () => {
+  it("refuses a fourth status and a half-made decision", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const person = await seed.user();
@@ -763,7 +763,7 @@ describe("the concept write path under app_rt", () => {
   const A_PARENT_SHA = "e".repeat(40);
   const A_COMMIT_NOBODY_RECORDED = "f".repeat(40);
 
-  it("returns zero rows on a missing scope and only the scoped tenant's rows otherwise, on every one of the five", async () => {
+  it("returns none unscoped and only the tenant's, on all five", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
 
@@ -788,7 +788,7 @@ describe("the concept write path under app_rt", () => {
     });
   });
 
-  it("refuses the worker role on four of the five, reading and writing alike (migrations 0015, 0022)", async () => {
+  it("refuses the worker four of five, reading and writing alike", async () => {
     const OUT_OF_REACH = CONCEPT_TABLES.filter((table) => table !== "concept_index");
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
@@ -811,7 +811,7 @@ describe("the concept write path under app_rt", () => {
     });
   });
 
-  it("lets the worker read the concept index in its scope and never write it (migration 0022)", async () => {
+  it("lets the worker only read the concept index in scope", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       for (const workspaceId of [WS_A, WS_B]) await seed.conceptIndex({ workspaceId });
@@ -842,7 +842,7 @@ describe("the concept write path under app_rt", () => {
     });
   });
 
-  it("refuses a concept written into another tenant, and a check naming another tenant's concept", async () => {
+  it("refuses a concept or check reaching into another tenant", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const theirs = await seed.conceptIdentity({ workspaceId: WS_B });
@@ -861,7 +861,7 @@ describe("the concept write path under app_rt", () => {
     });
   });
 
-  it("refuses every row the write path's sentences forbid, each at its own constraint", async () => {
+  it("refuses each forbidden write-path row at its own constraint", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const identity = await seed.conceptIdentity({ workspaceId: WS_A });
@@ -933,7 +933,7 @@ describe("the concept write path under app_rt", () => {
     });
   });
 
-  it("refuses an index row naming a commit the workspace never recorded, when the act ends", async () => {
+  it("defers refusing an index row that cites an unrecorded commit", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const identity = await seed.conceptIdentity({ workspaceId: WS_A });
@@ -960,7 +960,7 @@ describe("the concept write path under app_rt", () => {
 describe("the graph tables under app_rt", () => {
   const GRAPH_TABLES = ["graph_generation", "graph_node", "graph_edge"] as const;
 
-  it("returns zero rows on a missing scope and only the scoped tenant's rows otherwise, on all three", async () => {
+  it("returns none unscoped and only the tenant's, on all three", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       for (const workspaceId of [WS_A, WS_B]) {
@@ -983,7 +983,7 @@ describe("the graph tables under app_rt", () => {
     });
   });
 
-  it("lets the worker build a generation beside the live one and flip it, and refuses it every edit to a node or an edge (migration 0022)", async () => {
+  it("lets the worker build and flip generations, never rewrite them", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const live = await seed.graphNode({ workspaceId: WS_A });
@@ -1033,7 +1033,7 @@ describe("the graph tables under app_rt", () => {
     });
   });
 
-  it("refuses a flip to any generation but the next, and a row in any generation but the live one or the next (migration 0022)", async () => {
+  it("refuses an out-of-turn generation for a flip or a row", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       await seed.graphNode({ workspaceId: WS_A });
@@ -1097,7 +1097,7 @@ describe("the graph tables under app_rt", () => {
     });
   });
 
-  it("refuses a node written into another tenant, from this tenant's scope", async () => {
+  it("refuses a node written into another tenant from this scope", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       await seed.graphGeneration({ workspaceId: WS_B });
@@ -1115,7 +1115,7 @@ describe("the graph tables under app_rt", () => {
     });
   });
 
-  it("refuses every row the graph's sentences forbid, each at its own constraint", async () => {
+  it("refuses each forbidden graph row at its own constraint", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const node = await seed.graphNode({ workspaceId: WS_A });
@@ -1212,7 +1212,7 @@ const submitSet = (
   );
 
 describe("the inbox under app_rt", () => {
-  it("returns zero rows on a missing scope and only the scoped tenant's suggestions otherwise", async () => {
+  it("returns none unscoped and only the scoped tenant's suggestions", async () => {
     await withRollback(db.pool, async (client) => {
       const { here } = await inboxAsApp(client);
 
@@ -1225,7 +1225,7 @@ describe("the inbox under app_rt", () => {
     });
   });
 
-  it("refuses both runtime roles the payload table itself, and serves it only through the definer function (migration 0018)", async () => {
+  it("refuses both roles the payload table, which the definer serves", async () => {
     await withRollback(db.pool, async (client) => {
       const { here } = await inboxAsApp(client);
 
@@ -1257,7 +1257,7 @@ describe("the inbox under app_rt", () => {
     });
   });
 
-  it("withholds a payload once the suggestion is decided, and one of another tenant always", async () => {
+  it("withholds a decided suggestion's payload, and another tenant's always", async () => {
     await withRollback(db.pool, async (client) => {
       const { here, there } = await inboxAsApp(client);
 
@@ -1277,7 +1277,7 @@ describe("the inbox under app_rt", () => {
     });
   });
 
-  it("refuses the api's role a deleted suggestion, so a decision can never become a silence", async () => {
+  it("refuses the api a DELETE of a suggestion", async () => {
     await withRollback(db.pool, async (client) => {
       const { here } = await inboxAsApp(client);
 
@@ -1287,7 +1287,7 @@ describe("the inbox under app_rt", () => {
     });
   });
 
-  it("decides a waiting suggestion once, and refuses every road back out of a decision (migration 0018)", async () => {
+  it("decides a waiting suggestion once, and refuses undoing it", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const decided = await seed.suggestion({ workspaceId: WS_A });
@@ -1341,7 +1341,7 @@ describe("the inbox under app_rt", () => {
     });
   });
 
-  it("refuses a first decision from a transaction that never said it was making one (migration 0018)", async () => {
+  it("refuses a first decision a transaction never declared", async () => {
     await withRollback(db.pool, async (client) => {
       const { here } = await inboxAsApp(client);
       const decline = (id: string) =>
@@ -1366,7 +1366,7 @@ describe("the inbox under app_rt", () => {
     });
   });
 
-  it("refuses the worker role the queue, and lets it submit a set through the function alone (migration 0018)", async () => {
+  it("lets the worker submit a set only through the function", async () => {
     await withRollback(db.pool, async (client) => {
       await seedTwoWorkspaces(client);
       await client.query("SET LOCAL ROLE worker_rt");
@@ -1387,7 +1387,7 @@ describe("the inbox under app_rt", () => {
     });
   });
 
-  it("refuses a set larger than one an Admin could decide, and one carrying nothing", async () => {
+  it("refuses an empty set and one too large to decide", async () => {
     await withRollback(db.pool, async (client) => {
       await seedTwoWorkspaces(client);
       await client.query("SET LOCAL ROLE app_rt");
@@ -1421,7 +1421,7 @@ describe("the inbox under app_rt", () => {
     });
   });
 
-  it("refuses every half-decided suggestion the write path forbids, each at its own constraint", async () => {
+  it("refuses each half-decided suggestion at its own constraint", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const identity = await seed.conceptIdentity({ workspaceId: WS_A });
@@ -1528,7 +1528,7 @@ describe("the inbox under app_rt", () => {
     });
   });
 
-  it("refuses a body larger than a concept could be, at the row", async () => {
+  it("refuses a body larger than a concept could be", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const here = await seed.suggestion({ workspaceId: WS_A });
@@ -1539,7 +1539,7 @@ describe("the inbox under app_rt", () => {
     });
   });
 
-  it("bounds a frontmatter by the characters its caller wrote, at the one road to the row (migration 0018)", async () => {
+  it("bounds a frontmatter by the characters its caller wrote", async () => {
     await withRollback(db.pool, async (client) => {
       await seedTwoWorkspaces(client);
       await client.query("SET LOCAL ROLE worker_rt");
@@ -1575,7 +1575,7 @@ describe("the inbox under app_rt", () => {
     });
   });
 
-  it("refuses a target naming another tenant's concept, whatever the row says", async () => {
+  it("refuses a target naming another tenant's concept", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const theirs = await seed.conceptIdentity({ workspaceId: WS_B });
@@ -1598,12 +1598,16 @@ describe("the inbox under app_rt", () => {
 
 const INSUFFICIENT_PRIVILEGE = "42501";
 
-// The one proposer form every kind's CHECK accepts, repair's platform-only one included, so
-// the pair under test is all the probe varies.
+/**
+ * The one proposer form every kind's CHECK accepts, repair's platform-only one included, so
+ * the pair under test is all the probe varies.
+ */
 const A_PLATFORM_PROPOSER = "process:better-answers-test";
 
-// Under role NONE the function reads its caller off `session_user` instead: the migrator
-// who applied the journal, whom its CASE names no branch for.
+/**
+ * Under role NONE the function reads its caller off `session_user` instead: the migrator
+ * who applied the journal, whom its CASE names no branch for.
+ */
 const THE_CALLERS = [
   { caller: "app_rt", mayRaise: SUGGESTION_KINDS_FROM_THE_APP, role: "app_rt" },
   { caller: "worker_rt", mayRaise: SUGGESTION_KINDS_FROM_A_RUN, role: "worker_rt" },
@@ -1634,8 +1638,8 @@ const submittingOneRequest = async (client: pg.PoolClient, kind: string): Promis
   }
 };
 
-describe("the kinds a caller may raise, asked of the function itself (migration 0018)", () => {
-  it("lands a set of any kind its caller's tier names, refuses that caller every other kind, and refuses a caller of no tier all of them", async () => {
+describe("the kinds a caller may raise, asked of the function", () => {
+  it("lands a set only of kinds its caller's tier names", async () => {
     await withRollback(db.pool, async (client) => {
       await seedTwoWorkspaces(client);
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
@@ -1717,7 +1721,7 @@ describe("a tenant table under app_rt", () => {
     });
   });
 
-  it("scopes the per-token counter to its tenant, so one workspace's tokens never read another's counts", async () => {
+  it("scopes the per-token counter to its tenant", async () => {
     await withRollback(db.pool, async (client) => {
       await seedTwoWorkspaces(client);
       await client.query("SET LOCAL ROLE app_rt");
@@ -1736,7 +1740,7 @@ describe("a tenant table under app_rt", () => {
 });
 
 describe("the workspace-lifecycle function", () => {
-  it("creates the chunk partition and its full-text index for app_rt, in one transaction", async () => {
+  it("creates the chunk partition and full-text index in one transaction", async () => {
     await withRollback(db.pool, async (client) => {
       /* jscpd:ignore-start */
       await seedTwoWorkspaces(client);
@@ -1778,7 +1782,7 @@ describe("the workspace-lifecycle function", () => {
     });
   });
 
-  it("refuses a workspace the transaction is not scoped to, and an unknown one", async () => {
+  it("refuses a workspace outside the scope, and an unknown one", async () => {
     await withRollback(db.pool, async (client) => {
       await seedTwoWorkspaces(client);
       await client.query("SET LOCAL ROLE app_rt");
@@ -1807,7 +1811,7 @@ describe("the workspace-lifecycle function", () => {
     });
   });
 
-  it("scopes chunk rows to their tenant through the parent, and denies the child table outright", async () => {
+  it("scopes chunk rows through the parent, and denies the partition", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       await client.query("SET LOCAL ROLE app_rt");
@@ -1855,7 +1859,7 @@ describe("the workspace-lifecycle function", () => {
 });
 
 describe("the chunk index under worker_rt", () => {
-  it("holds the four verbs on the parent and no other privilege, and nothing at all on a partition (migrations 0037 and 0043)", async () => {
+  it("holds only four verbs on the parent, nothing on partitions", async () => {
     await withRollback(db.pool, async (client) => {
       /* jscpd:ignore-start */
       await seedTwoWorkspaces(client);
@@ -1890,7 +1894,7 @@ describe("the chunk index under worker_rt", () => {
     });
   });
 
-  it("reads this tenant's chunk rows through the parent, and none on another scope or no scope", async () => {
+  it("reads only the scoped tenant's chunk rows, through the parent", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const mine = await seed.chunk({ workspaceId: WS_A, content: "ours" });
@@ -1941,7 +1945,7 @@ describe("the audience pair on every readable unit", () => {
   ];
 
   it.each(AUDIENCE_TABLES)(
-    "holds the word to the array on %s, refusing every half-shape and landing both whole ones",
+    "refuses every half-shape on %s and lands both whole ones",
     async (table, constraint, seedOne) => {
       await withRollback(db.pool, async (client) => {
         const seed = await seedTwoWorkspaces(client);
@@ -1980,7 +1984,7 @@ describe("the audience pair on every readable unit", () => {
 });
 
 describe("the rules in force on a source binding", () => {
-  it("gives a binding nobody configured the safe set, and takes the one flip that changes it", async () => {
+  it("starts bindings on the safe set, which one flip changes", async () => {
     await withRollback(db.pool, async (client) => {
       await seedTwoWorkspaces(client);
       await client.query("SET LOCAL ROLE app_rt");
@@ -2004,7 +2008,7 @@ describe("the rules in force on a source binding", () => {
     });
   });
 
-  it("refuses a set of rules the seam could not read as tiers", async () => {
+  it("refuses rules the seam could not read as tiers", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const binding = await seed.sourceBinding({ workspaceId: WS_A });
@@ -2059,7 +2063,7 @@ describe("the derivation's tables under app_rt", () => {
     return { binding, document, identity, cited, composed };
   };
 
-  it("returns zero rows on a missing scope and only the scoped tenant's rows otherwise, on all six", async () => {
+  it("returns none unscoped and only the tenant's, on all six", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       for (const workspaceId of [WS_A, WS_B]) await seedOneOfEach(seed, workspaceId);
@@ -2083,7 +2087,7 @@ describe("the derivation's tables under app_rt", () => {
     "composition_include",
   ] as const;
 
-  it("refuses the worker four of the six, and serves it exactly what a run reconciles on the other two (migrations 0020, 0037, 0052)", async () => {
+  it("limits the worker to reading and reconciling bindings and documents", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const seeded = await seedOneOfEach(seed, WS_A);
@@ -2173,7 +2177,7 @@ describe("the derivation's tables under app_rt", () => {
     });
   });
 
-  it("refuses a row naming another tenant's binding or concept, and a citation of evidence nobody recorded, each at its key", async () => {
+  it("refuses another tenant's binding or concept and unrecorded evidence", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const ours = await seedOneOfEach(seed, WS_A);
@@ -2210,7 +2214,7 @@ describe("the derivation's tables under app_rt", () => {
     });
   });
 
-  it("refuses an override by an actor of no known form, or to a class outside the three", async () => {
+  it("refuses an override with an unknown actor form or class", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const identity = await seed.conceptIdentity({ workspaceId: WS_A });
@@ -2235,7 +2239,7 @@ describe("the derivation's tables under app_rt", () => {
     });
   });
 
-  it("keeps cited evidence while a citation names it, and takes the citation with its concept", async () => {
+  it("keeps cited evidence, and deletes a citation with its concept", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const ours = await seedOneOfEach(seed, WS_A);
@@ -2271,7 +2275,7 @@ describe("the derivation's tables under app_rt", () => {
 });
 
 describe("the finding under both runtime roles", () => {
-  it("returns zero rows on a missing scope and only the scoped tenant's findings otherwise", async () => {
+  it("returns none unscoped and only the scoped tenant's findings", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       for (const workspaceId of [WS_A, WS_B]) await seed.finding({ workspaceId });
@@ -2284,7 +2288,7 @@ describe("the finding under both runtime roles", () => {
     });
   });
 
-  it("lets the worker record a finding and refuses it every road to what an Admin wrote on one (migrations 0024, 0032, 0041, 0042, 0052)", async () => {
+  it("lets the worker record findings, never touching an Admin's mark", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const document = await seed.sourceDocument({ workspaceId: WS_A });
@@ -2388,7 +2392,7 @@ describe("the finding under both runtime roles", () => {
     });
   });
 
-  it("serves the worker which spans of a document were restored, and only its own tenant's", async () => {
+  it("serves the worker a document's restored spans, its tenant's only", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const document = await seed.sourceDocument({ workspaceId: WS_A });
@@ -2440,7 +2444,7 @@ describe("the finding under both runtime roles", () => {
     });
   });
 
-  it("serves the worker which spans of a document an Admin dismissed, and only its own tenant's", async () => {
+  it("serves the worker a document's dismissed spans, its tenant's only", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const document = await seed.sourceDocument({ workspaceId: WS_A });
@@ -2497,7 +2501,7 @@ describe("the finding under both runtime roles", () => {
     });
   });
 
-  it("holds a document's class no wider than the Admin narrowed it to", async () => {
+  it("keeps a document's class within an Admin's narrowing", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const narrowed = await seed.sourceDocument({
@@ -2527,7 +2531,7 @@ describe("the finding under both runtime roles", () => {
     });
   });
 
-  it("holds one row per span, so a second run's insert lands nothing and leaves an Admin's mark where it stood", async () => {
+  it("holds one row per span, so a rerun lands nothing", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const document = await seed.sourceDocument({ workspaceId: WS_A });
@@ -2585,7 +2589,7 @@ describe("the finding under both runtime roles", () => {
     });
   });
 
-  it("lets a run refresh its own reading of a span it finds again, and nothing an Admin wrote on it", async () => {
+  it("lets a rerun refresh its own reading, never an Admin's", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const document = await seed.sourceDocument({ workspaceId: WS_A });
@@ -2710,7 +2714,7 @@ describe("the finding under both runtime roles", () => {
     });
   });
 
-  it("refuses a review, a restore and a tier the finding's own sentences do not admit", async () => {
+  it("refuses a review, restore or tier the finding forbids", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const always = await seed.finding({ workspaceId: WS_A });
@@ -2765,7 +2769,7 @@ describe("the finding under both runtime roles", () => {
 });
 
 describe("the subject request under both runtime roles", () => {
-  it("returns zero rows on a missing scope and only the scoped tenant's requests otherwise", async () => {
+  it("returns none unscoped and only the scoped tenant's requests", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       for (const workspaceId of [WS_A, WS_B]) await seed.subjectRequest({ workspaceId });
@@ -2820,7 +2824,7 @@ describe("the subject request under both runtime roles", () => {
     });
   });
 
-  it("refuses a subject, a clock and an identifier set the request's own sentences do not admit", async () => {
+  it("refuses a subject, clock or identifier set the request forbids", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const request = await seed.subjectRequest({ workspaceId: WS_A });
@@ -2895,7 +2899,7 @@ describe("the subject request under both runtime roles", () => {
 });
 
 describe("the erasure request under both runtime roles", () => {
-  it("returns zero rows on a missing scope and only the scoped tenant's routines otherwise", async () => {
+  it("returns none unscoped and only the scoped tenant's routines", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       for (const workspaceId of [WS_A, WS_B]) await seed.erasureRequest({ workspaceId });
@@ -2950,7 +2954,7 @@ describe("the erasure request under both runtime roles", () => {
     });
   });
 
-  it("refuses a completion, a pseudonym and a set of dates the routine's own sentences do not admit", async () => {
+  it("refuses a completion, pseudonym or dates the routine forbids", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const request = await seed.erasureRequest({ workspaceId: WS_A });
@@ -2996,7 +3000,7 @@ describe("the erasure request under both runtime roles", () => {
     });
   });
 
-  it("refuses a second routine over one subject request, and one naming another tenant's", async () => {
+  it("refuses a second routine per request, and a cross-tenant one", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const mine = await seed.erasureRequest({ workspaceId: WS_A });
@@ -3020,7 +3024,7 @@ describe("the erasure request under both runtime roles", () => {
 });
 
 describe("the suppression under both runtime roles", () => {
-  it("returns zero rows on a missing scope and only the scoped tenant's suppressions otherwise", async () => {
+  it("returns none unscoped and only the scoped tenant's suppressions", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       for (const workspaceId of [WS_A, WS_B]) await seed.suppression({ workspaceId });
@@ -3037,7 +3041,7 @@ describe("the suppression under both runtime roles", () => {
     });
   });
 
-  it("serves the worker the set a run must keep out, and refuses it every road that writes one", async () => {
+  it("lets the worker read suppressions but never write one", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const suppression = await seed.suppression({ workspaceId: WS_A });
@@ -3083,7 +3087,7 @@ describe("the suppression under both runtime roles", () => {
     });
   });
 
-  it("refuses a suppression that keeps nothing out, a second for one erasure request, and one naming another tenant's request", async () => {
+  it("refuses an empty, a duplicate or a cross-tenant suppression", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const mine = await seed.suppression({ workspaceId: WS_A });
@@ -3121,7 +3125,7 @@ describe("the suppression under both runtime roles", () => {
 });
 
 describe("the queue under both runtime roles", () => {
-  it("returns zero rows on a missing scope and only the scoped tenant's jobs otherwise", async () => {
+  it("returns none unscoped and only the scoped tenant's jobs", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       for (const workspaceId of [WS_A, WS_B]) await seed.job({ workspaceId });
@@ -3134,7 +3138,7 @@ describe("the queue under both runtime roles", () => {
     });
   });
 
-  it("claims nothing for a caller whose transaction names no workspace, and never another tenant's job", async () => {
+  it("claims nothing unscoped, and never another tenant's job", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const theirs = await seed.job({ workspaceId: WS_B });
@@ -3165,7 +3169,7 @@ describe("the queue under both runtime roles", () => {
     });
   });
 
-  it("refuses both runtime roles a DELETE on the queue, while the claim protocol still moves a row (migration 0022)", async () => {
+  it("refuses both roles a DELETE, while claims still move rows", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       const job = await seed.job({ workspaceId: WS_A });
@@ -3186,7 +3190,7 @@ describe("the queue under both runtime roles", () => {
     });
   });
 
-  it("refuses every caller but the two runtime roles the migration grants (migration 0022)", async () => {
+  it("refuses every caller but the two runtime roles", async () => {
     await withRollback(db.pool, async (client) => {
       await seedTwoWorkspaces(client);
       await client.query("CREATE ROLE queue_probe NOLOGIN");
@@ -3210,7 +3214,7 @@ describe("the queue under both runtime roles", () => {
 });
 
 describe("the migration stamp under worker_rt", () => {
-  it("lets the worker read the stamp, and refuses it every other road to the migrator's own table", async () => {
+  it("lets the worker read the stamp but never write one", async () => {
     await withRollback(db.pool, async (client) => {
       await client.query("SET LOCAL ROLE worker_rt");
 
@@ -3238,7 +3242,7 @@ describe("the migration stamp under worker_rt", () => {
 });
 
 describe("the contract stamp", () => {
-  it("holds one row, which the migrator rewrites rather than adds to", async () => {
+  it("holds one row that the migrator rewrites in place", async () => {
     await withRollback(db.pool, async (client) => {
       await client.query(STAMP_THE_CONTRACT, [CONTRACT_DIGEST]);
       await client.query(STAMP_THE_CONTRACT, ["a-contract-an-older-image-carried"]);
@@ -3249,7 +3253,7 @@ describe("the contract stamp", () => {
     });
   });
 
-  it("lets the worker read what the api carries, and refuses it every road to writing one", async () => {
+  it("lets the worker read the stamp but never write one", async () => {
     await withRollback(db.pool, async (client) => {
       await client.query(STAMP_THE_CONTRACT, [CONTRACT_DIGEST]);
       await client.query("SET LOCAL ROLE worker_rt");
@@ -3276,7 +3280,7 @@ describe("the contract stamp", () => {
 });
 
 describe("the sweep pass", () => {
-  it("lets the api record a pass and read it back, and never rewrite or remove one", async () => {
+  it("lets the api record and read passes, nothing more", async () => {
     await withRollback(db.pool, async (client) => {
       await client.query("SET LOCAL ROLE app_rt");
       const id = ulid();
@@ -3298,7 +3302,7 @@ describe("the sweep pass", () => {
     });
   });
 
-  it("refuses the worker every road to reading or recording a pass", async () => {
+  it("refuses the worker reading or recording a pass", async () => {
     await withRollback(db.pool, async (client) => {
       await client.query(A_SWEEP_PASS, [ulid()]);
       expect(Object.values(await privilegesHeld(client, "worker_rt", "sweep_pass"))).not.toContain(
