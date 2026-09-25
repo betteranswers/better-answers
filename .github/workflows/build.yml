@@ -48,6 +48,11 @@ jobs:
     needs: already-checked
     # `!cancelled()` and not `success()`: a broken gate has no verdict, so `check` runs.
     if: ${{ !cancelled() && needs.already-checked.outputs.verdict != 'yes' }}
+    # Replacing the workflow's grant, this must cover every called job, `pr-title` too, though it
+    # never runs on a push, or the run fails at startup.
+    permissions:
+      contents: read
+      pull-requests: read
     uses: ./.github/workflows/check.yml
     with:
       images-probed-by-the-caller: true
