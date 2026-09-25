@@ -36,7 +36,7 @@ afterAll(async () => {
 const json = async <T>(response: Response, shape: z.ZodType<T>): Promise<T> =>
   shape.parse(await response.json());
 
-// RFC 8414, the fields the surface's discovery is held to.
+/** RFC 8414's fields the surface's discovery is held to. */
 const authorizationServerMetadata = z.object({
   issuer: z.string(),
   client_id_metadata_document_supported: z.boolean().optional(),
@@ -47,14 +47,14 @@ const authorizationServerMetadata = z.object({
   registration_endpoint: z.string().optional(),
 });
 
-// RFC 9728.
+/** RFC 9728's fields the protected-resource document is held to. */
 const protectedResourceMetadata = z.object({
   resource: z.string(),
   authorization_servers: z.array(z.string()),
   scopes_supported: z.array(z.string()),
 });
 
-// `strictObject`, because the suite asserts the whole answer and nothing more.
+/** `strictObject`, because the suite asserts the whole answer and nothing more. */
 const whoAmI = z.strictObject({ workspaceId: z.string(), userId: z.string(), role: z.string() });
 
 const refusal = z.object({ error: z.string() });
@@ -62,7 +62,7 @@ const refusal = z.object({ error: z.string() });
 const rotatedTokens = z.object({ refresh_token: z.string() });
 
 describe("discovery", () => {
-  it("advertises CIMD, a public token endpoint, iss on responses, S256, and no openid (§9 19)", async () => {
+  it("advertises CIMD, public token endpoint, iss, S256 and no openid", async () => {
     const metadata = await json(
       await app.client().fetch("/.well-known/oauth-authorization-server"),
       authorizationServerMetadata,
@@ -83,7 +83,7 @@ describe("discovery", () => {
     expect(metadata.registration_endpoint).toBeUndefined();
   });
 
-  it("serves the protected-resource document at both paths with resource exactly the MCP URL (§9 20)", async () => {
+  it("serves both protected-resource paths with resource exactly the MCP URL", async () => {
     for (const path of [
       "/.well-known/oauth-protected-resource",
       "/.well-known/oauth-protected-resource/mcp",
@@ -95,7 +95,7 @@ describe("discovery", () => {
     }
   });
 
-  it("answers an unauthenticated call with 401 and a challenge naming the whole surface's scopes (§9 21; trap 3)", async () => {
+  it("answers an unauthenticated call 401, challenging for every scope", async () => {
     const response = await app.client().fetch("/mcp", {
       method: "POST",
       headers: {
@@ -121,7 +121,7 @@ describe("discovery", () => {
 });
 
 describe("the flow, as claude.ai drives it", () => {
-  it("reaches consent with Claude's real authorize shape and mints a {workspace, user} token bound to the MCP URL (§9 22–23; traps 1 and 2)", async () => {
+  it("mints a {workspace, user} token bound to the MCP URL", async () => {
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
     const started = Date.now();
@@ -144,7 +144,7 @@ describe("the flow, as claude.ai drives it", () => {
     expect(Date.now() - started).toBeLessThan(10_000);
   });
 
-  it("shows the picker to a person in two workspaces and puts the chosen one in the token", async () => {
+  it("puts a two-workspace person's picked workspace in the token", async () => {
     const one = await app.provision({ name: "One" });
     const two = await app.provision({ name: "Two" });
     await app.addMember(two.workspaceId, one.admin.id, "Viewer");
@@ -156,7 +156,7 @@ describe("the flow, as claude.ai drives it", () => {
     expect(connected.claims["user"]).toBe(one.admin.id);
   });
 
-  it("refuses a pick of a workspace the person does not belong to", async () => {
+  it("refuses picking a workspace the person does not belong to", async () => {
     const mine = await app.provision({ name: "Mine" });
     const other = await app.provision({ name: "Other" });
     await app.addMember(other.workspaceId, mine.admin.id, "Editor");
@@ -174,7 +174,7 @@ describe("the flow, as claude.ai drives it", () => {
     expect(`${resumed.origin}${resumed.pathname}`).toBe(`${PUBLIC_URL}/choose-workspace`);
   });
 
-  it("holds a member of one workspace who has given no display name at the post-login page, and carries them on to consent once they give one", async () => {
+  it("holds an unnamed member until named, then goes to consent", async () => {
     const acme = await app.provision({ name: "Unnamed" });
     const unnamed = await app.person(undefined, "");
     await app.addMember(acme.workspaceId, unnamed.id, "Editor");
@@ -192,7 +192,7 @@ describe("the flow, as claude.ai drives it", () => {
     expect(`${resumed.origin}${resumed.pathname}`).toBe(`${PUBLIC_URL}/consent`);
   });
 
-  it("sends a person with no workspace nowhere: nothing to pick, and no token is minted", async () => {
+  it("keeps a person with no workspace at an empty picker", async () => {
     const nobody = await app.person();
     const client = app.client();
 
@@ -206,7 +206,7 @@ describe("the flow, as claude.ai drives it", () => {
     expect(`${resumed.origin}${resumed.pathname}`).toBe(`${PUBLIC_URL}/choose-workspace`);
   });
 
-  it("sets the active workspace on a session that predates the person's one membership, moving its updated_at (T-109, ADR 0040)", async () => {
+  it("activates the workspace on an older session, moving its updated_at", async () => {
     const person = await app.person();
     const client = app.client();
 
@@ -237,7 +237,7 @@ describe("the flow, as claude.ai drives it", () => {
     expect(after.rows[0]?.updated_at.getTime() ?? 0).toBeGreaterThan(beforeUpdatedAt);
   });
 
-  it("redirects an authorize request for a scope the surface does not offer back to the host with iss (§9 23)", async () => {
+  it("redirects an unoffered scope back to the host with iss", async () => {
     const { challenge } = pkce();
 
     const response = await app
@@ -253,7 +253,7 @@ describe("the flow, as claude.ai drives it", () => {
     expect(target.searchParams.get("iss")).toBe(PUBLIC_URL);
   });
 
-  it("refuses a client whose metadata document lives anywhere but claude.ai, without ever fetching it", async () => {
+  it("refuses a non-claude.ai metadata document without ever fetching it", async () => {
     const { challenge } = pkce();
     const asked = app.metadataFetches.length;
 
@@ -273,7 +273,7 @@ describe("the flow, as claude.ai drives it", () => {
     expect(registered.rowCount).toBe(0);
   });
 
-  it("refuses an authorize request for a resource that is not the MCP URL (trap 2, RFC 8707)", async () => {
+  it("refuses a resource other than the MCP URL", async () => {
     const { challenge } = pkce();
 
     const response = await app.client().fetch(
@@ -302,7 +302,7 @@ describe("the pages, as a person walks them", () => {
     return client.form(`/consent${consent.search}`, { accept: "true" });
   };
 
-  it("never shows the picker to a person in exactly one workspace — consent is the next page", async () => {
+  it("takes a one-workspace person straight to consent, with no picker", async () => {
     const acme = await app.provision({ name: "Only" });
     const client = app.client();
 
@@ -313,7 +313,7 @@ describe("the pages, as a person walks them", () => {
     expect(me).toMatchObject({ workspaceId: acme.workspaceId, role: "Admin" });
   });
 
-  it("names every scope in the person's words on the consent page, staying connected included", async () => {
+  it("names every scope in the person's words, staying connected included", async () => {
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
     const consent = await driveToPage(
@@ -331,7 +331,7 @@ describe("the pages, as a person walks them", () => {
     expect(page).toContain("Claude will act as you");
   });
 
-  it("shows the client's real address beside its self-declared name, so a look-alike cannot borrow Claude's", async () => {
+  it("shows the client's real address beside its self-declared name", async () => {
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
     const consent = await driveToPage(app, client, acme.admin);
@@ -342,7 +342,7 @@ describe("the pages, as a person walks them", () => {
     expect(page).toContain(`sent to <strong>${new URL(CLAUDE_REDIRECT_URI).hostname}</strong>`);
   });
 
-  it("refuses consent once the person's credentials are revoked, and mints no code", async () => {
+  it("refuses consent after credentials are revoked, minting no code", async () => {
     const decided = await consentPostedAfter((acme) =>
       app.revokeCredentials(acme.admin.id, new Date(Date.now() + 1_000)),
     );
@@ -351,7 +351,7 @@ describe("the pages, as a person walks them", () => {
     expect(decided.headers.get("location")).toBeNull();
   });
 
-  it("mints no code for a person whose membership ended between the redirect decision and their consent", async () => {
+  it("mints no code when membership ends before the person consents", async () => {
     const decided = await consentPostedAfter((acme) =>
       app.removeMember(acme.workspaceId, acme.admin.id),
     );
@@ -377,7 +377,7 @@ describe("the pages, as a person walks them", () => {
 });
 
 describe("the pages refuse a cross-site form", () => {
-  it("refuses consent posted from another origin, even with the person's cookie, and mints no code", async () => {
+  it("refuses cross-origin consent despite the person's cookie, minting no code", async () => {
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
     const consent = await driveToPage(app, client, acme.admin);
@@ -397,7 +397,7 @@ describe("the pages refuse a cross-site form", () => {
     expect(crossSite.headers.get("location")).toBeNull();
   });
 
-  it("refuses consent posted as a fetch from this origin, even with the person's cookie, and mints no code", async () => {
+  it("refuses consent posted by a same-origin fetch, minting no code", async () => {
     /* jscpd:ignore-start */
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
@@ -436,7 +436,7 @@ describe("the pages refuse a cross-site form", () => {
     ).not.toBeNull();
   });
 
-  it("refuses consent posted with no Fetch Metadata at all, which no browser navigation is", async () => {
+  it("refuses consent posted without Fetch Metadata, unlike any browser navigation", async () => {
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
     const consent = await driveToPage(app, client, acme.admin);
@@ -451,7 +451,7 @@ describe("the pages refuse a cross-site form", () => {
     expect(bare.headers.get("location")).toBeNull();
   });
 
-  it("refuses a code request from another origin, so no site can start a sign-in for someone", async () => {
+  it("refuses a cross-origin code request, so sites cannot start sign-ins", async () => {
     const response = await app.client().fetch("/email-otp/send-verification-otp", {
       method: "POST",
       headers: {
@@ -467,8 +467,8 @@ describe("the pages refuse a cross-site form", () => {
   });
 });
 
-describe("one origin, one session (ADR 0034)", () => {
-  it("sets a host-only, Secure-prefixed session cookie, and never one scoped to the apex", async () => {
+describe("one origin, one session", () => {
+  it("sets a host-only, Secure-prefixed session cookie, never an apex one", async () => {
     const acme = await app.provision({ name: "Host-only" });
     const client = app.client();
 
@@ -489,7 +489,7 @@ describe("one origin, one session (ADR 0034)", () => {
     expect(me.status).toBe(200);
   });
 
-  it("sends a person with no session to the product's sign-in, carrying the signed query", async () => {
+  it("sends a sessionless person to sign-in, carrying the signed query", async () => {
     const { challenge } = pkce();
 
     const start = await app
@@ -503,7 +503,7 @@ describe("one origin, one session (ADR 0034)", () => {
     expect(sent.searchParams.get("client_id")).toBe(CLAUDE_CLIENT_ID);
   });
 
-  it("answers the resume with an absolute address on the one origin", async () => {
+  it("answers the resume with an absolute address on the origin", async () => {
     const two = await app.provision({ name: "Second" });
     const one = await app.provision({ name: "First" });
     await app.addMember(two.workspaceId, one.admin.id, "Viewer");
@@ -537,7 +537,7 @@ describe("one origin, one session (ADR 0034)", () => {
 });
 
 describe("the cookie session, through the same resolver", () => {
-  it("answers /me with the workspace, the person and the role the member row holds", async () => {
+  it("answers /me with the member row's workspace, person and role", async () => {
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
     await connectAsHost(app, client, acme.admin);
@@ -547,7 +547,7 @@ describe("the cookie session, through the same resolver", () => {
     expect(me).toEqual({ workspaceId: acme.workspaceId, userId: acme.admin.id, role: "Admin" });
   });
 
-  it("refuses /me with no session, and after the person's credentials are revoked", async () => {
+  it("refuses /me without a session and after credentials are revoked", async () => {
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
     expect((await client.fetch("/me")).status).toBe(401);
@@ -565,7 +565,7 @@ describe("the cookie session, through the same resolver", () => {
 });
 
 describe("refresh and revocation", () => {
-  it("rotates the refresh token, refuses the old one, and gives the new one ninety days (Q10)", async () => {
+  it("gives a rotated refresh token ninety days, refusing the old", async () => {
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
     const connected = await connectAsHost(app, client, acme.admin);
@@ -590,7 +590,7 @@ describe("refresh and revocation", () => {
     expect(family.status).toBe(400);
   });
 
-  it("revokes a refresh token so it can no longer be exchanged", async () => {
+  it("revokes a refresh token, which then cannot be exchanged", async () => {
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
     const connected = await connectAsHost(app, client, acme.admin);
@@ -612,8 +612,8 @@ describe("refresh and revocation", () => {
   });
 });
 
-describe("the audit logs (Q12)", () => {
-  it("emits sign-in, workspace pick, consent, token issue, refresh and revocation with the audit fields, and never a secret", async () => {
+describe("the audit logs", () => {
+  it("emits six auth events with audit fields, never a secret", async () => {
     const one = await app.provision({ name: "Logged" });
     const two = await app.provision({ name: "Logged too" });
     await app.addMember(two.workspaceId, one.admin.id, "Viewer");
@@ -662,15 +662,17 @@ describe("the audit logs (Q12)", () => {
 });
 
 describe("the limits", () => {
-  // The windows are wall-clock aligned, so a loop may straddle a boundary; 2·max + 1 puts
-  // max + 1 into one window.
+  /**
+   * The windows are wall-clock aligned, so a loop may straddle a boundary; 2·max + 1 puts
+   * max + 1 into one window.
+   */
   const untilRefused = async (send: () => Promise<Response>, max: number): Promise<number[]> => {
     const statuses: number[] = [];
     for (let attempt = 0; attempt < 2 * max + 1; attempt += 1) statuses.push((await send()).status);
     return statuses;
   };
 
-  it("keys the page limit on CF-Connecting-IP alone and ignores a spoofed X-Forwarded-For (Q8)", async () => {
+  it("keys the page limit on CF-Connecting-IP alone, ignoring spoofed X-Forwarded-For", async () => {
     const client = app.client("203.0.113.10");
     let spoof = 0;
 
@@ -704,7 +706,7 @@ describe("the limits", () => {
     expect(app.emails.filter((message) => message.to === email).length).toBeLessThanOrEqual(10);
   });
 
-  it("lets Better Auth's own database-backed limiter refuse a flood at the email-code endpoint", async () => {
+  it("lets Better Auth's database limiter refuse an email-code flood", async () => {
     const client = app.client("203.0.113.40");
     let attempt = 0;
 
@@ -749,7 +751,7 @@ describe("the three roles through Better Auth's own endpoints", () => {
     return row.rows[0]?.role;
   };
 
-  it("lets an Admin change a Viewer to an Editor, and refuses the plugin's own owner role", async () => {
+  it("lets an Admin set Editor, refusing the plugin's owner role", async () => {
     const acme = await app.provision({ name: "Acme" });
     const viewer = await app.person();
     await app.addMember(acme.workspaceId, viewer.id, "Viewer");
@@ -766,7 +768,7 @@ describe("the three roles through Better Auth's own endpoints", () => {
     expect(await roleOf(acme.workspaceId, viewer.id)).toBe("Editor");
   });
 
-  it("refuses a Viewer who tries to change a role, and refuses every invitation until the People screen ships", async () => {
+  it("refuses a Viewer's role change and every invitation", async () => {
     /* jscpd:ignore-start */
     const acme = await app.provision({ name: "Acme" });
     const viewer = await app.person();
@@ -795,9 +797,9 @@ describe("the three roles through Better Auth's own endpoints", () => {
   });
 });
 
-describe("workspace creation is the platform's (Q11)", () => {
+describe("workspace creation is the platform's", () => {
   it.each(["Viewer", "Admin"] as const)(
-    "refuses a signed-in %s who asks Better Auth to create a workspace",
+    "refuses a signed-in %s creating a workspace through Better Auth",
     async (role) => {
       const home = await app.provision({ name: "Home" });
       const person = role === "Admin" ? home.admin : await app.person();
