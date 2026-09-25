@@ -37,6 +37,10 @@ export type ObjectDoor = {
 
 export type ObjectStoreRefusal = "endpoint-not-a-url" | "no-bucket";
 
+/**
+ * Reaches no store: it checks only that the bucket is named and the endpoint parses as a URL, so a
+ * wrong address or credential shows at the first call.
+ */
 export const openObjects = (
   settings: ObjectStoreSettings,
 ): Result<ObjectDoor, ObjectStoreRefusal> => {
@@ -94,7 +98,7 @@ const putInside = async (
 ): Promise<Result<void, KeyRefusal>> => {
   if (!isPortablePath(key)) return err("malformed-key");
 
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- the DOM's `ReadableStream` and `node:stream/web`'s declare one runtime object; the DOM lib holds the first, and `Readable.fromWeb` wants the second
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- the DOM and `node:stream/web` declare one runtime stream, and `Readable.fromWeb` takes only the second
   const stream = body as NodeReadableStream<Uint8Array>;
   await new Upload({
     client: door.client,
@@ -187,6 +191,7 @@ const removeInside = async (
   return ok(undefined);
 };
 
+/** Replaces any object already at `key`, a portable path relative to the principal's workspace. */
 export const putObject = (
   principal: UserPrincipal,
   door: ObjectDoor,
@@ -201,12 +206,17 @@ export const getObject = (
 ): Promise<Result<ReadableStream<Uint8Array>, ReadRefusal>> =>
   getInside(door, prefixOf(principal), key);
 
+/**
+ * Every key in the principal's workspace that starts with `under`, relative to the workspace.
+ * `under` matches as a plain prefix: `docs` also lists `docs2/a`, and `docs/` does not.
+ */
 export const listObjects = (
   principal: UserPrincipal,
   door: ObjectDoor,
   under: string,
 ): Promise<Result<readonly string[], KeyRefusal>> => listInside(door, prefixOf(principal), under);
 
+/** As putObject, in the platform's own space outside every workspace. */
 export const putPlatformObject = (
   platform: PlatformPrincipal,
   door: ObjectDoor,
@@ -214,6 +224,7 @@ export const putPlatformObject = (
   body: ReadableStream<Uint8Array>,
 ): Promise<Result<void, KeyRefusal>> => putInside(door, PLATFORM_PREFIX, key, body);
 
+/** As getObject, in the platform's own space outside every workspace. */
 export const getPlatformObject = (
   platform: PlatformPrincipal,
   door: ObjectDoor,
@@ -221,12 +232,17 @@ export const getPlatformObject = (
 ): Promise<Result<ReadableStream<Uint8Array>, ReadRefusal>> =>
   getInside(door, PLATFORM_PREFIX, key);
 
+/** As listObjects, in the platform's own space outside every workspace. */
 export const listPlatformObjects = (
   platform: PlatformPrincipal,
   door: ObjectDoor,
   under: string,
 ): Promise<Result<readonly string[], KeyRefusal>> => listInside(door, PLATFORM_PREFIX, under);
 
+/**
+ * The platform's listing of one workspace's objects under `under`, each with when it was stored.
+ * An object whose stamp the store withheld is left out.
+ */
 export const listWorkspaceObjects = (
   platform: PlatformPrincipal,
   door: ObjectDoor,
