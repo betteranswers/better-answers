@@ -20,6 +20,7 @@ export const pkce = (): Pkce => {
   return { verifier, challenge: createHash("sha256").update(verifier).digest("base64url") };
 };
 
+/** A path on the public origin; the client defaults to Claude, the resource to the MCP surface. */
 export const authorizeUrl = (params: {
   readonly challenge: string;
   readonly scope: string;
@@ -75,9 +76,11 @@ export type Tokens = {
   readonly accessToken: string;
   readonly refreshToken: string | undefined;
   readonly expiresIn: number;
+  /** Decoded from the access token, never verified. */
   readonly claims: Readonly<Record<string, unknown>>;
 };
 
+/** Signs `client` in by the emailed code, failing the test unless both steps answer 200. */
 export const signIn = async (
   app: TestApp,
   client: TestClient,
@@ -99,6 +102,7 @@ export const setActiveWorkspace = async (
   workspaceId: string,
 ): Promise<Response> => client.json("/organization/set-active", { organizationId: workspaceId });
 
+/** `query` is the authorize request's search string. Fails the test when no next step is named. */
 export const continueAfterPostLogin = async (client: TestClient, query: string): Promise<URL> => {
   const continued = await client.json("/oauth2/continue", {
     postLogin: true,
@@ -112,6 +116,7 @@ export const continueAfterPostLogin = async (client: TestClient, query: string):
   return new URL(next ?? "", PUBLIC_URL);
 };
 
+/** Where the authorize request, resumed once `person` has signed in, sends the browser. */
 export const driveToPage = async (
   app: TestApp,
   client: TestClient,
@@ -131,6 +136,10 @@ export const driveToPage = async (
   return sentTo(resumed);
 };
 
+/**
+ * Connects as Claude does: authorize, sign in, `pick` the active workspace if given, consent and
+ * exchange. Fails the test at a step that strays.
+ */
 export const connectAsHost = async (
   app: TestApp,
   client: TestClient,

@@ -10,12 +10,14 @@ import { gitIn, throwawayRepository, writeUnder } from "@better-answers/devtools
 export const hookScript = (name: string): string =>
   path.resolve(import.meta.dirname, `../../../.claude/hooks/${name}.sh`);
 
+/** A temporary directory, removed by the `afterAll` this call registers. */
 export const scratchRoot = (prefix: string): string => {
   const root = mkdtempSync(path.join(tmpdir(), `${prefix}-`));
   afterAll(() => rmSync(root, { recursive: true, force: true }));
   return root;
 };
 
+/** Makes `root` a new repository whose one commit holds `files`. */
 export const repositoryHolding = (
   root: string,
   files: Readonly<Record<string, string>>,
@@ -27,6 +29,7 @@ export const repositoryHolding = (
   return root;
 };
 
+/** A worktree of `root` at `<scratch>/<name>-worktree`, on a new branch `t-<name>`. */
 export const worktreeUnder = (
   scratch: string,
   root: string,
@@ -39,6 +42,7 @@ export const worktreeUnder = (
   return worktree;
 };
 
+/** Creates `directory` holding an executable bash stub per tool; the caller puts it on PATH. */
 export const stubsOnPath = (
   directory: string,
   bodies: Readonly<Record<string, string>>,
@@ -52,11 +56,13 @@ export const stubsOnPath = (
   return directory;
 };
 
+/** A stub's body: it appends its arguments to `log` as one line, runs `andThen`, then exits 0. */
 export const recordsItsArgv = (log: string, andThen: readonly string[] = []): string =>
   [`printf '%s\\n' "$*" >> '${log}'`, ...andThen, "exit 0", ""].join("\n");
 
 export type HookRun = { readonly status: number | null; readonly stderr: string };
 
+/** Runs `script` under bash, with `env` laid over this process's environment. */
 export const runHook = (
   script: string,
   options: {
