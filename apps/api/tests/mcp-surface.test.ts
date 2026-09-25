@@ -23,7 +23,6 @@ afterAll(async () => {
 
 type Params = Readonly<Record<string, unknown>>;
 
-// The wire's shapes, as the suite holds the surface to them.
 const rpcError = z.object({ code: z.number(), message: z.string(), data: z.unknown().optional() });
 const envelope = z.object({
   jsonrpc: z.literal("2.0").optional(),
@@ -37,7 +36,7 @@ const tool = z.object({
   name: z.string(),
   description: z.string().optional(),
   annotations: z.looseObject({ readOnlyHint: z.boolean().optional() }).optional(),
-  // Loose, because one case reads the whole schema as text for a header it must not carry.
+  /** Loose, because one case reads the whole schema as text for a header it must not carry. */
   inputSchema: z.looseObject({ properties: z.record(z.string(), z.unknown()).optional() }),
 });
 type Tool = z.infer<typeof tool>;
@@ -81,6 +80,10 @@ const ENVELOPE = {
   "io.modelcontextprotocol/clientInfo": { name: "Anthropic/ClaudeAI", version: "1.0.0" },
 };
 
+/** An override of "" leaves the header off the request. */
+const withoutEmpty = (headers: Record<string, string>): Record<string, string> =>
+  Object.fromEntries(Object.entries(headers).filter(([, value]) => value !== ""));
+
 const modern = async (
   client: TestClient,
   token: string,
@@ -89,7 +92,7 @@ const modern = async (
   overrides: { headers?: Record<string, string>; envelope?: Params | null; version?: string } = {},
 ): Promise<Response> => {
   const meta = overrides.envelope === undefined ? ENVELOPE : overrides.envelope;
-  const headers: Record<string, string> = {
+  const headers = withoutEmpty({
     "content-type": "application/json",
     accept: "application/json, text/event-stream",
     authorization: `Bearer ${token}`,
@@ -97,8 +100,7 @@ const modern = async (
     "mcp-method": method,
     ...(typeof params["name"] === "string" ? { "mcp-name": params["name"] } : {}),
     ...overrides.headers,
-  };
-  for (const [name, value] of Object.entries(headers)) if (value === "") delete headers[name];
+  });
   return client.fetch("/mcp", {
     method: "POST",
     headers,
@@ -149,7 +151,7 @@ const connect = async (scope = "knowledge:read feedback:write offline_access") =
 };
 
 describe("era-independent", () => {
-  it("lists exactly the four entries a full token reaches, in the same order every time (§9 1)", async () => {
+  it("lists a full token's four entries, in a stable order", async () => {
     const { client, token } = await connect();
 
     const lists = await Promise.all([1, 2, 3].map(() => listTools(client, token)));
@@ -159,7 +161,7 @@ describe("era-independent", () => {
     expect(lists[2]).toEqual(lists[0]);
   });
 
-  it("omits give_feedback for a read-only token and refuses the call anyway (§9 2)", async () => {
+  it("hides give_feedback from a read-only token and refuses its call", async () => {
     const { client, token } = await connect("knowledge:read offline_access");
 
     const names = (await listTools(client, token)).map((tool) => tool.name);
@@ -175,7 +177,7 @@ describe("era-independent", () => {
     expect(refused.error ?? toolCalled.parse(refused.result).isError).toBeTruthy();
   });
 
-  it("carries annotations on every entry: reads read-only, the one write not (ADR 0018)", async () => {
+  it("annotates every entry: reads read-only, the one write not", async () => {
     const { client, token } = await connect();
 
     const tools = await listTools(client, token);
@@ -189,7 +191,7 @@ describe("era-independent", () => {
     ]);
   });
 
-  it("takes no workspace, bundle or tenant argument on any entry, and mirrors nothing into headers (§9 3, 14)", async () => {
+  it("takes no workspace, bundle or tenant argument, mirroring no headers", async () => {
     const { client, token } = await connect();
 
     for (const entry of await listTools(client, token)) {
@@ -201,7 +203,7 @@ describe("era-independent", () => {
     }
   });
 
-  it("describes the two reads in the glossary's words, so a host is told what a document hit is and how to open it (T-134)", async () => {
+  it("describes the two reads in the glossary's words", async () => {
     const { client, token } = await connect();
 
     const described = new Map(
@@ -216,7 +218,7 @@ describe("era-independent", () => {
     expect(described.get("find")?.toLowerCase()).not.toContain("chunk");
   });
 
-  it("answers open with structured content and a human rendering that is not the JSON, alike for absent and foreign IRIs (§9 4, 7)", async () => {
+  it("answers open in structured content and prose, foreign as absent", async () => {
     const { client, token } = await connect();
 
     const absent = await result(
@@ -269,7 +271,7 @@ describe("era-independent", () => {
     expect(fed.structuredContent?.["outcome"]).toBe("received");
   });
 
-  it("refuses a token whose person was revoked after it was issued, on the next call — the reason to the log, not the wire (§9 6; ADR 0018)", async () => {
+  it("refuses a revoked person's token, its reason logged, not sent", async () => {
     const { workspace, client, token } = await connect();
     expect((await modern(client, token, "tools/list")).status).toBe(200);
 
@@ -291,7 +293,7 @@ describe("era-independent", () => {
     );
   });
 
-  it("refuses a token whose person is no longer a member — the reason to the log, not the wire", async () => {
+  it("refuses a former member's token, its reason logged, not sent", async () => {
     const { workspace, client, token } = await connect();
     await app.removeMember(workspace.workspaceId, workspace.admin.id);
     const before = app.logs.length;
@@ -309,7 +311,7 @@ describe("era-independent", () => {
     );
   });
 
-  it("refuses a bearer that is not this issuer's (§9 5)", async () => {
+  it("refuses a bearer that is not this issuer's", async () => {
     const { client } = await connect();
 
     const refused = await modern(
@@ -321,12 +323,14 @@ describe("era-independent", () => {
     expect(refused.status).toBe(401);
   });
 
-  it("counts every call against the token and answers 429 with one sentence past the ceiling (ADR 0018)", async () => {
+  it("answers 429 with one sentence past the token's ceiling", async () => {
     const { client, token } = await connect();
 
     let refused: Response | undefined;
-    // The window is wall-clock aligned, so a burst of max + 1 can straddle a boundary and
-    // never be refused; 2·max + 1 cannot.
+    /**
+     * The window is wall-clock aligned, so a burst of max + 1 can straddle a boundary and never be
+     * refused; 2·max + 1 cannot.
+     */
     const enough = 2 * MCP_TOKEN_RULE.max + 1;
     for (let call = 0; call < enough && refused === undefined; call += 1) {
       const answer = await modern(client, token, "tools/list");
@@ -341,7 +345,7 @@ describe("era-independent", () => {
 });
 
 describe("the 2026-07-28 leg", () => {
-  it("answers server/discover with the version, the tools capability, resultType and cache hints (§9 8)", async () => {
+  it("answers server/discover with version, tools capability, resultType and cache hints", async () => {
     const { client, token } = await connect();
 
     const answer = await result(await modern(client, token, "server/discover"), discovered);
@@ -355,7 +359,7 @@ describe("the 2026-07-28 leg", () => {
     expect(answer.cacheScope).toBeDefined();
   });
 
-  it("returns tools/list complete, with the workspace's TTL and cacheScope private (§9 9; F5)", async () => {
+  it("returns tools/list complete, with the workspace's TTL and cacheScope private", async () => {
     const { client, token } = await connect();
 
     const listed = await result(await modern(client, token, "tools/list"), toolsListed);
@@ -374,7 +378,7 @@ describe("the 2026-07-28 leg", () => {
     expect(listed.ttlMs).toBe(42_000);
   });
 
-  it("rejects a header that disagrees with the envelope with 400 and -32020 (§9 10)", async () => {
+  it("rejects a header disagreeing with the envelope: 400 and -32020", async () => {
     const { client, token } = await connect();
 
     const response = await modern(client, token, "tools/list", {}, { version: "2025-11-25" });
@@ -383,7 +387,7 @@ describe("the 2026-07-28 leg", () => {
     expect((await rpc(response)).error?.code).toBe(-32020);
   });
 
-  it("rejects an envelope missing a required key with 400 and -32602 (§9 11)", async () => {
+  it("rejects an envelope missing a required key: 400 and -32602", async () => {
     const { client, token } = await connect();
 
     const response = await modern(
@@ -400,7 +404,7 @@ describe("the 2026-07-28 leg", () => {
     expect((await rpc(response)).error?.code).toBe(-32602);
   });
 
-  it("rejects a call missing Mcp-Method, and one whose Mcp-Name disagrees with params.name (§9 12)", async () => {
+  it("rejects a missing Mcp-Method and an Mcp-Name disagreeing with params.name", async () => {
     const { client, token } = await connect();
 
     const missing = await modern(
@@ -424,7 +428,7 @@ describe("the 2026-07-28 leg", () => {
     expect(mismatched.status).toBe(400);
   });
 
-  it("names its supported versions when a request declares one it does not speak (§9 13)", async () => {
+  it("names its supported versions to a request declaring another", async () => {
     const { client, token } = await connect();
 
     const response = await modern(
@@ -445,7 +449,7 @@ describe("the 2026-07-28 leg", () => {
 });
 
 describe("the 2025-11-25 leg", () => {
-  it("answers the pre-flight's bare initialize and negotiates 2025-11-25 (§9 16)", async () => {
+  it("answers the pre-flight's bare initialize and negotiates 2025-11-25", async () => {
     const { client, token } = await connect();
 
     const response = await legacy(client, token, "initialize", {
@@ -460,7 +464,7 @@ describe("the 2025-11-25 leg", () => {
     expect(answer.capabilities.tools).toBeDefined();
   });
 
-  it("lists the same four entries with no envelope and no method headers (§9 17)", async () => {
+  it("lists the same four entries without envelope or method headers", async () => {
     const { client, token } = await connect();
 
     const listed = await result(await legacy(client, token, "tools/list"), toolsListed);
@@ -473,7 +477,7 @@ describe("the 2025-11-25 leg", () => {
     ]);
   });
 
-  it("answers server/discover on this leg with method-not-found, so a client falls back (§9 18)", async () => {
+  it("answers server/discover with method-not-found, so a client falls back", async () => {
     const { client, token } = await connect();
 
     const body = await rpc(await legacy(client, token, "server/discover"));

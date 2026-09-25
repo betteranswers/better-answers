@@ -53,7 +53,7 @@ export const bindingsSeeding = z.object({
   bindings: z.array(aBinding).min(1),
 });
 
-// By workspace alone: a binding the browser bound carries an id only the page minted.
+/** By workspace alone: a binding the browser bound carries an id only the page minted. */
 export const indexRunMoving = z.object({
   workspaceId: z.string().min(1),
   to: z.enum(["claimed", "done"]),
@@ -194,8 +194,47 @@ const runColumns = (run: "queued" | "claimed" | "done", outcome: Record<string, 
   return { ...claimed, status: "done", finishedAt: now, outcome };
 };
 
-// Rows written as each act and the worker would leave them, so the screen reads what a real
-// binding's history leaves behind.
+type DocumentsOfABinding = {
+  readonly documents: readonly SeededDocument[];
+  readonly overridden: readonly OverriddenSpan[];
+  readonly chunkCount: number;
+};
+
+const seedDocuments = async (
+  seed: TestData,
+  workspaceId: string,
+  bindingId: string,
+  asked: readonly z.output<typeof aDocument>[],
+): Promise<DocumentsOfABinding> => {
+  const documents: SeededDocument[] = [];
+  const overridden: OverriddenSpan[] = [];
+  let chunkCount = 0;
+  for (const document of asked) {
+    const quarantined = document.quarantineError !== null;
+    const landed = await seed.sourceDocument({
+      workspaceId,
+      bindingId,
+      title: document.title,
+      sourceSystemId: document.title,
+      sensitivity: document.sensitivity,
+      ...(quarantined ? { outcome: "quarantined", quarantineError: document.quarantineError } : {}),
+    });
+    overridden.push(...(await seedFindings(seed, workspaceId, landed.id, document.findings)));
+    await seedChunks(seed, workspaceId, bindingId, landed.id, document.chunks);
+    chunkCount += document.chunks.length;
+    documents.push({
+      documentId: landed.id,
+      title: document.title,
+      citedBy: document.cited ? await citationOf(seed, workspaceId, landed.id) : null,
+    });
+  }
+  return { documents, overridden, chunkCount };
+};
+
+/**
+ * Rows written as each act and the worker would leave them, so the screen reads what a real
+ * binding's history leaves behind.
+ */
 export const seedBindings = async (
   app: TestApp,
   asked: z.output<typeof bindingsSeeding>,
@@ -206,7 +245,7 @@ export const seedBindings = async (
     const seeded: SeededBinding[] = [];
 
     for (const binding of asked.bindings) {
-      // The audience CHECK wants a named group beside the word, and the screen lists none by name.
+      /** The audience CHECK wants a named group beside the word; the screen names none. */
       const readers =
         binding.audience === "groups"
           ? [(await seed.group({ workspaceId, name: `${binding.name} readers` })).id]
@@ -221,30 +260,12 @@ export const seedBindings = async (
         state: binding.published ? "published" : "landed",
       });
 
-      const documents: SeededDocument[] = [];
-      const overridden: OverriddenSpan[] = [];
-      let chunkCount = 0;
-      for (const document of binding.documents) {
-        const quarantined = document.quarantineError !== null;
-        const landed = await seed.sourceDocument({
-          workspaceId,
-          bindingId: row.id,
-          title: document.title,
-          sourceSystemId: document.title,
-          sensitivity: document.sensitivity,
-          ...(quarantined
-            ? { outcome: "quarantined", quarantineError: document.quarantineError }
-            : {}),
-        });
-        overridden.push(...(await seedFindings(seed, workspaceId, landed.id, document.findings)));
-        await seedChunks(seed, workspaceId, row.id, landed.id, document.chunks);
-        chunkCount += document.chunks.length;
-        documents.push({
-          documentId: landed.id,
-          title: document.title,
-          citedBy: document.cited ? await citationOf(seed, workspaceId, landed.id) : null,
-        });
-      }
+      const { documents, overridden, chunkCount } = await seedDocuments(
+        seed,
+        workspaceId,
+        row.id,
+        binding.documents,
+      );
 
       if (binding.run !== "none") {
         await seed.job({
@@ -265,8 +286,10 @@ export const seedBindings = async (
     return seeded;
   });
 
-// The suite runs no worker process, so the harness takes its two steps through the queue's own
-// functions, under the worker's role.
+/**
+ * The suite runs no worker process, so the harness takes its two steps through the queue's own
+ * functions, under the worker's role.
+ */
 export const moveTheIndexRun = async (
   app: TestApp,
   asked: z.output<typeof indexRunMoving>,

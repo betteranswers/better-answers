@@ -83,8 +83,10 @@ const contentsSchema = z.object({
 
 type ImageContents = z.infer<typeof contentsSchema>;
 
-// No peer is followed: pnpm links one from anywhere in the workspace's graph, and a peer the api
-// loads is one it declares.
+/**
+ * No peer is followed: pnpm links one from anywhere in the workspace's graph, and a peer the api
+ * loads is one it declares.
+ */
 const probe = `
 const { createRequire } = require("node:module");
 const { existsSync, lstatSync, readdirSync, readFileSync, realpathSync } = require("node:fs");
@@ -231,7 +233,7 @@ describe.skipIf(nothingToProbeHere)("the api tier's runtime image", () => {
     expect(contents.broken).toEqual([]);
   });
 
-  it("loads every module `main.ts`, `migrate` and `pnpm ops` import from what the store kept", () => {
+  it("loads every module `main.ts`, `migrate` and `pnpm ops` import", () => {
     // Each entry reads its bootstrap first, and refuses it only once every static import has
     // resolved.
     expect(contents.loaded).toEqual(["main.ts", "migrate.ts", "ops.ts"]);
@@ -249,16 +251,16 @@ describe.skipIf(nothingToProbeHere)("the api tier's runtime image", () => {
     expect(contents.filterRepoVersion).toBe(pinnedFilterRepoVersion());
   });
 
-  it("puts the rewrite tool where git finds it as a subcommand", () => {
+  it("installs the rewrite tool as a git subcommand", () => {
     expect(contents.gitRanFilterRepo).toBe(true);
   });
 
-  it("ships no npm or npx, and keeps the corepack that provides pnpm", () => {
+  it("ships no npm or npx, and keeps corepack for pnpm", () => {
     expect(contents.commandsOnPath).toEqual(["corepack", "pnpm"]);
     expect(contents.hasNpmPackage).toBe(false);
   });
 
-  it("runs pnpm through corepack at the version the root manifest pins", () => {
+  it("runs pnpm through corepack at the root manifest's version", () => {
     expect(contents.pnpmTarget).toBe("/usr/local/lib/node_modules/corepack/dist/pnpm.js");
     expect(contents.pnpmVersion).toBe(pinnedPnpmVersion());
   });
@@ -269,7 +271,7 @@ describe.skipIf(nothingToProbeHere)("the api tier's runtime image", () => {
 });
 
 describe("the api leg of the image job", () => {
-  it("names this file as its probe, so the file cannot move without the workflow", () => {
+  it("names this file as its probe", () => {
     const api = legFor("api");
 
     expect(matrixLegs().length).toBeGreaterThan(1);

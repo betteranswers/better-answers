@@ -36,7 +36,7 @@ const stampedDigests = async (): Promise<readonly { readonly digest: string }[]>
 };
 
 describe("migrate", () => {
-  it("stamps the contract this image carries, so the worker has something to compare", async () => {
+  it("stamps the image's contract for the worker to compare", async () => {
     await database.superuser.query("DELETE FROM contract_stamp");
 
     const first = migrating();
@@ -45,7 +45,7 @@ describe("migrate", () => {
     expect(await stampedDigests()).toEqual([{ digest: CONTRACT_DIGEST }]);
   });
 
-  it("rewrites the one row on the next deploy rather than leaving a second behind", async () => {
+  it("rewrites the one row on the next deploy, adding none", async () => {
     await database.superuser.query("UPDATE contract_stamp SET digest = $1", [
       "a-contract-an-older-image-carried",
     ]);
@@ -55,7 +55,7 @@ describe("migrate", () => {
     expect(await stampedDigests()).toEqual([{ digest: CONTRACT_DIGEST }]);
   });
 
-  it("marks the full-text match leakproof again after a restore that dropped the mark", async () => {
+  it("re-marks the full-text match leakproof after a restore dropped it", async () => {
     await database.superuser.query(UNMARK_THE_MATCH);
     const restored = await matchIsLeakproof(database.superuser);
 
