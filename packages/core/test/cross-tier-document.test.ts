@@ -177,9 +177,9 @@ const bytesUnder = (directory: string): Buffer => {
 const storeOf = (workspaceId: string, bindingId: string): string =>
   path.join(lmdbRootUnder(bundles().root), workspaceId, bindingId);
 
-// A binding's directory holds two stores at sibling paths: its own, which a wipe
-// removes, and the findings memo's, which a wipe spares.
+/** A binding's own store, which a wipe removes; the findings memo's sits beside it. */
 const BINDING_STORE = "binding";
+/** The findings memo's store, beside the binding's own, which a wipe spares. */
 const FINDINGS_STORE = "findings";
 
 const bindingStoreOf = (workspaceId: string, bindingId: string): string =>
@@ -212,7 +212,7 @@ const opening = (who: UserPrincipal, locator: string) =>
 
 describe("one uploaded document, read back through both tiers", () => {
   it(
-    "returns the bound document's passage from find and open with the sort code withheld, once the Admin has reviewed and published it and not before",
+    "finds and opens the passage, sort code withheld, once published",
     async () => {
       const scenario = await arrange();
       const bound = await boundHandbook(scenario);
@@ -292,7 +292,7 @@ describe("one uploaded document, read back through both tiers", () => {
   );
 
   it(
-    "leaves every chunk row where it was when the same document is indexed a second time, and lands them all again when a rule change empties the binding",
+    "keeps chunk rows when reindexed, landing them anew once emptied",
     async () => {
       const scenario = await arrange();
       const bound = await boundHandbook(scenario);
@@ -348,7 +348,7 @@ describe("one uploaded document, read back through both tiers", () => {
   );
 
   it(
-    "returns the span an Admin keeps in the text once the worker has run over the keep, and withholds it again under an erasure that names it",
+    "serves a kept span until an erasure names it",
     async () => {
       const scenario = await arrange();
       const bound = await boundHandbook(scenario, "kept-handbook.md");
@@ -447,7 +447,7 @@ describe("one uploaded document, read back through both tiers", () => {
   );
 
   it(
-    "keeps the Admin's narrowing whether it lands inside the run or after it, and a binding narrowed to a group is read by that group alone",
+    "keeps a mid-run narrowing, and a later one to groups",
     async () => {
       const scenario = await arrange();
       const bound = await boundHandbook(scenario);
@@ -522,7 +522,7 @@ describe("one uploaded document, read back through both tiers", () => {
   );
 
   it(
-    "leaves one binding's chunk rows and its store standing when the binding beside it is wiped",
+    "spares one binding's chunks and store when another is wiped",
     async () => {
       const scenario = await arrange();
       const kept = await boundHandbook(scenario, "the-handbook-that-stays.md");
@@ -544,7 +544,7 @@ describe("one uploaded document, read back through both tiers", () => {
           ),
         ),
       );
-      // The act that withdraws a binding's documents is S4's; this is the row state it leaves.
+      // This delete stands in for withdrawing the binding's documents, and leaves the same rows.
       await db().pool.query(
         "DELETE FROM source_document WHERE workspace_id = $1 AND binding_id = $2",
         [scenario.workspaceId, dropped.bindingId],
@@ -563,7 +563,7 @@ describe("one uploaded document, read back through both tiers", () => {
   );
 });
 
-// A work address no detector rule raises, so only the erasure withholds it.
+/** A work address no detector rule raises, so only the erasure withholds it. */
 const THE_WORK_ADDRESS = "ann.raman@meridianfenland.co.uk";
 const THE_NAME = "Ann Raman";
 const THE_SURNAME = "Raman";
@@ -639,9 +639,9 @@ const normalisedCopyOf = async (scenario: Scenario, documentId: string): Promise
   return textOf(copy.value);
 };
 
-describe("an erasure over a bound document that names the subject, read back through both tiers", () => {
+describe("an erasure over a bound document, read through both tiers", () => {
   it(
-    "leaves find no passage and the normalised copy no word naming the subject by their work address or their name, and a second run over the request after the worker's finds no document, wipes nothing and queues no index run",
+    "erases the subject everywhere, and a second run changes nothing",
     async () => {
       const scenario = await arrange();
       const bound = await boundHandbook(scenario, "claims-handbook.md", THE_HANDBOOK_NAMING_ANN);

@@ -129,7 +129,7 @@ type StraddledRow = {
   readonly charEnd: number;
 };
 
-// A straddle's two rows can only be narrowed from above, never one row and not the other.
+/** A straddle's two rows can only be narrowed from above, never one row and not the other. */
 const documentWithTwoChunks = (
   workspaceId: string,
   what: {
@@ -182,8 +182,10 @@ const BOARD_TITLE = "The board's note";
 const BOARD_TEXT = "The board's note on the bid.";
 const BOARD_CHAR_END = 28;
 
-// Two bare words on purpose: to_tsquery raises a syntax error on prose, so this query breaks
-// a read that drops websearch_to_tsquery.
+/**
+ * Two bare words on purpose: to_tsquery raises a syntax error on prose, so this query breaks
+ * a read that drops websearch_to_tsquery.
+ */
 const QUERY = "holiday policy";
 
 const HANDBOOK = {
@@ -230,7 +232,7 @@ const opening = async (
   );
 
 describe("the passage a wire locator opens", () => {
-  it("answers every case the document-chunk agreement states, the astral character included", async () => {
+  it("answers every case the agreement states, the astral character included", async () => {
     const scenario = await arrange();
     await seedTheAgreementsDocument(scenario.workspaceId);
 
@@ -255,7 +257,7 @@ describe("the passage a wire locator opens", () => {
     );
   });
 
-  it("answers a span running from one chunk row into the next as one passage, at the narrower of its binding's class and its document's", async () => {
+  it("serves a straddle as one passage at its effective class", async () => {
     const scenario = await arrange();
 
     const documentId = await documentWithTwoChunks(scenario.workspaceId, {
@@ -277,7 +279,7 @@ describe("the passage a wire locator opens", () => {
     });
   });
 
-  it("carries the locator the agreement writes on the row and the one composed from that row's own columns alike", async () => {
+  it("matches each row's locator to the one its columns compose", async () => {
     const scenario = await arrange();
     await seedTheAgreementsDocument(scenario.workspaceId);
 
@@ -305,7 +307,7 @@ describe("the passage a wire locator opens", () => {
 });
 
 describe("what a passage read refuses", () => {
-  it("answers a withheld locator and an absent one alike, and a malformed one and an out-of-range one the same", async () => {
+  it("answers withheld, absent, malformed and out-of-range locators alike", async () => {
     const scenario = await arrange();
     await seedTheAgreementsDocument(scenario.workspaceId);
     const board = await documentWithOneChunk(scenario.workspaceId, {
@@ -334,7 +336,7 @@ describe("what a passage read refuses", () => {
     });
   });
 
-  it("refuses a straddle whole when its binding or its document is narrowed, and serves the Admin who reaches both rows from the same locator", async () => {
+  it("refuses a narrowed straddle whole, yet serves it to Admins", async () => {
     const scenario = await arrange();
 
     const narrowedBinding = await documentWithTwoChunks(scenario.workspaceId, {
@@ -377,7 +379,7 @@ describe("what a passage read refuses", () => {
     });
   });
 
-  it("hands the same locator to an Admin the Restricted row reaches, so the Viewer's refusal is the predicate and not an absence", async () => {
+  it("serves an Admin the Restricted passage the Viewer is refused", async () => {
     const scenario = await arrange();
     const board = await documentWithOneChunk(scenario.workspaceId, {
       title: BOARD_TITLE,
@@ -399,7 +401,7 @@ describe("what a passage read refuses", () => {
 });
 
 describe("what a passage read fails on", () => {
-  it("answers a row whose content runs past or short of its span as the store's error, never as a passage or a refusal", async () => {
+  it("errs on a chunk row whose content and span disagree", async () => {
     const scenario = await arrange();
     const runsPast = await documentWithOneChunk(scenario.workspaceId, {
       title: BOARD_TITLE,
@@ -440,7 +442,7 @@ const searching = async (
   );
 
 describe("the passages a search finds", () => {
-  it("withholds a document from the reader who may see a concept citing it and hands it to the reader who may not", async () => {
+  it("finds only passages no concept the reader sees rests on", async () => {
     const scenario = await arrange();
     const handbook = await documentWithOneChunk(scenario.workspaceId, {
       ...HANDBOOK,
@@ -465,7 +467,7 @@ describe("the passages a search finds", () => {
     expect(await searching(scenario.viewer, 1)).toEqual([hitOn(manual, MANUAL)]);
   });
 
-  it("finds nothing for a Viewer outside the binding's audience and the passage for the Editor inside it", async () => {
+  it("finds a passage only for readers in the binding's audience", async () => {
     const scenario = await arrange();
     const board = await groupNamed(db(), scenario, "Board", [scenario.editor]);
     const minutes = await documentWithOneChunk(scenario.workspaceId, {
@@ -481,7 +483,7 @@ describe("the passages a search finds", () => {
     expect(inside).toEqual([hitOn(minutes, MINUTES)]);
   });
 
-  it("finds no chunk of a binding still under review, for a Viewer, an Editor or an Admin alike", async () => {
+  it("finds no chunk of a binding under review for anyone", async () => {
     const scenario = await arrange();
     await documentWithOneChunk(scenario.workspaceId, {
       ...DRAFT,
@@ -567,8 +569,10 @@ const bindingUnderReview = (
     }
   });
 
-// Both documents hold a chunk matching the words the search asks, so the empty answer below
-// is the published arm, not an unmatched query.
+/**
+ * Both documents hold a chunk matching the search's words, so an empty search over them is the
+ * published arm at work, not an unmatched query.
+ */
 const seedTheBindingUnderReview = (workspaceId: string): Promise<void> =>
   bindingUnderReview(workspaceId, REVIEW_BINDING, [
     {
@@ -618,7 +622,7 @@ const previewing = async (
   );
 
 describe("the review list a binding is previewed with", () => {
-  it("hands an Admin every chunk of a binding still under review, in document and ordinal order, and refuses a Viewer and an Editor", async () => {
+  it("lists every chunk by document and ordinal, to Admins alone", async () => {
     const scenario = await arrange();
     await seedTheBindingUnderReview(scenario.workspaceId);
 
@@ -656,7 +660,7 @@ describe("the review list a binding is previewed with", () => {
     });
   });
 
-  it("is the only road to those rows: the same Admin finds none of them by search and opens none of them by locator", async () => {
+  it("alone reaches the rows; neither search nor open does", async () => {
     const scenario = await arrange();
     await seedTheBindingUnderReview(scenario.workspaceId);
 
@@ -669,7 +673,7 @@ describe("the review list a binding is previewed with", () => {
     expect(opened).toBe(NOT_FOUND);
   });
 
-  it("applies the class and the audience arms all the same, so an Admin lists a Restricted document's chunks and none of a binding for a group they are not in", async () => {
+  it("applies the class and audience arms all the same", async () => {
     const scenario = await arrange();
     const board = await groupNamed(db(), scenario, "Board", [scenario.editor]);
     await bindingUnderReview(scenario.workspaceId, ARMS_BINDING, [

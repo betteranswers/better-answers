@@ -68,6 +68,7 @@ export type BindingDoors = {
   readonly objects: ObjectDoor;
 };
 
+/** Binds `text` as an Internal Markdown upload of a file named `called`; throws when refused. */
 export const bindTheHandbook = async (
   admin: UserPrincipal,
   doors: BindingDoors,

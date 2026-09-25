@@ -17,7 +17,7 @@ describe("the media types the upload-media-types agreement admits", () => {
     expect([...UPLOAD_MEDIA_TYPES].toSorted()).toEqual(fixture.admitted.toSorted());
   });
 
-  it("are each written once, so a list of four is four types", () => {
+  it("are each written once", () => {
     expect(new Set(fixture.admitted).size).toBe(fixture.admitted.length);
     expect(new Set(UPLOAD_MEDIA_TYPES).size).toBe(UPLOAD_MEDIA_TYPES.length);
   });
