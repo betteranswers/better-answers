@@ -57,7 +57,7 @@ describe("the release's wait against the api's own /health", () => {
     }
   };
 
-  it("passes when the api names the promoted image, and fails when it names another", async () => {
+  it("passes on the promoted image and fails on another", async () => {
     await serving(serverFor(app.database.pool, { imageDigest: REPLACED }), async (origin) => {
       expect((await run([origin, REPLACED])).code).toBe(0);
 
@@ -69,7 +69,7 @@ describe("the release's wait against the api's own /health", () => {
     });
   });
 
-  it("fails against an api started without an image, which names none", async () => {
+  it("fails against an api started without an image", async () => {
     await serving(app.server, async (origin) => {
       const waited = await run([origin, PROMOTED]);
 
@@ -134,7 +134,7 @@ describe("the release's wait through a deploy's sequence of answers", () => {
     expect(waited).toMatchObject({ code: 0, asked: 1 });
   });
 
-  it("fails while the build it replaced still answers healthy, naming the digest expected and the one answering", async () => {
+  it("fails while the old build answers healthy, naming both digests", async () => {
     const waited = await awaitReleaseThrough([healthy(REPLACED)], PROMOTED, 3);
 
     expect(waited).toMatchObject({ code: 1, asked: 3 });
@@ -143,7 +143,7 @@ describe("the release's wait through a deploy's sequence of answers", () => {
     );
   });
 
-  it("keeps waiting through the old build, the edge's error and an unhealthy start, until the promoted image answers healthy", async () => {
+  it("passes after the old build, edge error and unhealthy start", async () => {
     const swap = [
       BEFORE_HEALTH_NAMED_ITS_IMAGE,
       EDGE_WHILE_NO_CONTAINER_ANSWERS,
@@ -154,14 +154,14 @@ describe("the release's wait through a deploy's sequence of answers", () => {
     expect(await awaitReleaseThrough(swap, PROMOTED, 6)).toMatchObject({ code: 0, asked: 4 });
   });
 
-  it("never passes on an unhealthy answer, even one naming the promoted image", async () => {
+  it("never passes on an unhealthy answer naming the promoted image", async () => {
     const waited = await awaitReleaseThrough([unhealthy(PROMOTED)], PROMOTED, 3);
 
     expect(waited).toMatchObject({ code: 1, asked: 3 });
     expect(waited.output).toContain(`answering ${PROMOTED} (the last answer: unhealthy)`);
   });
 
-  it("names nothing as answering once production stops answering, and names the image last seen before it", async () => {
+  it("says none answers once production stops, naming the last seen", async () => {
     const waited = await awaitReleaseThrough(
       [healthy(REPLACED), EDGE_WHILE_NO_CONTAINER_ANSWERS],
       PROMOTED,
@@ -174,7 +174,7 @@ describe("the release's wait through a deploy's sequence of answers", () => {
     );
   });
 
-  it("fails a rollback to an api that names no image, saying the healthy answer at the end named none", async () => {
+  it("fails a rollback to an api that names no image", async () => {
     const rollback = [healthy(PROMOTED), BEFORE_HEALTH_NAMED_ITS_IMAGE];
     const waited = await awaitReleaseThrough(rollback, REPLACED, 3);
 

@@ -56,7 +56,7 @@ const refusalOf = async (
   );
 
 describe("the bearer verifier", () => {
-  it("accepts a token this issuer minted for this audience and hands back its claims", async () => {
+  it("accepts this issuer's token for this audience, returning its claims", async () => {
     const key = await keyed();
     const verifier = verifierPublishing(key.jwk);
 
@@ -87,7 +87,7 @@ describe("the bearer verifier", () => {
     });
   });
 
-  it("refuses a token signed by a key the issuer never published", async () => {
+  it("refuses a token signed by an unpublished key", async () => {
     const published = await keyed();
     const rogue = await keyed();
 
@@ -114,7 +114,7 @@ describe("the bearer verifier", () => {
     });
   });
 
-  it("reads the key set once more when a token names a kid it has not seen — a rotation", async () => {
+  it("rereads the key set once for an unseen kid", async () => {
     const first = await keyed();
     const second = await keyed();
     let published = [first.jwk];

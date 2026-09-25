@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { defaultClientAddresses } from "./client-addresses.ts";
 
 describe("the address a default client is given", () => {
-  it("gives every client in one TestApp an address of its own", () => {
+  it("gives every client in one TestApp its own address", () => {
     const next = defaultClientAddresses();
 
     const drawn = Array.from({ length: 200 }, next);
@@ -11,7 +11,7 @@ describe("the address a default client is given", () => {
     expect(new Set(drawn).size).toBe(drawn.length);
   });
 
-  it("draws from TEST-NET-2, the half the harness owns, and never from the half tests name", () => {
+  it("draws from TEST-NET-2's harness half, never the half tests name", () => {
     const next = defaultClientAddresses();
 
     const drawn = Array.from({ length: 254 }, next);
@@ -21,7 +21,7 @@ describe("the address a default client is given", () => {
     expect(drawn.filter((address) => address.startsWith("203.0.113."))).toEqual([]);
   });
 
-  it("gives a default client no address once the harness's half is spent, rather than starting it again behind the suite's back", () => {
+  it("throws once the harness's half is spent, rather than wrapping", () => {
     const next = defaultClientAddresses();
     for (let drawn = 0; drawn < 254; drawn += 1) next();
 

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { clientKeyOf } from "../src/ingress/limits.ts";
 
 describe("the client key an address becomes", () => {
-  it("keys every address in one IPv6 /64 the same, whatever the spelling", () => {
+  it("keys every address in one IPv6 /64 alike, however spelt", () => {
     const keys = new Set(
       [
         "2001:db8:85a3::8a2e:370:7334",
@@ -17,7 +17,7 @@ describe("the client key an address becomes", () => {
     expect([...keys]).toEqual(["2001:0db8:85a3:0000::/64"]);
   });
 
-  it("keeps two IPv6 /64s apart, and an IPv4 address as itself", () => {
+  it("keeps two IPv6 /64s apart, and IPv4 as itself", () => {
     expect(clientKeyOf("2001:db8:85a3::1")).not.toBe(clientKeyOf("2001:db8:85a4::1"));
     expect(clientKeyOf("203.0.113.9")).toBe("203.0.113.9");
 

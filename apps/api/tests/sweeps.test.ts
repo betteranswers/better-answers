@@ -133,7 +133,7 @@ describe("the sweeps' daily pass", () => {
     expect(SWEEP_INTERVAL_MS).toBe(86_400_000);
   });
 
-  it("makes its first pass ten minutes after it starts when nothing says otherwise, and none before", async () => {
+  it("makes its first pass ten minutes in, and none before", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval"] });
     try {
       const sweeps = running(
@@ -155,7 +155,7 @@ describe("the sweeps' daily pass", () => {
     }
   });
 
-  it("logs that it ran though it removed nothing, and pings its check with the counts", async () => {
+  it("logs a pass removing nothing, pinging its check with counts", async () => {
     await provisioned();
 
     const sweeps = await onePass({ uploadSweep: "list", pingUrl: PING_URL });
@@ -180,7 +180,7 @@ describe("the sweeps' daily pass", () => {
     ]);
   });
 
-  it("reports how many orphaned uploads it removed, and never a key, once removal is switched on", async () => {
+  it("reports how many orphaned uploads it removed, never a key", async () => {
     const workspace = await withAnOrphan();
 
     const sweeps = await onePass({ uploadSweep: "remove", pingUrl: PING_URL });
@@ -198,7 +198,7 @@ describe("the sweeps' daily pass", () => {
     expect(await listObjects(workspace.admin, objects().door, "")).toEqual({ ok: true, value: [] });
   });
 
-  it("counts the orphaned uploads it would remove and removes none while it is list-only", async () => {
+  it("counts orphaned uploads but removes none while list-only", async () => {
     const workspace = await withAnOrphan();
 
     const sweeps = await onePass({ uploadSweep: "list", pingUrl: PING_URL });
@@ -212,7 +212,7 @@ describe("the sweeps' daily pass", () => {
     });
   });
 
-  it("skips its pass while a sweep by hand holds the lock, says so, and pings nothing", async () => {
+  it("skips its pass under a manual sweep's lock, pinging nothing", async () => {
     await withAnOrphan();
 
     const sweeps = await withSweepLock(SWEEPS, openPostgres(db().runtimePool), async () => {
@@ -230,7 +230,7 @@ describe("the sweeps' daily pass", () => {
     expect(sweeps.pinged).toEqual([]);
   });
 
-  it("goes on past a workspace it could not sweep, names it in the log alone, and pings its check's failure", async () => {
+  it("names an unsweepable workspace in the log alone, pinging failure", async () => {
     const stuck = await withMapLeftovers();
     await provisioned();
 
@@ -255,7 +255,7 @@ describe("the sweeps' daily pass", () => {
     ]);
   });
 
-  it("names a workspace whose removals it could not record, and never the key it removed", async () => {
+  it("names a workspace whose removals went unrecorded, never the key", async () => {
     const orphaned = await withAnOrphan();
 
     const sweeps = await whileWritesAreRefused(db().pool, "audit_event", () =>
@@ -275,7 +275,7 @@ describe("the sweeps' daily pass", () => {
     expect(JSON.stringify(sweeps.logs)).not.toContain("uploads/");
   });
 
-  it("says the pass failed and pings its check's failure when the pass could not leave its row", async () => {
+  it("logs and pings failure when its row cannot be written", async () => {
     await provisioned();
 
     const sweeps = await whileWritesAreRefused(db().pool, "sweep_pass", () =>
@@ -293,7 +293,7 @@ describe("the sweeps' daily pass", () => {
     expect(sweeps.pinged).toEqual([{ url: `${PING_URL}/fail`, body: "fail" }]);
   });
 
-  it("still sweeps and logs when the estate names no check to ping", async () => {
+  it("still sweeps and logs when the estate names no check", async () => {
     await provisioned();
     const sweeps = running({ uploadSweep: "list", pingUrl: undefined });
 
@@ -314,7 +314,7 @@ describe("the sweeps' daily pass", () => {
     expect(sweeps.pinged).toHaveLength(stoppedAt);
   });
 
-  it("does not start when the image was given no object store, and says nothing of its own", () => {
+  it("refuses to start without an object store, logging nothing", () => {
     const { logger, logs } = capturingLogger();
 
     const refused = startSweeps({

@@ -6,7 +6,7 @@ import { appForSuite } from "./suite-app.ts";
 const app = appForSuite();
 
 describe("the delete-user endpoint, to a person who is signed in", () => {
-  it("refuses them, and leaves their user row and their membership where they are", async () => {
+  it("refuses them, leaving their user row and membership in place", async () => {
     const acme = await app().provision({ name: "Acme" });
     const client = app().client();
     await signIn(app(), client, acme.admin.email);
