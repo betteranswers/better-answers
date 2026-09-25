@@ -9,6 +9,7 @@ import {
   type ViewToolbar,
 } from "@/shared/view-toolbar.tsx";
 
+/** Opens on the first tab until one is picked; with no tabs, it holds the view-state slot alone. */
 export function ViewTabsRoot(properties: {
   readonly tabs: readonly ViewTab[] | undefined;
   readonly children: ReactNode;
@@ -16,12 +17,16 @@ export function ViewTabsRoot(properties: {
   const [picked, setPicked] = useState<string>();
 
   const tabs = properties.tabs ?? [];
-  // Derived, not reset: an id is the declaring view's own, so a view that does not declare the
-  // pick opens on its first tab.
+  /**
+   * Derived, not reset: an id is the declaring view's own, so a view that does not declare the
+   * pick opens on its first tab.
+   */
   const openTab = tabs.find((tab) => tab.id === picked)?.id ?? tabs[0]?.id;
 
-  // Inside the tabs root, so the slot spans the toolbar and the panel and both halves of a
-  // view see one value.
+  /**
+   * Inside the tabs root, so the slot spans the toolbar and the panel and both halves of a
+   * view see one value.
+   */
   const spanned = <ViewStateSlot>{properties.children}</ViewStateSlot>;
 
   if (openTab === undefined) return spanned;
@@ -40,6 +45,7 @@ export function ViewTabsRoot(properties: {
   );
 }
 
+/** The open tab's panel; with no tab open, its children as they are. */
 export function ViewPanel(properties: { readonly children: ReactNode }) {
   const openTab = useOpenTab();
   if (openTab === undefined) return <>{properties.children}</>;

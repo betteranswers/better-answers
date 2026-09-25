@@ -36,8 +36,10 @@ export function SignInScreen() {
   const sendCode = useSendVerificationOtp();
   const signIn = useSignInEmailOtp();
 
-  // The query rides along, a connector's signed one included, so that screen sends the person
-  // where this one would have.
+  /**
+   * The query rides along, a connector's signed one included, so that screen sends the person
+   * where this one would have.
+   */
   const landAfterSignIn = (signedIn: SignedIn) => {
     queryClient.clear();
     const query = pageQuery();

@@ -10,7 +10,9 @@ import { useSetDisplayName } from "./auth-hooks.ts";
 import { AuthScreen, Outcome } from "./auth-screen.tsx";
 import { leavingFor, nextAfterSignIn, pageQuery } from "./carried-flow.ts";
 
-// The api's rule holds the limit; this is the number the screen tells a person before they type.
+/**
+ * The api's rule holds the limit; this is the number the screen tells a person before they type.
+ */
 const DISPLAY_NAME_MAX_CHARACTERS = 100;
 
 const HINT = "display-name-hint";
@@ -106,7 +108,7 @@ export function DisplayNameScreen() {
           name="displayName"
           autoComplete="name"
           required
-          // oxlint-disable-next-line jsx-a11y/no-autofocus -- the code step's field is gone, and this field is the reader's next act, so focus lands here and not on the page
+          // oxlint-disable-next-line jsx-a11y/no-autofocus -- the code step's field is gone, and this field is the reader's next act
           autoFocus
           aria-describedby={failure === null ? HINT : `${HINT} ${REFUSED}`}
           aria-invalid={refusedAs === "malformed"}

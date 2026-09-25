@@ -5,9 +5,10 @@ import { cn } from "@/shared/lib/utils.ts";
 import { SCREENS, type ScreenId } from "@/shared/screens.ts";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/ui/tooltip.tsx";
 
-// A beat before the first one, so a pointer crossing the rail on its way elsewhere opens none.
+/** A beat before the first one, so a pointer crossing the rail on its way elsewhere opens none. */
 const HOVER_DELAY_MS = 200;
 
+/** `tooltips` is for a rail of icons alone; where each entry shows its name, leave it off. */
 export function IconRail(properties: {
   readonly openScreenId: ScreenId | undefined;
   readonly tooltips: boolean;

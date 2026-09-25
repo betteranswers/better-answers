@@ -2,7 +2,7 @@ import { useQuery, type QueryClient } from "@tanstack/react-query";
 
 import { refusalOf, useTRPC, type ApiProxy, type RefusalWord } from "@/shared/api/trpc.ts";
 
-// The route has read this before the shell mounts, so a read on mount would be the second.
+/** The route has read this before the shell mounts, so a read on mount would be the second. */
 const membershipOptions = (api: ApiProxy) =>
   api.session.membership.queryOptions(undefined, { refetchOnMount: false });
 
@@ -11,7 +11,7 @@ export const useMembership = () => {
   return useQuery(membershipOptions(api));
 };
 
-// Only a class the reader can answer by signing in again sends them to the sign-in screen.
+/** Only a class the reader can answer by signing in again sends them to the sign-in screen. */
 const wordSendingThemToSignIn = (error: Error): RefusalWord | undefined => {
   const refusal = refusalOf(error);
   return refusal?.class === "unauthenticated" ? refusal.word : undefined;
@@ -19,7 +19,10 @@ const wordSendingThemToSignIn = (error: Error): RefusalWord | undefined => {
 
 export const NEEDS_A_PICK: RefusalWord = "no-active-workspace";
 
-// The cache the shell itself reads, so a redirect that has an answer already costs no request.
+/**
+ * The cache the shell itself reads, so a redirect that has an answer already costs no request.
+ * Undefined lets the shell mount.
+ */
 export const membershipRefusal = async (
   queryClient: QueryClient,
   api: ApiProxy,
@@ -33,7 +36,7 @@ export const membershipRefusal = async (
   }
 };
 
-// A pick answers this question differently, so the answer held is wrong rather than stale.
+/** A pick answers this question differently, so the answer held is wrong rather than stale. */
 export const forgetMembership = (queryClient: QueryClient, api: ApiProxy) => {
   queryClient.removeQueries({ queryKey: membershipOptions(api).queryKey });
 };

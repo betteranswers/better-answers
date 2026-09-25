@@ -6,8 +6,10 @@ const system = screenById("system");
 
 const SPEND = "spend";
 
-// Tabs divide this view and nothing else, so the view declares them and its route carries
-// them to the shell.
+/**
+ * Tabs divide this view and nothing else, so the view declares them and its route carries
+ * them to the shell.
+ */
 export const ROUTES_AND_SPEND_TOOLBAR: ViewToolbar = {
   tabs: [
     { id: "routes", name: "Routes" },

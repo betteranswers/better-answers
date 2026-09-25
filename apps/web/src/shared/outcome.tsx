@@ -4,8 +4,10 @@ export type Outcome =
   | { readonly tone: "said"; readonly words: ReactNode }
   | { readonly tone: "refused"; readonly words: ReactNode };
 
-// Both regions stand from the first render, because a live region inserted with its words already
-// inside is one a screen reader may never read.
+/**
+ * Both regions stand from the first render, because a live region inserted with its words already
+ * inside is one a screen reader may never read.
+ */
 export function OutcomeLine(properties: {
   readonly outcome: Outcome | undefined;
   readonly className?: string;

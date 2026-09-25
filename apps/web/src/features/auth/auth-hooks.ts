@@ -35,6 +35,7 @@ const sessionOptions = () =>
     queryFn: () => unwrap(authClient.getSession()),
   });
 
+/** Its `data` is null when this browser holds no session. */
 export const useSession = () => useQuery(sessionOptions());
 
 const listOrganizationsOptions = () =>
@@ -52,6 +53,7 @@ const sendVerificationOtpOptions = () =>
 
 export const useSendVerificationOtp = () => useMutation(sendVerificationOtpOptions());
 
+/** Whitespace alone is no name. */
 export const hasADisplayName = (name: string): boolean => name.trim() !== "";
 
 export type SignedIn = { readonly displayNameGiven: boolean };
@@ -68,7 +70,10 @@ const signInEmailOtpOptions = () =>
 
 export const useSignInEmailOtp = () => useMutation(signInEmailOtpOptions());
 
-// Read before the display-name screen draws, so a person it has nothing to ask never sees it.
+/**
+ * Read before the display-name screen draws, so a person it has nothing to ask never sees it.
+ * Undefined means the screen draws.
+ */
 export const displayNameDetour = async (
   queryClient: QueryClient,
   query: string,
@@ -82,6 +87,7 @@ export const displayNameDetour = async (
   return hasADisplayName(session.user.name) ? nextAfterSignIn(query) : undefined;
 };
 
+/** A save drops the held session, so the next read of it carries the new name. */
 export const useSetDisplayName = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
@@ -101,6 +107,7 @@ const signOutOptions = () =>
     mutationFn: () => unwrap(authClient.signOut()),
   });
 
+/** Whatever the server answers, clears every held query and goes to the sign-in screen. */
 export const useSignOut = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -126,6 +133,7 @@ const setActiveOrganizationOptions = () =>
     mutationFn: (input) => unwrap(authClient.organization.setActive(input)),
   });
 
+/** A pick drops the held membership and marks the held session and workspace list stale. */
 export const useSetActiveOrganization = () => {
   const queryClient = useQueryClient();
   const api = useTRPC();
@@ -141,7 +149,7 @@ export const useSetActiveOrganization = () => {
   });
 };
 
-// The client plugin types this answer as `any`, so its shape is read where it lands.
+/** The client plugin types this answer as `any`, so its shape is read where it lands. */
 const resumeAnswer = z.object({ redirect: z.boolean().optional(), url: z.string().optional() });
 export type ResumeAnswer = z.infer<typeof resumeAnswer>;
 

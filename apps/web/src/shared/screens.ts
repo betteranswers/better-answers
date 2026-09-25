@@ -98,13 +98,16 @@ export const screenById = (id: ScreenId): Screen => {
   return screen;
 };
 
-// A union of tuple types has no callable array methods; the element type restores them.
+/** A union of tuple types has no callable array methods; the element type restores them. */
 export const viewsOf = (screen: Screen): readonly View[] => screen.views;
 
-// Any address beneath a screen is on that screen; the trailing slash keeps a longer name
-// from matching a shorter screen's.
+/**
+ * Any address beneath a screen is on that screen; the trailing slash keeps a longer name
+ * from matching a shorter screen's.
+ */
 export const screenAt = (pathname: string): Screen | undefined =>
   SCREENS.find((screen) => pathname === screen.path || pathname.startsWith(`${screen.path}/`));
 
+/** An exact match: a screen's own address, with no view open, answers undefined. */
 export const viewAt = (pathname: string): View | undefined =>
   SCREENS.flatMap((screen) => viewsOf(screen)).find((view) => view.path === pathname);
