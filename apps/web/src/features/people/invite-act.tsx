@@ -27,14 +27,12 @@ import { invitedOutcome } from "./invitation-words.ts";
 import { useInvite, type SentInvitation } from "./invitations-api.ts";
 import { PEOPLE_KEYSTROKES, useInviteAsked } from "./people-state.ts";
 import { outcomeOfInvitationFailure } from "./refusal.tsx";
-import { ROLE_MEANINGS, ROLES } from "./role-meanings.ts";
+import { ROLE_MEANINGS, ROLES, roleOf } from "./role-meanings.ts";
 
 type Role = SentInvitation["role"];
 
 /** The least a new person is offered, so a slip never hands out more than asking. */
 const ROLE_OFFERED_FIRST: Role = "Viewer";
-
-const isRole = (word: string): word is Role => ROLES.some((role) => role === word);
 
 const ACT_NAME = "Invite a person";
 
@@ -123,7 +121,7 @@ export function InviteAct() {
               <Select
                 value={role}
                 onValueChange={(chosen) => {
-                  if (isRole(chosen)) setRole(chosen);
+                  setRole(roleOf(chosen) ?? ROLE_OFFERED_FIRST);
                 }}
               >
                 <SelectTrigger id={ids.role} aria-describedby={ids.meaning}>

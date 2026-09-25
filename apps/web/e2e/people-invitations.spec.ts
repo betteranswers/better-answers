@@ -103,7 +103,7 @@ test.describe("the People screen's Invitations tab", () => {
     await inviteDialog(page).getByRole("combobox", { name: "Role" }).click();
     await page.getByRole("option", { name: "Editor" }).click();
     await expect(inviteDialog(page)).toContainText(
-      "Checks concepts, runs question sets and saves Answers from history.",
+      "Checks concepts, runs question sets and saves Answers.",
     );
     await inviteDialog(page).getByRole("button", { name: "Send the invitation" }).click();
 
@@ -225,8 +225,8 @@ test.describe("the People screen's Invitations tab", () => {
     await page.keyboard.press("?");
     const keystrokes = page.getByRole("dialog", { name: "Keystrokes on People" });
     await expect(keystrokes).toContainText("Invite a person by email address");
-    await expect(keystrokes).toContainText("Resend the invitation whose row holds focus");
-    await expect(keystrokes).toContainText("Cancel the invitation whose row holds focus");
+    await expect(keystrokes).toContainText("Resend the invitation in focus");
+    await expect(keystrokes).toContainText("Cancel the invitation in focus");
     await page.keyboard.press("Escape");
 
     const invited = anAddress("invited");
@@ -243,7 +243,7 @@ test.describe("the People screen's Invitations tab", () => {
     await expect(page.getByRole("listbox")).toHaveCount(0);
     await expect(inviteDialog(page).getByRole("combobox", { name: "Role" })).toBeFocused();
     await expect(inviteDialog(page)).toContainText(
-      "Checks concepts, runs question sets and saves Answers from history.",
+      "Checks concepts, runs question sets and saves Answers.",
     );
     await page.keyboard.press("Shift+Tab");
     await expect(inviteDialog(page).getByLabel("Email address")).toBeFocused();
