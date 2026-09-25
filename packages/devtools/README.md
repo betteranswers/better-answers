@@ -226,6 +226,23 @@ A function of 9 is refused off the list and accepted on it, and a function of 8 
 Every listed file must still hold a function over 8, so a file brought under drops its line.
 `apps/worker/tests/test_complexity_cap.py` holds the same cases for both ruff configs.
 
+## The test-title rule — a stock rule, in root `check`
+
+oxlint's `vitest/valid-title` refuses a `describe`, `it` or `test` title of 11 words or more,
+and one that says "should". One `mustNotMatch` pattern holds both. The rule's
+`disallowedWords` option is left unset: at oxlint 1.85, setting it skips every check after it,
+the pattern included. The pattern's message prints the rule's tag, so `.oxlintrc.json` is
+named in `gates-printing-a-tag.json`.
+
+The files holding a refused title when the rule landed are listed by path in one override.
+That override sets the rule back to its stock checks, so a listed file still refuses an empty
+title. The list only shrinks.
+
+`test/test-titles.test.ts` runs oxlint over a throwaway tree at the root config's setting. An
+11-word title and a title with "should" are refused, and a 10-word title is accepted. Every
+listed file must still hold a refused title. It and `test/complexity-cap.test.ts` build their
+run from `test/rule-baseline.ts`.
+
 ## `src/insert-scan.ts` — the insert scan
 
 The setup rule's holder: a raw `INSERT` appears inside a factory module and nowhere else.
