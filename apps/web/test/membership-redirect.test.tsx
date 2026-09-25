@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAppClients, type AppClients } from "@/app/providers.tsx";
 
 import { openApp } from "./open-app.tsx";
+import { addressOf, answered } from "./stubbed-api.ts";
 
 const A_MEMBERSHIP = {
   workspace: { id: "w", name: "Northern Tooling" },
@@ -25,20 +26,6 @@ const TWO_WORKSPACES = [
 ];
 
 let asked: string[] = [];
-
-const addressOf = (input: string | URL | Request): URL =>
-  new URL(
-    typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
-    "http://app.test",
-  );
-
-const answered = (body: unknown): Promise<Response> =>
-  Promise.resolve(
-    new Response(JSON.stringify(body), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    }),
-  );
 
 /** The api answers a batch as one array with an entry per procedure, a refusal being an entry. */
 const answering =

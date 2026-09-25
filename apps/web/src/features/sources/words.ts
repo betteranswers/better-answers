@@ -1,3 +1,5 @@
+import { dayWords } from "@/shared/words.ts";
+
 import type { ListedBinding } from "./sources-api.ts";
 
 type Meaning = { readonly word: string; readonly means: string };
@@ -96,15 +98,8 @@ export const AUDITED_CATEGORIES = [
 /** A category's or a tier's word is kebab-case on the row and spaced on the screen. */
 export const spokenWord = (word: string): string => word.replaceAll("-", " ");
 
-const DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" });
-
 const TIME = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit" });
 
 /** In the reader's own time zone: `14:05 · 25 September 2026`. */
-export const instantWords = (iso: string): string => {
-  const at = new Date(iso);
-  return `${TIME.format(at)} · ${DAY.format(at)}`;
-};
-
-export const counted = (count: number, one: string, many: string): string =>
-  `${count} ${count === 1 ? one : many}`;
+export const instantWords = (iso: string): string =>
+  `${TIME.format(new Date(iso))} · ${dayWords(iso)}`;

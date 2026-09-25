@@ -1,14 +1,20 @@
 import { Link } from "@tanstack/react-router";
 
+import { CONTROL_CENTRE, type Surface } from "@/shared/screens.ts";
 import { Button } from "@/shared/ui/button.tsx";
 
-export function FailedScreen(properties: { readonly reset: () => void }) {
+export function FailedScreen(properties: {
+  readonly reset: () => void;
+  readonly surface?: Surface;
+}) {
+  const surface = properties.surface ?? CONTROL_CENTRE;
+
   return (
     <>
       <h1>This screen could not be shown</h1>
       <p role="alert" className="mt-2 text-muted-foreground">
-        Something in it failed while it was being drawn. The rest of Control Centre is still here,
-        and the other screens can be read as usual.
+        Something in it failed while it was being drawn. The rest of {surface.nameInProse} is still
+        here, and the other screens can be read as usual.
       </p>
 
       <p className="mt-6">
@@ -18,8 +24,8 @@ export function FailedScreen(properties: { readonly reset: () => void }) {
       </p>
 
       <p className="mt-4">
-        <Link to="/system" className="text-brand underline">
-          Go to System
+        <Link to={surface.home.path} className="text-brand underline">
+          Go to {surface.home.name}
         </Link>
       </p>
     </>

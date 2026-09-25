@@ -106,6 +106,34 @@ const theOperatorOnTheWeb = async () => {
   return { workspace, ...(await webSignedIn(app(), workspace.admin.email)) };
 };
 
+/** Every role a workspace gives, each signed in on the web, none of them carrying the mark. */
+const everyRoleOnTheWeb = async () => {
+  const workspace = await app().provision();
+  const editor = await app().person();
+  const viewer = await app().person();
+  await app().addMember(workspace.workspaceId, editor.id, "Editor");
+  await app().addMember(workspace.workspaceId, viewer.id, "Viewer");
+
+  const signedIn = [];
+  for (const email of [workspace.admin.email, editor.email, viewer.email]) {
+    signedIn.push(await webSignedIn(app(), email));
+  }
+  return signedIn;
+};
+
+/** The tRPC surface reads no bearer, so the operator's own token is a caller with no session. */
+const theOperatorsBearerAt = async (path: string, init: RequestInit = {}) => {
+  const { workspace } = await theOperatorOnTheWeb();
+  const { accessToken } = await connectAsHost(app(), app().client(), workspace.admin);
+  const response = await app()
+    .client()
+    .fetch(`${TRPC_ENDPOINT}/${path}`, {
+      ...init,
+      headers: { "content-type": "application/json", authorization: `Bearer ${accessToken}` },
+    });
+  return { status: response.status, answer: await response.json() };
+};
+
 describe("operator — the mark an ops command sets and clears", () => {
   it("grants the mark, recorded under the platform's identity actor", async () => {
     const person = await app().person();
@@ -278,15 +306,8 @@ describe("the console's list of every workspace, the operator's alone", () => {
   });
 
   it.each(CONSOLE_CALLS)("refuses %s to Admin, Editor and Viewer", async (_path, call) => {
-    const workspace = await app().provision();
-    const editor = await app().person();
-    const viewer = await app().person();
-    await app().addMember(workspace.workspaceId, editor.id, "Editor");
-    await app().addMember(workspace.workspaceId, viewer.id, "Viewer");
-
     const refusals: unknown[] = [];
-    for (const email of [workspace.admin.email, editor.email, viewer.email]) {
-      const { api } = await webSignedIn(app(), email);
+    for (const { api } of await everyRoleOnTheWeb()) {
       refusals.push(await refusalOfCall(call(api)));
     }
 
@@ -303,17 +324,7 @@ describe("the console's list of every workspace, the operator's alone", () => {
   });
 
   it.each(BEARER_ASKS)("refuses %s to the operator's own OAuth bearer", async (path, init) => {
-    const { workspace } = await theOperatorOnTheWeb();
-    const { accessToken } = await connectAsHost(app(), app().client(), workspace.admin);
-
-    const response = await app()
-      .client()
-      .fetch(`${TRPC_ENDPOINT}/${path}`, {
-        ...init,
-        headers: { "content-type": "application/json", authorization: `Bearer ${accessToken}` },
-      });
-
-    expect({ status: response.status, answer: await response.json() }).toMatchObject({
+    expect(await theOperatorsBearerAt(path, init)).toMatchObject({
       status: 401,
       answer: { error: { data: { refusal: { word: "no-session" } } } },
     });
@@ -470,5 +481,38 @@ describe("revoking a person's credentials everywhere, from the console", () => {
       data: { httpStatus: 404, refusal: { word: "no-such-user", class: "absent" } },
     });
     expect(await revocationRowsOf(nobody)).toEqual([]);
+  });
+});
+
+describe("the session's read of whether its person is the operator", () => {
+  it("names the operator, who needs no workspace for it", async () => {
+    const person = await app().person();
+    await marking(app(), person.email, "grant");
+    const { api } = await webSignedIn(app(), person.email);
+
+    expect(await api.session.operator.query()).toEqual({ operator: true, name: person.name });
+  });
+
+  it("answers no to an Admin, an Editor and a Viewer", async () => {
+    const answers: unknown[] = [];
+    for (const { api } of await everyRoleOnTheWeb()) {
+      answers.push(await api.session.operator.query());
+    }
+
+    expect(answers).toEqual([{ operator: false }, { operator: false }, { operator: false }]);
+  });
+
+  it("answers no from the moment the mark is cleared", async () => {
+    const { workspace, api } = await theOperatorOnTheWeb();
+    await marking(app(), workspace.admin.email, "revoke");
+
+    expect(await api.session.operator.query()).toEqual({ operator: false });
+  });
+
+  it("refuses a caller with no session, the operator's bearer included", async () => {
+    expect(await theOperatorsBearerAt("session.operator")).toMatchObject({
+      status: 401,
+      answer: { error: { data: { refusal: { word: "no-session", class: "unauthenticated" } } } },
+    });
   });
 });

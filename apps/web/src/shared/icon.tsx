@@ -1,4 +1,5 @@
 import {
+  Buildings,
   CaretDown,
   Database,
   Graph,
@@ -25,7 +26,8 @@ export type IconName =
   | "question"
   | "search"
   | "secondary-nav"
-  | "tray";
+  | "tray"
+  | "workspaces";
 
 /**
  * The keys are the glossary's words, not Phosphor's: the shell says navigation and secondary
@@ -42,6 +44,7 @@ const GLYPHS = {
   search: MagnifyingGlass,
   "secondary-nav": SidebarSimple,
   tray: Tray,
+  workspaces: Buildings,
 } satisfies Readonly<Record<IconName, PhosphorGlyph>>;
 
 /** Hidden from assistive technology, so the caller names what it stands for beside it. */

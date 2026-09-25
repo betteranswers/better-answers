@@ -91,14 +91,66 @@ export const SCREENS = [
   },
 ] as const;
 
-export type Screen = (typeof SCREENS)[number];
-export type ScreenId = Screen["id"];
+export const CONSOLE_SCREENS = [
+  {
+    id: "people",
+    name: "People",
+    icon: "people",
+    path: "/console/people",
+    summary:
+      "Every person on the platform, the workspaces they belong to and their role in each, with the sessions and grants that can act as them.",
+    defaultView: "/console/people/everyone",
+    views: [
+      { name: "Everyone", path: "/console/people/everyone", built: false },
+      { name: "Names waiting", path: "/console/people/names-waiting", built: false },
+    ],
+  },
+  {
+    id: "workspaces",
+    name: "Workspaces",
+    icon: "workspaces",
+    path: "/console/workspaces",
+    summary:
+      "Every workspace on the platform, with its slug, its member count and the day it was provisioned. Provisioning and renaming are ops commands, so this list is read-only.",
+    defaultView: "/console/workspaces/every-workspace",
+    views: [{ name: "Every workspace", path: "/console/workspaces/every-workspace", built: true }],
+  },
+] as const;
+
+export type Screen = (typeof SCREENS)[number] | (typeof CONSOLE_SCREENS)[number];
 export type View = Screen["views"][number];
 
-export const screenById = (id: ScreenId): Screen => {
-  const screen = SCREENS.find((candidate) => candidate.id === id);
+const screenIn = <Held extends Screen>(screens: readonly Held[], id: Held["id"]): Held => {
+  const screen = screens.find((candidate) => candidate.id === id);
   if (screen === undefined) throw new Error(`no screen is named ${id}`);
   return screen;
+};
+
+export const screenById = (id: (typeof SCREENS)[number]["id"]): Screen => screenIn(SCREENS, id);
+
+export const consoleScreenById = (id: (typeof CONSOLE_SCREENS)[number]["id"]): Screen =>
+  screenIn(CONSOLE_SCREENS, id);
+
+/** The shell's regions draw one of these; `home` is where a reader who lost their way is sent. */
+export type Surface = {
+  readonly name: "Control Centre" | "Console";
+  readonly nameInProse: "Control Centre" | "the console";
+  readonly screens: readonly Screen[];
+  readonly home: Screen;
+};
+
+export const CONTROL_CENTRE: Surface = {
+  name: "Control Centre",
+  nameInProse: "Control Centre",
+  screens: SCREENS,
+  home: screenById("system"),
+};
+
+export const CONSOLE: Surface = {
+  name: "Console",
+  nameInProse: "the console",
+  screens: CONSOLE_SCREENS,
+  home: consoleScreenById("workspaces"),
 };
 
 /** A union of tuple types has no callable array methods; the element type restores them. */
@@ -108,9 +160,11 @@ export const viewsOf = (screen: Screen): readonly View[] => screen.views;
  * Any address beneath a screen is on that screen; the trailing slash keeps a longer name
  * from matching a shorter screen's.
  */
-export const screenAt = (pathname: string): Screen | undefined =>
-  SCREENS.find((screen) => pathname === screen.path || pathname.startsWith(`${screen.path}/`));
+export const screenAt = (surface: Surface, pathname: string): Screen | undefined =>
+  surface.screens.find(
+    (screen) => pathname === screen.path || pathname.startsWith(`${screen.path}/`),
+  );
 
 /** An exact match: a screen's own address, with no view open, answers undefined. */
-export const viewAt = (pathname: string): View | undefined =>
-  SCREENS.flatMap((screen) => viewsOf(screen)).find((view) => view.path === pathname);
+export const viewAt = (surface: Surface, pathname: string): View | undefined =>
+  surface.screens.flatMap((screen) => viewsOf(screen)).find((view) => view.path === pathname);

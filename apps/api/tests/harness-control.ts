@@ -1,9 +1,11 @@
 import { Hono } from "hono";
 import { z } from "zod";
 
+import { setOperatorMark } from "@better-answers/core/workspaces";
 import { llmPurpose } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
+import { IDENTITY_PRINCIPAL } from "../src/identity-principal.ts";
 import type { TestApp } from "./harness.ts";
 import {
   bindingsSeeding,
@@ -41,6 +43,7 @@ const seeding = z.object({
   ),
 });
 const ending = z.object({ workspaceId: z.string().min(1), userId: z.string().min(1) });
+const marking = z.object({ email: z.string().min(1), change: z.enum(["grant", "revoke"]) });
 
 const readBody = async <T>(request: Request, schema: z.ZodType<T>): Promise<T> => {
   const parsed = schema.safeParse(await request.json());
@@ -103,6 +106,14 @@ export const harnessControl = (app: TestApp): Hono => {
   control.post(`${HARNESS_PREFIX}/index-runs`, async (context) => {
     const asked = await readBody(context.req.raw, indexRunMoving);
     return context.json(await moveTheIndexRun(app, asked));
+  });
+
+  // The ops command's own act under its own principal, so the mark lands as the owner's would.
+  control.post(`${HARNESS_PREFIX}/operators`, async (context) => {
+    const asked = await readBody(context.req.raw, marking);
+    const marked = await setOperatorMark(IDENTITY_PRINCIPAL, app.doors.postgres, asked);
+    if (!marked.ok) throw new Error(`the operator mark was refused: ${String(marked.error)}`);
+    return context.json({ marked: true });
   });
 
   control.get(`${HARNESS_PREFIX}/codes`, (context) => {

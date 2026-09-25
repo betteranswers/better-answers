@@ -1,13 +1,13 @@
 import { Badge } from "@/shared/ui/badge.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
+import { counted } from "@/shared/words.ts";
 
 import { NARROWEST, widestAlready, type ListedBinding } from "./sources-api.ts";
 import { SOURCES_KEYSTROKES } from "./sources-state.ts";
 import { SummaryRow as Row } from "./summary-row.tsx";
 import {
   AUDIENCE_WORDS,
-  counted,
   destinationOf,
   instantWords,
   NEEDS_OCR,

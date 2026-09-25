@@ -23,7 +23,7 @@ import {
   widenBinding,
   widenBindingInput,
 } from "@better-answers/core/sources";
-import { readMembership } from "@better-answers/core/workspaces";
+import { readMembership, standingAsOperator } from "@better-answers/core/workspaces";
 
 import {
   answeredBy,
@@ -32,6 +32,7 @@ import {
   mutationProcedure,
   ownTransactionProcedure,
   parsedBy,
+  personProcedure,
   queryProcedure,
   router,
 } from "./base.ts";
@@ -44,6 +45,13 @@ export const appRouter = router({
   session: router({
     membership: queryProcedure.query(({ ctx }) =>
       crossing(ctx, readMembership.name, readMembership(ctx.principal, ctx.tx)),
+    ),
+    operator: personProcedure.query(({ ctx }) =>
+      crossing(
+        ctx,
+        standingAsOperator.name,
+        standingAsOperator(ctx.doors.postgres, { userId: ctx.personId, issuedAt: ctx.issuedAt }),
+      ),
     ),
   }),
   person: personRouter,

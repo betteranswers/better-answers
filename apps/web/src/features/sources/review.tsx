@@ -14,6 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/shared/ui/table.tsx";
+import { counted } from "@/shared/words.ts";
 
 import { outcomeOfFailure } from "./refusal.tsx";
 import {
@@ -37,7 +38,7 @@ import {
   SOURCES_KEYSTROKES,
   useTickedGroups,
 } from "./sources-state.ts";
-import { counted, spokenWord } from "./words.ts";
+import { spokenWord } from "./words.ts";
 
 const NOTHING_FOUND = {
   landed: "No index run has finished yet, so nothing has been found.",
