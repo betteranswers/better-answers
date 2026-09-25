@@ -75,18 +75,28 @@ type CorePackage = {
 
 const packages = new Map<string, CorePackage | null>();
 
+const entriesOf = (
+  root: string,
+  exported: readonly (readonly [string, unknown])[],
+): ReadonlyMap<string, string> => {
+  const entries = new Map<string, string>();
+  for (const [entry, target] of exported) {
+    if (typeof target === "string") entries.set(entry, path.resolve(root, target));
+  }
+  return entries;
+};
+
 const readManifest = (root: string): CorePackage | null => {
   const manifest: unknown = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
 
   // A manifest without the core's name is no core package, whatever else it holds.
   if (typeof manifest !== "object" || manifest === null) return null;
   if (!("name" in manifest) || manifest.name !== CORE) return null;
-  const entries = new Map<string, string>();
-  if ("exports" in manifest && typeof manifest.exports === "object" && manifest.exports !== null) {
-    for (const [entry, target] of Object.entries(manifest.exports)) {
-      if (typeof target === "string") entries.set(entry, path.resolve(root, target));
-    }
-  }
+  const exported =
+    "exports" in manifest && typeof manifest.exports === "object" && manifest.exports !== null
+      ? Object.entries(manifest.exports)
+      : [];
+  const entries = entriesOf(root, exported);
   return { root, entries, faces: new Set(entries.values()) };
 };
 
@@ -111,19 +121,23 @@ type Place = {
   readonly top: string;
 };
 
+const srcPlaceOf = (first: string, second: string | undefined, depth: number): Place => {
+  const dir = `src/${first}`;
+  if (first === "kernel" || first === "access") return { zone: first, dir, top: first };
+  if (first === "store") {
+    const door = second !== undefined && depth > 3 ? `${dir}/${second}` : dir;
+    return { zone: "door", dir: door, top: first };
+  }
+  const zone = LAYERS.some((layer) => layer === first) ? "layer" : "slice";
+  return { zone, dir, top: first };
+};
+
 const placeOf = (pkg: CorePackage, absolute: string): Place | undefined => {
   const segments = path.relative(pkg.root, absolute).split(path.sep);
   const [area, first, second] = segments;
   if (area === "test" && segments.length >= 2) return { zone: "test", dir: "test", top: "test" };
   if (area !== "src" || first === undefined || segments.length < 3) return undefined;
-  const dir = `src/${first}`;
-  if (first === "kernel" || first === "access") return { zone: first, dir, top: first };
-  if (first === "store") {
-    const door = second !== undefined && segments.length > 3 ? `${dir}/${second}` : dir;
-    return { zone: "door", dir: door, top: first };
-  }
-  const zone = LAYERS.some((layer) => layer === first) ? "layer" : "slice";
-  return { zone, dir, top: first };
+  return srcPlaceOf(first, second, segments.length);
 };
 
 const faceOf = (pkg: CorePackage, place: Place): string =>
@@ -142,6 +156,72 @@ const targetOf = (pkg: CorePackage, importer: string, specifier: string): string
   const under = entry.slice("./".length);
   return path.join(pkg.root, "src", under.endsWith(".ts") ? under : path.join(under, "index.ts"));
 };
+
+type Edge = { readonly importer: Place; readonly reached: Place; readonly target: string };
+
+const edgeOf = (pkg: CorePackage, importerFile: string, specifier: string): Edge | undefined => {
+  const importer = placeOf(pkg, importerFile);
+  if (importer === undefined) return undefined;
+  const target = targetOf(pkg, importerFile, specifier);
+  if (target === undefined) return undefined;
+  const reached = placeOf(pkg, target);
+  if (reached === undefined || reached.dir === importer.dir) return undefined;
+  return { importer, reached, target };
+};
+
+type Finding = {
+  readonly messageId: "direction" | "erasure" | "internal" | "unexported";
+  readonly data?: Readonly<Record<string, string>>;
+};
+
+const directionFinding = ({ importer, reached }: Edge): Finding | undefined => {
+  const { reaches, rule, clause } = ZONES[importer.zone];
+  if (reaches.has(reached.zone) || (importer.dir === GRAPH_DOOR && reached.zone === "access")) {
+    return undefined;
+  }
+  return {
+    messageId: "direction",
+    data: {
+      fromDir: importer.dir,
+      from: importer.zone,
+      toDir: reached.dir,
+      to: reached.zone,
+      rule,
+      clause,
+    },
+  };
+};
+
+const erasureFinding = ({ importer, reached }: Edge): Finding | undefined =>
+  reached.zone === "slice" && reached.top === TOP_SLICE && importer.zone !== "test"
+    ? { messageId: "erasure" }
+    : undefined;
+
+const faceFinding = (
+  pkg: CorePackage,
+  { importer, reached, target }: Edge,
+): Finding | undefined => {
+  const face = faceOf(pkg, reached);
+  if (target !== face) {
+    return {
+      messageId: "internal",
+      data: {
+        fromDir: importer.dir,
+        from: importer.zone,
+        dir: reached.dir,
+        inside: path.relative(path.dirname(face), target).split(path.sep).join("/"),
+      },
+    };
+  }
+  if (pkg.faces.has(target)) return undefined;
+  return {
+    messageId: "unexported",
+    data: { dir: reached.dir, entry: reached.dir.slice("src/".length) },
+  };
+};
+
+const findingOf = (pkg: CorePackage, edge: Edge): Finding | undefined =>
+  directionFinding(edge) ?? erasureFinding(edge) ?? faceFinding(pkg, edge);
 
 export const importDirectionRule = defineRule({
   meta: {
@@ -171,57 +251,10 @@ export const importDirectionRule = defineRule({
         context.report({ node, messageId: "transport", data: { specifier } });
         return;
       }
-      const importer = placeOf(pkg, context.filename);
-      if (importer === undefined) return;
-      const target = targetOf(pkg, context.filename, specifier);
-      if (target === undefined) return;
-      const reached = placeOf(pkg, target);
-      if (reached === undefined || reached.dir === importer.dir) return;
-
-      const { reaches, rule, clause } = ZONES[importer.zone];
-      const allowed =
-        reaches.has(reached.zone) || (importer.dir === GRAPH_DOOR && reached.zone === "access");
-      if (!allowed) {
-        context.report({
-          node,
-          messageId: "direction",
-          data: {
-            fromDir: importer.dir,
-            from: importer.zone,
-            toDir: reached.dir,
-            to: reached.zone,
-            rule,
-            clause,
-          },
-        });
-        return;
-      }
-      if (reached.zone === "slice" && reached.top === TOP_SLICE && importer.zone !== "test") {
-        context.report({ node, messageId: "erasure" });
-        return;
-      }
-
-      const face = faceOf(pkg, reached);
-      if (target !== face) {
-        context.report({
-          node,
-          messageId: "internal",
-          data: {
-            fromDir: importer.dir,
-            from: importer.zone,
-            dir: reached.dir,
-            inside: path.relative(path.dirname(face), target).split(path.sep).join("/"),
-          },
-        });
-        return;
-      }
-      if (!pkg.faces.has(target)) {
-        context.report({
-          node,
-          messageId: "unexported",
-          data: { dir: reached.dir, entry: reached.dir.slice("src/".length) },
-        });
-      }
+      const edge = edgeOf(pkg, context.filename, specifier);
+      if (edge === undefined) return;
+      const found = findingOf(pkg, edge);
+      if (found !== undefined) context.report({ node, ...found });
     };
     const source = (node: {
       readonly source: { readonly value: unknown } | null;

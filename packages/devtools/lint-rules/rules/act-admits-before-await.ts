@@ -6,7 +6,7 @@ const DECLARE = "declareAct";
 
 const ADMIT = "admit";
 
-// The visitors fire in source order, so whichever of the two lands first is the earlier one.
+/** The visitors fire in source order, so whichever of the two lands first is the earlier one. */
 type Frame = {
   readonly first: "awaited" | "admitted" | undefined;
   readonly admitted: ESTree.Node | undefined;
