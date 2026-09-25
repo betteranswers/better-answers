@@ -32,9 +32,10 @@ import {
   type IdentityArm,
   type RunErasureRefusal,
 } from "../src/erasure/index.ts";
-import { actorIdOfPerson, type Result } from "../src/kernel/index.ts";
+import { actorIdOfPerson, type Result, type UserPrincipal } from "../src/kernel/index.ts";
 import { setDisplayName } from "../src/workspaces/index.ts";
 import { authorLinesOf, bundleHistory, everyObjectOf, objectPresent } from "./bundle.ts";
+import { erasureDoorsFor } from "./erasure-doors.ts";
 import { identityRowsFor, verificationCodeFor } from "./identity-rows.ts";
 import { bootstrap } from "./platform.ts";
 import { ledgerRowsOf } from "./sourced-concept.ts";
@@ -71,8 +72,10 @@ const BEYOND_USE = {
   monthly: "2026-12-01T12:00:00.000Z",
 } as const;
 
-// This day tells a day count from a calendar interval: six months on is 28 February, 183
-// days on 2 March.
+/**
+ * This day tells a day count from a calendar interval: six months on is 28 February, 183 days
+ * on 2 March.
+ */
 const ANCHORED_ON_A_31ST = new Date("2026-08-31T12:00:00.000Z");
 
 const BEYOND_USE_FROM_THE_31ST = {
@@ -103,7 +106,7 @@ const DOCUMENTS_WITHHELD =
   "bound later, each time a document is indexed; and the documents found above are indexed " +
   "again now.";
 
-// Every run in the file logs here, so a case reads back the lines of its own request alone.
+/** Every run in the file logs here, so a case reads back the lines of its own request alone. */
 const operatorLines: ErasureLogLine[] = [];
 
 const operatorLog: ErasureLog = {
@@ -120,17 +123,10 @@ const runningTheRoutine = (
   subjectRequestId: string,
   at: Date = LOCKED_AT,
 ): Promise<Result<ErasureRun, RunErasureRefusal | Error>> =>
-  runErasure(
-    ERASURE,
-    {
-      git: scenario.git,
-      postgres: scenario.postgres,
-      objects: objects().door,
-      clock: { now: () => at },
-      log: operatorLog,
-    },
-    { workspaceId: scenario.workspaceId, subjectRequestId },
-  );
+  runErasure(ERASURE, erasureDoorsFor(scenario, objects().door, at, operatorLog), {
+    workspaceId: scenario.workspaceId,
+    subjectRequestId,
+  });
 
 const completing = async (
   scenario: Scenario,
@@ -248,15 +244,16 @@ const filesNaming = (
   },
 ];
 
-const bundleNamingThePerson = async (named: { readonly byIdAlone?: boolean } = {}) => {
-  const { scenario, email, person, subjectRequestId } = await workspaceWithAnErasureRequest(named);
-  const principal = await principalFor(db(), scenario.workspaceId, person.id);
+const committingInTurn = async (
+  principal: UserPrincipal,
+  git: GitDoor,
+  email: string,
+  files: ReturnType<typeof filesNaming>,
+): Promise<readonly string[]> => {
   const author = { name: "Priya Anand", email };
-  const files = filesNaming(email);
-
   const shas: string[] = [];
   for (const [at, file] of files.entries()) {
-    const written = await commit(principal, scenario.git, {
+    const written = await commit(principal, git, {
       path: file.path,
       content: renderConceptFile(file.frontmatter, file.body),
       message: `Record a policy (${at + 1})`,
@@ -268,6 +265,14 @@ const bundleNamingThePerson = async (named: { readonly byIdAlone?: boolean } = {
     if (!written.ok) throw new Error(`the commit was refused: ${String(written.error)}`);
     shas.push(written.value.sha);
   }
+  return shas;
+};
+
+const bundleNamingThePerson = async (named: { readonly byIdAlone?: boolean } = {}) => {
+  const { scenario, email, person, subjectRequestId } = await workspaceWithAnErasureRequest(named);
+  const principal = await principalFor(db(), scenario.workspaceId, person.id);
+  const files = filesNaming(email);
+  const shas = await committingInTurn(principal, scenario.git, email, files);
 
   const landed = await seedingWith(db().pool, async (seed) => {
     for (const [at, sha] of shas.entries()) {
@@ -458,13 +463,10 @@ const verificationsFor = async (identifier: string): Promise<number> => {
   return Number(read.rows[0]?.count ?? -1);
 };
 
+const NOT_COUNTED = { sessions: "-1", accounts: "-1", verifications: "-1", invitations: "-1" };
+
 const identityRowCountsFor = async (workspaceId: string, userId: string, email: string) => {
-  const read = await db().pool.query<{
-    sessions: string;
-    accounts: string;
-    verifications: string;
-    invitations: string;
-  }>(
+  const read = await db().pool.query<typeof NOT_COUNTED>(
     `SELECT (SELECT count(*) FROM session WHERE user_id = $1) AS sessions,
             (SELECT count(*) FROM account WHERE user_id = $1) AS accounts,
             (SELECT count(*) FROM verification WHERE lower(identifier) = $2) AS verifications,
@@ -472,12 +474,12 @@ const identityRowCountsFor = async (workspaceId: string, userId: string, email: 
               AS invitations`,
     [userId, email.toLowerCase(), workspaceId],
   );
-  const row = read.rows[0];
+  const row = read.rows[0] ?? NOT_COUNTED;
   return {
-    sessions: Number(row?.sessions ?? -1),
-    accounts: Number(row?.accounts ?? -1),
-    verifications: Number(row?.verifications ?? -1),
-    invitations: Number(row?.invitations ?? -1),
+    sessions: Number(row.sessions),
+    accounts: Number(row.accounts),
+    verifications: Number(row.verifications),
+    invitations: Number(row.invitations),
   };
 };
 
@@ -524,7 +526,7 @@ const theDumpCouldTakeItsLock = async (): Promise<boolean> => {
 };
 
 describe("the erasure pseudonym", () => {
-  it("mints one opaque id for a request, never the person's own, and finds the same one on a second run", async () => {
+  it("mints one opaque id per request, kept on rerun", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
 
     await completing(scenario, subjectRequestId);
@@ -540,7 +542,7 @@ describe("the erasure pseudonym", () => {
     expect(first[0]?.subject_request_id).toEqual(subjectRequestId);
   });
 
-  it("mints a different pseudonym for one person in each workspace that erases them", async () => {
+  it("mints a different one in each workspace erasing the person", async () => {
     const email = addressOf("priya");
     const person = await seedingWith(db().pool, (seed) =>
       seed.user({ name: "Priya Anand", email }),
@@ -575,7 +577,7 @@ describe("the report", () => {
     await theBundleRewritten();
   });
 
-  it("is ADR 0020's fixed wording, with the four beyond-use dates computed from the lock instant", async () => {
+  it("states four beyond-use dates from the lock, in fixed words", async () => {
     const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
 
     const done = await completing(scenario, subjectRequestId);
@@ -613,7 +615,7 @@ describe("the report", () => {
     });
   });
 
-  it("dates the beyond-use copies one interval on as Postgres does, never a count of days", async () => {
+  it("dates beyond use by calendar interval, never by day count", async () => {
     const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
 
     const done = await completing(scenario, subjectRequestId, ANCHORED_ON_A_31ST);
@@ -638,7 +640,7 @@ describe("the report", () => {
     );
   });
 
-  it("names which anchor it used, so the reader is never left to guess between the lock and the last dump", async () => {
+  it("says its anchor is the lock, not the last dump", async () => {
     const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
 
     const done = await completing(scenario, subjectRequestId);
@@ -650,7 +652,7 @@ describe("the report", () => {
     );
   });
 
-  it("says that no export is recalled, because none has been issued", async () => {
+  it("says no export is recalled, since none was issued", async () => {
     const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
 
     const done = await completing(scenario, subjectRequestId);
@@ -660,7 +662,7 @@ describe("the report", () => {
     );
   });
 
-  it("says in fixed words on every report, whichever arm ran, that the original files are untouched and the identifiers are withheld from every document of the workspace, now and later", async () => {
+  it("says on every arm the identifiers are withheld from documents", async () => {
     expect(await armsWhoseReportSays(DOCUMENTS_WITHHELD)).toEqual([
       "last-membership",
       "membership-ended",
@@ -669,7 +671,7 @@ describe("the report", () => {
     expect(await armsWhoseReportSays("The object store is untouched")).toEqual([]);
   });
 
-  it("says invitations are deleted wherever they were sent on every report, whichever arm ran, so the sentence tells nobody which one did", async () => {
+  it("says on every arm that invitations are deleted wherever sent", async () => {
     expect(await armsWhoseReportSays(INVITATIONS_WHEREVER_SENT)).toEqual([
       "last-membership",
       "membership-ended",
@@ -677,7 +679,7 @@ describe("the report", () => {
     ]);
   });
 
-  it("says a person's sign-in identity is removed by the request that ends their last membership on every report, whichever arm ran", async () => {
+  it("says on every arm when a sign-in identity is removed", async () => {
     expect(await armsWhoseReportSays(SIGN_IN_IDENTITY_REMOVED)).toEqual([
       "last-membership",
       "membership-ended",
@@ -685,7 +687,7 @@ describe("the report", () => {
     ]);
   });
 
-  it("lists the concepts whose body names the person by IRI, for the owner to edit", async () => {
+  it("lists by IRI each concept whose body names the person", async () => {
     const { iri, done } = await theBundleRewritten();
 
     expect(done.report).toContain("Names inside concept bodies, for the owner to edit:");
@@ -702,7 +704,7 @@ describe("the report", () => {
 });
 
 describe("the lock the hourly dump waits behind", () => {
-  it("keeps pg_try_advisory_lock(41) refused for the whole routine and gives it back at the end", async () => {
+  it("holds the dump's lock throughout the routine, then releases it", async () => {
     const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
     const tried: boolean[] = [];
 
@@ -723,7 +725,7 @@ describe("the lock the hourly dump waits behind", () => {
 });
 
 describe("the ledger an erasure never rewrites", () => {
-  it("books its completion to the platform's own actor and leaves every earlier row byte-identical", async () => {
+  it("books completion to the platform actor, leaving earlier rows unchanged", async () => {
     const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
     const before = await rowTextIn("audit_event", scenario.workspaceId);
     const earlier = new Set(before.map((row) => row.id));
@@ -747,7 +749,7 @@ describe("the ledger an erasure never rewrites", () => {
     ]);
   });
 
-  it("leaves the person's rows in the identity-set ledger as they were, their person id still naming the pseudonymised person", async () => {
+  it("leaves the identity-set ledger rows as they were", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
     const named = await setDisplayName(bootstrap, scenario.postgres, {
       personId: person.id,
@@ -770,7 +772,7 @@ describe("the ledger an erasure never rewrites", () => {
     expect(await userRowOf(person.id)).toMatchObject({ id: person.id, name: "" });
   });
 
-  it("names in its detail the person the map found, whether or not the request named one", async () => {
+  it("names in its detail the person the map found", async () => {
     const named = await workspaceWithAnErasureRequest();
     const byAddressAlone = await arrange();
     const email = addressOf("nadia");
@@ -808,7 +810,7 @@ describe("the ledger an erasure never rewrites", () => {
 });
 
 describe("a second run of the routine", () => {
-  it("writes one more ledger event and moves nothing else, which is what the replay relies on", async () => {
+  it("writes one more ledger event and moves nothing else", async () => {
     const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
 
     const first = await completing(scenario, subjectRequestId);
@@ -836,7 +838,7 @@ describe("the git step", () => {
     await theBundleRewritten();
   });
 
-  it("leaves no object at any commit holding the address the files and the author lines carried", async () => {
+  it("leaves no object at any commit holding the address", async () => {
     const { email, before, after } = await theBundleRewritten();
 
     expect(before.objects).toContain(`human:${email}`);
@@ -845,7 +847,7 @@ describe("the git step", () => {
     expect(after.objects).toContain("human:");
   });
 
-  it("mailmaps every author line in the bundle to the erasure pseudonym", async () => {
+  it("mailmaps every author line in the bundle to the pseudonym", async () => {
     const { email, before, after, pseudonym } = await theBundleRewritten();
     expect(before.authors).toEqual([`Priya Anand <${email}>`, `Priya Anand <${email}>`]);
 
@@ -855,7 +857,7 @@ describe("the git step", () => {
     ]);
   });
 
-  it("prunes the pre-rewrite objects, so git cat-file -e fails on every hash the history held", async () => {
+  it("prunes every object the history held before the rewrite", async () => {
     const { before, after, stillPresent } = await theBundleRewritten();
     expect(before.history).toHaveLength(2);
 
@@ -864,7 +866,7 @@ describe("the git step", () => {
     expect(after.history).toHaveLength(2);
   });
 
-  it("finds nothing to replace on a second run and moves the history no further", async () => {
+  it("moves the history no further on a second run", async () => {
     const { scenario, subjectRequestId } = await bundleNamingThePerson();
 
     await completing(scenario, subjectRequestId);
@@ -880,7 +882,7 @@ describe("the git step", () => {
     expect(await bundleCommitRowsIn(scenario.workspaceId)).toEqual(rows);
   });
 
-  it("rewrites the address the subject's own user row carries when the request names them by id alone", async () => {
+  it("rewrites the sign-in address for a request by id alone", async () => {
     const { scenario, email, subjectRequestId } = await bundleNamingThePerson({ byIdAlone: true });
     const before = await everyObjectOf(scenario.git, scenario.workspaceId);
     expect(before).toContain(`human:${email}`);
@@ -897,7 +899,7 @@ describe("the git step", () => {
     expect(done.report).toContain("bundle-commit: found 2, moved 2");
   });
 
-  it("refuses when the bundle names the person only by an address already erased to", async () => {
+  it("refuses a request naming only an address already erased to", async () => {
     const { scenario, subjectRequestId } = await bundleNamingThePerson();
     await completing(scenario, subjectRequestId);
     const [erased] = await erasureRowsIn(scenario.workspaceId);
@@ -923,7 +925,7 @@ describe("the bundle_commit rows the rewrite moves", () => {
     await theBundleRewritten();
   });
 
-  it("names the rewritten hashes, parents and all, and carries the index row's key with them", async () => {
+  it("names the rewritten hashes and parents, carrying the index's key", async () => {
     const { before, after, commitOfTheConcept } = await theBundleRewritten();
     expect(before.rows.map((row) => row.sha)).toEqual(before.history);
 
@@ -934,7 +936,7 @@ describe("the bundle_commit rows the rewrite moves", () => {
     expect(commitOfTheConcept).toEqual(after.history[0]);
   });
 
-  it("leaves the reconciler nothing to replay, because the head and the watermark agree", async () => {
+  it("leaves the reconciler nothing to replay, head and watermark agreeing", async () => {
     const { scenario } = await theBundleRewritten();
 
     const swept = await reconcile(RECONCILER, doorsOf(scenario), {
@@ -948,7 +950,7 @@ describe("the bundle_commit rows the rewrite moves", () => {
     expect(swept.value.watermark).toEqual(swept.value.head);
   });
 
-  it("records what the two families did in the report's actions, rather than reshaping them", async () => {
+  it("records both families' work in the report's actions", async () => {
     const { actions } = await theBundleRewritten();
 
     expect(actions).toMatchObject({
@@ -960,12 +962,22 @@ describe("the bundle_commit rows the rewrite moves", () => {
   });
 });
 
+const checkOn = (checks: Awaited<ReturnType<typeof checksIn>>, iri: string) => {
+  const check = checks.find((one) => one.iri === iri);
+  return {
+    hash: check?.content_hash,
+    origin: check?.origin,
+    actor: check?.actor,
+    at: check?.checked_at.toISOString(),
+  };
+};
+
 describe("the checks the rewrite moved", () => {
   beforeAll(async () => {
     await theBundleRewritten();
   });
 
-  it("carries each one onto the new hash under origin erasure-rewrite, and the trust reading stands with the erased person named by id alone", async () => {
+  it("carries each onto the new hash under origin erasure-rewrite", async () => {
     const {
       email,
       person,
@@ -977,29 +989,23 @@ describe("the checks the rewrite moved", () => {
       trustBefore,
       trustAfter,
     } = await theBundleRewritten();
-    const before = checksBefore.find((check) => check.iri === iri);
+    const before = checkOn(checksBefore, iri);
     const indexBefore = indexedBefore.find((row) => row.iri === iri);
 
-    expect(before?.content_hash).toEqual(indexBefore?.content_hash);
-    expect(before?.origin).toEqual("platform");
+    expect(before.hash).toEqual(indexBefore?.content_hash);
+    expect(before.origin).toEqual("platform");
 
-    const after = checksAfter.find((check) => check.iri === iri);
     const indexAfter = indexedAfter.find((row) => row.iri === iri);
 
     expect(indexBefore?.body).toContain(email);
     expect(indexAfter?.content_hash).not.toEqual(indexBefore?.content_hash);
     expect(indexAfter?.body).not.toContain(email);
-    expect({
-      hash: after?.content_hash,
-      origin: after?.origin,
-      actor: after?.actor,
-      at: after?.checked_at.toISOString(),
-    }).toEqual({
+    expect(checkOn(checksAfter, iri)).toEqual({
       hash: indexAfter?.content_hash,
 
       origin: "erasure-rewrite",
-      actor: before?.actor,
-      at: before?.checked_at.toISOString(),
+      actor: before.actor,
+      at: before.at,
     });
 
     expect(trustBefore[0]).toMatchObject({ checkedBy: "Priya Anand" });
@@ -1012,7 +1018,7 @@ describe("the checks the rewrite moved", () => {
     });
   });
 
-  it("leaves a check alone when the rewrite touched only the keys ADR 0019 keeps out of the hash, the reading naming the erased person by id alone", async () => {
+  it("leaves a check alone when only unhashed keys were rewritten", async () => {
     const { person, steadyIri, checksBefore, checksAfter, trustBefore, trustAfter } =
       await theBundleRewritten();
 
@@ -1029,7 +1035,7 @@ describe("the checks the rewrite moved", () => {
     });
   });
 
-  it("rewrites the index's copy of a concept the rewrite touched only in the keys kept out of the hash, so no index row still names the erased person", async () => {
+  it("reindexes a concept rewritten only in unhashed keys", async () => {
     const { email, steadyIri, indexedBefore, indexedAfter } = await theBundleRewritten();
     const steadyBefore = indexedBefore.find((row) => row.iri === steadyIri);
     const steadyAfter = indexedAfter.find((row) => row.iri === steadyIri);
@@ -1043,7 +1049,7 @@ describe("the checks the rewrite moved", () => {
     expect(steadyAfter?.content_hash).toEqual(steadyBefore?.content_hash);
   });
 
-  it("records what it moved in the report's actions, rather than reshaping them", async () => {
+  it("records what it moved in the report's actions", async () => {
     const { actions } = await theBundleRewritten();
 
     expect(actions).toMatchObject({
@@ -1054,7 +1060,7 @@ describe("the checks the rewrite moved", () => {
 });
 
 describe("the identity set on the person's last membership", () => {
-  it("pseudonymises the user row with its id kept, so every ledger row still resolves to it", async () => {
+  it("pseudonymises the user row, keeping its id for the ledger", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
     const acted = await seedingWith(db().pool, (seed) =>
       seed.auditEvent({
@@ -1102,7 +1108,7 @@ describe("the identity set on the person's last membership", () => {
     });
   });
 
-  it("deletes the codes the subject's own address holds and never one keyed by an address in the set that is not theirs", async () => {
+  it("deletes the subject's own codes, never a stranger's", async () => {
     const scenario = await arrange();
     const email = addressOf("priya");
     const person = await memberOf(db().pool, scenario.workspaceId, email);
@@ -1122,7 +1128,7 @@ describe("the identity set on the person's last membership", () => {
     }).toEqual({ theirs: 0, theStranger: 1 });
   });
 
-  it("ends this workspace's membership alone when the person holds another, and leaves the identity set standing", async () => {
+  it("ends this membership alone while the person holds another", async () => {
     const scenario = await arrange();
     const elsewhere = await arrange();
     const email = addressOf("priya");
@@ -1145,7 +1151,7 @@ describe("the identity set on the person's last membership", () => {
     expect(await workspacesMemberOf(person.id)).toEqual([elsewhere.workspaceId]);
   });
 
-  it("deletes the invitations the address holds in every workspace on the last-membership arm, and never a stranger's", async () => {
+  it("deletes the address's invitations in every workspace, never a stranger's", async () => {
     const scenario = await arrange();
     const elsewhere = await arrange();
     const email = addressOf("priya");
@@ -1176,7 +1182,7 @@ describe("the identity set on the person's last membership", () => {
     });
   });
 
-  it("counts on the report's line the invitations it found in this workspace alone, and gives what it deleted here and everywhere to the operator's record", async () => {
+  it("reports invitations found here, logging every deletion for the operator", async () => {
     const scenario = await arrange();
     const elsewhere = await arrange();
     const email = addressOf("priya");
@@ -1207,7 +1213,7 @@ describe("the identity set on the person's last membership", () => {
     ]);
   });
 
-  it("gives the operator's record one line on every arm, carrying the arm, the pseudonymisation and every identity delete, and never an address", async () => {
+  it("logs one operator line per arm, never an address", async () => {
     const { runs } = await erasedOnEachArmOnce();
     const namingTheRequest = (done: ErasureRun) => ({
       actor: ERASURE_ACTOR,
@@ -1258,7 +1264,7 @@ describe("the identity set on the person's last membership", () => {
     });
   });
 
-  it("leaves every invitation standing when another membership does, because the address is still theirs to be invited by", async () => {
+  it("leaves every invitation standing while another membership stands", async () => {
     const staying = await arrange();
     const elsewhere = await arrange();
     const email = addressOf("priya");
@@ -1281,7 +1287,7 @@ describe("the identity set on the person's last membership", () => {
     });
   });
 
-  it("stores the same five identity lines whether or not another workspace holds the person, in the row's actions and in its report, and never names the other workspace", async () => {
+  it("stores identical identity lines on both arms, never naming elsewhere", async () => {
     const { runs, elsewhereId } = await erasedOnEachArmOnce();
     const identityLinesOf = async (done: ErasureRun) => {
       const row = (await erasureRowsIn(done.workspaceId)).find(
@@ -1461,7 +1467,7 @@ const theRowHoldingTheAddressAlone = (done: ErasureRun, email: string) => [
 ];
 
 describe("the suppression the workspace keeps for the request", () => {
-  it("writes one row for the request, holding its set with the address the person signs in with here added to its emails, though the map found no document", async () => {
+  it("writes a row adding the sign-in address, even without documents", async () => {
     const {
       scenario,
       signsInWith,
@@ -1481,7 +1487,7 @@ describe("the suppression the workspace keeps for the request", () => {
     ]);
   });
 
-  it("writes one for a member's request recorded by their person id alone, holding the address they sign in with", async () => {
+  it("holds the sign-in address for a request by id alone", async () => {
     const { scenario, email, subjectRequestId } = await workspaceWithAnErasureRequest({
       byIdAlone: true,
     });
@@ -1493,7 +1499,7 @@ describe("the suppression the workspace keeps for the request", () => {
     );
   });
 
-  it("keeps the address the person signs in with when a first run died writing the row, because the row is written before the identity step takes the address away", async () => {
+  it("keeps the sign-in address when the first run's write failed", async () => {
     const { scenario, email, subjectRequestId } = await workspaceWithAnErasureRequest({
       byIdAlone: true,
     });
@@ -1509,7 +1515,7 @@ describe("the suppression the workspace keeps for the request", () => {
     );
   });
 
-  it("adds no second copy of a sign-in address the request already names in other capitals", async () => {
+  it("skips a sign-in address the request names in other capitals", async () => {
     const {
       scenario,
       email: asGiven,
@@ -1523,7 +1529,7 @@ describe("the suppression the workspace keeps for the request", () => {
     ]);
   });
 
-  it("writes a row the boundary admits for a request already holding fifty emails, the two sign-in addresses added", async () => {
+  it("writes a row the boundary admits from fifty-two emails", async () => {
     const scenario = await arrange();
     const erasure = await anOpenErasure(scenario.workspaceId);
     const fifty = Array.from({ length: 50 }, (_, at) => `person-${at}@example.invalid`);
@@ -1545,7 +1551,7 @@ describe("the suppression the workspace keeps for the request", () => {
     ).toBe(true);
   });
 
-  it("writes nothing for a set that names nobody and a person with no address, because a suppression that keeps nothing out is an erasure undone at the next conversion", async () => {
+  it("writes nothing for an empty set and no sign-in address", async () => {
     const scenario = await arrange();
     const erasure = await anOpenErasure(scenario.workspaceId);
 
@@ -1564,7 +1570,7 @@ describe("the suppression the workspace keeps for the request", () => {
     expect(await suppressionsIn(scenario.workspaceId)).toEqual([]);
   });
 
-  it("leaves the row it already wrote exactly as it is when the step runs a second time", async () => {
+  it("leaves the row it wrote unchanged on a second run", async () => {
     const scenario = await arrange();
     const erasure = await anOpenErasure(scenario.workspaceId);
 
@@ -1584,7 +1590,7 @@ describe("the suppression the workspace keeps for the request", () => {
     expect(await suppressionsIn(scenario.workspaceId)).toEqual(before);
   });
 
-  it("gives the documents found, the bindings re-indexed now and the identifiers withheld on the report's documents line, naming none of them", async () => {
+  it("counts documents, bindings and identifiers on the report, naming none", async () => {
     const {
       scenario,
       signsInWith,
@@ -1606,7 +1612,7 @@ describe("the suppression the workspace keeps for the request", () => {
 });
 
 describe("the full-rebuild the erasure asks for", () => {
-  it("puts one job on the queue with reason erasure, after the lock is taken and before it is given back", async () => {
+  it("queues one job with reason erasure", async () => {
     const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
 
     await completing(scenario, subjectRequestId);
@@ -1616,7 +1622,7 @@ describe("the full-rebuild the erasure asks for", () => {
     ]);
   });
 
-  it("puts no second one on the queue when the request is run again, because a replay writes a ledger event and nothing else", async () => {
+  it("queues no second one when the request runs again", async () => {
     const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
 
     await completing(scenario, subjectRequestId);
@@ -1627,7 +1633,7 @@ describe("the full-rebuild the erasure asks for", () => {
     ]);
   });
 
-  it("names the bindings holding the documents the map found, once each, which is the list the wipe runs over", async () => {
+  it("names each binding holding a found document once", async () => {
     const { scenario, shared, apart, found } = await aMapOverTwoOfThreeBindings();
 
     const rederived = await rederivingOver(scenario, found, LOCKED_AT);
@@ -1656,7 +1662,7 @@ const everyBindingWiped = (arranged: Awaited<ReturnType<typeof aMapOverTwoOfThre
 });
 
 describe("the wipe of every binding the map found", () => {
-  it("takes away each binding's chunk rows and queues each its index run with the wipe's reason, beside the full-rebuild", async () => {
+  it("deletes each binding's chunks, queueing its index run as wiped", async () => {
     const arranged = await aMapOverTwoOfThreeBindings();
 
     const rederived = await rederivingOver(arranged.scenario, arranged.found, null);
@@ -1667,7 +1673,7 @@ describe("the wipe of every binding the map found", () => {
     );
   });
 
-  it("takes away the chunk rows of the binding holding a document that names the subject, and queues its index run as wiped, when the routine runs over the request", async () => {
+  it("wipes a binding naming the subject when the routine runs", async () => {
     const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
     const workspaceId = scenario.workspaceId;
     const naming = await bindingIn(workspaceId);
@@ -1691,7 +1697,7 @@ describe("the wipe of every binding the map found", () => {
     );
   });
 
-  it("wipes again on a replay, where a restore brought the rows back, queueing no second run of either kind", async () => {
+  it("wipes restored rows on a replay, queueing no second run", async () => {
     const arranged = await aMapOverTwoOfThreeBindings();
 
     await rederivingOver(arranged.scenario, arranged.found, null);
@@ -1707,28 +1713,25 @@ describe("the wipe of every binding the map found", () => {
   it.each([
     ["restored", "wiped"],
     ["rule-change", "rule-change"],
-  ] as const)(
-    "queues no second run behind one queued as %s, and leaves it %s, a reason the worker empties the binding on",
-    async (queuedAs, left) => {
-      const { scenario, shared, apart, found } = await aMapOverTwoOfThreeBindings();
-      await seedingWith(db().pool, (seed) =>
-        seed.job({
-          workspaceId: scenario.workspaceId,
-          kind: "index",
-          subjectId: shared.id,
-          reason: queuedAs,
-        }),
-      );
+  ] as const)("queues nothing behind one queued as %s, leaving it %s", async (queuedAs, left) => {
+    const { scenario, shared, apart, found } = await aMapOverTwoOfThreeBindings();
+    await seedingWith(db().pool, (seed) =>
+      seed.job({
+        workspaceId: scenario.workspaceId,
+        kind: "index",
+        subjectId: shared.id,
+        reason: queuedAs,
+      }),
+    );
 
-      await rederivingOver(scenario, found, LOCKED_AT);
+    await rederivingOver(scenario, found, LOCKED_AT);
 
-      expect(await queuedIn(scenario.workspaceId)).toEqual(
-        wipesOf([shared, apart]).map((run) =>
-          run.subject_id === shared.id ? { ...run, reason: left } : run,
-        ),
-      );
-    },
-  );
+    expect(await queuedIn(scenario.workspaceId)).toEqual(
+      wipesOf([shared, apart]).map((run) =>
+        run.subject_id === shared.id ? { ...run, reason: left } : run,
+      ),
+    );
+  });
 });
 
 const completedForASubjectWithNoUserRow = async () => {
@@ -1745,7 +1748,7 @@ const completedForASubjectWithNoUserRow = async () => {
 };
 
 describe("a subject with no user row", () => {
-  it("runs with its git and identity arms finding nothing and its suppression arm doing the erasure, and the report says what each did", async () => {
+  it("erases by suppression alone and reports what each arm did", async () => {
     const { scenario, done } = await completedForASubjectWithNoUserRow();
 
     expect(done.report).toContain("concept-file: found 0, reindexed 0, rewritten 0");
@@ -1773,7 +1776,7 @@ const replayCopyOf = async (workspaceId: string, erasureRequestId: string): Prom
   return textOf(got.value);
 };
 
-// Strict, so a key the copy gained is refused here and never read past as a finder's own.
+/** Strict, so a key the copy gained is refused here and never read past as a finder's own. */
 const copyAsRead = z.strictObject({
   workspaceId: z.string(),
   subjectRequestId: z.string(),
@@ -1799,7 +1802,7 @@ const replayCopiesIn = async (workspaceId: string): Promise<readonly string[]> =
 };
 
 describe("the replay copy the restore reads", () => {
-  it("lands under the platform's own prefix, where no workspace's principal can address it", async () => {
+  it("lands under the platform's prefix, beyond any workspace's principal", async () => {
     const { scenario, subjectRequestId } = await bundleNamingThePerson();
 
     const done = await completing(scenario, subjectRequestId);
@@ -1812,7 +1815,7 @@ describe("the replay copy the restore reads", () => {
     expect(theirs).toEqual({ ok: true, value: [] });
   });
 
-  it("carries what a re-run must have: the pseudonym, the identifier set and the map", async () => {
+  it("carries the pseudonym, the identifier set and the map", async () => {
     const { scenario, email, person, subjectRequestId } = await bundleNamingThePerson();
 
     const done = await completing(scenario, subjectRequestId);
@@ -1837,7 +1840,7 @@ describe("the replay copy the restore reads", () => {
     expect(found.filter((at) => at.endsWith("(author line)"))).toHaveLength(2);
   });
 
-  it("carries nothing a finder does not need — not the report, not the counts, not a value a location names", async () => {
+  it("carries nothing a finder does not need", async () => {
     const { scenario, email, subjectRequestId } = await bundleNamingThePerson();
 
     const done = await completing(scenario, subjectRequestId);
@@ -1867,7 +1870,7 @@ describe("the replay copy the restore reads", () => {
     expect(text).not.toContain("Expenses are claimed within thirty days");
   });
 
-  it("names no person for a subject with no user row, because an absent login is not a null one", async () => {
+  it("names no person for a subject with no user row", async () => {
     const { scenario, done } = await completedForASubjectWithNoUserRow();
 
     const copy = await readCopy(scenario.workspaceId, done.erasureRequestId);
@@ -1880,7 +1883,7 @@ describe("the replay copy the restore reads", () => {
     });
   });
 
-  it("refuses to complete a request whose copy the store would not take, so no completion stands without one", async () => {
+  it("refuses to complete when the store refuses the copy", async () => {
     const { scenario, subjectRequestId } = await bundleNamingThePerson();
 
     const shut = openObjects({
@@ -1894,13 +1897,7 @@ describe("the replay copy the restore reads", () => {
 
     const run = await runErasure(
       ERASURE,
-      {
-        git: scenario.git,
-        postgres: scenario.postgres,
-        objects: shut.value,
-        clock: { now: () => LOCKED_AT },
-        log: operatorLog,
-      },
+      erasureDoorsFor(scenario, shut.value, LOCKED_AT, operatorLog),
       { workspaceId: scenario.workspaceId, subjectRequestId },
     );
 
@@ -1911,7 +1908,7 @@ describe("the replay copy the restore reads", () => {
     expect(await replayCopiesIn(scenario.workspaceId)).toEqual([]);
   });
 
-  it("leaves one copy and not two on a second run, still dated the completion the first run wrote", async () => {
+  it("leaves one copy dated the first completion on a rerun", async () => {
     const { scenario, subjectRequestId } = await bundleNamingThePerson();
 
     const first = await completing(scenario, subjectRequestId);
@@ -1928,7 +1925,7 @@ describe("the replay copy the restore reads", () => {
 });
 
 describe("a request the routine will not run", () => {
-  it("refuses an access request, because an access request is answered and never erased", async () => {
+  it("refuses an access request, which is answered and never erased", async () => {
     const scenario = await arrange();
     const seeded = await seedingWith(db().pool, (seed) =>
       seed.subjectRequest({ workspaceId: scenario.workspaceId, kind: "access" }),

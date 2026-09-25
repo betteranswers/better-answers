@@ -10,6 +10,7 @@ import {
 import { getObject } from "../src/store/objects/index.ts";
 import { revokeCredentials } from "../src/workspaces/index.ts";
 import { bundleHistory, everyObjectOf, fileAtCommit } from "./bundle.ts";
+import { erasureDoorsFor } from "./erasure-doors.ts";
 import { bootstrap } from "./platform.ts";
 import { ledgerRowsOf } from "./sourced-concept.ts";
 import { objectStoreForSuite, textOf } from "./suite-objects.ts";
@@ -33,13 +34,8 @@ const REHEARSED = "platform.erasure.rehearsed";
 
 const CONCEPT_PATH = "knowledge/erasure-rehearsal.md";
 
-const doorsFor = (scenario: Scenario, at: Date = REHEARSED_AT) => ({
-  git: scenario.git,
-  postgres: scenario.postgres,
-  objects: objects().door,
-  clock: { now: () => at },
-  log: { info: () => undefined },
-});
+const doorsFor = (scenario: Scenario, at: Date = REHEARSED_AT) =>
+  erasureDoorsFor(scenario, objects().door, at);
 
 const expectedTokensFor = (workspaceId: string): readonly string[] => {
   const email = `subject-${workspaceId.toLowerCase()}@erasure-rehearsal.example.test`;
@@ -107,7 +103,7 @@ const bindingsIn = async (workspaceId: string): Promise<readonly string[]> => {
 };
 
 describe("the seed", () => {
-  it("writes one synthetic person, their membership and one concept file naming them, and answers with the tokens a dump is grepped for", async () => {
+  it("writes one synthetic member and answers the tokens to grep", async () => {
     const scenario = await arrange();
     const [email, named, name] = expectedTokensFor(scenario.workspaceId);
 
@@ -120,7 +116,7 @@ describe("the seed", () => {
     ]);
   });
 
-  it("binds one document naming the subject by their work address and by name, and queues its index run", async () => {
+  it("binds a document naming the subject, queueing its index run", async () => {
     const scenario = await arrange();
     const [email, , name] = expectedTokensFor(scenario.workspaceId);
 
@@ -139,7 +135,7 @@ describe("the seed", () => {
     });
   });
 
-  it("binds a document of their own for a subject seeded after the last one was erased, rather than answering with the document naming the one erased", async () => {
+  it("binds a new document for a subject seeded after erasure", async () => {
     const scenario = await arrange();
     const erased = await seeding(scenario);
     await rehearsing(scenario);
@@ -157,7 +153,7 @@ describe("the seed", () => {
     expect(await bindingsIn(scenario.workspaceId)).toHaveLength(2);
   });
 
-  it("names the subject in the concept file's own text, in the one form the routine rewrites", async () => {
+  it("names the subject in the concept file in rewritable form", async () => {
     const scenario = await arrange();
     const [, named] = expectedTokensFor(scenario.workspaceId);
 
@@ -169,7 +165,7 @@ describe("the seed", () => {
     expect(file).toContain(named);
   });
 
-  it("is the same subject the second time, because a drill phase re-run is not a second person, and makes no second commit", async () => {
+  it("seeds the same subject again, with no second commit", async () => {
     const scenario = await arrange();
 
     const first = await seeding(scenario);
@@ -183,7 +179,7 @@ describe("the seed", () => {
     expect(await bindingsIn(scenario.workspaceId)).toEqual([first.document.bindingId]);
   });
 
-  it("refuses to seed a workspace where another concept holds the drill's path, with the bundle's head where it was, rather than reporting it seeded", async () => {
+  it("refuses where another concept holds the drill's path, head unmoved", async () => {
     const scenario = await arrange();
     const other = await writeConcept(scenario.editor, doorsOf(scenario), {
       mergeKey: "Note:not the drill",
@@ -211,7 +207,7 @@ describe("the seed", () => {
 });
 
 describe("the rehearsal", () => {
-  it("finds the subject the seed left in the rows, so a dump may be taken between the two phases", async () => {
+  it("finds the subject the seed left in the rows", async () => {
     const scenario = await arrange();
 
     await seedSyntheticSubject(ERASURE, doorsFor(scenario), {
@@ -223,7 +219,7 @@ describe("the rehearsal", () => {
     expect(rehearsed.tokens).toEqual(expectedTokensFor(scenario.workspaceId));
   });
 
-  it("names a principal its door refused as the subject's, never as a refusal of the request", async () => {
+  it("names a refused principal as the subject's, not the request's", async () => {
     const scenario = await arrange();
     const subject = await seeding(scenario);
     const revoked = await revokeCredentials(bootstrap, scenario.postgres, {
@@ -244,7 +240,7 @@ describe("the rehearsal", () => {
     });
   });
 
-  it("refuses a workspace nothing was seeded into, rather than erasing whoever else is there", async () => {
+  it("refuses a workspace nothing was seeded into", async () => {
     const scenario = await arrange();
 
     const rehearsed = await rehearseErasure(ERASURE, doorsFor(scenario), {
@@ -282,7 +278,7 @@ describe("the rehearsal", () => {
     expect(report).toContain("Exports already issued are not recalled. None have been issued.");
   });
 
-  it("leaves no token in any object the bundle still reaches, and no identity row for the subject", async () => {
+  it("leaves no token in the bundle and no identity row", async () => {
     const scenario = await arrange();
     const subject = await seeding(scenario);
 
@@ -297,7 +293,7 @@ describe("the rehearsal", () => {
     expect(await membershipRows(scenario.workspaceId, subject.personId)).toEqual([]);
   });
 
-  it("records one act under the platform principal, carrying ids and a count and no token", async () => {
+  it("records one act under the platform principal, carrying no token", async () => {
     const scenario = await arrange();
     const subject = await seeding(scenario);
 
