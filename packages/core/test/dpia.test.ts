@@ -88,7 +88,7 @@ const DEFAULT_ON = ["date-of-birth", "home-address", "personal-contact"] as cons
 const DEFAULT_OFF = ["person-name", "job-title"] as const;
 
 describe("the categories a binding's rules in force can raise", () => {
-  it("names the always set and the default-on set for a binding nobody configured", async () => {
+  it("names the always and default-on sets for an unconfigured binding", async () => {
     const scenario = await arrange();
     const binding = await bindingIn(scenario);
 
@@ -103,7 +103,7 @@ describe("the categories a binding's rules in force can raise", () => {
     }
   });
 
-  it("names the default-off set on a binding that switched it on", async () => {
+  it("names the default-off set once a binding switches it on", async () => {
     const scenario = await arrange();
     const binding = await bindingIn(scenario, { default_on: true, default_off: true });
 
@@ -114,7 +114,7 @@ describe("the categories a binding's rules in force can raise", () => {
     ]);
   });
 
-  it("drops the default-on set from a binding that switched it off, and keeps the always set", async () => {
+  it("drops a switched-off default-on set and keeps the always set", async () => {
     const scenario = await arrange();
     const binding = await bindingIn(scenario, { default_on: false, default_off: true });
 
@@ -124,7 +124,7 @@ describe("the categories a binding's rules in force can raise", () => {
     ]);
   });
 
-  it("carries the binding's own rules in force beside the categories they raised", async () => {
+  it("carries the binding's own rules in force", async () => {
     const scenario = await arrange();
     const binding = await bindingIn(scenario, { default_on: false, default_off: true });
 
@@ -136,7 +136,7 @@ describe("the categories a binding's rules in force can raise", () => {
 });
 
 describe("what the platform holds whatever the binding", () => {
-  it("names the four platform-held categories on two bindings with different rules in force", async () => {
+  it("names four platform-held categories on bindings with different rules", async () => {
     const scenario = await arrange();
     const safe = await bindingIn(scenario);
     const everything = await bindingIn(scenario, { default_on: true, default_off: true });
@@ -152,7 +152,7 @@ describe("what the platform holds whatever the binding", () => {
     expect((await documentFor(scenario, everything)).platformHeldCategories).toEqual(expected);
   });
 
-  it("carries the special-category label with the condition the platform recorded for it", async () => {
+  it("carries the special-category label with its recorded condition", async () => {
     const scenario = await arrange();
     const binding = await bindingIn(scenario);
 
@@ -165,7 +165,7 @@ describe("what the platform holds whatever the binding", () => {
 });
 
 describe("the routes a DPIA input lists", () => {
-  it("prints the provider's own retention sentence for a route that carries one", async () => {
+  it("prints the provider's retention sentence a route carries", async () => {
     const scenario = await arrange();
     const tail = "Prompts and outputs are deleted within 30 days; no training on customer data.";
     const binding = await answeringRouteAndBinding(scenario, tail);
@@ -182,7 +182,7 @@ describe("the routes a DPIA input lists", () => {
     ]);
   });
 
-  it("says not recorded for a route nobody read the provider's terms for", async () => {
+  it("says not recorded for a route without a retention sentence", async () => {
     const scenario = await arrange();
     const binding = await answeringRouteAndBinding(scenario, null);
 
@@ -205,7 +205,7 @@ describe("the routes a DPIA input lists", () => {
     expect((await documentFor(scenario, binding)).routes).toEqual([]);
   });
 
-  it("lists no embedding route, and never names Mistral — no v0.1 block embeds anything", async () => {
+  it("lists no embedding route and never names Mistral", async () => {
     const scenario = await arrange();
     await routeIn(scenario, {
       purpose: "embedding",
@@ -228,7 +228,7 @@ describe("the routes a DPIA input lists", () => {
 });
 
 describe("what the platform has no row for", () => {
-  it("says not recorded for a binding's scope and its retention class, rather than inventing either", async () => {
+  it("says not recorded for a binding's scope and retention class", async () => {
     const scenario = await arrange();
     const binding = await bindingIn(scenario);
 
@@ -240,7 +240,7 @@ describe("what the platform has no row for", () => {
     });
   });
 
-  it("reads the binding's class and audience off the row, because those the platform does hold", async () => {
+  it("reads the binding's class and audience off its row", async () => {
     const scenario = await arrange();
     const binding = await seedingWith(
       db().pool,
@@ -264,7 +264,7 @@ describe("what the platform has no row for", () => {
 });
 
 describe("the hash the publish row carries", () => {
-  it("is the same across two reads of a binding nothing changed", async () => {
+  it("is the same across two reads of an unchanged binding", async () => {
     const scenario = await arrange();
     const binding = await bindingIn(scenario);
 
@@ -282,7 +282,7 @@ describe("the hash the publish row carries", () => {
     expect(after).not.toBe(before);
   });
 
-  it("is the shape the ledger's content-hash kind takes, so a publish row can carry it", async () => {
+  it("takes the shape of the ledger's content-hash kind", async () => {
     const scenario = await arrange();
     const binding = await bindingIn(scenario);
 
@@ -294,19 +294,16 @@ describe("who may read a DPIA input", () => {
   it.each([
     ["a Viewer", (scenario: Scenario) => scenario.viewer],
     ["an Editor", (scenario: Scenario) => scenario.editor],
-  ] as const)(
-    "refuses %s — it is the Admin's document, as the publish act is",
-    async (_who, principalOf) => {
-      const scenario = await arrange();
-      const bindingId = await bindingIn(scenario);
+  ] as const)("refuses %s, as the document is the Admin's alone", async (_who, principalOf) => {
+    const scenario = await arrange();
+    const bindingId = await bindingIn(scenario);
 
-      const read = await acting(principalOf(scenario), (principal, tx) =>
-        dpiaInputFor(principal, tx, inputOf(dpiaReadInput, { bindingId })),
-      );
+    const read = await acting(principalOf(scenario), (principal, tx) =>
+      dpiaInputFor(principal, tx, inputOf(dpiaReadInput, { bindingId })),
+    );
 
-      expect(read).toEqual({ ok: false, error: "role-forbids" });
-    },
-  );
+    expect(read).toEqual({ ok: false, error: "role-forbids" });
+  });
 
   it("says no-such-binding for another workspace's binding", async () => {
     const mine = await arrange();
@@ -320,7 +317,7 @@ describe("who may read a DPIA input", () => {
     expect(read).toEqual({ ok: false, error: "no-such-binding" });
   });
 
-  it("names the field when the id is not the minter's shape, and the read is never reached", () => {
+  it("names an id that is not the minter's shape", () => {
     expect(parse(dpiaReadInput, { bindingId: "not-an-id" })).toEqual({
       ok: false,
       error: { word: "malformed", fields: { bindingId: "bad-format" } },
