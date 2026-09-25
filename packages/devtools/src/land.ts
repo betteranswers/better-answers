@@ -15,8 +15,10 @@ const BASE = "main";
 const REPOSITORY = path.resolve(import.meta.dirname, "../../..");
 const COMMITLINT = path.join(REPOSITORY, "node_modules", ".bin", "commitlint");
 
-// The repository tracks content of its own under these — hooks, agents, two skills — so only
-// what git has never seen is a session's.
+/**
+ * The repository tracks content of its own under `.claude/`, so only what git has never seen is
+ * a session's.
+ */
 const KEPT_BY_THE_SESSION = [".claude/", ".scratch/"];
 const UNTRACKED = "??";
 
@@ -150,7 +152,7 @@ const addressIn = (output: string): PullRequest | undefined => {
 
 type QueueState = { readonly isInMergeQueue: boolean; readonly enabledAt: string | undefined };
 
-// The shape gh answers the queue query with; anything else is no queue state to report.
+/** The shape gh answers the queue query with; anything else is no queue state to report. */
 const queueAnswer = z.object({
   data: z
     .object({
@@ -346,6 +348,10 @@ const openAndArm = (): number => {
   return queueReadBack(pull);
 };
 
+/**
+ * The exit status: 0 once the pull request is queued or armed, 2 for a refusal before anything
+ * is committed, 1 for any other failure.
+ */
 export const land = (argv: readonly string[]): number => {
   const landing = landingFrom(argv);
   if (typeof landing === "number") return landing;
