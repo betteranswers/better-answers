@@ -402,7 +402,6 @@
         "packages/core/src/erasure/map.ts",
         "packages/core/src/erasure/rehearsal.ts",
         "packages/core/src/erasure/routine.ts",
-        "packages/core/src/sources/binding.ts",
         "packages/core/src/store/git/index.ts",
         "packages/core/src/store/graph/index.ts",
         "packages/core/test/bundle.ts",

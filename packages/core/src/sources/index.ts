@@ -1,4 +1,3 @@
-import { boundarySchemas } from "@better-answers/schema";
 import { z } from "zod";
 
 import { visibilityAgreed, visibilityOf, widens, type Visibility } from "../access/index.ts";
@@ -6,7 +5,13 @@ import { act, declareActs, record, type AuditEvent, type LedgerAct } from "../au
 import { attempt, err, ok, ulid, type Result, type UserPrincipal } from "../kernel/index.ts";
 import { openingACascadeOverHeldGroups } from "../concepts/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
-import { adminOnBinding, bindingNamed, BINDING_ID, type ActingOnBinding } from "./admin-binding.ts";
+import {
+  adminOnBinding,
+  bindingNamed,
+  BINDING_ID,
+  BINDING_VISIBILITY,
+  type ActingOnBinding,
+} from "./admin-binding.ts";
 import { cascadeOverEvidence } from "./cascade.ts";
 import { holdsAnUnreviewedSpecialCategory } from "./review.ts";
 import type { SourceRefusal } from "./vocabulary.ts";
@@ -87,14 +92,10 @@ const SOURCE_ACTS = declareActs("sources", {
   }),
 });
 
-const BINDING_VISIBILITY = boundarySchemas.sourceBinding.select.pick({
-  sensitivity: true,
-  audience: true,
-  audienceGroups: true,
-});
-
-// A narrowing and a widening ask for the same pair; built twice, since one schema exported under
-// two names is a duplicate export.
+/**
+ * A narrowing and a widening ask for the same pair; built twice, since one schema exported under
+ * two names is a duplicate export.
+ */
 const theClassAsked = () =>
   BINDING_VISIBILITY.extend({
     bindingId: BINDING_ID,
@@ -154,8 +155,10 @@ type ClassAsked = {
   readonly next: Visibility;
 };
 
-// A narrowing and a widening both open the cascade before they lock the binding, so the two queue
-// behind each other rather than deadlock.
+/**
+ * A narrowing and a widening both open the cascade before they lock the binding, so the two queue
+ * behind each other rather than deadlock.
+ */
 const classAskedOf = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -203,6 +206,10 @@ const classSet = async <A extends LedgerAct>(
   return ok({ bindingId, auditEventId, visibility: next, ...cascaded.value });
 };
 
+/**
+ * `widening-refused` if the class asked is wider in sensitivity or audience, even when it is
+ * narrower in the other.
+ */
 export const narrowBinding = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -223,7 +230,10 @@ export const narrowBinding = async (
   });
 };
 
-// A document's own class is left alone: the derivation reads the narrower of it and the binding's.
+/**
+ * `not-wider` unless the class asked is wider in sensitivity or audience and narrower in neither.
+ * A document's own class is left alone: the derivation reads the narrower of it and the binding's.
+ */
 export const widenBinding = async (
   principal: UserPrincipal,
   tx: Tx,
