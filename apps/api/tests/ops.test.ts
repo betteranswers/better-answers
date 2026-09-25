@@ -1986,6 +1986,147 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
   });
 
+  describe("rename-workspace — the platform renames a workspace", () => {
+    const renaming = (app: TestApp, workspaceId: string, flags: readonly string[]): Promise<Run> =>
+      opsWith(app, ["rename-workspace", "--workspace", workspaceId, ...flags], {});
+
+    const outcomeOf = async (app: TestApp, workspaceId: string) => {
+      const standing = await app.database.superuser.query<{ name: string; slug: string }>(
+        "SELECT name, slug FROM workspace WHERE id = $1",
+        [workspaceId],
+      );
+      return {
+        standing: standing.rows,
+        renamed: await rowsOfAct(app, workspaceId, "platform.workspace.renamed"),
+      };
+    };
+
+    const renamedEvent = (
+      workspaceId: string,
+      detail: { readonly nameChanged: boolean; readonly slugChanged: boolean },
+    ) => ({ actor: BOOTSTRAP_ACTOR, subject_id: workspaceId, detail });
+
+    const MALFORMED =
+      "rename-workspace: REFUSED — malformed: give --workspace a workspace id, and --name, --slug or both a value that is not blank";
+
+    it("renames the name, the slug or both, recording each change", async () => {
+      const { workspaceId, slug } = await app().provision({ name: "Acme" });
+      const [first, second] = [aSlug(), aSlug()];
+
+      const runs = [
+        await renaming(app(), workspaceId, ["--name", "Acme Group"]),
+        await renaming(app(), workspaceId, ["--slug", first]),
+        await renaming(app(), workspaceId, ["--name", "Acme Ltd", "--slug", second]),
+      ];
+
+      expect(runs.map((run) => run.exitCode)).toEqual([0, 0, 0]);
+      expect(runs.map((run) => run.lines)).toEqual([
+        [`rename-workspace: done — workspace ${workspaceId} is named Acme Group, slug ${slug}`],
+        [`rename-workspace: done — workspace ${workspaceId} is named Acme Group, slug ${first}`],
+        [`rename-workspace: done — workspace ${workspaceId} is named Acme Ltd, slug ${second}`],
+      ]);
+      expect(await outcomeOf(app(), workspaceId)).toEqual({
+        standing: [{ name: "Acme Ltd", slug: second }],
+        renamed: [
+          renamedEvent(workspaceId, { nameChanged: true, slugChanged: false }),
+          renamedEvent(workspaceId, { nameChanged: false, slugChanged: true }),
+          renamedEvent(workspaceId, { nameChanged: true, slugChanged: true }),
+        ],
+      });
+    });
+
+    it("takes back its own slug without refusing, writing nothing", async () => {
+      const { workspaceId, slug } = await app().provision({ name: "Acme" });
+
+      const run = await renaming(app(), workspaceId, ["--name", "Acme", "--slug", slug]);
+
+      expect(run.exitCode).toBe(0);
+      expect(run.lines).toEqual([
+        `rename-workspace: done — workspace ${workspaceId} is named Acme, slug ${slug}`,
+      ]);
+      expect(await outcomeOf(app(), workspaceId)).toEqual({
+        standing: [{ name: "Acme", slug }],
+        renamed: [],
+      });
+    });
+
+    it("refuses slug-taken for another workspace's slug, changing nothing", async () => {
+      const taken = (await app().provision()).slug;
+      const { workspaceId, slug } = await app().provision({ name: "Acme" });
+
+      const run = await renaming(app(), workspaceId, ["--name", "Acme Group", "--slug", taken]);
+
+      expect(run.exitCode).toBe(1);
+      expect(run.lines).toEqual([
+        "rename-workspace: REFUSED — slug-taken: another workspace already holds that slug",
+      ]);
+      expect(await outcomeOf(app(), workspaceId)).toEqual({
+        standing: [{ name: "Acme", slug }],
+        renamed: [],
+      });
+    });
+
+    it("refuses no-such-workspace for an unknown id, and writes nothing", async () => {
+      const nowhere = ulid();
+
+      const run = await renaming(app(), nowhere, ["--name", "Acme Group"]);
+
+      expect(run.exitCode).toBe(1);
+      expect(run.lines).toEqual([
+        `rename-workspace: REFUSED — no-such-workspace: ${nowhere} is not a workspace`,
+      ]);
+      expect(await ledgerOf(app(), nowhere)).toEqual([]);
+    });
+
+    it.each([
+      ["a blank name", ["--name", "   "]],
+      ["a blank slug beside a good name", ["--name", "Acme Group", "--slug", " "]],
+      ["neither --name nor --slug", []],
+    ])("refuses malformed for %s, changing nothing", async (_shape, flags) => {
+      const { workspaceId, slug } = await app().provision({ name: "Acme" });
+
+      const run = await renaming(app(), workspaceId, flags);
+
+      expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
+        exitCode: 2,
+        lines: [MALFORMED],
+      });
+      expect(await outcomeOf(app(), workspaceId)).toEqual({
+        standing: [{ name: "Acme", slug }],
+        renamed: [],
+      });
+    });
+
+    it("refuses malformed for a workspace that is not an id", async () => {
+      const run = await renaming(app(), "ws_synthetic", ["--name", "Acme Group"]);
+
+      expect({ exitCode: run.exitCode, lines: run.lines }).toEqual({
+        exitCode: 2,
+        lines: [MALFORMED],
+      });
+    });
+
+    it.each([
+      ["no flags at all", []],
+      ["no --workspace", ["--name", "Acme Group", "--slug", "acme"]],
+    ])("answers usage to %s, before it reads anything", async (_shape, flags) => {
+      const run = await ops(app(), ["rename-workspace", ...flags]);
+
+      expect(run.exitCode).toBe(2);
+      expect(run.lines).toEqual([
+        "rename-workspace: --workspace <id> is required, with --name <name>, --slug <slug> or both",
+      ]);
+    });
+
+    it("names the command in the usage", async () => {
+      const run = await ops(app(), ["help"]);
+
+      expect(run.lines.join("\n")).toContain(
+        "rename-workspace --workspace <id> [--name <name>] [--slug <slug>]",
+      );
+    });
+  });
+
   describe("import-bundle — the company's bundle landed through the governed write", () => {
     const BUNDLE_FIXTURE = fileURLToPath(new URL("fixtures/bundle", import.meta.url));
     const BUNDLE_ID = "01J6CCCCCCCCCCCCCCCCCCCCCC";

@@ -18,6 +18,7 @@ import {
   personIdByEmail,
   provisionWorkspace,
   readMembership,
+  renameWorkspace,
   revokeCredentials,
   revokeWorkspaceTokens,
   TOOLS_LIST_TTL_CONFIG_KEY,
@@ -714,6 +715,10 @@ describe("what the slice answers when the store cannot be reached", () => {
           role: "Editor",
         }),
       ],
+      [
+        "renameWorkspace",
+        await renameWorkspace(bootstrap, door, { workspaceId: ulid(), name: "Acme" }),
+      ],
     ];
 
     for (const [name, answered] of answers) {
@@ -745,6 +750,17 @@ describe("what the slice answers when the store cannot be reached", () => {
         role: "Admin",
       }),
     ).toEqual({ ok: false, error: "malformed" });
+    for (const input of [
+      { workspaceId: "not-a-ulid", name: "Acme" },
+      { workspaceId: ulid(), name: "   " },
+      { workspaceId: ulid(), slug: "" },
+      { workspaceId: ulid() },
+    ]) {
+      expect({ input, answered: await renameWorkspace(bootstrap, door, input) }).toEqual({
+        input,
+        answered: { ok: false, error: "malformed" },
+      });
+    }
 
     expect(await workspaceIdBySlug(bootstrap, door, "   ")).toEqual({ ok: true, value: undefined });
   });
@@ -904,6 +920,132 @@ describe("adding a member — the platform's act for a person who has signed in"
     // @ts-expect-error a user principal is not a platform principal
     void (() => addMember(admin, door, { workspaceId: ulid(), email: "a@b.c", role: "Editor" }));
     expect(admin.role).toBe("Admin");
+  });
+});
+
+describe("renaming a workspace — the platform's act", () => {
+  const standingOf = async (workspaceId: string) => {
+    const found = await db().pool.query<{ name: string; slug: string }>(
+      "SELECT name, slug FROM workspace WHERE id = $1",
+      [workspaceId],
+    );
+    return found.rows;
+  };
+
+  const renamedRowsOf = async (workspaceId: string) => {
+    const found = await db().pool.query(
+      "SELECT id, act, family, actor, subject_kind, subject_id, detail, batch_id FROM audit_event WHERE workspace_id = $1 AND act = 'platform.workspace.renamed' ORDER BY at, id",
+      [workspaceId],
+    );
+    return found.rows;
+  };
+
+  it("sets both, answering the standing and recording one row", async () => {
+    const { door, workspaceId } = await provisionedWorkspace(db(), "Acme");
+    const slug = `group-${workspaceId.toLowerCase()}`;
+
+    const renamed = await renameWorkspace(bootstrap, door, {
+      workspaceId,
+      name: "  Acme Group ",
+      slug,
+    });
+
+    expect(renamed).toEqual({
+      ok: true,
+      value: {
+        workspaceId,
+        name: "Acme Group",
+        slug,
+        actorId: "process:better-answers-bootstrap",
+      },
+    });
+    expect(await standingOf(workspaceId)).toEqual([{ name: "Acme Group", slug }]);
+    expect(await renamedRowsOf(workspaceId)).toEqual([
+      {
+        id: expect.stringMatching(ULID_SHAPE),
+        act: "platform.workspace.renamed",
+        family: "platform",
+        actor: "process:better-answers-bootstrap",
+        subject_kind: "workspace",
+        subject_id: workspaceId,
+        detail: { nameChanged: true, slugChanged: true },
+        batch_id: null,
+      },
+    ]);
+  });
+
+  it("keeps the field left out, recording only the other as changed", async () => {
+    const named = await provisionedWorkspace(db(), "Named");
+    const slugged = await provisionedWorkspace(db(), "Slugged");
+    const newSlug = `moved-${slugged.workspaceId.toLowerCase()}`;
+
+    await renameWorkspace(bootstrap, named.door, {
+      workspaceId: named.workspaceId,
+      name: "Named Again",
+    });
+    await renameWorkspace(bootstrap, slugged.door, {
+      workspaceId: slugged.workspaceId,
+      slug: newSlug,
+    });
+
+    expect({
+      named: await standingOf(named.workspaceId),
+      slugged: await standingOf(slugged.workspaceId),
+    }).toEqual({
+      named: [{ name: "Named Again", slug: named.slug }],
+      slugged: [{ name: "Slugged", slug: newSlug }],
+    });
+    expect({
+      named: (await renamedRowsOf(named.workspaceId)).map((row) => row.detail),
+      slugged: (await renamedRowsOf(slugged.workspaceId)).map((row) => row.detail),
+    }).toEqual({
+      named: [{ nameChanged: true, slugChanged: false }],
+      slugged: [{ nameChanged: false, slugChanged: true }],
+    });
+  });
+
+  it("writes nothing when the input changes neither field", async () => {
+    const { door, workspaceId, slug } = await provisionedWorkspace(db(), "Same");
+
+    const renamed = await renameWorkspace(bootstrap, door, { workspaceId, name: "Same", slug });
+
+    expect(renamed).toEqual({
+      ok: true,
+      value: { workspaceId, name: "Same", slug, actorId: "process:better-answers-bootstrap" },
+    });
+    expect(await renamedRowsOf(workspaceId)).toEqual([]);
+  });
+
+  it("refuses slug-taken and no-such-workspace, writing nothing", async () => {
+    const holder = await provisionedWorkspace(db(), "Holder");
+    const { door, workspaceId, slug } = await provisionedWorkspace(db(), "Taker");
+
+    const refusals = [
+      await renameWorkspace(bootstrap, door, {
+        workspaceId,
+        name: "Taker Again",
+        slug: holder.slug,
+      }),
+      await renameWorkspace(bootstrap, door, { workspaceId: ulid(), name: "Nowhere" }),
+    ];
+
+    expect(refusals).toEqual([
+      { ok: false, error: "slug-taken" },
+      { ok: false, error: "no-such-workspace" },
+    ]);
+    expect(await standingOf(workspaceId)).toEqual([{ name: "Taker", slug }]);
+    expect(await renamedRowsOf(workspaceId)).toEqual([]);
+  });
+
+  it("renames and records together, or neither", async () => {
+    const { door, workspaceId, slug } = await provisionedWorkspace(db(), "Atomic");
+
+    const renamed = await whileWritesAreRefused(db().pool, "audit_event", () =>
+      renameWorkspace(bootstrap, door, { workspaceId, name: "Atomic Again" }),
+    );
+
+    expect(renamed).toMatchObject({ ok: false, error: expect.any(Error) });
+    expect(await standingOf(workspaceId)).toEqual([{ name: "Atomic", slug }]);
   });
 });
 

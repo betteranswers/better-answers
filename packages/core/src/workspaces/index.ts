@@ -43,6 +43,7 @@ export const BOOTSTRAP: BootstrapPrincipal = { kind: "platform", actorId: BOOTST
 
 const WORKSPACE_ACTS = declareActs("platform", {
   provisioned: act("platform.workspace.provisioned", { adminUserId: "id", role: "role" }),
+  renamed: act("platform.workspace.renamed", { nameChanged: "flag", slugChanged: "flag" }),
 });
 
 const MEMBER_ACTS = declareActs("people", {
@@ -156,6 +157,78 @@ export const provisionWorkspace = async (
   if (!act.ok) return err(refusalFor(act.error, PROVISION_CONSTRAINTS));
   if (!act.value.ok) return err(act.value.error);
   return ok({ workspaceId: row.data.id, actorId: platform.actorId });
+};
+
+export type RenameWorkspaceInput = {
+  readonly workspaceId: string;
+  readonly name?: string | undefined;
+  readonly slug?: string | undefined;
+};
+
+export type RenameRefusal = WorkspaceRefusal<"malformed" | "no-such-workspace" | "slug-taken">;
+
+type WorkspaceNames = { readonly name: string; readonly slug: string };
+
+type WorkspaceRenamed = WorkspaceNames & {
+  readonly workspaceId: WorkspaceId;
+  readonly actorId: PlatformPrincipal["actorId"];
+};
+
+const RENAME_CONSTRAINTS = {
+  workspace_slug_unique: "slug-taken",
+} as const satisfies Record<string, RenameRefusal>;
+
+/**
+ * A field the input leaves out keeps what it holds. An input naming neither is malformed, and one
+ * that changes neither writes nothing.
+ */
+export const renameWorkspace = async (
+  platform: PlatformPrincipal,
+  door: PostgresDoor,
+  input: RenameWorkspaceInput,
+): Promise<Result<WorkspaceRenamed, RenameRefusal | Error>> => {
+  const workspaceId = boundarySchemas.workspace.select.shape.id.safeParse(input.workspaceId);
+  const asked = boundarySchemas.workspace.update.safeParse({ name: input.name, slug: input.slug });
+  if (!workspaceId.success || !asked.success) return err("malformed");
+  const { name, slug } = asked.data;
+  if (name === undefined && slug === undefined) return err("malformed");
+
+  const renamed = await attempt(() =>
+    withScope(
+      platform,
+      door,
+      workspaceId.data,
+      async (tx): Promise<Result<WorkspaceNames, WorkspaceRefusal<"no-such-workspace">>> => {
+        const held = await tx.query<WorkspaceNames>(
+          "SELECT name, slug FROM workspace WHERE id = $1 FOR UPDATE",
+          [workspaceId.data],
+        );
+        const was = held.rows[0];
+        if (was === undefined) return err("no-such-workspace");
+        const next = { name: name ?? was.name, slug: slug ?? was.slug };
+        const nameChanged = next.name !== was.name;
+        const slugChanged = next.slug !== was.slug;
+        if (!nameChanged && !slugChanged) return ok(next);
+
+        await tx.query("UPDATE workspace SET name = $2, slug = $3 WHERE id = $1", [
+          workspaceId.data,
+          next.name,
+          next.slug,
+        ]);
+        await record(platform, tx, {
+          id: ulid(),
+          act: WORKSPACE_ACTS.renamed,
+          subjectId: workspaceId.data,
+          detail: { nameChanged, slugChanged },
+        });
+        return ok(next);
+      },
+    ),
+  );
+
+  if (!renamed.ok) return err(refusalFor(renamed.error, RENAME_CONSTRAINTS));
+  if (!renamed.value.ok) return err(renamed.value.error);
+  return ok({ workspaceId: workspaceId.data, ...renamed.value.value, actorId: platform.actorId });
 };
 
 const personByEmail = async (tx: Tx, email: string): Promise<NamedPerson | undefined> => {
