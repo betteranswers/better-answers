@@ -21,12 +21,12 @@ const CLASS_WORDS = {
   precondition: { why: "What this act waits on has not happened.", next: "Try once it has." },
 } satisfies Record<RefusalClass, Said>;
 
-export const refusedIn = (
-  own: SaidOfWord,
+export const refusalOutcome = (
+  featureWords: SaidOfWord,
   word: RefusalWord,
   refusalClass: RefusalClass,
 ): Outcome => {
-  const said = own[word] ?? CLASS_WORDS[refusalClass];
+  const said = featureWords[word] ?? CLASS_WORDS[refusalClass];
   return {
     tone: "refused",
     words: (
@@ -43,7 +43,9 @@ const UNANSWERED: Outcome = {
 };
 
 // A failure with no refusal word is the network's or the platform's, never the reader's to fix.
-export const failureIn = (own: SaidOfWord, failure: Error | ApiError): Outcome => {
+export const failureOutcome = (featureWords: SaidOfWord, failure: Error | ApiError): Outcome => {
   const refusal = refusalOf(failure);
-  return refusal === undefined ? UNANSWERED : refusedIn(own, refusal.word, refusal.class);
+  return refusal === undefined
+    ? UNANSWERED
+    : refusalOutcome(featureWords, refusal.word, refusal.class);
 };

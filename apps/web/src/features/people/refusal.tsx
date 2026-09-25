@@ -1,6 +1,6 @@
 import type { ApiError } from "@/shared/api/trpc.ts";
 import type { Outcome } from "@/shared/outcome.tsx";
-import { failureIn, type SaidOfWord } from "@/shared/refusal-outcome.tsx";
+import { failureOutcome, type SaidOfWord } from "@/shared/refusal-outcome.tsx";
 
 const SAID_OF_WORD = {
   "role-forbids": {
@@ -10,4 +10,4 @@ const SAID_OF_WORD = {
 } satisfies SaidOfWord;
 
 export const outcomeOfFailure = (failure: Error | ApiError): Outcome =>
-  failureIn(SAID_OF_WORD, failure);
+  failureOutcome(SAID_OF_WORD, failure);

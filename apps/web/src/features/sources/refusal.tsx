@@ -1,6 +1,6 @@
 import type { ApiError, RefusalClass, RefusalWord } from "@/shared/api/trpc.ts";
 import type { Outcome } from "@/shared/outcome.tsx";
-import { failureIn, refusedIn, type SaidOfWord } from "@/shared/refusal-outcome.tsx";
+import { failureOutcome, refusalOutcome, type SaidOfWord } from "@/shared/refusal-outcome.tsx";
 
 import { UPLOAD_CAP_MB } from "./words.ts";
 
@@ -79,7 +79,7 @@ export const whyAndNextOf = (word: keyof typeof SAID_OF_WORD): string =>
   `${SAID_OF_WORD[word].why} ${SAID_OF_WORD[word].next}`;
 
 export const refusedFor = (word: RefusalWord, refusalClass: RefusalClass): Outcome =>
-  refusedIn(SAID_OF_WORD, word, refusalClass);
+  refusalOutcome(SAID_OF_WORD, word, refusalClass);
 
 export const outcomeOfFailure = (failure: Error | ApiError): Outcome =>
-  failureIn(SAID_OF_WORD, failure);
+  failureOutcome(SAID_OF_WORD, failure);

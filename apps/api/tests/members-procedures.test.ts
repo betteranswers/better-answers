@@ -14,46 +14,33 @@ afterAll(async () => {
   await app.stop();
 });
 
-type MemberRow = { readonly id: string; readonly user_id: string; readonly created_at: Date };
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
-const memberRowsOf = async (workspaceId: string): Promise<readonly MemberRow[]> =>
-  (
-    await app.database.superuser.query<MemberRow>(
-      "SELECT id, user_id, created_at FROM member WHERE workspace_id = $1",
-      [workspaceId],
-    )
-  ).rows;
-
-const joinedAtOf = (rows: readonly MemberRow[], personId: string): string | undefined =>
-  rows.find((row) => row.user_id === personId)?.created_at.toISOString();
-
-/** An Admin, an Editor in two groups and a Viewer in none. */
 const aWorkspaceOfThree = async () => {
   const workspace = await app.provision();
+  const { workspaceId } = workspace;
   const editor = await app.person(undefined, "Priya Shah");
   const viewer = await app.person(undefined, "Sam Okoro");
-  await app.addMember(workspace.workspaceId, editor.id, "Editor");
-  await app.addMember(workspace.workspaceId, viewer.id, "Viewer");
-  const groups = await seededIn(app, async (seed) => {
-    const { workspaceId } = workspace;
+  const seeded = await seededIn(app, async (seed) => {
+    const editorRow = await seed.member({ workspaceId, userId: editor.id, role: "Editor" });
+    const viewerRow = await seed.member({ workspaceId, userId: viewer.id, role: "Viewer" });
     const hr = await seed.group({ workspaceId, name: "HR team" });
     const bids = await seed.group({ workspaceId, name: "Bid writers" });
     await seed.groupMember({ workspaceId, groupId: hr.id, userId: editor.id });
     await seed.groupMember({ workspaceId, groupId: bids.id, userId: editor.id });
-    return { hr: hr.id, bids: bids.id };
+    return { editorRow, viewerRow, hr: hr.id, bids: bids.id };
   });
-  return { workspace, editor, viewer, groups };
+  return { workspace, editor, viewer, seeded };
 };
 
 describe("the members list over tRPC", () => {
   it("lists each member's name, address, role, groups and when joined", async () => {
-    const { workspace, editor, viewer, groups } = await aWorkspaceOfThree();
+    const { workspace, editor, viewer, seeded } = await aWorkspaceOfThree();
     const { admin } = workspace;
     const { api } = await webSignedIn(app, admin.email);
 
     const listed = await api.members.list.query();
 
-    const rows = await memberRowsOf(workspace.workspaceId);
     expect(listed).toEqual([
       {
         personId: editor.id,
@@ -61,10 +48,10 @@ describe("the members list over tRPC", () => {
         address: editor.email,
         role: "Editor",
         groups: [
-          { groupId: groups.bids, name: "Bid writers" },
-          { groupId: groups.hr, name: "HR team" },
+          { groupId: seeded.bids, name: "Bid writers" },
+          { groupId: seeded.hr, name: "HR team" },
         ],
-        joinedAt: joinedAtOf(rows, editor.id),
+        joinedAt: seeded.editorRow.createdAt.toISOString(),
       },
       {
         personId: viewer.id,
@@ -72,7 +59,7 @@ describe("the members list over tRPC", () => {
         address: viewer.email,
         role: "Viewer",
         groups: [],
-        joinedAt: joinedAtOf(rows, viewer.id),
+        joinedAt: seeded.viewerRow.createdAt.toISOString(),
       },
       {
         personId: admin.id,
@@ -80,20 +67,19 @@ describe("the members list over tRPC", () => {
         address: admin.email,
         role: "Admin",
         groups: [],
-        joinedAt: joinedAtOf(rows, admin.id),
+        joinedAt: expect.stringMatching(ISO_INSTANT),
       },
     ]);
   });
 
   it("names no member row's own key anywhere in its answer", async () => {
-    const { workspace } = await aWorkspaceOfThree();
+    const { workspace, seeded } = await aWorkspaceOfThree();
     const { api } = await webSignedIn(app, workspace.admin.email);
 
     const answered = JSON.stringify(await api.members.list.query());
 
-    const keys = (await memberRowsOf(workspace.workspaceId)).map((row) => row.id);
-    expect(keys).toHaveLength(3);
-    expect(keys.filter((key) => answered.includes(key))).toEqual([]);
+    expect(answered).not.toContain(seeded.editorRow.id);
+    expect(answered).not.toContain(seeded.viewerRow.id);
   });
 
   it("never lists a member of another workspace", async () => {

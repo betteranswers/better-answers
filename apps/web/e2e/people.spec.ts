@@ -154,6 +154,7 @@ test.describe("the People screen's Members view", () => {
   test("finds one person by name or address, and says when no one matches", async ({
     page,
     request,
+    passesTheAccessibilityGate,
   }) => {
     const { joined } = await anAdminAtPeople(page, request, "Wharfe Fabrication");
     const sam = joined.find((member) => member.displayName === "Sam Okoro");
@@ -174,6 +175,7 @@ test.describe("the People screen's Members view", () => {
     await searchBox(page).fill("nobody by this name");
     await expect(memberRows(page)).toHaveCount(1);
     await expect(membersRegion(page)).toContainText("No one matches “nobody by this name”.");
+    await passesTheAccessibilityGate();
     await membersRegion(page).getByRole("button", { name: "Clear the search" }).click();
 
     await expect(memberRows(page)).toHaveCount(3);
@@ -219,7 +221,7 @@ test.describe("the People screen's Members view", () => {
     });
   }
 
-  test("is reached and searched by keyboard, and clean under axe", async ({
+  test("lets an Admin reach and search members by keyboard alone", async ({
     page,
     request,
     passesTheAccessibilityGate,

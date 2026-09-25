@@ -59,8 +59,6 @@ const MEMBERS = `SELECT u.id AS "personId", u.name AS "displayName", u.email AS 
       GROUP BY u.id, u.name, u.email, m.role, m.created_at
       ORDER BY lower(u.name), lower(u.email), u.id`;
 
-const UNREADABLE_MEMBER = new Error("a member's row is not the shape its tables admit");
-
 /**
  * In display-name order, then by address. A member is named by their person id: the member row's
  * own key names nothing outside its table.
@@ -72,10 +70,11 @@ export const listMembers = async (
   const admitted = admit(listMembersAct, principal, {});
   if (!admitted.ok) return err(admitted.error);
 
-  const read = await attempt(() => tx.query(MEMBERS, [admitted.value.workspaceId]));
-  if (!read.ok) return err(read.error);
-  const parsed = z.array(LISTED_ROW).safeParse(read.value.rows);
-  if (!parsed.success) return err(UNREADABLE_MEMBER);
+  // The parse brands the ids; a row it throws on fails the read like the query would.
+  const listed = await attempt(async () =>
+    z.array(LISTED_ROW).parse((await tx.query(MEMBERS, [admitted.value.workspaceId])).rows),
+  );
+  if (!listed.ok) return err(listed.error);
 
-  return ok(parsed.data.map((row) => ({ ...row, joinedAt: row.joinedAt.toISOString() })));
+  return ok(listed.value.map((row) => ({ ...row, joinedAt: row.joinedAt.toISOString() })));
 };

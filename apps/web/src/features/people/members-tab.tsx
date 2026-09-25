@@ -34,14 +34,14 @@ const PERSON = "person";
 
 const SEARCH_LABEL = "Search by name or address";
 
-const JOINED = new Intl.DateTimeFormat("en-GB", {
+const LONG_UK_DATE = new Intl.DateTimeFormat("en-GB", {
   day: "numeric",
   month: "long",
   year: "numeric",
   timeZone: "Europe/London",
 });
 
-const peopleWord = (count: number): string => (count === 1 ? "1 person" : `${count} people`);
+const countOfPeople = (count: number): string => (count === 1 ? "1 person" : `${count} people`);
 
 function PersonCell(properties: { readonly member: ListedMember }) {
   const { displayName, address } = properties.member;
@@ -87,29 +87,21 @@ const COLUMNS = column.columns([
   column.accessor("joinedAt", {
     header: "Joined",
     cell: ({ getValue }) => (
-      <span className="tabular-nums">{JOINED.format(new Date(getValue()))}</span>
+      <span className="tabular-nums">{LONG_UK_DATE.format(new Date(getValue()))}</span>
     ),
   }),
 ]);
 
-function NoOneListed(properties: {
+function NoOneMatches(properties: {
   readonly search: string;
   readonly total: number;
   readonly onClear: () => void;
 }) {
-  if (properties.total === 0) {
-    return (
-      <div className="px-4 py-10">
-        <p className="font-medium">No one belongs to this workspace yet.</p>
-        <p className="text-muted-foreground">An invitation, once accepted, brings a person in.</p>
-      </div>
-    );
-  }
   return (
     <div className="flex flex-col items-start gap-1 px-4 py-10">
       <p className="font-medium">No one matches “{properties.search}”.</p>
       <p className="text-muted-foreground">
-        Clear the search to see all {peopleWord(properties.total)}.
+        Clear the search to see all {countOfPeople(properties.total)}.
       </p>
       <Button variant="outline" className="mt-3" onClick={properties.onClear}>
         Clear the search
@@ -145,8 +137,8 @@ function MemberList(properties: { readonly members: readonly ListedMember[] }) {
   const shown = table.getRowModel().rows.length;
   const said =
     search === ""
-      ? peopleWord(members.length)
-      : `${shown} of ${peopleWord(members.length)} match “${search}”.`;
+      ? countOfPeople(members.length)
+      : `${shown} of ${countOfPeople(members.length)} match “${search}”.`;
 
   return (
     <>
@@ -182,7 +174,7 @@ function MemberList(properties: { readonly members: readonly ListedMember[] }) {
         <GridTable
           table={table}
           caption="Members of this workspace, each with their address, role, groups and the day they joined."
-          empty={<NoOneListed search={search} total={members.length} onClear={clear} />}
+          empty={<NoOneMatches search={search} total={members.length} onClear={clear} />}
         />
       </div>
     </>
