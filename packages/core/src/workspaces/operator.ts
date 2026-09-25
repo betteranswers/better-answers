@@ -5,12 +5,18 @@ import {
   attempt,
   err,
   ok,
+  type Claims,
   type PlatformPrincipal,
   type Result,
   type UserId,
   ulid,
 } from "../kernel/index.ts";
-import { type PostgresDoor, type Tx, withIdentityWrite } from "../store/postgres/index.ts";
+import {
+  type PostgresDoor,
+  type Tx,
+  withIdentityWrite,
+  withOperator,
+} from "../store/postgres/index.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
 const OPERATOR_ACTS = declareIdentitySetActs("people", {
@@ -77,4 +83,30 @@ export const setOperatorMark = async (
   );
   if (!marked.ok) return err(marked.error);
   return marked.value;
+};
+
+type OperatorStanding =
+  | { readonly operator: false }
+  | { readonly operator: true; readonly name: string };
+
+/**
+ * Whether a signed-in person stands as the operator, by the rule every console act is resolved
+ * on, and their display name where they do. It answers no rather than refusing.
+ */
+export const standingAsOperator = async (
+  door: PostgresDoor,
+  claims: Pick<Claims, "userId" | "issuedAt">,
+): Promise<Result<OperatorStanding, Error>> => {
+  const resolved = await attempt(() =>
+    withOperator(door, claims, async (operator, tx) => {
+      const found = await tx.query<{ name: string }>('SELECT name FROM "user" WHERE id = $1', [
+        operator.userId,
+      ]);
+      return found.rows[0]?.name;
+    }),
+  );
+  if (!resolved.ok) return err(resolved.error);
+
+  const name = resolved.value.ok ? resolved.value.value : undefined;
+  return ok(name === undefined ? { operator: false } : { operator: true, name });
 };

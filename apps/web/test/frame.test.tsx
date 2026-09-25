@@ -4,7 +4,14 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { createAppClients } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
-import { SCREENS, viewsOf } from "@/shared/screens.ts";
+import {
+  CONSOLE,
+  CONSOLE_SCREENS,
+  CONTROL_CENTRE,
+  SCREENS,
+  viewsOf,
+  type Screen,
+} from "@/shared/screens.ts";
 
 import { appAt, openApp } from "./open-app.tsx";
 
@@ -143,11 +150,13 @@ describe("Control Centre's three-region shell", () => {
   });
 });
 
+const EVERY_SCREEN: readonly Screen[] = [...SCREENS, ...CONSOLE_SCREENS];
+
 /**
  * One direction finds the view the router forgot; only the other finds the route nothing declared.
  */
-const declaredViewPaths = (): readonly string[] =>
-  SCREENS.flatMap((each) => viewsOf(each).map((view) => view.path));
+const declaredViewPaths = (screens: readonly Screen[] = SCREENS): readonly string[] =>
+  screens.flatMap((each) => viewsOf(each).map((view) => view.path));
 
 const routedViewPaths = (): readonly string[] => {
   const router = createAppRouter(
@@ -155,7 +164,7 @@ const routedViewPaths = (): readonly string[] => {
     createMemoryHistory({ initialEntries: ["/system"] }),
   );
   return Object.keys(router.routesByPath).filter((path) =>
-    SCREENS.some((each) => path.startsWith(`${each.path}/`)),
+    EVERY_SCREEN.some((each) => path.startsWith(`${each.path}/`)),
   );
 };
 
@@ -229,11 +238,11 @@ describe("Control Centre's one list of screens and their views", () => {
   it("gives every declared view a route of its own", () => {
     const routed = routedViewPaths();
 
-    expect(declaredViewPaths().filter((path) => !routed.includes(path))).toEqual([]);
+    expect(declaredViewPaths(EVERY_SCREEN).filter((path) => !routed.includes(path))).toEqual([]);
   });
 
   it("routes no view the list does not declare", () => {
-    const declared = declaredViewPaths();
+    const declared = declaredViewPaths(EVERY_SCREEN);
 
     expect(routedViewPaths().filter((path) => !declared.includes(path))).toEqual([]);
   });
@@ -288,5 +297,53 @@ describe("Control Centre's one list of screens and their views", () => {
         unmount();
       }
     }
+  });
+});
+
+describe("the console's own list of screens and their views", () => {
+  it("declares People and Workspaces, apart from Control Centre's six", () => {
+    expect(
+      CONSOLE_SCREENS.map((each) => [each.name, viewsOf(each).map((view) => view.name)]),
+    ).toEqual([
+      ["People", ["Everyone", "Names waiting"]],
+      ["Workspaces", ["Every workspace"]],
+    ]);
+    expect(CONSOLE.screens.map((each) => each.name)).toEqual(["People", "Workspaces"]);
+    expect(CONTROL_CENTRE.screens.map((each) => each.name)).toEqual([
+      "Sources",
+      "Suggestions",
+      "Knowledge",
+      "Questions",
+      "People",
+      "System",
+    ]);
+  });
+
+  it("keeps every console screen and view under the console's address", () => {
+    const outside = declaredViewPaths(CONSOLE_SCREENS)
+      .concat(CONSOLE_SCREENS.map((each) => each.path))
+      .filter((path) => !path.startsWith("/console/"));
+
+    expect(outside).toEqual([]);
+  });
+
+  it("calls the Workspaces list built, and People's two views not", () => {
+    expect(
+      declaredViewPaths(CONSOLE_SCREENS).filter((path) =>
+        CONSOLE_SCREENS.some((each) =>
+          viewsOf(each).some((view) => view.path === path && view.built),
+        ),
+      ),
+    ).toEqual(["/console/workspaces/every-workspace"]);
+  });
+
+  it("lands each console screen's own address on its default view", async () => {
+    const landed: string[] = [];
+    for (const each of CONSOLE_SCREENS) {
+      const { router } = await appAt(each.path);
+      landed.push(router.state.location.pathname);
+    }
+
+    expect(landed).toEqual(["/console/people/everyone", "/console/workspaces/every-workspace"]);
   });
 });

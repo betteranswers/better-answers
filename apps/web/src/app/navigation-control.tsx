@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 
 import { Icon } from "@/shared/icon.tsx";
-import type { Screen } from "@/shared/screens.ts";
+import type { Screen, Surface } from "@/shared/screens.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/shared/ui/sheet.tsx";
 import { IconRail } from "./icon-rail.tsx";
@@ -14,6 +14,7 @@ const SCREENS_AND_VIEWS = "Screens and views";
  * toggle when wide. `controls` is that nav's id.
  */
 export function NavigationControl(properties: {
+  readonly surface: Surface;
   readonly wide: boolean;
   readonly showing: boolean;
   readonly controls: string;
@@ -77,7 +78,12 @@ export function NavigationControl(properties: {
           <SheetTitle>{SCREENS_AND_VIEWS}</SheetTitle>
         </SheetHeader>
 
-        <IconRail openScreenId={properties.openScreen?.id} tooltips={false} onChoose={close} />
+        <IconRail
+          surface={properties.surface}
+          openScreen={properties.openScreen}
+          tooltips={false}
+          onChoose={close}
+        />
 
         {properties.openScreen === undefined ? null : (
           <SecondaryNav

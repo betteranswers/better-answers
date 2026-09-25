@@ -35,6 +35,7 @@ describe("what a procedure may answer the wire", () => {
       "routes.list",
       "runs.ofSubject",
       "session.membership",
+      "session.operator",
       "sources.bind",
       "sources.dismissAsNotSpecialCategory",
       "sources.findings",
@@ -48,6 +49,7 @@ describe("what a procedure may answer the wire", () => {
     ]);
     expectTypeOf<EveryProcedure["path"]>().toEqualTypeOf<
       | "session.membership"
+      | "session.operator"
       | "person.setDisplayName"
       | "person.requestAccess"
       | "console.people.revokeCredentials"

@@ -250,8 +250,8 @@ export const ownTransactionProcedure = trpc.procedure.use(async ({ ctx, next }) 
  * value the request names.
  */
 export const personProcedure = trpc.procedure.use(async ({ ctx, next }) => {
-  const session = await sessionOf(ctx);
-  return next({ ctx: { personId: session.user.id, doors: ctx.doors } });
+  const { user, session } = await sessionOf(ctx);
+  return next({ ctx: { personId: user.id, issuedAt: session.createdAt, doors: ctx.doors } });
 });
 
 /**

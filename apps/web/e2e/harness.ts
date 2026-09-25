@@ -58,6 +58,15 @@ export const removeMember = async (
 export const revokeCredentials = (api: APIRequestContext, userId: string) =>
   ask(api, "/revocations", { userId }, credentialsRevoked);
 
+const operatorMarked = z.object({ marked: z.boolean() });
+
+/** The mark only an ops command sets, granted or cleared as that command does it. */
+export const markTheOperator = (
+  api: APIRequestContext,
+  email: string,
+  change: "grant" | "revoke" = "grant",
+) => ask(api, "/operators", { email, change }, operatorMarked);
+
 export type SeedRoute = {
   readonly purpose: "extraction" | "enrichment" | "answering" | "judging" | "embedding";
   readonly provider: string;

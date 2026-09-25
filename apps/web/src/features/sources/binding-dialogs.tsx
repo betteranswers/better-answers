@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/ui/select.tsx";
+import { counted } from "@/shared/words.ts";
 
 import { ActDialog } from "./act-dialog.tsx";
 import { bindingHeadingId } from "./binding-list.tsx";
@@ -23,7 +24,7 @@ import {
   type Sensitivity,
 } from "./sources-api.ts";
 import { SummaryRow } from "./summary-row.tsx";
-import { AUDIENCE_WORDS, AUDITED_CATEGORIES, counted, spokenWord } from "./words.ts";
+import { AUDIENCE_WORDS, AUDITED_CATEGORIES, spokenWord } from "./words.ts";
 
 type DialogProperties<Asked> = {
   readonly binding: ListedBinding;

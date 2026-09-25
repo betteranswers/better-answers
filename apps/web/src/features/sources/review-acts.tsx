@@ -6,6 +6,7 @@ import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";
+import { counted } from "@/shared/words.ts";
 
 import { ActDialog } from "./act-dialog.tsx";
 import { outcomeOfFailure, whyAndNextOf } from "./refusal.tsx";
@@ -28,7 +29,7 @@ import {
   useTickedGroups,
   type TickedGroups,
 } from "./sources-state.ts";
-import { counted, spokenWord } from "./words.ts";
+import { spokenWord } from "./words.ts";
 
 type Settled<Answer> = {
   readonly onSuccess: (answer: Answer) => void;

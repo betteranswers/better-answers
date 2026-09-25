@@ -3,27 +3,42 @@ import { useId } from "react";
 
 import { useSignOut } from "@/features/auth/auth-hooks.ts";
 import { useMembership } from "@/features/auth/membership.ts";
-import { screenAt, viewAt, type Screen, type View } from "@/shared/screens.ts";
+import { useOperatorStanding } from "@/features/console/operator.ts";
+import {
+  CONTROL_CENTRE,
+  screenAt,
+  viewAt,
+  type Screen,
+  type Surface,
+  type View,
+} from "@/shared/screens.ts";
 import { isFilled } from "@/shared/view-toolbar.tsx";
 import { IconRail } from "./icon-rail.tsx";
 import { NavigationControl } from "./navigation-control.tsx";
 import { SecondaryNav } from "./secondary-nav.tsx";
 import { useSecondaryNavShowing } from "./secondary-nav-showing.ts";
 import { Toolbar, ViewPanel, ViewTabsRoot } from "./toolbar.tsx";
-import { TopBar } from "./top-bar.tsx";
+import { TopBar, type MenuLink, type Person } from "./top-bar.tsx";
 import { useWideLayout } from "./wide-layout.ts";
 
-export function Frame() {
+const TO_THE_CONSOLE: MenuLink = { name: "Console", to: "/console" };
+
+/** The three regions over one surface's screens; `place` is what the top bar leads with. */
+export function Frame(properties: {
+  readonly surface: Surface;
+  readonly place: string | undefined;
+  readonly person: Person | undefined;
+  readonly links: readonly MenuLink[];
+}) {
+  const { surface } = properties;
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const membership = useMembership();
   const { signOut, signingOut } = useSignOut();
   const wide = useWideLayout();
   const { showing, show } = useSecondaryNavShowing();
   const navId = useId();
 
-  const person = membership.data;
-  const openScreen = screenAt(pathname);
-  const openView = viewAt(pathname);
+  const openScreen = screenAt(surface, pathname);
+  const openView = viewAt(surface, pathname);
 
   return (
     /*
@@ -40,6 +55,7 @@ export function Frame() {
 
       {wide ? (
         <Navigation
+          surface={surface}
           navId={navId}
           showing={showing}
           openScreen={openScreen}
@@ -49,19 +65,14 @@ export function Frame() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar
-          membership={
-            person === undefined
-              ? undefined
-              : {
-                  workspaceName: person.workspace.name,
-                  personName: person.person.name,
-                  role: person.role,
-                }
-          }
+          place={properties.place}
+          person={properties.person}
+          links={properties.links}
           screenName={openScreen?.name}
           viewName={openView?.name}
           navigation={
             <NavigationControl
+              surface={surface}
               wide={wide}
               showing={showing}
               controls={navId}
@@ -80,7 +91,24 @@ export function Frame() {
   );
 }
 
+export function ControlCentreFrame() {
+  const membership = useMembership();
+  const standing = useOperatorStanding();
+  const held = membership.data;
+
+  return (
+    <Frame
+      surface={CONTROL_CENTRE}
+      place={held?.workspace.name}
+      person={held === undefined ? undefined : { name: held.person.name, role: held.role }}
+      // Shown to the operator alone: a link anyone else would only be refused at.
+      links={standing.data?.operator === true ? [TO_THE_CONSOLE] : []}
+    />
+  );
+}
+
 function Navigation(properties: {
+  readonly surface: Surface;
   readonly navId: string;
   readonly showing: boolean;
   readonly openScreen: Screen | undefined;
@@ -88,7 +116,7 @@ function Navigation(properties: {
 }) {
   return (
     <>
-      <IconRail openScreenId={properties.openScreen?.id} tooltips />
+      <IconRail surface={properties.surface} openScreen={properties.openScreen} tooltips />
 
       {properties.openScreen === undefined ? null : (
         <SecondaryNav

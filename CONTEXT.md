@@ -851,7 +851,8 @@ to it by IRI and never restates it (ADR 0014).
   spend, backups) (ADR 0017, ticket 37). "Proposal" is the bid document a company completes and is
   never a screen (Liam, 26/08/2026). _Avoid_: section (a guide's node), "Mission Control".
 - **console** — the *operator*'s surface over every workspace, outside any one of them and never
-  a screen of Control Centre: **People** (every person, the workspaces they belong to and their
+  a screen of Control Centre, drawn in the same regions with two screens of its own: **People**
+  (every person, the workspaces they belong to and their
   role in each, their sessions and grants; revoke everywhere, correct a display name) and
   **Workspaces** (each with its member count, read-only). Shown to the operator alone and reached
   only from a signed-in session, never from a token. _Avoid_: admin panel, platform console,
@@ -864,8 +865,9 @@ to it by IRI and never restates it (ADR 0014).
   address leads there. A view nobody has built yet is still a destination, and says in words that
   it is not built. Not a *view (of an MCP App)*. _Avoid_: section (a guide's node), tab (a division
   inside one view, and the view's own business rather than a word of this glossary's).
-- **icon rail** — the region down Control Centre's left edge listing its six screens, each an icon
-  carrying its screen's name and marking the screen being read. _Avoid_: section nav, sidebar.
+- **icon rail** — the region down the left edge listing the screens of Control Centre, or of the
+  *console*, each an icon carrying its screen's name and marking the screen being read. _Avoid_:
+  section nav, sidebar.
 - **secondary nav** — the region beside the icon rail listing the open screen's views under that
   screen's name, marking the view being read, and swapping when the screen changes. The navigation
   control closes it and opens it again, and that choice is remembered on the browser it was made
@@ -883,7 +885,9 @@ to it by IRI and never restates it (ADR 0014).
   is emptied when the reader opens another tab. _Avoid_: selection store, shared context.
 - **top bar** — the region across the top of Control Centre carrying the navigation control in its
   leading corner, then naming the workspace, then which screen and view the person is in, then who
-  they are, their role and the way to sign out. _Avoid_: masthead, section header.
+  they are, their role and the way to sign out. Its menu leads the operator alone to the
+  *console*, whose top bar reads *Console* in place of a workspace, shows no role and leads back
+  to the workspace picker. _Avoid_: masthead, section header.
 - **promotion** — an Editor's proposal that an answer or a response become an `Answer`
   concept — the button is *Save as an Answer* — kept as a suggestion of kind *promotion* until
   decided at the promotion gate. _Avoid_: promote (as a reader's verb — a marketing word).

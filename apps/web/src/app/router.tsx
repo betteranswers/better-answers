@@ -17,13 +17,23 @@ import { DisplayNameScreen } from "@/features/auth/display-name-screen.tsx";
 import { membershipRefusal, NEEDS_A_PICK } from "@/features/auth/membership.ts";
 import { NoWorkspaceScreen } from "@/features/auth/no-workspace-screen.tsx";
 import { SignInScreen } from "@/features/auth/sign-in-screen.tsx";
+import { mustSignInForTheConsole } from "@/features/console/operator.ts";
+import { WorkspacesView } from "@/features/console/workspaces-view.tsx";
 import { MEMBERS_TOOLBAR, MembersView } from "@/features/people/members-view.tsx";
 import { BINDINGS_TOOLBAR, BindingsView } from "@/features/sources/bindings-view.tsx";
 import { createApiProxy, type ApiProxy } from "@/shared/api/trpc.ts";
-import { SCREENS, viewsOf, type Screen, type View } from "@/shared/screens.ts";
+import {
+  CONSOLE,
+  CONTROL_CENTRE,
+  viewsOf,
+  type Screen,
+  type Surface,
+  type View,
+} from "@/shared/screens.ts";
 import type { ViewToolbar } from "@/shared/view-toolbar.tsx";
+import { ConsoleFrame } from "./console-frame.tsx";
 import { FailedScreen } from "./failed-screen.tsx";
-import { Frame } from "./frame.tsx";
+import { ControlCentreFrame } from "./frame.tsx";
 import type { AppClients } from "./providers.tsx";
 import { UnknownScreen } from "./unknown-screen.tsx";
 import { ROUTES_AND_SPEND_TOOLBAR, RoutesAndSpendView } from "./views/routes-and-spend-view.tsx";
@@ -36,13 +46,14 @@ const BUILT_VIEWS = new Map<View["path"], BuiltView>([
   ["/sources/bindings", { draw: BindingsView, toolbar: BINDINGS_TOOLBAR }],
   ["/people/members", { draw: MembersView, toolbar: MEMBERS_TOOLBAR }],
   ["/system/routes-and-spend", { draw: RoutesAndSpendView, toolbar: ROUTES_AND_SPEND_TOOLBAR }],
+  ["/console/workspaces/every-workspace", { draw: WorkspacesView }],
 ]);
 
 type ShellContext = { readonly queryClient: QueryClient; readonly api: ApiProxy };
 
 const rootRoute = createRootRouteWithContext<ShellContext>()({
   component: Outlet,
-  notFoundComponent: UnknownScreen,
+  notFoundComponent: () => <UnknownScreen />,
 });
 
 const signInRoute = createRoute({
@@ -73,11 +84,16 @@ const noWorkspaceRoute = createRoute({
   component: NoWorkspaceScreen,
 });
 
+const signInAndBackTo = (href: string) => ({
+  href: `/sign-in?redirect=${encodeURIComponent(href)}`,
+  replace: true,
+});
+
 const shellRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: "shell",
-  component: Frame,
-  notFoundComponent: UnknownScreen,
+  component: ControlCentreFrame,
+  notFoundComponent: () => <UnknownScreen />,
   // The sign-in screen and the picker are this route's siblings, so this never runs on them.
   beforeLoad: async ({ context, location }) => {
     const refusal = await membershipRefusal(context.queryClient, context.api);
@@ -86,7 +102,7 @@ const shellRoute = createRoute({
     throw redirect(
       refusal === NEEDS_A_PICK
         ? { href: "/choose-workspace", replace: true }
-        : { href: `/sign-in?redirect=${encodeURIComponent(location.href)}`, replace: true },
+        : signInAndBackTo(location.href),
     );
   },
 });
@@ -95,7 +111,29 @@ const indexRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: "/",
   beforeLoad: () => {
-    throw redirect({ to: "/system", replace: true });
+    throw redirect({ href: CONTROL_CENTRE.home.path, replace: true });
+  },
+});
+
+/** Outside any workspace, so it asks for a session and never for a workspace pick. */
+const consoleRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  id: "console",
+  component: ConsoleFrame,
+  notFoundComponent: () => <UnknownScreen surface={CONSOLE} />,
+  // Asked afresh on the way in, and not again on each move between the console's own screens.
+  beforeLoad: async ({ context, location, cause }) => {
+    if (await mustSignInForTheConsole(context.queryClient, context.api, cause === "enter")) {
+      throw redirect(signInAndBackTo(location.href));
+    }
+  },
+});
+
+const consoleIndexRoute = createRoute({
+  getParentRoute: () => consoleRoute,
+  path: "/console",
+  beforeLoad: () => {
+    throw redirect({ href: CONSOLE.home.path, replace: true });
   },
 });
 
@@ -110,26 +148,34 @@ const componentFor = (screen: Screen, view: View): (() => ReactElement) => {
   return built?.draw ?? (() => <UnbuiltView screen={screen} view={view} />);
 };
 
-const screenRoutes: AnyRoute[] = SCREENS.map((screen) =>
-  createRoute({
-    getParentRoute: () => shellRoute,
-    path: screen.path,
-    beforeLoad: () => {
-      throw redirect({ href: screen.defaultView, replace: true });
-    },
-  }),
-);
-
-const viewRoutes: AnyRoute[] = SCREENS.flatMap((screen) =>
-  viewsOf(screen).map((view) =>
+/** A failed view names its own surface and its way home, so the view carries the failure screen. */
+const routesOf = (surface: Surface, shell: AnyRoute): AnyRoute[] => {
+  const failed = (failure: { readonly reset: () => void }) => (
+    <FailedScreen reset={failure.reset} surface={surface} />
+  );
+  return surface.screens.flatMap((screen) => [
     createRoute({
-      getParentRoute: () => shellRoute,
-      path: view.path,
-      component: componentFor(screen, view),
-      staticData: { toolbar: BUILT_VIEWS.get(view.path)?.toolbar },
+      getParentRoute: () => shell,
+      path: screen.path,
+      beforeLoad: () => {
+        throw redirect({ href: screen.defaultView, replace: true });
+      },
     }),
-  ),
-);
+    ...viewsOf(screen).map((view) =>
+      createRoute({
+        getParentRoute: () => shell,
+        path: view.path,
+        component: componentFor(screen, view),
+        errorComponent: failed,
+        staticData: { toolbar: BUILT_VIEWS.get(view.path)?.toolbar },
+      }),
+    ),
+  ]);
+};
+
+const controlCentreRoutes = routesOf(CONTROL_CENTRE, shellRoute);
+
+const consoleRoutes = routesOf(CONSOLE, consoleRoute);
 
 export const createAppRouter = (clients: AppClients, history?: RouterHistory) => {
   const options = {
@@ -138,7 +184,8 @@ export const createAppRouter = (clients: AppClients, history?: RouterHistory) =>
       displayNameRoute,
       chooseWorkspaceRoute,
       noWorkspaceRoute,
-      shellRoute.addChildren([indexRoute, ...screenRoutes, ...viewRoutes]),
+      shellRoute.addChildren([indexRoute, ...controlCentreRoutes]),
+      consoleRoute.addChildren([consoleIndexRoute, ...consoleRoutes]),
     ]),
 
     context: {
