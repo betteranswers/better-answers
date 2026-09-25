@@ -124,7 +124,7 @@ const AS_BOUND = {
 };
 
 describe("the Sources list an Admin reads", () => {
-  it("says each binding's state, its document and chunk counts and its last run, by name", async () => {
+  it("names each binding's state, counts and last run", async () => {
     const scenario = await arrange();
     const handbook = await bindingOf(scenario, "Handbook", [{ title: "handbook.md" }]);
     const handbookRun = await runOver(scenario, handbook.bindingId, {
@@ -249,7 +249,7 @@ describe("the Sources list an Admin reads", () => {
     ]);
   });
 
-  it("says a binding no run has reached yet has landed and has no last run", async () => {
+  it("shows an unrun binding as landed with no last run", async () => {
     const scenario = await arrange();
     const minutes = await bindingOf(scenario, "Minutes", [{ title: "minutes.md" }]);
 
@@ -260,7 +260,7 @@ describe("the Sources list an Admin reads", () => {
     ]);
   });
 
-  it("names why each quarantined document was set aside, and counts the documents by that name", async () => {
+  it("names each quarantined document's error and counts by error", async () => {
     const scenario = await arrange();
     const scans = await bindingOf(scenario, "Scans", [
       { title: "Minutes" },
@@ -301,7 +301,7 @@ describe("the Sources list an Admin reads", () => {
 });
 
 describe("the runs of a binding, read by subject", () => {
-  it("answers every run of the subject, newest first, with its outcome and its instants as ISO text", async () => {
+  it("answers every run newest first, with outcome and ISO instants", async () => {
     const scenario = await arrange();
     const handbook = await bindingOf(scenario, "Handbook", [{ title: "handbook.md" }]);
     const failed = await runOver(scenario, handbook.bindingId, {
