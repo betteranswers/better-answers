@@ -112,7 +112,7 @@ export type TestApp = {
     workspaceId: string,
     userId: string,
     role: "Admin" | "Editor" | "Viewer",
-  ): Promise<void>;
+  ): Promise<{ id: string }>;
 
   invite(input: { workspaceId: string; email: string; inviterId: string }): Promise<{ id: string }>;
 
@@ -133,6 +133,7 @@ export type TestApp = {
 type Provisioned = {
   readonly workspaceId: string;
   readonly name: string;
+  readonly slug: string;
   readonly admin: Person;
 };
 
@@ -312,20 +313,22 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     const admin = await person(input.adminEmail);
     const id = ulid();
     const name = input.name ?? `Workspace ${id.slice(-4)}`;
+    const slug = `ws-${id.toLowerCase()}`;
     const provisioned = await provisionWorkspace(bootstrap, door, {
       id,
       name,
-      slug: `ws-${id.toLowerCase()}`,
+      slug,
       adminUserId: admin.id,
     });
     if (!provisioned.ok) throw new Error(`provisioning failed: ${provisioned.error}`);
-    return { workspaceId: id, name, admin };
+    return { workspaceId: id, name, slug, admin };
   };
 
   const addMember: TestApp["addMember"] = async (workspaceId, userId, role) => {
     const client = await database.superuser.connect();
     try {
-      await testData(client).member({ workspaceId, userId, role });
+      const created = await testData(client).member({ workspaceId, userId, role });
+      return { id: created.id };
     } finally {
       client.release();
     }
