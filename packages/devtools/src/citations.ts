@@ -19,6 +19,10 @@ type Citation = { readonly what: string; readonly cited: string };
 const patterns: readonly { readonly what: string; readonly pattern: RegExp }[] =
   read().patterns.map((one) => ({ what: one.name, pattern: new RegExp(one.pattern) }));
 
+/**
+ * The first pattern in `contracts/citation/cases.json` the prose matches; undefined when it
+ * cites nothing.
+ */
 export const citationIn = (prose: string): Citation | undefined => {
   for (const { what, pattern } of patterns) {
     const found = pattern.exec(prose);

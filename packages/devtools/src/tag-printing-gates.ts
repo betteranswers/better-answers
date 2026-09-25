@@ -16,6 +16,7 @@ const gates = read();
 
 const A_TEST_PATH = /(?:^|\/)(?:tests?|e2e)\/|\.test\.[cm]?tsx?$/;
 
+/** True for a test, or a gate `gates-printing-a-tag.json` lists; the string check skips both. */
 export const stringsGoUnread = (filename: string): boolean => {
   const posix = filename.replaceAll("\\", "/");
   return A_TEST_PATH.test(posix) || gates.some((gate) => posix.endsWith(gate));

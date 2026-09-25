@@ -20,12 +20,17 @@ const provableCommand = (name: string): readonly string[] => {
   return words;
 };
 
+/** The root `lint` script's words after `oxlint`; throws when it runs another tool. */
 export const lintFlags = (): readonly string[] => {
   const [tool, ...flags] = scriptWords("lint");
   if (tool !== "oxlint") throw new Error(`\`lint\` no longer runs oxlint: ${String(tool)}`);
   return flags;
 };
 
+/**
+ * The paths `comment-gate:python` hands its checker, once each and sorted; throws when it
+ * names no `.py` checker.
+ */
 export const pythonGateRoots = (): readonly string[] => {
   const [, checker, ...roots] = provableCommand("comment-gate:python");
   if (checker === undefined || !checker.endsWith(".py")) {
