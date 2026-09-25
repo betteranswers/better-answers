@@ -180,6 +180,8 @@ A test feeding a value its type forbids says so with `@ts-expect-error`. An asse
 
 Return a new value. What a caller passed in is the caller's.
 
+Reviewer: the lint holds an assignment to a parameter or its property; only a person sees a mutating call on one, such as `push` or `Object.assign`.
+
 ### [TYPES6] Return an error as a `Result`, and catch only around a library
 
 Wrap an external library's throw through `normalizeError`. No `catch` is empty: a swallowed error carries the reason it is safe to lose.

@@ -267,28 +267,25 @@ interface WhatAJobSaw {
   readonly resolves: Record<string, string>;
 }
 
-const noteWhatAJobSaw = (saw: WhatAJobSaw, key: string, rest: string): void => {
+const noteWhatAJobSaw = (saw: WhatAJobSaw, key: string, rest: string): WhatAJobSaw => {
   if (key === "env") {
-    Object.assign(saw.environment, environmentOf([rest]));
-  } else if (key === "resolves") {
-    const [tool, where] = fieldsOf(rest);
-    saw.resolves[tool] = where;
+    return { ...saw, environment: { ...saw.environment, ...environmentOf([rest]) } };
   }
+  if (key !== "resolves") return saw;
+  const [tool, where] = fieldsOf(rest);
+  return { ...saw, resolves: { ...saw.resolves, [tool]: where } };
 };
 
 const readWhatJobsSaw = (stdout: string): ReadonlyMap<string, WhatAJobSaw> => {
   const seen = new Map<string, WhatAJobSaw>();
-  let current: WhatAJobSaw | undefined;
+  let job: { readonly name: string; readonly saw: WhatAJobSaw } | undefined;
   for (const line of stdout.split("\n")) {
     const tab = line.indexOf("\t");
     const key = line.slice(0, tab);
     const rest = line.slice(tab + 1);
-    if (key === "job") {
-      current = { environment: {}, resolves: {} };
-      seen.set(rest, current);
-    } else if (current !== undefined) {
-      noteWhatAJobSaw(current, key, rest);
-    }
+    if (key === "job") job = { name: rest, saw: { environment: {}, resolves: {} } };
+    else if (job !== undefined) job = { name: job.name, saw: noteWhatAJobSaw(job.saw, key, rest) };
+    if (job !== undefined) seen.set(job.name, job.saw);
   }
   return seen;
 };
