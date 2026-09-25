@@ -808,7 +808,7 @@ describe("the shards command", () => {
     { what: "no files", text: '{"schemaVersion": "1.0"}' },
     { what: "a file without mutants", text: '{"files": {"src/b.ts": {"source": ""}}}' },
     {
-      what: "a mutant naming its tests other than in a list",
+      what: "a mutant's tests outside a list",
       text: '{"files": {"src/b.ts": {"mutants": [{"coveredBy": "0"}]}}}',
     },
     { what: "a test file without tests", text: '{"files": {}, "testFiles": {"t.ts": {}}}' },
@@ -824,7 +824,7 @@ describe("the shards command", () => {
       what: "a test placed on no line",
       text: '{"files": {}, "testFiles": {"t.ts": {"tests": [{"id": "0", "name": "a", "location": {"start": {}}}]}}}',
     },
-  ])("reads a report holding $what as none at all", async ({ text }) => {
+  ])("discards a report holding $what", async ({ text }) => {
     const summary = await merging(
       downloaded({ "1.report.json": JSON.stringify(SHARD_ONE), "2.report.json": text }),
       path.join(scratch, `merged-${String(downloads)}`),
@@ -836,15 +836,15 @@ describe("the shards command", () => {
   });
 
   it.each([
-    { what: "a leg it does not know", argv: ["slice", "--leg", "web"], says: USAGE },
+    { what: "an unknown leg", argv: ["slice", "--leg", "web"], says: USAGE },
     {
-      what: "a slice without the previous run's results",
+      what: "a slice without --baseline",
       argv: ["slice", "--leg", "core", "--shard", "1", "--of", "2"],
       says: USAGE,
     },
     { what: "a flag without its value", argv: ["slice", "--leg"], says: USAGE },
     {
-      what: "a command it does not have",
+      what: "an unknown command",
       argv: [
         "list",
         "--leg",
@@ -866,7 +866,7 @@ describe("the shards command", () => {
       says: USAGE,
     },
     {
-      what: "a merge without the previous run's results",
+      what: "a merge without --baseline",
       argv: ["merge", "--leg", "core", "--of", "2", "--shards", ".", "--out", "."],
       says: USAGE,
     },
@@ -886,7 +886,7 @@ describe("the shards command", () => {
       says: `--of takes a whole number from 1\n${USAGE}`,
     },
     {
-      what: "a count that is not a number",
+      what: "a non-numeric count",
       argv: ["slice", "--leg", "core", "--shard", "1", "--of", "two", "--baseline", "."],
       says: `--of takes a whole number from 1\n${USAGE}`,
     },

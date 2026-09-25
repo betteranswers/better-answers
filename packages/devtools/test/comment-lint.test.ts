@@ -155,7 +155,7 @@ describe("the one lint config accepts a comment keeping the rules", () => {
       ),
     ],
     [
-      "a disable naming its rule, with its reason, that suppresses something",
+      "a disable naming its rule and reason, suppressing something",
       holding(
         `// oxlint-disable-next-line ${SUPPRESSIBLE} -- the runner prints its report\n`,
         PRINTS,
@@ -170,7 +170,7 @@ describe("the one lint config accepts a comment keeping the rules", () => {
       holding("// The todo list stays sorted.\n"),
     ],
     [
-      "a doc block on an export that states units and the refusal",
+      "an export's doc block stating units and the refusal",
       exporting(
         "/** Milliseconds, never negative. Refuses a count over 60 with `too-long`, and `null` means no wait. */\n",
       ),

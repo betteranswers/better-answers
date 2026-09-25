@@ -44,7 +44,7 @@ describe("the comment rule fires on a long or citing comment", () => {
     ["an ADR number", "// Kept because the graph is Postgres under ADR 0021.\n"],
     ["a rule tag", `// Kept because a raw insert lives in a factory (${tag("TEST", "4")}).\n`],
     [
-      "a rule tag whose family carries a digit",
+      "a tag from a digit-bearing family",
       `// Kept because the outcome is announced (${tag("A11Y", "1")}).\n`,
     ],
     ["an ISO date", "// Kept because the reading of the registry moved on 2026-09-21.\n"],
@@ -76,7 +76,7 @@ describe("the comment rule fires on a long or citing comment", () => {
     ],
     ["a block comment under a line one", `// ${wordsOf(20)}\n/* ${wordsOf(20)} */\n`],
     ["a line comment under a block one", `/* ${wordsOf(20)} */\n// ${wordsOf(20)}\n`],
-  ])("counts %s as a block of its own", (_what, source) => {
+  ])("counts %s separately", (_what, source) => {
     expect(lint.flagged(holding(source))).toEqual([]);
   });
 
@@ -108,10 +108,10 @@ describe("the comment rule fires on a long or citing comment", () => {
     ["a Stryker restore", "the Stryker restore form"],
     ["a type-checker escape", "the @ts-expect-error form"],
     ["a notice", "the SPDX-License-Identifier line"],
-  ])("reads %s named mid-sentence as prose, not as a directive", (_what, named) => {
+  ])("reads %s named mid-sentence as prose", (_what, named) => {
     const source = `// ${wordsOf(12)}\n// ${named} is named here\n// ${wordsOf(12)}\n`;
 
-    expect(lint.flagged(holding(source))).toEqual([FILE]);
+    expect(lint.flagged(holding(source)), "prose, never a directive").toEqual([FILE]);
   });
 
   it.each([
@@ -160,11 +160,11 @@ describe("the comment rule's exemptions", () => {
 
 describe("the comment rule holds a directive to a same-line reason", () => {
   it.each([
-    ["an oxlint disable", "// oxlint-disable-next-line no-console\n"],
-    ["an ESLint disable in a block", "/* eslint-disable no-console */\n"],
-    ["a disable whose separator carries nothing", "// eslint-disable-line no-console --\n"],
-    ["a Stryker disable", "// Stryker disable next-line all\n"],
-  ])("refuses %s with no reason, naming the directive rule", (_what, directive) => {
+    ["oxlint disable", "// oxlint-disable-next-line no-console\n"],
+    ["block-comment ESLint disable", "/* eslint-disable no-console */\n"],
+    ["bare-separator disable", "// eslint-disable-line no-console --\n"],
+    ["Stryker disable", "// Stryker disable next-line all\n"],
+  ])("refuses a reasonless %s, naming the directive rule", (_what, directive) => {
     const output = lint.output(holding(directive));
 
     expect(output).toContain("gives no reason");
@@ -184,7 +184,7 @@ describe("the comment rule holds a directive to a same-line reason", () => {
     ["an oxlint disable", `// oxlint-disable-next-line no-console -- ${wordsOf(26)}\n`],
     ["a Stryker disable", `// Stryker disable next-line all: ${wordsOf(26)}\n`],
     ["a type-checker escape", `// @ts-expect-error ${wordsOf(26)}\n`],
-  ])("refuses %s whose reason exceeds 25 words, naming the count", (_what, directive) => {
+  ])("refuses %s's 26-word reason, naming the count", (_what, directive) => {
     const output = lint.output(holding(directive));
 
     expect(output).toContain("reason runs to 26 words");
@@ -194,7 +194,7 @@ describe("the comment rule holds a directive to a same-line reason", () => {
   it.each([
     ["a disable", "oxlint-disable-next-line"],
     ["an enable", "oxlint-enable"],
-  ])("walks past %s whose reason runs to exactly 25 words", (_what, directive) => {
+  ])("walks past %s whose reason is exactly 25 words", (_what, directive) => {
     expect(lint.flagged(holding(`// ${directive} no-console -- ${wordsOf(25)}\n`))).toEqual([]);
   });
 
@@ -245,7 +245,7 @@ describe("the comment rule allows an exported function a longer block", () => {
       "an overload's signature",
       "export function wait(count: number): number;\nexport function wait(count: number): number {\n  return count;\n}\n",
     ],
-  ])("walks past a 50-word block on %s in packages/core", (_what, code) => {
+  ])("walks past 50 words on %s in packages/core", (_what, code) => {
     expect(lint.flagged(inCore(`/** ${wordsOf(50)} */\n${code}`))).toEqual([]);
   });
 
@@ -266,13 +266,13 @@ describe("the comment rule allows an exported function a longer block", () => {
 
   it.each([
     ["an exported value", "export const limit = 50;\n"],
-    ["an exported value beside a function", "export const limit = 50, wait = (): number => 1;\n"],
+    ["a value-and-function export", "export const limit = 50, wait = (): number => 1;\n"],
     [
       "an internal function",
       "const wait = (count: number): number => count;\nexport const keep = wait(1);\n",
     ],
     ["an exported type", "export type Wait = number;\n"],
-    ["an exported binding with no value yet", "export let later: number | undefined;\n"],
+    ["an uninitialised export", "export let later: number | undefined;\n"],
     ["a re-export of a function", "export { wait } from './wait.ts';\n"],
   ])("refuses a 26-word block on %s", (_what, code) => {
     expect(lint.output(inCore(`/** ${wordsOf(26)} */\n${code}`))).toContain("runs to 26 words");
@@ -292,9 +292,9 @@ describe("the comment rule allows an exported function a longer block", () => {
   });
 
   it.each([
-    ["outside the two packages", "apps/api/src/probe.ts"],
-    ["in a package's tests", "packages/core/test/probe.ts"],
-  ])("refuses a 26-word block on an exported function %s", (_where, file) => {
+    ["outside both packages", "apps/api/src/probe.ts"],
+    ["in package tests", "packages/core/test/probe.ts"],
+  ])("refuses 26 words on an exported function %s", (_where, file) => {
     const source = `/** ${wordsOf(26)} */\nexport const wait = (count: number): number => count;\n`;
 
     expect(lint.flagged(inCore(source, file))).toEqual([file]);

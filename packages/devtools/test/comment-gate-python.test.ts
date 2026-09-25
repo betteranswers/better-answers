@@ -68,7 +68,7 @@ describe("the Python check fires on a long or citing comment", () => {
     ["an ADR number", "# Kept because the graph is Postgres under ADR 0021.\n"],
     ["a rule tag", `# Kept because a raw insert lives in a factory (${tag("TEST", "4")}).\n`],
     [
-      "a rule tag whose family carries a digit",
+      "a tag from a digit-bearing family",
       `# Kept because the outcome is announced (${tag("A11Y", "1")}).\n`,
     ],
     ["an ISO date", "# Kept because the reading of the registry moved on 2026-09-21.\n"],
@@ -162,7 +162,7 @@ describe("a directive's reason counts against the twenty-five words", () => {
   it.each([
     ["a noqa", "import os  # noqa: F401"],
     ["a type-checker escape", "KEEP: int = 1  # type: ignore[assignment]"],
-  ])("refuses %s with a twenty-six-word reason, naming the directive rule", (_what, line) => {
+  ])("refuses %s's twenty-six-word reason, naming the directive rule", (_what, line) => {
     const output = run({ [FILE]: `${line}  # ${wordsOf(26)}\n` });
 
     expect(output).toContain("reason runs to 26 words");
@@ -178,7 +178,7 @@ describe("a directive's reason counts against the twenty-five words", () => {
   it.each([
     ["a noqa", "import os  # noqa: F401, E501"],
     ["a type-checker escape", "KEEP: int = 1  # type: ignore[assignment]"],
-  ])("refuses %s whose reason follows on with no second marker", (_what, line) => {
+  ])("refuses %s whose reason lacks a second marker", (_what, line) => {
     const output = run({ [FILE]: `${line} - ${wordsOf(26)}\n` });
 
     expect(output).toContain("runs to 26 words");
@@ -226,18 +226,18 @@ describe("a public worker function's docstring may run to fifty words", () => {
       `class Reader:\n    def reads(self) -> int:\n        """${wordsOf(26)}"""\n        return 1\n`,
     ],
     [
-      "a function nested in a public one",
+      "a function inside a public one",
       WORKER_MODULE,
       `def reads() -> int:\n    def inner() -> int:\n        """${wordsOf(26)}"""\n        return 1\n    return inner()\n`,
     ],
     ["the worker module itself", WORKER_MODULE, `"""${wordsOf(26)}"""\n\nKEEP = 1\n`],
     [
-      "a line comment above a public function",
+      "a comment above a public function",
       WORKER_MODULE,
       `# ${wordsOf(26)}\ndef reads() -> int:\n    return 1\n`,
     ],
     [
-      "a public function in the worker's tests",
+      "a public function in worker tests",
       "apps/worker/tests/test_probe.py",
       documented("def test_reads() -> int:", 26),
     ],
