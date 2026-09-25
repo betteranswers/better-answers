@@ -2,8 +2,10 @@ export const IDENTITY_PROVIDER = "apps/api/src/auth";
 export const POSTGRES_DOOR = "packages/core/src/store/postgres";
 export const GRAPH_DOOR = "packages/core/src/store/graph";
 
-// Not `MIGRATOR`: the roles' surface spells the owning database role that way, and this names
-// `migrate.ts`'s directory.
+/**
+ * Not `MIGRATOR`: the roles' surface spells the owning database role that way, and this names
+ * `migrate.ts`'s directory.
+ */
 export const JOURNAL_MIGRATOR = "apps/api/src";
 
 export const OWNERS_OUTSIDE_CORE = [

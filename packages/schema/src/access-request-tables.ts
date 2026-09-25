@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
-import { check, index, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { check, index, text, uniqueIndex } from "drizzle-orm/pg-core";
 
+import { listed, stamp } from "./column-helpers.ts";
 import { invitation, user } from "./identity-tables.ts";
 import { withRLS } from "./with-rls.ts";
 import { workspace } from "./workspace-table.ts";
@@ -12,7 +13,7 @@ export const ACCESS_REQUEST_OPEN_STATUS =
 
 export const ACCESS_REQUEST_REASON_MAX = 1_000;
 
-const statusList = ACCESS_REQUEST_STATUSES.map((status) => `'${status}'`).join(", ");
+const statusList = listed(ACCESS_REQUEST_STATUSES);
 
 export const accessRequest = withRLS(
   "access_request",
@@ -29,10 +30,10 @@ export const accessRequest = withRLS(
       .references(() => user.id),
     reason: text("reason").notNull(),
     status: text("status").notNull().default(ACCESS_REQUEST_OPEN_STATUS),
-    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    createdAt: stamp("created_at").notNull().defaultNow(),
 
     decidedBy: text("decided_by").references(() => user.id),
-    decidedAt: timestamp("decided_at", { withTimezone: true, mode: "date" }),
+    decidedAt: stamp("decided_at"),
 
     invitationId: text("invitation_id").references(() => invitation.id),
   },

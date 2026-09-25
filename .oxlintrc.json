@@ -397,8 +397,6 @@
         "packages/core/test/erasure-replay.test.ts",
         "packages/core/test/erasure-routine.test.ts",
         "packages/core/test/queue.contract.test.ts",
-        "packages/schema/src/concept-tables.ts",
-        "packages/schema/src/journal.ts",
         "packages/schema/test/finding-factory.test.ts",
         "packages/schema/test/null-safe-checks.test.ts",
         "packages/schema/test/readable-chunk.test.ts"

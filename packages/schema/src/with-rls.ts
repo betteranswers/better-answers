@@ -6,6 +6,10 @@ import {
   pgTable,
 } from "drizzle-orm/pg-core";
 
+/**
+ * A table with row-level security on and one policy, `<name>_workspace_isolation`, that holds
+ * every statement to rows whose `tenantColumn` is the transaction's workspace.
+ */
 export const withRLS = <TName extends string, TColumns extends Record<string, PgColumnBuilderBase>>(
   name: TName,
   columns: TColumns,

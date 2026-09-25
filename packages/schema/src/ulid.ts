@@ -44,8 +44,12 @@ const encodeTime = (milliseconds: number): string => {
   return encoded;
 };
 
-// Mints ids, never secrets: the time half is public by design, so an id is unique and
-// sortable, not confidential.
+/**
+ * Mints ids, never secrets: the time half is public by design, so an id is unique and
+ * sortable, not confidential. Each sorts after the last one this process minted, even when the
+ * clock stands still or steps back.
+ * @throws once the clock is past the 48-bit time half.
+ */
 export const ulid = (): string => {
   const now = Date.now();
   if (now > lastTimeMs) {

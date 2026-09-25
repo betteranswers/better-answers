@@ -1,13 +1,6 @@
-import {
-  foreignKey,
-  index,
-  primaryKey,
-  text,
-  timestamp,
-  unique,
-  uniqueIndex,
-} from "drizzle-orm/pg-core";
+import { foreignKey, index, primaryKey, text, unique, uniqueIndex } from "drizzle-orm/pg-core";
 
+import { stamp } from "./column-helpers.ts";
 import { member } from "./identity-tables.ts";
 import { withRLS } from "./with-rls.ts";
 import { workspace } from "./workspace-table.ts";
@@ -25,7 +18,7 @@ export const group = withRLS(
       .references(() => workspace.id),
     name: text("name").notNull(),
     origin: text("origin").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    createdAt: stamp("created_at").notNull().defaultNow(),
   },
   "workspaceId",
   (table) => [
@@ -42,7 +35,7 @@ export const groupMember = withRLS(
     groupId: text("group_id").notNull(),
 
     userId: text("user_id").notNull(),
-    addedAt: timestamp("added_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+    addedAt: stamp("added_at").notNull().defaultNow(),
   },
   "workspaceId",
   (table) => [

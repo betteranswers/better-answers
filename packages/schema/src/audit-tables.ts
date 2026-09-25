@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
-import { check, index, jsonb, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { check, index, jsonb, pgTable, text, uniqueIndex } from "drizzle-orm/pg-core";
 
+import { listed, stamp } from "./column-helpers.ts";
 import { withRLS } from "./with-rls.ts";
 import { workspace } from "./workspace-table.ts";
 
@@ -10,9 +11,9 @@ export const ACT_PATTERN = `^(${FAMILIES.join("|")})\\.[a-z][a-z_]*\\.[a-z][a-z_
 
 export const ACT = new RegExp(ACT_PATTERN);
 
-const familyList = FAMILIES.map((family) => `'${family}'`).join(", ");
+const familyList = listed(FAMILIES);
 
-// Both ledgers name an act the same way and carry the same row after the key.
+/** Both ledgers name an act the same way and carry the same row after the key. */
 const ledgerColumns = () => ({
   act: text("act").notNull(),
 
@@ -26,7 +27,7 @@ const ledgerColumns = () => ({
     .notNull()
     .generatedAlwaysAs(sql`split_part(act, '.', 2)`),
   subjectId: text("subject_id").notNull(),
-  at: timestamp("at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  at: stamp("at").notNull().defaultNow(),
 
   detail: jsonb("detail").notNull(),
 
@@ -58,7 +59,9 @@ export const auditEvent = withRLS(
   ],
 );
 
-// An act on the identity set belongs to no workspace, so no workspace's scope can hold its row.
+/**
+ * An act on the identity set belongs to no workspace, so no workspace's scope can hold its row.
+ */
 export const identityAuditEvent = pgTable(
   "identity_audit_event",
   {

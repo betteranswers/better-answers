@@ -13,6 +13,10 @@ export type ColumnRow = {
   readonly notNull: boolean;
 };
 
+/**
+ * Every live column of the `public` and `index` tables, in schema, table and column order. Any
+ * table named `chunk_*` is skipped, partition or not.
+ */
 export const introspect = async (client: pg.Pool | pg.PoolClient): Promise<ColumnRow[]> => {
   const result = await client.query(
     String.raw`SELECT n.nspname AS schema, c.relname AS table, a.attname AS column,
@@ -33,6 +37,7 @@ export const introspect = async (client: pg.Pool | pg.PoolClient): Promise<Colum
   }));
 };
 
+/** `schema.table` for each table the public entry exports; no schema reads as `public`. */
 export const declaredTableNames = (): Set<string> => {
   const names = new Set<string>();
   for (const value of Object.values(publicEntry)) {
@@ -44,6 +49,7 @@ export const declaredTableNames = (): Set<string> => {
   return names;
 };
 
+/** @throws naming each table in the rows that `src/` never declared. */
 export const assertNoUndeclaredTables = (rows: readonly ColumnRow[]): void => {
   const declared = declaredTableNames();
   const undeclared = [...new Set(rows.map((row) => `${row.schema}.${row.table}`))].filter(
