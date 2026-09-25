@@ -25,9 +25,9 @@ import type { WORKSPACE_REFUSALS } from "../workspaces/index.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
 const INVITATION_ACTS = declareActs("people", {
-  created: act("people.invitation.created", { role: "role", replacedInvitationId: "id?" }),
+  created: act("people.invitation.created", { role: "role" }),
   resent: act("people.invitation.resent", {}),
-  cancelled: act("people.invitation.cancelled", {}),
+  cancelled: act("people.invitation.cancelled", { replacedByInvitationId: "id?" }),
 });
 
 const ROLE = boundarySchemas.member.select.shape.role;
@@ -93,7 +93,7 @@ export type CancelInvitationRefusal = MemberRefusal<RefusalOf<typeof cancelInvit
 
 export type ListInvitationsRefusal = MemberRefusal<RefusalOf<typeof listInvitationsAct>> | Error;
 
-const LISTED_ROW = z.object({
+const WAITING_ROW = z.object({
   invitationId: INVITATION_ID,
   address: boundarySchemas.invitation.select.shape.email,
   role: ROLE,
@@ -101,13 +101,18 @@ const LISTED_ROW = z.object({
   expiresAt: boundarySchemas.invitation.select.shape.expiresAt,
 });
 
-type ListedRow = z.output<typeof LISTED_ROW>;
+type WaitingRow = z.output<typeof WAITING_ROW>;
 
 /** The instants are ISO strings, which is what a `Date` becomes on the wire anyway. */
-export type WaitingInvitation = Omit<ListedRow, "invitedAt" | "expiresAt"> & {
+type WaitingInvitation = Omit<WaitingRow, "invitedAt" | "expiresAt"> & {
   readonly invitedAt: string;
   readonly expiresAt: string;
 };
+
+/** The inviter by display name, read from their person row, so it stands after they leave. */
+export type ListedInvitation = WaitingInvitation & { readonly invitedBy: string };
+
+const LISTED_ROW = WAITING_ROW.extend({ invitedBy: boundarySchemas.user.select.shape.name });
 
 /** What the email to the invited address is written from. */
 export type InvitationToSend = WaitingInvitation & { readonly workspaceName: string };
@@ -115,11 +120,15 @@ export type InvitationToSend = WaitingInvitation & { readonly workspaceName: str
 const RETURNED = `id AS "invitationId", email AS address, role, created_at AS "invitedAt",
                   expires_at AS "expiresAt"`;
 
-const waitingOf = (row: ListedRow): WaitingInvitation => ({
+const waitingOf = <Row extends WaitingRow>(
+  row: Row,
+): Omit<Row, "invitedAt" | "expiresAt"> & { invitedAt: string; expiresAt: string } => ({
   ...row,
   invitedAt: row.invitedAt.toISOString(),
   expiresAt: row.expiresAt.toISOString(),
 });
+
+const WORKSPACE_NAMED = z.object({ name: boundarySchemas.workspace.select.shape.name });
 
 const expiryFrom = (now: Date): Date => new Date(now.getTime() + INVITATION_EXPIRY_SECONDS * 1000);
 
@@ -129,7 +138,7 @@ const oneWaiting = async (
 ): Promise<Result<WaitingInvitation | undefined, Error>> => {
   const read = await attempt(async () => {
     const [row] = (await query()).rows;
-    return row === undefined ? undefined : waitingOf(LISTED_ROW.parse(row));
+    return row === undefined ? undefined : waitingOf(WAITING_ROW.parse(row));
   });
   return read.ok ? ok(read.value) : err(read.error);
 };
@@ -139,13 +148,15 @@ const toSend = async (
   tx: Tx,
   invitation: WaitingInvitation,
 ): Promise<Result<InvitationToSend, Error>> => {
-  const named = await attempt(() =>
-    tx.query<{ name: string }>("SELECT name FROM workspace WHERE id = $1", [admin.workspaceId]),
+  // The admitted member's own workspace, so a row the parse finds missing is a failure.
+  const named = await attempt(
+    async () =>
+      WORKSPACE_NAMED.parse(
+        (await tx.query("SELECT name FROM workspace WHERE id = $1", [admin.workspaceId])).rows[0],
+      ).name,
   );
   if (!named.ok) return err(named.error);
-  const workspaceName = named.value.rows[0]?.name;
-  if (workspaceName === undefined) return err(new Error("members: the workspace has no row"));
-  return ok({ ...invitation, workspaceName });
+  return ok({ ...invitation, workspaceName: named.value });
 };
 
 export type MintInvitationInput = {
@@ -158,7 +169,8 @@ export type MintInvitationInput = {
 /**
  * The one step every invitation is minted by: a direct invite and an approved access request
  * alike. It cancels the address's waiting invitation in the same transaction, so only the newest
- * link stands, and writes `people.invitation.created`.
+ * link stands, and writes `people.invitation.created`, with the replaced one's cancellation beside
+ * it in one batch.
  */
 export const mintInvitation = async (
   admin: AdminUserPrincipal,
@@ -167,29 +179,25 @@ export const mintInvitation = async (
 ): Promise<Result<InvitationToSend, Error>> => {
   const address = input.address.toLowerCase();
   const { workspaceId } = admin;
+  const invitationId = ulid();
+  const expiresAt = expiryFrom(input.now);
 
-  // Two invitations to one address queue here, so the later replaces the earlier rather than
-  // failing on the index.
   const replaced = await attempt(async () => {
+    // Two invitations to one address queue here, so the later replaces the earlier rather than
+    // failing on the index.
     await tx.query(
       "SELECT pg_advisory_xact_lock(hashtext('invitation'), hashtext($1 || ' ' || $2))",
       [workspaceId, address],
     );
-    return tx.query<{ id: string }>(
+    const cancelled = await tx.query<{ id: string }>(
       `UPDATE invitation SET status = $3
         WHERE workspace_id = $1 AND lower(email) = $2 AND status = $4
        RETURNING id`,
       [workspaceId, address, INVITATION_CANCELLED_STATUS, INVITATION_WAITING_STATUS],
     );
-  });
-  if (!replaced.ok) return err(replaced.error);
-
-  const invitationId = ulid();
-  const minted = await oneWaiting(() =>
-    tx.query(
+    await tx.query(
       `INSERT INTO invitation (id, workspace_id, email, role, status, created_at, expires_at, inviter_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING ${RETURNED}`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
         invitationId,
         workspaceId,
@@ -197,25 +205,38 @@ export const mintInvitation = async (
         input.role,
         INVITATION_WAITING_STATUS,
         input.now,
-        expiryFrom(input.now),
+        expiresAt,
         admin.userId,
       ],
-    ),
-  );
-  if (!minted.ok) return err(minted.error);
-  if (minted.value === undefined) return err(new Error("members: the invitation was not written"));
+    );
+    return cancelled.rows[0]?.id;
+  });
+  if (!replaced.ok) return err(replaced.error);
 
-  const replacedInvitationId = replaced.value.rows[0]?.id;
+  const batchId = replaced.value === undefined ? undefined : ulid();
   await record(admin, tx, {
     id: ulid(),
     act: INVITATION_ACTS.created,
     subjectId: invitationId,
-    detail:
-      replacedInvitationId === undefined
-        ? { role: input.role }
-        : { role: input.role, replacedInvitationId },
+    detail: { role: input.role },
+    batchId,
   });
-  return toSend(admin, tx, minted.value);
+  if (replaced.value !== undefined) {
+    await record(admin, tx, {
+      id: ulid(),
+      act: INVITATION_ACTS.cancelled,
+      subjectId: replaced.value,
+      detail: { replacedByInvitationId: invitationId },
+      batchId,
+    });
+  }
+  return toSend(admin, tx, {
+    invitationId,
+    address,
+    role: input.role,
+    invitedAt: input.now.toISOString(),
+    expiresAt: expiresAt.toISOString(),
+  });
 };
 
 const isMember = async (
@@ -338,13 +359,13 @@ export const cancelInvitation = async (
 };
 
 /**
- * Newest first. A lapsed invitation is listed with the waiting ones, since resending it is how an
- * Admin revives it.
+ * Newest first. An expired invitation is listed with the waiting ones, since resending it is how
+ * an Admin revives it.
  */
 export const listInvitations = async (
   principal: UserPrincipal,
   tx: Tx,
-): Promise<Result<readonly WaitingInvitation[], ListInvitationsRefusal>> => {
+): Promise<Result<readonly ListedInvitation[], ListInvitationsRefusal>> => {
   const admitted = admit(listInvitationsAct, principal, {});
   if (!admitted.ok) return err(admitted.error);
 
@@ -352,9 +373,11 @@ export const listInvitations = async (
     z.array(LISTED_ROW).parse(
       (
         await tx.query(
-          `SELECT ${RETURNED} FROM invitation
-            WHERE workspace_id = $1 AND status = $2
-            ORDER BY created_at DESC, id DESC`,
+          `SELECT i.id AS "invitationId", i.email AS address, i.role, i.created_at AS "invitedAt",
+                  i.expires_at AS "expiresAt", u.name AS "invitedBy"
+             FROM invitation i JOIN "user" u ON u.id = i.inviter_id
+            WHERE i.workspace_id = $1 AND i.status = $2
+            ORDER BY i.created_at DESC, i.id DESC`,
           [admitted.value.workspaceId, INVITATION_WAITING_STATUS],
         )
       ).rows,

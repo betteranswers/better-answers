@@ -79,8 +79,9 @@ const invitationEvents = async (workspace: ProvisionedWorkspace) =>
       actor: string;
       subject_id: string;
       detail: Record<string, string>;
+      batch_id: string | null;
     }>(
-      `SELECT act, actor, subject_id, detail FROM audit_event
+      `SELECT act, actor, subject_id, detail, batch_id FROM audit_event
         WHERE workspace_id = $1 AND act LIKE 'people.invitation.%' ORDER BY id`,
       [workspace.workspaceId],
     )
@@ -127,6 +128,7 @@ describe("inviting a person by address", () => {
         actor: `human:${workspace.adminUserId}`,
         subject_id: invitationId,
         detail: { role: "Editor" },
+        batch_id: null,
       },
     ]);
   });
@@ -140,6 +142,14 @@ describe("inviting a person by address", () => {
     const toKnown = answeredValue(await invite(workspace, known.email, "Viewer"));
     const toUnknown = answeredValue(await invite(workspace, unknown, "Viewer"));
 
+    expect(toKnown).toEqual({
+      invitationId: expect.stringMatching(ULID),
+      address: known.email,
+      role: "Viewer",
+      invitedAt: "2031-06-15T09:30:00.000Z",
+      expiresAt: A_WEEK_LATER,
+      workspaceName: "Neutral",
+    });
     expect({ ...toKnown, invitationId: "", address: "" }).toEqual({
       ...toUnknown,
       invitationId: "",
@@ -187,9 +197,35 @@ describe("inviting a person by address", () => {
       { id: first.invitationId, status: "canceled", role: "Viewer" },
       { id: second.invitationId, status: "pending", role: "Editor" },
     ]);
-    expect((await invitationEvents(workspace)).map((event) => event.detail)).toEqual([
-      { role: "Viewer" },
-      { role: "Editor", replacedInvitationId: first.invitationId },
+    const events = await invitationEvents(workspace);
+    const batch = events.find((event) => event.batch_id !== null)?.batch_id;
+    expect(batch).toEqual(expect.stringMatching(ULID));
+    expect(
+      events.map(({ act, subject_id, detail, batch_id }) => ({
+        act,
+        subject_id,
+        detail,
+        batch_id,
+      })),
+    ).toEqual([
+      {
+        act: "people.invitation.created",
+        subject_id: first.invitationId,
+        detail: { role: "Viewer" },
+        batch_id: null,
+      },
+      {
+        act: "people.invitation.created",
+        subject_id: second.invitationId,
+        detail: { role: "Editor" },
+        batch_id: batch,
+      },
+      {
+        act: "people.invitation.cancelled",
+        subject_id: first.invitationId,
+        detail: { replacedByInvitationId: second.invitationId },
+        batch_id: batch,
+      },
     ]);
   });
 
@@ -264,11 +300,20 @@ describe("an approved access request's invitation", () => {
         expires_at: new Date(A_WEEK_LATER),
       },
     ]);
-    expect((await invitationEvents(workspace)).at(-1)).toMatchObject({
-      act: "people.invitation.created",
-      subject_id: approved.invitationId,
-      detail: { role: "Editor", replacedInvitationId: direct.invitationId },
-    });
+    expect(await invitationEvents(workspace)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          act: "people.invitation.created",
+          subject_id: approved.invitationId,
+          detail: { role: "Editor" },
+        }),
+        expect.objectContaining({
+          act: "people.invitation.cancelled",
+          subject_id: direct.invitationId,
+          detail: { replacedByInvitationId: approved.invitationId },
+        }),
+      ]),
+    );
   });
 });
 
@@ -317,6 +362,7 @@ describe("cancelling an invitation", () => {
       actor: `human:${workspace.adminUserId}`,
       subject_id: invited.invitationId,
       detail: {},
+      batch_id: null,
     });
   });
 });
@@ -380,13 +426,15 @@ describe("what resending and cancelling refuse", () => {
 });
 
 describe("the waiting invitations", () => {
-  it("lists waiting and lapsed invitations newest first, none decided", async () => {
-    const workspace = await provisionedWorkspace(db(), "Listing");
+  it("lists waiting and expired invitations newest first, none decided", async () => {
+    const workspace = await provisionedWorkspace(db(), "Listing", { name: "Priya Shah" });
     const elsewhere = await provisionedWorkspace(db(), "Unlisted");
-    const lapsed = answeredValue(
-      await invite(workspace, addressOf("lapsed"), "Viewer", new Date("2031-05-01T08:00:00Z")),
+    const expiredAddress = addressOf("expired");
+    const waitingAddress = addressOf("waiting");
+    const expired = answeredValue(
+      await invite(workspace, expiredAddress, "Viewer", new Date("2031-05-01T08:00:00Z")),
     );
-    const waiting = answeredValue(await invite(workspace, addressOf("waiting"), "Editor"));
+    const waiting = answeredValue(await invite(workspace, waitingAddress, "Editor"));
     const gone = answeredValue(await invite(workspace, addressOf("gone"), "Admin"));
     answeredValue(
       await as(workspace, workspace.adminUserId, (principal, tx) =>
@@ -397,9 +445,27 @@ describe("the waiting invitations", () => {
 
     const listed = await as(workspace, workspace.adminUserId, listInvitations);
 
-    const { workspaceName: _waiting, ...waitingListed } = waiting;
-    const { workspaceName: _lapsed, ...lapsedListed } = lapsed;
-    expect(listed).toEqual({ ok: true, value: [waitingListed, lapsedListed] });
+    expect(listed).toEqual({
+      ok: true,
+      value: [
+        {
+          invitationId: waiting.invitationId,
+          address: waitingAddress,
+          role: "Editor",
+          invitedAt: "2031-06-15T09:30:00.000Z",
+          expiresAt: A_WEEK_LATER,
+          invitedBy: "Priya Shah",
+        },
+        {
+          invitationId: expired.invitationId,
+          address: expiredAddress,
+          role: "Viewer",
+          invitedAt: "2031-05-01T08:00:00.000Z",
+          expiresAt: "2031-05-08T08:00:00.000Z",
+          invitedBy: "Priya Shah",
+        },
+      ],
+    });
   });
 });
 

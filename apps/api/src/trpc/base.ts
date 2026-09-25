@@ -25,7 +25,7 @@ import {
   type Tx,
 } from "@better-answers/core/store/postgres";
 
-import type { EmailSender } from "../email.ts";
+import type { Mail } from "../email.ts";
 import { sessionClaims, type SessionReader } from "../auth/verify.ts";
 import type { Doors } from "../doors.ts";
 import { refusalLogged, refusalOf, RefusedError, type RefusalAnswer } from "../refusal.ts";
@@ -36,8 +36,7 @@ type TrpcContext = {
   readonly readSession: SessionReader;
   readonly headers: Headers;
   readonly log: Logger;
-  readonly sendEmail: EmailSender;
-  readonly publicUrl: string;
+  readonly mail: Mail;
 };
 
 /** Spelled here because tRPC exports the Standard Schema type only from a path it marks internal. */

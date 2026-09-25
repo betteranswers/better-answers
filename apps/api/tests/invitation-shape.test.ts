@@ -1,5 +1,6 @@
 import { getTableColumns } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import {
   invitation,
@@ -21,7 +22,6 @@ type Field = {
 
 type OrganisationPlugin = {
   schema?: { invitation?: { fields?: Record<string, Field> } };
-  options?: { invitationExpiresIn?: unknown };
 };
 
 const organisationPlugin = (): OrganisationPlugin | undefined => {
@@ -37,6 +37,8 @@ const organisationPlugin = (): OrganisationPlugin | undefined => {
 
 const invitationFields = (): Readonly<Record<string, Field>> =>
   organisationPlugin()?.schema?.invitation?.fields ?? {};
+
+const TOLD_AN_EXPIRY = z.object({ options: z.object({ invitationExpiresIn: z.number() }) });
 
 const platformKey = (key: string, field: Field): string =>
   typeof field.fieldName === "string" ? field.fieldName : key;
@@ -73,6 +75,6 @@ describe("the invitation an approved access request mints", () => {
 
   it("expires an invitation after seven days, as the plugin says", () => {
     expect(INVITATION_EXPIRY_SECONDS).toBe(604_800);
-    expect(organisationPlugin()?.options?.invitationExpiresIn).toBe(604_800);
+    expect(TOLD_AN_EXPIRY.parse(organisationPlugin()).options.invitationExpiresIn).toBe(604_800);
   });
 });

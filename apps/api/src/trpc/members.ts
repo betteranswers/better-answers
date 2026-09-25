@@ -1,3 +1,6 @@
+import type { Logger } from "pino";
+
+import type { Clock, Malformed, Result, UserPrincipal } from "@better-answers/core/kernel";
 import {
   cancelInvitation,
   changeRole,
@@ -12,7 +15,11 @@ import {
   resendInvitation,
   type InvitationToSend,
 } from "@better-answers/core/members";
+import type { Tx } from "@better-answers/core/store/postgres";
 
+import type { Doors } from "../doors.ts";
+import type { Mail } from "../email.ts";
+import type { RefusalAnswer } from "../refusal.ts";
 import {
   answeredBy,
   committedAs,
@@ -24,12 +31,45 @@ import {
   queryProcedure,
   router,
 } from "./base.ts";
-import { invitationAnswer, sentInvitation } from "./invitation-email.ts";
+import { sentInvitation } from "./invitation-email.ts";
 
-type Emailing = Parameters<typeof sentInvitation>[0];
+type Emailing = {
+  readonly principal: UserPrincipal;
+  readonly doors: Doors;
+  readonly mail: Mail;
+  readonly log: Logger;
+  readonly clock: Clock;
+};
 
-const emailedAfterCommit = async (ctx: Emailing, invitation: InvitationToSend) =>
-  invitationAnswer(invitation, await sentInvitation(ctx, invitation));
+/**
+ * Runs an act that mints or renews an invitation, then emails it once the act committed, and
+ * answers the invitation with whether its email went.
+ */
+const committedThenEmailed =
+  <Asked>(
+    act: (
+      principal: UserPrincipal,
+      tx: Tx,
+      input: Asked & { readonly now: Date },
+    ) => Promise<Result<InvitationToSend, RefusalAnswer | Error>>,
+  ) =>
+  async ({ ctx, input }: { readonly ctx: Emailing; readonly input: Result<Asked, Malformed> }) => {
+    const invitation = await crossing(
+      ctx,
+      act.name,
+      given(input, (asked) =>
+        committedAs(ctx, (principal, tx) => act(principal, tx, { ...asked, now: ctx.clock.now() })),
+      ),
+    );
+    return {
+      invitationId: invitation.invitationId,
+      address: invitation.address,
+      role: invitation.role,
+      invitedAt: invitation.invitedAt,
+      expiresAt: invitation.expiresAt,
+      emailSent: await sentInvitation(ctx, invitation),
+    };
+  };
 
 export const membersRouter = router({
   list: queryProcedure.query(({ ctx }) =>
@@ -42,32 +82,10 @@ export const membersRouter = router({
   ),
   invite: ownTransactionProcedure
     .input(parsedBy(inviteMemberInput))
-    .mutation(async ({ ctx, input }) => {
-      const invited = await crossing(
-        ctx,
-        inviteMember.name,
-        given(input, (asked) =>
-          committedAs(ctx, (principal, tx) =>
-            inviteMember(principal, tx, { ...asked, now: ctx.clock.now() }),
-          ),
-        ),
-      );
-      return emailedAfterCommit(ctx, invited);
-    }),
+    .mutation(committedThenEmailed(inviteMember)),
   resendInvitation: ownTransactionProcedure
     .input(parsedBy(invitationInput))
-    .mutation(async ({ ctx, input }) => {
-      const resent = await crossing(
-        ctx,
-        resendInvitation.name,
-        given(input, (asked) =>
-          committedAs(ctx, (principal, tx) =>
-            resendInvitation(principal, tx, { ...asked, now: ctx.clock.now() }),
-          ),
-        ),
-      );
-      return emailedAfterCommit(ctx, resent);
-    }),
+    .mutation(committedThenEmailed(resendInvitation)),
   cancelInvitation: mutationProcedure
     .input(parsedBy(invitationInput))
     .mutation(answeredBy(cancelInvitation)),

@@ -3,7 +3,7 @@ import type { Logger } from "pino";
 import { attempt } from "@better-answers/core/kernel";
 import type { InvitationToSend } from "@better-answers/core/members";
 
-import type { EmailMessage, EmailSender } from "../email.ts";
+import type { EmailMessage, Mail } from "../email.ts";
 
 /** The SPA's accept page, which the link in the email opens with the invitation's id after it. */
 const ACCEPT_INVITATION_PATH = "/invitations";
@@ -36,10 +36,11 @@ const invitationEmail = (publicUrl: string, invitation: InvitationToSend): Email
 
 /** A failed send leaves the invitation standing: the answer says so, and the Admin resends. */
 export const sentInvitation = async (
-  ctx: { readonly sendEmail: EmailSender; readonly publicUrl: string; readonly log: Logger },
+  ctx: { readonly mail: Mail; readonly log: Logger },
   invitation: InvitationToSend,
 ): Promise<boolean> => {
-  const sent = await attempt(() => ctx.sendEmail(invitationEmail(ctx.publicUrl, invitation)));
+  const { mail } = ctx;
+  const sent = await attempt(() => mail.send(invitationEmail(mail.publicUrl, invitation)));
   if (!sent.ok) {
     // The error is the relay's, which may quote the address; the id is enough to find it.
     ctx.log.warn(
@@ -49,13 +50,3 @@ export const sentInvitation = async (
   }
   return sent.ok;
 };
-
-/** What the wire answers: the invitation, and whether its email went. */
-export const invitationAnswer = (invitation: InvitationToSend, emailSent: boolean) => ({
-  invitationId: invitation.invitationId,
-  address: invitation.address,
-  role: invitation.role,
-  invitedAt: invitation.invitedAt,
-  expiresAt: invitation.expiresAt,
-  emailSent,
-});

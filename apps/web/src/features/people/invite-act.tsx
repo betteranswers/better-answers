@@ -25,7 +25,7 @@ import {
 
 import { invitedOutcome } from "./invitation-words.ts";
 import { useInvite, type SentInvitation } from "./invitations-api.ts";
-import { PEOPLE_KEYSTROKES } from "./people-state.ts";
+import { PEOPLE_KEYSTROKES, useInviteAsked } from "./people-state.ts";
 import { outcomeOfInvitationFailure } from "./refusal.tsx";
 import { ROLE_MEANINGS, ROLES } from "./role-meanings.ts";
 
@@ -57,10 +57,19 @@ export function InviteAct() {
   };
   useKeystroke(PEOPLE_KEYSTROKES.invite, show);
 
+  // The panel asks through the view's slot, so an empty list's own action opens this one dialog.
+  const [asked] = useInviteAsked();
+  const [heard, setHeard] = useState(asked);
+  if (asked !== heard) {
+    setHeard(asked);
+    if (asked !== undefined) show();
+  }
+
+  // Never disabled while sending: a disabled button drops focus, and a refusal would land nowhere.
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const address = new FormData(event.currentTarget).get("address");
-    if (typeof address !== "string") return;
+    if (typeof address !== "string" || invite.isPending) return;
     setOutcome(undefined);
     invite.mutate(
       { address: address.trim(), role },
@@ -143,7 +152,7 @@ export function InviteAct() {
                   Cancel
                 </Button>
               </DialogClose>
-              <Button type="submit" form={ids.form} disabled={invite.isPending}>
+              <Button type="submit" form={ids.form}>
                 {invite.isPending ? "Sending the invitation" : "Send the invitation"}
               </Button>
             </>

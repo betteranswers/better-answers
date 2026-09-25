@@ -48,6 +48,28 @@ const resentWithItsEmail = async (api: Api, invitationId: string): Promise<void>
   expect(resent).toMatchObject({ invitationId, emailSent: true });
 };
 
+/**
+ * Every write the act makes lands, and its commit is what fails, so an email sent before the
+ * commit would already have gone.
+ */
+const whileCommitsAreRefused = async <T>(table: string, work: () => Promise<T>): Promise<T> => {
+  const store = app.database.superuser;
+  await store.query(
+    `CREATE FUNCTION test_refuse_commit() RETURNS trigger LANGUAGE plpgsql AS $$
+     BEGIN RAISE EXCEPTION 'the store refused the commit'; END $$`,
+  );
+  await store.query(
+    `CREATE CONSTRAINT TRIGGER test_refuse_commit AFTER INSERT OR UPDATE ON "${table}"
+     DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION test_refuse_commit()`,
+  );
+  try {
+    return await work();
+  } finally {
+    await store.query(`DROP TRIGGER test_refuse_commit ON "${table}"`);
+    await store.query("DROP FUNCTION test_refuse_commit()");
+  }
+};
+
 const anAdmin = async () => {
   const workspace = await app.provision({ name: "Calder Joinery" });
   return { workspace, ...(await webSignedIn(app, workspace.admin.email)) };
@@ -95,6 +117,14 @@ describe("inviting a person over tRPC", () => {
     const toKnown = await api.members.invite.mutate({ address: known.email, role: "Viewer" });
     const toUnknown = await api.members.invite.mutate({ address: unknown, role: "Viewer" });
 
+    expect(toKnown).toEqual({
+      invitationId: expect.stringMatching(ULID),
+      address: known.email,
+      role: "Viewer",
+      invitedAt: expect.stringMatching(ISO_INSTANT),
+      expiresAt: expect.stringMatching(ISO_INSTANT),
+      emailSent: true,
+    });
     const shapeOf = (answer: typeof toKnown) => ({
       ...answer,
       invitationId: "the id",
@@ -126,16 +156,34 @@ describe("inviting a person over tRPC", () => {
 });
 
 describe("the waiting invitations over tRPC", () => {
-  it("lists each waiting invitation with its role and expiry", async () => {
+  it("lists each waiting invitation with its role, expiry and inviter", async () => {
     const { api } = await anAdmin();
-    const first = await api.members.invite.mutate({ address: anAddress("sam"), role: "Viewer" });
-    const second = await api.members.invite.mutate({ address: anAddress("una"), role: "Admin" });
+    const sam = anAddress("sam");
+    const una = anAddress("una");
+    const first = await api.members.invite.mutate({ address: sam, role: "Viewer" });
+    const second = await api.members.invite.mutate({ address: una, role: "Admin" });
 
     const listed = await api.members.invitations.query();
 
-    const { emailSent: _first, ...firstListed } = first;
-    const { emailSent: _second, ...secondListed } = second;
-    expect(listed).toEqual([secondListed, firstListed]);
+    const aWeekOn = (invitedAt: string) => new Date(Date.parse(invitedAt) + SEVEN_DAYS_MS);
+    expect(listed).toEqual([
+      {
+        invitationId: second.invitationId,
+        address: una,
+        role: "Admin",
+        invitedAt: expect.stringMatching(ISO_INSTANT),
+        expiresAt: aWeekOn(second.invitedAt).toISOString(),
+        invitedBy: "Test person",
+      },
+      {
+        invitationId: first.invitationId,
+        address: sam,
+        role: "Viewer",
+        invitedAt: expect.stringMatching(ISO_INSTANT),
+        expiresAt: aWeekOn(first.invitedAt).toISOString(),
+        invitedBy: "Test person",
+      },
+    ]);
   });
 
   it("resends a waiting invitation, emailing the same link again", async () => {
@@ -176,6 +224,21 @@ describe("the waiting invitations over tRPC", () => {
     ).toMatchObject({
       data: { httpStatus: 404, refusal: { word: "no-such-invitation", class: "absent" } },
     });
+  });
+});
+
+describe("the invitation email", () => {
+  it("is sent after the commit, never for a failed invitation", async () => {
+    const { api } = await anAdmin();
+    const address = anAddress("uncommitted");
+
+    const failed = await whileCommitsAreRefused("invitation", () =>
+      refusalOfCall(api.members.invite.mutate({ address, role: "Viewer" })),
+    );
+
+    expect(failed).toMatchObject({ data: { httpStatus: 500 } });
+    expect(emailsTo(address)).toEqual([]);
+    expect(await api.members.invitations.query()).toEqual([]);
   });
 });
 

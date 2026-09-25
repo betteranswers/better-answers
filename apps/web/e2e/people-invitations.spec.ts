@@ -96,12 +96,9 @@ test.describe("the People screen's Invitations tab", () => {
     await anAdminAtInvitations(page, request, "Calder Joinery");
     await openInvitations(page);
     await expect(invitationsRegion(page)).toContainText("Nobody is waiting to join.");
-    await expect(invitationsRegion(page).getByRole("status").last()).toHaveText(
-      "No invitation is waiting.",
-    );
     const address = anAddress("sam");
 
-    await page.getByRole("button", { name: "Invite a person" }).click();
+    await invitationsRegion(page).getByRole("button", { name: "Invite the first person" }).click();
     await inviteDialog(page).getByLabel("Email address").fill(address);
     await inviteDialog(page).getByRole("combobox", { name: "Role" }).click();
     await page.getByRole("option", { name: "Editor" }).click();
@@ -123,6 +120,8 @@ test.describe("the People screen's Invitations tab", () => {
     await expect(cells.nth(1)).toHaveText("Editor");
     await expect(cells.nth(2)).toHaveText("Waiting");
     await expect(cells.nth(3)).toHaveText(LONG_UK_DATE);
+    await expect(cells.nth(4)).toHaveText(LONG_UK_DATE);
+    await expect(cells.nth(5)).toHaveText("Test person");
     await expect(invitationsRegion(page).getByText("1 invitation", { exact: true })).toBeVisible();
   });
 
@@ -230,36 +229,73 @@ test.describe("the People screen's Invitations tab", () => {
     await expect(keystrokes).toContainText("Cancel the invitation whose row holds focus");
     await page.keyboard.press("Escape");
 
+    const invited = anAddress("invited");
     await page.keyboard.press("i");
     await expect(inviteDialog(page).getByLabel("Email address")).toBeFocused();
-    await page.keyboard.press("Escape");
+    await page.keyboard.type(invited);
+    await page.keyboard.press("Tab");
+    await expect(inviteDialog(page).getByRole("combobox", { name: "Role" })).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("option", { name: "Viewer" })).toBeFocused();
+    await page.keyboard.press("ArrowUp");
+    await expect(page.getByRole("option", { name: "Editor" })).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("listbox")).toHaveCount(0);
+    await expect(inviteDialog(page).getByRole("combobox", { name: "Role" })).toBeFocused();
+    await expect(inviteDialog(page)).toContainText(
+      "Checks concepts, runs question sets and saves Answers from history.",
+    );
+    await page.keyboard.press("Shift+Tab");
+    await expect(inviteDialog(page).getByLabel("Email address")).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(inviteDialog(page).getByRole("status")).toContainText(
+      `Invited ${invited} as an Editor.`,
+    );
+    await expect(inviteDialog(page).getByRole("button", { name: "Done" })).toBeFocused();
+    await passesTheAccessibilityGate();
+    await page.keyboard.press("Enter");
     await expect(inviteDialog(page)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Invite a person" })).toBeFocused();
+    await expect(invitationRows(page)).toHaveCount(2);
 
     await expect(invitationsRegion(page)).toMatchAriaSnapshot(`
       - region "Invitations":
         - heading "Invitations" [level=2]
         - status: /Cancelled the invitation to/
-        - status: 1 invitation
+        - status: 2 invitations
         - table:
           - caption: /Invitations to this workspace/
           - rowgroup:
-            - row "Address Role State Expires Acts":
+            - row "Address Role State Sent Expires Invited by Acts":
               - columnheader "Address"
               - columnheader "Role"
               - columnheader "State"
+              - columnheader "Sent"
               - columnheader "Expires"
+              - columnheader "Invited by"
               - columnheader "Acts"
           - rowgroup:
+            - row /invited-/:
+              - cell /invited-/
+              - cell "Editor"
+              - cell "Waiting"
+              - cell /\\d{4}/
+              - cell /\\d{4}/
+              - cell "Test person"
+              - cell:
+                - button /Resend the invitation to invited-/
+                - button /Cancel the invitation to invited-/
             - row /kept-/:
               - cell /kept-/
               - cell "Admin"
               - cell "Waiting"
               - cell /\\d{4}/
+              - cell /\\d{4}/
+              - cell "Test person"
               - cell:
                 - button /Resend the invitation to kept-/
                 - button /Cancel the invitation to kept-/
     `);
-    await passesTheAccessibilityGate();
   });
 
   for (const role of ["Editor", "Viewer"] as const) {

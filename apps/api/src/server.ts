@@ -132,8 +132,7 @@ export function createServer(dependencies: ServerDependencies): Hono {
       auth,
       doors,
       logger,
-      sendEmail: dependencies.sendEmail,
-      publicUrl: dependencies.publicUrl,
+      mail: { send: dependencies.sendEmail, publicUrl: dependencies.publicUrl },
     }),
   );
 

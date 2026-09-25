@@ -21,10 +21,10 @@ import {
   useResendInvitation,
   type WaitingInvitation,
 } from "./invitations-api.ts";
-import { PEOPLE_KEYSTROKES } from "./people-state.ts";
+import { PEOPLE_KEYSTROKES, useInviteAsked } from "./people-state.ts";
 import { outcomeOfInvitationFailure } from "./refusal.tsx";
 
-const COLUMNS = ["Address", "Role", "State", "Expires", "Acts"] as const;
+const COLUMNS = ["Address", "Role", "State", "Sent", "Expires", "Invited by", "Acts"] as const;
 
 const NOTHING_HELD: Outcome = {
   tone: "said",
@@ -41,16 +41,22 @@ const countOf = (invitations: readonly WaitingInvitation[], now: number): string
 };
 
 function NobodyWaiting() {
+  const [, askToInvite] = useInviteAsked();
   return (
     <div className="mt-4 flex flex-col items-start gap-1 border border-border bg-card px-4 py-10">
       <p className="font-medium">Nobody is waiting to join.</p>
       <p className="text-muted-foreground">
-        Invite a person by email address with Invite a person above, or press{" "}
-        <kbd className="border border-border bg-muted px-1.5 font-mono">
-          {PEOPLE_KEYSTROKES.invite.key}
-        </kbd>
-        . An invitation lasts seven days.
+        An invitation goes to one email address and lasts seven days.
       </p>
+      <Button
+        variant="outline"
+        className="mt-3"
+        onClick={() => {
+          askToInvite(Date.now());
+        }}
+      >
+        Invite the first person
+      </Button>
     </div>
   );
 }
@@ -58,7 +64,6 @@ function NobodyWaiting() {
 function InvitationRow(properties: {
   readonly invitation: WaitingInvitation;
   readonly now: number;
-  readonly resending: boolean;
   readonly onHeld: (invitation: WaitingInvitation | undefined) => void;
   readonly onResend: (invitation: WaitingInvitation) => void;
   readonly onCancel: (invitation: WaitingInvitation) => void;
@@ -86,7 +91,15 @@ function InvitationRow(properties: {
       <TableCell>
         <Pill>{expired ? "Expired" : "Waiting"}</Pill>
       </TableCell>
+      <TableCell className="tabular-nums">{longDate(invitation.invitedAt)}</TableCell>
       <TableCell className="tabular-nums">{longDate(invitation.expiresAt)}</TableCell>
+      <TableCell>
+        {invitation.invitedBy === "" ? (
+          <span className="text-muted-foreground">No display name yet</span>
+        ) : (
+          invitation.invitedBy
+        )}
+      </TableCell>
       <TableCell>
         <span className="flex flex-wrap gap-2">
           <Button
@@ -98,7 +111,7 @@ function InvitationRow(properties: {
               properties.onResend(invitation);
             }}
           >
-            {properties.resending ? "Resending" : "Resend"}
+            Resend
           </Button>
           <Button
             size="sm"
@@ -174,8 +187,8 @@ function InvitationList(properties: {
 
   return (
     <>
-      <output className="mt-1 block text-muted-foreground">
-        {invitations.length === 0 ? "No invitation is waiting." : countOf(invitations, now)}
+      <output className="mt-1 block text-muted-foreground empty:hidden">
+        {invitations.length === 0 ? null : countOf(invitations, now)}
       </output>
       {invitations.length === 0 ? (
         <NobodyWaiting />
@@ -200,9 +213,6 @@ function InvitationList(properties: {
                   key={invitation.invitationId}
                   invitation={invitation}
                   now={now}
-                  resending={
-                    resend.isPending && resend.variables.invitationId === invitation.invitationId
-                  }
                   onHeld={setHeld}
                   onResend={resent}
                   onCancel={cancelled}
