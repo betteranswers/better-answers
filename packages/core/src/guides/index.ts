@@ -40,6 +40,10 @@ const visibilityOfInclude = (include: IncludeRow): Visibility =>
         audience_groups: include.audience_groups,
       });
 
+/**
+ * Locks and re-derives each composition including one of `iris`; an include whose concept is gone
+ * counts as admins-only. Answers the id of each one recomputed, changed or not, in id order.
+ */
 export const recomputeCompositionsIncluding = async (
   principal: Principal,
   tx: Tx,
@@ -85,6 +89,10 @@ export const recomputeCompositionsIncluding = async (
   return moved;
 };
 
+/**
+ * Undefined when the composition is absent or the principal cannot read it. Otherwise only the
+ * includes whose concept the principal reads, in the composition's order.
+ */
 export const footnotesOf = async (
   principal: UserPrincipal,
   tx: Tx,

@@ -37,13 +37,16 @@ export type SweepsPrincipal = PlatformPrincipal & {
   readonly actorId: typeof SWEEPS_ACTOR;
 };
 
-// Holds the lock and lists the workspaces; each sweep still runs, and is audited, as its own
-// actor, the same as a run by hand.
+/**
+ * Holds the lock and lists the workspaces; each sweep still runs, and is audited, as its own
+ * actor, the same as a run by hand.
+ */
 export const SWEEPS: SweepsPrincipal = { kind: "platform", actorId: SWEEPS_ACTOR };
 
-// 41 is the dump's, which the erasure routine and the backup job share.
+/** 41 is the dump's, which the erasure routine and the backup job share. */
 const SWEEP_LOCK = 42;
 
+/** `list` finds the orphaned uploads and removes none; `remove` removes them. */
 export type UploadSweepMode = (typeof UPLOAD_SWEEP_MODES)[number];
 
 export type SweepDoors = {
@@ -95,7 +98,9 @@ const RECORD_THE_PASS = `INSERT INTO sweep_pass
     (id, upload_sweep, workspaces, refused, found, removed, generations)
   VALUES ($1, $2, $3, $4, $5, $6, $7)`;
 
-// One statement and no scope: the row names no workspace, so no transaction is needed around it.
+/**
+ * One statement and no scope: the row names no workspace, so no transaction is needed around it.
+ */
 const recordThePass = async (
   door: PostgresDoor,
   uploadSweep: UploadSweepMode,
@@ -133,6 +138,11 @@ const sweepOne = async (
   graph: await sweepGraph(GRAPH_MAINTENANCE, doors.postgres, { workspaceId }),
 });
 
+/**
+ * Answers `held` at once when another pass holds the lock. A workspace whose sweep is refused is
+ * counted in `refused` and the pass goes on. Writes one `sweep_pass` row; failing to write it
+ * fails the pass, though every sweep ran.
+ */
 export const sweepEveryWorkspace = async (
   platform: SweepsPrincipal,
   doors: SweepDoors,
@@ -158,8 +168,10 @@ export const sweepEveryWorkspace = async (
   return locked.ok ? locked.value : err(locked.error);
 };
 
-// A run by hand waits for a pass that holds the lock rather than skipping, since a person
-// asked for it.
+/**
+ * A run by hand waits for a pass that holds the lock rather than skipping, since a person
+ * asked for it.
+ */
 export const withSweepLock = <T>(
   platform: SweepsPrincipal,
   door: PostgresDoor,

@@ -271,6 +271,10 @@ export const removeFromGroup = async (
   return ok({ groupId, userId });
 };
 
+/**
+ * True for an empty list, and a repeated id counts once. A failed query rejects rather than
+ * answering an error.
+ */
 export const holdsEveryGroup = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -287,6 +291,7 @@ export const holdsEveryGroup = async (
   return ok(found.rows[0]?.held === distinct.length);
 };
 
+/** In name order. */
 export const listGroups = async (
   principal: UserPrincipal,
   tx: Tx,

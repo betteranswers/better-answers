@@ -20,20 +20,28 @@ const RESTRICTED = "Restricted" satisfies Sensitivity;
 
 const EVERYONE = { audience: AUDIENCE_EVERYONE, audienceGroups: null } as const;
 
+/** Admins alone read it. A derivation whose sources share no group falls to it. */
 export const RESTRICTED_TO_ADMINS: Visibility = { sensitivity: RESTRICTED, ...EVERYONE };
 
+/**
+ * A SQL condition: the row at `alias` is published and the principal may read it. The role binds
+ * at placeholder `roleParameter` and the groups at the next: bind `readableParameters` there.
+ */
 export const readableClause = (alias: string, roleParameter: number): string =>
   `${alias}.published_at IS NOT NULL
      AND ${sensitivityAndAudienceClause(alias, roleParameter)}`;
 
+/** `readableClause` without the published check, its placeholders bound the same way. */
 export const sensitivityAndAudienceClause = (alias: string, roleParameter: number): string =>
   `(${alias}.sensitivity <> '${RESTRICTED}' OR $${roleParameter} = 'Admin')
      AND (${alias}.audience = '${AUDIENCE_EVERYONE}' OR ${alias}.audience_groups && $${roleParameter + 1}::text[])`;
 
+/** The two values the readable clauses bind, in placeholder order. */
 export const readableParameters = (
   principal: UserPrincipal,
 ): readonly [Role, readonly GroupId[]] => [principal.role, principal.groups];
 
+/** Sensitivity alone: the audience is not checked. */
 export const readsSensitivity = (principal: UserPrincipal, sensitivity: Sensitivity): boolean =>
   sensitivity !== RESTRICTED || principal.role === "Admin";
 
@@ -78,6 +86,11 @@ const combined = (from: readonly Visibility[]): Visibility | undefined => {
   return audience === "nobody" ? RESTRICTED_TO_ADMINS : { sensitivity, ...audience };
 };
 
+/**
+ * `override` wins outright, over the kind's floor too. Otherwise the narrowest sensitivity in
+ * `from` and the groups its group-limited entries share, or `fallback` when `from` is empty,
+ * floored at Restricted for a Person. Entries sharing no group give `RESTRICTED_TO_ADMINS`.
+ */
 export const derivedVisibility = (derivation: Derivation): Visibility => {
   if (derivation.override !== undefined) return derivation.override;
   const inherited = combined(derivation.from) ?? derivation.fallback;
@@ -87,6 +100,7 @@ export const derivedVisibility = (derivation: Derivation): Visibility => {
     : { ...inherited, sensitivity: narrower(inherited.sensitivity, floor) };
 };
 
+/** Wider in sensitivity or in audience is enough: narrower in the other still widens. */
 export const widens = (from: Visibility, to: Visibility): boolean => {
   if (RANK[to.sensitivity] > RANK[from.sensitivity]) return true;
   if (from.audienceGroups === null) return false;
@@ -121,6 +135,10 @@ const visibilityAgreeing = (fields: VisibilityFields): Visibility | undefined =>
   return undefined;
 };
 
+/**
+ * For a zod refinement: when the audience word and the group list disagree, adds an issue at
+ * `audience` and answers undefined.
+ */
 export const visibilityAgreed = (
   fields: VisibilityFields,
   ctx: z.RefinementCtx,
@@ -132,6 +150,7 @@ export const visibilityAgreed = (
   return held;
 };
 
+/** @throws when the row does not parse, or its audience word and group list disagree. */
 export const visibilityOf = (row: VisibilityRow): Visibility => {
   const parsed = VISIBILITY_FIELDS.parse({
     sensitivity: row.sensitivity,
@@ -143,6 +162,9 @@ export const visibilityOf = (row: VisibilityRow): Visibility => {
   return visibility;
 };
 
+/**
+ * Fields that fail to parse or disagree give undefined, never a throw. Absent groups read as null.
+ */
 export const visibilityFrom = (fields: {
   readonly sensitivity: string;
   readonly audience: string;

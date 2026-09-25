@@ -15,7 +15,9 @@ import {
 import { type PostgresDoor, withIdentityWrite } from "../store/postgres/index.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
-// The row names the person by id and holds no name, so erasure's one copy to blank is the user row.
+/**
+ * The row names the person by id and holds no name, so erasure's one copy to blank is the user row.
+ */
 const PERSON_ACTS = declareIdentitySetActs("people", {
   named: act("people.person.named", {}),
 });
@@ -30,20 +32,25 @@ type DisplayNameRefusal = WorkspaceRefusal<
   | "display-name-too-long"
 >;
 
-// Trimming leaves U+0085, so it is named here. No `u` flag: the mutation run negates `\v` to
-// `\V`, which `u` refuses at load.
+/**
+ * Trimming leaves U+0085, so it is named here. No `u` flag: the mutation run negates `\v` to
+ * `\V`, which `u` refuses at load.
+ */
 const LINE_BREAK = /[\n\v\f\r\u0085\u2028\u2029]/;
 
 const CONTROL_CHARACTER = /\p{Cc}/u;
 
-// Git drops both from an author's name, so a commit would credit a name the person never gave.
+/** Git drops both from an author's name, so a commit would credit a name the person never gave. */
 const ANGLE_BRACKET = /[<>]/u;
 
-// Code points, as Postgres counts a length: counting graphemes would let a thousand combining
-// marks pass as one character.
+/**
+ * Code points, as Postgres counts a length: counting graphemes would let a thousand combining
+ * marks pass as one character.
+ */
 // oxlint-disable-next-line typescript/no-misused-spread -- the spread only counts code points, and nothing split is ever shown
 const charactersIn = (name: string): number => [...name].length;
 
+/** Answers the name trimmed, the form to store; every rule reads the trimmed name. */
 export const applyDisplayNameRule = (asked: string): Result<string, DisplayNameRefusal> => {
   const name = asked.trim();
   if (name === "") return err("display-name-empty");
@@ -54,6 +61,7 @@ export const applyDisplayNameRule = (asked: string): Result<string, DisplayNameR
   return ok(name);
 };
 
+/** A name of whitespace alone counts as none. */
 export const hasNoDisplayName = (held: string): boolean => held.trim() === "";
 
 export const setDisplayNameInput = z.object({ displayName: z.string() });
@@ -72,8 +80,10 @@ type DisplayNameSet = {
   readonly displayName: string;
 };
 
-// The person is the one writer: a caller hands the id of the session's own person, never one a
-// request names.
+/**
+ * The person is the one writer: a caller hands the id of the session's own person, never one a
+ * request names.
+ */
 export const setDisplayName = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
