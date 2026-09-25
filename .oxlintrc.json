@@ -405,10 +405,7 @@
         "apps/web/test/refusal.test.ts",
         "apps/web/test/secondary-nav-showing.test.tsx",
         "apps/web/test/sources-acts.test.tsx",
-        "apps/web/test/toolbar.test.tsx",
-        "packages/core/test/chunk-visibility.test.ts",
-        "packages/core/test/reconciler.test.ts",
-        "packages/core/test/visibility.test.ts"
+        "apps/web/test/toolbar.test.tsx"
       ],
       "rules": {
         "vitest/valid-title": ["error", {}]
