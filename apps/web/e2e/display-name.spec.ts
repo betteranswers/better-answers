@@ -4,11 +4,11 @@ import { expect, test } from "./browser.ts";
 import {
   addMember,
   anAddress,
-  clockTheAct,
+  clockTheNextKey,
   person,
   provision,
   signIn,
-  theActReadWithinItsBudget,
+  theActLandedWithinItsBudget,
 } from "./harness.ts";
 
 const displayNameHeading = (page: Page) =>
@@ -56,9 +56,9 @@ test("a person signing in for the first time gives a display name before anythin
   expect(ring, "the focused field shows no focus ring").not.toBe("none");
 
   await page.keyboard.type("Priya Shah");
-  await clockTheAct(page, "Saving");
+  await clockTheNextKey(page, { at: "//main//button[@type='submit']", reads: "Saving" });
   await page.keyboard.press("Enter");
-  await theActReadWithinItsBudget(page, "display name save");
+  await theActLandedWithinItsBudget(page, "display name save");
 
   await expect(noWorkspaceHeading(page)).toBeVisible();
 });

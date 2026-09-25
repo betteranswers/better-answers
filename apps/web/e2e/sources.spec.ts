@@ -4,18 +4,18 @@ import { expect, test } from "./browser.ts";
 import {
   addMember,
   anAddress,
+  clockTheNextKey,
   moveTheIndexRun,
   person,
   provision,
   seedBindings,
   signIn,
   skipLinkReachesTheScreen,
+  theActLandedWithinItsBudget,
   type SeedBinding,
 } from "./harness.ts";
 
 const LIST_BUDGET_MS = 1000;
-
-const ACT_BUDGET_MS = 100;
 
 // Any id the platform mints: the screen shows none, a finding's least of all.
 const AN_ID = /\b[0-9A-HJKMNP-TV-Z]{26}\b/;
@@ -74,44 +74,6 @@ const twoFramesDrawn = (page: Page) =>
         });
       }),
   );
-
-// An act's 100 ms is timed in the page, key to first mutation showing it: a matcher's polling is
-// coarser than the budget.
-const clockTheNextKey = (page: Page, landed: { readonly at: string; readonly reads: string }) =>
-  page.evaluate((asked) => {
-    const reads = () =>
-      document
-        .evaluate(asked.at, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE)
-        .singleNodeValue?.textContent?.includes(asked.reads) === true;
-    const clocked = new Promise<number>((resolve) => {
-      document.addEventListener(
-        "keydown",
-        () => {
-          const pressedAt = performance.now();
-          const observer = new MutationObserver(() => {
-            if (!reads()) return;
-            observer.disconnect();
-            resolve(performance.now() - pressedAt);
-          });
-          observer.observe(document.body, {
-            subtree: true,
-            childList: true,
-            characterData: true,
-          });
-        },
-        { capture: true, once: true },
-      );
-    });
-    Reflect.set(window, "actClocked", clocked);
-  }, landed);
-
-const theActLandedWithinItsBudget = async (page: Page, act: string) => {
-  const elapsed = await page.evaluate(() => Reflect.get(window, "actClocked"));
-  test.info().annotations.push({ type: `${act} act`, description: `${elapsed} ms` });
-  expect(elapsed, `the ${act} did not read as landed within its budget`).toBeLessThan(
-    ACT_BUDGET_MS,
-  );
-};
 
 const indexed = (name: string, overrides: Partial<SeedBinding> = {}): SeedBinding => ({
   name,

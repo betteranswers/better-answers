@@ -101,12 +101,25 @@ export const crossing = async <Value>(
   throw refused(ctx.log, act, answered.error);
 };
 
+/** A ceiling's answer carries this as its cause, so the wire can say when to ask again. */
+export class CeilingMet extends Error {
+  readonly retryAfterSeconds: number;
+
+  constructor(retryAfterSeconds: number) {
+    super(`ceiling met; ask again in ${retryAfterSeconds} seconds`);
+    this.name = "CeilingMet";
+    this.retryAfterSeconds = retryAfterSeconds;
+  }
+}
+
 const trpc = initTRPC.context<TrpcContext>().create({
   errorFormatter: ({ shape, error }) => ({
     ...shape,
     data: {
       ...shape.data,
       refusal: error.cause instanceof RefusedError ? error.cause.refusal : undefined,
+      retryAfterSeconds:
+        error.cause instanceof CeilingMet ? error.cause.retryAfterSeconds : undefined,
     },
   }),
 });
@@ -181,10 +194,10 @@ export const personProcedure = trpc.procedure.use(async ({ ctx, next }) => {
 });
 
 /**
- * A ceiling is no refusal: time is its only remedy, so past one the call answers 429, as every
- * ingress ceiling does.
+ * A ceiling is no refusal: time is its only remedy, so past one the call answers 429 and when to
+ * ask again.
  */
-export const personCeiling = (rule: CounterRule, sentence: string) =>
+export const personCeiling = (rule: CounterRule) =>
   personProcedure.use(async ({ ctx, path, next }) => {
     const counted = await attempt(() =>
       consumeIngress(
@@ -197,8 +210,13 @@ export const personCeiling = (rule: CounterRule, sentence: string) =>
     );
     if (!counted.ok) throw failed(ctx.log, consumeIngress.name, counted.error);
     if (!counted.value.allowed) {
-      ctx.log.info({ event: "trpc.throttled", act: path }, "throttled");
-      throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: sentence });
+      const { retryAfterSeconds } = counted.value;
+      ctx.log.info({ event: "trpc.throttled", act: path, retryAfterSeconds }, "throttled");
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message: `Too many calls from this person; ask again in ${retryAfterSeconds} seconds.`,
+        cause: new CeilingMet(retryAfterSeconds),
+      });
     }
     return next();
   });

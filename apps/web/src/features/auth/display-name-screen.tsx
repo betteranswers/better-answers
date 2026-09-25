@@ -7,7 +7,7 @@ import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 
 import { useSetDisplayName } from "./auth-hooks.ts";
-import { AuthScreen, Refused, SESSION_ENDED, type Said } from "./auth-screen.tsx";
+import { AuthScreen, Refused, type Said } from "./auth-screen.tsx";
 import { leavingFor, nextAfterSignIn, pageQuery } from "./carried-flow.ts";
 
 /**
@@ -51,9 +51,7 @@ const REFUSED_OTHERWISE: Said = {
 
 const UNANSWERED = "The platform did not answer, so nothing changed. Try again in a moment.";
 
-const saidOf = (refusal: Refusal): Said =>
-  WORDS.get(refusal.word) ??
-  (refusal.class === "unauthenticated" ? SESSION_ENDED : REFUSED_OTHERWISE);
+const saidOf = (refusal: Refusal): Said => WORDS.get(refusal.word) ?? REFUSED_OTHERWISE;
 
 export function DisplayNameScreen() {
   const navigate = useNavigate();
@@ -105,19 +103,6 @@ export function DisplayNameScreen() {
       {failure === null ? null : (
         <Refused id={REFUSED} failure={failure} saidOf={saidOf} unanswered={UNANSWERED} />
       )}
-
-      {refusedAs === "unauthenticated" ? (
-        <Button
-          type="button"
-          variant="link"
-          className="mt-6 px-0"
-          onClick={() => {
-            void navigate(leavingFor(`/sign-in${pageQuery()}`));
-          }}
-        >
-          Sign in again
-        </Button>
-      ) : null}
     </AuthScreen>
   );
 }

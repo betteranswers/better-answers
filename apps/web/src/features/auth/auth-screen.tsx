@@ -1,6 +1,10 @@
+import { useNavigate } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
 import { refusalOf, type ApiError, type Refusal } from "@/shared/api/trpc.ts";
+import { Button } from "@/shared/ui/button.tsx";
+
+import { leavingFor, pageQuery } from "./carried-flow.ts";
 
 export function AuthScreen(properties: { readonly title: string; readonly children: ReactNode }) {
   return (
@@ -41,7 +45,23 @@ export function Outcome(properties: {
 
 export type Said = { readonly why: string; readonly next: string };
 
-export const SESSION_ENDED: Said = { why: "Your session has ended.", next: "Sign in again." };
+const SESSION_ENDED: Said = { why: "Your session has ended.", next: "Sign in again." };
+
+function SignInAgain() {
+  const navigate = useNavigate();
+  return (
+    <Button
+      type="button"
+      variant="link"
+      className="mt-4 px-0"
+      onClick={() => {
+        void navigate(leavingFor(`/sign-in${pageQuery()}`));
+      }}
+    >
+      Sign in again
+    </Button>
+  );
+}
 
 /**
  * A refusal shown as its own word, then why and what the reader can do next; a failure with no
@@ -61,10 +81,14 @@ export function Refused(properties: {
       </Outcome>
     );
   }
-  const said = properties.saidOf(refusal);
+  const sessionEnded = refusal.class === "unauthenticated";
+  const said = sessionEnded ? SESSION_ENDED : properties.saidOf(refusal);
   return (
-    <Outcome tone="refused" id={properties.id}>
-      Refused: <code className="font-mono">{refusal.word}</code>. {said.why} {said.next}
-    </Outcome>
+    <>
+      <Outcome tone="refused" id={properties.id}>
+        Refused: <code className="font-mono">{refusal.word}</code>. {said.why} {said.next}
+      </Outcome>
+      {sessionEnded ? <SignInAgain /> : null}
+    </>
   );
 }

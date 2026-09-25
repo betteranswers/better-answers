@@ -36,7 +36,7 @@ const asksBy = async (personId: string) => {
 
 const answeredStatus = z.object({ data: z.object({ httpStatus: z.number() }) });
 
-// An answer with no refusal on it is the acknowledgement, whose status tRPC does not hand over.
+/** An answer with no refusal on it is the acknowledgement, whose status tRPC does not hand over. */
 const statusOf = async (call: Promise<unknown>): Promise<number> => {
   const refused = answeredStatus.safeParse(await refusalOfCall(call));
   return refused.success ? refused.data.data.httpStatus : 200;
@@ -80,7 +80,7 @@ describe("a signed-in person asking to join a workspace over tRPC", () => {
     ];
 
     expect(answers).toEqual([ACKNOWLEDGED, ACKNOWLEDGED, ACKNOWLEDGED, ACKNOWLEDGED]);
-    expect((await asksBy(person.id)).map((ask) => ask.workspace_id)).toEqual([
+    expect((await asksBy(person.id)).map((asked) => asked.workspace_id)).toEqual([
       waitedOn.workspaceId,
       fresh.workspaceId,
     ]);
@@ -129,25 +129,46 @@ describe("a signed-in person asking to join a workspace over tRPC", () => {
 
   it("refuses a person past their ceiling, and only them", async () => {
     const workspace = await app().provision();
-    const { person, api } = await aSignedInPerson();
-    const ask = (slug: string) => api.person.requestAccess.mutate({ slug, reason: REASON });
+    const { person, api, client } = await aSignedInPerson();
     const statuses: number[] = [];
 
     // The window is wall-clock aligned, so a burst straddling a boundary starts its count
     // again: ask until refused, not a fixed number.
     for (let attempt = 0; attempt <= ASK_TO_JOIN_PERSON_RULE.max * 2 + 1; attempt += 1) {
-      const status = await statusOf(ask(unknownSlug()));
+      const status = await statusOf(
+        api.person.requestAccess.mutate({ slug: unknownSlug(), reason: REASON }),
+      );
       statuses.push(status);
       if (status === 429) break;
     }
-    const known = await refusalOfCall(ask(workspace.slug));
+    const known = await client.json(REQUEST_ACCESS, { slug: workspace.slug, reason: REASON });
     const someoneElse = await aSignedInPerson();
 
-    expect(statuses).toContain(429);
-    expect(known).toMatchObject({ data: { httpStatus: 429, code: "TOO_MANY_REQUESTS" } });
+    expect(statuses.at(-1)).toBe(429);
+    expect(statuses.filter((status) => status === 200).length).toBeGreaterThanOrEqual(10);
+    expect(known.status).toBe(429);
+    const retryAfter = Number(known.headers.get("retry-after"));
+    expect(retryAfter).toBeGreaterThanOrEqual(1);
+    expect(retryAfter).toBeLessThanOrEqual(3600);
+    expect(await known.json()).toMatchObject({
+      error: { data: { code: "TOO_MANY_REQUESTS", retryAfterSeconds: retryAfter } },
+    });
     expect(await asksBy(person.id)).toEqual([]);
     expect(
       await someoneElse.api.person.requestAccess.mutate({ slug: workspace.slug, reason: REASON }),
     ).toEqual(ACKNOWLEDGED);
+  });
+
+  it("answers known and unknown slugs no sooner than 250 ms", async () => {
+    const workspace = await app().provision();
+    const { api } = await aSignedInPerson();
+    const timed = async (slug: string): Promise<number> => {
+      const started = performance.now();
+      await api.person.requestAccess.mutate({ slug, reason: REASON });
+      return performance.now() - started;
+    };
+
+    expect(await timed(unknownSlug())).toBeGreaterThanOrEqual(250);
+    expect(await timed(workspace.slug)).toBeGreaterThanOrEqual(250);
   });
 });
