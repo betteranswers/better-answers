@@ -114,7 +114,7 @@ Refs: T-123
 
 - The summary is imperative and lower-case, with no full stop. A name keeps its capitals in backticks: `` fix(api): refuse an `OKF` key with no prefix ``.
 - The types: `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `build`, `ci`, `chore`, `revert`.
-- The scope is optional and names a workspace or an area: `api`, `web`, `worker`, `core`, `schema`, `devtools`, `design-system`, `deploy`, `ci`, `docs`. `deps` is Renovate's.
+- The scope is optional and names a workspace or an area: `api`, `web`, `worker`, `core`, `schema`, `devtools`, `design-system`, `deploy`, `ci`, `docs`, `auth`, `people`, `ops`. `deps` is Renovate's.
 - The ticket goes in the footer, never in the subject. A change with no ticket has no footer.
 
 One commitlint config, `commitlint.config.mjs`, holds the form in three places. Each refusal names the rule it broke.
