@@ -29,7 +29,7 @@ CASES: list[dict[str, Any]] = read_erasure_match()["cases"]
 
 
 @pytest.mark.parametrize("case", CASES, ids=[case["why"][:60] for case in CASES])
-def test_the_seam_raises_a_match_at_every_occurrence_the_agreement_answers(
+def test_raises_a_match_at_every_agreed_occurrence(
     case: dict[str, Any],
 ) -> None:
     raised = erasure_matches_in(case["text"], ({case["kind"]: (case["identifier"],)},))
@@ -44,7 +44,7 @@ def test_the_seam_raises_a_match_at_every_occurrence_the_agreement_answers(
 
 
 @pytest.mark.parametrize("case", CASES, ids=[case["why"][:60] for case in CASES])
-def test_an_identifier_clears_the_floor_where_the_agreement_says_it_does(
+def test_clears_the_floor_exactly_where_the_agreement_says(
     case: dict[str, Any],
 ) -> None:
     assert (
@@ -66,7 +66,7 @@ def test_an_identifier_is_normalised_as_the_agreement_normalises_it() -> None:
         assert normalised(case["identifier"]) == case["normalised"], case["why"]
 
 
-def test_whitespace_is_every_code_point_the_agreement_lists_and_no_other() -> None:
+def test_whitespace_is_exactly_the_code_points_the_agreement_lists() -> None:
     listed = set(read_erasure_match()["normalisation"]["whitespace"])
     surrogates = range(0xD800, 0xE000)
 

@@ -67,13 +67,13 @@ def files_this_process_maps() -> set[Path]:
     }
 
 
-def test_the_detector_asks_gliner_for_the_load_that_holds_its_weights_once(
+def test_asks_gliner_for_the_load_that_holds_weights_once(
     recogniser: ModelRecogniser,
 ) -> None:
     assert recogniser.gliner.model_kwargs == {"low_cpu_mem_usage": True}
 
 
-def test_the_detectors_weights_are_its_file_mapped_and_none_is_left_on_meta(
+def test_the_detectors_weights_are_file_mapped_with_none_on_meta(
     recogniser: ModelRecogniser,
 ) -> None:
     gliner_model = recogniser.gliner.gliner
@@ -87,6 +87,6 @@ def test_the_detectors_weights_are_its_file_mapped_and_none_is_left_on_meta(
 
 
 @pytest.mark.usefixtures("recogniser")
-def test_torch_maps_a_file_for_the_detectors_build_and_for_nothing_after_it() -> None:
+def test_torch_maps_a_file_only_for_the_detectors_build() -> None:
     assert the_weights_file() in files_this_process_maps()
     assert torch.utils.serialization.config.load.mmap is False

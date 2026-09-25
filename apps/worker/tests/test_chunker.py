@@ -25,7 +25,7 @@ def test_a_concept_chunk_carries_the_body_and_never_the_frontmatter() -> None:
     assert "@type" not in "\n".join(chunks)
 
 
-def test_a_chunk_ends_at_a_paragraph_and_never_grows_past_its_size() -> None:
+def test_ends_a_chunk_at_a_paragraph_within_its_size() -> None:
     paragraphs = [f"Paragraph {number}. " + "word " * 60 for number in range(6)]
 
     chunks = chunks_of(render_concept_file(FRONTMATTER, "\n\n".join(paragraphs)))
@@ -37,7 +37,7 @@ def test_a_chunk_ends_at_a_paragraph_and_never_grows_past_its_size() -> None:
     assert all(f"Paragraph {number}." in joined for number in range(6))
 
 
-def test_one_paragraph_past_the_ceiling_is_cut_at_it_and_loses_nothing() -> None:
+def test_cuts_a_paragraph_past_the_ceiling_and_loses_nothing() -> None:
 
     short = "A short paragraph first."
     long = "".join(f"w{number:04d} " for number in range(300)).strip()

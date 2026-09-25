@@ -165,7 +165,7 @@ def names_on(text: str) -> set[str]:
     }
 
 
-def test_no_window_edge_falls_inside_a_word_on_a_page_that_has_to_be_stepped() -> None:
+def test_no_window_edge_splits_a_word_on_a_stepped_page() -> None:
 
     for text in (whole_page(), heading_less_page()):
         starts, ends = edges_of(text)
@@ -215,7 +215,7 @@ def test_a_heading_inside_a_code_fence_opens_no_window() -> None:
     assert fenced.index("# not a heading") not in starts
 
 
-def test_presidio_cuts_a_word_on_this_page_and_the_seams_windows_never_do() -> None:
+def test_the_seams_windows_never_cut_a_word_presidio_cuts() -> None:
 
     for cut in THE_CUTS_PRESIDIO_MAKES:
         text = page_at(cut.page_length)
@@ -232,7 +232,7 @@ def test_presidio_cuts_a_word_on_this_page_and_the_seams_windows_never_do() -> N
         assert cuts_in(text, ends) == [], cut
 
 
-def test_the_windows_cover_every_length_and_carry_the_offsets_they_claim() -> None:
+def test_windows_cover_every_length_at_the_offsets_they_claim() -> None:
 
     for length in THE_LENGTHS_T168_MEASURED:
         text = page_at(length)
@@ -249,15 +249,13 @@ def test_the_windows_cover_every_length_and_carry_the_offsets_they_claim() -> No
         ), length
 
 
-def test_no_length_this_page_was_measured_at_raises_part_of_a_word() -> None:
+def test_no_measured_length_raises_part_of_a_word() -> None:
 
     for length in THE_LENGTHS_T168_MEASURED:
         assert partial_spans_on(page_at(length)) == [], length
 
 
-def test_every_length_answers_what_the_whole_page_answers_in_the_runs_they_share() -> (
-    None
-):
+def test_every_length_answers_as_the_whole_page_in_shared_runs() -> None:
 
     page = whole_page()
     expected = spans_past_the_shared_heading(page, 0)
@@ -269,7 +267,7 @@ def test_every_length_answers_what_the_whole_page_answers_in_the_runs_they_share
         assert here == expected, length
 
 
-def test_a_page_with_no_heading_answers_the_same_at_every_length() -> None:
+def test_a_headingless_page_answers_the_same_at_every_length() -> None:
 
     first, tail_at = under(THE_PREAMBLES_THAT_MOVE_THE_GRID[0])
     expected = spans_past(first, tail_at)

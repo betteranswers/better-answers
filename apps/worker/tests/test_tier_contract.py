@@ -234,7 +234,7 @@ def materialised(root: Path, tree: dict[str, bytes]) -> Path:
     return root
 
 
-def test_the_digest_answers_the_hex_the_framing_says_over_every_tree_the_cases_name(
+def test_the_digest_answers_the_agreed_hex_for_every_case_tree(
     tmp_path: Path,
 ) -> None:
     from better_answers_worker.contract_digest import contract_digest
@@ -247,7 +247,7 @@ def test_the_digest_answers_the_hex_the_framing_says_over_every_tree_the_cases_n
     assert answered == [(why, expected) for why, _tree, expected in DIGEST_CASES]
 
 
-def test_a_symlink_counts_for_nothing_so_neither_tier_reads_a_file_twice(
+def test_a_symlink_counts_for_nothing_in_the_digest(
     tmp_path: Path,
 ) -> None:
     from better_answers_worker.contract_digest import contract_digest
@@ -259,7 +259,7 @@ def test_a_symlink_counts_for_nothing_so_neither_tier_reads_a_file_twice(
     assert contract_digest(root) == DIGEST_CASES[0][2]
 
 
-def test_the_digest_this_tier_carries_is_whole_and_never_a_short_form() -> None:
+def test_the_carried_digest_is_whole_never_a_short_form() -> None:
     from better_answers_worker.contract_stamp import CONTRACT_DIGEST
 
     assert re.fullmatch(r"[0-9a-f]{64}", CONTRACT_DIGEST)
@@ -286,7 +286,7 @@ def test_names_exactly_the_agreements_spoken_each_in_the_expected_form() -> None
         assert manifest["agreements"][agreement_id]["form"] == form
 
 
-def test_lists_a_fixture_if_and_only_if_it_exists_under_an_agreement_it_names() -> None:
+def test_lists_a_fixture_exactly_when_it_exists_under_its_agreement() -> None:
     manifest = read_manifest()
 
     for fixture in manifest["fixtures"]:
@@ -312,11 +312,11 @@ def test_counts_a_fixture_and_never_a_dotfile(tmp_path: Path) -> None:
     assert fixtures_on_disk(tmp_path) == {"id-shape/cases.json"}
 
 
-def test_the_disk_answers_every_form_declared_and_every_directory_is_claimed() -> None:
+def test_the_disk_matches_every_declared_form_and_claimed_directory() -> None:
     assert form_failures(read_manifest(), CONTRACTS_DIR) == []
 
 
-def test_names_the_agreement_and_its_form_for_each_entry_the_disk_denies(
+def test_names_the_agreement_and_form_of_each_denied_entry(
     tmp_path: Path,
 ) -> None:
     materialise_broken_contracts(tmp_path)
@@ -338,7 +338,7 @@ def read_id_shape() -> dict[str, Any]:
     return cast("dict[str, Any]", json.loads(raw))
 
 
-def test_the_id_shape_accepts_and_refuses_exactly_what_the_fixture_says() -> None:
+def test_the_id_shape_accepts_and_refuses_as_the_fixture_says() -> None:
     fixture = read_id_shape()
     pattern = re.compile(fixture["pattern"])
 
@@ -348,14 +348,14 @@ def test_the_id_shape_accepts_and_refuses_exactly_what_the_fixture_says() -> Non
         assert not pattern.fullmatch(rejected["id"]), rejected["why"]
 
 
-def test_the_shape_this_tier_holds_a_workspace_id_to_is_the_fixtures_own() -> None:
+def test_holds_workspace_ids_to_the_fixtures_own_shape() -> None:
 
     from better_answers_worker.ids import ID_SHAPE
 
     assert ID_SHAPE.pattern == read_id_shape()["pattern"]
 
 
-def test_an_id_minted_in_this_tier_matches_the_shape_the_other_tier_parses() -> None:
+def test_a_minted_id_matches_the_shape_the_other_tier_parses() -> None:
 
     from better_answers_worker.ids import ulid
 
@@ -453,7 +453,7 @@ def _submit_fixture_set(cursor: Cursor[Any], fixture: dict[str, Any]) -> int:
     return submitted
 
 
-def test_the_inbox_takes_a_whole_set_in_one_call_and_re_renders_its_summary() -> None:
+def test_one_call_submits_a_set_and_re_renders_its_summary() -> None:
     from pg_harness import migrated_postgres
 
     fixture = read_concept_inbox()
@@ -575,9 +575,7 @@ def _as_role_in_scope(cursor: Cursor[Any], where: dict[str, Any]) -> None:
     )
 
 
-def test_the_queue_hands_out_every_job_the_fixture_says_and_answers_every_call() -> (
-    None
-):
+def test_the_queue_hands_out_and_answers_as_the_fixture_says() -> None:
     from pg_harness import migrated_postgres
 
     fixture = read_queue()
@@ -656,9 +654,7 @@ def read_concept_file() -> dict[str, Any]:
     return cast("dict[str, Any]", json.loads(raw))
 
 
-def test_the_concept_file_canonical_text_and_hash_are_the_fixtures_for_every_case() -> (
-    None
-):
+def test_the_canonical_text_and_hash_match_every_fixture_case() -> None:
     from better_answers_worker.concept_file import (
         Frontmatter,
         canonical_frontmatter,
@@ -679,9 +675,7 @@ def test_the_concept_file_canonical_text_and_hash_are_the_fixtures_for_every_cas
         }
 
 
-def test_every_number_the_fixture_names_is_written_as_the_text_both_tiers_write() -> (
-    None
-):
+def test_writes_every_fixture_number_as_both_tiers_write_it() -> None:
     from better_answers_worker.concept_file import canonical_frontmatter
 
     for entry in read_concept_file()["numbers"]:
@@ -720,7 +714,7 @@ def test_the_comment_gate_refuses_every_sentence_the_fixture_says_cites(
             assert f"cites {pattern['name']} (`{cited}`)" in said, prose
 
 
-def test_the_comment_gate_walks_past_every_sentence_the_fixture_says_cites_nothing(
+def test_the_comment_gate_passes_every_sentence_that_cites_nothing(
     tmp_path: Path,
 ) -> None:
     for prose in read_citation()["cites_nothing"]:

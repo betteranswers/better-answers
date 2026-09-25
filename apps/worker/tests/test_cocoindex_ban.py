@@ -85,6 +85,6 @@ def test_the_pipeline_package_may_compose_the_engine() -> None:
     assert BANNED_API not in fired
 
 
-def test_the_pipeline_package_is_the_only_path_the_ban_is_lifted_for() -> None:
+def test_lifts_the_ban_for_the_pipeline_package_alone() -> None:
 
     assert paths_the_ban_is_lifted_for() == [THE_ONE_EXEMPT_PATTERN]

@@ -48,7 +48,7 @@ def test_a_run_with_no_daemon_skip_leaves_the_reporter_untouched() -> None:
     assert reporter.lines == []
 
 
-def test_a_run_with_no_skips_at_all_leaves_the_reporter_untouched() -> None:
+def test_a_run_with_no_skips_leaves_the_reporter_untouched() -> None:
     reporter = _StubReporter()
 
     pytest_terminal_summary(reporter)  # type: ignore[arg-type]

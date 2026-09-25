@@ -26,7 +26,7 @@ def _a_warmed_cache(at: Path) -> Path:
     return entry
 
 
-def test_the_copy_carries_what_the_library_cached_and_not_the_locks_it_took(
+def test_copies_the_cached_suffix_list_without_its_locks(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
 
@@ -47,7 +47,7 @@ def test_the_copy_carries_what_the_library_cached_and_not_the_locks_it_took(
     assert [found.name for found in warmed_entries()] == [AN_ENTRY]
 
 
-def test_a_build_that_warmed_nothing_refuses_rather_than_shipping_a_fetch(
+def test_a_build_that_warmed_nothing_refuses_to_ship_a_fetch(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
 
@@ -62,7 +62,7 @@ def test_a_build_that_warmed_nothing_refuses_rather_than_shipping_a_fetch(
     assert not carried_to.exists()
 
 
-def test_the_build_warms_the_suffix_list_by_running_the_module_that_fences_it() -> None:
+def test_the_build_warms_the_suffix_list_through_its_own_module() -> None:
 
     dockerfile = DOCKERFILE.read_text("utf-8")
 
