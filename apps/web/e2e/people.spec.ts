@@ -27,7 +27,7 @@ const membersRegion = (page: Page) => page.getByRole("region", { name: "Members"
 const searchBox = (page: Page) =>
   page.getByRole("searchbox", { name: "Search by name or address" });
 
-// The header row is a row too, so the members are the rows with a cell.
+/** The header row is a row too, so the members are the rows with a cell. */
 const memberRows = (page: Page): Locator =>
   membersRegion(page)
     .getByRole("row")
@@ -35,7 +35,7 @@ const memberRows = (page: Page): Locator =>
 
 const rowOf = (page: Page, name: string): Locator => memberRows(page).filter({ hasText: name });
 
-// Timed in the page, from the key to the count that says it: a matcher polls too coarsely.
+/** Timed in the page, from the key to the count that says it: a matcher polls too coarsely. */
 const clockTheSearch = (page: Page, saying: string) =>
   page.evaluate((expected) => {
     const landed = Promise.withResolvers<number>();
@@ -65,7 +65,7 @@ type Joined = {
   readonly role: "Editor" | "Viewer";
 };
 
-// Another workspace's member is made alongside, so a list that leaked would show them.
+/** Another workspace's member is made alongside, so a list that leaked would show them. */
 const anAdminAtPeople = async (
   page: Page,
   api: APIRequestContext,
@@ -127,10 +127,7 @@ test.describe("the People screen's Members view", () => {
     );
   });
 
-  test("shows an Admin each member's name, address, role and groups, and no one else", async ({
-    page,
-    request,
-  }) => {
+  test("shows an Admin each member's details, and no one else's", async ({ page, request }) => {
     const { admin, joined, stranger } = await anAdminAtPeople(page, request, "Aire Valley Tooling");
 
     await expect(memberRows(page)).toHaveCount(3);
@@ -151,7 +148,7 @@ test.describe("the People screen's Members view", () => {
     await expect(everything).not.toContainText(stranger);
   });
 
-  test("finds one person by name or address, and says when no one matches", async ({
+  test("searches by name or address, and says when none match", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -199,10 +196,7 @@ test.describe("the People screen's Members view", () => {
   });
 
   for (const role of ["Editor", "Viewer"] as const) {
-    test(`refuses a member at ${role} the list, saying the refusal in its own word`, async ({
-      page,
-      request,
-    }) => {
+    test(`refuses a member at ${role} the list, in its word`, async ({ page, request }) => {
       const email = anAddress(role.toLowerCase());
       const member = await person(request, email, { displayName: `A ${role}` });
       const workspace = await provision(request, { name: `Calder ${role}s` });
@@ -284,10 +278,7 @@ test.describe("the People screen's Members view", () => {
 
 test.describe("the People screen's words", () => {
   // Every People surface joins this test as it is built: the product's word is workspace.
-  test("names a workspace and never an organisation, on every People view", async ({
-    page,
-    request,
-  }) => {
+  test("says workspace, never organisation, on every People view", async ({ page, request }) => {
     await anAdminAtPeople(page, request, "Ryedale Metalwork");
     const organisation = /organi[sz]ation/i;
 

@@ -14,7 +14,7 @@ const ACT_BUDGET_MS = 100;
 
 const NARROW = { width: 320, height: 720 };
 
-// Past `--breakpoint-md`, which `--shell-wide` in `index.css` reads for the shell.
+/** Past `--breakpoint-md`, which `--shell-wide` in `index.css` reads for the shell. */
 const WIDE = { width: 1024, height: 720 };
 
 const SCREENS_AND_VIEWS = "Screens and views";
@@ -50,7 +50,7 @@ const sidewaysRoom = (page: Page) =>
 const holdsFocus = (panel: Locator) =>
   panel.evaluate((node) => node.contains(document.activeElement));
 
-// Swept rather than read by key: what matters is that nothing kept here is about the reader.
+/** Swept rather than read by key: what matters is that nothing kept here is about the reader. */
 const keptOnThisBrowser = (page: Page) =>
   page.evaluate(() =>
     Object.keys(localStorage).map((key) => `${key} ${localStorage.getItem(key) ?? ""}`),
@@ -75,10 +75,7 @@ const signedIn = async (page: Page, api: Parameters<typeof provision>[0], name: 
   return workspace;
 };
 
-test("the icon rail reaches each of the six screens, named to the eye, the pointer and the keyboard", async ({
-  page,
-  request,
-}) => {
+test("names the icon rail's screens to eye, pointer and keyboard", async ({ page, request }) => {
   await signedIn(page, request, "Wharfedale Castings");
   await page.goto("/system/routes-and-spend");
 
@@ -96,10 +93,7 @@ test("the icon rail reaches each of the six screens, named to the eye, the point
   await expect(page.getByRole("tooltip").filter({ hasText: "People" }).first()).toBeVisible();
 });
 
-test("the rail marks the screen being read, announced and drawn, and never two at once", async ({
-  page,
-  request,
-}) => {
+test("marks only the screen being read in the icon rail", async ({ page, request }) => {
   await signedIn(page, request, "Pennine Metalwork");
   await page.goto("/people/thresholds");
 
@@ -115,10 +109,7 @@ test("the rail marks the screen being read, announced and drawn, and never two a
   expect(await paintedFill(page, "System")).toBe("rgba(0, 0, 0, 0)");
 });
 
-test("the secondary nav lists the open screen's views, marks the one being read and swaps on a change of screen", async ({
-  page,
-  request,
-}) => {
+test("lists, marks and swaps the secondary nav's views by screen", async ({ page, request }) => {
   await signedIn(page, request, "Northern Tooling");
   await page.goto("/system/health");
 
@@ -175,10 +166,7 @@ test("the secondary nav lists the open screen's views, marks the one being read 
   ).toBeVisible();
 });
 
-test("the top bar names the workspace, then where the person is, then who they are and their role", async ({
-  page,
-  request,
-}) => {
+test("names workspace, screen, view, person, role in the top bar", async ({ page, request }) => {
   const workspace = await signedIn(page, request, "Halifax Fabrication");
   await page.goto("/system/routes-and-spend");
 
@@ -195,10 +183,7 @@ test("the top bar names the workspace, then where the person is, then who they a
   await expect(page.getByRole("menuitem", { name: "Sign out" })).toBeVisible();
 });
 
-test("the keyboard order is the skip link, the rail, the secondary nav, the top bar, the screen", async ({
-  page,
-  request,
-}) => {
+test("tabs skip link, icon rail, secondary nav, top bar, screen", async ({ page, request }) => {
   const workspace = await signedIn(page, request, "Dales Engineering");
   await page.goto("/system/routes-and-spend");
   const rail = railOf(page);
@@ -228,8 +213,10 @@ test("the keyboard order is the skip link, the rail, the secondary nav, the top 
     page.getByRole("banner").getByRole("button", { name: new RegExp(workspace.admin.name) }),
   ).toBeFocused();
 
-  // Nothing carries a positive tabindex, so the document's own order is the tab order. Zero
-  // is not positive: the open tab's panel carries one.
+  /**
+   * Nothing carries a positive tabindex, so the document's own order is the tab order. Zero
+   * is not positive: the open tab's panel carries one.
+   */
   const contentIsLast = await page.evaluate(() => {
     const bar = document.querySelector("header");
     const content = document.querySelector("main");
@@ -245,10 +232,7 @@ test("the keyboard order is the skip link, the rail, the secondary nav, the top 
 
 // Its own test, not the tail of the one above: the skip link is the first stop, so it needs
 // a screen with nothing focused.
-test("the skip link moves focus into the content, not back into the navigation", async ({
-  page,
-  request,
-}) => {
+test("moves focus from the skip link into the content", async ({ page, request }) => {
   await signedIn(page, request, "Ribble Toolmaking");
   await page.goto("/system/routes-and-spend");
   // A keypress before the shell has drawn is spent on nothing, so wait for the screen first.
@@ -257,7 +241,7 @@ test("the skip link moves focus into the content, not back into the navigation",
   await skipLinkReachesTheScreen(page);
 });
 
-test("a screen at 320 pixels scrolls nothing sideways, with the navigation closed and with it open", async ({
+test("scrolls nothing sideways at 320 pixels, navigation open or closed", async ({
   page,
   request,
 }) => {
@@ -280,10 +264,7 @@ test("a screen at 320 pixels scrolls nothing sideways, with the navigation close
   expect(open.scrolls).toBeLessThanOrEqual(open.holds);
 });
 
-test("the shell is painted in the page's own token, so a screen sits on the product's surface", async ({
-  page,
-  request,
-}) => {
+test("paints the shell in the page's own surface token", async ({ page, request }) => {
   await signedIn(page, request, "Southern Castings");
   await page.goto("/system/routes-and-spend");
 
@@ -295,8 +276,10 @@ test("the shell is painted in the page's own token, so a screen sits on the prod
     const token = getComputedStyle(probe).backgroundColor;
     probe.remove();
 
-    // The first painted ancestor is what a reader sees behind the screen, whatever the number
-    // of layout wrappers between.
+    /**
+     * The first painted ancestor is what a reader sees behind the screen, whatever the number
+     * of layout wrappers between.
+     */
     let behind = main.parentElement;
     while (behind !== null && getComputedStyle(behind).backgroundColor === nothing) {
       behind = behind.parentElement;
@@ -313,15 +296,14 @@ const tabsOf = (page: Page) => page.getByRole("tablist", { name: "Routes and spe
 
 const routesCardOf = (page: Page) => page.getByRole("region", { name: "Routes" });
 
-// The view's read of the routes is issued after the nav paints, so a screen here has not
-// finished starting until its card lists them.
+/**
+ * The view's read of the routes is issued after the nav paints, so a screen here has not
+ * finished starting until its card lists them.
+ */
 const theRoutesHaveLanded = (page: Page) =>
   expect(routesCardOf(page).getByRole("list")).toHaveCount(1);
 
-test("the open view fills the toolbar with its tabs, marks the open one selected and moves on an arrow key", async ({
-  page,
-  request,
-}) => {
+test("fills the toolbar with tabs the arrow keys move between", async ({ page, request }) => {
   await signedIn(page, request, "Calder Ironworks");
   await page.goto("/system/routes-and-spend");
 
@@ -351,27 +333,21 @@ test("the open view fills the toolbar with its tabs, marks the open one selected
   await expect(routesCardOf(page)).toBeVisible();
 });
 
-test("a view that declares neither tabs nor acts gets no toolbar over its content", async ({
-  page,
-  request,
-}) => {
+test("draws no toolbar over a view without tabs or acts", async ({ page, request }) => {
   await signedIn(page, request, "Airedale Presswork");
   await page.goto("/system/health");
   await expect(page.getByRole("heading", { level: 2, name: "Health" })).toBeVisible();
 
   await expect(page.getByRole("tablist")).toHaveCount(0);
 
-  // An empty bar is what this forbids, so the content must follow the top bar itself.
+  /** An empty bar is what this forbids, so the content must follow the top bar itself. */
   const met = await page.evaluate(
     () => document.querySelector("header")?.nextElementSibling === document.querySelector("main"),
   );
   expect(met).toBe(true);
 });
 
-test("the keyboard order gains the toolbar between the top bar and the content", async ({
-  page,
-  request,
-}) => {
+test("tabs to the toolbar between the top bar and content", async ({ page, request }) => {
   const workspace = await signedIn(page, request, "Wensleydale Precision");
   await page.goto("/system/routes-and-spend");
   await expect(routesCardOf(page).getByRole("listitem")).toHaveCount(5);
@@ -393,7 +369,7 @@ test("the keyboard order gains the toolbar between the top bar and the content",
   await expect(panel.getByRole("region", { name: "Routes" })).toBeVisible();
 });
 
-test("one button closes the secondary nav and opens it again, says which state it is in, and the content and the toolbar take the freed width", async ({
+test("toggles the secondary nav on the navigation control, freeing width", async ({
   page,
   request,
   passesTheAccessibilityGate,
@@ -427,8 +403,10 @@ test("one button closes the secondary nav and opens it again, says which state i
   expect(await leftOf(rail)).toBe(railAt);
   expect(await widthOf(rail)).toBe(railWide);
 
-  // The toolbar shares the content's column, so one distance answers for both: each starts
-  // that much further left, and the content is that much wider.
+  /**
+   * The toolbar shares the content's column, so one distance answers for both: each starts
+   * that much further left, and the content is that much wider.
+   */
   const freed = contentAt - (await leftOf(page.getByRole("main")));
   expect(freed).toBeGreaterThan(0);
   expect(await widthOf(page.getByRole("main"))).toBe(contentWide + freed);
@@ -443,10 +421,7 @@ test("one button closes the secondary nav and opens it again, says which state i
   await expect(nav).toBeVisible();
 });
 
-test("the choice to close the secondary nav survives a reload, kept on this browser and sent nowhere", async ({
-  page,
-  request,
-}) => {
+test("remembers a closed secondary nav on this browser only", async ({ page, request }) => {
   const workspace = await signedIn(page, request, "Ribble Toolmaking");
   await page.goto("/system/routes-and-spend");
   await expect(navOf(page, "System")).toBeVisible();
@@ -480,7 +455,7 @@ test("the choice to close the secondary nav survives a reload, kept on this brow
   }
 });
 
-test("below the medium breakpoint one menu button opens the rail and the views over the content, holds focus and gives it back", async ({
+test("opens the navigation over narrow content, holding and returning focus", async ({
   page,
   request,
   passesTheAccessibilityGate,
@@ -504,8 +479,10 @@ test("below the medium breakpoint one menu button opens the rail and the views o
   // Over the content, not beside it: the content keeps every pixel it had.
   expect(await widthOf(page.getByRole("main"))).toBe(contentWide);
 
-  // Twice round every stop it holds — the destinations and its way out — so a reader behind
-  // it can never tab onto the screen.
+  /**
+   * Twice round every stop it holds — the destinations and its way out — so a reader behind
+   * it can never tab onto the screen.
+   */
   const stops = SCREEN_NAMES.length + SYSTEM_VIEWS.length + 1;
   expect(await holdsFocus(panel)).toBe(true);
   for (let step = 0; step < stops * 2; step += 1) {
@@ -520,7 +497,7 @@ test("below the medium breakpoint one menu button opens the rail and the views o
   await expect(menu).toBeFocused();
 });
 
-test("choosing a destination on a narrow screen closes the navigation over the content", async ({
+test("closes the navigation over the content on a chosen destination", async ({
   page,
   request,
 }) => {
@@ -544,7 +521,7 @@ test("choosing a destination on a narrow screen closes the navigation over the c
   await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
 });
 
-test("the navigation over the content closes when the wide layout arrives under the reader, and hands focus to the control that stays", async ({
+test("closes Screens and views on widening, focusing the navigation control", async ({
   page,
   request,
 }) => {
