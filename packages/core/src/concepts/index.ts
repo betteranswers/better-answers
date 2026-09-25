@@ -15,6 +15,7 @@ import {
   readableParameters,
   readsSensitivity,
   widens,
+  type Sensitivity,
   type Visibility,
 } from "../access/index.ts";
 import { act, declareActs, record } from "../audit/index.ts";
@@ -594,9 +595,14 @@ type Prepared = {
 const acceptanceMessage = (title: string): string =>
   `Accept the suggested change to ${title.replaceAll(/\s+/gu, " ").trim()}`;
 
+/**
+ * Accepts each decision on its own, in order: one refused leaves the rest to go ahead. A
+ * suggestion whose concept moved or went stale goes back to its proposer. Two or more decisions
+ * share one audit batch.
+ */
 export const acceptSuggestions = async (
   principal: UserPrincipal,
-  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor; readonly clock: Clock },
+  doors: WriteDoors,
   input: { readonly decisions: readonly AcceptanceDecision[] },
 ): Promise<
   Result<readonly AcceptanceOutcome[], RoleRefusal | PrincipalRefusal | "malformed" | Error>
@@ -615,46 +621,36 @@ export const acceptSuggestions = async (
   return ok(outcomes);
 };
 
-const acceptOne = async (
+const preparedFor = async (
   principal: UserPrincipal,
-  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor; readonly clock: Clock },
-  decision: AcceptanceDecision,
-  batchId: string | undefined,
-): Promise<AcceptanceOutcome> => {
-  const refused = (why: AcceptSuggestionRefusal | Error): AcceptanceOutcome => ({
-    suggestionId: decision.suggestionId,
-    outcome: err(why),
-  });
-
-  const returning = async (why: AcceptSuggestionRefusal, reason: string) => {
-    const returned = await returnToProposer(principal, doors, {
-      suggestionId: decision.suggestionId,
-      reason,
-    });
-    return refused(returned.ok ? why : returned.error);
-  };
-
+  postgres: PostgresDoor,
+  suggestionId: string,
+): Promise<Result<Prepared, AcceptSuggestionRefusal | Error>> => {
   const prepared = await attempt(() =>
-    withMembership(principal, doors.postgres, async (fresh, tx) => {
-      const payload = await payloadFor(fresh, tx, decision.suggestionId);
+    withMembership(principal, postgres, async (fresh, tx) => {
+      const payload = await payloadFor(fresh, tx, suggestionId);
       if (payload === undefined) return undefined;
       const target = await targetOfMergeKey(fresh, tx, payload.mergeKey);
       const author = await authorFor(fresh, tx, payload);
       return author === undefined ? undefined : { payload, target, author };
     }),
   );
-  if (!prepared.ok) return refused(prepared.error);
-  if (!prepared.value.ok) return refused(prepared.value.error);
+  if (!prepared.ok) return err(prepared.error);
+  if (!prepared.value.ok) return err(prepared.value.error);
   const found: Prepared | undefined = prepared.value.value;
-  if (found === undefined) return refused("no-such-suggestion");
+  return found === undefined ? err("no-such-suggestion") : ok(found);
+};
 
-  const moved = "the concept this suggestion resolves to moved after the set was opened";
+const acceptanceOf = async (
+  principal: UserPrincipal,
+  doors: WriteDoors,
+  decision: AcceptanceDecision,
+  found: Prepared,
+  batchId: string | undefined,
+): Promise<Result<ConceptWritten, AcceptSuggestionRefusal | Error>> => {
+  if ((found.target ?? null) !== decision.expectedTarget) return err("resolution-moved");
 
-  if ((found.target ?? null) !== decision.expectedTarget) {
-    return returning("resolution-moved", moved);
-  }
-
-  const written = await writeConcept(principal, doors, {
+  return writeConcept(principal, doors, {
     iri: found.target,
     mergeKey: found.payload.mergeKey,
     path: found.payload.path,
@@ -672,20 +668,46 @@ const acceptOne = async (
       batchId,
     },
   });
-  if (written.ok) return { suggestionId: decision.suggestionId, outcome: ok(written.value) };
+};
 
-  if (written.error === "merge-key-taken" || written.error === "resolution-moved") {
-    return returning("resolution-moved", moved);
+const returnedToProposerOn = (
+  refusal: AcceptSuggestionRefusal | Error,
+): readonly [word: AcceptSuggestionRefusal, reason: string] | undefined => {
+  if (refusal === "merge-key-taken" || refusal === "resolution-moved") {
+    return [
+      "resolution-moved",
+      "the concept this suggestion resolves to moved after the set was opened",
+    ];
   }
-  if (written.error === "stale-precondition") {
-    return returning("stale-precondition", "the concept moved after this suggestion was written");
+  if (refusal === "stale-precondition") {
+    return ["stale-precondition", "the concept moved after this suggestion was written"];
   }
-  return refused(written.error);
+  return undefined;
+};
+
+const acceptOne = async (
+  principal: UserPrincipal,
+  doors: WriteDoors,
+  decision: AcceptanceDecision,
+  batchId: string | undefined,
+): Promise<AcceptanceOutcome> => {
+  const { suggestionId } = decision;
+  const prepared = await preparedFor(principal, doors.postgres, suggestionId);
+  if (!prepared.ok) return { suggestionId, outcome: err(prepared.error) };
+
+  const accepted = await acceptanceOf(principal, doors, decision, prepared.value, batchId);
+  const returning = accepted.ok ? undefined : returnedToProposerOn(accepted.error);
+  if (returning === undefined) return { suggestionId, outcome: accepted };
+
+  const [word, reason] = returning;
+  const returned = await returnToProposer(principal, doors, { suggestionId, reason });
+  return { suggestionId, outcome: err(returned.ok ? word : returned.error) };
 };
 
 export type ImportBundleInput = {
   readonly tree: BundleTree;
 
+  /** The class every landed concept takes; `IMPORT_SENSITIVITY_DEFAULT` when absent. */
   readonly sensitivity?: (typeof SENSITIVITIES)[number] | undefined;
 
   readonly dryRun?: boolean | undefined;
@@ -795,7 +817,7 @@ const dryRunOf = (
     (held === undefined ? landed : skipped).push(concept.path);
     checks = plus(checks, countChecks(held?.iri, concept.checks, present));
 
-    // No iri is minted on a dry run, so the target's own path stands in and only the count is read.
+    /** No iri is minted on a dry run, so the target's path stands in and only the count is read. */
     const { links } = rewriteLinks(held?.body ?? concept.body, concept.path, (target) =>
       paths.has(target) ? target : undefined,
     );
@@ -813,23 +835,22 @@ const dryRunOf = (
   };
 };
 
-export const importBundle = async (
+type OpenedImport = {
+  readonly manifest: BundleManifest;
+  readonly resolved: readonly ResolvedConcept[];
+  readonly standing: ReadonlyMap<string, StandingConcept>;
+  readonly author: CommitAuthor;
+  readonly present: ReadonlySet<string>;
+};
+
+const importContextOf = (
   principal: UserPrincipal,
-  doors: { readonly git: GitDoor; readonly postgres: PostgresDoor; readonly clock: Clock },
+  postgres: PostgresDoor,
   input: ImportBundleInput,
-): Promise<Result<BundleImported, ImportBundleRefusal | Error>> => {
-  if (!mayWrite(principal)) return err("role-forbids");
-  const sensitivity = input.sensitivity ?? IMPORT_SENSITIVITY_DEFAULT;
-
-  // The second pass reads back what the first landed; a class the runner cannot read would stop
-  // the run after everything was written.
-  if (!readsSensitivity(principal, sensitivity)) return err("class-unreadable");
-  const loaded = readBundle(input.tree);
-  if (!loaded.ok) return err({ kind: "unsound", ...loaded.error });
-  const { manifest, concepts } = loaded.value;
-
-  const prepared = await attempt(() =>
-    withMembership(principal, doors.postgres, async (fresh, tx) => {
+  concepts: readonly LoadedConcept[],
+) =>
+  attempt(() =>
+    withMembership(principal, postgres, async (fresh, tx) => {
       const standing = await standingAt(
         fresh,
         tx,
@@ -854,90 +875,153 @@ export const importBundle = async (
       };
     }),
   );
-  if (!prepared.ok) return err(prepared.error);
-  if (!prepared.value.ok) return err(prepared.value.error);
-  const { standing, persons, author, present } = prepared.value.value;
 
+const resolvedOf = (
+  concepts: readonly LoadedConcept[],
+  persons: ReadonlyMap<string, UserId>,
+): Result<readonly ResolvedConcept[], Unsound> => {
   const resolved: ResolvedConcept[] = [];
   for (const concept of concepts) {
     const one = withPersonsAsVerifiers(concept, persons);
-    if (!one.ok) return err({ kind: "unsound", ...one.error });
+    if (!one.ok) return err(one.error);
     resolved.push(one.value);
   }
+  return ok(resolved);
+};
 
-  if (input.dryRun === true) {
-    const state = await manifestStanding(principal, doors.git, manifest);
-    if (!state.ok) return err(state.error);
-    return ok(dryRunOf(manifest.id, state.value, resolved, standing, present));
-  }
+const openImport = async (
+  principal: UserPrincipal,
+  postgres: PostgresDoor,
+  input: ImportBundleInput,
+): Promise<Result<OpenedImport, ImportBundleRefusal | Error>> => {
+  const loaded = readBundle(input.tree);
+  if (!loaded.ok) return err({ kind: "unsound", ...loaded.error });
+  const { manifest, concepts } = loaded.value;
 
-  const written = await writeManifest(principal, doors, {
-    manifest,
-    message: "Write the bundle's manifest",
-    author,
+  const read = await importContextOf(principal, postgres, input, concepts);
+  if (!read.ok) return err(read.error);
+  if (!read.value.ok) return err(read.value.error);
+  const { persons, ...context } = read.value.value;
+
+  const resolved = resolvedOf(concepts, persons);
+  if (!resolved.ok) return err({ kind: "unsound", ...resolved.error });
+  return ok({ manifest, resolved: resolved.value, ...context });
+};
+
+const dryRunImport = async (
+  principal: UserPrincipal,
+  git: GitDoor,
+  opened: OpenedImport,
+): Promise<Result<BundleImported, ImportBundleRefusal | Error>> => {
+  const state = await manifestStanding(principal, git, opened.manifest);
+  if (!state.ok) return err(state.error);
+  const { manifest, resolved, standing, present } = opened;
+  return ok(dryRunOf(manifest.id, state.value, resolved, standing, present));
+};
+
+type ImportRun = {
+  readonly author: CommitAuthor;
+  readonly sensitivity: Sensitivity;
+  readonly batchId: string;
+};
+
+type Holding = readonly [concept: ResolvedConcept, held: StandingConcept];
+
+type Landing = {
+  readonly progress: Omit<ImportProgress, "rewritten">;
+  readonly known: ReadonlyMap<string, StandingConcept>;
+  readonly holdings: readonly Holding[];
+};
+
+const stoppedAt = (file: string, reason: WriteConceptRefusal | Error, progress: ImportProgress) =>
+  err({ kind: "stopped" as const, file, reason, progress });
+
+const landOne = async (
+  principal: UserPrincipal,
+  doors: WriteDoors,
+  run: ImportRun,
+  concept: ResolvedConcept,
+): Promise<Result<StandingConcept, WriteConceptRefusal | Error>> => {
+  const wrote = await writeConcept(principal, doors, {
+    mergeKey: concept.mergeKey,
+    path: concept.path,
+    kind: concept.kind,
+    title: concept.title,
+    frontmatter: concept.frontmatter,
+    body: concept.body,
+    message: `Import ${concept.path} from ${concept.entry}`,
+    author: run.author,
+    expects: { base: null },
+    sensitivity: run.sensitivity,
+    status: CONCEPT_STABLE_STATUS,
   });
-  if (!written.ok) return err(manifestRefusalOf(written.error));
+  if (!wrote.ok) return err(wrote.error);
+  return ok({
+    iri: wrote.value.iri,
+    mergeKey: concept.mergeKey,
+    status: CONCEPT_STABLE_STATUS,
+    body: concept.body,
+    contentHash: wrote.value.contentHash,
+  });
+};
 
+const checksRecordedOn = async (
+  principal: UserPrincipal,
+  postgres: PostgresDoor,
+  input: Parameters<typeof recordImportedChecks>[2],
+): Promise<Result<ChecksRecorded, WriteConceptRefusal | Error>> => {
+  const recorded = await attempt(() =>
+    withMembership(principal, postgres, (fresh, tx) => recordImportedChecks(fresh, tx, input)),
+  );
+  if (!recorded.ok) return err(recorded.error);
+  return recorded.value;
+};
+
+const landEach = async (
+  principal: UserPrincipal,
+  doors: WriteDoors,
+  run: ImportRun,
+  opened: OpenedImport,
+): Promise<Result<Landing, ImportBundleRefusal>> => {
   const landed: string[] = [];
   const skipped: string[] = [];
   let checks: ChecksRecorded = { recorded: 0, present: 0 };
-  const rewritten: ConceptRewritten[] = [];
-  const batchId = ulid();
-  const stoppedAt = (file: string, reason: WriteConceptRefusal | Error) =>
-    err({
-      kind: "stopped" as const,
-      file,
-      reason,
-      progress: { landed, skipped, checks, rewritten },
-    });
-  const known = new Map<string, StandingConcept>(standing);
-  for (const concept of resolved) {
+  const stop = (file: string, reason: WriteConceptRefusal | Error) =>
+    stoppedAt(file, reason, { landed, skipped, checks, rewritten: [] });
+  const known = new Map<string, StandingConcept>(opened.standing);
+  const holdings: Holding[] = [];
+  for (const concept of opened.resolved) {
     let held = known.get(concept.path);
     if (held === undefined) {
-      const wrote = await writeConcept(principal, doors, {
-        mergeKey: concept.mergeKey,
-        path: concept.path,
-        kind: concept.kind,
-        title: concept.title,
-        frontmatter: concept.frontmatter,
-        body: concept.body,
-        message: `Import ${concept.path} from ${concept.entry}`,
-        author,
-        expects: { base: null },
-        sensitivity,
-        status: CONCEPT_STABLE_STATUS,
-      });
-      if (wrote.ok) {
-        landed.push(concept.path);
-        held = {
-          iri: wrote.value.iri,
-          mergeKey: concept.mergeKey,
-          status: CONCEPT_STABLE_STATUS,
-          body: concept.body,
-          contentHash: wrote.value.contentHash,
-        };
-        known.set(concept.path, held);
-      } else {
-        return stoppedAt(concept.file, wrote.error);
-      }
+      const wrote = await landOne(principal, doors, run, concept);
+      if (!wrote.ok) return stop(concept.file, wrote.error);
+      landed.push(concept.path);
+      held = wrote.value;
+      known.set(concept.path, held);
     } else {
       skipped.push(concept.path);
     }
-    const target = held.iri;
-    const recorded = await attempt(() =>
-      withMembership(principal, doors.postgres, (fresh, tx) =>
-        recordImportedChecks(fresh, tx, { iri: target, checks: concept.checks, batchId }),
-      ),
-    );
-    if (!recorded.ok) return stoppedAt(concept.file, recorded.error);
-    if (!recorded.value.ok) return stoppedAt(concept.file, recorded.value.error);
-    checks = plus(checks, recorded.value.value);
+    const recorded = await checksRecordedOn(principal, doors.postgres, {
+      iri: held.iri,
+      checks: concept.checks,
+      batchId: run.batchId,
+    });
+    if (!recorded.ok) return stop(concept.file, recorded.error);
+    checks = plus(checks, recorded.value);
+    holdings.push([concept, held]);
   }
+  return ok({ progress: { landed, skipped, checks }, known, holdings });
+};
 
-  const iriOf = (target: string): string | undefined => known.get(target)?.iri;
-  for (const concept of resolved) {
-    const held = known.get(concept.path);
-    if (held === undefined) continue;
+const rewriteEach = async (
+  principal: UserPrincipal,
+  doors: WriteDoors,
+  run: ImportRun,
+  landing: Landing,
+): Promise<Result<readonly ConceptRewritten[], ImportBundleRefusal>> => {
+  const rewritten: ConceptRewritten[] = [];
+  const iriOf = (target: string): string | undefined => landing.known.get(target)?.iri;
+  for (const [concept, held] of landing.holdings) {
     const linked = rewriteLinks(held.body, concept.path, iriOf);
     if (linked.links === 0) continue;
     const wrote = await writeConcept(principal, doors, {
@@ -949,23 +1033,64 @@ export const importBundle = async (
       frontmatter: concept.frontmatter,
       body: linked.body,
       message: `Rewrite the links in ${concept.path} to the iris of the concepts they name`,
-      author,
+      author: run.author,
       expects: { base: held.contentHash },
       status: held.status,
     });
-    if (!wrote.ok) return stoppedAt(concept.file, wrote.error);
+    if (!wrote.ok) return stoppedAt(concept.file, wrote.error, { ...landing.progress, rewritten });
     rewritten.push({ path: concept.path, links: linked.links });
   }
+  return ok(rewritten);
+};
+
+const runImport = async (
+  principal: UserPrincipal,
+  doors: WriteDoors,
+  opened: OpenedImport,
+  sensitivity: Sensitivity,
+): Promise<Result<BundleImported, ImportBundleRefusal | Error>> => {
+  const written = await writeManifest(principal, doors, {
+    manifest: opened.manifest,
+    message: "Write the bundle's manifest",
+    author: opened.author,
+  });
+  if (!written.ok) return err(manifestRefusalOf(written.error));
+
+  const run: ImportRun = { author: opened.author, sensitivity, batchId: ulid() };
+  const landing = await landEach(principal, doors, run, opened);
+  if (!landing.ok) return err(landing.error);
+  const rewritten = await rewriteEach(principal, doors, run, landing.value);
+  if (!rewritten.ok) return err(rewritten.error);
   return ok({
-    bundleId: manifest.id,
+    bundleId: opened.manifest.id,
     manifest: written.value.written ? "written" : "standing",
-    landed,
-    skipped,
-    checks,
-    rewritten,
-    concepts: resolved.length,
+    ...landing.value.progress,
+    rewritten: rewritten.value,
+    concepts: opened.resolved.length,
     dryRun: false,
   });
+};
+
+/**
+ * Not one transaction: a run stopped part way keeps what landed and names it in `progress`, and
+ * a rerun skips it. A dry run writes nothing and counts what a run would do.
+ */
+export const importBundle = async (
+  principal: UserPrincipal,
+  doors: WriteDoors,
+  input: ImportBundleInput,
+): Promise<Result<BundleImported, ImportBundleRefusal | Error>> => {
+  if (!mayWrite(principal)) return err("role-forbids");
+  const sensitivity = input.sensitivity ?? IMPORT_SENSITIVITY_DEFAULT;
+
+  // The second pass reads back what the first landed; a class the runner cannot read would stop
+  // the run after everything was written.
+  if (!readsSensitivity(principal, sensitivity)) return err("class-unreadable");
+  const opened = await openImport(principal, doors.postgres, input);
+  if (!opened.ok) return err(opened.error);
+  return input.dryRun === true
+    ? dryRunImport(principal, doors.git, opened.value)
+    : runImport(principal, doors, opened.value, sensitivity);
 };
 
 type ConceptCheck = {
