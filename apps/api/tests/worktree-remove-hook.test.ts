@@ -45,8 +45,8 @@ const removeHook = (worktree: string, bin: string): HookRun =>
 const argvLines = (log: string): readonly string[] =>
   existsSync(log) ? readFileSync(log, "utf8").split("\n").filter(Boolean) : [];
 
-describe("the jCodeMunch index a removed worktree leaves behind (T-181)", () => {
-  it("drops the index of the worktree it removes, so no indexed root outlives its path", () => {
+describe("the jCodeMunch index a removed worktree leaves behind", () => {
+  it("drops the removed worktree's index, leaving no orphaned root", () => {
     const { worktree } = worktreeOf("removed");
     const log = path.join(scratch, "removed-argv");
     const bin = stubJcodemunch("removed", worktree, log);
@@ -59,7 +59,7 @@ describe("the jCodeMunch index a removed worktree leaves behind (T-181)", () => 
     expect(run.stderr).toContain(`jcodemunch: dropped the index ${REPO_ID}`);
   });
 
-  it("keeps the index of a worktree holding work, which it keeps on disk too", () => {
+  it("keeps a worktree holding work, and its index", () => {
     const { worktree } = worktreeOf("kept");
     writeFileSync(path.join(worktree, "half-done.txt"), "work in progress\n");
     const log = path.join(scratch, "kept-argv");
@@ -73,7 +73,7 @@ describe("the jCodeMunch index a removed worktree leaves behind (T-181)", () => 
     expect(run.stderr).toContain("keeping");
   });
 
-  it("removes a worktree whose only extra is the .scratch link, and the notes it points at stay", () => {
+  it("removes a worktree holding only a .scratch link, notes intact", () => {
     const { root, worktree } = worktreeOf("scratch-link");
     writeUnder(root, ".scratch/v01-spec/map.md", "# the map\n");
     symlinkSync(path.join(root, ".scratch"), path.join(worktree, ".scratch"));

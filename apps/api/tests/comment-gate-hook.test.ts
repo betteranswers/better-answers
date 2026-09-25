@@ -55,7 +55,7 @@ const FORTY_WORDS =
 const A_WHY_OF_TWENTY =
   "Deleting this line changes what the engine memoises, and every caller below then reads a value the store never wrote";
 
-// Spelled in two halves, so the tag scan does not read a fixture as a citation.
+/** Spelled in two halves, so the tag scan does not read a fixture as a citation. */
 const tag = (family: string, number: string): string => `[${family}${number}]`;
 
 const hookText = readFileSync(script, "utf8");
@@ -88,7 +88,10 @@ const ignorePatterns = (): readonly string[] => {
   return patterns ?? [];
 };
 
-/** A bare name is a directory at any depth, a double-star pattern a file anywhere, and any other one place. */
+/**
+ * A bare name is a directory at any depth, a double-star pattern a file anywhere, and any other
+ * one place.
+ */
 const probeUnder = (pattern: string): string => {
   if (!pattern.includes("/")) return `packages/probe/${pattern}/probe.ts`;
   if (pattern.startsWith("**/")) return `packages/probe/${pattern.slice(3).replaceAll("*", "x")}`;
@@ -98,7 +101,7 @@ const probeUnder = (pattern: string): string => {
 const skippable = (): readonly (readonly [string, string])[] =>
   ignorePatterns().map((pattern) => [pattern, probeUnder(pattern)] as const);
 
-// A silence below means nothing until the gate is known to be loud in this tree.
+/** A silence below means nothing until the gate is known to be loud in this tree. */
 const smoke = edit("packages/smoke/probe.ts", `// ${FORTY_WORDS}\nexport const keep = 1;\n`);
 if (smoke.status !== 2 || !smoke.stderr.includes("runs to 40 words")) {
   throw new Error(
@@ -108,7 +111,7 @@ if (smoke.status !== 2 || !smoke.stderr.includes("runs to 40 words")) {
 
 const CASE_BLOCK = /case "\$RELATIVE" in\n([\s\S]*?)\n\s*esac/;
 
-// The roots a `case` arm names, with the trailing glob off, so `scripts/*` reads as `scripts`.
+/** The roots a `case` arm names, with the trailing glob off, so `scripts/*` reads as `scripts`. */
 const rootsIn = (hook: string): readonly string[] => {
   const block = CASE_BLOCK.exec(hook)?.[1];
   if (block === undefined) throw new Error("the hook holds no `$RELATIVE` case block to read");
@@ -122,12 +125,12 @@ const rootsIn = (hook: string): readonly string[] => {
 const missingFrom = (named: readonly string[], read: readonly string[]): readonly string[] =>
   named.filter((root) => !read.includes(root)).sort();
 
-describe("the write-time hook and the Python gate read one set of roots", () => {
-  it("names every root of its own in the Python gate's command too", () => {
+describe("the write-time hook and the Python gate share roots", () => {
+  it("finds every hook root in the Python gate's command", () => {
     expect(missingFrom(rootsIn(hookText), pythonGateRoots())).toEqual([]);
   });
 
-  it("reads every root the Python gate names, so no rule is learnt a pull request late", () => {
+  it("reads every Python gate root, so rules bind before CI", () => {
     expect(missingFrom(pythonGateRoots(), rootsIn(hookText))).toEqual([]);
   });
 
@@ -139,8 +142,8 @@ describe("the write-time hook and the Python gate read one set of roots", () => 
   });
 });
 
-describe("the write-time hook hands back the comment rule the edit broke", () => {
-  it("refuses a 40-word TypeScript comment, naming the count and its rule", () => {
+describe("the write-time hook hands back the broken comment rule", () => {
+  it("refuses a 40-word TypeScript comment, naming count and rule", () => {
     const run = edit("packages/probe/long.ts", `// ${FORTY_WORDS}\nexport const keep = 1;\n`);
 
     expect(run.status).toBe(2);
@@ -148,7 +151,7 @@ describe("the write-time hook hands back the comment rule the edit broke", () =>
     expect(run.stderr).toContain(tag("COMMENT", "1"));
   });
 
-  it("refuses a 40-word Python comment, naming the count and its rule", () => {
+  it("refuses a 40-word Python comment, naming count and rule", () => {
     const run = edit("packages/probe/long.py", `# ${FORTY_WORDS}\nKEEP = 1\n`);
 
     expect(run.status).toBe(2);
@@ -157,7 +160,7 @@ describe("the write-time hook hands back the comment rule the edit broke", () =>
   });
 
   it.each([["a root script", "scripts/long.mjs", `// ${FORTY_WORDS}\nexport const keep = 1;\n`]])(
-    "refuses a 40-word comment in %s, naming the count and its rule",
+    "refuses a 40-word comment in %s, naming count and rule",
     (_what, file, source) => {
       const run = edit(file, source);
 
@@ -167,7 +170,7 @@ describe("the write-time hook hands back the comment rule the edit broke", () =>
     },
   );
 
-  it("reads a relative path against the session's directory, as the docs write one", () => {
+  it("reads a relative path against the session's directory", () => {
     const file = "packages/probe/relative.ts";
     writeUnder(tree, file, `// ${FORTY_WORDS}\nexport const keep = 1;\n`);
 
@@ -179,7 +182,7 @@ describe("the write-time hook hands back the comment rule the edit broke", () =>
     expect(run.status).toBe(2);
   });
 
-  it("refuses a comment citing a ticket, which is the gate's other condition", () => {
+  it("refuses a comment citing a ticket, the gate's other condition", () => {
     const citing =
       "// Kept because the claim protocol changed under T-243.\nexport const keep = 1;\n";
 
@@ -187,7 +190,7 @@ describe("the write-time hook hands back the comment rule the edit broke", () =>
   });
 });
 
-describe("the write-time hook is silent where the comment earns its place", () => {
+describe("the write-time hook passes a comment that earns its place", () => {
   it.each([
     ["a why inside the ceiling", "probe/why.ts", `// ${A_WHY_OF_TWENTY}\nexport const keep = 1;\n`],
     [
@@ -226,14 +229,14 @@ describe("the write-time hook speaks only for what root `check` gates", () => {
     expect(edit(file, `// ${FORTY_WORDS}\nexport const keep = 1;\n`).status).toBe(0);
   });
 
-  it("refuses a TypeScript file outside every Python root, which root lint walks too", () => {
+  it("refuses TypeScript outside the Python roots, which lint walks too", () => {
     const run = edit("tools/loose.ts", `// ${FORTY_WORDS}\nexport const keep = 1;\n`);
 
     expect(run.status).toBe(2);
     expect(run.stderr).toContain("runs to 40 words");
   });
 
-  it("walks past a path no checkout owns rather than refusing the edit", () => {
+  it("walks past a path no checkout owns", () => {
     const loose = path.join(scratch, "unowned.ts");
     writeUnder(scratch, "unowned.ts", `// ${FORTY_WORDS}\nexport const keep = 1;\n`);
 
@@ -254,7 +257,7 @@ describe("the write-time hook speaks only for what root `check` gates", () => {
   });
 });
 
-describe("the write-time hook runs every comment rule the root config holds", () => {
+describe("the write-time hook runs the root config's comment rules", () => {
   it.each([
     ["a TODO", "packages/probe/todo.ts", "// TODO: file the ticket\n", "no-warning-comments"],
     ["`@ts-ignore`", "packages/probe/ignore.ts", "// @ts-ignore\n", "ban-ts-comment"],
@@ -302,22 +305,22 @@ describe("the write-time hook runs every comment rule the root config holds", ()
   });
 });
 
-describe("the write-time hook blames a comment only when the gate names one", () => {
-  it("lets a half-written file through rather than calling a parse error a comment", () => {
+describe("the write-time hook blames only a comment the gate names", () => {
+  it("lets a half-written file through without blaming a comment", () => {
     const run = edit("packages/probe/broken.ts", "export const broken = (\n");
 
     expect(run.status).toBe(0);
     expect(run.stderr).toContain("without naming a comment");
   });
 
-  it("lets a line another rule refuses through, which is not a comment's to fix", () => {
+  it("lets through a line only another rule refuses", () => {
     const run = edit("packages/probe/prints.ts", "console.log(1);\nexport const keep = 1;\n");
 
     expect(run.status).toBe(0);
     expect(run.stderr).toContain("without naming a comment");
   });
 
-  it("hands back only the comment's line when another rule fails beside it", () => {
+  it("hands back only the comment's line beside another failing rule", () => {
     const run = edit(
       "packages/probe/both.ts",
       `// ${FORTY_WORDS}\nconsole.log(1);\nexport const keep = 1;\n`,
@@ -328,7 +331,7 @@ describe("the write-time hook blames a comment only when the gate names one", ()
   });
 });
 
-describe("the write-time hook refuses nothing when it cannot run the gate", () => {
+describe("the write-time hook refuses nothing when the gate cannot run", () => {
   const bare = throwawayRepository(path.join(scratch, "bare"));
 
   it.each([
@@ -357,7 +360,7 @@ const branchSuffixes = (): readonly string[] => {
   return branch.split("|").map((one) => one.trim().replace(/^\*/, ""));
 };
 
-describe("the write-time hook runs the same gate the root check runs", () => {
+describe("the write-time hook runs the root check's own gate", () => {
   it("dispatches to the checker on Python files alone", () => {
     expect(branchSuffixes()).toEqual([".py"]);
   });
@@ -387,12 +390,12 @@ const wiring = (): readonly { matcher: string | undefined; timeout: number | und
   );
 };
 
-describe("the write-time hook is wired where the project's other hooks are", () => {
+describe("the write-time hook is wired beside the project's other hooks", () => {
   it("runs after an edit and after a write, once", () => {
     expect(wiring().map((entry) => entry.matcher)).toEqual(["Edit|Write"]);
   });
 
-  it("carries a timeout, because an unbounded gate would hang the edit", () => {
+  it("carries a timeout, since an unbounded gate hangs the edit", () => {
     expect(wiring().map((entry) => entry.timeout)).toEqual([15]);
   });
 });

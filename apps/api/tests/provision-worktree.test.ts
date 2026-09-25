@@ -97,8 +97,8 @@ const upstreamOf = (worktree: string): string | undefined => {
   return result.status === 0 ? result.stdout.trim() : undefined;
 };
 
-describe("the upstream stage of worktree provisioning (T-099)", () => {
-  it("unsets the upstream a worktree added against origin/main was given, and says so", () => {
+describe("the upstream stage of worktree provisioning", () => {
+  it("unsets an origin/main upstream on the worktree, and says so", () => {
     const primary = clonedPrimary("tracking");
     const worktree = worktreeUnder(scratch, primary, "tracking", "origin/main");
     expect(upstreamOf(worktree)).toBe("origin/main");
@@ -110,7 +110,7 @@ describe("the upstream stage of worktree provisioning (T-099)", () => {
     expect(upstreamOf(worktree)).toBeUndefined();
   });
 
-  it("leaves a branch that tracks nothing alone, and says that on the same line", () => {
+  it("leaves a branch tracking nothing alone, and says so", () => {
     const primary = clonedPrimary("untracked");
     const worktree = worktreeUnder(scratch, primary, "untracked");
     expect(upstreamOf(worktree)).toBeUndefined();
@@ -122,13 +122,13 @@ describe("the upstream stage of worktree provisioning (T-099)", () => {
   });
 });
 
-describe("the jCodeMunch stage of worktree provisioning (T-181)", () => {
+describe("the jCodeMunch stage of worktree provisioning", () => {
   const worktreeOf = (name: string): { readonly worktree: string; readonly log: string } => {
     const worktree = worktreeUnder(scratch, clonedPrimary(name), name);
     return { worktree, log: path.join(scratch, `${name}-argv`) };
   };
 
-  it("indexes the worktree as a root of its own, so an agent's first edit registers there", () => {
+  it("indexes the worktree as its own root, where edits register", () => {
     const { worktree, log } = worktreeOf("indexed");
 
     const run = provision("indexed", worktree, { [TOOL]: recordsItsArgv(log) });
@@ -138,7 +138,7 @@ describe("the jCodeMunch stage of worktree provisioning (T-181)", () => {
     expect(readFileSync(log, "utf8")).toBe(`index ${realpathSync(worktree)}\n`);
   });
 
-  it("provisions a worktree on a machine without jCodeMunch, saying what that costs", () => {
+  it("provisions without jCodeMunch, saying what that costs", () => {
     const { worktree } = worktreeOf("no-jcodemunch");
 
     const run = provision("no-jcodemunch", worktree);
@@ -149,7 +149,7 @@ describe("the jCodeMunch stage of worktree provisioning (T-181)", () => {
     );
   });
 
-  it("reads the provisioning incomplete when the index fails, rather than ready", () => {
+  it("reports provisioning incomplete when the index fails", () => {
     const { worktree } = worktreeOf("failed-index");
 
     const run = provision("failed-index", worktree, { [TOOL]: "exit 3\n" });
@@ -169,7 +169,7 @@ describe("the scratch stage of worktree provisioning", () => {
     return { primary, worktree: worktreeUnder(scratch, primary, name) };
   };
 
-  it("links the worktree's .scratch at the primary's, so a relative pointer resolves", () => {
+  it("links the worktree's .scratch to the primary's, resolving relative pointers", () => {
     const { primary, worktree } = treesWithScratch("linked");
     const link = path.join(worktree, ".scratch");
 
@@ -182,7 +182,7 @@ describe("the scratch stage of worktree provisioning", () => {
     expect(readFileSync(path.join(link, "v01-spec/map.md"), "utf8")).toBe("# the map\n");
   });
 
-  it("leaves the link out of git status, which is what keeps the remove hook reading no work", () => {
+  it("keeps the link out of git status, which removal reads", () => {
     const { worktree } = treesWithScratch("ignored");
 
     ready(provision("ignored", worktree));
@@ -191,7 +191,7 @@ describe("the scratch stage of worktree provisioning", () => {
     expect(gitIn(worktree, "status", "--porcelain")).toBe("");
   });
 
-  it("leaves a .scratch already there alone, which is what makes a second run a no-op", () => {
+  it("leaves an existing .scratch alone, so reruns are no-ops", () => {
     const { worktree } = treesWithScratch("second-run");
     ready(provision("second-run", worktree));
 
@@ -201,7 +201,7 @@ describe("the scratch stage of worktree provisioning", () => {
     expect(run.stderr).toContain("scratch: already here — left alone");
   });
 
-  it("says a primary with no .scratch has nothing to link, and provisions the worktree anyway", () => {
+  it("says there is nothing to link, and provisions anyway", () => {
     const primary = clonedPrimary("no-scratch");
     const worktree = worktreeUnder(scratch, primary, "no-scratch");
 

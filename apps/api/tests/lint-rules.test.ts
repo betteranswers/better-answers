@@ -70,7 +70,7 @@ const suiteOf = (...titles: readonly string[]): string =>
     .map((title) => `  it("${title}", () => {\n    expect(door).toBeDefined();\n  });`)
     .join("\n")}\n});\n`;
 
-describe("no two tests in one describe block carry the same title", () => {
+describe("no two tests in one block share a title", () => {
   const copied: Tree = {
     "test/copied.test.ts": suiteOf("refuses a stranger", "refuses a stranger"),
   };
@@ -79,14 +79,14 @@ describe("no two tests in one describe block carry the same title", () => {
     flagged: ["test/copied.test.ts"],
   });
 
-  it("fires when a copied test keeps the title of the one it was copied from", () => {
+  it("fires when a copied test keeps its original's title", () => {
     const output = lintTitles(copied);
 
     expect(output).toContain("test/copied.test.ts");
     expect(output).toContain("no-identical-title");
   });
 
-  it("stays silent when the two titles differ, which is the whole ask of the rule", () => {
+  it("stays silent when the two titles differ", () => {
     const output = lintTitles({
       "test/distinct.test.ts": suiteOf("refuses a stranger", "admits a member"),
     });
@@ -94,7 +94,7 @@ describe("no two tests in one describe block carry the same title", () => {
     expect(output).not.toContain("test/distinct.test.ts");
   });
 
-  it("stays silent when two files share a title — a title is unique inside its block, not the tree", () => {
+  it("stays silent when two files share a title", () => {
     const output = lintTitles({
       "test/one.test.ts": suiteOf("refuses a stranger"),
       "test/two.test.ts": suiteOf("refuses a stranger"),
@@ -108,18 +108,18 @@ describe("no two tests in one describe block carry the same title", () => {
 const swallow = (body: string): string =>
   `export const rollbackQuietly = async (client: Client): Promise<void> => {\n  try {\n    await client.query("ROLLBACK");\n  } catch {${body}}\n};\n`;
 
-describe("no block is empty, and a swallowed error is a commented decision", () => {
+describe("no empty block; a swallowed error carries its comment", () => {
   const silent: Tree = { "src/silent.ts": swallow("") };
   const lintBlocks = ruleRunner("no-empty", { tree: silent, flagged: ["src/silent.ts"] });
 
-  it("fires on an empty catch — `allowEmptyCatch` is off, so a swallow says nothing by accident", () => {
+  it("fires on an empty catch, with `allowEmptyCatch` off", () => {
     const output = lintBlocks(silent);
 
     expect(output).toContain("src/silent.ts");
     expect(output).toContain("no-empty");
   });
 
-  it("stays silent on a catch holding a comment, which is how the Postgres door's own swallow passes", () => {
+  it("stays silent on a catch holding a comment", () => {
     const output = lintBlocks({
       "src/reasoned.ts": swallow(
         "\n    // The connection is already gone; releasing it below is all that is left.\n  ",
@@ -129,7 +129,7 @@ describe("no block is empty, and a swallowed error is a commented decision", () 
     expect(output).not.toContain("src/reasoned.ts");
   });
 
-  it("fires on an empty block that is no catch at all", () => {
+  it("fires on an empty block that is no catch", () => {
     const output = lintBlocks({
       "src/branch.ts": `export const guard = (revoked: boolean): void => {\n  if (revoked) {\n  }\n};\n`,
     });
@@ -139,8 +139,10 @@ describe("no block is empty, and a swallowed error is a commented decision", () 
   });
 });
 
-// tsgolint types what it lints from this tsconfig; without one a type-aware rule is
-// silent and every case asserting silence passes.
+/**
+ * tsgolint types what it lints from this tsconfig; without one a type-aware rule is silent and
+ * every case asserting silence passes.
+ */
 const typedTree = (files: Tree, include: readonly string[] = ["src"]): Tree => ({
   "tsconfig.json": JSON.stringify({
     compilerOptions: { target: "esnext", module: "esnext", strict: true, noEmit: true },
@@ -152,7 +154,7 @@ const typedTree = (files: Tree, include: readonly string[] = ["src"]): Tree => (
 const callsRevoke = (call: string): string =>
   `const revoke = async (): Promise<void> => {};\n\nexport const act = async (): Promise<void> => {\n  ${call}\n};\n`;
 
-describe("no promise floats — an unawaited call is awaited or `void`", () => {
+describe("no promise floats: a call is awaited or `void`", () => {
   const forgotten = typedTree({ "src/forgotten.ts": callsRevoke("revoke();") });
   const lintPromises = ruleRunner("typescript/no-floating-promises", {
     tree: forgotten,
@@ -166,7 +168,7 @@ describe("no promise floats — an unawaited call is awaited or `void`", () => {
     expect(output).toContain("no-floating-promises");
   });
 
-  it("stays silent on a `void`-prefixed call — the sanctioned way to say fire and forget", () => {
+  it("stays silent on a `void`-prefixed call, the sanctioned fire-and-forget", () => {
     const output = lintPromises(typedTree({ "src/sanctioned.ts": callsRevoke("void revoke();") }));
 
     expect(output).not.toContain("src/sanctioned.ts");
@@ -194,7 +196,7 @@ const registryZone = (): OxlintConfig["overrides"][number] => {
   };
 };
 
-describe("one guard per condition — a value the type refused is not refused again", () => {
+describe("one guard per condition, never re-refusing what the type refused", () => {
   const twice = typedTree({
     "src/twice.ts": refusesSession("session === null || session === undefined"),
   });
@@ -208,7 +210,7 @@ describe("one guard per condition — a value the type refused is not refused ag
     { tree: twice, flagged: ["src/twice.ts"] },
   ).output;
 
-  it("fires on a guard the type makes unreachable — the second half of a check on `T | null`", () => {
+  it("fires on a guard the type makes unreachable", () => {
     const output = lintGuards(twice);
 
     expect(output).toContain("src/twice.ts");
@@ -221,7 +223,7 @@ describe("one guard per condition — a value the type refused is not refused ag
     expect(output).not.toContain("src/once.ts");
   });
 
-  it("leaves registry source as its upstream wrote it (ADR 0033), and fires on the same source one directory over", () => {
+  it("leaves registry source alone but fires on a copy outside", () => {
     const output = lintGuards(
       typedTree(
         {
@@ -338,20 +340,20 @@ describe.each(ADOPTED)("$rule refuses $refuses", ({ rule, fires, silent }) => {
     expect(output).toContain(reportedName(rule));
   });
 
-  it("stays silent on the source that does the same work the way it asks", () => {
+  it("stays silent on the same work done as it asks", () => {
     const output = lintRule(typedTree({ "src/asked.ts": silent }));
 
     expect(output).not.toContain("src/asked.ts");
   });
 
-  it("is one the repository's own categories switch on, having no line of its own to do it", () => {
+  it("runs under the categories, never named in the rules block", () => {
     expect(config.rules).not.toHaveProperty(rule);
     expect(lintUnderCategories(firing)).toContain(reportedName(rule));
   });
 });
 
-describe("ADR 0009 — the identity provider stays behind its seam", () => {
-  it("refuses a better-auth import outside the auth module, and allows it inside", () => {
+describe("the identity provider stays behind its seam", () => {
+  it("refuses better-auth outside the auth module and allows it inside", () => {
     const output = lint({
       "apps/api/src/mcp/probe.ts": probe("better-auth"),
       "apps/api/src/auth/probe.ts": probe("better-auth"),
@@ -366,7 +368,7 @@ describe("ADR 0009 — the identity provider stays behind its seam", () => {
   });
 });
 
-describe("ADR 0030 — no MCP library type crosses into packages/core", () => {
+describe("no MCP library type crosses into packages/core", () => {
   it("refuses @modelcontextprotocol/server inside packages/core and allows it in apps/api", () => {
     const output = lint({
       "packages/core/package.json": JSON.stringify({ name: "@better-answers/core" }),
@@ -381,7 +383,7 @@ describe("ADR 0030 — no MCP library type crosses into packages/core", () => {
 });
 
 describe("every MCP entry carries its annotations", () => {
-  it("refuses a defineEntry without annotations and a registerTool without them, and allows both with", () => {
+  it("refuses defineEntry and registerTool without annotations, and allows both with", () => {
     const output = lint({
       "apps/api/src/mcp/entries/without.ts": `defineEntry({ name: "find", input: z.object({ query: z.string() }) });\n`,
       "apps/api/src/mcp/entries/with.ts": `defineEntry({ name: "find", input: z.object({ query: z.string() }), annotations: { readOnlyHint: true } });\n`,
@@ -396,7 +398,7 @@ describe("every MCP entry carries its annotations", () => {
     expect(output).not.toContain("registered-with.ts");
   });
 
-  it("refuses annotations that carry no readOnlyHint — the host splits read from write on it", () => {
+  it("refuses annotations with no readOnlyHint, the host's read-write split", () => {
     const output = lint({
       "apps/api/src/mcp/entries/no-hint.ts": `defineEntry({ name: "find", input: z.object({}), annotations: { idempotentHint: true } });\n`,
       "apps/api/src/mcp/entries/hinted.ts": `defineEntry({ name: "find", input: z.object({}), annotations: { readOnlyHint: false } });\n`,
@@ -421,7 +423,7 @@ describe("no MCP entry takes a workspace argument", () => {
     },
   );
 
-  it("allows an input that names none of the three, in either declaration form, and unwraps a refine", () => {
+  it("allows other inputs in either form, and unwraps a refine", () => {
     const output = lint({
       "apps/api/src/mcp/entries/probe.ts": `defineEntry({ name: "find", annotations: { readOnlyHint: true }, input: z.object({ query: z.string(), limit: z.number() }) });\n`,
       "apps/api/src/mcp/entries/refined.ts": `defineEntry({ name: "open", annotations: { readOnlyHint: true }, input: z.object({ iri: z.string() }).refine(() => true) });\n`,
@@ -431,7 +433,7 @@ describe("no MCP entry takes a workspace argument", () => {
     expect(output).not.toContain("mcp-entry-no-workspace-argument");
   });
 
-  it("fails closed on a defineEntry whose input is an opaque variable, and on a spread key", () => {
+  it("fails closed on an opaque input and a spread key", () => {
     const output = lint({
       "apps/api/src/mcp/entries/opaque.ts": `defineEntry({ name: "find", annotations: { readOnlyHint: true }, input: sharedShape });\n`,
       "apps/api/src/mcp/entries/spread.ts": `defineEntry({ name: "find", annotations: { readOnlyHint: true }, input: z.object({ ...base, query: z.string() }) });\n`,
@@ -442,11 +444,12 @@ describe("no MCP entry takes a workspace argument", () => {
     expect(output).toContain("mcp-entry-no-workspace-argument");
   });
 
-  it("fails closed on a registerTool whose inputSchema is a variable — the one mount over ENTRIES carries the disable that names its runtime fence", () => {
+  it("fails closed on a registerTool whose inputSchema is a variable", () => {
     const output = lint({
       "apps/api/src/mcp/mount.ts": `server.registerTool(entry.name, { annotations: entry.annotations, inputSchema: entry.input }, entry.run);\n`,
     });
 
+    // The one mount over ENTRIES carries the disable that names its runtime fence.
     expect(output).toContain("mcp-entry-no-workspace-argument");
   });
 });
