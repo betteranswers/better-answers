@@ -16,6 +16,7 @@ const teardown: PlatformPrincipal = {
 
 const BARE_SUFFIX = ".git";
 
+/** Waits up to 30 seconds for an act still holding any bundle's lock, then removes the root. */
 export const removeBundleRoot = async (root: string): Promise<void> => {
   await untilActsGone(root);
   await rm(root, {

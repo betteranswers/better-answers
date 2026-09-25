@@ -26,8 +26,10 @@ const PLATFORM: PlatformPrincipal = {
 
 const WORKSPACE = "01K4TEARDOWN000000000000";
 
-// What lets the case go red: a teardown that never waits has finished several times over
-// before the second write lands.
+/**
+ * What lets the case go red: a teardown that never waits has finished several times over
+ * before the second write lands.
+ */
 const ACT_PAUSE_MS = 250;
 
 const OBJECTS_NOBODY_WAITS_FOR = 400;
@@ -61,7 +63,7 @@ const isGone = async (root: string): Promise<boolean> => {
 };
 
 describe("a bundle root's teardown", () => {
-  it("waits for an act still writing into a bundle before it removes the root", async () => {
+  it("waits for an act still writing before removing the root", async () => {
     const { root, door, gitDir } = await rootWithBundle();
     const scratch = await scratchDir();
     let written = 0;
@@ -89,7 +91,7 @@ describe("a bundle root's teardown", () => {
     await rm(scratch, { recursive: true, force: true });
   });
 
-  it("does not wait for a git process the lock does not know about", async () => {
+  it("does not wait for a git process outside the lock", async () => {
     const { root, gitDir } = await rootWithBundle();
     const scratch = await scratchDir();
     let written = 0;
