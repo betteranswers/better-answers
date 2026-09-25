@@ -1,4 +1,4 @@
-import { expect, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import { z } from "zod";
 
 import type { REDACTION_TIERS, SENSITIVITIES } from "@better-answers/schema";
@@ -10,6 +10,7 @@ const aPerson = z.object({ id: z.string(), email: z.string(), name: z.string() }
 const aProvisionedWorkspace = z.object({
   workspaceId: z.string(),
   name: z.string(),
+  slug: z.string(),
   admin: aPerson,
 });
 
@@ -163,4 +164,38 @@ export const signIn = async (page: Page, api: APIRequestContext, email: string):
   // Wait for the screen to be left, not just the click: navigating away cancels the request
   // in flight and no session is set.
   await expect(code).toHaveCount(0);
+};
+
+const ACT_BUDGET_MS = 100;
+
+// Timed in the page, from the next key to a button reading `busy`: a matcher's polling is
+// coarser than the budget.
+export const clockTheAct = (page: Page, busy: string) =>
+  page.evaluate((reading) => {
+    const busyNow = () =>
+      [...document.querySelectorAll("main button")].some(
+        (button) => button.textContent === reading,
+      );
+    const clocked = new Promise<number>((resolve) => {
+      document.addEventListener(
+        "keydown",
+        () => {
+          const pressedAt = performance.now();
+          const observer = new MutationObserver(() => {
+            if (!busyNow()) return;
+            observer.disconnect();
+            resolve(performance.now() - pressedAt);
+          });
+          observer.observe(document.body, { subtree: true, childList: true, characterData: true });
+        },
+        { capture: true, once: true },
+      );
+    });
+    Reflect.set(window, "actClocked", clocked);
+  }, busy);
+
+export const theActReadWithinItsBudget = async (page: Page, act: string): Promise<void> => {
+  const elapsed = await page.evaluate(() => Reflect.get(window, "actClocked"));
+  test.info().annotations.push({ type: act, description: `${elapsed} ms` });
+  expect(elapsed, `the ${act} did not read as busy within its budget`).toBeLessThan(ACT_BUDGET_MS);
 };

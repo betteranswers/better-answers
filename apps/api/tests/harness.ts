@@ -133,6 +133,7 @@ export type TestApp = {
 type Provisioned = {
   readonly workspaceId: string;
   readonly name: string;
+  readonly slug: string;
   readonly admin: Person;
 };
 
@@ -312,14 +313,15 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     const admin = await person(input.adminEmail);
     const id = ulid();
     const name = input.name ?? `Workspace ${id.slice(-4)}`;
+    const slug = `ws-${id.toLowerCase()}`;
     const provisioned = await provisionWorkspace(bootstrap, door, {
       id,
       name,
-      slug: `ws-${id.toLowerCase()}`,
+      slug,
       adminUserId: admin.id,
     });
     if (!provisioned.ok) throw new Error(`provisioning failed: ${provisioned.error}`);
-    return { workspaceId: id, name, admin };
+    return { workspaceId: id, name, slug, admin };
   };
 
   const addMember: TestApp["addMember"] = async (workspaceId, userId, role) => {

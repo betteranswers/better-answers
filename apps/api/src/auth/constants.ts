@@ -32,6 +32,9 @@ export const TRPC_IP_RULE: CounterRule = { windowMs: 60_000, max: 120 };
 
 export const MCP_TOKEN_RULE: CounterRule = { windowMs: 60_000, max: 120 };
 
+/** Room for a few mistyped slugs, not for a list of guesses. */
+export const ASK_TO_JOIN_PERSON_RULE: CounterRule = { windowMs: 60 * 60_000, max: 10 };
+
 export const BETTER_AUTH_RATE_LIMIT = {
   window: 60,
   max: 100,

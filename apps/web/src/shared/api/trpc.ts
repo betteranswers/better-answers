@@ -27,6 +27,13 @@ export const refusalOf = (error: Error | ApiError): Refusal | undefined => {
   return refusal;
 };
 
+/** A ceiling carries no refusal word, because waiting is its one remedy. */
+export const isThrottled = (error: Error | ApiError): boolean => {
+  if (!(error instanceof TRPCClientError)) return false;
+  const code: string | undefined = error.data?.code;
+  return code === "TOO_MANY_REQUESTS";
+};
+
 export const { TRPCProvider, useTRPC, useTRPCClient } = createTRPCContext<AppRouter>();
 
 export const createApiClient = () =>

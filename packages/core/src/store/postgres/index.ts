@@ -414,7 +414,7 @@ const countInWindow = async (
  */
 export const consumeIngress = async (
   door: PostgresDoor,
-  scope: "ip" | "email",
+  scope: "ip" | "email" | "person",
   key: string,
   rule: CounterRule,
   now: Date,

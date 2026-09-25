@@ -3,7 +3,7 @@ import {
   boundarySchemas,
   INVITATION_EXPIRY_SECONDS,
 } from "@better-answers/schema";
-import type { z } from "zod";
+import { z } from "zod";
 
 import { act, declareActs, record, recordFor } from "../audit/index.ts";
 import type { DetailOf, LedgerAct } from "../audit/index.ts";
@@ -43,6 +43,9 @@ export const REQUEST_ROLE_DEFAULT = "Viewer" satisfies Role;
 export type Acknowledgement = { readonly acknowledged: true };
 
 const ACKNOWLEDGED: Acknowledgement = { acknowledged: true };
+
+/** What a person sends: the requester is the session's own person, never a field they fill. */
+export const requestAccessInput = z.object({ slug: z.string(), reason: z.string() });
 
 export type RequestAccessInput = {
   readonly slug: string;

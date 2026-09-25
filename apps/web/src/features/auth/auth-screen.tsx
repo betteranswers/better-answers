@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import { refusalOf, type ApiError, type Refusal } from "@/shared/api/trpc.ts";
+
 export function AuthScreen(properties: { readonly title: string; readonly children: ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -34,5 +36,35 @@ export function Outcome(properties: {
     >
       {properties.children}
     </p>
+  );
+}
+
+export type Said = { readonly why: string; readonly next: string };
+
+export const SESSION_ENDED: Said = { why: "Your session has ended.", next: "Sign in again." };
+
+/**
+ * A refusal shown as its own word, then why and what the reader can do next; a failure with no
+ * word says `unanswered` instead.
+ */
+export function Refused(properties: {
+  readonly id: string;
+  readonly failure: Error | ApiError;
+  readonly saidOf: (refusal: Refusal) => Said;
+  readonly unanswered: string;
+}) {
+  const refusal = refusalOf(properties.failure);
+  if (refusal === undefined) {
+    return (
+      <Outcome tone="refused" id={properties.id}>
+        {properties.unanswered}
+      </Outcome>
+    );
+  }
+  const said = properties.saidOf(refusal);
+  return (
+    <Outcome tone="refused" id={properties.id}>
+      Refused: <code className="font-mono">{refusal.word}</code>. {said.why} {said.next}
+    </Outcome>
   );
 }

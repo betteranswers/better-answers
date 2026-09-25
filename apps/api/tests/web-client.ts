@@ -76,6 +76,11 @@ export const refusalOfCall = (call: Promise<unknown>): Promise<unknown> =>
     (refused: unknown) => refused,
   );
 
+/** The body a person's procedure answers a caller with no session, over the wire. */
+export const NO_SESSION_ANSWERED = {
+  error: { data: { refusal: { word: "no-session", class: "unauthenticated" } } },
+} as const;
+
 export const uploadHeaders = (descriptor: UploadDescriptor): Headers => {
   const headers = new Headers(uploadOptions(descriptor).context.upload);
   headers.set("content-type", "application/octet-stream");

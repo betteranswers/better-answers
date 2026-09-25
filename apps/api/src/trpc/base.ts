@@ -12,7 +12,12 @@ import {
   type RefusalClass,
   type Result,
 } from "@better-answers/core/kernel";
-import { withHeldPrincipal, withPrincipal } from "@better-answers/core/store/postgres";
+import {
+  consumeIngress,
+  withHeldPrincipal,
+  withPrincipal,
+  type CounterRule,
+} from "@better-answers/core/store/postgres";
 
 import { sessionClaims, type SessionReader } from "../auth/verify.ts";
 import type { Doors } from "../doors.ts";
@@ -174,3 +179,26 @@ export const personProcedure = trpc.procedure.use(async ({ ctx, next }) => {
   const session = await sessionOf(ctx);
   return next({ ctx: { personId: session.user.id, doors: ctx.doors } });
 });
+
+/**
+ * A ceiling is no refusal: time is its only remedy, so past one the call answers 429, as every
+ * ingress ceiling does.
+ */
+export const personCeiling = (rule: CounterRule, sentence: string) =>
+  personProcedure.use(async ({ ctx, path, next }) => {
+    const counted = await attempt(() =>
+      consumeIngress(
+        ctx.doors.postgres,
+        "person",
+        `${path}:${ctx.personId}`,
+        rule,
+        ctx.clock.now(),
+      ),
+    );
+    if (!counted.ok) throw failed(ctx.log, consumeIngress.name, counted.error);
+    if (!counted.value.allowed) {
+      ctx.log.info({ event: "trpc.throttled", act: path }, "throttled");
+      throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: sentence });
+    }
+    return next();
+  });
