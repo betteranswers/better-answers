@@ -3,7 +3,7 @@ import type { Logger } from "pino";
 import { attempt } from "@better-answers/core/kernel";
 import type { InvitationToSend } from "@better-answers/core/members";
 
-import type { EmailMessage, EmailSender } from "../auth/index.ts";
+import type { EmailMessage, EmailSender } from "../email.ts";
 
 /** The SPA's accept page, which the link in the email opens with the invitation's id after it. */
 const ACCEPT_INVITATION_PATH = "/invitations";

@@ -2,9 +2,10 @@ import { trpcServer } from "@hono/trpc-server";
 import { Hono } from "hono";
 import type { Logger } from "pino";
 
-import type { Auth, EmailSender } from "../auth/index.ts";
+import type { Auth } from "../auth/index.ts";
 import { TRPC_IP_RULE } from "../auth/index.ts";
 import type { Doors } from "../doors.ts";
+import type { EmailSender } from "../email.ts";
 import { limitByIp } from "../ingress/limits.ts";
 import { CeilingMet } from "./base.ts";
 import { appRouter } from "./router.ts";

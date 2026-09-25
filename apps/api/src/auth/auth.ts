@@ -20,6 +20,7 @@ import {
   workspacesHeldBy,
 } from "@better-answers/core/workspaces";
 
+import type { EmailSender } from "../email.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
 import {
   account,
@@ -65,13 +66,6 @@ type WidenedAuthorize<P extends { readonly endpoints: object }> = Omit<P, "endpo
 const widenAuthorize = <P extends { readonly endpoints: object }>(plugin: P): WidenedAuthorize<P> =>
   // oxlint-disable-next-line typescript/consistent-type-assertions -- a declaration gap: better-auth types `oauth2Authorize`'s openapi metadata outside `Endpoint`; the runtime value fits
   plugin as WidenedAuthorize<P>;
-
-export type EmailMessage = {
-  readonly to: string;
-  readonly subject: string;
-  readonly text: string;
-};
-export type EmailSender = (message: EmailMessage) => Promise<void>;
 
 type ClientMetadataFetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 

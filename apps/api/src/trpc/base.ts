@@ -25,7 +25,7 @@ import {
   type Tx,
 } from "@better-answers/core/store/postgres";
 
-import type { EmailSender } from "../auth/index.ts";
+import type { EmailSender } from "../email.ts";
 import { sessionClaims, type SessionReader } from "../auth/verify.ts";
 import type { Doors } from "../doors.ts";
 import { refusalLogged, refusalOf, RefusedError, type RefusalAnswer } from "../refusal.ts";
