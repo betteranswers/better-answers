@@ -48,7 +48,7 @@ const expirySecondsInInstalledPlugin = (): number => {
 };
 
 describe("the invitation an approved access request mints", () => {
-  it("carries every column the organisation plugin declares, and no column it does not", () => {
+  it("carries exactly the columns the organisation plugin declares", () => {
     const declared = Object.entries(invitationFields()).map(([key, field]) =>
       platformKey(key, field),
     );
@@ -56,20 +56,20 @@ describe("the invitation an approved access request mints", () => {
     expect(Object.keys(columns()).toSorted()).toEqual([...declared, "id"].toSorted());
   });
 
-  it("makes each column as optional as the plugin says, so a direct write cannot miss a required one", () => {
+  it("makes each column as optional as the plugin says", () => {
     for (const [key, field] of Object.entries(invitationFields())) {
       const column = columns()[platformKey(key, field)];
       expect({ key, notNull: column?.notNull }).toEqual({ key, notNull: field.required === true });
     }
   });
 
-  it("starts an invitation at the status the plugin defaults it to, so the row reads as pending", () => {
+  it("starts an invitation at the plugin's default status, pending", () => {
     const status = invitationFields()["status"];
     expect(status?.defaultValue).toBe("pending");
     expect(columns()["status"]?.hasDefault).toBe(true);
   });
 
-  it("expires an invitation at the plugin's own default, pinned to the installed source", () => {
+  it("expires an invitation at the installed plugin's own default", () => {
     const seconds = expirySecondsInInstalledPlugin();
     expect(seconds).toBeGreaterThan(0);
     expect(INVITATION_EXPIRY_SECONDS).toBe(seconds);

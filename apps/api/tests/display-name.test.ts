@@ -12,7 +12,7 @@ const SET_DISPLAY_NAME = `${TRPC_ENDPOINT}/person.setDisplayName`;
 const aPersonWithNoDisplayName = () => app().person(undefined, "");
 
 describe("a signed-in person setting their own display name over tRPC", () => {
-  it("takes it from a person who belongs to no workspace, trimmed as the rule takes it", async () => {
+  it("takes it from a person in no workspace, trimmed", async () => {
     const person = await aPersonWithNoDisplayName();
     const { api } = await webSignedIn(app(), person.email);
 
@@ -22,7 +22,7 @@ describe("a signed-in person setting their own display name over tRPC", () => {
     expect(await displayNameHeldBy(app(), person.id)).toBe("Priya Shah");
   });
 
-  it("takes it from a member of two workspaces who has picked neither, whom every workspace procedure refuses", async () => {
+  it("takes it from a two-workspace member who picked neither", async () => {
     const first = await app().provision();
     const second = await app().provision();
     const person = await aPersonWithNoDisplayName();
@@ -38,7 +38,7 @@ describe("a signed-in person setting their own display name over tRPC", () => {
     expect(await displayNameHeldBy(app(), person.id)).toBe("Sam Okoro");
   });
 
-  it("sends a name the rule refuses back as the rule's own word, under the status its class carries, and writes nothing", async () => {
+  it("refuses a bad name with the rule's word, writing nothing", async () => {
     const person = await app().person(undefined, "Priya Shah");
     const { api } = await webSignedIn(app(), person.email);
 
@@ -55,7 +55,7 @@ describe("a signed-in person setting their own display name over tRPC", () => {
     expect(await displayNameHeldBy(app(), person.id)).toBe("Priya Shah");
   });
 
-  it("refuses a caller with no session, in the word that sends them to sign in", async () => {
+  it("refuses a sessionless caller, sending them to sign in", async () => {
     const response = await app().client().json(SET_DISPLAY_NAME, { displayName: "Mallory" });
 
     expect(response.status).toBe(401);
@@ -64,7 +64,7 @@ describe("a signed-in person setting their own display name over tRPC", () => {
     });
   });
 
-  it("records the act as one row of the identity-set ledger, naming the person by person id and never by the name", async () => {
+  it("records one identity-set ledger row by person id, not name", async () => {
     const person = await aPersonWithNoDisplayName();
     const { api } = await webSignedIn(app(), person.email);
     const displayName = `Ada ${person.id.slice(-6)}`;

@@ -24,7 +24,7 @@ const resolvesTo =
   async () =>
     answers;
 
-// The fetcher sends every header as one string; Node's wider shapes are not its.
+/** The fetcher sends every header as one string; Node's wider shapes are not its. */
 const stringHeadersOf = (headers: RequestOptions["headers"]): Readonly<Record<string, string>> =>
   Object.fromEntries(
     Object.entries(headers ?? {}).flatMap(([name, value]) =>
@@ -101,7 +101,7 @@ const neverResolving = (
 };
 
 describe("the CIMD transport's fix", () => {
-  it("answers the socket's all-addresses lookup with an array and the single form with an address", async () => {
+  it("answers an all-addresses lookup with an array, else one address", async () => {
     const observed = observe();
     const fetcher = createClientMetadataFetcher({
       lookup: resolvesTo(publicAnswer),
@@ -117,7 +117,7 @@ describe("the CIMD transport's fix", () => {
     ]);
   });
 
-  it("keeps the original hostname as Host and SNI while connecting to the pinned address", async () => {
+  it("pins the address, keeping the hostname for Host and SNI", async () => {
     const observed = observe();
     const fetcher = createClientMetadataFetcher({
       lookup: resolvesTo(publicAnswer),
@@ -173,21 +173,18 @@ describe("the SSRF policy", () => {
     ["CGNAT / shared address space", "100.64.0.1"],
     ["IPv6 loopback", "::1"],
     ["IPv6 unique local", "fd00::1"],
-  ])(
-    "refuses a hostname that resolves to a %s address (%s), before any packet leaves",
-    async (_class, address) => {
-      const observed = observe();
-      const fetcher = createClientMetadataFetcher({
-        lookup: resolvesTo({ address, family: address.includes(":") ? 6 : 4 }),
-        request: answering(observed, { status: 200 }),
-      });
+  ])("refuses a hostname at a %s address (%s), sending nothing", async (_class, address) => {
+    const observed = observe();
+    const fetcher = createClientMetadataFetcher({
+      lookup: resolvesTo({ address, family: address.includes(":") ? 6 : 4 }),
+      request: answering(observed, { status: 200 }),
+    });
 
-      expect(await refusal(fetcher, "https://evil.example/doc")).toBe("address-not-public");
-      expect(observed.lookupAnswers).toEqual([]);
-    },
-  );
+    expect(await refusal(fetcher, "https://evil.example/doc")).toBe("address-not-public");
+    expect(observed.lookupAnswers).toEqual([]);
+  });
 
-  it("refuses when any one answer is private, even if the first is public", async () => {
+  it("refuses a private answer behind a public first one", async () => {
     const fetcher = createClientMetadataFetcher({
       lookup: resolvesTo(publicAnswer, { address: "10.0.0.5", family: 4 }),
       request: answering(observe(), { status: 200 }),
@@ -203,7 +200,7 @@ describe("the SSRF policy", () => {
     expect(await refusal(fetcher, "https://nowhere.example/doc")).toBe("no-addresses");
   });
 
-  it("returns a redirect and never follows it — a location to a private address is never fetched", async () => {
+  it("returns a redirect unfollowed, never fetching a private location", async () => {
     let lookups = 0;
     const fetcher = createClientMetadataFetcher({
       lookup: async () => {
@@ -254,14 +251,14 @@ describe("the SSRF policy", () => {
     expect(await refusal(fetcher, "https://claude.ai/doc")).toBe("bad-status");
   });
 
-  it("refuses a resolver that never answers, under the same deadline, without a request", async () => {
+  it("refuses a silent resolver under the same deadline, sending nothing", async () => {
     const { fetcher, requests } = neverResolving(20);
 
     expect(await refusal(fetcher, "https://claude.ai/doc")).toBe("timeout");
     expect(requests()).toBe(0);
   });
 
-  it("bounds the resolves in flight: a lookup the caller stopped waiting for still holds its slot", async () => {
+  it("bounds lookups in flight, counting ones the caller abandoned", async () => {
     const { fetcher, requests } = neverResolving(10);
 
     for (let n = 0; n < 32; n += 1) {
@@ -273,7 +270,7 @@ describe("the SSRF policy", () => {
     expect(requests()).toBe(0);
   });
 
-  it("bounds the host cache: past the cap the oldest host is resolved again", async () => {
+  it("bounds the host cache, re-resolving the oldest past the cap", async () => {
     const lookups = new Map<string, number>();
     const fetcher = createClientMetadataFetcher({
       lookup: async (hostname) => {
@@ -291,7 +288,7 @@ describe("the SSRF policy", () => {
     expect(lookups.get("first.example")).toBe(2);
   });
 
-  it("reuses a host's pinned answer inside the cache window and resolves again after it", async () => {
+  it("reuses a host's pinned answer until the cache window ends", async () => {
     let lookups = 0;
     let clock = 0;
     const fetcher = createClientMetadataFetcher({

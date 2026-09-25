@@ -25,7 +25,7 @@ type PathsAnsweringAResult<Leaves> = [ResultAnswering<Leaves>] extends [never]
   : ResultAnswering<Leaves>["path"];
 
 describe("what a procedure may answer the wire", () => {
-  it("reaches every procedure the router carries, by the path its caller names", () => {
+  it("reaches every router procedure by the path its caller names", () => {
     expect(Object.keys(appRouter._def.procedures).sort()).toEqual([
       "person.setDisplayName",
       "routes.list",
@@ -60,7 +60,7 @@ describe("what a procedure may answer the wire", () => {
     >();
   });
 
-  it("answers no caller a Result, which would cross a refusal as a success", () => {
+  it("answers no Result, which would cross a refusal as success", () => {
     expectTypeOf<PathsAnsweringAResult<EveryProcedure>>().toEqualTypeOf<"none">();
   });
 

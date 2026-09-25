@@ -67,7 +67,7 @@ const input = (step: ImageStep, name: string): unknown => step.with?.[name];
 
 const recordSchema = z.record(z.string(), z.unknown());
 
-// The two forms of yq path the tiers job uses, `.key` and `.key[]`, and nothing wider.
+/** The two forms of yq path the tiers job uses, `.key` and `.key[]`, and nothing wider. */
 const valuesAt = (document: unknown, yqPath: string): readonly unknown[] =>
   yqPath
     .split(".")
@@ -93,7 +93,7 @@ type Resolved = {
   readonly log: string;
 };
 
-// The step's own script under bash, with `gh` answering from the pages given, or refusing.
+/** The step's own script under bash, with `gh` answering from the pages given, or refusing. */
 const resolveAgainst = (pages: unknown): Resolved => {
   const step = resolveStep();
   const directory = mkdtempSync(path.join(tmpdir(), "scan-resolve-"));
@@ -143,7 +143,9 @@ const version = (name: string, createdAt: string, tags: readonly string[]) => ({
   metadata: { package_type: "container", container: { tags } },
 });
 
-// Read from the api package: an image, then the two manifests its provenance push wrote after it.
+/**
+ * Read from the api package: an image, then the two manifests its provenance push wrote after it.
+ */
 const IMAGE = version(
   "sha256:317ef2837f4ce3105d418849237c9e914477b44e6b5b9767671ca49bc2fdc173",
   "2026-09-23T15:29:50Z",
@@ -178,7 +180,7 @@ const cronOf = (file: string): number => {
 };
 
 describe("the nightly scan of the images build.yml pushes", () => {
-  it("scans one leg per image build.yml builds, reading the tiers out of build.yml as it runs", () => {
+  it("scans one leg per image, reading the tiers from build.yml", () => {
     const tiers = tiersStep();
     const build = parse(
       readFileSync(path.join(repositoryRoot, ".github/workflows/build.yml"), "utf8"),
@@ -197,7 +199,7 @@ describe("the nightly scan of the images build.yml pushes", () => {
     expect(trivy.strategy["fail-fast"]).toBe(false);
   });
 
-  it("scans each package's newest sha-tagged version, never the signature pushed after it", () => {
+  it("scans each package's newest sha-tagged version, not its signature", () => {
     const newestFirst = resolveAgainst([[REFERRER, UNTAGGED, IMAGE], [IMAGE_BEFORE]]);
     const oldestFirst = resolveAgainst([[IMAGE_BEFORE], [UNTAGGED, IMAGE, REFERRER]]);
 
@@ -212,7 +214,7 @@ describe("the nightly scan of the images build.yml pushes", () => {
     expect(oldestFirst.output).toEqual(newestFirst.output);
   });
 
-  it("refuses a package with no sha-tagged version rather than scanning something else", () => {
+  it("refuses a package with no sha-tagged version, scanning nothing", () => {
     const resolved = resolveAgainst([[REFERRER, UNTAGGED]]);
 
     expect(resolved.status).toBe(1);
@@ -220,7 +222,7 @@ describe("the nightly scan of the images build.yml pushes", () => {
     expect(resolved.log).toContain("holds no sha- tagged version");
   });
 
-  it("goes red, naming the package, when the packages API will not list its versions", () => {
+  it("goes red, naming the package, when listing its versions fails", () => {
     const resolved = resolveAgainst(undefined);
 
     expect(resolved.status).toBe(1);
@@ -228,13 +230,13 @@ describe("the nightly scan of the images build.yml pushes", () => {
     expect(resolved.log).toContain("ghcr.io/betteranswers/api's versions");
   });
 
-  it("scans the digest it resolved, which no later push can move", () => {
+  it("scans the resolved digest, which no later push moves", () => {
     expect(input(scanStepUsing("aquasecurity/trivy-action"), "image-ref")).toEqual(
       "ghcr.io/${{ github.repository_owner }}/${{ matrix.tier }}@${{ steps.image.outputs.digest }}",
     );
   });
 
-  it("holds the three permissions the scan needs, on its own job and no wider", () => {
+  it("holds the scan's three permissions on its own job alone", () => {
     expect(scanWorkflow().permissions).toEqual({ contents: "read" });
     expect(scanWorkflow().jobs.tiers.permissions).toBeUndefined();
     expect(scanWorkflow().jobs.trivy.permissions).toEqual({
@@ -244,7 +246,7 @@ describe("the nightly scan of the images build.yml pushes", () => {
     });
   });
 
-  it("reports what it finds to code scanning and gates nothing: only the clock or a person starts it, and a vulnerability exits zero", () => {
+  it("reports to code scanning and gates nothing, exiting zero", () => {
     const trivy = scanStepUsing("aquasecurity/trivy-action");
     const upload = scanStepUsing("github/codeql-action/upload-sarif");
 

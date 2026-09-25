@@ -98,7 +98,7 @@ const restrictedSourcedConcept = async () => {
 };
 
 describe("a Restricted-sourced concept, to a Viewer's token", () => {
-  it("is no hit through find — while the Admin's token finds it", async () => {
+  it("is no hit through find, though the Admin finds it", async () => {
     const { iri, viewer, admin } = await restrictedSourcedConcept();
 
     const found = await called(viewer.client, viewer.token, "find", { query: "remuneration" });
@@ -109,7 +109,7 @@ describe("a Restricted-sourced concept, to a Viewer's token", () => {
     expect(rpcListOf(structured(seen)["hits"]).map((hit) => hit["iri"])).toEqual([iri]);
   });
 
-  it("reaches no answer through ask — no citation, no passage, no word of it, and nothing an unrelated question would not also get — while the Admin's token is told which concept it rests on", async () => {
+  it("is absent from ask's answer, though cited in the Admin's", async () => {
     const { iri, viewer, admin } = await restrictedSourcedConcept();
     const question = { question: "How is the board's remuneration reviewed?" };
 
@@ -133,7 +133,7 @@ describe("a Restricted-sourced concept, to a Viewer's token", () => {
     expect(rendered(seen)).toContain(iri);
   });
 
-  it("opens exactly as an IRI nobody minted — the same shape, the same words — while the Admin's token opens it", async () => {
+  it("opens as an unminted IRI, though the Admin opens it", async () => {
     const { iri, viewer, admin } = await restrictedSourcedConcept();
     const absentIri = "https://better-answers.com/c/01J6ZZZZZZZZZZZZZZZZZZZZZZ";
 
@@ -205,7 +205,7 @@ const documentsAndTheConceptOverThem = async () => {
 };
 
 describe("the document layer through the MCP entries", () => {
-  it("previews a document as a hit of its own layer, marked Not company knowledge, beside the concept — and never a document that concept covers", async () => {
+  it("previews a document as its layer's hit, skipping covered ones", async () => {
     const { iri, standalone, viewer } = await documentsAndTheConceptOverThem();
 
     const found = await called(viewer.client, viewer.token, "find", { query: QUERY });
@@ -244,7 +244,7 @@ describe("the document layer through the MCP entries", () => {
     expect(JSON.stringify(found)).not.toContain(COVERED_TITLE);
   });
 
-  it("opens the passage at a wire locator, with the document it is in and the word it is held under", async () => {
+  it("opens a wire locator's passage, with its document and sensitivity", async () => {
     const { standalone, viewer } = await documentsAndTheConceptOverThem();
 
     const opened = await called(viewer.client, viewer.token, "open", {
@@ -269,7 +269,7 @@ describe("the document layer through the MCP entries", () => {
     );
   });
 
-  it("answers a locator outside the audience, one under review, one that is no address and one past the end of the text with the one word, in the one shape", async () => {
+  it("answers every unreachable locator with the one word and shape", async () => {
     const { standalone, underReview, elsewhere, viewer } = await documentsAndTheConceptOverThem();
     const nonsense = "not an address at all";
     const pastTheEnd = `${standalone.documentId}/chars:0-${codePointsOf(INVOICE_TEXT) + 1}`;
@@ -292,7 +292,7 @@ describe("the document layer through the MCP entries", () => {
     }
   });
 
-  it("renders each evidence item's wire locator when a concept is opened, and opens the passage at it", async () => {
+  it("renders each evidence item's wire locator, which opens its passage", async () => {
     const { iri, covered, viewer } = await documentsAndTheConceptOverThem();
 
     const concept = await called(viewer.client, viewer.token, "open", { iri });

@@ -9,23 +9,20 @@ describe("the update-user endpoint, to a person who is signed in", () => {
   it.each([
     ["set", "Mallory <mallory@acme.invalid>"],
     ["blank", ""],
-  ])(
-    "refuses them the path to %s their display name, and leaves it where it was",
-    async (_act, name) => {
-      const person = await app().person(undefined, "Priya Shah");
-      const client = await signedInClient(app(), person.email);
-      expect((await client.fetch("/get-session")).status).toBe(200);
+  ])("refuses to %s their display name, leaving it unchanged", async (_act, name) => {
+    const person = await app().person(undefined, "Priya Shah");
+    const client = await signedInClient(app(), person.email);
+    expect((await client.fetch("/get-session")).status).toBe(200);
 
-      const updated = await client.json("/update-user", { name });
+    const updated = await client.json("/update-user", { name });
 
-      expect(updated.status).toBe(404);
-      expect(await displayNameHeldBy(app(), person.id)).toBe("Priya Shah");
-    },
-  );
+    expect(updated.status).toBe(404);
+    expect(await displayNameHeldBy(app(), person.id)).toBe("Priya Shah");
+  });
 });
 
 describe("a first sign-in that carries a name of its own", () => {
-  it("creates the person with no display name, so the name is stated through the one act that holds the rule", async () => {
+  it("stores no name, so only the display-name act sets one", async () => {
     const client = app().client();
     const email = `first-${Date.now()}@acme.invalid`;
     await client.json("/email-otp/send-verification-otp", { email, type: "sign-in" });

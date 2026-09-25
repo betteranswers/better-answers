@@ -50,15 +50,19 @@ const NOTHING_BUT_SELECT = {
 
 type Grants = readonly { readonly object: string; readonly privilege: string }[];
 
-// A role is the cluster's, not a database's: on the shared warm cluster it would reach every
-// suite that reads the roles.
+/**
+ * A role is the cluster's, not a database's: on the shared warm cluster it would reach every
+ * suite that reads the roles.
+ */
 let db: MigratedPostgres;
 let browse: pg.Pool;
 let workspaces: readonly string[];
 let partition: string;
 
-// psql runs a file one statement at a time, each committing alone unless the file opens a
-// transaction; one query would hide that.
+/**
+ * psql runs a file one statement at a time, each committing alone unless the file opens a
+ * transaction; one query would hide that.
+ */
 const statementsOf = (file: string): readonly string[] => {
   const statements: string[] = [];
   let pending: string[] = [];
@@ -127,7 +131,7 @@ afterAll(async () => {
 });
 
 describe("the read-only browsing role, applied over the whole journal", () => {
-  it("signs in as a login that is no superuser, makes no role, database or replica, and bypasses row-level security", async () => {
+  it("logs in and bypasses RLS, holding no other role attribute", async () => {
     const role = await db.pool.query(
       `SELECT rolcanlogin, rolsuper, rolcreaterole, rolcreatedb, rolreplication, rolbypassrls
          FROM pg_roles WHERE rolname = 'browse_ro'`,
@@ -154,7 +158,7 @@ describe("the read-only browsing role, applied over the whole journal", () => {
     );
   });
 
-  it("holds SELECT and nothing else on every table, view and partition in public and index", async () => {
+  it("holds SELECT alone on every relation in public and index", async () => {
     const relations = await db.pool.query<{ relation: string }>(
       `SELECT format('%I.%I', n.nspname, c.relname) AS relation
          FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -178,7 +182,7 @@ describe("the read-only browsing role, applied over the whole journal", () => {
     }
   });
 
-  it("answers a read of every view, so no view in a GUI's list is a dead end", async () => {
+  it("answers a read of every view in public and index", async () => {
     const views = await db.pool.query<{ relation: string }>(
       `SELECT format('%I.%I', n.nspname, c.relname) AS relation
          FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -194,7 +198,7 @@ describe("the read-only browsing role, applied over the whole journal", () => {
     expect(refused).toEqual([]);
   });
 
-  it("withholds the identity set's credential columns and serves every other column of those tables", async () => {
+  it("withholds the identity set's credential columns, serving every other", async () => {
     const columns = await db.pool.query<{ relation: string; column: string; readable: boolean }>(
       `SELECT format('%s.%s', n.nspname, c.relname) AS relation, a.attname AS column,
               has_column_privilege('browse_ro', c.oid, a.attname, 'SELECT') AS readable
@@ -219,7 +223,7 @@ describe("the read-only browsing role, applied over the whole journal", () => {
     expect(served.rowCount).toEqual(1);
   });
 
-  it("opens every session read-only, so a slip in a GUI is refused before any grant is asked", async () => {
+  it("opens sessions read-only, refusing a GUI's write before grant checks", async () => {
     const shown = await browse.query<{ default_transaction_read_only: string }>(
       "SHOW default_transaction_read_only",
     );
@@ -229,7 +233,7 @@ describe("the read-only browsing role, applied over the whole journal", () => {
     );
   });
 
-  it("refuses a write to any platform table, DDL in either schema and every definer function, in a read-write transaction it asks for", async () => {
+  it("refuses writes, DDL and definer functions in a read-write transaction", async () => {
     const client = await browse.connect();
     try {
       await client.query("BEGIN READ WRITE");
@@ -281,7 +285,7 @@ describe("the read-only browsing role, applied over the whole journal", () => {
     expect(definers.rows.filter((row) => row.executable)).toEqual([]);
   });
 
-  it("leaves no credential column readable when it fails partway, run statement by statement as psql runs it", async () => {
+  it("leaves no credential column readable when psql's run fails partway", async () => {
     const client = await db.pool.connect();
     try {
       await client.query('REVOKE ALL ON ALL TABLES IN SCHEMA public, "index" FROM browse_ro');
