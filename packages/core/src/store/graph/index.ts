@@ -62,15 +62,31 @@ const FENCED_BLOCK = /^ {0,3}((`|~)\2{2,})[^\n]*\n[\s\S]*?(?:^ {0,3}\1\2*[ \t]*$
 
 const blanked = (text: string): string => text.replaceAll(/[^\n]/g, " ");
 
-const blankedSpans = (body: string): string => {
-  const runs = [...body.matchAll(/`+/g)];
-
+const laterRunsByLength = (
+  runs: readonly RegExpExecArray[],
+): ReadonlyMap<number, readonly number[]> => {
   const queued = new Map<number, number[]>();
   for (const [position, run] of runs.entries()) {
     const queue = queued.get(run[0].length);
     if (queue === undefined) queued.set(run[0].length, []);
     else queue.push(position);
   }
+  return queued;
+};
+
+const headAfter = (queue: readonly number[], from: number, at: number): number => {
+  let head = from;
+  while (head < queue.length) {
+    const position = queue[head];
+    if (position === undefined || position > at) break;
+    head += 1;
+  }
+  return head;
+};
+
+const blankedSpans = (body: string): string => {
+  const runs = [...body.matchAll(/`+/g)];
+  const queued = laterRunsByLength(runs);
   const heads = new Map<number, number>();
 
   const pieces: string[] = [];
@@ -80,13 +96,7 @@ const blankedSpans = (body: string): string => {
     const opener = runs[at];
     if (opener === undefined) continue;
     const queue = queued.get(opener[0].length) ?? [];
-    let head = heads.get(opener[0].length) ?? 0;
-
-    while (head < queue.length) {
-      const position = queue[head];
-      if (position === undefined || position > at) break;
-      head += 1;
-    }
+    const head = headAfter(queue, heads.get(opener[0].length) ?? 0, at);
     heads.set(opener[0].length, head);
     const closer = runs[queue[head] ?? -1];
     if (closer === undefined) continue;
@@ -359,6 +369,19 @@ const liveGeneration = async (workspaceId: string, tx: Tx): Promise<number> => {
   return liveGen;
 };
 
+const existingLiveGen = async (workspaceId: string, tx: Tx): Promise<number | null> => {
+  const live = await tx.query<{ live_gen: number }>(
+    "SELECT live_gen FROM graph_generation WHERE workspace_id = $1",
+    [workspaceId],
+  );
+  return live.rows[0]?.live_gen ?? null;
+};
+
+/**
+ * Upserts the concept's node in the live generation, opening generation 1 if the workspace has
+ * none, and refreshes the edges into and out of it. A concept new to the generation also
+ * re-derives the edges of every concept naming its file.
+ */
 export const writeConceptDelta = async (
   principal: Principal,
   tx: Tx,
@@ -439,17 +462,17 @@ export type ConceptVisibility = {
   readonly audienceGroups: readonly string[] | null;
 };
 
+/**
+ * Copies the visibility onto the concept's live node and its outgoing derived edges; a workspace
+ * with no live generation is left untouched.
+ */
 export const writeConceptVisibility = async (
   principal: Principal,
   tx: Tx,
   visibility: ConceptVisibility,
 ): Promise<void> => {
-  const live = await tx.query<{ live_gen: number }>(
-    "SELECT live_gen FROM graph_generation WHERE workspace_id = $1",
-    [visibility.workspaceId],
-  );
-  const gen = live.rows[0]?.live_gen;
-  if (gen === undefined) return;
+  const gen = await existingLiveGen(visibility.workspaceId, tx);
+  if (gen === null) return;
   const columns = [
     visibility.workspaceId,
     gen,
@@ -470,8 +493,10 @@ export const writeConceptVisibility = async (
   );
 };
 
-// The readable predicate goes on every node and edge of a path, not only the endpoints:
-// filtering the ends alone leaks the middle.
+/**
+ * The readable predicate goes on every node and edge of a path, not only the endpoints:
+ * filtering the ends alone leaks the middle.
+ */
 const walkStatement = (outward: boolean): string => {
   const [source, sink] = outward ? ["from_uid", "to_uid"] : ["to_uid", "from_uid"];
   return `WITH RECURSIVE live AS (
@@ -517,12 +542,18 @@ const walk = async (
   return found.rows;
 };
 
+/**
+ * One step per acyclic path out of `uid`, the start at depth 0, to GRAPH_WALK_DEPTH hops and at
+ * most GRAPH_WALK_ROW_LIMIT rows. A path stops at the first node or edge the principal cannot
+ * read. With no live generation the walk finds nothing.
+ */
 export const walkFrom = (
   principal: UserPrincipal,
   tx: Tx,
   uid: string,
 ): Promise<readonly WalkStep[]> => walk(WALK_FROM, principal, tx, uid);
 
+/** As walkFrom, against the edges' direction: the paths into `uid`. */
 export const walkTo = (
   principal: UserPrincipal,
   tx: Tx,
@@ -555,16 +586,16 @@ const countsOf = async (
   return Object.fromEntries(found.rows.map((row) => [row.label, row.count]));
 };
 
+/**
+ * Node and edge counts by label over the source partition and the live generation. With none
+ * live, `liveGen` is null and only the source partition counts.
+ */
 export const countMap = async (
   platform: PlatformPrincipal,
   tx: Tx,
   workspaceId: string,
 ): Promise<GraphCounts> => {
-  const live = await tx.query<{ live_gen: number }>(
-    "SELECT live_gen FROM graph_generation WHERE workspace_id = $1",
-    [workspaceId],
-  );
-  const liveGen = live.rows[0]?.live_gen ?? null;
+  const liveGen = await existingLiveGen(workspaceId, tx);
   return {
     liveGen,
     nodes: await countsOf(COUNT_NODES, tx, workspaceId, liveGen),
@@ -578,8 +609,7 @@ export type SweptGeneration = {
   readonly edges: number;
 };
 
-// gen IS NOT NULL spares the source partition, and a missing generation row answers NULL, so
-// an unknown live generation sweeps nothing.
+/** A missing generation row makes the `<>` comparison NULL, which deletes nothing. */
 const SWEEP = `WITH live AS (
     SELECT live_gen FROM graph_generation WHERE workspace_id = $1
   ),
@@ -603,6 +633,10 @@ const SWEEP = `WITH live AS (
    GROUP BY gen
    ORDER BY gen`;
 
+/**
+ * Deletes the nodes and edges of every generation but the live one, counted by generation. The
+ * source partition is never swept, and nothing is when no generation is live.
+ */
 export const sweepNonLiveGenerations = async (
   platform: PlatformPrincipal,
   tx: Tx,
