@@ -6,8 +6,10 @@ import path from "node:path";
 
 import { z } from "zod";
 
-// What `execFileSync` throws once the tool ran; a spawn that never started carries a null
-// status and no streams, so nothing is required.
+/**
+ * What `execFileSync` throws once the tool ran; a spawn that never started carries a null
+ * status and no streams, so nothing is required.
+ */
 const spawnFailure = z.object({
   status: z.number().nullish(),
   stdout: z.string().nullish(),
@@ -17,16 +19,21 @@ const spawnFailure = z.object({
 export type Tree = Readonly<Record<string, string>>;
 
 export type Tool = {
+  /** The package that ships the binary, and the binary's path inside that package. */
   readonly executable: { readonly package: string; readonly path: readonly string[] };
 
   readonly argv: readonly string[];
 
+  /** Written under every tree before the tree's own files, which win on a shared path. */
   readonly scaffold?: Tree;
 
+  /** Laid over this process's environment, never in place of it. */
   readonly env?: Readonly<Record<string, string>>;
 
+  /** The exits that mean the tool ran and reported something; any other non-zero exit throws. */
   readonly foundSomething: readonly number[];
 
+  /** A tree the tool must report on, run once when the runner is made. */
   readonly smoke: { readonly tree: Tree; readonly reports: (output: string) => boolean };
 };
 
@@ -52,6 +59,10 @@ const packageRoot = (from: ReturnType<typeof createRequire>, name: string): stri
   return directory;
 };
 
+/**
+ * The binary's absolute path; throws when the package is not a dependency here or ships no such
+ * file.
+ */
 export const executableOf = (executable: Tool["executable"]): string => {
   const from = createRequire(import.meta.url);
   const root = packageRoot(from, executable.package);
@@ -79,6 +90,7 @@ const writeTree = (directory: string, tree: Tree): void => {
   for (const [file, source] of Object.entries(tree)) writeUnder(directory, file, source);
 };
 
+/** git's stdout; a non-zero exit throws, carrying both streams. */
 export const gitIn = (directory: string, ...args: readonly string[]): string => {
   const result = spawnSync("git", ["-C", directory, ...args], { encoding: "utf8" });
   if (result.status !== 0) {
@@ -87,6 +99,7 @@ export const gitIn = (directory: string, ...args: readonly string[]): string => 
   return result.stdout;
 };
 
+/** Makes `root`, which must not exist yet, a repository on `main` with a throwaway identity. */
 export const throwawayRepository = (root: string): string => {
   mkdirSync(root);
   gitIn(root, "init", "-q", "-b", "main");
@@ -95,6 +108,27 @@ export const throwawayRepository = (root: string): string => {
   return root;
 };
 
+const failureOf = (cause: unknown): z.infer<typeof spawnFailure> => {
+  const read = spawnFailure.safeParse(cause);
+  return read.success ? read.data : {};
+};
+
+const reportOrThrow = (tool: Tool, binary: string, cause: unknown): string => {
+  const failure = failureOf(cause);
+  const status = failure.status;
+  if (status !== null && status !== undefined && tool.foundSomething.includes(status)) {
+    return String(failure.stdout ?? "");
+  }
+
+  throw new Error(
+    `${tool.executable.package} (${binary}) did not run: exit ${String(status)}\n${String(failure.stdout ?? "")}\n${String(failure.stderr ?? cause)}`,
+  );
+};
+
+/**
+ * Resolves the binary and runs the smoke case now, throwing if either fails. Each run returns
+ * stdout from a fresh temporary directory it leaves behind.
+ */
 export const runsOverThrowawayTree = (tool: Tool): RunOverTree => {
   const binary = executableOf(tool.executable);
 
@@ -111,16 +145,7 @@ export const runsOverThrowawayTree = (tool: Tool): RunOverTree => {
         env: { ...process.env, ...tool.env },
       });
     } catch (cause) {
-      const read = spawnFailure.safeParse(cause);
-      const failure = read.success ? read.data : {};
-      const status = failure.status;
-      if (status !== null && status !== undefined && tool.foundSomething.includes(status)) {
-        return String(failure.stdout ?? "");
-      }
-
-      throw new Error(
-        `${tool.executable.package} (${binary}) did not run: exit ${String(status)}\n${String(failure.stdout ?? "")}\n${String(failure.stderr ?? cause)}`,
-      );
+      return reportOrThrow(tool, binary, cause);
     }
   };
 
@@ -156,11 +181,16 @@ const tsgolintPath = (): string => {
   }
 };
 
+const sameInOrder = (found: readonly string[], expected: readonly string[]): boolean =>
+  found.length === expected.length && found.every((one, index) => one === expected[index]);
+
 export type OxlintRunner = {
   readonly output: (tree: Tree) => string;
+  /** Each file the report names, once, sorted. */
   readonly flagged: (tree: Tree) => readonly string[];
 };
 
+/** The smoke tree must flag exactly the files `smoke.flagged` names, in any order. */
 export const oxlintOver = (
   configJson: string,
   smoke: { readonly tree: Tree; readonly flagged: readonly string[] },
@@ -175,16 +205,7 @@ export const oxlintOver = (
     scaffold: { ".oxlintrc.json": configJson },
     env: { OXLINT_TSGOLINT_PATH: tsgolintPath() },
     foundSomething: [1],
-    smoke: {
-      tree: smoke.tree,
-      reports: (output) => {
-        const flagged = pathsIn(output);
-        return (
-          flagged.length === expected.length &&
-          flagged.every((file, index) => file === expected[index])
-        );
-      },
-    },
+    smoke: { tree: smoke.tree, reports: (output) => sameInOrder(pathsIn(output), expected) },
   });
 
   return { output: run, flagged: (tree) => pathsIn(run(tree)) };
@@ -212,8 +233,10 @@ export type KnipRunner = {
 
 const namedIssues = z.array(z.object({ name: z.string() })).optional();
 
-// knip's JSON reporter, its kinds spelled out against the tuple. The smoke case proves the
-// shape, so an unreadable report is refused there.
+/**
+ * knip's JSON reporter, its kinds spelled out against the tuple. The smoke case proves the
+ * shape, so an unreadable report is refused there.
+ */
 const knipReport = z.object({
   issues: z
     .array(
@@ -248,6 +271,7 @@ const findingsIn = (output: string): readonly KnipFinding[] =>
     )
     .sort((left, right) => sortKey(left).localeCompare(sortKey(right)));
 
+/** Each tree is laid over `scaffold`; the smoke tree must report exactly `smoke.findings`. */
 export const knipOver = (
   scaffold: Tree,
   smoke: { readonly tree: Tree; readonly findings: readonly KnipFinding[] },
@@ -260,12 +284,7 @@ export const knipOver = (
     foundSomething: [1],
     smoke: {
       tree: smoke.tree,
-      reports: (output) => {
-        const found = findingsIn(output).map(sortKey);
-        return (
-          found.length === expected.length && found.every((key, index) => key === expected[index])
-        );
-      },
+      reports: (output) => sameInOrder(findingsIn(output).map(sortKey), expected),
     },
   });
 

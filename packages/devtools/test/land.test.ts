@@ -66,8 +66,10 @@ const executable = (at: string, body: string): void => {
 };
 
 const workspace = (name: string, answers: Answers = {}): Throwaway => {
-  // A bare repository stands in for origin, so the fetch is real and only the push and the
-  // whole of gh are stubbed.
+  /**
+   * A bare repository stands in for origin, so the fetch is real and only the push and the
+   * whole of gh are stubbed.
+   */
   const origin = path.join(scratch, `${name}-origin.git`);
   mkdirSync(origin, { recursive: true });
   spawnSync("git", ["init", "--bare", "-q", "-b", "main", origin]);
@@ -79,7 +81,7 @@ const workspace = (name: string, answers: Answers = {}): Throwaway => {
   gitIn(root, "remote", "add", "origin", origin);
   gitIn(root, "push", "-q", "origin", "main");
 
-  // Outside the repository, so `git add -A` inside the run cannot commit the stubs or the log.
+  /** The stubs, answers and log sit outside the repository, so `git add -A` cannot commit them. */
   const bin = path.join(scratch, `${name}-bin`);
   const canned = path.join(scratch, `${name}-answers`);
   const log = path.join(scratch, `${name}.log`);
@@ -116,8 +118,10 @@ const dirty = (tree: Throwaway): Throwaway => {
   return tree;
 };
 
-// The stubs and the log sit outside the repository, so a linked worktree borrows them
-// unchanged and only the working directory moves.
+/**
+ * The stubs and the log sit outside the repository, so a linked worktree borrows them
+ * unchanged and only the working directory moves.
+ */
 const linked = (tree: Throwaway, branch: string): Throwaway => {
   const root = path.join(scratch, `${branch}-worktree`);
   gitIn(tree.root, "worktree", "add", "-q", "-b", branch, root);
@@ -210,7 +214,7 @@ const REFUSED_MESSAGES = [
 ] as const;
 
 describe("pnpm land over a throwaway repository", () => {
-  it("branches off origin's main, commits, pushes, opens the pull request and arms the merge", () => {
+  it("branches, commits, pushes, opens the pull request and arms it", () => {
     const tree = dirty(workspace("armed"));
 
     const run = landWith(tree, GOOD);
@@ -304,7 +308,7 @@ describe("pnpm land over a throwaway repository", () => {
     expect(logOf(tree)).not.toContain("gh pr create");
   });
 
-  it("takes a linked worktree's uncommitted change, which can never stand on main", () => {
+  it("takes a linked worktree's uncommitted change", () => {
     const worktree = linked(dirty(workspace("a-worktree")), "a-branch-of-its-own");
     writeUnder(worktree.root, "docs/note.md", "a line the worktree can see\n");
 
@@ -317,7 +321,7 @@ describe("pnpm land over a throwaway repository", () => {
     expect(messageOf(worktree)).toBe(GOOD);
   });
 
-  it("takes a detached head that is origin's main, naming no branch to stand on", () => {
+  it("takes a detached head at origin's main", () => {
     const tree = dirty(workspace("detached"));
     gitIn(tree.root, "checkout", "-q", "--detach");
 
@@ -329,7 +333,7 @@ describe("pnpm land over a throwaway repository", () => {
     expect(messageOf(tree)).toBe(GOOD);
   });
 
-  it("commits a head behind origin's main onto the newer head it fetched", () => {
+  it("commits a head behind origin's main onto the fetched head", () => {
     const tree = workspace("behind");
     const newer = "A commit origin's main carries and this tree has not seen";
     gitIn(tree.root, "commit", "-q", "--allow-empty", "-m", newer);
@@ -348,25 +352,22 @@ describe("pnpm land over a throwaway repository", () => {
   it.each([
     { held: 1, directory: "ahead-by-one", counted: "1 commit that" },
     { held: 2, directory: "ahead-by-two", counted: "2 commits that" },
-  ])(
-    "refuses a head carrying $held of its own that origin's main has not, counting them",
-    ({ held, directory, counted }) => {
-      const tree = workspace(directory);
-      for (let made = 0; made < held; made += 1) {
-        gitIn(tree.root, "commit", "-q", "--allow-empty", "-m", `A commit this tree kept ${held}`);
-      }
-      dirty(tree);
+  ])("refuses and counts a head $held ahead of origin's main", ({ held, directory, counted }) => {
+    const tree = workspace(directory);
+    for (let made = 0; made < held; made += 1) {
+      gitIn(tree.root, "commit", "-q", "--allow-empty", "-m", `A commit this tree kept ${held}`);
+    }
+    dirty(tree);
 
-      const run = landWith(tree, GOOD);
+    const run = landWith(tree, GOOD);
 
-      expect(run.status).not.toBe(0);
-      expect(run.stderr).toContain(counted);
-      expect(logOf(tree)).not.toContain("git commit");
-      expect(logOf(tree)).not.toContain("git push");
-    },
-  );
+    expect(run.status).not.toBe(0);
+    expect(run.stderr).toContain(counted);
+    expect(logOf(tree)).not.toContain("git commit");
+    expect(logOf(tree)).not.toContain("git push");
+  });
 
-  it("names the change it could not carry onto origin's head, and pushes nothing", () => {
+  it("names a change it cannot carry onto origin's head", () => {
     const tree = workspace("overwritten");
     writeUnder(tree.root, "README.md", "the line origin's main carries\n");
     gitIn(tree.root, "add", "-A");
@@ -383,7 +384,7 @@ describe("pnpm land over a throwaway repository", () => {
     expect(logOf(tree)).not.toContain("git push");
   });
 
-  it("refuses a branch of the name it would make that already stands, and pushes nothing", () => {
+  it("refuses a branch name that already stands", () => {
     const tree = dirty(workspace("branch-stands"));
     gitIn(tree.root, "branch", GOOD_BRANCH);
 
@@ -398,7 +399,7 @@ describe("pnpm land over a throwaway repository", () => {
   it.each([
     { shape: "a session's own note", directory: "session-claude", path: ".claude/notes.md" },
     { shape: "a scratch working file", directory: "session-scratch", path: ".scratch/map.md" },
-  ])("refuses $shape, untracked and under a kept folder, and commits nothing", (kept) => {
+  ])("refuses $shape untracked under a kept folder", (kept) => {
     const tree = dirty(workspace(kept.directory));
     writeUnder(tree.root, kept.path, "a line this session kept\n");
 
@@ -410,7 +411,7 @@ describe("pnpm land over a throwaway repository", () => {
     expect(logOf(tree)).not.toContain("git push");
   });
 
-  it("takes a tracked file under .claude, which is this repository's content and not a session's", () => {
+  it("takes a file this repository tracks under .claude", () => {
     const tree = workspace("tracked-claude");
     const hook = ".claude/hooks/provision-worktree.sh";
     writeUnder(tree.root, hook, "#!/bin/sh\nexit 0\n");
@@ -438,7 +439,7 @@ describe("pnpm land over a throwaway repository", () => {
     expect(logOf(tree)).not.toContain("gh pr create");
   });
 
-  it("refuses a branch that already has an open pull request, naming it, and pushes nothing", () => {
+  it("refuses a branch with an open pull request, naming it", () => {
     const tree = dirty(workspace("open-pr", { prList: JSON.stringify([{ number: 99 }]) }));
 
     const run = landWith(tree, GOOD);
@@ -449,7 +450,7 @@ describe("pnpm land over a throwaway repository", () => {
     expect(logOf(tree)).not.toContain("gh pr create");
   });
 
-  it("reads a pull request number that is not a number as no open pull request", () => {
+  it("reads a non-numeric pull request number as none open", () => {
     const tree = dirty(workspace("string-number", { prList: JSON.stringify([{ number: "99" }]) }));
 
     const run = landWith(tree, GOOD);
@@ -468,7 +469,7 @@ describe("pnpm land over a throwaway repository", () => {
     expect(logOf(tree)).not.toContain("git push");
   });
 
-  it("names the command that arms it when the queue read-back says it is neither", () => {
+  it("names the arming command when neither queued nor armed", () => {
     const tree = dirty(workspace("unarmed", { graphql: queueAnswer(false, null) }));
 
     const run = landWith(tree, GOOD);
@@ -479,7 +480,7 @@ describe("pnpm land over a throwaway repository", () => {
     expect(run.stderr).toContain("gh pr merge 131 --auto --merge");
   });
 
-  it("refuses to call the pull request armed when the queue read-back has no answer in it", () => {
+  it("refuses an empty queue read-back, naming the arming command", () => {
     const tree = dirty(workspace("unreadable", { graphql: "{}" }));
 
     const run = landWith(tree, GOOD);
@@ -489,7 +490,7 @@ describe("pnpm land over a throwaway repository", () => {
     expect(run.stderr).toContain("gh pr merge 131 --auto --merge");
   });
 
-  it("refuses to call the pull request armed when the read-back says it is queued by a word", () => {
+  it("refuses a read-back whose queue flag is a word", () => {
     const tree = dirty(
       workspace("worded", { graphql: queueAnswer(true, null).replace("true", '"yes"') }),
     );
@@ -525,7 +526,7 @@ describe("pnpm land over a throwaway repository", () => {
     expect(logOf(tree)).not.toContain("git push");
   });
 
-  it("says the pull request is queued when the read-back says so", () => {
+  it("says the pull request is queued when the read-back does", () => {
     const tree = dirty(workspace("queued", { graphql: queueAnswer(true, null) }));
 
     const run = landWith(tree, GOOD);

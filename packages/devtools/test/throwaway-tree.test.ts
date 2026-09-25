@@ -29,8 +29,8 @@ const oxlintTool = (over: Partial<Tool> = {}): Tool => ({
   ...over,
 });
 
-describe("a tool that cannot run is never mistaken for a tool that found nothing", () => {
-  it("refuses a tool whose package is not in this package's dependency tree", () => {
+describe("runsOverThrowawayTree over a tool that cannot run", () => {
+  it("refuses a tool whose package is not a dependency", () => {
     expect(() =>
       runsOverThrowawayTree(
         oxlintTool({ executable: { package: "no-such-linter", path: ["bin", "no-such-linter"] } }),
@@ -38,7 +38,7 @@ describe("a tool that cannot run is never mistaken for a tool that found nothing
     ).toThrow(/no-such-linter/);
   });
 
-  it("refuses a tool whose package is installed but carries no such executable", () => {
+  it("refuses an installed package that carries no such executable", () => {
     expect(() =>
       runsOverThrowawayTree(
         oxlintTool({ executable: { package: "oxlint", path: ["bin", "absent"] } }),
@@ -46,40 +46,40 @@ describe("a tool that cannot run is never mistaken for a tool that found nothing
     ).toThrow(/absent/);
   });
 
-  it("refuses a configuration the tool could not parse, rather than reading its silence as a quiet rule", () => {
+  it("refuses a configuration the tool could not parse", () => {
     expect(() =>
       runsOverThrowawayTree(oxlintTool({ scaffold: { ".oxlintrc.json": "{ not json" } })),
     ).toThrow(/oxlint/);
   });
 
-  it("re-throws an exit the tool was not told to tolerate, carrying what the tool wrote", () => {
+  it("re-throws an untolerated exit, carrying what the tool wrote", () => {
     expect(() => runsOverThrowawayTree(oxlintTool({ foundSomething: [] }))).toThrow(
       /exit 1[\s\S]*filename-case/,
     );
   });
 });
 
-describe("a tool that ran hands back what it reported", () => {
-  it("returns the report on the exit that means the tool found something", () => {
+describe("runsOverThrowawayTree over a tool that ran", () => {
+  it("returns the report on an exit that means a finding", () => {
     const lint = runsOverThrowawayTree(oxlintTool());
 
     expect(lint({ [CAMEL_CASE_FILE]: SOURCE })).toContain(CAMEL_CASE_FILE);
   });
 
-  it("returns nothing when the tool ran over a tree it has nothing to say about", () => {
+  it("returns nothing over a tree the tool finds nothing in", () => {
     const lint = runsOverThrowawayTree(oxlintTool());
 
     expect(lint({ [KEBAB_CASE_FILE]: SOURCE })).toBe("");
   });
 
-  it("writes each tree fresh, so one run never sees the file another wrote", () => {
+  it("writes each tree fresh, so no run sees another's files", () => {
     const lint = runsOverThrowawayTree(oxlintTool());
     lint({ [CAMEL_CASE_FILE]: SOURCE });
 
     expect(lint({ [KEBAB_CASE_FILE]: SOURCE })).toBe("");
   });
 
-  it("runs the tool in the environment the caller named, which is how a child finds a binary the tree has no node_modules for", () => {
+  it("runs the tool in the environment the caller named", () => {
     expect(() =>
       runsOverThrowawayTree(
         oxlintTool({
@@ -96,30 +96,30 @@ describe("a tool that ran hands back what it reported", () => {
     ).toThrow(/\/nowhere\/tsgolint/);
   });
 
-  it("writes a file into a directory the tree names but does not create", () => {
+  it("creates the directories a file's path names", () => {
     const lint = runsOverThrowawayTree(oxlintTool());
 
     expect(lint({ [`src/deep/${CAMEL_CASE_FILE}`]: SOURCE })).toContain(CAMEL_CASE_FILE);
   });
 });
 
-describe("oxlint over a config, for the suites that run this repository's lint rules", () => {
+describe("oxlintOver", () => {
   const lint = oxlintOver(kebabCaseConfig, {
     tree: smokeTree,
     flagged: [CAMEL_CASE_FILE],
   });
 
-  it("names the files a rule fired on and leaves out the ones it stayed silent about", () => {
+  it("names the files a rule fired on, and no others", () => {
     expect(lint.flagged({ [CAMEL_CASE_FILE]: SOURCE, [KEBAB_CASE_FILE]: SOURCE })).toEqual([
       CAMEL_CASE_FILE,
     ]);
   });
 
-  it("hands back the whole report for a suite that reads the rule's name out of it", () => {
+  it("hands back the whole report, rule names included", () => {
     expect(lint.output({ [CAMEL_CASE_FILE]: SOURCE })).toContain("filename-case");
   });
 
-  it("refuses a smoke case the reporter does not answer the way the caller said it would", () => {
+  it("refuses a smoke case the report does not match", () => {
     expect(() =>
       oxlintOver(kebabCaseConfig, { tree: smokeTree, flagged: [KEBAB_CASE_FILE] }),
     ).toThrow(/smoke/i);
