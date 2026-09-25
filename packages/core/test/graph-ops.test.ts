@@ -91,7 +91,7 @@ const mapWithLeftovers = async (workspace: ProvisionedWorkspace): Promise<void> 
 };
 
 describe("counting a workspace's map", () => {
-  it("reports the live generation and the source entities beside it, per label, and never a rebuild's leftovers", async () => {
+  it("counts the live generation and source entities, never rebuild leftovers", async () => {
     const workspace = await arrange();
     await mapWithLeftovers(workspace);
 
@@ -107,7 +107,7 @@ describe("counting a workspace's map", () => {
     });
   });
 
-  it("answers a workspace nobody has mapped with zeroes, so a restore over an empty map is done and not a failure", async () => {
+  it("counts an unmapped workspace as empty, not a failure", async () => {
     const workspace = await arrange();
 
     const counted = await counting(workspace);
@@ -125,7 +125,7 @@ describe("counting a workspace's map", () => {
     expect(counted).toEqual({ ok: true, value: { liveGen: null, nodes: {}, edges: {} } });
   });
 
-  it("says a workspace that is not an id is malformed, before it reads anything", async () => {
+  it("says a workspace that is not an id is malformed", async () => {
     const workspace = await arrange();
 
     const counted = await counting(workspace, "ws_synthetic");
@@ -144,7 +144,7 @@ describe("counting a workspace's map", () => {
 });
 
 describe("sweeping a workspace's map", () => {
-  it("removes every generation but the live one, and leaves the live one and the source entities exactly as they were", async () => {
+  it("removes every generation but the live one, keeping source entities", async () => {
     const workspace = await arrange();
     await mapWithLeftovers(workspace);
 
@@ -156,7 +156,7 @@ describe("sweeping a workspace's map", () => {
     expect(await rowsOf(workspace.workspaceId, 2)).toEqual([0, 0]);
   });
 
-  it("writes one ledger row per generation removed, sharing a batch id, with the counts it removed", async () => {
+  it("writes one ledger row per removed generation, under one batch", async () => {
     const workspace = await arrange();
     await mapWithLeftovers(workspace);
 
@@ -192,7 +192,7 @@ describe("sweeping a workspace's map", () => {
     expect([...batches][0]).not.toBeNull();
   });
 
-  it("has nothing to sweep in a workspace whose map is only the live generation, and writes no row for it", async () => {
+  it("sweeps nothing from a live-only map, and writes no row", async () => {
     const workspace = await arrange();
     await seeded((seed) => seed.graphNode({ workspaceId: workspace.workspaceId }));
 
@@ -203,7 +203,7 @@ describe("sweeping a workspace's map", () => {
     expect(await sweptEvents(workspace.workspaceId)).toEqual([]);
   });
 
-  it("has nothing to sweep in a workspace with no generation row, and touches no row it cannot say is not live", async () => {
+  it("sweeps nothing in a workspace without a generation row", async () => {
     const workspace = await arrange();
 
     await seeded(async (seed) => {
@@ -232,7 +232,7 @@ describe("sweeping a workspace's map", () => {
     expect(await rowsOf(theirs.workspaceId, 2)).toEqual([2, 1]);
   });
 
-  it("says a workspace that is not an id is malformed, before it deletes anything", async () => {
+  it("says a workspace that is not an id is malformed", async () => {
     const workspace = await arrange();
 
     const swept = await sweeping(workspace, "ws_synthetic");
@@ -242,7 +242,7 @@ describe("sweeping a workspace's map", () => {
 });
 
 describe("rebuilding a workspace's map", () => {
-  it("queues a full rebuild for the reason it was given, and answers the id of the job it queued", async () => {
+  it("queues a full rebuild and answers the queued job's id", async () => {
     const workspace = await arrange();
 
     const rebuilt = await rebuilding(workspace);

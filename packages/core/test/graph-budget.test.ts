@@ -21,8 +21,10 @@ const EDGES = 159;
 const IN_FLIGHT = 20;
 const ROUNDS = 5;
 
-// Priced against a one-row walk on the same connection before it: load slows both alike, a
-// dearer walk only the one filling the cap.
+/**
+ * Priced against a one-row walk on the same connection before it: load slows both alike, a
+ * dearer walk only the one filling the cap.
+ */
 const WALK_BUDGET_IN_ONE_ROW_WALKS = 200;
 
 const REBUILD_BUDGET_MS = 120_000;
@@ -127,7 +129,7 @@ describe("the graph under concurrent read load", () => {
     map = await landDenseMap(await arrange());
   }, 300_000);
 
-  it("answers a walk that fills the row cap for under two hundred one-row walks at the median while nineteen other walks are in flight", async () => {
+  it("answers a row-cap walk within budget beside nineteen concurrent walks", async () => {
     const walks: TimedWalk[] = [];
     for (let round = 0; round < ROUNDS; round += 1) {
       const inFlight = Array.from({ length: IN_FLIGHT }, (_unused, at) =>
@@ -162,7 +164,7 @@ describe("the graph under concurrent read load", () => {
     ).toBeLessThan(WALK_BUDGET_IN_ONE_ROW_WALKS);
   });
 
-  it("lands the dense map the two budgets are measured over, every concept and every edge", async () => {
+  it("lands every concept and edge of the dense map", async () => {
     const rows = await db().pool.query<{ nodes: string; edges: string }>(
       `SELECT (SELECT count(*) FROM graph_node WHERE workspace_id = $1) AS nodes,
               (SELECT count(*) FROM graph_edge WHERE workspace_id = $1) AS edges`,
@@ -171,7 +173,7 @@ describe("the graph under concurrent read load", () => {
     expect(rows.rows[0]).toEqual({ nodes: String(CONCEPTS), edges: String(EDGES) });
   });
 
-  it("rebuilds the whole map in the worker, as a real process, inside the two-minute promise", async () => {
+  it("rebuilds the map in a real worker within two minutes", async () => {
     const workspaceId = map.scenario.workspaceId;
     const queued = await enqueueJob(map.scenario.admin, map.scenario.postgres, {
       workspaceId,
@@ -181,8 +183,10 @@ describe("the graph under concurrent read load", () => {
     });
     if (!queued.ok) throw new Error(`the rebuild was not queued: ${String(queued.error)}`);
 
-    // The whole hop's wall clock, boot included: over-counting is the safe direction for a
-    // promise.
+    /**
+     * The whole hop's wall clock, boot included: over-counting is the safe direction for a
+     * promise.
+     */
     const started = performance.now();
     await runWorkerOnce(db().connectionUri, bundles().root, "graph-budget");
     const wallClockMs = performance.now() - started;

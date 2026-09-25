@@ -51,11 +51,11 @@ const written = (source: string): string => {
 };
 
 describe("the warm object store", () => {
-  it("hands a suite a bucket named for the file it runs in", () => {
+  it("hands a suite a bucket named for its file", () => {
     expect(store().bucket).toMatch(/^ba-warm-objects-test-ts-[0-9a-f]{12}$/u);
   });
 
-  it("gives each file a bucket of its own, and refuses one file's key the bucket beside it", async () => {
+  it("gives each file its own bucket, refusing a neighbour's key", async () => {
     const one = await openObjectStore("one-file");
     const another = await openObjectStore("another-file");
     const trespass = doorWith(one, another.bucket);
@@ -78,7 +78,7 @@ describe("the warm object store", () => {
     }
   });
 
-  it("re-opens a key onto an emptied bucket, so a run that bailed leaves nothing behind", async () => {
+  it("re-opens a key onto an emptied bucket", async () => {
     const bailed = await openObjectStore("re-run");
     await wrote(bailed, "landed/page.txt");
     closeObjects(bailed.door);
@@ -94,7 +94,7 @@ describe("the warm object store", () => {
     }
   });
 
-  it("reads a file that names the harness as wanting a store, and one that does not as wanting none", () => {
+  it("reads only a harness-naming file as asking for a store", () => {
     const wants = written('import { objectStoreForSuite } from "./suite-objects.ts";\n');
     const wantsNot = written('import { postgresForSuite } from "./suite-postgres.ts";\n');
 
@@ -104,7 +104,7 @@ describe("the warm object store", () => {
     });
   });
 
-  it("starts a Garage of its own where nothing provided a warm one, and stops it again", async () => {
+  it("starts and stops its own Garage where none was warm", async () => {
     const script = [
       `import { keysIn, openObjectStore } from ${JSON.stringify(warmObjectsModule)};`,
       'const store = await openObjectStore("cold");',

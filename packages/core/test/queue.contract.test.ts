@@ -128,72 +128,90 @@ const asRoleInScope = async (
   await client.query("SELECT set_config('app.workspace_id', $1, true)", [where.workspace_id]);
 };
 
+const enqueuesAnswered = async (client: pg.PoolClient) => {
+  const enqueues: { readonly why: string; readonly sqlstate: string }[] = [];
+  for (const refused of fixture.refused_enqueues) {
+    enqueues.push({ why: refused.why, sqlstate: await refusedEnqueue(client, refused) });
+  }
+  return enqueues;
+};
+
+const claimsAnswered = async (client: pg.PoolClient) => {
+  const claimed: { readonly why: string; readonly ids: readonly string[] }[] = [];
+  for (const claim of fixture.claims) {
+    await lapseLeases(client, claim.lapse_first ?? []);
+    await asRoleInScope(client, claim);
+    const answered = await client.query<{ id: string }>(
+      "SELECT id FROM claim_job($1, $2::interval, $3)",
+      [claim.worker_id, seconds(fixture.lease_seconds), [...claim.kinds]],
+    );
+    claimed.push({ why: claim.why, ids: answered.rows.map((row) => row.id) });
+    await client.query("RESET ROLE");
+  }
+  return claimed;
+};
+
+const callStatement = (
+  call: (typeof fixture.calls)[number],
+): { readonly statement: string; readonly leaseOrOutcome: string | null } =>
+  call.function === "heartbeat_job"
+    ? {
+        statement: "SELECT heartbeat_job($1, $2, $3::interval) AS answer",
+        leaseOrOutcome: seconds(fixture.lease_seconds),
+      }
+    : {
+        statement: `SELECT ${call.function}($1, $2, $3::jsonb) AS answer`,
+        leaseOrOutcome: call.outcome === undefined ? null : JSON.stringify(call.outcome),
+      };
+
+const callsAnswered = async (client: pg.PoolClient) => {
+  const answered: { readonly why: string; readonly answer: boolean }[] = [];
+  for (const call of fixture.calls) {
+    await asRoleInScope(client, call);
+    const { statement, leaseOrOutcome } = callStatement(call);
+    const result = await client.query<{ answer: boolean }>(statement, [
+      call.job_id,
+      call.worker_id,
+      leaseOrOutcome,
+    ]);
+    answered.push({ why: call.why, answer: result.rows[0]?.answer ?? false });
+    await client.query("RESET ROLE");
+  }
+  return answered;
+};
+
+const finalRows = async (client: pg.PoolClient) => {
+  const rows = await client.query<{
+    workspace_id: string;
+    id: string;
+    status: string;
+    attempts: number;
+    claimed_by: string | null;
+  }>("SELECT workspace_id, id, status, attempts, claimed_by FROM job ORDER BY workspace_id, id");
+  return rows.rows;
+};
+
 describe("the queue agreement", () => {
-  it("hands out the jobs the fixture says, in the fixture's order, and answers every call the way it says", async () => {
+  it("refuses, hands out and answers exactly as the fixture says", async () => {
     await withRollback(db().pool, async (client) => {
       await seedFixture(client);
 
-      const enqueues: { readonly why: string; readonly sqlstate: string }[] = [];
-      for (const refused of fixture.refused_enqueues) {
-        enqueues.push({ why: refused.why, sqlstate: await refusedEnqueue(client, refused) });
-      }
-      expect(enqueues).toEqual(
+      expect(await enqueuesAnswered(client)).toEqual(
         fixture.refused_enqueues.map((refused) => ({
           why: refused.why,
           sqlstate: refused.sqlstate,
         })),
       );
 
-      const claimed: { readonly why: string; readonly ids: readonly string[] }[] = [];
-      for (const claim of fixture.claims) {
-        await lapseLeases(client, claim.lapse_first ?? []);
-        await asRoleInScope(client, claim);
-        const answered = await client.query<{ id: string }>(
-          "SELECT id FROM claim_job($1, $2::interval, $3)",
-          [claim.worker_id, seconds(fixture.lease_seconds), [...claim.kinds]],
-        );
-        claimed.push({ why: claim.why, ids: answered.rows.map((row) => row.id) });
-        await client.query("RESET ROLE");
-      }
-      expect(claimed).toEqual(
+      expect(await claimsAnswered(client)).toEqual(
         fixture.claims.map((claim) => ({ why: claim.why, ids: claim.expect_ids })),
       );
 
-      const answered: { readonly why: string; readonly answer: boolean }[] = [];
-      for (const call of fixture.calls) {
-        await asRoleInScope(client, call);
-        const statement =
-          call.function === "heartbeat_job"
-            ? "SELECT heartbeat_job($1, $2, $3::interval) AS answer"
-            : `SELECT ${call.function}($1, $2, $3::jsonb) AS answer`;
-        const third =
-          call.function === "heartbeat_job"
-            ? seconds(fixture.lease_seconds)
-            : call.outcome === undefined
-              ? null
-              : JSON.stringify(call.outcome);
-        const result = await client.query<{ answer: boolean }>(statement, [
-          call.job_id,
-          call.worker_id,
-          third,
-        ]);
-        answered.push({ why: call.why, answer: result.rows[0]?.answer ?? false });
-        await client.query("RESET ROLE");
-      }
-      expect(answered).toEqual(
+      expect(await callsAnswered(client)).toEqual(
         fixture.calls.map((call) => ({ why: call.why, answer: call.expect })),
       );
 
-      const rows = await client.query<{
-        workspace_id: string;
-        id: string;
-        status: string;
-        attempts: number;
-        claimed_by: string | null;
-      }>(
-        "SELECT workspace_id, id, status, attempts, claimed_by FROM job ORDER BY workspace_id, id",
-      );
-      expect(rows.rows).toEqual(
+      expect(await finalRows(client)).toEqual(
         [...fixture.expect_final]
           .toSorted((a, b) => `${a.workspace_id}${a.id}`.localeCompare(`${b.workspace_id}${b.id}`))
           .map((expected) => ({

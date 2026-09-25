@@ -88,27 +88,24 @@ describe("opening the git door", () => {
 
 describe("what the git door will put a file at", () => {
   it.each([
-    ["climbs out of the bundle", "../escape.md"],
+    ["escapes the bundle", "../escape.md"],
     ["climbs out part-way along", "knowledge/../../escape.md"],
     ["is absolute", "/etc/passwd"],
     ["carries an empty segment", "knowledge//expenses.md"],
-    ["carries a bare current-directory segment", "knowledge/./expenses.md"],
+    ["carries a `.` segment", "knowledge/./expenses.md"],
     ["is empty", ""],
 
     ["carries a tab", "knowledge/ex\tpenses.md"],
     ["carries a newline", "knowledge/ex\npenses.md"],
-  ])(
-    "refuses a path that %s, and leaves the bundle without a commit",
-    async (_shape, candidate) => {
-      const bundle = await arrange();
+  ])("refuses a path that %s, committing nothing", async (_shape, candidate) => {
+    const bundle = await arrange();
 
-      const refused = await commit(bundle.principal, bundle.door, requestFor({ path: candidate }));
+    const refused = await commit(bundle.principal, bundle.door, requestFor({ path: candidate }));
 
-      expect(refused).toEqual({ ok: false, error: "malformed-path" });
-      expect(await head(bundle.principal, bundle.door)).toBeNull();
-      expect(await bundleHistory(bundle.door, bundle.workspaceId)).toEqual([]);
-    },
-  );
+    expect(refused).toEqual({ ok: false, error: "malformed-path" });
+    expect(await head(bundle.principal, bundle.door)).toBeNull();
+    expect(await bundleHistory(bundle.door, bundle.workspaceId)).toEqual([]);
+  });
 
   it("writes a relative path inside the bundle, at every depth", async () => {
     const bundle = await arrange();
@@ -148,7 +145,7 @@ describe("one commit's index", () => {
     );
   });
 
-  it("stages in an index of its own, leaving the repository holding none", async () => {
+  it("stages in its own index, leaving the repository without one", async () => {
     const bundle = await arrange();
 
     await commit(bundle.principal, bundle.door, requestFor());
@@ -158,7 +155,7 @@ describe("one commit's index", () => {
 });
 
 describe("a git failure after the precondition passed", () => {
-  it("reads a ref it could not lock as the stale precondition it is", async () => {
+  it("reads an unlockable ref as a stale precondition", async () => {
     const bundle = await arrange();
 
     await writeFile(
@@ -171,7 +168,7 @@ describe("a git failure after the precondition passed", () => {
     expect(refused).toEqual({ ok: false, error: "stale-precondition" });
   });
 
-  it("hands back the store's own failure when git refuses the write for anything else", async () => {
+  it("hands back the store's failure for any other refused write", async () => {
     const bundle = await arrange();
 
     const failed = await commit(bundle.principal, bundle.door, requestFor({ path: ".git/config" }));
@@ -183,7 +180,7 @@ describe("a git failure after the precondition passed", () => {
 });
 
 describe("the message the git door composes", () => {
-  it("carries all five trailers ADR 0012 fixes when an act names all five", async () => {
+  it("carries all five trailers when an act names them all", async () => {
     const bundle = await arrange();
     const trailers = {
       actor: `human:${ulid()}` satisfies ActorId,
@@ -208,7 +205,7 @@ describe("the message the git door composes", () => {
   it.each([
     ["a subject", { message: "" }],
     ["a trailer value", { trailers: { actor: `human:${ulid()}` satisfies ActorId, audit: "" } }],
-  ])("refuses %s that is empty, so no commit carries a blank line as one", async (_what, part) => {
+  ])("refuses %s that is empty, committing nothing", async (_what, part) => {
     const bundle = await arrange();
 
     const refused = await commit(bundle.principal, bundle.door, requestFor(part));
@@ -229,7 +226,7 @@ const gate = (): { readonly waited: Promise<void>; readonly open: () => void } =
 const settle = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
 
 describe("the per-repository lock", () => {
-  it("queues a third act behind the second, after the first has left the lock", async () => {
+  it("queues a third act behind a second still holding it", async () => {
     const bundle = await arrange();
     const order: string[] = [];
     const first = gate();
@@ -250,8 +247,10 @@ describe("the per-repository lock", () => {
     await a;
     await secondStarted.waited;
 
-    // The first has cleaned up while the second still holds the lock: an entry cleared by
-    // anyone but its owner lets this past.
+    /**
+     * The first has cleaned up while the second still holds the lock: an entry cleared by
+     * anyone but its owner lets this past.
+     */
     const c = withRepositoryLock(bundle.principal, bundle.door, async () => {
       order.push("c");
     });
@@ -282,7 +281,7 @@ const bundleNamingPriya = async (): Promise<{ bundle: Bundle; sha: string }> => 
 };
 
 describe("what a bundle's history names", () => {
-  it("answers the commit and the path whose file carries the needle", async () => {
+  it("answers the commit and path whose file carries the needle", async () => {
     const { bundle, sha } = await bundleNamingPriya();
 
     const found = await historyNaming(PLATFORM, bundle.door, bundle.workspaceId, [SUBJECT_EMAIL]);
@@ -293,7 +292,7 @@ describe("what a bundle's history names", () => {
     });
   });
 
-  it("answers the commit whose author line carries the needle, and no file", async () => {
+  it("answers an author-line match as a commit, not a file", async () => {
     const { bundle, sha } = await bundleNamingPriya();
 
     const found = await historyNaming(PLATFORM, bundle.door, bundle.workspaceId, [AUTHOR.email]);
@@ -301,7 +300,7 @@ describe("what a bundle's history names", () => {
     expect(found).toEqual({ blobs: [], authors: [sha] });
   });
 
-  it("answers nothing for a history that names nobody, and for a bundle with no commits", async () => {
+  it("answers nothing for an empty history or one naming nobody", async () => {
     const { bundle } = await bundleNamingPriya();
     const empty = await arrange();
 
@@ -314,7 +313,7 @@ describe("what a bundle's history names", () => {
     });
   });
 
-  it("hands back the store's failure when git could not read an object, rather than answering that nobody is named", async () => {
+  it("hands back an unreadable object's failure, not an empty answer", async () => {
     const { bundle, sha } = await bundleNamingPriya();
     await objectRemovedFrom(bundle.door, bundle.workspaceId, `${sha}:knowledge/expenses.md`);
 
@@ -325,7 +324,7 @@ describe("what a bundle's history names", () => {
 });
 
 describe("the file this door reads back at a commit", () => {
-  it("answers nothing for a path the commit's tree does not hold, because that is a fair question", async () => {
+  it("answers null for a path the commit's tree lacks", async () => {
     const { bundle, sha } = await bundleNamingPriya();
 
     expect(
@@ -333,7 +332,7 @@ describe("the file this door reads back at a commit", () => {
     ).toBe(null);
   });
 
-  it("refuses a commit the repository does not hold, rather than calling it an absent file", async () => {
+  it("refuses a missing commit rather than calling the file absent", async () => {
     const { bundle } = await bundleNamingPriya();
 
     await expect(

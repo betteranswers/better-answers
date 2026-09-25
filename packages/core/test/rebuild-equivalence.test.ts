@@ -136,8 +136,10 @@ const buildTheMap = async (scenario: Scenario) => {
     body: "The evidence this rests on.",
   });
 
-  // This path's concept is written after the linker, so the live map gains the linker's edge
-  // through the re-derive.
+  /**
+   * This path's concept is written after the linker, so the live map gains the linker's edge
+   * through the re-derive.
+   */
   const laterPath = `knowledge/lands-later-${ulid().toLowerCase()}.md`;
 
   const unlanded = conceptIriOf(ulid());
@@ -216,7 +218,7 @@ const EQUIVALENCE_ALLOWANCE_MS = 120_000;
 
 describe("the worker's rebuild against the api's own map", () => {
   it(
-    "reproduces the live generation exactly, column by column, from the bundle and the records",
+    "reproduces the live generation exactly from the bundle and records",
     async () => {
       const scenario = await arrange();
       const { linker, group } = await buildTheMap(scenario);
@@ -264,7 +266,7 @@ describe("the worker's rebuild against the api's own map", () => {
     EQUIVALENCE_ALLOWANCE_MS,
   );
 
-  it("finds no mismatch between the two parsers over the bundle those acts wrote", async () => {
+  it("finds no parser mismatch over the bundle those acts wrote", async () => {
     const scenario = await arrange();
     await buildTheMap(scenario);
 
