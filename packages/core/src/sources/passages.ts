@@ -21,8 +21,10 @@ export type Passage = {
   readonly sensitivity: Sensitivity;
 };
 
-// The view's class is NULL only for a word both source columns' CHECKs refuse; the
-// predicate's Admin arm passes it, and the parse fails it.
+/**
+ * The view's class is NULL only for a word both source columns' CHECKs refuse; the predicate's
+ * Admin arm passes it, and the parse fails it.
+ */
 const CHUNK_SENSITIVITY = z.enum(SENSITIVITIES);
 
 const COVERING_ROWS = `SELECT c.content, c.char_start, c.char_end, c.sensitivity, d.title
@@ -43,6 +45,10 @@ type CoveringRow = {
   readonly title: string;
 };
 
+/**
+ * `not-found` unless chunks the caller can read cover the whole span without a gap. The class is
+ * the narrowest among them.
+ */
 export const passageAt = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -63,9 +69,9 @@ export const passageAt = async (
     ]);
 
     return read.rows.map((row) => {
-      // No CHECK holds a row's content to its span; one that misses shifts every later
-      // offset or opens a passage no row covers.
       const points = Array.from(row.content).length;
+      // No CHECK holds a row's content to its span; one that misses shifts every later offset or
+      // opens a passage no row covers.
       if (points !== row.char_end - row.char_start) {
         throw new Error(
           `the chunk row at ${locatorOf(sourceDocumentId, row.char_start, row.char_end)} holds ${String(points)} code points`,
@@ -147,6 +153,10 @@ type HitRow = {
   readonly title: string;
 };
 
+/**
+ * Leaves out a chunk whose document is evidence for a concept the caller can read. `limit` is held
+ * to 0 through 20.
+ */
 export const findPassages = (
   principal: UserPrincipal,
   tx: Tx,
@@ -207,6 +217,7 @@ export type PreviewChunksInput = z.output<typeof previewChunksInput>;
 
 type PreviewChunksRefusal = SourceRefusal<"role-forbids"> | Error;
 
+/** `limit` is held to 20 at most. */
 export const previewChunks = async (
   principal: UserPrincipal,
   tx: Tx,

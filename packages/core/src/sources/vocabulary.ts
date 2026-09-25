@@ -20,7 +20,7 @@ export const SOURCE_REFUSALS = declareRefusals("sources", {
   "not-wider": "inapplicable",
 });
 
-// A binding's audience names groups, which the members slice owns and declares.
+/** A binding's audience names groups, which the members slice owns and declares. */
 type BorrowedFromMembers = MemberRefusal<"no-such-group">;
 
 export type SourceRefusal<W extends RefusalWordFor<typeof SOURCE_REFUSALS> | BorrowedFromMembers> =

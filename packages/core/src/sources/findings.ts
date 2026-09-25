@@ -23,6 +23,7 @@ const FINDING_ID = boundarySchemas.finding.select.shape.id;
 
 export const RESTORE_REASON = boundarySchemas.finding.select.shape.restoreReason.unwrap();
 
+/** A SQL predicate on the two aliases: the finding belongs to its document's current redaction. */
 export const raisedByTheLastRun = (finding: string, document: string): string =>
   `${finding}.rule_version || ':' || ${finding}.detector_pin = ${document}.redaction_version`;
 
