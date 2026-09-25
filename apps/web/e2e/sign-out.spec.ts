@@ -27,7 +27,7 @@ test("an ended session sends the person to sign-in and returns them where they w
   await page.goto("/sign-in");
   await signIn(page, request, email);
   await page.getByRole("link", { name: "People" }).click();
-  await expect(page).toHaveURL(/\/people\/roles$/);
+  await expect(page).toHaveURL(/\/people\/members$/);
 
   await context.clearCookies();
   await page.reload();
@@ -35,7 +35,7 @@ test("an ended session sends the person to sign-in and returns them where they w
   await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
   await signIn(page, request, email);
 
-  await expect(page).toHaveURL(/\/people\/roles$/);
+  await expect(page).toHaveURL(/\/people\/members$/);
   await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
 });
 

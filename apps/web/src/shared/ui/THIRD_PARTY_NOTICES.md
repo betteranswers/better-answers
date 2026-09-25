@@ -21,6 +21,11 @@ T-136 added `checkbox` and `progress` on **23 September 2026** with the same CLI
 `shadcn@4.20.1`, for the Sources screen's finding groups, publish confirmations and upload; their
 two digests were taken that day and their arrival edits are listed below with the others.
 
+T-397 added `avatar` and Kibo UI's `pill` on **25 September 2026** with the same CLI,
+`shadcn@4.20.1`: the pill is every pill a People screen shows (the design system's readme, owner
+25/09/2026), and `avatar` is the registry dependency it names beside `badge` and `button`. Their
+two digests were taken that day and their arrival edits are listed below with the others.
+
 This file records vendored source only. The npm packages those items stand on are ordinary
 dependencies with lockfile entries; their versions live in `apps/web/package.json` and the
 lockfile, which is where a reader reads them and where Renovate moves them.
@@ -65,6 +70,8 @@ the pin.
 | `sheet.tsx` | https://ui.shadcn.com/r/styles/new-york/sheet.json | `f9d5c635be778573` | `bc0fc5ea77392c4a` |
 | `checkbox.tsx` | https://ui.shadcn.com/r/styles/new-york/checkbox.json | `e1520741b7976375` | `c8cd1bd04ef664b7` |
 | `progress.tsx` | https://ui.shadcn.com/r/styles/new-york/progress.json | `5b99e42b997efaef` | `7b166fa8e9810e4d` |
+| `avatar.tsx` | https://ui.shadcn.com/r/styles/new-york/avatar.json | `4fdcb3d39aa70de7` | `55160fb2558f506a` |
+| `kibo-ui/pill.tsx` | https://www.kibo-ui.com/r/pill.json | `c1dd3d46048b0d5f` | `9b0c909d9043c5fc` |
 
 `components.json` writes `https://ui.shadcn.com/r/{name}.json` for the primitives because that is
 the CLI's own default form; the table records the style-qualified URL the CLI resolves it to,
@@ -132,6 +139,20 @@ T-136's arrival edits, on the two items it added:
 - The progress indicator's `transition-all` became `transition-transform duration-base
   ease-standard`: it moves by a transform alone, and the curve and the duration are the design
   system's to name.
+
+T-397's arrival edits, on the two items it added:
+
+- The `cn` import repointed at `@/shared/lib/utils.ts` and the dependency on `cn` dropped, as the
+  tooltip's, the sheet's and the checkbox's arrivals needed. The CLI wrote the pill to
+  `components/kibo-ui/pill/index.tsx` with extensionless imports; it sits at `kibo-ui/pill.tsx`
+  beside the other Kibo UI items, its imports given their extensions, and the CLI's rewrite of
+  `badge.tsx` and `button.tsx` was declined, since both were already here.
+- The pill's status dot and delta arrows read the design system's four `--status-*-fg` tokens
+  rather than Tailwind's emerald, rose, amber and sky: the colours are the platform's half.
+  The dot's four `variant ===` chains became one lookup by variant, which is the same classes
+  within the complexity cap.
+- The pill's `themed` prop, which upstream takes only to keep it off the badge, is bound to
+  `_themed`, the name the unused-variable rule reads as deliberate.
 
 Everything else is upstream's, unedited. Their behaviour — keyboard handling, focus, ARIA
 wiring, virtualisation — is theirs by ADR 0033; the screens that use them carry the WCAG 2.2 AA

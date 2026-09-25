@@ -59,7 +59,15 @@ describe("Control Centre's three-region shell", () => {
       within(secondaryNav("People"))
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["Roles", "Owners", "Thresholds", "Erasure and suppression", "Tokens"]);
+    ).toEqual([
+      "Members",
+      "Groups",
+      "Owners",
+      "Thresholds",
+      "Erasure and suppression",
+      "Tokens",
+      "Audit log",
+    ]);
     expect(screen.queryByRole("navigation", { name: "System" })).toBeNull();
     unmount();
 
@@ -100,7 +108,7 @@ describe("Control Centre's three-region shell", () => {
     expect(container.textContent).not.toMatch(/sign out/i);
   });
 
-  it("says the four screens nobody has built are unbuilt, and does not say it of Sources or System", async () => {
+  it("says the three screens nobody has built are unbuilt, and not Sources, People or System", async () => {
     const unbuilt: string[] = [];
     for (const each of SCREENS) {
       const { unmount } = await openAt(each.path);
@@ -108,7 +116,7 @@ describe("Control Centre's three-region shell", () => {
       unmount();
     }
 
-    expect(unbuilt).toEqual(["Suggestions", "Knowledge", "Questions", "People"]);
+    expect(unbuilt).toEqual(["Suggestions", "Knowledge", "Questions"]);
   });
 
   it("gives System the routes card, and says the rest of the screen is unbuilt", async () => {
@@ -179,7 +187,18 @@ describe("Control Centre's one list of screens and their views", () => {
       ["Suggestions", ["Queue"]],
       ["Knowledge", ["Review table", "Conflicts and verification requests", "Exports"]],
       ["Questions", ["Answer audit", "Promotions", "Answer tests"]],
-      ["People", ["Roles", "Owners", "Thresholds", "Erasure and suppression", "Tokens"]],
+      [
+        "People",
+        [
+          "Members",
+          "Groups",
+          "Owners",
+          "Thresholds",
+          "Erasure and suppression",
+          "Tokens",
+          "Audit log",
+        ],
+      ],
       ["System", ["Signals", "Health", "Routes and spend", "Backups"]],
     ]);
   });
@@ -190,19 +209,19 @@ describe("Control Centre's one list of screens and their views", () => {
       ["/suggestions", "/suggestions/queue"],
       ["/knowledge", "/knowledge/review-table"],
       ["/questions", "/questions/answer-audit"],
-      ["/people", "/people/roles"],
+      ["/people", "/people/members"],
       ["/system", "/system/routes-and-spend"],
     ]);
   });
 
-  it("calls two views built — Sources' bindings and System's routes, each its screen's own address — and the rest not", () => {
+  it("calls three views built — Sources' bindings, People's members and System's routes, each its screen's own address — and the rest not", () => {
     const built = SCREENS.flatMap((each) =>
       viewsOf(each)
         .filter((view) => view.built)
         .map((view) => view.path),
     );
 
-    expect(built).toEqual(["/sources/bindings", "/system/routes-and-spend"]);
+    expect(built).toEqual(["/sources/bindings", "/people/members", "/system/routes-and-spend"]);
   });
 
   it("gives every view on the list a route of its own", () => {
@@ -253,7 +272,7 @@ describe("Control Centre's one list of screens and their views", () => {
       "/suggestions/queue",
       "/knowledge/review-table",
       "/questions/answer-audit",
-      "/people/roles",
+      "/people/members",
       "/system/routes-and-spend",
     ]);
   });

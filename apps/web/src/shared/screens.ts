@@ -62,14 +62,17 @@ export const SCREENS = [
     name: "People",
     icon: "people",
     path: "/people",
-    summary: "The workspace's members and their roles, with owners, thresholds and tokens.",
-    defaultView: "/people/roles",
+    summary:
+      "The workspace's members, their roles and groups, with owners, thresholds, tokens and the audit log.",
+    defaultView: "/people/members",
     views: [
-      { name: "Roles", path: "/people/roles", built: false },
+      { name: "Members", path: "/people/members", built: true },
+      { name: "Groups", path: "/people/groups", built: false },
       { name: "Owners", path: "/people/owners", built: false },
       { name: "Thresholds", path: "/people/thresholds", built: false },
       { name: "Erasure and suppression", path: "/people/erasure-and-suppression", built: false },
       { name: "Tokens", path: "/people/tokens", built: false },
+      { name: "Audit log", path: "/people/audit-log", built: false },
     ],
   },
   {
