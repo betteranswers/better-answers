@@ -30,7 +30,7 @@ export type DismissedAsNotSpecialCategory = inferOutput<
 
 export type Sensitivity = ListedBinding["sensitivity"];
 
-// Narrowest first, the order a narrowing moves in.
+/** Narrowest first, the order a narrowing moves in. */
 export const CLASSES: readonly Sensitivity[] = ["Restricted", "Internal", "Public"];
 
 export const NARROWEST: Sensitivity = "Restricted";
@@ -70,8 +70,10 @@ export const usePreview = (bindingId: string, enabled: boolean) => {
   return useQuery({ ...api.sources.preview.queryOptions({ bindingId }), enabled });
 };
 
-// The one act whose input is bytes: its descriptor rides beside them, so it goes through the
-// client rather than an options factory built once.
+/**
+ * The one act whose input is bytes: its descriptor rides beside them, so it goes through the
+ * client rather than an options factory built once.
+ */
 export const useBind = () => {
   const api = useTRPC();
   const client = useTRPCClient();
@@ -85,8 +87,10 @@ export const useBind = () => {
 
 type Undo = { readonly undo: () => void };
 
-// A click must read as done within a tenth of a second, so the cache takes the act before the
-// api answers.
+/**
+ * A click must read as done within a tenth of a second, so the cache takes the act before the
+ * api answers.
+ */
 const useOptimistic = () => {
   const queryClient = useQueryClient();
   return async <Data>(
@@ -104,7 +108,7 @@ const useOptimistic = () => {
   };
 };
 
-// Every settled act reads again what it changed, so the cache ends as the api left it.
+/** Every settled act reads again what it changed, so the cache ends as the api left it. */
 const useReconcile = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
@@ -143,7 +147,10 @@ export const usePublish = () => {
   );
 };
 
-// Text until parsed: the input's class and audience are the api's words as the wire carries them.
+/**
+ * Text until parsed: the input's class and audience are the api's words as the wire carries
+ * them.
+ */
 type ClassAsked = inferInput<Api["sources"]["widen"]>;
 
 const classSetAsAsked =
@@ -155,7 +162,7 @@ const classSetAsAsked =
       : { ...binding, sensitivity };
   };
 
-// A narrowing and a widening draw the same class on the row, and undo it the same way.
+/** A narrowing and a widening draw the same class on the row, and undo it the same way. */
 const useClassSetOnTheRow = () => {
   const api = useTRPC();
   const optimistic = useOptimistic();
@@ -197,7 +204,7 @@ export const keyOf = (group: FindingGroupKey): FindingGroupKey => ({
   tier: group.tier,
 });
 
-// What a group is, as one string for a list's key: it names no finding and no span.
+/** What a group is, as one string for a list's key: it names no finding and no span. */
 export const groupKeyText = (group: FindingGroupKey): string =>
   [group.documentId, group.category, group.ruleId, group.tier].join(" ");
 

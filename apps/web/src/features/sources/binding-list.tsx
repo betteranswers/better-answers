@@ -37,7 +37,7 @@ const audienceWords = (binding: ListedBinding): string => {
   return named === 0 ? words : `${words} (${counted(named, "group", "groups")})`;
 };
 
-// The one disclosure: what a reader weighs after the lead, never an act of its own.
+/** The one disclosure: what a reader weighs after the lead, never an act of its own. */
 function MoreAbout(properties: { readonly binding: ListedBinding; readonly onFocus: () => void }) {
   const { binding } = properties;
   const wantingOcr = binding.quarantinedByError[NEEDS_OCR] ?? 0;
@@ -104,7 +104,7 @@ function BindingItem(properties: { readonly binding: ListedBinding; readonly act
   const { binding, acts } = properties;
   const headingId = bindingHeadingId(binding.bindingId);
   const named = <span className="sr-only"> {binding.name}</span>;
-  // Every control in the row names its binding as the one in focus, for the keystrokes.
+  /** Every control in the row names its binding as the one in focus, for the keystrokes. */
   const focused = () => {
     acts.onFocusBinding(binding.bindingId);
   };

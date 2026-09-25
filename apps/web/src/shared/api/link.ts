@@ -1,8 +1,10 @@
 import { httpBatchLink, httpLink, isNonJsonSerializable, splitLink } from "@trpc/client";
 import type { OperationContext } from "@trpc/client";
 
-// The bytes are the mutation's input, so this rides beside them where the router's types never
-// reach; the api harness holds the pair.
+/**
+ * The bytes are the mutation's input, so this rides beside them where the router's types never
+ * reach; the api harness holds the pair.
+ */
 export type UploadDescriptor = {
   readonly bindingId: string;
   readonly name: string;
@@ -29,8 +31,10 @@ const HEADER_OF_FIELD = new Map<string, string>(Object.entries(UPLOAD_HEADER_OF_
 
 const UPLOAD_CONTEXT = "upload";
 
-// A header carries bytes and a file's name may not be one, so each value is its JSON,
-// percent-encoded.
+/**
+ * A header carries bytes and a file's name may not be one, so each value is its JSON,
+ * percent-encoded.
+ */
 export const uploadOptions = (descriptor: UploadDescriptor) => {
   const headers = new Headers();
   for (const [field, value] of Object.entries(descriptor)) {
@@ -50,8 +54,10 @@ type ApiLinkOptions = Pick<Parameters<typeof httpBatchLink>[0], "url" | "fetch">
   readonly uploadFetch?: Parameters<typeof httpLink>[0]["fetch"];
 };
 
-// A batch carries its inputs in the address, and an address past this length is one some proxies
-// refuse; the link splits the batch instead.
+/**
+ * A batch carries its inputs in the address, and an address past this length is one some proxies
+ * refuse; the link splits the batch instead.
+ */
 const BATCH_URL_CEILING = 2083;
 
 export const apiLink = ({ uploadFetch, ...options }: ApiLinkOptions) => {

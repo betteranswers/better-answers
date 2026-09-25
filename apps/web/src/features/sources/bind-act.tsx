@@ -18,14 +18,16 @@ import {
 
 import { ActDialog } from "./act-dialog.tsx";
 import { outcomeOfFailure, refusedFor } from "./refusal.tsx";
-import { CLASSES, NARROWEST, useBind } from "./sources-api.ts";
+import { CLASSES, EVERYONE, NARROWEST, useBind } from "./sources-api.ts";
 import { SOURCES_KEYSTROKES } from "./sources-state.ts";
 import { AUDIENCE_WORDS, UPLOAD_CAP_MB } from "./words.ts";
 
-// The api's allow-list, stated not imported: the web takes nothing from the api at runtime, and
-// the api refuses alike.
 const UPLOAD_BYTE_CAP = UPLOAD_CAP_MB * 1024 * 1024;
 
+/**
+ * The api's allow-list, stated not imported: the web takes nothing from the api at runtime, and
+ * the api refuses alike.
+ */
 const MEDIA_TYPE_OF_EXTENSION = new Map([
   ["md", "text/markdown"],
   ["markdown", "text/markdown"],
@@ -41,13 +43,14 @@ const ACCEPTED = [
   ...MEDIA_TYPES,
 ].join(",");
 
-// A browser names a markdown file's type inconsistently, so the extension decides where it is silent.
+/**
+ * A browser names a markdown file's type inconsistently, so the extension decides where it is
+ * silent.
+ */
 const mediaTypeOf = (file: File): string | undefined => {
   if (MEDIA_TYPES.has(file.type)) return file.type;
   return MEDIA_TYPE_OF_EXTENSION.get(file.name.split(".").at(-1)?.toLowerCase() ?? "");
 };
-
-const EVERYONE = "everyone";
 
 type Uploading = UploadProgress & { readonly fileName: string };
 
