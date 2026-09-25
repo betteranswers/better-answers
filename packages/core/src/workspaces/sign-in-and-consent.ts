@@ -14,7 +14,7 @@ import { type PostgresDoor, withIdentityWrite, withScope } from "../store/postgr
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
 /** Empty detail: an address, an IP or a user agent here would need rewriting on erasure. */
-const SIGN_IN_ACTS = declareIdentitySetActs("people", {
+export const SIGN_IN_ACTS = declareIdentitySetActs("people", {
   signedIn: act("people.person.signed_in", {}),
 });
 

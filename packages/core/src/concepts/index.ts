@@ -47,7 +47,7 @@ import {
   type Committed,
   type GitDoor,
 } from "../store/git/index.ts";
-import { withMembership, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
+import { containing, withMembership, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import {
   hashedFileOf,
   renderConceptFile,
@@ -1170,8 +1170,6 @@ export const conceptByIri = async (
   return ok(row === undefined ? undefined : openedOf(row));
 };
 
-const likeEscaped = (text: string): string => text.replaceAll(/[\\%_]/g, String.raw`\$&`);
-
 /**
  * Matches the trimmed query as literal text, ignoring case, in a readable concept's title or
  * body, ordered by title. A blank query or a `limit` under 1 finds nothing.
@@ -1187,12 +1185,7 @@ export const findConcepts = async (
     tx.query<ConceptRow>(
       `${CONCEPT_SELECT} AND (c.title ILIKE $4 OR c.body ILIKE $4)
         ORDER BY c.title, c.iri LIMIT $5`,
-      [
-        principal.workspaceId,
-        ...readableParameters(principal),
-        `%${likeEscaped(query)}%`,
-        input.limit,
-      ],
+      [principal.workspaceId, ...readableParameters(principal), containing(query), input.limit],
     ),
   );
   if (!found.ok) return err(found.error);

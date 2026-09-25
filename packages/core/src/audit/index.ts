@@ -62,6 +62,25 @@ export const eventsOfAct = async (
   return found.rows.map((row) => boundarySchemas.auditEvent.select.parse(row));
 };
 
+/**
+ * The latest instant each subject met `act` on the identity-set audit log; a subject that never
+ * did is left out. Naming the subject kind reaches the log's index on kind and subject.
+ */
+export const latestOnIdentitySet = async (
+  _operator: OperatorPrincipal,
+  tx: Tx,
+  act: LedgerAct,
+  subjectIds: readonly string[],
+): Promise<ReadonlyMap<string, Date>> => {
+  const found = await tx.query<{ subject_id: string; at: Date }>(
+    `SELECT subject_id, max(at) AS at FROM identity_audit_event
+      WHERE subject_kind = split_part($1, '.', 2) AND subject_id = ANY($2::text[]) AND act = $1
+      GROUP BY subject_id`,
+    [act.name, subjectIds],
+  );
+  return new Map(found.rows.map((row) => [row.subject_id, row.at]));
+};
+
 const eventInsert = boundarySchemas.auditEvent.insert.omit({ workspaceId: true });
 
 const identitySetInsert = boundarySchemas.identityAuditEvent.insert;

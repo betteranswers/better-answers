@@ -35,6 +35,10 @@ export const scopeClause = (at: number): string =>
 export const scopeParameter = (principal: Principal | OperatorPrincipal): string | null =>
   principal.kind === "user" ? principal.workspaceId : null;
 
+/** An `ILIKE` pattern matching `text` anywhere, its own `%`, `_` and `\` taken literally. */
+export const containing = (text: string): string =>
+  `%${text.replaceAll(/[\\%_]/g, String.raw`\$&`)}%`;
+
 export type Tx = Pick<pg.PoolClient, "query">;
 
 export type TxRow = pg.QueryResultRow;
