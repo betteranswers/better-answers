@@ -18,7 +18,7 @@ const provisioning = z.object({
   name: z.string().min(1).optional(),
   adminEmail: z.string().min(1).optional(),
 });
-// An empty display name is a person who has not given one yet, which a spec may want.
+/** An empty display name is a person who has not given one yet, which a spec may want. */
 const person = z.object({
   email: z.string().min(1).optional(),
   displayName: z.string().optional(),
@@ -48,6 +48,7 @@ const readBody = async <T>(request: Request, schema: z.ZodType<T>): Promise<T> =
   return parsed.data;
 };
 
+/** Routes under `/__harness` through which the browser suite drives the TestApp as a test would. */
 export const harnessControl = (app: TestApp): Hono => {
   const control = new Hono();
 

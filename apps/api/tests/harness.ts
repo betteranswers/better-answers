@@ -57,10 +57,11 @@ const CLAUDE_METADATA_DOCUMENT = {
   token_endpoint_auth_method: "none",
 } as const;
 
+/** On a host that only resembles Claude's; the metadata fixture serves it a document too. */
 export const LOOKALIKE_CLIENT_ID = "https://claude-ai.example/oauth/mcp-oauth-client-metadata";
 const LOOKALIKE_REDIRECT_URI = "https://claude-ai.example/api/mcp/auth_callback";
 
-// pino writes one JSON object per line: its own level and time, then whatever the call logged.
+/** pino writes one JSON object per line: its own level and time, then whatever the call logged. */
 const logLine = z.looseObject({ level: z.number(), time: z.number() });
 export type LogLine = Readonly<z.infer<typeof logLine>>;
 
@@ -88,12 +89,18 @@ export type TestApp = {
 
   readonly emails: EmailMessage[];
 
+  /** Each URL the api asked for a client's metadata document, in order. */
   readonly metadataFetches: string[];
 
   readonly logs: LogLine[];
 
+  /**
+   * The six-digit code in the latest email to `email`.
+   * @throws when none went to it, or the latest holds no code.
+   */
   codeSentTo(email: string): string;
 
+  /** A new workspace, and a new person as its Admin. */
   provision(input?: {
     name?: string | undefined;
     adminEmail?: string | undefined;
@@ -115,8 +122,10 @@ export type TestApp = {
 
   removeMember(workspaceId: string, userId: string): Promise<void>;
 
+  /** Updates a key the workspace already holds; a key it lacks stays absent, silently. */
   setWorkspaceConfig(workspaceId: string, key: string, value: string): Promise<void>;
 
+  /** A TestClient with its own cookie jar; without `ip` it takes the next default address. */
   client(ip?: string, hostname?: string): TestClient;
   stop(): Promise<void>;
 };
@@ -137,14 +146,17 @@ export type TestClient = {
   readonly ip: string;
 
   readonly origin: string;
+  /** A path resolves on `origin`; cookies go from and to the jar, and a non-GET gains `origin`. */
   fetch(
     path: string,
     init?: RequestInit & { readonly followRedirects?: boolean },
   ): Promise<Response>;
 
+  /** Posts `fields` as a browser's same-origin form navigation does. */
   form(path: string, fields: Readonly<Record<string, string>>): Promise<Response>;
 
   json(path: string, body: unknown): Promise<Response>;
+  /** The jar as a `cookie` header's value. */
   cookies(): string;
 };
 
@@ -176,6 +188,7 @@ type DoorOptions = {
 export const doorsFor = (database: Pool | string, options: DoorOptions = {}): Doors =>
   openDoors({ database, ...options });
 
+/** A server over `pool` with no TestApp around it: emails go nowhere and nothing is logged. */
 export const serverFor = (
   pool: Pool,
   options: { readonly imageDigest?: string | undefined } = {},
@@ -191,6 +204,10 @@ export const serverFor = (
     imageDigest: options.imageDigest,
   });
 
+/**
+ * Runs `work` in one transaction as the member `who` names.
+ * @throws when the membership or `work` answers a refusal.
+ */
 export const actingIn = async <T>(
   app: TestApp,
   who: { readonly workspaceId: string; readonly userId: string },
@@ -203,6 +220,7 @@ export const actingIn = async <T>(
   return answered.value;
 };
 
+/** @throws when the TestApp's repositories' root did not open. */
 export const openTestGit = (app: TestApp): GitDoor => {
   if (app.doors.git?.ok !== true) {
     throw new Error(`the TestApp's repositories' root is ${app.doors.git?.error ?? "not set"}`);
@@ -223,11 +241,17 @@ export type TestAppOptions = {
 
   readonly objectStore?: ObjectStoreSettings | undefined;
 
-  // A count of connections below the pool's ceiling reads what was asked for, and the suite's
-  // runtime pool is small.
+  /**
+   * A count of connections below the pool's ceiling reads what was asked for, and the suite's
+   * runtime pool is small.
+   */
   readonly poolSize?: number | undefined;
 };
 
+/**
+ * A TestApp over a fresh migrated database and git root; `stop` removes both.
+ * @throws when `publicUrl`'s host is not `hostnames.app`.
+ */
 export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> => {
   const hostnames = options.hostnames ?? HOSTNAMES;
   const publicUrl = options.publicUrl ?? PUBLIC_URL;
