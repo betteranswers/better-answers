@@ -222,10 +222,6 @@ max-complexity = 8
 # `tests/test_cocoindex_ban.py` refuses, because the ban means nothing once more than one
 # directory can lift it.
 "src/better_answers_worker/pipeline/**" = ["TID251"]
-# Files over the complexity cap when it arrived. The list only shrinks: bring one under and
-# delete its line.
-"src/better_answers_worker/concept_file.py" = ["C901"]
-"tests/test_image.py" = ["C901"]
 
 [tool.mypy]
 python_version = "3.13"

@@ -34,7 +34,7 @@ const row: MembershipRow & { role: Role } = refuse(member);
 
 ### [DESIGN6] Keep a function's complexity at 8 or under
 
-Each branch, loop, `catch`, `case` and boolean operator adds one to a function's cyclomatic complexity. This holds in both tiers, tests included. Split a function before it passes 8. The files over the cap when the rule arrived are listed by path in `.oxlintrc.json` and the worker's ruff config. The list only shrinks:
+Each branch, loop, `catch`, `case` and boolean operator adds one to a function's cyclomatic complexity. This holds in both tiers, tests included. Split a function before it passes 8. The files over the cap when the rule arrived are listed by path in `.oxlintrc.json`. The list only shrinks:
 
 - No file joins it.
 - An agent touching a listed file may bring it under and drop it from the list.

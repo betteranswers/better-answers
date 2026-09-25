@@ -12,7 +12,7 @@ DEVTOOLS_CONFIG = WORKER_ROOT.parents[1] / "packages/devtools/python/ruff.toml"
 
 RULE = "C901"
 
-OFF_THE_LIST = "src/better_answers_worker/probe.py"
+PROBE = "src/better_answers_worker/probe.py"
 
 
 def of_complexity(complexity: int) -> str:
@@ -23,7 +23,7 @@ def of_complexity(complexity: int) -> str:
     return f"def decide(value: int) -> int:\n{branches}    return -1\n"
 
 
-def listed() -> list[str]:
+def paths_exempt_from_the_cap() -> list[str]:
     manifest = tomllib.loads(WORKER_CONFIG.read_text())
     ignores: dict[str, list[str]] = manifest["tool"]["ruff"]["lint"]["per-file-ignores"]
     return sorted(pattern for pattern, rules in ignores.items() if RULE in rules)
@@ -58,12 +58,12 @@ def rules_fired_over(
 @pytest.mark.parametrize(
     ("config", "file"),
     [
-        (WORKER_CONFIG, OFF_THE_LIST),
+        (WORKER_CONFIG, PROBE),
         (WORKER_CONFIG, "tests/test_probe.py"),
         (DEVTOOLS_CONFIG, "probe.py"),
     ],
 )
-def test_ruff_refuses_a_function_of_nine_off_the_list(
+def test_ruff_refuses_a_function_of_nine(
     tmp_path: Path, config: Path, file: str
 ) -> None:
     fired = rules_fired_over(tmp_path, config, {file: of_complexity(9)})
@@ -73,7 +73,7 @@ def test_ruff_refuses_a_function_of_nine_off_the_list(
 
 @pytest.mark.parametrize(
     ("config", "file"),
-    [(WORKER_CONFIG, OFF_THE_LIST), (DEVTOOLS_CONFIG, "probe.py")],
+    [(WORKER_CONFIG, PROBE), (DEVTOOLS_CONFIG, "probe.py")],
 )
 def test_ruff_accepts_a_function_of_eight(
     tmp_path: Path, config: Path, file: str
@@ -83,33 +83,7 @@ def test_ruff_accepts_a_function_of_eight(
     assert fired[file] == []
 
 
-def test_ruff_accepts_a_function_of_nine_in_a_listed_file(tmp_path: Path) -> None:
-    on_the_list = listed()
-    assert on_the_list, "the baseline list is empty: delete this case with it"
-
-    fired = rules_fired_over(
-        tmp_path, WORKER_CONFIG, {on_the_list[0]: of_complexity(9)}
-    )
-
-    assert fired[on_the_list[0]] == []
-
-
-def test_the_list_names_only_files_the_tree_still_has() -> None:
-    gone = [file for file in listed() if not (WORKER_ROOT / file).is_file()]
-
-    assert gone == [], "a listed file was moved or deleted: drop it from the list"
-
-
-def test_the_list_names_only_files_still_over_the_cap(tmp_path: Path) -> None:
-    kept = [file for file in listed() if (WORKER_ROOT / file).is_file()]
-    moved = {
-        f"unlisted/{file}": (WORKER_ROOT / file).read_text(encoding="utf-8")
-        for file in kept
-    }
-
-    fired = rules_fired_over(tmp_path, WORKER_CONFIG, moved)
-
-    under_the_cap = [file for file, codes in fired.items() if RULE not in codes]
-    assert under_the_cap == [], (
-        "a listed file is under the cap now: drop it from the list"
+def test_no_file_is_exempt_from_the_cap() -> None:
+    assert paths_exempt_from_the_cap() == [], (
+        "a file is exempt from C901: split its function over 8"
     )

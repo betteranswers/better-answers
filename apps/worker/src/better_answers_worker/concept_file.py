@@ -46,6 +46,33 @@ def _pair_of(line: str) -> tuple[str, str | None]:
     return key, match.group(2)
 
 
+def _opener_of(line: str) -> str | tuple[str, str | None]:
+    try:
+        return _pair_of(line)
+    except MalformedConceptFileError:
+        item = _scalar_of(line)
+        if not isinstance(item, str):
+            raise MalformedConceptFileError(f"not a list item: {line!r}") from None
+        return item
+
+
+def _object_item_of(
+    lines: list[str], first: tuple[str, str | None], at: int, close: int
+) -> tuple[dict[str, Scalar], int]:
+    key, rest = first
+    entry: dict[str, Scalar] = {}
+    while True:
+        if rest is None:
+            raise MalformedConceptFileError(
+                f"a nested list is not written here: {key!r}"
+            )
+        entry[key] = _scalar_of(rest)
+        if at >= close or not lines[at].startswith("    "):
+            return entry, at
+        key, rest = _pair_of(lines[at][4:])
+        at += 1
+
+
 def _list_items_of(
     lines: list[str], start: int, close: int
 ) -> tuple[Sequence[str] | Sequence[SourceEntry], int]:
@@ -53,29 +80,12 @@ def _list_items_of(
     entries: list[dict[str, Scalar]] = []
     at = start
     while at < close and lines[at].startswith("  - "):
-        opener = lines[at][4:]
+        opener = _opener_of(lines[at][4:])
         at += 1
-        try:
-            key, rest = _pair_of(opener)
-        except MalformedConceptFileError:
-            item = _scalar_of(opener)
-            if not isinstance(item, str):
-                raise MalformedConceptFileError(
-                    f"not a list item: {opener!r}"
-                ) from None
-            strings.append(item)
+        if isinstance(opener, str):
+            strings.append(opener)
             continue
-        entry: dict[str, Scalar] = {}
-        while True:
-            if rest is None:
-                raise MalformedConceptFileError(
-                    f"a nested list is not written here: {key!r}"
-                )
-            entry[key] = _scalar_of(rest)
-            if at >= close or not lines[at].startswith("    "):
-                break
-            key, rest = _pair_of(lines[at][4:])
-            at += 1
+        entry, at = _object_item_of(lines, opener, at, close)
         entries.append(entry)
     if at == start:
         raise MalformedConceptFileError("a key with no value and no items")
