@@ -1,15 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { createGroup } from "@better-answers/core/members";
-
-import { actingIn, startApp, type TestApp } from "./harness.ts";
+import { startApp, type TestApp } from "./harness.ts";
+import { makeGroups } from "./harness-people.ts";
 import {
   NOT_A_MEMBER_ANSWERED,
   refusalToAMemberAt,
   refusalToAnotherWorkspacesAdmin,
+  refusalToTheAdmin,
   ROLE_FORBIDS_ANSWERED,
 } from "./people-refusals.ts";
-import { refusalOfCall, webSignedIn } from "./web-client.ts";
+import { webSignedIn } from "./web-client.ts";
 
 let app: TestApp;
 
@@ -20,19 +20,6 @@ beforeAll(async () => {
 afterAll(async () => {
   await app.stop();
 });
-
-const groupsMadeBy = async (
-  who: { readonly workspaceId: string; readonly userId: string },
-  names: readonly string[],
-): Promise<void> => {
-  for (const name of names) {
-    await actingIn(app, who, (principal, tx) => createGroup(principal, tx, { name }));
-  }
-};
-
-const nameErased = async (personId: string): Promise<void> => {
-  await app.database.superuser.query(`UPDATE "user" SET name = '' WHERE id = $1`, [personId]);
-};
 
 const signInsOf = async (personId: string): Promise<number> => {
   const found = await app.database.superuser.query<{ held: number }>(
@@ -47,19 +34,18 @@ describe("the audit log over tRPC", () => {
   it("answers an Admin the workspace's events newest first, actors named", async () => {
     const workspace = await app.provision();
     const { workspaceId, admin } = workspace;
-    const leaver = await app.person(undefined, "Sam Okoro");
-    await app.addMember(workspaceId, leaver.id, "Admin");
-    await groupsMadeBy({ workspaceId, userId: leaver.id }, ["Estimators"]);
-    await nameErased(leaver.id);
-    await groupsMadeBy({ workspaceId, userId: admin.id }, ["Bid writers"]);
+    const unnamed = await app.person(undefined, "");
+    await app.addMember(workspaceId, unnamed.id, "Admin");
+    await makeGroups(app, { workspaceId, userId: unnamed.id, names: ["Estimators"] });
+    await makeGroups(app, { workspaceId, userId: admin.id, names: ["Bid writers"] });
     const { api } = await webSignedIn(app, admin.email);
 
     const page = await api.members.auditLog.query({});
 
     expect(page.events.map(({ act, by }) => [act, by])).toEqual([
-      ["people.group.created", admin.name],
-      ["people.group.created", "a former member"],
-      ["platform.workspace.provisioned", "the platform"],
+      ["people.group.created", { kind: "person", displayName: admin.name }],
+      ["people.group.created", { kind: "former-member" }],
+      ["platform.workspace.provisioned", { kind: "platform" }],
     ]);
     expect(page.nextCursor).toBeNull();
   });
@@ -87,7 +73,7 @@ describe("the audit log over tRPC", () => {
   it("answers one family, a page at a time", async () => {
     const workspace = await app.provision();
     const { workspaceId, admin } = workspace;
-    await groupsMadeBy({ workspaceId, userId: admin.id }, ["One", "Two", "Three"]);
+    await makeGroups(app, { workspaceId, userId: admin.id, names: ["One", "Two", "Three"] });
     const { api } = await webSignedIn(app, admin.email);
 
     const first = await api.members.auditLog.query({ family: "people", limit: 2 });
@@ -106,7 +92,11 @@ describe("the audit log over tRPC", () => {
   it("never answers an event of another workspace", async () => {
     const mine = await app.provision();
     const theirs = await app.provision();
-    await groupsMadeBy({ workspaceId: theirs.workspaceId, userId: theirs.admin.id }, ["Theirs"]);
+    await makeGroups(app, {
+      workspaceId: theirs.workspaceId,
+      userId: theirs.admin.id,
+      names: ["Theirs"],
+    });
     const { api } = await webSignedIn(app, mine.admin.email);
 
     const page = await api.members.auditLog.query({});
@@ -135,11 +125,9 @@ describe("what the audit log refuses", () => {
   it.each([
     ["a cursor that is no event's id", { cursor: "not-an-id" }],
     ["a page of no events", { limit: 0 }],
+    ["a page past fifty events", { limit: 51 }],
   ])("refuses %s, malformed", async (_asked, input) => {
-    const workspace = await app.provision();
-    const { api } = await webSignedIn(app, workspace.admin.email);
-
-    const refused = await refusalOfCall(api.members.auditLog.query(input));
+    const refused = await refusalToTheAdmin(app, (api) => api.members.auditLog.query(input));
 
     expect(refused).toMatchObject({
       data: { httpStatus: 400, refusal: { word: "malformed", class: "malformed" } },

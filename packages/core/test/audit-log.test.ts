@@ -46,18 +46,21 @@ const acting = <T>(
 ): Promise<Folded<T>> =>
   readingAs(db().runtimePool, { workspaceId: workspace.workspaceId, userId }, work);
 
-// Each group in a transaction of its own, so each event holds an instant of its own.
+/** One transaction each, so each group's event holds an instant of its own. */
 const groupsMadeBy = async (
   workspace: ProvisionedWorkspace,
   userId: string,
   names: readonly string[],
-): Promise<void> => {
+): Promise<readonly string[]> => {
+  const made: string[] = [];
   for (const name of names) {
-    const made = await acting(workspace, userId, (principal, tx) =>
+    const group = await acting(workspace, userId, (principal, tx) =>
       createGroup(principal, tx, { name }),
     );
-    if (!made.ok) throw new Error(`the group ${name} was not made: ${String(made.error)}`);
+    if (!group.ok) throw new Error(`the group ${name} was not made: ${String(group.error)}`);
+    made.push(group.value.groupId);
   }
+  return made;
 };
 
 const readAs = (
@@ -74,14 +77,12 @@ const pageOf = (read: Result<AuditLogPage, unknown>): AuditLogPage => {
   return read.value;
 };
 
-const nameErased = async (personId: string): Promise<void> => {
-  await db().pool.query(`UPDATE "user" SET name = '' WHERE id = $1`, [personId]);
-};
+const subjectsOf = (page: AuditLogPage) => page.events.map((event) => event.subjectId);
 
 describe("the audit log", () => {
   it("reads events newest first, naming actors from the person row", async () => {
     const workspace = await provisionedWorkspace(db(), "Logged", { name: "Priya Shah" });
-    await groupsMadeBy(workspace, workspace.adminUserId, ["Bid writers", "HR team"]);
+    const [bidWriters] = await groupsMadeBy(workspace, workspace.adminUserId, ["Bid writers"]);
 
     const page = pageOf(await readAs(workspace, workspace.adminUserId));
 
@@ -92,41 +93,55 @@ describe("the audit log", () => {
           act: "people.group.created",
           family: "people",
           subjectKind: "group",
-          subjectId: expect.any(String),
+          subjectId: bidWriters,
+          actor: `human:${workspace.adminUserId}`,
           at: expect.stringMatching(ISO_INSTANT),
-          by: "Priya Shah",
+          by: { kind: "person", displayName: "Priya Shah" },
           detail: {},
         },
-        expect.objectContaining({ act: "people.group.created", by: "Priya Shah" }),
         {
           id: expect.any(String),
           act: "platform.workspace.provisioned",
           family: "platform",
           subjectKind: "workspace",
           subjectId: workspace.workspaceId,
+          actor: "process:better-answers-bootstrap",
           at: expect.stringMatching(ISO_INSTANT),
-          by: "the platform",
+          by: { kind: "platform" },
           detail: { adminUserId: workspace.adminUserId, role: "Admin" },
         },
       ],
       nextCursor: null,
     });
-    const [newest, older] = page.events;
-    expect(Date.parse(newest?.at ?? "")).toBeGreaterThan(Date.parse(older?.at ?? ""));
+    const [newest, oldest] = page.events;
+    expect(Date.parse(newest?.at ?? "")).toBeGreaterThan(Date.parse(oldest?.at ?? ""));
   });
 
-  it("names a person whose name is gone a former member", async () => {
-    const workspace = await provisionedWorkspace(db(), "Erased");
-    const leaver = await memberAt(workspace, "Admin", "Sam Okoro");
-    await groupsMadeBy(workspace, leaver, ["Estimators"]);
-    await nameErased(leaver);
+  it("names a person with no display name a former member", async () => {
+    const workspace = await provisionedWorkspace(db(), "Unnamed");
+    const unnamed = await memberAt(workspace, "Admin", "");
+    await groupsMadeBy(workspace, unnamed, ["Estimators"]);
 
     const page = pageOf(await readAs(workspace, workspace.adminUserId));
 
-    expect(page.events.map((event) => [event.act, event.by])).toEqual([
-      ["people.group.created", "a former member"],
-      ["platform.workspace.provisioned", "the platform"],
+    expect(page.events.map((event) => event.by)).toEqual([
+      { kind: "former-member" },
+      { kind: "platform" },
     ]);
+  });
+
+  it("names a removed member by the name they gave", async () => {
+    const workspace = await provisionedWorkspace(db(), "Removed");
+    const leaver = await memberAt(workspace, "Admin", "Sam Okoro");
+    await groupsMadeBy(workspace, leaver, ["Estimators"]);
+    await db().pool.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
+      workspace.workspaceId,
+      leaver,
+    ]);
+
+    const page = pageOf(await readAs(workspace, workspace.adminUserId));
+
+    expect(page.events[0]?.by).toEqual({ kind: "person", displayName: "Sam Okoro" });
   });
 
   it("reads one family alone when asked for it", async () => {
@@ -146,8 +161,12 @@ describe("the audit log", () => {
 
   it("pages from the newest, each resuming where the last stopped", async () => {
     const workspace = await provisionedWorkspace(db(), "Paged");
-    await groupsMadeBy(workspace, workspace.adminUserId, ["One", "Two", "Three", "Four"]);
-    const everything = pageOf(await readAs(workspace, workspace.adminUserId));
+    const [one, two, three, four] = await groupsMadeBy(workspace, workspace.adminUserId, [
+      "One",
+      "Two",
+      "Three",
+      "Four",
+    ]);
 
     const first = pageOf(await readAs(workspace, workspace.adminUserId, { limit: 2 }));
     const second = pageOf(
@@ -157,12 +176,10 @@ describe("the audit log", () => {
       await readAs(workspace, workspace.adminUserId, { limit: 2, cursor: second.nextCursor }),
     );
 
-    const ids = (page: AuditLogPage) => page.events.map((event) => event.id);
-    expect(everything.events).toHaveLength(5);
-    expect(ids(first)).toEqual(ids(everything).slice(0, 2));
-    expect(first.nextCursor).toBe(ids(everything)[1]);
-    expect(ids(second)).toEqual(ids(everything).slice(2, 4));
-    expect(ids(last)).toEqual(ids(everything).slice(4));
+    expect(subjectsOf(first)).toEqual([four, three]);
+    expect(first.nextCursor).toBe(first.events[1]?.id);
+    expect(subjectsOf(second)).toEqual([two, one]);
+    expect(subjectsOf(last)).toEqual([workspace.workspaceId]);
     expect(last.nextCursor).toBeNull();
   });
 
@@ -178,7 +195,7 @@ describe("the audit log", () => {
 
   it("pages within the family asked for", async () => {
     const workspace = await provisionedWorkspace(db(), "FamilyPaged");
-    await groupsMadeBy(workspace, workspace.adminUserId, ["One", "Two"]);
+    const [one, two] = await groupsMadeBy(workspace, workspace.adminUserId, ["One", "Two"]);
 
     const first = pageOf(
       await readAs(workspace, workspace.adminUserId, { family: "people", limit: 1 }),
@@ -191,10 +208,7 @@ describe("the audit log", () => {
       }),
     );
 
-    expect([...first.events, ...second.events].map((event) => event.act)).toEqual([
-      "people.group.created",
-      "people.group.created",
-    ]);
+    expect([...subjectsOf(first), ...subjectsOf(second)]).toEqual([two, one]);
     expect(second.nextCursor).toBeNull();
   });
 
@@ -209,9 +223,7 @@ describe("the audit log", () => {
       await readAs(ours, ours.adminUserId, { cursor: theirPage.nextCursor }),
     );
 
-    expect(page.events.map((event) => [event.act, event.subjectId])).toEqual([
-      ["platform.workspace.provisioned", ours.workspaceId],
-    ]);
+    expect(subjectsOf(page)).toEqual([ours.workspaceId]);
     expect(byTheirCursor).toEqual({ events: [], nextCursor: null });
   });
 
@@ -232,7 +244,7 @@ describe("the audit log", () => {
     expect(await readAs(workspace, member)).toEqual({ ok: false, error: "role-forbids" });
   });
 
-  it("answers the store's own failure rather than an empty log", async () => {
+  it("answers the store's own failure rather than an empty page", async () => {
     const workspace = await provisionedWorkspace(db(), "Unread");
     let read: Result<unknown, unknown> | undefined;
 

@@ -12,6 +12,16 @@ export const NOT_A_MEMBER_ANSWERED = {
   data: { httpStatus: 401, refusal: { word: "not-a-member", class: "unauthenticated" } },
 } as const;
 
+/** For a refusal of what was asked rather than of who asked: the workspace's own Admin calls. */
+export const refusalToTheAdmin = async (
+  app: TestApp,
+  call: (api: WebApi) => Promise<unknown>,
+): Promise<unknown> => {
+  const workspace = await app.provision();
+  const { api } = await webSignedIn(app, workspace.admin.email);
+  return refusalOfCall(call(api));
+};
+
 /** Every People procedure is an Admin's, so each is called by a member who is not one. */
 export const refusalToAMemberAt = async (
   app: TestApp,

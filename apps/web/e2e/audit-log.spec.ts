@@ -17,11 +17,13 @@ const LIST_BUDGET_MS = 1000;
 
 const AUDIT_LOG_VIEW = "/people/audit-log";
 
-const SAID_WHEN = /^\d{2}:\d{2} · \d{1,2} [A-Z][a-z]+ \d{4}$/;
+const SAID_AT = /^\d{2}:\d{2}$/;
+
+const SAID_DAY = /^[A-Z][a-z]+day \d{1,2} [A-Z][a-z]+ \d{4}$/;
 
 const auditLog = (page: Page) => page.getByRole("region", { name: "Audit log" });
 
-// The header row is a row too, so the events are the rows with a cell.
+/** The header row and each day's heading are rows too, so the events are the rows with a cell. */
 const eventRows = (page: Page): Locator =>
   auditLog(page)
     .getByRole("row")
@@ -38,8 +40,10 @@ const pickFamily = async (page: Page, family: string): Promise<void> => {
 
 const cellsOf = (row: Locator) => row.getByRole("cell");
 
-// Three events by three kinds of actor, and another workspace's alongside, so a log that leaked
-// would show its person.
+/**
+ * Three events by three kinds of actor, and another workspace's alongside, so an audit log that
+ * leaked would show its person.
+ */
 const anAdminAtTheAuditLog = async (
   page: Page,
   api: APIRequestContext,
@@ -81,10 +85,7 @@ const anAdminAtTheAuditLog = async (
 };
 
 test.describe("the People screen's Audit log view", () => {
-  test("shows an Admin every act in the workspace, newest first, each actor named", async ({
-    page,
-    request,
-  }) => {
+  test("shows an Admin every act, newest first, each actor named", async ({ page, request }) => {
     await anAdminAtTheAuditLog(page, request, "Calder Joinery");
 
     await expect(
@@ -99,7 +100,8 @@ test.describe("the People screen's Audit log view", () => {
     const newest = cellsOf(eventRows(page).nth(0));
     const older = cellsOf(eventRows(page).nth(1));
     const oldest = cellsOf(eventRows(page).nth(2));
-    await expect(newest.nth(0)).toHaveText(SAID_WHEN);
+    await expect(auditLog(page).getByRole("rowheader")).toHaveText(SAID_DAY);
+    await expect(newest.nth(0)).toHaveText(SAID_AT);
     await expect(newest.nth(1)).toHaveText("People");
     await expect(newest.nth(2)).toContainText("Group created");
     await expect(newest.nth(3)).toHaveText("a former member");
@@ -112,10 +114,7 @@ test.describe("the People screen's Audit log view", () => {
     await expect(page.locator("body")).not.toContainText("Una Elsewhere");
   });
 
-  test("opens one event for what it was recorded as and what it acted on", async ({
-    page,
-    request,
-  }) => {
+  test("opens an event for its act, subject, actor and detail", async ({ page, request }) => {
     const { workspaceId } = await anAdminAtTheAuditLog(page, request, "Aire Valley Tooling");
 
     const oldest = eventRows(page).nth(2);
@@ -126,10 +125,12 @@ test.describe("the People screen's Audit log view", () => {
     await expect(details).toHaveAttribute("aria-expanded", "true");
     await expect(oldest).toContainText("platform.workspace.provisioned");
     await expect(oldest).toContainText(`workspace ${workspaceId}`);
-    await expect(oldest).toContainText("role");
+    await expect(oldest).toContainText("process:better-answers-bootstrap");
+    await expect(oldest).toContainText("Admin person id");
+    await expect(oldest).not.toContainText(/user/i);
   });
 
-  test("reads one family at a time, and says when a family holds nothing yet", async ({
+  test("filters by family, and says when a family holds nothing", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -159,10 +160,7 @@ test.describe("the People screen's Audit log view", () => {
     await expect(familyFilter(page)).toBeFocused();
   });
 
-  test("shows older events a page at a time, focus landing on the first older one", async ({
-    page,
-    request,
-  }) => {
+  test("shows older events, focus landing on the first of them", async ({ page, request }) => {
     const { workspaceId, adminId } = await anAdminAtTheAuditLog(page, request, "Dales Castings");
     const names = Array.from({ length: 48 }, (_, index) => `Crew ${index + 1}`);
     await makeGroups(request, { workspaceId, userId: adminId, names });
@@ -174,9 +172,15 @@ test.describe("the People screen's Audit log view", () => {
     ).toBeVisible();
     await expect(cellsOf(eventRows(page).nth(49)).nth(3)).toHaveText("Priya Shah");
 
+    // Timed from the key, so the budget is the page's read and its rows.
+    const started = Date.now();
     await page.keyboard.press("o");
-
     await expect(eventRows(page)).toHaveCount(51);
+    const elapsed = Date.now() - started;
+    test.info().annotations.push({ type: "older events", description: `${elapsed} ms` });
+    expect(elapsed, "the page of older events rendered past the list's budget").toBeLessThan(
+      LIST_BUDGET_MS,
+    );
     await expect(auditLog(page).getByText("51 events.", { exact: true })).toBeVisible();
     await expect(showOlder(page)).toHaveCount(0);
     await expect(
@@ -186,10 +190,10 @@ test.describe("the People screen's Audit log view", () => {
     ).toBeFocused();
   });
 
-  test("renders the log within the constitution's latency budget", async ({ page, request }) => {
+  test("renders the audit log within the latency budget", async ({ page, request }) => {
     await anAdminAtTheAuditLog(page, request, "Ryedale Metalwork");
 
-    // A fresh document, so no page of the log is already in the page's cache.
+    // A fresh document, so no page of the audit log is already in the page's cache.
     const started = Date.now();
     await page.goto(AUDIT_LOG_VIEW);
     await expect(eventRows(page)).toHaveCount(3);
@@ -202,10 +206,7 @@ test.describe("the People screen's Audit log view", () => {
   });
 
   for (const role of ["Editor", "Viewer"] as const) {
-    test(`refuses a member at ${role} the log, saying the refusal in its own word`, async ({
-      page,
-      request,
-    }) => {
+    test(`refuses a member at ${role} the audit log`, async ({ page, request }) => {
       await aMemberSignedInAt(page, request, role, AUDIT_LOG_VIEW);
 
       const refused = auditLog(page).getByRole("alert");
@@ -215,7 +216,32 @@ test.describe("the People screen's Audit log view", () => {
     });
   }
 
-  test("lets an Admin filter, page and open the log by keyboard alone", async ({
+  test("keeps the filter through a failed read, and says so", async ({ page, request }) => {
+    await anAdminAtTheAuditLog(page, request, "Swale Joinery");
+    await expect(eventRows(page)).toHaveCount(3);
+    const read = (url: URL) => url.pathname.includes("members.auditLog");
+    const held = Promise.withResolvers<void>();
+    await page.route(read, async (route) => {
+      await held.promise;
+      await route.abort();
+    });
+
+    await pickFamily(page, "Sources");
+    await expect(auditLog(page).getByText("The audit log is still loading.")).toBeVisible();
+    held.resolve();
+
+    // The query asks twice more before it answers, as it does of any failure with no word.
+    await expect(auditLog(page).getByRole("alert")).toContainText("The platform did not answer");
+    await expect(familyFilter(page)).toHaveText("Sources");
+    await page.unroute(read);
+    await pickFamily(page, "All families");
+    await expect(eventRows(page)).toHaveCount(3);
+    await expect(auditLog(page).getByRole("alert")).toHaveCount(0);
+    await pickFamily(page, "Sources");
+    await expect(auditLog(page)).toContainText("No acts in the sources family yet.");
+  });
+
+  test("filters, pages and opens the audit log by keyboard", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -234,9 +260,10 @@ test.describe("the People screen's Audit log view", () => {
     await expect(keystrokes).toHaveCount(0);
 
     await page.keyboard.press("f");
-    // The list takes focus once it has placed itself; a key sent before then reaches nothing.
+    // The list moves focus a frame after each key, so each key waits for the last to land.
     await expect(page.getByRole("option", { name: "All families" })).toBeFocused();
     await page.keyboard.press("ArrowDown");
+    await expect(page.getByRole("option", { name: "People" })).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(familyFilter(page)).toHaveText("People");
     await expect(familyFilter(page)).toBeFocused();
@@ -257,8 +284,8 @@ test.describe("the People screen's Audit log view", () => {
         - status: 2 events in the people family.
         - text: Family
         - combobox "Family": People
-        - table /The audit log, newest first/:
-          - caption: /The audit log, newest first/
+        - table /The audit log, newest first under each day/:
+          - caption: /The audit log, newest first under each day/
           - rowgroup:
             - row "When Family Act By":
               - columnheader "When"
@@ -266,23 +293,29 @@ test.describe("the People screen's Audit log view", () => {
               - columnheader "Act"
               - columnheader "By"
           - rowgroup:
+            - row /day \\d{1,2} [A-Z][a-z]+ \\d{4}$/:
+              - rowheader /day \\d{1,2} [A-Z][a-z]+ \\d{4}$/
             - row /Group created/:
-              - cell /\\d{4}/
+              - cell /^\\d{2}:\\d{2}$/:
+                - time: /^\\d{2}:\\d{2}$/
               - cell "People"
               - cell /Group created/:
                 - text: Group created
-                - button /Details of Group created/ [expanded]
+                - button /^Details of Group created, \\d{2}:\\d{2} · / [expanded]
                 - term: Recorded as
                 - definition: people.group.created
                 - term: Subject
                 - definition: /^group /
+                - term: Actor id
+                - definition: /^human:/
               - cell "a former member"
             - row /Group created/:
-              - cell /\\d{4}/
+              - cell /^\\d{2}:\\d{2}$/:
+                - time: /^\\d{2}:\\d{2}$/
               - cell "People"
               - cell /Group created/:
                 - text: Group created
-                - button /Details of Group created/
+                - button /^Details of Group created, \\d{2}:\\d{2} · /
               - cell "Priya Shah"
     `);
 

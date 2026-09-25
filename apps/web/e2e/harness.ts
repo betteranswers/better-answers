@@ -191,7 +191,7 @@ export const signIn = async (page: Page, api: APIRequestContext, email: string):
   await expect(code).toHaveCount(0);
 };
 
-// Asked for before signing in, so the sign-in screen carries the member back to it.
+/** Asked for before signing in, so the sign-in screen carries the member back to it. */
 export const aMemberSignedInAt = async (
   page: Page,
   api: APIRequestContext,
@@ -209,7 +209,7 @@ export const aMemberSignedInAt = async (
   return workspace;
 };
 
-// `?` opens a screen's keystrokes from anywhere on it outside a field.
+/** `?` opens a screen's keystrokes from anywhere on it outside a field. */
 export const keystrokesListed = async (page: Page, screen: string): Promise<Locator> => {
   await page.keyboard.press("?");
   const listed = page.getByRole("dialog", { name: `Keystrokes on ${screen}` });

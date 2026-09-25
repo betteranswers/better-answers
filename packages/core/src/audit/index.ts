@@ -41,6 +41,9 @@ export type Recorded = {
 
 export type LedgerRow = z.infer<typeof boundarySchemas.auditEvent.select>;
 
+const LEDGER_ROW = `id, workspace_id AS "workspaceId", act, family, actor, subject_kind AS "subjectKind",
+            subject_id AS "subjectId", at, detail, batch_id AS "batchId"`;
+
 /** Oldest first; `since` is inclusive. */
 export const eventsOfAct = async (
   principal: Principal,
@@ -49,8 +52,7 @@ export const eventsOfAct = async (
   since?: Date,
 ): Promise<readonly LedgerRow[]> => {
   const found = await tx.query(
-    `SELECT id, workspace_id AS "workspaceId", act, family, actor, subject_kind AS "subjectKind",
-            subject_id AS "subjectId", at, detail, batch_id AS "batchId"
+    `SELECT ${LEDGER_ROW}
        FROM audit_event
       WHERE workspace_id = ${scopeClause(1)}
         AND act = $2
@@ -79,6 +81,43 @@ export const latestOnIdentitySet = async (
     [act.name, subjectIds],
   );
   return new Map(found.rows.map((row) => [row.subject_id, row.at]));
+};
+
+export type LedgerPage = {
+  readonly rows: readonly LedgerRow[];
+  /** The last row's id when an older row follows it; null when this page holds the oldest. */
+  readonly nextCursor: AuditEventId | null;
+};
+
+/**
+ * Newest first, from the row after `cursor`. A cursor naming no row in scope reads nothing, so
+ * another workspace's id learns nothing of it; one row past the page says another follows.
+ */
+export const eventsNewestFirst = async (
+  principal: Principal,
+  tx: Tx,
+  asked: {
+    readonly family?: LedgerRow["family"] | undefined;
+    readonly cursor?: string | null | undefined;
+    readonly limit: number;
+  },
+): Promise<LedgerPage> => {
+  const found = await tx.query(
+    `SELECT ${LEDGER_ROW}
+       FROM audit_event
+      WHERE workspace_id = ${scopeClause(1)}
+        AND ($2::text IS NULL OR family = $2)
+        AND ($3::text IS NULL OR (at, id) < (
+              SELECT page_end.at, page_end.id FROM audit_event page_end
+               WHERE page_end.workspace_id = ${scopeClause(1)} AND page_end.id = $3))
+      ORDER BY at DESC, id DESC
+      LIMIT $4 + 1`,
+    [scopeParameter(principal), asked.family ?? null, asked.cursor ?? null, asked.limit],
+  );
+
+  const rows = found.rows.map((row) => boundarySchemas.auditEvent.select.parse(row));
+  const lastOfAFullPage = rows.length > asked.limit ? rows[asked.limit - 1] : undefined;
+  return { rows: rows.slice(0, asked.limit), nextCursor: lastOfAFullPage?.id ?? null };
 };
 
 const eventInsert = boundarySchemas.auditEvent.insert.omit({ workspaceId: true });
