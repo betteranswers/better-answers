@@ -5,6 +5,7 @@ import { screenById, viewsOf } from "@/shared/screens.ts";
 import { expect, test } from "./browser.ts";
 import {
   addMember,
+  aMemberSignedInAt,
   anAddress,
   clockTheNextKey,
   person,
@@ -21,6 +22,8 @@ const ACT_BUDGET_MS = 100;
 const people = screenById("people");
 
 const MEMBERS_VIEW = "/people/members";
+
+const AUDIT_LOG_VIEW = "/people/audit-log";
 
 const rail = (page: Page) => page.getByRole("navigation", { name: "Control Centre" });
 
@@ -212,15 +215,7 @@ test.describe("the People screen's Members view", () => {
 
   for (const role of ["Editor", "Viewer"] as const) {
     test(`refuses a member at ${role} the list, in its word`, async ({ page, request }) => {
-      const email = anAddress(role.toLowerCase());
-      const member = await person(request, email, { displayName: `A ${role}` });
-      const workspace = await provision(request, { name: `Calder ${role}s` });
-      await addMember(request, { role, userId: member.id, workspaceId: workspace.workspaceId });
-
-      // Asked for before signing in, so the sign-in screen carries the person back to it.
-      await page.goto(MEMBERS_VIEW);
-      await signIn(page, request, email);
-      await expect(page).toHaveURL(new RegExp(`${MEMBERS_VIEW}$`));
+      const workspace = await aMemberSignedInAt(page, request, role, MEMBERS_VIEW);
 
       const refused = membersRegion(page).getByRole("alert");
       await expect(refused).toContainText("Refused: role-forbids.");
@@ -498,5 +493,15 @@ test.describe("the People screen's words", () => {
     await expect(sheet).toBeVisible();
     await expect(page.locator("body"), "a member's sheet").not.toContainText(organisation);
     expect(await sheet.ariaSnapshot(), "a member's sheet").not.toMatch(organisation);
+
+    await page.goto(AUDIT_LOG_VIEW);
+    const auditLog = page.getByRole("region", { name: "Audit log" });
+    await expect(auditLog.getByRole("row").filter({ has: page.getByRole("cell") })).toHaveCount(1);
+    await auditLog.getByRole("button", { name: /^Details of/ }).click();
+    await expect(auditLog).toContainText("platform.workspace.provisioned");
+    await said(`${AUDIT_LOG_VIEW}, an event opened`);
+    await auditLog.getByRole("combobox", { name: "Family" }).click();
+    await expect(page.getByRole("listbox"), "the families listed").not.toContainText(organisation);
+    await page.keyboard.press("Escape");
   });
 });

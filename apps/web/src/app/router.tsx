@@ -19,6 +19,7 @@ import { NoWorkspaceScreen } from "@/features/auth/no-workspace-screen.tsx";
 import { SignInScreen } from "@/features/auth/sign-in-screen.tsx";
 import { mustSignInForTheConsole } from "@/features/console/operator.ts";
 import { WorkspacesView } from "@/features/console/workspaces-view.tsx";
+import { AUDIT_LOG_TOOLBAR, AuditLogView } from "@/features/people/audit-log-view.tsx";
 import { MEMBERS_TOOLBAR, MembersView } from "@/features/people/members-view.tsx";
 import { BINDINGS_TOOLBAR, BindingsView } from "@/features/sources/bindings-view.tsx";
 import { createApiProxy, type ApiProxy } from "@/shared/api/trpc.ts";
@@ -45,6 +46,7 @@ type BuiltView = { readonly draw: () => ReactElement; readonly toolbar?: ViewToo
 const BUILT_VIEWS = new Map<View["path"], BuiltView>([
   ["/sources/bindings", { draw: BindingsView, toolbar: BINDINGS_TOOLBAR }],
   ["/people/members", { draw: MembersView, toolbar: MEMBERS_TOOLBAR }],
+  ["/people/audit-log", { draw: AuditLogView, toolbar: AUDIT_LOG_TOOLBAR }],
   ["/system/routes-and-spend", { draw: RoutesAndSpendView, toolbar: ROUTES_AND_SPEND_TOOLBAR }],
   ["/console/workspaces/every-workspace", { draw: WorkspacesView }],
 ]);

@@ -7,6 +7,7 @@ import { testData } from "@better-answers/schema/testing";
 
 import { IDENTITY_PRINCIPAL } from "../src/identity-principal.ts";
 import type { TestApp } from "./harness.ts";
+import { groupsMaking, makeGroups } from "./harness-people.ts";
 import {
   bindingsSeeding,
   indexRunMoving,
@@ -114,6 +115,11 @@ export const harnessControl = (app: TestApp): Hono => {
     const marked = await setOperatorMark(IDENTITY_PRINCIPAL, app.doors.postgres, asked);
     if (!marked.ok) throw new Error(`the operator mark was refused: ${String(marked.error)}`);
     return context.json({ marked: true });
+  });
+
+  control.post(`${HARNESS_PREFIX}/groups`, async (context) => {
+    const asked = await readBody(context.req.raw, groupsMaking);
+    return context.json(await makeGroups(app, asked));
   });
 
   control.get(`${HARNESS_PREFIX}/codes`, (context) => {

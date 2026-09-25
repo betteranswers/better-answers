@@ -7,10 +7,16 @@ import { startApp, type TestApp } from "./harness.ts";
 import {
   revocationHeldOpen,
   seededIn,
-  sessionPointedAt,
   someoneWaitsOnALock,
   type HeldRevocation,
 } from "./provoke.ts";
+import {
+  anAdminOfElsewherePointedAt,
+  NOT_A_MEMBER_ANSWERED,
+  refusalToAMemberAt,
+  refusalToAnotherWorkspacesAdmin,
+  ROLE_FORBIDS_ANSWERED,
+} from "./people-refusals.ts";
 import { refusalOfCall, webSignedIn } from "./web-client.ts";
 
 let app: TestApp;
@@ -40,14 +46,6 @@ const aWorkspaceOfThree = async () => {
     return { editorRow, viewerRow, hr: hr.id, bids: bids.id };
   });
   return { workspace, editor, viewer, seeded };
-};
-
-/** Signed in to a workspace of their own, with a session that names `workspaceId` instead. */
-const anAdminOfElsewherePointedAt = async (workspaceId: string) => {
-  const elsewhere = await app.provision();
-  const { api } = await webSignedIn(app, elsewhere.admin.email);
-  await sessionPointedAt(app, elsewhere.admin.id, workspaceId);
-  return api;
 };
 
 describe("the members list over tRPC", () => {
@@ -114,27 +112,15 @@ describe("the members list over tRPC", () => {
 
 describe("what the members list refuses", () => {
   it.each(["Editor", "Viewer"] as const)("refuses a member at %s, role-forbids", async (role) => {
-    const workspace = await app.provision();
-    const person = await app.person();
-    await app.addMember(workspace.workspaceId, person.id, role);
-    const { api } = await webSignedIn(app, person.email);
+    const refused = await refusalToAMemberAt(app, role, (api) => api.members.list.query());
 
-    const refused = await refusalOfCall(api.members.list.query());
-
-    expect(refused).toMatchObject({
-      data: { httpStatus: 403, refusal: { word: "role-forbids", class: "forbidden" } },
-    });
+    expect(refused).toMatchObject(ROLE_FORBIDS_ANSWERED);
   });
 
   it("refuses an Admin of another workspace pointed at this one", async () => {
-    const workspace = await app.provision();
-    const api = await anAdminOfElsewherePointedAt(workspace.workspaceId);
+    const refused = await refusalToAnotherWorkspacesAdmin(app, (api) => api.members.list.query());
 
-    const refused = await refusalOfCall(api.members.list.query());
-
-    expect(refused).toMatchObject({
-      data: { httpStatus: 401, refusal: { word: "not-a-member", class: "unauthenticated" } },
-    });
+    expect(refused).toMatchObject(NOT_A_MEMBER_ANSWERED);
   });
 });
 
@@ -260,7 +246,7 @@ describe("who may change a role", () => {
 
   it("refuses an Admin of another workspace pointed at this one", async () => {
     const { workspace, viewer } = await aWorkspaceOfThree();
-    const api = await anAdminOfElsewherePointedAt(workspace.workspaceId);
+    const api = await anAdminOfElsewherePointedAt(app, workspace.workspaceId);
 
     const refused = await refusalOfCall(
       api.members.changeRole.mutate({ personId: viewer.id, role: "Editor" }),

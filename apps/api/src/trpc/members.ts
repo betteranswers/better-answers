@@ -1,4 +1,10 @@
-import { changeRole, changeRoleInput, listMembers } from "@better-answers/core/members";
+import {
+  changeRole,
+  changeRoleInput,
+  listMembers,
+  readAuditLog,
+  readAuditLogInput,
+} from "@better-answers/core/members";
 
 import {
   answeredBy,
@@ -14,4 +20,5 @@ export const membersRouter = router({
     crossing(ctx, listMembers.name, listMembers(ctx.principal, ctx.tx)),
   ),
   changeRole: mutationProcedure.input(parsedBy(changeRoleInput)).mutation(answeredBy(changeRole)),
+  auditLog: queryProcedure.input(parsedBy(readAuditLogInput)).query(answeredBy(readAuditLog)),
 });

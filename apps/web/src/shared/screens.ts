@@ -72,7 +72,7 @@ export const SCREENS = [
       { name: "Thresholds", path: "/people/thresholds", built: false },
       { name: "Erasure and suppression", path: "/people/erasure-and-suppression", built: false },
       { name: "Tokens", path: "/people/tokens", built: false },
-      { name: "Audit log", path: "/people/audit-log", built: false },
+      { name: "Audit log", path: "/people/audit-log", built: true },
     ],
   },
   {
