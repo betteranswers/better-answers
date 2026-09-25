@@ -85,8 +85,8 @@ describe("the territory the scan reads", () => {
 
   it.each([
     ["a lower-case statement", `await q("${insert("job").toLowerCase()}")`],
-    ["a statement split over its columns", `\`${insert("job").slice(0, 20)}\n  , name)\``],
-    ["a line of a long literal", `const q = \`\n       ${insert("job")}\`;`],
+    ["a statement split across columns", `\`${insert("job").slice(0, 20)}\n  , name)\``],
+    ["a long literal's line", `const q = \`\n       ${insert("job")}\`;`],
     ["a quoted table name", `cur.execute('INSERT ${"INTO"} "index".chunk (id) VALUES (1)')`],
   ])("reads %s as a raw insert", (_what, source) => {
     expect(rawInsertsIn("one.test.ts", source)).toHaveLength(1);
@@ -169,7 +169,7 @@ describe("the scan over a throwaway tree", () => {
   });
 
   it.each([
-    ["a regex that names the statement", `expect(cause).toThrow(/INSERT ${"INTO"} job/);\n`],
+    ["a regex naming the statement", `expect(cause).toThrow(/INSERT ${"INTO"} job/);\n`],
     ["prose that names it", `// a raw INSERT ${"INTO"} belongs in a factory, never here\n`],
   ])("passes over a test carrying %s", (_what, line) => {
     const tree = { ...CLEAN, [`${WORKSPACE}/test/one.test.ts`]: line };
