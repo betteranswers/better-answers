@@ -2,7 +2,7 @@ import { trpcServer } from "@hono/trpc-server";
 import { Hono } from "hono";
 import type { Logger } from "pino";
 
-import type { Auth } from "../auth/index.ts";
+import type { Auth, EmailSender } from "../auth/index.ts";
 import { TRPC_IP_RULE } from "../auth/index.ts";
 import type { Doors } from "../doors.ts";
 import { limitByIp } from "../ingress/limits.ts";
@@ -15,6 +15,10 @@ type TrpcRoutesDependencies = {
   readonly auth: Auth;
   readonly doors: Doors;
   readonly logger: Logger;
+  readonly sendEmail: EmailSender;
+
+  /** Where a link in an email points: the one origin the SPA is served from. */
+  readonly publicUrl: string;
 };
 
 export const createTrpcRoutes = (deps: TrpcRoutesDependencies): Hono => {
@@ -33,6 +37,8 @@ export const createTrpcRoutes = (deps: TrpcRoutesDependencies): Hono => {
         readSession: (headers: Headers) => deps.auth.api.getSession({ headers }),
         headers: context.req.raw.headers,
         log,
+        sendEmail: deps.sendEmail,
+        publicUrl: deps.publicUrl,
       }),
       responseMeta: ({ errors }) => {
         const met = errors.map((error) => error.cause).find((cause) => cause instanceof CeilingMet);

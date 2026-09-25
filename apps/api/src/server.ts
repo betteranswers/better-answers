@@ -126,7 +126,16 @@ export function createServer(dependencies: ServerDependencies): Hono {
 
   server.all("/mcp", (context) => mcp(context.req.raw));
 
-  server.route("/", createTrpcRoutes({ auth, doors, logger }));
+  server.route(
+    "/",
+    createTrpcRoutes({
+      auth,
+      doors,
+      logger,
+      sendEmail: dependencies.sendEmail,
+      publicUrl: dependencies.publicUrl,
+    }),
+  );
 
   const spa = serveSpa({ root: dependencies.webRoot, hostname: dependencies.hostnames.app });
   server.use("*", spa.assets);

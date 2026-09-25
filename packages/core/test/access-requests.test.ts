@@ -287,7 +287,7 @@ describe("approving a request", () => {
       workspace_id: workspace.id,
     });
 
-    expect(invitation.rows[0]?.expires_at).toEqual(new Date("2031-06-17T09:30:00.000Z"));
+    expect(invitation.rows[0]?.expires_at).toEqual(new Date("2031-06-22T09:30:00.000Z"));
 
     expect(await eventsAbout(requestId)).toEqual([
       {

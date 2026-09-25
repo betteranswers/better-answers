@@ -1,8 +1,4 @@
-import {
-  ACCESS_REQUEST_OPEN_STATUS,
-  boundarySchemas,
-  INVITATION_EXPIRY_SECONDS,
-} from "@better-answers/schema";
+import { ACCESS_REQUEST_OPEN_STATUS, boundarySchemas } from "@better-answers/schema";
 import { z } from "zod";
 
 import { act, declareActs, record, recordFor } from "../audit/index.ts";
@@ -26,6 +22,7 @@ import {
 } from "../kernel/index.ts";
 import { type PostgresDoor, type Tx, withScope } from "../store/postgres/index.ts";
 import { workspaceIdBySlug } from "../workspaces/index.ts";
+import { mintInvitation } from "./invitations.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
 const REQUEST_ACTS = declareActs("people", {
@@ -199,9 +196,9 @@ export type Approved = {
 };
 
 /**
- * Mints an invitation to the requester's address at `role`, or `REQUEST_ROLE_DEFAULT`, expiring
- * `INVITATION_EXPIRY_SECONDS` after `now`. The request row is locked, so of two decisions at once
- * the second answers `already-decided`.
+ * Mints an invitation to the requester's address at `role`, or `REQUEST_ROLE_DEFAULT`, through the
+ * one step a direct invite takes. The request row is locked, so of two decisions at once the
+ * second answers `already-decided`.
  */
 export const approveRequest = async (
   principal: UserPrincipal,
@@ -218,46 +215,23 @@ export const approveRequest = async (
   );
   if (!role.success) return err("no-such-role");
 
-  const invitation = boundarySchemas.invitation.insert.safeParse({
-    id: ulid(),
-    workspaceId: admin.workspaceId,
-    email: claimed.value.email,
+  const minted = await mintInvitation(admin, tx, {
+    address: claimed.value.email,
     role: role.data,
-
-    expiresAt: new Date(now.getTime() + INVITATION_EXPIRY_SECONDS * 1000),
-    inviterId: admin.userId,
+    now,
   });
-  if (!invitation.success) return err("malformed");
-
-  const minted = await attempt(() =>
-    tx.query(
-      `INSERT INTO invitation (id, workspace_id, email, role, expires_at, inviter_id)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [
-        invitation.data.id,
-        invitation.data.workspaceId,
-        invitation.data.email,
-        invitation.data.role,
-        invitation.data.expiresAt,
-        invitation.data.inviterId,
-      ],
-    ),
-  );
   if (!minted.ok) return err(minted.error);
+  const { invitationId } = minted.value;
 
   const decided = await landDecision(admin, tx, requestId, {
     status: "approved",
     act: REQUEST_ACTS.approved,
-    detail: {
-      requesterId: claimed.value.requesterId,
-      role: role.data,
-      invitationId: invitation.data.id,
-    },
-    invitationId: invitation.data.id,
+    detail: { requesterId: claimed.value.requesterId, role: role.data, invitationId },
+    invitationId,
   });
   if (!decided.ok) return err(decided.error);
 
-  return ok({ requestId, invitationId: invitation.data.id, role: role.data });
+  return ok({ requestId, invitationId, role: role.data });
 };
 
 export type DeclineRequestInput = { readonly requestId: string };

@@ -50,7 +50,7 @@ const sendOverSmtp = (smtpUrl: string): ((message: EmailMessage) => Promise<void
       subject: message.subject,
       text: message.text,
     });
-    logger.info({ to_domain: message.to.split("@")[1] ?? null }, "sign-in email sent");
+    logger.info({ to_domain: message.to.split("@")[1] ?? null }, "email sent");
   };
 };
 

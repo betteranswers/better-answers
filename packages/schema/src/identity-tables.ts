@@ -130,7 +130,12 @@ export const member = pgTable(
   ],
 );
 
-export const INVITATION_EXPIRY_SECONDS = 3600 * 48;
+export const INVITATION_EXPIRY_SECONDS = 3600 * 24 * 7;
+
+/** The organisation plugin's own status words, which its kept reads still speak. */
+export const INVITATION_WAITING_STATUS = "pending";
+
+export const INVITATION_CANCELLED_STATUS = "canceled";
 
 export const invitation = pgTable(
   "invitation",
@@ -141,7 +146,7 @@ export const invitation = pgTable(
       .references(() => workspace.id, { onDelete: "cascade" }),
     email: text("email").notNull(),
     role: text("role"),
-    status: text("status").default("pending").notNull(),
+    status: text("status").default(INVITATION_WAITING_STATUS).notNull(),
     expiresAt: stamp("expires_at").notNull(),
     createdAt: stamp("created_at").defaultNow().notNull(),
     inviterId: text("inviter_id")
@@ -152,6 +157,11 @@ export const invitation = pgTable(
     index("invitation_workspace_id_idx").on(table.workspaceId),
     index("invitation_email_idx").on(table.email),
     check("invitation_role_check", sql.raw(`role IS NULL OR role IN (${roleList})`)),
+
+    // Over the address as any case spells it, so a capital never makes a second waiting one.
+    uniqueIndex("invitation_waiting_uidx")
+      .on(table.workspaceId, sql`lower(${table.email})`)
+      .where(sql.raw(`status = '${INVITATION_WAITING_STATUS}'`)),
   ],
 );
 

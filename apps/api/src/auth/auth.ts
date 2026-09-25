@@ -24,6 +24,7 @@ import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
 import {
   account,
   invitation,
+  INVITATION_EXPIRY_SECONDS,
   jwks,
   member,
   oauthAccessToken,
@@ -423,6 +424,8 @@ export const createAuth = (deps: AuthDependencies) => {
          * heuristic off, dropping the verification ask.
          */
         requireEmailVerificationOnInvitation: true,
+
+        invitationExpiresIn: INVITATION_EXPIRY_SECONDS,
 
         schema: {
           organization: { modelName: "workspace" },
