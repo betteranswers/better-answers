@@ -10,7 +10,7 @@ const ROOT_FILE = "CODING_RULES.md";
 const ROOT_BUDGET = 3000;
 const RULE_BUDGET = 80;
 
-// The list only shrinks: the last case here fails an entry whose rule now fits.
+/** The list only shrinks: the last case here fails an entry whose rule now fits. */
 const OVER_BUDGET: readonly string[] = ["SEC3"];
 
 const ADVERBS: ReadonlySet<string> = new Set(["Never", "Always", "Only"]);
@@ -84,8 +84,10 @@ type Rule = {
 
 type Heading = { readonly line: number; readonly level: number; readonly text: string };
 
-// A fenced snippet is free of every budget and of the banned references, so it leaves the
-// prose before anything is counted or scanned.
+/**
+ * A fenced snippet is free of every budget and of the banned references, so it leaves the prose
+ * before anything is counted or scanned.
+ */
 const withoutFences = (text: string): readonly Line[] => {
   let inside = false;
   return text.split("\n").flatMap((text_, index) => {
@@ -100,7 +102,7 @@ const withoutFences = (text: string): readonly Line[] => {
 const fenceLinesIn = (text: string): number =>
   text.split("\n").filter((line) => FENCE.test(line)).length;
 
-// Read before the fences are stripped, so a rule a stray fence hid still counts here.
+/** Read before the fences are stripped, so a rule a stray fence hid still counts here. */
 const taggedHeadingsIn = (text: string): number =>
   text.split("\n").filter((line) => {
     const heading = HEADING.exec(line)?.groups?.["text"];
@@ -120,19 +122,27 @@ const headingsIn = (lines: readonly Line[]): readonly Heading[] =>
       : [{ line: line.number, level: hashes.length, text }];
   });
 
+const tagAndTitleOf = (text: string): Pick<Rule, "tag" | "title"> | undefined => {
+  const groups = TAGGED.exec(text)?.groups;
+  const tag = groups?.["tag"];
+  const title = groups?.["title"];
+  return tag === undefined || title === undefined ? undefined : { tag, title };
+};
+
+const proseBetween = (lines: readonly Line[], after: number, before: number): string =>
+  lines
+    .filter((line) => line.number > after && line.number < before)
+    .map((line) => line.text)
+    .join("\n");
+
 const rulesIn = (file: string, lines: readonly Line[]): readonly Rule[] => {
   const headings = headingsIn(lines);
   return headings.flatMap((heading, index) => {
-    const match = TAGGED.exec(heading.text);
-    const tag = match?.groups?.["tag"];
-    const title = match?.groups?.["title"];
-    if (tag === undefined || title === undefined) return [];
+    const tagged = tagAndTitleOf(heading.text);
+    if (tagged === undefined) return [];
     const ends = headings[index + 1]?.line ?? Number.MAX_SAFE_INTEGER;
-    const prose = lines
-      .filter((line) => line.number > heading.line && line.number < ends)
-      .map((line) => line.text)
-      .join("\n");
-    return [{ file, tag, title, line: heading.line, prose }];
+    const prose = proseBetween(lines, heading.line, ends);
+    return [{ file, ...tagged, line: heading.line, prose }];
   });
 };
 
@@ -171,7 +181,7 @@ const rulesFiles = (): readonly string[] =>
 const everyRule = (): readonly Rule[] =>
   rulesFiles().flatMap((file) => rulesIn(file, withoutFences(read(file))));
 
-// Spelled in two halves, so the tag scan does not read a fixture as a citation.
+/** Spelled in two halves, so the tag scan does not read a fixture as a citation. */
 const spelled = (family: string, number: string): string => `[${family}${number}]`;
 
 describe("the parser this form test reads a rules file with", () => {
@@ -197,7 +207,7 @@ describe("the parser this form test reads a rules file with", () => {
 
   const lines = withoutFences(FIXTURE);
 
-  it("reads a tagged heading as a rule and every other heading as none", () => {
+  it("reads a tagged heading as a rule, and no other", () => {
     expect(rulesIn("fixture.md", lines).map((rule) => `${rule.tag} ${rule.title}`)).toEqual([
       "FIX1 Write the expected value down",
       "FIX2 Deep modules at clean seams",
@@ -205,7 +215,7 @@ describe("the parser this form test reads a rules file with", () => {
     expect(headingsIn(lines).map((heading) => heading.text)).toContain("FAMILY");
   });
 
-  it("sorts a heading into the file's title, a family word, a rule's tag, or none of the three", () => {
+  it("sorts a heading as a rule, a family or neither", () => {
     const sorted = (text: string): string =>
       TAGGED.test(text) ? "a rule" : FAMILY.test(text) ? "a family" : "neither";
 
@@ -220,7 +230,7 @@ describe("the parser this form test reads a rules file with", () => {
     expect(fenceLinesIn("# A file\n\n```ts\nconst one = 1;\n")).toBe(1);
   });
 
-  it("counts a rule's heading whether or not a stray fence hid it", () => {
+  it("counts every rule's heading, even one a stray fence hid", () => {
     const swallowed = [
       `### ${spelled("FIX", "3")} Keep it`,
       "```",
@@ -235,17 +245,17 @@ describe("the parser this form test reads a rules file with", () => {
     expect(taggedHeadingsIn(FIXTURE)).toBe(2);
   });
 
-  it("counts a rule's prose and leaves a fenced snippet out of the count", () => {
+  it("counts a rule's prose, leaving out a fenced snippet", () => {
     const [first] = rulesIn("fixture.md", lines);
     expect(first).toBeDefined();
     expect(countWords(first?.prose ?? "")).toBe(6);
   });
 
-  it("finds a banned reference in prose and none inside a fence", () => {
+  it("finds a banned reference in prose, never inside a fence", () => {
     expect(bannedIn("fixture.md", lines)).toEqual(["fixture.md:16 names a ticket id (T-002)"]);
   });
 
-  it("reads an imperative opener, and an adverb before one, and refuses a noun phrase", () => {
+  it("accepts an imperative, adverb-led or not, refusing a noun phrase", () => {
     expect(isImperative("Write the expected value down")).toBe(true);
     expect(isImperative("Never mock our own code")).toBe(true);
     expect(isImperative("`Reviewer` lines")).toBe(false);
@@ -264,7 +274,7 @@ describe("the form every coding rule is written in", () => {
     ]);
   });
 
-  it("closes every fence it opens, so no rule is swallowed by one", () => {
+  it("closes every fence it opens", () => {
     const odd = rulesFiles()
       .map((file) => ({ file, fences: fenceLinesIn(read(file)) }))
       .filter(({ fences }) => fences % 2 !== 0)
@@ -276,7 +286,7 @@ describe("the form every coding rule is written in", () => {
     ).toEqual([]);
   });
 
-  it("reads as many rules as each file has tagged headings, so none is hidden in a snippet", () => {
+  it("reads as many rules as each file has tagged headings", () => {
     const lost = rulesFiles()
       .map((file) => ({ file, headings: taggedHeadingsIn(read(file)) }))
       .map(({ file, headings }) => ({
@@ -295,7 +305,7 @@ describe("the form every coding rule is written in", () => {
     ).toEqual([]);
   });
 
-  it("opens every rule with a tagged heading whose title is an imperative", () => {
+  it("opens every rule with a tagged, imperative heading", () => {
     const wrong = everyRule()
       .filter((rule) => !isImperative(rule.title))
       .map((rule) => `${rule.file}:${rule.line} [${rule.tag}] ${rule.title}`);
@@ -306,7 +316,7 @@ describe("the form every coding rule is written in", () => {
     ).toEqual([]);
   });
 
-  it("heads every section with the file's title, a family word or a rule's tag", () => {
+  it("heads every lower section with a family word or tag", () => {
     const stray = rulesFiles().flatMap((file) =>
       headingsIn(withoutFences(read(file)))
         .filter(
@@ -322,7 +332,7 @@ describe("the form every coding rule is written in", () => {
     ).toEqual([]);
   });
 
-  it("names no ticket id, date or ADR number outside a snippet", () => {
+  it("names no ticket, date or ADR number outside a snippet", () => {
     const named = rulesFiles().flatMap((file) => bannedIn(file, withoutFences(read(file))));
 
     expect(
@@ -369,7 +379,7 @@ describe("the form every coding rule is written in", () => {
     ).toBeLessThanOrEqual(ROOT_BUDGET);
   });
 
-  it("names a rule that is still over the budget in every entry of the exception list", () => {
+  it("names a rule still over budget in every exception entry", () => {
     const rules = new Map(everyRule().map((rule) => [rule.tag, rule] as const));
     const spent = OVER_BUDGET.map((tag) => {
       const rule = rules.get(tag);
