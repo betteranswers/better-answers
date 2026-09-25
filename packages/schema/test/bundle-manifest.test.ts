@@ -20,8 +20,8 @@ describe("the bundle manifest, the file a bundle describes itself with", () => {
   });
 
   it.each([
-    ["an id that is not the minter's", { ...MANIFEST, id: "acme-2026" }],
-    ["an origin the platform does not know", { ...MANIFEST, origin: "vendor" }],
+    ["an id not the minter's", { ...MANIFEST, id: "acme-2026" }],
+    ["an unknown origin", { ...MANIFEST, origin: "vendor" }],
     ["a blank owner", { ...MANIFEST, owner: "   " }],
     ["a blank content version", { ...MANIFEST, content_version: "" }],
     ["a key of its own", { ...MANIFEST, name: "Acme's bundle" }],

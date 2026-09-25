@@ -19,7 +19,7 @@ const NULL_SAFE_IDIOMS: readonly {
   readonly example: string;
 }[] = [
   {
-    idiom: "x IS [NOT] NULL, as in (a IS NULL) = (b IS NULL)",
+    idiom: "(a IS [NOT] NULL) = (b IS [NOT] NULL)",
     why: "IS NULL and IS NOT NULL answer true or false and never NULL, so a comparison of two such answers is never NULL either",
     example: "(maybe IS NULL) = (other IS NOT NULL)",
   },
@@ -272,9 +272,11 @@ describe("the NULL-safety gate over the CHECKs", () => {
     });
   });
 
-  it.each(NULL_SAFE_IDIOMS)("admits $idiom, because $why", async ({ example }) => {
+  it.each(NULL_SAFE_IDIOMS)("admits $idiom", async ({ example, why }) => {
     await withRollback(db.pool, async (client) => {
-      expect(await readsOfEach(client, [onTheProbe(example)])).toEqual([[onTheProbe(example), []]]);
+      expect(await readsOfEach(client, [onTheProbe(example)]), `because ${why}`).toEqual([
+        [onTheProbe(example), []],
+      ]);
     });
   });
 
