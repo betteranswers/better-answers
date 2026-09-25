@@ -1,5 +1,6 @@
 import type { Logger } from "pino";
 
+import type { Sensitivity } from "@better-answers/core/access";
 import {
   GRAPH_MAINTENANCE,
   graphCounts,
@@ -9,6 +10,7 @@ import {
   rebuildGraph,
   reconcile,
   sweepGraph,
+  type BundleImported,
   type BundleTree,
   type ConceptRewritten,
   type ImportBundleRefusal,
@@ -66,7 +68,9 @@ const REFUSED = 1;
 const USAGE = 2;
 export const NOT_BUILT = 3;
 
-// A wrapper reads the code alone, so a precondition it can wait on never shares one with a fault.
+/**
+ * A wrapper reads the code alone, so a precondition it can wait on never shares one with a fault.
+ */
 export const EXIT_OF_CLASS = {
   malformed: USAGE,
   unauthenticated: 4,
@@ -85,6 +89,7 @@ export type OpsIo = {
 
   readonly logger: Logger;
 
+  /** The smoke test sends the app hostname as its `host`; absent, it sends none. */
   readonly appHostname?: string | undefined;
 
   readonly writeReport?: ((path: string, body: string) => Promise<void>) | undefined;
@@ -92,6 +97,7 @@ export type OpsIo = {
   readonly readTree?: ((directory: string) => Promise<BundleTree>) | undefined;
 };
 
+/** Takes a dump stamp (`20260601T120000Z`) or any instant `Date` reads; `undefined` is neither. */
 export const parseSince = (value: string): Date | undefined => {
   const stamp = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(value);
   const iso =
@@ -318,6 +324,29 @@ const SECTION_OPENS = /^COPY\s+([^\s(]+)/;
 const maskToken = (token: string): string =>
   token.length > 8 ? `${token.slice(0, 4)}…${token.slice(-2)}` : token;
 
+type ScannedLine = { readonly table: string | undefined; readonly countable: boolean };
+
+const scanLine = (table: string | undefined, line: string): ScannedLine => {
+  if (table === undefined) {
+    const opened = SECTION_OPENS.exec(line)?.[1];
+    return { table: opened, countable: opened === undefined };
+  }
+  return line === "\\." ? { table: undefined, countable: false } : { table, countable: true };
+};
+
+const countTokens = (
+  hits: ReadonlyMap<string, Map<string, number>>,
+  tokens: readonly string[],
+  line: string,
+  where: string,
+): void => {
+  for (const token of tokens) {
+    if (!line.includes(token)) continue;
+    const counted = hits.get(token);
+    counted?.set(where, (counted.get(where) ?? 0) + 1);
+  }
+};
+
 const perSectionHits = (
   text: string,
   tokens: readonly string[],
@@ -327,21 +356,9 @@ const perSectionHits = (
   );
   let table: string | undefined;
   for (const line of text.split("\n")) {
-    const opened = table === undefined ? SECTION_OPENS.exec(line)?.[1] : undefined;
-    if (opened !== undefined) {
-      table = opened;
-      continue;
-    }
-    if (table !== undefined && line === "\\.") {
-      table = undefined;
-      continue;
-    }
-    for (const token of tokens) {
-      if (!line.includes(token)) continue;
-      const counted = hits.get(token);
-      const where = table ?? OUTSIDE_ANY_SECTION;
-      counted?.set(where, (counted.get(where) ?? 0) + 1);
-    }
+    const scanned = scanLine(table, line);
+    table = scanned.table;
+    if (scanned.countable) countTokens(hits, tokens, line, table ?? OUTSIDE_ANY_SECTION);
   }
   return hits;
 };
@@ -390,6 +407,16 @@ const sliceCommand = async (
     );
     return NOT_BUILT;
   }
+  return runSlice(command, doors, workspaceId, flags, io);
+};
+
+const runSlice = (
+  command: SliceCommand,
+  doors: Doors,
+  workspaceId: string,
+  flags: Flags,
+  io: OpsIo,
+): Promise<number> => {
   if (command === "reconcile-watermark") return reconcileWatermark(doors, workspaceId, io);
   if (command === "graph-rebuild") return graphRebuildCommand(doors, workspaceId, flags, io);
   if (command === "graph-counts") return graphCountsCommand(doors, workspaceId, io);
@@ -649,46 +676,89 @@ const importReason = (refusal: ImportBundleRefusal | Error, email: string): stri
   return `stopped at ${refusal.file} (${reasonOf(refusal.reason)}); landed ${landed.length}, skipped ${skipped.length}, checks ${checks.recorded} recorded, ${counted(linksOf(rewritten), "link")} rewritten; what landed stays, and a rerun continues from there`;
 };
 
-const importBundleCommand = async (
-  doors: Doors,
-  workspaceId: string,
-  flags: Flags,
-  io: OpsIo,
-): Promise<number> => {
+type ImportAsked = {
+  readonly from: string;
+  readonly email: string;
+  readonly sensitivity: Sensitivity;
+  readonly dryRun: boolean;
+};
+
+const importAskedOf = (flags: Flags): Result<ImportAsked, string> => {
   const from = flagValue(flags, "from");
   const email = flagValue(flags, "as");
   const asked = flagValue(flags, "sensitivity") ?? IMPORT_SENSITIVITY_DEFAULT;
   const sensitivity = SENSITIVITIES.find((word) => word === asked);
   const dryRun = flags.get("dry-run");
   if (from === undefined || email === undefined) {
-    io.say("import-bundle: --from <directory> and --as <member email> are required");
-    return USAGE;
+    return err("--from <directory> and --as <member email> are required");
   }
   if (sensitivity === undefined) {
-    io.say(`import-bundle: --sensitivity must be one of ${SENSITIVITIES.join(", ")}`);
+    return err(`--sensitivity must be one of ${SENSITIVITIES.join(", ")}`);
+  }
+  if (dryRun !== undefined && dryRun !== true) return err("--dry-run takes no value");
+  return ok({ from, email, sensitivity, dryRun: dryRun === true });
+};
+
+const treeUnder = async (io: OpsIo, from: string): Promise<Result<BundleTree, string>> => {
+  const readTree = io.readTree;
+  if (readTree === undefined) {
+    return err(
+      "this process has no way to read a directory, which is a wiring fault and not an operator's",
+    );
+  }
+  const tree = await attempt(() => readTree(from));
+  return tree.ok
+    ? ok(tree.value)
+    : err(`the directory ${from} could not be read: ${tree.error.message}`);
+};
+
+const sayImported = (io: OpsIo, imported: BundleImported, seconds: string): void => {
+  const { bundleId, manifest, landed, skipped, checks, rewritten, concepts } = imported;
+  const recorded = `${counted(checks.recorded, "check")} recorded (${checks.present} already present)`;
+  const links = counted(linksOf(rewritten), "link");
+  if (imported.dryRun) {
+    const standing = manifest === "standing" ? "already stands" : "would be written first";
+    io.say(
+      `import-bundle: dry run — the tree is sound: ${counted(concepts, "concept")}, of which ${landed.length} would land and ${skipped.length} already stand; ${recorded.replace(" recorded", " would be recorded")}; ${links} in ${counted(rewritten.length, "concept")} would be rewritten; manifest ${bundleId} ${standing}; nothing was written`,
+    );
+    return;
+  }
+  io.say(
+    `import-bundle: manifest ${bundleId} ${manifest === "written" ? "written as the bundle's first commit" : "already stands"}`,
+  );
+  const outcomes = [
+    ...landed.map((path) => [path, `landed ${path}`] as const),
+    ...skipped.map((path) => [path, `skipped ${path} — already landed`] as const),
+  ].toSorted(([one], [other]) => (one < other ? -1 : one > other ? 1 : 0));
+  for (const [, line] of outcomes) io.say(`import-bundle: ${line}`);
+  for (const concept of rewritten) {
+    io.say(`import-bundle: rewrote ${concept.path} — ${counted(concept.links, "link")}`);
+  }
+  io.say(
+    `import-bundle: done — landed ${landed.length}, skipped ${skipped.length}, ${recorded}, ${links} rewritten, ${seconds} seconds`,
+  );
+};
+
+const importBundleCommand = async (
+  doors: Doors,
+  workspaceId: string,
+  flags: Flags,
+  io: OpsIo,
+): Promise<number> => {
+  const asked = importAskedOf(flags);
+  if (!asked.ok) {
+    io.say(`import-bundle: ${asked.error}`);
     return USAGE;
   }
-  if (dryRun !== undefined && dryRun !== true) {
-    io.say("import-bundle: --dry-run takes no value");
-    return USAGE;
-  }
+  const { from, email, sensitivity, dryRun } = asked.value;
   const git = bundleStore(doors, "the bundle the import writes into cannot be opened");
   if (!git.ok) {
     io.say(`import-bundle: REFUSED — ${git.error}`);
     return REFUSED;
   }
-  const readTree = io.readTree;
-  if (readTree === undefined) {
-    io.say(
-      "import-bundle: REFUSED — this process has no way to read a directory, which is a wiring fault and not an operator's",
-    );
-    return REFUSED;
-  }
-  const tree = await attempt(() => readTree(from));
+  const tree = await treeUnder(io, from);
   if (!tree.ok) {
-    io.say(
-      `import-bundle: REFUSED — the directory ${from} could not be read: ${tree.error.message}`,
-    );
+    io.say(`import-bundle: REFUSED — ${tree.error}`);
     return REFUSED;
   }
   const postgres = doors.postgres;
@@ -708,37 +778,14 @@ const importBundleCommand = async (
   const run = await importBundle(
     principal.value,
     { git: git.value, postgres, clock: doors.clock },
-    { tree: tree.value, sensitivity, dryRun: dryRun === true },
+    { tree: tree.value, sensitivity, dryRun },
   );
   const seconds = ((doors.clock.now().getTime() - started.getTime()) / 1_000).toFixed(1);
   if (!run.ok) {
     io.say(`import-bundle: REFUSED — ${importReason(run.error, email)}`);
     return REFUSED;
   }
-  const { bundleId, manifest, landed, skipped, checks, rewritten, concepts } = run.value;
-  const recorded = `${counted(checks.recorded, "check")} recorded (${checks.present} already present)`;
-  const links = counted(linksOf(rewritten), "link");
-  if (run.value.dryRun) {
-    const standing = manifest === "standing" ? "already stands" : "would be written first";
-    io.say(
-      `import-bundle: dry run — the tree is sound: ${counted(concepts, "concept")}, of which ${landed.length} would land and ${skipped.length} already stand; ${recorded.replace(" recorded", " would be recorded")}; ${links} in ${counted(rewritten.length, "concept")} would be rewritten; manifest ${bundleId} ${standing}; nothing was written`,
-    );
-    return DONE;
-  }
-  io.say(
-    `import-bundle: manifest ${bundleId} ${manifest === "written" ? "written as the bundle's first commit" : "already stands"}`,
-  );
-  const outcomes = [
-    ...landed.map((path) => [path, `landed ${path}`] as const),
-    ...skipped.map((path) => [path, `skipped ${path} — already landed`] as const),
-  ].toSorted(([one], [other]) => (one < other ? -1 : one > other ? 1 : 0));
-  for (const [, line] of outcomes) io.say(`import-bundle: ${line}`);
-  for (const concept of rewritten) {
-    io.say(`import-bundle: rewrote ${concept.path} — ${counted(concept.links, "link")}`);
-  }
-  io.say(
-    `import-bundle: done — landed ${landed.length}, skipped ${skipped.length}, ${recorded}, ${links} rewritten, ${seconds} seconds`,
-  );
+  sayImported(io, run.value, seconds);
   return DONE;
 };
 
@@ -781,36 +828,72 @@ const seedingToBeDumped = async (
   return DONE;
 };
 
+type RehearsalAsked =
+  | { readonly phase: "seed"; readonly waitSeconds: number }
+  | { readonly phase: "run"; readonly reportPath: string };
+
+const WAIT_SECONDS_MALFORMED = "--wait-seconds takes a whole number of seconds";
+
+const rehearsalAskedOf = (flags: Flags): Result<RehearsalAsked, string> => {
+  if (flags.get("synthetic") !== true) {
+    return err(
+      "--synthetic is required — this command creates a synthetic subject and then erases them, and the flag is the caller saying this workspace is somewhere that may happen",
+    );
+  }
+  const seeding = flags.get("seed") === true;
+  if (seeding === (flags.get("run") === true)) {
+    return err(
+      "exactly one of --seed (phase one) or --run --report <file> (phase two); the drill takes a dump between them",
+    );
+  }
+  const wait = waitSecondsOf(flags);
+  if (seeding) {
+    return wait === "malformed"
+      ? err(WAIT_SECONDS_MALFORMED)
+      : ok({ phase: "seed", waitSeconds: wait ?? WAIT_SECONDS });
+  }
+  const reportPath = flagValue(flags, "report");
+  if (reportPath === undefined) {
+    return err(
+      "--run needs --report <file> — the report is what the drill keeps, and a run whose report went nowhere proved nothing",
+    );
+  }
+  return wait === "malformed" ? err(WAIT_SECONDS_MALFORMED) : ok({ phase: "run", reportPath });
+};
+
+const erasedToTheReport = async (
+  erasure: ErasureDoors,
+  workspaceId: string,
+  reportPath: string,
+  io: OpsIo,
+): Promise<number> => {
+  const rehearsed = await rehearseErasure(ERASURE, erasure, { workspaceId });
+  if (!rehearsed.ok) {
+    return refused("erasure-rehearsal", workspaceId, rehearsalReason(rehearsed.error), io);
+  }
+  const written = await writeTheReport(reportPath, rehearsed.value.report, io);
+  if (written !== undefined) {
+    io.say(
+      `erasure-rehearsal: REFUSED — the erasure ran and completed at ${rehearsed.value.completedAt.toISOString()}, but its report could not be written to ${reportPath}: ${written}`,
+    );
+    return REFUSED;
+  }
+  io.say(
+    `erasure-rehearsal: done — erased the synthetic subject of ${workspaceId} under request ${rehearsed.value.subjectRequestId}; the report is at ${reportPath}`,
+  );
+  io.say(rehearsed.value.tokens.join(","));
+  return DONE;
+};
+
 const erasureRehearsal = async (
   doors: Doors,
   workspaceId: string,
   flags: Flags,
   io: OpsIo,
 ): Promise<number> => {
-  if (flags.get("synthetic") !== true) {
-    io.say(
-      "erasure-rehearsal: --synthetic is required — this command creates a synthetic subject and then erases them, and the flag is the caller saying this workspace is somewhere that may happen",
-    );
-    return USAGE;
-  }
-  const seeding = flags.get("seed") === true;
-  const running = flags.get("run") === true;
-  if (seeding === running) {
-    io.say(
-      "erasure-rehearsal: exactly one of --seed (phase one) or --run --report <file> (phase two); the drill takes a dump between them",
-    );
-    return USAGE;
-  }
-  const reportPath = flagValue(flags, "report");
-  if (running && reportPath === undefined) {
-    io.say(
-      "erasure-rehearsal: --run needs --report <file> — the report is what the drill keeps, and a run whose report went nowhere proved nothing",
-    );
-    return USAGE;
-  }
-  const wait = waitSecondsOf(flags);
-  if (wait === "malformed") {
-    io.say("erasure-rehearsal: --wait-seconds takes a whole number of seconds");
+  const asked = rehearsalAskedOf(flags);
+  if (!asked.ok) {
+    io.say(`erasure-rehearsal: ${asked.error}`);
     return USAGE;
   }
   const opened = erasureDoors(doors, io.logger);
@@ -818,27 +901,11 @@ const erasureRehearsal = async (
     io.say(`erasure-rehearsal: REFUSED — ${opened.error}`);
     return REFUSED;
   }
-
-  if (seeding) {
-    return seedingToBeDumped(doors, opened.value, workspaceId, wait ?? WAIT_SECONDS, io);
+  const rehearsal = asked.value;
+  if (rehearsal.phase === "seed") {
+    return seedingToBeDumped(doors, opened.value, workspaceId, rehearsal.waitSeconds, io);
   }
-
-  const rehearsed = await rehearseErasure(ERASURE, opened.value, { workspaceId });
-  if (!rehearsed.ok) {
-    return refused("erasure-rehearsal", workspaceId, rehearsalReason(rehearsed.error), io);
-  }
-  const written = await writeTheReport(reportPath ?? "", rehearsed.value.report, io);
-  if (written !== undefined) {
-    io.say(
-      `erasure-rehearsal: REFUSED — the erasure ran and completed at ${rehearsed.value.completedAt.toISOString()}, but its report could not be written to ${reportPath ?? ""}: ${written}`,
-    );
-    return REFUSED;
-  }
-  io.say(
-    `erasure-rehearsal: done — erased the synthetic subject of ${workspaceId} under request ${rehearsed.value.subjectRequestId}; the report is at ${reportPath ?? ""}`,
-  );
-  io.say(rehearsed.value.tokens.join(","));
-  return DONE;
+  return erasedToTheReport(opened.value, workspaceId, rehearsal.reportPath, io);
 };
 
 const writeTheReport = async (
@@ -881,8 +948,19 @@ const provisionReason = (
   }
 };
 
-// The repository lives outside the Postgres transaction, so the root is checked before the act
-// and the repository made after it.
+const signedInPerson = async (
+  postgres: PostgresDoor,
+  email: string,
+): Promise<Result<string, string>> => {
+  const person = await personIdByEmail(BOOTSTRAP, postgres, email);
+  if (!person.ok) return err(person.error.message);
+  return person.value === undefined ? err(notSignedIn(email)) : ok(person.value);
+};
+
+/**
+ * The repository lives outside the Postgres transaction, so the root is checked before the act
+ * and the repository made after it.
+ */
 const provisionWorkspaceCommand = async (
   doors: Doors,
   flags: Flags,
@@ -901,13 +979,9 @@ const provisionWorkspaceCommand = async (
     return REFUSED;
   }
   const postgres = doors.postgres;
-  const admin = await personIdByEmail(BOOTSTRAP, postgres, email);
+  const admin = await signedInPerson(postgres, email);
   if (!admin.ok) {
-    io.say(`provision-workspace: REFUSED — ${admin.error.message}`);
-    return REFUSED;
-  }
-  if (admin.value === undefined) {
-    io.say(`provision-workspace: REFUSED — ${notSignedIn(email)}`);
+    io.say(`provision-workspace: REFUSED — ${admin.error}`);
     return REFUSED;
   }
   const id = ulid();
@@ -975,6 +1049,21 @@ const addMemberCommand = async (doors: Doors, flags: Flags, io: OpsIo): Promise<
   return DONE;
 };
 
+const SLICELESS_COMMANDS = new Map<
+  string,
+  (doors: Doors, flags: Flags, io: OpsIo) => Promise<number>
+>([
+  ["replay-erasures", replayErasuresCommand],
+  ["smoke", (_doors, flags, io) => smoke(flags, io)],
+  ["dump-grep", (_doors, flags, io) => dumpGrep(flags, io)],
+  ["provision-workspace", provisionWorkspaceCommand],
+  ["add-member", addMemberCommand],
+]);
+
+/**
+ * Resolves to the exit code: 0 done, 1 refused in no registered word, 2 usage, `NOT_BUILT`, or
+ * a registered word's `EXIT_OF_CLASS` code.
+ */
 export const runOps = async (argv: readonly string[], doors: Doors, io: OpsIo): Promise<number> => {
   const [command, ...rest] = argv[0] === "--" ? argv.slice(1) : argv;
   const flags = parseFlags(rest);
@@ -982,11 +1071,8 @@ export const runOps = async (argv: readonly string[], doors: Doors, io: OpsIo): 
     io.say(USAGE_TEXT);
     return command === undefined ? USAGE : DONE;
   }
-  if (command === "replay-erasures") return replayErasuresCommand(doors, flags, io);
-  if (command === "smoke") return smoke(flags, io);
-  if (command === "dump-grep") return dumpGrep(flags, io);
-  if (command === "provision-workspace") return provisionWorkspaceCommand(doors, flags, io);
-  if (command === "add-member") return addMemberCommand(doors, flags, io);
+  const run = SLICELESS_COMMANDS.get(command);
+  if (run !== undefined) return run(doors, flags, io);
   if (isSliceCommand(command)) return sliceCommand(command, doors, flags, io);
   io.say(`unknown command: ${command}\n${USAGE_TEXT}`);
   return USAGE;

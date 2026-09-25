@@ -1052,13 +1052,17 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("answers usage to a wait that is not whole seconds", async () => {
+    it.each([
+      ["--seed", []],
+      ["--run", ["--report", "report.md"]],
+    ])("answers usage to %s with a wait not in seconds", async (phase, report) => {
       const run = await ops(app(), [
         "erasure-rehearsal",
         "--workspace",
         "ws_synthetic",
         "--synthetic",
-        "--seed",
+        phase,
+        ...report,
         "--wait-seconds",
         "a minute",
       ]);

@@ -384,7 +384,6 @@
       "files": [
         "apps/api/src/ingress/limits.ts",
         "apps/api/src/mcp/surface.ts",
-        "apps/api/src/ops/index.ts",
         "apps/web/src/features/sources/bindings-view.tsx",
         "apps/web/src/shared/api/upload-progress.ts",
         "packages/core/src/concepts/file.ts",
