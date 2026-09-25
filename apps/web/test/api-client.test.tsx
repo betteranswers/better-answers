@@ -21,7 +21,7 @@ function RoutesProbe() {
 }
 
 describe("the SPA's tRPC client", () => {
-  it("hands a component the query options for a workspace's routes, named by the procedure", () => {
+  it("hands a component routes' query options, keyed by the procedure", () => {
     render(
       <Providers clients={createAppClients()}>
         <RoutesProbe />
@@ -34,13 +34,13 @@ describe("the SPA's tRPC client", () => {
     ]);
   });
 
-  it("is reachable only through the provider, so no screen can hold a client of its own", () => {
+  it("throws for a component rendered outside the provider", () => {
     expect(() => render(<RoutesProbe />)).toThrow(/TRPCProvider/);
   });
 });
 
 describe("the query provider above the router", () => {
-  it("wraps the router, so a screen the router renders reaches the same client", async () => {
+  it("wraps the router, so its screens reach the same client", async () => {
     const clients = createAppClients();
     const router = createAppRouter(clients, createMemoryHistory({ initialEntries: ["/system"] }));
     await router.load();
@@ -58,7 +58,7 @@ describe("the query provider above the router", () => {
 });
 
 describe("the path the client and the api agree on", () => {
-  it("is the path apps/api mounts its router at, and there is only one of it", () => {
+  it("matches the one path apps/api mounts its router at", () => {
     const source = readFileSync(
       path.join(import.meta.dirname, "../../api/src/trpc/mount.ts"),
       "utf8",
@@ -71,9 +71,11 @@ describe("the path the client and the api agree on", () => {
 });
 
 describe("routes.list's types crossing from apps/api", () => {
-  it("takes no input, because the workspace is the session's and never an argument", () => {
-    // `toEqualTypeOf` constrains its argument, so absence is asserted through a conditional,
-    // written both ways round so a widened input fails it too.
+  it("takes no input, since the session carries the workspace", () => {
+    /**
+     * `toEqualTypeOf` constrains its argument, so absence is asserted through a conditional,
+     * written both ways round so a widened input fails it too.
+     */
     type NoInput = [inferInput<ListProcedure>] extends [void | undefined]
       ? [void | undefined] extends [inferInput<ListProcedure>]
         ? true
@@ -82,7 +84,7 @@ describe("routes.list's types crossing from apps/api", () => {
     expectTypeOf<NoInput>().toEqualTypeOf<true>();
   });
 
-  it("answers one route per purpose, with the words a screen shows", () => {
+  it("answers one route per purpose, in a screen's words", () => {
     type Route = inferOutput<ListProcedure>[number];
 
     type ExpectedRoute = {

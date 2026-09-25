@@ -17,7 +17,7 @@ afterEach(() => {
   else process.env["CI"] = ciBefore;
 });
 
-describe("the browser suite's configuration (T-068)", () => {
+describe("the browser suite's configuration", () => {
   it("refuses a focused spec when it runs in CI", async () => {
     expect((await configUnder("true")).forbidOnly).toBe(true);
   });

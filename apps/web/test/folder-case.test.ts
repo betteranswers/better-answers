@@ -16,7 +16,7 @@ const foldersUnder = (directory: string): readonly string[] =>
     });
 
 describe("the SPA's folders", () => {
-  it("names every folder under its source in kebab-case, whatever the filesystem's case rules", () => {
+  it("names every source folder in kebab-case, whatever the filesystem", () => {
     const folders = foldersUnder(source);
 
     // A walk that found nothing would pass the filter below while checking nothing.

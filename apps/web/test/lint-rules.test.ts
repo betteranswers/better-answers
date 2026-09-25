@@ -29,7 +29,7 @@ const typeProbe = (specifier: string): string =>
   `import type { AppRouter } from "${specifier}";\nexport type Kept = AppRouter;\n`;
 
 describe("no feature imports another feature", () => {
-  it("refuses a sibling feature and allows a feature's own files and shared", () => {
+  it("refuses a sibling feature, allows its own files and shared", () => {
     const refused = flagged({
       "apps/web/src/features/routes/reaches-sideways.ts": probe("@/features/people/api.ts"),
       "apps/web/src/features/routes/reaches-sideways-relatively.ts": probe("../people/api.ts"),
@@ -45,8 +45,8 @@ describe("no feature imports another feature", () => {
   });
 });
 
-describe("the direction is app \u2192 features \u2192 shared and never back", () => {
-  it("refuses a feature importing the app layer, and allows it importing shared", () => {
+describe("imports run app \u2192 features \u2192 shared, never back", () => {
+  it("refuses a feature importing the app layer, allows shared", () => {
     const refused = flagged({
       "apps/web/src/features/routes/reaches-up.ts": probe("@/app/router.tsx"),
       "apps/web/src/features/routes/reaches-up-relatively.ts": probe("../../app/router.tsx"),
@@ -59,7 +59,7 @@ describe("the direction is app \u2192 features \u2192 shared and never back", ()
     ]);
   });
 
-  it("lets a view read the toolbar's state from shared and refuses it the shell's own module", () => {
+  it("lets a view import shared's toolbar state, not the shell's", () => {
     const refused = flagged({
       "apps/web/src/features/sources/review-toolbar.ts": probe("@/shared/view-toolbar.tsx"),
       "apps/web/src/features/sources/reaches-the-shell.ts": probe("@/app/toolbar.tsx"),
@@ -68,7 +68,7 @@ describe("the direction is app \u2192 features \u2192 shared and never back", ()
     expect(refused).toEqual(["apps/web/src/features/sources/reaches-the-shell.ts"]);
   });
 
-  it("refuses shared importing a feature or the app layer, and allows the app layer importing both", () => {
+  it("refuses shared importing upwards, allows app importing features and shared", () => {
     const refused = flagged({
       "apps/web/src/shared/reaches-a-feature.ts": probe("@/features/routes/api.ts"),
       "apps/web/src/shared/reaches-the-app.ts": probe("@/app/router.tsx"),
@@ -89,7 +89,7 @@ describe("the direction is app \u2192 features \u2192 shared and never back", ()
 });
 
 describe("better-auth is named in the identity feature and nowhere else", () => {
-  it("allows the client in the one directory that owns identity, and refuses it outside", () => {
+  it("allows the client in the identity feature, refuses it outside", () => {
     const refused = flagged({
       "apps/web/src/features/auth/auth-client.ts": probe("better-auth/client"),
       "apps/web/src/features/auth/deep.ts": probe("better-auth/client/plugins"),
@@ -108,7 +108,7 @@ describe("better-auth is named in the identity feature and nowhere else", () => 
     ]);
   });
 
-  it("keeps every other rule over the identity feature: it may not reach sideways, or up", () => {
+  it("holds the identity feature to every other import rule", () => {
     const refused = flagged({
       "apps/web/src/features/auth/reaches-sideways.ts": probe("@/features/routes/api.ts"),
       "apps/web/src/features/auth/reaches-up.ts": probe("@/app/router.tsx"),
@@ -135,8 +135,8 @@ describe("filenames in the SPA are kebab-case", () => {
   });
 });
 
-describe("ADR 0006's one exception \u2014 AppRouter as a type, in one file", () => {
-  it("allows the type import in the client-instance file and refuses it in a second file", () => {
+describe("AppRouter as a type, in one file only", () => {
+  it("allows the type import in the client-instance file only", () => {
     const refused = flagged({
       "apps/web/src/shared/api/trpc.ts": typeProbe("@better-answers/api/trpc"),
       "apps/web/src/shared/api/second-client.ts": typeProbe("@better-answers/api/trpc"),
@@ -149,7 +149,7 @@ describe("ADR 0006's one exception \u2014 AppRouter as a type, in one file", () 
     ]);
   });
 
-  it("refuses a runtime import from the api, in the client-instance file as much as outside it", () => {
+  it("refuses a runtime api import, the client-instance file included", () => {
     const refused = flagged({
       "apps/web/src/shared/api/trpc.ts": probe("@better-answers/api/trpc"),
       "apps/web/src/app/screens/system-screen.ts": probe("@better-answers/api/trpc"),
@@ -163,7 +163,7 @@ describe("ADR 0006's one exception \u2014 AppRouter as a type, in one file", () 
     ]);
   });
 
-  it("lets a second api type into the client-instance file, because what the rule bans is runtime coupling", () => {
+  it("lets a second api type into the client-instance file", () => {
     const refused = flagged({
       "apps/web/src/shared/api/trpc.ts": `import type { TrpcContext } from "@better-answers/api/trpc";\nexport type Kept = TrpcContext;\n`,
     });

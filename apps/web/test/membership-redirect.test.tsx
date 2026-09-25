@@ -40,7 +40,7 @@ const answered = (body: unknown): Promise<Response> =>
     }),
   );
 
-// The api answers a batch as one array with an entry per procedure, a refusal being an entry.
+/** The api answers a batch as one array with an entry per procedure, a refusal being an entry. */
 const answering =
   (refusal?: string) =>
   (input: string | URL | Request): Promise<Response> => {
@@ -87,7 +87,7 @@ afterEach(() => {
 });
 
 describe("a person the api will not answer about", () => {
-  it("meets the sign-in screen, which is told the address they were asking for", async () => {
+  it("meets sign-in, which is told the address they asked for", async () => {
     vi.stubGlobal("fetch", answering(NO_SESSION));
 
     const router = await openAt("/people/thresholds");
@@ -105,7 +105,7 @@ describe("a person the api will not answer about", () => {
     expect(router.state.location.href).toBe("/choose-workspace");
   });
 
-  it("is left on the sign-in screen when that is where they went", async () => {
+  it("stays on the sign-in screen when they went there", async () => {
     vi.stubGlobal("fetch", answering(NO_SESSION));
 
     const router = await openAt("/sign-in");
@@ -114,7 +114,7 @@ describe("a person the api will not answer about", () => {
     expect(router.state.location.href).toBe("/sign-in");
   });
 
-  it("is carried into the shell when the read failed for any other reason", async () => {
+  it("reaches the shell when the read fails for another reason", async () => {
     vi.stubGlobal("fetch", () => Promise.reject(new TypeError("the network is down")));
     const clients = createAppClients();
     // The shell's own read is batched and retried past the end of this test, onto the next stub.
@@ -130,7 +130,7 @@ describe("a person the api will not answer about", () => {
 });
 
 describe("the membership the shell and its redirect both read", () => {
-  it("is one read, so drawing the shell and moving between views asks the api nothing more", async () => {
+  it("is read once across drawing the shell and changing views", async () => {
     vi.stubGlobal("fetch", answering());
     const router = await openAt("/people/thresholds");
     await screen.findByText("Northern Tooling", { exact: false });

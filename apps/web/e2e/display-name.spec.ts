@@ -21,7 +21,7 @@ const displayNameField = (page: Page) => page.getByLabel("Display name");
 
 const saveButton = (page: Page) => page.getByRole("button", { name: "Save and continue" });
 
-// Every screen the page was shown, so a screen that came and went cannot pass unseen.
+/** Every screen the page was shown, so a screen that came and went cannot pass unseen. */
 const screensShown = (page: Page): readonly string[] => {
   const shown: string[] = [];
   page.on("framenavigated", (frame) => {
@@ -30,7 +30,7 @@ const screensShown = (page: Page): readonly string[] => {
   return shown;
 };
 
-test("a person signing in for the first time gives a display name before anything else, then meets No workspace yet", async ({
+test("asks a first-time person for a display name before anything", async ({
   page,
   request,
   passesTheAccessibilityGate,
@@ -63,10 +63,7 @@ test("a person signing in for the first time gives a display name before anythin
   await expect(noWorkspaceHeading(page)).toBeVisible();
 });
 
-test("the name a person gives is the one the shell credits them by once an Admin adds them, and they are never asked again", async ({
-  page,
-  request,
-}) => {
+test("credits a new member by their given name, asking once", async ({ page, request }) => {
   const email = anAddress("named");
   const who = await person(request, email, { displayName: "" });
   await page.goto("/sign-in");
@@ -86,10 +83,7 @@ test("the name a person gives is the one the shell credits them by once an Admin
   expect(shown).not.toContain("/display-name");
 });
 
-test("a member who has a display name signs in straight to the shell and is never asked for one", async ({
-  page,
-  request,
-}) => {
+test("signs a named member straight into the shell, never asking", async ({ page, request }) => {
   const email = anAddress("already");
   await provision(request, { name: "Already Named", adminEmail: email });
   const shown = screensShown(page);
@@ -103,7 +97,7 @@ test("a member who has a display name signs in straight to the shell and is neve
   await expect(page).toHaveURL(/\/system\/routes-and-spend$/);
 });
 
-test("a name the platform refuses is shown as its own word with what to do next, and a name it takes carries the person on", async ({
+test("refuses a bad name by its word, then accepts one", async ({
   page,
   request,
   passesTheAccessibilityGate,
@@ -134,14 +128,14 @@ test("a name the platform refuses is shown as its own word with what to do next,
   await expect(noWorkspaceHeading(page)).toBeVisible();
 });
 
-test("the display-name screen sends a visitor with no session to sign in", async ({ page }) => {
+test("sends a signed-out visitor from the display-name screen to sign-in", async ({ page }) => {
   await page.goto("/display-name");
 
   await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
   await expect(page).toHaveURL(/\/sign-in$/);
 });
 
-test("a save made after the session ended says so in its word, and offers the way back to sign in", async ({
+test("refuses a save after the session ended, offering sign-in again", async ({
   page,
   context,
   request,

@@ -54,7 +54,7 @@ const connectedAt = async (page: Page): Promise<URL> => {
   return callback;
 };
 
-test("sign-in, authorize, consent and the code at Claude's redirect, all on one origin", async ({
+test("carries sign-in through consent to Claude's code on one origin", async ({
   page,
   request,
   baseURL,
@@ -90,7 +90,7 @@ test("sign-in, authorize, consent and the code at Claude's redirect, all on one 
   expect(callback.searchParams.get("error")).toBeNull();
 });
 
-test("a second authorization from the same client shows consent again when the host asks for it, and skips it when it does not", async ({
+test("asks consent again only when the host asks for it", async ({
   page,
   request,
   baseURL,
@@ -148,7 +148,7 @@ test("cancelling consent sends the client a refusal and no code", async ({
   expect(callback.searchParams.get("code")).toBeNull();
 });
 
-test("consent is refused once the person's credentials are revoked, and no code is sent", async ({
+test("refuses consent after credentials are revoked, sending no code", async ({
   page,
   request,
   baseURL,
@@ -172,7 +172,7 @@ test("consent is refused once the person's credentials are revoked, and no code 
   expect(landedAt(page).searchParams.get("code")).toBeNull();
 });
 
-test("the connector's own sign-in carries a member who has a display name on to consent, never asking for one", async ({
+test("takes a named member from connector sign-in straight to consent", async ({
   page,
   request,
   baseURL,
@@ -191,7 +191,7 @@ test("the connector's own sign-in carries a member who has a display name on to 
   await connectedAt(page);
 });
 
-test("the connector's own sign-in asks a member with no display name for one, then carries them on to consent and the code", async ({
+test("asks an unnamed member's name, then carries on through consent", async ({
   page,
   request,
   baseURL,
@@ -222,11 +222,7 @@ test("the connector's own sign-in asks a member with no display name for one, th
   expect(callback.searchParams.get("state")).toBe("named-first");
 });
 
-test("the connector's own sign-in asks a person in no workspace for a display name, then says No workspace yet", async ({
-  page,
-  request,
-  baseURL,
-}) => {
+test("asks a non-member's name, then says No workspace yet", async ({ page, request, baseURL }) => {
   await page.goto(authorizeUrl(baseURL ?? ""));
   await signIn(page, request, anAddress("unplaced"));
 

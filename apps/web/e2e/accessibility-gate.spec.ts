@@ -16,24 +16,20 @@ const theSignInScreen = async (page: Page): Promise<void> => {
   await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
 };
 
-test("a spec that never asks for the gate is audited anyway, on the screen it leaves behind", async ({
-  page,
-}) => {
+test("audits the screen a spec leaves, though it never asked", async ({ page }) => {
   test.fail();
   await theSignInScreen(page);
   await page.evaluate(drawAPictureWithNoAltText);
 });
 
-test("a spec that leaves the browser off the product's screens and audits none of them is refused", async ({
-  page,
-}) => {
+test("refuses a spec that leaves the product and audits nothing", async ({ page }) => {
   test.fail();
   await theSignInScreen(page);
 
   await page.goto("about:blank");
 });
 
-test("a spec that audits the screen it exercises may then leave the product's origin", async ({
+test("lets a spec leave the origin once it has audited", async ({
   page,
   passesTheAccessibilityGate,
 }) => {
@@ -42,8 +38,6 @@ test("a spec that audits the screen it exercises may then leave the product's or
   await page.goto("about:blank");
 });
 
-test("a screen with nothing wrong with it is left alone by the gate it never mentioned", async ({
-  page,
-}) => {
+test("passes a clean screen the spec never asked about", async ({ page }) => {
   await theSignInScreen(page);
 });

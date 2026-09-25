@@ -33,7 +33,9 @@ const ask = async <T>(
 export const provision = (api: APIRequestContext, input: { name: string; adminEmail?: string }) =>
   ask(api, "/workspaces", input, aProvisionedWorkspace);
 
-// A display name left out is the harness's own; an empty one is a person who has given none yet.
+/**
+ * A display name left out is the harness's own; an empty one is a person who has given none yet.
+ */
 export const person = (
   api: APIRequestContext,
   email: string,
@@ -62,6 +64,7 @@ export type SeedRoute = {
   readonly model: string;
 };
 
+/** A purpose `routes` leaves out has no route. */
 export const seedRoutes = (
   api: APIRequestContext,
   input: { workspaceId: string; routes: readonly SeedRoute[] },
@@ -120,23 +123,26 @@ export const seedBindings = (
 
 const indexRunMoved = z.object({ jobId: z.string() });
 
-// The suite runs no worker, so a spec watching a state word move asks the harness for its steps.
+/**
+ * The suite runs no worker, so a spec watching a state word move asks the harness for its steps.
+ */
 export const moveTheIndexRun = (
   api: APIRequestContext,
   input: { workspaceId: string; to: "claimed" | "done" },
 ) => ask(api, "/index-runs", input, indexRunMoved);
 
-// The code the api captured for this address, in place of the email nobody receives.
+/** The code the api captured for this address, in place of the email nobody receives. */
 export const codeSentTo = async (api: APIRequestContext, email: string): Promise<string> => {
   const sent = await api.get(`${HARNESS}/codes?email=${encodeURIComponent(email)}`);
   expect(sent.ok(), "no code was captured for this address").toBe(true);
   return codeSent.parse(await sent.json()).code;
 };
 
+/** Timestamped and randomised, so a code read back for it is this test's alone. */
 export const anAddress = (who: string): string =>
   `${who}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
 
-// Sign-out is one disclosure in from the top bar, so a spec that leaves opens the menu first.
+/** Sign-out is one disclosure in from the top bar, so a spec that leaves opens the menu first. */
 export const signOutFromTheShell = async (page: Page, who: string): Promise<void> => {
   await page
     .getByRole("banner")
@@ -145,6 +151,7 @@ export const signOutFromTheShell = async (page: Page, who: string): Promise<void
   await page.getByRole("menuitem", { name: "Sign out" }).click();
 };
 
+/** Needs a page with nothing focused yet, so the first Tab lands on the skip link. */
 export const skipLinkReachesTheScreen = async (page: Page): Promise<void> => {
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "Skip to the screen" })).toBeFocused();
@@ -152,6 +159,7 @@ export const skipLinkReachesTheScreen = async (page: Page): Promise<void> => {
   await expect(page.getByRole("main")).toBeFocused();
 };
 
+/** Starts on the sign-in screen the page already shows; it does not navigate there. */
 export const signIn = async (page: Page, api: APIRequestContext, email: string): Promise<void> => {
   await page.getByLabel("Email address").fill(email);
   await page.getByRole("button", { name: "Send code" }).click();
@@ -199,6 +207,7 @@ export const clockTheNextKey = (
     Reflect.set(window, "actClocked", clocked);
   }, landed);
 
+/** Reads the clock `clockTheNextKey` started, so that call comes before the key it times. */
 export const theActLandedWithinItsBudget = async (page: Page, act: string): Promise<void> => {
   const elapsed = await page.evaluate(() => Reflect.get(window, "actClocked"));
   test.info().annotations.push({ type: `${act} act`, description: `${elapsed} ms` });

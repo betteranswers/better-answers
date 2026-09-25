@@ -5,7 +5,7 @@ const NOT_A_LIST = { why: "the api answered a shape the routes card cannot rende
 
 const ROUTES_LIST = "routes.list";
 
-test("a view that throws leaves the three regions standing and an accessible way out", async ({
+test("offers a way out, shell intact, when a view throws", async ({
   page,
   request,
   passesTheAccessibilityGate,

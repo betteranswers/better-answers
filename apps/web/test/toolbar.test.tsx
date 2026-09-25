@@ -17,7 +17,7 @@ const tabs = () => screen.getByRole("tablist", { name: "Routes and spend" });
 
 const openTab = () => within(tabs()).getByRole("tab", { selected: true }).textContent;
 
-// The registry opens a tab where a pointer commits — the press — and not on the click.
+/** The registry opens a tab where a pointer commits — the press — and not on the click. */
 const pick = (name: string) => fireEvent.mouseDown(within(tabs()).getByRole("tab", { name }));
 
 const A_TABBED_VIEW: ViewToolbar = {
@@ -39,8 +39,10 @@ const ANOTHER_TABBED_VIEW: ViewToolbar = {
   ],
 };
 
-// One helper of the feature's own, called by its content and by its acts: the shared slot
-// never learns the type.
+/**
+ * One helper of the feature's own, called by its content and by its acts: the shared slot
+ * never learns the type.
+ */
 const useTickedGroups = viewStateOf<number>("/bindings/review");
 
 const useAnotherViewsTickedGroups = viewStateOf<number>("/bindings/all");
@@ -82,7 +84,7 @@ const A_REVIEW_VIEW: ViewToolbar = {
     { id: "review-open", name: "Open" },
     { id: "review-done", name: "Done" },
   ],
-  // Built once, the way a route's static data is, and live on every render all the same.
+  /** Built once, the way a route's static data is, and live on every render all the same. */
   acts: (
     <>
       <NarrowAct />
@@ -115,7 +117,7 @@ const reviewTab = (name: string) =>
   fireEvent.mouseDown(screen.getByRole("tab", { name, selected: false }));
 
 describe("the toolbar the open view fills", () => {
-  it("carries the open view's tabs in the view's own order, marking the open one selected", async () => {
+  it("carries the view's tabs in order, the open one selected", async () => {
     await shellAt(ROUTES_AND_SPEND);
 
     expect(
@@ -126,7 +128,7 @@ describe("the toolbar the open view fills", () => {
     expect(openTab()).toBe("Routes");
   });
 
-  it("opens the tab a reader picks, and says in words the one nobody has built", async () => {
+  it("opens the picked tab, and says when it is unbuilt", async () => {
     await shellAt(ROUTES_AND_SPEND);
 
     pick("Spend");
@@ -138,7 +140,7 @@ describe("the toolbar the open view fills", () => {
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("System");
   });
 
-  it("opens another view on its own first tab, never on the tab this one left open", () => {
+  it("opens another view on its own first tab", () => {
     const shell = (toolbar: ViewToolbar, name: string) => (
       <ViewTabsRoot tabs={toolbar.tabs}>
         <Toolbar name={name} toolbar={toolbar} />
@@ -153,7 +155,7 @@ describe("the toolbar the open view fills", () => {
     expect(screen.getByRole("tab", { selected: true }).textContent).toBe("Spend");
   });
 
-  it("gives the open tab a panel of its own to control, and the view inside it", async () => {
+  it("gives the open tab its own panel, holding the view", async () => {
     await shellAt(ROUTES_AND_SPEND);
 
     const panel = screen.getByRole("tabpanel");
@@ -163,14 +165,14 @@ describe("the toolbar the open view fills", () => {
     expect(within(panel).getByRole("region", { name: "Routes" })).toBeDefined();
   });
 
-  it("gives a view that declares neither tabs nor acts no toolbar and no panel", async () => {
+  it("draws no toolbar or panel without tabs or acts", async () => {
     await shellAt("/system/health");
 
     expect(screen.queryByRole("tablist")).toBeNull();
     expect(screen.queryByRole("tabpanel")).toBeNull();
   });
 
-  it("draws a view's tabs at the start of the toolbar and its acts at the end", () => {
+  it("draws a view's tabs before its acts in the toolbar", () => {
     render(
       <ViewTabsRoot tabs={A_TABBED_VIEW.tabs}>
         <Toolbar name="Bindings" toolbar={A_TABBED_VIEW} />
@@ -186,7 +188,7 @@ describe("the toolbar the open view fills", () => {
     expect(list.compareDocumentPosition(act) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
   });
 
-  it("gives a view that declares acts and no tabs a toolbar with the acts alone", () => {
+  it("draws only the acts for a view without tabs", () => {
     render(<Toolbar name="Bindings" toolbar={{ acts: A_TABBED_VIEW.acts }} />);
 
     expect(screen.getByRole("button", { name: "Add a binding" })).toBeDefined();
@@ -195,7 +197,7 @@ describe("the toolbar the open view fills", () => {
 });
 
 describe("the slot a view writes and its acts read", () => {
-  it("gives an act declared on the route what its own view wrote, and another view nothing", () => {
+  it("gives an act what its own view wrote, not another's", () => {
     drawReview(false);
 
     expect(narrowAct().textContent).toBe("Narrow these documents");
@@ -208,7 +210,7 @@ describe("the slot a view writes and its acts read", () => {
     expect(anotherViewsAct().hasAttribute("disabled")).toBe(true);
   });
 
-  it("leaves an act over a view that threw inert, because the way back in empties the slot", () => {
+  it("empties the slot when a view that threw is reopened", () => {
     drawReview(true);
 
     fireEvent.click(screen.getByRole("button", { name: "Tick two groups" }));

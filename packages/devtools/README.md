@@ -260,16 +260,11 @@ oxlint's `vitest/valid-title` refuses a `describe`, `it` or `test` title of 11 w
 and one that says "should". One `mustNotMatch` pattern holds both. The rule's
 `disallowedWords` option is left unset: at oxlint 1.85, setting it skips every check after it,
 the pattern included. The pattern's message prints the rule's tag, so `.oxlintrc.json` is
-named in `gates-printing-a-tag.json`.
-
-The files holding a refused title when the rule landed are listed by path in one override.
-That override sets the rule back to its stock checks, so a listed file still refuses an empty
-title. The list only shrinks.
+named in `gates-printing-a-tag.json`. No file is exempt from it.
 
 `test/test-titles.test.ts` runs oxlint over a throwaway tree at the root config's setting. An
-11-word title and a title with "should" are refused, and a 10-word title is accepted. Every
-listed file must still hold a refused title. It and `test/complexity-cap.test.ts` build their
-run from `test/rule-baseline.ts`.
+11-word title and a title with "should" are refused, and a 10-word title is accepted. It and
+`test/complexity-cap.test.ts` build their run from `test/rule-baseline.ts`.
 
 ## `src/insert-scan.ts` — the insert scan
 

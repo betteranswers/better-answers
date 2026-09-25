@@ -48,10 +48,7 @@ const signedInWith = async (
 };
 
 test.describe("the System screen's routes card", () => {
-  test("shows a member of one workspace their five routes and never another workspace's", async ({
-    page,
-    request,
-  }) => {
+  test("shows a member their five routes, never another workspace's", async ({ page, request }) => {
     const theirs = await provision(request, { name: "Southern Castings" });
     await seedRoutes(request, {
       workspaceId: theirs.workspaceId,
@@ -79,10 +76,7 @@ test.describe("the System screen's routes card", () => {
     await expect(everything).not.toContainText(theirs.name);
   });
 
-  test("says which purposes have no route, so the list is always five rows", async ({
-    page,
-    request,
-  }) => {
+  test("says which purposes have no route, keeping five rows", async ({ page, request }) => {
     await signedInWith(page, request, {
       name: "Acme Joinery",
       routes: [{ purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" }],
@@ -101,10 +95,7 @@ test.describe("the System screen's routes card", () => {
     await expect(embedding).not.toContainText("dimensions");
   });
 
-  test("says the embedding route is fixed, in words, with its dimension count and why", async ({
-    page,
-    request,
-  }) => {
+  test("says the embedding route is fixed, its dimensions and why", async ({ page, request }) => {
     await signedInWith(page, request, {
       name: "Halifax Fabrication",
       routes: [{ purpose: "embedding", provider: "mistral", model: "mistral-embed" }],
@@ -164,10 +155,7 @@ test.describe("the System screen's routes card", () => {
   });
 
   for (const role of ["Admin", "Editor", "Viewer"] as const) {
-    test(`shows the list to a member at ${role}, because the list is read-only`, async ({
-      page,
-      request,
-    }) => {
+    test(`shows the list to a member at ${role}`, async ({ page, request }) => {
       const workspace = await provision(request, { name: `Workspace for a ${role}` });
       await seedRoutes(request, {
         workspaceId: workspace.workspaceId,
@@ -185,7 +173,7 @@ test.describe("the System screen's routes card", () => {
     });
   }
 
-  test("is reachable by keyboard and clean under axe, and leaves the rest of System unbuilt", async ({
+  test("is keyboard-reachable and axe-clean, with the rest unbuilt", async ({
     page,
     request,
     passesTheAccessibilityGate,

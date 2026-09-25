@@ -13,8 +13,10 @@ const tsc = (() => {
   return binary;
 })();
 
-// The icon set declares a file per glyph, which puts this listing past Node's default
-// megabyte; truncation fails as a spawn error, not a finding.
+/**
+ * The icon set declares a file per glyph, which puts this listing past Node's default
+ * megabyte; truncation fails as a spawn error, not a finding.
+ */
 const LISTING_BUFFER_BYTES = 64 * 1024 * 1024;
 
 describe("the AppRouter seam", () => {

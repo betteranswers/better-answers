@@ -34,32 +34,4 @@ describe("the test-title rule", () => {
   it("accepts a 10-word title", () => {
     expect(refused(TEN_WORDS)).toEqual([]);
   });
-
-  it("accepts an 11-word title in a listed file", () => {
-    const file = baseline.onTheList();
-
-    expect(baseline.refusedFiles({ [file]: titled(ELEVEN_WORDS) })).toEqual([]);
-  });
-
-  it("keeps the stock title checks in a listed file", () => {
-    const file = baseline.onTheList();
-
-    expect(baseline.refusedFiles({ [file]: titled("") })).toEqual([file]);
-  });
-});
-
-describe("the test-title baseline", () => {
-  it("names only files the tree still has", () => {
-    expect(
-      baseline.gone(),
-      "a listed file was moved or deleted: drop its line from the list.",
-    ).toEqual([]);
-  });
-
-  it("names only files holding a title the rule refuses", () => {
-    expect(
-      baseline.cleared(),
-      "a listed file holds no refused title any more: drop its line from the list, which only shrinks.",
-    ).toEqual([]);
-  });
 });
