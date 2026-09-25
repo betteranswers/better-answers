@@ -12,7 +12,12 @@ import {
   type RefusalClass,
   type Result,
 } from "@better-answers/core/kernel";
-import { withHeldPrincipal, withPrincipal } from "@better-answers/core/store/postgres";
+import {
+  consumeIngress,
+  withHeldPrincipal,
+  withPrincipal,
+  type CounterRule,
+} from "@better-answers/core/store/postgres";
 
 import { sessionClaims, type SessionReader } from "../auth/verify.ts";
 import type { Doors } from "../doors.ts";
@@ -96,12 +101,25 @@ export const crossing = async <Value>(
   throw refused(ctx.log, act, answered.error);
 };
 
+/** A ceiling's answer carries this as its cause, so the wire can say when to ask again. */
+export class CeilingMet extends Error {
+  readonly retryAfterSeconds: number;
+
+  constructor(retryAfterSeconds: number) {
+    super(`ceiling met; ask again in ${retryAfterSeconds} seconds`);
+    this.name = "CeilingMet";
+    this.retryAfterSeconds = retryAfterSeconds;
+  }
+}
+
 const trpc = initTRPC.context<TrpcContext>().create({
   errorFormatter: ({ shape, error }) => ({
     ...shape,
     data: {
       ...shape.data,
       refusal: error.cause instanceof RefusedError ? error.cause.refusal : undefined,
+      retryAfterSeconds:
+        error.cause instanceof CeilingMet ? error.cause.retryAfterSeconds : undefined,
     },
   }),
 });
@@ -174,3 +192,31 @@ export const personProcedure = trpc.procedure.use(async ({ ctx, next }) => {
   const session = await sessionOf(ctx);
   return next({ ctx: { personId: session.user.id, doors: ctx.doors } });
 });
+
+/**
+ * A ceiling is no refusal: time is its only remedy, so past one the call answers 429 and when to
+ * ask again.
+ */
+export const personCeiling = (rule: CounterRule) =>
+  personProcedure.use(async ({ ctx, path, next }) => {
+    const counted = await attempt(() =>
+      consumeIngress(
+        ctx.doors.postgres,
+        "person",
+        `${path}:${ctx.personId}`,
+        rule,
+        ctx.clock.now(),
+      ),
+    );
+    if (!counted.ok) throw failed(ctx.log, consumeIngress.name, counted.error);
+    if (!counted.value.allowed) {
+      const { retryAfterSeconds } = counted.value;
+      ctx.log.info({ event: "trpc.throttled", act: path, retryAfterSeconds }, "throttled");
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message: `Too many calls from this person; ask again in ${retryAfterSeconds} seconds.`,
+        cause: new CeilingMet(retryAfterSeconds),
+      });
+    }
+    return next();
+  });

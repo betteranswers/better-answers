@@ -74,9 +74,13 @@ to do with what it was testing, and Better Auth logs that it could not tell the 
   `MCP_UNAUTHENTICATED_IP_RULE`, all in `apps/api/src/auth/constants.ts`; Better Auth's own
   limiter, configured there as `BETTER_AUTH_RATE_LIMIT`, keys on the same header. `MCP_TOKEN_RULE`
   is the odd one out, counted against the bearer token rather than the caller's address.
+- **Per person.** `personCeiling` in `apps/api/src/trpc/base.ts` counts a signed-in person's calls
+  to one procedure against a rule from the same constants file, `ASK_TO_JOIN_PERSON_RULE` for
+  asking to join. Past it the call answers 429 with `Retry-After` and no refusal word. It keys on
+  the session's person, so a flood through the page's own `page.request` reaches it.
 
-A spec that means to prove a ceiling names which of the two it is proving, and reaches it from the
-side that counts. Read the numbers off those two files rather than from here.
+A spec that means to prove a ceiling names which of the three it is proving, and reaches it from
+the side that counts. Read the numbers off those files rather than from here.
 
 ## The harness's acts
 
@@ -87,7 +91,7 @@ call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources
 
 | Act | What it does |
 | --- | --- |
-| `provision` | A workspace with its first Admin — the platform-provisioned act; the product offers no way to make one |
+| `provision` | A workspace with its first Admin — the platform-provisioned act; the product offers no way to make one. It answers the workspace's id, name and slug, and the Admin |
 | `person` | A person with no membership, for the refused screen and the picker |
 | `addMember` | A second membership at a named role — Admin, Editor or Viewer |
 | `removeMember` | Ends a membership, as the People screen will |
@@ -96,7 +100,7 @@ call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources
 | `seedBindings` | Source bindings as their acts and the worker leave them — documents, findings kept or overridden by an erasure, quarantined documents, chunks, an index run at any status, a concept and composition citing a document — answering each binding's and document's id |
 | `moveTheIndexRun` | The worker's two steps over the workspace's one index run, claimed then done, through the queue's own functions under the worker's role — how a spec watches a state word move without a worker process |
 
-Four more helpers in the same module drive the browser rather than the harness:
+Six more helpers in the same module drive the browser rather than the harness:
 
 | Helper | What it does |
 | --- | --- |
@@ -104,6 +108,8 @@ Four more helpers in the same module drive the browser rather than the harness:
 | `signIn` | Signs a person in **through the product's own screen** — fill the address, send, read the six-digit code back from the captured transport, fill it, submit, and wait for the code field to be gone rather than for the click |
 | `signOutFromTheShell` | Opens the top bar's menu, then signs out, because sign-out is one disclosure in |
 | `skipLinkReachesTheScreen` | Tab, the skip link has focus, Enter, `main` has focus — where a shell spec's keyboard traversal starts |
+| `clockTheNextKey` | Starts the act's clock in the page: from the next key to the node an XPath names reading a given text |
+| `theActLandedWithinItsBudget` | Reads that clock, annotates the test with it and asserts it under the act's 100 ms |
 
 The code is read from that capture and from nowhere else: the api's logger is forbidden from ever
 holding one.
@@ -127,7 +133,8 @@ holding one.
   beside the comparison, so a run that passes still says how close it came. A list's second is
   timed from a fresh `goto`, so no cache answers it. An act's 100 ms is timed **in the page** — a
   keydown listener and a `MutationObserver` — because a matcher's polling is coarser than the
-  budget; `apps/web/e2e/sources.spec.ts` holds both.
+  budget. `apps/web/e2e/sources.spec.ts` times both; the act's clock is the harness's two helpers
+  above.
 
 ## The accessibility gate
 

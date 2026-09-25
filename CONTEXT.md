@@ -815,6 +815,8 @@ to it by IRI and never restates it (ADR 0014).
 - **access request** — a signed-in person's recorded ask to join one workspace, with a reason;
   decided by an Admin — approved (which mints the invitation) or declined — each decision on the
   *audit log*. Not a *subject request*.
+- **slug** — a workspace's unique short name, given when the platform provisions it: how a person
+  names a workspace they do not belong to when they ask to join it. Never its id.
 - **membership** — a person's place in one workspace: the one *role* they hold there, the *groups*
   they belong to in it, and the instant their credentials there were last revoked. It begins when
   the person accepts an *invitation*, or when the platform provisions the workspace or adds them;

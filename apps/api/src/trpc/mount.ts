@@ -6,6 +6,7 @@ import type { Auth } from "../auth/index.ts";
 import { TRPC_IP_RULE } from "../auth/index.ts";
 import type { Doors } from "../doors.ts";
 import { limitByIp } from "../ingress/limits.ts";
+import { CeilingMet } from "./base.ts";
 import { appRouter } from "./router.ts";
 
 export const TRPC_ENDPOINT = "/trpc";
@@ -33,6 +34,12 @@ export const createTrpcRoutes = (deps: TrpcRoutesDependencies): Hono => {
         headers: context.req.raw.headers,
         log,
       }),
+      responseMeta: ({ errors }) => {
+        const met = errors.map((error) => error.cause).find((cause) => cause instanceof CeilingMet);
+        return met instanceof CeilingMet
+          ? { headers: { "retry-after": String(met.retryAfterSeconds) } }
+          : {};
+      },
     }),
   );
   return routes;

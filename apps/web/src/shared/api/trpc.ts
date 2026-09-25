@@ -27,6 +27,16 @@ export const refusalOf = (error: Error | ApiError): Refusal | undefined => {
   return refusal;
 };
 
+/**
+ * The seconds until a ceiling the call met lifts. A ceiling carries no refusal word, because
+ * waiting is its one remedy.
+ */
+export const ceilingLiftsIn = (error: Error | ApiError): number | undefined => {
+  if (!(error instanceof TRPCClientError)) return undefined;
+  const seconds: number | undefined = error.data?.retryAfterSeconds;
+  return seconds;
+};
+
 export const { TRPCProvider, useTRPC, useTRPCClient } = createTRPCContext<AppRouter>();
 
 export const createApiClient = () =>

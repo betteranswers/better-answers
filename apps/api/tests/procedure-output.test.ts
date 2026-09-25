@@ -27,6 +27,7 @@ type PathsAnsweringAResult<Leaves> = [ResultAnswering<Leaves>] extends [never]
 describe("what a procedure may answer the wire", () => {
   it("reaches every router procedure by the path its caller names", () => {
     expect(Object.keys(appRouter._def.procedures).sort()).toEqual([
+      "person.requestAccess",
       "person.setDisplayName",
       "routes.list",
       "runs.ofSubject",
@@ -45,6 +46,7 @@ describe("what a procedure may answer the wire", () => {
     expectTypeOf<EveryProcedure["path"]>().toEqualTypeOf<
       | "session.membership"
       | "person.setDisplayName"
+      | "person.requestAccess"
       | "routes.list"
       | "sources.list"
       | "sources.bind"

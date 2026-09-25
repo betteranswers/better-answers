@@ -1,13 +1,13 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 
-import { refusalOf, type ApiError, type RefusalWord } from "@/shared/api/trpc.ts";
+import { refusalOf, type Refusal, type RefusalWord } from "@/shared/api/trpc.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 
 import { useSetDisplayName } from "./auth-hooks.ts";
-import { AuthScreen, Outcome } from "./auth-screen.tsx";
+import { AuthScreen, Refused, type Said } from "./auth-screen.tsx";
 import { leavingFor, nextAfterSignIn, pageQuery } from "./carried-flow.ts";
 
 /**
@@ -18,8 +18,6 @@ const DISPLAY_NAME_MAX_CHARACTERS = 100;
 const HINT = "display-name-hint";
 
 const REFUSED = "display-name-refused";
-
-type Said = { readonly why: string; readonly next: string };
 
 const SAID_OF_WORD = {
   "display-name-empty": {
@@ -46,8 +44,6 @@ const SAID_OF_WORD = {
 
 const WORDS = new Map<string, Said>(Object.entries(SAID_OF_WORD));
 
-const SESSION_ENDED: Said = { why: "Your session has ended.", next: "Sign in again." };
-
 const REFUSED_OTHERWISE: Said = {
   why: "The platform could not read what this screen sent.",
   next: "Reload the page and save the name again.",
@@ -55,24 +51,7 @@ const REFUSED_OTHERWISE: Said = {
 
 const UNANSWERED = "The platform did not answer, so nothing changed. Try again in a moment.";
 
-function Refused(properties: { readonly failure: Error | ApiError }) {
-  const refusal = refusalOf(properties.failure);
-  if (refusal === undefined) {
-    return (
-      <Outcome tone="refused" id={REFUSED}>
-        {UNANSWERED}
-      </Outcome>
-    );
-  }
-  const said =
-    WORDS.get(refusal.word) ??
-    (refusal.class === "unauthenticated" ? SESSION_ENDED : REFUSED_OTHERWISE);
-  return (
-    <Outcome tone="refused" id={REFUSED}>
-      Refused: <code className="font-mono">{refusal.word}</code>. {said.why} {said.next}
-    </Outcome>
-  );
-}
+const saidOf = (refusal: Refusal): Said => WORDS.get(refusal.word) ?? REFUSED_OTHERWISE;
 
 export function DisplayNameScreen() {
   const navigate = useNavigate();
@@ -121,20 +100,9 @@ export function DisplayNameScreen() {
         </Button>
       </form>
 
-      {failure === null ? null : <Refused failure={failure} />}
-
-      {refusedAs === "unauthenticated" ? (
-        <Button
-          type="button"
-          variant="link"
-          className="mt-6 px-0"
-          onClick={() => {
-            void navigate(leavingFor(`/sign-in${pageQuery()}`));
-          }}
-        >
-          Sign in again
-        </Button>
-      ) : null}
+      {failure === null ? null : (
+        <Refused id={REFUSED} failure={failure} saidOf={saidOf} unanswered={UNANSWERED} />
+      )}
     </AuthScreen>
   );
 }

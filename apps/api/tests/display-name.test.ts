@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
 import { displayNameHeldBy } from "./provoke.ts";
 import { appForSuite } from "./suite-app.ts";
-import { refusalOfCall, webSignedIn } from "./web-client.ts";
+import { NO_SESSION_ANSWERED, refusalOfCall, webSignedIn } from "./web-client.ts";
 
 const app = appForSuite();
 
@@ -59,9 +59,7 @@ describe("a signed-in person setting their own display name over tRPC", () => {
     const response = await app().client().json(SET_DISPLAY_NAME, { displayName: "Mallory" });
 
     expect(response.status).toBe(401);
-    expect(await response.json()).toMatchObject({
-      error: { data: { refusal: { word: "no-session", class: "unauthenticated" } } },
-    });
+    expect(await response.json()).toMatchObject(NO_SESSION_ANSWERED);
   });
 
   it("records one identity-set ledger row by person id, not name", async () => {

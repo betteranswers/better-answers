@@ -1,9 +1,15 @@
 import type { Page } from "@playwright/test";
 
 import { expect, test } from "./browser.ts";
-import { addMember, anAddress, person, provision, signIn } from "./harness.ts";
-
-const ACT_BUDGET_MS = 100;
+import {
+  addMember,
+  anAddress,
+  clockTheNextKey,
+  person,
+  provision,
+  signIn,
+  theActLandedWithinItsBudget,
+} from "./harness.ts";
 
 const displayNameHeading = (page: Page) =>
   page.getByRole("heading", { level: 1, name: "Your display name" });
@@ -14,38 +20,6 @@ const noWorkspaceHeading = (page: Page) =>
 const displayNameField = (page: Page) => page.getByLabel("Display name");
 
 const saveButton = (page: Page) => page.getByRole("button", { name: "Save and continue" });
-
-// The save's 100 ms is timed in the page, key to the button reading as saving: a matcher's
-// polling is coarser than the budget.
-const clockTheSave = (page: Page) =>
-  page.evaluate(() => {
-    const saving = () =>
-      [...document.querySelectorAll("main button")].some(
-        (button) => button.textContent === "Saving",
-      );
-    const clocked = new Promise<number>((resolve) => {
-      document.addEventListener(
-        "keydown",
-        () => {
-          const pressedAt = performance.now();
-          const observer = new MutationObserver(() => {
-            if (!saving()) return;
-            observer.disconnect();
-            resolve(performance.now() - pressedAt);
-          });
-          observer.observe(document.body, { subtree: true, childList: true, characterData: true });
-        },
-        { capture: true, once: true },
-      );
-    });
-    Reflect.set(window, "saveClocked", clocked);
-  });
-
-const theSaveLandedWithinItsBudget = async (page: Page) => {
-  const elapsed = await page.evaluate(() => Reflect.get(window, "saveClocked"));
-  test.info().annotations.push({ type: "display name save", description: `${elapsed} ms` });
-  expect(elapsed, "the save did not read as saving within its budget").toBeLessThan(ACT_BUDGET_MS);
-};
 
 // Every screen the page was shown, so a screen that came and went cannot pass unseen.
 const screensShown = (page: Page): readonly string[] => {
@@ -82,9 +56,9 @@ test("a person signing in for the first time gives a display name before anythin
   expect(ring, "the focused field shows no focus ring").not.toBe("none");
 
   await page.keyboard.type("Priya Shah");
-  await clockTheSave(page);
+  await clockTheNextKey(page, { at: "//main//button[@type='submit']", reads: "Saving" });
   await page.keyboard.press("Enter");
-  await theSaveLandedWithinItsBudget(page);
+  await theActLandedWithinItsBudget(page, "display name save");
 
   await expect(noWorkspaceHeading(page)).toBeVisible();
 });
