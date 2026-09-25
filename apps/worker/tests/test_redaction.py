@@ -237,7 +237,7 @@ def how_written(found: Redaction, withholding: Withholding) -> str:
     return NOT_WRITTEN_AT_ALL
 
 
-def test_every_span_is_cut_back_out_of_the_text_by_the_offsets_it_came_with(
+def test_cuts_every_span_out_by_its_own_offsets(
     on_a_plain_binding: Redaction, page: str
 ) -> None:
 
@@ -271,7 +271,7 @@ def test_every_finding_names_the_tier_its_category_is_raised_at(
     assert ("personal-contact", "default-on") in raised
 
 
-def test_the_always_set_is_withheld_where_every_switchable_rule_is_off(
+def test_withholds_the_always_set_with_every_switchable_rule_off(
     with_nothing_switchable_on: Redaction,
 ) -> None:
 
@@ -284,7 +284,7 @@ def test_the_always_set_is_withheld_where_every_switchable_rule_is_off(
     assert redacted.count("[withheld]") == 7
 
 
-def test_a_switchable_tier_that_is_off_leaves_its_spans_in_the_text(
+def test_a_switched_off_tier_leaves_its_spans_in_the_text(
     with_nothing_switchable_on: Redaction,
 ) -> None:
 
@@ -295,7 +295,7 @@ def test_a_switchable_tier_that_is_off_leaves_its_spans_in_the_text(
     assert A_CONSUMER_ADDRESS in redacted
 
 
-def test_the_default_on_tier_writes_its_own_word_in_place_of_each_span(
+def test_the_default_on_tier_writes_its_word_over_each_span(
     on_a_plain_binding: Redaction,
 ) -> None:
 
@@ -308,7 +308,7 @@ def test_the_default_on_tier_writes_its_own_word_in_place_of_each_span(
     assert A_CONSUMER_ADDRESS not in redacted
 
 
-def test_a_job_title_stays_in_the_text_until_the_binding_switches_its_tier_on(
+def test_a_job_title_stays_until_its_tier_is_switched_on(
     on_a_plain_binding: Redaction, on_an_hr_shaped_binding: Redaction, page: str
 ) -> None:
 
@@ -324,7 +324,7 @@ def test_a_job_title_stays_in_the_text_until_the_binding_switches_its_tier_on(
     assert on_an_hr_shaped_binding.counts["job-title"] == 5
 
 
-def test_a_bare_date_is_not_a_finding_and_a_date_beside_date_of_birth_is(
+def test_only_a_date_beside_date_of_birth_is_a_finding(
     on_a_plain_binding: Redaction, page: str
 ) -> None:
 
@@ -336,7 +336,7 @@ def test_a_bare_date_is_not_a_finding_and_a_date_beside_date_of_birth_is(
         assert bare in on_a_plain_binding.text
 
 
-def test_an_email_on_a_consumer_domain_is_personal_contact_and_a_company_one_is_not(
+def test_only_a_consumer_domain_email_is_personal_contact(
     on_a_plain_binding: Redaction, page: str
 ) -> None:
 
@@ -356,7 +356,7 @@ def test_an_email_on_a_consumer_domain_is_personal_contact_and_a_company_one_is_
     assert A_COMPANY_ADDRESS in on_a_plain_binding.text
 
 
-def test_the_telephone_number_is_personal_contact_whatever_the_domain_rule_does(
+def test_the_telephone_number_is_personal_contact_regardless_of_domain(
     on_a_plain_binding: Redaction, page: str
 ) -> None:
 
@@ -391,7 +391,7 @@ def test_a_health_cue_withholds_its_sentence_and_narrows_the_document(
     assert A_HEALTH_SENTENCE not in on_a_plain_binding.text
 
 
-def test_an_ordinary_sentence_carrying_a_health_word_is_kept_on_every_binding(
+def test_an_ordinary_sentence_with_a_health_word_is_always_kept(
     on_a_plain_binding: Redaction,
     with_nothing_switchable_on: Redaction,
     on_an_hr_shaped_binding: Redaction,
@@ -414,7 +414,7 @@ def test_an_ordinary_sentence_carrying_a_health_word_is_kept_on_every_binding(
         assert A_HEALTH_AND_SAFETY_SENTENCE in found.text
 
 
-def test_a_cue_is_the_lemma_of_the_word_a_document_wrote_and_not_its_spelling() -> None:
+def test_a_cue_matches_the_words_lemma_not_its_spelling() -> None:
 
     cued = (
         "Sickness absence is logged by the site office.\n\n"
@@ -441,7 +441,7 @@ def test_a_page_with_no_special_category_cue_narrows_nothing() -> None:
     ] == []
 
 
-def test_a_sort_code_shaped_number_inside_a_code_fence_is_a_finding_today(
+def test_finds_a_sort_code_inside_a_code_fence_today(
     on_a_plain_binding: Redaction, page: str
 ) -> None:
 
@@ -454,7 +454,7 @@ def test_the_redaction_carries_the_version_string_every_finding_rides_on(
     assert on_a_plain_binding.version == VERSION_STRING
 
 
-def test_a_name_passes_through_on_a_plain_binding_and_is_a_pseudonym_on_an_hr_one(
+def test_a_name_is_a_pseudonym_only_on_an_hr_binding(
     on_a_plain_binding: Redaction, on_an_hr_shaped_binding: Redaction
 ) -> None:
 
@@ -465,7 +465,7 @@ def test_a_name_passes_through_on_a_plain_binding_and_is_a_pseudonym_on_an_hr_on
     assert "[person Y]" in on_an_hr_shaped_binding.text
 
 
-def test_the_same_name_is_the_same_letter_everywhere_in_one_binding(
+def test_one_name_is_one_letter_throughout_a_binding(
     on_an_hr_shaped_binding: Redaction, page: str
 ) -> None:
 
@@ -487,7 +487,7 @@ def test_a_different_seed_gives_the_same_name_a_different_letter(
         assert under_other in under_another_seed.text
 
 
-def test_a_name_inside_an_officers_block_is_withheld_with_its_block_whatever_the_rules(
+def test_withholds_a_name_with_its_officers_block_whatever_the_rules(
     on_a_plain_binding: Redaction,
     on_an_hr_shaped_binding: Redaction,
     with_nothing_switchable_on: Redaction,
@@ -506,7 +506,7 @@ def test_a_name_inside_an_officers_block_is_withheld_with_its_block_whatever_the
         assert block.count("[withheld]") == 2
 
 
-def test_the_same_name_outside_the_block_is_still_its_own_tier(
+def test_the_same_name_outside_the_block_keeps_its_own_tier(
     on_a_plain_binding: Redaction, on_an_hr_shaped_binding: Redaction, page: str
 ) -> None:
 
@@ -518,7 +518,7 @@ def test_the_same_name_outside_the_block_is_still_its_own_tier(
     }
 
 
-def test_a_signatory_named_inside_a_home_address_is_withheld_with_its_block(
+def test_withholds_a_signatory_inside_a_home_address_with_the_address(
     on_a_plain_binding: Redaction,
     with_nothing_switchable_on: Redaction,
     page: str,
@@ -562,7 +562,7 @@ def test_a_signatory_named_inside_a_home_address_is_withheld_with_its_block(
     ) == (True, UNDER_ITS_OWN_PLACEHOLDER)
 
 
-def test_a_suppressed_name_is_withheld_and_every_other_name_is_untouched(
+def test_withholds_a_suppressed_name_and_leaves_every_other_untouched(
     on_an_hr_shaped_binding: Redaction, with_one_name_suppressed: Redaction
 ) -> None:
 
@@ -575,7 +575,7 @@ def test_a_suppressed_name_is_withheld_and_every_other_name_is_untouched(
         ) == on_an_hr_shaped_binding.text.count(f"[person {letter}]")
 
 
-def test_a_suppression_withholds_the_named_person_at_the_always_tier_and_rewrites_none(
+def test_a_suppression_withholds_at_always_and_rewrites_no_tier(
     on_a_plain_binding: Redaction, with_one_name_suppressed: Redaction, page: str
 ) -> None:
 
@@ -601,7 +601,7 @@ def test_a_suppression_withholds_the_named_person_at_the_always_tier_and_rewrite
     [THE_SAFE_SET, NOTHING_SWITCHABLE, AN_HR_SHAPED_BINDING],
     ids=["the safe set", "nothing switchable on", "an HR-shaped binding"],
 )
-def test_an_erased_work_address_and_name_are_withheld_whatever_rule_is_in_force(
+def test_withholds_an_erased_work_address_and_name_under_any_rules(
     page: str, spans: tuple[Span, ...], rules_in_force: Mapping[str, bool]
 ) -> None:
 
@@ -615,7 +615,7 @@ def test_an_erased_work_address_and_name_are_withheld_whatever_rule_is_in_force(
     assert "our own company address, [withheld]. Data" in found.text
 
 
-def test_an_erasure_match_is_no_finding_and_moves_no_count_or_verdict(
+def test_an_erasure_match_moves_no_finding_count_or_verdict(
     on_a_plain_binding: Redaction, with_his_erasure: Redaction, page: str
 ) -> None:
 
@@ -660,7 +660,7 @@ def test_a_kept_span_naming_an_erased_person_keeps_her_withheld() -> None:
     assert [one.reason for one in erased.withholdings] == [RESTORED]
 
 
-def test_a_switched_off_rule_does_not_release_an_erased_name_inside_its_span() -> None:
+def test_an_erased_name_inside_a_switched_off_span_stays_withheld() -> None:
 
     text = AN_ADDRESS_THE_BANK_RULE_RAN_INTO
     claims = (("UK_HOME_ADDRESS", "Imogen Sarkar, 12 Acacia Avenue, Leeds LS1 4AB"),)
@@ -674,7 +674,7 @@ def test_a_switched_off_rule_does_not_release_an_erased_name_inside_its_span() -
     )
 
 
-def test_a_match_a_withheld_finding_covers_adds_no_span_of_its_own(
+def test_a_match_under_a_withheld_finding_adds_no_span(
     page: str, spans: tuple[Span, ...]
 ) -> None:
 
@@ -690,7 +690,7 @@ def test_a_match_a_withheld_finding_covers_adds_no_span_of_its_own(
     )
 
 
-def test_a_match_inside_a_withheld_finding_is_written_under_the_findings_word() -> None:
+def test_a_match_inside_a_withheld_finding_takes_the_findings_word() -> None:
 
     text = AN_ADDRESS_THE_BANK_RULE_RAN_INTO
     payment = (span_over(text, "UK_BANK_ACCOUNT", A_PAYMENT_TO_HER),)
@@ -701,7 +701,7 @@ def test_a_match_inside_a_withheld_finding_is_written_under_the_findings_word() 
     assert found.text == "Pay [withheld] today"
 
 
-def test_an_erasure_match_takes_its_characters_from_a_lower_tier_it_overlaps() -> None:
+def test_an_erasure_match_takes_characters_from_an_overlapping_lower_tier() -> None:
 
     text = "Deliveries go to Imogen Sarkar, 9 Kestrel Lane, Wetherby LS22 4TD"
     spans = (
@@ -717,7 +717,7 @@ def test_an_erasure_match_takes_its_characters_from_a_lower_tier_it_overlaps() -
     assert found.text == "Deliveries go to [withheld][home address withheld]"
 
 
-def test_a_one_word_name_is_below_the_floor_and_withholds_nothing() -> None:
+def test_a_one_word_name_withholds_nothing_below_the_floor() -> None:
 
     text = "Imogen signed the lease for Imogen Sarkar."
     one_word = ({"emails": (), "names": ("Imogen",), "other": ()},)
@@ -756,7 +756,7 @@ def restore_of(found: Redaction, page: str, span: str, tier: str = "always") -> 
     return Restore(rule_id=finding.rule_id, start=finding.start, end=finding.end)
 
 
-def test_a_restored_span_is_left_in_the_text_and_is_still_the_finding_it_was(
+def test_leaves_a_restored_span_in_the_text_as_a_finding(
     on_a_plain_binding: Redaction,
     page: str,
     spans: tuple[Span, ...],
@@ -774,7 +774,7 @@ def test_a_restored_span_is_left_in_the_text_and_is_still_the_finding_it_was(
     assert FENCED_SORT_CODE not in found.text
 
 
-def test_a_restore_is_of_one_rules_span_and_another_rule_over_it_restores_nothing(
+def test_a_restore_under_another_rule_restores_nothing(
     on_a_plain_binding: Redaction,
     page: str,
     spans: tuple[Span, ...],
@@ -834,7 +834,7 @@ def test_an_erasure_outranks_a_restore(
     ] == [in_the_block]
 
 
-def test_the_withholding_names_the_first_of_the_five_reasons_that_holds(
+def test_the_withholding_names_the_first_reason_that_holds(
     on_a_plain_binding: Redaction,
     on_an_hr_shaped_binding: Redaction,
     page: str,
@@ -866,7 +866,7 @@ def test_the_withholding_names_the_first_of_the_five_reasons_that_holds(
     } == {OVERRIDDEN_BY_THE_ERASURE, AN_ERASURE, RESTORED, SWITCHED_OFF, IN_FORCE}
 
 
-def test_the_seam_answers_one_withholding_for_each_finding_in_the_order_it_raised_them(
+def test_answers_one_withholding_per_finding_in_raised_order(
     on_a_plain_binding: Redaction,
     with_nothing_switchable_on: Redaction,
     with_one_name_suppressed: Redaction,
@@ -881,7 +881,7 @@ def test_the_seam_answers_one_withholding_for_each_finding_in_the_order_it_raise
         assert [one.finding for one in found.withholdings] == list(found.findings)
 
 
-def test_a_restore_moves_neither_the_counts_nor_the_verdict_the_findings_give(
+def test_a_restore_moves_neither_the_counts_nor_the_verdict(
     on_a_plain_binding: Redaction,
     page: str,
     spans: tuple[Span, ...],
@@ -920,7 +920,7 @@ def dismissal_at(at: tuple[int, int]) -> Dismissal:
     return Dismissal(rule_id="HEALTH_CUE", start=at[0], end=at[1])
 
 
-def test_a_health_cue_in_the_verb_form_withholds_its_sentence_and_narrows_the_page(
+def test_a_verb_form_health_cue_withholds_and_narrows_the_page(
     service_notes: str, service_spans: tuple[Span, ...]
 ) -> None:
     start, end = THE_DIAGNOSED_SENTENCE_AT
@@ -954,7 +954,7 @@ def test_the_verb_withholds_an_engineers_diagnosis_of_a_fault_too(
     assert AN_ENGINEERING_DIAGNOSIS not in found.text
 
 
-def test_dismissing_every_special_category_finding_lifts_the_verdict_and_nothing_else(
+def test_dismissing_every_special_category_finding_lifts_only_the_verdict(
     service_notes: str, service_spans: tuple[Span, ...]
 ) -> None:
     standing = redact(service_notes, service_spans, THE_SAFE_SET, NO_SUPPRESSIONS, SEED)
@@ -978,7 +978,7 @@ def test_dismissing_every_special_category_finding_lifts_the_verdict_and_nothing
     assert found.counts == standing.counts
 
 
-def test_a_dismissal_that_leaves_one_special_category_finding_standing_lifts_nothing(
+def test_one_special_category_finding_left_standing_lifts_nothing(
     service_notes: str, service_spans: tuple[Span, ...]
 ) -> None:
 
@@ -994,9 +994,7 @@ def test_a_dismissal_that_leaves_one_special_category_finding_standing_lifts_not
     assert (found.verdict, found.lifted) == ("Restricted", False)
 
 
-def test_dismissing_an_engineers_diagnosis_lifts_its_page_and_keeps_it_withheld() -> (
-    None
-):
+def test_a_dismissed_diagnosis_lifts_its_page_and_stays_withheld() -> None:
     section = the_engineers_section()
     spans = spans_detected(section)
     start, end = THE_ENGINEERS_SENTENCE_AT
@@ -1021,7 +1019,7 @@ def test_dismissing_an_engineers_diagnosis_lifts_its_page_and_keeps_it_withheld(
     assert AN_ENGINEERING_DIAGNOSIS not in dismissed.text
 
 
-def test_a_span_both_kept_and_dismissed_is_back_in_the_text_and_lifts_the_verdict(
+def test_a_kept_and_dismissed_span_returns_and_lifts_the_verdict(
     service_notes: str, service_spans: tuple[Span, ...]
 ) -> None:
     both = [THE_ENGINEERS_SENTENCE_AT, THE_DIAGNOSED_SENTENCE_AT]
@@ -1062,7 +1060,7 @@ def test_a_dismissal_under_another_rule_dismisses_nothing(
     assert (found.verdict, found.lifted) == ("Restricted", False)
 
 
-def test_a_keep_lets_a_health_sentence_back_in_and_lifts_nothing(
+def test_a_kept_health_sentence_returns_but_lifts_nothing(
     service_notes: str, service_spans: tuple[Span, ...]
 ) -> None:
     kept = [
@@ -1078,7 +1076,7 @@ def test_a_keep_lets_a_health_sentence_back_in_and_lifts_nothing(
     assert (found.verdict, found.lifted) == ("Restricted", False)
 
 
-def test_a_page_that_raises_no_special_category_finding_is_never_lifted() -> None:
+def test_a_page_without_special_category_findings_is_never_lifted() -> None:
     text = "The sort code is 00-00-00 and the account number is 12345678."
 
     found = redacted_over(
@@ -1090,7 +1088,7 @@ def test_a_page_that_raises_no_special_category_finding_is_never_lifted() -> Non
     assert (found.verdict, found.lifted) == (None, False)
 
 
-def test_each_withheld_character_lies_under_one_written_span_and_a_kept_one_writes_none(
+def test_each_withheld_character_lies_under_exactly_one_written_span(
     on_a_plain_binding: Redaction,
     with_nothing_switchable_on: Redaction,
     on_an_hr_shaped_binding: Redaction,
@@ -1136,7 +1134,7 @@ def extent_written_for(found: Redaction, span: WrittenSpan) -> tuple[int, int]:
     return span.withholding.finding.start, span.withholding.finding.end
 
 
-def test_a_loser_of_a_partial_overlap_gives_up_only_the_characters_the_winner_takes(
+def test_a_partial_overlap_loser_cedes_only_the_winners_characters(
     with_a_partial_overlap: Redaction,
 ) -> None:
 
@@ -1158,7 +1156,7 @@ def test_a_loser_of_a_partial_overlap_gives_up_only_the_characters_the_winner_ta
     )
 
 
-def test_a_trimmed_loser_is_still_the_finding_it_was_raised_as(
+def test_a_trimmed_loser_keeps_the_finding_it_was_raised_as(
     with_a_partial_overlap: Redaction,
 ) -> None:
 
@@ -1228,7 +1226,7 @@ def test_a_trimmed_loser_is_still_the_finding_it_was_raised_as(
         ),
     ],
 )
-def test_a_loser_is_written_over_what_its_winners_leave_and_nowhere_if_they_leave_none(
+def test_writes_a_loser_only_over_what_its_winners_leave(
     text: str, claims: tuple[tuple[str, str], ...], written: list[tuple[str, str]]
 ) -> None:
 
@@ -1247,7 +1245,7 @@ def test_a_loser_is_written_over_what_its_winners_leave_and_nowhere_if_they_leav
         ),
     ],
 )
-def test_a_finding_inside_a_losing_container_is_withheld_under_what_the_container_keeps(
+def test_a_finding_in_a_losing_container_takes_the_containers_placeholder(
     inside: tuple[tuple[str, str], ...],
 ) -> None:
 
@@ -1272,9 +1270,7 @@ def test_a_finding_inside_a_losing_container_is_withheld_under_what_the_containe
     assert found.text == "Pay [home address withheld][withheld] today"
 
 
-def test_a_name_that_lost_part_of_its_run_is_written_with_the_whole_names_letter() -> (
-    None
-):
+def test_a_partly_overlapped_name_keeps_the_whole_names_letter() -> None:
 
     text = (
         "Imogen Sarkar asked Rosalind Petheridge to write to"

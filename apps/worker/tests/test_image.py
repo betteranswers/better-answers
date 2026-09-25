@@ -1020,7 +1020,7 @@ def contents(image: str) -> ImageContents:
     )
 
 
-def test_the_image_gives_the_worker_no_development_dependency_it_could_load(
+def test_the_image_carries_no_development_dependency(
     contents: ImageContents,
 ) -> None:
     assert development_only_distributions()
@@ -1035,7 +1035,7 @@ def test_the_image_runs_the_interpreter_this_tier_says_it_requires(
     assert contents.version[:2] == pinned_python_version()
 
 
-def test_the_interpreter_is_the_python_images_and_not_one_the_build_fetched(
+def test_the_interpreter_is_the_python_images_not_a_fetched_one(
     contents: ImageContents,
 ) -> None:
 
@@ -1063,7 +1063,7 @@ def test_the_runtime_is_distroless_and_renovate_moves_every_pinned_base() -> Non
     )
 
 
-def test_the_image_carries_no_shell_no_package_manager_and_no_wheel_to_install_one(
+def test_the_image_carries_no_shell_package_manager_or_installer_wheel(
     contents: ImageContents,
 ) -> None:
     assert contents.tools_present == ()
@@ -1083,7 +1083,7 @@ def test_the_health_check_and_the_command_run_without_a_shell(
     assert contents.command_interpreter == f"/usr/local/bin/python{major}.{minor}"
 
 
-def test_a_health_check_or_a_command_in_string_form_reads_as_no_exec_form() -> None:
+def test_a_string_form_healthcheck_or_command_has_no_exec_form() -> None:
     written = (
         "FROM scratch AS runtime\n"
         "HEALTHCHECK --interval=15s \\\n"
@@ -1095,14 +1095,14 @@ def test_a_health_check_or_a_command_in_string_form_reads_as_no_exec_form() -> N
     assert exec_form(written, "CMD") is None
 
 
-def test_every_shared_object_the_image_carries_resolves_on_its_own_loader(
+def test_every_shared_object_in_the_image_resolves_on_its_loader(
     contents: ImageContents,
 ) -> None:
     assert contents.shared_object_count > 0
     assert dict(contents.unresolved_shared_objects) == {}
 
 
-def test_every_library_the_image_carries_has_a_package_record_a_scanner_reads(
+def test_every_library_in_the_image_has_a_scannable_package_record(
     contents: ImageContents,
 ) -> None:
     assert contents.library_file_count > 0
@@ -1128,7 +1128,7 @@ def test_the_image_carries_every_library_the_detector_runs_on(
     assert set(contents.imports) == set(PROBED_IMPORTS)
 
 
-def test_the_image_carries_both_converters_at_the_versions_this_tier_pins(
+def test_the_image_carries_both_converters_at_their_pinned_versions(
     contents: ImageContents,
 ) -> None:
 
@@ -1155,7 +1155,7 @@ def test_the_image_carries_every_library_the_host_composes(
     )
 
 
-def test_the_image_carries_the_model_the_seam_runs_and_not_the_one_it_was_measured_on(
+def test_the_image_carries_the_running_model_not_the_measured_one(
     contents: ImageContents,
 ) -> None:
 
@@ -1167,7 +1167,7 @@ def test_the_image_carries_the_model_the_seam_runs_and_not_the_one_it_was_measur
     assert contents.spacy_pipeline is True
 
 
-def test_the_image_holds_its_weights_where_the_deploy_unit_says_they_are(
+def test_the_image_holds_its_weights_where_the_deploy_unit_says(
     contents: ImageContents,
 ) -> None:
 
@@ -1175,7 +1175,7 @@ def test_the_image_holds_its_weights_where_the_deploy_unit_says_they_are(
     assert contents.hf_home != ""
 
 
-def test_the_image_stops_the_engine_calling_its_gateway_and_the_deploy_unit_agrees(
+def test_the_image_and_deploy_unit_refuse_the_engines_gateway_call(
     contents: ImageContents,
 ) -> None:
     assert contents.usage_tracking == worker_environment(
@@ -1184,11 +1184,11 @@ def test_the_image_stops_the_engine_calling_its_gateway_and_the_deploy_unit_agre
     assert contents.usage_tracking == "1"
 
 
-def test_the_deploy_unit_mounts_nothing_over_the_weights_the_image_carries() -> None:
+def test_the_deploy_unit_mounts_nothing_over_the_images_weights() -> None:
     assert worker_mounts_over(worker_environment("HF_HOME")) == []
 
 
-def test_the_lmdb_mount_is_caught_with_a_trailing_comment_and_a_longer_path_is_not(
+def test_finds_a_commented_lmdb_mount_but_not_a_longer_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     assert worker_mounts_over("/data/worker/lmdb") == [
@@ -1210,11 +1210,11 @@ def test_the_lmdb_mount_is_caught_with_a_trailing_comment_and_a_longer_path_is_n
     assert worker_mounts_over("/data/worker/lmdb") == []
 
 
-def test_the_deploy_unit_mounts_nothing_over_the_suffix_list_in_the_image() -> None:
+def test_the_deploy_unit_mounts_nothing_over_the_images_suffix_list() -> None:
     assert worker_mounts_over(worker_environment("TLDEXTRACT_CACHE")) == []
 
 
-def test_the_build_fetches_the_weights_by_running_the_module_that_names_them(
+def test_the_build_runs_the_weights_module_to_fetch_them(
     contents: ImageContents,
 ) -> None:
 
@@ -1237,7 +1237,7 @@ def test_the_runtime_stage_copies_the_source_last() -> None:
     }
 
 
-def test_the_image_redacts_the_fixture_with_its_network_refused_and_fetches_nothing(
+def test_the_image_redacts_the_fixture_offline_and_fetches_nothing(
     image: str,
 ) -> None:
     found = _answered(
@@ -1276,7 +1276,7 @@ def test_the_image_redacts_the_fixture_with_its_network_refused_and_fetches_noth
     assert found["reached_out"] == []
 
 
-def test_what_the_seam_costs_per_page_is_measured_on_the_image_and_never_budgeted(
+def test_the_seams_page_cost_is_measured_without_a_budget(
     image: str,
 ) -> None:
     measured = _read_measurement(
@@ -1310,7 +1310,7 @@ def test_what_the_seam_costs_per_page_is_measured_on_the_image_and_never_budgete
     assert measured.pinned_ms > 0
 
 
-def test_a_documents_ceiling_is_cut_from_the_slowest_reading_under_the_cap() -> None:
+def test_a_documents_ceiling_comes_from_the_slowest_capped_reading() -> None:
     reading = SEAM_READINGS[THE_CEILINGS_READING]
     margin_s = math.ceil(LOADS_IN_THE_MARGIN * max(reading.load_ms) / 1000)
 
@@ -1326,7 +1326,7 @@ def test_a_documents_ceiling_is_cut_from_the_slowest_reading_under_the_cap() -> 
     assert _pipeline_constant("landed.py", "TIMEOUT_MARGIN_MS") == margin_s * 1000
 
 
-def test_both_converters_hold_on_the_image_under_the_engines_own_runtime(
+def test_both_converters_hold_on_the_image_under_the_engines_runtime(
     image: str,
 ) -> None:
     if not DOCKER_ANSWERS:
@@ -1351,7 +1351,7 @@ def test_both_converters_hold_on_the_image_under_the_engines_own_runtime(
     )
 
 
-def test_the_container_runs_as_the_uid_that_owns_this_tiers_volumes_with_its_own_home(
+def test_runs_as_the_volumes_uid_with_a_writable_home(
     contents: ImageContents,
 ) -> None:
     assert contents.uid == chowned_worker_uid()
@@ -1437,7 +1437,7 @@ def test_this_tier_reads_the_names_the_workflows_actually_hand_it() -> None:
     assert misread == set(), CHECK_WORKFLOW
 
 
-def test_the_runner_refuses_the_engines_gateway_call_the_way_the_image_does() -> None:
+def test_the_runner_refuses_the_engines_gateway_call_like_the_image() -> None:
     legs = _legs_of_check()
     running = {
         job for job, lines in legs.items() if THIS_TIERS_GATE in _gates_of(lines)
@@ -1462,7 +1462,7 @@ def test_the_runner_refuses_the_engines_gateway_call_the_way_the_image_does() ->
     )
 
 
-def test_the_worker_leg_of_the_image_job_names_this_file_as_its_probe() -> None:
+def test_the_worker_image_leg_names_this_file_as_its_probe() -> None:
     leg = matrix_leg("worker")
     here = Path(__file__).resolve().relative_to(WORKSPACE)
 
@@ -1470,7 +1470,7 @@ def test_the_worker_leg_of_the_image_job_names_this_file_as_its_probe() -> None:
     assert "apps/worker" in leg["probe"]
 
 
-def test_a_runner_builds_through_buildx_and_a_laptop_builds_as_it_always_did() -> None:
+def test_a_runner_builds_through_buildx_and_a_laptop_as_before() -> None:
     leg = {
         "tier": "worker",
         "dockerfile": "apps/worker/Dockerfile",
@@ -1503,7 +1503,7 @@ def test_a_runner_builds_through_buildx_and_a_laptop_builds_as_it_always_did() -
     ]
 
 
-def test_only_a_builder_that_can_export_a_cache_is_taken_for_one() -> None:
+def test_takes_only_a_builder_that_can_export_a_cache() -> None:
     assert (
         _builder_that_can_export(
             "Name:          builder-1c0ffee\n"

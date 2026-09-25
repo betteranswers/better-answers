@@ -323,7 +323,7 @@ def catalogue_rows_of(
         return by_column(cursor)
 
 
-def test_the_loop_claims_an_index_job_runs_it_and_finishes_it_with_its_three_figures(
+def test_the_loop_claims_runs_and_finishes_an_index_job(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -357,7 +357,7 @@ def test_the_loop_claims_an_index_job_runs_it_and_finishes_it_with_its_three_fig
     assert row[4]["restores_overridden_by_erasure"] == []
 
 
-def test_every_column_of_the_chunk_rows_one_run_lands_under_a_binding_with_a_visibility(
+def test_lands_every_chunk_column_under_a_binding_with_a_visibility(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -449,7 +449,7 @@ def test_the_findings_land_as_the_rows_an_admin_will_review(
     ]
 
 
-def test_the_catalogue_row_is_reconciled_and_the_copy_lands_beside_the_original(
+def test_reconciles_the_catalogue_and_lands_the_copy_beside_the_original(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -483,7 +483,7 @@ def test_the_catalogue_row_is_reconciled_and_the_copy_lands_beside_the_original(
 
 
 # jscpd:ignore-start
-def test_a_special_category_verdict_narrows_the_document_and_every_row_cut_from_it(
+def test_a_special_category_verdict_narrows_the_document_and_its_chunks(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -546,7 +546,7 @@ def test_the_verdict_narrows_a_documents_class_and_never_widens_it(
         (None, "Public", "Public"),
     ],
 )
-def test_the_fold_takes_the_narrower_word_whichever_side_it_arrives_on(
+def test_the_fold_takes_the_narrower_word_from_either_side(
     database: tuple[psycopg.Connection, str],
     tmp_path: Path,
     standing: str | None,
@@ -568,7 +568,7 @@ def test_the_fold_takes_the_narrower_word_whichever_side_it_arrives_on(
     assert catalogue_rows_of(connection, workspace_id)[0]["sensitivity"] == folded
 
 
-def test_a_document_the_seam_says_nothing_about_keeps_the_class_it_stood_at(
+def test_a_document_without_a_verdict_keeps_its_standing_class(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -585,7 +585,7 @@ def test_a_document_the_seam_says_nothing_about_keeps_the_class_it_stood_at(
     assert catalogue_rows_of(connection, workspace_id)[0]["sensitivity"] == "Restricted"
 
 
-def test_a_document_this_tier_cannot_read_is_quarantined_on_its_own_catalogue_row(
+def test_quarantines_an_unreadable_document_on_its_own_catalogue_row(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -617,7 +617,7 @@ def test_a_document_this_tier_cannot_read_is_quarantined_on_its_own_catalogue_ro
     ] == [AN_INVOICE_ID]
 
 
-def test_a_pdf_with_no_text_layer_names_ocr_on_its_row_which_is_what_an_admin_counts(
+def test_a_textless_pdf_names_ocr_on_its_row(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -648,7 +648,7 @@ def test_a_pdf_with_no_text_layer_names_ocr_on_its_row_which_is_what_an_admin_co
     "media_type",
     [outside["media_type"] for outside in read_upload_media_types()["outside"]],
 )
-def test_a_media_type_the_agreement_places_outside_the_list_is_quarantined_on_its_row(
+def test_quarantines_an_unlisted_media_type_on_its_row(
     database: tuple[psycopg.Connection, str], tmp_path: Path, media_type: str
 ) -> None:
     connection, dsn = database
@@ -680,7 +680,7 @@ def test_a_media_type_the_agreement_places_outside_the_list_is_quarantined_on_it
     } == {AN_INVOICE_ID}
 
 
-def test_a_document_that_ran_past_its_ceiling_lands_the_deadline_on_its_row(
+def test_lands_the_deadline_on_an_overrunning_documents_row(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -706,7 +706,7 @@ def test_a_document_that_ran_past_its_ceiling_lands_the_deadline_on_its_row(
     assert chunk_rows_of(connection, workspace_id) == []
 
 
-def test_a_document_quarantined_by_one_run_and_read_by_the_next_loses_its_error(
+def test_a_quarantined_document_read_next_run_loses_its_error(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -739,7 +739,7 @@ def test_a_document_quarantined_by_one_run_and_read_by_the_next_loses_its_error(
     ]
 
 
-def test_a_suppression_the_workspace_holds_is_read_off_the_table_and_kept_out(
+def test_reads_a_suppression_off_the_table_and_keeps_it_out(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -768,7 +768,7 @@ def test_a_suppression_the_workspace_holds_is_read_off_the_table_and_kept_out(
 ANOTHER_DELIVERY_NOTE_ID = "01M2Q3R4S5T6V7W8X9YZAB0004"
 
 
-def test_a_suppression_written_before_a_binding_reaches_every_document_it_holds(
+def test_an_earlier_suppression_reaches_every_document_the_binding_holds(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -803,7 +803,7 @@ A_ROTA = "Rota changes go to priya.raman@meridianfenland.co.uk by Thursday.\n"
 A_ROTA_ERASED = "Rota changes go to [withheld] by Thursday.\n"
 
 
-def test_an_erased_work_address_is_withheld_on_the_next_run_and_is_never_a_finding(
+def test_the_next_run_withholds_an_erased_address_without_a_finding(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -845,7 +845,7 @@ def marked_rows_of(
         return by_column(cursor)
 
 
-def test_a_second_run_lands_no_second_finding_row_and_moves_none(
+def test_a_second_run_adds_no_finding_row_and_moves_none(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -895,7 +895,7 @@ def readings_of(
         return by_column(cursor)
 
 
-def test_a_span_an_older_run_left_is_read_again_and_all_five_of_its_reading_move(
+def test_rereads_an_older_runs_span_and_moves_all_five_readings(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -935,7 +935,7 @@ def test_a_span_an_older_run_left_is_read_again_and_all_five_of_its_reading_move
     }
 
 
-def test_a_restored_span_keeps_its_id_its_marks_and_the_tier_it_was_restored_at(
+def test_a_restored_span_keeps_its_id_marks_and_restored_tier(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -989,7 +989,7 @@ def test_a_restored_span_keeps_its_id_its_marks_and_the_tier_it_was_restored_at(
 
 
 # jscpd:ignore-start
-def test_a_name_an_erasure_has_since_raised_reads_always_after_the_next_run(
+def test_a_name_a_later_erasure_raises_reads_always_next_run(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -1036,7 +1036,7 @@ A_BANK_SPAN = Finding(
 )
 
 
-def test_the_insert_steps_over_a_known_span_and_over_no_other_collision(
+def test_the_insert_raises_on_any_collision_but_a_known_span(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -1080,7 +1080,7 @@ A_NAME_SPAN = Finding(
 )
 
 
-def test_a_rows_tier_is_the_one_the_withholding_names_and_not_the_findings(
+def test_a_rows_tier_is_the_withholdings_not_the_findings(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -1108,7 +1108,7 @@ def test_a_rows_tier_is_the_one_the_withholding_names_and_not_the_findings(
 
 
 # jscpd:ignore-start
-def test_a_span_an_admin_restored_is_back_in_the_text_after_the_next_run(
+def test_the_next_run_puts_an_admin_restored_span_back(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -1240,7 +1240,7 @@ class OneDocumentRun:
         marked_as(self.connection, self.workspace_id, mark, self.document_id, span)
 
 
-def test_a_dismissal_of_its_only_health_finding_reads_a_document_at_its_bindings_class(
+def test_dismissing_the_only_health_finding_returns_the_bindings_class(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -1288,7 +1288,7 @@ def test_a_document_with_a_second_undismissed_health_finding_stays_restricted(
     assert both_dismissed["own"] is None
 
 
-def test_dismissing_an_engineers_diagnosis_gives_its_document_back_after_the_run(
+def test_dismissing_an_engineers_diagnosis_gives_its_document_back(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -1308,7 +1308,7 @@ def test_dismissing_an_engineers_diagnosis_gives_its_document_back_after_the_run
     assert lifted == {"own": None, "narrowed_to": None, "chunks": ["Internal"]}
 
 
-def test_a_kept_health_sentence_is_back_in_the_text_and_its_document_restricted(
+def test_a_kept_health_sentence_returns_and_its_document_stays_restricted(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -1324,7 +1324,7 @@ def test_a_kept_health_sentence_is_back_in_the_text_and_its_document_restricted(
     assert kept == {"own": "Restricted", "narrowed_to": None, "chunks": ["Restricted"]}
 
 
-def test_a_lifted_verdict_returns_a_document_to_the_admins_narrowing_no_further(
+def test_a_lifted_verdict_returns_to_the_admins_narrowing_only(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -1351,7 +1351,7 @@ THE_INVOICES_ACCOUNT_AS_FOUND = "00-00-00 and the account number is 12345678"
 
 
 # jscpd:ignore-start
-def test_a_kept_span_an_erasure_names_stays_withheld_and_the_run_says_which(
+def test_an_erased_kept_span_stays_withheld_and_is_reported(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -1415,7 +1415,7 @@ def detected_afresh_in(written: str) -> list[list[str]]:
     ]
 
 
-def test_a_reason_the_app_deletes_rows_for_empties_the_store_before_any_read(
+def test_a_row_deleting_reason_empties_the_store_before_reading(
     database: tuple[psycopg.Connection, str],
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -1500,7 +1500,7 @@ def test_a_reason_the_app_deletes_rows_for_empties_the_store_before_any_read(
 A_REASON_NO_DESCRIPTOR_DECLARES = "a-word-no-descriptor-declares"
 
 
-def test_a_run_carrying_a_reason_this_tier_does_not_know_indexes_as_any_other_does(
+def test_a_run_with_an_unknown_reason_indexes_like_any_other(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -1519,7 +1519,7 @@ def test_a_run_carrying_a_reason_this_tier_does_not_know_indexes_as_any_other_do
     ]
 
 
-def test_the_claimant_hands_such_a_job_to_the_run_rather_than_raising_on_its_word(
+def test_the_claimant_runs_an_unknown_reason_job_without_raising(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -1542,7 +1542,7 @@ def test_the_claimant_hands_such_a_job_to_the_run_rather_than_raising_on_its_wor
     assert outcome["lmdb_bytes"] > 0
 
 
-def test_a_run_dying_before_the_landing_leaves_the_verdict_and_no_chunk_at_all(
+def test_a_run_dying_before_landing_leaves_only_the_verdict(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -1587,7 +1587,7 @@ def test_a_run_dying_before_the_landing_leaves_the_verdict_and_no_chunk_at_all(
     ] == [A_SICK_NOTE_ID]
 
 
-def test_a_rule_change_lands_again_every_chunk_row_the_apps_reprocess_deleted(
+def test_a_rule_change_relands_every_chunk_the_reprocess_deleted(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -1623,7 +1623,7 @@ def test_a_rule_change_lands_again_every_chunk_row_the_apps_reprocess_deleted(
     assert invoice == [AN_INVOICE_REDACTED]
 
 
-def test_a_row_from_before_is_rewritten_once_and_an_unchanged_next_run_writes_nothing(
+def test_rewrites_an_old_row_once_and_then_writes_nothing(
     database: tuple[psycopg.Connection, str], tmp_path: Path
 ) -> None:
     connection, dsn = database
@@ -1644,7 +1644,7 @@ def test_a_row_from_before_is_rewritten_once_and_an_unchanged_next_run_writes_no
     ]
 
 
-def test_the_worker_login_the_runs_connect_as_is_the_runtime_role_and_not_the_owner(
+def test_the_worker_login_is_the_runtime_role_not_the_owner(
     database: tuple[psycopg.Connection, str],
 ) -> None:
     _connection, dsn = database
