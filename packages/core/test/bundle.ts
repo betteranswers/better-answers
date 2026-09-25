@@ -12,6 +12,7 @@ import { removeBundleRoot } from "./bundle-root.ts";
 
 const run = promisify(execFile);
 
+/** Registers the suite's hooks; the getter it hands back throws before `beforeAll` has run. */
 export const bundlesForSuite = (): (() => GitDoor) => {
   let root: string | undefined;
 
@@ -32,6 +33,11 @@ export const bundlesForSuite = (): (() => GitDoor) => {
   };
 };
 
+const gitDirOf = (door: GitDoor, workspaceId: string): string =>
+  path.join(door.root, `${workspaceId}.git`);
+
+const linesOf = (text: string): string[] => text.split("\n").filter((line) => line !== "");
+
 const git = async (
   door: GitDoor,
   workspaceId: string,
@@ -40,13 +46,14 @@ const git = async (
 ) => {
   const { stdout } = await run(
     "git",
-    ["--git-dir", path.join(door.root, `${workspaceId}.git`), ...arguments_],
+    ["--git-dir", gitDirOf(door, workspaceId), ...arguments_],
 
     { env: { ...process.env, ...env } },
   );
   return stdout;
 };
 
+/** Deletes the loose object a revision names and hands back its id; a packed one throws. */
 export const objectRemovedFrom = async (
   door: GitDoor,
   workspaceId: string,
@@ -54,12 +61,13 @@ export const objectRemovedFrom = async (
 ): Promise<string> => {
   const id = (await git(door, workspaceId, ["rev-parse", revision])).trim();
 
-  await rm(path.join(door.root, `${workspaceId}.git`, "objects", id.slice(0, 2), id.slice(2)));
+  await rm(path.join(gitDirOf(door, workspaceId), "objects", id.slice(0, 2), id.slice(2)));
   return id;
 };
 
 const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
+/** Points `main` at a new root commit sharing no history with the old; hands back its sha. */
 export const divergeHistory = async (door: GitDoor, workspaceId: string): Promise<string> => {
   const nobody = {
     GIT_AUTHOR_NAME: "Nobody",
@@ -90,6 +98,16 @@ export type CommitFacts = {
 
 const FIELD = "%H%n%s%n%an <%ae>%n%cn <%ce>%n%P%n%B";
 
+const trailersOf = (message: readonly string[]): Record<string, string> => {
+  const blank = message.indexOf("");
+  const trailers: Record<string, string> = {};
+  for (const line of blank === -1 ? [] : message.slice(blank + 1)) {
+    const match = /^([A-Za-z][A-Za-z-]*): (.+)$/.exec(line);
+    if (match?.[1] !== undefined && match[2] !== undefined) trailers[match[1]] = match[2];
+  }
+  return trailers;
+};
+
 export const commitFacts = async (
   door: GitDoor,
   workspaceId: string,
@@ -99,21 +117,15 @@ export const commitFacts = async (
   const [id = "", subject = "", author = "", committer = "", parents = "", ...message] =
     shown.split("\n");
 
-  const blank = message.indexOf("");
-  const trailers: Record<string, string> = {};
-  for (const line of blank === -1 ? [] : message.slice(blank + 1)) {
-    const match = /^([A-Za-z][A-Za-z-]*): (.+)$/.exec(line);
-    if (match?.[1] !== undefined && match[2] !== undefined) trailers[match[1]] = match[2];
-  }
   const tree = await git(door, workspaceId, ["ls-tree", "-r", "--name-only", sha]);
   return {
     sha: id,
     subject,
     author,
     committer,
-    trailers,
+    trailers: trailersOf(message),
     parents: parents.split(" ").filter((parent) => parent !== ""),
-    files: tree.split("\n").filter((file) => file !== ""),
+    files: linesOf(tree),
   };
 };
 
@@ -124,22 +136,24 @@ export const fileAtCommit = (
   file: string,
 ): Promise<string> => git(door, workspaceId, ["show", `${sha}:${file}`]);
 
+/** `main`'s commits, oldest first; none when the repository has no `main` yet. */
 export const bundleHistory = async (
   door: GitDoor,
   workspaceId: string,
 ): Promise<readonly string[]> => {
   const listed = await git(door, workspaceId, ["rev-list", "--reverse", "main"]).catch(() => "");
-  return listed.split("\n").filter((sha) => sha !== "");
+  return linesOf(listed);
 };
 
 export const staged = async (door: GitDoor, workspaceId: string): Promise<readonly string[]> => {
   const listed = await git(door, workspaceId, ["ls-files"]);
-  return listed.split("\n").filter((file) => file !== "");
+  return linesOf(listed);
 };
 
 export const removeRepository = (door: GitDoor, workspaceId: string): Promise<void> =>
-  rm(path.join(door.root, `${workspaceId}.git`), { recursive: true, force: true });
+  rm(gitDirOf(door, workspaceId), { recursive: true, force: true });
 
+/** Each object reachable from `main`, as `cat-file --batch` prints it; empty with no `main`. */
 export const everyObjectOf = async (door: GitDoor, workspaceId: string): Promise<string> => {
   const listed = await git(door, workspaceId, ["rev-list", "--objects", "main"]).catch(() => "");
   const objects = listed
@@ -149,7 +163,7 @@ export const everyObjectOf = async (door: GitDoor, workspaceId: string): Promise
   if (objects.length === 0) return "";
   const child = run(
     "git",
-    ["--git-dir", path.join(door.root, `${workspaceId}.git`), "cat-file", "--batch", "--buffer"],
+    ["--git-dir", gitDirOf(door, workspaceId), "cat-file", "--batch", "--buffer"],
     { env: { ...process.env }, maxBuffer: 64 * 1024 * 1024 },
   );
   child.child.stdin?.end(`${objects.join("\n")}\n`);
@@ -166,6 +180,7 @@ export const objectPresent = async (
     .then(() => true)
     .catch(() => false);
 
+/** Each `main` commit's `name <email>` author line, oldest first; none with no `main`. */
 export const authorLinesOf = async (
   door: GitDoor,
   workspaceId: string,
@@ -176,5 +191,5 @@ export const authorLinesOf = async (
     "--format=%an <%ae>",
     "main",
   ]).catch(() => "");
-  return logged.split("\n").filter((line) => line !== "");
+  return linesOf(logged);
 };

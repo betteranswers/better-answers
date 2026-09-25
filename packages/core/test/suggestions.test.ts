@@ -242,7 +242,7 @@ const trustOf = async (scenario: Scenario, iri: string) => {
 };
 
 describe("a suggestion set", () => {
-  it("waits with no target at all, because identity is the acceptance's to resolve", async () => {
+  it("waits with no target, leaving identity to the acceptance", async () => {
     const scenario = await arrange();
 
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
@@ -271,7 +271,7 @@ describe("a suggestion set", () => {
     expect(after.map((item) => item.baseMoved)).toEqual([false]);
   });
 
-  it("renders an item's kind, its status and who decided it, as the rows hold them", async () => {
+  it("renders each item's kind, status and decider from its rows", async () => {
     const scenario = await arrange();
     const request = requestFor();
     const set = await submitted(scenario, scenario.editor, "edit", [request]);
@@ -307,7 +307,7 @@ describe("a suggestion set", () => {
     ]);
   });
 
-  it("shows a member a set nobody minted as an empty one rather than a refusal", async () => {
+  it("shows a member an unminted set as empty, not refused", async () => {
     const scenario = await arrange();
 
     const read = await readingAs(db().runtimePool, scenario.editor, (principal, tx) =>
@@ -317,7 +317,7 @@ describe("a suggestion set", () => {
     expect(read).toEqual({ ok: true, value: [] });
   });
 
-  it("hands a caller the store's own failure rather than a set with no items in it", async () => {
+  it("hands a caller the store's failure, not an empty set", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
     let read: Result<unknown, unknown> | undefined;
@@ -346,7 +346,7 @@ describe("a suggestion set", () => {
 });
 
 describe("accepting a suggestion", () => {
-  it("mints the concept, lands its rows and its commit, and decides the suggestion together", async () => {
+  it("mints the concept, lands rows and commit, and decides together", async () => {
     const scenario = await arrange();
     const request = requestFor();
     const set = await submitted(scenario, scenario.editor, "edit", [request]);
@@ -388,7 +388,7 @@ describe("accepting a suggestion", () => {
     expect(concept.rows).toEqual([{ iri: accepted.iri, body: request.body }]);
   });
 
-  it("lands the graph delta in the acceptance's own transaction, so the map is never behind for one", async () => {
+  it("lands the graph delta in the acceptance's own transaction", async () => {
     const scenario = await arrange();
 
     const { input: cited, written } = await editorWrote(scenario);
@@ -414,7 +414,7 @@ describe("accepting a suggestion", () => {
     expect(edges.rows).toEqual([{ from_uid: accepted.iri, to_uid: written.iri }]);
   });
 
-  it("commits an *edit* with the proposer as git author and the platform bot as committer", async () => {
+  it("commits an *edit* as the proposer, with the bot committing", async () => {
     const scenario = await arrange();
     const proposer = await db().pool.query<{ name: string; email: string }>(
       'SELECT name, email FROM "user" WHERE id = $1',
@@ -434,7 +434,7 @@ describe("accepting a suggestion", () => {
     expect(facts.committer).toContain("Better Answers");
   });
 
-  it("commits a run's candidate with the accepting Admin as git author, who has an author line", async () => {
+  it("commits a run's candidate with the accepting Admin as author", async () => {
     const scenario = await arrange();
     const admin = await db().pool.query<{ name: string }>('SELECT name FROM "user" WHERE id = $1', [
       scenario.admin.userId,
@@ -455,7 +455,7 @@ describe("accepting a suggestion", () => {
     expect(facts.author).toContain(admin.rows[0]?.name ?? "");
   });
 
-  it("never names a person of another workspace as author, whatever a proposer claims", async () => {
+  it("never names another workspace's person as author, whatever is claimed", async () => {
     const here = await arrange();
     const elsewhere = await arrange();
     const stranger = await db().pool.query<{ name: string; email: string }>(
@@ -481,7 +481,7 @@ describe("accepting a suggestion", () => {
     expect(facts.author).not.toContain(stranger.rows[0]?.email ?? "no address");
   });
 
-  it("makes one commit per item in bulk, and shares one batch id across the ledger rows", async () => {
+  it("commits each item in bulk under one shared batch id", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [
       requestFor(),
@@ -500,7 +500,7 @@ describe("accepting a suggestion", () => {
     expect([...batches][0]).not.toBeNull();
   });
 
-  it("re-writes the concept its merge key resolves to, rather than minting a second one", async () => {
+  it("re-writes the concept its merge key resolves to, minting none", async () => {
     const scenario = await arrange();
     const { written, set } = await proposedAgainst(scenario, "edit");
 
@@ -514,7 +514,7 @@ describe("accepting a suggestion", () => {
     expect(concepts.rows).toEqual([{ count: "1" }]);
   });
 
-  it("refuses a Viewer and an Editor, and leaves the set waiting", async () => {
+  it("refuses a Viewer and an Editor, leaving the set waiting", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
 
@@ -529,7 +529,7 @@ describe("accepting a suggestion", () => {
     expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({ status: "waiting" });
   });
 
-  it("answers a suggestion of another workspace exactly as it answers one nobody minted", async () => {
+  it("answers another workspace's suggestion as one nobody minted", async () => {
     const here = await arrange();
     const there = await arrange();
     const theirs = await submitted(there, there.editor, "edit", [requestFor()]);
@@ -550,7 +550,7 @@ describe("accepting a suggestion", () => {
 });
 
 describe("an acceptance whose ground moved", () => {
-  it("is refused and returned to the proposer when the resolution moved since the summary", async () => {
+  it("is returned to the proposer when its resolution has moved", async () => {
     const scenario = await arrange();
     const request = requestFor();
     const set = await submitted(scenario, scenario.editor, "edit", [request]);
@@ -576,7 +576,7 @@ describe("an acceptance whose ground moved", () => {
     expect(await ledgerFor(scenario.workspaceId, "knowledge.suggestion.returned")).toHaveLength(1);
   });
 
-  it("is refused and returned when the content the payload was written against moved", async () => {
+  it("is refused and returned when the payload's base content moved", async () => {
     const scenario = await arrange();
     const { input, written, set } = await proposedAgainst(scenario, "edit");
 
@@ -595,7 +595,7 @@ describe("an acceptance whose ground moved", () => {
     expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({ status: "returned" });
   });
 
-  it("refuses a second decision on a suggestion somebody has already decided", async () => {
+  it("refuses a second decision on an already decided suggestion", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
     await acceptAll(scenario, set.setId);
@@ -661,14 +661,14 @@ describe("declining a suggestion", () => {
     expect(await suggestionRow(suggestionId)).toMatchObject({ status: "waiting" });
   });
 
-  it("refuses a reason the column would hold as nothing, which is not a reason at all", async () => {
+  it("refuses a reason the column would hold as nothing", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
     const suggestionId = set.suggestionIds[0] ?? "";
 
     const nothing = await declineSuggestion(scenario.admin, doorsOf(scenario), {
       suggestionId,
-      // @ts-expect-error — the column is nullable, so JSON's null parses; the runtime half of what the type says.
+      // @ts-expect-error — the column is nullable, so JSON's null parses.
       reason: null,
     });
 
@@ -676,7 +676,7 @@ describe("declining a suggestion", () => {
     expect(await suggestionRow(suggestionId)).toMatchObject({ status: "waiting" });
   });
 
-  it("refuses a suggestion nobody minted, rather than deciding a row that is not there", async () => {
+  it("refuses a suggestion nobody minted", async () => {
     const scenario = await arrange();
 
     const declined = await declineSuggestion(scenario.admin, doorsOf(scenario), {
@@ -717,7 +717,7 @@ describe("declining a suggestion", () => {
       },
       "credentials-revoked",
     ],
-  ])("answers %s as itself, and decides nothing", async (_why, decide, expected) => {
+  ])("answers %s as itself, deciding nothing", async (_why, decide, expected) => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
     const suggestionId = set.suggestionIds[0] ?? "";
@@ -728,7 +728,7 @@ describe("declining a suggestion", () => {
     expect(await suggestionRow(suggestionId)).toMatchObject({ status: "waiting" });
   });
 
-  it("refuses a reason longer than the row will carry, before it opens a transaction at all", async () => {
+  it("refuses an overlong reason before opening a transaction", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
     const suggestionId = set.suggestionIds[0] ?? "";
@@ -745,7 +745,7 @@ describe("declining a suggestion", () => {
 });
 
 describe("an acceptance at a path another concept holds", () => {
-  it("is refused before a commit, and leaves neither the concept, nor its ledger row, nor the suggestion decided", async () => {
+  it("is refused before a commit, leaving nothing written or decided", async () => {
     const scenario = await arrange();
 
     const first = requestFor();
@@ -772,7 +772,7 @@ describe("an acceptance at a path another concept holds", () => {
 });
 
 describe("the platform's citation repair", () => {
-  it("re-hashes the checks it moved, so a repair never turns Checked into Changed since checked", async () => {
+  it("re-hashes moved checks, so Checked never becomes Changed since checked", async () => {
     const scenario = await arrange();
 
     const cite = (locator: string) => ({
@@ -863,7 +863,7 @@ describe("the platform's citation repair", () => {
 });
 
 describe("two acts over one suggestion", () => {
-  it("lets one of an acceptance and a decline through, and leaves no commit for the other", async () => {
+  it("lets one of an acceptance and a decline through", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
     const suggestionId = set.suggestionIds[0] ?? "";
@@ -897,7 +897,7 @@ describe("two acts over one suggestion", () => {
     );
   });
 
-  it("lets one of two Admins accept the same new concept, and refuses the other with no commit", async () => {
+  it("lets one of two Admins accept a new concept", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
     const decisions = [{ suggestionId: set.suggestionIds[0] ?? "", expectedTarget: null }];
@@ -916,7 +916,7 @@ describe("two acts over one suggestion", () => {
     expect(refusals.filter((refusal) => refusal === "already-decided")).toHaveLength(1);
   });
 
-  it("refuses a write onto a merge key another concept already holds, before it commits", async () => {
+  it("refuses a write onto a held merge key before committing", async () => {
     const scenario = await arrange();
     const { input } = await editorWrote(scenario);
 
@@ -967,7 +967,7 @@ describe("an acceptance whose ground moved under its own lock", () => {
     expect(await suggestionRow(suggestionId)).toMatchObject({ status: "returned", reason: MOVED });
   };
 
-  it("returns the item to its proposer when the merge key is taken while it commits", async () => {
+  it("returns the item when its merge key is taken mid-commit", async () => {
     const scenario = await arrange();
     const request = requestFor();
     const set = await submitted(scenario, scenario.editor, "edit", [request]);
@@ -991,7 +991,7 @@ describe("an acceptance whose ground moved under its own lock", () => {
     expect(await countOf("concept_index", scenario.workspaceId)).toBe("0");
   });
 
-  it("returns the item to its proposer when its target leaves the merge key first", async () => {
+  it("returns the item when its target leaves the merge key", async () => {
     const scenario = await arrange();
     const { input, written, set } = await proposedAgainst(scenario, "edit");
     const decisions = await decisionsFor(scenario, set.setId);
@@ -1007,7 +1007,7 @@ describe("an acceptance whose ground moved under its own lock", () => {
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(1);
   });
 
-  it("throws rather than commits a decision that a second act had already made", async () => {
+  it("throws rather than commits a decision another act made", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
     const suggestionId = set.suggestionIds[0] ?? "";
@@ -1044,7 +1044,7 @@ describe("an acceptance whose ground moved under its own lock", () => {
 });
 
 describe("what an acceptance answers when it cannot be prepared", () => {
-  it("hands the item the store's own failure rather than a suggestion nobody minted", async () => {
+  it("hands the item the store's failure, not an unminted suggestion", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
     const gone = new pg.Pool(db().runtimePool.options);
@@ -1060,7 +1060,7 @@ describe("what an acceptance answers when it cannot be prepared", () => {
     expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({ status: "waiting" });
   });
 
-  it("refuses an Admin whose credentials ended, rather than reading the queue as empty", async () => {
+  it("refuses an Admin whose credentials were revoked, leaving it waiting", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
     await db().pool.query(
@@ -1076,7 +1076,7 @@ describe("what an acceptance answers when it cannot be prepared", () => {
     expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({ status: "waiting" });
   });
 
-  it("commits the accepting Admin as author for a candidate a person proposed", async () => {
+  it("commits a person's candidate with the accepting Admin as author", async () => {
     const scenario = await arrange();
     const admin = await db().pool.query<{ name: string; email: string }>(
       'SELECT name, email FROM "user" WHERE id = $1',
@@ -1118,7 +1118,7 @@ describe("what an acceptance answers when it cannot be prepared", () => {
 });
 
 describe("who may open a suggestion set", () => {
-  it("shows an Admin any set, shows a proposer their own, and refuses everyone else", async () => {
+  it("shows Admins any set, proposers their own, refusing everyone else", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
     const opened = (principal: UserPrincipal) =>
@@ -1137,7 +1137,7 @@ describe("who may open a suggestion set", () => {
     expect(byStranger).toEqual({ ok: false, error: "role-forbids" });
   });
 
-  it("shows a proposer no resolution they may not read, and the deciding Admin the one they must", async () => {
+  it("hides unreadable resolutions from a proposer, not the deciding Admin", async () => {
     const scenario = await arrange();
 
     const { input, written } = await editorWrote(scenario, { sensitivity: "Restricted" });
@@ -1169,7 +1169,7 @@ describe("who may open a suggestion set", () => {
 });
 
 describe("what a write may not do with an IRI", () => {
-  it("refuses a write naming an IRI this workspace never minted, and makes no commit", async () => {
+  it("refuses a write naming an IRI this workspace never minted", async () => {
     const scenario = await arrange();
 
     const refused = await writeConcept(scenario.editor, doorsOf(scenario), {
@@ -1213,7 +1213,7 @@ describe("an acceptance reached straight through the write path", () => {
     expect(await suggestionRow(set.suggestionIds[0] ?? "")).toMatchObject({ status: "waiting" });
   };
 
-  it("refuses an Editor, because a decision is an Admin's whichever road reached the act", async () => {
+  it("refuses an Editor, since only an Admin decides", async () => {
     const scenario = await arrange();
     const { input, written, set } = await proposedAgainst(scenario, "edit");
 
@@ -1227,7 +1227,7 @@ describe("an acceptance reached straight through the write path", () => {
     await leftWaiting(scenario, set, 1);
   });
 
-  it("refuses one made against the ref's head rather than the payload's base", async () => {
+  it("refuses one made against the ref's head, not the base", async () => {
     const scenario = await arrange();
     const { input, written, set } = await proposedAgainst(scenario, "edit");
 
@@ -1241,7 +1241,7 @@ describe("an acceptance reached straight through the write path", () => {
     await leftWaiting(scenario, set, 1);
   });
 
-  it("refuses one naming a suggestion nobody minted, and makes no commit", async () => {
+  it("refuses one naming an unminted suggestion, making no commit", async () => {
     const scenario = await arrange();
     const { input, written, set } = await proposedAgainst(scenario, "edit");
 
@@ -1254,7 +1254,7 @@ describe("an acceptance reached straight through the write path", () => {
     await leftWaiting(scenario, set, 1);
   });
 
-  it("refuses one whose named target no longer answers to the merge key it was proposed under", async () => {
+  it("refuses one whose target no longer holds its merge key", async () => {
     const scenario = await arrange();
     const { input, written, set } = await proposedAgainst(scenario, "edit");
 
@@ -1276,20 +1276,20 @@ describe("an acceptance reached straight through the write path", () => {
 });
 
 describe("what the inbox refuses before it does any work", () => {
-  it("refuses a kind nobody declared, in the word a caller can act on", async () => {
+  it("refuses an undeclared kind with a word callers act on", async () => {
     const scenario = await arrange();
 
     const set = await submitSuggestionSet(
       scenario.editor,
       { postgres: scenario.postgres },
-      // @ts-expect-error — a fifth kind is not one; the runtime half of what the type says.
+      // @ts-expect-error — an undeclared kind, which only runtime input can send.
       { kind: "merge", requests: [requestFor()] },
     );
 
     expect(set).toEqual({ ok: false, error: "malformed" });
   });
 
-  it("refuses a payload whose frontmatter is not a mapping, and queues nothing", async () => {
+  it("refuses a payload whose frontmatter is no mapping, queuing nothing", async () => {
     const scenario = await arrange();
 
     const set = await submitSuggestionSet(
@@ -1297,7 +1297,7 @@ describe("what the inbox refuses before it does any work", () => {
       { postgres: scenario.postgres },
       {
         kind: "edit",
-        // @ts-expect-error — null is not a frontmatter mapping; the runtime half of what the type says.
+        // @ts-expect-error — null is not a frontmatter mapping.
         requests: [requestFor({ frontmatter: null })],
       },
     );
@@ -1331,7 +1331,7 @@ describe("what the inbox refuses before it does any work", () => {
     ]);
   });
 
-  it("hands a submitter the store's own failure rather than a set with no ids in it", async () => {
+  it("hands a submitter the store's failure, not an empty set", async () => {
     const scenario = await arrange();
     const gone = new pg.Pool(db().runtimePool.options);
     await gone.end();
@@ -1365,7 +1365,7 @@ describe("what the inbox refuses before it does any work", () => {
     expect(queued.rowCount).toBe(0);
   });
 
-  it("refuses an acceptance asked for in ids of no known form, and decides nothing", async () => {
+  it("refuses an acceptance in ids of no known form", async () => {
     const scenario = await arrange();
     const set = await submitted(scenario, scenario.editor, "edit", [requestFor()]);
 

@@ -76,7 +76,7 @@ const nothingWritten = async (scenario: Scenario) => {
 };
 
 describe("the manifest, the bundle's first commit", () => {
-  it("lands as one commit at the reserved path, in the platform's own form, with its audit event and its commit row and no concept", async () => {
+  it("lands one commit with its event and row, no concept", async () => {
     const scenario = await arrange();
 
     const landed = await written(scenario);
@@ -135,7 +135,7 @@ describe("the manifest, the bundle's first commit", () => {
     });
   });
 
-  it("lands on the head it found when concepts already stand, so an older bundle can gain its manifest", async () => {
+  it("lands on the head it found when concepts already stand", async () => {
     const scenario = await arrange();
     const first = await writeConcept(scenario.editor, doorsOf(scenario), {
       mergeKey: "policy:expenses",
@@ -163,7 +163,7 @@ describe("the manifest, the bundle's first commit", () => {
     });
   });
 
-  it("is a no-op the second time for the same bundle id: no commit, no event, no row", async () => {
+  it("writes nothing the second time for the same bundle id", async () => {
     const scenario = await arrange();
     const landed = await written(scenario);
 
@@ -177,7 +177,7 @@ describe("the manifest, the bundle's first commit", () => {
     await onlyTheStandingManifest(scenario, landed);
   });
 
-  it("refuses a manifest with another bundle id when one already stands, and leaves the standing one as it was", async () => {
+  it("refuses another bundle id and leaves the standing manifest alone", async () => {
     const scenario = await arrange();
     const landed = await written(scenario);
 
@@ -191,7 +191,7 @@ describe("the manifest, the bundle's first commit", () => {
     ["an id that is not the minter's", manifestFor({ id: "acme-2026" })],
     ["a blank owner", manifestFor({ owner: "  " })],
     ["a blank content version", manifestFor({ content_version: "" })],
-  ])("refuses a manifest with %s before anything is written", async (_why, input) => {
+  ])("refuses %s, writing nothing", async (_why, input) => {
     const scenario = await arrange();
 
     const refused = await write(scenario, scenario.editor, input);
@@ -209,7 +209,7 @@ describe("the manifest, the bundle's first commit", () => {
     await nothingWritten(scenario);
   });
 
-  it("refuses a workspace with no bundle, rather than making one nobody asked for", async () => {
+  it("refuses a workspace with no bundle rather than making one", async () => {
     const scenario = await arrange();
     await removeRepository(scenario.git, scenario.workspaceId);
 

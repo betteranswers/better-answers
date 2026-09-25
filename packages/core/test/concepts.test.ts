@@ -132,7 +132,7 @@ const reading = <T>(
 ): Promise<Folded<T>> => readingAs(db().runtimePool, principal, work);
 
 describe("a governed write", () => {
-  it("lands one commit with the person as author and the platform bot as committer", async () => {
+  it("lands one commit authored by the person, bot as committer", async () => {
     const scenario = await arrange();
     const input = writeFor();
 
@@ -148,7 +148,7 @@ describe("a governed write", () => {
     expect(facts.files).toEqual([input.path]);
   });
 
-  it("carries the actor and the audit id in its trailers, and the audit id was minted before the commit", async () => {
+  it("carries the actor and a pre-minted audit id as trailers", async () => {
     const scenario = await arrange();
 
     const written = await landed(scenario, writeFor());
@@ -170,7 +170,7 @@ describe("a governed write", () => {
     expect(joined.rows).toEqual([{ act: "knowledge.concept.committed", sha: written.sha }]);
   });
 
-  it("writes the file to the bundle with its frontmatter, its body and its own IRI", async () => {
+  it("writes the file with its frontmatter, body and own IRI", async () => {
     const scenario = await arrange();
     const input = writeFor();
 
@@ -202,7 +202,7 @@ describe("a governed write", () => {
     );
   });
 
-  it("hashes the frontmatter the file carries — the type and the title the act wrote in — so the row's hash is what a parse of the file reproduces", async () => {
+  it("hashes the frontmatter the file carries, as a parse reproduces", async () => {
     const scenario = await arrange();
 
     const input = writeFor({ frontmatter: { tags: ["finance"] } });
@@ -227,7 +227,7 @@ describe("a governed write", () => {
     expect(row.rows[0]?.content_hash).toBe(written.contentHash);
   });
 
-  it("takes the status the file names when the act names none, so a file that says stable is not indexed as a draft", async () => {
+  it("takes the file's status when the act names none", async () => {
     const scenario = await arrange();
 
     const input = writeFor({
@@ -246,7 +246,7 @@ describe("a governed write", () => {
     expect(file).toContain('"status": "stable"');
   });
 
-  it("records the concept, its identity, the commit and its evidence in one transaction", async () => {
+  it("records concept, identity, commit and evidence in one transaction", async () => {
     const scenario = await arrange();
 
     const handbook = await bindingHolding(db(), scenario.workspaceId);
@@ -318,7 +318,7 @@ describe("a governed write", () => {
     expect(stored.rows).toEqual([{ content_version: "2026-03-01" }]);
   });
 
-  it("folds the row's kind for case and plural, and leaves the file's own spelling alone", async () => {
+  it("folds the row's kind, leaving the file's spelling alone", async () => {
     const scenario = await arrange();
 
     let head: string | null = null;
@@ -347,7 +347,7 @@ describe("a governed write", () => {
     expect(file).toContain('"type": "policy"');
   });
 
-  it("hashes two spellings of one source alike, and a swapped source differently", async () => {
+  it("hashes two spellings of one source alike, a swap differently", async () => {
     const body = "Expenses are claimed within thirty days.";
     const path = "knowledge/policies/expenses.md";
     const cite = (resource: string) => ({ sources: [{ resource, locator: "p.4" }] });
@@ -378,7 +378,7 @@ describe("a governed write", () => {
     ).toBe(absolute);
   });
 
-  it("keeps the recorded commits a prefix of the bundle's history across a chain of acts", async () => {
+  it("keeps recorded commits a prefix of history across many acts", async () => {
     const scenario = await arrange();
     let head: string | null = null;
     const shas: string[] = [];
@@ -401,7 +401,7 @@ describe("a governed write", () => {
 describe("what a concept hashes and what it renders", () => {
   const HASHED_PATH = "knowledge/policies/expenses.md";
 
-  it("hashes the sorted canonical JSON of everything but the trust keys and the identity", () => {
+  it("hashes canonical JSON of all but trust keys and identity", () => {
     const frontmatter: Frontmatter = {
       title: "Expenses",
       type: "Policy",
@@ -440,7 +440,7 @@ describe("what a concept hashes and what it renders", () => {
     ).toBe(contentHashOf(frontmatter, body, HASHED_PATH));
   });
 
-  it("hashes a list of objects under any other key the same whichever order their keys were written in", () => {
+  it("hashes a list of objects alike whatever its key order", () => {
     const body = "Expenses are claimed within thirty days.";
 
     const written = contentHashOf(
@@ -478,7 +478,7 @@ describe("what a concept hashes and what it renders", () => {
     expect(changed).not.toBe(written);
   });
 
-  it("hashes a `sources` that is no list, and an entry citing nothing, as citing nothing", () => {
+  it("hashes a non-list `sources` or resourceless entry as citing nothing", () => {
     const body = "Expenses are claimed within thirty days.";
 
     expect(contentHashOf({ title: "Expenses", sources: "handbook.pdf" }, body, HASHED_PATH)).toBe(
@@ -495,7 +495,7 @@ describe("what a concept hashes and what it renders", () => {
     ).toBe("d135b04bcf88ef64e2dc07dbf14991ce75090677a2aada11804fa8014b7151e8");
   });
 
-  it("renders every key quoted, an empty list inline and a list of any length over lines", () => {
+  it("renders keys quoted, empty lists inline, other lists over lines", () => {
     const file = renderConceptFile(
       {
         title: "Expenses",
@@ -575,7 +575,7 @@ describe("the map a governed write leaves behind", () => {
     return { product, policy: { ...policyInput, iri: second.iri } };
   };
 
-  it("maps the concept and its links in the transaction that committed them", async () => {
+  it("maps the concept and its links in the committing transaction", async () => {
     const scenario = await arrange();
     const { product, policy } = await linkedPair(scenario, (_product, filename) => ({
       kind: "Policy",
@@ -658,7 +658,7 @@ describe("the map a governed write leaves behind", () => {
     ]);
   });
 
-  it("reads a link however the markdown writes it — inline, by reference, shortcut or autolink", async () => {
+  it("reads inline, reference, shortcut and autolink markdown links alike", async () => {
     const scenario = await arrange();
 
     const { product, policy } = await linkedPair(scenario, (target, filename) => ({
@@ -701,7 +701,7 @@ describe("the map a governed write leaves behind", () => {
     ]);
   });
 
-  it("keeps images, quoted code and protocol-relative targets off the map a reader walks", async () => {
+  it("keeps images, quoted code and protocol-relative targets off the map", async () => {
     const scenario = await arrange();
 
     const { product, policy } = await linkedPair(scenario, (_target, filename) => ({
@@ -734,11 +734,13 @@ describe("the map a governed write leaves behind", () => {
     ]);
   });
 
-  it("keeps mapping an Editor's links past long unmatched backtick runs in the body", async () => {
+  it("keeps mapping links past long unmatched backtick runs", async () => {
     const scenario = await arrange();
 
-    // The middle paragraph's size and shape are what a rescanning pairing chokes on: many
-    // distinct unpaired lengths, then many paired short runs.
+    /**
+     * The middle paragraph's size and shape are what a rescanning pairing chokes on: many
+     * distinct unpaired lengths, then many paired short runs.
+     */
     const { product, policy } = await linkedPair(scenario, (_target, filename) => ({
       body: [
         "# Details",
@@ -764,7 +766,7 @@ describe("the map a governed write leaves behind", () => {
     ]);
   });
 
-  it("backfills the map a reader walks when an edit lands on a concept the map had lost", async () => {
+  it("backfills the map when an edit reaches a lost concept", async () => {
     const scenario = await arrange();
     const product = writeFor({ kind: "Product", status: "stable" });
     const first = await landed(scenario, product);
@@ -788,7 +790,7 @@ describe("the map a governed write leaves behind", () => {
     expect(edges.rows).toEqual([{ from_uid: second.iri, to_uid: first.iri }]);
   });
 
-  it("derives a succession over a deprecated concept of its kind, and a derivation over anything else", async () => {
+  it("derives succession over a deprecated same-kind concept, else derivation", async () => {
     const scenario = await arrange();
 
     const superseded = writeFor({ status: "deprecated" });
@@ -836,7 +838,7 @@ describe("the map a governed write leaves behind", () => {
     ]);
   });
 
-  it("relabels a successor's lineage when the concept it cites is deprecated", async () => {
+  it("relabels a successor's lineage when its cited concept is deprecated", async () => {
     const scenario = await arrange();
     const cited = writeFor({ status: "stable" });
     const first = await landed(scenario, cited);
@@ -872,7 +874,7 @@ describe("the map a governed write leaves behind", () => {
 });
 
 describe("what a governed write refuses", () => {
-  it("refuses a write against a head that has moved, loudly and without a commit", async () => {
+  it("refuses a write against a moved head, without a commit", async () => {
     const scenario = await arrange();
     await landed(scenario, writeFor());
 
@@ -883,7 +885,7 @@ describe("what a governed write refuses", () => {
     expect(await recordedCommits(scenario.workspaceId)).toHaveLength(1);
   });
 
-  it("refuses a path another concept holds before it commits, so the head and the recorded commits stay where they were and the next write lands", async () => {
+  it("refuses a path another concept holds before committing anything", async () => {
     const scenario = await arrange();
     const first = writeFor();
     const written = await landed(scenario, first);
@@ -903,7 +905,7 @@ describe("what a governed write refuses", () => {
     expect(await recordedCommits(scenario.workspaceId)).toEqual([written.sha, next.sha]);
   });
 
-  it("holds a concept's own path for it, so a rewrite at that path is not the path being taken", async () => {
+  it("lets a concept be rewritten at its own path", async () => {
     const scenario = await arrange();
     const input = writeFor();
     const first = await landed(scenario, input);
@@ -928,7 +930,7 @@ describe("what a governed write refuses", () => {
     expect(await rowsFor(scenario.workspaceId)).toMatchObject({ concepts: "0", commits: "0" });
   });
 
-  it("refuses a workspace with no bundle, rather than making one nobody asked for", async () => {
+  it("refuses a workspace with no bundle rather than making one", async () => {
     const scenario = await arrange();
 
     await removeRepository(scenario.git, scenario.workspaceId);
@@ -942,7 +944,7 @@ describe("what a governed write refuses", () => {
     ["outside the bundle's concept area", "elsewhere/expenses.md"],
     ["at the bundle's reserved manifest", "knowledge/manifest.yaml"],
     ["out of the tree altogether", "knowledge/../../escape.md"],
-  ])("refuses a path %s, and makes no commit", async (_why, path) => {
+  ])("refuses a path %s without committing", async (_why, path) => {
     const scenario = await arrange();
 
     const refused = await write(scenario, scenario.editor, writeFor({ path }));
@@ -951,7 +953,7 @@ describe("what a governed write refuses", () => {
     expect(await head(scenario.editor, scenario.git)).toBeNull();
   });
 
-  it("refuses an entry with no keys in a list of objects, and makes no commit", async () => {
+  it("refuses a keyless entry in a list of objects", async () => {
     const scenario = await arrange();
 
     const refused = await write(
@@ -964,7 +966,7 @@ describe("what a governed write refuses", () => {
     expect(await head(scenario.editor, scenario.git)).toBeNull();
   });
 
-  it("refuses a trailer value carrying a newline, whatever its type promised", async () => {
+  it("refuses a trailer value carrying a newline, whatever its type", async () => {
     const scenario = await arrange();
 
     const forged = await commit(scenario.editor, scenario.git, {
@@ -988,7 +990,7 @@ describe("what a governed write refuses", () => {
       { evidence: [{ sourceDocumentId: ulid(), locator: "   ", resource: "Handbook" }] },
     ],
   ] satisfies readonly (readonly [string, Partial<WriteConceptInput>])[])(
-    "refuses %s, and makes no commit",
+    "refuses %s without committing",
     async (_why, invalid) => {
       const scenario = await arrange();
 
@@ -999,7 +1001,7 @@ describe("what a governed write refuses", () => {
     },
   );
 
-  it("hands a caller the store's own failure from the read it makes before it commits", async () => {
+  it("hands back the store's own failure from its pre-commit read", async () => {
     const scenario = await arrange();
     const gone = new pg.Pool(db().runtimePool.options);
     await gone.end();
@@ -1016,7 +1018,7 @@ describe("what a governed write refuses", () => {
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual([]);
   });
 
-  it("refuses a message carrying a newline, so a forged trailer never reaches a commit", async () => {
+  it("refuses a newline in a message, blocking a forged trailer", async () => {
     const scenario = await arrange();
 
     const forged = await write(
@@ -1031,7 +1033,7 @@ describe("what a governed write refuses", () => {
 });
 
 describe("what a re-write of an existing concept may not move", () => {
-  it("refuses a named widening of an existing concept's class, and makes no commit", async () => {
+  it("refuses widening an existing concept's class, and makes no commit", async () => {
     const scenario = await arrange();
     const input = writeFor({ sensitivity: "Restricted" });
     const first = await landed(scenario, input);
@@ -1051,7 +1053,7 @@ describe("what a re-write of an existing concept may not move", () => {
     expect(held.rows).toEqual([{ sensitivity: "Restricted" }]);
   });
 
-  it("keeps an existing concept's class when the write names none, rather than narrowing it", async () => {
+  it("keeps an existing concept's class when the write names none", async () => {
     const scenario = await arrange();
     const input = writeFor({ sensitivity: "Internal" });
     const first = await landed(scenario, input);
@@ -1069,7 +1071,7 @@ describe("what a re-write of an existing concept may not move", () => {
     expect(held.rows).toEqual([{ sensitivity: "Internal" }]);
   });
 
-  it("keeps an existing concept's status when the write names none, rather than un-publishing it", async () => {
+  it("keeps an existing concept's status when the write names none", async () => {
     const scenario = await arrange();
     const input = writeFor({ status: "stable" });
     const first = await landed(scenario, input);
@@ -1088,7 +1090,7 @@ describe("what a re-write of an existing concept may not move", () => {
     expect(held.rows[0]?.published_at).toBeInstanceOf(Date);
   });
 
-  it("lands a newly published concept's publishedAt as the platform's instant, never the transaction's", async () => {
+  it("stamps publishedAt with the platform's instant, not the transaction's", async () => {
     const scenario = await arrange();
     const input = writeFor({ status: "stable" });
 
@@ -1107,7 +1109,7 @@ describe("what a re-write of an existing concept may not move", () => {
     expect(held.rows[0]?.published_at).toEqual(pinned);
   });
 
-  it("refuses moving an existing concept to another path, and makes no commit", async () => {
+  it("refuses moving an existing concept to another path", async () => {
     const scenario = await arrange();
     const input = writeFor();
     const first = await landed(scenario, input);
@@ -1124,8 +1126,10 @@ describe("what a re-write of an existing concept may not move", () => {
   });
 });
 
-// Bound here, never Postgres's now(): issuance is stamped by this process, and a second clock
-// would order events milliseconds apart by drift.
+/**
+ * Bound here, never Postgres's now(): issuance is stamped by this process, and a second clock
+ * would order events milliseconds apart by drift.
+ */
 const REVOCATIONS = {
   here: {
     statement:
@@ -1174,7 +1178,7 @@ const expectCommitsWithoutRows = async (scenario: Scenario, commits: number): Pr
 };
 
 describe("authority that moved while the act was in flight", () => {
-  it("refuses a writer whose role moved, before a commit is made", async () => {
+  it("refuses a writer whose role moved, before any commit", async () => {
     const scenario = await arrange();
 
     await db().pool.query(
@@ -1189,7 +1193,7 @@ describe("authority that moved while the act was in flight", () => {
   });
 
   it.each(["here", "everywhere"] as const)(
-    "refuses a writer whose credentials were revoked %s, before a commit is made",
+    "refuses a writer with credentials revoked %s, before any commit",
     async (scope) => {
       const scenario = await arrange();
       await revokeEditor(scenario, scope);
@@ -1201,7 +1205,7 @@ describe("authority that moved while the act was in flight", () => {
     },
   );
 
-  it("lets a credential minted after a revocation write, because the instant ends what was issued", async () => {
+  it("lets a credential minted after a revocation write", async () => {
     const scenario = await arrange();
 
     await revokeEditor(scenario, "here");
@@ -1212,7 +1216,7 @@ describe("authority that moved while the act was in flight", () => {
     expect(written.ok).toBe(true);
   });
 
-  it("refuses a writer whose membership ended, before a commit is made", async () => {
+  it("refuses a writer whose membership ended, before any commit", async () => {
     const scenario = await arrange();
     await db().pool.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
       scenario.workspaceId,
@@ -1226,7 +1230,7 @@ describe("authority that moved while the act was in flight", () => {
   });
 
   it.each(["here", "everywhere"] as const)(
-    "makes a revocation %s wait for the act holding the membership, and refuses the act after it",
+    "holds a revocation %s behind the act, then refuses writes",
     async (scope) => {
       const scenario = await arrange();
 
@@ -1258,7 +1262,7 @@ describe("authority that moved while the act was in flight", () => {
     },
   );
 
-  it("refuses the rows when the revocation lands in the window the act cannot see", async () => {
+  it("refuses the rows for a revocation the act cannot see", async () => {
     const scenario = await arrange();
 
     const revoker = await db().pool.connect();
@@ -1294,7 +1298,7 @@ describe("authority that moved while the act was in flight", () => {
 });
 
 describe("the read a concept's trust is derived from", () => {
-  it("reads no check at all off a concept nobody has checked", async () => {
+  it("reads no check off a concept nobody has checked", async () => {
     const scenario = await arrange();
     const written = await landed(scenario, writeFor({ status: "stable" }));
 
@@ -1308,7 +1312,7 @@ describe("the read a concept's trust is derived from", () => {
     expect(opened.value?.contentHash).toBe(written.contentHash);
   });
 
-  it("hands a reader the store's own failure rather than a concept nobody minted", async () => {
+  it("hands a reader the store's failure, not an unminted concept", async () => {
     const scenario = await arrange();
     const written = await landed(scenario, writeFor({ status: "stable" }));
     let read: Result<unknown, unknown> | undefined;
@@ -1325,7 +1329,7 @@ describe("the read a concept's trust is derived from", () => {
 });
 
 describe("a failure after the commit", () => {
-  it("leaves no partial rows, and a head ahead of the last recorded commit", async () => {
+  it("leaves no partial rows, and the head ahead of them", async () => {
     const scenario = await arrange();
     const first = writeFor();
     const written = await landed(scenario, first);
@@ -1359,7 +1363,7 @@ describe("a failure after the commit", () => {
 });
 
 describe("the per-repository lock", () => {
-  it("runs one act at a time per bundle, and lets another bundle's act through beside it", async () => {
+  it("serialises acts per bundle but not across bundles", async () => {
     const door = bundles();
     const here = await arrange();
     const there = await arrange();
@@ -1382,7 +1386,7 @@ describe("the per-repository lock", () => {
     expect(order).toContain("elsewhere out");
   });
 
-  it("holds the bundle through the whole act, so two writes racing one head leave one commit", async () => {
+  it("leaves one commit when two writes race one head", async () => {
     const scenario = await arrange();
 
     const [first, second] = await Promise.all([
@@ -1398,12 +1402,14 @@ describe("the per-repository lock", () => {
     expect(await recordedCommits(scenario.workspaceId)).toEqual(history);
   });
 
-  it("releases the bundle when an act fails inside it, so the next act is not blocked behind it", async () => {
+  it("releases the bundle when an act fails inside the lock", async () => {
     const scenario = await arrange();
     await landed(scenario, writeFor());
 
-    // A failure the act meets inside the lock; one decided before the lock is taken would
-    // prove nothing about releasing it.
+    /**
+     * A failure the act meets inside the lock; one decided before the lock is taken would
+     * prove nothing about releasing it.
+     */
     const failed = await write(scenario, scenario.editor, writeFor({ expects: { head: null } }));
     expect(failed).toEqual({ ok: false, error: "stale-precondition" });
 
@@ -1417,7 +1423,7 @@ describe("the per-repository lock", () => {
 describe("opening a concept by IRI", () => {
   const now = new Date("2026-09-08T12:00:00.000Z");
 
-  it("hands the reader the concept the write committed, unchecked until somebody checks it", async () => {
+  it("hands back the committed concept, unchecked until somebody checks it", async () => {
     const scenario = await arrange();
     const input = writeFor({ status: "stable" });
     const written = await landed(scenario, input);
@@ -1465,7 +1471,7 @@ describe("opening a concept by IRI", () => {
     expect(stored.rows).toEqual([{ published_at: null }]);
   });
 
-  it("reads a person's check off the verification record, and says so when the content moved", async () => {
+  it("reads a person's check, and says when the content moved", async () => {
     const scenario = await arrange();
     const input = writeFor({ status: "stable" });
     const written = await landed(scenario, input);
@@ -1506,7 +1512,7 @@ describe("opening a concept by IRI", () => {
     );
   });
 
-  it("names the member who checked it, and falls back to their id once they have left the workspace", async () => {
+  it("names the checking member, or their id once they leave", async () => {
     const scenario = await arrange();
     const written = await landed(scenario, writeFor({ status: "stable" }));
     const priya = await memberOf(db().pool, scenario.workspaceId, "priya.anand@acme.invalid");
@@ -1538,7 +1544,7 @@ describe("opening a concept by IRI", () => {
     expect(await checkedBy()).toBe(`human:${priya.id}`);
   });
 
-  it("shows a deprecated concept to every reader, and says that is what it is", async () => {
+  it("shows a deprecated concept to every reader as deprecated", async () => {
     const scenario = await arrange();
 
     const written = await landed(scenario, writeFor({ status: "deprecated" }));
@@ -1552,7 +1558,7 @@ describe("opening a concept by IRI", () => {
     );
   });
 
-  it("names a check the platform made without naming a person, and an imported one by its rider", async () => {
+  it("names a platform check by its process and its rider", async () => {
     const scenario = await arrange();
     const written = await landed(scenario, writeFor({ status: "stable" }));
     const client = await db().pool.connect();
@@ -1582,7 +1588,7 @@ describe("opening a concept by IRI", () => {
     });
   });
 
-  it("shows every source a concept cites by the name a reader recognises, and none where it cites none", async () => {
+  it("shows each cited source by its recognisable name, or none", async () => {
     const scenario = await arrange();
     const citing = await landed(
       scenario,
@@ -1626,7 +1632,7 @@ describe("opening a concept by IRI", () => {
     ["no shelf life at all", undefined, "current"],
     ["a date long past", "2020-01-01", "out-of-date"],
 
-    ["the Clock's day, which the concept lasts through", "2026-09-08", "current"],
+    ["the Clock's day, which it lasts through", "2026-09-08", "current"],
     ["a date far ahead", "3000-01-01", "current"],
     ["an offset datetime long past", "2020-01-01T00:00:00Z", "out-of-date"],
     ["an offset datetime far ahead", "3000-01-01T00:00:00+01:00", "current"],
@@ -1666,7 +1672,7 @@ describe("opening a concept by IRI", () => {
     expect(read.ok && read.value.found && read.value.concept?.trust.status).toBe(expected);
   });
 
-  it("is out of date exactly at the end of a date-only shelf life's day, and current a moment before", async () => {
+  it("expires at the end of a date-only shelf life's day", async () => {
     const scenario = await arrange();
     const written = await landed(
       scenario,
@@ -1694,7 +1700,7 @@ describe("opening a concept by IRI", () => {
     ).toBe("current");
   });
 
-  it("is still current at the exact instant an offset-datetime shelf life names, and out of date a moment after", async () => {
+  it("is current at an offset-datetime shelf life's exact instant", async () => {
     const scenario = await arrange();
     const written = await landed(
       scenario,
@@ -1722,7 +1728,7 @@ describe("opening a concept by IRI", () => {
     ).toBe("out-of-date");
   });
 
-  it("withholds a Restricted concept from a Viewer exactly as it answers an IRI nobody minted", async () => {
+  it("withholds a Restricted concept from a Viewer as if unminted", async () => {
     const scenario = await arrange();
     const input = writeFor({ sensitivity: "Restricted", status: "stable" });
     const written = await landed(scenario, input);

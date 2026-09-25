@@ -281,8 +281,10 @@ const REWRITTEN_IN_ORDER = [
   { path: LINKED.standardAnswer, links: 1 },
 ];
 
-// Stands in for another writer's commit between the passes: the row's hash moves when the
-// concept's first check lands, before pass two reads it.
+/**
+ * Stands in for another writer's commit between the passes: the row's hash moves when the
+ * concept's first check lands, before pass two reads it.
+ */
 const movedBetweenThePasses = async <T>(path: string, work: () => Promise<T>): Promise<T> => {
   const pool = db().pool;
   await pool.query(
@@ -322,8 +324,10 @@ const standingConcept = (
     ...overrides,
   });
 
-// Held at the manifest's row, the run has read the standing paths; the writer queues behind it
-// on the bundle's lock.
+/**
+ * Held at the manifest's row, the run has read the standing paths; the writer queues behind it
+ * on the bundle's lock.
+ */
 const landedBetweenTheReadAndTheWrite = async (
   scenario: Scenario,
   path: string,
@@ -356,7 +360,7 @@ const stoppedAt = (file: string, reason: string, progress: ImportProgress) => ({
 });
 
 describe("importing the bundle", () => {
-  it("lands the manifest first and every concept in path order through the governed write, each as its own commit", async () => {
+  it("commits the manifest, then each concept in path order", async () => {
     const { scenario, verifiers } = await arranged();
 
     const run = await imported(scenario, soundBundle(verifiers));
@@ -432,7 +436,7 @@ describe("importing the bundle", () => {
     ]);
   });
 
-  it("writes the file in the platform's own form: the verifier as a person id, no email, the source kept as a projection, status stable and the minted iri", async () => {
+  it("writes each file in platform form with its minted iri", async () => {
     const { scenario, verifiers, people } = await arranged();
 
     await imported(scenario, soundBundle(verifiers));
@@ -483,7 +487,7 @@ describe("importing the bundle", () => {
     expect(file).not.toContain("@");
   });
 
-  it("records every verified event as an imported check with a null hash, one audit event each under the run's batch id", async () => {
+  it("records verified events as imported checks under the run's batch", async () => {
     const { scenario, verifiers, people } = await arranged();
 
     await imported(scenario, soundBundle(verifiers));
@@ -531,7 +535,7 @@ describe("importing the bundle", () => {
     );
   });
 
-  it("skips what already landed on a rerun, records no second check for the same actor and instant, rewrites no link, and says so", async () => {
+  it("skips what already landed on a rerun, and says so", async () => {
     const { scenario, verifiers } = await arranged();
     await imported(scenario, soundBundle(verifiers));
 
@@ -559,7 +563,7 @@ describe("importing the bundle", () => {
     });
   });
 
-  it("stops at the concept whose merge key another already holds, keeps what landed, and completes on a rerun once the key is free", async () => {
+  it("stops at a taken merge key, completing once it frees", async () => {
     const { scenario, verifiers } = await arranged();
     const standing = await standingConcept(
       scenario,
@@ -628,7 +632,7 @@ describe("importing the bundle", () => {
     expect(await checkRows(scenario.workspaceId)).toHaveLength(7);
   });
 
-  it("stops at the concept whose path another writer landed between the loader's read and its write, naming the file, with the head and the recorded commits where the refusal found them, and skips it on a rerun", async () => {
+  it("stops at a path another writer took mid-run, naming it", async () => {
     const { scenario, verifiers } = await arranged();
 
     const { stopped, other } = await landedBetweenTheReadAndTheWrite(
@@ -669,7 +673,7 @@ describe("importing the bundle", () => {
     });
   });
 
-  it("reports what a run would do on a dry run and writes nothing", async () => {
+  it("reports a dry run's plan and writes nothing", async () => {
     const { scenario, verifiers } = await arranged();
 
     const run = await imported(scenario, soundBundle(verifiers), { dryRun: true });
@@ -687,7 +691,7 @@ describe("importing the bundle", () => {
     await nothingWritten(scenario);
   });
 
-  it("lands every concept at the class the caller names, an Admin landing them Restricted and reading them back for the second pass", async () => {
+  it("lands each concept at the class the caller names", async () => {
     const { scenario, verifiers } = await arranged();
 
     const run = await importing(scenario, scenario.admin, {
@@ -703,8 +707,8 @@ describe("importing the bundle", () => {
   });
 });
 
-describe("the second pass: every relative link becomes the iri of the concept it names", () => {
-  it("rewrites each link's target to the iri, its text untouched, as a governed write on top of pass one, and says which files it rewrote", async () => {
+describe("the second pass: each relative link becomes its concept's iri", () => {
+  it("rewrites each link's target to its iri, text untouched", async () => {
     const { scenario, verifiers } = await arranged();
 
     const run = await imported(scenario, soundBundle(verifiers));
@@ -761,7 +765,7 @@ describe("the second pass: every relative link becomes the iri of the concept it
     );
   });
 
-  it("stops at the file whose concept moved between the passes, naming it, rewrites nothing after it, and rewrites it on a rerun", async () => {
+  it("stops at a file whose concept moved between the passes", async () => {
     const { scenario, verifiers } = await arranged();
 
     const stopped = await movedBetweenThePasses(LINKED.supportHours, () =>
@@ -791,7 +795,7 @@ describe("the second pass: every relative link becomes the iri of the concept it
 });
 
 describe("an imported concept, opened", () => {
-  it("renders the locator after a source that carries one, and no parenthesis after a source that carries none", async () => {
+  it("renders a source's locator, and no parenthesis without one", async () => {
     const { scenario, verifiers } = await arranged();
     await imported(
       scenario,
@@ -1000,7 +1004,7 @@ describe("what the import refuses before it writes anything", () => {
     await nothingWritten(scenario);
   });
 
-  it("refuses an Editor asked to land the bundle Restricted, a class only an Admin could read back for the second pass", async () => {
+  it("refuses an Editor asked to land the bundle Restricted", async () => {
     const { scenario, verifiers } = await arranged();
 
     const refused = await importing(scenario, scenario.editor, {
@@ -1012,7 +1016,7 @@ describe("what the import refuses before it writes anything", () => {
     await nothingWritten(scenario);
   });
 
-  it("refuses a bundle whose workspace already carries a manifest with another id, on a run and on a dry run alike", async () => {
+  it("refuses a bundle whose workspace carries another manifest id", async () => {
     const { scenario, verifiers } = await arranged();
     const other = await writeManifest(scenario.editor, doorsOf(scenario), {
       manifest: {
