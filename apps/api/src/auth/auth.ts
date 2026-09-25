@@ -12,11 +12,7 @@ import type { Logger } from "pino";
 import { z } from "zod";
 
 import { ulid } from "@better-answers/core/kernel";
-import {
-  withIdentityWrite,
-  withScope,
-  type PostgresDoor,
-} from "@better-answers/core/store/postgres";
+import { withIdentityWrite, type PostgresDoor } from "@better-answers/core/store/postgres";
 import { hasNoDisplayName, workspacesHeldBy } from "@better-answers/core/workspaces";
 
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
@@ -38,8 +34,6 @@ import {
   verification,
   workspace,
 } from "@better-answers/schema";
-
-import { ROLES } from "@better-answers/schema";
 
 import {
   ACCESS_TOKEN_LIFETIME_SECONDS,
@@ -124,6 +118,24 @@ const AUDITED_PATHS: ReadonlyMap<string, AuditEvent> = new Map([
 
 const auditedEvent = (path: string): AuditEvent | undefined => AUDITED_PATHS.get(path);
 
+/**
+ * Their writes change a membership or a workspace with no audit event; the slug check tells
+ * anyone whether a company is a customer.
+ */
+const CLOSED_ORGANISATION_PATHS = [
+  "/organization/invite-member",
+  "/organization/cancel-invitation",
+  "/organization/accept-invitation",
+  "/organization/reject-invitation",
+  "/organization/update-member-role",
+  "/organization/remove-member",
+  "/organization/leave",
+  "/organization/create",
+  "/organization/update",
+  "/organization/delete",
+  "/organization/check-slug",
+] as const;
+
 const tokenResponse = z.object({ access_token: z.string() }).optional().catch(undefined);
 const mintedClaims = z.object({
   user: z.string().nullish(),
@@ -134,16 +146,6 @@ const mintedClaims = z.object({
   azp: z.string().optional(),
 });
 
-const isPlatformRole = (role: string | undefined): boolean =>
-  role === undefined || ROLES.some((known) => known === role);
-
-const refuseForeignRole = (role: string | undefined): void => {
-  if (isPlatformRole(role)) return;
-  throw new APIError("BAD_REQUEST", {
-    error: "invalid_role",
-    error_description: `role must be one of ${ROLES.join(", ")}`,
-  });
-};
 const bodyFields = z
   .object({
     client_id: z.string().optional(),
@@ -158,12 +160,6 @@ const signedInUser = z
   .object({ user: z.object({ id: z.string() }) })
   .optional()
   .catch(undefined);
-
-const invitationsNotYet = (): APIError =>
-  new APIError("NOT_IMPLEMENTED", {
-    error: "invitations_not_yet",
-    error_description: "invitations arrive with the People screen",
-  });
 
 const clientIdOfQuery = (query: string | undefined): string | undefined =>
   query === undefined ? undefined : (new URLSearchParams(query).get("client_id") ?? undefined);
@@ -284,7 +280,7 @@ export const createAuth = (deps: AuthDependencies) => {
      * /token serves callers with no OAuth flow, which the library asks off under a provider;
      * /update-user writes a display name past its rule.
      */
-    disabledPaths: ["/token", "/update-user"],
+    disabledPaths: ["/token", "/update-user", ...CLOSED_ORGANISATION_PATHS],
     user: {
       additionalFields: {
         credentialsRevokedAt: { type: "date", required: false, input: false },
@@ -350,7 +346,6 @@ export const createAuth = (deps: AuthDependencies) => {
         roles,
         creatorRole,
 
-        allowUserToCreateOrganization: false,
         /**
          * Unset, the plugin reads the id generator to decide, and a custom minter switches that
          * heuristic off, dropping the verification ask.
@@ -372,31 +367,6 @@ export const createAuth = (deps: AuthDependencies) => {
           },
           invitation: { fields: { organizationId: "workspaceId" } },
           session: { fields: { activeOrganizationId: "activeWorkspaceId" } },
-        },
-        organizationHooks: {
-          afterCreateOrganization: async ({ organization }) => {
-            await withScope(IDENTITY_PRINCIPAL, deps.door, organization.id, async (tx) => {
-              await tx.query("SELECT create_workspace_partition($1)", [organization.id]);
-            });
-          },
-          /**
-           * Better Auth merges its owner/admin/member defaults into any roles map, so its own
-           * endpoints could otherwise assign a role outside the three.
-           */
-          beforeAddMember: async ({ member }) => {
-            refuseForeignRole(member.role);
-          },
-          beforeUpdateMemberRole: async ({ newRole }) => {
-            refuseForeignRole(newRole);
-          },
-
-          beforeCreateInvitation: async () => {
-            throw invitationsNotYet();
-          },
-
-          beforeAcceptInvitation: async () => {
-            throw invitationsNotYet();
-          },
         },
       }),
       emailOTP({
