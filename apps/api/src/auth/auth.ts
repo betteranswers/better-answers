@@ -63,7 +63,7 @@ type WidenedAuthorize<P extends { readonly endpoints: object }> = Omit<P, "endpo
 };
 
 const widenAuthorize = <P extends { readonly endpoints: object }>(plugin: P): WidenedAuthorize<P> =>
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- better-auth declares `oauth2Authorize`'s openapi metadata outside `Endpoint`, so its declaration alone fails `BetterAuthPlugin["endpoints"]`; nothing at runtime narrows it
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- a declaration gap: better-auth types `oauth2Authorize`'s openapi metadata outside `Endpoint`; the runtime value fits
   plugin as WidenedAuthorize<P>;
 
 export type EmailMessage = {
@@ -124,7 +124,7 @@ const AUDITED_PATHS: ReadonlyMap<string, AuditEvent> = new Map([
 
 const auditedEvent = (path: string): AuditEvent | undefined => AUDITED_PATHS.get(path);
 
-const tokenResponse = z.object({ access_token: z.string() });
+const tokenResponse = z.object({ access_token: z.string() }).optional().catch(undefined);
 const mintedClaims = z.object({
   user: z.string().nullish(),
   sub: z.string().optional(),
@@ -152,8 +152,12 @@ const bodyFields = z
     accept: z.boolean().optional(),
     oauth_query: z.string().optional(),
   })
-  .partial();
-const signedInUser = z.object({ user: z.object({ id: z.string() }) });
+  .partial()
+  .catch({});
+const signedInUser = z
+  .object({ user: z.object({ id: z.string() }) })
+  .optional()
+  .catch(undefined);
 
 const invitationsNotYet = (): APIError =>
   new APIError("NOT_IMPLEMENTED", {
@@ -164,6 +168,89 @@ const invitationsNotYet = (): APIError =>
 const clientIdOfQuery = (query: string | undefined): string | undefined =>
   query === undefined ? undefined : (new URLSearchParams(query).get("client_id") ?? undefined);
 
+type AuditFields = z.infer<typeof bodyFields>;
+
+type AuditedCall = {
+  readonly fields: AuditFields;
+  readonly refused: boolean;
+  readonly issued: z.infer<typeof tokenResponse>;
+  readonly signedIn: z.infer<typeof signedInUser>;
+};
+
+type Outcome = "refused" | "declined" | "ok";
+
+type AuditLine = {
+  readonly event: AuditEvent;
+  readonly principal: string | undefined;
+  readonly workspaceId: string | undefined;
+  readonly clientId: string | undefined;
+  readonly tokenId: string | undefined;
+};
+
+const isRedirect = (failure: Error): boolean =>
+  failure instanceof APIError && failure.statusCode >= 300 && failure.statusCode < 400;
+
+const openedLine = (
+  event: AuditEvent,
+  principal: string | undefined,
+  fields: AuditFields,
+): AuditLine => ({
+  event,
+  principal,
+  workspaceId: undefined,
+  clientId: fields.client_id ?? clientIdOfQuery(fields.oauth_query),
+  tokenId: undefined,
+});
+
+const claimsOfIssued = (issued: AuditedCall["issued"]) => {
+  if (issued === undefined) return undefined;
+  const claims = mintedClaims.safeParse(decodeJwt(issued.access_token));
+  return claims.success ? claims.data : undefined;
+};
+
+const issuedLine = (line: AuditLine, call: AuditedCall): AuditLine => {
+  const event = call.fields.grant_type === "refresh_token" ? "auth.token_refresh" : line.event;
+  const claims = claimsOfIssued(call.issued);
+  if (claims === undefined) return { ...line, event };
+  return {
+    event,
+    principal: claims.user ?? claims.sub,
+    workspaceId: claims.workspace ?? undefined,
+    clientId: line.clientId ?? claims.azp ?? claims.client_id,
+    tokenId: claims.jti,
+  };
+};
+
+const auditLineOf = (line: AuditLine, call: AuditedCall): AuditLine => {
+  if (line.event === "auth.workspace_pick") {
+    return { ...line, workspaceId: call.fields.organizationId };
+  }
+  if (call.refused) return line;
+  if (line.event === "auth.token_issue") return issuedLine(line, call);
+  if (line.event === "auth.sign_in" && call.signedIn !== undefined) {
+    return { ...line, principal: call.signedIn.user.id };
+  }
+  return line;
+};
+
+const outcomeOf = (event: AuditEvent, call: AuditedCall): Outcome => {
+  if (call.refused) return "refused";
+  return event === "auth.consent" && call.fields.accept === false ? "declined" : "ok";
+};
+
+const auditRecord = (line: AuditLine, outcome: Outcome) => ({
+  event: line.event,
+  principal: line.principal ?? null,
+  workspace: line.workspaceId ?? null,
+  client_id: line.clientId ?? null,
+  outcome,
+  token_id: line.tokenId ?? null,
+});
+
+/**
+ * Each sign-in, workspace pick, consent, token issue or refresh and revocation writes an audit
+ * line to `logger`.
+ */
 export const createAuth = (deps: AuthDependencies) => {
   const audit = deps.logger.child({ module: "auth" });
 
@@ -193,8 +280,10 @@ export const createAuth = (deps: AuthDependencies) => {
     database: drizzleAdapter(db, { provider: "pg", schema: identitySchema }),
 
     trustedOrigins: [deps.publicUrl],
-    // /token serves callers with no OAuth flow, which the library asks off under a provider;
-    // /update-user writes a display name past its rule.
+    /**
+     * /token serves callers with no OAuth flow, which the library asks off under a provider;
+     * /update-user writes a display name past its rule.
+     */
     disabledPaths: ["/token", "/update-user"],
     user: {
       additionalFields: {
@@ -213,12 +302,14 @@ export const createAuth = (deps: AuthDependencies) => {
       database: {
         generateId: () => ulid(),
       },
-      // The library defaults this to NODE_ENV === "test": unset, the fence is off under
-      // every test runner and the suites asserting it still pass.
+      /**
+       * The library defaults this to NODE_ENV === "test": unset, the fence is off under every
+       * test runner and the suites asserting it still pass.
+       */
       disableOriginCheck: false,
     },
     databaseHooks: {
-      // A first sign-in may carry a name, which would reach the row past the display-name rule.
+      /** A first sign-in may carry a name, which would reach the row past the display-name rule. */
       user: {
         create: {
           before: async (person) => ({ data: { ...person, name: "" } }),
@@ -239,57 +330,17 @@ export const createAuth = (deps: AuthDependencies) => {
       after: createAuthMiddleware(async (ctx) => {
         const event = auditedEvent(ctx.path);
         if (event === undefined) return;
-        const returned = ctx.context.returned;
-
-        const redirected =
-          returned instanceof APIError && returned.statusCode >= 300 && returned.statusCode < 400;
-        const refused = !redirected && (returned instanceof APIError || returned instanceof Error);
-        const body = bodyFields.safeParse(ctx.body ?? {});
-        const fields = body.success ? body.data : {};
-
+        const { returned } = ctx.context;
+        const call: AuditedCall = {
+          fields: bodyFields.parse(ctx.body),
+          refused: returned instanceof Error && !isRedirect(returned),
+          issued: tokenResponse.parse(returned),
+          signedIn: signedInUser.parse(returned),
+        };
         const session = ctx.context.session ?? (await getSessionFromCtx(ctx));
 
-        let principal = session?.user.id;
-        let workspaceId: string | undefined = undefined;
-        let tokenId: string | undefined = undefined;
-        let name: AuditEvent = event;
-        let clientId = fields.client_id ?? clientIdOfQuery(fields.oauth_query);
-
-        if (event === "auth.token_issue" && !refused) {
-          const issued = tokenResponse.safeParse(returned);
-          const claims = issued.success
-            ? mintedClaims.safeParse(decodeJwt(issued.data.access_token))
-            : undefined;
-          if (claims?.success) {
-            principal = claims.data.user ?? claims.data.sub;
-            workspaceId = claims.data.workspace ?? undefined;
-            tokenId = claims.data.jti;
-            clientId = clientId ?? claims.data.azp ?? claims.data.client_id;
-          }
-          if (fields.grant_type === "refresh_token") name = "auth.token_refresh";
-        }
-        if (event === "auth.sign_in" && !refused) {
-          const parsed = signedInUser.safeParse(returned);
-          if (parsed.success) principal = parsed.data.user.id;
-        }
-        if (event === "auth.workspace_pick") workspaceId = fields.organizationId;
-
-        audit.info(
-          {
-            event: name,
-            principal: principal ?? null,
-            workspace: workspaceId ?? null,
-            client_id: clientId ?? null,
-            outcome: refused
-              ? "refused"
-              : event === "auth.consent" && fields.accept === false
-                ? "declined"
-                : "ok",
-
-            token_id: tokenId ?? null,
-          },
-          name,
-        );
+        const line = auditLineOf(openedLine(event, session?.user.id, call.fields), call);
+        audit.info(auditRecord(line, outcomeOf(event, call)), line.event);
       }),
     },
     plugins: [
@@ -300,8 +351,10 @@ export const createAuth = (deps: AuthDependencies) => {
         creatorRole,
 
         allowUserToCreateOrganization: false,
-        // Unset, the plugin reads the id generator to decide, and a custom minter
-        // switches that heuristic off, dropping the verification ask.
+        /**
+         * Unset, the plugin reads the id generator to decide, and a custom minter switches that
+         * heuristic off, dropping the verification ask.
+         */
         requireEmailVerificationOnInvitation: true,
 
         schema: {
@@ -326,8 +379,10 @@ export const createAuth = (deps: AuthDependencies) => {
               await tx.query("SELECT create_workspace_partition($1)", [organization.id]);
             });
           },
-          // Better Auth merges its owner/admin/member defaults into any roles map, so its
-          // own endpoints could otherwise assign a role outside the three.
+          /**
+           * Better Auth merges its owner/admin/member defaults into any roles map, so its own
+           * endpoints could otherwise assign a role outside the three.
+           */
           beforeAddMember: async ({ member }) => {
             refuseForeignRole(member.role);
           },
@@ -360,8 +415,10 @@ export const createAuth = (deps: AuthDependencies) => {
       }),
       widenAuthorize(
         oauthProvider({
-          // No page may carry a query of its own: the signed query is appended with an
-          // unconditional ?, and a second breaks the signature.
+          /**
+           * No page may carry a query of its own: the signed query is appended with an
+           * unconditional ?, and a second breaks the signature.
+           */
           loginPage: `${deps.publicUrl}/sign-in`,
 
           consentPage: `${deps.publicUrl}/consent`,

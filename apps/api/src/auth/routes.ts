@@ -4,7 +4,7 @@ import { Hono, type MiddlewareHandler } from "hono";
 import type { Logger } from "pino";
 import { z } from "zod";
 
-import { attempt, type Clock } from "@better-answers/core/kernel";
+import { attempt, type Claims, type Clock, type Result } from "@better-answers/core/kernel";
 import {
   consumeIngress,
   withPrincipal,
@@ -94,8 +94,10 @@ const sameOriginOnly = (publicUrl: string): MiddlewareHandler => {
   };
 };
 
-// Consent shares the product's origin, so a script's fetch passes the check above; only a
-// document navigation follows the redirect.
+/**
+ * Consent shares the product's origin, so a script's fetch passes the same-origin check; only a
+ * document navigation follows the redirect.
+ */
 const navigationOnly: MiddlewareHandler = async (context, next) => {
   if (context.req.method === "POST" && context.req.header("sec-fetch-dest") !== "document") {
     return context.html(
@@ -161,9 +163,52 @@ const callFlow = (
 
 const clientShape = z.object({ client_name: z.string().nullish(), name: z.string().nullish() });
 
+const UNNAMED_WORKSPACE = "your workspace";
+
+const consentQueryOf = (url: string) => {
+  const query = new URL(url).searchParams;
+  return {
+    clientId: query.get("client_id") ?? "",
+    scopes: (query.get("scope") ?? "").split(" ").filter((scope) => scope !== ""),
+    redirectUri: query.get("redirect_uri") ?? "",
+  };
+};
+
+const clientNameOf = async (auth: Auth, clientId: string, headers: Headers): Promise<string> => {
+  const client = await attempt(() =>
+    auth.api.getOAuthClientPublic({ query: { client_id: clientId }, headers }),
+  );
+  const named = client.ok ? clientShape.safeParse(client.value) : undefined;
+  return (named?.success ? (named.data.client_name ?? named.data.name) : undefined) ?? "This app";
+};
+
+const workspaceNameOf = async (door: PostgresDoor, claims: Claims): Promise<string> => {
+  const named = await withPrincipal(door, claims, async (_principal, tx) => {
+    const row = await tx.query<{ name: string }>("SELECT name FROM workspace WHERE id = $1", [
+      claims.workspaceId,
+    ]);
+    return row.rows[0]?.name ?? UNNAMED_WORKSPACE;
+  });
+  return named.ok ? named.value : UNNAMED_WORKSPACE;
+};
+
+const failureOf = async (decided: Result<Response>) =>
+  decided.ok
+    ? { status: decided.value.status, detail: await decided.value.clone().text() }
+    : { status: null, detail: decided.error.message };
+
 export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
   const routes = new Hono();
   const { auth, door, publicUrl, clock } = deps;
+
+  const claimsFrom = (headers: Headers): Promise<Claims | undefined> =>
+    sessionClaims((sent) => auth.api.getSession({ headers: sent }), headers);
+
+  const sessionHolds = async (headers: Headers): Promise<boolean> => {
+    const claims = await claimsFrom(headers);
+    if (claims === undefined) return false;
+    return (await withPrincipal(door, claims, async () => true)).ok;
+  };
 
   const prm = {
     resource: deps.mcpUrl,
@@ -195,38 +240,25 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
   });
 
   routes.get("/consent", async (context) => {
-    const query = new URL(context.req.url).searchParams;
-    const clientId = query.get("client_id") ?? "";
-    const scopes = (query.get("scope") ?? "").split(" ").filter((scope) => scope !== "");
+    const asked = consentQueryOf(context.req.url);
     const headers = flowHeaders(context.req.raw, publicUrl);
-    const claims = await sessionClaims((h) => auth.api.getSession({ headers: h }), headers);
+    const claims = await claimsFrom(headers);
     if (claims === undefined) {
       return context.html(
         refusedPage("Sign in first", "Choose a workspace before connecting."),
         401,
       );
     }
-    const client = await attempt(() =>
-      auth.api.getOAuthClientPublic({ query: { client_id: clientId }, headers }),
-    );
-    const clientName = client.ok ? clientShape.safeParse(client.value) : undefined;
-    const workspaceName = await withPrincipal(door, claims, async (_principal, tx) => {
-      const row = await tx.query<{ name: string }>("SELECT name FROM workspace WHERE id = $1", [
-        claims.workspaceId,
-      ]);
-      return row.rows[0]?.name ?? "your workspace";
-    });
+    const clientName = await clientNameOf(auth, asked.clientId, headers);
+    const workspace = await workspaceNameOf(door, claims);
 
     return context.html(
       consentPage(carry(context.req.url), {
-        clientName:
-          (clientName?.success
-            ? (clientName.data.client_name ?? clientName.data.name)
-            : undefined) ?? "This app",
-        hostedAt: hostnameOf(clientId),
-        sendsCodeTo: hostnameOf(query.get("redirect_uri") ?? ""),
-        workspace: workspaceName.ok ? workspaceName.value : "your workspace",
-        scopes,
+        clientName,
+        hostedAt: hostnameOf(asked.clientId),
+        sendsCodeTo: hostnameOf(asked.redirectUri),
+        workspace,
+        scopes: asked.scopes,
       }),
     );
   });
@@ -236,19 +268,11 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
 
     const accept = form.get("accept") === "true";
 
-    if (accept) {
-      const claims = await sessionClaims(
-        (headers) => auth.api.getSession({ headers }),
-        flowHeaders(context.req.raw, publicUrl),
+    if (accept && !(await sessionHolds(flowHeaders(context.req.raw, publicUrl)))) {
+      return context.html(
+        refusedPage("Sign in again", "Your session is no longer valid. Sign in again."),
+        401,
       );
-      const resolved =
-        claims === undefined ? undefined : await withPrincipal(door, claims, async () => true);
-      if (claims === undefined || resolved === undefined || !resolved.ok) {
-        return context.html(
-          refusedPage("Sign in again", "Your session is no longer valid. Sign in again."),
-          401,
-        );
-      }
     }
     const decided = await attempt(() =>
       callFlow(auth, publicUrl, "/oauth2/consent", flowHeaders(context.req.raw, publicUrl), {
@@ -256,15 +280,13 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
         oauth_query: oauthQuery(context.req.url),
       }),
     );
-    if (decided.ok) forwardCookies(decided.value, context.res.headers);
-    const next = decided.ok ? await nextLocation(decided.value) : undefined;
-    if (next !== undefined) return context.redirect(next, 302);
+    if (decided.ok) {
+      forwardCookies(decided.value, context.res.headers);
+      const next = await nextLocation(decided.value);
+      if (next !== undefined) return context.redirect(next, 302);
+    }
     deps.logger.warn(
-      {
-        event: "auth.consent_failed",
-        status: decided.ok ? decided.value.status : null,
-        detail: decided.ok ? await decided.value.clone().text() : decided.error.message,
-      },
+      { event: "auth.consent_failed", ...(await failureOf(decided)) },
       "consent could not be completed",
     );
     return context.html(
@@ -274,10 +296,7 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
   });
 
   routes.get("/me", async (context) => {
-    const claims = await sessionClaims(
-      (headers) => auth.api.getSession({ headers }),
-      flowHeaders(context.req.raw, publicUrl),
-    );
+    const claims = await claimsFrom(flowHeaders(context.req.raw, publicUrl));
     if (claims === undefined) return context.json({ error: "not_signed_in" }, 401);
     const resolved = await withPrincipal(door, claims, async (principal) => ({
       workspaceId: principal.workspaceId,

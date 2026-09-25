@@ -382,10 +382,6 @@
     },
     {
       "files": [
-        "apps/api/lifts/better-auth-cimd-node/index.ts",
-        "apps/api/src/auth/auth.ts",
-        "apps/api/src/auth/routes.ts",
-        "apps/api/src/auth/verify.ts",
         "apps/api/src/ingress/limits.ts",
         "apps/api/src/mcp/surface.ts",
         "apps/api/src/ops/index.ts",
