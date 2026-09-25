@@ -4,6 +4,8 @@ import type pg from "pg";
 import { err, ok, type Result } from "../../kernel/index.ts";
 import type {
   Claims,
+  OperatorPrincipal,
+  OperatorRefusal,
   PlatformPrincipal,
   Principal,
   PrincipalRefusal,
@@ -373,6 +375,53 @@ const refuse = (
     }
   }
   return ok({ ...row, role: row.role });
+};
+
+type OperatorRow = {
+  readonly id: string;
+  readonly operator: boolean;
+  readonly revoked_at: Date | null;
+};
+
+const carriesTheMark = (
+  row: OperatorRow | undefined,
+  credentialIssuedAtMs: number,
+): row is OperatorRow =>
+  row !== undefined &&
+  row.operator &&
+  (row.revoked_at === null || credentialIssuedAtMs >= row.revoked_at.getTime());
+
+/**
+ * Resolves a signed-in person to the operator, then runs `work` as them in one transaction scoped
+ * to no workspace. Refuses `not-the-operator` to anyone else: a person without the mark, credentials
+ * issued before their revocation, an id no person holds.
+ */
+export const withOperator = async <T>(
+  door: PostgresDoor,
+  claims: Pick<Claims, "userId" | "issuedAt">,
+  work: (operator: OperatorPrincipal, tx: Tx) => Promise<T>,
+): Promise<Result<T, OperatorRefusal>> => {
+  const credentialIssuedAtMs = claims.issuedAt.getTime();
+
+  return transaction(
+    door,
+    async (client): Promise<Result<T, OperatorRefusal>> => {
+      const found = await client.query<OperatorRow>(
+        'SELECT id, operator, credentials_revoked_at AS revoked_at FROM "user" WHERE id = $1',
+        [claims.userId],
+      );
+      const row = found.rows[0];
+      if (!carriesTheMark(row, credentialIssuedAtMs)) return err("not-the-operator");
+
+      const operator: OperatorPrincipal = {
+        kind: "operator",
+        userId: boundarySchemas.user.select.shape.id.parse(row.id),
+        credentialIssuedAtMs,
+      };
+      return ok(await work(operator, client));
+    },
+    (opened) => !opened.ok || answersARefusal(opened.value),
+  );
 };
 
 export type CounterRule = {

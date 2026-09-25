@@ -1,4 +1,4 @@
-# Runbook — twelve pages and seven procedures
+# Runbook — twelve pages and eight procedures
 
 **Operational reference, not a page of the docs site.** This file lives in `docs/operations/` because that is where the operational documents are kept; the docs site does not render it, and it is read from the repository.
 
@@ -233,3 +233,11 @@ The first client is landed by this page on staging first and then on production,
 8. **Record the numbers** from the closing line — landed, skipped, checks, links, seconds — in the estate-size record, staging's beside production's.
 9. **Wipe staging** by the drill's own wipe (the procedure above); the `staging-wiped` ping is the proof, and the exception above ends with it.
 10. **Production:** steps 2 to 8 again on VPC 1 — the same two people, the same slug, the manifest's id unchanged. The numbers into the estate-size record are the first measurement of a real client, and the route's C1 row says so.
+
+## Make or unmake the operator
+
+The operator is the person the console serves, marked on their person row. Only one command on the `api` service sets or clears the mark, and no screen can. The person signs in with an email code first: the command refuses an address nobody has signed in with, `REFUSED — no-such-user`.
+
+- `pnpm ops operator --email <address> --grant` makes them the operator, and `--revoke` clears the mark. Each change writes `people.operator.granted` or `people.operator.revoked` to the identity-set audit log under the platform's own actor id. A person who already stands as asked is left alone, and the done line says nothing was written.
+- The console answers the operator from their ordinary signed-in session, and never from an OAuth token. Clearing the mark refuses them from their next request.
+- Inside a workspace the operator is a member like any other, with the role they hold there. An erasure that pseudonymises the person clears the mark with the rest of their identity.

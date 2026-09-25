@@ -30,6 +30,8 @@ export const user = pgTable("user", {
   updatedAt: stamp("updated_at").defaultNow().notNull(),
 
   credentialsRevokedAt: stamp("credentials_revoked_at"),
+
+  operator: boolean("operator").default(false).notNull(),
 });
 
 export const session = pgTable(

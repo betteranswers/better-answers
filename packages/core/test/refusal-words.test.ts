@@ -26,6 +26,7 @@ const REGISTER = {
   malformed: "malformed by kernel",
   "role-forbids": "forbidden by kernel",
   "not-found": "absent by kernel",
+  "not-the-operator": "forbidden by kernel",
   "not-a-member": "unauthenticated by kernel",
   "credentials-revoked": "unauthenticated by kernel",
   "role-disagrees": "unauthenticated by kernel",

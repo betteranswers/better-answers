@@ -16,7 +16,7 @@ export { declareRefusals, REFUSAL_CLASSES, refusalRegister } from "./refusal.ts"
 export type { RefusalClass } from "./refusal.ts";
 export { KERNEL_REFUSALS, MALFORMED, NOT_FOUND } from "./vocabulary.ts";
 export type { KernelRefusal, RefusalWordFor } from "./vocabulary.ts";
-export { admit, declareAct, EVERY_PURPOSE } from "./admission.ts";
+export { admit, declareAct, EVERY_PURPOSE, OPERATOR_ALONE } from "./admission.ts";
 export type { AdmissionRefusal, AdmittedOf, InputOf, RefusalOf } from "./admission.ts";
 export { ISSUE_WORDS, parse, ROOT_PATH } from "./parse.ts";
 export type { FieldIssues, IssueWord, Malformed } from "./parse.ts";
@@ -39,6 +39,8 @@ export type {
   AuditEventId,
   Claims,
   GroupId,
+  OperatorPrincipal,
+  OperatorRefusal,
   PlatformPrincipal,
   Principal,
   PrincipalRefusal,

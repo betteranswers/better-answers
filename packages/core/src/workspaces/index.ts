@@ -29,6 +29,8 @@ export {
   setDisplayNameInput,
 } from "./display-name.ts";
 export type { SetDisplayNameRefusal } from "./display-name.ts";
+export { listWorkspaces } from "./listing.ts";
+export { setOperatorMark } from "./operator.ts";
 
 export const TOOLS_LIST_TTL_MS_DEFAULT = 300_000;
 export const TOOLS_LIST_TTL_CONFIG_KEY = "mcp.tools_list_ttl_ms";

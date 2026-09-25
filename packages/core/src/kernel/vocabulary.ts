@@ -8,6 +8,10 @@ export const KERNEL_REFUSALS = declareRefusals("kernel", {
   "role-forbids": "forbidden",
   "not-found": "absent",
 
+  // The operator resolver's one word, whatever it found, so a signed-in person it refuses learns
+  // nothing else.
+  "not-the-operator": "forbidden",
+
   // The resolver's five: the remedy is a fresh sign-in, which `role-forbids` never is.
   "not-a-member": "unauthenticated",
   "credentials-revoked": "unauthenticated",

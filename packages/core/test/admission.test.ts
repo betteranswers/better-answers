@@ -6,12 +6,15 @@ import {
   admit,
   declareAct,
   EVERY_PURPOSE,
+  OPERATOR_ALONE,
   refusalRegister,
   type AdmissionRefusal,
   type AdmittedOf,
   type InputOf,
+  type OperatorPrincipal,
   type PlatformPrincipal,
   type RefusalOf,
+  type Result,
   type Role,
   type UserPrincipal,
 } from "../src/kernel/index.ts";
@@ -42,6 +45,12 @@ const processActor = (purpose: string): PlatformPrincipal => ({
   actorId: `process:better-answers-${purpose}`,
 });
 
+const theOperator = (): OperatorPrincipal => ({
+  kind: "operator",
+  userId: boundarySchemas.user.select.shape.id.parse("01JQ0000000000000000000ZED"),
+  credentialIssuedAtMs: Date.now(),
+});
+
 const nothing = z.object({});
 
 const adminsOnly = declareAct({
@@ -63,6 +72,13 @@ const erasureOnly = declareAct({
   input: nothing,
   refuses: ["role-forbids"],
   effect: "write",
+});
+
+const operatorsOnly = declareAct({
+  admits: OPERATOR_ALONE,
+  input: nothing,
+  refuses: ["not-the-operator"],
+  effect: "read",
 });
 
 const classOf = (word: string): string | undefined =>
@@ -120,6 +136,43 @@ describe("what an act admits, from the principal and input alone", () => {
     expectTypeOf<"not-found">().not.toExtend<AdmissionRefusal>();
 
     expect(classOf("malformed")).toBe("malformed");
+  });
+});
+
+describe("what an act admits of the operator", () => {
+  it("admits the operator alone to an operator's act", () => {
+    const operator = theOperator();
+
+    expect([
+      admit(operatorsOnly, operator, {}),
+      admit(operatorsOnly, person("Admin"), {}),
+      admit(operatorsOnly, processActor("bootstrap"), {}),
+    ]).toEqual([
+      { ok: true, value: operator },
+      { ok: false, error: "not-the-operator" },
+      { ok: false, error: "not-the-operator" },
+    ]);
+  });
+
+  it("refuses the operator every act a role or purpose admits", () => {
+    expect([
+      admit(everyone, theOperator(), {}),
+      admit(adminsOnly, theOperator(), {}),
+      admit(erasureOnly, theOperator(), {}),
+    ]).toEqual([
+      { ok: false, error: "role-forbids" },
+      { ok: false, error: "role-forbids" },
+      { ok: false, error: "role-forbids" },
+    ]);
+  });
+
+  it("hands back the operator, and refuses in a forbidden word", () => {
+    expectTypeOf<AdmittedOf<typeof operatorsOnly>>().toEqualTypeOf<OperatorPrincipal>();
+    expectTypeOf<OperatorPrincipal>().not.toExtend<AdmittedOf<typeof everyone>>();
+    expectTypeOf<ReturnType<typeof admit<typeof operatorsOnly>>>().toEqualTypeOf<
+      Result<OperatorPrincipal, "not-the-operator">
+    >();
+    expect(classOf("not-the-operator")).toBe("forbidden");
   });
 });
 

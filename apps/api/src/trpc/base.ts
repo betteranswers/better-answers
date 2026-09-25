@@ -15,6 +15,7 @@ import {
 import {
   consumeIngress,
   withHeldPrincipal,
+  withOperator,
   withPrincipal,
   type CounterRule,
 } from "@better-answers/core/store/postgres";
@@ -128,6 +129,8 @@ export const router = trpc.router;
 
 const RESOLVER = "withPrincipal";
 
+const OPERATOR_RESOLVER = "withOperator";
+
 type Session = NonNullable<Awaited<ReturnType<SessionReader>>>;
 
 const sessionOf = async (ctx: TrpcContext): Promise<Session> => {
@@ -146,26 +149,43 @@ const claimsOf = async (ctx: TrpcContext): Promise<Claims> => {
   return claims;
 };
 
+const settled = <Ran>(
+  ctx: TrpcContext,
+  resolver: string,
+  resolved: Result<Result<Ran, RefusalAnswer>, Error>,
+): Ran => {
+  if (!resolved.ok) {
+    // The procedure's own answer has crossed already; logging it here would say it twice.
+    if (resolved.error instanceof TRPCError) throw resolved.error;
+    throw failed(ctx.log, resolver, resolved.error);
+  }
+  if (!resolved.value.ok) throw refused(ctx.log, resolver, resolved.value.error);
+  return resolved.value.value;
+};
+
+/**
+ * tRPC returns a failed procedure rather than throwing it, so without the throw the transaction it
+ * failed inside commits.
+ */
+const thrownIfFailed = <
+  Ran extends { readonly ok: true } | { readonly ok: false; readonly error: Error },
+>(
+  ran: Ran,
+): Ran => {
+  if (!ran.ok) throw ran.error;
+  return ran;
+};
+
 const inTheResolversTransaction = (resolve: typeof withPrincipal) =>
   trpc.procedure.use(async ({ ctx, next }) => {
     const claims = await claimsOf(ctx);
 
     const resolved = await attempt(() =>
-      resolve(ctx.doors.postgres, claims, async (principal, tx) => {
-        // tRPC returns a failed procedure rather than throwing, so without the throw below
-        // the transaction it failed inside commits.
-        const ran = await next({ ctx: { principal, tx, doors: undefined } });
-        if (!ran.ok) throw ran.error;
-        return ran;
-      }),
+      resolve(ctx.doors.postgres, claims, async (principal, tx) =>
+        thrownIfFailed(await next({ ctx: { principal, tx, doors: undefined } })),
+      ),
     );
-    if (!resolved.ok) {
-      // The procedure's own answer has crossed already; logging it here would say it twice.
-      if (resolved.error instanceof TRPCError) throw resolved.error;
-      throw failed(ctx.log, RESOLVER, resolved.error);
-    }
-    if (!resolved.value.ok) throw refused(ctx.log, RESOLVER, resolved.value.error);
-    return resolved.value.value;
+    return settled(ctx, RESOLVER, resolved);
   });
 
 export const queryProcedure = inTheResolversTransaction(withPrincipal);
@@ -220,3 +240,21 @@ export const personCeiling = (rule: CounterRule) =>
     }
     return next();
   });
+
+/**
+ * Built from the session alone: this surface reads no bearer, so a token never becomes the
+ * operator.
+ */
+export const operatorProcedure = trpc.procedure.use(async ({ ctx, next }) => {
+  const { user, session } = await sessionOf(ctx);
+
+  const resolved = await attempt(() =>
+    withOperator(
+      ctx.doors.postgres,
+      { userId: user.id, issuedAt: session.createdAt },
+      async (operator, tx) =>
+        thrownIfFailed(await next({ ctx: { operator, tx, doors: undefined } })),
+    ),
+  );
+  return settled(ctx, OPERATOR_RESOLVER, resolved);
+});

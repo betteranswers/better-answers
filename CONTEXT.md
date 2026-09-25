@@ -756,9 +756,10 @@ to it by IRI and never restates it (ADR 0014).
   principal, never under a live user session.
   _Avoid_: user (in code), session, caller, actor (which is the *id* on a file, not the principal).
 - **operator** — the platform's own administrator over every workspace: a real person on the
-  identity set, made the operator only by the platform's own tooling and never from a screen, a
-  third principal kind beside a user and the platform, audited under their own id. Never a
-  workspace *role*; *Admin* is the highest role a workspace has.
+  identity set, made the operator by a **mark** on their person that only the platform's own
+  tooling grants or revokes, never a screen, and that erasure clears with the rest of their
+  identity; a third principal kind beside a user and the platform, audited under their own id.
+  Never a workspace *role*; *Admin* is the highest role a workspace has.
 - **act** — what an entry — a screen's call, an MCP entry, an ops command, the reconciler's tick —
   may ask the platform to do as a *principal*: one thing, a **read** or a **write**, answered with
   its value or with a *refusal*. Reading a binding's findings is an act as much as publishing the
