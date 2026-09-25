@@ -78,6 +78,35 @@ the report means anything. A leg cut short at its ceiling writes no report, so t
 read from the checkpoint it left instead. Its suite asserts the prose a reader sees, line by
 line, and runs the script over files.
 
+`src/mutation-shards.ts` cuts a mutation leg into shards and puts the leg back together, behind
+`scripts/mutation-shards.mjs`, which reads each leg's `mutate` patterns from its Stryker config.
+`slice --leg … --shard … --of … --baseline …` prints one shard's files for `stryker run
+--mutate`: the patterns resolved in order as Stryker resolves them, then each file, heaviest
+first, onto the lightest shard so far. A file weighs what its mutants cost the previous run, in
+seconds of a worker fitted to a forced run of every shard, a timed-out mutant far above the rest;
+a file that run did not hold is priced by size at its seconds a byte, and with no previous run
+size is all there is. Ties keep path order, so every job of a run, reading the same previous run,
+cuts the same slices. `merge --leg … --of … --shards … --baseline … --out …` takes each file from
+the shard that owned it,
+renumbering the tests each shard numbered on its own. A shard that stopped leaves out what it
+never reached, so a forced run's gaps are not refilled with the results it was replacing; only
+a shard that left nothing is filled from the previous run, so a lost shard never leaves the leg
+poorer than it started. The merge writes the leg's checkpoint always and its report only when
+every shard finished, as one run would, and prints a line naming the shards that did not. A
+file keeps its results when a new file moves it to another shard, because every shard starts
+from the whole leg's results and Stryker carries a file outside `--mutate` forward from the file
+it read. A leg can name a file too heavy for one shard and a number of pieces: the file is cut by
+line into that many `file:from-to` ranges, each a shard of its own ahead of the dealt ones, the
+other files dealt over the shards left. Stryker's own instrumenter lists the file's mutants, a cut falls
+only between lines no mutant runs across, since Stryker mutates only what a range holds whole,
+and each cut is the one nearest its share of the cost, a mutant priced by the previous run's
+mutant of the same text wherever the file has moved it. The merge takes each mutant of a cut
+file from the piece holding the line it starts on, since each piece's shard carries the rest of
+the file forward onto its text as it stands; a piece whose shard left nothing is filled from
+another piece's shard, and from the previous run only when none left anything. The suite runs Stryker over a throwaway workspace, two shards merged against
+one whole run, then moves a file and reads its results back, and runs a leg with a file cut in
+two against one whole run of it.
+
 `src/land.ts` is the landing command behind `scripts/land.mjs` (`pnpm land --message "…"`): the
 working tree's changes and one message become a branch named from its `Refs:` footer and its
 summary, a commit over `origin/main`'s fetched head, a push, a pull request opened with

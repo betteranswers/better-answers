@@ -1,0 +1,53 @@
+name: mutation-baseline
+description: Restore a mutation leg's results from the newest run on main, or on this branch, that uploaded them before this run began.
+inputs:
+  leg:
+    description: The leg whose results to restore, as the workflow's matrix names it.
+    required: true
+  reports:
+    description: The directory to restore into, as the incremental file Stryker reads and as the baseline the slicing and the summary read.
+    required: true
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      # An artifact, not the Actions cache: the build's layers fill the cache, and it evicts a checkpoint read once a night.
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPOSITORY: ${{ github.repository }}
+        BRANCH: ${{ github.ref_name }}
+        RUN: ${{ github.run_id }}
+        ARTIFACT: stryker-incremental-${{ inputs.leg }}
+        REPORTS: ${{ inputs.reports }}
+        # A fork can name its branch main, hence the head repository; an upload after this run began would split its jobs' slicing.
+        NEWEST_CHECKPOINT: >-
+          [.[].artifacts[]
+          | select((.expired | not)
+          and .created_at < env.BEGAN
+          and .workflow_run.head_repository_id == .workflow_run.repository_id
+          and (.workflow_run.head_branch == "main" or .workflow_run.head_branch == env.BRANCH))]
+          | max_by(.created_at) // empty
+          | "\(.workflow_run.id) \(.created_at)"
+      run: |
+        set -euo pipefail
+        if ! BEGAN="$(gh api "repos/${REPOSITORY}/actions/runs/${RUN}" --jq .created_at)"; then
+          echo "::error::the runs API would not say when run ${RUN} began"
+          exit 1
+        fi
+        export BEGAN
+        if ! pages="$(gh api --paginate --slurp "repos/${REPOSITORY}/actions/artifacts?name=${ARTIFACT}&per_page=100")"; then
+          echo "::error::the artifacts API would not list ${ARTIFACT} to this run's token"
+          exit 1
+        fi
+        if ! newest="$(jq --raw-output "${NEWEST_CHECKPOINT}" <<<"${pages}")"; then
+          echo "::error::the artifacts API answered with something other than a list of ${ARTIFACT}"
+          exit 1
+        fi
+        if [ -z "${newest}" ]; then
+          echo "No run on main or ${BRANCH} has left ${ARTIFACT}, so this leg tests every mutant."
+          exit 0
+        fi
+        read -r run uploaded <<<"${newest}"
+        gh run download "${run}" --repo "${REPOSITORY}" --name "${ARTIFACT}" --dir "${REPORTS}"
+        cp "${REPORTS}/stryker-incremental.json" "${REPORTS}/baseline.json"
+        echo "Restored ${ARTIFACT} from run ${run}, uploaded ${uploaded}."
