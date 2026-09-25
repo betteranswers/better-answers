@@ -258,6 +258,12 @@ are the platform's own, on the auth module's hooks over the better-auth client (
 amended 2026-09-05); the client says *organization* throughout and the module's word map
 says *workspace*; that map is not optional.
 
+**A pill is Kibo UI's Pill** (owner, 25/09/2026; <https://www.kibo-ui.com/components/pill>).
+Every pill a screen shows — a role, a group, an invitation's state, a count — is that
+component, installed through the registry with its notices entry and skinned by the tokens.
+It is never shadcn's Badge restyled or a hand-rolled span. Screens built before this date are
+not swept.
+
 The seven product-specific components the set used to hold are the ones to rebuild first on
 top of a registry primitive, because nothing off the shelf carries their meaning:
 **`TrustTag`** (the closed set of trust words, `CONTEXT.md` and ADR 0019),

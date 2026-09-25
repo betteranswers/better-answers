@@ -220,3 +220,7 @@ Everything else in this ADR and its amendments stands, including keep in text, t
 - A keyed hash of each finding's value, to recognise the person's spans without the text: a hash of a value is the value.
 
 Everything else in this ADR and its amendments stands, including the seam, the identity of a finding, the erasure that outranks a restore, one withholding per finding and the replay copy's shape.
+
+## Amendment — 2026-09-24 (the T-027 and T-028 grill), erasure and the last Admin
+
+Every People act refuses to leave a workspace with no Admin (`last-admin`, T-027). Erasure is the one act that does not check, because the right outranks the rule, so a request from a workspace's only Admin leaves it with none. The identity step's log line gains `admins_left`, and the repair is the operator's `pnpm ops add-member`, which needs the person to have signed in. Erasure also clears the operator's mark where the person carries one (ADR 0009, amended today). Everything else stands.
