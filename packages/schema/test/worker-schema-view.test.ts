@@ -42,7 +42,7 @@ describe("the worker's schema view", () => {
     expect(unknown, "tables the journal does not know — the view claims too much").toEqual([]);
   });
 
-  it("is byte-identical to a regeneration and carries the journal's last migration id", async () => {
+  it("matches a regeneration and carries the last migration id", async () => {
     const migration = lastMigration();
 
     const regenerated = renderWorkerSchemaView(await introspect(db.pool), migration);
@@ -50,7 +50,7 @@ describe("the worker's schema view", () => {
     expect(regenerated).toContain(`MIGRATION_ID = "${migration.tag}"`);
   });
 
-  it("stamps the instant the migrator wrote, so the worker's stamp check has something to compare", async () => {
+  it("stamps the instant the migrator wrote, for the worker's check", async () => {
     const migration = lastMigration();
     const stamped = await db.pool.query<{ created_at: string }>(
       "SELECT created_at FROM drizzle.__drizzle_migrations ORDER BY created_at DESC LIMIT 1",
@@ -60,7 +60,7 @@ describe("the worker's schema view", () => {
     expect(Number(stamped.rows[0]?.created_at)).toBe(migration.when);
   });
 
-  it("refuses a journal whose migrations share an instant, because the stamp check could not tell them apart", () => {
+  it("refuses a journal whose migrations share an instant", () => {
     const entries = journalEntries();
     expect(entries.map((entry) => entry.when)).toEqual(
       entries.map((entry) => entry.when).toSorted((a, b) => a - b),

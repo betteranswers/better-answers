@@ -12,6 +12,10 @@ import { openMigratedPostgres } from "./warm-postgres.ts";
 
 type Writer = Pick<pg.PoolClient, "query">;
 
+/**
+ * Registers the `beforeAll` that opens the suite's database and stops it after; call it at module
+ * scope. The getter throws before that hook runs.
+ */
 export const postgresForSuite = (): (() => MigratedPostgres) => {
   let opened: MigratedPostgres | undefined;
   beforeAll(async () => {
@@ -35,8 +39,10 @@ const constraintOf = (error: unknown): string => {
   return typeof named === "string" ? named : `nothing named a constraint: ${String(error)}`;
 };
 
-// The closed set the pinned image has, so a privilege the journal never mentions is answered
-// false rather than left out of the question.
+/**
+ * The closed set the pinned image has, so a privilege the journal never mentions is answered
+ * false rather than left out of the question.
+ */
 const TABLE_PRIVILEGES = [
   "SELECT",
   "INSERT",
@@ -72,10 +78,17 @@ export const matchIsLeakproof = async (client: Writer): Promise<boolean | undefi
 
 export const ADMITTED = "admitted";
 
-// A refusal's SQLSTATE outlives its message, which any author may reword.
+/**
+ * A refusal's SQLSTATE outlives its message, which any author may reword. `none` when the error
+ * carries no code.
+ */
 export const sqlstateOf = (error: unknown): string =>
   typeof error === "object" && error !== null && "code" in error ? String(error.code) : "none";
 
+/**
+ * Runs `attempt` under a savepoint it always rolls back. Answers `ADMITTED`, the constraint the
+ * refusal names, or the error when it names none.
+ */
 export const refusalOf = async (
   client: pg.PoolClient,
   attempt: () => Promise<unknown>,
@@ -98,6 +111,10 @@ export type Refusal = readonly [
   message?: RegExp,
 ];
 
+/**
+ * Expects each statement refused with a message matching its pattern, `permission denied` when it
+ * gives none. Each runs under a savepoint rolled back after.
+ */
 export const refusesEach = async (
   client: pg.PoolClient,
   refusals: readonly Refusal[],
@@ -312,6 +329,7 @@ export const conceptIriTakenAgain = (
     iri,
   ]);
 
+/** Answers `ADMITTED` or the refusal's SQLSTATE, not its constraint; the row never stays. */
 export const enqueueAttempted = async (
   client: Writer,
   job: {

@@ -15,7 +15,7 @@ describe("the bundle manifest, the file a bundle describes itself with", () => {
     expect(BUNDLE_MANIFEST_PATH).toBe("knowledge/manifest.yaml");
   });
 
-  it("accepts the five keys the bundle carries, trimming what a person typed around them", () => {
+  it("accepts the five keys, trimming what a person typed", () => {
     expect(bundleManifest.parse({ ...MANIFEST, owner: "  Acme  " })).toEqual(MANIFEST);
   });
 

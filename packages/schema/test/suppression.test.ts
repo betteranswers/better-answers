@@ -39,8 +39,10 @@ const HIS_SET: Identifiers = { emails: [], names: ["Dan Okoro"], other: ["ACME-4
 const THEIR_SET: Identifiers = { emails: ["sam@other.invalid"], names: [], other: [] };
 const NO_SET: Identifiers = { emails: [], names: [], other: [] };
 
-// Replayed from the journal where it can be, so the rows seeded under it are ones a real
-// database held.
+/**
+ * Replayed from the journal where it can be, so the rows seeded under it are ones a real
+ * database held.
+ */
 const theShapeItHadPerDocument = async (client: pg.PoolClient): Promise<void> => {
   await client.query(
     'ALTER TABLE "suppression" DROP CONSTRAINT "suppression_workspace_id_erasure_request_id_pk"',
@@ -130,8 +132,8 @@ const suppressionsStanding = async (client: pg.PoolClient) =>
     )
   ).rows;
 
-describe("the suppression reshaped to the workspace's, one row per erasure request", () => {
-  it("collapses a request's rows, one per document its map found, to one row holding the request's set, in every workspace", async () => {
+describe("the suppression reshaped to one row per erasure request", () => {
+  it("collapses a request's per-document rows into one, in every workspace", async () => {
     await withTwoWorkspacesSuppressedPerDocument(async (client) => {
       const hers = await erasureOf(client, WS, HER_SET, "completed");
       const theirs = await erasureOf(client, ANOTHER_WS, THEIR_SET, "completed");
@@ -147,7 +149,7 @@ describe("the suppression reshaped to the workspace's, one row per erasure reque
     });
   });
 
-  it("writes one for every completed erasure whose set names someone and which has none, and none for an open request or a person named by id alone", async () => {
+  it("backfills completed erasures naming someone, skipping open and id-only ones", async () => {
     await withTwoWorkspacesSuppressedPerDocument(async (client) => {
       const his = await erasureOf(client, WS, HIS_SET, "completed");
       await erasureOf(client, WS, HER_SET, "open");

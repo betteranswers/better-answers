@@ -49,8 +49,10 @@ type Tree =
   | { readonly kind: "list"; readonly items: readonly Tree[] }
   | { readonly kind: "atom"; readonly text: string };
 
-// The stored tree rather than `pg_get_constraintdef`'s SQL, where a quoted string or a pattern
-// could hide a column's name.
+/**
+ * The stored tree rather than `pg_get_constraintdef`'s SQL, where a quoted string or a pattern
+ * could hide a column's name.
+ */
 const TOKEN = /"(?:\\.|[^"\\])*"|[{}()[\]]|(?:\\.|[^\s{}()[\]"\\])+/gu;
 
 const treeOf = (stored: string): Tree => {
@@ -62,30 +64,31 @@ const treeOf = (stored: string): Tree => {
     at += 1;
     return token;
   };
+  const readNode = (): Tree => {
+    const name = take();
+    const fields = new Map<string, Tree[]>();
+    let values: Tree[] = [];
+    while (tokens[at] !== "}") {
+      if (tokens[at]?.startsWith(":")) {
+        values = [];
+        fields.set(take(), values);
+      } else {
+        values.push(read());
+      }
+    }
+    take();
+    return { kind: "node", name, fields };
+  };
+  const readList = (close: string): Tree => {
+    const items: Tree[] = [];
+    while (tokens[at] !== close) items.push(read());
+    take();
+    return { kind: "list", items };
+  };
   const read = (): Tree => {
     const token = take();
-    if (token === "{") {
-      const name = take();
-      const fields = new Map<string, Tree[]>();
-      let values: Tree[] = [];
-      while (tokens[at] !== "}") {
-        if (tokens[at]?.startsWith(":")) {
-          values = [];
-          fields.set(take(), values);
-        } else {
-          values.push(read());
-        }
-      }
-      take();
-      return { kind: "node", name, fields };
-    }
-    if (token === "(" || token === "[") {
-      const close = token === "(" ? ")" : "]";
-      const items: Tree[] = [];
-      while (tokens[at] !== close) items.push(read());
-      take();
-      return { kind: "list", items };
-    }
+    if (token === "{") return readNode();
+    if (token === "(" || token === "[") return readList(token === "(" ? ")" : "]");
     return { kind: "atom", text: token };
   };
   return read();
@@ -99,8 +102,10 @@ const atomIn = (values: readonly Tree[]): string | undefined => {
   return first?.kind === "atom" ? first.text : undefined;
 };
 
-// An outer join can hand a NULL to a domain declared NOT NULL, so its VALUE counts as nullable
-// whatever the domain declares.
+/**
+ * An outer join can hand a NULL to a domain declared NOT NULL, so its VALUE counts as nullable
+ * whatever the domain declares.
+ */
 const DOMAIN_VALUE = "VALUE";
 
 const inputReadBy = (tree: Tree | undefined): string | undefined => {
@@ -110,7 +115,7 @@ const inputReadBy = (tree: Tree | undefined): string | undefined => {
   return undefined;
 };
 
-// Postgres stores a NullTestType as its ordinal.
+/** Postgres stores a NullTestType as its ordinal. */
 const IS_NULL = "0";
 const IS_NOT_NULL = "1";
 
@@ -132,8 +137,24 @@ const guardsAmong = (tree: Extract<Tree, { kind: "node" }>): readonly string[] =
   );
 };
 
-// A NULL written into a CHECK answers as a NULL column does, so `x IN ('a', NULL)` is a read.
+/** A NULL written into a CHECK answers as a NULL column does, so `x IN ('a', NULL)` is a read. */
 const WRITTEN_NULL = "NULL";
+
+/** `undefined` when the walk must go below the node to find what it reads. */
+const readsAt = (
+  at: Extract<Tree, { kind: "node" }>,
+  nullable: ReadonlyMap<string, string>,
+  guarded: ReadonlySet<string>,
+): readonly string[] | undefined => {
+  if (at.name === "NULLTEST" || at.name === "DISTINCTEXPR") return [];
+  if (at.name === "CONST") {
+    return atomIn(fieldOf(at, ":constisnull")) === "true" ? [WRITTEN_NULL] : [];
+  }
+  const input = inputReadBy(at);
+  if (input === undefined) return undefined;
+  const column = nullable.get(input);
+  return column === undefined || guarded.has(input) ? [] : [column];
+};
 
 const readsOutsideAnIdiom = (
   tree: Tree,
@@ -142,15 +163,8 @@ const readsOutsideAnIdiom = (
   const walk = (at: Tree, guarded: ReadonlySet<string>): readonly string[] => {
     if (at.kind === "atom") return [];
     if (at.kind === "list") return at.items.flatMap((item) => walk(item, guarded));
-    if (at.name === "NULLTEST" || at.name === "DISTINCTEXPR") return [];
-    if (at.name === "CONST") {
-      return atomIn(fieldOf(at, ":constisnull")) === "true" ? [WRITTEN_NULL] : [];
-    }
-    const input = inputReadBy(at);
-    if (input !== undefined) {
-      const column = nullable.get(input);
-      return column === undefined || guarded.has(input) ? [] : [column];
-    }
+    const reads = readsAt(at, nullable, guarded);
+    if (reads !== undefined) return reads;
     const guardedBelow =
       at.name === "BOOLEXPR" ? new Set([...guarded, ...guardsAmong(at)]) : guarded;
     return [...at.fields.values()].flat().flatMap((value) => walk(value, guardedBelow));
@@ -165,8 +179,10 @@ type UnsafeCheck = {
   readonly reads: readonly string[];
 };
 
-// Reads columns and written NULLs only: a subscript, field or function answering NULL on a
-// non-NULL value, as `->` on an absent key, passes unseen.
+/**
+ * Reads columns and written NULLs only: a subscript, field or function answering NULL on a
+ * non-NULL value, as `->` on an absent key, passes unseen.
+ */
 const unsafeChecks = async (client: pg.PoolClient): Promise<readonly UnsafeCheck[]> => {
   const { rows } = await client.query<{
     check: string;
@@ -229,13 +245,13 @@ const readsOfEach = async (
 };
 
 describe("every CHECK the migrated database holds", () => {
-  it("reads a nullable column only in a NULL-safe idiom, so none admits a row for the NULL in it", async () => {
+  it("reads a nullable column only in a NULL-safe idiom", async () => {
     expect(await withRollback(db.pool, unsafeChecks)).toEqual([]);
   });
 });
 
 describe("the NULL-safety gate over the CHECKs", () => {
-  it("turns red on the quarantine error CHECK written with = over its nullable outcome, which admits the row it exists to refuse", async () => {
+  it("flags a quarantine CHECK reading its nullable outcome with =", async () => {
     await withRollback(db.pool, async (client) => {
       await client.query(
         'ALTER TABLE "source_document" DROP CONSTRAINT "source_document_quarantine_error_check"',
@@ -262,7 +278,7 @@ describe("the NULL-safety gate over the CHECKs", () => {
     });
   });
 
-  it("admits a CHECK naming NOT NULL columns alone, and a domain's VALUE behind its guard", async () => {
+  it("admits NOT NULL columns alone, and a guarded domain VALUE", async () => {
     const admitted = [
       [onTheProbe("always <> ''"), []],
       [`CREATE DOMAIN ${PROBE_DOMAIN} AS text CHECK (VALUE IS NULL OR VALUE <> '')`, []],
@@ -278,7 +294,7 @@ describe("the NULL-safety gate over the CHECKs", () => {
     });
   });
 
-  it("refuses a nullable read outside an idiom, a guard misplaced or read past its own OR, and a written NULL", async () => {
+  it("refuses unguarded reads, misplaced guards and a written NULL", async () => {
     const refused = [
       [onTheProbe("maybe <> always"), ["maybe"]],
       [onTheProbe("maybe IS NOT NULL OR maybe <> always"), ["maybe"]],

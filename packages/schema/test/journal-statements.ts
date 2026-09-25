@@ -6,6 +6,10 @@ import { journalMigrationFiles } from "../src/journal.ts";
 
 const SEPARATOR = "--> statement-breakpoint";
 
+/**
+ * The statements of the migration whose file name ends with `tag`, trimmed, blanks dropped.
+ * @throws when no journal entry's file ends with `tag`.
+ */
 export const migrationStatements = (tag: string): readonly string[] => {
   const file = journalMigrationFiles().find((name) => name.endsWith(tag));
   if (file === undefined) throw new Error(`${tag} is not in the journal`);
@@ -15,6 +19,10 @@ export const migrationStatements = (tag: string): readonly string[] => {
     .filter((statement) => statement !== "");
 };
 
+/**
+ * The first statement of `tag`'s migration that contains `word`.
+ * @throws when the journal has no `tag`, or no statement contains `word`.
+ */
 export const migrationStatementSaying = (tag: string, word: string): string => {
   const statement = migrationStatements(tag).find((part) => part.includes(word));
   if (statement === undefined) throw new Error(`no statement of ${tag} says ${word}`);
@@ -23,8 +31,10 @@ export const migrationStatementSaying = (tag: string, word: string): string => {
 
 const THE_MIGRATION_OWNER = "the_migration_owner";
 
-// `migrate` connects as the owner, no superuser, so the policies the tables force bind it; a
-// suite connects as a superuser, which no policy binds.
+/**
+ * Runs `work` as a new non-superuser owner of `objects`, as `migrate` connects, so the policies a
+ * superuser escapes bind it. Only inside a transaction.
+ */
 export const asTheMigrationOwnerOf = async <T>(
   client: pg.PoolClient,
   objects: readonly string[],

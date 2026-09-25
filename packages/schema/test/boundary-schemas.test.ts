@@ -650,7 +650,7 @@ const acceptedRows = {
   ],
 } as const;
 
-// `hasOwn` is what `keyof` means at runtime, so the filter narrows rather than asserts.
+/** `hasOwn` is what `keyof` means at runtime, so the filter narrows rather than asserts. */
 const ownKeys = <T extends object>(record: T): readonly (keyof T)[] =>
   Object.keys(record).filter((name): name is Extract<keyof T, string> =>
     Object.hasOwn(record, name),
@@ -685,7 +685,7 @@ describe("1 — every table has a boundary", () => {
     expect(new Set(registeredTables)).toEqual(new Set(exportedTables));
   });
 
-  it("has an accepted row for every registered table, and no row for an unregistered one", () => {
+  it("has an accepted row for exactly the registered tables", () => {
     expect(Object.keys(acceptedRows).toSorted()).toEqual(registryNames.toSorted());
   });
 });
@@ -1045,7 +1045,7 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
 });
 
 describe("what a finding may hold", () => {
-  it("has exactly these columns, and not one a personal detail could sit in", () => {
+  it("has exactly these columns, none for a personal detail", () => {
     expect(Object.keys(boundarySchemas.finding.select.shape).toSorted()).toEqual(
       [
         "workspaceId",
@@ -1075,7 +1075,7 @@ describe("the rules in force a binding carries", () => {
   const asKey = (tier: string) => tier.replaceAll("-", "_");
   const keyed: readonly string[] = RULES_IN_FORCE_KEYS;
 
-  it("keys the column on the two tiers a binding switches, and on no other", () => {
+  it("keys the column on the two tiers a binding switches", () => {
     expect(RULES_IN_FORCE_KEYS).toEqual(["default_on", "default_off"]);
     expect(RULES_IN_FORCE_KEYS).toEqual(
       REDACTION_TIERS.filter((tier) => tier !== REDACTION_ALWAYS_TIER).map(asKey),
@@ -1086,7 +1086,7 @@ describe("the rules in force a binding carries", () => {
     ]);
   });
 
-  it("defaults to the safe set, so a binding nobody configured withholds the more", () => {
+  it("defaults to the safe set for an unconfigured binding", () => {
     expect(RULES_IN_FORCE_DEFAULT).toEqual({ default_on: true, default_off: false });
     expect(
       boundarySchemas.sourceBinding.select.shape.rulesInForce.safeParse(RULES_IN_FORCE_DEFAULT)
@@ -1106,7 +1106,7 @@ describe("the emails a suppression holds", () => {
       },
     }).success;
 
-  it("are a full request's fifty and the two sign-in addresses an erasure adds, and no more", () => {
+  it("number at most a request's fifty plus an erasure's two", () => {
     expect([holding(52), holding(53)]).toEqual([true, false]);
   });
 });
@@ -1114,14 +1114,14 @@ describe("the emails a suppression holds", () => {
 describe("who a subject request is about", () => {
   const stranger = acceptedRows.subjectRequest[1];
 
-  it("takes a request whose subject never signed in, written either way", () => {
+  it("takes a never-signed-in subject, with the id null or absent", () => {
     expect(boundarySchemas.subjectRequest.insert.safeParse(stranger).success).toBe(true);
 
     const { personId: _absent, ...omitted } = { ...stranger };
     expect(boundarySchemas.subjectRequest.insert.safeParse(omitted).success).toBe(true);
   });
 
-  it("keeps the identifier set's three kinds, so every finder reads its own arm", () => {
+  it("keeps the identifier set's three kinds apart", () => {
     const parsed = boundarySchemas.subjectRequest.insert.parse(stranger);
     expect(parsed.identifiers).toEqual({
       emails: ["priya@client.invalid"],
@@ -1171,7 +1171,7 @@ describe("the customType exception, per shape", () => {
     expect(insert.safeParse({ ...row, embedding: tooShort }).success).toBe(false);
   });
 
-  it("chunk.update accepts a row that touches no embedding, and still checks one it does", () => {
+  it("chunk.update skips an absent embedding and checks a present one", () => {
     const update = boundarySchemas.chunk.update;
     expect(update.safeParse({ content: "edited" }).success).toBe(true);
     expect(update.safeParse({ embedding: tooShort }).success).toBe(false);
@@ -1365,7 +1365,7 @@ describe("5 — the inferred type is pinned", () => {
     >
   >;
 
-  it("holds at compile time (the assertions above are types, not values)", () => {
+  it("holds at compile time (the assertions above are types)", () => {
     expect(true).toBe(true);
   });
 });

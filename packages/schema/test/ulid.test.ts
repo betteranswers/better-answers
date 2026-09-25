@@ -6,8 +6,10 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-// Far future, and the offsets below only move forward: the minter keeps the latest
-// millisecond, so an earlier instant proves the fallback.
+/**
+ * Far future, and the offsets below only move forward: the minter keeps the latest
+ * millisecond, so an earlier instant proves the fallback.
+ */
 const FAR_FUTURE = Date.parse("2099-01-01T00:00:00.000Z");
 const at = (offsetMs: number) => {
   vi.useFakeTimers();
@@ -15,7 +17,7 @@ const at = (offsetMs: number) => {
 };
 
 describe("the minter, for anything that keeps an id", () => {
-  it("mints an id a reader can recognise: 26 Crockford base32 characters", () => {
+  it("mints an id of 26 Crockford base32 characters", () => {
     const minted = ulid();
 
     expect(minted).toHaveLength(26);
@@ -28,7 +30,7 @@ describe("the minter, for anything that keeps an id", () => {
     expect(new Set(minted).size).toBe(minted.length);
   });
 
-  it("still sorts in minting order when a thousand ids share one millisecond", () => {
+  it("keeps minting order for a thousand ids in one millisecond", () => {
     at(0);
 
     const minted = Array.from({ length: 1000 }, () => ulid());
@@ -38,7 +40,7 @@ describe("the minter, for anything that keeps an id", () => {
     for (const id of minted) expect(new RegExp(ULID_PATTERN).test(id)).toBe(true);
   });
 
-  it("carries the same millisecond into every id minted in it, so the time half is readable", () => {
+  it("carries one millisecond into every id minted in it", () => {
     at(1000);
 
     const [first, second] = [ulid(), ulid()];
@@ -46,7 +48,7 @@ describe("the minter, for anything that keeps an id", () => {
     expect(second.slice(0, 10)).toBe(first.slice(0, 10));
   });
 
-  it("mints ids that sort in the order they were minted, across two instants and across a year", () => {
+  it("sorts ids in minting order across instants and a year", () => {
     at(2000);
     const earlier = ulid();
     at(3000);

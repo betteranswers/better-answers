@@ -11,8 +11,10 @@ const db = postgresForSuite();
 const WS_A = "01J6EAAAAAAAAAAAAAAAAAAAAA";
 const WS_B = "01J6EBBBBBBBBBBBBBBBBBBBBB";
 
-// Spelled here, not imported: `packages/core` owns the builder and depends on this package,
-// so the arrow points one way.
+/**
+ * Spelled here, not imported: `packages/core` owns the builder and depends on this package,
+ * so the arrow points one way.
+ */
 const READABLE = `SELECT id FROM "index".readable_chunk AS v
      WHERE v.published_at IS NOT NULL
        AND (v.sensitivity <> 'Restricted' OR $1 = 'Admin')
@@ -61,16 +63,18 @@ type Arrangement = {
   readonly withoutADocument?: boolean | undefined;
 };
 
+const bindingArranged = (workspaceId: string, arrangement: Arrangement) => ({
+  workspaceId,
+  sensitivity: arrangement.bindingClass ?? "Internal",
+  audience: arrangement.audience ?? AUDIENCE_EVERYONE,
+  audienceGroups: arrangement.audienceGroups ? [...arrangement.audienceGroups] : null,
+  publishedAt: arrangement.publishedAt === undefined ? new Date() : arrangement.publishedAt,
+});
+
 const aChunkUnderABinding = async (client: pg.PoolClient, arrangement: Arrangement = {}) => {
   const workspaceId = arrangement.workspaceId ?? WS_A;
   const seed = testData(client);
-  const binding = await seed.sourceBinding({
-    workspaceId,
-    sensitivity: arrangement.bindingClass ?? "Internal",
-    audience: arrangement.audience ?? AUDIENCE_EVERYONE,
-    audienceGroups: arrangement.audienceGroups ? [...arrangement.audienceGroups] : null,
-    publishedAt: arrangement.publishedAt === undefined ? new Date() : arrangement.publishedAt,
-  });
+  const binding = await seed.sourceBinding(bindingArranged(workspaceId, arrangement));
   const document = arrangement.withoutADocument
     ? undefined
     : await seed.sourceDocument({
@@ -148,13 +152,13 @@ const folded = async (
 };
 
 describe("the one SQL statement of the class ranking", () => {
-  it("answers the narrower of two classes, for every pair in the ranking and in both orders", async () => {
+  it("answers the narrower class for every ranked pair, both orders", async () => {
     await withRollback(db().pool, async (client) => {
       expect(await folded(client, THE_FOLD)).toEqual(THE_FOLD.map((pair) => pair.narrower));
     });
   });
 
-  it("answers the binding's class where the document names none, and nothing for a word outside the set", async () => {
+  it("answers the binding's class alone, and null for unknown words", async () => {
     await withRollback(db().pool, async (client) => {
       expect(await folded(client, THE_FOLD_AT_ITS_EDGES)).toEqual(
         THE_FOLD_AT_ITS_EDGES.map((pair) => pair.narrower),
@@ -168,7 +172,7 @@ describe("the one SQL statement of the class ranking", () => {
     expect([...ranked].toSorted()).toEqual([...SENSITIVITIES].toSorted());
   });
 
-  it("is immutable and pinned, so a caller's own object cannot shadow what the ranking counts with", async () => {
+  it("is immutable and pins its search path", async () => {
     const read = await db().pool.query<{ volatile: string; settings: string[] | null }>(
       `SELECT p.provolatile AS volatile, p.proconfig AS settings
          FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
@@ -178,7 +182,7 @@ describe("the one SQL statement of the class ranking", () => {
     expect(read.rows).toEqual([{ volatile: "i", settings: ["search_path=pg_catalog, pg_temp"] }]);
   });
 
-  it("folds a pair for the worker, which may call it and may not read the view it answers for", async () => {
+  it("serves the worker, which still cannot read the view", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
       await aChunkUnderABinding(client, { bindingClass: "Public" });
@@ -217,7 +221,7 @@ describe("the one SQL statement of the class ranking", () => {
 });
 
 describe("the shape the view presents", () => {
-  it("presents every column of the chunk a reader still needs, and the four visibility terms beside them", async () => {
+  it("presents every chunk column plus the four visibility terms", async () => {
     const [onTheChunk, onTheView] = await Promise.all([
       columnsOf("chunk"),
       columnsOf("readable_chunk"),
@@ -236,7 +240,7 @@ describe("the shape the view presents", () => {
 
   // From the definition, not a plan: at this suite's row counts a sequential scan is the
   // right plan whether or not the workspace id prunes.
-  it("joins the binding inner and the document left, each on the workspace id beside the id", async () => {
+  it("joins the binding inner and the document left, by workspace", async () => {
     const read = await db().pool.query<{ definition: string }>(
       `SELECT pg_get_viewdef('"index".readable_chunk'::regclass, true) AS definition`,
     );
@@ -252,7 +256,7 @@ describe("the shape the view presents", () => {
     }).toEqual({ binding: true, document: true });
   });
 
-  it("is read under the caller's own privileges, with no barrier in the planner's way", async () => {
+  it("runs as the invoker, with no security barrier", async () => {
     const read = await db().pool.query<{ options: string[] | null }>(
       `SELECT c.reloptions AS options FROM pg_class c
          JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -263,8 +267,8 @@ describe("the shape the view presents", () => {
   });
 });
 
-describe("what the view reports for a chunk, as app_rt under RLS", () => {
-  it("reports the narrower of the binding's class and the document's, and shows the row to a reader who may read it", async () => {
+describe("what the view reports for a chunk, as app_rt", () => {
+  it("reports the narrower class and shows permitted readers the row", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
       const landed: { readonly id: string; readonly expected: string; readonly viewer: boolean }[] =
@@ -296,7 +300,7 @@ describe("what the view reports for a chunk, as app_rt under RLS", () => {
     });
   });
 
-  it("carries the binding's audience, so a reader in the named group reads it and a reader outside it does not", async () => {
+  it("carries the binding's audience, readable only inside the named group", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
       const held = ulid();
@@ -322,7 +326,7 @@ describe("what the view reports for a chunk, as app_rt under RLS", () => {
     });
   });
 
-  it("carries the binding's publish stamp, so an unpublished binding's chunk is read by nobody and a published one's by a reader", async () => {
+  it("carries the publish stamp, hiding an unpublished binding's chunk", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
       await aChunkUnderABinding(client, { publishedAt: null });
@@ -343,7 +347,7 @@ describe("what the view reports for a chunk, as app_rt under RLS", () => {
     });
   });
 
-  it("reads the binding as it stands now, so a narrowing after the row was landed is seen at once", async () => {
+  it("reads the binding live, so later narrowing shows at once", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
       const { binding, chunk } = await aChunkUnderABinding(client, { bindingClass: "Public" });
@@ -374,7 +378,7 @@ describe("what the view reports for a chunk, as app_rt under RLS", () => {
 });
 
 describe("what the view withholds", () => {
-  it("shows a reader scoped to one workspace nothing of another's, whatever that workspace holds", async () => {
+  it("shows a reader scoped to one workspace nothing of another's", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
       const mine = await aChunkUnderABinding(client, { bindingClass: "Public" });
@@ -398,7 +402,7 @@ describe("what the view withholds", () => {
     });
   });
 
-  it("drops a chunk whose binding row has gone, while its neighbour under a live binding still reads", async () => {
+  it("drops a chunk whose binding has gone, keeping its neighbour", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
       // A chunk naming a document cascades away with the binding; one naming none outlives
@@ -426,7 +430,7 @@ describe("what the view withholds", () => {
     });
   });
 
-  it("keeps a chunk that names no document, reading it at its binding's own class", async () => {
+  it("keeps a chunk naming no document, at its binding's class", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
       const { chunk } = await aChunkUnderABinding(client, {
@@ -446,7 +450,7 @@ describe("what the view withholds", () => {
 });
 
 describe("who may read the view", () => {
-  it("is selected by app_rt and refused to worker_rt, which holds nothing on it at all", async () => {
+  it("is selected by app_rt, and worker_rt holds nothing on it", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
       const { chunk } = await aChunkUnderABinding(client, { bindingClass: "Public" });
@@ -492,7 +496,7 @@ describe("who may read the view", () => {
 });
 
 describe("a partition attached after the view was made", () => {
-  it("reads through it exactly as the partition that was there first does", async () => {
+  it("reads through it as through the first partition", async () => {
     await withRollback(db().pool, async (client) => {
       await twoWorkspaces(client);
       const first = await aChunkUnderABinding(client, { bindingClass: "Public" });
