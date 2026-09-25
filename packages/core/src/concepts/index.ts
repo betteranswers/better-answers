@@ -1,6 +1,5 @@
 import {
   boundarySchemas,
-  BUNDLE_MANIFEST_PATH,
   CONCEPT_STABLE_STATUS,
   conceptIriOf,
   SUGGESTION_EDIT_KIND,
@@ -41,7 +40,6 @@ import {
 } from "../kernel/index.ts";
 import {
   commit as commitToBundle,
-  fileAtHead,
   head,
   withRepositoryLock,
   type CommitAuthor,
@@ -93,7 +91,7 @@ import {
   type StandingConcept,
   type Unsound,
 } from "./loader.ts";
-import { parseBundleManifest, writeManifest, type WriteManifestRefusal } from "./manifest.ts";
+import { manifestAtHead, writeManifest, type WriteManifestRefusal } from "./manifest.ts";
 import { conceptVisibilityFrom } from "./visibility.ts";
 
 export {
@@ -773,18 +771,6 @@ const plus = (sum: ChecksRecorded, more: ChecksRecorded): ChecksRecorded => ({
   present: sum.present + more.present,
 });
 
-const manifestStanding = async (
-  principal: UserPrincipal,
-  door: GitDoor,
-  manifest: BundleManifest,
-): Promise<Result<"standing" | "would-write", "manifest-taken" | Error>> => {
-  const standing = await attempt(() => fileAtHead(principal, door, BUNDLE_MANIFEST_PATH));
-  if (!standing.ok) return err(standing.error);
-  if (standing.value === null) return ok("would-write");
-  const held = parseBundleManifest(standing.value);
-  return held.ok && held.value.id === manifest.id ? ok("standing") : err("manifest-taken");
-};
-
 const manifestRefusalOf = (refusal: WriteManifestRefusal | Error): ImportBundleRefusal | Error => {
   if (refusal instanceof Error) return refusal;
   switch (refusal) {
@@ -913,10 +899,12 @@ const dryRunImport = async (
   git: GitDoor,
   opened: OpenedImport,
 ): Promise<Result<BundleImported, ImportBundleRefusal | Error>> => {
-  const state = await manifestStanding(principal, git, opened.manifest);
+  const state = await manifestAtHead(principal, git, opened.manifest);
   if (!state.ok) return err(state.error);
+  if (state.value === "taken") return err("manifest-taken");
   const { manifest, resolved, standing, present } = opened;
-  return ok(dryRunOf(manifest.id, state.value, resolved, standing, present));
+  const willBe = state.value === "absent" ? "would-write" : "standing";
+  return ok(dryRunOf(manifest.id, willBe, resolved, standing, present));
 };
 
 type ImportRun = {

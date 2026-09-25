@@ -549,6 +549,7 @@ describe("importing the bundle", () => {
       dryRun: false,
     });
     expect(dry.rewritten).toEqual([]);
+    expect(dry.manifest).toBe("standing");
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(10);
     expect(await rowsFor(scenario.workspaceId)).toEqual({
       concepts: "6",
