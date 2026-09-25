@@ -148,3 +148,9 @@ A vitest run starts its stores once, from `globalSetup`. It then gives each file
 
 - Postgres, in every workspace: a database per file, cloned from a migrated template.
 - Garage, in `packages/core` and `apps/api`: a bucket and a key per file, made through the admin API. Garage starts only where a selected file names `objectStoreForSuite`.
+
+Every process that starts a container has a Ryuk of its own, testcontainers' reaper. Ten seconds after the process ends, killed or not, its Ryuk removes what the process started. Unpatched, the library hands every process on the machine one shared Ryuk, which clears nothing while any run is still going. `patches/testcontainers@12.1.0.patch` gives each process its own, and `packages/devtools/test/testcontainers-patch.test.ts` holds it.
+
+Run `pnpm reap-containers` after the Docker daemon restarts mid-run, or when `docker ps --filter label=org.testcontainers=true` still lists stopped containers after your runs have ended. A restart stops every container and every Ryuk, and no Ryuk is left to clear what they stopped. The command removes a stopped container, from either tier, when no Ryuk still serves its session. `--dry-run` lists them without removing them.
+
+The command never removes a running container, because a live run with Ryuk turned off looks the same as one whose Ryuk is gone. If you know its run is over, `docker stop` it, and the command will take it. Nor does it touch a container whose session's Ryuk is still running. That Ryuk clears it once the last process connected to it has ended. A checkout without the patch shares one such Ryuk among all its runs, so what those runs leave waits until every one of them has ended. `lsof -nP -iTCP:<the Ryuk's host port> -sTCP:ESTABLISHED` names the processes still connected.

@@ -29,6 +29,7 @@
   },
   "devDependencies": {
     "@better-answers/devtools": "workspace:*",
+    "@better-answers/schema": "workspace:*",
     "@oxlint/plugins": "1.85.0",
     "@stryker-mutator/core": "10.0.0",
     "@stryker-mutator/instrumenter": "10.0.0",
@@ -39,6 +40,7 @@
     "knip": "6.38.0",
     "oxlint": "1.85.0",
     "oxlint-tsgolint": "7.0.2002",
+    "testcontainers": "12.1.0",
     "typescript": "7.0.2",
     "vitest": "5.0.1",
     "zod": "4.6.5"

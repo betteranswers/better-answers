@@ -167,6 +167,7 @@ overrides:
 
 patchedDependencies:
   '@stryker-mutator/vitest-runner@10.0.0': 245344c18e456c88a52f98ce901d3fc750b70d5940545c9219756a648f51b189
+  testcontainers@12.1.0: 6796c7b967c1e04405fe36f9a69a6c43796d0d7f2303e7819e507c1aadbd5a0c
 
 importers:
 
@@ -450,7 +451,7 @@ importers:
         version: 8.23.0
       testcontainers:
         specifier: 12.1.0
-        version: 12.1.0
+        version: 12.1.0(patch_hash=6796c7b967c1e04405fe36f9a69a6c43796d0d7f2303e7819e507c1aadbd5a0c)
       typescript:
         specifier: 7.0.2
         version: 7.0.2
@@ -472,6 +473,9 @@ importers:
       '@better-answers/devtools':
         specifier: workspace:*
         version: 'link:'
+      '@better-answers/schema':
+        specifier: workspace:*
+        version: link:../schema
       '@oxlint/plugins':
         specifier: 1.85.0
         version: 1.85.0
@@ -502,6 +506,9 @@ importers:
       oxlint-tsgolint:
         specifier: 7.0.2002
         version: 7.0.2002
+      testcontainers:
+        specifier: 12.1.0
+        version: 12.1.0(patch_hash=6796c7b967c1e04405fe36f9a69a6c43796d0d7f2303e7819e507c1aadbd5a0c)
       typescript:
         specifier: 7.0.2
         version: 7.0.2
@@ -8341,7 +8348,7 @@ snapshots:
 
   '@testcontainers/postgresql@12.1.0':
     dependencies:
-      testcontainers: 12.1.0
+      testcontainers: 12.1.0(patch_hash=6796c7b967c1e04405fe36f9a69a6c43796d0d7f2303e7819e507c1aadbd5a0c)
     transitivePeerDependencies:
       - bare-abort-controller
       - bare-buffer
@@ -10326,7 +10333,7 @@ snapshots:
       - bare-abort-controller
       - react-native-b4a
 
-  testcontainers@12.1.0:
+  testcontainers@12.1.0(patch_hash=6796c7b967c1e04405fe36f9a69a6c43796d0d7f2303e7819e507c1aadbd5a0c):
     dependencies:
       '@balena/dockerignore': 1.0.2
       '@types/dockerode': 4.0.1
