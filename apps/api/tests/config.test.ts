@@ -24,7 +24,7 @@ const identityEnvironment = (
 });
 
 describe("the bootstrap configuration", () => {
-  it("gives the database, the port and where the SPA's build is, and nothing more", () => {
+  it("gives the database, port and SPA's build, and nothing more", () => {
     const read = readBootstrap({
       DATABASE_URL: "postgresql://x@db/x",
       PORT: "4000",
@@ -37,37 +37,37 @@ describe("the bootstrap configuration", () => {
     });
   });
 
-  it("refuses an empty build directory, which would serve the image's own files", () => {
+  it("refuses an empty WEB_ROOT, which would serve the image's files", () => {
     const read = readBootstrap({ DATABASE_URL: "postgresql://x@db/x", WEB_ROOT: "" });
 
     expect(read.ok).toBe(false);
   });
 
-  it("gives the api the bare repositories' root, so the head check has bundles to open", () => {
+  it("gives the bare repositories' root for the head check's bundles", () => {
     const read = readBootstrap({ DATABASE_URL: "postgresql://x@db/x", GIT_STORE_DIR: "/data/git" });
 
     expect(read.ok && read.value.gitStoreDir).toBe("/data/git");
   });
 
-  it("starts without a repositories' root, because `migrate` shares this shape and opens no bundle", () => {
+  it("starts without a repositories' root, as `migrate` opens no bundle", () => {
     const read = readBootstrap({ DATABASE_URL: "postgresql://x@db/x" });
 
     expect(read.ok && read.value.gitStoreDir).toBe(undefined);
   });
 
-  it("refuses an empty repositories' root, which would open every bundle relative to the working directory", () => {
+  it("refuses an empty repositories' root, read as the working directory", () => {
     const read = readBootstrap({ DATABASE_URL: "postgresql://x@db/x", GIT_STORE_DIR: "" });
 
     expect(read.ok).toBe(false);
   });
 
-  it("defaults the SPA's build to this repository's own, so the dev loop needs no setting", () => {
+  it("defaults to this repository's SPA build, so dev sets nothing", () => {
     const read = readBootstrap({ DATABASE_URL: "postgresql://x@db/x" });
 
     expect(read.ok && read.value.webRoot.endsWith("/apps/web/dist")).toBe(true);
   });
 
-  it("gives the two ops commands the object store's five settings, shaped for the door", () => {
+  it("gives ops the object store's settings, shaped for the door", () => {
     const read = readObjectStore({
       S3_ENDPOINT: "http://objectstore:3900",
       S3_BUCKET: "better-answers",
@@ -86,7 +86,7 @@ describe("the bootstrap configuration", () => {
     });
   });
 
-  it("takes a region an operator names, for a store that is not Garage", () => {
+  it("takes an operator's region for a store other than Garage", () => {
     const read = readObjectStore({
       S3_ENDPOINT: "https://s3.eu-west-2.amazonaws.com",
       S3_BUCKET: "better-answers",
@@ -98,12 +98,12 @@ describe("the bootstrap configuration", () => {
     expect(read.ok && read.value.region).toBe("eu-west-2");
   });
 
-  it("is refused, and the process still starts, when the estate names no object store", () => {
+  it("refuses a missing object store, and the process still starts", () => {
     expect(readObjectStore({ DATABASE_URL: "postgresql://x@db/x" }).ok).toBe(false);
   });
 
   it.each(["S3_ENDPOINT", "S3_BUCKET", "S3_REGION", "S3_ACCESS_KEY", "S3_SECRET_KEY"])(
-    "is refused without %s, because a door opened on a half-set store fails at the first key",
+    "refuses a store missing %s rather than fail on use",
     (name) => {
       const environment: Record<string, string | undefined> = {
         S3_ENDPOINT: "http://objectstore:3900",
@@ -118,7 +118,7 @@ describe("the bootstrap configuration", () => {
     },
   );
 
-  it("refuses a host and port written without a scheme, which no S3 client can speak to", () => {
+  it("refuses a schemeless endpoint, which no S3 client speaks to", () => {
     const read = readObjectStore({
       S3_ENDPOINT: "objectstore:3900",
       S3_BUCKET: "better-answers",
@@ -130,7 +130,7 @@ describe("the bootstrap configuration", () => {
     expect(read.ok).toBe(false);
   });
 
-  it("gives the api the one origin, normalised, its secret and the three hostnames", () => {
+  it("gives the normalised origin, the secret and the three hostnames", () => {
     const read = readIdentityBootstrap(
       identityEnvironment({ PUBLIC_URL: "https://app.example.test/" }),
     );
@@ -166,7 +166,7 @@ describe("the bootstrap configuration", () => {
     expect(readIdentityBootstrap(identityEnvironment({ AUTH_SECRET: "short" })).ok).toBe(false);
   });
 
-  it("gives the api its SMTP connection URL, so the sign-in code has a transport", () => {
+  it("gives the SMTP URL, so sign-in codes have a transport", () => {
     const read = readIdentityBootstrap(
       identityEnvironment({ SMTP_URL: "smtps://resend:key@smtp.example.test:465" }),
     );
@@ -174,7 +174,7 @@ describe("the bootstrap configuration", () => {
     expect(read.ok && read.value.smtpUrl).toBe("smtps://resend:key@smtp.example.test:465");
   });
 
-  it("starts without SMTP, because the dev loop and the harness send no email", () => {
+  it("starts without SMTP, since dev and harness send no email", () => {
     const read = readIdentityBootstrap(identityEnvironment());
 
     expect(read.ok && read.value.smtpUrl).toBe(undefined);
@@ -194,14 +194,14 @@ describe("the bootstrap configuration", () => {
 });
 
 describe("the sweeps' settings", () => {
-  it("keeps the upload sweep list-only, and pings nothing, until the estate says otherwise", () => {
+  it("keeps the upload sweep list-only and pings nothing by default", () => {
     expect(readSweeps({})).toEqual({
       ok: true,
       value: { uploadSweep: "list", pingUrl: undefined },
     });
   });
 
-  it("switches the upload sweep to removing, and gives the pass its check, when the estate names them", () => {
+  it("switches to removing and takes the pass's check when named", () => {
     const read = readSweeps({
       UPLOAD_SWEEP: "remove",
       HEALTHCHECKS_PING_URL_SWEEPS: "https://hc-ping.com/0f5e8a2c-5d3a-4c55-9d0e-2b8c1f7a6e41",
@@ -239,7 +239,7 @@ describe("the head check's settings", () => {
     expect(readHeadCheck({})).toEqual({ ok: true, value: { pingUrl: undefined } });
   });
 
-  it("gives the head check the scheduler check to ping when the estate names it", () => {
+  it("pings the scheduler check when the estate names it", () => {
     const read = readHeadCheck({
       HEALTHCHECKS_PING_URL_SCHEDULER: "https://hc-ping.com/7c1d9e4a-2b6f-4e83-a5d0-9f3c8b1e6a27",
     });
@@ -269,7 +269,7 @@ describe("the head check's settings", () => {
     expect(readHeadCheck({ HEALTHCHECKS_PING_URL_SCHEDULER: url }).ok).toBe(false);
   });
 
-  it("names the setting it refused and never the value it was given", () => {
+  it("names the refused setting, never the value it was given", () => {
     const read = readHeadCheck({ HEALTHCHECKS_PING_URL_SCHEDULER: "hc-ping.com/7c1d9e4a" });
 
     expect(read.ok).toBe(false);
@@ -282,14 +282,14 @@ describe("the head check's settings", () => {
 describe("the image the api runs", () => {
   const DIGEST = "sha256:9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8d";
 
-  it("gives the api the digest the deploy unit pinned its image to", () => {
+  it("gives the digest the deploy unit pinned its image to", () => {
     expect(readRunningImage({ API_IMAGE_DIGEST: DIGEST })).toEqual({
       ok: true,
       value: { digest: DIGEST },
     });
   });
 
-  it("names no image when the estate hands none, as the dev loop and the harness do", () => {
+  it("names no image when none is set, as in dev", () => {
     expect(readRunningImage({})).toEqual({ ok: true, value: { digest: undefined } });
   });
 
@@ -319,7 +319,7 @@ describe("the three hostnames of the estate", () => {
     expect(readIdentityBootstrap(identityEnvironment({ [name]: undefined })).ok).toBe(false);
   });
 
-  it("ignores an APP_HOSTNAME the deploy unit still sets, because the app hostname is PUBLIC_URL's host", () => {
+  it("ignores APP_HOSTNAME, since the app hostname is PUBLIC_URL's host", () => {
     const read = readIdentityBootstrap(identityEnvironment({ APP_HOSTNAME: "elsewhere.test" }));
 
     expect(read.ok && read.value.hostnames.app).toBe("app.example.test");
@@ -342,7 +342,7 @@ describe("the three hostnames of the estate", () => {
     expect(readIdentityBootstrap(identityEnvironment({ AGENT_HOSTNAME: hostname })).ok).toBe(false);
   });
 
-  it("gives app. the host the product is served from and the authorization server issues from, without being told it twice", () => {
+  it("derives app. from PUBLIC_URL's host, without being told twice", () => {
     const read = readIdentityBootstrap(
       identityEnvironment({ PUBLIC_URL: "https://product.example.test" }),
     );
@@ -350,7 +350,7 @@ describe("the three hostnames of the estate", () => {
     expect(read.ok && read.value.hostnames.app).toBe("product.example.test");
   });
 
-  it("refuses two hostnames that are the same, which would hand one surface to the other", () => {
+  it("refuses equal hostnames, which hand one surface to the other", () => {
     const read = readIdentityBootstrap(identityEnvironment({ AGENT_HOSTNAME: "example.test" }));
 
     expect(read.ok).toBe(false);
@@ -382,7 +382,7 @@ describe("the three hostnames of the estate", () => {
     expect(read.ok && read.value.hostnames.agent).toBe("agent.example.test");
   });
 
-  it("strips DNS's trailing dot from PUBLIC_URL, so every string derived from it is on the host a browser sends", () => {
+  it("strips PUBLIC_URL's trailing dot, to match the host browsers send", () => {
     const read = readIdentityBootstrap(
       identityEnvironment({ PUBLIC_URL: "https://app.example.test./" }),
     );
@@ -391,7 +391,7 @@ describe("the three hostnames of the estate", () => {
     expect(read.ok && read.value.hostnames.app).toBe("app.example.test");
   });
 
-  it("accepts a port beside DNS's trailing dot, which names the same host on a port of its own", () => {
+  it("keeps a port beside the trailing dot it strips", () => {
     const read = readIdentityBootstrap(
       identityEnvironment({ PUBLIC_URL: "https://app.example.test.:8443" }),
     );
