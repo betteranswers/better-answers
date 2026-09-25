@@ -60,8 +60,8 @@ const duplicates = (values: readonly string[]): readonly string[] => [
   ...new Set(values.filter((value, index) => values.indexOf(value) !== index)),
 ];
 
-describe("the ADR index against the ADRs it indexes (T-040)", () => {
-  it("names every decision record once, and records every decision it names", () => {
+describe("the ADR index against the ADRs it indexes", () => {
+  it("names every decision record once, and none that is absent", () => {
     const numbers = adrs().map((adr) => adr.number);
     const indexed = rows().map((row) => row.number);
 
@@ -71,7 +71,7 @@ describe("the ADR index against the ADRs it indexes (T-040)", () => {
     expect(duplicates(numbers)).toEqual([]);
   });
 
-  it("dates every row at or after the newest amendment of the ADR it summarises", () => {
+  it("dates every row no earlier than its ADR's newest amendment", () => {
     const byNumber = new Map(adrs().map((adr) => [adr.number, adr]));
 
     const behind = rows()
@@ -93,7 +93,7 @@ describe("the ADR index against the ADRs it indexes (T-040)", () => {
     ).toEqual([]);
   });
 
-  it("carries a readable date on every amendment, and rows for the check to bite on", () => {
+  it("dates every amendment readably, and has something to check", () => {
     const undated = adrs().flatMap((adr) =>
       (bodyOf(adr).match(AMENDMENT_HEADING) ?? [])
         .filter((heading) => latestDateIn(heading) === undefined)

@@ -32,7 +32,7 @@ const entriesOf = (glossary: string): readonly Entry[] => {
   return entries;
 };
 
-// Split at the top level only, so a qualifier's own comma stays inside its item.
+/** Split at the top level only, so a qualifier's own comma stays inside its item. */
 const itemsOf = (clause: string): readonly string[] => {
   const items: string[] = [];
   let depth = 0;
@@ -58,11 +58,16 @@ const avoidedIn = ({ text }: Entry): readonly string[] => {
     .filter((word) => word.length > 0);
 };
 
-// A sense one directory's code alone writes is read there alone, so its shapes pass nowhere else.
+/**
+ * A sense one directory's code alone writes is read there alone, so its shapes pass
+ * nowhere else.
+ */
 type Sense = { readonly sense: string; readonly written: RegExp; readonly within?: string };
 
-// Only a pattern tells the senses apart, so a use no permitted pattern explains is the avoided
-// sense, and an unwatched word goes unscanned.
+/**
+ * Only a pattern tells the senses apart, so a use no permitted pattern explains is the avoided
+ * sense, and an unwatched word goes unscanned.
+ */
 type Watched = {
   readonly entry: string;
   readonly word: string;
@@ -144,7 +149,10 @@ const CARVED_OUT: readonly CarveOut[] = [
   },
 ];
 
-// A rules file binds every directory, so its sweep is this suite's own and no carve-out holds it.
+/**
+ * A rules file binds every directory, so its sweep is this suite's own and no carve-out
+ * holds it.
+ */
 const isCarvedOut = (file: string): boolean =>
   path.basename(file) !== "CODING_RULES.md" && CARVED_OUT.some(({ holds }) => holds(file));
 
@@ -183,13 +191,13 @@ const avoidedSenseLines = (root: string): readonly string[] => {
 };
 
 describe("the words the glossary avoids, read from the glossary", () => {
-  it("reads the api entry's avoided words, across the line its clause wraps onto", () => {
+  it("reads the api entry's avoided words across a wrapped line", () => {
     const api = entriesOf(readUnder(repositoryRoot, GLOSSARY)).find(({ term }) => term === "api");
 
     expect(api === undefined ? [] : avoidedIn(api)).toEqual(["app", "the backend", "the server"]);
   });
 
-  it("watches only a word the glossary still avoids, under the entry that avoids it", () => {
+  it("watches only words the glossary still avoids, under their entry", () => {
     const glossed = watchedIn(repositoryRoot);
 
     expect(
@@ -199,7 +207,7 @@ describe("the words the glossary avoids, read from the glossary", () => {
   });
 });
 
-describe("where the tree uses an avoided word in its avoided sense", () => {
+describe("where the tree uses a word in its avoided sense", () => {
   it("finds no line outside the carve-outs", () => {
     expect(
       avoidedSenseLines(repositoryRoot),
@@ -213,8 +221,10 @@ afterAll(() => {
   rmSync(scratch, { force: true, recursive: true });
 });
 
-// Spelled in two halves, so no fixture reads as a finding should the carve-out that holds this
-// file out for its patterns ever be lifted.
+/**
+ * Spelled in two halves, so no fixture reads as a finding should the carve-out that holds this file
+ * out for its patterns ever be lifted.
+ */
 const WORD = ["a", "pp"].join("");
 
 const THE_GLOSSARY = [
@@ -298,12 +308,12 @@ describe("the sense a planted line is read in", () => {
     `  const git = openTestGit(${WORD});`,
     `  const response = await ${WORD}`,
     `      ${WORD},`,
-  ])("passes the api's own names in apps/api, and nowhere else: %s", (planted) => {
+  ])("passes the api's own names in apps/api alone: %s", (planted) => {
     expect(findingsOver(planted, "apps/api/src/planted.ts")).toEqual([]);
     expect(findingsOver(planted)).toEqual([`docs/planted.md:1: ${planted.trim()}`]);
   });
 
-  it("passes the glossary's own entry, which names the word it avoids", () => {
+  it("passes the glossary's own entry naming the word it avoids", () => {
     expect(findingsOver("An ordinary line.")).toEqual([]);
   });
 
@@ -338,7 +348,7 @@ describe("the sense a planted line is read in", () => {
     expect(findingsOver(planted, file)).toEqual([`${file}:1: ${planted.trim()}`]);
   });
 
-  it("reads the api's source and tests, and holds out only this scan", () => {
+  it("reads the api's source and tests, except this scan", () => {
     trees += 1;
     const root = throwawayRepository(path.join(scratch, `tree-${String(trees)}`));
     writeUnder(root, GLOSSARY, THE_GLOSSARY);

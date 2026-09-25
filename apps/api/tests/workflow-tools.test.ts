@@ -43,7 +43,10 @@ const linesOf = (file: string): readonly string[] =>
 const STEP_OPENS = /^ {6}- /;
 const COMMENT = /^ {6}#/;
 
-// check.yml installs the tool on two legs, and one leg's install is nothing to the other's suite.
+/**
+ * check.yml installs the tool on two legs, and one leg's install is nothing to the
+ * other's suite.
+ */
 const JOB_OPENS = /^ {2}(?<job>[\w-]+):\s*$/;
 
 type Step = { readonly at: number; readonly job: string; readonly body: string };
@@ -108,27 +111,24 @@ const STEP_CONDITION = /^(?: {6}- | {8})if:\s*(?<condition>.+?)\s*$/m;
 const conditionOf = (step: Step): string =>
   STEP_CONDITION.exec(step.body)?.groups?.["condition"] ?? "";
 
-describe.each(RUNS_THE_SUITE)(
-  "the tools $file installs for `$suiteCommand` (T-124, T-224)",
-  (runner: Runner) => {
-    it("installs the rewrite tool the erasure suite runs before it runs the suite", () => {
-      expect(
-        installStep(runner).at,
-        `the rewrite tool is installed after \`${runner.suiteCommand}\`, so the erasure suite runs without it.`,
-      ).toBeLessThan(suiteStep(runner).at);
-    });
+describe.each(RUNS_THE_SUITE)("the tools $file installs for `$suiteCommand`", (runner: Runner) => {
+  it("installs the rewrite tool before the step running the suite", () => {
+    expect(
+      installStep(runner).at,
+      `the rewrite tool is installed after \`${runner.suiteCommand}\`, so the erasure suite runs without it.`,
+    ).toBeLessThan(suiteStep(runner).at);
+  });
 
-    it("installs it wherever the suite runs, and on no narrower a condition", () => {
-      expect(
-        conditionOf(installStep(runner)),
-        `the rewrite tool is installed on a narrower condition than \`${runner.suiteCommand}\` runs on, so some run of this job reaches the erasure routine's git step without it.`,
-      ).toEqual(conditionOf(suiteStep(runner)));
-    });
-  },
-);
+  it("installs the tool on the suite's own condition", () => {
+    expect(
+      conditionOf(installStep(runner)),
+      `the rewrite tool is installed on a narrower condition than \`${runner.suiteCommand}\` runs on, so some run of this job reaches the erasure routine's git step without it.`,
+    ).toEqual(conditionOf(suiteStep(runner)));
+  });
+});
 
-describe("the install every one of those workflows runs (T-224)", () => {
-  it("takes the version from the api image's pin rather than naming one", () => {
+describe("the install every one of those workflows runs", () => {
+  it("reads the version from the api image's pin, naming none", () => {
     const action = linesOf(ACTION);
 
     expect(
@@ -144,7 +144,7 @@ describe("the install every one of those workflows runs (T-224)", () => {
     ).toEqual([]);
   });
 
-  it("reads a pin that is there and is a version, so the assertions above are about something", () => {
+  it("reads a pin that exists and is a version", () => {
     const pinned = new RegExp(`^ARG\\s+${PIN_ARG}=(?<version>\\S+)\\s*$`, "m").exec(
       readFileSync(path.join(repositoryRoot, DOCKERFILE), "utf8"),
     )?.groups?.["version"];
@@ -157,7 +157,7 @@ describe("the install every one of those workflows runs (T-224)", () => {
   });
 });
 
-describe("the two tables against the workflow directory (T-224)", () => {
+describe("the two tables against the workflow directory", () => {
   const onDisk = (): readonly string[] =>
     readdirSync(path.join(repositoryRoot, workflowDirectory))
       .filter((file) => file.endsWith(".yml") || file.endsWith(".yaml"))
