@@ -27,6 +27,7 @@ export const principalOf = (
 export type ProvisionedWorkspace = {
   readonly door: PostgresDoor;
   readonly workspaceId: WorkspaceId;
+  readonly slug: string;
   readonly adminUserId: string;
 };
 
@@ -38,14 +39,10 @@ export const provisionedWorkspace = async (
   const adminUserId = await seedPerson(db.pool, admin);
   const door = openPostgres(db.runtimePool);
   const mintedId = ulid();
-  const made = await provisionWorkspace(bootstrap, door, {
-    id: mintedId,
-    name,
-    slug: `${name.toLowerCase()}-${mintedId.toLowerCase()}`,
-    adminUserId,
-  });
+  const slug = `${name.toLowerCase()}-${mintedId.toLowerCase()}`;
+  const made = await provisionWorkspace(bootstrap, door, { id: mintedId, name, slug, adminUserId });
   if (!made.ok) throw new Error(`the workspace was not provisioned: ${made.error}`);
-  return { door, workspaceId: made.value.workspaceId, adminUserId };
+  return { door, workspaceId: made.value.workspaceId, slug, adminUserId };
 };
 
 export type PersonOverrides = Parameters<ReturnType<typeof testData>["user"]>[0];

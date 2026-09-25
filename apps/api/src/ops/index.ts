@@ -54,8 +54,10 @@ import {
   personIdByEmail,
   principalOfMember,
   provisionWorkspace,
+  renameWorkspace,
   type AddMemberRefusal,
   type ProvisionRefusal,
+  type RenameRefusal,
 } from "@better-answers/core/workspaces";
 import { REBUILD_REASONS, ROLES, SENSITIVITIES, ulid } from "@better-answers/schema";
 
@@ -173,6 +175,8 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
                                                             a client's workspace with its first Admin, a person who has signed in; the id it minted is first on the done line
   add-member --workspace <id> --email <email> --role <${ROLES.join("|")}>
                                                             a signed-in person made a member of the workspace; a repeat is refused and never changes a role
+  rename-workspace --workspace <id> [--name <name>] [--slug <slug>]
+                                                            the workspace's name, its slug, or both; at least one is named, and the other kept
   import-bundle --workspace <id> --from <directory> --as <member email> [--sensitivity <class>] [--dry-run]
                                                             the company's bundle landed through the governed write, its checks imported, its links rewritten to iris
     --sensitivity  one of ${SENSITIVITIES.join(" · ")} (default ${IMPORT_SENSITIVITY_DEFAULT})
@@ -930,6 +934,9 @@ const notSignedIn = (email: string): string =>
 const noDisplayName = (email: string): string =>
   `no-display-name: ${email} has given no display name; have them sign in and give one, then run this again`;
 
+const noSuchWorkspace = (workspaceId: string): string =>
+  `no-such-workspace: ${workspaceId} is not a workspace`;
+
 const provisionReason = (
   refusal: ProvisionRefusal | Error,
   slug: string,
@@ -1018,7 +1025,7 @@ const memberReason = (
     case "no-display-name":
       return noDisplayName(email);
     case "no-such-workspace":
-      return `no-such-workspace: ${workspaceId} is not a workspace`;
+      return noSuchWorkspace(workspaceId);
     case "already-a-member":
       return `already-a-member: ${email} is already a member of workspace ${workspaceId}; a role change is the Admin's act on the People screen`;
     default:
@@ -1049,6 +1056,40 @@ const addMemberCommand = async (doors: Doors, flags: Flags, io: OpsIo): Promise<
   return DONE;
 };
 
+const renameReason = (refusal: RenameRefusal | Error, workspaceId: string): string => {
+  if (refusal instanceof Error) return refusal.message;
+  switch (refusal) {
+    case "malformed":
+      return "malformed: give --workspace a workspace id, and --name, --slug or both a value that is not blank";
+    case "no-such-workspace":
+      return noSuchWorkspace(workspaceId);
+    case "slug-taken":
+      return "slug-taken: another workspace already holds that slug";
+  }
+};
+
+const renameWorkspaceCommand = async (doors: Doors, flags: Flags, io: OpsIo): Promise<number> => {
+  const workspaceId = flagValue(flags, "workspace");
+  if (workspaceId === undefined) {
+    io.say(
+      "rename-workspace: --workspace <id> is required, with --name <name>, --slug <slug> or both",
+    );
+    return USAGE;
+  }
+  const renamed = await renameWorkspace(BOOTSTRAP, doors.postgres, {
+    workspaceId,
+    name: flagValue(flags, "name"),
+    slug: flagValue(flags, "slug"),
+  });
+  if (!renamed.ok) {
+    io.say(`rename-workspace: REFUSED — ${renameReason(renamed.error, workspaceId)}`);
+    return renamed.error === "malformed" ? EXIT_OF_CLASS.malformed : REFUSED;
+  }
+  const { name, slug } = renamed.value;
+  io.say(`rename-workspace: done — workspace ${workspaceId} is named ${name}, slug ${slug}`);
+  return DONE;
+};
+
 const SLICELESS_COMMANDS = new Map<
   string,
   (doors: Doors, flags: Flags, io: OpsIo) => Promise<number>
@@ -1058,6 +1099,7 @@ const SLICELESS_COMMANDS = new Map<
   ["dump-grep", (_doors, flags, io) => dumpGrep(flags, io)],
   ["provision-workspace", provisionWorkspaceCommand],
   ["add-member", addMemberCommand],
+  ["rename-workspace", renameWorkspaceCommand],
 ]);
 
 /**
