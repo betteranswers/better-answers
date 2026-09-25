@@ -65,6 +65,27 @@ export type WriteManifestRefusal =
   | "malformed"
   | "path-taken";
 
+/**
+ * Reads the bundle's head against `manifest`: `absent` when no manifest stands, `standing` when
+ * one with the same id does, and `taken` when anything else holds the path, a malformed file
+ * included.
+ */
+export const manifestAtHead = async (
+  principal: UserPrincipal,
+  git: GitDoor,
+  manifest: BundleManifest,
+): Promise<Result<"absent" | "standing" | "taken", Error>> => {
+  const standing = await attempt(() => fileAtHead(principal, git, BUNDLE_MANIFEST_PATH));
+  if (!standing.ok) return err(standing.error);
+  if (standing.value === null) return ok("absent");
+  const held = parseBundleManifest(standing.value);
+  return ok(held.ok && held.value.id === manifest.id ? "standing" : "taken");
+};
+
+/**
+ * Writes the manifest as a commit of its own, once: `written: false` when a manifest with the
+ * same id already stands, `path-taken` when anything else holds the path.
+ */
 export const writeManifest = async (
   principal: UserPrincipal,
   doors: { readonly git: GitDoor; readonly postgres: PostgresDoor; readonly clock: Clock },
@@ -77,14 +98,10 @@ export const writeManifest = async (
   const auditEventId = ulid();
 
   return withRepositoryLock(principal, doors.git, async () => {
-    const standing = await attempt(() => fileAtHead(principal, doors.git, BUNDLE_MANIFEST_PATH));
-    if (!standing.ok) return err(standing.error);
-    if (standing.value !== null) {
-      const held = parseBundleManifest(standing.value);
-      return held.ok && held.value.id === manifest.data.id
-        ? ok({ written: false })
-        : err("path-taken");
-    }
+    const atHead = await manifestAtHead(principal, doors.git, manifest.data);
+    if (!atHead.ok) return err(atHead.error);
+    if (atHead.value === "standing") return ok({ written: false });
+    if (atHead.value === "taken") return err("path-taken");
 
     const committed = await commitToBundle(principal, doors.git, {
       path: BUNDLE_MANIFEST_PATH,
