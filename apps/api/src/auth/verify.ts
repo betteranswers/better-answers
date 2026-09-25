@@ -10,6 +10,8 @@ import {
   errors as joseErrors,
   jwtVerify,
   type JSONWebKeySet,
+  type JWTPayload,
+  type ProtectedHeaderParameters,
 } from "jose";
 import { z } from "zod";
 
@@ -41,6 +43,7 @@ const bearerExtra = z.object({
   }),
 });
 
+/** Undefined when the auth info was not made by this module's verifier. */
 export const bearerOf = (authInfo: AuthInfo): VerifiedBearer | undefined => {
   const parsed = bearerExtra.safeParse(authInfo.extra);
   return parsed.success ? parsed.data : undefined;
@@ -51,6 +54,37 @@ export type JwksSource = () => Promise<JSONWebKeySet>;
 const invalid = (message: string): OAuthError =>
   new OAuthError(OAuthErrorCode.InvalidToken, message);
 
+const headerOf = (token: string): ProtectedHeaderParameters => {
+  try {
+    return decodeProtectedHeader(token);
+  } catch {
+    throw invalid("the bearer is not a JWT");
+  }
+};
+
+type SurfaceToken = {
+  readonly payload: z.infer<typeof accessTokenClaims>;
+  readonly claims: Claims;
+};
+
+const surfaceTokenOf = (verified: JWTPayload): SurfaceToken => {
+  const parsed = accessTokenClaims.safeParse(verified);
+  if (!parsed.success) throw invalid("the bearer's claims are not the surface's");
+  const { data } = parsed;
+  const userId = data.user ?? data.sub;
+  if (data.workspace === null || data.workspace === undefined || userId === undefined) {
+    throw invalid("the bearer names no workspace");
+  }
+  return {
+    payload: data,
+    claims: { workspaceId: data.workspace, userId, issuedAt: new Date(data.iat * 1000) },
+  };
+};
+
+/**
+ * The verifier refuses with `invalid_token` when a bearer's signature, issuer, audience, expiry or
+ * claims fail. An unseen key id rereads the key set once.
+ */
 export const createTokenVerifier = (options: {
   readonly issuer: string;
   readonly audience: string;
@@ -74,42 +108,25 @@ export const createTokenVerifier = (options: {
     }
   };
 
+  const payloadOf = async (token: string): Promise<JWTPayload> => {
+    try {
+      return (await verify(token)).payload;
+    } catch (cause) {
+      throw invalid(cause instanceof Error ? cause.message : "the bearer did not verify");
+    }
+  };
+
   return {
     async verifyAccessToken(token) {
-      let header: ReturnType<typeof decodeProtectedHeader>;
-      try {
-        header = decodeProtectedHeader(token);
-      } catch {
-        throw invalid("the bearer is not a JWT");
-      }
-      if (header.alg === undefined) throw invalid("the bearer names no algorithm");
-
-      let payload;
-      try {
-        payload = (await verify(token)).payload;
-      } catch (cause) {
-        throw invalid(cause instanceof Error ? cause.message : "the bearer did not verify");
-      }
-      const parsed = accessTokenClaims.safeParse(payload);
-      if (!parsed.success) throw invalid("the bearer's claims are not the surface's");
-      const { data } = parsed;
-      const userId = data.user ?? data.sub;
-      if (data.workspace === null || data.workspace === undefined || userId === undefined) {
-        throw invalid("the bearer names no workspace");
-      }
-
-      const claims: Claims = {
-        workspaceId: data.workspace,
-        userId,
-        issuedAt: new Date(data.iat * 1000),
-      };
+      if (headerOf(token).alg === undefined) throw invalid("the bearer names no algorithm");
+      const { payload, claims } = surfaceTokenOf(await payloadOf(token));
       return {
         token,
-        clientId: data.azp ?? data.client_id ?? "",
-        scopes: data.scope.split(" ").filter((scope) => scope !== ""),
-        expiresAt: data.exp,
+        clientId: payload.azp ?? payload.client_id ?? "",
+        scopes: payload.scope.split(" ").filter((scope) => scope !== ""),
+        expiresAt: payload.exp,
         resource: new URL(options.audience),
-        extra: { claims, tokenId: data.jti } satisfies z.input<typeof bearerExtra>,
+        extra: { claims, tokenId: payload.jti } satisfies z.input<typeof bearerExtra>,
       };
     },
   };
@@ -132,6 +149,7 @@ type SessionRecord = {
 };
 export type SessionReader = (headers: Headers) => Promise<SessionRecord | null>;
 
+/** Undefined when the headers carry no session, or a session with no workspace chosen. */
 export const sessionClaims = async (
   readSession: SessionReader,
   headers: Headers,

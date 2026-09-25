@@ -13,8 +13,10 @@ const BODY_FORBIDDEN_RESPONSE_STATUSES = new Set([204, 205, 304]);
 
 export type LookedUpAddress = { readonly address: string; readonly family: 4 | 6 };
 export type Lookup = (hostname: string) => Promise<readonly LookedUpAddress[]>;
-// Only what the fetcher reads: Node's `request` fits, and so does a double built from an
-// `EventEmitter` and a `Readable`.
+/**
+ * Only what the fetcher reads: Node's `request` fits, and so does a double built from an
+ * `EventEmitter` and a `Readable`.
+ */
 export type InboundResponse = Readable & {
   readonly statusCode?: number | undefined;
   readonly statusMessage?: string | undefined;
@@ -111,6 +113,24 @@ const capped = (source: Readable, maxBytes: number, onExceeded: () => void): Rea
     },
   });
 
+const publicPinOf = (addresses: readonly LookedUpAddress[]): LookedUpAddress => {
+  if (!addresses.every((answer) => isPublicRoutableHost(answer.address))) {
+    throw new CimdTransportError(
+      "address-not-public",
+      "metadata hostname must resolve only to public-routable addresses",
+    );
+  }
+  const [pinned] = addresses;
+  if (pinned === undefined) {
+    throw new CimdTransportError("no-addresses", "metadata hostname returned no DNS addresses");
+  }
+  return pinned;
+};
+
+/**
+ * A refusal rejects with `CimdTransportError`, whose `reason` names it; a body past the cap errors
+ * its stream instead.
+ */
 export const createClientMetadataFetcher = (options: ClientMetadataFetcherOptions = {}) => {
   const lookup = options.lookup ?? nodeLookup;
   const request = options.request ?? httpsRequest;
@@ -118,13 +138,23 @@ export const createClientMetadataFetcher = (options: ClientMetadataFetcherOption
   const maxBodyBytes = options.maxBodyBytes ?? 64 * 1024;
   const hostCacheMs = options.hostCacheMs ?? 60_000;
   const now = options.now ?? Date.now;
-  // Bounded: a flood of distinct client hostnames evicts the oldest entry, never grows.
+  /** Bounded: a flood of distinct client hostnames evicts the oldest entry, never grows. */
   const hostCache = new Map<string, { readonly pinned: LookedUpAddress; readonly until: number }>();
   const HOST_CACHE_ENTRIES = 1024;
-  // Node's resolver cannot be cancelled: a lookup that outlives the deadline keeps running,
-  // so the number in flight is bounded.
+  /**
+   * Node's resolver cannot be cancelled: a lookup that outlives the deadline keeps running, so the
+   * number in flight is bounded.
+   */
   const MAX_INFLIGHT_LOOKUPS = 32;
   let inFlight = 0;
+
+  const timedOut = (): CimdTransportError =>
+    new CimdTransportError("timeout", `metadata fetch exceeded ${timeoutMs} ms`);
+
+  const cachedPin = (hostname: string): LookedUpAddress | undefined => {
+    const cached = hostCache.get(hostname);
+    return cached !== undefined && cached.until > now() ? cached.pinned : undefined;
+  };
 
   const remember = (hostname: string, pinned: LookedUpAddress): void => {
     if (hostCache.size >= HOST_CACHE_ENTRIES) {
@@ -140,8 +170,7 @@ export const createClientMetadataFetcher = (options: ClientMetadataFetcherOption
     signal: AbortSignal,
   ): Promise<readonly LookedUpAddress[]> =>
     new Promise((resolve, reject) => {
-      const onAbort = () =>
-        reject(new CimdTransportError("timeout", `metadata fetch exceeded ${timeoutMs} ms`));
+      const onAbort = () => reject(timedOut());
       if (signal.aborted) {
         onAbort();
         return;
@@ -151,8 +180,8 @@ export const createClientMetadataFetcher = (options: ClientMetadataFetcherOption
     });
 
   const resolvePinned = async (hostname: string, signal: AbortSignal): Promise<LookedUpAddress> => {
-    const cached = hostCache.get(hostname);
-    if (cached !== undefined && cached.until > now()) return cached.pinned;
+    const cached = cachedPin(hostname);
+    if (cached !== undefined) return cached;
 
     if (inFlight >= MAX_INFLIGHT_LOOKUPS) {
       throw new CimdTransportError(
@@ -160,9 +189,7 @@ export const createClientMetadataFetcher = (options: ClientMetadataFetcherOption
         "too many metadata hostnames resolving at once",
       );
     }
-    if (signal.aborted) {
-      throw new CimdTransportError("timeout", `metadata fetch exceeded ${timeoutMs} ms`);
-    }
+    if (signal.aborted) throw timedOut();
     // A lookup the caller stopped waiting for is still running, and still counts; a settled
     // promise makes a synchronous throw release the slot.
     inFlight += 1;
@@ -175,22 +202,7 @@ export const createClientMetadataFetcher = (options: ClientMetadataFetcherOption
         inFlight -= 1;
       },
     );
-    const addresses = await within(resolving, signal);
-    if (addresses.length === 0) {
-      throw new CimdTransportError("no-addresses", "metadata hostname returned no DNS addresses");
-    }
-    for (const answer of addresses) {
-      if (!isPublicRoutableHost(answer.address)) {
-        throw new CimdTransportError(
-          "address-not-public",
-          "metadata hostname must resolve only to public-routable addresses",
-        );
-      }
-    }
-    const [pinned] = addresses;
-    if (pinned === undefined) {
-      throw new CimdTransportError("no-addresses", "metadata hostname returned no DNS addresses");
-    }
+    const pinned = publicPinOf(await within(resolving, signal));
     remember(hostname, pinned);
     return pinned;
   };
@@ -228,8 +240,10 @@ export const createClientMetadataFetcher = (options: ClientMetadataFetcherOption
           method: webRequest.method,
           servername: isIP(url.hostname.replace(/^\[|\]$/g, "")) === 0 ? url.hostname : undefined,
           signal,
-          // The fix: answer in whichever shape the socket asked for. `all: true` is
-          // what Node 20+ sends under autoSelectFamily and expects an array back.
+          /**
+           * The fix: answer in whichever shape the socket asked for. `all: true` is what Node 20+
+           * sends under autoSelectFamily and expects an array back.
+           */
           lookup: (_hostname, lookupOptions, callback) => {
             if (lookupOptions.all === true) {
               callback(null, [{ address: pinned.address, family: pinned.family }]);
@@ -266,7 +280,7 @@ export const createClientMetadataFetcher = (options: ClientMetadataFetcherOption
       );
       outbound.once("error", (error: NodeJS.ErrnoException) => {
         if (error.name === "AbortError" || error.name === "TimeoutError" || signal.aborted) {
-          reject(new CimdTransportError("timeout", `metadata fetch exceeded ${timeoutMs} ms`));
+          reject(timedOut());
           return;
         }
         reject(error);

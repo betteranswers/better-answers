@@ -17,6 +17,7 @@ ul{padding-left:1.1rem}.muted{opacity:.7;font-size:.9rem}
 form.inline{display:inline}
 </style></head><body><main>${body}</main></body></html>`;
 
+/** `query` is the signed search string, leading `?` included. Every value is escaped here. */
 export const consentPage = (
   query: string,
   params: {
@@ -48,5 +49,6 @@ export const consentPage = (
 </form>`,
   );
 
+/** Both values are escaped here. */
 export const refusedPage = (title: string, message: string): string =>
   shell(title, `<h1>${escape(title)}</h1><p>${escape(message)}</p>`);
