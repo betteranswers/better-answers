@@ -16,8 +16,10 @@ export type JscpdConfig = {
   readonly ignore: readonly string[];
 };
 
-// A command line, never jscpd's own config file: it reports a config it could not parse,
-// then scans on its defaults and exits zero.
+/**
+ * A command line, never jscpd's own config file: it reports a config it could not parse,
+ * then scans on its defaults and exits zero.
+ */
 export const jscpdArgv = (config: JscpdConfig): readonly string[] => [
   "--min-lines",
   String(config.minLines),
@@ -56,6 +58,7 @@ const clonesIn = (output: string): readonly Clone[] => {
 
 export type JscpdRunner = (tree: Tree) => readonly Clone[];
 
+/** The smoke tree must report exactly `smoke.clones` clones. */
 export const jscpdOver = (
   config: JscpdConfig,
   smoke: { readonly tree: Tree; readonly clones: number },

@@ -6,6 +6,7 @@ import { executableOf, runsOverThrowawayTree } from "./throwaway-tree.ts";
 
 import type { Tree } from "./throwaway-tree.ts";
 
+/** Comment lines per code line; an arm over its figure fails the gate. */
 export const CEILING = { source: 0.1, test: 0.05 } as const;
 
 export type Arm = keyof typeof CEILING;
@@ -28,8 +29,10 @@ const MEASURED_LANGUAGES = {
 
 type Kind = keyof typeof MEASURED_LANGUAGES;
 
-// A unit no directory gathers names the paths it holds; one that is a directory or a
-// workspace stands at its own.
+/**
+ * A unit no directory gathers names the paths it holds; one that is a directory or a
+ * workspace stands at its own.
+ */
 export type Unit = {
   readonly name: string;
   readonly kind: Kind;
@@ -83,8 +86,10 @@ export type Counted = {
   readonly comment: number;
 };
 
-// cloc's by-file JSON, with a `header` and a `SUM` beside the files; the smoke case proves
-// the contract.
+/**
+ * cloc's by-file JSON, with a `header` and a `SUM` beside the files; the smoke case proves
+ * the contract.
+ */
 const clocReport = z.record(
   z.string(),
   z.looseObject({
@@ -106,6 +111,7 @@ const countedIn = (output: string): readonly Counted[] =>
     .filter((counted) => EVERY_MEASURED_LANGUAGE.has(counted.language))
     .sort((left, right) => left.file.localeCompare(right.file));
 
+/** A file under an `e2e`, `test` or `tests` directory, or named as a test, is `test`. */
 export const armOf = (file: string): Arm => {
   const segments = file.replace(/^\.\//, "").split("/");
   const name = segments.at(-1) ?? "";
@@ -133,6 +139,10 @@ const unitOf = (file: string, units: readonly Unit[]): Unit | undefined => {
 
 type Total = { code: number; comment: number };
 
+/**
+ * A file no unit holds, or in a language its unit does not measure, is dropped; a directory
+ * unit has only a `source` arm.
+ */
 export const measure = (
   counted: readonly Counted[],
   units: readonly Unit[],
@@ -144,7 +154,7 @@ export const measure = (
     if (!MEASURED_LANGUAGES[unit.kind].has(row.language)) continue;
     const arms = totals.get(unit.name) ?? new Map<Arm, Total>();
 
-    // A config root has no test arm to hold to the tighter ceiling, so one number is the truth.
+    /** A config root has no test arm to hold to the tighter ceiling, so one number is the truth. */
     const arm = unit.kind === "directory" ? "source" : armOf(row.file);
     const running = arms.get(arm) ?? { code: 0, comment: 0 };
     arms.set(arm, { code: running.code + row.code, comment: running.comment + row.comment });
@@ -169,6 +179,7 @@ export const overTheCeiling = (measured: readonly Measured[]): readonly Measured
 export const reportOf = (one: Measured): string =>
   `${one.unit} ${one.arm}: ${one.ratio.toFixed(2)} comment lines per code line, over the ${CEILING[one.arm].toFixed(2)} ceiling ([COMMENT1]).`;
 
+/** Runs cloc over `paths` from `cwd`; throws when cloc fails or writes no JSON. */
 export const countOver = (cwd: string, paths: readonly string[]): readonly Counted[] =>
   countedIn(
     execFileSync(executableOf(CLOC_EXECUTABLE), [...clocArgv(paths)], {
@@ -183,6 +194,7 @@ export const WRAPPER_EXECUTABLE = {
   path: ["..", "..", "scripts", "comment-density.mjs"],
 } as const;
 
+/** The smoke tree must count exactly `smoke.counted` measured files. */
 export const clocOver = (
   paths: readonly string[],
   smoke: { readonly tree: Tree; readonly counted: number },
