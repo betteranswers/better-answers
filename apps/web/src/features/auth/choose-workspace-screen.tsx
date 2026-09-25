@@ -15,11 +15,36 @@ import { AuthScreen, Outcome } from "./auth-screen.tsx";
 import { carriedFlow, leavingFor, pageQuery } from "./carried-flow.ts";
 import { WORKSPACE_WORDS } from "./workspace-words.ts";
 
+type Session = ReturnType<typeof useSession>;
+type Workspaces = ReturnType<typeof useListOrganizations>;
+type Workspace = NonNullable<Workspaces["data"]>[number];
+
 const addressIn = (answer: ResumeAnswer): string | undefined => {
   const next = answer.url;
   return typeof next === "string" && next !== "" ? next : undefined;
 };
 
+const whatTheSessionSays = (session: Session) => ({
+  signedOut: !session.isPending && (session.data === null || session.data === undefined),
+  unnamed:
+    session.data !== null && session.data !== undefined && !hasADisplayName(session.data.user.name),
+  active: session.data?.session.activeOrganizationId ?? undefined,
+});
+
+const whereThePersonStands = (session: Session, workspaces: Workspaces) => {
+  const held = workspaces.data ?? [];
+  return {
+    ...whatTheSessionSays(session),
+    held,
+    sole: held.length === 1 ? held[0] : undefined,
+    settled: !session.isPending && !workspaces.isPending,
+  };
+};
+
+/**
+ * Opens a sole workspace without asking; a carried connection resumes after any pick. No session,
+ * display name or workspace sends the person on.
+ */
 export function ChooseWorkspaceScreen() {
   const navigate = useNavigate();
   const carried = carriedFlow(pageQuery());
@@ -31,13 +56,10 @@ export function ChooseWorkspaceScreen() {
 
   const [wentNowhere, setWentNowhere] = useState(false);
 
-  const signedOut = !session.isPending && (session.data === null || session.data === undefined);
-  const unnamed =
-    session.data !== null && session.data !== undefined && !hasADisplayName(session.data.user.name);
-  const held = workspaces.data ?? [];
-  const sole = held.length === 1 ? held[0] : undefined;
-  const active = session.data?.session.activeOrganizationId ?? undefined;
-  const settled = !session.isPending && !workspaces.isPending;
+  const { signedOut, unnamed, held, sole, active, settled } = whereThePersonStands(
+    session,
+    workspaces,
+  );
 
   const goOn = () => {
     if (carried === "") {
@@ -60,6 +82,10 @@ export function ChooseWorkspaceScreen() {
     );
   };
 
+  const openWorkspace = (organizationId: string) => {
+    pick.mutate({ organizationId }, { onSuccess: goOn });
+  };
+
   const openSoleWorkspace = () => {
     if (sole === undefined) return;
     if (active !== undefined) {
@@ -67,7 +93,7 @@ export function ChooseWorkspaceScreen() {
       return;
     }
 
-    pick.mutate({ organizationId: sole.id }, { onSuccess: goOn });
+    openWorkspace(sole.id);
   };
 
   const decided = settled && !pick.isPending && !resume.isPending && !wentNowhere;
@@ -101,9 +127,37 @@ export function ChooseWorkspaceScreen() {
     navigate,
   ]);
 
-  const refused = pick.error !== null || resume.error !== null;
+  return (
+    <WorkspaceChoice
+      wentNowhere={wentNowhere}
+      settled={settled}
+      unread={workspaces.isError}
+      held={held}
+      busy={pick.isPending || resume.isPending}
+      refused={pick.error !== null || resume.error !== null}
+      onRetry={() => {
+        void workspaces.refetch();
+      }}
+      onPick={openWorkspace}
+      onCarryOn={() => {
+        void navigate({ href: "/", replace: true });
+      }}
+    />
+  );
+}
 
-  if (wentNowhere) {
+function WorkspaceChoice(properties: {
+  readonly wentNowhere: boolean;
+  readonly settled: boolean;
+  readonly unread: boolean;
+  readonly held: readonly Workspace[];
+  readonly busy: boolean;
+  readonly refused: boolean;
+  readonly onRetry: () => void;
+  readonly onPick: (organizationId: string) => void;
+  readonly onCarryOn: () => void;
+}) {
+  if (properties.wentNowhere) {
     return (
       <AuthScreen title="The connection could not be finished">
         <Outcome tone="refused">
@@ -111,20 +165,14 @@ export function ChooseWorkspaceScreen() {
           you were connecting, or carry on in Better Answers.
         </Outcome>
 
-        <Button
-          type="button"
-          className="mt-6"
-          onClick={() => {
-            void navigate({ href: "/", replace: true });
-          }}
-        >
+        <Button type="button" className="mt-6" onClick={properties.onCarryOn}>
           Go to Better Answers
         </Button>
       </AuthScreen>
     );
   }
 
-  if (!settled) {
+  if (!properties.settled) {
     return (
       <AuthScreen title={WORKSPACE_WORDS.organizations}>
         <Outcome tone="said">Reading your workspaces.</Outcome>
@@ -132,28 +180,22 @@ export function ChooseWorkspaceScreen() {
     );
   }
 
-  if (workspaces.isError) {
+  if (properties.unread) {
     return (
       <AuthScreen title={WORKSPACE_WORDS.organizations}>
         <Outcome tone="refused">Your workspaces could not be read. Try again.</Outcome>
 
-        <Button
-          type="button"
-          className="mt-6"
-          onClick={() => {
-            void workspaces.refetch();
-          }}
-        >
+        <Button type="button" className="mt-6" onClick={properties.onRetry}>
           Try again
         </Button>
       </AuthScreen>
     );
   }
 
-  if (held.length < 2) {
+  if (properties.held.length < 2) {
     return (
       <AuthScreen title={WORKSPACE_WORDS.organizations}>
-        {refused ? (
+        {properties.refused ? (
           <Outcome tone="refused">
             Your workspace could not be opened. Sign out and sign in again.
           </Outcome>
@@ -171,15 +213,15 @@ export function ChooseWorkspaceScreen() {
       </p>
 
       <ul className="mt-6 flex flex-col gap-2">
-        {held.map((workspace) => (
+        {properties.held.map((workspace) => (
           <li key={workspace.id}>
             <Button
               type="button"
               variant="outline"
               className="w-full justify-start"
-              disabled={pick.isPending || resume.isPending}
+              disabled={properties.busy}
               onClick={() => {
-                pick.mutate({ organizationId: workspace.id }, { onSuccess: goOn });
+                properties.onPick(workspace.id);
               }}
             >
               {workspace.name}
@@ -188,7 +230,7 @@ export function ChooseWorkspaceScreen() {
         ))}
       </ul>
 
-      {refused ? (
+      {properties.refused ? (
         <Outcome tone="refused">
           That workspace could not be opened. Choose again, or sign out and back in.
         </Outcome>

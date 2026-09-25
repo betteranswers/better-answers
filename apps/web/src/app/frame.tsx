@@ -3,7 +3,7 @@ import { useId } from "react";
 
 import { useSignOut } from "@/features/auth/auth-hooks.ts";
 import { useMembership } from "@/features/auth/membership.ts";
-import { screenAt, viewAt } from "@/shared/screens.ts";
+import { screenAt, viewAt, type Screen, type View } from "@/shared/screens.ts";
 import { isFilled } from "@/shared/view-toolbar.tsx";
 import { IconRail } from "./icon-rail.tsx";
 import { NavigationControl } from "./navigation-control.tsx";
@@ -24,11 +24,6 @@ export function Frame() {
   const person = membership.data;
   const openScreen = screenAt(pathname);
   const openView = viewAt(pathname);
-  // The open view's own declaration, carried by its route: the shell fills nothing itself.
-  const toolbar = useRouterState({ select: (state) => state.matches.at(-1)?.staticData.toolbar });
-  // One source for both halves of the region, so a panel never outlives its tab list.
-  const region =
-    openView !== undefined && isFilled(toolbar) ? { name: openView.name, toolbar } : undefined;
 
   return (
     /*
@@ -43,13 +38,11 @@ export function Frame() {
         Skip to the screen
       </a>
 
-      {wide ? <IconRail openScreenId={openScreen?.id} tooltips /> : null}
-
-      {wide && openScreen !== undefined ? (
-        <SecondaryNav
-          id={navId}
+      {wide ? (
+        <Navigation
+          navId={navId}
           showing={showing}
-          screen={openScreen}
+          openScreen={openScreen}
           openViewPath={openView?.path}
         />
       ) : null}
@@ -81,18 +74,53 @@ export function Frame() {
           onSignOut={signOut}
         />
 
-        <ViewTabsRoot tabs={region?.toolbar.tabs}>
-          {region === undefined ? null : <Toolbar name={region.name} toolbar={region.toolbar} />}
-
-          <main id="screen" aria-label="Screen" tabIndex={-1} className="flex-1 px-4 py-6 md:px-8">
-            <div className="max-w-measure">
-              <ViewPanel>
-                <Outlet />
-              </ViewPanel>
-            </div>
-          </main>
-        </ViewTabsRoot>
+        <ToolbarAndScreen openView={openView} />
       </div>
     </div>
+  );
+}
+
+function Navigation(properties: {
+  readonly navId: string;
+  readonly showing: boolean;
+  readonly openScreen: Screen | undefined;
+  readonly openViewPath: string | undefined;
+}) {
+  return (
+    <>
+      <IconRail openScreenId={properties.openScreen?.id} tooltips />
+
+      {properties.openScreen === undefined ? null : (
+        <SecondaryNav
+          id={properties.navId}
+          showing={properties.showing}
+          screen={properties.openScreen}
+          openViewPath={properties.openViewPath}
+        />
+      )}
+    </>
+  );
+}
+
+function ToolbarAndScreen(properties: { readonly openView: View | undefined }) {
+  const { openView } = properties;
+  /** The open view's own declaration, carried by its route: the shell fills nothing itself. */
+  const toolbar = useRouterState({ select: (state) => state.matches.at(-1)?.staticData.toolbar });
+  /** One source for both halves of the region, so a panel never outlives its tab list. */
+  const region =
+    openView !== undefined && isFilled(toolbar) ? { name: openView.name, toolbar } : undefined;
+
+  return (
+    <ViewTabsRoot tabs={region?.toolbar.tabs}>
+      {region === undefined ? null : <Toolbar name={region.name} toolbar={region.toolbar} />}
+
+      <main id="screen" aria-label="Screen" tabIndex={-1} className="flex-1 px-4 py-6 md:px-8">
+        <div className="max-w-measure">
+          <ViewPanel>
+            <Outlet />
+          </ViewPanel>
+        </div>
+      </main>
+    </ViewTabsRoot>
   );
 }
