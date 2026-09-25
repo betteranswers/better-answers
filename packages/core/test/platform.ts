@@ -2,8 +2,18 @@ import { boundarySchemas, ulid } from "@better-answers/schema";
 import { type MigratedPostgres, testData } from "@better-answers/schema/testing";
 import type pg from "pg";
 
-import type { PlatformPrincipal, UserPrincipal, WorkspaceId } from "../src/kernel/index.ts";
-import { openPostgres, type PostgresDoor } from "../src/store/postgres/index.ts";
+import type {
+  OperatorPrincipal,
+  PlatformPrincipal,
+  UserPrincipal,
+  WorkspaceId,
+} from "../src/kernel/index.ts";
+import {
+  openPostgres,
+  type PostgresDoor,
+  type Tx,
+  withOperator,
+} from "../src/store/postgres/index.ts";
 import { provisionWorkspace } from "../src/workspaces/index.ts";
 
 export const bootstrap: PlatformPrincipal = {
@@ -54,4 +64,19 @@ export const seedPerson = async (pool: pg.Pool, overrides?: PersonOverrides): Pr
   } finally {
     client.release();
   }
+};
+
+/** Answers the new operator's id, the actor on every row they write, beside the resolver's answer. */
+export const asANewOperator = async <T>(
+  db: MigratedPostgres,
+  signedInAt: Date,
+  work: (operator: OperatorPrincipal, tx: Tx) => Promise<T>,
+) => {
+  const operatorId = await seedPerson(db.pool, { operator: true });
+  const answered = await withOperator(
+    openPostgres(db.runtimePool),
+    { userId: operatorId, issuedAt: signedInAt },
+    work,
+  );
+  return { operatorId, answered };
 };

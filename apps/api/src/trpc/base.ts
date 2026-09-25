@@ -292,6 +292,8 @@ export const operatorProcedure = trpc.procedure.use(async ({ ctx, next }) => {
   const resolved = await attempt(() =>
     withOperator(
       ctx.doors.postgres,
+      // The row's own creation: the library's refresh moves only its update and expiry, so the
+      // hour the operator's writes allow runs from the sign-in itself.
       { userId: user.id, issuedAt: session.createdAt },
       async (operator, tx) =>
         thrownIfFailed(await next({ ctx: { operator, tx, doors: undefined } })),

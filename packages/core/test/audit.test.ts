@@ -23,7 +23,7 @@ import {
   type PostgresDoor,
 } from "../src/store/postgres/index.ts";
 import { loadEveryEntryPoint } from "./entry-points.ts";
-import { bootstrap, principalOf, provisionedWorkspace } from "./platform.ts";
+import { asANewOperator, bootstrap, principalOf, provisionedWorkspace } from "./platform.ts";
 import { coreSourceFiles, sourceTreeIsInstrumented } from "./source-tree.ts";
 import { postgresForSuite } from "./suite-postgres.ts";
 
@@ -515,6 +515,43 @@ describe("the identity-set ledger, reached through either door", () => {
       actor: `human:${adminUserId}`,
       subject_id: adminUserId,
     });
+    expect(await rowById(id)).toBeUndefined();
+  });
+
+  it("books the operator's row to the operator's own person", async () => {
+    const id = ulid();
+
+    const { operatorId } = await asANewOperator(db(), new Date(), (operator, tx) =>
+      record(operator, tx, {
+        id,
+        act: IDENTITY_PROBE.noted,
+        subjectId: operator.userId,
+        detail: { confirmed: true },
+      }),
+    );
+
+    expect(await identityRowById(id)).toMatchObject({
+      actor: `human:${operatorId}`,
+      subject_id: operatorId,
+    });
+    expect(await rowById(id)).toBeUndefined();
+  });
+
+  it("refuses a workspace's act under the operator, who has none", async () => {
+    const id = ulid();
+
+    const writing = asANewOperator(db(), new Date(), (operator, tx) =>
+      record(operator, tx, {
+        id,
+        act: PROBE.noted,
+        subjectId: operator.userId,
+        detail: { confirmed: true },
+      }),
+    );
+
+    await expect(writing).rejects.toThrow(
+      'new row violates row-level security policy for table "audit_event"',
+    );
     expect(await rowById(id)).toBeUndefined();
   });
 

@@ -11,7 +11,13 @@ import { z } from "zod";
 import type { Clock, PlatformPrincipal, UserPrincipal } from "@better-answers/core/kernel";
 import type { GitDoor } from "@better-answers/core/store/git";
 import type { ObjectStoreSettings } from "@better-answers/core/store/objects";
-import { folded, withPrincipal, type Foldable, type Tx } from "@better-answers/core/store/postgres";
+import {
+  folded,
+  withOperator,
+  withPrincipal,
+  type Foldable,
+  type Tx,
+} from "@better-answers/core/store/postgres";
 import { removeBundleRoot } from "@better-answers/core/testing/bundle-root";
 import {
   provisionWorkspace,
@@ -355,12 +361,27 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     ]);
   };
 
+  /** Made on the first revocation, so a suite that never revokes holds no extra person. */
+  let operatorMade: Promise<string> | undefined;
+  const operatorsId = (): Promise<string> => {
+    operatorMade ??= (async () => {
+      const client = await database.superuser.connect();
+      try {
+        return (await testData(client).user({ operator: true })).id;
+      } finally {
+        client.release();
+      }
+    })();
+    return operatorMade;
+  };
+
   const revokeCredentials: TestApp["revokeCredentials"] = async (userId, at) => {
-    const revoked = await revokeCredentials_(
-      { kind: "platform", actorId: "process:better-answers-test" },
+    const opened = await withOperator(
       door,
-      { userId, at },
+      { userId: await operatorsId(), issuedAt: at },
+      (operator, tx) => revokeCredentials_(operator, tx, { personId: userId, at }),
     );
+    const revoked = opened.ok ? opened.value : opened;
     if (!revoked.ok) throw new Error(`revokeCredentials failed: ${String(revoked.error)}`);
   };
 

@@ -2,7 +2,13 @@ import { boundarySchemas } from "@better-answers/schema";
 import type { z } from "zod";
 
 import { actorIdOf } from "../kernel/index.ts";
-import type { ActorId, AuditEventId, PlatformPrincipal, Principal } from "../kernel/index.ts";
+import type {
+  ActorId,
+  AuditEventId,
+  OperatorPrincipal,
+  PlatformPrincipal,
+  Principal,
+} from "../kernel/index.ts";
 import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
 import {
   DETAIL_KINDS,
@@ -137,10 +143,11 @@ const write = async <A extends LedgerAct>(
 
 /**
  * Writes the event to the ledger its act was declared for. Rejects when the act was never
- * declared, or the event does not fit the ledger's row or its act's detail shape.
+ * declared, or the event does not fit the ledger's row or its act's detail shape; under the
+ * operator, who stands in no workspace, when the act is not the identity set's.
  */
 export const record = <A extends LedgerAct>(
-  principal: Principal,
+  principal: Principal | OperatorPrincipal,
   tx: Tx,
   event: AuditEvent<A>,
 ): Promise<Recorded> => write(tx, scopeParameter(principal), actorIdOf(principal), event);
