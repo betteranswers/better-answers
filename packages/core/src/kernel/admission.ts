@@ -16,7 +16,7 @@ export type Admits = {
   readonly purposes: readonly string[] | typeof EVERY_PURPOSE;
 };
 
-// The resolver's own words reach a caller from the door, never from here.
+/** The resolver's own words reach a caller from the door, never from here. */
 export type AdmissionRefusal = KernelRefusalOfClass<"forbidden" | "unauthenticated">;
 
 const ADMISSION_REFUSED = "role-forbids" satisfies AdmissionRefusal;
@@ -25,7 +25,9 @@ type AdmissionRefused = typeof ADMISSION_REFUSED;
 
 const reaches = (held: Role, named: Role): boolean => ROLES.indexOf(held) <= ROLES.indexOf(named);
 
-// `ROLES` runs from the highest down, so a named role is reached by itself and everything above.
+/**
+ * `ROLES` runs from the highest down, so a named role is reached by itself and everything above.
+ */
 type Reaching<
   Named extends Role,
   Rest extends readonly Role[] = typeof ROLES,
@@ -66,7 +68,12 @@ type AdmitsOf<D extends ActDeclaration> = [Extract<D["admits"], ReadsAdmits>] ex
 
 export type AdmittedOf<D extends ActDeclaration> = Admitted<AdmitsOf<D>>;
 
-// A word stated twice counts once in the union it builds, so the count is checked here.
+/**
+ * Hands the declaration back unchanged. A word stated twice counts once in the union it builds,
+ * so the count is checked here.
+ *
+ * @throws when `refuses` lists one word twice.
+ */
 export const declareAct = <
   Schema extends z.ZodType,
   const A extends Admits,
@@ -85,6 +92,11 @@ const admitsPurpose = (admits: Admits, principal: PlatformPrincipal): boolean =>
   admits.purposes === EVERY_PURPOSE ||
   admits.purposes.includes(principal.actorId.slice(PROCESS_PREFIX.length));
 
+/**
+ * Admits a person whose role is the declared one or above, or the platform acting for a declared
+ * purpose. An `admits` written as a function is read from `input`. Anyone else is refused
+ * `role-forbids`.
+ */
 export const admit = <D extends ActDeclaration>(
   declaration: D,
   principal: Principal,
@@ -97,6 +109,6 @@ export const admit = <D extends ActDeclaration>(
       ? admitsPurpose(wanted, principal)
       : reaches(principal.role, wanted.role);
 
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- `AdmittedOf<D>` is conditional on a `D` still open here, which no runtime predicate resolves for the compiler
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- `AdmittedOf<D>` turns on a `D` still open here, which no runtime check narrows
   return opens ? ok(principal as AdmittedOf<D>) : err(ADMISSION_REFUSED);
 };

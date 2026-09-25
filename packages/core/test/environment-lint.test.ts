@@ -52,20 +52,22 @@ const EXCUSED: readonly (readonly [string, string])[] = [
   ["a browser spec", "apps/web/e2e/routes.spec.ts"],
 ];
 
-describe("the environment lint passes where a setting is read on purpose", () => {
+describe("the environment lint passes where a read is deliberate", () => {
   it.each(EXCUSED)("%s", (_what, file) => {
     expect(lint.flagged({ [file]: READS_A_SETTING })).toEqual([]);
   });
 });
 
-// Without this control a silence above would read as an excuse, when it could as easily be a
-// file extension the linter never opened.
+/**
+ * Without this control a silence above would read as an excuse, when it could as easily be a
+ * file extension the linter never opened.
+ */
 const unexcused = oxlintOver(
   JSON.stringify({ plugins: config.plugins, rules: { [RULE]: SEVERITY } }),
   { tree: { [SOURCE]: READS_A_SETTING }, flagged: [SOURCE] },
 );
 
-describe("each of those passes because an override says so, not because the linter was silent", () => {
+describe("each of those passes only because an override excuses it", () => {
   it.each(EXCUSED)("%s", (_what, file) => {
     expect(unexcused.flagged({ [file]: READS_A_SETTING })).toEqual([file]);
   });
@@ -77,7 +79,7 @@ describe("the configuration the repository commits", () => {
     expect(config.plugins).toContain("node");
   });
 
-  it("excuses the config modules, the pass-through, the tooling and the suites, and nothing wider", () => {
+  it("excuses config modules, the pass-through, tooling and suites, nothing wider", () => {
     expect(excused.map((override) => override.files)).toEqual([
       ["apps/api/src/config.ts", "apps/web/playwright.config.ts"],
       ["packages/core/src/store/git/index.ts"],
@@ -90,7 +92,7 @@ describe("the configuration the repository commits", () => {
 const DOOR = "packages/core/src/store/git/index.ts";
 const UNEXCUSED_DOOR = "packages/core/src/store/git/probe.ts";
 
-describe("the git store door, the one source file the excuses let read the environment", () => {
+describe("the git store door, the one excused source file", () => {
   it("reads it in exactly one place", () => {
     const source = readFileSync(path.join(repositoryRoot, DOOR), "utf8");
     const reported = lint

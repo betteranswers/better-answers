@@ -170,7 +170,7 @@ const through = async <T>(
 };
 
 describe("a door whose work answers a refusal after a write", () => {
-  it.each(DOORS)("rolls %s door back, leaving no row, no ledger entry and no job", async (door) => {
+  it.each(DOORS)("rolls %s door back: no row, ledger entry or job", async (door) => {
     const key = `probe-${ulid()}`;
 
     const { seeded, answered } = await through(door, answeringAfterThreeWrites(key, err(PROVOKED)));
@@ -179,20 +179,14 @@ describe("a door whose work answers a refusal after a write", () => {
     expect(answered).toEqual({ ok: false, error: PROVOKED });
   });
 
-  it.each(DOORS)(
-    "commits the same three writes through %s door when the work answers a value",
-    async (door) => {
-      const key = `probe-${ulid()}`;
+  it.each(DOORS)("commits the three writes through %s door on a value", async (door) => {
+    const key = `probe-${ulid()}`;
 
-      const { seeded, answered } = await through(
-        door,
-        answeringAfterThreeWrites(key, ok("landed")),
-      );
+    const { seeded, answered } = await through(door, answeringAfterThreeWrites(key, ok("landed")));
 
-      expect(await leftBehindIn(seeded.workspaceId, key)).toEqual({ rows: 1, ledger: 1, jobs: 1 });
-      expect(answered).toEqual({ ok: true, value: "landed" });
-    },
-  );
+    expect(await leftBehindIn(seeded.workspaceId, key)).toEqual({ rows: 1, ledger: 1, jobs: 1 });
+    expect(answered).toEqual({ ok: true, value: "landed" });
+  });
 });
 
 describe("a principal-scoped door's answer", () => {
@@ -224,23 +218,16 @@ describe("a principal-scoped door's answer", () => {
         };
   };
 
-  it.each(TOLD_APART)(
-    "keeps %s door's own refusal apart from its work's, when the two share a word",
-    async (door) => {
-      const seeded = await seedMembership();
+  it.each(TOLD_APART)("keeps %s door's own refusal apart from its work's", async (door) => {
+    const seeded = await seedMembership();
 
-      const { byTheDoor, byTheWork } = refusedBothWays(
-        door,
-        seeded,
-        openPostgres(db().runtimePool),
-      );
+    const { byTheDoor, byTheWork } = refusedBothWays(door, seeded, openPostgres(db().runtimePool));
 
-      expect(await byTheDoor).toEqual({ ok: false, error: "not-a-member" });
-      expect(await byTheWork).toEqual({ ok: true, value: { ok: false, error: "not-a-member" } });
-    },
-  );
+    expect(await byTheDoor).toEqual({ ok: false, error: "not-a-member" });
+    expect(await byTheWork).toEqual({ ok: true, value: { ok: false, error: "not-a-member" } });
+  });
 
-  it("answers its own refusal and its work's as one to a caller whose own answer carries both", async () => {
+  it("folds the door's refusal and the work's into one answer", async () => {
     const seeded = await seedMembership();
     const door = openPostgres(db().runtimePool);
 
@@ -257,7 +244,7 @@ describe("a principal-scoped door's answer", () => {
     expect(plain).toEqual({ ok: true, value: "reached" });
   });
 
-  it("hands back a work's answer that is only partly a Result untouched, and names no answer to fold from it", async () => {
+  it("hands back a partly-Result answer untouched, with nothing to fold", async () => {
     type Partly = Result<number, typeof PROVOKED> | string;
     const seeded = await seedMembership();
     const door = openPostgres(db().runtimePool);
@@ -276,7 +263,7 @@ describe("a principal-scoped door's answer", () => {
 });
 
 describe("the Principal resolver", () => {
-  it("builds a Principal from the member row, with the role read in the same transaction as the work", async () => {
+  it("builds the Principal in the work's own transaction", async () => {
     const seeded = await seedMembership({ role: "Editor" });
     const door = openPostgres(db().runtimePool);
     const claims = claimsFor(seeded);
@@ -300,7 +287,7 @@ describe("the Principal resolver", () => {
     expect(resolved.value.scope).toBe(seeded.workspaceId);
   });
 
-  it("refuses a person who is not a member of the workspace the credential names", async () => {
+  it("refuses a non-member of the workspace the credential names", async () => {
     const seeded = await seedMembership();
     const door = openPostgres(db().runtimePool);
 
@@ -333,7 +320,7 @@ describe("the Principal resolver", () => {
     expect(after).toEqual({ ok: true, value: "reached" });
   });
 
-  it("refuses a credential issued before this workspace revoked the person's credentials here", async () => {
+  it("refuses a credential issued before this workspace's own revocation", async () => {
     const revokedHereAt = new Date("2026-09-03T12:00:00Z");
     const seeded = await seedMembership({ revokedHereAt });
     const door = openPostgres(db().runtimePool);
@@ -354,7 +341,7 @@ describe("the Principal resolver", () => {
     expect(after).toEqual({ ok: true, value: "reached" });
   });
 
-  it("hands the caller the ids of every group they are in here, and an empty list when they are in none", async () => {
+  it("lists the caller's groups here, or none when ungrouped", async () => {
     const grouped = await seedMembership({ role: "Editor", groupsEach: 2 });
     const alone = await seedMembership({ role: "Editor" });
     const door = openPostgres(db().runtimePool);
@@ -366,7 +353,7 @@ describe("the Principal resolver", () => {
     expect(none).toEqual({ ok: true, value: [] });
   });
 
-  it("lets a person revoked in one workspace go on working in the other, role and groups intact", async () => {
+  it("lets a person revoked in one workspace work in another", async () => {
     const revokedHereAt = new Date("2026-09-03T12:00:00Z");
     const seeded = await seedMembership({
       role: "Editor",
@@ -400,7 +387,7 @@ describe("the Principal resolver", () => {
     expect(seeded.groupIds.there).not.toEqual(seeded.groupIds.here);
   });
 
-  it("refuses a credential whose role claim disagrees with the member row", async () => {
+  it("refuses a role claim that disagrees with the member row", async () => {
     const seeded = await seedMembership({ role: "Viewer" });
     const door = openPostgres(db().runtimePool);
 
@@ -419,7 +406,7 @@ describe("the Principal resolver", () => {
     expect(agreeing).toEqual({ ok: true, value: "reached" });
   });
 
-  it("refuses claims that are not a workspace id and a user id", async () => {
+  it("refuses claims that are not a workspace and user id", async () => {
     const door = openPostgres(db().runtimePool);
 
     const resolved = await withPrincipal(
@@ -434,23 +421,16 @@ describe("the Principal resolver", () => {
   it.each([
     ["the workspace id", { workspaceId: "not-a-ulid" }],
     ["the user id", { userId: "" }],
-  ] as const)(
-    "refuses claims where %s alone is malformed, not only when both are",
-    async (_which, malformed) => {
-      const seeded = await seedMembership();
-      const door = openPostgres(db().runtimePool);
+  ] as const)("refuses claims where %s alone is malformed", async (_which, malformed) => {
+    const seeded = await seedMembership();
+    const door = openPostgres(db().runtimePool);
 
-      const resolved = await withPrincipal(
-        door,
-        claimsFor(seeded, malformed),
-        async () => "reached",
-      );
+    const resolved = await withPrincipal(door, claimsFor(seeded, malformed), async () => "reached");
 
-      expect(resolved).toEqual({ ok: false, error: "malformed-claims" });
-    },
-  );
+    expect(resolved).toEqual({ ok: false, error: "malformed-claims" });
+  });
 
-  it("lets a credential issued at the revocation's own instant through, because revocation ends what came before it", async () => {
+  it("lets through a credential issued at the revocation's instant", async () => {
     const revokedAt = new Date("2026-09-05T09:00:00.000Z");
     const seeded = await seedMembership({ revokedAt, revokedHereAt: revokedAt });
     const door = openPostgres(db().runtimePool);
@@ -464,7 +444,7 @@ describe("the Principal resolver", () => {
     expect(atTheInstant).toEqual({ ok: true, value: "reached" });
   });
 
-  it("rolls the work back when it throws, and never leaves a Principal behind", async () => {
+  it("rolls the work back when it throws", async () => {
     const seeded = await seedMembership({ role: "Admin" });
     const door = openPostgres(db().runtimePool);
     const key = `probe-${ulid()}`;
@@ -541,8 +521,8 @@ const withRoleOutsideTheThree = async (
   }
 };
 
-describe("a member row carrying a role the platform does not have", () => {
-  it("refuses it rather than building a Principal at a role nothing grants", async () => {
+describe("a member row carrying a role the platform lacks", () => {
+  it("refuses it rather than building a Principal at that role", async () => {
     const seeded = await seedMembership();
     const door = openPostgres(db().runtimePool);
 
@@ -555,7 +535,7 @@ describe("a member row carrying a role the platform does not have", () => {
 });
 
 describe("a workspace's config", () => {
-  it("answers a key nobody set with nothing, rather than failing the transaction it runs in", async () => {
+  it("answers nothing for an unset key without failing the transaction", async () => {
     const seeded = await seedMembership();
     const door = openPostgres(db().runtimePool);
 
@@ -568,7 +548,7 @@ describe("a workspace's config", () => {
 });
 
 describe("the catalogue read the estate's restore commands make", () => {
-  it("names the tables that are there and stays silent about the ones that are not", async () => {
+  it("names the tables present and omits the absent ones", async () => {
     const door = openPostgres(db().runtimePool);
 
     const present = await tablesPresent(door, ["member", "workspace", "table_nobody_migrated"]);
@@ -610,7 +590,7 @@ describe("a transaction a caught failure aborted", () => {
 });
 
 describe("the counters", () => {
-  it("counts a token's calls per window and refuses the call past the ceiling", async () => {
+  it("counts a token's calls per window, refusing past the ceiling", async () => {
     const seeded = await seedMembership();
     const door = openPostgres(db().runtimePool);
     const rule = { windowMs: 60_000, max: 2 };

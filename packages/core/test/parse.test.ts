@@ -40,7 +40,7 @@ const ALWAYS_GROUP = {
 
 const refusalOf = (read: ReturnType<typeof parse>) => (read.ok ? "ok" : read.error);
 
-// One case per word, so the walk below proves both directions of the register.
+/** One case per word, so the walk below proves both directions of the register. */
 const EVERY_ISSUE: ReadonlyArray<readonly [IssueWord, string, z.ZodType, unknown]> = [
   ["missing", "field", z.object({ field: z.string() }), {}],
   ["wrong-type", "field", z.object({ field: z.string() }), { field: 1 }],
@@ -66,7 +66,7 @@ const EVERY_ISSUE: ReadonlyArray<readonly [IssueWord, string, z.ZodType, unknown
 ];
 
 describe("what a kernel parse answers", () => {
-  it("hands back the branded value a schema admits, so an act's field is its own proof", () => {
+  it("hands back the branded value a schema admits", () => {
     const read = parse(narrowBindingInput, {
       bindingId: A_BINDING,
       sensitivity: "Restricted",
@@ -82,7 +82,7 @@ describe("what a kernel parse answers", () => {
     });
   });
 
-  it("names the failing field with a word and never the value that failed", () => {
+  it("names the failing field with a word, never its value", () => {
     const read = parse(bindUploadFields, {
       bindingId: A_BINDING,
       name: SECRET,
@@ -99,7 +99,7 @@ describe("what a kernel parse answers", () => {
     expect(JSON.stringify(read)).not.toContain("-1");
   });
 
-  it("carries no offending value for a whole object of wrong ones", () => {
+  it("carries no offending value when every field is wrong", () => {
     const read = parse(keepInTextInput, {
       bindingId: SECRET,
       findingGroups: [{ ...ALWAYS_GROUP, tier: SECRET }],
@@ -129,7 +129,7 @@ describe("what a kernel parse answers", () => {
     });
   });
 
-  it("reads a nested key written as undefined the same as one that was never there", () => {
+  it("reads a nested undefined key as a missing one", () => {
     expect(
       parse(publishBindingInput, {
         bindingId: A_BINDING,
@@ -141,14 +141,14 @@ describe("what a kernel parse answers", () => {
     });
   });
 
-  it("calls the whole value missing when nothing was handed in at all", () => {
+  it("calls the whole value missing when nothing was handed in", () => {
     expect(parse(findingsOfInput, undefined)).toEqual({
       ok: false,
       error: { word: "malformed", fields: { [ROOT_PATH]: "missing" } },
     });
   });
 
-  it("names the root when the whole value is the wrong kind", () => {
+  it("names the root when the whole value is mistyped", () => {
     expect(parse(findingsOfInput, "not an object")).toEqual({
       ok: false,
       error: { word: "malformed", fields: { [ROOT_PATH]: "wrong-type" } },
@@ -165,7 +165,7 @@ describe("what a kernel parse answers", () => {
     },
   );
 
-  it("owns every word an issue can answer with, and reaches every word it owns", () => {
+  it("owns every issue word and reaches each one", () => {
     const reached = EVERY_ISSUE.map(([word]) => word);
 
     expect([...ISSUE_WORDS].filter((word) => !reached.includes(word))).toEqual([]);
@@ -174,7 +174,7 @@ describe("what a kernel parse answers", () => {
 });
 
 describe("the shapes the Sources acts are handed", () => {
-  it("defaults a bind's class, audience and groups to the narrowest a workspace can start from", () => {
+  it("defaults a bind's class, audience and groups to the narrowest", () => {
     const read = parse(bindUploadFields, {
       bindingId: A_BINDING,
       name: "The staff handbook",
@@ -196,7 +196,7 @@ describe("the shapes the Sources acts are handed", () => {
     });
   });
 
-  it("refuses an audience word and a group list that disagree, on either side", () => {
+  it("refuses an audience word and group list that disagree", () => {
     const named = parse(narrowBindingInput, {
       bindingId: A_BINDING,
       sensitivity: "Internal",
@@ -215,7 +215,7 @@ describe("the shapes the Sources acts are handed", () => {
     ]);
   });
 
-  it("refuses an empty group list, which a binding's audience column never holds", () => {
+  it("refuses an empty group list", () => {
     expect(
       refusalOf(
         parse(narrowBindingInput, {
@@ -228,7 +228,7 @@ describe("the shapes the Sources acts are handed", () => {
     ).toEqual({ word: "malformed", fields: { audienceGroups: "too-small" } });
   });
 
-  it("refuses a preview asking for a fraction of a row, and defaults one that asks for nothing", () => {
+  it("refuses a fractional preview limit and defaults an absent one", () => {
     expect(refusalOf(parse(previewChunksInput, { bindingId: A_BINDING, limit: 2.5 }))).toEqual({
       word: "malformed",
       fields: { limit: "wrong-type" },
@@ -239,7 +239,7 @@ describe("the shapes the Sources acts are handed", () => {
     });
   });
 
-  it("defaults a narrowing of documents to the narrowest class, and keeps the groups it was handed", () => {
+  it("defaults a narrowing to the narrowest class, keeping its groups", () => {
     expect(
       parse(narrowDocumentsInput, { bindingId: A_BINDING, findingGroups: [ALWAYS_GROUP] }),
     ).toEqual({
@@ -252,7 +252,7 @@ describe("the shapes the Sources acts are handed", () => {
     });
   });
 
-  it("refuses a reprocess reason no run carries or that empties no binding, and a restore of a tier nobody named", () => {
+  it("refuses a non-reprocess reason and an unknown finding tier", () => {
     for (const reason of ["spring-clean", "bound", "restored", "narrowed"]) {
       expect(
         refusalOf(
@@ -275,7 +275,7 @@ describe("the shapes the Sources acts are handed", () => {
     ).toEqual({ word: "malformed", fields: { "findingGroups.0.tier": "not-in-set" } });
   });
 
-  it("refuses a dismissal with no reason, a blank one or one past the review's ceiling", () => {
+  it("refuses a missing, blank or overlong dismissal reason", () => {
     for (const [reason, word] of [
       [undefined, "missing"],
       ["   ", "too-small"],
@@ -293,7 +293,7 @@ describe("the shapes the Sources acts are handed", () => {
     }
   });
 
-  it("brands the ids an act is handed, so no act parses one a second time", () => {
+  it("brands the ids an act is handed", () => {
     const kept = parse(keepInTextInput, {
       bindingId: A_BINDING,
       findingGroups: [ALWAYS_GROUP],

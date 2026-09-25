@@ -50,13 +50,19 @@ const wordOf = (issue: z.core.$ZodIssue): IssueWord => {
   return WORD_OF_CODE.get(issue.code) ?? "refused";
 };
 
+/**
+ * Refuses `malformed` with the word of each failing field's first issue, keyed by its dotted path
+ * and `ROOT_PATH` for the whole value. No value that failed is carried.
+ */
 export const parse = <Schema extends z.ZodType>(
   schema: Schema,
-  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- the boundary itself: a transport hands over whatever arrived and the schema narrows it, so a named type would claim a parse not yet done
+  // oxlint-disable-next-line anti-slop/no-unknown-parameters -- the boundary itself: a named type would claim a parse the schema has not yet done
   raw: unknown,
 ): Result<z.output<Schema>, Malformed> => {
-  // `reportInput` is how a missing key is told from a wrong-typed one; the values it
-  // copies onto issues never leave this function.
+  /**
+   * `reportInput` is how a missing key is told from a wrong-typed one; the values it
+   * copies onto issues never leave this function.
+   */
   const read = schema.safeParse(raw, { reportInput: true });
   if (read.success) return ok(read.data);
 

@@ -26,8 +26,10 @@ import { ulid } from "../src/kernel/index.ts";
 
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
-// Hardcoded on purpose, never read from a shared constant: that is what fails a tier not yet
-// taught a contract change.
+/**
+ * Hardcoded on purpose, never read from a shared constant: that is what fails a tier not yet
+ * taught a contract change.
+ */
 const SPOKEN_AGREEMENTS = {
   citation: "fixtured",
   "concept-file": "fixtured",
@@ -74,38 +76,66 @@ const filesUnder = (root: string, agreement: string): readonly string[] => {
   return existsSync(directory) ? fixturesOnDisk(directory) : [];
 };
 
-const formFailures = (contract: z.infer<typeof manifest>, root: string): readonly string[] => {
-  const failures: string[] = [];
+type Contract = z.infer<typeof manifest>;
 
-  for (const [agreement, { form }] of Object.entries(contract.agreements)) {
-    const listed = contract.fixtures.filter((fixture) => fixture.agreement === agreement);
+type Fixture = Contract["fixtures"][number];
 
-    if (form === "fixtured") {
-      if (listed.length === 0)
-        failures.push(`${agreement} declares fixtured and the manifest lists no fixture under it`);
-      for (const fixture of listed)
-        if (!fixture.path.startsWith(`${agreement}/`))
-          failures.push(
-            `${agreement} declares fixtured and lists ${fixture.path}, which is not under ${agreement}/`,
-          );
-        else if (!existsSync(path.join(root, fixture.path)))
-          failures.push(
-            `${agreement} declares fixtured and lists ${fixture.path}, which is not on disk`,
-          );
-    } else if (form === "generated") {
-      if (filesUnder(root, agreement).length === 0)
-        failures.push(`${agreement} declares generated and has no golden rows on disk`);
-    } else if (form !== "sql-function") {
-      failures.push(`${agreement} declares ${form}, a form this check does not know`);
-    }
-  }
-
-  for (const directory of directoriesIn(root))
-    if (contract.agreements[directory] === undefined)
-      failures.push(`${directory} is a directory under contracts/ that no agreement claims`);
-
-  return failures.toSorted();
+const fixturePathFailures = (
+  agreement: string,
+  fixture: Fixture,
+  root: string,
+): readonly string[] => {
+  if (!fixture.path.startsWith(`${agreement}/`))
+    return [
+      `${agreement} declares fixtured and lists ${fixture.path}, which is not under ${agreement}/`,
+    ];
+  if (!existsSync(path.join(root, fixture.path)))
+    return [`${agreement} declares fixtured and lists ${fixture.path}, which is not on disk`];
+  return [];
 };
+
+const fixturedFailures = (
+  agreement: string,
+  listed: readonly Fixture[],
+  root: string,
+): readonly string[] => {
+  if (listed.length === 0)
+    return [`${agreement} declares fixtured and the manifest lists no fixture under it`];
+  return listed.flatMap((fixture) => fixturePathFailures(agreement, fixture, root));
+};
+
+const agreementFailures = (
+  agreement: string,
+  form: string,
+  fixtures: readonly Fixture[],
+  root: string,
+): readonly string[] => {
+  if (form === "fixtured")
+    return fixturedFailures(
+      agreement,
+      fixtures.filter((fixture) => fixture.agreement === agreement),
+      root,
+    );
+  if (form === "generated")
+    return filesUnder(root, agreement).length === 0
+      ? [`${agreement} declares generated and has no golden rows on disk`]
+      : [];
+  if (form === "sql-function") return [];
+  return [`${agreement} declares ${form}, a form this check does not know`];
+};
+
+const unclaimedDirectories = (contract: Contract, root: string): readonly string[] =>
+  directoriesIn(root)
+    .filter((directory) => contract.agreements[directory] === undefined)
+    .map((directory) => `${directory} is a directory under contracts/ that no agreement claims`);
+
+const formFailures = (contract: Contract, root: string): readonly string[] =>
+  [
+    ...Object.entries(contract.agreements).flatMap(([agreement, { form }]) =>
+      agreementFailures(agreement, form, contract.fixtures, root),
+    ),
+    ...unclaimedDirectories(contract, root),
+  ].toSorted();
 
 const throwaway = mkdtempSync(path.join(tmpdir(), "tier-contract-"));
 const brokenRoot = mkdtempSync(path.join(tmpdir(), "tier-contract-broken-"));
@@ -147,7 +177,7 @@ const materialiseBrokenContracts = (root: string) => {
 };
 
 describe("the tier contract", () => {
-  it("names exactly the agreements this tier speaks, each in the form this tier expects", () => {
+  it("names exactly the agreements this tier speaks, in their forms", () => {
     const manifest = readManifest();
 
     expect(Object.keys(manifest.agreements).toSorted()).toEqual(
@@ -158,7 +188,7 @@ describe("the tier contract", () => {
     }
   });
 
-  it("lists a fixture if and only if it exists, under an agreement it names", () => {
+  it("lists exactly the fixtures on disk, under agreements it names", () => {
     const manifest = readManifest();
 
     for (const fixture of manifest.fixtures) {
@@ -171,7 +201,7 @@ describe("the tier contract", () => {
     );
   });
 
-  it("counts a fixture and never a dotfile, so a stray .DS_Store is not an unlisted one", () => {
+  it("counts a fixture and never a dotfile", () => {
     mkdirSync(path.join(throwaway, "id-shape"));
     writeFileSync(path.join(throwaway, "id-shape", "cases.json"), "{}");
     writeFileSync(path.join(throwaway, "manifest.json"), "{}");
@@ -185,11 +215,11 @@ describe("the tier contract", () => {
     expect(fixturesOnDisk(throwaway)).toEqual(["id-shape/cases.json"]);
   });
 
-  it("finds the disk answering every form the manifest declares, and claiming every directory", () => {
+  it("finds every declared form answered and every directory claimed", () => {
     expect(formFailures(readManifest(), contractsDir)).toEqual([]);
   });
 
-  it("names the agreement and the form it declared for each entry the disk does not answer", () => {
+  it("names the agreement and form of each unanswered entry", () => {
     materialiseBrokenContracts(brokenRoot);
 
     expect(formFailures(readManifest(brokenRoot), brokenRoot)).toEqual([
@@ -203,8 +233,10 @@ describe("the tier contract", () => {
   });
 });
 
-// Each hex below is worked out of band from the framing, never by calling this tier's own
-// reading a second time.
+/**
+ * Each hex below is worked out of band from the framing, never by calling this tier's own
+ * reading a second time.
+ */
 const DIGEST_CASES = [
   { why: "the manifest alone", tree: { "manifest.json": "{}" } },
   { why: "a nested directory", tree: { "manifest.json": "{}", "deep/under/cases.json": "[1]" } },
@@ -258,8 +290,8 @@ const materialised = (index: number, tree: Tree): string => {
   return root;
 };
 
-describe("the contract's digest, which is this tier's version of the contract", () => {
-  it("answers the hex the framing says over every tree the cases name", () => {
+describe("the contract's digest, this tier's version of the contract", () => {
+  it("answers the framing's hex over every case's tree", () => {
     expect(
       DIGEST_CASES.map(({ why, tree }, index) => ({
         why,
@@ -268,7 +300,7 @@ describe("the contract's digest, which is this tier's version of the contract", 
     ).toEqual(DIGEST_CASES.map(({ why }) => ({ why, hex: EXPECTED_HEX[why] })));
   });
 
-  it("counts a symlink for nothing, so neither tier reads one file as two", () => {
+  it("counts a symlink for nothing", () => {
     const root = materialised(DIGEST_CASES.length, { "manifest.json": "{}" });
     mkdirSync(path.join(root, "queue"));
     symlinkSync(path.join(root, "manifest.json"), path.join(root, "queue", "cases.json"));
@@ -276,7 +308,7 @@ describe("the contract's digest, which is this tier's version of the contract", 
     expect(contractDigest(root)).toBe(EXPECTED_HEX["the manifest alone"]);
   });
 
-  it("carries the whole hash, so nothing an operator compares by eye is a short form", () => {
+  it("carries the whole hash, never a short form", () => {
     expect(CONTRACT_DIGEST).toMatch(/^[0-9a-f]{64}$/);
   });
 });
@@ -293,11 +325,11 @@ const readIdShape = () =>
   );
 
 describe("id-shape, the agreement about what an id looks like", () => {
-  it("pins the very pattern this tier narrows an identity id to at its boundary", () => {
+  it("pins the pattern this tier's boundary narrows an id to", () => {
     expect(readIdShape().pattern).toBe(ULID_PATTERN);
   });
 
-  it("parses at this tier's boundary every id the other tier may mint, and refuses every id it may not", () => {
+  it("parses the ids the fixture allows and refuses the others", () => {
     const fixture = readIdShape();
     const atTheBoundary = boundarySchemas.workspace.select.shape.id;
 
@@ -309,7 +341,7 @@ describe("id-shape, the agreement about what an id looks like", () => {
     }
   });
 
-  it("mints ids the fixture's pattern accepts, so an id minted here parses over there", () => {
+  it("mints ids the fixture's pattern accepts", () => {
     const pattern = new RegExp(readIdShape().pattern);
 
     for (let minted = 0; minted < 100; minted += 1) expect(pattern.test(ulid())).toBe(true);
@@ -358,7 +390,7 @@ const lineFor = (file: string, said: string): string =>
   said.split("\n").find((line) => line.startsWith(`${file}:`)) ?? "";
 
 describe("citation, the agreement about what a citation looks like", () => {
-  it("refuses every sentence the fixture says cites, quoting back the text the fixture names", () => {
+  it("refuses every citing sentence, quoting the cited text back", () => {
     const said = commentGate.output(citedTree);
 
     expect(
@@ -369,7 +401,7 @@ describe("citation, the agreement about what a citation looks like", () => {
     ).toEqual(citedSentences.map(({ prose }) => ({ prose, names: true })));
   });
 
-  it("walks past every sentence the fixture says cites nothing, so the gate holds no pattern of its own", () => {
+  it("walks past every sentence the fixture says cites nothing", () => {
     const clean = readCitation().cites_nothing;
 
     expect({ clean, flagged: commentGate.flagged(treeOf(clean)) }).toEqual({ clean, flagged: [] });

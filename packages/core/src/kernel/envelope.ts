@@ -16,8 +16,10 @@ export type OpenEnvelopeRefusal = KernelRefusal<
   "envelope-version-unknown" | "envelope-malformed" | "envelope-not-authentic"
 >;
 
-// A wrong key length is the caller's defect: a refusal word here would let a mis-provisioned key
-// read as somebody's bad envelope.
+/**
+ * A wrong key length is the caller's defect: a refusal word here would let a mis-provisioned key
+ * read as somebody's bad envelope.
+ */
 const keyed = (key: Uint8Array): Uint8Array => {
   if (key.length !== ENVELOPE_KEY_BYTES) {
     throw new Error(`envelope: a key is ${ENVELOPE_KEY_BYTES} bytes, not ${key.length}`);
@@ -25,10 +27,17 @@ const keyed = (key: Uint8Array): Uint8Array => {
   return key;
 };
 
+/**
+ * A frame of the version byte, a fresh nonce, the ciphertext and the tag, in that order.
+ *
+ * @throws when `key` is not `ENVELOPE_KEY_BYTES` long.
+ */
 export const sealEnvelope = (key: Uint8Array, plaintext: Uint8Array): Uint8Array => {
   const version = Uint8Array.of(ENVELOPE_VERSION);
-  // Never a counter: two processes share the key and would hand out one number twice, which
-  // under GCM hands out the plaintexts.
+  /**
+   * Never a counter: two processes share the key and would hand out one number twice, which
+   * under GCM hands out the plaintexts.
+   */
   const nonce = randomBytes(ENVELOPE_NONCE_BYTES);
   const cipher = createCipheriv(ENVELOPE_AEAD, keyed(key), nonce, {
     authTagLength: ENVELOPE_TAG_BYTES,
@@ -39,6 +48,12 @@ export const sealEnvelope = (key: Uint8Array, plaintext: Uint8Array): Uint8Array
   return new Uint8Array(Buffer.concat([version, nonce, ciphertext, cipher.getAuthTag()]));
 };
 
+/**
+ * The plaintext of a frame sealEnvelope wrote under `key`. Refuses a frame of another version, one
+ * too short to hold a nonce and tag, and one whose tag does not verify.
+ *
+ * @throws when `key` is not `ENVELOPE_KEY_BYTES` long.
+ */
 export const openEnvelope = (
   key: Uint8Array,
   frame: Uint8Array,

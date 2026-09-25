@@ -28,15 +28,15 @@ const bootstrap: PlatformPrincipal = {
 };
 
 describe("the actor a record names", () => {
-  it("names a person by their person id, so no record carries an email", () => {
+  it("names a person by their person id, never an email", () => {
     expect(actorIdOf(person("Editor"))).toBe("human:01JQ0000000000000000000PER");
   });
 
-  it("names the platform by its own actor id, never by a person", () => {
+  it("names the platform by its own actor id", () => {
     expect(actorIdOf(bootstrap)).toBe("process:better-answers-bootstrap");
   });
 
-  it("refuses a bare string where an actor id belongs, so none can be composed by hand", () => {
+  it("refuses a bare string where an actor id belongs", () => {
     expectTypeOf<string>().not.toExtend<ActorId>();
     expectTypeOf<"human:01JQ">().toExtend<ActorId>();
     expectTypeOf<"process:better-answers-erasure">().toExtend<ActorId>();
@@ -49,7 +49,7 @@ describe("the actor a record names", () => {
 });
 
 describe("the guard on an act only an Admin may perform", () => {
-  it("lets an Admin through, carrying the role the act may rely on", () => {
+  it("lets an Admin through with the role narrowed to Admin", () => {
     const admin = person("Admin");
     const guarded = requireAdmin(admin);
 
@@ -57,16 +57,16 @@ describe("the guard on an act only an Admin may perform", () => {
     if (guarded.ok) expectTypeOf(guarded.value.role).toEqualTypeOf<"Admin">();
   });
 
-  it("refuses an Editor with the one word every role-guarded act refuses with", () => {
+  it("refuses an Editor with role-forbids", () => {
     expect(requireAdmin(person("Editor"))).toEqual({ ok: false, error: "role-forbids" });
   });
 
-  it("refuses a Viewer with that same word, so the two read alike to a caller", () => {
+  it("refuses a Viewer with role-forbids too", () => {
     expect(requireAdmin(person("Viewer"))).toEqual({ ok: false, error: "role-forbids" });
   });
 });
 
-describe("the one try/catch every slice entry point wraps its library in", () => {
+describe("the try/catch every slice entry point wraps its library in", () => {
   const errorOfThrown = async (
     thrown: unknown,
   ): Promise<{ isError: boolean; message: string; cause: unknown }> => {
@@ -81,7 +81,7 @@ describe("the one try/catch every slice entry point wraps its library in", () =>
     };
   };
 
-  it("hands back the driver's own Error, so the class and the fields it carries survive", async () => {
+  it("keeps the driver's own Error, its class and fields intact", async () => {
     const thrown = Object.assign(new TypeError("deadlock detected"), {
       constraint: "member_pkey",
     });
@@ -94,7 +94,7 @@ describe("the one try/catch every slice entry point wraps its library in", () =>
     expect(answered.ok ? undefined : answered.error).toBe(thrown);
   });
 
-  it("turns a thrown string into an Error carrying it as the message", async () => {
+  it("turns a thrown string into an Error with that message", async () => {
     expect(await errorOfThrown("the socket hung up")).toEqual({
       isError: true,
       message: "the socket hung up",
@@ -102,7 +102,7 @@ describe("the one try/catch every slice entry point wraps its library in", () =>
     });
   });
 
-  it("names what was thrown when it is neither an Error nor a string, and keeps it as the cause", async () => {
+  it("names any other thrown value, kept as the cause", async () => {
     const thrown = { code: 42 };
 
     expect(await errorOfThrown(thrown)).toEqual({
@@ -116,7 +116,7 @@ describe("the one try/catch every slice entry point wraps its library in", () =>
 describe("reading a store's constraint names into a slice's words", () => {
   const named = { workspace_slug_unique: "slug-taken" } as const;
 
-  it("answers the refusal word a caller can act on when the map names the constraint", () => {
+  it("answers the mapped refusal word for a named constraint", () => {
     const violation = Object.assign(new Error("duplicate key value violates unique constraint"), {
       constraint: "workspace_slug_unique",
     });
@@ -124,7 +124,7 @@ describe("reading a store's constraint names into a slice's words", () => {
     expect(refusalFor(violation, named)).toBe("slug-taken");
   });
 
-  it("reads the constraint out of the message when the driver put it nowhere else", () => {
+  it("falls back to the constraint named in the message", () => {
     const violation = new Error(
       'duplicate key value violates unique constraint "workspace_slug_unique"',
     );
@@ -132,13 +132,13 @@ describe("reading a store's constraint names into a slice's words", () => {
     expect(refusalFor(violation, named)).toBe("slug-taken");
   });
 
-  it("hands back the store's own error when the map names no constraint of it", () => {
+  it("hands back the store's own error for an unmapped constraint", () => {
     const failure = Object.assign(new Error("deadlock detected"), { constraint: "member_pkey" });
 
     expect(refusalFor(failure, named)).toBe(failure);
   });
 
-  it("answers for the constraint that was violated, not one whose name it contains", () => {
+  it("answers for the violated constraint, not one its name contains", () => {
     const overlapping = { member_pkey: "one", member_pkey_v2: "the other" } as const;
     const violation = Object.assign(
       new Error('duplicate key value violates unique constraint "member_pkey_v2"'),
@@ -150,7 +150,7 @@ describe("reading a store's constraint names into a slice's words", () => {
 });
 
 describe("the shape of a name a store can hand back", () => {
-  it("takes a relative name whose every segment is a plain one", () => {
+  it("takes a relative name made of plain segments", () => {
     expect(isPortablePath("knowledge/expenses.md")).toBe(true);
     expect(
       isPortablePath("erasures/01JQ0000000000000000000WSP/01JQ00000000000000000ERQ.json"),
@@ -167,7 +167,7 @@ describe("the shape of a name a store can hand back", () => {
     expect(isPortablePath("knowledge/expenses.md/..")).toBe(false);
   });
 
-  it("refuses a name with nothing to read, an empty segment, or a separator at either end", () => {
+  it("refuses an empty name, empty segment or edge separator", () => {
     expect(isPortablePath("")).toBe(false);
     expect(isPortablePath("/")).toBe(false);
     expect(isPortablePath("/knowledge/expenses.md")).toBe(false);
@@ -175,7 +175,7 @@ describe("the shape of a name a store can hand back", () => {
     expect(isPortablePath("knowledge/expenses.md/")).toBe(false);
   });
 
-  it("refuses a control character, because a listing would have to quote it", () => {
+  it("refuses a control character, which a listing would quote", () => {
     expect(isPortablePath("knowledge/expenses\u0000.md")).toBe(false);
     expect(isPortablePath("knowledge/expenses\t.md")).toBe(false);
     expect(isPortablePath("knowledge/expenses\n.md")).toBe(false);
@@ -185,7 +185,7 @@ describe("the shape of a name a store can hand back", () => {
     expect(isPortablePath("knowledge/travel expenses.md")).toBe(true);
   });
 
-  it("takes a name outside the ASCII range, because a name is text and not bytes", () => {
+  it("takes a name outside the ASCII range", () => {
     expect(isPortablePath("knowledge/dépenses.md")).toBe(true);
     expect(isPortablePath("knowledge/\u{1d11e}.md")).toBe(true);
   });

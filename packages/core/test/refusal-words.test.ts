@@ -96,18 +96,18 @@ const registerAsRead = (): Readonly<Record<string, string>> =>
   );
 
 describe("the refusal-word walk", () => {
-  it("classes a word by what its caller can do, in one of seven classes", () => {
+  it("classes a word in one of seven classes", () => {
     expect([...REFUSAL_CLASSES]).toEqual(SEVEN_CLASSES);
   });
 
-  it("holds one class and one declaring slice for every word a converted union may name", async () => {
+  it("holds one class and declaring slice for every union word", async () => {
     await loadEveryEntryPoint();
 
     expect(registerAsRead()).toEqual(REGISTER);
   });
 
   it.skipIf(sourceTreeIsInstrumented())(
-    "reaches every registered word from a union an act answers, and every word those unions name from the register",
+    "matches the register and the acts' union words both ways",
     async () => {
       await loadEveryEntryPoint();
       const held = new Set(Object.keys(registerAsRead()));
@@ -119,7 +119,7 @@ describe("the refusal-word walk", () => {
     },
   );
 
-  it("refuses a second declaration of a word the register already holds", async () => {
+  it("refuses a second declaration of a registered word", async () => {
     await loadEveryEntryPoint();
 
     expect(() => declareRefusals("sources", { "no-such-binding": "absent" })).toThrow(
@@ -133,15 +133,15 @@ describe("the refusal-word walk", () => {
     );
   });
 
-  it("builds a union from a registered word, and refuses an invented one and a door's own", () => {
+  it("builds a union from a registered word and no other", () => {
     expectTypeOf<SourceRefusal<"no-such-binding">>().toEqualTypeOf<"no-such-binding">();
     // @ts-expect-error — a word no slice declared is no refusal word.
     expectTypeOf<SourceRefusal<"no-such-thing">>().toBeString();
-    // @ts-expect-error — a store door's own word is a defect where an act meets it, never a refusal.
+    // @ts-expect-error — a store door's own word is a defect, never a refusal.
     expectTypeOf<SourceRefusal<"no-bucket">>().toBeString();
   });
 
-  it("answers an act's union in registered words alone, never a literal written beside them", () => {
+  it("answers an act's union in registered words alone", () => {
     expectTypeOf<BindUploadRefusal>().toExtend<EveryRegisteredWord | Error>();
     expectTypeOf<ProvisionRefusal>().toExtend<EveryRegisteredWord>();
     expectTypeOf<AddMemberRefusal>().toExtend<EveryRegisteredWord>();
