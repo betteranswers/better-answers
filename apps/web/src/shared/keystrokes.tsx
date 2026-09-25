@@ -17,12 +17,16 @@ const KEPT_UNDER = "better-answers.keystrokes";
 
 const OFF = "off";
 
-// WCAG 2.1.4: a reader whose speech input or tremor types letters by accident can turn every
-// single-key keystroke off.
+/**
+ * WCAG 2.1.4: a reader whose speech input or tremor types letters by accident can turn every
+ * single-key keystroke off.
+ */
 const keystrokesAreOn = (): boolean => onThisBrowser()?.getItem(KEPT_UNDER) !== OFF;
 
-// A key typed into a field is the field's, one with a modifier the browser's, one inside a
-// dialog or menu that surface's.
+/**
+ * A key typed into a field is the field's, one with a modifier the browser's, one inside a
+ * dialog or menu that surface's.
+ */
 const OWNED_ELSEWHERE =
   'input, textarea, select, [contenteditable="true"], [role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]';
 
@@ -32,6 +36,10 @@ const isTheScreens = (event: KeyboardEvent): boolean => {
   return !(target instanceof Element) || target.closest(OWNED_ELSEWHERE) === null;
 };
 
+/**
+ * Runs `act` on the bare key from anywhere but a field, dialog or menu, unless the reader turned
+ * single-key keystrokes off.
+ */
 export function useKeystroke(keystroke: Keystroke, act: () => void) {
   const pressed = useEffectEvent((event: KeyboardEvent) => {
     if (event.key !== keystroke.key || !isTheScreens(event) || !keystrokesAreOn()) return;
@@ -70,6 +78,7 @@ function TurnedOn() {
   );
 }
 
+/** Lists `keystrokes` with its own `?`, which opens it, so the caller leaves `?` out. */
 export function KeystrokesAct(properties: {
   readonly screen: string;
   readonly keystrokes: readonly Keystroke[];

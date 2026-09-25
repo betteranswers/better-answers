@@ -9,8 +9,10 @@ export type AppClients = {
   readonly apiClient: ApiClient;
 };
 
-// A module-scope client is one cache shared by every render in the process, so a second
-// test render would see the first one's data.
+/**
+ * A module-scope client is one cache shared by every render in the process, so a second
+ * test render would see the first one's data.
+ */
 export const createAppClients = (): AppClients => ({
   queryClient: createQueryClient(),
   apiClient: createApiClient(),

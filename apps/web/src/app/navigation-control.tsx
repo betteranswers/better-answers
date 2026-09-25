@@ -9,6 +9,10 @@ import { SecondaryNav } from "./secondary-nav.tsx";
 
 const SCREENS_AND_VIEWS = "Screens and views";
 
+/**
+ * The corner the navigation is governed from: a sheet's trigger when narrow, the secondary nav's
+ * toggle when wide. `controls` is that nav's id.
+ */
 export function NavigationControl(properties: {
   readonly wide: boolean;
   readonly showing: boolean;

@@ -30,7 +30,7 @@ import { UnbuiltView } from "./views/unbuilt-view.tsx";
 
 type BuiltView = { readonly draw: () => ReactElement; readonly toolbar?: ViewToolbar };
 
-// The list decides which views are built; this map only says by what, and with what in hand.
+/** The list decides which views are built; this map only says by what, and with what in hand. */
 const BUILT_VIEWS = new Map<View["path"], BuiltView>([
   ["/sources/bindings", { draw: BindingsView, toolbar: BINDINGS_TOOLBAR }],
   ["/system/routes-and-spend", { draw: RoutesAndSpendView, toolbar: ROUTES_AND_SPEND_TOOLBAR }],
@@ -154,7 +154,7 @@ declare module "@tanstack/react-router" {
     router: ReturnType<typeof createAppRouter>;
   }
 
-  // The route is how a view's toolbar reaches the shell: props down, never an import up.
+  /** The route is how a view's toolbar reaches the shell: props down, never an import up. */
   interface StaticDataRouteOption {
     readonly toolbar?: ViewToolbar | undefined;
   }
