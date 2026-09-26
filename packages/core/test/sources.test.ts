@@ -391,6 +391,20 @@ describe("an Admin binds an upload", () => {
     expect(bound.ok).toEqual(true);
   });
 
+  it.each([
+    ["more", HANDBOOK_BYTES * 1000],
+    ["fewer", 1],
+  ])("records the size streamed, not %s bytes declared", async (_case, byteSize) => {
+    const scenario = await arrange();
+    const { input } = handbookOffered({ byteSize });
+
+    const bound = await bindUpload(scenario.admin, doorsOf(scenario), input);
+    if (!bound.ok) throw new Error(`the bind was refused: ${String(bound.error)}`);
+
+    const row = await documentRowOf(db().pool, scenario.workspaceId, bound.value.documentId);
+    expect(row?.byte_size).toEqual(HANDBOOK_BYTES);
+  });
+
   it("refuses a body past the cap, whatever its declared size", async () => {
     const scenario = await arrange();
     const asked = handbookAsked();

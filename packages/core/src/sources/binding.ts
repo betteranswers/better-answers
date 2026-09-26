@@ -214,6 +214,7 @@ const inTransaction = async <T>(
 type CappedBody = {
   readonly body: ReadableStream<Uint8Array>;
   readonly passedTheCap: () => boolean;
+  readonly bytesStreamed: () => number;
 };
 
 const cappedAt = (body: ReadableStream<Uint8Array>): CappedBody => {
@@ -233,6 +234,7 @@ const cappedAt = (body: ReadableStream<Uint8Array>): CappedBody => {
       }),
     ),
     passedTheCap: () => counted.passed,
+    bytesStreamed: () => counted.bytes,
   };
 };
 
@@ -289,7 +291,7 @@ const storeOriginal = async (
   objects: ObjectDoor,
   originalKey: string,
   body: ReadableStream<Uint8Array>,
-): Promise<Result<undefined, SourceRefusal<"too-large">>> => {
+): Promise<Result<number, SourceRefusal<"too-large">>> => {
   const capped = cappedAt(body);
   const put = await attempt(() => putObject(admin, objects, originalKey, capped.body));
   if (!put.ok) {
@@ -299,13 +301,13 @@ const storeOriginal = async (
   if (!put.value.ok) {
     throw new Error(`sources: the original's key was refused (${put.value.error})`);
   }
-  return ok(undefined);
+  return ok(capped.bytesStreamed());
 };
 
 /**
  * Once the first bind commits, a repeat returns its outcome and reads no byte. A concurrent repeat
  * that loses the insert returns it too, its own object left to the upload sweep. `too-large`
- * answers a declared size or streamed body over the cap.
+ * answers a declared size or streamed body over the cap; the document records the size streamed.
  */
 export const bindUpload = async (
   principal: UserPrincipal,
@@ -336,6 +338,7 @@ export const bindUpload = async (
 
   const stored = await storeOriginal(admin.value, doors.objects, originalKey, input.body);
   if (!stored.ok) return err(stored.error);
+  const bytesStreamed = stored.value;
 
   return inTransaction(principal, doors.postgres, async (fresh, tx) => {
     const landed = await tx.query(INSERT_BINDING, [
@@ -361,7 +364,7 @@ export const bindUpload = async (
       input.fileName,
       input.fileName,
       input.mediaType,
-      input.byteSize,
+      bytesStreamed,
       originalKey,
     ]);
     await record(fresh, tx, {
