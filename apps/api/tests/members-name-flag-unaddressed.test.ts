@@ -5,7 +5,7 @@ import { webSignedIn } from "./web-client.ts";
 
 let app: TestApp;
 
-// A file of its own: the harness names each app's database after the running file.
+// A file of its own: the harness names the api's database after the running file.
 beforeAll(async () => {
   app = await startApp({ operatorAddress: null });
 });
