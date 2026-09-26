@@ -118,7 +118,7 @@ function CreateGroupForm(properties: {
 }) {
   const { fieldRef, onAsked, onCreated, onRefused } = properties;
   const createGroup = useCreateGroup();
-  const ids = { field: useId(), hint: useId() };
+  const fieldId = useId();
 
   // Never disabled: the field keeps the name and focus while the answer comes back.
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -146,22 +146,18 @@ function CreateGroupForm(properties: {
       className="flex flex-wrap items-end gap-2 border-b border-border p-3"
     >
       <div className="grid gap-1.5">
-        <Label htmlFor={ids.field}>Name of a new group</Label>
+        <Label htmlFor={fieldId}>Name of a new group</Label>
         <Input
           ref={fieldRef}
-          id={ids.field}
+          id={fieldId}
           name="name"
           required
           autoComplete="off"
           aria-keyshortcuts={CREATE_KEYSTROKE.key}
-          aria-describedby={ids.hint}
           className="w-64"
         />
       </div>
       <Button type="submit">Create the group</Button>
-      <p id={ids.hint} className="w-full text-sm text-muted-foreground">
-        A binding&rsquo;s audience can name the group.
-      </p>
     </form>
   );
 }

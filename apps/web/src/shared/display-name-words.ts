@@ -16,14 +16,14 @@ export const DISPLAY_NAME_WORDS = {
 export const DISPLAY_NAME_REFUSED = {
   "display-name-empty": {
     why: "A display name needs a character other than a space.",
-    next: "Type the name you want to be credited by.",
+    next: "Type the name you want others to see.",
   },
   "display-name-not-one-line": {
     why: "A display name is one line.",
     next: "Remove the line break and save again.",
   },
   "display-name-control-character": {
-    why: "A display name cannot hold a control character, such as a tab.",
+    why: "A display name cannot hold a special character, such as a tab.",
     next: "Type it again rather than pasting it.",
   },
   "display-name-angle-bracket": {

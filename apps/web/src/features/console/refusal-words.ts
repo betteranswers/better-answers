@@ -48,7 +48,7 @@ export const SAID_OF_CORRECTING = {
   ...DISPLAY_NAME_REFUSED,
   "display-name-empty": {
     why: DISPLAY_NAME_REFUSED["display-name-empty"].why,
-    next: "Type the name they are to be credited by.",
+    next: "Type the name others are to see them by.",
   },
   [SIGN_IN_TOO_OLD]: {
     why: "Your sign-in is more than an hour old, and correcting a name needs one from the last hour.",
