@@ -404,7 +404,7 @@ describe("the audit log's unique pair", () => {
   it("is a target for a later composite foreign key", async () => {
     await withAuditEventRow(async (client, id) => {
       await client.query(
-        `CREATE TABLE keyed_to_the_ledger (
+        `CREATE TABLE keyed_to_the_audit_log (
            workspace_id text NOT NULL,
            audit_event_id text NOT NULL,
            FOREIGN KEY (workspace_id, audit_event_id) REFERENCES audit_event (workspace_id, id)
@@ -416,7 +416,7 @@ describe("the audit log's unique pair", () => {
         unnamed: await attemptRowKeyedToTheAuditLog(client, WORKSPACE, ulid()),
       }).toEqual({
         named: ADMITTED,
-        unnamed: "keyed_to_the_ledger_workspace_id_audit_event_id_fkey",
+        unnamed: "keyed_to_the_audit_log_workspace_id_audit_event_id_fkey",
       });
     });
   });

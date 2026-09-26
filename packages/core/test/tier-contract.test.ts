@@ -153,7 +153,7 @@ const brokenContracts = {
     "empty-handed": { form: "fixtured" },
     "missing-file": { form: "fixtured" },
     astray: { form: "fixtured" },
-    ledger: { form: "generated" },
+    hollow: { form: "generated" },
     rows: { form: "generated" },
     routing: { form: "sql-function" },
     hearsay: { form: "spoken" },
@@ -226,7 +226,7 @@ describe("the tier contract", () => {
       "astray declares fixtured and lists shape/cases.json, which is not under astray/",
       "empty-handed declares fixtured and the manifest lists no fixture under it",
       "hearsay declares spoken, a form this check does not know",
-      "ledger declares generated and has no golden rows on disk",
+      "hollow declares generated and has no golden rows on disk",
       "missing-file declares fixtured and lists missing-file/cases.json, which is not on disk",
       "orphan is a directory under contracts/ that no agreement claims",
     ]);

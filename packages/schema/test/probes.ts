@@ -233,10 +233,10 @@ export const attemptRowKeyedToTheAuditLog = (
   auditEventId: string,
 ): Promise<string> =>
   refusalOf(client, () =>
-    client.query("INSERT INTO keyed_to_the_ledger (workspace_id, audit_event_id) VALUES ($1, $2)", [
-      workspaceId,
-      auditEventId,
-    ]),
+    client.query(
+      "INSERT INTO keyed_to_the_audit_log (workspace_id, audit_event_id) VALUES ($1, $2)",
+      [workspaceId, auditEventId],
+    ),
   );
 
 export const attemptAuditEventRowReusingAnId = (

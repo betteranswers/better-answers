@@ -17,7 +17,7 @@ C4Deployment
 
   Deployment_Node(vpc1, "VPC 1 — production", "IONOS VPS, 4 GB, 4 GB swap file, Coolify-managed over SSH", "Everything production, every service with a memory limit") {
     Deployment_Node(pgnode, "Postgres resource", "Coolify database resource, 1 GB, shared_buffers 512 MB", "Its own lifecycle and a second backup writer") {
-      ContainerDb(postgres, "Postgres", "pgvector on Postgres 18, pinned by digest", "The identity set, the tenant tables, the graph, the queue, the ledger")
+      ContainerDb(postgres, "Postgres", "pgvector on Postgres 18, pinned by digest", "The identity set, the tenant tables, the graph, the queue, the audit log")
     }
     Deployment_Node(stores, "stores stack", "docker compose, redeployed for a store's upgrade only", "init, objectstore, cloudflared, backup; the backup image's digest set here from build.yml's run summary") {
       Container(init, "init", "alpine, one-shot", "Owns every /data directory by uid; never root")
