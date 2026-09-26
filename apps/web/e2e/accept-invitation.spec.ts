@@ -88,7 +88,7 @@ test("an invited newcomer signs in, gives a name, and joins", async ({
   await expect(bar.getByRole("button", { name: /Priya Shah/ })).toContainText("Editor");
 });
 
-test("reads the invitation within a second, and joins by keyboard", async ({ page, request }) => {
+test("a named invitee reads it within a second, joins by keyboard", async ({ page, request }) => {
   const { address, link } = await anInvitation(request, "Ryedale Metalwork", "Viewer");
   await person(request, address, { displayName: "Sam Okoro" });
   await page.goto(link);
@@ -113,7 +113,7 @@ test("reads the invitation within a second, and joins by keyboard", async ({ pag
   await expect(page.getByRole("banner").getByText("Ryedale Metalwork")).toBeVisible();
 });
 
-test("refuses another address, offering sign-in with the invited one", async ({
+test("refuses a person at another address, offering the invited one", async ({
   page,
   request,
   passesTheAccessibilityGate,
@@ -145,14 +145,18 @@ test("refuses another address, offering sign-in with the invited one", async ({
   await expect(page.getByRole("main")).not.toContainText("Brightwater Estimating");
   await passesTheAccessibilityGate();
 
-  await page.getByRole("button", { name: "Sign in with another address" }).click();
+  const keystrokes = await keystrokesListed(page, "this screen");
+  await expect(keystrokes).toContainText("Sign in with another address");
+  await page.keyboard.press("Escape");
+  await expect(keystrokes).toBeHidden();
+  await page.keyboard.press("s");
   await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
   await signIn(page, request, address);
 
   await expect(acceptHeading(page, "Brightwater Estimating")).toBeVisible();
 });
 
-test("refuses a link naming no invitation, in its own word", async ({ page, request }) => {
+test("tells a named person a stray link names no invitation", async ({ page, request }) => {
   const address = anAddress("stray");
   await person(request, address, { displayName: "Una Price" });
 

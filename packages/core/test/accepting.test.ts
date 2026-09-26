@@ -69,7 +69,7 @@ const statusOf = async (invitationId: string) =>
     ])
   ).rows[0]?.status;
 
-describe("accepting an invitation at once, twice", () => {
+describe("accepting an invitation", () => {
   it("leaves one membership; the second answers already-a-member", async () => {
     const { workspace, personId, invitationId } = await anInvitation("Twice");
 
@@ -95,9 +95,6 @@ describe("accepting an invitation at once, twice", () => {
     expect(await membersOf(workspace.workspaceId, personId)).toEqual([{ role: "Editor" }]);
     expect(await joinedEvents(personId)).toHaveLength(1);
   });
-});
-
-describe("an accept racing a membership made elsewhere", () => {
   it("answers already-a-member from the index, landing nothing", async () => {
     const { workspace, personId, invitationId } = await anInvitation("Raced");
 

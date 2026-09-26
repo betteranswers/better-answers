@@ -13,7 +13,7 @@ import { z } from "zod";
 import { useTRPC } from "@/shared/api/trpc.ts";
 
 import { authClient } from "./auth-client.ts";
-import { nextAfterSignIn } from "./carried-flow.ts";
+import { backTo, nextAfterSignIn } from "./carried-flow.ts";
 import { forgetMembership } from "./membership.ts";
 
 const AUTH_KEYS = {
@@ -90,10 +90,6 @@ export const displayNameDetour = async (
   if (session === null) return `/sign-in${query}`;
   return hasADisplayName(session.user.name) ? nextAfterSignIn(query) : undefined;
 };
-
-/** `/sign-in` or `/display-name`, asked to come back to `path` once the person has done it there. */
-const backTo = (screen: string, path: string): string =>
-  `${screen}?redirect=${encodeURIComponent(path)}`;
 
 /** The accept page asks only a person signed in and named. Undefined means the page draws. */
 export const acceptDetour = async (

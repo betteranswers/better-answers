@@ -11,4 +11,4 @@ export const ROLE_MEANINGS = {
 
 export const roleOf = (word: string): Role | undefined => ROLES.find((role) => role === word);
 
-export const aRole = (role: Role): string => `${role === "Viewer" ? "a" : "an"} ${role}`;
+export { aRole } from "@/shared/role-words.ts";

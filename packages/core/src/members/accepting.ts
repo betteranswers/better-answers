@@ -73,7 +73,7 @@ type Held = { readonly invitation: HeldInvitation; readonly invitee: Invitee };
 
 type Asked = { readonly invitationId: InvitationId; readonly personId: UserId; readonly now: Date };
 
-const HOLDING = {
+const LOCKING = {
   read: "",
   lock: "FOR UPDATE OF i",
 } as const;
@@ -81,7 +81,7 @@ const HOLDING = {
 const invitationHeld = async (
   tx: Tx,
   invitationId: InvitationId,
-  holding: keyof typeof HOLDING,
+  locking: keyof typeof LOCKING,
 ): Promise<HeldInvitation | undefined> => {
   const found = await tx.query(
     `SELECT i.workspace_id AS "workspaceId", i.email AS address, i.role, i.status,
@@ -90,7 +90,7 @@ const invitationHeld = async (
        JOIN workspace w ON w.id = i.workspace_id
        JOIN "user" inviter ON inviter.id = i.inviter_id
       WHERE i.id = $1
-      ${HOLDING[holding]}`,
+      ${LOCKING[locking]}`,
     [invitationId],
   );
   const [row] = found.rows;
@@ -117,7 +117,7 @@ const inviteeOf = async (
  * The address is judged first, so a person holding another's link learns nothing of the
  * invitation's state.
  */
-const refusalOf = (
+const refusalAgainst = (
   { invitation, invitee }: Held,
   now: Date,
 ): AcceptInvitationRefusal | undefined => {
@@ -133,13 +133,13 @@ const refusalOf = (
 const judged = async (
   tx: Tx,
   asked: Asked,
-  holding: keyof typeof HOLDING,
+  locking: keyof typeof LOCKING,
 ): Promise<Result<Held, AcceptInvitationRefusal>> => {
-  const invitation = await invitationHeld(tx, asked.invitationId, holding);
+  const invitation = await invitationHeld(tx, asked.invitationId, locking);
   if (invitation === undefined) return err("no-such-invitation");
   const invitee = await inviteeOf(tx, asked.personId, invitation.workspaceId);
   if (invitee === undefined) return err("person-gone");
-  const refused = refusalOf({ invitation, invitee }, asked.now);
+  const refused = refusalAgainst({ invitation, invitee }, asked.now);
   return refused === undefined ? ok({ invitation, invitee }) : err(refused);
 };
 
@@ -241,6 +241,8 @@ const join = async (
     "INSERT INTO member (id, workspace_id, user_id, role, created_at) VALUES ($1, $2, $3, $4, now())",
     [ulid(), workspaceId, joining.personId, role],
   );
+  // A session ended meanwhile matches no row: the membership still stands, and the next sign-in
+  // finds it.
   await tx.query(
     `UPDATE session SET active_workspace_id = $1, updated_at = now()
       WHERE id = $2 AND user_id = $3`,

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import type { FormEvent, ReactNode } from "react";
+import type { inferOutput } from "@trpc/tanstack-react-query";
+import type { FormEvent } from "react";
 
 import {
   refusalOf,
@@ -10,16 +11,21 @@ import {
   type RefusalWord,
 } from "@/shared/api/trpc.ts";
 import { KeystrokesAct, useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
+import { aRole } from "@/shared/role-words.ts";
 import { SummaryRow } from "@/shared/summary-row.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { dayWords } from "@/shared/words.ts";
 
 import { useAcceptInvitation, useSession, useSignOut } from "./auth-hooks.ts";
 import { AuthScreen, Outcome, Refused, type Said } from "./auth-screen.tsx";
-import { leavingFor } from "./carried-flow.ts";
+import { backTo, leavingFor } from "./carried-flow.ts";
 import { SignOutButton } from "./sign-out-button.tsx";
 
+type Invitation = inferOutput<ReturnType<typeof useTRPC>["person"]["invitation"]>;
+
 const JOIN: Keystroke = { key: "j", act: "Join the workspace" };
+
+const READ_AGAIN: Keystroke = { key: "r", act: "Read the invitation again" };
 
 const SCREEN = "this screen";
 
@@ -31,80 +37,119 @@ const READ_REFUSED = "invitation-refused";
 
 const JOIN_REFUSED = "join-refused";
 
-const SAID_OF_WORD = {
+/** The one act a refusal leaves the person: a screen to go to, from the path of this page. */
+type WayOn = {
+  readonly keystroke: Keystroke;
+  readonly to: (here: string) => string;
+
+  /** Signed out first, so the sign-in screen can take another address and come back here. */
+  readonly signingOutFirst?: true;
+};
+
+type Answer = { readonly said: Said; readonly way?: WayOn };
+
+const ANSWER_OF_WORD = {
   "no-such-invitation": {
-    why: "No invitation stands at this link: it was cancelled, replaced by a newer one, or never sent.",
-    next: "Ask the Admin who invited you to send a new one.",
+    said: {
+      why: "No invitation stands at this link: it was cancelled, replaced by a newer one, or never sent.",
+      next: "Ask the Admin who invited you to send a new one.",
+    },
   },
   "invitation-expired": {
-    why: "This invitation has expired.",
-    next: "Ask the Admin who invited you to send it again.",
+    said: {
+      why: "This invitation has expired.",
+      next: "Ask the Admin who invited you to send it again.",
+    },
   },
   "invitation-for-another-address": {
-    why: "This invitation was sent to another email address than the one you are signed in with.",
-    next: "Sign in with the address it was sent to.",
+    said: {
+      why: "This invitation was sent to another email address than the one you are signed in with.",
+      next: "Sign in with the address it was sent to.",
+    },
+    way: {
+      keystroke: { key: "s", act: "Sign in with another address" },
+      to: (here) => here,
+      signingOutFirst: true,
+    },
   },
   "already-a-member": {
-    why: "You are already a member of this workspace.",
-    next: "Open it from your workspaces.",
+    said: {
+      why: "You are already a member of this workspace.",
+      next: "Open it from your workspaces.",
+    },
+    way: { keystroke: { key: "w", act: "Go to your workspaces" }, to: () => "/choose-workspace" },
   },
   "no-display-name": {
-    why: "A workspace credits its members by name, and you have not given one yet.",
-    next: "Give a display name, then join.",
+    said: {
+      why: "A workspace credits its members by name, and you have not given one yet.",
+      next: "Give a display name, then join.",
+    },
+    way: {
+      keystroke: { key: "d", act: "Give a display name" },
+      to: (here) => backTo("/display-name", here),
+    },
   },
-} satisfies Partial<Record<RefusalWord, Said>>;
+} satisfies Partial<Record<RefusalWord, Answer>>;
 
-const WORDS = new Map<string, Said>(Object.entries(SAID_OF_WORD));
+const ANSWERS = new Map<string, Answer>(Object.entries(ANSWER_OF_WORD));
 
 const REFUSED_OTHERWISE: Said = {
-  why: "The platform could not read this invitation link.",
+  why: "The platform could not read what this page sent.",
   next: "Open the link in the email again.",
 };
 
-const saidOf = (refusal: Refusal): Said => WORDS.get(refusal.word) ?? REFUSED_OTHERWISE;
+const saidOf = (refusal: Refusal): Said => ANSWERS.get(refusal.word)?.said ?? REFUSED_OTHERWISE;
 
-const aRole = (role: string): string => `${role === "Viewer" ? "a" : "an"} ${role}`;
+const wayOf = (failure: Error | ApiError | null): WayOn | undefined => {
+  const word = failure === null ? undefined : refusalOf(failure)?.word;
+  return word === undefined ? undefined : ANSWERS.get(word)?.way;
+};
 
-const displayNameThenBackTo = (here: string): string =>
-  `/display-name?redirect=${encodeURIComponent(here)}`;
-
-function SignInWithAnotherAddress(properties: { readonly here: string }) {
-  const { signOut, signingOut } = useSignOut(properties.here);
-  return (
-    <Button type="button" variant="outline" disabled={signingOut} onClick={signOut}>
-      Sign in with another address
-    </Button>
-  );
-}
-
-function GoTo(properties: { readonly href: string; readonly children: ReactNode }) {
+function WayOnAct(properties: { readonly way: WayOn; readonly here: string }) {
+  const { way, here } = properties;
   const navigate = useNavigate();
+  const { signOut, signingOut } = useSignOut(way.to(here));
+
+  const go = () => {
+    // Enabled while signing out, so the focus a click gave the button is not dropped.
+    if (signingOut) return;
+    if (way.signingOutFirst === true) signOut();
+    else void navigate(leavingFor(way.to(here)));
+  };
+  useKeystroke(way.keystroke, go);
+
   return (
     <Button
       type="button"
       variant="outline"
-      onClick={() => {
-        void navigate(leavingFor(properties.href));
-      }}
+      className="aria-disabled:opacity-50"
+      aria-disabled={signingOut}
+      aria-keyshortcuts={way.keystroke.key}
+      onClick={go}
     >
-      {properties.children}
+      {way.keystroke.act}
     </Button>
   );
 }
 
-/** The one act a refusal leaves the person, where there is one. */
-function WayOn(properties: { readonly failure: Error | ApiError; readonly here: string }) {
-  const word = refusalOf(properties.failure)?.word;
-  if (word === "invitation-for-another-address") {
-    return <SignInWithAnotherAddress here={properties.here} />;
-  }
-  if (word === "already-a-member") {
-    return <GoTo href="/choose-workspace">Go to your workspaces</GoTo>;
-  }
-  if (word === "no-display-name") {
-    return <GoTo href={displayNameThenBackTo(properties.here)}>Give a display name</GoTo>;
-  }
-  return null;
+function ReadAgain(properties: { readonly reading: boolean; readonly onReadAgain: () => void }) {
+  const readAgain = () => {
+    if (!properties.reading) properties.onReadAgain();
+  };
+  useKeystroke(READ_AGAIN, readAgain);
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      className="aria-disabled:opacity-50"
+      aria-disabled={properties.reading}
+      aria-keyshortcuts={READ_AGAIN.key}
+      onClick={readAgain}
+    >
+      {properties.reading ? "Reading" : "Try again"}
+    </Button>
+  );
 }
 
 function Leaving(properties: { readonly keystrokes: readonly Keystroke[] }) {
@@ -119,9 +164,12 @@ function Leaving(properties: { readonly keystrokes: readonly Keystroke[] }) {
 function InvitationUnread(properties: {
   readonly failure: Error | ApiError;
   readonly here: string;
-  readonly onRetry: () => void;
+  readonly reading: boolean;
+  readonly onReadAgain: () => void;
 }) {
   const unanswered = refusalOf(properties.failure) === undefined;
+  const way = wayOf(properties.failure);
+  const keystrokes = unanswered ? [READ_AGAIN] : way === undefined ? [] : [way.keystroke];
   return (
     <AuthScreen title={UNTITLED}>
       <Refused
@@ -133,24 +181,14 @@ function InvitationUnread(properties: {
       />
       <div className="mt-6 flex flex-wrap items-center gap-2">
         {unanswered ? (
-          <Button type="button" variant="outline" onClick={properties.onRetry}>
-            Try again
-          </Button>
-        ) : (
-          <WayOn failure={properties.failure} here={properties.here} />
-        )}
+          <ReadAgain reading={properties.reading} onReadAgain={properties.onReadAgain} />
+        ) : null}
+        {way === undefined ? null : <WayOnAct way={way} here={properties.here} />}
       </div>
-      <Leaving keystrokes={[]} />
+      <Leaving keystrokes={keystrokes} />
     </AuthScreen>
   );
 }
-
-type Invitation = {
-  readonly workspaceName: string;
-  readonly role: string;
-  readonly invitedBy: string;
-  readonly expiresAt: string;
-};
 
 function InvitationToJoin(properties: {
   readonly invitationId: string;
@@ -160,6 +198,7 @@ function InvitationToJoin(properties: {
   const { invitation } = properties;
   const address = useSession().data?.user.email;
   const accept = useAcceptInvitation();
+  const way = wayOf(accept.error);
 
   const join = () => {
     // The button stays enabled while joining, so the focus a click gave it is not dropped.
@@ -202,21 +241,21 @@ function InvitationToJoin(properties: {
       </form>
 
       {accept.error === null ? null : (
-        <>
-          <Refused
-            id={JOIN_REFUSED}
-            failure={accept.error}
-            saidOf={saidOf}
-            unanswered="The platform did not answer, so you have not joined. Try again in a moment."
-            signInAt={properties.here}
-          />
-          <div className="mt-4">
-            <WayOn failure={accept.error} here={properties.here} />
-          </div>
-        </>
+        <Refused
+          id={JOIN_REFUSED}
+          failure={accept.error}
+          saidOf={saidOf}
+          unanswered="The platform did not answer, so you have not joined. Try again in a moment."
+          signInAt={properties.here}
+        />
+      )}
+      {way === undefined ? null : (
+        <div className="mt-4">
+          <WayOnAct way={way} here={properties.here} />
+        </div>
       )}
 
-      <Leaving keystrokes={[JOIN]} />
+      <Leaving keystrokes={way === undefined ? [JOIN] : [JOIN, way.keystroke]} />
     </AuthScreen>
   );
 }
@@ -243,7 +282,8 @@ export function AcceptInvitationScreen(properties: { readonly invitationId: stri
       <InvitationUnread
         failure={invitation.error}
         here={here}
-        onRetry={() => {
+        reading={invitation.isFetching}
+        onReadAgain={() => {
           void invitation.refetch();
         }}
       />

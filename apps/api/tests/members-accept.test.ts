@@ -185,7 +185,7 @@ describe("accepting an invitation over tRPC", () => {
   });
 });
 
-describe("an accept that is refused", () => {
+describe("refusing an accept over tRPC", () => {
   it("refuses a person signed in with another address", async () => {
     const { admin, invitationId, address } = await anInvitee();
     const other = anAddress("other");
@@ -298,7 +298,7 @@ describe("an accept that is refused", () => {
   });
 });
 
-describe("an accept whose commit fails", () => {
+describe("a failed accept over tRPC", () => {
   it("lands no member, no event, and no workspace pick", async () => {
     const { admin, api, address, invitationId } = await anInvitee();
 

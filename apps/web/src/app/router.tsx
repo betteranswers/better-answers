@@ -12,7 +12,7 @@ import type { ReactElement } from "react";
 
 import { AcceptInvitationScreen } from "@/features/auth/accept-invitation-screen.tsx";
 import { acceptDetour, displayNameDetour } from "@/features/auth/auth-hooks.ts";
-import { leavingFor, pageQuery } from "@/features/auth/carried-flow.ts";
+import { backTo, leavingFor, pageQuery } from "@/features/auth/carried-flow.ts";
 import { ChooseWorkspaceScreen } from "@/features/auth/choose-workspace-screen.tsx";
 import { DisplayNameScreen } from "@/features/auth/display-name-screen.tsx";
 import { membershipRefusal, NEEDS_A_PICK } from "@/features/auth/membership.ts";
@@ -103,10 +103,7 @@ const acceptInvitationRoute = createRoute({
   },
 });
 
-const signInAndBackTo = (href: string) => ({
-  href: `/sign-in?redirect=${encodeURIComponent(href)}`,
-  replace: true,
-});
+const signInAndBackTo = (href: string) => ({ href: backTo("/sign-in", href), replace: true });
 
 const shellRoute = createRoute({
   getParentRoute: () => rootRoute,
