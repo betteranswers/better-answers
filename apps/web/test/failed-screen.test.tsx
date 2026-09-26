@@ -3,8 +3,10 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FailedScreen } from "@/app/failed-screen.tsx";
-import { createAppClients } from "@/app/providers.tsx";
+import { createAppClients, Providers } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
+import { FAILED_SCREEN, goHome, UNKNOWN_SCREEN } from "@/app/words.ts";
+import { screenById } from "@/shared/screens.ts";
 
 import { openApp } from "./open-app.tsx";
 
@@ -61,14 +63,14 @@ describe("a screen that throws", () => {
     expect(screen.getByRole("main").contains(screen.getByRole("alert"))).toBe(true);
   });
 
-  it("says the screen could not be shown, as an alert", async () => {
+  it("says the screen did not load, as an alert", async () => {
     await openSystemWithABrokenRead();
 
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
-      "This screen could not be shown",
+    const alert = screen.getByRole("alert");
+    expect(within(alert).getByRole("heading", { level: 1 }).textContent).toBe(
+      FAILED_SCREEN.heading,
     );
-
-    expect(screen.getByRole("alert").textContent).toContain("failed while it was being drawn");
+    expect(alert.textContent).toContain(FAILED_SCREEN.said);
   });
 
   it("shows no message, name or stack from what threw", async () => {
@@ -86,7 +88,7 @@ describe("a screen that throws", () => {
   it("offers the two ways out as controls a keyboard reaches", async () => {
     await openSystemWithABrokenRead();
 
-    const again = screen.getByRole("button", { name: "Try this screen again" });
+    const again = screen.getByRole("button", { name: FAILED_SCREEN.retry });
 
     expect(again.tagName).toBe("BUTTON");
     expect(again.getAttribute("tabindex")).toBeNull();
@@ -94,8 +96,16 @@ describe("a screen that throws", () => {
     again.focus();
     expect(document.activeElement).toBe(again);
 
-    const away = screen.getByRole("link", { name: "Go to System" });
-    expect(away.getAttribute("href")).toBe("/system");
+    const away = await screen.findByRole("link", { name: goHome(screenById("people")) });
+    expect(away.getAttribute("href")).toBe("/people");
+  });
+
+  it("offers no way home to a reader whose home failed", async () => {
+    vi.stubGlobal("fetch", answerTrpc);
+    await openApp("/people");
+
+    expect(await screen.findByRole("button", { name: FAILED_SCREEN.retry })).toBeDefined();
+    expect(within(screen.getByRole("main")).queryAllByRole("link")).toEqual([]);
   });
 
   it("draws the screen again when the reader asks for it", () => {
@@ -105,26 +115,24 @@ describe("a screen that throws", () => {
       return <p>The screen drew.</p>;
     };
 
-    const router = createAppRouter(
-      createAppClients(),
-      createMemoryHistory({ initialEntries: ["/system"] }),
-    );
+    const clients = createAppClients();
+    const router = createAppRouter(clients, createMemoryHistory({ initialEntries: ["/system"] }));
     render(
-      <RouterContextProvider router={router}>
-        <CatchBoundary getResetKey={() => "the reader's own retry"} errorComponent={FailedScreen}>
-          <DrawsWhenItCan />
-        </CatchBoundary>
-      </RouterContextProvider>,
+      <Providers clients={clients}>
+        <RouterContextProvider router={router}>
+          <CatchBoundary getResetKey={() => "the reader's own retry"} errorComponent={FailedScreen}>
+            <DrawsWhenItCan />
+          </CatchBoundary>
+        </RouterContextProvider>
+      </Providers>,
     );
 
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
-      "This screen could not be shown",
-    );
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(FAILED_SCREEN.heading);
 
     broken = false;
     expect(screen.queryByText("The screen drew.")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Try this screen again" }));
+    fireEvent.click(screen.getByRole("button", { name: FAILED_SCREEN.retry }));
 
     expect(screen.getByText("The screen drew.")).toBeDefined();
     expect(screen.queryByRole("alert")).toBeNull();
@@ -135,6 +143,6 @@ describe("a screen that throws", () => {
 
     await openApp("/not-a-screen");
 
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("No such screen");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(UNKNOWN_SCREEN.heading);
   });
 });

@@ -1,33 +1,28 @@
-import { Link } from "@tanstack/react-router";
-
 import { CONTROL_CENTRE, type Surface } from "@/shared/screens.ts";
 import { Button } from "@/shared/ui/button.tsx";
+
+import { GoHome } from "./go-home.tsx";
+import { FAILED_SCREEN } from "./words.ts";
 
 export function FailedScreen(properties: {
   readonly reset: () => void;
   readonly surface?: Surface;
 }) {
-  const surface = properties.surface ?? CONTROL_CENTRE;
-
   return (
     <>
-      <h1>This screen could not be shown</h1>
-      <p role="alert" className="mt-2 text-muted-foreground">
-        Something in it failed while it was being drawn. The rest of {surface.nameInProse} is still
-        here, and the other screens can be read as usual.
-      </p>
+      {/* The heading is what happened, so the alert carries it to a screen reader too. */}
+      <div role="alert">
+        <h1>{FAILED_SCREEN.heading}</h1>
+        <p className="mt-2 text-muted-foreground">{FAILED_SCREEN.said}</p>
+      </div>
 
       <p className="mt-6">
         <Button type="button" onClick={properties.reset}>
-          Try this screen again
+          {FAILED_SCREEN.retry}
         </Button>
       </p>
 
-      <p className="mt-4">
-        <Link to={surface.home.path} className="text-brand underline">
-          Go to {surface.home.name}
-        </Link>
-      </p>
+      <GoHome surface={properties.surface ?? CONTROL_CENTRE} className="mt-4" />
     </>
   );
 }

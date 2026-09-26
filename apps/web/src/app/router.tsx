@@ -15,7 +15,7 @@ import { acceptDetour, displayNameDetour } from "@/features/auth/auth-hooks.ts";
 import { backTo, leavingFor, pageQuery } from "@/features/auth/carried-flow.ts";
 import { ChooseWorkspaceScreen } from "@/features/auth/choose-workspace-screen.tsx";
 import { DisplayNameScreen } from "@/features/auth/display-name-screen.tsx";
-import { membershipRefusal, NEEDS_A_PICK } from "@/features/auth/membership.ts";
+import { membershipRefusal, NEEDS_A_PICK, roleHeld } from "@/features/auth/membership.ts";
 import { NoWorkspaceScreen } from "@/features/auth/no-workspace-screen.tsx";
 import { SignInScreen } from "@/features/auth/sign-in-screen.tsx";
 import { EVERYONE_TOOLBAR, EveryoneView } from "@/features/console/everyone-view.tsx";
@@ -131,8 +131,10 @@ const shellRoute = createRoute({
 const indexRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: "/",
-  beforeLoad: () => {
-    throw redirect({ href: CONTROL_CENTRE.home.path, replace: true });
+  beforeLoad: ({ context }) => {
+    // A read that failed leaves the role unknown, and every role reaches a Viewer's home.
+    const role = roleHeld(context.queryClient, context.api) ?? "Viewer";
+    throw redirect({ href: CONTROL_CENTRE.homes[role].path, replace: true });
   },
 });
 

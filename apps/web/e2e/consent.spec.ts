@@ -7,6 +7,7 @@ import {
   catchClaudesRedirect,
   CLAUDES_REDIRECT_URI,
   claudesAuthorizeUrl,
+  landedAtHome,
   person,
   provision,
   revokeCredentials,
@@ -42,7 +43,7 @@ test("carries sign-in through consent to Claude's code on one origin", async ({
 
   await page.goto("/sign-in");
   await signIn(page, request, email);
-  await expect(page).toHaveURL(/\/system\/routes-and-spend$/);
+  await landedAtHome(page, "Admin");
 
   await page.goto(claudesAuthorizeUrl(origin, { prompt: "consent" }));
 

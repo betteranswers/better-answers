@@ -1,3 +1,6 @@
+import { FAILED_SCREEN, goHome, UNBUILT_VIEW } from "@/app/words.ts";
+import { CONTROL_CENTRE } from "@/shared/screens.ts";
+
 import { expect, test } from "./browser.ts";
 import { anAddress, provision, seedRoutes, signIn, skipLinkReachesTheScreen } from "./harness.ts";
 
@@ -40,10 +43,10 @@ test("offers a way out, shell intact, when a view throws", async ({
   await signIn(page, request, email);
   await page.goto("/system");
 
-  await expect(
-    page.getByRole("heading", { level: 1, name: "This screen could not be shown" }),
-  ).toBeVisible();
-  await expect(page.getByRole("alert")).toContainText("failed while it was being drawn");
+  await expect(page.getByRole("heading", { level: 1, name: FAILED_SCREEN.heading })).toBeVisible();
+  await expect(page.getByRole("alert")).toContainText(FAILED_SCREEN.said);
+  const home = CONTROL_CENTRE.homes.Admin;
+  await expect(page.getByRole("link", { name: goHome(home) })).toHaveAttribute("href", home.path);
   const everything = page.locator("body");
   await expect(everything).not.toContainText("TypeError");
   await expect(everything).not.toContainText("is not a function");
@@ -60,7 +63,7 @@ test("offers a way out, shell intact, when a view throws", async ({
   await page.keyboard.press("Tab");
   await expect(page.getByRole("tabpanel")).toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("button", { name: "Try this screen again" })).toBeFocused();
+  await expect(page.getByRole("button", { name: FAILED_SCREEN.retry })).toBeFocused();
 
   await passesTheAccessibilityGate();
 
@@ -73,7 +76,7 @@ test("offers a way out, shell intact, when a view throws", async ({
   /* jscpd:ignore-start */
   await navigation.getByRole("link", { name: "Knowledge" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Knowledge" })).toBeVisible();
-  await expect(page.getByText("This view is not built yet.")).toBeVisible();
+  await expect(page.getByText(UNBUILT_VIEW)).toBeVisible();
   /* jscpd:ignore-end */
   await expect(page.getByRole("alert")).toHaveCount(0);
 });

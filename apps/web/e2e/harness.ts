@@ -5,6 +5,8 @@ import { z } from "zod";
 
 import type { REDACTION_TIERS, SENSITIVITIES } from "@better-answers/schema";
 
+import { CONTROL_CENTRE, type Role } from "@/shared/screens.ts";
+
 const HARNESS = "/__harness";
 
 const aPerson = z.object({ id: z.string(), email: z.string(), name: z.string() });
@@ -379,7 +381,14 @@ export const keystrokesDismissed = async (page: Page, listed: Locator): Promise<
   await expect(page.getByRole("button", { name: "Keystrokes", exact: true })).toBeFocused();
 };
 
-/** From the sign-in screen to Control Centre's home, as a member of one workspace arrives. */
+/** Read off the screen list, so moving a role's home breaks no spec. */
+export const landedAtHome = async (page: Page, role: Role): Promise<void> => {
+  const home = CONTROL_CENTRE.homes[role];
+  await expect(page).toHaveURL(new RegExp(`${home.defaultView}$`));
+  await expect(page.getByRole("heading", { level: 1, name: home.name })).toBeVisible();
+};
+
+/** From the sign-in screen to an Admin's home, as the Admin of one workspace arrives. */
 export const signedInAtHome = async (
   page: Page,
   api: APIRequestContext,
@@ -387,7 +396,7 @@ export const signedInAtHome = async (
 ): Promise<void> => {
   await page.goto("/sign-in");
   await signIn(page, api, email);
-  await expect(page.getByRole("heading", { level: 1, name: "System" })).toBeVisible();
+  await landedAtHome(page, "Admin");
 };
 
 const ACT_BUDGET_MS = 100;

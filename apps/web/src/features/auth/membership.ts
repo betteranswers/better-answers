@@ -11,6 +11,15 @@ export const useMembership = () => {
   return useQuery(membershipOptions(api));
 };
 
+export const useRole = () => {
+  const api = useTRPC();
+  return useQuery({ ...membershipOptions(api), select: (held) => held.role }).data;
+};
+
+/** Read after the shell's own read, which left no answer when it failed. */
+export const roleHeld = (queryClient: QueryClient, api: ApiProxy) =>
+  queryClient.getQueryData(membershipOptions(api).queryKey)?.role;
+
 /** Only a class the reader can answer by signing in again sends them to the sign-in screen. */
 const wordSendingThemToSignIn = (error: Error): RefusalWord | undefined => {
   const refusal = refusalOf(error);

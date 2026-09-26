@@ -4,11 +4,13 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { createAppClients } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
+import { goHome, UNBUILT_VIEW, unbuiltLineOf, UNKNOWN_SCREEN } from "@/app/words.ts";
 import {
   CONSOLE,
   CONSOLE_SCREENS,
   CONTROL_CENTRE,
   SCREENS,
+  screenById,
   viewsOf,
   type Screen,
 } from "@/shared/screens.ts";
@@ -119,11 +121,19 @@ describe("Control Centre's three-region shell", () => {
     const unbuilt: string[] = [];
     for (const each of SCREENS) {
       const { unmount } = await openAt(each.path);
-      if (screen.queryByText("This view is not built yet.") !== null) unbuilt.push(each.name);
+      if (screen.queryByText(unbuiltLineOf(each)) !== null) unbuilt.push(each.name);
       unmount();
     }
 
     expect(unbuilt).toEqual(["Suggestions", "Knowledge", "Questions"]);
+  });
+
+  it("tells a Questions reader what they will do there", async () => {
+    const questions = screenById("questions");
+    await openAt(questions.path);
+
+    expect(unbuiltLineOf(questions)).not.toBe(UNBUILT_VIEW);
+    expect(screen.getByText(unbuiltLineOf(questions))).toBeDefined();
   });
 
   it("gives System the routes card and calls the rest unbuilt", async () => {
@@ -134,16 +144,22 @@ describe("Control Centre's three-region shell", () => {
     expect(screen.getByText(/The rest of System/)).toBeDefined();
   });
 
-  it("shows No such screen for an unknown address", async () => {
+  it("says an unknown address names no screen", async () => {
     await openAt("/not-a-screen");
 
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("No such screen");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(UNKNOWN_SCREEN.heading);
   });
 
-  it("says No such screen for an unknown view, regions kept", async () => {
+  it("sends a reader of unknown role home by the index", async () => {
+    await openAt("/not-a-screen");
+
+    expect(screen.getByRole("link", { name: goHome(undefined) }).getAttribute("href")).toBe("/");
+  });
+
+  it("says an unknown view names no screen, regions kept", async () => {
     await openAt("/system/not-a-view");
 
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("No such screen");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(UNKNOWN_SCREEN.heading);
     expect(rail()).toBeDefined();
     expect(secondaryNav("System")).toBeDefined();
     expect(screen.getByRole("banner")).toBeDefined();
@@ -299,7 +315,7 @@ describe("Control Centre's one list of screens and their views", () => {
       for (const view of viewsOf(each)) {
         const { unmount } = await openAt(view.path);
         expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(each.name);
-        expect(screen.queryByText("This view is not built yet.") === null).toBe(view.built);
+        expect(screen.queryByText(unbuiltLineOf(each)) === null).toBe(view.built);
         unmount();
       }
     }

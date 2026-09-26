@@ -5,6 +5,7 @@ import {
   addMember,
   anAddress,
   clockTheNextKey,
+  landedAtHome,
   person,
   provision,
   signIn,
@@ -77,7 +78,7 @@ test("credits a new member by their given name, asking once", async ({ page, req
   const shown = screensShown(page);
   await page.goto("/choose-workspace");
 
-  await expect(page).toHaveURL(/\/system\/routes-and-spend$/);
+  await landedAtHome(page, "Editor");
   const bar = page.getByRole("banner");
   await expect(bar.getByText("Theo Approver", { exact: false })).toBeVisible();
   expect(shown).not.toContain("/display-name");
@@ -91,10 +92,10 @@ test("signs a named member straight into the shell, never asking", async ({ page
   await page.goto("/sign-in");
   await signIn(page, request, email);
 
-  await expect(page).toHaveURL(/\/system\/routes-and-spend$/);
+  await landedAtHome(page, "Admin");
   expect(shown).not.toContain("/display-name");
   await page.goto("/display-name");
-  await expect(page).toHaveURL(/\/system\/routes-and-spend$/);
+  await landedAtHome(page, "Admin");
 });
 
 test("refuses a bad name by its word, then accepts one", async ({

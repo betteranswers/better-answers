@@ -2,8 +2,10 @@ import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients, type AppClients } from "@/app/providers.tsx";
+import { ROLES } from "@/features/people/role-meanings.ts";
+import type { Role } from "@/shared/screens.ts";
 
-import { openApp } from "./open-app.tsx";
+import { appAt, openApp } from "./open-app.tsx";
 import { addressOf, answered } from "./stubbed-api.ts";
 
 const A_MEMBERSHIP = {
@@ -29,7 +31,7 @@ let asked: string[] = [];
 
 /** The api answers a batch as one array with an entry per procedure, a refusal being an entry. */
 const answering =
-  (refusal?: string) =>
+  (refusal?: string, role: Role = "Admin") =>
   (input: string | URL | Request): Promise<Response> => {
     const { pathname } = addressOf(input);
     if (!pathname.startsWith("/trpc/")) {
@@ -41,7 +43,7 @@ const answering =
     return answered(
       names.map((name) =>
         refusal === undefined
-          ? { result: { data: A_MEMBERSHIP } }
+          ? { result: { data: { ...A_MEMBERSHIP, role } } }
           : {
               error: {
                 message: refusal,
@@ -128,4 +130,22 @@ describe("the membership the shell and its redirect both read", () => {
     expect(router.state.location.pathname).toBe("/people/owners");
     expect(membershipAsks()).toBe(1);
   });
+});
+
+const LANDS_AT: Readonly<Record<Role, string>> = {
+  Admin: "/people/members",
+  Editor: "/questions/answer-audit",
+  Viewer: "/questions/answer-audit",
+};
+
+describe("the index route", () => {
+  for (const role of ROLES) {
+    it(`lands a member at ${role} on ${LANDS_AT[role]}`, async () => {
+      vi.stubGlobal("fetch", answering(undefined, role));
+
+      const { router } = await appAt("/");
+
+      expect(router.state.location.pathname).toBe(LANDS_AT[role]);
+    });
+  }
 });
