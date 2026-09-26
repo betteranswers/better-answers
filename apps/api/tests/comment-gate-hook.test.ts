@@ -193,7 +193,7 @@ describe("the write-time hook hands back the broken comment rule", () => {
 describe("the write-time hook passes a comment that earns its place", () => {
   it.each([
     [
-      "a why inside the ceiling",
+      "a TypeScript why inside the ceiling",
       "probe/why.ts",
       `/** ${A_WHY_OF_TWENTY} */\nexport const keep = 1;\n`,
     ],
@@ -202,7 +202,7 @@ describe("the write-time hook passes a comment that earns its place", () => {
       "probe/directive.ts",
       "// oxlint-disable-next-line no-console -- the runner prints\nconsole.log(1);\n",
     ],
-    ["a why inside the ceiling", "probe/why.py", `# ${A_WHY_OF_TWENTY}\nKEEP = 1\n`],
+    ["a Python why inside the ceiling", "probe/why.py", `# ${A_WHY_OF_TWENTY}\nKEEP = 1\n`],
     ["a type-checker escape", "probe/directive.py", "# type: ignore[attr-defined]\nKEEP = 1\n"],
   ])("lets %s through", (_what, file, source) => {
     const run = edit(`packages/${file}`, source);

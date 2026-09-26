@@ -167,10 +167,7 @@ export type TestClient = {
 
   readonly origin: string;
   /** A path resolves on `origin`; cookies go from and to the jar, and a non-GET gains `origin`. */
-  fetch(
-    path: string,
-    init?: RequestInit & { readonly followRedirects?: boolean },
-  ): Promise<Response>;
+  fetch(path: string, init?: RequestInit): Promise<Response>;
 
   /** Posts `fields` as a browser's same-origin form navigation does. */
   form(path: string, fields: Readonly<Record<string, string>>): Promise<Response>;

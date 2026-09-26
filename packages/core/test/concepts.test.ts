@@ -1654,7 +1654,7 @@ describe("opening a concept by IRI", () => {
     ["a list where a date belongs", ["2020-01-01"], "current"],
   ];
 
-  it.each(SHELF_LIVES)("reads %s as %s", async (_why, staleAfter, expected) => {
+  it.each(SHELF_LIVES)("reads $0 as $2", async (_why, staleAfter, expected) => {
     const scenario = await arrange();
     const input = writeFor({
       status: "stable",
