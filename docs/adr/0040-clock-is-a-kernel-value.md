@@ -236,3 +236,12 @@ stays as it is). What leaving it cost, visibly, was an `ALTER TABLE "account" AL
 "updated_at" SET DEFAULT now();` that every `drizzle-kit generate` run proposed and that each
 of T-120's four iterations stripped out of a family's migration by hand (`badaad8`); a
 generate run on a clean tree now proposes nothing.
+
+## Amendment — 2026-09-26, the lint can now express the gate; the scan stays (T-429)
+
+The reason *The gate* gives for the scan is no longer true. The root lint loads
+`oxlint-plugin-eslint`, and its `eslint-js/no-restricted-syntax` accepts the two selectors
+quoted there. The decision is unchanged: the scan still holds the clock, with its three roots
+and two exemptions. In the lint, each exemption would be an override, and an override
+replaces the whole selector list rather than adding to it, so each would have to restate every
+other selector. That move is a ticket's, not this amendment's.

@@ -43,6 +43,7 @@
     "lefthook": "2.1.14",
     "oxfmt": "0.70.0",
     "oxlint": "1.85.0",
+    "oxlint-plugin-eslint": "1.85.0",
     "oxlint-plugin-react-doctor": "0.9.14",
     "oxlint-tsgolint": "7.0.2002",
     "typescript": "7.0.2"

@@ -3,6 +3,7 @@ import path from "node:path";
 
 import {
   oxlintOverrideFor,
+  pluginConfigFor,
   readOxlintConfig,
   repositoryRoot,
 } from "@better-answers/devtools/oxlint-config";
@@ -56,16 +57,10 @@ const AUDIT = `${CORE}/src/audit/index.ts`;
 const TEST = `${CORE}/test/concepts.test.ts`;
 const ROOT_FILE = `${CORE}/probe.ts`;
 
-const lint = oxlintOver(
-  JSON.stringify({
-    jsPlugins: config.jsPlugins.map((plugin) => ({
-      ...plugin,
-      specifier: path.join(repositoryRoot, plugin.specifier),
-    })),
-    rules: { [RULE]: severity },
-  }),
-  { tree: importing(SLICE, "../guides/renderer.ts"), flagged: [SLICE] },
-);
+const lint = oxlintOver(pluginConfigFor({ [RULE]: severity }), {
+  tree: importing(SLICE, "../guides/renderer.ts"),
+  flagged: [SLICE],
+});
 
 describe("the rule fires, naming the ADR 0029 rule it holds", () => {
   it.each([

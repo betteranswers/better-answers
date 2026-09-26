@@ -36,6 +36,10 @@ const row: MembershipRow & { role: Role } = refuse(member);
 
 Each branch, loop, `catch`, `case` and boolean operator adds one to a function's cyclomatic complexity. This holds in both tiers, tests included. Split a function before it passes 8.
 
+### [DESIGN7] Return from a nested loop, never jump out by a label
+
+A labelled `break` or `continue` lands somewhere the reader has to hunt for. Move the inner loop into a function, and return from it.
+
 ## TEST
 
 ### [TEST1] Test through the interface a caller crosses
@@ -194,6 +198,12 @@ A dynamic `import()` hides a dependency from every tool that reads the graph.
 ### [TYPES9] Type every public Python signature
 
 mypy runs strict over `src` and `tests`. An untyped signature does not lint, and neither does `Any` in one.
+
+### [TYPES10] Read only the keys a table owns
+
+`in` and `for…in` also see what an object inherits, so a name such as `toString` passes as a key. Test a key with `Object.hasOwn`, or hold the table in a `Map`. Walk a table with `for…of` over `Object.keys` or `Object.entries`.
+
+Reviewer: the lint knows a table only by its upper-case name. It cannot tell a lower-case table from the `in` that narrows a union type.
 
 ## LOG
 

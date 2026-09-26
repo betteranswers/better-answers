@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 
 import { z } from "zod";
@@ -26,6 +27,10 @@ const oxlintConfig = z.object({
 
 export type OxlintConfig = z.infer<typeof oxlintConfig>;
 
+type RuleSetting = z.infer<typeof ruleSetting>;
+
+type JsPlugin = OxlintConfig["jsPlugins"][number];
+
 export const readOxlintConfig = (): OxlintConfig =>
   oxlintConfig.parse(
     JSON.parse(
@@ -38,19 +43,28 @@ export const readOxlintConfig = (): OxlintConfig =>
     ),
   );
 
+const requireFromRoot = createRequire(path.join(repositoryRoot, "package.json"));
+
+/** oxlint resolves a specifier from the config's directory, and a throwaway tree has no `node_modules`. */
+export const loadableAnywhere = (plugin: JsPlugin): JsPlugin => ({
+  ...plugin,
+  specifier: plugin.specifier.startsWith(".")
+    ? path.join(repositoryRoot, plugin.specifier)
+    : requireFromRoot.resolve(plugin.specifier),
+});
+
 /**
  * The specifier is read off the real config, so a plugin that stopped loading fails the case
  * rather than leaving every rule under it silent.
  */
-export const pluginConfigFor = (rules: Readonly<Record<string, string>>): string => {
-  const plugin = readOxlintConfig().jsPlugins.find((one) => one.name === "better-answers");
-  if (plugin === undefined) {
-    throw new Error(".oxlintrc.json no longer loads the better-answers plugin.");
+export const pluginConfigFor = (rules: Readonly<Record<string, RuleSetting>>): string => {
+  const named = new Set(Object.keys(rules).map((rule) => rule.split("/")[0] ?? rule));
+  const plugins = readOxlintConfig().jsPlugins.filter((one) => named.has(one.name));
+  const missing = [...named].filter((name) => !plugins.some((one) => one.name === name));
+  if (missing.length > 0) {
+    throw new Error(`.oxlintrc.json loads no JS plugin named ${missing.join(", ")}.`);
   }
-  return JSON.stringify({
-    jsPlugins: [{ name: plugin.name, specifier: path.join(repositoryRoot, plugin.specifier) }],
-    rules,
-  });
+  return JSON.stringify({ jsPlugins: plugins.map(loadableAnywhere), rules });
 };
 
 type GlobbedOverride = OxlintConfig["overrides"][number] & {

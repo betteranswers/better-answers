@@ -1,6 +1,4 @@
-import path from "node:path";
-
-import { readOxlintConfig, repositoryRoot } from "@better-answers/devtools/oxlint-config";
+import { loadableAnywhere, readOxlintConfig } from "@better-answers/devtools/oxlint-config";
 import { lintFlags } from "@better-answers/devtools/root-commands";
 import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 import { describe, expect, it } from "vitest";
@@ -23,14 +21,12 @@ const SUPPRESSIBLE = "no-console";
 
 const config = readOxlintConfig();
 
-const plugin = config.jsPlugins.find((one) => one.name === "better-answers");
-
 /** Each rule at the setting the root config holds it, so a rule it drops or softens fails here. */
 const CONFIG = JSON.stringify({
   plugins: config.plugins,
-  jsPlugins: [
-    { name: "better-answers", specifier: path.join(repositoryRoot, plugin?.specifier ?? "") },
-  ],
+  jsPlugins: config.jsPlugins
+    .filter((plugin) => plugin.name === "better-answers")
+    .map(loadableAnywhere),
   rules: Object.fromEntries(
     Object.entries(config.rules).filter(
       ([name]) => COMMENT_RULES.includes(name) || name === SUPPRESSIBLE,
