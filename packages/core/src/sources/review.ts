@@ -14,18 +14,9 @@ import {
 import { byCodeUnit } from "@better-answers/schema/code-unit";
 
 import { narrower, type Sensitivity } from "../access/index.ts";
-import { act, declareActs, record, type DetailOf, type AuditAct } from "../audit/index.ts";
+import { act, batchIdFor, declareActs, recordEach } from "../audit/index.ts";
 import { openingACascadeOverHeldGroups } from "../concepts/index.ts";
-import {
-  actorIdOf,
-  attempt,
-  err,
-  ok,
-  ulid,
-  type AdminUserPrincipal,
-  type Result,
-  type UserPrincipal,
-} from "../kernel/index.ts";
+import { actorIdOf, attempt, err, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
 import {
   enqueueJobIn,
   indexRunRefused,
@@ -370,7 +361,7 @@ export const keepInText = async (
 
   const named = spans.map((span) => span.id);
   /** One audit event per span, so the batch counts spans, not the documents the answer names. */
-  const batchId = named.length > 1 ? ulid() : undefined;
+  const batchId = batchIdFor(named.length);
   for (const findingId of named) {
     const restored = await restoreFinding(admin, tx, {
       findingId,
@@ -400,26 +391,6 @@ const REVIEW_ACTS = declareActs("sources", {
     findingCount: "count",
   }),
 });
-
-const recordEachDocument = async <A extends AuditAct>(
-  admin: AdminUserPrincipal,
-  tx: Tx,
-  auditAct: A,
-  documentIds: readonly string[],
-  detailOf: (documentId: string) => DetailOf<A["detail"]>,
-): Promise<string | undefined> => {
-  const batchId = documentIds.length > 1 ? ulid() : undefined;
-  for (const documentId of documentIds) {
-    await record(admin, tx, {
-      id: ulid(),
-      act: auditAct,
-      subjectId: documentId,
-      detail: detailOf(documentId),
-      batchId,
-    });
-  }
-  return batchId;
-};
 
 export const narrowDocumentsInput = z.object({
   bindingId: BINDING_ID,
@@ -538,12 +509,14 @@ export const narrowDocuments = async (
   if (!reviewed.ok) return err(reviewed.error);
 
   const documentIds = documents.value.map((row) => row.id);
-  const batchId = await recordEachDocument(
+  const batchId = await recordEach(
     admin,
     tx,
     REVIEW_ACTS.narrowed,
-    documentIds,
-    (documentId) => ({ documentId, bindingId, sensitivity: next }),
+    documentIds.map((documentId) => ({
+      subjectId: documentId,
+      detail: { documentId, bindingId, sensitivity: next },
+    })),
   );
 
   const cascaded = await attempt(() => cascadeOverEvidence(admin, tx, { bindingId, documentIds }));
@@ -609,16 +582,18 @@ export const dismissAsNotSpecialCategory = async (
   if (!reviewed.ok) return err(reviewed.error);
 
   const documentIds = documentsHolding(spans);
-  const batchId = await recordEachDocument(
+  const batchId = await recordEach(
     admin,
     tx,
     REVIEW_ACTS.dismissed,
-    documentIds,
-    (documentId) => ({
-      documentId,
-      bindingId,
-      findingCount: spans.filter((span) => span.documentId === documentId).length,
-    }),
+    documentIds.map((documentId) => ({
+      subjectId: documentId,
+      detail: {
+        documentId,
+        bindingId,
+        findingCount: spans.filter((span) => span.documentId === documentId).length,
+      },
+    })),
   );
 
   const jobId = await indexRunQueued(acting, tx, "dismissed");

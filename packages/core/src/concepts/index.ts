@@ -18,7 +18,7 @@ import {
   type Sensitivity,
   type Visibility,
 } from "../access/index.ts";
-import { act, declareActs, record } from "../audit/index.ts";
+import { act, batchIdFor, declareActs, record } from "../audit/index.ts";
 import {
   actorIdOf,
   actorIdOfPerson,
@@ -612,7 +612,7 @@ export const acceptSuggestions = async (
   const decisions = ACCEPTANCE_DECISIONS.safeParse(input.decisions);
   if (!decisions.success) return err("malformed");
 
-  const batchId = decisions.data.length > 1 ? ulid() : undefined;
+  const batchId = batchIdFor(decisions.data.length);
   const outcomes: AcceptanceOutcome[] = [];
   for (const decision of decisions.data) {
     outcomes.push(await acceptOne(principal, doors, decision, batchId));

@@ -2,7 +2,7 @@ import type { z } from "zod";
 
 import { boundarySchemas } from "@better-answers/schema";
 
-import { actorIdOf } from "../kernel/index.ts";
+import { actorIdOf, ulid } from "../kernel/index.ts";
 import type {
   ActorId,
   AuditEventId,
@@ -218,6 +218,23 @@ export const record = <A extends AuditAct>(
   tx: Tx,
   event: AuditEvent<A>,
 ): Promise<Recorded> => write(tx, scopeParameter(principal), actorIdOf(principal), event);
+
+/** A lone event stands in no batch. */
+export const batchIdFor = (count: number): string | undefined => (count > 1 ? ulid() : undefined);
+
+/** Answers the batch the events share, or undefined for a lone one, which stands in none. */
+export const recordEach = async <A extends AuditAct>(
+  principal: Principal | OperatorPrincipal,
+  tx: Tx,
+  act: A,
+  events: readonly Pick<AuditEvent<A>, "subjectId" | "detail">[],
+): Promise<string | undefined> => {
+  const batchId = batchIdFor(events.length);
+  for (const { subjectId, detail } of events) {
+    await record(principal, tx, { id: ulid(), act, subjectId, detail, batchId });
+  }
+  return batchId;
+};
 
 /** As `record`, but the event's own `actor` is recorded rather than the platform. */
 export const recordFor = <A extends AuditAct>(

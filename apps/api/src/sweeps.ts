@@ -1,6 +1,6 @@
 import type { Logger } from "pino";
 
-import { attempt, err, ok, type Result } from "@better-answers/core/kernel";
+import { attemptResult, err, ok, type Result } from "@better-answers/core/kernel";
 import { SWEEPS, sweepEveryWorkspace, type SweepPass } from "@better-answers/core/sweeps";
 
 import type { SweepSettings } from "./config.ts";
@@ -63,8 +63,7 @@ export const startSweeps = (dependencies: SweepsDependencies): Result<Sweeps, Sw
   });
 
   const pass = async (): Promise<void> => {
-    const run = await attempt(() => sweepEveryWorkspace(SWEEPS, doors, { uploadSweep }));
-    const swept = run.ok ? run.value : err(run.error);
+    const swept = await attemptResult(() => sweepEveryWorkspace(SWEEPS, doors, { uploadSweep }));
     if (!swept.ok) {
       if (swept.error === "held") {
         logger.warn("a sweep pass was skipped: another holder has the sweeps' lock");

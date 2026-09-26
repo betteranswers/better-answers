@@ -6,14 +6,14 @@ import {
   ULID,
 } from "@better-answers/schema";
 
-import { eventsOfAct, record } from "../audit/index.ts";
+import { batchIdFor, eventsOfAct, record } from "../audit/index.ts";
 import {
   attempt,
+  attemptResult,
   err,
   isActorId,
   ok,
   refusalFor,
-  ulid,
   type ActorId,
   type Clock,
   type PlatformPrincipal,
@@ -294,7 +294,7 @@ const replayCommit = async (
   const facts = factsOf(read.value, trailers);
   if (facts === undefined) return err("unreadable-commit");
 
-  const landed = await attempt(() =>
+  const landed = await attemptResult(() =>
     withScope(
       platform,
       doors.postgres,
@@ -344,11 +344,10 @@ const replayCommit = async (
       },
     ),
   );
-  if (!landed.ok) {
-    const named = refusalFor(landed.error, WRITE_CONSTRAINTS);
-    return err(typeof named === "string" ? named : landed.error);
+  if (!landed.ok && landed.error instanceof Error) {
+    return err(refusalFor(landed.error, WRITE_CONSTRAINTS));
   }
-  return landed.value;
+  return landed;
 };
 
 /**
@@ -373,7 +372,7 @@ export const reconcile = async (
     const scanned = await commitsAfter(platform, doors.git, workspaceId, watermark.value);
     if (!scanned.ok) return err(scanned.error);
 
-    const batchId = scanned.value.missed.length > 1 ? ulid() : undefined;
+    const batchId = batchIdFor(scanned.value.missed.length);
     const replayed: string[] = [];
     const skipped: string[] = [];
     let stopped: Reconciled["stopped"];

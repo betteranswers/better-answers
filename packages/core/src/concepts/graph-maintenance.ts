@@ -1,11 +1,10 @@
 import { boundarySchemas, FULL_REBUILD_KIND } from "@better-answers/schema";
 
-import { act, declareActs, record } from "../audit/index.ts";
+import { act, declareActs, recordEach } from "../audit/index.ts";
 import {
   attempt,
   err,
   ok,
-  ulid,
   type PlatformPrincipal,
   type PrincipalRefusal,
   type Result,
@@ -67,20 +66,15 @@ export const sweepGraph = async (
   const swept = await attempt(() =>
     withScope(platform, door, workspace.data, async (tx) => {
       const generations = await sweepNonLiveGenerations(platform, tx, workspace.data);
-      const batchId = generations.length > 1 ? ulid() : undefined;
-      for (const generation of generations) {
-        await record(platform, tx, {
-          id: ulid(),
-          act: GRAPH_ACTS.swept,
-          subjectId: String(generation.gen),
-          batchId,
-          detail: {
-            generation: generation.gen,
-            nodes: generation.nodes,
-            edges: generation.edges,
-          },
-        });
-      }
+      await recordEach(
+        platform,
+        tx,
+        GRAPH_ACTS.swept,
+        generations.map(({ gen, nodes, edges }) => ({
+          subjectId: String(gen),
+          detail: { generation: gen, nodes, edges },
+        })),
+      );
       return generations;
     }),
   );

@@ -32,3 +32,11 @@ export async function attempt<T>(operation: () => Promise<T>): Promise<Result<T>
     return err(normalizeError(cause));
   }
 }
+
+/** As `attempt`, for an operation that answers a Result: its refusal and a rejection meet in one. */
+export async function attemptResult<T, E>(
+  operation: () => Promise<Result<T, E>>,
+): Promise<Result<T, E | Error>> {
+  const ran = await attempt(operation);
+  return ran.ok ? ran.value : ran;
+}

@@ -5,7 +5,7 @@ import {
   reconcileEveryWorkspace,
   type WorkspaceReconciled,
 } from "@better-answers/core/concepts";
-import { attempt, err, ok, type Result } from "@better-answers/core/kernel";
+import { attemptResult, err, ok, type Result } from "@better-answers/core/kernel";
 
 import type { HeadCheckSettings } from "./config.ts";
 import { deadManPing, type PingFetch, type PingOutcome } from "./dead-man-ping.ts";
@@ -74,8 +74,7 @@ export const startReconciler = (
   });
 
   const tick = async (): Promise<PingOutcome> => {
-    const run = await attempt(() => reconcileEveryWorkspace(RECONCILER, doors));
-    const pass = run.ok ? run.value : err(run.error);
+    const pass = await attemptResult(() => reconcileEveryWorkspace(RECONCILER, doors));
     if (!pass.ok) {
       logger.error({ reason: pass.error.message }, "the reconciler tick failed");
       return "fail";

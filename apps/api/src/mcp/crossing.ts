@@ -1,7 +1,7 @@
 import type { CallToolResult } from "@modelcontextprotocol/server";
 import type { Logger } from "pino";
 
-import { attempt, type Result } from "@better-answers/core/kernel";
+import { attemptResult, type Result } from "@better-answers/core/kernel";
 
 import { fieldsSaid, refusalLogged, refusalOf, type RefusalAnswer } from "../refusal.ts";
 
@@ -20,8 +20,7 @@ export const crossing = async <Value>(
   running: () => Promise<Result<Value, RefusalAnswer | Error>>,
   render: (value: Value) => string,
 ): Promise<CallToolResult> => {
-  const ran = await attempt(running);
-  const answered = ran.ok ? ran.value : ran;
+  const answered = await attemptResult(running);
 
   if (answered.ok) {
     return {

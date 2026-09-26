@@ -6,10 +6,14 @@ import {
   type ActorId,
   actorIdOf,
   attempt,
+  attemptResult,
+  err,
   isPortablePath,
+  ok,
   type PlatformPrincipal,
   refusalFor,
   requireAdmin,
+  type Result,
   type UserPrincipal,
 } from "../src/kernel/index.ts";
 
@@ -111,6 +115,28 @@ describe("the try/catch every slice entry point wraps its library in", () => {
       message: "non-Error thrown: [object Object]",
       cause: thrown,
     });
+  });
+});
+
+describe("attemptResult, for an operation that answers a Result", () => {
+  it("answers the operation's value as it came", async () => {
+    expect(await attemptResult(async () => ok("landed"))).toEqual({ ok: true, value: "landed" });
+  });
+
+  it("answers the operation's refusal as it came", async () => {
+    expect(await attemptResult(async () => err("rename-refused"))).toEqual({
+      ok: false,
+      error: "rename-refused",
+    });
+  });
+
+  it("answers a rejection as the normalised Error, beside the refusals", async () => {
+    const answered = await attemptResult(async (): Promise<Result<string, "held">> => {
+      throw "the socket hung up";
+    });
+
+    expect(answered.ok ? undefined : answered.error).toEqual(new Error("the socket hung up"));
+    expectTypeOf(answered).toEqualTypeOf<Result<string, "held" | Error>>();
   });
 });
 

@@ -1,7 +1,7 @@
 import { boundarySchemas, ULID } from "@better-answers/schema";
 
-import { act, declareActs, record } from "../audit/index.ts";
-import { attempt, err, ok, ulid, type PlatformPrincipal, type Result } from "../kernel/index.ts";
+import { act, declareActs, recordEach } from "../audit/index.ts";
+import { attempt, err, ok, type PlatformPrincipal, type Result } from "../kernel/index.ts";
 import {
   listWorkspaceObjects,
   removeWorkspaceObject,
@@ -87,19 +87,15 @@ const recordTheSweep = async (
   swept: readonly KeyIds[],
 ): Promise<Result<void, Error>> => {
   if (swept.length === 0) return ok(undefined);
-  const batchId = swept.length > 1 ? ulid() : undefined;
   const written = await attempt(() =>
-    withScope(platform, door, workspaceId, async (tx) => {
-      for (const ids of swept) {
-        await record(platform, tx, {
-          id: ulid(),
-          act: SWEEP_ACTS.swept,
-          subjectId: ids.bindingId,
-          batchId,
-          detail: ids,
-        });
-      }
-    }),
+    withScope(platform, door, workspaceId, (tx) =>
+      recordEach(
+        platform,
+        tx,
+        SWEEP_ACTS.swept,
+        swept.map((ids) => ({ subjectId: ids.bindingId, detail: ids })),
+      ),
+    ),
   );
   return written.ok ? ok(undefined) : err(written.error);
 };

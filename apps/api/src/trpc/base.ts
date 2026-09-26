@@ -4,6 +4,7 @@ import type { z } from "zod";
 
 import {
   attempt,
+  attemptResult,
   err,
   parse,
   type Claims,
@@ -105,8 +106,7 @@ export const crossing = async <Value>(
   act: string,
   running: Promise<Result<Value, RefusalAnswer | Error>>,
 ): Promise<Value> => {
-  const ran = await attempt(() => running);
-  const answered = ran.ok ? ran.value : ran;
+  const answered = await attemptResult(() => running);
 
   if (answered.ok) return answered.value;
   if (answered.error instanceof Error) throw failed(ctx.log, act, answered.error);
