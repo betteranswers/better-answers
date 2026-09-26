@@ -40,6 +40,10 @@ Each branch, loop, `catch`, `case` and boolean operator adds one to a function's
 
 A labelled `break` or `continue` lands somewhere the reader has to hunt for. Move the inner loop into a function, and return from it.
 
+### [DESIGN8] Give a slice its own type for the doors it takes
+
+Name the type for what the function does, as the orphan sweep's is `SweepDoors`. Slices whose door lists match are no duplication to merge. The list is part of each slice's interface, and a shared type would couple them by coincidence.
+
 ## TEST
 
 ### [TEST1] Test through the interface a caller crosses
@@ -72,7 +76,7 @@ workspace = seed_workspace(cursor, name="Acme")
 
 ### [TEST5] Title a test by what the system does, in 10 words at most
 
-A title is a short present-tense phrase. It says what the system does, not which function it calls: "refuses a name over 100 characters". It has 10 words at most and never says "should". The `describe` block names the unit under test. A Python test's name takes the same shape: `test_refuses_long_name`.
+A title is a short present-tense phrase. It says what the system does, not which function it calls: "refuses a name over 100 characters". It never says "should". The `describe` block names the unit under test. A Python test's name takes the same shape: `test_refuses_long_name`.
 
 Reviewer: only a person reads a title's subject.
 
@@ -108,7 +112,7 @@ expect(hashOf(frontmatter)).toBe(hashOf(canonical(frontmatter)));
 expect(hashOf(frontmatter)).toBe("b5f1…");
 ```
 
-Reviewer: no gate can tell an oracle from an expectation. The nightly mutation summary catches the rest after the fact.
+Reviewer: no gate can tell an oracle from an expectation.
 
 ## CHECK
 
@@ -139,7 +143,7 @@ Reviewer: no tool reads a comment's intent.
 
 ### [COMMENT2] Write a rule tag in a rules file, a review finding or a gate's failure message
 
-Write it in those three places and nowhere else, with no document exempt. In source, a test, a document or a deploy file, a tag is a pointer a reader cannot follow. It is also a citation nothing keeps true. Write the rule in words where the reader meets it, or delete the sentence. `apps/api/tests/coding-rules-tags.test.ts` holds the rule over the two places that are files.
+Write it in those three places and nowhere else, with no document exempt. In source, a test, a document or a deploy file, a tag is a pointer a reader cannot follow. It is also a citation nothing keeps true. Write the rule in words where the reader meets it, or delete the sentence.
 
 ### [COMMENT3] Give a directive its reason on the same line
 
@@ -181,7 +185,7 @@ A test feeding a value its type forbids says so with `@ts-expect-error`. An asse
 
 Return a new value. What a caller passed in is the caller's.
 
-Reviewer: the lint holds an assignment to a parameter or its property; only a person sees a mutating call on one, such as `push` or `Object.assign`.
+Reviewer: only a person sees a mutating call on a parameter, such as `push` or `Object.assign`.
 
 ### [TYPES6] Return an error as a `Result`, and catch only around a library
 
@@ -245,7 +249,7 @@ A definer function:
 
 No LLM-authored SQL runs against a shared store.
 
-Reviewer: attack a change to a migration, a grant, a policy or a definer function before it merges. A person does this, not CI. Nothing scans LLM-authored SQL.
+Reviewer: attack a change to a migration, a grant, a policy or a definer function before it merges. Nothing scans LLM-authored SQL.
 
 ### [SEC4] Read the environment in the tier's one config module
 

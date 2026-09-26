@@ -171,6 +171,8 @@ export type BindUploadRefusal =
   | SourceRefusal<"role-forbids" | "no-such-group" | "media-type-refused" | "too-large">
   | Error;
 
+type BindUploadDoors = { readonly postgres: PostgresDoor; readonly objects: ObjectDoor };
+
 export type UploadBound = {
   readonly bindingId: string;
   readonly documentId: string;
@@ -311,7 +313,7 @@ const storeOriginal = async (
  */
 export const bindUpload = async (
   principal: UserPrincipal,
-  doors: { readonly postgres: PostgresDoor; readonly objects: ObjectDoor },
+  doors: BindUploadDoors,
   input: BindUploadInput,
 ): Promise<Result<UploadBound, BindUploadRefusal>> => {
   const admin = requireAdmin(principal);
