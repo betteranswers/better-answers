@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { Result, Role } from "../src/kernel/index.ts";
 import { listMembers } from "../src/members/index.ts";
 import { provisionedWorkspace, type ProvisionedWorkspace } from "./platform.ts";
-import { abortTheTransaction, postgresForSuite, readingAs } from "./suite-postgres.ts";
+import { abortTheTransaction, postgresForSuite, readingAs, seedingWith } from "./suite-postgres.ts";
 
 const db = postgresForSuite();
 
@@ -75,6 +75,7 @@ describe("the member list", () => {
             { groupId: hr, name: "HR team" },
           ],
           joinedAt: priya.member.createdAt.toISOString(),
+          credentialsRevokedAt: null,
         },
         {
           personId: sam.person.id,
@@ -83,6 +84,7 @@ describe("the member list", () => {
           role: "Viewer",
           groups: [],
           joinedAt: sam.member.createdAt.toISOString(),
+          credentialsRevokedAt: null,
         },
         {
           personId: workspace.adminUserId,
@@ -91,9 +93,43 @@ describe("the member list", () => {
           role: "Admin",
           groups: [],
           joinedAt: expect.stringMatching(ISO_INSTANT),
+          credentialsRevokedAt: null,
         },
       ],
     });
+  });
+
+  it("says when a member's credentials here were revoked, never elsewhere", async () => {
+    const ours = await provisionedWorkspace(db(), "RevokedOurs");
+    const theirs = await provisionedWorkspace(db(), "RevokedTheirs");
+    const revokedHere = new Date("2026-09-25T10:00:00.000Z");
+    const [here, there] = await seedingWith(db().pool, async (seed) => {
+      const first = await seed.user({ name: "Ada Here" });
+      const second = await seed.user({ name: "Bo There" });
+      const { workspaceId } = ours;
+      await seed.member({ workspaceId, userId: first.id, credentialsRevokedAt: revokedHere });
+      await seed.member({ workspaceId, userId: second.id });
+      await seed.member({
+        workspaceId: theirs.workspaceId,
+        userId: second.id,
+        credentialsRevokedAt: revokedHere,
+      });
+      return [first.id, second.id];
+    });
+
+    const listed = await listedAs(ours, ours.adminUserId);
+
+    expect(
+      listed.ok &&
+        listed.value.map(({ personId, credentialsRevokedAt }) => ({
+          personId,
+          credentialsRevokedAt,
+        })),
+    ).toEqual([
+      { personId: here, credentialsRevokedAt: revokedHere.toISOString() },
+      { personId: there, credentialsRevokedAt: null },
+      { personId: ours.adminUserId, credentialsRevokedAt: null },
+    ]);
   });
 
   it("orders two members of one display name by their address", async () => {

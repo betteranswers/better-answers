@@ -210,9 +210,9 @@ export const CROSS_OWNER_TABLE_ACCESS = [
   {
     table: "public.member",
     by: "members",
-    access: "read",
+    access: "read and write",
     reason:
-      "Adding a person to a group reads whether they are a member of the workspace first, so the act answers `no-such-member` rather than letting the composite foreign key abort the caller's transaction; the request act reads the same row to answer already-a-member neutrally.",
+      "Adding a person to a group reads whether they are a member of the workspace first, so the act answers `no-such-member` rather than letting the composite foreign key abort the caller's transaction; the request act reads the same row to answer already-a-member neutrally. An Admin's acts on a member write the row itself — a role change, a removal and the membership's revocation instant — and a role change or a removal first holds every Admin row of the workspace, so it never loses its last.",
   },
   {
     table: "public.user",

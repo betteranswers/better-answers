@@ -417,6 +417,29 @@ export type RevokeWorkspaceTokensInput = {
 };
 
 /**
+ * The step inside an act's own transaction: the tokens whose consented workspace is this one. It
+ * takes the principal its act admitted, and judges none.
+ */
+export const endWorkspaceTokens = async (
+  _admitted: PlatformPrincipal | UserPrincipal,
+  tx: Tx,
+  input: { readonly workspaceId: WorkspaceId; readonly personId: UserId; readonly at: Date },
+): Promise<{ readonly refreshTokensEnded: number; readonly accessTokensEnded: number }> => {
+  const end = async (table: "oauth_refresh_token" | "oauth_access_token"): Promise<number> => {
+    const updated = await tx.query(
+      `UPDATE ${table} SET revoked = now()
+        WHERE user_id = $1 AND reference_id = $2 AND created_at < $3 AND revoked IS NULL`,
+      [input.personId, input.workspaceId, input.at],
+    );
+    return updated.rowCount ?? 0;
+  };
+
+  const refreshTokensEnded = await end("oauth_refresh_token");
+  const accessTokensEnded = await end("oauth_access_token");
+  return { refreshTokensEnded, accessTokensEnded };
+};
+
+/**
  * Ends the person's OAuth tokens for this workspace issued before `at`. Sessions are deliberately
  * untouched: a browser session belongs to the person, not to one workspace, so ending it would
  * reach another tenant.
@@ -442,20 +465,13 @@ export const revokeWorkspaceTokens = async (
   if (!workspaceId.success || !userId.success) return err("malformed");
 
   const ended = await attempt(() =>
-    withIdentityWrite(platform, door, async (tx) => {
-      const end = async (table: "oauth_refresh_token" | "oauth_access_token"): Promise<number> => {
-        const updated = await tx.query(
-          `UPDATE ${table} SET revoked = now()
-            WHERE user_id = $1 AND reference_id = $2 AND created_at < $3 AND revoked IS NULL`,
-          [userId.data, workspaceId.data, input.at],
-        );
-        return updated.rowCount ?? 0;
-      };
-
-      const refreshTokensEnded = await end("oauth_refresh_token");
-      const accessTokensEnded = await end("oauth_access_token");
-      return { refreshTokensEnded, accessTokensEnded };
-    }),
+    withIdentityWrite(platform, door, (tx) =>
+      endWorkspaceTokens(platform, tx, {
+        workspaceId: workspaceId.data,
+        personId: userId.data,
+        at: input.at,
+      }),
+    ),
   );
 
   if (!ended.ok) return err(ended.error);

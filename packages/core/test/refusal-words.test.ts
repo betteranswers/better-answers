@@ -12,6 +12,7 @@ import type {
   ListInvitationsRefusal,
   RequestAccessRefusal,
   ResendInvitationRefusal,
+  RevokeCredentialsHereRefusal,
 } from "../src/members/index.ts";
 import type { BindUploadRefusal, SourceRefusal } from "../src/sources/index.ts";
 import type {
@@ -172,6 +173,7 @@ describe("the refusal-word walk", () => {
     expectTypeOf<ResendInvitationRefusal>().toExtend<EveryRegisteredWord | Error>();
     expectTypeOf<CancelInvitationRefusal>().toExtend<EveryRegisteredWord | Error>();
     expectTypeOf<ListInvitationsRefusal>().toExtend<EveryRegisteredWord | Error>();
+    expectTypeOf<RevokeCredentialsHereRefusal>().toExtend<EveryRegisteredWord | Error>();
     expectTypeOf<SourceRefusal<"no-such-binding"> | "invented">().not.toExtend<
       EveryRegisteredWord | Error
     >();

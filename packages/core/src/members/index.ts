@@ -1,4 +1,5 @@
 export * from "./audit-log.ts";
+export * from "./credentials.ts";
 export * from "./groups.ts";
 export {
   cancelInvitation,

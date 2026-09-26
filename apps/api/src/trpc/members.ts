@@ -13,6 +13,8 @@ import {
   readAuditLog,
   readAuditLogInput,
   resendInvitation,
+  revokeCredentialsHere,
+  revokeCredentialsHereInput,
   type InvitationToSend,
 } from "@better-answers/core/members";
 import type { Tx } from "@better-answers/core/store/postgres";
@@ -89,4 +91,15 @@ export const membersRouter = router({
   cancelInvitation: mutationProcedure
     .input(parsedBy(invitationInput))
     .mutation(answeredBy(cancelInvitation)),
+  revokeCredentials: mutationProcedure
+    .input(parsedBy(revokeCredentialsHereInput))
+    .mutation(({ ctx, input }) =>
+      crossing(
+        ctx,
+        revokeCredentialsHere.name,
+        given(input, (asked) =>
+          revokeCredentialsHere(ctx.principal, ctx.tx, { ...asked, at: ctx.clock.now() }),
+        ),
+      ),
+    ),
 });

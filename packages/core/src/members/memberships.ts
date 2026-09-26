@@ -29,6 +29,7 @@ const LISTED_ROW = z.object({
   address: boundarySchemas.user.select.shape.email,
   role: boundarySchemas.member.select.shape.role,
   joinedAt: boundarySchemas.member.select.shape.createdAt,
+  credentialsRevokedAt: boundarySchemas.member.select.shape.credentialsRevokedAt,
   groups: z.array(
     z.object({
       groupId: boundarySchemas.group.select.shape.id,
@@ -39,13 +40,16 @@ const LISTED_ROW = z.object({
 
 type ListedRow = z.output<typeof LISTED_ROW>;
 
-export type ListedMember = Omit<ListedRow, "joinedAt"> & {
+export type ListedMember = Omit<ListedRow, "joinedAt" | "credentialsRevokedAt"> & {
   /** An ISO instant, which is what a `Date` becomes on the wire anyway. */
   readonly joinedAt: string;
+
+  /** A credential issued before it is refused here; null where no Admin here has revoked any. */
+  readonly credentialsRevokedAt: string | null;
 };
 
 const MEMBERS = `SELECT u.id AS "personId", u.name AS "displayName", u.email AS address, m.role,
-            m.created_at AS "joinedAt",
+            m.created_at AS "joinedAt", m.credentials_revoked_at AS "credentialsRevokedAt",
             COALESCE(
               json_agg(json_build_object('groupId', g.id, 'name', g.name) ORDER BY g.name, g.id)
                 FILTER (WHERE g.id IS NOT NULL),
@@ -56,7 +60,7 @@ const MEMBERS = `SELECT u.id AS "personId", u.name AS "displayName", u.email AS 
        LEFT JOIN group_member gm ON gm.workspace_id = m.workspace_id AND gm.user_id = m.user_id
        LEFT JOIN "group" g ON g.workspace_id = gm.workspace_id AND g.id = gm.group_id
       WHERE m.workspace_id = $1
-      GROUP BY u.id, u.name, u.email, m.role, m.created_at
+      GROUP BY u.id, u.name, u.email, m.role, m.created_at, m.credentials_revoked_at
       ORDER BY lower(u.name), lower(u.email), u.id`;
 
 /**
@@ -76,5 +80,11 @@ export const listMembers = async (
   );
   if (!listed.ok) return err(listed.error);
 
-  return ok(listed.value.map((row) => ({ ...row, joinedAt: row.joinedAt.toISOString() })));
+  return ok(
+    listed.value.map((row) => ({
+      ...row,
+      joinedAt: row.joinedAt.toISOString(),
+      credentialsRevokedAt: row.credentialsRevokedAt?.toISOString() ?? null,
+    })),
+  );
 };
