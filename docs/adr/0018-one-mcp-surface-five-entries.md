@@ -61,6 +61,14 @@ Recorded on the day after the build, because a shipped behaviour that contradict
 
 **Until S2, the two arms rank separately.** Each is ranked by its own read — the concepts by the index's order, the documents by the parser's rank — and the concepts come **first**, because a concept is the company's answer and a raw passage is what there was no answer for. One ranking *across* the two layers is S2's: it needs a score the arms share, and a merge invented here would be an ordering nothing could hold to. A session opening this ADR before S2's `/to-spec` reads the separate ranking as the question S2 closes, not as a shape to preserve.
 
-**`open` by locator is the second door, and it takes one.** Where the decision above says "the passage a citation rests on by locator, one or many", read **one**: the entry takes an IRI or a locator, exactly one of the two, and a locator answers the passage — locator, source title, text, sensitivity word — or *not found*. A wire locator now reaches the caller from two places rather than one: a citation, as before, and a document hit's own line. And **`open` by IRI renders each evidence item's wire locator**, so a concept read in full names the addresses its evidence opens at and the next call opens one.
+**`open` by locator is the second door, and it takes one.** Where the decision above says "the passage a citation rests on by locator, one or many", read **one**: the entry takes an IRI or a locator, exactly one of the two, and a locator answers the passage — locator, source title, text, sensitivity word — or *not found*. A wire locator now reaches the caller from two places rather than one: a citation, as before, and a document hit's own line. ~~And **`open` by IRI renders each evidence item's wire locator**, so a concept read in full names the addresses its evidence opens at and the next call opens one.~~ (Narrowed 2026-09-26: a locator only where the source gives one, below.)
 
 Everything else in this ADR and its amendments stands — the four entries, the principal from the token, the per-call revocation check, no workspace argument on any entry, and the growth by token scope.
+
+## Amendment — 2026-09-26, an evidence item carries a locator only where its source gives one (T-380)
+
+The amendment above says `open` by IRI renders **each** evidence item's wire locator. An imported concept's evidence often has none. An OKF bundle's `sources` entry names a resource and a title, and `sources[].locator` is a key the platform adds to a concept file, so a bundle landed by import carries it only where its author wrote one.
+
+**Read: `open` by IRI answers each evidence item with its source, and with the wire locator that opens its passage only where the source gives one.** An item whose source gives no locator, or a locator of spaces only, leaves the key out of the structured content. It is never an empty string. Its rendered line ends at the source's title. The entry's output schema and its description say the same. An item with no locator has no passage `open` can fetch; the concept is still the thing to quote.
+
+Everything else in this ADR and its amendments stands.

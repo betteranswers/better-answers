@@ -1621,10 +1621,10 @@ describe("opening a concept by IRI", () => {
       reading(scenario.viewer, (principal, tx) => open(principal, tx, { iri: bare.iri }, now)),
     ]);
 
-    expect(cited.ok && cited.value.found && cited.value.concept?.evidence).toEqual([
+    expect(cited.ok && cited.value.found && cited.value.concept?.evidence).toStrictEqual([
       { locator: "p.4", source: "Handbook" },
       { locator: "p.9", source: "/sources/travel.pdf" },
-      { locator: "", source: "/sources/rates.csv" },
+      { source: "/sources/rates.csv" },
     ]);
     expect(uncited.ok && uncited.value.found && uncited.value.concept?.evidence).toEqual([]);
   });
