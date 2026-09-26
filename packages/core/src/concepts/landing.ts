@@ -28,6 +28,7 @@ import { markDeciding } from "./inbox.ts";
 import type { Acceptance } from "./index.ts";
 import { conceptVisibilityFrom, replaceCitations } from "./visibility.ts";
 
+/** Title-cases each word and drops a plural: `policies` and `Policy` both fold to `Policy`. */
 export const foldKind = (kind: string): string =>
   kind.replaceAll(/\S+/g, (word) => {
     const cased = word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
@@ -37,6 +38,7 @@ export const foldKind = (kind: string): string =>
     return cased.slice(0, -1);
   });
 
+/** Trims the title, collapses its whitespace and lower-cases it; the kind is used as given. */
 export const mergeKeyOf = (foldedKind: string, title: string): string =>
   `${foldedKind}:${title.trim().replaceAll(/\s+/g, " ").toLowerCase()}`;
 
@@ -76,6 +78,7 @@ type HeldRow = {
   readonly published_at: Date | null;
 };
 
+/** `undefined` when no concept holds `iri`, or when a user principal may not read it. */
 export const heldByIri = async (
   principal: Principal,
   tx: Tx,
@@ -112,6 +115,7 @@ export const heldByIri = async (
       };
 };
 
+/** The IRI at `path` whatever its visibility; `undefined` when no concept holds the path. */
 export const holderOfPath = async (
   principal: Principal,
   tx: Tx,
@@ -124,6 +128,7 @@ export const holderOfPath = async (
   return found.rows[0]?.iri;
 };
 
+/** True when the workspace holds every listed source document, and for an empty list. */
 export const holdsEveryDocument = async (
   principal: Principal,
   tx: Tx,
@@ -164,13 +169,39 @@ type RowFacts = {
   readonly sensitivity: string | undefined;
 };
 
-export const indexRowOf = (facts: RowFacts, held: Held | undefined, now: Date) => {
+const statusOf = (facts: RowFacts, held: Held | undefined): string => {
   const fileStatus = facts.frontmatter["status"];
-  const status =
+  return (
     facts.status ??
     (typeof fileStatus === "string" ? fileStatus : undefined) ??
     held?.status ??
-    CONCEPT_DRAFT_STATUS;
+    CONCEPT_DRAFT_STATUS
+  );
+};
+
+const publishedAtOf = (status: string, held: Held | undefined, now: Date): Date | null =>
+  PUBLISHED_STATUSES.some((published) => published === status) ? (held?.publishedAt ?? now) : null;
+
+const rowVisibilityOf = (facts: RowFacts, held: Held | undefined) =>
+  held === undefined
+    ? {
+        sensitivity: facts.sensitivity ?? SENSITIVITY_DEFAULT,
+        audience: AUDIENCE_EVERYONE,
+        audienceGroups: null,
+      }
+    : {
+        sensitivity: held.sensitivity,
+        audience: held.audience,
+        audienceGroups: held.audienceGroups,
+      };
+
+/**
+ * The status is the one asked for, else the file's, else the held row's, else draft. A held
+ * concept keeps its visibility and its publication time; `now` stamps a published row that has
+ * none.
+ */
+export const indexRowOf = (facts: RowFacts, held: Held | undefined, now: Date) => {
+  const status = statusOf(facts, held);
   return conceptRow.safeParse({
     workspaceId: facts.workspaceId,
     iri: facts.iri,
@@ -181,14 +212,12 @@ export const indexRowOf = (facts: RowFacts, held: Held | undefined, now: Date) =
     body: facts.body,
     contentHash: facts.contentHash,
     status,
-    publishedAt: PUBLISHED_STATUSES.some((published) => published === status)
-      ? (held?.publishedAt ?? now)
-      : null,
-    sensitivity: held?.sensitivity ?? facts.sensitivity ?? SENSITIVITY_DEFAULT,
-    audience: held?.audience ?? AUDIENCE_EVERYONE,
-    audienceGroups: held?.audienceGroups ?? null,
+    publishedAt: publishedAtOf(status, held, now),
+    ...rowVisibilityOf(facts, held),
   });
 };
+
+type EvidenceRow = z.infer<typeof boundarySchemas.evidence.insert>;
 
 type Landing = z.infer<typeof conceptRow> & {
   readonly mergeKey: string;
@@ -198,7 +227,7 @@ type Landing = z.infer<typeof conceptRow> & {
 
   readonly sources: readonly HashedSource[];
 
-  readonly evidence: readonly z.infer<typeof boundarySchemas.evidence.insert>[] | undefined;
+  readonly evidence: readonly EvidenceRow[] | undefined;
 
   readonly restsAlsoOn: readonly Visibility[];
 
@@ -229,13 +258,13 @@ export const landBundleCommit = async (
   );
 };
 
-export const landRows = async (principal: Principal, tx: Tx, index: Landing): Promise<void> => {
-  await tx.query(
-    `INSERT INTO concept_identity (workspace_id, iri, merge_key) VALUES ($1, $2, $3)
-     ON CONFLICT (workspace_id, iri) DO UPDATE SET merge_key = EXCLUDED.merge_key`,
-    [index.workspaceId, index.iri, index.mergeKey],
-  );
-  for (const piece of index.evidence ?? []) {
+const landEvidence = async (
+  principal: Principal,
+  tx: Tx,
+  iri: string,
+  evidence: readonly EvidenceRow[],
+): Promise<void> => {
+  for (const piece of evidence) {
     await tx.query(
       `INSERT INTO evidence (workspace_id, source_document_id, locator, resource, content_version)
        VALUES ($1, $2, $3, $4, $5)
@@ -250,8 +279,22 @@ export const landRows = async (principal: Principal, tx: Tx, index: Landing): Pr
       ],
     );
   }
+  await replaceCitations(principal, tx, iri, evidence);
+};
+
+/**
+ * Writes the concept's identity, evidence, citations, index row, bundle commit and graph delta,
+ * recomputes compositions when its visibility moved, and decides an accepted suggestion.
+ * @throws when somebody else decided that suggestion first.
+ */
+export const landRows = async (principal: Principal, tx: Tx, index: Landing): Promise<void> => {
+  await tx.query(
+    `INSERT INTO concept_identity (workspace_id, iri, merge_key) VALUES ($1, $2, $3)
+     ON CONFLICT (workspace_id, iri) DO UPDATE SET merge_key = EXCLUDED.merge_key`,
+    [index.workspaceId, index.iri, index.mergeKey],
+  );
   if (index.evidence !== undefined) {
-    await replaceCitations(principal, tx, index.iri, index.evidence);
+    await landEvidence(principal, tx, index.iri, index.evidence);
   }
   const held = visibilityOf({
     sensitivity: index.sensitivity,
@@ -312,9 +355,13 @@ export const landRows = async (principal: Principal, tx: Tx, index: Landing): Pr
   if (!sameVisibility(held, visibility)) {
     await recomputeCompositionsIncluding(principal, tx, { iris: [index.iri] });
   }
-  if (index.acceptance === undefined) return;
+  if (index.acceptance !== undefined) {
+    await landAcceptance(tx, index, index.acceptance);
+  }
+};
 
-  await markDeciding(tx, index.acceptance.suggestionId);
+const landAcceptance = async (tx: Tx, index: Landing, acceptance: Acceptance): Promise<void> => {
+  await markDeciding(tx, acceptance.suggestionId);
   const decided = await tx.query<{ id: string }>(
     `UPDATE suggestion
         SET status = $3, decider = $4, decided_at = now(), target_iri = $5
@@ -322,7 +369,7 @@ export const landRows = async (principal: Principal, tx: Tx, index: Landing): Pr
     RETURNING id`,
     [
       index.workspaceId,
-      index.acceptance.suggestionId,
+      acceptance.suggestionId,
       SUGGESTION_ACCEPTED_STATUS,
       index.actor,
       index.iri,
@@ -332,7 +379,7 @@ export const landRows = async (principal: Principal, tx: Tx, index: Landing): Pr
   if (decided.rows.length === 0) {
     throw new Error("the suggestion was decided by somebody else while this act was in flight");
   }
-  if (index.acceptance.kind !== SUGGESTION_REPAIR_KIND) return;
+  if (acceptance.kind !== SUGGESTION_REPAIR_KIND) return;
 
   await tx.query(
     `UPDATE concept_verification SET content_hash = $3, origin = $4
@@ -341,6 +388,10 @@ export const landRows = async (principal: Principal, tx: Tx, index: Landing): Pr
   );
 };
 
+/**
+ * Swaps each `[before, after]` sha in `bundle_commit` and `concept_index`; answers how many bundle
+ * commits changed.
+ */
 export const moveBundleCommits = async (
   platform: PlatformPrincipal,
   tx: Tx,
@@ -385,6 +436,11 @@ type RewrittenRow = {
   readonly content_hash: string;
 };
 
+/**
+ * Re-reads each rewritten path at its indexed commit, refreshes the index row, and moves the
+ * concept's checks onto a changed hash.
+ * @throws when the bundle holds a file the platform cannot read.
+ */
 export const carryChecksOntoRewrite = async (
   platform: PlatformPrincipal,
   tx: Tx,

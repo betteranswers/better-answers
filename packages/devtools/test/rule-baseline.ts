@@ -1,21 +1,10 @@
-import { existsSync, readFileSync } from "node:fs";
-import path from "node:path";
-
-import { readOxlintConfig, repositoryRoot } from "@better-answers/devtools/oxlint-config";
+import { readOxlintConfig } from "@better-answers/devtools/oxlint-config";
 import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
-import { expect } from "vitest";
 
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
 type RuleBaseline = {
-  readonly listed: readonly string[];
-  /** The first listed file; fails the calling test when the list is empty. */
-  readonly onTheList: () => string;
   readonly refusedFiles: (tree: Tree) => readonly string[];
-  /** Listed files the tree no longer has. */
-  readonly gone: () => readonly string[];
-  /** Listed files the rule would no longer refuse if they were unlisted. */
-  readonly cleared: () => readonly string[];
 };
 
 type Smoke = { readonly tree: Tree; readonly flagged: readonly string[] };
@@ -28,7 +17,7 @@ const partsOf = (rule: string): { readonly plugin: string; readonly name: string
     : { plugin: rule.slice(0, slash), name: rule.slice(slash + 1) };
 };
 
-/** Lints fixture trees under `rule` as the root config sets it, baseline overrides included. */
+/** Lints fixture trees under `rule` as the root config sets it, its overrides included. */
 export const ruleBaseline = (rule: string, smoke: Smoke): RuleBaseline => {
   const { plugin, name } = partsOf(rule);
   const config = readOxlintConfig();
@@ -38,7 +27,6 @@ export const ruleBaseline = (rule: string, smoke: Smoke): RuleBaseline => {
       ? []
       : [{ files: override.files ?? [], rules: { [rule]: setting } }];
   });
-  const listed = overrides.flatMap((override) => override.files);
 
   /** Read off the root config, so a setting it loosens or an exemption it widens fails here. */
   const lint = oxlintOver(
@@ -61,33 +49,5 @@ export const ruleBaseline = (rule: string, smoke: Smoke): RuleBaseline => {
       ),
     ].sort();
 
-  const onTheList = (): string => {
-    const [first] = listed;
-    expect(
-      first,
-      "the baseline list is empty: delete its override from .oxlintrc.json and the cases reading it.",
-    ).toBeDefined();
-    return first ?? "";
-  };
-
-  const present = (file: string): boolean => existsSync(path.join(repositoryRoot, file));
-
-  /** Each listed file is copied under a path no override names, so the rule reads it as new. */
-  const cleared = (): readonly string[] => {
-    const moved = (file: string): string => path.posix.join("unlisted", file);
-    const kept = listed.filter(present);
-    const tree = Object.fromEntries(
-      kept.map((file) => [moved(file), readFileSync(path.join(repositoryRoot, file), "utf8")]),
-    );
-    const stillRefused = refusedFiles(tree);
-    return kept.filter((file) => !stillRefused.includes(moved(file)));
-  };
-
-  return {
-    listed,
-    onTheList,
-    refusedFiles,
-    gone: () => listed.filter((file) => !present(file)),
-    cleared,
-  };
+  return { refusedFiles };
 };

@@ -266,12 +266,10 @@ worker's locked environment — the one Python toolchain the repository installs
 ## The complexity cap — stock rules, in root `check`
 
 oxlint's `complexity` rule holds every function to 8 at error, and ruff's `C901` holds the
-same 8 in the worker and in `python/ruff.toml`. The files over the cap when it landed are
-listed by path in one `.oxlintrc.json` override. The list only shrinks.
+same 8 in the worker and in `python/ruff.toml`. No override or per-file ignore exempts a file.
 
 `test/complexity-cap.test.ts` runs oxlint over a throwaway tree at the root config's setting.
-A function of 9 is refused off the list and accepted on it, and a function of 8 is accepted.
-Every listed file must still hold a function over 8, so a file brought under drops its line.
+A function of 9 is refused, and a function of 8 is accepted.
 `apps/worker/tests/test_complexity_cap.py` refuses a function of 9 and accepts one of 8 under
 both ruff configs, and fails any `C901` entry in the worker's `per-file-ignores`.
 

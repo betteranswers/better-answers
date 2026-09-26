@@ -380,16 +380,6 @@
       "rules": {
         "node/no-process-env": "off"
       }
-    },
-    {
-      "files": [
-        "packages/core/src/concepts/file.ts",
-        "packages/core/src/concepts/landing.ts",
-        "packages/core/src/concepts/loader.ts"
-      ],
-      "rules": {
-        "complexity": "off"
-      }
     }
   ],
   "ignorePatterns": [
