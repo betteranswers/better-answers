@@ -16,6 +16,8 @@ from citations import citation_in
 
 SUFFIX = ".py"
 
+UNREADABLE = (OSError, SyntaxError, tokenize.TokenError, UnicodeDecodeError)
+
 WORD_LIMIT = 25
 
 DOCSTRING_LIMIT = 50
@@ -273,13 +275,21 @@ def _under(root: Path) -> Iterable[Path]:
     return root.rglob(f"*{SUFFIX}")
 
 
+def _argv_refusal(named: list[Path]) -> str | None:
+    if not named:
+        return "name at least one path to read"
+    missing = [str(root) for root in named if not root.exists()]
+    return f"no path at {', '.join(missing)}" if missing else None
+
+
 def main(argv: list[str]) -> int:
-    """Answers 0 when clean, 1 with findings printed, and 2 when no
-    path is named or a file cannot be decoded or parsed."""
-    if not argv:
-        print("comment_gate: name at least one path to read", file=sys.stderr)
+    """0: clean. 1: findings. 2: no path is named, a named path does not exist,
+    or a file cannot be read, decoded or parsed."""
+    named = [Path(root) for root in argv]
+    refused = _argv_refusal(named)
+    if refused is not None:
+        print(f"comment_gate: {refused}", file=sys.stderr)
         return 2
-    named = (Path(root) for root in argv)
     files = sorted(
         {
             found
@@ -293,8 +303,8 @@ def main(argv: list[str]) -> int:
         try:
             findings.extend(_findings(path, path.read_text(encoding="utf8")))
 
-        except (SyntaxError, tokenize.TokenError, UnicodeDecodeError) as refused:
-            print(f"comment_gate: {path} could not be read: {refused}", file=sys.stderr)
+        except UNREADABLE as unread:
+            print(f"comment_gate: {path} could not be read: {unread}", file=sys.stderr)
             return 2
     for finding in sorted(findings):
         print(finding)
