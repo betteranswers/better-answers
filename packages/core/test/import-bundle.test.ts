@@ -893,7 +893,7 @@ describe("what the import refuses before it writes anything", () => {
       { file: "company/answers/untitled.md", reason: "type-or-title-missing", about: "title" },
     ],
     [
-      "a link to a file that is not a concept in the tree",
+      "a link to no concept in the tree",
       (verifiers: Verifiers) =>
         oneConcept(verifiers, "company/answers/dangling.md", {
           title: "Dangling",
@@ -906,7 +906,7 @@ describe("what the import refuses before it writes anything", () => {
       },
     ],
     [
-      "a verifier who is not a member of the workspace",
+      "a verifier who is not a workspace member",
       () =>
         oneConcept({ mona: "", theo: "" }, "company/answers/stranger.md", {
           title: "Stranger",
@@ -986,12 +986,15 @@ describe("what the import refuses before it writes anything", () => {
         }),
       { file: "manifest.yaml", reason: "manifest-malformed", about: "id" },
     ],
-  ])("refuses %s, naming the file and the reason", async (_shape, tree, unsound) => {
+  ])("refuses %s", async (_shape, tree, unsound) => {
     const { scenario, verifiers } = await arranged();
 
     const refused = await importing(scenario, scenario.editor, { tree: tree(verifiers) });
 
-    expect(refused).toEqual({ ok: false, error: { kind: "unsound", ...unsound } });
+    expect(refused, "the refusal names the file and the reason").toEqual({
+      ok: false,
+      error: { kind: "unsound", ...unsound },
+    });
     await nothingWritten(scenario);
   });
 

@@ -283,30 +283,18 @@ describe("an Admin binds an upload", () => {
   });
 
   it.each([
-    [
-      "a binding id the caller did not mint as one",
-      { bindingId: "ws_handbook" },
-      { bindingId: "bad-format" },
-    ],
+    ["a malformed binding id", { bindingId: "ws_handbook" }, { bindingId: "bad-format" }],
     ["a binding nobody named", { name: "   " }, { name: "too-small" }],
-    ["a file the source system calls nothing", { fileName: "  " }, { fileName: "too-small" }],
+    ["a blank file name", { fileName: "  " }, { fileName: "too-small" }],
+    ["a class outside the glossary", { sensitivity: "Secret" }, { sensitivity: "not-in-set" }],
+    ["an audience outside the glossary", { audience: "the board" }, { audience: "not-in-set" }],
     [
-      "a class the glossary does not have",
-      { sensitivity: "Secret" },
-      { sensitivity: "not-in-set" },
-    ],
-    [
-      "an audience the glossary does not have",
-      { audience: "the board" },
-      { audience: "not-in-set" },
-    ],
-    [
-      "groups named under the audience that takes none",
+      "groups under an audience taking none",
       { audienceGroups: ["01J6NNNNNNNNNNNNNNNNNNNNN2"] },
       { audience: "refused" },
     ],
-    ["a size that is not a whole number of bytes", { byteSize: 12.5 }, { byteSize: "wrong-type" }],
-    ["a media type of nothing at all", { mediaType: "   " }, { mediaType: "too-small" }],
+    ["a fractional byte size", { byteSize: 12.5 }, { byteSize: "wrong-type" }],
+    ["a blank media type", { mediaType: "   " }, { mediaType: "too-small" }],
   ])("names the field of %s", (_case, override, fields) => {
     expect(parse(bindUploadFields, handbookAsked(override))).toEqual({
       ok: false,
@@ -344,14 +332,14 @@ describe("an Admin binds an upload", () => {
   });
 
   it.each([
-    ["a spreadsheet", "application/vnd.ms-excel"],
-    ["an image", "image/png"],
+    ["a spreadsheet, outside the allow-list", "application/vnd.ms-excel"],
+    ["an image, outside the allow-list", "image/png"],
 
     ...typesOutsideTheAgreement.map((outside) => [
-      `${outside.media_type}, which the agreement both tiers read places outside the list`,
+      `${outside.media_type}, outside the tiers' agreement`,
       outside.media_type,
     ]),
-  ])("refuses %s, outside the allow-list, before reading a byte", async (_case, mediaType) => {
+  ])("refuses %s, before reading a byte", async (_case, mediaType) => {
     const scenario = await arrange();
     const { upload, input } = handbookOffered({ mediaType });
 
@@ -884,10 +872,10 @@ describe("an Admin publishes a binding", () => {
   });
 
   it.each([
-    ["the lawful basis is not recorded", { lawfulBasisRecorded: false }],
-    ["the privacy information has not been updated", { privacyInformationUpdated: false }],
-    ["the DPIA is not referenced", { dpiaReferenced: false }],
-  ])("refuses the publish when %s, and writes nothing", async (_case, override) => {
+    ["lawful basis is recorded", { lawfulBasisRecorded: false }],
+    ["privacy information is updated", { privacyInformationUpdated: false }],
+    ["the DPIA is referenced", { dpiaReferenced: false }],
+  ])("refuses a publish unless %s, writing nothing", async (_case, override) => {
     const scenario = await arrange();
     const { bindingId, jobId } = await boundHandbook(scenario);
     await runEndedAt(scenario.workspaceId, bindingId, jobId, "done", RUN_FINISHED_AT);

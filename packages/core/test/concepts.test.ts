@@ -1647,7 +1647,7 @@ describe("opening a concept by IRI", () => {
     ["a month the calendar has not got", "2020-13-01", "current"],
     ["a datetime with no offset", "2020-01-01T00:00:00", "current"],
     ["a two-digit year `Date` would remap", "0020-01-01", "out-of-date"],
-    ["something that is not a date", "when the contract ends", "current"],
+    ["a non-date", "when the contract ends", "current"],
 
     ["a past date behind a prefix", "not-a-date2020-01-01", "current"],
 
