@@ -5,6 +5,13 @@ import type { SaidOfWord } from "@/shared/refusal-words.ts";
  */
 export const DISPLAY_NAME_MAX_CHARACTERS = 100;
 
+/** Wherever a person gives their own name: the display-name screen and the invitation screen. */
+export const DISPLAY_NAME_WORDS = {
+  heading: "Your name",
+  label: "Display name",
+  hint: "Members of every workspace you join see this name.",
+} as const;
+
 /** The rule's own refusals, said the same wherever a display name is typed. */
 export const DISPLAY_NAME_REFUSED = {
   "display-name-empty": {

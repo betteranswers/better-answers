@@ -127,7 +127,6 @@ const refusalAgainst = (
   if (invitee.alreadyAMember) return "already-a-member";
   if (invitation.status !== INVITATION_WAITING_STATUS) return "no-such-invitation";
   if (invitation.expiresAt <= now) return "invitation-expired";
-  if (hasNoDisplayName(invitee.name)) return "no-display-name";
   return undefined;
 };
 
@@ -174,8 +173,9 @@ export type InvitationRead = {
 };
 
 /**
- * What accepting would join, for the person the invitation is addressed to; it refuses as
- * accepting would, so the page says so before the click.
+ * What accepting would join, for the person the invitation is addressed to. It refuses as
+ * accepting would, so the page says so before the click, save a missing display name: the page
+ * asks for that beside the join.
  */
 export const readInvitation = async (
   platform: PlatformPrincipal,
@@ -232,6 +232,7 @@ const join = async (
   // The invitation's row lock queues a second accept of it, which then finds the member.
   const held = await judged(tx, joining, "lock");
   if (!held.ok) return held;
+  if (hasNoDisplayName(held.value.invitee.name)) return err("no-display-name");
   const { workspaceId, workspaceName, role } = held.value.invitation;
 
   await tx.query("UPDATE invitation SET status = $2 WHERE id = $1", [

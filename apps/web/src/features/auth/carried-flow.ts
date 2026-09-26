@@ -24,6 +24,13 @@ const safeReturnPath = (value: string | null | undefined): string | undefined =>
   return value;
 };
 
+const INVITATIONS = "/invitations/";
+
+export const invitationAt = (invitationId: string): string =>
+  `${INVITATIONS}${encodeURIComponent(invitationId)}`;
+
+export const isAnInvitation = (path: string): boolean => path.startsWith(INVITATIONS);
+
 /** A screen, such as the sign-in screen, asked to send the person on to `path` once done. */
 export const backTo = (screen: string, path: string): string =>
   `${screen}?redirect=${encodeURIComponent(path)}`;
