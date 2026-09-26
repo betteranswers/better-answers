@@ -16,6 +16,9 @@ import {
   APEX_HOSTNAME,
   CLAUDE_CLIENT_ID,
   CLAUDE_REDIRECT_URI,
+  KEYED_CLIENT_ID,
+  KEYED_CLIENT_JWKS_URI,
+  keyedClientAssertion,
   LOOKALIKE_CLIENT_ID,
   MCP_URL,
   PUBLIC_URL,
@@ -288,6 +291,29 @@ describe("the flow, as claude.ai drives it", () => {
     expect(response.status).toBe(302);
     const target = new URL(response.headers.get("location") ?? "");
     expect(target.searchParams.get("error")).toBe("invalid_target");
+  });
+
+  it("fetches a keyed client's jwks_uri through the metadata fetcher", async () => {
+    const asked = app.metadataFetches.length;
+    const tokenEndpoint = `${PUBLIC_URL}/oauth2/token`;
+
+    const response = await app.client().fetch(tokenEndpoint, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        code: "no-such-code",
+        redirect_uri: CLAUDE_REDIRECT_URI,
+        client_id: KEYED_CLIENT_ID,
+        client_assertion_type: "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+        client_assertion: await keyedClientAssertion(tokenEndpoint),
+        code_verifier: pkce().verifier,
+        resource: MCP_URL,
+      }).toString(),
+    });
+
+    expect(app.metadataFetches.slice(asked)).toEqual([KEYED_CLIENT_ID, KEYED_CLIENT_JWKS_URI]);
+    expect(await json(response, refusal)).toEqual({ error: "invalid_grant" });
   });
 });
 

@@ -5,8 +5,6 @@ import { attempt } from "@better-answers/core/kernel";
 
 import { createClientMetadataFetcher } from "../lifts/better-auth-cimd-node/index.ts";
 import {
-  CIMD_FETCH_TIMEOUT_MS,
-  CIMD_RESPONSE_CAP_BYTES,
   createAuth,
   createAuthRoutes,
   createTokenVerifier,
@@ -57,11 +55,7 @@ export function createServer(dependencies: ServerDependencies): Hono {
     secret: dependencies.authSecret,
     sendEmail: dependencies.sendEmail,
     fetchClientMetadataResource:
-      dependencies.fetchClientMetadataResource ??
-      createClientMetadataFetcher({
-        timeoutMs: CIMD_FETCH_TIMEOUT_MS,
-        maxBodyBytes: CIMD_RESPONSE_CAP_BYTES,
-      }),
+      dependencies.fetchClientMetadataResource ?? createClientMetadataFetcher(),
     logger,
   });
 
