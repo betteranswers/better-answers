@@ -4,6 +4,7 @@ import path from "node:path";
 import { Writable } from "node:stream";
 
 import type { Hono } from "hono";
+import { exportJWK, generateKeyPair, SignJWT, type GenerateKeyPairResult } from "jose";
 import { Pool } from "pg";
 import { pino } from "pino";
 import { z } from "zod";
@@ -63,6 +64,31 @@ const CLAUDE_METADATA_DOCUMENT = {
   response_types: ["code"],
   token_endpoint_auth_method: "none",
 } as const;
+
+/** A claude.ai client that signs its token requests with a key it publishes at `jwks_uri`. */
+export const KEYED_CLIENT_ID = "https://claude.ai/oauth/keyed-client-metadata";
+export const KEYED_CLIENT_JWKS_URI = "https://claude.ai/oauth/keyed-client-jwks.json";
+/** Shared by the assertion's header and the published key, so the two cannot drift. */
+const KEYED_CLIENT_KEY = { alg: "ES256", kid: "keyed" } as const;
+let keyedClientKeyPair: Promise<GenerateKeyPairResult> | undefined;
+const keyPairOfKeyedClient = () =>
+  (keyedClientKeyPair ??= generateKeyPair(KEYED_CLIENT_KEY.alg, { extractable: true }));
+
+/** A `private_key_jwt` client assertion from the keyed client, for `audience`. */
+export const keyedClientAssertion = async (audience: string): Promise<string> =>
+  new SignJWT({})
+    .setProtectedHeader(KEYED_CLIENT_KEY)
+    .setIssuer(KEYED_CLIENT_ID)
+    .setSubject(KEYED_CLIENT_ID)
+    .setAudience(audience)
+    .setJti(ulid())
+    .setIssuedAt()
+    .setExpirationTime("1m")
+    .sign((await keyPairOfKeyedClient()).privateKey);
+
+const keyedClientJwks = async () => ({
+  keys: [{ ...(await exportJWK((await keyPairOfKeyedClient()).publicKey)), ...KEYED_CLIENT_KEY }],
+});
 
 /** On a host that only resembles Claude's; the metadata fixture serves it a document too. */
 export const LOOKALIKE_CLIENT_ID = "https://claude-ai.example/oauth/mcp-oauth-client-metadata";
@@ -184,12 +210,23 @@ const bootstrap: PlatformPrincipal = {
 
 const cimdFixture = async (input: string | URL | Request): Promise<Response> => {
   const url = new URL(input instanceof Request ? input.url : String(input));
-  const document = (clientId: string, redirectUri: string) =>
+  const document = (clientId: string, redirectUri: string, fields: object = {}) =>
     Response.json(
-      { ...CLAUDE_METADATA_DOCUMENT, client_id: clientId, redirect_uris: [redirectUri] },
+      { ...CLAUDE_METADATA_DOCUMENT, client_id: clientId, redirect_uris: [redirectUri], ...fields },
       { headers: { "content-type": "application/json", "cache-control": "max-age=3600" } },
     );
   if (url.href === CLAUDE_CLIENT_ID) return document(CLAUDE_CLIENT_ID, CLAUDE_REDIRECT_URI);
+  if (url.href === KEYED_CLIENT_ID) {
+    return document(KEYED_CLIENT_ID, CLAUDE_REDIRECT_URI, {
+      token_endpoint_auth_method: "private_key_jwt",
+      jwks_uri: KEYED_CLIENT_JWKS_URI,
+    });
+  }
+  if (url.href === KEYED_CLIENT_JWKS_URI) {
+    return Response.json(await keyedClientJwks(), {
+      headers: { "content-type": "application/json" },
+    });
+  }
   if (url.href === LOOKALIKE_CLIENT_ID) {
     return document(LOOKALIKE_CLIENT_ID, LOOKALIKE_REDIRECT_URI);
   }
