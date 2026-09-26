@@ -1,5 +1,6 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { SELECT_FIRST } from "@/shared/keystroke-words.ts";
 import { screenById, viewNamed, viewsOf } from "@/shared/screens.ts";
 
 import { expect, test } from "./browser.ts";
@@ -493,9 +494,7 @@ test.describe("a member, opened as a sheet", () => {
     await expect(memberRows(page)).toHaveCount(3);
 
     await page.keyboard.press("c");
-    await expect(membersRegion(page)).toContainText(
-      "Move focus to a member first: the keystroke acts on the member in focus.",
-    );
+    await expect(membersRegion(page)).toContainText(SELECT_FIRST.member);
 
     const keystrokes = await keystrokesListed(page, people.name);
     await expect(keystrokes).toContainText("Open the member in focus");
@@ -628,9 +627,7 @@ test.describe("revoking a member's credentials here", () => {
     await expect(memberRows(page)).toHaveCount(3);
 
     await page.keyboard.press("v");
-    await expect(membersRegion(page)).toContainText(
-      "Move focus to a member first: the keystroke acts on the member in focus.",
-    );
+    await expect(membersRegion(page)).toContainText(SELECT_FIRST.member);
 
     await memberButton(page, "Sam Okoro").focus();
     await page.keyboard.press("v");
@@ -748,9 +745,7 @@ test.describe("removing a member from their sheet", () => {
     await expect(memberRows(page)).toHaveCount(3);
 
     await page.keyboard.press("d");
-    await expect(membersRegion(page)).toContainText(
-      "Move focus to a member first: the keystroke acts on the member in focus.",
-    );
+    await expect(membersRegion(page)).toContainText(SELECT_FIRST.member);
 
     await memberButton(page, "Sam Okoro").focus();
     await page.keyboard.press("d");

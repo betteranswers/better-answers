@@ -4,7 +4,7 @@ import { useId, useMemo, useRef, useState, type FormEvent, type RefObject } from
 import { EmptyState } from "@/shared/empty-state.tsx";
 import { GridTable } from "@/shared/grid-table.tsx";
 import { KeystrokesAct, useKeystroke } from "@/shared/keystrokes.tsx";
-import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
+import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { screenById } from "@/shared/screens.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
@@ -166,10 +166,7 @@ function CreateGroupForm(properties: {
   );
 }
 
-const NOTHING_IN_FOCUS: Outcome = {
-  tone: "said",
-  words: "Move focus to a group first: the keystroke acts on the group in focus.",
-};
+const NOTHING_IN_FOCUS = selectFirst("group");
 
 type Opened = { readonly groupId: string; readonly at: GroupOpenedAt };
 

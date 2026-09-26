@@ -6,8 +6,7 @@ export const SCREENS = [
     name: "Sources",
     icon: "database",
     path: "/sources",
-    summary:
-      "The workspace's source bindings, what each one is allowed to reach, and the gates that publish and accept what it brings in.",
+    summary: "The documents this workspace learns from.",
     defaultView: "/sources/bindings",
     views: [
       { name: "Bindings", path: "/sources/bindings", built: true },
@@ -24,7 +23,7 @@ export const SCREENS = [
     name: "Suggestions",
     icon: "tray",
     path: "/suggestions",
-    summary: "Every suggestion waiting on a decision, in one queue.",
+    summary: "Suggested changes waiting for a decision.",
     defaultView: "/suggestions/queue",
     views: [{ name: "Queue", path: "/suggestions/queue", built: false }],
   },
@@ -33,8 +32,7 @@ export const SCREENS = [
     name: "Knowledge",
     icon: "map",
     path: "/knowledge",
-    summary:
-      "The review table over every concept and composition on the workspace's map, with its conflicts and its verification requests.",
+    summary: "What this workspace knows, and what needs checking.",
     defaultView: "/knowledge/review-table",
     views: [
       { name: "Review table", path: "/knowledge/review-table", built: false },
@@ -51,7 +49,7 @@ export const SCREENS = [
     name: "Questions",
     icon: "question",
     path: "/questions",
-    summary: "The answer audit — every question the workspace asked, the flagged ones first.",
+    summary: "The questions asked in this workspace, and the answers they got.",
     defaultView: "/questions/answer-audit",
     views: [
       { name: "Answer audit", path: "/questions/answer-audit", built: false },
@@ -64,8 +62,7 @@ export const SCREENS = [
     name: "People",
     icon: "people",
     path: "/people",
-    summary:
-      "The workspace's members, their roles and groups, with owners, thresholds, tokens and the audit log.",
+    summary: "Who can use this workspace, and what each person can do.",
     defaultView: "/people/members",
     views: [
       { name: "Members", path: "/people/members", built: true },
@@ -82,7 +79,7 @@ export const SCREENS = [
     name: "System",
     icon: "pulse",
     path: "/system",
-    summary: "Signals, health, routes and spend, and backups.",
+    summary: "How this workspace is running, and what it costs.",
     defaultView: "/system/routes-and-spend",
     views: [
       { name: "Signals", path: "/system/signals", built: false },

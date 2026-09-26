@@ -1,5 +1,6 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { KEYSTROKE_WORDS, SELECT_FIRST } from "@/shared/keystroke-words.ts";
 import { consoleScreenById, viewNamed } from "@/shared/screens.ts";
 
 import { expect, test } from "./browser.ts";
@@ -392,9 +393,7 @@ test.describe("the console's Everyone view", () => {
 
     await skipLinkReachesTheScreen(page);
     await page.keyboard.press("o");
-    await expect(everyone(page)).toContainText(
-      "Move focus to a person first: the keystroke acts on the person in focus.",
-    );
+    await expect(everyone(page)).toContainText(SELECT_FIRST.person);
 
     const listed = (await keystrokesListed(page, "People")).getByRole("definition");
     await expect(listed).toHaveText([
@@ -404,12 +403,12 @@ test.describe("the console's Everyone view", () => {
       "Correct the display name of the person in focus",
       "Show the previous page of people",
       "Show the next page of people",
-      "List these keystrokes",
+      KEYSTROKE_WORDS.showTheList,
     ]);
     await page.keyboard.press("Escape");
     await expect(listed).toHaveCount(0);
     // The list hands focus back to its button as its exit ends; a key sent sooner goes astray.
-    await expect(page.getByRole("button", { name: "Keystrokes" })).toBeFocused();
+    await expect(page.getByRole("button", { name: KEYSTROKE_WORDS.button })).toBeFocused();
 
     await page.keyboard.press("/");
     await expect(searchBox(page)).toBeFocused();
@@ -838,13 +837,11 @@ test.describe("the console's Names waiting view", () => {
 
     await skipLinkReachesTheScreen(page);
     await page.keyboard.press("c");
-    await expect(namesWaiting(page)).toContainText(
-      "Move focus to a name first: the keystroke acts on the name in focus.",
-    );
+    await expect(namesWaiting(page)).toContainText(SELECT_FIRST.name);
     const listed = await keystrokesListed(page, "People");
     await expect(listed.getByRole("definition")).toHaveText([
       "Correct the display name in focus",
-      "List these keystrokes",
+      KEYSTROKE_WORDS.showTheList,
     ]);
     await keystrokesDismissed(page, listed);
 

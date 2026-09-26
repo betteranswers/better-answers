@@ -4,7 +4,7 @@ import { flushSync } from "react-dom";
 import type { ApiError } from "@/shared/api/trpc.ts";
 import { EmptyState } from "@/shared/empty-state.tsx";
 import { KeystrokesAct, useKeystroke } from "@/shared/keystrokes.tsx";
-import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
+import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { screenById } from "@/shared/screens.ts";
 import type { ViewToolbar } from "@/shared/view-toolbar.tsx";
 
@@ -49,10 +49,7 @@ export const BINDINGS_TOOLBAR: ViewToolbar = {
   ),
 };
 
-const NOTHING_IN_FOCUS: Outcome = {
-  tone: "said",
-  words: "Move focus to a binding first: the keystroke acts on the binding in focus.",
-};
+const NOTHING_IN_FOCUS = selectFirst("binding");
 
 const waitsForItsRun = (binding: ListedBinding): Outcome => ({
   tone: "said",

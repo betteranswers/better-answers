@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import type { REDACTION_TIERS, SENSITIVITIES } from "@better-answers/schema";
 
+import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { CONTROL_CENTRE, type Role } from "@/shared/screens.ts";
 
 const HARNESS = "/__harness";
@@ -369,7 +370,7 @@ export const aMemberSignedInAt = async (
 /** `?` opens a screen's keystrokes from anywhere on it outside a field. */
 export const keystrokesListed = async (page: Page, screen: string): Promise<Locator> => {
   await page.keyboard.press("?");
-  const listed = page.getByRole("dialog", { name: `Keystrokes on ${screen}` });
+  const listed = page.getByRole("dialog", { name: `${KEYSTROKE_WORDS.button} on ${screen}` });
   await expect(listed).toBeVisible();
   return listed;
 };
@@ -378,7 +379,9 @@ export const keystrokesListed = async (page: Page, screen: string): Promise<Loca
 export const keystrokesDismissed = async (page: Page, listed: Locator): Promise<void> => {
   await page.keyboard.press("Escape");
   await expect(listed).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Keystrokes", exact: true })).toBeFocused();
+  await expect(
+    page.getByRole("button", { name: KEYSTROKE_WORDS.button, exact: true }),
+  ).toBeFocused();
 };
 
 /** Read off the screen list, so moving a role's home breaks no spec. */

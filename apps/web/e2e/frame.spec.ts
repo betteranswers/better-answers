@@ -1,5 +1,8 @@
 import type { Locator, Page } from "@playwright/test";
 
+import { ROUTES_WORDS } from "@/features/routes/words.ts";
+import { SCREENS, viewsOf, type Screen } from "@/shared/screens.ts";
+
 import { expect, test } from "./browser.ts";
 import { anAddress, provision, signIn, skipLinkReachesTheScreen } from "./harness.ts";
 
@@ -296,11 +299,11 @@ const tabsOf = (page: Page) => page.getByRole("tablist", { name: "Routes and spe
 const routesCardOf = (page: Page) => page.getByRole("region", { name: "Routes" });
 
 /**
- * The view's read of the routes is issued after the nav paints, so a screen here has not
- * finished starting until its card lists them.
+ * The view reads the routes after the nav paints, so a screen here has started only once its
+ * card says a new workspace has none.
  */
 const theRoutesHaveLanded = (page: Page) =>
-  expect(routesCardOf(page).getByRole("list")).toHaveCount(1);
+  expect(routesCardOf(page).getByText(ROUTES_WORDS.noneSet, { exact: true })).toBeVisible();
 
 test("fills the toolbar with tabs the arrow keys move between", async ({ page, request }) => {
   await signedIn(page, request, "Calder Ironworks");
@@ -349,7 +352,7 @@ test("draws no toolbar over a view without tabs or acts", async ({ page, request
 test("tabs to the toolbar between the top bar and content", async ({ page, request }) => {
   const workspace = await signedIn(page, request, "Wensleydale Precision");
   await page.goto("/system/routes-and-spend");
-  await expect(routesCardOf(page).getByRole("listitem")).toHaveCount(5);
+  await theRoutesHaveLanded(page);
 
   // The order down to the top bar is another test's; starting at its last stop proves this
   // claim without proving that one twice.
@@ -540,4 +543,26 @@ test("closes Screens and views on widening, focusing the navigation control", as
   await expect(railOf(page)).toBeVisible();
   await expect(navOf(page, "System")).toBeVisible();
   await expect(closerOf(page)).toBeFocused();
+});
+
+const opensABuiltView = (screen: Screen): boolean =>
+  viewsOf(screen).some((view) => view.path === screen.defaultView && view.built);
+
+test("leads each built screen with its line, auditing every screen", async ({
+  page,
+  request,
+  passesTheAccessibilityGate,
+}) => {
+  await signedIn(page, request, "Swaledale Foundry");
+
+  for (const screen of SCREENS) {
+    await page.goto(screen.path);
+    await expect(page.getByRole("heading", { level: 1, name: screen.name })).toBeVisible();
+    await passesTheAccessibilityGate();
+  }
+
+  for (const screen of SCREENS.filter(opensABuiltView)) {
+    await page.goto(screen.path);
+    await expect(page.getByRole("main").getByText(screen.summary, { exact: true })).toBeVisible();
+  }
 });

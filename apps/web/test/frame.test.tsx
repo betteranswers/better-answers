@@ -136,12 +136,10 @@ describe("Control Centre's three-region shell", () => {
     expect(screen.getByText(unbuiltLineOf(questions))).toBeDefined();
   });
 
-  it("gives System the routes card and calls the rest unbuilt", async () => {
+  it("gives System the routes card", async () => {
     await openAt("/system");
 
     expect(screen.getByRole("heading", { level: 2, name: "Routes" })).toBeDefined();
-
-    expect(screen.getByText(/The rest of System/)).toBeDefined();
   });
 
   it("says an unknown address names no screen", async () => {

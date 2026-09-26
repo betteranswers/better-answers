@@ -1,6 +1,7 @@
 import { Badge } from "@/shared/ui/badge.tsx";
 
 import { useWorkspaceRoutes, type WorkspaceRoute } from "./list-routes.ts";
+import { ROUTES_WORDS } from "./words.ts";
 
 const PURPOSE_NAMES = {
   extraction: "Extraction",
@@ -12,14 +13,15 @@ const PURPOSE_NAMES = {
 
 const FIXED_PURPOSE: WorkspaceRoute["purpose"] = "embedding";
 
-const FIXED_REASON =
-  "An embedding route never changes once vectors exist: every vector already written was made by the route's model, and a different one would leave them unreadable.";
+type SetRoute = WorkspaceRoute & { readonly provider: string; readonly model: string };
+
+const isSet = (route: WorkspaceRoute): route is SetRoute =>
+  route.provider !== null && route.model !== null;
 
 function RouteFields(properties: { readonly route: WorkspaceRoute }) {
-  const { provider, model } = properties.route;
-  if (provider === null || model === null) {
-    return <p className="mt-1 text-muted-foreground">No route is set.</p>;
-  }
+  const { route } = properties;
+  if (!isSet(route)) return <p className="mt-1 text-muted-foreground">{ROUTES_WORDS.unset}</p>;
+  const { provider, model } = route;
   return (
     <dl className="mt-1 flex flex-col gap-1 sm:flex-row sm:gap-8">
       <div className="flex gap-2">
@@ -34,25 +36,44 @@ function RouteFields(properties: { readonly route: WorkspaceRoute }) {
   );
 }
 
+/** Only an embedding route that exists is fixed, so a purpose with none carries no note. */
+function FixedNote(properties: { readonly route: WorkspaceRoute }) {
+  const { route } = properties;
+  if (route.purpose !== FIXED_PURPOSE || !isSet(route)) return null;
+  return (
+    <>
+      <p className="mt-2">
+        {/* The outline is decoration: a reader who cannot see it loses nothing. */}
+        <Badge variant="outline">{ROUTES_WORDS.fixed}</Badge>{" "}
+        {route.dimensions === null ? null : (
+          <span className="text-muted-foreground">{route.dimensions} dimensions</span>
+        )}
+      </p>
+      <p className="mt-1 text-muted-foreground">{ROUTES_WORDS.fixedReason}</p>
+    </>
+  );
+}
+
 function RouteRow(properties: { readonly route: WorkspaceRoute }) {
   const { route } = properties;
   return (
     <li className="border-t border-border py-3 first:border-t-0 first:pt-0">
       <h3 className="font-medium text-foreground">{PURPOSE_NAMES[route.purpose]}</h3>
       <RouteFields route={route} />
-      {route.purpose === FIXED_PURPOSE ? (
-        <>
-          <p className="mt-2">
-            {/* The outline is decoration: a reader who cannot see it loses nothing. */}
-            <Badge variant="outline">Fixed</Badge>{" "}
-            {route.dimensions === null ? null : (
-              <span className="text-muted-foreground">{route.dimensions} dimensions</span>
-            )}
-          </p>
-          <p className="mt-1 text-muted-foreground">{FIXED_REASON}</p>
-        </>
-      ) : null}
+      <FixedNote route={route} />
     </li>
+  );
+}
+
+/** With no route set, one line says so rather than five rows each saying it. */
+function RouteList(properties: { readonly routes: readonly WorkspaceRoute[] }) {
+  if (!properties.routes.some(isSet)) return <p>{ROUTES_WORDS.noneSet}</p>;
+  return (
+    <ul>
+      {properties.routes.map((route) => (
+        <RouteRow key={route.purpose} route={route} />
+      ))}
+    </ul>
   );
 }
 
@@ -62,26 +83,12 @@ export function RoutesCard() {
   return (
     <section aria-labelledby="routes" className="mt-6 border border-border bg-card p-4">
       <h2 id="routes">Routes</h2>
-      <p className="mt-2 text-muted-foreground">
-        Which model does which job in this workspace. Listed only: choosing a route is not part of
-        this screen.
-      </p>
+      <p className="mt-2 text-muted-foreground">{ROUTES_WORDS.lead}</p>
 
       <div aria-live="polite" className="mt-4">
-        {routes.isPending ? <p>The routes are still loading.</p> : null}
-        {routes.isError ? (
-          <p>
-            This workspace's routes did not load, so none are listed below. An Admin can take it up
-            with the platform.
-          </p>
-        ) : null}
-        {routes.data === undefined ? null : (
-          <ul>
-            {routes.data.map((route) => (
-              <RouteRow key={route.purpose} route={route} />
-            ))}
-          </ul>
-        )}
+        {routes.isPending ? <p>{ROUTES_WORDS.loading}</p> : null}
+        {routes.isError ? <p>{ROUTES_WORDS.failed}</p> : null}
+        {routes.data === undefined ? null : <RouteList routes={routes.data} />}
       </div>
     </section>
   );
