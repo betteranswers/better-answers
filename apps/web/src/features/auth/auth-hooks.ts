@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { BetterFetchError } from "better-auth/client";
+import { useState } from "react";
 import { z } from "zod";
 
 import { useTRPC } from "@/shared/api/trpc.ts";
@@ -15,6 +16,8 @@ import { useTRPC } from "@/shared/api/trpc.ts";
 import { authClient } from "./auth-client.ts";
 import { backTo, isAnInvitation, nextAfterSignIn } from "./carried-flow.ts";
 import { forgetMembership } from "./membership.ts";
+import { rememberTheSession, sessionRemembered } from "./session-memory.ts";
+import type { Arrival } from "./sign-in-words.ts";
 
 const AUTH_KEYS = {
   session: ["auth", "session"],
@@ -46,9 +49,62 @@ const listOrganizationsOptions = () =>
 
 export const useListOrganizations = () => useQuery(listOrganizationsOptions());
 
+/** The per-email ceiling in front of Better Auth answers the first; Better Auth's own, the second. */
+const WAIT_HEADERS = ["retry-after", "x-retry-after"] as const;
+
+const wholeSeconds = z
+  .string()
+  .trim()
+  .regex(/^\d+$/)
+  .transform((seconds) => Number(seconds));
+
+const waitNamedBy = (response: Response): number | undefined => {
+  for (const header of WAIT_HEADERS) {
+    const named = wholeSeconds.safeParse(response.headers.get(header));
+    if (named.success) return named.data;
+  }
+  return undefined;
+};
+
+const SERVER_FAILED = 500;
+
+/** Better Auth refused a code's send or its check, with the wait a ceiling named, if it named one. */
+export class CodeRefused extends Error {
+  readonly status: number;
+  readonly waitSeconds: number | undefined;
+
+  constructor(status: number, waitSeconds: number | undefined) {
+    super(`answered ${String(status)}`);
+    this.name = "CodeRefused";
+    this.status = status;
+    this.waitSeconds = waitSeconds;
+  }
+}
+
+type WaitReading = { readonly onError: (context: { readonly response: Response }) => void };
+
+/**
+ * The client's error drops the response's headers, so the wait is read as the response lands. A
+ * server's failure is no refusal.
+ */
+const unwrapWithTheWait = async <TData>(
+  call: (reading: WaitReading) => Promise<{ data: TData; error: { status: number } | null }>,
+): Promise<TData> => {
+  let waitSeconds: number | undefined;
+  const { data, error } = await call({
+    onError: ({ response }) => {
+      waitSeconds = waitNamedBy(response);
+    },
+  });
+  if (error === null) return data;
+  if (error.status >= SERVER_FAILED) throw new Error(`answered ${String(error.status)}`);
+  throw new CodeRefused(error.status, waitSeconds);
+};
+
 const sendVerificationOtpOptions = () =>
-  mutationOptions<unknown, BetterFetchError, { email: string; type: "sign-in" }>({
-    mutationFn: (input) => unwrap(authClient.emailOtp.sendVerificationOtp(input)),
+  mutationOptions<unknown, Error, { email: string; type: "sign-in" }>({
+    mutationFn: (input) =>
+      unwrapWithTheWait((reading) => authClient.emailOtp.sendVerificationOtp(input, reading)),
   });
 
 export const useSendVerificationOtp = () => useMutation(sendVerificationOtpOptions());
@@ -59,16 +115,32 @@ export const hasADisplayName = (name: string): boolean => name.trim() !== "";
 export type SignedIn = { readonly displayNameGiven: boolean };
 
 const signInEmailOtpOptions = () =>
-  mutationOptions<SignedIn, BetterFetchError, { email: string; otp: string }>({
+  mutationOptions<SignedIn, Error, { email: string; otp: string }>({
     mutationFn: async (input) => {
-      const answer = await unwrap(authClient.signIn.emailOtp(input));
+      const answer = await unwrapWithTheWait((reading) =>
+        authClient.signIn.emailOtp(input, reading),
+      );
       // An answer naming nobody sends the person to the display-name screen, whose own read
       // decides.
       return { displayNameGiven: answer !== null && hasADisplayName(answer.user.name) };
     },
+    onSuccess: () => {
+      rememberTheSession("held");
+    },
   });
 
 export const useSignInEmailOtp = () => useMutation(signInEmailOtpOptions());
+
+/**
+ * Said only once the api reads no session: a failed sign-out, or a visit while signed in, leaves
+ * one standing.
+ */
+export const useArrival = (): Arrival | undefined => {
+  const [remembered] = useState(sessionRemembered);
+  const session = useQuery({ ...sessionOptions(), enabled: remembered !== undefined });
+  if (remembered === undefined || session.data !== null) return undefined;
+  return remembered === "signed-out" ? "signed-out" : "session-ended";
+};
 
 /**
  * Undefined when unread: the screen then stands, and its own next request says in words what went
@@ -161,6 +233,7 @@ export const useSignOut = (returnTo?: string) => {
         // session the person asked to leave.
         onSettled: () => {
           queryClient.clear();
+          rememberTheSession("signed-out");
           const href = returnTo === undefined ? "/sign-in" : backTo("/sign-in", returnTo);
           void navigate({ href, replace: true });
         },

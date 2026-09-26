@@ -1,3 +1,5 @@
+import type { CarriedOn } from "./sign-in-words.ts";
+
 const SIGNATURE = "sig";
 
 /**
@@ -40,4 +42,11 @@ export const nextAfterSignIn = (query: string): string => {
   const carried = carriedFlow(query);
   if (carried !== "") return `/choose-workspace${carried}`;
   return safeReturnPath(new URLSearchParams(query).get("redirect")) ?? "/";
+};
+
+/** Claude is the one client the authorization server admits, so a signed flow is Claude's. */
+export const carriedOnTo = (query: string): CarriedOn | undefined => {
+  if (carriedFlow(query) !== "") return "connecting";
+  const back = safeReturnPath(new URLSearchParams(query).get("redirect"));
+  return back !== undefined && isAnInvitation(back) ? "joining" : undefined;
 };

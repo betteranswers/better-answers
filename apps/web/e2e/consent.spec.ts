@@ -14,6 +14,7 @@ import {
   provision,
   revokeCredentials,
   signIn,
+  signInHeading,
 } from "./harness.ts";
 
 const landedAt = (page: Page): URL => new URL(page.url());
@@ -183,7 +184,7 @@ test("asks an unnamed member's name, then carries on through consent", async ({
   await catchClaudesRedirect(page);
 
   await page.goto(claudesAuthorizeUrl(origin, { prompt: "consent", state: "named-first" }));
-  await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
+  await expect(signInHeading(page, "connecting")).toBeVisible();
   expect(landedAt(page).pathname).toBe("/sign-in");
   await signIn(page, request, email);
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { onThisBrowser } from "@/shared/browser-storage.ts";
+import { keepOnThisBrowser, onThisBrowser } from "@/shared/browser-storage.ts";
 
 const KEPT_UNDER = "better-answers.secondary-nav";
 
@@ -21,7 +21,7 @@ export const useSecondaryNavShowing = (): SecondaryNavShowing => {
     showing,
     show: (next: boolean) => {
       setShowing(next);
-      onThisBrowser()?.setItem(KEPT_UNDER, next ? OPEN : CLOSED);
+      keepOnThisBrowser(KEPT_UNDER, next ? OPEN : CLOSED);
     },
   };
 };

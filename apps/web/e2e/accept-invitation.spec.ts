@@ -18,8 +18,10 @@ import {
   landedAtHome,
   person,
   provision,
+  quoted,
   saysItsSentenceNotItsWord,
   signIn,
+  signInHeading,
   theActLandedWithinItsBudget,
 } from "./harness.ts";
 
@@ -36,8 +38,6 @@ const joinButton = (page: Page, workspace: string) =>
   page.getByRole("button", { name: INVITATION_WORDS.join(workspace) });
 
 const nameField = (page: Page) => page.getByLabel(DISPLAY_NAME_WORDS.label);
-
-const quoted = (words: string) => JSON.stringify(words);
 
 /** A workspace, a named inviter and a waiting invitation to a fresh address, not yet signed in. */
 const anInvitation = async (request: APIRequestContext, workspaceName: string, role: Role) => {
@@ -61,7 +61,7 @@ test("an invited newcomer names themselves on the invitation, then joins", async
   const { address, link } = await anInvitation(request, "Calder Joinery", "Editor");
 
   await page.goto(link);
-  await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
+  await expect(signInHeading(page, "joining")).toBeVisible();
   await signIn(page, request, address);
 
   await expect(invitationHeading(page, "Calder Joinery")).toBeVisible();
@@ -259,7 +259,7 @@ test("refuses a person at another address, offering the invited one", async ({
   await page.keyboard.press("Escape");
   await expect(keystrokes).toBeHidden();
   await page.keyboard.press("s");
-  await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
+  await expect(signInHeading(page, "joining")).toBeVisible();
   await signIn(page, request, address);
 
   await expect(invitationHeading(page, "Brightwater Estimating")).toBeVisible();

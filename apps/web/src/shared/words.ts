@@ -1,3 +1,6 @@
+/** The product's name as a reader meets it; `better-answers` is the handle, never the name. */
+export const PRODUCT_NAME = "Better Answers";
+
 const DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" });
 
 const WEEKDAY = new Intl.DateTimeFormat("en-GB", { weekday: "long" });
