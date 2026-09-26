@@ -30,8 +30,8 @@ Two modes:
   not hours. This is the practice.
 - **Full-repo baseline**: occasional audit (manually-dispatched workflow or
   background run) to track the overall mutation score. Never block a PR on
-  it. Reference setup: a `mutation:full` package script (`stryker run
-  --incrementalFile reports/stryker-incremental-full.json --mutate
+  it. Reference setup: a `mutation:full` package script (`node
+  ./node_modules/@stryker-mutator/core/bin/stryker.js run --incrementalFile reports/stryker-incremental-full.json --mutate
   'src/**/*.ts,!src/**/*.test.ts,!<generated>,!<test-utils>'` — separate
   incremental file so audit and scoped runs don't poison each other's
   cache) plus a `workflow_dispatch`-only GitHub Actions job that runs it
@@ -66,7 +66,9 @@ there are noise; use Stryker's `"file.ts:120-160"` line-range syntax to
 target just the logic (it works, and it's how to mutate one function
 inside a big route file).
 
-Run `npx stryker run`; the HTML report lands in `reports/mutation/`.
+Run the workspace's `mutation` script, `pnpm --filter <workspace> run
+mutation` (flags after it reach Stryker); the HTML report lands in
+`reports/mutation/`.
 `incremental` caches verdicts so re-runs after adding tests only re-test
 affected mutants — but static mutants (top-level `const` initializers) can
 stay stale in the cache; do a fresh run (delete
@@ -83,8 +85,11 @@ Known sharp edges (hit in practice):
   and add bulky gitignored dirs (worktrees, reports) to Stryker's
   `ignorePatterns`, or sandboxes balloon and tests double-run.
 - Add package scripts so runs/cleanup are one approvable command, e.g.
-  `"mutation": "stryker run"`, `"clean:mutation": "rm -rf .stryker-tmp
-  reports/mutation reports/stryker-incremental.json"`.
+  `"mutation": "node ./node_modules/@stryker-mutator/core/bin/stryker.js
+  run"`, `"clean:mutation": "rm -rf .stryker-tmp reports/mutation
+  reports/stryker-incremental.json"`. Start Stryker and vitest through
+  `node <entry>`, never `npx`, `pnpm exec` or a bare `stryker`: on macOS a
+  process tree rooted in a `.bin` shim pays a policy check on every spawn.
 
 **Multi-project / heavyweight test-runner gotcha.** If the repo's Vitest
 config defines multiple projects, point Stryker at a dedicated config that

@@ -1,41 +1,9 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { z } from "zod";
 
-import { repositoryRoot } from "@better-answers/devtools/paths";
-
-const PACKAGES_BLOCK = /^packages:\n((?:[ \t]*-[ \t]+\S+[ \t]*\n)+)/m;
-
-/** The workspace directories pnpm-workspace.yaml names, relative to the root and sorted. */
-export const workspacePackages = (): readonly string[] => {
-  const file = readFileSync(path.join(repositoryRoot, "pnpm-workspace.yaml"), "utf8");
-  const block = PACKAGES_BLOCK.exec(file)?.[1];
-  if (block === undefined) throw new Error("pnpm-workspace.yaml has no `packages:` list");
-
-  const patterns = block
-    .split("\n")
-    .map((line) =>
-      line
-        .replace(/^[ \t]*-[ \t]+/, "")
-        .trim()
-        .replace(/^["']|["']$/g, ""),
-    )
-    .filter((entry) => entry.length > 0);
-
-  const expand = (pattern: string): readonly string[] => {
-    if (!pattern.endsWith("/*")) return [pattern];
-    const parent = pattern.slice(0, -2);
-    return readdirSync(path.join(repositoryRoot, parent), { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => `${parent}/${entry.name}`);
-  };
-
-  return patterns
-    .flatMap(expand)
-    .filter((project) => existsSync(path.join(repositoryRoot, project, "package.json")))
-    .sort();
-};
+import { repositoryRoot, workspacePackages } from "@better-answers/devtools/paths";
 
 /** Both fields are optional, so a manifest missing either reads as a workspace without it. */
 const manifest = z.object({
