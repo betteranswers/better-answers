@@ -15,8 +15,7 @@ export const CONSENT_WORDS = {
   actsAs: (client: string, workspace: string) => `${client} will act as you, at ${workspace}.`,
   hostedAt: (client: string, host: string) =>
     `This app calls itself “${client}” and is hosted at ${host}.`,
-  goesNext: (host: string) =>
-    `Connect takes you to ${host}, so if you did not expect that address, cancel.`,
+  goesNext: (host: string) => `If you did not expect Connect to take you to ${host}, cancel.`,
   scopes: {
     "knowledge:read": "Read what you can see of the company's knowledge",
     "feedback:write": "Send your feedback on answers",
@@ -28,11 +27,16 @@ export const CONSENT_WORDS = {
   cancel: "Cancel",
 } as const;
 
-type RefusalWords = { readonly title: string; readonly why: string; readonly next: string };
+type RefusalWords = { readonly title: string; readonly why: string };
+
+/** A refusal whose last line says what to do. */
+type ReadNext = RefusalWords & { readonly next: string };
+
+/** A refusal whose last line is a link to sign in, labelled `signIn`. */
+type SignInNext = RefusalWords & { readonly signIn: string };
 
 const START_AGAIN = "Start the connection again from where you began it.";
 
-/** Each refusal page's words. `next` is the page's last line, or its sign-in link's label. */
 export const REFUSAL_PAGES = {
   crossSite: {
     title: "Nothing was connected",
@@ -41,7 +45,7 @@ export const REFUSAL_PAGES = {
   },
   notNavigated: {
     title: "Nothing was connected",
-    why: "This form only works when you open it in your browser.",
+    why: "The form was not sent from this page.",
     next: START_AGAIN,
   },
   notCompleted: {
@@ -51,15 +55,15 @@ export const REFUSAL_PAGES = {
   },
   signInFirst: {
     title: "Sign in first",
-    why: "You need to be signed in, with a workspace chosen, to connect.",
-    next: "Sign in and choose a workspace",
+    why: "You are not signed in to a workspace yet.",
+    signIn: "Sign in and carry on",
   },
   sessionEnded: {
     title: "Sign in again",
     why: "Your session has ended, so nothing was connected.",
-    next: "Sign in and come back to connect",
+    signIn: "Sign in and come back to connect",
   },
-} as const satisfies Record<string, RefusalWords>;
+} as const satisfies Record<string, ReadNext | SignInNext>;
 
 const shell = (title: string, body: string): string => `<!doctype html>
 <html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -110,9 +114,8 @@ export const consentPage = (
 const refusal = (words: RefusalWords, next: string): string =>
   shell(words.title, `<h1>${escape(words.title)}</h1><p>${escape(words.why)}</p><p>${next}</p>`);
 
-/** A refusal whose next step is a line to read. */
-export const refusedPage = (words: RefusalWords): string => refusal(words, escape(words.next));
+export const refusedPage = (words: ReadNext): string => refusal(words, escape(words.next));
 
 /** `query` is the signed search string, leading `?` included: sign-in carries it back here. */
-export const signInPage = (words: RefusalWords, query: string): string =>
-  refusal(words, `<a href="${escape(`${SIGN_IN_PATH}${query}`)}">${escape(words.next)}</a>`);
+export const signInPage = (words: SignInNext, query: string): string =>
+  refusal(words, `<a href="${escape(`${SIGN_IN_PATH}${query}`)}">${escape(words.signIn)}</a>`);

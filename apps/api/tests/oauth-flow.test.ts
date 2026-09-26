@@ -7,7 +7,6 @@ import {
   REFRESH_TOKEN_LIFETIME_SECONDS,
   REFUSAL_PAGES,
   SEND_EMAIL_CODE_PATH,
-  SIGN_IN_PATH,
 } from "../src/auth/index.ts";
 import {
   authorizeUrl,
@@ -92,9 +91,10 @@ type RefusalWords = (typeof REFUSAL_PAGES)[keyof typeof REFUSAL_PAGES];
 /** The page says what went wrong, and its last words are the next step. */
 const expectRefusalPage = (html: string, said: RefusalWords): void => {
   const read = readOf(html);
+  const next = "next" in said ? said.next : said.signIn;
   expect(read).toContain(said.title);
   expect(read).toContain(said.why);
-  expect(read.slice(-said.next.length)).toBe(said.next);
+  expect(read.slice(-next.length)).toBe(next);
 };
 
 /** Signs `email` in on `client`, then follows `href` on as the sign-in screen does. */
@@ -431,8 +431,8 @@ describe("the pages, as a person walks them", () => {
     const page = await refused.text();
     const link = linkOn(page);
     expect(link).toEqual({
-      href: `${SIGN_IN_PATH}${consent.search}`,
-      label: REFUSAL_PAGES.sessionEnded.next,
+      href: `/sign-in${consent.search}`,
+      label: REFUSAL_PAGES.sessionEnded.signIn,
     });
     const back = await backThroughSignIn(client, acme.admin.email, link.href);
     expect(`${back.origin}${back.pathname}`).toBe(`${PUBLIC_URL}/consent`);
@@ -454,8 +454,8 @@ describe("the pages, as a person walks them", () => {
     expectRefusalPage(page, REFUSAL_PAGES.signInFirst);
     const link = linkOn(page);
     expect(link).toEqual({
-      href: `${SIGN_IN_PATH}${consent.search}`,
-      label: REFUSAL_PAGES.signInFirst.next,
+      href: `/sign-in${consent.search}`,
+      label: REFUSAL_PAGES.signInFirst.signIn,
     });
     const back = await backThroughSignIn(signedOut, acme.admin.email, link.href);
     expect(`${back.origin}${back.pathname}`).toBe(`${PUBLIC_URL}/consent`);
