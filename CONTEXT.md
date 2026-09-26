@@ -279,7 +279,9 @@ Where a unit lives is decided by **minting**.
   unit the scheduler runs and the unit that is published. One domain per binding — a website is
   bound per URL prefix (ADR 0013). A binding wears one state word: **landed** (its documents are in
   the object store), **indexing** (a run is turning them into chunks), **indexed** (the run has
-  finished and there is something to review) and **published**. _Avoid_: connection, integration.
+  finished and there is something to review) and **published**. An upload's binding id is minted
+  by its caller, and the first bind under it wins: a repeat answers the first outcome, whatever
+  file it carries (ADR 0043). _Avoid_: connection, integration.
 - **connector** — the lifted or written code that reaches one kind of source system and yields its
   documents: upload, website, SharePoint, HubSpot, Asana, the share agent's file share, the
   referenced read tool. A binding names one connector; a connector serves many bindings.
@@ -430,8 +432,8 @@ Where a unit lives is decided by **minting**.
   run. _Avoid_: idempotency key (cocoindex's word for its stable data ids).
 - **route** — a workspace's choice of model and provider for one purpose (extraction,
   enrichment, answering, judging, embedding), local or hosted; one route per purpose. The
-  embedding route is **fixed** — the word a reader sees on it — and never changes once vectors
-  exist (ADR 0020).
+  embedding route is **fixed** — the word a reader sees on it — from the start, before any vector
+  exists, and never changes once vectors exist (ADR 0020).
 - **DPIA input** — what one binding contributes to a data protection impact assessment, as a
   document and its hash: the personal data categories its rules in force can raise, its scope,
   class, routes, *retention class* and audience. The hash rides on the publish audit row.
