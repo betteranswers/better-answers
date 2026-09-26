@@ -56,13 +56,27 @@ git update-ref refs/ordna/tasks/T-004 "$oid"
 ordna show T-004                                             # confirm the edit is what the CLI reads
 ```
 
-`ordna create` and `ordna move` write the local ref only. Push it by hand within the minute, and with `--force`, since a blob ref never fast-forwards and a plain push is refused: `git push --force origin refs/ordna/tasks/T-030`. Left unpushed, a created ref survives the next fetch but no other clone sees it, and a moved ref is reverted to origin's copy (22/09/2026: T-227's `done` was lost this way). Two sessions editing the same task race on origin; re-read before writing.
+`ordna create` and `ordna move` write the local ref only. `ordna create` also raises the local counter, which needs its own push (*The counter is ordna's alone*, below). Push the task ref by hand within the minute, and with `--force`, since a blob ref never fast-forwards and a plain push is refused: `git push --force origin refs/ordna/tasks/T-030`. Left unpushed, a created ref survives the next fetch but no other clone sees it, and a moved ref is reverted to origin's copy (22/09/2026: T-227's `done` was lost this way). Two sessions editing the same task race on origin; re-read before writing.
 
 `ordna move` fails silently about one time in ten. Read the status line back — `ordna show T-nnn | sed -n 2p` — after every move and before its push.
 
 ### The counter is ordna's alone
 
-`refs/ordna/state` holds `next_id`, and ordna only ever raises it: it merges origin's copy by keeping the higher `next_id`, then pushes. Git commands move task refs alone — fetch with `git fetch origin '+refs/ordna/tasks/*:refs/ordna/tasks/*'` or one task's ref, and push one task ref at a time. A wholesale copy of the counter (a fetch of `refs/ordna/*`, a forced push of `refs/ordna/state`) can lower it, and the next `ordna create` then refuses with "already exists locally despite a fresh allocation" (23/09/2026: origin fell to 333 with tasks up to T-347). The repair is a counter rebuilt from both copies — `next_id` the highest task plus one, the two `ops` lists merged — pushed with `--force-with-lease=refs/ordna/state:<origin's oid>`.
+`refs/ordna/state` holds `next_id`, and ordna only ever raises it. `ordna create` merges origin's copy into the local one, keeping the higher `next_id`, then raises the local one. It does not push it. So origin's counter falls behind each session that creates a task, and another clone's next `ordna create` can collide (26/09/2026: origin read 439 with tasks up to T-451).
+
+After each batch of `ordna create`, push the counter with a lease on origin's copy, and only when the local `next_id` is higher:
+
+```bash
+o=$(git ls-remote origin refs/ordna/state | cut -f1)
+git fetch origin "$o"
+git cat-file -p "$o" | grep next_id                  # origin's
+git cat-file -p refs/ordna/state | grep next_id      # local; push only if higher
+git push --force-with-lease=refs/ordna/state:"$o" origin refs/ordna/state
+```
+
+A refused lease means another session pushed first. Rebuild the counter as the repair below says, then push that.
+
+Apart from that push, git commands move task refs alone. Fetch with `git fetch origin '+refs/ordna/tasks/*:refs/ordna/tasks/*'` or one task's ref, and push one task ref at a time. A wholesale copy of the counter (a fetch of `refs/ordna/*`, a forced push of `refs/ordna/state` without the check above) can lower it, and the next `ordna create` then refuses with "already exists locally despite a fresh allocation" (23/09/2026: origin fell to 333 with tasks up to T-347). The repair is a counter rebuilt from both copies — `next_id` the highest task plus one, the two `ops` lists merged — pushed with `--force-with-lease=refs/ordna/state:<origin's oid>`.
 
 ### When a skill says "publish to the issue tracker"
 
