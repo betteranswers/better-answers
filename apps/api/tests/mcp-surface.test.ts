@@ -213,6 +213,10 @@ describe("era-independent", () => {
     expect(described.get("find")).toContain("Not company knowledge");
     expect(described.get("find")).toContain("locator");
     expect(described.get("open")).toContain("locator");
+    expect(described.get("open")).toContain(
+      "carries the locator that opens it only where the source gives one",
+    );
+    expect(described.get("open")).toContain("an item with no locator has no passage to open");
 
     expect(described.get("find")).toContain("hit");
     expect(described.get("find")?.toLowerCase()).not.toContain("chunk");

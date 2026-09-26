@@ -61,7 +61,7 @@ import {
   type LogLine,
   type TestApp,
 } from "./harness.ts";
-import { calledTool, rendered } from "./mcp-call.ts";
+import { calledTool, rendered, rpcOf, structured } from "./mcp-call.ts";
 import { servedApp } from "./suite-app.ts";
 
 type Run = {
@@ -2447,7 +2447,19 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
-    it("renders imported evidence over MCP, a locator only where given", async () => {
+    const SUPPORT_HOURS = "Support answers between 08:00 and 18:00 on working days.";
+
+    const TWO_SOURCES = [
+      "  - id: ENTRY-001",
+      "    resource: ../sources/Acme_Bid_Library_v1.md",
+      "    title: Acme Bid Library v1, entry ENTRY-001",
+      "    locator: p.4",
+      "  - id: PROD-005",
+      "    resource: ../sources/Acme_Product_Library_v2.md",
+      "    title: Acme Product Library v2, entry PROD-005",
+    ];
+
+    const openedOverMcp = async (sources: readonly string[], body = SUPPORT_HOURS) => {
       const { workspaceId, admin } = await bundleWorkspace(app());
       const from = await mkdtemp(path.join(tmpdir(), "bundle-"));
       await mkdir(path.join(from, "company", "answers"), { recursive: true });
@@ -2461,21 +2473,15 @@ describe("pnpm ops — the restore scripts' commands", () => {
           "---",
           "type: Answer",
           "title: Support hours",
-          "description: Support answers between 08:00 and 18:00 on working days.",
+          `description: ${SUPPORT_HOURS}`,
           "tags: [company, support]",
           "verified:",
           `  - { by: human:${MONA}, at: 2026-04-16T00:00:00Z }`,
           "sources:",
-          "  - id: ENTRY-001",
-          "    resource: ../sources/Acme_Bid_Library_v1.md",
-          "    title: Acme Bid Library v1, entry ENTRY-001",
-          "    locator: p.4",
-          "  - id: PROD-005",
-          "    resource: ../sources/Acme_Product_Library_v2.md",
-          "    title: Acme Product Library v2, entry PROD-005",
+          ...sources,
           "---",
           "",
-          "Support answers between 08:00 and 18:00 on working days.",
+          body,
           "",
         ].join("\n"),
       );
@@ -2484,13 +2490,50 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const { accessToken } = await connectAsHost(app(), app().client(), admin, {
         scope: "knowledge:read offline_access",
       });
+      return calledTool(app().client(), accessToken, "open", { iri });
+    };
 
-      const opened = await calledTool(app().client(), accessToken, "open", { iri });
+    it("renders imported evidence over MCP, a locator only where given", async () => {
+      const opened = await openedOverMcp(TWO_SOURCES);
 
       expect(rendered(opened).split("\n").slice(-3)).toEqual([
         "Evidence:",
         "- Acme Bid Library v1, entry ENTRY-001 (p.4)",
         "- Acme Product Library v2, entry PROD-005",
+      ]);
+    });
+
+    it("answers no locator over MCP for none or only spaces", async () => {
+      const opened = await openedOverMcp([
+        ...TWO_SOURCES,
+        "  - id: PROD-006",
+        "    resource: ../sources/Acme_Product_Library_v2.md",
+        "    title: Acme Product Library v2, entry PROD-006",
+        '    locator: "   "',
+      ]);
+
+      expect(rpcOf(structured(opened)["concept"])["evidence"]).toStrictEqual([
+        { locator: "p.4", source: "Acme Bid Library v1, entry ENTRY-001" },
+        { source: "Acme Product Library v2, entry PROD-005" },
+        { source: "Acme Product Library v2, entry PROD-006" },
+      ]);
+      expect(rendered(opened).split("\n").slice(-4)).toEqual([
+        "Evidence:",
+        "- Acme Bid Library v1, entry ENTRY-001 (p.4)",
+        "- Acme Product Library v2, entry PROD-005",
+        "- Acme Product Library v2, entry PROD-006",
+      ]);
+    });
+
+    it("renders a newline-ended body over MCP without an extra blank", async () => {
+      const opened = await openedOverMcp(TWO_SOURCES, `${SUPPORT_HOURS}\n`);
+
+      expect(rendered(opened).split("\n").slice(0, 5)).toEqual([
+        "# Support hours",
+        "",
+        SUPPORT_HOURS,
+        "",
+        "_Checked by Mona Reviewer · 16 April 2026 · imported_",
       ]);
     });
 

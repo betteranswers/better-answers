@@ -116,7 +116,7 @@ const openEntry = defineEntry({
   name: "open",
   title: "Open a concept, or the passage a citation rests on",
   description:
-    "The verbatim fetch: a concept by its IRI (from a `find` hit or an `ask` citation) — its frontmatter, body, relations, trust state and evidence, each evidence item with the locator that opens it — or the passage itself by that locator, which a document hit and a citation both carry. Give one of the two. Quote what comes back; do not summarise it.",
+    "The verbatim fetch: a concept by its IRI (from a `find` hit or an `ask` citation) — its frontmatter, body, relations, trust state and evidence — or the passage itself by a locator, which a document hit and a citation both carry. Give one of the two. Each evidence item names its source, and carries the locator that opens it only where the source gives one: an imported concept's evidence often has none, and an item with no locator has no passage to open. Quote what comes back; do not summarise it.",
   scopes: ["knowledge:read"],
   input: z
     .object({
@@ -142,7 +142,18 @@ const openEntry = defineEntry({
             body: z.string(),
             relations: z.array(z.object({ kind: z.string(), target: z.string() })),
             trust,
-            evidence: z.array(z.object({ locator: z.string(), source: z.string() })),
+            evidence: z.array(
+              z.object({
+                locator: z
+                  .string()
+                  .regex(/\S/)
+                  .exactOptional()
+                  .describe(
+                    "The locator that opens the passage; absent where the source gives none.",
+                  ),
+                source: z.string(),
+              }),
+            ),
           })
           .optional(),
         passage: passage.optional(),

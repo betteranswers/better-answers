@@ -106,8 +106,11 @@ type ConceptView = {
   readonly body: string;
   readonly relations: readonly { readonly kind: string; readonly target: string }[];
   readonly trust: Trust;
-  readonly evidence: readonly { readonly locator: string; readonly source: string }[];
+  readonly evidence: readonly Evidence[];
 };
+
+/** `locator` is left out when the source gives none, or gives only spaces; it is never `""`. */
+type Evidence = { readonly locator?: string; readonly source: string };
 
 type PassageView = {
   readonly locator: string;
@@ -278,12 +281,9 @@ const evidenceOf = (concept: OpenedConcept): ConceptView["evidence"] => {
     if (cited === undefined) return [];
 
     const title = typeof entry === "string" ? undefined : entry["title"];
-    return [
-      {
-        locator: cited.locator ?? "",
-        source: typeof title === "string" && title !== "" ? title : cited.resource,
-      },
-    ];
+    const source = typeof title === "string" && title !== "" ? title : cited.resource;
+    const locator = cited.locator ?? "";
+    return [locator.trim() === "" ? { source } : { locator, source }];
   });
 };
 
@@ -400,12 +400,14 @@ export const renderOpen = (result: OpenResult): string => {
   const title =
     typeof concept.frontmatter["title"] === "string" ? concept.frontmatter["title"] : concept.iri;
   const evidence = concept.evidence
-    .map(({ source, locator }) => (locator === "" ? `- ${source}` : `- ${source} (${locator})`))
+    .map(({ source, locator }) =>
+      locator === undefined ? `- ${source}` : `- ${source} (${locator})`,
+    )
     .join("\n");
   return [
     `# ${title}`,
     "",
-    concept.body,
+    concept.body.trimEnd(),
     "",
     `_${trustWords(concept.trust)}_`,
     ...(evidence === "" ? [] : ["", "Evidence:", evidence]),

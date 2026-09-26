@@ -795,7 +795,20 @@ describe("the second pass: each relative link becomes its concept's iri", () => 
 });
 
 describe("an imported concept, opened", () => {
-  it("renders a source's locator, and no parenthesis without one", async () => {
+  const SUPPORT_HOURS = "Support answers between 08:00 and 18:00 on working days.";
+
+  const TWO_SOURCES = [
+    "  - id: ENTRY-001",
+    "    resource: ../sources/Acme_Bid_Library_v1.md",
+    "    title: Acme Bid Library v1, entry ENTRY-001",
+    "    locator: p.4",
+    "  - id: PROD-005",
+    "    resource: ../sources/Acme_Product_Library_v2.md",
+    "    title: Acme Product Library v2, entry PROD-005",
+    "",
+  ].join("\n");
+
+  const openedImport = async (sources: string, body = SUPPORT_HOURS) => {
     const { scenario, verifiers } = await arranged();
     await imported(
       scenario,
@@ -804,25 +817,19 @@ describe("an imported concept, opened", () => {
         "company/answers/support-hours.md": conceptFile({
           title: "Support hours",
           verified: [{ by: humanOf(verifiers.mona), at: CHECKED_AT }],
-          sources: [
-            "  - id: ENTRY-001",
-            "    resource: ../sources/Acme_Bid_Library_v1.md",
-            "    title: Acme Bid Library v1, entry ENTRY-001",
-            "    locator: p.4",
-            "  - id: PROD-005",
-            "    resource: ../sources/Acme_Product_Library_v2.md",
-            "    title: Acme Product Library v2, entry PROD-005",
-            "",
-          ].join("\n"),
-          body: "Support answers between 08:00 and 18:00 on working days.",
+          sources,
+          body,
         }),
       }),
     );
     const iri = (await irisByPath(scenario.workspaceId)).get(LINKED.supportHours) ?? "";
-
-    const opened = await readingAs(db().runtimePool, scenario.viewer, (principal, tx) =>
+    return readingAs(db().runtimePool, scenario.viewer, (principal, tx) =>
       open(principal, tx, { iri }, new Date("2026-09-22T10:00:00.000Z")),
     );
+  };
+
+  it("renders a source's locator, and no parenthesis without one", async () => {
+    const opened = await openedImport(TWO_SOURCES);
 
     expect(opened.ok).toBe(true);
     if (!opened.ok) return;
@@ -830,6 +837,51 @@ describe("an imported concept, opened", () => {
       "Evidence:",
       "- Acme Bid Library v1, entry ENTRY-001 (p.4)",
       "- Acme Product Library v2, entry PROD-005",
+    ]);
+  });
+
+  it("answers no locator for a source that carries none", async () => {
+    const opened = await openedImport(TWO_SOURCES);
+
+    expect(opened.ok && opened.value.found && opened.value.concept?.evidence).toStrictEqual([
+      { locator: "p.4", source: "Acme Bid Library v1, entry ENTRY-001" },
+      { source: "Acme Product Library v2, entry PROD-005" },
+    ]);
+  });
+
+  it("treats a locator of only spaces as no locator", async () => {
+    const opened = await openedImport(
+      [
+        "  - id: PROD-005",
+        "    resource: ../sources/Acme_Product_Library_v2.md",
+        "    title: Acme Product Library v2, entry PROD-005",
+        '    locator: "   "',
+        "",
+      ].join("\n"),
+    );
+
+    expect(opened.ok).toBe(true);
+    if (!opened.ok) return;
+    expect(opened.value.found && opened.value.concept?.evidence).toStrictEqual([
+      { source: "Acme Product Library v2, entry PROD-005" },
+    ]);
+    expect(renderOpen(opened.value).split("\n").slice(-2)).toEqual([
+      "Evidence:",
+      "- Acme Product Library v2, entry PROD-005",
+    ]);
+  });
+
+  it("renders a newline-ended body without an extra blank line", async () => {
+    const opened = await openedImport(TWO_SOURCES, `${SUPPORT_HOURS}\n`);
+
+    expect(opened.ok).toBe(true);
+    if (!opened.ok) return;
+    expect(renderOpen(opened.value).split("\n").slice(0, 5)).toEqual([
+      "# Support hours",
+      "",
+      SUPPORT_HOURS,
+      "",
+      "_Checked by Priya Anand · 16 April 2026 · imported_",
     ]);
   });
 });
