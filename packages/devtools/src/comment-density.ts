@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 
 import { z } from "zod";
 
+import { isTestPath } from "./paths.ts";
 import { executableOf, runsOverThrowawayTree } from "./throwaway-tree.ts";
 import type { Tree } from "./throwaway-tree.ts";
 
@@ -56,10 +57,6 @@ const NEVER_WALKED = [
   "test-results",
 ];
 
-const TEST_DIRECTORIES = new Set(["e2e", "test", "tests"]);
-
-const TEST_FILE = /(^test_|[._](test|spec)\.)/;
-
 const CLOC_EXECUTABLE = { package: "cloc", path: ["lib", "cloc"] } as const;
 
 export const clocArgv = (paths: readonly string[]): readonly string[] => [
@@ -111,12 +108,7 @@ const countedIn = (output: string): readonly Counted[] =>
     .sort((left, right) => left.file.localeCompare(right.file));
 
 /** A file under an `e2e`, `test` or `tests` directory, or named as a test, is `test`. */
-export const armOf = (file: string): Arm => {
-  const segments = file.replace(/^\.\//, "").split("/");
-  const name = segments.at(-1) ?? "";
-  const inATestDirectory = segments.some((segment) => TEST_DIRECTORIES.has(segment));
-  return inATestDirectory || TEST_FILE.test(name) ? "test" : "source";
-};
+export const armOf = (file: string): Arm => (isTestPath(file) ? "test" : "source");
 
 export type Measured = {
   readonly unit: string;

@@ -7,8 +7,8 @@ import {
   oxlintOverrideFor,
   pluginConfigFor,
   readOxlintConfig,
-  repositoryRoot,
 } from "@better-answers/devtools/oxlint-config";
+import { repositoryRoot } from "@better-answers/devtools/paths";
 import { oxlintOver, type Tree } from "@better-answers/devtools/throwaway-tree";
 
 const RULE = "better-answers/import-direction";

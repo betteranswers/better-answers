@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { repositoryRoot } from "@better-answers/devtools/oxlint-config";
+import { repositoryRoot } from "@better-answers/devtools/paths";
 
 const AMBIENT_CLOCK_READ = /\bnew\s+Date\s*\(\s*\)|\bDate\s*\.\s*now\s*\(\s*\)/g;
 

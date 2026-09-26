@@ -5,9 +5,9 @@ import { z } from "zod";
 
 import { byCodeUnit } from "@better-answers/schema/code-unit";
 
-const manifest = z.looseObject({ scripts: z.record(z.string(), z.string()).default({}) });
+import { repositoryRoot } from "./paths.ts";
 
-const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
+const manifest = z.looseObject({ scripts: z.record(z.string(), z.string()).default({}) });
 
 export const rootScripts = (): Readonly<Record<string, string>> =>
   manifest.parse(JSON.parse(readFileSync(path.join(repositoryRoot, "package.json"), "utf8")))

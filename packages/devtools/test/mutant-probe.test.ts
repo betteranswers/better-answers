@@ -7,7 +7,7 @@ import path from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
 
-import { repositoryRoot } from "@better-answers/devtools/oxlint-config";
+import { repositoryRoot } from "@better-answers/devtools/paths";
 import { gitIn, throwawayRepository, writeUnder } from "@better-answers/devtools/throwaway-tree";
 
 const script = path.join(repositoryRoot, "scripts/mutant-probe.mjs");
