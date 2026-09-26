@@ -45,6 +45,7 @@ import {
   landRows,
   mergeKeyOf,
   WRITE_CONSTRAINTS,
+  type Held,
 } from "./landing.ts";
 import { parseBundleManifest } from "./manifest.ts";
 import { RECONCILER_ACTS, restsAlsoOnWhenReplayed } from "./reconciler-hit.ts";
@@ -215,6 +216,60 @@ const lastRecordedCommit = async (platform: PlatformPrincipal, tx: Tx): Promise<
   return found.rows[0]?.sha ?? null;
 };
 
+type Suggested = {
+  readonly mergeKey: string | undefined;
+  readonly acceptance: Acceptance | undefined;
+};
+
+const suggestedBy = async (
+  platform: PlatformPrincipal,
+  tx: Tx,
+  suggestionId: string | undefined,
+): Promise<Suggested> => {
+  const payload =
+    suggestionId === undefined ? undefined : await payloadFor(platform, tx, suggestionId);
+  return suggestionId === undefined || payload === undefined
+    ? { mergeKey: undefined, acceptance: undefined }
+    : {
+        mergeKey: payload.mergeKey,
+        acceptance: { suggestionId, setId: payload.setId, kind: payload.kind },
+      };
+};
+
+type IndexRow = Extract<ReturnType<typeof indexRowOf>, { readonly success: true }>["data"];
+
+type Replayable = { readonly row: IndexRow; readonly sources: readonly HashedSource[] };
+
+const replayableOf = (
+  workspaceId: WorkspaceId,
+  facts: CommitFacts,
+  held: Held | undefined,
+  clock: Clock,
+): Replayable | undefined => {
+  const kind = stringIn(facts.frontmatter, "type") ?? held?.kind;
+  const title = stringIn(facts.frontmatter, "title") ?? held?.title;
+  if (kind === undefined || title === undefined) return undefined;
+  const { contentHash, sources } = hashedFileOf(facts.frontmatter, facts.body, facts.path);
+
+  const parsed = indexRowOf(
+    {
+      workspaceId,
+      iri: facts.iri,
+      path: facts.path,
+      kind,
+      title,
+      frontmatter: facts.frontmatter,
+      body: facts.body,
+      contentHash,
+      status: stringIn(facts.frontmatter, "status"),
+      sensitivity: undefined,
+    },
+    held,
+    clock.now(),
+  );
+  return parsed.success ? { row: parsed.data, sources } : undefined;
+};
+
 const replayCommit = async (
   platform: ReconcilerPrincipal,
   doors: { readonly git: GitDoor; readonly postgres: PostgresDoor; readonly clock: Clock },
@@ -250,39 +305,12 @@ const replayCommit = async (
         const held = await heldByIri(platform, tx, facts.iri);
 
         if (held !== undefined && held.path !== facts.path) return err("rename-refused");
-        const payload =
-          facts.suggestionId === undefined
-            ? undefined
-            : await payloadFor(platform, tx, facts.suggestionId);
-        const acceptance: Acceptance | undefined =
-          facts.suggestionId === undefined || payload === undefined
-            ? undefined
-            : { suggestionId: facts.suggestionId, setId: payload.setId, kind: payload.kind };
-        const kind = stringIn(facts.frontmatter, "type") ?? held?.kind;
-        const title = stringIn(facts.frontmatter, "title") ?? held?.title;
-        if (kind === undefined || title === undefined) return err("unreadable-commit");
-        const { contentHash, sources } = hashedFileOf(facts.frontmatter, facts.body, facts.path);
-
-        const parsed = indexRowOf(
-          {
-            workspaceId,
-            iri: facts.iri,
-            path: facts.path,
-            kind,
-            title,
-            frontmatter: facts.frontmatter,
-            body: facts.body,
-            contentHash,
-            status: stringIn(facts.frontmatter, "status"),
-            sensitivity: undefined,
-          },
-          held,
-          doors.clock.now(),
-        );
-        if (!parsed.success) return err("unreadable-commit");
-        const row = parsed.data;
+        const suggested = await suggestedBy(platform, tx, facts.suggestionId);
+        const replayable = replayableOf(workspaceId, facts, held, doors.clock);
+        if (replayable === undefined) return err("unreadable-commit");
+        const { row, sources } = replayable;
         const mergeKey =
-          payload?.mergeKey ??
+          suggested.mergeKey ??
           held?.mergeKey ??
           (await derivedMergeKey(platform, tx, row.iri, row.kind, row.title));
         const evidenceAgrees = await fileCitesTheStandingEvidence(platform, tx, facts, sources);
@@ -292,7 +320,12 @@ const replayCommit = async (
           act: RECONCILER_ACTS.replayed,
           subjectId: facts.sha,
           batchId,
-          detail: { iri: row.iri, commitSha: facts.sha, contentHash, evidenceAgrees },
+          detail: {
+            iri: row.iri,
+            commitSha: facts.sha,
+            contentHash: row.contentHash,
+            evidenceAgrees,
+          },
         });
         await landRows(platform, tx, {
           ...row,
@@ -305,7 +338,7 @@ const replayCommit = async (
           evidence: undefined,
 
           restsAlsoOn: restsAlsoOnWhenReplayed(evidenceAgrees),
-          acceptance,
+          acceptance: suggested.acceptance,
         });
         return ok("landed");
       },
@@ -318,6 +351,11 @@ const replayCommit = async (
   return landed.value;
 };
 
+/**
+ * Replays, oldest first and under the repository lock, each bundle commit after the last one
+ * the index recorded. The first commit it cannot replay ends the pass and is named in
+ * `stopped`, not refused.
+ */
 export const reconcile = async (
   platform: ReconcilerPrincipal,
   doors: { readonly git: GitDoor; readonly postgres: PostgresDoor; readonly clock: Clock },
@@ -367,6 +405,7 @@ export type ReconcilerHit = {
   readonly batchId: string | null;
 };
 
+/** Oldest first; `since` is inclusive. */
 export const reconcilerHits = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,

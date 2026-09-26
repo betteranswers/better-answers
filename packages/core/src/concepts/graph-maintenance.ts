@@ -53,6 +53,10 @@ export const graphCounts = async (
   return counted.ok ? ok(counted.value) : err(counted.error);
 };
 
+/**
+ * Deletes every graph generation but the live one, with a ledger row for each, under one batch
+ * id when there are several.
+ */
 export const sweepGraph = async (
   platform: GraphMaintenancePrincipal,
   door: PostgresDoor,
@@ -83,6 +87,7 @@ export const sweepGraph = async (
   return swept.ok ? ok(swept.value) : err(swept.error);
 };
 
+/** Queues a full rebuild for the worker and returns its job id; nothing is rebuilt here. */
 export const rebuildGraph = async (
   platform: GraphMaintenancePrincipal,
   door: PostgresDoor,

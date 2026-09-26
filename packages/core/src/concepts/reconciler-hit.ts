@@ -20,8 +20,10 @@ const EVIDENCE_AGREES = "evidenceAgrees" satisfies keyof DetailOf<
   typeof RECONCILER_ACTS.replayed.detail
 >;
 
-// A cascade re-derives from the standing citations, not the ones the lost commit's file names,
-// so only the hit still says they disagree.
+/**
+ * A cascade re-derives from the standing citations, not the ones the lost commit's file names,
+ * so only the hit still says they disagree.
+ */
 export const restsAlsoOnItsReconcilerHit = async (
   principal: Principal,
   tx: Tx,
