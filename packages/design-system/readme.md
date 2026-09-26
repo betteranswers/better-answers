@@ -47,10 +47,11 @@ Surfaces the design system dresses:
 The product's writing is already specified more tightly than most brands specify theirs,
 because `CONTEXT.md` is a glossary that *code obeys*. The design system inherits it.
 
-**The glossary is binding.** If a word is in `CONTEXT.md`, that word is the word. *Map*,
+**Never contradict the glossary.** A screen uses the glossary's word for a thing. *Map*,
 never *graph*, on a screen. *Workspace*, never *organisation*, *account*, *team* or *site*.
 *Client*, never *connector*, for an MCP host. *Screen*, never *section*, for Control Centre.
-Terms marked *Avoid* in the glossary are banned outright.
+Terms marked *Avoid* in the glossary are banned outright. The glossary's definition is never
+a screen's sentence.
 
 **Trust words are a closed set** and appear verbatim:
 Checked by <person> · Checked by the platform · Unchecked · Changed since checked ·
@@ -74,8 +75,9 @@ British spelling and UK conventions throughout.
 - Write: "Checked by Priya Shah · 3 March 2026"
 - Not: "✅ Verified 6 months ago"
 
-**Person.** Second person for what the reader does ("you asked", "your queue"); the
-platform in the third ("the platform confirmed it"); never first-person plural. No "we".
+**Person.** Second person for what the reader does ("you asked", "your queue"); never
+first-person plural. No "we". The audit log's actor column names the platform's own acts
+"the platform". That column names an actor; it doesn't address the reader.
 
 **Casing.** Sentence case everywhere — headings, buttons, tabs, table headers (the only
 upper-case is the micro-label at 11px with 0.06em tracking). Proper nouns keep their case:
@@ -91,8 +93,24 @@ Never 03/03/2026. Money as £1,240.00. Relative time only under a minute.
 **Emoji: never.** Not in the interface, not in empty states, not in documentation. Unicode
 symbols are used only where they are typographic (·, —, ’, “ ”, ✕ on a dismiss control).
 
-**Length.** One sentence where one will do. Empty states are two lines and an action.
-Errors are full sentences ending in a full stop, naming who can fix it.
+**Clarity.** A screen answers three questions, in order: where am I, what happened, what do I
+do next. Say those, then stop.
+
+- Say what to do, not how the system works. Explain a rule only when the reader can't act
+  without it.
+- Use the reader's words. A glossary word goes on a screen only when the reader needs that
+  exact word to act, and it's explained where they first meet it.
+- Give one next action, its label naming the effect: "Join Acme", not "Continue".
+- Don't repeat the heading in the body, or the body in the button.
+- An empty state says what is missing, in one line. Add an action only where the screen has
+  no other way to take it.
+- A consequence line states the one thing the reader would regret not knowing: that it can't
+  be undone, or who will see it. Record-keeping isn't a consequence for the reader.
+- An error says what went wrong, then what to do. Name who can fix it only when the reader
+  can't. A code word never leads.
+- "The platform" isn't a character. Write "Nothing was saved", not "The platform did not
+  answer".
+- Turn stacked conditions into two short sentences.
 
 ## 4. Visual foundations
 

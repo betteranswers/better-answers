@@ -787,10 +787,10 @@ to it by IRI and never restates it (ADR 0014).
   *unauthenticated* (sign in again), *forbidden* (someone with the authority must do it), *absent*
   (name something that exists), *malformed* (fix the shape of what was sent), *inapplicable*
   (well-formed, but not something this act applies to), *conflict* (the state moved: read again
-  and decide again), *precondition* (something else comes first). A word reaches a screen, an
-  agent and an operator as itself; once shipped it is never removed and never changes class, so a
-  client that has never met a word can still act on its class (ADR 0043). _Avoid_: error (a
-  failure, not a refusal), rejection, denial, error code.
+  and decide again), *precondition* (something else comes first). A word reaches an agent, an
+  operator and the web client as itself; a person reads its sentence. Once shipped, a word is never
+  removed and never changes class, so a client that has never met a word can still act on its
+  class (ADR 0043). _Avoid_: error (a failure, not a refusal), rejection, denial, error code.
 - **issue word** — what a *malformed* refusal says about one field: one hyphenated word from the
   kernel's closed list (`missing`, `wrong-type`, `too-small`, `not-in-set`, `bad-format`) naming
   how the field was wrong, carried in a map of field path to word. The map never holds the value

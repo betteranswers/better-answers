@@ -149,8 +149,14 @@ Four more play Claude's part in its OAuth flow on the suite's own origin — `ap
 - **Give an assertion a message wherever the failure would not name itself.** The harness's own
   `${path} answered ${status}` is the pattern, and so are the axe assertion and the gate's refusal
   in `apps/web/e2e/browser.ts`.
-- **Read the SPA's own constants rather than copying them.** `apps/web/e2e/routes.spec.ts` imports
-  `@/shared/screens.ts`, so the list of screens is written once.
+- **Read the SPA's own constants, words as well as screens, rather than copying them.**
+  `apps/web/e2e/routes.spec.ts` imports `@/shared/screens.ts`, so the list of screens is written
+  once. Read a sentence the same way: import it from a feature's word table
+  (`apps/web/src/features/sources/words.ts`), the screen list or the role meanings
+  (`apps/web/src/features/people/role-meanings.ts`). Then assert the state it belongs to: the
+  region, its role, the next action. Never pin prose as a literal, so rewording a screen breaks no
+  spec. Read a control's accessible name from the same table where one exists. Two things stay
+  literal: the trust words, a closed set that is part of the behaviour, and text a person types.
 - **A latency budget is measured, annotated and asserted** — `test.info().annotations.push(…)`
   beside the comparison, so a run that passes still says how close it came. A list's second is
   timed from a fresh `goto`, so no cache answers it. An act's 100 ms is timed **in the page** — a
