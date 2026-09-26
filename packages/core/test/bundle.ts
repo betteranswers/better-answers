@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -152,6 +152,15 @@ export const staged = async (door: GitDoor, workspaceId: string): Promise<readon
 
 export const removeRepository = (door: GitDoor, workspaceId: string): Promise<void> =>
   rm(gitDirOf(door, workspaceId), { recursive: true, force: true });
+
+/** Packs every ref, then corrupts the pack, so git still sees a repository but reads no ref. */
+export const corruptPackedRefs = async (door: GitDoor, workspaceId: string): Promise<void> => {
+  await git(door, workspaceId, ["pack-refs", "--all"]);
+  await writeFile(
+    path.join(gitDirOf(door, workspaceId), "packed-refs"),
+    "# pack-refs with: peeled fully-peeled sorted \nnot-a-ref-line\n",
+  );
+};
 
 /** Each object reachable from `main`, as `cat-file --batch` prints it; empty with no `main`. */
 export const everyObjectOf = async (door: GitDoor, workspaceId: string): Promise<string> => {

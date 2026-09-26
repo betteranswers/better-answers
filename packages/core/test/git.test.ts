@@ -24,6 +24,7 @@ import {
   bundleHistory,
   bundlesForSuite,
   commitFacts,
+  corruptPackedRefs,
   fileAtCommit,
   objectRemovedFrom,
   staged,
@@ -330,6 +331,52 @@ describe("the commits an empty bundle holds after a watermark", () => {
     const scanned = await commitsAfter(PLATFORM, bundle.door, bundle.workspaceId, watermark);
 
     expect(scanned).toEqual({ ok: false, error: "history-diverged" });
+  });
+});
+
+describe("a repository whose refs git cannot read", () => {
+  const unreadableRefs = async (): Promise<Bundle & { readonly sha: string }> => {
+    const bundle = await arrange();
+    const sha = shaOf(await commit(bundle.principal, bundle.door, requestFor()));
+    await corruptPackedRefs(bundle.door, bundle.workspaceId);
+    return { ...bundle, sha };
+  };
+
+  it("scans it as a bundle with no head", async () => {
+    const bundle = await unreadableRefs();
+
+    expect(await commitsAfter(PLATFORM, bundle.door, bundle.workspaceId, null)).toEqual({
+      ok: true,
+      value: { head: null, missed: [] },
+    });
+    expect(await commitsAfter(PLATFORM, bundle.door, bundle.workspaceId, bundle.sha)).toEqual({
+      ok: false,
+      error: "history-diverged",
+    });
+  });
+
+  it("refuses a commit expecting its old head as stale", async () => {
+    const bundle = await unreadableRefs();
+
+    const refused = await commit(
+      bundle.principal,
+      bundle.door,
+      requestFor({ path: "knowledge/b.md", expectedHead: bundle.sha }),
+    );
+
+    expect(refused).toEqual({ ok: false, error: "stale-precondition" });
+  });
+
+  it("hands back the store's failure committing on any head", async () => {
+    const bundle = await unreadableRefs();
+
+    const failed = await commit(
+      bundle.principal,
+      bundle.door,
+      requestFor({ path: "knowledge/b.md", expectedHead: ANY_HEAD }),
+    );
+
+    expect(failed.ok ? undefined : failed.error).toBeInstanceOf(Error);
   });
 });
 

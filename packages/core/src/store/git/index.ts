@@ -134,17 +134,30 @@ const stderrOf = (cause: unknown): string => {
   return typeof stderr === "string" ? stderr.trim() : "";
 };
 
+const stdoutOf = (cause: unknown): string => {
+  if (typeof cause !== "object" || cause === null || !("stdout" in cause)) return "";
+  const { stdout } = cause;
+  return typeof stdout === "string" ? stdout.trim() : "";
+};
+
 /**
- * Under `--quiet`, git exits 1 only when `main` names no commit; any other failure means no
- * repository.
+ * git prints `--git-dir` only for a repository it recognises, before the ref read can fail: a
+ * corrupt `packed-refs` exits 128 yet reads as no head.
  */
 const standingHead = async (
   gitDir: string,
 ): Promise<Result<string | null, "no-such-repository">> => {
   try {
-    return ok(await git(gitDir, ["rev-parse", "--verify", "--quiet", `${BUNDLE_REF}^{commit}`]));
+    const read = await git(gitDir, [
+      "rev-parse",
+      "--git-dir",
+      "--verify",
+      "--quiet",
+      `${BUNDLE_REF}^{commit}`,
+    ]);
+    return ok(read.split("\n")[1] ?? null);
   } catch (cause) {
-    return exitStatusOf(cause) === 1 ? ok(null) : err("no-such-repository");
+    return stdoutOf(cause) === "" ? err("no-such-repository") : ok(null);
   }
 };
 
