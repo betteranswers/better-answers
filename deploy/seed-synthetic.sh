@@ -31,7 +31,8 @@ INSERT INTO source_document
      outcome)
   SELECT :'workspace', d ->> 'source_document_id', d ->> 'binding_id', 'invoice-2026-041.md',
          'invoice-2026-041.md', d ->> 'media_type', octet_length(d ->> 'normalised_text'),
-         'uploads/' || lower(d ->> 'binding_id') || '/original', 'converted'
+         'uploads/' || lower(d ->> 'binding_id') || '/' || lower(d ->> 'source_document_id')
+           || '/original', 'converted'
     FROM fixture
   ON CONFLICT (workspace_id, id) DO NOTHING;
 INSERT INTO "index".chunk

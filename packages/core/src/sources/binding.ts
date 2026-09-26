@@ -58,8 +58,9 @@ import type { SourceRefusal } from "./vocabulary.ts";
 
 export const UPLOAD_ORIGINALS_PREFIX = "uploads/";
 
-const originalKeyOf = (bindingId: string): string =>
-  `${UPLOAD_ORIGINALS_PREFIX}${bindingId.toLowerCase()}/original`;
+/** One key per attempt: a concurrent repeat that loses writes beside the committed original. */
+const originalKeyOf = (bindingId: string, documentId: string): string =>
+  `${UPLOAD_ORIGINALS_PREFIX}${bindingId.toLowerCase()}/${documentId.toLowerCase()}/original`;
 
 export const UPLOAD_MEDIA_TYPES = [
   "text/markdown",
@@ -302,9 +303,9 @@ const storeOriginal = async (
 };
 
 /**
- * Stores the body as the binding's original, then writes the binding, document, audit event and
- * index run in one transaction. Once that commits, a repeat that passes the checks returns its
- * outcome and reads no byte. `too-large` answers a declared size or streamed body over the cap.
+ * Once the first bind commits, a repeat returns its outcome and reads no byte. A concurrent repeat
+ * that loses the insert returns it too, its own object left to the upload sweep. `too-large`
+ * answers a declared size or streamed body over the cap.
  */
 export const bindUpload = async (
   principal: UserPrincipal,
@@ -316,26 +317,25 @@ export const bindUpload = async (
   const { workspaceId } = admin.value;
 
   const { bindingId, visibility } = input;
-  const originalKey = originalKeyOf(bindingId);
 
   const limited = withinUploadLimits(input);
   if (!limited.ok) return err(limited.error);
   const held = await everyGroupHeld(principal, doors.postgres, visibility);
   if (!held.ok) return err(held.error);
 
-  // Before a byte is read: a repeat that streamed again would replace the bytes the standing
-  // document's row already describes.
+  // Before a byte is read: a repeat of a committed bind would otherwise stream a copy no row names.
   const standing = await inTransaction(principal, doors.postgres, (fresh, tx) =>
     firstOutcomeOf(tx, workspaceId, bindingId),
   );
   if (!standing.ok) return err(standing.error);
   if (standing.value !== undefined) return ok(standing.value);
 
-  const stored = await storeOriginal(admin.value, doors.objects, originalKey, input.body);
-  if (!stored.ok) return err(stored.error);
-
   const documentId = ulid();
   const auditEventId = ulid();
+  const originalKey = originalKeyOf(bindingId, documentId);
+
+  const stored = await storeOriginal(admin.value, doors.objects, originalKey, input.body);
+  if (!stored.ok) return err(stored.error);
 
   return inTransaction(principal, doors.postgres, async (fresh, tx) => {
     const landed = await tx.query(INSERT_BINDING, [

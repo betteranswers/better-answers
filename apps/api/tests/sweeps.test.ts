@@ -102,7 +102,7 @@ const provisioned = async () => {
 
 const withAnOrphan = async () => {
   const workspace = await provisioned();
-  const orphan = `uploads/${ulid().toLowerCase()}/original`;
+  const orphan = `uploads/${ulid().toLowerCase()}/${ulid().toLowerCase()}/original`;
   const put = await putObject(
     workspace.admin,
     objects().door,

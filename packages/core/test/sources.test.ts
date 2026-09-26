@@ -67,6 +67,24 @@ const uploadOf = (text: string) => {
   return { state, body };
 };
 
+/** Holds its bytes until released, so a test can say which of two binds streams first. */
+const heldUploadOf = (text: string) => {
+  const reached = Promise.withResolvers<void>();
+  const gate = Promise.withResolvers<void>();
+  const body = new ReadableStream<Uint8Array>(
+    {
+      pull: async (controller) => {
+        reached.resolve();
+        await gate.promise;
+        controller.enqueue(new TextEncoder().encode(text));
+        controller.close();
+      },
+    },
+    { highWaterMark: 0 },
+  );
+  return { body, streaming: reached.promise, release: () => gate.resolve() };
+};
+
 const A_MEGABYTE = 1024 * 1024;
 
 const pastTheCap = () => {
@@ -211,7 +229,9 @@ describe("an Admin binds an upload", () => {
       outcome: null,
       sensitivity: null,
     });
-    expect(originalKey).toEqual(`uploads/${bindingId.toLowerCase()}/original`);
+    expect(originalKey).toEqual(
+      `uploads/${bindingId.toLowerCase()}/${documentId.toLowerCase()}/original`,
+    );
 
     expect(
       await auditEventRowsOf(db().pool, scenario.workspaceId, "sources.binding.bound"),
@@ -409,6 +429,42 @@ describe("an Admin binds an upload", () => {
     });
   });
 
+  it("keeps the first body when a concurrent repeat loses", async () => {
+    const scenario = await arrange();
+    const bindingId = ulid();
+    const asked = inputOf(bindUploadFields, handbookAsked({ bindingId }));
+    const winner = heldUploadOf(HANDBOOK);
+    const loser = heldUploadOf("A body no row describes.");
+
+    const first = bindUpload(scenario.admin, doorsOf(scenario), { ...asked, body: winner.body });
+    const second = bindUpload(scenario.admin, doorsOf(scenario), { ...asked, body: loser.body });
+    await Promise.all([winner.streaming, loser.streaming]);
+    winner.release();
+    const won = await first;
+    loser.release();
+    const lost = await second;
+
+    if (!won.ok) throw new Error(`the first bind was refused: ${String(won.error)}`);
+    expect(lost).toEqual(won);
+    const { documentId, originalKey } = won.value;
+    const row = await documentRowOf(db().pool, scenario.workspaceId, documentId);
+    expect(row?.original_key).toEqual(originalKey);
+    const got = await getObject(scenario.admin, store().door, originalKey);
+    if (!got.ok) throw new Error(`the object door refused the read: ${got.error}`);
+    expect(await textOf(got.value)).toEqual(HANDBOOK);
+    expect((await storedFor(scenario.admin)).filter((key) => key !== originalKey)).toEqual([
+      expect.stringMatching(
+        new RegExp(`^uploads/${bindingId.toLowerCase()}/[0-9a-z]{26}/original$`),
+      ),
+    ]);
+    expect(await oneOfEachIn(db().pool, scenario.workspaceId)).toEqual({
+      bindings: 1,
+      documents: 1,
+      auditEvents: 1,
+      jobs: 1,
+    });
+  });
+
   it("caps one upload below the edge's own limit", () => {
     expect(UPLOAD_BYTE_CAP).toEqual(67108864);
     expect(UPLOAD_BYTE_CAP).toBeLessThan(104857600);
@@ -437,7 +493,14 @@ const aFailedBind = async (scenario: Scenario) => {
   return left[0];
 };
 
-describe("the sweep collects the originals a failed bind left", () => {
+/** An original under `uploads/<binding>/original`, the shape keys already in the store still have. */
+const anOlderOriginal = async (scenario: Scenario, bindingId: string) => {
+  const key = `uploads/${bindingId.toLowerCase()}/original`;
+  await putObject(scenario.admin, store().door, key, uploadOf(HANDBOOK).body);
+  return key;
+};
+
+describe("the sweep collects what failed binds and lost races left", () => {
   it("leaves every original standing while the grace holds", async () => {
     const scenario = await arrange();
     const named = await boundHandbook(scenario);
@@ -474,22 +537,57 @@ describe("the sweep collects the originals a failed bind left", () => {
     const past = new Date(Date.now() + A_DAY_MS * 2);
     await sweptAt(scenario, past);
 
-    const bindingId = orphaned.slice("uploads/".length, -"/original".length).toUpperCase();
+    const [bindingId, documentId] = orphaned
+      .split("/")
+      .slice(1, 3)
+      .map((id) => id.toUpperCase());
     const rows = await auditEventRowsOf(db().pool, scenario.workspaceId, "sources.upload.swept");
     expect(rows).toEqual([
       {
         id: expect.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/),
         actor: "process:better-answers-uploads",
         subject_id: bindingId,
-        detail: { bindingId },
+        detail: { bindingId, documentId },
       },
     ]);
     expect(JSON.stringify(rows)).not.toContain("uploads/");
   });
 
-  it("leaves a key under the prefix no bind writes", async () => {
+  it("sweeps an unnamed older original, keeping a named one", async () => {
     const scenario = await arrange();
-    const stray = "uploads/a-note-from-somewhere-else/original";
+    const named = await boundHandbook(scenario);
+    const kept = await anOlderOriginal(scenario, named.bindingId);
+    await db().pool.query(
+      "UPDATE source_document SET original_key = $3 WHERE workspace_id = $1 AND id = $2",
+      [scenario.workspaceId, named.documentId, kept],
+    );
+    const bindingId = ulid();
+    await anOlderOriginal(scenario, bindingId);
+
+    const swept = await sweptAt(scenario, new Date(Date.now() + A_DAY_MS * 2));
+
+    expect(swept).toEqual({ ok: true, value: { found: 2, removed: 2 } });
+    expect(await storedFor(scenario.admin)).toEqual([kept]);
+    const rows = await auditEventRowsOf(db().pool, scenario.workspaceId, "sources.upload.swept");
+    expect(rows.map((row) => row.detail)).toEqual(
+      expect.arrayContaining([
+        { bindingId: named.bindingId, documentId: named.documentId },
+        { bindingId },
+      ]),
+    );
+    expect(rows).toHaveLength(2);
+  });
+
+  it.each([
+    ["an older key whose binding is no id", "uploads/a-note-from-somewhere-else/original"],
+    ["a key whose document is no id", `uploads/${ulid().toLowerCase()}/a-draft/original`],
+    ["a key whose binding is no id", `uploads/a-draft/${ulid().toLowerCase()}/original`],
+    [
+      "a key a segment too long",
+      `uploads/${ulid().toLowerCase()}/${ulid().toLowerCase()}/x/original`,
+    ],
+  ])("leaves %s", async (_case, stray) => {
+    const scenario = await arrange();
     await putObject(scenario.admin, store().door, stray, uploadOf("not an original").body);
 
     const swept = await sweptAt(scenario, new Date(Date.now() + A_DAY_MS * 2));

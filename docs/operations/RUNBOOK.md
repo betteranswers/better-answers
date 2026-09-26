@@ -187,7 +187,7 @@ VPC 1 carries a 4 GB swap file on the NVMe so a first index that outgrows the wo
 
 ## The daily sweeps
 
-Two sweeps clear what no row names. **The upload sweep** removes an original a failed bind left in the object store, once it is past the 24-hour grace and no document row names it: bytes that may hold personal data nobody can find (ADR 0020). **The graph sweep** deletes every generation of a workspace's map but the live one.
+Two sweeps clear what no row names. **The upload sweep** removes an original a failed bind or a lost race left in the object store, once it is past the 24-hour grace and no document row names it: bytes that may hold personal data nobody can find (ADR 0020). **The graph sweep** deletes every generation of a workspace's map but the live one.
 
 **Where the schedule lives.** In the api process, on a daily timer of its own beside the reconciler's and never on its tick (`apps/api/src/sweeps.ts`). The first pass runs ten minutes after the api starts and the next every 24 hours after that, so a release restarts the wait without ever starving it. One pass sweeps every workspace in turn; a workspace whose sweep is refused is named in the log and passed over, and the rest are still swept.
 
@@ -206,10 +206,10 @@ Two sweeps clear what no row names. **The upload sweep** removes an original a f
 
 **List-only until an operator switches removal on.** On production the upload sweep starts as `list`: it counts what it would remove and removes nothing, so a pass reads `upload_sweep=list … removed=0` and `found` is the number of originals past the grace that no document row names, over every workspace. The graph sweep deletes from its first pass. A sweep that lists the bucket and removes what no row names deletes live bytes for good if its join is ever wrong, so its counts are read against their causes before it removes anything:
 
-- `found` rises by one for each bind whose second transaction failed, and falls only when something removes originals, such as `object-store-orphans` run by hand without `--list`. A rise with no failed bind behind it is the join being wrong: leave the setting at `list` and escalate.
+- `found` rises by one for each bind whose second transaction failed, and for each repeat of a bind that lost the race to the first. A lost race's key, `uploads/<binding>/<document>/original`, names a binding whose document row names another key. `found` falls only when something removes originals, such as `object-store-orphans` run by hand without `--list`. A rise with neither behind it is the join being wrong: leave the setting at `list` and escalate.
 - `pnpm ops object-store-orphans --workspace <id> --list` gives one workspace's count, and the per-workspace counts add up to `found`. By hand the command removes unless given `--list`, whatever the setting says.
 
-Switch removal on after a week of list-only passes in which every rise in `found` has a failed bind behind it: set `UPLOAD_SWEEP=remove` on the platform resource and redeploy. The next pass reads `upload_sweep=remove`, with `removed` equal to `found`, and `found` falls to the binds that failed since. Setting it back to `list` stops the removal from the next start.
+Switch removal on after a week of list-only passes in which every rise in `found` has a failed bind or a lost race behind it: set `UPLOAD_SWEEP=remove` on the platform resource and redeploy. The next pass reads `upload_sweep=remove`, with `removed` equal to `found`, and `found` falls to what failed binds and lost races have left since. Setting it back to `list` stops the removal from the next start.
 
 ## Import a company's bundle
 
