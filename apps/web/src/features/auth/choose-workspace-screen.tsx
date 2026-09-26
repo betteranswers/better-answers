@@ -1,6 +1,12 @@
 import { useNavigate } from "@tanstack/react-router";
+import type { BetterFetchError } from "better-auth/client";
 import { useEffect, useState } from "react";
+import { flushSync } from "react-dom";
+import { z } from "zod";
 
+import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
+import { RefusalLine } from "@/shared/refusal-outcome.tsx";
+import type { Said } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 
 import {
@@ -11,13 +17,28 @@ import {
   useSetActiveOrganization,
   type ResumeAnswer,
 } from "./auth-hooks.ts";
-import { AuthScreen, Outcome } from "./auth-screen.tsx";
+import { AuthScreen } from "./auth-screen.tsx";
 import { carriedFlow, leavingFor, pageQuery } from "./carried-flow.ts";
-import { WORKSPACE_WORDS } from "./workspace-words.ts";
+import {
+  CONNECTION_UNFINISHED,
+  noLongerAMember,
+  PICK_REFUSED,
+  SOLE_PICK_REFUSED,
+  WORKSPACES_UNREAD,
+} from "./refusal-words.ts";
+import { NOT_CONNECTED, PICKER_WORDS } from "./workspace-words.ts";
 
 type Session = ReturnType<typeof useSession>;
 type Workspaces = ReturnType<typeof useListOrganizations>;
 type Workspace = NonNullable<Workspaces["data"]>[number];
+
+const WORKSPACE_LIST = "workspace-list";
+
+/** Better Auth's code for a pick of a workspace the person holds no membership in. */
+const noMembership = z.object({ code: z.literal("USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION") });
+
+const refusedForNoMembership = (refused: BetterFetchError | null): boolean =>
+  noMembership.safeParse(refused).success;
 
 const addressIn = (answer: ResumeAnswer): string | undefined => {
   const next = answer.url;
@@ -31,14 +52,43 @@ const whatTheSessionSays = (session: Session) => ({
   active: session.data?.session.activeOrganizationId ?? undefined,
 });
 
-const whereThePersonStands = (session: Session, workspaces: Workspaces) => {
-  const held = workspaces.data ?? [];
+/** A workspace refused as no longer held is left out at once, before the list is read again. */
+const whereThePersonStands = (
+  session: Session,
+  workspaces: Workspaces,
+  noLongerHeld: Workspace | undefined,
+) => {
+  const held = (workspaces.data ?? []).filter((workspace) => workspace.id !== noLongerHeld?.id);
   return {
     ...whatTheSessionSays(session),
     held,
     sole: held.length === 1 ? held[0] : undefined,
     settled: !session.isPending && !workspaces.isPending,
   };
+};
+
+/** Once a pick is refused, the list or the refusal stands to be read rather than a pick retried. */
+const whereThePickStands = (
+  held: readonly Workspace[],
+  noLongerHeld: Workspace | undefined,
+  went: {
+    readonly pick: BetterFetchError | null;
+    readonly resume: BetterFetchError | null;
+    readonly nowhere: boolean;
+  },
+) => {
+  const one = held.length === 1;
+  return {
+    notConnected: went.nowhere || went.resume !== null,
+    listed: held.length > 1 || (one && noLongerHeld !== undefined),
+    refused: went.pick !== null,
+    removedFrom: refusedForNoMembership(went.pick) ? noLongerHeld : undefined,
+    opensAlone: one && noLongerHeld === undefined && went.pick === null && went.resume === null,
+  };
+};
+
+const focusTheFirstWorkspace = () => {
+  document.getElementById(WORKSPACE_LIST)?.querySelector("button")?.focus();
 };
 
 /**
@@ -55,11 +105,18 @@ export function ChooseWorkspaceScreen() {
   const resume = useOAuthContinue();
 
   const [wentNowhere, setWentNowhere] = useState(false);
+  const [noLongerHeld, setNoLongerHeld] = useState<Workspace | undefined>(undefined);
 
   const { signedOut, unnamed, held, sole, active, settled } = whereThePersonStands(
     session,
     workspaces,
+    noLongerHeld,
   );
+  const { opensAlone, ...pickStanding } = whereThePickStands(held, noLongerHeld, {
+    pick: pick.error,
+    resume: resume.error,
+    nowhere: wentNowhere,
+  });
 
   const goOn = () => {
     if (carried === "") {
@@ -82,8 +139,21 @@ export function ChooseWorkspaceScreen() {
     );
   };
 
-  const openWorkspace = (organizationId: string) => {
-    pick.mutate({ organizationId }, { onSuccess: goOn });
+  const openWorkspace = (workspace: Workspace) => {
+    pick.mutate(
+      { organizationId: workspace.id },
+      {
+        onSuccess: goOn,
+        onError: (refused) => {
+          if (!refusedForNoMembership(refused)) return;
+          flushSync(() => {
+            setNoLongerHeld(workspace);
+          });
+          focusTheFirstWorkspace();
+          void workspaces.refetch();
+        },
+      },
+    );
   };
 
   const openSoleWorkspace = () => {
@@ -93,7 +163,7 @@ export function ChooseWorkspaceScreen() {
       return;
     }
 
-    openWorkspace(sole.id);
+    openWorkspace(sole);
   };
 
   const decided = settled && !pick.isPending && !resume.isPending && !wentNowhere;
@@ -112,7 +182,7 @@ export function ChooseWorkspaceScreen() {
       void navigate({ href: "/no-workspace", replace: true });
       return;
     }
-    if (sole !== undefined) openSoleWorkspace();
+    if (opensAlone) openSoleWorkspace();
 
     // eslint-disable-next-line react-hooks/exhaustive-deps -- adding `openSoleWorkspace` re-runs this on every render and resumes a flow that is already resuming
   }, [
@@ -122,6 +192,7 @@ export function ChooseWorkspaceScreen() {
     held.length,
     workspaces.isError,
     sole?.id,
+    opensAlone,
     active,
     carried,
     navigate,
@@ -129,12 +200,13 @@ export function ChooseWorkspaceScreen() {
 
   return (
     <WorkspaceChoice
-      wentNowhere={wentNowhere}
-      settled={settled}
-      unread={workspaces.isError}
+      standing={{
+        settled,
+        unread: workspaces.isError,
+        ...pickStanding,
+      }}
       held={held}
       busy={pick.isPending || resume.isPending}
-      refused={pick.error !== null || resume.error !== null}
       onRetry={() => {
         void workspaces.refetch();
       }}
@@ -146,82 +218,57 @@ export function ChooseWorkspaceScreen() {
   );
 }
 
-function WorkspaceChoice(properties: {
-  readonly wentNowhere: boolean;
+type Standing = {
+  /** A carried connection that could not be handed back once the workspace was open. */
+  readonly notConnected: boolean;
   readonly settled: boolean;
   readonly unread: boolean;
+  readonly listed: boolean;
+  readonly refused: boolean;
+  /** Set only while the latest pick's refusal is the ended membership. */
+  readonly removedFrom: Workspace | undefined;
+};
+
+const refusedWith = (said: Said): Outcome => ({
+  tone: "refused",
+  words: <RefusalLine said={said} />,
+});
+
+const pickOutcome = (standing: Standing): Outcome | undefined => {
+  if (standing.removedFrom !== undefined) {
+    return { tone: "refused", words: noLongerAMember(standing.removedFrom.name) };
+  }
+  if (standing.refused) return refusedWith(standing.listed ? PICK_REFUSED : SOLE_PICK_REFUSED);
+  return standing.listed ? undefined : { tone: "said", words: PICKER_WORDS.opening };
+};
+
+const outcomeOf = (standing: Standing): Outcome | undefined => {
+  if (standing.notConnected) return refusedWith(CONNECTION_UNFINISHED);
+  if (!standing.settled) return { tone: "said", words: PICKER_WORDS.reading };
+  if (standing.unread) return { tone: "refused", words: WORKSPACES_UNREAD };
+  return pickOutcome(standing);
+};
+
+function WorkspaceList(properties: {
   readonly held: readonly Workspace[];
   readonly busy: boolean;
-  readonly refused: boolean;
-  readonly onRetry: () => void;
-  readonly onPick: (organizationId: string) => void;
-  readonly onCarryOn: () => void;
+  readonly onPick: (workspace: Workspace) => void;
 }) {
-  if (properties.wentNowhere) {
-    return (
-      <AuthScreen title="The connection could not be finished">
-        <Outcome tone="refused">
-          You are signed in, but this connection could not be resumed. Start it again from the app
-          you were connecting, or carry on in Better Answers.
-        </Outcome>
-
-        <Button type="button" className="mt-6" onClick={properties.onCarryOn}>
-          Go to Better Answers
-        </Button>
-      </AuthScreen>
-    );
-  }
-
-  if (!properties.settled) {
-    return (
-      <AuthScreen title={WORKSPACE_WORDS.organizations}>
-        <Outcome tone="said">Reading your workspaces.</Outcome>
-      </AuthScreen>
-    );
-  }
-
-  if (properties.unread) {
-    return (
-      <AuthScreen title={WORKSPACE_WORDS.organizations}>
-        <Outcome tone="refused">Your workspaces could not be read. Try again.</Outcome>
-
-        <Button type="button" className="mt-6" onClick={properties.onRetry}>
-          Try again
-        </Button>
-      </AuthScreen>
-    );
-  }
-
-  if (properties.held.length < 2) {
-    return (
-      <AuthScreen title={WORKSPACE_WORDS.organizations}>
-        {properties.refused ? (
-          <Outcome tone="refused">
-            Your workspace could not be opened. Sign out and sign in again.
-          </Outcome>
-        ) : (
-          <Outcome tone="said">Taking you to your workspace.</Outcome>
-        )}
-      </AuthScreen>
-    );
-  }
-
   return (
-    <AuthScreen title="Choose a workspace">
-      <p className="mt-2 text-muted-foreground">
-        You are a member of more than one. Everything you see next is the one you pick.
-      </p>
+    <>
+      <p className="mt-2 text-muted-foreground">{PICKER_WORDS.lead}</p>
 
-      <ul className="mt-6 flex flex-col gap-2">
+      <ul id={WORKSPACE_LIST} className="mt-6 flex flex-col gap-2">
         {properties.held.map((workspace) => (
           <li key={workspace.id}>
+            {/* Enabled while a pick is open, so a refused pick can hand focus to what is left. */}
             <Button
               type="button"
               variant="outline"
-              className="w-full justify-start"
-              disabled={properties.busy}
+              className="w-full justify-start aria-disabled:opacity-50"
+              aria-disabled={properties.busy}
               onClick={() => {
-                properties.onPick(workspace.id);
+                if (!properties.busy) properties.onPick(workspace);
               }}
             >
               {workspace.name}
@@ -229,12 +276,49 @@ function WorkspaceChoice(properties: {
           </li>
         ))}
       </ul>
+    </>
+  );
+}
 
-      {properties.refused ? (
-        <Outcome tone="refused">
-          That workspace could not be opened. Choose again, or sign out and back in.
-        </Outcome>
+function NextAct(properties: {
+  readonly standing: Standing;
+  readonly onRetry: () => void;
+  readonly onCarryOn: () => void;
+}) {
+  if (properties.standing.notConnected) {
+    return (
+      <Button type="button" className="mt-6" onClick={properties.onCarryOn}>
+        {NOT_CONNECTED.carryOn}
+      </Button>
+    );
+  }
+  if (!properties.standing.unread) return null;
+  return (
+    <Button type="button" className="mt-6" onClick={properties.onRetry}>
+      {PICKER_WORDS.tryAgain}
+    </Button>
+  );
+}
+
+/** The outcome's regions stand in one place through every state, so each change is announced. */
+function WorkspaceChoice(properties: {
+  readonly standing: Standing;
+  readonly held: readonly Workspace[];
+  readonly busy: boolean;
+  readonly onRetry: () => void;
+  readonly onPick: (workspace: Workspace) => void;
+  readonly onCarryOn: () => void;
+}) {
+  const { standing } = properties;
+  const listing = standing.listed && !standing.notConnected;
+
+  return (
+    <AuthScreen title={standing.notConnected ? NOT_CONNECTED.heading : PICKER_WORDS.heading}>
+      {listing ? (
+        <WorkspaceList held={properties.held} busy={properties.busy} onPick={properties.onPick} />
       ) : null}
+      <OutcomeLine outcome={outcomeOf(standing)} className="mt-4" />
+      <NextAct standing={standing} onRetry={properties.onRetry} onCarryOn={properties.onCarryOn} />
     </AuthScreen>
   );
 }

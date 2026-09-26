@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import type { REDACTION_TIERS, SENSITIVITIES } from "@better-answers/schema";
 
+import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
 import type { RefusalWord } from "@/shared/api/trpc.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { sentenceOf, type Said } from "@/shared/refusal-words.ts";
@@ -402,6 +403,16 @@ export const signedInAtHome = async (
   await page.goto("/sign-in");
   await signIn(page, api, email);
   await landedAtHome(page, "Admin");
+};
+
+/** From the sign-in screen to the no-workspace screen, as a person in no workspace arrives. */
+export const signedInWithNoWorkspace = async (page: Page, api: APIRequestContext, who: string) => {
+  const email = anAddress(who);
+  const signedIn = await person(api, email);
+  await page.goto("/sign-in");
+  await signIn(page, api, email);
+  await expect(page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeVisible();
+  return signedIn;
 };
 
 const ACT_BUDGET_MS = 100;

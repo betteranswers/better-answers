@@ -1,6 +1,7 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
 import { goHome, UNKNOWN_SCREEN } from "@/app/words.ts";
+import { PICKER_WORDS } from "@/features/auth/workspace-words.ts";
 import { NOT_THE_OPERATOR, ONLY_THE_OPERATOR } from "@/features/console/refusal-words.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
 import { CONSOLE } from "@/shared/screens.ts";
@@ -144,7 +145,7 @@ test.describe("the way into the console", () => {
     await page.getByRole("menuitem", { name: "Back to your workspaces" }).click();
 
     await expect(page).toHaveURL("/choose-workspace");
-    await expect(page.getByRole("heading", { level: 1, name: "Choose a workspace" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: PICKER_WORDS.heading })).toBeVisible();
   });
 });
 

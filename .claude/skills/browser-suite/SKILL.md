@@ -106,7 +106,7 @@ call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources
 | `askToJoin` | A person's ask to join a workspace by its slug, with a reason, through the members slice's own act and the principal the ask-to-join procedure uses, without its sign-in or its answer's floor — a request waiting on the Requests tab |
 | `flagTheName` | A workspace's Admin flags a member's display name through the members slice's own act and principal, without the email the procedure sends the operator — a name waiting on the console's *Names waiting* view |
 
-Fifteen more helpers in the same module drive the browser rather than the harness:
+Sixteen more helpers in the same module drive the browser rather than the harness:
 
 | Helper | What it does |
 | --- | --- |
@@ -115,6 +115,7 @@ Fifteen more helpers in the same module drive the browser rather than the harnes
 | `aMemberSignedInAt` | A new workspace's Editor or Viewer, signed in having asked for a path first, so sign-in carries them back to it — where a refused screen is proved |
 | `landedAtHome` | Asserts the page is on a role's home, its address and its heading read off the screen list |
 | `signedInAtHome` | Opens the sign-in screen, runs `signIn`, and waits for an Admin's home, as the Admin of one workspace arrives |
+| `signedInWithNoWorkspace` | A new person with no membership, signed in through `signIn` and waiting on the no-workspace screen, answered as the harness's `person` |
 | `signOutFromTheShell` | Opens the top bar's menu, then signs out, because sign-out is one disclosure in |
 | `skipLinkReachesTheScreen` | Tab, the skip link has focus, Enter, `main` has focus — where a shell spec's keyboard traversal starts |
 | `tabUntilFocused` | Presses Tab until a locator has focus, and fails by name when it never does |

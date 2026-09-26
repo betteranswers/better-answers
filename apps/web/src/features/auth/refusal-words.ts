@@ -45,11 +45,44 @@ export const REASON_REFUSED: Said = {
 };
 
 export const ASK_REFUSED: Said = {
-  why: "Your ask wasn't sent.",
+  why: "Your request wasn't sent.",
   next: "Reload the page and ask again.",
 };
 
 export const ASK_UNANSWERED: Said = {
-  why: "No response, so your ask wasn't sent.",
+  why: "No response, so your request wasn't sent.",
   next: "Try again in a moment.",
+};
+
+/** Rounded up, so the reader never asks again before the ceiling lifts. */
+const minutesUntil = (seconds: number): string => {
+  const minutes = Math.max(1, Math.ceil(seconds / 60));
+  return minutes === 1 ? "a minute" : `${minutes} minutes`;
+};
+
+export const askedTooOften = (liftsInSeconds: number): Said => ({
+  why: "You have asked to join too often.",
+  next: `Ask again in ${minutesUntil(liftsInSeconds)}.`,
+});
+
+/** The list of what is left stands beside it, so the list is what to do next. */
+export const noLongerAMember = (workspace: string): string =>
+  `You are no longer a member of ${workspace}.`;
+
+/** A Try again button stands beside it. */
+export const WORKSPACES_UNREAD = "Your workspaces couldn't be read.";
+
+export const PICK_REFUSED: Said = {
+  why: "That workspace didn't open.",
+  next: "Choose it again.",
+};
+
+export const SOLE_PICK_REFUSED: Said = {
+  why: "Your workspace didn't open.",
+  next: "Reload the page to try again.",
+};
+
+export const CONNECTION_UNFINISHED: Said = {
+  why: "The connection couldn't be finished.",
+  next: "Start it again from the app you were connecting.",
 };
