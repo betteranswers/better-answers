@@ -66,22 +66,58 @@ index fa4f8138ab3b2aba64f4e715be2d8126da6ccf8b..1b7ede0e76b017705bb8ed073f316825
          fileName: test.file?.filepath && path.resolve(test.file.filepath),
      };
 diff --git a/dist/src/vitest-test-runner.js b/dist/src/vitest-test-runner.js
-index 84f1ca026503b8e92b7adc952ec6c6a401943656..a1f3e39c870e0f955d989ebbcad91e42772104be 100644
+index 84f1ca026503b8e92b7adc952ec6c6a401943656..063c0b4a8914ea742fae9934548e72955d3365a4 100644
 --- a/dist/src/vitest-test-runner.js
 +++ b/dist/src/vitest-test-runner.js
-@@ -7,8 +7,10 @@ import { commonTokens, tokens, } from '@stryker-mutator/api/plugin';
+@@ -7,8 +7,46 @@ import { commonTokens, tokens, } from '@stryker-mutator/api/plugin';
  import { DryRunStatus, toMutantRunResult, determineHitLimitReached, TestStatus, } from '@stryker-mutator/api/test-runner';
  import { errorToString, escapeRegExp, normalizeFileName, notEmpty, testFilesProvided, } from '@stryker-mutator/util';
  import { vitestWrapper } from './vitest-wrapper.js';
 -import { convertTestToTestResult, fromTestId, collectTestsFromSuite, normalizeCoverage, isErrorCodeError, VITEST_ERROR_CODES, } from './vitest-helpers.js';
++import { collectTestName } from './test-helpers.js';
 +import { convertTestToTestResult, fromTestId, collectTestsFromSuite, normalizeCoverage, normalizeTestId, isErrorCodeError, VITEST_ERROR_CODES, } from './vitest-helpers.js';
  const STRYKER_SETUP = fileURLToPath(new URL('./stryker-setup.js', import.meta.url));
 +/** The name the patch above gives a test file's own failure to load (better-answers). */
 +const FILE_FAILED_TO_LOAD = 'the test file failed to load';
++/** A suite that failed on its own error: a file that failed to load, or a hook that threw (better-answers). */
++function isOwnSuiteFailure(task, result) {
++    return task?.type === 'suite' && result?.state === 'fail' && (result.errors?.length ?? 0) > 0;
++}
++/** A test file that failed with no test collected: a module it imports threw while loading. */
++function failedToLoad(suite) {
++    return suite.file === suite && suite.result?.state === 'fail' && collectTestsFromSuite(suite).length === 0;
++}
++function suitesFailedOnTheirOwn(suite) {
++    const own = isOwnSuiteFailure(suite, suite.result) || failedToLoad(suite);
++    const nested = suite.tasks.filter((task) => task.type === 'suite').flatMap(suitesFailedOnTheirOwn);
++    return own ? [suite, ...nested] : nested;
++}
++/** Tests skipped under a failed suite mean its beforeAll threw; tests that ran mean its afterAll did. */
++function failedHookOf(suite) {
++    const ran = collectTestsFromSuite(suite).some((test) => test.result?.state === 'pass' || test.result?.state === 'fail');
++    return ran ? 'afterAll' : 'beforeAll';
++}
++function suiteFailureResult(suite, separator) {
++    const file = path.relative(process.cwd(), suite.file.filepath).replace(/\\/g, '/');
++    const message = suite.result?.errors?.[0]?.message ?? 'StrykerJS: the suite failed';
++    const base = {
++        timeSpentMs: suite.result?.duration ?? 0,
++        fileName: path.resolve(suite.file.filepath),
++        status: TestStatus.Failed,
++    };
++    if (failedToLoad(suite)) {
++        return { ...base, id: normalizeTestId(`${suite.file.filepath}#${FILE_FAILED_TO_LOAD}`), name: FILE_FAILED_TO_LOAD, failureMessage: `${file} failed to load: ${message}` };
++    }
++    const hook = `the ${failedHookOf(suite)}`;
++    const [where, name] = suite.file === suite
++        ? [file, `${hook} hook`]
++        : [`${file} > ${collectTestName(suite, ' > ')}`, collectTestName({ name: `${hook} hook`, suite }, separator)];
++    return { ...base, id: normalizeTestId(`${suite.file.filepath}#${name}`), name, failureMessage: `${hook} of ${where} failed: ${message}` };
++}
  export class VitestTestRunner {
      log;
      globalNamespace;
-@@ -19,6 +21,7 @@ export class VitestTestRunner {
+@@ -19,6 +57,7 @@ export class VitestTestRunner {
      ];
      ctx;
      options;
@@ -89,7 +125,7 @@ index 84f1ca026503b8e92b7adc952ec6c6a401943656..a1f3e39c870e0f955d989ebbcad91e42
      localSetupFile = path.resolve(`./stryker-setup-${process.env.STRYKER_MUTATOR_WORKER ?? 0}.js`);
      constructor(options, log, globalNamespace) {
          this.log = log;
-@@ -81,6 +84,13 @@ export class VitestTestRunner {
+@@ -81,6 +120,27 @@ export class VitestTestRunner {
              bail: this.options.disableBail ? 0 : 1,
              onConsoleLog: () => false,
          });
@@ -100,35 +136,50 @@ index 84f1ca026503b8e92b7adc952ec6c6a401943656..a1f3e39c870e0f955d989ebbcad91e42
 +        // the ids reported back are built with the one joiner, so the filter selects the test.
 +        this.testNameSeparator = semver.major(vitestWrapper.version) >= 5 ? ' > ' : ' ';
 +        this.ctx.provide('testNameSeparator', this.testNameSeparator);
++        // PATCHED (better-answers): vitest bails on a failed test alone. A file that fails to load,
++        // or a hook that throws, fails a suite and no test, so vitest would run on through every
++        // related file, and under CI's contention a static mutant outlasts its budget and reads
++        // Timeout. A suite's own failure cancels the run as a failed test does.
++        if (!this.options.disableBail) {
++            this.ctx.reporters.push({
++                onTaskUpdate: (packs) => {
++                    const failed = packs.some(([id, result]) => isOwnSuiteFailure(this.ctx.state.idMap.get(id), result));
++                    if (failed && !this.ctx.isCancelling) {
++                        void this.ctx.cancelCurrentRun('test-failure');
++                    }
++                },
++            });
++        }
          this.ctx.provide('globalNamespace', this.globalNamespace);
          this.ctx.provide('isGreaterThanVitest4Point1', semver.satisfies(vitestWrapper.version, '>=4.1.0'));
          this.ctx.config.browser.screenshotFailures = false;
-@@ -173,10 +183,29 @@ export class VitestTestRunner {
+@@ -172,11 +232,29 @@ export class VitestTestRunner {
+             .flatMap((file) => collectTestsFromSuite(file))
              .filter((test) => test.result); // if no result: it was skipped because of bail
          let failure = false;
++        const failedTests = new Set();
          const testResults = tests.map((test) => {
 -            const testResult = convertTestToTestResult(test);
+-            failure ||= testResult.status === TestStatus.Failed;
 +            const testResult = convertTestToTestResult(test, this.testNameSeparator);
-             failure ||= testResult.status === TestStatus.Failed;
++            if (testResult.status === TestStatus.Failed) {
++                failure = true;
++                failedTests.add(test);
++            }
              return testResult;
          });
-+        // PATCHED (better-answers): a test file that failed before any of its tests ran — a
-+        // module it imports threw while loading — has no test tasks, so the loop above reads
-+        // it as nothing ran and the mutant that broke the import is reported as survived with
-+        // testsCompleted: 0. Every test in that file would have failed; the file's own failure
-+        // is one failed test here, named for the file, so the mutant is killed with the error
-+        // it caused. The dry run reads it the same way and refuses to start.
++        // PATCHED (better-answers): a suite that fails on its own — its file fails to load, or a
++        // file-level beforeAll or any afterAll throws — has no failed test beneath it: its tests
++        // are never collected, are skipped, or pass, so the loop above reads the mutant as
++        // survived. Each such suite is one failed test here, its reason naming the file and any
++        // hook, so the mutant is killed with the error it caused. The dry run reads it the same
++        // way and refuses to start.
 +        for (const file of this.ctx.state.getFiles()) {
-+            if (file.result?.state === 'fail' && collectTestsFromSuite(file).length === 0) {
-+                failure = true;
-+                testResults.push({
-+                    id: normalizeTestId(`${file.filepath}#${FILE_FAILED_TO_LOAD}`),
-+                    name: FILE_FAILED_TO_LOAD,
-+                    timeSpentMs: file.result.duration ?? 0,
-+                    fileName: path.resolve(file.filepath),
-+                    status: TestStatus.Failed,
-+                    failureMessage: file.result.errors?.[0]?.message ?? 'StrykerJS: the test file failed to load',
-+                });
++            for (const suite of suitesFailedOnTheirOwn(file)) {
++                if (!collectTestsFromSuite(suite).some((test) => failedTests.has(test))) {
++                    failure = true;
++                    testResults.push(suiteFailureResult(suite, this.testNameSeparator));
++                }
 +            }
 +        }
          if (!failure && this.ctx.state.errorsSet.size > 0) {
