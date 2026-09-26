@@ -149,7 +149,7 @@ function TickedList(properties: { readonly groups: readonly FindingGroup[] }) {
 }
 
 /**
- * Both reasoned acts land the reason on the ledger beside the Admin who gave it, so they ask for
+ * Both reasoned acts land the reason in the audit log beside the Admin who gave it, so they ask for
  * it alike.
  */
 function ReasonedDialog(properties: {

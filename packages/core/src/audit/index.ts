@@ -19,13 +19,13 @@ import {
   isDeclared,
   isIdentitySetAct,
   isOptionalKind,
-  type LedgerAct,
+  type AuditAct,
 } from "./vocabulary.ts";
 
 export { act, declareActs, declareIdentitySetActs, declarations } from "./vocabulary.ts";
-export type { ActName, LedgerAct, DetailOf } from "./vocabulary.ts";
+export type { ActName, AuditAct, DetailOf } from "./vocabulary.ts";
 
-export type AuditEvent<A extends LedgerAct> = {
+export type AuditEvent<A extends AuditAct> = {
   readonly id: string;
   readonly act: A;
   readonly subjectId: string;
@@ -39,20 +39,20 @@ export type Recorded = {
   readonly actorId: ActorId;
 };
 
-export type LedgerRow = z.infer<typeof boundarySchemas.auditEvent.select>;
+export type AuditEventRow = z.infer<typeof boundarySchemas.auditEvent.select>;
 
-const LEDGER_ROW = `id, workspace_id AS "workspaceId", act, family, actor, subject_kind AS "subjectKind",
+const AUDIT_EVENT_ROW = `id, workspace_id AS "workspaceId", act, family, actor, subject_kind AS "subjectKind",
             subject_id AS "subjectId", at, detail, batch_id AS "batchId"`;
 
 /** Oldest first; `since` is inclusive. */
 export const eventsOfAct = async (
   principal: Principal,
   tx: Tx,
-  act: LedgerAct,
+  act: AuditAct,
   since?: Date,
-): Promise<readonly LedgerRow[]> => {
+): Promise<readonly AuditEventRow[]> => {
   const found = await tx.query(
-    `SELECT ${LEDGER_ROW}
+    `SELECT ${AUDIT_EVENT_ROW}
        FROM audit_event
       WHERE workspace_id = ${scopeClause(1)}
         AND act = $2
@@ -71,7 +71,7 @@ export const eventsOfAct = async (
 export const latestOnIdentitySet = async (
   _operator: OperatorPrincipal,
   tx: Tx,
-  act: LedgerAct,
+  act: AuditAct,
   subjectIds: readonly string[],
 ): Promise<ReadonlyMap<string, Date>> => {
   const found = await tx.query<{ subject_id: string; at: Date }>(
@@ -83,8 +83,8 @@ export const latestOnIdentitySet = async (
   return new Map(found.rows.map((row) => [row.subject_id, row.at]));
 };
 
-export type LedgerPage = {
-  readonly rows: readonly LedgerRow[];
+export type AuditEventPage = {
+  readonly rows: readonly AuditEventRow[];
   /** The last row's id when an older row follows it; null when this page holds the oldest. */
   readonly nextCursor: AuditEventId | null;
 };
@@ -97,13 +97,13 @@ export const eventsNewestFirst = async (
   principal: Principal,
   tx: Tx,
   asked: {
-    readonly family?: LedgerRow["family"] | undefined;
+    readonly family?: AuditEventRow["family"] | undefined;
     readonly cursor?: string | null | undefined;
     readonly limit: number;
   },
-): Promise<LedgerPage> => {
+): Promise<AuditEventPage> => {
   const found = await tx.query(
-    `SELECT ${LEDGER_ROW}
+    `SELECT ${AUDIT_EVENT_ROW}
        FROM audit_event
       WHERE workspace_id = ${scopeClause(1)}
         AND ($2::text IS NULL OR family = $2)
@@ -124,7 +124,7 @@ const eventInsert = boundarySchemas.auditEvent.insert.omit({ workspaceId: true }
 
 const identitySetInsert = boundarySchemas.identityAuditEvent.insert;
 
-/** Both ledgers take the same row; only a workspace's ledger adds the workspace it belongs to. */
+/** Both audit logs take the same row; only a workspace's audit log adds the workspace it belongs to. */
 const ROW_COLUMNS = "id, act, actor, subject_id, detail, batch_id";
 
 const AN_KINDS: ReadonlySet<string> = new Set(["id", "iri", "audience"]);
@@ -155,13 +155,13 @@ const detailRefusal = (
   return undefined;
 };
 
-const rowToInsert = <A extends LedgerAct>(
-  ledger: typeof eventInsert | typeof identitySetInsert,
+const rowToInsert = <A extends AuditAct>(
+  auditLog: typeof eventInsert | typeof identitySetInsert,
   actor: ActorId,
   event: AuditEvent<A>,
 ) => {
   if (!isDeclared(event.act.name)) throw new Error(`audit: ${event.act.name} was never declared`);
-  const row = ledger.safeParse({
+  const row = auditLog.safeParse({
     id: event.id,
     act: event.act.name,
     actor,
@@ -177,7 +177,7 @@ const rowToInsert = <A extends LedgerAct>(
   return row.data;
 };
 
-const write = async <A extends LedgerAct>(
+const write = async <A extends AuditAct>(
   tx: Tx,
   workspaceId: string | null,
   actor: ActorId,
@@ -200,18 +200,18 @@ const write = async <A extends LedgerAct>(
 };
 
 /**
- * Writes the event to the ledger its act was declared for. Rejects when the act was never
- * declared, or the event does not fit the ledger's row or its act's detail shape; under the
+ * Writes the event to the audit log its act was declared for. Rejects when the act was never
+ * declared, or the event does not fit the audit log's row or its act's detail shape; under the
  * operator, who stands in no workspace, when the act is not the identity set's.
  */
-export const record = <A extends LedgerAct>(
+export const record = <A extends AuditAct>(
   principal: Principal | OperatorPrincipal,
   tx: Tx,
   event: AuditEvent<A>,
 ): Promise<Recorded> => write(tx, scopeParameter(principal), actorIdOf(principal), event);
 
 /** As `record`, but the event's own `actor` is recorded rather than the platform. */
-export const recordFor = <A extends LedgerAct>(
+export const recordFor = <A extends AuditAct>(
   platform: PlatformPrincipal,
   tx: Tx,
   event: AuditEvent<A> & { readonly actor: ActorId },

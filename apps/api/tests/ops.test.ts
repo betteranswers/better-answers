@@ -254,10 +254,10 @@ const erasedAt = async (
   return { ...rehearsed.value, workspaceId };
 };
 
-type LedgerRow = { act: string; actor: string; subject_id: string };
+type AuditEventRow = { act: string; actor: string; subject_id: string };
 
-const ledgerOf = async (app: TestApp, workspaceId: string): Promise<readonly LedgerRow[]> => {
-  const found = await app.database.superuser.query<LedgerRow>(
+const auditLogOf = async (app: TestApp, workspaceId: string): Promise<readonly AuditEventRow[]> => {
+  const found = await app.database.superuser.query<AuditEventRow>(
     "SELECT act, actor, subject_id FROM audit_event WHERE workspace_id = $1 ORDER BY at, id",
     [workspaceId],
   );
@@ -615,7 +615,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         "replay-erasures: done — replayed 1 erasure since 2026-05-31T00:00:00.000Z",
       ]);
 
-      expect(await ledgerOf(app(), erased.workspaceId)).toContainEqual({
+      expect(await auditLogOf(app(), erased.workspaceId)).toContainEqual({
         act: "platform.erasure.replayed",
         actor: "process:better-answers-erasure",
         subject_id: erased.erasureRequestId,
@@ -712,7 +712,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect([second.exitCode, second.lines]).toEqual([0, replayedOnce]);
       expect(await whatAReplayActsOn(app(), workspaceId)).toEqual(afterTheFirst);
       expect(
-        (await ledgerOf(app(), workspaceId)).filter(
+        (await auditLogOf(app(), workspaceId)).filter(
           (row) => row.act === "platform.erasure.replayed",
         ),
       ).toHaveLength(2);
@@ -1110,7 +1110,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
           `${BEYOND_USE}.`,
       );
       expect(written).toContain("Exports already issued are not recalled.");
-      expect(await ledgerOf(app(), workspaceId)).toContainEqual({
+      expect(await auditLogOf(app(), workspaceId)).toContainEqual({
         act: "platform.erasure.rehearsed",
         actor: "process:better-answers-erasure",
         subject_id: expect.any(String),
@@ -1685,7 +1685,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       return found.rows;
     };
 
-    it("stands up the workspace, partition, membership, config, ledger and repository", async () => {
+    it("stands up workspace, partition, membership, config, audit log and repository", async () => {
       const admin = await app().person(undefined, "Priya Shah");
       const slug = aSlug();
 
@@ -1873,7 +1873,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
   describe("add-member — a signed-in person made a workspace's member", () => {
     it.each(["Admin", "Editor", "Viewer"])(
-      "makes a person a %s, writing membership and ledger rows",
+      "makes a person a %s, writing membership and audit events",
       async (role) => {
         const { workspaceId } = await app().provision();
         const person = await app().person();
@@ -1942,7 +1942,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         `add-member: REFUSED — no-such-workspace: ${nowhere} is not a workspace`,
       ]);
       expect(await membershipsHeldBy(app(), person.id)).toBe(0);
-      expect(await ledgerOf(app(), nowhere)).toEqual([]);
+      expect(await auditLogOf(app(), nowhere)).toEqual([]);
     });
 
     it("refuses already-a-member on any repeat, never changing a role", async () => {
@@ -2085,7 +2085,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run.lines).toEqual([
         `rename-workspace: REFUSED — no-such-workspace: ${nowhere} is not a workspace`,
       ]);
-      expect(await ledgerOf(app(), nowhere)).toEqual([]);
+      expect(await auditLogOf(app(), nowhere)).toEqual([]);
     });
 
     it.each([

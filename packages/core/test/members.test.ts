@@ -142,7 +142,7 @@ describe("making a group", () => {
     ]);
   });
 
-  it("refuses a taken name, adding neither group nor ledger row", async () => {
+  it("refuses a taken name, adding neither group nor audit event", async () => {
     const workspace = await provisioned("Beta");
     await madeGroup(workspace, "HR team");
 
@@ -291,7 +291,7 @@ describe("who is in a group", () => {
     expect(memberships.rowCount).toBe(0);
   });
 
-  it("refuses a repeat add, so the ledger records one", async () => {
+  it("refuses a repeat add, so the audit log records one", async () => {
     const { workspace, person, groupId } = await oneGroupOnePerson("Lambda");
 
     const again = await putInGroup(workspace, groupId, person);
@@ -570,7 +570,7 @@ describe("an Admin of another workspace", () => {
 });
 
 describe("an act whose transaction fails after it", () => {
-  it("leaves neither the group nor its ledger row behind", async () => {
+  it("leaves neither the group nor its audit event behind", async () => {
     const workspace = await provisioned("Together");
     let groupId: string | undefined;
 

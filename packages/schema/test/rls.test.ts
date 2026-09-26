@@ -45,8 +45,8 @@ import {
   A_GRAPH_NODE_OF_KIND,
   A_GROUP,
   A_GROUP_MEMBERSHIP,
-  A_LEDGER_ROW,
-  A_LEDGER_ROW_WITH_ITS_FAMILY,
+  AN_AUDIT_EVENT_ROW,
+  AN_AUDIT_EVENT_ROW_WITH_ITS_FAMILY,
   A_MEMBER,
   A_MIGRATION_STAMP,
   A_SOURCE_BINDING,
@@ -61,8 +61,8 @@ import {
   AN_EDGE,
   AN_EDGE_CARRYING_A_SENTENCE,
   AN_ERASURE_ROUTINE,
-  AN_IDENTITY_SET_LEDGER_ROW,
-  AN_IDENTITY_SET_LEDGER_ROW_WITH_ITS_FAMILY,
+  AN_IDENTITY_SET_AUDIT_EVENT_ROW,
+  AN_IDENTITY_SET_AUDIT_EVENT_ROW_WITH_ITS_FAMILY,
   AN_INVITATION,
   ONE_CALL_AGAINST_A_TOKEN,
   REFRESH_THE_READING,
@@ -310,7 +310,7 @@ describe("the role CHECK on the identity set", () => {
   });
 });
 
-const ledgerRowAsApp = async (client: pg.PoolClient) => {
+const auditEventRowAsApp = async (client: pg.PoolClient) => {
   const seed = await seedTwoWorkspaces(client);
   const row = await seed.auditEvent({ workspaceId: WS_A });
   await client.query("SET LOCAL ROLE app_rt");
@@ -318,7 +318,7 @@ const ledgerRowAsApp = async (client: pg.PoolClient) => {
   return row;
 };
 
-describe("the ledger under app_rt", () => {
+describe("the audit log under app_rt", () => {
   it("returns none unscoped and only the scoped tenant's rows", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
@@ -337,10 +337,10 @@ describe("the ledger under app_rt", () => {
 
   it("lets the api read and insert, never UPDATE or DELETE", async () => {
     await withRollback(db.pool, async (client) => {
-      const row = await ledgerRowAsApp(client);
+      const row = await auditEventRowAsApp(client);
 
       const inserted = await client.query<{ family: string; subject_kind: string }>(
-        `${A_LEDGER_ROW} ${THE_FAMILY_AND_SUBJECT_IT_LANDS_IN}`,
+        `${AN_AUDIT_EVENT_ROW} ${THE_FAMILY_AND_SUBJECT_IT_LANDS_IN}`,
         [ulid(), WS_A, "people.group.created", "process:better-answers-test", ulid()],
       );
       expect(inserted.rows).toEqual([{ family: "people", subject_kind: "group" }]);
@@ -361,14 +361,14 @@ describe("the ledger under app_rt", () => {
 
   it("refuses the api upserts, cross-tenant inserts and derived-column writes", async () => {
     await withRollback(db.pool, async (client) => {
-      const row = await ledgerRowAsApp(client);
+      const row = await auditEventRowAsApp(client);
 
       const GROUP_CREATED = "people.group.created";
       const TEST_ACTOR = "process:better-answers-test";
 
       await client.query("SAVEPOINT upsert");
       await expect(
-        client.query(`${A_LEDGER_ROW} ${THE_DETAIL_EDITED}`, [
+        client.query(`${AN_AUDIT_EVENT_ROW} ${THE_DETAIL_EDITED}`, [
           row.id,
           WS_A,
           GROUP_CREATED,
@@ -380,12 +380,12 @@ describe("the ledger under app_rt", () => {
 
       await client.query("SAVEPOINT other_tenant");
       await expect(
-        client.query(A_LEDGER_ROW, [ulid(), WS_B, GROUP_CREATED, TEST_ACTOR, ulid()]),
+        client.query(AN_AUDIT_EVENT_ROW, [ulid(), WS_B, GROUP_CREATED, TEST_ACTOR, ulid()]),
       ).rejects.toThrow(/row-level security/);
       await client.query("ROLLBACK TO SAVEPOINT other_tenant");
 
       await expect(
-        client.query(A_LEDGER_ROW_WITH_ITS_FAMILY, [
+        client.query(AN_AUDIT_EVENT_ROW_WITH_ITS_FAMILY, [
           ulid(),
           WS_A,
           GROUP_CREATED,
@@ -397,7 +397,7 @@ describe("the ledger under app_rt", () => {
     });
   });
 
-  it("refuses the worker the ledger, reading and writing alike", async () => {
+  it("refuses the worker the audit log, reading and writing alike", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       await seed.auditEvent({ workspaceId: WS_A });
@@ -410,7 +410,7 @@ describe("the ledger under app_rt", () => {
       );
       await client.query("ROLLBACK TO SAVEPOINT r");
       await expect(
-        client.query(A_LEDGER_ROW, [
+        client.query(AN_AUDIT_EVENT_ROW, [
           ulid(),
           WS_A,
           "sources.binding.published",
@@ -427,7 +427,13 @@ describe("the ledger under app_rt", () => {
       for (const act of ["billing.invoice.sent", "people.member", "People.Member.Added"]) {
         await client.query("SAVEPOINT act");
         await expect(
-          client.query(A_LEDGER_ROW, [ulid(), WS_A, act, "process:better-answers-test", ulid()]),
+          client.query(AN_AUDIT_EVENT_ROW, [
+            ulid(),
+            WS_A,
+            act,
+            "process:better-answers-test",
+            ulid(),
+          ]),
         ).rejects.toThrow(/audit_event_act_check|audit_event_family_check/);
         await client.query("ROLLBACK TO SAVEPOINT act");
       }
@@ -449,7 +455,7 @@ describe("the ledger under app_rt", () => {
   });
 });
 
-describe("the identity-set ledger", () => {
+describe("the identity-set audit log", () => {
   const PERSON_NAMED = "people.person.named";
 
   it("lets the api record and read unscoped acts, nothing more", async () => {
@@ -459,7 +465,7 @@ describe("the identity-set ledger", () => {
       const personId = ulid();
 
       const inserted = await client.query<{ family: string; subject_kind: string }>(
-        `${AN_IDENTITY_SET_LEDGER_ROW} ${THE_FAMILY_AND_SUBJECT_IT_LANDS_IN}`,
+        `${AN_IDENTITY_SET_AUDIT_EVENT_ROW} ${THE_FAMILY_AND_SUBJECT_IT_LANDS_IN}`,
         [id, PERSON_NAMED, `human:${personId}`, personId],
       );
       expect(inserted.rows).toEqual([{ family: "people", subject_kind: "person" }]);
@@ -472,7 +478,7 @@ describe("the identity-set ledger", () => {
           "a row the api could rewrite could book a person's act to someone else",
         ],
         [
-          `${AN_IDENTITY_SET_LEDGER_ROW} ${THE_DETAIL_EDITED}`,
+          `${AN_IDENTITY_SET_AUDIT_EVENT_ROW} ${THE_DETAIL_EDITED}`,
           "and an upsert is a rewrite by another road",
           [id, PERSON_NAMED, `human:${personId}`, personId],
         ],
@@ -482,7 +488,7 @@ describe("the identity-set ledger", () => {
         ],
         ["TRUNCATE identity_audit_event", "nor empty the whole record at once"],
         [
-          AN_IDENTITY_SET_LEDGER_ROW_WITH_ITS_FAMILY,
+          AN_IDENTITY_SET_AUDIT_EVENT_ROW_WITH_ITS_FAMILY,
           "nor write the family the act already names",
           [ulid(), PERSON_NAMED, "platform", `human:${personId}`, personId],
           /generated|non-DEFAULT/,
@@ -494,7 +500,7 @@ describe("the identity-set ledger", () => {
   it("refuses the worker reading or recording a person's act", async () => {
     await withRollback(db.pool, async (client) => {
       const personId = ulid();
-      await client.query(AN_IDENTITY_SET_LEDGER_ROW, [
+      await client.query(AN_IDENTITY_SET_AUDIT_EVENT_ROW, [
         ulid(),
         PERSON_NAMED,
         `human:${personId}`,
@@ -508,7 +514,7 @@ describe("the identity-set ledger", () => {
       await refusesEach(client, [
         ["SELECT id FROM identity_audit_event", "the worker acts on no person's identity"],
         [
-          AN_IDENTITY_SET_LEDGER_ROW,
+          AN_IDENTITY_SET_AUDIT_EVENT_ROW,
           "so it has no act of one to record",
           [ulid(), PERSON_NAMED, "process:better-answers-worker", personId],
         ],
@@ -521,7 +527,7 @@ describe("the identity-set ledger", () => {
   it("takes only acts of the four families in family.subject.verb shape", async () => {
     await withRollback(db.pool, async (client) => {
       const personId = ulid();
-      const landed = await client.query(AN_IDENTITY_SET_LEDGER_ROW, [
+      const landed = await client.query(AN_IDENTITY_SET_AUDIT_EVENT_ROW, [
         ulid(),
         PERSON_NAMED,
         `human:${personId}`,
@@ -532,8 +538,8 @@ describe("the identity-set ledger", () => {
       await refusesEach(
         client,
         ["billing.person.named", "people.person", "People.Person.Named"].map((act) => [
-          AN_IDENTITY_SET_LEDGER_ROW,
-          `${act} is no act the ledgers name`,
+          AN_IDENTITY_SET_AUDIT_EVENT_ROW,
+          `${act} is no act the audit logs name`,
           [ulid(), act, "process:better-answers-test", ulid()],
           /identity_audit_event_act_check|identity_audit_event_family_check/,
         ]),
@@ -2145,7 +2151,7 @@ describe("the derivation's tables under app_rt", () => {
       await refusesEach(client, [
         [
           "UPDATE source_document SET narrowed_to = NULL",
-          "an Admin's narrowing is an act with a ledger row, and a run that could clear it could widen a document at nobody's word",
+          "an Admin's narrowing is an act with an audit event, and a run that could clear it could widen a document at nobody's word",
         ],
         [
           "UPDATE source_document SET title = 'Retitled by a run'",
@@ -2171,7 +2177,7 @@ describe("the derivation's tables under app_rt", () => {
         ],
         [
           "DELETE FROM source_document",
-          "the withdrawal of a document is an act with a ledger row, so the run marks one gone and never removes it",
+          "the withdrawal of a document is an act with an audit event, so the run marks one gone and never removes it",
         ],
       ]);
     });
@@ -2316,11 +2322,11 @@ describe("the finding under both runtime roles", () => {
         ],
         [
           "SELECT restored_by FROM finding",
-          "who restored a span is the review's business and the ledger's, never the run's",
+          "who restored a span is the review's business and the audit log's, never the run's",
         ],
         [
           "SELECT reviewed_by FROM finding",
-          "who reviewed a span is the review's business and the ledger's, never the run's",
+          "who reviewed a span is the review's business and the audit log's, never the run's",
         ],
         [
           "SELECT reviewed_at FROM finding",
@@ -2332,7 +2338,7 @@ describe("the finding under both runtime roles", () => {
         ],
         [
           "SELECT id FROM finding",
-          "a finding's id is the ledger's subject and nothing a run names",
+          "a finding's id is the audit log's subject and nothing a run names",
         ],
         ["SELECT * FROM finding", "every column is more than the twelve the grants name"],
 
@@ -2348,7 +2354,7 @@ describe("the finding under both runtime roles", () => {
           "UPDATE finding SET document_id = document_id, rule_id = rule_id",
           "the document and the rule are what a finding is as well",
         ],
-        ["UPDATE finding SET id = id", "the id is the ledger's subject, minted once"],
+        ["UPDATE finding SET id = id", "the id is the audit log's subject, minted once"],
         [
           "UPDATE finding SET workspace_id = workspace_id",
           "the tenant a row belongs to is the first part of what a finding is",

@@ -149,7 +149,7 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "erasure",
     access: "read and write",
     reason:
-      "The routine's step 5 pseudonymises the row on the person's last membership — the address to a tombstone the erasure pseudonym names, the name cleared, the id kept because every row of a workspace's ledger and of the identity-set ledger names it — and reads the address off it first, because the two rows deleted below are keyed by address and not by person. The erasure rehearsal's seed writes one row the other way, the synthetic subject a drill erases, under a reserved domain that resolves nowhere.",
+      "The routine's step 5 pseudonymises the row on the person's last membership — the address to a tombstone the erasure pseudonym names, the name cleared, the id kept because every row of a workspace's audit log and of the identity-set audit log names it — and reads the address off it first, because the two rows deleted below are keyed by address and not by person. The erasure rehearsal's seed writes one row the other way, the synthetic subject a drill erases, under a reserved domain that resolves nowhere.",
   },
   {
     table: "public.member",
@@ -226,7 +226,7 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "concepts",
     access: "read",
     reason:
-      "Accepting an *edit* suggestion commits with the proposer as git author, and a git author line is a name and an address — which the ledger's `human:<person id>` deliberately is not, so the act reads them off the person the proposer names.",
+      "Accepting an *edit* suggestion commits with the proposer as git author, and a git author line is a name and an address — which the audit log's `human:<person id>` deliberately is not, so the act reads them off the person the proposer names.",
   },
   {
     table: "public.member",

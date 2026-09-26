@@ -301,7 +301,7 @@ const storeOriginal = async (
 };
 
 /**
- * Stores the body as the binding's original, then writes the binding, document, ledger row and
+ * Stores the body as the binding's original, then writes the binding, document, audit event and
  * index run in one transaction. Once that commits, a repeat that passes the checks returns its
  * outcome and reads no byte. `too-large` answers a declared size or streamed body over the cap.
  */
@@ -516,7 +516,7 @@ const publishAndCascade = async (
 
 /**
  * `confirmation-missing` unless all three confirmations are true, and `not-indexed` unless the
- * latest index run is done. Stamps the binding published, writes a ledger row with the DPIA hash
+ * latest index run is done. Stamps the binding published, writes an audit event with the DPIA hash
  * and the last run's finding count per category, and recomputes what cites its documents.
  */
 export const publishBinding = async (

@@ -330,7 +330,7 @@ export const edgeVisibilityHeld = async (
   return read.rows;
 };
 
-export const ledgerRowsOf = async (
+export const auditEventRowsOf = async (
   pool: pg.Pool,
   workspaceId: string,
   act: string,

@@ -54,7 +54,7 @@ export const graphCounts = async (
 };
 
 /**
- * Deletes every graph generation but the live one, with a ledger row for each, under one batch
+ * Deletes every graph generation but the live one, with an audit event for each, under one batch
  * id when there are several.
  */
 export const sweepGraph = async (

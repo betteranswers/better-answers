@@ -2,7 +2,7 @@ import { ACCESS_REQUEST_OPEN_STATUS, boundarySchemas } from "@better-answers/sch
 import { z } from "zod";
 
 import { act, declareActs, record, recordFor } from "../audit/index.ts";
-import type { DetailOf, LedgerAct } from "../audit/index.ts";
+import type { DetailOf, AuditAct } from "../audit/index.ts";
 import {
   actorIdOfPerson,
   attempt,
@@ -153,7 +153,7 @@ const claimForDecision = async (
   });
 };
 
-const landDecision = async <A extends LedgerAct>(
+const landDecision = async <A extends AuditAct>(
   admin: AdminUserPrincipal,
   tx: Tx,
   requestId: AccessRequestId,

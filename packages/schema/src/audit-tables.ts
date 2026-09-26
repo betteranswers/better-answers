@@ -13,8 +13,8 @@ export const ACT = new RegExp(ACT_PATTERN);
 
 const familyList = listed(FAMILIES);
 
-/** Both ledgers name an act the same way and carry the same row after the key. */
-const ledgerColumns = () => ({
+/** Both audit logs name an act the same way and carry the same row after the key. */
+const auditLogColumns = () => ({
   act: text("act").notNull(),
 
   family: text("family")
@@ -34,7 +34,7 @@ const ledgerColumns = () => ({
   batchId: text("batch_id"),
 });
 
-const ledgerChecks = (table: string) => [
+const auditLogChecks = (table: string) => [
   check(`${table}_act_check`, sql.raw(`act ~ '${ACT_PATTERN}'`)),
   check(`${table}_family_check`, sql.raw(`family IN (${familyList})`)),
 ];
@@ -46,7 +46,7 @@ export const auditEvent = withRLS(
     workspaceId: text("workspace_id")
       .notNull()
       .references(() => workspace.id),
-    ...ledgerColumns(),
+    ...auditLogColumns(),
   },
   "workspaceId",
   (table) => [
@@ -55,7 +55,7 @@ export const auditEvent = withRLS(
     index("audit_event_subject_idx").on(table.workspaceId, table.subjectKind, table.subjectId),
 
     uniqueIndex("audit_event_workspace_id_id_uidx").on(table.workspaceId, table.id),
-    ...ledgerChecks("audit_event"),
+    ...auditLogChecks("audit_event"),
   ],
 );
 
@@ -66,10 +66,10 @@ export const identityAuditEvent = pgTable(
   "identity_audit_event",
   {
     id: text("id").primaryKey(),
-    ...ledgerColumns(),
+    ...auditLogColumns(),
   },
   (table) => [
     index("identity_audit_event_subject_idx").on(table.subjectKind, table.subjectId),
-    ...ledgerChecks("identity_audit_event"),
+    ...auditLogChecks("identity_audit_event"),
   ],
 );

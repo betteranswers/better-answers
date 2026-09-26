@@ -32,7 +32,7 @@ import { contractFixture, mediaTypeOutside } from "./contract-fixture.ts";
 import {
   chunkUnder,
   chunkVersionsOf,
-  ledgerRowsOf,
+  auditEventRowsOf,
   groupNamed,
   seededBy,
 } from "./sourced-concept.ts";
@@ -135,13 +135,13 @@ const oneOfEachIn = async (pool: pg.Pool, workspaceId: string) => {
   const read = await pool.query<{
     bindings: number;
     documents: number;
-    ledger: number;
+    auditEvents: number;
     jobs: number;
   }>(
     `SELECT (SELECT count(*)::int FROM source_binding WHERE workspace_id = $1) AS bindings,
             (SELECT count(*)::int FROM source_document WHERE workspace_id = $1) AS documents,
             (SELECT count(*)::int FROM audit_event
-               WHERE workspace_id = $1 AND act = 'sources.binding.bound') AS ledger,
+               WHERE workspace_id = $1 AND act = 'sources.binding.bound') AS "auditEvents",
             (SELECT count(*)::int FROM job
                WHERE workspace_id = $1 AND kind = 'index') AS jobs`,
     [workspaceId],
@@ -177,7 +177,7 @@ const leftBehindBy = async (
 ) => ({ bodyRead: upload.state.read, stored: await storedFor(by) });
 
 describe("an Admin binds an upload", () => {
-  it("lands the binding, document, ledger row, job and object together", async () => {
+  it("lands the binding, document, audit event, job and object together", async () => {
     const scenario = await arrange();
     const { input } = handbookOffered();
 
@@ -212,7 +212,9 @@ describe("an Admin binds an upload", () => {
     });
     expect(originalKey).toEqual(`uploads/${bindingId.toLowerCase()}/original`);
 
-    expect(await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.bound")).toEqual([
+    expect(
+      await auditEventRowsOf(db().pool, scenario.workspaceId, "sources.binding.bound"),
+    ).toEqual([
       {
         id: auditEventId,
         actor: `human:${scenario.admin.userId}`,
@@ -263,9 +265,9 @@ describe("an Admin binds an upload", () => {
 
     expect(bound.ok).toEqual(false);
     expect(await countsIn(db().pool, scenario.workspaceId)).toEqual({ bindings: 0, documents: 0 });
-    expect(await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.bound")).toEqual(
-      [],
-    );
+    expect(
+      await auditEventRowsOf(db().pool, scenario.workspaceId, "sources.binding.bound"),
+    ).toEqual([]);
 
     const left = await listObjects(scenario.admin, store().door, "");
     if (!left.ok) throw new Error(`the object door refused the listing: ${left.error}`);
@@ -401,7 +403,7 @@ describe("an Admin binds an upload", () => {
     expect(await oneOfEachIn(db().pool, scenario.workspaceId)).toEqual({
       bindings: 1,
       documents: 1,
-      ledger: 1,
+      auditEvents: 1,
       jobs: 1,
     });
   });
@@ -472,7 +474,7 @@ describe("the sweep collects the originals a failed bind left", () => {
     await sweptAt(scenario, past);
 
     const bindingId = orphaned.slice("uploads/".length, -"/original".length).toUpperCase();
-    const rows = await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.upload.swept");
+    const rows = await auditEventRowsOf(db().pool, scenario.workspaceId, "sources.upload.swept");
     expect(rows).toEqual([
       {
         id: expect.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/),
@@ -746,7 +748,11 @@ describe("an Admin publishes a binding", () => {
       PUBLISHED_AT,
     ]);
 
-    const rows = await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.published");
+    const rows = await auditEventRowsOf(
+      db().pool,
+      scenario.workspaceId,
+      "sources.binding.published",
+    );
     expect(rows.length).toEqual(1);
     const row = rows[0];
     expect(row?.id).toEqual(published.auditEventId);
@@ -822,7 +828,7 @@ describe("an Admin publishes a binding", () => {
     });
     expect(await chunkStampsOf(db().pool, scenario.workspaceId, bindingId)).toEqual([null]);
     expect(
-      await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.published"),
+      await auditEventRowsOf(db().pool, scenario.workspaceId, "sources.binding.published"),
     ).toEqual([]);
   });
 
@@ -867,7 +873,7 @@ describe("an Admin publishes a binding", () => {
       state: "published",
     });
     expect(
-      await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.published"),
+      await auditEventRowsOf(db().pool, scenario.workspaceId, "sources.binding.published"),
     ).toHaveLength(1);
   });
 
@@ -892,7 +898,7 @@ describe("an Admin publishes a binding", () => {
       state: "landed",
     });
     expect(
-      await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.published"),
+      await auditEventRowsOf(db().pool, scenario.workspaceId, "sources.binding.published"),
     ).toEqual([]);
   });
 

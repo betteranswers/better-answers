@@ -294,8 +294,8 @@ const detail = z.union([
   z.null(),
 ]);
 
-/** One id space across both ledgers: an audit event's id, whichever ledger holds its row. */
-const ledgerRefinements = {
+/** One id space across both audit logs: an audit event's id, whichever audit log holds its row. */
+const auditLogRefinements = {
   id: (schema: z.ZodString) => schema.regex(ULID).brand<"AuditEventId">(),
   act: (schema: z.ZodString) =>
     schema.regex(ACT).pipe(z.templateLiteral([z.enum(FAMILIES), ".", z.string(), ".", z.string()])),
@@ -305,26 +305,26 @@ const ledgerRefinements = {
   batchId: (schema: z.ZodString) => schema.regex(ULID),
 };
 
-const ledgerDerivedRefinements = {
+const auditLogDerivedRefinements = {
   family: (schema: z.ZodString) => schema.pipe(z.enum(FAMILIES)),
   subjectKind: (schema: z.ZodString) => schema.trim().min(1),
 };
 
-const auditEventRefinements = { ...ledgerRefinements, workspaceId };
+const auditEventRefinements = { ...auditLogRefinements, workspaceId };
 
 export const auditEventSelect = createSelectSchema(auditEvent, {
   ...auditEventRefinements,
-  ...ledgerDerivedRefinements,
+  ...auditLogDerivedRefinements,
 });
 export const auditEventInsert = createInsertSchema(auditEvent, auditEventRefinements);
 export const auditEventUpdate = createUpdateSchema(auditEvent, auditEventRefinements);
 
 export const identityAuditEventSelect = createSelectSchema(identityAuditEvent, {
-  ...ledgerRefinements,
-  ...ledgerDerivedRefinements,
+  ...auditLogRefinements,
+  ...auditLogDerivedRefinements,
 });
-export const identityAuditEventInsert = createInsertSchema(identityAuditEvent, ledgerRefinements);
-export const identityAuditEventUpdate = createUpdateSchema(identityAuditEvent, ledgerRefinements);
+export const identityAuditEventInsert = createInsertSchema(identityAuditEvent, auditLogRefinements);
+export const identityAuditEventUpdate = createUpdateSchema(identityAuditEvent, auditLogRefinements);
 
 const accessRequestRefinements = {
   id: (schema: z.ZodString) => schema.regex(ULID).brand<"AccessRequestId">(),

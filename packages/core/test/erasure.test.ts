@@ -13,7 +13,7 @@ import {
   type SubjectRequestRecorded,
 } from "../src/erasure/index.ts";
 import type { PrincipalRefusal, Result, UserPrincipal } from "../src/kernel/index.ts";
-import { ledgerRowsOf } from "./sourced-concept.ts";
+import { auditEventRowsOf } from "./sourced-concept.ts";
 import { readingAs, seedingWith, whileWritesAreRefused } from "./suite-postgres.ts";
 import { suiteWithBundles } from "./workspace-with-bundle.ts";
 
@@ -74,7 +74,7 @@ const workspaceWithARequest = async () => {
 };
 
 describe("recording a subject request", () => {
-  it("lands the request and its ledger row, counting the identifiers", async () => {
+  it("lands the request and its audit event, counting the identifiers", async () => {
     const { scenario, subject, recorded, requestId } = await workspaceWithARequest();
 
     const auditEventId = recorded.ok ? recorded.value.auditEventId : "";
@@ -95,7 +95,7 @@ describe("recording a subject request", () => {
     ]);
 
     expect(
-      await ledgerRowsOf(db().pool, scenario.workspaceId, "people.subject_request.received"),
+      await auditEventRowsOf(db().pool, scenario.workspaceId, "people.subject_request.received"),
     ).toEqual([
       {
         id: auditEventId,
@@ -122,7 +122,7 @@ describe("recording a subject request", () => {
       { person_id: null, kind: "erasure" },
     ]);
     expect(
-      await ledgerRowsOf(db().pool, scenario.workspaceId, "people.subject_request.received"),
+      await auditEventRowsOf(db().pool, scenario.workspaceId, "people.subject_request.received"),
     ).toMatchObject([{ detail: { identifierCount: 2 } }]);
   });
 
@@ -148,7 +148,7 @@ describe("recording a subject request", () => {
     ]);
   });
 
-  it("leaves no request when the ledger refuses the act's event", async () => {
+  it("leaves no request when the audit log refuses the event", async () => {
     const scenario = await arrange();
 
     await whileWritesAreRefused(db().pool, "audit_event", async () => {
@@ -159,7 +159,7 @@ describe("recording a subject request", () => {
 
     expect(await requestRowsIn(scenario.workspaceId)).toEqual([]);
     expect(
-      await ledgerRowsOf(db().pool, scenario.workspaceId, "people.subject_request.received"),
+      await auditEventRowsOf(db().pool, scenario.workspaceId, "people.subject_request.received"),
     ).toEqual([]);
   });
 

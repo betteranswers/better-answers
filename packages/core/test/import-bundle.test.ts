@@ -230,7 +230,7 @@ const checkRows = async (workspaceId: string) => {
   return found.rows;
 };
 
-const ledgerOf = async (workspaceId: string) => {
+const knowledgeEventsOf = async (workspaceId: string) => {
   const found = await db().pool.query<Record<string, unknown>>(
     `SELECT act, actor, subject_kind, batch_id
        FROM audit_event WHERE workspace_id = $1 AND act LIKE 'knowledge.%'
@@ -510,12 +510,14 @@ describe("importing the bundle", () => {
         origin: "imported",
       },
     ]);
-    const ledger = await ledgerOf(scenario.workspaceId);
-    expect(ledger.map((row) => row["subject_kind"]).join(" ")).toBe(
+    const auditEvents = await knowledgeEventsOf(scenario.workspaceId);
+    expect(auditEvents.map((row) => row["subject_kind"]).join(" ")).toBe(
       "manifest concept check check concept check concept check concept check concept check concept check concept concept concept",
     );
     expect(
-      new Set(ledger.map((row) => `${String(row["act"])} on a ${String(row["subject_kind"])}`)),
+      new Set(
+        auditEvents.map((row) => `${String(row["act"])} on a ${String(row["subject_kind"])}`),
+      ),
     ).toEqual(
       new Set([
         "knowledge.manifest.written on a manifest",
@@ -524,13 +526,13 @@ describe("importing the bundle", () => {
       ]),
     );
     const batches = new Set(
-      ledger
+      auditEvents
         .filter((row) => row["act"] === "knowledge.check.imported")
         .map((row) => row["batch_id"]),
     );
     expect(batches.size).toBe(1);
     expect([...batches][0]).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
-    expect(new Set(ledger.map((row) => row["actor"]))).toEqual(
+    expect(new Set(auditEvents.map((row) => row["actor"]))).toEqual(
       new Set([`human:${scenario.editor.userId}`]),
     );
   });
@@ -742,7 +744,9 @@ describe("the second pass: each relative link becomes its concept's iri", () => 
       author: await authorOf(scenario.editor),
       actor: `human:${scenario.editor.userId}`,
     });
-    expect((await ledgerOf(scenario.workspaceId)).slice(-3).map((row) => row["act"])).toEqual([
+    expect(
+      (await knowledgeEventsOf(scenario.workspaceId)).slice(-3).map((row) => row["act"]),
+    ).toEqual([
       "knowledge.concept.committed",
       "knowledge.concept.committed",
       "knowledge.concept.committed",

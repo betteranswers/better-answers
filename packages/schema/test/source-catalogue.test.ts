@@ -27,9 +27,9 @@ import {
   attemptDocumentClassed,
   attemptDocumentConcluded,
   attemptDocumentSized,
-  attemptLedgerRowReusingAnId,
+  attemptAuditEventRowReusingAnId,
   attemptQuarantinePair,
-  attemptRowKeyedToTheLedger,
+  attemptRowKeyedToTheAuditLog,
   type BindingWords,
   postgresForSuite,
   refusalOf,
@@ -393,8 +393,8 @@ describe("the key from evidence to the document it locates into", () => {
   });
 });
 
-describe("the ledger's unique pair", () => {
-  const withLedgerRow = async (fn: (client: pg.PoolClient, id: string) => Promise<void>) => {
+describe("the audit log's unique pair", () => {
+  const withAuditEventRow = async (fn: (client: pg.PoolClient, id: string) => Promise<void>) => {
     await withWorkspace(async (client) => {
       const event = await testData(client).auditEvent({ workspaceId: WORKSPACE });
       await fn(client, event.id);
@@ -402,7 +402,7 @@ describe("the ledger's unique pair", () => {
   };
 
   it("is a target for a later composite foreign key", async () => {
-    await withLedgerRow(async (client, id) => {
+    await withAuditEventRow(async (client, id) => {
       await client.query(
         `CREATE TABLE keyed_to_the_ledger (
            workspace_id text NOT NULL,
@@ -412,8 +412,8 @@ describe("the ledger's unique pair", () => {
       );
 
       expect({
-        named: admitting(await attemptRowKeyedToTheLedger(client, WORKSPACE, id)),
-        unnamed: await attemptRowKeyedToTheLedger(client, WORKSPACE, ulid()),
+        named: admitting(await attemptRowKeyedToTheAuditLog(client, WORKSPACE, id)),
+        unnamed: await attemptRowKeyedToTheAuditLog(client, WORKSPACE, ulid()),
       }).toEqual({
         named: ADMITTED,
         unnamed: "keyed_to_the_ledger_workspace_id_audit_event_id_fkey",
@@ -421,9 +421,9 @@ describe("the ledger's unique pair", () => {
     });
   });
 
-  it("refuses a second ledger row on the same pair", async () => {
-    await withLedgerRow(async (client, id) => {
-      expect(await attemptLedgerRowReusingAnId(client, WORKSPACE, id)).toBe("audit_event_pkey");
+  it("refuses a second audit event on the same pair", async () => {
+    await withAuditEventRow(async (client, id) => {
+      expect(await attemptAuditEventRowReusingAnId(client, WORKSPACE, id)).toBe("audit_event_pkey");
     });
   });
 });

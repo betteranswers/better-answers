@@ -227,7 +227,7 @@ export const attemptDocumentSized = (
 ): Promise<string> =>
   refusalOf(client, () => client.query(documentSized(bytes), [...anotherItemUnder(place)]));
 
-export const attemptRowKeyedToTheLedger = (
+export const attemptRowKeyedToTheAuditLog = (
   client: pg.PoolClient,
   workspaceId: string,
   auditEventId: string,
@@ -239,7 +239,7 @@ export const attemptRowKeyedToTheLedger = (
     ]),
   );
 
-export const attemptLedgerRowReusingAnId = (
+export const attemptAuditEventRowReusingAnId = (
   client: pg.PoolClient,
   workspaceId: string,
   id: string,

@@ -122,7 +122,7 @@ const removeOrphans = async (
     );
     if (!removed.ok) {
       const kept = await recordTheSweep(platform, doors.postgres, workspaceId, gone);
-      const unrecorded = kept.ok ? "" : `, and its ledger rows too: ${kept.error.message}`;
+      const unrecorded = kept.ok ? "" : `, and its audit events too: ${kept.error.message}`;
       return err(
         new Error(`${removed.error.message}; ${String(gone.length)} removed first${unrecorded}`),
       );
@@ -135,7 +135,7 @@ const removeOrphans = async (
 
 /**
  * Removes each `uploads/<binding>/original` object that no document names once it is past the
- * grace hours, with a ledger row per removal. `dryRun` counts them and removes none. A failed
+ * grace hours, with an audit event per removal. `dryRun` counts them and removes none. A failed
  * removal is an Error saying how many went before it.
  */
 export const sweepOrphanedUploads = async (
