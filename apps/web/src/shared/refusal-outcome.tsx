@@ -54,7 +54,7 @@ const UNANSWERED: Outcome = {
   words: "The platform did not answer, so nothing changed. Try again in a moment.",
 };
 
-// A failure with no refusal word is the network's or the platform's, never the reader's to fix.
+/** A failure with no refusal word is the network's or the platform's, never the reader's to fix. */
 export const failureOutcome = (featureWords: SaidOfWord, failure: Error | ApiError): Outcome => {
   const refusal = refusalOf(failure);
   return refusal === undefined

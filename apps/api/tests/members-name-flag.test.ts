@@ -15,7 +15,7 @@ let operators: readonly [string, string];
 
 let formerOperator: string;
 
-// While set, the transport refuses mail to it, as an SMTP relay refusing that address would.
+/** While set, the transport refuses mail to it, as an SMTP relay refusing that address would. */
 let relayRefuses: string | undefined;
 
 beforeAll(async () => {

@@ -19,7 +19,7 @@ const unreachable = new Set<string>();
 
 const app = appForSuite(unreachable);
 
-// A resend answers the same invitation, its email gone this time.
+/** A resend answers the same invitation, its email gone this time. */
 const resentWithItsEmail = async (api: Api, invitationId: string): Promise<void> => {
   const resent = await api.members.resendInvitation.mutate({ invitationId });
   expect(resent).toMatchObject({ invitationId, emailSent: true });

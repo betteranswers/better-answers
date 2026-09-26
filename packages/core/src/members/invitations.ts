@@ -132,7 +132,7 @@ const WORKSPACE_NAMED = z.object({ name: boundarySchemas.workspace.select.shape.
 
 const expiryFrom = (now: Date): Date => new Date(now.getTime() + INVITATION_EXPIRY_SECONDS * 1000);
 
-// The parse brands the ids; a row it throws on fails the act like the query would.
+/** The parse brands the ids; a row it throws on fails the act like the query would. */
 const firstWaitingOf = (rows: readonly unknown[]): WaitingInvitation | undefined => {
   const [row] = rows;
   return row === undefined ? undefined : waitingOf(WAITING_ROW.parse(row));

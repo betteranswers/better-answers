@@ -7,7 +7,7 @@ import { NO_SESSION_ANSWERED, refusalOfCall, webSignedIn } from "./web-client.ts
 
 const EIGHT_DAYS_MS = 8 * 24 * 60 * 60 * 1000;
 
-// The act reads its instant from this clock, so an invitation can be read after its week is up.
+/** The act reads its instant from this clock, so an invitation can be read after its week is up. */
 const clockShift = { ms: 0 };
 
 const app = appForSuite({ clock: { now: () => new Date(Date.now() + clockShift.ms) } });

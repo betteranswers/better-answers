@@ -28,7 +28,7 @@ const NAMES_AN_ORGANISATION = /organi[sz]ation/i;
 
 const requestsRegion = (page: Page) => page.getByRole("region", { name: "Requests" });
 
-// The header row is a row too, so the requests are the rows with a cell.
+/** The header row is a row too, so the requests are the rows with a cell. */
 const requestRows = (page: Page): Locator =>
   requestsRegion(page)
     .getByRole("row")
@@ -56,7 +56,7 @@ const asksToJoin = async (api: APIRequestContext, slug: string, asking: Asking):
   return { displayName: asking.displayName, email };
 };
 
-// Asked one at a time, so the list's oldest-first order is the order given here.
+/** Asked one at a time, so the list's oldest-first order is the order given here. */
 const anAdminAtRequests = async (
   page: Page,
   api: APIRequestContext,

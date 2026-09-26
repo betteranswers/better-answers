@@ -23,7 +23,7 @@ const unreachable = new Set<string>();
 
 const app = appForSuite(unreachable);
 
-// The id is read off the Admin's own list, as the Requests tab reads it.
+/** The id is read off the Admin's own list, as the Requests tab reads it. */
 const anAdminWithOneRequest = async () => {
   const workspace = await app().provision({ name: "Calder Joinery" });
   const requester = await asksToJoin(app(), workspace, "Priya", REASON);

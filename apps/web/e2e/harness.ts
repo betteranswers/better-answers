@@ -70,7 +70,7 @@ export const markTheOperator = (
 ) => ask(api, "/operators", { email, change }, operatorMarked);
 const invitationWritten = z.object({ id: z.string() });
 
-// A waiting invitation as the invite act leaves it, less the email, which no spec reads.
+/** A waiting invitation as the invite act leaves it, less the email, which no spec reads. */
 export const invite = (
   api: APIRequestContext,
   input: {

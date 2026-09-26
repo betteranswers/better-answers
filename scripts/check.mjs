@@ -7,7 +7,7 @@ if (steps.length === 0) {
   process.exit(2);
 }
 
-// Collected rather than thrown at the first, so one run names every step that failed.
+/** Collected rather than thrown at the first, so one run names every step that failed. */
 const failed = [];
 
 for (const step of steps) {

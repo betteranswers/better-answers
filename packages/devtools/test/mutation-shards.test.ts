@@ -146,7 +146,7 @@ type Test = { readonly id: string; readonly name: string; readonly line?: number
 type Results = NonNullable<ShardResults["checkpoint"]>;
 type Found = Results["files"][string]["mutants"][number];
 
-// A test with no line is one the runner could not place, as Stryker writes it with no location.
+/** A test with no line is one the runner could not place, as Stryker writes it with no location. */
 const tests = (file: string, ...found: readonly Test[]): NonNullable<Results["testFiles"]> => ({
   [file]: {
     source: "describe()",
@@ -192,8 +192,10 @@ const B_TEST = { name: "answers > b", line: 9 };
 const C_TEST = { name: "answers > c" };
 const GONE_TEST = { name: "answers > gone", line: 20 };
 
-// Two dry runs may number the tests differently; a mutant naming a test its shard never listed
-// names none.
+/**
+ * Two dry runs may number the tests differently; a mutant naming a test its shard never listed
+ * names none.
+ */
 const SHARD_ONE = results(
   {
     "src/a.ts": [killed("1", "0", ["0", "1", "9"])],
@@ -219,7 +221,7 @@ const SHARD_TWO = results(
     { id: "2", ...C_TEST },
   ),
 );
-// The previous run held a test this run no longer has.
+/** The previous run held a test this run no longer has. */
 const PREVIOUS = results(
   {
     "src/a.ts": [survived("1", ["5"])],
@@ -477,8 +479,10 @@ describe("a leg's files, weighed by their cost last run", () => {
   });
 });
 
-// Nineteen mutants: seven on lines 2 and 3, ten on 5 to 8, one spanning them, two on line 10,
-// none on 1 or 11.
+/**
+ * Nineteen mutants: seven on lines 2 and 3, ten on 5 to 8, one spanning them, two on line 10,
+ * none on 1 or 11.
+ */
 const THREE_STATEMENTS = `export type Name = string;
 export const greet = (name: Name): string =>
   name === "" ? "nobody" : \`hello \${name}\`;
@@ -492,11 +496,11 @@ export const double = (value: number): number => value * 2;
 export type Doubled = number;
 `;
 
-// Two mutants a line: the arrow emptied, and the string emptied.
+/** Two mutants a line: the arrow emptied, and the string emptied. */
 const line = (name: string, text = name): string =>
   `export const ${name} = (): string => "${text}";`;
 
-// As Stryker writes a mutant: its line and columns counted from 1, the end column past it.
+/** As Stryker writes a mutant: its line and columns counted from 1, the end column past it. */
 const reported = (
   lines: readonly string[],
   at: number,
@@ -511,7 +515,7 @@ const reported = (
   };
 };
 
-// A previous run over `lines`, each line's string mutant timed out or killed.
+/** A previous run over `lines`, each line's string mutant timed out or killed. */
 const previousRun = (
   lines: readonly string[],
   timedOut: number,
@@ -905,7 +909,7 @@ describe("the shards command", () => {
   });
 });
 
-// Padded to a size, since a file's size decides its shard.
+/** Padded to a size, since a file's size decides its shard. */
 const sourceOf = (body: string, bytes: number): string => {
   const padding = bytes - body.length - 4;
   return `${body}// ${"x".repeat(padding)}\n`;
@@ -1010,7 +1014,7 @@ const verdictsIn = (file: string): readonly Verdict[] =>
       `${left.file} ${left.mutant}` < `${right.file} ${right.mutant}` ? -1 : 1,
     );
 
-// The two files named as the workflow's gather step names them, the names the merge reads.
+/** The two files named as the workflow's gather step names them, the names the merge reads. */
 const runAsShards = async (
   root: string,
   leg: ReadonlyMap<string, Leg>,
@@ -1051,7 +1055,7 @@ const runAsShards = async (
   );
 };
 
-// Cleared after, so every shard starts from no previous run as a forced one does.
+/** Cleared after, so every shard starts from no previous run as a forced one does. */
 const wholeRun = (root: string): readonly Verdict[] => {
   runStryker(root);
   const verdicts = verdictsIn(path.join(root, "reports", "mutation.json"));

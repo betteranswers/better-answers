@@ -47,7 +47,7 @@ case "/$RELATIVE" in
 /packages/devtools/lifts/anti-slop/* | /.claude/worktrees/* | /.claude/skills/*) exit 0 ;;
 esac
 
-COMMENT_RULES='better-answers\((comment-only-the-why|string-cites-nothing)\)|typescript\((ban-ts-comment|prefer-ts-expect-error)\)|eslint\(no-warning-comments\)|unicorn\(no-abusive-eslint-disable\)|Unused (eslint|oxlint)-disable directive'
+COMMENT_RULES='better-answers\((comment-only-the-why|declaration-doc-block|string-cites-nothing)\)|typescript\((ban-ts-comment|prefer-ts-expect-error)\)|eslint\(no-warning-comments\)|unicorn\(no-abusive-eslint-disable\)|Unused (eslint|oxlint)-disable directive'
 
 case "$FILE" in
 *.ts | *.tsx | *.mts | *.cts | *.js | *.jsx | *.mjs | *.cjs)

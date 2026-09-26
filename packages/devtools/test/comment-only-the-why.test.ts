@@ -1,21 +1,15 @@
-import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import path from "node:path";
-
-import { executableOf, oxlintOver, writeUnder } from "@better-answers/devtools/throwaway-tree";
+import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 import { pluginConfigFor } from "@better-answers/devtools/oxlint-config";
 import { describe, expect, it } from "vitest";
 
 import { tag, wordsOf } from "./fixture-text.ts";
+import { fixedByOxlint } from "./oxlint-fix.ts";
 
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
 const RULE = "better-answers/comment-only-the-why";
 const FILE = "probe.ts";
 const CORE = "packages/core/src/probe.ts";
-
-const OXLINT = { package: "oxlint", path: ["bin", "oxlint"] } as const;
 
 const CONFIG = pluginConfigFor({ [RULE]: "error" });
 
@@ -308,17 +302,7 @@ describe("the comment rule allows an exported function a longer block", () => {
 });
 
 describe("the rule's fix", () => {
-  const fixed = (tree: Tree): string => {
-    const directory = mkdtempSync(path.join(tmpdir(), "comment-fix-"));
-    writeUnder(directory, ".oxlintrc.json", CONFIG);
-    for (const [file, source] of Object.entries(tree)) writeUnder(directory, file, source);
-    execFileSync(executableOf(OXLINT), ["--config", ".oxlintrc.json", "--fix", "."], {
-      cwd: directory,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    return readFileSync(path.join(directory, FILE), "utf8");
-  };
+  const fixed = (tree: Tree): string => fixedByOxlint(CONFIG, tree, FILE);
 
   it("removes the offending comment and leaves the code", () => {
     const after = fixed(holding(TOO_LONG));

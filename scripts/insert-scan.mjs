@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { rawInsertsIn, reportOf, scannedFilesUnder } from "../packages/devtools/src/insert-scan.ts";
 
-// The tree it is run in, not the tree it lives in, so a suite can spawn it over a throwaway.
+/** The tree it is run in, not the tree it lives in, so a suite can spawn it over a throwaway. */
 const root = process.cwd();
 const roots = process.argv.slice(2);
 

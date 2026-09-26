@@ -143,7 +143,7 @@ describe("oxlintOver", () => {
   });
 });
 
-// Resolved because oxlint names a tree by its real path, and macOS's temp directory is a link.
+/** Resolved because oxlint names a tree by its real path, and macOS's temp directory is a link. */
 const scratch = realpathSync(mkdtempSync(path.join(tmpdir(), "throwaway-tree-test-")));
 
 afterAll(() => {

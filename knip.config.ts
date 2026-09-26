@@ -1,6 +1,6 @@
 import type { KnipConfig } from "knip";
 
-// Not gated: `--production`/`--strict` call helpers unused and their devDependencies unlisted.
+/** Not gated: `--production`/`--strict` call helpers unused and their devDependencies unlisted. */
 const config: KnipConfig = {
   // `uv` is installed on the machine and never by npm, so no manifest names it.
   ignoreBinaries: ["uv"],
