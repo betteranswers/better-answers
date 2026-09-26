@@ -3,6 +3,7 @@ import type { inferOutput } from "@trpc/tanstack-react-query";
 import { useId } from "react";
 
 import { useTRPC } from "@/shared/api/trpc.ts";
+import { RefusalLine } from "@/shared/refusal-outcome.tsx";
 import { consoleScreenById } from "@/shared/screens.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
@@ -10,7 +11,6 @@ import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { counted, dayWords } from "@/shared/words.ts";
 
 import { Facts } from "./facts.tsx";
-import { RefusalLine } from "./refusal-line.tsx";
 import { readRefused } from "./words.ts";
 
 type ListedWorkspace = inferOutput<

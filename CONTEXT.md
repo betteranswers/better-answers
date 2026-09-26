@@ -828,11 +828,11 @@ to it by IRI and never restates it (ADR 0014).
   outranks the rule, and the operator then adds an Admin. A **member** is a person holding a membership of the
   workspace in question. _Avoid_: seat, account, user (on a screen), organisation member.
 - **invitation** — an Admin's offer of a *membership* with one *role* to one email address, sent
-  to that address and good for seven days; accepted only by a person signed in with exactly that
-  address, which is when the membership begins. Approving an *access request* mints one; a new
-  invitation to an address with one waiting replaces it. Whether the address already belongs to a
-  person on the platform never changes what the Admin is told. _Avoid_: invite (as a noun), join
-  link.
+  to that address and good for seven days; accepted only by a person signed in with that address,
+  whatever its letter case, which is when the membership begins. Approving an *access request*
+  mints one; a new invitation to an address with one waiting replaces it. Whether the address
+  already belongs to a person on the platform never changes what the Admin is told. _Avoid_:
+  invite (as a noun), join link.
 
 ## Platform surfaces
 

@@ -6,7 +6,7 @@ import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { TableCell } from "@/shared/ui/table.tsx";
 
 import { ApproveRequest } from "./approve-request.tsx";
-import { approvedOutcome, longDate } from "./invitation-words.ts";
+import { approvedOutcome } from "./invitation-words.ts";
 import type { Role } from "./people-api.ts";
 import { PEOPLE_KEYSTROKES, useInviteAsked } from "./people-state.ts";
 import { outcomeOfRequestFailure } from "./refusal.tsx";
@@ -18,7 +18,7 @@ import {
   type WaitingRequest,
 } from "./requests-api.ts";
 import { aRole } from "./role-meanings.ts";
-import { useKeystrokeOnHeld, WaitingRow, WaitingTable } from "./waiting-list.tsx";
+import { DayCell, useKeystrokeOnHeld, WaitingRow, WaitingTable } from "./waiting-list.tsx";
 
 const COLUMNS = ["Person", "Reason", "State", "Asked", "Acts"] as const;
 
@@ -90,7 +90,7 @@ function RequestRow(properties: {
       <TableCell>
         <Pill>Waiting</Pill>
       </TableCell>
-      <TableCell className="tabular-nums">{longDate(request.askedAt)}</TableCell>
+      <DayCell instant={request.askedAt} />
       <TableCell>
         <span className="flex flex-wrap gap-2">
           <Button

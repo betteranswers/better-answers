@@ -3,13 +3,13 @@ import { Link } from "@tanstack/react-router";
 import { AuthScreen, Outcome, Refused } from "@/features/auth/auth-screen.tsx";
 import { SignOutButton } from "@/features/auth/sign-out-button.tsx";
 import { useOperatorStanding } from "@/features/console/operator.ts";
-import { RefusalLine } from "@/features/console/refusal-line.tsx";
 import {
   CONSOLE_CLOSED,
   NOT_THE_OPERATOR,
   ONLY_THE_OPERATOR,
   saidOf,
 } from "@/features/console/words.ts";
+import { RefusalLine } from "@/shared/refusal-outcome.tsx";
 import { CONSOLE } from "@/shared/screens.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Frame } from "./frame.tsx";

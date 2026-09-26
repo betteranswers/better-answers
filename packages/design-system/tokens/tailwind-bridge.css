@@ -213,19 +213,23 @@
  * the token. These three rules catch them. Keep this list SHORT — if it grows
  * past a dozen rules, the component should be edited in place instead.
  * ------------------------------------------------------------------------ */
-@layer base {
-  /* Any hardcoded rounded-* utility inside kit output. */
+@layer utilities {
+  /* Any hardcoded rounded-* utility inside kit output. In base, every utility
+     would beat it; here its two selectors outweigh a utility's one. */
   [class*="rounded-"]:not(.ba-allow-radius) {
     border-radius: 0;
   }
 
-  /* Circles we do keep: spinner ring, radio, avatar. */
+  /* Circles we do keep: spinner ring, radio, avatar. `[class]` gives each the
+     reset's weight, and coming after it, they win. */
   .rounded-full.ba-allow-radius,
-  [role="radio"],
-  [data-slot="avatar"] {
+  [role="radio"][class],
+  [data-slot="avatar"][class] {
     border-radius: var(--radius-full);
   }
+}
 
+@layer base {
   /* Our focus treatment, not the kit's. */
   :where(button, a, input, textarea, select, [tabindex]):focus-visible {
     outline: none;

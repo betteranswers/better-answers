@@ -5,7 +5,7 @@ import { Button } from "@/shared/ui/button.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { TableCell } from "@/shared/ui/table.tsx";
 
-import { longDate, resentOutcome } from "./invitation-words.ts";
+import { resentOutcome } from "./invitation-words.ts";
 import {
   useCancelInvitation,
   useInvitations,
@@ -14,7 +14,7 @@ import {
 } from "./invitations-api.ts";
 import { PEOPLE_KEYSTROKES, useInviteAsked } from "./people-state.ts";
 import { outcomeOfInvitationFailure } from "./refusal.tsx";
-import { useKeystrokeOnHeld, WaitingRow, WaitingTable } from "./waiting-list.tsx";
+import { DayCell, useKeystrokeOnHeld, WaitingRow, WaitingTable } from "./waiting-list.tsx";
 
 const COLUMNS = ["Address", "Role", "State", "Sent", "Expires", "Invited by", "Acts"] as const;
 
@@ -72,8 +72,8 @@ function InvitationRow(properties: {
       <TableCell>
         <Pill>{expired ? "Expired" : "Waiting"}</Pill>
       </TableCell>
-      <TableCell className="tabular-nums">{longDate(invitation.invitedAt)}</TableCell>
-      <TableCell className="tabular-nums">{longDate(invitation.expiresAt)}</TableCell>
+      <DayCell instant={invitation.invitedAt} />
+      <DayCell instant={invitation.expiresAt} />
       <TableCell>
         {invitation.invitedBy === "" ? (
           <span className="text-muted-foreground">No display name yet</span>

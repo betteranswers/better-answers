@@ -5,10 +5,12 @@ import {
   Table,
   TableBody,
   TableCaption,
+  TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/shared/ui/table.tsx";
+import { dayWords } from "@/shared/words.ts";
 
 /** What waits on an Admin, a row each with its acts: invitations not yet accepted, requests. */
 export function WaitingTable(properties: {
@@ -55,6 +57,10 @@ export function WaitingRow<Item>(properties: {
       {properties.children}
     </TableRow>
   );
+}
+
+export function DayCell(properties: { readonly instant: string }) {
+  return <TableCell className="tabular-nums">{dayWords(properties.instant)}</TableCell>;
 }
 
 /** With no row held, `nothingHeld` says where focus goes first rather than acting on none. */
