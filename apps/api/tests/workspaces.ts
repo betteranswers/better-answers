@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { z } from "zod";
 
-const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
+import { repositoryRoot } from "@better-answers/devtools/paths";
 
 const PACKAGES_BLOCK = /^packages:\n((?:[ \t]*-[ \t]+\S+[ \t]*\n)+)/m;
 

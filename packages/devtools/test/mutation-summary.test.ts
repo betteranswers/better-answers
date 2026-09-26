@@ -10,7 +10,7 @@ import {
   mutationSummaryFromArgv,
 } from "@better-answers/devtools/mutation-summary";
 import type { Report, ReportMutant } from "@better-answers/devtools/mutation-summary";
-import { repositoryRoot } from "@better-answers/devtools/oxlint-config";
+import { repositoryRoot } from "@better-answers/devtools/paths";
 
 const script = path.join(repositoryRoot, "scripts/mutation-summary.mjs");
 

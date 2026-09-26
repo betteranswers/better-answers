@@ -13,6 +13,7 @@
     "./mutation-shards": "./src/mutation-shards.ts",
     "./mutation-summary": "./src/mutation-summary.ts",
     "./oxlint-config": "./src/oxlint-config.ts",
+    "./paths": "./src/paths.ts",
     "./root-commands": "./src/root-commands.ts",
     "./throwaway-tree": "./src/throwaway-tree.ts"
   },

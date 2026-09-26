@@ -3,14 +3,12 @@ import path from "node:path";
 
 import { byCodeUnit } from "@better-answers/schema/code-unit";
 
+import { isTestPath } from "./paths.ts";
+
 /** A statement, not the two words: it opens a string literal, or a line inside a long one. */
 const RAW_INSERT = /(?:^|["'`])\s*insert\s+into\s+["'`]?[a-z_]/i;
 
-const TEST_FILE = /(^test_|[._](test|spec)\.)/;
-
 const SCANNED = /\.(?:tsx?|py)$/;
-
-const SUITE_DIRECTORIES = new Set(["e2e", "test", "tests"]);
 
 const NEVER_WALKED = new Set([
   ".git",
@@ -44,12 +42,7 @@ export const SCAN_EXECUTABLE = {
 } as const;
 
 /** The suites' territory: a test by its name, and every module that sits among them. */
-export const isSuiteFile = (file: string): boolean => {
-  const segments = file.split("/");
-  const name = segments.at(-1) ?? "";
-  if (!SCANNED.test(name)) return false;
-  return segments.some((segment) => SUITE_DIRECTORIES.has(segment)) || TEST_FILE.test(name);
-};
+export const isSuiteFile = (file: string): boolean => SCANNED.test(file) && isTestPath(file);
 
 export const isFactoryModule = (file: string): boolean => FACTORY_MODULES.includes(file);
 

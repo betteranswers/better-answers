@@ -12,7 +12,7 @@ import {
   SCAN_EXECUTABLE,
   WHERE_THE_LIST_LIVES,
 } from "@better-answers/devtools/insert-scan";
-import { repositoryRoot } from "@better-answers/devtools/oxlint-config";
+import { repositoryRoot } from "@better-answers/devtools/paths";
 import { runsOverThrowawayTree } from "@better-answers/devtools/throwaway-tree";
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 

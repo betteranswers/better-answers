@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { z } from "zod";
 
-export const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
+import { repositoryRoot } from "./paths.ts";
 
 const ruleSetting = z.union([z.string(), z.tuple([z.string()], z.unknown())]);
 
