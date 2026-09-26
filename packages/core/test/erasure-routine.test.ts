@@ -736,6 +736,27 @@ describe("the lock the hourly dump waits behind", () => {
 
     expect(tried).toEqual([false, true]);
   });
+
+  it("releases the dump's lock when the routine's work throws", async () => {
+    const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
+    const doors = erasureDoorsFor(scenario, objects().door, LOCKED_AT, operatorLog);
+
+    const run = runErasure(
+      ERASURE,
+      {
+        ...doors,
+        clock: {
+          now: () => {
+            throw new Error("the clock failed");
+          },
+        },
+      },
+      { workspaceId: scenario.workspaceId, subjectRequestId },
+    );
+
+    await expect(run).rejects.toThrow("the clock failed");
+    expect(await theDumpCouldTakeItsLock()).toBe(true);
+  });
 });
 
 describe("the audit log an erasure never rewrites", () => {
