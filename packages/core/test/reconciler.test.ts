@@ -1,3 +1,4 @@
+import pg from "pg";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -25,10 +26,12 @@ import {
 } from "../src/concepts/index.ts";
 import { actorIdOf, type Result, type UserPrincipal } from "../src/kernel/index.ts";
 import { narrowBinding, narrowBindingInput } from "../src/sources/index.ts";
+import { openPostgres } from "../src/store/postgres/index.ts";
 import {
   bundleHistory,
   commitFacts,
   divergeHistory,
+  emptyRootCommit,
   fileAtCommit,
   removeRepository,
 } from "./bundle.ts";
@@ -821,6 +824,23 @@ describe("what the reconciler refuses", () => {
     expect(refused).toEqual({ ok: false, error: "no-such-repository" });
   });
 
+  it("hands back the store's own failure from reading the watermark", async () => {
+    const scenario = await arrange();
+    await landed(scenario, scenario.editor, guideline("Umbrellas"));
+    const gone = new pg.Pool(db().runtimePool.options);
+    await gone.end();
+
+    const refused = await reconcile(
+      RECONCILER,
+      { ...doorsOf(scenario), postgres: openPostgres(gone) },
+      { workspaceId: scenario.workspaceId },
+    );
+
+    expect(refused.ok).toBe(false);
+    if (refused.ok) return;
+    expect(refused.error).toBeInstanceOf(Error);
+  });
+
   it("refuses a malformed workspace id before opening anything", async () => {
     const scenario = await arrange();
 
@@ -928,6 +948,34 @@ describe("a commit the rows cannot take", () => {
     });
 
     expect(replay).toEqual(stoppedUnreadableAt(made));
+  });
+
+  it("stops at a hand-made concept file with no IRI", async () => {
+    const { made, replay } = await handMadeFirstAndReplayed(await arrange(), {
+      path: "knowledge/guidelines/unnamed.md",
+      content: renderConceptFile({ type: "Guideline", title: "Unnamed" }, "# Unnamed\n\nNo IRI."),
+      message: "Record a concept by hand, lacking its IRI",
+    });
+
+    expect(replay).toEqual(stoppedUnreadableAt(made));
+  });
+
+  it("stops at a hand-made commit that changes no file", async () => {
+    const scenario = await arrange();
+    const made = await emptyRootCommit(
+      scenario.git,
+      scenario.workspaceId,
+      `Record nothing by hand\n\nActor: ${actorIdOf(scenario.editor)}\nAudit: ${ulid()}`,
+    );
+
+    const { replayed, skipped, stopped } = await reconciled(scenario);
+
+    expect({ replayed, skipped, stopped }).toEqual({
+      replayed: [],
+      skipped: [],
+      stopped: { sha: made, reason: "unreadable-commit" },
+    });
+    expect(await recordedChain(scenario.workspaceId)).toEqual([]);
   });
 
   it.each([
