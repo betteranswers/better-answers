@@ -1,6 +1,14 @@
 import { spawn, spawnSync } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -67,6 +75,18 @@ const workspace = (name: string, suite = SUITE, extraSuite?: string): string => 
   return root;
 };
 
+const TORN_REPORT_VITEST = `import { writeFileSync } from "node:fs";
+
+const flag = process.argv.find((arg) => arg.startsWith("--outputFile.json="));
+writeFileSync(flag.slice("--outputFile.json=".length), '{"numTotalTests": 1, "numFail');
+process.exit(1);
+`;
+
+const shimTornReportVitest = (root: string): void => {
+  rmSync(path.join(root, "node_modules/vitest"));
+  writeUnder(root, "node_modules/vitest/vitest.mjs", TORN_REPORT_VITEST);
+};
+
 type Run = { readonly status: number | null; readonly stdout: string; readonly stderr: string };
 
 type Mutation = {
@@ -89,10 +109,11 @@ const argvFor = (root: string, mutation: Mutation): readonly string[] => [
   ...(mutation.timeoutMs === undefined ? [] : ["--timeout-ms", String(mutation.timeoutMs)]),
 ];
 
-const probe = (root: string, mutation: Mutation): Run => {
+const probe = (root: string, mutation: Mutation, env: NodeJS.ProcessEnv = {}): Run => {
   const result = spawnSync(process.execPath, [...argvFor(root, mutation)], {
     cwd: root,
     encoding: "utf8",
+    env: { ...process.env, ...env },
   });
   return { status: result.status, stdout: result.stdout, stderr: result.stderr };
 };
@@ -204,6 +225,20 @@ describe("the mutant probe over a throwaway workspace", () => {
     expect(verdictOf(run)).toBeUndefined();
     expect(run.stderr).toContain("did not run");
     expect(source(root)).toBe(SOURCE);
+  });
+
+  it("restores the file and removes a torn report", () => {
+    const root = workspace("torn-report");
+    shimTornReportVitest(root);
+    const temporary = mkdtempSync(path.join(scratch, "tmp-"));
+
+    const run = probe(root, { line: 1, from: "n + 1", to: "n - 1" }, { TMPDIR: temporary });
+
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain("did not run");
+    expect(verdictOf(run)).toBeUndefined();
+    expect(source(root)).toBe(SOURCE);
+    expect(readdirSync(temporary)).toEqual([]);
   });
 
   it("refuses a verdict when one test file failed to run", () => {
