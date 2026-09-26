@@ -46,7 +46,12 @@ import {
   type SourcedConcept,
 } from "./sourced-concept.ts";
 import { inputOf } from "./suite-input.ts";
-import { countWaitingOnLocks, until, whileActsWaitAt } from "./suite-postgres.ts";
+import {
+  countWaitingOnLocks,
+  statementsWaitingOnALock,
+  until,
+  whileActsWaitAt,
+} from "./suite-postgres.ts";
 import { doorsOf, type Scenario } from "./workspace-with-bundle.ts";
 
 const { db, arrange, reading } = visibilitySuite();
@@ -185,15 +190,8 @@ const documentsCitedBy = async (workspaceId: string, iri: string) => {
   return read.rows.map((row) => row.source_document_id).toSorted();
 };
 
-const statementsWaitingOnALock = async (): Promise<readonly string[]> => {
-  const found = await db().pool.query<{ query: string }>(
-    "SELECT query FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'",
-  );
-  return found.rows.map((row) => row.query);
-};
-
 const someoneWaitsOnALock = async (): Promise<boolean> =>
-  (await statementsWaitingOnALock()).length > 0;
+  (await statementsWaitingOnALock(db().pool)).length > 0;
 
 const besideAnOpenNarrowing = async <T>(
   scenario: Scenario,
@@ -212,7 +210,7 @@ const besideAnOpenNarrowing = async <T>(
       return outcome;
     });
     await until(someoneWaitsOnALock);
-    const waitingAt = await statementsWaitingOnALock();
+    const waitingAt = await statementsWaitingOnALock(db().pool);
     expect(settled).toBe(false);
 
     await holder.query("COMMIT");

@@ -25,7 +25,7 @@ import {
   revokeCredentials as revokeCredentials_,
   setOperatorMark,
 } from "@better-answers/core/workspaces";
-import { ulid } from "@better-answers/schema";
+import { boundarySchemas, ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
 import type { EmailMessage } from "../src/auth/index.ts";
@@ -427,7 +427,11 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     const opened = await withOperator(
       door,
       { userId: await operatorsId(), issuedAt: at },
-      (operator, tx) => revokeCredentials_(operator, tx, { personId: userId, at }),
+      (operator, tx) =>
+        revokeCredentials_(operator, tx, {
+          personId: boundarySchemas.user.select.shape.id.parse(userId),
+          at,
+        }),
     );
     const revoked = opened.ok ? opened.value : opened;
     if (!revoked.ok) throw new Error(`revokeCredentials failed: ${String(revoked.error)}`);

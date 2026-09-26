@@ -39,6 +39,7 @@ import { endedGrants, issuedCredentialsFor } from "./identity-rows.ts";
 import {
   asANewOperator,
   bootstrap,
+  personIdOf,
   principalOf,
   provisionedWorkspace,
   seedPerson,
@@ -332,7 +333,9 @@ describe("revoking a person's credentials everywhere, as the operator", () => {
   const AT = new Date("2026-09-02T12:00:00.000Z");
 
   const revoking = (input: { personId: string; at: Date }, signedInAt = input.at) =>
-    asANewOperator(db(), signedInAt, (operator, tx) => revokeCredentials(operator, tx, input));
+    asANewOperator(db(), signedInAt, (operator, tx) =>
+      revokeCredentials(operator, tx, { personId: personIdOf(input.personId), at: input.at }),
+    );
 
   const revokedAtOf = async (personId: string) =>
     (await db().pool.query('SELECT credentials_revoked_at FROM "user" WHERE id = $1', [personId]))
@@ -415,15 +418,9 @@ describe("revoking a person's credentials everywhere, as the operator", () => {
   it("refuses a person who does not exist, writing nothing", async () => {
     const nobody = ulid();
 
-    const answers = [
-      (await revoking({ personId: "user-missing", at: AT })).answered,
-      (await revoking({ personId: nobody, at: AT })).answered,
-    ];
+    const { answered } = await revoking({ personId: nobody, at: AT });
 
-    expect(answers).toEqual([
-      { ok: true, value: { ok: false, error: "no-such-user" } },
-      { ok: true, value: { ok: false, error: "no-such-user" } },
-    ]);
+    expect(answered).toEqual({ ok: true, value: { ok: false, error: "no-such-user" } });
     expect(await revokedAtOf(nobody)).toEqual([]);
     expect(await identityRowsAbout(nobody)).toEqual([]);
   });
@@ -833,8 +830,12 @@ describe("what the slice answers when the store cannot be reached", () => {
 
     expect([
       await listWorkspaces(operator, closed),
-      await revokeCredentials(operator, closed, { personId: ulid(), at }),
-      await correctDisplayName(operator, closed, { personId: ulid(), displayName: "Sam", at }),
+      await revokeCredentials(operator, closed, { personId: personIdOf(ulid()), at }),
+      await correctDisplayName(operator, closed, {
+        personId: personIdOf(ulid()),
+        displayName: "Sam",
+        at,
+      }),
     ]).toEqual([
       { ok: false, error: expect.any(Error) },
       { ok: false, error: expect.any(Error) },
@@ -845,12 +846,6 @@ describe("what the slice answers when the store cannot be reached", () => {
   it("refuses what the boundary will not accept before any statement", async () => {
     const door = await unreachableDoor();
 
-    expect(
-      await revokeCredentials(operatorSignedInAt(at), await closedTransaction(), {
-        personId: "not-a-ulid",
-        at,
-      }),
-    ).toEqual({ ok: false, error: "no-such-user" });
     expect(
       await revokeWorkspaceTokens(bootstrap, door, { workspaceId: "not-a-ulid", userId: "x", at }),
     ).toEqual({ ok: false, error: "malformed" });

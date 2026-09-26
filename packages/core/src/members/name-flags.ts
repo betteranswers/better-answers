@@ -18,7 +18,7 @@ import {
   ulid,
 } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
-import { DISPLAY_NAME_CORRECTED } from "../workspaces/index.ts";
+import { DISPLAY_NAME_CORRECTED, holdTheNameOf, notErasedAt } from "../workspaces/index.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
 /** Neither row holds the name: the person row keeps the one copy, which erasure blanks. */
@@ -74,10 +74,6 @@ export type NameFlagged = {
   readonly raised: RaisedFlag | null;
 };
 
-/** Held until commit, so of two flags at once the second finds the first's row. */
-const HELD_FLAGS_OF_THE_PERSON =
-  "SELECT pg_advisory_xact_lock(hashtext('name-flag'), hashtext($1))";
-
 const FLAGGED_PERSON = `SELECT u.name AS "displayName", w.name AS "workspaceName"
                           FROM member m
                           JOIN "user" u ON u.id = m.user_id
@@ -98,7 +94,7 @@ const flagging = async (
   personId: UserId,
 ): Promise<Result<NameFlagged, MemberRefusal<"no-such-member">>> => {
   const { workspaceId } = admin;
-  await tx.query(HELD_FLAGS_OF_THE_PERSON, [personId]);
+  await holdTheNameOf(tx, personId);
   const found = (await tx.query(FLAGGED_PERSON, [workspaceId, personId])).rows[0];
   if (found === undefined) return err("no-such-member");
   const person = FLAGGED_ROW.parse(found);
@@ -121,6 +117,7 @@ const flagging = async (
     act: RAISED_ACTS.raised,
     subjectId: personId,
     detail: { workspaceId },
+    stampedAsWritten: true,
   });
   return ok({ personId, raised: { workspaceId, personId, ...person } });
 };
@@ -160,7 +157,7 @@ const FLAGS_WAITING = `SELECT raised.subject_id AS "personId", u.name AS "displa
     FROM identity_audit_event raised
     JOIN "user" u ON u.id = raised.subject_id
     JOIN workspace w ON w.id = raised.detail ->> 'workspaceId'
-   WHERE ${STILL_WAITING}
+   WHERE ${STILL_WAITING} AND ${notErasedAt("u.email")}
    ORDER BY raised.at, raised.id`;
 
 const WAITING_ROW = z.object({
@@ -193,7 +190,7 @@ const byPerson = (rows: readonly z.output<typeof WAITING_ROW>[]): readonly NameW
 /**
  * Every person flagged since the operator last corrected their display name, the longest waiting
  * first, each with the workspaces that flagged them and when. A person's own renaming leaves a
- * flag waiting.
+ * flag waiting; an erased person's flags wait no more.
  */
 export const listNamesWaiting = (
   _operator: OperatorPrincipal,

@@ -3,7 +3,15 @@ import { z } from "zod";
 import { boundarySchemas, CREATOR_ROLE } from "@better-answers/schema";
 
 import { act, declareActs, declareIdentitySetActs, record } from "../audit/index.ts";
-import { attempt, err, ok, refusalFor, type Result, ulid } from "../kernel/index.ts";
+import {
+  attempt,
+  err,
+  ok,
+  refusalFor,
+  requireFreshSignIn,
+  type Result,
+  ulid,
+} from "../kernel/index.ts";
 import type {
   OperatorPrincipal,
   PlatformPrincipal,
@@ -22,7 +30,6 @@ import {
   withScope,
 } from "../store/postgres/index.ts";
 import { hasNoDisplayName } from "./display-name.ts";
-import { admitOperatorWrite } from "./operator.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
 export { WORKSPACE_REFUSALS } from "./vocabulary.ts";
@@ -32,6 +39,8 @@ export {
   correctDisplayNameInput,
   DISPLAY_NAME_CORRECTED,
   hasNoDisplayName,
+  holdTheNameOf,
+  notErasedAt,
   setDisplayName,
   setDisplayNameInput,
 } from "./display-name.ts";
@@ -342,7 +351,7 @@ const CREDENTIAL_ACTS = declareIdentitySetActs("people", {
   revoked: act("people.person.credentials_revoked", {}),
 });
 
-export const revokeCredentialsInput = z.object({ personId: z.string() });
+export const revokeCredentialsInput = z.object({ personId: boundarySchemas.user.select.shape.id });
 
 type RevokeCredentialsInput = z.output<typeof revokeCredentialsInput> & {
   /** When the act happens: the sign-in's age is judged against it, and it is the revocation's. */
@@ -381,22 +390,22 @@ const endingCredentials = async (tx: Tx, personId: UserId, at: Date): Promise<Da
 /**
  * Ends every session and OAuth token the person was issued before the revocation instant, in every
  * workspace, and records the act under the operator. The instant only moves forward: an `at`
- * before the one held keeps the held one. A malformed id answers `no-such-user`.
+ * before the one held keeps the held one.
  */
 export const revokeCredentials = async (
   operator: OperatorPrincipal,
   tx: Tx,
   input: RevokeCredentialsInput,
 ): Promise<Result<CredentialsRevoked, RevokeCredentialsRefusal | Error>> => {
-  const admitted = admitOperatorWrite(operator, input);
-  if (!admitted.ok) return err(admitted.error);
-  const { personId } = admitted.value;
+  const fresh = requireFreshSignIn(operator, input.at);
+  if (!fresh.ok) return err(fresh.error);
+  const { personId } = input;
 
   const ended = await attempt(() => endingCredentials(tx, personId, input.at));
   if (!ended.ok) return err(ended.error);
   if (ended.value === undefined) return err("no-such-user");
 
-  await record(admitted.value.operator, tx, {
+  await record(fresh.value, tx, {
     id: ulid(),
     act: CREDENTIAL_ACTS.revoked,
     subjectId: personId,

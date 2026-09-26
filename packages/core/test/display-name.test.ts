@@ -7,9 +7,17 @@ import { openPostgres } from "../src/store/postgres/index.ts";
 import {
   applyDisplayNameRule,
   correctDisplayName,
+  correctDisplayNameInput,
   setDisplayName,
 } from "../src/workspaces/index.ts";
-import { asANewOperator, bootstrap, provisionedWorkspace, seedPerson } from "./platform.ts";
+import {
+  asANewOperator,
+  bootstrap,
+  erasedFromTheSet,
+  provisionedWorkspace,
+  seedPerson,
+} from "./platform.ts";
+import { inputOf } from "./suite-input.ts";
 import { postgresForSuite, whileWritesAreRefused } from "./suite-postgres.ts";
 
 const db = postgresForSuite();
@@ -212,7 +220,7 @@ describe("correcting a display name, as the operator", () => {
 
   const correcting = (input: { personId: string; displayName: string }, signedInAt = AT) =>
     asANewOperator(db(), signedInAt, (operator, tx) =>
-      correctDisplayName(operator, tx, { ...input, at: AT }),
+      correctDisplayName(operator, tx, { ...inputOf(correctDisplayNameInput, input), at: AT }),
     );
 
   it("writes the name the rule takes, recorded under the operator", async () => {
@@ -279,13 +287,24 @@ describe("correcting a display name, as the operator", () => {
     expect(await identitySetRowsFor(personId)).toEqual([]);
   });
 
-  it.each([
-    ["a malformed id", "user-missing"],
-    ["an unknown id", ulid()],
-  ])("refuses %s as no such user, writing nothing", async (_case, personId) => {
+  it("refuses an id nobody holds as no such user", async () => {
+    const personId = ulid();
+
     const { answered } = await correcting({ personId, displayName: "Priya Shah" });
 
     expect(answered).toEqual({ ok: true, value: { ok: false, error: "no-such-user" } });
+    expect(await identitySetRowsFor(personId)).toEqual([]);
+  });
+
+  it("refuses an erased person as no such user, naming nobody", async () => {
+    const workspace = await provisionedWorkspace(db(), "Erased");
+    const personId = await seedPerson(db().pool, { name: "Rude Name" });
+    await erasedFromTheSet(db(), workspace.workspaceId, personId);
+
+    const { answered } = await correcting({ personId, displayName: "Priya Shah" });
+
+    expect(answered).toEqual({ ok: true, value: { ok: false, error: "no-such-user" } });
+    expect(await displayNameHeld(personId)).toBe("");
     expect(await identitySetRowsFor(personId)).toEqual([]);
   });
 

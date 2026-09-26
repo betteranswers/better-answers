@@ -8,11 +8,16 @@ import type {
 } from "../src/kernel/index.ts";
 import { flagDisplayName, flagDisplayNameInput, listNamesWaiting } from "../src/members/index.ts";
 import { openPostgres, type Tx } from "../src/store/postgres/index.ts";
-import { correctDisplayName, setDisplayName } from "../src/workspaces/index.ts";
+import {
+  correctDisplayName,
+  correctDisplayNameInput,
+  setDisplayName,
+} from "../src/workspaces/index.ts";
 import { heldAs, membersSuite } from "./members-suite.ts";
 import {
   asTheOperator,
   bootstrap,
+  erasedFromTheSet,
   provisionedWorkspace,
   type ProvisionedWorkspace,
 } from "./platform.ts";
@@ -21,6 +26,7 @@ import {
   countWaitingOnLocks,
   postgresForSuite,
   seedingWith,
+  statementsWaitingOnALock,
   until,
   whileWritesAreRefused,
 } from "./suite-postgres.ts";
@@ -81,10 +87,16 @@ const nameOf = async (personId: string): Promise<string | undefined> =>
   (await db().pool.query<{ name: string }>('SELECT name FROM "user" WHERE id = $1', [personId]))
     .rows[0]?.name;
 
+const correcting = (operator: OperatorPrincipal, tx: Tx, personId: string, displayName: string) =>
+  correctDisplayName(operator, tx, {
+    ...inputOf(correctDisplayNameInput, { personId, displayName }),
+    at: new Date(),
+  });
+
 /** @throws when the operator's correction is refused. */
 const correctedSince = async (personId: string, displayName = "Priya Shah") => {
   const corrected = await asTheOperator(db(), (operator, tx) =>
-    correctDisplayName(operator, tx, { personId, displayName, at: new Date() }),
+    correcting(operator, tx, personId, displayName),
   );
   if (!corrected.ok) throw new Error(`the correction was refused: ${String(corrected.error)}`);
 };
@@ -327,11 +339,84 @@ describe("the names waiting for the operator", () => {
     );
   });
 
+  it("leaves out a person whose erasure has been carried out", async () => {
+    const workspace = await provisionedWorkspace(db(), "WaitingErased");
+    const person = await joined(workspace, await aPerson(), "Viewer");
+    await flaggedBy(workspace, workspace.adminUserId, person);
+    expect(await waitingAmong([person])).toHaveLength(1);
+
+    await erasedFromTheSet(db(), workspace.workspaceId, person);
+
+    expect(await waitingAmong([person])).toEqual([]);
+  });
+
   it("admits the operator alone, never an Admin or the platform", () => {
     type Reader = Parameters<typeof listNamesWaiting>[0];
 
     expectTypeOf<OperatorPrincipal>().toExtend<Reader>();
     expectTypeOf<UserPrincipal>().not.toExtend<Reader>();
     expectTypeOf<PlatformPrincipal>().not.toExtend<Reader>();
+  });
+});
+
+describe("a flag raised while the operator corrects the name", () => {
+  it("keeps waiting a flag begun first but committed after", async () => {
+    const workspace = await provisionedWorkspace(db(), "RaceFlagLast");
+    const person = await joined(workspace, await aPerson(), "Viewer");
+    const flagBegun = Promise.withResolvers<undefined>();
+    const correctionHeld = Promise.withResolvers<undefined>();
+    let flagSettled = false;
+
+    const flag = heldAs(workspace, workspace.adminUserId, async (principal, tx) => {
+      flagBegun.resolve(undefined);
+      await correctionHeld.promise;
+      const flagged = await flagging(principal, tx, person);
+      flagSettled = true;
+      return flagged;
+    });
+    await flagBegun.promise;
+    const heldOpen = await asTheOperator(db(), async (operator, tx) => {
+      const corrected = await correcting(operator, tx, person, "Priya Shah");
+      correctionHeld.resolve(undefined);
+      await until(async () => (await countWaitingOnLocks(db().pool)) > 0);
+      return { corrected, waitingAt: await statementsWaitingOnALock(db().pool), flagSettled };
+    });
+
+    expect(heldOpen).toEqual({
+      corrected: { ok: true, value: { personId: person, displayName: "Priya Shah" } },
+      waitingAt: [expect.stringContaining("pg_advisory_xact_lock")],
+      flagSettled: false,
+    });
+    expect(await flag).toMatchObject({
+      ok: true,
+      value: { raised: { displayName: "Priya Shah" } },
+    });
+    expect(await waitingAmong([person])).toMatchObject([
+      {
+        personId: person,
+        displayName: "Priya Shah",
+        flags: [{ workspace: { id: workspace.workspaceId } }],
+      },
+    ]);
+  });
+
+  it("clears a flag begun last but committed before", async () => {
+    const workspace = await provisionedWorkspace(db(), "RaceFlagFirst");
+    const person = await joined(workspace, await aPerson(), "Viewer");
+    const correctionBegun = Promise.withResolvers<undefined>();
+    const flagCommitted = Promise.withResolvers<undefined>();
+
+    const correction = asTheOperator(db(), async (operator, tx) => {
+      correctionBegun.resolve(undefined);
+      await flagCommitted.promise;
+      return correcting(operator, tx, person, "Priya Shah");
+    });
+    await correctionBegun.promise;
+    const flagged = await flaggedBy(workspace, workspace.adminUserId, person);
+    flagCommitted.resolve(undefined);
+
+    expect(flagged).toMatchObject({ ok: true, value: { raised: { personId: person } } });
+    expect(await correction).toMatchObject({ ok: true });
+    expect(await waitingAmong([person])).toEqual([]);
   });
 });

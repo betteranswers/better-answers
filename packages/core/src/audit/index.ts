@@ -33,6 +33,12 @@ export type AuditEvent<A extends AuditAct> = {
   readonly detail: DetailOf<A["detail"]>;
 
   readonly batchId?: string | undefined;
+
+  /**
+   * Stamps `at` as the row is written, not as its transaction began, so rows a lock serialises
+   * sort in the lock's order.
+   */
+  readonly stampedAsWritten?: true;
 };
 
 export type Recorded = {
@@ -187,11 +193,13 @@ const write = async <A extends AuditAct>(
   const identitySet = isIdentitySetAct(event.act.name);
   const data = rowToInsert(identitySet ? identitySetInsert : eventInsert, actor, event);
   const values = [data.id, data.act, data.actor, data.subjectId, data.detail, data.batchId];
+  const stamp = event.stampedAsWritten === true ? "clock_timestamp()" : "now()";
   const inserted = await tx.query<{ id: string }>(
     identitySet
-      ? `INSERT INTO identity_audit_event (${ROW_COLUMNS}) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
-      : `INSERT INTO audit_event (${ROW_COLUMNS}, workspace_id)
-         VALUES ($1, $2, $3, $4, $5, $6, ${scopeClause(7)}) RETURNING id`,
+      ? `INSERT INTO identity_audit_event (${ROW_COLUMNS}, at)
+         VALUES ($1, $2, $3, $4, $5, $6, ${stamp}) RETURNING id`
+      : `INSERT INTO audit_event (${ROW_COLUMNS}, at, workspace_id)
+         VALUES ($1, $2, $3, $4, $5, $6, ${stamp}, ${scopeClause(7)}) RETURNING id`,
     identitySet ? values : [...values, workspaceId],
   );
 

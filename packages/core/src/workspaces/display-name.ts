@@ -10,12 +10,13 @@ import {
   ok,
   type OperatorPrincipal,
   type PlatformPrincipal,
+  requireFreshSignIn,
   type Result,
   type UserId,
   ulid,
 } from "../kernel/index.ts";
+import { ERASED_DOMAIN } from "../store/git/index.ts";
 import { type PostgresDoor, type Tx, withIdentityWrite } from "../store/postgres/index.ts";
-import { admitOperatorWrite } from "./operator.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
 /**
@@ -88,13 +89,38 @@ type DisplayNameSet = {
   readonly displayName: string;
 };
 
-/** False, having changed nothing, where no person holds the id. */
+const ERASED_ADDRESS = `@${ERASED_DOMAIN}`;
+
+/**
+ * An SQL condition on a person's address, false once erasure has pseudonymised it: erasure keeps
+ * the person row, so the address is how an erased person shows.
+ */
+export const notErasedAt = (email: string): string =>
+  `right(lower(${email}), ${ERASED_ADDRESS.length}) <> '${ERASED_ADDRESS}'`;
+
+/** False, having changed nothing, where no person holds the id or the one who did is erased. */
 const naming = async (tx: Tx, personId: UserId, name: string): Promise<boolean> => {
-  const named = await tx.query('UPDATE "user" SET name = $2, updated_at = now() WHERE id = $1', [
-    personId,
-    name,
-  ]);
+  const named = await tx.query(
+    `UPDATE "user" SET name = $2, updated_at = now()
+      WHERE id = $1 AND ${notErasedAt("email")}`,
+    [personId, name],
+  );
   return (named.rowCount ?? 0) > 0;
+};
+
+/**
+ * Held until commit by a flag on the person and by a correction of their name, so the later
+ * one finds the earlier's row.
+ */
+export const holdTheNameOf = async (tx: Tx, personId: UserId): Promise<void> => {
+  await tx.query("SELECT pg_advisory_xact_lock(hashtext('display-name'), hashtext($1))", [
+    personId,
+  ]);
+};
+
+const correcting = async (tx: Tx, personId: UserId, name: string): Promise<boolean> => {
+  await holdTheNameOf(tx, personId);
+  return naming(tx, personId, name);
 };
 
 /**
@@ -129,7 +155,10 @@ export const setDisplayName = async (
   return ok({ personId: personId.data, displayName: displayName.value });
 };
 
-export const correctDisplayNameInput = z.object({ personId: z.string(), displayName: z.string() });
+export const correctDisplayNameInput = z.object({
+  personId: boundarySchemas.user.select.shape.id,
+  displayName: z.string(),
+});
 
 type CorrectDisplayNameInput = z.output<typeof correctDisplayNameInput> & {
   /** When the act happens, which the sign-in's age is judged against. */
@@ -142,29 +171,30 @@ type CorrectDisplayNameRefusal =
 
 /**
  * Replaces a person's display name under the rule their own name follows, and records it under
- * the operator even where the name is unchanged, so a flag on a name judged fine still clears. A
- * malformed id answers `no-such-user`.
+ * the operator even where the name is unchanged, so a flag on a name judged fine still clears. An
+ * erased person answers `no-such-user`, as one nobody holds does.
  */
 export const correctDisplayName = async (
   operator: OperatorPrincipal,
   tx: Tx,
   input: CorrectDisplayNameInput,
 ): Promise<Result<DisplayNameSet, CorrectDisplayNameRefusal | Error>> => {
-  const admitted = admitOperatorWrite(operator, input);
-  if (!admitted.ok) return err(admitted.error);
-  const { personId } = admitted.value;
+  const fresh = requireFreshSignIn(operator, input.at);
+  if (!fresh.ok) return err(fresh.error);
+  const { personId } = input;
   const displayName = applyDisplayNameRule(input.displayName);
   if (!displayName.ok) return err(displayName.error);
 
-  const named = await attempt(() => naming(tx, personId, displayName.value));
+  const named = await attempt(() => correcting(tx, personId, displayName.value));
   if (!named.ok) return err(named.error);
   if (!named.value) return err("no-such-user");
 
-  await record(admitted.value.operator, tx, {
+  await record(fresh.value, tx, {
     id: ulid(),
     act: DISPLAY_NAME_CORRECTED,
     subjectId: personId,
     detail: {},
+    stampedAsWritten: true,
   });
   return ok({ personId, displayName: displayName.value });
 };
