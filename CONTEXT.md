@@ -626,7 +626,8 @@ to it by IRI and never restates it (ADR 0014).
 - **audit log** — the one append-only record of every *audit event* a workspace keeps, written in
   the same act it records; an Admin reads their workspace's own on People's *Audit log* view, and
   never another's. Not the *answer audit*, which records answers. _Avoid_: ledger (retired
-  24/09/2026 for the word an Admin looks for), event log, log (alone).
+  24/09/2026 for the word an Admin looks for; spend's cost ledger, the `llm_call` rows, keeps
+  it), event log, log (alone).
 - **identity-set audit log** — the append-only record of the acts that belong to no workspace
   because they act on a person's identity itself: a person giving their own *display name*, an
   Admin's flag on one, a sign-in, and every write the *operator* makes. It sits beside the *audit log* and uses the same

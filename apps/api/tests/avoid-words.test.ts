@@ -207,29 +207,34 @@ const isCarvedOut = (file: string): boolean =>
 
 const escaped = (word: string): string => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/** A word its entry retires outright is refused in every form, a merely avoided one whole alone. */
-type Held = { readonly watched: Watched; readonly retired: boolean };
+/** A watched word with the test its glossary entry sets for what the permitted senses leave. */
+type Scan = { readonly watched: Watched; readonly finds: (unexplained: string) => boolean };
 
-/** `ledgerRowsOf`, `LEDGER_ACT` and `a_ledger_row` read as words, so a retired word is seen inside. */
+/** `auditRowsOf`, `AUDIT_ACT` and `an_audit_row` read as words, so a retired word is seen inside. */
 const wordsOfCompounds = (text: string): string =>
   text.replace(/(?<=[a-z\d])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])/g, " ").replaceAll("_", " ");
 
-const retiredForm = (word: string): RegExp =>
-  new RegExp(`\\b${word.split(" ").map(escaped).join("[\\s-]+")}s?\\b`, "i");
-
-const usesInAvoidedSense = ({ watched, retired }: Held, file: string, text: string): boolean => {
-  const unexplained = watched.permitted
-    .filter(({ within }) => within === undefined || file.startsWith(within))
-    .reduce(
-      (left, { written }) => left.replace(written, (found) => " ".repeat(found.length)),
-      text,
-    );
-  return retired
-    ? retiredForm(watched.word).test(wordsOfCompounds(unexplained))
-    : new RegExp(`\\b${escaped(watched.word)}\\b`, "i").test(unexplained);
+/** A word its entry retires outright is refused in every form, a merely avoided one whole alone. */
+const findsIn = (word: string, retired: boolean): Scan["finds"] => {
+  if (!retired) {
+    const whole = new RegExp(`\\b${escaped(word)}\\b`, "i");
+    return (unexplained) => whole.test(unexplained);
+  }
+  const anyForm = new RegExp(`\\b${word.split(" ").map(escaped).join("[\\s-]+")}s?\\b`, "i");
+  return (unexplained) => anyForm.test(wordsOfCompounds(unexplained));
 };
 
-const watchedIn = (root: string): readonly Held[] => {
+const usesInAvoidedSense = ({ watched, finds }: Scan, file: string, text: string): boolean =>
+  finds(
+    watched.permitted
+      .filter(({ within }) => within === undefined || file.startsWith(within))
+      .reduce(
+        (left, { written }) => left.replace(written, (found) => " ".repeat(found.length)),
+        text,
+      ),
+  );
+
+const watchedIn = (root: string): readonly Scan[] => {
   const entries = entriesOf(readUnder(root, GLOSSARY));
   return WATCHED.flatMap((watched) => {
     const entry = entries.find(
@@ -237,7 +242,7 @@ const watchedIn = (root: string): readonly Held[] => {
     );
     return entry === undefined
       ? []
-      : [{ watched, retired: retiredIn(entry).includes(watched.word) }];
+      : [{ watched, finds: findsIn(watched.word, retiredIn(entry).includes(watched.word)) }];
   });
 };
 
@@ -317,13 +322,19 @@ const THE_GLOSSARY = [
 
 let trees = 0;
 
-const findingsOver = (planted: string, file = "docs/planted.md"): readonly string[] => {
+const findingsIn = (
+  files: Readonly<Record<string, string>>,
+  glossary = THE_GLOSSARY,
+): readonly string[] => {
   trees += 1;
   const root = throwawayRepository(path.join(scratch, `tree-${String(trees)}`));
-  writeUnder(root, GLOSSARY, THE_GLOSSARY);
-  writeUnder(root, file, `${planted}\n`);
+  writeUnder(root, GLOSSARY, glossary);
+  for (const [file, text] of Object.entries(files)) writeUnder(root, file, text);
   return avoidedSenseLines(root);
 };
+
+const findingsOver = (planted: string, file = "docs/planted.md"): readonly string[] =>
+  findingsIn({ [file]: `${planted}\n` });
 
 describe("the sense a planted line is read in", () => {
   it.each([
@@ -397,16 +408,15 @@ describe("the sense a planted line is read in", () => {
   });
 
   it("reads nothing a carve-out holds but a rules file", () => {
-    trees += 1;
-    const root = throwawayRepository(path.join(scratch, `tree-${String(trees)}`));
-    writeUnder(root, GLOSSARY, THE_GLOSSARY);
-    writeUnder(root, "docs/adr/0001-planted.md", `The ${WORD} claims the job.\n`);
-    writeUnder(root, "docs/specs/T-001.md", `The ${WORD} claims the job.\n`);
-    writeUnder(root, "docs/specs/v01-route.md", `The ${WORD} claims the job.\n`);
-    writeUnder(root, "apps/web/src/planted.ts", `// The ${WORD} claims the job.\n`);
-    writeUnder(root, "apps/web/CODING_RULES.md", `The ${WORD} claims the job.\n`);
+    const findings = findingsIn({
+      "docs/adr/0001-planted.md": `The ${WORD} claims the job.\n`,
+      "docs/specs/T-001.md": `The ${WORD} claims the job.\n`,
+      "docs/specs/v01-route.md": `The ${WORD} claims the job.\n`,
+      "apps/web/src/planted.ts": `// The ${WORD} claims the job.\n`,
+      "apps/web/CODING_RULES.md": `The ${WORD} claims the job.\n`,
+    });
 
-    expect(avoidedSenseLines(root)).toEqual([
+    expect(findings).toEqual([
       `apps/web/CODING_RULES.md:1: The ${WORD} claims the job.`,
       `docs/specs/v01-route.md:1: The ${WORD} claims the job.`,
     ]);
@@ -428,30 +438,29 @@ describe("the sense a planted line is read in", () => {
   });
 
   it("reads the api's source and tests, except this scan", () => {
-    trees += 1;
-    const root = throwawayRepository(path.join(scratch, `tree-${String(trees)}`));
-    writeUnder(root, GLOSSARY, THE_GLOSSARY);
-    writeUnder(root, "apps/api/src/planted.ts", `// The ${WORD} claims the job.\n`);
-    writeUnder(root, "apps/api/tests/planted.test.ts", `// The ${WORD} claims the job.\n`);
-    writeUnder(root, "apps/api/tests/avoid-words.test.ts", `// The ${WORD} claims the job.\n`);
+    const findings = findingsIn({
+      "apps/api/src/planted.ts": `// The ${WORD} claims the job.\n`,
+      "apps/api/tests/planted.test.ts": `// The ${WORD} claims the job.\n`,
+      "apps/api/tests/avoid-words.test.ts": `// The ${WORD} claims the job.\n`,
+    });
 
-    expect(avoidedSenseLines(root)).toEqual([
+    expect(findings).toEqual([
       `apps/api/src/planted.ts:1: // The ${WORD} claims the job.`,
       `apps/api/tests/planted.test.ts:1: // The ${WORD} claims the job.`,
     ]);
   });
 
   it("stops reading a word the glossary no longer avoids", () => {
-    trees += 1;
-    const root = throwawayRepository(path.join(scratch, `tree-${String(trees)}`));
-    writeUnder(root, GLOSSARY, "- **api** — the TypeScript deployable. _Avoid_: the backend.\n");
-    writeUnder(root, "docs/planted.md", `The ${WORD} claims the job.\n`);
+    const findings = findingsIn(
+      { "docs/planted.md": `The ${WORD} claims the job.\n` },
+      "- **api** — the TypeScript deployable. _Avoid_: the backend.\n",
+    );
 
-    expect(avoidedSenseLines(root)).toEqual([]);
+    expect(findings).toEqual([]);
   });
 });
 
-describe("a word the glossary retires outright", () => {
+describe("a word retired outright, beside one merely avoided", () => {
   it.each([
     { file: "packages/core/src/planted.ts", planted: `const rows = await ${RETIRED}RowsOf(tx);` },
     { file: "packages/core/src/planted.ts", planted: `type ${Retired}Act = AuditAct;` },
@@ -510,16 +519,25 @@ describe("a word the glossary retires outright", () => {
     expect(findingsOver(planted)).toEqual([`docs/planted.md:1: ${planted}`]);
   });
 
-  it("reads a word merely avoided as a whole word", () => {
+  it("reads a word merely avoided whole, never inside a compound", () => {
     expect(findingsOver(`const my_${WORD}_name = ${WORD}Router;`)).toEqual([]);
   });
 
-  it("reads the word whole once its entry stops retiring it", () => {
-    trees += 1;
-    const root = throwawayRepository(path.join(scratch, `tree-${String(trees)}`));
-    writeUnder(root, GLOSSARY, `- **audit log** — the record. _Avoid_: ${RETIRED}, log.\n`);
-    writeUnder(root, "docs/planted.md", `${RETIRED}RowsOf\nThe ${RETIRED} holds it.\n`);
+  it("refuses a retired two-word item inside a compound", () => {
+    const findings = findingsIn(
+      { "docs/planted.md": `type ${Retired}Act = string;\nThe ${RETIRED} holds it.\n` },
+      `- **audit act** — the name. _Avoid_: ${RETIRED} act (retired).\n`,
+    );
 
-    expect(avoidedSenseLines(root)).toEqual([`docs/planted.md:2: The ${RETIRED} holds it.`]);
+    expect(findings).toEqual([`docs/planted.md:1: type ${Retired}Act = string;`]);
+  });
+
+  it("reads the word whole once its entry stops retiring it", () => {
+    const findings = findingsIn(
+      { "docs/planted.md": `${RETIRED}RowsOf\nThe ${RETIRED} holds it.\n` },
+      `- **audit log** — the record. _Avoid_: ${RETIRED}, log.\n`,
+    );
+
+    expect(findings).toEqual([`docs/planted.md:2: The ${RETIRED} holds it.`]);
   });
 });
