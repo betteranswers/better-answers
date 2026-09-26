@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { boundarySchemas, CREATOR_ROLE } from "@better-answers/schema";
 
-import { act, declareActs, declareIdentitySetActs, record } from "../audit/index.ts";
+import { act, declareActs, type EndedGrant, record } from "../audit/index.ts";
 import {
   attempt,
   err,
@@ -30,9 +30,14 @@ import {
   withScope,
 } from "../store/postgres/index.ts";
 import { hasNoDisplayName } from "./display-name.ts";
+import { endTokens, REVOKED_EVERYWHERE, type TokensEnded } from "./grants.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
 export { WORKSPACE_REFUSALS } from "./vocabulary.ts";
+export { actorOf, namesOfActors } from "./actors.ts";
+export { recordGrantsEndedHere } from "./grants.ts";
+export { detailsNamed } from "./grant-names.ts";
+export type { AuditEventActor } from "./actors.ts";
 export {
   applyDisplayNameRule,
   correctDisplayName,
@@ -347,10 +352,6 @@ export const addMember = async (
   });
 };
 
-const CREDENTIAL_ACTS = declareIdentitySetActs("people", {
-  revoked: act("people.person.credentials_revoked", {}),
-});
-
 export const revokeCredentialsInput = z.object({ personId: boundarySchemas.user.select.shape.id });
 
 type RevokeCredentialsInput = z.output<typeof revokeCredentialsInput> & {
@@ -367,8 +368,14 @@ type CredentialsRevoked = {
 
 export type RevokeCredentialsRefusal = WorkspaceRefusal<"no-such-user" | "sign-in-too-old">;
 
+type CredentialsEnded = { readonly held: Date; readonly grants: readonly EndedGrant[] };
+
 /** Undefined, having changed nothing, when no person holds the id. */
-const endingCredentials = async (tx: Tx, personId: UserId, at: Date): Promise<Date | undefined> => {
+const endingCredentials = async (
+  tx: Tx,
+  personId: UserId,
+  at: Date,
+): Promise<CredentialsEnded | undefined> => {
   const person = await tx.query<{ at: Date }>(
     'UPDATE "user" SET credentials_revoked_at = GREATEST(COALESCE(credentials_revoked_at, $2), $2), updated_at = now() WHERE id = $1 RETURNING credentials_revoked_at AS at',
     [personId, at],
@@ -376,13 +383,8 @@ const endingCredentials = async (tx: Tx, personId: UserId, at: Date): Promise<Da
   const held = person.rows[0]?.at;
   if (held === undefined) return undefined;
   await tx.query("DELETE FROM session WHERE user_id = $1 AND created_at < $2", [personId, held]);
-  // Deleted, as in `endWorkspaceTokens`: a marked refresh token presented later makes the provider
-  // delete the grant the person takes after this instant.
-  const end = (table: "oauth_refresh_token" | "oauth_access_token") =>
-    tx.query(`DELETE FROM ${table} WHERE user_id = $1 AND created_at < $2`, [personId, held]);
-  await end("oauth_access_token");
-  await end("oauth_refresh_token");
-  return held;
+  const { grants } = await endTokens(tx, { personId, before: held, workspaceId: null });
+  return { held, grants };
 };
 
 /**
@@ -405,11 +407,11 @@ export const revokeCredentials = async (
 
   await record(fresh.value, tx, {
     id: ulid(),
-    act: CREDENTIAL_ACTS.revoked,
+    act: REVOKED_EVERYWHERE,
     subjectId: personId,
-    detail: {},
+    detail: { grants: ended.value.grants },
   });
-  return ok({ personId, revokedAt: ended.value.toISOString() });
+  return ok({ personId, revokedAt: ended.value.held.toISOString() });
 };
 
 export type RevokeWorkspaceTokensInput = {
@@ -421,28 +423,14 @@ export type RevokeWorkspaceTokensInput = {
 
 /**
  * The step inside an act's own transaction: the tokens whose consented workspace is this one. It
- * takes the principal its act admitted, and judges none. It deletes rather than marks them: the
- * provider meets a revoked refresh token by deleting the person's tokens for that client in every
- * workspace.
+ * takes the principal its act admitted, and judges none.
  */
-export const endWorkspaceTokens = async (
+export const endWorkspaceTokens = (
   _admitted: PlatformPrincipal | UserPrincipal,
   tx: Tx,
   input: { readonly workspaceId: WorkspaceId; readonly personId: UserId; readonly at: Date },
-): Promise<{ readonly refreshTokensEnded: number; readonly accessTokensEnded: number }> => {
-  const end = async (table: "oauth_refresh_token" | "oauth_access_token"): Promise<number> => {
-    const deleted = await tx.query(
-      `DELETE FROM ${table} WHERE user_id = $1 AND reference_id = $2 AND created_at < $3`,
-      [input.personId, input.workspaceId, input.at],
-    );
-    return deleted.rowCount ?? 0;
-  };
-
-  // Access tokens first: deleting a refresh token cascades to its own, which would go uncounted.
-  const accessTokensEnded = await end("oauth_access_token");
-  const refreshTokensEnded = await end("oauth_refresh_token");
-  return { refreshTokensEnded, accessTokensEnded };
-};
+): Promise<TokensEnded> =>
+  endTokens(tx, { personId: input.personId, before: input.at, workspaceId: input.workspaceId });
 
 /**
  * Ends the person's OAuth tokens for this workspace issued before `at`. Sessions are deliberately
@@ -484,7 +472,8 @@ export const revokeWorkspaceTokens = async (
     workspaceId: workspaceId.data,
     userId: userId.data,
     actorId: platform.actorId,
-    ...ended.value,
+    refreshTokensEnded: ended.value.refreshTokensEnded,
+    accessTokensEnded: ended.value.accessTokensEnded,
   });
 };
 

@@ -289,8 +289,11 @@ export const sweepPassUpdate = createUpdateSchema(sweepPass, sweepPassRefinement
 
 export { ACTOR_ID } from "./actor-id.ts";
 
+/** A list's entries are flat: text, or null where the entry has none. */
+const detailEntry = z.record(z.string(), z.union([z.string(), z.null()]));
+
 const detail = z.union([
-  z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])),
+  z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.array(detailEntry)])),
   z.null(),
 ]);
 

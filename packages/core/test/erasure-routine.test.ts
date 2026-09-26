@@ -33,6 +33,7 @@ import {
   type RunErasureRefusal,
 } from "../src/erasure/index.ts";
 import { actorIdOfPerson, type Result, type UserPrincipal } from "../src/kernel/index.ts";
+import { revokeCredentialsHere } from "../src/members/index.ts";
 import { setDisplayName, setOperatorMark } from "../src/workspaces/index.ts";
 import { authorLinesOf, bundleHistory, everyObjectOf, objectPresent } from "./bundle.ts";
 import { erasureDoorsFor } from "./erasure-doors.ts";
@@ -455,6 +456,15 @@ const rowTextIn = async (table: string, workspaceId: string) => {
   return read.rows;
 };
 
+const grantsEndedRowsAbout = async (personId: string) => {
+  const read = await db().pool.query<{ row: string }>(
+    `SELECT row_to_json(e)::text AS row FROM identity_audit_event e
+      WHERE e.subject_id = $1 AND e.act = 'people.person.grants_ended'`,
+    [personId],
+  );
+  return read.rows.map((each) => each.row);
+};
+
 const verificationsFor = async (identifier: string): Promise<number> => {
   const read = await db().pool.query<{ count: string }>(
     "SELECT count(*) AS count FROM verification WHERE lower(identifier) = $1",
@@ -782,6 +792,45 @@ describe("the audit log an erasure never rewrites", () => {
       "personId",
       "subjectRequestId",
     ]);
+  });
+
+  it("keeps a revocation's ended grants as recorded, naming no one", async () => {
+    const { scenario, email, person, subjectRequestId } = await workspaceWithAnErasureRequest();
+    const issuedAt = new Date("2026-05-01T09:00:00.000Z");
+    const clientId = await seedingWith(db().pool, async (seed) => {
+      const client = await seed.oauthClient({ name: "Claude" });
+      await seed.oauthRefreshToken({
+        clientId: client.clientId,
+        userId: person.id,
+        referenceId: scenario.workspaceId,
+        createdAt: issuedAt,
+      });
+      return client.clientId;
+    });
+    const revoked = await withScope(bootstrap, scenario.postgres, scenario.workspaceId, (tx) =>
+      revokeCredentialsHere(scenario.admin, tx, { personId: person.id, at: new Date() }),
+    );
+    expect(revoked.ok).toBe(true);
+    const before = await rowTextIn("audit_event", scenario.workspaceId);
+    const endedBefore = await grantsEndedRowsAbout(person.id);
+
+    await completing(scenario, subjectRequestId);
+
+    const [revocation] = await auditEventRowsOf(
+      db().pool,
+      scenario.workspaceId,
+      "people.member.credentials_revoked",
+    );
+    expect(revocation?.detail).toEqual({
+      grants: [{ clientId, workspaceId: scenario.workspaceId, issuedAt: issuedAt.toISOString() }],
+    });
+    const after = await rowTextIn("audit_event", scenario.workspaceId);
+    const revocationRow = after.find((row) => row.id === revocation?.id);
+    expect(before).toContainEqual(revocationRow);
+    expect(revocationRow?.row).not.toContain(email);
+    expect(revocationRow?.row).not.toContain("Priya");
+    expect(endedBefore).toHaveLength(1);
+    expect(await grantsEndedRowsAbout(person.id)).toEqual(endedBefore);
   });
 
   it("leaves the identity-set audit events as they were", async () => {

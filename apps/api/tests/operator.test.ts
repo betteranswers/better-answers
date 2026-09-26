@@ -442,7 +442,13 @@ describe("revoking a person's credentials everywhere, from the console", () => {
         act: "people.person.credentials_revoked",
         actor: `human:${operators.admin.id}`,
         subject_id: person.id,
-        detail: {},
+        detail: {
+          grants: [acme, beta].map(({ workspaceId }) => ({
+            clientId: CLAUDE_CLIENT_ID,
+            workspaceId,
+            issuedAt: expect.stringMatching(ISO_INSTANT),
+          })),
+        },
       },
     ]);
 
@@ -824,21 +830,56 @@ describe("the console's list and inspection of people", () => {
           issuedAt: instant,
           lastUsedAt: instant,
           expiresAt: instant,
-          revokedAt: null,
         },
       ],
+      ended: [],
     });
   });
 
-  it("shows no grant once the person's credentials are revoked", async () => {
-    const { api } = await theOperatorOnTheWeb();
-    const workspace = await app().provision();
-    await connectAsHost(app(), app().client(), workspace.admin);
-    await app().revokeCredentials(workspace.admin.id, new Date(Date.now() + 1));
+  it("shows ended grants in both scopes, newest first", async () => {
+    const { workspace: operators, api } = await theOperatorOnTheWeb();
+    const acme = await app().provision({ name: "Acme" });
+    const zenith = await app().provision({ name: "Zenith" });
+    const person = await app().person(undefined, "Priya Shah");
+    await app().addMember(acme.workspaceId, person.id, "Editor");
+    await app().addMember(zenith.workspaceId, person.id, "Editor");
+    for (const { workspaceId } of [acme, zenith]) {
+      await connectAsHost(app(), app().client(), person, { pick: workspaceId });
+    }
+    const acmeAdmin = await webSignedIn(app(), acme.admin.email);
+    await acmeAdmin.api.members.revokeCredentials.mutate({ personId: person.id });
+    await api.console.people.revokeCredentials.mutate({ personId: person.id });
 
-    const inspected = await api.console.people.inspect.query({ personId: workspace.admin.id });
+    const inspected = await api.console.people.inspect.query({ personId: person.id });
 
-    expect(inspected).toEqual({ sessions: [], grants: [] });
+    const instant = expect.stringMatching(ISO_INSTANT);
+    const claude = { id: CLAUDE_CLIENT_ID, name: "Claude" };
+    expect(inspected).toEqual({
+      sessions: [],
+      grants: [],
+      ended: [
+        {
+          client: claude,
+          workspace: { id: zenith.workspaceId, name: "Zenith" },
+          issuedAt: instant,
+          endedAt: instant,
+          scope: "everywhere",
+          endedBy: { kind: "person", displayName: operators.admin.name },
+        },
+        {
+          client: claude,
+          workspace: { id: acme.workspaceId, name: "Acme" },
+          issuedAt: instant,
+          endedAt: instant,
+          scope: "workspace",
+          endedBy: { kind: "person", displayName: acme.admin.name },
+        },
+      ],
+    });
+    const [everywhere, here] = inspected.ended;
+    expect(Date.parse(everywhere?.endedAt ?? "")).toBeGreaterThanOrEqual(
+      Date.parse(here?.endedAt ?? ""),
+    );
   });
 
   it("refuses a malformed ask, naming the field", async () => {

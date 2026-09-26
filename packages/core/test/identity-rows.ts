@@ -67,7 +67,7 @@ type CredentialPair = {
   readonly later: string;
 };
 
-const OAUTH_CLIENT_ID = "https://c.example/x";
+export const OAUTH_CLIENT_ID = "https://c.example/x";
 
 export const issuedCredentialsFor = async (
   pool: pg.Pool,

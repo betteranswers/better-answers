@@ -27,15 +27,9 @@ import {
   TableRow,
 } from "@/shared/ui/table.tsx";
 import type { ViewToolbar } from "@/shared/view-toolbar.tsx";
-import { counted, instantWords, timeWords, weekdayWords } from "@/shared/words.ts";
+import { byWords, counted, instantWords, timeWords, weekdayWords } from "@/shared/words.ts";
 
-import {
-  useAuditLog,
-  type AuditEventActor,
-  type AuditLog,
-  type Family,
-  type ReadAuditEvent,
-} from "./audit-log-api.ts";
+import { useAuditLog, type AuditLog, type Family, type ReadAuditEvent } from "./audit-log-api.ts";
 import { AUDIT_LOG_KEYSTROKES } from "./audit-log-state.ts";
 import { SAID_OF_THE_AUDIT_LOG } from "./refusal-words.ts";
 
@@ -64,15 +58,6 @@ type Picked = Family | typeof EVERY_FAMILY;
 
 const isFamily = (value: string): value is Family => Object.hasOwn(FAMILY_WORDS, value);
 
-/** The glossary's words for an actor the audit log cannot name by the name they gave. */
-const BY_WORDS = {
-  "former-member": "a former member",
-  platform: "the platform",
-} as const satisfies Readonly<Record<Exclude<AuditEventActor["kind"], "person">, string>>;
-
-const byWords = (by: AuditEventActor): string =>
-  by.kind === "person" ? by.displayName : BY_WORDS[by.kind];
-
 const outcomeOfFailure = (failure: Error | ApiError): Outcome =>
   failureOutcome(SAID_OF_THE_AUDIT_LOG, failure, "read");
 
@@ -97,7 +82,14 @@ const wordsOfField = (field: string): string =>
       .replaceAll("user", "person"),
   );
 
-const wordsOfValue = (value: string | number | boolean): string => {
+type DetailValue = ReadAuditEvent["detail"][string];
+
+/** A list is the client grants an act ended, each named by its client. */
+const wordsOfValue = (value: DetailValue): string => {
+  if (Array.isArray(value)) {
+    const clients = value.map((grant) => grant["clientName"] ?? grant["clientId"] ?? "");
+    return clients.length === 0 ? "none" : clients.join(", ");
+  }
   if (typeof value !== "boolean") return String(value);
   return value ? "yes" : "no";
 };

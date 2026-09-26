@@ -520,7 +520,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     passesTheAccessibilityGate,
   }) => {
     const tag = aTag();
-    await priyaConnected(page, request, baseURL, tag);
+    const { operators } = await priyaConnected(page, request, baseURL, tag);
     const sheet = await openPriya(page, tag);
     const revoke = sheet.getByRole("button", { name: REVOKE });
     const grant = regionOf(sheet, "Client grants").getByRole("listitem", { name: "Claude" });
@@ -551,13 +551,29 @@ test.describe("a person, opened from Everyone as a sheet", () => {
       /^Priya Shah's sessions and client grants ended at \d{2}:\d{2} · .+\. They can sign in again\.$/,
     );
     await expect(revoke).toBeFocused();
-    await expect(grant).toHaveCount(0);
+    const endedEverywhere = `
+      - listitem "Claude":
+        - heading "Claude" [level=4]
+        - text: Ended
+        - term: Workspace
+        - definition: ${operators.name}
+        - term: Issued
+        - definition: /\\d{4}/
+        - term: Ended
+        - definition: /\\d{4}/
+        - term: Ended by
+        - definition: ${operators.admin.name}
+        - term: Ended in
+        - definition: Every workspace
+        - button "More about Claude's grant"
+    `;
+    await expect(grant).toMatchAriaSnapshot(endedEverywhere);
     await expect(regionOf(sheet, "Sign-in").getByRole("definition").nth(1)).toHaveText(INSTANT);
 
     await page.reload();
     await personButton(page, "Priya Shah").click();
     await expect(regionOf(sheet, "Sessions")).toContainText("No session is open.");
-    await expect(grant).toHaveCount(0);
+    await expect(grant).toMatchAriaSnapshot(endedEverywhere);
   });
 
   test("sends a stale sign-in to sign in and back", async ({ page, request, baseURL }) => {

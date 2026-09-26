@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type RefObject } from "react";
+import { useId, useRef, useState, type ReactNode, type RefObject } from "react";
 
 import { RefusalLine } from "@/shared/refusal-outcome.tsx";
 import { RowSheet } from "@/shared/row-sheet.tsx";
@@ -8,12 +8,18 @@ import { Button } from "@/shared/ui/button.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { SheetDescription, SheetHeader, SheetTitle } from "@/shared/ui/sheet.tsx";
-import { counted } from "@/shared/words.ts";
+import { byWords, counted } from "@/shared/words.ts";
 
 import { CorrectDisplayName } from "./correct-display-name.tsx";
 import { Facts } from "./facts.tsx";
 import type { FreshAct } from "./people-address.ts";
-import { useInspected, type HeldGrant, type HeldSession, type ListedPerson } from "./people-api.ts";
+import {
+  useInspected,
+  type EndedGrant,
+  type HeldGrant,
+  type HeldSession,
+  type ListedPerson,
+} from "./people-api.ts";
 import { At, grantStateOf, Instant, Memberships, nameOf } from "./person-words.tsx";
 import { RevokeEverywhere } from "./revoke-everywhere.tsx";
 import { readRefused } from "./words.ts";
@@ -55,7 +61,13 @@ function Sessions(properties: { readonly sessions: readonly HeldSession[] }) {
   );
 }
 
-function Grant(properties: { readonly grant: HeldGrant; readonly nowMs: number }) {
+/** An open grant and an ended one share the client, the state, the facts and the client id. */
+function GrantItem(properties: {
+  readonly grant: HeldGrant | EndedGrant;
+  readonly state: string;
+  readonly facts: ReactNode;
+  readonly more?: ReactNode;
+}) {
   const { grant } = properties;
   const headingId = useId();
   const client = grant.client.name ?? grant.client.id;
@@ -66,21 +78,14 @@ function Grant(properties: { readonly grant: HeldGrant; readonly nowMs: number }
         <h4 id={headingId} className="font-medium wrap-anywhere">
           {client}
         </h4>
-        <Pill>{grantStateOf(grant, properties.nowMs)}</Pill>
+        <Pill>{properties.state}</Pill>
       </div>
       <Facts>
         <SummaryRow term="Workspace">{grant.workspace?.name ?? "None"}</SummaryRow>
         <SummaryRow term="Issued">
           <At iso={grant.issuedAt} />
         </SummaryRow>
-        <SummaryRow term="Last used">
-          <At iso={grant.lastUsedAt} />
-        </SummaryRow>
-        {grant.revokedAt === null ? null : (
-          <SummaryRow term="Revoked">
-            <At iso={grant.revokedAt} />
-          </SummaryRow>
-        )}
+        {properties.facts}
       </Facts>
       <Collapsible className="mt-1">
         <CollapsibleTrigger asChild>
@@ -93,9 +98,7 @@ function Grant(properties: { readonly grant: HeldGrant; readonly nowMs: number }
             <SummaryRow term="Client id">
               <code className="font-mono break-all">{grant.client.id}</code>
             </SummaryRow>
-            <SummaryRow term="Expires">
-              <At iso={grant.expiresAt} />
-            </SummaryRow>
+            {properties.more}
           </Facts>
         </CollapsibleContent>
       </Collapsible>
@@ -103,17 +106,69 @@ function Grant(properties: { readonly grant: HeldGrant; readonly nowMs: number }
   );
 }
 
-function Grants(properties: { readonly grants: readonly HeldGrant[]; readonly name: string }) {
-  const { grants } = properties;
+function OpenGrant(properties: { readonly grant: HeldGrant; readonly nowMs: number }) {
+  const { grant } = properties;
+  return (
+    <GrantItem
+      grant={grant}
+      state={grantStateOf(grant, properties.nowMs)}
+      facts={
+        <SummaryRow term="Last used">
+          <At iso={grant.lastUsedAt} />
+        </SummaryRow>
+      }
+      more={
+        <SummaryRow term="Expires">
+          <At iso={grant.expiresAt} />
+        </SummaryRow>
+      }
+    />
+  );
+}
+
+function Ended(properties: { readonly grant: EndedGrant }) {
+  const { grant } = properties;
+  return (
+    <GrantItem
+      grant={grant}
+      state="Ended"
+      facts={
+        <>
+          <SummaryRow term="Ended">
+            <At iso={grant.endedAt} />
+          </SummaryRow>
+          <SummaryRow term="Ended by">{byWords(grant.endedBy)}</SummaryRow>
+          <SummaryRow term="Ended in">
+            {grant.scope === "everywhere" ? "Every workspace" : (grant.workspace?.name ?? "None")}
+          </SummaryRow>
+        </>
+      }
+    />
+  );
+}
+
+function Grants(properties: {
+  readonly grants: readonly HeldGrant[];
+  readonly ended: readonly EndedGrant[];
+  readonly name: string;
+}) {
+  const { grants, ended } = properties;
   const [openedAtMs] = useState(Date.now);
   return (
     <SheetPart title="Client grants">
-      {grants.length === 0 ? (
+      {grants.length === 0 && ended.length === 0 ? (
         <p>No client has been connected as {properties.name}.</p>
       ) : (
         <ul className="grid gap-4">
           {grants.map((grant) => (
-            <Grant key={`${grant.client.id} ${grant.issuedAt}`} grant={grant} nowMs={openedAtMs} />
+            <OpenGrant
+              key={`${grant.client.id} ${grant.issuedAt}`}
+              grant={grant}
+              nowMs={openedAtMs}
+            />
+          ))}
+          {ended.map((grant) => (
+            <Ended key={`${grant.client.id} ${grant.issuedAt} ${grant.endedAt}`} grant={grant} />
           ))}
         </ul>
       )}
@@ -127,7 +182,11 @@ function HeldCredentials(properties: { readonly person: ListedPerson }) {
     return (
       <>
         <Sessions sessions={inspected.data.sessions} />
-        <Grants grants={inspected.data.grants} name={nameOf(properties.person)} />
+        <Grants
+          grants={inspected.data.grants}
+          ended={inspected.data.ended}
+          name={nameOf(properties.person)}
+        />
       </>
     );
   }

@@ -3,6 +3,9 @@ import type { inferOutput } from "@trpc/tanstack-react-query";
 
 import { useOptimistic, type Undo } from "@/shared/api/optimistic.ts";
 import { useTRPC } from "@/shared/api/trpc.ts";
+import type { DoneBy } from "@/shared/words.ts";
+
+import { useOperatorStanding } from "./operator.ts";
 
 type Api = ReturnType<typeof useTRPC>;
 
@@ -15,6 +18,8 @@ export type PersonInspected = inferOutput<Api["console"]["people"]["inspect"]>;
 export type HeldSession = PersonInspected["sessions"][number];
 
 export type HeldGrant = PersonInspected["grants"][number];
+
+export type EndedGrant = PersonInspected["ended"][number];
 
 /** The api answers a hundred at most; fifty keeps a page inside the list's second. */
 export const PAGE_SIZE = 50;
@@ -37,10 +42,32 @@ export const useInspected = (personId: string) => {
   return useQuery(api.console.people.inspect.queryOptions({ personId }));
 };
 
-const ended = (held: PersonInspected, at: string): PersonInspected => ({
+/** In the api's order: one act's grants newest issued first, above every earlier act's. */
+const endedEverywhere = (held: PersonInspected, at: string, by: DoneBy): PersonInspected => ({
   sessions: [],
-  grants: held.grants.map((grant) => ({ ...grant, revokedAt: grant.revokedAt ?? at })),
+  grants: [],
+  ended: [
+    ...held.grants
+      .map(({ client, workspace, issuedAt }) => ({
+        client: { id: client.id, name: client.name ?? client.id },
+        workspace,
+        issuedAt,
+        endedAt: at,
+        scope: "everywhere" as const,
+        endedBy: by,
+      }))
+      .toSorted((a, b) => b.issuedAt.localeCompare(a.issuedAt)),
+    ...held.ended,
+  ],
 });
+
+/** The operator, named as the api will name them once it answers. */
+const useTheOperator = (): DoneBy => {
+  const standing = useOperatorStanding().data;
+  return standing?.operator === true && standing.name.trim() !== ""
+    ? { kind: "person", displayName: standing.name }
+    : { kind: "former-member" };
+};
 
 const revokedIn = (page: PeoplePage, personId: string, at: string): PeoplePage => ({
   ...page,
@@ -72,19 +99,20 @@ const undoEach = (undos: readonly Undo[] | undefined) => {
   for (const each of undos ?? []) each.undo();
 };
 
-/** Everything reads revoked before the api answers, so the act lands within 100 ms. */
+/** Everything reads ended before the api answers, so the act lands within 100 ms. */
 export const useRevokeEverywhere = (personId: string) => {
   const api = useTRPC();
   const queryClient = useQueryClient();
   const optimistic = useOptimistic();
   const onEveryPage = useOnEveryPage();
+  const operator = useTheOperator();
   const inspectedKey = api.console.people.inspect.queryKey({ personId });
   return useMutation(
     api.console.people.revokeCredentials.mutationOptions({
       onMutate: () => {
         const at = new Date().toISOString();
         return Promise.all([
-          optimistic(inspectedKey, (held) => ended(held, at)),
+          optimistic(inspectedKey, (held) => endedEverywhere(held, at, operator)),
           onEveryPage((page) => revokedIn(page, personId, at)),
         ]);
       },

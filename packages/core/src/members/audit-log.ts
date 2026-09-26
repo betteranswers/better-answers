@@ -8,16 +8,13 @@ import {
   attempt,
   declareAct,
   err,
-  isActorId,
   ok,
-  personOfActor,
   type RefusalOf,
   type Result,
-  type UserId,
   type UserPrincipal,
 } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
-import { hasNoDisplayName } from "../workspaces/index.ts";
+import { actorOf, type AuditEventActor, detailsNamed, namesOfActors } from "../workspaces/index.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
 const AUDIT_LOG_PAGE = 50;
@@ -40,12 +37,6 @@ const readAuditLogAct = declareAct({
 
 export type ReadAuditLogRefusal = MemberRefusal<RefusalOf<typeof readAuditLogAct>> | Error;
 
-/** The kind, not the words: a person may give any display name, "the platform" among them. */
-type AuditEventActor =
-  | { readonly kind: "person"; readonly displayName: string }
-  | { readonly kind: "former-member" }
-  | { readonly kind: "platform" };
-
 type ReadAuditEvent = Pick<
   AuditEventRow,
   "id" | "act" | "family" | "subjectKind" | "subjectId" | "actor"
@@ -60,33 +51,11 @@ export type AuditLogPage = Omit<AuditEventPage, "rows"> & {
   readonly events: readonly ReadAuditEvent[];
 };
 
-const personIn = (actor: string): UserId | undefined =>
-  isActorId(actor) ? personOfActor(actor) : undefined;
-
-/** By person id, never through the membership, so a name stands after its member leaves. */
-const namesOf = async (
-  tx: Tx,
-  rows: readonly AuditEventRow[],
-): Promise<ReadonlyMap<string, string>> => {
-  const people = new Set(rows.map((row) => personIn(row.actor)));
-  people.delete(undefined);
-  const found = await tx.query<{ id: string; name: string }>(
-    'SELECT id, name FROM "user" WHERE id = ANY($1::text[])',
-    [[...people]],
-  );
-  return new Map(found.rows.map((row) => [row.id, row.name]));
-};
-
-const actorOf = (actor: string, names: ReadonlyMap<string, string>): AuditEventActor => {
-  const person = personIn(actor);
-  if (person === undefined) return { kind: "platform" };
-  const displayName = names.get(person) ?? "";
-  return hasNoDisplayName(displayName)
-    ? { kind: "former-member" }
-    : { kind: "person", displayName };
-};
-
-const eventOf = (row: AuditEventRow, names: ReadonlyMap<string, string>): ReadAuditEvent => ({
+const eventOf = (
+  row: AuditEventRow,
+  names: ReadonlyMap<string, string>,
+  detail: ReadAuditEvent["detail"] | undefined,
+): ReadAuditEvent => ({
   id: row.id,
   act: row.act,
   family: row.family,
@@ -95,10 +64,13 @@ const eventOf = (row: AuditEventRow, names: ReadonlyMap<string, string>): ReadAu
   actor: row.actor,
   at: row.at.toISOString(),
   by: actorOf(row.actor, names),
-  detail: row.detail ?? {},
+  detail: detail ?? {},
 });
 
-/** The workspace's own audit log, newest first; the identity-set audit log is never read. */
+/**
+ * The workspace's own audit log, newest first; the identity-set audit log is never read. A grant
+ * an act ended is named from its client and workspace as they stand now.
+ */
 export const readAuditLog = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -109,8 +81,18 @@ export const readAuditLog = async (
 
   const read = await attempt(async () => {
     const page = await eventsNewestFirst(admitted.value, tx, input);
-    const names = await namesOf(tx, page.rows);
-    return { events: page.rows.map((row) => eventOf(row, names)), nextCursor: page.nextCursor };
+    const names = await namesOfActors(
+      tx,
+      page.rows.map((row) => row.actor),
+    );
+    const details = await detailsNamed(
+      tx,
+      page.rows.map((row) => row.detail ?? {}),
+    );
+    return {
+      events: page.rows.map((row, index) => eventOf(row, names, details[index])),
+      nextCursor: page.nextCursor,
+    };
   });
   return read.ok ? ok(read.value) : err(read.error);
 };

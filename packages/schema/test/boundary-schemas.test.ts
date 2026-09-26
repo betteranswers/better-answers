@@ -217,6 +217,27 @@ const acceptedRows = {
       detail: { confirmed: true, count: 3 },
       batchId: BATCH_ID,
     },
+    {
+      id: "01J6GGGGGGGGGGGGGGGGGGGGG6",
+      workspaceId: WS_ID,
+      act: "people.member.credentials_revoked",
+      actor: `human:${USER_ID}`,
+      subjectId: USER_ID,
+      detail: {
+        grants: [
+          {
+            clientId: "https://claude.ai/oauth/mcp-oauth-client-metadata",
+            workspaceId: WS_ID,
+            issuedAt: "2026-09-26T09:00:00.000Z",
+          },
+          {
+            clientId: "https://claude.ai/oauth/mcp-oauth-client-metadata",
+            workspaceId: null,
+            issuedAt: "2026-09-26T09:00:00.000Z",
+          },
+        ],
+      },
+    },
   ],
 
   accessRequest: [
@@ -876,6 +897,8 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { ...acceptedRows.auditEvent[0], actor: USER_ID },
       { ...acceptedRows.auditEvent[0], actor: "Priya Patel" },
       { ...acceptedRows.auditEvent[0], detail: { person: { name: "Priya" } } },
+      { ...acceptedRows.auditEvent[0], detail: { grants: [{ client: { name: "Claude" } }] } },
+      { ...acceptedRows.auditEvent[0], detail: { grants: [{ count: 3 }] } },
       { ...acceptedRows.auditEvent[2], batchId: "batch-1" },
     ],
     identityAuditEvent: [
@@ -1325,7 +1348,7 @@ describe("5 — the inferred type is pinned", () => {
         subjectKind: string;
         subjectId: string;
         at: Date;
-        detail: Record<string, string | number | boolean> | null;
+        detail: Record<string, string | number | boolean | Record<string, string | null>[]> | null;
         batchId: string | null;
       }
     >

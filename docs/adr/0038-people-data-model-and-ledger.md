@@ -51,3 +51,7 @@ The word *ledger* is retired for *audit log*, *ledger act* for *audit act*, and 
 ## Amendment — 2026-09-25 (T-411), a sign-in and a consent are `recordFor`'s next callers
 
 A sign-in and a consent are recorded from Better Auth's after-hook, where no user principal exists: a person signing in may hold no membership, and a consent comes before its token. Both run under the platform principal and name the person as actor through `recordFor`, the same shape as the access request and a person's own display name. `people.person.signed_in` lands in the identity-set audit log with the person as actor and subject and an empty detail. That is how ADR 0009's "detail carrying the person id" is met: the id is on the row, and the detail holds nothing. `people.client.consented` lands in the consented workspace's audit log, with the client as its subject. Everything else stands.
+
+## Amendment — 2026-09-27 (T-460), what joins the identity-set audit log grows by one act
+
+An Admin's act that ends a person's grants joins the identity-set audit log, as `people.person.grants_ended`: ADR 0009's amendment of 2026-09-27 decides it. Everything else stands.

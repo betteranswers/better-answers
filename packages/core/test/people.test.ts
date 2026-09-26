@@ -1,8 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ulid } from "@better-answers/schema";
 
 import type { OperatorPrincipal } from "../src/kernel/index.ts";
+import {
+  removeMember,
+  removeMemberInput,
+  revokeCredentialsHere,
+  revokeCredentialsHereInput,
+} from "../src/members/index.ts";
 import { openPostgres } from "../src/store/postgres/index.ts";
 import {
   addMember,
@@ -13,13 +19,17 @@ import {
   setDisplayName,
 } from "../src/workspaces/index.ts";
 import { sessionFor } from "./identity-rows.ts";
+import { heldAs } from "./members-suite.ts";
 import {
+  asANewOperator,
   asTheOperator,
   bootstrap,
+  erasedFromTheSet,
   personIdOf,
   provisionedWorkspace,
   seedPerson,
 } from "./platform.ts";
+import { inputOf } from "./suite-input.ts";
 import { addressOf, postgresForSuite, seedingWith } from "./suite-postgres.ts";
 
 const db = postgresForSuite();
@@ -143,7 +153,10 @@ describe("the operator's list of people", () => {
         ],
       },
     });
-    expect(await inspected(personId)).toEqual({ ok: true, value: { sessions: [], grants: [] } });
+    expect(await inspected(personId)).toEqual({
+      ok: true,
+      value: { sessions: [], grants: [], ended: [] },
+    });
   });
 
   it("matches a name or address as literal text, ignoring case", async () => {
@@ -239,11 +252,12 @@ describe("inspecting a person", () => {
           },
         ],
         grants: [],
+        ended: [],
       },
     });
   });
 
-  it("folds a grant's rotated refresh tokens into one standing grant", async () => {
+  it("folds rotated tokens into one grant, leaving out revoked ones", async () => {
     const acme = await provisionedWorkspace(db(), "Acme");
     const zenith = await provisionedWorkspace(db(), "Zenith");
     const personId = await seedPerson(db().pool);
@@ -283,21 +297,13 @@ describe("inspecting a person", () => {
         grants: [
           {
             client: { id: clientId, name: "Claude" },
-            workspace: { id: zenith.workspaceId, name: "Zenith" },
-            issuedAt: "2026-09-22T09:00:00.000Z",
-            lastUsedAt: "2026-09-22T09:00:00.000Z",
-            expiresAt: "2026-10-22T09:00:00.000Z",
-            revokedAt: "2026-09-23T09:00:00.000Z",
-          },
-          {
-            client: { id: clientId, name: "Claude" },
             workspace: { id: acme.workspaceId, name: "Acme" },
             issuedAt: "2026-09-20T09:00:00.000Z",
             lastUsedAt: "2026-09-21T09:00:00.000Z",
             expiresAt: "2026-10-21T09:00:00.000Z",
-            revokedAt: null,
           },
         ],
+        ended: [],
       },
     });
   });
@@ -325,7 +331,7 @@ describe("inspecting a person", () => {
 
     expect(await inspected(personId)).toMatchObject({
       ok: true,
-      value: { grants: [{ issuedAt: "2026-09-20T09:00:00.000Z", revokedAt: null }] },
+      value: { grants: [{ issuedAt: "2026-09-20T09:00:00.000Z" }] },
     });
   });
 
@@ -347,5 +353,227 @@ describe("inspecting a person", () => {
 
   it("refuses an id no person holds", async () => {
     expect(await inspected(ulid())).toEqual({ ok: false, error: "no-such-user" });
+  });
+});
+
+describe("inspecting a person's ended grants", () => {
+  const ISSUED = new Date("2026-09-20T09:00:00.000Z");
+
+  /** Newest first, as the inspection lists them. */
+  const endedAtOf = async (act: string, personId: string) => {
+    const found = await db().pool.query<{ at: Date }>(
+      "SELECT at FROM identity_audit_event WHERE subject_id = $1 AND act = $2 ORDER BY at DESC",
+      [personId, act],
+    );
+    return found.rows.map((row) => row.at.toISOString());
+  };
+
+  /** A member of both workspaces, with a Claude grant in each and one naming none. */
+  const connectedIn = async (...workspaces: readonly { readonly workspaceId: string }[]) => {
+    const personId = await seedPerson(db().pool);
+    const clientId = await seedingWith(db().pool, async (seed) => {
+      const client = await seed.oauthClient({ name: "Claude" });
+      for (const { workspaceId } of workspaces) {
+        await seed.member({ workspaceId, userId: personId, role: "Editor" });
+      }
+      for (const referenceId of [...workspaces.map((each) => each.workspaceId), null]) {
+        await seed.oauthRefreshToken({
+          clientId: client.clientId,
+          userId: personId,
+          referenceId,
+          createdAt: ISSUED,
+        });
+      }
+      return client.clientId;
+    });
+    return { personId, clientId };
+  };
+
+  /** Ada, Acme's Admin, revokes a connected member's credentials there. */
+  const revokedHereByAda = async () => {
+    const acme = await provisionedWorkspace(db(), "Acme", { name: "Ada Okafor" });
+    const { personId } = await connectedIn(acme);
+    const revoked = await heldAs(acme, acme.adminUserId, (principal, tx) =>
+      revokeCredentialsHere(principal, tx, {
+        ...inputOf(revokeCredentialsHereInput, { personId }),
+        at: new Date(),
+      }),
+    );
+    expect(revoked.ok).toBe(true);
+    return { acme, personId };
+  };
+
+  it("lists each, newest first, with its scope and actor", async () => {
+    const acme = await provisionedWorkspace(db(), "Acme", { name: "Ada Okafor" });
+    const zenith = await provisionedWorkspace(db(), "Zenith", { name: "Zoe Lin" });
+    const { personId, clientId } = await connectedIn(acme, zenith);
+    const bystander = await connectedIn(acme);
+
+    for (const each of [personId, bystander.personId]) {
+      const revoked = await heldAs(acme, acme.adminUserId, (principal, tx) =>
+        revokeCredentialsHere(principal, tx, {
+          ...inputOf(revokeCredentialsHereInput, { personId: each }),
+          at: new Date(),
+        }),
+      );
+      expect(revoked.ok).toBe(true);
+    }
+    const removed = await heldAs(zenith, zenith.adminUserId, (principal, tx) =>
+      removeMember(principal, tx, { ...inputOf(removeMemberInput, { personId }), at: new Date() }),
+    );
+    expect(removed.ok).toBe(true);
+    const everywhere = await asANewOperator(db(), new Date(), (operator, tx) =>
+      revokeCredentials(operator, tx, { personId: personIdOf(personId), at: new Date() }),
+    );
+    expect(everywhere.answered).toMatchObject({ ok: true, value: { ok: true } });
+
+    const claude = { id: clientId, name: "Claude" };
+    const issuedAt = ISSUED.toISOString();
+    const [removedAt, revokedHereAt] = await endedAtOf("people.person.grants_ended", personId);
+    expect(await inspected(personId)).toEqual({
+      ok: true,
+      value: {
+        sessions: [],
+        grants: [],
+        ended: [
+          {
+            client: claude,
+            workspace: null,
+            issuedAt,
+            endedAt: (await endedAtOf("people.person.credentials_revoked", personId))[0],
+            scope: "everywhere",
+            endedBy: { kind: "person", displayName: "Test person" },
+          },
+          {
+            client: claude,
+            workspace: { id: zenith.workspaceId, name: "Zenith" },
+            issuedAt,
+            endedAt: removedAt,
+            scope: "workspace",
+            endedBy: { kind: "person", displayName: "Zoe Lin" },
+          },
+          {
+            client: claude,
+            workspace: { id: acme.workspaceId, name: "Acme" },
+            issuedAt,
+            endedAt: revokedHereAt,
+            scope: "workspace",
+            endedBy: { kind: "person", displayName: "Ada Okafor" },
+          },
+        ],
+      },
+    });
+  });
+
+  it("orders by each act's instant, then newest issued first", async () => {
+    const acme = await provisionedWorkspace(db(), "Acme");
+    const personId = await seedPerson(db().pool);
+    const grant = (issuedAt: string) => ({
+      clientId: "https://gone.example.invalid/metadata",
+      workspaceId: acme.workspaceId,
+      issuedAt,
+    });
+    await seedingWith(db().pool, async (seed) => {
+      const about = { actor: `human:${acme.adminUserId}`, subjectId: personId };
+      const endedHere = (at: string, id: string, issued: readonly string[]) =>
+        seed.identityAuditEvent({
+          ...about,
+          id,
+          act: "people.person.grants_ended",
+          at: new Date(at),
+          detail: { workspaceId: acme.workspaceId, grants: issued.map(grant) },
+        });
+      await endedHere("2026-09-25T10:00:00.000Z", "01A00000000000000000000000", [
+        "2026-09-01T09:00:00.000Z",
+        "2026-09-02T09:00:00.000Z",
+      ]);
+      await endedHere("2026-09-24T10:00:00.000Z", "01ZZZZZZZZZZZZZZZZZZZZZZZZ", [
+        "2026-08-01T09:00:00.000Z",
+      ]);
+      await seed.identityAuditEvent({
+        ...about,
+        act: "people.person.credentials_revoked",
+        at: new Date("2026-09-26T10:00:00.000Z"),
+        detail: {},
+      });
+    });
+
+    const read = await inspected(personId);
+
+    expect(read.ok ? read.value.ended.map((each) => [each.endedAt, each.issuedAt]) : []).toEqual([
+      ["2026-09-25T10:00:00.000Z", "2026-09-02T09:00:00.000Z"],
+      ["2026-09-25T10:00:00.000Z", "2026-09-01T09:00:00.000Z"],
+      ["2026-09-24T10:00:00.000Z", "2026-08-01T09:00:00.000Z"],
+    ]);
+    expect(read.ok ? read.value.ended[0] : undefined).toMatchObject({
+      client: {
+        id: "https://gone.example.invalid/metadata",
+        name: "https://gone.example.invalid/metadata",
+      },
+      workspace: { id: acme.workspaceId, name: "Acme" },
+      scope: "workspace",
+    });
+  });
+
+  it("names a workspace gone since by its id", async () => {
+    const personId = await seedPerson(db().pool);
+    const gone = ulid();
+    const clientId = await seedingWith(db().pool, async (seed) => {
+      const client = await seed.oauthClient({ name: "Claude" });
+      await seed.identityAuditEvent({
+        actor: "process:better-answers-test",
+        subjectId: personId,
+        act: "people.person.credentials_revoked",
+        detail: {
+          grants: [
+            { clientId: client.clientId, workspaceId: gone, issuedAt: ISSUED.toISOString() },
+          ],
+        },
+      });
+      return client.clientId;
+    });
+
+    expect(await inspected(personId)).toMatchObject({
+      ok: true,
+      value: {
+        ended: [
+          {
+            client: { id: clientId, name: "Claude" },
+            workspace: { id: gone, name: gone },
+            scope: "everywhere",
+            endedBy: { kind: "platform" },
+          },
+        ],
+      },
+    });
+  });
+
+  it("never scopes the operator's transaction to a workspace", async () => {
+    const { personId } = await revokedHereByAda();
+
+    const read = await asTheOperator(db(), async (operator, tx) => {
+      const queries = vi.spyOn(tx, "query");
+      const answered = await inspectPerson(operator, tx, { personId: personIdOf(personId) });
+      const statements = queries.mock.calls.map(([statement]) => String(statement));
+      queries.mockRestore();
+      const scope = await tx.query<{ scope: string | null }>(
+        "SELECT current_workspace_id() AS scope",
+      );
+      return { answered, statements, scope: scope.rows[0]?.scope };
+    });
+
+    expect(read).toMatchObject({ answered: { ok: true, value: { ended: [{}] } }, scope: null });
+    expect(read.statements.length).toBeGreaterThan(0);
+    expect(read.statements.filter((each) => /app\.workspace_id|set_config/.test(each))).toEqual([]);
+  });
+
+  it("names a former member who ended one as such", async () => {
+    const { acme, personId } = await revokedHereByAda();
+    await erasedFromTheSet(db(), acme.workspaceId, acme.adminUserId);
+
+    expect(await inspected(personId)).toMatchObject({
+      ok: true,
+      value: { ended: [{ endedBy: { kind: "former-member" } }] },
+    });
   });
 });
