@@ -65,6 +65,43 @@ export const askedTooOften = (liftsInSeconds: number): Said => ({
   next: `Ask again in ${minutesUntil(liftsInSeconds)}.`,
 });
 
+const tryAgainAfter = (waitSeconds: number | undefined): string =>
+  waitSeconds === undefined
+    ? "Wait a few minutes, then try again."
+    : `Try again in ${minutesUntil(waitSeconds)}.`;
+
+/** A ceiling's refusal names the wait whenever its answer carried one. */
+export const tooManyCodesAskedFor = (waitSeconds: number | undefined): Said => ({
+  why: "Too many codes have been asked for.",
+  next: tryAgainAfter(waitSeconds),
+});
+
+export const tooManyCodesTried = (waitSeconds: number | undefined): Said => ({
+  why: "Too many codes have been tried.",
+  next: tryAgainAfter(waitSeconds),
+});
+
+/** Said on the email step and of a new code alike, so its next step fits both. */
+export const CODE_NOT_SENT: Said = {
+  why: "No code was sent to that address.",
+  next: "Check it, or use a different email address.",
+};
+
+export const CODE_UNANSWERED: Said = {
+  why: "No response, so no code was sent.",
+  next: "Try again in a moment.",
+};
+
+export const CODE_REFUSED: Said = {
+  why: "That code is wrong or has expired.",
+  next: "Check it, or send a new code.",
+};
+
+export const SIGN_IN_UNANSWERED: Said = {
+  why: "No response, so you aren't signed in.",
+  next: "Try again in a moment.",
+};
+
 /** The list of what is left stands beside it, so the list is what to do next. */
 export const noLongerAMember = (workspace: string): string =>
   `You are no longer a member of ${workspace}.`;

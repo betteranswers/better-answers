@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import type { REDACTION_TIERS, SENSITIVITIES } from "@better-answers/schema";
 
+import { SIGN_IN_WORDS, type CarriedOn } from "@/features/auth/sign-in-words.ts";
 import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
 import type { RefusalWord } from "@/shared/api/trpc.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
@@ -337,15 +338,26 @@ export const editorPickedByKeyboard = async (page: Page, select: Locator): Promi
   await expect(select).toBeFocused();
 };
 
+/** The email step's heading, read off its word table for what the sign-in carries on to. */
+export const signInHeading = (page: Page, carriedOn: CarriedOn | "nothing" = "nothing"): Locator =>
+  page.getByRole("heading", {
+    level: 1,
+    name: SIGN_IN_WORDS.emailStep[carriedOn].title,
+    exact: true,
+  });
+
+/** Quoted as an aria snapshot's template takes a name or a line, so a table's words drop in. */
+export const quoted = (words: string): string => JSON.stringify(words);
+
 /** Starts on the sign-in screen the page already shows; it does not navigate there. */
 export const signIn = async (page: Page, api: APIRequestContext, email: string): Promise<void> => {
-  await page.getByLabel("Email address").fill(email);
-  await page.getByRole("button", { name: "Send code" }).click();
+  await page.getByLabel(SIGN_IN_WORDS.emailField).fill(email);
+  await page.getByRole("button", { name: SIGN_IN_WORDS.send }).click();
 
-  const code = page.getByLabel("Code");
+  const code = page.getByLabel(SIGN_IN_WORDS.codeField, { exact: true });
   await expect(code).toBeVisible();
   await code.fill(await codeSentTo(api, email));
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: SIGN_IN_WORDS.signIn, exact: true }).click();
 
   // Wait for the screen to be left, not just the click: navigating away cancels the request
   // in flight and no session is set.

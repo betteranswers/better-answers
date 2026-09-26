@@ -239,12 +239,12 @@ way to render one.
 not meaning (ADR 0033).
 
 **Logo: there is none yet.** The source contains no logo, wordmark file or brand mark, so
-none was drawn. Wherever a mark would go, the name is set in type — **Geist Mono 500,
-−0.02em, lower case: `better-answers`**. One word, hyphenated, always lower case: the mark,
-the handle and the domain (`better-answers.com`) are the same string. Never "Better
-Answers", never "BetterAnswers", never "BA". **Logo and icon files are being produced
-separately; when they land, drop the SVGs into `assets/` and replace the wordmark in
-`apps/web`'s frame and in `thumbnail.html`.**
+none was drawn. Wherever a mark would go on a screen, the name is set in type as a reader
+says it — **Geist 500: Better Answers**. The handle and the domain (`better-answers.com`)
+are the lower-case `better-answers`, in Geist Mono where a machine string is shown; a
+reader never meets it as the name. Never "BetterAnswers", never "BA". **Logo and icon
+files are being produced separately; when they land, drop the SVGs into `assets/` and
+replace the name in `apps/web`'s auth screens and in `thumbnail.html`.**
 
 ## 6. What is in this repository
 
@@ -303,7 +303,7 @@ GOV.UK brand), **`Icon`** (the Phosphor substitution in one file) and
 
 1. **Fonts.** No brand font binaries exist in the source. **Geist and Geist Mono** were chosen as the closest match to the stated reference styling, and the substitution stands. Since T-035 the product **self-hosts** them from this package's own `@fontsource-variable/geist` and `-geist-mono` dependencies (`tokens/fonts-hosted.css`), so no screen makes a third-party request; the specimen cards under `guidelines/`, which are opened straight from disk and cannot resolve a package name, still link Google Fonts through `tokens/fonts-remote.css`. Replace the two `tokens/fonts-*.css` files if a licensed brand font exists; `tokens/fonts.css` names the families and stays.
 2. **Icons.** No icon set exists in the source. **Phosphor** — `@phosphor-icons/react` in the app, `@phosphor-icons/web` on a page — flagged above.
-3. **Logo.** None exists yet; none was drawn. The wordmark is `better-answers` set in Geist Mono. Logo and icon files are in production separately.
+3. **Logo.** None exists yet; none was drawn. Until one lands, a screen names the product in type: Better Answers, in Geist. Logo and icon files are in production separately.
 4. **Accent colour.** Ink blue `#2e4bd4` was chosen, not found. The source specifies no palette — only that colour never carries a signal alone.
 7. **Textures.** `GridPattern`, `DotPattern` and `NoiseTexture` are ports of the corresponding Magic UI components, retuned to these tokens rather than pulled from npm — the design system ships no build step. In an application, install `@magicui/grid-pattern`, `@magicui/dot-pattern` and `@magicui/noise-texture` and pass the same tokens.
 5. **Dark theme.** Authored on the reference styling's convention, not on evidence from the source.

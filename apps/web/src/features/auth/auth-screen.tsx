@@ -6,14 +6,19 @@ import { cn } from "@/shared/lib/utils.ts";
 import { RefusalLine } from "@/shared/refusal-outcome.tsx";
 import { NO_RESPONSE, SAID_OF_CLASS, type Said } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
+import { PRODUCT_NAME } from "@/shared/words.ts";
 
 import { leavingFor, pageQuery } from "./carried-flow.ts";
+
+export const focusOn = (id: string) => {
+  document.getElementById(id)?.focus();
+};
 
 export function AuthScreen(properties: { readonly title: string; readonly children: ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="px-4 py-5 md:px-8">
-        <p className="font-mono font-medium tracking-tight text-foreground">better-answers</p>
+        <p className="font-medium tracking-tight text-foreground">{PRODUCT_NAME}</p>
       </header>
 
       <main id="screen" className="flex-1 px-4 md:px-8">

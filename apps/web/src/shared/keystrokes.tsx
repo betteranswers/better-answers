@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useId, useState } from "react";
 
-import { onThisBrowser } from "@/shared/browser-storage.ts";
+import { keepOnThisBrowser, onThisBrowser } from "@/shared/browser-storage.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Checkbox } from "@/shared/ui/checkbox.tsx";
@@ -71,7 +71,7 @@ function TurnedOn() {
           const next = checked === true;
           setOn(next);
           if (next) onThisBrowser()?.removeItem(KEPT_UNDER);
-          else onThisBrowser()?.setItem(KEPT_UNDER, OFF);
+          else keepOnThisBrowser(KEPT_UNDER, OFF);
         }}
       />
       <Label htmlFor={switchId}>{KEYSTROKE_WORDS.turnedOn}</Label>

@@ -445,15 +445,16 @@ test("remembers a closed secondary nav on this browser only", async ({ page, req
   await expect(openerOf(page)).toBeVisible();
 
   const kept = await keptOnThisBrowser(page);
-  expect(kept).toHaveLength(1);
-  expect(kept[0]).toMatch(/ (open|closed)$/);
-  for (const secret of [
+  const theNavs = kept.filter((entry) => / (open|closed)$/.test(entry));
+  expect(theNavs, "the nav's choice is not kept once").toHaveLength(1);
+  const secrets = [
     workspace.admin.email,
     workspace.admin.name,
     workspace.admin.id,
     workspace.workspaceId,
-  ]) {
-    expect(kept[0]).not.toContain(secret);
+  ];
+  for (const entry of kept) {
+    for (const secret of secrets) expect(entry).not.toContain(secret);
   }
 });
 

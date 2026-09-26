@@ -10,3 +10,12 @@ export const onThisBrowser = (): Storage | undefined => {
     return undefined;
   }
 };
+
+/** A full or refusing store throws on a write; the choice is then not kept, and the act goes on. */
+export const keepOnThisBrowser = (key: string, value: string): void => {
+  try {
+    onThisBrowser()?.setItem(key, value);
+  } catch {
+    // Losing a kept choice costs the reader one click next time; failing the act would cost more.
+  }
+};

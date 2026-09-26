@@ -1,3 +1,6 @@
+import type { Page } from "@playwright/test";
+
+import { SIGN_IN_WORDS, type Arrival } from "@/features/auth/sign-in-words.ts";
 import { screenById } from "@/shared/screens.ts";
 
 import { expect, test } from "./browser.ts";
@@ -7,8 +10,15 @@ import {
   provision,
   revokeCredentials,
   signIn,
+  signInHeading,
   signOutFromTheShell,
 } from "./harness.ts";
+
+/** Says why the person is there in the region a status is read from. */
+const signInSays = async (page: Page, arrival: Arrival): Promise<void> => {
+  await expect(signInHeading(page)).toBeVisible();
+  await expect(page.getByRole("status")).toHaveText(SIGN_IN_WORDS.arrived[arrival]);
+};
 
 test("sign-out from the shell ends the session", async ({ page, request }) => {
   const email = anAddress("leaving");
@@ -19,16 +29,17 @@ test("sign-out from the shell ends the session", async ({ page, request }) => {
 
   await signOutFromTheShell(page, workspace.admin.name);
 
-  await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
+  await signInSays(page, "signed-out");
 
   await page.goto("/people");
-  await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
+  await signInSays(page, "signed-out");
 });
 
 test("brings an ended session through sign-in back to its screen", async ({
   page,
   context,
   request,
+  passesTheAccessibilityGate,
 }) => {
   const email = anAddress("returning");
   await provision(request, { name: "Returning", adminEmail: email });
@@ -42,7 +53,8 @@ test("brings an ended session through sign-in back to its screen", async ({
   await context.clearCookies();
   await page.reload();
 
-  await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
+  await signInSays(page, "session-ended");
+  await passesTheAccessibilityGate();
   await signIn(page, request, email);
 
   await expect(page).toHaveURL(new RegExp(`${elsewhere.defaultView}$`));
@@ -61,5 +73,5 @@ test("refuses revoked credentials on the next request", async ({ page, request }
   await page.getByRole("link", { name: "Knowledge" }).click();
   await page.reload();
 
-  await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
+  await signInSays(page, "session-ended");
 });
