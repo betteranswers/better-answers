@@ -147,7 +147,7 @@ const NEEDS = {
 
 type SliceCommand = keyof typeof NEEDS;
 
-const isSliceCommand = (command: string): command is SliceCommand => command in NEEDS;
+const isSliceCommand = (command: string): command is SliceCommand => Object.hasOwn(NEEDS, command);
 
 export const SLICE_COMMANDS: readonly SliceCommand[] = Object.keys(NEEDS).filter(isSliceCommand);
 
@@ -414,23 +414,7 @@ const sliceCommand = async (
     );
     return NOT_BUILT;
   }
-  return runSlice(command, doors, workspaceId, flags, io);
-};
-
-const runSlice = (
-  command: SliceCommand,
-  doors: Doors,
-  workspaceId: string,
-  flags: Flags,
-  io: OpsIo,
-): Promise<number> => {
-  if (command === "reconcile-watermark") return reconcileWatermark(doors, workspaceId, io);
-  if (command === "graph-rebuild") return graphRebuildCommand(doors, workspaceId, flags, io);
-  if (command === "graph-counts") return graphCountsCommand(doors, workspaceId, io);
-  if (command === "graph-sweep") return graphSweepCommand(doors, workspaceId, io);
-  if (command === "erasure-rehearsal") return erasureRehearsal(doors, workspaceId, flags, io);
-  if (command === "object-store-orphans") return objectStoreOrphans(doors, workspaceId, flags, io);
-  return importBundleCommand(doors, workspaceId, flags, io);
+  return SLICE_RUNNERS[command](doors, workspaceId, flags, io);
 };
 
 export const reasonOf = (reason: string | Error): string =>
@@ -1121,6 +1105,22 @@ const operatorCommand = async (doors: Doors, flags: Flags, io: OpsIo): Promise<n
   io.say(`operator: done — ${email} ${said}`);
   return DONE;
 };
+
+const SLICE_RUNNERS = {
+  "graph-rebuild": graphRebuildCommand,
+  "graph-sweep": (doors, workspaceId, _flags, io) => graphSweepCommand(doors, workspaceId, io),
+  "graph-counts": (doors, workspaceId, _flags, io) => graphCountsCommand(doors, workspaceId, io),
+  "reconcile-watermark": (doors, workspaceId, _flags, io) =>
+    reconcileWatermark(doors, workspaceId, io),
+  "object-store-orphans": objectStoreOrphans,
+  "erasure-rehearsal": erasureRehearsal,
+  "import-bundle": importBundleCommand,
+} satisfies Readonly<
+  Record<
+    SliceCommand,
+    (doors: Doors, workspaceId: string, flags: Flags, io: OpsIo) => Promise<number>
+  >
+>;
 
 const SLICELESS_COMMANDS = new Map<
   string,

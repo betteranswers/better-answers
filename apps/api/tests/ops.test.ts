@@ -535,6 +535,16 @@ describe("pnpm ops — the restore scripts' commands", () => {
     expect((await ops(app(), ["replay-erasures"])).exitCode).toBe(2);
   });
 
+  it.each(["toString", "__proto__"])(
+    "answers %s, a name every object inherits, as unknown",
+    async (command) => {
+      const run = await ops(app(), [command, "--workspace", ulid()]);
+
+      expect(run.exitCode).toBe(2);
+      expect(run.lines.join("\n")).toContain(`unknown command: ${command}`);
+    },
+  );
+
   it("prints a refusal's word and exits with its class's code", async () => {
     const run = await ops(app(), ["graph-counts", "--workspace", "not-a-workspace-id"]);
 
