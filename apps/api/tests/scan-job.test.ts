@@ -8,13 +8,9 @@ import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { z } from "zod";
 
-import {
-  type ImageStep,
-  matrixLegs,
-  readWorkflow,
-  repositoryRoot,
-  workflowStepSchema,
-} from "./image-probe.ts";
+import { repositoryRoot } from "@better-answers/devtools/paths";
+
+import { type ImageStep, matrixLegs, readWorkflow, workflowStepSchema } from "./image-probe.ts";
 /* jscpd:ignore-end */
 
 const permissionsSchema = z.record(z.string(), z.string());

@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { z } from "zod";
 
+import { repositoryRoot } from "@better-answers/devtools/paths";
 import { POSTGRES_IMAGE } from "@better-answers/schema";
 
 import {
@@ -15,7 +16,6 @@ import {
   legFor,
   nothingToProbeHere,
   readTheImage,
-  repositoryRoot,
   type StartedContainer,
   startTheImage,
 } from "./image-probe.ts";

@@ -3,7 +3,8 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
+import { repositoryRoot } from "@better-answers/devtools/paths";
+
 const adrDirectory = path.join(repositoryRoot, "docs", "adr");
 const indexPath = path.join(adrDirectory, "README.md");
 

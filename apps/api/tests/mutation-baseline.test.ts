@@ -8,11 +8,12 @@ import { parse } from "yaml";
 import { z } from "zod";
 
 import { mutateSet, mutationShardsFromArgv } from "@better-answers/devtools/mutation-shards";
+import { repositoryRoot } from "@better-answers/devtools/paths";
 
 import coreStrykerConfig from "../../../packages/core/stryker.config.mjs";
 import { legs } from "../../../scripts/mutation-shards.mjs";
 import apiStrykerConfig from "../stryker.config.mjs";
-import { type ImageStep, readWorkflow, repositoryRoot, workflowStepSchema } from "./image-probe.ts";
+import { type ImageStep, readWorkflow, workflowStepSchema } from "./image-probe.ts";
 
 const shardSchema = z.object({
   name: z.string(),

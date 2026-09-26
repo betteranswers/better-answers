@@ -5,7 +5,8 @@ import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { z } from "zod";
 
-const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
+import { repositoryRoot } from "@better-answers/devtools/paths";
+
 const workflowDirectory = path.join(repositoryRoot, ".github", "workflows");
 
 const LOCAL_WORKFLOW = /^\.\/\.github\/workflows\/(?<file>[^/@]+)$/;

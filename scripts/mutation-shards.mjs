@@ -3,8 +3,7 @@ import path from "node:path";
 import apiStryker from "../apps/api/stryker.config.mjs";
 import coreStryker from "../packages/core/stryker.config.mjs";
 import { mutationShardsFromArgv } from "../packages/devtools/src/mutation-shards.ts";
-
-const repositoryRoot = path.resolve(import.meta.dirname, "..");
+import { repositoryRoot } from "../packages/devtools/src/paths.ts";
 
 /** @type {ReadonlyMap<string, import("../packages/devtools/src/mutation-shards.ts").Leg>} */
 export const legs = new Map([

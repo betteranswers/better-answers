@@ -8,9 +8,9 @@ import { promisify } from "node:util";
 import { parse } from "yaml";
 import { z } from "zod";
 
-const run = promisify(execFile);
+import { repositoryRoot } from "@better-answers/devtools/paths";
 
-export const repositoryRoot = fileURLToPath(new URL("../../../", import.meta.url));
+const run = promisify(execFile);
 
 const dockerIsAvailable = async (): Promise<boolean> => {
   try {

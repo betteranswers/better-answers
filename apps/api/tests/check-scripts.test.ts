@@ -6,9 +6,9 @@ import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { gatesNamed, workspacePackages } from "./workspaces.ts";
+import { repositoryRoot } from "@better-answers/devtools/paths";
 
-const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
+import { gatesNamed, workspacePackages } from "./workspaces.ts";
 
 const read = (relative: string): string =>
   readFileSync(path.join(repositoryRoot, relative), "utf8");

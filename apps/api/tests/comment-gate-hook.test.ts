@@ -4,12 +4,11 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { repositoryRoot } from "@better-answers/devtools/paths";
 import { pythonGateRoots, rootScripts } from "@better-answers/devtools/root-commands";
 import { throwawayRepository, writeUnder } from "@better-answers/devtools/throwaway-tree";
 
 import { hookScript, runHook, scratchRoot, type HookRun } from "./worktree-hooks.ts";
-
-const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 
 const script = hookScript("comment-gate-hook");
 

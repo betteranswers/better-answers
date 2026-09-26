@@ -7,10 +7,10 @@ import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { repositoryRoot } from "@better-answers/devtools/paths";
 import { POSTGRES_IMAGE } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
-const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 const apiRoot = path.resolve(import.meta.dirname, "..");
 
 const fenced = (script: string, step: string): string => {

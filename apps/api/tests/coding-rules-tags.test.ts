@@ -4,7 +4,9 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { readUnder, repositoryRoot, treeFiles } from "./tree-walk.ts";
+import { repositoryRoot } from "@better-answers/devtools/paths";
+
+import { readUnder, treeFiles } from "./tree-walk.ts";
 
 const RULE_TAG = /\[(?<tag>[A-Z][A-Z0-9]*[A-Z][0-9]+)\]/g;
 const RULE_HEADING = /^#{2,3}\s+\[(?<tag>[A-Z][A-Z0-9]*[A-Z][0-9]+)\]/gm;
