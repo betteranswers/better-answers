@@ -12,6 +12,8 @@ export const contractFixture = <Schema extends z.ZodType>(
 ): z.output<Schema> =>
   schema.parse(JSON.parse(readFileSync(path.join(contractsDir, agreement, file), "utf8")));
 
+export const OPEN_OUTCOMES = ["passage", "not-found"] as const;
+
 export const documentChunkRow = z.object({
   ordinal: z.int().nonnegative(),
   id: z.string().min(1),

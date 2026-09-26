@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { llmPurpose } from "@better-answers/schema";
 import { testData, withRollback } from "@better-answers/schema/testing";
 
 import { contractFixture } from "./contract-fixture.ts";
 import { postgresForSuite } from "./suite-postgres.ts";
 
-const purpose = z.enum(["extraction", "enrichment", "answering", "judging", "embedding"]);
+const purpose = z.enum(llmPurpose.enumValues);
 const fixtureSchema = z.object({
   workspaces: z.array(z.object({ id: z.string(), name: z.string() })),
   routes: z.array(

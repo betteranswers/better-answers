@@ -2,6 +2,14 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
+  ANSWER_VERDICTS,
+  FEEDBACK_REASONS,
+  FEEDBACK_VERDICTS,
+  TRUST_RIDERS,
+  TRUST_STATUSES,
+  TRUST_TIERS,
+} from "@better-answers/core/answering";
+import {
   TOOLS_LIST_TTL_CONFIG_KEY,
   TOOLS_LIST_TTL_MS_DEFAULT,
 } from "@better-answers/core/workspaces";
@@ -38,6 +46,7 @@ const tool = z.object({
   annotations: z.looseObject({ readOnlyHint: z.boolean().optional() }).optional(),
   /** Loose, because one case reads the whole schema as text for a header it must not carry. */
   inputSchema: z.looseObject({ properties: z.record(z.string(), z.unknown()).optional() }),
+  outputSchema: z.looseObject({}).optional(),
 });
 type Tool = z.infer<typeof tool>;
 
@@ -201,6 +210,26 @@ describe("era-independent", () => {
       }
       expect(JSON.stringify(entry.inputSchema)).not.toContain("x-mcp-header");
     }
+  });
+
+  it.each([
+    ["find", "trust tier", TRUST_TIERS],
+    ["find", "trust status", TRUST_STATUSES],
+    ["find", "trust rider", TRUST_RIDERS],
+    ["ask", "verdict", ANSWER_VERDICTS],
+    ["open", "trust tier", TRUST_TIERS],
+    ["open", "trust status", TRUST_STATUSES],
+    ["open", "trust rider", TRUST_RIDERS],
+    ["give_feedback", "verdict", FEEDBACK_VERDICTS],
+    ["give_feedback", "flag reason", FEEDBACK_REASONS],
+  ])("offers %s every %s core declares", async (name, _set, values) => {
+    const { client, token } = await connect();
+
+    const entry = (await listTools(client, token)).find((listed) => listed.name === name);
+
+    expect(JSON.stringify([entry?.inputSchema, entry?.outputSchema])).toContain(
+      `"enum":${JSON.stringify(values)}`,
+    );
   });
 
   it("describes the two reads in the glossary's words", async () => {

@@ -39,11 +39,15 @@ const aDocument = z.object({
   cited: z.boolean().default(false),
 });
 
+const SEEDED_RUNS = ["none", "queued", "claimed", "done"] as const;
+
+const MOVED_RUNS = ["claimed", "done"] as const;
+
 const aBinding = z.object({
   name: z.string().min(1),
   sensitivity: z.enum(SENSITIVITIES).default("Restricted"),
   audience: z.enum(AUDIENCES).default("everyone"),
-  run: z.enum(["none", "queued", "claimed", "done"]).default("done"),
+  run: z.enum(SEEDED_RUNS).default("done"),
   published: z.boolean().default(false),
   documents: z.array(aDocument).default([]),
 });
@@ -56,7 +60,7 @@ export const bindingsSeeding = z.object({
 /** By workspace alone: a binding the browser bound carries an id only the page minted. */
 export const indexRunMoving = z.object({
   workspaceId: z.string().min(1),
-  to: z.enum(["claimed", "done"]),
+  to: z.enum(MOVED_RUNS),
 });
 
 type SeededDocument = {
@@ -184,7 +188,10 @@ const citationOf = async (seed: TestData, workspaceId: string, documentId: strin
   return { iri: concept.iri, compositionId: composition.id };
 };
 
-const runColumns = (run: "queued" | "claimed" | "done", outcome: Record<string, unknown>) => {
+const runColumns = (
+  run: Exclude<(typeof SEEDED_RUNS)[number], "none">,
+  outcome: Record<string, unknown>,
+) => {
   if (run === "queued") return {};
   const now = new Date();
   const claimed = { attempts: 1, claimedBy: SUITE_WORKER, claimedAt: now, heartbeatAt: now };

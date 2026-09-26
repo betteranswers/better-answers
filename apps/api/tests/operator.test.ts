@@ -65,8 +65,10 @@ const BEARER_ASKS: readonly (readonly [string, RequestInit])[] = [
 
 const answeredUser = z.object({ user: z.looseObject({ id: z.string() }) });
 
+const PROCEDURE_TYPES = ["query", "mutation"] as const;
+
 /** The router's flattened record types its entries as routers, though each is a procedure. */
-const procedureDef = z.object({ type: z.enum(["query", "mutation"]) });
+const procedureDef = z.object({ type: z.enum(PROCEDURE_TYPES) });
 
 type Run = { readonly exitCode: number; readonly lines: readonly string[] };
 

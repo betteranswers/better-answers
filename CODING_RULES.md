@@ -165,7 +165,7 @@ Input, environment and tool schemas are parsed where they enter.
 
 ### [TYPES3] Choose a type over an enum
 
-An `enum` does not compile here. A union of string literals says the same thing and erases.
+`enum` does not compile. `z.enum` takes the `as const` tuple a literal union derives from, never a copy.
 
 ### [TYPES4] Never assert a type with `as`
 

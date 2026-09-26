@@ -4,15 +4,17 @@ import { z } from "zod";
 import { ULID } from "@better-answers/schema";
 
 import { chunkIdOf, parseLocator, spanText } from "../src/sources/index.ts";
-import { contractFixture, documentChunkRow } from "./contract-fixture.ts";
+import { contractFixture, documentChunkRow, OPEN_OUTCOMES } from "./contract-fixture.ts";
+
+const REFUSERS = ["the parser", "the read"] as const;
 
 const openCase = z.object({
   case: z.string().min(1),
   wire: z.string(),
-  expect: z.enum(["passage", "not-found"]),
+  expect: z.enum(OPEN_OUTCOMES),
   passage: z.string().optional(),
   covers_ordinals: z.array(z.int().nonnegative()).optional(),
-  refused_by: z.enum(["the parser", "the read"]).optional(),
+  refused_by: z.enum(REFUSERS).optional(),
   because: z.string().optional(),
   why: z.string().min(1),
 });

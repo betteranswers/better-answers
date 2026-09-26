@@ -18,6 +18,8 @@ const jobCaseSchema = z.object({
   subject_id: z.string().nullable(),
 });
 
+const WORKER_CALLS = ["heartbeat_job", "finish_job", "fail_job"] as const;
+
 const fixtureSchema = z.object({
   description: z.string(),
   lease_seconds: z.number().int().positive(),
@@ -47,7 +49,7 @@ const fixtureSchema = z.object({
   calls: z.array(
     z.object({
       why: z.string(),
-      function: z.enum(["heartbeat_job", "finish_job", "fail_job"]),
+      function: z.enum(WORKER_CALLS),
       role: z.string(),
       workspace_id: z.string(),
       job_id: z.string(),

@@ -40,6 +40,8 @@ const ALWAYS_GROUP = {
 
 const refusalOf = (read: ReturnType<typeof parse>) => (read.ok ? "ok" : read.error);
 
+const A_AND_B = ["a", "b"] as const;
+
 /** One case per word, so the walk below proves both directions of the register. */
 const EVERY_ISSUE: ReadonlyArray<readonly [IssueWord, string, z.ZodType, unknown]> = [
   ["missing", "field", z.object({ field: z.string() }), {}],
@@ -48,7 +50,7 @@ const EVERY_ISSUE: ReadonlyArray<readonly [IssueWord, string, z.ZodType, unknown
   ["too-big", "field", z.object({ field: z.string().max(1) }), { field: "ab" }],
   ["bad-format", "field", z.object({ field: z.string().regex(/^x$/) }), { field: "y" }],
   ["not-a-multiple", "field", z.object({ field: z.number().multipleOf(3) }), { field: 4 }],
-  ["not-in-set", "field", z.object({ field: z.enum(["a", "b"]) }), { field: "c" }],
+  ["not-in-set", "field", z.object({ field: z.enum(A_AND_B) }), { field: "c" }],
   [
     "no-shape-matches",
     "field",

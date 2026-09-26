@@ -3,7 +3,10 @@ import { z } from "zod";
 import { conceptFrontmatter } from "@better-answers/schema";
 
 import {
+  ANSWER_VERDICTS,
   ask,
+  FEEDBACK_REASONS,
+  FEEDBACK_VERDICTS,
   find,
   giveFeedback,
   open,
@@ -11,18 +14,20 @@ import {
   renderFeedback,
   renderFind,
   renderOpen,
-  type FeedbackReason,
+  TRUST_RIDERS,
+  TRUST_STATUSES,
+  TRUST_TIERS,
 } from "@better-answers/core/answering";
 import { parse } from "@better-answers/core/kernel";
 
 import { defineEntry, type Entry } from "./define.ts";
 
 const trust = z.object({
-  tier: z.enum(["unverified", "machine-confirmed", "human-reviewed"]),
-  status: z.enum(["current", "changed-since-checked", "out-of-date", "draft", "deprecated"]),
+  tier: z.enum(TRUST_TIERS),
+  status: z.enum(TRUST_STATUSES),
   checkedBy: z.string().nullable(),
   checkedAt: z.string().nullable(),
-  rider: z.enum(["imported", "source-moved-on"]).nullable(),
+  rider: z.enum(TRUST_RIDERS).nullable(),
 });
 
 const passage = z.object({
@@ -85,7 +90,7 @@ const askEntry = defineEntry({
     question: z.string().min(1).max(2000).describe("The question, in the person's own words."),
   }),
   output: z.object({
-    verdict: z.enum(["ok", "warn", "refuse"]),
+    verdict: z.enum(ANSWER_VERDICTS),
     text: z.string(),
     citations: z.array(z.object({ iri: z.string(), url: z.string() })),
     conflicts: z.array(
@@ -184,13 +189,6 @@ const openEntry = defineEntry({
   render: renderOpen,
 });
 
-const FLAG_REASONS = [
-  "wrong",
-  "out-of-date",
-  "incomplete",
-  "should-not-have-shown",
-] as const satisfies readonly FeedbackReason[];
-
 const feedbackIri = z.string().min(1).describe("The concept or answer the feedback is about.");
 
 const feedbackDetail = z
@@ -204,7 +202,7 @@ const feedbackInput = z.discriminatedUnion("verdict", [
   z.object({
     iri: feedbackIri,
     verdict: z.literal("flag"),
-    reason: z.enum(FLAG_REASONS),
+    reason: z.enum(FEEDBACK_REASONS),
     detail: feedbackDetail,
   }),
 ]);
@@ -218,8 +216,8 @@ const giveFeedbackEntry = defineEntry({
   // A flag with no reason is the act's own refusal, not a rule the flat wire shape could carry.
   input: z.object({
     iri: feedbackIri,
-    verdict: z.enum(["helpful", "flag"]).describe("Helpful, or a flag with a reason."),
-    reason: z.enum(FLAG_REASONS).optional().describe("Required with a flag."),
+    verdict: z.enum(FEEDBACK_VERDICTS).describe("Helpful, or a flag with a reason."),
+    reason: z.enum(FEEDBACK_REASONS).optional().describe("Required with a flag."),
     detail: feedbackDetail,
   }),
   output: z.object({

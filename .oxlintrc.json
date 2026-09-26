@@ -44,6 +44,10 @@
       {
         "selector": "LabeledStatement",
         "message": "A label jumps out of a nested loop. Move the inner loop into a function and return from it [DESIGN7]"
+      },
+      {
+        "selector": "CallExpression[callee.object.name='z'][callee.property.name='enum'] > :matches(ArrayExpression, TSAsExpression[expression.type='ArrayExpression'], TSSatisfiesExpression[expression.type='ArrayExpression'])",
+        "message": "A list written inside `z.enum` copies a closed set, and drifts from it. Declare the set once as an `as const` tuple, derive its type from it, and pass the tuple to `z.enum` [TYPES3]"
       }
     ],
     "vitest/no-identical-title": "error",
