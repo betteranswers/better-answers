@@ -71,6 +71,13 @@ const signInEmailOtpOptions = () =>
 export const useSignInEmailOtp = () => useMutation(signInEmailOtpOptions());
 
 /**
+ * Undefined when unread: the screen then stands, and its own next request says in words what went
+ * wrong.
+ */
+const sessionOrUnread = (queryClient: QueryClient) =>
+  queryClient.fetchQuery(sessionOptions()).catch(() => undefined);
+
+/**
  * Read before the display-name screen draws, so a person it has nothing to ask never sees it.
  * Undefined means the screen draws.
  */
@@ -78,13 +85,25 @@ export const displayNameDetour = async (
   queryClient: QueryClient,
   query: string,
 ): Promise<string | undefined> => {
-  const session = await queryClient
-    .fetchQuery(sessionOptions())
-    // Left unread, the form stands, and a save refused for want of a session says so in words.
-    .catch(() => undefined);
+  const session = await sessionOrUnread(queryClient);
   if (session === undefined) return undefined;
   if (session === null) return `/sign-in${query}`;
   return hasADisplayName(session.user.name) ? nextAfterSignIn(query) : undefined;
+};
+
+/** `/sign-in` or `/display-name`, asked to come back to `path` once the person has done it there. */
+const backTo = (screen: string, path: string): string =>
+  `${screen}?redirect=${encodeURIComponent(path)}`;
+
+/** The accept page asks only a person signed in and named. Undefined means the page draws. */
+export const acceptDetour = async (
+  queryClient: QueryClient,
+  path: string,
+): Promise<string | undefined> => {
+  const session = await sessionOrUnread(queryClient);
+  if (session === undefined) return undefined;
+  if (session === null) return backTo("/sign-in", path);
+  return hasADisplayName(session.user.name) ? undefined : backTo("/display-name", path);
 };
 
 /** A save drops the held session, so the next read of it carries the new name. */
@@ -102,13 +121,36 @@ export const useSetDisplayName = () => {
   );
 };
 
+/**
+ * A join points the session at the workspace joined, so the held session, membership and list of
+ * workspaces are dropped before the shell reads them.
+ */
+export const useAcceptInvitation = () => {
+  const api = useTRPC();
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  return useMutation(
+    api.person.acceptInvitation.mutationOptions({
+      onSuccess: () => {
+        forgetMembership(queryClient, api);
+        queryClient.removeQueries({ queryKey: AUTH_KEYS.session });
+        queryClient.removeQueries({ queryKey: AUTH_KEYS.workspaces });
+        void navigate({ href: "/", replace: true });
+      },
+    }),
+  );
+};
+
 const signOutOptions = () =>
   mutationOptions<unknown, BetterFetchError, void>({
     mutationFn: () => unwrap(authClient.signOut()),
   });
 
-/** Whatever the server answers, clears every held query and goes to the sign-in screen. */
-export const useSignOut = () => {
+/**
+ * Whatever the server answers, clears every held query and goes to the sign-in screen, which
+ * comes back to `returnTo` when one is named.
+ */
+export const useSignOut = (returnTo?: string) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const signOut = useMutation(signOutOptions());
@@ -121,7 +163,8 @@ export const useSignOut = () => {
         // session the person asked to leave.
         onSettled: () => {
           queryClient.clear();
-          void navigate({ href: "/sign-in", replace: true });
+          const href = returnTo === undefined ? "/sign-in" : backTo("/sign-in", returnTo);
+          void navigate({ href, replace: true });
         },
       });
     },

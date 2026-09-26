@@ -8,6 +8,7 @@ import {
   aMemberSignedInAt,
   anAddress,
   clockTheNextKey,
+  invite,
   person,
   provision,
   signIn,
@@ -738,7 +739,7 @@ test.describe("removing a member from their sheet", () => {
 test.describe("the People screen's words", () => {
   // Every People surface joins this test as it is built: the product's word is workspace.
   test("says workspace, never organisation, on every People view", async ({ page, request }) => {
-    await anAdminAtPeople(page, request, "Ryedale Metalwork");
+    const { admin } = await anAdminAtPeople(page, request, "Ryedale Metalwork");
     const organisation = /organi[sz]ation/i;
 
     const said = async (where: string) => {
@@ -808,5 +809,32 @@ test.describe("the People screen's words", () => {
     await inviting.getByRole("button", { name: "Done" }).click();
     await expect(page.getByRole("region", { name: "Invitations" }).getByRole("row")).toHaveCount(2);
     await said("the Invitations tab with an invitation waiting");
+
+    // The accept page stands outside the shell, so it is read without the People heading.
+    const saidOnTheAcceptPage = async (where: string) => {
+      await expect(page.locator("body"), where).not.toContainText(organisation);
+      expect(await page.locator("body").ariaSnapshot(), where).not.toMatch(organisation);
+    };
+    const elsewhere = await provision(request, { name: "Wolds Fabrication" });
+    const toJoin = await invite(request, {
+      workspaceId: elsewhere.workspaceId,
+      email: admin,
+      inviterId: elsewhere.admin.id,
+      role: "Viewer",
+    });
+    const forSomeoneElse = await invite(request, {
+      workspaceId: elsewhere.workspaceId,
+      email: anAddress("someone-else"),
+      inviterId: elsewhere.admin.id,
+      role: "Viewer",
+    });
+    await page.goto(`/invitations/${toJoin.id}`);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Join Wolds Fabrication" }),
+    ).toBeVisible();
+    await saidOnTheAcceptPage("the accept page");
+    await page.goto(`/invitations/${forSomeoneElse.id}`);
+    await expect(page.getByRole("alert")).toContainText("invitation-for-another-address");
+    await saidOnTheAcceptPage("the accept page refusing another address");
   });
 });
