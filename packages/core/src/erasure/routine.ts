@@ -344,7 +344,7 @@ const detailOf = (request: SubjectRequest, map: ErasureMap): CompletedDetail => 
 
 type CompletionRow = { readonly completed_at: Date | null; readonly report: string | null };
 
-type ErasureDoors = {
+export type ErasureDoors = {
   readonly git: GitDoor;
   readonly postgres: PostgresDoor;
   readonly objects: ObjectDoor;

@@ -71,6 +71,7 @@ import {
   holderOfPath,
   holdsEveryDocument,
   indexRowOf,
+  type IndexRow,
   landRows,
   WRITE_CONSTRAINTS,
   type Held,
@@ -337,8 +338,6 @@ type Existing = {
   readonly holder: string | undefined;
   readonly waiting: boolean;
 };
-
-type IndexRow = Extract<ReturnType<typeof indexRowOf>, { readonly success: true }>["data"];
 
 const writeUnderLock = async (
   principal: UserPrincipal,

@@ -21,6 +21,7 @@ import {
   rehearseErasure,
   replayErasures,
   seedSyntheticSubject,
+  type ErasureDoors,
   type ErasureLog,
   type RehearsalRefusal,
 } from "@better-answers/core/erasure";
@@ -28,7 +29,6 @@ import {
   attempt,
   err,
   ok,
-  type Clock,
   type PlatformPrincipal,
   type RefusalClass,
   type Result,
@@ -45,7 +45,6 @@ import {
   UPLOAD_SWEEP,
 } from "@better-answers/core/sources";
 import { initRepository, type GitDoor } from "@better-answers/core/store/git";
-import type { ObjectDoor } from "@better-answers/core/store/objects";
 import { tablesPresent, type PostgresDoor } from "@better-answers/core/store/postgres";
 import { SWEEPS, withSweepLock } from "@better-answers/core/sweeps";
 import {
@@ -187,14 +186,6 @@ exit codes: ${DONE} done · ${REFUSED} refused in no registered word, stop · ${
   a refusal in a registered word exits with its class's code: ${Object.entries(EXIT_OF_CLASS)
     .map(([refusalClass, code]) => `${code} ${refusalClass}`)
     .join(" · ")}`;
-
-type ErasureDoors = {
-  readonly git: GitDoor;
-  readonly postgres: PostgresDoor;
-  readonly objects: ObjectDoor;
-  readonly clock: Clock;
-  readonly log: ErasureLog;
-};
 
 const bundleStore = (doors: Doors, purpose: string): Result<GitDoor, string> =>
   doorTold(
