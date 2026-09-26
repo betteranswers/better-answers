@@ -22,6 +22,7 @@ import { EVERYONE_TOOLBAR, EveryoneView } from "@/features/console/everyone-view
 import { mustSignInForTheConsole } from "@/features/console/operator.ts";
 import { WorkspacesView } from "@/features/console/workspaces-view.tsx";
 import { AUDIT_LOG_TOOLBAR, AuditLogView } from "@/features/people/audit-log-view.tsx";
+import { GROUPS_TOOLBAR, GroupsView } from "@/features/people/groups-view.tsx";
 import { MEMBERS_TOOLBAR, MembersView } from "@/features/people/members-view.tsx";
 import { BINDINGS_TOOLBAR, BindingsView } from "@/features/sources/bindings-view.tsx";
 import { createApiProxy, type ApiProxy } from "@/shared/api/trpc.ts";
@@ -48,6 +49,7 @@ type BuiltView = { readonly draw: () => ReactElement; readonly toolbar?: ViewToo
 const BUILT_VIEWS = new Map<View["path"], BuiltView>([
   ["/sources/bindings", { draw: BindingsView, toolbar: BINDINGS_TOOLBAR }],
   ["/people/members", { draw: MembersView, toolbar: MEMBERS_TOOLBAR }],
+  ["/people/groups", { draw: GroupsView, toolbar: GROUPS_TOOLBAR }],
   ["/people/audit-log", { draw: AuditLogView, toolbar: AUDIT_LOG_TOOLBAR }],
   ["/system/routes-and-spend", { draw: RoutesAndSpendView, toolbar: ROUTES_AND_SPEND_TOOLBAR }],
   ["/console/people/everyone", { draw: EveryoneView, toolbar: EVERYONE_TOOLBAR }],

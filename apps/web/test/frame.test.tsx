@@ -225,7 +225,7 @@ describe("Control Centre's one list of screens and their views", () => {
     ]);
   });
 
-  it("calls only bindings, members, the audit log and routes built", () => {
+  it("calls only bindings, members, groups, audit log and routes built", () => {
     const built = SCREENS.flatMap((each) =>
       viewsOf(each)
         .filter((view) => view.built)
@@ -235,6 +235,7 @@ describe("Control Centre's one list of screens and their views", () => {
     expect(built).toEqual([
       "/sources/bindings",
       "/people/members",
+      "/people/groups",
       "/people/audit-log",
       "/system/routes-and-spend",
     ]);

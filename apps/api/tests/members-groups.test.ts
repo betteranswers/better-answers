@@ -1,7 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { startApp, type TestApp } from "./harness.ts";
-import { seededIn, sessionPointedAt } from "./provoke.ts";
+import {
+  anAdminOfElsewherePointedAt,
+  NOT_A_MEMBER_ANSWERED,
+  ROLE_FORBIDS_ANSWERED,
+} from "./people-refusals.ts";
+import { seededIn } from "./provoke.ts";
 import { refusalOfCall, webSignedIn } from "./web-client.ts";
 
 const CURATED = "admin-curated";
@@ -245,9 +250,23 @@ describe("the group acts over tRPC", () => {
   });
 
   it.each([
-    { act: "addToGroup", group: "hr", word: "already-in-group", status: 409, class: "conflict" },
-    { act: "removeFromGroup", group: "bids", word: "not-in-group", status: 404, class: "absent" },
-  ] as const)("refuses $act where it changes nothing, $word", async (asked) => {
+    {
+      what: "putting in a member already there",
+      act: "addToGroup",
+      group: "hr",
+      word: "already-in-group",
+      status: 409,
+      class: "conflict",
+    },
+    {
+      what: "taking out a member not there",
+      act: "removeFromGroup",
+      group: "bids",
+      word: "not-in-group",
+      status: 404,
+      class: "absent",
+    },
+  ] as const)("refuses $what, $word, recording nothing", async (asked) => {
     const seeded = await aWorkspaceWithGroups();
     const api = await asTheAdmin(seeded);
 
@@ -259,78 +278,78 @@ describe("the group acts over tRPC", () => {
   });
 });
 
-type Verb = {
-  readonly name: string;
+type GroupAct = {
+  /** What the act does, in the words a title reads. */
+  readonly does: string;
   readonly call: (api: Api, seeded: Seeded) => Promise<unknown>;
 };
 
-const EVERY_VERB: readonly Verb[] = [
-  { name: "groups", call: (api) => api.members.groups.query() },
-  { name: "createGroup", call: (api) => api.members.createGroup.mutate({ name: "Site leads" }) },
+const EVERY_GROUP_ACT: readonly GroupAct[] = [
+  { does: "list the groups", call: (api) => api.members.groups.query() },
   {
-    name: "renameGroup",
+    does: "create a group",
+    call: (api) => api.members.createGroup.mutate({ name: "Site leads" }),
+  },
+  {
+    does: "rename a group",
     call: (api, seeded) => api.members.renameGroup.mutate({ groupId: seeded.hr, name: "Leads" }),
   },
   {
-    name: "deleteGroup",
+    does: "delete a group",
     call: (api, seeded) => api.members.deleteGroup.mutate({ groupId: seeded.hr }),
   },
   {
-    name: "addToGroup",
+    does: "put a member in a group",
     call: (api, seeded) =>
       api.members.addToGroup.mutate({ groupId: seeded.bids, userId: seeded.sam.id }),
   },
   {
-    name: "removeFromGroup",
+    does: "take a member out of a group",
     call: (api, seeded) =>
       api.members.removeFromGroup.mutate({ groupId: seeded.hr, userId: seeded.sam.id }),
   },
 ];
 
-/** The acts that name a group, so a group of another workspace can be named to them. */
-const TARGETING_VERBS = EVERY_VERB.filter(
-  (verb) => verb.name !== "groups" && verb.name !== "createGroup",
-);
+/** A group named by one of these can belong to another workspace. */
+const ACTS_NAMING_A_GROUP = EVERY_GROUP_ACT.slice(2);
 
 describe("who may see and change groups", () => {
   it.each(
-    EVERY_VERB.flatMap((verb) => [
-      { ...verb, role: "Editor" as const },
-      { ...verb, role: "Viewer" as const },
+    EVERY_GROUP_ACT.flatMap((act) => [
+      { ...act, role: "Editor" as const },
+      { ...act, role: "Viewer" as const },
     ]),
-  )("refuses $name to a member at $role, changing nothing", async (verb) => {
+  )("refuses to let a member at $role $does", async (act) => {
     const seeded = await aWorkspaceWithGroups();
     const actor = await app.person();
-    await app.addMember(seeded.workspace.workspaceId, actor.id, verb.role);
+    await app.addMember(seeded.workspace.workspaceId, actor.id, act.role);
     const { api } = await webSignedIn(app, actor.email);
 
     const refused = await refusedChangingNothing(seeded.workspace.workspaceId, () =>
-      verb.call(api, seeded),
+      act.call(api, seeded),
     );
 
-    expect(refused).toMatchObject(refusedAs(403, "role-forbids", "forbidden"));
+    expect(refused).toMatchObject(ROLE_FORBIDS_ANSWERED);
   });
 
-  it.each(EVERY_VERB)("refuses $name to an Admin pointed from elsewhere", async (verb) => {
+  it.each(EVERY_GROUP_ACT)("refuses to let another workspace's Admin $does here", async (act) => {
     const seeded = await aWorkspaceWithGroups();
-    const elsewhere = await app.provision();
-    const { api } = await webSignedIn(app, elsewhere.admin.email);
-    await sessionPointedAt(app, elsewhere.admin.id, seeded.workspace.workspaceId);
+    const api = await anAdminOfElsewherePointedAt(app, seeded.workspace.workspaceId);
 
     const refused = await refusedChangingNothing(seeded.workspace.workspaceId, () =>
-      verb.call(api, seeded),
+      act.call(api, seeded),
     );
 
-    expect(refused).toMatchObject(refusedAs(401, "not-a-member", "unauthenticated"));
+    expect(refused).toMatchObject(NOT_A_MEMBER_ANSWERED);
   });
 
-  it.each(TARGETING_VERBS)("refuses $name another workspace's group as none here", async (verb) => {
+  it.each(ACTS_NAMING_A_GROUP)("finds no such group to $does elsewhere", async (act) => {
     const theirs = await aWorkspaceWithGroups();
     const mine = await app.provision();
     const { api } = await webSignedIn(app, mine.admin.email);
 
     const refused = await refusedChangingNothing(theirs.workspace.workspaceId, () =>
-      verb.call(api, theirs),
+      act.call(api, theirs),
     );
 
     expect(refused).toMatchObject(refusedAs(404, "no-such-group", "absent"));

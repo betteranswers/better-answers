@@ -1,13 +1,8 @@
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-  type DataTag,
-  type QueryKey,
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { inferInput, inferOutput } from "@trpc/tanstack-react-query";
 
 import { uploadOptions, type UploadDescriptor } from "@/shared/api/link.ts";
+import { useOptimistic, type Undo } from "@/shared/api/optimistic.ts";
 import { useTRPC, useTRPCClient, type ApiError } from "@/shared/api/trpc.ts";
 
 type Api = ReturnType<typeof useTRPC>;
@@ -83,29 +78,6 @@ export const useBind = () => {
       client.sources.bind.mutate(asked.file, uploadOptions(asked.descriptor)),
     onSettled: () => queryClient.invalidateQueries({ queryKey: api.sources.list.queryKey() }),
   });
-};
-
-type Undo = { readonly undo: () => void };
-
-/**
- * A click must read as done within a tenth of a second, so the cache takes the act before the
- * api answers.
- */
-const useOptimistic = () => {
-  const queryClient = useQueryClient();
-  return async <Data>(
-    queryKey: DataTag<QueryKey, Data, unknown>,
-    change: (data: Data) => Data,
-  ): Promise<Undo> => {
-    await queryClient.cancelQueries({ queryKey });
-    const before = queryClient.getQueryData(queryKey);
-    queryClient.setQueryData(queryKey, (held) => (held === undefined ? held : change(held)));
-    return {
-      undo: () => {
-        queryClient.setQueryData(queryKey, before);
-      },
-    };
-  };
 };
 
 /** Every settled act reads again what it changed, so the cache ends as the api left it. */

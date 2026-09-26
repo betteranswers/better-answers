@@ -31,6 +31,11 @@ role picker on a member's sheet. The CLI served it from the `new-york-v4` style,
 imports `radix-ui` as this directory's other primitives do, so the table names that URL. Its two
 digests were taken that day and its arrival edits are listed below with the others.
 
+T-406 added `alert-dialog` on **26 September 2026** with the same CLI, `shadcn@4.20.1`, for the
+confirmation before a group is deleted: deleting cannot be undone, which is the one act the
+register gives a modal to. The CLI served it from the `new-york-v4` style, as it did the radio
+group. Its two digests were taken that day and its arrival edits are listed below with the others.
+
 This file records vendored source only. The npm packages those items stand on are ordinary
 dependencies with lockfile entries; their versions live in `apps/web/package.json` and the
 lockfile, which is where a reader reads them and where Renovate moves them.
@@ -78,6 +83,7 @@ the pin.
 | `avatar.tsx` | https://ui.shadcn.com/r/styles/new-york/avatar.json | `4fdcb3d39aa70de7` | `55160fb2558f506a` |
 | `kibo-ui/pill.tsx` | https://www.kibo-ui.com/r/pill.json | `c1dd3d46048b0d5f` | `9b0c909d9043c5fc` |
 | `radio-group.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/radio-group.json | `299fa36d5c5df3ae` | `3e0591dd59910958` |
+| `alert-dialog.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/alert-dialog.json | `03c0d4de131a9b04` | `b89696dd357f7246` |
 
 `components.json` writes `https://ui.shadcn.com/r/{name}.json` for the primitives because that is
 the CLI's own default form; the table records the style-qualified URL the CLI resolves it to,
@@ -165,6 +171,16 @@ T-399's arrival edits, on the one item it added:
 - The `cn` import repointed at `@/shared/lib/utils.ts` and the dependency on `cn` dropped, as
   every arrival since the tooltip's has needed, and the file given this repository's format.
 - Its `rounded-full` stays: a radio is one of the two controls the design system lets be round.
+
+T-406's arrival edits, on the one item it added:
+
+- The `cn` import repointed at `@/shared/lib/utils.ts` and the dependency on `cn` dropped, as
+  every arrival since the tooltip's has needed; the button import given its extension, and the
+  file given this repository's format. The CLI's rewrite of `button.tsx` was declined, since it
+  was already here.
+- The overlay's `bg-black/50` became `bg-[var(--surface-scrim)]` with
+  `[backdrop-filter:var(--blur-scrim)]`, the correction `dialog.tsx` and `sheet.tsx` already
+  carry.
 
 Everything else is upstream's, unedited. Their behaviour — keyboard handling, focus, ARIA
 wiring, virtualisation — is theirs by ADR 0033; the screens that use them carry the WCAG 2.2 AA

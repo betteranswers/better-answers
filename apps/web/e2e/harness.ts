@@ -224,10 +224,18 @@ export const moveTheIndexRun = (
 
 const groupsMade = z.object({ made: z.number() });
 
-/** Groups have no screen yet, so a spec wanting a member's own acts on the audit log asks here. */
+/**
+ * Groups made by the member `userId` names, through the slice's own acts, each holding every one
+ * of `memberIds`.
+ */
 export const makeGroups = (
   api: APIRequestContext,
-  input: { workspaceId: string; userId: string; names: readonly string[] },
+  input: {
+    workspaceId: string;
+    userId: string;
+    names: readonly string[];
+    memberIds?: readonly string[];
+  },
 ) => ask(api, "/groups", input, groupsMade);
 
 /** The code the api captured for this address, in place of the email nobody receives. */
@@ -297,6 +305,13 @@ export const keystrokesListed = async (page: Page, screen: string): Promise<Loca
   const listed = page.getByRole("dialog", { name: `Keystrokes on ${screen}` });
   await expect(listed).toBeVisible();
   return listed;
+};
+
+/** Focus returns to the button a task after the list is gone, taking it from a sooner key's. */
+export const keystrokesDismissed = async (page: Page, listed: Locator): Promise<void> => {
+  await page.keyboard.press("Escape");
+  await expect(listed).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Keystrokes", exact: true })).toBeFocused();
 };
 
 /** From the sign-in screen to Control Centre's home, as a member of one workspace arrives. */

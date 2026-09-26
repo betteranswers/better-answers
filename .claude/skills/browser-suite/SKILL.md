@@ -102,7 +102,7 @@ call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources
 | `seedRoutes` | The routes a workspace has chosen; a purpose left out of the list has no route, which the screen must show rather than omit |
 | `seedBindings` | Source bindings as their acts and the worker leave them — documents, findings kept or overridden by an erasure, quarantined documents, chunks, an index run at any status, a concept and composition citing a document — answering each binding's and document's id |
 | `moveTheIndexRun` | The worker's two steps over the workspace's one index run, claimed then done, through the queue's own functions under the worker's role — how a spec watches a state word move without a worker process |
-| `makeGroups` | Groups made by a named member through the members slice's own act, one transaction each — the member's own acts on the audit log, until groups have a screen |
+| `makeGroups` | Groups made by a named member through the members slice's own acts, one transaction each, every group holding the members `memberIds` names — the member's own acts on the audit log, and the groups the `Groups` view and a member's sheet start from |
 
 Nine more helpers in the same module drive the browser rather than the harness:
 
@@ -115,6 +115,7 @@ Nine more helpers in the same module drive the browser rather than the harness:
 | `signOutFromTheShell` | Opens the top bar's menu, then signs out, because sign-out is one disclosure in |
 | `skipLinkReachesTheScreen` | Tab, the skip link has focus, Enter, `main` has focus — where a shell spec's keyboard traversal starts |
 | `keystrokesListed` | Presses `?` and answers the screen's list of keystrokes once it is open |
+| `keystrokesDismissed` | Presses Escape and waits for the list to go and for focus to come back to its button, which lands a task later and would take focus from a sooner key |
 | `clockTheNextKey` | Starts the act's clock in the page: from the next key to the node an XPath names reading a given text |
 | `theActLandedWithinItsBudget` | Reads that clock, annotates the test with it and asserts it under the act's 100 ms |
 

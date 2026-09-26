@@ -1,6 +1,6 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
-import { screenById, viewsOf } from "@/shared/screens.ts";
+import { screenById, viewNamed, viewsOf } from "@/shared/screens.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -9,6 +9,8 @@ import {
   anAddress,
   clockTheNextKey,
   invite,
+  keystrokesDismissed,
+  keystrokesListed,
   person,
   provision,
   removeMember,
@@ -26,6 +28,8 @@ const people = screenById("people");
 const MEMBERS_VIEW = "/people/members";
 
 const AUDIT_LOG_VIEW = "/people/audit-log";
+
+const GROUPS_VIEW = viewNamed(people, "Groups").path;
 
 const rail = (page: Page) => page.getByRole("navigation", { name: "Control Centre" });
 
@@ -277,14 +281,9 @@ test.describe("the People screen's Members view", () => {
 
     await skipLinkReachesTheScreen(page);
 
-    await page.keyboard.press("?");
-    const keystrokes = page.getByRole("dialog", { name: "Keystrokes on People" });
+    const keystrokes = await keystrokesListed(page, people.name);
     await expect(keystrokes).toContainText("Search the members by name or address");
-    await page.keyboard.press("Escape");
-    await expect(keystrokes).toHaveCount(0);
-    // Focus returns to the button a task after the list is gone, taking it from wherever a sooner
-    // `/` moved it.
-    await expect(page.getByRole("button", { name: "Keystrokes", exact: true })).toBeFocused();
+    await keystrokesDismissed(page, keystrokes);
 
     await page.keyboard.press("/");
     await expect(searchBox(page)).toBeFocused();
@@ -895,25 +894,42 @@ test.describe("the People screen's words", () => {
     await expect(auditLog).toContainText("Member credentials revoked");
     await said(`${AUDIT_LOG_VIEW}, a revocation logged`);
 
+    // A modal hides the page behind it from the tree, so each one is read on its own.
+    const saidIn = async (modal: Locator, where: string) => {
+      await expect(modal).toBeVisible();
+      await expect(page.locator("body"), where).not.toContainText(organisation);
+      expect(await modal.ariaSnapshot(), where).not.toMatch(organisation);
+    };
+
     // Last, so the audit log above reads the one event the workspace's provisioning wrote.
     await page.goto(MEMBERS_VIEW);
     await expect(memberRows(page)).toHaveCount(3);
-    // A modal hides the page behind it from the tree, so the dialog is read on its own.
     const inviting = page.getByRole("dialog", { name: "Invite a person" });
-    const saidInTheDialog = async (where: string) => {
-      await expect(page.locator("body"), where).not.toContainText(organisation);
-      expect(await inviting.ariaSnapshot(), where).not.toMatch(organisation);
-    };
     await page.getByRole("tab", { name: "Invitations" }).click();
     await page.getByRole("button", { name: "Invite a person" }).click();
-    await saidInTheDialog("the invite dialog");
+    await saidIn(inviting, "the invite dialog");
     await inviting.getByLabel("Email address").fill(anAddress("invited"));
     await inviting.getByRole("button", { name: "Send the invitation" }).click();
     await expect(inviting.getByRole("button", { name: "Done" })).toBeVisible();
-    await saidInTheDialog("the invite dialog's answer");
+    await saidIn(inviting, "the invite dialog's answer");
     await inviting.getByRole("button", { name: "Done" }).click();
     await expect(page.getByRole("region", { name: "Invitations" }).getByRole("row")).toHaveCount(2);
     await said("the Invitations tab with an invitation waiting");
+
+    await page.goto(GROUPS_VIEW);
+    const naming = page.getByRole("textbox", { name: "Name of a new group" });
+    await naming.fill("Site leads");
+    await naming.press("Enter");
+    await expect(page.getByRole("button", { name: "Site leads", exact: true })).toBeFocused();
+    await said(`${GROUPS_VIEW}, a group created`);
+    await page.getByRole("button", { name: "Site leads", exact: true }).click();
+    const group = page.getByRole("dialog", { name: "Site leads" });
+    await saidIn(group, "a group's sheet");
+    await group.getByRole("button", { name: "Delete Site leads" }).click();
+    await saidIn(
+      page.getByRole("alertdialog", { name: "Delete Site leads" }),
+      "a group's deletion",
+    );
 
     // The accept page stands outside the shell, so it is read without the People heading.
     const saidOnTheAcceptPage = async (where: string) => {

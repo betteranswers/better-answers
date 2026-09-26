@@ -18,6 +18,7 @@ import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
+import { useGroups } from "./groups-api.ts";
 import { MemberSheet, memberButtonId, type OpenedAt } from "./member-sheet.tsx";
 import { useMembers, useRemoveMember, type ListedMember } from "./people-api.ts";
 import { PEOPLE_KEYSTROKES } from "./people-state.ts";
@@ -172,6 +173,8 @@ function MemberList(properties: { readonly members: readonly ListedMember[] }) {
   const [opened, setOpened] = useState<Opened>();
   const [outcome, setOutcome] = useState<Outcome>();
   const searchRef = useRef<HTMLInputElement>(null);
+  // Read with the list, so a sheet opened on its groups has boxes to land focus on.
+  useGroups();
 
   const columns = useMemo(
     () =>
@@ -215,6 +218,9 @@ function MemberList(properties: { readonly members: readonly ListedMember[] }) {
   });
   useKeystroke(PEOPLE_KEYSTROKES.revokeCredentials, () => {
     openInFocus("credentials");
+  });
+  useKeystroke(PEOPLE_KEYSTROKES.changeGroups, () => {
+    openInFocus("groups");
   });
   useKeystroke(PEOPLE_KEYSTROKES.remove, () => {
     openInFocus("removal");

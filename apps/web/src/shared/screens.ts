@@ -67,7 +67,7 @@ export const SCREENS = [
     defaultView: "/people/members",
     views: [
       { name: "Members", path: "/people/members", built: true },
-      { name: "Groups", path: "/people/groups", built: false },
+      { name: "Groups", path: "/people/groups", built: true },
       { name: "Owners", path: "/people/owners", built: false },
       { name: "Thresholds", path: "/people/thresholds", built: false },
       { name: "Erasure and suppression", path: "/people/erasure-and-suppression", built: false },
@@ -155,6 +155,13 @@ export const CONSOLE: Surface = {
 
 /** A union of tuple types has no callable array methods; the element type restores them. */
 export const viewsOf = (screen: Screen): readonly View[] => screen.views;
+
+/** A view's address read off the list, so a link to it is never a second copy. */
+export const viewNamed = (screen: Screen, name: View["name"]): View => {
+  const view = viewsOf(screen).find((candidate) => candidate.name === name);
+  if (view === undefined) throw new Error(`${screen.name} has no view named ${name}`);
+  return view;
+};
 
 /**
  * Any address beneath a screen is on that screen; the trailing slash keeps a longer name
