@@ -370,10 +370,14 @@ const perSectionHits = (
 };
 
 const dumpGrep = async (flags: Flags, io: OpsIo): Promise<number> => {
-  const tokens = (flagValue(flags, "tokens") ?? "")
-    .split(",")
-    .map((token) => token.trim())
-    .filter((token) => token.length > 0);
+  const tokens = [
+    ...new Set(
+      (flagValue(flags, "tokens") ?? "")
+        .split(",")
+        .map((token) => token.trim())
+        .filter((token) => token.length > 0),
+    ),
+  ];
   if (tokens.length === 0) {
     io.say("dump-grep: --tokens <a,b,…> is required");
     return USAGE;

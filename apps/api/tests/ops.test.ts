@@ -1662,6 +1662,31 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ]);
     });
 
+    it("counts and reports a token named twice only once", async () => {
+      const run = await ops(
+        app(),
+        ["dump-grep", "--tokens", "other@example.test,other@example.test"],
+        dump,
+      );
+
+      expect(run.exitCode).toBe(0);
+      expect(run.lines).toEqual(["othe…st: present in 1 line(s) of table public.person"]);
+    });
+
+    it("reports each distinct token once, in the order first named", async () => {
+      const run = await ops(
+        app(),
+        ["dump-grep", "--tokens", "other@example.test,nobody@example.test,other@example.test"],
+        dump,
+      );
+
+      expect(run.exitCode).toBe(0);
+      expect(run.lines).toEqual([
+        "othe…st: present in 1 line(s) of table public.person",
+        "nobo…st: absent",
+      ]);
+    });
+
     it("never counts the COPY header's column names as a row", async () => {
       const run = await ops(app(), ["dump-grep", "--tokens", "id"], dump);
 
