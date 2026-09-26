@@ -2,20 +2,30 @@ import type { Logger } from "pino";
 
 import type { Clock, Malformed, Result, UserPrincipal } from "@better-answers/core/kernel";
 import {
+  addToGroup,
   cancelInvitation,
   changeRole,
   changeRoleInput,
+  createGroup,
+  createGroupInput,
+  deleteGroup,
+  deleteGroupInput,
   flagDisplayName,
   flagDisplayNameInput,
+  groupMemberInput,
   invitationInput,
   inviteMember,
   inviteMemberInput,
+  listGroups,
   listInvitations,
   listMembers,
   readAuditLog,
   readAuditLogInput,
+  removeFromGroup,
   removeMember,
   removeMemberInput,
+  renameGroup,
+  renameGroupInput,
   resendInvitation,
   revokeCredentialsHere,
   revokeCredentialsHereInput,
@@ -131,4 +141,20 @@ export const membersRouter = router({
       if (flagged.raised !== null) await tellTheOperator(ctx, flagged.raised);
       return { personId: flagged.personId, sentToTheOperator: true } as const;
     }),
+  groups: queryProcedure.query(({ ctx }) =>
+    crossing(ctx, listGroups.name, listGroups(ctx.principal, ctx.tx)),
+  ),
+  createGroup: mutationProcedure
+    .input(parsedBy(createGroupInput))
+    .mutation(answeredBy(createGroup)),
+  renameGroup: mutationProcedure
+    .input(parsedBy(renameGroupInput))
+    .mutation(answeredBy(renameGroup)),
+  deleteGroup: mutationProcedure
+    .input(parsedBy(deleteGroupInput))
+    .mutation(answeredBy(deleteGroup)),
+  addToGroup: mutationProcedure.input(parsedBy(groupMemberInput)).mutation(answeredBy(addToGroup)),
+  removeFromGroup: mutationProcedure
+    .input(parsedBy(groupMemberInput))
+    .mutation(answeredBy(removeFromGroup)),
 });

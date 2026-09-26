@@ -1,5 +1,5 @@
 import { boundarySchemas, CURATED_ORIGIN } from "@better-answers/schema";
-import type { z } from "zod";
+import { z } from "zod";
 
 import { act, declareActs, record } from "../audit/index.ts";
 import { attempt, err, ok, requireAdmin, ulid } from "../kernel/index.ts";
@@ -43,16 +43,28 @@ type GuardRefusal = AdminRefusal | MemberRefusal<"malformed">;
 
 type TargetRefusal = GuardRefusal | MemberRefusal<"no-such-group">;
 
-export type CreateGroupInput = { readonly name: string };
+/**
+ * Each field is any text, so a name or an id the act cannot take reaches it and is refused in its
+ * own word, `malformed`.
+ */
+export const createGroupInput = z.object({ name: z.string() });
+
+export type CreateGroupInput = z.output<typeof createGroupInput>;
 export type CreateGroupRefusal = GuardRefusal | MemberRefusal<"name-taken"> | Error;
 
-export type RenameGroupInput = { readonly groupId: string; readonly name: string };
+export const renameGroupInput = z.object({ groupId: z.string(), name: z.string() });
+
+export type RenameGroupInput = z.output<typeof renameGroupInput>;
 export type RenameGroupRefusal = TargetRefusal | MemberRefusal<"name-taken"> | Error;
 
-export type DeleteGroupInput = { readonly groupId: string };
+export const deleteGroupInput = z.object({ groupId: z.string() });
+
+export type DeleteGroupInput = z.output<typeof deleteGroupInput>;
 export type DeleteGroupRefusal = TargetRefusal | Error;
 
-export type GroupMemberInput = { readonly groupId: string; readonly userId: string };
+export const groupMemberInput = z.object({ groupId: z.string(), userId: z.string() });
+
+export type GroupMemberInput = z.output<typeof groupMemberInput>;
 export type AddToGroupRefusal =
   | TargetRefusal
   | MemberRefusal<"no-such-member" | "already-in-group">
