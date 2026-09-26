@@ -32,7 +32,7 @@ const fileResult = z.looseObject({ source: z.string().optional(), mutants: z.arr
 
 const testFile = z.looseObject({ tests: z.array(test) });
 
-// Loose, so every key survives: the merged file is the one the next run's Stryker reads back.
+/** Loose, so every key survives: the merged file is the one the next run's Stryker reads back. */
 const results = z.looseObject({
   files: z.record(z.string(), fileResult),
   testFiles: z.record(z.string(), testFile).optional(),
@@ -54,8 +54,10 @@ const USAGE = [
   "       mutation-shards merge --leg <name> --of <count> --shards <directory> --baseline <path> --out <directory>",
 ].join("\n");
 
-// In order, as Stryker reads `mutate`: a `!` pattern takes back what an earlier one chose. The
-// glob, like Stryker's, never matches a hidden file.
+/**
+ * In order, as Stryker reads `mutate`: a `!` pattern takes back what an earlier one chose. The
+ * glob, like Stryker's, never matches a hidden file.
+ */
 export const mutateSet = (root: string, patterns: readonly string[]): readonly string[] => {
   const chosen = new Set<string>();
   for (const pattern of patterns) {
@@ -71,10 +73,10 @@ export const mutateSet = (root: string, patterns: readonly string[]): readonly s
   return [...chosen].toSorted(byCodeUnit);
 };
 
-// Seconds of a worker, fitted to a forced run of every shard. A timeout waits out the whole
-// related suite.
+/** Seconds of a worker, fitted to a forced run of every shard. */
 const ORDINARY_SECONDS = 10;
 const STATIC_SECONDS = 13;
+/** A timeout waits out the whole related suite. */
 const TIMEOUT_SECONDS = 370;
 
 const secondsOf = (found: Mutant): number => {
@@ -86,8 +88,10 @@ const secondsOf = (found: Mutant): number => {
 const sum = (values: readonly number[]): number =>
   values.reduce((total, value) => total + value, 0);
 
-// Unmeasured, a file is priced by size at the previous run's seconds a byte; with no previous
-// run, by size alone.
+/**
+ * Unmeasured, a file is priced by size at the previous run's seconds a byte; with no previous
+ * run, by size alone.
+ */
 export const weightsOf = (
   root: string,
   files: readonly string[],
@@ -109,8 +113,10 @@ export const weightsOf = (
 
 type Load = { weight: number; readonly files: string[] };
 
-// The heaviest file first, each onto the lightest shard so far. A stable sort over files in path
-// order gives every job the same slices.
+/**
+ * The heaviest file first, each onto the lightest shard so far. A stable sort over files in path
+ * order gives every job the same slices.
+ */
 export const shardSlices = (
   weights: ReadonlyMap<string, number>,
   of: number,
@@ -154,7 +160,7 @@ const SILENT: ConstructorParameters<typeof Instrumenter>[0] = {
   fatal: nothing,
 };
 
-// A place as Stryker reports it: lines and columns from 1, the end column past the text.
+/** A place as Stryker reports it: lines and columns from 1, the end column past the text. */
 const textAt = (source: string, { start, end }: Place): string => {
   const rows = source.split("\n");
   const offset = ({ line, column }: Place["start"]): number =>
@@ -168,8 +174,10 @@ const mutantKey = (
   text: string,
 ) => JSON.stringify([mutatorName, replacement, text]);
 
-// Known by what it mutates, not where, so a mutant keeps its price when its file moves it. Two
-// alike pair in line order.
+/**
+ * Known by what it mutates, not where, so a mutant keeps its price when its file moves it. Two
+ * alike pair in line order.
+ */
 const pricesIn = (entry: FileResult | undefined): ReadonlyMap<string, number[]> => {
   const prices = new Map<string, number[]>();
   if (entry?.source === undefined) return prices;
@@ -186,8 +194,10 @@ const pricesIn = (entry: FileResult | undefined): ReadonlyMap<string, number[]> 
   return prices;
 };
 
-// Stryker's own instrumenter, with its default options, lists the mutants a run makes. Its
-// lines and columns count from 0.
+/**
+ * Stryker's own instrumenter, with its default options, lists the mutants a run makes. Its
+ * lines and columns count from 0.
+ */
 const spansIn = async (
   name: string,
   content: string,
@@ -214,8 +224,10 @@ const spansIn = async (
   });
 };
 
-// Stryker mutates only what a range holds whole, so a mutant across a cut would be in neither
-// piece.
+/**
+ * Stryker mutates only what a range holds whole, so a mutant across a cut would be in neither
+ * piece.
+ */
 const cutsBetween = (spans: readonly Span[], lastLine: number): readonly number[] => {
   // Of the cuts leaving the same mutants either side, the first stands for all.
   const held = new Set<number>();
@@ -231,7 +243,7 @@ const cutsBetween = (spans: readonly Span[], lastLine: number): readonly number[
 const costBefore = (spans: readonly Span[], after: number): number =>
   sum(spans.filter((span) => span.start <= after).map((span) => span.seconds));
 
-// Nearest its share, but never so late that a later piece is left without a cut.
+/** Nearest its share, but never so late that a later piece is left without a cut. */
 const chosenCuts = (spans: readonly Span[], cuts: readonly number[], count: number) => {
   const total = sum(spans.map((span) => span.seconds));
   const chosen: number[] = [];
@@ -246,7 +258,7 @@ const chosenCuts = (spans: readonly Span[], cuts: readonly number[], count: numb
   return chosen;
 };
 
-// Line ranges as `stryker run --mutate` takes them, covering the file end to end.
+/** Line ranges as `stryker run --mutate` takes them, covering the file end to end. */
 export const piecesOf = async (
   root: string,
   file: string,
@@ -272,8 +284,10 @@ type Part = { readonly file: string; readonly lines?: Lines | undefined };
 const partName = ({ file, lines }: Part): string =>
   lines === undefined ? file : `${file}:${String(lines.from)}-${String(lines.to)}`;
 
-// A shard apiece for the pieces, so cutting a file that had a shard to itself leaves the others'
-// slices as they were.
+/**
+ * A shard apiece for the pieces, so cutting a file that had a shard to itself leaves the others'
+ * slices as they were.
+ */
 const legSlices = async (
   name: string,
   { root, mutate, split = new Map<string, number>() }: Leg,
@@ -332,8 +346,10 @@ type TestTable = {
   readonly files: ReadonlyMap<string, TestFile>;
 };
 
-// Each shard numbers its tests itself; a test is matched by file, place and title, as Stryker
-// matches one between runs.
+/**
+ * Each shard numbers its tests itself; a test is matched by file, place and title, as Stryker
+ * matches one between runs.
+ */
 const testTableOf = (sources: readonly Results[]): TestTable => {
   const idByKey = new Map<string, string>();
   const files = new Map<string, { readonly entry: TestFile; readonly tests: Test[] }>();
@@ -387,7 +403,7 @@ type Merged = {
 const numbered = (of: number): readonly number[] =>
   Array.from({ length: of }, (_, index) => index + 1);
 
-// A finished shard's report and its checkpoint are one report written twice.
+/** A finished shard's report and its checkpoint are one report written twice. */
 const leftBy = (shards: ReadonlyMap<number, ShardResults>, shard: number): Results | undefined =>
   shards.get(shard)?.report ?? shards.get(shard)?.checkpoint;
 
@@ -414,16 +430,20 @@ const shardLines = (
   ];
 };
 
-// A piece's shard holds the whole file, the rest carried forward, so each mutant comes from the
-// piece holding its first line.
+/**
+ * A piece's shard holds the whole file, the rest carried forward, so each mutant comes from the
+ * piece holding its first line.
+ */
 const heldBy = (lines: Lines | undefined, found: Mutant): boolean => {
   if (lines === undefined) return true;
   const line = found.location?.start.line ?? 0;
   return lines.from <= line && line <= lines.to;
 };
 
-// A stopped shard's gaps stay out, or a forced run's would refill with what it was replacing.
-// Only a shard that left nothing is filled.
+/**
+ * A stopped shard's gaps stay out, or a forced run's would refill with what it was replacing.
+ * Only a shard that left nothing is filled.
+ */
 export const mergeShards = ({
   leg,
   files,
@@ -475,8 +495,10 @@ export const mergeShards = ({
   return { checkpoint, report: everyShardFinished ? checkpoint : undefined, summary };
 };
 
-// Absent, not JSON or not a report reads as nothing left: a shard cut before or during its
-// write, or a leg never run.
+/**
+ * Absent, not JSON or not a report reads as nothing left: a shard cut before or during its
+ * write, or a leg never run.
+ */
 const readResults = (file: string): Results | undefined => {
   try {
     const read = results.safeParse(JSON.parse(readFileSync(file, "utf8")));
@@ -494,8 +516,7 @@ const positive = (value: string | undefined, name: string): number => {
   return parsed;
 };
 
-// The workflow's gather step writes these names, each after its shard's number, so one
-// directory holds every shard.
+/** The gather step puts a shard's number before each name, so one directory holds every shard. */
 const CHECKPOINT = "checkpoint.json";
 const REPORT = "report.json";
 

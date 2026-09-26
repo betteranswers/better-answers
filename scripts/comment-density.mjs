@@ -11,7 +11,7 @@ import {
   reportOf,
 } from "../packages/devtools/src/comment-density.ts";
 
-// The tree it is run in, not the tree it lives in, so a suite can spawn it over a throwaway.
+/** The tree it is run in, not the tree it lives in, so a suite can spawn it over a throwaway. */
 const root = process.cwd();
 
 const refuse = (message) => {
@@ -36,7 +36,7 @@ try {
 const roots = parsed.positionals;
 const directories = parsed.values.directory ?? [];
 
-// A set no directory gathers, named so the report has one line for it rather than five.
+/** A set no directory gathers, named so the report has one line for it rather than five. */
 const named = (parsed.values.unit ?? []).map((given) => {
   const at = given.indexOf("=");
   const label = given.slice(0, Math.max(at, 0)).trim();
@@ -55,7 +55,7 @@ if (roots.length === 0 && directories.length === 0 && named.length === 0) {
   refuse("name at least one root of workspaces, one directory with --directory, or one --unit");
 }
 
-// A workspace is what carries a manifest, so a new one is measured without a line here.
+/** A workspace is what carries a manifest, so a new one is measured without a line here. */
 const workspaces = roots.flatMap((directory) =>
   readdirSync(path.join(root, directory), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())

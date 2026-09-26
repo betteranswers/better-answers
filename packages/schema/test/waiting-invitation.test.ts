@@ -50,7 +50,7 @@ const invited = async (
     })
   ).id;
 
-// The shape a database held before the migration: no index over the waiting invitations.
+/** The shape a database held before the migration: no index over the waiting invitations. */
 const withoutTheIndex = async (client: pg.PoolClient): Promise<void> => {
   await client.query('DROP INDEX "invitation_waiting_uidx"');
 };

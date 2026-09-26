@@ -7,7 +7,7 @@ import {
   untilContainerGone,
 } from "./held-containers.ts";
 
-// Ryuk's own timer is ten seconds; a shorter one only shortens the wait for what it clears.
+/** Ryuk's own timer is ten seconds; a shorter one only shortens the wait for what it clears. */
 const QUICK_RYUK = { TESTCONTAINERS_RYUK_RECONNECTION_TIMEOUT: "1s" };
 
 const CLEARED_WITHIN_MS = 20_000;

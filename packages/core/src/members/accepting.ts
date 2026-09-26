@@ -151,7 +151,7 @@ export type ReadInvitationInput = {
   readonly now: Date;
 };
 
-// An id that parses as none names no invitation, which is what a mistyped link is.
+/** An id that parses as none names no invitation, which is what a mistyped link is. */
 const askedOf = (
   input: ReadInvitationInput,
 ): Result<Asked, MemberRefusal<"malformed" | "no-such-invitation">> => {

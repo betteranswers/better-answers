@@ -163,8 +163,10 @@ const contentsOf = (file: string): string | undefined =>
 
 const REFUSED = Symbol("the artifacts API refuses the token");
 
-// Answers the runs API as asked, lists `pages.json` as the artifacts API, and downloads a run's
-// checkpoint as one naming that run.
+/**
+ * Answers the runs API as asked, lists `pages.json` as the artifacts API, and downloads a run's
+ * checkpoint as one naming that run.
+ */
 const fakeGh = (
   file: (name: string) => string,
   answer: unknown,
@@ -403,9 +405,9 @@ describe("the nightly mutation baseline, kept as the previous run's artifact", (
   });
 });
 
-// The organisation's plan runs 20 jobs at once. A merge group runs four legs and a pull request
-// three, each opening with a lane job.
+/** The organisation's plan runs 20 jobs at once. */
 const CONCURRENT_JOBS = 20;
+/** A merge group runs four legs and a pull request three, each opening with a lane job. */
 const MERGE_GROUP_LEGS = 4;
 const PULL_REQUEST_LEGS = 3;
 const A_LANE_JOB = 1;

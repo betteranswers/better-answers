@@ -92,6 +92,7 @@
     "anti-slop/no-shape-in-symbol-names": "off",
     "better-answers/act-admits-before-await": "error",
     "better-answers/comment-only-the-why": "error",
+    "better-answers/declaration-doc-block": "error",
     "better-answers/string-cites-nothing": "error",
     "better-answers/mcp-entry-annotations": "error",
     "better-answers/mcp-entry-no-workspace-argument": "error",

@@ -177,11 +177,19 @@ No config key reports a disable that suppresses nothing, so the `lint` script pa
 `--report-unused-disable-directives-severity=error`. The pre-commit hook and each workspace's
 `lint` pass it too.
 
-Two rules are this plugin's own. `comment-only-the-why` holds the 25-word cap and the citation
+Three rules are this plugin's own. `comment-only-the-why` holds the 25-word cap and the citation
 ban. A `/** */` block on an exported function under `packages/core/src` or `packages/schema/src` may
 run to 50 words. A disable gives its reason on the same line, and a directive's reason counts against
 the cap. A notice is exempt by its opening text. A directive is dropped before blocks are
 grouped, so it cannot lend a paragraph its exemption.
+
+`declaration-doc-block` refuses a run of `//` lines that ends on the line above a module-scope
+declaration or export, and its fix writes the run as a `/** */` block. It groups blocks the way
+`comment-only-the-why` does, through `lint-rules/shared/comment-blocks.ts`, so a block it fixes has
+the words the cap already counted. A comment inside a function body or a call's argument is left
+as it is, and so is a directive or a notice. So is a run directly under a directive, since
+`@ts-expect-error` reaches past `//` lines to the code and a `/** */` block would stop it. A run holding `*/` is reported without a fix, since
+the doc block would close early.
 
 `string-cites-nothing` reads the strings in source. A usage line, a refusal message or a log
 line sends its reader somewhere just as a comment does. A string with no space in it is a value
@@ -201,7 +209,7 @@ notice. A comment in YAML, shell, TOML or SQL is the density ceiling's alone.
 
 | Part | What runs it | Its suite |
 | --- | --- | --- |
-| `.oxlintrc.json`, with `lint-rules/rules/comment-only-the-why.ts` and `lint-rules/rules/string-cites-nothing.ts` | `pnpm lint` | `test/comment-lint.test.ts`, `test/comment-only-the-why.test.ts`, `test/string-cites-nothing.test.ts` |
+| `.oxlintrc.json`, with `lint-rules/rules/comment-only-the-why.ts`, `lint-rules/rules/declaration-doc-block.ts` and `lint-rules/rules/string-cites-nothing.ts` | `pnpm lint` | `test/comment-lint.test.ts`, `test/comment-only-the-why.test.ts`, `test/declaration-doc-block.test.ts`, `test/string-cites-nothing.test.ts` |
 | `python/comment_gate.py` | `pnpm comment-gate:python` | `test/comment-gate-python.test.ts` |
 | `src/comment-density.ts`, behind `scripts/comment-density.mjs` | `pnpm comment-density` | `test/comment-density.test.ts` |
 
@@ -245,7 +253,8 @@ pnpm or uv. cloc agrees with scc where the choice mattered: a Python docstring i
 is passed because cloc counts a file with an identical twin once, which would quietly take an
 arm's lines away.
 
-`comment-only-the-why`'s fix deletes the offending block. The suite proves it by spawning oxlint `--fix` over
+`comment-only-the-why`'s fix deletes the offending block, and `declaration-doc-block`'s rewrites
+it. Both suites prove their fix through `test/oxlint-fix.ts`, which spawns oxlint `--fix` over
 a tree it wrote rather than through the runner, which answers with a report and not a rewrite;
 a linter that did not run leaves the text as it was, and both halves of that assertion fail.
 It spawns the binary the runner would, through the runner's own `executableOf`, so the two

@@ -192,7 +192,11 @@ describe("the write-time hook hands back the broken comment rule", () => {
 
 describe("the write-time hook passes a comment that earns its place", () => {
   it.each([
-    ["a why inside the ceiling", "probe/why.ts", `// ${A_WHY_OF_TWENTY}\nexport const keep = 1;\n`],
+    [
+      "a why inside the ceiling",
+      "probe/why.ts",
+      `/** ${A_WHY_OF_TWENTY} */\nexport const keep = 1;\n`,
+    ],
     [
       "a linter directive",
       "probe/directive.ts",
@@ -278,6 +282,12 @@ describe("the write-time hook runs the root config's comment rules", () => {
       "packages/probe/long-named.ts",
       `// ${FORTY_WORDS}\n`,
       "comment-only-the-why",
+    ],
+    [
+      "a line comment on a declaration",
+      "packages/probe/doc-block.ts",
+      "// Kept short.\n",
+      "declaration-doc-block",
     ],
     [
       "a disable with no reason",

@@ -29,7 +29,7 @@ const LONG_UK_DATE = /^\d{1,2} [A-Z][a-z]+ \d{4}$/;
 
 const invitationsRegion = (page: Page) => page.getByRole("region", { name: "Invitations" });
 
-// The header row is a row too, so the invitations are the rows with a cell.
+/** The header row is a row too, so the invitations are the rows with a cell. */
 const invitationRows = (page: Page): Locator =>
   invitationsRegion(page)
     .getByRole("row")
@@ -46,7 +46,7 @@ type AtInvitations = {
   readonly editor: string;
 };
 
-// The Editor is a member already, so a spec can invite them and be refused.
+/** The Editor is a member already, so a spec can invite them and be refused. */
 const anAdminAtInvitations = async (
   page: Page,
   api: APIRequestContext,
@@ -67,7 +67,7 @@ const anAdminAtInvitations = async (
   return at;
 };
 
-// Signed in on People below Admin, so what the tab shows them is a refusal.
+/** Signed in on People below Admin, so what the tab shows them is a refusal. */
 const aMemberBelowAdminAtPeople = async (
   page: Page,
   api: APIRequestContext,

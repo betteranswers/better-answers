@@ -9,7 +9,7 @@ const packageRoot = (name: string): string => path.dirname(require.resolve(`${na
 const strykerRoot = packageRoot("@stryker-mutator/core");
 const runnerRoot = packageRoot("@stryker-mutator/vitest-runner");
 
-// The runner's own vitest, the one its patch under `patches/` is written against.
+/** The runner's own vitest, the one its patch under `patches/` is written against. */
 const vitestRoot = path.dirname(
   createRequire(path.join(runnerRoot, "package.json")).resolve("vitest/package.json"),
 );

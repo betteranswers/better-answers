@@ -1,7 +1,7 @@
 import { POSTGRES_IMAGE } from "@better-answers/schema";
 import { GenericContainer } from "testcontainers";
 
-// The pinned image every suite already pulls; `sleep` holds it without starting Postgres.
+/** The pinned image every suite already pulls; `sleep` holds it without starting Postgres. */
 const started = await new GenericContainer(POSTGRES_IMAGE)
   .withCommand(["sleep", "infinity"])
   .start();
