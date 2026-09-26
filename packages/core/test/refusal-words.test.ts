@@ -10,6 +10,7 @@ import type {
   DecideRefusal,
   InviteMemberRefusal,
   ListInvitationsRefusal,
+  RemoveMemberRefusal,
   RequestAccessRefusal,
   ResendInvitationRefusal,
   RevokeCredentialsHereRefusal,
@@ -174,6 +175,7 @@ describe("the refusal-word walk", () => {
     expectTypeOf<CancelInvitationRefusal>().toExtend<EveryRegisteredWord | Error>();
     expectTypeOf<ListInvitationsRefusal>().toExtend<EveryRegisteredWord | Error>();
     expectTypeOf<RevokeCredentialsHereRefusal>().toExtend<EveryRegisteredWord | Error>();
+    expectTypeOf<RemoveMemberRefusal>().toExtend<EveryRegisteredWord | Error>();
     expectTypeOf<SourceRefusal<"no-such-binding"> | "invented">().not.toExtend<
       EveryRegisteredWord | Error
     >();

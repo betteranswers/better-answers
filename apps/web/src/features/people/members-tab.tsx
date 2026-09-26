@@ -7,8 +7,9 @@ import {
   tableFeatures,
   useTable,
 } from "@tanstack/react-table";
-import { useId, useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState, type RefObject } from "react";
 
+import type { ApiError } from "@/shared/api/trpc.ts";
 import { GridTable } from "@/shared/grid-table.tsx";
 import { Icon } from "@/shared/icon.tsx";
 import { useKeystroke } from "@/shared/keystrokes.tsx";
@@ -18,10 +19,10 @@ import { Input } from "@/shared/ui/input.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
 import { MemberSheet, memberButtonId, type OpenedAt } from "./member-sheet.tsx";
-import { useMembers, type ListedMember } from "./people-api.ts";
+import { useMembers, useRemoveMember, type ListedMember } from "./people-api.ts";
 import { PEOPLE_KEYSTROKES } from "./people-state.ts";
 import { outcomeOfFailure } from "./refusal.tsx";
-import { GroupPills, JoinedOn } from "./words.tsx";
+import { GroupPills, JoinedOn, nameOf } from "./words.tsx";
 
 const features = tableFeatures({
   columnFilteringFeature,
@@ -118,6 +119,52 @@ function NoOneMatches(properties: {
 
 type Opened = { readonly personId: string; readonly at: OpenedAt };
 
+/**
+ * The removed row goes before the api answers, so focus lands on the row that took its place, else
+ * on the search.
+ */
+function useRemovalFromTheList(properties: {
+  readonly shownIds: () => readonly string[];
+  readonly closeTheSheet: () => void;
+  readonly setOutcome: (outcome: Outcome | undefined) => void;
+  readonly searchRef: RefObject<HTMLInputElement | null>;
+}) {
+  const { shownIds, closeTheSheet, setOutcome, searchRef } = properties;
+  const removeMember = useRemoveMember();
+  const landing = useRef<{ readonly personId: string | undefined }>(undefined);
+
+  const remove = (member: ListedMember) => {
+    const shown = shownIds();
+    const at = shown.indexOf(member.personId);
+    landing.current = { personId: shown[at + 1] ?? shown[at - 1] };
+    closeTheSheet();
+    setOutcome(undefined);
+    removeMember.mutate(
+      { personId: member.personId },
+      {
+        onSuccess: () => {
+          setOutcome({
+            tone: "said",
+            words: `${nameOf(member)} is no longer a member of this workspace.`,
+          });
+        },
+        onError: (failure: Error | ApiError) => {
+          setOutcome(outcomeOfFailure(failure));
+        },
+      },
+    );
+  };
+
+  const returnFocus = (personId: string) => {
+    const landsOn = landing.current === undefined ? personId : landing.current.personId;
+    landing.current = undefined;
+    const row = landsOn === undefined ? null : document.getElementById(memberButtonId(landsOn));
+    (row ?? searchRef.current)?.focus();
+  };
+
+  return { remove, returnFocus };
+}
+
 function MemberList(properties: { readonly members: readonly ListedMember[] }) {
   const { members } = properties;
   const [search, setSearch] = useState("");
@@ -168,6 +215,18 @@ function MemberList(properties: { readonly members: readonly ListedMember[] }) {
   });
   useKeystroke(PEOPLE_KEYSTROKES.revokeCredentials, () => {
     openInFocus("credentials");
+  });
+  useKeystroke(PEOPLE_KEYSTROKES.remove, () => {
+    openInFocus("removal");
+  });
+
+  const removal = useRemovalFromTheList({
+    shownIds: () => table.getRowModel().rows.map((row) => row.id),
+    closeTheSheet: () => {
+      setOpened(undefined);
+    },
+    setOutcome,
+    searchRef,
   });
 
   const clear = () => {
@@ -228,6 +287,10 @@ function MemberList(properties: { readonly members: readonly ListedMember[] }) {
           openedAt={opened.at}
           onClose={() => {
             setOpened(undefined);
+          }}
+          onRemove={removal.remove}
+          returnFocus={() => {
+            removal.returnFocus(opened.personId);
           }}
         />
       )}

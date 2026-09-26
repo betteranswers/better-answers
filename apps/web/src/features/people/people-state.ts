@@ -6,6 +6,7 @@ export const PEOPLE_KEYSTROKES = {
   open: { key: "o", act: "Open the member in focus" },
   changeRole: { key: "c", act: "Change the role of the member in focus" },
   revokeCredentials: { key: "v", act: "Revoke the credentials here of the member in focus" },
+  remove: { key: "d", act: "Remove the member in focus" },
   invite: { key: "i", act: "Invite a person by email address" },
   resend: { key: "r", act: "Resend the invitation in focus" },
   cancel: { key: "x", act: "Cancel the invitation in focus" },

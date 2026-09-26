@@ -17,6 +17,7 @@ import {
 } from "../src/concepts/index.ts";
 import type { FrontmatterValue, TrustStatus } from "../src/answering/index.ts";
 import type { Result, UserPrincipal } from "../src/kernel/index.ts";
+import { removeMember } from "../src/members/index.ts";
 import { commit, head, PLATFORM_BOT, withRepositoryLock } from "@better-answers/core/store/git";
 import { walkFrom } from "@better-answers/core/store/graph";
 import {
@@ -1512,7 +1513,7 @@ describe("opening a concept by IRI", () => {
     );
   });
 
-  it("names the checking member, or their id once they leave", async () => {
+  it("names the checker from their person row, after removal too", async () => {
     const scenario = await arrange();
     const written = await landed(scenario, writeFor({ status: "stable" }));
     const priya = await memberOf(db().pool, scenario.workspaceId, "priya.anand@acme.invalid");
@@ -1536,12 +1537,12 @@ describe("opening a concept by IRI", () => {
 
     expect(await checkedBy()).toBe("Priya Anand");
 
-    await db().pool.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
-      scenario.workspaceId,
-      priya.id,
-    ]);
+    const removed = await reading(scenario.admin, (principal, tx) =>
+      removeMember(principal, tx, { personId: priya.id, at: new Date() }),
+    );
 
-    expect(await checkedBy()).toBe(`human:${priya.id}`);
+    expect(removed).toMatchObject({ ok: true });
+    expect(await checkedBy()).toBe("Priya Anand");
   });
 
   it("shows a deprecated concept to every reader as deprecated", async () => {

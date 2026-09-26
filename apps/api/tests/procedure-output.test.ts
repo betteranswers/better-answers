@@ -37,6 +37,7 @@ describe("what a procedure may answer the wire", () => {
       "members.invitations",
       "members.invite",
       "members.list",
+      "members.remove",
       "members.resendInvitation",
       "members.revokeCredentials",
       "person.requestAccess",
@@ -73,6 +74,7 @@ describe("what a procedure may answer the wire", () => {
       | "members.resendInvitation"
       | "members.cancelInvitation"
       | "members.revokeCredentials"
+      | "members.remove"
       | "routes.list"
       | "sources.list"
       | "sources.bind"

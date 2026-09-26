@@ -1087,7 +1087,8 @@ type ConceptCheck = {
 
   readonly contentHash: string | null;
 
-  readonly memberName: string | null;
+  /** Read by person id, so it outlives the membership; null once erasure clears the name. */
+  readonly checkerName: string | null;
 };
 
 export type OpenedConcept = {
@@ -1122,7 +1123,7 @@ type ConceptRow = {
 const CONCEPT_SELECT = `SELECT c.iri, c.path, c.kind, c.title, c.frontmatter, c.body, c.status,
               c.content_hash, c.commit_sha,
               v.actor AS checked_by, v.checked_at, v.content_hash AS checked_hash,
-              checker.name AS checked_by_name
+              NULLIF(checker.name, '') AS checked_by_name
          FROM concept_index c
          LEFT JOIN LATERAL (
                 SELECT actor, checked_at, content_hash
@@ -1131,12 +1132,9 @@ const CONCEPT_SELECT = `SELECT c.iri, c.path, c.kind, c.title, c.frontmatter, c.
                  ORDER BY checked_at DESC, id DESC
                  LIMIT 1
               ) v ON true
-         LEFT JOIN LATERAL (
-                SELECT u.name
-                  FROM member m
-                  JOIN "user" u ON u.id = m.user_id
-                 WHERE m.workspace_id = c.workspace_id AND v.actor = '${PERSON_PREFIX}' || m.user_id
-              ) checker ON true
+         LEFT JOIN "user" checker
+                ON starts_with(v.actor, '${PERSON_PREFIX}')
+               AND checker.id = substr(v.actor, ${PERSON_PREFIX.length + 1})
         WHERE c.workspace_id = $1 AND ${readableClause("c", 2)}`;
 
 const openedOf = (row: ConceptRow): OpenedConcept => ({
@@ -1200,6 +1198,6 @@ const checkOf = (row: ConceptRow): ConceptCheck | undefined => {
     actor: row.checked_by,
     at: row.checked_at,
     contentHash: row.checked_hash,
-    memberName: row.checked_by_name,
+    checkerName: row.checked_by_name,
   };
 };

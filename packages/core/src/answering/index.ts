@@ -223,7 +223,7 @@ const trustOfCheck = (check: OpenedConcept["check"]): Omit<Trust, "status"> =>
     ? { tier: "unverified", checkedBy: null, checkedAt: null, rider: null }
     : {
         tier: isPersonActor(check.actor) ? "human-reviewed" : "machine-confirmed",
-        checkedBy: check.memberName ?? check.actor,
+        checkedBy: check.checkerName ?? check.actor,
         checkedAt: check.at.toISOString(),
         rider: check.contentHash === null ? "imported" : null,
       };
