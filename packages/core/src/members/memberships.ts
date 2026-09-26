@@ -14,6 +14,9 @@ import {
 import type { Tx } from "../store/postgres/index.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
+/** Every act on one member names them by person id, as the list does. */
+export const memberKeyed = z.object({ personId: boundarySchemas.user.select.shape.id });
+
 const listMembersAct = declareAct({
   admits: { role: "Admin", purposes: [] },
   input: z.object({}),

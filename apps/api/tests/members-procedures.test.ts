@@ -2,7 +2,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { until } from "@better-answers/core/testing/postgres";
 
+import { connectAsHost, setActiveWorkspace } from "./flow.ts";
 import { startApp, type TestApp } from "./harness.ts";
+import { callMcp } from "./mcp-call.ts";
 import {
   failureOf,
   revocationHeldOpen,
@@ -18,7 +20,7 @@ import {
   refusalToAnotherWorkspacesAdmin,
   ROLE_FORBIDS_ANSWERED,
 } from "./people-refusals.ts";
-import { refusalOfCall, webSignedIn } from "./web-client.ts";
+import { refusalOfCall, webClientOf, webSignedIn } from "./web-client.ts";
 
 let app: TestApp;
 
@@ -128,8 +130,6 @@ describe("what the members list refuses", () => {
   });
 });
 
-const ROLE_CHANGED = "people.member.role_changed";
-
 const roleHeldBy = async (workspaceId: string, personId: string): Promise<string | undefined> => {
   const held = await app.database.superuser.query<{ role: string }>(
     "SELECT role FROM member WHERE workspace_id = $1 AND user_id = $2",
@@ -138,16 +138,49 @@ const roleHeldBy = async (workspaceId: string, personId: string): Promise<string
   return held.rows[0]?.role;
 };
 
-const roleChangesIn = async (workspaceId: string) => {
+const eventsIn = async (workspaceId: string, act: string) => {
   const rows = await app.database.superuser.query<{
     actor: string;
     subject_id: string;
     detail: Readonly<Record<string, string>>;
   }>(
     "SELECT actor, subject_id, detail FROM audit_event WHERE workspace_id = $1 AND act = $2 ORDER BY id",
-    [workspaceId, ROLE_CHANGED],
+    [workspaceId, act],
   );
   return rows.rows;
+};
+
+const ROLE_CHANGED = "people.member.role_changed";
+
+const REMOVED = "people.member.removed";
+
+const roleChangesIn = (workspaceId: string) => eventsIn(workspaceId, ROLE_CHANGED);
+
+const removalsIn = (workspaceId: string) => eventsIn(workspaceId, REMOVED);
+
+type WebApi = Awaited<ReturnType<typeof webSignedIn>>["api"];
+
+/** Each act on one member as the Members view asks it, beside the audit act it writes. */
+const ACTS_ON_A_MEMBER = [
+  {
+    verb: "change a role",
+    ask: (api: WebApi, personId: string) =>
+      api.members.changeRole.mutate({ personId, role: "Editor" }),
+    recorded: ROLE_CHANGED,
+  },
+  {
+    verb: "remove a member",
+    ask: (api: WebApi, personId: string) => api.members.remove.mutate({ personId }),
+    recorded: REMOVED,
+  },
+] as const;
+
+/** Its first Admin is the one signed in on the web. */
+const aWorkspaceOfTwoAdmins = async () => {
+  const workspace = await app.provision();
+  const second = await app.person();
+  await app.addMember(workspace.workspaceId, second.id, "Admin");
+  return { workspace, second, ...(await webSignedIn(app, workspace.admin.email)) };
 };
 
 describe("changing a member's role over tRPC", () => {
@@ -169,11 +202,8 @@ describe("changing a member's role over tRPC", () => {
   });
 
   it("holds from the member's next request, as their membership says", async () => {
-    const workspace = await app.provision();
-    const second = await app.person();
-    await app.addMember(workspace.workspaceId, second.id, "Admin");
+    const { second, api: mine } = await aWorkspaceOfTwoAdmins();
     const { api: theirs } = await webSignedIn(app, second.email);
-    const { api: mine } = await webSignedIn(app, workspace.admin.email);
     expect((await theirs.session.membership.query()).role).toBe("Admin");
 
     await mine.members.changeRole.mutate({ personId: second.id, role: "Viewer" });
@@ -199,26 +229,8 @@ describe("changing a member's role over tRPC", () => {
     expect(await roleChangesIn(workspace.workspaceId)).toEqual([]);
   });
 
-  it("refuses demoting the only Admin, last-admin, recording nothing", async () => {
-    const workspace = await app.provision();
-    const { api } = await webSignedIn(app, workspace.admin.email);
-
-    const refused = await refusalOfCall(
-      api.members.changeRole.mutate({ personId: workspace.admin.id, role: "Editor" }),
-    );
-
-    expect(refused).toMatchObject({
-      data: { httpStatus: 412, refusal: { word: "last-admin", class: "precondition" } },
-    });
-    expect(await roleHeldBy(workspace.workspaceId, workspace.admin.id)).toBe("Admin");
-    expect(await roleChangesIn(workspace.workspaceId)).toEqual([]);
-  });
-
   it("lets one of two Admins demote themself", async () => {
-    const workspace = await app.provision();
-    const second = await app.person();
-    await app.addMember(workspace.workspaceId, second.id, "Admin");
-    const { api } = await webSignedIn(app, workspace.admin.email);
+    const { workspace, second, api } = await aWorkspaceOfTwoAdmins();
 
     await api.members.changeRole.mutate({ personId: workspace.admin.id, role: "Editor" });
 
@@ -227,7 +239,7 @@ describe("changing a member's role over tRPC", () => {
   });
 });
 
-describe("who may change a role", () => {
+describe.each(ACTS_ON_A_MEMBER)("who may $verb", ({ ask, recorded }) => {
   it.each(["Editor", "Viewer"] as const)(
     "refuses a member at %s, role-forbids, recording nothing",
     async (role) => {
@@ -236,15 +248,11 @@ describe("who may change a role", () => {
       await app.addMember(workspace.workspaceId, actor.id, role);
       const { api } = await webSignedIn(app, actor.email);
 
-      const refused = await refusalOfCall(
-        api.members.changeRole.mutate({ personId: viewer.id, role: "Editor" }),
-      );
+      const refused = await refusalOfCall(ask(api, viewer.id));
 
-      expect(refused).toMatchObject({
-        data: { httpStatus: 403, refusal: { word: "role-forbids", class: "forbidden" } },
-      });
+      expect(refused).toMatchObject(ROLE_FORBIDS_ANSWERED);
       expect(await roleHeldBy(workspace.workspaceId, viewer.id)).toBe("Viewer");
-      expect(await roleChangesIn(workspace.workspaceId)).toEqual([]);
+      expect(await eventsIn(workspace.workspaceId, recorded)).toEqual([]);
     },
   );
 
@@ -252,15 +260,11 @@ describe("who may change a role", () => {
     const { workspace, viewer } = await aWorkspaceOfThree();
     const api = await anAdminOfElsewherePointedAt(app, workspace.workspaceId);
 
-    const refused = await refusalOfCall(
-      api.members.changeRole.mutate({ personId: viewer.id, role: "Editor" }),
-    );
+    const refused = await refusalOfCall(ask(api, viewer.id));
 
-    expect(refused).toMatchObject({
-      data: { httpStatus: 401, refusal: { word: "not-a-member", class: "unauthenticated" } },
-    });
+    expect(refused).toMatchObject(NOT_A_MEMBER_ANSWERED);
     expect(await roleHeldBy(workspace.workspaceId, viewer.id)).toBe("Viewer");
-    expect(await roleChangesIn(workspace.workspaceId)).toEqual([]);
+    expect(await eventsIn(workspace.workspaceId, recorded)).toEqual([]);
   });
 
   it("refuses a member of another workspace as no member here", async () => {
@@ -270,15 +274,26 @@ describe("who may change a role", () => {
     await app.addMember(theirs.workspaceId, stranger.id, "Viewer");
     const { api } = await webSignedIn(app, mine.admin.email);
 
-    const refused = await refusalOfCall(
-      api.members.changeRole.mutate({ personId: stranger.id, role: "Admin" }),
-    );
+    const refused = await refusalOfCall(ask(api, stranger.id));
 
     expect(refused).toMatchObject({
       data: { httpStatus: 404, refusal: { word: "no-such-member", class: "absent" } },
     });
     expect(await roleHeldBy(theirs.workspaceId, stranger.id)).toBe("Viewer");
-    expect(await roleChangesIn(theirs.workspaceId)).toEqual([]);
+    expect(await eventsIn(theirs.workspaceId, recorded)).toEqual([]);
+  });
+
+  it("refuses the workspace's only Admin, last-admin, recording nothing", async () => {
+    const workspace = await app.provision();
+    const { api } = await webSignedIn(app, workspace.admin.email);
+
+    const refused = await refusalOfCall(ask(api, workspace.admin.id));
+
+    expect(refused).toMatchObject({
+      data: { httpStatus: 412, refusal: { word: "last-admin", class: "precondition" } },
+    });
+    expect(await roleHeldBy(workspace.workspaceId, workspace.admin.id)).toBe("Admin");
+    expect(await eventsIn(workspace.workspaceId, recorded)).toEqual([]);
   });
 });
 
@@ -353,5 +368,130 @@ describe("a role change that fails partway", () => {
       },
     });
     expect(await whatLanded(workspaceId, viewerId)).toEqual(NOTHING_LANDED);
+  });
+});
+
+const refreshTokensOf = async (personId: string) => {
+  const found = await app.database.superuser.query<{ workspace_id: string; revoked: boolean }>(
+    `SELECT reference_id AS workspace_id, revoked IS NOT NULL AS revoked FROM oauth_refresh_token
+      WHERE user_id = $1 ORDER BY reference_id`,
+    [personId],
+  );
+  return found.rows;
+};
+
+const sessionsHeldBy = async (personId: string): Promise<number | undefined> => {
+  const found = await app.database.superuser.query<{ held: number }>(
+    "SELECT count(*)::int AS held FROM session WHERE user_id = $1",
+    [personId],
+  );
+  return found.rows[0]?.held;
+};
+
+/** Each client signs in on its own, so the person holds a session per client. */
+const aMemberOfTwoOnFourClients = async () => {
+  const acme = await app.provision({ name: "Acme" });
+  const beta = await app.provision({ name: "Beta" });
+  const person = await app.person(undefined, "Priya Shah");
+  await app.addMember(acme.workspaceId, person.id, "Editor");
+  await app.addMember(beta.workspaceId, person.id, "Viewer");
+  const laptop = await webSignedIn(app, person.email);
+  const phone = await webSignedIn(app, person.email);
+  for (const browser of [laptop, phone]) {
+    expect((await setActiveWorkspace(browser.client, acme.workspaceId)).status).toBe(200);
+    expect((await browser.api.session.membership.query()).role).toBe("Editor");
+  }
+  const acmeHost = app.client();
+  const betaHost = app.client();
+  const inAcme = await connectAsHost(app, acmeHost, person, { pick: acme.workspaceId });
+  const inBeta = await connectAsHost(app, betaHost, person, { pick: beta.workspaceId });
+  return {
+    acme,
+    beta,
+    person,
+    sessionsInAcme: [laptop.api, phone.api, webClientOf(acmeHost).api],
+    sessionInBeta: webClientOf(betaHost).api,
+    laptop,
+    inAcme,
+    inBeta,
+  };
+};
+
+describe("removing a member over tRPC", () => {
+  it("refuses every session here, and keeps the person's other workspace", async () => {
+    const { acme, beta, person, sessionsInAcme, sessionInBeta, laptop, inAcme, inBeta } =
+      await aMemberOfTwoOnFourClients();
+    const { api } = await webSignedIn(app, acme.admin.email);
+    const host = app.client();
+    expect(await sessionsHeldBy(person.id)).toBe(4);
+
+    const removed = await api.members.remove.mutate({ personId: person.id });
+
+    expect(removed).toEqual({ personId: person.id, role: "Editor" });
+    expect(await roleHeldBy(acme.workspaceId, person.id)).toBeUndefined();
+    for (const session of sessionsInAcme) {
+      expect(await refusalOfCall(session.session.membership.query())).toMatchObject(
+        NOT_A_MEMBER_ANSWERED,
+      );
+    }
+    expect(await sessionInBeta.session.membership.query()).toMatchObject({
+      workspace: { id: beta.workspaceId },
+      role: "Viewer",
+    });
+    expect(await refreshTokensOf(person.id)).toEqual(
+      [
+        { workspace_id: acme.workspaceId, revoked: true },
+        { workspace_id: beta.workspaceId, revoked: false },
+      ].toSorted((one, other) => one.workspace_id.localeCompare(other.workspace_id)),
+    );
+    expect([
+      (await callMcp(host, inAcme.accessToken, "tools/list")).status,
+      (await callMcp(host, inBeta.accessToken, "tools/list")).status,
+    ]).toEqual([401, 200]);
+    expect(await sessionsHeldBy(person.id)).toBe(4);
+    expect(await removalsIn(acme.workspaceId)).toEqual([
+      { actor: `human:${acme.admin.id}`, subject_id: person.id, detail: { role: "Editor" } },
+    ]);
+
+    expect((await setActiveWorkspace(laptop.client, beta.workspaceId)).status).toBe(200);
+    expect(await laptop.api.session.membership.query()).toMatchObject({
+      workspace: { id: beta.workspaceId },
+      role: "Viewer",
+    });
+  });
+
+  it("lets one of two Admins remove themself, ending access here", async () => {
+    const { workspace, second, api } = await aWorkspaceOfTwoAdmins();
+
+    const removed = await api.members.remove.mutate({ personId: workspace.admin.id });
+
+    expect(removed).toEqual({ personId: workspace.admin.id, role: "Admin" });
+    expect(await refusalOfCall(api.members.list.query())).toMatchObject(NOT_A_MEMBER_ANSWERED);
+    expect(await roleHeldBy(workspace.workspaceId, second.id)).toBe("Admin");
+  });
+});
+
+describe("a removal that fails partway", () => {
+  it("keeps the membership and tokens when no audit row lands", async () => {
+    const workspace = await app.provision();
+    const person = await app.person();
+    await app.addMember(workspace.workspaceId, person.id, "Viewer");
+    await connectAsHost(app, app.client(), person, { pick: workspace.workspaceId });
+    const { api } = await webSignedIn(app, workspace.admin.email);
+
+    const failed = await whileAuditRowsVanish(app, () =>
+      refusalOfCall(api.members.remove.mutate({ personId: person.id })),
+    );
+
+    expect(failureOf(failed)).toEqual({
+      message: "removeMember failed",
+      httpStatus: 500,
+      refusal: undefined,
+    });
+    expect(await roleHeldBy(workspace.workspaceId, person.id)).toBe("Viewer");
+    expect(await refreshTokensOf(person.id)).toEqual([
+      { workspace_id: workspace.workspaceId, revoked: false },
+    ]);
+    expect(await removalsIn(workspace.workspaceId)).toEqual([]);
   });
 });

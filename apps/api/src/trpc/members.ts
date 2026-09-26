@@ -12,6 +12,8 @@ import {
   listMembers,
   readAuditLog,
   readAuditLogInput,
+  removeMember,
+  removeMemberInput,
   resendInvitation,
   revokeCredentialsHere,
   revokeCredentialsHereInput,
@@ -102,4 +104,13 @@ export const membersRouter = router({
         ),
       ),
     ),
+  remove: mutationProcedure.input(parsedBy(removeMemberInput)).mutation(({ ctx, input }) =>
+    crossing(
+      ctx,
+      removeMember.name,
+      given(input, (asked) =>
+        removeMember(ctx.principal, ctx.tx, { ...asked, at: ctx.clock.now() }),
+      ),
+    ),
+  ),
 });

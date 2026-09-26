@@ -4,7 +4,6 @@ import { z } from "zod";
 import { act, declareActs, record } from "../audit/index.ts";
 import {
   admit,
-  attempt,
   declareAct,
   err,
   ok,
@@ -15,7 +14,9 @@ import {
   type UserPrincipal,
   ulid,
 } from "../kernel/index.ts";
-import { refusalOfDeadlock, type Tx } from "../store/postgres/index.ts";
+import type { Tx } from "../store/postgres/index.ts";
+import { leavesNoAdmin, withMemberHeld, type HeldRefusal } from "./last-admin.ts";
+import { memberKeyed } from "./memberships.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
 const ROLE_ACTS = declareActs("people", {
@@ -24,13 +25,8 @@ const ROLE_ACTS = declareActs("people", {
 
 const ROLE = boundarySchemas.member.select.shape.role;
 
-const ADMIN = "Admin" satisfies Role;
-
 /** The role is any text, so a role outside the three reaches the act and is refused in its word. */
-export const changeRoleInput = z.object({
-  personId: boundarySchemas.user.select.shape.id,
-  role: z.string(),
-});
+export const changeRoleInput = memberKeyed.extend({ role: z.string() });
 
 export type ChangeRoleInput = z.output<typeof changeRoleInput>;
 
@@ -55,42 +51,29 @@ export type RoleChanged = {
 
 type Asked = { readonly personId: UserId; readonly role: Role };
 
-/**
- * Held until commit, so of two acts that would each leave one Admin, the second counts what the
- * first left.
- */
-const HELD_ADMINS = `SELECT user_id FROM member WHERE workspace_id = $1 AND role = $2
-                      ORDER BY user_id FOR UPDATE`;
-
-const HELD_MEMBER = "SELECT role FROM member WHERE workspace_id = $1 AND user_id = $2 FOR UPDATE";
-
-const roleSetUnderTheLock = async (
+const roleSetUnderTheLock = (
   admin: AdmittedOf<typeof changeRoleAct>,
   tx: Tx,
   asked: Asked,
-): Promise<Result<RoleChanged, MemberRefusal<"no-such-member" | "last-admin">>> => {
-  const admins = await tx.query(HELD_ADMINS, [admin.workspaceId, ADMIN]);
-  const held = await tx.query<{ role: string }>(HELD_MEMBER, [admin.workspaceId, asked.personId]);
-  const row = held.rows[0];
-  if (row === undefined) return err("no-such-member");
+): Promise<Result<RoleChanged, MemberRefusal<"last-admin"> | HeldRefusal | Error>> =>
+  withMemberHeld(admin, tx, asked.personId, async (held) => {
+    const changed: RoleChanged = { ...asked, previousRole: held.role };
+    if (changed.previousRole === changed.role) return ok(changed);
+    if (leavesNoAdmin(held)) return err("last-admin");
 
-  const changed: RoleChanged = { ...asked, previousRole: ROLE.parse(row.role) };
-  if (changed.previousRole === changed.role) return ok(changed);
-  if (changed.previousRole === ADMIN && admins.rows.length <= 1) return err("last-admin");
-
-  await tx.query("UPDATE member SET role = $3 WHERE workspace_id = $1 AND user_id = $2", [
-    admin.workspaceId,
-    asked.personId,
-    asked.role,
-  ]);
-  await record(admin, tx, {
-    id: ulid(),
-    act: ROLE_ACTS.roleChanged,
-    subjectId: asked.personId,
-    detail: { previousRole: changed.previousRole, role: changed.role },
+    await tx.query("UPDATE member SET role = $3 WHERE workspace_id = $1 AND user_id = $2", [
+      admin.workspaceId,
+      asked.personId,
+      asked.role,
+    ]);
+    await record(admin, tx, {
+      id: ulid(),
+      act: ROLE_ACTS.roleChanged,
+      subjectId: asked.personId,
+      detail: { previousRole: changed.previousRole, role: changed.role },
+    });
+    return ok(changed);
   });
-  return ok(changed);
-};
 
 /**
  * Refuses `last-admin` for a change that would leave the workspace with no Admin; an Admin may
@@ -107,8 +90,5 @@ export const changeRole = async (
   const role = ROLE.safeParse(input.role);
   if (!role.success) return err("no-such-role");
 
-  const set = await attempt(() =>
-    roleSetUnderTheLock(admitted.value, tx, { personId: input.personId, role: role.data }),
-  );
-  return set.ok ? set.value : err(refusalOfDeadlock(set.error));
+  return roleSetUnderTheLock(admitted.value, tx, { personId: input.personId, role: role.data });
 };

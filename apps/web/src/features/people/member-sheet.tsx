@@ -12,6 +12,7 @@ import { RadioGroup, RadioGroupItem } from "@/shared/ui/radio-group.tsx";
 import { SheetDescription, SheetHeader, SheetTitle } from "@/shared/ui/sheet.tsx";
 import { instantWords } from "@/shared/words.ts";
 
+import { MemberRemoval } from "./member-removal.tsx";
 import {
   useChangeRole,
   useReaderId,
@@ -26,7 +27,7 @@ import { outcomeOfFailure } from "./refusal.tsx";
 import { CredentialsHere, GroupPills, JoinedOn, nameOf } from "./words.tsx";
 
 /** Where focus lands when the sheet opens: on who the member is, or straight on an act. */
-export type OpenedAt = "member" | "role" | "credentials";
+export type OpenedAt = "member" | "role" | "credentials" | "removal";
 
 export const memberButtonId = (personId: string): string => `member-${personId}`;
 
@@ -220,25 +221,32 @@ export function MemberSheet(properties: {
   readonly member: ListedMember;
   readonly openedAt: OpenedAt;
   readonly onClose: () => void;
+  readonly onRemove: (member: ListedMember) => void;
+
+  /** The member's own row may be gone by then, so the list decides where focus lands. */
+  readonly returnFocus: () => void;
 }) {
-  const { member, openedAt, onClose } = properties;
+  const { member, openedAt, onClose, onRemove, returnFocus } = properties;
   const titleRef = useRef<HTMLHeadingElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
   const revokeRef = useRef<HTMLButtonElement>(null);
+  const askRef = useRef<HTMLButtonElement>(null);
+
+  const landOn = {
+    member: () => titleRef.current,
+    role: () => pickerRef.current?.querySelector<HTMLElement>('[aria-checked="true"]'),
+    credentials: () => revokeRef.current,
+    removal: () => askRef.current,
+  } satisfies Readonly<Record<OpenedAt, () => HTMLElement | null | undefined>>;
 
   return (
     <RowSheet
       rowButtonId={memberButtonId(member.personId)}
       onOpen={() => {
-        if (openedAt === "role") {
-          pickerRef.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus();
-        } else if (openedAt === "credentials") {
-          revokeRef.current?.focus();
-        } else {
-          titleRef.current?.focus();
-        }
+        landOn[openedAt]()?.focus();
       }}
       onClose={onClose}
+      returnFocus={returnFocus}
     >
       <SheetHeader className="border-b border-border">
         <div className="flex items-center gap-3 pr-8">
@@ -259,6 +267,7 @@ export function MemberSheet(properties: {
         <Membership member={member} />
         <RolePicker member={member} pickerRef={pickerRef} />
         <CredentialsRevoker member={member} revokeRef={revokeRef} />
+        <MemberRemoval member={member} askRef={askRef} onRemove={onRemove} />
       </div>
     </RowSheet>
   );

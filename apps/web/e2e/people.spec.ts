@@ -47,6 +47,11 @@ const sheetOf = (page: Page, name: string): Locator => page.getByRole("dialog", 
 
 const rolePicker = (sheet: Locator): Locator => sheet.getByRole("radiogroup", { name: "Role" });
 
+const removalOf = (sheet: Locator): Locator => sheet.getByRole("region", { name: "Removal" });
+
+/** The one output the Members region holds as a child of its own: the count of people. */
+const THE_COUNT = "//section[h2='Members']/output";
+
 const EACH_ROLE_MEANS = {
   Admin: "Manages people and sources, and does everything an Editor does.",
   Editor: "Checks concepts, runs question sets and saves Answers.",
@@ -122,6 +127,28 @@ const anAdminAtPeople = async (
   await rail(page).getByRole("link", { name: "People" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
   return { admin, joined, stranger };
+};
+
+/** The Admin signed in is one of two, so they may demote or remove themself. */
+const anAdminBesideAnotherAtPeople = async (
+  page: Page,
+  api: APIRequestContext,
+  workspaceName: string,
+): Promise<void> => {
+  const admin = anAddress("admin");
+  const workspace = await provision(api, { name: workspaceName, adminEmail: admin });
+  const successor = await person(api, anAddress("ada"), { displayName: "Ada Hartley" });
+  await addMember(api, { workspaceId: workspace.workspaceId, userId: successor.id, role: "Admin" });
+  await page.goto(MEMBERS_VIEW);
+  await signIn(page, api, admin);
+  await expect(memberRows(page)).toHaveCount(2);
+};
+
+const removedThroughTheirSheet = async (page: Page, name: string): Promise<void> => {
+  await memberButton(page, name).click();
+  const removal = removalOf(sheetOf(page, name));
+  await removal.getByRole("button", { name: `Remove ${name}`, exact: true }).click();
+  await removal.getByRole("button", { name: `Remove ${name} from this workspace` }).click();
 };
 
 test.describe("the People screen's Members view", () => {
@@ -391,29 +418,23 @@ test.describe("a member, opened as a sheet", () => {
     await memberButton(page, "Test person").click();
     const sheet = sheetOf(page, "Test person");
     await sheet.getByRole("radio", { name: "Viewer", exact: true }).click();
-    await sheet.getByRole("button", { name: "Make Test person a Viewer" }).click();
+    const commit = sheet.getByRole("button", { name: "Make Test person a Viewer" });
+    await commit.click();
 
     const refused = sheet.getByRole("alert");
     await expect(refused).toContainText("Refused: last-admin.");
     await expect(refused).toContainText("Make someone else an Admin first.");
     await expect(sheet.getByRole("region", { name: "Membership" })).toContainText("Admin");
+    // The refusal re-enables the button mid-fade from its disabled look; an audit inside that fade
+    // reads a contrast nobody settles on.
+    await expect(commit).toHaveCSS("opacity", "1");
     await passesTheAccessibilityGate();
     await page.keyboard.press("Escape");
     await expect(rowOf(page, "Test person").getByRole("cell").nth(1)).toHaveText("Admin");
   });
 
   test("an Admin demoting themself sees their new role at once", async ({ page, request }) => {
-    const admin = anAddress("admin");
-    const workspace = await provision(request, { name: "Esk Presswork", adminEmail: admin });
-    const successor = await person(request, anAddress("ada"), { displayName: "Ada Hartley" });
-    await addMember(request, {
-      workspaceId: workspace.workspaceId,
-      userId: successor.id,
-      role: "Admin",
-    });
-    await page.goto(MEMBERS_VIEW);
-    await signIn(page, request, admin);
-    await expect(memberRows(page)).toHaveCount(2);
+    await anAdminBesideAnotherAtPeople(page, request, "Esk Presswork");
     const bar = page.getByRole("banner");
     await expect(bar).toContainText("Admin");
 
@@ -446,6 +467,7 @@ test.describe("a member, opened as a sheet", () => {
     await expect(keystrokes).toContainText("Open the member in focus");
     await expect(keystrokes).toContainText("Change the role of the member in focus");
     await expect(keystrokes).toContainText("Revoke the credentials here of the member in focus");
+    await expect(keystrokes).toContainText("Remove the member in focus");
     await page.keyboard.press("Escape");
 
     await memberButton(page, "Priya Shah").focus();
@@ -588,6 +610,131 @@ test.describe("revoking a member's credentials here", () => {
   });
 });
 
+test.describe("removing a member from their sheet", () => {
+  test("removes a member behind a confirmation, within its budget", async ({
+    page,
+    request,
+    passesTheAccessibilityGate,
+  }) => {
+    await anAdminAtPeople(page, request, "Rye Foundry");
+
+    await memberButton(page, "Priya Shah").click();
+    const sheet = sheetOf(page, "Priya Shah");
+    const removal = removalOf(sheet);
+    const asked = removal.getByRole("button", { name: "Remove Priya Shah", exact: true });
+    await expect(asked).toHaveAccessibleDescription(
+      "Priya Shah loses access to this workspace on every session and client they hold. Any other workspace they belong to is untouched, and they stay named on what they checked.",
+    );
+    await asked.click();
+    await expect(removal.getByText("Confirm the removal of Priya Shah")).toBeFocused();
+    await removal.getByRole("button", { name: "Keep Priya Shah" }).click();
+    await expect(asked).toBeFocused();
+    await expect(asked).toHaveAttribute("aria-expanded", "false");
+
+    await asked.click();
+    const confirm = removal.getByRole("button", { name: "Remove Priya Shah from this workspace" });
+    await expect(confirm).toHaveAccessibleDescription(
+      "Recorded on the audit log under your name. Their groups here end with the membership.",
+    );
+    await expect(removal).toMatchAriaSnapshot(`
+      - region "Removal":
+        - heading "Removal" [level=3]
+        - paragraph: /Priya Shah loses access to this workspace/
+        - button "Remove Priya Shah" [expanded]
+        - group "Confirm the removal of Priya Shah":
+          - text: Confirm the removal of Priya Shah
+          - paragraph: /Recorded on the audit log/
+          - button "Remove Priya Shah from this workspace"
+          - button "Keep Priya Shah"
+    `);
+    await passesTheAccessibilityGate();
+
+    await confirm.focus();
+    await clockTheNextKey(page, { at: THE_COUNT, reads: "2 people" });
+    await page.keyboard.press("Enter");
+
+    await expect(sheet).toHaveCount(0);
+    await expect(memberRows(page)).toHaveCount(2);
+    await expect(memberButton(page, "Sam Okoro")).toBeFocused();
+    await expect(membersRegion(page).getByRole("status").last()).toHaveText(
+      "Priya Shah is no longer a member of this workspace.",
+    );
+    await theActLandedWithinItsBudget(page, "removal");
+
+    await page.reload();
+    await expect(memberRows(page)).toHaveCount(2);
+    await expect(rowOf(page, "Priya Shah")).toHaveCount(0);
+  });
+
+  test("refuses removing the last Admin, and puts them back", async ({
+    page,
+    request,
+    passesTheAccessibilityGate,
+  }) => {
+    await anAdminAtPeople(page, request, "Hodder Tools");
+
+    await removedThroughTheirSheet(page, "Test person");
+
+    const refused = membersRegion(page).getByRole("alert");
+    await expect(refused).toContainText("Refused: last-admin.");
+    await expect(refused).toContainText("Make someone else an Admin first.");
+    await expect(memberRows(page)).toHaveCount(3);
+    await expect(rowOf(page, "Test person").getByRole("cell").nth(1)).toHaveText("Admin");
+    await passesTheAccessibilityGate();
+  });
+
+  test("an Admin removing themself is refused the list at once", async ({ page, request }) => {
+    await anAdminBesideAnotherAtPeople(page, request, "Esk Tinsmiths");
+    await memberButton(page, "Test person").click();
+    await expect(
+      removalOf(sheetOf(page, "Test person")).getByRole("button", {
+        name: "Remove Test person",
+        exact: true,
+      }),
+    ).toHaveAccessibleDescription(/^You lose access to this workspace, People included,/);
+    await page.keyboard.press("Escape");
+
+    await removedThroughTheirSheet(page, "Test person");
+
+    const refused = membersRegion(page).getByRole("alert");
+    await expect(refused).toContainText("Refused: not-a-member.");
+    await expect(refused).toContainText("You are not a member of this workspace.");
+    await expect(membersRegion(page)).toContainText(
+      "Test person is no longer a member of this workspace.",
+    );
+  });
+
+  test("removes a member by keyboard alone", async ({ page, request }) => {
+    await anAdminAtPeople(page, request, "Calder Presswork");
+    await page.goto(MEMBERS_VIEW);
+    await expect(memberRows(page)).toHaveCount(3);
+
+    await page.keyboard.press("d");
+    await expect(membersRegion(page)).toContainText(
+      "Move focus to a member first: the keystroke acts on the member in focus.",
+    );
+
+    await memberButton(page, "Sam Okoro").focus();
+    await page.keyboard.press("d");
+    const sheet = sheetOf(page, "Sam Okoro");
+    const removal = removalOf(sheet);
+    await expect(
+      removal.getByRole("button", { name: "Remove Sam Okoro", exact: true }),
+    ).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(removal.getByText("Confirm the removal of Sam Okoro")).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(
+      removal.getByRole("button", { name: "Remove Sam Okoro from this workspace" }),
+    ).toBeFocused();
+    await page.keyboard.press("Enter");
+
+    await expect(sheet).toHaveCount(0);
+    await expect(memberRows(page)).toHaveCount(2);
+    await expect(memberButton(page, "Test person")).toBeFocused();
+  });
+});
+
 test.describe("the People screen's words", () => {
   // Every People surface joins this test as it is built: the product's word is workspace.
   test("says workspace, never organisation, on every People view", async ({ page, request }) => {
@@ -616,6 +763,8 @@ test.describe("the People screen's words", () => {
     await memberButton(page, "Priya Shah").click();
     const sheet = sheetOf(page, "Priya Shah");
     await expect(sheet).toBeVisible();
+    await removalOf(sheet).getByRole("button", { name: "Remove Priya Shah", exact: true }).click();
+    await expect(removalOf(sheet).getByRole("group")).toBeVisible();
     await expect(page.locator("body"), "a member's sheet").not.toContainText(organisation);
     expect(await sheet.ariaSnapshot(), "a member's sheet").not.toMatch(organisation);
 

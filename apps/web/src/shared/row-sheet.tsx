@@ -11,9 +11,12 @@ export function RowSheet(properties: {
   /** Puts focus where the opener asked, in place of Radix's first control. */
   readonly onOpen: () => void;
   readonly onClose: () => void;
+
+  /** For an act that takes the row away with it, so the list says where focus lands instead. */
+  readonly returnFocus?: () => void;
   readonly children: ReactNode;
 }) {
-  const { rowButtonId, onOpen, onClose } = properties;
+  const { rowButtonId, onOpen, onClose, returnFocus } = properties;
 
   return (
     <Sheet
@@ -30,7 +33,8 @@ export function RowSheet(properties: {
         }}
         onCloseAutoFocus={(event) => {
           event.preventDefault();
-          document.getElementById(rowButtonId)?.focus();
+          if (returnFocus === undefined) document.getElementById(rowButtonId)?.focus();
+          else returnFocus();
         }}
       >
         {properties.children}

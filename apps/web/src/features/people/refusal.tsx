@@ -23,6 +23,10 @@ const SAID_OF_WORD = {
     why: "The roles here are Admin, Editor and Viewer.",
     next: "Pick one of the three.",
   },
+  "not-a-member": {
+    why: "You are not a member of this workspace.",
+    next: "Sign in again to reach a workspace you belong to.",
+  },
 } satisfies SaidOfWord;
 
 export const outcomeOfFailure = (failure: Error | ApiError): Outcome =>

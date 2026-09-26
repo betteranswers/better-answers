@@ -15,6 +15,7 @@ export {
   type ResendInvitationRefusal,
 } from "./invitations.ts";
 export * from "./memberships.ts";
+export * from "./removal.ts";
 export * from "./requests.ts";
 export * from "./roles.ts";
 export { MEMBER_REFUSALS, type MemberRefusal } from "./vocabulary.ts";

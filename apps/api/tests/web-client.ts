@@ -35,7 +35,7 @@ const forwarded = (init: LinkInit): RequestInit => ({
  * The web's own link and wrapper, never a copy, so a field renamed on one side alone refuses the
  * upload here.
  */
-const webClientOf = (client: TestClient) => {
+export const webClientOf = (client: TestClient) => {
   const sent: Sent[] = [];
   const api = createTRPCClient<AppRouter>({
     links: [

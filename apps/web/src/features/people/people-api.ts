@@ -85,3 +85,11 @@ export const useReaderId = (): string | undefined => {
   return useQuery(api.session.membership.queryOptions(undefined, { refetchOnMount: false })).data
     ?.person.id;
 };
+
+export const useRemoveMember = () => {
+  const api = useTRPC();
+  const reconciled = useReconciledList((listed, asked: { readonly personId: string }) =>
+    listed.filter((member) => member.personId !== asked.personId),
+  );
+  return useMutation(api.members.remove.mutationOptions(reconciled));
+};
