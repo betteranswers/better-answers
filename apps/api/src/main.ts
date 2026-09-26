@@ -65,6 +65,7 @@ serve(
       hostnames: identity.hostnames,
       authSecret: identity.authSecret,
       sendEmail,
+      operatorAddress: identity.operatorAddress,
       webRoot: bootstrap.webRoot,
       imageDigest: image.digest,
     }).fetch,

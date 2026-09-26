@@ -41,6 +41,9 @@ export const AUTH_SECRET = "test-secret-that-is-at-least-thirty-two-characters-l
 export const APP_HOSTNAME = hostnameOfUrl(PUBLIC_URL);
 export const AGENT_HOSTNAME = "agent.example.test";
 export const APEX_HOSTNAME = "example.test";
+
+/** Where the harness's deployment emails a flagged display name. */
+export const OPERATOR_ADDRESS = "operator@example.test";
 const HOSTNAMES: PublicHostnames = {
   app: APP_HOSTNAME,
   agent: AGENT_HOSTNAME,
@@ -254,6 +257,9 @@ export type TestAppOptions = {
 
   readonly objectStore?: ObjectStoreSettings | undefined;
 
+  /** `OPERATOR_ADDRESS` when left out; null is a deployment that names no operator. */
+  readonly operatorAddress?: string | null | undefined;
+
   /**
    * A count of connections below the pool's ceiling reads what was asked for, and the suite's
    * runtime pool is small.
@@ -299,6 +305,8 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
       emails.push(message);
       options.onEmail?.(message);
     },
+    operatorAddress:
+      options.operatorAddress === null ? undefined : (options.operatorAddress ?? OPERATOR_ADDRESS),
     fetchClientMetadataResource: (input) => {
       metadataFetches.push(input instanceof Request ? input.url : String(input));
       return cimdFixture(input);

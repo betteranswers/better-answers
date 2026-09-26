@@ -15,6 +15,11 @@ export type RoleChanged = inferOutput<Api["members"]["changeRole"]>;
 
 export type CredentialsRevokedHere = inferOutput<Api["members"]["revokeCredentials"]>;
 
+export const useFlagDisplayName = () => {
+  const api = useTRPC();
+  return useMutation(api.members.flagDisplayName.mutationOptions());
+};
+
 export const useMembers = () => {
   const api = useTRPC();
   return useQuery(api.members.list.queryOptions());

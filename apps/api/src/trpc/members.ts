@@ -5,6 +5,8 @@ import {
   cancelInvitation,
   changeRole,
   changeRoleInput,
+  flagDisplayName,
+  flagDisplayNameInput,
   invitationInput,
   inviteMember,
   inviteMemberInput,
@@ -36,6 +38,7 @@ import {
   router,
 } from "./base.ts";
 import { sentInvitation } from "./invitation-email.ts";
+import { tellTheOperator } from "./name-flag-email.ts";
 
 type Emailing = {
   readonly principal: UserPrincipal;
@@ -113,4 +116,19 @@ export const membersRouter = router({
       ),
     ),
   ),
+
+  /** A constant answer: whether a flag was raised or already waited is the operator's to know. */
+  flagDisplayName: ownTransactionProcedure
+    .input(parsedBy(flagDisplayNameInput))
+    .mutation(async ({ ctx, input }) => {
+      const flagged = await crossing(
+        ctx,
+        flagDisplayName.name,
+        given(input, (asked) =>
+          committedAs(ctx, (principal, tx) => flagDisplayName(principal, tx, asked)),
+        ),
+      );
+      if (flagged.raised !== null) await tellTheOperator(ctx, flagged.raised);
+      return { personId: flagged.personId, sentToTheOperator: true } as const;
+    }),
 });

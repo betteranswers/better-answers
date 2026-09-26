@@ -628,8 +628,8 @@ to it by IRI and never restates it (ADR 0014).
   never another's. Not the *answer audit*, which records answers. _Avoid_: ledger (retired
   24/09/2026 for the word an Admin looks for), event log, log (alone).
 - **identity-set audit log** — the append-only record of the acts that belong to no workspace
-  because they act on a person's identity itself: a person giving their own *display name*, a
-  sign-in, and every write the *operator* makes. It sits beside the *audit log* and uses the same
+  because they act on a person's identity itself: a person giving their own *display name*, an
+  Admin's flag on one, a sign-in, and every write the *operator* makes. It sits beside the *audit log* and uses the same
   *audit acts*. A person appears in it by *person id*, never by name or address, and no row is ever
   rewritten. Only the operator reads it; no workspace's Admin ever does.
 - **log line** — one line the running platform writes to its operational log for whoever runs

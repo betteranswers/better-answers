@@ -2,6 +2,7 @@ import {
   Buildings,
   CaretDown,
   Database,
+  Flag,
   Graph,
   List,
   MagnifyingGlass,
@@ -19,6 +20,7 @@ import { cn } from "@/shared/lib/utils.ts";
 export type IconName =
   | "caret-down"
   | "database"
+  | "flag"
   | "map"
   | "navigation"
   | "people"
@@ -36,6 +38,7 @@ export type IconName =
 const GLYPHS = {
   "caret-down": CaretDown,
   database: Database,
+  flag: Flag,
   map: Graph,
   navigation: List,
   people: Users,

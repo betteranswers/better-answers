@@ -191,6 +191,29 @@ describe("the bootstrap configuration", () => {
   ])("refuses SMTP_URL with %s", (_case, url) => {
     expect(readIdentityBootstrap(identityEnvironment({ SMTP_URL: url })).ok).toBe(false);
   });
+
+  it("gives the operator's address, where flagged display names are emailed", () => {
+    const read = readIdentityBootstrap(identityEnvironment({ OPERATOR_EMAIL: "ops@example.test" }));
+
+    expect(read.ok && read.value.operatorAddress).toBe("ops@example.test");
+  });
+
+  it("starts without an operator's address, which dev leaves unset", () => {
+    const read = readIdentityBootstrap(identityEnvironment());
+
+    expect(read.ok && read.value.operatorAddress).toBe(undefined);
+  });
+
+  it.each([
+    ["no at sign", "ops.example.test"],
+    [
+      "compose's own error message",
+      'The "OPERATOR_EMAIL" variable is not set. Defaulting to a blank string.',
+    ],
+    ["an empty value", ""],
+  ])("refuses OPERATOR_EMAIL with %s", (_case, address) => {
+    expect(readIdentityBootstrap(identityEnvironment({ OPERATOR_EMAIL: address })).ok).toBe(false);
+  });
 });
 
 describe("the sweeps' settings", () => {
