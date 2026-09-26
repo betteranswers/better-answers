@@ -67,8 +67,15 @@ export const objectRemovedFrom = async (
 
 const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
-/** Points `main` at a new root commit sharing no history with the old; hands back its sha. */
-export const divergeHistory = async (door: GitDoor, workspaceId: string): Promise<string> => {
+/**
+ * Points `main` at a new root commit of the empty tree, changing no file and sharing no history
+ * with the old; hands back its sha.
+ */
+export const emptyRootCommit = async (
+  door: GitDoor,
+  workspaceId: string,
+  message: string,
+): Promise<string> => {
   const nobody = {
     GIT_AUTHOR_NAME: "Nobody",
     GIT_AUTHOR_EMAIL: "nobody@acme.invalid",
@@ -76,11 +83,14 @@ export const divergeHistory = async (door: GitDoor, workspaceId: string): Promis
     GIT_COMMITTER_EMAIL: "nobody@acme.invalid",
   };
   const root = (
-    await git(door, workspaceId, ["commit-tree", EMPTY_TREE, "-m", "elsewhere"], nobody)
+    await git(door, workspaceId, ["commit-tree", EMPTY_TREE, "-m", message], nobody)
   ).trim();
   await git(door, workspaceId, ["update-ref", "refs/heads/main", root]);
   return root;
 };
+
+export const divergeHistory = (door: GitDoor, workspaceId: string): Promise<string> =>
+  emptyRootCommit(door, workspaceId, "elsewhere");
 
 export type CommitFacts = {
   readonly sha: string;
