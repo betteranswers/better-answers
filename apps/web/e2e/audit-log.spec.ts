@@ -1,5 +1,8 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { SAID_OF_THE_AUDIT_LOG } from "@/features/people/refusal-words.ts";
+import { NO_RESPONSE_TO_A_READ, sentenceOf } from "@/shared/refusal-words.ts";
+
 import { expect, test } from "./browser.ts";
 import {
   addMember,
@@ -209,9 +212,9 @@ test.describe("the People screen's Audit log view", () => {
     test(`refuses a member at ${role} the audit log`, async ({ page, request }) => {
       await aMemberSignedInAt(page, request, role, AUDIT_LOG_VIEW);
 
-      const refused = auditLog(page).getByRole("alert");
-      await expect(refused).toContainText("Refused: role-forbids.");
-      await expect(refused).toContainText("Only an Admin of this workspace reads its audit log.");
+      await expect(auditLog(page).getByRole("alert")).toHaveText(
+        sentenceOf(SAID_OF_THE_AUDIT_LOG["role-forbids"]),
+      );
       await expect(auditLog(page).getByRole("table")).toHaveCount(0);
     });
   }
@@ -231,7 +234,7 @@ test.describe("the People screen's Audit log view", () => {
     held.resolve();
 
     // The query asks twice more before it answers, as it does of any failure with no word.
-    await expect(auditLog(page).getByRole("alert")).toContainText("The platform did not answer");
+    await expect(auditLog(page).getByRole("alert")).toHaveText(sentenceOf(NO_RESPONSE_TO_A_READ));
     await expect(familyFilter(page)).toHaveText("Sources");
     await page.unroute(read);
     await pickFamily(page, "All families");

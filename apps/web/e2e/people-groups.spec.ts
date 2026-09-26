@@ -3,7 +3,9 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
 import { consequenceOfDeleting } from "@/features/people/group-words.ts";
 import { GROUPS_KEYSTROKES } from "@/features/people/people-state.ts";
+import { SAID_OF_A_GROUP } from "@/features/people/refusal-words.ts";
 import { SELECT_FIRST } from "@/shared/keystroke-words.ts";
+import { sentenceOf } from "@/shared/refusal-words.ts";
 import { screenById, viewNamed } from "@/shared/screens.ts";
 
 import { expect, test } from "./browser.ts";
@@ -17,6 +19,7 @@ import {
   makeGroups,
   person,
   provision,
+  saysItsSentenceNotItsWord,
   signIn,
   skipLinkReachesTheScreen,
   theActLandedWithinItsBudget,
@@ -139,7 +142,7 @@ test.describe("the People screen's Groups view", () => {
   });
 
   for (const role of ["Editor", "Viewer"] as const) {
-    test(`refuses a member at ${role} the groups, in its word`, async ({ page, request }) => {
+    test(`refuses a member at ${role} the groups, saying why`, async ({ page, request }) => {
       const workspace = await aMemberSignedInAt(page, request, role, GROUPS_VIEW);
       await makeGroups(request, {
         workspaceId: workspace.workspaceId,
@@ -148,9 +151,9 @@ test.describe("the People screen's Groups view", () => {
       });
       await page.reload();
 
-      const refused = groupsRegion(page).getByRole("alert");
-      await expect(refused).toContainText("Refused: role-forbids.");
-      await expect(refused).toContainText("Only an Admin of this workspace sees its groups.");
+      await expect(groupsRegion(page).getByRole("alert")).toHaveText(
+        sentenceOf(SAID_OF_A_GROUP["role-forbids"]),
+      );
       await expect(groupsRegion(page).getByRole("table")).toHaveCount(0);
       await expect(page.locator("body")).not.toContainText("Hidden from them");
     });
@@ -187,9 +190,10 @@ test.describe("a group's acts", () => {
     await nameField(page).fill("HR team");
     await groupsRegion(page).getByRole("button", { name: "Create the group" }).click();
 
-    const refused = groupsRegion(page).getByRole("alert");
-    await expect(refused).toContainText("Refused: name-taken.");
-    await expect(refused).toContainText("Choose another name.");
+    await saysItsSentenceNotItsWord(groupsRegion(page).getByRole("alert"), {
+      table: SAID_OF_A_GROUP,
+      word: "name-taken",
+    });
     await expect(nameField(page)).toHaveValue("HR team");
     await expect(groupRows(page)).toHaveCount(2);
     await passesTheAccessibilityGate();

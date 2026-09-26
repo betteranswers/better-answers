@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { createAppClients, Providers } from "@/app/providers.tsx";
+import { SAID_OF_A_BINDING } from "@/features/sources/refusal-words.ts";
 import { refusedFor } from "@/features/sources/refusal.tsx";
 import {
   DismissAsNotSpecialCategoryAct,
@@ -44,8 +45,9 @@ const HEALTH_CUE: FindingGroup = {
   dismissed: 0,
 };
 
-const NOT_SPECIAL_CATEGORY =
-  "Only a special category finding group can be dismissed as not special category. Untick the groups of another category.";
+const { why, next } = SAID_OF_A_BINDING["not-special-category"];
+
+const NOT_SPECIAL_CATEGORY = `${why} ${next}`;
 
 /** The review's half of the slot, standing in for the findings table a click writes through. */
 function TicksIn(properties: { readonly bindingId: string }) {
@@ -151,11 +153,9 @@ describe("the dismissal as not special category", () => {
     expect(dialog.textContent).not.toMatch(/\b[0-9A-HJKMNP-TV-Z]{26}\b/);
   });
 
-  it("words the api's not-special-category refusal, with the next step", () => {
+  it("says the api's not-special-category refusal as the hint does", () => {
     const { container } = render(<p>{refusedFor("not-special-category", "inapplicable").words}</p>);
 
-    expect(container.textContent).toBe(
-      "Refused: not-special-category. Only a special category finding group can be dismissed as not special category. Untick the groups of another category.",
-    );
+    expect(container.textContent).toBe(NOT_SPECIAL_CATEGORY);
   });
 });

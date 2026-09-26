@@ -80,7 +80,7 @@ function ListState(properties: { readonly listed: ReturnType<typeof useWorkspace
   if (listed.error !== null) {
     return (
       <p>
-        <RefusalLine {...readRefused(listed.error)} />
+        <RefusalLine said={readRefused(listed.error)} />
       </p>
     );
   }

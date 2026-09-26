@@ -1,6 +1,8 @@
 import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { NOT_THE_OPERATOR, ONLY_THE_OPERATOR } from "@/features/console/refusal-words.ts";
+
 import { openApp } from "./open-app.tsx";
 import { addressOf, answered } from "./stubbed-api.ts";
 
@@ -71,7 +73,9 @@ describe("the console's shell", () => {
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
       "The console is the operator's alone",
     );
-    expect(screen.getByRole("alert").textContent).toContain("not-the-operator");
+    const refused = screen.getByRole("alert").textContent;
+    expect(refused).toBe(`${ONLY_THE_OPERATOR.why} ${ONLY_THE_OPERATOR.next}`);
+    expect(refused).not.toContain(NOT_THE_OPERATOR);
     expect(screen.queryByRole("navigation", { name: "Console" })).toBeNull();
   });
 

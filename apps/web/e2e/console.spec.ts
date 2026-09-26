@@ -1,6 +1,8 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
 import { goHome, UNKNOWN_SCREEN } from "@/app/words.ts";
+import { NOT_THE_OPERATOR, ONLY_THE_OPERATOR } from "@/features/console/refusal-words.ts";
+import { sentenceOf } from "@/shared/refusal-words.ts";
 import { CONSOLE } from "@/shared/screens.ts";
 
 import { expect, test } from "./browser.ts";
@@ -103,9 +105,8 @@ test.describe("the way into the console", () => {
     await page.goto("/console");
 
     await expect(page.getByRole("heading", { level: 1, name: CLOSED })).toBeVisible();
-    await expect(page.getByRole("alert")).toHaveText(
-      "Refused: not-the-operator. Only the operator may open the console. Go back to your workspaces.",
-    );
+    await expect(page.getByRole("alert")).toHaveText(sentenceOf(ONLY_THE_OPERATOR));
+    await expect(page.locator("body")).not.toContainText(NOT_THE_OPERATOR);
     await expect(railOf(page)).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "Workspaces" })).toHaveCount(0);
     await passesTheAccessibilityGate();
@@ -202,7 +203,7 @@ test.describe("the console's Workspaces screen", () => {
     expect(elapsed, "the workspaces list took longer than its second").toBeLessThan(LIST_BUDGET_MS);
   });
 
-  test("the list shows the api's refusal once the mark clears", async ({ page, request }) => {
+  test("says who may read the list once the mark clears", async ({ page, request }) => {
     const workspace = await theOperator(page, request, "Calder Pressings");
     await page.goto(WORKSPACES_VIEW);
     await expect(itemOf(page, workspace.name)).toBeVisible();
@@ -212,9 +213,8 @@ test.describe("the console's Workspaces screen", () => {
     await railOf(page).getByRole("link", { name: "People" }).click();
     await railOf(page).getByRole("link", { name: "Workspaces" }).click();
 
-    await expect(listOf(page)).toContainText(
-      "Refused: not-the-operator. Only the operator may open the console. Go back to your workspaces.",
-    );
+    await expect(listOf(page)).toContainText(sentenceOf(ONLY_THE_OPERATOR));
+    await expect(listOf(page)).not.toContainText(NOT_THE_OPERATOR);
     await expect(listOf(page).getByRole("listitem")).toHaveCount(0);
   });
 

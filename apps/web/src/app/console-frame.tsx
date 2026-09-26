@@ -3,12 +3,8 @@ import { Link } from "@tanstack/react-router";
 import { AuthScreen, Outcome, Refused } from "@/features/auth/auth-screen.tsx";
 import { SignOutButton } from "@/features/auth/sign-out-button.tsx";
 import { useOperatorStanding } from "@/features/console/operator.ts";
-import {
-  CONSOLE_CLOSED,
-  NOT_THE_OPERATOR,
-  ONLY_THE_OPERATOR,
-  saidOf,
-} from "@/features/console/words.ts";
+import { ONLY_THE_OPERATOR, STANDING_UNANSWERED } from "@/features/console/refusal-words.ts";
+import { CONSOLE_CLOSED, saidOf } from "@/features/console/words.ts";
 import { RefusalLine } from "@/shared/refusal-outcome.tsx";
 import { CONSOLE } from "@/shared/screens.ts";
 import { Button } from "@/shared/ui/button.tsx";
@@ -51,7 +47,7 @@ function ConsoleClosed(properties: { readonly standing: ReturnType<typeof useOpe
           id="console-unread"
           failure={standing.error}
           saidOf={saidOf}
-          unanswered="The platform did not answer whether the console is open to you."
+          unanswered={STANDING_UNANSWERED}
         />
         <Button
           type="button"
@@ -70,7 +66,7 @@ function ConsoleClosed(properties: { readonly standing: ReturnType<typeof useOpe
   return (
     <AuthScreen title={CONSOLE_CLOSED}>
       <Outcome tone="refused">
-        <RefusalLine word={NOT_THE_OPERATOR} said={ONLY_THE_OPERATOR} />
+        <RefusalLine said={ONLY_THE_OPERATOR} />
       </Outcome>
       <WaysOut />
     </AuthScreen>

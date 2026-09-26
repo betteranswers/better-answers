@@ -41,7 +41,9 @@ function GroupMembers(properties: {
 
   return (
     <SheetPart title="Members">
-      <OutcomeLine outcome={members.error === null ? undefined : outcomeOfFailure(members.error)} />
+      <OutcomeLine
+        outcome={members.error === null ? undefined : outcomeOfFailure(members.error, "read")}
+      />
       <div aria-live="polite" className="empty:hidden">
         {members.isPending ? <p>The members are still loading.</p> : null}
       </div>

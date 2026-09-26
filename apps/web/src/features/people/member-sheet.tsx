@@ -289,7 +289,7 @@ function GroupsPicker(properties: {
   return (
     <SheetPart title="Groups">
       <OutcomeLine
-        outcome={groups.error === null ? undefined : outcomeOfGroupFailure(groups.error)}
+        outcome={groups.error === null ? undefined : outcomeOfGroupFailure(groups.error, "read")}
       />
       <div aria-live="polite" className="empty:hidden">
         {groups.isPending ? <p>The groups are still loading.</p> : null}

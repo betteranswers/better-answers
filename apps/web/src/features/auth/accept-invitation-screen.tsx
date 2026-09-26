@@ -11,14 +11,16 @@ import {
   type RefusalWord,
 } from "@/shared/api/trpc.ts";
 import { KeystrokesAct, useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
+import { saidOfRefusal, type Said } from "@/shared/refusal-words.ts";
 import { aRole } from "@/shared/role-words.ts";
 import { SummaryRow } from "@/shared/summary-row.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { dayWords } from "@/shared/words.ts";
 
 import { useAcceptInvitation, useSession, useSignOut } from "./auth-hooks.ts";
-import { AuthScreen, Outcome, Refused, type Said } from "./auth-screen.tsx";
+import { AuthScreen, Outcome, Refused } from "./auth-screen.tsx";
 import { backTo, leavingFor } from "./carried-flow.ts";
+import { INVITATION_UNANSWERED, JOIN_UNANSWERED, SAID_OF_ACCEPTING } from "./refusal-words.ts";
 import { SignOutButton } from "./sign-out-button.tsx";
 
 type Invitation = inferOutput<ReturnType<typeof useTRPC>["person"]["invitation"]>;
@@ -46,63 +48,30 @@ type WayOn = {
   readonly signingOutFirst?: true;
 };
 
-type Answer = { readonly said: Said; readonly way?: WayOn };
-
-const ANSWER_OF_WORD = {
-  "no-such-invitation": {
-    said: {
-      why: "No invitation stands at this link: it was cancelled, replaced by a newer one, or never sent.",
-      next: "Ask the Admin who invited you to send a new one.",
-    },
-  },
-  "invitation-expired": {
-    said: {
-      why: "This invitation has expired.",
-      next: "Ask the Admin who invited you to send it again.",
-    },
-  },
+const WAY_OF_WORD = {
   "invitation-for-another-address": {
-    said: {
-      why: "This invitation was sent to another email address than the one you are signed in with.",
-      next: "Sign in with the address it was sent to.",
-    },
-    way: {
-      keystroke: { key: "s", act: "Sign in with another address" },
-      to: (here) => here,
-      signingOutFirst: true,
-    },
+    keystroke: { key: "s", act: "Sign in with another address" },
+    to: (here) => here,
+    signingOutFirst: true,
   },
   "already-a-member": {
-    said: {
-      why: "You are already a member of this workspace.",
-      next: "Open it from your workspaces.",
-    },
-    way: { keystroke: { key: "w", act: "Go to your workspaces" }, to: () => "/choose-workspace" },
+    keystroke: { key: "w", act: "Go to your workspaces" },
+    to: () => "/choose-workspace",
   },
   "no-display-name": {
-    said: {
-      why: "A workspace credits its members by name, and you have not given one yet.",
-      next: "Give a display name, then join.",
-    },
-    way: {
-      keystroke: { key: "d", act: "Give a display name" },
-      to: (here) => backTo("/display-name", here),
-    },
+    keystroke: { key: "d", act: "Give a display name" },
+    to: (here) => backTo("/display-name", here),
   },
-} satisfies Partial<Record<RefusalWord, Answer>>;
+} satisfies Partial<Record<RefusalWord, WayOn>>;
 
-const ANSWERS = new Map<string, Answer>(Object.entries(ANSWER_OF_WORD));
+const WAYS = new Map<string, WayOn>(Object.entries(WAY_OF_WORD));
 
-const REFUSED_OTHERWISE: Said = {
-  why: "The platform could not read what this page sent.",
-  next: "Open the link in the email again.",
-};
-
-const saidOf = (refusal: Refusal): Said => ANSWERS.get(refusal.word)?.said ?? REFUSED_OTHERWISE;
+const saidOf = (refusal: Refusal): Said =>
+  saidOfRefusal(SAID_OF_ACCEPTING, refusal.word, refusal.class);
 
 const wayOf = (failure: Error | ApiError | null): WayOn | undefined => {
   const word = failure === null ? undefined : refusalOf(failure)?.word;
-  return word === undefined ? undefined : ANSWERS.get(word)?.way;
+  return word === undefined ? undefined : WAYS.get(word);
 };
 
 function WayOnAct(properties: { readonly way: WayOn; readonly here: string }) {
@@ -176,7 +145,7 @@ function InvitationUnread(properties: {
         id={READ_REFUSED}
         failure={properties.failure}
         saidOf={saidOf}
-        unanswered="The invitation could not be read, so nothing changed. Try again in a moment."
+        unanswered={INVITATION_UNANSWERED}
         signInAt={properties.here}
       />
       <div className="mt-6 flex flex-wrap items-center gap-2">
@@ -245,7 +214,7 @@ function InvitationToJoin(properties: {
           id={JOIN_REFUSED}
           failure={accept.error}
           saidOf={saidOf}
-          unanswered="The platform did not answer, so you have not joined. Try again in a moment."
+          unanswered={JOIN_UNANSWERED}
           signInAt={properties.here}
         />
       )}

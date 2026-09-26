@@ -1,5 +1,8 @@
 import type { Page } from "@playwright/test";
 
+import { DISPLAY_NAME_MAX_CHARACTERS, DISPLAY_NAME_REFUSED } from "@/shared/display-name-words.ts";
+import { SAID_OF_CLASS, sentenceOf } from "@/shared/refusal-words.ts";
+
 import { expect, test } from "./browser.ts";
 import {
   addMember,
@@ -8,6 +11,7 @@ import {
   landedAtHome,
   person,
   provision,
+  saysItsSentenceNotItsWord,
   signIn,
   theActLandedWithinItsBudget,
 } from "./harness.ts";
@@ -98,7 +102,7 @@ test("signs a named member straight into the shell, never asking", async ({ page
   await landedAtHome(page, "Admin");
 });
 
-test("refuses a bad name by its word, then accepts one", async ({
+test("says what to change in a bad name, then saves", async ({
   page,
   request,
   passesTheAccessibilityGate,
@@ -111,18 +115,17 @@ test("refuses a bad name by its word, then accepts one", async ({
   await saveButton(page).click();
 
   const refusal = page.getByRole("alert");
-  await expect(refusal).toContainText("display-name-angle-bracket");
-  await expect(refusal).toContainText(
-    "A display name cannot hold < or >. Remove them and save again.",
-  );
+  await saysItsSentenceNotItsWord(refusal, {
+    table: DISPLAY_NAME_REFUSED,
+    word: "display-name-angle-bracket",
+  });
   await expect(displayNameField(page)).toHaveAttribute("aria-invalid", "true");
   await expect(displayNameHeading(page)).toBeVisible();
   await passesTheAccessibilityGate();
 
-  await displayNameField(page).fill("a".repeat(101));
+  await displayNameField(page).fill("a".repeat(DISPLAY_NAME_MAX_CHARACTERS + 1));
   await saveButton(page).click();
-  await expect(refusal).toContainText("display-name-too-long");
-  await expect(refusal).toContainText("A display name is at most 100 characters.");
+  await expect(refusal).toHaveText(sentenceOf(DISPLAY_NAME_REFUSED["display-name-too-long"]));
 
   await displayNameField(page).fill("Priya Shah");
   await saveButton(page).click();
@@ -149,9 +152,7 @@ test("refuses a save after the session ended, offering sign-in again", async ({
   await displayNameField(page).fill("Priya Shah");
   await saveButton(page).click();
 
-  const refusal = page.getByRole("alert");
-  await expect(refusal).toContainText("no-session");
-  await expect(refusal).toContainText("Your session has ended. Sign in again.");
+  await expect(page.getByRole("alert")).toHaveText(sentenceOf(SAID_OF_CLASS.unauthenticated));
   await expect(displayNameField(page)).toHaveAttribute("aria-invalid", "false");
   await page.getByRole("button", { name: "Sign in again" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();

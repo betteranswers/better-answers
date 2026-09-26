@@ -1,7 +1,9 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { SAID_OF_A_BINDING } from "@/features/sources/refusal-words.ts";
 import { NOTHING_BOUND } from "@/features/sources/words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
+import { sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -11,6 +13,7 @@ import {
   moveTheIndexRun,
   person,
   provision,
+  saysItsSentenceNotItsWord,
   seedBindings,
   signIn,
   skipLinkReachesTheScreen,
@@ -184,7 +187,7 @@ test.describe("the Sources screen's list of bindings", () => {
     ]);
   });
 
-  test("refuses a non-Admin in its word, naming who can act", async ({ page, request }) => {
+  test("refuses a non-Admin, naming who can act", async ({ page, request }) => {
     const workspace = await provision(request, { name: "Pennine Fabrication" });
     await seedBindings(request, {
       workspaceId: workspace.workspaceId,
@@ -201,9 +204,7 @@ test.describe("the Sources screen's list of bindings", () => {
     await signIn(page, request, email);
     await rail(page).getByRole("link", { name: "Sources" }).click();
 
-    await expect(bindingsRegion(page)).toContainText(
-      "Refused: role-forbids. Only an Admin of this workspace may do this. An Admin can take it from here.",
-    );
+    await expect(bindingsRegion(page)).toContainText(sentenceOf(SAID_OF_A_BINDING["role-forbids"]));
     await expect(bindingsRegion(page)).not.toContainText("Staff handbook");
 
     await page.keyboard.press("b");
@@ -216,7 +217,7 @@ test.describe("the Sources screen's list of bindings", () => {
     });
     await dialog.getByRole("button", { name: "Bind the document" }).click();
     await expect(dialog.getByRole("alert")).toHaveText(
-      "Refused: role-forbids. Only an Admin of this workspace may do this. An Admin can take it from here.",
+      sentenceOf(SAID_OF_A_BINDING["role-forbids"]),
     );
   });
 });
@@ -300,7 +301,10 @@ test.describe("binding a document on the Sources screen", () => {
     await expect(lastRunOf(page, "The staff handbook")).toContainText("Index run done");
   });
 
-  test("refuses an Admin's unconvertible file in its own word", async ({ page, request }) => {
+  test("refuses an Admin's unconvertible file, naming the kinds that convert", async ({
+    page,
+    request,
+  }) => {
     await anAdminAtSources(page, request, { workspace: "Ryburn Signs" });
 
     await page.keyboard.press("b");
@@ -313,9 +317,10 @@ test.describe("binding a document on the Sources screen", () => {
     });
     await dialog.getByRole("button", { name: "Bind the document" }).click();
 
-    await expect(dialog.getByRole("alert")).toHaveText(
-      "Refused: media-type-refused. The platform converts markdown, plain text, Word (.docx) and PDF, and this file is none of them. Choose a file of one of those kinds.",
-    );
+    await saysItsSentenceNotItsWord(dialog.getByRole("alert"), {
+      table: SAID_OF_A_BINDING,
+      word: "media-type-refused",
+    });
     await expect(dialog).toBeVisible();
   });
 });
@@ -534,9 +539,7 @@ test.describe("reviewing a binding's findings", () => {
       }),
     ).toBeChecked();
     await expect(dismissal).toBeDisabled();
-    await expect(review).toContainText(
-      "Only a special category finding group can be dismissed as not special category. Untick the groups of another category.",
-    );
+    await expect(review).toContainText(sentenceOf(SAID_OF_A_BINDING["not-special-category"]));
     await page.keyboard.press("x");
 
     await page.keyboard.press("Tab");
@@ -908,9 +911,7 @@ test.describe("publishing, narrowing and widening a binding", () => {
     await expect(classPicked, "the list of classes did not hand focus back").toBeFocused();
     const commit = dialog.getByRole("button", { name: /^Widen Tender answers to / });
     await expect(commit).toBeDisabled();
-    await expect(commit).toHaveAccessibleDescription(
-      "That is no wider than the class and audience it has. Choose a wider class, or everyone in the workspace for its audience.",
-    );
+    await expect(commit).toHaveAccessibleDescription(sentenceOf(SAID_OF_A_BINDING["not-wider"]));
 
     await classPicked.press("Enter");
     await page.getByRole("option", { name: "Internal" }).press("Enter");
@@ -1016,7 +1017,7 @@ test.describe("publishing, narrowing and widening a binding", () => {
       .click();
 
     await expect(bindingsRegion(page).getByRole("alert")).toHaveText(
-      "Refused: special-category-unreviewed. A special category finding in this binding is still unreviewed, and a binding holding one cannot widen. Review the binding, narrow or dismiss that finding group, then widen it.",
+      sentenceOf(SAID_OF_A_BINDING["special-category-unreviewed"]),
     );
     await expect(classOf(page, "Service records")).toHaveText("Restricted");
   });

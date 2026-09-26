@@ -1,3 +1,9 @@
+import { TRPCClientError } from "@trpc/client";
+
+/** A failed call as the client hands it over, with whatever `data` the api's formatter sent. */
+export const carrying = (data: unknown): Error =>
+  Object.assign(new TRPCClientError("refused"), { data });
+
 /** The address a stubbed `fetch` was asked for, whichever of its three shapes the caller used. */
 export const addressOf = (input: string | URL | Request): URL =>
   new URL(

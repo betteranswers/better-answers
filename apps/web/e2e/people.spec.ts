@@ -1,6 +1,9 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { SAID_OF_ACCEPTING } from "@/features/auth/refusal-words.ts";
+import { SAID_OF_A_MEMBER } from "@/features/people/refusal-words.ts";
 import { SELECT_FIRST } from "@/shared/keystroke-words.ts";
+import { SAID_OF_CLASS, sentenceOf } from "@/shared/refusal-words.ts";
 import { screenById, viewNamed, viewsOf } from "@/shared/screens.ts";
 
 import { expect, test } from "./browser.ts";
@@ -16,6 +19,7 @@ import {
   person,
   provision,
   removeMember,
+  saysItsSentenceNotItsWord,
   signIn,
   skipLinkReachesTheScreen,
   theActLandedWithinItsBudget,
@@ -261,12 +265,13 @@ test.describe("the People screen's Members view", () => {
   });
 
   for (const role of ["Editor", "Viewer"] as const) {
-    test(`refuses a member at ${role} the list, in its word`, async ({ page, request }) => {
+    test(`refuses a member at ${role} the list, saying why`, async ({ page, request }) => {
       const workspace = await aMemberSignedInAt(page, request, role, MEMBERS_VIEW);
 
-      const refused = membersRegion(page).getByRole("alert");
-      await expect(refused).toContainText("Refused: role-forbids.");
-      await expect(refused).toContainText("Only an Admin of this workspace sees its members.");
+      await saysItsSentenceNotItsWord(membersRegion(page).getByRole("alert"), {
+        table: SAID_OF_A_MEMBER,
+        word: "role-forbids",
+      });
       await expect(membersRegion(page).getByRole("table")).toHaveCount(0);
       await expect(page.locator("body")).not.toContainText(workspace.admin.email);
     });
@@ -457,9 +462,10 @@ test.describe("a member, opened as a sheet", () => {
     const commit = sheet.getByRole("button", { name: "Make Test person a Viewer" });
     await commit.click();
 
-    const refused = sheet.getByRole("alert");
-    await expect(refused).toContainText("Refused: last-admin.");
-    await expect(refused).toContainText("Make someone else an Admin first.");
+    await saysItsSentenceNotItsWord(sheet.getByRole("alert"), {
+      table: SAID_OF_A_MEMBER,
+      word: "last-admin",
+    });
     await expect(sheet.getByRole("region", { name: "Membership" })).toContainText("Admin");
     // The refusal re-enables the button mid-fade from its disabled look; an audit inside that fade
     // reads a contrast nobody settles on.
@@ -485,7 +491,9 @@ test.describe("a member, opened as a sheet", () => {
 
     await expect(bar).toContainText("Editor");
     await expect(bar).not.toContainText("Admin");
-    await expect(membersRegion(page).getByRole("alert")).toContainText("Refused: role-forbids.");
+    await expect(membersRegion(page).getByRole("alert")).toHaveText(
+      sentenceOf(SAID_OF_A_MEMBER["role-forbids"]),
+    );
   });
 
   test("opens a member and changes their role by keyboard alone", async ({ page, request }) => {
@@ -608,9 +616,9 @@ test.describe("revoking a member's credentials here", () => {
     );
     await page.keyboard.press("Escape");
 
-    const refused = membersRegion(page).getByRole("alert");
-    await expect(refused).toContainText("Refused: credentials-revoked.");
-    await expect(refused).toContainText("Sign in again.");
+    await expect(membersRegion(page).getByRole("alert")).toHaveText(
+      sentenceOf(SAID_OF_CLASS.unauthenticated),
+    );
     await page.reload();
     await signIn(page, request, admin);
     await expect(page).toHaveURL(new RegExp(`${MEMBERS_VIEW}$`));
@@ -710,9 +718,9 @@ test.describe("removing a member from their sheet", () => {
 
     await removedThroughTheirSheet(page, "Test person");
 
-    const refused = membersRegion(page).getByRole("alert");
-    await expect(refused).toContainText("Refused: last-admin.");
-    await expect(refused).toContainText("Make someone else an Admin first.");
+    await expect(membersRegion(page).getByRole("alert")).toHaveText(
+      sentenceOf(SAID_OF_A_MEMBER["last-admin"]),
+    );
     await expect(memberRows(page)).toHaveCount(3);
     await expect(rowOf(page, "Test person").getByRole("cell").nth(1)).toHaveText("Admin");
     await passesTheAccessibilityGate();
@@ -731,9 +739,10 @@ test.describe("removing a member from their sheet", () => {
 
     await removedThroughTheirSheet(page, "Test person");
 
-    const refused = membersRegion(page).getByRole("alert");
-    await expect(refused).toContainText("Refused: not-a-member.");
-    await expect(refused).toContainText("You are not a member of this workspace.");
+    await saysItsSentenceNotItsWord(membersRegion(page).getByRole("alert"), {
+      table: SAID_OF_A_MEMBER,
+      word: "not-a-member",
+    });
     await expect(membersRegion(page)).toContainText(
       "Test person is no longer a member of this workspace.",
     );
@@ -813,7 +822,7 @@ test.describe("a member's display name, flagged to the operator", () => {
     await expect(region.getByRole("button")).toHaveCount(0);
   });
 
-  test("refuses a member removed meanwhile, saying its word and remedy", async ({
+  test("refuses a member removed meanwhile, saying why and what next", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -827,10 +836,9 @@ test.describe("a member's display name, flagged to the operator", () => {
 
     await flagButton(sheet).click();
 
-    const refused = displayNameRegion(sheet).getByRole("alert");
-    await expect(refused).toContainText("Refused: no-such-member.");
-    await expect(refused).toContainText("This person is no longer a member of this workspace.");
-    await expect(refused).toContainText("Read the list again.");
+    await expect(displayNameRegion(sheet).getByRole("alert")).toHaveText(
+      sentenceOf(SAID_OF_A_MEMBER["no-such-member"]),
+    );
     await expect(displayNameRegion(sheet).getByRole("status")).toHaveCount(0);
     await passesTheAccessibilityGate();
   });
@@ -982,7 +990,9 @@ test.describe("the People screen's words", () => {
     ).toBeVisible();
     await saidOnTheAcceptPage("the accept page");
     await page.goto(`/invitations/${forSomeoneElse.id}`);
-    await expect(page.getByRole("alert")).toContainText("invitation-for-another-address");
+    await expect(page.getByRole("alert")).toHaveText(
+      sentenceOf(SAID_OF_ACCEPTING["invitation-for-another-address"]),
+    );
     await saidOnTheAcceptPage("the accept page refusing another address");
   });
 });

@@ -312,7 +312,7 @@ export function MembersTab() {
     <section aria-labelledby={headingId} className="mt-6">
       <h2 id={headingId}>Members</h2>
       <OutcomeLine
-        outcome={members.error === null ? undefined : outcomeOfFailure(members.error)}
+        outcome={members.error === null ? undefined : outcomeOfFailure(members.error, "read")}
         className="mt-2"
       />
       <div aria-live="polite">

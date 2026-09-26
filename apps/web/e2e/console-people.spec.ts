@@ -1,6 +1,14 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import {
+  NOT_THE_OPERATOR,
+  ONLY_THE_OPERATOR,
+  SAID_OF_A_REVOCATION,
+  SAID_OF_CORRECTING,
+  SIGN_IN_TOO_OLD,
+} from "@/features/console/refusal-words.ts";
 import { KEYSTROKE_WORDS, SELECT_FIRST } from "@/shared/keystroke-words.ts";
+import { sentenceOf } from "@/shared/refusal-words.ts";
 import { consoleScreenById, viewNamed } from "@/shared/screens.ts";
 
 import { expect, test } from "./browser.ts";
@@ -346,9 +354,8 @@ test.describe("the console's Everyone view", () => {
     await railOf(page).getByRole("link", { name: "Workspaces" }).click();
     await railOf(page).getByRole("link", { name: "People" }).click();
 
-    await expect(everyone(page)).toContainText(
-      "Refused: not-the-operator. Only the operator may open the console. Go back to your workspaces.",
-    );
+    await expect(everyone(page)).toContainText(sentenceOf(ONLY_THE_OPERATOR));
+    await expect(everyone(page)).not.toContainText(NOT_THE_OPERATOR);
     await expect(everyone(page).getByRole("table")).toHaveCount(0);
   });
 
@@ -561,9 +568,9 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await sheet.getByRole("button", { name: REVOKE }).click();
     await confirmationOf(page).getByRole("button", { name: "Revoke everywhere" }).click();
 
-    const refused = regionOf(sheet, "Revoke everywhere").getByRole("alert");
-    await expect(refused).toContainText("Refused: sign-in-too-old.");
-    await expect(refused).toContainText("Your sign-in is more than an hour old");
+    await expect(regionOf(sheet, "Revoke everywhere").getByRole("alert")).toHaveText(
+      sentenceOf(SAID_OF_A_REVOCATION[SIGN_IN_TOO_OLD]),
+    );
     await expect(regionOf(sheet, "Sessions")).toContainText("1 session open.");
 
     await sheet.getByRole("link", { name: "Sign in again" }).click();
@@ -685,8 +692,9 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await nameFieldOf(dialogToCorrect(page, "Priya Shah")).fill("Priya Sharma");
     await page.keyboard.press("Enter");
 
-    await expect(part.getByRole("alert")).toContainText("Refused: sign-in-too-old.");
-    await expect(part.getByRole("alert")).toContainText("Your sign-in is more than an hour old");
+    await expect(part.getByRole("alert")).toHaveText(
+      sentenceOf(SAID_OF_CORRECTING[SIGN_IN_TOO_OLD]),
+    );
     await part.getByRole("link", { name: "Sign in again" }).click();
     await expect(page).toHaveURL(/\/sign-in\?redirect=/);
     await signIn(page, request, operators.admin.email);
@@ -782,8 +790,7 @@ test.describe("the console's Names waiting view", () => {
 
   test("refuses a name the rule forbids, in the rule's words", async ({ page, request }) => {
     const { name } = await priyaFlagged(page, request, aTag());
-    const refusal =
-      "Refused: display-name-angle-bracket. A display name cannot hold < or >. Remove them and save again.";
+    const refusal = sentenceOf(SAID_OF_CORRECTING["display-name-angle-bracket"]);
     await page.goto(NAMES_WAITING_VIEW);
     await correctButtonOf(page, name).click();
     const dialog = dialogToCorrect(page, name);
@@ -808,9 +815,9 @@ test.describe("the console's Names waiting view", () => {
     await nameFieldOf(dialogToCorrect(page, name)).fill(corrected);
     await page.keyboard.press("Enter");
 
-    const refused = namesWaiting(page).getByRole("alert");
-    await expect(refused).toContainText("Refused: sign-in-too-old.");
-    await expect(refused).toContainText("Your sign-in is more than an hour old");
+    await expect(namesWaiting(page).getByRole("alert")).toHaveText(
+      sentenceOf(SAID_OF_CORRECTING[SIGN_IN_TOO_OLD]),
+    );
     await expect(waitingRowOf(page, name)).toBeVisible();
     const signInAgain = namesWaiting(page).getByRole("link", { name: "Sign in again" });
     await expect(signInAgain).toBeFocused();
