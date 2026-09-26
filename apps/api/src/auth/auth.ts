@@ -220,7 +220,8 @@ const claimsOfIssued = (issued: AuditedCall["issued"]) => {
   return claims.success ? claims.data : undefined;
 };
 
-const issuedLine = (line: AuditLine, call: AuditedCall): AuditLine => {
+/** Named from the grant whatever the outcome, so a refused refresh never reads as a first issue. */
+const tokenLine = (line: AuditLine, call: AuditedCall): AuditLine => {
   const event = call.fields.grant_type === "refresh_token" ? "auth.token_refresh" : line.event;
   const claims = claimsOfIssued(call.issued);
   if (claims === undefined) return { ...line, event };
@@ -237,8 +238,7 @@ const auditLineOf = (line: AuditLine, call: AuditedCall): AuditLine => {
   if (line.event === "auth.workspace_pick") {
     return { ...line, workspaceId: call.fields.organizationId };
   }
-  if (call.refused) return line;
-  if (line.event === "auth.token_issue") return issuedLine(line, call);
+  if (line.event === "auth.token_issue") return tokenLine(line, call);
   if (line.event === "auth.sign_in" && call.signedIn !== undefined) {
     return { ...line, principal: call.signedIn.user.id };
   }
