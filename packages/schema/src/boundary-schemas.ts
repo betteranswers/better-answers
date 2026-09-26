@@ -27,7 +27,7 @@ import {
   VERIFICATION_ORIGINS,
 } from "./concept-tables.ts";
 import { CONTRACT_DIGEST_PATTERN } from "./contract-digest.ts";
-import { ingressCounter, mcpCallCounter } from "./counter-tables.ts";
+import { INGRESS_SCOPES, ingressCounter, mcpCallCounter } from "./counter-tables.ts";
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "./drizzle-zod.ts";
 import {
   erasureRequest,
@@ -251,8 +251,6 @@ const mcpCallCounterRefinements = {
 export const mcpCallCounterSelect = createSelectSchema(mcpCallCounter, mcpCallCounterRefinements);
 export const mcpCallCounterInsert = createInsertSchema(mcpCallCounter, mcpCallCounterRefinements);
 export const mcpCallCounterUpdate = createUpdateSchema(mcpCallCounter, mcpCallCounterRefinements);
-
-const INGRESS_SCOPES = ["ip", "email"] as const;
 
 const ingressCounterRefinements = {
   scope: (schema: z.ZodString) => schema.pipe(z.enum(INGRESS_SCOPES)),

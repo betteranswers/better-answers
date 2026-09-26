@@ -1,6 +1,6 @@
 import type pg from "pg";
 
-import { boundarySchemas, ROLES } from "@better-answers/schema";
+import { boundarySchemas, type INGRESS_SCOPES, ROLES } from "@better-answers/schema";
 
 import { err, ok, type Result } from "../../kernel/index.ts";
 import type {
@@ -481,7 +481,7 @@ const countInWindow = async (
  */
 export const consumeIngress = async (
   door: PostgresDoor,
-  scope: "ip" | "email" | "person",
+  scope: (typeof INGRESS_SCOPES)[number],
   key: string,
   rule: CounterRule,
   now: Date,
