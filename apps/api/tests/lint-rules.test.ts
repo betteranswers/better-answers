@@ -362,21 +362,21 @@ const lintUnderCategories = oxlintOver(
   { tree: typedTree({ "src/fires.ts": ADOPTED[0].fires }), flagged: ["src/fires.ts"] },
 ).output;
 
-describe.each(ADOPTED)("$rule refuses $refuses", ({ rule, fires, silent }) => {
+describe.each(ADOPTED)("$rule", ({ rule, refuses, fires, silent }) => {
   const firing = typedTree({ "src/fires.ts": fires });
   const lintRule = ruleRunner(rule, { tree: firing, flagged: ["src/fires.ts"] });
 
   it("names the file holding the source it refuses", () => {
     const output = lintRule(firing);
 
-    expect(output).toContain("src/fires.ts");
+    expect(output, `refuses ${refuses}`).toContain("src/fires.ts");
     expect(output).toContain(reportedName(rule));
   });
 
   it("stays silent on the same work done as it asks", () => {
     const output = lintRule(typedTree({ "src/asked.ts": silent }));
 
-    expect(output).not.toContain("src/asked.ts");
+    expect(output, `refuses only ${refuses}`).not.toContain("src/asked.ts");
   });
 
   it("runs under the categories, never named in the rules block", () => {

@@ -185,9 +185,9 @@ describe("the release's wait through a deploy's sequence of answers", () => {
   });
 
   it.each([
-    ["something that is not a digest", PROMOTED.slice(0, 19)],
-    ["no digest at all", undefined],
-  ])("refuses to wait for %s, before asking production anything", async (_case, digest) => {
+    ["a truncated digest", PROMOTED.slice(0, 19)],
+    ["no digest", undefined],
+  ])("refuses to wait for %s, asking production nothing", async (_case, digest) => {
     const waited = await awaitReleaseThrough([healthy(PROMOTED)], digest, 3);
 
     expect(waited).toMatchObject({ code: 2, asked: 0 });
