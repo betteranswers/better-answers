@@ -1111,6 +1111,13 @@ describe("the emails a suppression holds", () => {
   });
 });
 
+describe("the scopes an ingress counter row takes", () => {
+  it("takes the person scope a signed-in caller is counted by", () => {
+    const row = { ...acceptedRows.ingressCounter[0], scope: "person" };
+    expect(boundarySchemas.ingressCounter.insert.safeParse(row).success).toBe(true);
+  });
+});
+
 describe("who a subject request is about", () => {
   const stranger = acceptedRows.subjectRequest[1];
 
@@ -1343,7 +1350,7 @@ describe("5 — the inferred type is pinned", () => {
   type _ingressCounterSelect = Expect<
     Equal<
       z.infer<typeof boundarySchemas.ingressCounter.select>,
-      { scope: "ip" | "email"; key: string; windowStart: Date; count: number }
+      { scope: "ip" | "email" | "person"; key: string; windowStart: Date; count: number }
     >
   >;
   type _chunkSelect = Expect<
