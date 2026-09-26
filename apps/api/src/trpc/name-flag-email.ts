@@ -2,11 +2,14 @@ import type { Logger } from "pino";
 
 import { attempt } from "@better-answers/core/kernel";
 import type { RaisedFlag } from "@better-answers/core/members";
+import { operatorAddresses } from "@better-answers/core/workspaces";
 
+import type { Doors } from "../doors.ts";
 import type { EmailMessage, Mail } from "../email.ts";
+import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
 
-const nameFlagEmail = (operatorAddress: string, raised: RaisedFlag): EmailMessage => ({
-  to: operatorAddress,
+const nameFlagEmail = (to: string, raised: RaisedFlag): EmailMessage => ({
+  to,
   subject: `A display name is flagged in ${raised.workspaceName}`,
   text: [
     `An Admin of ${raised.workspaceName} flagged a display name as inappropriate.`,
@@ -21,17 +24,28 @@ const nameFlagEmail = (operatorAddress: string, raised: RaisedFlag): EmailMessag
 
 /** A missed email loses no flag: it stands on the identity-set audit log, and the answer is unmoved. */
 export const tellTheOperator = async (
-  ctx: { readonly mail: Mail; readonly log: Logger },
+  ctx: { readonly doors: Doors; readonly mail: Mail; readonly log: Logger },
   raised: RaisedFlag,
 ): Promise<void> => {
-  const { mail, log } = ctx;
+  const { doors, mail, log } = ctx;
   const facts = { event: "trpc.email_failed", person_id: raised.personId };
-  if (mail.operatorAddress === undefined) {
-    log.error(facts, "no operator address is configured, so the name flag was not emailed");
+  const addresses = await operatorAddresses(IDENTITY_PRINCIPAL, doors.postgres);
+  if (!addresses.ok) {
+    log.error(
+      { ...facts, err: addresses.error },
+      "the operator's address was not read, so the name flag was not emailed",
+    );
     return;
   }
-  const { operatorAddress } = mail;
-  const sent = await attempt(() => mail.send(nameFlagEmail(operatorAddress, raised)));
-  // The error is the relay's, which may quote the name; the person id is enough to find it.
-  if (!sent.ok) log.warn(facts, "the name flag's email to the operator did not go");
+  if (addresses.value.length === 0) {
+    log.error(facts, "no person carries the operator mark, so the name flag was not emailed");
+    return;
+  }
+  await Promise.all(
+    addresses.value.map(async (address) => {
+      const sent = await attempt(() => mail.send(nameFlagEmail(address, raised)));
+      // The error is the relay's, which may quote the name; the person id is enough to find it.
+      if (!sent.ok) log.warn(facts, "the name flag's email to the operator did not go");
+    }),
+  );
 };

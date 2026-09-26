@@ -1,11 +1,21 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 
-import type { Role, UserPrincipal } from "../src/kernel/index.ts";
-import { flagDisplayName, flagDisplayNameInput } from "../src/members/index.ts";
-import type { Tx } from "../src/store/postgres/index.ts";
-import { correctionOf } from "./identity-rows.ts";
+import type {
+  OperatorPrincipal,
+  PlatformPrincipal,
+  Role,
+  UserPrincipal,
+} from "../src/kernel/index.ts";
+import { flagDisplayName, flagDisplayNameInput, listNamesWaiting } from "../src/members/index.ts";
+import { openPostgres, type Tx } from "../src/store/postgres/index.ts";
+import { correctDisplayName, setDisplayName } from "../src/workspaces/index.ts";
 import { heldAs, membersSuite } from "./members-suite.ts";
-import { provisionedWorkspace, type ProvisionedWorkspace } from "./platform.ts";
+import {
+  asTheOperator,
+  bootstrap,
+  provisionedWorkspace,
+  type ProvisionedWorkspace,
+} from "./platform.ts";
 import { inputOf } from "./suite-input.ts";
 import {
   countWaitingOnLocks,
@@ -22,6 +32,8 @@ const NAME_FLAGGED = "people.person.name_flagged";
 const FLAG_RAISED = "people.name_flag.raised";
 
 const RUDE_NAME = "Rude Name";
+
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
 const aPerson = (name = RUDE_NAME): Promise<string> =>
   seedingWith(db().pool, async (seed) => (await seed.user({ name })).id);
@@ -69,12 +81,19 @@ const nameOf = async (personId: string): Promise<string | undefined> =>
   (await db().pool.query<{ name: string }>('SELECT name FROM "user" WHERE id = $1', [personId]))
     .rows[0]?.name;
 
-const correctedSince = async (personId: string) => {
-  const operatorId = await seedingWith(
-    db().pool,
-    async (seed) => (await seed.user({ operator: true })).id,
+/** @throws when the operator's correction is refused. */
+const correctedSince = async (personId: string, displayName = "Priya Shah") => {
+  const corrected = await asTheOperator(db(), (operator, tx) =>
+    correctDisplayName(operator, tx, { personId, displayName, at: new Date() }),
   );
-  await correctionOf(db().pool, { personId, operatorId });
+  if (!corrected.ok) throw new Error(`the correction was refused: ${String(corrected.error)}`);
+};
+
+/** Narrowed to `personIds`: every flag this file raises shares one database. */
+const waitingAmong = async (personIds: readonly string[]) => {
+  const listed = await asTheOperator(db(), listNamesWaiting);
+  if (!listed.ok) throw new Error(`the names waiting were refused: ${String(listed.error)}`);
+  return listed.value.filter((waiting) => personIds.includes(waiting.personId));
 };
 
 describe("flagging a member's display name", () => {
@@ -233,5 +252,86 @@ describe("what flagging a display name refuses", () => {
     expect(failed).toEqual({ ok: false, error: expect.any(Error) });
     expect(await flaggedIn(workspace)).toEqual([]);
     expect(await raisedFor(person)).toEqual([]);
+  });
+});
+
+describe("the names waiting for the operator", () => {
+  const flagOn = ({ workspaceId, name }: ProvisionedWorkspace) => ({
+    workspace: { id: workspaceId, name },
+    raisedAt: expect.stringMatching(ISO_INSTANT),
+  });
+
+  it("lists each flagged person with every flagging workspace, oldest first", async () => {
+    const ours = await provisionedWorkspace(db(), "WaitingOurs");
+    const theirs = await provisionedWorkspace(db(), "WaitingTheirs");
+    const twice = await aPerson();
+    const once = await aPerson("Worse Name");
+    const unflagged = await aPerson("Fine Name");
+    for (const personId of [twice, once, unflagged]) await joined(ours, personId, "Viewer");
+    await joined(theirs, twice, "Editor");
+    await flaggedBy(ours, ours.adminUserId, twice);
+    await flaggedBy(ours, ours.adminUserId, once);
+    await flaggedBy(theirs, theirs.adminUserId, twice);
+
+    const waiting = await waitingAmong([once, unflagged, twice]);
+
+    expect(waiting).toEqual([
+      { personId: twice, displayName: RUDE_NAME, flags: [flagOn(ours), flagOn(theirs)] },
+      { personId: once, displayName: "Worse Name", flags: [flagOn(ours)] },
+    ]);
+  });
+
+  it("takes a person off once the operator corrects their name", async () => {
+    const workspace = await provisionedWorkspace(db(), "WaitingCorrected");
+    const person = await joined(workspace, await aPerson(), "Viewer");
+    await flaggedBy(workspace, workspace.adminUserId, person);
+    expect(await waitingAmong([person])).toHaveLength(1);
+
+    await correctedSince(person);
+
+    expect(await waitingAmong([person])).toEqual([]);
+  });
+
+  it("lists only the flags raised since the last correction", async () => {
+    const ours = await provisionedWorkspace(db(), "WaitingBefore");
+    const theirs = await provisionedWorkspace(db(), "WaitingAfter");
+    const person = await aPerson();
+    await joined(ours, person, "Viewer");
+    await joined(theirs, person, "Viewer");
+    await flaggedBy(ours, ours.adminUserId, person);
+    await correctedSince(person, "Still Rude");
+
+    await flaggedBy(theirs, theirs.adminUserId, person);
+
+    expect(await waitingAmong([person])).toMatchObject([
+      { personId: person, displayName: "Still Rude", flags: [flagOn(theirs)] },
+    ]);
+  });
+
+  it("keeps a person waiting who renames themself", async () => {
+    const workspace = await provisionedWorkspace(db(), "WaitingSelfNamed");
+    const person = await joined(workspace, await aPerson(), "Viewer");
+    await flaggedBy(workspace, workspace.adminUserId, person);
+
+    const named = await setDisplayName(bootstrap, openPostgres(db().runtimePool), {
+      personId: person,
+      displayName: "Ruder Name",
+    });
+
+    expect(named.ok).toBe(true);
+    expect(await waitingAmong([person])).toMatchObject([
+      { personId: person, displayName: "Ruder Name", flags: [flagOn(workspace)] },
+    ]);
+    expect(await flaggedBy(workspace, workspace.adminUserId, person)).toEqual(
+      alreadyWaited(person),
+    );
+  });
+
+  it("admits the operator alone, never an Admin or the platform", () => {
+    type Reader = Parameters<typeof listNamesWaiting>[0];
+
+    expectTypeOf<OperatorPrincipal>().toExtend<Reader>();
+    expectTypeOf<UserPrincipal>().not.toExtend<Reader>();
+    expectTypeOf<PlatformPrincipal>().not.toExtend<Reader>();
   });
 });

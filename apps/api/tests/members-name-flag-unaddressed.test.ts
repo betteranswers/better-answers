@@ -5,17 +5,17 @@ import { webSignedIn } from "./web-client.ts";
 
 let app: TestApp;
 
-// A file of its own: the harness names the api's database after the running file.
+// A file of its own, so no person in its database carries the operator mark.
 beforeAll(async () => {
-  app = await startApp({ operatorAddress: null });
+  app = await startApp();
 });
 
 afterAll(async () => {
   await app.stop();
 });
 
-describe("a deployment that names no operator", () => {
-  it("answers alike and keeps the flag, logging the missing address", async () => {
+describe("a platform where no person carries the operator mark", () => {
+  it("answers alike and keeps the flag, logging the missing operator", async () => {
     const workspace = await app.provision();
     const flagged = await app.person(undefined, "Rude Name");
     await app.addMember(workspace.workspaceId, flagged.id, "Editor");
@@ -35,7 +35,7 @@ describe("a deployment that names no operator", () => {
         level: 50,
         event: "trpc.email_failed",
         person_id: flagged.id,
-        msg: "no operator address is configured, so the name flag was not emailed",
+        msg: "no person carries the operator mark, so the name flag was not emailed",
       }),
     );
   });

@@ -49,8 +49,6 @@ services:
       AUTH_SECRET: ${AUTH_SECRET:?}
       PUBLIC_URL: ${PUBLIC_URL:?}
       SMTP_URL: ${SMTP_URL:?}
-      # Where an Admin's flag on a display name is emailed.
-      OPERATOR_EMAIL: ${OPERATOR_EMAIL:?}
       AGENT_HOSTNAME: ${AGENT_HOSTNAME:?}
       APEX_HOSTNAME: ${APEX_HOSTNAME:?}
       AGENT_MAX_FILE_BYTES: "104857600"

@@ -4,7 +4,6 @@ import { z } from "zod";
 
 import type { OperatorPrincipal, Principal } from "@better-answers/core/kernel";
 import type { Tx } from "@better-answers/core/store/postgres";
-import { setOperatorMark } from "@better-answers/core/workspaces";
 import { ulid } from "@better-answers/schema";
 
 import { runOps } from "../src/ops/index.ts";
@@ -12,9 +11,9 @@ import type { operatorProcedure } from "../src/trpc/base.ts";
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
 import { appRouter } from "../src/trpc/router.ts";
 import { connectAsHost, refresh, signIn } from "./flow.ts";
-import { CLAUDE_CLIENT_ID, capturingLogger, type TestApp } from "./harness.ts";
+import { CLAUDE_CLIENT_ID, capturingLogger } from "./harness.ts";
 import { callMcp } from "./mcp-call.ts";
-import { sessionsSignedInOverAnHourAgo } from "./provoke.ts";
+import { displayNameHeldBy, sessionsSignedInOverAnHourAgo } from "./provoke.ts";
 import { appForSuite } from "./suite-app.ts";
 import { refusalOfCall, webSignedIn } from "./web-client.ts";
 
@@ -40,6 +39,12 @@ const CONSOLE_CALLS: readonly (readonly [
     "console.people.revokeCredentials",
     (api, personId) => api.console.people.revokeCredentials.mutate({ personId }),
   ],
+  ["console.people.namesWaiting", (api) => api.console.people.namesWaiting.query()],
+  [
+    "console.people.correctDisplayName",
+    (api, personId) =>
+      api.console.people.correctDisplayName.mutate({ personId, displayName: "Priya Shah" }),
+  ],
 ];
 
 /** The same procedures as a client holding only a bearer asks for them. */
@@ -50,6 +55,11 @@ const BEARER_ASKS: readonly (readonly [string, RequestInit])[] = [
   [
     "console.people.revokeCredentials",
     { method: "POST", body: JSON.stringify({ personId: ulid() }) },
+  ],
+  ["console.people.namesWaiting", {}],
+  [
+    "console.people.correctDisplayName",
+    { method: "POST", body: JSON.stringify({ personId: ulid(), displayName: "Priya Shah" }) },
   ],
 ];
 
@@ -97,22 +107,9 @@ const markHeldBy = async (personId: string): Promise<boolean | undefined> => {
   return found.rows[0]?.operator;
 };
 
-const marking = async (
-  application: TestApp,
-  email: string,
-  change: "grant" | "revoke",
-): Promise<void> => {
-  const marked = await setOperatorMark(
-    { kind: "platform", actorId: "process:better-answers-test" },
-    application.doors.postgres,
-    { email, change },
-  );
-  if (!marked.ok) throw new Error(`the mark was refused: ${String(marked.error)}`);
-};
-
 const theOperatorOnTheWeb = async () => {
   const workspace = await app().provision();
-  await marking(app(), workspace.admin.email, "grant");
+  await app().markOperator(workspace.admin.email, "grant");
   return { workspace, ...(await webSignedIn(app(), workspace.admin.email)) };
 };
 
@@ -264,7 +261,7 @@ describe("the mark the identity provider never takes or returns", () => {
 
   it("leaves the mark out of the session the library answers", async () => {
     const person = await app().person();
-    await marking(app(), person.email, "grant");
+    await app().markOperator(person.email, "grant");
     const client = app().client();
 
     const signedIn = await signIn(app(), client, person.email);
@@ -378,7 +375,7 @@ describe("the console, the operator's alone", () => {
     const { workspace, api } = await theOperatorOnTheWeb();
     expect(Array.isArray(await api.console.workspaces.list.query())).toBe(true);
 
-    await marking(app(), workspace.admin.email, "revoke");
+    await app().markOperator(workspace.admin.email, "revoke");
 
     expect(await refusalOfCall(api.console.workspaces.list.query())).toMatchObject({
       data: { refusal: { word: "not-the-operator", class: "forbidden" } },
@@ -520,10 +517,130 @@ describe("revoking a person's credentials everywhere, from the console", () => {
   });
 });
 
+describe("correcting a flagged display name, from the console", () => {
+  const RUDE_NAME = "Rude Name";
+
+  const correctionRowsOf = async (personId: string) => {
+    const found = await app().database.superuser.query(
+      `SELECT act, actor, subject_id, detail FROM identity_audit_event
+        WHERE subject_id = $1 AND act = 'people.person.renamed'`,
+      [personId],
+    );
+    return found.rows;
+  };
+
+  /** The operator on the web, and a person an Admin of another workspace flagged. */
+  const theOperatorAndAFlaggedPerson = async () => {
+    const operator = await theOperatorOnTheWeb();
+    const acme = await app().provision({ name: "Acme Flagging" });
+    const person = await app().person(undefined, RUDE_NAME);
+    await app().addMember(acme.workspaceId, person.id, "Viewer");
+    const { api: admin } = await webSignedIn(app(), acme.admin.email);
+    await admin.members.flagDisplayName.mutate({ personId: person.id });
+    return { ...operator, acme, person };
+  };
+
+  const waitingFor = async (api: WebApi, personId: string) =>
+    (await api.console.people.namesWaiting.query()).filter(
+      (waiting) => waiting.personId === personId,
+    );
+
+  it("corrects the name, taking the person off the names waiting", async () => {
+    const { api, workspace, acme, person } = await theOperatorAndAFlaggedPerson();
+    expect(await waitingFor(api, person.id)).toEqual([
+      {
+        personId: person.id,
+        displayName: RUDE_NAME,
+        flags: [
+          {
+            workspace: { id: acme.workspaceId, name: "Acme Flagging" },
+            raisedAt: expect.stringMatching(ISO_INSTANT),
+          },
+        ],
+      },
+    ]);
+
+    const corrected = await api.console.people.correctDisplayName.mutate({
+      personId: person.id,
+      displayName: "  Priya Shah ",
+    });
+
+    expect(corrected).toEqual({ personId: person.id, displayName: "Priya Shah" });
+    expect(await displayNameHeldBy(app(), person.id)).toBe("Priya Shah");
+    expect(await waitingFor(api, person.id)).toEqual([]);
+    expect(await correctionRowsOf(person.id)).toEqual([
+      {
+        act: "people.person.renamed",
+        actor: `human:${workspace.admin.id}`,
+        subject_id: person.id,
+        detail: {},
+      },
+    ]);
+  });
+
+  it("refuses a name the person's own rule refuses, still waiting", async () => {
+    const { api, person } = await theOperatorAndAFlaggedPerson();
+
+    const refused = await refusalOfCall(
+      api.console.people.correctDisplayName.mutate({ personId: person.id, displayName: "Sam\tO" }),
+    );
+
+    expect(refused).toMatchObject({
+      data: { httpStatus: 400, refusal: { word: "display-name-control-character" } },
+    });
+    expect(await displayNameHeldBy(app(), person.id)).toBe(RUDE_NAME);
+    expect(await waitingFor(api, person.id)).toHaveLength(1);
+    expect(await correctionRowsOf(person.id)).toEqual([]);
+  });
+
+  it("refuses the operator's sign-in over an hour old, writing nothing", async () => {
+    const { api, workspace, person } = await theOperatorAndAFlaggedPerson();
+    await sessionsSignedInOverAnHourAgo(app(), workspace.admin.id);
+
+    const refused = await refusalOfCall(
+      api.console.people.correctDisplayName.mutate({ personId: person.id, displayName: "Sam" }),
+    );
+
+    expect(refused).toMatchObject({
+      data: { httpStatus: 401, refusal: { word: "sign-in-too-old", class: "unauthenticated" } },
+    });
+    expect(await displayNameHeldBy(app(), person.id)).toBe(RUDE_NAME);
+    expect(await correctionRowsOf(person.id)).toEqual([]);
+  });
+
+  it("admits the operator again after a fresh sign-in", async () => {
+    const { workspace, person } = await theOperatorAndAFlaggedPerson();
+    await sessionsSignedInOverAnHourAgo(app(), workspace.admin.id);
+
+    const { api } = await webSignedIn(app(), workspace.admin.email);
+    const corrected = await api.console.people.correctDisplayName.mutate({
+      personId: person.id,
+      displayName: "Sam Okoro",
+    });
+
+    expect(corrected.displayName).toBe("Sam Okoro");
+    expect(await waitingFor(api, person.id)).toEqual([]);
+  });
+
+  it("refuses a person nobody holds, writing nothing", async () => {
+    const { api } = await theOperatorOnTheWeb();
+    const nobody = ulid();
+
+    const refused = await refusalOfCall(
+      api.console.people.correctDisplayName.mutate({ personId: nobody, displayName: "Sam" }),
+    );
+
+    expect(refused).toMatchObject({
+      data: { httpStatus: 404, refusal: { word: "no-such-user", class: "absent" } },
+    });
+    expect(await correctionRowsOf(nobody)).toEqual([]);
+  });
+});
+
 describe("the session's read of whether its person is the operator", () => {
   it("names the operator, who needs no workspace for it", async () => {
     const person = await app().person();
-    await marking(app(), person.email, "grant");
+    await app().markOperator(person.email, "grant");
     const { api } = await webSignedIn(app(), person.email);
 
     expect(await api.session.operator.query()).toEqual({ operator: true, name: person.name });
@@ -540,7 +657,7 @@ describe("the session's read of whether its person is the operator", () => {
 
   it("answers no from the moment the mark is cleared", async () => {
     const { workspace, api } = await theOperatorOnTheWeb();
-    await marking(app(), workspace.admin.email, "revoke");
+    await app().markOperator(workspace.admin.email, "revoke");
 
     expect(await api.session.operator.query()).toEqual({ operator: false });
   });

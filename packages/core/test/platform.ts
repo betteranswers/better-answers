@@ -37,6 +37,7 @@ export const principalOf = (
 export type ProvisionedWorkspace = {
   readonly door: PostgresDoor;
   readonly workspaceId: WorkspaceId;
+  readonly name: string;
   readonly slug: string;
   readonly adminUserId: string;
 };
@@ -52,7 +53,7 @@ export const provisionedWorkspace = async (
   const slug = `${name.toLowerCase()}-${mintedId.toLowerCase()}`;
   const made = await provisionWorkspace(bootstrap, door, { id: mintedId, name, slug, adminUserId });
   if (!made.ok) throw new Error(`the workspace was not provisioned: ${made.error}`);
-  return { door, workspaceId: made.value.workspaceId, slug, adminUserId };
+  return { door, workspaceId: made.value.workspaceId, name, slug, adminUserId };
 };
 
 export type PersonOverrides = Parameters<ReturnType<typeof testData>["user"]>[0];
@@ -79,4 +80,17 @@ export const asANewOperator = async <T>(
     work,
   );
   return { operatorId, answered };
+};
+
+/**
+ * Answers `work` as a new operator signed in just now.
+ * @throws when the resolver refuses them.
+ */
+export const asTheOperator = async <T>(
+  db: MigratedPostgres,
+  work: (operator: OperatorPrincipal, tx: Tx) => Promise<T>,
+): Promise<T> => {
+  const { answered } = await asANewOperator(db, new Date(), work);
+  if (!answered.ok) throw new Error(`the operator was refused: ${answered.error}`);
+  return answered.value;
 };

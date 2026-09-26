@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { boundarySchemas, ulid } from "@better-answers/schema";
 
 import type { OperatorPrincipal } from "../src/kernel/index.ts";
-import { openPostgres, type Tx, withOperator } from "../src/store/postgres/index.ts";
+import { openPostgres } from "../src/store/postgres/index.ts";
 import {
   addMember,
   inspectPerson,
@@ -13,33 +13,22 @@ import {
   setDisplayName,
 } from "../src/workspaces/index.ts";
 import { sessionFor } from "./identity-rows.ts";
-import { bootstrap, provisionedWorkspace, seedPerson } from "./platform.ts";
+import { asTheOperator, bootstrap, provisionedWorkspace, seedPerson } from "./platform.ts";
 import { addressOf, postgresForSuite, seedingWith } from "./suite-postgres.ts";
 
 const db = postgresForSuite();
 
-const asTheOperator = async <T>(
-  work: (operator: OperatorPrincipal, tx: Tx) => Promise<T>,
-): Promise<T> => {
-  const operatorId = await seedPerson(db().pool, { operator: true });
-  const ran = await withOperator(
-    openPostgres(db().runtimePool),
-    { userId: operatorId, issuedAt: new Date() },
-    work,
-  );
-  if (!ran.ok) throw new Error(`the operator was refused: ${ran.error}`);
-  return ran.value;
-};
-
 const listed = (search: string, page: { offset?: number; limit?: number } = {}) =>
-  asTheOperator((operator, tx) =>
+  asTheOperator(db(), (operator, tx) =>
     listPeople(operator, tx, { search, offset: page.offset ?? 0, limit: page.limit ?? 50 }),
   );
 
 const personIdOf = (id: string) => boundarySchemas.user.select.shape.id.parse(id);
 
 const inspected = (personId: string) =>
-  asTheOperator((operator, tx) => inspectPerson(operator, tx, { personId: personIdOf(personId) }));
+  asTheOperator(db(), (operator, tx) =>
+    inspectPerson(operator, tx, { personId: personIdOf(personId) }),
+  );
 
 const signInsOf = async (personId: string): Promise<readonly string[]> => {
   const found = await db().pool.query<{ at: Date }>(
@@ -133,7 +122,7 @@ describe("the operator's list of people", () => {
       expiresAt: new Date(Date.now() + 3_600_000),
     });
     const revokedAt = new Date();
-    const revoked = await asTheOperator((operator, tx) =>
+    const revoked = await asTheOperator(db(), (operator, tx) =>
       revokeCredentials(operator, tx, { personId, at: revokedAt }),
     );
     expect(revoked.ok).toBe(true);
