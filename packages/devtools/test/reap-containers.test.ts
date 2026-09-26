@@ -13,9 +13,10 @@ import path from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
 
+import { repositoryRoot } from "@better-answers/devtools/paths";
+
 import { containerState, holdAContainer, removeContainers } from "./held-containers.ts";
 
-const repositoryRoot = path.join(import.meta.dirname, "../../..");
 const script = path.join(repositoryRoot, "scripts/reap-containers.mjs");
 
 const scratch = mkdtempSync(path.join(tmpdir(), "reap-containers-"));

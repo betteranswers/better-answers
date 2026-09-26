@@ -4,6 +4,8 @@ import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { repositoryRoot } from "@better-answers/devtools/paths";
+
 import {
   fileFromTheWorkspace,
   IMAGE_PROBE_ALLOWANCE,
@@ -11,7 +13,6 @@ import {
   matrixLegs,
   nothingToProbeHere,
   readTheImage,
-  repositoryRoot,
 } from "./image-probe.ts";
 import { workspacePackages } from "./workspaces.ts";
 

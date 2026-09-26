@@ -7,10 +7,10 @@ import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { z } from "zod";
 
+import { repositoryRoot } from "@better-answers/devtools/paths";
 import { runsOverThrowawayTree } from "@better-answers/devtools/throwaway-tree";
 import type { Tool } from "@better-answers/devtools/throwaway-tree";
 
-const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 const read = (relative: string): string =>
   readFileSync(path.join(repositoryRoot, relative), "utf8");
 

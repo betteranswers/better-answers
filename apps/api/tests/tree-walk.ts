@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { lstatSync, readFileSync } from "node:fs";
 import path from "node:path";
 
-export const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
+import { repositoryRoot } from "@better-answers/devtools/paths";
 
 const NOT_TEXT = /\.(png|jpe?g|gif|webp|ico|woff2?|ttf|otf|pdf|zip|gz|sqlite)$/i;
 const OUTSIDE = [".scratch/", ".cubic/"];

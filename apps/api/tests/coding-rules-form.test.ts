@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
+import { repositoryRoot } from "@better-answers/devtools/paths";
 
 const ROOT_FILE = "CODING_RULES.md";
 const ROOT_BUDGET = 3000;

@@ -15,10 +15,10 @@ import path from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
 
+import { repositoryRoot } from "@better-answers/devtools/paths";
 import { gitIn, throwawayRepository, writeUnder } from "@better-answers/devtools/throwaway-tree";
 
 const realGit = spawnSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).stdout.trim();
-const repositoryRoot = path.join(import.meta.dirname, "../../..");
 const landScript = path.join(repositoryRoot, "scripts/land.mjs");
 
 const lefthook = readFileSync(path.join(repositoryRoot, "lefthook.yml"), "utf8");

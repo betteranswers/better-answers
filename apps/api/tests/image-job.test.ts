@@ -3,6 +3,8 @@ import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { repositoryRoot } from "@better-answers/devtools/paths";
+
 import {
   buildWorkflow,
   IMAGE_ID_VARIABLE,
@@ -11,7 +13,6 @@ import {
   matrixLegs,
   PROBE_DEFERRAL_VARIABLE,
   readWorkflow,
-  repositoryRoot,
   workflowStepSchema,
 } from "./image-probe.ts";
 import { gatesUnder, rootScripts, workspacesChecked } from "./workspaces.ts";

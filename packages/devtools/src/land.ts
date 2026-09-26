@@ -4,6 +4,7 @@ import path from "node:path";
 import { z } from "zod";
 
 import { flagValues } from "./flags.ts";
+import { repositoryRoot } from "./paths.ts";
 
 const USAGE =
   'usage: land --message "<type>(<scope>): <summary>", then a blank line, the body and a "Refs: T-nnn" footer';
@@ -12,8 +13,7 @@ const SLUG_WORDS = 5;
 const BASE = "main";
 
 /** This checkout's config and binary, whichever tree the command lands from. */
-const REPOSITORY = path.resolve(import.meta.dirname, "../../..");
-const COMMITLINT = path.join(REPOSITORY, "node_modules", ".bin", "commitlint");
+const COMMITLINT = path.join(repositoryRoot, "node_modules", ".bin", "commitlint");
 
 /**
  * The repository tracks content of its own under `.claude/`, so only what git has never seen is
@@ -47,7 +47,7 @@ const complain = (line: string): void => {
 const commitsWord = (count: string): string => (count === "1" ? "1 commit" : `${count} commits`);
 
 const commitlintRefusal = (message: string): number | undefined => {
-  const ran = spawnSync(COMMITLINT, [], { cwd: REPOSITORY, input: message, encoding: "utf8" });
+  const ran = spawnSync(COMMITLINT, [], { cwd: repositoryRoot, input: message, encoding: "utf8" });
   if (ran.error !== undefined) {
     complain(
       `commitlint could not run from ${COMMITLINT}: ${ran.error.message}; pnpm install puts it there`,

@@ -5,7 +5,8 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
+import { repositoryRoot } from "@better-answers/devtools/paths";
+
 const skillPath = ".claude/skills/browser-suite/SKILL.md";
 
 const NAMED_PATH = /`(?<file>apps\/[\w./-]+\.(?:tsx?|json))`/g;

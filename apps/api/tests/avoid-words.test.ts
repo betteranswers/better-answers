@@ -4,9 +4,10 @@ import path from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
 
+import { repositoryRoot } from "@better-answers/devtools/paths";
 import { throwawayRepository, writeUnder } from "@better-answers/devtools/throwaway-tree";
 
-import { readUnder, repositoryRoot, treeFilesUnder } from "./tree-walk.ts";
+import { readUnder, treeFilesUnder } from "./tree-walk.ts";
 
 const GLOSSARY = "CONTEXT.md";
 

@@ -18,13 +18,13 @@ import path from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
 
+import { repositoryRoot } from "@better-answers/devtools/paths";
 import {
   gitIn as git,
   throwawayRepository,
   writeUnder as write,
 } from "@better-answers/devtools/throwaway-tree";
 
-const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 const script = path.join(repositoryRoot, ".claude/hooks/provision-skills.sh");
 
 const scratch = mkdtempSync(path.join(tmpdir(), "provision-skills-"));

@@ -7,9 +7,9 @@ import { describe, expect, it, onTestFinished } from "vitest";
 import { z } from "zod";
 
 import { GARAGE_IMAGE } from "@better-answers/core/store/objects";
+import { repositoryRoot } from "@better-answers/devtools/paths";
 import { boundarySchemas, POSTGRES_IMAGE, ULID_PATTERN } from "@better-answers/schema";
 
-const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 const read = (relative: string): string =>
   readFileSync(path.join(repositoryRoot, relative), "utf8");
 

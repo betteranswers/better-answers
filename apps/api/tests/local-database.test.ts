@@ -6,12 +6,12 @@ import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { repositoryRoot } from "@better-answers/devtools/paths";
 import { CONTRACT_DIGEST, POSTGRES_IMAGE } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
 import { freePort, heldPort, released } from "./loopback-port.ts";
 
-const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 const script = path.join(repositoryRoot, "deploy/local-database.sh");
 const readJson = (relative: string): unknown =>
   JSON.parse(readFileSync(path.join(repositoryRoot, relative), "utf8"));

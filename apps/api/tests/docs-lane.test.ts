@@ -15,6 +15,8 @@ import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { z } from "zod";
 
+import { repositoryRoot } from "@better-answers/devtools/paths";
+
 import {
   gatesNamed,
   gatesUnder,
@@ -25,8 +27,6 @@ import {
   workspacesChecked,
   workspacesWithNoCheck,
 } from "./workspaces.ts";
-
-const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 
 const read = (relative: string): string =>
   readFileSync(path.join(repositoryRoot, relative), "utf8");

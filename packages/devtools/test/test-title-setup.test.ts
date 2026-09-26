@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { repositoryRoot } from "@better-answers/devtools/paths";
 import { runsOverThrowawayTree } from "@better-answers/devtools/throwaway-tree";
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
@@ -18,15 +19,13 @@ const namedSetupFiles = z.object({
   default: z.object({ test: z.object({ setupFiles: z.array(z.string()).default([]) }) }),
 });
 
-const REPOSITORY = path.resolve(import.meta.dirname, "../../..");
-
 /** Read off the tree, so a new workspace that takes vitest is held to name the setup. */
 const WORKSPACES = ["apps", "packages"]
   .flatMap((parent) =>
-    readdirSync(path.join(REPOSITORY, parent)).map((name) => `${parent}/${name}`),
+    readdirSync(path.join(repositoryRoot, parent)).map((name) => `${parent}/${name}`),
   )
   .filter((workspace) => {
-    const manifest = path.join(REPOSITORY, workspace, "package.json");
+    const manifest = path.join(repositoryRoot, workspace, "package.json");
     return existsSync(manifest) && readFileSync(manifest, "utf8").includes('"vitest"');
   });
 
@@ -128,7 +127,7 @@ describe("the rendered test-title hold", () => {
 
   it.each(WORKSPACES)("is named in the setup files of %s", async (workspace) => {
     const loaded: unknown = await import(
-      pathToFileURL(path.join(REPOSITORY, workspace, "vitest.config.ts")).href
+      pathToFileURL(path.join(repositoryRoot, workspace, "vitest.config.ts")).href
     );
 
     expect(namedSetupFiles.parse(loaded).default.test.setupFiles).toContain(SPECIFIER);
