@@ -401,6 +401,22 @@ test.describe("a member, opened as a sheet", () => {
     await expect(memberButton(page, "Priya Shah")).toBeFocused();
   });
 
+  test("draws a role pill square, the avatar and radios round", async ({ page, request }) => {
+    await anAdminAtPeople(page, request, "Wharfe Gauges");
+    const pill = rowOf(page, "Priya Shah").getByText("Editor", { exact: true });
+    await expect(pill, "the kit's rounded-full on a pill").toHaveCSS("border-radius", "0px");
+
+    await memberButton(page, "Priya Shah").click();
+    const sheet = sheetOf(page, "Priya Shah");
+    // The avatar is hidden from assistive technology, so no role or name reaches it.
+    const avatar = sheet.locator("[data-slot='avatar']");
+    await expect(avatar, "the avatar, a kept circle").toHaveCSS("border-radius", "999px");
+    await expect(
+      sheet.getByRole("radio", { name: "Admin", exact: true }),
+      "a radio, a kept circle",
+    ).toHaveCSS("border-radius", "999px");
+  });
+
   test("changes a member's role within its budget, and it holds", async ({ page, request }) => {
     await anAdminAtPeople(page, request, "Nidd Valley Casting");
 
@@ -481,8 +497,7 @@ test.describe("a member, opened as a sheet", () => {
       "Move focus to a member first: the keystroke acts on the member in focus.",
     );
 
-    await page.keyboard.press("?");
-    const keystrokes = page.getByRole("dialog", { name: "Keystrokes on People" });
+    const keystrokes = await keystrokesListed(page, people.name);
     await expect(keystrokes).toContainText("Open the member in focus");
     await expect(keystrokes).toContainText("Change the role of the member in focus");
     await expect(keystrokes).toContainText("Revoke the credentials here of the member in focus");
@@ -490,7 +505,7 @@ test.describe("a member, opened as a sheet", () => {
     await expect(keystrokes, "d declines a request on the Requests tab alone").not.toContainText(
       "Decline the request in focus",
     );
-    await page.keyboard.press("Escape");
+    await keystrokesDismissed(page, keystrokes);
 
     await memberButton(page, "Priya Shah").focus();
     await page.keyboard.press("o");
@@ -501,9 +516,10 @@ test.describe("a member, opened as a sheet", () => {
 
     await page.keyboard.press("c");
     await expect(sheet.getByRole("radio", { name: "Editor", exact: true })).toBeFocused();
-    // The group checks the radio it moves to only while the arrow is held, as a person's is.
-    await page.keyboard.press("ArrowDown", { delay: 50 });
+    // The group checks the radio it moves to, a task later, only while the arrow is still held.
+    await page.keyboard.down("ArrowDown");
     await expect(sheet.getByRole("radio", { name: "Viewer", exact: true })).toBeChecked();
+    await page.keyboard.up("ArrowDown");
     await page.keyboard.press("Tab");
     await expect(sheet.getByRole("button", { name: "Make Priya Shah a Viewer" })).toBeFocused();
     await page.keyboard.press("Enter");
@@ -827,11 +843,9 @@ test.describe("a member's display name, flagged to the operator", () => {
   test("flags a member's name by keyboard alone, from the list", async ({ page, request }) => {
     await anAdminAtPeople(page, request, "Swale Carving");
 
-    await page.keyboard.press("?");
-    await expect(page.getByRole("dialog", { name: "Keystrokes on People" })).toContainText(
-      "Flag the display name of the member in focus",
-    );
-    await page.keyboard.press("Escape");
+    const keystrokes = await keystrokesListed(page, people.name);
+    await expect(keystrokes).toContainText("Flag the display name of the member in focus");
+    await keystrokesDismissed(page, keystrokes);
 
     await memberButton(page, "Priya Shah").focus();
     await page.keyboard.press("f");

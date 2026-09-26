@@ -1,5 +1,6 @@
 import { useId, useRef, useState, type RefObject } from "react";
 
+import { RefusalLine } from "@/shared/refusal-outcome.tsx";
 import { RowSheet } from "@/shared/row-sheet.tsx";
 import { SheetPart } from "@/shared/sheet-part.tsx";
 import { SummaryRow } from "@/shared/summary-row.tsx";
@@ -14,7 +15,6 @@ import type { FreshAct } from "./people-address.ts";
 import { Facts } from "./facts.tsx";
 import { useInspected, type HeldGrant, type HeldSession, type ListedPerson } from "./people-api.ts";
 import { At, grantStateOf, Instant, Memberships, nameOf } from "./person-words.tsx";
-import { RefusalLine } from "./refusal-line.tsx";
 import { RevokeEverywhere } from "./revoke-everywhere.tsx";
 import { readRefused } from "./words.ts";
 

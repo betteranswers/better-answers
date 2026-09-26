@@ -5,6 +5,7 @@ import { useMemo, useState, type RefObject } from "react";
 import { GridTable } from "@/shared/grid-table.tsx";
 import { useKeystroke } from "@/shared/keystrokes.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
+import { RefusalLine } from "@/shared/refusal-outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 
 import { CorrectNameDialog } from "./correct-name-dialog.tsx";
@@ -12,7 +13,6 @@ import { arrival, backToTheName, EVERYONE_PATH, NAMES_WAITING_PATH } from "./peo
 import { useNamesWaiting, type NameWaiting } from "./people-api.ts";
 import { NAMES_WAITING_KEYSTROKES } from "./people-keystrokes.ts";
 import { At } from "./person-words.tsx";
-import { RefusalLine } from "./refusal-line.tsx";
 import { SignInAgain } from "./sign-in-again.tsx";
 import { useCorrecting } from "./use-correcting.ts";
 import { correctWords, readRefused } from "./words.ts";

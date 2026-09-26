@@ -1,9 +1,7 @@
 import { refusalOf, type ApiError, type Refusal, type RefusalWord } from "@/shared/api/trpc.ts";
 import { DISPLAY_NAME_REFUSED } from "@/shared/display-name-words.ts";
 import type { Outcome } from "@/shared/outcome.tsx";
-import { failureOutcome, type SaidOfWord } from "@/shared/refusal-outcome.tsx";
-
-export type Said = { readonly why: string; readonly next: string };
+import { failureOutcome, type Said, type SaidOfWord } from "@/shared/refusal-outcome.tsx";
 
 export const CONSOLE_CLOSED = "The console is the operator's alone";
 

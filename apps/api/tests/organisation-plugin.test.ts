@@ -185,4 +185,26 @@ describe("the organisation plugin's kept endpoints", () => {
     const session = await (await scene.client.fetch("/get-session")).json();
     expect(session).toMatchObject({ session: { activeOrganizationId: scene.other } });
   });
+
+  it("answers an Admin no for every organisation write", async () => {
+    const scene = await aKeptScene();
+    const writes = [
+      { organization: ["update"] },
+      { member: ["create"] },
+      { member: ["update"] },
+      { member: ["delete"] },
+      { invitation: ["create"] },
+      { invitation: ["cancel"] },
+    ];
+
+    const answers = [];
+    for (const permissions of writes) {
+      const answered = await scene.client.json("/organization/has-permission", { permissions });
+      answers.push({ permissions, answer: await answered.json() });
+    }
+
+    expect(answers).toEqual(
+      writes.map((permissions) => ({ permissions, answer: { error: null, success: false } })),
+    );
+  });
 });

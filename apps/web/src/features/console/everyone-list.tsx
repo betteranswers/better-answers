@@ -5,6 +5,7 @@ import { useMemo, useRef, useState, type RefObject } from "react";
 import { GridTable } from "@/shared/grid-table.tsx";
 import { useKeystroke } from "@/shared/keystrokes.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
+import { RefusalLine } from "@/shared/refusal-outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { counted } from "@/shared/words.ts";
 
@@ -15,7 +16,6 @@ import { usePeople, type Asked, type ListedPerson } from "./people-api.ts";
 import { PEOPLE_KEYSTROKES } from "./people-keystrokes.ts";
 import { PersonSheet, personButtonId, type OpenedAt } from "./person-sheet.tsx";
 import { Instant, Memberships } from "./person-words.tsx";
-import { RefusalLine } from "./refusal-line.tsx";
 import { readRefused } from "./words.ts";
 
 const features = tableFeatures({});

@@ -6,7 +6,7 @@ import {
 } from "@/shared/api/trpc.ts";
 import type { Outcome } from "@/shared/outcome.tsx";
 
-type Said = { readonly why: string; readonly next: string };
+export type Said = { readonly why: string; readonly next: string };
 
 /** A feature's own words for the refusals it knows; any other word is said by its class. */
 export type SaidOfWord = Partial<Record<RefusalWord, Said>>;
@@ -21,21 +21,33 @@ const CLASS_WORDS = {
   precondition: { why: "What this act waits on has not happened.", next: "Try once it has." },
 } satisfies Record<RefusalClass, Said>;
 
+/** The api's word as itself, then why and what the reader can do next. */
+export function RefusalLine(properties: {
+  readonly word: RefusalWord | undefined;
+  readonly said: Said;
+}) {
+  const { word, said } = properties;
+
+  return (
+    <>
+      {word === undefined ? null : (
+        <>
+          Refused: <code className="font-mono">{word}</code>.{" "}
+        </>
+      )}
+      {said.why} {said.next}
+    </>
+  );
+}
+
 export const refusalOutcome = (
   featureWords: SaidOfWord,
   word: RefusalWord,
   refusalClass: RefusalClass,
-): Outcome => {
-  const said = featureWords[word] ?? CLASS_WORDS[refusalClass];
-  return {
-    tone: "refused",
-    words: (
-      <>
-        Refused: <code className="font-mono">{word}</code>. {said.why} {said.next}
-      </>
-    ),
-  };
-};
+): Outcome => ({
+  tone: "refused",
+  words: <RefusalLine word={word} said={featureWords[word] ?? CLASS_WORDS[refusalClass]} />,
+});
 
 const UNANSWERED: Outcome = {
   tone: "refused",

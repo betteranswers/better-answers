@@ -1,14 +1,7 @@
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
-import { instantWords, nameOrAddress } from "@/shared/words.ts";
+import { dayWords, instantWords, nameOrAddress } from "@/shared/words.ts";
 
 import type { ListedMember } from "./people-api.ts";
-
-const LONG_UK_DATE = new Intl.DateTimeFormat("en-GB", {
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-  timeZone: "Europe/London",
-});
 
 /** Said beside every People act before it is taken, since each writes an audit event. */
 export const RECORDED = "Recorded on the audit log under your name.";
@@ -17,7 +10,7 @@ export const nameOf = (member: ListedMember): string =>
   nameOrAddress(member.displayName, member.address);
 
 export function JoinedOn(properties: { readonly instant: string }) {
-  return <span className="tabular-nums">{LONG_UK_DATE.format(new Date(properties.instant))}</span>;
+  return <span className="tabular-nums">{dayWords(properties.instant)}</span>;
 }
 
 export function CredentialsHere(properties: { readonly revokedAt: string | null }) {

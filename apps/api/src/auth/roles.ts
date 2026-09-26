@@ -10,12 +10,8 @@ const statement = {
 
 export const accessControl = createAccessControl(statement);
 
-const Admin = accessControl.newRole({
-  organization: ["update"],
-  member: ["create", "update", "delete"],
-  invitation: ["create", "cancel"],
-});
-
+/** Every write these statements name is a disabled path, so a grant would only make has-permission lie. */
+const Admin = accessControl.newRole({});
 const Editor = accessControl.newRole({});
 const Viewer = accessControl.newRole({});
 
