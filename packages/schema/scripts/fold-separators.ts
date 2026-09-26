@@ -1,6 +1,8 @@
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
+import { byCodeUnit } from "../src/code-unit.ts";
+
 const SEPARATOR = "--> statement-breakpoint";
 
 const folded = (sql: string): string => {
@@ -19,7 +21,7 @@ const folded = (sql: string): string => {
 /** The line counter reads a directive alone on a line as a comment, which the ceiling pays for. */
 export const foldSeparators = (migrationsFolder: string): readonly string[] => {
   const moved: string[] = [];
-  for (const name of readdirSync(migrationsFolder).toSorted()) {
+  for (const name of readdirSync(migrationsFolder).toSorted(byCodeUnit)) {
     if (!name.endsWith(".sql")) continue;
     const file = path.join(migrationsFolder, name);
     const before = readFileSync(file, "utf8");

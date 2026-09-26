@@ -1,6 +1,7 @@
 import { globSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
+import { byCodeUnit } from "@better-answers/schema/code-unit";
 import { Instrumenter } from "@stryker-mutator/instrumenter";
 import { z } from "zod";
 
@@ -67,7 +68,7 @@ export const mutateSet = (root: string, patterns: readonly string[]): readonly s
       }
     }
   }
-  return [...chosen].toSorted();
+  return [...chosen].toSorted(byCodeUnit);
 };
 
 // Seconds of a worker, fitted to a forced run of every shard. A timeout waits out the whole
@@ -128,7 +129,7 @@ export const shardSlices = (
     lightest.files.push(file);
     lightest.weight += weight;
   }
-  return loads.map((load) => load.files.toSorted());
+  return loads.map((load) => load.files.toSorted(byCodeUnit));
 };
 
 export type Lines = { readonly from: number; readonly to: number };

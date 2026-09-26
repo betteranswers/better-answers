@@ -1,4 +1,5 @@
 import { boundarySchemas } from "@better-answers/schema";
+import { byCodeUnit } from "@better-answers/schema/code-unit";
 
 import { actorIdOfPerson, type ActorId, type PlatformPrincipal } from "../kernel/index.ts";
 import { historyNaming, type GitDoor } from "../store/git/index.ts";
@@ -229,7 +230,11 @@ export const erasureMapOf = async (
     const descriptor = ERASURE_FAMILY_DESCRIPTORS[family];
     const found = await descriptor.find(platform, subject, tx, door);
 
-    entries.push({ family, categories: descriptor.categories, locations: [...found].sort() });
+    entries.push({
+      family,
+      categories: descriptor.categories,
+      locations: [...found].sort(byCodeUnit),
+    });
   }
   return entries;
 };

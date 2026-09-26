@@ -2,6 +2,7 @@ import path from "node:path";
 
 import type pg from "pg";
 
+import { byCodeUnit } from "../src/code-unit.ts";
 import { listed } from "../src/column-helpers.ts";
 import { DEFINER_REACH_NOTE } from "../src/definer-reach.ts";
 import { testData } from "../test/factory.ts";
@@ -339,7 +340,7 @@ export const readRolesSurface = async (client: Client): Promise<RolesSurface> =>
       privilege: row.privilege,
       grantable: row.grantable,
     })),
-    relations_with_no_acl: [...new Set(withoutAcl.rows.map(objectNamed))].toSorted(),
+    relations_with_no_acl: [...new Set(withoutAcl.rows.map(objectNamed))].toSorted(byCodeUnit),
     columns: columns.rows.map((row) => ({
       role: named(row.role),
       object: row.object,
@@ -373,7 +374,7 @@ const block = (
   { last = false, ordered = false } = {},
 ): readonly string[] => {
   const drawn = rows.map((row) => JSON.stringify(row));
-  const rendered = ordered ? drawn : [...new Set(drawn)].toSorted();
+  const rendered = ordered ? drawn : [...new Set(drawn)].toSorted(byCodeUnit);
   if (rendered.length === 0) return [`  "${name}": []${last ? "" : ","}`];
   return [
     `  "${name}": [`,

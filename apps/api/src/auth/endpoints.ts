@@ -1,3 +1,5 @@
+import { byCodeUnit } from "@better-answers/schema/code-unit";
+
 import type { Auth } from "./auth.ts";
 
 export const mountedPaths = (auth: Auth): readonly string[] => {
@@ -5,7 +7,7 @@ export const mountedPaths = (auth: Auth): readonly string[] => {
   for (const endpoint of Object.values<MountedEndpoint>(auth.api)) {
     if (typeof endpoint.path === "string") paths.add(endpoint.path);
   }
-  return [...paths].sort();
+  return [...paths].sort(byCodeUnit);
 };
 
 type MountedEndpoint = { readonly path?: string };

@@ -1,6 +1,8 @@
 import { readdirSync } from "node:fs";
 import path from "node:path";
 
+import { byCodeUnit } from "@better-answers/schema/code-unit";
+
 /** A statement, not the two words: it opens a string literal, or a line inside a long one. */
 const RAW_INSERT = /(?:^|["'`])\s*insert\s+into\s+["'`]?[a-z_]/i;
 
@@ -64,7 +66,9 @@ const filesUnder = (root: string, directory: string): readonly string[] =>
 
 /** Each scanned file under the `roots` directories, relative to `root`, once and sorted. */
 export const scannedFilesUnder = (root: string, roots: readonly string[]): readonly string[] =>
-  [...new Set(roots.flatMap((directory) => filesUnder(root, directory)))].filter(isScanned).sort();
+  [...new Set(roots.flatMap((directory) => filesUnder(root, directory)))]
+    .filter(isScanned)
+    .sort(byCodeUnit);
 
 export type RawInsert = { readonly file: string; readonly line: number };
 

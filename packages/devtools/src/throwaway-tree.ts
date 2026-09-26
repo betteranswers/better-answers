@@ -12,6 +12,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
+import { byCodeUnit } from "@better-answers/schema/code-unit";
 import { z } from "zod";
 
 /**
@@ -233,7 +234,7 @@ const pathsIn = (output: string): readonly string[] =>
         .map((line) => /^(?<file>[^\s:]+):\d+:\d+:/.exec(line)?.groups?.["file"])
         .filter((file): file is string => file !== undefined),
     ),
-  ].sort();
+  ].sort(byCodeUnit);
 
 const tsgolintPath = (): string => {
   const from = createRequire(import.meta.url);
@@ -262,7 +263,7 @@ export const oxlintOver = (
   smoke: { readonly tree: Tree; readonly flagged: readonly string[] },
   flags: readonly string[] = [],
 ): OxlintRunner => {
-  const expected = [...smoke.flagged].sort();
+  const expected = [...smoke.flagged].sort(byCodeUnit);
   const run = runsOverThrowawayTree({
     executable: { package: "oxlint", path: ["bin", "oxlint"] },
     // Pinned, never left to oxlint: under Actions it picks the annotation reporter, whose
@@ -324,6 +325,10 @@ const knipReport = z.object({
 
 const sortKey = (finding: KnipFinding): string => `${finding.kind}:${finding.file}:${finding.name}`;
 
+/** The smoke case compares the expected and found findings in order, so both sort by this. */
+const byFinding = (left: KnipFinding, right: KnipFinding): number =>
+  sortKey(left).localeCompare(sortKey(right));
+
 const findingsIn = (output: string): readonly KnipFinding[] =>
   (knipReport.parse(JSON.parse(output)).issues ?? [])
     .flatMap((entry) =>
@@ -335,14 +340,14 @@ const findingsIn = (output: string): readonly KnipFinding[] =>
         })),
       ),
     )
-    .sort((left, right) => sortKey(left).localeCompare(sortKey(right)));
+    .sort(byFinding);
 
 /** Each tree is laid over `scaffold`; the smoke tree must report exactly `smoke.findings`. */
 export const knipOver = (
   scaffold: Tree,
   smoke: { readonly tree: Tree; readonly findings: readonly KnipFinding[] },
 ): KnipRunner => {
-  const expected = [...smoke.findings].map(sortKey).sort();
+  const expected = [...smoke.findings].sort(byFinding).map(sortKey);
   const run = runsOverThrowawayTree({
     executable: { package: "knip", path: ["bin", "knip.js"] },
     argv: ["--reporter", "json"],

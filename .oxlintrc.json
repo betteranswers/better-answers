@@ -39,7 +39,7 @@
     ],
     "typescript/no-floating-promises": ["error", { "ignoreVoid": true }],
     "typescript/no-unnecessary-condition": "error",
-    "typescript/require-array-sort-compare": "off",
+    "typescript/require-array-sort-compare": ["error", { "ignoreStringArrays": false }],
     "typescript/no-explicit-any": "error",
     "typescript/consistent-type-imports": "error",
     "typescript/no-non-null-assertion": "error",
@@ -344,6 +344,7 @@
     {
       "files": ["**/*.test.ts", "**/*.test.tsx", "**/test/**", "**/tests/**", "**/e2e/**"],
       "rules": {
+        "typescript/require-array-sort-compare": "off",
         "anti-slop/no-chained-type-assertions": "off",
         "anti-slop/no-conditional-empty-object-spread": "off",
         "anti-slop/no-known-value-widening": "off",

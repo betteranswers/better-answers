@@ -276,6 +276,61 @@ describe("one guard per condition, never re-refusing what the type refused", () 
   });
 });
 
+const SORT_COMPARE = "typescript/require-array-sort-compare";
+
+/** Every override that re-sets the rule, so an exemption widened in the config widens here. */
+const sortCompareOverrides = config.overrides.flatMap((override) => {
+  const setting = override.rules?.[SORT_COMPARE];
+  return setting === undefined
+    ? []
+    : [{ files: override.files ?? [], rules: { [SORT_COMPARE]: setting } }];
+});
+
+const sortingModule = (call: string): string =>
+  `export const ordered = (names: readonly string[]): readonly string[] => [...names].${call};\n`;
+
+describe("every sort in source names its comparator", () => {
+  const bare = typedTree({ "src/bare.ts": sortingModule("sort()") });
+  const lintSorts = oxlintOver(
+    JSON.stringify({
+      plugins: config.plugins,
+      options: config.options,
+      rules: { [SORT_COMPARE]: severityOf(SORT_COMPARE) },
+      overrides: sortCompareOverrides,
+    }),
+    { tree: bare, flagged: ["src/bare.ts"] },
+  ).output;
+
+  it.each(["sort()", "toSorted()"])("fires on a string array's bare `%s`", (call) => {
+    const output = lintSorts(typedTree({ "src/bare.ts": sortingModule(call) }));
+
+    expect(output).toContain("src/bare.ts");
+    expect(output).toContain("require-array-sort-compare");
+  });
+
+  it("stays silent on a sort given a comparator", () => {
+    const output = lintSorts(
+      typedTree({
+        "src/compared.ts": sortingModule("toSorted((one, other) => one.localeCompare(other))"),
+      }),
+    );
+
+    expect(output).not.toContain("src/compared.ts");
+  });
+
+  it("stays silent on a bare sort in a test", () => {
+    const output = lintSorts(
+      typedTree(
+        { "src/bare.test.ts": sortingModule("sort()"), "test/bare.ts": sortingModule("sort()") },
+        ["src", "test"],
+      ),
+    );
+
+    expect(output).not.toContain("bare.test.ts");
+    expect(output).not.toContain("test/bare.ts");
+  });
+});
+
 const ADOPTED = [
   {
     rule: "typescript/await-thenable",

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { citedSourcesOf, resolvedResource } from "@better-answers/schema";
+import { byCodeUnit } from "@better-answers/schema/code-unit";
 
 import { err, ok, type Result } from "../kernel/index.ts";
 
@@ -55,7 +56,7 @@ export const canonicalFrontmatter = (frontmatter: Frontmatter, path: string): st
 
 const canonicalOver = (frontmatter: Frontmatter, sources: readonly HashedSource[]): string => {
   const pairs = Object.keys(frontmatter)
-    .toSorted()
+    .toSorted(byCodeUnit)
     .filter((key) => !UNHASHED_KEYS.has(key))
     .map((key) => {
       const text = key === "sources" ? JSON.stringify(sources) : canonicalText(frontmatter[key]);
@@ -70,7 +71,7 @@ const canonicalText = (value: FrontmatterValue | undefined): string =>
         .map((item) =>
           typeof item === "object" && item !== null
             ? `{${Object.keys(item)
-                .toSorted((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+                .toSorted(byCodeUnit)
                 .map((key) => `${JSON.stringify(key)}:${JSON.stringify(item[key])}`)
                 .join(",")}}`
             : JSON.stringify(item),

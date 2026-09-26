@@ -1,3 +1,5 @@
+import { byCodeUnit } from "@better-answers/schema/code-unit";
+
 import type { ErasureFamily, ErasureMap } from "./map.ts";
 import type { SubjectRequest } from "./requests.ts";
 
@@ -81,7 +83,7 @@ export const erasureReportOf = (input: ErasureReportInput): string => {
   const named =
     input.concepts.length === 0
       ? [NO_CONCEPT_NAMES]
-      : [...input.concepts].sort().map((iri) => `- ${iri}`);
+      : [...input.concepts].sort(byCodeUnit).map((iri) => `- ${iri}`);
   return [
     `Erasure report for subject request ${input.request.id}.`,
     "",

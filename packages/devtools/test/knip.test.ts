@@ -90,6 +90,27 @@ describe("knip over a throwaway tree", () => {
   });
 });
 
+describe("knipOver's smoke case", () => {
+  /** Code-unit order puts `Upper` first and `lower` last; a locale's order does the reverse. */
+  const CASED_TREE: Tree = {
+    "src/main.ts": MAIN,
+    "src/reached.ts": `${REACHED}export const Upper = 2;\nexport const lower = 3;\n`,
+  };
+  const UPPER: KnipFinding = { kind: "exports", file: "src/reached.ts", name: "Upper" };
+  const LOWER: KnipFinding = { kind: "exports", file: "src/reached.ts", name: "lower" };
+
+  it.each([
+    ["code-unit order", [UPPER, LOWER]],
+    ["a locale's order", [LOWER, UPPER]],
+  ])("accepts findings differing in case, named in %s", (_order, findings) => {
+    expect(() => knipOver(scaffold, { tree: CASED_TREE, findings })).not.toThrow();
+  });
+
+  it("refuses a smoke case the report does not match", () => {
+    expect(() => knipOver(scaffold, { tree: CASED_TREE, findings: [UPPER] })).toThrow(/smoke/);
+  });
+});
+
 describe("the knip gate in the root check", () => {
   it("runs under the root check, which CI already runs", () => {
     const root = z
