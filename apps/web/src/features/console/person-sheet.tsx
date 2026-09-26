@@ -13,7 +13,7 @@ import { useInspected, type HeldGrant, type HeldSession, type ListedPerson } fro
 import { At, grantStateOf, Instant, Memberships, nameOf } from "./person-words.tsx";
 import { RefusalLine } from "./refusal-line.tsx";
 import { RevokeEverywhere } from "./revoke-everywhere.tsx";
-import { SheetPart } from "./sheet-part.tsx";
+import { SheetPart } from "@/shared/sheet-part.tsx";
 import { readRefused } from "./words.ts";
 
 export type OpenedAt = "person" | "revoke";

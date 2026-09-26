@@ -8,7 +8,7 @@ import { Button } from "@/shared/ui/button.tsx";
 import { instantWords } from "@/shared/words.ts";
 
 import { backTo } from "./everyone-address.ts";
-import { SheetPart } from "./sheet-part.tsx";
+import { SheetPart } from "@/shared/sheet-part.tsx";
 import { useRevokeEverywhere, type ListedPerson } from "./people-api.ts";
 import { nameOf } from "./person-words.tsx";
 import { revocationRefused, SIGN_IN_TOO_OLD } from "./words.ts";

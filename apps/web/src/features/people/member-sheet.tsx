@@ -4,6 +4,7 @@ import type { ApiError } from "@/shared/api/trpc.ts";
 import { Icon } from "@/shared/icon.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { RowSheet } from "@/shared/row-sheet.tsx";
+import { SheetPart } from "@/shared/sheet-part.tsx";
 import { SummaryRow } from "@/shared/summary-row.tsx";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar.tsx";
 import { Button } from "@/shared/ui/button.tsx";
@@ -164,7 +165,6 @@ function CredentialsRevoker(properties: {
   const [outcome, setOutcome] = useState<Outcome>();
   const revoke = useRevokeCredentials();
   const readerId = useReaderId();
-  const headingId = useId();
   const hintId = useId();
   const name = nameOf(member);
 
@@ -188,34 +188,29 @@ function CredentialsRevoker(properties: {
   };
 
   return (
-    <section aria-labelledby={headingId} className="border border-border">
-      <h3 id={headingId} className="border-b border-border px-4 py-2 font-medium">
-        Credentials
-      </h3>
-      <div className="grid gap-4 px-4 py-3">
-        <div className="flex flex-col items-start gap-2">
-          <Button
-            ref={revokeRef}
-            variant="outline"
-            aria-describedby={hintId}
-            // Not `disabled`: a disabled button drops the focus the act leaves on it.
-            aria-disabled={revoke.isPending}
-            onClick={commit}
-          >
-            Revoke {name}'s credentials here
-          </Button>
-          <p id={hintId} className="text-sm text-muted-foreground">
-            Every session and token {name} holds for this workspace is refused at once, and a fresh
-            sign-in works.{" "}
-            {member.personId === readerId
-              ? "Your own session here ends with it."
-              : "Recorded on the audit log under your name."}
-          </p>
-        </div>
-
-        <OutcomeLine outcome={outcome} />
+    <SheetPart title="Credentials">
+      <div className="flex flex-col items-start gap-2">
+        <Button
+          ref={revokeRef}
+          variant="outline"
+          aria-describedby={hintId}
+          // Not `disabled`: a disabled button drops the focus the act leaves on it.
+          aria-disabled={revoke.isPending}
+          onClick={commit}
+        >
+          Revoke {name}'s credentials here
+        </Button>
+        <p id={hintId} className="text-sm text-muted-foreground">
+          Every session and token {name} holds for this workspace is refused at once, and a fresh
+          sign-in works.{" "}
+          {member.personId === readerId
+            ? "Your own session here ends with it."
+            : "Recorded on the audit log under your name."}
+        </p>
       </div>
-    </section>
+
+      <OutcomeLine outcome={outcome} />
+    </SheetPart>
   );
 }
 
@@ -232,7 +227,6 @@ function DisplayNameFlag(properties: {
   const { member, flagRef } = properties;
   const [outcome, setOutcome] = useState<Outcome>();
   const flagName = useFlagDisplayName();
-  const headingId = useId();
   const hintId = useId();
 
   const flag = () => {
@@ -248,36 +242,31 @@ function DisplayNameFlag(properties: {
   };
 
   return (
-    <section aria-labelledby={headingId} className="border border-border">
-      <h3 id={headingId} className="border-b border-border px-4 py-2 font-medium">
-        Display name
-      </h3>
-      <div className="grid gap-4 px-4 py-3">
-        {member.displayName === "" ? (
-          <p className="text-sm text-muted-foreground wrap-anywhere">
-            {member.address} has given no display name yet, so there is none to flag.
+    <SheetPart title="Display name">
+      {member.displayName === "" ? (
+        <p className="text-sm text-muted-foreground wrap-anywhere">
+          {member.address} has given no display name yet, so there is none to flag.
+        </p>
+      ) : (
+        <>
+          <p className="text-sm">
+            People give their own display name, and no Admin can change one. The operator corrects a
+            name you flag as inappropriate.
           </p>
-        ) : (
-          <>
-            <p className="text-sm">
-              People give their own display name, and no Admin can change one. The operator corrects
-              a name you flag as inappropriate.
+          <div className="flex flex-col items-start gap-2">
+            <Button ref={flagRef} variant="outline" aria-describedby={hintId} onClick={flag}>
+              <Icon name="flag" />
+              Flag the name to the operator
+            </Button>
+            <p id={hintId} className="text-sm text-muted-foreground">
+              The operator is emailed, and the flag is recorded on the audit log under your name.
+              While a flag from this workspace waits, another adds nothing.
             </p>
-            <div className="flex flex-col items-start gap-2">
-              <Button ref={flagRef} variant="outline" aria-describedby={hintId} onClick={flag}>
-                <Icon name="flag" />
-                Flag the name to the operator
-              </Button>
-              <p id={hintId} className="text-sm text-muted-foreground">
-                The operator is emailed, and the flag is recorded on the audit log under your name.
-                While a flag from this workspace waits, another adds nothing.
-              </p>
-            </div>
-            <OutcomeLine outcome={outcome} />
-          </>
-        )}
-      </div>
-    </section>
+          </div>
+          <OutcomeLine outcome={outcome} />
+        </>
+      )}
+    </SheetPart>
   );
 }
 
