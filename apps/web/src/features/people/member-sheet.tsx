@@ -1,9 +1,11 @@
+import { Link } from "@tanstack/react-router";
 import { useId, useRef, useState, type RefObject } from "react";
 
 import type { ApiError } from "@/shared/api/trpc.ts";
 import { Icon } from "@/shared/icon.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { RowSheet } from "@/shared/row-sheet.tsx";
+import { screenById, viewNamed } from "@/shared/screens.ts";
 import { SheetPart } from "@/shared/sheet-part.tsx";
 import { SummaryRow } from "@/shared/summary-row.tsx";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar.tsx";
@@ -14,6 +16,8 @@ import { RadioGroup, RadioGroupItem } from "@/shared/ui/radio-group.tsx";
 import { SheetDescription, SheetHeader, SheetTitle } from "@/shared/ui/sheet.tsx";
 import { instantWords } from "@/shared/words.ts";
 
+import { GroupChecklist } from "./group-checklist.tsx";
+import { useGroups } from "./groups-api.ts";
 import { MemberRemoval } from "./member-removal.tsx";
 import {
   useChangeRole,
@@ -26,13 +30,15 @@ import {
   type RoleChanged,
 } from "./people-api.ts";
 import { aRole, ROLE_MEANINGS, roleOf, ROLES } from "./role-meanings.ts";
-import { outcomeOfFailure } from "./refusal.tsx";
-import { CredentialsHere, GroupPills, JoinedOn, nameOf } from "./words.tsx";
+import { outcomeOfFailure, outcomeOfGroupFailure } from "./refusal.tsx";
+import { CredentialsHere, GroupPills, JoinedOn, nameOf, RECORDED } from "./words.tsx";
 
 /** Where focus lands when the sheet opens: on who the member is, or straight on an act. */
-export type OpenedAt = "member" | "role" | "credentials" | "flag" | "removal";
+export type OpenedAt = "member" | "role" | "groups" | "credentials" | "flag" | "removal";
 
 export const memberButtonId = (personId: string): string => `member-${personId}`;
+
+const GROUPS_VIEW = viewNamed(screenById("people"), "Groups").path;
 
 const initialsOf = (member: ListedMember): string =>
   nameOf(member)
@@ -147,7 +153,7 @@ function RolePicker(properties: {
           <p id={hintId} className="text-sm text-muted-foreground">
             {unchanged
               ? `${name} is ${aRole(member.role)}. Pick another role to change it.`
-              : "Recorded on the audit log under your name. It holds from their next request."}
+              : `${RECORDED} It holds from their next request.`}
           </p>
         </div>
 
@@ -203,9 +209,7 @@ function CredentialsRevoker(properties: {
         <p id={hintId} className="text-sm text-muted-foreground">
           Every session and token {name} holds for this workspace is refused at once, and a fresh
           sign-in works.{" "}
-          {member.personId === readerId
-            ? "Your own session here ends with it."
-            : "Recorded on the audit log under your name."}
+          {member.personId === readerId ? "Your own session here ends with it." : RECORDED}
         </p>
       </div>
 
@@ -270,6 +274,60 @@ function DisplayNameFlag(properties: {
   );
 }
 
+function GroupsPicker(properties: {
+  readonly member: ListedMember;
+  readonly pickerRef: RefObject<HTMLDivElement | null>;
+}) {
+  const { member, pickerRef } = properties;
+  const groups = useGroups();
+  const name = nameOf(member);
+  const held = new Set<string>(member.groups.map((group) => group.groupId));
+  const workspaceGroups = groups.data ?? [];
+
+  return (
+    <SheetPart title="Groups">
+      <OutcomeLine
+        outcome={groups.error === null ? undefined : outcomeOfGroupFailure(groups.error)}
+      />
+      <div aria-live="polite" className="empty:hidden">
+        {groups.isPending ? <p>The groups are still loading.</p> : null}
+      </div>
+      <div ref={pickerRef} className="contents">
+        {groups.data?.length === 0 ? (
+          <div className="grid gap-1">
+            <p>No groups in this workspace yet.</p>
+            <Link to={GROUPS_VIEW} className="justify-self-start text-brand underline">
+              Create one on the Groups view
+            </Link>
+          </div>
+        ) : null}
+        {workspaceGroups.length === 0 ? null : (
+          <GroupChecklist
+            legend={`Groups ${name} is in`}
+            hint={`Each box puts ${name} in its group or takes them out at once. ${RECORDED}`}
+            choices={workspaceGroups.map((group) => ({
+              id: group.id,
+              label: group.name,
+              detail: undefined,
+              checked: held.has(group.id),
+            }))}
+            pairOf={(groupId) => {
+              const group = workspaceGroups.find((candidate) => candidate.id === groupId);
+              return group === undefined
+                ? undefined
+                : {
+                    inGroup: { groupId, userId: member.personId },
+                    person: name,
+                    group: group.name,
+                  };
+            }}
+          />
+        )}
+      </div>
+    </SheetPart>
+  );
+}
+
 export function MemberSheet(properties: {
   readonly member: ListedMember;
   readonly openedAt: OpenedAt;
@@ -283,12 +341,15 @@ export function MemberSheet(properties: {
   const titleRef = useRef<HTMLHeadingElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
   const revokeRef = useRef<HTMLButtonElement>(null);
+  const groupsRef = useRef<HTMLDivElement>(null);
   const flagRef = useRef<HTMLButtonElement>(null);
   const askRef = useRef<HTMLButtonElement>(null);
 
   const landOn = {
     member: () => titleRef.current,
     role: () => pickerRef.current?.querySelector<HTMLElement>('[aria-checked="true"]'),
+    // A workspace with no groups offers its link to the Groups view in their place.
+    groups: () => groupsRef.current?.querySelector<HTMLElement>('[role="checkbox"], a'),
     credentials: () => revokeRef.current,
     // A member with no display name has no flag to land on, so focus goes to who they are.
     flag: () => flagRef.current ?? titleRef.current,
@@ -299,7 +360,7 @@ export function MemberSheet(properties: {
     <RowSheet
       rowButtonId={memberButtonId(member.personId)}
       onOpen={() => {
-        landOn[openedAt]()?.focus();
+        (landOn[openedAt]() ?? titleRef.current)?.focus();
       }}
       onClose={onClose}
       returnFocus={returnFocus}
@@ -322,6 +383,7 @@ export function MemberSheet(properties: {
       <div className="grid gap-4 px-4 pb-4">
         <Membership member={member} />
         <RolePicker member={member} pickerRef={pickerRef} />
+        <GroupsPicker member={member} pickerRef={groupsRef} />
         <CredentialsRevoker member={member} revokeRef={revokeRef} />
         <DisplayNameFlag member={member} flagRef={flagRef} />
         <MemberRemoval member={member} askRef={askRef} onRemove={onRemove} />

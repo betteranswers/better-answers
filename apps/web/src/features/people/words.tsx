@@ -10,6 +10,9 @@ const LONG_UK_DATE = new Intl.DateTimeFormat("en-GB", {
   timeZone: "Europe/London",
 });
 
+/** Said beside every People act before it is taken, since each writes an audit event. */
+export const RECORDED = "Recorded on the audit log under your name.";
+
 export const nameOf = (member: ListedMember): string =>
   nameOrAddress(member.displayName, member.address);
 

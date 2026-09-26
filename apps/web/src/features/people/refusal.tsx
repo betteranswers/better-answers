@@ -57,3 +57,38 @@ const SAID_OF_AN_INVITATION = {
 
 export const outcomeOfInvitationFailure = (failure: Error | ApiError): Outcome =>
   failureOutcome(SAID_OF_AN_INVITATION, failure);
+
+/** A group act refuses `malformed` for a name with no letter or figure in it. */
+const SAID_OF_A_GROUP = {
+  "role-forbids": {
+    why: "Only an Admin of this workspace sees its groups.",
+    next: "Ask one of its Admins for what you need.",
+  },
+  "name-taken": {
+    why: "A group in this workspace has that name already.",
+    next: "Choose another name.",
+  },
+  malformed: {
+    why: "A group's name needs at least one letter or figure.",
+    next: "Give it a name.",
+  },
+  "no-such-group": {
+    why: "That group is no longer in this workspace.",
+    next: "Read the list again.",
+  },
+  "no-such-member": {
+    why: "This person is no longer a member of this workspace.",
+    next: "Read the list again.",
+  },
+  "already-in-group": {
+    why: "That member is in that group already: another change put them there first.",
+    next: "Read the list again.",
+  },
+  "not-in-group": {
+    why: "That member is out of that group already: another change took them out first.",
+    next: "Read the list again.",
+  },
+} satisfies SaidOfWord;
+
+export const outcomeOfGroupFailure = (failure: Error | ApiError): Outcome =>
+  failureOutcome(SAID_OF_A_GROUP, failure);
