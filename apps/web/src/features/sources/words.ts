@@ -16,6 +16,9 @@ export const AUDIENCE_WORDS = {
   groups: "Named groups",
 } satisfies Record<ListedBinding["audience"], string>;
 
+/** The empty list's one line: the toolbar's Bind a document is how a document is bound. */
+export const NOTHING_BOUND = "No document is bound yet.";
+
 const DESTINATIONS = new Map<string, Meaning>([
   [
     "chunk-index",

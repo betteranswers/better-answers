@@ -6,9 +6,10 @@ import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { TableCell } from "@/shared/ui/table.tsx";
 
 import { ApproveRequest } from "./approve-request.tsx";
+import { EMPTY_LINES } from "./empty-lines.ts";
 import { approvedOutcome } from "./invitation-words.ts";
 import type { Role } from "./people-api.ts";
-import { PEOPLE_KEYSTROKES, useInviteAsked } from "./people-state.ts";
+import { PEOPLE_KEYSTROKES } from "./people-state.ts";
 import { outcomeOfRequestFailure } from "./refusal.tsx";
 import {
   requesterName,
@@ -18,7 +19,13 @@ import {
   type WaitingRequest,
 } from "./requests-api.ts";
 import { aRole } from "./role-meanings.ts";
-import { DayCell, useKeystrokeOnHeld, WaitingRow, WaitingTable } from "./waiting-list.tsx";
+import {
+  DayCell,
+  NothingWaiting,
+  useKeystrokeOnHeld,
+  WaitingRow,
+  WaitingTable,
+} from "./waiting-list.tsx";
 
 const COLUMNS = ["Person", "Reason", "State", "Asked", "Acts"] as const;
 
@@ -29,27 +36,6 @@ const NOTHING_HELD: Outcome = {
 
 const countOf = (requests: readonly WaitingRequest[]): string =>
   requests.length === 1 ? "1 request waiting" : `${requests.length} requests waiting`;
-
-function NobodyAsking() {
-  const [, askToInvite] = useInviteAsked();
-  return (
-    <div className="mt-4 flex flex-col items-start gap-1 border border-border bg-card px-4 py-10">
-      <p className="font-medium">Nobody is asking to join.</p>
-      <p className="text-muted-foreground">
-        A person signed in to no workspace asks to join this one by its slug, with a reason.
-      </p>
-      <Button
-        variant="outline"
-        className="mt-3"
-        onClick={() => {
-          askToInvite(Date.now());
-        }}
-      >
-        Invite a person by address
-      </Button>
-    </div>
-  );
-}
 
 function Requester(properties: { readonly request: WaitingRequest }) {
   const { name, email } = properties.request.requester;
@@ -166,7 +152,7 @@ function RequestList(properties: {
         {requests.length === 0 ? null : countOf(requests)}
       </output>
       {requests.length === 0 ? (
-        <NobodyAsking />
+        <NothingWaiting line={EMPTY_LINES.requests} />
       ) : (
         <>
           <p id={consequenceId} className="mt-1 text-muted-foreground">

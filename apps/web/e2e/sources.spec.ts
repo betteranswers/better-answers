@@ -1,5 +1,7 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { NOTHING_BOUND } from "@/features/sources/words.ts";
+
 import { expect, test } from "./browser.ts";
 import {
   addMember,
@@ -222,10 +224,21 @@ test.describe("binding a document on the Sources screen", () => {
   test("an Admin binds by keyboard and sees landed, indexing, indexed", async ({
     page,
     request,
+    passesTheAccessibilityGate,
   }) => {
     const { workspace } = await anAdminAtSources(page, request, { workspace: "Airedale Tooling" });
     await page.goto("/sources/bindings");
-    await expect(bindingsRegion(page)).toContainText("No document is bound yet.");
+    await expect(bindingsRegion(page)).toMatchAriaSnapshot(`
+      - region "Bindings":
+        - /children: equal
+        - heading "Bindings" [level=2]
+        - paragraph: ${NOTHING_BOUND}
+    `);
+    await expect(
+      page.getByRole("button", { name: /^bind/i }),
+      "the toolbar's act is the one way to bind",
+    ).toHaveCount(1);
+    await passesTheAccessibilityGate();
     await skipLinkReachesTheScreen(page);
 
     await page.keyboard.press("b");

@@ -1,5 +1,8 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
+import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
+
 import { expect, test } from "./browser.ts";
 import {
   addMember,
@@ -38,6 +41,9 @@ const rowOf = (page: Page, name: string): Locator => requestRows(page).filter({ 
 
 const approveDialog = (page: Page, name: string) =>
   page.getByRole("dialog", { name: `Approve the request from ${name}` });
+
+/** Every button whose name starts by inviting, so a second one under another name is counted. */
+const invitingButtons = (page: Page) => page.getByRole("button", { name: /^invite/i });
 
 type Asking = { readonly displayName: string; readonly reason?: string };
 
@@ -113,7 +119,7 @@ test.describe("the People screen's Requests tab", () => {
     await expect(requestsRegion(page).getByRole("status").first()).toContainText(
       `Approved. The invitation went to ${priya} as an Editor and lasts until`,
     );
-    await expect(requestsRegion(page)).toContainText("Nobody is asking to join.");
+    await expect(requestsRegion(page)).toContainText(EMPTY_LINES.requests);
 
     await page.getByRole("tab", { name: "Invitations" }).click();
     const invited = page
@@ -143,6 +149,24 @@ test.describe("the People screen's Requests tab", () => {
     );
     await expect(requestRows(page).nth(0)).toContainText("Sam Okafor");
     await expect(requestRows(page).nth(2)).toContainText("Ola Nowak");
+  });
+
+  test("an empty tab says so in one line, inviting once", async ({ page, request }) => {
+    await anAdminAtRequests(page, request, "Swale Presswork", []);
+    await openRequests(page);
+
+    await expect(requestsRegion(page)).toMatchAriaSnapshot(`
+      - region "Requests":
+        - /children: equal
+        - heading "Requests" [level=2]
+        - paragraph: ${EMPTY_LINES.requests}
+    `);
+    await expect(invitingButtons(page), "the toolbar's act is the one way to invite").toHaveCount(
+      1,
+    );
+    await expect(
+      page.getByRole("button", { name: PEOPLE_KEYSTROKES.invite.act, exact: true }),
+    ).toBeVisible();
   });
 
   test("an Admin decides requests by keyboard alone", async ({
@@ -258,7 +282,7 @@ test.describe("the People screen's Requests tab", () => {
     await rowOf(elsewhere, "Priya Shah")
       .getByRole("button", { name: "Decline the request from Priya Shah" })
       .click();
-    await expect(requestsRegion(elsewhere)).toContainText("Nobody is asking to join.");
+    await expect(requestsRegion(elsewhere)).toContainText(EMPTY_LINES.requests);
     await elsewhere.close();
 
     await approving.getByRole("button", { name: "Approve and send the invitation" }).click();

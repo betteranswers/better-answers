@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useId, useRef, useState, type RefObject } from "react";
 
 import type { ApiError } from "@/shared/api/trpc.ts";
+import { EmptyState } from "@/shared/empty-state.tsx";
 import { Icon } from "@/shared/icon.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { RowSheet } from "@/shared/row-sheet.tsx";
@@ -16,6 +17,7 @@ import { RadioGroup, RadioGroupItem } from "@/shared/ui/radio-group.tsx";
 import { SheetDescription, SheetHeader, SheetTitle } from "@/shared/ui/sheet.tsx";
 import { instantWords } from "@/shared/words.ts";
 
+import { EMPTY_LINES } from "./empty-lines.ts";
 import { GroupChecklist } from "./group-checklist.tsx";
 import { useGroups } from "./groups-api.ts";
 import { MemberRemoval } from "./member-removal.tsx";
@@ -294,17 +296,20 @@ function GroupsPicker(properties: {
       </div>
       <div ref={pickerRef} className="contents">
         {groups.data?.length === 0 ? (
-          <div className="grid gap-1">
-            <p>No groups in this workspace yet.</p>
-            <Link to={GROUPS_VIEW} className="justify-self-start text-brand underline">
-              Create one on the Groups view
-            </Link>
-          </div>
+          <EmptyState
+            line={EMPTY_LINES.groups}
+            className="gap-1"
+            action={
+              <Link to={GROUPS_VIEW} className="text-brand underline">
+                Create one on the Groups view
+              </Link>
+            }
+          />
         ) : null}
         {workspaceGroups.length === 0 ? null : (
           <GroupChecklist
             legend={`Groups ${name} is in`}
-            hint={`Each box puts ${name} in its group or takes them out at once. ${RECORDED}`}
+            hint={`Each box puts ${name} in its group or takes them out at once.`}
             choices={workspaceGroups.map((group) => ({
               id: group.id,
               label: group.name,

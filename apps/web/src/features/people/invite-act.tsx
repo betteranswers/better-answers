@@ -18,13 +18,14 @@ import { Label } from "@/shared/ui/label.tsx";
 
 import { invitedOutcome } from "./invitation-words.ts";
 import { useInvite, type SentInvitation } from "./invitations-api.ts";
-import { PEOPLE_KEYSTROKES, useInviteAsked } from "./people-state.ts";
+import { PEOPLE_KEYSTROKES } from "./people-state.ts";
 import { outcomeOfInvitationFailure } from "./refusal.tsx";
 import { ROLE_OFFERED_FIRST, RoleChoice } from "./role-choice.tsx";
 
 type Role = SentInvitation["role"];
 
-const ACT_NAME = "Invite a person";
+/** The keystroke list names the act as the button does, so inviting has one name. */
+const ACT_NAME = PEOPLE_KEYSTROKES.invite.act;
 
 export function InviteAct() {
   const [open, setOpen] = useState(false);
@@ -44,14 +45,6 @@ export function InviteAct() {
     setOpen(true);
   };
   useKeystroke(PEOPLE_KEYSTROKES.invite, show);
-
-  // The panel asks through the view's slot, so an empty list's own action opens this one dialog.
-  const [asked] = useInviteAsked();
-  const [heard, setHeard] = useState(asked);
-  if (asked !== heard) {
-    setHeard(asked);
-    if (asked !== undefined) show();
-  }
 
   // Never disabled while sending: a disabled button drops focus, and a refusal would land nowhere.
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -85,8 +78,8 @@ export function InviteAct() {
         <DialogHeader>
           <DialogTitle>{ACT_NAME}</DialogTitle>
           <DialogDescription>
-            The platform emails the address a link to join this workspace. The invitation lasts
-            seven days, and a new one to the same address replaces it.
+            They get an email with a link to join. The link lasts seven days, and inviting them
+            again replaces it.
           </DialogDescription>
         </DialogHeader>
 
@@ -125,7 +118,7 @@ export function InviteAct() {
           ) : (
             <>
               <Button type="button" variant="outline" onClick={again}>
-                Invite another person
+                {ACT_NAME}
               </Button>
               <DialogClose asChild>
                 {/* oxlint-disable-next-line jsx-a11y/no-autofocus -- the control that had focus is gone, and this is where the act leaves the reader */}

@@ -1,6 +1,7 @@
 import { createColumnHelper, tableFeatures, useTable } from "@tanstack/react-table";
 import { useId, useMemo, useRef, useState, type FormEvent, type RefObject } from "react";
 
+import { EmptyState } from "@/shared/empty-state.tsx";
 import { GridTable } from "@/shared/grid-table.tsx";
 import { KeystrokesAct, useKeystroke } from "@/shared/keystrokes.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
@@ -12,6 +13,7 @@ import { Label } from "@/shared/ui/label.tsx";
 import type { ViewToolbar } from "@/shared/view-toolbar.tsx";
 import { counted } from "@/shared/words.ts";
 
+import { EMPTY_LINES } from "./empty-lines.ts";
 import { GroupSheet, groupButtonId, type GroupOpenedAt } from "./group-sheet.tsx";
 import {
   inNameOrder,
@@ -24,7 +26,6 @@ import {
 import { useMembers } from "./people-api.ts";
 import { GROUPS_KEYSTROKES } from "./people-state.ts";
 import { outcomeOfGroupFailure } from "./refusal.tsx";
-import { RECORDED } from "./words.tsx";
 
 const people = screenById("people");
 
@@ -159,23 +160,9 @@ function CreateGroupForm(properties: {
       </div>
       <Button type="submit">Create the group</Button>
       <p id={ids.hint} className="w-full text-sm text-muted-foreground">
-        A binding&rsquo;s audience can name the group. {RECORDED}
+        A binding&rsquo;s audience can name the group.
       </p>
     </form>
-  );
-}
-
-function NoGroupsYet(properties: { readonly onCreate: () => void }) {
-  return (
-    <div className="flex flex-col items-start gap-1 px-4 py-10">
-      <p className="font-medium">No groups in this workspace yet.</p>
-      <p className="text-muted-foreground">
-        A group names members, and a binding&rsquo;s audience can name the group.
-      </p>
-      <Button variant="outline" className="mt-3" onClick={properties.onCreate}>
-        Name the first group
-      </Button>
-    </div>
   );
 }
 
@@ -285,7 +272,7 @@ function GroupList(properties: {
         <GridTable
           table={table}
           caption="Groups in this workspace, each with how many members it holds. A group's name opens it."
-          empty={<NoGroupsYet onCreate={toTheNameField} />}
+          empty={<EmptyState line={EMPTY_LINES.groups} className="px-4 py-10" />}
         />
       </div>
 
