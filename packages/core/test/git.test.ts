@@ -5,7 +5,9 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  ANY_HEAD,
   commit,
+  commitsAfter,
   fileAt,
   head,
   historyNaming,
@@ -26,6 +28,7 @@ import {
   objectRemovedFrom,
   staged,
 } from "./bundle.ts";
+import { gitStarts } from "./git-starts.ts";
 
 const bundles = bundlesForSuite();
 
@@ -143,6 +146,52 @@ describe("one commit's index", () => {
     expect(await fileAtCommit(bundle.door, bundle.workspaceId, sha, "knowledge/expenses.md")).toBe(
       "Expenses are claimed within thirty days.\n",
     );
+  });
+
+  it("starts one rev-parse, then the plumbing, on a parent", async () => {
+    const bundle = await arrange();
+    const expectedHead = shaOf(await commit(bundle.principal, bundle.door, requestFor()));
+
+    const started = await gitStarts(() =>
+      commit(bundle.principal, bundle.door, requestFor({ path: "knowledge/b.md", expectedHead })),
+    );
+
+    expect(started).toEqual([
+      "rev-parse",
+      "read-tree",
+      "hash-object",
+      "update-index",
+      "write-tree",
+      "commit-tree",
+      "update-ref",
+    ]);
+  });
+
+  it("lands on the standing head when it expects any head", async () => {
+    const bundle = await arrange();
+    const first = shaOf(await commit(bundle.principal, bundle.door, requestFor()));
+
+    const second = await commit(
+      bundle.principal,
+      bundle.door,
+      requestFor({ path: "knowledge/b.md", expectedHead: ANY_HEAD }),
+    );
+
+    expect(second).toEqual({ ok: true, value: { sha: expect.any(String), parent: first } });
+    expect(await bundleHistory(bundle.door, bundle.workspaceId)).toEqual([first, shaOf(second)]);
+  });
+
+  it("lands a first commit when it expects any head", async () => {
+    const bundle = await arrange();
+
+    const first = await commit(
+      bundle.principal,
+      bundle.door,
+      requestFor({ expectedHead: ANY_HEAD }),
+    );
+
+    expect(first).toEqual({ ok: true, value: { sha: expect.any(String), parent: null } });
+    expect(await head(bundle.principal, bundle.door)).toBe(shaOf(first));
   });
 
   it("stages in its own index, leaving the repository without one", async () => {
@@ -264,6 +313,25 @@ describe("the per-repository lock", () => {
 });
 
 const PLATFORM: PlatformPrincipal = { kind: "platform", actorId: "process:better-answers-erasure" };
+
+describe("the commits an empty bundle holds after a watermark", () => {
+  it("answers no head and nothing missed without a watermark", async () => {
+    const bundle = await arrange();
+
+    const scanned = await commitsAfter(PLATFORM, bundle.door, bundle.workspaceId, null);
+
+    expect(scanned).toEqual({ ok: true, value: { head: null, missed: [] } });
+  });
+
+  it("reads a watermark in an empty bundle as diverged", async () => {
+    const bundle = await arrange();
+    const watermark = "0123456789abcdef0123456789abcdef01234567";
+
+    const scanned = await commitsAfter(PLATFORM, bundle.door, bundle.workspaceId, watermark);
+
+    expect(scanned).toEqual({ ok: false, error: "history-diverged" });
+  });
+});
 
 const SUBJECT_EMAIL = "priya@example.invalid";
 

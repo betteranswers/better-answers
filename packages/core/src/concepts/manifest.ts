@@ -14,9 +14,9 @@ import {
   type UserPrincipal,
 } from "../kernel/index.ts";
 import {
+  ANY_HEAD,
   commit as commitToBundle,
   fileAtHead,
-  head,
   withRepositoryLock,
   type CommitAuthor,
   type CommitRefusal,
@@ -109,7 +109,7 @@ export const writeManifest = async (
       message: input.message,
       author: input.author,
       trailers: { actor: actorIdOf(principal), audit: auditEventId },
-      expectedHead: await head(principal, doors.git),
+      expectedHead: ANY_HEAD,
       at: doors.clock.now(),
     });
     if (!committed.ok) return err(committed.error);

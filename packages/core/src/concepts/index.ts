@@ -40,8 +40,8 @@ import {
   type UserPrincipal,
 } from "../kernel/index.ts";
 import {
+  ANY_HEAD,
   commit as commitToBundle,
-  head,
   withRepositoryLock,
   type CommitAuthor,
   type CommitRefusal,
@@ -476,7 +476,7 @@ const commitWrite = async (
       suggestion: input.acceptance?.suggestionId,
     },
 
-    expectedHead: "head" in input.expects ? input.expects.head : await head(principal, git),
+    expectedHead: "head" in input.expects ? input.expects.head : ANY_HEAD,
     at,
   });
 };

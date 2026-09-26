@@ -57,6 +57,9 @@ export type CommitAuthor = {
   readonly email: string;
 };
 
+/** No precondition on the head: the commit lands on whichever stands, the ref move still guarded. */
+export const ANY_HEAD: unique symbol = Symbol("any head");
+
 export type CommitRequest = {
   readonly path: string;
   readonly content: string;
@@ -65,7 +68,7 @@ export type CommitRequest = {
   readonly author: CommitAuthor;
   readonly trailers: CommitTrailers;
 
-  readonly expectedHead: string | null;
+  readonly expectedHead: string | null | typeof ANY_HEAD;
 
   readonly at: Date;
 };
@@ -131,12 +134,17 @@ const stderrOf = (cause: unknown): string => {
   return typeof stderr === "string" ? stderr.trim() : "";
 };
 
-const hasRepository = async (gitDir: string): Promise<boolean> => {
+/**
+ * Under `--quiet`, git exits 1 only when `main` names no commit; any other failure means no
+ * repository.
+ */
+const standingHead = async (
+  gitDir: string,
+): Promise<Result<string | null, "no-such-repository">> => {
   try {
-    await run("git", ["--git-dir", gitDir, "rev-parse", "--git-dir"]);
-    return true;
-  } catch {
-    return false;
+    return ok(await git(gitDir, ["rev-parse", "--verify", "--quiet", `${BUNDLE_REF}^{commit}`]));
+  } catch (cause) {
+    return exitStatusOf(cause) === 1 ? ok(null) : err("no-such-repository");
   }
 };
 
@@ -154,11 +162,8 @@ export const head = (principal: UserPrincipal, door: GitDoor): Promise<string | 
   headOf(bundleOf(door, principal));
 
 const headOf = async (gitDir: string): Promise<string | null> => {
-  try {
-    return await git(gitDir, ["rev-parse", "--verify", `${BUNDLE_REF}^{commit}`]);
-  } catch {
-    return null;
-  }
+  const standing = await standingHead(gitDir);
+  return standing.ok ? standing.value : null;
 };
 
 const isSubjectLine = (message: string): boolean => message.length > 0 && !/[\r\n]/.test(message);
@@ -219,6 +224,11 @@ const danglingCommit = async (
   );
 };
 
+const meetsExpectedHead = (
+  expectedHead: CommitRequest["expectedHead"],
+  parent: string | null,
+): boolean => expectedHead === ANY_HEAD || expectedHead === parent;
+
 const commitFailure = (cause: unknown): "stale-precondition" | Error => {
   const message = cause instanceof Error ? cause.message : String(cause);
   if (/cannot lock ref|reference already exists|but expected/i.test(message)) {
@@ -228,8 +238,9 @@ const commitFailure = (cause: unknown): "stale-precondition" | Error => {
 };
 
 /**
- * Writes one file as one commit on `main`, compare-and-swap against `expectedHead`, which is null
- * for the first commit. The committer is always the platform bot; the author is the request's.
+ * Writes one file as one commit on `main`, compare-and-swap against the head it reads, which must
+ * be `expectedHead` (null for the first commit) unless that is `ANY_HEAD`. The committer is always
+ * the platform bot; the author is the request's.
  */
 export const commit = async (
   principal: UserPrincipal,
@@ -240,10 +251,11 @@ export const commit = async (
   const trailers = trailerLines(request.trailers);
   if (!isSubjectLine(request.message) || trailers === undefined) return err("malformed-message");
   const gitDir = bundleOf(door, principal);
-  if (!(await hasRepository(gitDir))) return err("no-such-repository");
+  const standing = await standingHead(gitDir);
+  if (!standing.ok) return err(standing.error);
 
-  const parent = await head(principal, door);
-  if (parent !== request.expectedHead) return err("stale-precondition");
+  const parent = standing.value;
+  if (!meetsExpectedHead(request.expectedHead, parent)) return err("stale-precondition");
 
   const index = await mkdtemp(path.join(tmpdir(), "better-answers-index-"));
   try {
@@ -307,8 +319,9 @@ export const commitsAfter = async (
   >
 > => {
   const gitDir = repositoryPath(door, workspaceId);
-  if (!(await hasRepository(gitDir))) return err("no-such-repository");
-  const head = await headOf(gitDir);
+  const standing = await standingHead(gitDir);
+  if (!standing.ok) return err(standing.error);
+  const head = standing.value;
   if (head === null) return since === null ? ok({ head, missed: [] }) : err("history-diverged");
   if (since !== null) {
     try {
