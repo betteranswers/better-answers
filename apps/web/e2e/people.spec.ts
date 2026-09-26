@@ -7,6 +7,7 @@ import {
   addMember,
   aMemberSignedInAt,
   anAddress,
+  askToJoin,
   clockTheNextKey,
   invite,
   keystrokesDismissed,
@@ -112,6 +113,7 @@ const anAdminAtPeople = async (
   readonly workspaceId: string;
   readonly joined: readonly (Joined & { readonly id: string })[];
   readonly stranger: string;
+  readonly slug: string;
 }> => {
   const admin = anAddress("admin");
   const workspace = await provision(api, { name: workspaceName, adminEmail: admin });
@@ -143,7 +145,7 @@ const anAdminAtPeople = async (
   await signIn(page, api, admin);
   await rail(page).getByRole("link", { name: "People" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
-  return { admin, workspaceId: workspace.workspaceId, joined, stranger };
+  return { admin, workspaceId: workspace.workspaceId, joined, stranger, slug: workspace.slug };
 };
 
 /** The Admin signed in is one of two, so they may demote or remove themself. */
@@ -485,6 +487,9 @@ test.describe("a member, opened as a sheet", () => {
     await expect(keystrokes).toContainText("Change the role of the member in focus");
     await expect(keystrokes).toContainText("Revoke the credentials here of the member in focus");
     await expect(keystrokes).toContainText("Remove the member in focus");
+    await expect(keystrokes, "d declines a request on the Requests tab alone").not.toContainText(
+      "Decline the request in focus",
+    );
     await page.keyboard.press("Escape");
 
     await memberButton(page, "Priya Shah").focus();
@@ -843,7 +848,7 @@ test.describe("a member's display name, flagged to the operator", () => {
 test.describe("the People screen's words", () => {
   // Every People surface joins this test as it is built: the product's word is workspace.
   test("says workspace, never organisation, on every People view", async ({ page, request }) => {
-    const { admin } = await anAdminAtPeople(page, request, "Ryedale Metalwork");
+    const { admin, slug } = await anAdminAtPeople(page, request, "Ryedale Metalwork");
     const organisation = /organi[sz]ation/i;
 
     const said = async (where: string) => {
@@ -915,6 +920,19 @@ test.describe("the People screen's words", () => {
     await inviting.getByRole("button", { name: "Done" }).click();
     await expect(page.getByRole("region", { name: "Invitations" }).getByRole("row")).toHaveCount(2);
     await said("the Invitations tab with an invitation waiting");
+
+    const asker = await person(request, anAddress("asker"), { displayName: "Ola Asker" });
+    await askToJoin(request, { slug, requesterId: asker.id, reason: "I bid for the rail work." });
+    await page.getByRole("tab", { name: "Requests" }).click();
+    await expect(page.getByRole("region", { name: "Requests" }).getByRole("row")).toHaveCount(2);
+    await said("the Requests tab with a request waiting");
+    const approving = page.getByRole("dialog", { name: "Approve the request from Ola Asker" });
+    await page.getByRole("button", { name: "Approve the request from Ola Asker" }).click();
+    await saidIn(approving, "the approve dialog");
+    await approving.getByRole("button", { name: "Approve and send the invitation" }).click();
+    await expect(approving).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "Requests" })).toContainText("Approved.");
+    await said("the Requests tab once the request is approved");
 
     await page.goto(GROUPS_VIEW);
     const naming = page.getByRole("textbox", { name: "Name of a new group" });

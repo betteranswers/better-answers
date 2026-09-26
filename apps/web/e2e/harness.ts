@@ -238,6 +238,17 @@ export const makeGroups = (
   },
 ) => ask(api, "/groups", input, groupsMade);
 
+const accessAsked = z.object({ asked: z.literal(true) });
+
+/**
+ * A person's ask to join a workspace by its slug, as the ask-to-join form leaves it, without the
+ * sign-in the form needs.
+ */
+export const askToJoin = (
+  api: APIRequestContext,
+  input: { slug: string; requesterId: string; reason: string },
+) => ask(api, "/access-requests", input, accessAsked);
+
 /** The code the api captured for this address, in place of the email nobody receives. */
 export const codeSentTo = async (api: APIRequestContext, email: string): Promise<string> => {
   const sent = await api.get(`${HARNESS}/codes?email=${encodeURIComponent(email)}`);
@@ -264,6 +275,49 @@ export const skipLinkReachesTheScreen = async (page: Page): Promise<void> => {
   await expect(page.getByRole("link", { name: "Skip to the screen" })).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("main")).toBeFocused();
+};
+
+export const tabUntilFocused = async (page: Page, target: Locator, most = 40): Promise<void> => {
+  for (let pressed = 0; pressed < most; pressed += 1) {
+    if (await target.evaluate((node) => node === document.activeElement)) return;
+    await page.keyboard.press("Tab");
+  }
+  await expect(target, "Tab never reached it").toBeFocused();
+};
+
+/**
+ * A fresh document, so the first Tab starts from the top. Each arrow lands before the next, or
+ * the tab's navigation swallows the second.
+ */
+export const tabOpenedByKeyboard = async (page: Page, path: string, name: string) => {
+  await page.goto(path);
+  const tabs = page.getByRole("tab");
+  await expect(tabs.first()).toBeVisible();
+  await skipLinkReachesTheScreen(page);
+  await tabUntilFocused(page, page.getByRole("tab", { selected: true }));
+
+  const names = await tabs.allInnerTexts();
+  const from = names.indexOf(await page.getByRole("tab", { selected: true }).innerText());
+  for (let at = from + 1; at <= names.indexOf(name); at += 1) {
+    await page.keyboard.press("ArrowRight");
+    await expect(tabs.nth(at)).toBeFocused();
+  }
+  await expect(page.getByRole("tab", { name }), `no tab ${name}`).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+};
+
+/** A role select in focus reading Viewer, opened, one step up to Editor and picked. */
+export const editorPickedByKeyboard = async (page: Page, select: Locator): Promise<void> => {
+  await expect(select).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("option", { name: "Viewer" })).toBeFocused();
+  await page.keyboard.press("ArrowUp");
+  await expect(page.getByRole("option", { name: "Editor" })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("listbox")).toHaveCount(0);
+  await expect(select).toBeFocused();
 };
 
 /** Starts on the sign-in screen the page already shows; it does not navigate there. */

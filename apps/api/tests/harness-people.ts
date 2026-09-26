@@ -1,7 +1,8 @@
 import { z } from "zod";
 
-import { addToGroup, createGroup } from "@better-answers/core/members";
+import { addToGroup, createGroup, requestAccess } from "@better-answers/core/members";
 
+import { IDENTITY_PRINCIPAL } from "../src/identity-principal.ts";
 import { actingIn, type TestApp } from "./harness.ts";
 
 export const groupsMaking = z.object({
@@ -31,4 +32,23 @@ export const makeGroups = async (
     }
   }
   return { made: asked.names.length };
+};
+
+export const accessAsking = z.object({
+  slug: z.string().min(1),
+  requesterId: z.string().min(1),
+  reason: z.string().min(1),
+});
+
+/**
+ * The slice's own act under the principal the ask-to-join procedure uses, without the sign-in and
+ * the answer's floor that procedure puts in front of it.
+ */
+export const askToJoin = async (
+  app: TestApp,
+  asked: z.output<typeof accessAsking>,
+): Promise<{ readonly asked: true }> => {
+  const answered = await requestAccess(IDENTITY_PRINCIPAL, app.doors.postgres, asked);
+  if (!answered.ok) throw new Error(`the ask answered ${String(answered.error)}`);
+  return { asked: true };
 };

@@ -25,6 +25,12 @@ export const invitedOutcome = (sent: SentInvitation): Outcome =>
     didNotGo: `The invitation to ${sent.address} stands, but its email did not go. Resend it from the Invitations tab.`,
   });
 
+export const approvedOutcome = (sent: SentInvitation): Outcome =>
+  outcomeOfSending(sent, {
+    went: `Approved. The invitation went to ${sent.address} as ${aRole(sent.role)} and lasts until ${longDate(sent.expiresAt)}.`,
+    didNotGo: `Approved, but the email to ${sent.address} did not go. The invitation stands: resend it from the Invitations tab.`,
+  });
+
 export const resentOutcome = (sent: SentInvitation): Outcome =>
   outcomeOfSending(sent, {
     went: `Sent the invitation to ${sent.address} again. It lasts until ${longDate(sent.expiresAt)}.`,

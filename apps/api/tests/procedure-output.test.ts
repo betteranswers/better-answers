@@ -32,10 +32,12 @@ describe("what a procedure may answer the wire", () => {
       "console.people.revokeCredentials",
       "console.workspaces.list",
       "members.addToGroup",
+      "members.approveRequest",
       "members.auditLog",
       "members.cancelInvitation",
       "members.changeRole",
       "members.createGroup",
+      "members.declineRequest",
       "members.deleteGroup",
       "members.flagDisplayName",
       "members.groups",
@@ -45,6 +47,7 @@ describe("what a procedure may answer the wire", () => {
       "members.remove",
       "members.removeFromGroup",
       "members.renameGroup",
+      "members.requests",
       "members.resendInvitation",
       "members.revokeCredentials",
       "person.acceptInvitation",
@@ -93,6 +96,9 @@ describe("what a procedure may answer the wire", () => {
       | "members.deleteGroup"
       | "members.addToGroup"
       | "members.removeFromGroup"
+      | "members.requests"
+      | "members.approveRequest"
+      | "members.declineRequest"
       | "routes.list"
       | "sources.list"
       | "sources.bind"

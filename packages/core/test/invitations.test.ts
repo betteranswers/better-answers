@@ -287,7 +287,11 @@ describe("an approved access request's invitation", () => {
 
     const approved = answeredValue(
       await as(workspace, workspace.adminUserId, (principal, tx) =>
-        approveRequest(principal, tx, { requestId: requestId ?? "", role: "Editor" }, INVITED_AT),
+        approveRequest(principal, tx, {
+          requestId: requestId ?? "",
+          role: "Editor",
+          now: INVITED_AT,
+        }),
       ),
     );
 

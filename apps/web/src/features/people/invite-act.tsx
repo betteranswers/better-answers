@@ -15,24 +15,14 @@ import {
 } from "@/shared/ui/dialog.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/ui/select.tsx";
 
 import { invitedOutcome } from "./invitation-words.ts";
 import { useInvite, type SentInvitation } from "./invitations-api.ts";
 import { PEOPLE_KEYSTROKES, useInviteAsked } from "./people-state.ts";
 import { outcomeOfInvitationFailure } from "./refusal.tsx";
-import { ROLE_MEANINGS, ROLES, roleOf } from "./role-meanings.ts";
+import { ROLE_OFFERED_FIRST, RoleChoice } from "./role-choice.tsx";
 
 type Role = SentInvitation["role"];
-
-/** The least a new person is offered, so a slip never hands out more than asking. */
-const ROLE_OFFERED_FIRST: Role = "Viewer";
 
 const ACT_NAME = "Invite a person";
 
@@ -42,7 +32,7 @@ export function InviteAct() {
   const [outcome, setOutcome] = useState<Outcome>();
   const [sent, setSent] = useState<SentInvitation>();
   const invite = useInvite();
-  const ids = { form: useId(), address: useId(), role: useId(), meaning: useId() };
+  const ids = { form: useId(), address: useId() };
 
   const again = () => {
     setOutcome(undefined);
@@ -116,29 +106,7 @@ export function InviteAct() {
               />
             </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor={ids.role}>Role</Label>
-              <Select
-                value={role}
-                onValueChange={(chosen) => {
-                  setRole(roleOf(chosen) ?? ROLE_OFFERED_FIRST);
-                }}
-              >
-                <SelectTrigger id={ids.role} aria-describedby={ids.meaning}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ROLES.map((word) => (
-                    <SelectItem key={word} value={word}>
-                      {word}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p id={ids.meaning} className="text-sm text-muted-foreground">
-                {ROLE_MEANINGS[role]}
-              </p>
-            </div>
+            <RoleChoice role={role} onChoose={setRole} />
           </form>
         ) : null}
 
