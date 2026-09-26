@@ -220,8 +220,10 @@ describe("the sweeps' settings", () => {
     ["a word it does not know", "delete"],
     ["the right word in another case", "Remove"],
     ["an empty value", ""],
-  ])("refuses UPLOAD_SWEEP with %s rather than guess whether to remove", (_case, word) => {
-    expect(readSweeps({ UPLOAD_SWEEP: word }).ok).toBe(false);
+  ])("refuses UPLOAD_SWEEP with %s", (_case, word) => {
+    expect(readSweeps({ UPLOAD_SWEEP: word }).ok, "rather than guess whether to remove").toBe(
+      false,
+    );
   });
 
   it.each([
@@ -262,7 +264,7 @@ describe("the head check's settings", () => {
     ["no scheme", "hc-ping.com/7c1d9e4a"],
     ["another scheme", "ftp://hc-ping.com/7c1d9e4a"],
     ["an empty value", ""],
-    ["a user and a password", "https://who:secret@hc-ping.com/7c1d9e4a"],
+    ["a user and password", "https://who:secret@hc-ping.com/7c1d9e4a"],
     ["a user alone", "https://who@hc-ping.com/7c1d9e4a"],
     ["a password alone", "https://:secret@hc-ping.com/7c1d9e4a"],
   ])("refuses a check to ping with %s", (_case, url) => {
@@ -306,10 +308,10 @@ describe("the image the api runs", () => {
     ["a digest cut short", "sha256:9e8d7c6b5a4f"],
     ["a digest in capitals", DIGEST.toUpperCase()],
     ["the whole image reference", `ghcr.io/betteranswers/api@${DIGEST}`],
-  ])("refuses %s, which no pull by digest could have started", (_case, value) => {
+  ])("refuses %s for API_IMAGE_DIGEST", (_case, value) => {
     const read = readRunningImage({ API_IMAGE_DIGEST: value });
 
-    expect(read.ok).toBe(false);
+    expect(read.ok, "no pull by digest could have started it").toBe(false);
     expect(read.ok ? "" : read.error.message).toContain("API_IMAGE_DIGEST");
   });
 });
@@ -370,7 +372,7 @@ describe("the three hostnames of the estate", () => {
     ["an IPv6 literal", "https://[::1]"],
 
     ["an empty final label", "https://app.example.test.."],
-  ])("refuses a PUBLIC_URL whose host the parser rewrites — %s", (_case, url) => {
+  ])("refuses a parser-rewritten PUBLIC_URL host: %s", (_case, url) => {
     expect(readIdentityBootstrap(identityEnvironment({ PUBLIC_URL: url })).ok).toBe(false);
   });
 

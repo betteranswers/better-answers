@@ -163,7 +163,7 @@ describe.each<{
     expected: [],
   },
   {
-    shape: "a job grant that drops the workflow's contents",
+    shape: "a job grant dropping the workflow's contents",
     caller: callingWith({ "pull-requests": "read" }),
     called: CHECK_WITH_PR_TITLE,
     expected: [
@@ -172,7 +172,7 @@ describe.each<{
     ],
   },
   {
-    shape: "less than a top-level block every job overrides",
+    shape: "less than a fully overridden top-level block",
     caller: callingWith(undefined),
     called: {
       permissions: { "pull-requests": "write" },
@@ -189,7 +189,7 @@ describe.each<{
     expected: [],
   },
   {
-    shape: "nothing, to a workflow that asks for nothing",
+    shape: "nothing to a workflow asking nothing",
     caller: callingWith({}),
     called: { jobs: { lane: {} } },
     expected: [],

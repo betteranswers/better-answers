@@ -299,12 +299,12 @@ const EVERY_GROUP_ACT: readonly GroupAct[] = [
     call: (api, seeded) => api.members.deleteGroup.mutate({ groupId: seeded.hr }),
   },
   {
-    does: "put a member in a group",
+    does: "add a group member",
     call: (api, seeded) =>
       api.members.addToGroup.mutate({ groupId: seeded.bids, userId: seeded.sam.id }),
   },
   {
-    does: "take a member out of a group",
+    does: "remove a group member",
     call: (api, seeded) =>
       api.members.removeFromGroup.mutate({ groupId: seeded.hr, userId: seeded.sam.id }),
   },
@@ -319,7 +319,7 @@ describe("who may see and change groups", () => {
       { ...act, role: "Editor" as const },
       { ...act, role: "Viewer" as const },
     ]),
-  )("refuses to let a member at $role $does", async (act) => {
+  )("refuses to let $role members $does", async (act) => {
     const seeded = await aWorkspaceWithGroups();
     const actor = await app.person();
     await app.addMember(seeded.workspace.workspaceId, actor.id, act.role);
@@ -332,7 +332,7 @@ describe("who may see and change groups", () => {
     expect(refused).toMatchObject(ROLE_FORBIDS_ANSWERED);
   });
 
-  it.each(EVERY_GROUP_ACT)("refuses to let another workspace's Admin $does here", async (act) => {
+  it.each(EVERY_GROUP_ACT)("refuses to let another workspace's Admin $does", async (act) => {
     const seeded = await aWorkspaceWithGroups();
     const api = await anAdminOfElsewherePointedAt(app, seeded.workspace.workspaceId);
 

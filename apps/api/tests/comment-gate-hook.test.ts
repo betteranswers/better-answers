@@ -160,7 +160,7 @@ describe("the write-time hook hands back the broken comment rule", () => {
   });
 
   it.each([["a root script", "scripts/long.mjs", `// ${FORTY_WORDS}\nexport const keep = 1;\n`]])(
-    "refuses a 40-word comment in %s, naming count and rule",
+    "refuses %s's 40-word comment, naming count and rule",
     (_what, file, source) => {
       const run = edit(file, source);
 
@@ -208,12 +208,12 @@ describe("the write-time hook passes a comment that earns its place", () => {
   });
 
   it.each([
-    ["a YAML file", "packages/probe/long.yml", `# ${FORTY_WORDS}\nkeep: 1\n`],
-    ["a shell file", "packages/probe/long.sh", `# ${FORTY_WORDS}\nKEEP=1\n`],
-    ["a TOML file", "packages/probe/long.toml", `# ${FORTY_WORDS}\nkeep = 1\n`],
-    ["a SQL file", "packages/probe/long.sql", `-- ${FORTY_WORDS}\nSELECT 1;\n`],
-    ["a workflow", ".github/workflows/long.yml", `# ${FORTY_WORDS}\nname: probe\n`],
-  ])("lets a 40-word comment in %s through, being no Python", (_what, file, source) => {
+    ["YAML", "packages/probe/long.yml", `# ${FORTY_WORDS}\nkeep: 1\n`],
+    ["shell", "packages/probe/long.sh", `# ${FORTY_WORDS}\nKEEP=1\n`],
+    ["TOML", "packages/probe/long.toml", `# ${FORTY_WORDS}\nkeep = 1\n`],
+    ["SQL", "packages/probe/long.sql", `-- ${FORTY_WORDS}\nSELECT 1;\n`],
+    ["workflow", ".github/workflows/long.yml", `# ${FORTY_WORDS}\nname: probe\n`],
+  ])("lets a 40-word %s comment through, being no Python", (_what, file, source) => {
     const run = edit(file, source);
 
     expect(run.status).toBe(0);
@@ -223,7 +223,7 @@ describe("the write-time hook passes a comment that earns its place", () => {
 
 describe("the write-time hook speaks only for what root `check` gates", () => {
   it.each([
-    ["a Python file outside every root the Python gate walks", "tools/loose.py"],
+    ["a Python file outside the Python gate's roots", "tools/loose.py"],
     ["a file the gate has no reader for", "packages/probe/notes.md"],
   ])("walks past %s", (_what, file) => {
     expect(edit(file, `// ${FORTY_WORDS}\nexport const keep = 1;\n`).status).toBe(0);
@@ -262,13 +262,13 @@ describe("the write-time hook runs the root config's comment rules", () => {
     ["a TODO", "packages/probe/todo.ts", "// TODO: file the ticket\n", "no-warning-comments"],
     ["`@ts-ignore`", "packages/probe/ignore.ts", "// @ts-ignore\n", "ban-ts-comment"],
     [
-      "`@ts-ignore`, naming the directive to use",
+      "`@ts-ignore`, naming its replacement",
       "packages/probe/prefer.ts",
       "// @ts-ignore\n",
       "prefer-ts-expect-error",
     ],
     [
-      "a disable that names no rule",
+      "a disable naming no rule",
       "packages/probe/blanket.ts",
       "/* eslint-disable */\n",
       "no-abusive-eslint-disable",

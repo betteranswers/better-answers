@@ -262,7 +262,7 @@ describe("the sense a planted line is read in", () => {
     `logger.info({ port: address.port }, "${WORD} listening");`,
     `throw new Error("the browser suite's ${WORD} needs a port as its one argument");`,
     `It starts ${WORD}, worker and migrate in that order.`,
-  ])("refuses the tier: %s", (planted) => {
+  ])("refuses the tier sense, case %$", (planted) => {
     expect(findingsOver(planted)).toEqual([`docs/planted.md:1: ${planted}`]);
   });
 
@@ -292,7 +292,7 @@ describe("the sense a planted line is read in", () => {
     `# The binding's store: the chunks ${WORD} and its target-state tracking.`,
     `<p>This ${WORD} calls itself “Claude”. It is hosted at <strong>claude.ai</strong>.</p>`,
     `      : undefined) ?? "This ${WORD}",`,
-  ])("passes a permitted sense: %s", (planted) => {
+  ])("passes a permitted sense, case %$", (planted) => {
     expect(findingsOver(planted)).toEqual([]);
   });
 
@@ -308,7 +308,7 @@ describe("the sense a planted line is read in", () => {
     `  const git = openTestGit(${WORD});`,
     `  const response = await ${WORD}`,
     `      ${WORD},`,
-  ])("passes the api's own names in apps/api alone: %s", (planted) => {
+  ])("passes the api's own names in apps/api alone, case %$", (planted) => {
     expect(findingsOver(planted, "apps/api/src/planted.ts")).toEqual([]);
     expect(findingsOver(planted)).toEqual([`docs/planted.md:1: ${planted.trim()}`]);
   });

@@ -262,10 +262,10 @@ describe("the nightly mutation baseline, kept as the previous run's artifact", (
   it.each([
     { left: "no checkpoint at all", pages: [page()] },
     {
-      left: "only an expired upload, a fork's pull request's and another branch's",
+      left: "stale or foreign uploads",
       pages: [page(EXPIRED_ON_MAIN, A_FORK_CALLING_ITS_BRANCH_MAIN, ANOTHER_BRANCH)],
     },
-  ])("tests every mutant, staying green, when earlier runs left $left", ({ pages }) => {
+  ])("tests every mutant, staying green, given $left", ({ pages }) => {
     const restored = restoreAgainst(pages);
 
     expect(restored.status, `the step went red: ${restored.log}`).toBe(0);
@@ -311,13 +311,13 @@ describe("the nightly mutation baseline, kept as the previous run's artifact", (
   });
 
   it.each([
-    { when: "will not list it", answer: REFUSED, says: `would not list ${ARTIFACT}` },
+    { when: "refuses the listing", answer: REFUSED, says: `would not list ${ARTIFACT}` },
     {
-      when: "answers with something other than a list of artifacts",
+      when: "answers with a non-list",
       answer: { message: "Not Found", status: "404" },
       says: `something other than a list of ${ARTIFACT}`,
     },
-  ])("goes red, naming the artifact, when the artifacts API $when", ({ answer, says }) => {
+  ])("goes red when the artifacts API $when", ({ answer, says }) => {
     const restored = restoreAgainst(answer);
 
     expect(restored.status).toBe(1);

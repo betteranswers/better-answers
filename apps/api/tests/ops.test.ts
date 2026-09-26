@@ -1270,9 +1270,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     it.each([
       ["a --wait carrying a value", ["--wait", "soon"]],
-      ["a --wait-seconds that is not a whole number of seconds", ["--wait-seconds", "soon"]],
-      ["a --wait-seconds of no seconds at all", ["--wait-seconds", "0"]],
-    ])("answers usage to %s, and queues nothing", async (_shape, flags) => {
+      ["a non-numeric --wait-seconds", ["--wait-seconds", "soon"]],
+      ["a --wait-seconds of zero", ["--wait-seconds", "0"]],
+    ])("answers usage to %s, queueing nothing", async (_shape, flags) => {
       const { workspaceId } = await app().provision();
 
       const run = await ops(app(), ["graph-rebuild", "--workspace", workspaceId, ...flags]);
@@ -1850,7 +1850,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       ["no --admin", ["--name", "Acme", "--slug", "acme"]],
       ["no --slug", ["--name", "Acme", "--admin", "a@b.c"]],
       ["no --name", ["--slug", "acme", "--admin", "a@b.c"]],
-    ])("answers usage to %s, before it reads anything", async (_shape, flags) => {
+    ])("answers usage to %s, reading nothing", async (_shape, flags) => {
       const run = await ops(app(), ["provision-workspace", ...flags]);
 
       expect(run.exitCode).toBe(2);
@@ -2090,7 +2090,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
     it.each([
       ["a blank name", ["--name", "   "]],
-      ["a blank slug beside a good name", ["--name", "Acme Group", "--slug", " "]],
+      ["a good name, blank slug", ["--name", "Acme Group", "--slug", " "]],
       ["neither --name nor --slug", []],
     ])("refuses malformed for %s, changing nothing", async (_shape, flags) => {
       const { workspaceId, slug } = await app().provision({ name: "Acme" });
@@ -2119,7 +2119,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     it.each([
       ["no flags at all", []],
       ["no --workspace", ["--name", "Acme Group", "--slug", "acme"]],
-    ])("answers usage to %s, before it reads anything", async (_shape, flags) => {
+    ])("answers usage to %s, reading nothing", async (_shape, flags) => {
       const run = await ops(app(), ["rename-workspace", ...flags]);
 
       expect(run.exitCode).toBe(2);
@@ -2612,16 +2612,16 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it.each([
-      ["no --from and no --as", []],
+      ["no --from or --as", []],
       [
-        "a sensitivity that is not a class",
+        "an unknown sensitivity",
         ["--from", "/tmp/bundle", "--as", "a@b.c", "--sensitivity", "Secret"],
       ],
       [
         "a --dry-run carrying a value",
         ["--from", "/tmp/bundle", "--as", "a@b.c", "--dry-run", "yes"],
       ],
-    ])("answers usage to %s, before it reads anything", async (_shape, flags) => {
+    ])("answers usage to %s, reading nothing", async (_shape, flags) => {
       const { workspaceId } = await bundleWorkspace(app());
 
       const run = await ops(app(), ["import-bundle", "--workspace", workspaceId, ...flags]);
