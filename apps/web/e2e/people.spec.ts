@@ -418,12 +418,16 @@ test.describe("a member, opened as a sheet", () => {
     await memberButton(page, "Test person").click();
     const sheet = sheetOf(page, "Test person");
     await sheet.getByRole("radio", { name: "Viewer", exact: true }).click();
-    await sheet.getByRole("button", { name: "Make Test person a Viewer" }).click();
+    const commit = sheet.getByRole("button", { name: "Make Test person a Viewer" });
+    await commit.click();
 
     const refused = sheet.getByRole("alert");
     await expect(refused).toContainText("Refused: last-admin.");
     await expect(refused).toContainText("Make someone else an Admin first.");
     await expect(sheet.getByRole("region", { name: "Membership" })).toContainText("Admin");
+    // The refusal re-enables the button mid-fade from its disabled look; an audit inside that fade
+    // reads a contrast nobody settles on.
+    await expect(commit).toHaveCSS("opacity", "1");
     await passesTheAccessibilityGate();
     await page.keyboard.press("Escape");
     await expect(rowOf(page, "Test person").getByRole("cell").nth(1)).toHaveText("Admin");
