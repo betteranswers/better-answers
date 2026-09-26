@@ -160,7 +160,7 @@ export type SubmitSuggestionSetRefusal = PrincipalRefusal | "malformed" | "kind-
 
 /**
  * `malformed` also refuses an empty set and one over `SUGGESTION_SET_MAX`; `kind-forbids`
- * refuses a kind the app may not raise.
+ * refuses a kind a person may not raise.
  */
 export const submitSuggestionSet = async (
   principal: UserPrincipal,
