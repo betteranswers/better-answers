@@ -305,6 +305,10 @@ export const runsOfSubjectInput = z.object({ subjectId: SUBJECT_ID });
 
 export type RunsOfSubjectInput = z.output<typeof runsOfSubjectInput>;
 
+/**
+ * Its outcome stays on the job row: an index run's outcome locates each overridden span, the
+ * address of withheld text.
+ */
 export type SubjectRun = {
   readonly jobId: string;
   readonly kind: JobKind;
@@ -314,42 +318,32 @@ export type SubjectRun = {
   readonly enqueuedAt: string;
 
   readonly finishedAt: string | null;
-  readonly outcome: JobOutcome | null;
 };
 
-type SubjectRunRow = Omit<SubjectRun, "enqueuedAt" | "finishedAt" | "jobId" | "outcome"> & {
+type SubjectRunRow = Omit<SubjectRun, "enqueuedAt" | "finishedAt" | "jobId"> & {
   readonly id: string;
   readonly subject_id: string;
   readonly enqueued_at: Date;
   readonly finished_at: Date | null;
-  readonly outcome: OutcomeColumn;
 };
 
 const SUBJECT_RUN_COLUMNS =
-  "id, subject_id, kind, reason, status, attempts, enqueued_at, finished_at, outcome";
+  "id, subject_id, kind, reason, status, attempts, enqueued_at, finished_at";
 
 const NEWEST_FIRST = "enqueued_at DESC, id DESC";
 
 const subjectRunsOf = (
   rows: readonly SubjectRunRow[],
-): Result<ReadonlyArray<readonly [string, SubjectRun]>, Error> => {
-  const runs: Array<readonly [string, SubjectRun]> = [];
-  for (const { id, subject_id, enqueued_at, finished_at, outcome, ...run } of rows) {
-    const found = outcomeOf(outcome);
-    if (!found.ok) return err(found.error);
-    runs.push([
-      subject_id,
-      {
-        jobId: id,
-        ...run,
-        enqueuedAt: enqueued_at.toISOString(),
-        finishedAt: finished_at?.toISOString() ?? null,
-        outcome: found.value,
-      },
-    ]);
-  }
-  return ok(runs);
-};
+): ReadonlyArray<readonly [string, SubjectRun]> =>
+  rows.map(({ id, subject_id, enqueued_at, finished_at, ...run }) => [
+    subject_id,
+    {
+      jobId: id,
+      ...run,
+      enqueuedAt: enqueued_at.toISOString(),
+      finishedAt: finished_at?.toISOString() ?? null,
+    },
+  ]);
 
 /** Newest first. */
 export const runsOfSubject = async (
@@ -369,8 +363,7 @@ export const runsOfSubject = async (
     ),
   );
   if (!read.ok) return err(read.error);
-  const runs = subjectRunsOf(read.value.rows);
-  return runs.ok ? ok(runs.value.map(([, run]) => run)) : runs;
+  return ok(subjectRunsOf(read.value.rows).map(([, run]) => run));
 };
 
 /** Each subject's newest run; a subject with no run is absent from the map. */
@@ -388,8 +381,7 @@ export const latestRunsOf = async (
     ),
   );
   if (!read.ok) return err(read.error);
-  const runs = subjectRunsOf(read.value.rows);
-  return runs.ok ? ok(new Map(runs.value)) : runs;
+  return ok(new Map(subjectRunsOf(read.value.rows)));
 };
 
 const AUDIT_FINDINGS = ["mismatched", "unparsed", "missing_row", "missing_file"] as const;
