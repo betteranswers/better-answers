@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { bindingIdTakenAgain } from "@better-answers/schema/testing/probes";
 import type pg from "pg";
 import { describe, expect, it } from "vitest";
@@ -15,8 +17,6 @@ import {
 import {
   bindUpload,
   bindUploadFields,
-  dpiaInputFor,
-  dpiaReadInput,
   ORPHANED_UPLOAD_GRACE_HOURS,
   publishBinding,
   publishBindingInput,
@@ -679,13 +679,42 @@ const publishedHandbook = async (scenario: Scenario, bindingId: string) => {
   return published.value;
 };
 
-const dpiaHashOf = async (scenario: Scenario, bindingId: string) => {
-  const input = await asAdmin(scenario, (admin, tx) =>
-    dpiaInputFor(admin, tx, inputOf(dpiaReadInput, { bindingId })),
-  );
-  if (!input.ok) throw new Error(`the DPIA input was refused: ${String(input.error)}`);
-  return input.value.hash;
-};
+/**
+ * Keys written sorted at every depth, the canonical form the hash covers, so the expected hash owes
+ * nothing to the code under test.
+ */
+const dpiaHashOfTheHandbook = (bindingId: string): string =>
+  createHash("sha256")
+    .update(
+      JSON.stringify({
+        audience: "everyone",
+        bindingId,
+        class: "Internal",
+        personalDataCategories: [
+          "special-category",
+          "bank-details",
+          "government-identifier",
+          "date-of-birth",
+          "home-address",
+          "personal-contact",
+        ],
+        platformHeldCategories: [
+          "human:<email> in concept files",
+          "the Person concept",
+          "the per-binding LMDB",
+          "authored concept bodies",
+        ],
+        retentionClass: "not recorded",
+        routes: [],
+        rulesInForce: { default_off: false, default_on: true },
+        scope: "not recorded",
+        specialCategory: {
+          category: "special-category",
+          condition: "none until a health-sector client",
+        },
+      }),
+    )
+    .digest("hex");
 
 describe("an Admin publishes a binding", () => {
   it("publishes, recording confirmations, counts, DPIA hash, class and audience", async () => {
@@ -772,7 +801,7 @@ describe("an Admin publishes a binding", () => {
     });
 
     expect(row?.detail["dpiaHash"]).toMatch(SHA256_HEX);
-    expect(row?.detail["dpiaHash"]).toEqual(await dpiaHashOf(scenario, bindingId));
+    expect(row?.detail["dpiaHash"]).toEqual(dpiaHashOfTheHandbook(bindingId));
   });
 
   it("publishes once the latest run is done, despite earlier failures", async () => {

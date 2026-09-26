@@ -14,7 +14,7 @@ import {
   TOOLS_LIST_TTL_MS_DEFAULT,
 } from "@better-answers/core/workspaces";
 
-import { MCP_TOKEN_RULE } from "../src/auth/constants.ts";
+import { MCP_TOKEN_RULE, MCP_UNAUTHENTICATED_IP_RULE } from "../src/auth/constants.ts";
 import { connectAsHost } from "./flow.ts";
 import { startApp, type TestApp, type TestClient } from "./harness.ts";
 import { callMcp } from "./mcp-call.ts";
@@ -157,6 +157,28 @@ const connect = async (scope = "knowledge:read feedback:write offline_access") =
   const client = app.client();
   const tokens = await connectAsHost(app, client, workspace.admin, { scope });
   return { workspace, client, token: tokens.accessToken };
+};
+
+/**
+ * The window is wall-clock aligned, so a burst of max + 1 can straddle a boundary and never be
+ * refused; 2·max + 1 cannot.
+ */
+const pastTheCeiling = async (max: number, send: () => Promise<Response>) => {
+  let answer = await send();
+  for (let call = 1; call < 2 * max + 1 && answer.status !== 429; call += 1) answer = await send();
+
+  const body = ceilingRefusal.safeParse(await answer.json());
+  return {
+    status: answer.status,
+    hasRetryAfter: answer.headers.get("retry-after") !== null,
+    sentence: body.success ? body.data.error_description : undefined,
+  };
+};
+
+const REFUSED_AT_THE_CEILING = {
+  status: 429,
+  hasRetryAfter: true,
+  sentence: expect.stringContaining("an Admin can raise the ceiling in System"),
 };
 
 describe("era-independent", () => {
@@ -359,21 +381,35 @@ describe("era-independent", () => {
   it("answers 429 with one sentence past the token's ceiling", async () => {
     const { client, token } = await connect();
 
-    let refused: Response | undefined;
-    /**
-     * The window is wall-clock aligned, so a burst of max + 1 can straddle a boundary and never be
-     * refused; 2·max + 1 cannot.
-     */
-    const enough = 2 * MCP_TOKEN_RULE.max + 1;
-    for (let call = 0; call < enough && refused === undefined; call += 1) {
-      const answer = await modern(client, token, "tools/list");
-      if (answer.status === 429) refused = answer;
-    }
+    const refused = await pastTheCeiling(MCP_TOKEN_RULE.max, () =>
+      modern(client, token, "tools/list"),
+    );
 
-    expect(refused?.status).toBe(429);
-    expect(refused?.headers.get("retry-after")).not.toBeNull();
-    const body = ceilingRefusal.parse(await refused?.json());
-    expect(body.error_description).toContain("an Admin can raise the ceiling in System");
+    expect(refused).toEqual(REFUSED_AT_THE_CEILING);
+  });
+});
+
+describe("a call with no bearer", () => {
+  const unauthenticated = (client: TestClient): Promise<Response> =>
+    modern(client, "", "tools/list", {}, { headers: { authorization: "" } });
+
+  it("is challenged for the bearer it lacks", async () => {
+    const challenged = await unauthenticated(app.client());
+
+    expect(challenged.status).toBe(401);
+    expect(challenged.headers.get("www-authenticate")).toContain(
+      'error_description="a bearer token is required"',
+    );
+  });
+
+  it("answers 429 once its address floods the surface", async () => {
+    const client = app.client();
+
+    const refused = await pastTheCeiling(MCP_UNAUTHENTICATED_IP_RULE.max, () =>
+      unauthenticated(client),
+    );
+
+    expect(refused).toEqual(REFUSED_AT_THE_CEILING);
   });
 });
 
