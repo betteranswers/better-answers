@@ -1,7 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { REFRESH_TOKEN_LIFETIME_SECONDS, SEND_EMAIL_CODE_PATH } from "../src/auth/index.ts";
+import {
+  CONSENT_WORDS,
+  OAUTH_SCOPES,
+  REFRESH_TOKEN_LIFETIME_SECONDS,
+  REFUSAL_PAGES,
+  SEND_EMAIL_CODE_PATH,
+} from "../src/auth/index.ts";
 import {
   authorizeUrl,
   connectAsHost,
@@ -63,6 +69,43 @@ const whoAmI = z.strictObject({ workspaceId: z.string(), userId: z.string(), rol
 const refusal = z.object({ error: z.string() });
 
 const rotatedTokens = z.object({ refresh_token: z.string() });
+
+/** A page's words as a person reads them: its tags gone and its escapes undone. */
+const readOf = (html: string): string =>
+  html
+    .replaceAll(/<[^>]*>/g, "")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&amp;", "&")
+    .trim();
+
+/** The page's one link, its address unescaped. */
+const linkOn = (html: string): { readonly href: string; readonly label: string } => {
+  const [, href = "", label = ""] = /<a href="([^"]*)">([^<]*)<\/a>/.exec(html) ?? [];
+  return { href: href.replaceAll("&amp;", "&"), label };
+};
+
+type RefusalWords = (typeof REFUSAL_PAGES)[keyof typeof REFUSAL_PAGES];
+
+/** The page says what went wrong, and its last words are the next step. */
+const expectRefusalPage = (html: string, said: RefusalWords): void => {
+  const read = readOf(html);
+  const next = "next" in said ? said.next : said.signIn;
+  expect(read).toContain(said.title);
+  expect(read).toContain(said.why);
+  expect(read.slice(-next.length)).toBe(next);
+};
+
+/** Signs `email` in on `client`, then follows `href` on as the sign-in screen does. */
+const backThroughSignIn = async (
+  client: ReturnType<TestApp["client"]>,
+  email: string,
+  href: string,
+): Promise<URL> => {
+  await signIn(app, client, email);
+  return continueAfterPostLogin(client, new URL(href, PUBLIC_URL).search);
+};
 
 describe("discovery", () => {
   it("advertises CIMD, public token endpoint, iss, S256 and no openid", async () => {
@@ -349,23 +392,21 @@ describe("the pages, as a person walks them", () => {
       "knowledge:read feedback:write offline_access",
     );
 
-    const page = await (await client.fetch(`${consent.pathname}${consent.search}`)).text();
+    const page = readOf(await (await client.fetch(`${consent.pathname}${consent.search}`)).text());
 
-    expect(page).toContain("Read what you can see of the company's knowledge");
-    expect(page).toContain("Send your feedback on answers");
-    expect(page).toContain("Stay connected until you disconnect it");
-    expect(page).toContain("Claude will act as you");
+    for (const scope of OAUTH_SCOPES) expect(page).toContain(CONSENT_WORDS.scopes[scope]);
+    expect(page).toContain(CONSENT_WORDS.actsAs("Claude", "Acme"));
   });
 
-  it("shows the client's real address beside its self-declared name", async () => {
+  it("shows the client's real address and where Connect goes", async () => {
     const acme = await app.provision({ name: "Acme" });
     const client = app.client();
     const consent = await driveToPage(app, client, acme.admin);
 
-    const page = await (await client.fetch(`${consent.pathname}${consent.search}`)).text();
+    const page = readOf(await (await client.fetch(`${consent.pathname}${consent.search}`)).text());
 
-    expect(page).toContain(`hosted at <strong>${new URL(CLAUDE_CLIENT_ID).hostname}</strong>`);
-    expect(page).toContain(`sent to <strong>${new URL(CLAUDE_REDIRECT_URI).hostname}</strong>`);
+    expect(page).toContain(CONSENT_WORDS.hostedAt("Claude", new URL(CLAUDE_CLIENT_ID).hostname));
+    expect(page).toContain(CONSENT_WORDS.goesNext(new URL(CLAUDE_REDIRECT_URI).hostname));
   });
 
   it("refuses consent after credentials are revoked, minting no code", async () => {
@@ -375,6 +416,63 @@ describe("the pages, as a person walks them", () => {
 
     expect(decided.status).toBe(401);
     expect(decided.headers.get("location")).toBeNull();
+    expectRefusalPage(await decided.text(), REFUSAL_PAGES.sessionEnded);
+  });
+
+  it("returns an ended session through sign-in to the connection", async () => {
+    const acme = await app.provision({ name: "Acme" });
+    const client = app.client();
+    const consent = await driveToPage(app, client, acme.admin);
+    await app.database.superuser.query("DELETE FROM session WHERE user_id = $1", [acme.admin.id]);
+
+    const refused = await client.form(`/consent${consent.search}`, { accept: "true" });
+
+    expect(refused.status).toBe(401);
+    const page = await refused.text();
+    const link = linkOn(page);
+    expect(link).toEqual({
+      href: `/sign-in${consent.search}`,
+      label: REFUSAL_PAGES.sessionEnded.signIn,
+    });
+    const back = await backThroughSignIn(client, acme.admin.email, link.href);
+    expect(`${back.origin}${back.pathname}`).toBe(`${PUBLIC_URL}/consent`);
+    const connected = await client.form(`/consent${back.search}`, { accept: "true" });
+    const callback = new URL(connected.headers.get("location") ?? "", PUBLIC_URL);
+    expect(`${callback.origin}${callback.pathname}`).toBe(CLAUDE_REDIRECT_URI);
+    expect(callback.searchParams.get("code")).not.toBeNull();
+  });
+
+  it("returns a signed-out person through sign-in to consent", async () => {
+    const acme = await app.provision({ name: "Acme" });
+    const consent = await driveToPage(app, app.client(), acme.admin);
+    const signedOut = app.client();
+
+    const refused = await signedOut.fetch(`${consent.pathname}${consent.search}`);
+
+    expect(refused.status).toBe(401);
+    const page = await refused.text();
+    expectRefusalPage(page, REFUSAL_PAGES.signInFirst);
+    const link = linkOn(page);
+    expect(link).toEqual({
+      href: `/sign-in${consent.search}`,
+      label: REFUSAL_PAGES.signInFirst.signIn,
+    });
+    const back = await backThroughSignIn(signedOut, acme.admin.email, link.href);
+    expect(`${back.origin}${back.pathname}`).toBe(`${PUBLIC_URL}/consent`);
+  });
+
+  it("tells a person whose connection failed to start again", async () => {
+    const acme = await app.provision({ name: "Acme" });
+    const client = app.client();
+    const consent = await driveToPage(app, client, acme.admin);
+    const forged = new URLSearchParams(consent.search);
+    forged.set("sig", "forged");
+
+    const failed = await client.form(`/consent?${forged.toString()}`, { accept: "true" });
+
+    expect(failed.status).toBe(400);
+    expect(failed.headers.get("location")).toBeNull();
+    expectRefusalPage(await failed.text(), REFUSAL_PAGES.notCompleted);
   });
 
   it("mints no code when membership ends before the person consents", async () => {
@@ -421,6 +519,7 @@ describe("the pages refuse a cross-site form", () => {
 
     expect(crossSite.status).toBe(403);
     expect(crossSite.headers.get("location")).toBeNull();
+    expectRefusalPage(await crossSite.text(), REFUSAL_PAGES.crossSite);
   });
 
   it("refuses consent posted by a same-origin fetch, minting no code", async () => {
@@ -448,6 +547,7 @@ describe("the pages refuse a cross-site form", () => {
 
     expect(fetched.status).toBe(403);
     expect(fetched.headers.get("location")).toBeNull();
+    expectRefusalPage(await fetched.text(), REFUSAL_PAGES.notNavigated);
     const after = await app.database.superuser.query(
       "SELECT count(*)::int AS n FROM oauth_consent",
     );
@@ -510,6 +610,18 @@ describe("one origin, one session", () => {
       expect(cookie).not.toMatch(/;\s*Domain=/i);
       expect(cookie).not.toContain(APEX_HOSTNAME);
     }
+
+    const me = await client.fetch(`${PUBLIC_URL}/me`);
+    expect(me.status).toBe(200);
+  });
+
+  it("keeps a new session signed in over an ended one", async () => {
+    const acme = await app.provision({ name: "Ended" });
+    const client = app.client();
+    await signIn(app, client, acme.admin.email);
+    await app.database.superuser.query("DELETE FROM session WHERE user_id = $1", [acme.admin.id]);
+
+    await signIn(app, client, acme.admin.email);
 
     const me = await client.fetch(`${PUBLIC_URL}/me`);
     expect(me.status).toBe(200);

@@ -51,6 +51,7 @@ import {
   EMAIL_CODE_LIFETIME_SECONDS,
   OAUTH_SCOPES,
   REFRESH_TOKEN_LIFETIME_SECONDS,
+  SIGN_IN_PATH,
 } from "./constants.ts";
 import { accessControl, creatorRole, roles } from "./roles.ts";
 
@@ -167,6 +168,13 @@ const redirectedTo = z.object({ url: z.string() }).optional().catch(undefined);
  */
 const carriesACode = (redirect: z.infer<typeof redirectedTo>): boolean =>
   redirect !== undefined && (URL.parse(redirect.url)?.searchParams.has("code") ?? false);
+
+/**
+ * Reading a stale cookie's session expires every session cookie, so a sign-in's own new session
+ * is read before the request's.
+ */
+const sessionOfCall = async (ctx: Parameters<typeof getSessionFromCtx>[0]) =>
+  ctx.context.session ?? ctx.context.newSession ?? (await getSessionFromCtx(ctx));
 
 const clientIdOfQuery = (query: string | undefined): string | undefined =>
   query === undefined ? undefined : (new URLSearchParams(query).get("client_id") ?? undefined);
@@ -396,7 +404,7 @@ export const createAuth = (deps: AuthDependencies) => {
           signedIn: signedInUser.parse(returned),
           redirect: redirectedTo.parse(returned),
         };
-        const session = ctx.context.session ?? (await getSessionFromCtx(ctx));
+        const session = await sessionOfCall(ctx);
 
         const line = auditLineOf(openedLine(event, session?.user.id, call.fields), call);
         const outcome = outcomeOf(event, call);
@@ -457,7 +465,7 @@ export const createAuth = (deps: AuthDependencies) => {
            * No page may carry a query of its own: the signed query is appended with an
            * unconditional ?, and a second breaks the signature.
            */
-          loginPage: `${deps.publicUrl}/sign-in`,
+          loginPage: `${deps.publicUrl}${SIGN_IN_PATH}`,
 
           consentPage: `${deps.publicUrl}/consent`,
           scopes: [...OAUTH_SCOPES],

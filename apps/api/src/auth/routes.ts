@@ -20,7 +20,7 @@ import {
   PAGE_IP_RULE,
   SEND_EMAIL_CODE_PATH,
 } from "./constants.ts";
-import { consentPage, refusedPage } from "./pages.ts";
+import { consentPage, refusedPage, REFUSAL_PAGES, signInPage } from "./pages.ts";
 import { sessionClaims } from "./verify.ts";
 
 export type AuthRoutesDependencies = {
@@ -85,10 +85,7 @@ const sameOriginOnly = (publicUrl: string): MiddlewareHandler => {
       origin === publicUrl ||
       (origin === undefined && (site === undefined || site === "same-origin" || site === "none"));
     if (!sameOrigin) {
-      return context.html(
-        refusedPage("Refused", "This form can only be sent from Better Answers."),
-        403,
-      );
+      return context.html(refusedPage(REFUSAL_PAGES.crossSite), 403);
     }
     await next();
   };
@@ -100,10 +97,7 @@ const sameOriginOnly = (publicUrl: string): MiddlewareHandler => {
  */
 const navigationOnly: MiddlewareHandler = async (context, next) => {
   if (context.req.method === "POST" && context.req.header("sec-fetch-dest") !== "document") {
-    return context.html(
-      refusedPage("Refused", "This form can only be sent by opening it in your browser."),
-      403,
-    );
+    return context.html(refusedPage(REFUSAL_PAGES.notNavigated), 403);
   }
   await next();
 };
@@ -244,10 +238,7 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
     const headers = flowHeaders(context.req.raw, publicUrl);
     const claims = await claimsFrom(headers);
     if (claims === undefined) {
-      return context.html(
-        refusedPage("Sign in first", "Choose a workspace before connecting."),
-        401,
-      );
+      return context.html(signInPage(REFUSAL_PAGES.signInFirst, carry(context.req.url)), 401);
     }
     const clientName = await clientNameOf(auth, asked.clientId, headers);
     const workspace = await workspaceNameOf(door, claims);
@@ -269,10 +260,7 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
     const accept = form.get("accept") === "true";
 
     if (accept && !(await sessionHolds(flowHeaders(context.req.raw, publicUrl)))) {
-      return context.html(
-        refusedPage("Sign in again", "Your session is no longer valid. Sign in again."),
-        401,
-      );
+      return context.html(signInPage(REFUSAL_PAGES.sessionEnded, carry(context.req.url)), 401);
     }
     const decided = await attempt(() =>
       callFlow(auth, publicUrl, "/oauth2/consent", flowHeaders(context.req.raw, publicUrl), {
@@ -289,10 +277,7 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
       { event: "auth.consent_failed", ...(await failureOf(decided)) },
       "consent could not be completed",
     );
-    return context.html(
-      refusedPage("Something went wrong", "The connection could not be completed."),
-      400,
-    );
+    return context.html(refusedPage(REFUSAL_PAGES.notCompleted), 400);
   });
 
   routes.get("/me", async (context) => {
