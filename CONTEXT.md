@@ -127,9 +127,10 @@ Where a unit lives is decided by **minting**.
 - **sweep pass** — the platform's daily run of the *upload sweep* and the *graph sweep* over every
   workspace, one pass at a time, a sweep by hand included. Every pass is recorded, a pass that
   removed nothing too. _Avoid_: cleanup, garbage collection, cron.
-- **upload sweep** — the removal of the originals a failed bind left, once past their grace, that
-  no document names. **List-only** until an operator switches removal on: it counts what it would
-  remove and removes nothing.
+- **upload sweep** — the removal of the originals no document names, once past their grace: what a
+  failed bind left, and what a concurrent repeat left when it lost the race to the first bind.
+  **List-only** until an operator switches removal on: it counts what it would remove and removes
+  nothing.
 - **graph sweep** — the removal of every generation of a workspace's map but the live one.
 - **concept index** — the platform's derived row for every concept, written when the concept's
   commit is made, checked by the sync, never edited. The only "both" of the minting rule. Carries
@@ -300,7 +301,7 @@ Where a unit lives is decided by **minting**.
   those keys. _Avoid_: ingest trace (the draft's word).
 - **landed copy** — a source document's bytes as the platform holds them in the object store: the
   original and the normalised redacted text. The normalised copy is keyed by the document; an
-  upload's original by its *source binding*, the id its caller minted.
+  upload's original by its *source binding*, the id its caller minted, and its document.
 - **converter** — what turns a landed copy's bytes into the document's normalised text, before the
   redaction seam sees a word of it. One per media type, chosen once (ADR 0013), because the text it
   writes is the address space every locator and every content hash is read against. _Avoid_: parser

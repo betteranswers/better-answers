@@ -164,7 +164,7 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
   graph-sweep --workspace <id>                              delete every generation of the map but the live one
   graph-counts --workspace <id>                             nodes per label and edges, as JSON, for the drill's diff
   reconcile-watermark --workspace <id>                      recovery order step 2: replay the commits the rows missed
-  object-store-orphans --workspace <id> [--list]            recovery order step 5: remove the originals a failed bind left, past a ${ORPHANED_UPLOAD_GRACE_HOURS}-hour grace, that no document row names
+  object-store-orphans --workspace <id> [--list]            recovery order step 5: remove the originals a failed bind or a lost race left, past a ${ORPHANED_UPLOAD_GRACE_HOURS}-hour grace, that no document row names
     --list         say how many there are, removing none
   smoke --url <origin> [--workspace <id>] [--find] [--guide] [--ask]
   erasure-rehearsal --workspace <id> --synthetic --seed [--wait-seconds <n>]

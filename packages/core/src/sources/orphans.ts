@@ -1,4 +1,4 @@
-import { boundarySchemas } from "@better-answers/schema";
+import { boundarySchemas, ULID } from "@better-answers/schema";
 
 import { act, declareActs, record } from "../audit/index.ts";
 import { attempt, err, ok, ulid, type PlatformPrincipal, type Result } from "../kernel/index.ts";
@@ -9,7 +9,6 @@ import {
   type StoredObject,
 } from "../store/objects/index.ts";
 import { withScope, type PostgresDoor } from "../store/postgres/index.ts";
-import { BINDING_ID } from "./admin-binding.ts";
 import { UPLOAD_ORIGINALS_PREFIX } from "./binding.ts";
 
 const UPLOAD_SWEEP_ACTOR = "process:better-answers-uploads";
@@ -24,14 +23,18 @@ export const UPLOAD_SWEEP: UploadSweepPrincipal = {
 };
 
 const SWEEP_ACTS = declareActs("sources", {
-  swept: act("sources.upload.swept", { bindingId: "id" }),
+  swept: act("sources.upload.swept", { bindingId: "id", documentId: "id?" }),
 });
 
 export const ORPHANED_UPLOAD_GRACE_HOURS = 24;
 
 const AN_HOUR_MS = 60 * 60 * 1000;
 
-const AN_ORIGINAL = /^uploads\/([^/]+)\/original$/;
+/**
+ * Both shapes stand in the store: `uploads/<binding>/<document>/original` and
+ * `uploads/<binding>/original`.
+ */
+const AN_ORIGINAL = /^uploads\/([^/]+)\/(?:([^/]+)\/)?original$/;
 
 const NAMED_ORIGINALS = `SELECT original_key FROM source_document
     WHERE workspace_id = $1 AND original_key IS NOT NULL`;
@@ -51,9 +54,20 @@ export type SweepUploadsInput = {
 
 export type SweepUploadsRefusal = "malformed" | Error;
 
-const bindingOfKey = (key: string): string | undefined => {
-  const named = AN_ORIGINAL.exec(key)?.[1]?.toUpperCase();
-  return named !== undefined && BINDING_ID.safeParse(named).success ? named : undefined;
+type KeyIds = { readonly bindingId: string; readonly documentId?: string };
+
+const idOf = (segment: string | undefined): string | undefined => {
+  const id = segment?.toUpperCase();
+  return id !== undefined && ULID.test(id) ? id : undefined;
+};
+
+const idsOfKey = (key: string): KeyIds | undefined => {
+  const [, binding, document] = AN_ORIGINAL.exec(key) ?? [];
+  const bindingId = idOf(binding);
+  if (bindingId === undefined) return undefined;
+  if (document === undefined) return { bindingId };
+  const documentId = idOf(document);
+  return documentId === undefined ? undefined : { bindingId, documentId };
 };
 
 const asDefect = async <Value, Word>(
@@ -70,19 +84,19 @@ const recordTheSweep = async (
   platform: UploadSweepPrincipal,
   door: PostgresDoor,
   workspaceId: string,
-  swept: readonly string[],
+  swept: readonly KeyIds[],
 ): Promise<Result<void, Error>> => {
   if (swept.length === 0) return ok(undefined);
   const batchId = swept.length > 1 ? ulid() : undefined;
   const written = await attempt(() =>
     withScope(platform, door, workspaceId, async (tx) => {
-      for (const bindingId of swept) {
+      for (const ids of swept) {
         await record(platform, tx, {
           id: ulid(),
           act: SWEEP_ACTS.swept,
-          subjectId: bindingId,
+          subjectId: ids.bindingId,
           batchId,
-          detail: { bindingId },
+          detail: ids,
         });
       }
     }),
@@ -92,7 +106,7 @@ const recordTheSweep = async (
 
 type SweepDoors = { readonly postgres: PostgresDoor; readonly objects: ObjectDoor };
 
-type Orphan = { readonly key: string; readonly bindingId: string };
+type Orphan = { readonly key: string; readonly ids: KeyIds };
 
 const orphansAmong = (
   stored: readonly StoredObject[],
@@ -101,10 +115,10 @@ const orphansAmong = (
 ): readonly Orphan[] => {
   const orphaned: Orphan[] = [];
   for (const object of stored) {
-    const bindingId = bindingOfKey(object.key);
-    if (bindingId === undefined) continue;
+    const ids = idsOfKey(object.key);
+    if (ids === undefined) continue;
     if (held.has(object.key) || object.storedAt.getTime() > before) continue;
-    orphaned.push({ key: object.key, bindingId });
+    orphaned.push({ key: object.key, ids });
   }
   return orphaned;
 };
@@ -115,7 +129,7 @@ const removeOrphans = async (
   workspaceId: string,
   orphaned: readonly Orphan[],
 ): Promise<Result<number, Error>> => {
-  const gone: string[] = [];
+  const gone: KeyIds[] = [];
   for (const orphan of orphaned) {
     const removed = await asDefect("an orphaned original's key was refused", () =>
       removeWorkspaceObject(platform, doors.objects, workspaceId, orphan.key),
@@ -127,16 +141,17 @@ const removeOrphans = async (
         new Error(`${removed.error.message}; ${String(gone.length)} removed first${unrecorded}`),
       );
     }
-    gone.push(orphan.bindingId);
+    gone.push(orphan.ids);
   }
   const recorded = await recordTheSweep(platform, doors.postgres, workspaceId, gone);
   return recorded.ok ? ok(gone.length) : err(recorded.error);
 };
 
 /**
- * Removes each `uploads/<binding>/original` object that no document names once it is past the
- * grace hours, with an audit event per removal. `dryRun` counts them and removes none. A failed
- * removal is an Error saying how many went before it.
+ * Removes each original under `uploads/` that no document names once past the grace hours: a
+ * failed bind's, or a lost race's. Each removal's audit event names its binding, and its document
+ * when the key has one. `dryRun` only counts. A failed removal is an Error saying how many went
+ * first.
  */
 export const sweepOrphanedUploads = async (
   platform: UploadSweepPrincipal,

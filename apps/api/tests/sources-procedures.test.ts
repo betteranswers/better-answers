@@ -214,8 +214,11 @@ describe("the upload, one mutation over the split link", () => {
       documentId: expect.any(String),
       jobId: expect.any(String),
       auditEventId: expect.any(String),
-      originalKey: `uploads/${described.bindingId.toLowerCase()}/original`,
+      originalKey: expect.any(String),
     });
+    expect(bound.originalKey).toEqual(
+      `uploads/${described.bindingId.toLowerCase()}/${bound.documentId.toLowerCase()}/original`,
+    );
     expect(await rowsFor(workspace.workspaceId, described.bindingId)).toEqual([
       {
         name: "The staff handbook",

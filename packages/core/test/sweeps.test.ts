@@ -29,7 +29,7 @@ const doors = () => ({
 const workspaceWithLeftovers = async (name: string) => {
   const workspace = await provisionedWorkspace(db(), name);
   const admin = principalOf(workspace.workspaceId, workspace.adminUserId, "Admin");
-  const orphan = `uploads/${ulid().toLowerCase()}/original`;
+  const orphan = `uploads/${ulid().toLowerCase()}/${ulid().toLowerCase()}/original`;
   const put = await putObject(
     admin,
     store().door,
@@ -125,7 +125,7 @@ describe("a sweep pass over every workspace", () => {
   it("goes on past a refused workspace and names it", async () => {
     const stuck = await workspaceWithLeftovers("Stuck");
     const orphaned = await provisionedWorkspace(db(), "Orphaned");
-    const orphan = `uploads/${ulid().toLowerCase()}/original`;
+    const orphan = `uploads/${ulid().toLowerCase()}/${ulid().toLowerCase()}/original`;
     const admin = principalOf(orphaned.workspaceId, orphaned.adminUserId, "Admin");
     await putObject(admin, store().door, orphan, new Blob(["Left by a failed bind."]).stream());
 
