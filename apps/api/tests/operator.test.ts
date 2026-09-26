@@ -10,7 +10,7 @@ import { runOps } from "../src/ops/index.ts";
 import type { operatorProcedure } from "../src/trpc/base.ts";
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
 import { appRouter } from "../src/trpc/router.ts";
-import { connectAsHost, refresh, signIn } from "./flow.ts";
+import { connectAsHost, refresh, revokeAtEndpoint, signIn } from "./flow.ts";
 import { CLAUDE_CLIENT_ID, capturingLogger } from "./harness.ts";
 import { callMcp } from "./mcp-call.ts";
 import { displayNameHeldBy, sessionsSignedInOverAnHourAgo } from "./provoke.ts";
@@ -397,8 +397,7 @@ describe("revoking a person's credentials everywhere, from the console", () => {
 
   const refreshTokensOf = async (personId: string) => {
     const found = await app().database.superuser.query(
-      `SELECT reference_id AS workspace_id, revoked IS NOT NULL AS revoked FROM oauth_refresh_token
-        WHERE user_id = $1 ORDER BY reference_id`,
+      "SELECT id FROM oauth_refresh_token WHERE user_id = $1",
       [personId],
     );
     return found.rows;
@@ -431,11 +430,7 @@ describe("revoking a person's credentials everywhere, from the console", () => {
 
     expect(revoked).toEqual({ personId: person.id, revokedAt: expect.stringMatching(ISO_INSTANT) });
     expect(await sessionsHeldBy(person.id)).toBe(0);
-    expect(await refreshTokensOf(person.id)).toEqual(
-      [acme.workspaceId, beta.workspaceId]
-        .toSorted()
-        .map((workspaceId) => ({ workspace_id: workspaceId, revoked: true })),
-    );
+    expect(await refreshTokensOf(person.id)).toEqual([]);
     expect([
       (await callMcp(host, inAcme.accessToken, "tools/list")).status,
       (await callMcp(host, inBeta.accessToken, "tools/list")).status,
@@ -456,6 +451,37 @@ describe("revoking a person's credentials everywhere, from the console", () => {
     for (const workspaceId of [acme.workspaceId, beta.workspaceId]) {
       await connectAsHost(app(), app().client(), person, { pick: workspaceId });
     }
+  });
+
+  /** The refresh tokens of the grant held before the revocation and the one taken after it. */
+  const connectedAgainAfterRevocation = async () => {
+    const { api } = await theOperatorOnTheWeb();
+    const { admin: person } = await app().provision();
+    const before = await connectAsHost(app(), app().client(), person);
+    await api.console.people.revokeCredentials.mutate({ personId: person.id });
+    const after = await connectAsHost(app(), app().client(), person);
+    const [earlier, later] = [before.refreshToken, after.refreshToken];
+    if (earlier === undefined || later === undefined)
+      throw new Error("a grant came without a refresh token");
+    return { earlier, later, host: app().client() };
+  };
+
+  it("keeps the later grant when an earlier token is replayed", async () => {
+    const { earlier, later, host } = await connectedAgainAfterRevocation();
+
+    const replayed = await refresh(host, earlier);
+
+    expect(replayed.status).toBe(400);
+    expect((await refresh(host, later)).status).toBe(200);
+  });
+
+  it("keeps the later grant when an earlier token is revoked", async () => {
+    const { earlier, later, host } = await connectedAgainAfterRevocation();
+
+    const revoking = await revokeAtEndpoint(host, earlier);
+
+    expect(revoking.status).toBe(400);
+    expect((await refresh(host, later)).status).toBe(200);
   });
 
   it("admits the person's fresh sign-in once the revocation lands", async () => {
@@ -804,7 +830,7 @@ describe("the console's list and inspection of people", () => {
     });
   });
 
-  it("shows the grant revoked once the person's credentials are", async () => {
+  it("shows no grant once the person's credentials are revoked", async () => {
     const { api } = await theOperatorOnTheWeb();
     const workspace = await app().provision();
     await connectAsHost(app(), app().client(), workspace.admin);
@@ -812,10 +838,7 @@ describe("the console's list and inspection of people", () => {
 
     const inspected = await api.console.people.inspect.query({ personId: workspace.admin.id });
 
-    expect(inspected).toEqual({
-      sessions: [],
-      grants: [expect.objectContaining({ revokedAt: expect.stringMatching(ISO_INSTANT) })],
-    });
+    expect(inspected).toEqual({ sessions: [], grants: [] });
   });
 
   it("refuses a malformed ask, naming the field", async () => {

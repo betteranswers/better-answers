@@ -376,14 +376,12 @@ const endingCredentials = async (tx: Tx, personId: UserId, at: Date): Promise<Da
   const held = person.rows[0]?.at;
   if (held === undefined) return undefined;
   await tx.query("DELETE FROM session WHERE user_id = $1 AND created_at < $2", [personId, held]);
-  await tx.query(
-    "UPDATE oauth_refresh_token SET revoked = now() WHERE user_id = $1 AND created_at < $2 AND revoked IS NULL",
-    [personId, held],
-  );
-  await tx.query(
-    "UPDATE oauth_access_token SET revoked = now() WHERE user_id = $1 AND created_at < $2 AND revoked IS NULL",
-    [personId, held],
-  );
+  // Deleted, as in `endWorkspaceTokens`: a marked refresh token presented later makes the provider
+  // delete the grant the person takes after this instant.
+  const end = (table: "oauth_refresh_token" | "oauth_access_token") =>
+    tx.query(`DELETE FROM ${table} WHERE user_id = $1 AND created_at < $2`, [personId, held]);
+  await end("oauth_access_token");
+  await end("oauth_refresh_token");
   return held;
 };
 
