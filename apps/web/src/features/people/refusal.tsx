@@ -12,7 +12,7 @@ const SAID_OF_WORD = {
     next: "Make someone else an Admin first.",
   },
   "changed-meanwhile": {
-    why: "Another change to these roles landed at the same moment.",
+    why: "Another change to these members landed at the same moment.",
     next: "Read the list again and decide again.",
   },
   "no-such-member": {

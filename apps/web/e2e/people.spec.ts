@@ -329,6 +329,8 @@ test.describe("a member, opened as a sheet", () => {
           - definition: No group
           - term: Joined
           - definition: /\\d{4}/
+          - term: Credentials here
+          - definition: Never revoked
         - region "Role":
           - heading "Role" [level=3]
           - radiogroup "Role":
@@ -340,6 +342,10 @@ test.describe("a member, opened as a sheet", () => {
             - text: Viewer Asks questions, flags answers and suggests changes.
           - button "Make Priya Shah an Editor" [disabled]
           - paragraph: Priya Shah is an Editor. Pick another role to change it.
+        - region "Credentials":
+          - heading "Credentials" [level=3]
+          - button "Revoke Priya Shah's credentials here"
+          - paragraph: Every session and token Priya Shah holds for this workspace is refused at once, and a fresh sign-in works. Recorded on the audit log under your name.
         - button "Close"
     `);
     await passesTheAccessibilityGate();
@@ -439,6 +445,7 @@ test.describe("a member, opened as a sheet", () => {
     const keystrokes = page.getByRole("dialog", { name: "Keystrokes on People" });
     await expect(keystrokes).toContainText("Open the member in focus");
     await expect(keystrokes).toContainText("Change the role of the member in focus");
+    await expect(keystrokes).toContainText("Revoke the credentials here of the member in focus");
     await page.keyboard.press("Escape");
 
     await memberButton(page, "Priya Shah").focus();
@@ -463,6 +470,121 @@ test.describe("a member, opened as a sheet", () => {
     await page.keyboard.press("Escape");
     await expect(memberButton(page, "Priya Shah")).toBeFocused();
     await expect(rowOf(page, "Priya Shah").getByRole("cell").nth(1)).toHaveText("Viewer");
+  });
+});
+
+const CREDENTIALS_HERE =
+  "//div[@role='dialog']//dt[normalize-space(.)='Credentials here']/following-sibling::dd[1]";
+
+const REVOKED_AT = /Revoked\s*\d{2}:\d{2} · \d{1,2} [A-Z][a-z]+ \d{4}/;
+
+const revokeButton = (sheet: Locator, name: string): Locator =>
+  sheet.getByRole("button", { name: `Revoke ${name}'s credentials here` });
+
+/** Priya is a member of a second workspace too, so a screen that told of it would name it. */
+const anAdminWithAMemberOfTwo = async (page: Page, api: APIRequestContext) => {
+  const admin = anAddress("admin");
+  const workspace = await provision(api, { name: "Swale Presswork", adminEmail: admin });
+  const elsewhere = await provision(api, { name: "Zenith Tooling" });
+  const priya = await person(api, anAddress("priya"), { displayName: "Priya Shah" });
+  await addMember(api, { workspaceId: workspace.workspaceId, userId: priya.id, role: "Editor" });
+  await addMember(api, { workspaceId: elsewhere.workspaceId, userId: priya.id, role: "Viewer" });
+  await page.goto(MEMBERS_VIEW);
+  await signIn(page, api, admin);
+  await expect(memberRows(page)).toHaveCount(2);
+  return { elsewhere };
+};
+
+test.describe("revoking a member's credentials here", () => {
+  test("revokes a member's credentials within its budget, and it holds", async ({
+    page,
+    request,
+    passesTheAccessibilityGate,
+  }) => {
+    const { elsewhere } = await anAdminWithAMemberOfTwo(page, request);
+
+    await memberButton(page, "Priya Shah").click();
+    const sheet = sheetOf(page, "Priya Shah");
+    const membership = sheet.getByRole("region", { name: "Membership" });
+    await expect(membership).toContainText("Never revoked");
+    const revoke = revokeButton(sheet, "Priya Shah");
+    await revoke.focus();
+    await clockTheNextKey(page, { at: CREDENTIALS_HERE, reads: "Revoked" });
+    await page.keyboard.press("Enter");
+
+    await expect(sheet.getByRole("status")).toContainText(
+      "Priya Shah's credentials here are revoked.",
+    );
+    await theActLandedWithinItsBudget(page, "revocation");
+    await expect(revoke).toBeFocused();
+    await expect(membership).toContainText(REVOKED_AT);
+    await passesTheAccessibilityGate();
+    await expect(page.locator("body")).not.toContainText(elsewhere.name);
+    expect(await sheet.ariaSnapshot()).not.toContain(elsewhere.name);
+
+    await page.keyboard.press("Escape");
+    await page.reload();
+    await memberButton(page, "Priya Shah").click();
+    await expect(
+      sheetOf(page, "Priya Shah").getByRole("region", { name: "Membership" }),
+    ).toContainText(REVOKED_AT);
+  });
+
+  test("revokes the Admin's own credentials, then admits a fresh sign-in", async ({
+    page,
+    request,
+  }) => {
+    const admin = anAddress("admin");
+    await provision(request, { name: "Esk Rolling", adminEmail: admin });
+    await page.goto(MEMBERS_VIEW);
+    await signIn(page, request, admin);
+    await expect(memberRows(page)).toHaveCount(1);
+
+    await memberButton(page, "Test person").click();
+    const sheet = sheetOf(page, "Test person");
+    await expect(sheet).toContainText("Your own session here ends with it.");
+    await revokeButton(sheet, "Test person").click();
+    await expect(sheet.getByRole("status")).toContainText(
+      "Test person's credentials here are revoked.",
+    );
+    await page.keyboard.press("Escape");
+
+    const refused = membersRegion(page).getByRole("alert");
+    await expect(refused).toContainText("Refused: credentials-revoked.");
+    await expect(refused).toContainText("Sign in again.");
+    await page.reload();
+    await signIn(page, request, admin);
+    await expect(page).toHaveURL(new RegExp(`${MEMBERS_VIEW}$`));
+    await expect(memberRows(page)).toHaveCount(1);
+    await expect(membersRegion(page).getByRole("alert")).toHaveCount(0);
+  });
+
+  test("opens a member's credentials and revokes them by keyboard alone", async ({
+    page,
+    request,
+  }) => {
+    await anAdminAtPeople(page, request, "Nidd Presswork");
+    await page.goto(MEMBERS_VIEW);
+    await expect(memberRows(page)).toHaveCount(3);
+
+    await page.keyboard.press("v");
+    await expect(membersRegion(page)).toContainText(
+      "Move focus to a member first: the keystroke acts on the member in focus.",
+    );
+
+    await memberButton(page, "Sam Okoro").focus();
+    await page.keyboard.press("v");
+    const sheet = sheetOf(page, "Sam Okoro");
+    const revoke = revokeButton(sheet, "Sam Okoro");
+    await expect(revoke).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(sheet.getByRole("status")).toContainText(
+      "Sam Okoro's credentials here are revoked.",
+    );
+    await expect(revoke).toBeFocused();
+
+    await page.keyboard.press("Escape");
+    await expect(memberButton(page, "Sam Okoro")).toBeFocused();
   });
 });
 
@@ -506,6 +628,17 @@ test.describe("the People screen's words", () => {
     await auditLog.getByRole("combobox", { name: "Family" }).click();
     await expect(page.getByRole("listbox"), "the families listed").not.toContainText(organisation);
     await page.keyboard.press("Escape");
+
+    await page.goto(MEMBERS_VIEW);
+    await memberButton(page, "Priya Shah").click();
+    await revokeButton(sheet, "Priya Shah").click();
+    await expect(sheet.getByRole("status")).toContainText("credentials here are revoked");
+    await expect(page.locator("body"), "a revocation").not.toContainText(organisation);
+    expect(await sheet.ariaSnapshot(), "a revocation").not.toMatch(organisation);
+
+    await page.goto(AUDIT_LOG_VIEW);
+    await expect(auditLog).toContainText("Member credentials revoked");
+    await said(`${AUDIT_LOG_VIEW}, a revocation logged`);
 
     // Last, so the audit log above reads the one event the workspace's provisioning wrote.
     await page.goto(MEMBERS_VIEW);

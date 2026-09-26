@@ -1,5 +1,5 @@
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
-import { nameOrAddress } from "@/shared/words.ts";
+import { instantWords, nameOrAddress } from "@/shared/words.ts";
 
 import type { ListedMember } from "./people-api.ts";
 
@@ -15,6 +15,19 @@ export const nameOf = (member: ListedMember): string =>
 
 export function JoinedOn(properties: { readonly instant: string }) {
   return <span className="tabular-nums">{LONG_UK_DATE.format(new Date(properties.instant))}</span>;
+}
+
+export function CredentialsHere(properties: { readonly revokedAt: string | null }) {
+  const { revokedAt } = properties;
+  if (revokedAt === null) {
+    return <span className="text-muted-foreground">Never revoked</span>;
+  }
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      <Pill>Revoked</Pill>
+      <span className="tabular-nums">{instantWords(revokedAt)}</span>
+    </span>
+  );
 }
 
 export function GroupPills(properties: { readonly groups: ListedMember["groups"] }) {

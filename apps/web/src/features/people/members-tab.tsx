@@ -166,6 +166,9 @@ function MemberList(properties: { readonly members: readonly ListedMember[] }) {
   useKeystroke(PEOPLE_KEYSTROKES.changeRole, () => {
     openInFocus("role");
   });
+  useKeystroke(PEOPLE_KEYSTROKES.revokeCredentials, () => {
+    openInFocus("credentials");
+  });
 
   const clear = () => {
     setSearch("");
