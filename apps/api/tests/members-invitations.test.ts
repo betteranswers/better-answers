@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { startApp, type TestApp } from "./harness.ts";
-import { sessionPointedAt } from "./provoke.ts";
+import { sessionPointedAt, whileCommitsAreRefused } from "./provoke.ts";
 import { refusalOfCall, webSignedIn } from "./web-client.ts";
 
 let app: TestApp;
@@ -46,28 +46,6 @@ type Api = Awaited<ReturnType<typeof webSignedIn>>["api"];
 const resentWithItsEmail = async (api: Api, invitationId: string): Promise<void> => {
   const resent = await api.members.resendInvitation.mutate({ invitationId });
   expect(resent).toMatchObject({ invitationId, emailSent: true });
-};
-
-/**
- * Every write the act makes lands, and its commit is what fails, so an email sent before the
- * commit would already have gone.
- */
-const whileCommitsAreRefused = async <T>(table: string, work: () => Promise<T>): Promise<T> => {
-  const store = app.database.superuser;
-  await store.query(
-    `CREATE FUNCTION test_refuse_commit() RETURNS trigger LANGUAGE plpgsql AS $$
-     BEGIN RAISE EXCEPTION 'the store refused the commit'; END $$`,
-  );
-  await store.query(
-    `CREATE CONSTRAINT TRIGGER test_refuse_commit AFTER INSERT OR UPDATE ON "${table}"
-     DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION test_refuse_commit()`,
-  );
-  try {
-    return await work();
-  } finally {
-    await store.query(`DROP TRIGGER test_refuse_commit ON "${table}"`);
-    await store.query("DROP FUNCTION test_refuse_commit()");
-  }
 };
 
 const anAdmin = async () => {
@@ -232,7 +210,7 @@ describe("the invitation email", () => {
     const { api } = await anAdmin();
     const address = anAddress("uncommitted");
 
-    const failed = await whileCommitsAreRefused("invitation", () =>
+    const failed = await whileCommitsAreRefused(app, "invitation", () =>
       refusalOfCall(api.members.invite.mutate({ address, role: "Viewer" })),
     );
 

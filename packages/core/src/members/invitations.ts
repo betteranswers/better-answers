@@ -133,13 +133,15 @@ const WORKSPACE_NAMED = z.object({ name: boundarySchemas.workspace.select.shape.
 const expiryFrom = (now: Date): Date => new Date(now.getTime() + INVITATION_EXPIRY_SECONDS * 1000);
 
 // The parse brands the ids; a row it throws on fails the act like the query would.
+const firstWaitingOf = (rows: readonly unknown[]): WaitingInvitation | undefined => {
+  const [row] = rows;
+  return row === undefined ? undefined : waitingOf(WAITING_ROW.parse(row));
+};
+
 const oneWaiting = async (
   query: () => Promise<{ readonly rows: readonly unknown[] }>,
 ): Promise<Result<WaitingInvitation | undefined, Error>> => {
-  const read = await attempt(async () => {
-    const [row] = (await query()).rows;
-    return row === undefined ? undefined : waitingOf(WAITING_ROW.parse(row));
-  });
+  const read = await attempt(async () => firstWaitingOf((await query()).rows));
   return read.ok ? ok(read.value) : err(read.error);
 };
 
@@ -157,6 +159,50 @@ const toSend = async (
   );
   if (!named.ok) return err(named.error);
   return ok({ ...invitation, workspaceName: named.value });
+};
+
+type Minting = {
+  readonly invitationId: string;
+  readonly address: string;
+  readonly role: Role;
+  readonly now: Date;
+  readonly expiresAt: Date;
+};
+
+/** Answers the id of the waiting invitation it cancelled, when there was one. */
+const replaceTheWaiting = async (
+  admin: AdminUserPrincipal,
+  tx: Tx,
+  minting: Minting,
+): Promise<string | undefined> => {
+  const { workspaceId } = admin;
+  // Two invitations to one address queue here, so the later replaces the earlier rather than
+  // failing on the index.
+  await tx.query(
+    "SELECT pg_advisory_xact_lock(hashtext('invitation'), hashtext($1 || ' ' || $2))",
+    [workspaceId, minting.address],
+  );
+  const cancelled = await tx.query<{ id: string }>(
+    `UPDATE invitation SET status = $3
+      WHERE workspace_id = $1 AND lower(email) = $2 AND status = $4
+     RETURNING id`,
+    [workspaceId, minting.address, INVITATION_CANCELLED_STATUS, INVITATION_WAITING_STATUS],
+  );
+  await tx.query(
+    `INSERT INTO invitation (id, workspace_id, email, role, status, created_at, expires_at, inviter_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [
+      minting.invitationId,
+      workspaceId,
+      minting.address,
+      minting.role,
+      INVITATION_WAITING_STATUS,
+      minting.now,
+      minting.expiresAt,
+      admin.userId,
+    ],
+  );
+  return cancelled.rows[0]?.id;
 };
 
 export type MintInvitationInput = {
@@ -178,39 +224,18 @@ export const mintInvitation = async (
   input: MintInvitationInput,
 ): Promise<Result<InvitationToSend, Error>> => {
   const address = input.address.toLowerCase();
-  const { workspaceId } = admin;
   const invitationId = ulid();
   const expiresAt = expiryFrom(input.now);
 
-  const replaced = await attempt(async () => {
-    // Two invitations to one address queue here, so the later replaces the earlier rather than
-    // failing on the index.
-    await tx.query(
-      "SELECT pg_advisory_xact_lock(hashtext('invitation'), hashtext($1 || ' ' || $2))",
-      [workspaceId, address],
-    );
-    const cancelled = await tx.query<{ id: string }>(
-      `UPDATE invitation SET status = $3
-        WHERE workspace_id = $1 AND lower(email) = $2 AND status = $4
-       RETURNING id`,
-      [workspaceId, address, INVITATION_CANCELLED_STATUS, INVITATION_WAITING_STATUS],
-    );
-    await tx.query(
-      `INSERT INTO invitation (id, workspace_id, email, role, status, created_at, expires_at, inviter_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [
-        invitationId,
-        workspaceId,
-        address,
-        input.role,
-        INVITATION_WAITING_STATUS,
-        input.now,
-        expiresAt,
-        admin.userId,
-      ],
-    );
-    return cancelled.rows[0]?.id;
-  });
+  const replaced = await attempt(() =>
+    replaceTheWaiting(admin, tx, {
+      invitationId,
+      address,
+      role: input.role,
+      now: input.now,
+      expiresAt,
+    }),
+  );
   if (!replaced.ok) return err(replaced.error);
 
   const batchId = replaced.value === undefined ? undefined : ulid();
