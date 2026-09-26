@@ -20,7 +20,7 @@ C4Container
     Container(migrate, "migrate", "Drizzle over one journal", "One-shot on every release, ahead of api: every migration, then the contract digest stamped")
     Container(backup, "backup", "cron, pg_dump, age, rclone, git", "Hourly dumps; nightly the object-store mirror, one git bundle per repository and the push mirror")
 
-    ContainerDb(postgres, "Postgres", "Postgres 18 with pgvector, RLS default-deny", "The identity set, every tenant table, findings and suppressions, index.chunk and its readable view, the graph tables, the queue, the ledger")
+    ContainerDb(postgres, "Postgres", "Postgres 18 with pgvector, RLS default-deny", "The identity set, every tenant table, findings and suppressions, index.chunk and its readable view, the graph tables, the queue, the audit log")
     ContainerDb(objects, "Object store", "Garage, S3 API, path-style", "Each document's original and its normalised redacted copy under a per-workspace prefix; erasure replay copies under the platform prefix")
     ContainerDb(git, "Git store", "Bare repositories under GIT_STORE_DIR", "One repository per workspace holding the bundle; the api the only committer, one commit per act")
     ContainerDb(lmdb, "Per-binding LMDB, two stores", "cocoindex Environment", "binding/: the chunks' target-state tracking. findings/: the detector's memo, rule id, offsets and score. Neither holds text; never backed up")

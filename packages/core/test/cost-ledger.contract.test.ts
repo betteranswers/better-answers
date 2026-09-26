@@ -41,8 +41,8 @@ const WORDS_A_PROMPT_OR_A_COMPLETION_SITS_UNDER = [
   "body",
 ];
 
-describe("cost-ledger, golden rows for the ledger of model calls", () => {
-  it("gives every row exactly the columns the ledger fixes", () => {
+describe("cost-ledger, golden rows for the cost ledger of model calls", () => {
+  it("gives every row exactly the columns the cost ledger fixes", () => {
     expect(fixture.rows.map((row) => Object.keys(row).toSorted())).toEqual(
       fixture.rows.map(() => recordedColumns),
     );

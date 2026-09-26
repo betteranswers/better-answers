@@ -11,7 +11,7 @@ C4Dynamic
 
   Container_Boundary(core, "packages/core") {
     Component(concepts, "concepts slice", "the act", "Authoring, acceptance, verification, revert; owns the transaction and the lock")
-    Component(audit, "audit", "ledger", "Mints the event id before the commit")
+    Component(audit, "audit", "audit log", "Mints the event id before the commit")
     Component(gitdoor, "store/git", "git binary", "Lock, precondition, commit with the Audit trailer")
     Component(pgdoor, "store/postgres", "pg", "The one transaction the rows land in")
     Component(graphdoor, "store/graph", "delta builder", "The map's delta under the predicate")
@@ -28,7 +28,7 @@ C4Dynamic
   Rel(gitdoor, git, "5. Writes one commit: the person as author, the platform bot as committer, the Audit trailer", "git")
   Rel(concepts, pgdoor, "6. Writes concept_index (its tsvector from S2), concept_identity, evidence, bundle_commit; runs the audience cascade")
   Rel(concepts, graphdoor, "7. Writes the delta into the same transaction, under the predicate")
-  Rel(concepts, audit, "8. Books the ledger row, insert-only, under the id from step 4")
+  Rel(concepts, audit, "8. Books the audit event, insert-only, under the id from step 4")
   Rel(pgdoor, postgres, "9. COMMIT; the lock releases after it, so bundle_commit is a prefix of git history", "pg")
   Rel(reconciler, git, "10. Every 30 s reads each workspace's head", "git")
   Rel(reconciler, postgres, "11. Reads the watermark; replays any missed commit oldest-first through steps 6 to 9, idempotent on the trailer id; a commit the index refuses stops the replay, reported", "pg")
@@ -40,7 +40,7 @@ C4Dynamic
 
 - **Authorization is judged at time of act**, against the instant the acting credential was issued at, under a shared lock on the member and person rows — so rows after a revocation are impossible by construction, and a bare commit inside the window is the replay case (ADR 0012, T-052).
 - **The map is never behind for an edit.** The delta joins the commit transaction; a full rebuild writes beside the live generation and flips in one row update. The reader's two phrases are *map as of* and *map unavailable since*; the third is retired (ADR 0023, `CONTEXT.md` *map*).
-- **A replay is fail-closed on what a commit does not carry.** The merge key, class and evidence are recovered; a file whose `sources[]` are not the standing citations lands Restricted with a ledger row saying so; the replay's ledger row is the reconciler's under the commit's `Audit:` id (ADR 0012, amendments of 2026-09-07 and 2026-09-08).
+- **A replay is fail-closed on what a commit does not carry.** The merge key, class and evidence are recovered; a file whose `sources[]` are not the standing citations lands Restricted with an audit event saying so; the replay's audit event is the reconciler's under the commit's `Audit:` id (ADR 0012, amendments of 2026-09-07 and 2026-09-08).
 - **Unwanted content is undone by a forward revert, never a history rewrite.** The one rewrite the platform performs is the erasure routine's, on author lines, to the erasure pseudonym (ADRs 0012, 0035).
 
 ## Measured

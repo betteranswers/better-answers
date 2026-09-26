@@ -50,13 +50,26 @@ const itemsOf = (clause: string): readonly string[] => {
   return [...items, item];
 };
 
-const avoidedIn = ({ text }: Entry): readonly string[] => {
+type Avoided = { readonly word: string; readonly retired: boolean };
+
+const avoidedItemsIn = ({ text }: Entry): readonly Avoided[] => {
   const clause = text.split("_Avoid_:")[1];
   if (clause === undefined) return [];
   return itemsOf(clause)
-    .map((item) => (item.split(/\(| — /)[0] ?? "").trim().replace(/\.$/, ""))
-    .filter((word) => word.length > 0);
+    .map((item) => ({
+      word: (item.split(/\(| — /)[0] ?? "").trim().replace(/\.$/, ""),
+      retired: /\(retired\b/.test(item),
+    }))
+    .filter(({ word }) => word.length > 0);
 };
+
+const avoidedIn = (entry: Entry): readonly string[] =>
+  avoidedItemsIn(entry).map(({ word }) => word);
+
+const retiredIn = (entry: Entry): readonly string[] =>
+  avoidedItemsIn(entry)
+    .filter(({ retired }) => retired)
+    .map(({ word }) => word);
 
 /**
  * A sense one directory's code alone writes is read there alone, so its shapes pass
@@ -118,6 +131,42 @@ const WATCHED: readonly Watched[] = [
       },
     ],
   },
+  {
+    entry: "audit log",
+    word: "ledger",
+    permitted: [
+      {
+        sense: "spend's cost ledger, by its name or the llm_call row it holds",
+        written: /cost[-_ ]?ledger|`?llm_call`? ledger\b/gi,
+      },
+      {
+        sense: "the cost ledger's own agreement, whose every edit moves the contract's digest",
+        within: "contracts/cost-ledger/",
+        written: /\bledger\b/gi,
+      },
+      {
+        sense: "a migration's tag, naming the dated file it was generated as",
+        within: "packages/schema/migrations/meta/",
+        written: /"tag": "\d{4}_[\w-]+"/g,
+      },
+      {
+        sense: "a company's own books, in the source documents the worker's fixtures stand in for",
+        within: "apps/worker/tests/fixtures/",
+        written: /\bledger\b/gi,
+      },
+      {
+        sense: "the glossary naming the word it avoids",
+        written: /_Avoid_: ledger(?: act)?\b/gi,
+      },
+    ],
+  },
+  {
+    entry: "audit act",
+    word: "ledger act",
+    permitted: [
+      { sense: "the glossary naming the word it avoids", written: /_Avoid_: ledger act\b/gi },
+    ],
+  },
 ];
 
 type CarveOut = { readonly holds: (file: string) => boolean; readonly why: string };
@@ -158,9 +207,26 @@ const isCarvedOut = (file: string): boolean =>
 
 const escaped = (word: string): string => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const usesInAvoidedSense = ({ word, permitted }: Watched, file: string, text: string): boolean =>
-  new RegExp(`\\b${escaped(word)}\\b`, "i").test(
-    permitted
+/** A watched word with the test its glossary entry sets for what the permitted senses leave. */
+type Scan = { readonly watched: Watched; readonly finds: (unexplained: string) => boolean };
+
+/** `auditRowsOf`, `AUDIT_ACT` and `an_audit_row` read as words, so a retired word is seen inside. */
+const wordsOfCompounds = (text: string): string =>
+  text.replace(/(?<=[a-z\d])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])/g, " ").replaceAll("_", " ");
+
+/** A word its entry retires outright is refused in every form, a merely avoided one whole alone. */
+const findsIn = (word: string, retired: boolean): Scan["finds"] => {
+  if (!retired) {
+    const whole = new RegExp(`\\b${escaped(word)}\\b`, "i");
+    return (unexplained) => whole.test(unexplained);
+  }
+  const anyForm = new RegExp(`\\b${word.split(" ").map(escaped).join("[\\s-]+")}s?\\b`, "i");
+  return (unexplained) => anyForm.test(wordsOfCompounds(unexplained));
+};
+
+const usesInAvoidedSense = ({ watched, finds }: Scan, file: string, text: string): boolean =>
+  finds(
+    watched.permitted
       .filter(({ within }) => within === undefined || file.startsWith(within))
       .reduce(
         (left, { written }) => left.replace(written, (found) => " ".repeat(found.length)),
@@ -168,11 +234,16 @@ const usesInAvoidedSense = ({ word, permitted }: Watched, file: string, text: st
       ),
   );
 
-const watchedIn = (root: string): readonly Watched[] => {
+const watchedIn = (root: string): readonly Scan[] => {
   const entries = entriesOf(readUnder(root, GLOSSARY));
-  return WATCHED.filter(({ entry, word }) =>
-    entries.some((one) => one.term === entry && avoidedIn(one).includes(word)),
-  );
+  return WATCHED.flatMap((watched) => {
+    const entry = entries.find(
+      (one) => one.term === watched.entry && avoidedIn(one).includes(watched.word),
+    );
+    return entry === undefined
+      ? []
+      : [{ watched, finds: findsIn(watched.word, retiredIn(entry).includes(watched.word)) }];
+  });
 };
 
 const avoidedSenseLines = (root: string): readonly string[] => {
@@ -197,8 +268,14 @@ describe("the words the glossary avoids, read from the glossary", () => {
     expect(api === undefined ? [] : avoidedIn(api)).toEqual(["app", "the backend", "the server"]);
   });
 
+  it("reads which avoided words an entry retires outright", () => {
+    const retired = entriesOf(readUnder(repositoryRoot, GLOSSARY)).flatMap(retiredIn);
+
+    expect(retired).toEqual(["member id", "ledger act", "ledger"]);
+  });
+
   it("watches only words the glossary still avoids, under their entry", () => {
-    const glossed = watchedIn(repositoryRoot);
+    const glossed = watchedIn(repositoryRoot).map(({ watched }) => watched);
 
     expect(
       WATCHED.filter((one) => !glossed.includes(one)).map(({ entry, word }) => `${entry}: ${word}`),
@@ -227,24 +304,37 @@ afterAll(() => {
  */
 const WORD = ["a", "pp"].join("");
 
+/** A retired word, spelled in halves for the same reason, and capitalised as a type opens. */
+const RETIRED = ["led", "ger"].join("");
+const Retired = `L${RETIRED.slice(1)}`;
+
 const THE_GLOSSARY = [
   "# Glossary",
   "",
   `- **api** — the TypeScript deployable. _Avoid_: ${WORD} (for`,
   "  the tier), the backend, the server.",
   "- **estate** — the running deployment. _Avoid_: environment.",
+  `- **audit act** — the name an audit event is recorded under. _Avoid_: ${RETIRED} act (retired`,
+  "  24/09/2026), event type.",
+  `- **audit log** — the append-only record. _Avoid_: ${RETIRED} (retired 24/09/2026), log (alone).`,
   "",
 ].join("\n");
 
 let trees = 0;
 
-const findingsOver = (planted: string, file = "docs/planted.md"): readonly string[] => {
+const findingsIn = (
+  files: Readonly<Record<string, string>>,
+  glossary = THE_GLOSSARY,
+): readonly string[] => {
   trees += 1;
   const root = throwawayRepository(path.join(scratch, `tree-${String(trees)}`));
-  writeUnder(root, GLOSSARY, THE_GLOSSARY);
-  writeUnder(root, file, `${planted}\n`);
+  writeUnder(root, GLOSSARY, glossary);
+  for (const [file, text] of Object.entries(files)) writeUnder(root, file, text);
   return avoidedSenseLines(root);
 };
+
+const findingsOver = (planted: string, file = "docs/planted.md"): readonly string[] =>
+  findingsIn({ [file]: `${planted}\n` });
 
 describe("the sense a planted line is read in", () => {
   it.each([
@@ -318,16 +408,15 @@ describe("the sense a planted line is read in", () => {
   });
 
   it("reads nothing a carve-out holds but a rules file", () => {
-    trees += 1;
-    const root = throwawayRepository(path.join(scratch, `tree-${String(trees)}`));
-    writeUnder(root, GLOSSARY, THE_GLOSSARY);
-    writeUnder(root, "docs/adr/0001-planted.md", `The ${WORD} claims the job.\n`);
-    writeUnder(root, "docs/specs/T-001.md", `The ${WORD} claims the job.\n`);
-    writeUnder(root, "docs/specs/v01-route.md", `The ${WORD} claims the job.\n`);
-    writeUnder(root, "apps/web/src/planted.ts", `// The ${WORD} claims the job.\n`);
-    writeUnder(root, "apps/web/CODING_RULES.md", `The ${WORD} claims the job.\n`);
+    const findings = findingsIn({
+      "docs/adr/0001-planted.md": `The ${WORD} claims the job.\n`,
+      "docs/specs/T-001.md": `The ${WORD} claims the job.\n`,
+      "docs/specs/v01-route.md": `The ${WORD} claims the job.\n`,
+      "apps/web/src/planted.ts": `// The ${WORD} claims the job.\n`,
+      "apps/web/CODING_RULES.md": `The ${WORD} claims the job.\n`,
+    });
 
-    expect(avoidedSenseLines(root)).toEqual([
+    expect(findings).toEqual([
       `apps/web/CODING_RULES.md:1: The ${WORD} claims the job.`,
       `docs/specs/v01-route.md:1: The ${WORD} claims the job.`,
     ]);
@@ -349,25 +438,106 @@ describe("the sense a planted line is read in", () => {
   });
 
   it("reads the api's source and tests, except this scan", () => {
-    trees += 1;
-    const root = throwawayRepository(path.join(scratch, `tree-${String(trees)}`));
-    writeUnder(root, GLOSSARY, THE_GLOSSARY);
-    writeUnder(root, "apps/api/src/planted.ts", `// The ${WORD} claims the job.\n`);
-    writeUnder(root, "apps/api/tests/planted.test.ts", `// The ${WORD} claims the job.\n`);
-    writeUnder(root, "apps/api/tests/avoid-words.test.ts", `// The ${WORD} claims the job.\n`);
+    const findings = findingsIn({
+      "apps/api/src/planted.ts": `// The ${WORD} claims the job.\n`,
+      "apps/api/tests/planted.test.ts": `// The ${WORD} claims the job.\n`,
+      "apps/api/tests/avoid-words.test.ts": `// The ${WORD} claims the job.\n`,
+    });
 
-    expect(avoidedSenseLines(root)).toEqual([
+    expect(findings).toEqual([
       `apps/api/src/planted.ts:1: // The ${WORD} claims the job.`,
       `apps/api/tests/planted.test.ts:1: // The ${WORD} claims the job.`,
     ]);
   });
 
   it("stops reading a word the glossary no longer avoids", () => {
-    trees += 1;
-    const root = throwawayRepository(path.join(scratch, `tree-${String(trees)}`));
-    writeUnder(root, GLOSSARY, "- **api** — the TypeScript deployable. _Avoid_: the backend.\n");
-    writeUnder(root, "docs/planted.md", `The ${WORD} claims the job.\n`);
+    const findings = findingsIn(
+      { "docs/planted.md": `The ${WORD} claims the job.\n` },
+      "- **api** — the TypeScript deployable. _Avoid_: the backend.\n",
+    );
 
-    expect(avoidedSenseLines(root)).toEqual([]);
+    expect(findings).toEqual([]);
+  });
+});
+
+describe("a word retired outright, beside one merely avoided", () => {
+  it.each([
+    { file: "packages/core/src/planted.ts", planted: `const rows = await ${RETIRED}RowsOf(tx);` },
+    { file: "packages/core/src/planted.ts", planted: `type ${Retired}Act = AuditAct;` },
+    {
+      file: "packages/core/src/planted.ts",
+      planted: `export const ${RETIRED.toUpperCase()}_ACT = 1;`,
+    },
+    { file: "apps/worker/src/planted.py", planted: `def read_${RETIRED}_row(tx): ...` },
+    { file: "packages/schema/src/planted.sql", planted: `SELECT id FROM a_${RETIRED}_row;` },
+    { file: "docs/planted.md", planted: `Every act books its ${RETIRED}-row, insert-only.` },
+    { file: "docs/planted.md", planted: `The Admin reads the ${RETIRED}s.` },
+  ])("refuses it inside a compound, case %$", ({ file, planted }) => {
+    expect(findingsOver(planted, file)).toEqual([`${file}:1: ${planted}`]);
+  });
+
+  it.each([
+    {
+      file: "packages/core/src/planted.ts",
+      planted: `const fixture = contractFixture("cost-${RETIRED}");`,
+    },
+    {
+      file: "apps/worker/tests/planted.py",
+      planted: `def read_cost_${RETIRED}() -> dict[str, Any]:`,
+    },
+    {
+      file: "packages/core/src/planted.ts",
+      planted: `const cost${Retired} = readCost${Retired}();`,
+    },
+    {
+      file: "docs/planted.md",
+      planted: `The \`llm_call\` ${RETIRED} and the model client land in S2.`,
+    },
+    {
+      file: "docs/planted.md",
+      planted: `Every signal over the cost ${RETIRED} groups by workspace.`,
+    },
+    {
+      file: "contracts/cost-ledger/rows.json",
+      planted: `"is": "every signal over this ${RETIRED}"`,
+    },
+  ])("passes spend's cost-ledger sense, case %$", ({ file, planted }) => {
+    expect(findingsOver(planted, file)).toEqual([]);
+  });
+
+  it("passes a migration's tag in the journal alone", () => {
+    const planted = `      "tag": "0008_${RETIRED}-substrate",`;
+
+    expect(findingsOver(planted, "packages/schema/migrations/meta/_journal.json")).toEqual([]);
+    expect(findingsOver(planted)).toEqual([`docs/planted.md:1: ${planted.trim()}`]);
+  });
+
+  it("passes a company's own books in the worker's fixtures alone", () => {
+    const planted = `and the ${RETIRED} is the record the claim rests on`;
+
+    expect(findingsOver(planted, "apps/worker/tests/fixtures/terms.txt")).toEqual([]);
+    expect(findingsOver(planted)).toEqual([`docs/planted.md:1: ${planted}`]);
+  });
+
+  it("reads a word merely avoided whole, never inside a compound", () => {
+    expect(findingsOver(`const my_${WORD}_name = ${WORD}Router;`)).toEqual([]);
+  });
+
+  it("refuses a retired two-word item inside a compound", () => {
+    const findings = findingsIn(
+      { "docs/planted.md": `type ${Retired}Act = string;\nThe ${RETIRED} holds it.\n` },
+      `- **audit act** — the name. _Avoid_: ${RETIRED} act (retired).\n`,
+    );
+
+    expect(findings).toEqual([`docs/planted.md:1: type ${Retired}Act = string;`]);
+  });
+
+  it("reads the word whole once its entry stops retiring it", () => {
+    const findings = findingsIn(
+      { "docs/planted.md": `${RETIRED}RowsOf\nThe ${RETIRED} holds it.\n` },
+      `- **audit log** — the record. _Avoid_: ${RETIRED}, log.\n`,
+    );
+
+    expect(findings).toEqual([`docs/planted.md:2: The ${RETIRED} holds it.`]);
   });
 });

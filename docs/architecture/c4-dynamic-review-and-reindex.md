@@ -22,10 +22,10 @@ C4Dynamic
 
   Rel(admin, trpc, "1. Opens the review: the finding groups the last run raised, by document, category, rule and tier")
   Rel(trpc, review, "2. keepInText over always-set groups with one reason")
-  Rel(review, postgres, "3. restoreFinding per span — restored_at and one ledger row each — reviewed kept-in-text")
+  Rel(review, postgres, "3. restoreFinding per span — restored_at and one audit event each — reviewed kept-in-text")
   Rel(review, runs, "4. Queues the run with reason restored, so the spans are back in the text")
   Rel(trpc, review, "5. dismissAsNotSpecialCategory over special-category groups with one reason")
-  Rel(review, runs, "6. Reviewed dismissed, a ledger row per document; queues reason dismissed, so the verdict can lift")
+  Rel(review, runs, "6. Reviewed dismissed, an audit event per document; queues reason dismissed, so the verdict can lift")
   Rel(trpc, review, "7. narrowDocuments: each named document takes a class of its own, only narrower")
   Rel(review, cascade, "8. Re-derives the concepts citing those documents, then their compositions; queues no run")
   Rel(trpc, binding, "9. narrow: the binding's class and audience, only narrower; the same cascade; queues no run")
