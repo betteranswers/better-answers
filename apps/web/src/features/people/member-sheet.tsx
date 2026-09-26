@@ -1,6 +1,7 @@
 import { useId, useRef, useState, type RefObject } from "react";
 
 import type { ApiError } from "@/shared/api/trpc.ts";
+import { Icon } from "@/shared/icon.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { RowSheet } from "@/shared/row-sheet.tsx";
 import { SummaryRow } from "@/shared/summary-row.tsx";
@@ -15,6 +16,7 @@ import { instantWords } from "@/shared/words.ts";
 import { MemberRemoval } from "./member-removal.tsx";
 import {
   useChangeRole,
+  useFlagDisplayName,
   useReaderId,
   useRevokeCredentials,
   type CredentialsRevokedHere,
@@ -27,7 +29,7 @@ import { outcomeOfFailure } from "./refusal.tsx";
 import { CredentialsHere, GroupPills, JoinedOn, nameOf } from "./words.tsx";
 
 /** Where focus lands when the sheet opens: on who the member is, or straight on an act. */
-export type OpenedAt = "member" | "role" | "credentials" | "removal";
+export type OpenedAt = "member" | "role" | "credentials" | "name" | "removal";
 
 export const memberButtonId = (personId: string): string => `member-${personId}`;
 
@@ -217,6 +219,67 @@ function CredentialsRevoker(properties: {
   );
 }
 
+/** Shown at the press, since the answer is this for every member; a refusal replaces it. */
+const SENT_TO_THE_OPERATOR: Outcome = {
+  tone: "said",
+  words: "Sent to the operator. The name stands until they correct it.",
+};
+
+function DisplayNameFlag(properties: {
+  readonly member: ListedMember;
+  readonly flagRef: RefObject<HTMLButtonElement | null>;
+}) {
+  const { member, flagRef } = properties;
+  const [outcome, setOutcome] = useState<Outcome>();
+  const flagName = useFlagDisplayName();
+  const headingId = useId();
+  const hintId = useId();
+
+  const flag = () => {
+    setOutcome(SENT_TO_THE_OPERATOR);
+    flagName.mutate(
+      { personId: member.personId },
+      {
+        onError: (failure: Error | ApiError) => {
+          setOutcome(outcomeOfFailure(failure));
+        },
+      },
+    );
+  };
+
+  return (
+    <section aria-labelledby={headingId} className="border border-border">
+      <h3 id={headingId} className="border-b border-border px-4 py-2 font-medium">
+        Display name
+      </h3>
+      <div className="grid gap-4 px-4 py-3">
+        {member.displayName === "" ? (
+          <p className="text-sm text-muted-foreground wrap-anywhere">
+            {member.address} has given no display name yet, so there is none to flag.
+          </p>
+        ) : (
+          <>
+            <p className="text-sm">
+              People give their own display name, and no Admin can change one. The operator corrects
+              a name you flag as inappropriate.
+            </p>
+            <div className="flex flex-col items-start gap-2">
+              <Button ref={flagRef} variant="outline" aria-describedby={hintId} onClick={flag}>
+                <Icon name="flag" />
+                Flag the name to the operator
+              </Button>
+              <p id={hintId} className="text-sm text-muted-foreground">
+                The operator is emailed. Recorded on the audit log under your name.
+              </p>
+            </div>
+            <OutcomeLine outcome={outcome} />
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export function MemberSheet(properties: {
   readonly member: ListedMember;
   readonly openedAt: OpenedAt;
@@ -230,12 +293,15 @@ export function MemberSheet(properties: {
   const titleRef = useRef<HTMLHeadingElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
   const revokeRef = useRef<HTMLButtonElement>(null);
+  const flagRef = useRef<HTMLButtonElement>(null);
   const askRef = useRef<HTMLButtonElement>(null);
 
   const landOn = {
     member: () => titleRef.current,
     role: () => pickerRef.current?.querySelector<HTMLElement>('[aria-checked="true"]'),
     credentials: () => revokeRef.current,
+    // A member with no display name has no flag to land on, so focus goes to who they are.
+    name: () => flagRef.current ?? titleRef.current,
     removal: () => askRef.current,
   } satisfies Readonly<Record<OpenedAt, () => HTMLElement | null | undefined>>;
 
@@ -267,6 +333,7 @@ export function MemberSheet(properties: {
         <Membership member={member} />
         <RolePicker member={member} pickerRef={pickerRef} />
         <CredentialsRevoker member={member} revokeRef={revokeRef} />
+        <DisplayNameFlag member={member} flagRef={flagRef} />
         <MemberRemoval member={member} askRef={askRef} onRemove={onRemove} />
       </div>
     </RowSheet>

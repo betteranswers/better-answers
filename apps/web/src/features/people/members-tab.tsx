@@ -219,6 +219,9 @@ function MemberList(properties: { readonly members: readonly ListedMember[] }) {
   useKeystroke(PEOPLE_KEYSTROKES.remove, () => {
     openInFocus("removal");
   });
+  useKeystroke(PEOPLE_KEYSTROKES.flagName, () => {
+    openInFocus("name");
+  });
 
   const removal = useRemovalFromTheList({
     shownIds: () => table.getRowModel().rows.map((row) => row.id),

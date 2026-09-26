@@ -10,6 +10,7 @@ import {
   clockTheNextKey,
   person,
   provision,
+  removeMember,
   signIn,
   skipLinkReachesTheScreen,
   theActLandedWithinItsBudget,
@@ -51,6 +52,14 @@ const removalOf = (sheet: Locator): Locator => sheet.getByRole("region", { name:
 
 /** The one output the Members region holds as a child of its own: the count of people. */
 const THE_COUNT = "//section[h2='Members']/output";
+
+const displayNameRegion = (sheet: Locator): Locator =>
+  sheet.getByRole("region", { name: "Display name" });
+
+const flagButton = (sheet: Locator): Locator =>
+  sheet.getByRole("button", { name: "Flag the name to the operator" });
+
+const SENT_TO_THE_OPERATOR = "Sent to the operator. The name stands until they correct it.";
 
 const EACH_ROLE_MEANS = {
   Admin: "Manages people and sources, and does everything an Editor does.",
@@ -95,22 +104,25 @@ const anAdminAtPeople = async (
   workspaceName: string,
 ): Promise<{
   readonly admin: string;
-  readonly joined: readonly Joined[];
+  readonly workspaceId: string;
+  readonly joined: readonly (Joined & { readonly id: string })[];
   readonly stranger: string;
 }> => {
   const admin = anAddress("admin");
   const workspace = await provision(api, { name: workspaceName, adminEmail: admin });
-  const joined: readonly Joined[] = [
+  const joining: readonly Joined[] = [
     { email: anAddress("priya"), displayName: "Priya Shah", role: "Editor" },
     { email: anAddress("sam"), displayName: "Sam Okoro", role: "Viewer" },
   ];
-  for (const member of joined) {
+  const joined = [];
+  for (const member of joining) {
     const made = await person(api, member.email, { displayName: member.displayName });
     await addMember(api, {
       workspaceId: workspace.workspaceId,
       userId: made.id,
       role: member.role,
     });
+    joined.push({ ...member, id: made.id });
   }
 
   const elsewhere = await provision(api, { name: `Not ${workspaceName}` });
@@ -126,7 +138,7 @@ const anAdminAtPeople = async (
   await signIn(page, api, admin);
   await rail(page).getByRole("link", { name: "People" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
-  return { admin, joined, stranger };
+  return { admin, workspaceId: workspace.workspaceId, joined, stranger };
 };
 
 /** The Admin signed in is one of two, so they may demote or remove themself. */
@@ -373,6 +385,11 @@ test.describe("a member, opened as a sheet", () => {
           - heading "Credentials" [level=3]
           - button "Revoke Priya Shah's credentials here"
           - paragraph: Every session and token Priya Shah holds for this workspace is refused at once, and a fresh sign-in works. Recorded on the audit log under your name.
+        - region "Display name":
+          - heading "Display name" [level=3]
+          - paragraph: People give their own display name, and no Admin can change one. The operator corrects a name you flag as inappropriate.
+          - button "Flag the name to the operator"
+          - paragraph: The operator is emailed. Recorded on the audit log under your name.
         - button "Close"
     `);
     await passesTheAccessibilityGate();
@@ -732,6 +749,94 @@ test.describe("removing a member from their sheet", () => {
     await expect(sheet).toHaveCount(0);
     await expect(memberRows(page)).toHaveCount(2);
     await expect(memberButton(page, "Test person")).toBeFocused();
+  });
+});
+
+test.describe("a member's display name, flagged to the operator", () => {
+  test("flags a member's name within budget, and again answers alike", async ({
+    page,
+    request,
+    passesTheAccessibilityGate,
+  }) => {
+    await anAdminAtPeople(page, request, "Swale Signworks");
+    await memberButton(page, "Sam Okoro").click();
+    const sheet = sheetOf(page, "Sam Okoro");
+    const said = displayNameRegion(sheet).getByRole("status");
+
+    await flagButton(sheet).focus();
+    await clockTheNextKey(page, {
+      at: "//section[h3[normalize-space(.)='Display name']]//output",
+      reads: SENT_TO_THE_OPERATOR,
+    });
+    await page.keyboard.press("Enter");
+
+    await expect(said).toHaveText(SENT_TO_THE_OPERATOR);
+    await theActLandedWithinItsBudget(page, "name flag");
+    await expect(flagButton(sheet)).toBeFocused();
+
+    await page.keyboard.press("Enter");
+    await expect(said).toHaveText(SENT_TO_THE_OPERATOR);
+    await expect(displayNameRegion(sheet).getByRole("alert")).toHaveCount(0);
+    await expect(sheet.getByRole("heading", { level: 2, name: "Sam Okoro" })).toBeVisible();
+    await passesTheAccessibilityGate();
+  });
+
+  test("offers no flag for a member with no display name", async ({ page, request }) => {
+    const { workspaceId } = await anAdminAtPeople(page, request, "Swale Lettering");
+    const unnamed = anAddress("unnamed");
+    const made = await person(request, unnamed, { displayName: "" });
+    await addMember(request, { workspaceId, userId: made.id, role: "Viewer" });
+    await page.reload();
+
+    await memberButton(page, "No display name yet").click();
+    const region = displayNameRegion(sheetOf(page, unnamed));
+
+    await expect(region).toContainText(
+      `${unnamed} has given no display name yet, so there is none to flag.`,
+    );
+    await expect(region.getByRole("button")).toHaveCount(0);
+  });
+
+  test("refuses a member removed meanwhile, saying its word and remedy", async ({
+    page,
+    request,
+    passesTheAccessibilityGate,
+  }) => {
+    const { workspaceId, joined } = await anAdminAtPeople(page, request, "Swale Stonecraft");
+    const sam = joined.find((member) => member.displayName === "Sam Okoro");
+    if (sam === undefined) throw new Error("Sam Okoro was joined");
+    await memberButton(page, "Sam Okoro").click();
+    const sheet = sheetOf(page, "Sam Okoro");
+    await removeMember(request, { workspaceId, userId: sam.id });
+
+    await flagButton(sheet).click();
+
+    const refused = displayNameRegion(sheet).getByRole("alert");
+    await expect(refused).toContainText("Refused: no-such-member.");
+    await expect(refused).toContainText("This person is no longer a member of this workspace.");
+    await expect(refused).toContainText("Read the list again.");
+    await expect(displayNameRegion(sheet).getByRole("status")).toHaveCount(0);
+    await passesTheAccessibilityGate();
+  });
+
+  test("flags a member's name by keyboard alone, from the list", async ({ page, request }) => {
+    await anAdminAtPeople(page, request, "Swale Carving");
+
+    await page.keyboard.press("?");
+    await expect(page.getByRole("dialog", { name: "Keystrokes on People" })).toContainText(
+      "Flag the display name of the member in focus",
+    );
+    await page.keyboard.press("Escape");
+
+    await memberButton(page, "Priya Shah").focus();
+    await page.keyboard.press("f");
+    const sheet = sheetOf(page, "Priya Shah");
+    await expect(flagButton(sheet)).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(displayNameRegion(sheet).getByRole("status")).toHaveText(SENT_TO_THE_OPERATOR);
+
+    await page.keyboard.press("Escape");
+    await expect(memberButton(page, "Priya Shah")).toBeFocused();
   });
 });
 
