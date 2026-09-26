@@ -186,7 +186,6 @@ describe("the Sources list an Admin reads", () => {
           attempts: 1,
           enqueuedAt: "2026-09-11T08:00:00.000Z",
           finishedAt: null,
-          outcome: null,
         },
       },
       {
@@ -205,7 +204,6 @@ describe("the Sources list an Admin reads", () => {
           attempts: 0,
           enqueuedAt: "2026-09-11T08:00:00.000Z",
           finishedAt: null,
-          outcome: null,
         },
       },
       {
@@ -224,7 +222,6 @@ describe("the Sources list an Admin reads", () => {
           attempts: 1,
           enqueuedAt: "2026-09-11T09:00:00.000Z",
           finishedAt: "2026-09-11T09:30:00.000Z",
-          outcome: { documents: 2, chunks: 3 },
         },
       },
       {
@@ -243,7 +240,6 @@ describe("the Sources list an Admin reads", () => {
           attempts: 1,
           enqueuedAt: "2026-09-11T08:00:00.000Z",
           finishedAt: "2026-09-11T09:30:00.000Z",
-          outcome: { documents: 2, chunks: 3 },
         },
       },
     ]);
@@ -301,7 +297,7 @@ describe("the Sources list an Admin reads", () => {
 });
 
 describe("the runs of a binding, read by subject", () => {
-  it("answers every run newest first, with outcome and ISO instants", async () => {
+  it("answers every run newest first, in ISO instants", async () => {
     const scenario = await arrange();
     const handbook = await bindingOf(scenario, "Handbook", [{ title: "handbook.md" }]);
     const failed = await runOver(scenario, handbook.bindingId, {
@@ -334,7 +330,6 @@ describe("the runs of a binding, read by subject", () => {
         attempts: 0,
         enqueuedAt: "2026-09-11T09:00:00.000Z",
         finishedAt: null,
-        outcome: null,
       },
       {
         jobId: failed,
@@ -344,7 +339,6 @@ describe("the runs of a binding, read by subject", () => {
         attempts: 1,
         enqueuedAt: "2026-09-11T08:00:00.000Z",
         finishedAt: "2026-09-11T08:30:00.000Z",
-        outcome: { error: "DeadlineExceededError" },
       },
     ]);
   });

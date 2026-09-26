@@ -88,6 +88,40 @@ const finishedRun = (workspaceId: string, bindingId: string, outcome: Record<str
     }),
   );
 
+const OVERRIDDEN_KEY = "restores_overridden_by_erasure";
+
+type RunOverridingASpan = {
+  readonly bindingId: string;
+  readonly jobId: string;
+  readonly documentId: string;
+  readonly ruleId: string;
+};
+
+const aRunThatOverrodeAKeptSpan = async (workspaceId: string): Promise<RunOverridingASpan> => {
+  const { bindingId, documentId } = await unpublishedBinding(workspaceId);
+  const kept = await seededIn(app, (seed) => seed.finding({ workspaceId, documentId }));
+  const run = await finishedRun(workspaceId, bindingId, {
+    documents: 1,
+    chunks: 1,
+    [OVERRIDDEN_KEY]: [
+      {
+        document_id: documentId,
+        rule_id: kept.ruleId,
+        char_start: kept.charStart,
+        char_end: kept.charEnd,
+      },
+    ],
+  });
+  return { bindingId, jobId: run.id, documentId, ruleId: kept.ruleId };
+};
+
+const addressesIn = (answer: unknown, run: RunOverridingASpan): readonly string[] => {
+  const answered = JSON.stringify(answer);
+  return [OVERRIDDEN_KEY, run.documentId, run.ruleId, "char_start", "char_end"].filter((part) =>
+    answered.includes(part),
+  );
+};
+
 const rowsFor = async (workspaceId: string, bindingId: string) => {
   const read = await app.database.superuser.query<{
     name: string;
@@ -475,7 +509,6 @@ describe("the Sources procedures over the wire", () => {
           attempts: 0,
           enqueuedAt: expect.stringMatching(ISO_INSTANT),
           finishedAt: null,
-          outcome: null,
         },
         quarantined: [],
         quarantinedByError: {},
@@ -499,9 +532,38 @@ describe("the Sources procedures over the wire", () => {
         attempts: 0,
         enqueuedAt: expect.stringMatching(ISO_INSTANT),
         finishedAt: null,
-        outcome: null,
       },
     ]);
+  });
+
+  it("lists a run that overrode spans with no span's address", async () => {
+    const { workspace, api } = await anAdmin();
+    const run = await aRunThatOverrodeAKeptSpan(workspace.workspaceId);
+
+    const listed = await api.sources.list.query();
+
+    expect(listed.map((binding) => binding.lastRun)).toEqual([
+      {
+        jobId: run.jobId,
+        kind: "index",
+        reason: "bound",
+        status: "done",
+        attempts: 1,
+        enqueuedAt: expect.stringMatching(ISO_INSTANT),
+        finishedAt: PINNED_AT.toISOString(),
+      },
+    ]);
+    expect(addressesIn(listed, run)).toEqual([]);
+  });
+
+  it("answers a subject's runs with no span's address in them", async () => {
+    const { workspace, api } = await anAdmin();
+    const run = await aRunThatOverrodeAKeptSpan(workspace.workspaceId);
+
+    const runs = await api.runs.ofSubject.query({ subjectId: run.bindingId });
+
+    expect(runs.map((listedRun) => listedRun.jobId)).toEqual([run.jobId]);
+    expect(addressesIn(runs, run)).toEqual([]);
   });
 
   it("reads findings by group, counting kept spans an erasure overrides", async () => {
@@ -520,7 +582,7 @@ describe("the Sources procedures over the wire", () => {
     await finishedRun(workspace.workspaceId, bindingId, {
       documents: 1,
       chunks: 1,
-      restores_overridden_by_erasure: [
+      [OVERRIDDEN_KEY]: [
         {
           document_id: documentId,
           rule_id: kept.ruleId,
