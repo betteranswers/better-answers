@@ -99,12 +99,14 @@ export const citedSourcesOf = (value: SourcesValue): readonly CitedSource[] =>
 
 /**
  * A URL, or a resource starting `//`, comes back unchanged. Any other resolves against the root
- * when it starts with `/`, else against the directory of `from`, which must hold a `/`. The
- * answer is rooted, with `.` and `..` folded; `..` stops at the root.
+ * when it starts with `/`, else against the directory of `from`, the root when `from` holds no `/`.
+ * The answer is rooted, with `.` and `..` folded; `..` stops at the root.
  */
 export const resolvedResource = (resource: string, from: string): string => {
   if (resource.startsWith("//") || /^[a-z][a-z0-9+.-]*:/i.test(resource)) return resource;
-  const directory = resource.startsWith("/") ? "" : from.slice(0, from.lastIndexOf("/"));
+  const directory = resource.startsWith("/")
+    ? ""
+    : from.slice(0, Math.max(0, from.lastIndexOf("/")));
   const segments: string[] = [];
   for (const segment of `${directory}/${resource}`.split("/")) {
     if (segment === "" || segment === ".") continue;
