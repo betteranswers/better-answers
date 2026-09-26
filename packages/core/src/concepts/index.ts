@@ -79,7 +79,7 @@ import {
   authorOf,
   countChecks,
   IMPORT_SENSITIVITY_DEFAULT,
-  memberIdsByEmail,
+  personIdsByEmail,
   presentChecks,
   readBundle,
   recordImportedChecks,
@@ -845,7 +845,7 @@ const importContextOf = (
       );
       return {
         standing,
-        persons: await memberIdsByEmail(
+        persons: await personIdsByEmail(
           fresh,
           tx,
           concepts.flatMap((concept) => concept.verified.map((event) => event.email)),
