@@ -137,7 +137,7 @@ function HeldCredentials(properties: { readonly person: ListedPerson }) {
         {inspected.error === null ? (
           "Reading the sessions and client grants."
         ) : (
-          <RefusalLine {...readRefused(inspected.error)} />
+          <RefusalLine said={readRefused(inspected.error)} />
         )}
       </p>
     </SheetPart>

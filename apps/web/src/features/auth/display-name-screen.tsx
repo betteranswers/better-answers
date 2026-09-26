@@ -3,28 +3,21 @@ import { useState, type FormEvent } from "react";
 
 import { refusalOf, type Refusal } from "@/shared/api/trpc.ts";
 import { DISPLAY_NAME_MAX_CHARACTERS, DISPLAY_NAME_REFUSED } from "@/shared/display-name-words.ts";
+import { saidOfRefusal, type Said } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 
 import { useSetDisplayName } from "./auth-hooks.ts";
-import { AuthScreen, Refused, type Said } from "./auth-screen.tsx";
+import { AuthScreen, Refused } from "./auth-screen.tsx";
 import { leavingFor, nextAfterSignIn, pageQuery } from "./carried-flow.ts";
 
 const HINT = "display-name-hint";
 
 const REFUSED = "display-name-refused";
 
-const WORDS = new Map<string, Said>(Object.entries(DISPLAY_NAME_REFUSED));
-
-const REFUSED_OTHERWISE: Said = {
-  why: "The platform could not read what this screen sent.",
-  next: "Reload the page and save the name again.",
-};
-
-const UNANSWERED = "The platform did not answer, so nothing changed. Try again in a moment.";
-
-const saidOf = (refusal: Refusal): Said => WORDS.get(refusal.word) ?? REFUSED_OTHERWISE;
+const saidOf = (refusal: Refusal): Said =>
+  saidOfRefusal(DISPLAY_NAME_REFUSED, refusal.word, refusal.class);
 
 export function DisplayNameScreen() {
   const navigate = useNavigate();
@@ -73,9 +66,7 @@ export function DisplayNameScreen() {
         </Button>
       </form>
 
-      {failure === null ? null : (
-        <Refused id={REFUSED} failure={failure} saidOf={saidOf} unanswered={UNANSWERED} />
-      )}
+      {failure === null ? null : <Refused id={REFUSED} failure={failure} saidOf={saidOf} />}
     </AuthScreen>
   );
 }

@@ -95,7 +95,7 @@ function ListSaid(properties: { readonly listed: Listed; readonly asked: Asked }
       {listed.error === null ? (
         countSaid(listed, properties.asked)
       ) : (
-        <RefusalLine {...readRefused(listed.error)} />
+        <RefusalLine said={readRefused(listed.error)} />
       )}
     </output>
   );

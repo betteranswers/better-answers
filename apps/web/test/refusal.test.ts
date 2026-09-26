@@ -1,13 +1,9 @@
-import { TRPCClientError } from "@trpc/client";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { createQueryClient } from "@/shared/api/query-client.ts";
 import { refusalOf, type Refusal, type RefusalClass, type RefusalWord } from "@/shared/api/trpc.ts";
 
-const carrying = (data: unknown): Error => {
-  const error = new TRPCClientError("refused");
-  return Object.assign(error, { data });
-};
+import { carrying } from "./stubbed-api.ts";
 
 const retryPolicy = () => {
   const policy = createQueryClient().getDefaultOptions().queries?.retry;

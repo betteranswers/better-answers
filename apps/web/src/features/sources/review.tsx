@@ -102,7 +102,7 @@ function Preview(properties: { readonly binding: ListedBinding }) {
         </p>
         <div aria-live="polite" className="mt-2">
           {preview.isPending && open ? <p>The chunks are still loading.</p> : null}
-          {preview.error === null ? null : <p>{outcomeOfFailure(preview.error).words}</p>}
+          {preview.error === null ? null : <p>{outcomeOfFailure(preview.error, "read").words}</p>}
           {preview.data?.length === 0 ? <p>No chunk has landed yet.</p> : null}
           {preview.data === undefined || preview.data.length === 0 ? null : (
             <ol className="grid gap-2">
@@ -220,7 +220,7 @@ export function Review(properties: { readonly binding: ListedBinding }) {
 
       <div aria-live="polite" className="mt-4">
         {findings.isPending ? <p>The findings are still loading.</p> : null}
-        {findings.error === null ? null : <p>{outcomeOfFailure(findings.error).words}</p>}
+        {findings.error === null ? null : <p>{outcomeOfFailure(findings.error, "read").words}</p>}
         {findings.data?.length === 0 ? <p>{NOTHING_FOUND[binding.state]}</p> : null}
       </div>
       {findings.data === undefined || findings.data.length === 0 ? null : (

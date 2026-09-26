@@ -2,6 +2,8 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
 import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
+import { SAID_OF_A_REQUEST } from "@/features/people/refusal-words.ts";
+import { sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -267,7 +269,11 @@ test.describe("the People screen's Requests tab", () => {
     `);
   });
 
-  test("says a request decided meanwhile in its word", async ({ page, context, request }) => {
+  test("says a request was decided meanwhile, and what next", async ({
+    page,
+    context,
+    request,
+  }) => {
     await anAdminAtRequests(page, request, "Aire Valley Tooling", [{ displayName: "Priya Shah" }]);
     await openRequests(page);
     await rowOf(page, "Priya Shah")
@@ -288,10 +294,8 @@ test.describe("the People screen's Requests tab", () => {
     await approving.getByRole("button", { name: "Approve and send the invitation" }).click();
 
     await expect(approving).toHaveCount(0);
-    const refused = requestsRegion(page).getByRole("alert");
-    await expect(refused).toContainText("Refused: already-decided.");
-    await expect(refused).toContainText(
-      "This request was decided while you were deciding it. Read the list again.",
+    await expect(requestsRegion(page).getByRole("alert")).toHaveText(
+      sentenceOf(SAID_OF_A_REQUEST["already-decided"]),
     );
     await expect(requestRows(page)).toHaveCount(0);
     await expect(requestsRegion(page).getByRole("heading", { name: "Requests" })).toBeFocused();
@@ -311,7 +315,7 @@ test.describe("the People screen's Requests tab", () => {
   });
 
   for (const role of ["Editor", "Viewer"] as const) {
-    test(`refuses a member at ${role} the requests, in its word`, async ({ page, request }) => {
+    test(`refuses a member at ${role} the requests, saying why`, async ({ page, request }) => {
       const email = anAddress(role.toLowerCase());
       const [member, workspace] = await Promise.all([
         person(request, email, { displayName: `A ${role}` }),
@@ -323,10 +327,8 @@ test.describe("the People screen's Requests tab", () => {
       await signIn(page, request, email);
       await openRequests(page);
 
-      const refused = requestsRegion(page).getByRole("alert");
-      await expect(refused).toContainText("Refused: role-forbids.");
-      await expect(refused).toContainText(
-        "Only an Admin of this workspace sees and decides its access requests.",
+      await expect(requestsRegion(page).getByRole("alert")).toHaveText(
+        sentenceOf(SAID_OF_A_REQUEST["role-forbids"]),
       );
       await expect(requestsRegion(page).getByRole("table")).toHaveCount(0);
       await expect(requestsRegion(page)).not.toContainText("Priya Shah");

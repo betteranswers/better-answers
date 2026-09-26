@@ -1,6 +1,8 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
+import { REASON_REFUSED } from "@/features/auth/refusal-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
+import { SAID_OF_CLASS, sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -129,7 +131,7 @@ test("answers a known, an unknown and a repeated slug alike", async ({ page, req
   expect(alreadyAsked, "a second ask was answered differently").toBe(known);
 });
 
-test("refuses a blank reason in its word, saying what next", async ({
+test("refuses a blank reason, saying what to send", async ({
   page,
   request,
   passesTheAccessibilityGate,
@@ -139,11 +141,7 @@ test("refuses a blank reason in its word, saying what next", async ({
 
   await askToJoin(page, workspace.slug, "   ");
 
-  const refusal = page.getByRole("alert");
-  await expect(refusal).toContainText("malformed");
-  await expect(refusal).toContainText(
-    "The reason needs a character other than a space. Say why you are asking and send it again.",
-  );
+  await expect(page.getByRole("alert")).toHaveText(sentenceOf(REASON_REFUSED));
   await expect(reasonField(page)).toHaveAttribute("aria-invalid", "true");
   await expect(reasonField(page)).toBeFocused();
   await expect(acknowledgement(page)).toHaveCount(0);
@@ -181,9 +179,7 @@ test("sends a person whose session ended back to sign in", async ({ page, contex
 
   await askToJoin(page, "acme-joinery");
 
-  const refusal = page.getByRole("alert");
-  await expect(refusal).toContainText("no-session");
-  await expect(refusal).toContainText("Your session has ended. Sign in again.");
+  await expect(page.getByRole("alert")).toHaveText(sentenceOf(SAID_OF_CLASS.unauthenticated));
   await theScreenSaysNoOrganisation(page, "once the session ended");
   await page.getByRole("button", { name: "Sign in again" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();

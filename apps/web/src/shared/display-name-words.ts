@@ -1,4 +1,4 @@
-import type { SaidOfWord } from "@/shared/refusal-outcome.tsx";
+import type { SaidOfWord } from "@/shared/refusal-words.ts";
 
 /**
  * The api's rule holds the limit; this is the number a screen tells the reader before they type.

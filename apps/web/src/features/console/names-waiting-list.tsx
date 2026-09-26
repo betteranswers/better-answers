@@ -133,7 +133,11 @@ function ListSaid(properties: {
   return (
     <>
       <output className="mt-1 block text-muted-foreground">
-        {listed.error === null ? countSaid(listed) : <RefusalLine {...readRefused(listed.error)} />}
+        {listed.error === null ? (
+          countSaid(listed)
+        ) : (
+          <RefusalLine said={readRefused(listed.error)} />
+        )}
       </output>
       <OutcomeLine outcome={properties.outcome} className="mt-2" />
       {staleFor === undefined ? null : (

@@ -97,7 +97,9 @@ function WhatTheRowCarries(properties: {
       ))}
       {findings.data === undefined ? (
         <SummaryRow term="Findings">
-          {findings.error === null ? "Still counting" : outcomeOfFailure(findings.error).words}
+          {findings.error === null
+            ? "Still counting"
+            : outcomeOfFailure(findings.error, "read").words}
         </SummaryRow>
       ) : (
         AUDITED_CATEGORIES.map((category) => (

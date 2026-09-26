@@ -2,6 +2,8 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
 import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
+import { SAID_OF_AN_INVITATION } from "@/features/people/refusal-words.ts";
+import { sentenceOf } from "@/shared/refusal-words.ts";
 import { screenById } from "@/shared/screens.ts";
 
 import { expect, test } from "./browser.ts";
@@ -147,7 +149,7 @@ test.describe("the People screen's Invitations tab", () => {
     await expect(inviteAct(page)).toBeVisible();
   });
 
-  test("refuses inviting a current member, saying so in its word", async ({ page, request }) => {
+  test("refuses inviting a current member, saying where they are", async ({ page, request }) => {
     const { editor } = await anAdminAtInvitations(page, request, "Aire Valley Tooling");
     await openInvitations(page);
 
@@ -155,10 +157,8 @@ test.describe("the People screen's Invitations tab", () => {
     await inviteDialog(page).getByLabel("Email address").fill(editor.toUpperCase());
     await inviteDialog(page).getByRole("button", { name: "Send the invitation" }).click();
 
-    const refused = inviteDialog(page).getByRole("alert");
-    await expect(refused).toContainText("Refused: already-a-member.");
-    await expect(refused).toContainText(
-      "That address belongs to a member of this workspace already. Find them on the Members tab.",
+    await expect(inviteDialog(page).getByRole("alert")).toHaveText(
+      sentenceOf(SAID_OF_AN_INVITATION["already-a-member"]),
     );
     await expect(inviteDialog(page).getByLabel("Email address")).toBeVisible();
     await page.keyboard.press("Escape");
@@ -300,14 +300,12 @@ test.describe("the People screen's Invitations tab", () => {
   });
 
   for (const role of ["Editor", "Viewer"] as const) {
-    test(`refuses a member at ${role} the invitations, in its word`, async ({ page, request }) => {
+    test(`refuses a member at ${role} the invitations, saying why`, async ({ page, request }) => {
       await aMemberBelowAdminAtPeople(page, request, role);
       await openInvitations(page);
 
-      const refused = invitationsRegion(page).getByRole("alert");
-      await expect(refused).toContainText("Refused: role-forbids.");
-      await expect(refused).toContainText(
-        "Only an Admin of this workspace sees and sends its invitations.",
+      await expect(invitationsRegion(page).getByRole("alert")).toHaveText(
+        sentenceOf(SAID_OF_AN_INVITATION["role-forbids"]),
       );
       await expect(invitationsRegion(page).getByRole("table")).toHaveCount(0);
     });

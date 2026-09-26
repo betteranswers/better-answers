@@ -307,7 +307,7 @@ function GroupsSection() {
         Groups
       </h2>
       <OutcomeLine
-        outcome={groups.error === null ? undefined : outcomeOfGroupFailure(groups.error)}
+        outcome={groups.error === null ? undefined : outcomeOfGroupFailure(groups.error, "read")}
         className="mt-2"
       />
       <div aria-live="polite">

@@ -74,7 +74,7 @@ function ListStatus(properties: { readonly bindings: ReturnType<typeof useBindin
   return (
     <div aria-live="polite" className="mt-2">
       {bindings.isPending ? <p>The bindings are still loading.</p> : null}
-      {bindings.error === null ? null : <p>{outcomeOfFailure(bindings.error).words}</p>}
+      {bindings.error === null ? null : <p>{outcomeOfFailure(bindings.error, "read").words}</p>}
       {bindings.data?.length === 0 ? <EmptyState line={NOTHING_BOUND} /> : null}
     </div>
   );

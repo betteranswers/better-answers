@@ -1,6 +1,8 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
+import { SAID_OF_ACCEPTING } from "@/features/auth/refusal-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
+import { sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -10,6 +12,7 @@ import {
   keystrokesListed,
   person,
   provision,
+  saysItsSentenceNotItsWord,
   signIn,
   theActLandedWithinItsBudget,
 } from "./harness.ts";
@@ -128,18 +131,12 @@ test("refuses a person at another address, offering the invited one", async ({
   await page.goto(link);
   await signIn(page, request, other);
 
-  const refusal = page.getByRole("alert");
-  await expect(refusal).toContainText("invitation-for-another-address");
-  await expect(refusal).toContainText(
-    "This invitation was sent to another email address than the one you are signed in with. Sign in with the address it was sent to.",
-  );
+  const refused = sentenceOf(SAID_OF_ACCEPTING["invitation-for-another-address"]);
+  await expect(page.getByRole("alert")).toHaveText(refused);
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
       - heading "Your invitation" [level=1]
-      - alert:
-        - text: "Refused:"
-        - code: invitation-for-another-address
-        - text: . This invitation was sent to another email address than the one you are signed in with. Sign in with the address it was sent to.
+      - alert: ${JSON.stringify(refused)}
       - button "Sign in with another address"
       - button "Sign out"
       - button ${JSON.stringify(KEYSTROKE_WORDS.button)}
@@ -165,10 +162,9 @@ test("tells a named person a stray link names no invitation", async ({ page, req
   await page.goto("/invitations/01J0000000000000000000000Z");
   await signIn(page, request, address);
 
-  const refusal = page.getByRole("alert");
-  await expect(refusal).toContainText("no-such-invitation");
-  await expect(refusal).toContainText(
-    "No invitation stands at this link: it was cancelled, replaced by a newer one, or never sent. Ask the Admin who invited you to send a new one.",
-  );
+  await saysItsSentenceNotItsWord(page.getByRole("alert"), {
+    table: SAID_OF_ACCEPTING,
+    word: "no-such-invitation",
+  });
   await expect(page.getByRole("button", { name: /^Join/ })).toHaveCount(0);
 });

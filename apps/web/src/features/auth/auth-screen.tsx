@@ -2,6 +2,8 @@ import { useNavigate } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
 import { refusalOf, type ApiError, type Refusal } from "@/shared/api/trpc.ts";
+import { RefusalLine } from "@/shared/refusal-outcome.tsx";
+import { NO_RESPONSE, SAID_OF_CLASS, type Said } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 
 import { leavingFor, pageQuery } from "./carried-flow.ts";
@@ -43,10 +45,6 @@ export function Outcome(properties: {
   );
 }
 
-export type Said = { readonly why: string; readonly next: string };
-
-const SESSION_ENDED: Said = { why: "Your session has ended.", next: "Sign in again." };
-
 function SignInAgain(properties: { readonly signInAt: string }) {
   const navigate = useNavigate();
   return (
@@ -63,31 +61,34 @@ function SignInAgain(properties: { readonly signInAt: string }) {
   );
 }
 
+/** Every unauthenticated word says the one thing, since signing in again is its one remedy. */
+const saidOfFailure = (
+  refusal: Refusal | undefined,
+  saidOf: (refusal: Refusal) => Said,
+  unanswered: Said,
+): Said => {
+  if (refusal === undefined) return unanswered;
+  return refusal.class === "unauthenticated" ? SAID_OF_CLASS.unauthenticated : saidOf(refusal);
+};
+
 /**
- * A refusal as its own word, why and what next; a wordless failure says `unanswered`. An ended
- * session signs in at `signInAt`.
+ * What went wrong and what to do, in the shared refusal template. A wordless failure says
+ * `unanswered`, and an ended session signs in at `signInAt`.
  */
 export function Refused(properties: {
   readonly id: string;
   readonly failure: Error | ApiError;
   readonly saidOf: (refusal: Refusal) => Said;
-  readonly unanswered: string;
+  readonly unanswered?: Said;
   readonly signInAt?: string;
 }) {
   const refusal = refusalOf(properties.failure);
-  if (refusal === undefined) {
-    return (
-      <Outcome tone="refused" id={properties.id}>
-        {properties.unanswered}
-      </Outcome>
-    );
-  }
-  const sessionEnded = refusal.class === "unauthenticated";
-  const said = sessionEnded ? SESSION_ENDED : properties.saidOf(refusal);
+  const sessionEnded = refusal?.class === "unauthenticated";
+  const said = saidOfFailure(refusal, properties.saidOf, properties.unanswered ?? NO_RESPONSE);
   return (
     <>
       <Outcome tone="refused" id={properties.id}>
-        Refused: <code className="font-mono">{refusal.word}</code>. {said.why} {said.next}
+        <RefusalLine said={said} />
       </Outcome>
       {sessionEnded ? (
         <SignInAgain signInAt={properties.signInAt ?? `/sign-in${pageQuery()}`} />

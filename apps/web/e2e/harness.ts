@@ -5,7 +5,9 @@ import { z } from "zod";
 
 import type { REDACTION_TIERS, SENSITIVITIES } from "@better-answers/schema";
 
+import type { RefusalWord } from "@/shared/api/trpc.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
+import { sentenceOf, type Said } from "@/shared/refusal-words.ts";
 import { CONTROL_CENTRE, type Role } from "@/shared/screens.ts";
 
 const HARNESS = "/__harness";
@@ -441,5 +443,17 @@ export const theActLandedWithinItsBudget = async (page: Page, act: string): Prom
   test.info().annotations.push({ type: `${act} act`, description: `${elapsed} ms` });
   expect(elapsed, `the ${act} did not read as landed within its budget`).toBeLessThan(
     ACT_BUDGET_MS,
+  );
+};
+
+/** The word stays off the page: it is for the logs and the wire. */
+export const saysItsSentenceNotItsWord = async <Word extends RefusalWord>(
+  alert: Locator,
+  refused: { readonly table: Readonly<Record<Word, Said>>; readonly word: Word },
+): Promise<void> => {
+  const { word } = refused;
+  await expect(alert).toHaveText(sentenceOf(refused.table[word]));
+  await expect(alert.page().locator("body"), `the page shows the word ${word}`).not.toContainText(
+    word,
   );
 };

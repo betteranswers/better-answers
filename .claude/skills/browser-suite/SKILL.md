@@ -106,7 +106,7 @@ call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources
 | `askToJoin` | A person's ask to join a workspace by its slug, with a reason, through the members slice's own act and the principal the ask-to-join procedure uses, without its sign-in or its answer's floor — a request waiting on the Requests tab |
 | `flagTheName` | A workspace's Admin flags a member's display name through the members slice's own act and principal, without the email the procedure sends the operator — a name waiting on the console's *Names waiting* view |
 
-Fourteen more helpers in the same module drive the browser rather than the harness:
+Fifteen more helpers in the same module drive the browser rather than the harness:
 
 | Helper | What it does |
 | --- | --- |
@@ -124,6 +124,7 @@ Fourteen more helpers in the same module drive the browser rather than the harne
 | `keystrokesDismissed` | Presses Escape and waits for the list to go and for focus to come back to its button, which lands a task later and would take focus from a sooner key |
 | `clockTheNextKey` | Starts the act's clock in the page: from the next key to the node an XPath names reading a given text |
 | `theActLandedWithinItsBudget` | Reads that clock, annotates the test with it and asserts it under the act's 100 ms |
+| `saysItsSentenceNotItsWord` | Asserts an alert reads the sentence a feature's refusal table holds for a word, and that the word is nowhere on the page |
 
 The sign-in code is read from that capture and from nowhere else: the api's logger is forbidden from ever
 holding one.
@@ -158,6 +159,9 @@ Four more play Claude's part in its OAuth flow on the suite's own origin — `ap
   region, its role, the next action. Never pin prose as a literal, so rewording a screen breaks no
   spec. Read a control's accessible name from the same table where one exists. Two things stay
   literal: the trust words, a closed set that is part of the behaviour, and text a person types.
+  A refusal's sentence comes from its feature's `refusal-words.ts`, or `@/shared/refusal-words.ts`
+  for the class fallbacks. A word table imports no React or tRPC code at runtime, so the suite
+  loads it without the rest of the SPA.
 - **A latency budget is measured, annotated and asserted** — `test.info().annotations.push(…)`
   beside the comparison, so a run that passes still says how close it came. A list's second is
   timed from a fresh `goto`, so no cache answers it. An act's 100 ms is timed **in the page** — a

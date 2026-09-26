@@ -223,7 +223,9 @@ export function RequestsTab() {
         Requests
       </h2>
       <OutcomeLine
-        outcome={requests.error === null ? outcome : outcomeOfRequestFailure(requests.error)}
+        outcome={
+          requests.error === null ? outcome : outcomeOfRequestFailure(requests.error, "read")
+        }
         className="mt-2"
       />
       <div aria-live="polite">

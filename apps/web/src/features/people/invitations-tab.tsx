@@ -188,7 +188,9 @@ export function InvitationsTab() {
       </h2>
       <OutcomeLine
         outcome={
-          invitations.error === null ? outcome : outcomeOfInvitationFailure(invitations.error)
+          invitations.error === null
+            ? outcome
+            : outcomeOfInvitationFailure(invitations.error, "read")
         }
         className="mt-2"
       />

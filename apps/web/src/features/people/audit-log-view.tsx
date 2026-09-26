@@ -4,7 +4,7 @@ import { refusalOf, type ApiError } from "@/shared/api/trpc.ts";
 import { Icon } from "@/shared/icon.tsx";
 import { KeystrokesAct, useKeystroke } from "@/shared/keystrokes.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
-import { failureOutcome, type SaidOfWord } from "@/shared/refusal-outcome.tsx";
+import { failureOutcome } from "@/shared/refusal-outcome.tsx";
 import { screenById } from "@/shared/screens.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
@@ -37,6 +37,7 @@ import {
   type ReadAuditEvent,
 } from "./audit-log-api.ts";
 import { AUDIT_LOG_KEYSTROKES } from "./audit-log-state.ts";
+import { SAID_OF_THE_AUDIT_LOG } from "./refusal-words.ts";
 
 const people = screenById("people");
 
@@ -72,15 +73,8 @@ const BY_WORDS = {
 const byWords = (by: AuditEventActor): string =>
   by.kind === "person" ? by.displayName : BY_WORDS[by.kind];
 
-const SAID_OF_WORD = {
-  "role-forbids": {
-    why: "Only an Admin of this workspace reads its audit log.",
-    next: "Ask one of its Admins for what you need.",
-  },
-} satisfies SaidOfWord;
-
 const outcomeOfFailure = (failure: Error | ApiError): Outcome =>
-  failureOutcome(SAID_OF_WORD, failure);
+  failureOutcome(SAID_OF_THE_AUDIT_LOG, failure, "read");
 
 export const AUDIT_LOG_TOOLBAR: ViewToolbar = {
   acts: <KeystrokesAct screen={people.name} keystrokes={Object.values(AUDIT_LOG_KEYSTROKES)} />,

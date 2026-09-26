@@ -10,11 +10,13 @@ import {
   type Refusal,
 } from "@/shared/api/trpc.ts";
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
+import type { Said } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 
-import { Refused, type Said } from "./auth-screen.tsx";
+import { Refused } from "./auth-screen.tsx";
+import { ASK_REFUSED, ASK_UNANSWERED, REASON_REFUSED } from "./refusal-words.ts";
 
 export const ASK_TO_JOIN: Keystroke = { key: "j", act: "Ask to join a workspace" };
 
@@ -44,31 +46,22 @@ const ASKED_TITLE = "ask-to-join-asked-title";
 const ACKNOWLEDGED =
   "If a workspace goes by that slug, its Admins will see that you asked and why. If one approves, an invitation comes to your email address; nothing is sent otherwise.";
 
-const MALFORMED: Said = {
-  why: "The reason needs a character other than a space.",
-  next: "Say why you are asking and send it again.",
-};
-
-const REFUSED_OTHERWISE: Said = {
-  why: "The platform could not read what this screen sent.",
-  next: "Reload the page and ask again.",
-};
-
-const UNANSWERED = "The platform did not answer, so nothing was sent. Try again in a moment.";
-
 const saidOf = (refusal: Refusal): Said =>
-  refusal.class === "malformed" ? MALFORMED : REFUSED_OTHERWISE;
+  refusal.class === "malformed" ? REASON_REFUSED : ASK_REFUSED;
 
 const minutesUntil = (seconds: number): string => {
   const minutes = Math.ceil(seconds / 60);
   return minutes === 1 ? "a minute" : `${minutes} minutes`;
 };
 
-const unansweredOf = (failure: Error | ApiError): string => {
+const unansweredOf = (failure: Error | ApiError): Said => {
   const liftsIn = ceilingLiftsIn(failure);
   return liftsIn === undefined
-    ? UNANSWERED
-    : `You have asked to join too often. Ask again in ${minutesUntil(liftsIn)}.`;
+    ? ASK_UNANSWERED
+    : {
+        why: "You have asked to join too often.",
+        next: `Ask again in ${minutesUntil(liftsIn)}.`,
+      };
 };
 
 /** Focus is moved here once the ask lands, so the answer is what a reader meets next. */
