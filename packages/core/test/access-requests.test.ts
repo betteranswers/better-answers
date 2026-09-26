@@ -613,19 +613,23 @@ describe("who may decide", () => {
 });
 
 describe("the actor-naming door", () => {
-  it.skipIf(sourceTreeIsInstrumented())("is called only by the acts ADR 0038 names", async () => {
-    const call = /\brecordFor\(/;
+  it.skipIf(sourceTreeIsInstrumented())(
+    "is called only by the auth-boundary acts the ADRs name",
+    async () => {
+      const call = /\brecordFor\(/;
 
-    expect(call.test("await recordFor(platform, tx, event);")).toBe(true);
-    expect(call.test("export const recordFor = <A extends LedgerAct>(")).toBe(false);
-    expect(call.test("import { record } from '../audit/index.ts';")).toBe(false);
+      expect(call.test("await recordFor(platform, tx, event);")).toBe(true);
+      expect(call.test("export const recordFor = <A extends LedgerAct>(")).toBe(false);
+      expect(call.test("import { record } from '../audit/index.ts';")).toBe(false);
 
-    const callers = coreSourceFiles().filter((file) => call.test(readFileSync(file, "utf8")));
+      const callers = coreSourceFiles().filter((file) => call.test(readFileSync(file, "utf8")));
 
-    expect(asSliceRelative(callers).toSorted()).toEqual([
-      "members/requests.ts",
-      "workspaces/display-name.ts",
-      "workspaces/sign-in-and-consent.ts",
-    ]);
-  });
+      expect(asSliceRelative(callers).toSorted()).toEqual([
+        "members/accepting.ts",
+        "members/requests.ts",
+        "workspaces/display-name.ts",
+        "workspaces/sign-in-and-consent.ts",
+      ]);
+    },
+  );
 });

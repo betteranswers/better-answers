@@ -10,8 +10,9 @@ import {
 } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
-import { displayNameDetour } from "@/features/auth/auth-hooks.ts";
-import { leavingFor, pageQuery } from "@/features/auth/carried-flow.ts";
+import { AcceptInvitationScreen } from "@/features/auth/accept-invitation-screen.tsx";
+import { acceptDetour, displayNameDetour } from "@/features/auth/auth-hooks.ts";
+import { backTo, leavingFor, pageQuery } from "@/features/auth/carried-flow.ts";
 import { ChooseWorkspaceScreen } from "@/features/auth/choose-workspace-screen.tsx";
 import { DisplayNameScreen } from "@/features/auth/display-name-screen.tsx";
 import { membershipRefusal, NEEDS_A_PICK } from "@/features/auth/membership.ts";
@@ -88,10 +89,21 @@ const noWorkspaceRoute = createRoute({
   component: NoWorkspaceScreen,
 });
 
-const signInAndBackTo = (href: string) => ({
-  href: `/sign-in?redirect=${encodeURIComponent(href)}`,
-  replace: true,
+/** Outside the shell: the person joining holds no membership of the workspace yet. */
+const acceptInvitationRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/invitations/$invitationId",
+  component: function AcceptInvitationPage(): ReactElement {
+    const { invitationId } = acceptInvitationRoute.useParams();
+    return <AcceptInvitationScreen invitationId={invitationId} />;
+  },
+  beforeLoad: async ({ context, location }) => {
+    const elsewhere = await acceptDetour(context.queryClient, location.pathname);
+    if (elsewhere !== undefined) throw redirect(leavingFor(elsewhere));
+  },
 });
+
+const signInAndBackTo = (href: string) => ({ href: backTo("/sign-in", href), replace: true });
 
 const shellRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -188,6 +200,7 @@ export const createAppRouter = (clients: AppClients, history?: RouterHistory) =>
       displayNameRoute,
       chooseWorkspaceRoute,
       noWorkspaceRoute,
+      acceptInvitationRoute,
       shellRoute.addChildren([indexRoute, ...controlCentreRoutes]),
       consoleRoute.addChildren([consoleIndexRoute, ...consoleRoutes]),
     ]),

@@ -24,6 +24,10 @@ const safeReturnPath = (value: string | null | undefined): string | undefined =>
   return value;
 };
 
+/** A screen, such as the sign-in screen, asked to send the person on to `path` once done. */
+export const backTo = (screen: string, path: string): string =>
+  `${screen}?redirect=${encodeURIComponent(path)}`;
+
 /** A signed flow goes on to the workspace picker; otherwise `redirect` on this origin, or home. */
 export const nextAfterSignIn = (query: string): string => {
   const carried = carriedFlow(query);

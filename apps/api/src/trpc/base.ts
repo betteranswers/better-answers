@@ -263,7 +263,14 @@ export const committedAs = async <Value, Refused>(
  */
 export const personProcedure = trpc.procedure.use(async ({ ctx, next }) => {
   const { user, session } = await sessionOf(ctx);
-  return next({ ctx: { personId: user.id, issuedAt: session.createdAt, doors: ctx.doors } });
+  return next({
+    ctx: {
+      personId: user.id,
+      sessionId: session.id,
+      issuedAt: session.createdAt,
+      doors: ctx.doors,
+    },
+  });
 });
 
 /**

@@ -47,7 +47,7 @@ export type Said = { readonly why: string; readonly next: string };
 
 const SESSION_ENDED: Said = { why: "Your session has ended.", next: "Sign in again." };
 
-function SignInAgain() {
+function SignInAgain(properties: { readonly signInAt: string }) {
   const navigate = useNavigate();
   return (
     <Button
@@ -55,7 +55,7 @@ function SignInAgain() {
       variant="link"
       className="mt-4 px-0"
       onClick={() => {
-        void navigate(leavingFor(`/sign-in${pageQuery()}`));
+        void navigate(leavingFor(properties.signInAt));
       }}
     >
       Sign in again
@@ -64,14 +64,15 @@ function SignInAgain() {
 }
 
 /**
- * A refusal shown as its own word, then why and what the reader can do next; a failure with no
- * word says `unanswered` instead.
+ * A refusal as its own word, why and what next; a wordless failure says `unanswered`. An ended
+ * session signs in at `signInAt`.
  */
 export function Refused(properties: {
   readonly id: string;
   readonly failure: Error | ApiError;
   readonly saidOf: (refusal: Refusal) => Said;
   readonly unanswered: string;
+  readonly signInAt?: string;
 }) {
   const refusal = refusalOf(properties.failure);
   if (refusal === undefined) {
@@ -88,7 +89,9 @@ export function Refused(properties: {
       <Outcome tone="refused" id={properties.id}>
         Refused: <code className="font-mono">{refusal.word}</code>. {said.why} {said.next}
       </Outcome>
-      {sessionEnded ? <SignInAgain /> : null}
+      {sessionEnded ? (
+        <SignInAgain signInAt={properties.signInAt ?? `/sign-in${pageQuery()}`} />
+      ) : null}
     </>
   );
 }
