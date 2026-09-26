@@ -3,7 +3,7 @@ import { useId, useState, type RefObject } from "react";
 import { Button } from "@/shared/ui/button.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
 
-import type { ListedMember } from "./people-api.ts";
+import { useReaderId, type ListedMember } from "./people-api.ts";
 import { nameOf } from "./words.tsx";
 
 /** Module-level, so React calls it once as the confirmation mounts, never on a re-render. */
@@ -23,6 +23,7 @@ export function MemberRemoval(properties: {
   const consequenceId = useId();
   const recordId = useId();
   const name = nameOf(member);
+  const yourself = useReaderId() === member.personId;
 
   return (
     <section aria-labelledby={headingId} className="border border-border">
@@ -31,8 +32,9 @@ export function MemberRemoval(properties: {
       </h3>
       <Collapsible open={asking} onOpenChange={setAsking} className="grid gap-3 px-4 py-3">
         <p id={consequenceId} className="text-sm text-muted-foreground">
-          {name} loses access to this workspace on every session and client they hold. Any other
-          workspace they belong to is untouched, and they stay named on what they checked.
+          {yourself
+            ? "You lose access to this workspace, People included, on every session and client you hold. Any other workspace you belong to is untouched, and you stay named on what you checked."
+            : `${name} loses access to this workspace on every session and client they hold. Any other workspace they belong to is untouched, and they stay named on what they checked.`}
         </p>
         <CollapsibleTrigger asChild>
           <Button
@@ -50,8 +52,7 @@ export function MemberRemoval(properties: {
               Confirm the removal of {name}
             </legend>
             <p id={recordId} className="text-sm text-muted-foreground">
-              One governed write, recorded on the audit log under your name. Their groups here end
-              with the membership.
+              Recorded on the audit log under your name. Their groups here end with the membership.
             </p>
             <div className="flex flex-wrap gap-2">
               <Button

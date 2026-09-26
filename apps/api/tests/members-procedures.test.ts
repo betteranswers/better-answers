@@ -20,7 +20,7 @@ import {
   refusalToAnotherWorkspacesAdmin,
   ROLE_FORBIDS_ANSWERED,
 } from "./people-refusals.ts";
-import { refusalOfCall, webSignedIn } from "./web-client.ts";
+import { refusalOfCall, webClientOf, webSignedIn } from "./web-client.ts";
 
 let app: TestApp;
 
@@ -250,9 +250,7 @@ describe.each(ACTS_ON_A_MEMBER)("who may $verb", ({ ask, recorded }) => {
 
       const refused = await refusalOfCall(ask(api, viewer.id));
 
-      expect(refused).toMatchObject({
-        data: { httpStatus: 403, refusal: { word: "role-forbids", class: "forbidden" } },
-      });
+      expect(refused).toMatchObject(ROLE_FORBIDS_ANSWERED);
       expect(await roleHeldBy(workspace.workspaceId, viewer.id)).toBe("Viewer");
       expect(await eventsIn(workspace.workspaceId, recorded)).toEqual([]);
     },
@@ -264,9 +262,7 @@ describe.each(ACTS_ON_A_MEMBER)("who may $verb", ({ ask, recorded }) => {
 
     const refused = await refusalOfCall(ask(api, viewer.id));
 
-    expect(refused).toMatchObject({
-      data: { httpStatus: 401, refusal: { word: "not-a-member", class: "unauthenticated" } },
-    });
+    expect(refused).toMatchObject(NOT_A_MEMBER_ANSWERED);
     expect(await roleHeldBy(workspace.workspaceId, viewer.id)).toBe("Viewer");
     expect(await eventsIn(workspace.workspaceId, recorded)).toEqual([]);
   });
@@ -392,10 +388,6 @@ const sessionsHeldBy = async (personId: string): Promise<number | undefined> => 
   return found.rows[0]?.held;
 };
 
-const NOT_A_MEMBER = {
-  data: { httpStatus: 401, refusal: { word: "not-a-member", class: "unauthenticated" } },
-};
-
 /** Each client signs in on its own, so the person holds a session per client. */
 const aMemberOfTwoOnFourClients = async () => {
   const acme = await app.provision({ name: "Acme" });
@@ -409,14 +401,25 @@ const aMemberOfTwoOnFourClients = async () => {
     expect((await setActiveWorkspace(browser.client, acme.workspaceId)).status).toBe(200);
     expect((await browser.api.session.membership.query()).role).toBe("Editor");
   }
-  const inAcme = await connectAsHost(app, app.client(), person, { pick: acme.workspaceId });
-  const inBeta = await connectAsHost(app, app.client(), person, { pick: beta.workspaceId });
-  return { acme, beta, person, browsers: [laptop, phone], laptop, inAcme, inBeta };
+  const acmeHost = app.client();
+  const betaHost = app.client();
+  const inAcme = await connectAsHost(app, acmeHost, person, { pick: acme.workspaceId });
+  const inBeta = await connectAsHost(app, betaHost, person, { pick: beta.workspaceId });
+  return {
+    acme,
+    beta,
+    person,
+    sessionsInAcme: [laptop.api, phone.api, webClientOf(acmeHost).api],
+    sessionInBeta: webClientOf(betaHost).api,
+    laptop,
+    inAcme,
+    inBeta,
+  };
 };
 
 describe("removing a member over tRPC", () => {
   it("refuses every session here, and keeps the person's other workspace", async () => {
-    const { acme, beta, person, browsers, laptop, inAcme, inBeta } =
+    const { acme, beta, person, sessionsInAcme, sessionInBeta, laptop, inAcme, inBeta } =
       await aMemberOfTwoOnFourClients();
     const { api } = await webSignedIn(app, acme.admin.email);
     const host = app.client();
@@ -426,11 +429,15 @@ describe("removing a member over tRPC", () => {
 
     expect(removed).toEqual({ personId: person.id, role: "Editor" });
     expect(await roleHeldBy(acme.workspaceId, person.id)).toBeUndefined();
-    for (const browser of browsers) {
-      expect(await refusalOfCall(browser.api.session.membership.query())).toMatchObject(
-        NOT_A_MEMBER,
+    for (const session of sessionsInAcme) {
+      expect(await refusalOfCall(session.session.membership.query())).toMatchObject(
+        NOT_A_MEMBER_ANSWERED,
       );
     }
+    expect(await sessionInBeta.session.membership.query()).toMatchObject({
+      workspace: { id: beta.workspaceId },
+      role: "Viewer",
+    });
     expect(await refreshTokensOf(person.id)).toEqual(
       [
         { workspace_id: acme.workspaceId, revoked: true },
@@ -459,7 +466,7 @@ describe("removing a member over tRPC", () => {
     const removed = await api.members.remove.mutate({ personId: workspace.admin.id });
 
     expect(removed).toEqual({ personId: workspace.admin.id, role: "Admin" });
-    expect(await refusalOfCall(api.members.list.query())).toMatchObject(NOT_A_MEMBER);
+    expect(await refusalOfCall(api.members.list.query())).toMatchObject(NOT_A_MEMBER_ANSWERED);
     expect(await roleHeldBy(workspace.workspaceId, second.id)).toBe("Admin");
   });
 });

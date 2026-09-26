@@ -17,7 +17,7 @@ const ROLE = boundarySchemas.member.select.shape.role;
 
 const ADMIN = "Admin" satisfies Role;
 
-/** What both acts' admission hands on, so the step judges no one. */
+/** What an Admin-only act's admission hands on, so the step judges no one. */
 type AnAdmin = UserPrincipal & { readonly role: typeof ADMIN };
 
 export type HeldMember = {

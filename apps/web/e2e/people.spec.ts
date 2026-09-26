@@ -630,7 +630,7 @@ test.describe("removing a member from their sheet", () => {
     await asked.click();
     const confirm = removal.getByRole("button", { name: "Remove Priya Shah from this workspace" });
     await expect(confirm).toHaveAccessibleDescription(
-      "One governed write, recorded on the audit log under your name. Their groups here end with the membership.",
+      "Recorded on the audit log under your name. Their groups here end with the membership.",
     );
     await expect(removal).toMatchAriaSnapshot(`
       - region "Removal":
@@ -639,7 +639,7 @@ test.describe("removing a member from their sheet", () => {
         - button "Remove Priya Shah" [expanded]
         - group "Confirm the removal of Priya Shah":
           - text: Confirm the removal of Priya Shah
-          - paragraph: /One governed write/
+          - paragraph: /Recorded on the audit log/
           - button "Remove Priya Shah from this workspace"
           - button "Keep Priya Shah"
     `);
@@ -681,6 +681,14 @@ test.describe("removing a member from their sheet", () => {
 
   test("an Admin removing themself is refused the list at once", async ({ page, request }) => {
     await anAdminBesideAnotherAtPeople(page, request, "Esk Tinsmiths");
+    await memberButton(page, "Test person").click();
+    await expect(
+      removalOf(sheetOf(page, "Test person")).getByRole("button", {
+        name: "Remove Test person",
+        exact: true,
+      }),
+    ).toHaveAccessibleDescription(/^You lose access to this workspace, People included,/);
+    await page.keyboard.press("Escape");
 
     await removedThroughTheirSheet(page, "Test person");
 
