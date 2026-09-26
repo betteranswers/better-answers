@@ -282,7 +282,7 @@ describe("the hash the publish row carries", () => {
     expect(after).not.toBe(before);
   });
 
-  it("takes the shape of the ledger's content-hash kind", async () => {
+  it("takes the shape of the audit log's content-hash kind", async () => {
     const scenario = await arrange();
     const binding = await bindingIn(scenario);
 

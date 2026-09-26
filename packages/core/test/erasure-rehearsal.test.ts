@@ -12,7 +12,7 @@ import { revokeCredentials } from "../src/workspaces/index.ts";
 import { bundleHistory, everyObjectOf, fileAtCommit } from "./bundle.ts";
 import { erasureDoorsFor } from "./erasure-doors.ts";
 import { asANewOperator } from "./platform.ts";
-import { ledgerRowsOf } from "./sourced-concept.ts";
+import { auditEventRowsOf } from "./sourced-concept.ts";
 import { objectStoreForSuite, textOf } from "./suite-objects.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
@@ -299,7 +299,7 @@ describe("the rehearsal", () => {
 
     const rehearsed = await rehearsing(scenario);
 
-    const rows = await ledgerRowsOf(db().pool, scenario.workspaceId, REHEARSED);
+    const rows = await auditEventRowsOf(db().pool, scenario.workspaceId, REHEARSED);
     expect(rows).toEqual([
       {
         id: rehearsed.auditEventId,

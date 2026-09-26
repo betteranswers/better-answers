@@ -4,20 +4,20 @@ export const A_MEMBER =
 export const AN_INVITATION = `INSERT INTO invitation (id, workspace_id, email, role, expires_at, inviter_id)
        VALUES ($1, $2, 'x@example.invalid', $3, now(), $4)`;
 
-export const A_LEDGER_ROW = `INSERT INTO audit_event (id, workspace_id, act, actor, subject_id, detail)
+export const AN_AUDIT_EVENT_ROW = `INSERT INTO audit_event (id, workspace_id, act, actor, subject_id, detail)
        VALUES ($1, $2, $3, $4, $5, '{}')`;
 
 export const THE_FAMILY_AND_SUBJECT_IT_LANDS_IN = "RETURNING family, subject_kind";
 
 export const THE_DETAIL_EDITED = `ON CONFLICT (id) DO UPDATE SET detail = '{"edited": true}'`;
 
-export const AN_IDENTITY_SET_LEDGER_ROW = `INSERT INTO identity_audit_event (id, act, actor, subject_id, detail)
+export const AN_IDENTITY_SET_AUDIT_EVENT_ROW = `INSERT INTO identity_audit_event (id, act, actor, subject_id, detail)
        VALUES ($1, $2, $3, $4, '{}')`;
 
-export const AN_IDENTITY_SET_LEDGER_ROW_WITH_ITS_FAMILY = `INSERT INTO identity_audit_event (id, act, family, actor, subject_id, detail)
+export const AN_IDENTITY_SET_AUDIT_EVENT_ROW_WITH_ITS_FAMILY = `INSERT INTO identity_audit_event (id, act, family, actor, subject_id, detail)
        VALUES ($1, $2, $3, $4, $5, '{}')`;
 
-export const A_LEDGER_ROW_WITH_ITS_FAMILY = `INSERT INTO audit_event (id, workspace_id, act, family, actor, subject_id, detail)
+export const AN_AUDIT_EVENT_ROW_WITH_ITS_FAMILY = `INSERT INTO audit_event (id, workspace_id, act, family, actor, subject_id, detail)
        VALUES ($1, $2, $3, $4, $5, $6, '{}')`;
 
 export const A_GROUP = `INSERT INTO "group" (id, workspace_id, name, origin) VALUES ($1, $2, $3, 'admin-curated')`;

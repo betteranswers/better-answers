@@ -31,7 +31,7 @@ export const RLS_EXEMPTIONS = {
   "public.sweep_pass":
     "One row per sweep pass, and a pass covers every workspace at once: a fact about the deploy's schedule that names no tenant and holds counts alone.",
   "public.identity_audit_event":
-    "The identity-set ledger: an act on a person's own identity belongs to no workspace, so no scope could hold its row; it names people by person id and acts by their word, never a name or an address.",
+    "The identity-set audit log: an act on a person's own identity belongs to no workspace, so no scope could hold its row; it names people by person id and acts by their word, never a name or an address.",
 } satisfies Record<string, string>;
 
 export const EXEMPT_TABLE_NAMES: readonly string[] = [

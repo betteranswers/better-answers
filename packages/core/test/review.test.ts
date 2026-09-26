@@ -253,11 +253,11 @@ const jobsOf = async (workspaceId: string) => {
 
 const narrowingLeftBehindIn = async (workspaceId: string, documentId: string) => ({
   classes: await chunkClassesOf(workspaceId, documentId),
-  ledger: await batchedRowsOf(db().pool, workspaceId, "sources.document.narrowed"),
+  auditEvents: await batchedRowsOf(db().pool, workspaceId, "sources.document.narrowed"),
   jobs: await jobsOf(workspaceId),
 });
 
-const NOTHING_NARROWED = { classes: ["Internal"], ledger: [], jobs: [] };
+const NOTHING_NARROWED = { classes: ["Internal"], auditEvents: [], jobs: [] };
 
 const findingsAs = (who: UserPrincipal, bindingId: string) =>
   acting(who, (principal, tx) =>
@@ -635,11 +635,15 @@ describe("an Admin keeping named finding groups in the text", () => {
       restore_reason: null,
     });
 
-    const ledger = await batchedRowsOf(db().pool, scenario.workspaceId, "sources.finding.restored");
+    const auditEvents = await batchedRowsOf(
+      db().pool,
+      scenario.workspaceId,
+      "sources.finding.restored",
+    );
     const batchId = outcome.ok ? outcome.value.batchId : undefined;
     expect(typeof batchId).toBe("string");
 
-    expect(ledger).toEqual(
+    expect(auditEvents).toEqual(
       spans.map((span) => ({ subject_id: span, batch_id: batchId, detail: { findingId: span } })),
     );
     expect(await jobsOf(scenario.workspaceId)).toEqual([
@@ -843,7 +847,7 @@ describe("an Admin keeping named finding groups in the text", () => {
 });
 
 describe("an Admin narrowing named documents", () => {
-  it("takes each to Restricted with one ledger row, chunks untouched", async () => {
+  it("takes each to Restricted with one audit event, chunks untouched", async () => {
     const scenario = await arrange();
     const { bindingId, first, second } = await bindingWithTwoDocuments(scenario);
     const stoodAt = await chunkVersionsOf(db(), scenario.workspaceId, bindingId);
@@ -956,7 +960,7 @@ describe("an Admin narrowing named documents", () => {
     expect(await jobsOf(scenario.workspaceId)).toEqual([]);
   });
 
-  it("narrows not one document when the ledger refuses the event", async () => {
+  it("narrows no document when the audit log refuses the event", async () => {
     const scenario = await arrange();
     const { bindingId, first } = await bindingWithTwoDocuments(scenario);
     const shown = await findingIn(scenario.workspaceId, first.documentId);
@@ -1158,7 +1162,7 @@ describe("an Admin dismissing finding groups as not special category", () => {
     expect(await reviewOf(scenario.workspaceId, left)).toEqual(UNREVIEWED);
   });
 
-  it("writes a batched ledger row per document, queueing one run", async () => {
+  it("writes a batched audit event per document, queueing one run", async () => {
     const scenario = await arrange();
 
     const { bindingId, first, second, outcome } = await dismissingTwoGroupsOfThree(scenario);
@@ -1253,7 +1257,7 @@ describe("an Admin dismissing finding groups as not special category", () => {
 
   it.each([
     ["the queue refuses its run", "job"],
-    ["the ledger refuses the event", "audit_event"],
+    ["the audit log refuses the event", "audit_event"],
   ] as const)("rejects, dismissing no span, when %s", async (_when, table) => {
     const scenario = await arrange();
     const { bindingId, first } = await twoDocumentsTheSeamNarrowed(scenario);

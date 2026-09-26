@@ -62,7 +62,7 @@ const restoreEventsOf = async (pool: pg.Pool, workspaceId: string) => {
 };
 
 describe("an Admin's restore of one always-set span", () => {
-  it("writes the instant, actor and reason, with a ledger row", async () => {
+  it("writes the instant, actor and reason, with an audit event", async () => {
     const scenario = await arrange();
     const { findingId } = await findingIn(scenario);
 
@@ -95,7 +95,7 @@ describe("an Admin's restore of one always-set span", () => {
     ]);
   });
 
-  it("corrects a reason on restoring again, keeping both ledger rows", async () => {
+  it("corrects a reason on restoring again, keeping both audit events", async () => {
     const scenario = await arrange();
     const { findingId } = await findingIn(scenario);
     const corrected = "The account is the company's own; the supplier form prints it in full.";
@@ -147,7 +147,7 @@ describe("what the restore act refuses", () => {
       "not-the-always-set",
     ],
   ] as const)(
-    "refuses %s, moving neither row nor ledger",
+    "refuses %s, moving neither row nor audit log",
     async (_who, principalOf, overrides, refusal) => {
       const scenario = await arrange();
       const { findingId } = await findingIn(scenario, overrides);
@@ -208,8 +208,8 @@ describe("what the restore act refuses", () => {
   });
 });
 
-describe("the restore and its ledger row land or fail together", () => {
-  it("leaves the finding unrestored when the ledger refuses the event", async () => {
+describe("the restore and its audit event land or fail together", () => {
+  it("leaves the finding unrestored when an audit event is refused", async () => {
     const scenario = await arrange();
     const { findingId } = await findingIn(scenario);
 

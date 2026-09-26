@@ -10,7 +10,7 @@ import {
 import type { z } from "zod";
 
 import { readableClause, readableParameters } from "../access/index.ts";
-import { act, declareActs, record, type LedgerAct } from "../audit/index.ts";
+import { act, declareActs, record, type AuditAct } from "../audit/index.ts";
 import {
   actorIdOf,
   attempt,
@@ -256,7 +256,7 @@ const decide = async (
   principal: UserPrincipal,
   doors: { readonly git: GitDoor; readonly postgres: PostgresDoor },
   input: DecideSuggestionInput,
-  decision: { readonly status: SuggestionStatus; readonly act: LedgerAct },
+  decision: { readonly status: SuggestionStatus; readonly act: AuditAct },
 ): Promise<Result<SuggestionDecided, DecideSuggestionRefusal | Error>> => {
   const admin = requireAdmin(principal);
   if (!admin.ok) return err(admin.error);

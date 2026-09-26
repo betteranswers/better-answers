@@ -41,7 +41,7 @@ import {
   documentUnder,
   edgeVisibilityHeld,
   groupNamed,
-  ledgerRowsOf,
+  auditEventRowsOf,
   publishedOnceIndexed,
   restrictedAndInternal,
   seededBy,
@@ -636,16 +636,16 @@ describe("narrowing a binding", () => {
       ...EVERYONE,
     });
 
-    expect(await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.narrowed")).toEqual(
-      [
-        {
-          id: narrowed.ok ? narrowed.value.auditEventId : "",
-          actor: `human:${scenario.admin.userId}`,
-          subject_id: binding.bindingId,
-          detail: { bindingId: binding.bindingId, sensitivity: "Restricted", audience: "everyone" },
-        },
-      ],
-    );
+    expect(
+      await auditEventRowsOf(db().pool, scenario.workspaceId, "sources.binding.narrowed"),
+    ).toEqual([
+      {
+        id: narrowed.ok ? narrowed.value.auditEventId : "",
+        actor: `human:${scenario.admin.userId}`,
+        subject_id: binding.bindingId,
+        detail: { bindingId: binding.bindingId, sensitivity: "Restricted", audience: "everyone" },
+      },
+    ]);
   });
 
   it("touches no document's chunk row, whatever its own class", async () => {
@@ -1046,7 +1046,7 @@ describe("narrowing a binding", () => {
       bothAt({ sensitivity: "Restricted", ...EVERYONE }),
     );
     expect(
-      await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.narrowed"),
+      await auditEventRowsOf(db().pool, scenario.workspaceId, "sources.binding.narrowed"),
     ).toHaveLength(2);
   });
 
@@ -1083,9 +1083,9 @@ describe("narrowing a binding", () => {
     expect(await chunkVisibilityOf(scenario.workspaceId, binding.documentId)).toEqual([
       { sensitivity: "Internal", ...EVERYONE },
     ]);
-    expect(await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.narrowed")).toEqual(
-      [],
-    );
+    expect(
+      await auditEventRowsOf(db().pool, scenario.workspaceId, "sources.binding.narrowed"),
+    ).toEqual([]);
   });
 });
 
@@ -1120,7 +1120,7 @@ describe("publishing a binding", () => {
     ).toEqual(internalToHr);
     expect(await heldRow(scenario.workspaceId, untouched.iri)).toEqual(restrictedToHr);
     expect(
-      await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.published"),
+      await auditEventRowsOf(db().pool, scenario.workspaceId, "sources.binding.published"),
     ).toMatchObject([
       { subject_id: binding.bindingId, detail: { sensitivity: "Internal", audience: "groups" } },
     ]);
@@ -1202,7 +1202,9 @@ describe("widening a binding", () => {
     expect(await chunkVisibilityOf(scenario.workspaceId, binding.documentId)).toEqual([internal]);
     expect(await heldRow(scenario.workspaceId, untouched.iri)).toEqual(restrictedToHr);
 
-    expect(await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.widened")).toEqual([
+    expect(
+      await auditEventRowsOf(db().pool, scenario.workspaceId, "sources.binding.widened"),
+    ).toEqual([
       {
         id: widened.ok ? widened.value.auditEventId : "",
         actor: `human:${scenario.admin.userId}`,
@@ -1315,7 +1317,7 @@ describe("widening a binding", () => {
       ...EVERYONE,
     });
     expect(
-      await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.widened"),
+      await auditEventRowsOf(db().pool, scenario.workspaceId, "sources.binding.widened"),
     ).toMatchObject([{ subject_id: reviewed.bindingId }]);
   });
 
@@ -1339,9 +1341,9 @@ describe("widening a binding", () => {
     expect(
       await visibilityHeld(db().pool, "source_binding", scenario.workspaceId, forBoth.bindingId),
     ).toEqual({ sensitivity: "Internal", audience: "groups", audience_groups: [hr, sales] });
-    expect(await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.widened")).toEqual(
-      [],
-    );
+    expect(
+      await auditEventRowsOf(db().pool, scenario.workspaceId, "sources.binding.widened"),
+    ).toEqual([]);
   });
 
   it("refuses a non-Admin, an unknown binding and a foreign group", async () => {
@@ -1393,9 +1395,9 @@ describe("widening a binding", () => {
       await visibilityHeld(db().pool, "source_binding", scenario.workspaceId, binding.bindingId),
     ).toEqual(restricted);
     expect(await heldRow(scenario.workspaceId, written.iri)).toEqual(restricted);
-    expect(await ledgerRowsOf(db().pool, scenario.workspaceId, "sources.binding.widened")).toEqual(
-      [],
-    );
+    expect(
+      await auditEventRowsOf(db().pool, scenario.workspaceId, "sources.binding.widened"),
+    ).toEqual([]);
   });
 });
 
@@ -1535,7 +1537,7 @@ describe("an Admin's recorded override", () => {
       { actor: `human:${scenario.admin.userId}`, audit_event_id: auditEventId },
     ]);
     expect(
-      await ledgerRowsOf(db().pool, scenario.workspaceId, "knowledge.concept.class_overridden"),
+      await auditEventRowsOf(db().pool, scenario.workspaceId, "knowledge.concept.class_overridden"),
     ).toEqual([
       {
         id: auditEventId,
@@ -1599,7 +1601,7 @@ describe("an Admin's recorded override", () => {
       "malformed",
     ]);
     expect(
-      await ledgerRowsOf(db().pool, scenario.workspaceId, "knowledge.concept.class_overridden"),
+      await auditEventRowsOf(db().pool, scenario.workspaceId, "knowledge.concept.class_overridden"),
     ).toEqual([]);
   });
 
@@ -1631,7 +1633,7 @@ describe("an Admin's recorded override", () => {
       ...EVERYONE,
     });
     expect(
-      await ledgerRowsOf(db().pool, scenario.workspaceId, "knowledge.concept.class_overridden"),
+      await auditEventRowsOf(db().pool, scenario.workspaceId, "knowledge.concept.class_overridden"),
     ).toEqual([]);
   });
 });

@@ -51,7 +51,7 @@ const rowsFor = async (workspaceId: string) => {
   return counted.rows[0];
 };
 
-const ledgerOf = async (workspaceId: string) => {
+const knowledgeEventsOf = async (workspaceId: string) => {
   const found = await db().pool.query<Record<string, unknown>>(
     `SELECT e.act, e.actor, e.subject_kind, e.subject_id, e.detail, c.sha, c.parent_sha, c.actor AS committer
        FROM audit_event e
@@ -116,7 +116,7 @@ describe("the manifest, the bundle's first commit", () => {
         "",
       ].join("\n"),
     );
-    expect(await ledgerOf(scenario.workspaceId)).toEqual([
+    expect(await knowledgeEventsOf(scenario.workspaceId)).toEqual([
       {
         act: "knowledge.manifest.written",
         actor: `human:${scenario.editor.userId}`,

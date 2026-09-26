@@ -38,7 +38,7 @@ import { authorLinesOf, bundleHistory, everyObjectOf, objectPresent } from "./bu
 import { erasureDoorsFor } from "./erasure-doors.ts";
 import { identityRowsFor, verificationCodeFor } from "./identity-rows.ts";
 import { bootstrap } from "./platform.ts";
-import { ledgerRowsOf } from "./sourced-concept.ts";
+import { auditEventRowsOf } from "./sourced-concept.ts";
 import { objectStoreForSuite, textOf } from "./suite-objects.ts";
 import {
   addressOf,
@@ -738,7 +738,7 @@ describe("the lock the hourly dump waits behind", () => {
   });
 });
 
-describe("the ledger an erasure never rewrites", () => {
+describe("the audit log an erasure never rewrites", () => {
   it("books completion to the platform actor, leaving earlier rows unchanged", async () => {
     const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
     const before = await rowTextIn("audit_event", scenario.workspaceId);
@@ -750,7 +750,7 @@ describe("the ledger an erasure never rewrites", () => {
     expect(after.filter((row) => earlier.has(row.id))).toEqual(before);
     expect(after.filter((row) => !earlier.has(row.id))).toHaveLength(1);
 
-    const completions = await ledgerRowsOf(db().pool, scenario.workspaceId, COMPLETED);
+    const completions = await auditEventRowsOf(db().pool, scenario.workspaceId, COMPLETED);
     expect(
       completions.map((row) => ({ id: row.id, actor: row.actor, subject: row.subject_id })),
     ).toEqual([{ id: done.auditEventId, actor: ERASURE_ACTOR, subject: done.erasureRequestId }]);
@@ -763,7 +763,7 @@ describe("the ledger an erasure never rewrites", () => {
     ]);
   });
 
-  it("leaves the identity-set ledger rows as they were", async () => {
+  it("leaves the identity-set audit events as they were", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
     const named = await setDisplayName(bootstrap, scenario.postgres, {
       personId: person.id,
@@ -804,8 +804,8 @@ describe("the ledger an erasure never rewrites", () => {
     const forTheNamed = await completing(named.scenario, named.subjectRequestId);
     const forTheAddress = await completing(byAddressAlone, anonymous.id);
 
-    const [namedRow] = await ledgerRowsOf(db().pool, named.scenario.workspaceId, COMPLETED);
-    const [foundRow] = await ledgerRowsOf(db().pool, byAddressAlone.workspaceId, COMPLETED);
+    const [namedRow] = await auditEventRowsOf(db().pool, named.scenario.workspaceId, COMPLETED);
+    const [foundRow] = await auditEventRowsOf(db().pool, byAddressAlone.workspaceId, COMPLETED);
     expect({ id: namedRow?.id, personId: namedRow?.detail["personId"] }).toEqual({
       id: forTheNamed.auditEventId,
       personId: named.person.id,
@@ -824,12 +824,12 @@ describe("the ledger an erasure never rewrites", () => {
 });
 
 describe("a second run of the routine", () => {
-  it("writes one more ledger event and moves nothing else", async () => {
+  it("writes one more audit event and moves nothing else", async () => {
     const { scenario, subjectRequestId } = await workspaceWithAnErasureRequest();
 
     const first = await completing(scenario, subjectRequestId);
     const requests = await rowTextIn("erasure_request", scenario.workspaceId);
-    const ledger = await rowTextIn("audit_event", scenario.workspaceId);
+    const auditEvents = await rowTextIn("audit_event", scenario.workspaceId);
 
     const again = await completing(scenario, subjectRequestId, RAN_AGAIN_AT);
 
@@ -838,8 +838,8 @@ describe("a second run of the routine", () => {
     expect(again.completedAt).toEqual(first.completedAt);
 
     const after = await rowTextIn("audit_event", scenario.workspaceId);
-    const earlier = new Set(ledger.map((row) => row.id));
-    expect(after.filter((row) => earlier.has(row.id))).toEqual(ledger);
+    const earlier = new Set(auditEvents.map((row) => row.id));
+    expect(after.filter((row) => earlier.has(row.id))).toEqual(auditEvents);
     expect(after.filter((row) => !earlier.has(row.id)).map((row) => row.id)).toEqual([
       again.auditEventId,
     ]);
@@ -1074,7 +1074,7 @@ describe("the checks the rewrite moved", () => {
 });
 
 describe("the identity set on the person's last membership", () => {
-  it("pseudonymises the user row, keeping its id for the ledger", async () => {
+  it("pseudonymises the user row, keeping its id for audit events", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
     const acted = await seedingWith(db().pool, (seed) =>
       seed.auditEvent({

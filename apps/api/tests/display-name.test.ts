@@ -62,7 +62,7 @@ describe("a signed-in person setting their own display name over tRPC", () => {
     expect(await response.json()).toMatchObject(NO_SESSION_ANSWERED);
   });
 
-  it("records one identity-set ledger row by person id, not name", async () => {
+  it("records one identity-set audit event by person id, not name", async () => {
     const person = await aPersonWithNoDisplayName();
     const { api } = await webSignedIn(app(), person.email);
     const displayName = `Ada ${person.id.slice(-6)}`;

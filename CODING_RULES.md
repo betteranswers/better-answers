@@ -274,7 +274,7 @@ The four families are the one closed list: people, knowledge, sources, platform.
 
 ### [AUDIT3] Derive the actor as an `ActorId`
 
-The row's actor is the kernel's `ActorId`, derived from the Principal by the kernel's one function. It is never composed by hand, and never an email, a display name or a session. A concept file keeps `human:<email>` in `generated.by` and `verified[].by`. The two forms differ by decision, which is why erasure rewrites files and never the ledger.
+The row's actor is the kernel's `ActorId`, derived from the Principal by the kernel's one function. It is never composed by hand, and never an email, a display name or a session. A concept file keeps `human:<email>` in `generated.by` and `verified[].by`. The two forms differ by decision, which is why erasure rewrites files and never the audit log.
 
 ### [AUDIT4] Audit a platform or a deferred act under its own actor
 
@@ -285,15 +285,15 @@ Work that outlives a session names the actor the kernel derives from its princip
 
 ### [AUDIT5] Carry ids and role words in the detail
 
-The structured detail names a record by its id, and a role by its word: Admin, Editor, Viewer. It carries an act's confirmations as typed fields. It never carries an email, a display name, a prompt or a completion. A ledger holding one would need rewriting on erasure, and the ledger is never rewritten.
+The structured detail names a record by its id, and a role by its word: Admin, Editor, Viewer. It carries an act's confirmations as typed fields. It never carries an email, a display name, a prompt or a completion. An audit log holding one would need rewriting on erasure, and the audit log is never rewritten.
 
-### [AUDIT6] Keep the ledger append-only in the database
+### [AUDIT6] Keep the audit log append-only in the database
 
 The migration that creates `audit_event` or `identity_audit_event` revokes `UPDATE` and `DELETE` from the api's role, and grants the worker's role nothing. Each refusal is tested beside the path it serves.
 
 ### [AUDIT7] Mint the row's id before the write
 
-The writer mints a ULID through the kernel minter, and the column has no database default. So a governed write mints its id before its git commit, and a ledger row and a commit join on one id.
+The writer mints a ULID through the kernel minter, and the column has no database default. So a governed write mints its id before its git commit, and an audit event and a commit join on one id.
 
 ### [AUDIT8] Keep a read, a run and a health check out of the audit log
 

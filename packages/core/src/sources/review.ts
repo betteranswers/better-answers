@@ -13,7 +13,7 @@ import { byCodeUnit } from "@better-answers/schema/code-unit";
 import { z } from "zod";
 
 import { narrower, type Sensitivity } from "../access/index.ts";
-import { act, declareActs, record, type DetailOf, type LedgerAct } from "../audit/index.ts";
+import { act, declareActs, record, type DetailOf, type AuditAct } from "../audit/index.ts";
 import { openingACascadeOverHeldGroups } from "../concepts/index.ts";
 import {
   actorIdOf,
@@ -368,7 +368,7 @@ export const keepInText = async (
   const { admin, workspaceId, bindingId } = acting;
 
   const named = spans.map((span) => span.id);
-  /** One ledger row per span, so the batch counts spans, not the documents the answer names. */
+  /** One audit event per span, so the batch counts spans, not the documents the answer names. */
   const batchId = named.length > 1 ? ulid() : undefined;
   for (const findingId of named) {
     const restored = await restoreFinding(admin, tx, {
@@ -400,10 +400,10 @@ const REVIEW_ACTS = declareActs("sources", {
   }),
 });
 
-const recordEachDocument = async <A extends LedgerAct>(
+const recordEachDocument = async <A extends AuditAct>(
   admin: AdminUserPrincipal,
   tx: Tx,
-  ledgerAct: A,
+  auditAct: A,
   documentIds: readonly string[],
   detailOf: (documentId: string) => DetailOf<A["detail"]>,
 ): Promise<string | undefined> => {
@@ -411,7 +411,7 @@ const recordEachDocument = async <A extends LedgerAct>(
   for (const documentId of documentIds) {
     await record(admin, tx, {
       id: ulid(),
-      act: ledgerAct,
+      act: auditAct,
       subjectId: documentId,
       detail: detailOf(documentId),
       batchId,
@@ -580,7 +580,7 @@ const DISMISSED_REVIEW = `UPDATE finding
       WHERE workspace_id = $1 AND id = ANY($2::text[])`;
 
 /**
- * Dismisses each finding the document's last redaction raised in the groups, with a ledger row per
+ * Dismisses each finding the document's last redaction raised in the groups, with an audit event per
  * document, and queues an index run. A group outside the special category refuses the whole
  * command.
  */

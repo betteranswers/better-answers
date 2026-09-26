@@ -1,7 +1,7 @@
 import { boundarySchemas, FAMILIES } from "@better-answers/schema";
 import { z } from "zod";
 
-import { eventsNewestFirst, type LedgerPage, type LedgerRow } from "../audit/index.ts";
+import { eventsNewestFirst, type AuditEventPage, type AuditEventRow } from "../audit/index.ts";
 import {
   admit,
   attempt,
@@ -46,16 +46,16 @@ type AuditEventActor =
   | { readonly kind: "platform" };
 
 type ReadAuditEvent = Pick<
-  LedgerRow,
+  AuditEventRow,
   "id" | "act" | "family" | "subjectKind" | "subjectId" | "actor"
 > & {
   /** An ISO instant, which is what a `Date` becomes on the wire anyway. */
   readonly at: string;
   readonly by: AuditEventActor;
-  readonly detail: NonNullable<LedgerRow["detail"]>;
+  readonly detail: NonNullable<AuditEventRow["detail"]>;
 };
 
-export type AuditLogPage = Omit<LedgerPage, "rows"> & {
+export type AuditLogPage = Omit<AuditEventPage, "rows"> & {
   readonly events: readonly ReadAuditEvent[];
 };
 
@@ -65,7 +65,7 @@ const personIn = (actor: string): UserId | undefined =>
 /** By person id, never through the membership, so a name stands after its member leaves. */
 const namesOf = async (
   tx: Tx,
-  rows: readonly LedgerRow[],
+  rows: readonly AuditEventRow[],
 ): Promise<ReadonlyMap<string, string>> => {
   const people = new Set(rows.map((row) => personIn(row.actor)));
   people.delete(undefined);
@@ -85,7 +85,7 @@ const actorOf = (actor: string, names: ReadonlyMap<string, string>): AuditEventA
     : { kind: "person", displayName };
 };
 
-const eventOf = (row: LedgerRow, names: ReadonlyMap<string, string>): ReadAuditEvent => ({
+const eventOf = (row: AuditEventRow, names: ReadonlyMap<string, string>): ReadAuditEvent => ({
   id: row.id,
   act: row.act,
   family: row.family,

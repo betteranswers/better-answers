@@ -133,7 +133,7 @@ describe("counting a workspace's map", () => {
     expect(counted).toEqual({ ok: false, error: "malformed" });
   });
 
-  it("writes no ledger row, because a count is a read", async () => {
+  it("writes no audit event, because a count is a read", async () => {
     const workspace = await arrange();
     await mapWithLeftovers(workspace);
 
@@ -156,7 +156,7 @@ describe("sweeping a workspace's map", () => {
     expect(await rowsOf(workspace.workspaceId, 2)).toEqual([0, 0]);
   });
 
-  it("writes one ledger row per removed generation, under one batch", async () => {
+  it("writes one audit event per removed generation, under one batch", async () => {
     const workspace = await arrange();
     await mapWithLeftovers(workspace);
 
@@ -263,7 +263,7 @@ describe("rebuilding a workspace's map", () => {
   });
 });
 
-describe("a sweep whose ledger row cannot be written", () => {
+describe("a sweep whose audit event cannot be written", () => {
   it("removes no generation at all", async () => {
     const workspace = await arrange();
     await mapWithLeftovers(workspace);

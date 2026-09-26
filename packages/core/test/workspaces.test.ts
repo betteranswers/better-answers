@@ -135,8 +135,8 @@ describe("provisioning a workspace", () => {
 
     const provisioned = await provisionWorkspace(bootstrap, door, {
       id,
-      name: "Ledgered",
-      slug: `ledgered-${id.toLowerCase()}`,
+      name: "Audited",
+      slug: `audited-${id.toLowerCase()}`,
       adminUserId,
     });
 
@@ -912,8 +912,8 @@ describe("adding a signed-in person as a member, the platform's act", () => {
     },
   );
 
-  it("writes one people.member.added row to the workspace's own ledger", async () => {
-    const { door, workspaceId } = await provisionedWorkspace(db(), "Ledgered");
+  it("writes one people.member.added row to the workspace's own audit log", async () => {
+    const { door, workspaceId } = await provisionedWorkspace(db(), "Audited");
     const { email, userId } = await signedIn();
 
     await addMember(bootstrap, door, { workspaceId, email, role: "Editor" });
@@ -932,7 +932,7 @@ describe("adding a signed-in person as a member, the platform's act", () => {
     ]);
   });
 
-  it("writes the membership and its ledger row together, or neither", async () => {
+  it("writes the membership and its audit event together, or neither", async () => {
     const { door, workspaceId } = await provisionedWorkspace(db(), "Atomic");
     const { email, userId } = await signedIn();
 

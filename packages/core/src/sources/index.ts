@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { visibilityAgreed, visibilityOf, widens, type Visibility } from "../access/index.ts";
-import { act, declareActs, record, type AuditEvent, type LedgerAct } from "../audit/index.ts";
+import { act, declareActs, record, type AuditEvent, type AuditAct } from "../audit/index.ts";
 import { attempt, err, ok, ulid, type Result, type UserPrincipal } from "../kernel/index.ts";
 import { openingACascadeOverHeldGroups } from "../concepts/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
@@ -183,11 +183,11 @@ const classAskedOf = async (
   return ok({ acting: acting.value, from: visibilityOf(current.value), next });
 };
 
-const classSet = async <A extends LedgerAct>(
+const classSet = async <A extends AuditAct>(
   acting: ActingOnBinding,
   tx: Tx,
   next: Visibility,
-  ledger: Pick<AuditEvent<A>, "act" | "detail">,
+  auditEvent: Pick<AuditEvent<A>, "act" | "detail">,
 ): Promise<Result<BindingClassSet, Error>> => {
   const { admin, workspaceId, bindingId } = acting;
   const written = await attempt(() =>
@@ -200,7 +200,7 @@ const classSet = async <A extends LedgerAct>(
   if (!written.ok) return err(written.error);
 
   const auditEventId = ulid();
-  await record(admin, tx, { id: auditEventId, subjectId: bindingId, ...ledger });
+  await record(admin, tx, { id: auditEventId, subjectId: bindingId, ...auditEvent });
   const cascaded = await attempt(() => cascadeOverEvidence(admin, tx, { bindingId }));
   if (!cascaded.ok) return err(cascaded.error);
   return ok({ bindingId, auditEventId, visibility: next, ...cascaded.value });

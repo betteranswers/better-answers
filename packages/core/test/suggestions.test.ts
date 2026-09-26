@@ -122,7 +122,7 @@ const suggestionRow = async (suggestionId: string) => {
   return found.rows[0];
 };
 
-const ledgerFor = async (workspaceId: string, act: string) => {
+const auditEventsFor = async (workspaceId: string, act: string) => {
   const found = await db().pool.query<Record<string, unknown>>(
     "SELECT act, subject_id, subject_kind, batch_id, detail FROM audit_event WHERE workspace_id = $1 AND act = $2 ORDER BY id",
     [workspaceId, act],
@@ -367,7 +367,7 @@ describe("accepting a suggestion", () => {
       decider: `human:${scenario.admin.userId}`,
       reason: null,
     });
-    expect(await ledgerFor(scenario.workspaceId, "knowledge.suggestion.accepted")).toEqual([
+    expect(await auditEventsFor(scenario.workspaceId, "knowledge.suggestion.accepted")).toEqual([
       {
         act: "knowledge.suggestion.accepted",
         subject_id: set.suggestionIds[0],
@@ -493,7 +493,7 @@ describe("accepting a suggestion", () => {
 
     expect(outcomes.map(refusalOf)).toEqual([undefined, undefined, undefined]);
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toHaveLength(3);
-    const rows = await ledgerFor(scenario.workspaceId, "knowledge.suggestion.accepted");
+    const rows = await auditEventsFor(scenario.workspaceId, "knowledge.suggestion.accepted");
     expect(rows).toHaveLength(3);
     const batches = new Set(rows.map((row) => row["batch_id"]));
     expect(batches.size).toBe(1);
@@ -573,7 +573,9 @@ describe("an acceptance whose ground moved", () => {
       target_iri: null,
     });
     expect(String(row?.["reason"])).toContain("moved");
-    expect(await ledgerFor(scenario.workspaceId, "knowledge.suggestion.returned")).toHaveLength(1);
+    expect(
+      await auditEventsFor(scenario.workspaceId, "knowledge.suggestion.returned"),
+    ).toHaveLength(1);
   });
 
   it("is refused and returned when the payload's base content moved", async () => {
@@ -629,7 +631,7 @@ describe("declining a suggestion", () => {
     });
     expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual([]);
 
-    expect(await ledgerFor(scenario.workspaceId, "knowledge.suggestion.declined")).toEqual([
+    expect(await auditEventsFor(scenario.workspaceId, "knowledge.suggestion.declined")).toEqual([
       {
         act: "knowledge.suggestion.declined",
         subject_id: set.suggestionIds[0],
@@ -685,7 +687,7 @@ describe("declining a suggestion", () => {
     });
 
     expect(declined).toEqual({ ok: false, error: "no-such-suggestion" });
-    expect(await ledgerFor(scenario.workspaceId, "knowledge.suggestion.declined")).toEqual([]);
+    expect(await auditEventsFor(scenario.workspaceId, "knowledge.suggestion.declined")).toEqual([]);
   });
 
   const anError: unknown = expect.any(Error);
@@ -740,7 +742,7 @@ describe("declining a suggestion", () => {
 
     expect(refused).toEqual({ ok: false, error: "malformed" });
     expect(await suggestionRow(suggestionId)).toMatchObject({ status: "waiting" });
-    expect(await ledgerFor(scenario.workspaceId, "knowledge.suggestion.declined")).toEqual([]);
+    expect(await auditEventsFor(scenario.workspaceId, "knowledge.suggestion.declined")).toEqual([]);
   });
 });
 
@@ -759,7 +761,9 @@ describe("an acceptance at a path another concept holds", () => {
     expect(await countOf("concept_index", scenario.workspaceId)).toBe("1");
 
     expect(await countOf("graph_node", scenario.workspaceId)).toBe("1");
-    expect(await ledgerFor(scenario.workspaceId, "knowledge.suggestion.accepted")).toHaveLength(1);
+    expect(
+      await auditEventsFor(scenario.workspaceId, "knowledge.suggestion.accepted"),
+    ).toHaveLength(1);
     expect(await suggestionRow(set.suggestionIds[1] ?? "")).toMatchObject({
       status: "waiting",
       decider: null,
@@ -1039,7 +1043,7 @@ describe("an acceptance whose ground moved under its own lock", () => {
     );
     expect(await suggestionRow(suggestionId)).toMatchObject({ status: "declined" });
     expect(await countOf("concept_index", scenario.workspaceId)).toBe("0");
-    expect(await ledgerFor(scenario.workspaceId, "knowledge.suggestion.accepted")).toEqual([]);
+    expect(await auditEventsFor(scenario.workspaceId, "knowledge.suggestion.accepted")).toEqual([]);
   });
 });
 

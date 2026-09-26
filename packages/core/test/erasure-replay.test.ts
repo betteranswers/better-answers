@@ -11,7 +11,7 @@ import {
   type ReplayedErasure,
 } from "../src/erasure/index.ts";
 import { erasureDoorsFor } from "./erasure-doors.ts";
-import { ledgerRowsOf } from "./sourced-concept.ts";
+import { auditEventRowsOf } from "./sourced-concept.ts";
 import { objectStoreForSuite } from "./suite-objects.ts";
 import { addressOf, seedingWith } from "./suite-postgres.ts";
 import { memberOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
@@ -198,7 +198,7 @@ describe("the set of erasures a restore must replay", () => {
     expect(idsFor(set.value, scenario.workspaceId)).toEqual([]);
     expect(replayed).toEqual({ ok: true, value: [] });
 
-    expect(await ledgerRowsOf(db().pool, scenario.workspaceId, REPLAYED)).toEqual([]);
+    expect(await auditEventRowsOf(db().pool, scenario.workspaceId, REPLAYED)).toEqual([]);
   });
 
   it("replays one the restored rows hold under the platform actor", async () => {
@@ -220,8 +220,8 @@ describe("the set of erasures a restore must replay", () => {
       },
     ]);
 
-    const ledger = await ledgerRowsOf(db().pool, scenario.workspaceId, REPLAYED);
-    expect(ledger).toEqual([
+    const auditEvents = await auditEventRowsOf(db().pool, scenario.workspaceId, REPLAYED);
+    expect(auditEvents).toEqual([
       {
         id: replayed[0]?.auditEventId,
         actor: ERASURE_ACTOR,
@@ -355,7 +355,7 @@ describe("an object store a restore cannot read", () => {
       expect(copies.ok).toBe(false);
       expect(replayed.ok).toBe(false);
 
-      expect(await ledgerRowsOf(db().pool, scenario.workspaceId, REPLAYED)).toEqual([]);
+      expect(await auditEventRowsOf(db().pool, scenario.workspaceId, REPLAYED)).toEqual([]);
     } finally {
       closeObjects(unreachable.value);
     }
@@ -367,7 +367,7 @@ describe("an object store a restore cannot read", () => {
 });
 
 describe("a second replay of the same request", () => {
-  it("changes nothing but the ledger", async () => {
+  it("changes nothing but the audit log", async () => {
     const scenario = await arrange();
     const erased = await completedInTheRows(scenario.workspaceId, TWICE_AT);
 
@@ -381,13 +381,16 @@ describe("a second replay of the same request", () => {
     expect(await erasureRowsIn(scenario.workspaceId)).toEqual(after);
 
     expect(await subjectRowsIn(scenario.workspaceId)).toEqual(subjects);
-    const ledger = await ledgerRowsOf(db().pool, scenario.workspaceId, REPLAYED);
+    const auditEvents = await auditEventRowsOf(db().pool, scenario.workspaceId, REPLAYED);
 
-    expect(ledger.map((row) => row.subject_id)).toEqual([
+    expect(auditEvents.map((row) => row.subject_id)).toEqual([
       erased.erasureRequestId,
       erased.erasureRequestId,
     ]);
-    expect(ledger.map((row) => row.id)).toEqual([first[0]?.auditEventId, second[0]?.auditEventId]);
+    expect(auditEvents.map((row) => row.id)).toEqual([
+      first[0]?.auditEventId,
+      second[0]?.auditEventId,
+    ]);
   });
 });
 
@@ -411,8 +414,8 @@ describe("a request whose routine will not run", () => {
 
     expect(String(replayed.error)).toContain("not a git repository");
 
-    expect(await ledgerRowsOf(db().pool, scenario.workspaceId, REPLAYED)).toEqual([]);
-    expect(await ledgerRowsOf(db().pool, stranded.id, REPLAYED)).toEqual([]);
+    expect(await auditEventRowsOf(db().pool, scenario.workspaceId, REPLAYED)).toEqual([]);
+    expect(await auditEventRowsOf(db().pool, stranded.id, REPLAYED)).toEqual([]);
     expect(second.erasureRequestId).not.toEqual(first.erasureRequestId);
   });
 });

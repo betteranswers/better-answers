@@ -70,7 +70,7 @@ export type DetailOf<Shape extends DetailShape> = {
   ]?: DetailValueOf<Shape[Field]>;
 };
 
-export type LedgerAct<Name extends ActName = ActName, Shape extends DetailShape = DetailShape> = {
+export type AuditAct<Name extends ActName = ActName, Shape extends DetailShape = DetailShape> = {
   readonly name: Name;
   readonly detail: Shape;
 };
@@ -78,7 +78,7 @@ export type LedgerAct<Name extends ActName = ActName, Shape extends DetailShape 
 export const act = <Name extends ActName, const Shape extends DetailShape>(
   name: Name,
   detail: Shape,
-): LedgerAct<Name, Shape> => ({ name, detail });
+): AuditAct<Name, Shape> => ({ name, detail });
 
 const NEVER_A_SUBJECT: ReadonlySet<string> = new Set([
   "run",
@@ -106,7 +106,7 @@ const declarationRefusal = (family: Family, name: string): string | undefined =>
     return `${name} is not a ${family} act of the form family.subject.verb`;
   }
   if (subject !== undefined && NEVER_A_SUBJECT.has(subject)) {
-    return `${name} names a record that is never a ledger row`;
+    return `${name} names a record that is never an audit event`;
   }
   if (declaredNames.has(name)) return `${name} is declared twice`;
   return undefined;
@@ -114,11 +114,11 @@ const declarationRefusal = (family: Family, name: string): string | undefined =>
 
 /**
  * Declares every act or none: throws when a name is not of the family's form, names a record never
- * kept as a ledger row, or is already declared.
+ * kept as an audit event, or is already declared.
  */
 export const declareActs = <
   F extends Family,
-  const Acts extends Record<string, LedgerAct<ActName<F>>>,
+  const Acts extends Record<string, AuditAct<ActName<F>>>,
 >(
   family: F,
   acts: Acts,
@@ -136,12 +136,12 @@ export const declareActs = <
 const identitySetNames = new Set<string>();
 
 /**
- * Which ledger keeps an act is fixed where it is declared, so no caller can file a person's own
+ * Which audit log keeps an act is fixed where it is declared, so no caller can file a person's own
  * act in a workspace.
  */
 export const declareIdentitySetActs = <
   F extends Family,
-  const Acts extends Record<string, LedgerAct<ActName<F>>>,
+  const Acts extends Record<string, AuditAct<ActName<F>>>,
 >(
   family: F,
   acts: Acts,

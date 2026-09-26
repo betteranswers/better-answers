@@ -136,9 +136,9 @@ const answeringAfterThreeWrites =
   };
 
 const leftBehindIn = async (workspaceId: string, key: string) => {
-  const counted = await db().pool.query<{ rows: number; ledger: number; jobs: number }>(
+  const counted = await db().pool.query<{ rows: number; auditEvents: number; jobs: number }>(
     `SELECT (SELECT count(*)::int FROM workspace_config WHERE workspace_id = $1 AND key = $2) AS rows,
-            (SELECT count(*)::int FROM audit_event WHERE workspace_id = $1 AND act = $3) AS ledger,
+            (SELECT count(*)::int FROM audit_event WHERE workspace_id = $1 AND act = $3) AS "auditEvents",
             (SELECT count(*)::int FROM job WHERE workspace_id = $1) AS jobs`,
     [workspaceId, key, PROBE_ACTS.rolledBack.name],
   );
@@ -181,7 +181,11 @@ describe("a door whose work answers a refusal after a write", () => {
 
     const { seeded, answered } = await through(door, answeringAfterThreeWrites(key, err(PROVOKED)));
 
-    expect(await leftBehindIn(seeded.workspaceId, key)).toEqual({ rows: 0, ledger: 0, jobs: 0 });
+    expect(await leftBehindIn(seeded.workspaceId, key)).toEqual({
+      rows: 0,
+      auditEvents: 0,
+      jobs: 0,
+    });
     expect(answered).toEqual({ ok: false, error: PROVOKED });
   });
 
@@ -190,7 +194,11 @@ describe("a door whose work answers a refusal after a write", () => {
 
     const { seeded, answered } = await through(door, answeringAfterThreeWrites(key, ok("landed")));
 
-    expect(await leftBehindIn(seeded.workspaceId, key)).toEqual({ rows: 1, ledger: 1, jobs: 1 });
+    expect(await leftBehindIn(seeded.workspaceId, key)).toEqual({
+      rows: 1,
+      auditEvents: 1,
+      jobs: 1,
+    });
     expect(answered).toEqual({ ok: true, value: "landed" });
   });
 });

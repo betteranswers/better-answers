@@ -95,7 +95,7 @@ const workspaceHoldingAMember = async () => {
   const actor = actorIdOfPerson(person.id);
 
   const seeded = await seedingWith(db().pool, async (seed) => ({
-    ledger: await seed.bundleCommit({ workspaceId: scenario.workspaceId, sha, actor }),
+    commit: await seed.bundleCommit({ workspaceId: scenario.workspaceId, sha, actor }),
     check: await seed.conceptVerification({ workspaceId: scenario.workspaceId, actor }),
     invite: await seed.invitation({
       workspaceId: scenario.workspaceId,
@@ -243,7 +243,7 @@ describe("the erasure map in one workspace's scope", () => {
     const actor = actorIdOfPerson(person.id);
 
     const mine = await seedingWith(db().pool, async (seed) => ({
-      ledger: await seed.bundleCommit({ workspaceId: here.workspaceId, actor }),
+      commit: await seed.bundleCommit({ workspaceId: here.workspaceId, actor }),
       check: await seed.conceptVerification({ workspaceId: here.workspaceId, actor }),
       invite: await seed.invitation({
         workspaceId: here.workspaceId,
@@ -252,7 +252,7 @@ describe("the erasure map in one workspace's scope", () => {
       }),
     }));
     const theirs = await seedingWith(db().pool, async (seed) => ({
-      ledger: await seed.bundleCommit({ workspaceId: elsewhere.workspaceId, actor }),
+      commit: await seed.bundleCommit({ workspaceId: elsewhere.workspaceId, actor }),
       check: await seed.conceptVerification({ workspaceId: elsewhere.workspaceId, actor }),
       invite: await seed.invitation({
         workspaceId: elsewhere.workspaceId,
@@ -272,7 +272,7 @@ describe("the erasure map in one workspace's scope", () => {
 
     expect(locationsOf(map)).toEqual([
       ["concept-file", []],
-      ["bundle-commit", [mine.ledger.sha]],
+      ["bundle-commit", [mine.commit.sha]],
       ["concept-verification", [mine.check.id]],
       ["identity-user", [person.id]],
       ["identity-session", []],
@@ -282,7 +282,7 @@ describe("the erasure map in one workspace's scope", () => {
       ["source-document", []],
     ]);
     const named = map.flatMap((entry) => entry.locations);
-    for (const theirsOwn of [theirs.ledger.sha, theirs.check.id, theirs.invite.id, shaElsewhere]) {
+    for (const theirsOwn of [theirs.commit.sha, theirs.check.id, theirs.invite.id, shaElsewhere]) {
       expect(named).not.toContain(theirsOwn);
     }
   });

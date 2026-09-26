@@ -151,11 +151,11 @@ describe("setting one's own display name", () => {
     expect(set).toEqual({ ok: false, error: "malformed" });
   });
 
-  it("writes one identity-set row and nothing to a workspace's ledger", async () => {
+  it("writes one identity-set row, leaving the workspace's audit log alone", async () => {
     const { door, workspaceId, adminUserId } = await provisionedWorkspace(db(), "Named", {
       name: "Held",
     });
-    const ledgerBefore = await db().pool.query(
+    const auditLogBefore = await db().pool.query(
       "SELECT id FROM audit_event WHERE workspace_id = $1",
       [workspaceId],
     );
@@ -174,14 +174,14 @@ describe("setting one's own display name", () => {
         batch_id: null,
       },
     ]);
-    const ledgerAfter = await db().pool.query(
+    const auditLogAfter = await db().pool.query(
       "SELECT id FROM audit_event WHERE workspace_id = $1",
       [workspaceId],
     );
-    expect(ledgerAfter.rows).toEqual(ledgerBefore.rows);
+    expect(auditLogAfter.rows).toEqual(auditLogBefore.rows);
   });
 
-  it("carries the name in no row of either ledger", async () => {
+  it("carries the name in no row of either audit log", async () => {
     const personId = await seedPerson(db().pool, { name: "" });
     const door = openPostgres(db().runtimePool);
     const displayName = `Distinct ${ulid()}`;

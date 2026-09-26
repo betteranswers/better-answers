@@ -38,7 +38,7 @@ const actLiteralsIn = (files: readonly string[]): Set<string> =>
     ),
   );
 
-const provisioned = () => provisionedWorkspace(db(), "Ledger");
+const provisioned = () => provisionedWorkspace(db(), "Audited");
 
 const writingIn =
   (door: PostgresDoor, workspaceId: string) => (event: Parameters<typeof record>[2]) =>
@@ -131,7 +131,7 @@ describe("the declared-acts walk", () => {
     ).toThrow(/not a billing act/);
   });
 
-  it("refuses an act whose subject is never a ledger row", () => {
+  it("refuses an act whose subject is never an audit event", () => {
     const neverASubject = [
       "run",
       "answer_audit",
@@ -146,7 +146,7 @@ describe("the declared-acts walk", () => {
     for (const subject of neverASubject) {
       expect(() =>
         declareActs("platform", { probe: act(`platform.${subject}.started`, {}) }),
-      ).toThrow(/never a ledger row/);
+      ).toThrow(/never an audit event/);
     }
   });
 
@@ -156,7 +156,7 @@ describe("the declared-acts walk", () => {
         fine: act("platform.probe.atomic", {}),
         refused: act("platform.run.started", {}),
       }),
-    ).toThrow(/never a ledger row/);
+    ).toThrow(/never an audit event/);
     expect(declarations().flatMap((declaration) => declaration.acts)).not.toContain(
       "platform.probe.atomic",
     );
@@ -466,7 +466,7 @@ const identityRowById = async (id: string) => {
   return found.rows[0];
 };
 
-describe("the identity-set ledger, reached through either door", () => {
+describe("the identity-set audit log, reached through either door", () => {
   it("books the platform's row to its named actor, outside workspaces", async () => {
     const door = openPostgres(db().runtimePool);
     const id = ulid();
@@ -495,7 +495,7 @@ describe("the identity-set ledger, reached through either door", () => {
     expect(await rowById(id)).toBeUndefined();
   });
 
-  it("lands a person's row here, not in their workspace's ledger", async () => {
+  it("lands a person's row here, outside their workspace's audit log", async () => {
     const { door, workspaceId, adminUserId } = await provisioned();
     const id = ulid();
 
