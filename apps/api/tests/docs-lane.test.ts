@@ -15,14 +15,13 @@ import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { z } from "zod";
 
-import { repositoryRoot } from "@better-answers/devtools/paths";
+import { repositoryRoot, workspacePackages } from "@better-answers/devtools/paths";
 
 import {
   gatesNamed,
   gatesUnder,
   rootName,
   rootScripts,
-  workspacePackages,
   workspacesGated,
   workspacesChecked,
   workspacesWithNoCheck,

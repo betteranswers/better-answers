@@ -1,13 +1,14 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { repositoryRoot } from "@better-answers/devtools/paths";
+import { repositoryRoot, workspacePackages } from "@better-answers/devtools/paths";
 import { runsOverThrowawayTree } from "@better-answers/devtools/throwaway-tree";
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
+import { pathWithAppleGit } from "@better-answers/schema/testing/apple-git";
 
 import { tag, wordsOf } from "./fixture-text.ts";
 
@@ -15,19 +16,26 @@ const SPECIFIER = "@better-answers/schema/testing/test-title-setup";
 
 const SETUP = fileURLToPath(import.meta.resolve(SPECIFIER));
 
-const namedSetupFiles = z.object({
-  default: z.object({ test: z.object({ setupFiles: z.array(z.string()).default([]) }) }),
+const testOptions = z.object({
+  default: z.object({
+    test: z.object({
+      setupFiles: z.array(z.string()).default([]),
+      env: z.record(z.string(), z.string()).default({}),
+    }),
+  }),
 });
 
-/** Read off the tree, so a new workspace that takes vitest is held to name the setup. */
-const WORKSPACES = ["apps", "packages"]
-  .flatMap((parent) =>
-    readdirSync(path.join(repositoryRoot, parent)).map((name) => `${parent}/${name}`),
-  )
-  .filter((workspace) => {
-    const manifest = path.join(repositoryRoot, workspace, "package.json");
-    return existsSync(manifest) && readFileSync(manifest, "utf8").includes('"vitest"');
-  });
+const testOptionsOf = async (workspace: string) => {
+  const loaded: unknown = await import(
+    pathToFileURL(path.join(repositoryRoot, workspace, "vitest.config.ts")).href
+  );
+  return testOptions.parse(loaded).default.test;
+};
+
+/** Read off pnpm's workspace list, so a new workspace that takes vitest is held to these. */
+const WORKSPACES = workspacePackages().filter((workspace) =>
+  readFileSync(path.join(repositoryRoot, workspace, "package.json"), "utf8").includes('"vitest"'),
+);
 
 /**
  * `globals`, so a tree outside the repository imports nothing it cannot resolve; `stdout`, or
@@ -126,10 +134,12 @@ describe("the rendered test-title hold", () => {
   });
 
   it.each(WORKSPACES)("is named in the setup files of %s", async (workspace) => {
-    const loaded: unknown = await import(
-      pathToFileURL(path.join(repositoryRoot, workspace, "vitest.config.ts")).href
-    );
+    expect((await testOptionsOf(workspace)).setupFiles).toContain(SPECIFIER);
+  });
+});
 
-    expect(namedSetupFiles.parse(loaded).default.test.setupFiles).toContain(SPECIFIER);
+describe("the workers' apple git", () => {
+  it.each(WORKSPACES)("sets the worker PATH of %s through pathWithAppleGit", async (workspace) => {
+    expect((await testOptionsOf(workspace)).env["PATH"]).toBe(pathWithAppleGit());
   });
 });
