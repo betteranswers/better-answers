@@ -2,6 +2,7 @@ import { useId, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 
 import type { ApiError } from "@/shared/api/trpc.ts";
+import { EmptyState } from "@/shared/empty-state.tsx";
 import { KeystrokesAct, useKeystroke } from "@/shared/keystrokes.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { screenById } from "@/shared/screens.ts";
@@ -31,7 +32,7 @@ import {
   type ListedBinding,
 } from "./sources-api.ts";
 import { REVIEW_HEADING, SOURCES_KEYSTROKES } from "./sources-state.ts";
-import { AUDIENCE_WORDS } from "./words.ts";
+import { AUDIENCE_WORDS, NOTHING_BOUND } from "./words.ts";
 
 const sources = screenById("sources");
 
@@ -77,12 +78,7 @@ function ListStatus(properties: { readonly bindings: ReturnType<typeof useBindin
     <div aria-live="polite" className="mt-2">
       {bindings.isPending ? <p>The bindings are still loading.</p> : null}
       {bindings.error === null ? null : <p>{outcomeOfFailure(bindings.error).words}</p>}
-      {bindings.data?.length === 0 ? (
-        <p>
-          No document is bound yet. Bind one with Bind a document, or{" "}
-          <kbd className="font-mono">{SOURCES_KEYSTROKES.bind.key}</kbd>.
-        </p>
-      ) : null}
+      {bindings.data?.length === 0 ? <EmptyState line={NOTHING_BOUND} /> : null}
     </div>
   );
 }
@@ -178,16 +174,18 @@ export function BindingsView() {
 
         <ListStatus bindings={bindings} />
 
-        <BindingList
-          bindings={listed}
-          acts={{
-            onFocusBinding: setInFocus,
-            onReview: review,
-            onPublish: publish,
-            onNarrow: narrow,
-            onWiden: widen,
-          }}
-        />
+        {listed.length === 0 ? null : (
+          <BindingList
+            bindings={listed}
+            acts={{
+              onFocusBinding: setInFocus,
+              onReview: review,
+              onPublish: publish,
+              onNarrow: narrow,
+              onWiden: widen,
+            }}
+          />
+        )}
       </section>
 
       {underReview === undefined ? null : (

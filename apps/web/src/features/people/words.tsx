@@ -3,7 +3,6 @@ import { dayWords, instantWords, nameOrAddress } from "@/shared/words.ts";
 
 import type { ListedMember } from "./people-api.ts";
 
-/** Said beside every People act before it is taken, since each writes an audit event. */
 export const RECORDED = "Recorded on the audit log under your name.";
 
 export const nameOf = (member: ListedMember): string =>

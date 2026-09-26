@@ -1,5 +1,7 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
+import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
 import { screenById } from "@/shared/screens.ts";
 
 import { expect, test } from "./browser.ts";
@@ -38,7 +40,14 @@ const invitationRows = (page: Page): Locator =>
 const rowOf = (page: Page, address: string): Locator =>
   invitationRows(page).filter({ hasText: address });
 
-const inviteDialog = (page: Page) => page.getByRole("dialog", { name: "Invite a person" });
+const INVITE = PEOPLE_KEYSTROKES.invite.act;
+
+const inviteDialog = (page: Page) => page.getByRole("dialog", { name: INVITE });
+
+const inviteAct = (page: Page) => page.getByRole("button", { name: INVITE, exact: true });
+
+/** Every button whose name starts by inviting, so a second one under another name is counted. */
+const invitingButtons = (page: Page) => page.getByRole("button", { name: /^invite/i });
 
 type AtInvitations = {
   readonly workspaceId: string;
@@ -92,10 +101,10 @@ test.describe("the People screen's Invitations tab", () => {
   test("an Admin invites a person by address; the invitation waits", async ({ page, request }) => {
     await anAdminAtInvitations(page, request, "Calder Joinery");
     await openInvitations(page);
-    await expect(invitationsRegion(page)).toContainText("Nobody is waiting to join.");
+    await expect(invitationsRegion(page)).toContainText(EMPTY_LINES.invitations);
     const address = anAddress("sam");
 
-    await invitationsRegion(page).getByRole("button", { name: "Invite the first person" }).click();
+    await inviteAct(page).click();
     await inviteDialog(page).getByLabel("Email address").fill(address);
     await inviteDialog(page).getByRole("combobox", { name: "Role" }).click();
     await page.getByRole("option", { name: "Editor" }).click();
@@ -110,7 +119,7 @@ test.describe("the People screen's Invitations tab", () => {
     await expect(inviteDialog(page).getByRole("button", { name: "Done" })).toBeFocused();
     await inviteDialog(page).getByRole("button", { name: "Done" }).click();
     await expect(inviteDialog(page)).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Invite a person" })).toBeFocused();
+    await expect(inviteAct(page)).toBeFocused();
 
     await expect(invitationRows(page)).toHaveCount(1);
     const cells = rowOf(page, address).getByRole("cell");
@@ -122,11 +131,27 @@ test.describe("the People screen's Invitations tab", () => {
     await expect(invitationsRegion(page).getByText("1 invitation", { exact: true })).toBeVisible();
   });
 
+  test("an empty tab says so in one line, inviting once", async ({ page, request }) => {
+    await anAdminAtInvitations(page, request, "Swale Presswork");
+    await openInvitations(page);
+
+    await expect(invitationsRegion(page)).toMatchAriaSnapshot(`
+      - region "Invitations":
+        - /children: equal
+        - heading "Invitations" [level=2]
+        - paragraph: ${EMPTY_LINES.invitations}
+    `);
+    await expect(invitingButtons(page), "the toolbar's act is the one way to invite").toHaveCount(
+      1,
+    );
+    await expect(inviteAct(page)).toBeVisible();
+  });
+
   test("refuses inviting a current member, saying so in its word", async ({ page, request }) => {
     const { editor } = await anAdminAtInvitations(page, request, "Aire Valley Tooling");
     await openInvitations(page);
 
-    await page.getByRole("button", { name: "Invite a person" }).click();
+    await inviteAct(page).click();
     await inviteDialog(page).getByLabel("Email address").fill(editor.toUpperCase());
     await inviteDialog(page).getByRole("button", { name: "Send the invitation" }).click();
 
@@ -207,7 +232,7 @@ test.describe("the People screen's Invitations tab", () => {
     );
 
     const keystrokes = await keystrokesListed(page, people.name);
-    await expect(keystrokes).toContainText("Invite a person by email address");
+    await expect(keystrokes).toContainText(INVITE);
     await expect(keystrokes).toContainText("Resend the invitation in focus");
     await expect(keystrokes).toContainText("Cancel the invitation in focus");
     await keystrokesDismissed(page, keystrokes);
@@ -231,7 +256,7 @@ test.describe("the People screen's Invitations tab", () => {
     await passesTheAccessibilityGate();
     await page.keyboard.press("Enter");
     await expect(inviteDialog(page)).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Invite a person" })).toBeFocused();
+    await expect(inviteAct(page)).toBeFocused();
     await expect(invitationRows(page)).toHaveCount(2);
 
     await expect(invitationsRegion(page)).toMatchAriaSnapshot(`

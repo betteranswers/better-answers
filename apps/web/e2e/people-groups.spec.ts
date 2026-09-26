@@ -1,5 +1,8 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
+import { consequenceOfDeleting } from "@/features/people/group-words.ts";
+import { GROUPS_KEYSTROKES } from "@/features/people/people-state.ts";
 import { screenById, viewNamed } from "@/shared/screens.ts";
 
 import { expect, test } from "./browser.ts";
@@ -231,13 +234,14 @@ test.describe("a group's acts", () => {
 
     await groupButton(page, "HR team").click();
     const sheet = sheetOf(page, "HR team");
-    await expect(sheet.getByRole("region", { name: "Delete" })).toContainText(
-      "Deleting HR team takes its 2 members out of it, and cannot be undone.",
-    );
+    const consequence = consequenceOfDeleting({ name: "HR team", memberCount: 2 });
+    await expect(sheet.getByRole("region", { name: "Delete" })).toContainText(consequence);
     await sheet.getByRole("button", { name: "Delete HR team" }).click();
 
     const confirming = page.getByRole("alertdialog", { name: "Delete HR team" });
-    await expect(confirming).toContainText("Recorded on the audit log under your name.");
+    await expect(confirming, "the consequence, and no record-keeping").toHaveAccessibleDescription(
+      consequence,
+    );
     await expect(confirming.getByRole("button", { name: "Keep HR team" })).toBeFocused();
     await passesTheAccessibilityGate();
     await confirming.getByRole("button", { name: "Delete HR team" }).focus();
@@ -457,7 +461,14 @@ test.describe("a member's groups, on their row and their sheet", () => {
       .getByRole("button", { name: "Test person", exact: true })
       .click();
     const groups = sheetOf(page, "Test person").getByRole("region", { name: "Groups" });
-    await expect(groups).toContainText("No groups in this workspace yet.");
+    // The sheet has no way to create a group, so its empty state carries the one act.
+    await expect(groups).toMatchAriaSnapshot(`
+      - region "Groups":
+        - /children: equal
+        - heading "Groups" [level=3]
+        - paragraph: ${EMPTY_LINES.groups}
+        - link "Create one on the Groups view"
+    `);
     await groups.getByRole("link", { name: "Create one on the Groups view" }).click();
 
     await expect(page).toHaveURL(new RegExp(`${GROUPS_VIEW}$`));
@@ -465,7 +476,7 @@ test.describe("a member's groups, on their row and their sheet", () => {
       - region "Groups":
         - heading "Groups" [level=2]
         - status: 0 groups
-        - form "Create a group":
+        - form "${GROUPS_KEYSTROKES.create.act}":
           - textbox "Name of a new group"
           - button "Create the group"
         - table:
@@ -473,10 +484,13 @@ test.describe("a member's groups, on their row and their sheet", () => {
             - row "Group Members"
           - rowgroup:
             - row:
-              - cell /No groups in this workspace yet\\./:
-                - button "Name the first group"
+              - cell "${EMPTY_LINES.groups}"
     `);
-    await groupsRegion(page).getByRole("button", { name: "Name the first group" }).click();
+    await expect(
+      groupsRegion(page).getByRole("button"),
+      "the form above holds the one create act",
+    ).toHaveCount(1);
+    await page.keyboard.press(GROUPS_KEYSTROKES.create.key);
     await expect(nameField(page)).toBeFocused();
   });
 });

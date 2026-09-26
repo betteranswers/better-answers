@@ -18,20 +18,18 @@ import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 import { SheetDescription, SheetHeader, SheetTitle } from "@/shared/ui/sheet.tsx";
-import { counted } from "@/shared/words.ts";
 
 import { GroupChecklist } from "./group-checklist.tsx";
+import { consequenceOfDeleting, membersWord } from "./group-words.ts";
 import { useRenameGroup, type ListedGroup } from "./groups-api.ts";
 import { useMembers } from "./people-api.ts";
 import { outcomeOfFailure, outcomeOfGroupFailure } from "./refusal.tsx";
-import { nameOf, RECORDED } from "./words.tsx";
+import { nameOf } from "./words.tsx";
 
 /** Where focus lands when the sheet opens: on the group, or straight on one of its acts. */
 export type GroupOpenedAt = "group" | "members" | "rename" | "delete";
 
 export const groupButtonId = (groupId: string): string => `group-${groupId}`;
-
-const membersWord = (group: ListedGroup): string => counted(group.memberCount, "member", "members");
 
 function GroupMembers(properties: {
   readonly group: ListedGroup;
@@ -50,7 +48,7 @@ function GroupMembers(properties: {
       {members.data === undefined ? null : (
         <GroupChecklist
           legend={`Members of ${group.name}`}
-          hint={`Each box puts the member in ${group.name} or takes them out at once. ${RECORDED}`}
+          hint={`Each box puts the member in ${group.name} or takes them out at once.`}
           listRef={listRef}
           choices={everyone.map((member) => ({
             id: member.personId,
@@ -121,7 +119,7 @@ function RenameGroup(properties: {
             aria-describedby={ids.hint}
           />
           <p id={ids.hint} className="text-sm text-muted-foreground">
-            Its members stay in it. {RECORDED}
+            Its members stay in it.
           </p>
         </div>
         <Button type="submit" className="justify-self-start">
@@ -138,10 +136,7 @@ function DeleteGroup(properties: {
   readonly onDelete: (group: ListedGroup) => void;
 }) {
   const { group, buttonRef, onDelete } = properties;
-  const consequence =
-    group.memberCount === 0
-      ? `Deleting ${group.name} cannot be undone.`
-      : `Deleting ${group.name} takes its ${membersWord(group)} out of it, and cannot be undone.`;
+  const consequence = consequenceOfDeleting(group);
 
   return (
     <SheetPart title="Delete">
@@ -155,9 +150,7 @@ function DeleteGroup(properties: {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete {group.name}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {consequence} {RECORDED}
-            </AlertDialogDescription>
+            <AlertDialogDescription>{consequence}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Keep {group.name}</AlertDialogCancel>

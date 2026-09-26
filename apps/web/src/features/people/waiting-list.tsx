@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { EmptyState } from "@/shared/empty-state.tsx";
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import {
   Table,
@@ -12,6 +13,9 @@ import {
 } from "@/shared/ui/table.tsx";
 import { dayWords } from "@/shared/words.ts";
 
+/** The table and its empty state stand in the same card, so the tab keeps its shape. */
+const CARD = "mt-4 border border-border bg-card";
+
 /** What waits on an Admin, a row each with its acts: invitations not yet accepted, requests. */
 export function WaitingTable(properties: {
   readonly caption: string;
@@ -19,7 +23,7 @@ export function WaitingTable(properties: {
   readonly children: ReactNode;
 }) {
   return (
-    <div className="mt-4 border border-border bg-card">
+    <div className={CARD}>
       <Table>
         <TableCaption className="sr-only">{properties.caption}</TableCaption>
         <TableHeader>
@@ -35,6 +39,11 @@ export function WaitingTable(properties: {
       </Table>
     </div>
   );
+}
+
+/** No second invite: the toolbar holds the one. */
+export function NothingWaiting(properties: { readonly line: string }) {
+  return <EmptyState line={properties.line} className={`${CARD} px-4 py-10`} />;
 }
 
 /** Focus moving between the row's own buttons keeps it held; only leaving the row lets go. */

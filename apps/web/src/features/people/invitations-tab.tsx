@@ -5,6 +5,7 @@ import { Button } from "@/shared/ui/button.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { TableCell } from "@/shared/ui/table.tsx";
 
+import { EMPTY_LINES } from "./empty-lines.ts";
 import { resentOutcome } from "./invitation-words.ts";
 import {
   useCancelInvitation,
@@ -12,9 +13,15 @@ import {
   useResendInvitation,
   type WaitingInvitation,
 } from "./invitations-api.ts";
-import { PEOPLE_KEYSTROKES, useInviteAsked } from "./people-state.ts";
+import { PEOPLE_KEYSTROKES } from "./people-state.ts";
 import { outcomeOfInvitationFailure } from "./refusal.tsx";
-import { DayCell, useKeystrokeOnHeld, WaitingRow, WaitingTable } from "./waiting-list.tsx";
+import {
+  DayCell,
+  NothingWaiting,
+  useKeystrokeOnHeld,
+  WaitingRow,
+  WaitingTable,
+} from "./waiting-list.tsx";
 
 const COLUMNS = ["Address", "Role", "State", "Sent", "Expires", "Invited by", "Acts"] as const;
 
@@ -31,27 +38,6 @@ const countOf = (invitations: readonly WaitingInvitation[], now: number): string
   const expired = invitations.filter((invitation) => hasExpired(invitation, now)).length;
   return expired === 0 ? said : `${said}, ${expired} expired`;
 };
-
-function NobodyWaiting() {
-  const [, askToInvite] = useInviteAsked();
-  return (
-    <div className="mt-4 flex flex-col items-start gap-1 border border-border bg-card px-4 py-10">
-      <p className="font-medium">Nobody is waiting to join.</p>
-      <p className="text-muted-foreground">
-        An invitation goes to one email address and lasts seven days.
-      </p>
-      <Button
-        variant="outline"
-        className="mt-3"
-        onClick={() => {
-          askToInvite(Date.now());
-        }}
-      >
-        Invite the first person
-      </Button>
-    </div>
-  );
-}
 
 function InvitationRow(properties: {
   readonly invitation: WaitingInvitation;
@@ -169,7 +155,7 @@ function InvitationList(properties: {
         {invitations.length === 0 ? null : countOf(invitations, now)}
       </output>
       {invitations.length === 0 ? (
-        <NobodyWaiting />
+        <NothingWaiting line={EMPTY_LINES.invitations} />
       ) : (
         <WaitingTable
           caption="Invitations to this workspace not yet accepted, each with its role, state and expiry."

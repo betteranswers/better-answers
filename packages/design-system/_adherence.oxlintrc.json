@@ -101,8 +101,8 @@
         "message": "<DotPattern> doesn't accept that prop. Declared props: width, height, cx, cy, cr, x, y, color, fade."
       },
       {
-        "selector": "JSXOpeningElement[name.name='EmptyState'] > JSXAttribute > JSXIdentifier[name!=/^(?:title|description|action|icon|key|ref|className|style|children)$/]",
-        "message": "<EmptyState> doesn't accept that prop. Declared props: title, description, action, icon."
+        "selector": "JSXOpeningElement[name.name='EmptyState'] > JSXAttribute > JSXIdentifier[name!=/^(?:line|action|key|ref|className|style|children)$/]",
+        "message": "<EmptyState> doesn't accept that prop. Declared props: line, action."
       },
       {
         "selector": "JSXOpeningElement[name.name='Frame'] > JSXAttribute > JSXIdentifier[name!=/^(?:as|label|note|marks|corners|surface|border|padding|markColor|children|key|ref|className|style|children)$/]",
