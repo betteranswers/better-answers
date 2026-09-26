@@ -487,23 +487,6 @@ test.describe("the People screen's words", () => {
       await said(`${MEMBERS_VIEW}, the ${tab} tab`);
     }
 
-    // A modal hides the page behind it from the tree, so the dialog is read on its own.
-    const inviting = page.getByRole("dialog", { name: "Invite a person" });
-    const saidInTheDialog = async (where: string) => {
-      await expect(page.locator("body"), where).not.toContainText(organisation);
-      expect(await inviting.ariaSnapshot(), where).not.toMatch(organisation);
-    };
-    await page.getByRole("tab", { name: "Invitations" }).click();
-    await page.getByRole("button", { name: "Invite a person" }).click();
-    await saidInTheDialog("the invite dialog");
-    await inviting.getByLabel("Email address").fill(anAddress("invited"));
-    await inviting.getByRole("button", { name: "Send the invitation" }).click();
-    await expect(inviting.getByRole("button", { name: "Done" })).toBeVisible();
-    await saidInTheDialog("the invite dialog's answer");
-    await inviting.getByRole("button", { name: "Done" }).click();
-    await expect(page.getByRole("region", { name: "Invitations" }).getByRole("row")).toHaveCount(2);
-    await said("the Invitations tab with an invitation waiting");
-
     await page.getByRole("tab", { name: "Members" }).click();
     await memberButton(page, "Priya Shah").click();
     const sheet = sheetOf(page, "Priya Shah");
@@ -520,5 +503,25 @@ test.describe("the People screen's words", () => {
     await auditLog.getByRole("combobox", { name: "Family" }).click();
     await expect(page.getByRole("listbox"), "the families listed").not.toContainText(organisation);
     await page.keyboard.press("Escape");
+
+    // Last, so the audit log above reads the one event the workspace's provisioning wrote.
+    await page.goto(MEMBERS_VIEW);
+    await expect(memberRows(page)).toHaveCount(3);
+    // A modal hides the page behind it from the tree, so the dialog is read on its own.
+    const inviting = page.getByRole("dialog", { name: "Invite a person" });
+    const saidInTheDialog = async (where: string) => {
+      await expect(page.locator("body"), where).not.toContainText(organisation);
+      expect(await inviting.ariaSnapshot(), where).not.toMatch(organisation);
+    };
+    await page.getByRole("tab", { name: "Invitations" }).click();
+    await page.getByRole("button", { name: "Invite a person" }).click();
+    await saidInTheDialog("the invite dialog");
+    await inviting.getByLabel("Email address").fill(anAddress("invited"));
+    await inviting.getByRole("button", { name: "Send the invitation" }).click();
+    await expect(inviting.getByRole("button", { name: "Done" })).toBeVisible();
+    await saidInTheDialog("the invite dialog's answer");
+    await inviting.getByRole("button", { name: "Done" }).click();
+    await expect(page.getByRole("region", { name: "Invitations" }).getByRole("row")).toHaveCount(2);
+    await said("the Invitations tab with an invitation waiting");
   });
 });
