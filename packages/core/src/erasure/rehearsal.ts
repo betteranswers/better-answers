@@ -8,13 +8,11 @@ import {
   ok,
   PERSON_PREFIX,
   ulid,
-  type Clock,
   type Result,
   type UserPrincipal,
 } from "../kernel/index.ts";
 import { bindUpload, bindUploadFields } from "../sources/index.ts";
-import { head, type GitDoor } from "../store/git/index.ts";
-import type { ObjectDoor } from "../store/objects/index.ts";
+import { head } from "../store/git/index.ts";
 import {
   withIdentityRead,
   withIdentityWrite,
@@ -23,7 +21,7 @@ import {
   type PostgresDoor,
 } from "../store/postgres/index.ts";
 import { recordSubjectRequest, type RecordSubjectRequestRefusal } from "./requests.ts";
-import { runErasure, type ErasureLog, type ErasurePrincipal } from "./routine.ts";
+import { runErasure, type ErasureDoors, type ErasurePrincipal } from "./routine.ts";
 
 const REHEARSAL_ACTS = declareActs("platform", {
   rehearsed: act("platform.erasure.rehearsed", {
@@ -35,14 +33,6 @@ const REHEARSAL_ACTS = declareActs("platform", {
 });
 
 type RehearsedDetail = DetailOf<(typeof REHEARSAL_ACTS)["rehearsed"]["detail"]>;
-
-export type RehearsalDoors = {
-  readonly git: GitDoor;
-  readonly postgres: PostgresDoor;
-  readonly objects: ObjectDoor;
-  readonly clock: Clock;
-  readonly log: ErasureLog;
-};
 
 export type RehearsalRefusal = "malformed" | "not-seeded";
 
@@ -181,7 +171,7 @@ const principalOf = async (
 
 const conceptSeeded = async (
   writer: UserPrincipal,
-  doors: RehearsalDoors,
+  doors: ErasureDoors,
   subject: SyntheticSubject,
 ): Promise<Result<undefined, Error>> => {
   const at = doors.clock.now();
@@ -230,7 +220,7 @@ const bindingHolding = (
 const documentSeeded = async (
   platform: ErasurePrincipal,
   writer: UserPrincipal,
-  doors: RehearsalDoors,
+  doors: ErasureDoors,
   subject: SyntheticSubject,
 ): Promise<Result<SeededDocument, Error>> => {
   const fileName = documentFileOf(subject);
@@ -264,7 +254,7 @@ const documentSeeded = async (
 /** A rerun finds the person, membership, concept and binding the first run seeded. */
 export const seedSyntheticSubject = async (
   platform: ErasurePrincipal,
-  doors: RehearsalDoors,
+  doors: ErasureDoors,
   input: RehearsalInput,
 ): Promise<Result<SeededSubject, RehearsalRefusal | Error>> => {
   const named = workspaceNamed(input.workspaceId);
@@ -326,7 +316,7 @@ const refusalWordOf = (refused: RecordSubjectRequestRefusal): string =>
 /* jscpd:ignore-start */
 export const rehearseErasure = async (
   platform: ErasurePrincipal,
-  doors: RehearsalDoors,
+  doors: ErasureDoors,
   input: RehearsalInput,
 ): Promise<Result<ErasureRehearsed, RehearsalRefusal | Error>> => {
   const named = workspaceNamed(input.workspaceId);

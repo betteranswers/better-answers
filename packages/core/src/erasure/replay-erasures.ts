@@ -1,22 +1,12 @@
 import { boundarySchemas } from "@better-answers/schema";
 
 import { act, declareActs, record, type DetailOf } from "../audit/index.ts";
-import {
-  attempt,
-  err,
-  ok,
-  ulid,
-  type Clock,
-  type PlatformPrincipal,
-  type Result,
-} from "../kernel/index.ts";
-import type { GitDoor } from "../store/git/index.ts";
-import type { ObjectDoor } from "../store/objects/index.ts";
+import { attempt, err, ok, ulid, type PlatformPrincipal, type Result } from "../kernel/index.ts";
 import { withScope, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import { workspaceIds } from "../workspaces/index.ts";
 import { replayCopiesSince, type ReplayCopy } from "./replay.ts";
 import { dueDateOf } from "./requests.ts";
-import { beyondUseFrom, runErasure, type ErasureLog, type ErasurePrincipal } from "./routine.ts";
+import { beyondUseFrom, runErasure, type ErasureDoors, type ErasurePrincipal } from "./routine.ts";
 
 const REPLAY_ACTS = declareActs("platform", {
   replayed: act("platform.erasure.replayed", {
@@ -47,14 +37,6 @@ export type ReplayedErasure = {
   readonly fromReplayCopy: boolean;
 
   readonly auditEventId: string;
-};
-
-export type ReplayDoors = {
-  readonly git: GitDoor;
-  readonly postgres: PostgresDoor;
-  readonly objects: ObjectDoor;
-  readonly clock: Clock;
-  readonly log: ErasureLog;
 };
 
 type CompletedRow = {
@@ -104,7 +86,7 @@ const erasureRequestsSince = async (
 /** Oldest completion first. A request's own row wins over its replay copy. */
 export const replayableErasures = async (
   platform: PlatformPrincipal,
-  doors: Pick<ReplayDoors, "postgres" | "objects">,
+  doors: Pick<ErasureDoors, "postgres" | "objects">,
   input: { readonly since: Date },
 ): Promise<Result<readonly ReplayableErasure[], Error>> => {
   const rows = await erasureRequestsSince(platform, doors.postgres, input.since);
@@ -210,7 +192,7 @@ const recordTheReplay = async (
 /** Stops at the first erasure that fails, naming it and how many were replayed before it. */
 export const replayErasures = async (
   platform: ErasurePrincipal,
-  doors: ReplayDoors,
+  doors: ErasureDoors,
   input: { readonly since: Date },
 ): Promise<Result<readonly ReplayedErasure[], Error>> => {
   const owed = await replayableErasures(platform, doors, input);

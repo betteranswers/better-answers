@@ -218,6 +218,8 @@ export const indexRowOf = (facts: RowFacts, held: Held | undefined, now: Date) =
   });
 };
 
+export type IndexRow = Extract<ReturnType<typeof indexRowOf>, { readonly success: true }>["data"];
+
 type EvidenceRow = z.infer<typeof boundarySchemas.evidence.insert>;
 
 type Landing = z.infer<typeof conceptRow> & {

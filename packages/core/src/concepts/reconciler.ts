@@ -41,6 +41,7 @@ import type { Acceptance } from "./index.ts";
 import {
   heldByIri,
   indexRowOf,
+  type IndexRow,
   landBundleCommit,
   landRows,
   mergeKeyOf,
@@ -235,8 +236,6 @@ const suggestedBy = async (
         acceptance: { suggestionId, setId: payload.setId, kind: payload.kind },
       };
 };
-
-type IndexRow = Extract<ReturnType<typeof indexRowOf>, { readonly success: true }>["data"];
 
 type Replayable = { readonly row: IndexRow; readonly sources: readonly HashedSource[] };
 
