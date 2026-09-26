@@ -1,16 +1,18 @@
-import type { APIRequestContext, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
-import { REASON_REFUSED } from "@/features/auth/refusal-words.ts";
+import { ASK_TO_JOIN_WORDS, SLUG_EXAMPLE } from "@/features/auth/ask-to-join-words.ts";
+import { askedTooOften, REASON_REFUSED } from "@/features/auth/refusal-words.ts";
+import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { SAID_OF_CLASS, sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
-  anAddress,
   clockTheNextKey,
-  person,
+  keystrokesDismissed,
+  keystrokesListed,
   provision,
-  signIn,
+  signedInWithNoWorkspace,
   theActLandedWithinItsBudget,
 } from "./harness.ts";
 
@@ -19,30 +21,26 @@ const ASK_TO_JOIN_ENDPOINT = "/trpc/person.requestAccess";
 
 const REASON = "I run the estimating desk and need the tender library.";
 
-const ACKNOWLEDGED =
-  "If a workspace goes by that slug, its Admins will see that you asked and why. If one approves, an invitation comes to your email address; nothing is sent otherwise.";
+const A_SLUG = "acme-joinery";
 
-const NAMES_AN_ORGANISATION = /organi[sz]ation/i;
+/** A reader has no use for the glossary's "slug", and a workspace is never an organisation. */
+const UNSAID = [
+  { word: "an organisation", pattern: /organi[sz]ation/i },
+  { word: "a slug", pattern: /\bslug\b/i },
+] as const;
 
-const noWorkspaceHeading = (page: Page) =>
-  page.getByRole("heading", { level: 1, name: "No workspace yet" });
+const askRegion = (page: Page) => page.getByRole("region", { name: ASK_TO_JOIN_WORDS.heading });
 
-const slugField = (page: Page) => page.getByLabel("Workspace slug");
+const slugField = (page: Page) => page.getByLabel(ASK_TO_JOIN_WORDS.slug);
 
-const reasonField = (page: Page) => page.getByLabel("Why you are asking");
+const reasonField = (page: Page) => page.getByLabel(ASK_TO_JOIN_WORDS.reason);
 
-const askButton = (page: Page) => page.getByRole("button", { name: /^Ask/ });
+const askButton = (page: Page) =>
+  askRegion(page).getByRole("button", {
+    name: new RegExp(`^(${ASK_TO_JOIN_WORDS.ask}|${ASK_TO_JOIN_WORDS.asking})$`),
+  });
 
-const acknowledgement = (page: Page) => page.getByRole("alert", { name: "Asked" });
-
-/** A person with a display name and no membership lands here from the product's own sign-in. */
-const onTheRefusedScreen = async (page: Page, request: APIRequestContext): Promise<void> => {
-  const email = anAddress("asker");
-  await person(request, email);
-  await page.goto("/sign-in");
-  await signIn(page, request, email);
-  await expect(noWorkspaceHeading(page)).toBeVisible();
-};
+const requestSent = (page: Page) => page.getByRole("alert", { name: ASK_TO_JOIN_WORDS.sent });
 
 const askToJoin = async (page: Page, slug: string, reason = REASON): Promise<void> => {
   await slugField(page).fill(slug);
@@ -51,11 +49,11 @@ const askToJoin = async (page: Page, slug: string, reason = REASON): Promise<voi
 };
 
 /** The body as read and as heard, so a word in an accessible name is caught too. */
-const theScreenSaysNoOrganisation = async (page: Page, when: string): Promise<void> => {
+const theScreenSaysNeither = async (page: Page, when: string): Promise<void> => {
   const said = `${await page.locator("body").innerText()}\n${await page.locator("body").ariaSnapshot()}`;
-  expect(said, `the refused screen names an organisation ${when}`).not.toMatch(
-    NAMES_AN_ORGANISATION,
-  );
+  for (const { word, pattern } of UNSAID) {
+    expect(said, `the no-workspace screen names ${word} ${when}`).not.toMatch(pattern);
+  }
 };
 
 test("a person in no workspace asks to join by keyboard", async ({
@@ -64,24 +62,27 @@ test("a person in no workspace asks to join by keyboard", async ({
   passesTheAccessibilityGate,
 }) => {
   const workspace = await provision(request, { name: "Acme Joinery" });
-  await onTheRefusedScreen(page, request);
+  await signedInWithNoWorkspace(page, request, "asker");
 
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
-      - heading "No workspace yet" [level=1]
-      - paragraph
-      - region "Ask to join a workspace":
-        - heading "Ask to join a workspace" [level=2]
+      - heading ${JSON.stringify(NO_WORKSPACE_HEADING)} [level=1]
+      - region ${JSON.stringify(ASK_TO_JOIN_WORDS.heading)}:
+        - heading ${JSON.stringify(ASK_TO_JOIN_WORDS.heading)} [level=2]
+        - text: ${JSON.stringify(ASK_TO_JOIN_WORDS.slug)}
         - paragraph
-        - text: Workspace slug
-        - textbox "Workspace slug"
-        - text: Why you are asking
+        - textbox ${JSON.stringify(ASK_TO_JOIN_WORDS.slug)}
+        - text: ${JSON.stringify(ASK_TO_JOIN_WORDS.reason)}
         - paragraph
-        - textbox "Why you are asking"
-        - button "Ask to join"
+        - textbox ${JSON.stringify(ASK_TO_JOIN_WORDS.reason)}
+        - button ${JSON.stringify(ASK_TO_JOIN_WORDS.ask)}
       - button "Sign out"
       - button ${JSON.stringify(KEYSTROKE_WORDS.button)}
   `);
+  await expect(slugField(page)).toHaveAccessibleDescription(
+    `${ASK_TO_JOIN_WORDS.forExample} ${SLUG_EXAMPLE}`,
+  );
+  await expect(reasonField(page)).toHaveAccessibleDescription(ASK_TO_JOIN_WORDS.reasonHint);
   await passesTheAccessibilityGate();
 
   await page.keyboard.press("j");
@@ -90,24 +91,18 @@ test("a person in no workspace asks to join by keyboard", async ({
   await page.keyboard.press("Tab");
   await expect(reasonField(page)).toBeFocused();
   await page.keyboard.type(REASON);
-  await clockTheNextKey(page, { at: "//main//button[@type='submit']", reads: "Asking" });
+  await clockTheNextKey(page, {
+    at: "//main//button[@type='submit']",
+    reads: ASK_TO_JOIN_WORDS.asking,
+  });
   await page.keyboard.press("Enter");
   await theActLandedWithinItsBudget(page, "ask to join");
 
-  await expect(acknowledgement(page)).toBeFocused();
-  await expect(page.getByRole("region", { name: "Ask to join a workspace" })).toMatchAriaSnapshot(`
-    - region "Ask to join a workspace":
-      - heading "Ask to join a workspace" [level=2]
-      - paragraph
-      - text: Workspace slug
-      - textbox "Workspace slug"
-      - text: Why you are asking
-      - paragraph
-      - textbox "Why you are asking"
-      - button "Ask to join"
-      - alert "Asked":
-        - paragraph: Asked
-        - paragraph: "${ACKNOWLEDGED}"
+  await expect(requestSent(page)).toBeFocused();
+  await expect(requestSent(page)).toMatchAriaSnapshot(`
+    - alert ${JSON.stringify(ASK_TO_JOIN_WORDS.sent)}:
+      - paragraph: ${JSON.stringify(ASK_TO_JOIN_WORDS.sent)}
+      - paragraph: ${JSON.stringify(ASK_TO_JOIN_WORDS.whatHappensNext)}
   `);
   await expect(slugField(page)).toHaveValue("");
   await expect(reasonField(page)).toHaveValue("");
@@ -115,18 +110,18 @@ test("a person in no workspace asks to join by keyboard", async ({
 
 test("answers a known, an unknown and a repeated slug alike", async ({ page, request }) => {
   const workspace = await provision(request, { name: "Brightwater Estimating" });
-  await onTheRefusedScreen(page, request);
+  await signedInWithNoWorkspace(page, request, "asker");
 
   const said: string[] = [];
   for (const slug of [workspace.slug, `nobody-${Date.now()}`, workspace.slug]) {
     await askToJoin(page, slug);
     // The fields empty only once this ask is acknowledged, so the banner read is this ask's.
     await expect(slugField(page)).toHaveValue("");
-    said.push(await acknowledgement(page).innerText());
+    said.push(await requestSent(page).innerText());
   }
 
   const [known, unknown, alreadyAsked] = said;
-  expect(known).toContain(ACKNOWLEDGED);
+  expect(known).toContain(ASK_TO_JOIN_WORDS.whatHappensNext);
   expect(unknown, "an unknown slug was answered differently").toBe(known);
   expect(alreadyAsked, "a second ask was answered differently").toBe(known);
 });
@@ -137,20 +132,27 @@ test("refuses a blank reason, saying what to send", async ({
   passesTheAccessibilityGate,
 }) => {
   const workspace = await provision(request, { name: "Coldharbour Fabrication" });
-  await onTheRefusedScreen(page, request);
+  await signedInWithNoWorkspace(page, request, "asker");
+
+  const refusal = page.getByRole("alert", { includeHidden: true });
+  await expect(refusal, "the refusal region does not stand before an ask").toHaveCount(1);
+  await expect(refusal, "the refusal region stands with words already in it").toBeEmpty();
+  const stood = await refusal.elementHandle();
 
   await askToJoin(page, workspace.slug, "   ");
 
-  await expect(page.getByRole("alert")).toHaveText(sentenceOf(REASON_REFUSED));
+  await expect(refusal).toHaveText(sentenceOf(REASON_REFUSED));
+  const sameRegion = await refusal.evaluate((now, then) => now === then, stood);
+  expect(sameRegion, "the refusal came in an alert region of its own").toBe(true);
   await expect(reasonField(page)).toHaveAttribute("aria-invalid", "true");
   await expect(reasonField(page)).toBeFocused();
-  await expect(acknowledgement(page)).toHaveCount(0);
-  await theScreenSaysNoOrganisation(page, "in a refusal");
+  await expect(requestSent(page)).toHaveCount(0);
+  await theScreenSaysNeither(page, "in a refusal");
   await passesTheAccessibilityGate();
 });
 
 test("tells a person past the ceiling when to ask again", async ({ page, request }) => {
-  await onTheRefusedScreen(page, request);
+  await signedInWithNoWorkspace(page, request, "asker");
 
   // The window is wall-clock aligned, so a burst straddling a boundary starts its count again:
   // ask until refused, not a fixed number.
@@ -163,39 +165,39 @@ test("tells a person past the ceiling when to ask again", async ({ page, request
   }
   expect(status, "the flood never met the ceiling").toBe(429);
 
-  await askToJoin(page, "acme-joinery");
+  const refused = page.waitForResponse((response) => response.url().includes(ASK_TO_JOIN_ENDPOINT));
+  await askToJoin(page, A_SLUG);
+  const liftsInSeconds = Number((await refused).headers()["retry-after"]);
 
-  await expect(page.getByRole("alert")).toContainText(
-    /^You have asked to join too often\. Ask again in (a minute|\d+ minutes)\.$/,
-  );
+  expect(liftsInSeconds, "the ceiling's answer named no wait").toBeGreaterThan(0);
+  await expect(page.getByRole("alert")).toHaveText(sentenceOf(askedTooOften(liftsInSeconds)));
   await expect(askButton(page)).toBeFocused();
-  await expect(acknowledgement(page)).toHaveCount(0);
-  await theScreenSaysNoOrganisation(page, "at the ceiling");
+  await expect(requestSent(page)).toHaveCount(0);
+  await theScreenSaysNeither(page, "at the ceiling");
 });
 
 test("sends a person whose session ended back to sign in", async ({ page, context, request }) => {
-  await onTheRefusedScreen(page, request);
+  await signedInWithNoWorkspace(page, request, "asker");
   await context.clearCookies();
 
-  await askToJoin(page, "acme-joinery");
+  await askToJoin(page, A_SLUG);
 
   await expect(page.getByRole("alert")).toHaveText(sentenceOf(SAID_OF_CLASS.unauthenticated));
-  await theScreenSaysNoOrganisation(page, "once the session ended");
+  await theScreenSaysNeither(page, "once the session ended");
   await page.getByRole("button", { name: "Sign in again" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
 });
 
-test("never names an organisation, asking or not, nor in keystrokes", async ({ page, request }) => {
-  await onTheRefusedScreen(page, request);
-  await theScreenSaysNoOrganisation(page, "before an ask");
+test("never names an organisation or a slug, nor in keystrokes", async ({ page, request }) => {
+  await signedInWithNoWorkspace(page, request, "asker");
+  await theScreenSaysNeither(page, "before an ask");
 
-  await page.keyboard.press("?");
-  const keystrokes = page.getByRole("dialog", { name: `${KEYSTROKE_WORDS.button} on this screen` });
-  await expect(keystrokes).toContainText("Ask to join a workspace");
-  await theScreenSaysNoOrganisation(page, "in its keystrokes");
-  await page.keyboard.press("Escape");
+  const keystrokes = await keystrokesListed(page, "this screen");
+  await expect(keystrokes).toContainText(ASK_TO_JOIN_WORDS.heading);
+  await theScreenSaysNeither(page, "in its keystrokes");
+  await keystrokesDismissed(page, keystrokes);
 
   await askToJoin(page, `nobody-${Date.now()}`);
-  await expect(acknowledgement(page)).toBeVisible();
-  await theScreenSaysNoOrganisation(page, "after an ask");
+  await expect(requestSent(page)).toBeVisible();
+  await theScreenSaysNeither(page, "after an ask");
 });

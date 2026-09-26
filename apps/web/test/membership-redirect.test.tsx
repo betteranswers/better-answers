@@ -2,6 +2,7 @@ import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients, type AppClients } from "@/app/providers.tsx";
+import { PICKER_WORDS } from "@/features/auth/workspace-words.ts";
 import { ROLES } from "@/features/people/role-meanings.ts";
 import type { Role } from "@/shared/screens.ts";
 
@@ -90,7 +91,7 @@ describe("a person the api will not answer about", () => {
 
     const router = await openAt("/people/thresholds");
 
-    expect(screen.getByText("Reading your workspaces.")).toBeDefined();
+    expect(screen.getByText(PICKER_WORDS.reading)).toBeDefined();
     expect(router.state.location.href).toBe("/choose-workspace");
   });
 

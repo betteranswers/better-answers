@@ -1,4 +1,14 @@
-import type { APIRequestContext } from "@playwright/test";
+import type { APIRequestContext, Page } from "@playwright/test";
+
+import { ASK_TO_JOIN_WORDS } from "@/features/auth/ask-to-join-words.ts";
+import {
+  noLongerAMember,
+  PICK_REFUSED,
+  SOLE_PICK_REFUSED,
+  WORKSPACES_UNREAD,
+} from "@/features/auth/refusal-words.ts";
+import { NO_WORKSPACE_HEADING, PICKER_WORDS } from "@/features/auth/workspace-words.ts";
+import { sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -9,8 +19,12 @@ import {
   person,
   provision,
   removeMember,
+  signedInWithNoWorkspace,
   signIn,
 } from "./harness.ts";
+
+const thePicker = (page: Page) =>
+  page.getByRole("heading", { level: 1, name: PICKER_WORDS.heading });
 
 const memberOfTwoWorkspaces = async (
   request: APIRequestContext,
@@ -58,7 +72,8 @@ test("scopes everything to the workspace a two-workspace member picks", async ({
   await page.goto("/sign-in");
   await signIn(page, request, email);
 
-  await expect(page.getByRole("heading", { level: 1, name: "Choose a workspace" })).toBeVisible();
+  await expect(thePicker(page)).toBeVisible();
+  await expect(page.getByText(PICKER_WORDS.lead)).toBeVisible();
   await expect(page.getByRole("button", { name: first.name })).toBeVisible();
 
   await expect(page.getByRole("button", { name: /create/i })).toHaveCount(0);
@@ -72,18 +87,10 @@ test("scopes everything to the workspace a two-workspace member picks", async ({
   await expect(bar.getByText(first.name)).toHaveCount(0);
 });
 
-test("refuses a person with no membership, offering sign-out, not creation", async ({
-  page,
-  request,
-}) => {
-  const email = anAddress("nobody");
-  await person(request, email);
+test("offers one way on to a person with no membership", async ({ page, request }) => {
+  await signedInWithNoWorkspace(page, request, "nobody");
 
-  await page.goto("/sign-in");
-  await signIn(page, request, email);
-
-  await expect(page.getByRole("heading", { level: 1, name: "No workspace yet" })).toBeVisible();
-  await expect(page.getByText("An Admin adds people to a workspace")).toBeVisible();
+  await expect(page.getByRole("region", { name: ASK_TO_JOIN_WORDS.heading })).toBeVisible();
 
   await expect(page.getByRole("button", { name: /create/i })).toHaveCount(0);
   await expect(page.getByRole("link", { name: /create/i })).toHaveCount(0);
@@ -149,27 +156,30 @@ test("announces a sent code in the standing region, keeping focus", async ({ pag
   await expect(page.getByLabel("Code"), "sending the code took focus from the field").toBeFocused();
 });
 
-test("skips the picker when the membership postdates the session", async ({ page, request }) => {
-  /* jscpd:ignore-start */
-  const email = anAddress("later");
-  const who = await person(request, email);
-  await page.goto("/sign-in");
-  await signIn(page, request, email);
-  await expect(page.getByRole("heading", { level: 1, name: "No workspace yet" })).toBeVisible();
-  /* jscpd:ignore-end */
-
-  const workspace = await provision(request, { name: "Arrived Late" });
+/** A session begun with no membership names no workspace, so the picker opens the one joined since. */
+const joinedAfterSigningIn = async (page: Page, request: APIRequestContext, name: string) => {
+  const who = await signedInWithNoWorkspace(page, request, "later");
+  const workspace = await provision(request, { name });
   await addMember(request, { workspaceId: workspace.workspaceId, userId: who.id, role: "Editor" });
+  return workspace;
+};
+
+test("skips the picker when the membership postdates the session", async ({ page, request }) => {
+  const workspace = await joinedAfterSigningIn(page, request, "Arrived Late");
   await page.goto("/choose-workspace");
 
   await landedAtHome(page, "Editor");
   const bar = page.getByRole("banner");
   await expect(bar.getByText(workspace.name)).toBeVisible();
   await expect(bar.getByText("Editor", { exact: false })).toBeVisible();
-  await expect(page.getByRole("heading", { level: 1, name: "Choose a workspace" })).toHaveCount(0);
+  await expect(thePicker(page)).toHaveCount(0);
 });
 
-test("refuses, in words, a workspace the person was removed from", async ({ page, request }) => {
+test("drops and names a workspace the person was removed from", async ({
+  page,
+  request,
+  passesTheAccessibilityGate,
+}) => {
   const email = anAddress("removed");
   const { first, second } = await memberOfTwoWorkspaces(request, email, {
     first: "Still Mine",
@@ -182,20 +192,55 @@ test("refuses, in words, a workspace the person was removed from", async ({ page
   await removeMember(request, { workspaceId: second.workspaceId, userId: first.admin.id });
   await page.getByRole("button", { name: second.name }).click();
 
-  await expect(page.getByRole("alert")).toContainText("That workspace could not be opened");
+  await expect(page.getByRole("alert")).toHaveText(noLongerAMember(second.name));
+  await expect(thePicker(page)).toBeVisible();
+  await expect(page.getByRole("button", { name: second.name })).toHaveCount(0);
+  const stillMine = page.getByRole("button", { name: first.name });
+  await expect(stillMine, "focus was not left on what the reader can do next").toBeFocused();
+  await passesTheAccessibilityGate();
 
-  await expect(page.getByRole("heading", { level: 1, name: "Choose a workspace" })).toBeVisible();
+  await page.keyboard.press("Enter");
+  await landedAtHome(page, "Admin");
+});
+
+test("stops at one refused pick of a sole workspace", async ({ page, request }) => {
+  await joinedAfterSigningIn(page, request, "Out Of Reach");
+  let picks = 0;
+  await page.route("**/organization/set-active", async (route) => {
+    picks += 1;
+    await route.abort();
+  });
+  await page.goto("/choose-workspace");
+
+  await expect(page.getByRole("alert")).toHaveText(sentenceOf(SOLE_PICK_REFUSED));
+  await expect(thePicker(page)).toBeVisible();
+  expect(picks, "a refused pick was asked again").toBe(1);
+});
+
+test("keeps the list, saying so, when a pick is refused", async ({ page, request }) => {
+  const email = anAddress("pickfails");
+  const { first, second } = await memberOfTwoWorkspaces(request, email, {
+    first: "Kept Listed",
+    second: "Did Not Open",
+  });
+  await page.goto("/sign-in");
+  await signIn(page, request, email);
+  await page.route("**/organization/set-active", (route) => route.abort());
+
+  const picked = page.getByRole("button", { name: second.name });
+  await picked.click();
+
+  await expect(page.getByRole("alert")).toHaveText(sentenceOf(PICK_REFUSED));
+  await expect(picked).toBeFocused();
+  await expect(page.getByRole("button", { name: first.name })).toBeVisible();
 });
 
 test("sends a non-member from the picker to the refused screen", async ({ page, request }) => {
-  const email = anAddress("none");
-  await person(request, email);
-  await page.goto("/sign-in");
-  await signIn(page, request, email);
+  await signedInWithNoWorkspace(page, request, "none");
 
   await page.goto("/choose-workspace");
 
-  await expect(page.getByRole("heading", { level: 1, name: "No workspace yet" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
 });
 
@@ -214,18 +259,16 @@ test("separates an unread workspace list from no membership, offering retry", as
   await page.goto("/sign-in");
   await signIn(page, request, email);
 
-  await expect(page.getByRole("alert")).toContainText("Your workspaces could not be read", {
-    timeout: 15_000,
-  });
-  await expect(page.getByRole("heading", { level: 1, name: "Workspaces" })).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveText(WORKSPACES_UNREAD, { timeout: 15_000 });
+  await expect(thePicker(page)).toBeVisible();
 
-  await expect(page.getByRole("heading", { level: 1, name: "No workspace yet" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toHaveCount(0);
 
   await page.unroute("**/organization/list");
-  await page.getByRole("button", { name: "Try again" }).click();
+  await page.getByRole("button", { name: PICKER_WORDS.tryAgain }).click();
 
   /* jscpd:ignore-start */
-  await expect(page.getByRole("heading", { level: 1, name: "Choose a workspace" })).toBeVisible();
+  await expect(page.getByText(PICKER_WORDS.lead)).toBeVisible();
   await expect(page.getByRole("button", { name: first.name })).toBeVisible();
   await expect(page.getByRole("button", { name: second.name })).toBeVisible();
   /* jscpd:ignore-end */
@@ -255,7 +298,7 @@ test("makes the screens outside the shell keyboard-operable, landmarked and labe
   await page.keyboard.type(sixDigits);
   await page.keyboard.press("Enter");
 
-  await expect(page.getByRole("heading", { level: 1, name: "No workspace yet" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeVisible();
   await expect(page.getByRole("main")).toHaveCount(1);
   const signOut = page.getByRole("button", { name: "Sign out" });
   await signOut.focus();
