@@ -2,10 +2,11 @@ import { execFile } from "node:child_process";
 import path from "node:path";
 import { promisify } from "node:util";
 
-import { CONTRACT_DIGEST, STAMP_THE_CONTRACT } from "@better-answers/schema";
 import pg from "pg";
 import { expect } from "vitest";
 import { z } from "zod";
+
+import { CONTRACT_DIGEST, STAMP_THE_CONTRACT } from "@better-answers/schema";
 
 const run = promisify(execFile);
 

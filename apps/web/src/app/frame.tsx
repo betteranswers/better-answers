@@ -13,10 +13,11 @@ import {
   type View,
 } from "@/shared/screens.ts";
 import { isFilled } from "@/shared/view-toolbar.tsx";
+
 import { IconRail } from "./icon-rail.tsx";
 import { NavigationControl } from "./navigation-control.tsx";
-import { SecondaryNav } from "./secondary-nav.tsx";
 import { useSecondaryNavShowing } from "./secondary-nav-showing.ts";
+import { SecondaryNav } from "./secondary-nav.tsx";
 import { Toolbar, ViewPanel, ViewTabsRoot } from "./toolbar.tsx";
 import { TopBar, type MenuLink, type Person } from "./top-bar.tsx";
 import { useWideLayout } from "./wide-layout.ts";

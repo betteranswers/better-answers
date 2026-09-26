@@ -1,7 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 
 import { expect, test } from "./browser.ts";
-
 import { anAddress, provision, signIn, skipLinkReachesTheScreen } from "./harness.ts";
 
 const SCREEN_NAMES = ["Sources", "Suggestions", "Knowledge", "Questions", "People", "System"];

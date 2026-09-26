@@ -1,7 +1,8 @@
-import * as React from "react";
-import { cn } from "@/shared/lib/utils.ts";
 import { CircleIcon } from "lucide-react";
 import { RadioGroup as RadioGroupPrimitive } from "radix-ui";
+import * as React from "react";
+
+import { cn } from "@/shared/lib/utils.ts";
 
 function RadioGroup({
   className,

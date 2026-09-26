@@ -1,6 +1,7 @@
+import { describe, expect, it } from "vitest";
+
 import { readOxlintConfig } from "@better-answers/devtools/oxlint-config";
 import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
-import { describe, expect, it } from "vitest";
 
 const webOverrides = () =>
   readOxlintConfig().overrides.filter(

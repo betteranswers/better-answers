@@ -12,6 +12,7 @@ import {
 import { RefusalLine } from "@/shared/refusal-outcome.tsx";
 import { CONSOLE } from "@/shared/screens.ts";
 import { Button } from "@/shared/ui/button.tsx";
+
 import { Frame } from "./frame.tsx";
 import type { MenuLink } from "./top-bar.tsx";
 

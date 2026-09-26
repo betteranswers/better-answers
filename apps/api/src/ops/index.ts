@@ -64,7 +64,6 @@ import { REBUILD_REASONS, ROLES, SENSITIVITIES, ulid } from "@better-answers/sch
 
 import { doorTold, type Doors } from "../doors.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
-
 import { isRefusalWord, refusalOf } from "../refusal.ts";
 
 const DONE = 0;

@@ -1,5 +1,6 @@
-import { boundarySchemas, REDACTION_ALWAYS_TIER } from "@better-answers/schema";
 import { z } from "zod";
+
+import { boundarySchemas, REDACTION_ALWAYS_TIER } from "@better-answers/schema";
 
 import { act, declareActs, record } from "../audit/index.ts";
 import {

@@ -13,8 +13,9 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { gitIn, throwawayRepository, writeUnder } from "@better-answers/devtools/throwaway-tree";
 import { afterAll, describe, expect, it } from "vitest";
+
+import { gitIn, throwawayRepository, writeUnder } from "@better-answers/devtools/throwaway-tree";
 
 const realGit = spawnSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).stdout.trim();
 const repositoryRoot = path.join(import.meta.dirname, "../../..");

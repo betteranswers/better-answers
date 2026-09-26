@@ -1,5 +1,6 @@
-import { ulid } from "@better-answers/schema";
 import { describe, expect, it } from "vitest";
+
+import { ulid } from "@better-answers/schema";
 
 import type { PlatformPrincipal } from "../src/kernel/index.ts";
 import {

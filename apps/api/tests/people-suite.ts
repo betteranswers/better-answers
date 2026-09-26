@@ -1,7 +1,7 @@
 import { afterAll, beforeAll } from "vitest";
 
-import { startApp, type TestApp } from "./harness.ts";
 import { askToJoin } from "./harness-people.ts";
+import { startApp, type TestApp } from "./harness.ts";
 import { sessionPointedAt } from "./provoke.ts";
 import { refusalOfCall, webSignedIn } from "./web-client.ts";
 

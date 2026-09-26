@@ -1,5 +1,6 @@
-import { testData } from "@better-answers/schema/testing";
 import { describe, expect, it } from "vitest";
+
+import { testData } from "@better-answers/schema/testing";
 
 import type { Result, Role } from "../src/kernel/index.ts";
 import { listMembers } from "../src/members/index.ts";

@@ -16,12 +16,13 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 
+import { afterAll, describe, expect, it } from "vitest";
+
 import {
   gitIn as git,
   throwawayRepository,
   writeUnder as write,
 } from "@better-answers/devtools/throwaway-tree";
-import { afterAll, describe, expect, it } from "vitest";
 
 const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
 const script = path.join(repositoryRoot, ".claude/hooks/provision-skills.sh");

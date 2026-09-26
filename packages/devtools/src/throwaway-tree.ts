@@ -12,8 +12,9 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { byCodeUnit } from "@better-answers/schema/code-unit";
 import { z } from "zod";
+
+import { byCodeUnit } from "@better-answers/schema/code-unit";
 
 /**
  * What `execFileSync` throws once the tool ran; a spawn that never started carries a null

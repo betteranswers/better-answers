@@ -1,6 +1,7 @@
-import { CONFIGURED_LLM_ROUTES, LISTED_LLM_ROUTES, testData } from "@better-answers/schema/testing";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
+
+import { CONFIGURED_LLM_ROUTES, LISTED_LLM_ROUTES, testData } from "@better-answers/schema/testing";
 
 import { TRPC_IP_RULE } from "../src/auth/index.ts";
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";

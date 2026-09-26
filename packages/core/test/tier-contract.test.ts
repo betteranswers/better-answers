@@ -10,11 +10,13 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+
 import { afterAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { pluginConfigFor } from "@better-answers/devtools/oxlint-config";
 import { oxlintOver, writeUnder } from "@better-answers/devtools/throwaway-tree";
+import type { Tree } from "@better-answers/devtools/throwaway-tree";
 import {
   boundarySchemas,
   CONTRACT_DIGEST,
@@ -23,8 +25,6 @@ import {
 } from "@better-answers/schema";
 
 import { ulid } from "../src/kernel/index.ts";
-
-import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
 /**
  * Hardcoded on purpose, never read from a shared constant: that is what fails a tier not yet

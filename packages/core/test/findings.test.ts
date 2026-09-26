@@ -1,7 +1,7 @@
+import type pg from "pg";
 import { describe, expect, it } from "vitest";
 
 import { REDACTION_ALWAYS_TIER } from "@better-answers/schema";
-import type pg from "pg";
 
 import { parse, type UserPrincipal } from "../src/kernel/index.ts";
 import { restoreFinding, restoreFindingInput } from "../src/sources/index.ts";

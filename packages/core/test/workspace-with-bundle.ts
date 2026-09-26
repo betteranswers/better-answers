@@ -1,7 +1,7 @@
-import { testData, type MigratedPostgres } from "@better-answers/schema/testing";
 import type pg from "pg";
 
 import { initRepository, type GitDoor } from "@better-answers/core/store/git";
+import { testData, type MigratedPostgres } from "@better-answers/schema/testing";
 
 import {
   systemClock,

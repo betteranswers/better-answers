@@ -1,8 +1,9 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
-import { repositoryRoot } from "@better-answers/devtools/oxlint-config";
 import { describe, expect, it } from "vitest";
+
+import { repositoryRoot } from "@better-answers/devtools/oxlint-config";
 
 const AMBIENT_CLOCK_READ = /\bnew\s+Date\s*\(\s*\)|\bDate\s*\.\s*now\s*\(\s*\)/g;
 

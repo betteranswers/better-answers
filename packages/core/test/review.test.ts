@@ -1,8 +1,8 @@
-import { REASONS_EMPTYING_THE_BINDING } from "@better-answers/schema";
 import type pg from "pg";
 import { describe, expect, it } from "vitest";
-
 import type { z } from "zod";
+
+import { REASONS_EMPTYING_THE_BINDING } from "@better-answers/schema";
 
 import { parse, type UserPrincipal } from "../src/kernel/index.ts";
 import {
@@ -19,7 +19,6 @@ import {
   reprocessBindingInput,
   type findingGroupKey,
 } from "../src/sources/index.ts";
-import { inputOf } from "./suite-input.ts";
 import {
   bindingHolding,
   chunkUnder,
@@ -30,6 +29,7 @@ import {
   visibilitySuite,
   visibilityHeld,
 } from "./sourced-concept.ts";
+import { inputOf } from "./suite-input.ts";
 import { whileWritesAreRefused } from "./suite-postgres.ts";
 import type { Scenario } from "./workspace-with-bundle.ts";
 

@@ -1,3 +1,5 @@
+import type { z } from "zod";
+
 import {
   boundarySchemas,
   conceptFrontmatter,
@@ -7,7 +9,6 @@ import {
   SUGGESTION_SET_MAX,
   SUGGESTION_WAITING_STATUS,
 } from "@better-answers/schema";
-import type { z } from "zod";
 
 import { readableClause, readableParameters } from "../access/index.ts";
 import { act, declareActs, record, type AuditAct } from "../audit/index.ts";

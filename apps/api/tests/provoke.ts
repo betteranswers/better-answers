@@ -1,5 +1,6 @@
-import { testData } from "@better-answers/schema/testing";
 import { z } from "zod";
+
+import { testData } from "@better-answers/schema/testing";
 
 import { signIn } from "./flow.ts";
 import { APP_HOSTNAME, type TestApp, type TestClient } from "./harness.ts";

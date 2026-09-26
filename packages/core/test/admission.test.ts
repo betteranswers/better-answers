@@ -1,6 +1,7 @@
-import { boundarySchemas } from "@better-answers/schema";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { z } from "zod";
+
+import { boundarySchemas } from "@better-answers/schema";
 
 import {
   admit,

@@ -1,6 +1,8 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
+import { describe, expect, it } from "vitest";
+
 import {
   oxlintOverrideFor,
   pluginConfigFor,
@@ -8,7 +10,6 @@ import {
   repositoryRoot,
 } from "@better-answers/devtools/oxlint-config";
 import { oxlintOver, type Tree } from "@better-answers/devtools/throwaway-tree";
-import { describe, expect, it } from "vitest";
 
 const RULE = "better-answers/import-direction";
 const CORE = "packages/core";

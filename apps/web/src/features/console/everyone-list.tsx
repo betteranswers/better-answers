@@ -9,9 +9,9 @@ import { RefusalLine } from "@/shared/refusal-outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { counted } from "@/shared/words.ts";
 
-import { arrival, EVERYONE_PATH, type Arrival } from "./people-address.ts";
 import { Pages, turnsOf, type PageTurns } from "./everyone-pages.tsx";
 import { SearchField, useAsking } from "./everyone-search.tsx";
+import { arrival, EVERYONE_PATH, type Arrival } from "./people-address.ts";
 import { usePeople, type Asked, type ListedPerson } from "./people-api.ts";
 import { PEOPLE_KEYSTROKES } from "./people-keystrokes.ts";
 import { PersonSheet, personButtonId, type OpenedAt } from "./person-sheet.tsx";

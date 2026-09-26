@@ -1,10 +1,9 @@
 import { defineRule } from "@oxlint/plugins";
+import type { Comment, ESTree, Fix, Fixer, SourceCode } from "@oxlint/plugins";
 
 import { citationIn } from "../../src/citations.ts";
 import { blocksIn, directiveIn, lastOf, proseOf } from "../shared/comment-blocks.ts";
-
 import type { Block, Opened } from "../shared/comment-blocks.ts";
-import type { Comment, ESTree, Fix, Fixer, SourceCode } from "@oxlint/plugins";
 
 const WORD_LIMIT = 25;
 

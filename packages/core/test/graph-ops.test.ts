@@ -1,4 +1,3 @@
-import type { TestData } from "@better-answers/schema/testing";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -7,6 +6,7 @@ import {
   rebuildGraph,
   sweepGraph,
 } from "@better-answers/core/concepts";
+import type { TestData } from "@better-answers/schema/testing";
 
 import { provisionedWorkspace, type ProvisionedWorkspace } from "./platform.ts";
 import { postgresForSuite, seedingWith } from "./suite-postgres.ts";

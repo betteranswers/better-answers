@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
+import { describe, expect, it } from "vitest";
+
 import { readOxlintConfig, repositoryRoot } from "@better-answers/devtools/oxlint-config";
 import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
-import { describe, expect, it } from "vitest";
 
 const RULE = "node/no-process-env";
 const SEVERITY = "error";

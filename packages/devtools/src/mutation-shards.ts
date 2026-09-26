@@ -1,9 +1,10 @@
 import { globSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import { byCodeUnit } from "@better-answers/schema/code-unit";
 import { Instrumenter } from "@stryker-mutator/instrumenter";
 import { z } from "zod";
+
+import { byCodeUnit } from "@better-answers/schema/code-unit";
 
 import { flagValues } from "./flags.ts";
 

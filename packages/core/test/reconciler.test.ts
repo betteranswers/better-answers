@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { commit, withRepositoryLock } from "@better-answers/core/store/git";
 import { conceptIriOf, ulid } from "@better-answers/schema";
 
 import {
@@ -24,8 +25,6 @@ import {
 } from "../src/concepts/index.ts";
 import { actorIdOf, type Result, type UserPrincipal } from "../src/kernel/index.ts";
 import { narrowBinding, narrowBindingInput } from "../src/sources/index.ts";
-import { inputOf } from "./suite-input.ts";
-import { commit, withRepositoryLock } from "@better-answers/core/store/git";
 import {
   bundleHistory,
   commitFacts,
@@ -34,6 +33,7 @@ import {
   removeRepository,
 } from "./bundle.ts";
 import { bindingHolding, publishedOnceIndexed } from "./sourced-concept.ts";
+import { inputOf } from "./suite-input.ts";
 import { readingAs } from "./suite-postgres.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 

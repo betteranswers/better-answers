@@ -1,3 +1,5 @@
+import type { z } from "zod";
+
 import {
   ACT,
   AUDIENCES,
@@ -9,7 +11,6 @@ import {
   ULID,
 } from "@better-answers/schema";
 import type { boundarySchemas } from "@better-answers/schema";
-import type { z } from "zod";
 
 import type { Role } from "../kernel/index.ts";
 

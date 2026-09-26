@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 
-import { boundarySchemas, RULES_IN_FORCE_KEYS, type REDACTION_TIERS } from "@better-answers/schema";
 import { z } from "zod";
+
+import { boundarySchemas, RULES_IN_FORCE_KEYS, type REDACTION_TIERS } from "@better-answers/schema";
 
 import { err, ok, type Result, type UserPrincipal } from "../kernel/index.ts";
 import { listRoutes, type LlmPurpose } from "../llm/index.ts";

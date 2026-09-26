@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { conceptIriOf, ulid } from "@better-answers/schema";
-
 import { walkFrom, walkTo } from "@better-answers/core/store/graph";
+import { conceptIriOf, ulid } from "@better-answers/schema";
 
 import { readableClause, readableParameters } from "../src/access/index.ts";
 import { conceptByIri } from "../src/concepts/index.ts";

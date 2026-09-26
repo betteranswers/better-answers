@@ -1,6 +1,7 @@
-import { testData } from "@better-answers/schema/testing";
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
+
+import { testData } from "@better-answers/schema/testing";
 
 import type { Result, Role, UserPrincipal } from "../src/kernel/index.ts";
 import {

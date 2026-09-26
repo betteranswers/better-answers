@@ -1,10 +1,10 @@
-import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
-import { pluginConfigFor } from "@better-answers/devtools/oxlint-config";
 import { describe, expect, it } from "vitest";
 
-import { tag } from "./fixture-text.ts";
-
+import { pluginConfigFor } from "@better-answers/devtools/oxlint-config";
+import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
+
+import { tag } from "./fixture-text.ts";
 
 const RULE = "better-answers/string-cites-nothing";
 const FILE = "probe.ts";

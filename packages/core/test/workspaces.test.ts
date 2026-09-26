@@ -1,8 +1,8 @@
-import { testData } from "@better-answers/schema/testing";
 import pg from "pg";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { boundarySchemas, ulid } from "@better-answers/schema";
+import { testData } from "@better-answers/schema/testing";
 
 import {
   attempt,
@@ -11,14 +11,6 @@ import {
   type PlatformPrincipal,
   type UserPrincipal,
 } from "../src/kernel/index.ts";
-import { issuedCredentialsFor } from "./identity-rows.ts";
-import {
-  asANewOperator,
-  bootstrap,
-  principalOf,
-  provisionedWorkspace,
-  seedPerson,
-} from "./platform.ts";
 import {
   openPostgres,
   type PostgresDoor,
@@ -43,6 +35,14 @@ import {
   workspaceIdBySlug,
   workspacesHeldBy,
 } from "../src/workspaces/index.ts";
+import { issuedCredentialsFor } from "./identity-rows.ts";
+import {
+  asANewOperator,
+  bootstrap,
+  principalOf,
+  provisionedWorkspace,
+  seedPerson,
+} from "./platform.ts";
 import { addressOf, postgresForSuite, readingAs, whileWritesAreRefused } from "./suite-postgres.ts";
 
 const db = postgresForSuite();

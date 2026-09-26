@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 
-import { testData } from "@better-answers/schema/testing";
 import pg from "pg";
 import { describe, expect, it } from "vitest";
 
 import { ulid } from "@better-answers/schema";
+import { testData } from "@better-answers/schema/testing";
 
 import { attempt, type Result, type Role, type UserPrincipal } from "../src/kernel/index.ts";
 import {

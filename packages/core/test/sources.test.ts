@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
 
-import { bindingIdTakenAgain } from "@better-answers/schema/testing/probes";
 import type pg from "pg";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+
+import { bindingIdTakenAgain } from "@better-answers/schema/testing/probes";
 
 import { readableClause, readableParameters } from "../src/access/index.ts";
 import { ERASURE } from "../src/erasure/index.ts";

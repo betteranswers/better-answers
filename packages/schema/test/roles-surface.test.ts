@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
+
 import type pg from "pg";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { declaredTableNames } from "../scripts/worker-view.ts";
 import {
   isRuntimeRole,
   MIGRATOR,
@@ -14,11 +14,12 @@ import {
   rolesSurfacePath,
   withOneWorkspacePartition,
 } from "../scripts/roles-surface.ts";
+import { declaredTableNames } from "../scripts/worker-view.ts";
 import { identityOf, SECURITY_DEFINER_REACH, ulid } from "../src/index.ts";
 import { testData } from "./factory.ts";
 import { withRollback } from "./harness.ts";
-import { A_GRAPH_NODE } from "./rls-probes.ts";
 import { postgresForSuite, privilegesHeld, refusesEach } from "./probes.ts";
+import { A_GRAPH_NODE } from "./rls-probes.ts";
 
 /**
  * Read from the database, not parsed back out of the file: the drift test ties the two, so

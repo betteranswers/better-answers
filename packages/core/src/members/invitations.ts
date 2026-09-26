@@ -1,10 +1,11 @@
+import { z } from "zod";
+
 import {
   boundarySchemas,
   INVITATION_CANCELLED_STATUS,
   INVITATION_EXPIRY_SECONDS,
   INVITATION_WAITING_STATUS,
 } from "@better-answers/schema";
-import { z } from "zod";
 
 import { act, declareActs, record } from "../audit/index.ts";
 import {

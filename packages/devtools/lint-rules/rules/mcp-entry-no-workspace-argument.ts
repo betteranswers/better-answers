@@ -1,5 +1,4 @@
 import { defineRule } from "@oxlint/plugins";
-
 import type { ESTree } from "@oxlint/plugins";
 
 import { entryCallOf, findProperty, propertyName } from "../shared/entry-calls.ts";

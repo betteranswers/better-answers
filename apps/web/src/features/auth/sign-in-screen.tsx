@@ -1,6 +1,6 @@
-import type { BetterFetchError } from "better-auth/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
+import type { BetterFetchError } from "better-auth/client";
 import { useState, type FormEvent } from "react";
 
 import { Button } from "@/shared/ui/button.tsx";

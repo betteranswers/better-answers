@@ -1,5 +1,6 @@
-import { boundarySchemas, CREATOR_ROLE } from "@better-answers/schema";
 import { z } from "zod";
+
+import { boundarySchemas, CREATOR_ROLE } from "@better-answers/schema";
 
 import { act, declareActs, declareIdentitySetActs, record } from "../audit/index.ts";
 import { attempt, err, ok, refusalFor, type Result, ulid } from "../kernel/index.ts";

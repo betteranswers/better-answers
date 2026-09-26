@@ -1,6 +1,7 @@
+import type pg from "pg";
+
 import { boundarySchemas, ulid } from "@better-answers/schema";
 import { type MigratedPostgres, testData } from "@better-answers/schema/testing";
-import type pg from "pg";
 
 import type {
   OperatorPrincipal,

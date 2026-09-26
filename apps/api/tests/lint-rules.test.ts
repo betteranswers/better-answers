@@ -1,3 +1,5 @@
+import { describe, expect, it } from "vitest";
+
 import {
   loadableAnywhere,
   oxlintOverrideFor,
@@ -5,7 +7,6 @@ import {
   type OxlintConfig,
 } from "@better-answers/devtools/oxlint-config";
 import { oxlintOver, type Tree } from "@better-answers/devtools/throwaway-tree";
-import { describe, expect, it } from "vitest";
 
 const probe = (specifier: string): string =>
   `import * as probe from "${specifier}";\nexport const keep = probe;\n`;

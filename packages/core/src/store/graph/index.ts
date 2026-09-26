@@ -1,3 +1,6 @@
+import type pg from "pg";
+import type { z } from "zod";
+
 import {
   CONCEPT_DEPRECATED_STATUS,
   CONCEPT_NODE_LABEL,
@@ -10,8 +13,6 @@ import {
   resolvedResource,
   SUPERSEDES_LABEL,
 } from "@better-answers/schema";
-import type pg from "pg";
-import type { z } from "zod";
 
 import { readableClause, readableParameters } from "../../access/index.ts";
 import type { PlatformPrincipal, Principal, UserPrincipal } from "../../kernel/index.ts";

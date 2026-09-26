@@ -1,6 +1,7 @@
 import { boundarySchemas } from "@better-answers/schema";
 
 import { act, declareActs, record, type DetailOf } from "../audit/index.ts";
+import { carryChecksOntoRewrite, moveBundleCommits } from "../concepts/index.ts";
 import {
   attempt,
   err,
@@ -10,7 +11,6 @@ import {
   type PlatformPrincipal,
   type Result,
 } from "../kernel/index.ts";
-import { carryChecksOntoRewrite, moveBundleCommits } from "../concepts/index.ts";
 import {
   ERASED_DOMAIN,
   rewriteHistory,

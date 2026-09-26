@@ -1,9 +1,8 @@
 import { defineRule } from "@oxlint/plugins";
+import type { Node } from "@oxlint/plugins";
 
 import { citationIn } from "../../src/citations.ts";
 import { stringsGoUnread } from "../../src/tag-printing-gates.ts";
-
-import type { Node } from "@oxlint/plugins";
 
 const A_SPACE = /\s/;
 

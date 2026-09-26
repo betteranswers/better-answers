@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 import { RouterProvider, createMemoryHistory } from "@tanstack/react-router";
-import type { inferInput, inferOutput } from "@trpc/tanstack-react-query";
 import { cleanup, render, screen } from "@testing-library/react";
+import type { inferInput, inferOutput } from "@trpc/tanstack-react-query";
 import { afterEach, describe, expect, expectTypeOf, it } from "vitest";
 
 import { createAppClients, Providers } from "@/app/providers.tsx";

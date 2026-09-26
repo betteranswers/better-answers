@@ -15,7 +15,6 @@ import {
   type PreviewedChunk,
 } from "../src/sources/index.ts";
 import { contractFixture, documentChunkRow, OPEN_OUTCOMES } from "./contract-fixture.ts";
-import { inputOf } from "./suite-input.ts";
 import {
   bindingHolding,
   conceptCiting,
@@ -23,6 +22,7 @@ import {
   seededBy,
   visibilitySuite,
 } from "./sourced-concept.ts";
+import { inputOf } from "./suite-input.ts";
 import { answered } from "./suite-postgres.ts";
 
 const fixtureSchema = z.object({

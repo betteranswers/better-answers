@@ -6,9 +6,10 @@ import {
   isValidElement,
   useState,
 } from "react";
+
+import { cn } from "@/shared/lib/utils.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs.tsx";
-import { cn } from "@/shared/lib/utils.ts";
 
 export type SnippetProps = ComponentProps<typeof Tabs>;
 

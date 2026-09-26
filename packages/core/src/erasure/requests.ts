@@ -1,9 +1,10 @@
+import type { z } from "zod";
+
 import {
   boundarySchemas,
   SUBJECT_IDENTIFIER_FLOOR,
   SUBJECT_IDENTIFIER_KINDS,
 } from "@better-answers/schema";
-import type { z } from "zod";
 
 import { act, declareActs, record, type DetailOf } from "../audit/index.ts";
 import {

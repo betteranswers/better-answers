@@ -1,5 +1,6 @@
-import { boundarySchemas, FAMILIES } from "@better-answers/schema";
 import { z } from "zod";
+
+import { boundarySchemas, FAMILIES } from "@better-answers/schema";
 
 import { eventsNewestFirst, type AuditEventPage, type AuditEventRow } from "../audit/index.ts";
 import {

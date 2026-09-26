@@ -28,7 +28,6 @@ import {
 } from "./concept-tables.ts";
 import { CONTRACT_DIGEST_PATTERN } from "./contract-digest.ts";
 import { ingressCounter, mcpCallCounter } from "./counter-tables.ts";
-import { contractStamp, sweepPass, UPLOAD_SWEEP_MODES } from "./platform-tables.ts";
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "./drizzle-zod.ts";
 import {
   erasureRequest,
@@ -55,7 +54,6 @@ import {
   SOURCE_ENTITY_LABEL_PREFIX,
 } from "./graph-tables.ts";
 import { group, GROUP_ORIGINS, groupMember } from "./group-tables.ts";
-import { job, JOB_KINDS, JOB_REASONS, JOB_STATUSES } from "./job-tables.ts";
 import {
   account,
   invitation,
@@ -74,6 +72,8 @@ import {
   verification,
 } from "./identity-tables.ts";
 import { chunk, EMBEDDING_DIMENSIONS } from "./index-tables.ts";
+import { job, JOB_KINDS, JOB_REASONS, JOB_STATUSES } from "./job-tables.ts";
+import { contractStamp, sweepPass, UPLOAD_SWEEP_MODES } from "./platform-tables.ts";
 import { AUDIENCES, SENSITIVITIES } from "./readable-columns.ts";
 import { ROLES } from "./roles.ts";
 import { llmRoute, workspaceConfig } from "./schema.ts";

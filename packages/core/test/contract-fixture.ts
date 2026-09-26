@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
+
 import { z } from "zod";
 
 const contractsDir = path.resolve(import.meta.dirname, "../../../contracts");

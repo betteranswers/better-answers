@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import {
   BINDING_INDEXED_STATE,
   BINDING_INDEXING_STATE,
@@ -9,7 +11,6 @@ import {
   JOB_DONE_STATUS,
   type BINDING_STATES,
 } from "@better-answers/schema";
-import { z } from "zod";
 
 import {
   attempt,

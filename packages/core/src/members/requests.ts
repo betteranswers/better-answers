@@ -1,5 +1,6 @@
-import { ACCESS_REQUEST_OPEN_STATUS, boundarySchemas } from "@better-answers/schema";
 import { z } from "zod";
+
+import { ACCESS_REQUEST_OPEN_STATUS, boundarySchemas } from "@better-answers/schema";
 
 import { act, declareActs, record, recordFor } from "../audit/index.ts";
 import type { DetailOf, AuditAct } from "../audit/index.ts";

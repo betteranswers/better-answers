@@ -4,6 +4,7 @@ import { Icon } from "@/shared/icon.tsx";
 import type { Screen, Surface } from "@/shared/screens.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/shared/ui/sheet.tsx";
+
 import { IconRail } from "./icon-rail.tsx";
 import { SecondaryNav } from "./secondary-nav.tsx";
 

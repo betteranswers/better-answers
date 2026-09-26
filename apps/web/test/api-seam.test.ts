@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 const webRoot = path.resolve(import.meta.dirname, "..");

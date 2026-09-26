@@ -3,7 +3,6 @@ import { execFileSync } from "node:child_process";
 import { z } from "zod";
 
 import { executableOf, runsOverThrowawayTree } from "./throwaway-tree.ts";
-
 import type { Tree } from "./throwaway-tree.ts";
 
 /** Comment lines per code line; an arm over its figure fails the gate. */

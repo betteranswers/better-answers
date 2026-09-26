@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import {
   AUDIENCE_EVERYONE,
   BINDING_PUBLISHED_STATE,
@@ -9,10 +11,10 @@ import {
   REASONS_EMPTYING_THE_BINDING,
   SENSITIVITY_DEFAULT,
 } from "@better-answers/schema";
-import { z } from "zod";
 
 import { visibilityAgreed } from "../access/index.ts";
 import { act, declareActs, record, type DetailOf } from "../audit/index.ts";
+import { openingACascadeOverHeldGroups } from "../concepts/index.ts";
 import {
   admit,
   attempt,
@@ -30,7 +32,6 @@ import {
   type Result,
   type UserPrincipal,
 } from "../kernel/index.ts";
-import { openingACascadeOverHeldGroups } from "../concepts/index.ts";
 import { holdsEveryGroup } from "../members/index.ts";
 import { enqueueJobIn, indexRunRefused } from "../runs/index.ts";
 import { putObject, type ObjectDoor } from "../store/objects/index.ts";

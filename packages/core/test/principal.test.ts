@@ -1,7 +1,8 @@
+import { describe, expect, expectTypeOf, it } from "vitest";
+
 import { NIGHTLY_AUDIT_KIND, ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 import { configProbeWritten } from "@better-answers/schema/testing/probes";
-import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { act, declareActs, declareIdentitySetActs, record, recordFor } from "../src/audit/index.ts";
 import {

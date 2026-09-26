@@ -3,10 +3,11 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { mutateSet, mutationShardsFromArgv } from "@better-answers/devtools/mutation-shards";
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { z } from "zod";
+
+import { mutateSet, mutationShardsFromArgv } from "@better-answers/devtools/mutation-shards";
 
 import coreStrykerConfig from "../../../packages/core/stryker.config.mjs";
 import { legs } from "../../../scripts/mutation-shards.mjs";

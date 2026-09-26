@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-
 import type { z } from "zod";
 
 import { ulid } from "@better-answers/schema";
@@ -19,8 +18,8 @@ import {
   publishBindingInput,
 } from "../src/sources/index.ts";
 import { seededBy, visibilitySuite } from "./sourced-concept.ts";
-import { answered } from "./suite-postgres.ts";
 import { inputOf } from "./suite-input.ts";
+import { answered } from "./suite-postgres.ts";
 import type { Scenario } from "./workspace-with-bundle.ts";
 
 const { db, arrange, reading } = visibilitySuite();

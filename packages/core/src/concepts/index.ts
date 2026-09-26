@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import {
   boundarySchemas,
   CONCEPT_STABLE_STATUS,
@@ -7,7 +9,6 @@ import {
   type BundleManifest,
   type SENSITIVITIES,
 } from "@better-answers/schema";
-import { z } from "zod";
 
 import {
   readableClause,

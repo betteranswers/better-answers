@@ -1,5 +1,4 @@
 import { expect, test } from "./browser.ts";
-
 import { anAddress, provision, revokeCredentials, signIn, signOutFromTheShell } from "./harness.ts";
 
 test("sign-out from the shell ends the session", async ({ page, request }) => {

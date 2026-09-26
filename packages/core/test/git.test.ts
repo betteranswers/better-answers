@@ -2,7 +2,6 @@ import { writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { boundarySchemas, ulid } from "@better-answers/schema";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -16,6 +15,7 @@ import {
   type CommitRequest,
   type GitDoor,
 } from "@better-answers/core/store/git";
+import { boundarySchemas, ulid } from "@better-answers/schema";
 
 import type { ActorId, PlatformPrincipal, UserPrincipal } from "../src/kernel/index.ts";
 import {

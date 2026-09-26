@@ -1,6 +1,7 @@
-import * as React from "react";
-import { cn } from "@/shared/lib/utils.ts";
 import { Avatar as AvatarPrimitive } from "radix-ui";
+import * as React from "react";
+
+import { cn } from "@/shared/lib/utils.ts";
 
 function Avatar({
   className,

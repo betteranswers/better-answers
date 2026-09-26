@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { repositoryRoot } from "@better-answers/devtools/oxlint-config";
 import { describe, expect, it } from "vitest";
+
+import { repositoryRoot } from "@better-answers/devtools/oxlint-config";
 
 /**
  * Text, never imported: one half is Python, and importing either asks one language to answer
