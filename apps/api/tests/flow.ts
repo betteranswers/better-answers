@@ -177,15 +177,15 @@ export const connectAsHost = async (
   const code = callback.searchParams.get("code") ?? "";
   expect(code).not.toBe("");
 
-  const tokens = await exchange(client, { code, verifier });
+  const tokens = await exchangeForTokens(client, { code, verifier });
   return { ...tokens, code, callback };
 };
 
-const exchange = async (
+export const exchangeCode = async (
   client: TestClient,
   params: { readonly code: string; readonly verifier: string },
-): Promise<Tokens> => {
-  const response = await client.fetch(`${PUBLIC_URL}/oauth2/token`, {
+): Promise<Response> =>
+  client.fetch(`${PUBLIC_URL}/oauth2/token`, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -197,6 +197,12 @@ const exchange = async (
       resource: MCP_URL,
     }).toString(),
   });
+
+const exchangeForTokens = async (
+  client: TestClient,
+  params: { readonly code: string; readonly verifier: string },
+): Promise<Tokens> => {
+  const response = await exchangeCode(client, params);
   expect(response.status).toBe(200);
   return tokensOf(await response.json());
 };

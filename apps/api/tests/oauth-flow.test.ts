@@ -13,8 +13,10 @@ import {
   connectAsHost,
   continueAfterPostLogin,
   driveToPage,
+  exchangeCode,
   pkce,
   refresh,
+  revokeAtEndpoint,
   setActiveWorkspace,
   signIn,
 } from "./flow.ts";
@@ -31,6 +33,10 @@ import {
   startApp,
   type TestApp,
 } from "./harness.ts";
+import { webSignedIn } from "./web-client.ts";
+
+const json = async <T>(response: Response, shape: z.ZodType<T>): Promise<T> =>
+  shape.parse(await response.json());
 
 let app: TestApp;
 
@@ -41,9 +47,6 @@ beforeAll(async () => {
 afterAll(async () => {
   await app.stop();
 });
-
-const json = async <T>(response: Response, shape: z.ZodType<T>): Promise<T> =>
-  shape.parse(await response.json());
 
 /** RFC 8414's fields the surface's discovery is held to. */
 const authorizationServerMetadata = z.object({
@@ -751,6 +754,13 @@ describe("refresh and revocation", () => {
 });
 
 describe("the audit logs", () => {
+  const authLinesSince = (before: number) => {
+    const lines = app.logs.slice(before).filter((line) => line["module"] === "auth");
+    return (event: string) => lines.filter((line) => line["event"] === event);
+  };
+
+  const REFUSED_LINE = { client_id: CLAUDE_CLIENT_ID, workspace: null, token_id: null };
+
   it("logs picks and token events, not sign-ins or secrets", async () => {
     const one = await app.provision({ name: "Logged" });
     const two = await app.provision({ name: "Logged too" });
@@ -766,8 +776,7 @@ describe("the audit logs", () => {
       body: new URLSearchParams({ token: current, client_id: CLAUDE_CLIENT_ID }).toString(),
     });
 
-    const events = app.logs.slice(before).filter((line) => line["module"] === "auth");
-    const byEvent = (name: string) => events.filter((line) => line["event"] === name);
+    const byEvent = authLinesSince(before);
 
     expect(byEvent("auth.sign_in")).toEqual([]);
     expect(byEvent("auth.workspace_pick")).toMatchObject([
@@ -794,6 +803,64 @@ describe("the audit logs", () => {
     expect(everything).not.toContain(connected.refreshToken ?? "never");
     expect(everything).not.toContain(current);
     expect(everything).not.toContain(app.codeSentTo(one.admin.email));
+  });
+
+  const refreshTokensHeldBy = async (personId: string): Promise<number | undefined> => {
+    const held = await app.database.superuser.query<{ held: number }>(
+      "SELECT count(*)::int AS held FROM oauth_refresh_token WHERE user_id = $1",
+      [personId],
+    );
+    return held.rows[0]?.held;
+  };
+
+  /** One person each, because a refused replay ends every token its person holds for the client. */
+  const aConnectedMember = async (workspaceId: string) => {
+    const person = await app.person();
+    await app.addMember(workspaceId, person.id, "Viewer");
+    const client = app.client();
+    const tokens = await connectAsHost(app, client, person, { pick: workspaceId });
+    expect(tokens.refreshToken).toEqual(expect.stringMatching(/./));
+    return { person, client, refreshToken: tokens.refreshToken ?? "" };
+  };
+
+  it("logs a refused refresh as a refresh, whatever refused it", async () => {
+    const acme = await app.provision({ name: "Refreshed" });
+    const replaying = await aConnectedMember(acme.workspaceId);
+    expect((await refresh(replaying.client, replaying.refreshToken)).status).toBe(200);
+    const revoked = await aConnectedMember(acme.workspaceId);
+    expect((await revokeAtEndpoint(revoked.client, revoked.refreshToken)).status).toBe(200);
+    const removed = await aConnectedMember(acme.workspaceId);
+    const { api } = await webSignedIn(app, acme.admin.email);
+    await api.members.remove.mutate({ personId: removed.person.id });
+    expect(await refreshTokensHeldBy(removed.person.id)).toBe(0);
+    const before = app.logs.length;
+
+    const statuses = [
+      (await refresh(replaying.client, replaying.refreshToken)).status,
+      (await refresh(revoked.client, revoked.refreshToken)).status,
+      (await refresh(removed.client, removed.refreshToken)).status,
+    ];
+
+    expect(statuses).toEqual([400, 400, 400]);
+    const byEvent = authLinesSince(before);
+    expect(byEvent("auth.token_issue")).toEqual([]);
+    expect(byEvent("auth.token_refresh")).toMatchObject(
+      Array.from({ length: 3 }, () => ({ ...REFUSED_LINE, outcome: "refused" })),
+    );
+  });
+
+  it("logs a refused code exchange as an issue", async () => {
+    const acme = await app.provision({ name: "Reused" });
+    const client = app.client();
+    const connected = await connectAsHost(app, client, acme.admin);
+    const before = app.logs.length;
+
+    const reused = await exchangeCode(client, { code: connected.code, verifier: pkce().verifier });
+
+    expect(reused.status).toBe(400);
+    const byEvent = authLinesSince(before);
+    expect(byEvent("auth.token_refresh")).toEqual([]);
+    expect(byEvent("auth.token_issue")).toMatchObject([{ ...REFUSED_LINE, outcome: "refused" }]);
   });
 });
 
