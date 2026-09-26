@@ -74,7 +74,7 @@ workspace = seed_workspace(cursor, name="Acme")
 
 A title is a short present-tense phrase. It says what the system does, not which function it calls: "refuses a name over 100 characters". It has 10 words at most and never says "should". The `describe` block names the unit under test. A Python test's name takes the same shape: `test_refuses_long_name`.
 
-Reviewer: only a person reads a title's subject or counts a Python test name's words.
+Reviewer: only a person reads a title's subject.
 
 ### [TEST6] Triage the nightly mutation summary, never the score
 

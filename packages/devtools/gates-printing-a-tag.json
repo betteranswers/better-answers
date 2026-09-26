@@ -11,6 +11,7 @@
     "packages/devtools/lint-rules/rules/string-cites-nothing.ts",
     "packages/devtools/python/comment_gate.py",
     "packages/devtools/src/comment-density.ts",
-    "packages/devtools/src/insert-scan.ts"
+    "packages/devtools/src/insert-scan.ts",
+    "packages/schema/test/test-title.ts"
   ]
 }

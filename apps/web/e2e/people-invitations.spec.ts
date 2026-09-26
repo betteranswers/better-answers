@@ -89,10 +89,7 @@ const openInvitations = async (page: Page): Promise<void> => {
 };
 
 test.describe("the People screen's Invitations tab", () => {
-  test("an Admin invites a person by address, and the invitation waits", async ({
-    page,
-    request,
-  }) => {
+  test("an Admin invites a person by address; the invitation waits", async ({ page, request }) => {
     await anAdminAtInvitations(page, request, "Calder Joinery");
     await openInvitations(page);
     await expect(invitationsRegion(page)).toContainText("Nobody is waiting to join.");
@@ -125,10 +122,7 @@ test.describe("the People screen's Invitations tab", () => {
     await expect(invitationsRegion(page).getByText("1 invitation", { exact: true })).toBeVisible();
   });
 
-  test("refuses inviting a current member, saying the refusal in its word", async ({
-    page,
-    request,
-  }) => {
+  test("refuses inviting a current member, saying so in its word", async ({ page, request }) => {
     const { editor } = await anAdminAtInvitations(page, request, "Aire Valley Tooling");
     await openInvitations(page);
 
@@ -281,10 +275,7 @@ test.describe("the People screen's Invitations tab", () => {
   });
 
   for (const role of ["Editor", "Viewer"] as const) {
-    test(`refuses a member at ${role} the invitations, in its own word`, async ({
-      page,
-      request,
-    }) => {
+    test(`refuses a member at ${role} the invitations, in its word`, async ({ page, request }) => {
       await aMemberBelowAdminAtPeople(page, request, role);
       await openInvitations(page);
 

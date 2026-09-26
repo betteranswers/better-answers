@@ -6,6 +6,8 @@ export default defineConfig({
   test: {
     include: ["test/**/*.test.ts"],
 
+    setupFiles: ["@better-answers/schema/testing/test-title-setup"],
+
     // An absolute path: Vitest imports a globalSetup entry as it is written rather than
     // resolving it against this file.
     globalSetup: [fileURLToPath(new URL("./test/warm-postgres.ts", import.meta.url))],

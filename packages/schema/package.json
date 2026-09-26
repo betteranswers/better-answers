@@ -9,6 +9,8 @@
     "./code-unit": "./src/code-unit.ts",
     "./testing": "./test/testing.ts",
     "./testing/probes": "./test/probes.ts",
+    "./testing/test-title": "./test/test-title.ts",
+    "./testing/test-title-setup": "./test/test-title-setup.ts",
     "./testing/warm-postgres": "./test/warm-postgres.ts"
   },
   "scripts": {

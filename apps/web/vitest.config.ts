@@ -8,5 +8,6 @@ export default defineConfig({
   test: {
     include: ["test/**/*.test.ts", "test/**/*.test.tsx"],
     environment: "jsdom",
+    setupFiles: ["@better-answers/schema/testing/test-title-setup"],
   },
 });

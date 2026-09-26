@@ -1,6 +1,8 @@
 import { AxeBuilder } from "@axe-core/playwright";
 import { expect, test as base, type Page } from "@playwright/test";
 
+import { holdTitle } from "@better-answers/schema/testing/test-title";
+
 let issued = 0;
 
 /** `CLIENT_IP_HEADER`, named not imported: `apps/web` takes nothing from `apps/api` at runtime. */
@@ -23,6 +25,7 @@ const auditOf = async (page: Page): Promise<void> => {
 
 export type BrowserFixtures = {
   readonly passesTheAccessibilityGate: () => Promise<void>;
+  readonly holdsItsTitle: void;
 };
 
 /**
@@ -30,6 +33,15 @@ export type BrowserFixtures = {
  * axe audit no passing test can skip.
  */
 export const test = base.extend<BrowserFixtures>({
+  holdsItsTitle: [
+    // oxlint-disable-next-line no-empty-pattern -- Playwright reads a fixture's dependencies from this pattern, and it has none
+    async ({}, use, testInfo) => {
+      holdTitle(testInfo.title);
+      await use();
+    },
+    { auto: true },
+  ],
+
   context: async ({ browser }, use, testInfo) => {
     const context = await browser.newContext({
       extraHTTPHeaders: { [CLIENT_IP_HEADER]: anAddress(testInfo.workerIndex) },

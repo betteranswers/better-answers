@@ -24,10 +24,10 @@ describe("the test-title rule", () => {
   });
 
   it.each([
-    "should refuse a long name",
-    "Should refuse a long name",
-    "refuses what it should not take",
-  ])("refuses %j", (title) => {
+    { where: "leading", title: "should refuse a long name" },
+    { where: "capitalised", title: "Should refuse a long name" },
+    { where: "mid-phrase", title: "refuses what it should not take" },
+  ])("refuses the forbidden word, $where", ({ title }) => {
     expect(refused(title)).toEqual([OFF_THE_LIST]);
   });
 

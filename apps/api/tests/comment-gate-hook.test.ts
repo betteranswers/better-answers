@@ -284,7 +284,7 @@ describe("the write-time hook runs the root config's comment rules", () => {
       "comment-only-the-why",
     ],
     [
-      "a line comment on a declaration",
+      "a declaration's line comment",
       "packages/probe/doc-block.ts",
       "// Kept short.\n",
       "declaration-doc-block",

@@ -1257,7 +1257,7 @@ describe("an Admin dismissing finding groups as not special category", () => {
 
   it.each([
     ["the queue refuses its run", "job"],
-    ["the audit log refuses the event", "audit_event"],
+    ["the audit log refuses", "audit_event"],
   ] as const)("rejects, dismissing no span, when %s", async (_when, table) => {
     const scenario = await arrange();
     const { bindingId, first } = await twoDocumentsTheSeamNarrowed(scenario);
