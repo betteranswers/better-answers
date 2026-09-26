@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { connectAsHost, refresh, setActiveWorkspace } from "./flow.ts";
+import { connectAsHost, refresh, revokeAtEndpoint, setActiveWorkspace } from "./flow.ts";
 import type { TestClient } from "./harness.ts";
 import { callMcp } from "./mcp-call.ts";
 import {
@@ -75,6 +75,21 @@ const signedInHere = async (email: string, workspaceId: string) => {
   return signedIn;
 };
 
+/** The member's client holds a grant in each workspace, and a third client presents them. */
+const connectedInBoth = async () => {
+  const members = await aMemberOfTwoWorkspaces();
+  const { here, elsewhere, person } = members;
+  const inHere = await connectAsHost(app(), app().client(), person, { pick: here.workspaceId });
+  const inElsewhere = await connectAsHost(app(), app().client(), person, {
+    pick: elsewhere.workspaceId,
+  });
+  expect([inHere.refreshToken, inElsewhere.refreshToken]).toEqual([
+    expect.stringMatching(/./),
+    expect.stringMatching(/./),
+  ]);
+  return { ...members, inHere, inElsewhere, host: app().client() };
+};
+
 const tokenAnswers = async (
   host: TestClient,
   tokens: { readonly accessToken: string; readonly refreshToken: string | undefined },
@@ -124,28 +139,28 @@ describe("revoking a member's credentials in this workspace over tRPC", () => {
   });
 
   it("ends the member's tokens for this workspace, not another's", async () => {
-    const { here, elsewhere, person, admin } = await aMemberOfTwoWorkspaces();
-    const inHere = await connectAsHost(app(), app().client(), person, { pick: here.workspaceId });
-    const inElsewhere = await connectAsHost(app(), app().client(), person, {
-      pick: elsewhere.workspaceId,
-    });
-    const host = app().client();
+    const { elsewhere, person, admin, inHere, inElsewhere, host } = await connectedInBoth();
 
     await admin.members.revokeCredentials.mutate({ personId: person.id });
 
-    expect(await refreshTokensOf(person.id)).toEqual(
-      [
-        { workspace_id: here.workspaceId, revoked: true },
-        { workspace_id: elsewhere.workspaceId, revoked: false },
-      ].toSorted((one, other) => one.workspace_id.localeCompare(other.workspace_id)),
-    );
-    // A revoked refresh token presented makes the library delete that client's others for the
-    // person in every workspace, so elsewhere goes first.
-    const elsewhereAnswers = await tokenAnswers(host, inElsewhere);
-    expect({ here: await tokenAnswers(host, inHere), elsewhere: elsewhereAnswers }).toEqual({
+    expect(await refreshTokensOf(person.id)).toEqual([
+      { workspace_id: elsewhere.workspaceId, revoked: false },
+    ]);
+    const hereAnswers = await tokenAnswers(host, inHere);
+    expect({ here: hereAnswers, elsewhere: await tokenAnswers(host, inElsewhere) }).toEqual({
       here: { mcp: 401, refresh: 400 },
       elsewhere: { mcp: 200, refresh: 200 },
     });
+  });
+
+  it("keeps elsewhere's tokens when this one's is presented to revoke", async () => {
+    const { person, admin, inHere, inElsewhere, host } = await connectedInBoth();
+    await admin.members.revokeCredentials.mutate({ personId: person.id });
+
+    const revoking = await revokeAtEndpoint(host, inHere.refreshToken ?? "");
+
+    expect(revoking.status).toBe(400);
+    expect(await tokenAnswers(host, inElsewhere)).toEqual({ mcp: 200, refresh: 200 });
   });
 
   it("answers alike whether or not the person belongs elsewhere", async () => {

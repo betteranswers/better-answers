@@ -35,7 +35,7 @@ import {
   workspaceIdBySlug,
   workspacesHeldBy,
 } from "../src/workspaces/index.ts";
-import { issuedCredentialsFor } from "./identity-rows.ts";
+import { endedGrants, issuedCredentialsFor } from "./identity-rows.ts";
 import {
   asANewOperator,
   bootstrap,
@@ -43,7 +43,13 @@ import {
   provisionedWorkspace,
   seedPerson,
 } from "./platform.ts";
-import { addressOf, postgresForSuite, readingAs, whileWritesAreRefused } from "./suite-postgres.ts";
+import {
+  addressOf,
+  postgresForSuite,
+  readingAs,
+  seedingWith,
+  whileWritesAreRefused,
+} from "./suite-postgres.ts";
 
 const db = postgresForSuite();
 
@@ -576,7 +582,7 @@ describe("revoking a person's tokens in one workspace", () => {
     userId: string;
     clientId: string;
 
-    grants: ReadonlyMap<string, string>;
+    labelById: ReadonlyMap<string, string>;
   };
 
   const seedTwoWorkspaces = async (): Promise<Seeded> => {
@@ -588,7 +594,7 @@ describe("revoking a person's tokens in one workspace", () => {
       const person = await seed.user();
       const other = await seed.user();
       const oauthClient = await seed.oauthClient();
-      const grants = new Map<string, string>();
+      const labelById = new Map<string, string>();
       const mint = async (
         grant: string,
         userId: string,
@@ -607,8 +613,8 @@ describe("revoking a person's tokens in one workspace", () => {
           referenceId,
           createdAt,
         });
-        grants.set(refresh.id, `refresh ${grant}`);
-        grants.set(access.id, `access ${grant}`);
+        labelById.set(refresh.id, `refresh ${grant}`);
+        labelById.set(access.id, `access ${grant}`);
       };
       await mint("here-old", person.id, here.id, before);
       await mint("here-new", person.id, here.id, after);
@@ -621,7 +627,7 @@ describe("revoking a person's tokens in one workspace", () => {
         there: there.id,
         userId: person.id,
         clientId: oauthClient.clientId,
-        grants,
+        labelById,
       };
     } finally {
       client.release();
@@ -630,16 +636,6 @@ describe("revoking a person's tokens in one workspace", () => {
 
   const endTokens = (input: { workspaceId: string; userId: string; at: Date }) =>
     revokeWorkspaceTokens(bootstrap, openPostgres(db().runtimePool), input);
-
-  const endedGrants = async (seeded: Seeded): Promise<readonly string[]> => {
-    const rows = await db().pool.query<{ id: string }>(
-      `SELECT id FROM oauth_refresh_token WHERE client_id = $1 AND revoked IS NOT NULL
-       UNION ALL
-       SELECT id FROM oauth_access_token WHERE client_id = $1 AND revoked IS NOT NULL`,
-      [seeded.clientId],
-    );
-    return rows.rows.map((row) => seeded.grants.get(row.id) ?? row.id).toSorted();
-  };
 
   it("ends only this workspace's tokens from before the instant", async () => {
     const seeded = await seedTwoWorkspaces();
@@ -656,7 +652,7 @@ describe("revoking a person's tokens in one workspace", () => {
         accessTokensEnded: 1,
       },
     });
-    expect(await endedGrants(seeded)).toEqual(["access here-old", "refresh here-old"]);
+    expect(await endedGrants(db().pool, seeded)).toEqual(["access here-old", "refresh here-old"]);
   });
 
   it("never reaches another workspace's tokens, even with a later instant", async () => {
@@ -670,11 +666,43 @@ describe("revoking a person's tokens in one workspace", () => {
 
     expect(ended.ok).toBe(true);
 
-    expect(await endedGrants(seeded)).toEqual([
+    expect(await endedGrants(db().pool, seeded)).toEqual([
       "access here-new",
       "access here-old",
       "refresh here-new",
       "refresh here-old",
+    ]);
+  });
+
+  it("ends a token already rotated here, with its access tokens", async () => {
+    const seeded = await seedTwoWorkspaces();
+    const labelById = new Map(seeded.labelById);
+    await seedingWith(db().pool, async (seed) => {
+      const rotated = await seed.oauthRefreshToken({
+        clientId: seeded.clientId,
+        userId: seeded.userId,
+        referenceId: seeded.here,
+        createdAt: before,
+        revoked: before,
+        rotatedAt: before,
+      });
+      const access = await seed.oauthAccessToken({
+        clientId: seeded.clientId,
+        userId: seeded.userId,
+        refreshId: rotated.id,
+        createdAt: before,
+      });
+      labelById.set(rotated.id, "refresh here-rotated");
+      labelById.set(access.id, "access of here-rotated");
+    });
+
+    await endTokens({ workspaceId: seeded.here, userId: seeded.userId, at });
+
+    expect(await endedGrants(db().pool, { clientId: seeded.clientId, labelById })).toEqual([
+      "access here-old",
+      "access of here-rotated",
+      "refresh here-old",
+      "refresh here-rotated",
     ]);
   });
 
@@ -688,7 +716,7 @@ describe("revoking a person's tokens in one workspace", () => {
     });
 
     expect(malformed).toEqual({ ok: false, error: "malformed" });
-    expect(await endedGrants(seeded)).toEqual([]);
+    expect(await endedGrants(db().pool, seeded)).toEqual([]);
   });
 });
 

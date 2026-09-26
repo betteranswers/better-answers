@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { until } from "@better-answers/core/testing/postgres";
 
-import { connectAsHost, setActiveWorkspace } from "./flow.ts";
+import { connectAsHost, refresh, revokeAtEndpoint, setActiveWorkspace } from "./flow.ts";
 import { startApp, type TestApp } from "./harness.ts";
 import { callMcp } from "./mcp-call.ts";
 import {
@@ -438,12 +438,9 @@ describe("removing a member over tRPC", () => {
       workspace: { id: beta.workspaceId },
       role: "Viewer",
     });
-    expect(await refreshTokensOf(person.id)).toEqual(
-      [
-        { workspace_id: acme.workspaceId, revoked: true },
-        { workspace_id: beta.workspaceId, revoked: false },
-      ].toSorted((one, other) => one.workspace_id.localeCompare(other.workspace_id)),
-    );
+    expect(await refreshTokensOf(person.id)).toEqual([
+      { workspace_id: beta.workspaceId, revoked: false },
+    ]);
     expect([
       (await callMcp(host, inAcme.accessToken, "tools/list")).status,
       (await callMcp(host, inBeta.accessToken, "tools/list")).status,
@@ -458,6 +455,23 @@ describe("removing a member over tRPC", () => {
       workspace: { id: beta.workspaceId },
       role: "Viewer",
     });
+  });
+
+  it("refuses this workspace's refresh token, and still refreshes another's", async () => {
+    const { acme, person, inAcme, inBeta } = await aMemberOfTwoOnFourClients();
+    const [endedHere, heldInBeta] = [inAcme.refreshToken ?? "", inBeta.refreshToken ?? ""];
+    expect([endedHere, heldInBeta]).not.toContain("");
+    const { api } = await webSignedIn(app, acme.admin.email);
+    await api.members.remove.mutate({ personId: person.id });
+    const host = app.client();
+
+    const answered = {
+      revoke: (await revokeAtEndpoint(host, endedHere)).status,
+      refresh: (await refresh(host, endedHere)).status,
+      beta: (await refresh(host, heldInBeta)).status,
+    };
+
+    expect(answered).toEqual({ revoke: 400, refresh: 400, beta: 200 });
   });
 
   it("lets one of two Admins remove themself, ending access here", async () => {

@@ -213,6 +213,20 @@ export const refresh = async (client: TestClient, refreshToken: string): Promise
     }).toString(),
   });
 
+export const revokeAtEndpoint = async (
+  client: TestClient,
+  refreshToken: string,
+): Promise<Response> =>
+  client.fetch(`${PUBLIC_URL}/oauth2/revoke`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      token: refreshToken,
+      token_type_hint: "refresh_token",
+      client_id: CLAUDE_CLIENT_ID,
+    }).toString(),
+  });
+
 const tokenResponse = z.object({
   access_token: z.string().min(1),
   refresh_token: z.string().optional(),

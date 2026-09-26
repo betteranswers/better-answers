@@ -118,3 +118,26 @@ export const issuedCredentialsFor = async (
     superuser.release();
   }
 };
+
+/** Seeded tokens named by grant, so an assertion reads which ones an act ended. */
+export type NamedGrants = {
+  readonly clientId: string;
+  readonly labelById: ReadonlyMap<string, string>;
+};
+
+export const endedGrants = async (
+  pool: pg.Pool,
+  grants: NamedGrants,
+): Promise<readonly string[]> => {
+  const held = await pool.query<{ id: string }>(
+    `SELECT id FROM oauth_refresh_token WHERE client_id = $1
+     UNION ALL
+     SELECT id FROM oauth_access_token WHERE client_id = $1`,
+    [grants.clientId],
+  );
+  const stillHeld = new Set(held.rows.map((row) => row.id));
+  return [...grants.labelById]
+    .filter(([id]) => !stillHeld.has(id))
+    .map(([, name]) => name)
+    .toSorted();
+};

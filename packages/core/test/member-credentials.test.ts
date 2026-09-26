@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { Role, UserPrincipal } from "../src/kernel/index.ts";
 import { revokeCredentialsHere, revokeCredentialsHereInput } from "../src/members/index.ts";
 import { type Tx, withPrincipal } from "../src/store/postgres/index.ts";
+import { endedGrants } from "./identity-rows.ts";
 import { bothHoldingTheirOwnRow, heldAs, membersSuite } from "./members-suite.ts";
 import { provisionedWorkspace, type ProvisionedWorkspace } from "./platform.ts";
 import { inputOf } from "./suite-input.ts";
@@ -99,31 +100,22 @@ describe("revoking a member's credentials in this workspace", () => {
     await alsoJoining(elsewhere, "Editor", editor);
     const grants = await seedingWith(db().pool, async (seed) => {
       const { clientId } = await seed.oauthClient();
-      const named = new Map<string, string>();
+      const labelById = new Map<string, string>();
       for (const [grant, referenceId, createdAt] of [
         ["here-old", workspace.workspaceId, BEFORE],
         ["here-new", workspace.workspaceId, AFTER],
         ["there-old", elsewhere.workspaceId, BEFORE],
       ] as const) {
         const token = { clientId, userId: editor, referenceId, createdAt };
-        named.set((await seed.oauthRefreshToken(token)).id, `refresh ${grant}`);
-        named.set((await seed.oauthAccessToken(token)).id, `access ${grant}`);
+        labelById.set((await seed.oauthRefreshToken(token)).id, `refresh ${grant}`);
+        labelById.set((await seed.oauthAccessToken(token)).id, `access ${grant}`);
       }
-      return { clientId, named };
+      return { clientId, labelById };
     });
 
     await revokedBy(workspace, workspace.adminUserId, editor);
 
-    const ended = await db().pool.query<{ id: string }>(
-      `SELECT id FROM oauth_refresh_token WHERE client_id = $1 AND revoked IS NOT NULL
-       UNION ALL
-       SELECT id FROM oauth_access_token WHERE client_id = $1 AND revoked IS NOT NULL`,
-      [grants.clientId],
-    );
-    expect(ended.rows.map((row) => grants.named.get(row.id)).toSorted()).toEqual([
-      "access here-old",
-      "refresh here-old",
-    ]);
+    expect(await endedGrants(db().pool, grants)).toEqual(["access here-old", "refresh here-old"]);
   });
 
   it("never moves a later instant back to an earlier one", async () => {

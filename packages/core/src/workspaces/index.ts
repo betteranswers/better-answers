@@ -414,7 +414,9 @@ export type RevokeWorkspaceTokensInput = {
 
 /**
  * The step inside an act's own transaction: the tokens whose consented workspace is this one. It
- * takes the principal its act admitted, and judges none.
+ * takes the principal its act admitted, and judges none. It deletes rather than marks them: the
+ * provider meets a revoked refresh token by deleting the person's tokens for that client in every
+ * workspace.
  */
 export const endWorkspaceTokens = async (
   _admitted: PlatformPrincipal | UserPrincipal,
@@ -422,16 +424,16 @@ export const endWorkspaceTokens = async (
   input: { readonly workspaceId: WorkspaceId; readonly personId: UserId; readonly at: Date },
 ): Promise<{ readonly refreshTokensEnded: number; readonly accessTokensEnded: number }> => {
   const end = async (table: "oauth_refresh_token" | "oauth_access_token"): Promise<number> => {
-    const updated = await tx.query(
-      `UPDATE ${table} SET revoked = now()
-        WHERE user_id = $1 AND reference_id = $2 AND created_at < $3 AND revoked IS NULL`,
+    const deleted = await tx.query(
+      `DELETE FROM ${table} WHERE user_id = $1 AND reference_id = $2 AND created_at < $3`,
       [input.personId, input.workspaceId, input.at],
     );
-    return updated.rowCount ?? 0;
+    return deleted.rowCount ?? 0;
   };
 
-  const refreshTokensEnded = await end("oauth_refresh_token");
+  // Access tokens first: deleting a refresh token cascades to its own, which would go uncounted.
   const accessTokensEnded = await end("oauth_access_token");
+  const refreshTokensEnded = await end("oauth_refresh_token");
   return { refreshTokensEnded, accessTokensEnded };
 };
 
