@@ -7,6 +7,7 @@ import {
   type BundleManifest,
   type SENSITIVITIES,
 } from "@better-answers/schema";
+import { byCodeUnit } from "@better-answers/schema/code-unit";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 
@@ -311,7 +312,7 @@ export const readBundle = (tree: BundleTree): Result<LoadedBundle, Unsound> => {
   }
   const manifest = manifestOf(manifestText);
   if (!manifest.ok) return manifest;
-  const files = [...tree.keys()].filter(isConceptFile).toSorted();
+  const files = [...tree.keys()].filter(isConceptFile).toSorted(byCodeUnit);
   const paths = new Set(files.map(pathOf));
   const holders = new Map<string, string>();
   const concepts: LoadedConcept[] = [];

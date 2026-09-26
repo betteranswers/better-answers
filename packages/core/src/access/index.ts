@@ -4,6 +4,7 @@ import {
   boundarySchemas,
   type SENSITIVITIES,
 } from "@better-answers/schema";
+import { byCodeUnit } from "@better-answers/schema/code-unit";
 import type { z } from "zod";
 
 import type { GroupId, Role, UserPrincipal } from "../kernel/index.ts";
@@ -63,7 +64,7 @@ const audienceIntersection = (audiences: readonly Audience[]): Audience | "nobod
         : named.filter((id) => each.audienceGroups.includes(id));
   }
   if (named === undefined) return EVERYONE;
-  const distinct = [...new Set(named)].toSorted();
+  const distinct = [...new Set(named)].toSorted(byCodeUnit);
   return distinct.length === 0 ? "nobody" : { audience: AUDIENCE_GROUPS, audienceGroups: distinct };
 };
 

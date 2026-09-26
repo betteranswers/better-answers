@@ -9,6 +9,7 @@ import {
   type FINDING_REVIEW_STATES,
   type INDEX_REASONS,
 } from "@better-answers/schema";
+import { byCodeUnit } from "@better-answers/schema/code-unit";
 import { z } from "zod";
 
 import { narrower, type Sensitivity } from "../access/index.ts";
@@ -283,7 +284,7 @@ const spansOfGroups = async (
 };
 
 const documentsHolding = (spans: readonly HeldSpan[]): readonly string[] =>
-  [...new Set(spans.map((span) => span.documentId))].toSorted();
+  [...new Set(spans.map((span) => span.documentId))].toSorted(byCodeUnit);
 
 type CommandedSpans = { readonly acting: ActingOnBinding; readonly spans: readonly HeldSpan[] };
 

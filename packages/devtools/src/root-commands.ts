@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
+import { byCodeUnit } from "@better-answers/schema/code-unit";
 import { z } from "zod";
 
 const manifest = z.looseObject({ scripts: z.record(z.string(), z.string()).default({}) });
@@ -36,5 +37,5 @@ export const pythonGateRoots = (): readonly string[] => {
   if (checker === undefined || !checker.endsWith(".py")) {
     throw new Error("`comment-gate:python` runs no checker this reading can find");
   }
-  return [...new Set(roots)].sort();
+  return [...new Set(roots)].sort(byCodeUnit);
 };

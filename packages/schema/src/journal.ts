@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 
+import { byCodeUnit } from "./code-unit.ts";
 import { migrationsFolder } from "./migrations-folder.ts";
 
 export const journalMetaFolder = path.join(migrationsFolder, "meta");
@@ -80,7 +81,7 @@ const unpairedIn = (
       return { kind: "snapshot-missing", tag: entry.tag, snapshot };
     }
   }
-  for (const snapshot of readdirSync(folder).toSorted()) {
+  for (const snapshot of readdirSync(folder).toSorted(byCodeUnit)) {
     if (snapshot.endsWith("_snapshot.json") && !named.has(snapshot)) {
       return { kind: "snapshot-orphaned", snapshot };
     }
