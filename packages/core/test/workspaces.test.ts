@@ -376,15 +376,41 @@ describe("revoking a person's credentials everywhere, as the operator", () => {
     expect(sessions.rows).toEqual([{ id: "s-new" }]);
     expect(await tokenState("oauth_refresh_token", personId)).toEqual([
       { id: "r-new", revoked: false },
-      { id: "r-old", revoked: true },
     ]);
     expect(await tokenState("oauth_access_token", personId)).toEqual([
       { id: "a-new", revoked: false },
-      { id: "a-old", revoked: true },
     ]);
     expect(await identityRowsAbout(personId)).toEqual([
       { act: "people.person.credentials_revoked", actor: `human:${operatorId}`, detail: {} },
     ]);
+  });
+
+  it("ends a token already rotated, with its access tokens", async () => {
+    const personId = await seedUser();
+    const earlier = new Date("2026-09-02T11:00:00Z");
+    await seedingWith(db().pool, async (seed) => {
+      const { clientId } = await seed.oauthClient();
+      const rotated = await seed.oauthRefreshToken({
+        id: "r-rotated",
+        clientId,
+        userId: personId,
+        createdAt: earlier,
+        revoked: earlier,
+        rotatedAt: earlier,
+      });
+      await seed.oauthAccessToken({
+        id: "a-of-rotated",
+        clientId,
+        userId: personId,
+        refreshId: rotated.id,
+        createdAt: new Date("2026-09-02T13:00:00Z"),
+      });
+    });
+
+    await revoking({ personId, at: AT });
+
+    expect(await tokenState("oauth_refresh_token", personId)).toEqual([]);
+    expect(await tokenState("oauth_access_token", personId)).toEqual([]);
   });
 
   it("keeps the later instant when asked for an earlier one", async () => {

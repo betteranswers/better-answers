@@ -523,6 +523,8 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await priyaConnected(page, request, baseURL, tag);
     const sheet = await openPriya(page, tag);
     const revoke = sheet.getByRole("button", { name: REVOKE });
+    const grant = regionOf(sheet, "Client grants").getByRole("listitem", { name: "Claude" });
+    await expect(grant).toBeVisible();
 
     await revoke.click();
     const confirmation = confirmationOf(page);
@@ -549,14 +551,13 @@ test.describe("a person, opened from Everyone as a sheet", () => {
       /^Priya Shah's sessions and client grants ended at \d{2}:\d{2} · .+\. They can sign in again\.$/,
     );
     await expect(revoke).toBeFocused();
-    const grant = regionOf(sheet, "Client grants").getByRole("listitem", { name: "Claude" });
-    await expect(grant).toContainText("Revoked");
+    await expect(grant).toHaveCount(0);
     await expect(regionOf(sheet, "Sign-in").getByRole("definition").nth(1)).toHaveText(INSTANT);
 
     await page.reload();
     await personButton(page, "Priya Shah").click();
     await expect(regionOf(sheet, "Sessions")).toContainText("No session is open.");
-    await expect(grant).toContainText("Revoked");
+    await expect(grant).toHaveCount(0);
   });
 
   test("sends a stale sign-in to sign in and back", async ({ page, request, baseURL }) => {
