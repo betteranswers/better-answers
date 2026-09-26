@@ -8,6 +8,7 @@ import {
   removeMemberInput,
 } from "../src/members/index.ts";
 import type { Tx } from "../src/store/postgres/index.ts";
+import { endedGrants } from "./identity-rows.ts";
 import { bothHoldingTheirOwnRow, heldAs, membersSuite } from "./members-suite.ts";
 import { provisionedWorkspace, type ProvisionedWorkspace } from "./platform.ts";
 import { inputOf } from "./suite-input.ts";
@@ -54,7 +55,7 @@ const grantsTo = async (
 ) =>
   seedingWith(db().pool, async (seed) => {
     const client = await seed.oauthClient();
-    const named = new Map<string, string>();
+    const labelById = new Map<string, string>();
     for (const [grant, { workspaceId, personId: holder }] of Object.entries(grants)) {
       const held = {
         clientId: client.clientId,
@@ -63,21 +64,11 @@ const grantsTo = async (
       };
       const refresh = await seed.oauthRefreshToken({ ...held, referenceId: workspaceId });
       const access = await seed.oauthAccessToken({ ...held, referenceId: workspaceId });
-      named.set(refresh.id, `refresh ${grant}`);
-      named.set(access.id, `access ${grant}`);
+      labelById.set(refresh.id, `refresh ${grant}`);
+      labelById.set(access.id, `access ${grant}`);
     }
-    return { clientId: client.clientId, named };
+    return { clientId: client.clientId, labelById };
   });
-
-const endedGrants = async (issued: Awaited<ReturnType<typeof grantsTo>>) => {
-  const rows = await db().pool.query<{ id: string }>(
-    `SELECT id FROM oauth_refresh_token WHERE client_id = $1 AND revoked IS NOT NULL
-     UNION ALL
-     SELECT id FROM oauth_access_token WHERE client_id = $1 AND revoked IS NOT NULL`,
-    [issued.clientId],
-  );
-  return rows.rows.map((row) => issued.named.get(row.id) ?? row.id).toSorted();
-};
 
 describe("removing a member", () => {
   it("ends the membership and its groups, recording the removal", async () => {
@@ -120,7 +111,7 @@ describe("removing a member", () => {
 
     await removedBy(here, here.adminUserId, person);
 
-    expect(await endedGrants(issued)).toEqual(["access here", "refresh here"]);
+    expect(await endedGrants(db().pool, issued)).toEqual(["access here", "refresh here"]);
     expect((await rolesOf(there))[person]).toBe("Viewer");
   });
 
@@ -162,7 +153,7 @@ describe("what removing a member refuses", () => {
 
     expect(refused).toEqual({ ok: false, error: "no-such-member" });
     expect((await rolesOf(theirs))[elsewhere]).toBe("Viewer");
-    expect(await endedGrants(issued)).toEqual([]);
+    expect(await endedGrants(db().pool, issued)).toEqual([]);
     expect(await removalsIn(ours)).toEqual([]);
   });
 
@@ -177,7 +168,7 @@ describe("what removing a member refuses", () => {
 
     expect(failed).toEqual({ ok: false, error: expect.any(Error) });
     expect((await rolesOf(workspace))[viewer]).toBe("Viewer");
-    expect(await endedGrants(issued)).toEqual([]);
+    expect(await endedGrants(db().pool, issued)).toEqual([]);
   });
 });
 
