@@ -31,6 +31,9 @@ const config: KnipConfig = {
     },
 
     "packages/devtools": {
+      // A suite runs this as a process of its own, so nothing imports it.
+      entry: ["test/holds-a-container.ts"],
+
       ignore: ["lifts/**"],
 
       ignoreDependencies: [

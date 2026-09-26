@@ -1,0 +1,26 @@
+diff --git a/build/reaper/reaper.js b/build/reaper/reaper.js
+index 9890518ac6a451a869eb2bc9e9c23c2152e9cf08..77c9b7b75a7cc52f6bfc0b7d398f7028fc59f94f 100644
+--- a/build/reaper/reaper.js
++++ b/build/reaper/reaper.js
+@@ -29,7 +29,8 @@ async function getReaper(client) {
+     }
+     const userId = (0, os_1.userInfo)().uid;
+     reaper = await (0, common_1.withFileLock)(`testcontainers-node-${userId}.lock`, async () => {
+-        const reaperContainers = await findReaperContainers(client);
++        // better-answers: a process joins no other process's Ryuk, so the session ends with it.
++        const reaperContainers = [];
+         if (process.env.TESTCONTAINERS_RYUK_DISABLED === "true") {
+             sessionId = new common_1.RandomUuid().nextUuid();
+             return new DisabledReaper(sessionId, "");
+@@ -89,9 +90,8 @@ async function createNewReaper(sessionId, remoteSocketPath) {
+     if (process.env["TESTCONTAINERS_RYUK_PRIVILEGED"] === "true") {
+         container.withPrivilegedMode();
+     }
+-    if (process.env["TESTCONTAINERS_RYUK_TEST_LABEL"] === "true") {
+-        container.withLabels({ TESTCONTAINERS_RYUK_TEST_LABEL: "true" });
+-    }
++    // better-answers: an unpatched process skips a Ryuk with this label, so it joins none of ours.
++    container.withLabels({ TESTCONTAINERS_RYUK_TEST_LABEL: "true" });
+     const startedContainer = await container.start();
+     const socket = await connectToReaperSocket(startedContainer.getHost(), startedContainer.getMappedPort(8080), startedContainer.getId());
+     return new RyukReaper(sessionId, startedContainer.getId(), socket);

@@ -132,6 +132,19 @@ package exists to refuse. Its suite spawns the script over a throwaway git repos
 path, so the fetch is real and no case can reach GitHub; it also commits through the hook's
 own command in a throwaway repository, over the same messages.
 
+`src/reap-containers.ts` is the container reaper behind `scripts/reap-containers.mjs` (`pnpm
+reap-containers [--dry-run]`): it removes each stopped testcontainers container, from either
+tier's library, whose session no Ryuk still serves. It exists because a daemon restart stops
+every container and every Ryuk, and then nothing is left to clear them. A Ryuk leaves once every
+process of its session has, so a stopped container with no Ryuk up for its session has no run
+left to own it. A running container is never removed: a live run with Ryuk turned off looks the
+same as one whose Ryuk is gone. Nor is a container with no session to judge.
+
+Its suite stubs `docker` on the path for the cases that remove. Over the real daemon, it holds
+that a dry run spares a live run's container and names an ended one's.
+`test/testcontainers-patch.test.ts` holds `patches/testcontainers@12.1.0.patch`, which gives
+each test process a Ryuk of its own (`docs/agents/workflow.md`, *Environment*).
+
 ## `lint-rules/` — the `better-answers` oxlint plugin
 
 The repository's own rules: the ones that hold a rule in `CODING_RULES.md` or an ADR rather
