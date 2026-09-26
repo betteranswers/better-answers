@@ -40,6 +40,8 @@ describe("what a procedure may answer the wire", () => {
       "members.remove",
       "members.resendInvitation",
       "members.revokeCredentials",
+      "person.acceptInvitation",
+      "person.invitation",
       "person.requestAccess",
       "person.setDisplayName",
       "routes.list",
@@ -62,6 +64,8 @@ describe("what a procedure may answer the wire", () => {
       | "session.operator"
       | "person.setDisplayName"
       | "person.requestAccess"
+      | "person.invitation"
+      | "person.acceptInvitation"
       | "console.people.list"
       | "console.people.inspect"
       | "console.people.revokeCredentials"

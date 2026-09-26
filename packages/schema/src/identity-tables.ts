@@ -137,6 +137,8 @@ export const INVITATION_WAITING_STATUS = "pending";
 
 export const INVITATION_CANCELLED_STATUS = "canceled";
 
+export const INVITATION_ACCEPTED_STATUS = "accepted";
+
 export const invitation = pgTable(
   "invitation",
   {

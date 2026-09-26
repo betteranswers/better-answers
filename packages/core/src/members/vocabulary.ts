@@ -14,6 +14,11 @@ export const MEMBER_REFUSALS = declareRefusals("members", {
 
   // Someone else is made an Admin first.
   "last-admin": "precondition",
+  // An Admin sends the invitation again, or a new one.
+  "invitation-expired": "precondition",
+
+  // Only the person signed in with the invited address may take it up.
+  "invitation-for-another-address": "forbidden",
 });
 
 export type MemberRefusal<W extends RefusalWordFor<typeof MEMBER_REFUSALS>> = W;

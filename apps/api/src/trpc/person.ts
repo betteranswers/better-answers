@@ -1,6 +1,12 @@
 import { setTimeout as elapsed } from "node:timers/promises";
 
-import { requestAccess, requestAccessInput } from "@better-answers/core/members";
+import {
+  acceptInvitation,
+  invitationInput,
+  readInvitation,
+  requestAccess,
+  requestAccessInput,
+} from "@better-answers/core/members";
 import { setDisplayName, setDisplayNameInput } from "@better-answers/core/workspaces";
 
 import { ASK_TO_JOIN_ANSWER_FLOOR_MS, ASK_TO_JOIN_PERSON_RULE } from "../auth/constants.ts";
@@ -45,4 +51,31 @@ export const personRouter = router({
         ),
       ),
     ),
+  invitation: personProcedure.input(parsedBy(invitationInput)).query(({ ctx, input }) =>
+    crossing(
+      ctx,
+      readInvitation.name,
+      given(input, (asked) =>
+        readInvitation(IDENTITY_PRINCIPAL, ctx.doors.postgres, {
+          invitationId: asked.invitationId,
+          personId: ctx.personId,
+          now: ctx.clock.now(),
+        }),
+      ),
+    ),
+  ),
+  acceptInvitation: personProcedure.input(parsedBy(invitationInput)).mutation(({ ctx, input }) =>
+    crossing(
+      ctx,
+      acceptInvitation.name,
+      given(input, (asked) =>
+        acceptInvitation(IDENTITY_PRINCIPAL, ctx.doors.postgres, {
+          invitationId: asked.invitationId,
+          personId: ctx.personId,
+          sessionId: ctx.sessionId,
+          now: ctx.clock.now(),
+        }),
+      ),
+    ),
+  ),
 });

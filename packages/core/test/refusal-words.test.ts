@@ -4,6 +4,7 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { declareRefusals, REFUSAL_CLASSES, refusalRegister } from "../src/kernel/index.ts";
 import type {
+  AcceptInvitationRefusal,
   ApproveRefusal,
   CancelInvitationRefusal,
   ChangeRoleRefusal,
@@ -74,6 +75,8 @@ const REGISTER = {
   "already-decided": "conflict by members",
   "last-admin": "precondition by members",
   "no-such-invitation": "absent by members",
+  "invitation-expired": "precondition by members",
+  "invitation-for-another-address": "forbidden by members",
 
   "no-such-user": "absent by workspaces",
   "no-such-workspace": "absent by workspaces",
@@ -176,6 +179,7 @@ describe("the refusal-word walk", () => {
     expectTypeOf<ListInvitationsRefusal>().toExtend<EveryRegisteredWord | Error>();
     expectTypeOf<RevokeCredentialsHereRefusal>().toExtend<EveryRegisteredWord | Error>();
     expectTypeOf<RemoveMemberRefusal>().toExtend<EveryRegisteredWord | Error>();
+    expectTypeOf<AcceptInvitationRefusal>().toExtend<EveryRegisteredWord>();
     expectTypeOf<SourceRefusal<"no-such-binding"> | "invented">().not.toExtend<
       EveryRegisteredWord | Error
     >();
