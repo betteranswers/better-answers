@@ -38,6 +38,8 @@ const actLiteralsIn = (files: readonly string[]): Set<string> =>
     ),
   );
 
+const declaredActNames = () => declarations().flatMap((declaration) => declaration.acts);
+
 const provisioned = () => provisionedWorkspace(db(), "Audited");
 
 const writingIn =
@@ -83,7 +85,7 @@ describe("the declared-acts walk", () => {
     "reaches every act declared in the tree, and no other",
     async () => {
       await loadEveryEntryPoint();
-      const registered = new Set<string>(declarations().flatMap((declaration) => declaration.acts));
+      const registered = new Set<string>(declaredActNames());
       const inTree = actLiteralsIn(coreSourceFiles());
       const inThisSuite = actLiteralsIn([path.resolve(import.meta.dirname, "audit.test.ts")]);
 
@@ -157,9 +159,7 @@ describe("the declared-acts walk", () => {
         refused: act("platform.run.started", {}),
       }),
     ).toThrow(/never an audit event/);
-    expect(declarations().flatMap((declaration) => declaration.acts)).not.toContain(
-      "platform.probe.atomic",
-    );
+    expect(declaredActNames()).not.toContain("platform.probe.atomic");
   });
 
   it("refuses an act declared twice, so each has one slice", () => {
@@ -167,6 +167,21 @@ describe("the declared-acts walk", () => {
     expect(() => declareActs("platform", { again: act("platform.probe.twice", {}) })).toThrow(
       /declared twice/,
     );
+  });
+
+  it("refuses an act named twice in one declaration, declaring none", () => {
+    expect(() =>
+      declareActs("platform", {
+        one: act("platform.probe.doubled", {}),
+        two: act("platform.probe.doubled", {}),
+        other: act("platform.probe.beside", {}),
+      }),
+    ).toThrow("audit: platform.probe.doubled is declared twice");
+    expect(declaredActNames()).not.toContain("platform.probe.doubled");
+    expect(declaredActNames()).not.toContain("platform.probe.beside");
+    expect(() =>
+      declareActs("platform", { once: act("platform.probe.doubled", {}) }),
+    ).not.toThrow();
   });
 
   it.skipIf(sourceTreeIsInstrumented())(

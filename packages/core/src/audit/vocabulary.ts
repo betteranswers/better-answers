@@ -101,7 +101,11 @@ export type Declaration = {
 const declared: Declaration[] = [];
 const declaredNames = new Set<string>();
 
-const declarationRefusal = (family: Family, name: string): string | undefined => {
+const declarationRefusal = (
+  family: Family,
+  name: string,
+  earlierInCall: ReadonlySet<string>,
+): string | undefined => {
   const [prefix, subject] = name.split(".");
   if (!ACT.test(name) || prefix !== family) {
     return `${name} is not a ${family} act of the form family.subject.verb`;
@@ -109,13 +113,13 @@ const declarationRefusal = (family: Family, name: string): string | undefined =>
   if (subject !== undefined && NEVER_A_SUBJECT.has(subject)) {
     return `${name} names a record that is never an audit event`;
   }
-  if (declaredNames.has(name)) return `${name} is declared twice`;
+  if (declaredNames.has(name) || earlierInCall.has(name)) return `${name} is declared twice`;
   return undefined;
 };
 
 /**
  * Declares every act or none: throws when a name is not of the family's form, names a record never
- * kept as an audit event, or is already declared.
+ * kept as an audit event, or is declared already or earlier in the same call.
  */
 export const declareActs = <
   F extends Family,
@@ -125,9 +129,11 @@ export const declareActs = <
   acts: Acts,
 ): Acts => {
   const names = Object.values(acts).map(({ name }) => name);
+  const earlierInCall = new Set<string>();
   for (const name of names) {
-    const refusal = declarationRefusal(family, name);
+    const refusal = declarationRefusal(family, name, earlierInCall);
     if (refusal !== undefined) throw new Error(`audit: ${refusal}`);
+    earlierInCall.add(name);
   }
   for (const name of names) declaredNames.add(name);
   declared.push({ family, acts: names });
