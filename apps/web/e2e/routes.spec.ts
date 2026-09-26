@@ -3,6 +3,7 @@ import type { APIRequestContext, Page } from "@playwright/test";
 import { EMBEDDING_DIMENSIONS } from "@better-answers/schema";
 
 import { unbuiltLineOf } from "@/app/words.ts";
+import { ROUTES_WORDS } from "@/features/routes/words.ts";
 import { SCREENS, screenById, viewsOf } from "@/shared/screens.ts";
 
 import { expect, test } from "./browser.ts";
@@ -32,8 +33,6 @@ const embeddingRow = (page: Page) =>
     .filter({ has: page.getByRole("heading", { level: 3, name: "Embedding" }) });
 
 const PURPOSES = ["Extraction", "Enrichment", "Answering", "Judging", "Embedding"];
-
-const FIXED_REASON_PHRASE = "never changes once vectors exist";
 
 /** No role lands on System, so every test here opens it from where sign-in left the member. */
 const openSystem = async (page: Page) => {
@@ -93,14 +92,25 @@ test.describe("the System screen's routes card", () => {
     const card = routesCard(page);
     await expect(card.getByRole("listitem")).toHaveCount(5);
     await expect(card.getByRole("heading", { level: 3 })).toHaveText(PURPOSES);
-    await expect(card.getByText("No route is set.")).toHaveCount(4);
+    await expect(card.getByText(ROUTES_WORDS.unset, { exact: true })).toHaveCount(4);
 
     const embedding = embeddingRow(page);
-    await expect(embedding).toContainText("No route is set.");
-    await expect(embedding.getByText("Fixed", { exact: true })).toHaveCount(1);
-    await expect(embedding).toContainText(FIXED_REASON_PHRASE);
+    await expect(embedding).toContainText(ROUTES_WORDS.unset);
+    await expect(
+      embedding.getByText(ROUTES_WORDS.fixed, { exact: true }),
+      "an embedding purpose with no route has nothing fixed to note",
+    ).toHaveCount(0);
+    await expect(embedding).not.toContainText(ROUTES_WORDS.fixedReason);
+  });
 
-    await expect(embedding).not.toContainText("dimensions");
+  test("says in one line that no route is set", async ({ page, request }) => {
+    await signedInWith(page, request, { name: "Ryedale Pressings", routes: [] });
+
+    const card = routesCard(page);
+    await expect(card.getByText(ROUTES_WORDS.noneSet, { exact: true })).toBeVisible();
+    await expect(card.getByRole("list")).toHaveCount(0);
+    await expect(card.getByRole("heading", { level: 3 })).toHaveCount(0);
+    await expect(card).not.toContainText(ROUTES_WORDS.fixedReason);
   });
 
   test("says the embedding route is fixed, its dimensions and why", async ({ page, request }) => {
@@ -113,13 +123,13 @@ test.describe("the System screen's routes card", () => {
     await expect(embedding).toContainText("mistral");
     await expect(embedding).toContainText("mistral-embed");
 
-    await expect(embedding).toContainText("Fixed");
+    await expect(embedding).toContainText(ROUTES_WORDS.fixed);
 
     await expect(embedding).toContainText(`${EMBEDDING_DIMENSIONS} dimensions`);
 
-    await expect(embedding).toContainText(FIXED_REASON_PHRASE);
+    await expect(embedding).toContainText(ROUTES_WORDS.fixedReason);
 
-    await expect(routesCard(page).getByText("Fixed", { exact: true })).toHaveCount(1);
+    await expect(routesCard(page).getByText(ROUTES_WORDS.fixed, { exact: true })).toHaveCount(1);
   });
 
   test("carries no control that edits, adds or deletes a route", async ({ page, request }) => {
@@ -198,14 +208,14 @@ test.describe("the System screen's routes card", () => {
     await expect(routesCard(page)).toMatchAriaSnapshot(`
       - region "Routes":
         - heading "Routes" [level=2]
-        - paragraph: "Which model does which job in this workspace. Listed only: choosing a route is not part of this screen."
+        - paragraph: ${JSON.stringify(ROUTES_WORDS.lead)}
         - list:
           - listitem:
             - heading "Extraction" [level=3]
-            - paragraph: No route is set.
+            - paragraph: ${JSON.stringify(ROUTES_WORDS.unset)}
           - listitem:
             - heading "Enrichment" [level=3]
-            - paragraph: No route is set.
+            - paragraph: ${JSON.stringify(ROUTES_WORDS.unset)}
           - listitem:
             - heading "Answering" [level=3]
             - term: Provider
@@ -214,20 +224,28 @@ test.describe("the System screen's routes card", () => {
             - definition: claude-sonnet-5
           - listitem:
             - heading "Judging" [level=3]
-            - paragraph: No route is set.
+            - paragraph: ${JSON.stringify(ROUTES_WORDS.unset)}
           - listitem:
             - heading "Embedding" [level=3]
             - term: Provider
             - definition: mistral
             - term: Model
             - definition: mistral-embed
-            - paragraph: /Fixed ${EMBEDDING_DIMENSIONS} dimensions/
-            - paragraph: /${FIXED_REASON_PHRASE}/
+            - paragraph: ${JSON.stringify(`${ROUTES_WORDS.fixed} ${EMBEDDING_DIMENSIONS} dimensions`)}
+            - paragraph: ${JSON.stringify(ROUTES_WORDS.fixedReason)}
+    `);
+    // Equal children: the view holds its heading, its lead line and the card, nothing else.
+    await expect(page.getByRole("main", { name: "Screen" })).toMatchAriaSnapshot(`
+      - main "Screen":
+        - tabpanel "Routes":
+          - /children: equal
+          - heading ${JSON.stringify(screenById("system").name)} [level=1]
+          - paragraph: ${JSON.stringify(screenById("system").summary)}
+          - region "Routes"
     `);
 
     await passesTheAccessibilityGate();
 
-    await expect(page.getByText(/The rest of System/)).toBeVisible();
     const navigation = page.getByRole("navigation", { name: "Control Centre" });
     const opensUnbuilt = SCREENS.filter((candidate) =>
       viewsOf(candidate).some((view) => view.path === candidate.defaultView && !view.built),

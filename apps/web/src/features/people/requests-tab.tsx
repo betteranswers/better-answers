@@ -1,6 +1,6 @@
 import { useId, useRef, useState } from "react";
 
-import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
+import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { TableCell } from "@/shared/ui/table.tsx";
@@ -29,10 +29,7 @@ import {
 
 const COLUMNS = ["Person", "Reason", "State", "Asked", "Acts"] as const;
 
-const NOTHING_HELD: Outcome = {
-  tone: "said",
-  words: "Move focus to a request's row first, then press the key again.",
-};
+const NOTHING_HELD = selectFirst("request");
 
 const countOf = (requests: readonly WaitingRequest[]): string =>
   requests.length === 1 ? "1 request waiting" : `${requests.length} requests waiting`;

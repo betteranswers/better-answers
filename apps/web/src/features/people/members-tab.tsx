@@ -13,7 +13,7 @@ import type { ApiError } from "@/shared/api/trpc.ts";
 import { GridTable } from "@/shared/grid-table.tsx";
 import { Icon } from "@/shared/icon.tsx";
 import { useKeystroke } from "@/shared/keystrokes.tsx";
-import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
+import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
@@ -38,10 +38,7 @@ const PERSON = "person";
 
 const SEARCH_LABEL = "Search by name or address";
 
-const NOTHING_IN_FOCUS: Outcome = {
-  tone: "said",
-  words: "Move focus to a member first: the keystroke acts on the member in focus.",
-};
+const NOTHING_IN_FOCUS = selectFirst("member");
 
 const countOfPeople = (count: number): string => (count === 1 ? "1 person" : `${count} people`);
 

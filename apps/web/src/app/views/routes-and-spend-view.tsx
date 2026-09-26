@@ -30,11 +30,6 @@ export function RoutesAndSpendView() {
       ) : (
         <RoutesCard />
       )}
-
-      <p className="mt-6 text-muted-foreground">
-        The rest of System — boxes, backups, sources and worker, the map, knowledge, questions,
-        connected clients and personal data — is not built yet.
-      </p>
     </>
   );
 }

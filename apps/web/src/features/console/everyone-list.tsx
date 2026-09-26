@@ -13,7 +13,7 @@ import { Pages, turnsOf, type PageTurns } from "./everyone-pages.tsx";
 import { SearchField, useAsking } from "./everyone-search.tsx";
 import { arrival, EVERYONE_PATH, type Arrival } from "./people-address.ts";
 import { usePeople, type Asked, type ListedPerson } from "./people-api.ts";
-import { PEOPLE_KEYSTROKES } from "./people-keystrokes.ts";
+import { NO_PERSON_IN_FOCUS, PEOPLE_KEYSTROKES } from "./people-keystrokes.ts";
 import { PersonSheet, personButtonId, type OpenedAt } from "./person-sheet.tsx";
 import { Instant, Memberships } from "./person-words.tsx";
 import { readRefused } from "./words.ts";
@@ -21,11 +21,6 @@ import { readRefused } from "./words.ts";
 const features = tableFeatures({});
 
 const column = createColumnHelper<typeof features, ListedPerson>();
-
-const NOTHING_IN_FOCUS: Outcome = {
-  tone: "said",
-  words: "Move focus to a person first: the keystroke acts on the person in focus.",
-};
 
 const ON_THE_FIRST_PAGE: Outcome = { tone: "said", words: "This is the first page of people." };
 
@@ -226,7 +221,7 @@ export function EveryoneList() {
   /** A letter pressed outside the list still needs a person, so the one last in focus stands. */
   const openInFocus = (at: OpenedAt) => {
     const person = people.find((listedPerson) => listedPerson.id === inFocus);
-    setOutcome(person === undefined ? NOTHING_IN_FOCUS : undefined);
+    setOutcome(person === undefined ? NO_PERSON_IN_FOCUS : undefined);
     if (person !== undefined) setOpened({ personId: person.id, at });
   };
   usePeopleKeystrokes({ searchRef, openInFocus, turns, turnTo, say: setOutcome });

@@ -1,6 +1,7 @@
 import { useEffect, useEffectEvent, useId, useState } from "react";
 
 import { onThisBrowser } from "@/shared/browser-storage.ts";
+import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Checkbox } from "@/shared/ui/checkbox.tsx";
 import { Label } from "@/shared/ui/label.tsx";
@@ -11,7 +12,7 @@ export type Keystroke = {
   readonly act: string;
 };
 
-const LIST_THE_KEYSTROKES: Keystroke = { key: "?", act: "List these keystrokes" };
+const LIST_THE_KEYSTROKES: Keystroke = { key: "?", act: KEYSTROKE_WORDS.showTheList };
 
 const KEPT_UNDER = "better-answers.keystrokes";
 
@@ -73,7 +74,7 @@ function TurnedOn() {
           else onThisBrowser()?.setItem(KEPT_UNDER, OFF);
         }}
       />
-      <Label htmlFor={switchId}>Single-key keystrokes, kept on this browser</Label>
+      <Label htmlFor={switchId}>{KEYSTROKE_WORDS.turnedOn}</Label>
     </div>
   );
 }
@@ -93,16 +94,14 @@ export function KeystrokesAct(properties: {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="sm" aria-keyshortcuts={LIST_THE_KEYSTROKES.key}>
-          Keystrokes
+          {KEYSTROKE_WORDS.button}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" aria-labelledby={headingId} className="grid w-80 gap-3">
         <h2 id={headingId} className="font-medium">
-          Keystrokes on {properties.screen}
+          {KEYSTROKE_WORDS.button} on {properties.screen}
         </h2>
-        <p className="text-sm text-muted-foreground">
-          Each works from anywhere on the screen outside a field or a dialog.
-        </p>
+        <p className="text-sm text-muted-foreground">{KEYSTROKE_WORDS.where}</p>
         <TurnedOn />
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
           {[...properties.keystrokes, LIST_THE_KEYSTROKES].map((keystroke) => (

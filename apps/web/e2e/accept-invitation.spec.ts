@@ -1,5 +1,7 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
+import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
+
 import { expect, test } from "./browser.ts";
 import {
   anAddress,
@@ -70,7 +72,7 @@ test("an invited newcomer signs in, gives a name, and joins", async ({
       - button "Join Calder Joinery as an Editor"
       - paragraph: You become a member at once, and the workspace's audit log records that you joined.
       - button "Sign out"
-      - button "Keystrokes"
+      - button ${JSON.stringify(KEYSTROKE_WORDS.button)}
   `);
   await passesTheAccessibilityGate();
 
@@ -140,7 +142,7 @@ test("refuses a person at another address, offering the invited one", async ({
         - text: . This invitation was sent to another email address than the one you are signed in with. Sign in with the address it was sent to.
       - button "Sign in with another address"
       - button "Sign out"
-      - button "Keystrokes"
+      - button ${JSON.stringify(KEYSTROKE_WORDS.button)}
   `);
   await expect(page.getByRole("main")).not.toContainText("Brightwater Estimating");
   await passesTheAccessibilityGate();

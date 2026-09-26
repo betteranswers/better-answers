@@ -3,6 +3,7 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
 import { consequenceOfDeleting } from "@/features/people/group-words.ts";
 import { GROUPS_KEYSTROKES } from "@/features/people/people-state.ts";
+import { SELECT_FIRST } from "@/shared/keystroke-words.ts";
 import { screenById, viewNamed } from "@/shared/screens.ts";
 
 import { expect, test } from "./browser.ts";
@@ -344,9 +345,7 @@ test.describe("a group's acts", () => {
     await keystrokesDismissed(page, keystrokes);
 
     await page.keyboard.press("o");
-    await expect(groupsRegion(page)).toContainText(
-      "Move focus to a group first: the keystroke acts on the group in focus.",
-    );
+    await expect(groupsRegion(page)).toContainText(SELECT_FIRST.group);
 
     await page.keyboard.press("n");
     await expect(nameField(page)).toBeFocused();

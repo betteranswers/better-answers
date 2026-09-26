@@ -1,6 +1,7 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { NOTHING_BOUND } from "@/features/sources/words.ts";
+import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -1026,13 +1027,13 @@ test.describe("the Sources screen's keystrokes", () => {
     await anAdminAtSources(page, request, { workspace: "Luddenden Weaving" });
 
     await page.keyboard.press("?");
-    const listed = page.getByRole("dialog", { name: "Keystrokes on Sources" });
+    const listed = page.getByRole("dialog", { name: `${KEYSTROKE_WORDS.button} on Sources` });
     await expect(listed).toMatchAriaSnapshot(`
-      - dialog "Keystrokes on Sources":
-        - heading "Keystrokes on Sources" [level=2]
-        - paragraph: Each works from anywhere on the screen outside a field or a dialog.
-        - checkbox "Single-key keystrokes, kept on this browser" [checked]
-        - text: Single-key keystrokes, kept on this browser
+      - dialog ${JSON.stringify(`${KEYSTROKE_WORDS.button} on Sources`)}:
+        - heading ${JSON.stringify(`${KEYSTROKE_WORDS.button} on Sources`)} [level=2]
+        - paragraph: ${JSON.stringify(KEYSTROKE_WORDS.where)}
+        - checkbox ${JSON.stringify(KEYSTROKE_WORDS.turnedOn)} [checked]
+        - text: ${JSON.stringify(KEYSTROKE_WORDS.turnedOn)}
         - term: b
         - definition: Bind a document
         - term: r
@@ -1052,11 +1053,11 @@ test.describe("the Sources screen's keystrokes", () => {
         - term: s
         - definition: Dismiss the selected finding groups as not special category
         - term: "?"
-        - definition: List these keystrokes
+        - definition: ${JSON.stringify(KEYSTROKE_WORDS.showTheList)}
     `);
     await page.keyboard.press("Escape");
     await expect(listed).toHaveCount(0);
-    const keystrokes = page.getByRole("button", { name: "Keystrokes" });
+    const keystrokes = page.getByRole("button", { name: KEYSTROKE_WORDS.button });
     await expect(keystrokes).toHaveAttribute("aria-keyshortcuts", "?");
     await expect(keystrokes).toBeFocused();
 
@@ -1067,9 +1068,7 @@ test.describe("the Sources screen's keystrokes", () => {
     await expect(binding).toHaveCount(0);
 
     await keystrokes.click();
-    await listed
-      .getByRole("checkbox", { name: "Single-key keystrokes, kept on this browser" })
-      .press("Space");
+    await listed.getByRole("checkbox", { name: KEYSTROKE_WORDS.turnedOn }).press("Space");
     await page.keyboard.press("Escape");
     await page.keyboard.press("b");
     await page.keyboard.press("?");

@@ -1,5 +1,7 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
+import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
+
 import { expect, test } from "./browser.ts";
 import {
   anAddress,
@@ -76,7 +78,7 @@ test("a person in no workspace asks to join by keyboard", async ({
         - textbox "Why you are asking"
         - button "Ask to join"
       - button "Sign out"
-      - button "Keystrokes"
+      - button ${JSON.stringify(KEYSTROKE_WORDS.button)}
   `);
   await passesTheAccessibilityGate();
 
@@ -192,7 +194,7 @@ test("never names an organisation, asking or not, nor in keystrokes", async ({ p
   await theScreenSaysNoOrganisation(page, "before an ask");
 
   await page.keyboard.press("?");
-  const keystrokes = page.getByRole("dialog", { name: "Keystrokes on this screen" });
+  const keystrokes = page.getByRole("dialog", { name: `${KEYSTROKE_WORDS.button} on this screen` });
   await expect(keystrokes).toContainText("Ask to join a workspace");
   await theScreenSaysNoOrganisation(page, "in its keystrokes");
   await page.keyboard.press("Escape");
