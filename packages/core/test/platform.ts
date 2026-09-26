@@ -9,6 +9,7 @@ import type {
   UserPrincipal,
   WorkspaceId,
 } from "../src/kernel/index.ts";
+import { ERASED_DOMAIN } from "../src/store/git/index.ts";
 import {
   openPostgres,
   type PostgresDoor,
@@ -16,6 +17,8 @@ import {
   withOperator,
 } from "../src/store/postgres/index.ts";
 import { provisionWorkspace } from "../src/workspaces/index.ts";
+
+export const personIdOf = (id: string) => boundarySchemas.user.select.shape.id.parse(id);
 
 export const bootstrap: PlatformPrincipal = {
   kind: "platform",
@@ -94,4 +97,21 @@ export const asTheOperator = async <T>(
   const { answered } = await asANewOperator(db, new Date(), work);
   if (!answered.ok) throw new Error(`the operator was refused: ${answered.error}`);
   return answered.value;
+};
+
+/** The person row as an erasure on their last membership leaves it, that membership ended. */
+export const erasedFromTheSet = async (
+  db: MigratedPostgres,
+  workspaceId: string,
+  personId: string,
+): Promise<void> => {
+  await db.pool.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
+    workspaceId,
+    personId,
+  ]);
+  await db.pool.query(
+    `UPDATE "user" SET email = $2, email_verified = false, name = '', image = NULL, operator = false
+      WHERE id = $1`,
+    [personId, `erased-${ulid().toLowerCase()}@${ERASED_DOMAIN}`],
+  );
 };

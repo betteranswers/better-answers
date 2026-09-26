@@ -517,6 +517,22 @@ describe("revoking a person's credentials everywhere, from the console", () => {
     });
     expect(await revocationRowsOf(nobody)).toEqual([]);
   });
+
+  it("refuses a malformed person id, naming the field", async () => {
+    const { api } = await theOperatorOnTheWeb();
+
+    const refused = await refusalOfCall(
+      api.console.people.revokeCredentials.mutate({ personId: "not-a-person" }),
+    );
+
+    expect(refused).toMatchObject({
+      data: {
+        httpStatus: 400,
+        refusal: { word: "malformed", fields: { personId: expect.any(String) } },
+      },
+    });
+    expect(await revocationRowsOf("not-a-person")).toEqual([]);
+  });
 });
 
 describe("correcting a flagged display name, from the console", () => {
@@ -636,6 +652,25 @@ describe("correcting a flagged display name, from the console", () => {
       data: { httpStatus: 404, refusal: { word: "no-such-user", class: "absent" } },
     });
     expect(await correctionRowsOf(nobody)).toEqual([]);
+  });
+
+  it("refuses a malformed person id, naming the field", async () => {
+    const { api } = await theOperatorOnTheWeb();
+
+    const refused = await refusalOfCall(
+      api.console.people.correctDisplayName.mutate({
+        personId: "not-a-person",
+        displayName: "Sam",
+      }),
+    );
+
+    expect(refused).toMatchObject({
+      data: {
+        httpStatus: 400,
+        refusal: { word: "malformed", fields: { personId: expect.any(String) } },
+      },
+    });
+    expect(await correctionRowsOf("not-a-person")).toEqual([]);
   });
 });
 

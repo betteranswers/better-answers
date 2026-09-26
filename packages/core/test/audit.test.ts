@@ -589,6 +589,33 @@ describe("the identity-set audit log, reached through either door", () => {
     expect(await identityRowById(id)).toBeUndefined();
   });
 
+  it("stamps a row as written only where the event asks", async () => {
+    const door = openPostgres(db().runtimePool);
+    const [unstamped, stamped] = [ulid(), ulid()];
+    const event = (id: string) => ({
+      id,
+      actor: `human:${ulid()}` as const,
+      act: IDENTITY_PROBE.noted,
+      subjectId: ulid(),
+      detail: { confirmed: true },
+    });
+
+    const began = await withIdentityWrite(bootstrap, door, async (tx) => {
+      await recordFor(bootstrap, tx, event(unstamped));
+      await tx.query("SELECT pg_sleep(0.01)");
+      await recordFor(bootstrap, tx, { ...event(stamped), stampedAsWritten: true });
+      return (await tx.query<{ at: Date }>("SELECT now() AS at")).rows[0]?.at;
+    });
+
+    const found = await db().pool.query<{ id: string; at: Date }>(
+      "SELECT id, at FROM identity_audit_event WHERE id = ANY($1)",
+      [[unstamped, stamped]],
+    );
+    const atOf = (id: string) => found.rows.find((row) => row.id === id)?.at.getTime();
+    expect(atOf(unstamped)).toBe(began?.getTime());
+    expect(atOf(stamped)).toBeGreaterThanOrEqual((began?.getTime() ?? 0) + 10);
+  });
+
   it("registers an identity-set act once, among the declared acts", () => {
     expect(declarations()).toContainEqual({
       family: "platform",

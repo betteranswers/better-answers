@@ -191,12 +191,15 @@ export const whileActsWaitAt = async <T>(
   }
 };
 
-export const countWaitingOnLocks = async (pool: pg.Pool): Promise<number> => {
-  const found = await pool.query<{ waiting: string }>(
-    "SELECT count(*) AS waiting FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'",
+export const statementsWaitingOnALock = async (pool: pg.Pool): Promise<readonly string[]> => {
+  const found = await pool.query<{ query: string }>(
+    "SELECT query FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'",
   );
-  return Number(found.rows[0]?.waiting ?? 0);
+  return found.rows.map((row) => row.query);
 };
+
+export const countWaitingOnLocks = async (pool: pg.Pool): Promise<number> =>
+  (await statementsWaitingOnALock(pool)).length;
 
 export const whileWritesAreRefused = async <T>(
   pool: pg.Pool,

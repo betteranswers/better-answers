@@ -5,9 +5,7 @@ import {
   attempt,
   err,
   ok,
-  requireFreshSignIn,
   type Claims,
-  type OperatorPrincipal,
   type PlatformPrincipal,
   type Result,
   type UserId,
@@ -86,23 +84,6 @@ export const setOperatorMark = async (
   );
   if (!marked.ok) return err(marked.error);
   return marked.value;
-};
-
-type OperatorWrite = { readonly operator: OperatorPrincipal; readonly personId: UserId };
-
-/**
- * Admits the operator's write on a person: a sign-in within the hour of `at`, and an id a person
- * could hold. A malformed id answers `no-such-user`, as one nobody holds does.
- */
-export const admitOperatorWrite = (
-  operator: OperatorPrincipal,
-  input: { readonly personId: string; readonly at: Date },
-): Result<OperatorWrite, WorkspaceRefusal<"sign-in-too-old" | "no-such-user">> => {
-  const fresh = requireFreshSignIn(operator, input.at);
-  if (!fresh.ok) return err(fresh.error);
-  const personId = boundarySchemas.user.select.shape.id.safeParse(input.personId);
-  if (!personId.success) return err("no-such-user");
-  return ok({ operator: fresh.value, personId: personId.data });
 };
 
 /** Every person carrying the mark, by address: where the platform writes to its operator. */
