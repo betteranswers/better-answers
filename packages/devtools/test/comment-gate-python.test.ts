@@ -341,4 +341,24 @@ describe("the check refuses to judge a file it cannot read", () => {
   it("exits on an unparseable file rather than reporting it clean", () => {
     expect(() => run({ [FILE]: "def broken(\n" })).toThrow(/could not be read/);
   });
+
+  it("refuses a directory named like a module, never skipping it", () => {
+    const aDirectory = { "pkg.py/inner.txt": "not a module\n" };
+
+    expect(() => run(aDirectory)).toThrow(/exit 2\n\ncomment_gate: pkg\.py could not be read: /);
+  });
+});
+
+describe("the check refuses a named path that does not exist", () => {
+  it("refuses a named path the tree does not hold", () => {
+    const namingAnAbsentPath: Tool = {
+      ...gate,
+      argv: [".", "absent"],
+      smoke: { tree: {}, reports: () => true },
+    };
+
+    expect(() => runsOverThrowawayTree(namingAnAbsentPath)).toThrow(
+      /exit 2\n\ncomment_gate: no path at absent\n/,
+    );
+  });
 });
