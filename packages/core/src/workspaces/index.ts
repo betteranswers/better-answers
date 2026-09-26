@@ -2,15 +2,7 @@ import { boundarySchemas, CREATOR_ROLE } from "@better-answers/schema";
 import { z } from "zod";
 
 import { act, declareActs, declareIdentitySetActs, record } from "../audit/index.ts";
-import {
-  attempt,
-  err,
-  ok,
-  refusalFor,
-  requireFreshSignIn,
-  type Result,
-  ulid,
-} from "../kernel/index.ts";
+import { attempt, err, ok, refusalFor, type Result, ulid } from "../kernel/index.ts";
 import type {
   OperatorPrincipal,
   PlatformPrincipal,
@@ -29,18 +21,22 @@ import {
   withScope,
 } from "../store/postgres/index.ts";
 import { hasNoDisplayName } from "./display-name.ts";
+import { admitOperatorWrite } from "./operator.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
 export { WORKSPACE_REFUSALS } from "./vocabulary.ts";
 export {
   applyDisplayNameRule,
+  correctDisplayName,
+  correctDisplayNameInput,
+  DISPLAY_NAME_CORRECTED,
   hasNoDisplayName,
   setDisplayName,
   setDisplayNameInput,
 } from "./display-name.ts";
 export type { SetDisplayNameRefusal } from "./display-name.ts";
 export { listWorkspaces } from "./listing.ts";
-export { setOperatorMark, standingAsOperator } from "./operator.ts";
+export { operatorAddresses, setOperatorMark, standingAsOperator } from "./operator.ts";
 export { inspectPerson, inspectPersonInput, listPeople, listPeopleInput } from "./people.ts";
 export { recordConsent, recordSignIn } from "./sign-in-and-consent.ts";
 
@@ -391,22 +387,21 @@ export const revokeCredentials = async (
   tx: Tx,
   input: RevokeCredentialsInput,
 ): Promise<Result<CredentialsRevoked, RevokeCredentialsRefusal | Error>> => {
-  const fresh = requireFreshSignIn(operator, input.at);
-  if (!fresh.ok) return err(fresh.error);
-  const personId = boundarySchemas.user.select.shape.id.safeParse(input.personId);
-  if (!personId.success) return err("no-such-user");
+  const admitted = admitOperatorWrite(operator, input);
+  if (!admitted.ok) return err(admitted.error);
+  const { personId } = admitted.value;
 
-  const ended = await attempt(() => endingCredentials(tx, personId.data, input.at));
+  const ended = await attempt(() => endingCredentials(tx, personId, input.at));
   if (!ended.ok) return err(ended.error);
   if (ended.value === undefined) return err("no-such-user");
 
-  await record(fresh.value, tx, {
+  await record(admitted.value.operator, tx, {
     id: ulid(),
     act: CREDENTIAL_ACTS.revoked,
-    subjectId: personId.data,
+    subjectId: personId,
     detail: {},
   });
-  return ok({ personId: personId.data, revokedAt: ended.value.toISOString() });
+  return ok({ personId, revokedAt: ended.value.toISOString() });
 };
 
 export type RevokeWorkspaceTokensInput = {

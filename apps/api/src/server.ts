@@ -27,7 +27,6 @@ export type ServerDependencies = {
   readonly hostnames: PublicHostnames;
   readonly authSecret: string;
   readonly sendEmail: EmailSender;
-  readonly operatorAddress?: string | undefined;
   readonly logger?: Logger;
 
   readonly fetchClientMetadataResource?: (
@@ -133,11 +132,7 @@ export function createServer(dependencies: ServerDependencies): Hono {
       auth,
       doors,
       logger,
-      mail: {
-        send: dependencies.sendEmail,
-        publicUrl: dependencies.publicUrl,
-        operatorAddress: dependencies.operatorAddress,
-      },
+      mail: { send: dependencies.sendEmail, publicUrl: dependencies.publicUrl },
     }),
   );
 

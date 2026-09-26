@@ -7,12 +7,8 @@ export type EmailMessage = {
 
 export type EmailSender = (message: EmailMessage) => Promise<void>;
 
-/**
- * What an email the api writes needs: the transport, the origin its links point at, and the
- * operator's address, undefined where the deployment names none.
- */
+/** What an email the api writes needs: the transport, and the origin its links point at. */
 export type Mail = {
   readonly send: EmailSender;
   readonly publicUrl: string;
-  readonly operatorAddress: string | undefined;
 };

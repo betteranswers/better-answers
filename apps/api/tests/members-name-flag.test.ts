@@ -1,22 +1,39 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { OPERATOR_ADDRESS, startApp, type TestApp } from "./harness.ts";
+import type { EmailMessage } from "../src/email.ts";
+import { startApp, type TestApp } from "./harness.ts";
 import { displayNameHeldBy, sessionPointedAt, whileCommitsAreRefused } from "./provoke.ts";
 import { refusalOfCall, webSignedIn } from "./web-client.ts";
 
 let app: TestApp;
 
-// While set, the transport refuses the operator's mail, as an SMTP relay that is down would.
-let relayDown = false;
+/** What the relay took; the harness's own list keeps a refused message too. */
+const delivered: EmailMessage[] = [];
+
+/** In address order, as the relay's messages are sorted before they are compared. */
+let operators: readonly [string, string];
+
+let formerOperator: string;
+
+// While set, the transport refuses mail to it, as an SMTP relay refusing that address would.
+let relayRefuses: string | undefined;
 
 beforeAll(async () => {
   app = await startApp({
     onEmail: (message) => {
-      if (relayDown && message.to === OPERATOR_ADDRESS) {
-        throw new Error("the relay refused the message");
-      }
+      if (message.to === relayRefuses) throw new Error("the relay refused the message");
+      delivered.push(message);
     },
   });
+  const [first, second, former] = [
+    await app.person("a-operator@example.test"),
+    await app.person("b-operator@example.test"),
+    await app.person(),
+  ];
+  for (const { email } of [first, second, former]) await app.markOperator(email, "grant");
+  await app.markOperator(former.email, "revoke");
+  operators = [first.email, second.email];
+  formerOperator = former.email;
 });
 
 afterAll(async () => {
@@ -53,10 +70,9 @@ const raisedFor = async (personId: string) =>
     )
   ).rows;
 
+/** Every email about the person the relay took, whoever it went to. */
 const toldTheOperatorOf = (personId: string) =>
-  app.emails.filter(
-    (message) => message.to === OPERATOR_ADDRESS && message.text.includes(personId),
-  );
+  delivered.filter((message) => message.text.includes(personId));
 
 const sentToTheOperator = (personId: string) => ({ personId, sentToTheOperator: true });
 
@@ -94,14 +110,15 @@ describe("flagging a display name over tRPC", () => {
     ]);
   });
 
-  it("emails the operator the workspace, person id and current name", async () => {
+  it("emails each marked person the workspace, person id and name", async () => {
     const { workspace, person, api } = await aWorkspaceWithAFlaggable("Hollins Freight");
 
     await api.members.flagDisplayName.mutate({ personId: person.id });
 
-    expect(toldTheOperatorOf(person.id)).toEqual([
-      {
-        to: OPERATOR_ADDRESS,
+    const told = toldTheOperatorOf(person.id).toSorted((a, b) => a.to.localeCompare(b.to));
+    expect(told).toEqual(
+      operators.map((to) => ({
+        to,
         subject: "A display name is flagged in Hollins Freight",
         text: [
           "An Admin of Hollins Freight flagged a display name as inappropriate.",
@@ -112,8 +129,9 @@ describe("flagging a display name over tRPC", () => {
           "",
           "The name stands until it is corrected. No Admin can change it.",
         ].join("\n"),
-      },
-    ]);
+      })),
+    );
+    expect(told.map((message) => message.to)).not.toContain(formerOperator);
   });
 
   it("answers a second flag alike, writing and emailing nothing new", async () => {
@@ -125,7 +143,7 @@ describe("flagging a display name over tRPC", () => {
     expect(again).toEqual(sentToTheOperator(person.id));
     expect(await flaggedIn(workspace.workspaceId)).toHaveLength(1);
     expect(await raisedFor(person.id)).toHaveLength(1);
-    expect(toldTheOperatorOf(person.id)).toHaveLength(1);
+    expect(toldTheOperatorOf(person.id)).toHaveLength(operators.length);
   });
 
   it("answers alike wherever else the person belongs or is flagged", async () => {
@@ -244,24 +262,26 @@ describe("the operator's email", () => {
     expect(await whatLanded(workspace.workspaceId, person.id)).toEqual(NOTHING_LANDED);
   });
 
-  it("fails leaving the answer and the flag, and is logged", async () => {
+  it("fails to one operator yet reaches the other, logging it", async () => {
     const { person, api } = await aWorkspaceWithAFlaggable();
-    relayDown = true;
+    const [refused, reached] = operators;
+    relayRefuses = refused;
     const answered = await api.members.flagDisplayName
       .mutate({ personId: person.id })
       .finally(() => {
-        relayDown = false;
+        relayRefuses = undefined;
       });
 
     expect(answered).toEqual(sentToTheOperator(person.id));
     expect(await raisedFor(person.id)).toHaveLength(1);
-    expect(app.logs).toContainEqual(
+    expect(toldTheOperatorOf(person.id).map((message) => message.to)).toEqual([reached]);
+    expect(app.logs.filter((line) => line["person_id"] === person.id)).toEqual([
       expect.objectContaining({
+        level: 40,
         event: "trpc.email_failed",
-        person_id: person.id,
         msg: "the name flag's email to the operator did not go",
       }),
-    );
+    ]);
     expect(JSON.stringify(app.logs)).not.toContain(RUDE_NAME);
   });
 });

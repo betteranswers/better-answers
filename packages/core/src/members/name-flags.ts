@@ -9,6 +9,7 @@ import {
   err,
   ok,
   type AdmittedOf,
+  type OperatorPrincipal,
   type Result,
   type UserId,
   type UserPrincipal,
@@ -16,6 +17,7 @@ import {
   ulid,
 } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
+import { DISPLAY_NAME_CORRECTED } from "../workspaces/index.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
 /** Neither row holds the name: the person row keeps the one copy, which erasure blanks. */
@@ -28,8 +30,18 @@ const RAISED_ACTS = declareIdentitySetActs("people", {
   raised: act("people.name_flag.raised", { workspaceId: "id" }),
 });
 
-/** Written by the operator's correction of a display name; a flag raised before it waits no more. */
-const CORRECTED = "people.person.renamed";
+/**
+ * Over the rows aliased `raised`. It takes `$1` and `$2` from `WAITING_ACTS`, so a query using it
+ * numbers its own parameters from `$3`.
+ */
+const STILL_WAITING = `raised.subject_kind = split_part($1, '.', 2) AND raised.act = $1
+    AND raised.at > COALESCE(
+      (SELECT max(corrected.at) FROM identity_audit_event corrected
+        WHERE corrected.subject_kind = split_part($2, '.', 2) AND corrected.act = $2
+          AND corrected.subject_id = raised.subject_id),
+      '-infinity')`;
+
+const WAITING_ACTS = [RAISED_ACTS.raised.name, DISPLAY_NAME_CORRECTED.name] as const;
 
 export const flagDisplayNameInput = z.object({
   personId: boundarySchemas.user.select.shape.id,
@@ -73,13 +85,8 @@ const FLAGGED_PERSON = `SELECT u.name AS "displayName", w.name AS "workspaceName
 
 const A_FLAG_WAITS = `SELECT EXISTS (
     SELECT 1 FROM identity_audit_event raised
-     WHERE raised.subject_kind = split_part($3, '.', 2) AND raised.subject_id = $1
-       AND raised.act = $3 AND raised.detail ->> 'workspaceId' = $2
-       AND raised.at > COALESCE(
-         (SELECT max(corrected.at) FROM identity_audit_event corrected
-           WHERE corrected.subject_kind = split_part($4, '.', 2) AND corrected.subject_id = $1
-             AND corrected.act = $4),
-         '-infinity')
+     WHERE ${STILL_WAITING}
+       AND raised.subject_id = $3 AND raised.detail ->> 'workspaceId' = $4
   ) AS waits`;
 
 const FLAGGED_ROW = z.object({ displayName: z.string(), workspaceName: z.string() });
@@ -96,10 +103,9 @@ const flagging = async (
   const person = FLAGGED_ROW.parse(found);
 
   const waiting = await tx.query<{ waits: boolean }>(A_FLAG_WAITS, [
+    ...WAITING_ACTS,
     personId,
     workspaceId,
-    RAISED_ACTS.raised.name,
-    CORRECTED,
   ]);
   if (waiting.rows[0]?.waits === true) return ok({ personId, raised: null });
 
@@ -134,3 +140,65 @@ export const flagDisplayName = async (
   const flagged = await attempt(() => flagging(admitted.value, tx, input.personId));
   return flagged.ok ? flagged.value : err(flagged.error);
 };
+
+type FlagWaiting = {
+  readonly workspace: { readonly id: WorkspaceId; readonly name: string };
+  readonly raisedAt: string;
+};
+
+type NameWaiting = {
+  readonly personId: UserId;
+  readonly displayName: string;
+
+  /** A workspace's second flag is never raised while its first waits, so each appears once. */
+  readonly flags: readonly FlagWaiting[];
+};
+
+const FLAGS_WAITING = `SELECT raised.subject_id AS "personId", u.name AS "displayName",
+         w.id AS "workspaceId", w.name AS "workspaceName", raised.at AS "raisedAt"
+    FROM identity_audit_event raised
+    JOIN "user" u ON u.id = raised.subject_id
+    JOIN workspace w ON w.id = raised.detail ->> 'workspaceId'
+   WHERE ${STILL_WAITING}
+   ORDER BY raised.at, raised.id`;
+
+const WAITING_ROW = z.object({
+  personId: boundarySchemas.user.select.shape.id,
+  displayName: boundarySchemas.user.select.shape.name,
+  workspaceId: boundarySchemas.workspace.select.shape.id,
+  workspaceName: boundarySchemas.workspace.select.shape.name,
+  raisedAt: boundarySchemas.identityAuditEvent.select.shape.at,
+});
+
+/** The rows come oldest first, so a Map keeps each person where their oldest flag put them. */
+const byPerson = (rows: readonly z.output<typeof WAITING_ROW>[]): readonly NameWaiting[] => {
+  const people = new Map<UserId, NameWaiting>();
+  for (const row of rows) {
+    const flag = {
+      workspace: { id: row.workspaceId, name: row.workspaceName },
+      raisedAt: row.raisedAt.toISOString(),
+    };
+    const held = people.get(row.personId);
+    people.set(
+      row.personId,
+      held === undefined
+        ? { personId: row.personId, displayName: row.displayName, flags: [flag] }
+        : { ...held, flags: [...held.flags, flag] },
+    );
+  }
+  return [...people.values()];
+};
+
+/**
+ * Every person flagged since the operator last corrected their display name, the longest waiting
+ * first, each with the workspaces that flagged them and when. A person's own renaming leaves a
+ * flag waiting.
+ */
+export const listNamesWaiting = (
+  _operator: OperatorPrincipal,
+  tx: Tx,
+): Promise<Result<readonly NameWaiting[], Error>> =>
+  attempt(async () => {
+    const found = await tx.query(FLAGS_WAITING, [...WAITING_ACTS]);
+    return byPerson(found.rows.map((row) => WAITING_ROW.parse(row)));
+  });

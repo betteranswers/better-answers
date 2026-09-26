@@ -28,7 +28,9 @@ import {
 } from "../src/store/postgres/index.ts";
 import {
   addMember,
+  correctDisplayName,
   listWorkspaces,
+  operatorAddresses,
   personIdByEmail,
   provisionWorkspace,
   readMembership,
@@ -774,6 +776,7 @@ describe("what the slice answers when the store cannot be reached", () => {
         "setOperatorMark",
         await setOperatorMark(bootstrap, door, { email: "acme@example.invalid", change: "grant" }),
       ],
+      ["operatorAddresses", await operatorAddresses(bootstrap, door)],
     ];
 
     for (const [name, answered] of answers) {
@@ -803,7 +806,9 @@ describe("what the slice answers when the store cannot be reached", () => {
     expect([
       await listWorkspaces(operator, closed),
       await revokeCredentials(operator, closed, { personId: ulid(), at }),
+      await correctDisplayName(operator, closed, { personId: ulid(), displayName: "Sam", at }),
     ]).toEqual([
+      { ok: false, error: expect.any(Error) },
       { ok: false, error: expect.any(Error) },
       { ok: false, error: expect.any(Error) },
     ]);
@@ -1204,6 +1209,22 @@ describe("the operator mark, set and cleared by the platform", () => {
       ok: false,
       error: "no-such-user",
     });
+  });
+
+  it("names every marked person's address, and no one else's", async () => {
+    const first = `a-${addressOf("first")}`;
+    const second = `b-${addressOf("second")}`;
+    const cleared = addressOf("cleared");
+    const plain = addressOf("plain");
+    for (const email of [first, second, cleared, plain]) await seedPerson(db().pool, { email });
+    for (const email of [second, first, cleared]) await marking(email, "grant");
+    await marking(cleared, "revoke");
+
+    const read = await operatorAddresses(bootstrap, openPostgres(db().runtimePool));
+
+    const addresses = read.ok ? read.value : [];
+    const ours = addresses.filter((email) => [first, second, cleared, plain].includes(email));
+    expect(ours).toEqual([first, second]);
   });
 });
 

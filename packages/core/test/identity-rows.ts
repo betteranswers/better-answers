@@ -61,18 +61,6 @@ export const sessionFor = async (
   return sessionId;
 };
 
-/** The row the operator's correction of a display name leaves, stamped now, before its act exists. */
-export const correctionOf = async (
-  pool: pg.Pool,
-  person: { readonly personId: string; readonly operatorId: string },
-): Promise<void> => {
-  await pool.query(
-    `INSERT INTO identity_audit_event (id, act, actor, subject_id, detail)
-     VALUES ($1, 'people.person.renamed', $2, $3, '{}'::jsonb)`,
-    [ulid(), `human:${person.operatorId}`, person.personId],
-  );
-};
-
 type CredentialPair = {
   readonly earlier: string;
   readonly later: string;

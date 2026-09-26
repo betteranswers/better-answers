@@ -22,6 +22,7 @@ import { removeBundleRoot } from "@better-answers/core/testing/bundle-root";
 import {
   provisionWorkspace,
   revokeCredentials as revokeCredentials_,
+  setOperatorMark,
 } from "@better-answers/core/workspaces";
 import { ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
@@ -41,9 +42,6 @@ export const AUTH_SECRET = "test-secret-that-is-at-least-thirty-two-characters-l
 export const APP_HOSTNAME = hostnameOfUrl(PUBLIC_URL);
 export const AGENT_HOSTNAME = "agent.example.test";
 export const APEX_HOSTNAME = "example.test";
-
-/** Where the harness's deployment emails a flagged display name. */
-export const OPERATOR_ADDRESS = "operator@example.test";
 const HOSTNAMES: PublicHostnames = {
   app: APP_HOSTNAME,
   agent: AGENT_HOSTNAME,
@@ -134,6 +132,12 @@ export type TestApp = {
   setEmailVerified(email: string, verified: boolean): Promise<void>;
 
   revokeCredentials(userId: string, at: Date): Promise<void>;
+
+  /**
+   * Grants or clears the operator mark of the person holding `email`, as the ops command does.
+   * @throws when no person holds it.
+   */
+  markOperator(email: string, change: "grant" | "revoke"): Promise<void>;
 
   removeMember(workspaceId: string, userId: string): Promise<void>;
 
@@ -257,9 +261,6 @@ export type TestAppOptions = {
 
   readonly objectStore?: ObjectStoreSettings | undefined;
 
-  /** `OPERATOR_ADDRESS` when left out; null is a deployment that names no operator. */
-  readonly operatorAddress?: string | null | undefined;
-
   /**
    * A count of connections below the pool's ceiling reads what was asked for, and the suite's
    * runtime pool is small.
@@ -305,8 +306,6 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
       emails.push(message);
       options.onEmail?.(message);
     },
-    operatorAddress:
-      options.operatorAddress === null ? undefined : (options.operatorAddress ?? OPERATOR_ADDRESS),
     fetchClientMetadataResource: (input) => {
       metadataFetches.push(input instanceof Request ? input.url : String(input));
       return cimdFixture(input);
@@ -398,6 +397,11 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     );
     const revoked = opened.ok ? opened.value : opened;
     if (!revoked.ok) throw new Error(`revokeCredentials failed: ${String(revoked.error)}`);
+  };
+
+  const markOperator: TestApp["markOperator"] = async (email, change) => {
+    const marked = await setOperatorMark(bootstrap, door, { email, change });
+    if (!marked.ok) throw new Error(`the mark was refused: ${String(marked.error)}`);
   };
 
   const removeMember: TestApp["removeMember"] = async (workspaceId, userId) => {
@@ -493,6 +497,7 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     invite,
     setEmailVerified,
     revokeCredentials,
+    markOperator,
     removeMember,
     setWorkspaceConfig,
     client,
