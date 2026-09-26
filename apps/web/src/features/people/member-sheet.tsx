@@ -10,14 +10,23 @@ import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 import { RadioGroup, RadioGroupItem } from "@/shared/ui/radio-group.tsx";
 import { SheetDescription, SheetHeader, SheetTitle } from "@/shared/ui/sheet.tsx";
+import { instantWords } from "@/shared/words.ts";
 
-import { useChangeRole, type ListedMember, type Role, type RoleChanged } from "./people-api.ts";
+import {
+  useChangeRole,
+  useReaderId,
+  useRevokeCredentials,
+  type CredentialsRevokedHere,
+  type ListedMember,
+  type Role,
+  type RoleChanged,
+} from "./people-api.ts";
 import { aRole, ROLE_MEANINGS, roleOf, ROLES } from "./role-meanings.ts";
 import { outcomeOfFailure } from "./refusal.tsx";
-import { GroupPills, JoinedOn, nameOf } from "./words.tsx";
+import { CredentialsHere, GroupPills, JoinedOn, nameOf } from "./words.tsx";
 
-/** Where focus lands when the sheet opens: on who the member is, or straight on their role. */
-export type OpenedAt = "member" | "role";
+/** Where focus lands when the sheet opens: on who the member is, or straight on an act. */
+export type OpenedAt = "member" | "role" | "credentials";
 
 export const memberButtonId = (personId: string): string => `member-${personId}`;
 
@@ -46,6 +55,9 @@ function Membership(properties: { readonly member: ListedMember }) {
         </SummaryRow>
         <SummaryRow term="Joined">
           <JoinedOn instant={member.joinedAt} />
+        </SummaryRow>
+        <SummaryRow term="Credentials here">
+          <CredentialsHere revokedAt={member.credentialsRevokedAt} />
         </SummaryRow>
       </dl>
     </section>
@@ -141,6 +153,69 @@ function RolePicker(properties: {
   );
 }
 
+function CredentialsRevoker(properties: {
+  readonly member: ListedMember;
+  readonly revokeRef: RefObject<HTMLButtonElement | null>;
+}) {
+  const { member, revokeRef } = properties;
+  const [outcome, setOutcome] = useState<Outcome>();
+  const revoke = useRevokeCredentials();
+  const readerId = useReaderId();
+  const headingId = useId();
+  const hintId = useId();
+  const name = nameOf(member);
+
+  const commit = () => {
+    if (revoke.isPending) return;
+    setOutcome(undefined);
+    revoke.mutate(
+      { personId: member.personId },
+      {
+        onSuccess: (revoked: CredentialsRevokedHere) => {
+          setOutcome({
+            tone: "said",
+            words: `${name}'s credentials here are revoked. Every session and token issued before ${instantWords(revoked.revokedAt)} is refused here; a fresh sign-in works.`,
+          });
+        },
+        onError: (failure: Error | ApiError) => {
+          setOutcome(outcomeOfFailure(failure));
+        },
+      },
+    );
+  };
+
+  return (
+    <section aria-labelledby={headingId} className="border border-border">
+      <h3 id={headingId} className="border-b border-border px-4 py-2 font-medium">
+        Credentials
+      </h3>
+      <div className="grid gap-4 px-4 py-3">
+        <div className="flex flex-col items-start gap-2">
+          <Button
+            ref={revokeRef}
+            variant="outline"
+            aria-describedby={hintId}
+            // Not `disabled`: a disabled button drops the focus the act leaves on it.
+            aria-disabled={revoke.isPending}
+            onClick={commit}
+          >
+            Revoke {name}'s credentials here
+          </Button>
+          <p id={hintId} className="text-sm text-muted-foreground">
+            Every session and token {name} holds for this workspace is refused at once, and a fresh
+            sign-in works.{" "}
+            {member.personId === readerId
+              ? "Your own session here ends with it."
+              : "Recorded on the audit log under your name."}
+          </p>
+        </div>
+
+        <OutcomeLine outcome={outcome} />
+      </div>
+    </section>
+  );
+}
+
 export function MemberSheet(properties: {
   readonly member: ListedMember;
   readonly openedAt: OpenedAt;
@@ -149,6 +224,7 @@ export function MemberSheet(properties: {
   const { member, openedAt, onClose } = properties;
   const titleRef = useRef<HTMLHeadingElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
+  const revokeRef = useRef<HTMLButtonElement>(null);
 
   return (
     <RowSheet
@@ -156,6 +232,8 @@ export function MemberSheet(properties: {
       onOpen={() => {
         if (openedAt === "role") {
           pickerRef.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus();
+        } else if (openedAt === "credentials") {
+          revokeRef.current?.focus();
         } else {
           titleRef.current?.focus();
         }
@@ -180,6 +258,7 @@ export function MemberSheet(properties: {
       <div className="grid gap-4 px-4 pb-4">
         <Membership member={member} />
         <RolePicker member={member} pickerRef={pickerRef} />
+        <CredentialsRevoker member={member} revokeRef={revokeRef} />
       </div>
     </RowSheet>
   );

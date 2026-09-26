@@ -1,13 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { z } from "zod";
 
 import { until } from "@better-answers/core/testing/postgres";
 
 import { startApp, type TestApp } from "./harness.ts";
 import {
+  failureOf,
   revocationHeldOpen,
   seededIn,
   someoneWaitsOnALock,
+  whileAuditRowsVanish,
   type HeldRevocation,
 } from "./provoke.ts";
 import {
@@ -67,6 +68,7 @@ describe("the members list over tRPC", () => {
           { groupId: seeded.hr, name: "HR team" },
         ],
         joinedAt: seeded.editorRow.createdAt.toISOString(),
+        credentialsRevokedAt: null,
       },
       {
         personId: viewer.id,
@@ -75,6 +77,7 @@ describe("the members list over tRPC", () => {
         role: "Viewer",
         groups: [],
         joinedAt: seeded.viewerRow.createdAt.toISOString(),
+        credentialsRevokedAt: null,
       },
       {
         personId: admin.id,
@@ -83,6 +86,7 @@ describe("the members list over tRPC", () => {
         role: "Admin",
         groups: [],
         joinedAt: expect.stringMatching(ISO_INSTANT),
+        credentialsRevokedAt: null,
       },
     ]);
   });
@@ -278,38 +282,6 @@ describe("who may change a role", () => {
   });
 });
 
-/**
- * The insert lands no row and raises nothing, so Postgres leaves the transaction open: only the
- * transport's rollback can undo the write before it.
- */
-const whileAuditRowsVanish = async <T>(work: () => Promise<T>): Promise<T> => {
-  const { superuser } = app.database;
-  await superuser.query(
-    `CREATE FUNCTION test_audit_row_vanishes() RETURNS trigger LANGUAGE plpgsql AS $$
-     BEGIN RETURN NULL; END $$`,
-  );
-  await superuser.query(
-    `CREATE TRIGGER test_audit_row_vanishes BEFORE INSERT ON audit_event
-     FOR EACH ROW EXECUTE FUNCTION test_audit_row_vanishes()`,
-  );
-  try {
-    return await work();
-  } finally {
-    await superuser.query("DROP TRIGGER test_audit_row_vanishes ON audit_event");
-    await superuser.query("DROP FUNCTION test_audit_row_vanishes()");
-  }
-};
-
-const FAILED = z.object({
-  message: z.string(),
-  data: z.object({ httpStatus: z.number(), refusal: z.unknown().optional() }),
-});
-
-const failureOf = (failed: unknown) => {
-  const { message, data } = FAILED.parse(failed);
-  return { message, httpStatus: data.httpStatus, refusal: data.refusal };
-};
-
 const NOTHING_LANDED = { role: "Viewer", changes: [] };
 
 const whatLanded = async (workspaceId: string, personId: string) => ({
@@ -341,7 +313,7 @@ describe("a role change that fails partway", () => {
     const { workspace, viewer } = await aWorkspaceOfThree();
     const { api } = await webSignedIn(app, workspace.admin.email);
 
-    const failed = await whileAuditRowsVanish(() =>
+    const failed = await whileAuditRowsVanish(app, () =>
       refusalOfCall(api.members.changeRole.mutate({ personId: viewer.id, role: "Editor" })),
     );
 

@@ -1,48 +1,24 @@
 import { describe, expect, it } from "vitest";
 
-import type { Role, UserPrincipal } from "../src/kernel/index.ts";
+import type { UserPrincipal } from "../src/kernel/index.ts";
 import { changeRole, changeRoleInput, listMembers } from "../src/members/index.ts";
-import {
-  folded,
-  type Foldable,
-  type Folded,
-  type Tx,
-  withHeldPrincipal,
-} from "../src/store/postgres/index.ts";
+import type { Tx } from "../src/store/postgres/index.ts";
+import { bothHoldingTheirOwnRow, heldAs, membersSuite } from "./members-suite.ts";
 import { provisionedWorkspace, type ProvisionedWorkspace } from "./platform.ts";
 import { inputOf } from "./suite-input.ts";
 import {
   countWaitingOnLocks,
   postgresForSuite,
-  seedingWith,
   until,
   whileWritesAreRefused,
 } from "./suite-postgres.ts";
 
 const db = postgresForSuite();
 
-const ROLE_CHANGED = "people.member.role_changed";
+const { joining, rolesOf, adminsOf, auditRowsOf } = membersSuite(db);
 
-const joining = (workspace: ProvisionedWorkspace, role: Role): Promise<string> =>
-  seedingWith(db().pool, async (seed) => {
-    const { id } = await seed.user();
-    await seed.member({ workspaceId: workspace.workspaceId, userId: id, role });
-    return id;
-  });
-
-/** As the transport holds a mutation's caller: their own member row `FOR SHARE` until commit. */
-const heldAs = async <T>(
-  workspace: ProvisionedWorkspace,
-  userId: string,
-  work: (principal: UserPrincipal, tx: Tx) => Promise<Foldable<T>>,
-): Promise<Folded<T>> =>
-  folded<T>(
-    await withHeldPrincipal(
-      workspace.door,
-      { workspaceId: workspace.workspaceId, userId, issuedAt: new Date() },
-      work,
-    ),
-  );
+const roleChangesIn = (workspace: ProvisionedWorkspace) =>
+  auditRowsOf(workspace, "people.member.role_changed");
 
 const changing = (principal: UserPrincipal, tx: Tx, personId: string, role: string) =>
   changeRole(principal, tx, inputOf(changeRoleInput, { personId, role }));
@@ -53,33 +29,6 @@ const roleChangedBy = (
   personId: string,
   role: string,
 ) => heldAs(workspace, actor, (principal, tx) => changing(principal, tx, personId, role));
-
-const rolesOf = async (
-  workspace: ProvisionedWorkspace,
-): Promise<Readonly<Record<string, string>>> => {
-  const held = await db().pool.query<{ user_id: string; role: string }>(
-    "SELECT user_id, role FROM member WHERE workspace_id = $1",
-    [workspace.workspaceId],
-  );
-  return Object.fromEntries(held.rows.map((row) => [row.user_id, row.role]));
-};
-
-const adminsOf = async (workspace: ProvisionedWorkspace): Promise<readonly string[]> =>
-  Object.entries(await rolesOf(workspace))
-    .filter(([, role]) => role === "Admin")
-    .map(([userId]) => userId);
-
-const roleChangesIn = async (workspace: ProvisionedWorkspace) => {
-  const rows = await db().pool.query<{
-    actor: string;
-    subject_id: string;
-    detail: Readonly<Record<string, string>>;
-  }>(
-    "SELECT actor, subject_id, detail FROM audit_event WHERE workspace_id = $1 AND act = $2 ORDER BY id",
-    [workspace.workspaceId, ROLE_CHANGED],
-  );
-  return rows.rows;
-};
 
 describe("changing a member's role", () => {
   it("moves a member to the asked role, recording both roles", async () => {
@@ -254,22 +203,12 @@ describe("the last Admin", () => {
     const workspace = await provisionedWorkspace(db(), "Deadlocked");
     const first = workspace.adminUserId;
     const second = await joining(workspace, "Admin");
-    const bothHold = Promise.withResolvers<undefined>();
-    let holding = 0;
 
-    /** Each waits until both hold their own member row, so each then waits on the other's. */
-    const demotingOnceBothHold = (actor: string, target: string) =>
-      heldAs(workspace, actor, async (principal, tx) => {
-        holding += 1;
-        if (holding === 2) bothHold.resolve(undefined);
-        await bothHold.promise;
-        return changing(principal, tx, target, "Editor");
-      });
-
-    const answers = await Promise.all([
-      demotingOnceBothHold(first, second),
-      demotingOnceBothHold(second, first),
-    ]);
+    const answers = await bothHoldingTheirOwnRow(
+      workspace,
+      [first, second],
+      (principal, tx, other) => changing(principal, tx, other, "Editor"),
+    );
 
     expect(answers.map((answer) => answer.ok).sort()).toEqual([false, true]);
     expect(answers.find((answer) => !answer.ok)).toEqual({

@@ -1,4 +1,5 @@
 import { testData } from "@better-answers/schema/testing";
+import { z } from "zod";
 
 import { signIn } from "./flow.ts";
 import { APP_HOSTNAME, type TestApp, type TestClient } from "./harness.ts";
@@ -144,4 +145,36 @@ export const whileCommitsAreRefused = async <T>(
     await store.query(`DROP TRIGGER test_refuse_commit ON "${table}"`);
     await store.query("DROP FUNCTION test_refuse_commit()");
   }
+};
+
+/**
+ * The insert lands no row and raises nothing, so Postgres leaves the transaction open: only the
+ * transport's rollback can undo the write before it.
+ */
+export const whileAuditRowsVanish = async <T>(app: TestApp, work: () => Promise<T>): Promise<T> => {
+  const { superuser } = app.database;
+  await superuser.query(
+    `CREATE FUNCTION test_audit_row_vanishes() RETURNS trigger LANGUAGE plpgsql AS $$
+     BEGIN RETURN NULL; END $$`,
+  );
+  await superuser.query(
+    `CREATE TRIGGER test_audit_row_vanishes BEFORE INSERT ON audit_event
+     FOR EACH ROW EXECUTE FUNCTION test_audit_row_vanishes()`,
+  );
+  try {
+    return await work();
+  } finally {
+    await superuser.query("DROP TRIGGER test_audit_row_vanishes ON audit_event");
+    await superuser.query("DROP FUNCTION test_audit_row_vanishes()");
+  }
+};
+
+const FAILED = z.object({
+  message: z.string(),
+  data: z.object({ httpStatus: z.number(), refusal: z.unknown().optional() }),
+});
+
+export const failureOf = (failed: unknown) => {
+  const { message, data } = FAILED.parse(failed);
+  return { message, httpStatus: data.httpStatus, refusal: data.refusal };
 };
