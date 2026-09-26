@@ -104,8 +104,10 @@ type YamlFrontmatter = z.infer<typeof yamlFrontmatter>;
 const isMapping = (value: YamlFrontmatter[string]): value is FrontmatterSource =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-// The platform's frontmatter holds scalars and lists, so a flow mapping such as OKF's
-// `generated {by, at}` is carried as a one-entry list.
+/**
+ * The platform's frontmatter holds scalars and lists, so a flow mapping such as OKF's
+ * `generated {by, at}` is carried as a one-entry list.
+ */
 const frontmatterOf = (decoded: YamlFrontmatter): Frontmatter =>
   Object.fromEntries(
     Object.entries(decoded).map(([key, value]) => [key, isMapping(value) ? [value] : value]),
@@ -141,6 +143,24 @@ const stringOf = (frontmatter: Frontmatter, key: string): string | undefined => 
   return typeof value === "string" && value.trim() !== "" ? value : undefined;
 };
 
+const verifiedEventOf = (
+  file: string,
+  entry: string | FrontmatterSource,
+  index: number,
+): Result<VerifiedEvent, Unsound> => {
+  if (typeof entry !== "object") return err(unsound(file, "does-not-parse", `verified[${index}]`));
+  const by = entry["by"];
+  if (typeof by !== "string") {
+    return err(unsound(file, "does-not-parse", `verified[${index}].by`));
+  }
+  if (!by.startsWith(PERSON_PREFIX)) return err(unsound(file, "verifier-not-a-member", by));
+  const at = typeof entry["at"] === "string" ? new Date(entry["at"]) : new Date(Number.NaN);
+  if (Number.isNaN(at.getTime())) {
+    return err(unsound(file, "does-not-parse", `verified[${index}].at`));
+  }
+  return ok({ entry, email: by.slice(PERSON_PREFIX.length), at });
+};
+
 const verifiedEventsOf = (
   file: string,
   frontmatter: Frontmatter,
@@ -150,18 +170,9 @@ const verifiedEventsOf = (
   if (!Array.isArray(verified)) return err(unsound(file, "does-not-parse", "verified"));
   const events: VerifiedEvent[] = [];
   for (const [index, entry] of verified.entries()) {
-    if (typeof entry !== "object")
-      return err(unsound(file, "does-not-parse", `verified[${index}]`));
-    const by = entry["by"];
-    if (typeof by !== "string") {
-      return err(unsound(file, "does-not-parse", `verified[${index}].by`));
-    }
-    if (!by.startsWith(PERSON_PREFIX)) return err(unsound(file, "verifier-not-a-member", by));
-    const at = typeof entry["at"] === "string" ? new Date(entry["at"]) : new Date(Number.NaN);
-    if (Number.isNaN(at.getTime())) {
-      return err(unsound(file, "does-not-parse", `verified[${index}].at`));
-    }
-    events.push({ entry, email: by.slice(PERSON_PREFIX.length), at });
+    const event = verifiedEventOf(file, entry, index);
+    if (!event.ok) return event;
+    events.push(event.value);
   }
   return ok(events);
 };
@@ -192,6 +203,10 @@ export type RewrittenBody = {
   readonly links: number;
 };
 
+/**
+ * Swaps each relative `.md` link that `iriOf` knows for its IRI, keeping any `#fragment`;
+ * `links` counts the swaps.
+ */
 export const rewriteLinks = (
   body: string,
   path: string,
@@ -226,40 +241,58 @@ const pathOf = (file: string): string => `${BUNDLE_ROOT}/${file}`;
 const isConceptFile = (file: string): boolean =>
   file.endsWith(".md") && !LISTING_FILES.has(file.split("/").at(-1) ?? "");
 
+const conceptPathOf = (file: string): Result<string, Unsound> => {
+  const path = pathOf(file);
+  if (RESERVED_PATHS.has(path)) return err(unsound(file, "reserved-path", path));
+  return CONCEPT_PATH.test(path) && isPortablePath(path)
+    ? ok(path)
+    : err(unsound(file, "path-refused", path));
+};
+
+const parsedConcept = (
+  file: string,
+  text: string,
+): Result<{ readonly frontmatter: Frontmatter; readonly body: string }, Unsound> => {
+  const split = splitFile(text);
+  if (!split.ok) return err(unsound(file, "does-not-parse", split.error));
+  const decoded = decodedYaml(split.value.head, yamlFrontmatter, "frontmatter");
+  if (!decoded.ok) return err(unsound(file, "does-not-parse", decoded.error));
+  return ok({ frontmatter: frontmatterOf(decoded.value), body: split.value.body });
+};
+
+const linkOutsideTree = (
+  body: string,
+  path: string,
+  paths: ReadonlySet<string>,
+): string | undefined =>
+  relativeConceptLinksOf(body).find((link) => !paths.has(resolvedResource(link, path).slice(1)));
+
 const readConcept = (
   file: string,
   text: string,
   paths: ReadonlySet<string>,
 ): Result<LoadedConcept, Unsound> => {
-  const path = pathOf(file);
-  if (RESERVED_PATHS.has(path)) return err(unsound(file, "reserved-path", path));
-  if (!CONCEPT_PATH.test(path) || !isPortablePath(path)) {
-    return err(unsound(file, "path-refused", path));
-  }
-  const split = splitFile(text);
-  if (!split.ok) return err(unsound(file, "does-not-parse", split.error));
-  const decoded = decodedYaml(split.value.head, yamlFrontmatter, "frontmatter");
-  if (!decoded.ok) return err(unsound(file, "does-not-parse", decoded.error));
-  const frontmatter = frontmatterOf(decoded.value);
+  const path = conceptPathOf(file);
+  if (!path.ok) return path;
+  const parsed = parsedConcept(file, text);
+  if (!parsed.ok) return parsed;
+  const { frontmatter, body } = parsed.value;
   const kind = stringOf(frontmatter, "type");
   if (kind === undefined) return err(unsound(file, "type-or-title-missing", "type"));
   const title = stringOf(frontmatter, "title");
   if (title === undefined) return err(unsound(file, "type-or-title-missing", "title"));
   const verified = verifiedEventsOf(file, frontmatter);
   if (!verified.ok) return verified;
-  for (const link of relativeConceptLinksOf(split.value.body)) {
-    if (!paths.has(resolvedResource(link, path).slice(1))) {
-      return err(unsound(file, "link-outside-tree", link));
-    }
-  }
+  const outside = linkOutsideTree(body, path.value, paths);
+  if (outside !== undefined) return err(unsound(file, "link-outside-tree", outside));
   return ok({
     file,
-    path,
+    path: path.value,
     kind,
     title,
     mergeKey: mergeKeyOf(foldKind(kind), title),
     frontmatter,
-    body: split.value.body,
+    body,
     verified: verified.value,
     entry: entryLabelOf(frontmatter),
   });
@@ -270,6 +303,7 @@ const manifestOf = (text: string): Result<BundleManifest, Unsound> => {
   return decoded.ok ? decoded : err(unsound(MANIFEST_FILE, "manifest-malformed", decoded.error));
 };
 
+/** Refuses the whole bundle at its first unsound file, taken in path order. */
 export const readBundle = (tree: BundleTree): Result<LoadedBundle, Unsound> => {
   const manifestText = tree.get(MANIFEST_FILE);
   if (manifestText === undefined) {
@@ -292,6 +326,7 @@ export const readBundle = (tree: BundleTree): Result<LoadedBundle, Unsound> => {
   return ok({ manifest: manifest.value, concepts });
 };
 
+/** Keyed by lower-cased email; an address with no member in the workspace is absent. */
 export const memberIdsByEmail = async (
   principal: Principal,
   tx: Tx,
@@ -311,6 +346,7 @@ export const memberIdsByEmail = async (
   );
 };
 
+/** @throws when `personId` is no member of the workspace. */
 export const authorOf = async (
   principal: Principal,
   tx: Tx,
@@ -346,6 +382,7 @@ type StandingRow = {
   readonly content_hash: string;
 };
 
+/** Keyed by path; a path no concept holds is absent. */
 export const standingAt = async (
   principal: Principal,
   tx: Tx,
@@ -381,6 +418,7 @@ export type ImportedCheck = {
 const checkKey = (iri: string, check: ImportedCheck): string =>
   `${iri} ${check.actor} ${check.at.toISOString()}`;
 
+/** The checks already recorded on `iris`, as opaque keys for `countChecks`. */
 export const presentChecks = async (
   principal: Principal,
   tx: Tx,
@@ -402,6 +440,7 @@ export type ChecksRecorded = {
   readonly present: number;
 };
 
+/** An `undefined` IRI is a concept not held yet, so every check counts as recorded. */
 export const countChecks = (
   iri: string | undefined,
   checks: readonly ImportedCheck[],
@@ -412,6 +451,7 @@ export const countChecks = (
   return { recorded: missing.length, present: checks.length - missing.length };
 };
 
+/** Records each check not already there, with an audit event each; `present` counts the rest. */
 export const recordImportedChecks = async (
   principal: Principal,
   tx: Tx,
