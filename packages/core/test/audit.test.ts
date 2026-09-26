@@ -8,10 +8,12 @@ import { FAMILIES, ulid } from "@better-answers/schema";
 import {
   act,
   type ActName,
+  batchIdFor,
   declarations,
   declareActs,
   declareIdentitySetActs,
   record,
+  recordEach,
   recordFor,
 } from "../src/audit/index.ts";
 import type { ActorId, PlatformPrincipal, UserPrincipal } from "../src/kernel/index.ts";
@@ -226,6 +228,65 @@ const PROBE = declareActs("platform", {
   noted: act("platform.probe.noted", { confirmed: "flag" }),
 
   optional: act("platform.probe.optional", { adminUserId: "id?", confirmed: "flag" }),
+});
+
+const rowsOfSubjects = async (subjectIds: readonly string[]) => {
+  const found = await db().pool.query<{
+    subject_id: string;
+    detail: Record<string, string | number | boolean>;
+    batch_id: string | null;
+  }>(
+    "SELECT subject_id, detail, batch_id FROM audit_event WHERE subject_id = ANY($1) ORDER BY id",
+    [subjectIds],
+  );
+  return found.rows;
+};
+
+describe("a batch id, for one act written over several subjects", () => {
+  it("names no batch for none or one subject", () => {
+    expect(batchIdFor(0)).toBeUndefined();
+    expect(batchIdFor(1)).toBeUndefined();
+  });
+
+  it("mints a fresh ULID for two subjects or more", () => {
+    const first = batchIdFor(2);
+    expect(first).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
+    expect(batchIdFor(2)).not.toBe(first);
+  });
+});
+
+describe("recordEach — one row per subject, batched when several", () => {
+  it("lands a lone subject's row outside any batch", async () => {
+    const { door, workspaceId } = await provisioned();
+    const subjectId = ulid();
+
+    const batchId = await withScope(bootstrap, door, workspaceId, (tx) =>
+      recordEach(bootstrap, tx, PROBE.noted, [{ subjectId, detail: { confirmed: true } }]),
+    );
+
+    expect(batchId).toBeUndefined();
+    expect(await rowsOfSubjects([subjectId])).toEqual([
+      { subject_id: subjectId, detail: { confirmed: true }, batch_id: null },
+    ]);
+  });
+
+  it("lands every row in order, under the batch it answers", async () => {
+    const { door, workspaceId } = await provisioned();
+    const [first, second] = [ulid(), ulid()];
+
+    const batchId = await withScope(bootstrap, door, workspaceId, (tx) =>
+      recordEach(bootstrap, tx, PROBE.noted, [
+        { subjectId: first, detail: { confirmed: true } },
+        { subjectId: second, detail: { confirmed: false } },
+      ]),
+    );
+
+    expect(batchId).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
+    expect(await rowsOfSubjects([first, second])).toEqual([
+      { subject_id: first, detail: { confirmed: true }, batch_id: batchId },
+      { subject_id: second, detail: { confirmed: false }, batch_id: batchId },
+    ]);
+  });
 });
 
 describe("the first door — record, the actor from the Principal", () => {

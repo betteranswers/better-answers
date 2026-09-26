@@ -21,7 +21,7 @@ export type { AdmissionRefusal, AdmittedOf, InputOf, RefusalOf } from "./admissi
 export { ISSUE_WORDS, parse, ROOT_PATH } from "./parse.ts";
 export type { FieldIssues, IssueWord, Malformed } from "./parse.ts";
 export { isPortablePath } from "./portable-path.ts";
-export { attempt, err, normalizeError, ok } from "./result.ts";
+export { attempt, attemptResult, err, normalizeError, ok } from "./result.ts";
 export type { Result } from "./result.ts";
 export {
   actorIdOf,

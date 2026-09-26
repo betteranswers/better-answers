@@ -6,6 +6,7 @@ import { act, declareActs, declareIdentitySetActs, record } from "../audit/index
 import {
   admit,
   attempt,
+  attemptResult,
   declareAct,
   err,
   ok,
@@ -135,8 +136,7 @@ export const flagDisplayName = async (
   const admitted = admit(flagDisplayNameAct, principal, input);
   if (!admitted.ok) return err(admitted.error);
 
-  const flagged = await attempt(() => flagging(admitted.value, tx, input.personId));
-  return flagged.ok ? flagged.value : err(flagged.error);
+  return attemptResult(() => flagging(admitted.value, tx, input.personId));
 };
 
 type FlagWaiting = {
