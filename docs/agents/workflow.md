@@ -129,7 +129,7 @@ The repository's `merge_commit_message` is `PR_BODY`. So the body and its footer
 
 | When | What | Who |
 | --- | --- | --- |
-| The attempt's end | Each touched workspace's `lint` and `typecheck` (the worker's `ruff` and `mypy`). The suites the ticket names or touched, by file (`pnpm --filter <workspace> exec vitest run <file>…`; `cd apps/worker && uv run --frozen pytest <file>…`), with `IMAGE_PROBE_DEFERRED=true`. The root gates that the root `package.json`'s `check:gates` names. | the agent |
+| The attempt's end | Each touched workspace's `lint` and `typecheck` (the worker's `ruff` and `mypy`). The suites the ticket names or touched, by file (`pnpm --filter <workspace> run test <file>…`, which starts vitest through `node` rather than its `.bin` shim; `cd apps/worker && uv run --frozen pytest <file>…`), with `IMAGE_PROBE_DEFERRED=true`. The root gates that the root `package.json`'s `check:gates` names. | the agent |
 | The PR | The **affected lane** on the runner (`.github/workflows/check.yml`). A `lane` job picks the lane. Then three legs run at once: `affected-gates`, `affected-workspaces` and `affected-worker`. A change whose every path ends `.md` takes the docs lane instead: `docs-gates`, which runs the root `check:docs`. | CI |
 | The merge group | `full-root` (the root gates, then `packages/core`, `packages/schema` and `packages/devtools`), `full-api`, `full-web` and `full-worker`. A run that `build.yml` calls is the same. | CI, the arbiter |
 

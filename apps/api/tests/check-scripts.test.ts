@@ -157,6 +157,91 @@ describe("the gates a branch never narrows", () => {
   });
 });
 
+/** A runner's command word, which pnpm resolves to its `.bin` shim. */
+const SHIMMED_RUNNERS: readonly string[] = ["vitest", "stryker"];
+
+/** The package whose runner each script starts. */
+const RUNNER_SCRIPTS: Readonly<Record<string, string>> = {
+  test: "vitest",
+  mutation: "@stryker-mutator/core",
+};
+
+const RUNNER_ENTRY = /\bnode\s+\.\/node_modules\/(?<pkg>(?:@[^/\s]+\/)?[^/\s]+)\/(?<file>\S+)/;
+
+const binManifest = z.object({
+  bin: z.union([z.string(), z.record(z.string(), z.string())]),
+});
+
+const binsOf = (packageDirectory: string): readonly string[] => {
+  const { bin } = binManifest.parse(JSON.parse(read(path.join(packageDirectory, "package.json"))));
+  return (typeof bin === "string" ? [bin] : Object.values(bin)).map((file) =>
+    path.posix.normalize(file),
+  );
+};
+
+type Script = { readonly directory: string; readonly name: string; readonly script: string };
+
+type RunnerEntry = Script & { readonly pkg: string; readonly file: string };
+
+const everyScript = (): readonly Script[] =>
+  [".", ...workspacePackages()].flatMap((directory) =>
+    Object.entries(scriptsOf(directory)).map(([name, script]) => ({ directory, name, script })),
+  );
+
+const runnerEntries = (): readonly RunnerEntry[] =>
+  everyScript().flatMap((started) => {
+    const groups = RUNNER_ENTRY.exec(started.script)?.groups;
+    const pkg = groups?.["pkg"];
+    const file = groups?.["file"];
+    return pkg === undefined || file === undefined
+      ? []
+      : [{ ...started, pkg, file: path.posix.normalize(file) }];
+  });
+
+describe("the runners start through node", () => {
+  it("starts no runner through its bin shim", () => {
+    const shimmed = everyScript()
+      .filter(({ script }) => script.split(/\s+/).some((word) => SHIMMED_RUNNERS.includes(word)))
+      .map(({ directory, name, script }) => `${directory} ${name}: ${script}`);
+
+    expect(
+      shimmed,
+      "a script starts vitest or Stryker through pnpm's `.bin` shim, a `#!` file: on macOS every process under it waits on the policy check. Start it as `node ./node_modules/<package>/<its bin file>`.",
+    ).toEqual([]);
+  });
+
+  it("starts each runner at the file its package names", () => {
+    const moved = runnerEntries().flatMap(({ directory, name, pkg, file }) => {
+      const bins = binsOf(path.join(directory, "node_modules", pkg));
+      return bins.includes(file)
+        ? []
+        : [`${directory} ${name}: ${pkg}/${file} (bin: ${bins.join(", ")})`];
+    });
+
+    expect(
+      moved,
+      "a script starts a runner at a file its package no longer names as its bin: an upgrade moved it. Point the script at the package's `bin` entry.",
+    ).toEqual([]);
+  });
+
+  it("starts exactly the test and mutation scripts at a runner", () => {
+    const expected = workspacePackages().flatMap((directory) =>
+      Object.entries(RUNNER_SCRIPTS).flatMap(([name, pkg]) =>
+        scriptsOf(directory)[name] === undefined ? [] : [`${directory} ${name}: ${pkg}`],
+      ),
+    );
+    const started = runnerEntries().map(
+      ({ directory, name, pkg }) => `${directory} ${name}: ${pkg}`,
+    );
+
+    expect(expected).toContain("packages/core mutation: @stryker-mutator/core");
+    expect(
+      [...started].sort(),
+      "a workspace's test or mutation script starts no runner entry, or another script does",
+    ).toEqual([...expected].sort());
+  });
+});
+
 const throwaway = mkdtempSync(path.join(tmpdir(), "check-runner-"));
 
 afterAll(() => rmSync(throwaway, { recursive: true, force: true }));

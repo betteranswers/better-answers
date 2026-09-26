@@ -2,9 +2,13 @@ import { fileURLToPath } from "node:url";
 
 import { defineConfig } from "vitest/config";
 
+import { pathWithAppleGit } from "./test/apple-git.ts";
+
 export default defineConfig({
   test: {
     include: ["test/**/*.test.ts"],
+
+    env: { PATH: pathWithAppleGit() },
 
     setupFiles: ["@better-answers/schema/testing/test-title-setup"],
 

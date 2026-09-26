@@ -87,13 +87,10 @@ const gitSync = (cwd: string, args: readonly string[]): GitAnswer => {
   return { status: result.status, out: `${result.stdout}${result.stderr}` };
 };
 
-/**
- * pnpm's shim, not vitest's entry: its NODE_PATH reaches the hoisted store, and a suite
- * that fails to collect reads as a kill.
- */
-const vitestShimFor = (workspace: string): string | undefined => {
-  const shim = path.join(workspace, "node_modules", ".bin", "vitest");
-  return existsSync(shim) ? shim : undefined;
+/** The entry a workspace's `test` script starts; under pnpm's `#!` shim, every macOS spawn queues. */
+const vitestEntryFor = (workspace: string): string | undefined => {
+  const entry = path.join(workspace, "node_modules", "vitest", "vitest.mjs");
+  return existsSync(entry) ? entry : undefined;
 };
 
 const applyTo = (original: string, mutation: Mutation): { readonly mutated: string } | Refused => {
@@ -186,13 +183,14 @@ const killGroup = (pid: number, signal: NodeJS.Signals): void => {
   }
 };
 
-const runSuite = (workspace: string, shim: string, mutation: Mutation): Promise<SuiteOutcome> =>
+const runSuite = (workspace: string, entry: string, mutation: Mutation): Promise<SuiteOutcome> =>
   new Promise((resolve) => {
     const reportDirectory = mkdtempSync(path.join(tmpdir(), "mutant-probe-"));
     const reportFile = path.join(reportDirectory, "report.json");
     const child = spawn(
-      shim,
+      process.execPath,
       [
+        entry,
         "run",
         "--reporter=default",
         "--reporter=json",
@@ -254,7 +252,7 @@ const complain = (line: string): void => {
   process.stderr.write(`mutant-probe: ${line}\n`);
 };
 
-type Suite = { readonly workspace: string; readonly shim: string };
+type Suite = { readonly workspace: string; readonly entry: string };
 
 const suiteFor = (file: string): Suite | Refused => {
   const workspace = workspaceOf(file);
@@ -263,11 +261,11 @@ const suiteFor = (file: string): Suite | Refused => {
       refused: `no package.json above ${file}, so there is no workspace whose suite to run`,
     };
   }
-  const shim = vitestShimFor(workspace);
-  if (shim === undefined) {
-    return { refused: `${workspace} has no vitest on its bin path, so its suite cannot be run` };
+  const entry = vitestEntryFor(workspace);
+  if (entry === undefined) {
+    return { refused: `${workspace} has no vitest installed, so its suite cannot be run` };
   }
-  return { workspace, shim };
+  return { workspace, entry };
 };
 
 const gitRefusal = (workspace: string, file: string, relative: string): Refused | undefined => {
@@ -313,7 +311,7 @@ const runMutated = async (probe: Probe): Promise<SuiteOutcome> => {
     complain(
       `${relative}:${String(mutation.line)} \`${mutation.from}\` → \`${mutation.to}\`, running ${mutation.suite ?? "the whole suite"} in ${probe.workspace}`,
     );
-    return await runSuite(probe.workspace, probe.shim, mutation);
+    return await runSuite(probe.workspace, probe.entry, mutation);
   } finally {
     writeFileSync(mutation.file, original);
     const restored = readFileSync(mutation.file, "utf8") === original;

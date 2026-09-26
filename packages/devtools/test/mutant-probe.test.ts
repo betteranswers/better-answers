@@ -21,8 +21,6 @@ afterAll(() => {
 
 const vitestRoot = path.dirname(createRequire(import.meta.url).resolve("vitest/package.json"));
 
-const VITEST_SHIM = `#!/bin/sh\nexec node "${path.join(vitestRoot, "vitest.mjs")}" "$@"\n`;
-
 const SOURCE = `export const answer = (n: number): number => n + 1;
 export const label = "answer";
 `;
@@ -63,9 +61,8 @@ const workspace = (name: string, suite = SUITE, extraSuite?: string): string => 
   writeUnder(root, "test/answer.test.ts", suite);
   gitIn(root, "add", "-A");
   gitIn(root, "commit", "-q", "-m", "tracked");
-  mkdirSync(path.join(root, "node_modules/.bin"), { recursive: true });
+  mkdirSync(path.join(root, "node_modules"), { recursive: true });
   symlinkSync(vitestRoot, path.join(root, "node_modules/vitest"));
-  writeFileSync(path.join(root, "node_modules/.bin/vitest"), VITEST_SHIM, { mode: 0o755 });
   if (extraSuite !== undefined) writeUnder(root, "test/extra.test.ts", extraSuite);
   return root;
 };

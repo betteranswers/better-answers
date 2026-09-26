@@ -10,7 +10,7 @@
     "lint": "oxlint --report-unused-disable-directives-severity=error --config ../../.oxlintrc.json .",
     "typecheck": "tsc --noEmit",
     "check": "node ../../scripts/check.mjs typecheck test e2e",
-    "test": "vitest run",
+    "test": "node ./node_modules/vitest/vitest.mjs run",
     "e2e": "pnpm run build && playwright test"
   },
   "dependencies": {

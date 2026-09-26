@@ -8,6 +8,7 @@
     "./ulid": "./src/ulid.ts",
     "./code-unit": "./src/code-unit.ts",
     "./testing": "./test/testing.ts",
+    "./testing/apple-git": "./test/apple-git.ts",
     "./testing/probes": "./test/probes.ts",
     "./testing/test-title": "./test/test-title.ts",
     "./testing/test-title-setup": "./test/test-title-setup.ts",
@@ -21,7 +22,7 @@
     "lint": "oxlint --report-unused-disable-directives-severity=error --config ../../.oxlintrc.json .",
     "typecheck": "tsc --noEmit",
     "check": "node ../../scripts/check.mjs typecheck test",
-    "test": "vitest run"
+    "test": "node ./node_modules/vitest/vitest.mjs run"
   },
   "dependencies": {
     "drizzle-orm": "0.45.3",

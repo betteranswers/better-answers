@@ -25,7 +25,7 @@
     "typecheck": "node ../../scripts/check.mjs typecheck:ts typecheck:python",
     "typecheck:ts": "tsc --noEmit",
     "typecheck:python": "cd ../../apps/worker && uv run --frozen mypy --strict ../../packages/devtools/python",
-    "test": "vitest run",
+    "test": "node ./node_modules/vitest/vitest.mjs run",
     "check": "node ../../scripts/check.mjs lint:python lint:python-format typecheck test"
   },
   "devDependencies": {
