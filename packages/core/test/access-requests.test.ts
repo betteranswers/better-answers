@@ -96,9 +96,9 @@ const eventsAbout = async (subjectId: string) => {
   return rows.rows;
 };
 
-const withOneWaitingRequest = async (name: string) => {
+const withOneWaitingRequest = async (name: string, asker?: { readonly email: string }) => {
   const workspace = await provision(name);
-  const requester = await outsider();
+  const requester = await seedPerson(db().pool, asker);
   const asked = await requestAccess(bootstrap, door(), {
     slug: workspace.slug,
     requesterId: requester,
@@ -239,12 +239,15 @@ describe("asking to join a workspace", () => {
 
 describe("approving a request", () => {
   it("mints and records the requester's invitation at the chosen role", async () => {
-    const { workspace, requester, requestId } = await withOneWaitingRequest("Approve");
+    // Each file has its own database, so the one address is this test's alone.
+    const { workspace, requester, requestId } = await withOneWaitingRequest("Approve", {
+      email: "Priya.Shah@Calder.example",
+    });
 
     const decidedAt = new Date("2031-06-15T09:30:00.000Z");
 
     const approved = await as(workspace.id, workspace.adminUserId, (principal, tx) =>
-      approveRequest(principal, tx, { requestId, role: "Editor" }, decidedAt),
+      approveRequest(principal, tx, { requestId, role: "Editor", now: decidedAt }),
     );
 
     expect(approved).toEqual({
@@ -252,7 +255,11 @@ describe("approving a request", () => {
       value: {
         requestId,
         invitationId: expect.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/),
+        address: "priya.shah@calder.example",
         role: "Editor",
+        invitedAt: "2031-06-15T09:30:00.000Z",
+        expiresAt: "2031-06-22T09:30:00.000Z",
+        workspaceName: "Approve",
       },
     });
     if (!approved.ok) return;
@@ -275,12 +282,8 @@ describe("approving a request", () => {
       "SELECT email, role, status, expires_at, inviter_id, workspace_id FROM invitation WHERE id = $1",
       [approved.value.invitationId],
     );
-    const person = await db().pool.query<{ email: string }>(
-      'SELECT email FROM "user" WHERE id = $1',
-      [requester],
-    );
     expect(invitation.rows[0]).toMatchObject({
-      email: person.rows[0]?.email,
+      email: "priya.shah@calder.example",
       role: "Editor",
       status: "pending",
       inviter_id: workspace.adminUserId,
@@ -313,7 +316,7 @@ describe("approving a request", () => {
     const { workspace, requestId } = await withOneWaitingRequest("Default");
 
     const approved = await as(workspace.id, workspace.adminUserId, (principal, tx) =>
-      approveRequest(principal, tx, { requestId }, new Date()),
+      approveRequest(principal, tx, { requestId, now: new Date() }),
     );
 
     expect(approved).toMatchObject({ ok: true, value: { role: REQUEST_ROLE_DEFAULT } });
@@ -324,7 +327,7 @@ describe("approving a request", () => {
     const { workspace, requestId } = await withOneWaitingRequest("Foreign");
 
     const approved = await as(workspace.id, workspace.adminUserId, (principal, tx) =>
-      approveRequest(principal, tx, { requestId, role: "owner" }, new Date()),
+      approveRequest(principal, tx, { requestId, role: "owner", now: new Date() }),
     );
 
     expect(approved).toEqual({ ok: false, error: "no-such-role" });
@@ -339,7 +342,7 @@ describe("approving a request", () => {
     const { workspace, requestId } = await withOneWaitingRequest("Twice");
     const approve = () =>
       as(workspace.id, workspace.adminUserId, (principal, tx) =>
-        approveRequest(principal, tx, { requestId }, new Date()),
+        approveRequest(principal, tx, { requestId, now: new Date() }),
       );
 
     expect((await approve()).ok).toBe(true);
@@ -354,7 +357,7 @@ describe("approving a request", () => {
     const workspace = await provision("Missing");
 
     const approved = await as(workspace.id, workspace.adminUserId, (principal, tx) =>
-      approveRequest(principal, tx, { requestId: ulid() }, new Date()),
+      approveRequest(principal, tx, { requestId: ulid(), now: new Date() }),
     );
 
     expect(approved).toEqual({ ok: false, error: "no-such-request" });
@@ -367,7 +370,7 @@ describe("approving a request", () => {
     await expect(
       whileWritesAreRefused(db().pool, "invitation", () =>
         as(workspace.id, workspace.adminUserId, async (principal, tx) => {
-          approved = await approveRequest(principal, tx, { requestId }, new Date());
+          approved = await approveRequest(principal, tx, { requestId, now: new Date() });
         }),
       ),
     ).rejects.toThrow(/did not commit/);
@@ -387,7 +390,7 @@ describe("what a decision refuses and what it passes on", () => {
   const DECISIONS: readonly (readonly [string, Decision])[] = [
     [
       "approving",
-      (principal, tx, requestId) => approveRequest(principal, tx, { requestId }, new Date()),
+      (principal, tx, requestId) => approveRequest(principal, tx, { requestId, now: new Date() }),
     ],
     ["declining", (principal, tx, requestId) => declineRequest(principal, tx, { requestId })],
   ];
@@ -576,7 +579,7 @@ describe("who may decide", () => {
   const verbs: readonly [string, Verb][] = [
     [
       "approve",
-      (principal, tx, requestId) => approveRequest(principal, tx, { requestId }, new Date()),
+      (principal, tx, requestId) => approveRequest(principal, tx, { requestId, now: new Date() }),
     ],
     ["decline", (principal, tx, requestId) => declineRequest(principal, tx, { requestId })],
     ["list", (principal, tx) => listWaitingRequests(principal, tx)],

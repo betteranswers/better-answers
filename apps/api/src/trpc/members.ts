@@ -3,11 +3,15 @@ import type { Logger } from "pino";
 import type { Clock, Malformed, Result, UserPrincipal } from "@better-answers/core/kernel";
 import {
   addToGroup,
+  approveRequest,
+  approveRequestInput,
   cancelInvitation,
   changeRole,
   changeRoleInput,
   createGroup,
   createGroupInput,
+  declineRequest,
+  declineRequestInput,
   deleteGroup,
   deleteGroupInput,
   flagDisplayName,
@@ -19,6 +23,7 @@ import {
   listGroups,
   listInvitations,
   listMembers,
+  listWaitingRequests,
   readAuditLog,
   readAuditLogInput,
   removeFromGroup,
@@ -157,4 +162,13 @@ export const membersRouter = router({
   removeFromGroup: mutationProcedure
     .input(parsedBy(groupMemberInput))
     .mutation(answeredBy(removeFromGroup)),
+  requests: queryProcedure.query(({ ctx }) =>
+    crossing(ctx, listWaitingRequests.name, listWaitingRequests(ctx.principal, ctx.tx)),
+  ),
+  approveRequest: ownTransactionProcedure
+    .input(parsedBy(approveRequestInput))
+    .mutation(committedThenEmailed(approveRequest)),
+  declineRequest: mutationProcedure
+    .input(parsedBy(declineRequestInput))
+    .mutation(answeredBy(declineRequest)),
 });

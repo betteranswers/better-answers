@@ -1,18 +1,9 @@
-import { useId, useRef, useState, type FocusEvent } from "react";
+import { useId, useRef, useState } from "react";
 
-import { useKeystroke } from "@/shared/keystrokes.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/shared/ui/table.tsx";
+import { TableCell } from "@/shared/ui/table.tsx";
 
 import { longDate, resentOutcome } from "./invitation-words.ts";
 import {
@@ -23,6 +14,7 @@ import {
 } from "./invitations-api.ts";
 import { PEOPLE_KEYSTROKES, useInviteAsked } from "./people-state.ts";
 import { outcomeOfInvitationFailure } from "./refusal.tsx";
+import { useKeystrokeOnHeld, WaitingRow, WaitingTable } from "./waiting-list.tsx";
 
 const COLUMNS = ["Address", "Role", "State", "Sent", "Expires", "Invited by", "Acts"] as const;
 
@@ -71,19 +63,8 @@ function InvitationRow(properties: {
   const { invitation } = properties;
   const expired = hasExpired(invitation, properties.now);
 
-  const leaving = (event: FocusEvent<HTMLTableRowElement>) => {
-    if (event.currentTarget.contains(event.relatedTarget)) return;
-    properties.onHeld(undefined);
-  };
-
   return (
-    <TableRow
-      className="border-border"
-      onFocus={() => {
-        properties.onHeld(invitation);
-      }}
-      onBlur={leaving}
-    >
+    <WaitingRow item={invitation} onHeld={properties.onHeld}>
       <TableCell className="whitespace-normal wrap-anywhere">{invitation.address}</TableCell>
       <TableCell>
         <Pill>{invitation.role}</Pill>
@@ -126,7 +107,7 @@ function InvitationRow(properties: {
           </Button>
         </span>
       </TableCell>
-    </TableRow>
+    </WaitingRow>
   );
 }
 
@@ -176,14 +157,11 @@ function InvitationList(properties: {
     );
   };
 
-  useKeystroke(PEOPLE_KEYSTROKES.resend, () => {
-    if (held === undefined) onOutcome(NOTHING_HELD);
-    else resent(held);
-  });
-  useKeystroke(PEOPLE_KEYSTROKES.cancel, () => {
-    if (held === undefined) onOutcome(NOTHING_HELD);
-    else cancelled(held);
-  });
+  const nothingHeld = () => {
+    onOutcome(NOTHING_HELD);
+  };
+  useKeystrokeOnHeld(PEOPLE_KEYSTROKES.resend, held, resent, nothingHeld);
+  useKeystrokeOnHeld(PEOPLE_KEYSTROKES.cancel, held, cancelled, nothingHeld);
 
   return (
     <>
@@ -193,34 +171,21 @@ function InvitationList(properties: {
       {invitations.length === 0 ? (
         <NobodyWaiting />
       ) : (
-        <div className="mt-4 border border-border bg-card">
-          <Table>
-            <TableCaption className="sr-only">
-              Invitations to this workspace not yet accepted, each with its role, state and expiry.
-            </TableCaption>
-            <TableHeader>
-              <TableRow className="border-border hover:bg-transparent">
-                {COLUMNS.map((name) => (
-                  <TableHead key={name} scope="col">
-                    {name}
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {invitations.map((invitation) => (
-                <InvitationRow
-                  key={invitation.invitationId}
-                  invitation={invitation}
-                  now={now}
-                  onHeld={setHeld}
-                  onResend={resent}
-                  onCancel={cancelled}
-                />
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <WaitingTable
+          caption="Invitations to this workspace not yet accepted, each with its role, state and expiry."
+          columns={COLUMNS}
+        >
+          {invitations.map((invitation) => (
+            <InvitationRow
+              key={invitation.invitationId}
+              invitation={invitation}
+              now={now}
+              onHeld={setHeld}
+              onResend={resent}
+              onCancel={cancelled}
+            />
+          ))}
+        </WaitingTable>
       )}
     </>
   );

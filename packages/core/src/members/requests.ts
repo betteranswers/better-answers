@@ -22,7 +22,7 @@ import {
 } from "../kernel/index.ts";
 import { type PostgresDoor, type Tx, withScope } from "../store/postgres/index.ts";
 import { workspaceIdBySlug } from "../workspaces/index.ts";
-import { mintInvitation } from "./invitations.ts";
+import { mintInvitation, type InvitationToSend } from "./invitations.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
 const REQUEST_ACTS = declareActs("people", {
@@ -183,17 +183,15 @@ const landDecision = async <A extends LedgerAct>(
   return ok(undefined);
 };
 
-export type ApproveRequestInput = {
-  readonly requestId: string;
+export const approveRequestInput = z.object({
+  requestId: z.string(),
+  role: z.string().optional(),
+});
 
-  readonly role?: string;
-};
+export type ApproveRequestInput = z.output<typeof approveRequestInput> & { readonly now: Date };
 
-export type Approved = {
-  readonly requestId: AccessRequestId;
-  readonly invitationId: string;
-  readonly role: Role;
-};
+/** The invitation the approval minted, which the transport emails once the approval commits. */
+export type Approved = InvitationToSend & { readonly requestId: AccessRequestId };
 
 /**
  * Mints an invitation to the requester's address at `role`, or `REQUEST_ROLE_DEFAULT`, through the
@@ -204,7 +202,6 @@ export const approveRequest = async (
   principal: UserPrincipal,
   tx: Tx,
   input: ApproveRequestInput,
-  now: Date,
 ): Promise<Result<Approved, ApproveRefusal | Error>> => {
   const claimed = await claimForDecision(principal, tx, input.requestId);
   if (!claimed.ok) return err(claimed.error);
@@ -218,7 +215,7 @@ export const approveRequest = async (
   const minted = await mintInvitation(admin, tx, {
     address: claimed.value.email,
     role: role.data,
-    now,
+    now: input.now,
   });
   if (!minted.ok) return err(minted.error);
   const { invitationId } = minted.value;
@@ -231,10 +228,12 @@ export const approveRequest = async (
   });
   if (!decided.ok) return err(decided.error);
 
-  return ok({ requestId, invitationId, role: role.data });
+  return ok({ ...minted.value, requestId });
 };
 
-export type DeclineRequestInput = { readonly requestId: string };
+export const declineRequestInput = z.object({ requestId: z.string() });
+
+export type DeclineRequestInput = z.output<typeof declineRequestInput>;
 
 export const declineRequest = async (
   principal: UserPrincipal,

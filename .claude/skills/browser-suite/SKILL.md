@@ -85,9 +85,9 @@ the side that counts. Read the numbers off those files rather than from here.
 ## The harness's acts
 
 State is built through the api's harness over HTTP, from `apps/web/e2e/harness.ts`, using the
-`request` fixture. Nothing writes a row itself and nothing sets a cookie from outside. Twelve acts
+`request` fixture. Nothing writes a row itself and nothing sets a cookie from outside. Thirteen acts
 call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources two from
-`apps/api/tests/harness-sources.ts` and the People one from `apps/api/tests/harness-people.ts`:
+`apps/api/tests/harness-sources.ts` and the People two from `apps/api/tests/harness-people.ts`:
 
 | Act | What it does |
 | --- | --- |
@@ -103,8 +103,9 @@ call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources
 | `seedBindings` | Source bindings as their acts and the worker leave them — documents, findings kept or overridden by an erasure, quarantined documents, chunks, an index run at any status, a concept and composition citing a document — answering each binding's and document's id |
 | `moveTheIndexRun` | The worker's two steps over the workspace's one index run, claimed then done, through the queue's own functions under the worker's role — how a spec watches a state word move without a worker process |
 | `makeGroups` | Groups made by a named member through the members slice's own acts, one transaction each, every group holding the members `memberIds` names — the member's own acts on the audit log, and the groups the `Groups` view and a member's sheet start from |
+| `askToJoin` | A person's ask to join a workspace by its slug, with a reason, through the members slice's own act and the principal the ask-to-join procedure uses, without its sign-in or its answer's floor — a request waiting on the Requests tab |
 
-Nine more helpers in the same module drive the browser rather than the harness:
+Thirteen more helpers in the same module drive the browser rather than the harness:
 
 | Helper | What it does |
 | --- | --- |
@@ -114,6 +115,9 @@ Nine more helpers in the same module drive the browser rather than the harness:
 | `signedInAtHome` | Opens the sign-in screen, runs `signIn`, and waits for Control Centre's home, as a member of one workspace arrives |
 | `signOutFromTheShell` | Opens the top bar's menu, then signs out, because sign-out is one disclosure in |
 | `skipLinkReachesTheScreen` | Tab, the skip link has focus, Enter, `main` has focus — where a shell spec's keyboard traversal starts |
+| `tabUntilFocused` | Presses Tab until a locator has focus, and fails by name when it never does |
+| `tabOpenedByKeyboard` | A fresh document at a view, the skip link, Tab to its open tab, then the arrow keys along to a named tab, each arrow landing before the next |
+| `editorPickedByKeyboard` | From a role select in focus reading Viewer: open it, one step up to Editor, pick it, and focus is back on the select |
 | `keystrokesListed` | Presses `?` and answers the screen's list of keystrokes once it is open |
 | `keystrokesDismissed` | Presses Escape and waits for the list to go and for focus to come back to its button, which lands a task later and would take focus from a sooner key |
 | `clockTheNextKey` | Starts the act's clock in the page: from the next key to the node an XPath names reading a given text |

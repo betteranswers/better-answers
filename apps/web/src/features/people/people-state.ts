@@ -12,6 +12,8 @@ export const PEOPLE_KEYSTROKES = {
   invite: { key: "i", act: "Invite a person by email address" },
   resend: { key: "r", act: "Resend the invitation in focus" },
   cancel: { key: "x", act: "Cancel the invitation in focus" },
+  approve: { key: "a", act: "Approve the request in focus" },
+  decline: { key: "d", act: "Decline the request in focus" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
 /** When the panel last asked the toolbar's invite act to open, so an empty list can offer it. */

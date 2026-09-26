@@ -1,46 +1,23 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
-import { startApp, type TestApp } from "./harness.ts";
-import { sessionPointedAt, whileCommitsAreRefused } from "./provoke.ts";
+import {
+  anAddress,
+  answeredBelowAdmin,
+  answeredToAnAdminPointedHere,
+  appForSuite,
+  emailsTo,
+  eventsOn,
+  ISO_INSTANT,
+  SEVEN_DAYS_MS,
+  ULID,
+  type Api,
+} from "./people-suite.ts";
+import { whileCommitsAreRefused } from "./provoke.ts";
 import { refusalOfCall, webSignedIn } from "./web-client.ts";
 
-let app: TestApp;
-
-// The transport refuses these addresses, as an SMTP relay that is down would.
 const unreachable = new Set<string>();
 
-beforeAll(async () => {
-  app = await startApp({
-    onEmail: (message) => {
-      if (unreachable.has(message.to)) throw new Error("the relay refused the message");
-    },
-  });
-});
-
-afterAll(async () => {
-  await app.stop();
-});
-
-const ULID = /^[0-9A-HJKMNP-TV-Z]{26}$/;
-
-const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
-
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-
-const anAddress = (who: string): string =>
-  `${who}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@client.example`;
-
-const emailsTo = (address: string) => app.emails.filter((message) => message.to === address);
-
-const eventsOn = async (subjectId: string) =>
-  (
-    await app.database.superuser.query<{ act: string }>(
-      "SELECT act FROM audit_event WHERE subject_id = $1 ORDER BY id",
-      [subjectId],
-    )
-  ).rows.map((row) => row.act);
-
-type Api = Awaited<ReturnType<typeof webSignedIn>>["api"];
+const app = appForSuite(unreachable);
 
 // A resend answers the same invitation, its email gone this time.
 const resentWithItsEmail = async (api: Api, invitationId: string): Promise<void> => {
@@ -49,8 +26,8 @@ const resentWithItsEmail = async (api: Api, invitationId: string): Promise<void>
 };
 
 const anAdmin = async () => {
-  const workspace = await app.provision({ name: "Calder Joinery" });
-  return { workspace, ...(await webSignedIn(app, workspace.admin.email)) };
+  const workspace = await app().provision({ name: "Calder Joinery" });
+  return { workspace, ...(await webSignedIn(app(), workspace.admin.email)) };
 };
 
 describe("inviting a person over tRPC", () => {
@@ -72,7 +49,7 @@ describe("inviting a person over tRPC", () => {
       emailSent: true,
     });
     expect(Date.parse(invited.expiresAt) - Date.parse(invited.invitedAt)).toBe(SEVEN_DAYS_MS);
-    expect(emailsTo(address)).toEqual([
+    expect(emailsTo(app(), address)).toEqual([
       {
         to: address,
         subject: "Join Calder Joinery on Better Answers",
@@ -81,15 +58,15 @@ describe("inviting a person over tRPC", () => {
         ),
       },
     ]);
-    expect(emailsTo(address)[0]?.text).toContain("as an Editor");
-    expect(await eventsOn(invited.invitationId)).toEqual(["people.invitation.created"]);
+    expect(emailsTo(app(), address)[0]?.text).toContain("as an Editor");
+    expect(await eventsOn(app(), invited.invitationId)).toEqual(["people.invitation.created"]);
   });
 
   it("answers alike whether or not the address uses Better Answers", async () => {
     const { api } = await anAdmin();
-    const elsewhere = await app.provision();
-    const known = await app.person(anAddress("known"));
-    await app.addMember(elsewhere.workspaceId, known.id, "Admin");
+    const elsewhere = await app().provision();
+    const known = await app().person(anAddress("known"));
+    await app().addMember(elsewhere.workspaceId, known.id, "Admin");
     const unknown = anAddress("unknown");
 
     const toKnown = await api.members.invite.mutate({ address: known.email, role: "Viewer" });
@@ -112,14 +89,14 @@ describe("inviting a person over tRPC", () => {
     });
     expect(shapeOf(toKnown)).toEqual(shapeOf(toUnknown));
     expect(Object.keys(toKnown).toSorted()).toEqual(Object.keys(toUnknown).toSorted());
-    expect(emailsTo(known.email)).toHaveLength(1);
-    expect(emailsTo(unknown)).toHaveLength(1);
+    expect(emailsTo(app(), known.email)).toHaveLength(1);
+    expect(emailsTo(app(), unknown)).toHaveLength(1);
   });
 
   it("refuses a current member already-a-member, emailing nobody", async () => {
     const { api, workspace } = await anAdmin();
-    const editor = await app.person(anAddress("editor"));
-    await app.addMember(workspace.workspaceId, editor.id, "Editor");
+    const editor = await app().person(anAddress("editor"));
+    await app().addMember(workspace.workspaceId, editor.id, "Editor");
 
     const refused = await refusalOfCall(
       api.members.invite.mutate({ address: editor.email, role: "Admin" }),
@@ -128,7 +105,7 @@ describe("inviting a person over tRPC", () => {
     expect(refused).toMatchObject({
       data: { httpStatus: 409, refusal: { word: "already-a-member", class: "conflict" } },
     });
-    expect(emailsTo(editor.email)).toEqual([]);
+    expect(emailsTo(app(), editor.email)).toEqual([]);
     expect(await api.members.invitations.query()).toEqual([]);
   });
 });
@@ -171,11 +148,11 @@ describe("the waiting invitations over tRPC", () => {
 
     await resentWithItsEmail(api, invited.invitationId);
 
-    expect(emailsTo(address).map((message) => message.text)).toEqual([
+    expect(emailsTo(app(), address).map((message) => message.text)).toEqual([
       expect.stringContaining(`/invitations/${invited.invitationId}`),
       expect.stringContaining(`/invitations/${invited.invitationId}`),
     ]);
-    expect(await eventsOn(invited.invitationId)).toEqual([
+    expect(await eventsOn(app(), invited.invitationId)).toEqual([
       "people.invitation.created",
       "people.invitation.resent",
     ]);
@@ -191,7 +168,7 @@ describe("the waiting invitations over tRPC", () => {
 
     expect(cancelled).toEqual({ invitationId: invited.invitationId });
     expect(await api.members.invitations.query()).toEqual([]);
-    expect(await eventsOn(invited.invitationId)).toEqual([
+    expect(await eventsOn(app(), invited.invitationId)).toEqual([
       "people.invitation.created",
       "people.invitation.cancelled",
     ]);
@@ -210,12 +187,12 @@ describe("the invitation email", () => {
     const { api } = await anAdmin();
     const address = anAddress("uncommitted");
 
-    const failed = await whileCommitsAreRefused(app, "invitation", () =>
+    const failed = await whileCommitsAreRefused(app(), "invitation", () =>
       refusalOfCall(api.members.invite.mutate({ address, role: "Viewer" })),
     );
 
     expect(failed).toMatchObject({ data: { httpStatus: 500 } });
-    expect(emailsTo(address)).toEqual([]);
+    expect(emailsTo(app(), address)).toEqual([]);
     expect(await api.members.invitations.query()).toEqual([]);
   });
 });
@@ -236,9 +213,17 @@ describe("an invitation whose email did not go", () => {
     unreachable.delete(address);
     await resentWithItsEmail(api, invited.invitationId);
 
-    expect(emailsTo(address).at(-1)?.text).toContain(`/invitations/${invited.invitationId}`);
+    expect(emailsTo(app(), address).at(-1)?.text).toContain(`/invitations/${invited.invitationId}`);
   });
 });
+
+const NOT_A_MEMBER = {
+  data: { httpStatus: 401, refusal: { word: "not-a-member", class: "unauthenticated" } },
+};
+
+const ROLE_FORBIDS = {
+  data: { httpStatus: 403, refusal: { word: "role-forbids", class: "forbidden" } },
+};
 
 type Verb = readonly [string, (api: Api, invitationId: string) => Promise<unknown>];
 
@@ -262,37 +247,29 @@ describe("who may act on invitations", () => {
   it.each(VERBS)("refuses an Editor and a Viewer the %s verb", async (_verb, call) => {
     const { workspace, invitationId } = await aWaitingInvitation();
 
-    for (const role of ["Editor", "Viewer"] as const) {
-      const person = await app.person(anAddress(role.toLowerCase()));
-      await app.addMember(workspace.workspaceId, person.id, role);
-      const { api } = await webSignedIn(app, person.email);
+    const answered = await answeredBelowAdmin(app(), workspace.workspaceId, (api) =>
+      call(api, invitationId),
+    );
 
-      expect({ role, refused: await refusalOfCall(call(api, invitationId)) }).toMatchObject({
-        role,
-        refused: {
-          data: { httpStatus: 403, refusal: { word: "role-forbids", class: "forbidden" } },
-        },
-      });
-    }
+    expect(answered).toMatchObject({ Editor: ROLE_FORBIDS, Viewer: ROLE_FORBIDS });
   });
 
   it.each(VERBS)("refuses an Admin elsewhere pointed here the %s verb", async (_verb, call) => {
     const { workspace, invitationId } = await aWaitingInvitation();
-    const elsewhere = await app.provision();
-    const { api } = await webSignedIn(app, elsewhere.admin.email);
-    await sessionPointedAt(app, elsewhere.admin.id, workspace.workspaceId);
 
-    expect(await refusalOfCall(call(api, invitationId))).toMatchObject({
-      data: { httpStatus: 401, refusal: { word: "not-a-member", class: "unauthenticated" } },
-    });
+    const answered = await answeredToAnAdminPointedHere(app(), workspace.workspaceId, (api) =>
+      call(api, invitationId),
+    );
+
+    expect(answered).toMatchObject(NOT_A_MEMBER);
   });
 
   it.each(VERBS.filter(([verb]) => verb === "resend" || verb === "cancel"))(
     "refuses an Admin elsewhere the %s verb on this invitation",
     async (_verb, call) => {
       const { invitationId } = await aWaitingInvitation();
-      const elsewhere = await app.provision();
-      const { api } = await webSignedIn(app, elsewhere.admin.email);
+      const elsewhere = await app().provision();
+      const { api } = await webSignedIn(app(), elsewhere.admin.email);
 
       expect(await refusalOfCall(call(api, invitationId))).toMatchObject({
         data: { httpStatus: 404, refusal: { word: "no-such-invitation", class: "absent" } },

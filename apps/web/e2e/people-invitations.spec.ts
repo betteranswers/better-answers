@@ -8,8 +8,10 @@ import {
   invite,
   person,
   provision,
+  editorPickedByKeyboard,
   signIn,
-  skipLinkReachesTheScreen,
+  tabOpenedByKeyboard,
+  tabUntilFocused,
   theActLandedWithinItsBudget,
 } from "./harness.ts";
 
@@ -78,14 +80,6 @@ const aMemberBelowAdminAtPeople = async (
 const openInvitations = async (page: Page): Promise<void> => {
   await page.getByRole("tab", { name: "Invitations" }).click();
   await expect(invitationsRegion(page).getByRole("heading", { name: "Invitations" })).toBeVisible();
-};
-
-const tabUntilFocused = async (page: Page, target: Locator, most = 40): Promise<void> => {
-  for (let pressed = 0; pressed < most; pressed += 1) {
-    if (await target.evaluate((node) => node === document.activeElement)) return;
-    await page.keyboard.press("Tab");
-  }
-  await expect(target, "Tab never reached it").toBeFocused();
 };
 
 test.describe("the People screen's Invitations tab", () => {
@@ -186,17 +180,7 @@ test.describe("the People screen's Invitations tab", () => {
         await invite(request, { workspaceId: at.workspaceId, email, inviterId: at.adminId, role });
       }
     });
-    // A fresh document, so the first Tab starts from the top rather than from the sign-in.
-    await page.goto(MEMBERS_VIEW);
-    await expect(page.getByRole("tab", { name: "Members" })).toBeVisible();
-    await skipLinkReachesTheScreen(page);
-
-    await tabUntilFocused(page, page.getByRole("tab", { name: "Members" }));
-    await page.keyboard.press("ArrowRight");
-    await expect(page.getByRole("tab", { name: "Invitations" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    await tabOpenedByKeyboard(page, MEMBERS_VIEW, "Invitations");
     await expect(invitationRows(page)).toHaveCount(2);
 
     await tabUntilFocused(
@@ -234,14 +218,7 @@ test.describe("the People screen's Invitations tab", () => {
     await expect(inviteDialog(page).getByLabel("Email address")).toBeFocused();
     await page.keyboard.type(invited);
     await page.keyboard.press("Tab");
-    await expect(inviteDialog(page).getByRole("combobox", { name: "Role" })).toBeFocused();
-    await page.keyboard.press("Enter");
-    await expect(page.getByRole("option", { name: "Viewer" })).toBeFocused();
-    await page.keyboard.press("ArrowUp");
-    await expect(page.getByRole("option", { name: "Editor" })).toBeFocused();
-    await page.keyboard.press("Enter");
-    await expect(page.getByRole("listbox")).toHaveCount(0);
-    await expect(inviteDialog(page).getByRole("combobox", { name: "Role" })).toBeFocused();
+    await editorPickedByKeyboard(page, inviteDialog(page).getByRole("combobox", { name: "Role" }));
     await expect(inviteDialog(page)).toContainText(
       "Checks concepts, runs question sets and saves Answers.",
     );

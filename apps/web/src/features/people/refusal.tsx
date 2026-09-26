@@ -92,3 +92,29 @@ const SAID_OF_A_GROUP = {
 
 export const outcomeOfGroupFailure = (failure: Error | ApiError): Outcome =>
   failureOutcome(SAID_OF_A_GROUP, failure);
+
+const SAID_OF_A_REQUEST = {
+  "role-forbids": {
+    why: "Only an Admin of this workspace sees and decides its access requests.",
+    next: "Ask one of its Admins to decide it.",
+  },
+  "already-decided": {
+    why: "This request was decided while you were deciding it.",
+    next: "Read the list again.",
+  },
+  "no-such-request": {
+    why: "That request is no longer one of this workspace's.",
+    next: "Read the list again.",
+  },
+  "no-such-role": {
+    why: "A role is Admin, Editor or Viewer.",
+    next: "Choose one of the three.",
+  },
+  malformed: {
+    why: "The platform could not read which request this is.",
+    next: "Read the list again.",
+  },
+} satisfies SaidOfWord;
+
+export const outcomeOfRequestFailure = (failure: Error | ApiError): Outcome =>
+  failureOutcome(SAID_OF_A_REQUEST, failure);
