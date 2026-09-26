@@ -242,6 +242,9 @@ test.describe("the People screen's Members view", () => {
     await expect(keystrokes).toContainText("Search the members by name or address");
     await page.keyboard.press("Escape");
     await expect(keystrokes).toHaveCount(0);
+    // Focus returns to the button a task after the list is gone, taking it from wherever a sooner
+    // `/` moved it.
+    await expect(page.getByRole("button", { name: "Keystrokes", exact: true })).toBeFocused();
 
     await page.keyboard.press("/");
     await expect(searchBox(page)).toBeFocused();
