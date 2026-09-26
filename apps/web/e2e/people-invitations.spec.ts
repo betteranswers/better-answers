@@ -1,11 +1,15 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { screenById } from "@/shared/screens.ts";
+
 import { expect, test } from "./browser.ts";
 import {
   addMember,
   anAddress,
   clockTheNextKey,
   invite,
+  keystrokesDismissed,
+  keystrokesListed,
   person,
   provision,
   editorPickedByKeyboard,
@@ -14,6 +18,8 @@ import {
   tabUntilFocused,
   theActLandedWithinItsBudget,
 } from "./harness.ts";
+
+const people = screenById("people");
 
 const LIST_BUDGET_MS = 1000;
 
@@ -206,12 +212,11 @@ test.describe("the People screen's Invitations tab", () => {
       `Cancelled the invitation to ${dropped}; its link no longer works.`,
     );
 
-    await page.keyboard.press("?");
-    const keystrokes = page.getByRole("dialog", { name: "Keystrokes on People" });
+    const keystrokes = await keystrokesListed(page, people.name);
     await expect(keystrokes).toContainText("Invite a person by email address");
     await expect(keystrokes).toContainText("Resend the invitation in focus");
     await expect(keystrokes).toContainText("Cancel the invitation in focus");
-    await page.keyboard.press("Escape");
+    await keystrokesDismissed(page, keystrokes);
 
     const invited = anAddress("invited");
     await page.keyboard.press("i");

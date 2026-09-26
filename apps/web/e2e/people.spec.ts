@@ -516,9 +516,10 @@ test.describe("a member, opened as a sheet", () => {
 
     await page.keyboard.press("c");
     await expect(sheet.getByRole("radio", { name: "Editor", exact: true })).toBeFocused();
-    // The group checks the radio it moves to only while the arrow is held, as a person's is.
-    await page.keyboard.press("ArrowDown", { delay: 50 });
+    // The group checks the radio it moves to, a task later, only while the arrow is still held.
+    await page.keyboard.down("ArrowDown");
     await expect(sheet.getByRole("radio", { name: "Viewer", exact: true })).toBeChecked();
+    await page.keyboard.up("ArrowDown");
     await page.keyboard.press("Tab");
     await expect(sheet.getByRole("button", { name: "Make Priya Shah a Viewer" })).toBeFocused();
     await page.keyboard.press("Enter");
