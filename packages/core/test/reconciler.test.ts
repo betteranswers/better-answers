@@ -403,6 +403,40 @@ describe("a commit with lost rows, carrying what the replay reads", () => {
   });
 });
 
+const handMadeFirstAndReplayed = async (
+  scenario: Scenario,
+  change: { readonly path: string; readonly content: string; readonly message: string },
+) => {
+  const made = await commit(scenario.editor, scenario.git, {
+    ...change,
+    author: { name: "Grace Editor", email: "grace@acme.invalid" },
+    trailers: { actor: actorIdOf(scenario.editor), audit: ulid() },
+    expectedHead: null,
+    at: new Date(),
+  });
+  if (!made.ok) throw new Error(`the hand-made commit was refused: ${String(made.error)}`);
+
+  const { replayed, skipped, stopped } = await reconciled(scenario);
+  return {
+    made: made.value.sha,
+    replay: {
+      replayed,
+      skipped,
+      stopped,
+      chain: await recordedChain(scenario.workspaceId),
+      events: await replayedEvents(scenario.workspaceId),
+    },
+  };
+};
+
+const stoppedUnreadableAt = (sha: string) => ({
+  replayed: [],
+  skipped: [],
+  stopped: { sha, reason: "unreadable-commit" },
+  chain: [],
+  events: [],
+});
+
 describe("a manifest commit whose rows were lost", () => {
   const manifest = {
     id: "01J6BBBBBBBBBBBBBBBBBBBBBB",
@@ -446,27 +480,13 @@ describe("a manifest commit whose rows were lost", () => {
   });
 
   it("stops at an unparsable hand-made manifest, landing nothing", async () => {
-    const scenario = await arrange();
-    const forged = await commit(scenario.editor, scenario.git, {
+    const { made, replay } = await handMadeFirstAndReplayed(await arrange(), {
       path: "knowledge/manifest.yaml",
       content: '"id": "acme-2026"\n"origin": "company"\n',
       message: "Write a manifest by hand",
-      author: { name: "Grace Editor", email: "grace@acme.invalid" },
-      trailers: { actor: actorIdOf(scenario.editor), audit: ulid() },
-      expectedHead: null,
-      at: new Date(),
     });
-    if (!forged.ok) throw new Error(`the forged commit was refused: ${String(forged.error)}`);
 
-    const run = await reconciled(scenario);
-
-    expect(run).toMatchObject({
-      replayed: [],
-      skipped: [],
-      stopped: { sha: forged.value.sha, reason: "unreadable-commit" },
-    });
-    expect(await recordedChain(scenario.workspaceId)).toEqual([]);
-    expect(await replayedEvents(scenario.workspaceId)).toEqual([]);
+    expect(replay).toEqual(stoppedUnreadableAt(made));
   });
 });
 
@@ -901,26 +921,27 @@ describe("a commit the rows cannot take", () => {
   });
 
   it("stops at a hand-made commit rather than guessing its meaning", async () => {
-    const scenario = await arrange();
-
-    const made = await commit(scenario.editor, scenario.git, {
+    const { made, replay } = await handMadeFirstAndReplayed(await arrange(), {
       path: "knowledge/manifest.yaml",
       content: "name: acme\n",
       message: "Seed the manifest by hand",
-      author: { name: "Grace Editor", email: "grace@acme.invalid" },
-      trailers: { actor: actorIdOf(scenario.editor), audit: ulid() },
-      expectedHead: null,
-      at: new Date(),
     });
-    expect(made.ok).toBe(true);
 
-    const run = await reconciled(scenario);
+    expect(replay).toEqual(stoppedUnreadableAt(made));
+  });
 
-    expect(run.stopped).toEqual({
-      sha: made.ok ? made.value.sha : "",
-      reason: "unreadable-commit",
+  it.each([
+    ["no type or title", {}],
+    ["a title but no type", { title: "Untitled" }],
+    ["a type but no title", { type: "Guideline" }],
+  ] as const)("stops at an unheld concept with %s", async (_lacking, named) => {
+    const { made, replay } = await handMadeFirstAndReplayed(await arrange(), {
+      path: "knowledge/guidelines/untitled.md",
+      content: renderConceptFile({ ...named, iri: conceptIriOf(ulid()) }, "# Untitled\n\nNo name."),
+      message: "Record a concept by hand, lacking its type or its title",
     });
-    expect(await recordedChain(scenario.workspaceId)).toEqual([]);
+
+    expect(replay).toEqual(stoppedUnreadableAt(made));
   });
 });
 

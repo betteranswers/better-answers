@@ -260,3 +260,40 @@ describe("a sweep by hand", () => {
     expect(order).toEqual(["first in", "first out", "second in"]);
   });
 });
+
+/**
+ * Read from the suite's own pool, so a lock left on a connection back in the runtime pool still
+ * counts.
+ */
+const sessionLocksHeld = async (): Promise<number> => {
+  const found = await db().pool.query<{ held: string }>(
+    `SELECT count(*) AS held FROM pg_locks
+      WHERE locktype = 'advisory' AND granted
+        AND database = (SELECT oid FROM pg_database WHERE datname = current_database())`,
+  );
+  return Number(found.rows[0]?.held ?? 0);
+};
+
+describe("the session lock a sweep by hand holds", () => {
+  it("is released once its work ends", async () => {
+    let during = 0;
+
+    await withSweepLock(SWEEPS, doors().postgres, async () => {
+      during = await sessionLocksHeld();
+    });
+
+    expect({ during, after: await sessionLocksHeld() }).toEqual({ during: 1, after: 0 });
+  });
+
+  it("is released when its work throws", async () => {
+    let during = 0;
+
+    const run = withSweepLock(SWEEPS, doors().postgres, async () => {
+      during = await sessionLocksHeld();
+      throw new Error("the work failed");
+    });
+
+    await expect(run).rejects.toThrow("the work failed");
+    expect({ during, after: await sessionLocksHeld() }).toEqual({ during: 1, after: 0 });
+  });
+});
