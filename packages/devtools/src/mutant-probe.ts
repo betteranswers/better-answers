@@ -142,10 +142,20 @@ const vitestReport = z.object({
 });
 type VitestReport = z.infer<typeof vitestReport>;
 
-/** A reporter that changed shape reads as a suite that never ran. */
+/**
+ * A reporter that changed shape reads as a suite that never ran, as does a report torn by
+ * killing vitest mid-write.
+ */
 const readReport = (file: string): VitestReport | undefined => {
   if (!existsSync(file)) return undefined;
-  const read = vitestReport.safeParse(JSON.parse(readFileSync(file, "utf8")));
+  const text = readFileSync(file, "utf8");
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+  const read = vitestReport.safeParse(json);
   return read.success ? read.data : undefined;
 };
 
