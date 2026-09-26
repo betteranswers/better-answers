@@ -1,5 +1,6 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { INVITATION_WORDS } from "@/features/auth/invitation-words.ts";
 import { SAID_OF_ACCEPTING } from "@/features/auth/refusal-words.ts";
 import { SAID_OF_A_MEMBER } from "@/features/people/refusal-words.ts";
 import { SELECT_FIRST } from "@/shared/keystroke-words.ts";
@@ -986,7 +987,10 @@ test.describe("the People screen's words", () => {
     });
     await page.goto(`/invitations/${toJoin.id}`);
     await expect(
-      page.getByRole("heading", { level: 1, name: "Join Wolds Fabrication" }),
+      page.getByRole("heading", {
+        level: 1,
+        name: INVITATION_WORDS.heading("Wolds Fabrication"),
+      }),
     ).toBeVisible();
     await saidOnTheAcceptPage("the accept page");
     await page.goto(`/invitations/${forSomeoneElse.id}`);

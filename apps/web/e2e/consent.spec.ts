@@ -1,5 +1,7 @@
 import type { Page } from "@playwright/test";
 
+import { DISPLAY_NAME_WORDS } from "@/shared/display-name-words.ts";
+
 import { expect, test } from "./browser.ts";
 import {
   addMember,
@@ -20,7 +22,7 @@ const consentHeading = (page: Page) =>
   page.getByRole("heading", { level: 1, name: "Connect Claude" });
 
 const displayNameHeading = (page: Page) =>
-  page.getByRole("heading", { level: 1, name: "Your display name" });
+  page.getByRole("heading", { level: 1, name: DISPLAY_NAME_WORDS.heading });
 
 const connectedAt = async (page: Page): Promise<URL> => {
   await page.getByRole("button", { name: "Connect" }).click();
@@ -189,7 +191,7 @@ test("asks an unnamed member's name, then carries on through consent", async ({
   expect(landedAt(page).pathname).toBe("/display-name");
   expect(landedAt(page).searchParams.get("sig")).not.toBeNull();
   await passesTheAccessibilityGate();
-  await page.getByLabel("Display name").fill("Mona Reviewer");
+  await page.getByLabel(DISPLAY_NAME_WORDS.label).fill("Mona Reviewer");
   await page.keyboard.press("Enter");
 
   await expect(consentHeading(page)).toBeVisible();
@@ -203,7 +205,7 @@ test("asks a non-member's name, then says No workspace yet", async ({ page, requ
   await signIn(page, request, anAddress("unplaced"));
 
   await expect(displayNameHeading(page)).toBeVisible();
-  await page.getByLabel("Display name").fill("Sam Okoro");
+  await page.getByLabel(DISPLAY_NAME_WORDS.label).fill("Sam Okoro");
   await page.getByRole("button", { name: "Save and continue" }).click();
 
   await expect(page.getByRole("heading", { level: 1, name: "No workspace yet" })).toBeVisible();

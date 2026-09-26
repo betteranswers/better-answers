@@ -155,7 +155,7 @@ Four more play Claude's part in its OAuth flow on the suite's own origin — `ap
   `apps/web/e2e/routes.spec.ts` imports `@/shared/screens.ts`, so the list of screens is written
   once. Read a sentence the same way: import it from a feature's word table
   (`apps/web/src/features/sources/words.ts`), the screen list or the role meanings
-  (`apps/web/src/features/people/role-meanings.ts`). Then assert the state it belongs to: the
+  (`apps/web/src/shared/role-words.ts`). Then assert the state it belongs to: the
   region, its role, the next action. Never pin prose as a literal, so rewording a screen breaks no
   spec. Read a control's accessible name from the same table where one exists. Two things stay
   literal: the trust words, a closed set that is part of the behaviour, and text a person types.

@@ -2,7 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 
 import { refusalOf, type Refusal } from "@/shared/api/trpc.ts";
-import { DISPLAY_NAME_MAX_CHARACTERS, DISPLAY_NAME_REFUSED } from "@/shared/display-name-words.ts";
+import { DISPLAY_NAME_REFUSED, DISPLAY_NAME_WORDS } from "@/shared/display-name-words.ts";
 import { saidOfRefusal, type Said } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
@@ -40,10 +40,9 @@ export function DisplayNameScreen() {
   };
 
   return (
-    <AuthScreen title="Your display name">
+    <AuthScreen title={DISPLAY_NAME_WORDS.heading}>
       <p id={HINT} className="mt-2 text-muted-foreground">
-        The one line the platform credits you by wherever it names you: on a check you make, as the
-        author of a change, in a member list. Up to {DISPLAY_NAME_MAX_CHARACTERS} characters.
+        {DISPLAY_NAME_WORDS.hint}
       </p>
 
       <form onSubmit={save} className="mt-6">

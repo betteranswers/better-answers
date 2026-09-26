@@ -1,6 +1,10 @@
 import type { Page } from "@playwright/test";
 
-import { DISPLAY_NAME_MAX_CHARACTERS, DISPLAY_NAME_REFUSED } from "@/shared/display-name-words.ts";
+import {
+  DISPLAY_NAME_MAX_CHARACTERS,
+  DISPLAY_NAME_REFUSED,
+  DISPLAY_NAME_WORDS,
+} from "@/shared/display-name-words.ts";
 import { SAID_OF_CLASS, sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
@@ -17,12 +21,12 @@ import {
 } from "./harness.ts";
 
 const displayNameHeading = (page: Page) =>
-  page.getByRole("heading", { level: 1, name: "Your display name" });
+  page.getByRole("heading", { level: 1, name: DISPLAY_NAME_WORDS.heading });
 
 const noWorkspaceHeading = (page: Page) =>
   page.getByRole("heading", { level: 1, name: "No workspace yet" });
 
-const displayNameField = (page: Page) => page.getByLabel("Display name");
+const displayNameField = (page: Page) => page.getByLabel(DISPLAY_NAME_WORDS.label);
 
 const saveButton = (page: Page) => page.getByRole("button", { name: "Save and continue" });
 
@@ -48,10 +52,10 @@ test("asks a first-time person for a display name before anything", async ({
   await expect(displayNameField(page)).toBeFocused();
   await expect(page.getByRole("main")).toMatchAriaSnapshot(`
     - main:
-      - heading "Your display name" [level=1]
-      - paragraph: "The one line the platform credits you by wherever it names you: on a check you make, as the author of a change, in a member list. Up to 100 characters."
-      - text: Display name
-      - textbox "Display name"
+      - heading ${JSON.stringify(DISPLAY_NAME_WORDS.heading)} [level=1]
+      - paragraph: ${JSON.stringify(DISPLAY_NAME_WORDS.hint)}
+      - text: ${JSON.stringify(DISPLAY_NAME_WORDS.label)}
+      - textbox ${JSON.stringify(DISPLAY_NAME_WORDS.label)}
       - button "Save and continue"
   `);
   await passesTheAccessibilityGate();

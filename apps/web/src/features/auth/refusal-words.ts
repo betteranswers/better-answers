@@ -3,15 +3,15 @@ import type { Said, SaidOfWord } from "@/shared/refusal-words.ts";
 /** Said on the invitation screen, of its read and of joining alike. */
 export const SAID_OF_ACCEPTING = {
   "no-such-invitation": {
-    why: "No invitation stands at this link: it was cancelled, replaced by a newer one, or never sent.",
-    next: "Ask the Admin who invited you to send a new one.",
+    why: "There's no invitation at this link.",
+    next: "Ask the person who invited you to send a new one.",
   },
   "invitation-expired": {
     why: "This invitation has expired.",
-    next: "Ask the Admin who invited you to send it again.",
+    next: "Ask the person who invited you to send a new one.",
   },
   "invitation-for-another-address": {
-    why: "This invitation was sent to another email address than the one you are signed in with.",
+    why: "This invitation is for a different email address.",
     next: "Sign in with the address it was sent to.",
   },
   "already-a-member": {
@@ -19,8 +19,8 @@ export const SAID_OF_ACCEPTING = {
     next: "Open it from your workspaces.",
   },
   "no-display-name": {
-    why: "A workspace credits its members by name, and you have not given one yet.",
-    next: "Give a display name, then join.",
+    why: "You haven't given a display name yet.",
+    next: "Type one, then join.",
   },
   malformed: {
     why: "This invitation link isn't valid.",

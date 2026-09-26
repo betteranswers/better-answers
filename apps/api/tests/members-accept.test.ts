@@ -270,13 +270,17 @@ describe("refusing an accept over tRPC", () => {
     expect(await joinedEventsOf(personId)).toHaveLength(1);
   });
 
-  it("refuses a person with no display name until named", async () => {
+  it("reads a nameless invitee their invitation, joining them once named", async () => {
     const { workspace, api: adminApi } = await anAdmin();
     const address = anAddress("nameless");
     await adminApi.members.invite.mutate({ address, role: "Viewer" });
     const invitationId = linkedInvitationId(address);
     const { api } = await webSignedIn(app(), address);
 
+    expect(await api.person.invitation.query({ invitationId })).toMatchObject({
+      invitationId,
+      role: "Viewer",
+    });
     expect(await accepting(api, invitationId)).toMatchObject(
       refusedAs(412, "no-display-name", "precondition"),
     );

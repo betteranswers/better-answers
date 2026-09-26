@@ -13,7 +13,7 @@ import { z } from "zod";
 import { useTRPC } from "@/shared/api/trpc.ts";
 
 import { authClient } from "./auth-client.ts";
-import { backTo, nextAfterSignIn } from "./carried-flow.ts";
+import { backTo, isAnInvitation, nextAfterSignIn } from "./carried-flow.ts";
 import { forgetMembership } from "./membership.ts";
 
 const AUTH_KEYS = {
@@ -78,8 +78,8 @@ const sessionOrUnread = (queryClient: QueryClient) =>
   queryClient.fetchQuery(sessionOptions()).catch(() => undefined);
 
 /**
- * Read before the display-name screen draws, so a person it has nothing to ask never sees it.
- * Undefined means the screen draws.
+ * Read before the screen draws, so a person it has nothing to ask never sees it; an invitation
+ * asks its invitee's name. Undefined: it draws.
  */
 export const displayNameDetour = async (
   queryClient: QueryClient,
@@ -88,18 +88,20 @@ export const displayNameDetour = async (
   const session = await sessionOrUnread(queryClient);
   if (session === undefined) return undefined;
   if (session === null) return `/sign-in${query}`;
-  return hasADisplayName(session.user.name) ? nextAfterSignIn(query) : undefined;
+  const next = nextAfterSignIn(query);
+  return hasADisplayName(session.user.name) || isAnInvitation(next) ? next : undefined;
 };
 
-/** The accept page asks only a person signed in and named. Undefined means the page draws. */
+/**
+ * Only a signed-out person is sent on: the page asks a nameless invitee's name beside its join,
+ * so joining is one step. Undefined: it draws.
+ */
 export const acceptDetour = async (
   queryClient: QueryClient,
   path: string,
 ): Promise<string | undefined> => {
   const session = await sessionOrUnread(queryClient);
-  if (session === undefined) return undefined;
-  if (session === null) return backTo("/sign-in", path);
-  return hasADisplayName(session.user.name) ? undefined : backTo("/display-name", path);
+  return session === null ? backTo("/sign-in", path) : undefined;
 };
 
 /** A save drops the held session, so the next read of it carries the new name. */
