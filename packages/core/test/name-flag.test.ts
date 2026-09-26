@@ -175,7 +175,7 @@ describe("a flag that already waits", () => {
     expect(await flagsOn(workspace, person)).toEqual({ flagged: 2, raised: 2 });
   });
 
-  it("raises one flag from two by two Admins at once", async () => {
+  it("raises one flag when two Admins flag at once", async () => {
     const workspace = await provisionedWorkspace(db(), "AtOnce");
     const second = await joined(workspace, await aPerson("Second Admin"), "Admin");
     const person = await joined(workspace, await aPerson(), "Viewer");

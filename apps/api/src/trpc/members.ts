@@ -38,7 +38,7 @@ import {
   router,
 } from "./base.ts";
 import { sentInvitation } from "./invitation-email.ts";
-import { toldTheOperator } from "./name-flag-email.ts";
+import { tellTheOperator } from "./name-flag-email.ts";
 
 type Emailing = {
   readonly principal: UserPrincipal;
@@ -117,7 +117,7 @@ export const membersRouter = router({
     ),
   ),
 
-  /** The same answer for every member, so it tells the Admin nothing of other workspaces. */
+  /** A constant answer: whether a flag was raised or already waited is the operator's to know. */
   flagDisplayName: ownTransactionProcedure
     .input(parsedBy(flagDisplayNameInput))
     .mutation(async ({ ctx, input }) => {
@@ -128,7 +128,7 @@ export const membersRouter = router({
           committedAs(ctx, (principal, tx) => flagDisplayName(principal, tx, asked)),
         ),
       );
-      if (flagged.raised !== null) await toldTheOperator(ctx, flagged.raised);
+      if (flagged.raised !== null) await tellTheOperator(ctx, flagged.raised);
       return { personId: flagged.personId, sentToTheOperator: true } as const;
     }),
 });

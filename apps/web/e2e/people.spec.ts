@@ -389,7 +389,7 @@ test.describe("a member, opened as a sheet", () => {
           - heading "Display name" [level=3]
           - paragraph: People give their own display name, and no Admin can change one. The operator corrects a name you flag as inappropriate.
           - button "Flag the name to the operator"
-          - paragraph: The operator is emailed. Recorded on the audit log under your name.
+          - paragraph: The operator is emailed, and the flag is recorded on the audit log under your name. While a flag from this workspace waits, another adds nothing.
         - button "Close"
     `);
     await passesTheAccessibilityGate();

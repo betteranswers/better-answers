@@ -121,7 +121,6 @@ export type IdentityBootstrap = {
 
   readonly smtpUrl: string | undefined;
 
-  /** Where a flagged display name is emailed, until the operator's mark names who to tell. */
   readonly operatorAddress: string | undefined;
 };
 

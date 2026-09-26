@@ -20,7 +20,7 @@ const nameFlagEmail = (operatorAddress: string, raised: RaisedFlag): EmailMessag
 });
 
 /** A missed email loses no flag: it stands on the identity-set audit log, and the answer is unmoved. */
-export const toldTheOperator = async (
+export const tellTheOperator = async (
   ctx: { readonly mail: Mail; readonly log: Logger },
   raised: RaisedFlag,
 ): Promise<void> => {

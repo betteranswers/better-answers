@@ -27,8 +27,6 @@ export type ServerDependencies = {
   readonly hostnames: PublicHostnames;
   readonly authSecret: string;
   readonly sendEmail: EmailSender;
-
-  /** Where a flagged display name is emailed. */
   readonly operatorAddress?: string | undefined;
   readonly logger?: Logger;
 

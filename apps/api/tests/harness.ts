@@ -257,6 +257,9 @@ export type TestAppOptions = {
 
   readonly objectStore?: ObjectStoreSettings | undefined;
 
+  /** `OPERATOR_ADDRESS` when left out; null is a deployment that names no operator. */
+  readonly operatorAddress?: string | null | undefined;
+
   /**
    * A count of connections below the pool's ceiling reads what was asked for, and the suite's
    * runtime pool is small.
@@ -302,7 +305,8 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
       emails.push(message);
       options.onEmail?.(message);
     },
-    operatorAddress: OPERATOR_ADDRESS,
+    operatorAddress:
+      options.operatorAddress === null ? undefined : (options.operatorAddress ?? OPERATOR_ADDRESS),
     fetchClientMetadataResource: (input) => {
       metadataFetches.push(input instanceof Request ? input.url : String(input));
       return cimdFixture(input);

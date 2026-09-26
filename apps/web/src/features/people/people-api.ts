@@ -15,7 +15,6 @@ export type RoleChanged = inferOutput<Api["members"]["changeRole"]>;
 
 export type CredentialsRevokedHere = inferOutput<Api["members"]["revokeCredentials"]>;
 
-/** The same answer for every member: it says nothing of the person beyond this workspace. */
 export const useFlagDisplayName = () => {
   const api = useTRPC();
   return useMutation(api.members.flagDisplayName.mutationOptions());

@@ -220,7 +220,7 @@ function MemberList(properties: { readonly members: readonly ListedMember[] }) {
     openInFocus("removal");
   });
   useKeystroke(PEOPLE_KEYSTROKES.flagName, () => {
-    openInFocus("name");
+    openInFocus("flag");
   });
 
   const removal = useRemovalFromTheList({

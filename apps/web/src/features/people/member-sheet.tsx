@@ -29,7 +29,7 @@ import { outcomeOfFailure } from "./refusal.tsx";
 import { CredentialsHere, GroupPills, JoinedOn, nameOf } from "./words.tsx";
 
 /** Where focus lands when the sheet opens: on who the member is, or straight on an act. */
-export type OpenedAt = "member" | "role" | "credentials" | "name" | "removal";
+export type OpenedAt = "member" | "role" | "credentials" | "flag" | "removal";
 
 export const memberButtonId = (personId: string): string => `member-${personId}`;
 
@@ -269,7 +269,8 @@ function DisplayNameFlag(properties: {
                 Flag the name to the operator
               </Button>
               <p id={hintId} className="text-sm text-muted-foreground">
-                The operator is emailed. Recorded on the audit log under your name.
+                The operator is emailed, and the flag is recorded on the audit log under your name.
+                While a flag from this workspace waits, another adds nothing.
               </p>
             </div>
             <OutcomeLine outcome={outcome} />
@@ -301,7 +302,7 @@ export function MemberSheet(properties: {
     role: () => pickerRef.current?.querySelector<HTMLElement>('[aria-checked="true"]'),
     credentials: () => revokeRef.current,
     // A member with no display name has no flag to land on, so focus goes to who they are.
-    name: () => flagRef.current ?? titleRef.current,
+    flag: () => flagRef.current ?? titleRef.current,
     removal: () => askRef.current,
   } satisfies Readonly<Record<OpenedAt, () => HTMLElement | null | undefined>>;
 
