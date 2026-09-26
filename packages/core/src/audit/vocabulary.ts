@@ -1,8 +1,9 @@
-import type { z } from "zod";
+import { z } from "zod";
 
 import {
   ACT,
   AUDIENCES,
+  boundarySchemas,
   CONTENT_HASH,
   GIT_SHA,
   IRI,
@@ -10,7 +11,6 @@ import {
   SENSITIVITIES,
   ULID,
 } from "@better-answers/schema";
-import type { boundarySchemas } from "@better-answers/schema";
 
 import type { Role } from "../kernel/index.ts";
 
@@ -20,7 +20,18 @@ export type Family = AuditEventRow["family"];
 
 export type ActName<F extends Family = Family> = Extract<AuditEventRow["act"], `${F}.${string}`>;
 
-export type DetailValue = string | number | boolean;
+/** Ids alone: the client's and the workspace's names are read when the grant is shown. */
+export const endedGrant = z.strictObject({
+  clientId: z.string().min(1),
+  workspaceId: boundarySchemas.workspace.select.shape.id.nullable(),
+  issuedAt: z.iso.datetime(),
+});
+
+export type EndedGrant = z.output<typeof endedGrant>;
+
+type DetailEntry = Readonly<Record<string, string | null>>;
+
+export type DetailValue = string | number | boolean | readonly DetailEntry[];
 
 const isId = (value: DetailValue) => typeof value === "string" && ULID.test(value);
 const isFlag = (value: DetailValue) => typeof value === "boolean";
@@ -43,6 +54,7 @@ export const DETAIL_KINDS = {
     typeof value === "string" && SENSITIVITIES.some((word) => word === value),
   audience: (value: DetailValue) =>
     typeof value === "string" && AUDIENCES.some((word) => word === value),
+  grants: (value: DetailValue) => z.array(endedGrant).safeParse(value).success,
 } as const;
 
 export type DetailKind = keyof typeof DETAIL_KINDS;
@@ -59,7 +71,9 @@ type DetailValueOf<K extends DetailKind> = K extends "role"
     ? boolean
     : K extends "count"
       ? number
-      : string;
+      : K extends "grants"
+        ? readonly EndedGrant[]
+        : string;
 
 export type DetailOf<Shape extends DetailShape> = {
   readonly [

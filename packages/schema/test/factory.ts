@@ -70,6 +70,10 @@ export type TestData = {
 
   auditEvent(overrides?: Partial<InsertInput<"auditEvent">>): Promise<Row<"auditEvent">>;
 
+  identityAuditEvent(
+    overrides?: Partial<InsertInput<"identityAuditEvent">>,
+  ): Promise<Row<"identityAuditEvent">>;
+
   accessRequest(overrides?: Partial<InsertInput<"accessRequest">>): Promise<Row<"accessRequest">>;
 
   conceptIdentity(
@@ -383,6 +387,17 @@ export const testData = (client: pg.PoolClient): TestData => {
       workspaceId,
     });
   };
+
+  const identityAuditEvent: TestData["identityAuditEvent"] = (overrides = {}) =>
+    insertRow(client, "identityAuditEvent", {
+      id: ulid(),
+      act: "platform.probe.seeded",
+      actor: "process:better-answers-test",
+      subjectId: ulid(),
+      detail: {},
+      batchId: null,
+      ...overrides,
+    });
 
   const accessRequest: TestData["accessRequest"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
@@ -845,6 +860,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     oauthRefreshToken,
     oauthAccessToken,
     auditEvent,
+    identityAuditEvent,
     accessRequest,
     conceptIdentity,
     conceptIndex,

@@ -26,3 +26,18 @@ export const counted = (count: number, one: string, many: string): string =>
 /** A person who has given no display name yet is named by their address. */
 export const nameOrAddress = (displayName: string, address: string): string =>
   displayName === "" ? address : displayName;
+
+/** Who did an act: the kind, not the words, since a person may give any display name. */
+export type DoneBy =
+  | { readonly kind: "person"; readonly displayName: string }
+  | { readonly kind: "former-member" }
+  | { readonly kind: "platform" };
+
+/** The glossary's words for an actor the audit log cannot name by the name they gave. */
+const BY_WORDS = {
+  "former-member": "a former member",
+  platform: "the platform",
+} as const satisfies Readonly<Record<Exclude<DoneBy["kind"], "person">, string>>;
+
+export const byWords = (by: DoneBy): string =>
+  by.kind === "person" ? by.displayName : BY_WORDS[by.kind];

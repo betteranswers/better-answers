@@ -6,11 +6,9 @@ import type { HeldGrant, ListedPerson } from "./people-api.ts";
 export const nameOf = (person: ListedPerson): string =>
   nameOrAddress(person.displayName, person.email);
 
-/** Past its expiry a grant refreshes nothing, though no act revoked it. */
-export const grantStateOf = (grant: HeldGrant, nowMs: number): "Revoked" | "Expired" | "Live" => {
-  if (grant.revokedAt !== null) return "Revoked";
-  return Date.parse(grant.expiresAt) <= nowMs ? "Expired" : "Live";
-};
+/** Past its expiry a grant refreshes nothing, though no act ended it. */
+export const grantStateOf = (grant: HeldGrant, nowMs: number): "Expired" | "Live" =>
+  Date.parse(grant.expiresAt) <= nowMs ? "Expired" : "Live";
 
 export function Memberships(properties: { readonly person: ListedPerson }) {
   const { memberships } = properties.person;

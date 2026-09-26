@@ -23,8 +23,14 @@ import {
   type AuditAct,
 } from "./vocabulary.ts";
 
-export { act, declareActs, declareIdentitySetActs, declarations } from "./vocabulary.ts";
-export type { ActName, AuditAct, DetailOf } from "./vocabulary.ts";
+export {
+  act,
+  declareActs,
+  declareIdentitySetActs,
+  declarations,
+  endedGrant,
+} from "./vocabulary.ts";
+export type { ActName, AuditAct, DetailOf, EndedGrant } from "./vocabulary.ts";
 
 export type AuditEvent<A extends AuditAct> = {
   readonly id: string;
@@ -137,6 +143,7 @@ const ROW_COLUMNS = "id, act, actor, subject_id, detail, batch_id";
 const AN_KINDS: ReadonlySet<string> = new Set(["id", "iri", "audience"]);
 
 const kindRefusal = (kind: DetailKind): string => {
+  if (kind === "grants") return "a list of ended grants";
   const optional = isOptionalKind(kind);
   const base = optional ? kind.slice(0, -1) : kind;
   const article = AN_KINDS.has(base) ? "an" : "a";

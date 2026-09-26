@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { until } from "@better-answers/core/testing/postgres";
 
 import { connectAsHost, refresh, revokeAtEndpoint, setActiveWorkspace } from "./flow.ts";
-import { startApp, type TestApp } from "./harness.ts";
+import { CLAUDE_CLIENT_ID, startApp, type TestApp } from "./harness.ts";
 import { callMcp } from "./mcp-call.ts";
 import {
   anAdminOfElsewherePointedAt,
@@ -447,7 +447,20 @@ describe("removing a member over tRPC", () => {
     ]).toEqual([401, 200]);
     expect(await sessionsHeldBy(person.id)).toBe(4);
     expect(await removalsIn(acme.workspaceId)).toEqual([
-      { actor: `human:${acme.admin.id}`, subject_id: person.id, detail: { role: "Editor" } },
+      {
+        actor: `human:${acme.admin.id}`,
+        subject_id: person.id,
+        detail: {
+          role: "Editor",
+          grants: [
+            {
+              clientId: CLAUDE_CLIENT_ID,
+              workspaceId: acme.workspaceId,
+              issuedAt: expect.stringMatching(ISO_INSTANT),
+            },
+          ],
+        },
+      },
     ]);
 
     expect((await setActiveWorkspace(laptop.client, beta.workspaceId)).status).toBe(200);

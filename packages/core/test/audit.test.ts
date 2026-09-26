@@ -16,7 +16,12 @@ import {
   recordEach,
   recordFor,
 } from "../src/audit/index.ts";
-import type { ActorId, PlatformPrincipal, UserPrincipal } from "../src/kernel/index.ts";
+import type {
+  ActorId,
+  PlatformPrincipal,
+  UserPrincipal,
+  WorkspaceId,
+} from "../src/kernel/index.ts";
 import {
   openPostgres,
   withIdentityWrite,
@@ -228,6 +233,8 @@ const PROBE = declareActs("platform", {
   noted: act("platform.probe.noted", { confirmed: "flag" }),
 
   optional: act("platform.probe.optional", { adminUserId: "id?", confirmed: "flag" }),
+
+  ended: act("platform.probe.ended", { grants: "grants" }),
 });
 
 const rowsOfSubjects = async (subjectIds: readonly string[]) => {
@@ -685,5 +692,102 @@ describe("the identity-set audit log, reached through either door", () => {
     expect(() =>
       declareIdentitySetActs("platform", { again: act("platform.probe.identity_noted", {}) }),
     ).toThrow(/declared twice/);
+  });
+});
+
+describe("a detail's list of ended grants", () => {
+  const CLIENT_ID = "https://claude.ai/oauth/mcp-oauth-client-metadata";
+
+  const aGrant = (workspaceId: WorkspaceId | null) => ({
+    clientId: CLIENT_ID,
+    workspaceId,
+    issuedAt: "2026-09-26T09:00:00.000Z",
+  });
+
+  it("lands each grant as given, with a workspace or none", async () => {
+    const { door, workspaceId, adminUserId } = await provisioned();
+    const id = ulid();
+    const grants = [aGrant(workspaceId), aGrant(null)];
+
+    await writingIn(
+      door,
+      workspaceId,
+    )({ id, act: PROBE.ended, subjectId: adminUserId, detail: { grants } });
+
+    expect(await rowById(id)).toMatchObject({ detail: { grants } });
+  });
+
+  it("lands an empty list", async () => {
+    const { door, workspaceId, adminUserId } = await provisioned();
+    const id = ulid();
+
+    await writingIn(
+      door,
+      workspaceId,
+    )({
+      id,
+      act: PROBE.ended,
+      subjectId: adminUserId,
+      detail: { grants: [] },
+    });
+
+    expect(await rowById(id)).toMatchObject({ detail: { grants: [] } });
+  });
+
+  it.each([
+    ["a field no grant has", { email: "priya@example.invalid" }],
+    ["its client's name", { clientName: "Claude" }],
+    ["its workspace's name", { workspaceName: "Acme" }],
+    ["no client id", { clientId: null }],
+    ["an empty client id", { clientId: "" }],
+    ["a workspace id not minted", { workspaceId: "acme" }],
+    ["an unreadable issue instant", { issuedAt: "yesterday" }],
+    ["an issue instant not in ISO-8601", { issuedAt: "26 September 2026" }],
+    ["no issue instant", { issuedAt: null }],
+  ])("rejects a grant with %s", async (_, changed) => {
+    const { door, workspaceId, adminUserId } = await provisioned();
+    const grant = { ...aGrant(workspaceId), ...changed };
+
+    await expect(
+      writingIn(
+        door,
+        workspaceId,
+      )({
+        id: ulid(),
+        act: PROBE.ended,
+        subjectId: adminUserId,
+        // @ts-expect-error — each case breaks the grant's shape; the runtime half.
+        detail: { grants: [grant] },
+      }),
+    ).rejects.toThrow(/grants is not a list of ended grants$/);
+  });
+
+  const writingGrants = async (grants: (workspaceId: WorkspaceId) => unknown) => {
+    const { door, workspaceId, adminUserId } = await provisioned();
+    return writingIn(
+      door,
+      workspaceId,
+    )({
+      id: ulid(),
+      act: PROBE.ended,
+      subjectId: adminUserId,
+      // @ts-expect-error — no list of ended grants; the runtime half.
+      detail: { grants: grants(workspaceId) },
+    });
+  };
+
+  it("rejects a grant missing a field", async () => {
+    const unplaced = (workspaceId: WorkspaceId) => {
+      const { workspaceId: _, ...rest } = aGrant(workspaceId);
+      return [rest];
+    };
+
+    await expect(writingGrants(unplaced)).rejects.toThrow(/grants is not a list of ended grants$/);
+  });
+
+  it("rejects text where the list belongs", async () => {
+    await expect(writingGrants(() => "Claude")).rejects.toThrow(
+      /grants is not a list of ended grants$/,
+    );
   });
 });

@@ -77,7 +77,7 @@ export const membersSuite = (db: () => MigratedPostgres) => {
     const rows = await db().pool.query<{
       actor: string;
       subject_id: string;
-      detail: Readonly<Record<string, string>>;
+      detail: Readonly<Record<string, unknown>>;
     }>(
       "SELECT actor, subject_id, detail FROM audit_event WHERE workspace_id = $1 AND act = $2 ORDER BY id",
       [workspace.workspaceId, act],
@@ -85,5 +85,18 @@ export const membersSuite = (db: () => MigratedPostgres) => {
     return rows.rows;
   };
 
-  return { joining, rolesOf, adminsOf, auditRowsOf };
+  /** The person's ended grants an Admin's act filed on the identity-set audit log. */
+  const grantsEndedAbout = async (personId: string) => {
+    const rows = await db().pool.query<{
+      actor: string;
+      detail: Readonly<Record<string, unknown>>;
+    }>(
+      `SELECT actor, detail FROM identity_audit_event
+        WHERE subject_id = $1 AND act = 'people.person.grants_ended' ORDER BY id`,
+      [personId],
+    );
+    return rows.rows;
+  };
+
+  return { joining, rolesOf, adminsOf, auditRowsOf, grantsEndedAbout };
 };

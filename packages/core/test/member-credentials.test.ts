@@ -11,7 +11,7 @@ import { postgresForSuite, seedingWith, whileWritesAreRefused } from "./suite-po
 
 const db = postgresForSuite();
 
-const { joining, auditRowsOf } = membersSuite(db);
+const { joining, auditRowsOf, grantsEndedAbout } = membersSuite(db);
 
 const BEFORE = new Date("2026-09-25T09:00:00.000Z");
 const AT = new Date("2026-09-25T10:00:00.000Z");
@@ -69,8 +69,17 @@ describe("revoking a member's credentials in this workspace", () => {
     });
     expect(await instantHeld(workspace, viewer)).toEqual(AT);
     expect(await revocationsIn(workspace)).toEqual([
-      { actor: `human:${workspace.adminUserId}`, subject_id: viewer, detail: {} },
+      { actor: `human:${workspace.adminUserId}`, subject_id: viewer, detail: { grants: [] } },
     ]);
+  });
+
+  it("writes no identity-set row when it ended no grant", async () => {
+    const workspace = await provisionedWorkspace(db(), "NoGrant");
+    const viewer = await joining(workspace, "Viewer");
+
+    await revokedBy(workspace, workspace.adminUserId, viewer);
+
+    expect(await grantsEndedAbout(viewer)).toEqual([]);
   });
 
   it("refuses credentials issued before it here, admitting later ones", async () => {
@@ -99,7 +108,7 @@ describe("revoking a member's credentials in this workspace", () => {
     const editor = await joining(workspace, "Editor");
     await alsoJoining(elsewhere, "Editor", editor);
     const grants = await seedingWith(db().pool, async (seed) => {
-      const { clientId } = await seed.oauthClient();
+      const { clientId } = await seed.oauthClient({ name: "Claude" });
       const labelById = new Map<string, string>();
       for (const [grant, referenceId, createdAt] of [
         ["here-old", workspace.workspaceId, BEFORE],
@@ -116,6 +125,20 @@ describe("revoking a member's credentials in this workspace", () => {
     await revokedBy(workspace, workspace.adminUserId, editor);
 
     expect(await endedGrants(db().pool, grants)).toEqual(["access here-old", "refresh here-old"]);
+    const ended = [
+      {
+        clientId: grants.clientId,
+        workspaceId: workspace.workspaceId,
+        issuedAt: BEFORE.toISOString(),
+      },
+    ];
+    expect((await revocationsIn(workspace)).map((row) => row.detail)).toEqual([{ grants: ended }]);
+    expect(await grantsEndedAbout(editor)).toEqual([
+      {
+        actor: `human:${workspace.adminUserId}`,
+        detail: { workspaceId: workspace.workspaceId, grants: ended },
+      },
+    ]);
   });
 
   it("never moves a later instant back to an earlier one", async () => {

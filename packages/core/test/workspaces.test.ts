@@ -35,7 +35,7 @@ import {
   workspaceIdBySlug,
   workspacesHeldBy,
 } from "../src/workspaces/index.ts";
-import { endedGrants, issuedCredentialsFor } from "./identity-rows.ts";
+import { endedGrants, issuedCredentialsFor, OAUTH_CLIENT_ID } from "./identity-rows.ts";
 import {
   asANewOperator,
   bootstrap,
@@ -381,8 +381,70 @@ describe("revoking a person's credentials everywhere, as the operator", () => {
       { id: "a-new", revoked: false },
     ]);
     expect(await identityRowsAbout(personId)).toEqual([
-      { act: "people.person.credentials_revoked", actor: `human:${operatorId}`, detail: {} },
+      {
+        act: "people.person.credentials_revoked",
+        actor: `human:${operatorId}`,
+        detail: {
+          grants: [
+            { clientId: OAUTH_CLIENT_ID, workspaceId: null, issuedAt: "2026-09-02T11:00:00.000Z" },
+          ],
+        },
+      },
     ]);
+  });
+
+  it("names each open grant once, issued at its first token", async () => {
+    const acme = await provisionedWorkspace(db(), "Acme");
+    const zenith = await provisionedWorkspace(db(), "Zenith");
+    const personId = await seedUser();
+    const clientId = await seedingWith(db().pool, async (seed) => {
+      const client = await seed.oauthClient({ name: "Claude" });
+      const token = (
+        authorizationCodeId: string,
+        referenceId: string,
+        createdAt: string,
+        rotatedAt: string | null,
+      ) =>
+        seed.oauthRefreshToken({
+          clientId: client.clientId,
+          userId: personId,
+          authorizationCodeId,
+          referenceId,
+          createdAt: new Date(createdAt),
+          rotatedAt: rotatedAt === null ? null : new Date(rotatedAt),
+        });
+      await token("code-acme", acme.workspaceId, "2026-09-01T09:00:00Z", "2026-09-01T10:00:00Z");
+      await token("code-acme", acme.workspaceId, "2026-09-01T10:00:00Z", null);
+      await token("code-zenith", zenith.workspaceId, "2026-09-02T09:00:00Z", null);
+      await token("code-later", zenith.workspaceId, "2026-09-02T13:00:00Z", null);
+      await seed.oauthRefreshToken({
+        clientId: client.clientId,
+        userId: personId,
+        authorizationCodeId: "code-signed-out",
+        referenceId: acme.workspaceId,
+        createdAt: new Date("2026-09-02T10:00:00Z"),
+        revoked: new Date("2026-09-02T10:30:00Z"),
+      });
+      return client.clientId;
+    });
+
+    await revoking({ personId, at: AT });
+
+    const [row] = await identityRowsAbout(personId);
+    expect(row?.detail).toEqual({
+      grants: [
+        { clientId, workspaceId: acme.workspaceId, issuedAt: "2026-09-01T09:00:00.000Z" },
+        { clientId, workspaceId: zenith.workspaceId, issuedAt: "2026-09-02T09:00:00.000Z" },
+      ],
+    });
+  });
+
+  it("records an empty list when it ended no grant", async () => {
+    const personId = await seedUser();
+
+    await revoking({ personId, at: AT });
+
+    expect((await identityRowsAbout(personId)).map((row) => row.detail)).toEqual([{ grants: [] }]);
   });
 
   it("ends a token already rotated, with its access tokens", async () => {

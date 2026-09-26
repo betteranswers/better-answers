@@ -19,7 +19,7 @@ import {
   type ProvisionedWorkspace,
 } from "./platform.ts";
 import { inputOf } from "./suite-input.ts";
-import { abortTheTransaction, postgresForSuite, readingAs } from "./suite-postgres.ts";
+import { abortTheTransaction, postgresForSuite, readingAs, seedingWith } from "./suite-postgres.ts";
 
 const db = postgresForSuite();
 
@@ -143,6 +143,42 @@ describe("the audit log", () => {
     const page = pageOf(await readAs(workspace, workspace.adminUserId));
 
     expect(page.events[0]?.by).toEqual({ kind: "person", displayName: "Sam Okoro" });
+  });
+
+  it("names each ended grant's client and workspace, else its ids", async () => {
+    const workspace = await provisionedWorkspace(db(), "Granted");
+    const gone = "https://gone.example.invalid/metadata";
+    const claude = await seedingWith(db().pool, async (seed) => {
+      const client = await seed.oauthClient({ name: "Claude" });
+      await seed.auditEvent({
+        workspaceId: workspace.workspaceId,
+        act: "people.member.credentials_revoked",
+        actor: `human:${workspace.adminUserId}`,
+        detail: {
+          grants: [
+            ...[client.clientId, gone].map((clientId) => ({
+              clientId,
+              workspaceId: workspace.workspaceId,
+              issuedAt: "2026-09-26T09:00:00.000Z",
+            })),
+            { clientId: gone, workspaceId: null, issuedAt: "2026-09-26T09:00:00.000Z" },
+          ],
+        },
+      });
+      return client.clientId;
+    });
+
+    const page = pageOf(await readAs(workspace, workspace.adminUserId));
+
+    const issuedAt = "2026-09-26T09:00:00.000Z";
+    const inGranted = { workspaceId: workspace.workspaceId, workspaceName: "Granted", issuedAt };
+    expect(page.events[0]?.detail).toEqual({
+      grants: [
+        { clientId: claude, clientName: "Claude", ...inGranted },
+        { clientId: gone, clientName: gone, ...inGranted },
+        { clientId: gone, clientName: gone, workspaceId: null, workspaceName: null, issuedAt },
+      ],
+    });
   });
 
   it("reads one family alone when asked for it", async () => {

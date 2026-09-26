@@ -17,11 +17,11 @@ import {
   ulid,
 } from "../kernel/index.ts";
 import { refusalOfDeadlock, type Tx } from "../store/postgres/index.ts";
-import { endWorkspaceTokens } from "../workspaces/index.ts";
+import { endWorkspaceTokens, recordGrantsEndedHere } from "../workspaces/index.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
 const REVOCATION_ACTS = declareActs("people", {
-  credentialsRevoked: act("people.member.credentials_revoked", {}),
+  credentialsRevoked: act("people.member.credentials_revoked", { grants: "grants" }),
 });
 
 export const revokeCredentialsHereInput = z.object({
@@ -69,7 +69,7 @@ const revokedHere = async (
   const at = held.rows[0]?.at;
   if (at === undefined) return err("no-such-member");
 
-  await endWorkspaceTokens(admin, tx, {
+  const { grants } = await endWorkspaceTokens(admin, tx, {
     workspaceId: admin.workspaceId,
     personId: asked.personId,
     at,
@@ -78,8 +78,9 @@ const revokedHere = async (
     id: ulid(),
     act: REVOCATION_ACTS.credentialsRevoked,
     subjectId: asked.personId,
-    detail: {},
+    detail: { grants },
   });
+  await recordGrantsEndedHere(admin, tx, { personId: asked.personId, grants });
   return ok({ personId: asked.personId, revokedAt: at.toISOString() });
 };
 

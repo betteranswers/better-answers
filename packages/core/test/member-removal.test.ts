@@ -22,7 +22,7 @@ import {
 
 const db = postgresForSuite();
 
-const { joining, rolesOf, adminsOf, auditRowsOf } = membersSuite(db);
+const { joining, rolesOf, adminsOf, auditRowsOf, grantsEndedAbout } = membersSuite(db);
 
 const removalsIn = (workspace: ProvisionedWorkspace) =>
   auditRowsOf(workspace, "people.member.removed");
@@ -46,7 +46,7 @@ const groupsHeldBy = async (workspace: ProvisionedWorkspace, personId: string) =
   return rows.rows.map((row) => row.group_id);
 };
 
-const aMinuteAgo = () => new Date(Date.now() - 60_000);
+const A_MINUTE_AGO = new Date(Date.now() - 60_000);
 
 /** A refresh and an access token for each grant, named so an assertion reads which ended. */
 const grantsTo = async (
@@ -60,14 +60,14 @@ const grantsTo = async (
       const held = {
         clientId: client.clientId,
         userId: holder ?? personId,
-        createdAt: aMinuteAgo(),
+        createdAt: A_MINUTE_AGO,
       };
       const refresh = await seed.oauthRefreshToken({ ...held, referenceId: workspaceId });
       const access = await seed.oauthAccessToken({ ...held, referenceId: workspaceId });
       labelById.set(refresh.id, `refresh ${grant}`);
       labelById.set(access.id, `access ${grant}`);
     }
-    return { clientId: client.clientId, labelById };
+    return { clientId: client.clientId, labelById, issuedAt: A_MINUTE_AGO };
   });
 
 describe("removing a member", () => {
@@ -92,9 +92,10 @@ describe("removing a member", () => {
       {
         actor: `human:${workspace.adminUserId}`,
         subject_id: viewer,
-        detail: { role: "Viewer" },
+        detail: { role: "Viewer", grants: [] },
       },
     ]);
+    expect(await grantsEndedAbout(viewer)).toEqual([]);
   });
 
   it("ends this workspace's tokens and keeps the person's other workspace", async () => {
@@ -111,8 +112,25 @@ describe("removing a member", () => {
 
     await removedBy(here, here.adminUserId, person);
 
+    const ended = {
+      clientId: issued.clientId,
+      workspaceId: here.workspaceId,
+      issuedAt: issued.issuedAt.toISOString(),
+    };
     expect(await endedGrants(db().pool, issued)).toEqual(["access here", "refresh here"]);
     expect((await rolesOf(there))[person]).toBe("Viewer");
+    expect((await removalsIn(here)).map((row) => row.detail)).toEqual([
+      {
+        role: "Editor",
+        grants: [ended],
+      },
+    ]);
+    expect(await grantsEndedAbout(person)).toEqual([
+      {
+        actor: `human:${here.adminUserId}`,
+        detail: { workspaceId: here.workspaceId, grants: [ended] },
+      },
+    ]);
   });
 
   it("lets one of two Admins remove themself", async () => {
@@ -125,7 +143,11 @@ describe("removing a member", () => {
     expect(removed).toEqual({ ok: true, value: { personId: adminUserId, role: "Admin" } });
     expect(await adminsOf(workspace)).toEqual([successor]);
     expect(await removalsIn(workspace)).toEqual([
-      { actor: `human:${adminUserId}`, subject_id: adminUserId, detail: { role: "Admin" } },
+      {
+        actor: `human:${adminUserId}`,
+        subject_id: adminUserId,
+        detail: { role: "Admin", grants: [] },
+      },
     ]);
   });
 });

@@ -4,13 +4,13 @@ import { act, declareActs, record } from "../audit/index.ts";
 import { admit, declareAct, err, ok, ulid } from "../kernel/index.ts";
 import type { AdmittedOf, Result, Role, UserId, UserPrincipal } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
-import { endWorkspaceTokens } from "../workspaces/index.ts";
+import { endWorkspaceTokens, recordGrantsEndedHere } from "../workspaces/index.ts";
 import { leavesNoAdmin, withMemberHeld, type HeldRefusal } from "./last-admin.ts";
 import { memberKeyed } from "./memberships.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
 const REMOVAL_ACTS = declareActs("people", {
-  removed: act("people.member.removed", { role: "role" }),
+  removed: act("people.member.removed", { role: "role", grants: "grants" }),
 });
 
 export const removeMemberInput = memberKeyed;
@@ -51,7 +51,7 @@ const removedUnderTheLock = (
       admin.workspaceId,
       input.personId,
     ]);
-    await endWorkspaceTokens(admin, tx, {
+    const { grants } = await endWorkspaceTokens(admin, tx, {
       workspaceId: admin.workspaceId,
       personId: input.personId,
       at: input.at,
@@ -60,8 +60,9 @@ const removedUnderTheLock = (
       id: ulid(),
       act: REMOVAL_ACTS.removed,
       subjectId: input.personId,
-      detail: { role: held.role },
+      detail: { role: held.role, grants },
     });
+    await recordGrantsEndedHere(admin, tx, { personId: input.personId, grants });
     return ok({ personId: input.personId, role: held.role });
   });
 

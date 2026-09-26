@@ -633,7 +633,8 @@ to it by IRI and never restates it (ADR 0014).
   it), event log, log (alone).
 - **identity-set audit log** — the append-only record of the acts that belong to no workspace
   because they act on a person's identity itself: a person giving their own *display name*, an
-  Admin's flag on one, a sign-in, and every write the *operator* makes. It sits beside the *audit log* and uses the same
+  Admin's flag on one, a sign-in, every write the *operator* makes, and an Admin's act that ends a
+  person's grants. It sits beside the *audit log* and uses the same
   *audit acts*. A person appears in it by *person id*, never by name or address, and no row is ever
   rewritten. Only the operator reads it; no workspace's Admin ever does.
 - **log line** — one line the running platform writes to its operational log for whoever runs
@@ -940,6 +941,11 @@ to it by IRI and never restates it (ADR 0014).
   System card lists the distinct `client_id` URLs seen on issued grants, each named from its own
   metadata document, with who has connected through it. _Avoid_: registered client, connector,
   integration.
+- **client grant** — what a person's consent gives a client: access to the surface in one
+  workspace, or in none, lasting through the client's refreshes. It is open until it lapses or an
+  act ends it: revoking credentials, here or everywhere, or removing a member. That act's audit
+  event records each grant it ended, so an ended grant stays on record after its tokens are gone.
+  _Avoid_: connection, token (for the grant as a whole).
 - **Account page** — a person's own small surface outside Control Centre: name, role,
   workspace, personal tokens.
 - **sign-in** — how a person proves who they are to the platform: an email code, or Microsoft

@@ -118,7 +118,7 @@ describe("revoking a member's credentials in this workspace over tRPC", () => {
       role: "Viewer",
     });
     expect(await revocationsIn(here.workspaceId)).toEqual([
-      { actor: `human:${here.admin.id}`, subject_id: person.id, detail: {} },
+      { actor: `human:${here.admin.id}`, subject_id: person.id, detail: { grants: [] } },
     ]);
     expect(await revocationsIn(elsewhere.workspaceId)).toEqual([]);
   });
@@ -232,7 +232,9 @@ describe("a revoked Admin on the People procedures", () => {
     expect(refused).toMatchObject([REVOKED_HERE, REVOKED_HERE, REVOKED_HERE]);
     expect(await whatLanded(workspace.workspaceId, workspace.admin.id)).toEqual({
       instant: null,
-      revocations: [{ actor: `human:${workspace.admin.id}`, subject_id: second.id, detail: {} }],
+      revocations: [
+        { actor: `human:${workspace.admin.id}`, subject_id: second.id, detail: { grants: [] } },
+      ],
     });
     expect((await mine.session.membership.query()).role).toBe("Admin");
   });
