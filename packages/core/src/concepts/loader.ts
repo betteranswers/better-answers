@@ -328,8 +328,8 @@ export const readBundle = (tree: BundleTree): Result<LoadedBundle, Unsound> => {
   return ok({ manifest: manifest.value, concepts });
 };
 
-/** Keyed by lower-cased email; an address with no member in the workspace is absent. */
-export const memberIdsByEmail = async (
+/** Person ids keyed by lower-cased email; an address with no member in the workspace is absent. */
+export const personIdsByEmail = async (
   principal: Principal,
   tx: Tx,
   emails: readonly string[],
