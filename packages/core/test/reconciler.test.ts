@@ -932,8 +932,8 @@ describe("a commit the rows cannot take", () => {
 
   it.each([
     ["no type or title", {}],
-    ["a title but no type", { title: "Untitled" }],
-    ["a type but no title", { type: "Guideline" }],
+    ["a title, no type", { title: "Untitled" }],
+    ["a type, no title", { type: "Guideline" }],
   ] as const)("stops at an unheld concept with %s", async (_lacking, named) => {
     const { made, replay } = await handMadeFirstAndReplayed(await arrange(), {
       path: "knowledge/guidelines/untitled.md",

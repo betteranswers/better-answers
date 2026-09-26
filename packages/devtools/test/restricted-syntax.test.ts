@@ -54,13 +54,13 @@ describe("the syntax the lint refuses, with what to write instead", () => {
       tag("TYPES", "3"),
     ],
     [
-      "a list held `as const` inside `z.enum`",
+      "an `as const` list inside `z.enum`",
       parsing('  return z.enum(["a", "b"] as const);'),
       "as const",
       tag("TYPES", "3"),
     ],
     [
-      "a list checked by `satisfies` inside `z.enum`",
+      "a `satisfies` list inside `z.enum`",
       parsing('  return z.enum(["a", "b"] satisfies readonly string[]);'),
       "as const",
       tag("TYPES", "3"),

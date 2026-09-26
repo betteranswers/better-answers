@@ -222,7 +222,7 @@ test.describe("a group's acts", () => {
     await expect(priya.getByRole("cell").nth(2)).toHaveText("People team");
   });
 
-  test("lets an Admin delete a group after saying what it takes", async ({
+  test("an Admin deletes a group once told what it takes", async ({
     page,
     request,
     passesTheAccessibilityGate,

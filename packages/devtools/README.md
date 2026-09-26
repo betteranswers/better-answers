@@ -145,6 +145,16 @@ that a dry run spares a live run's container and names an ended one's.
 `test/testcontainers-patch.test.ts` holds `patches/testcontainers@12.1.0.patch`, which gives
 each test process a Ryuk of its own (`docs/agents/workflow.md`, *Environment*).
 
+`test/test-title-setup.test.ts` runs real vitest over a throwaway tree to prove the rendered
+title check. The lint rule reads only a literal title, but a title that `.each` fills from a row,
+a template literal or a loop builds is known only once the test runs. So a setup file checks each
+title in a `beforeEach`, and an offending test fails under its own name. The check lives in
+`packages/schema`, as `@better-answers/schema/testing/test-title-setup`: this package depends on
+schema, so schema's own suite could not load it from here without a cycle. Every TypeScript
+workspace's vitest config names it in `setupFiles`, which the suite also holds.
+`apps/web/e2e/browser.ts` runs the same check on Playwright's `testInfo.title`, and the worker's
+`tests/conftest.py` counts a Python test name's words the same way.
+
 ## `lint-rules/` — the `better-answers` oxlint plugin
 
 The repository's own rules: the ones that hold a rule in `CODING_RULES.md` or an ADR rather

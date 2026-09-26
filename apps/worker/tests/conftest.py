@@ -76,6 +76,21 @@ def guarded_monkeypatch() -> Iterator[pytest.MonkeyPatch]:
         yield patcher
 
 
+MOST_TITLE_WORDS = 10
+
+TITLE_REFUSAL = (
+    "A test name is a present-tense phrase of 10 words at most, never "
+    '"should" [TEST5]: `{name}` runs to {words}'
+)
+
+
+def pytest_runtest_setup(item: pytest.Item) -> None:
+    name = getattr(item, "originalname", item.name)
+    words = [word for word in name.removeprefix("test_").split("_") if word]
+    if len(words) > MOST_TITLE_WORDS or "should" in (word.lower() for word in words):
+        pytest.fail(TITLE_REFUSAL.format(name=name, words=len(words)), pytrace=False)
+
+
 DAEMON_SKIP_REASON = "no Docker daemon answered"
 
 

@@ -4,6 +4,8 @@ export default defineConfig({
   test: {
     include: ["test/**/*.test.ts"],
 
+    setupFiles: ["@better-answers/schema/testing/test-title-setup"],
+
     // A file that wants the object store names `objectStoreForSuite` in its own source, or the
     // run it is selected in starts no Garage for it.
     globalSetup: [

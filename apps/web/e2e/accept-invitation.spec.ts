@@ -88,7 +88,7 @@ test("an invited newcomer signs in, gives a name, and joins", async ({
   await expect(bar.getByRole("button", { name: /Priya Shah/ })).toContainText("Editor");
 });
 
-test("a named invitee reads it within a second, joins by keyboard", async ({ page, request }) => {
+test("a named invitee reads it within a second, joins keyboard-only", async ({ page, request }) => {
   const { address, link } = await anInvitation(request, "Ryedale Metalwork", "Viewer");
   await person(request, address, { displayName: "Sam Okoro" });
   await page.goto(link);
