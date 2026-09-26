@@ -27,7 +27,7 @@ const HEADER = `\
 # own task (ADR 0034).
 #
 # Refresh:
-#   UPDATE_BETTER_AUTH_ENDPOINTS=1 pnpm --filter @better-answers/api exec vitest run tests/better-auth-endpoints.test.ts
+#   UPDATE_BETTER_AUTH_ENDPOINTS=1 pnpm --filter @better-answers/api run test tests/better-auth-endpoints.test.ts
 #
 # A path here is a path to check, not a path that answers: better-call leaves a
 # \`SERVER_ONLY\` endpoint off its router and \`disabledPaths\` closes \`/token\`,

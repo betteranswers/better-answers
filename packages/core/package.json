@@ -33,8 +33,8 @@
   "scripts": {
     "lint": "oxlint --report-unused-disable-directives-severity=error --config ../../.oxlintrc.json .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "mutation": "stryker run",
+    "test": "node ./node_modules/vitest/vitest.mjs run",
+    "mutation": "node ./node_modules/@stryker-mutator/core/bin/stryker.js run",
     "check": "node ../../scripts/check.mjs typecheck test"
   },
   "dependencies": {

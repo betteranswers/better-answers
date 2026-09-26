@@ -238,9 +238,12 @@ const pathsIn = (output: string): readonly string[] =>
   ].sort(byCodeUnit);
 
 const tsgolintPath = (): string => {
-  const from = createRequire(import.meta.url);
   const suffix = process.platform === "win32" ? ".exe" : "";
   try {
+    // From the package that depends on the build, since no NODE_PATH reaches the hoisted store.
+    const from = createRequire(
+      createRequire(import.meta.url).resolve("oxlint-tsgolint/package.json"),
+    );
     return from.resolve(`@oxlint-tsgolint/${process.platform}-${process.arch}/tsgolint${suffix}`);
   } catch {
     throw new Error(
