@@ -1,9 +1,13 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
+import { goHome, UNKNOWN_SCREEN } from "@/app/words.ts";
+import { CONSOLE } from "@/shared/screens.ts";
+
 import { expect, test } from "./browser.ts";
 import {
   addMember,
   anAddress,
+  landedAtHome,
   markTheOperator,
   person,
   provision,
@@ -109,7 +113,7 @@ test.describe("the way into the console", () => {
     await page.keyboard.press("Tab");
     await expect(page.getByRole("link", { name: "Back to your workspaces" })).toBeFocused();
     await page.keyboard.press("Enter");
-    await expect(page.getByRole("heading", { level: 1, name: "System" })).toBeVisible();
+    await landedAtHome(page, "Admin");
   });
 
   test("sends a signed-out operator to sign in, then back", async ({ page, request }) => {
@@ -248,12 +252,13 @@ test.describe("the console's Workspaces screen", () => {
 
     await page.goto("/console/not-a-screen");
 
-    await expect(page.getByRole("heading", { level: 1, name: "No such screen" })).toBeVisible();
-    await expect(page.getByText("not one of the console's screens")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: UNKNOWN_SCREEN.heading }),
+    ).toBeVisible();
     await expect(railOf(page)).toBeVisible();
-    await expect(page.getByRole("link", { name: "Go to Workspaces" })).toHaveAttribute(
+    await expect(page.getByRole("link", { name: goHome(CONSOLE.home) })).toHaveAttribute(
       "href",
-      "/console/workspaces",
+      CONSOLE.home.path,
     );
   });
 

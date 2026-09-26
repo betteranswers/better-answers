@@ -2,7 +2,8 @@ import type { APIRequestContext, Page } from "@playwright/test";
 
 import { EMBEDDING_DIMENSIONS } from "@better-answers/schema";
 
-import { SCREENS, viewsOf } from "@/shared/screens.ts";
+import { unbuiltLineOf } from "@/app/words.ts";
+import { SCREENS, screenById, viewsOf } from "@/shared/screens.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -34,6 +35,12 @@ const PURPOSES = ["Extraction", "Enrichment", "Answering", "Judging", "Embedding
 
 const FIXED_REASON_PHRASE = "never changes once vectors exist";
 
+/** No role lands on System, so every test here opens it from where sign-in left the member. */
+const openSystem = async (page: Page) => {
+  await page.goto(screenById("system").path);
+  await expect(routesCard(page)).toBeVisible();
+};
+
 const signedInWith = async (
   page: Page,
   api: APIRequestContext,
@@ -44,6 +51,7 @@ const signedInWith = async (
   await seedRoutes(api, { workspaceId: workspace.workspaceId, routes: input.routes });
   await page.goto("/sign-in");
   await signIn(page, api, email);
+  await openSystem(page);
   return workspace;
 };
 
@@ -167,6 +175,7 @@ test.describe("the System screen's routes card", () => {
 
       await page.goto("/sign-in");
       await signIn(page, request, email);
+      await openSystem(page);
 
       await expect(routesCard(page).getByRole("listitem")).toHaveCount(5);
       await expect(routesCard(page)).toContainText("claude-sonnet-5");
@@ -226,7 +235,7 @@ test.describe("the System screen's routes card", () => {
     for (const screen of opensUnbuilt) {
       await navigation.getByRole("link", { name: screen.name }).click();
       await expect(page.getByRole("heading", { level: 1, name: screen.name })).toBeVisible();
-      await expect(page.getByText("This view is not built yet.")).toBeVisible();
+      await expect(page.getByText(unbuiltLineOf(screen))).toBeVisible();
     }
   });
 });

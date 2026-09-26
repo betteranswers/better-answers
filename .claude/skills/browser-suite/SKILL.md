@@ -106,14 +106,15 @@ call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources
 | `askToJoin` | A person's ask to join a workspace by its slug, with a reason, through the members slice's own act and the principal the ask-to-join procedure uses, without its sign-in or its answer's floor — a request waiting on the Requests tab |
 | `flagTheName` | A workspace's Admin flags a member's display name through the members slice's own act and principal, without the email the procedure sends the operator — a name waiting on the console's *Names waiting* view |
 
-Thirteen more helpers in the same module drive the browser rather than the harness:
+Fourteen more helpers in the same module drive the browser rather than the harness:
 
 | Helper | What it does |
 | --- | --- |
 | `anAddress` | An email address nobody else in the run will use, so a code read back is this test's |
 | `signIn` | Signs a person in **through the product's own screen** — fill the address, send, read the six-digit code back from the captured transport, fill it, submit, and wait for the code field to be gone rather than for the click |
 | `aMemberSignedInAt` | A new workspace's Editor or Viewer, signed in having asked for a path first, so sign-in carries them back to it — where a refused screen is proved |
-| `signedInAtHome` | Opens the sign-in screen, runs `signIn`, and waits for Control Centre's home, as a member of one workspace arrives |
+| `landedAtHome` | Asserts the page is on a role's home, its address and its heading read off the screen list |
+| `signedInAtHome` | Opens the sign-in screen, runs `signIn`, and waits for an Admin's home, as the Admin of one workspace arrives |
 | `signOutFromTheShell` | Opens the top bar's menu, then signs out, because sign-out is one disclosure in |
 | `skipLinkReachesTheScreen` | Tab, the skip link has focus, Enter, `main` has focus — where a shell spec's keyboard traversal starts |
 | `tabUntilFocused` | Presses Tab until a locator has focus, and fails by name when it never does |

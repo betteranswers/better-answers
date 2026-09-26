@@ -1,3 +1,5 @@
+import type { ROLES } from "@better-answers/schema";
+
 export const SCREENS = [
   {
     id: "sources",
@@ -131,27 +133,30 @@ export const screenById = (id: (typeof SCREENS)[number]["id"]): Screen => screen
 export const consoleScreenById = (id: (typeof CONSOLE_SCREENS)[number]["id"]): Screen =>
   screenIn(CONSOLE_SCREENS, id);
 
-/** The shell's regions draw one of these; `home` is where a reader who lost their way is sent. */
+/** A workspace role, as the session's membership names it. */
+export type Role = (typeof ROLES)[number];
+
+/** A reader lands on their home and is sent back there when lost; the console's reader holds no role. */
 export type Surface = {
   readonly name: "Control Centre" | "Console";
-  readonly nameInProse: "Control Centre" | "the console";
   readonly screens: readonly Screen[];
-  readonly home: Screen;
-};
+} & ({ readonly homes: { readonly [held in Role]: Screen } } | { readonly home: Screen });
 
-export const CONTROL_CENTRE: Surface = {
+export const CONTROL_CENTRE = {
   name: "Control Centre",
-  nameInProse: "Control Centre",
   screens: SCREENS,
-  home: screenById("system"),
-};
+  homes: {
+    Admin: screenById("people"),
+    Editor: screenById("questions"),
+    Viewer: screenById("questions"),
+  },
+} satisfies Surface;
 
-export const CONSOLE: Surface = {
+export const CONSOLE = {
   name: "Console",
-  nameInProse: "the console",
   screens: CONSOLE_SCREENS,
   home: consoleScreenById("workspaces"),
-};
+} satisfies Surface;
 
 /** A union of tuple types has no callable array methods; the element type restores them. */
 export const viewsOf = (screen: Screen): readonly View[] => screen.views;

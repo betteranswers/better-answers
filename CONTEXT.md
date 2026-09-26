@@ -867,8 +867,13 @@ to it by IRI and never restates it (ADR 0014).
   the Control Centre entry above lists for that screen, in that order and in those words. Each has
   an address of its own; a screen names one of them its **default view**, and the screen's own
   address leads there. A view nobody has built yet is still a destination, and says in words that
-  it is not built. Not a *view (of an MCP App)*. _Avoid_: section (a guide's node), tab (a division
-  inside one view, and the view's own business rather than a word of this glossary's).
+  it is not built, or, on a role's *home*, what that role will do there. Not a
+  *view (of an MCP App)*. _Avoid_: section (a guide's node), tab (a division inside one view, and
+  the view's own business rather than a word of this glossary's).
+- **home (of a role)** — the screen a member lands on after signing in, and the one offered back
+  when a screen fails or an address names none: People for an Admin, Questions for an Editor or a
+  Viewer. The *console* has one home for everyone, Workspaces. _Avoid_: landing page, dashboard,
+  start page.
 - **icon rail** — the region down the left edge listing the screens of Control Centre, or of the
   *console*, each an icon carrying its screen's name and marking the screen being read. _Avoid_:
   section nav, sidebar.

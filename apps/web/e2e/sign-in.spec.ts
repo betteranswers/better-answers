@@ -5,6 +5,7 @@ import {
   addMember,
   anAddress,
   codeSentTo,
+  landedAtHome,
   person,
   provision,
   removeMember,
@@ -33,8 +34,7 @@ test("lands a sole member in the shell: workspace, person, role", async ({ page,
   await page.goto("/sign-in");
   await signIn(page, request, email);
 
-  await expect(page).toHaveURL(/\/system\/routes-and-spend$/);
-  await expect(page.getByRole("heading", { level: 1, name: "System" })).toBeVisible();
+  await landedAtHome(page, "Admin");
   const bar = page.getByRole("banner");
   await expect(bar.getByText(workspace.name)).toBeVisible();
   await expect(bar.getByText(workspace.admin.name, { exact: false })).toBeVisible();
@@ -65,7 +65,7 @@ test("scopes everything to the workspace a two-workspace member picks", async ({
   await expect(page.getByRole("link", { name: /create/i })).toHaveCount(0);
   await page.getByRole("button", { name: second.name }).click();
 
-  await expect(page).toHaveURL(/\/system\/routes-and-spend$/);
+  await landedAtHome(page, "Viewer");
   const bar = page.getByRole("banner");
   await expect(bar.getByText(second.name)).toBeVisible();
   await expect(bar.getByText("Viewer", { exact: false })).toBeVisible();
@@ -136,7 +136,7 @@ test("skips the picker when the membership postdates the session", async ({ page
   await addMember(request, { workspaceId: workspace.workspaceId, userId: who.id, role: "Editor" });
   await page.goto("/choose-workspace");
 
-  await expect(page).toHaveURL(/\/system\/routes-and-spend$/);
+  await landedAtHome(page, "Editor");
   const bar = page.getByRole("banner");
   await expect(bar.getByText(workspace.name)).toBeVisible();
   await expect(bar.getByText("Editor", { exact: false })).toBeVisible();
