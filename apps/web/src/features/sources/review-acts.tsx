@@ -1,5 +1,6 @@
 import { useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 
+import { ActDialog } from "@/shared/act-dialog.tsx";
 import type { ApiError } from "@/shared/api/trpc.ts";
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
@@ -8,7 +9,6 @@ import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 import { counted } from "@/shared/words.ts";
 
-import { ActDialog } from "./act-dialog.tsx";
 import { outcomeOfFailure, whyAndNextOf } from "./refusal.tsx";
 import {
   groupKeyText,

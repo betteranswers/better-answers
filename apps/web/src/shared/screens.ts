@@ -101,7 +101,7 @@ export const CONSOLE_SCREENS = [
       "Every person on the platform, the workspaces they belong to and their role in each, with the sessions and grants that can act as them.",
     defaultView: "/console/people/everyone",
     views: [
-      { name: "Everyone", path: "/console/people/everyone", built: false },
+      { name: "Everyone", path: "/console/people/everyone", built: true },
       { name: "Names waiting", path: "/console/people/names-waiting", built: false },
     ],
   },

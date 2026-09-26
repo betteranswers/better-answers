@@ -1,5 +1,6 @@
 import { useId, useState, type ReactNode } from "react";
 
+import { ActDialog } from "@/shared/act-dialog.tsx";
 import { SummaryRow } from "@/shared/summary-row.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Checkbox } from "@/shared/ui/checkbox.tsx";
@@ -13,7 +14,6 @@ import {
 } from "@/shared/ui/select.tsx";
 import { counted } from "@/shared/words.ts";
 
-import { ActDialog } from "./act-dialog.tsx";
 import { bindingHeadingId } from "./binding-list.tsx";
 import { outcomeOfFailure, whyAndNextOf } from "./refusal.tsx";
 import {

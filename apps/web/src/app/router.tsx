@@ -17,6 +17,7 @@ import { DisplayNameScreen } from "@/features/auth/display-name-screen.tsx";
 import { membershipRefusal, NEEDS_A_PICK } from "@/features/auth/membership.ts";
 import { NoWorkspaceScreen } from "@/features/auth/no-workspace-screen.tsx";
 import { SignInScreen } from "@/features/auth/sign-in-screen.tsx";
+import { EVERYONE_TOOLBAR, EveryoneView } from "@/features/console/everyone-view.tsx";
 import { mustSignInForTheConsole } from "@/features/console/operator.ts";
 import { WorkspacesView } from "@/features/console/workspaces-view.tsx";
 import { AUDIT_LOG_TOOLBAR, AuditLogView } from "@/features/people/audit-log-view.tsx";
@@ -48,6 +49,7 @@ const BUILT_VIEWS = new Map<View["path"], BuiltView>([
   ["/people/members", { draw: MembersView, toolbar: MEMBERS_TOOLBAR }],
   ["/people/audit-log", { draw: AuditLogView, toolbar: AUDIT_LOG_TOOLBAR }],
   ["/system/routes-and-spend", { draw: RoutesAndSpendView, toolbar: ROUTES_AND_SPEND_TOOLBAR }],
+  ["/console/people/everyone", { draw: EveryoneView, toolbar: EVERYONE_TOOLBAR }],
   ["/console/workspaces/every-workspace", { draw: WorkspacesView }],
 ]);
 
