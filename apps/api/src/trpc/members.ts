@@ -5,6 +5,8 @@ import {
   cancelInvitation,
   changeRole,
   changeRoleInput,
+  flagDisplayName,
+  flagDisplayNameInput,
   invitationInput,
   inviteMember,
   inviteMemberInput,
@@ -36,6 +38,7 @@ import {
   router,
 } from "./base.ts";
 import { sentInvitation } from "./invitation-email.ts";
+import { toldTheOperator } from "./name-flag-email.ts";
 
 type Emailing = {
   readonly principal: UserPrincipal;
@@ -113,4 +116,19 @@ export const membersRouter = router({
       ),
     ),
   ),
+
+  /** The same answer for every member, so it tells the Admin nothing of other workspaces. */
+  flagDisplayName: ownTransactionProcedure
+    .input(parsedBy(flagDisplayNameInput))
+    .mutation(async ({ ctx, input }) => {
+      const flagged = await crossing(
+        ctx,
+        flagDisplayName.name,
+        given(input, (asked) =>
+          committedAs(ctx, (principal, tx) => flagDisplayName(principal, tx, asked)),
+        ),
+      );
+      if (flagged.raised !== null) await toldTheOperator(ctx, flagged.raised);
+      return { personId: flagged.personId, sentToTheOperator: true } as const;
+    }),
 });

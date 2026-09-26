@@ -11,4 +11,7 @@ export type EmailSender = (message: EmailMessage) => Promise<void>;
 export type Mail = {
   readonly send: EmailSender;
   readonly publicUrl: string;
+
+  /** Where a flagged display name is told; undefined where the deployment names no operator. */
+  readonly operatorAddress: string | undefined;
 };

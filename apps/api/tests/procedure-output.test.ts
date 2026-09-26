@@ -34,6 +34,7 @@ describe("what a procedure may answer the wire", () => {
       "members.auditLog",
       "members.cancelInvitation",
       "members.changeRole",
+      "members.flagDisplayName",
       "members.invitations",
       "members.invite",
       "members.list",
@@ -75,6 +76,7 @@ describe("what a procedure may answer the wire", () => {
       | "members.cancelInvitation"
       | "members.revokeCredentials"
       | "members.remove"
+      | "members.flagDisplayName"
       | "routes.list"
       | "sources.list"
       | "sources.bind"

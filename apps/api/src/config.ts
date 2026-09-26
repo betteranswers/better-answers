@@ -61,6 +61,8 @@ const identityBootstrapSchema = z
     APEX_HOSTNAME: bareHostname,
 
     SMTP_URL: z.url({ protocol: /^smtps?$/ }).optional(),
+
+    OPERATOR_EMAIL: z.email().optional(),
   })
   .refine((parsed) => {
     const hostnames = [
@@ -118,6 +120,9 @@ export type IdentityBootstrap = {
   readonly hostnames: PublicHostnames;
 
   readonly smtpUrl: string | undefined;
+
+  /** Where a flagged display name is emailed, until the operator's mark names who to tell. */
+  readonly operatorAddress: string | undefined;
 };
 
 export type SweepSettings = {
@@ -159,6 +164,7 @@ export function readIdentityBootstrap(
     publicUrl: parsed.data.PUBLIC_URL,
     authSecret: parsed.data.AUTH_SECRET,
     smtpUrl: parsed.data.SMTP_URL,
+    operatorAddress: parsed.data.OPERATOR_EMAIL,
     hostnames: {
       app: hostnameOfUrl(parsed.data.PUBLIC_URL),
       agent: parsed.data.AGENT_HOSTNAME,
