@@ -9,6 +9,10 @@
     {
       "name": "better-answers",
       "specifier": "./packages/devtools/lint-rules/index.ts"
+    },
+    {
+      "name": "eslint-js",
+      "specifier": "oxlint-plugin-eslint"
     }
   ],
   "categories": {
@@ -27,6 +31,21 @@
     "import/no-cycle": "error",
     "no-empty": ["error", { "allowEmptyCatch": false }],
     "no-param-reassign": ["error", { "props": true }],
+    "eslint-js/no-restricted-syntax": [
+      "error",
+      {
+        "selector": "BinaryExpression[operator='in'][right.type='Identifier'][right.name=/^[A-Z][A-Z0-9_]+$/]",
+        "message": "`in` also answers for a name the table inherits, such as `toString`. Test the key with `Object.hasOwn(TABLE, key)`, or hold the table in a `Map` [TYPES10]"
+      },
+      {
+        "selector": "ForInStatement",
+        "message": "`for…in` also walks the keys an object inherits. Walk `Object.keys` or `Object.entries` with `for…of` [TYPES10]"
+      },
+      {
+        "selector": "LabeledStatement",
+        "message": "A label jumps out of a nested loop. Move the inner loop into a function and return from it [DESIGN7]"
+      }
+    ],
     "vitest/no-identical-title": "error",
     "vitest/valid-title": [
       "error",

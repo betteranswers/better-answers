@@ -1,9 +1,7 @@
-import path from "node:path";
-
 import {
+  loadableAnywhere,
   oxlintOverrideFor,
   readOxlintConfig,
-  repositoryRoot,
   type OxlintConfig,
 } from "@better-answers/devtools/oxlint-config";
 import { oxlintOver, type Tree } from "@better-answers/devtools/throwaway-tree";
@@ -16,10 +14,7 @@ const config = readOxlintConfig();
 
 const { output: lint } = oxlintOver(
   JSON.stringify({
-    jsPlugins: config.jsPlugins.map((plugin) => ({
-      ...plugin,
-      specifier: path.join(repositoryRoot, plugin.specifier),
-    })),
+    jsPlugins: config.jsPlugins.map(loadableAnywhere),
     rules: Object.fromEntries(
       Object.entries(config.rules).filter(([name]) => name.startsWith("better-answers/")),
     ),

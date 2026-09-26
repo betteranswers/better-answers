@@ -40,7 +40,7 @@ export const refusalOf = (answered: RefusalAnswer): Refusal =>
     : { word: answered.word, class: REFUSALS[answered.word], fields: answered.fields };
 
 export const isRefusalWord = (candidate: string | Error): candidate is RefusalWord =>
-  typeof candidate === "string" && candidate in REFUSALS;
+  typeof candidate === "string" && Object.hasOwn(REFUSALS, candidate);
 
 export const refusalLogged = (refusal: Refusal) => ({
   refusal: refusal.word,
