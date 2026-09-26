@@ -34,6 +34,7 @@ import {
   fileAtCommit,
   removeRepository,
 } from "./bundle.ts";
+import { gitStarts } from "./git-starts.ts";
 import { bindingHolding } from "./sourced-concept.ts";
 import {
   abortTheTransaction,
@@ -396,6 +397,20 @@ describe("a governed write", () => {
       [scenario.workspaceId],
     );
     expect(parents.rows.map((row) => row.parent_sha)).toEqual([null, shas[0], shas[1]]);
+  });
+
+  it("reads the head once when it expects a base", async () => {
+    const scenario = await arrange();
+    const first = await landed(scenario, writeFor());
+
+    const started = await gitStarts(() => landed(scenario, writeFor({ expects: { base: null } })));
+
+    expect(started.filter((subcommand) => subcommand === "rev-parse")).toEqual(["rev-parse"]);
+    expect(started).toHaveLength(7);
+    expect(await bundleHistory(scenario.git, scenario.workspaceId)).toEqual([
+      first.sha,
+      expect.any(String),
+    ]);
   });
 });
 
