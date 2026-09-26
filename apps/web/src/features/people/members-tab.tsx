@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-table";
 import { useId, useMemo, useRef, useState } from "react";
 
+import { GridTable } from "@/shared/grid-table.tsx";
 import { Icon } from "@/shared/icon.tsx";
 import { useKeystroke } from "@/shared/keystrokes.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
@@ -16,7 +17,6 @@ import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
-import { GridTable } from "./grid-table.tsx";
 import { MemberSheet, memberButtonId, type OpenedAt } from "./member-sheet.tsx";
 import { useMembers, type ListedMember } from "./people-api.ts";
 import { PEOPLE_KEYSTROKES } from "./people-state.ts";

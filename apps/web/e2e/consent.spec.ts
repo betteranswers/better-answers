@@ -1,42 +1,17 @@
-import { createHash, randomBytes } from "node:crypto";
-
 import type { Page } from "@playwright/test";
 
 import { expect, test } from "./browser.ts";
-import { addMember, anAddress, person, provision, revokeCredentials, signIn } from "./harness.ts";
-
-const CLIENT_ID = "https://claude.ai/oauth/mcp-oauth-client-metadata";
-const REDIRECT_URI = "https://claude.ai/api/mcp/auth_callback";
-
-const aChallenge = (): string =>
-  createHash("sha256").update(randomBytes(64).toString("base64url")).digest("base64url");
-
-const authorizeUrl = (
-  baseURL: string,
-  options: { readonly prompt?: "consent" | undefined; readonly state?: string } = {},
-): string => {
-  const query = new URLSearchParams({
-    client_id: CLIENT_ID,
-    redirect_uri: REDIRECT_URI,
-    response_type: "code",
-    code_challenge: aChallenge(),
-    code_challenge_method: "S256",
-    resource: `${baseURL}/mcp`,
-    scope: "knowledge:read feedback:write offline_access",
-    state: options.state ?? "state-from-the-host",
-  });
-  if (options.prompt !== undefined) query.set("prompt", options.prompt);
-  return `/oauth2/authorize?${query.toString()}`;
-};
-
-const catchClaudesRedirect = (page: Page) =>
-  page.route(`${REDIRECT_URI}*`, (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "text/html",
-      body: "<!doctype html><title>Claude</title><p>The client received the redirect.</p>",
-    }),
-  );
+import {
+  addMember,
+  anAddress,
+  catchClaudesRedirect,
+  CLAUDES_REDIRECT_URI,
+  claudesAuthorizeUrl,
+  person,
+  provision,
+  revokeCredentials,
+  signIn,
+} from "./harness.ts";
 
 const landedAt = (page: Page): URL => new URL(page.url());
 
@@ -49,7 +24,7 @@ const displayNameHeading = (page: Page) =>
 const connectedAt = async (page: Page): Promise<URL> => {
   await page.getByRole("button", { name: "Connect" }).click();
   const callback = landedAt(page);
-  expect(`${callback.origin}${callback.pathname}`).toBe(REDIRECT_URI);
+  expect(`${callback.origin}${callback.pathname}`).toBe(CLAUDES_REDIRECT_URI);
   expect(callback.searchParams.get("code")).not.toBeNull();
   return callback;
 };
@@ -69,7 +44,7 @@ test("carries sign-in through consent to Claude's code on one origin", async ({
   await signIn(page, request, email);
   await expect(page).toHaveURL(/\/system\/routes-and-spend$/);
 
-  await page.goto(authorizeUrl(origin, { prompt: "consent" }));
+  await page.goto(claudesAuthorizeUrl(origin, { prompt: "consent" }));
 
   await expect(consentHeading(page)).toBeVisible();
   expect(landedAt(page).origin).toBe(origin);
@@ -103,22 +78,22 @@ test("asks consent again only when the host asks for it", async ({
   await page.goto("/sign-in");
   await signIn(page, request, email);
 
-  await page.goto(authorizeUrl(origin, { prompt: "consent", state: "first" }));
+  await page.goto(claudesAuthorizeUrl(origin, { prompt: "consent", state: "first" }));
   await expect(consentHeading(page)).toBeVisible();
   await passesTheAccessibilityGate();
   await page.getByRole("button", { name: "Connect" }).click();
   expect(landedAt(page).searchParams.get("state")).toBe("first");
 
-  await page.goto(authorizeUrl(origin, { prompt: "consent", state: "second" }));
+  await page.goto(claudesAuthorizeUrl(origin, { prompt: "consent", state: "second" }));
   await expect(consentHeading(page)).toBeVisible();
   expect(landedAt(page).pathname).toBe("/consent");
   await page.getByRole("button", { name: "Connect" }).click();
   expect(landedAt(page).searchParams.get("state")).toBe("second");
   expect(landedAt(page).searchParams.get("code")).not.toBeNull();
 
-  await page.goto(authorizeUrl(origin, { state: "third" }));
+  await page.goto(claudesAuthorizeUrl(origin, { state: "third" }));
   const skipped = landedAt(page);
-  expect(`${skipped.origin}${skipped.pathname}`).toBe(REDIRECT_URI);
+  expect(`${skipped.origin}${skipped.pathname}`).toBe(CLAUDES_REDIRECT_URI);
   expect(skipped.searchParams.get("state")).toBe("third");
   expect(skipped.searchParams.get("code")).not.toBeNull();
   await expect(consentHeading(page)).toHaveCount(0);
@@ -136,14 +111,14 @@ test("cancelling consent sends the client a refusal and no code", async ({
   await catchClaudesRedirect(page);
   await page.goto("/sign-in");
   await signIn(page, request, email);
-  await page.goto(authorizeUrl(origin, { prompt: "consent" }));
+  await page.goto(claudesAuthorizeUrl(origin, { prompt: "consent" }));
   await expect(consentHeading(page)).toBeVisible();
   await passesTheAccessibilityGate();
 
   await page.getByRole("button", { name: "Cancel" }).click();
 
   const callback = landedAt(page);
-  expect(`${callback.origin}${callback.pathname}`).toBe(REDIRECT_URI);
+  expect(`${callback.origin}${callback.pathname}`).toBe(CLAUDES_REDIRECT_URI);
   expect(callback.searchParams.get("error")).toBe("access_denied");
   expect(callback.searchParams.get("code")).toBeNull();
 });
@@ -160,7 +135,7 @@ test("refuses consent after credentials are revoked, sending no code", async ({
   await catchClaudesRedirect(page);
   await page.goto("/sign-in");
   await signIn(page, request, email);
-  await page.goto(authorizeUrl(origin, { prompt: "consent" }));
+  await page.goto(claudesAuthorizeUrl(origin, { prompt: "consent" }));
   await expect(consentHeading(page)).toBeVisible();
   /* jscpd:ignore-end */
 
@@ -182,7 +157,7 @@ test("takes a named member from connector sign-in straight to consent", async ({
   await provision(request, { name: "Named Connecting Ltd", adminEmail: email });
   await catchClaudesRedirect(page);
 
-  await page.goto(authorizeUrl(baseURL ?? "", { prompt: "consent" }));
+  await page.goto(claudesAuthorizeUrl(baseURL ?? "", { prompt: "consent" }));
   await signIn(page, request, email);
 
   await expect(consentHeading(page)).toBeVisible();
@@ -204,7 +179,7 @@ test("asks an unnamed member's name, then carries on through consent", async ({
   await addMember(request, { workspaceId: workspace.workspaceId, userId: who.id, role: "Editor" });
   await catchClaudesRedirect(page);
 
-  await page.goto(authorizeUrl(origin, { prompt: "consent", state: "named-first" }));
+  await page.goto(claudesAuthorizeUrl(origin, { prompt: "consent", state: "named-first" }));
   await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
   expect(landedAt(page).pathname).toBe("/sign-in");
   await signIn(page, request, email);
@@ -223,7 +198,7 @@ test("asks an unnamed member's name, then carries on through consent", async ({
 });
 
 test("asks a non-member's name, then says No workspace yet", async ({ page, request, baseURL }) => {
-  await page.goto(authorizeUrl(baseURL ?? ""));
+  await page.goto(claudesAuthorizeUrl(baseURL ?? ""));
   await signIn(page, request, anAddress("unplaced"));
 
   await expect(displayNameHeading(page)).toBeVisible();

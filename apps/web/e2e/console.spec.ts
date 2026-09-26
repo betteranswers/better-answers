@@ -7,6 +7,7 @@ import {
   markTheOperator,
   person,
   provision,
+  signedInAtHome,
   signIn,
   skipLinkReachesTheScreen,
 } from "./harness.ts";
@@ -30,13 +31,6 @@ const listOf = (page: Page) => page.getByRole("region", { name: "Every workspace
 const itemOf = (page: Page, name: string) =>
   listOf(page).getByRole("listitem", { name, exact: true });
 
-/** Signed in on the product's own screen, so the session is the one a person would hold. */
-const signedInAs = async (page: Page, api: APIRequestContext, email: string) => {
-  await page.goto("/sign-in");
-  await signIn(page, api, email);
-  await expect(page.getByRole("heading", { level: 1, name: "System" })).toBeVisible();
-};
-
 /**
  * The console lists every workspace the run provisioned, so a name another spec also uses would
  * match two rows.
@@ -51,14 +45,14 @@ const theOperator = async (page: Page, api: APIRequestContext, workspaceName: st
     adminEmail: email,
   });
   await markTheOperator(api, email);
-  await signedInAs(page, api, email);
+  await signedInAtHome(page, api, email);
   return workspace;
 };
 
 const anAdmin = async (page: Page, api: APIRequestContext, workspaceName: string) => {
   const email = anAddress("admin");
   const workspace = await provision(api, { name: workspaceName, adminEmail: email });
-  await signedInAs(page, api, email);
+  await signedInAtHome(page, api, email);
   return workspace;
 };
 
@@ -234,17 +228,17 @@ test.describe("the console's Workspaces screen", () => {
     await expect(railOf(page)).toHaveCount(0);
   });
 
-  test("says People's two views are not built yet", async ({ page, request }) => {
+  test("opens People on Everyone, and Names waiting is unbuilt", async ({ page, request }) => {
     await theOperator(page, request, "Halifax Fabrication");
     await page.goto(WORKSPACES_VIEW);
 
     await railOf(page).getByRole("link", { name: "People" }).click();
 
     await expect(page).toHaveURL("/console/people/everyone");
-    await expect(page.getByRole("navigation", { name: "People" }).getByRole("link")).toHaveText([
-      "Everyone",
-      "Names waiting",
-    ]);
+    await expect(page.getByRole("region", { name: "Everyone" })).toBeVisible();
+    const views = page.getByRole("navigation", { name: "People" }).getByRole("link");
+    await expect(views).toHaveText(["Everyone", "Names waiting"]);
+    await views.filter({ hasText: "Names waiting" }).click();
     await expect(page.getByText("This view is not built yet.")).toBeVisible();
   });
 

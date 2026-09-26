@@ -14,6 +14,7 @@ import {
   moveTheIndexRun,
   seedBindings,
 } from "./harness-sources.ts";
+import { sessionsSignedInOverAnHourAgo } from "./provoke.ts";
 
 const HARNESS_PREFIX = "/__harness";
 
@@ -51,6 +52,7 @@ const seeding = z.object({
 });
 const ending = z.object({ workspaceId: z.string().min(1), userId: z.string().min(1) });
 const marking = z.object({ email: z.string().min(1), change: z.enum(["grant", "revoke"]) });
+const aging = z.object({ userId: z.string().min(1) });
 
 const readBody = async <T>(request: Request, schema: z.ZodType<T>): Promise<T> => {
   const parsed = schema.safeParse(await request.json());
@@ -88,6 +90,13 @@ export const harnessControl = (app: TestApp): Hono => {
 
     await app.revokeCredentials(asked.userId, new Date(Date.now() + 1_000));
     return context.json({ revoked: true });
+  });
+
+  // An hour is too long for a spec to wait, so the sign-in is moved back behind the api's back.
+  control.post(`${HARNESS_PREFIX}/sign-ins/aged`, async (context) => {
+    const asked = await readBody(context.req.raw, aging);
+    await sessionsSignedInOverAnHourAgo(app, asked.userId);
+    return context.json({ aged: true });
   });
 
   control.delete(`${HARNESS_PREFIX}/members`, async (context) => {

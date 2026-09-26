@@ -19,3 +19,7 @@ export const instantWords = (iso: string): string => `${timeWords(iso)} · ${day
 
 export const counted = (count: number, one: string, many: string): string =>
   `${count} ${count === 1 ? one : many}`;
+
+/** A person who has given no display name yet is named by their address. */
+export const nameOrAddress = (displayName: string, address: string): string =>
+  displayName === "" ? address : displayName;

@@ -1,3 +1,5 @@
+import { createHash, randomBytes } from "node:crypto";
+
 import { expect, test, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 import { z } from "zod";
 
@@ -78,6 +80,74 @@ export const invite = (
     role: "Admin" | "Editor" | "Viewer";
   },
 ) => ask(api, "/invitations", input, invitationWritten);
+
+const signInAged = z.object({ aged: z.boolean() });
+
+/** How a spec meets `sign-in-too-old` without waiting the hour out. */
+export const ageTheSignIn = (api: APIRequestContext, userId: string) =>
+  ask(api, "/sign-ins/aged", { userId }, signInAged);
+
+export const CLAUDES_REDIRECT_URI = "https://claude.ai/api/mcp/auth_callback";
+
+const CLAUDE = {
+  client_id: "https://claude.ai/oauth/mcp-oauth-client-metadata",
+  redirect_uri: CLAUDES_REDIRECT_URI,
+} as const;
+
+/** A verifier and its challenge, as Claude mints a pair for each connection. */
+export const aPkcePair = () => {
+  const verifier = randomBytes(64).toString("base64url");
+  return { verifier, challenge: createHash("sha256").update(verifier).digest("base64url") };
+};
+
+/** Claude's authorize request for the MCP surface at `origin`. */
+export const claudesAuthorizeUrl = (
+  origin: string,
+  options: {
+    readonly challenge?: string;
+    readonly prompt?: "consent" | undefined;
+    readonly state?: string;
+  } = {},
+): string => {
+  const query = new URLSearchParams({
+    ...CLAUDE,
+    response_type: "code",
+    code_challenge: options.challenge ?? aPkcePair().challenge,
+    code_challenge_method: "S256",
+    resource: `${origin}/mcp`,
+    scope: "knowledge:read feedback:write offline_access",
+    state: options.state ?? "state-from-the-host",
+  });
+  if (options.prompt !== undefined) query.set("prompt", options.prompt);
+  return `/oauth2/authorize?${query.toString()}`;
+};
+
+/** claude.ai is out of the suite's reach, so a stand-in page answers its redirect. */
+export const catchClaudesRedirect = (page: Page) =>
+  page.route(`${CLAUDES_REDIRECT_URI}*`, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "text/html",
+      body: "<!doctype html><title>Claude</title><p>The client received the redirect.</p>",
+    }),
+  );
+
+/** The code exchanged as Claude does, which is when the grant's refresh token is minted. */
+export const claudeExchanges = async (
+  api: APIRequestContext,
+  asked: { readonly origin: string; readonly code: string; readonly verifier: string },
+): Promise<void> => {
+  const exchanged = await api.post("/oauth2/token", {
+    form: {
+      ...CLAUDE,
+      resource: `${asked.origin}/mcp`,
+      grant_type: "authorization_code",
+      code: asked.code,
+      code_verifier: asked.verifier,
+    },
+  });
+  expect(exchanged.ok(), `the code's exchange answered ${exchanged.status()}`).toBe(true);
+};
 
 export type SeedRoute = {
   readonly purpose: "extraction" | "enrichment" | "answering" | "judging" | "embedding";
@@ -227,6 +297,17 @@ export const keystrokesListed = async (page: Page, screen: string): Promise<Loca
   const listed = page.getByRole("dialog", { name: `Keystrokes on ${screen}` });
   await expect(listed).toBeVisible();
   return listed;
+};
+
+/** From the sign-in screen to Control Centre's home, as a member of one workspace arrives. */
+export const signedInAtHome = async (
+  page: Page,
+  api: APIRequestContext,
+  email: string,
+): Promise<void> => {
+  await page.goto("/sign-in");
+  await signIn(page, api, email);
+  await expect(page.getByRole("heading", { level: 1, name: "System" })).toBeVisible();
 };
 
 const ACT_BUDGET_MS = 100;

@@ -85,7 +85,7 @@ the side that counts. Read the numbers off those files rather than from here.
 ## The harness's acts
 
 State is built through the api's harness over HTTP, from `apps/web/e2e/harness.ts`, using the
-`request` fixture. Nothing writes a row itself and nothing sets a cookie from outside. Ten acts
+`request` fixture. Nothing writes a row itself and nothing sets a cookie from outside. Twelve acts
 call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources two from
 `apps/api/tests/harness-sources.ts` and the People one from `apps/api/tests/harness-people.ts`:
 
@@ -98,26 +98,37 @@ call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources
 | `revokeCredentials` | Revokes a person's credentials, so the next request is refused |
 | `markTheOperator` | Grants the operator mark to the person holding an address, or clears it with `"revoke"`, through the ops command's own act and principal — the console's door, and a mark cleared under an open page |
 | `invite` | A waiting invitation to an address at a named role, as the invite act leaves it, with no email sent |
+| `ageTheSignIn` | Moves every session a person holds to a sign-in 61 minutes ago, behind the api's back — how a spec meets `sign-in-too-old` without waiting an hour |
 | `seedRoutes` | The routes a workspace has chosen; a purpose left out of the list has no route, which the screen must show rather than omit |
 | `seedBindings` | Source bindings as their acts and the worker leave them — documents, findings kept or overridden by an erasure, quarantined documents, chunks, an index run at any status, a concept and composition citing a document — answering each binding's and document's id |
 | `moveTheIndexRun` | The worker's two steps over the workspace's one index run, claimed then done, through the queue's own functions under the worker's role — how a spec watches a state word move without a worker process |
 | `makeGroups` | Groups made by a named member through the members slice's own act, one transaction each — the member's own acts on the audit log, until groups have a screen |
 
-Eight more helpers in the same module drive the browser rather than the harness:
+Nine more helpers in the same module drive the browser rather than the harness:
 
 | Helper | What it does |
 | --- | --- |
 | `anAddress` | An email address nobody else in the run will use, so a code read back is this test's |
 | `signIn` | Signs a person in **through the product's own screen** — fill the address, send, read the six-digit code back from the captured transport, fill it, submit, and wait for the code field to be gone rather than for the click |
 | `aMemberSignedInAt` | A new workspace's Editor or Viewer, signed in having asked for a path first, so sign-in carries them back to it — where a refused screen is proved |
+| `signedInAtHome` | Opens the sign-in screen, runs `signIn`, and waits for Control Centre's home, as a member of one workspace arrives |
 | `signOutFromTheShell` | Opens the top bar's menu, then signs out, because sign-out is one disclosure in |
 | `skipLinkReachesTheScreen` | Tab, the skip link has focus, Enter, `main` has focus — where a shell spec's keyboard traversal starts |
 | `keystrokesListed` | Presses `?` and answers the screen's list of keystrokes once it is open |
 | `clockTheNextKey` | Starts the act's clock in the page: from the next key to the node an XPath names reading a given text |
 | `theActLandedWithinItsBudget` | Reads that clock, annotates the test with it and asserts it under the act's 100 ms |
 
-The code is read from that capture and from nowhere else: the api's logger is forbidden from ever
+The sign-in code is read from that capture and from nowhere else: the api's logger is forbidden from ever
 holding one.
+
+Four more play Claude's part in its OAuth flow on the suite's own origin — `apps/web/e2e/consent.spec.ts` for the consent screen, `apps/web/e2e/console-people.spec.ts` for a person holding a client grant:
+
+| Helper | What it does |
+| --- | --- |
+| `aPkcePair` | A verifier and its challenge, as Claude mints one for each connection |
+| `claudesAuthorizeUrl` | Claude's authorize request for the MCP surface at an origin, with an optional challenge, `prompt` and `state` |
+| `catchClaudesRedirect` | Answers the redirect to claude.ai with a stand-in page, since the suite cannot reach it |
+| `claudeExchanges` | Exchanges the code at the redirect for tokens, which is when the grant's refresh token is minted |
 
 ## Writing a spec
 

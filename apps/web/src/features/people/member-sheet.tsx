@@ -2,19 +2,14 @@ import { useId, useRef, useState, type RefObject } from "react";
 
 import type { ApiError } from "@/shared/api/trpc.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
+import { RowSheet } from "@/shared/row-sheet.tsx";
 import { SummaryRow } from "@/shared/summary-row.tsx";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 import { RadioGroup, RadioGroupItem } from "@/shared/ui/radio-group.tsx";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/shared/ui/sheet.tsx";
+import { SheetDescription, SheetHeader, SheetTitle } from "@/shared/ui/sheet.tsx";
 
 import { useChangeRole, type ListedMember, type Role, type RoleChanged } from "./people-api.ts";
 import { aRole, ROLE_MEANINGS, roleOf, ROLES } from "./role-meanings.ts";
@@ -156,47 +151,36 @@ export function MemberSheet(properties: {
   const pickerRef = useRef<HTMLDivElement>(null);
 
   return (
-    <Sheet
-      open
-      onOpenChange={(open) => {
-        if (!open) onClose();
+    <RowSheet
+      rowButtonId={memberButtonId(member.personId)}
+      onOpen={() => {
+        if (openedAt === "role") {
+          pickerRef.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus();
+        } else {
+          titleRef.current?.focus();
+        }
       }}
+      onClose={onClose}
     >
-      <SheetContent
-        className="overflow-y-auto sm:max-w-md"
-        onOpenAutoFocus={(event) => {
-          event.preventDefault();
-          if (openedAt === "role") {
-            pickerRef.current?.querySelector<HTMLElement>('[aria-checked="true"]')?.focus();
-          } else {
-            titleRef.current?.focus();
-          }
-        }}
-        onCloseAutoFocus={(event) => {
-          event.preventDefault();
-          document.getElementById(memberButtonId(member.personId))?.focus();
-        }}
-      >
-        <SheetHeader className="border-b border-border">
-          <div className="flex items-center gap-3 pr-8">
-            <Avatar aria-hidden className="size-9">
-              <AvatarFallback>{initialsOf(member)}</AvatarFallback>
-            </Avatar>
-            <div className="flex min-w-0 flex-col leading-tight">
-              <SheetTitle asChild>
-                <h2 ref={titleRef} tabIndex={-1} className="wrap-anywhere">
-                  {nameOf(member)}
-                </h2>
-              </SheetTitle>
-              <SheetDescription className="wrap-anywhere">{member.address}</SheetDescription>
-            </div>
+      <SheetHeader className="border-b border-border">
+        <div className="flex items-center gap-3 pr-8">
+          <Avatar aria-hidden className="size-9">
+            <AvatarFallback>{initialsOf(member)}</AvatarFallback>
+          </Avatar>
+          <div className="flex min-w-0 flex-col leading-tight">
+            <SheetTitle asChild>
+              <h2 ref={titleRef} tabIndex={-1} className="wrap-anywhere">
+                {nameOf(member)}
+              </h2>
+            </SheetTitle>
+            <SheetDescription className="wrap-anywhere">{member.address}</SheetDescription>
           </div>
-        </SheetHeader>
-        <div className="grid gap-4 px-4 pb-4">
-          <Membership member={member} />
-          <RolePicker member={member} pickerRef={pickerRef} />
         </div>
-      </SheetContent>
-    </Sheet>
+      </SheetHeader>
+      <div className="grid gap-4 px-4 pb-4">
+        <Membership member={member} />
+        <RolePicker member={member} pickerRef={pickerRef} />
+      </div>
+    </RowSheet>
   );
 }

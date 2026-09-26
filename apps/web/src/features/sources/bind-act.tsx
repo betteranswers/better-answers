@@ -1,6 +1,7 @@
 import { ulid } from "@better-answers/schema/ulid";
 import { useId, useState, type FormEvent } from "react";
 
+import { ActDialog } from "@/shared/act-dialog.tsx";
 import { watchUpload, type UploadProgress } from "@/shared/api/upload-progress.ts";
 import { useKeystroke } from "@/shared/keystrokes.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
@@ -16,7 +17,6 @@ import {
   SelectValue,
 } from "@/shared/ui/select.tsx";
 
-import { ActDialog } from "./act-dialog.tsx";
 import { outcomeOfFailure, refusedFor } from "./refusal.tsx";
 import { CLASSES, EVERYONE, NARROWEST, useBind } from "./sources-api.ts";
 import { SOURCES_KEYSTROKES } from "./sources-state.ts";

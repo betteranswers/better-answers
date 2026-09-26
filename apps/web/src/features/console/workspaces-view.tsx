@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import type { inferOutput } from "@trpc/tanstack-react-query";
-import { useId, type ReactNode } from "react";
+import { useId } from "react";
 
 import { useTRPC } from "@/shared/api/trpc.ts";
 import { consoleScreenById } from "@/shared/screens.ts";
@@ -9,6 +9,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { counted, dayWords } from "@/shared/words.ts";
 
+import { Facts } from "./facts.tsx";
 import { RefusalLine } from "./refusal-line.tsx";
 import { readRefused } from "./words.ts";
 
@@ -24,12 +25,6 @@ const useWorkspaces = () => {
 };
 
 const TERM = "text-muted-foreground";
-
-function Facts(properties: { readonly children: ReactNode }) {
-  return (
-    <dl className="mt-2 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">{properties.children}</dl>
-  );
-}
 
 function WorkspaceItem(properties: { readonly workspace: ListedWorkspace }) {
   const { workspace } = properties;
