@@ -27,3 +27,29 @@ const SAID_OF_WORD = {
 
 export const outcomeOfFailure = (failure: Error | ApiError): Outcome =>
   failureOutcome(SAID_OF_WORD, failure);
+
+const SAID_OF_AN_INVITATION = {
+  "role-forbids": {
+    why: "Only an Admin of this workspace sees and sends its invitations.",
+    next: "Ask one of its Admins to invite the person.",
+  },
+  "already-a-member": {
+    why: "That address belongs to a member of this workspace already.",
+    next: "Find them on the Members tab.",
+  },
+  "no-such-invitation": {
+    why: "That invitation is no longer waiting: it was accepted or cancelled.",
+    next: "Read the list again.",
+  },
+  "no-such-role": {
+    why: "A role is Admin, Editor or Viewer.",
+    next: "Choose one of the three.",
+  },
+  malformed: {
+    why: "That is not an email address.",
+    next: "Check the address and send the invitation again.",
+  },
+} satisfies SaidOfWord;
+
+export const outcomeOfInvitationFailure = (failure: Error | ApiError): Outcome =>
+  failureOutcome(SAID_OF_AN_INVITATION, failure);

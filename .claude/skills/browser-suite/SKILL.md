@@ -85,7 +85,7 @@ the side that counts. Read the numbers off those files rather than from here.
 ## The harness's acts
 
 State is built through the api's harness over HTTP, from `apps/web/e2e/harness.ts`, using the
-`request` fixture. Nothing writes a row itself and nothing sets a cookie from outside. Nine acts
+`request` fixture. Nothing writes a row itself and nothing sets a cookie from outside. Ten acts
 call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources two from
 `apps/api/tests/harness-sources.ts` and the People one from `apps/api/tests/harness-people.ts`:
 
@@ -97,6 +97,7 @@ call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources
 | `removeMember` | Ends a membership, as the People screen will |
 | `revokeCredentials` | Revokes a person's credentials, so the next request is refused |
 | `markTheOperator` | Grants the operator mark to the person holding an address, or clears it with `"revoke"`, through the ops command's own act and principal — the console's door, and a mark cleared under an open page |
+| `invite` | A waiting invitation to an address at a named role, as the invite act leaves it, with no email sent |
 | `seedRoutes` | The routes a workspace has chosen; a purpose left out of the list has no route, which the screen must show rather than omit |
 | `seedBindings` | Source bindings as their acts and the worker leave them — documents, findings kept or overridden by an erasure, quarantined documents, chunks, an index run at any status, a concept and composition citing a document — answering each binding's and document's id |
 | `moveTheIndexRun` | The worker's two steps over the workspace's one index run, claimed then done, through the queue's own functions under the worker's role — how a spec watches a state word move without a worker process |

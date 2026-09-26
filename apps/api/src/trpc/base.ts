@@ -15,13 +15,17 @@ import {
 } from "@better-answers/core/kernel";
 import {
   consumeIngress,
+  folded,
   withHeldPrincipal,
+  withMembership,
   withOperator,
   withPrincipal,
   type CounterRule,
+  type Folded,
   type Tx,
 } from "@better-answers/core/store/postgres";
 
+import type { Mail } from "../email.ts";
 import { sessionClaims, type SessionReader } from "../auth/verify.ts";
 import type { Doors } from "../doors.ts";
 import { refusalLogged, refusalOf, RefusedError, type RefusalAnswer } from "../refusal.ts";
@@ -32,6 +36,7 @@ type TrpcContext = {
   readonly readSession: SessionReader;
   readonly headers: Headers;
   readonly log: Logger;
+  readonly mail: Mail;
 };
 
 /** Spelled here because tRPC exports the Standard Schema type only from a path it marks internal. */
@@ -244,6 +249,13 @@ export const ownTransactionProcedure = trpc.procedure.use(async ({ ctx, next }) 
 
   return next({ ctx: { principal: resolved.value.value, doors: ctx.doors } });
 });
+
+/** Answers only once the act committed, so a follow-up such as an email never outruns the write. */
+export const committedAs = async <Value, Refused>(
+  ctx: { readonly principal: UserPrincipal; readonly doors: Doors },
+  act: (principal: UserPrincipal, tx: Tx) => Promise<Result<Value, Refused>>,
+): Promise<Folded<Result<Value, Refused>>> =>
+  folded<Result<Value, Refused>>(await withMembership(ctx.principal, ctx.doors.postgres, act));
 
 /**
  * An act on the person themselves needs no workspace; the person is the session's, never a

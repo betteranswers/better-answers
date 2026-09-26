@@ -66,6 +66,18 @@ export const markTheOperator = (
   email: string,
   change: "grant" | "revoke" = "grant",
 ) => ask(api, "/operators", { email, change }, operatorMarked);
+const invitationWritten = z.object({ id: z.string() });
+
+// A waiting invitation as the invite act leaves it, less the email, which no spec reads.
+export const invite = (
+  api: APIRequestContext,
+  input: {
+    workspaceId: string;
+    email: string;
+    inviterId: string;
+    role: "Admin" | "Editor" | "Viewer";
+  },
+) => ask(api, "/invitations", input, invitationWritten);
 
 export type SeedRoute = {
   readonly purpose: "extraction" | "enrichment" | "answering" | "judging" | "embedding";

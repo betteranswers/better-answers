@@ -119,3 +119,29 @@ export const sessionPointedAt = async (
     [userId, workspaceId],
   );
 };
+
+/**
+ * Every write an act makes lands, and its commit is what fails, so anything sent before the
+ * commit would already have gone.
+ */
+export const whileCommitsAreRefused = async <T>(
+  app: TestApp,
+  table: string,
+  work: () => Promise<T>,
+): Promise<T> => {
+  const store = app.database.superuser;
+  await store.query(
+    `CREATE FUNCTION test_refuse_commit() RETURNS trigger LANGUAGE plpgsql AS $$
+     BEGIN RAISE EXCEPTION 'the store refused the commit'; END $$`,
+  );
+  await store.query(
+    `CREATE CONSTRAINT TRIGGER test_refuse_commit AFTER INSERT OR UPDATE ON "${table}"
+     DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION test_refuse_commit()`,
+  );
+  try {
+    return await work();
+  } finally {
+    await store.query(`DROP TRIGGER test_refuse_commit ON "${table}"`);
+    await store.query("DROP FUNCTION test_refuse_commit()");
+  }
+};

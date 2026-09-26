@@ -32,6 +32,12 @@ const membership = z.object({
   role: z.enum(["Admin", "Editor", "Viewer"]),
 });
 const revocation = z.object({ userId: z.string().min(1) });
+const invitation = z.object({
+  workspaceId: z.string().min(1),
+  email: z.string().min(1),
+  inviterId: z.string().min(1),
+  role: z.enum(["Admin", "Editor", "Viewer"]),
+});
 const seeding = z.object({
   workspaceId: z.string().min(1),
 
@@ -70,6 +76,11 @@ export const harnessControl = (app: TestApp): Hono => {
     const asked = await readBody(context.req.raw, membership);
     await app.addMember(asked.workspaceId, asked.userId, asked.role);
     return context.json({ added: true });
+  });
+
+  control.post(`${HARNESS_PREFIX}/invitations`, async (context) => {
+    const asked = await readBody(context.req.raw, invitation);
+    return context.json(await app.invite(asked));
   });
 
   control.post(`${HARNESS_PREFIX}/revocations`, async (context) => {

@@ -6,6 +6,7 @@ export const MEMBER_REFUSALS = declareRefusals("members", {
   "not-in-group": "absent",
   "no-such-request": "absent",
   "no-such-role": "absent",
+  "no-such-invitation": "absent",
 
   "name-taken": "conflict",
   "already-in-group": "conflict",

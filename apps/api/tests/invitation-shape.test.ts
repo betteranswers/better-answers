@@ -1,11 +1,13 @@
-import { readFileSync } from "node:fs";
-import { createRequire } from "node:module";
-import path from "node:path";
-
 import { getTableColumns } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
-import { invitation, INVITATION_EXPIRY_SECONDS } from "@better-answers/schema";
+import {
+  invitation,
+  INVITATION_CANCELLED_STATUS,
+  INVITATION_EXPIRY_SECONDS,
+  INVITATION_WAITING_STATUS,
+} from "@better-answers/schema";
 
 import { authAsServerBuildsIt } from "./auth-instance.ts";
 
@@ -18,34 +20,31 @@ type Field = {
   defaultValue?: unknown;
 };
 
-const invitationFields = (): Readonly<Record<string, Field>> => {
+type OrganisationPlugin = {
+  schema?: { invitation?: { fields?: Record<string, Field> } };
+};
+
+const organisationPlugin = (): OrganisationPlugin | undefined => {
   const plugins: readonly unknown[] = auth.options.plugins;
-  const organisation = plugins.find(
-    (plugin): plugin is { schema?: { invitation?: { fields?: Record<string, Field> } } } =>
+  return plugins.find(
+    (plugin): plugin is OrganisationPlugin =>
       typeof plugin === "object" &&
       plugin !== null &&
       "id" in plugin &&
       plugin.id === "organization",
   );
-  return organisation?.schema?.invitation?.fields ?? {};
 };
+
+const invitationFields = (): Readonly<Record<string, Field>> =>
+  organisationPlugin()?.schema?.invitation?.fields ?? {};
+
+const TOLD_AN_EXPIRY = z.object({ options: z.object({ invitationExpiresIn: z.number() }) });
 
 const platformKey = (key: string, field: Field): string =>
   typeof field.fieldName === "string" ? field.fieldName : key;
 
 const columns = (): Readonly<Record<string, { notNull: boolean; hasDefault: boolean }>> =>
   getTableColumns(invitation);
-
-const expirySecondsInInstalledPlugin = (): number => {
-  const entry = createRequire(import.meta.url).resolve("better-auth");
-  const adapter = path.resolve(path.dirname(entry), "plugins/organization/adapter.mjs");
-  const matches = [
-    ...readFileSync(adapter, "utf8").matchAll(/invitationExpiresIn\s*\|\|\s*([\d\s*]+?)\s*,/g),
-  ];
-  expect(matches).toHaveLength(1);
-  const expression = matches[0]?.[1] ?? "";
-  return expression.split("*").reduce((product, factor) => product * Number(factor.trim()), 1);
-};
 
 describe("the invitation an approved access request mints", () => {
   it("carries exactly the columns the organisation plugin declares", () => {
@@ -66,12 +65,16 @@ describe("the invitation an approved access request mints", () => {
   it("starts an invitation at the plugin's default status, pending", () => {
     const status = invitationFields()["status"];
     expect(status?.defaultValue).toBe("pending");
+    expect(INVITATION_WAITING_STATUS).toBe("pending");
     expect(columns()["status"]?.hasDefault).toBe(true);
   });
 
-  it("expires an invitation at the installed plugin's own default", () => {
-    const seconds = expirySecondsInInstalledPlugin();
-    expect(seconds).toBeGreaterThan(0);
-    expect(INVITATION_EXPIRY_SECONDS).toBe(seconds);
+  it("cancels in the plugin's own word, which its reads speak", () => {
+    expect(INVITATION_CANCELLED_STATUS).toBe("canceled");
+  });
+
+  it("expires an invitation after seven days, as the plugin says", () => {
+    expect(INVITATION_EXPIRY_SECONDS).toBe(604_800);
+    expect(TOLD_AN_EXPIRY.parse(organisationPlugin()).options.invitationExpiresIn).toBe(604_800);
   });
 });
