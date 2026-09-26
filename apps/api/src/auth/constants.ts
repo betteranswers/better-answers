@@ -11,6 +11,7 @@ export const REFRESH_TOKEN_LIFETIME_SECONDS = 90 * 24 * 60 * 60;
 export const MCP_SCOPES = ["knowledge:read", "feedback:write"] as const;
 export const OAUTH_SCOPES = [...MCP_SCOPES, "offline_access"] as const;
 export type McpScope = (typeof MCP_SCOPES)[number];
+export type OAuthScope = (typeof OAUTH_SCOPES)[number];
 
 export const MCP_REQUIRED_SCOPE: McpScope = "knowledge:read";
 
@@ -25,6 +26,8 @@ export const PAGE_IP_RULE: CounterRule = { windowMs: 60_000, max: 30 };
 export const EMAIL_CODE_EMAIL_RULE: CounterRule = { windowMs: 10 * 60_000, max: 5 };
 
 export const SEND_EMAIL_CODE_PATH = "/email-otp/send-verification-otp";
+
+export const SIGN_IN_PATH = "/sign-in";
 
 export const MCP_UNAUTHENTICATED_IP_RULE: CounterRule = { windowMs: 60_000, max: 60 };
 

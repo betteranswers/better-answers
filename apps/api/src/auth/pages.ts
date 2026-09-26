@@ -1,9 +1,65 @@
+import { OAUTH_SCOPES, type OAuthScope, SIGN_IN_PATH } from "./constants.ts";
+
 const escape = (value: string): string =>
   value
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+
+const strong = (value: string): string => `<strong>${escape(value)}</strong>`;
+
+/** The consent page's words. The page's body passes each value in escaped and marked up. */
+export const CONSENT_WORDS = {
+  title: (client: string) => `Connect ${client}`,
+  actsAs: (client: string, workspace: string) => `${client} will act as you, at ${workspace}.`,
+  hostedAt: (client: string, host: string) =>
+    `This app calls itself “${client}” and is hosted at ${host}.`,
+  goesNext: (host: string) =>
+    `Connect takes you to ${host}, so if you did not expect that address, cancel.`,
+  scopes: {
+    "knowledge:read": "Read what you can see of the company's knowledge",
+    "feedback:write": "Send your feedback on answers",
+    offline_access: "Stay connected until you disconnect it, without signing in each time",
+  } satisfies Record<OAuthScope, string>,
+  recorded: (client: string) =>
+    `Every question you ask through ${client} is recorded as asked by you.`,
+  connect: "Connect",
+  cancel: "Cancel",
+} as const;
+
+type RefusalWords = { readonly title: string; readonly why: string; readonly next: string };
+
+const START_AGAIN = "Start the connection again from where you began it.";
+
+/** Each refusal page's words. `next` is the page's last line, or its sign-in link's label. */
+export const REFUSAL_PAGES = {
+  crossSite: {
+    title: "Nothing was connected",
+    why: "This form can only be sent from Better Answers.",
+    next: START_AGAIN,
+  },
+  notNavigated: {
+    title: "Nothing was connected",
+    why: "This form only works when you open it in your browser.",
+    next: START_AGAIN,
+  },
+  notCompleted: {
+    title: "Nothing was connected",
+    why: "The connection could not be finished.",
+    next: START_AGAIN,
+  },
+  signInFirst: {
+    title: "Sign in first",
+    why: "You need to be signed in, with a workspace chosen, to connect.",
+    next: "Sign in and choose a workspace",
+  },
+  sessionEnded: {
+    title: "Sign in again",
+    why: "Your session has ended, so nothing was connected.",
+    next: "Sign in and come back to connect",
+  },
+} as const satisfies Record<string, RefusalWords>;
 
 const shell = (title: string, body: string): string => `<!doctype html>
 <html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -29,26 +85,34 @@ export const consentPage = (
     readonly workspace: string;
     readonly scopes: readonly string[];
   },
-): string =>
-  shell(
-    `Connect ${params.clientName}`,
-    `<h1>Connect ${escape(params.clientName)}</h1>
-<p>${escape(params.clientName)} will act as you, at <strong>${escape(params.workspace)}</strong>.</p>
-<p>This app calls itself “${escape(params.clientName)}”. It is hosted at <strong>${escape(params.hostedAt)}</strong> and your connection will be sent to <strong>${escape(params.sendsCodeTo)}</strong>. If you did not expect those addresses, cancel.</p>
+): string => {
+  const client = escape(params.clientName);
+  const granted = OAUTH_SCOPES.filter((scope) => params.scopes.includes(scope));
+  return shell(
+    CONSENT_WORDS.title(params.clientName),
+    `<h1>${CONSENT_WORDS.title(client)}</h1>
+<p>${CONSENT_WORDS.actsAs(client, strong(params.workspace))}</p>
+<p>${CONSENT_WORDS.hostedAt(client, strong(params.hostedAt))}</p>
+<p>${CONSENT_WORDS.goesNext(strong(params.sendsCodeTo))}</p>
 <ul>
-  ${params.scopes.includes("knowledge:read") ? "<li>Read what you can see of the company's knowledge</li>" : ""}
-  ${params.scopes.includes("feedback:write") ? "<li>Send your feedback on answers</li>" : ""}
-  ${params.scopes.includes("offline_access") ? "<li>Stay connected until you disconnect it, without signing in each time</li>" : ""}
+  ${granted.map((scope) => `<li>${escape(CONSENT_WORDS.scopes[scope])}</li>`).join("\n  ")}
 </ul>
-<p>Every question you ask through ${escape(params.clientName)} is recorded as asked by you.</p>
+<p>${CONSENT_WORDS.recorded(client)}</p>
 <form method="post" action="/consent${escape(query)}" class="inline">
-  <input type="hidden" name="accept" value="true"><button type="submit">Connect</button>
+  <input type="hidden" name="accept" value="true"><button type="submit">${CONSENT_WORDS.connect}</button>
 </form>
 <form method="post" action="/consent${escape(query)}" class="inline">
-  <input type="hidden" name="accept" value="false"><button type="submit" class="secondary">Cancel</button>
+  <input type="hidden" name="accept" value="false"><button type="submit" class="secondary">${CONSENT_WORDS.cancel}</button>
 </form>`,
   );
+};
 
-/** Both values are escaped here. */
-export const refusedPage = (title: string, message: string): string =>
-  shell(title, `<h1>${escape(title)}</h1><p>${escape(message)}</p>`);
+const refusal = (words: RefusalWords, next: string): string =>
+  shell(words.title, `<h1>${escape(words.title)}</h1><p>${escape(words.why)}</p><p>${next}</p>`);
+
+/** A refusal whose next step is a line to read. */
+export const refusedPage = (words: RefusalWords): string => refusal(words, escape(words.next));
+
+/** `query` is the signed search string, leading `?` included: sign-in carries it back here. */
+export const signInPage = (words: RefusalWords, query: string): string =>
+  refusal(words, `<a href="${escape(`${SIGN_IN_PATH}${query}`)}">${escape(words.next)}</a>`);
