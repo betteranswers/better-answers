@@ -228,7 +228,7 @@ test.describe("the console's Workspaces screen", () => {
     await expect(railOf(page)).toHaveCount(0);
   });
 
-  test("opens People on Everyone, and Names waiting is unbuilt", async ({ page, request }) => {
+  test("opens People on Everyone, with Names waiting beside it", async ({ page, request }) => {
     await theOperator(page, request, "Halifax Fabrication");
     await page.goto(WORKSPACES_VIEW);
 
@@ -239,7 +239,8 @@ test.describe("the console's Workspaces screen", () => {
     const views = page.getByRole("navigation", { name: "People" }).getByRole("link");
     await expect(views).toHaveText(["Everyone", "Names waiting"]);
     await views.filter({ hasText: "Names waiting" }).click();
-    await expect(page.getByText("This view is not built yet.")).toBeVisible();
+    await expect(page).toHaveURL("/console/people/names-waiting");
+    await expect(page.getByRole("region", { name: "Names waiting" })).toBeVisible();
   });
 
   test("keeps the console's regions on an address it lacks", async ({ page, request }) => {

@@ -8,7 +8,7 @@ import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { counted } from "@/shared/words.ts";
 
-import { arrival, EVERYONE_PATH } from "./everyone-address.ts";
+import { arrival, EVERYONE_PATH, type Arrival } from "./people-address.ts";
 import { Pages, turnsOf, type PageTurns } from "./everyone-pages.tsx";
 import { SearchField, useAsking } from "./everyone-search.tsx";
 import { usePeople, type Asked, type ListedPerson } from "./people-api.ts";
@@ -124,19 +124,30 @@ function NoOneMatches(properties: { readonly search: string; readonly onClear: (
 type Opened = { readonly personId: string; readonly at: OpenedAt };
 
 /** Signing in again comes back with the person named, to be reopened at the act. */
-const reopened = (personId: string | undefined): Opened | undefined =>
-  personId === undefined ? undefined : { personId, at: "revoke" };
+const reopened = (arrived: Arrival): Opened | undefined =>
+  arrived.personId === undefined ? undefined : { personId: arrived.personId, at: arrived.act };
 
 const NO_ONE: readonly ListedPerson[] = [];
 
-/** A person no longer on the page on screen closes their sheet. */
+/** Correcting a name can take its person out of the search; their sheet stays on the last read. */
+const useLastRead = (
+  people: readonly ListedPerson[],
+  personId: string | undefined,
+): ListedPerson | undefined => {
+  const found = people.find((listed) => listed.id === personId);
+  const [lastRead, setLastRead] = useState(found);
+  if (found !== undefined && found !== lastRead) setLastRead(found);
+  return found ?? (lastRead?.id === personId ? lastRead : undefined);
+};
+
 function OpenedSheet(properties: {
   readonly opened: Opened | undefined;
   readonly people: readonly ListedPerson[];
   readonly onClose: () => void;
+  readonly returnFocus: (personId: string) => void;
 }) {
   const { opened } = properties;
-  const person = properties.people.find((listed) => listed.id === opened?.personId);
+  const person = useLastRead(properties.people, opened?.personId);
   if (opened === undefined || person === undefined) return null;
   return (
     <PersonSheet
@@ -144,6 +155,9 @@ function OpenedSheet(properties: {
       person={person}
       openedAt={opened.at}
       onClose={properties.onClose}
+      returnFocus={() => {
+        properties.returnFocus(person.id);
+      }}
     />
   );
 }
@@ -171,6 +185,9 @@ function usePeopleKeystrokes(properties: {
   useKeystroke(PEOPLE_KEYSTROKES.revoke, () => {
     openInFocus("revoke");
   });
+  useKeystroke(PEOPLE_KEYSTROKES.correct, () => {
+    openInFocus("correct");
+  });
   useKeystroke(PEOPLE_KEYSTROKES.previous, () => {
     turnOr(turns.previous, ON_THE_FIRST_PAGE);
   });
@@ -183,7 +200,7 @@ export function EveryoneList() {
   const [arrived] = useState(arrival);
   const { typed, asked, type, clear, turnTo } = useAsking(arrived.search);
   const [inFocus, setInFocus] = useState<string>();
-  const [opened, setOpened] = useState(() => reopened(arrived.personId));
+  const [opened, setOpened] = useState(() => reopened(arrived));
   const [outcome, setOutcome] = useState<Outcome>();
   const searchRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
@@ -253,7 +270,15 @@ export function EveryoneList() {
         )}
       </div>
 
-      <OpenedSheet opened={opened} people={people} onClose={close} />
+      <OpenedSheet
+        opened={opened}
+        people={people}
+        onClose={close}
+        returnFocus={(personId) => {
+          // A person the list no longer holds has no row to go back to.
+          (document.getElementById(personButtonId(personId)) ?? searchRef.current)?.focus();
+        }}
+      />
     </>
   );
 }

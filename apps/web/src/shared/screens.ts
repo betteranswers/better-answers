@@ -102,7 +102,7 @@ export const CONSOLE_SCREENS = [
     defaultView: "/console/people/everyone",
     views: [
       { name: "Everyone", path: "/console/people/everyone", built: true },
-      { name: "Names waiting", path: "/console/people/names-waiting", built: false },
+      { name: "Names waiting", path: "/console/people/names-waiting", built: true },
     ],
   },
   {

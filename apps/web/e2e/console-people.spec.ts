@@ -1,6 +1,6 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
-import { consoleScreenById } from "@/shared/screens.ts";
+import { consoleScreenById, viewNamed } from "@/shared/screens.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -13,6 +13,8 @@ import {
   claudeExchanges,
   claudesAuthorizeUrl,
   clockTheNextKey,
+  flagTheName,
+  keystrokesDismissed,
   keystrokesListed,
   markTheOperator,
   person,
@@ -28,7 +30,12 @@ const LIST_BUDGET_MS = 1000;
 /** Where the console's People screen opens. */
 const EVERYONE_VIEW = consoleScreenById("people").defaultView;
 
-const INSTANT = /^\d{2}:\d{2} · \d{1,2} [A-Z][a-z]+ \d{4}$/;
+const NAMES_WAITING_VIEW = viewNamed(consoleScreenById("people"), "Names waiting").path;
+
+/** Written once, so an aria snapshot can set it after a workspace's name. */
+const INSTANT_WORDS = String.raw`\d{2}:\d{2} · \d{1,2} [A-Z][a-z]+ \d{4}`;
+
+const INSTANT = new RegExp(`^${INSTANT_WORDS}$`);
 
 const REVOKE = "Revoke Priya Shah's credentials everywhere";
 
@@ -125,6 +132,94 @@ const openPriya = async (page: Page, tag: string): Promise<Locator> => {
   await expect(regionOf(sheet, "Sessions")).toContainText("1 session open.");
   return sheet;
 };
+
+const dialogToCorrect = (page: Page, name: string): Locator =>
+  page.getByRole("dialog", { name: `Correct ${name}'s display name` });
+
+const nameFieldOf = (dialog: Locator): Locator =>
+  dialog.getByRole("textbox", { name: "Display name" });
+
+/**
+ * The act opens on the name as it stands, under the rule and the consequence; Cancel hands focus
+ * back. `audit` runs on the open dialog.
+ */
+const correctingCancelled = async (
+  page: Page,
+  correct: Locator,
+  name: string,
+  asked: { readonly audit: () => Promise<void> },
+): Promise<Locator> => {
+  await correct.click();
+  const dialog = dialogToCorrect(page, name);
+  await expect(nameFieldOf(dialog)).toBeFocused();
+  await expect(nameFieldOf(dialog)).toHaveValue(name);
+  await expect(dialog).toContainText("the rule a person's own name follows");
+  await expect(dialog).toContainText("in every workspace they belong to");
+  await asked.audit();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(correct).toBeFocused();
+  return dialog;
+};
+
+const namesWaiting = (page: Page) => page.getByRole("region", { name: "Names waiting" });
+
+/** The count, told apart by its words from the act's own status beside it. */
+const waitingCount = (page: Page): Locator =>
+  namesWaiting(page).getByRole("status").filter({ hasText: "to be corrected." });
+
+/** Every name the run flags waits on this list, so a test's own name carries its tag. */
+const waitingRowOf = (page: Page, name: string): Locator =>
+  namesWaiting(page)
+    .getByRole("row")
+    .filter({ has: page.getByRole("cell", { name, exact: true }) });
+
+const correctButtonOf = (page: Page, name: string): Locator =>
+  waitingRowOf(page, name).getByRole("button", { name: `Correct ${name}'s display name` });
+
+/** Priya, named `displayName`, is an Editor in the operator's workspace. */
+const priyaWithTheOperator = async (
+  page: Page,
+  api: APIRequestContext,
+  asked: { readonly tag: string; readonly displayName: string },
+) => {
+  const operators = await signedInAsTheOperator(page, api, asked.tag);
+  const priya = await person(api, anAddress(`${asked.tag}-priya`), {
+    displayName: asked.displayName,
+  });
+  await addMember(api, { workspaceId: operators.workspaceId, userId: priya.id, role: "Editor" });
+  return { operators, priya };
+};
+
+/** The operator, as Admin of her workspace, flags her name. */
+const priyaFlagged = async (page: Page, api: APIRequestContext, tag: string) => {
+  const name = `Priya Shah ${tag}`;
+  const { operators, priya } = await priyaWithTheOperator(page, api, { tag, displayName: name });
+  await flagTheName(api, {
+    workspaceId: operators.workspaceId,
+    adminId: operators.admin.id,
+    personId: priya.id,
+  });
+  return { operators, priya, name };
+};
+
+/** From the key that saves to the list holding the name no more. */
+const clockTheRowLeaving = (page: Page, name: string) =>
+  clockTheNextKey(page, {
+    at: `//section[h2[normalize-space(.)='Names waiting']][not(.//td[normalize-space(.)='${name}'])]`,
+    reads: "Names waiting",
+  });
+
+/** The operator lands on Everyone, searched for her. */
+const priyaListed = async (page: Page, api: APIRequestContext, tag: string) => {
+  const held = await priyaWithTheOperator(page, api, { tag, displayName: "Priya Shah" });
+  await page.goto(`${EVERYONE_VIEW}?search=${tag}`);
+  return held;
+};
+
+/** The saved name's words, which the view and the sheet both say. */
+const savedWords = (was: string, now: string): string =>
+  `Saved: ${was}'s display name is ${now} now, wherever the platform names them.`;
 
 test.describe("the console's Everyone view", () => {
   test("lists each person with their workspaces, roles and last sign-in", async ({
@@ -306,6 +401,7 @@ test.describe("the console's Everyone view", () => {
       "Search everyone by name or address",
       "Open the person in focus",
       "Revoke the credentials of the person in focus",
+      "Correct the display name of the person in focus",
       "Show the previous page of people",
       "Show the next page of people",
       "List these keystrokes",
@@ -326,6 +422,15 @@ test.describe("the console's Everyone view", () => {
     await priya.focus();
     await page.keyboard.press("o");
     await expect(sheetOf(page, "Priya Shah").getByRole("heading", { level: 2 })).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(priya).toBeFocused();
+
+    await page.keyboard.press("c");
+    await expect(
+      sheetOf(page, "Priya Shah").getByRole("button", {
+        name: "Correct Priya Shah's display name",
+      }),
+    ).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(priya).toBeFocused();
   });
@@ -382,6 +487,10 @@ test.describe("a person, opened from Everyone as a sheet", () => {
               - term: Last used
               - definition: /\\d{4}/
               - button "More about Claude's grant"
+        - region "Display name":
+          - heading "Display name" [level=3]
+          - paragraph: /Replaces Priya Shah's display name in every workspace they belong to/
+          - button "Correct Priya Shah's display name"
         - region "Revoke everywhere":
           - heading "Revoke everywhere" [level=3]
           - paragraph: /Ends every session and client grant Priya Shah holds/
@@ -430,7 +539,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
 
     await expect(regionOf(sheet, "Sessions")).toContainText("No session is open.");
     await theActLandedWithinItsBudget(page, "revoke everywhere");
-    await expect(sheet.getByRole("status")).toHaveText(
+    await expect(regionOf(sheet, "Revoke everywhere").getByRole("status")).toHaveText(
       /^Priya Shah's sessions and client grants ended at \d{2}:\d{2} · .+\. They can sign in again\.$/,
     );
     await expect(revoke).toBeFocused();
@@ -453,7 +562,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await sheet.getByRole("button", { name: REVOKE }).click();
     await confirmationOf(page).getByRole("button", { name: "Revoke everywhere" }).click();
 
-    const refused = sheet.getByRole("alert");
+    const refused = regionOf(sheet, "Revoke everywhere").getByRole("alert");
     await expect(refused).toContainText("Refused: sign-in-too-old.");
     await expect(refused).toContainText("Your sign-in is more than an hour old");
     await expect(regionOf(sheet, "Sessions")).toContainText("1 session open.");
@@ -468,7 +577,9 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await expect(revoke).toBeFocused();
     await revoke.press("Enter");
     await confirmationOf(page).getByRole("button", { name: "Revoke everywhere" }).click();
-    await expect(again.getByRole("status")).toContainText("sessions and client grants ended");
+    await expect(regionOf(again, "Revoke everywhere").getByRole("status")).toContainText(
+      "sessions and client grants ended",
+    );
     await expect(regionOf(again, "Sessions")).toContainText("No session is open.");
 
     // The way back has served once the person is closed, so a reload does not reopen them.
@@ -495,8 +606,255 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await expect(confirmation.getByRole("button", { name: "Revoke everywhere" })).toBeFocused();
     await page.keyboard.press("Enter");
 
-    await expect(sheet.getByRole("status")).toContainText("sessions and client grants ended");
+    await expect(regionOf(sheet, "Revoke everywhere").getByRole("status")).toContainText(
+      "sessions and client grants ended",
+    );
     await page.keyboard.press("Escape");
     await expect(personButton(page, "Priya Shah")).toBeFocused();
+  });
+
+  test("corrects a display name from the sheet, within its budget", async ({
+    page,
+    request,
+    passesTheAccessibilityGate,
+  }) => {
+    await priyaListed(page, request, aTag());
+    await personButton(page, "Priya Shah").click();
+    const correct = regionOf(sheetOf(page, "Priya Shah"), "Display name").getByRole("button", {
+      name: "Correct Priya Shah's display name",
+    });
+
+    const dialog = await correctingCancelled(page, correct, "Priya Shah", {
+      audit: passesTheAccessibilityGate,
+    });
+
+    await correct.click();
+    await nameFieldOf(dialog).fill("Priya Sharma");
+    await clockTheNextKey(page, {
+      at: "(//div[@role='dialog'][.//h3[normalize-space(.)='Display name']]//h2)[1]",
+      reads: "Priya Sharma",
+    });
+    await page.keyboard.press("Enter");
+
+    const renamed = sheetOf(page, "Priya Sharma");
+    await expect(renamed.getByRole("heading", { level: 2 })).toHaveText("Priya Sharma");
+    await theActLandedWithinItsBudget(page, "correct display name");
+    const part = regionOf(renamed, "Display name");
+    await expect(part.getByRole("status")).toHaveText(savedWords("Priya Shah", "Priya Sharma"));
+    await expect(
+      part.getByRole("button", { name: "Correct Priya Sharma's display name" }),
+    ).toBeFocused();
+
+    await page.keyboard.press("Escape");
+    await expect(personButton(page, "Priya Sharma")).toBeFocused();
+    await page.reload();
+    await expect(personButton(page, "Priya Sharma")).toBeVisible();
+  });
+
+  test("keeps a sheet open when its person leaves the search", async ({ page, request }) => {
+    const tag = aTag();
+    await signedInAsTheOperator(page, request, tag);
+    const flagged = `Priya ${tag}`;
+    await person(request, anAddress("priya"), { displayName: flagged });
+    await page.goto(`${EVERYONE_VIEW}?search=${tag}`);
+    await personButton(page, flagged).click();
+    const correct = regionOf(sheetOf(page, flagged), "Display name").getByRole("button", {
+      name: `Correct ${flagged}'s display name`,
+    });
+
+    await correct.click();
+    await nameFieldOf(dialogToCorrect(page, flagged)).fill("Priya Shah");
+    await page.keyboard.press("Enter");
+
+    // Behind the sheet, so read as text: the list, read again, holds the operator alone.
+    await expect(page.getByText(`1 person matches “${tag}”.`)).toBeVisible();
+    const part = regionOf(sheetOf(page, "Priya Shah"), "Display name");
+    await expect(part.getByRole("status")).toHaveText(savedWords(flagged, "Priya Shah"));
+    await expect(
+      part.getByRole("button", { name: "Correct Priya Shah's display name" }),
+    ).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(searchBox(page)).toBeFocused();
+  });
+
+  test("corrects after a stale sign-in's round trip, from the sheet", async ({ page, request }) => {
+    const { operators } = await priyaListed(page, request, aTag());
+    await ageTheSignIn(request, operators.admin.id);
+    await personButton(page, "Priya Shah").click();
+    const part = regionOf(sheetOf(page, "Priya Shah"), "Display name");
+    await part.getByRole("button", { name: "Correct Priya Shah's display name" }).click();
+    await nameFieldOf(dialogToCorrect(page, "Priya Shah")).fill("Priya Sharma");
+    await page.keyboard.press("Enter");
+
+    await expect(part.getByRole("alert")).toContainText("Refused: sign-in-too-old.");
+    await expect(part.getByRole("alert")).toContainText("Your sign-in is more than an hour old");
+    await part.getByRole("link", { name: "Sign in again" }).click();
+    await expect(page).toHaveURL(/\/sign-in\?redirect=/);
+    await signIn(page, request, operators.admin.email);
+
+    const again = regionOf(sheetOf(page, "Priya Shah"), "Display name").getByRole("button", {
+      name: "Correct Priya Shah's display name",
+    });
+    await expect(again).toBeFocused();
+    await again.press("Enter");
+    await nameFieldOf(dialogToCorrect(page, "Priya Shah")).fill("Priya Sharma");
+    await page.keyboard.press("Enter");
+    await expect(
+      regionOf(sheetOf(page, "Priya Sharma"), "Display name").getByRole("status"),
+    ).toHaveText(savedWords("Priya Shah", "Priya Sharma"));
+  });
+});
+
+test.describe("the console's Names waiting view", () => {
+  test("lists each flagged name with its flags, within budget", async ({ page, request }) => {
+    const tag = aTag();
+    const { operators, priya, name } = await priyaFlagged(page, request, tag);
+    const beta = await provision(request, { name: `Beta ${tag}` });
+    await addMember(request, { workspaceId: beta.workspaceId, userId: priya.id, role: "Viewer" });
+    await flagTheName(request, {
+      workspaceId: beta.workspaceId,
+      adminId: beta.admin.id,
+      personId: priya.id,
+    });
+
+    // A fresh document, so no list is already in the page's cache.
+    const started = Date.now();
+    await page.goto(NAMES_WAITING_VIEW);
+    await expect(waitingRowOf(page, name)).toBeVisible();
+    const elapsed = Date.now() - started;
+
+    test.info().annotations.push({ type: "names waiting list", description: `${elapsed} ms` });
+    expect(elapsed, "the names waiting rendered past their budget").toBeLessThan(LIST_BUDGET_MS);
+    await expect(namesWaiting(page)).toMatchAriaSnapshot(`
+      - region "Names waiting":
+        - heading "Names waiting" [level=2]
+        - paragraph: /the longest waiting first/
+        - status: /^\\d+ names? waits? to be corrected\\.$/
+        - table:
+          - caption: /Every display name an Admin flagged/
+          - rowgroup:
+            - row "Person Flagged by Acts":
+              - columnheader "Person"
+              - columnheader "Flagged by"
+              - columnheader "Acts"
+          - rowgroup:
+            - row /${name}/:
+              - cell "${name}"
+              - cell:
+                - list:
+                  - listitem: /^${operators.name} ${INSTANT_WORDS}$/
+                  - listitem: /^Beta ${tag} ${INSTANT_WORDS}$/
+              - cell:
+                - button "Correct ${name}'s display name"
+    `);
+  });
+
+  test("corrects a name behind a confirmation, within its budget", async ({
+    page,
+    request,
+    passesTheAccessibilityGate,
+  }) => {
+    const tag = aTag();
+    const { name } = await priyaFlagged(page, request, tag);
+    const corrected = `Priya Sharma ${tag}`;
+    await page.goto(NAMES_WAITING_VIEW);
+    const correct = correctButtonOf(page, name);
+
+    const dialog = await correctingCancelled(page, correct, name, {
+      audit: passesTheAccessibilityGate,
+    });
+
+    await correct.click();
+    await nameFieldOf(dialog).fill(corrected);
+    await clockTheRowLeaving(page, name);
+    await page.keyboard.press("Enter");
+
+    await expect(waitingRowOf(page, name)).toHaveCount(0);
+    await theActLandedWithinItsBudget(page, "correct display name");
+    await expect(namesWaiting(page)).toContainText(savedWords(name, corrected));
+    await expect(namesWaiting(page).getByRole("heading", { name: "Names waiting" })).toBeFocused();
+
+    await page.goto(`${EVERYONE_VIEW}?search=${tag}`);
+    await expect(personButton(page, corrected)).toBeVisible();
+    await page.goto(NAMES_WAITING_VIEW);
+    await expect(waitingCount(page)).toBeVisible();
+    await expect(waitingRowOf(page, name)).toHaveCount(0);
+  });
+
+  test("refuses a name the rule forbids, in the rule's words", async ({ page, request }) => {
+    const { name } = await priyaFlagged(page, request, aTag());
+    const refusal =
+      "Refused: display-name-angle-bracket. A display name cannot hold < or >. Remove them and save again.";
+    await page.goto(NAMES_WAITING_VIEW);
+    await correctButtonOf(page, name).click();
+    const dialog = dialogToCorrect(page, name);
+    await nameFieldOf(dialog).fill("Priya <priya@acme.invalid>");
+    await dialog.getByRole("button", { name: "Save the name" }).click();
+
+    await expect(namesWaiting(page).getByRole("alert")).toHaveText(refusal);
+    await expect(correctButtonOf(page, name)).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(nameFieldOf(dialog)).toHaveValue("Priya <priya@acme.invalid>");
+    await expect(nameFieldOf(dialog)).toHaveAttribute("aria-invalid", "true");
+    await expect(nameFieldOf(dialog)).toHaveAccessibleDescription(new RegExp(`${refusal}$`));
+  });
+
+  test("corrects a name after a stale sign-in's round trip", async ({ page, request }) => {
+    const tag = aTag();
+    const { operators, name } = await priyaFlagged(page, request, tag);
+    const corrected = `Priya Sharma ${tag}`;
+    await ageTheSignIn(request, operators.admin.id);
+    await page.goto(NAMES_WAITING_VIEW);
+    await correctButtonOf(page, name).click();
+    await nameFieldOf(dialogToCorrect(page, name)).fill(corrected);
+    await page.keyboard.press("Enter");
+
+    const refused = namesWaiting(page).getByRole("alert");
+    await expect(refused).toContainText("Refused: sign-in-too-old.");
+    await expect(refused).toContainText("Your sign-in is more than an hour old");
+    await expect(waitingRowOf(page, name)).toBeVisible();
+    const signInAgain = namesWaiting(page).getByRole("link", { name: "Sign in again" });
+    await expect(signInAgain).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/\/sign-in\?redirect=/);
+    await signIn(page, request, operators.admin.email);
+
+    await expect(page).toHaveURL(new RegExp(`${NAMES_WAITING_VIEW}\\?`));
+    const again = correctButtonOf(page, name);
+    await expect(again).toBeFocused();
+    await again.press("Enter");
+    await nameFieldOf(dialogToCorrect(page, name)).fill(corrected);
+    await page.keyboard.press("Enter");
+    await expect(waitingRowOf(page, name)).toHaveCount(0);
+    await expect(namesWaiting(page)).toContainText(savedWords(name, corrected));
+    // The way back has served once the name is corrected, so a reload lands nowhere in particular.
+    await expect(page).toHaveURL(NAMES_WAITING_VIEW);
+  });
+
+  test("is keyboard-operable and lists its keystrokes", async ({ page, request }) => {
+    const { name } = await priyaFlagged(page, request, aTag());
+    await page.goto(NAMES_WAITING_VIEW);
+    await expect(waitingRowOf(page, name)).toBeVisible();
+
+    await skipLinkReachesTheScreen(page);
+    await page.keyboard.press("c");
+    await expect(namesWaiting(page)).toContainText(
+      "Move focus to a name first: the keystroke acts on the name in focus.",
+    );
+    const listed = await keystrokesListed(page, "People");
+    await expect(listed.getByRole("definition")).toHaveText([
+      "Correct the display name in focus",
+      "List these keystrokes",
+    ]);
+    await keystrokesDismissed(page, listed);
+
+    const correct = correctButtonOf(page, name);
+    await correct.focus();
+    await page.keyboard.press("c");
+    const dialog = dialogToCorrect(page, name);
+    await expect(nameFieldOf(dialog)).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(correct).toBeFocused();
   });
 });

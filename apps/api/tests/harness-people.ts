@@ -1,6 +1,12 @@
 import { z } from "zod";
 
-import { addToGroup, createGroup, requestAccess } from "@better-answers/core/members";
+import {
+  addToGroup,
+  createGroup,
+  flagDisplayName,
+  flagDisplayNameInput,
+  requestAccess,
+} from "@better-answers/core/members";
 
 import { IDENTITY_PRINCIPAL } from "../src/identity-principal.ts";
 import { actingIn, type TestApp } from "./harness.ts";
@@ -51,4 +57,23 @@ export const askToJoin = async (
   const answered = await requestAccess(IDENTITY_PRINCIPAL, app.doors.postgres, asked);
   if (!answered.ok) throw new Error(`the ask answered ${String(answered.error)}`);
   return { asked: true };
+};
+
+export const nameFlagging = flagDisplayNameInput.extend({
+  workspaceId: z.string().min(1),
+  adminId: z.string().min(1),
+});
+
+/**
+ * The slice's own act under the flagging Admin, less the operator's email the procedure sends once
+ * it commits.
+ */
+export const flagTheName = async (
+  app: TestApp,
+  asked: z.output<typeof nameFlagging>,
+): Promise<{ readonly flagged: true }> => {
+  await actingIn(app, { workspaceId: asked.workspaceId, userId: asked.adminId }, (principal, tx) =>
+    flagDisplayName(principal, tx, { personId: asked.personId }),
+  );
+  return { flagged: true };
 };

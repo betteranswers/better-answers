@@ -46,3 +46,34 @@ export function ActDialog(properties: {
     </Dialog>
   );
 }
+
+type Parts = Pick<
+  ComponentProps<typeof ActDialog>,
+  "title" | "consequence" | "commit" | "children"
+>;
+
+/**
+ * Open for as long as its opener mounts it. No Radix trigger opened it, so `onFocusBack` says
+ * where focus goes as it closes.
+ */
+export function MountedActDialog(
+  properties: Parts & { readonly onClose: () => void; readonly onFocusBack: () => void },
+) {
+  const { onClose, onFocusBack, ...parts } = properties;
+  return (
+    <ActDialog
+      {...parts}
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+      content={{
+        className: "wrap-anywhere",
+        onCloseAutoFocus: (event) => {
+          event.preventDefault();
+          onFocusBack();
+        },
+      }}
+    />
+  );
+}

@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 
-import { ActDialog } from "@/shared/act-dialog.tsx";
+import { MountedActDialog } from "@/shared/act-dialog.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 
 import type { Role } from "./people-api.ts";
@@ -22,17 +22,10 @@ export function ApproveRequest(properties: {
   const sent = useRef(false);
 
   return (
-    <ActDialog
-      open
-      onOpenChange={(open) => {
-        if (!open) properties.onClose();
-      }}
-      content={{
-        className: "wrap-anywhere",
-        onCloseAutoFocus: (event) => {
-          event.preventDefault();
-          properties.onFocusBack(sent.current);
-        },
+    <MountedActDialog
+      onClose={properties.onClose}
+      onFocusBack={() => {
+        properties.onFocusBack(sent.current);
       }}
       title={`Approve the request from ${requesterName(request)}`}
       consequence={`Approving emails ${request.requester.email} an invitation to join this workspace at the role below. It lasts seven days, and they become a member when they accept it.`}
@@ -48,6 +41,6 @@ export function ApproveRequest(properties: {
       }
     >
       <RoleChoice role={role} onChoose={setRole} />
-    </ActDialog>
+    </MountedActDialog>
   );
 }

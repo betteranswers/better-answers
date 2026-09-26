@@ -85,9 +85,9 @@ the side that counts. Read the numbers off those files rather than from here.
 ## The harness's acts
 
 State is built through the api's harness over HTTP, from `apps/web/e2e/harness.ts`, using the
-`request` fixture. Nothing writes a row itself and nothing sets a cookie from outside. Thirteen acts
+`request` fixture. Nothing writes a row itself and nothing sets a cookie from outside. Fourteen acts
 call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources two from
-`apps/api/tests/harness-sources.ts` and the People two from `apps/api/tests/harness-people.ts`:
+`apps/api/tests/harness-sources.ts` and the People three from `apps/api/tests/harness-people.ts`:
 
 | Act | What it does |
 | --- | --- |
@@ -104,6 +104,7 @@ call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources
 | `moveTheIndexRun` | The worker's two steps over the workspace's one index run, claimed then done, through the queue's own functions under the worker's role — how a spec watches a state word move without a worker process |
 | `makeGroups` | Groups made by a named member through the members slice's own acts, one transaction each, every group holding the members `memberIds` names — the member's own acts on the audit log, and the groups the `Groups` view and a member's sheet start from |
 | `askToJoin` | A person's ask to join a workspace by its slug, with a reason, through the members slice's own act and the principal the ask-to-join procedure uses, without its sign-in or its answer's floor — a request waiting on the Requests tab |
+| `flagTheName` | A workspace's Admin flags a member's display name through the members slice's own act and principal, without the email the procedure sends the operator — a name waiting on the console's *Names waiting* view |
 
 Thirteen more helpers in the same module drive the browser rather than the harness:
 
