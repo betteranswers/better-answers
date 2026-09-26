@@ -1,5 +1,6 @@
-import { testData } from "@better-answers/schema/testing";
 import { describe, expect, expectTypeOf, it } from "vitest";
+
+import { testData } from "@better-answers/schema/testing";
 
 import {
   ask,

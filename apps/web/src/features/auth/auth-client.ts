@@ -1,6 +1,6 @@
 import { oauthProviderClient } from "@better-auth/oauth-provider/client";
-import { emailOTPClient, organizationClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/client";
+import { emailOTPClient, organizationClient } from "better-auth/client/plugins";
 
 export const authClient = createAuthClient({
   basePath: "/",

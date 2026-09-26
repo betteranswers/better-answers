@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { head, PLATFORM_BOT } from "@better-answers/core/store/git";
 import { ulid } from "@better-answers/schema";
 
 import {
@@ -9,7 +10,6 @@ import {
   type WriteManifestInput,
 } from "../src/concepts/index.ts";
 import type { UserPrincipal } from "../src/kernel/index.ts";
-import { head, PLATFORM_BOT } from "@better-answers/core/store/git";
 import { bundleHistory, commitFacts, fileAtCommit, removeRepository } from "./bundle.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 

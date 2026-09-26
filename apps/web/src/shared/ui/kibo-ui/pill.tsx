@@ -1,9 +1,10 @@
 import { ChevronDownIcon, ChevronUpIcon, MinusIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
+
+import { cn } from "@/shared/lib/utils.ts";
 import { Avatar, AvatarFallback, AvatarImage } from "@/shared/ui/avatar.tsx";
 import { Badge } from "@/shared/ui/badge.tsx";
 import { Button } from "@/shared/ui/button.tsx";
-import { cn } from "@/shared/lib/utils.ts";
 
 export type PillProps = ComponentProps<typeof Badge> & {
   themed?: boolean;

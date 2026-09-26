@@ -1,8 +1,8 @@
-import { testData } from "@better-answers/schema/testing";
 import pg from "pg";
 import { describe, expect, it } from "vitest";
 
 import { conceptIriOf, ulid } from "@better-answers/schema";
+import { testData } from "@better-answers/schema/testing";
 
 import { open } from "../src/answering/index.ts";
 import {

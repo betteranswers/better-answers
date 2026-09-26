@@ -1,5 +1,18 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "sortImports": {
+    "internalPattern": ["@better-answers/"],
+    "customGroups": [{ "groupName": "app-alias", "elementNamePattern": ["@/**"] }],
+    "groups": [
+      "builtin",
+      "external",
+      ["internal", "subpath"],
+      "app-alias",
+      ["parent", "sibling", "index"],
+      "style",
+      "unknown"
+    ]
+  },
   "ignorePatterns": [
     "**/*.md",
     "**/*.yml",

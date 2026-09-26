@@ -1,5 +1,6 @@
-import { ROLES } from "@better-answers/schema";
 import type { z } from "zod";
+
+import { ROLES } from "@better-answers/schema";
 
 import { PROCESS_PREFIX } from "./actor.ts";
 import type {

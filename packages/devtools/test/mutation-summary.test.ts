@@ -3,13 +3,14 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
+import { afterAll, describe, expect, it } from "vitest";
+
 import {
   mutationSummary,
   mutationSummaryFromArgv,
 } from "@better-answers/devtools/mutation-summary";
 import type { Report, ReportMutant } from "@better-answers/devtools/mutation-summary";
 import { repositoryRoot } from "@better-answers/devtools/oxlint-config";
-import { afterAll, describe, expect, it } from "vitest";
 
 const script = path.join(repositoryRoot, "scripts/mutation-summary.mjs");
 

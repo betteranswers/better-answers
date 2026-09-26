@@ -36,6 +36,7 @@ import {
   type View,
 } from "@/shared/screens.ts";
 import type { ViewToolbar } from "@/shared/view-toolbar.tsx";
+
 import { ConsoleFrame } from "./console-frame.tsx";
 import { FailedScreen } from "./failed-screen.tsx";
 import { ControlCentreFrame } from "./frame.tsx";

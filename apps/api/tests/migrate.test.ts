@@ -1,9 +1,10 @@
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { CONTRACT_DIGEST } from "@better-answers/schema";
 import { matchIsLeakproof, UNMARK_THE_MATCH } from "@better-answers/schema/testing/probes";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { startTestDatabase, type TestDatabase } from "./postgres.ts";
 

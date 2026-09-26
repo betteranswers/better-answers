@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import {
   boundarySchemas,
   FINDING_DISMISSED_STATE,
@@ -10,7 +12,6 @@ import {
   type INDEX_REASONS,
 } from "@better-answers/schema";
 import { byCodeUnit } from "@better-answers/schema/code-unit";
-import { z } from "zod";
 
 import { narrower, type Sensitivity } from "../access/index.ts";
 import { act, declareActs, record, type DetailOf, type AuditAct } from "../audit/index.ts";

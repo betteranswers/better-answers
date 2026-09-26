@@ -1,3 +1,6 @@
+import type pg from "pg";
+import { afterAll, afterEach, beforeAll, beforeEach, expect } from "vitest";
+
 import { ulid } from "@better-answers/schema";
 import {
   openMigratedPostgres,
@@ -5,8 +8,6 @@ import {
   type MigratedPostgres,
   type TestData,
 } from "@better-answers/schema/testing";
-import type pg from "pg";
-import { afterAll, afterEach, beforeAll, beforeEach, expect } from "vitest";
 
 import type { Result, UserPrincipal } from "../src/kernel/index.ts";
 import {

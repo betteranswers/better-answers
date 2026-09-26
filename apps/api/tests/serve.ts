@@ -1,6 +1,6 @@
-import { serve } from "@hono/node-server";
 import { fileURLToPath } from "node:url";
 
+import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 
 import { openObjectStore } from "@better-answers/core/testing/warm-objects";

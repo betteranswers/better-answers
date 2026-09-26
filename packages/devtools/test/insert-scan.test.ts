@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
+import { describe, expect, it } from "vitest";
+
 import {
   FACTORY_MODULES,
   isFactoryModule,
@@ -12,11 +14,9 @@ import {
 } from "@better-answers/devtools/insert-scan";
 import { repositoryRoot } from "@better-answers/devtools/oxlint-config";
 import { runsOverThrowawayTree } from "@better-answers/devtools/throwaway-tree";
-import { describe, expect, it } from "vitest";
+import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
 import { tag } from "./fixture-text.ts";
-
-import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
 const WORKSPACE = "packages/probe";
 

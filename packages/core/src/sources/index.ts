@@ -2,8 +2,8 @@ import { z } from "zod";
 
 import { visibilityAgreed, visibilityOf, widens, type Visibility } from "../access/index.ts";
 import { act, declareActs, record, type AuditEvent, type AuditAct } from "../audit/index.ts";
-import { attempt, err, ok, ulid, type Result, type UserPrincipal } from "../kernel/index.ts";
 import { openingACascadeOverHeldGroups } from "../concepts/index.ts";
+import { attempt, err, ok, ulid, type Result, type UserPrincipal } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import {
   adminOnBinding,

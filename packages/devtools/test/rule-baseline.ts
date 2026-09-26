@@ -1,6 +1,5 @@
 import { readOxlintConfig } from "@better-answers/devtools/oxlint-config";
 import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
-
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
 type RuleBaseline = {

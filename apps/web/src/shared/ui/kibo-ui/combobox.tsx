@@ -9,6 +9,8 @@ import {
   useRef,
   useState,
 } from "react";
+
+import { cn } from "@/shared/lib/utils.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import {
   Command,
@@ -20,7 +22,6 @@ import {
   CommandSeparator,
 } from "@/shared/ui/command.tsx";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover.tsx";
-import { cn } from "@/shared/lib/utils.ts";
 
 type ComboboxData = {
   label: string;

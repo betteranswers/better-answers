@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-
 import { z } from "zod";
 
 import { ISSUE_WORDS, parse, ROOT_PATH, type IssueWord } from "../src/kernel/index.ts";

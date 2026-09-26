@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { startApp, type TestApp } from "./harness.ts";
 import { makeGroups } from "./harness-people.ts";
+import { startApp, type TestApp } from "./harness.ts";
 import {
   NOT_A_MEMBER_ANSWERED,
   refusalToAMemberAt,

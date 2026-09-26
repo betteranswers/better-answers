@@ -1,5 +1,6 @@
-import { boundarySchemas, ROLES } from "@better-answers/schema";
 import type pg from "pg";
+
+import { boundarySchemas, ROLES } from "@better-answers/schema";
 
 import { err, ok, type Result } from "../../kernel/index.ts";
 import type {

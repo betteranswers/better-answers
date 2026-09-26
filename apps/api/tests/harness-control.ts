@@ -6,7 +6,6 @@ import { llmPurpose, ROLES } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
 import { IDENTITY_PRINCIPAL } from "../src/identity-principal.ts";
-import type { TestApp } from "./harness.ts";
 import {
   accessAsking,
   askToJoin,
@@ -21,6 +20,7 @@ import {
   moveTheIndexRun,
   seedBindings,
 } from "./harness-sources.ts";
+import type { TestApp } from "./harness.ts";
 import { sessionsSignedInOverAnHourAgo } from "./provoke.ts";
 
 const HARNESS_PREFIX = "/__harness";

@@ -1,5 +1,6 @@
-import { serve } from "@hono/node-server";
 import { fileURLToPath } from "node:url";
+
+import { serve } from "@hono/node-server";
 
 import { hostnameOfUrl, originOfUrl } from "../src/ingress/hostnames.ts";
 import { startApp } from "./harness.ts";

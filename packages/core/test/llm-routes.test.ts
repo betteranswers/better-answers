@@ -1,5 +1,6 @@
-import { CONFIGURED_LLM_ROUTES, LISTED_LLM_ROUTES, testData } from "@better-answers/schema/testing";
 import { describe, expect, it } from "vitest";
+
+import { CONFIGURED_LLM_ROUTES, LISTED_LLM_ROUTES, testData } from "@better-answers/schema/testing";
 
 import { attempt, type Claims } from "../src/kernel/index.ts";
 import { listRoutes, LLM_PURPOSES } from "../src/llm/index.ts";

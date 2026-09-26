@@ -1,3 +1,5 @@
+import type { z } from "zod";
+
 import {
   AUDIENCE_EVERYONE,
   boundarySchemas,
@@ -10,7 +12,6 @@ import {
   VERIFICATION_ERASURE_ORIGIN,
   VERIFICATION_REPAIR_ORIGIN,
 } from "@better-answers/schema";
-import type { z } from "zod";
 
 import {
   readableParameters,
@@ -18,9 +19,9 @@ import {
   visibilityOf,
   type Visibility,
 } from "../access/index.ts";
+import { recomputeCompositionsIncluding } from "../guides/index.ts";
 import type { ActorId, PlatformPrincipal, Principal } from "../kernel/index.ts";
 import { fileAt, type Committed, type GitDoor } from "../store/git/index.ts";
-import { recomputeCompositionsIncluding } from "../guides/index.ts";
 import { writeConceptDelta } from "../store/graph/index.ts";
 import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
 import { contentHashOf, parseConceptFile, type Frontmatter, type HashedSource } from "./file.ts";

@@ -6,6 +6,13 @@ import { connectAsHost, setActiveWorkspace } from "./flow.ts";
 import { startApp, type TestApp } from "./harness.ts";
 import { callMcp } from "./mcp-call.ts";
 import {
+  anAdminOfElsewherePointedAt,
+  NOT_A_MEMBER_ANSWERED,
+  refusalToAMemberAt,
+  refusalToAnotherWorkspacesAdmin,
+  ROLE_FORBIDS_ANSWERED,
+} from "./people-refusals.ts";
+import {
   failureOf,
   revocationHeldOpen,
   seededIn,
@@ -13,13 +20,6 @@ import {
   whileAuditRowsVanish,
   type HeldRevocation,
 } from "./provoke.ts";
-import {
-  anAdminOfElsewherePointedAt,
-  NOT_A_MEMBER_ANSWERED,
-  refusalToAMemberAt,
-  refusalToAnotherWorkspacesAdmin,
-  ROLE_FORBIDS_ANSWERED,
-} from "./people-refusals.ts";
 import { refusalOfCall, webClientOf, webSignedIn } from "./web-client.ts";
 
 let app: TestApp;

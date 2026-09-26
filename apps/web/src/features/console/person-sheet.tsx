@@ -11,8 +11,8 @@ import { SheetDescription, SheetHeader, SheetTitle } from "@/shared/ui/sheet.tsx
 import { counted } from "@/shared/words.ts";
 
 import { CorrectDisplayName } from "./correct-display-name.tsx";
-import type { FreshAct } from "./people-address.ts";
 import { Facts } from "./facts.tsx";
+import type { FreshAct } from "./people-address.ts";
 import { useInspected, type HeldGrant, type HeldSession, type ListedPerson } from "./people-api.ts";
 import { At, grantStateOf, Instant, Memberships, nameOf } from "./person-words.tsx";
 import { RevokeEverywhere } from "./revoke-everywhere.tsx";

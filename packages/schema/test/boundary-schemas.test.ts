@@ -1,9 +1,10 @@
 import { getTableColumns, is } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { PgTable } from "drizzle-orm/pg-core";
-import type { z } from "zod";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { z } from "zod";
 
+import { createInsertSchema, createSelectSchema, createUpdateSchema } from "../src/drizzle-zod.ts";
 import {
   ACCESS_REQUEST_REASON_MAX,
   boundarySchemas,
@@ -21,7 +22,6 @@ import {
   SUGGESTION_REASON_MAX,
 } from "../src/index.ts";
 import * as publicEntry from "../src/index.ts";
-import { createInsertSchema, createSelectSchema, createUpdateSchema } from "../src/drizzle-zod.ts";
 import { type MigratedPostgres, withRollback } from "./harness.ts";
 import { openMigratedPostgres } from "./warm-postgres.ts";
 

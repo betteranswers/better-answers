@@ -1,7 +1,7 @@
-import { testData, type MigratedPostgres, type TestData } from "@better-answers/schema/testing";
 import type pg from "pg";
 
 import { head } from "@better-answers/core/store/git";
+import { testData, type MigratedPostgres, type TestData } from "@better-answers/schema/testing";
 
 import {
   writeConcept,

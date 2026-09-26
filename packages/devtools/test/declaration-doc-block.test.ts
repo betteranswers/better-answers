@@ -1,6 +1,7 @@
-import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
-import { pluginConfigFor } from "@better-answers/devtools/oxlint-config";
 import { describe, expect, it } from "vitest";
+
+import { pluginConfigFor } from "@better-answers/devtools/oxlint-config";
+import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 
 import { tag, wordsOf } from "./fixture-text.ts";
 import { fixedByOxlint } from "./oxlint-fix.ts";

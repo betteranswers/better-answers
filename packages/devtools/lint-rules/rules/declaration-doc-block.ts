@@ -1,9 +1,8 @@
 import { defineRule } from "@oxlint/plugins";
+import type { Comment, ESTree, Fix, Fixer } from "@oxlint/plugins";
 
 import { blocksIn, directiveIn, lastOf, proseOf, standsAlone } from "../shared/comment-blocks.ts";
-
 import type { Block } from "../shared/comment-blocks.ts";
-import type { Comment, ESTree, Fix, Fixer } from "@oxlint/plugins";
 
 const DECLARATIONS = new Set([
   "VariableDeclaration",

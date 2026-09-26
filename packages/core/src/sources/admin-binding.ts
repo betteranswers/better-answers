@@ -1,5 +1,6 @@
-import { boundarySchemas } from "@better-answers/schema";
 import type { z } from "zod";
+
+import { boundarySchemas } from "@better-answers/schema";
 
 import {
   attempt,

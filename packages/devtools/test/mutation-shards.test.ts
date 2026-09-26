@@ -11,6 +11,9 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { z } from "zod";
+
 import {
   mergeShards,
   mutateSet,
@@ -20,8 +23,6 @@ import {
   weightsOf,
 } from "@better-answers/devtools/mutation-shards";
 import type { Leg, ShardResults } from "@better-answers/devtools/mutation-shards";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { z } from "zod";
 
 import { runStryker, strykerWorkspace, writtenTree } from "./stryker-workspace.ts";
 

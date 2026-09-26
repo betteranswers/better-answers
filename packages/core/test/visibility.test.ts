@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
+import type { z } from "zod";
 
+import { head } from "@better-answers/core/store/git";
 import { conceptIriOf, ulid } from "@better-answers/schema";
 import type { TestData } from "@better-answers/schema/testing";
 import { bindingIdTakenAgain, conceptIriTakenAgain } from "@better-answers/schema/testing/probes";
-
-import { head } from "@better-answers/core/store/git";
 
 import { ask, find, open } from "../src/answering/index.ts";
 import {
@@ -14,8 +14,6 @@ import {
   type WriteConceptInput,
 } from "../src/concepts/index.ts";
 import { footnotesOf } from "../src/guides/index.ts";
-import type { z } from "zod";
-
 import { attempt, parse, type UserPrincipal } from "../src/kernel/index.ts";
 import {
   narrowBinding,
@@ -26,10 +24,7 @@ import {
   widenBindingInput,
 } from "../src/sources/index.ts";
 import type { Folded, Tx } from "../src/store/postgres/index.ts";
-import { inputOf } from "./suite-input.ts";
 import { bundleHistory } from "./bundle.ts";
-import { countWaitingOnLocks, until, whileActsWaitAt } from "./suite-postgres.ts";
-import { doorsOf, type Scenario } from "./workspace-with-bundle.ts";
 import {
   bindingForGroups,
   bindingHolding,
@@ -50,6 +45,9 @@ import {
   type Sourced,
   type SourcedConcept,
 } from "./sourced-concept.ts";
+import { inputOf } from "./suite-input.ts";
+import { countWaitingOnLocks, until, whileActsWaitAt } from "./suite-postgres.ts";
+import { doorsOf, type Scenario } from "./workspace-with-bundle.ts";
 
 const { db, arrange, reading } = visibilitySuite();
 

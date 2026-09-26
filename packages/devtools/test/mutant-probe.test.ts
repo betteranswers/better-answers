@@ -5,9 +5,10 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
+import { afterAll, describe, expect, it } from "vitest";
+
 import { repositoryRoot } from "@better-answers/devtools/oxlint-config";
 import { gitIn, throwawayRepository, writeUnder } from "@better-answers/devtools/throwaway-tree";
-import { afterAll, describe, expect, it } from "vitest";
 
 const script = path.join(repositoryRoot, "scripts/mutant-probe.mjs");
 

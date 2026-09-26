@@ -1,7 +1,5 @@
-import { citedSourcesOf, conceptIriOf, ulid } from "@better-answers/schema";
-import type { TestData } from "@better-answers/schema/testing";
-import { describe, expect, it } from "vitest";
 import type { QueryResultRow } from "pg";
+import { describe, expect, it } from "vitest";
 
 import {
   GRAPH_WALK_DEPTH,
@@ -12,6 +10,9 @@ import {
   type ConceptDelta,
   type WalkStep,
 } from "@better-answers/core/store/graph";
+import { citedSourcesOf, conceptIriOf, ulid } from "@better-answers/schema";
+import type { TestData } from "@better-answers/schema/testing";
+
 import { answered, postgresForSuite, readingAs, seedingWith } from "./suite-postgres.ts";
 
 const db = postgresForSuite();

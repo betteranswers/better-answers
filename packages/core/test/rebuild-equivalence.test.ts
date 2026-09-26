@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { conceptIriOf, ulid } from "@better-answers/schema";
-
 import { head } from "@better-answers/core/store/git";
+import { conceptIriOf, ulid } from "@better-answers/schema";
 
 import {
   acceptSuggestions,
@@ -15,10 +14,10 @@ import {
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import { enqueueJob } from "../src/runs/index.ts";
 import { narrowBinding, narrowBindingInput } from "../src/sources/index.ts";
+import { bindingHolding, groupNamed } from "./sourced-concept.ts";
 import { inputOf } from "./suite-input.ts";
 import { readingAs } from "./suite-postgres.ts";
 import { runWorkerOnce } from "./worker-process.ts";
-import { bindingHolding, groupNamed } from "./sourced-concept.ts";
 import { doorsOf, suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
 const { db, bundles, arrange } = suiteWithBundles();

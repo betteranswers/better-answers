@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { byCodeUnit } from "@better-answers/schema/code-unit";
 import { z } from "zod";
+
+import { byCodeUnit } from "@better-answers/schema/code-unit";
 
 const manifest = z.looseObject({ scripts: z.record(z.string(), z.string()).default({}) });
 

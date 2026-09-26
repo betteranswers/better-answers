@@ -29,8 +29,8 @@ import {
   type Role,
   type RoleChanged,
 } from "./people-api.ts";
-import { aRole, ROLE_MEANINGS, roleOf, ROLES } from "./role-meanings.ts";
 import { outcomeOfFailure, outcomeOfGroupFailure } from "./refusal.tsx";
+import { aRole, ROLE_MEANINGS, roleOf, ROLES } from "./role-meanings.ts";
 import { CredentialsHere, GroupPills, JoinedOn, nameOf, RECORDED } from "./words.tsx";
 
 /** Where focus lands when the sheet opens: on who the member is, or straight on an act. */

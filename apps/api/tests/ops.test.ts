@@ -4,7 +4,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { serve } from "@hono/node-server";
-
 import { Pool } from "pg";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -29,8 +28,8 @@ import {
   type Foldable,
   type Tx,
 } from "@better-answers/core/store/postgres";
-import { inputOf } from "@better-answers/core/testing/input";
 import { SWEEPS, withSweepLock } from "@better-answers/core/sweeps";
+import { inputOf } from "@better-answers/core/testing/input";
 import { objectStoreForSuite, textOf } from "@better-answers/core/testing/objects";
 import {
   countWaitingOnLocks,

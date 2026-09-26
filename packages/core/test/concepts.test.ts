@@ -1,10 +1,13 @@
-import { testData } from "@better-answers/schema/testing";
 import pg from "pg";
 import { describe, expect, it } from "vitest";
 
+import { commit, head, PLATFORM_BOT, withRepositoryLock } from "@better-answers/core/store/git";
+import { walkFrom } from "@better-answers/core/store/graph";
 import { conceptIriOf, ulid } from "@better-answers/schema";
+import { testData } from "@better-answers/schema/testing";
 
 import { open } from "../src/answering/index.ts";
+import type { FrontmatterValue, TrustStatus } from "../src/answering/index.ts";
 import {
   contentHashOf,
   conceptByIri,
@@ -15,11 +18,8 @@ import {
   type Frontmatter,
   type WriteConceptInput,
 } from "../src/concepts/index.ts";
-import type { FrontmatterValue, TrustStatus } from "../src/answering/index.ts";
 import type { Result, UserPrincipal } from "../src/kernel/index.ts";
 import { removeMember } from "../src/members/index.ts";
-import { commit, head, PLATFORM_BOT, withRepositoryLock } from "@better-answers/core/store/git";
-import { walkFrom } from "@better-answers/core/store/graph";
 import {
   openPostgres,
   type Foldable,

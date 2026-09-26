@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { executableOf, writeUnder } from "@better-answers/devtools/throwaway-tree";
-
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
 const OXLINT = { package: "oxlint", path: ["bin", "oxlint"] } as const;

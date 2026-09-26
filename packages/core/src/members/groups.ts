@@ -1,5 +1,6 @@
-import { boundarySchemas, CURATED_ORIGIN } from "@better-answers/schema";
 import { z } from "zod";
+
+import { boundarySchemas, CURATED_ORIGIN } from "@better-answers/schema";
 
 import { act, declareActs, record } from "../audit/index.ts";
 import { attempt, err, ok, requireAdmin, ulid } from "../kernel/index.ts";

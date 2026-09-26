@@ -1,5 +1,6 @@
-import type { boundarySchemas } from "@better-answers/schema";
 import type { z } from "zod";
+
+import type { boundarySchemas } from "@better-answers/schema";
 
 import type { ProcessActorId } from "./actor.ts";
 import type { KernelRefusal } from "./vocabulary.ts";

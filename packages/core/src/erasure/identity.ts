@@ -1,7 +1,7 @@
+import { normalizeError, type PlatformPrincipal } from "../kernel/index.ts";
 import { ERASED_DOMAIN } from "../store/git/index.ts";
 import { withIdentityWrite, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import { workspacesHeldBy } from "../workspaces/index.ts";
-import { normalizeError, type PlatformPrincipal } from "../kernel/index.ts";
 
 export type IdentityArm = "no-person" | "last-membership" | "membership-ended";
 

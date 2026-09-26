@@ -1,3 +1,5 @@
+import { describe, expect, it } from "vitest";
+
 import {
   CEILING,
   WRAPPER_EXECUTABLE,
@@ -8,12 +10,9 @@ import {
   overTheCeiling,
   reportOf,
 } from "@better-answers/devtools/comment-density";
-import { runsOverThrowawayTree } from "@better-answers/devtools/throwaway-tree";
-import { describe, expect, it } from "vitest";
-
-import { rootScripts } from "@better-answers/devtools/root-commands";
-
 import type { Unit } from "@better-answers/devtools/comment-density";
+import { rootScripts } from "@better-answers/devtools/root-commands";
+import { runsOverThrowawayTree } from "@better-answers/devtools/throwaway-tree";
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
 const WORKSPACE = "packages/probe";

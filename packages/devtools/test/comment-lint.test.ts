@@ -1,11 +1,11 @@
+import { describe, expect, it } from "vitest";
+
 import { loadableAnywhere, readOxlintConfig } from "@better-answers/devtools/oxlint-config";
 import { lintFlags } from "@better-answers/devtools/root-commands";
 import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
-import { describe, expect, it } from "vitest";
+import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
 import { tag, wordsOf } from "./fixture-text.ts";
-
-import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
 const COMMENT_RULES = [
   "typescript/ban-ts-comment",

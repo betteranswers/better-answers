@@ -11,6 +11,7 @@ import {
   type VisibilityRow,
 } from "../access/index.ts";
 import { act, declareActs, record } from "../audit/index.ts";
+import { recomputeCompositionsIncluding } from "../guides/index.ts";
 import {
   actorIdOf,
   attempt,
@@ -27,7 +28,6 @@ import {
   type RoleRefusal,
   type UserPrincipal,
 } from "../kernel/index.ts";
-import { recomputeCompositionsIncluding } from "../guides/index.ts";
 import { holdsEveryGroup } from "../members/index.ts";
 import { writeConceptVisibility } from "../store/graph/index.ts";
 import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";

@@ -11,8 +11,8 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { parse } from "yaml";
 import { describe, expect, it } from "vitest";
+import { parse } from "yaml";
 import { z } from "zod";
 
 import {

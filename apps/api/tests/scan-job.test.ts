@@ -1,3 +1,4 @@
+/* jscpd:ignore-start */
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -14,6 +15,7 @@ import {
   repositoryRoot,
   workflowStepSchema,
 } from "./image-probe.ts";
+/* jscpd:ignore-end */
 
 const permissionsSchema = z.record(z.string(), z.string());
 

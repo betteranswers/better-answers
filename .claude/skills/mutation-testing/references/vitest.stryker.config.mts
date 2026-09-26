@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+
 import { defineConfig, configDefaults } from "vitest/config";
 
 // Mutation-testing config: the node project ONLY, flattened (no `projects`

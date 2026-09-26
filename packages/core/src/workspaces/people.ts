@@ -1,5 +1,6 @@
-import { boundarySchemas } from "@better-answers/schema";
 import { z } from "zod";
+
+import { boundarySchemas } from "@better-answers/schema";
 
 import { latestOnIdentitySet } from "../audit/index.ts";
 import {

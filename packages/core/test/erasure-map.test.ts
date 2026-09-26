@@ -1,8 +1,8 @@
-import { SUBJECT_IDENTIFIER_KINDS, ulid } from "@better-answers/schema";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { commit, type GitDoor } from "@better-answers/core/store/git";
+import { SUBJECT_IDENTIFIER_KINDS, ulid } from "@better-answers/schema";
 
 import {
   accessAnswerOf,
@@ -18,8 +18,8 @@ import {
 } from "../src/erasure/index.ts";
 import { actorIdOfPerson, type UserPrincipal } from "../src/kernel/index.ts";
 import { withScope } from "../src/store/postgres/index.ts";
-import { identityRowsFor, verificationCodeFor } from "./identity-rows.ts";
 import { contractFixture } from "./contract-fixture.ts";
+import { identityRowsFor, verificationCodeFor } from "./identity-rows.ts";
 import { bootstrap } from "./platform.ts";
 import { addressOf, readingAs, seedingWith } from "./suite-postgres.ts";
 import {

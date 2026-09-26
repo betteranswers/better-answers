@@ -1,6 +1,6 @@
 import type { UserPrincipal } from "./principal.ts";
-import type { KernelRefusal } from "./vocabulary.ts";
 import { err, ok, type Result } from "./result.ts";
+import type { KernelRefusal } from "./vocabulary.ts";
 
 export type RoleRefusal = KernelRefusal<"role-forbids">;
 

@@ -1,11 +1,12 @@
+import { ArrowLeftIcon, ArrowRightIcon } from "lucide-react";
+import type { ComponentProps } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
+
+import { cn } from "@/shared/lib/utils.ts";
 import { Badge } from "@/shared/ui/badge.tsx";
 import type { CarouselApi } from "@/shared/ui/carousel.tsx";
 import { Carousel, CarouselContent, CarouselItem } from "@/shared/ui/carousel.tsx";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/shared/ui/hover-card.tsx";
-import { cn } from "@/shared/lib/utils.ts";
-import { ArrowLeftIcon, ArrowRightIcon } from "lucide-react";
-import type { ComponentProps } from "react";
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
 
 export type InlineCitationProps = ComponentProps<"span">;
 

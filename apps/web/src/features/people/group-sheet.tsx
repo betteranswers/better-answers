@@ -24,7 +24,6 @@ import { GroupChecklist } from "./group-checklist.tsx";
 import { useRenameGroup, type ListedGroup } from "./groups-api.ts";
 import { useMembers } from "./people-api.ts";
 import { outcomeOfFailure, outcomeOfGroupFailure } from "./refusal.tsx";
-
 import { nameOf, RECORDED } from "./words.tsx";
 
 /** Where focus lands when the sheet opens: on the group, or straight on one of its acts. */

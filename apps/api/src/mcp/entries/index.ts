@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-import { conceptFrontmatter } from "@better-answers/schema";
-
 import {
   ANSWER_VERDICTS,
   ask,
@@ -19,6 +17,7 @@ import {
   TRUST_TIERS,
 } from "@better-answers/core/answering";
 import { parse } from "@better-answers/core/kernel";
+import { conceptFrontmatter } from "@better-answers/schema";
 
 import { defineEntry, type Entry } from "./define.ts";
 

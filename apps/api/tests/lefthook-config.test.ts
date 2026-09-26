@@ -3,8 +3,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 
-import { parse } from "yaml";
 import { describe, expect, it } from "vitest";
+import { parse } from "yaml";
 import { z } from "zod";
 
 import { runsOverThrowawayTree } from "@better-answers/devtools/throwaway-tree";

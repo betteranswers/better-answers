@@ -1,9 +1,9 @@
-import { runsOverThrowawayTree } from "@better-answers/devtools/throwaway-tree";
 import { describe, expect, it } from "vitest";
 
-import { tag, wordsOf } from "./fixture-text.ts";
-
+import { runsOverThrowawayTree } from "@better-answers/devtools/throwaway-tree";
 import type { Tool, Tree } from "@better-answers/devtools/throwaway-tree";
+
+import { tag, wordsOf } from "./fixture-text.ts";
 
 const FILE = "probe.py";
 

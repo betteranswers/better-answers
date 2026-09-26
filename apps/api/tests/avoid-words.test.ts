@@ -2,8 +2,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { throwawayRepository, writeUnder } from "@better-answers/devtools/throwaway-tree";
 import { afterAll, describe, expect, it } from "vitest";
+
+import { throwawayRepository, writeUnder } from "@better-answers/devtools/throwaway-tree";
 
 import { readUnder, repositoryRoot, treeFilesUnder } from "./tree-walk.ts";
 

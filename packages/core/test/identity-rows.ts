@@ -1,6 +1,7 @@
+import type pg from "pg";
+
 import { ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
-import type pg from "pg";
 
 export type IdentityRows = {
   readonly sessionId: string;

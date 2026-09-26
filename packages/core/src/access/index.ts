@@ -1,3 +1,5 @@
+import type { z } from "zod";
+
 import {
   AUDIENCE_EVERYONE,
   AUDIENCE_GROUPS,
@@ -5,7 +7,6 @@ import {
   type SENSITIVITIES,
 } from "@better-answers/schema";
 import { byCodeUnit } from "@better-answers/schema/code-unit";
-import type { z } from "zod";
 
 import type { GroupId, Role, UserPrincipal } from "../kernel/index.ts";
 

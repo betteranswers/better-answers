@@ -1,5 +1,6 @@
-import { ulid } from "@better-answers/schema";
 import { describe, expect, expectTypeOf, it } from "vitest";
+
+import { ulid } from "@better-answers/schema";
 
 import type { OperatorPrincipal, PlatformPrincipal, UserPrincipal } from "../src/kernel/index.ts";
 import { openPostgres } from "../src/store/postgres/index.ts";

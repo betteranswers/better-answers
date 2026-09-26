@@ -1,4 +1,3 @@
-import { boundarySchemas, ulid } from "@better-answers/schema";
 import { beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -10,6 +9,7 @@ import {
   openObjects,
 } from "@better-answers/core/store/objects";
 import { withScope } from "@better-answers/core/store/postgres";
+import { boundarySchemas, ulid } from "@better-answers/schema";
 
 import { open } from "../src/answering/index.ts";
 import {

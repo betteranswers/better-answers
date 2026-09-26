@@ -1,8 +1,8 @@
 import path from "node:path";
 
 import apiStryker from "../apps/api/stryker.config.mjs";
-import { mutationShardsFromArgv } from "../packages/devtools/src/mutation-shards.ts";
 import coreStryker from "../packages/core/stryker.config.mjs";
+import { mutationShardsFromArgv } from "../packages/devtools/src/mutation-shards.ts";
 
 const repositoryRoot = path.resolve(import.meta.dirname, "..");
 

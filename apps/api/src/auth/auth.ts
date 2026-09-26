@@ -19,9 +19,6 @@ import {
   recordSignIn,
   workspacesHeldBy,
 } from "@better-answers/core/workspaces";
-
-import type { EmailSender } from "../email.ts";
-import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
 import {
   account,
   invitation,
@@ -42,6 +39,8 @@ import {
   workspace,
 } from "@better-answers/schema";
 
+import type { EmailSender } from "../email.ts";
+import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
 import {
   ACCESS_TOKEN_LIFETIME_SECONDS,
   BETTER_AUTH_RATE_LIMIT,

@@ -1,5 +1,6 @@
-import { SENSITIVITIES } from "@better-answers/schema";
 import { z } from "zod";
+
+import { SENSITIVITIES } from "@better-answers/schema";
 
 import {
   narrower,
