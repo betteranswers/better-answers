@@ -66,7 +66,7 @@ export function DisplayNameScreen() {
         </Button>
       </form>
 
-      {failure === null ? null : <Refused id={REFUSED} failure={failure} saidOf={saidOf} />}
+      <Refused id={REFUSED} failure={failure} saidOf={saidOf} />
     </AuthScreen>
   );
 }

@@ -2,6 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
 import { refusalOf, type ApiError, type Refusal } from "@/shared/api/trpc.ts";
+import { cn } from "@/shared/lib/utils.ts";
 import { RefusalLine } from "@/shared/refusal-outcome.tsx";
 import { NO_RESPONSE, SAID_OF_CLASS, type Said } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
@@ -25,6 +26,10 @@ export function AuthScreen(properties: { readonly title: string; readonly childr
   );
 }
 
+/**
+ * Hidden while empty, so it can stand before its words: a live region inserted already holding
+ * words may never be read.
+ */
 export function Outcome(properties: {
   readonly tone: "said" | "refused";
   readonly children: ReactNode;
@@ -34,11 +39,12 @@ export function Outcome(properties: {
     <p
       id={properties.id}
       role={properties.tone === "refused" ? "alert" : "status"}
-      className={
+      className={cn(
+        "mt-4 empty:hidden",
         properties.tone === "refused"
-          ? "mt-4 border-l-2 border-destructive pl-3 text-destructive"
-          : "mt-4 text-muted-foreground"
-      }
+          ? "border-l-2 border-destructive pl-3 text-destructive"
+          : "text-muted-foreground",
+      )}
     >
       {properties.children}
     </p>
@@ -77,18 +83,21 @@ const saidOfFailure = (
  */
 export function Refused(properties: {
   readonly id: string;
-  readonly failure: Error | ApiError;
+  readonly failure: Error | ApiError | null;
   readonly saidOf: (refusal: Refusal) => Said;
   readonly unanswered?: Said;
   readonly signInAt?: string;
 }) {
-  const refusal = refusalOf(properties.failure);
+  const { failure } = properties;
+  const refusal = failure === null ? undefined : refusalOf(failure);
   const sessionEnded = refusal?.class === "unauthenticated";
-  const said = saidOfFailure(refusal, properties.saidOf, properties.unanswered ?? NO_RESPONSE);
+  const unanswered = properties.unanswered ?? NO_RESPONSE;
   return (
     <>
       <Outcome tone="refused" id={properties.id}>
-        <RefusalLine said={said} />
+        {failure === null ? null : (
+          <RefusalLine said={saidOfFailure(refusal, properties.saidOf, unanswered)} />
+        )}
       </Outcome>
       {sessionEnded ? (
         <SignInAgain signInAt={properties.signInAt ?? `/sign-in${pageQuery()}`} />

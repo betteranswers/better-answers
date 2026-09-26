@@ -111,14 +111,20 @@ test("says what to change in a bad name, then saves", async ({
   await signIn(page, request, anAddress("refused"));
   await expect(displayNameHeading(page)).toBeVisible();
 
+  const refusal = page.getByRole("alert", { includeHidden: true });
+  await expect(refusal, "the display-name screen stands no refusal region").toHaveCount(1);
+  await expect(refusal, "the refusal region stands with words already in it").toBeEmpty();
+  const stood = await refusal.elementHandle();
+
   await displayNameField(page).fill("Priya <priya@acme.invalid>");
   await saveButton(page).click();
 
-  const refusal = page.getByRole("alert");
   await saysItsSentenceNotItsWord(refusal, {
     table: DISPLAY_NAME_REFUSED,
     word: "display-name-angle-bracket",
   });
+  const sameRegion = await refusal.evaluate((now, then) => now === then, stood);
+  expect(sameRegion, "the refusal was said in an alert region of its own").toBe(true);
   await expect(displayNameField(page)).toHaveAttribute("aria-invalid", "true");
   await expect(displayNameHeading(page)).toBeVisible();
   await passesTheAccessibilityGate();

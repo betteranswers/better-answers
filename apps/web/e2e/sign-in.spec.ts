@@ -123,6 +123,32 @@ test("says a code is sent, wrong, or asked too often", async ({ page, request })
   await expect(page.getByRole("alert")).toContainText("Too many codes have been asked for");
 });
 
+test("announces a sent code in the standing region, keeping focus", async ({ page, request }) => {
+  const email = anAddress("stood");
+  await person(request, email);
+
+  await page.goto("/sign-in");
+  await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
+
+  const said = page.getByRole("status", { includeHidden: true });
+  const refused = page.getByRole("alert", { includeHidden: true });
+  await expect(said, "the sign-in screen stands no status region").toHaveCount(1);
+  await expect(said, "the status region stands with words already in it").toBeEmpty();
+  await expect(refused, "the sign-in screen stands no alert region").toHaveCount(1);
+  await expect(refused, "the alert region stands with words already in it").toBeEmpty();
+  const stood = await said.elementHandle();
+
+  await page.getByLabel("Email address").fill(email);
+  await page.getByLabel("Email address").press("Enter");
+
+  await expect(said).toContainText(email);
+  const sameRegion = await said.evaluate((now, then) => now === then, stood);
+  expect(sameRegion, "the code step said the code went in a status region of its own").toBe(true);
+  await expect(refused, "the code step stood an alert region of its own").toHaveCount(1);
+  await expect(refused, "the code step's alert region holds words").toBeEmpty();
+  await expect(page.getByLabel("Code"), "sending the code took focus from the field").toBeFocused();
+});
+
 test("skips the picker when the membership postdates the session", async ({ page, request }) => {
   /* jscpd:ignore-start */
   const email = anAddress("later");

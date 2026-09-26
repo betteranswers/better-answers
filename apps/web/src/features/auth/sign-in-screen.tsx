@@ -26,6 +26,18 @@ const didNotWork = (error: BetterFetchError): string =>
     ? TOO_MANY
     : "That code did not work. Check it and try again, or ask for a new one.";
 
+/**
+ * Reaching the code step takes a sent code, and leaving it resets both acts, so at most one has
+ * failed.
+ */
+const failureWords = (
+  sendFailure: BetterFetchError | null,
+  signInFailure: BetterFetchError | null,
+): string | null => {
+  if (signInFailure !== null) return didNotWork(signInFailure);
+  return sendFailure === null ? null : couldNotSend(sendFailure);
+};
+
 export function SignInScreen() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -68,75 +80,88 @@ export function SignInScreen() {
     signIn.mutate({ email: sentTo, otp: code.trim() }, { onSuccess: landAfterSignIn });
   };
 
-  if (sentTo === undefined) {
-    return (
-      <AuthScreen title="Sign in">
-        <p className="mt-2 text-muted-foreground">
-          Enter your work email address. We will send you a six-digit code.
-        </p>
+  const step =
+    sentTo === undefined
+      ? {
+          title: "Sign in",
+          said: null,
+          hint: (
+            <p className="mt-2 text-muted-foreground">
+              Enter your work email address. We will send you a six-digit code.
+            </p>
+          ),
+          form: (
+            <form onSubmit={askForCode} className="mt-6">
+              <Label htmlFor="email">Email address</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="username"
+                required
+                className="mt-2"
+                value={address}
+                onChange={(event) => setAddress(event.target.value)}
+              />
+              <Button type="submit" className="mt-4" disabled={sendCode.isPending}>
+                {sendCode.isPending ? "Sending" : "Send code"}
+              </Button>
+            </form>
+          ),
+          back: null,
+        }
+      : {
+          title: "Enter your code",
+          said: (
+            <>
+              We have sent a six-digit code to {sentTo}. It is valid for {CODE_LIFETIME}.
+            </>
+          ),
+          hint: null,
+          form: (
+            <form onSubmit={submitCode} className="mt-6">
+              <Label htmlFor="code">Code</Label>
+              <Input
+                id="code"
+                name="code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]{6}"
+                required
+                className="mt-2"
+                value={code}
+                onChange={(event) => setCode(event.target.value)}
+              />
+              <Button type="submit" className="mt-4" disabled={signIn.isPending}>
+                {signIn.isPending ? "Signing in" : "Sign in"}
+              </Button>
+            </form>
+          ),
+          back: (
+            <Button
+              type="button"
+              variant="link"
+              className="mt-6 px-0"
+              onClick={() => {
+                setSentTo(undefined);
+                sendCode.reset();
+                signIn.reset();
+              }}
+            >
+              Use a different email address
+            </Button>
+          ),
+        };
 
-        <form onSubmit={askForCode} className="mt-6">
-          <Label htmlFor="email">Email address</Label>
-          <Input
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="username"
-            required
-            className="mt-2"
-            value={address}
-            onChange={(event) => setAddress(event.target.value)}
-          />
-          <Button type="submit" className="mt-4" disabled={sendCode.isPending}>
-            {sendCode.isPending ? "Sending" : "Send code"}
-          </Button>
-        </form>
-
-        {sendCode.error === null ? null : (
-          <Outcome tone="refused">{couldNotSend(sendCode.error)}</Outcome>
-        )}
-      </AuthScreen>
-    );
-  }
-
+  // Each slot keeps its element across the steps, so the code step speaks in the regions that
+  // stood and focus stays in the field.
   return (
-    <AuthScreen title="Enter your code">
-      <Outcome tone="said">
-        We have sent a six-digit code to {sentTo}. It is valid for {CODE_LIFETIME}.
-      </Outcome>
-
-      <form onSubmit={submitCode} className="mt-6">
-        <Label htmlFor="code">Code</Label>
-        <Input
-          id="code"
-          name="code"
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          pattern="[0-9]{6}"
-          required
-          className="mt-2"
-          value={code}
-          onChange={(event) => setCode(event.target.value)}
-        />
-        <Button type="submit" className="mt-4" disabled={signIn.isPending}>
-          {signIn.isPending ? "Signing in" : "Sign in"}
-        </Button>
-      </form>
-
-      {signIn.error === null ? null : <Outcome tone="refused">{didNotWork(signIn.error)}</Outcome>}
-
-      <Button
-        type="button"
-        variant="link"
-        className="mt-6 px-0"
-        onClick={() => {
-          setSentTo(undefined);
-          sendCode.reset();
-          signIn.reset();
-        }}
-      >
-        Use a different email address
-      </Button>
+    <AuthScreen title={step.title}>
+      <Outcome tone="said">{step.said}</Outcome>
+      {step.hint}
+      {step.form}
+      <Outcome tone="refused">{failureWords(sendCode.error, signIn.error)}</Outcome>
+      {step.back}
     </AuthScreen>
   );
 }
