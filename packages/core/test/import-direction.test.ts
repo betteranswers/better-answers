@@ -81,28 +81,13 @@ describe("the rule fires, naming the ADR 0029 rule it holds", () => {
     ["5", "a slice importing node:http2", SLICE, "node:http2"],
     ["5", "a slice importing node:https", SLICE, "node:https"],
     ["5", "a test importing hono", TEST, "hono"],
-    ["5", "a file at the package root importing hono", ROOT_FILE, "hono"],
+    ["5", "a package-root file importing hono", ROOT_FILE, "hono"],
 
     ["4", "a slice reaching a sibling's internal file", SLICE, "../guides/renderer.ts"],
-    [
-      "4",
-      "a slice reaching a sibling's internal without an extension",
-      SLICE,
-      "../guides/renderer",
-    ],
+    ["4", "a slice reaching a sibling's extensionless internal", SLICE, "../guides/renderer"],
     ["4", "a slice reaching a door's internal file", SLICE, "../store/postgres/handle.ts"],
-    [
-      "4",
-      "a slice reaching a sibling's internal through a detour",
-      SLICE,
-      "../concepts/../guides/renderer.ts",
-    ],
-    [
-      "4",
-      "a slice subdirectory reaching a sibling's internal two up",
-      NESTED,
-      "../../concepts/inbox.ts",
-    ],
+    ["4", "a slice detouring to a sibling's internal", SLICE, "../concepts/../guides/renderer.ts"],
+    ["4", "a slice subdirectory reaching a sibling's internal", NESTED, "../../concepts/inbox.ts"],
     ["4", "a door reaching kernel's internal", GRAPH_DOOR, "../../kernel/actor.ts"],
     ["4", "the graph door reaching access's internal", GRAPH_DOOR, "../../access/predicate.ts"],
     ["4", "a test reaching a slice's internal", TEST, "../src/concepts/file.ts"],
@@ -113,22 +98,12 @@ describe("the rule fires, naming the ADR 0029 rule it holds", () => {
       "@better-answers/core/guides/renderer.ts",
     ],
 
-    ["4", "a slice reaching a face the map does not name", SLICE, "../store/objects/index.ts"],
-    ["4", "a slice reaching a sibling the map does not name", SLICE, "../sources/index.ts"],
-    [
-      "4",
-      "a slice reaching a directory the map does not name, by its directory",
-      SLICE,
-      "../sources",
-    ],
-    ["4", "a slice reaching a nested face inside a sibling", SLICE, "../guides/internal/index.ts"],
-    ["4", "a test reaching a face the map does not name", TEST, "../src/store/objects/index.ts"],
-    [
-      "4",
-      "a self-reference to an entry the map does not name",
-      SLICE,
-      "@better-answers/core/sources",
-    ],
+    ["4", "a slice reaching an unmapped face", SLICE, "../store/objects/index.ts"],
+    ["4", "a slice reaching an unmapped sibling", SLICE, "../sources/index.ts"],
+    ["4", "a slice reaching an unmapped directory", SLICE, "../sources"],
+    ["4", "a slice reaching a sibling's nested face", SLICE, "../guides/internal/index.ts"],
+    ["4", "a test reaching an unmapped face", TEST, "../src/store/objects/index.ts"],
+    ["4", "a self-reference to an unmapped entry", SLICE, "@better-answers/core/sources"],
 
     ["4", "a slice importing erasure's face", SLICE, "../erasure/index.ts"],
     ["4", "a slice importing erasure by its directory", SLICE, "../erasure"],
@@ -231,11 +206,7 @@ describe("the rule stays silent where the ADR allows the import", () => {
   });
 
   it.each([
-    [
-      "a relative import that leaves its directory",
-      "apps/api/src/routers/probe.ts",
-      "../auth/claims.ts",
-    ],
+    ["an upward relative import", "apps/api/src/routers/probe.ts", "../auth/claims.ts"],
     ["a transport import", "apps/api/src/probe.ts", "hono"],
   ])("stays silent outside packages/core for %s", (_title, file, specifier) => {
     expect(lint.flagged(importing(file, specifier))).toEqual([]);

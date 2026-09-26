@@ -147,7 +147,7 @@ describe("what the restore act refuses", () => {
       "not-the-always-set",
     ],
   ] as const)(
-    "refuses %s, and neither the row nor the ledger moves",
+    "refuses %s, moving neither row nor ledger",
     async (_who, principalOf, overrides, refusal) => {
       const scenario = await arrange();
       const { findingId } = await findingIn(scenario, overrides);

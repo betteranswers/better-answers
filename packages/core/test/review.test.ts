@@ -706,8 +706,8 @@ describe("an Admin keeping named finding groups in the text", () => {
 
   it.each([
     ["named once", 1],
-    ["named twice, which is one group all the same", 2],
-  ] as const)("keeps a one-span group, %s, with no batch id", async (_how, times) => {
+    ["named twice, still one group", 2],
+  ] as const)("keeps a one-span group, %s, unbatched", async (_how, times) => {
     const scenario = await arrange();
     const { bindingId, first } = await bindingWithTwoDocuments(scenario);
     const kept = await findingIn(scenario.workspaceId, first.documentId);
@@ -730,7 +730,7 @@ describe("an Admin keeping named finding groups in the text", () => {
   it.each([
     ["an Editor", (scenario: Scenario) => scenario.editor, "role-forbids"],
     ["a Viewer", (scenario: Scenario) => scenario.viewer, "role-forbids"],
-  ] as const)("refuses %s, and neither a row nor a run moves", async (_who, personOf, refusal) => {
+  ] as const)("refuses %s, moving neither a row nor a run", async (_who, personOf, refusal) => {
     const scenario = await arrange();
     const { bindingId, first } = await bindingWithTwoDocuments(scenario);
     const named = await findingIn(scenario.workspaceId, first.documentId);
@@ -1229,9 +1229,9 @@ describe("an Admin dismissing finding groups as not special category", () => {
   });
 
   it.each([
-    ["dismissed and then kept in text", ["dismiss", "keep"]],
-    ["kept in text and then dismissed", ["keep", "dismiss"]],
-  ] as const)("leaves a span %s both dismissed and restored", async (_order, acts) => {
+    ["dismissed, then kept-in-text", ["dismiss", "keep"]],
+    ["kept-in-text, then dismissed", ["keep", "dismiss"]],
+  ] as const)("leaves a span %s, both dismissed and restored", async (_order, acts) => {
     const scenario = await arrange();
     const { bindingId, first } = await twoDocumentsTheSeamNarrowed(scenario);
     const named = await findingIn(scenario.workspaceId, first.documentId, HEALTH);
@@ -1252,7 +1252,7 @@ describe("an Admin dismissing finding groups as not special category", () => {
   });
 
   it.each([
-    ["the queue will not hold its run", "job"],
+    ["the queue refuses its run", "job"],
     ["the ledger refuses the event", "audit_event"],
   ] as const)("rejects, dismissing no span, when %s", async (_when, table) => {
     const scenario = await arrange();
@@ -1273,7 +1273,7 @@ describe("an Admin dismissing finding groups as not special category", () => {
   it.each([
     ["an Editor", (scenario: Scenario) => scenario.editor],
     ["a Viewer", (scenario: Scenario) => scenario.viewer],
-  ] as const)("refuses %s, and neither a row nor a run moves", async (_who, personOf) => {
+  ] as const)("refuses %s, moving neither a row nor a run", async (_who, personOf) => {
     const scenario = await arrange();
     const { bindingId, first } = await twoDocumentsTheSeamNarrowed(scenario);
     const named = await findingIn(scenario.workspaceId, first.documentId, HEALTH);
@@ -1425,36 +1425,33 @@ describe("the reprocess that follows a review", () => {
 
   it.each([
     [
-      "restored by a single-span restore alone, so never reviewed",
+      "an Admin restored singly, never reviewed",
       { restoredAt: new Date("2026-09-12T10:00:00.000Z"), restoreReason: BUSINESS_FACT },
       "restoredBy",
     ],
     [
-      "reviewed as narrowed, and never restored",
+      "an Admin reviewed as narrowed, never restored",
       { reviewState: "narrowed", reviewedAt: new Date("2026-09-12T10:00:00.000Z") },
       "reviewedBy",
     ],
-  ] as const)(
-    "spares a finding %s, either mark being an Admin's act",
-    async (_how, marks, actorColumn) => {
-      const scenario = await arrange();
-      const { bindingId, first } = await bindingWithTwoDocuments(scenario);
-      const marked = await seededBy(db(), async (seed) => {
-        const row = await seed.finding({
-          workspaceId: scenario.workspaceId,
-          documentId: first.documentId,
-          ...marks,
-          [actorColumn]: `human:${scenario.admin.userId}`,
-        });
-        return row.id;
+  ] as const)("spares a finding %s", async (_how, marks, actorColumn) => {
+    const scenario = await arrange();
+    const { bindingId, first } = await bindingWithTwoDocuments(scenario);
+    const marked = await seededBy(db(), async (seed) => {
+      const row = await seed.finding({
+        workspaceId: scenario.workspaceId,
+        documentId: first.documentId,
+        ...marks,
+        [actorColumn]: `human:${scenario.admin.userId}`,
       });
+      return row.id;
+    });
 
-      const outcome = await reprocessAsAdmin(scenario, bindingId, "wiped");
+    const outcome = await reprocessAsAdmin(scenario, bindingId, "wiped");
 
-      expect(outcome).toMatchObject({ ok: true, value: { findings: 0 } });
-      expect(await marksOf(scenario.workspaceId, marked)).toBeDefined();
-    },
-  );
+    expect(outcome).toMatchObject({ ok: true, value: { findings: 0 } });
+    expect(await marksOf(scenario.workspaceId, marked)).toBeDefined();
+  });
 
   it("leaves another binding's findings where they are", async () => {
     const scenario = await arrange();

@@ -176,7 +176,7 @@ const through = async <T>(
 };
 
 describe("a door whose work answers a refusal after a write", () => {
-  it.each(DOORS)("rolls %s door back: no row, ledger entry or job", async (door) => {
+  it.each(DOORS)("rolls back three writes through %s door", async (door) => {
     const key = `probe-${ulid()}`;
 
     const { seeded, answered } = await through(door, answeringAfterThreeWrites(key, err(PROVOKED)));
@@ -185,7 +185,7 @@ describe("a door whose work answers a refusal after a write", () => {
     expect(answered).toEqual({ ok: false, error: PROVOKED });
   });
 
-  it.each(DOORS)("commits the three writes through %s door on a value", async (door) => {
+  it.each(DOORS)("commits three writes through %s door on a value", async (door) => {
     const key = `probe-${ulid()}`;
 
     const { seeded, answered } = await through(door, answeringAfterThreeWrites(key, ok("landed")));

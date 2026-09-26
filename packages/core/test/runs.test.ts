@@ -315,28 +315,28 @@ describe("an act landing its rows and job in one transaction", () => {
 
   it.each([
     ["an index job with no subject", { kind: "index", reason: "bound" }],
-    ["a nightly audit that names one", { kind: "nightly-audit", subjectId: BINDING }],
-    ["a rebuild with none of its six reasons", { kind: "full-rebuild" }],
+    ["a nightly audit naming a subject", { kind: "nightly-audit", subjectId: BINDING }],
+    ["a rebuild with none of its reasons", { kind: "full-rebuild" }],
     ["an index reason on a rebuild", { kind: "full-rebuild", reason: "bound" }],
     ["a rebuild reason on an index job", { kind: "index", subjectId: BINDING, reason: "drill" }],
     ["a kind the queue does not carry", { kind: "prune", subjectId: BINDING }],
-  ])(
-    "refuses %s as malformed, rather than aborting the act's transaction",
-    async (_what, asked) => {
-      const scenario = await arrange();
+  ])("refuses %s as malformed", async (_what, asked) => {
+    const scenario = await arrange();
 
-      const refused = await actOf(scenario, (tx) =>
-        // @ts-expect-error each row is outside the queue's input, on purpose
-        enqueueJobIn(graphMaintenance, tx, {
-          workspaceId: scenario.workspaceId,
-          ...asked,
-        }),
-      );
+    const refused = await actOf(scenario, (tx) =>
+      // @ts-expect-error each row is outside the queue's input, on purpose
+      enqueueJobIn(graphMaintenance, tx, {
+        workspaceId: scenario.workspaceId,
+        ...asked,
+      }),
+    );
 
-      expect(refused).toEqual({ ok: false, error: "malformed" });
-      expect(await jobsIn(scenario.workspaceId)).toEqual([]);
-    },
-  );
+    expect(refused, "refused, rather than aborting the act's transaction").toEqual({
+      ok: false,
+      error: "malformed",
+    });
+    expect(await jobsIn(scenario.workspaceId)).toEqual([]);
+  });
 
   it("gates the enqueue on the role the kind's descriptor names", async () => {
     const scenario = await arrange();
@@ -530,53 +530,44 @@ describe("what the platform can say about the two parsers agreeing", () => {
   });
 
   it.each([
-    ["a file whose hash is not the row's", { mismatched: [{ path: "knowledge/expenses.md" }] }],
+    ["a file hashed unlike its row", { mismatched: [{ path: "knowledge/expenses.md" }] }],
     ["a file the grammar cannot read", { unparsed: ["knowledge/strange.md"] }],
     ["a file the index does not know", { missing_row: ["knowledge/new.md"] }],
     ["a row whose file is gone", { missing_file: ["knowledge/gone.md"] }],
-  ])(
-    "says mismatched over %s, the repository and the index disagreeing",
-    async (_finding, found) => {
-      const scenario = await arrange();
-      await finishedAudit(
-        scenario.workspaceId,
-        { ...NOTHING_FOUND, ...found },
-        new Date("2026-09-07T02:00:00Z"),
-      );
+  ])("says mismatched over %s", async (_finding, found) => {
+    const scenario = await arrange();
+    await finishedAudit(
+      scenario.workspaceId,
+      { ...NOTHING_FOUND, ...found },
+      new Date("2026-09-07T02:00:00Z"),
+    );
 
-      expect(await bundleHealth(scenario.admin, scenario.postgres)).toEqual({
-        ok: true,
-        value: "mismatched",
-      });
-    },
-  );
+    expect(
+      await bundleHealth(scenario.admin, scenario.postgres),
+      "the repository and the index disagree",
+    ).toEqual({ ok: true, value: "mismatched" });
+  });
 
   it.each([
     ["a list missing", { checked: 3, mismatched: [], unparsed: [] }],
-    ["a finding that is not a list", { ...NOTHING_FOUND, mismatched: "" }],
-    [
-      "an outcome outside the boundary's shape",
-      { ...NOTHING_FOUND, mismatched: [{ deep: { path: "x" } }] },
-    ],
-  ])(
-    "says mismatched, never healthy, over an unreadable audit outcome: %s",
-    async (_shape, outcome) => {
-      const scenario = await arrange();
-      const jobId = await auditQueuedByCron(scenario);
-      await finishedAudit(
-        scenario.workspaceId,
-        NOTHING_FOUND,
-        new Date("2026-09-07T02:00:00Z"),
-        jobId,
-      );
-      await outcomeWrittenRaw(scenario.workspaceId, jobId, outcome);
+    ["a non-list finding", { ...NOTHING_FOUND, mismatched: "" }],
+    ["a misshapen entry", { ...NOTHING_FOUND, mismatched: [{ deep: { path: "x" } }] }],
+  ])("says mismatched over an unreadable audit outcome: %s", async (_shape, outcome) => {
+    const scenario = await arrange();
+    const jobId = await auditQueuedByCron(scenario);
+    await finishedAudit(
+      scenario.workspaceId,
+      NOTHING_FOUND,
+      new Date("2026-09-07T02:00:00Z"),
+      jobId,
+    );
+    await outcomeWrittenRaw(scenario.workspaceId, jobId, outcome);
 
-      expect(await bundleHealth(scenario.admin, scenario.postgres)).toEqual({
-        ok: true,
-        value: "mismatched",
-      });
-    },
-  );
+    expect(
+      await bundleHealth(scenario.admin, scenario.postgres),
+      "an unreadable outcome is never healthy",
+    ).toEqual({ ok: true, value: "mismatched" });
+  });
 
   it("reads the latest finished audit, so a fixed mismatch clears", async () => {
     const scenario = await arrange();

@@ -586,7 +586,7 @@ describe("who may decide", () => {
   ];
 
   for (const [name, verb] of verbs) {
-    it(`refuses an Editor and a Viewer the ${name} verb, with the one word`, async () => {
+    it(`refuses Editors and Viewers the ${name} verb with one word`, async () => {
       const { workspace, requestId } = await withOneWaitingRequest(`Role${name}`);
 
       for (const role of ["Editor", "Viewer"] as const) {
@@ -599,7 +599,7 @@ describe("who may decide", () => {
       expect(await requestRows(workspace.id)).toMatchObject([{ status: "waiting" }]);
     });
 
-    it(`keeps an Admin of another workspace out of the ${name} verb`, async () => {
+    it(`keeps another workspace's Admin out of the ${name} verb`, async () => {
       const { workspace, requestId } = await withOneWaitingRequest(`Tenant${name}`);
       const elsewhere = await provision(`Other${name}`);
 

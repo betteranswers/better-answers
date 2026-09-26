@@ -26,7 +26,7 @@ describe("the display-name rule", () => {
     ["an apostrophe, a hyphen and an accent", "Siân O'Brien-Smith", "Siân O'Brien-Smith"],
     ["a script other than Latin", "李小龍", "李小龍"],
     ["a hundred characters", HUNDRED, HUNDRED],
-    ["a hundred characters once the space around them is gone", `  ${HUNDRED}  `, HUNDRED],
+    ["a hundred characters, once trimmed", `  ${HUNDRED}  `, HUNDRED],
     ["a hundred characters that are two UTF-16 units each", HUNDRED_ASTRAL, HUNDRED_ASTRAL],
   ])("takes %s", (_case, asked, taken) => {
     expect(applyDisplayNameRule(asked)).toEqual({ ok: true, value: taken });
@@ -37,7 +37,7 @@ describe("the display-name rule", () => {
     ["spaces alone", "    ", "display-name-empty"],
     ["line breaks and a tab alone", "\n\t\r\n", "display-name-empty"],
     ["a line feed inside it", "Priya\nShah", "display-name-not-one-line"],
-    ["a carriage return and a line feed inside it", "Priya\r\nShah", "display-name-not-one-line"],
+    ["an inner carriage return and line feed", "Priya\r\nShah", "display-name-not-one-line"],
     ["a Unicode line separator inside it", "Priya\u2028Shah", "display-name-not-one-line"],
     ["a next-line character, which trimming leaves", "\u0085Priya", "display-name-not-one-line"],
     ["a tab inside it", "Priya\tShah", "display-name-control-character"],
@@ -49,18 +49,10 @@ describe("the display-name rule", () => {
     ["a greater-than sign", "Priya > Sam", "display-name-angle-bracket"],
     ["a tag", "<b>Priya</b>", "display-name-angle-bracket"],
     ["a hundred and one characters", `${HUNDRED}a`, "display-name-too-long"],
-    ["a hundred and one characters past the BMP", `${HUNDRED_ASTRAL}𝐀`, "display-name-too-long"],
-    [
-      "one letter under a hundred combining marks, counted mark by mark",
-      `e${"́".repeat(100)}`,
-      "display-name-too-long",
-    ],
-    ["a break and a bracket, the break named first", "Priya\n<Shah>", "display-name-not-one-line"],
-    [
-      "a bracket in a name too long, the bracket named first",
-      `<${HUNDRED}`,
-      "display-name-angle-bracket",
-    ],
+    ["a hundred and one astral characters", `${HUNDRED_ASTRAL}𝐀`, "display-name-too-long"],
+    ["one letter's hundred marks, counted singly", `e${"́".repeat(100)}`, "display-name-too-long"],
+    ["a break and a bracket, break first", "Priya\n<Shah>", "display-name-not-one-line"],
+    ["a bracket and excess length, bracket first", `<${HUNDRED}`, "display-name-angle-bracket"],
   ])("refuses %s, naming how", (_case, asked, word) => {
     expect(applyDisplayNameRule(asked)).toEqual({ ok: false, error: word });
   });
@@ -287,8 +279,8 @@ describe("correcting a display name, as the operator", () => {
   });
 
   it.each([
-    ["an id no person could hold", "user-missing"],
-    ["an id no person holds", ulid()],
+    ["a malformed id", "user-missing"],
+    ["an unknown id", ulid()],
   ])("refuses %s as no such user, writing nothing", async (_case, personId) => {
     const { answered } = await correcting({ personId, displayName: "Priya Shah" });
 

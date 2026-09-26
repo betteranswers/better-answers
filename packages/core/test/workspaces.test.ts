@@ -215,7 +215,7 @@ describe("provisioning a workspace", () => {
 
   it.each([
     ["empty", ""],
-    ["spaces alone", "   "],
+    ["blank", "   "],
   ])(
     "refuses no-display-name when the Admin's name is %s, leaving nothing",
     async (_case, name) => {
@@ -969,7 +969,7 @@ describe("adding a signed-in person as a member, the platform's act", () => {
 
   it.each([
     ["empty", ""],
-    ["spaces alone", "   "],
+    ["blank", "   "],
   ])(
     "refuses no-display-name when the person's name is %s, writing nothing",
     async (_case, name) => {
