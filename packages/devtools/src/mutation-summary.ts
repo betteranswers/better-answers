@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { flagValues } from "./flags.ts";
 
-const mutantStatus = z.enum([
+const MUTANT_STATUSES = [
   "Killed",
   "Survived",
   "NoCoverage",
@@ -13,7 +13,9 @@ const mutantStatus = z.enum([
   "CompileError",
   "RuntimeError",
   "Pending",
-]);
+] as const;
+
+const mutantStatus = z.enum(MUTANT_STATUSES);
 
 const position = z.object({ line: z.number(), column: z.number() });
 

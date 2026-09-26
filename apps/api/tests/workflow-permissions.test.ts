@@ -13,10 +13,9 @@ const LOCAL_WORKFLOW = /^\.\/\.github\/workflows\/(?<file>[^/@]+)$/;
 const LEVELS = ["none", "read", "write"] as const;
 type Level = (typeof LEVELS)[number];
 
-const permissionsSchema = z.union([
-  z.enum(["read-all", "write-all"]),
-  z.record(z.string(), z.enum(LEVELS)),
-]);
+const BLANKETS = ["read-all", "write-all"] as const;
+
+const permissionsSchema = z.union([z.enum(BLANKETS), z.record(z.string(), z.enum(LEVELS))]);
 type Permissions = z.infer<typeof permissionsSchema>;
 
 const workflowSchema = z.object({

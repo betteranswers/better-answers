@@ -11,15 +11,20 @@ import {
 import { findPassages, passageAt } from "../sources/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 
-type TrustTier = "unverified" | "machine-confirmed" | "human-reviewed";
-export type TrustStatus =
-  | "current"
-  | "changed-since-checked"
-  | "out-of-date"
-  | "draft"
-  | "deprecated";
+export const TRUST_TIERS = ["unverified", "machine-confirmed", "human-reviewed"] as const;
+type TrustTier = (typeof TRUST_TIERS)[number];
 
-type TrustRider = "imported" | "source-moved-on";
+export const TRUST_STATUSES = [
+  "current",
+  "changed-since-checked",
+  "out-of-date",
+  "draft",
+  "deprecated",
+] as const;
+export type TrustStatus = (typeof TRUST_STATUSES)[number];
+
+export const TRUST_RIDERS = ["imported", "source-moved-on"] as const;
+type TrustRider = (typeof TRUST_RIDERS)[number];
 
 export type Trust = {
   readonly tier: TrustTier;
@@ -140,8 +145,11 @@ export type MapState =
   | { readonly state: "as_of"; readonly at: string }
   | { readonly state: "unavailable_since"; readonly since: string };
 
+export const ANSWER_VERDICTS = ["ok", "warn", "refuse"] as const;
+type AnswerVerdict = (typeof ANSWER_VERDICTS)[number];
+
 export type AnswerResult = {
-  readonly verdict: "ok" | "warn" | "refuse";
+  readonly verdict: AnswerVerdict;
   readonly text: string;
   readonly citations: readonly { readonly iri: string; readonly url: string }[];
   readonly conflicts: readonly {
@@ -155,13 +163,22 @@ export type AnswerResult = {
 
 export const NOT_ANSWERED = "Not answered from the company's knowledge.";
 
-export type FeedbackReason = "wrong" | "out-of-date" | "incomplete" | "should-not-have-shown";
+export const FEEDBACK_REASONS = [
+  "wrong",
+  "out-of-date",
+  "incomplete",
+  "should-not-have-shown",
+] as const;
+export type FeedbackReason = (typeof FEEDBACK_REASONS)[number];
+
+export const FEEDBACK_VERDICTS = ["helpful", "flag"] as const;
+type FeedbackVerdict = (typeof FEEDBACK_VERDICTS)[number];
 
 export type FeedbackInput =
-  | { readonly iri: string; readonly verdict: "helpful" }
+  | { readonly iri: string; readonly verdict: Extract<FeedbackVerdict, "helpful"> }
   | {
       readonly iri: string;
-      readonly verdict: "flag";
+      readonly verdict: Extract<FeedbackVerdict, "flag">;
       readonly reason: FeedbackReason;
       readonly detail?: string | undefined;
     };

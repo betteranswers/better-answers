@@ -21,6 +21,10 @@ const holding = (body: string): Tree => ({
 
 const IN_TABLE = holding("  return key in REFUSALS;");
 
+const parsing = (body: string): Tree => ({
+  [FILE]: `import { z } from "zod";\n\nexport const SET = ["a", "b"] as const;\nexport const name = z.string();\nexport const choices = { enum: (list: readonly string[]) => list };\n\nexport const probe = () => {\n${body}\n};\n`,
+});
+
 const lint = oxlintOver(pluginConfigFor({ [RULE]: setting }), {
   tree: IN_TABLE,
   flagged: [FILE],
@@ -43,6 +47,24 @@ describe("the syntax the lint refuses, with what to write instead", () => {
       "return from it",
       tag("DESIGN", "7"),
     ],
+    [
+      "a list written inside `z.enum`",
+      parsing('  return z.enum(["a", "b"]);'),
+      "as const",
+      tag("TYPES", "3"),
+    ],
+    [
+      "a list held `as const` inside `z.enum`",
+      parsing('  return z.enum(["a", "b"] as const);'),
+      "as const",
+      tag("TYPES", "3"),
+    ],
+    [
+      "a list checked by `satisfies` inside `z.enum`",
+      parsing('  return z.enum(["a", "b"] satisfies readonly string[]);'),
+      "as const",
+      tag("TYPES", "3"),
+    ],
   ])("refuses %s, naming its rule", (_shape, tree, instead, rule) => {
     const findings = lint
       .output(tree)
@@ -56,11 +78,20 @@ describe("the syntax the lint refuses, with what to write instead", () => {
   });
 
   it.each([
-    ["`in` over a lower-case table", "  return key in refusals;"],
-    ["`in` over a member access", "  return key in holder.REFUSALS;"],
-    ["`Object.hasOwn` over the table", "  return Object.hasOwn(REFUSALS, key);"],
-    ["a `for…of` loop", "  for (const name of Object.keys(REFUSALS)) return name;\n  return key;"],
-  ])("stays silent on %s", (_shape, body) => {
-    expect(lint.flagged(holding(body))).toEqual([]);
+    ["`in` over a lower-case table", holding("  return key in refusals;")],
+    ["`in` over a member access", holding("  return key in holder.REFUSALS;")],
+    ["`Object.hasOwn` over the table", holding("  return Object.hasOwn(REFUSALS, key);")],
+    [
+      "a `for…of` loop",
+      holding("  for (const name of Object.keys(REFUSALS)) return name;\n  return key;"),
+    ],
+    ["a declared tuple passed to `z.enum`", parsing("  return z.enum(SET);")],
+    [
+      "a list inside `z.union`",
+      parsing("  return z.union([z.literal(SET[0]), z.literal(SET[1])]);"),
+    ],
+    ["a list inside another object's `enum`", parsing('  return choices.enum(["a", "b"]);')],
+  ])("stays silent on %s", (_shape, tree) => {
+    expect(lint.flagged(tree)).toEqual([]);
   });
 });

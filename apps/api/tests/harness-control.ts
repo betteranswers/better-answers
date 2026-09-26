@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 
 import { setOperatorMark } from "@better-answers/core/workspaces";
-import { llmPurpose } from "@better-answers/schema";
+import { llmPurpose, ROLES } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
 import { IDENTITY_PRINCIPAL } from "../src/identity-principal.ts";
@@ -37,14 +37,14 @@ const person = z.object({
 const membership = z.object({
   workspaceId: z.string().min(1),
   userId: z.string().min(1),
-  role: z.enum(["Admin", "Editor", "Viewer"]),
+  role: z.enum(ROLES),
 });
 const revocation = z.object({ userId: z.string().min(1) });
 const invitation = z.object({
   workspaceId: z.string().min(1),
   email: z.string().min(1),
   inviterId: z.string().min(1),
-  role: z.enum(["Admin", "Editor", "Viewer"]),
+  role: z.enum(ROLES),
 });
 const seeding = z.object({
   workspaceId: z.string().min(1),
@@ -58,7 +58,8 @@ const seeding = z.object({
   ),
 });
 const ending = z.object({ workspaceId: z.string().min(1), userId: z.string().min(1) });
-const marking = z.object({ email: z.string().min(1), change: z.enum(["grant", "revoke"]) });
+const MARK_CHANGES = ["grant", "revoke"] as const;
+const marking = z.object({ email: z.string().min(1), change: z.enum(MARK_CHANGES) });
 const aging = z.object({ userId: z.string().min(1) });
 
 const readBody = async <T>(request: Request, schema: z.ZodType<T>): Promise<T> => {

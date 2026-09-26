@@ -14,7 +14,7 @@ import {
   type PassageHit,
   type PreviewedChunk,
 } from "../src/sources/index.ts";
-import { contractFixture, documentChunkRow } from "./contract-fixture.ts";
+import { contractFixture, documentChunkRow, OPEN_OUTCOMES } from "./contract-fixture.ts";
 import { inputOf } from "./suite-input.ts";
 import {
   bindingHolding,
@@ -36,7 +36,7 @@ const fixtureSchema = z.object({
     z.object({
       case: z.string().min(1),
       wire: z.string().min(1),
-      expect: z.enum(["passage", "not-found"]),
+      expect: z.enum(OPEN_OUTCOMES),
       passage: z.string().optional(),
     }),
   ),
