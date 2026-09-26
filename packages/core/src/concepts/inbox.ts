@@ -102,6 +102,10 @@ const summaryItem = (row: SummaryRow): SuggestionSummaryItem => {
   };
 };
 
+/**
+ * Refuses anyone but an Admin a set holding another person's suggestion. For anyone but an
+ * Admin, `target` is null where they cannot read the concept the suggestion resolved to.
+ */
 export const suggestionSetSummary = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -154,6 +158,10 @@ export type SuggestionSetSubmitted = {
 
 export type SubmitSuggestionSetRefusal = PrincipalRefusal | "malformed" | "kind-forbids";
 
+/**
+ * `malformed` also refuses an empty set and one over `SUGGESTION_SET_MAX`; `kind-forbids`
+ * refuses a kind a person may not raise.
+ */
 export const submitSuggestionSet = async (
   principal: UserPrincipal,
   doors: { readonly postgres: PostgresDoor },
@@ -217,6 +225,10 @@ export const submitSuggestionSet = async (
   return ok({ setId, suggestionIds: submitted.value.value });
 };
 
+/**
+ * The database refuses to decide a suggestion the transaction has not marked; the mark lasts
+ * until the transaction ends.
+ */
 export const markDeciding = async (tx: Tx, suggestionId: string): Promise<void> => {
   await tx.query("SELECT set_config('app.deciding_suggestion', $1, true)", [suggestionId]);
 };

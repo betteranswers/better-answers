@@ -46,6 +46,7 @@ export type Citation = {
   readonly locator: string;
 };
 
+/** Recomputes no class: the caller derives it once the citations stand. */
 export const replaceCitations = async (
   principal: Principal,
   tx: Tx,
@@ -93,6 +94,11 @@ const restingOn = (row: SourcedVisibilityRow): readonly Visibility[] => [
   ...(row.published ? [] : [RESTRICTED_TO_ADMINS]),
 ];
 
+/**
+ * Derives the class from the bindings and documents the concept cites, or from `citing` in
+ * place of its standing citations. `alsoOn` adds classes, `onTheRow` adds its index row locked
+ * for update, and an override wins outright. Share-locks each binding it reads.
+ */
 export const conceptVisibilityFrom = async (
   principal: Principal,
   tx: Tx,
@@ -134,8 +140,10 @@ export const conceptVisibilityFrom = async (
   );
   const override = await overrideOf(principal, tx, concept.iri);
 
-  // After the bindings, never before: taking this row first is the one order that deadlocks
-  // with a narrowing.
+  /**
+   * After the bindings, never before: taking this row first is the one order that deadlocks
+   * with a narrowing.
+   */
   const row =
     concept.onTheRow === true
       ? await tx.query<VisibilityRow>(
@@ -158,8 +166,10 @@ export const conceptVisibilityFrom = async (
 
 type IndexVisibilityRow = VisibilityRow & { readonly workspace_id: string; readonly kind: string };
 
-// Every act that cascades takes this at its head; without it two narrowings each hold what
-// the other wants.
+/**
+ * Every act that cascades takes this at its head; without it two narrowings each hold what
+ * the other wants.
+ */
 const serialisingCascades = async (principal: Principal, tx: Tx): Promise<void> => {
   await tx.query(
     `SELECT pg_advisory_xact_lock(hashtext('visibility-cascade'), hashtext(${scopeClause(1)}))`,
@@ -167,6 +177,10 @@ const serialisingCascades = async (principal: Principal, tx: Tx): Promise<void> 
   );
 };
 
+/**
+ * Takes the workspace's cascade lock until the transaction ends, then answers whether the
+ * workspace holds every group in `groupIds`.
+ */
 export const openingACascadeOverHeldGroups = async (
   admin: AdminUserPrincipal,
   tx: Tx,
@@ -179,8 +193,10 @@ export const openingACascadeOverHeldGroups = async (
   return groups.value;
 };
 
-// Row first, citations after, the opposite order to conceptVisibilityFrom: waiting on the row
-// is what makes a re-write's citations the ones read.
+/**
+ * Row first, citations after, the opposite order to conceptVisibilityFrom: waiting on the row
+ * is what makes a re-write's citations the ones read.
+ */
 const recomputeConceptVisibility = async (
   principal: Principal,
   tx: Tx,
@@ -212,6 +228,10 @@ const recomputeConceptVisibility = async (
   return visibility;
 };
 
+/**
+ * Recomputes each indexed concept citing the binding's documents, or only those among
+ * `documentIds`, and returns every one, whether or not its class moved.
+ */
 export const recomputeVisibilitySourcedFrom = async (
   principal: Principal,
   tx: Tx,
@@ -226,12 +246,12 @@ export const recomputeVisibilitySourcedFrom = async (
       ORDER BY ce.iri`,
     [scopeParameter(principal), input.bindingId, input.documentIds ?? null],
   );
-  const moved: string[] = [];
+  const recomputed: string[] = [];
   for (const { iri } of citing.rows) {
     const visibility = await recomputeConceptVisibility(principal, tx, iri);
-    if (visibility !== undefined) moved.push(iri);
+    if (visibility !== undefined) recomputed.push(iri);
   }
-  return moved;
+  return recomputed;
 };
 
 export type OverrideConceptClassInput = {
@@ -260,6 +280,7 @@ export type ConceptClassOverridden = {
 
 const OVERRIDE_IRI = boundarySchemas.conceptClassOverride.insert.shape.iri;
 
+/** Admin only. `compositions` names every composition including the concept, each recomputed. */
 export const overrideConceptClass = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -270,24 +291,38 @@ export const overrideConceptClass = async (
   const iri = OVERRIDE_IRI.safeParse(input.iri);
   const visibility = visibilityFrom(input);
   if (!iri.success || visibility === undefined) return err("malformed");
-  const { workspaceId } = admin.value;
 
-  const groups = await openingACascadeOverHeldGroups(
-    admin.value,
-    tx,
-    visibility.audienceGroups ?? [],
-  );
+  const opened = await openingTheOverride(admin.value, tx, iri.data, visibility);
+  if (!opened.ok) return err(opened.error);
+  return writeOverride(admin.value, tx, iri.data, visibility);
+};
+
+const openingTheOverride = async (
+  admin: AdminUserPrincipal,
+  tx: Tx,
+  iri: string,
+  visibility: Visibility,
+): Promise<Result<undefined, OverrideConceptClassRefusal>> => {
+  const groups = await openingACascadeOverHeldGroups(admin, tx, visibility.audienceGroups ?? []);
   if (!groups.ok) return err(groups.error);
   const known = await attempt(() =>
     tx.query("SELECT 1 FROM concept_identity WHERE workspace_id = $1 AND iri = $2", [
-      workspaceId,
-      iri.data,
+      admin.workspaceId,
+      iri,
     ]),
   );
   if (!known.ok) return err(known.error);
   if (known.value.rowCount === 0) return err("no-such-concept");
   if (!groups.value) return err("no-such-group");
+  return ok(undefined);
+};
 
+const writeOverride = async (
+  admin: AdminUserPrincipal,
+  tx: Tx,
+  iri: string,
+  visibility: Visibility,
+): Promise<Result<ConceptClassOverridden, Error>> => {
   const auditEventId = ulid();
   const recorded = await attempt(() =>
     tx.query(
@@ -299,30 +334,30 @@ export const overrideConceptClass = async (
               audience_groups = EXCLUDED.audience_groups, actor = EXCLUDED.actor,
               audit_event_id = EXCLUDED.audit_event_id, recorded_at = now()`,
       [
-        workspaceId,
-        iri.data,
+        admin.workspaceId,
+        iri,
         visibility.sensitivity,
         visibility.audience,
         visibility.audienceGroups,
-        actorIdOf(admin.value),
+        actorIdOf(admin),
         auditEventId,
       ],
     ),
   );
   if (!recorded.ok) return err(recorded.error);
 
-  await record(admin.value, tx, {
+  await record(admin, tx, {
     id: auditEventId,
     act: VISIBILITY_ACTS.classOverridden,
-    subjectId: iri.data,
-    detail: { iri: iri.data, sensitivity: visibility.sensitivity, audience: visibility.audience },
+    subjectId: iri,
+    detail: { iri, sensitivity: visibility.sensitivity, audience: visibility.audience },
   });
   const cascaded = await attempt(async () => {
-    await recomputeConceptVisibility(admin.value, tx, iri.data);
-    return recomputeCompositionsIncluding(admin.value, tx, { iris: [iri.data] });
+    await recomputeConceptVisibility(admin, tx, iri);
+    return recomputeCompositionsIncluding(admin, tx, { iris: [iri] });
   });
   if (!cascaded.ok) return err(cascaded.error);
-  return ok({ iri: iri.data, auditEventId, visibility, compositions: cascaded.value });
+  return ok({ iri, auditEventId, visibility, compositions: cascaded.value });
 };
 
 type ReadableEvidence = {
@@ -354,6 +389,17 @@ const PANE_COPY = {
   nextWhenNothingCited: "Read the concept as it stands.",
 } as const;
 
+const PANE_WORDS = {
+  "nothing-cited": { lead: PANE_COPY.nothingCited, next: PANE_COPY.nextWhenNothingCited },
+  included: { lead: PANE_COPY.included, next: PANE_COPY.nextWhenIncluded },
+  "partly-included": { lead: PANE_COPY.partlyIncluded, next: PANE_COPY.nextWhenWithheld },
+  "not-included": { lead: PANE_COPY.notIncluded, next: PANE_COPY.nextWhenWithheld },
+} as const satisfies Record<
+  EvidencePane["access"] | "nothing-cited",
+  { readonly lead: string; readonly next: string }
+>;
+
+/** `undefined` when the principal cannot read the concept, or no concept has the IRI. */
 export const evidencePaneOf = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -400,28 +446,22 @@ const paneOf = (facts: {
   const withheld = facts.cited - facts.readable.length;
   const access =
     withheld === 0 ? "included" : facts.readable.length === 0 ? "not-included" : "partly-included";
-  const sharedBeyondEvidence =
-    withheld > 0 && facts.override !== undefined && isActorId(facts.override.actor)
-      ? { by: facts.override.actor, at: facts.override.recorded_at }
-      : undefined;
-  const lead =
-    access === "included"
-      ? facts.cited === 0
-        ? PANE_COPY.nothingCited
-        : PANE_COPY.included
-      : access === "partly-included"
-        ? PANE_COPY.partlyIncluded
-        : PANE_COPY.notIncluded;
+  const sharedBeyondEvidence = sharerOf(withheld, facts.override);
+  const { lead, next } =
+    PANE_WORDS[access === "included" && facts.cited === 0 ? "nothing-cited" : access];
   return {
     access,
     lead: sharedBeyondEvidence === undefined ? lead : `${lead} ${PANE_COPY.sharedBeyondEvidence}`,
     evidence: facts.readable,
     sharedBeyondEvidence,
-    next:
-      access === "included"
-        ? facts.cited === 0
-          ? PANE_COPY.nextWhenNothingCited
-          : PANE_COPY.nextWhenIncluded
-        : PANE_COPY.nextWhenWithheld,
+    next,
   };
 };
+
+const sharerOf = (
+  withheld: number,
+  override: OverrideRow | undefined,
+): EvidencePane["sharedBeyondEvidence"] =>
+  withheld > 0 && override !== undefined && isActorId(override.actor)
+    ? { by: override.actor, at: override.recorded_at }
+    : undefined;
