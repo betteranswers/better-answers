@@ -1,17 +1,17 @@
-import { Link } from "@tanstack/react-router";
 import { useId, useState, type RefObject } from "react";
 
-import { refusalOf } from "@/shared/api/trpc.ts";
 import { ActDialog } from "@/shared/act-dialog.tsx";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
+import { SheetPart } from "@/shared/sheet-part.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { instantWords } from "@/shared/words.ts";
 
-import { backTo } from "./everyone-address.ts";
-import { SheetPart } from "@/shared/sheet-part.tsx";
+import { backTo } from "./people-address.ts";
 import { useRevokeEverywhere, type ListedPerson } from "./people-api.ts";
 import { nameOf } from "./person-words.tsx";
-import { revocationRefused, SIGN_IN_TOO_OLD } from "./words.ts";
+import { SheetActButton } from "./sheet-act.tsx";
+import { SignInAgain } from "./sign-in-again.tsx";
+import { refusedAsStale, revocationRefused } from "./words.ts";
 
 type Revocation = ReturnType<typeof useRevokeEverywhere>;
 
@@ -27,19 +27,6 @@ const outcomeOf = (revocation: Revocation, name: string): Outcome | undefined =>
   }
   return revocation.isError ? revocationRefused(revocation.error) : undefined;
 };
-
-/** A stale sign-in's way on: sign in again and land back on this person, at this act. */
-function SignInAgain(properties: { readonly person: ListedPerson }) {
-  return (
-    <Link
-      to="/sign-in"
-      search={{ redirect: backTo(properties.person) }}
-      className="justify-self-start text-brand underline"
-    >
-      Sign in again
-    </Link>
-  );
-}
 
 export function RevokeEverywhere(properties: {
   readonly person: ListedPerson;
@@ -57,30 +44,24 @@ export function RevokeEverywhere(properties: {
     revocation.mutate({ personId: person.id });
   };
 
-  const stale = revocation.isError && refusalOf(revocation.error)?.word === SIGN_IN_TOO_OLD;
-
   return (
     <SheetPart title="Revoke everywhere">
       <p id={consequenceId} className="text-muted-foreground">
         Ends every session and client grant {name} holds, in every workspace, at once. They can sign
         in again afterwards. Recorded on the identity-set audit log under your name.
       </p>
-      {/* Held, not disabled, while the api answers: focus comes back here when the dialog closes. */}
-      <Button
-        ref={actRef}
-        variant="outline"
-        aria-describedby={consequenceId}
-        aria-haspopup="dialog"
-        aria-disabled={revocation.isPending}
-        className="h-auto min-h-8 justify-self-start text-left whitespace-normal aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
-        onClick={() => {
-          if (!revocation.isPending) setConfirming(true);
+      <SheetActButton
+        actRef={actRef}
+        consequenceId={consequenceId}
+        pending={revocation.isPending}
+        onAsk={() => {
+          setConfirming(true);
         }}
       >
         Revoke {name}'s credentials everywhere
-      </Button>
+      </SheetActButton>
       <OutcomeLine outcome={outcomeOf(revocation, name)} />
-      {stale ? <SignInAgain person={person} /> : null}
+      {refusedAsStale(revocation.error) ? <SignInAgain back={backTo(person, "revoke")} /> : null}
 
       <ActDialog
         open={confirming}

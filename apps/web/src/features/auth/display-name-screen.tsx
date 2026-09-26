@@ -1,7 +1,8 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 
-import { refusalOf, type Refusal, type RefusalWord } from "@/shared/api/trpc.ts";
+import { refusalOf, type Refusal } from "@/shared/api/trpc.ts";
+import { DISPLAY_NAME_MAX_CHARACTERS, DISPLAY_NAME_REFUSED } from "@/shared/display-name-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";
@@ -10,39 +11,11 @@ import { useSetDisplayName } from "./auth-hooks.ts";
 import { AuthScreen, Refused, type Said } from "./auth-screen.tsx";
 import { leavingFor, nextAfterSignIn, pageQuery } from "./carried-flow.ts";
 
-/**
- * The api's rule holds the limit; this is the number the screen tells a person before they type.
- */
-const DISPLAY_NAME_MAX_CHARACTERS = 100;
-
 const HINT = "display-name-hint";
 
 const REFUSED = "display-name-refused";
 
-const SAID_OF_WORD = {
-  "display-name-empty": {
-    why: "A display name needs a character other than a space.",
-    next: "Type the name you want to be credited by.",
-  },
-  "display-name-not-one-line": {
-    why: "A display name is one line.",
-    next: "Remove the line break and save again.",
-  },
-  "display-name-control-character": {
-    why: "A display name cannot hold a control character, such as a tab.",
-    next: "Type it again rather than pasting it.",
-  },
-  "display-name-angle-bracket": {
-    why: "A display name cannot hold < or >.",
-    next: "Remove them and save again.",
-  },
-  "display-name-too-long": {
-    why: `A display name is at most ${DISPLAY_NAME_MAX_CHARACTERS} characters.`,
-    next: "Shorten it and save again.",
-  },
-} satisfies Partial<Record<RefusalWord, Said>>;
-
-const WORDS = new Map<string, Said>(Object.entries(SAID_OF_WORD));
+const WORDS = new Map<string, Said>(Object.entries(DISPLAY_NAME_REFUSED));
 
 const REFUSED_OTHERWISE: Said = {
   why: "The platform could not read what this screen sent.",

@@ -333,14 +333,18 @@ describe("the console's own list of screens and their views", () => {
     expect(outside).toEqual([]);
   });
 
-  it("calls Everyone and the Workspaces list built, Names waiting not", () => {
+  it("calls every console view built", () => {
     expect(
       declaredViewPaths(CONSOLE_SCREENS).filter((path) =>
         CONSOLE_SCREENS.some((each) =>
           viewsOf(each).some((view) => view.path === path && view.built),
         ),
       ),
-    ).toEqual(["/console/people/everyone", "/console/workspaces/every-workspace"]);
+    ).toEqual([
+      "/console/people/everyone",
+      "/console/people/names-waiting",
+      "/console/workspaces/every-workspace",
+    ]);
   });
 
   it("lands each console screen's own address on its default view", async () => {

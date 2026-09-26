@@ -7,7 +7,14 @@ import { testData } from "@better-answers/schema/testing";
 
 import { IDENTITY_PRINCIPAL } from "../src/identity-principal.ts";
 import type { TestApp } from "./harness.ts";
-import { accessAsking, askToJoin, groupsMaking, makeGroups } from "./harness-people.ts";
+import {
+  accessAsking,
+  askToJoin,
+  flagTheName,
+  groupsMaking,
+  makeGroups,
+  nameFlagging,
+} from "./harness-people.ts";
 import {
   bindingsSeeding,
   indexRunMoving,
@@ -145,6 +152,11 @@ export const harnessControl = (app: TestApp): Hono => {
   control.post(`${HARNESS_PREFIX}/access-requests`, async (context) => {
     const asked = await readBody(context.req.raw, accessAsking);
     return context.json(await askToJoin(app, asked));
+  });
+
+  control.post(`${HARNESS_PREFIX}/name-flags`, async (context) => {
+    const asked = await readBody(context.req.raw, nameFlagging);
+    return context.json(await flagTheName(app, asked));
   });
 
   control.get(`${HARNESS_PREFIX}/codes`, (context) => {

@@ -1,6 +1,7 @@
-import { useId, useRef, useState } from "react";
+import { useId, useRef, useState, type RefObject } from "react";
 
 import { RowSheet } from "@/shared/row-sheet.tsx";
+import { SheetPart } from "@/shared/sheet-part.tsx";
 import { SummaryRow } from "@/shared/summary-row.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
@@ -8,15 +9,17 @@ import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { SheetDescription, SheetHeader, SheetTitle } from "@/shared/ui/sheet.tsx";
 import { counted } from "@/shared/words.ts";
 
+import { CorrectDisplayName } from "./correct-display-name.tsx";
+import type { FreshAct } from "./people-address.ts";
 import { Facts } from "./facts.tsx";
 import { useInspected, type HeldGrant, type HeldSession, type ListedPerson } from "./people-api.ts";
 import { At, grantStateOf, Instant, Memberships, nameOf } from "./person-words.tsx";
 import { RefusalLine } from "./refusal-line.tsx";
 import { RevokeEverywhere } from "./revoke-everywhere.tsx";
-import { SheetPart } from "@/shared/sheet-part.tsx";
 import { readRefused } from "./words.ts";
 
-export type OpenedAt = "person" | "revoke";
+/** Where focus lands when the sheet opens: on the person, or straight on one of their acts. */
+export type OpenedAt = "person" | FreshAct;
 
 export const personButtonId = (personId: string): string => `person-${personId}`;
 
@@ -145,19 +148,27 @@ export function PersonSheet(properties: {
   readonly person: ListedPerson;
   readonly openedAt: OpenedAt;
   readonly onClose: () => void;
+  readonly returnFocus: () => void;
 }) {
   const { person, openedAt } = properties;
   const titleRef = useRef<HTMLHeadingElement>(null);
-  const actRef = useRef<HTMLButtonElement>(null);
+  const revokeRef = useRef<HTMLButtonElement>(null);
+  const correctRef = useRef<HTMLButtonElement>(null);
+
+  const landOn = {
+    person: titleRef,
+    revoke: revokeRef,
+    correct: correctRef,
+  } satisfies Readonly<Record<OpenedAt, RefObject<HTMLElement | null>>>;
 
   return (
     <RowSheet
       rowButtonId={personButtonId(person.id)}
       onOpen={() => {
-        const landing = openedAt === "revoke" ? actRef.current : titleRef.current;
-        landing?.focus();
+        landOn[openedAt].current?.focus();
       }}
       onClose={properties.onClose}
+      returnFocus={properties.returnFocus}
     >
       <SheetHeader className="border-b border-border">
         <SheetTitle asChild>
@@ -182,7 +193,8 @@ export function PersonSheet(properties: {
           </Facts>
         </SheetPart>
         <HeldCredentials person={person} />
-        <RevokeEverywhere person={person} actRef={actRef} />
+        <CorrectDisplayName person={person} actRef={correctRef} />
+        <RevokeEverywhere person={person} actRef={revokeRef} />
       </div>
     </RowSheet>
   );

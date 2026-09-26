@@ -249,6 +249,17 @@ export const askToJoin = (
   input: { slug: string; requesterId: string; reason: string },
 ) => ask(api, "/access-requests", input, accessAsked);
 
+const nameFlagged = z.object({ flagged: z.literal(true) });
+
+/**
+ * A workspace's Admin flags a member's display name, as the member sheet does, without the email to
+ * the operator.
+ */
+export const flagTheName = (
+  api: APIRequestContext,
+  input: { workspaceId: string; adminId: string; personId: string },
+) => ask(api, "/name-flags", input, nameFlagged);
+
 /** The code the api captured for this address, in place of the email nobody receives. */
 export const codeSentTo = async (api: APIRequestContext, email: string): Promise<string> => {
   const sent = await api.get(`${HARNESS}/codes?email=${encodeURIComponent(email)}`);
