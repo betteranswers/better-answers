@@ -144,7 +144,7 @@ for (const role of ["Editor", "Viewer"] as const) {
   });
 }
 
-test("draws a Viewer's Ask within a second of a fresh visit", async ({ page, request }) => {
+test("draws a Viewer's Ask within a second of arriving", async ({ page, request }) => {
   const home = HOMES.Viewer;
   await signedInAs(page, request, "Viewer");
   await landedAtHome(page, "Viewer");
