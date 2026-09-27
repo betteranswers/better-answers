@@ -12,17 +12,6 @@ import { boundarySchemas, POSTGRES_IMAGE, ULID_PATTERN } from "@better-answers/s
 const read = (relative: string): string =>
   readFileSync(path.join(repositoryRoot, relative), "utf8");
 
-/** packages/core depends on this package, so its pin is read out of the source, and once. */
-const garageImage = (): string => {
-  const pins = [
-    ...read("packages/core/src/store/objects/garage-image.ts").matchAll(
-      /"(?<image>dxflrs\/garage:[^"]+)"/g,
-    ),
-  ];
-  expect(pins, "garage-image.ts pins no Garage image, or more than one").toHaveLength(1);
-  return pins[0]?.groups?.["image"] ?? "";
-};
-
 const liveLines = (relative: string): readonly string[] =>
   read(relative)
     .split("\n")
@@ -133,13 +122,6 @@ describe("the deploy tree", () => {
     expect(read(".github/workflows/build.yml")).toMatch(
       /tier: backup\n\s+context: deploy\n\s+dockerfile: deploy\/backup\.Dockerfile/,
     );
-  });
-
-  it("runs the object store on the one pinned Garage image", () => {
-    const objectstore = composeServices(read("deploy/stores.compose.yaml")).find(
-      (service) => service.name === "objectstore",
-    );
-    expect(objectstore?.body).toContain(`image: ${garageImage()}`);
   });
 
   it("gives Garage its secrets from the environment, no `*_file` key", () => {

@@ -18,8 +18,6 @@ import {
   type UserPrincipal,
 } from "../../kernel/index.ts";
 
-export { GARAGE_IMAGE } from "./garage-image.ts";
-
 export type ObjectStoreSettings = {
   readonly endpoint: string;
 
