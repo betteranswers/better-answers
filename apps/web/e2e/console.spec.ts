@@ -4,7 +4,7 @@ import { goHome, UNKNOWN_SCREEN } from "@/app/words.ts";
 import { PICKER_WORDS } from "@/features/auth/workspace-words.ts";
 import { NOT_THE_OPERATOR, ONLY_THE_OPERATOR } from "@/features/console/refusal-words.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
-import { CONSOLE } from "@/shared/screens.ts";
+import { CONSOLE, readerScreenById } from "@/shared/screens.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -93,7 +93,7 @@ test.describe("the way into the console", () => {
 
     await menuOf(page, workspace.admin.name).click();
 
-    await expect(page.getByRole("menuitem")).toHaveText(["Sign out"]);
+    await expect(page.getByRole("menuitem")).toHaveText([readerScreenById("ask").name, "Sign out"]);
   });
 
   test("shows a non-operator the refused state at /console", async ({

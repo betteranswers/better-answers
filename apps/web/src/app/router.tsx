@@ -30,6 +30,8 @@ import { createApiProxy, type ApiProxy } from "@/shared/api/trpc.ts";
 import {
   CONSOLE,
   CONTROL_CENTRE,
+  HOMES,
+  READER_SURFACE,
   viewsOf,
   type Screen,
   type Surface,
@@ -39,7 +41,7 @@ import type { ViewToolbar } from "@/shared/view-toolbar.tsx";
 
 import { ConsoleFrame } from "./console-frame.tsx";
 import { FailedScreen } from "./failed-screen.tsx";
-import { ControlCentreFrame } from "./frame.tsx";
+import { WorkspaceFrame } from "./frame.tsx";
 import type { AppClients } from "./providers.tsx";
 import { UnknownScreen } from "./unknown-screen.tsx";
 import { ROUTES_AND_SPEND_TOOLBAR, RoutesAndSpendView } from "./views/routes-and-spend-view.tsx";
@@ -113,7 +115,7 @@ const signInAndBackTo = (href: string) => ({ href: backTo("/sign-in", href), rep
 const shellRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: "shell",
-  component: ControlCentreFrame,
+  component: WorkspaceFrame,
   notFoundComponent: () => <UnknownScreen />,
   // The sign-in screen and the picker are this route's siblings, so this never runs on them.
   beforeLoad: async ({ context, location }) => {
@@ -134,7 +136,7 @@ const indexRoute = createRoute({
   beforeLoad: ({ context }) => {
     // A read that failed leaves the role unknown, and every role reaches a Viewer's home.
     const role = roleHeld(context.queryClient, context.api) ?? "Viewer";
-    throw redirect({ href: CONTROL_CENTRE.homes[role].path, replace: true });
+    throw redirect({ href: HOMES[role].path, replace: true });
   },
 });
 
@@ -200,6 +202,8 @@ const controlCentreRoutes = routesOf(CONTROL_CENTRE, shellRoute);
 
 const consoleRoutes = routesOf(CONSOLE, consoleRoute);
 
+const readerRoutes = routesOf(READER_SURFACE, shellRoute);
+
 export const createAppRouter = (clients: AppClients, history?: RouterHistory) => {
   const options = {
     routeTree: rootRoute.addChildren([
@@ -208,7 +212,7 @@ export const createAppRouter = (clients: AppClients, history?: RouterHistory) =>
       chooseWorkspaceRoute,
       noWorkspaceRoute,
       acceptInvitationRoute,
-      shellRoute.addChildren([indexRoute, ...controlCentreRoutes]),
+      shellRoute.addChildren([indexRoute, ...controlCentreRoutes, ...readerRoutes]),
       consoleRoute.addChildren([consoleIndexRoute, ...consoleRoutes]),
     ]),
 

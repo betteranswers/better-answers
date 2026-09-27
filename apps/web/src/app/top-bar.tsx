@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
 import { Icon } from "@/shared/icon.tsx";
+import type { Screen } from "@/shared/screens.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import {
   DropdownMenu,
@@ -20,7 +21,7 @@ export type Person = {
 /** Another surface, reached from the person's menu. */
 export type MenuLink = {
   readonly name: string;
-  readonly to: "/console" | "/choose-workspace";
+  readonly to: Screen["path"] | "/console" | "/choose-workspace";
 };
 
 export function TopBar(properties: {

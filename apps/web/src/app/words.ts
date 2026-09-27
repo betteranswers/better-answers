@@ -1,4 +1,4 @@
-import { screenById, type Screen } from "@/shared/screens.ts";
+import { readerScreenById, type Screen } from "@/shared/screens.ts";
 
 export const FAILED_SCREEN = {
   heading: "This screen didn't load",
@@ -19,8 +19,8 @@ export const goHome = (home: Screen | undefined): string =>
 /** A role's home says what that role will do there, not only that it is unbuilt. */
 const WHILE_UNBUILT: ReadonlyMap<Screen, string> = new Map([
   [
-    screenById("questions"),
-    "You'll see your workspace's questions and answers here, and can ask yours in Claude now.",
+    readerScreenById("ask"),
+    "Ask in Claude for now. Your questions and their answers will be listed here.",
   ],
 ]);
 

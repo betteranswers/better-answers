@@ -1,6 +1,7 @@
 import {
   Buildings,
   CaretDown,
+  ChatText,
   Database,
   Flag,
   Graph,
@@ -18,6 +19,7 @@ import { cn } from "@/shared/lib/utils.ts";
 
 /** Phosphor stands in until the product has a set of its own; one family, one door to it. */
 export type IconName =
+  | "ask"
   | "caret-down"
   | "database"
   | "flag"
@@ -36,6 +38,7 @@ export type IconName =
  * nav, never list or sidebar.
  */
 const GLYPHS = {
+  ask: ChatText,
   "caret-down": CaretDown,
   database: Database,
   flag: Flag,

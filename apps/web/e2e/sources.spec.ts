@@ -4,6 +4,7 @@ import { SAID_OF_A_BINDING } from "@/features/sources/refusal-words.ts";
 import { NOTHING_BOUND } from "@/features/sources/words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
+import { screenById } from "@/shared/screens.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -202,7 +203,8 @@ test.describe("the Sources screen's list of bindings", () => {
     });
     await page.goto("/sign-in");
     await signIn(page, request, email);
-    await rail(page).getByRole("link", { name: "Sources" }).click();
+    // An Editor's home is on the reader surface, whose rail holds no Sources.
+    await page.goto(screenById("sources").path);
 
     await expect(bindingsRegion(page)).toContainText(sentenceOf(SAID_OF_A_BINDING["role-forbids"]));
     await expect(bindingsRegion(page)).not.toContainText("Staff handbook");

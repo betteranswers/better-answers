@@ -870,6 +870,10 @@ to it by IRI and never restates it (ADR 0014).
   **Workspaces** (each with its member count, read-only). Shown to the operator alone and reached
   only from a signed-in session, never from a token. _Avoid_: admin panel, platform console,
   back office.
+- **reader surface** — the surface a member asks and reads on, beside Control Centre and the
+  *console* and drawn in the same regions, its navigation named *Better Answers*. Its one screen
+  so far is **Ask** (a new question; your questions), the *home* of an Editor or a Viewer.
+  Control Centre stays the Admin's surface (ADR 0046). _Avoid_: portal, front end, reader view.
 - **screen (of Control Centre)** — one of its six: Sources, Suggestions, Knowledge, Questions,
   People, System.
 - **view (of a screen)** — one of the parts a screen of Control Centre is divided into: the parts
@@ -880,11 +884,11 @@ to it by IRI and never restates it (ADR 0014).
   *view (of an MCP App)*. _Avoid_: section (a guide's node), tab (a division inside one view, and
   the view's own business rather than a word of this glossary's).
 - **home (of a role)** — the screen a member lands on after signing in, and the one offered back
-  when a screen fails or an address names none: People for an Admin, Questions for an Editor or a
-  Viewer. The *console* has one home for everyone, Workspaces. _Avoid_: landing page, dashboard,
+  when a screen fails or an address names none: People for an Admin, and Ask, on the *reader
+  surface*, for an Editor or a Viewer. The *console* has one home for everyone, Workspaces. _Avoid_: landing page, dashboard,
   start page.
-- **icon rail** — the region down the left edge listing the screens of Control Centre, or of the
-  *console*, each an icon carrying its screen's name and marking the screen being read. _Avoid_:
+- **icon rail** — the region down the left edge listing the screens of Control Centre, of the
+  *reader surface* or of the *console*, each an icon carrying its screen's name and marking the screen being read. _Avoid_:
   section nav, sidebar.
 - **secondary nav** — the region beside the icon rail listing the open screen's views under that
   screen's name, marking the view being read, and swapping when the screen changes. The navigation
@@ -903,8 +907,8 @@ to it by IRI and never restates it (ADR 0014).
   is emptied when the reader opens another tab. _Avoid_: selection store, shared context.
 - **top bar** — the region across the top of Control Centre carrying the navigation control in its
   leading corner, then naming the workspace, then which screen and view the person is in, then who
-  they are, their role and the way to sign out. Its menu leads the operator alone to the
-  *console*, whose top bar reads *Console* in place of a workspace, shows no role and leads back
+  they are, their role and the way to sign out. Its menu leads from Control Centre to the
+  *reader surface* and back, and the operator alone to the *console*, whose top bar reads *Console* in place of a workspace, shows no role and leads back
   to the workspace picker. _Avoid_: masthead, section header.
 - **promotion** — an Editor's proposal that an answer or a response become an `Answer`
   concept — the button is *Save as an Answer* — kept as a suggestion of kind *promotion* until

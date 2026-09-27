@@ -116,7 +116,25 @@ export const CONSOLE_SCREENS = [
   },
 ] as const;
 
-export type Screen = (typeof SCREENS)[number] | (typeof CONSOLE_SCREENS)[number];
+export const READER_SCREENS = [
+  {
+    id: "ask",
+    name: "Ask",
+    icon: "ask",
+    path: "/ask",
+    summary: "Your questions to this workspace, and the cited answers they get.",
+    defaultView: "/ask/new-question",
+    views: [
+      { name: "New question", path: "/ask/new-question", built: false },
+      { name: "Your questions", path: "/ask/your-questions", built: false },
+    ],
+  },
+] as const;
+
+export type Screen =
+  | (typeof SCREENS)[number]
+  | (typeof CONSOLE_SCREENS)[number]
+  | (typeof READER_SCREENS)[number];
 export type View = Screen["views"][number];
 
 const screenIn = <Held extends Screen>(screens: readonly Held[], id: Held["id"]): Held => {
@@ -130,23 +148,36 @@ export const screenById = (id: (typeof SCREENS)[number]["id"]): Screen => screen
 export const consoleScreenById = (id: (typeof CONSOLE_SCREENS)[number]["id"]): Screen =>
   screenIn(CONSOLE_SCREENS, id);
 
+export const readerScreenById = (id: (typeof READER_SCREENS)[number]["id"]): Screen =>
+  screenIn(READER_SCREENS, id);
+
 /** A workspace role, as the session's membership names it. */
 export type Role = (typeof ROLES)[number];
 
 /** A reader lands on their home and is sent back there when lost; the console's reader holds no role. */
 export type Surface = {
-  readonly name: "Control Centre" | "Console";
+  readonly name: "Control Centre" | "Console" | "Better Answers";
   readonly screens: readonly Screen[];
 } & ({ readonly homes: { readonly [held in Role]: Screen } } | { readonly home: Screen });
+
+/** A member has one home, whichever of the workspace's two surfaces they are lost on. */
+export const HOMES = {
+  Admin: screenById("people"),
+  Editor: readerScreenById("ask"),
+  Viewer: readerScreenById("ask"),
+} as const satisfies { readonly [held in Role]: Screen };
 
 export const CONTROL_CENTRE = {
   name: "Control Centre",
   screens: SCREENS,
-  homes: {
-    Admin: screenById("people"),
-    Editor: screenById("questions"),
-    Viewer: screenById("questions"),
-  },
+  homes: HOMES,
+} satisfies Surface;
+
+/** Its navigation carries the product's name, set in type where a mark would stand. */
+export const READER_SURFACE = {
+  name: "Better Answers",
+  screens: READER_SCREENS,
+  homes: HOMES,
 } satisfies Surface;
 
 export const CONSOLE = {
@@ -177,3 +208,11 @@ export const screenAt = (surface: Surface, pathname: string): Screen | undefined
 /** An exact match: a screen's own address, with no view open, answers undefined. */
 export const viewAt = (surface: Surface, pathname: string): View | undefined =>
   surface.screens.flatMap((screen) => viewsOf(screen)).find((view) => view.path === pathname);
+
+/** Control Centre has no address of its own, so a link to it names one of its screens. */
+export const controlCentreOpensAt = (role: Role): Screen => {
+  const home = HOMES[role];
+  return CONTROL_CENTRE.screens.some((screen) => screen === home)
+    ? home
+    : CONTROL_CENTRE.screens[0];
+};
