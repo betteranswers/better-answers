@@ -20,7 +20,7 @@ ADR 0041 fixes the seven classes and the secrets-seam rule keeps the rule that t
 | **repository** | the git store's own keys — the mirror deploy key, the per-run read path | root-only on the host, mounted read-only into the service that needs it |
 | **object store** | the bucket credentials, in three grades: **write-and-list** on the host, **read** for the drill, **admin** (delete, lifecycle, governance bypass) never on any box; and the backup **`age` identity** — public half in the stores resource's env, private half in escrow **and resident on VPC 2** (§ The backup identity) | the write-and-list pair from env; the admin credential from escrow only; the identity from a root-only file on VPC 2 |
 
-**CI** carries two more that are not the platform's: a read-only registry pull token and the deploy token, both provider-issued and revocable, and both scoped to exactly one action.
+**CI** carries three more that are not the platform's: a read-only registry pull token, the deploy token, and the dead-man service's read-only API key (`HEALTHCHECKS_READ_KEY`), which the nightly release reads to see that the box's backup is fresh. All three are provider-issued and revocable, and each is scoped to one action. The key reads check states and can ping nothing, so it cannot make a backup look fresh.
 
 ## The rotation contract
 

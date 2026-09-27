@@ -119,6 +119,6 @@ Everything else in this ADR and its amendments stands.
 
 ## Amendment — 2026-09-27, the stuck-bundle trigger names no switch (ADR 0022 amended)
 
-A correction of wording, no change of decision. The 2026-09-19 amendment dated its trigger as "the day `CLIENT_DATA_ON_BOX` is set, the switch that already puts the release train on the drill day". That switch is gone. ADR 0022, amended today, starts the drill-day rule when the platform goes live, and names that day's variable `PLATFORM_LIVE_SINCE`. This trigger does not move with it. It is still the day the first client's data is on the box, the day T-331 lands, and the rehearsal still comes before it.
+A correction of wording, no change of decision. The 2026-09-19 amendment dated its trigger as "the day `CLIENT_DATA_ON_BOX` is set, the switch that already puts the release train on the drill day". That switch is gone. ADR 0022, amended today, starts the drill-day rule when the platform goes live~~, and names that day's variable `PLATFORM_LIVE_SINCE`~~ (struck 2026-09-27 — one variable, `RELEASE_MODE`, now holds the release's phases; ADR 0022's later amendment of that date). This trigger does not move with it. It is still the day the first client's data is on the box, the day T-331 lands, and the rehearsal still comes before it.
 
 Everything else in this ADR and its amendments stands.

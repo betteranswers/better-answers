@@ -8,6 +8,20 @@ on:
         description: "the commit whose sha-<short> images the calling build pushed; released only while it is main's head"
         type: string
         required: true
+    # Environment secrets, which a called job reads only when its caller passes their names.
+    secrets:
+      COOLIFY_DEPLOY_TOKEN:
+        required: false
+      CF_ACCESS_CLIENT_ID:
+        required: false
+      CF_ACCESS_CLIENT_SECRET:
+        required: false
+      # Read by the nightly release alone, which no caller starts.
+      HEALTHCHECKS_READ_KEY:
+        required: false
+  # After the box's 02:00 copy and its 02:05 dump; clear of mutation at 02:17 and scan at 03:41.
+  schedule:
+    - cron: "35 2 * * *"
   workflow_dispatch:
     inputs:
       api_digest:
@@ -17,7 +31,7 @@ on:
         description: "ghcr.io/…/worker digest (sha256:…) — blank = the image of main's head commit (its sha-<short> tag); refused if that commit has none"
         required: false
       rehearsed_by:
-        description: "Once PLATFORM_LIVE_SINCE is set: the drill report this release rides on (drills/drill-<stamp>.md), or `hotfix: <reason>`"
+        description: "When RELEASE_MODE is drill: the drill report this release rides on (drills/drill-<stamp>.md), or `hotfix: <reason>`"
         required: false
 
 permissions: {}
@@ -35,48 +49,25 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      actions: read
     outputs:
       promote: ${{ steps.ask.outputs.promote }}
+      commit: ${{ steps.ask.outputs.commit }}
+      trigger: ${{ steps.ask.outputs.trigger }}
     steps:
-      - name: a build releases its own commit, while that is main's head and the platform is not live
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: whether this run releases, and which commit
         id: ask
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           COMMIT: ${{ inputs.commit }}
-          PLATFORM_LIVE_SINCE: ${{ vars.PLATFORM_LIVE_SINCE }}
+          EVENT: ${{ github.event_name }}
+          RELEASE_MODE: ${{ vars.RELEASE_MODE }}
           REHEARSED_BY: ${{ inputs.rehearsed_by }}
-        run: |
-          set -euo pipefail
-          skip() {
-            echo "::notice::$1"
-            printf '### Not released\n\n%s\n' "$1" >> "$GITHUB_STEP_SUMMARY"
-            echo "promote=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          }
-          if [ -z "${COMMIT}" ]; then
-            if [ -n "${PLATFORM_LIVE_SINCE}" ] && [ -z "${REHEARSED_BY}" ]; then
-              echo "::error::the platform is live (PLATFORM_LIVE_SINCE ${PLATFORM_LIVE_SINCE}): a release must ride a drill that just proved a restore, or state a hotfix reason. Fill \`rehearsed_by\` (RUNBOOK.md page 6)"
-              exit 1
-            fi
-            echo "promote=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if ! [[ "${COMMIT}" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::commit is not a full commit sha (40 hex characters)"
-            exit 1
-          fi
-          if [ -n "${PLATFORM_LIVE_SINCE}" ]; then
-            skip "The platform is live (PLATFORM_LIVE_SINCE ${PLATFORM_LIVE_SINCE}), so a green build no longer releases itself. Dispatch \`release\` with \`rehearsed_by\` (RUNBOOK.md page 6)."
-          fi
-          if ! head="$(gh api "repos/${REPOSITORY}/git/ref/heads/main" --jq .object.sha)"; then
-            echo "::error::main's head could not be read, so ${COMMIT} is not released: a newer commit may already be the head"
-            exit 1
-          fi
-          if [ "${head}" != "${COMMIT}" ]; then
-            skip "${COMMIT} is no longer main's head; ${head} is. Production never goes back to an older commit, so a newer commit's green build releases in its place."
-          fi
-          echo "promote=true" >> "$GITHUB_OUTPUT"
+        run: deploy/release-gate.sh
 
   promote:
     needs: gate
@@ -95,12 +86,21 @@ jobs:
       PROD_UUID: ${{ vars.COOLIFY_PROD_APP_UUID }}
       PUBLIC_URL: ${{ vars.PUBLIC_URL }}
       REHEARSED_BY: ${{ inputs.rehearsed_by }}
-      COMMIT: ${{ inputs.commit }}
+      TRIGGER: ${{ needs.gate.outputs.trigger }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: # zizmor: ignore[artipacked] the job pushes its release tag with this credential
-          # A build's own commit, never main's head as it is now, whose images may not exist yet.
-          ref: ${{ inputs.commit || 'main' }}
+          # The commit the gate chose, never main's head as it is now, whose images may not exist yet.
+          ref: ${{ needs.gate.outputs.commit || 'main' }}
+      - name: the box's own backup is fresh, before a nightly release
+        id: backup
+        if: needs.gate.outputs.trigger == 'nightly'
+        env:
+          HEALTHCHECKS_READ_KEY: ${{ secrets.HEALTHCHECKS_READ_KEY }}
+        run: |
+          set -euo pipefail
+          rode="$(deploy/backup-fresh.sh)"
+          echo "rode=${rode}" >> "$GITHUB_OUTPUT"
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
@@ -144,34 +144,35 @@ jobs:
         env:
           API_DIGEST: ${{ steps.d.outputs.api }}
           WORKER_DIGEST: ${{ steps.d.outputs.worker }}
+        run: deploy/release-redeploy.sh "${API_DIGEST}" "${WORKER_DIGEST}"
+      - name: post-deploy smoke against production
+        id: smoke
+        env:
+          API_DIGEST: ${{ steps.d.outputs.api }}
         run: |
           set -euo pipefail
-          patch() {
-            jq -cn --arg key "$1" --arg value "$2" '{key: $key, value: $value, is_preview: false}' \
-              | curl -fsS -X PATCH "${COOLIFY_URL}/api/v1/applications/${PROD_UUID}/envs" \
-                  -H "Authorization: Bearer ${COOLIFY_TOKEN}" -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}" \
-                  -H "Content-Type: application/json" --data-binary @-
-          }
-          patch API_IMAGE_DIGEST "${API_DIGEST}"
-          patch WORKER_IMAGE_DIGEST "${WORKER_DIGEST}"
-          # `-X POST`: Coolify answers a GET on /deploy with 405, hidden behind a 403.
-          curl -fsS -X POST "${COOLIFY_URL}/api/v1/deploy?uuid=${PROD_UUID}&force=false" \
-            -H "Authorization: Bearer ${COOLIFY_TOKEN}" -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}"
-      - name: record the promotion as an annotated release/<stamp> tag
+          deploy/await-release.sh "${PUBLIC_URL}" "${API_DIGEST}"
+          # The uptime check watches this path and /health, so the smoke and the monitor
+          # read the same two.
+          curl -fsS --retry 5 --retry-delay 6 --retry-all-errors "${PUBLIC_URL}/.well-known/oauth-protected-resource/mcp" | jq -e --arg mcp "${PUBLIC_URL}/mcp" '.resource == $mcp' >/dev/null
+      # Only a release the smoke passed is recorded, so the newest tag is always one that held.
+      - name: record the promotion as an annotated release/<stamp> tag (the release's last step)
         env:
           API_DIGEST: ${{ steps.d.outputs.api }}
           WORKER_DIGEST: ${{ steps.d.outputs.worker }}
           ACTOR: ${{ github.actor }}
           IN_API: ${{ inputs.api_digest }}
           IN_WORKER: ${{ inputs.worker_digest }}
+          BACKUP: ${{ steps.backup.outputs.rode }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
-          rode="${REHEARSED_BY:-before go-live: any green build}"
-          by="${ACTOR}"
-          if [ -n "${COMMIT}" ]; then
-            by="automatic, after the green build of this commit"
-          fi
+          rode="${REHEARSED_BY:-${BACKUP:-any green build}}"
+          case "${TRIGGER}" in
+            merge) by="automatic, after the green build of this commit" ;;
+            nightly) by="automatic, the nightly release" ;;
+            *) by="${ACTOR}" ;;
+          esac
           when="$(date -u +%FT%TZ)"
           head="$(git rev-parse HEAD)"
           # A ref name takes no colon; the head makes two runs of one second two tags.
@@ -187,7 +188,9 @@ jobs:
           else
             points="main's head, which the api digest was resolved from — the worker digest was passed in and its image was built elsewhere"
           fi
-          # The tag is pushed before the smoke, so only its run says whether this release held.
+          if [ "${TRIGGER}" = nightly ]; then
+            points="main's newest commit with a green build, which both digests were resolved from"
+          fi
           message="$(printf 'release: api %s · worker %s\n\nWhen (UTC): %s\nBy: %s\napi: %s\nworker: %s\nRode on: %s\nCommit: %s (%s)\nRun: %s\n' \
             "${API_DIGEST:7:12}" "${WORKER_DIGEST:7:12}" "${when}" "${by}" "${API_DIGEST}" "${WORKER_DIGEST}" "${rode}" "${head}" "${points}" "${RUN_URL}")"
           git config user.name "github-actions[bot]"
@@ -205,12 +208,15 @@ jobs:
             echo ""
             echo "The api refuses to start unless PUBLIC_URL, AGENT_HOSTNAME and APEX_HOSTNAME are set on the api resource and all three hostnames differ (ADR 0034)."
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: post-deploy smoke against production (the release's last step)
+      - name: say that a failed release recorded no tag
+        if: failure()
         env:
+          SMOKE: ${{ steps.smoke.outcome }}
           API_DIGEST: ${{ steps.d.outputs.api }}
         run: |
-          set -euo pipefail
-          deploy/await-release.sh "${PUBLIC_URL}" "${API_DIGEST}"
-          # The uptime check watches this path and /health, so the smoke and the monitor
-          # read the same two.
-          curl -fsS --retry 5 --retry-delay 6 --retry-all-errors "${PUBLIC_URL}/.well-known/oauth-protected-resource/mcp" | jq -e --arg mcp "${PUBLIC_URL}/mcp" '.resource == $mcp' >/dev/null
+          case "${SMOKE}" in
+            failure) said="The smoke failed: production never answered healthy on api \`${API_DIGEST}\`. No \`release/*\` tag was pushed, so the newest tag is still the release that held (RUNBOOK.md page 6)." ;;
+            success) said="The smoke passed, but its \`release/*\` tag was not pushed: record it by hand (RUNBOOK.md page 6)." ;;
+            *) said="The release stopped before its smoke, so no \`release/*\` tag was pushed. Production may still be on the release before it (RUNBOOK.md page 6)." ;;
+          esac
+          printf '### Not released\n\n%s\n' "${said}" >> "$GITHUB_STEP_SUMMARY"

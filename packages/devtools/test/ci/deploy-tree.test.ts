@@ -580,7 +580,7 @@ describe("the deploy tree", () => {
 
     const runbook = read(`${operationsDocuments}/RUNBOOK.md`);
     expect(runbook).toContain("git tag --list 'release/*' --sort=-creatordate");
-    expect(runbook).toContain("release/*` tags (failed, rolled back to)");
+    expect(runbook).toContain("the `release/*` tag rolled back to");
   });
 
   it("promotes main's head image, and refuses by name without one", () => {
@@ -589,7 +589,7 @@ describe("the deploy tree", () => {
 
     expect(build).toContain("type=sha,prefix=sha-");
     expect(build).not.toContain("type=raw");
-    expect(release).toContain("ref: ${{ inputs.commit || 'main' }}\n");
+    expect(release).toContain("ref: ${{ needs.gate.outputs.commit || 'main' }}\n");
     expect(release).toContain('head="$(git rev-parse HEAD)"');
 
     const cutTo = /DOCKER_METADATA_SHORT_SHA_LENGTH: "(\d+)"/.exec(build)?.[1];
