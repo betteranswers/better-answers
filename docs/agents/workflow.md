@@ -36,8 +36,17 @@ The evaluator is a small model that reads the transcript and runs nothing. That 
 4. **Read** the report against the ticket's acceptance lines. If the report cannot show a line, that gap is the next attempt's brief: one paragraph, on the same branch. If the third attempt comes back short, the goal stops and the conversation with the owner opens.
 5. **Land**:
    - Push the branch and open the PR. Its title is the commit's subject, and its body is the commit's body, footer included (*The commit's form*, below). Repository settings make these the merge commit's subject and body.
-   - Run `gh pr merge <n>` as soon as the PR is open. It adds the PR to `main`'s **merge queue**, which runs `check` on the merge group and merges on green. Before `check` is green, the command arms the merge instead, and the PR joins the queue when `check` passes.
+   - Run `gh pr merge <n>` as soon as the PR is open. The PR's own `check` reads only its title, so it goes green in a minute or two and the armed PR enters `main`'s **merge queue**. The queue runs the suites on the merge group and merges on green.
    - The command prints nothing, so read it back. GraphQL's `pullRequest(number: <n>) { isInMergeQueue autoMergeRequest { enabledAt } }` has one of the two set when the PR is queued or armed.
+   - A red merge group takes the PR out of the queue. Its timeline then ends in a `RemovedFromMergeQueueEvent` whose `reason` is `failed_checks`. The failure is in the merge group's run, not the PR's, so read that run's log and fix what it names:
+
+     ```
+     gh run list --workflow check.yml --event merge_group --json databaseId,headBranch,conclusion \
+       --jq '.[] | select(.headBranch | contains("/pr-<n>-"))'
+     gh run view <id> --log-failed
+     ```
+
+     Push the fix and run `gh pr merge <n>` again.
    - *The queue*, below, is where every commit goes. GitHub deletes the merged branch; then run `node .gitnexus/run.cjs analyze` in the main checkout.
 6. **Record** a Progress entry of three lines:
    - where it landed: the date, the merge commit and the PR number;
@@ -130,10 +139,10 @@ The repository's `merge_commit_message` is `PR_BODY`. So the body and its footer
 | When | What | Who |
 | --- | --- | --- |
 | The attempt's end | Each touched workspace's `lint` and `typecheck` (the worker's `ruff` and `mypy`). The suites the ticket names or touched, by file (`pnpm --filter <workspace> run test <file>…`, which starts vitest through `node` rather than its `.bin` shim; `cd apps/worker && uv run --frozen pytest <file>…`), with `IMAGE_PROBE_DEFERRED=true`. The root gates that the root `package.json`'s `check:gates` names. | the agent |
-| The PR | The **affected lane** on the runner (`.github/workflows/check.yml`). A `lane` job picks the lane. Then three legs run at once: `affected-gates`, `affected-workspaces` and `affected-worker`. A change whose every path ends `.md` takes the docs lane instead: `docs-gates`, which runs the root `check:docs`. | CI |
-| The merge group | `full-root` (the root gates, then `packages/core`, `packages/schema` and `packages/devtools`), `full-api`, `full-web` and `full-worker`. A run that `build.yml` calls is the same. | CI, the arbiter |
+| The PR | No suite (`.github/workflows/check.yml`). The `lane` job puts every pull request in the `pr` lane, where no leg runs, and `pr-title` checks the title. | CI |
+| The merge group | The `lane` job diffs the group against its base. A change whose every path ends `.md` takes the docs lane: `docs-gates`, which runs the root `check:docs`. Anything else takes the full lane: `full-root` (the root gates, then `packages/core`, `packages/schema` and `packages/devtools`), `full-api`, `full-web` and `full-worker`. The api and worker legs skip the image suites unless a changed path is an image input, such as a manifest, a lockfile, a Dockerfile or a path under `deploy/`; `scripts/docs-lane.mjs` holds the list. A run that `build.yml` calls is the same, except that it always skips them, because `build.yml` probes every image it pushes. | CI, the arbiter |
 
-An acceptance line reading "`check` green" is CI's: on the pull request, and again in the queue. Those are the two rows below the agent's. The agent runs the first row and no more. A rebase that touches none of the ticket's files needs no local re-run.
+An acceptance line reading "`check` green" is CI's, and only the merge group's run tests anything. The agent runs the first row and no more. A rebase that touches none of the ticket's files needs no local re-run.
 
 ## Environment
 
