@@ -1638,6 +1638,37 @@ describe("the evidence pane", () => {
   const paneFor = (person: UserPrincipal, iri: string) =>
     reading(person, (reader, tx) => evidencePaneOf(reader, tx, iri));
 
+  /** A read takes no lock a write could hold, so the pane is paused through its `tx`. */
+  const paneAcross = async (
+    reader: UserPrincipal,
+    iri: string,
+    pauseAfter: (statement: string) => boolean,
+    write: () => Promise<{ readonly ok: boolean }>,
+  ) => {
+    let paused = false;
+    let wrote: { readonly ok: boolean } | undefined;
+    const pane = await reading(reader, (principal, tx) =>
+      evidencePaneOf(
+        principal,
+        new Proxy(tx, {
+          get: (target, key) =>
+            key === "query"
+              ? async (statement: string, values?: unknown[]) => {
+                  const read = await target.query(statement, values);
+                  if (!paused && pauseAfter(statement)) {
+                    paused = true;
+                    wrote = await write();
+                  }
+                  return read;
+                }
+              : Reflect.get(target, key),
+        }),
+        iri,
+      ),
+    );
+    return { pane, wrote };
+  };
+
   it("answers a withheld concept exactly as one nobody minted", async () => {
     const scenario = await arrange();
     const restricted = await bindingHolding(db(), scenario.workspaceId, RESTRICTED);
@@ -1753,6 +1784,91 @@ describe("the evidence pane", () => {
       lead: "Based on your current access, the evidence isn't included.",
       evidence: [],
       sharedBeyondEvidence: undefined,
+    });
+  });
+
+  it("reads count and rows from one snapshot across a re-write", async () => {
+    const scenario = await arrange();
+    const kept = await bindingHolding(db(), scenario.workspaceId);
+    const added = await bindingHolding(db(), scenario.workspaceId);
+    const written = await conceptCiting(scenario, scenario.editor, [kept.documentId]);
+
+    const { pane, wrote } = await paneAcross(
+      scenario.admin,
+      written.iri,
+      (statement) => statement.includes("concept_evidence"),
+      () => rewriteCiting(scenario, scenario.editor, written, [kept.documentId, added.documentId]),
+    );
+
+    expect(wrote).toMatchObject({ ok: true });
+    expect(pane).toEqual({
+      ok: true,
+      value: {
+        access: "included",
+        lead: "Based on your current access, the evidence is included.",
+        evidence: [{ locator: "p.1", resource: "Document 1" }],
+        sharedBeyondEvidence: undefined,
+        next: "Open a source to read the passage the concept rests on.",
+      },
+    });
+    const after = await paneFor(scenario.admin, written.iri);
+    expect(after.ok && after.value).toMatchObject({
+      access: "included",
+      evidence: [
+        { locator: "p.1", resource: "Document 1" },
+        { locator: "p.2", resource: "Document 2" },
+      ],
+    });
+  });
+
+  it("answers from the snapshot that found the concept readable", async () => {
+    const scenario = await arrange();
+    const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
+    const written = await conceptCiting(scenario, scenario.editor, [internal.documentId]);
+
+    const { pane, wrote } = await paneAcross(
+      scenario.viewer,
+      written.iri,
+      () => true,
+      () =>
+        rewriteCiting(scenario, scenario.admin, written, [
+          internal.documentId,
+          restricted.documentId,
+        ]),
+    );
+
+    expect(wrote).toMatchObject({ ok: true });
+    expect(pane.ok && pane.value).toMatchObject({
+      access: "included",
+      evidence: [{ locator: "p.1", resource: "Document 1" }],
+    });
+    expect(await paneFor(scenario.viewer, written.iri)).toEqual({ ok: true, value: undefined });
+  });
+
+  it("names the override that stood when the evidence was read", async () => {
+    const scenario = await arrange();
+    const { internal, restricted } = await restrictedAndInternal(db(), scenario.workspaceId);
+    const written = await conceptCiting(scenario, scenario.editor, [
+      internal.documentId,
+      restricted.documentId,
+    ]);
+    await overriddenTo(scenario, written.iri, "Internal");
+    const stood = await db().pool.query<{ recorded_at: Date }>(
+      "SELECT recorded_at FROM concept_class_override WHERE workspace_id = $1 AND iri = $2",
+      [scenario.workspaceId, written.iri],
+    );
+
+    const { pane, wrote } = await paneAcross(
+      scenario.viewer,
+      written.iri,
+      () => true,
+      () => overriddenTo(scenario, written.iri, "Public"),
+    );
+
+    expect(wrote).toMatchObject({ ok: true });
+    expect(pane.ok && pane.value?.sharedBeyondEvidence).toEqual({
+      by: `human:${scenario.admin.userId}`,
+      at: stood.rows[0]?.recorded_at,
     });
   });
 });
