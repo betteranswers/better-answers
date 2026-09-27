@@ -12,8 +12,8 @@ on:
           Set by a caller whose own job builds the images, loads each one that has a
           contents test and runs that test against the build it is about to push (`T-043`).
           The suites here then leave those tests to that job, so a push to main builds a
-          probed image once rather than once on this runner and once on that one. A pull
-          request builds no image, has no such job, passes nothing, and probes as usual.
+          probed image once rather than once on this runner and once on that one. A merge
+          group has no such job and passes nothing, so it probes when an image's inputs changed.
           It reaches every leg whose suites read it — the api's and the worker's — and no
           other; `apps/api/tests/image-job.test.ts` holds that both ways.
         type: boolean
@@ -36,8 +36,7 @@ jobs:
     timeout-minutes: 10
     outputs:
       lane: ${{ steps.lane.outputs.lane }}
-      base: ${{ steps.lane.outputs.base }}
-      worker: ${{ steps.lane.outputs.worker }}
+      images: ${{ steps.lane.outputs.images }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # The base is fetched by sha: `git diff` between two trees needs no ancestry.
@@ -45,56 +44,48 @@ jobs:
         id: lane
         env:
           EVENT: ${{ github.event_name }}
-          PULL_REQUEST_BASE: ${{ github.event.pull_request.base.sha }}
           MERGE_GROUP_BASE: ${{ github.event.merge_group.base_sha }}
           PUSHED_FROM: ${{ github.event.before }}
         run: |
           case "${EVENT}" in
-            pull_request) base="${PULL_REQUEST_BASE}" ;;
             merge_group) base="${MERGE_GROUP_BASE}" ;;
             push | workflow_call) base="${PUSHED_FROM}" ;;
             *) base="" ;;
           esac
           lane=full
-          worker=yes
-          if [ -n "${base}" ] && [ "${base}" != "0000000000000000000000000000000000000000" ] &&
+          images=yes
+          # The queue runs the suites on the tree that lands, so a pull request runs none.
+          if [ "${EVENT}" = "pull_request" ]; then
+            lane="pr"
+          elif [ -n "${base}" ] && [ "${base}" != "0000000000000000000000000000000000000000" ] &&
             git fetch --no-tags --depth=1 origin "${base}" &&
             git diff -z --name-only --no-renames "${base}" HEAD > "${RUNNER_TEMP}/changed-paths"; then
             # Read back here so that an unknown word is refused below, not published.
             decided="$(node scripts/docs-lane.mjs < "${RUNNER_TEMP}/changed-paths")"
             lane="$(printf '%s\n' "${decided}" | sed -n 's/^lane=//p')"
-            worker="$(printf '%s\n' "${decided}" | sed -n 's/^worker=//p')"
+            images="$(printf '%s\n' "${decided}" | sed -n 's/^images=//p')"
           else
-            # A leg filtering against a base this runner could not fetch reads nothing, so
-            # the base is cleared with the lane.
-            echo "::notice::no diff against a base (event ${EVENT}, base '${base}'), so this run takes the full lane"
-            base=""
-          fi
-          # The lane script reads the paths alone, so only a pull request may narrow.
-          if [ "${lane}" = "affected" ] && [ "${EVENT}" != "pull_request" ]; then
-            echo "::notice::a ${EVENT} run takes the full lane, whatever it changed"
-            lane=full
+            echo "::notice::no diff against a base (event ${EVENT}, base '${base}'), so this run takes the full lane and probes the images"
           fi
           # Every leg is gated on these words, so a fourth is a run that requires nothing.
           case "${lane}" in
-            docs | affected | full) ;;
+            pr | docs | full) ;;
             *)
               echo "::error::the lane resolved to '${lane}', which is no lane this workflow has"
               exit 1
               ;;
           esac
-          case "${worker}" in
+          case "${images}" in
             yes | no) ;;
             *)
-              echo "::error::the worker's own gates resolved to '${worker}', which is neither yes nor no"
+              echo "::error::whether an image's inputs changed resolved to '${images}', which is neither yes nor no"
               exit 1
               ;;
           esac
-          echo "this run is in the ${lane} lane, and the worker's gates are in it: ${worker}"
+          echo "this run is in the ${lane} lane, and an image's inputs changed: ${images}"
           {
             echo "lane=${lane}"
-            echo "base=${base}"
-            echo "worker=${worker}"
+            echo "images=${images}"
           } >> "$GITHUB_OUTPUT"
 
   docs-gates:
@@ -186,7 +177,7 @@ jobs:
       - uses: ./.github/actions/git-filter-repo
       - run: pnpm check:api
         env:
-          IMAGE_PROBE_DEFERRED: ${{ inputs.images-probed-by-the-caller }}
+          IMAGE_PROBE_DEFERRED: ${{ inputs.images-probed-by-the-caller || needs.lane.outputs.images == 'no' }}
 
   full-web:
     needs: lane
@@ -237,127 +228,9 @@ jobs:
       - uses: crazy-max/ghaction-github-runtime@04d248b84655b509d8c44dc1d6f990c879747487 # v4.0.0
       - run: pnpm check:worker
         env:
-          IMAGE_PROBE_DEFERRED: ${{ inputs.images-probed-by-the-caller }}
-          # Without it every pull request tells a third party what this repository is
-          # building, once per document.
-          COCOINDEX_DISABLE_USAGE_TRACKING: "1"
-
-  affected-gates:
-    needs: lane
-    if: ${{ needs.lane.outputs.lane == 'affected' }}
-    runs-on: ubuntu-26.04
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .node-version
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm check:gates
-
-  affected-workspaces:
-    needs: lane
-    if: ${{ needs.lane.outputs.lane == 'affected' }}
-    runs-on: ubuntu-26.04
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .node-version
-          cache: pnpm
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
-        with:
-          version-file: apps/worker/.tool-versions
-          enable-cache: true
-      - name: HF_HOME on the runner's own temp directory, not the checkout
-        run: echo "HF_HOME=${{ runner.temp }}/huggingface" >> "$GITHUB_ENV"
-      # This leg runs the worker over an index job, which loads the detector's models;
-      # without this it fetches them afresh every run.
-      - name: the redaction detector's weights, keyed on the pins that name them
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ runner.temp }}/huggingface
-          key: hugging-face-${{ runner.os }}-${{ hashFiles('apps/worker/src/better_answers_worker/redaction/pins.py') }}
-      - name: the base the filter reads, and a rename read as both its paths
-        env:
-          BASE: ${{ needs.lane.outputs.base }}
-        run: |
-          git fetch --no-tags --depth=1 origin "${BASE}"
-          # git reports a move as the destination alone, so without this the workspace the
-          # file left goes unchecked.
-          git config diff.renames false
-      - run: pnpm install --frozen-lockfile
-      - run: uv sync --frozen
-        working-directory: apps/worker
-      - uses: ./.github/actions/git-filter-repo
-      - run: pnpm --filter @better-answers/web exec playwright install --with-deps chromium
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      - uses: crazy-max/ghaction-github-runtime@04d248b84655b509d8c44dc1d6f990c879747487 # v4.0.0
-      - name: the filter selected something, or the worker's gates did
-        env:
-          BASE: ${{ needs.lane.outputs.base }}
-          WORKER: ${{ needs.lane.outputs.worker }}
-        run: |
-          selected="$(pnpm --silent check:affected:scope)"
-          printf 'the filter selected:\n%s\n' "${selected}"
-          if [ -z "${selected}" ] && [ "${WORKER}" != "yes" ]; then
-            echo "::error::the affected lane selected no workspace and the worker's gates are not in this change, so only the root gates would have read it"
-            exit 1
-          fi
-      - run: pnpm check:affected
-        env:
-          BASE: ${{ needs.lane.outputs.base }}
-          IMAGE_PROBE_DEFERRED: ${{ inputs.images-probed-by-the-caller }}
-
-  # A leg skipped by its own `if:` concludes nothing, and the verdict wants a conclusion.
-  affected-worker:
-    needs: lane
-    if: ${{ needs.lane.outputs.lane == 'affected' }}
-    runs-on: ubuntu-26.04
-    timeout-minutes: 30
-    steps:
-      - name: whether this change reached the worker at all
-        env:
-          WORKER: ${{ needs.lane.outputs.worker }}
-        run: echo "a path under apps/worker/ or contracts/ changed - ${WORKER}"
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: ${{ needs.lane.outputs.worker == 'yes' }}
-      - name: HF_HOME on the runner's own temp directory, not the checkout
-        if: ${{ needs.lane.outputs.worker == 'yes' }}
-        run: echo "HF_HOME=${{ runner.temp }}/huggingface" >> "$GITHUB_ENV"
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-        if: ${{ needs.lane.outputs.worker == 'yes' }}
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        if: ${{ needs.lane.outputs.worker == 'yes' }}
-        with:
-          node-version-file: .node-version
-          cache: pnpm
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
-        if: ${{ needs.lane.outputs.worker == 'yes' }}
-        with:
-          version-file: apps/worker/.tool-versions
-          enable-cache: true
-      - name: the redaction detector's weights, keyed on the pins that name them
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        if: ${{ needs.lane.outputs.worker == 'yes' }}
-        with:
-          path: ${{ runner.temp }}/huggingface
-          key: hugging-face-${{ runner.os }}-${{ hashFiles('apps/worker/src/better_answers_worker/redaction/pins.py') }}
-      - if: ${{ needs.lane.outputs.worker == 'yes' }}
-        run: uv sync --frozen
-        working-directory: apps/worker
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-        if: ${{ needs.lane.outputs.worker == 'yes' }}
-      - uses: crazy-max/ghaction-github-runtime@04d248b84655b509d8c44dc1d6f990c879747487 # v4.0.0
-        if: ${{ needs.lane.outputs.worker == 'yes' }}
-      - if: ${{ needs.lane.outputs.worker == 'yes' }}
-        run: pnpm check:worker
-        env:
-          IMAGE_PROBE_DEFERRED: ${{ inputs.images-probed-by-the-caller }}
+          IMAGE_PROBE_DEFERRED: ${{ inputs.images-probed-by-the-caller || needs.lane.outputs.images == 'no' }}
+          # Without it every run tells a third party what this repository is building, once
+          # per document.
           COCOINDEX_DISABLE_USAGE_TRACKING: "1"
 
   # The title becomes the merge commit's subject, so the queue reads it again: a retitle after
@@ -402,9 +275,6 @@ jobs:
         full-api,
         full-web,
         full-worker,
-        affected-gates,
-        affected-workspaces,
-        affected-worker,
         pr-title,
       ]
     # A skipped required check never reports, so this runs whatever the legs did.
@@ -433,13 +303,17 @@ jobs:
             echo "${leg}: ${was} (this lane wants ${wanted})"
             [ "${was}" = "${wanted}" ] || wrong="${wrong} ${leg}=${was}"
           done
+          # The pr lane runs no leg, so the title it reads is the one thing it requires.
+          if [ "${LANE}" = "pr" ] && [ "${TITLE_WANTED}" = "success" ]; then
+            required=$((required + 1))
+          fi
           # A floor, not a count to keep current: a verdict requiring nothing of anybody passes.
           if [ "${named}" -lt 2 ] || [ "${required}" -lt 1 ]; then
-            echo "::error::this verdict read ${named} jobs and required ${required} legs, so it proved nothing"
+            echo "::error::this verdict read ${named} jobs and required ${required} of them, so it proved nothing"
             exit 1
           fi
           if [ -n "${wrong}" ]; then
             echo "::error::check is not green:${wrong}"
             exit 1
           fi
-          echo "the ${LANE} lane is green: ${required} legs"
+          echo "the ${LANE} lane is green: ${required} required jobs"

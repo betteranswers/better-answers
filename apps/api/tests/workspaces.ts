@@ -19,18 +19,8 @@ const manifestOf = (directory: string): Manifest =>
 
 export const rootScripts = (): Readonly<Record<string, string>> => manifestOf(".").scripts ?? {};
 
-/** pnpm's own name for the workspace root, which is a project like any other to `--filter`. */
-export const rootName = (): string => manifestOf(".").name ?? "";
-
-/** By directory, where `workspacesWithNoCheck` answers by package name. */
 export const workspacesGated = (): readonly string[] =>
   workspacePackages().filter((directory) => manifestOf(directory).scripts?.["check"] !== undefined);
-
-/** By package name, which is how a filter names one: a selection of these alone runs no gate. */
-export const workspacesWithNoCheck = (): readonly string[] =>
-  workspacePackages()
-    .filter((directory) => manifestOf(directory).scripts?.["check"] === undefined)
-    .map((directory) => manifestOf(directory).name ?? directory);
 
 const RUNNER = /^node\s+(?:\.\.\/)*scripts\/check\.mjs\s+(?<gates>[\s\S]+)$/;
 
@@ -73,16 +63,9 @@ const ENTERED = /\bcd\s+(?<directory>[\w./-]+)/g;
 /** A command that ends in a named file runs that file, not the workspace's whole suite. */
 const RUNS_A_WHOLE_CHECK = /\bcheck$/;
 
-/**
- * `...[<ref>]` names no workspace, so the widest answer it could give is the one to hold a leg's
- * setup and its variables against.
- */
-const CHANGED_SINCE = /--filter\s+"?\.\.\.\[[^\]]*\]"?/;
-
 /** A pnpm workspace is named by its package, the worker's uv one by being stepped into. */
 export const workspacesChecked = (command: string): readonly string[] => {
   if (!RUNS_A_WHOLE_CHECK.test(command.trim())) return [];
-  if (CHANGED_SINCE.test(command)) return workspacesGated();
 
   const directoryOf = new Map(
     workspacePackages().map((directory) => [manifestOf(directory).name ?? directory, directory]),

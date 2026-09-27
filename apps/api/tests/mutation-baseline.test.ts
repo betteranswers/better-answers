@@ -409,9 +409,9 @@ describe("the nightly mutation baseline, kept as the previous run's artifact", (
 
 /** The organisation's plan runs 20 jobs at once. */
 const CONCURRENT_JOBS = 20;
-/** A merge group runs four legs and a pull request three, each opening with a lane job. */
+/** A merge group runs four legs after its lane job; a pull request runs a lane job and a title job. */
 const MERGE_GROUP_LEGS = 4;
-const PULL_REQUEST_LEGS = 3;
+const PULL_REQUEST_JOBS = 2;
 const A_LANE_JOB = 1;
 
 const legRoots = new Map([
@@ -604,7 +604,7 @@ describe("each mutation leg, run as shards and summed once", () => {
 
   it("leaves room for a merge group and a pull request", () => {
     expect(mutationWorkflow().jobs.stryker.strategy["max-parallel"]).toBeLessThanOrEqual(
-      CONCURRENT_JOBS - MERGE_GROUP_LEGS - PULL_REQUEST_LEGS - A_LANE_JOB,
+      CONCURRENT_JOBS - MERGE_GROUP_LEGS - PULL_REQUEST_JOBS - A_LANE_JOB,
     );
   });
 });

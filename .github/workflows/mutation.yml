@@ -36,7 +36,7 @@ jobs:
       SELECTED: ${{ !inputs.shards || contains(format(',{0},', inputs.shards), format(',{0}-{1},', matrix.name, matrix.shard)) }}
     strategy:
       fail-fast: false
-      # The plan runs 20 jobs at once; 8 stay free for a merge group's four legs, a pull request's three and a lane job.
+      # The plan runs 20 jobs at once; 8 stay free for a merge group's lane and four legs, and a pull request's two jobs.
       max-parallel: 12
       matrix:
         include:

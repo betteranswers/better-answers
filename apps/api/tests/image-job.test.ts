@@ -24,7 +24,13 @@ const checkWorkflowSchema = z.object({
       inputs: z.record(z.string(), z.record(z.string(), z.unknown())),
     }),
   }),
-  jobs: z.record(z.string(), z.object({ steps: z.array(workflowStepSchema).optional() })),
+  jobs: z.record(
+    z.string(),
+    z.object({
+      outputs: z.record(z.string(), z.string()).optional(),
+      steps: z.array(workflowStepSchema).optional(),
+    }),
+  ),
 });
 
 const checkWorkflow = () => readWorkflow("check.yml", checkWorkflowSchema);
@@ -37,6 +43,21 @@ const deferralAt = (steps: readonly ImageStep[]): number =>
 
 const legsCarryingTheDeferral = (): readonly string[] =>
   checkLegs().flatMap(([job, steps]) => (deferralAt(steps) === -1 ? [] : [job]));
+
+const DEFERRAL =
+  /^\$\{\{ inputs\.(?<input>[\w-]+) \|\| needs\.lane\.outputs\.(?<answer>[\w-]+) == 'no' \}\}$/;
+
+type DeferralRead = { readonly input: string; readonly answer: string };
+
+/** A value read some other way comes back whole, so the mismatch names it. */
+const deferralsRead = (): readonly DeferralRead[] =>
+  checkLegs()
+    .flatMap(([, steps]) => steps)
+    .flatMap((step) => step.env?.[PROBE_DEFERRAL_VARIABLE] ?? [])
+    .map((value) => {
+      const groups = DEFERRAL.exec(value)?.groups;
+      return { input: groups?.["input"] ?? value, answer: groups?.["answer"] ?? value };
+    });
 
 /** Tracked files only, which is what a leg would have checked out. */
 const workspacesReadingTheDeferral = (): ReadonlySet<string> => {
@@ -216,23 +237,19 @@ describe("the job that probes every image it pushes", () => {
     expect(group).not.toEqual(buildWorkflow().concurrency.group);
   });
 
-  it("defers the probes only when `check.yml`'s caller probes the images", () => {
+  it("defers probes the caller ran, or whose inputs are unchanged", () => {
     const check = checkWorkflow();
-    const named = new Set(
-      checkLegs()
-        .flatMap(([, steps]) => steps)
-        .flatMap(
-          (step) =>
-            /^\$\{\{\s*inputs\.([\w-]+)\s*\}\}$/.exec(
-              step.env?.[PROBE_DEFERRAL_VARIABLE] ?? "",
-            )?.[1] ?? [],
-        ),
-    );
-    const [only] = named;
+    const read = deferralsRead();
+    const { input, answer } = read[0] ?? { input: "", answer: "" };
 
-    expect(named.size, "the legs read the deferral out of two different inputs").toBe(1);
-    expect(check.on.workflow_call.inputs[only ?? ""]?.["default"]).toBe(false);
-    expect(buildWorkflow().jobs.check.with?.[only ?? ""]).toBe(true);
+    expect(read.length).toBeGreaterThan(1);
+    expect(
+      read,
+      "a leg reads the deferral another way, so the caller's input no longer wins or a changed input no longer probes",
+    ).toEqual(read.map(() => ({ input, answer })));
+    expect(check.on.workflow_call.inputs[input]?.["default"]).toBe(false);
+    expect(buildWorkflow().jobs.check.with?.[input]).toBe(true);
+    expect(check.jobs["lane"]?.outputs?.[answer]).toEqual("${{ steps.lane.outputs.images }}");
   });
 
   it("hands the deferral to exactly the legs reading it", () => {
@@ -255,8 +272,8 @@ describe("the job that probes every image it pushes", () => {
 
     expect(
       building.length,
-      "the legs of check.yml that build an image are the full lane's api and worker, and the affected lane's two",
-    ).toBe(4);
+      "the legs of check.yml that build an image are the full lane's api and worker",
+    ).toBe(2);
     for (const [job, steps] of building) {
       const at = (action: string): number => steps.findIndex((step) => runs(step, action));
 

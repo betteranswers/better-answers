@@ -26,11 +26,12 @@ For each, note what it moves (the body's table), the `check` verdict and whether
 
 ## 2. Read each red job's log
 
-`check` is the fan-in; the red leg beside it (`affected-worker`, `full-api`, …) is the one to read.
+`check` is the fan-in; the red leg beside it (`full-worker`, `full-api`, …) is the one to read. A pull request's own run holds no leg, so the red one is in its merge group's run, on the branch `gh-readonly-queue/main/pr-<n>-<sha>`.
 
 ```bash
-gh pr checks <n>                                   # the run and job ids are in each link
-gh run view <run> --job <job> --log-failed > /tmp/pr<n>.log
+gh run list --workflow check.yml --event merge_group --json databaseId,headBranch,conclusion \
+  --jq '.[] | select(.headBranch | contains("/pr-<n>-"))'
+gh run view <run> --log-failed > /tmp/pr<n>.log
 ```
 
 Find the first failing assertion or error line. A merge-group failure whose only red is a browser spec the pull request did not touch is a flake to re-arm. A red that the latest queue run also shows (`gh run list --workflow check.yml --event merge_group --limit 3`) is not this pull request's.
@@ -64,13 +65,13 @@ Order matters because Renovate **regenerates** a branch when its rebase box is t
    ```
 
    Renovate acts on its next run. Wait for the head commit to change before going on.
-3. **Branch fixes go last**, on the regenerated head: `git fetch origin <branch>`, `git switch -c <branch> --track origin/<branch>`, fix, commit, `git push origin HEAD:<branch>`. A branch behind `main` needs no rebase: the pull request's run tests its merge with `main`, and the queue tests the merge group. Once a commit of ours is on it, Renovate stops rebasing that branch; tick its box again only to throw the fix away. A conflict after that is ours to rebase, onto `origin/main`, pushed with `--force-with-lease`.
+3. **Branch fixes go last**, on the regenerated head: `git fetch origin <branch>`, `git switch -c <branch> --track origin/<branch>`, fix, commit, `git push origin HEAD:<branch>`. A branch behind `main` needs no rebase: the queue tests the merge group, which is the branch over `main`. Once a commit of ours is on it, Renovate stops rebasing that branch; tick its box again only to throw the fix away. A conflict after that is ours to rebase, onto `origin/main`, pushed with `--force-with-lease`.
 
 What a fix owes, whichever route:
 
 - **Every file still naming the old version**: `git grep -nF '<old version>' -- ':!*.lock' ':!pnpm-lock.yaml'`. jCodeMunch's index leaves Dockerfiles out, so its answer is not evidence here. A test comparing the manifest's pin to a literal moves with the pin; a literal handed to a function as input stays.
 - **The comment above each moved pin** in `apps/worker/pyproject.toml` and the Dockerfiles. Many carry a dated reading (licence, wheel tags, digest) and say what a bump owes: a probe to re-run, a reading to re-date. Re-read the licence and wheels at the source (`curl -s https://pypi.org/pypi/<name>/<version>/json`), re-date, run what it names.
-- **Suites by file**: the first row of *What `check` runs where* in `docs/agents/workflow.md`. That row sets `IMAGE_PROBE_DEFERRED=true`, which skips the image suites; when the red line is in one (`apps/worker/tests/test_image.py`, `apps/api/tests/image.test.ts`), run the failing test by its node id without it. The suite builds its image by id, so it is safe beside other sessions, and the worker's takes about three minutes. CI's affected lane and the queue's full run are the arbiters.
+- **Suites by file**: the first row of *What `check` runs where* in `docs/agents/workflow.md`. That row sets `IMAGE_PROBE_DEFERRED=true`, which skips the image suites; when the red line is in one (`apps/worker/tests/test_image.py`, `apps/api/tests/image.test.ts`), run the failing test by its node id without it. The suite builds its image by id, so it is safe beside other sessions, and the worker's takes about three minutes. The queue's run is the arbiter, and it runs the image suites whenever a manifest or a lockfile moved.
 - **Review**: `impact` before an edit and `detect_changes` before each commit (`docs/agents/code-review.md`; Cubic is paused). GitNexus leaves test files out, so `impact` on a test answers *not found*, and the blast radius is the assertion itself. One commit per fix, in the commit's form; a branch fix has no `Refs:` footer.
 - **A ticket**, when the route says so: `ordna create`, pushed origin first (`docs/agents/issue-tracker.md`), with the pull request's number and the log line in its Notes. When the fix cannot land ahead of the new version, the ticket carries the bump too, and the Renovate pull request closes as redundant once it lands (T-356 carries #211's).
 

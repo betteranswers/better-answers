@@ -2,10 +2,11 @@ import { spawnSync, type SpawnSyncReturns } from "node:child_process";
 import {
   chmodSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
-  readdirSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -20,11 +21,9 @@ import { repositoryRoot, workspacePackages } from "@better-answers/devtools/path
 import {
   gatesNamed,
   gatesUnder,
-  rootName,
   rootScripts,
   workspacesGated,
   workspacesChecked,
-  workspacesWithNoCheck,
 } from "./workspaces.ts";
 
 const read = (relative: string): string =>
@@ -32,7 +31,10 @@ const read = (relative: string): string =>
 
 const LANE_SCRIPT = "scripts/docs-lane.mjs";
 
-type Decision = { readonly lane: string; readonly worker: string };
+type Decision = { readonly lane: string; readonly images: string };
+
+const answerOf = (published: string, key: string): string =>
+  new RegExp(`^${key}=(?<value>.*)$`, "m").exec(published)?.groups?.["value"] ?? "";
 
 const decide = (changed: readonly string[], separator = "\n"): Decision => {
   const run = spawnSync("node", [path.join(repositoryRoot, LANE_SCRIPT)], {
@@ -41,21 +43,20 @@ const decide = (changed: readonly string[], separator = "\n"): Decision => {
   });
 
   expect(run.status, `${LANE_SCRIPT} ended non-zero: ${run.stderr}`).toBe(0);
-  const answered = (key: string): string =>
-    new RegExp(`^${key}=(?<value>.*)$`, "m").exec(run.stdout)?.groups?.["value"] ?? "";
-
-  return { lane: answered("lane"), worker: answered("worker") };
+  return { lane: answerOf(run.stdout, "lane"), images: answerOf(run.stdout, "images") };
 };
 
 const laneOf = (changed: readonly string[], separator = "\n"): string =>
   decide(changed, separator).lane;
+
+const imagesOf = (changed: readonly string[]): string => decide(changed).images;
 
 type LaneCase = {
   readonly changed: readonly string[];
 
   readonly lane: string;
 
-  readonly worker: string;
+  readonly images: string;
 
   /** Names the change in the test's title; `because` holds the reason, printed on failure. */
   readonly diff: string;
@@ -63,130 +64,153 @@ type LaneCase = {
   readonly because: string;
 };
 
-/** The paths are what a pull request's diff hands the script; the answer is what the legs read. */
+/** The paths are what a merge group's diff hands the script; the answer is what the legs read. */
 const LANES: readonly LaneCase[] = [
   {
     changed: ["apps/web/src/app.tsx"],
-    lane: "affected",
-    worker: "no",
+    lane: "full",
+    images: "no",
     diff: "a web-only change",
-    because: "a web-only change: the filter names apps/web, and nothing depends on the SPA",
+    because:
+      "the api image carries the SPA's build, but it is source the suites read on every run, and build.yml probes the image it pushes",
   },
   {
     changed: ["packages/core/src/kernel/actor.ts"],
-    lane: "affected",
-    worker: "no",
+    lane: "full",
+    images: "no",
     diff: "a core change",
-    because:
-      "a core change: apps/api imports it and apps/web imports apps/api, so the filter's `...[` prefix brings both of them with it",
+    because: "source the api image copies as it stands",
   },
   {
     changed: ["apps/worker/src/better_answers_worker/work_loop.py"],
-    lane: "affected",
-    worker: "yes",
-    diff: "a worker-only change",
+    lane: "full",
+    images: "no",
+    diff: "a worker source change",
+    because: "source the worker image copies as it stands",
+  },
+  {
+    changed: ["apps/worker/src/better_answers_worker/redaction/pins.py"],
+    lane: "full",
+    images: "yes",
+    diff: "a redaction module change",
     because:
-      "a worker-only change: no pnpm workspace owns apps/worker, so the filter selects nothing and the worker's own leg is what runs",
+      "the worker image's build runs the redaction module to install the detector's weights, so it is an install input and not only source",
   },
   {
     changed: ["package.json"],
     lane: "full",
-    worker: "no",
-    diff: "an unowned root file",
-    because:
-      "a root file no workspace owns: pnpm reads it as the workspace root's own and would run the root `check`, which is the whole run by another name",
+    images: "yes",
+    diff: "the root manifest",
+    because: "it names the pnpm the api image's corepack installs",
+  },
+  {
+    changed: ["apps/web/package.json"],
+    lane: "full",
+    images: "yes",
+    diff: "a workspace manifest",
+    because: "the api image installs from every workspace's manifest, the SPA's included",
   },
   {
     changed: ["pnpm-lock.yaml"],
     lane: "full",
-    worker: "no",
+    images: "yes",
     diff: "a lockfile change",
-    because: "a lockfile change is every workspace's dependencies, whatever the diff touched",
+    because: "a lockfile change is every image's dependencies, whatever else the diff touched",
   },
   {
-    changed: ["contracts/manifest.json"],
+    changed: ["apps/worker/uv.lock"],
     lane: "full",
-    worker: "yes",
-    diff: "a tier contract change",
-    because:
-      "both tiers read the contract and no pnpm workspace owns a line of contracts/, so the TypeScript half — packages/core/test/tier-contract.test.ts — would not run on the filter's answer",
+    images: "yes",
+    diff: "the worker's lockfile",
+    because: "the worker image syncs its environment from it",
+  },
+  {
+    changed: ["apps/api/Dockerfile"],
+    lane: "full",
+    images: "yes",
+    diff: "a Dockerfile",
+    because: "it is the image",
+  },
+  {
+    changed: ["deploy/backup.sh"],
+    lane: "full",
+    images: "yes",
+    diff: "a deploy file",
+    because: "deploy/ is the backup image's context, and the probes read the compose files in it",
+  },
+  {
+    changed: [".node-version"],
+    lane: "full",
+    images: "yes",
+    diff: "the node pin",
+    because: "the api image's base must run the node the tree is pinned to",
+  },
+  {
+    changed: ["apps/worker/.tool-versions"],
+    lane: "full",
+    images: "yes",
+    diff: "the uv pin",
+    because: "the worker image's uv must be the uv the runner resolves the lockfile with",
+  },
+  {
+    changed: ["apps/api/tests/image.test.ts"],
+    lane: "full",
+    images: "yes",
+    diff: "an image probe",
+    because: "an edit to a probe is run by that probe and by nothing else",
   },
   {
     changed: [".github/workflows/check.yml"],
     lane: "full",
-    worker: "no",
-    diff: "a workflow change",
-    because: "this workflow is held by suites in apps/api and apps/worker that no filter names",
+    images: "yes",
+    diff: "this workflow",
+    because: "it decides whether the probes run, and an edit to that decision is read by a run",
   },
   {
-    changed: ["apps/docs-site/index.ts"],
+    changed: ["contracts/manifest.json"],
     lane: "full",
-    worker: "no",
-    diff: "a lookalike directory in apps",
-    because:
-      "a directory that only looks like a workspace: pnpm would map it to the workspace root, the exclusion would drop that, and the leg would pass having run nothing",
+    images: "no",
+    diff: "a tier contract change",
+    because: "both tiers' suites read the contract, and no image copies a line of it",
   },
   {
-    changed: ["packages/not-a-workspace/index.ts"],
+    changed: ["deployment/notes.ts"],
     lane: "full",
-    worker: "no",
-    diff: "a lookalike directory in packages",
-    because: "the same hole one level down, and the same answer",
+    images: "no",
+    diff: "a lookalike of deploy/",
+    because: "a directory is matched by its whole name, never by a prefix of it",
   },
   {
     changed: ["docs/vision.md", "CONTEXT.md"],
     lane: "docs",
-    worker: "no",
+    images: "no",
     diff: "a prose-only change",
     because: "every changed path is prose, which is the docs lane's whole rule",
   },
   {
     changed: ["docs/vision.md", "apps/web/src/app.tsx"],
     lane: "full",
-    worker: "no",
+    images: "no",
     diff: "prose mixed with code",
     because:
-      "prose with code: the suites that read this repository's documents live in apps/api and packages/core, and a filter that named apps/web would run every gate except the coupled one",
+      "prose with code: the docs lane runs the suites that read documents, and none of the suites that read the code",
+  },
+  {
+    changed: ["apps/web/src/app.tsx", "pnpm-lock.yaml"],
+    lane: "full",
+    images: "yes",
+    diff: "source with a lockfile",
+    because: "one image input among any number of other paths is enough",
   },
 ];
 
 describe("which paths reach which lane", () => {
   it.each(LANES)(
     "picks the $lane lane for $diff",
-    ({ changed, lane, worker, because }: LaneCase) => {
-      expect(decide(changed), `${changed.join(", ")}: ${because}`).toEqual({ lane, worker });
+    ({ changed, lane, images, because }: LaneCase) => {
+      expect(decide(changed), `${changed.join(", ")}: ${because}`).toEqual({ lane, images });
     },
   );
-
-  it("treats no directory the repository stopped installing as a workspace", () => {
-    const known = new Set([...workspacePackages(), "apps/worker"]);
-    const firstLevel = ["apps", "packages"].flatMap((parent) =>
-      readdirSync(path.join(repositoryRoot, parent), { withFileTypes: true })
-        .filter((entry) => entry.isDirectory())
-        .map((entry) => `${parent}/${entry.name}`),
-    );
-    const orphans = firstLevel.filter(
-      (directory) =>
-        laneOf([`${directory}/a-changed-file.ts`]) === "affected" && !known.has(directory),
-    );
-
-    expect(firstLevel.length).toBeGreaterThan(known.size - 1);
-    expect(
-      orphans,
-      "the lane sends a directory to the affected lane that pnpm's filter cannot answer for, so its change would be read by the root gates alone",
-    ).toEqual([]);
-  });
-
-  it("reads every installed workspace as one the filter answers for", () => {
-    const unresolved = [...workspacePackages(), "apps/worker"].filter(
-      (directory) => laneOf([`${directory}/a-changed-file.ts`]) !== "affected",
-    );
-
-    expect(
-      unresolved,
-      "a workspace's own path takes the full lane, so every change inside it pays for the whole tree",
-    ).toEqual([]);
-  });
 });
 
 describe("which lane a change runs in", () => {
@@ -212,15 +236,123 @@ describe("which lane a change runs in", () => {
     expect(laneOf(["docs/mdfiles/index.html"])).toEqual("full");
   });
 
-  it("takes the full lane when given no paths", () => {
-    expect(laneOf([])).toEqual("full");
-    expect(laneOf([""], "\n")).toEqual("full");
+  it("takes the full lane and probes when given no paths", () => {
+    expect(decide([])).toEqual({ lane: "full", images: "yes" });
+    expect(decide([""], "\n")).toEqual({ lane: "full", images: "yes" });
   });
 
   it("reads the NUL-separated form the workflow actually feeds it", () => {
     expect(laneOf(["docs/a.md", "docs/b.md"], "\0")).toEqual("docs");
     expect(laneOf(["docs/a\nb.md"], "\0")).toEqual("docs");
     expect(laneOf(["docs/a.md", "src/b.ts"], "\0")).toEqual("full");
+  });
+});
+
+const imageLegSchema = z.object({
+  tier: z.string(),
+  context: z.string(),
+  dockerfile: z.string(),
+  probe: z.string().optional(),
+});
+type ImageLeg = z.infer<typeof imageLegSchema>;
+
+const imageLegs = (): readonly ImageLeg[] =>
+  z
+    .object({
+      jobs: z.object({
+        image: z.object({
+          strategy: z.object({ matrix: z.object({ include: z.array(imageLegSchema) }) }),
+        }),
+      }),
+    })
+    .parse(parse(read(".github/workflows/build.yml"))).jobs.image.strategy.matrix.include;
+
+/** The probe command ends in its file, relative to whichever workspace it runs in. */
+const probeFilesOf = (leg: ImageLeg): readonly string[] => {
+  const file = (leg.probe ?? "").trim().split(/\s+/).at(-1) ?? "";
+  return [...workspacePackages(), "apps/worker"]
+    .map((workspace) => path.posix.join(workspace, file))
+    .filter((candidate) => file !== "" && existsSync(path.join(repositoryRoot, candidate)));
+};
+
+const COPY = /^COPY\s+(?<words>.+)$/gm;
+
+/** A stage's own output is no path in the tree, so a `--from` copy names nothing to watch. */
+const copiedBy = (leg: ImageLeg): readonly string[] =>
+  [...read(leg.dockerfile).matchAll(COPY)].flatMap((found) => {
+    const words = (found.groups?.["words"] ?? "").trim().split(/\s+/);
+    if (words.some((word) => word.startsWith("--from="))) return [];
+    return words
+      .filter((word) => !word.startsWith("--"))
+      .slice(0, -1)
+      .map((source) => path.posix.join(leg.context, source).replace(/\/$/, ""));
+  });
+
+const aChangeTo = (copied: string): string =>
+  statSync(path.join(repositoryRoot, copied)).isDirectory() ? `${copied}/a-changed-file` : copied;
+
+/** Copied into an image as it stands; the suites read it on every run and build.yml probes the image. */
+const COPIED_SOURCE: readonly string[] = [
+  "apps/api/src",
+  "apps/web",
+  "apps/worker/src",
+  "packages/core/src",
+  "packages/design-system",
+  "packages/schema/migrations",
+  "packages/schema/src",
+];
+
+describe("which paths are an image's inputs", () => {
+  it("counts every Dockerfile, ignore file and probe build.yml names", () => {
+    const named = imageLegs().flatMap((leg) => [
+      leg.dockerfile,
+      ...[path.posix.join(leg.context, ".dockerignore")].filter((ignore) =>
+        existsSync(path.join(repositoryRoot, ignore)),
+      ),
+      ...probeFilesOf(leg),
+    ]);
+
+    expect(imageLegs().length).toBeGreaterThan(2);
+    expect(
+      imageLegs().filter((leg) => probeFilesOf(leg).length !== 1),
+      "a leg's probe names no file this reading can find, or names one in two workspaces",
+    ).toEqual([]);
+    expect(
+      named.filter((input) => imagesOf([input]) !== "yes"),
+      "a change to what build.yml builds or probes would leave the probes deferred",
+    ).toEqual([]);
+  });
+
+  it("counts everything a Dockerfile copies except the source", () => {
+    const copied = [...new Set(imageLegs().flatMap(copiedBy))];
+    const misread = copied.filter(
+      (source) => imagesOf([aChangeTo(source)]) !== (COPIED_SOURCE.includes(source) ? "no" : "yes"),
+    );
+
+    expect(copied.length).toBeGreaterThan(10);
+    expect(
+      misread,
+      "a Dockerfile copies a path the lane script does not count as an input, or counts source it was told to leave. Add it to the script's list, or to COPIED_SOURCE.",
+    ).toEqual([]);
+    expect(
+      COPIED_SOURCE.filter((source) => !copied.includes(source)),
+      "COPIED_SOURCE names a path no Dockerfile copies",
+    ).toEqual([]);
+  });
+
+  it("names only paths the tree has", () => {
+    const list = /const IMAGE_INPUTS = \[(?<list>[^\]]*)\]/.exec(read(LANE_SCRIPT))?.groups?.[
+      "list"
+    ];
+    const listed = [...(list ?? "").matchAll(/"(?<input>[^"]+)"/g)].map(
+      (found) => found.groups?.["input"] ?? "",
+    );
+
+    expect(listed.length).toBeGreaterThan(10);
+    expect(
+      listed.filter((input) => !existsSync(path.join(repositoryRoot, input))),
+      "the lane script names an image input the tree no longer has",
+    ).toEqual([]);
   });
 });
 
@@ -403,16 +535,18 @@ const LANE = "lane";
 /** The branch ruleset's required context, and the job build.yml's `image` waits on. */
 const FAN_IN = "check";
 
-/** No lane's leg: a pull request's title is read whichever lane its paths chose. */
+/** No lane's leg, though its name starts like the pr lane's: it reads the title in the queue too. */
 const TITLE_JOB = "pr-title";
 
 const checkJobs = (): Readonly<Record<string, Job>> => workflow("check.yml").jobs;
 
 /** The fan-in reads the prefix to decide what it requires, so it is load-bearing, not tidiness. */
 const legsOf = (lane: string): readonly string[] =>
-  Object.keys(checkJobs()).filter((job) => job.startsWith(`${lane}-`));
+  Object.keys(checkJobs()).filter((job) => job.startsWith(`${lane}-`) && job !== TITLE_JOB);
 
 const stepsOfJob = (job: string): readonly Step[] => checkJobs()[job]?.steps ?? [];
+
+const laneStep = (): string => stepsOfJob(LANE).find((one) => one.id === LANE)?.run ?? "exit 9";
 
 const toolOf = (step: Step): string => step.uses ?? step.run ?? "";
 
@@ -424,19 +558,158 @@ const NARROWED: Readonly<Record<string, readonly string[]>> = {
   "check:workspaces": ["check:libraries", "check:api", "check:web"],
 };
 
-/**
- * The affected lane narrows the same step by asking rather than by naming: one script, whose
- * workspaces are the filter's answer.
- */
-const BY_THE_FILTER: Readonly<Record<string, string>> = { "check:affected": "check:workspaces" };
-
 const wholeGateOf = (gate: string): string =>
-  BY_THE_FILTER[gate] ??
-  Object.entries(NARROWED).find(([, parts]) => parts.includes(gate))?.[0] ??
-  gate;
+  Object.entries(NARROWED).find(([, parts]) => parts.includes(gate))?.[0] ?? gate;
 
-/** The lanes that run the root check's gates. The docs lane runs the prose suites, held above. */
-const CODE_LANES = ["full", "affected"] as const;
+/** The lane that runs the root check's gates. The docs lane runs the prose suites, held above. */
+const CODE_LANE = "full";
+
+const A_BASE = "0123456789abcdef0123456789abcdef01234567";
+
+type LaneStepCase = {
+  readonly run: string;
+
+  readonly event: Readonly<Record<string, string>>;
+
+  /** Whether the stubbed `git fetch` finds the base. */
+  readonly fetched: boolean;
+
+  readonly changed: readonly string[];
+
+  readonly lane: string;
+
+  readonly images: string;
+};
+
+const LANE_STEPS: readonly LaneStepCase[] = [
+  {
+    run: "a pull request",
+    event: { EVENT: "pull_request" },
+    fetched: true,
+    changed: ["pnpm-lock.yaml"],
+    lane: "pr",
+    images: "yes",
+  },
+  {
+    run: "a docs-only merge group",
+    event: { EVENT: "merge_group", MERGE_GROUP_BASE: A_BASE },
+    fetched: true,
+    changed: ["docs/vision.md"],
+    lane: "docs",
+    images: "no",
+  },
+  {
+    run: "a merge group changing source",
+    event: { EVENT: "merge_group", MERGE_GROUP_BASE: A_BASE },
+    fetched: true,
+    changed: ["apps/api/src/main.ts"],
+    lane: "full",
+    images: "no",
+  },
+  {
+    run: "a merge group changing a lockfile",
+    event: { EVENT: "merge_group", MERGE_GROUP_BASE: A_BASE },
+    fetched: true,
+    changed: ["apps/api/src/main.ts", "pnpm-lock.yaml"],
+    lane: "full",
+    images: "yes",
+  },
+  {
+    run: "an unfetched merge group base",
+    event: { EVENT: "merge_group", MERGE_GROUP_BASE: A_BASE },
+    fetched: false,
+    changed: ["docs/vision.md"],
+    lane: "full",
+    images: "yes",
+  },
+  {
+    run: "a merge group with no base",
+    event: { EVENT: "merge_group" },
+    fetched: true,
+    changed: ["docs/vision.md"],
+    lane: "full",
+    images: "yes",
+  },
+  {
+    run: "a branch's first push",
+    event: { EVENT: "push", PUSHED_FROM: "0".repeat(40) },
+    fetched: true,
+    changed: ["docs/vision.md"],
+    lane: "full",
+    images: "yes",
+  },
+  {
+    run: "a called run changing source",
+    event: { EVENT: "workflow_call", PUSHED_FROM: A_BASE },
+    fetched: true,
+    changed: ["packages/core/src/kernel/actor.ts"],
+    lane: "full",
+    images: "no",
+  },
+];
+
+type LaneStepRun = {
+  readonly status: number | null;
+
+  readonly published: Decision;
+
+  /** The git subcommands the step ran, in order. */
+  readonly asked: readonly string[];
+
+  readonly output: string;
+};
+
+const stub = (bin: string, name: string, script: string): void => {
+  writeFileSync(path.join(bin, name), `#!/bin/sh\n${script}`);
+  chmodSync(path.join(bin, name), 0o755);
+};
+
+/** Over a `git` that answers from `changed` and fetches nothing; `answered` replaces the script's. */
+const runTheLaneStep = (
+  { event, fetched, changed }: LaneStepCase,
+  answered?: string,
+): LaneStepRun => {
+  const scratch = mkdtempSync(path.join(tmpdir(), "lane-step-"));
+  const bin = path.join(scratch, "bin");
+  const diffed = path.join(scratch, "changed");
+  const asked = path.join(scratch, "asked");
+  const published = path.join(scratch, "published");
+  mkdirSync(bin);
+  writeFileSync(diffed, changed.map((changedPath) => `${changedPath}\0`).join(""));
+  writeFileSync(asked, "");
+  writeFileSync(published, "");
+  stub(
+    bin,
+    "git",
+    `echo "$1" >> '${asked}'\ncase "$1" in\n  fetch) exit ${fetched ? 0 : 128} ;;\n  diff) cat '${diffed}' ;;\n  *) exit 3 ;;\nesac\n`,
+  );
+  if (answered !== undefined) stub(bin, "node", `printf '${answered}'\n`);
+  const ran = spawnSync("bash", ["--noprofile", "--norc", "-eo", "pipefail", "-c", laneStep()], {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      PATH: `${bin}:${process.env["PATH"] ?? ""}`,
+      RUNNER_TEMP: scratch,
+      GITHUB_OUTPUT: published,
+      EVENT: "",
+      MERGE_GROUP_BASE: "",
+      PUSHED_FROM: "",
+      ...event,
+    },
+  });
+  const outputs = readFileSync(published, "utf8");
+  const run = {
+    status: ran.status,
+    published: { lane: answerOf(outputs, "lane"), images: answerOf(outputs, "images") },
+    asked: readFileSync(asked, "utf8")
+      .split("\n")
+      .filter((line) => line !== ""),
+    output: `${ran.stdout}${ran.stderr}`,
+  };
+  rmSync(scratch, { recursive: true, force: true });
+  return run;
+};
 
 describe("the lane inside check.yml", () => {
   it("reports on merge groups under the job the ruleset requires", () => {
@@ -460,12 +733,10 @@ describe("the lane inside check.yml", () => {
   it("decides the lane once, in a job installing nothing", () => {
     const decider = checkJobs()[LANE];
     const steps = decider?.steps ?? [];
-    const decided = steps.find((step) => step.id === LANE)?.run ?? "";
 
     expect(decider?.outputs).toEqual({
       lane: `\${{ steps.${LANE}.outputs.lane }}`,
-      base: `\${{ steps.${LANE}.outputs.base }}`,
-      worker: `\${{ steps.${LANE}.outputs.worker }}`,
+      images: `\${{ steps.${LANE}.outputs.images }}`,
     });
     expect(steps.map(toolOf).filter((tool) => tool.startsWith("actions/checkout@"))).toHaveLength(
       1,
@@ -475,22 +746,51 @@ describe("the lane inside check.yml", () => {
       "the lane job installs a toolchain every leg then installs again",
     ).toEqual([]);
 
-    expect(decided).toContain("pull_request) base=");
-    expect(decided).toContain("merge_group) base=");
-    expect(decided).toContain("push | workflow_call) base=");
-    expect(decided).toContain("lane=full");
+    expect(laneStep()).toContain(LANE_SCRIPT);
+    expect(laneStep()).toContain("git diff -z --name-only --no-renames");
+    expect(laneStep(), "the step splices a context into the shell").not.toContain("${{");
+  });
 
-    expect(decided).toContain("docs | affected | full) ;;");
-    expect(decided).toContain("yes | no) ;;");
+  it.each(LANE_STEPS)("puts $run in $lane", (scenario: LaneStepCase) => {
+    const run = runTheLaneStep(scenario);
 
-    expect(
-      decided,
-      "the affected lane is a pull request's alone: merge-time checks are the whole",
-    ).toContain('[ "${EVENT}" != "pull_request" ]');
+    expect(run.status, `the step printed: ${run.output}`).toBe(0);
+    expect(run.published).toEqual({ lane: scenario.lane, images: scenario.images });
+  });
 
-    expect(decided).toContain(LANE_SCRIPT);
+  it("asks git nothing on a pull request", () => {
+    const asked = LANE_STEPS.filter((scenario) => scenario.event["EVENT"] === "pull_request").map(
+      (scenario) => runTheLaneStep(scenario).asked,
+    );
 
-    expect(decided).toContain("git diff -z --name-only --no-renames");
+    expect(asked, "a pull request's run diffs a base, which only the queue's run reads").toEqual([
+      [],
+    ]);
+  });
+
+  it.each([
+    {
+      word: "the retired affected lane",
+      answered: "lane=affected\\nimages=no\\n",
+      says: "no lane",
+    },
+    { word: "an images answer of maybe", answered: "lane=full\\nimages=maybe\\n", says: "neither" },
+  ])("refuses $word, publishing nothing", ({ answered, says }) => {
+    const run = runTheLaneStep(
+      {
+        run: "a merge group",
+        event: { EVENT: "merge_group", MERGE_GROUP_BASE: A_BASE },
+        fetched: true,
+        changed: ["docs/vision.md"],
+        lane: "",
+        images: "",
+      },
+      answered,
+    );
+
+    expect(run.status, `the step printed: ${run.output}`).not.toBe(0);
+    expect(run.output).toContain(says);
+    expect(run.published).toEqual({ lane: "", images: "" });
   });
 
   it("runs every leg on the lane its name starts with", () => {
@@ -498,11 +798,7 @@ describe("the lane inside check.yml", () => {
       ([job]) => job !== LANE && job !== FAN_IN && job !== TITLE_JOB,
     );
 
-    expect(legs.map(([job]) => job)).toEqual([
-      ...legsOf("docs"),
-      ...legsOf("full"),
-      ...legsOf("affected"),
-    ]);
+    expect(legs.map(([job]) => job)).toEqual([...legsOf("docs"), ...legsOf("full")]);
     for (const [job, leg] of legs) {
       const lane = job.slice(0, job.indexOf("-"));
 
@@ -512,6 +808,16 @@ describe("the lane inside check.yml", () => {
       ).toEqual(`\${{ needs.${LANE}.outputs.lane == '${lane}' }}`);
       expect(leg.needs).toEqual(LANE);
     }
+  });
+
+  it("runs a leg on every lane but the pull request's", () => {
+    const words =
+      /^\s*(?<words>[a-z]+(?: \| [a-z]+)*)\) ;;$/m
+        .exec(laneStep())
+        ?.groups?.["words"]?.split(" | ") ?? [];
+
+    expect(words).toEqual(["pr", "docs", "full"]);
+    expect(words.map((lane) => legsOf(lane).length)).toEqual([0, 1, 4]);
   });
 
   it("gives the docs lane one job with no unused setup", () => {
@@ -546,57 +852,48 @@ type Setup = {
 const SETUP: readonly Setup[] = [
   {
     tool: "pnpm install --frozen-lockfile",
-    onlyOn: [
-      "docs-gates",
-      "full-root",
-      "full-api",
-      "full-web",
-      "affected-gates",
-      "affected-workspaces",
-      TITLE_JOB,
-    ],
+    onlyOn: ["docs-gates", "full-root", "full-api", "full-web", TITLE_JOB],
     because:
-      "every leg that runs a pnpm workspace's own gates needs the tree installed, as does the title's commitlint; the worker's gates are uv's and its legs only spawn the runner",
+      "every leg that runs a pnpm workspace's own gates needs the tree installed, as does the title's commitlint; the worker's gates are uv's and its leg only spawns the runner",
   },
   {
     tool: "astral-sh/setup-uv@",
-    onlyOn: ["full-root", "full-api", "full-worker", "affected-workspaces", "affected-worker"],
+    onlyOn: ["full-root", "full-api", "full-worker"],
     because:
       "the worker's gates are uv's, packages/devtools runs ruff and mypy out of the same environment, and the api's hook suite asks the binary itself whether it is there",
   },
   {
     tool: "uv sync --frozen",
-    onlyOn: ["full-root", "full-api", "full-worker", "affected-workspaces", "affected-worker"],
+    onlyOn: ["full-root", "full-api", "full-worker"],
     because:
       "the binary alone runs nothing: a leg that spawns the worker, whether for its own gates or from a suite in the other tier, needs the environment the lockfile names",
   },
   {
     tool: "actions/cache@",
-    onlyOn: ["full-root", "full-api", "full-worker", "affected-workspaces", "affected-worker"],
+    onlyOn: ["full-root", "full-api", "full-worker"],
     because:
       "the only cache with a key here is the redaction detector's weights, and every leg that spawns the worker over an index job loads them",
   },
   {
     tool: "./.github/actions/git-filter-repo",
-    onlyOn: ["full-root", "full-api", "affected-workspaces"],
+    onlyOn: ["full-root", "full-api"],
     because:
-      "each leg reaches the erasure routine's git step — packages/core through the erasure suite, apps/api through the rehearsal's phase two, the filter through whichever of them it selects — and the hosted Ubuntu runner carries no such tool",
+      "each leg reaches the erasure routine's git step — packages/core through the erasure suite, apps/api through the rehearsal's phase two — and the hosted Ubuntu runner carries no such tool",
   },
   {
     tool: "playwright install",
-    onlyOn: ["full-web", "affected-workspaces"],
-    because:
-      "the browser suite over the served build is the SPA's last gate, and the filter cannot say whether the SPA is in its answer until it has been asked",
+    onlyOn: ["full-web"],
+    because: "the browser suite over the served build is the SPA's last gate",
   },
   {
     tool: "docker/setup-buildx-action@",
-    onlyOn: ["full-api", "full-worker", "affected-workspaces", "affected-worker"],
+    onlyOn: ["full-api", "full-worker"],
     because:
       "the daemon's own driver cannot import a type=gha cache, so a leg that builds an image without this builder is green and cold",
   },
   {
     tool: "crazy-max/ghaction-github-runtime@",
-    onlyOn: ["full-api", "full-worker", "affected-workspaces", "affected-worker"],
+    onlyOn: ["full-api", "full-worker"],
     because:
       "a runner hands the ACTIONS_* variables to an action and to no run: step, so the builds those legs run from inside a suite cannot reach the cache without it",
   },
@@ -613,23 +910,6 @@ describe("what each leg of check.yml installs", () => {
     }
   });
 
-  it("matches the two worker legs' steps, gating the affected leg's", () => {
-    const WORKERS = "worker == 'yes'";
-    const full = stepsOfJob("full-worker").map(toolOf);
-    const affected = stepsOfJob("affected-worker");
-
-    expect(
-      full.filter((tool) => !affected.map(toolOf).includes(tool)),
-      "a step the full lane's worker leg runs is missing from the affected lane's, so the two tiers' runs read different trees",
-    ).toEqual([]);
-    expect(
-      affected
-        .filter((step) => full.includes(toolOf(step)))
-        .filter((step) => !conditionOf(step).includes(WORKERS)),
-      "a step on the affected lane's worker leg runs whether or not the change reached the worker",
-    ).toEqual([]);
-  });
-
   it("names only existing legs for every tool", () => {
     const legs = Object.keys(checkJobs());
 
@@ -638,10 +918,10 @@ describe("what each leg of check.yml installs", () => {
   });
 });
 
-describe.each(CODE_LANES)("the %s lane's legs against the one list of gates", (lane: string) => {
+describe("the full lane's legs against the one list of gates", () => {
   it("runs exactly the root check's gates across its legs", () => {
     const ran: string[] = [];
-    for (const gate of legsOf(lane).flatMap(gatesOf)) {
+    for (const gate of legsOf(CODE_LANE).flatMap(gatesOf)) {
       const whole = wholeGateOf(gate);
       if (!ran.includes(whole)) ran.push(whole);
     }
@@ -653,7 +933,7 @@ describe.each(CODE_LANES)("the %s lane's legs against the one list of gates", (l
   });
 
   it("runs each gate on one leg only", () => {
-    const ran = legsOf(lane).flatMap(gatesOf);
+    const ran = legsOf(CODE_LANE).flatMap(gatesOf);
 
     expect(ran.filter((gate, at) => ran.indexOf(gate) !== at)).toEqual([]);
     expect(ran.filter((gate) => rootScripts()[gate] === undefined)).toEqual([]);
@@ -661,19 +941,14 @@ describe.each(CODE_LANES)("the %s lane's legs against the one list of gates", (l
 });
 
 describe("how the legs narrow check:workspaces", () => {
-  const ran = (): readonly string[] => CODE_LANES.flatMap((lane) => legsOf(lane).flatMap(gatesOf));
-
   it("narrows a step only into root scripts the legs run", () => {
-    const narrowings = [
-      ...Object.entries(NARROWED),
-      ...Object.entries(BY_THE_FILTER).map(([part, whole]) => [whole, [part]] as const),
-    ];
+    const ran = legsOf(CODE_LANE).flatMap(gatesOf);
 
-    for (const [whole, parts] of narrowings) {
+    for (const [whole, parts] of Object.entries(NARROWED)) {
       expect(rootScripts()[whole], `${whole} is not a root script`).toBeDefined();
       expect(parts.filter((part) => rootScripts()[part] === undefined)).toEqual([]);
       expect(
-        parts.filter((part) => !ran().includes(part)),
+        parts.filter((part) => !ran.includes(part)),
         `${whole} is narrowed past the legs`,
       ).toEqual([]);
     }
@@ -689,61 +964,146 @@ describe("how the legs narrow check:workspaces", () => {
       "a workspace with a check script is on no leg, or is on two. The legs run check:workspaces between them or they do not run it at all.",
     ).toEqual([...workspacesGated()].sort());
   });
-
-  it("asks the filter for touched workspaces and their dependents", () => {
-    const filtered = rootScripts()["check:affected"] ?? "";
-
-    expect(
-      filtered,
-      "the affected lane's script no longer asks pnpm which workspaces changed since the base",
-    ).toContain('--filter "...[${BASE}]"');
-    expect(filtered).toContain("--no-bail");
-    expect(filtered).toContain("--if-present");
-    expect(
-      filtered,
-      "pnpm maps a root file to the workspace root's own project, whose check is the whole run",
-    ).toContain("--filter '!better-answers'");
-    expect(rootName(), "the workspace root was renamed and the exclusion above was not").toEqual(
-      "better-answers",
-    );
-  });
-
-  it("guards the same selection, minus workspaces that run no gate", () => {
-    const selectors = (script: string): readonly string[] =>
-      [...(rootScripts()[script] ?? "").matchAll(/--filter\s+(?<selector>"[^"]*"|'[^']*')/g)].map(
-        (found) => found.groups?.["selector"] ?? "",
-      );
-
-    expect(
-      selectors("check:affected:scope"),
-      "the guard counts a workspace with no check script, so a selection of only those would pass it having run nothing — or it reads a different selection from the run it guards",
-    ).toEqual([
-      ...selectors("check:affected"),
-      ...workspacesWithNoCheck().map((name) => `'!${name}'`),
-    ]);
-    expect(selectors("check:affected")).toHaveLength(2);
-    expect(workspacesWithNoCheck().length).toBeGreaterThan(0);
-  });
-
-  it("brings a workspace's dependents with it through the `...` prefix", () => {
-    const listed = spawnSync(
-      "pnpm",
-      ["--filter", "...@better-answers/core", "list", "--depth", "-1", "--parseable"],
-      { cwd: repositoryRoot, encoding: "utf8" },
-    );
-    const selected = listed.stdout
-      .split("\n")
-      .filter((line) => line.startsWith(repositoryRoot) && line !== repositoryRoot)
-      .map((line) => path.relative(repositoryRoot, line))
-      .sort();
-
-    expect(listed.status, `pnpm ended non-zero: ${listed.stderr}`).toBe(0);
-    expect(
-      selected,
-      "a change to packages/core no longer pays for the workspaces that import it",
-    ).toEqual(["apps/api", "apps/web", "packages/core"]);
-  });
 });
+
+type VerdictCase = {
+  readonly verdict: "passes" | "fails";
+
+  readonly run: string;
+
+  readonly lane: string;
+
+  /** The legs that ended in success; every other leg was skipped. */
+  readonly ran: readonly string[];
+
+  readonly title: string;
+
+  readonly wanted: string;
+
+  /** Drops the lane's legs from the jobs the verdict reads, as a lane with no leg would. */
+  readonly withoutItsLegs?: boolean;
+
+  readonly says?: string;
+};
+
+const PROVED_NOTHING = "proved nothing";
+
+const FULL_LEGS = ["full-root", "full-api", "full-web", "full-worker"];
+
+const VERDICTS: readonly VerdictCase[] = [
+  {
+    verdict: "passes",
+    run: "a pull request whose title passed",
+    lane: "pr",
+    ran: [],
+    title: "success",
+    wanted: "success",
+  },
+  {
+    verdict: "fails",
+    run: "a pull request whose title failed",
+    lane: "pr",
+    ran: [],
+    title: "failure",
+    wanted: "success",
+  },
+  {
+    verdict: "fails",
+    run: "a pull request that ran a suite",
+    lane: "pr",
+    ran: ["full-api"],
+    title: "success",
+    wanted: "success",
+  },
+  {
+    verdict: "fails",
+    run: "a pr lane that read no title",
+    lane: "pr",
+    ran: [],
+    title: "skipped",
+    wanted: "skipped",
+    says: PROVED_NOTHING,
+  },
+  {
+    verdict: "passes",
+    run: "a docs merge group",
+    lane: "docs",
+    ran: ["docs-gates"],
+    title: "success",
+    wanted: "success",
+  },
+  {
+    verdict: "fails",
+    run: "a merge group whose title failed",
+    lane: "docs",
+    ran: ["docs-gates"],
+    title: "failure",
+    wanted: "success",
+  },
+  {
+    verdict: "passes",
+    run: "a full push",
+    lane: "full",
+    ran: FULL_LEGS,
+    title: "skipped",
+    wanted: "skipped",
+  },
+  {
+    verdict: "fails",
+    run: "a full merge group missing a leg",
+    lane: "full",
+    ran: FULL_LEGS.slice(1),
+    title: "success",
+    wanted: "success",
+  },
+  {
+    verdict: "fails",
+    run: "a docs run with no leg to require",
+    lane: "docs",
+    ran: [],
+    title: "success",
+    wanted: "success",
+    withoutItsLegs: true,
+    says: PROVED_NOTHING,
+  },
+  {
+    verdict: "fails",
+    run: "a full run with no leg to require",
+    lane: "full",
+    ran: [],
+    title: "skipped",
+    wanted: "skipped",
+    withoutItsLegs: true,
+    says: PROVED_NOTHING,
+  },
+];
+
+const verdictOn = ({
+  lane,
+  ran,
+  title,
+  wanted,
+  withoutItsLegs,
+}: VerdictCase): SpawnSyncReturns<string> => {
+  const legs = Object.keys(checkJobs())
+    .filter((job) => job !== FAN_IN && job !== LANE && job !== TITLE_JOB)
+    .filter((job) => withoutItsLegs !== true || !job.startsWith(`${lane}-`))
+    .map((job) => [job, { result: ran.includes(job) ? "success" : "skipped" }] as const);
+
+  return spawnSync("bash", ["-e", "-c", stepsOfJob(FAN_IN)[0]?.run ?? "exit 9"], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      LANE: lane,
+      LEGS: JSON.stringify({
+        ...Object.fromEntries(legs),
+        [LANE]: { result: "success" },
+        [TITLE_JOB]: { result: title },
+      }),
+      TITLE_WANTED: wanted,
+    },
+  });
+};
 
 describe("the one verdict check.yml reports", () => {
   it("hangs the required context off every leg, whatever they did", () => {
@@ -794,32 +1154,16 @@ describe("the one verdict check.yml reports", () => {
     );
   });
 
-  it.each([
-    { verdict: "passes", event: "a pull request", wanted: "success", title: "success" },
-    { verdict: "fails", event: "a merge group", wanted: "success", title: "failure" },
-    { verdict: "passes", event: "a push", wanted: "skipped", title: "skipped" },
-  ])("$verdict on $event whose title job ended $title", ({ verdict, wanted, title }) => {
-    const legs = Object.fromEntries(
-      Object.keys(checkJobs())
-        .filter((job) => job !== FAN_IN)
-        .map((job) => [job, { result: job.startsWith("docs-") ? "success" : "skipped" }]),
-    );
-    const ran = spawnSync("bash", ["-e", "-c", stepsOfJob(FAN_IN)[0]?.run ?? "exit 9"], {
-      encoding: "utf8",
-      env: {
-        ...process.env,
-        LANE: "docs",
-        LEGS: JSON.stringify({
-          ...legs,
-          [LANE]: { result: "success" },
-          [TITLE_JOB]: { result: title },
-        }),
-        TITLE_WANTED: wanted,
-      },
-    });
+  it.each(VERDICTS)("$verdict on $run", (scenario: VerdictCase) => {
+    const ran = verdictOn(scenario);
 
-    expect(ran.status === 0 ? "passes" : "fails", `${ran.stdout}${ran.stderr}`).toEqual(verdict);
-    expect(ran.stdout).toContain(`${TITLE_JOB}: ${title} (this lane wants ${wanted})`);
+    expect(ran.status === 0 ? "passes" : "fails", `${ran.stdout}${ran.stderr}`).toEqual(
+      scenario.verdict,
+    );
+    expect(ran.stdout).toContain(
+      `${TITLE_JOB}: ${scenario.title} (this lane wants ${scenario.wanted})`,
+    );
+    expect(ran.stdout).toContain(scenario.says ?? "");
   });
 });
 
