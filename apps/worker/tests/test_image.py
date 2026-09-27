@@ -244,6 +244,30 @@ def development_only_distributions() -> list[str]:
     return sorted(development - runtime)
 
 
+def pinned_converter_versions() -> dict[str, str | None]:
+    declared = {
+        _distribution_name(each): each
+        for each in _requirements("project", "dependencies")
+    }
+    exact = {
+        name: re.fullmatch(rf"{re.escape(name)}==(\S+)", declared.get(name, ""))
+        for name in CONVERTER_DISTRIBUTIONS
+    }
+    return {
+        name: None if found is None else found.group(1) for name, found in exact.items()
+    }
+
+
+def locked_versions() -> dict[str, set[str]]:
+    with (WORKSPACE / "uv.lock").open("rb") as handle:
+        packages = tomllib.load(handle)["package"]
+    locked: dict[str, set[str]] = {}
+    for package in packages:
+        versions = locked.setdefault(str(package["name"]), set())
+        versions.add(str(package.get("version", "")))
+    return locked
+
+
 def pinned_python_version() -> tuple[int, int]:
     pinned = (WORKSPACE / ".python-version").read_text("utf-8").strip()
     major, _, minor = pinned.partition(".")
@@ -458,6 +482,12 @@ def installed(name):
         return False
     return True
 
+def version_of(name):
+    try:
+        return metadata.version(name)
+    except metadata.PackageNotFoundError:
+        return ""
+
 def imports(name):
     try:
         importlib.import_module(name)
@@ -513,6 +543,9 @@ sys.stdout.write(json.dumps({
     "library_file_count": library_file_count,
     "unrecorded_library_files": unrecorded_library_files,
     "imports": {n: imports(n) for n in json.loads(os.environ["PROBE_IMPORTS"])},
+    "versions": {
+        n: version_of(n) for n in json.loads(os.environ["PROBE_DISTRIBUTIONS"])
+    },
     "has_tests": os.path.isdir(os.environ["PROBE_TESTS"]),
     "weights": {m: cached(m) for m in json.loads(os.environ["PROBE_MODEL_IDS"])},
     "spacy_pipeline": pipeline(os.environ["PROBE_SPACY_PIPELINE"]),
@@ -787,6 +820,7 @@ class ImageContents:
     library_file_count: int
     unrecorded_library_files: tuple[str, ...]
     imports: Mapping[str, bool]
+    versions: Mapping[str, str]
     has_tests: bool
     weights: Mapping[str, bool]
     spacy_pipeline: bool
@@ -818,6 +852,9 @@ def _read_contents(stdout: str) -> ImageContents:
             str(path) for path in answered["unrecorded_library_files"]
         ),
         imports={str(name): bool(found) for name, found in answered["imports"].items()},
+        versions={
+            str(name): str(version) for name, version in answered["versions"].items()
+        },
         has_tests=bool(answered["has_tests"]),
         weights={
             str(model): bool(found) for model, found in answered["weights"].items()
@@ -1008,6 +1045,7 @@ def contents(image: str) -> ImageContents:
             {
                 "PROBE_DEVELOPMENT": json.dumps(development_only_distributions()),
                 "PROBE_IMPORTS": json.dumps(list(PROBED_IMPORTS)),
+                "PROBE_DISTRIBUTIONS": json.dumps(list(CONVERTER_DISTRIBUTIONS)),
                 "PROBE_TESTS": TESTS_IN_THE_IMAGE,
                 "PROBE_MODEL_IDS": json.dumps(list(pinned_model_ids())),
                 "PROBE_SPACY_PIPELINE": _pin("SPACY_MODEL"),
@@ -1027,11 +1065,14 @@ def test_the_image_carries_no_development_dependency(
     assert list(contents.development) == []
 
 
+def test_the_tier_pins_the_python_its_manifest_requires() -> None:
+    assert pinned_python_version() == required_python_floor()
+
+
 def test_the_image_runs_the_interpreter_this_tier_says_it_requires(
     contents: ImageContents,
 ) -> None:
 
-    assert pinned_python_version() == required_python_floor()
     assert contents.version[:2] == pinned_python_version()
 
 
@@ -1070,16 +1111,20 @@ def test_the_image_carries_no_shell_package_manager_or_installer_wheel(
     assert contents.bundled_wheels == ()
 
 
-def test_the_health_check_and_the_command_run_without_a_shell(
-    contents: ImageContents,
-) -> None:
+def test_the_health_check_and_command_are_written_in_exec_form() -> None:
     dockerfile = DOCKERFILE.read_text("utf-8")
     health = exec_form(dockerfile, "HEALTHCHECK")
-    major, minor = pinned_python_version()
 
     assert health is not None
     assert exec_form(dockerfile, "CMD") is not None
     assert worker_health_check() == ["CMD", *health]
+
+
+def test_the_command_runs_on_the_images_python_not_a_shell(
+    contents: ImageContents,
+) -> None:
+    major, minor = pinned_python_version()
+
     assert contents.command_interpreter == f"/usr/local/bin/python{major}.{minor}"
 
 
@@ -1135,15 +1180,17 @@ def test_the_image_carries_both_converters_at_their_pinned_versions(
     assert {
         name: contents.imports[name] for name in CONVERTER_IMPORTS
     } == dict.fromkeys(CONVERTER_IMPORTS, True)
+    assert dict(contents.versions) == pinned_converter_versions()
 
-    pinned = {
-        _distribution_name(each): each
-        for each in _requirements("project", "dependencies")
+
+def test_each_converter_is_pinned_exactly_at_the_locked_version() -> None:
+    pinned = pinned_converter_versions()
+    locked = locked_versions()
+
+    assert None not in pinned.values(), pinned
+    assert {name: locked.get(name) for name in CONVERTER_DISTRIBUTIONS} == {
+        name: {version} for name, version in pinned.items()
     }
-    assert [pinned.get(name) for name in CONVERTER_DISTRIBUTIONS] == [
-        "firecrawl-anydoc==0.2.4",
-        "pdf-inspector==1.24.0",
-    ]
 
 
 def test_the_image_carries_every_library_the_host_composes(
@@ -1163,7 +1210,6 @@ def test_the_image_carries_the_running_model_not_the_measured_one(
         _pin("GLINER_MODEL_ID"): True,
         _pin("GLINER_MODEL_ID_MEASURED"): False,
     }
-    assert len(pinned_model_ids()) == 2
     assert contents.spacy_pipeline is True
 
 
@@ -1214,14 +1260,11 @@ def test_the_deploy_unit_mounts_nothing_over_the_images_suffix_list() -> None:
     assert worker_mounts_over(worker_environment("TLDEXTRACT_CACHE")) == []
 
 
-def test_the_build_runs_the_weights_module_to_fetch_them(
-    contents: ImageContents,
-) -> None:
-
+def test_the_build_runs_the_weights_module_to_fetch_them() -> None:
     dockerfile = DOCKERFILE.read_text("utf-8")
 
     assert WEIGHTS_MODULE in dockerfile
-    assert contents.hf_home in dockerfile
+    assert worker_environment("HF_HOME") in dockerfile
 
 
 def test_the_runtime_stage_copies_the_source_last() -> None:
