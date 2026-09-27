@@ -2,7 +2,14 @@ import type { APIRequestContext, Page } from "@playwright/test";
 
 import { goHome, unbuiltLineOf, UNKNOWN_SCREEN } from "@/app/words.ts";
 import { aRole, ROLES } from "@/features/people/role-meanings.ts";
-import { CONTROL_CENTRE, viewAt, type Role } from "@/shared/screens.ts";
+import {
+  CONTROL_CENTRE,
+  controlCentreOpensAt,
+  HOMES,
+  READER_SURFACE,
+  viewAt,
+  type Role,
+} from "@/shared/screens.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -11,9 +18,13 @@ import {
   landedAtHome,
   person,
   provision,
+  quoted,
   signIn,
   skipLinkReachesTheScreen,
+  tabUntilFocused,
 } from "./harness.ts";
+
+const READ_BUDGET_MS = 1000;
 
 /** Every role joins the same way, so the Admin here differs from the others by role alone. */
 const signedInAs = async (page: Page, api: APIRequestContext, role: Role) => {
@@ -29,8 +40,21 @@ const signedInAs = async (page: Page, api: APIRequestContext, role: Role) => {
 const unknownScreen = (page: Page) =>
   page.getByRole("heading", { level: 1, name: UNKNOWN_SCREEN.heading });
 
+const personMenu = (page: Page, role: Role) =>
+  page.getByRole("banner").getByRole("button", { name: `A ${role}` });
+
+/** Radix focuses the menu's first entry when a key opens it, and each surface's link comes first. */
+const firstInThePersonMenu = async (page: Page, role: Role, name: string) => {
+  await tabUntilFocused(page, personMenu(page, role));
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("menuitem", { name })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("menuitem")).toHaveCount(0);
+  await expect(personMenu(page, role)).toBeFocused();
+};
+
 for (const role of ROLES) {
-  const home = CONTROL_CENTRE.homes[role];
+  const home = HOMES[role];
 
   test(`lands ${aRole(role)} on ${home.name} after sign-in`, async ({ page, request }) => {
     await signedInAs(page, request, role);
@@ -63,7 +87,7 @@ test("offers a Viewer's home from an unknown view, shell kept", async ({
   request,
   passesTheAccessibilityGate,
 }) => {
-  const home = CONTROL_CENTRE.homes.Viewer;
+  const home = HOMES.Viewer;
   await signedInAs(page, request, "Viewer");
   await landedAtHome(page, "Viewer");
 
@@ -81,20 +105,55 @@ test("offers a Viewer's home from an unknown view, shell kept", async ({
 });
 
 for (const role of ["Editor", "Viewer"] as const) {
-  test(`tells ${aRole(role)} on Questions to ask in Claude meanwhile`, async ({
-    page,
-    request,
-  }) => {
-    const home = CONTROL_CENTRE.homes[role];
-    const view = viewAt(CONTROL_CENTRE, home.defaultView);
+  test(`tells ${aRole(role)} on Ask to ask in Claude meanwhile`, async ({ page, request }) => {
+    const home = HOMES[role];
+    const view = viewAt(READER_SURFACE, home.defaultView);
     await signedInAs(page, request, role);
     await landedAtHome(page, role);
 
+    await expect(page.getByRole("navigation", { name: READER_SURFACE.name })).toMatchAriaSnapshot(`
+      - navigation ${quoted(READER_SURFACE.name)}:
+        - list:
+          - /children: equal
+          - listitem:
+            - link ${quoted(home.name)}
+    `);
+    await expect(page.getByRole("navigation", { name: CONTROL_CENTRE.name })).toHaveCount(0);
     await expect(page.getByRole("main")).toMatchAriaSnapshot(`
       - main "Screen":
-        - heading ${JSON.stringify(home.name)} [level=1]
-        - heading ${JSON.stringify(view?.name)} [level=2]
-        - paragraph: ${JSON.stringify(unbuiltLineOf(home))}
+        - heading ${quoted(home.name)} [level=1]
+        - heading ${quoted(view?.name ?? "")} [level=2]
+        - paragraph: ${quoted(unbuiltLineOf(home))}
     `);
   });
+
+  test(`takes ${aRole(role)} from Ask to Control Centre and back`, async ({ page, request }) => {
+    const home = HOMES[role];
+    const opening = controlCentreOpensAt(role);
+    await signedInAs(page, request, role);
+    await landedAtHome(page, role);
+
+    await firstInThePersonMenu(page, role, CONTROL_CENTRE.name);
+    await expect(page).toHaveURL(new RegExp(`${opening.defaultView}$`));
+    await expect(page.getByRole("navigation", { name: CONTROL_CENTRE.name })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: opening.name })).toBeVisible();
+
+    await firstInThePersonMenu(page, role, home.name);
+    await landedAtHome(page, role);
+    await expect(page.getByRole("navigation", { name: READER_SURFACE.name })).toBeVisible();
+  });
 }
+
+test("draws a Viewer's Ask within a second of a fresh visit", async ({ page, request }) => {
+  const home = HOMES.Viewer;
+  await signedInAs(page, request, "Viewer");
+  await landedAtHome(page, "Viewer");
+
+  const started = Date.now();
+  await page.goto(home.path);
+  await expect(page.getByText(unbuiltLineOf(home))).toBeVisible();
+  const elapsedMs = Date.now() - started;
+
+  test.info().annotations.push({ type: "Ask drawn", description: `${elapsedMs} ms` });
+  expect(elapsedMs, "Ask was not drawn within its second").toBeLessThan(READ_BUDGET_MS);
+});

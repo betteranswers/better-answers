@@ -10,7 +10,7 @@ import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
 import type { RefusalWord } from "@/shared/api/trpc.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { sentenceOf, type Said } from "@/shared/refusal-words.ts";
-import { CONTROL_CENTRE, type Role } from "@/shared/screens.ts";
+import { HOMES, type Role } from "@/shared/screens.ts";
 
 const HARNESS = "/__harness";
 
@@ -401,7 +401,7 @@ export const keystrokesDismissed = async (page: Page, listed: Locator): Promise<
 
 /** Read off the screen list, so moving a role's home breaks no spec. */
 export const landedAtHome = async (page: Page, role: Role): Promise<void> => {
-  const home = CONTROL_CENTRE.homes[role];
+  const home = HOMES[role];
   await expect(page).toHaveURL(new RegExp(`${home.defaultView}$`));
   await expect(page.getByRole("heading", { level: 1, name: home.name })).toBeVisible();
 };

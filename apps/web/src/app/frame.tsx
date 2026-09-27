@@ -6,8 +6,12 @@ import { useMembership } from "@/features/auth/membership.ts";
 import { useOperatorStanding } from "@/features/console/operator.ts";
 import {
   CONTROL_CENTRE,
+  controlCentreOpensAt,
+  READER_SURFACE,
+  readerScreenById,
   screenAt,
   viewAt,
+  type Role,
   type Screen,
   type Surface,
   type View,
@@ -23,6 +27,10 @@ import { TopBar, type MenuLink, type Person } from "./top-bar.tsx";
 import { useWideLayout } from "./wide-layout.ts";
 
 const TO_THE_CONSOLE: MenuLink = { name: "Console", to: "/console" };
+
+const ASK = readerScreenById("ask");
+
+const TO_ASK: MenuLink = { name: ASK.name, to: ASK.path };
 
 /** The three regions over one surface's screens; `place` is what the top bar leads with. */
 export function Frame(properties: {
@@ -92,18 +100,30 @@ export function Frame(properties: {
   );
 }
 
-export function ControlCentreFrame() {
+const acrossFrom = (reading: boolean, role: Role): MenuLink =>
+  reading ? { name: CONTROL_CENTRE.name, to: controlCentreOpensAt(role).path } : TO_ASK;
+
+/**
+ * One frame for both workspace surfaces, so crossing between them keeps the pressed menu button
+ * and its focus.
+ */
+export function WorkspaceFrame() {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
   const membership = useMembership();
   const standing = useOperatorStanding();
   const held = membership.data;
+  const reading = screenAt(READER_SURFACE, pathname) !== undefined;
 
   return (
     <Frame
-      surface={CONTROL_CENTRE}
+      surface={reading ? READER_SURFACE : CONTROL_CENTRE}
       place={held?.workspace.name}
       person={held === undefined ? undefined : { name: held.person.name, role: held.role }}
-      // Shown to the operator alone: a link anyone else would only be refused at.
-      links={standing.data?.operator === true ? [TO_THE_CONSOLE] : []}
+      links={[
+        ...(held === undefined ? [] : [acrossFrom(reading, held.role)]),
+        // Shown to the operator alone: a link anyone else would only be refused at.
+        ...(standing.data?.operator === true ? [TO_THE_CONSOLE] : []),
+      ]}
     />
   );
 }

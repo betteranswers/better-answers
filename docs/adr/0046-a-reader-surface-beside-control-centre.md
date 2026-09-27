@@ -13,7 +13,7 @@ date: 2026-09-27
 - **Ask** is that screen, at `/ask`. It has two views, *New question* (the default) and *Your questions*. Both ship unbuilt and tell the reader to ask in Claude for now.
 - An Editor's and a Viewer's home is Ask. They land there after signing in, and they are sent back there when a screen fails or an address names none. An Admin's home is still People.
 - Control Centre is still the one Admin surface. Its six screens are unchanged, and so are Questions' three views, their names and their addresses, *Answer audit* included. Questions loses the line it carried for readers, because it is no longer anyone's home.
-- The person menu on each workspace surface leads to the other one: Control Centre's to Ask, the reader surface's to Control Centre. The operator's link to the console is unchanged.
+- The person menu on each workspace surface leads to the other one: Control Centre's to Ask, the reader surface's to Control Centre. The link to the console is still shown to the operator alone, on either surface's menu.
 
 ## Why
 
@@ -37,5 +37,5 @@ The change is cheap. The web client already runs a second surface, the console, 
 
 - `CONTEXT.md` gains *reader surface*, and its *home* entry names Ask for Editors and Viewers.
 - The web client's screen tables hold a third surface. Control Centre and the reader surface read one table of homes, so a member lost on either is offered the same way home.
-- The link to Control Centre opens it at the member's home where Control Centre holds that home, which is People for an Admin. Anyone else meets its first screen.
+- The link to Control Centre opens it at the member's home where Control Centre holds that home, which is People for an Admin. Anyone else meets its first screen, Sources, which refuses them until Control Centre is filtered by role.
 - Building Ask, Search and Guides, and placing the reader screens in the route, are later tickets.

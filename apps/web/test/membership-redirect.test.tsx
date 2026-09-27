@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAppClients, type AppClients } from "@/app/providers.tsx";
 import { PICKER_WORDS } from "@/features/auth/workspace-words.ts";
 import { ROLES } from "@/features/people/role-meanings.ts";
-import type { Role } from "@/shared/screens.ts";
+import { HOMES, type Role } from "@/shared/screens.ts";
 
 import { appAt, openApp } from "./open-app.tsx";
 import { addressOf, answered } from "./stubbed-api.ts";
@@ -133,20 +133,16 @@ describe("the membership the shell and its redirect both read", () => {
   });
 });
 
-const LANDS_AT: Readonly<Record<Role, string>> = {
-  Admin: "/people/members",
-  Editor: "/questions/answer-audit",
-  Viewer: "/questions/answer-audit",
-};
-
 describe("the index route", () => {
   for (const role of ROLES) {
-    it(`lands a member at ${role} on ${LANDS_AT[role]}`, async () => {
+    const home = HOMES[role];
+
+    it(`lands a member at ${role} on ${home.name}'s default view`, async () => {
       vi.stubGlobal("fetch", answering(undefined, role));
 
       const { router } = await appAt("/");
 
-      expect(router.state.location.pathname).toBe(LANDS_AT[role]);
+      expect(router.state.location.pathname).toBe(home.defaultView);
     });
   }
 });

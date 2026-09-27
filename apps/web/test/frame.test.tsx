@@ -9,6 +9,7 @@ import {
   CONSOLE,
   CONSOLE_SCREENS,
   CONTROL_CENTRE,
+  READER_SCREENS,
   SCREENS,
   screenById,
   viewsOf,
@@ -128,12 +129,13 @@ describe("Control Centre's three-region shell", () => {
     expect(unbuilt).toEqual(["Suggestions", "Knowledge", "Questions"]);
   });
 
-  it("tells a Questions reader what they will do there", async () => {
+  it("gives Questions, no role's home, the ordinary unbuilt line", async () => {
     const questions = screenById("questions");
     await openAt(questions.path);
 
-    expect(unbuiltLineOf(questions)).not.toBe(UNBUILT_VIEW);
-    expect(screen.getByText(unbuiltLineOf(questions))).toBeDefined();
+    expect(unbuiltLineOf(questions)).toBe(UNBUILT_VIEW);
+    expect(screen.getByText(UNBUILT_VIEW)).toBeDefined();
+    expect(screen.getByText(questions.summary)).toBeDefined();
   });
 
   it("gives System the routes card", async () => {
@@ -164,7 +166,7 @@ describe("Control Centre's three-region shell", () => {
   });
 });
 
-const EVERY_SCREEN: readonly Screen[] = [...SCREENS, ...CONSOLE_SCREENS];
+const EVERY_SCREEN: readonly Screen[] = [...SCREENS, ...CONSOLE_SCREENS, ...READER_SCREENS];
 
 /**
  * One direction finds the view the router forgot; only the other finds the route nothing declared.
