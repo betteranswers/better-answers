@@ -129,8 +129,8 @@ Where a unit lives is decided by **minting**.
   removed nothing too. _Avoid_: cleanup, garbage collection, cron.
 - **upload sweep** — the removal of the originals no document names, once past their grace: what a
   failed bind left, and what a concurrent repeat left when it lost the race to the first bind.
-  **List-only** until an operator switches removal on: it counts what it would remove and removes
-  nothing.
+  **List-only** until an operator switches removal on, seven days after the first upload is bound
+  in a client's workspace on production: it counts what it would remove and removes nothing.
 - **graph sweep** — the removal of every generation of a workspace's map but the live one.
 - **concept index** — the platform's derived row for every concept, written when the concept's
   commit is made, checked by the sync, never edited. The only "both" of the minting rule. Carries
