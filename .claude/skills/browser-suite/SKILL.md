@@ -232,6 +232,11 @@ the only fence — a focused spec left behind would run alone and report the sui
 `apps/web/test/playwright-config.test.ts` holds it both ways. Take the `.only` out before
 committing.
 
+Under CI a failed test gets one retry, and the retry records a trace. A test that passes only on
+its retry is flaky, not green. `apps/web/e2e/flaky-report.ts` names it in a warning annotation
+and in the job's summary, with its first failure, so file a ticket with the run id. Nothing is
+retried on your own machine.
+
 ## Carried from Onyx
 
 The donor is Onyx's Playwright skill. Its practices that are ours too:
