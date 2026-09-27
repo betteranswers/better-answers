@@ -30,6 +30,11 @@ const config: KnipConfig = {
       includeEntryExports: false,
     },
 
+    "packages/core": {
+      // Stryker names the second by string, so nothing imports it.
+      vitest: { config: ["vitest.config.ts", "vitest.stryker.config.ts"] },
+    },
+
     "packages/devtools": {
       // A suite runs this as a process of its own, so nothing imports it.
       entry: ["test/holds-a-container.ts"],
