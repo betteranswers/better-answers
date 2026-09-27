@@ -122,7 +122,7 @@ A lint rule, a tool in `check` and a hook command each land with a functional te
 
 ### [CHECK2] Fail a suite that can run nothing
 
-A test script never passes for having found no tests. A focused browser spec fails under CI. pytest refuses a marker it does not know, and an expected failure that passed. Every workspace carries a `check` script, or is named with its reason in `apps/api/tests/check-scripts.test.ts`.
+A test script never passes for having found no tests. A focused browser spec fails under CI. pytest refuses a marker it does not know, and an expected failure that passed. Every workspace carries a `check` script, or is named with its reason in `packages/devtools/test/ci/check-scripts.test.ts`.
 
 ### [CHECK3] Name every failure in one run
 

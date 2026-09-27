@@ -4,7 +4,6 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { gitIn, writeUnder } from "@better-answers/devtools/throwaway-tree";
-
 import {
   commitIn,
   hookScript,
@@ -17,7 +16,7 @@ import {
   stubsOnPath,
   worktreeUnder,
   type HookRun,
-} from "./worktree-hooks.ts";
+} from "@better-answers/devtools/worktree-hooks";
 
 const hook = hookScript("worktree-remove-hook");
 

@@ -25,7 +25,7 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "The versions an image fetches by name — `ARG <NAME>_VERSION=` under a `# renovate: datasource=… depName=…` line. The `dockerfile` manager reads `FROM` and nothing else, so rclone, age and git-filter-repo aged in silence (T-211). `enabledManagers` is an allow-list: without `custom.regex` in it this block is read and never run. `apps/api/tests/deploy-tree.test.ts` holds all three halves against the Dockerfiles `build.yml` builds",
+      "description": "The versions an image fetches by name — `ARG <NAME>_VERSION=` under a `# renovate: datasource=… depName=…` line. The `dockerfile` manager reads `FROM` and nothing else, so rclone, age and git-filter-repo aged in silence (T-211). `enabledManagers` is an allow-list: without `custom.regex` in it this block is read and never run. `packages/devtools/test/ci/deploy-tree.test.ts` holds all three halves against the Dockerfiles `build.yml` builds",
       "managerFilePatterns": ["/(^|/|\\.)Dockerfile$/"],
       "matchStrings": ["# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>\\S+)\\nARG [A-Z0-9_]+_VERSION=(?<currentValue>\\S+)\\n"]
     },

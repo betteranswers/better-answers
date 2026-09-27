@@ -4,8 +4,12 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 import { writeUnder } from "@better-answers/devtools/throwaway-tree";
-
-import { hookScript, repositoryHolding, runHook, scratchRoot } from "./worktree-hooks.ts";
+import {
+  hookScript,
+  repositoryHolding,
+  runHook,
+  scratchRoot,
+} from "@better-answers/devtools/worktree-hooks";
 
 const hook = hookScript("worktree-create-hook");
 

@@ -5,10 +5,11 @@ import path from "node:path";
 
 import { afterAll } from "vitest";
 
-import { gitIn, throwawayRepository, writeUnder } from "@better-answers/devtools/throwaway-tree";
+import { repositoryRoot } from "./paths.ts";
+import { gitIn, throwawayRepository, writeUnder } from "./throwaway-tree.ts";
 
 export const hookScript = (name: string): string =>
-  path.resolve(import.meta.dirname, `../../../.claude/hooks/${name}.sh`);
+  path.join(repositoryRoot, ".claude", "hooks", `${name}.sh`);
 
 /** A temporary directory, removed by the `afterAll` this call registers. */
 export const scratchRoot = (prefix: string): string => {

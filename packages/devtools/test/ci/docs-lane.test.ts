@@ -17,14 +17,18 @@ import { parse } from "yaml";
 import { z } from "zod";
 
 import { repositoryRoot, workspacePackages } from "@better-answers/devtools/paths";
-
 import {
   gatesNamed,
   gatesUnder,
   rootScripts,
   workspacesGated,
   workspacesChecked,
-} from "./workspaces.ts";
+} from "@better-answers/devtools/root-commands";
+import {
+  type ImageStep,
+  readWorkflow,
+  workflowStepSchema,
+} from "@better-answers/devtools/workflows";
 
 const read = (relative: string): string =>
   readFileSync(path.join(repositoryRoot, relative), "utf8");
@@ -386,20 +390,20 @@ const PROSE_SUITES: readonly ProseSuite[] = [
     inTheLane: "check:docs:api",
   },
   {
-    file: "apps/api/tests/deploy-tree.test.ts",
+    file: "packages/devtools/test/ci/deploy-tree.test.ts",
     reads:
       "the deploy tree, .github/workflows/*.yml and deploy/RELEASES.md and docs/operations/{RUNBOOK,SECRETS,coolify}.md",
-    inTheLane: "check:docs:api",
+    inTheLane: "check:docs:devtools",
   },
   {
-    file: "apps/api/tests/provision-skills.test.ts",
+    file: "packages/devtools/test/ci/provision-skills.test.ts",
     reads: "the tracked SKILL.md files, packages/design-system/SKILL.md through its symlink",
-    inTheLane: "check:docs:api",
+    inTheLane: "check:docs:devtools",
   },
   {
-    file: "apps/api/tests/docs-lane.test.ts",
+    file: "packages/devtools/test/ci/docs-lane.test.ts",
     reads: "no markdown — it holds this table against the script the lane runs",
-    inTheLane: "check:docs:api",
+    inTheLane: "check:docs:devtools",
   },
   {
     file: "apps/web/test/browser-suite-skill.test.ts",
@@ -496,14 +500,7 @@ describe("what the docs lane runs", () => {
   });
 });
 
-const step = z.object({
-  id: z.string().optional(),
-  if: z.string().optional(),
-  uses: z.string().optional(),
-  run: z.string().optional(),
-  env: z.record(z.string(), z.string()).optional(),
-});
-type Step = z.infer<typeof step>;
+type Step = ImageStep;
 
 const workflowFile = z.object({
   jobs: z.record(
@@ -517,15 +514,14 @@ const workflowFile = z.object({
           matrix: z.record(z.string(), z.array(z.unknown())),
         })
         .optional(),
-      steps: z.array(step).optional(),
+      steps: z.array(workflowStepSchema).optional(),
     }),
   ),
 });
 type Workflow = z.infer<typeof workflowFile>;
 type Job = Workflow["jobs"][string];
 
-const workflow = (name: string): Workflow =>
-  workflowFile.parse(parse(read(path.join(".github", "workflows", name))));
+const workflow = (name: string): Workflow => readWorkflow(name, workflowFile);
 
 const LANE = "lane";
 

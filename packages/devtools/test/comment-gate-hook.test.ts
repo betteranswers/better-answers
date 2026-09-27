@@ -7,8 +7,12 @@ import { z } from "zod";
 import { repositoryRoot } from "@better-answers/devtools/paths";
 import { pythonGateRoots, rootScripts } from "@better-answers/devtools/root-commands";
 import { throwawayRepository, writeUnder } from "@better-answers/devtools/throwaway-tree";
-
-import { hookScript, runHook, scratchRoot, type HookRun } from "./worktree-hooks.ts";
+import {
+  hookScript,
+  runHook,
+  scratchRoot,
+  type HookRun,
+} from "@better-answers/devtools/worktree-hooks";
 
 const script = hookScript("comment-gate-hook");
 

@@ -7,8 +7,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { repositoryRoot, workspacePackages } from "@better-answers/devtools/paths";
-
-import { gatesNamed } from "./workspaces.ts";
+import { gatesNamed } from "@better-answers/devtools/root-commands";
 
 const read = (relative: string): string =>
   readFileSync(path.join(repositoryRoot, relative), "utf8");

@@ -9,8 +9,12 @@ import { parse } from "yaml";
 import { z } from "zod";
 
 import { repositoryRoot } from "@better-answers/devtools/paths";
-
-import { type ImageStep, matrixLegs, readWorkflow, workflowStepSchema } from "./image-probe.ts";
+import {
+  type ImageStep,
+  matrixLegs,
+  readWorkflow,
+  workflowStepSchema,
+} from "@better-answers/devtools/workflows";
 /* jscpd:ignore-end */
 
 const scheduleSchema = z.object({

@@ -1,21 +1,26 @@
 import { spawnSync } from "node:child_process";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { repositoryRoot } from "@better-answers/devtools/paths";
-
+import { gatesUnder, rootScripts, workspacesChecked } from "@better-answers/devtools/root-commands";
 import {
   buildWorkflow,
-  IMAGE_ID_VARIABLE,
   imageJob,
   type ImageStep,
   matrixLegs,
-  PROBE_DEFERRAL_VARIABLE,
   readWorkflow,
   workflowStepSchema,
-} from "./image-probe.ts";
-import { gatesUnder, rootScripts, workspacesChecked } from "./workspaces.ts";
+} from "@better-answers/devtools/workflows";
+
+const IMAGE_ID_VARIABLE = "IMAGE_ID";
+const PROBE_DEFERRAL_VARIABLE = "IMAGE_PROBE_DEFERRED";
+
+/** This suite spells the variable too, and reads it in no leg. */
+const thisSuite = path.relative(repositoryRoot, fileURLToPath(import.meta.url));
 
 const checkWorkflowSchema = z.object({
   concurrency: z.object({ group: z.string() }),
@@ -63,7 +68,7 @@ const deferralsRead = (): readonly DeferralRead[] =>
 const workspacesReadingTheDeferral = (): ReadonlySet<string> => {
   const found = spawnSync(
     "git",
-    ["grep", "-l", "-F", PROBE_DEFERRAL_VARIABLE, "--", "apps", "packages"],
+    ["grep", "-l", "-F", PROBE_DEFERRAL_VARIABLE, "--", "apps", "packages", `:!${thisSuite}`],
     { cwd: repositoryRoot, encoding: "utf8" },
   );
 

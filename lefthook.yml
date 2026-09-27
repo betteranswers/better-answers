@@ -109,6 +109,10 @@ pre-push:
       run: ": {files}; {without-git-env} pnpm run check:docs:core"
       fail_text: "run it alone with pnpm run check:docs:core"
 
+    check:docs:devtools:
+      run: ": {files}; {without-git-env} pnpm run check:docs:devtools"
+      fail_text: "run it alone with pnpm run check:docs:devtools"
+
     check:docs:web:
       run: ": {files}; {without-git-env} pnpm run check:docs:web"
       fail_text: "run it alone with pnpm run check:docs:web"
