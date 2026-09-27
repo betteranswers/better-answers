@@ -134,7 +134,7 @@ The estate is two 4 GB boxes (ADR 0024): VPC 1 is production, VPC 2 is the orche
   7. `pnpm ops reconcile-watermark --workspace <id>` again. `done — head <sha>, watermark <sha>, replayed 0, already landed 0` with the two shas equal is the bundle and its rows agreeing, and the workspace is writable again.
 - **Attach:** the refusal line or the tick's warn line that fired, with its stop reason; the old head; the dropped commits with their subjects and actors; who was told to redo which edit; the `reconcile-watermark` line that ended it.
 - **Escalate:** the technical contact before any rewind — this is the page that throws work away; the client's named contact once the list of edits to redo exists, since it is their people who redo them.
-- **Rehearsed by:** once on staging against a made-up stuck bundle, before the first client's data is on the box (ADR 0012, amended 2026-09-19). It is also the day page 6's switch turns to `nightly`. A commit the governed write did not make, written into a staging workspace's bundle by hand, stops the replay as `unreadable-commit` and is the cheapest stuck bundle there is.
+- **Rehearsed by:** once on staging against a made-up stuck bundle, before the first client's data is on the box (ADR 0012, amended 2026-09-19). It is also the day page 6's switch turns to `nightly`. A commit the governed write did not make, written into a staging workspace's bundle by hand, stops the replay as `unreadable-commit` and is the cheapest stuck bundle there is. Rehearsed on 27/09/2026 at build `3557cba8`. The replay stopped as `unreadable-commit`, the tick logged the stop every thirty seconds, and steps 1 to 7 put it right. The workspace took a governed write straight after. Step 1's refusal exits non-zero, so run it on its own rather than in a script that stops on the first failure.
 
 ## 11. The sweeps' check is red
 
@@ -266,6 +266,8 @@ The first client is landed by this page on staging first and then on production,
 8. **Record the numbers** from the closing line — landed, skipped, checks, links, seconds — in the estate-size record, staging's beside production's.
 9. **Wipe staging** by the drill's own wipe (the procedure above); the `staging-wiped` ping is the proof, and the exception above ends with it.
 10. **Production:** steps 2 to 8 again on VPC 1 — the same two people, the same slug, the manifest's id unchanged. The numbers into the estate-size record are the first measurement of a real client, and the route's C1 row says so.
+
+**Staging has no mail and no public hostname.** A rehearsal therefore runs steps 2 and 7 from inside the staging `api` container, against its loopback. The codes go to a mail catcher on the platform network. The display name is set by hand in staging's database, because the screen that asks for it is not reachable. The MCP read runs the claude.ai client's OAuth flow to a bearer, then calls `/mcp`. Of the stores stack, only `objectstore` is started: `backup` would ship staging's rows to the off-host dumps, and the tunnel has nowhere to go. Production has both mail and a hostname, so its run follows the steps as written. On production the running Admin may be the operator's own address rather than one at the client, and the verifier may be added by `add-person` rather than signed in. That is how the first client landed.
 
 ## Make or unmake the operator
 
