@@ -54,7 +54,7 @@ services:
       AGENT_MAX_FILE_BYTES: "104857600"
       HEALTHCHECKS_PING_URL_SCHEDULER: ${HEALTHCHECKS_PING_URL_SCHEDULER:?}
       HEALTHCHECKS_PING_URL_SWEEPS: ${HEALTHCHECKS_PING_URL_SWEEPS:?}
-      # `remove` waits for an operator: a listing sweep that joins wrongly deletes live bytes for good.
+      # `remove` waits for an operator, since a wrong join deletes live bytes for good. RUNBOOK.md § The daily sweeps names the day.
       UPLOAD_SWEEP: ${UPLOAD_SWEEP:-list}
     # A healthcheck declared here replaces the image's outright, so its own is repeated.
     healthcheck:

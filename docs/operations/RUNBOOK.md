@@ -222,7 +222,25 @@ Two sweeps clear what no row names. **The upload sweep** removes an original a f
 - `found` rises by one for each bind whose second transaction failed, and for each repeat of a bind that lost the race to the first. A lost race's key, `uploads/<binding>/<document>/original`, names a binding whose document row names another key. `found` falls only when something removes originals, such as `object-store-orphans` run by hand without `--list`. A rise with neither behind it is the join being wrong: leave the setting at `list` and escalate.
 - `pnpm ops object-store-orphans --workspace <id> --list` gives one workspace's count, and the per-workspace counts add up to `found`. By hand the command removes unless given `--list`, whatever the setting says.
 
-Switch removal on after a week of list-only passes in which every rise in `found` has a failed bind or a lost race behind it: set `UPLOAD_SWEEP=remove` on the platform resource and redeploy. The next pass reads `upload_sweep=remove`, with `removed` equal to `found`, and `found` falls to what failed binds and lost races have left since. Setting it back to `list` stops the removal from the next start.
+**The day to switch** is seven days after the first upload is bound in a client's workspace on production. The earliest document row that names an original gives it, read through `browse_ro` (§ Browse production):
+
+```sql
+SELECT workspace_id, first_seen FROM source_document
+ WHERE original_key LIKE 'uploads/%' ORDER BY first_seen LIMIT 1;
+```
+
+No row means nothing is bound yet, and the setting stays at `list`. A row whose workspace is not a client's does not count: add `AND workspace_id <> '<its id>'` and read again. The day is the row's `first_seen` plus seven days.
+
+The week starts at the first bind because a pass proves nothing before it. Until an original is bound, no row names one, so the join has nothing to hold and every pass reads `found=0` whatever the join does. The exception is a failed bind, which can leave an original before any row exists; that rise is still read against its cause, as the list above says. A wrong join shows only once there are named originals for it to miss, and the first week with live originals is the one that proves the join holds them. Importing a bundle (§ Import a company's bundle) writes concepts and no originals, so it does not start the week. Nor should the switch wait past it: from then on an orphan may hold personal data nobody can find (ADR 0020), and the 24-hour grace already keeps removal away from an original whose bind is still running.
+
+On the day, read the week's passes through `browse_ro`, with that `first_seen` in place:
+
+```sql
+SELECT at, upload_sweep, found, removed FROM sweep_pass
+ WHERE at >= '<first_seen>' ORDER BY at;
+```
+
+If every rise in `found` has a failed bind or a lost race behind it, set `UPLOAD_SWEEP=remove` on the platform resource and redeploy. If any rise has neither, leave the setting at `list` and escalate. After the switch, the next pass reads `upload_sweep=remove`, with `removed` equal to `found`, and `found` falls to what failed binds and lost races have left since. Setting it back to `list` stops the removal from the next start.
 
 ## Import a company's bundle
 
