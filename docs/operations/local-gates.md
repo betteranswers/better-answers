@@ -36,19 +36,31 @@ The root `prepare` script runs `lefthook install`, and pnpm runs `prepare` after
 
 ## The pre-push hook
 
-Before a push leaves the machine, the hook runs every step root `check:gates` names and the four prose suites `check:docs` adds to them: `check:docs:api`, `check:docs:core`, `check:docs:devtools` and `check:docs:web`. `format:check` is in both scripts and runs once. In a sample of 30 failed pull requests, about half failed on one of these, and CI took five to nine minutes to say so. The merge queue is the only full CI run, so this hook is where a pull request hears about them first.
+Before a push that carries commits to a branch leaves the machine, the hook runs every step root `check:gates` names and the four prose suites `check:docs` adds to them: `check:docs:api`, `check:docs:core`, `check:docs:devtools` and `check:docs:web`. `format:check` is in both scripts and runs once. In a sample of 30 failed pull requests, about half failed on one of these, and CI took five to nine minutes to say so. The merge queue is the only full CI run, so this hook is where a pull request hears about them first.
 
 Each step is a command of its own, and the commands run in parallel. A failure therefore names its gate, and `LEFTHOOK_EXCLUDE` can skip one gate and keep the rest. The list repeats the steps the two scripts name, and `packages/devtools/test/lefthook-config.test.ts` holds it to them in both directions: a gate added to either script fails that suite until the hook runs it too. The same file pushes through the real `lefthook.yml` in a throwaway repository, with a stand-in `pnpm`, from the main checkout and from a linked worktree.
 
 Measured on the owner's machine (the same one as above) with every gate passing, the whole hook took 22s to 23s over three runs, where `check:gates` and `check:docs` one after the other take about 30s. `check:docs:api` is the slowest command and sets the wait. The api and core suites start Postgres in Docker, as every vitest run in those two workspaces does, so the hook needs Docker running.
 
-A failed gate stops the push, and the summary's last lines name each one with the command that runs it alone:
+A failed gate stops the push. The gates' summary names each failure with the command that runs it alone, and the hook's own summary under it marks `gates` failed:
 
 ```
 ✗ knip: run it alone with pnpm run knip (3.14 seconds)
 ```
 
-The gates read the working tree, not the commits being pushed, so push from a clean tree. `pnpm land` commits and then pushes, so for it the two are the same.
+The gates read the working tree, not the commits being pushed, so push from a clean tree. An untracked file counts too: `format:check` reads one that no ignore pattern covers, and refuses the push if it is unformatted. `pnpm land` commits and then pushes, so for it the two are the same.
+
+### When the gates run
+
+Git hands the hook one line per ref it pushes: the local ref and its sha, then the remote ref and its sha. `scripts/pre-push.sh` reads them, and runs the gates when any line sends a sha that is not all zeros to a ref under `refs/heads/`. Every other push carries no commit CI would check, so the script prints one line and lets it through:
+
+```
+gates skipped: every ref pushed is a deletion or outside refs/heads/, so none carries commits
+```
+
+That covers a tag's push or deletion, an ordna ref under `refs/ordna/`, and a branch's deletion. A dirty working tree cannot block any of them. A tag pushed beside a branch's new commits still runs the gates, as does a branch push that only deletes files. The suite pushes each of these cases through the hook.
+
+The gates live in a second hook, `pre-push-gates`, because lefthook hands git's lines to a job with `use_stdin` and to nothing else. A `skip` condition, a `setup` step and a `files` command all read an empty stdin, so none of them can tell a tag from a branch. `pre-push` is therefore one job, `gates`, which runs the script, and the script runs `pnpm exec lefthook run pre-push-gates`.
 
 ### How to skip the pre-push hook
 
@@ -58,16 +70,16 @@ The gates read the working tree, not the commits being pushed, so push from a cl
 | `LEFTHOOK_EXCLUDE=knip git push` | one gate |
 | `LEFTHOOK_EXCLUDE=knip,check:docs:api git push` | several, comma-separated |
 
-`LEFTHOOK=0` skips it as it skips the pre-commit hook. `pnpm exec lefthook run pre-push` runs the whole hook without pushing.
+`LEFTHOOK=0` skips it as it skips the pre-commit hook. `pnpm exec lefthook run pre-push-gates` runs every gate without pushing. `lefthook run pre-push` by hand would wait on stdin for lines only git sends.
 
 ### What each command's `run` carries
 
 - `{without-git-env}` unsets every variable `git rev-parse --local-env-vars` lists. Pushed from a linked worktree, git runs the hook with `GIT_DIR` set to the worktree's git directory, and every gate would inherit it. `GIT_DIR` outranks the directory `git -C <dir>` names, so a suite that builds a throwaway repository would read and write the worktree's own repository in its place. A push from the main checkout sets no `GIT_DIR`, so only a worktree shows this.
-- `: {files};` does nothing when it runs. It is there because a pre-push command that names no files template is skipped when the push changes no file still on disk, and a push that only deletes files is one of those. Naming `{files}` makes lefthook read the hook's own `files` list instead, which is `lefthook.yml` alone and never empty.
+- `: {files};`, in the `gates` job alone, does nothing when it runs. It is there because a pre-push command that names no files template is skipped when the push changes no file still on disk, and a push that only deletes files is one of those. Naming `{files}` makes lefthook read the hook's own `files` list instead, which is `lefthook.yml` alone and never empty. lefthook skips on a push's files only in a hook named `pre-push`, so the commands of `pre-push-gates` need no such thing.
 
 ### Where it is installed
 
-Git keeps hooks in the common git directory, so one `pre-push` serves the main checkout and every worktree, and each run reads the `lefthook.yml` of the checkout it runs in. `prepare` installs it with the other two. lefthook also re-installs the hooks whenever one of them runs under a `lefthook.yml` that has changed since the last install, so a checkout that has not run `pnpm install` since this hook landed picks it up at its next commit.
+Git keeps hooks in the common git directory, so one `pre-push` serves the main checkout and every worktree, and each run reads the `lefthook.yml` of the checkout it runs in. `prepare` installs it with the other two. `pre-push-gates` is not a name git calls, so `lefthook install` writes no file for it. lefthook also re-installs the hooks whenever one of them runs under a `lefthook.yml` that has changed since the last install, so a checkout that has not run `pnpm install` since this hook landed picks it up at its next commit.
 
 ## The commit-message hook
 

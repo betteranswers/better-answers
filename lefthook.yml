@@ -64,55 +64,63 @@ templates:
   without-git-env: unset $(git rev-parse --local-env-vars);
 
 pre-push:
-  parallel: true
   # Naming {files} stops lefthook skipping a push that changes no file on disk, or only deletes.
   files: echo lefthook.yml
 
   commands:
+    # Only a job sees the pushed refs, and no file list skips a hook not named pre-push.
+    gates:
+      use_stdin: true
+      run: ": {files}; sh scripts/pre-push.sh"
+
+pre-push-gates:
+  parallel: true
+
+  commands:
     format:check:
-      run: ": {files}; {without-git-env} pnpm run format:check"
+      run: "{without-git-env} pnpm run format:check"
       fail_text: "run it alone with pnpm run format:check"
 
     lint:
-      run: ": {files}; {without-git-env} pnpm run lint"
+      run: "{without-git-env} pnpm run lint"
       fail_text: "run it alone with pnpm run lint"
 
     lint:workflows:
-      run: ": {files}; {without-git-env} pnpm run lint:workflows"
+      run: "{without-git-env} pnpm run lint:workflows"
       fail_text: "run it alone with pnpm run lint:workflows"
 
     comment-gate:python:
-      run: ": {files}; {without-git-env} pnpm run comment-gate:python"
+      run: "{without-git-env} pnpm run comment-gate:python"
       fail_text: "run it alone with pnpm run comment-gate:python"
 
     comment-density:
-      run: ": {files}; {without-git-env} pnpm run comment-density"
+      run: "{without-git-env} pnpm run comment-density"
       fail_text: "run it alone with pnpm run comment-density"
 
     insert-scan:
-      run: ": {files}; {without-git-env} pnpm run insert-scan"
+      run: "{without-git-env} pnpm run insert-scan"
       fail_text: "run it alone with pnpm run insert-scan"
 
     jscpd:
-      run: ": {files}; {without-git-env} pnpm run jscpd"
+      run: "{without-git-env} pnpm run jscpd"
       fail_text: "run it alone with pnpm run jscpd"
 
     knip:
-      run: ": {files}; {without-git-env} pnpm run knip"
+      run: "{without-git-env} pnpm run knip"
       fail_text: "run it alone with pnpm run knip"
 
     check:docs:api:
-      run: ": {files}; {without-git-env} pnpm run check:docs:api"
+      run: "{without-git-env} pnpm run check:docs:api"
       fail_text: "run it alone with pnpm run check:docs:api"
 
     check:docs:core:
-      run: ": {files}; {without-git-env} pnpm run check:docs:core"
+      run: "{without-git-env} pnpm run check:docs:core"
       fail_text: "run it alone with pnpm run check:docs:core"
 
     check:docs:devtools:
-      run: ": {files}; {without-git-env} pnpm run check:docs:devtools"
+      run: "{without-git-env} pnpm run check:docs:devtools"
       fail_text: "run it alone with pnpm run check:docs:devtools"
 
     check:docs:web:
-      run: ": {files}; {without-git-env} pnpm run check:docs:web"
+      run: "{without-git-env} pnpm run check:docs:web"
       fail_text: "run it alone with pnpm run check:docs:web"
