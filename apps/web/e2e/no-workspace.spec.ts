@@ -132,7 +132,7 @@ test("says nothing of Claude or invitations to an ordinary arrival", async ({ pa
   await expect(askRegion(page)).toBeVisible();
 });
 
-test("shows a waiting invitation within a second, joined from its page", async ({
+test("shows a waiting invitation in a second, joined from its page", async ({
   page,
   request,
   passesTheAccessibilityGate,
