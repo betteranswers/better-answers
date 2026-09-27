@@ -334,6 +334,25 @@ describe("the commits an empty bundle holds after a watermark", () => {
   });
 });
 
+describe("a bundle whose history behind its head is unreadable", () => {
+  it("hands back the scan's failure rather than throwing it", async () => {
+    const bundle = await arrange();
+    const first = shaOf(await commit(bundle.principal, bundle.door, requestFor()));
+    shaOf(
+      await commit(
+        bundle.principal,
+        bundle.door,
+        requestFor({ path: "knowledge/b.md", expectedHead: first }),
+      ),
+    );
+    await objectRemovedFrom(bundle.door, bundle.workspaceId, first);
+
+    const scanned = await commitsAfter(PLATFORM, bundle.door, bundle.workspaceId, null);
+
+    expect(scanned.ok ? undefined : scanned.error).toBeInstanceOf(Error);
+  });
+});
+
 describe("a repository whose refs git cannot read", () => {
   const unreadableRefs = async (): Promise<Bundle & { readonly sha: string }> => {
     const bundle = await arrange();
