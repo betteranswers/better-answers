@@ -41,17 +41,19 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # The base is fetched by sha, and anonymously, the repository being public: `git diff`
-      # between two trees needs no ancestry.
+      # The base is fetched one commit deep, and anonymously, the repository being public:
+      # `git diff` between two trees needs no ancestry.
       - name: the lane this change runs in
         id: lane
         env:
           EVENT: ${{ github.event_name }}
-          MERGE_GROUP_BASE: ${{ github.event.merge_group.base_sha }}
+          MERGE_GROUP_TARGET: ${{ github.event.merge_group.base_ref }}
           PUSHED_FROM: ${{ github.event.before }}
         run: |
+          # `base_sha` is the head of the group queued ahead, whose changes merge with this one, so
+          # the diff starts at the target branch.
           case "${EVENT}" in
-            merge_group) base="${MERGE_GROUP_BASE}" ;;
+            merge_group) base="${MERGE_GROUP_TARGET}" ;;
             push | workflow_call) base="${PUSHED_FROM}" ;;
             *) base="" ;;
           esac
@@ -62,7 +64,9 @@ jobs:
             lane="pr"
           elif [ -n "${base}" ] && [ "${base}" != "0000000000000000000000000000000000000000" ] &&
             git fetch --no-tags --depth=1 origin "${base}" &&
-            git diff -z --name-only --no-renames "${base}" HEAD > "${RUNNER_TEMP}/changed-paths"; then
+            from="$(git rev-parse FETCH_HEAD)" &&
+            git diff -z --name-only --no-renames "${from}" HEAD > "${RUNNER_TEMP}/changed-paths"; then
+            echo "the changed paths are read from ${base}, at ${from}, to HEAD"
             # Read back here so that an unknown word is refused below, not published.
             decided="$(node scripts/docs-lane.mjs < "${RUNNER_TEMP}/changed-paths")"
             lane="$(printf '%s\n' "${decided}" | sed -n 's/^lane=//p')"
