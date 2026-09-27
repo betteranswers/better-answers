@@ -34,6 +34,41 @@ The root `prepare` script runs `lefthook install`, and pnpm runs `prepare` after
 - `actionlint` is a Homebrew binary, not an npm package, so a clone may not have it. A warning and a pass, never a failure: a tool nobody installed must not block a commit.
 - The five `*-typecheck` commands are every workspace with a `typecheck` script but the design system, which has neither a `tsconfig.json` nor a `scripts` block. `root:` is what scopes each command to its own workspace's staged files, so these five never see each other's changes.
 
+## The pre-push hook
+
+Before a push leaves the machine, the hook runs every step root `check:gates` names and the three prose suites `check:docs` adds to them: `check:docs:api`, `check:docs:core` and `check:docs:web`. `format:check` is in both scripts and runs once. In a sample of 30 failed pull requests, about half failed on one of these, and CI took five to nine minutes to say so. The merge queue is the only full CI run, so this hook is where a pull request hears about them first.
+
+Each step is a command of its own, and the commands run in parallel. A failure therefore names its gate, and `LEFTHOOK_EXCLUDE` can skip one gate and keep the rest. The list repeats the steps the two scripts name, and `apps/api/tests/lefthook-config.test.ts` holds it to them in both directions: a gate added to either script fails that suite until the hook runs it too. The same file pushes through the real `lefthook.yml` in a throwaway repository, with a stand-in `pnpm`, from the main checkout and from a linked worktree.
+
+Measured on the owner's machine (the same one as above) with every gate passing, the whole hook took 22s to 23s over three runs, where `check:gates` and `check:docs` one after the other take about 30s. `check:docs:api` is the slowest command and sets the wait. The api and core suites start Postgres in Docker, as every vitest run in those two workspaces does, so the hook needs Docker running.
+
+A failed gate stops the push, and the summary's last lines name each one with the command that runs it alone:
+
+```
+✗ knip: run it alone with pnpm run knip (3.14 seconds)
+```
+
+The gates read the working tree, not the commits being pushed, so push from a clean tree. `pnpm land` commits and then pushes, so for it the two are the same.
+
+### How to skip the pre-push hook
+
+| Command | What it skips |
+| --- | --- |
+| `git push --no-verify` | the whole hook, once |
+| `LEFTHOOK_EXCLUDE=knip git push` | one gate |
+| `LEFTHOOK_EXCLUDE=knip,check:docs:api git push` | several, comma-separated |
+
+`LEFTHOOK=0` skips it as it skips the pre-commit hook. `pnpm exec lefthook run pre-push` runs the whole hook without pushing.
+
+### What each command's `run` carries
+
+- `{without-git-env}` unsets every variable `git rev-parse --local-env-vars` lists. Pushed from a linked worktree, git runs the hook with `GIT_DIR` set to the worktree's git directory, and every gate would inherit it. `GIT_DIR` outranks the directory `git -C <dir>` names, so a suite that builds a throwaway repository would read and write the worktree's own repository in its place. A push from the main checkout sets no `GIT_DIR`, so only a worktree shows this.
+- `: {files};` does nothing when it runs. It is there because a pre-push command that names no files template is skipped when the push changes no file still on disk, and a push that only deletes files is one of those. Naming `{files}` makes lefthook read the hook's own `files` list instead, which is `lefthook.yml` alone and never empty.
+
+### Where it is installed
+
+Git keeps hooks in the common git directory, so one `pre-push` serves the main checkout and every worktree, and each run reads the `lefthook.yml` of the checkout it runs in. `prepare` installs it with the other two. lefthook also re-installs the hooks whenever one of them runs under a `lefthook.yml` that has changed since the last install, so a checkout that has not run `pnpm install` since this hook landed picks it up at its next commit.
+
 ## The commit-message hook
 
 The `commit-msg` hook runs commitlint over every commit's message, not just `pnpm land`'s. Its config, `commitlint.config.mjs` at the root, is the one `pnpm land` and the `pr-title` job in `check.yml` read too, so one config checks the form everywhere (`docs/agents/workflow.md`, *The commit's form*). `packages/devtools/test/land.test.ts` commits through the hook's own command in a throwaway repository: a Conventional message goes in, and a declarative subject, a subject naming its ticket and one over 72 characters are each refused.
