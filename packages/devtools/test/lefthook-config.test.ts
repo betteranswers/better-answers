@@ -27,7 +27,7 @@ const command = z.object({
 });
 type Command = z.infer<typeof command>;
 const hook = z.object({ commands: z.record(z.string(), command).optional() }).optional();
-const lefthook = z.object({ "pre-commit": hook, "pre-push": hook });
+const lefthook = z.object({ "pre-commit": hook, "pre-push-gates": hook });
 type Lefthook = z.infer<typeof lefthook>;
 
 const config = (): Lefthook => lefthook.parse(parse(read("lefthook.yml")));
@@ -198,11 +198,11 @@ const stepsOf = (script: string): readonly string[] => {
 
 const pushedSteps = (): readonly string[] => [...new Set(PUSHED_SCRIPTS.flatMap(stepsOf))].sort();
 
-const pushCommands = (): Record<string, Command> => declared("pre-push").commands ?? {};
+const pushCommands = (): Record<string, Command> => declared("pre-push-gates").commands ?? {};
 
 const runAlone = (step: string): string => `run it alone with pnpm run ${step}`;
 
-describe("the pre-push hook", () => {
+describe("the pre-push gates", () => {
   it("runs each step `check:gates` and `check:docs` name, and nothing else", () => {
     expect(Object.keys(pushCommands()).sort()).toEqual(pushedSteps());
   });
@@ -215,9 +215,13 @@ describe("the pre-push hook", () => {
 });
 
 const LEFTHOOK = path.join(repositoryRoot, "node_modules", ".bin", "lefthook");
+const PRE_PUSH_SCRIPT = "scripts/pre-push.sh";
+const SKIPPED =
+  "gates skipped: every ref pushed is a deletion or outside refs/heads/, so none carries commits";
 
 const PNPM_STUB = [
   "#!/bin/sh",
+  'if [ "$1 $2" = "exec lefthook" ]; then shift 2; exec "$LEFTHOOK_BIN" "$@"; fi',
   `printf '%s GIT_DIR=%s\\n' "$*" "$(printenv GIT_DIR || echo unset)" >> "$PNPM_STUB_LOG"`,
   'case ",$PNPM_STUB_FAILS," in *",$2,"*) echo "$2 found something" >&2; exit 1 ;; esac',
   "",
@@ -241,6 +245,7 @@ const hookedRepository = (name: string): Pushing => {
   gitIn(scratch, "init", "--bare", "-q", "-b", "main", origin);
   gitIn(root, "remote", "add", "origin", origin);
   writeUnder(root, "lefthook.yml", read("lefthook.yml"));
+  writeUnder(root, PRE_PUSH_SCRIPT, read(PRE_PUSH_SCRIPT));
   gitIn(root, "add", "-A");
   gitIn(root, "commit", "-q", "-m", "the hooks' configuration");
   execFileSync(LEFTHOOK, ["install"], { cwd: root, stdio: "pipe" });
@@ -255,20 +260,25 @@ const LEFTHOOK_SWITCHES = new Set(["LEFTHOOK", "LEFTHOOK_EXCLUDE"]);
 const pushFrom = (
   pushing: Pushing,
   directory: string,
-  ref: string,
+  refs: string | readonly string[],
   options: { readonly env?: Readonly<Record<string, string>>; readonly flags?: string[] } = {},
 ): { readonly status: number | null; readonly said: string } => {
   const inherited = Object.entries(process.env).filter(([name]) => !LEFTHOOK_SWITCHES.has(name));
-  const ran = spawnSync("git", ["-C", directory, "push", ...(options.flags ?? []), "origin", ref], {
-    encoding: "utf8",
-    env: {
-      ...Object.fromEntries(inherited),
-      PATH: `${pushing.bin}${path.delimiter}${process.env["PATH"] ?? ""}`,
-      LEFTHOOK_BIN: LEFTHOOK,
-      PNPM_STUB_LOG: pushing.log,
-      ...options.env,
+  const pushed = [refs].flat();
+  const ran = spawnSync(
+    "git",
+    ["-C", directory, "push", ...(options.flags ?? []), "origin", ...pushed],
+    {
+      encoding: "utf8",
+      env: {
+        ...Object.fromEntries(inherited),
+        PATH: `${pushing.bin}${path.delimiter}${process.env["PATH"] ?? ""}`,
+        LEFTHOOK_BIN: LEFTHOOK,
+        PNPM_STUB_LOG: pushing.log,
+        ...options.env,
+      },
     },
-  });
+  );
   return { status: ran.status, said: `${ran.stdout}${ran.stderr}` };
 };
 
@@ -289,9 +299,18 @@ const originHas = (pushing: Pushing, branch: string): boolean =>
     `refs/heads/${branch}`,
   ]).status === 0;
 
+const originRefs = (pushing: Pushing): readonly string[] =>
+  gitIn(pushing.origin, "for-each-ref", "--format=%(refname)")
+    .split("\n")
+    .filter((line) => line !== "");
+
+const pushedUnhooked = (pushing: Pushing, ref: string): void => {
+  const pushed = pushFrom(pushing, pushing.root, ref, { flags: ["--no-verify"] });
+  if (pushed.status !== 0) throw new Error(`pushing ${ref} unhooked failed:\n${pushed.said}`);
+};
+
 const seeded = (pushing: Pushing): void => {
-  const pushed = pushFrom(pushing, pushing.root, "main", { flags: ["--no-verify"] });
-  if (pushed.status !== 0) throw new Error(`seeding origin's main failed:\n${pushed.said}`);
+  pushedUnhooked(pushing, "main");
   gitIn(pushing.root, "remote", "set-head", "origin", "main");
 };
 
@@ -300,6 +319,63 @@ const committedChange = (directory: string): void => {
   gitIn(directory, "add", "-A");
   gitIn(directory, "commit", "-q", "--no-verify", "-m", "a change to push");
 };
+
+const tagged = (pushing: Pushing): void => {
+  committedChange(pushing.root);
+  gitIn(pushing.root, "tag", "probe");
+};
+
+const TASK_REF = "refs/ordna/tasks/T-1";
+
+const taskFiled = (pushing: Pushing): void => {
+  writeUnder(pushing.root, "task.md", "a task, left untracked\n");
+  const blob = gitIn(pushing.root, "hash-object", "-w", "task.md").trim();
+  gitIn(pushing.root, "update-ref", TASK_REF, blob);
+};
+
+type CarriesNothing = {
+  readonly push: string;
+  readonly directory: string;
+  readonly before: (pushing: Pushing) => void;
+  readonly refspec: string;
+  readonly left: readonly string[];
+};
+
+const CARRY_NOTHING: readonly CarriesNothing[] = [
+  {
+    push: "a tag",
+    directory: "tag",
+    before: tagged,
+    refspec: "refs/tags/probe",
+    left: ["refs/heads/main", "refs/tags/probe"],
+  },
+  {
+    push: "a tag's deletion",
+    directory: "tag-deletion",
+    before: (pushing) => {
+      tagged(pushing);
+      pushedUnhooked(pushing, "refs/tags/probe");
+    },
+    refspec: ":refs/tags/probe",
+    left: ["refs/heads/main"],
+  },
+  {
+    push: "an ordna ref",
+    directory: "ordna",
+    before: taskFiled,
+    refspec: TASK_REF,
+    left: ["refs/heads/main", TASK_REF],
+  },
+  {
+    push: "a branch's deletion",
+    directory: "branch-deletion",
+    before: (pushing) => {
+      pushedUnhooked(pushing, "main:refs/heads/other");
+    },
+    refspec: ":refs/heads/other",
+    left: ["refs/heads/main"],
+  },
+];
 
 const linkedWorktree = (pushing: Pushing): string => {
   seeded(pushing);
@@ -320,6 +396,7 @@ describe("the pre-push hook over a throwaway repository", () => {
     expect([...ranBy(pushing)].sort()).toEqual(
       pushedSteps().map((step) => `run ${step} GIT_DIR=unset`),
     );
+    expect(pushed.said).not.toContain(SKIPPED);
   });
 
   it("refuses a push, naming each failed gate's run-alone command", () => {
@@ -370,6 +447,36 @@ describe("the pre-push hook over a throwaway repository", () => {
     expect(originHas(pushing, "removal")).toBe(false);
     expect(pushed.said).toContain(runAlone("lint"));
   });
+
+  it("runs when a tag rides with a branch's commits", () => {
+    const pushing = hookedRepository("tag-and-branch");
+    seeded(pushing);
+    tagged(pushing);
+
+    const pushed = pushFrom(pushing, pushing.root, ["refs/tags/probe", "main"], {
+      env: { PNPM_STUB_FAILS: "lint" },
+    });
+
+    expect(pushed.status).not.toBe(0);
+    expect(originRefs(pushing)).toEqual(["refs/heads/main"]);
+    expect(pushed.said).toContain(runAlone("lint"));
+  });
+
+  it.each(CARRY_NOTHING)(
+    "skips every gate on $push, saying why",
+    ({ directory, before, refspec, left }) => {
+      const pushing = hookedRepository(directory);
+      seeded(pushing);
+      before(pushing);
+
+      const pushed = pushFrom(pushing, pushing.root, refspec, { env: { PNPM_STUB_FAILS: "lint" } });
+
+      expect(pushed).toMatchObject({ status: 0 });
+      expect(pushed.said).toContain(SKIPPED);
+      expect(originRefs(pushing)).toEqual(left);
+      expect(ranBy(pushing)).toEqual([]);
+    },
+  );
 
   it("runs from a linked worktree, through the common git directory", () => {
     const pushing = hookedRepository("worktree");
