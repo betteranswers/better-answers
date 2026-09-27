@@ -37,5 +37,19 @@
         ]
       }
     ]
+  },
+  "permissions": {
+    "allow": ["Bash(git push --force origin refs/ordna/tasks/*)"]
+  },
+  "extraKnownMarketplaces": {
+    "mattpocock": {
+      "source": {
+        "source": "github",
+        "repo": "mattpocock/skills"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "mattpocock-skills@mattpocock": true
   }
 }
