@@ -16,8 +16,8 @@ const ACTION_USES = "./.github/actions/git-filter-repo";
 type Runner = { readonly file: string; readonly suiteCommand: string };
 
 const RUNS_THE_SUITE: readonly Runner[] = [
-  // The `full-root` leg, whose `check:libraries` step runs packages/core's erasure suite.
-  { file: "check.yml", suiteCommand: "pnpm check:tree" },
+  // The `full-core` leg, whose shards run packages/core's erasure suite between them.
+  { file: "check.yml", suiteCommand: "pnpm check:core:suite" },
 
   // The `full-api` leg: `tests/ops.test.ts` reaches the same git step through the rehearsal.
   { file: "check.yml", suiteCommand: "pnpm check:api" },

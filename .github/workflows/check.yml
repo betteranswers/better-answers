@@ -121,15 +121,6 @@ jobs:
         with:
           version-file: apps/worker/.tool-versions
           enable-cache: true
-      - name: HF_HOME on the runner's own temp directory, not the checkout
-        run: echo "HF_HOME=${{ runner.temp }}/huggingface" >> "$GITHUB_ENV"
-      # `packages/core`'s cross-tier suite runs the worker over an index job, which loads the
-      # detector's models; without this the leg fetches them afresh every run.
-      - name: the redaction detector's weights, keyed on the pins that name them
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ runner.temp }}/huggingface
-          key: hugging-face-${{ runner.os }}-${{ hashFiles('apps/worker/src/better_answers_worker/redaction/pins.py') }}
       - run: pnpm install --frozen-lockfile
       # The only fresh clone in CI, so the only place install's promise can be tested.
       - name: the pre-commit hook is installed by install alone
@@ -139,8 +130,47 @@ jobs:
           grep -q lefthook "$hook" || { echo "$hook is not lefthook's"; exit 1; }
       - run: uv sync --frozen
         working-directory: apps/worker
+      # `check:tree` less `packages/core`'s suite, which is `full-core`'s.
+      - run: pnpm check:root
+
+  # vitest deals files to the shards by a hash of their paths, not by what they cost.
+  full-core:
+    needs: lane
+    if: ${{ needs.lane.outputs.lane == 'full' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 25
+    strategy:
+      # Cancelling the other shard would hide its failures until this one's were fixed.
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version-file: apps/worker/.tool-versions
+          enable-cache: true
+      - name: HF_HOME on the runner's own temp directory, not the checkout
+        run: echo "HF_HOME=${{ runner.temp }}/huggingface" >> "$GITHUB_ENV"
+      # The cross-tier suite runs the worker over an index job, which loads the detector's
+      # models; without this the shard holding it fetches them afresh every run.
+      - name: the redaction detector's weights, keyed on the pins that name them
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/huggingface
+          key: hugging-face-${{ runner.os }}-${{ hashFiles('apps/worker/src/better_answers_worker/redaction/pins.py') }}
+      - run: pnpm install --frozen-lockfile
+      - run: uv sync --frozen
+        working-directory: apps/worker
       - uses: ./.github/actions/git-filter-repo
-      - run: pnpm check:tree
+      - run: pnpm check:core:suite --shard="${SHARD}"
+        env:
+          SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
 
   full-api:
     needs: lane
@@ -272,6 +302,7 @@ jobs:
         lane,
         docs-gates,
         full-root,
+        full-core,
         full-api,
         full-web,
         full-worker,
