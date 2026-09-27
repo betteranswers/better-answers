@@ -27,7 +27,7 @@ const playwrightOver = (spec: string): Run => {
     const reporter = JSON.stringify(path.join(web, "e2e", "flaky-report.ts"));
     writeFileSync(
       path.join(tree, "playwright.config.ts"),
-      `export default { testDir: ".", retries: 1, reporter: [[${reporter}]] };\n`,
+      `export default { testDir: ".", retries: 1, reporter: [[${reporter}]], use: { trace: "on-first-retry" } };\n`,
     );
     writeFileSync(path.join(tree, "a.spec.ts"), spec);
     const summary = path.join(tree, "summary.md");
@@ -39,7 +39,12 @@ const playwrightOver = (spec: string): Run => {
       {
         cwd: tree,
         encoding: "utf8",
-        env: { ...process.env, GITHUB_STEP_SUMMARY: summary, GITHUB_WORKSPACE: tree },
+        env: {
+          ...process.env,
+          GITHUB_STEP_SUMMARY: summary,
+          GITHUB_WORKSPACE: tree,
+          TRACE_ARTIFACT: "browser-traces-attempt-1",
+        },
       },
     );
     if (run.status !== 0) {
@@ -70,7 +75,8 @@ describe("the flaky report", () => {
         "the checkout › takes a payment failed, then passed on retry: Error: the first attempt fails\n",
     );
     expect(run.summary).toContain(
-      "| the checkout › takes a payment | `a.spec.ts:3` | Error: the first attempt fails |\n",
+      "| the checkout › takes a payment | `a.spec.ts:3` | Error: the first attempt fails | " +
+        "`browser-traces-attempt-1/a-the-checkout-takes-a-payment-retry1/trace.zip` |\n",
     );
   }, 60_000);
 

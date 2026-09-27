@@ -9,7 +9,10 @@ type Flake = {
   readonly file: string;
   readonly line: number;
   readonly firstFailure: string;
+  readonly trace: string | undefined;
 };
+
+const workspace = (): string => process.env["GITHUB_WORKSPACE"] ?? process.cwd();
 
 const describesOf = (suite: Suite | undefined): readonly string[] =>
   suite?.type === "describe" ? [...describesOf(suite.parent), suite.title] : [];
@@ -20,13 +23,25 @@ const firstLineOf = (message: string | undefined): string =>
     .map((line) => line.trim())
     .find((line) => line !== "") ?? "no error message";
 
+/** The trace's path in the artifact CI uploads, or in the workspace when no artifact is named. */
+const traceOf = (test: TestCase): string | undefined => {
+  const trace = test.results
+    .flatMap((result) => result.attachments)
+    .find((attachment) => attachment.name === "trace")?.path;
+  const outputDir = test.parent.project()?.outputDir;
+  if (trace === undefined || outputDir === undefined) return undefined;
+  const root = process.env["TRACE_ARTIFACT"] ?? path.relative(workspace(), outputDir);
+  return `${root}/${path.relative(outputDir, trace)}`;
+};
+
 const flakeOf = (test: TestCase): Flake => ({
   title: [...describesOf(test.parent), test.title].join(" › "),
-  file: path.relative(process.env["GITHUB_WORKSPACE"] ?? process.cwd(), test.location.file),
+  file: path.relative(workspace(), test.location.file),
   line: test.location.line,
   firstFailure: firstLineOf(
     test.results.find((result) => result.error !== undefined)?.error?.message,
   ),
+  trace: traceOf(test),
 });
 
 const escapedData = (text: string): string =>
@@ -48,11 +63,12 @@ const summaryOf = (flakes: readonly Flake[]): string =>
     "",
     "Each failed, then passed on retry, so the run stayed green. Each needs its cause found.",
     "",
-    "| Test | Where | First failure |",
-    "| --- | --- | --- |",
+    "| Test | Where | First failure | Trace |",
+    "| --- | --- | --- | --- |",
     ...flakes.map(
       (flake) =>
-        `| ${cell(flake.title)} | \`${flake.file}:${flake.line}\` | ${cell(flake.firstFailure)} |`,
+        `| ${cell(flake.title)} | \`${flake.file}:${flake.line}\` | ${cell(flake.firstFailure)} | ` +
+        `${flake.trace === undefined ? "none recorded" : `\`${flake.trace}\``} |`,
     ),
     "",
   ].join("\n");
