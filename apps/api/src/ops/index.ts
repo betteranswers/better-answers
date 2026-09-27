@@ -49,6 +49,7 @@ import { tablesPresent, type PostgresDoor } from "@better-answers/core/store/pos
 import { SWEEPS, withSweepLock } from "@better-answers/core/sweeps";
 import {
   addMember,
+  addPerson,
   BOOTSTRAP,
   personIdByEmail,
   principalOfMember,
@@ -56,6 +57,7 @@ import {
   renameWorkspace,
   setOperatorMark,
   type AddMemberRefusal,
+  type AddPersonRefusal,
   type ProvisionRefusal,
   type RenameRefusal,
 } from "@better-answers/core/workspaces";
@@ -173,6 +175,8 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
   dump-grep --tokens <a,b,…>                                stdin: a plain-SQL dump; per token, which COPY section holds it and in how many lines — never a line
   provision-workspace --name <name> --slug <slug> --admin <email>
                                                             a client's workspace with its first Admin, a person who has signed in; the id it minted is first on the done line
+  add-person --email <address> --name <display name>
+                                                            a person named before their first sign-in, so add-member can take them; the id it minted is first on the done line
   add-member --workspace <id> --email <email> --role <${ROLES.join("|")}>
                                                             a signed-in person made a member of the workspace; a repeat is refused and never changes a role
   rename-workspace --workspace <id> [--name <name>] [--slug <slug>]
@@ -910,7 +914,7 @@ const writeTheReport = async (
 };
 
 const notSignedIn = (email: string): string =>
-  `no-such-user: ${email} has not signed in; have them sign in with an email code first, then run this again`;
+  `no-such-user: ${email} has not signed in; have them sign in with an email code first, or add them with add-person, then run this again`;
 
 const noDisplayName = (email: string): string =>
   `no-display-name: ${email} has given no display name; have them sign in and give one, then run this again`;
@@ -1037,6 +1041,44 @@ const addMemberCommand = async (doors: Doors, flags: Flags, io: OpsIo): Promise<
   return DONE;
 };
 
+const ADD_PERSON_USAGE = "add-person: --email <address> and --name <display name> are required";
+
+const personReason = (refusal: AddPersonRefusal, email: string): string => {
+  switch (refusal) {
+    case "malformed":
+      return `malformed: ${email} is not an email address`;
+    case "person-exists":
+      return `person-exists: ${email} is already a person; add-member takes them as they stand`;
+    default:
+      return `${refusal}: a display name is one line of 1 to 100 characters, with no angle brackets or control characters`;
+  }
+};
+
+const personRefused = (refusal: AddPersonRefusal | Error, email: string, io: OpsIo): number => {
+  if (refusal instanceof Error) {
+    io.say(`add-person: REFUSED — ${refusal.message}`);
+    return REFUSED;
+  }
+  io.say(`add-person: REFUSED — ${personReason(refusal, email)}`);
+  return EXIT_OF_CLASS[refusalOf(refusal).class];
+};
+
+const addPersonCommand = async (doors: Doors, flags: Flags, io: OpsIo): Promise<number> => {
+  const email = flagValue(flags, "email");
+  const name = flagValue(flags, "name");
+  if (email === undefined || name === undefined) {
+    io.say(ADD_PERSON_USAGE);
+    return USAGE;
+  }
+  const added = await addPerson(IDENTITY_PRINCIPAL, doors.postgres, { email, name });
+  if (!added.ok) return personRefused(added.error, email, io);
+  const person = added.value;
+  io.say(
+    `add-person: done — ${person.personId}, ${person.email}, named ${person.displayName}; unverified until their first email-code sign-in`,
+  );
+  return DONE;
+};
+
 const renameReason = (refusal: RenameRefusal | Error, workspaceId: string): string => {
   if (refusal instanceof Error) return refusal.message;
   switch (refusal) {
@@ -1124,6 +1166,7 @@ const SLICELESS_COMMANDS = new Map<
   ["smoke", (_doors, flags, io) => smoke(flags, io)],
   ["dump-grep", (_doors, flags, io) => dumpGrep(flags, io)],
   ["provision-workspace", provisionWorkspaceCommand],
+  ["add-person", addPersonCommand],
   ["add-member", addMemberCommand],
   ["rename-workspace", renameWorkspaceCommand],
   ["operator", operatorCommand],

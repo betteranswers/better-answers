@@ -573,10 +573,10 @@ to it by IRI and never restates it (ADR 0014).
 - **actor alias** — an Admin's mapping of an imported actor id to a member, so *Checked by* can
   name them; the file is never rewritten.
 - **person id** — the platform's one stable id for a person: minted by the platform at their first
-  sign-in, carried on the identity set's user row, `userId` on every Principal, and what every
-  record names a person by as `human:<person id>`. Never written into a concept file, which keeps
-  `human:<email>` (ADR 0019). _Avoid_: member id (retired 05/09/2026 — the member row's key names
-  nothing), user id (on a screen).
+  sign-in, or earlier when the platform adds them by name, carried on the identity set's user row,
+  `userId` on every Principal, and what every record names a person by as `human:<person id>`.
+  Never written into a concept file, which keeps `human:<email>` (ADR 0019). _Avoid_: member id
+  (retired 05/09/2026 — the member row's key names nothing), user id (on a screen).
 - **display name** — the one line a person is credited by wherever the platform names them:
   *Checked by*, a commit's author, a member list. The person states it themselves; an Admin flags
   an inappropriate one and the *operator* corrects it, since one name is shown in every workspace

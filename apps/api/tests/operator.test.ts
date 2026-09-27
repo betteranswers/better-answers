@@ -211,7 +211,7 @@ describe("operator — the mark an ops command sets and clears", () => {
     expect(run).toEqual({
       exitCode: 1,
       lines: [
-        "operator: REFUSED — no-such-user: nobody@acme.invalid has not signed in; have them sign in with an email code first, then run this again",
+        "operator: REFUSED — no-such-user: nobody@acme.invalid has not signed in; have them sign in with an email code first, or add them with add-person, then run this again",
       ],
     });
     expect(await operatorRowCount()).toBe(before);

@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
 import { Pool } from "pg";
 import { beforeAll, describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { find, open, trustWords } from "@better-answers/core/answering";
 import { writeConcept, writeManifest } from "@better-answers/core/concepts";
@@ -50,7 +51,7 @@ import {
   type OpsIo,
 } from "../src/ops/index.ts";
 import { readTreeUnder } from "../src/ops/read-tree.ts";
-import { connectAsHost } from "./flow.ts";
+import { connectAsHost, signIn } from "./flow.ts";
 import {
   APP_HOSTNAME,
   capturingLogger,
@@ -1778,7 +1779,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(run.exitCode).toBe(1);
       expect(run.lines).toEqual([
-        "provision-workspace: REFUSED — no-such-user: nobody@acme.invalid has not signed in; have them sign in with an email code first, then run this again",
+        "provision-workspace: REFUSED — no-such-user: nobody@acme.invalid has not signed in; have them sign in with an email code first, or add them with add-person, then run this again",
       ]);
       expect(await workspacesWithSlug(app(), slug)).toBe(0);
     });
@@ -1936,7 +1937,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect(run.exitCode).toBe(1);
       expect(run.lines).toEqual([
-        "add-member: REFUSED — no-such-user: nobody@acme.invalid has not signed in; have them sign in with an email code first, then run this again",
+        "add-member: REFUSED — no-such-user: nobody@acme.invalid has not signed in; have them sign in with an email code first, or add them with add-person, then run this again",
       ]);
       expect(await rowsOfAct(app(), workspaceId, "people.member.added")).toEqual([]);
     });
@@ -2017,6 +2018,173 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(noEmail.lines).toEqual([
         "add-member: --workspace <id>, --email <email> and --role <Admin|Editor|Viewer> are required",
       ]);
+    });
+  });
+
+  describe("add-person — a named person before their first sign-in", () => {
+    const addingPerson = (app: TestApp, flags: readonly string[]): Promise<Run> =>
+      opsWith(app, ["add-person", ...flags], {});
+
+    const personsAt = async (app: TestApp, email: string) => {
+      const found = await app.database.superuser.query<{
+        id: string;
+        name: string;
+        email: string;
+        email_verified: boolean;
+      }>('SELECT id, name, email, email_verified FROM "user" WHERE lower(email) = lower($1)', [
+        email,
+      ]);
+      return found.rows;
+    };
+
+    const addedRowsAbout = async (app: TestApp, personId: string) => {
+      const found = await app.database.superuser.query<Record<string, unknown>>(
+        `SELECT actor, subject_id, detail FROM identity_audit_event
+          WHERE subject_id = $1 AND act = 'people.person.added'`,
+        [personId],
+      );
+      return found.rows;
+    };
+
+    const addedRowCount = async (app: TestApp): Promise<number> => {
+      const found = await app.database.superuser.query<{ rows: number }>(
+        "SELECT count(*)::int AS rows FROM identity_audit_event WHERE act = 'people.person.added'",
+      );
+      return found.rows[0]?.rows ?? 0;
+    };
+
+    const aVerifier = (): string => `matthew-${ulid().toLowerCase()}@phew.invalid`;
+
+    const sessionHolder = z.object({
+      user: z.object({ id: z.string(), name: z.string(), emailVerified: z.boolean() }),
+    });
+
+    it("writes the person and its row, its id first", async () => {
+      const email = aVerifier();
+
+      const run = await addingPerson(app(), [
+        "--email",
+        email.toUpperCase(),
+        "--name",
+        "Matthew Burgess",
+      ]);
+
+      expect(run.exitCode).toBe(0);
+      const personId = idOnTheDoneLine(run);
+      expect(run.lines).toEqual([
+        `add-person: done — ${personId}, ${email}, named Matthew Burgess; unverified until their first email-code sign-in`,
+      ]);
+      expect(await personsAt(app(), email)).toEqual([
+        { id: personId, name: "Matthew Burgess", email, email_verified: false },
+      ]);
+      expect(await addedRowsAbout(app(), personId)).toEqual([
+        { actor: "process:better-answers-identity", subject_id: personId, detail: {} },
+      ]);
+    });
+
+    it("lets add-member take them, and their sign-in finds them", async () => {
+      const { workspaceId } = await app().provision();
+      const email = aVerifier();
+      const added = await addingPerson(app(), ["--email", email, "--name", "Matthew Burgess"]);
+      const personId = idOnTheDoneLine(added);
+
+      const member = await adding(app(), workspaceId, email, "Admin");
+      const client = app().client();
+      await signIn(app(), client, email);
+
+      expect(member.exitCode).toBe(0);
+      expect(await membershipsOf(app(), workspaceId, personId)).toEqual([
+        { id: expect.stringMatching(ULID_SHAPE), role: "Admin" },
+      ]);
+      const session = sessionHolder.parse(await (await client.fetch("/get-session")).json());
+      expect(session.user).toEqual({ id: personId, name: "Matthew Burgess", emailVerified: true });
+      expect(await personsAt(app(), email)).toEqual([
+        { id: personId, name: "Matthew Burgess", email, email_verified: true },
+      ]);
+    });
+
+    it.each([
+      [
+        "a non-address",
+        ["--email", "matthew.phew.invalid", "--name", "Matthew Burgess"],
+        "malformed: matthew.phew.invalid is not an email address",
+      ],
+      [
+        "a two-line name",
+        ["--email", "matthew@phew.invalid", "--name", "Matthew\nBurgess"],
+        "display-name-not-one-line: a display name is one line of 1 to 100 characters, with no angle brackets or control characters",
+      ],
+      [
+        "an angle-bracketed name",
+        ["--email", "matthew@phew.invalid", "--name", "Matthew <m@phew.invalid>"],
+        "display-name-angle-bracket: a display name is one line of 1 to 100 characters, with no angle brackets or control characters",
+      ],
+    ])("refuses %s in the malformed class, writing nothing", async (_shape, flags, said) => {
+      const before = await addedRowCount(app());
+
+      const run = await addingPerson(app(), flags);
+
+      expect(run).toMatchObject({ exitCode: 2, lines: [`add-person: REFUSED — ${said}`] });
+      expect(await personsAt(app(), flags[1] ?? "")).toEqual([]);
+      expect(await addedRowCount(app())).toBe(before);
+    });
+
+    it("refuses person-exists on a repeat or a signed-in address", async () => {
+      const email = aVerifier();
+      await addingPerson(app(), ["--email", email, "--name", "Matthew Burgess"]);
+      const signedIn = await app().person(undefined, "Priya Shah");
+      const before = await addedRowCount(app());
+
+      const again = await addingPerson(app(), ["--email", email, "--name", "Matt Burgess"]);
+      const held = await addingPerson(app(), [
+        "--email",
+        signedIn.email.toUpperCase(),
+        "--name",
+        "Someone Else",
+      ]);
+
+      expect([again.exitCode, held.exitCode]).toEqual([8, 8]);
+      expect([...again.lines, ...held.lines]).toEqual([
+        `add-person: REFUSED — person-exists: ${email} is already a person; add-member takes them as they stand`,
+        `add-person: REFUSED — person-exists: ${signedIn.email.toUpperCase()} is already a person; add-member takes them as they stand`,
+      ]);
+      expect((await personsAt(app(), email)).map((row) => row.name)).toEqual(["Matthew Burgess"]);
+      expect((await personsAt(app(), signedIn.email)).map((row) => row.name)).toEqual([
+        "Priya Shah",
+      ]);
+      expect(await addedRowCount(app())).toBe(before);
+    });
+
+    it("exits refused, in no word, when the store is unreachable", async () => {
+      const gone = new Pool({ connectionString: app().database.connectionUri, max: 1 });
+      await gone.end();
+
+      const run = await opsWith(
+        app(),
+        ["add-person", "--email", aVerifier(), "--name", "Matthew Burgess"],
+        { doors: { postgres: openPostgres(gone) } },
+      );
+
+      expect(run.exitCode).toBe(1);
+      expect(run.lines).toEqual([expect.stringMatching(/^add-person: REFUSED — .*pool/i)]);
+    });
+
+    it.each([
+      ["no --name", ["--email", "matthew@phew.invalid"]],
+      ["no --email", ["--name", "Matthew Burgess"]],
+    ])("answers usage to %s", async (_shape, flags) => {
+      const run = await ops(app(), ["add-person", ...flags]);
+
+      expect(run).toMatchObject({
+        exitCode: 2,
+        lines: ["add-person: --email <address> and --name <display name> are required"],
+      });
+    });
+
+    it("names the command in the usage", async () => {
+      const run = await ops(app(), ["help"]);
+
+      expect(run.lines.join("\n")).toContain("add-person --email <address> --name <display name>");
     });
   });
 

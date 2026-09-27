@@ -19,6 +19,7 @@ import type {
 import type { BindUploadRefusal, SourceRefusal } from "../src/sources/index.ts";
 import type {
   AddMemberRefusal,
+  AddPersonRefusal,
   ProvisionRefusal,
   SetDisplayNameRefusal,
 } from "../src/workspaces/index.ts";
@@ -85,6 +86,7 @@ const REGISTER = {
   "slug-taken": "conflict by workspaces",
   "workspace-exists": "conflict by workspaces",
   "already-a-member": "conflict by workspaces",
+  "person-exists": "conflict by workspaces",
   "no-display-name": "precondition by workspaces",
   "display-name-empty": "malformed by workspaces",
   "display-name-not-one-line": "malformed by workspaces",
@@ -168,6 +170,7 @@ describe("the refusal-word walk", () => {
     expectTypeOf<BindUploadRefusal>().toExtend<EveryRegisteredWord | Error>();
     expectTypeOf<ProvisionRefusal>().toExtend<EveryRegisteredWord>();
     expectTypeOf<AddMemberRefusal>().toExtend<EveryRegisteredWord>();
+    expectTypeOf<AddPersonRefusal>().toExtend<EveryRegisteredWord>();
     expectTypeOf<SetDisplayNameRefusal>().toExtend<EveryRegisteredWord>();
     expectTypeOf<RequestAccessRefusal>().toExtend<EveryRegisteredWord>();
     expectTypeOf<DecideRefusal>().toExtend<EveryRegisteredWord>();

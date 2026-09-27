@@ -20,6 +20,7 @@ import {
 } from "../src/store/postgres/index.ts";
 import {
   addMember,
+  addPerson,
   correctDisplayName,
   listWorkspaces,
   operatorAddresses,
@@ -46,9 +47,12 @@ import {
 } from "./platform.ts";
 import {
   addressOf,
+  countWaitingOnLocks,
   postgresForSuite,
   readingAs,
   seedingWith,
+  until,
+  whileActsWaitAt,
   whileWritesAreRefused,
 } from "./suite-postgres.ts";
 
@@ -1259,6 +1263,146 @@ describe("the person behind an email", () => {
       ok: true,
       value: undefined,
     });
+  });
+});
+
+describe("adding a person before their first sign-in, the platform's act", () => {
+  const personsAt = async (email: string) => {
+    const found = await db().pool.query<{
+      id: string;
+      name: string;
+      email: string;
+      email_verified: boolean;
+      operator: boolean;
+      credentials_revoked_at: Date | null;
+    }>(
+      `SELECT id, name, email, email_verified, operator, credentials_revoked_at
+         FROM "user" WHERE lower(email) = lower($1)`,
+      [email],
+    );
+    return found.rows;
+  };
+
+  const addedRowCount = async (): Promise<number> => {
+    const found = await db().pool.query<{ rows: number }>(
+      "SELECT count(*)::int AS rows FROM identity_audit_event WHERE act = 'people.person.added'",
+    );
+    return found.rows[0]?.rows ?? 0;
+  };
+
+  const adding = (email: string, name: string) =>
+    addPerson(bootstrap, openPostgres(db().runtimePool), { email, name });
+
+  it("writes the person unverified, lower-cased and named, with its row", async () => {
+    const email = addressOf("matthew");
+
+    const added = await adding(`  ${email.toUpperCase()} `, "  Matthew Burgess ");
+
+    expect(added).toEqual({
+      ok: true,
+      value: { personId: expect.stringMatching(ULID_SHAPE), email, displayName: "Matthew Burgess" },
+    });
+    const personId = added.ok ? added.value.personId : "";
+    expect(await personsAt(email)).toEqual([
+      {
+        id: personId,
+        name: "Matthew Burgess",
+        email,
+        email_verified: false,
+        operator: false,
+        credentials_revoked_at: null,
+      },
+    ]);
+    expect(await identityRowsAbout(personId)).toEqual([
+      { act: "people.person.added", actor: "process:better-answers-bootstrap", detail: {} },
+    ]);
+  });
+
+  it("lets add-member take the address it wrote", async () => {
+    const { door, workspaceId } = await provisionedWorkspace(db(), "Phew");
+    const email = addressOf("verifier");
+    const added = await adding(email, "Matthew Burgess");
+
+    const member = await addMember(bootstrap, door, { workspaceId, email, role: "Admin" });
+
+    expect(member).toMatchObject({
+      ok: true,
+      value: { userId: added.ok ? added.value.personId : "", role: "Admin" },
+    });
+  });
+
+  it.each(["", "matthew", "matthew@", "@phew.invalid", `${"m".repeat(250)}@phew.invalid`])(
+    "refuses %j as malformed, writing nothing",
+    async (email) => {
+      const before = await addedRowCount();
+
+      expect(await adding(email, "Matthew Burgess")).toEqual({ ok: false, error: "malformed" });
+      expect(await personsAt(email)).toEqual([]);
+      expect(await addedRowCount()).toBe(before);
+    },
+  );
+
+  it.each([
+    ["display-name-empty", "   "],
+    ["display-name-not-one-line", "Matthew\nBurgess"],
+    ["display-name-control-character", "Matthew\u0007Burgess"],
+    ["display-name-angle-bracket", "Matthew <m@phew.invalid>"],
+    ["display-name-too-long", "M".repeat(101)],
+  ])("refuses %s, writing nothing", async (refusal, name) => {
+    const email = addressOf("named");
+    const before = await addedRowCount();
+
+    expect(await adding(email, name)).toEqual({ ok: false, error: refusal });
+    expect(await personsAt(email)).toEqual([]);
+    expect(await addedRowCount()).toBe(before);
+  });
+
+  it("refuses person-exists for an address held however cased", async () => {
+    const email = addressOf("held");
+    const heldId = await seedPerson(db().pool, { email: email.toUpperCase(), name: "Held" });
+    const added = addressOf("added");
+    await adding(added, "Added Once");
+    const before = await addedRowCount();
+
+    const answers = [await adding(email, "Someone Else"), await adding(added, "Added Twice")];
+
+    expect(answers).toEqual([
+      { ok: false, error: "person-exists" },
+      { ok: false, error: "person-exists" },
+    ]);
+    expect((await personsAt(email)).map((row) => [row.id, row.name])).toEqual([[heldId, "Held"]]);
+    expect((await personsAt(added)).map((row) => row.name)).toEqual(["Added Once"]);
+    expect(await addedRowCount()).toBe(before);
+  });
+
+  it("adds one of two concurrent adds of one address", async () => {
+    const email = addressOf("racing");
+    const before = await addedRowCount();
+
+    const answers = await whileActsWaitAt(db().pool, "user", "INSERT", async (release) => {
+      const racing = [adding(email, "First Racer"), adding(email, "Second Racer")];
+      await until(async () => (await countWaitingOnLocks(db().pool)) === 2);
+      await release();
+      return Promise.all(racing);
+    });
+
+    expect(answers.map((answer) => (answer.ok ? "added" : answer.error)).toSorted()).toEqual([
+      "added",
+      "person-exists",
+    ]);
+    expect(await personsAt(email)).toHaveLength(1);
+    expect(await addedRowCount()).toBe(before + 1);
+  });
+
+  it("writes the person and its row together, or neither", async () => {
+    const email = addressOf("atomic");
+
+    const added = await whileWritesAreRefused(db().pool, "identity_audit_event", () =>
+      adding(email, "Matthew Burgess"),
+    );
+
+    expect(added).toMatchObject({ ok: false, error: expect.any(Error) });
+    expect(await personsAt(email)).toEqual([]);
   });
 });
 

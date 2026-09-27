@@ -12,6 +12,7 @@ export const WORKSPACE_REFUSALS = declareRefusals("workspaces", {
   "slug-taken": "conflict",
   "workspace-exists": "conflict",
   "already-a-member": "conflict",
+  "person-exists": "conflict",
 
   // A person is credited by name wherever they act, so nobody is let in without one.
   "no-display-name": "precondition",
