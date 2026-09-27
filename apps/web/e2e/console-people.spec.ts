@@ -516,7 +516,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await expect(personButton(page, "Priya Shah")).toBeFocused();
   });
 
-  test("shows a grant Claude disconnected as ended, by neither a person nor the platform", async ({
+  test("shows a grant Claude disconnected as ended, naming no person", async ({
     page,
     request,
     baseURL,
