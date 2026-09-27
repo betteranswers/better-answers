@@ -109,6 +109,14 @@ gh api graphql -F owner='{owner}' -F name='{repo}' -f query='
   }'
 ```
 
+**NB:** Creating a PR through `pnpm land` with a new branch name lands you on the branch - return to the working directory after the PR has been opened.
+
+### Merge queue facts
+
+- GitHub clears the auto-merge flag when a PR enters the merge queue. Do not read that as 'disarmed'.
+- `gh pr view` has no `isInMergeQueue` field. Use GraphQL: `gh api graphql -f query='{repository(owner:"O",name:"R"){pullRequest(number:N){mergeQueueEntry{state position}}}}'`.
+- Land sibling PRs that touch the same files one at a time, rebasing between merges.
+
 ### The commit's form
 
 **Conventional Commits: a subject `type(scope): summary` of 72 characters at most. Then a blank line and the body: what changed and why, in plain prose. Then a blank line and the footer, `Refs: T-nnn`.**
@@ -152,6 +160,17 @@ You need:
 - Playwright's Chromium for the web (`pnpm --filter @better-answers/web exec playwright install chromium`);
 - a warm `HF_HOME` for the detector's weights;
 - `git-filter-repo` at the version `apps/api/Dockerfile` pins.
+
+### Platform: macOS
+
+- The shell is macOS with bash 3.2 and BSD userland. Do NOT use GNU-only sed flags (use `sed -i ''` or perl), bash associative arrays, or other bash 4+ features in scripts.
+- Prefer `/usr/bin/git` over Homebrew git for `ordna` commands, because Homebrew git has hung `ordna list`.
+
+### Multi-session coordination
+
+Never write helper scripts to shared /tmp paths. Other sessions run in parallel and overwrite them. Use a session-scoped directory such as `$(mktemp -d)` or `.claude/tmp/<session-id>/`.
+
+### Vitest
 
 A vitest run starts its stores once, from `globalSetup`. It then gives each file its own share of them:
 
