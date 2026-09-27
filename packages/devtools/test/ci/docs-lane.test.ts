@@ -539,7 +539,7 @@ const legsOf = (lane: string): readonly string[] =>
 
 const stepsOfJob = (job: string): readonly Step[] => checkJobs()[job]?.steps ?? [];
 
-const laneStep = (): string => stepsOfJob(LANE).find((one) => one.id === LANE)?.run ?? "exit 9";
+const laneStep = (): Step | undefined => stepsOfJob(LANE).find((one) => one.id === LANE);
 
 /** The matrix leg hands each of its jobs one slice of a root script's files. */
 const SHARD_ARGUMENT = / --shard="\$\{SHARD\}"$/;
@@ -582,15 +582,35 @@ const CODE_LANE = "full";
 
 const A_BASE = "0123456789abcdef0123456789abcdef01234567";
 
+const TARGET = "refs/heads/main";
+
+/** Where `TARGET` points, which every group in the queue descends from. */
+const TARGET_TIP = "1111111111111111111111111111111111111111";
+
+/** The head of the group queued ahead, which GitHub gives the group behind it as `base_sha`. */
+const AHEAD = "2222222222222222222222222222222222222222";
+
+/** A run's `github` context by the path an expression names; GitHub reads an absent path as "". */
+type Context = Readonly<Record<string, string>>;
+
+const aGroupOn = (parent: string): Context => ({
+  "github.event_name": "merge_group",
+  "github.event.merge_group.base_sha": parent,
+  "github.event.merge_group.base_ref": TARGET,
+});
+
+const AN_IMAGE_CHANGE = ["apps/worker/pyproject.toml", "apps/worker/uv.lock"];
+
 type LaneStepCase = {
   readonly run: string;
 
-  readonly event: Readonly<Record<string, string>>;
+  readonly github: Context;
 
   /** Whether the stubbed `git fetch` finds the base. */
   readonly fetched: boolean;
 
-  readonly changed: readonly string[];
+  /** What `git diff` names from each base to HEAD; a base absent here is one git cannot read. */
+  readonly changedSince: Readonly<Record<string, readonly string[]>>;
 
   readonly lane: string;
 
@@ -600,65 +620,87 @@ type LaneStepCase = {
 const LANE_STEPS: readonly LaneStepCase[] = [
   {
     run: "a pull request",
-    event: { EVENT: "pull_request" },
+    github: { "github.event_name": "pull_request" },
     fetched: true,
-    changed: ["pnpm-lock.yaml"],
+    changedSince: { [TARGET_TIP]: ["pnpm-lock.yaml"] },
     lane: "pr",
     images: "yes",
   },
   {
     run: "a docs-only merge group",
-    event: { EVENT: "merge_group", MERGE_GROUP_BASE: A_BASE },
+    github: aGroupOn(TARGET_TIP),
     fetched: true,
-    changed: ["docs/vision.md"],
+    changedSince: { [TARGET_TIP]: ["docs/vision.md"] },
     lane: "docs",
     images: "no",
   },
   {
     run: "a merge group changing source",
-    event: { EVENT: "merge_group", MERGE_GROUP_BASE: A_BASE },
+    github: aGroupOn(TARGET_TIP),
     fetched: true,
-    changed: ["apps/api/src/main.ts"],
+    changedSince: { [TARGET_TIP]: ["apps/api/src/main.ts"] },
     lane: "full",
     images: "no",
   },
   {
     run: "a merge group changing a lockfile",
-    event: { EVENT: "merge_group", MERGE_GROUP_BASE: A_BASE },
+    github: aGroupOn(TARGET_TIP),
     fetched: true,
-    changed: ["apps/api/src/main.ts", "pnpm-lock.yaml"],
+    changedSince: { [TARGET_TIP]: ["apps/api/src/main.ts", "pnpm-lock.yaml"] },
+    lane: "full",
+    images: "yes",
+  },
+  {
+    run: "a docs group behind an image change",
+    github: aGroupOn(AHEAD),
+    fetched: true,
+    changedSince: {
+      [AHEAD]: ["docs/vision.md"],
+      [TARGET_TIP]: [...AN_IMAGE_CHANGE, "docs/vision.md"],
+    },
+    lane: "full",
+    images: "yes",
+  },
+  {
+    run: "a test-only group behind an image change",
+    github: aGroupOn(AHEAD),
+    fetched: true,
+    changedSince: {
+      [AHEAD]: ["apps/worker/tests/test_pipeline_landed.py"],
+      [TARGET_TIP]: [...AN_IMAGE_CHANGE, "apps/worker/tests/test_pipeline_landed.py"],
+    },
     lane: "full",
     images: "yes",
   },
   {
     run: "an unfetched merge group base",
-    event: { EVENT: "merge_group", MERGE_GROUP_BASE: A_BASE },
+    github: aGroupOn(TARGET_TIP),
     fetched: false,
-    changed: ["docs/vision.md"],
+    changedSince: { [TARGET_TIP]: ["docs/vision.md"] },
     lane: "full",
     images: "yes",
   },
   {
     run: "a merge group with no base",
-    event: { EVENT: "merge_group" },
+    github: { "github.event_name": "merge_group" },
     fetched: true,
-    changed: ["docs/vision.md"],
+    changedSince: { [TARGET_TIP]: ["docs/vision.md"] },
     lane: "full",
     images: "yes",
   },
   {
     run: "a branch's first push",
-    event: { EVENT: "push", PUSHED_FROM: "0".repeat(40) },
+    github: { "github.event_name": "push", "github.event.before": "0".repeat(40) },
     fetched: true,
-    changed: ["docs/vision.md"],
+    changedSince: { ["0".repeat(40)]: ["docs/vision.md"] },
     lane: "full",
     images: "yes",
   },
   {
     run: "a called run changing source",
-    event: { EVENT: "workflow_call", PUSHED_FROM: A_BASE },
+    github: { "github.event_name": "workflow_call", "github.event.before": A_BASE },
     fetched: true,
-    changed: ["packages/core/src/kernel/actor.ts"],
+    changedSince: { [A_BASE]: ["packages/core/src/kernel/actor.ts"] },
     lane: "full",
     images: "no",
   },
@@ -680,27 +722,69 @@ const stub = (bin: string, name: string, script: string): void => {
   chmodSync(path.join(bin, name), 0o755);
 };
 
-/** Over a `git` that answers from `changed` and fetches nothing; `answered` replaces the script's. */
+const EXPRESSION = /^\$\{\{ (?<path>[\w.]+) \}\}$/;
+
+/** The step's `env:` as GitHub expands it over `github`, refusing any expression but one path. */
+const laneStepEnv = (github: Context): Readonly<Record<string, string>> =>
+  Object.fromEntries(
+    Object.entries(laneStep()?.env ?? {}).map(([name, value]) => {
+      const named = EXPRESSION.exec(value)?.groups?.["path"];
+      if (named === undefined) throw new Error(`the lane step's ${name} reads more than a path`);
+      return [name, github[named] ?? ""];
+    }),
+  );
+
+type Scratch = {
+  readonly asked: string;
+
+  readonly fetched: boolean;
+
+  /** A file per base that `git diff` can read, holding the paths it names from there. */
+  readonly since: string;
+
+  readonly fetchHead: string;
+};
+
+/** Fetches `TARGET` as `TARGET_TIP` and a sha as itself, as the remote would. */
+const gitOver = ({ asked, fetched, since, fetchHead }: Scratch): string =>
+  [
+    `echo "$1" >> '${asked}'`,
+    'for word in "$@"; do before="$last"; last="$word"; done',
+    'case "$1" in',
+    fetched
+      ? `  fetch) if [ "$last" = '${TARGET}' ]; then echo ${TARGET_TIP}; else echo "$last"; fi > '${fetchHead}' ;;`
+      : "  fetch) exit 128 ;;",
+    `  rev-parse) [ "$last" = FETCH_HEAD ] && cat '${fetchHead}' ;;`,
+    `  diff) [ "$last" = HEAD ] && cat '${since}/'"$before" ;;`,
+    "  *) exit 3 ;;",
+    "esac",
+    "",
+  ].join("\n");
+
+/** Over a `git` answering from `changedSince`; `answered` replaces the lane script's answer. */
 const runTheLaneStep = (
-  { event, fetched, changed }: LaneStepCase,
+  { github, fetched, changedSince }: LaneStepCase,
   answered?: string,
 ): LaneStepRun => {
   const scratch = mkdtempSync(path.join(tmpdir(), "lane-step-"));
   const bin = path.join(scratch, "bin");
-  const diffed = path.join(scratch, "changed");
+  const since = path.join(scratch, "since");
   const asked = path.join(scratch, "asked");
   const published = path.join(scratch, "published");
   mkdirSync(bin);
-  writeFileSync(diffed, changed.map((changedPath) => `${changedPath}\0`).join(""));
+  mkdirSync(since);
+  for (const [base, changed] of Object.entries(changedSince)) {
+    writeFileSync(
+      path.join(since, base),
+      changed.map((changedPath) => `${changedPath}\0`).join(""),
+    );
+  }
   writeFileSync(asked, "");
   writeFileSync(published, "");
-  stub(
-    bin,
-    "git",
-    `echo "$1" >> '${asked}'\ncase "$1" in\n  fetch) exit ${fetched ? 0 : 128} ;;\n  diff) cat '${diffed}' ;;\n  *) exit 3 ;;\nesac\n`,
-  );
+  stub(bin, "git", gitOver({ asked, fetched, since, fetchHead: path.join(scratch, "fetch-head") }));
   if (answered !== undefined) stub(bin, "node", `printf '${answered}'\n`);
-  const ran = spawnSync("bash", ["--noprofile", "--norc", "-eo", "pipefail", "-c", laneStep()], {
+  const script = laneStep()?.run ?? "exit 9";
+  const ran = spawnSync("bash", ["--noprofile", "--norc", "-eo", "pipefail", "-c", script], {
     cwd: repositoryRoot,
     encoding: "utf8",
     env: {
@@ -708,10 +792,7 @@ const runTheLaneStep = (
       PATH: `${bin}:${process.env["PATH"] ?? ""}`,
       RUNNER_TEMP: scratch,
       GITHUB_OUTPUT: published,
-      EVENT: "",
-      MERGE_GROUP_BASE: "",
-      PUSHED_FROM: "",
-      ...event,
+      ...laneStepEnv(github),
     },
   });
   const outputs = readFileSync(published, "utf8");
@@ -736,9 +817,9 @@ describe("the lane inside check.yml", () => {
   });
 
   it("asks git nothing on a pull request", () => {
-    const asked = LANE_STEPS.filter((scenario) => scenario.event["EVENT"] === "pull_request").map(
-      (scenario) => runTheLaneStep(scenario).asked,
-    );
+    const asked = LANE_STEPS.filter(
+      (scenario) => scenario.github["github.event_name"] === "pull_request",
+    ).map((scenario) => runTheLaneStep(scenario).asked);
 
     expect(asked, "a pull request's run diffs a base, which only the queue's run reads").toEqual([
       [],
@@ -756,9 +837,9 @@ describe("the lane inside check.yml", () => {
     const run = runTheLaneStep(
       {
         run: "a merge group",
-        event: { EVENT: "merge_group", MERGE_GROUP_BASE: A_BASE },
+        github: aGroupOn(TARGET_TIP),
         fetched: true,
-        changed: ["docs/vision.md"],
+        changedSince: { [TARGET_TIP]: ["docs/vision.md"] },
         lane: "",
         images: "",
       },
