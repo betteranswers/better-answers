@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { boundarySchemas } from "@better-answers/schema";
 
-import { endedGrant, latestOnIdentitySet } from "../audit/index.ts";
+import { endedGrant, latestOnIdentitySet, type EndedGrant } from "../audit/index.ts";
 import {
   attempt,
   err,
@@ -166,17 +166,23 @@ type GrantHeld = {
   readonly expiresAt: string;
 };
 
+/** Marked when a session ends or at the client's own revocation: the row never says which. */
+type EndedByTheServer = { readonly kind: "authorization-server" };
+
 type EndedGrantInspected = GrantNamed & {
   readonly endedAt: string;
-  /** Everywhere is the operator's revocation; a workspace's is its Admin's revocation or removal. */
-  readonly scope: "everywhere" | "workspace";
-  readonly endedBy: AuditEventActor;
+  /**
+   * Everywhere is the operator's revocation; a workspace's is its Admin's revocation or removal;
+   * a grant's is the authorization server ending that grant alone.
+   */
+  readonly scope: "everywhere" | "workspace" | "grant";
+  readonly endedBy: AuditEventActor | EndedByTheServer;
 };
 
 type PersonInspected = {
   readonly sessions: readonly SessionHeld[];
   readonly grants: readonly GrantHeld[];
-  /** Newest first, as each act's audit event recorded it. */
+  /** Newest first: each act's, as its audit event recorded it, and each the server ended. */
   readonly ended: readonly EndedGrantInspected[];
 };
 
@@ -200,26 +206,33 @@ type GrantRow = {
 const SESSIONS_OF_PERSON = `SELECT created_at, updated_at, expires_at FROM session
                    WHERE user_id = $1 ORDER BY updated_at DESC, id DESC`;
 
-/**
- * Each refresh revokes the row it rotates, so the unrotated row is the grant as it stands: open
- * unless the provider revoked it too.
- */
+/** Each authorisation's family of the person's refresh tokens, its unrotated row standing first. */
+const FAMILIES_OF_PERSON = `SELECT r.client_id, c.name AS client_name, r.reference_id,
+                                 w.id AS workspace_id, w.name AS workspace_name,
+                                 min(r.created_at) OVER family AS issued_at,
+                                 r.created_at AS last_used_at, r.expires_at, r.revoked,
+                                 r.rotated_at,
+                                 row_number() OVER (family ORDER BY r.rotated_at IS NULL DESC,
+                                                    r.created_at DESC, r.id DESC) AS standing
+                            FROM oauth_refresh_token r
+                            JOIN oauth_client c ON c.client_id = r.client_id
+                            LEFT JOIN workspace w ON w.id = r.reference_id
+                           WHERE r.user_id = $1
+                          WINDOW family AS (PARTITION BY COALESCE(r.authorization_code_id, r.id))`;
+
+/** Each refresh revokes the row it rotates, so the unrotated row is the grant as it stands. */
 const GRANTS_OF_PERSON = `SELECT client_id, client_name, workspace_id, workspace_name,
                        issued_at, last_used_at, expires_at
-                  FROM (SELECT r.client_id, c.name AS client_name,
-                               w.id AS workspace_id, w.name AS workspace_name,
-                               min(r.created_at) OVER family AS issued_at,
-                               r.created_at AS last_used_at, r.expires_at, r.revoked,
-                               row_number() OVER (family ORDER BY r.rotated_at IS NULL DESC,
-                                                  r.created_at DESC, r.id DESC) AS standing
-                          FROM oauth_refresh_token r
-                          JOIN oauth_client c ON c.client_id = r.client_id
-                          LEFT JOIN workspace w ON w.id = r.reference_id
-                         WHERE r.user_id = $1
-                        WINDOW family AS (PARTITION BY COALESCE(r.authorization_code_id, r.id))
-                       ) grants
+                  FROM (${FAMILIES_OF_PERSON}) grants
                  WHERE standing = 1 AND revoked IS NULL
                  ORDER BY last_used_at DESC, issued_at DESC`;
+
+/** An unrotated row's mark ends its grant; once an act or a replay deletes the rows, it is gone. */
+const ENDED_BY_THE_SERVER = `SELECT client_id, reference_id AS workspace_id, issued_at,
+                                    revoked AS ended_at
+                               FROM (${FAMILIES_OF_PERSON}) grants
+                              WHERE standing = 1 AND revoked IS NOT NULL AND rotated_at IS NULL
+                              ORDER BY revoked DESC, issued_at DESC`;
 
 /** Both acts are the identity set's, so the read never enters a workspace's audit log. */
 const ENDINGS_OF_PERSON = `SELECT id, act, at, actor, detail FROM identity_audit_event
@@ -272,6 +285,34 @@ const endingEventsOf = async (tx: Tx, personId: UserId): Promise<readonly Ending
 
 type Names = { readonly actors: ReadonlyMap<string, string>; readonly grants: GrantNames };
 
+type EndedByTheServerRow = {
+  readonly client_id: string;
+  readonly workspace_id: WorkspaceId | null;
+  readonly issued_at: Date;
+  readonly ended_at: Date;
+};
+
+type ServerEnding = { readonly grant: EndedGrant; readonly at: Date };
+
+const serverEndingsOf = async (tx: Tx, personId: UserId): Promise<readonly ServerEnding[]> => {
+  const found = await tx.query<EndedByTheServerRow>(ENDED_BY_THE_SERVER, [personId]);
+  return found.rows.map((row) => ({
+    grant: {
+      clientId: row.client_id,
+      workspaceId: row.workspace_id,
+      issuedAt: row.issued_at.toISOString(),
+    },
+    at: row.ended_at,
+  }));
+};
+
+const grantEndedByTheServer = (ending: ServerEnding, names: Names): EndedGrantInspected => ({
+  ...grantNamed(ending.grant, names.grants),
+  endedAt: ending.at.toISOString(),
+  scope: "grant",
+  endedBy: { kind: "authorization-server" },
+});
+
 const grantsOfEnding = (ending: Ending, names: Names): readonly EndedGrantInspected[] =>
   ending.grants
     .toSorted((a, b) => b.issuedAt.localeCompare(a.issuedAt))
@@ -282,26 +323,33 @@ const grantsOfEnding = (ending: Ending, names: Names): readonly EndedGrantInspec
       endedBy: actorOf(ending.actor, names.actors),
     }));
 
-/** Read from the identity-set audit log alone: no workspace's audit log is the operator's. */
+/**
+ * No workspace's audit log is the operator's, so acts' endings come from the identity set's alone.
+ * The stable sort keeps each act's own order.
+ */
 const endedGrantsOf = async (tx: Tx, personId: UserId): Promise<readonly EndedGrantInspected[]> => {
   const endings = await endingEventsOf(tx, personId);
+  const byTheServer = await serverEndingsOf(tx, personId);
   const names = {
     actors: await namesOfActors(
       tx,
       endings.map((ending) => ending.actor),
     ),
-    grants: await namesOfGrants(
-      tx,
-      endings.flatMap((ending) => ending.grants),
-    ),
+    grants: await namesOfGrants(tx, [
+      ...endings.flatMap((ending) => ending.grants),
+      ...byTheServer.map((ending) => ending.grant),
+    ]),
   };
-  return endings.flatMap((ending) => grantsOfEnding(ending, names));
+  return [
+    ...endings.flatMap((ending) => grantsOfEnding(ending, names)),
+    ...byTheServer.map((ending) => grantEndedByTheServer(ending, names)),
+  ].toSorted((a, b) => b.endedAt.localeCompare(a.endedAt));
 };
 
 /**
- * The person's sessions by last use, each client grant they hold, and each an act ended, read from
- * the identity-set audit log. A grant is a refresh token's line: a client that asked for none holds only an
- * access token no row keeps, which lapses within the hour.
+ * The person's sessions by last use, each client grant they hold, and each an act or the
+ * authorization server ended. A grant is a refresh token's line: a client that asked for none
+ * holds only an access token no row keeps, which lapses within the hour.
  */
 export const inspectPerson = async (
   _operator: OperatorPrincipal,

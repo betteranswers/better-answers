@@ -8,10 +8,11 @@ import { Button } from "@/shared/ui/button.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { SheetDescription, SheetHeader, SheetTitle } from "@/shared/ui/sheet.tsx";
-import { byWords, counted } from "@/shared/words.ts";
+import { counted } from "@/shared/words.ts";
 
 import { CorrectDisplayName } from "./correct-display-name.tsx";
 import { Facts } from "./facts.tsx";
+import { endedByWords } from "./grant-words.ts";
 import type { FreshAct } from "./people-address.ts";
 import {
   useInspected,
@@ -137,7 +138,7 @@ function Ended(properties: { readonly grant: EndedGrant }) {
           <SummaryRow term="Ended">
             <At iso={grant.endedAt} />
           </SummaryRow>
-          <SummaryRow term="Ended by">{byWords(grant.endedBy)}</SummaryRow>
+          <SummaryRow term="Ended by">{endedByWords(grant.endedBy)}</SummaryRow>
           <SummaryRow term="Ended in">
             {grant.scope === "everywhere" ? "Every workspace" : (grant.workspace?.name ?? "None")}
           </SummaryRow>
