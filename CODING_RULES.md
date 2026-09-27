@@ -317,6 +317,6 @@ Reviewer: the schema is open, so a foreign file round-trips. Only a person holds
 
 Read every dependency, image, extension and tool version from the vendor's own release page, or from Context7. Read it at the time of the change, and say in the pull request where you read it. A Renovate pull request is a source when it names the release page it read.
 
-### [DEPS2] Export a pinned value as one constant
+### [DEPS2] Pin each value once
 
-Every pinned value is one exported constant in the package that owns the decision. Every TypeScript consumer imports it. A tier that cannot import reads the constant's source, and refuses more than one match. A copy is a second pin that ages alone.
+Every pinned value lives once, in the file its updater writes: an exported constant in the owning package, or the manifest a Renovate manager keeps (compose, Dockerfile `ARG`, `.tool-versions`). Consumers import or read that one, refusing zero or several matches. A copy ages alone.
