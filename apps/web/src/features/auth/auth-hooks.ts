@@ -14,7 +14,15 @@ import { z } from "zod";
 import { useTRPC } from "@/shared/api/trpc.ts";
 
 import { authClient } from "./auth-client.ts";
-import { backTo, isAnInvitation, nextAfterSignIn } from "./carried-flow.ts";
+import {
+  backTo,
+  dropTheCarriedFlow,
+  isAnInvitation,
+  leavingFor,
+  nextAfterJoining,
+  nextAfterSignIn,
+  pageQuery,
+} from "./carried-flow.ts";
 import { forgetMembership } from "./membership.ts";
 import { rememberTheSession, sessionRemembered } from "./session-memory.ts";
 import type { Arrival } from "./sign-in-words.ts";
@@ -205,7 +213,7 @@ export const useAcceptInvitation = () => {
         forgetMembership(queryClient, api);
         queryClient.removeQueries({ queryKey: AUTH_KEYS.session });
         queryClient.removeQueries({ queryKey: AUTH_KEYS.workspaces });
-        void navigate({ href: "/", replace: true });
+        void navigate(leavingFor(nextAfterJoining(pageQuery())));
       },
     }),
   );
@@ -213,7 +221,10 @@ export const useAcceptInvitation = () => {
 
 const signOutOptions = () =>
   mutationOptions<unknown, BetterFetchError, void>({
-    mutationFn: () => unwrap(authClient.signOut()),
+    mutationFn: () => {
+      dropTheCarriedFlow();
+      return unwrap(authClient.signOut());
+    },
   });
 
 /**

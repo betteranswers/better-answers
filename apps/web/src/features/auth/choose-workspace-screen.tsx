@@ -179,7 +179,7 @@ export function ChooseWorkspaceScreen() {
     }
 
     if (held.length === 0 && !workspaces.isError) {
-      void navigate({ href: "/no-workspace", replace: true });
+      void navigate(leavingFor(`/no-workspace${carried}`));
       return;
     }
     if (opensAlone) openSoleWorkspace();

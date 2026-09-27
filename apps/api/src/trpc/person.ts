@@ -4,6 +4,7 @@ import {
   acceptInvitation,
   invitationInput,
   readInvitation,
+  readOpenInvitations,
   requestAccess,
   requestAccessInput,
 } from "@better-answers/core/members";
@@ -62,6 +63,16 @@ export const personRouter = router({
           now: ctx.clock.now(),
         }),
       ),
+    ),
+  ),
+  invitations: personProcedure.query(({ ctx }) =>
+    crossing(
+      ctx,
+      readOpenInvitations.name,
+      readOpenInvitations(IDENTITY_PRINCIPAL, ctx.doors.postgres, {
+        personId: ctx.personId,
+        now: ctx.clock.now(),
+      }),
     ),
   ),
   acceptInvitation: personProcedure.input(parsedBy(invitationInput)).mutation(({ ctx, input }) =>

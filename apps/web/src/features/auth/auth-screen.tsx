@@ -2,6 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
 import { refusalOf, type ApiError, type Refusal } from "@/shared/api/trpc.ts";
+import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { cn } from "@/shared/lib/utils.ts";
 import { RefusalLine } from "@/shared/refusal-outcome.tsx";
 import { NO_RESPONSE, SAID_OF_CLASS, SIGN_IN_AGAIN, type Said } from "@/shared/refusal-words.ts";
@@ -53,6 +54,33 @@ export function Outcome(properties: {
     >
       {properties.children}
     </p>
+  );
+}
+
+export function ReadAgain(properties: {
+  readonly keystroke: Keystroke;
+  readonly reading: boolean;
+  readonly words: { readonly tryAgain: string; readonly readingAgain: string };
+  readonly onReadAgain: () => void;
+  readonly className?: string;
+}) {
+  const readAgain = () => {
+    // Enabled while reading, so the focus a click gave the button is not dropped.
+    if (!properties.reading) properties.onReadAgain();
+  };
+  useKeystroke(properties.keystroke, readAgain);
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      className={cn("aria-disabled:opacity-50", properties.className)}
+      aria-disabled={properties.reading}
+      aria-keyshortcuts={properties.keystroke.key}
+      onClick={readAgain}
+    >
+      {properties.reading ? properties.words.readingAgain : properties.words.tryAgain}
+    </Button>
   );
 }
 

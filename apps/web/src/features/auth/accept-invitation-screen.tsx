@@ -24,8 +24,8 @@ import {
   useSetDisplayName,
   useSignOut,
 } from "./auth-hooks.ts";
-import { AuthScreen, Outcome, Refused } from "./auth-screen.tsx";
-import { invitationAt, leavingFor } from "./carried-flow.ts";
+import { AuthScreen, Outcome, ReadAgain, Refused } from "./auth-screen.tsx";
+import { carriedFlow, invitationAt, leavingFor, pageQuery } from "./carried-flow.ts";
 import { INVITATION_ACTS, INVITATION_WORDS } from "./invitation-words.ts";
 import { INVITATION_UNANSWERED, JOIN_UNANSWERED, SAID_OF_ACCEPTING } from "./refusal-words.ts";
 import { SignOutButton } from "./sign-out-button.tsx";
@@ -65,7 +65,7 @@ const WAY_OF_WORD = {
   },
   "already-a-member": {
     keystroke: { key: "w", act: INVITATION_ACTS.yourWorkspaces },
-    to: () => "/choose-workspace",
+    to: () => `/choose-workspace${carriedFlow(pageQuery())}`,
   },
 } satisfies Partial<Record<RefusalWord, WayOn>>;
 
@@ -109,26 +109,6 @@ function WayOnAct(properties: { readonly way: WayOn; readonly here: string }) {
   );
 }
 
-function ReadAgain(properties: { readonly reading: boolean; readonly onReadAgain: () => void }) {
-  const readAgain = () => {
-    if (!properties.reading) properties.onReadAgain();
-  };
-  useKeystroke(READ_AGAIN, readAgain);
-
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      className="aria-disabled:opacity-50"
-      aria-disabled={properties.reading}
-      aria-keyshortcuts={READ_AGAIN.key}
-      onClick={readAgain}
-    >
-      {properties.reading ? INVITATION_WORDS.readingAgain : INVITATION_WORDS.tryAgain}
-    </Button>
-  );
-}
-
 function Leaving(properties: { readonly keystrokes: readonly Keystroke[] }) {
   return (
     <div className="mt-8 flex flex-wrap items-center gap-2">
@@ -158,7 +138,12 @@ function InvitationUnread(properties: {
       />
       <div className="mt-6 flex flex-wrap items-center gap-2">
         {unanswered ? (
-          <ReadAgain reading={properties.reading} onReadAgain={properties.onReadAgain} />
+          <ReadAgain
+            keystroke={READ_AGAIN}
+            reading={properties.reading}
+            words={INVITATION_WORDS}
+            onReadAgain={properties.onReadAgain}
+          />
         ) : null}
         {way === undefined ? null : <WayOnAct way={way} here={properties.here} />}
       </div>

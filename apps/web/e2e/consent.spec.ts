@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 
+import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
 import { DISPLAY_NAME_WORDS } from "@/shared/display-name-words.ts";
 
 import { expect, test } from "./browser.ts";
@@ -209,5 +210,6 @@ test("asks a non-member's name, then says No workspace yet", async ({ page, requ
   await page.getByLabel(DISPLAY_NAME_WORDS.label).fill("Sam Okoro");
   await page.getByRole("button", { name: "Save and continue" }).click();
 
-  await expect(page.getByRole("heading", { level: 1, name: "No workspace yet" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeVisible();
+  expect(landedAt(page).searchParams.get("sig")).not.toBeNull();
 });

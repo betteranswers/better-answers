@@ -172,6 +172,14 @@ export type InvitationRead = {
   readonly expiresAt: string;
 };
 
+const readOf = (invitationId: InvitationId, invitation: HeldInvitation): InvitationRead => ({
+  invitationId,
+  workspaceName: invitation.workspaceName,
+  role: invitation.role,
+  invitedBy: invitation.invitedBy,
+  expiresAt: invitation.expiresAt.toISOString(),
+});
+
 /**
  * What accepting would join, for the person the invitation is addressed to. It refuses as
  * accepting would, so the page says so before the click, save a missing display name: the page
@@ -190,14 +198,59 @@ export const readInvitation = async (
   );
   if (!read.ok) return err(read.error);
   if (!read.value.ok) return err(read.value.error);
-  const { invitation } = read.value.value;
-  return ok({
-    invitationId: asked.value.invitationId,
-    workspaceName: invitation.workspaceName,
-    role: invitation.role,
-    invitedBy: invitation.invitedBy,
-    expiresAt: invitation.expiresAt.toISOString(),
-  });
+  return ok(readOf(asked.value.invitationId, read.value.value.invitation));
+};
+
+const WAITING_ID = z.object({ id: INVITATION_ID });
+
+const waitingTo = async (tx: Tx, personId: UserId): Promise<readonly InvitationId[]> =>
+  z
+    .array(WAITING_ID)
+    .parse(
+      (
+        await tx.query(
+          `SELECT i.id FROM invitation i
+             JOIN "user" invitee ON lower(i.email) = lower(invitee.email)
+            WHERE invitee.id = $1 AND i.status = $2
+            ORDER BY i.created_at DESC, i.id DESC`,
+          [personId, INVITATION_WAITING_STATUS],
+        )
+      ).rows,
+    )
+    .map((waiting) => waiting.id);
+
+/** Judged one by one as `readInvitation` judges, so the two can never disagree on what is open. */
+const openTo = async (tx: Tx, personId: UserId, now: Date): Promise<readonly InvitationRead[]> => {
+  const waiting = await waitingTo(tx, personId);
+  const judgedEach = await Promise.all(
+    waiting.map(async (invitationId) => ({
+      invitationId,
+      held: await judged(tx, { invitationId, personId, now }, "read"),
+    })),
+  );
+  return judgedEach.flatMap(({ invitationId, held }) =>
+    held.ok ? [readOf(invitationId, held.value.invitation)] : [],
+  );
+};
+
+export type ReadOpenInvitationsInput = {
+  /** The session's own person, never one the request names. */
+  readonly personId: string;
+  readonly now: Date;
+};
+
+/** Every invitation `readInvitation` would read to this person rather than refuse, newest first. */
+export const readOpenInvitations = async (
+  platform: PlatformPrincipal,
+  door: PostgresDoor,
+  input: ReadOpenInvitationsInput,
+): Promise<Result<readonly InvitationRead[], MemberRefusal<"malformed"> | Error>> => {
+  const personId = boundarySchemas.user.select.shape.id.safeParse(input.personId);
+  if (!personId.success) return err("malformed");
+
+  return attempt(() =>
+    withIdentityRead(platform, door, (tx) => openTo(tx, personId.data, input.now)),
+  );
 };
 
 const workspaceOfInvitation = (

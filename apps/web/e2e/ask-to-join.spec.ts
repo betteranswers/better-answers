@@ -134,7 +134,7 @@ test("refuses a blank reason, saying what to send", async ({
   const workspace = await provision(request, { name: "Coldharbour Fabrication" });
   await signedInWithNoWorkspace(page, request, "asker");
 
-  const refusal = page.getByRole("alert", { includeHidden: true });
+  const refusal = askRegion(page).getByRole("alert", { includeHidden: true });
   await expect(refusal, "the refusal region does not stand before an ask").toHaveCount(1);
   await expect(refusal, "the refusal region stands with words already in it").toBeEmpty();
   const stood = await refusal.elementHandle();
