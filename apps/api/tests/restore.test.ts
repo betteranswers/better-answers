@@ -9,7 +9,7 @@ import { z } from "zod";
 
 import { repositoryRoot } from "@better-answers/devtools/paths";
 import { POSTGRES_IMAGE } from "@better-answers/schema";
-import { testData } from "@better-answers/schema/testing";
+import { endPool, testData } from "@better-answers/schema/testing";
 
 const apiRoot = path.resolve(import.meta.dirname, "..");
 
@@ -292,7 +292,7 @@ beforeAll(async () => {
 }, 240_000);
 
 afterAll(async () => {
-  await Promise.all([production, fresh, untouched, staging].map((pool) => pool.end()));
+  await Promise.all([production, fresh, untouched, staging].map(endPool));
   if (container !== "") docker(["rm", "--force", container]);
 });
 

@@ -5,6 +5,7 @@ import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
+  endPool,
   type MigratedPostgres,
   startMigratedPostgres,
   testData,
@@ -126,7 +127,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await browse.end();
+  await endPool(browse);
   await db.stop();
 });
 

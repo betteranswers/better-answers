@@ -32,6 +32,23 @@ export const migrateAsDeployed = async (pool: pg.Pool): Promise<void> => {
   await pool.query(MARK_THE_MATCH_LEAKPROOF);
 };
 
+/**
+ * `pool.end()` resolves before its sockets close; a database stopped in that gap sends 57P01,
+ * which the pool re-emits unheard, failing the run.
+ */
+export const endPool = async (pool: pg.Pool): Promise<void> => {
+  let open = pool.totalCount;
+  const closed = new Promise<void>((resolve) => {
+    if (open === 0) resolve();
+    pool.on("remove", () => {
+      open -= 1;
+      if (open === 0) resolve();
+    });
+  });
+  await pool.end();
+  await closed;
+};
+
 /** Migrates nothing: opens both pools over `connectionUri`; `stop` ends them, then `release`. */
 export const migratedPostgresOver = (
   connectionUri: string,
@@ -49,8 +66,8 @@ export const migratedPostgresOver = (
     runtimePool,
     connectionUri,
     stop: async () => {
-      await runtimePool.end();
-      await pool.end();
+      await endPool(runtimePool);
+      await endPool(pool);
       await release();
     },
   };
