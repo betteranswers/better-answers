@@ -98,6 +98,8 @@ Two boxes of 4 vCPU · 4 GB · 120 GB NVMe. VPC 1 runs all of production — the
 
 **A file left in `/staging` clears itself.** Each run first deletes anything there older than 24 hours. The first scheduled run of an image that gets its variables therefore removes a leftover like 04/09's `globals-…sql.age`, and the health check (cron alive, nothing stale in `/staging`) turns healthy at its next interval.
 
+**The pings hold the nightly release too.** When `RELEASE_MODE` is `nightly`, the release at 02:35 UTC reads the `pg-hourly` and `nightly` checks before it deploys anything, and refuses unless both are up with a recent ping (`CI.md` § `release.yml`, *The nightly backup*). So a red check here also stops that night's release, and production stays on the last release that rode a verified backup.
+
 ## Putting a new backup image on production
 
 `release.yml` promotes the api and worker digests; it never touches the backup image. After `build.yml` pushes a new one, the owner:

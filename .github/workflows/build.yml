@@ -214,10 +214,17 @@ jobs:
     needs: image
     # A skipped `check` above would skip this too, so the matrix's own result is named: every leg.
     if: ${{ !cancelled() && needs.image.result == 'success' && github.ref == 'refs/heads/main' }}
-    # Exactly release.yml's asks: `contents: write` for its tag, `packages: read` for the digests.
+    # Exactly release.yml's asks: the tag, the digests, and the nightly release's reading of runs.
     permissions:
       contents: write
       packages: read
+      actions: read
     uses: ./.github/workflows/release.yml
     with:
       commit: ${{ github.sha }}
+    # Empty here, being the production environment's: passing each name is what lets the called
+    # job that names that environment read it.
+    secrets:
+      COOLIFY_DEPLOY_TOKEN: ${{ secrets.COOLIFY_DEPLOY_TOKEN }}
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}

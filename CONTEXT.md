@@ -707,12 +707,15 @@ to it by IRI and never restates it (ADR 0014).
   deployed by image digest. The stores stack and the database resource are **not** in it: they change
   on their own upgrade drill, not on a release. Use the phrase in this sense only; a document that
   means "everything on the boxes" says **estate** (ADR 0022; A16 of the pre-build gate).
-- **release** — the recorded act that promotes a built image digest to production. Before
-  *go-live* every green build on `main` is released on its own, and an Admin dispatches one only to
-  roll back; from go-live an Admin dispatches every release, on the drill day or as a hotfix.
+- **release** — the recorded act that promotes a built image digest to production, on its own or
+  by an Admin's dispatch, as the *release mode* says. A release is recorded only once it has held.
+- **release mode** — how releases happen: **per-merge**, every green build on `main` released;
+  **nightly**, one release a night just after a verified backup; **drill**, only a dispatched release
+  riding a drill or a hotfix. The phases run in that order: per-merge until the first client's
+  bundle lands, nightly until *go-live*, drill after it.
 - **go-live** — the day the platform is live for its clients, no earlier than the end of v0.1. It
-  comes after the day the first client's data is on the box, which does not change how a release
-  runs. _Avoid_: "client data on the box" for this day.
+  comes after the day the first client's data is on the box. _Avoid_: "client data on the box" for
+  this day.
 - **signal** — a named query over rows the platform already keeps, with a threshold that makes it
   worth a line on System (ADR 0025). Never a metric scraped from a process. _Avoid_: metric, KPI.
 - **alert** — a signal over its threshold, recorded once as a `platform_event` and emailed by the
