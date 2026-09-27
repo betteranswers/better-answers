@@ -3,7 +3,7 @@ set -uo pipefail
 
 # Claude Code fires the remove hook only for a worktree whose agent changed nothing, so one that
 # committed outlives its merge. Other agents are at work in the worktrees beside those it removes.
-SAY_AS=sweep-worktrees
+SAY_AS="sweep-worktrees"
 . "$(dirname "${BASH_SOURCE[0]}")/worktree-lib.sh"
 
 USAGE="Usage: sweep-worktrees.sh [<main-checkout>]"

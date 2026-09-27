@@ -100,7 +100,7 @@ type Proof =
       readonly via?: string;
     }
   | { readonly kind: "uv" }
-  | { readonly kind: "guarded"; readonly binary: string };
+  | { readonly kind: "root-script"; readonly script: string };
 
 const HOOK: Readonly<Record<string, { readonly glob: string | undefined; readonly proof: Proof }>> =
   {
@@ -110,7 +110,7 @@ const HOOK: Readonly<Record<string, { readonly glob: string | undefined; readonl
     "ruff-check": { glob: "*.py", proof: { kind: "uv" } },
     actionlint: {
       glob: ".github/workflows/*.{yml,yaml}",
-      proof: { kind: "guarded", binary: "actionlint" },
+      proof: { kind: "root-script", script: "lint:workflows:actionlint" },
     },
 
     "api-typecheck": {
@@ -145,9 +145,9 @@ const npmCommands = (): readonly (readonly [string, string, string, string | und
 const uvCommands = (): readonly string[] =>
   Object.entries(HOOK).flatMap(([name, { proof }]) => (proof.kind === "uv" ? [name] : []));
 
-const guardedCommands = (): readonly (readonly [string, string])[] =>
+const rootScriptCommands = (): readonly (readonly [string, string])[] =>
   Object.entries(HOOK).flatMap(([name, { proof }]) =>
-    proof.kind === "guarded" ? [[name, proof.binary] as const] : [],
+    proof.kind === "root-script" ? [[name, proof.script] as const] : [],
   );
 
 const TSCONFIG = JSON.stringify({
@@ -222,15 +222,9 @@ describe("the pre-commit hook", () => {
     expect(() => execFileSync("uv", ["--version"], { stdio: "pipe" })).not.toThrow();
   });
 
-  it.each(guardedCommands())(
-    "skips `%s` with a warning where it is not installed",
-    (command, binary) => {
-      const run = runOf(command);
-      expect(run).toContain(`command -v ${binary}`);
-      expect(run).toContain("warning");
-      expect(run).toContain("exit 0");
-    },
-  );
+  it.each(rootScriptCommands())("runs `%s` as the root script %s runs it", (command, script) => {
+    expect(runOf(command)).toBe(`${rootScripts()[script] ?? ""} {staged_files}`);
+  });
 
   it("runs no test suite, and documents its measured worst case", () => {
     for (const [name, command] of Object.entries(commands())) {

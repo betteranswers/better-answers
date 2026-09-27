@@ -128,6 +128,11 @@ dev = [
     "pytest>=9.1.1",
     "ruff>=0.16.5",
     "testcontainers==4.15.0",
+    # The root `lint:workflows` linters, pinned here so CI and a laptop run one version of
+    # each and Renovate's pep621 manager moves them.
+    "actionlint-py==1.7.12.25",
+    "shellcheck-py==0.11.0.1",
+    "zizmor==1.30.1",
 ]
 
 # THE LINE THE BUILDERS ARE ACTUALLY ON. uv ships this backend inside itself and takes the

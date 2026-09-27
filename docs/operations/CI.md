@@ -6,13 +6,31 @@ Five workflows. `check.yml` decides whether a tree is green and is called from t
 
 ## Every `uses:` names a commit SHA
 
-A tag is a moving reference into somebody else's repository, and these workflows hold a token that can push our images. So every `uses:` in the directory names a commit SHA with its tag beside it as a comment: the tag is what a person reads and what Renovate rewrites, the SHA is what runs. One pin per action across the whole directory. `renovate.json` keeps them pinned through `pinDigests` on the `github-actions` manager, and `apps/api/tests/workflow-pins.test.ts` refuses a `uses:` that names anything else.
+A tag is a moving reference into somebody else's repository, and these workflows hold a token that can push our images. So every `uses:` in the directory names a commit SHA with its tag beside it as a comment: the tag is what a person reads and what Renovate rewrites, the SHA is what runs. One pin per action across the whole directory. `renovate.json` keeps them pinned through `pinDigests` on the `github-actions` manager, and zizmor's `unpinned-uses` audit refuses a `uses:` that names anything else (*The linters*, below).
 
 Two more moving references are pinned the same way and for the same reason.
 
 **Every `runs-on:` names a release, `ubuntu-26.04`, and not the `ubuntu-latest` label.** GitHub migrates that label on a date of its own, so a tree that passed on Friday would fail on Monday for a reason no commit carries. A named release moves on a branch of its own — one edit, every leg, a full run green before `main` sees it. actionlint's list of hosted runners predates `ubuntu-26.04`, so `.github/actionlint.yaml` names it, and actionlint stays clean across the directory.
 
 **Every `setup-uv` reads its version out of one file**, `apps/worker/.tool-versions`, through `version-file:`. Unpinned, the action takes whatever uv is newest, which was 0.12.17 against the worker image's 0.12.9 — two builders resolving one lockfile. Why that file rather than `[tool.uv] required-version`, and what keeps it in step with the image, are said in the file itself.
+
+## The linters
+
+`pnpm lint:workflows` is a step of root `check:gates`, so it runs in `full-root` and before every push. It runs three tools from the worker's locked dev group, where Renovate's `pep621` manager moves them:
+
+- actionlint over every workflow, with `.github/actionlint.yaml`. It runs shellcheck over each `run:` step.
+- zizmor over `.github/`, offline so it needs no token, with `.github/zizmor.yml`. The config is named on the command line because, from a linked worktree, zizmor's own search walks past the worktree and reads the main checkout's.
+- shellcheck over every `.sh` file under `deploy/`, `.claude/hooks/` and `scripts/`, following a `source` into the file it names.
+
+A finding is fixed, or allowed where it sits with its reason. Three are allowed:
+
+- `self-repository` is off in `.github/zizmor.yml`. It asks for GitHub's `$/` form of a local action or workflow, which actionlint refuses, so the two tools cannot both pass.
+- `release.yml`'s checkout keeps its credential, because the job pushes its release tag with it. Every other checkout sets `persist-credentials: false`. The lane job's fetch of its base needs none, the repository being public.
+- The `git-filter-repo` action writes to `GITHUB_PATH`. What it writes is uv's own tool directory, never an input.
+
+`build.yml`'s image job takes no toolchain cache. Another run writes a cache entry, and this job holds the token that pushes images, so a poisoned entry would reach it. The cost is an uncached install of the probe's toolchain on every build.
+
+`packages/devtools/test/lint-workflows.test.ts` runs each tool as the root script runs it, over throwaway repositories, and shows where it refuses and where it stays silent.
 
 ## The lanes
 
@@ -174,4 +192,4 @@ The method is the same at every severity; `IMAGE_VULNERABILITIES.md` says which 
 
 It is an action rather than a step per workflow because the install was written into `check.yml` and copied nowhere: Stryker's initial test run is a workspace's suite run whole, so both mutation legs died on `git: 'filter-repo' is not a git command`, mutated nothing and scored nothing for three nights before anyone looked. A step that has to be remembered is a step that will be forgotten.
 
-**The version is read out of `apps/api/Dockerfile` and is not written in the action.** A rewrite proved against one version of the tool and run against another is a rewrite nobody has tested, so the runner and the api image must carry the same one; a pinned value is written down once and read from there, because a second copy ages on its own. An action cannot import a constant, so reading the pin out of the file that declares it is the substitute. `apps/api/tests/workflow-tools.test.ts` holds the action to that, and holds every workflow either to using it before the step that runs the suite or to being named as one that runs no such suite.
+**The version is read out of `apps/api/Dockerfile` and is not written in the action.** A rewrite proved against one version of the tool and run against another is a rewrite nobody has tested, so the runner and the api image must carry the same one; a pinned value is written down once and read from there, because a second copy ages on its own. An action cannot import a constant, so reading the pin out of the file that declares it is the substitute. The action refuses a Dockerfile holding no such pin, or two. A job that runs the erasure suite without the action fails that suite, and the verdict job reads the failure.

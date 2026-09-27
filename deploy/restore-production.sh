@@ -55,10 +55,12 @@ tool age -d -i /run/age.key -o /work/pg.dump /work/pg.dump.age
 # A dump not readable whole stops here, before any drop. --no-owner: the restoring role owns everything; the grants ride the dump.
 tool pg_restore --no-owner --file=/work/pg.sql /work/pg.dump \
   || { say "REFUSED: ${dump} cannot be read whole — the database is unchanged"; exit 1; }
+# shellcheck disable=SC2016 # the tool container's shell expands it, where DATABASE_URL is set
 [ ! -f "${WORK}/globals.sql.age" ] || tool sh -c 'age -d -i /run/age.key /work/globals.sql.age | psql "$DATABASE_URL" -q' || true
 # Emptied, not --clean: --clean cannot drop a partition's inherited key, keeps what the dump lacks, and recreates tables under the live default grants.
 cp "${REPO_DIR}/deploy/empty-database.sql" "${WORK}/empty.sql"
 # One transaction: a statement that fails leaves the database as it was, and no reader sees it half replaced.
+# shellcheck disable=SC2016 # the tool container's shell expands it, where DATABASE_URL is set
 tool sh -c 'psql "$DATABASE_URL" -X -q -o /dev/null --single-transaction -v ON_ERROR_STOP=1 -f /work/empty.sql -f /work/pg.sql'
 # <<< replace the database
 rm -f "${WORK}/pg.dump" "${WORK}/pg.sql" "${WORK}/empty.sql" "${WORK}/pg.dump.age" "${WORK}/globals.sql.age"

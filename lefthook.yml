@@ -29,16 +29,10 @@ pre-commit:
       root: apps/worker/
       run: uv run --frozen --only-group dev ruff check {staged_files}
 
-    # A Homebrew binary a clone may not have: a warning and a pass, never a failure.
+    # The worker's locked actionlint, so a commit and CI read a workflow with one version.
     actionlint:
       glob: ".github/workflows/*.{yml,yaml}"
-      run: |
-        if command -v actionlint >/dev/null 2>&1; then
-          actionlint {staged_files}
-        else
-          echo "warning: actionlint is not installed, skipping. Install it with: brew install actionlint"
-          exit 0
-        fi
+      run: uv run --project apps/worker --frozen --only-group dev actionlint -config-file .github/actionlint.yaml {staged_files}
 
     api-typecheck:
       glob: "*.{ts,tsx}"
@@ -82,6 +76,10 @@ pre-push:
     lint:
       run: ": {files}; {without-git-env} pnpm run lint"
       fail_text: "run it alone with pnpm run lint"
+
+    lint:workflows:
+      run: ": {files}; {without-git-env} pnpm run lint:workflows"
+      fail_text: "run it alone with pnpm run lint:workflows"
 
     comment-gate:python:
       run: ": {files}; {without-git-env} pnpm run comment-gate:python"

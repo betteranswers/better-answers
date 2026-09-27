@@ -43,6 +43,7 @@ done
 # cron gives a job none of the container's environment. PID 1 holds it, root-only, so no
 # file ever carries a copy.
 while IFS= read -r -d '' pair; do
+  # shellcheck disable=SC2163 # `pair` is NAME=value, the form export takes as it stands
   if passes "${pair%%=*}"; then export "${pair}"; fi
 done < /proc/1/environ
 

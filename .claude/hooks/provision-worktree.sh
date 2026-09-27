@@ -12,7 +12,7 @@ git -C "$WORKTREE_PATH" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
 export PATH="$HOME/Library/pnpm:$HOME/.local/bin:/opt/homebrew/bin:$PATH"
 if ! command -v node >/dev/null 2>&1 && [ -d "$HOME/.nvm/versions/node" ]; then
   WANT="$(cat "$WORKTREE_PATH/.node-version" 2>/dev/null || echo 24)"
-  NODE_BIN="$(ls -d "$HOME/.nvm/versions/node/v${WANT}"*/bin 2>/dev/null | sort -V | tail -1 || true)"
+  NODE_BIN="$(find "$HOME/.nvm/versions/node" -mindepth 2 -maxdepth 2 -type d -path "*/v${WANT}*/bin" 2>/dev/null | sort -V | tail -1 || true)"
   [ -n "$NODE_BIN" ] && export PATH="$NODE_BIN:$PATH"
 fi
 

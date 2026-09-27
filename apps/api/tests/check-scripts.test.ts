@@ -151,7 +151,7 @@ describe("the gates a branch never narrows", () => {
       expect(
         scripts[gate],
         `${gate} recurses into the workspaces, so it is not a root gate`,
-      ).not.toMatch(/pnpm -r|--filter|uv run/);
+      ).not.toMatch(/pnpm -r|--filter|uv run(?: --[\w-]+)* check\b/);
     }
     expect(steps.slice(tiers)).toEqual(["check:workspaces", "check:worker"]);
   });

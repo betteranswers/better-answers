@@ -1,0 +1,8 @@
+rules:
+  # actionlint refuses GitHub's `$/` form for a local action or workflow, so the two linters cannot both pass.
+  self-repository:
+    disable: true
+  unpinned-uses:
+    config:
+      policies:
+        "*": hash-pin
