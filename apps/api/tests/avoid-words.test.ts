@@ -103,7 +103,7 @@ const WATCHED: readonly Watched[] = [
       {
         sense: "the hostname role",
         written:
-          /(?<!\bthe )\bapp\.(?!\w)|\bapp (?:hostname\b|·)|\*\*app\*\* hostname|\| `app` \||`app` is a hostname role/gi,
+          /(?<!\bthe )\bapp\.(?!\w)|\bapp (?:hostname\b|·)|\*\*app\*\* hostname|\| `app` \||`app` is a hostname role|"app"(?=, "agent", "apex"\])/gi,
       },
       {
         sense: "a third-party app, the consent page's client among them",

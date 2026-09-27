@@ -4,7 +4,7 @@ The repository's own gate tooling. **It is imported and never deployed** — `pa
 is imported, `apps/` is what deploys (ADR 0029) — so nothing under `apps/` copies this
 directory into an image, and every dependency here is a development dependency.
 
-Eight things live here.
+Nine things live here.
 
 ## `src/throwaway-tree.ts` — the runner
 
@@ -154,6 +154,22 @@ schema, so schema's own suite could not load it from here without a cycle. Every
 workspace's vitest config names it in `setupFiles`, which the suite also holds.
 `apps/web/e2e/browser.ts` runs the same check on Playwright's `testInfo.title`, and the worker's
 `tests/conftest.py` counts a Python test name's words the same way.
+
+## `test/ci/` — the suites that read the workflows, the deploy tree and the hooks
+
+What `pnpm lint:workflows` cannot hold as a tool is held here: a join between two files, such as
+a workflow and the root manifest, or a compose file and a script, and a workflow step, a deploy
+script or a `.claude/hooks` script run under stubs. `test/comment-gate-hook.test.ts` and
+`test/lefthook-config.test.ts` sit beside the gates they prove.
+
+Three modules serve them. `src/workflows.ts` reads `.github/workflows`, `build.yml`'s image legs
+among them. `src/root-commands.ts` reads the root manifest's scripts and the gates each runner
+call names. `src/worktree-hooks.ts` runs a hook over a throwaway repository, and the api's
+`browse-production` suite imports it too. They are imported through
+`@better-answers/devtools/workflows`, `/root-commands` and `/worktree-hooks`.
+
+Three of the suites read documents as well, so the docs lane runs them through
+`check:docs:devtools`.
 
 ## `lint-rules/` — the `better-answers` oxlint plugin
 

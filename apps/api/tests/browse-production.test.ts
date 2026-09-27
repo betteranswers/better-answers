@@ -5,15 +5,15 @@ import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { writeUnder } from "@better-answers/devtools/throwaway-tree";
-
-import { freePort, type Held, heldPort, released } from "./loopback-port.ts";
 import {
   recordsItsArgv,
   repositoryHolding,
   scratchRoot,
   stubsOnPath,
   worktreeUnder,
-} from "./worktree-hooks.ts";
+} from "@better-answers/devtools/worktree-hooks";
+
+import { freePort, type Held, heldPort, released } from "./loopback-port.ts";
 
 const helper = path.resolve(import.meta.dirname, "../../../deploy/browse-production.sh");
 

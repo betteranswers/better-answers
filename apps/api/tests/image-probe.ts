@@ -5,9 +5,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-import { parse } from "yaml";
-import { z } from "zod";
-
 import { repositoryRoot } from "@better-answers/devtools/paths";
 
 const run = promisify(execFile);
@@ -25,9 +22,9 @@ const dockerAnswers = await dockerIsAvailable();
 
 const daemonIsRequired = (process.env["CI"] ?? "") !== "";
 
-export const IMAGE_ID_VARIABLE = "IMAGE_ID";
+const IMAGE_ID_VARIABLE = "IMAGE_ID";
 
-export const PROBE_DEFERRAL_VARIABLE = "IMAGE_PROBE_DEFERRED";
+const PROBE_DEFERRAL_VARIABLE = "IMAGE_PROBE_DEFERRED";
 const probeRunsInTheJobThatPushes = process.env[PROBE_DEFERRAL_VARIABLE] === "true";
 
 export const nothingToProbeHere =
@@ -245,69 +242,6 @@ export const startTheImage = async (
       }
     },
   };
-};
-
-export const workflowStepSchema = z.object({
-  id: z.string().optional(),
-  if: z.string().optional(),
-
-  "continue-on-error": z.union([z.boolean(), z.string()]).optional(),
-
-  uses: z.string().optional(),
-  run: z.string().optional(),
-  env: z.record(z.string(), z.string()).optional(),
-  with: z.record(z.string(), z.unknown()).optional(),
-});
-
-export type ImageStep = z.infer<typeof workflowStepSchema>;
-
-const matrixLegSchema = z.object({
-  tier: z.string(),
-  context: z.string(),
-  dockerfile: z.string(),
-  probe: z.string().optional(),
-  "probe-toolchain": z.string().optional(),
-});
-
-export type MatrixLeg = z.infer<typeof matrixLegSchema>;
-
-const permissionsSchema = z.record(z.string(), z.string());
-
-const imageJobSchema = z.object({
-  permissions: permissionsSchema.optional(),
-  strategy: z.object({ matrix: z.object({ include: z.array(matrixLegSchema) }) }),
-  steps: z.array(workflowStepSchema),
-});
-
-export const readWorkflow = <Shape>(name: string, schema: z.ZodType<Shape>): Shape =>
-  schema.parse(parse(readFileSync(path.join(repositoryRoot, ".github/workflows", name), "utf8")));
-
-const buildWorkflowSchema = z.object({
-  concurrency: z.object({ group: z.string() }),
-  permissions: permissionsSchema.optional(),
-  jobs: z.object({
-    check: z.object({ with: z.record(z.string(), z.unknown()).optional() }),
-    image: imageJobSchema,
-  }),
-});
-
-let parsed: z.infer<typeof buildWorkflowSchema> | undefined;
-
-export const buildWorkflow = (): z.infer<typeof buildWorkflowSchema> =>
-  (parsed ??= readWorkflow("build.yml", buildWorkflowSchema));
-export const imageJob = () => buildWorkflow().jobs.image;
-export const matrixLegs = (): readonly MatrixLeg[] => imageJob().strategy.matrix.include;
-
-/** @throws when build.yml's image job builds no leg for the tier. */
-export const legFor = (tier: string): MatrixLeg => {
-  const leg = matrixLegs().find((candidate) => candidate.tier === tier);
-  if (leg === undefined) {
-    const tiers = matrixLegs()
-      .map((candidate) => candidate.tier)
-      .join(", ");
-    throw new Error(`build.yml's image job has no \`${tier}\` leg; it builds ${tiers}`);
-  }
-  return leg;
 };
 
 export const fileFromTheWorkspace = (moduleUrl: string, workspace: string): string =>

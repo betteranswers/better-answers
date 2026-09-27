@@ -36,9 +36,9 @@ The root `prepare` script runs `lefthook install`, and pnpm runs `prepare` after
 
 ## The pre-push hook
 
-Before a push leaves the machine, the hook runs every step root `check:gates` names and the three prose suites `check:docs` adds to them: `check:docs:api`, `check:docs:core` and `check:docs:web`. `format:check` is in both scripts and runs once. In a sample of 30 failed pull requests, about half failed on one of these, and CI took five to nine minutes to say so. The merge queue is the only full CI run, so this hook is where a pull request hears about them first.
+Before a push leaves the machine, the hook runs every step root `check:gates` names and the four prose suites `check:docs` adds to them: `check:docs:api`, `check:docs:core`, `check:docs:devtools` and `check:docs:web`. `format:check` is in both scripts and runs once. In a sample of 30 failed pull requests, about half failed on one of these, and CI took five to nine minutes to say so. The merge queue is the only full CI run, so this hook is where a pull request hears about them first.
 
-Each step is a command of its own, and the commands run in parallel. A failure therefore names its gate, and `LEFTHOOK_EXCLUDE` can skip one gate and keep the rest. The list repeats the steps the two scripts name, and `apps/api/tests/lefthook-config.test.ts` holds it to them in both directions: a gate added to either script fails that suite until the hook runs it too. The same file pushes through the real `lefthook.yml` in a throwaway repository, with a stand-in `pnpm`, from the main checkout and from a linked worktree.
+Each step is a command of its own, and the commands run in parallel. A failure therefore names its gate, and `LEFTHOOK_EXCLUDE` can skip one gate and keep the rest. The list repeats the steps the two scripts name, and `packages/devtools/test/lefthook-config.test.ts` holds it to them in both directions: a gate added to either script fails that suite until the hook runs it too. The same file pushes through the real `lefthook.yml` in a throwaway repository, with a stand-in `pnpm`, from the main checkout and from a linked worktree.
 
 Measured on the owner's machine (the same one as above) with every gate passing, the whole hook took 22s to 23s over three runs, where `check:gates` and `check:docs` one after the other take about 30s. `check:docs:api` is the slowest command and sets the wait. The api and core suites start Postgres in Docker, as every vitest run in those two workspaces does, so the hook needs Docker running.
 
@@ -83,7 +83,7 @@ The `commit-msg` hook runs commitlint over every commit's message, not just `pnp
 
 For a TypeScript file it runs root `lint`: the root config, `.oxlintrc.json`, with the `lint` script's flag, over any file the root run walks. It refuses the edit only on a comment rule's line, and leaves another rule's finding to `check`. For a Python file it runs the Python gate, over the roots that gate walks: `apps/`, `packages/`, `scripts/`, `.claude/hooks/`, `.github/`, `deploy/` and three root tool-configuration files.
 
-`apps/api/tests/comment-gate-hook.test.ts` holds the hook's roots to the Python gate's command in both directions. It also proves, through the hook, each comment rule the root config holds.
+`packages/devtools/test/comment-gate-hook.test.ts` holds the hook's roots to the Python gate's command in both directions. It also proves, through the hook, each comment rule the root config holds.
 
 ### Creating and removing a worktree
 

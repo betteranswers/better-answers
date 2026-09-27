@@ -15,7 +15,7 @@ on:
           probed image once rather than once on this runner and once on that one. A merge
           group has no such job and passes nothing, so it probes when an image's inputs changed.
           It reaches every leg whose suites read it — the api's and the worker's — and no
-          other; `apps/api/tests/image-job.test.ts` holds that both ways.
+          other; `packages/devtools/test/ci/image-job.test.ts` holds that both ways.
         type: boolean
         default: false
 

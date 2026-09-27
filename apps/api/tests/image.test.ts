@@ -5,12 +5,11 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { repositoryRoot, workspacePackages } from "@better-answers/devtools/paths";
+import { legFor, matrixLegs } from "@better-answers/devtools/workflows";
 
 import {
   fileFromTheWorkspace,
   IMAGE_PROBE_ALLOWANCE,
-  legFor,
-  matrixLegs,
   nothingToProbeHere,
   readTheImage,
 } from "./image-probe.ts";

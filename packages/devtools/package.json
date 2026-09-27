@@ -15,7 +15,9 @@
     "./oxlint-config": "./src/oxlint-config.ts",
     "./paths": "./src/paths.ts",
     "./root-commands": "./src/root-commands.ts",
-    "./throwaway-tree": "./src/throwaway-tree.ts"
+    "./throwaway-tree": "./src/throwaway-tree.ts",
+    "./workflows": "./src/workflows.ts",
+    "./worktree-hooks": "./src/worktree-hooks.ts"
   },
   "scripts": {
     "lint": "node ../../scripts/check.mjs lint:ts lint:python lint:python-format",
@@ -44,6 +46,7 @@
     "testcontainers": "12.1.0",
     "typescript": "7.0.2",
     "vitest": "5.0.1",
+    "yaml": "2.9.1",
     "zod": "4.6.5"
   }
 }

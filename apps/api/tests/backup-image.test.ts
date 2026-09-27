@@ -7,13 +7,13 @@ import { parse } from "yaml";
 import { z } from "zod";
 
 import { repositoryRoot } from "@better-answers/devtools/paths";
+import { legFor } from "@better-answers/devtools/workflows";
 import { POSTGRES_IMAGE } from "@better-answers/schema";
 
 import {
   fileFromTheWorkspace,
   IMAGE_PROBE_ALLOWANCE,
   type ImageUnderTest,
-  legFor,
   nothingToProbeHere,
   readTheImage,
   type StartedContainer,

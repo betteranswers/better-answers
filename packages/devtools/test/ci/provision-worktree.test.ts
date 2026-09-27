@@ -5,7 +5,6 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { gitIn, writeUnder } from "@better-answers/devtools/throwaway-tree";
-
 import {
   hookScript,
   recordsItsArgv,
@@ -15,14 +14,14 @@ import {
   stubsOnPath,
   worktreeUnder,
   type HookRun,
-} from "./worktree-hooks.ts";
+} from "@better-answers/devtools/worktree-hooks";
 
 const script = hookScript("provision-worktree");
 
 const scratch = scratchRoot("provision-worktree");
 
 const scratchIgnorePattern = (): string => {
-  const ignore = path.resolve(import.meta.dirname, "../../../.gitignore");
+  const ignore = path.resolve(import.meta.dirname, "../../../../.gitignore");
   const pattern = readFileSync(ignore, "utf8")
     .split("\n")
     .map((line) => line.trimEnd())
