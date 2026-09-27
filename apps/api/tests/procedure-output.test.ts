@@ -54,6 +54,7 @@ describe("what a procedure may answer the wire", () => {
       "members.revokeCredentials",
       "person.acceptInvitation",
       "person.invitation",
+      "person.invitations",
       "person.requestAccess",
       "person.setDisplayName",
       "routes.list",
@@ -77,6 +78,7 @@ describe("what a procedure may answer the wire", () => {
       | "person.setDisplayName"
       | "person.requestAccess"
       | "person.invitation"
+      | "person.invitations"
       | "person.acceptInvitation"
       | "console.people.list"
       | "console.people.inspect"

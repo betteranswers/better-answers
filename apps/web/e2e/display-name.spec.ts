@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 
+import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
 import {
   DISPLAY_NAME_MAX_CHARACTERS,
   DISPLAY_NAME_REFUSED,
@@ -24,7 +25,7 @@ const displayNameHeading = (page: Page) =>
   page.getByRole("heading", { level: 1, name: DISPLAY_NAME_WORDS.heading });
 
 const noWorkspaceHeading = (page: Page) =>
-  page.getByRole("heading", { level: 1, name: "No workspace yet" });
+  page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING });
 
 const displayNameField = (page: Page) => page.getByLabel(DISPLAY_NAME_WORDS.label);
 

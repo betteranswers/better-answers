@@ -33,6 +33,11 @@ export const INVITATION_UNANSWERED: Said = {
   next: "Try again in a moment.",
 };
 
+export const INVITATIONS_UNANSWERED: Said = {
+  why: "No response, so your invitations can't be shown.",
+  next: "Try again in a moment.",
+};
+
 export const JOIN_UNANSWERED: Said = {
   why: "No response, so you haven't joined.",
   next: "Try again in a moment.",

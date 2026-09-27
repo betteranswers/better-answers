@@ -48,6 +48,19 @@ const anInvitee = async (role: "Admin" | "Editor" | "Viewer" = "Editor") => {
   return { admin, address, invitationId: linkedInvitationId(address), ...invitee };
 };
 
+/** Written as the harness writes it, since the invite act lower-cases every address it is given. */
+const anUpperCaseInvitation = async () => {
+  const { workspace } = await anAdmin();
+  const address = anAddress("una");
+  const invited = await app().invite({
+    workspaceId: workspace.workspaceId,
+    email: address.toUpperCase(),
+    inviterId: workspace.admin.id,
+    role: "Viewer",
+  });
+  return { invitationId: invited.id, ...(await webSignedIn(app(), address)) };
+};
+
 const personIdOf = async (address: string): Promise<string> => {
   const found = await app().database.superuser.query<{ id: string }>(
     'SELECT id FROM "user" WHERE lower(email) = lower($1)',
@@ -168,20 +181,98 @@ describe("accepting an invitation over tRPC", () => {
   });
 
   it("matches the invited address whatever its case", async () => {
-    const { workspace } = await anAdmin();
-    const address = anAddress("una");
-    const invited = await app().invite({
-      workspaceId: workspace.workspaceId,
-      email: address.toUpperCase(),
-      inviterId: workspace.admin.id,
-      role: "Viewer",
-    });
-    const { api } = await webSignedIn(app(), address);
+    const { api, invitationId } = await anUpperCaseInvitation();
     await api.person.setDisplayName.mutate({ displayName: "Una Price" });
 
-    expect(await api.person.acceptInvitation.mutate({ invitationId: invited.id })).toMatchObject({
+    expect(await api.person.acceptInvitation.mutate({ invitationId })).toMatchObject({
       role: "Viewer",
     });
+  });
+});
+
+describe("reading a person's own invitations over tRPC", () => {
+  it("lists each waiting invitation, newest first", async () => {
+    const { api, address, invitationId } = await anInvitee("Editor");
+    const second = await anAdmin("Ryedale Metalwork");
+    await second.api.members.invite.mutate({ address, role: "Viewer" });
+
+    expect(await api.person.invitations.query()).toEqual([
+      {
+        invitationId: linkedInvitationId(address),
+        workspaceName: "Ryedale Metalwork",
+        role: "Viewer",
+        invitedBy: "Test person",
+        expiresAt: expect.stringMatching(ISO_INSTANT),
+      },
+      {
+        invitationId,
+        workspaceName: "Calder Joinery",
+        role: "Editor",
+        invitedBy: "Test person",
+        expiresAt: expect.stringMatching(ISO_INSTANT),
+      },
+    ]);
+  });
+
+  it("matches the invited address whatever its case", async () => {
+    const { api, invitationId } = await anUpperCaseInvitation();
+
+    expect(await api.person.invitations.query()).toMatchObject([{ invitationId }]);
+  });
+
+  it("leaves out an invitation to another address", async () => {
+    await anInvitee();
+    const { api } = await webSignedIn(app(), anAddress("other"));
+
+    expect(await api.person.invitations.query()).toEqual([]);
+  });
+
+  it("leaves out every invitation while the address is unverified", async () => {
+    const { api, address } = await anInvitee();
+    await app().setEmailVerified(address, false);
+
+    expect(await api.person.invitations.query()).toEqual([]);
+  });
+
+  it("leaves out an expired invitation until a resend revives it", async () => {
+    const { admin, api, invitationId } = await anInvitee();
+
+    clockShift.ms = EIGHT_DAYS_MS;
+    try {
+      expect(await api.person.invitations.query()).toEqual([]);
+
+      await admin.api.members.resendInvitation.mutate({ invitationId });
+
+      expect(await api.person.invitations.query()).toMatchObject([{ invitationId }]);
+    } finally {
+      clockShift.ms = 0;
+    }
+  });
+
+  it("leaves out a cancelled or an accepted invitation", async () => {
+    const cancelled = await anInvitee();
+    await cancelled.admin.api.members.cancelInvitation.mutate({
+      invitationId: cancelled.invitationId,
+    });
+    const accepted = await anInvitee();
+    await accepted.api.person.acceptInvitation.mutate({ invitationId: accepted.invitationId });
+
+    expect(await cancelled.api.person.invitations.query()).toEqual([]);
+    expect(await accepted.api.person.invitations.query()).toEqual([]);
+  });
+
+  it("leaves out an invitation to a workspace already joined", async () => {
+    const { admin, api, address } = await anInvitee("Viewer");
+    await app().addMember(admin.workspace.workspaceId, await personIdOf(address), "Editor");
+
+    expect(await api.person.invitations.query()).toEqual([]);
+  });
+
+  it("refuses a caller with no session", async () => {
+    const response = await app().client().fetch(`${TRPC_ENDPOINT}/person.invitations`);
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject(NO_SESSION_ANSWERED);
   });
 });
 
