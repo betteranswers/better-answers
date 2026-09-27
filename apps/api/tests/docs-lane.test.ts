@@ -518,6 +518,12 @@ const workflowFile = z.object({
       needs: z.union([z.string(), z.array(z.string())]).optional(),
       permissions: z.record(z.string(), z.string()).optional(),
       outputs: z.record(z.string(), z.string()).optional(),
+      strategy: z
+        .object({
+          "fail-fast": z.boolean().optional(),
+          matrix: z.record(z.string(), z.array(z.unknown())),
+        })
+        .optional(),
       steps: z.array(step).optional(),
     }),
   ),
@@ -550,12 +556,37 @@ const laneStep = (): string => stepsOfJob(LANE).find((one) => one.id === LANE)?.
 
 const toolOf = (step: Step): string => step.uses ?? step.run ?? "";
 
-const gatesOf = (job: string): readonly string[] =>
-  stepsOfJob(job).flatMap((step) => gatesUnder(step.run ?? ""));
+/** The matrix leg hands each of its jobs one slice of a root script's files. */
+const SHARD_ARGUMENT = / --shard="\$\{SHARD\}"$/;
 
-/** One step cannot run on four legs, so the legs run these narrowings and this folds them back. */
+const gatesOf = (job: string): readonly string[] =>
+  stepsOfJob(job).flatMap((step) =>
+    gatesUnder((step.run ?? "").trim().replace(SHARD_ARGUMENT, "")),
+  );
+
+/** One step cannot run on every leg, so the legs run these narrowings and this folds them back. */
 const NARROWED: Readonly<Record<string, readonly string[]>> = {
-  "check:workspaces": ["check:libraries", "check:api", "check:web"],
+  "check:workspaces": [
+    "check:libraries:unsharded",
+    "check:core:typecheck",
+    "check:core:suite",
+    "check:api",
+    "check:web",
+  ],
+};
+
+/** A workspace whose suite is sharded runs its check as the steps it names, each a root script. */
+const RUN_BY_STEP: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  "packages/core": { typecheck: "check:core:typecheck", test: "check:core:suite" },
+};
+
+const SHARDED_LEG = "full-core";
+
+const manifestAt = (directory: string): { readonly name: string; readonly check: string } => {
+  const { name, scripts } = z
+    .object({ name: z.string(), scripts: z.record(z.string(), z.string()) })
+    .parse(JSON.parse(read(path.join(directory, "package.json"))));
+  return { name, check: scripts["check"] ?? "" };
 };
 
 const wholeGateOf = (gate: string): string =>
@@ -817,7 +848,7 @@ describe("the lane inside check.yml", () => {
         ?.groups?.["words"]?.split(" | ") ?? [];
 
     expect(words).toEqual(["pr", "docs", "full"]);
-    expect(words.map((lane) => legsOf(lane).length)).toEqual([0, 1, 4]);
+    expect(words.map((lane) => legsOf(lane).length)).toEqual([0, 1, 5]);
   });
 
   it("gives the docs lane one job with no unused setup", () => {
@@ -852,33 +883,33 @@ type Setup = {
 const SETUP: readonly Setup[] = [
   {
     tool: "pnpm install --frozen-lockfile",
-    onlyOn: ["docs-gates", "full-root", "full-api", "full-web", TITLE_JOB],
+    onlyOn: ["docs-gates", "full-root", SHARDED_LEG, "full-api", "full-web", TITLE_JOB],
     because:
       "every leg that runs a pnpm workspace's own gates needs the tree installed, as does the title's commitlint; the worker's gates are uv's and its leg only spawns the runner",
   },
   {
     tool: "astral-sh/setup-uv@",
-    onlyOn: ["full-root", "full-api", "full-worker"],
+    onlyOn: ["full-root", SHARDED_LEG, "full-api", "full-worker"],
     because:
-      "the worker's gates are uv's, packages/devtools runs ruff and mypy out of the same environment, and the api's hook suite asks the binary itself whether it is there",
+      "the worker's gates are uv's, packages/devtools runs ruff and mypy out of the same environment, packages/core's shards spawn the worker, and the api's hook suite asks the binary itself whether it is there",
   },
   {
     tool: "uv sync --frozen",
-    onlyOn: ["full-root", "full-api", "full-worker"],
+    onlyOn: ["full-root", SHARDED_LEG, "full-api", "full-worker"],
     because:
-      "the binary alone runs nothing: a leg that spawns the worker, whether for its own gates or from a suite in the other tier, needs the environment the lockfile names",
+      "the binary alone runs nothing: packages/devtools' ruff and mypy, and a leg that spawns the worker, whether for its own gates or from a suite in the other tier, need the environment the lockfile names",
   },
   {
     tool: "actions/cache@",
-    onlyOn: ["full-root", "full-api", "full-worker"],
+    onlyOn: [SHARDED_LEG, "full-api", "full-worker"],
     because:
       "the only cache with a key here is the redaction detector's weights, and every leg that spawns the worker over an index job loads them",
   },
   {
     tool: "./.github/actions/git-filter-repo",
-    onlyOn: ["full-root", "full-api"],
+    onlyOn: [SHARDED_LEG, "full-api"],
     because:
-      "each leg reaches the erasure routine's git step — packages/core through the erasure suite, apps/api through the rehearsal's phase two — and the hosted Ubuntu runner carries no such tool",
+      "each leg reaches the erasure routine's git step — packages/core's shards through the erasure suite, apps/api through the rehearsal's phase two — and the hosted Ubuntu runner carries no such tool",
   },
   {
     tool: "playwright install",
@@ -955,14 +986,66 @@ describe("how the legs narrow check:workspaces", () => {
   });
 
   it("selects, between the narrowings of check:workspaces, every workspace it gates", () => {
-    const selected = Object.values(NARROWED)
-      .flat()
-      .flatMap((part) => workspacesChecked(rootScripts()[part] ?? ""));
+    const selected = [
+      ...Object.values(NARROWED)
+        .flat()
+        .flatMap((part) => workspacesChecked(rootScripts()[part] ?? "")),
+      ...Object.keys(RUN_BY_STEP),
+    ];
 
     expect(
       [...selected].sort(),
       "a workspace with a check script is on no leg, or is on two. The legs run check:workspaces between them or they do not run it at all.",
     ).toEqual([...workspacesGated()].sort());
+  });
+
+  it("runs every step a sharded workspace's check names", () => {
+    for (const [directory, steps] of Object.entries(RUN_BY_STEP)) {
+      const { name, check } = manifestAt(directory);
+
+      expect(gatesNamed(check), `${directory}'s check names a step no leg runs`).toEqual(
+        Object.keys(steps),
+      );
+      for (const [step, script] of Object.entries(steps)) {
+        expect(rootScripts()[script]).toEqual(`pnpm --filter ${name} run ${step}`);
+        expect(NARROWED["check:workspaces"]).toContain(script);
+      }
+    }
+  });
+});
+
+describe("the sharded leg of check.yml", () => {
+  it("numbers its shards 1 to N, one per job", () => {
+    const strategy = checkJobs()[SHARDED_LEG]?.strategy;
+    const shards = strategy?.matrix["shard"] ?? [];
+
+    expect(
+      Object.keys(strategy?.matrix ?? {}),
+      "a second matrix key multiplies the jobs, so two of them run one shard",
+    ).toEqual(["shard"]);
+    expect(shards.length).toBeGreaterThan(1);
+    expect(shards, "a gap or a repeat leaves some files unrun").toEqual(
+      shards.map((_, at) => at + 1),
+    );
+    expect(stepsOfJob(SHARDED_LEG).flatMap((one) => Object.entries(one.env ?? {}))).toEqual([
+      ["SHARD", "${{ matrix.shard }}/${{ strategy.job-total }}"],
+    ]);
+    expect(
+      strategy?.["fail-fast"],
+      "a red shard cancels the others, which then report nothing of their own files",
+    ).toBe(false);
+  });
+
+  it("runs its sharded script alone, and no other leg shards", () => {
+    const slicing = Object.keys(checkJobs()).filter((job) =>
+      stepsOfJob(job).some((one) => SHARD_ARGUMENT.test((one.run ?? "").trim())),
+    );
+
+    expect(slicing).toEqual([SHARDED_LEG]);
+    expect(
+      gatesOf(SHARDED_LEG),
+      "a gate beside the shard runs once per shard, where one run would do",
+    ).toEqual([RUN_BY_STEP["packages/core"]?.["test"]]);
   });
 });
 
@@ -988,7 +1071,8 @@ type VerdictCase = {
 
 const PROVED_NOTHING = "proved nothing";
 
-const FULL_LEGS = ["full-root", "full-api", "full-web", "full-worker"];
+/** A matrix leg is one entry in `needs`, its result the shards' together. */
+const FULL_LEGS = ["full-root", SHARDED_LEG, "full-api", "full-web", "full-worker"];
 
 const VERDICTS: readonly VerdictCase[] = [
   {
