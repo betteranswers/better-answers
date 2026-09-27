@@ -6,9 +6,12 @@ export type Said = { readonly why: string; readonly next: string };
 /** A feature's own words for the refusals it knows; any other word is said by its class. */
 export type SaidOfWord = Partial<Record<RefusalWord, Said>>;
 
+/** The label of each control that takes an ended or stale session to sign in. */
+export const SIGN_IN_AGAIN = "Sign in again";
+
 /** Only `forbidden` names who can act, because the reader can't. */
 export const SAID_OF_CLASS = {
-  unauthenticated: { why: "Your session has ended.", next: "Sign in again." },
+  unauthenticated: { why: "Your session has ended.", next: `${SIGN_IN_AGAIN}.` },
   forbidden: {
     why: "Your role doesn't allow this.",
     next: "Ask an Admin of this workspace to do it.",

@@ -5,7 +5,7 @@ import {
   DISPLAY_NAME_REFUSED,
   DISPLAY_NAME_WORDS,
 } from "@/shared/display-name-words.ts";
-import { SAID_OF_CLASS, sentenceOf } from "@/shared/refusal-words.ts";
+import { SAID_OF_CLASS, sentenceOf, SIGN_IN_AGAIN } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -162,8 +162,8 @@ test("refuses a save after the session ended, offering sign-in again", async ({
   await displayNameField(page).fill("Priya Shah");
   await saveButton(page).click();
 
-  await expect(page.getByRole("alert")).toHaveText(sentenceOf(SAID_OF_CLASS.unauthenticated));
+  await expect(page.getByRole("alert")).toHaveText(SAID_OF_CLASS.unauthenticated.why);
   await expect(displayNameField(page)).toHaveAttribute("aria-invalid", "false");
-  await page.getByRole("button", { name: "Sign in again" }).click();
+  await page.getByRole("button", { name: SIGN_IN_AGAIN }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
 });

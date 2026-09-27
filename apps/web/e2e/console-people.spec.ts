@@ -8,7 +8,7 @@ import {
   SIGN_IN_TOO_OLD,
 } from "@/features/console/refusal-words.ts";
 import { KEYSTROKE_WORDS, SELECT_FIRST } from "@/shared/keystroke-words.ts";
-import { sentenceOf } from "@/shared/refusal-words.ts";
+import { sentenceOf, SIGN_IN_AGAIN } from "@/shared/refusal-words.ts";
 import { consoleScreenById, viewNamed } from "@/shared/screens.ts";
 
 import { expect, test } from "./browser.ts";
@@ -590,7 +590,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     );
     await expect(regionOf(sheet, "Sessions")).toContainText("1 session open.");
 
-    await sheet.getByRole("link", { name: "Sign in again" }).click();
+    await sheet.getByRole("link", { name: SIGN_IN_AGAIN }).click();
     await expect(page).toHaveURL(/\/sign-in\?redirect=/);
     await signIn(page, request, operators.admin.email);
 
@@ -712,7 +712,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await expect(part.getByRole("alert")).toHaveText(
       sentenceOf(SAID_OF_CORRECTING[SIGN_IN_TOO_OLD]),
     );
-    await part.getByRole("link", { name: "Sign in again" }).click();
+    await part.getByRole("link", { name: SIGN_IN_AGAIN }).click();
     await expect(page).toHaveURL(/\/sign-in\?redirect=/);
     await signIn(page, request, operators.admin.email);
 
@@ -836,7 +836,7 @@ test.describe("the console's Names waiting view", () => {
       sentenceOf(SAID_OF_CORRECTING[SIGN_IN_TOO_OLD]),
     );
     await expect(waitingRowOf(page, name)).toBeVisible();
-    const signInAgain = namesWaiting(page).getByRole("link", { name: "Sign in again" });
+    const signInAgain = namesWaiting(page).getByRole("link", { name: SIGN_IN_AGAIN });
     await expect(signInAgain).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/\/sign-in\?redirect=/);
