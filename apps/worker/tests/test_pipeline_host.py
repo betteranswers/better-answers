@@ -22,7 +22,7 @@ from better_answers_worker.pipeline import (
     open_pool,
 )
 from factories import land_chunk, seed_workspace
-from pg_harness import migrated_postgres_at
+from pg_harness import login_in_role, migrated_postgres_at
 
 WORKER_LOGIN = "worker_login_under_test"
 WORKER_PASSWORD = "worker-login-under-test"
@@ -53,13 +53,9 @@ def chunk_row(
 @pytest.fixture(name="database")
 def a_migrated_database() -> Iterator[tuple[psycopg.Connection, str]]:
     with migrated_postgres_at() as (connection, conninfo):
-        # `CREATE ROLE` takes no parameters, so the names are spelled into the
-        # statement; both are constants here and neither comes from a row.
-        connection.execute(
-            f"CREATE ROLE \"{WORKER_LOGIN}\" LOGIN PASSWORD '{WORKER_PASSWORD}'"
-            " IN ROLE worker_rt"
+        login_in_role(
+            connection, login=WORKER_LOGIN, password=WORKER_PASSWORD, role="worker_rt"
         )
-        connection.commit()
         yield connection, as_role(conninfo, WORKER_LOGIN, WORKER_PASSWORD)
 
 

@@ -23,6 +23,9 @@ from planted_page import (
     typed_placeholders_under,
 )
 
+# The image fixture is per module, and per worker under xdist: one group, one build.
+pytestmark = pytest.mark.xdist_group("worker-image")
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 WORKSPACE = REPO_ROOT / "apps" / "worker"
 BUILD_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "build.yml"

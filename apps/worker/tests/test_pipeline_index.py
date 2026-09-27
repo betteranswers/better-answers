@@ -42,7 +42,7 @@ from factories import (
     seed_source_document,
     seed_suppression,
 )
-from pg_harness import migrated_postgres_at
+from pg_harness import login_in_role, migrated_postgres_at
 from planted_page import (
     SERVICE_NOTES_PAGE,
     THE_DIAGNOSED_SENTENCE_AT,
@@ -155,11 +155,9 @@ class ABucket:
 @pytest.fixture(name="database")
 def a_migrated_database() -> Iterator[tuple[psycopg.Connection, str]]:
     with migrated_postgres_at() as (connection, conninfo):
-        connection.execute(
-            f"CREATE ROLE \"{WORKER_LOGIN}\" LOGIN PASSWORD '{WORKER_PASSWORD}'"
-            " IN ROLE worker_rt"
+        login_in_role(
+            connection, login=WORKER_LOGIN, password=WORKER_PASSWORD, role="worker_rt"
         )
-        connection.commit()
         yield connection, as_role(conninfo, WORKER_LOGIN, WORKER_PASSWORD)
 
 

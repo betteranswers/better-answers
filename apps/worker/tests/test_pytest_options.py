@@ -1,6 +1,9 @@
 import tomllib
 from pathlib import Path
 
+import test_image
+from better_answers_worker.check import SUITE
+
 WORKER_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -23,3 +26,19 @@ def test_refuses_a_marker_the_suite_never_declared() -> None:
 
 def test_fails_an_expected_failure_that_has_started_passing() -> None:
     assert pytest_options()["xfail_strict"] is True
+
+
+def test_only_the_gate_spreads_the_suite_over_workers() -> None:
+    addopts = pytest_options()["addopts"]
+    assert isinstance(addopts, str)
+    _, command = SUITE
+
+    assert "-n" in command
+    assert not {"-n", "--numprocesses"} & set(addopts.split())
+
+
+def test_the_image_builds_in_one_worker_of_the_gates_run() -> None:
+    _, command = SUITE
+
+    assert command[command.index("--dist") + 1] == "loadgroup"
+    assert test_image.pytestmark.name == "xdist_group"
