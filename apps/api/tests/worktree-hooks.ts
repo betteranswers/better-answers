@@ -29,6 +29,48 @@ export const repositoryHolding = (
   return root;
 };
 
+/** An origin holding `files`, and a clone as the main checkout, whose `main` lags origin's. */
+export const originAndClone = (
+  scratch: string,
+  name: string,
+  files: Readonly<Record<string, string>>,
+): { readonly origin: string; readonly primary: string } => {
+  const origin = repositoryHolding(path.join(scratch, `${name}-origin`), files);
+  const primary = path.join(scratch, `${name}-primary`);
+  gitIn(scratch, "clone", "-q", origin, primary);
+  gitIn(primary, "config", "user.email", "test@example.invalid");
+  gitIn(primary, "config", "user.name", "throwaway repository");
+  return { origin, primary };
+};
+
+/** Commits a new file named `file` in `worktree`, and returns the commit's id. */
+export const commitIn = (worktree: string, file: string): string => {
+  writeUnder(worktree, file, `${file}\n`);
+  gitIn(worktree, "add", "-A");
+  gitIn(worktree, "commit", "-q", "-m", `add ${file}`);
+  return gitIn(worktree, "rev-parse", "HEAD").trim();
+};
+
+/** Merges `branch` of `primary` into origin's `main` as the queue does, dated `at` (ISO 8601). */
+export const mergeOnOrigin = (
+  origin: string,
+  primary: string,
+  branch: string,
+  at?: string,
+): void => {
+  gitIn(origin, "fetch", "-q", primary, branch);
+  const dated = at === undefined ? {} : { GIT_AUTHOR_DATE: at, GIT_COMMITTER_DATE: at };
+  const result = spawnSync(
+    "git",
+    ["-C", origin, "merge", "-q", "--no-ff", "--no-edit", "FETCH_HEAD"],
+    {
+      encoding: "utf8",
+      env: { ...process.env, ...dated },
+    },
+  );
+  if (result.status !== 0) throw new Error(`git merge of ${branch} failed:\n${result.stderr}`);
+};
+
 /** A worktree of `root` at `<scratch>/<name>-worktree`, on a new branch `t-<name>`. */
 export const worktreeUnder = (
   scratch: string,
@@ -60,7 +102,11 @@ export const stubsOnPath = (
 export const recordsItsArgv = (log: string, andThen: readonly string[] = []): string =>
   [`printf '%s\\n' "$*" >> '${log}'`, ...andThen, "exit 0", ""].join("\n");
 
-export type HookRun = { readonly status: number | null; readonly stderr: string };
+export type HookRun = {
+  readonly status: number | null;
+  readonly stdout: string;
+  readonly stderr: string;
+};
 
 /** Runs `script` under bash, with `env` laid over this process's environment. */
 export const runHook = (
@@ -76,5 +122,5 @@ export const runHook = (
     input: options.input ?? "",
     env: { ...process.env, ...options.env },
   });
-  return { status: result.status, stderr: result.stderr };
+  return { status: result.status, stdout: result.stdout, stderr: result.stderr };
 };

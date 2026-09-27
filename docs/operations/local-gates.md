@@ -54,11 +54,24 @@ For a TypeScript file it runs root `lint`: the root config, `.oxlintrc.json`, wi
 
 `worktree-create-hook.sh` replaces native worktree creation so every worktree Claude Code makes — an `Agent(isolation: "worktree")` fork, `claude --worktree`, a desktop parallel session — is provisioned before the agent's first turn. The hook contract is Claude Code's: JSON on stdin carrying `.name`, and stdout must be exactly the created directory, a non-path there aborting session startup.
 
-The layout stays native — `.claude/worktrees/<name>` on branch `worktree-<name>` — so `.gitignore` and oxlint's and oxfmt's ignore patterns keep working unchanged. The branch starts from the checkout's HEAD: `main` is pushed before any fork, and a fork briefed to work from its worktree HEAD must see what the session sees. A hook-created worktree carries no Claude Code marker, so the periodic sweep leaves it alone; the remove hook and `git worktree remove` are the two ways it goes.
+The layout stays native — `.claude/worktrees/<name>` on branch `worktree-<name>` — so `.gitignore` and oxlint's and oxfmt's ignore patterns keep working unchanged. The branch starts from the checkout's HEAD: `main` is pushed before any fork, and a fork briefed to work from its worktree HEAD must see what the session sees. A hook-created worktree carries no Claude Code marker, so Claude Code's own periodic sweep leaves it alone. The remove hook and `sweep-worktrees.sh` are what remove it.
 
-`worktree-remove-hook.sh` is the cleanup half. It applies Claude Code's own rule for native worktrees: a clean worktree goes, and one holding work stays on disk for a person to look at. "Work" is changed or untracked files, or commits its upstream (or `main`, when it has none) does not have. A kept worktree is removed by hand with `git worktree remove --force`. The hook may tidy and never block, so every outcome exits 0 and says why on stderr.
+`worktree-remove-hook.sh` is the cleanup half, and it sees less than its name suggests. Claude Code fires it only when an agent finishes having changed nothing. A worktree with a commit in it is kept and reported back, and no hook runs. The owner's transcripts show this: of 296 worktree agents that committed, 292 had their worktree reported kept. So the hook nearly always meets a fresh worktree, and removes it. When it does meet work, it keeps the worktree unless the work is merged:
 
-A worktree removed here also gives up the jCodeMunch index provisioning gave it. Without that, the registry keeps naming a root no longer on disk — the state the owner's machine was found in, seven create events and no removals, the oldest naming a path gone for a fortnight. A jCodeMunch repository id is not derivable from its path, so it is read from what `list-repos --json` prints.
+- changed or untracked files are always kept;
+- commits are merged when `origin/main` or `main` holds them, or when a merged pull request has the worktree's HEAD as its head. The hook fetches `origin/main` before it gives up, because the main checkout's `main` is rarely pulled.
+
+A kept worktree is removed by hand with `git worktree remove --force`. The hook may tidy and never block, so every outcome exits 0 and says why on stderr.
+
+`sweep-worktrees.sh [<main-checkout>]` removes what the remove hook never sees: the worktree whose agent committed, pushed and merged. Before the sweep, those piled up under `.claude/worktrees/` until someone cleared them by hand. The create hook starts it in the background on every creation, with its streams on `.git/worktree-sweep.log`, which holds the latest run. Creation is the one event that happens as often as worktrees pile up and needs nobody to remember it. A step in the Coordinator's *Land* is one an agent can skip, and a `pnpm land` session never reaches it. Run the sweep by hand to clear the estate at once. It fetches `origin/main` first, and then, for each worktree under `.claude/worktrees/` and nowhere else:
+
+- a locked worktree, or one with changed or untracked files, is kept;
+- a HEAD on `origin/main`'s first-parent line is kept. It holds no commit of its own, which is how a fresh worktree looks while its agent works;
+- a HEAD that reached `origin/main` through a merge commit, as the queue lands every pull request, is merged. So is a HEAD that a merged pull request has as its head, which gh answers;
+- a merge less than an hour old is kept, because the agent may still be reporting from the worktree, or be resumed in it;
+- anything else merged is removed, with its index, and its branch goes through `git branch -d`, never `-D`. The branch's upstream is pointed at `origin/main` first, so `-d` checks the ref the sweep judged by, where it would otherwise check the main checkout's lagging `main`. A squash-merged branch fails that check and stays for a person.
+
+A worktree the hook or the sweep removes also gives up the jCodeMunch index provisioning gave it. Without that, the registry keeps naming a root no longer on disk — the state the owner's machine was found in, seven create events and no removals, the oldest naming a path gone for a fortnight. A jCodeMunch repository id is not derivable from its path, so it is read from what `list-repos --json` prints.
 
 ### Provisioning a worktree
 
@@ -73,7 +86,7 @@ A worktree removed here also gives up the jCodeMunch index provisioning gave it.
 | skills | `provision-skills.sh`: the installed, ignored agent tooling |
 | scratch | the primary checkout's `.scratch`, linked |
 
-**The upstream.** `git worktree add -b <branch> <path> origin/main` sets the new branch to track `origin/main`, silently: a bare `git push` from the worktree then aims at `main`, and the remove hook measures "work" against that upstream rather than against `main`. `push.default` is unset here, so git's `simple` refuses the mismatched push — the tracking is surprising rather than harmful — and the stage unsets it so the branch's upstream is set on its first `git push -u`, by the session that means it. Here and not in the create hook, because a worktree made by hand fires no hook and runs this.
+**The upstream.** `git worktree add -b <branch> <path> origin/main` sets the new branch to track `origin/main`, silently: a bare `git push` from the worktree then aims at `main`. `push.default` is unset here, so git's `simple` refuses the mismatched push — the tracking is surprising rather than harmful — and the stage unsets it so the branch's upstream is set on its first `git push -u`, by the session that means it. Here and not in the create hook, because a worktree made by hand fires no hook and runs this.
 
 **Why `node_modules` and `.venv` are installed, never symlinked or copied.** pnpm and uv both install by hard link from a global store, in seconds, and both write links that are relative to the real tree: pnpm's workspace links (`node_modules/@better-answers/core -> ../../packages/core`) and uv's editable `.pth`. A `node_modules` or `.venv` shared with `main` would import main's `packages/core` and worker source, so a worktree's tests would run against code it is not editing. That reasoning is about path resolution and does not reach the skills, which are static markdown; `provision-skills.sh` copies those.
 
