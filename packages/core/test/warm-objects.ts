@@ -6,9 +6,10 @@ import { DeleteObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
 import { GenericContainer, Wait } from "testcontainers";
 import { expect, inject } from "vitest";
 import type { TestProject } from "vitest/node";
+import { parse } from "yaml";
 import { z } from "zod";
 
-import { GARAGE_IMAGE, type ObjectDoor, openObjects } from "../src/store/objects/index.ts";
+import { type ObjectDoor, openObjects } from "../src/store/objects/index.ts";
 
 export type WarmObjects = {
   readonly endpoint: string;
@@ -39,6 +40,23 @@ export type ObjectStore = {
 
 const GARAGE_CONFIG = path.resolve(import.meta.dirname, "../../../deploy/garage.toml");
 
+/** The one pin: production runs this file, and Renovate moves the image here and nowhere else. */
+const STORES_COMPOSE = path.resolve(import.meta.dirname, "../../../deploy/stores.compose.yaml");
+
+const storesComposeShape = z.object({
+  services: z.object({ objectstore: z.object({ image: z.string().min(1) }) }),
+});
+
+const garageImage = (): string => {
+  const compose = storesComposeShape.safeParse(parse(readFileSync(STORES_COMPOSE, "utf8")));
+  if (!compose.success) {
+    throw new Error(
+      `${STORES_COMPOSE} names no image for an objectstore service\n${z.prettifyError(compose.error)}`,
+    );
+  }
+  return compose.data.services.objectstore.image;
+};
+
 const S3_PORT = 3900;
 const ADMIN_PORT = 3903;
 
@@ -56,7 +74,7 @@ type StartedGarage = {
 
 const startGarage = async (): Promise<StartedGarage> => {
   const adminToken = randomBytes(16).toString("hex");
-  const container = await new GenericContainer(GARAGE_IMAGE)
+  const container = await new GenericContainer(garageImage())
     .withCommand(["/garage", "server", "--single-node"])
     .withCopyFilesToContainer([{ source: GARAGE_CONFIG, target: "/etc/garage.toml" }])
     .withEnvironment({
