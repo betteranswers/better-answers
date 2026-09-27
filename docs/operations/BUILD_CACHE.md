@@ -2,7 +2,7 @@
 
 **Operational reference, not a page of the docs site.** This file lives in `docs/operations/` because that is where the operational documents are kept; the docs site does not render it, and it is read from the repository.
 
-Two caches, neither the estate's. Nothing deployed builds images — `release.yml` promotes digests a runner built, and records each promotion as a `release/*` tag — so the build caches are the two that build: a development machine's, bounded by a garbage-collection policy the builder reads at startup and by nothing a person runs, and the runner's, a tag in each image's package on GHCR that nothing bounds yet, read in *The runner's cache* at the foot of this file. Every section between is the development machine's.
+Two caches, neither the estate's. Nothing deployed builds images — `release.yml` promotes digests a runner built, and records each promotion as a `release/*` tag — so the build caches are the two that build: a development machine's, bounded by a garbage-collection policy the builder reads at startup and by nothing a person runs, and the runner's, a tag in each image's package on GHCR whose old manifests a weekly workflow deletes, read in *The runner's cache* and *Deleting old cache manifests* at the foot of this file. Every section between is the development machine's.
 
 ## Where the policy lives
 
@@ -68,7 +68,7 @@ If one is ever wanted for another reason: it leaves nothing in the local image s
 
 A registry cache on GHCR: one tag, `buildcache`, in each image's own package, so `ghcr.io/<owner>/api:buildcache`, `…/worker:buildcache` and `…/backup:buildcache`. `build.yml`'s pushing step writes it with `mode=max`, which keeps the builder stages' layers as well as the shipped ones, and with `image-manifest=true`, which makes each write one OCI manifest whose config is `application/vnd.buildkit.cacheconfig.v0`. Each leg writes only its own image's tag. The first writes, on 27/09/2026, named 3.34 GB of layers for `worker`, 0.44 GB for `api` and 0.11 GB for `backup`. A worker build whose lock moved re-makes most of its 3.34 GB, and one that moved only source re-makes the last layer.
 
-**Why the registry and not the Actions cache.** Until 27/09/2026 this was BuildKit's `type=gha` backend, in the repository's Actions cache beside the pnpm store, uv's cache and the detector's weights. A run on `main` restores entries written on `main`. The cache service takes the runner's own token, not `GITHUB_TOKEN`, so no `permissions:` block narrows who writes: any code running in any workflow on `main` could write an entry under a key the image job reads. A compromised dependency in the nightly mutation job is one example. The image job holds `packages: write`, `id-token: write` and `attestations: write`, and the layers it restores go into the image it pushes and attests. zizmor's `cache-poisoning` audit named the job's pnpm and uv caches, and #441 turned them off; the layer cache had the same exposure and no audit that reads it. A tag in these packages moves only for a token holding `packages: write` on them, and the image job is the only job in the repository that holds it.
+**Why the registry and not the Actions cache.** Until 27/09/2026 this was BuildKit's `type=gha` backend, in the repository's Actions cache beside the pnpm store, uv's cache and the detector's weights. A run on `main` restores entries written on `main`. The cache service takes the runner's own token, not `GITHUB_TOKEN`, so no `permissions:` block narrows who writes: any code running in any workflow on `main` could write an entry under a key the image job reads. A compromised dependency in the nightly mutation job is one example. The image job holds `packages: write`, `id-token: write` and `attestations: write`, and the layers it restores go into the image it pushes and attests. zizmor's `cache-poisoning` audit named the job's pnpm and uv caches, and #441 turned them off; the layer cache had the same exposure and no audit that reads it. A tag in these packages moves only for a token holding `packages: write` on them. Two jobs in the repository hold it: the image job, and the weekly deletion in *Deleting old cache manifests*, which pushes nothing and never deletes a tagged version.
 
 **One writer, and the probes only read.** The readers are the two image-contents suites `check.yml` runs in a merge group: `apps/api/tests/image-probe.ts`, which builds `api` and `backup` on `full-api`, and `apps/worker/tests/test_image.py`, which builds `worker` on `full-worker`. Each passes `--cache-from` and no `--cache-to`, and each leg holds only `packages: read`, so a probe could not move the tag if it tried. The packages are private, so there is no anonymous read. Each leg logs in to ghcr.io with its own `GITHUB_TOKEN` and hands the suite the registry as `IMAGE_CACHE_REGISTRY`. A laptop names no registry and builds with the daemon, as before. Each suite holds its own argv as a literal.
 
@@ -82,9 +82,7 @@ A registry tag has no ref scope, as an Actions cache entry had. A merge group th
 
 **Two commits' runs can write one tag at once.** `build.yml`'s concurrency group is per commit (`T-211`), so nothing serialises the runs, and a burst of pushes has several legs exporting to `worker:buildcache` together. The last manifest written wins. Every writer of a tag built the same image, so the manifest left standing is right for the next run, and the losing runs' manifests are left untagged like any overwritten one.
 
-**An overwritten cache stays in the package.** GHCR keeps every manifest pushed to a package. Moving `buildcache` leaves the manifest it pointed at as an untagged version, still holding its layers, and nothing deletes it. Container registry storage is free today, and GitHub has said it will give a month's notice before that changes, so this costs nothing yet. It does lengthen the version lists. On 27/09/2026 each package held about 1,100 versions: every build adds its image and the attestation's two manifests, and now a cache. `scan.yml` reads every page and picks by `sha-` tag, and `release.yml` resolves a `sha-` tag directly, so neither reads a cache.
-
-A cleanup, when one is wanted, may delete an untagged version only when its manifest's config is `application/vnd.buildkit.cacheconfig.v0`. Deleting every untagged version is wrong here: each attestation leaves an untagged manifest that its `sha256-<digest>` tag's index names, and deleting it loses that image's provenance.
+**An overwritten cache stays in the package.** GHCR keeps every manifest pushed to a package. Moving `buildcache` leaves the manifest it pointed at as an untagged version, still holding its layers, until the weekly run in *Deleting old cache manifests* deletes it. Container registry storage is free today, and GitHub has said it will give a month's notice before that changes, so this costs nothing yet. It does lengthen the version lists. On 27/09/2026 each package held about 1,100 versions: every build adds its image and the attestation's two manifests, and now a cache. `scan.yml` reads every page and picks by `sha-` tag, and `release.yml` resolves a `sha-` tag directly, so neither reads a cache.
 
 Read it with:
 
@@ -95,3 +93,35 @@ gh api repos/{owner}/{repo}/actions/cache/usage
 ```
 
 The first says when a leg last wrote its tag; name `api` or `backup` for the other two. A merge group's probe that read the cache logs `importing cache manifest from ghcr.io/<owner>/<tier>:buildcache` and then `CACHED` against the layers it reused. The second is the Actions cache, which still holds the pnpm store, uv's cache and the detector's weights for `check.yml`. On 27/09/2026, before the move, it held 14.78 GB in 245 entries, 9.25 GB of them layer blobs. Those blobs stop being written, and eviction takes them.
+
+## Deleting old cache manifests
+
+`.github/workflows/ghcr-cleanup.yml` runs `scripts/ghcr-cleanup.mjs` at 06:43 UTC every Sunday. By then the nightly mutation run (02:17, about two and a half hours) and the scan (03:41) are done, and both draw on the same hourly API allowance. The packages it reads are the tiers in `build.yml`'s image matrix, read as `scan.yml` reads them.
+
+It deletes a version only when all four of these hold:
+
+- The version has no tag.
+- Its manifest, read from the registry by digest and checked against that digest, is an OCI image manifest whose config is `application/vnd.buildkit.cacheconfig.v0`, and it names no subject.
+- It is more than 7 days old, by the later of its created and updated times.
+- It is not one of the package's three newest cache manifests. The one `buildcache` names counts as one of the three.
+
+So it never deletes:
+
+- A tagged version: a `sha-` image, which `release.yml` and `scan.yml` read, a `sha256-` attestation index, or the manifest `buildcache` names.
+- An untagged attestation manifest. Its config is `application/vnd.oci.empty.v1+json`. Each image's `sha256-<digest>` index names one, and deleting it would lose that image's provenance.
+- An untagged image, left behind when a tag moved off it.
+- A manifest it cannot read, or whose body does not hash to its digest. The summary counts these.
+
+Before deleting, it lists the package again and drops any version that has gained a tag or changed. It deletes oldest first, with a two-second pause before each delete. It stops at 400 deletes in a run, or when fewer than 200 requests are left in the token's hour, and the next week's run takes the rest.
+
+The job summary gives each package's versions seen, selected and deleted, and why each kept version was kept. The packages API gives no sizes, so the bytes freed are read from the manifests: the blobs a deleted manifest names that no kept cache names. That figure is a ceiling, since an image can share a blob with a cache.
+
+**Deleting takes the Admin role.** `GITHUB_TOKEN` with `packages: write` can delete a version only when the repository holds the Admin role on the package. GitHub gives that role to the repository whose workflow first published the package, and `build.yml` first published all three on 03/09/2026. If GitHub refuses a delete (HTTP 403), the job fails and names the package and the setting: in the package's settings, under *Manage Actions access*, give this repository the Admin role.
+
+**A dry run.** In Actions, open *ghcr-cleanup* and run it on `main`. The `dry-run` box is ticked by default. From a terminal:
+
+```
+gh workflow run ghcr-cleanup.yml --ref main -f dry-run=true
+```
+
+A dry run lists, reads and selects exactly as the scheduled run does, sends no delete, and its summary says what would go. It cannot show whether a delete would be refused. Only the schedule deletes, or a dispatch with `dry-run` unticked.

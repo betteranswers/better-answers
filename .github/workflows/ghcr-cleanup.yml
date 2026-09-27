@@ -1,0 +1,64 @@
+name: ghcr-cleanup
+
+# Deletes old BuildKit cache manifests from the image packages and nothing else; BUILD_CACHE.md says what it keeps.
+
+on:
+  # Sundays, clear of the nightly mutation and scan runs, which draw on the same API allowance.
+  schedule:
+    - cron: "43 6 * * 0"
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Report what would be deleted, and delete nothing
+        type: boolean
+        default: true
+
+concurrency:
+  group: ghcr-cleanup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  cache-manifests:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            .github/workflows/build.yml
+            .node-version
+            scripts/ghcr-cleanup.mjs
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: the tiers build.yml builds an image for
+        id: tiers
+        env:
+          TIERS: .jobs.image.strategy.matrix.include[].tier
+        run: |
+          set -euo pipefail
+          tiers="$(yq --output-format=json --indent=0 "[${TIERS}]" .github/workflows/build.yml)"
+          if ! jq --exit-status 'length > 0 and all(type == "string")' <<<"${tiers}" >/dev/null; then
+            echo "::error::build.yml's image job names no tier at ${TIERS} (read ${tiers}), so there is no package to read"
+            exit 1
+          fi
+          echo "tiers=${tiers}" >> "$GITHUB_OUTPUT"
+      - name: old cache manifests deleted
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OWNER: ${{ github.repository_owner }}
+          ACTOR: ${{ github.actor }}
+          REPOSITORY: ${{ github.repository }}
+          TIERS: ${{ steps.tiers.outputs.tiers }}
+          # The script refuses anything but `true` or `false`, so no other event can delete.
+          DRY_RUN: ${{ github.event_name == 'schedule' && 'false' || inputs.dry-run }}
+        run: node scripts/ghcr-cleanup.mjs
