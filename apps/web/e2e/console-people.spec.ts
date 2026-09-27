@@ -1,5 +1,6 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { ENDED_BY_THE_SERVER } from "@/features/console/grant-words.ts";
 import {
   NOT_THE_OPERATOR,
   ONLY_THE_OPERATOR,
@@ -19,6 +20,7 @@ import {
   aPkcePair,
   catchClaudesRedirect,
   CLAUDES_REDIRECT_URI,
+  claudeDisconnects,
   claudeExchanges,
   claudesAuthorizeUrl,
   clockTheNextKey,
@@ -111,9 +113,10 @@ const claudeConnectedAs = async (
   await expect(page).toHaveURL(new RegExp(`^${CLAUDES_REDIRECT_URI}`));
   const code = new URL(page.url()).searchParams.get("code") ?? "";
 
-  await claudeExchanges(api, { origin, code, verifier });
+  const exchanged = await claudeExchanges(api, { origin, code, verifier });
   await page.unroute(`${CLAUDES_REDIRECT_URI}*`);
   await page.context().clearCookies();
+  return exchanged;
 };
 
 /**
@@ -129,9 +132,9 @@ const priyaConnected = async (
   const operators = await theOperatorsWorkspace(api, tag);
   const priya = await person(api, anAddress(`${tag}-priya`), { displayName: "Priya Shah" });
   await addMember(api, { workspaceId: operators.workspaceId, userId: priya.id, role: "Editor" });
-  await claudeConnectedAs(page, api, originOf(baseURL), priya.email);
+  const { refreshToken } = await claudeConnectedAs(page, api, originOf(baseURL), priya.email);
   await signedInAtHome(page, api, operators.admin.email);
-  return { operators, priya };
+  return { operators, priya, refreshToken };
 };
 
 const openPriya = async (page: Page, tag: string): Promise<Locator> => {
@@ -511,6 +514,36 @@ test.describe("a person, opened from Everyone as a sheet", () => {
 
     await page.keyboard.press("Escape");
     await expect(personButton(page, "Priya Shah")).toBeFocused();
+  });
+
+  test("shows a grant Claude disconnected as ended, naming no person", async ({
+    page,
+    request,
+    baseURL,
+  }) => {
+    const tag = aTag();
+    const { operators, refreshToken } = await priyaConnected(page, request, baseURL, tag);
+    await claudeDisconnects(request, refreshToken);
+
+    const sheet = await openPriya(page, tag);
+
+    const grant = regionOf(sheet, "Client grants").getByRole("listitem", { name: "Claude" });
+    await expect(grant).toMatchAriaSnapshot(`
+      - listitem "Claude":
+        - heading "Claude" [level=4]
+        - text: Ended
+        - term: Workspace
+        - definition: ${operators.name}
+        - term: Issued
+        - definition: /\\d{4}/
+        - term: Ended
+        - definition: /\\d{4}/
+        - term: Ended by
+        - definition: ${ENDED_BY_THE_SERVER}
+        - term: Ended in
+        - definition: ${operators.name}
+        - button "More about Claude's grant"
+    `);
   });
 
   test("revokes everywhere behind a confirmation, within its budget", async ({

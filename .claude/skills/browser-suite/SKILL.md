@@ -132,14 +132,15 @@ Eighteen more helpers in the same module drive the browser rather than the harne
 The sign-in code is read from that capture and from nowhere else: the api's logger is forbidden from ever
 holding one.
 
-Four more play Claude's part in its OAuth flow on the suite's own origin — `apps/web/e2e/consent.spec.ts` for the consent screen, `apps/web/e2e/console-people.spec.ts` for a person holding a client grant:
+Five more play Claude's part in its OAuth flow on the suite's own origin — `apps/web/e2e/consent.spec.ts` for the consent screen, `apps/web/e2e/console-people.spec.ts` for a person holding a client grant:
 
 | Helper | What it does |
 | --- | --- |
 | `aPkcePair` | A verifier and its challenge, as Claude mints one for each connection |
 | `claudesAuthorizeUrl` | Claude's authorize request for the MCP surface at an origin, with an optional challenge, `prompt` and `state` |
 | `catchClaudesRedirect` | Answers the redirect to claude.ai with a stand-in page, since the suite cannot reach it |
-| `claudeExchanges` | Exchanges the code at the redirect for tokens, which is when the grant's refresh token is minted |
+| `claudeExchanges` | Exchanges the code at the redirect for tokens, which is when the grant's refresh token is minted, and answers that refresh token |
+| `claudeDisconnects` | Revokes that refresh token at `/oauth2/revoke`, as Claude does when the person disconnects it, so the authorization server ends the grant itself |
 
 ## Writing a spec
 

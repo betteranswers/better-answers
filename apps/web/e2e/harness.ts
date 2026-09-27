@@ -143,7 +143,7 @@ export const catchClaudesRedirect = (page: Page) =>
 export const claudeExchanges = async (
   api: APIRequestContext,
   asked: { readonly origin: string; readonly code: string; readonly verifier: string },
-): Promise<void> => {
+): Promise<{ readonly refreshToken: string }> => {
   const exchanged = await api.post("/oauth2/token", {
     form: {
       ...CLAUDE,
@@ -154,6 +154,19 @@ export const claudeExchanges = async (
     },
   });
   expect(exchanged.ok(), `the code's exchange answered ${exchanged.status()}`).toBe(true);
+  const tokens = z.object({ refresh_token: z.string() }).parse(await exchanged.json());
+  return { refreshToken: tokens.refresh_token };
+};
+
+/** Claude revokes its own grant at the authorization server, as disconnecting it does. */
+export const claudeDisconnects = async (
+  api: APIRequestContext,
+  refreshToken: string,
+): Promise<void> => {
+  const revoked = await api.post("/oauth2/revoke", {
+    form: { client_id: CLAUDE.client_id, token: refreshToken, token_type_hint: "refresh_token" },
+  });
+  expect(revoked.ok(), `the revocation answered ${revoked.status()}`).toBe(true);
 };
 
 export type SeedRoute = {

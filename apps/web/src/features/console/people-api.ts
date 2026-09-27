@@ -42,7 +42,10 @@ export const useInspected = (personId: string) => {
   return useQuery(api.console.people.inspect.queryOptions({ personId }));
 };
 
-/** In the api's order: one act's grants newest issued first, above every earlier act's. */
+/**
+ * In the api's order, newest act first. A grant the server ended leaves, since the act deletes the
+ * tokens its end is read from.
+ */
 const endedEverywhere = (held: PersonInspected, at: string, by: DoneBy): PersonInspected => ({
   sessions: [],
   grants: [],
@@ -57,7 +60,7 @@ const endedEverywhere = (held: PersonInspected, at: string, by: DoneBy): PersonI
         endedBy: by,
       }))
       .toSorted((a, b) => b.issuedAt.localeCompare(a.issuedAt)),
-    ...held.ended,
+    ...held.ended.filter((grant) => grant.scope !== "grant"),
   ],
 });
 

@@ -257,7 +257,7 @@ describe("inspecting a person", () => {
     });
   });
 
-  it("folds rotated tokens into one grant, leaving out revoked ones", async () => {
+  it("folds rotated tokens, and ends a grant the server revoked", async () => {
     const acme = await provisionedWorkspace(db(), "Acme");
     const zenith = await provisionedWorkspace(db(), "Zenith");
     const personId = await seedPerson(db().pool);
@@ -303,7 +303,16 @@ describe("inspecting a person", () => {
             expiresAt: "2026-10-21T09:00:00.000Z",
           },
         ],
-        ended: [],
+        ended: [
+          {
+            client: { id: clientId, name: "Claude" },
+            workspace: { id: zenith.workspaceId, name: "Zenith" },
+            issuedAt: "2026-09-22T09:00:00.000Z",
+            endedAt: "2026-09-23T09:00:00.000Z",
+            scope: "grant",
+            endedBy: { kind: "authorization-server" },
+          },
+        ],
       },
     });
   });
@@ -403,6 +412,13 @@ describe("inspecting a person's ended grants", () => {
     return { acme, personId };
   };
 
+  const revokedEverywhere = async (personId: string) => {
+    const everywhere = await asANewOperator(db(), new Date(), (operator, tx) =>
+      revokeCredentials(operator, tx, { personId: personIdOf(personId), at: new Date() }),
+    );
+    expect(everywhere.answered).toMatchObject({ ok: true, value: { ok: true } });
+  };
+
   it("lists each, newest first, with its scope and actor", async () => {
     const acme = await provisionedWorkspace(db(), "Acme", { name: "Ada Okafor" });
     const zenith = await provisionedWorkspace(db(), "Zenith", { name: "Zoe Lin" });
@@ -422,10 +438,7 @@ describe("inspecting a person's ended grants", () => {
       removeMember(principal, tx, { ...inputOf(removeMemberInput, { personId }), at: new Date() }),
     );
     expect(removed.ok).toBe(true);
-    const everywhere = await asANewOperator(db(), new Date(), (operator, tx) =>
-      revokeCredentials(operator, tx, { personId: personIdOf(personId), at: new Date() }),
-    );
-    expect(everywhere.answered).toMatchObject({ ok: true, value: { ok: true } });
+    await revokedEverywhere(personId);
 
     const claude = { id: clientId, name: "Claude" };
     const issuedAt = ISSUED.toISOString();
@@ -575,5 +588,75 @@ describe("inspecting a person's ended grants", () => {
       ok: true,
       value: { ended: [{ endedBy: { kind: "former-member" } }] },
     });
+  });
+  /** A grant whose standing token the authorization server marked, at sign-out or at `/oauth2/revoke`. */
+  const endedByTheServer = async (personId: string, issued: Date, ended: Date) =>
+    seedingWith(db().pool, async (seed) => {
+      const client = await seed.oauthClient({ name: "Claude" });
+      await seed.oauthRefreshToken({
+        clientId: client.clientId,
+        userId: personId,
+        referenceId: null,
+        createdAt: issued,
+        revoked: ended,
+      });
+      return client.clientId;
+    });
+
+  it("orders the server's ending among the acts' by its instant", async () => {
+    const personId = await seedPerson(db().pool);
+    await endedByTheServer(
+      personId,
+      new Date("2026-09-10T09:00:00.000Z"),
+      new Date("2026-09-24T10:00:00.000Z"),
+    );
+    await seedingWith(db().pool, async (seed) => {
+      for (const at of ["2026-09-25T10:00:00.000Z", "2026-09-23T10:00:00.000Z"]) {
+        await seed.identityAuditEvent({
+          subjectId: personId,
+          act: "people.person.credentials_revoked",
+          at: new Date(at),
+          detail: {
+            grants: [
+              {
+                clientId: "https://gone.example.invalid/metadata",
+                workspaceId: null,
+                issuedAt: ISSUED.toISOString(),
+              },
+            ],
+          },
+        });
+      }
+    });
+
+    const read = await inspected(personId);
+
+    expect(read.ok ? read.value.ended.map((each) => [each.endedAt, each.endedBy]) : []).toEqual([
+      ["2026-09-25T10:00:00.000Z", { kind: "platform" }],
+      ["2026-09-24T10:00:00.000Z", { kind: "authorization-server" }],
+      ["2026-09-23T10:00:00.000Z", { kind: "platform" }],
+    ]);
+  });
+
+  it("leaves a server-ended grant out of a later revocation", async () => {
+    const personId = await seedPerson(db().pool);
+    const clientId = await endedByTheServer(personId, ISSUED, new Date("2026-09-21T09:00:00.000Z"));
+    const endedBy = { kind: "authorization-server" } as const;
+    expect(await inspected(personId)).toMatchObject({
+      ok: true,
+      value: { grants: [], ended: [{ client: { id: clientId }, scope: "grant", endedBy }] },
+    });
+
+    await revokedEverywhere(personId);
+
+    const read = await inspected(personId);
+    expect(read.ok ? read.value.ended.filter((each) => each.client.id === clientId) : []).toEqual(
+      [],
+    );
+    const recorded = await db().pool.query<{ detail: unknown }>(
+      "SELECT detail FROM identity_audit_event WHERE subject_id = $1 AND act = $2",
+      [personId, "people.person.credentials_revoked"],
+    );
+    expect(recorded.rows).toEqual([{ detail: { grants: [] } }]);
   });
 });

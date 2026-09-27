@@ -882,6 +882,73 @@ describe("the console's list and inspection of people", () => {
     );
   });
 
+  /** The one grant Claude holds for Acme's Admin, ended by the authorization server alone. */
+  const endedByTheServer = (workspaceId: string) => [
+    {
+      client: { id: CLAUDE_CLIENT_ID, name: "Claude" },
+      workspace: { id: workspaceId, name: "Acme" },
+      issuedAt: expect.stringMatching(ISO_INSTANT),
+      endedAt: expect.stringMatching(ISO_INSTANT),
+      scope: "grant",
+      endedBy: { kind: "authorization-server" },
+    },
+  ];
+
+  /** The operator on the web, and Claude connected as Acme's Admin through `host`. */
+  const acmeConnected = async () => {
+    const { api } = await theOperatorOnTheWeb();
+    const acme = await app().provision({ name: "Acme" });
+    const host = app().client();
+    const { refreshToken } = await connectAsHost(app(), host, acme.admin);
+    return { api, acme, host, refreshToken: refreshToken ?? "" };
+  };
+
+  const revokedByItsClient = async () => {
+    const { api, acme, host, refreshToken } = await acmeConnected();
+    expect((await revokeAtEndpoint(host, refreshToken)).status).toBe(200);
+    return { api, acme };
+  };
+
+  it("shows a client's own revocation as the authorization server's ending", async () => {
+    const { api, acme } = await revokedByItsClient();
+
+    const inspected = await api.console.people.inspect.query({ personId: acme.admin.id });
+
+    expect(inspected).toMatchObject({ grants: [], ended: endedByTheServer(acme.workspaceId) });
+  });
+
+  // Sign-out marks only a refresh token without `offline_access`, which Claude's grant holds
+  // until a refresh narrows its scopes.
+  it("shows a sign-out's revocation as the authorization server's ending", async () => {
+    const { api, acme, host, refreshToken } = await acmeConnected();
+    const narrowed = await refresh(host, refreshToken, "knowledge:read");
+    expect(narrowed.status).toBe(200);
+    expect((await host.json("/sign-out", {})).status).toBe(200);
+
+    const inspected = await api.console.people.inspect.query({ personId: acme.admin.id });
+
+    expect(inspected).toEqual({
+      sessions: [],
+      grants: [],
+      ended: endedByTheServer(acme.workspaceId),
+    });
+  });
+
+  it("leaves a grant its client revoked out of revoking everywhere", async () => {
+    const { api, acme } = await revokedByItsClient();
+
+    await api.console.people.revokeCredentials.mutate({ personId: acme.admin.id });
+
+    const recorded = await app().database.superuser.query(
+      `SELECT detail FROM identity_audit_event
+        WHERE subject_id = $1 AND act = 'people.person.credentials_revoked'`,
+      [acme.admin.id],
+    );
+    expect(recorded.rows).toEqual([{ detail: { grants: [] } }]);
+    const inspected = await api.console.people.inspect.query({ personId: acme.admin.id });
+    expect(inspected.ended).toEqual([]);
+  });
+
   it("refuses a malformed ask, naming the field", async () => {
     const { api } = await theOperatorOnTheWeb();
 

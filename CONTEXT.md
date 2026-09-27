@@ -957,6 +957,8 @@ to it by IRI and never restates it (ADR 0014).
   workspace, or in none, lasting through the client's refreshes. It is open until it lapses or an
   act ends it: revoking credentials, here or everywhere, or removing a member. That act's audit
   event records each grant it ended, so an ended grant stays on record after its tokens are gone.
+  The authorization server can end one too, when the person's session ends or the client
+  disconnects. Nothing records that end, so it stands only while the grant's tokens do.
   _Avoid_: connection, token (for the grant as a whole).
 - **Account page** — a person's own small surface outside Control Centre: name, role,
   workspace, personal tokens.

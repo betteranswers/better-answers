@@ -207,7 +207,12 @@ const exchangeForTokens = async (
   return tokensOf(await response.json());
 };
 
-export const refresh = async (client: TestClient, refreshToken: string): Promise<Response> =>
+/** `scope`, when given, narrows the grant's scopes for the tokens the refresh issues. */
+export const refresh = async (
+  client: TestClient,
+  refreshToken: string,
+  scope?: string,
+): Promise<Response> =>
   client.fetch(`${PUBLIC_URL}/oauth2/token`, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -216,6 +221,7 @@ export const refresh = async (client: TestClient, refreshToken: string): Promise
       refresh_token: refreshToken,
       client_id: CLAUDE_CLIENT_ID,
       resource: MCP_URL,
+      ...(scope === undefined ? {} : { scope }),
     }).toString(),
   });
 
