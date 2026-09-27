@@ -115,7 +115,7 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "workspaces",
     access: "read and write",
     reason:
-      "Revoking a person's credentials writes the instant every later claim is refused against; the person's own act writes their display name under its one rule, and adding a member or provisioning reads it to refuse a person with none; and the membership read looks up the person's name and address for the shell, as the operator's list of people does for every person, with their revocation instant.",
+      "Revoking a person's credentials writes the instant every later claim is refused against; the platform writes a person it names before their first sign-in, unverified, and that sign-in finds the row; the person's own act writes their display name under its one rule, and adding a member or provisioning reads it to refuse a person with none; and the membership read looks up the person's name and address for the shell, as the operator's list of people does for every person, with their revocation instant.",
   },
   {
     table: "public.session",

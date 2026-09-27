@@ -12,6 +12,7 @@ import {
   admit,
   attempt,
   declareAct,
+  emailAddressOf,
   err,
   ok,
   type AdminUserPrincipal,
@@ -34,9 +35,6 @@ const INVITATION_ACTS = declareActs("people", {
 const ROLE = boundarySchemas.member.select.shape.role;
 
 const INVITATION_ID = boundarySchemas.invitation.select.shape.id;
-
-/** Longer than any address a mail system delivers to, so a real one is never refused. */
-const ADDRESS = z.email().max(254);
 
 const ADMIN_ALONE = { role: "Admin", purposes: [] } as const;
 
@@ -294,17 +292,17 @@ export const inviteMember = async (
   const admitted = admit(inviteMemberAct, principal, input);
   if (!admitted.ok) return err(admitted.error);
 
-  const address = ADDRESS.safeParse(input.address.trim().toLowerCase());
-  if (!address.success) return err("malformed");
+  const address = emailAddressOf(input.address);
+  if (address === undefined) return err("malformed");
   const role = ROLE.safeParse(input.role);
   if (!role.success) return err("no-such-role");
 
-  const member = await isMember(admitted.value, tx, address.data);
+  const member = await isMember(admitted.value, tx, address);
   if (!member.ok) return err(member.error);
   if (member.value) return err("already-a-member");
 
   return mintInvitation(admitted.value, tx, {
-    address: address.data,
+    address,
     role: role.data,
     now: input.now,
   });

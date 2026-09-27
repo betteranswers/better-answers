@@ -222,7 +222,25 @@ Two sweeps clear what no row names. **The upload sweep** removes an original a f
 - `found` rises by one for each bind whose second transaction failed, and for each repeat of a bind that lost the race to the first. A lost race's key, `uploads/<binding>/<document>/original`, names a binding whose document row names another key. `found` falls only when something removes originals, such as `object-store-orphans` run by hand without `--list`. A rise with neither behind it is the join being wrong: leave the setting at `list` and escalate.
 - `pnpm ops object-store-orphans --workspace <id> --list` gives one workspace's count, and the per-workspace counts add up to `found`. By hand the command removes unless given `--list`, whatever the setting says.
 
-Switch removal on after a week of list-only passes in which every rise in `found` has a failed bind or a lost race behind it: set `UPLOAD_SWEEP=remove` on the platform resource and redeploy. The next pass reads `upload_sweep=remove`, with `removed` equal to `found`, and `found` falls to what failed binds and lost races have left since. Setting it back to `list` stops the removal from the next start.
+**The day to switch** is seven days after the first upload is bound in a client's workspace on production. The earliest document row that names an original gives it, read through `browse_ro` (§ Browse production):
+
+```sql
+SELECT workspace_id, first_seen FROM source_document
+ WHERE original_key LIKE 'uploads/%' ORDER BY first_seen LIMIT 1;
+```
+
+No row means nothing is bound yet, and the setting stays at `list`. A row whose workspace is not a client's does not count: add `AND workspace_id <> '<its id>'` and read again. The day is the row's `first_seen` plus seven days.
+
+The week starts at the first bind because a pass proves nothing before it. Until an original is bound, no row names one, so the join has nothing to hold and every pass reads `found=0` whatever the join does. The exception is a failed bind, which can leave an original before any row exists; that rise is still read against its cause, as the list above says. A wrong join shows only once there are named originals for it to miss, and the first week with live originals is the one that proves the join holds them. Importing a bundle (§ Import a company's bundle) writes concepts and no originals, so it does not start the week. Nor should the switch wait past it: from then on an orphan may hold personal data nobody can find (ADR 0020), and the 24-hour grace already keeps removal away from an original whose bind is still running.
+
+On the day, read the week's passes through `browse_ro`, with that `first_seen` in place:
+
+```sql
+SELECT at, upload_sweep, found, removed FROM sweep_pass
+ WHERE at >= '<first_seen>' ORDER BY at;
+```
+
+If every rise in `found` has a failed bind or a lost race behind it, set `UPLOAD_SWEEP=remove` on the platform resource and redeploy. If any rise has neither, leave the setting at `list` and escalate. After the switch, the next pass reads `upload_sweep=remove`, with `removed` equal to `found`, and `found` falls to what failed binds and lost races have left since. Setting it back to `list` stops the removal from the next start.
 
 ## Import a company's bundle
 
@@ -238,7 +256,9 @@ The first client is landed by this page on staging first and then on production,
 
 1. **Bring staging up** (the procedure above) at the digests `build.yml` last pushed.
 2. **Two sign-ins, each with an email code and a display name:** the running Admin — the owner, on staging and on production, reading only what they already hold as the platform's developer — and the verifier every `verified` event in the bundle names. The screen after the code asks each for the display name they are credited by — *Checked by*, a commit's author — and both finish it before the next step: a workspace is never provisioned around a person the identity set does not hold or who has given no display name, and the loader refuses a `verified` event whose person is not a member.
-3. **`pnpm ops provision-workspace --name <name> --slug <slug> --admin <the Admin's email>`** on the `api` service. The done line begins with the workspace id; copy it, since every later command takes it. It creates the workspace, its partition, the Admin's membership, its configuration row, its audit event and its bare bundle repository under `GIT_STORE_DIR`, and writes nothing when it refuses: `REFUSED — no-such-user` is step 2 not yet done for that person; `no-display-name` is step 2's display name not yet given — they sign in again and give it; `slug-taken` is a short name another workspace holds.
+
+   A person who cannot sign in before the run is added instead: **`pnpm ops add-person --email <address> --name <display name>`** on the `api` service. It is for a person who must stand on the platform before they have done anything, at an address whose mail the operator cannot read. It writes the person with the name given and the address unverified, and records `people.person.added` in the identity-set audit log under the platform's own actor id. The done line begins with the new person's id. Their first email-code sign-in finds that person, marks the address verified and asks no display name. The command writes nothing when it refuses. `malformed` is an address that is not one. A `display-name-…` word is a name the display-name rule refuses. `person-exists` is an address a person already holds, however it is cased, and that person is taken as they stand.
+3. **`pnpm ops provision-workspace --name <name> --slug <slug> --admin <the Admin's email>`** on the `api` service. The done line begins with the workspace id; copy it, since every later command takes it. It creates the workspace, its partition, the Admin's membership, its configuration row, its audit event and its bare bundle repository under `GIT_STORE_DIR`, and writes nothing when it refuses: `REFUSED — no-such-user` is step 2 not yet done for that person, by a sign-in or by `add-person`; `no-display-name` is step 2's display name not yet given — they sign in again and give it; `slug-taken` is a short name another workspace holds.
 4. **`pnpm ops add-member --workspace <id> --email <the verifier's email> --role Admin`** — the verifier as an Admin, since they own the content and will administer the workspace once the client's own accounts exist; any of the three roles satisfies the loader, and the choice is the command line's. `no-display-name` refuses as it does in step 3. `already-a-member` on a repeat is the command refusing to change a role, which is the Admin's act on the People screen (P1). Further people are added the same way when the client is ready, or by invitation once P1 lands.
 5. **Copy the tree to the box**, `manifest.yaml` with it.
 6. **`pnpm ops import-bundle --workspace <id> --from <directory> --as <the Admin's email> --dry-run`**, then the same without `--dry-run` (the procedure above). The dry run says what a run would do and writes nothing; a refusal names the file and the reason.
@@ -249,7 +269,7 @@ The first client is landed by this page on staging first and then on production,
 
 ## Make or unmake the operator
 
-The operator is the person the console serves, marked on their person row. Only one command on the `api` service sets or clears the mark, and no screen can. The person signs in with an email code first: the command refuses an address nobody has signed in with, `REFUSED — no-such-user`.
+The operator is the person the console serves, marked on their person row. Only one command on the `api` service sets or clears the mark, and no screen can. The person signs in with an email code first, or is added by `add-person` (the procedure above): the command refuses an address no person holds, `REFUSED — no-such-user`.
 
 - `pnpm ops operator --email <address> --grant` makes them the operator, and `--revoke` clears the mark. Each change writes `people.operator.granted` or `people.operator.revoked` to the identity-set audit log under the platform's own actor id. A person who already stands as asked is left alone, and the done line says nothing was written.
 - The console answers the operator from their ordinary signed-in session, and never from an OAuth token. Clearing the mark refuses them from their next request.

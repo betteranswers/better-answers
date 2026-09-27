@@ -318,7 +318,8 @@ const lockedRepository = async <T>(key: string, work: () => Promise<T>): Promise
 
 /**
  * The commits on `main` after `since`, oldest first, or all of them when `since` is null.
- * `history-diverged` when the head no longer descends from `since`.
+ * `history-diverged` when git cannot show that the head still descends from `since`; an `Error`
+ * when it reads the head but cannot list the commits behind it.
  */
 export const commitsAfter = async (
   platform: PlatformPrincipal,
@@ -328,7 +329,7 @@ export const commitsAfter = async (
 ): Promise<
   Result<
     { readonly head: string | null; readonly missed: readonly string[] },
-    "no-such-repository" | "history-diverged"
+    "no-such-repository" | "history-diverged" | Error
   >
 > => {
   const gitDir = repositoryPath(door, workspaceId);
@@ -343,12 +344,16 @@ export const commitsAfter = async (
       return err("history-diverged");
     }
   }
-  const listed = await git(gitDir, [
-    "rev-list",
-    "--reverse",
-    since === null ? BUNDLE_REF : `${since}..${BUNDLE_REF}`,
-  ]);
-  return ok({ head, missed: listed.split("\n").filter((sha) => sha !== "") });
+  try {
+    const listed = await git(gitDir, [
+      "rev-list",
+      "--reverse",
+      since === null ? BUNDLE_REF : `${since}..${BUNDLE_REF}`,
+    ]);
+    return ok({ head, missed: listed.split("\n").filter((sha) => sha !== "") });
+  } catch (cause) {
+    return err(normalizeError(cause));
+  }
 };
 
 export type HistoryNaming = {

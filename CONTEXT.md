@@ -129,8 +129,8 @@ Where a unit lives is decided by **minting**.
   removed nothing too. _Avoid_: cleanup, garbage collection, cron.
 - **upload sweep** — the removal of the originals no document names, once past their grace: what a
   failed bind left, and what a concurrent repeat left when it lost the race to the first bind.
-  **List-only** until an operator switches removal on: it counts what it would remove and removes
-  nothing.
+  **List-only** until an operator switches removal on, seven days after the first upload is bound
+  in a client's workspace on production: it counts what it would remove and removes nothing.
 - **graph sweep** — the removal of every generation of a workspace's map but the live one.
 - **concept index** — the platform's derived row for every concept, written when the concept's
   commit is made, checked by the sync, never edited. The only "both" of the minting rule. Carries
@@ -573,10 +573,10 @@ to it by IRI and never restates it (ADR 0014).
 - **actor alias** — an Admin's mapping of an imported actor id to a member, so *Checked by* can
   name them; the file is never rewritten.
 - **person id** — the platform's one stable id for a person: minted by the platform at their first
-  sign-in, carried on the identity set's user row, `userId` on every Principal, and what every
-  record names a person by as `human:<person id>`. Never written into a concept file, which keeps
-  `human:<email>` (ADR 0019). _Avoid_: member id (retired 05/09/2026 — the member row's key names
-  nothing), user id (on a screen).
+  sign-in, or earlier when the platform adds them by name, carried on the identity set's user row,
+  `userId` on every Principal, and what every record names a person by as `human:<person id>`.
+  Never written into a concept file, which keeps `human:<email>` (ADR 0019). _Avoid_: member id
+  (retired 05/09/2026 — the member row's key names nothing), user id (on a screen).
 - **display name** — the one line a person is credited by wherever the platform names them:
   *Checked by*, a commit's author, a member list. The person states it themselves; an Admin flags
   an inappropriate one and the *operator* corrects it, since one name is shown in every workspace

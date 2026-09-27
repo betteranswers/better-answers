@@ -5,7 +5,7 @@ import { refusalOf, type ApiError, type Refusal } from "@/shared/api/trpc.ts";
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { cn } from "@/shared/lib/utils.ts";
 import { RefusalLine } from "@/shared/refusal-outcome.tsx";
-import { NO_RESPONSE, SAID_OF_CLASS, type Said } from "@/shared/refusal-words.ts";
+import { NO_RESPONSE, SAID_OF_CLASS, SIGN_IN_AGAIN, type Said } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { PRODUCT_NAME } from "@/shared/words.ts";
 
@@ -95,24 +95,26 @@ function SignInAgain(properties: { readonly signInAt: string }) {
         void navigate(leavingFor(properties.signInAt));
       }}
     >
-      Sign in again
+      {SIGN_IN_AGAIN}
     </Button>
   );
 }
 
-/** Every unauthenticated word says the one thing, since signing in again is its one remedy. */
-const saidOfFailure = (
-  refusal: Refusal | undefined,
-  saidOf: (refusal: Refusal) => Said,
-  unanswered: Said,
-): Said => {
-  if (refusal === undefined) return unanswered;
-  return refusal.class === "unauthenticated" ? SAID_OF_CLASS.unauthenticated : saidOf(refusal);
-};
+/** An ended session is said by its `why` alone: the button after it is the remedy. */
+function FailureLine(properties: {
+  readonly refusal: Refusal | undefined;
+  readonly saidOf: (refusal: Refusal) => Said;
+  readonly unanswered: Said;
+}) {
+  const { refusal } = properties;
+  if (refusal === undefined) return <RefusalLine said={properties.unanswered} />;
+  if (refusal.class === "unauthenticated") return <>{SAID_OF_CLASS.unauthenticated.why}</>;
+  return <RefusalLine said={properties.saidOf(refusal)} />;
+}
 
 /**
- * What went wrong and what to do, in the shared refusal template. A wordless failure says
- * `unanswered`, and an ended session signs in at `signInAt`.
+ * What went wrong and what to do. A wordless failure says `unanswered`; an ended session gets a
+ * button that signs in at `signInAt`.
  */
 export function Refused(properties: {
   readonly id: string;
@@ -129,7 +131,7 @@ export function Refused(properties: {
     <>
       <Outcome tone="refused" id={properties.id}>
         {failure === null ? null : (
-          <RefusalLine said={saidOfFailure(refusal, properties.saidOf, unanswered)} />
+          <FailureLine refusal={refusal} saidOf={properties.saidOf} unanswered={unanswered} />
         )}
       </Outcome>
       {sessionEnded ? (

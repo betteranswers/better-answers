@@ -33,7 +33,7 @@ export const DISPLAY_NAME_CORRECTED = PERSON_ACTS.renamed;
 
 const DISPLAY_NAME_MAX_CHARACTERS = 100;
 
-type DisplayNameRefusal = WorkspaceRefusal<
+export type DisplayNameRefusal = WorkspaceRefusal<
   | "display-name-empty"
   | "display-name-not-one-line"
   | "display-name-control-character"

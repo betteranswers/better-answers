@@ -4,7 +4,7 @@ import { ASK_TO_JOIN_WORDS, SLUG_EXAMPLE } from "@/features/auth/ask-to-join-wor
 import { askedTooOften, REASON_REFUSED } from "@/features/auth/refusal-words.ts";
 import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
-import { SAID_OF_CLASS, sentenceOf } from "@/shared/refusal-words.ts";
+import { SAID_OF_CLASS, sentenceOf, SIGN_IN_AGAIN } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -182,9 +182,9 @@ test("sends a person whose session ended back to sign in", async ({ page, contex
 
   await askToJoin(page, A_SLUG);
 
-  await expect(page.getByRole("alert")).toHaveText(sentenceOf(SAID_OF_CLASS.unauthenticated));
+  await expect(page.getByRole("alert")).toHaveText(SAID_OF_CLASS.unauthenticated.why);
   await theScreenSaysNeither(page, "once the session ended");
-  await page.getByRole("button", { name: "Sign in again" }).click();
+  await page.getByRole("button", { name: SIGN_IN_AGAIN }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
 });
 

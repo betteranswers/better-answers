@@ -22,6 +22,7 @@ import {
   type Frontmatter,
   type Reconciled,
   type SuggestionRequest,
+  type WorkspaceReconciled,
   type WriteConceptInput,
 } from "../src/concepts/index.ts";
 import { actorIdOf, type Result, type UserPrincipal } from "../src/kernel/index.ts";
@@ -33,6 +34,7 @@ import {
   divergeHistory,
   emptyRootCommit,
   fileAtCommit,
+  objectRemovedFrom,
   removeRepository,
 } from "./bundle.ts";
 import { bindingHolding, publishedOnceIndexed } from "./sourced-concept.ts";
@@ -1014,6 +1016,14 @@ describe("the fence", () => {
 
 const PERIODIC_HEAD_CHECK_ALLOWANCE_MS = 90_000;
 
+const outcomesOfPass = async (
+  scenario: Scenario,
+): Promise<ReadonlyMap<string, WorkspaceReconciled["outcome"]>> => {
+  const pass = await reconcileEveryWorkspace(RECONCILER, doorsOf(scenario));
+  if (!pass.ok) throw new Error(`the pass was refused: ${pass.error.message}`);
+  return new Map(pass.value.map((outcome) => [outcome.workspaceId, outcome.outcome]));
+};
+
 describe("the periodic head check's pass", () => {
   it(
     "reconciles every workspace, each on its own outcome",
@@ -1024,11 +1034,8 @@ describe("the periodic head check's pass", () => {
       await removeRepository(missing.git, missing.workspaceId);
       const history = await writeInTheWindow(behind, behind.editor, guideline("Lunch"));
 
-      const pass = await reconcileEveryWorkspace(RECONCILER, doorsOf(behind));
+      const outcomes = await outcomesOfPass(behind);
 
-      expect(pass.ok).toBe(true);
-      if (!pass.ok) return;
-      const outcomes = new Map(pass.value.map((outcome) => [outcome.workspaceId, outcome.outcome]));
       expect(outcomes.get(behind.workspaceId)).toMatchObject({
         ok: true,
         value: { replayed: history },
@@ -1039,6 +1046,32 @@ describe("the periodic head check's pass", () => {
       });
 
       expect(outcomes.get(missing.workspaceId)).toEqual({ ok: false, error: "no-such-repository" });
+    },
+    PERIODIC_HEAD_CHECK_ALLOWANCE_MS,
+  );
+
+  it(
+    "keeps one workspace's unwalkable history to that workspace's outcome",
+    async () => {
+      const broken = await arrange();
+      const later = await arrange();
+      const [first = ""] = await writeInTheWindow(broken, broken.editor, guideline("Parking"));
+      await writeInTheWindow(
+        broken,
+        broken.editor,
+        guideline("Taxis", { expects: { head: first } }),
+      );
+      await objectRemovedFrom(broken.git, broken.workspaceId, first);
+      const history = await writeInTheWindow(later, later.editor, guideline("Hotels"));
+
+      const outcomes = await outcomesOfPass(broken);
+
+      const failed = outcomes.get(broken.workspaceId);
+      expect(failed?.ok === false ? failed.error : undefined).toBeInstanceOf(Error);
+      expect(outcomes.get(later.workspaceId)).toMatchObject({
+        ok: true,
+        value: { replayed: history },
+      });
     },
     PERIODIC_HEAD_CHECK_ALLOWANCE_MS,
   );
