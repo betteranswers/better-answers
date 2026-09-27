@@ -87,7 +87,7 @@ jobs:
           exit-code: "0"
           # Named, because the action's own default trails the scanner's security releases; Renovate moves this input.
           version: v0.74.0
-          # A dated database entry each night would share the Actions cache's 10 GB with the image layers, and evict them.
+          # Any run on main can write an Actions cache entry, and a database planted there would hide what this scan reports.
           cache: "false"
           # The worker's layers are 1.47 GB compressed, and the five-minute default spans the pull as well as the scan.
           timeout: 15m

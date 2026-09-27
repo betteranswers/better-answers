@@ -889,11 +889,19 @@ def _read_measurement(stdout: str) -> Measurement:
     )
 
 
-SHARED_CACHE_TOKEN = "ACTIONS_RUNTIME_TOKEN"
-SHARED_CACHE_URLS = ("ACTIONS_RESULTS_URL", "ACTIONS_CACHE_URL")
+CACHE_REGISTRY_VARIABLE = "IMAGE_CACHE_REGISTRY"
+
+
+CACHE_TAG = "buildcache"
 
 
 DRIVER_WITHOUT_AN_EXPORT = "docker"
+
+
+@dataclass(frozen=True)
+class SharedCache:
+    builder: str
+    registry: str
 
 
 def _builder_that_can_export(inspected: str) -> str | None:
@@ -909,10 +917,9 @@ def _builder_that_can_export(inspected: str) -> str | None:
     return named
 
 
-def _shared_cache_builder() -> str | None:
-    if not os.environ.get(SHARED_CACHE_TOKEN, "").strip():
-        return None
-    if not any(os.environ.get(name, "").strip() for name in SHARED_CACHE_URLS):
+def _shared_cache() -> SharedCache | None:
+    registry = os.environ.get(CACHE_REGISTRY_VARIABLE, "").strip()
+    if not registry:
         return None
     try:
         inspected = subprocess.run(
@@ -926,13 +933,14 @@ def _shared_cache_builder() -> str | None:
         return None
     if inspected.returncode != 0:
         return None
-    return _builder_that_can_export(inspected.stdout)
+    builder = _builder_that_can_export(inspected.stdout)
+    return None if builder is None else SharedCache(builder=builder, registry=registry)
 
 
 def _build_command(
-    leg: Mapping[str, str], *, builder: str | None, iidfile: Path
+    leg: Mapping[str, str], *, cache: SharedCache | None, iidfile: Path
 ) -> list[str]:
-    if builder is None:
+    if cache is None:
         return [
             "docker",
             "build",
@@ -946,9 +954,9 @@ def _build_command(
         "buildx",
         "build",
         "--builder",
-        builder,
+        cache.builder,
         "--cache-from",
-        f"type=gha,scope={leg['tier']}",
+        f"type=registry,ref={cache.registry}/{leg['tier']}:{CACHE_TAG}",
         "--load",
         "--iidfile",
         str(iidfile),
@@ -959,18 +967,18 @@ def _build_command(
 
 
 def _build_the_image(leg: Mapping[str, str]) -> str:
-    builder = _shared_cache_builder()
+    cache = _shared_cache()
     with tempfile.TemporaryDirectory() as scratch:
         iidfile = Path(scratch) / "image-id"
         built = subprocess.run(
-            _build_command(leg, builder=builder, iidfile=iidfile),
+            _build_command(leg, cache=cache, iidfile=iidfile),
             cwd=REPO_ROOT,
             check=True,
             capture_output=True,
             text=True,
             timeout=900,
         )
-        if builder is None:
+        if cache is None:
             return built.stdout.strip()
         return iidfile.read_text(encoding="utf-8").strip()
 
@@ -1515,15 +1523,16 @@ def test_a_runner_builds_through_buildx_and_a_laptop_as_before() -> None:
         "context": "apps/worker",
     }
     written_to = Path("/tmp/the-id-this-build-wrote")
+    cache = SharedCache(builder="the-container-builder", registry="ghcr.io/an-owner")
 
-    assert _build_command(leg, builder="the-container-builder", iidfile=written_to) == [
+    assert _build_command(leg, cache=cache, iidfile=written_to) == [
         "docker",
         "buildx",
         "build",
         "--builder",
         "the-container-builder",
         "--cache-from",
-        "type=gha,scope=worker",
+        "type=registry,ref=ghcr.io/an-owner/worker:buildcache",
         "--load",
         "--iidfile",
         "/tmp/the-id-this-build-wrote",
@@ -1531,7 +1540,7 @@ def test_a_runner_builds_through_buildx_and_a_laptop_as_before() -> None:
         "apps/worker/Dockerfile",
         "apps/worker",
     ]
-    assert _build_command(leg, builder=None, iidfile=written_to) == [
+    assert _build_command(leg, cache=None, iidfile=written_to) == [
         "docker",
         "build",
         "--quiet",
@@ -1570,11 +1579,10 @@ def test_takes_only_a_builder_that_can_export_a_cache() -> None:
     )
 
 
-def test_a_machine_without_the_cache_credentials_asks_the_daemon_nothing(
+def test_a_machine_naming_no_cache_registry_asks_the_daemon_nothing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    for name in (SHARED_CACHE_TOKEN, *SHARED_CACHE_URLS):
-        monkeypatch.delenv(name, raising=False)
+    monkeypatch.delenv(CACHE_REGISTRY_VARIABLE, raising=False)
 
     def refuse_to_run(*_arguments: object, **_keywords: object) -> None:
         message = "the probe asked the daemon for a builder it could not have used"
@@ -1582,4 +1590,4 @@ def test_a_machine_without_the_cache_credentials_asks_the_daemon_nothing(
 
     monkeypatch.setattr(subprocess, "run", refuse_to_run)
 
-    assert _shared_cache_builder() is None
+    assert _shared_cache() is None

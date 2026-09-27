@@ -50,8 +50,9 @@ const OUTPUT_CEILING_BYTES = 64 * 1024 * 1024;
 
 export const IMAGE_PROBE_ALLOWANCE = BUILD_ALLOWANCE + CONTAINER_ALLOWANCE;
 
-const SHARED_CACHE_TOKEN = "ACTIONS_RUNTIME_TOKEN";
-const SHARED_CACHE_URLS = ["ACTIONS_RESULTS_URL", "ACTIONS_CACHE_URL"] as const;
+const CACHE_REGISTRY_VARIABLE = "IMAGE_CACHE_REGISTRY";
+
+const CACHE_TAG = "buildcache";
 
 const DRIVER_WITHOUT_AN_EXPORT = "docker";
 
@@ -80,23 +81,29 @@ export const builderThatCanExport = (inspected: string): string | undefined => {
   return named;
 };
 
-/** Undefined, and the daemon never asked, unless the environment holds the cache's credentials. */
-export const sharedCacheBuilder = async (
+interface SharedCache {
+  readonly builder: string;
+  readonly registry: string;
+}
+
+/** Undefined, and the daemon never asked, unless the environment names the cache's registry. */
+export const sharedCache = async (
   environment: BuildEnvironment,
   inspectTheBuilder: () => Promise<string | undefined>,
-): Promise<string | undefined> => {
-  if ((environment[SHARED_CACHE_TOKEN] ?? "").trim() === "") return undefined;
-  if (!SHARED_CACHE_URLS.some((name) => (environment[name] ?? "").trim() !== "")) return undefined;
+): Promise<SharedCache | undefined> => {
+  const registry = (environment[CACHE_REGISTRY_VARIABLE] ?? "").trim();
+  if (registry === "") return undefined;
   const inspected = await inspectTheBuilder();
-  return inspected === undefined ? undefined : builderThatCanExport(inspected);
+  const builder = inspected === undefined ? undefined : builderThatCanExport(inspected);
+  return builder === undefined ? undefined : { builder, registry };
 };
 
-/** Without a builder the plain build prints the image's id, and `iidfile` goes unused. */
+/** Without a shared cache the plain build prints the image's id, and `iidfile` goes unused. */
 export const buildCommand = (
   image: ImageUnderTest,
-  choice: { readonly builder: string | undefined; readonly iidfile: string },
+  choice: { readonly cache: SharedCache | undefined; readonly iidfile: string },
 ): readonly [string, ...string[]] => {
-  if (choice.builder === undefined) {
+  if (choice.cache === undefined) {
     return ["docker", "build", "--quiet", "--file", image.dockerfile, image.context];
   }
   return [
@@ -104,9 +111,9 @@ export const buildCommand = (
     "buildx",
     "build",
     "--builder",
-    choice.builder,
+    choice.cache.builder,
     "--cache-from",
-    `type=gha,scope=${image.tier}`,
+    `type=registry,ref=${choice.cache.registry}/${image.tier}:${CACHE_TAG}`,
     "--load",
     "--iidfile",
     choice.iidfile,
@@ -126,17 +133,17 @@ const inspectTheCurrentBuilder = async (): Promise<string | undefined> => {
 };
 
 const buildTheImage = async (image: ImageUnderTest): Promise<string> => {
-  const builder = await sharedCacheBuilder(process.env, inspectTheCurrentBuilder);
+  const cache = await sharedCache(process.env, inspectTheCurrentBuilder);
   const scratch = mkdtempSync(path.join(tmpdir(), "image-probe-"));
   const iidfile = path.join(scratch, "image-id");
   try {
-    const [program, ...argv] = buildCommand(image, { builder, iidfile });
+    const [program, ...argv] = buildCommand(image, { cache, iidfile });
     const built = await run(program, argv, {
       cwd: repositoryRoot,
       timeout: BUILD_ALLOWANCE,
       maxBuffer: OUTPUT_CEILING_BYTES,
     });
-    return builder === undefined ? built.stdout.trim() : readFileSync(iidfile, "utf8").trim();
+    return cache === undefined ? built.stdout.trim() : readFileSync(iidfile, "utf8").trim();
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }
