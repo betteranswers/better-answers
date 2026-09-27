@@ -1,4 +1,5 @@
 export { ulid } from "@better-answers/schema";
+export { emailAddressOf } from "./address.ts";
 export { systemClock } from "./clock.ts";
 export type { Clock } from "./clock.ts";
 export { refusalFor } from "./constraint.ts";
