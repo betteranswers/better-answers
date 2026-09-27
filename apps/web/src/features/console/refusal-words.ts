@@ -34,7 +34,7 @@ const NO_SUCH_PERSON: Said = {
 export const SAID_OF_A_REVOCATION = {
   [SIGN_IN_TOO_OLD]: {
     why: "Your sign-in is more than an hour old, and revoking needs one from the last hour.",
-    next: "Sign in again, and you come back to this person.",
+    next: "Once you have signed in, you come back to this person.",
   },
   [NOT_THE_OPERATOR]: {
     why: "Only the operator may revoke credentials everywhere.",
@@ -52,7 +52,7 @@ export const SAID_OF_CORRECTING = {
   },
   [SIGN_IN_TOO_OLD]: {
     why: "Your sign-in is more than an hour old, and correcting a name needs one from the last hour.",
-    next: "Sign in again, and you come back here.",
+    next: "Once you have signed in, you come back here.",
   },
   [NOT_THE_OPERATOR]: {
     why: "Only the operator may correct a display name.",
