@@ -73,6 +73,12 @@
       "skillPath": "packages/server/skills/caching/SKILL.md",
       "computedHash": "c4f3f4bb6b04529e85705dc9c64043caf92818226fae7a95eeba28da79a6b45e"
     },
+    "ci-cd-and-automation": {
+      "source": "addyosmani/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/ci-cd-and-automation/SKILL.md",
+      "computedHash": "578b098a7d2352ccdac8b8abdc40eb6803538e81cf8382f138da6188a655087c"
+    },
     "client-setup": {
       "source": "trpc/trpc",
       "sourceType": "github",
