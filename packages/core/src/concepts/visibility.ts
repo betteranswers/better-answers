@@ -399,54 +399,56 @@ const PANE_WORDS = {
   { readonly lead: string; readonly next: string }
 >;
 
+/** `actor` and `recorded_at` are null together: no override row joined. */
+type PaneFacts = {
+  readonly cited: number;
+
+  readonly readable: readonly ReadableEvidence[];
+} & (
+  | { readonly actor: null; readonly recorded_at: null }
+  | { readonly actor: string; readonly recorded_at: Date }
+);
+
 /** `undefined` when the principal cannot read the concept, or no concept has the IRI. */
 export const evidencePaneOf = async (
   principal: UserPrincipal,
   tx: Tx,
   iri: string,
 ): Promise<Result<EvidencePane | undefined, Error>> => {
-  const parameters = readableParameters(principal);
-  const read = await attempt(async () => {
-    const concept = await tx.query(
-      `SELECT 1 FROM concept_index c WHERE c.workspace_id = $1 AND c.iri = $2 AND ${readableClause("c", 3)}`,
-      [principal.workspaceId, iri, ...parameters],
-    );
-    if (concept.rowCount === 0) return undefined;
-    const cited = await tx.query<{ cited: number }>(
-      "SELECT count(*)::int AS cited FROM concept_evidence WHERE workspace_id = $1 AND iri = $2",
-      [principal.workspaceId, iri],
-    );
-    const readable = await tx.query<ReadableEvidence>(
-      `SELECT ce.locator, e.resource
-         FROM concept_evidence ce
-         JOIN evidence e ON e.workspace_id = ce.workspace_id
-                        AND e.source_document_id = ce.source_document_id AND e.locator = ce.locator
-         JOIN source_document d ON d.workspace_id = ce.workspace_id AND d.id = ce.source_document_id
-         JOIN source_binding b ON b.workspace_id = d.workspace_id AND b.id = d.binding_id
-        WHERE ce.workspace_id = $1 AND ce.iri = $2 AND ${readableClause("b", 3)}
-        ORDER BY ce.locator, ce.source_document_id`,
-      [principal.workspaceId, iri, ...parameters],
-    );
-    return {
-      cited: cited.rows[0]?.cited ?? 0,
-      readable: readable.rows,
-      override: await overrideOf(principal, tx, iri),
-    };
-  });
+  // One statement, so one snapshot: reads taken apart can straddle a re-write's commit.
+  const read = await attempt(() =>
+    tx.query<PaneFacts>(
+      `SELECT count(ce.locator)::int AS cited,
+              coalesce(
+                json_agg(json_build_object('locator', ce.locator, 'resource', e.resource)
+                         ORDER BY ce.locator, ce.source_document_id)
+                  FILTER (WHERE e.resource IS NOT NULL),
+                '[]') AS readable,
+              o.actor, o.recorded_at
+         FROM concept_index c
+         LEFT JOIN concept_class_override o ON o.workspace_id = c.workspace_id AND o.iri = c.iri
+         LEFT JOIN concept_evidence ce ON ce.workspace_id = c.workspace_id AND ce.iri = c.iri
+         LEFT JOIN (evidence e
+                    JOIN source_document d
+                      ON d.workspace_id = e.workspace_id AND d.id = e.source_document_id
+                    JOIN source_binding b ON b.workspace_id = d.workspace_id AND b.id = d.binding_id)
+                ON e.workspace_id = ce.workspace_id AND e.source_document_id = ce.source_document_id
+               AND e.locator = ce.locator AND ${readableClause("b", 3)}
+        WHERE c.workspace_id = $1 AND c.iri = $2 AND ${readableClause("c", 3)}
+        GROUP BY c.iri, o.actor, o.recorded_at`,
+      [principal.workspaceId, iri, ...readableParameters(principal)],
+    ),
+  );
   if (!read.ok) return err(read.error);
-  if (read.value === undefined) return ok(undefined);
-  return ok(paneOf(read.value));
+  const [facts] = read.value.rows;
+  return ok(facts === undefined ? undefined : paneOf(facts));
 };
 
-const paneOf = (facts: {
-  readonly cited: number;
-  readonly readable: readonly ReadableEvidence[];
-  readonly override: OverrideRow | undefined;
-}): EvidencePane => {
+const paneOf = (facts: PaneFacts): EvidencePane => {
   const withheld = facts.cited - facts.readable.length;
   const access =
     withheld === 0 ? "included" : facts.readable.length === 0 ? "not-included" : "partly-included";
-  const sharedBeyondEvidence = sharerOf(withheld, facts.override);
+  const sharedBeyondEvidence = withheld > 0 ? sharerOf(facts) : undefined;
   const { lead, next } =
     PANE_WORDS[access === "included" && facts.cited === 0 ? "nothing-cited" : access];
   return {
@@ -458,10 +460,5 @@ const paneOf = (facts: {
   };
 };
 
-const sharerOf = (
-  withheld: number,
-  override: OverrideRow | undefined,
-): EvidencePane["sharedBeyondEvidence"] =>
-  withheld > 0 && override !== undefined && isActorId(override.actor)
-    ? { by: override.actor, at: override.recorded_at }
-    : undefined;
+const sharerOf = ({ actor, recorded_at }: PaneFacts): EvidencePane["sharedBeyondEvidence"] =>
+  actor !== null && isActorId(actor) ? { by: actor, at: recorded_at } : undefined;
