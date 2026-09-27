@@ -229,6 +229,21 @@ def _requirements(*path: str) -> list[str]:
     return [str(each) for each in found]
 
 
+def _group_requirements(group: str) -> list[str]:
+    found = _pyproject_at("dependency-groups", group)
+    if not isinstance(found, list):
+        message = f"pyproject.toml's dependency group {group} is not a list"
+        raise RuntimeError(message)
+    requirements: list[str] = []
+    for each in found:
+        included = each.get("include-group") if isinstance(each, dict) else None
+        if isinstance(included, str):
+            requirements += _group_requirements(included)
+        else:
+            requirements.append(str(each))
+    return requirements
+
+
 def _distribution_name(requirement: str) -> str:
     named = re.match(r"[A-Za-z0-9._-]+", requirement)
     if named is None:
@@ -238,9 +253,7 @@ def _distribution_name(requirement: str) -> str:
 
 
 def development_only_distributions() -> list[str]:
-    development = {
-        _distribution_name(each) for each in _requirements("dependency-groups", "dev")
-    }
+    development = {_distribution_name(each) for each in _group_requirements("dev")}
     runtime = {
         _distribution_name(each) for each in _requirements("project", "dependencies")
     }
@@ -1074,6 +1087,10 @@ def test_the_image_carries_no_development_dependency(
 ) -> None:
     assert development_only_distributions()
     assert list(contents.development) == []
+
+
+def test_the_development_group_counts_the_groups_it_includes() -> None:
+    assert "pytest" in development_only_distributions()
 
 
 def test_the_tier_pins_the_python_its_manifest_requires() -> None:
