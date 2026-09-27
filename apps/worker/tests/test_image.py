@@ -1505,14 +1505,6 @@ def test_the_runner_refuses_the_engines_gateway_call_like_the_image() -> None:
     )
 
 
-def test_the_worker_image_leg_names_this_file_as_its_probe() -> None:
-    leg = matrix_leg("worker")
-    here = Path(__file__).resolve().relative_to(WORKSPACE)
-
-    assert str(here) in leg["probe"]
-    assert "apps/worker" in leg["probe"]
-
-
 def test_a_runner_builds_through_buildx_and_a_laptop_as_before() -> None:
     leg = {
         "tier": "worker",

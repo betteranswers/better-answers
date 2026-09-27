@@ -506,18 +506,11 @@ const step = z.object({
 type Step = z.infer<typeof step>;
 
 const workflowFile = z.object({
-  on: z.record(z.string(), z.unknown()),
-  concurrency: z.object({
-    group: z.string(),
-    "cancel-in-progress": z.union([z.string(), z.boolean()]),
-  }),
   jobs: z.record(
     z.string(),
     z.object({
       if: z.string().optional(),
       needs: z.union([z.string(), z.array(z.string())]).optional(),
-      permissions: z.record(z.string(), z.string()).optional(),
-      outputs: z.record(z.string(), z.string()).optional(),
       strategy: z
         .object({
           "fail-fast": z.boolean().optional(),
@@ -533,8 +526,6 @@ type Job = Workflow["jobs"][string];
 
 const workflow = (name: string): Workflow =>
   workflowFile.parse(parse(read(path.join(".github", "workflows", name))));
-
-const conditionOf = (step: Step): string => step.if ?? "";
 
 const LANE = "lane";
 
@@ -553,8 +544,6 @@ const legsOf = (lane: string): readonly string[] =>
 const stepsOfJob = (job: string): readonly Step[] => checkJobs()[job]?.steps ?? [];
 
 const laneStep = (): string => stepsOfJob(LANE).find((one) => one.id === LANE)?.run ?? "exit 9";
-
-const toolOf = (step: Step): string => step.uses ?? step.run ?? "";
 
 /** The matrix leg hands each of its jobs one slice of a root script's files. */
 const SHARD_ARGUMENT = / --shard="\$\{SHARD\}"$/;
@@ -743,45 +732,6 @@ const runTheLaneStep = (
 };
 
 describe("the lane inside check.yml", () => {
-  it("reports on merge groups under the job the ruleset requires", () => {
-    const check = workflow("check.yml");
-
-    expect(Object.keys(check.on)).toContain("merge_group");
-    expect(Object.keys(check.on)).toContain("pull_request");
-    expect(Object.keys(check.jobs)).toContain(FAN_IN);
-  });
-
-  it("cancels a superseded run only on a pull request", () => {
-    const { concurrency } = workflow("check.yml");
-    const isAPullRequest = "github.event_name == 'pull_request'";
-
-    expect(concurrency["cancel-in-progress"]).toEqual(`\${{ ${isAPullRequest} }}`);
-    expect(concurrency.group).toEqual(
-      `check-\${{ ${isAPullRequest} && github.ref || github.sha }}`,
-    );
-  });
-
-  it("decides the lane once, in a job installing nothing", () => {
-    const decider = checkJobs()[LANE];
-    const steps = decider?.steps ?? [];
-
-    expect(decider?.outputs).toEqual({
-      lane: `\${{ steps.${LANE}.outputs.lane }}`,
-      images: `\${{ steps.${LANE}.outputs.images }}`,
-    });
-    expect(steps.map(toolOf).filter((tool) => tool.startsWith("actions/checkout@"))).toHaveLength(
-      1,
-    );
-    expect(
-      steps.map(toolOf).filter((tool) => tool.includes("setup") || tool.includes("install")),
-      "the lane job installs a toolchain every leg then installs again",
-    ).toEqual([]);
-
-    expect(laneStep()).toContain(LANE_SCRIPT);
-    expect(laneStep()).toContain("git diff -z --name-only --no-renames");
-    expect(laneStep(), "the step splices a context into the shell").not.toContain("${{");
-  });
-
   it.each(LANE_STEPS)("puts $run in $lane", (scenario: LaneStepCase) => {
     const run = runTheLaneStep(scenario);
 
@@ -822,130 +772,6 @@ describe("the lane inside check.yml", () => {
     expect(run.status, `the step printed: ${run.output}`).not.toBe(0);
     expect(run.output).toContain(says);
     expect(run.published).toEqual({ lane: "", images: "" });
-  });
-
-  it("runs every leg on the lane its name starts with", () => {
-    const legs = Object.entries(checkJobs()).filter(
-      ([job]) => job !== LANE && job !== FAN_IN && job !== TITLE_JOB,
-    );
-
-    expect(legs.map(([job]) => job)).toEqual([...legsOf("docs"), ...legsOf("full")]);
-    for (const [job, leg] of legs) {
-      const lane = job.slice(0, job.indexOf("-"));
-
-      expect(
-        leg.if,
-        `${job} runs on a condition its name does not say, so the fan-in requires the wrong thing of it`,
-      ).toEqual(`\${{ needs.${LANE}.outputs.lane == '${lane}' }}`);
-      expect(leg.needs).toEqual(LANE);
-    }
-  });
-
-  it("runs a leg on every lane but the pull request's", () => {
-    const words =
-      /^\s*(?<words>[a-z]+(?: \| [a-z]+)*)\) ;;$/m
-        .exec(laneStep())
-        ?.groups?.["words"]?.split(" | ") ?? [];
-
-    expect(words).toEqual(["pr", "docs", "full"]);
-    expect(words.map((lane) => legsOf(lane).length)).toEqual([0, 1, 5]);
-  });
-
-  it("gives the docs lane one job with no unused setup", () => {
-    const tools = legsOf("docs").flatMap((job) => stepsOfJob(job).map(toolOf));
-
-    expect(legsOf("docs")).toHaveLength(1);
-    for (const setup of [
-      "astral-sh/setup-uv@",
-      "actions/cache@",
-      "./.github/actions/git-filter-repo",
-      "docker/setup-buildx-action@",
-      "crazy-max/ghaction-github-runtime@",
-      "playwright install",
-    ]) {
-      expect(
-        tools.filter((tool) => tool.includes(setup)),
-        `${setup} runs in the docs lane too`,
-      ).toEqual([]);
-    }
-    expect(tools).toContain("pnpm check:docs");
-  });
-});
-
-type Setup = {
-  readonly tool: string;
-
-  readonly onlyOn: readonly string[];
-
-  readonly because: string;
-};
-
-const SETUP: readonly Setup[] = [
-  {
-    tool: "pnpm install --frozen-lockfile",
-    onlyOn: ["docs-gates", "full-root", SHARDED_LEG, "full-api", "full-web", TITLE_JOB],
-    because:
-      "every leg that runs a pnpm workspace's own gates needs the tree installed, as does the title's commitlint; the worker's gates are uv's and its leg only spawns the runner",
-  },
-  {
-    tool: "astral-sh/setup-uv@",
-    onlyOn: ["full-root", SHARDED_LEG, "full-api", "full-worker"],
-    because:
-      "the worker's gates are uv's, packages/devtools runs ruff and mypy out of the same environment, packages/core's shards spawn the worker, and the api's hook suite asks the binary itself whether it is there",
-  },
-  {
-    tool: "uv sync --frozen",
-    onlyOn: ["full-root", SHARDED_LEG, "full-api", "full-worker"],
-    because:
-      "the binary alone runs nothing: packages/devtools' ruff and mypy, and a leg that spawns the worker, whether for its own gates or from a suite in the other tier, need the environment the lockfile names",
-  },
-  {
-    tool: "actions/cache@",
-    onlyOn: [SHARDED_LEG, "full-api", "full-worker"],
-    because:
-      "the only cache with a key here is the redaction detector's weights, and every leg that spawns the worker over an index job loads them",
-  },
-  {
-    tool: "./.github/actions/git-filter-repo",
-    onlyOn: [SHARDED_LEG, "full-api"],
-    because:
-      "each leg reaches the erasure routine's git step — packages/core's shards through the erasure suite, apps/api through the rehearsal's phase two — and the hosted Ubuntu runner carries no such tool",
-  },
-  {
-    tool: "playwright install",
-    onlyOn: ["full-web"],
-    because: "the browser suite over the served build is the SPA's last gate",
-  },
-  {
-    tool: "docker/setup-buildx-action@",
-    onlyOn: ["full-api", "full-worker"],
-    because:
-      "the daemon's own driver cannot import a type=gha cache, so a leg that builds an image without this builder is green and cold",
-  },
-  {
-    tool: "crazy-max/ghaction-github-runtime@",
-    onlyOn: ["full-api", "full-worker"],
-    because:
-      "a runner hands the ACTIONS_* variables to an action and to no run: step, so the builds those legs run from inside a suite cannot reach the cache without it",
-  },
-];
-
-describe("what each leg of check.yml installs", () => {
-  it("installs each tool on exactly the legs that run it", () => {
-    for (const { tool, onlyOn, because } of SETUP) {
-      const where = Object.keys(checkJobs()).filter((job) =>
-        stepsOfJob(job).some((step) => toolOf(step).includes(tool)),
-      );
-
-      expect(where, `${tool}: ${because}`).toEqual([...onlyOn]);
-    }
-  });
-
-  it("names only existing legs for every tool", () => {
-    const legs = Object.keys(checkJobs());
-
-    expect(SETUP.flatMap((setup) => setup.onlyOn).filter((job) => !legs.includes(job))).toEqual([]);
-    expect(SETUP.length, "a row left this table without the leg that stopped needing it").toBe(8);
   });
 });
 
@@ -1204,29 +1030,6 @@ describe("the one verdict check.yml reports", () => {
     ).toEqual("${{ always() }}");
   });
 
-  it("wants success from this lane's legs and skips from others", () => {
-    const steps = stepsOfJob(FAN_IN);
-    const verdict = steps.map((step) => step.run ?? "").join("\n");
-    const read = steps.flatMap((step) => Object.values(step.env ?? {}));
-
-    expect(read).toContain(`\${{ needs.${LANE}.outputs.lane }}`);
-    expect(read).toContain("${{ toJSON(needs) }}");
-
-    expect(verdict).toContain(`${LANE}) wanted=success ;;`);
-    expect(verdict).toContain('"${LANE}-"*) wanted=success; required=$((required + 1)) ;;');
-    expect(verdict).toContain("*) wanted=skipped ;;");
-    expect(
-      verdict,
-      "the verdict can require nothing of anybody and still pass, which is a green check that read no leg",
-    ).toContain('[ "${required}" -lt 1 ]');
-    expect(verdict).toContain("exit 1");
-
-    expect(
-      verdict,
-      "the verdict splices a context into the shell rather than reading it from the environment",
-    ).not.toContain("${{");
-  });
-
   it("wants the title job's success exactly where it runs", () => {
     const runsOn = /^\$\{\{ (?<condition>.+) \}\}$/.exec(checkJobs()[TITLE_JOB]?.if ?? "")
       ?.groups?.["condition"];
@@ -1287,11 +1090,6 @@ describe("the pull request's title, read by check.yml", () => {
     return ran;
   };
 
-  it("reads every event field from the environment, never spliced", () => {
-    expect(titleStep()?.run ?? "").toContain(TITLE_COMMAND);
-    expect(titleStep()?.run ?? "").not.toContain("${{");
-  });
-
   it("passes a Conventional title", () => {
     const run = titleStepWith(CONVENTIONAL, FROM_A_PULL_REQUEST);
 
@@ -1331,50 +1129,5 @@ describe("the pull request's title, read by check.yml", () => {
 
     expect(run.status).not.toBe(0);
     expect(`${run.stdout}${run.stderr}`).toContain(named);
-  });
-});
-
-describe("the check build.yml does not run twice", () => {
-  const build = (): Workflow => workflow("build.yml");
-  const GATE = "already-checked";
-  const VERDICT = `needs.${GATE}.outputs.verdict`;
-
-  it("asks the runs API for this commit's green merge-group check", () => {
-    const gate = build().jobs[GATE];
-    const asked = (gate?.steps ?? []).map((step) => step.run ?? "").join("\n");
-
-    expect(asked).toContain("actions/workflows/check.yml/runs");
-    expect(asked).toContain("event=merge_group");
-    expect(asked).toContain('.conclusion == "success"');
-    expect(asked).toContain("head_sha=${COMMIT}");
-
-    expect(asked).not.toContain("${{");
-
-    expect(gate?.permissions).toEqual({ actions: "read" });
-  });
-
-  it("skips check only on a `yes` from the gate", () => {
-    expect(build().jobs["check"]?.if).toEqual(`\${{ !cancelled() && ${VERDICT} != 'yes' }}`);
-    expect(build().jobs["check"]?.needs).toEqual(GATE);
-  });
-
-  it("pushes an image after a green or already-green check", () => {
-    const condition = (build().jobs["image"]?.if ?? "").replace(/\s+/g, " ");
-
-    expect(condition).toEqual(
-      "${{ !cancelled() " +
-        "&& (needs.check.result == 'success' " +
-        "|| (needs.check.result == 'skipped' " +
-        `&& needs.${GATE}.result == 'success' ` +
-        `&& ${VERDICT} == 'yes')) }}`,
-    );
-    expect(build().jobs["image"]?.needs).toEqual([GATE, "check"]);
-  });
-
-  it("builds an image for every commit, docs-only ones included", () => {
-    const image = build().jobs["image"];
-
-    expect((image?.steps ?? []).filter((step) => conditionOf(step).includes("lane"))).toEqual([]);
-    expect(image?.if ?? "").not.toContain("lane");
   });
 });

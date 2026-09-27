@@ -128,6 +128,18 @@ describe("zizmor, as `lint:workflows:zizmor` runs it", () => {
     expect(run.said).toContain("warning[artipacked]");
   });
 
+  it("refuses a workflow whose token keeps the default grant", () => {
+    const run = ran("lint:workflows:zizmor", {
+      ".github/workflows/build.yml": workflowRunning("push", ["      - run: echo hello"]).replace(
+        "permissions:\n  contents: read\n",
+        "",
+      ),
+    });
+
+    expect(run.status).not.toBe(0);
+    expect(run.said).toContain("warning[excessive-permissions]");
+  });
+
   it("accepts a pinned workflow calling a local action", () => {
     const run = ran("lint:workflows:zizmor", CLEAN_WORKFLOWS);
 
@@ -168,6 +180,17 @@ describe("shellcheck, as `lint:workflows:shellcheck` runs it", () => {
     expect(run.status).not.toBe(0);
     expect(run.said).toContain(`In ${root}/unquoted.sh line 2:`);
     expect(run.said).toContain("SC2086");
+  });
+
+  it("refuses a script that does not parse", () => {
+    const run = ran("lint:workflows:shellcheck", {
+      ...cleanUnderEveryRoot(),
+      "deploy/unclosed.sh": ["#!/usr/bin/env bash", "if true; then", "  echo open", ""].join("\n"),
+    });
+
+    expect(run.status).not.toBe(0);
+    expect(run.said).toContain("In deploy/unclosed.sh line");
+    expect(run.said).toMatch(/SC10\d\d \(error\)/);
   });
 
   it("accepts clean scripts, following one into the library it sources", () => {
