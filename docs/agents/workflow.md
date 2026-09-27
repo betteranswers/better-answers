@@ -166,6 +166,23 @@ You need:
 - The shell is macOS with bash 3.2 and BSD userland. Do NOT use GNU-only sed flags (use `sed -i ''` or perl), bash associative arrays, or other bash 4+ features in scripts.
 - Prefer `/usr/bin/git` over Homebrew git for `ordna` commands, because Homebrew git has hung `ordna list`.
 
+### Platform: Claude Code on the web
+
+- GitHub's GraphQL API is closed to cloud sessions, and no setting opens it. So `gh pr create`, `gh pr merge`, `pnpm land`'s pull-request step and every GraphQL query in this document fail. REST works, through `gh api` or the GitHub MCP.
+- **Open** the PR with the MCP's `create_pull_request`, or `gh api -X POST repos/{owner}/{repo}/pulls -f title=<subject> -f head=<branch> -f base=main -f body=<body>`.
+- **Arm** it with `gh api -X PUT repos/{owner}/{repo}/pulls/<n>/ccr/auto_merge`, or the MCP's `enable_pr_auto_merge`, in place of `gh pr merge <n>`.
+- **Read it back** from the merge group's run, not `isInMergeQueue`:
+
+  ```
+  gh run list --workflow check.yml --event merge_group --json databaseId,headBranch,status,conclusion \
+    --jq '.[] | select(.headBranch | contains("/pr-<n>-"))'
+  ```
+
+  A run that is queued or in progress means the PR is in the queue. A failed run is read with `gh run view <id> --log-failed`, as above.
+- A change too small for a ticket is landed by hand: a branch off `origin/main`, the commit in the commit's form, a push, then the two calls above. The bypass needs a GraphQL read of the queue, so a cloud session never uses it.
+- A session pushes only the branches its prompt allows. The `/goal` prompt names the ticket branches and `refs/ordna/tasks/*`.
+- The shell is Linux with GNU userland, and the macOS notes above do not apply.
+
 ### Multi-session coordination
 
 Never write helper scripts to shared /tmp paths. Other sessions run in parallel and overwrite them. Use a session-scoped directory such as `$(mktemp -d)` or `.claude/tmp/<session-id>/`.
