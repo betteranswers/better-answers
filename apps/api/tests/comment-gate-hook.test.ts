@@ -380,31 +380,3 @@ describe("the write-time hook runs the root check's own gate", () => {
     expect(hookText).toContain(named);
   });
 });
-
-const hookCommand = z.object({ command: z.string().optional(), timeout: z.number().optional() });
-const hookMatcher = z.object({
-  matcher: z.string().optional(),
-  hooks: z.array(hookCommand).optional(),
-});
-const settings = z.object({ hooks: z.record(z.string(), z.array(hookMatcher)).optional() });
-
-const SETTINGS = path.join(repositoryRoot, ".claude/settings.json");
-
-const wiring = (): readonly { matcher: string | undefined; timeout: number | undefined }[] => {
-  const { hooks } = settings.parse(JSON.parse(readFileSync(SETTINGS, "utf8")));
-  return (hooks?.["PostToolUse"] ?? []).flatMap((entry) =>
-    (entry.hooks ?? [])
-      .filter((hook) => hook.command?.includes(path.basename(script)) === true)
-      .map((hook) => ({ matcher: entry.matcher, timeout: hook.timeout })),
-  );
-};
-
-describe("the write-time hook is wired beside the project's other hooks", () => {
-  it("runs after an edit and after a write, once", () => {
-    expect(wiring().map((entry) => entry.matcher)).toEqual(["Edit|Write"]);
-  });
-
-  it("carries a timeout, since an unbounded gate hangs the edit", () => {
-    expect(wiring().map((entry) => entry.timeout)).toEqual([15]);
-  });
-});

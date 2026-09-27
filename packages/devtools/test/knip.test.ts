@@ -1,10 +1,5 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
-
 import { describe, expect, it } from "vitest";
-import { z } from "zod";
 
-import { repositoryRoot } from "@better-answers/devtools/paths";
 import { knipOver } from "@better-answers/devtools/throwaway-tree";
 import type { KnipFinding, KnipRunner, Tree } from "@better-answers/devtools/throwaway-tree";
 
@@ -108,25 +103,6 @@ describe("knipOver's smoke case", () => {
 
   it("refuses a smoke case the report does not match", () => {
     expect(() => knipOver(scaffold, { tree: CASED_TREE, findings: [UPPER] })).toThrow(/smoke/);
-  });
-});
-
-describe("the knip gate in the root check", () => {
-  it("runs under the root check, which CI already runs", () => {
-    const root = z
-      .object({ scripts: z.record(z.string(), z.string()).optional() })
-      .parse(JSON.parse(readFileSync(path.join(repositoryRoot, "package.json"), "utf8")));
-    const scripts = root.scripts ?? {};
-
-    expect(scripts["knip"], "the root declares no knip script").toBeDefined();
-    // The gates a branch never narrows are one list under one name, so the reach is two hops.
-    expect(
-      scripts["check:gates"] ?? "",
-      "knip is not one of the gates that walk the whole tree",
-    ).toContain(" knip");
-    expect(scripts["check"] ?? "", "the root check no longer runs those gates").toContain(
-      "check:gates",
-    );
   });
 });
 

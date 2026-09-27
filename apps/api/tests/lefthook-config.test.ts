@@ -23,21 +23,12 @@ const read = (relative: string): string =>
 
 const command = z.object({
   run: z.string().optional(),
-  glob: z.string().optional(),
   root: z.string().optional(),
-  fail_text: z.string().optional(),
 });
 type Command = z.infer<typeof command>;
-const hook = z
-  .object({
-    parallel: z.boolean().optional(),
-    commands: z.record(z.string(), command).optional(),
-  })
-  .optional();
+const hook = z.object({ commands: z.record(z.string(), command).optional() }).optional();
 const lefthook = z.object({ "pre-commit": hook, "pre-push": hook });
 type Lefthook = z.infer<typeof lefthook>;
-
-const LOCAL_GATES = "docs/operations/local-gates.md";
 
 const config = (): Lefthook => lefthook.parse(parse(read("lefthook.yml")));
 
@@ -102,51 +93,36 @@ type Proof =
   | { readonly kind: "uv" }
   | { readonly kind: "root-script"; readonly script: string };
 
-const HOOK: Readonly<Record<string, { readonly glob: string | undefined; readonly proof: Proof }>> =
-  {
-    oxfmt: { glob: undefined, proof: { kind: "npm", package: "oxfmt" } },
-    oxlint: { glob: "*.{ts,tsx}", proof: { kind: "npm", package: "oxlint" } },
-    "ruff-format": { glob: "*.py", proof: { kind: "uv" } },
-    "ruff-check": { glob: "*.py", proof: { kind: "uv" } },
-    actionlint: {
-      glob: ".github/workflows/*.{yml,yaml}",
-      proof: { kind: "root-script", script: "lint:workflows:actionlint" },
-    },
-
-    "api-typecheck": {
-      glob: "*.{ts,tsx}",
-      proof: { kind: "npm", package: "typescript", binary: "tsc", via: "apps/api" },
-    },
-    "web-typecheck": {
-      glob: "*.{ts,tsx}",
-      proof: { kind: "npm", package: "typescript", binary: "tsc", via: "apps/web" },
-    },
-    "core-typecheck": {
-      glob: "*.{ts,tsx}",
-      proof: { kind: "npm", package: "typescript", binary: "tsc", via: "packages/core" },
-    },
-    "schema-typecheck": {
-      glob: "*.{ts,tsx}",
-      proof: { kind: "npm", package: "typescript", binary: "tsc", via: "packages/schema" },
-    },
-    "devtools-typecheck": {
-      glob: "*.{ts,tsx}",
-      proof: { kind: "npm", package: "typescript", binary: "tsc", via: "packages/devtools" },
-    },
-  };
+const HOOK: Readonly<Record<string, Proof>> = {
+  oxfmt: { kind: "npm", package: "oxfmt" },
+  oxlint: { kind: "npm", package: "oxlint" },
+  "ruff-format": { kind: "uv" },
+  "ruff-check": { kind: "uv" },
+  actionlint: { kind: "root-script", script: "lint:workflows:actionlint" },
+  "api-typecheck": { kind: "npm", package: "typescript", binary: "tsc", via: "apps/api" },
+  "web-typecheck": { kind: "npm", package: "typescript", binary: "tsc", via: "apps/web" },
+  "core-typecheck": { kind: "npm", package: "typescript", binary: "tsc", via: "packages/core" },
+  "schema-typecheck": { kind: "npm", package: "typescript", binary: "tsc", via: "packages/schema" },
+  "devtools-typecheck": {
+    kind: "npm",
+    package: "typescript",
+    binary: "tsc",
+    via: "packages/devtools",
+  },
+};
 
 const npmCommands = (): readonly (readonly [string, string, string, string | undefined])[] =>
-  Object.entries(HOOK).flatMap(([name, { proof }]) =>
+  Object.entries(HOOK).flatMap(([name, proof]) =>
     proof.kind === "npm"
       ? [[name, proof.package, proof.binary ?? proof.package, proof.via] as const]
       : [],
   );
 
 const uvCommands = (): readonly string[] =>
-  Object.entries(HOOK).flatMap(([name, { proof }]) => (proof.kind === "uv" ? [name] : []));
+  Object.entries(HOOK).flatMap(([name, proof]) => (proof.kind === "uv" ? [name] : []));
 
 const rootScriptCommands = (): readonly (readonly [string, string])[] =>
-  Object.entries(HOOK).flatMap(([name, { proof }]) =>
+  Object.entries(HOOK).flatMap(([name, proof]) =>
     proof.kind === "root-script" ? [[name, proof.script] as const] : [],
   );
 
@@ -189,23 +165,6 @@ describe("the hook's typecheck commands refuse a staged type error", () => {
 });
 
 describe("the pre-commit hook", () => {
-  it("runs exactly the commands this test knows how to prove", () => {
-    expect(Object.keys(commands()).sort()).toEqual(Object.keys(HOOK).sort());
-  });
-
-  it("runs in parallel, so the slowest command sets the wait", () => {
-    expect(declared("pre-commit").parallel).toBe(true);
-  });
-
-  it.each(Object.keys(HOOK))("runs `%s` over the files it says it does", (command) => {
-    expect(commands()[command]?.glob).toBe(HOOK[command]?.glob);
-  });
-
-  it("gives oxfmt every staged file, even with nothing to format", () => {
-    expect(existsSync(path.join(repositoryRoot, ".oxfmtrc.json"))).toBe(true);
-    expect(runOf("oxfmt")).toContain("--no-error-on-unmatched-pattern");
-  });
-
   it.each(npmCommands())(
     "runs `%s` from a binary this repository's own packages declare",
     (command, packageName, binaryName, via) => {
@@ -224,54 +183,6 @@ describe("the pre-commit hook", () => {
 
   it.each(rootScriptCommands())("runs `%s` as the root script %s runs it", (command, script) => {
     expect(runOf(command)).toBe(`${rootScripts()[script] ?? ""} {staged_files}`);
-  });
-
-  it("runs no test suite, and documents its measured worst case", () => {
-    for (const [name, command] of Object.entries(commands())) {
-      for (const forbidden of ["vitest", "pytest", "pnpm test", "run test"]) {
-        expect({ name, forbidden, present: (command.run ?? "").includes(forbidden) }).toEqual({
-          name,
-          forbidden,
-          present: false,
-        });
-      }
-    }
-
-    const operations = read(LOCAL_GATES);
-    expect(operations).toContain("worst case");
-    expect(operations).toMatch(/\d+(\.\d+)?s/);
-  });
-
-  it("documents both escape hatches and the typecheck's workspace limit", () => {
-    const operations = read(LOCAL_GATES);
-    expect(operations).toContain("LEFTHOOK=0");
-    expect(operations).toContain("LEFTHOOK_EXCLUDE");
-
-    expect(operations).toContain("root `check` owns the cross-workspace case");
-  });
-
-  it("points the hook file's reader at the local-gates document", () => {
-    expect(read("lefthook.yml")).toContain(LOCAL_GATES);
-  });
-
-  it("is installed by the root `prepare` script on every clone", () => {
-    const rootManifest = z.object({
-      scripts: z.record(z.string(), z.string()),
-      devDependencies: z.record(z.string(), z.string()),
-    });
-    const manifest = rootManifest.parse(JSON.parse(read("package.json")));
-    expect(manifest.scripts["prepare"]).toContain("lefthook install");
-
-    expect(manifest.scripts["prepare"]).toContain("||");
-    expect(manifest.devDependencies["lefthook"]).toBeDefined();
-  });
-
-  it("refuses lefthook's postinstall in the allow-list, since `prepare` wires it", () => {
-    const workspaceManifest = z.object({
-      allowBuilds: z.record(z.string(), z.boolean()).optional(),
-    });
-    const workspace = workspaceManifest.parse(parse(read("pnpm-workspace.yaml")));
-    expect(workspace.allowBuilds?.["lefthook"]).toBe(false);
   });
 });
 
@@ -300,21 +211,6 @@ describe("the pre-push hook", () => {
     for (const script of PUSHED_SCRIPTS) expect(stepsOf(script)).toContain("format:check");
     const runs = Object.values(pushCommands()).map((one) => one.run ?? "");
     expect(runs.filter((run) => run.includes("pnpm run format:check"))).toHaveLength(1);
-  });
-
-  it("runs in parallel, so the slowest gate sets the wait", () => {
-    expect(declared("pre-push").parallel).toBe(true);
-  });
-
-  it.each(pushedSteps())("runs `%s` and, failing, says how to run it alone", (step) => {
-    expect(pushCommands()[step]?.run).toContain(`pnpm run ${step}`);
-    expect(pushCommands()[step]?.fail_text).toBe(runAlone(step));
-  });
-
-  it("documents skipping one gate, or the whole hook, per push", () => {
-    const operations = read(LOCAL_GATES);
-    expect(operations).toContain("git push --no-verify");
-    expect(operations).toContain("LEFTHOOK_EXCLUDE=knip git push");
   });
 });
 

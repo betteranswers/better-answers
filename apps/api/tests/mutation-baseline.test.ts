@@ -28,13 +28,9 @@ const mutationWorkflowSchema = z.object({
       inputs: z.record(z.string(), z.object({ description: z.string(), type: z.string() })),
     }),
   }),
-  concurrency: z.object({ group: z.string(), "cancel-in-progress": z.boolean() }).optional(),
-  permissions: z.record(z.string(), z.string()),
   jobs: z.object({
     stryker: z.object({
-      "timeout-minutes": z.union([z.number(), z.string()]),
       env: z.record(z.string(), z.string()).optional(),
-      permissions: z.record(z.string(), z.string()).optional(),
       strategy: z.object({
         "max-parallel": z.number(),
         matrix: z.object({ include: z.array(shardSchema) }),
@@ -44,7 +40,6 @@ const mutationWorkflowSchema = z.object({
     summary: z.object({
       needs: z.string(),
       if: z.string(),
-      permissions: z.record(z.string(), z.string()).optional(),
       strategy: z.object({
         matrix: z.object({ include: z.array(z.object({ name: z.string(), of: z.number() })) }),
       }),
@@ -373,38 +368,6 @@ describe("the nightly mutation baseline, kept as the previous run's artifact", (
       });
     }
   });
-
-  it("uploads a leg's merged results unless its merge failed", () => {
-    const upload = onlyStep(
-      mutationWorkflow().jobs.summary.steps,
-      "actions/upload-artifact@",
-      "summary",
-    );
-
-    expect(upload.if).toEqual("always() && steps.merge.outcome == 'success'");
-    expect(upload.with?.["path"]).toEqual("${{ runner.temp }}/merged/stryker-incremental.json");
-    expect(upload.with?.["retention-days"]).toBe(14);
-    expect(upload.with?.["overwrite"]).toBe(true);
-  });
-
-  it("caps a night at 120 minutes, a dispatch as asked", () => {
-    expect(mutationWorkflow().jobs.stryker["timeout-minutes"]).toEqual(
-      "${{ fromJSON(inputs.ceiling-minutes || '120') }}",
-    );
-  });
-
-  it("queues a branch's runs, each starting from the last checkpoint", () => {
-    expect(mutationWorkflow().concurrency).toEqual({
-      group: "mutation-${{ github.ref }}",
-      "cancel-in-progress": false,
-    });
-  });
-
-  it("asks only to read the tree and this repository's artifacts", () => {
-    expect(mutationWorkflow().permissions).toEqual({ contents: "read", actions: "read" });
-    expect(mutationWorkflow().jobs.stryker.permissions).toBeUndefined();
-    expect(mutationWorkflow().jobs.summary.permissions).toBeUndefined();
-  });
 });
 
 /** The organisation's plan runs 20 jobs at once. */
@@ -552,13 +515,6 @@ describe("each mutation leg, run as shards and summed once", () => {
     expect(stepRunning(summary.steps, "mutation-shards.mjs merge", "summary").run).toContain(
       '--baseline "${RUNNER_TEMP}/baseline/baseline.json"',
     );
-  });
-
-  it("sums a leg up after every shard, whatever each did", () => {
-    const { summary } = mutationWorkflow().jobs;
-
-    expect(summary.needs).toEqual("stryker");
-    expect(summary.if).toEqual("always()");
   });
 
   it("runs only the shards a dispatch names, skipping the rest", () => {

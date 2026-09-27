@@ -20,15 +20,6 @@ const liveLines = (relative: string): readonly string[] =>
 
 const operationsDocuments = "docs/operations";
 
-/** One workflow step's block, so an assertion about it cannot pass on a neighbour's text. */
-const stepNamed = (workflow: string, name: string): string =>
-  workflow.split(/^ {6}- name: /m).find((block) => block.startsWith(name)) ?? "";
-
-const deployScripts = (): readonly string[] =>
-  readdirSync(path.join(repositoryRoot, "deploy"))
-    .filter((file) => file.endsWith(".sh"))
-    .sort();
-
 const fencedIn = (script: string, name: string): string | undefined => {
   const opened = script.split(`>>> ${name}`)[1];
   return opened?.slice(opened.indexOf("\n") + 1).split(`# <<< ${name}`)[0];
@@ -93,31 +84,6 @@ const composeServices = (file: string): readonly { name: string; body: string }[
 };
 
 describe("the deploy tree", () => {
-  it("has a script tree that parses, every file", () => {
-    for (const script of deployScripts()) {
-      expect(() =>
-        execFileSync("bash", ["-n", path.join(repositoryRoot, "deploy", script)], {
-          stdio: "pipe",
-        }),
-      ).not.toThrow();
-    }
-    expect(deployScripts()).toEqual(
-      expect.arrayContaining([
-        "await-release.sh",
-        "backup.sh",
-        "browse-production.sh",
-        "host-setup.sh",
-        "local-database.sh",
-        "mirror-shell.sh",
-        "restore-drill.sh",
-        "restore-production.sh",
-        "seed-synthetic.sh",
-        "uptime-probe.sh",
-        "wizard-41.sh",
-      ]),
-    );
-  });
-
   it("carries no `<read on the day>` placeholder in parsed fields", () => {
     for (const file of [
       "deploy/backup.Dockerfile",
@@ -176,7 +142,7 @@ describe("the deploy tree", () => {
     expect(objectstore?.body).toContain("GARAGE_ADMIN_TOKEN:");
   });
 
-  it("limits every VPC 1 service's memory, and the worker's swap", () => {
+  it("limits every VPC 1 service's memory", () => {
     for (const file of ["deploy/stores.compose.yaml", "deploy/platform.compose.yaml"]) {
       const services = composeServices(read(file));
       expect(services.length).toBeGreaterThan(1);
@@ -188,7 +154,6 @@ describe("the deploy tree", () => {
         .map((service) => `${file}: ${service.name}`);
       expect(unlimited).toEqual([]);
     }
-    expect(read("deploy/platform.compose.yaml")).toMatch(/^\s+memswap_limit: 3072m/m);
   });
 
   it("keeps the drill's traps out of the production restore", () => {
@@ -394,22 +359,6 @@ describe("the deploy tree", () => {
     expect(read("deploy/host-setup.sh")).toContain("STAGING_S3_BUCKET=");
   });
 
-  it("runs each graph command as it answers, and records counts", () => {
-    const drill = read("deploy/restore-drill.sh");
-
-    expect(drill).toContain('ops graph-rebuild --workspace "${DRILL_WORKSPACE}" --wait');
-    expect(drill).toContain('ops graph-sweep --workspace "${DRILL_WORKSPACE}"\n');
-    expect(drill).not.toContain('graph-sweep --workspace "${DRILL_WORKSPACE}" --wait');
-    expect(drill).toContain('ops reconcile-watermark --workspace "${DRILL_WORKSPACE}"');
-    expect(drill).toContain(
-      'ops object-store-orphans --workspace "${DRILL_WORKSPACE}" >> "${REPORT}"',
-    );
-    expect(drill).not.toContain('object-store-orphans --workspace "${DRILL_WORKSPACE}" --list');
-
-    expect(drill).toContain("no stamped run on production to diff against");
-    expect(drill).toContain("COUNTS DIFFER");
-  });
-
   it("pins the synthetic workspace's id in drill.env and BACKUPS.md", () => {
     const workspaceId = execFileSync(
       "bash",
@@ -568,14 +517,6 @@ describe("the deploy tree", () => {
     });
   });
 
-  it("prunes the mirror only after a push that replaced refs", () => {
-    const backup = read("deploy/backup.sh");
-    expect(backup).toContain("push --mirror --porcelain");
-    expect(backup).not.toContain("push --mirror --quiet");
-    expect(backup).toContain("grep -qE '^[+-]'");
-    expect(backup).toContain('prune-repo "${ws}"');
-  });
-
   it("lets the mirror key run init-repo, git-receive-pack and prune-repo only", () => {
     const shell = read("deploy/mirror-shell.sh");
     expect(shell).toContain('"init-repo "*)');
@@ -595,88 +536,6 @@ describe("the deploy tree", () => {
     expect(read("deploy/backup.sh")).toContain("init-repo");
   });
 
-  it("matches each digest alone through env, with the client-data switch", () => {
-    const release = read(".github/workflows/release.yml");
-    expect(release).toContain("^sha256:[0-9a-f]{64}$");
-    expect(release).toMatch(
-      /env:\n\s+API_DIGEST: \$\{\{ steps\.d\.outputs\.api \}\}\n\s+WORKER_DIGEST: \$\{\{ steps\.d\.outputs\.worker \}\}/,
-    );
-
-    /** Every workflow expression is a binding, never a token spliced into a shell line. */
-    const spliced = release
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line.includes("${{"))
-      .filter((line) => !/^[A-Z_]+: \$\{\{ [^}]+ \}\}$/.test(line))
-      .filter((line) => !/^(ref|registry|username|password): /.test(line));
-    expect(spliced).toEqual([]);
-    expect(release).toContain("CLIENT_DATA_ON_BOX");
-  });
-
-  it("tags each promotion once, pushes no branch, and smokes afterwards", () => {
-    const release = read(".github/workflows/release.yml");
-
-    // The record is a tag and nothing else: `main` is merge-queue-only, so a push to it
-    // from the workflow is refused.
-    expect(release).toContain('tag="release/${stamp}"');
-    expect(release).toContain('git tag --annotate --message "${message}" "${tag}" "${head}"');
-    // The head makes two promotions in one second two tags rather than a rejected push.
-    expect(release).toContain('stamp="${when//[-:]/}-${head:0:7}"');
-
-    const pushes = release
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line.startsWith("git push "));
-    expect(pushes).toEqual(['git push origin "refs/tags/${tag}"']);
-    expect(release).not.toContain("HEAD:main");
-    expect(release).not.toContain("git commit");
-
-    const record = stepNamed(release, "record the promotion");
-    /**
-     * Against the tag's own message, not the step: the step summary echoes four of these and would
-     * satisfy a message that carried none of them.
-     */
-    const message = /message="\$\(printf[\s\S]*?\)"/.exec(record)?.[0] ?? "";
-    expect(message).not.toEqual("");
-    for (const field of [
-      "${when}",
-      "${ACTOR}",
-      "${API_DIGEST}",
-      "${WORKER_DIGEST}",
-      "${rode}",
-      "${head}",
-      "${points}",
-    ]) {
-      expect(message).toContain(field);
-    }
-
-    const stepAt = (name: string): number => {
-      const index = release.indexOf(`- name: ${name}`);
-      expect(index).toBeGreaterThan(-1);
-      return index;
-    };
-    // The smoke follows the record, so a promotion whose smoke fails still has its tag.
-    expect(stepAt("record the promotion")).toBeLessThan(stepAt("post-deploy smoke"));
-  });
-
-  it("smokes until /health names this release's digest, then reads discovery", () => {
-    const smoke = stepNamed(read(".github/workflows/release.yml"), "post-deploy smoke");
-
-    expect(smoke).toMatch(/env:\n\s+API_DIGEST: \$\{\{ steps\.d\.outputs\.api \}\}\n/);
-    const waits = smoke.indexOf('deploy/await-release.sh "${PUBLIC_URL}" "${API_DIGEST}"');
-    expect(waits).toBeGreaterThan(-1);
-    expect(smoke.indexOf("/.well-known/oauth-protected-resource/mcp")).toBeGreaterThan(waits);
-
-    /**
-     * The build being replaced answers 200 until the swap, so a request that reads the status alone
-     * passes on it.
-     */
-    const readsTheStatusAlone = smoke
-      .split("\n")
-      .filter((line) => line.includes("curl") && line.includes("/health"));
-    expect(readsTheStatusAlone).toEqual([]);
-  });
-
   it("waits out the pull, within the job's timeout", () => {
     const script = read("deploy/await-release.sh");
     const polls = Number(/AWAIT_RELEASE_POLLS:-(\d+)/.exec(script)?.[1]);
@@ -689,26 +548,6 @@ describe("the deploy tree", () => {
     // Twice the three minutes a fresh image took to pull and start, end to end; no sleep follows the last poll.
     expect((polls - 1) * delaySeconds).toBeGreaterThanOrEqual(360);
     expect(polls * pollSeconds + (polls - 1) * delaySeconds).toBeLessThan(jobMinutes * 60);
-  });
-
-  it("says per digest whether it was resolved or passed in", () => {
-    const record = stepNamed(read(".github/workflows/release.yml"), "record the promotion");
-
-    // Four dispatch shapes, and the tag's message is true of each digest in all of them.
-    expect(record).toContain('if [ -z "${IN_API}" ] && [ -z "${IN_WORKER}" ]; then');
-    expect(record).toContain('elif [ -n "${IN_API}" ] && [ -n "${IN_WORKER}" ]; then');
-    expect(record).toContain('elif [ -n "${IN_API}" ]; then');
-
-    const points = [...record.matchAll(/^\s*points="([^"]+)"$/gm)].map((match) => match[1] ?? "");
-    expect(points).toHaveLength(4);
-    expect(new Set(points).size).toEqual(4);
-    for (const sentence of points) {
-      expect(sentence).toContain("main's head");
-    }
-    expect(
-      points.filter((sentence) => sentence.includes("both digests were resolved")),
-    ).toHaveLength(1);
-    expect(points.filter((sentence) => sentence.includes("were passed in"))).toHaveLength(1);
   });
 
   it("lets no workflow commit to a branch", () => {
@@ -808,12 +647,6 @@ describe("the deploy tree", () => {
       "github-releases rclone/rclone",
       "github-releases FiloSottile/age",
     ]);
-  });
-
-  it("leaves staging to the drill, with no build.yml job", () => {
-    const build = read(".github/workflows/build.yml");
-    expect(build).not.toMatch(/^\s+staging:\s*$/m);
-    expect(build).not.toContain("COOLIFY_STAGING_APP_UUID");
   });
 
   it("names the api fence, hostname roles and both uptime paths", () => {

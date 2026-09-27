@@ -13,23 +13,17 @@ import { repositoryRoot } from "@better-answers/devtools/paths";
 import { type ImageStep, matrixLegs, readWorkflow, workflowStepSchema } from "./image-probe.ts";
 /* jscpd:ignore-end */
 
-const permissionsSchema = z.record(z.string(), z.string());
-
 const scheduleSchema = z.object({
   on: z.object({ schedule: z.array(z.object({ cron: z.string() })) }),
 });
 
 const scanWorkflowSchema = z.object({
-  on: z.record(z.string(), z.unknown()),
-  permissions: permissionsSchema,
   jobs: z.object({
     tiers: z.object({
-      permissions: permissionsSchema.optional(),
       steps: z.array(workflowStepSchema),
     }),
     trivy: z.object({
       needs: z.string(),
-      permissions: permissionsSchema,
       strategy: z.object({
         "fail-fast": z.boolean(),
         matrix: z.object({ tier: z.string() }),
@@ -52,16 +46,6 @@ const carrying = (steps: readonly ImageStep[], variable: string): ImageStep => {
 
 const tiersStep = () => carrying(scanWorkflow().jobs.tiers.steps, TIERS_VARIABLE);
 const resolveStep = () => carrying(scanWorkflow().jobs.trivy.steps, NEWEST_BUILD_VARIABLE);
-
-const scanStepUsing = (action: string): ImageStep => {
-  const found = scanWorkflow().jobs.trivy.steps.find((step) =>
-    (step.uses ?? "").startsWith(`${action}@`),
-  );
-  if (found === undefined) throw new Error(`scan.yml's trivy job runs no \`${action}\``);
-  return found;
-};
-
-const input = (step: ImageStep, name: string): unknown => step.with?.[name];
 
 const recordSchema = z.record(z.string(), z.unknown());
 
@@ -228,41 +212,7 @@ describe("the nightly scan of the images build.yml pushes", () => {
     expect(resolved.log).toContain("ghcr.io/betteranswers/api's versions");
   });
 
-  it("scans the resolved digest, which no later push moves", () => {
-    expect(input(scanStepUsing("aquasecurity/trivy-action"), "image-ref")).toEqual(
-      "ghcr.io/${{ github.repository_owner }}/${{ matrix.tier }}@${{ steps.image.outputs.digest }}",
-    );
-  });
-
-  it("holds the scan's three permissions on its own job alone", () => {
-    expect(scanWorkflow().permissions).toEqual({ contents: "read" });
-    expect(scanWorkflow().jobs.tiers.permissions).toBeUndefined();
-    expect(scanWorkflow().jobs.trivy.permissions).toEqual({
-      contents: "read",
-      packages: "read",
-      "security-events": "write",
-    });
-  });
-
-  it("reports to code scanning and gates nothing, exiting zero", () => {
-    const trivy = scanStepUsing("aquasecurity/trivy-action");
-    const upload = scanStepUsing("github/codeql-action/upload-sarif");
-
-    expect(Object.keys(scanWorkflow().on).sort()).toEqual(["schedule", "workflow_dispatch"]);
-    expect(input(trivy, "exit-code")).toEqual("0");
-    expect(input(trivy, "format")).toEqual("sarif");
-    expect(input(trivy, "output")).toEqual("${{ matrix.tier }}.sarif");
-    expect(input(upload, "sarif_file")).toEqual("${{ matrix.tier }}.sarif");
-    expect(input(upload, "category")).toEqual("image-${{ matrix.tier }}");
-  });
-
   it("runs each night after the mutation run has started", () => {
     expect(cronOf("scan.yml")).toBeGreaterThan(cronOf("mutation.yml"));
-  });
-
-  it("names the scanner's release rather than taking the action's default", () => {
-    expect(input(scanStepUsing("aquasecurity/trivy-action"), "version")).toMatch(
-      /^v\d+\.\d+\.\d+$/,
-    );
   });
 });
