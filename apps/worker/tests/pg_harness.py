@@ -1,12 +1,17 @@
+import atexit
 import hashlib
 import json
 import re
 from collections.abc import Iterator
 from contextlib import contextmanager
+from functools import cache
+from itertools import count
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 import psycopg
+from psycopg.sql import SQL, Identifier, Literal
 from testcontainers.community.postgres import PostgresContainer
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -87,12 +92,63 @@ def migrated_postgres() -> Iterator[psycopg.Connection]:
         yield connection
 
 
+MIGRATED_TEMPLATE = "migrated"
+
+
+def on_database(conninfo: str, database: str) -> str:
+    return urlsplit(conninfo)._replace(path=f"/{database}").geturl()
+
+
+# A container costs a second and a half and a clone a fiftieth: one container per
+# process, one clone per test.
+@cache
+def _migrated_cluster() -> str:
+    container = PostgresContainer(pinned_postgres_image(), dbname=MIGRATED_TEMPLATE)
+    container.start()
+    atexit.register(container.stop)
+    conninfo = container.get_connection_url().replace(
+        "postgresql+psycopg2", "postgresql"
+    )
+    apply_journal(conninfo)
+    return conninfo
+
+
+_DATABASE_NUMBERS = count()
+
+
 @contextmanager
 def migrated_postgres_at() -> Iterator[tuple[psycopg.Connection, str]]:
-    with PostgresContainer(pinned_postgres_image()) as container:
-        conninfo = container.get_connection_url().replace(
-            "postgresql+psycopg2", "postgresql"
+    cluster = _migrated_cluster()
+    database = f"case_{next(_DATABASE_NUMBERS)}"
+    maintenance = on_database(cluster, "postgres")
+    with psycopg.connect(maintenance, autocommit=True) as admin:
+        admin.execute(
+            SQL("CREATE DATABASE {} TEMPLATE {}").format(
+                Identifier(database), Identifier(MIGRATED_TEMPLATE)
+            )
         )
-        apply_journal(conninfo)
+    conninfo = on_database(cluster, database)
+    try:
         with psycopg.connect(conninfo) as connection:
             yield connection, conninfo
+    finally:
+        with psycopg.connect(maintenance, autocommit=True) as admin:
+            admin.execute(
+                SQL("DROP DATABASE {} WITH (FORCE)").format(Identifier(database))
+            )
+
+
+# A role belongs to the cluster rather than to a database, so an earlier test in this
+# process may have made it already.
+def login_in_role(
+    connection: psycopg.Connection, *, login: str, password: str, role: str
+) -> None:
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (login,))
+        if cursor.fetchone() is None:
+            cursor.execute(
+                SQL("CREATE ROLE {} LOGIN PASSWORD {} IN ROLE {}").format(
+                    Identifier(login), Literal(password), Identifier(role)
+                )
+            )
+    connection.commit()

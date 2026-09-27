@@ -126,6 +126,7 @@ dev = [
     "mutmut>=3.7.0",
     "mypy>=2.3.1",
     "pytest>=9.1.1",
+    "pytest-xdist>=3.8.0",
     "ruff>=0.16.5",
     "testcontainers==4.15.0",
     # The root `lint:workflows` linters, pinned here so CI and a laptop run one version of
@@ -263,6 +264,11 @@ testpaths = ["tests"]
 # `--strict-markers`: a mistyped marker marks nothing and skips nothing, so it must be an
 # error rather than a warning nobody reads.
 addopts = "-q --strict-markers"
+# pytest-xdist declares this marker itself, but only where it is installed; `build.yml`
+# runs the image probe from an environment that may not carry it.
+markers = [
+    "xdist_group(name): runs every test of the group in one xdist worker",
+]
 # An expected failure that passes is a bug that was fixed and an `xfail` that outlived it.
 xfail_strict = true
 # TWO WARNINGS THIS TIER CANNOT FIX, AND NO WIDER A HOLE THAN THEM. A run that ends "3

@@ -1,3 +1,4 @@
+import contextlib
 import threading
 import time
 from collections.abc import Callable, Iterator, Mapping, Sequence
@@ -593,6 +594,26 @@ def test_a_worker_with_matching_stamps_runs_what_is_queued(
     assert audit_job(database, workspace) == ("done", WORKER)
 
 
+def a_daemon(bootstrap: Bootstrap) -> threading.Thread:
+    def serve() -> None:
+        # The loop ends only when its connection does, so that error is how it stops.
+        with contextlib.suppress(psycopg.OperationalError):
+            loop.run(bootstrap, once=False)
+
+    return threading.Thread(target=serve, daemon=True)
+
+
+def stop(daemon: threading.Thread, database: psycopg.Connection) -> None:
+    with database.cursor() as cursor:
+        cursor.execute(
+            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity"
+            " WHERE datname = current_database() AND pid <> pg_backend_pid()"
+        )
+    database.commit()
+    daemon.join(timeout=loop.IDLE_SLEEP_SECONDS * 2)
+    assert not daemon.is_alive(), "the daemon outlived its test"
+
+
 def test_the_refusal_logs_once_and_lifts_when_the_deploy_finishes(
     database: psycopg.Connection, tmp_path: Path
 ) -> None:
@@ -602,16 +623,15 @@ def test_the_refusal_logs_once_and_lifts_when_the_deploy_finishes(
     database.commit()
 
     with capture_logs() as written:
-        running = threading.Thread(
-            target=loop.run,
-            args=(bootstrap_for(database, tmp_path),),
-            kwargs={"once": False},
-            daemon=True,
-        )
+        running = a_daemon(bootstrap_for(database, tmp_path))
         running.start()
         # A daemon thread because the loop never returns on its own, and the stamp is
         # corrected from a connection of its own while it sleeps.
-        time.sleep(loop.IDLE_SLEEP_SECONDS / 2)
+        refused_by = time.monotonic() + loop.IDLE_SLEEP_SECONDS * 4
+        # Not a fixed pause: the loop first imports the detector's stack, which in a
+        # process that has not loaded it yet takes longer than one.
+        while not refusals_in(written) and time.monotonic() < refused_by:
+            time.sleep(0.05)
         with (
             psycopg.connect(_WHERE[database], autocommit=True) as deploying,
             deploying.cursor() as cursor,
@@ -622,6 +642,7 @@ def test_the_refusal_logs_once_and_lifts_when_the_deploy_finishes(
             if audit_job(database, workspace)[0] == "done":
                 break
             time.sleep(0.1)
+    stop(running, database)
 
     assert audit_job(database, workspace) == ("done", WORKER)
     assert refusals_in(written) == [(REFUSES, "matches", "differs")]
