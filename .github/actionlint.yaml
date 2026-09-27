@@ -2,3 +2,8 @@ self-hosted-runner:
   # actionlint's list of hosted runners predates GitHub's `ubuntu-26.04`, so it refuses the label on every job.
   labels:
     - ubuntu-26.04
+paths:
+  .github/workflows/*.yml:
+    ignore:
+      # actionlint predates GitHub's `queue` key for `concurrency`, and refuses it as unknown.
+      - 'unexpected key "queue" for "concurrency" section'

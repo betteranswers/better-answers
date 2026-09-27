@@ -331,7 +331,7 @@ say "This is the task's finish line. Nothing of a client's goes on the box until
 step "On VPC 2, as root:  set -a; . /etc/better-answers/drill.env; set +a; /opt/better-answers/deploy/restore-drill.sh"
 step "Read the report in the bucket under drills/. A step marked 'not built yet' is a slice that has not landed and is expected today; a FAIL is not. The 'drill' and 'staging-wiped' checks both pinged."
 step "Then rehearse 'Coolify lost' once (RUNBOOK.md page 5), and have the second holder open the vault once."
-step "Record the drill's date and RTO in the private RUNBOOK.md. The day the first client's data lands: gh variable set CLIENT_DATA_ON_BOX --body <date> — from then on 'release' insists on a drill-day or a hotfix reason (page 6)."
+step "Record the drill's date and RTO in the private RUNBOOK.md. The day the platform goes live, no earlier than v0.1: gh variable set PLATFORM_LIVE_SINCE --body <date> — from then on a green build no longer releases itself, and 'release' insists on a drill-day or a hotfix reason (page 6)."
 if confirm "Did the first drill run green, with its report in drills/ and both pings received"; then
   write_env FIRST_DRILL_DONE "$(date -u +%F)"
 else

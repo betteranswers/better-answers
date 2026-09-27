@@ -7,6 +7,7 @@ import { describe, expect, it, onTestFinished } from "vitest";
 import { z } from "zod";
 
 import { repositoryRoot } from "@better-answers/devtools/paths";
+import { readWorkflow } from "@better-answers/devtools/workflows";
 import { boundarySchemas, POSTGRES_IMAGE, ULID_PATTERN } from "@better-answers/schema";
 
 const read = (relative: string): string =>
@@ -56,6 +57,10 @@ const renovateSchema = z.object({
 });
 
 const groupOf = (match: RegExpMatchArray, name: string): string => match.groups?.[name] ?? "";
+
+const promoteTimeoutSchema = z.object({
+  jobs: z.object({ promote: z.object({ "timeout-minutes": z.number() }) }),
+});
 
 const composeModelSchema = z.object({
   services: z.record(
@@ -533,9 +538,9 @@ describe("the deploy tree", () => {
     const polls = Number(/AWAIT_RELEASE_POLLS:-(\d+)/.exec(script)?.[1]);
     const delaySeconds = Number(/AWAIT_RELEASE_DELAY_SECONDS:-(\d+)/.exec(script)?.[1]);
     const pollSeconds = Number(/curl [^\n]*--max-time (\d+)/.exec(script)?.[1]);
-    const jobMinutes = Number(
-      /timeout-minutes: (\d+)/.exec(read(".github/workflows/release.yml"))?.[1],
-    );
+    const jobMinutes = readWorkflow("release.yml", promoteTimeoutSchema).jobs.promote[
+      "timeout-minutes"
+    ];
 
     // Twice the three minutes a fresh image took to pull and start, end to end; no sleep follows the last poll.
     expect((polls - 1) * delaySeconds).toBeGreaterThanOrEqual(360);
@@ -584,7 +589,7 @@ describe("the deploy tree", () => {
 
     expect(build).toContain("type=sha,prefix=sha-");
     expect(build).not.toContain("type=raw");
-    expect(release).toMatch(/ref: main\n/);
+    expect(release).toContain("ref: ${{ inputs.commit || 'main' }}\n");
     expect(release).toContain('head="$(git rev-parse HEAD)"');
 
     const cutTo = /DOCKER_METADATA_SHORT_SHA_LENGTH: "(\d+)"/.exec(build)?.[1];
