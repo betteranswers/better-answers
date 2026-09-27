@@ -11,7 +11,7 @@ runs:
   using: composite
   steps:
     - shell: bash
-      # An artifact, not the Actions cache: the build's layers fill the cache, and it evicts a checkpoint read once a night.
+      # An artifact, not the Actions cache: past its quota the cache evicts the least recently read entry, and this is read once a night.
       env:
         GH_TOKEN: ${{ github.token }}
         REPOSITORY: ${{ github.repository }}

@@ -52,6 +52,7 @@ jobs:
     # never runs on a push, or the run fails at startup.
     permissions:
       contents: read
+      packages: read
       pull-requests: read
     uses: ./.github/workflows/check.yml
     with:
@@ -144,7 +145,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           # Read only: exporting from both would upload one build's cache twice, the
           # pushing step below resolving every layer this one produced.
-          cache-from: type=gha,scope=${{ matrix.tier }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.tier }}:buildcache
       # With no id the probe would build an image of its own, and the leg would push
       # something nothing read.
       - name: the image is read before it ships
@@ -168,10 +169,12 @@ jobs:
           sbom: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # The scope is the leg's name: the default is one scope for everyone, and three
-          # legs overwrote it in turn.
-          cache-from: type=gha,scope=${{ matrix.tier }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.tier }}
+          # In the registry, not the Actions cache, which any run on main can write: these
+          # layers ship, and only a job holding `packages: write` can write here. A failed
+          # export warns rather than fails, because the image is pushed before it and a red
+          # step here would skip the digest check and the attestation.
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.tier }}:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.tier }}:buildcache,mode=max,image-manifest=true,oci-mediatypes=true,ignore-error=true
       - name: digest to the job summary
         env:
           TIER: ${{ matrix.tier }}

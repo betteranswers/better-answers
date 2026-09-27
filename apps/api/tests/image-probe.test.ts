@@ -1,22 +1,25 @@
 import { describe, expect, it } from "vitest";
 
-import { buildCommand, builderThatCanExport, sharedCacheBuilder } from "./image-probe.ts";
+import { buildCommand, builderThatCanExport, sharedCache } from "./image-probe.ts";
 
 const API = { tier: "api", dockerfile: "apps/api/Dockerfile", context: "." };
 const BACKUP = { tier: "backup", dockerfile: "deploy/backup.Dockerfile", context: "deploy" };
 
+const CACHED = {
+  cache: { builder: "the-container-builder", registry: "ghcr.io/an-owner" },
+  iidfile: "/tmp/the-id-this-build-wrote",
+};
+
 describe("the build an image probe runs", () => {
   it("uses buildx on a runner and a plain build elsewhere", () => {
-    const writtenTo = "/tmp/the-id-this-build-wrote";
-
-    expect(buildCommand(API, { builder: "the-container-builder", iidfile: writtenTo })).toEqual([
+    expect(buildCommand(API, CACHED)).toEqual([
       "docker",
       "buildx",
       "build",
       "--builder",
       "the-container-builder",
       "--cache-from",
-      "type=gha,scope=api",
+      "type=registry,ref=ghcr.io/an-owner/api:buildcache",
       "--load",
       "--iidfile",
       "/tmp/the-id-this-build-wrote",
@@ -25,7 +28,7 @@ describe("the build an image probe runs", () => {
       ".",
     ]);
 
-    expect(buildCommand(API, { builder: undefined, iidfile: writtenTo })).toEqual([
+    expect(buildCommand(API, { cache: undefined, iidfile: CACHED.iidfile })).toEqual([
       "docker",
       "build",
       "--quiet",
@@ -35,24 +38,24 @@ describe("the build an image probe runs", () => {
     ]);
   });
 
-  it("caches each image's layers under a scope of its own", () => {
-    const cached = { builder: "the-container-builder", iidfile: "/tmp/the-id-this-build-wrote" };
-
-    expect(buildCommand(BACKUP, cached)).toContain("type=gha,scope=backup");
-    expect(buildCommand(API, cached)).not.toContain("type=gha,scope=backup");
+  it("reads each image's layers from its own package's cache tag", () => {
+    expect(buildCommand(BACKUP, CACHED)).toContain(
+      "type=registry,ref=ghcr.io/an-owner/backup:buildcache",
+    );
+    expect(buildCommand(API, CACHED)).not.toContain(
+      "type=registry,ref=ghcr.io/an-owner/backup:buildcache",
+    );
   });
 
   it("reads the shared cache and exports nothing to it", () => {
-    const cached = { builder: "the-container-builder", iidfile: "/tmp/the-id-this-build-wrote" };
-
-    expect(buildCommand(BACKUP, cached)).toEqual([
+    expect(buildCommand(BACKUP, CACHED)).toEqual([
       "docker",
       "buildx",
       "build",
       "--builder",
       "the-container-builder",
       "--cache-from",
-      "type=gha,scope=backup",
+      "type=registry,ref=ghcr.io/an-owner/backup:buildcache",
       "--load",
       "--iidfile",
       "/tmp/the-id-this-build-wrote",
@@ -89,30 +92,22 @@ describe("the build an image probe runs", () => {
     ).toBeUndefined();
   });
 
-  it("asks the daemon nothing without the cache credentials", async () => {
+  it("asks the daemon nothing unless a cache registry is named", async () => {
     const refuseToAsk = (): Promise<string | undefined> => {
       throw new Error("the probe asked the daemon for a builder it could not have used");
     };
 
-    await expect(sharedCacheBuilder({}, refuseToAsk)).resolves.toBeUndefined();
-
-    await expect(
-      sharedCacheBuilder({ ACTIONS_RUNTIME_TOKEN: "a-token" }, refuseToAsk),
-    ).resolves.toBeUndefined();
-    await expect(
-      sharedCacheBuilder(
-        { ACTIONS_RESULTS_URL: "https://results.example/_apis/artifactcache/" },
-        refuseToAsk,
-      ),
-    ).resolves.toBeUndefined();
+    await expect(sharedCache({}, refuseToAsk)).resolves.toBeUndefined();
+    await expect(sharedCache({ IMAGE_CACHE_REGISTRY: "  " }, refuseToAsk)).resolves.toBeUndefined();
     expect(
-      await sharedCacheBuilder(
-        {
-          ACTIONS_RUNTIME_TOKEN: "a-token",
-          ACTIONS_RESULTS_URL: "https://results.example/_apis/artifactcache/",
-        },
-        () => Promise.resolve("Name: builder-1c0ffee\nDriver: docker-container\n"),
+      await sharedCache({ IMAGE_CACHE_REGISTRY: "ghcr.io/an-owner" }, () =>
+        Promise.resolve("Name: builder-1c0ffee\nDriver: docker-container\n"),
       ),
-    ).toBe("builder-1c0ffee");
+    ).toEqual({ builder: "builder-1c0ffee", registry: "ghcr.io/an-owner" });
+    expect(
+      await sharedCache({ IMAGE_CACHE_REGISTRY: "ghcr.io/an-owner" }, () =>
+        Promise.resolve("Name: default\nDriver: docker\n"),
+      ),
+    ).toBeUndefined();
   });
 });

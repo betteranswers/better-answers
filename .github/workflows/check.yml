@@ -186,6 +186,10 @@ jobs:
     if: ${{ needs.lane.outputs.lane == 'full' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 25
+    # The image probes read the layer cache `build.yml` writes to the private packages.
+    permissions:
+      contents: read
+      packages: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -211,14 +215,19 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: uv sync --frozen
         working-directory: apps/worker
-      # The daemon's driver cannot read a `type=gha` cache, and a `run:` step gets the
-      # `ACTIONS_*` variables only from the second.
+      # The daemon's own builder reads no registry cache unless it keeps images in containerd,
+      # which the runner's does not.
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      - uses: crazy-max/ghaction-github-runtime@04d248b84655b509d8c44dc1d6f990c879747487 # v4.0.0
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - uses: ./.github/actions/git-filter-repo
       - run: pnpm check:api
         env:
           IMAGE_PROBE_DEFERRED: ${{ inputs.images-probed-by-the-caller || needs.lane.outputs.images == 'no' }}
+          IMAGE_CACHE_REGISTRY: ghcr.io/${{ github.repository_owner }}
 
   full-web:
     needs: lane
@@ -253,6 +262,9 @@ jobs:
     if: ${{ needs.lane.outputs.lane == 'full' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -280,10 +292,15 @@ jobs:
       - run: uv sync --frozen
         working-directory: apps/worker
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      - uses: crazy-max/ghaction-github-runtime@04d248b84655b509d8c44dc1d6f990c879747487 # v4.0.0
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - run: pnpm check:worker
         env:
           IMAGE_PROBE_DEFERRED: ${{ inputs.images-probed-by-the-caller || needs.lane.outputs.images == 'no' }}
+          IMAGE_CACHE_REGISTRY: ghcr.io/${{ github.repository_owner }}
           # Without it every run tells a third party what this repository is building, once
           # per document.
           COCOINDEX_DISABLE_USAGE_TRACKING: "1"
