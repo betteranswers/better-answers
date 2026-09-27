@@ -2,7 +2,7 @@
 set -uo pipefail
 
 # This hook may tidy and never block, so every outcome below exits 0 and says why on stderr.
-SAY_AS=worktree-remove-hook
+SAY_AS="worktree-remove-hook"
 . "$(dirname "${BASH_SOURCE[0]}")/worktree-lib.sh"
 
 INPUT="$(cat)"

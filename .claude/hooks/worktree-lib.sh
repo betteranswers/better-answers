@@ -1,3 +1,4 @@
+# shellcheck shell=bash # sourced by the worktree hooks, so it carries no shebang of its own
 say() {
   echo "$SAY_AS: $*" >&2
 }

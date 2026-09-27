@@ -30,7 +30,7 @@ key="$(value_of VPC1_SSH_KEY)"
 [[ "${target}" =~ ^[A-Za-z0-9._-]+@[A-Za-z0-9.:-]+$ ]] || refuse "VPC1_SSH_TARGET is not user@host"
 [ -n "${remote_port}" ] || refuse "the private file has no VPC1_DATABASE_PORT"
 is_port "${remote_port}" || refuse "VPC1_DATABASE_PORT is not a port number"
-case "${key}" in "~/"*) key="${HOME}/${key#\~/}" ;; esac
+case "${key}" in \~/*) key="${HOME}/${key#\~/}" ;; esac
 [ -z "${key}" ] || [ -r "${key}" ] || refuse "VPC1_SSH_KEY names no readable file"
 
 if (exec 3<>"/dev/tcp/127.0.0.1/${local_port}") 2>/dev/null; then

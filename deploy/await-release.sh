@@ -11,7 +11,7 @@ refuse() {
 origin="$1"
 expected="$2"
 [[ "${expected}" =~ ^sha256:[0-9a-f]{64}$ ]] || refuse "${expected} is not a digest (sha256: followed by 64 hex characters)"
-command -v curl >/dev/null && command -v jq >/dev/null || refuse "curl and jq must both be on PATH"
+{ command -v curl && command -v jq; } >/dev/null || refuse "curl and jq must both be on PATH"
 
 # Six minutes from first poll to last, twice the three a fresh pull took; even with every poll timing out, inside the job's timeout.
 polls="${AWAIT_RELEASE_POLLS:-61}"

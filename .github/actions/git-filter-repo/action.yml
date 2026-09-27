@@ -5,7 +5,7 @@ runs:
   steps:
     - shell: bash
       # The version is read out of the api image's pin and is never written here.
-      run: |
+      run: | # zizmor: ignore[github-env] the path written is uv's own tool directory, never an input
         pinned="$(sed -n 's/^ARG GIT_FILTER_REPO_VERSION=//p' "$GITHUB_WORKSPACE/apps/api/Dockerfile")"
         # Exactly one, never the first of several: a read that quietly picks one of two
         # `ARG` lines is the second copy this avoids.
