@@ -122,10 +122,11 @@ describe("what a job calling a reusable workflow grants it", () => {
     ).toEqual([]);
   });
 
-  it("reads build.yml's call to check.yml", () => {
-    expect(callsIn(workflowsOnDisk())).toContainEqual(
-      expect.objectContaining({ caller: "build.yml's `check`", uses: CHECK_USES }),
-    );
+  it.each([
+    { caller: "build.yml's `check`", uses: CHECK_USES },
+    { caller: "build.yml's `release`", uses: "./.github/workflows/release.yml" },
+  ])("reads $caller call to $uses", (call) => {
+    expect(callsIn(workflowsOnDisk())).toContainEqual(expect.objectContaining(call));
   });
 });
 

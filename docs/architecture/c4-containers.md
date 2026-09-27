@@ -7,7 +7,7 @@ C4Container
   title Container diagram — Better Answers
 
   Person(person, "Admin, Editor or Viewer", "Signed in on app., a session cookie host-only")
-  Person(operator, "Operator", "Runs pnpm ops inside the api container; releases by dispatching release.yml")
+  Person(operator, "Operator", "Runs pnpm ops inside the api container; rolls back, and releases after go-live, by dispatching release.yml")
   System_Ext(claude, "Claude and Claude Code", "MCP client with a bearer token from OAuth consent")
   System_Ext(models, "Model providers", "Answering, judging, extraction routes; embedding in reserve")
   System_Ext(external, "Microsoft 365, the client's website, SMTP", "Sign-in and SharePoint from P1 and S4; sign-in codes by email today")

@@ -90,6 +90,24 @@ describe("actionlint, as `lint:workflows:actionlint` runs it", () => {
   it("accepts a clean workflow on the runner the config names", () => {
     expect(ran("lint:workflows:actionlint", CLEAN_WORKFLOWS)).toEqual({ status: 0, said: "" });
   });
+
+  it("accepts a queued concurrency group, and no other unknown key", () => {
+    const concurrent = (key: string): Tree => ({
+      ...CLEAN_WORKFLOWS,
+      ".github/workflows/build.yml": workflowRunning("push", CLEAN_STEPS).replace(
+        "jobs:\n",
+        `concurrency:\n  group: build\n  ${key}\njobs:\n`,
+      ),
+    });
+    const unknown = ran("lint:workflows:actionlint", concurrent("lanes: 2"));
+
+    expect(ran("lint:workflows:actionlint", concurrent("queue: max"))).toEqual({
+      status: 0,
+      said: "",
+    });
+    expect(unknown.status).not.toBe(0);
+    expect(unknown.said).toContain('unexpected key "lanes" for "concurrency" section');
+  });
 });
 
 describe("zizmor, as `lint:workflows:zizmor` runs it", () => {

@@ -209,3 +209,15 @@ jobs:
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
           create-storage-record: false
+
+  release:
+    needs: image
+    # A skipped `check` above would skip this too, so the matrix's own result is named: every leg.
+    if: ${{ !cancelled() && needs.image.result == 'success' && github.ref == 'refs/heads/main' }}
+    # Exactly release.yml's asks: `contents: write` for its tag, `packages: read` for the digests.
+    permissions:
+      contents: write
+      packages: read
+    uses: ./.github/workflows/release.yml
+    with:
+      commit: ${{ github.sha }}
