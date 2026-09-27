@@ -191,6 +191,9 @@ def test_dropping_a_bindings_state_keeps_the_table_indexes_and_rows(
         indexes_before = chunk_indexes(connection, workspace_id)
         assert indexes_before != []
 
+    # Its own Host, as a run's would be: the engine can still hold the name the
+    # landing Host registered.
+    with Host(bootstrap_for(dsn, tmp_path)) as host:
         host.drop_binding(first)
 
     assert chunk_ids(connection, workspace_id) == ["chunk-one", "chunk-two"]
