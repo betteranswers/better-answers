@@ -122,10 +122,15 @@ better-answers-worker = "better_answers_worker.loop:main"
 generate-contract-stamp = "better_answers_worker.generate_contract_stamp:main"
 
 [dependency-groups]
+# All `build.yml`'s worker leg installs to run `tests/test_image.py` against the image it is
+# about to push. That suite reads the image through Docker and imports nothing of this tier,
+# so it needs pytest and not the tier's environment, torch and all. `dev` takes it whole, so
+# pytest is named once.
+probe = ["pytest>=9.1.1"]
 dev = [
+    { include-group = "probe" },
     "mutmut>=3.7.0",
     "mypy>=2.3.1",
-    "pytest>=9.1.1",
     "pytest-xdist>=3.8.0",
     "ruff>=0.16.5",
     "testcontainers==4.15.0",
