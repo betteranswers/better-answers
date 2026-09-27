@@ -11,6 +11,12 @@ ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel)}"
 DIR="$ROOT/.claude/worktrees/$NAME"
 BRANCH="worktree-$NAME"
 
+# Every creation sweeps, since nothing else reliably runs as often as worktrees pile up. Detached
+# with its streams redirected, so creation never waits on it; the log holds the latest sweep.
+LOG="$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" \
+  && LOG="$LOG/worktree-sweep.log" || LOG=/dev/null
+nohup bash "$ROOT/.claude/hooks/sweep-worktrees.sh" "$ROOT" </dev/null >"$LOG" 2>&1 &
+
 if [ -d "$DIR" ]; then
   echo "worktree-create-hook: reopening $DIR" >&2
   echo "$DIR"
