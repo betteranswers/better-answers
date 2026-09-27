@@ -87,7 +87,7 @@ jobs:
           - tier: worker
             context: apps/worker
             dockerfile: apps/worker/Dockerfile
-            probe: uv run --frozen --directory apps/worker pytest tests/test_image.py
+            probe: uv run --frozen --only-group probe --directory apps/worker pytest tests/test_image.py
             probe-toolchain: python
           - tier: backup
             context: deploy
@@ -130,7 +130,7 @@ jobs:
           version-file: apps/worker/.tool-versions
           enable-cache: false
       - if: matrix.probe-toolchain == 'python'
-        run: uv sync --frozen
+        run: uv sync --frozen --only-group probe
         working-directory: apps/worker
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         id: load
