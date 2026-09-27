@@ -4,7 +4,7 @@
 export default {
   testRunner: "vitest",
   plugins: ["@stryker-mutator/vitest-runner"],
-  vitest: { configFile: "vitest.config.ts" },
+  vitest: { configFile: "vitest.stryker.config.ts" },
 
   mutate: ["src/**/*.ts"],
   coverageAnalysis: "perTest",
