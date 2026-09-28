@@ -468,9 +468,6 @@ test.describe("a member, opened as a sheet", () => {
       word: "last-admin",
     });
     await expect(sheet.getByRole("region", { name: "Membership" })).toContainText("Admin");
-    // The refusal re-enables the button mid-fade from its disabled look; an audit inside that fade
-    // reads a contrast nobody settles on.
-    await expect(commit).toHaveCSS("opacity", "1");
     await passesTheAccessibilityGate();
     await page.keyboard.press("Escape");
     await expect(rowOf(page, "Test person").getByRole("cell").nth(1)).toHaveText("Admin");

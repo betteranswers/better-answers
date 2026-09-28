@@ -18,7 +18,28 @@ const anAddress = (workerIndex: number): string => {
 
 const WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
+/**
+ * Axe reads colours mid-fade, which no one settles on. A spinner never ends, so an endless
+ * animation is audited running.
+ */
+const transitionsHaveEnded = async (page: Page): Promise<void> => {
+  await page.evaluate(async () => {
+    const ending = (): Animation[] =>
+      document
+        .getAnimations()
+        .filter(
+          (animation) =>
+            animation.playState === "running" &&
+            animation.effect?.getComputedTiming().endTime !== Infinity,
+        );
+    for (let running = ending(); running.length > 0; running = ending()) {
+      await Promise.allSettled(running.map(async (animation) => animation.finished));
+    }
+  });
+};
+
 const auditOf = async (page: Page): Promise<void> => {
+  await transitionsHaveEnded(page);
   const audit = await new AxeBuilder({ page }).withTags(WCAG_TAGS).analyze();
   expect(audit.violations, `axe found violations on ${page.url()}`).toEqual([]);
 };

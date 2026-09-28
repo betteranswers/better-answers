@@ -182,7 +182,10 @@ three things, of which automated rules are only one:
   and `wcag22aa`, asserted to have no violations. **It is run for you**: the fixture in
   `apps/web/e2e/browser.ts` audits the screen the test leaves the browser on, once the body has
   finished, and stands aside where the test has already failed so the real error is the one
-  reported. A new spec is held to it by existing, and there is nothing to remember.
+  reported. A new spec is held to it by existing, and there is nothing to remember. Each audit
+  first waits for every transition on the page to end, because axe reads a control part-way
+  through its fade as a contrast nobody settles on. A refusal handing a button back from its
+  disabled look is the case. An endless animation, such as a spinner, is audited running.
 - **A keyboard traversal** reaching the screen and each of its acts without a pointer:
   `apps/web/e2e/sign-in.spec.ts` for the three screens outside the shell,
   `apps/web/e2e/frame.spec.ts` for the rail and the secondary nav, and
@@ -200,7 +203,7 @@ is another origin and no screen of ours. A test that ends somewhere this product
 audited nothing is refused by name, so an absence is a failure rather than a silence.
 
 `apps/web/e2e/routes.spec.ts` carries all three and is the model to copy.
-`apps/web/e2e/accessibility-gate.spec.ts` is the gate's own proof: two of its four tests are
+`apps/web/e2e/accessibility-gate.spec.ts` is the gate's own proof: two of its six tests are
 `test.fail()`, so the run prints them with a ✘ and counts them passed — that is the gate firing
 where it should, and an `Expected to fail, but passed` there means the gate has stopped running.
 
