@@ -514,6 +514,22 @@ describe("the 2026-07-28 leg", () => {
     expect(mismatched.status).toBe(400);
   });
 
+  it("logs a request the handler rejects, as the mcp module", async () => {
+    const { client, token } = await connect();
+    const before = app.logs.length;
+
+    await modern(client, token, "tools/list", {}, { headers: { "mcp-method": "" } });
+
+    expect(app.logs.slice(before)).toContainEqual(
+      expect.objectContaining({
+        level: 40,
+        module: "mcp",
+        event: "mcp.handler_error",
+        msg: "handler error",
+      }),
+    );
+  });
+
   it("names its supported versions to a request declaring another", async () => {
     const { client, token } = await connect();
 
