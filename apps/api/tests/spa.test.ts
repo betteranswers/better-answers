@@ -70,6 +70,15 @@ describe("the api serves the shell on app.", () => {
     expect(response.headers.get("content-type")).not.toContain("text/html");
   });
 
+  it("gives a browser the auth endpoint's own answer", async () => {
+    const response = await app()
+      .client(undefined, APP_HOSTNAME)
+      .fetch("/get-session", asABrowserNavigates);
+
+    expect(response.headers.get("content-type")).not.toContain("text/html");
+    await expect(response.text()).resolves.not.toContain(`<div id="root">`);
+  });
+
   it("leaves the product's transport answering on app., not the shell", async () => {
     const response = await app()
       .client(undefined, APP_HOSTNAME)
