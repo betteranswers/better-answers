@@ -403,7 +403,7 @@ export const keystrokesListed = async (page: Page, screen: string): Promise<Loca
   return listed;
 };
 
-/** Focus returns to the button a task after the list is gone, taking it from a sooner key's. */
+/** Focus lands back on the button a task after the list is gone, unless a key has moved it. */
 export const keystrokesDismissed = async (page: Page, listed: Locator): Promise<void> => {
   await page.keyboard.press("Escape");
   await expect(listed).toHaveCount(0);
