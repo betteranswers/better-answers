@@ -1,29 +1,25 @@
 #!/bin/sh
-# Writes eight tickets done state to origin, each with a lease on the copy this session read.
+# Moves T-468..T-473 to done on origin, from the cloud session that built them (28/09/2026).
+# Each push leases on the oid origin held when the session read it, so a ticket edited since is refused.
 set -eu
 git fetch origin claude/ordna-done-handoff
-oid=$(git rev-parse FETCH_HEAD:T-436.md)
-git push --force-with-lease=refs/ordna/tasks/T-436:fe6a9a50cb7320e3a7875b8b99b2b148acdb822c origin "$oid:refs/ordna/tasks/T-436"
-git update-ref refs/ordna/tasks/T-436 "$oid"
-oid=$(git rev-parse FETCH_HEAD:T-438.md)
-git push --force-with-lease=refs/ordna/tasks/T-438:6417cfac52bfbd9ce0ed706adcb68a9603ecca3b origin "$oid:refs/ordna/tasks/T-438"
-git update-ref refs/ordna/tasks/T-438 "$oid"
-oid=$(git rev-parse FETCH_HEAD:T-455.md)
-git push --force-with-lease=refs/ordna/tasks/T-455:05070c5d6d3c505a888f39d3faa4f40e1537445b origin "$oid:refs/ordna/tasks/T-455"
-git update-ref refs/ordna/tasks/T-455 "$oid"
-oid=$(git rev-parse FETCH_HEAD:T-462.md)
-git push --force-with-lease=refs/ordna/tasks/T-462:c50a8cf9c59b96a964e5ddc626814a004f639111 origin "$oid:refs/ordna/tasks/T-462"
-git update-ref refs/ordna/tasks/T-462 "$oid"
-oid=$(git rev-parse FETCH_HEAD:T-463.md)
-git push --force-with-lease=refs/ordna/tasks/T-463:a2a8f370e2fddbb6604e2047bc91bd69374e7563 origin "$oid:refs/ordna/tasks/T-463"
-git update-ref refs/ordna/tasks/T-463 "$oid"
-oid=$(git rev-parse FETCH_HEAD:T-465.md)
-git push --force-with-lease=refs/ordna/tasks/T-465:147b97041bf092cd52c246af7615a122a8225ed5 origin "$oid:refs/ordna/tasks/T-465"
-git update-ref refs/ordna/tasks/T-465 "$oid"
-oid=$(git rev-parse FETCH_HEAD:T-461.md)
-git push --force-with-lease=refs/ordna/tasks/T-461:2434d5469108e72c2d0032ebd50e1ba025980574 origin "$oid:refs/ordna/tasks/T-461"
-git update-ref refs/ordna/tasks/T-461 "$oid"
-oid=$(git rev-parse FETCH_HEAD:T-467.md)
-git push --force-with-lease=refs/ordna/tasks/T-467:b3234f161ba90c37a3c24aa74ac49a4e5b3d1890 origin "$oid:refs/ordna/tasks/T-467"
-git update-ref refs/ordna/tasks/T-467 "$oid"
+head=$(git rev-parse FETCH_HEAD)
+oid=$(git rev-parse "$head:T-468.md")
+git push --force-with-lease=refs/ordna/tasks/T-468:858675fd272291d357d8622f972587ec1f14d1b9 origin "$oid:refs/ordna/tasks/T-468"
+git update-ref refs/ordna/tasks/T-468 "$oid"
+oid=$(git rev-parse "$head:T-469.md")
+git push --force-with-lease=refs/ordna/tasks/T-469:816f03b0680d4122ed2fe14362184fca475dba77 origin "$oid:refs/ordna/tasks/T-469"
+git update-ref refs/ordna/tasks/T-469 "$oid"
+oid=$(git rev-parse "$head:T-470.md")
+git push --force-with-lease=refs/ordna/tasks/T-470:4fa4437fc7ff152700c3557dba4f00e40c8f3a34 origin "$oid:refs/ordna/tasks/T-470"
+git update-ref refs/ordna/tasks/T-470 "$oid"
+oid=$(git rev-parse "$head:T-471.md")
+git push --force-with-lease=refs/ordna/tasks/T-471:3680929c312f2ae804524d8f6e8422b18dcf10aa origin "$oid:refs/ordna/tasks/T-471"
+git update-ref refs/ordna/tasks/T-471 "$oid"
+oid=$(git rev-parse "$head:T-472.md")
+git push --force-with-lease=refs/ordna/tasks/T-472:29fca1bb23e0b5286d439734c24855359c79cb6c origin "$oid:refs/ordna/tasks/T-472"
+git update-ref refs/ordna/tasks/T-472 "$oid"
+oid=$(git rev-parse "$head:T-473.md")
+git push --force-with-lease=refs/ordna/tasks/T-473:d5dd45a2c699c48ca1b0ea86a2bbe658f99748bc origin "$oid:refs/ordna/tasks/T-473"
+git update-ref refs/ordna/tasks/T-473 "$oid"
 ordna list -s todo
