@@ -198,6 +198,41 @@ describe("the routes a DPIA input lists", () => {
     ]);
   });
 
+  it("names each provider's sub-processor, and not recorded for others", async () => {
+    const scenario = await arrange();
+    await routeIn(scenario, { purpose: "extraction", provider: "mistral", model: "mistral-large" });
+    await routeIn(scenario, { purpose: "enrichment", provider: "local", model: "llama-4" });
+    await routeIn(scenario, { purpose: "judging", provider: "openai", model: "gpt-6" });
+    const binding = await bindingIn(scenario);
+
+    expect((await documentFor(scenario, binding)).routes).toEqual([
+      {
+        purpose: "extraction",
+        provider: "mistral",
+        model: "mistral-large",
+        processor: "Mistral AI",
+        country: "European Union",
+        retentionTail: NOT_RECORDED,
+      },
+      {
+        purpose: "enrichment",
+        provider: "local",
+        model: "llama-4",
+        processor: "no sub-processor",
+        country: "the platform's own estate",
+        retentionTail: NOT_RECORDED,
+      },
+      {
+        purpose: "judging",
+        provider: "openai",
+        model: "gpt-6",
+        processor: NOT_RECORDED,
+        country: NOT_RECORDED,
+        retentionTail: NOT_RECORDED,
+      },
+    ]);
+  });
+
   it("lists no purpose the workspace has not configured", async () => {
     const scenario = await arrange();
     const binding = await bindingIn(scenario);
