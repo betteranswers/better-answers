@@ -5,7 +5,7 @@ import { testData } from "@better-answers/schema/testing";
 import type { PlatformPrincipal, WorkspaceId } from "../src/kernel/index.ts";
 import { bundleHealth, enqueueJob, enqueueJobIn, JOB_IS_OVER, jobById } from "../src/runs/index.ts";
 import { folded, withMembership, withScope, type Tx } from "../src/store/postgres/index.ts";
-import { abortTheTransaction } from "./suite-postgres.ts";
+import { abortTheTransaction, countWaitingOnLocks, until } from "./suite-postgres.ts";
 import { suiteWithBundles, type Scenario } from "./workspace-with-bundle.ts";
 
 const graphMaintenance: PlatformPrincipal = {
@@ -283,6 +283,37 @@ describe("an act landing its rows and job in one transaction", () => {
       }
     },
   );
+
+  it("rejects an enqueue that another act's commit overtook", async () => {
+    const scenario = await arrange();
+    const firstLanded = Promise.withResolvers<undefined>();
+    const held = Promise.withResolvers<undefined>();
+    const first = actOf(scenario, async (tx) => {
+      const queued = await enqueueJobIn(graphMaintenance, tx, boundJob(scenario.workspaceId));
+      firstLanded.resolve(undefined);
+      await held.promise;
+      return queued;
+    });
+    await firstLanded.promise;
+
+    const second = actOf(scenario, (tx) =>
+      enqueueJobIn(graphMaintenance, tx, boundJob(scenario.workspaceId)),
+    ).then(
+      () => "committed",
+      (error: unknown) => error,
+    );
+    try {
+      await until(async () => (await countWaitingOnLocks(db().pool)) > 0);
+    } finally {
+      held.resolve(undefined);
+    }
+
+    expect(await first).toEqual({ ok: true, value: { jobId: expect.any(String) } });
+    expect(await second).toEqual(
+      new Error("another act queued this subject while this one was enqueueing it"),
+    );
+    expect(await jobsIn(scenario.workspaceId)).toHaveLength(1);
+  });
 
   it("queues a second binding separately, one run key per subject", async () => {
     const scenario = await arrange();
