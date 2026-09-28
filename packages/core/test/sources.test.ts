@@ -529,6 +529,17 @@ describe("the sweep collects what failed binds and lost races left", () => {
     });
   });
 
+  it("keeps an unnamed original an hour inside the grace", async () => {
+    const scenario = await arrange();
+    const orphaned = await aFailedBind(scenario);
+
+    const almost = new Date(Date.now() + (ORPHANED_UPLOAD_GRACE_HOURS - 1) * 60 * 60 * 1000);
+    const swept = await sweptAt(scenario, almost);
+
+    expect(swept).toEqual({ ok: true, value: { found: 0, removed: 0 } });
+    expect(await storedFor(scenario.admin)).toContain(orphaned);
+  });
+
   it("removes an unnamed original after the grace, keeping named ones", async () => {
     const scenario = await arrange();
     const named = await boundHandbook(scenario);
@@ -600,6 +611,8 @@ describe("the sweep collects what failed binds and lost races left", () => {
       "a key a segment too long",
       `uploads/${ulid().toLowerCase()}/${ulid().toLowerCase()}/x/original`,
     ],
+    ["a key ending past its original", `uploads/${ulid().toLowerCase()}/original-draft`],
+    ["a key nesting an older original", `uploads/a-draft/uploads/${ulid().toLowerCase()}/original`],
   ])("leaves %s", async (_case, stray) => {
     const scenario = await arrange();
     await putObject(scenario.admin, store().door, stray, uploadOf("not an original").body);
