@@ -15,7 +15,7 @@ You are the implementor for a ticket that lands something a person looks at. Eve
 
 1. `/better-answers-design` — the brand, the colours, the type, the assets, and where components come from: the shadcn, Kibo UI and Vercel AI Elements registries (ADR 0033). A component the registries hold is never hand-written.
 2. `/browser-suite` — how this repository drives a browser: the served-build seam, the client-address fixture, the api harness's acts, locators, waiting and the accessibility gate. The spec is written with the screen, red first.
-3. The rules a screen binds: `CODING_RULES.md`'s UX and accessibility rules, `apps/web/CODING_RULES.md`, ADR 0037 (the budgets), ADR 0034 (one origin, tRPC only through the split link). `/writing-react-effects` and `/react-hook-form-writer` for the code.
+3. The rules a screen binds: `CODING_STANDARDS.md`'s UX and accessibility rules, `apps/web/CODING_STANDARDS.md`, ADR 0037 (the budgets), ADR 0034 (one origin, tRPC only through the split link). `/writing-react-effects` and `/react-hook-form-writer` for the code.
 4. The reference shape: the workspace shell's three regions, and the screens already routed under `apps/web/src/app/screens/`.
 
 ## What every screen holds

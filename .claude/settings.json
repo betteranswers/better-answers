@@ -42,14 +42,17 @@
     "allow": ["Bash(git push --force origin refs/ordna/tasks/*)"]
   },
   "extraKnownMarketplaces": {
-    "mattpocock": {
+    "compound-engineering-plugin": {
       "source": {
         "source": "github",
-        "repo": "mattpocock/skills"
+        "repo": "EveryInc/compound-engineering-plugin",
+        "ref": "compound-engineering-v3.29.0"
       }
     }
   },
   "enabledPlugins": {
-    "mattpocock-skills@mattpocock": true
+    "compound-engineering@compound-engineering-plugin": true,
+    "mattpocock-skills@mattpocock": false,
+    "mattpocock-skills@claude-plugins-official": false
   }
 }

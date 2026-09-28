@@ -9,7 +9,7 @@ This repo is **single-context**: one root `CONTEXT.md` and one `docs/adr/`. The 
 - **`CONTEXT.md`** at the repo root — the glossary.
 - **`docs/adr/`** — read ADRs that touch the area you're about to work in.
 - **`AGENTS.md`** — the map: layout, how a task is worked, which skill to reach for.
-- **`CODING_RULES.md`** — the constitution. A workspace's own rules live in `apps/api/CODING_RULES.md`, `apps/web/CODING_RULES.md` and `apps/worker/CODING_RULES.md`; read a workspace's file too when changing it.
+- **`CODING_STANDARDS.md`** — the constitution. A workspace's own rules live in `apps/api/CODING_STANDARDS.md`, `apps/web/CODING_STANDARDS.md` and `apps/worker/CODING_STANDARDS.md`; read a workspace's file too when changing it.
 - **`docs/okf-v02.md`** — read before adding a key, convention or feature that touches a concept file.
 
 ## File structure
@@ -18,15 +18,15 @@ This repo is **single-context**: one root `CONTEXT.md` and one `docs/adr/`. The 
 /
 ├── AGENTS.md          ← the map (CLAUDE.md is a one-line pointer to it)
 ├── CONTEXT.md         ← the glossary
-├── CODING_RULES.md    ← the constitution
+├── CODING_STANDARDS.md    ← the constitution
 ├── docs/
 │   ├── okf-v02.md
 │   ├── vision.md
 │   └── adr/           ← the decision record, numbered from 0001
 ├── apps/
-│   ├── api/           ← + apps/api/CODING_RULES.md
-│   ├── web/           ← + apps/web/CODING_RULES.md
-│   └── worker/        ← + apps/worker/CODING_RULES.md
+│   ├── api/           ← + apps/api/CODING_STANDARDS.md
+│   ├── web/           ← + apps/web/CODING_STANDARDS.md
+│   └── worker/        ← + apps/worker/CODING_STANDARDS.md
 ├── packages/{core,schema}
 └── contracts/         ← the tier contract's fixtures (ADR 0031)
 ```
@@ -35,7 +35,7 @@ This repo is **single-context**: one root `CONTEXT.md` and one `docs/adr/`. The 
 
 When your output names a domain concept (in a task title, a refactor proposal, a hypothesis, a test name), use the term as defined in `CONTEXT.md`. Don't drift to synonyms the glossary explicitly avoids.
 
-`CONTEXT.md` states the stronger rule this repo actually runs on: **a new domain word is settled in the glossary before it appears in code**, and a term moves into the glossary only once it has been settled in a wayfinder ticket. So if the concept you need isn't in the glossary yet, that's a signal — either you're inventing language the project doesn't use (reconsider) or there's a real gap (note it for `/domain-modeling`).
+`CONTEXT.md` states the stronger rule this repo actually runs on: **a new domain word is settled in the glossary before it appears in code**, and a term moves into the glossary only once it has been settled in a wayfinder ticket. So if the concept you need isn't in the glossary yet, that's a signal — either you're inventing language the project doesn't use (reconsider) or there's a real gap (note it for the next `/ce-brainstorm`).
 
 ## Flag ADR conflicts
 

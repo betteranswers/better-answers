@@ -48,7 +48,7 @@ A failed gate stops the push. The gates' summary names each failure with the com
 ✗ knip: run it alone with pnpm run knip (3.14 seconds)
 ```
 
-The gates read the working tree, not the commits being pushed, so push from a clean tree. An untracked file counts too: `format:check` reads one that no ignore pattern covers, and refuses the push if it is unformatted. `pnpm land` commits and then pushes, so for it the two are the same.
+The gates read the working tree, not the commits being pushed, so push from a clean tree. An untracked file counts too: `format:check` reads one that no ignore pattern covers, and refuses the push if it is unformatted.
 
 ### When the gates run
 
@@ -83,7 +83,7 @@ Git keeps hooks in the common git directory, so one `pre-push` serves the main c
 
 ## The commit-message hook
 
-The `commit-msg` hook runs commitlint over every commit's message, not just `pnpm land`'s. Its config, `commitlint.config.mjs` at the root, is the one `pnpm land` and the `pr-title` job in `check.yml` read too, so one config checks the form everywhere (`docs/agents/workflow.md`, *The commit's form*). `packages/devtools/test/land.test.ts` commits through the hook's own command in a throwaway repository: a Conventional message goes in, and a declarative subject, a subject naming its ticket and one over 72 characters are each refused.
+The `commit-msg` hook runs commitlint over every commit's message. Its config, `commitlint.config.mjs` at the root, is the one the `pr-title` job in `check.yml` reads too, so one config checks the form everywhere (`docs/agents/workflow.md`, *The commit's form*). `packages/devtools/test/commit-msg-hook.test.ts` commits through the hook's own command in a throwaway repository: a Conventional message goes in, and a declarative subject, a subject naming its ticket and one over 72 characters are each refused.
 
 ## The Claude Code hooks
 
@@ -110,7 +110,7 @@ The layout stays native — `.claude/worktrees/<name>` on branch `worktree-<name
 
 A kept worktree is removed by hand with `git worktree remove --force`. The hook may tidy and never block, so every outcome exits 0 and says why on stderr.
 
-`sweep-worktrees.sh [<main-checkout>]` removes what the remove hook never sees: the worktree whose agent committed, pushed and merged. Before the sweep, those piled up under `.claude/worktrees/` until someone cleared them by hand. The create hook starts it in the background on every creation, with its streams on `.git/worktree-sweep.log`, which holds the latest run. Creation is the one event that happens as often as worktrees pile up and needs nobody to remember it. A step in the Coordinator's *Land* is one an agent can skip, and a `pnpm land` session never reaches it. Run the sweep by hand to clear the estate at once. It fetches `origin/main` first, and then, for each worktree under `.claude/worktrees/` and nowhere else:
+`sweep-worktrees.sh [<main-checkout>]` removes what the remove hook never sees: the worktree whose agent committed, pushed and merged. Before the sweep, those piled up under `.claude/worktrees/` until someone cleared them by hand. The create hook starts it in the background on every creation, with its streams on `.git/worktree-sweep.log`, which holds the latest run. Creation is the one event that happens as often as worktrees pile up and needs nobody to remember it; a step after the merge is one an agent can skip. Run the sweep by hand to clear the estate at once. It fetches `origin/main` first, and then, for each worktree under `.claude/worktrees/` and nowhere else:
 
 - a locked worktree, or one with changed or untracked files, is kept;
 - a HEAD on `origin/main`'s first-parent line is kept. It holds no commit of its own, which is how a fresh worktree looks while its agent works;
@@ -132,6 +132,8 @@ A worktree the hook or the sweep removes also gives up the jCodeMunch index prov
 | jcodemunch index | the worktree as a jCodeMunch root of its own |
 | skills | `provision-skills.sh`: the installed, ignored agent tooling |
 | scratch | the primary checkout's `.scratch`, linked |
+| planning | the primary checkout's `.planning`, linked, for the same reasons as `.scratch` |
+| personas | `docs/personas`, a relative link to `.planning/personas`, where `/ce-dogfood` reads personas |
 
 **The upstream.** `git worktree add -b <branch> <path> origin/main` sets the new branch to track `origin/main`, silently: a bare `git push` from the worktree then aims at `main`. `push.default` is unset here, so git's `simple` refuses the mismatched push — the tracking is surprising rather than harmful — and the stage unsets it so the branch's upstream is set on its first `git push -u`, by the session that means it. Here and not in the create hook, because a worktree made by hand fires no hook and runs this.
 
@@ -139,11 +141,13 @@ A worktree the hook or the sweep removes also gives up the jCodeMunch index prov
 
 **Why the index is given at creation.** jCodeMunch resolves an edited file into the nearest containing indexed root. Until the worktree is one, every file an agent edits in it is registered into the *primary checkout's* index under `.claude/worktrees/…`, where a later search answers out of a ticket that is not the reader's, or out of a worktree no longer on disk. The verb is the CLI's own `index <path>`; `index_folder` is the MCP tool's name and is not something a script can call. A machine without jCodeMunch is not a broken worktree, so that case says what it costs and leaves the exit status alone — the shape `actionlint` has in `lefthook.yml` — while an index that was attempted and failed is a stage failure like any other.
 
-**Why `.scratch` is linked, never copied** — the opposite of the skills stage's reasoning, for three reasons a copy cannot answer. It is 1.2 GB across 45,256 files, so a copy per worktree is out. It is living context rather than static material: the Coordinator writes a note into it while a worktree is open, and a copy is stale from that moment. And a note an agent writes through the link outlives the worktree, where a copy is deleted with it. The cost, which is real: the link is read-write and shared, so every agent in every worktree writes into the one unversioned folder the primary checkout holds — there is no per-worktree `.scratch` to lose work in, and none to keep work private in either.
+**Why `.scratch` is linked, never copied** — the opposite of the skills stage's reasoning, for three reasons a copy cannot answer. It is 1.2 GB across 45,256 files, so a copy per worktree is out. It is living context rather than static material: another session writes a note into it while a worktree is open, and a copy is stale from that moment. And a note an agent writes through the link outlives the worktree, where a copy is deleted with it. The cost, which is real: the link is read-write and shared, so every agent in every worktree writes into the one unversioned folder the primary checkout holds — there is no per-worktree `.scratch` to lose work in, and none to keep work private in either.
 
 The link cannot bloat the worktree's jCodeMunch index, for two independent reasons: `jcodemunch-mcp index` walks a directory symlink only under `--follow-symlinks`, which this script does not pass, and `.gitignore` names `.scratch` besides. Measured over a throwaway tree: 3 files indexed, then the 45,256-file `.scratch` linked into it and re-indexed — 0 new files, and 0 again for a symlinked directory that no ignore pattern covered.
 
-That `.gitignore` pattern carries no trailing slash on purpose. Git reads a symlink as a file, so `.scratch/` would match the primary's directory and leave every worktree's link showing as `?? .scratch`: the remove hook would then keep each worktree as one holding untracked work, and a `git add -A` would commit the link.
+That `.gitignore` pattern carries no trailing slash on purpose. Git reads a symlink as a file, so `.scratch/` would match the primary's directory and leave every worktree's link showing as `?? .scratch`: the remove hook would then keep each worktree as one holding untracked work, and a `git add -A` would commit the link. `.planning` and `docs/personas` are ignored the same way.
+
+**Why the personas are linked, not committed.** They carry client material, and the repository is public. `docs/personas` is relative, so the one link resolves in the primary checkout and, through the `.planning` link, in every worktree. A cloud session has neither, and `/ce-dogfood` there infers a persona and says so.
 
 Nothing is copied from `.env.local`: no workspace, test or compose file reads it, and tests reach Postgres through Testcontainers. If that changes, copy the file here — a `WorktreeCreate` hook suppresses `.worktreeinclude`.
 

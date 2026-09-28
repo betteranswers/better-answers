@@ -2,8 +2,6 @@ import { execFileSync } from "node:child_process";
 import { lstatSync, readFileSync } from "node:fs";
 import path from "node:path";
 
-import { repositoryRoot } from "@better-answers/devtools/paths";
-
 const NOT_TEXT = /\.(png|jpe?g|gif|webp|ico|woff2?|ttf|otf|pdf|zip|gz|sqlite)$/i;
 const OUTSIDE = [".scratch/", ".cubic/"];
 
@@ -29,8 +27,6 @@ export const treeFilesUnder = (root: string): readonly string[] =>
     .filter((file) => !OUTSIDE.some((prefix) => file.startsWith(prefix)))
     .filter((file) => !NOT_TEXT.test(file))
     .filter((file) => !isLinkUnder(root, file));
-
-export const treeFiles = (): readonly string[] => treeFilesUnder(repositoryRoot);
 
 export const readUnder = (root: string, file: string): string =>
   readFileSync(path.join(root, file), "utf8");

@@ -21,7 +21,7 @@ tasks/
 
 CLAUDE.md
 AGENTS.md
-CODING_RULES.md
+CODING_STANDARDS.md
 CONTEXT.md
 LICENSE
 NOTICE
@@ -68,7 +68,7 @@ packages/schema/tsconfig.json
 packages/schema/vitest.config.ts
 
 apps/api/.claude/
-apps/api/CODING_RULES.md
+apps/api/CODING_STANDARDS.md
 apps/api/Dockerfile
 apps/api/lifts/better-auth-cimd-node/THIRD_PARTY_NOTICES.md
 apps/api/node_modules
@@ -79,7 +79,7 @@ apps/api/tsconfig.json
 apps/api/vitest.config.ts
 
 apps/web/.claude/
-apps/web/CODING_RULES.md
+apps/web/CODING_STANDARDS.md
 apps/web/components.json
 apps/web/dist/
 apps/web/e2e/
@@ -99,7 +99,7 @@ apps/worker/.pytest_cache/
 apps/worker/.python-version
 apps/worker/.ruff_cache/
 apps/worker/.venv/
-apps/worker/CODING_RULES.md
+apps/worker/CODING_STANDARDS.md
 apps/worker/Dockerfile
 apps/worker/pyproject.toml
 apps/worker/tests/

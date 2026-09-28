@@ -1,6 +1,6 @@
 # Coding rules — `apps/api/`
 
-The whole of `CODING_RULES.md` binds this workspace. What follows is true of this tier alone.
+The whole of `CODING_STANDARDS.md` binds this workspace. What follows is true of this tier alone.
 
 ## [APP1] Import with the `.ts` extension
 

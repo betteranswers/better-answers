@@ -42,7 +42,7 @@ Find the first failing assertion or error line. A merge-group failure whose only
 
 | Route | When | Seen |
 | --- | --- | --- |
-| **Main first** | The fix passes on `main`'s current version too. Land it with `pnpm land`; the Renovate pull request goes green untouched | #238: pnpm 11.27 left Playwright's test server running, fixed by starting it with `node`. #245: pnpm 12's native binary baked into the api image. Both unblocked #215 |
+| **Main first** | The fix passes on `main`'s current version too. Land it in a pull request of its own; the Renovate pull request goes green untouched | #238: pnpm 11.27 left Playwright's test server running, fixed by starting it with `node`. #245: pnpm 12's native binary baked into the api image. Both unblocked #215 |
 | **On the branch** | The fix holds only with the new version: a test that asserts the old version, a re-dated reading | #187 and #248: `test_image.py` pins `pdf-inspector` |
 | **A rule** | Renovate proposes something this repository refuses. A `packageRules` entry in `renovate.json`, its `description` saying why and naming the pull request that showed it | #240: `requires-python` and the `python` image held below 3.14 |
 | **A ticket** | The fix needs a migration, a production check or a person's review. Leave the pull request open and unarmed | #211 → T-356: better-auth 1.7.5 refuses a column 1.7.3 dropped, so a migration rides with the bump |
@@ -55,7 +55,7 @@ The test between the first two: check the fix out on `main` and run the suite. G
 
 Order matters because Renovate **regenerates** a branch when its rebase box is ticked, force-pushing its own commit and dropping everyone else's.
 
-1. **Main first and rules land.** `pnpm land --message "<type(scope): summary>\n\n<body>"` from a tree on `origin/main`, in the commit's form (`docs/agents/workflow.md`, *The commit's form*). Wait for each to merge.
+1. **Main first and rules land.** A branch off `origin/main`, one commit in the commit's form (`docs/agents/workflow.md`, *The commit's form*), and a pull request through `ce-commit-push-pr`. `arm-merge.yml` arms it once Cubic has read it. Wait for each to merge.
 2. **Tick the rebase box** on every pull request they touch, so Renovate regenerates it over the new `main`:
 
    ```bash

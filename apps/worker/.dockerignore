@@ -21,4 +21,4 @@ htmlcov
 
 # Not runtime, not build input
 tests
-CODING_RULES.md
+CODING_STANDARDS.md

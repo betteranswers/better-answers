@@ -220,7 +220,7 @@ describe("which paths reach which lane", () => {
 describe("which lane a change runs in", () => {
   it("takes the docs lane when every changed path is markdown", () => {
     expect(laneOf(["docs/adr/0043-what-an-act-is.md"])).toEqual("docs");
-    expect(laneOf(["docs/specs/T-121.md", "CONTEXT.md", "apps/web/CODING_RULES.md"])).toEqual(
+    expect(laneOf(["docs/specs/T-121.md", "CONTEXT.md", "apps/web/CODING_STANDARDS.md"])).toEqual(
       "docs",
     );
     expect(laneOf(["docs/specs/old-name.md", "docs/specs/new-name.md"])).toEqual("docs");
@@ -372,16 +372,6 @@ const PROSE_SUITES: readonly ProseSuite[] = [
   {
     file: "apps/api/tests/adr-index.test.ts",
     reads: "docs/adr/README.md against every docs/adr/NNNN-*.md",
-    inTheLane: "check:docs:api",
-  },
-  {
-    file: "apps/api/tests/coding-rules-form.test.ts",
-    reads: "the five CODING_RULES.md files, for the form every rule in them is written in",
-    inTheLane: "check:docs:api",
-  },
-  {
-    file: "apps/api/tests/coding-rules-tags.test.ts",
-    reads: "every tracked text file, so every CODING_RULES.md, CONTEXT.md and docs/**/*.md",
     inTheLane: "check:docs:api",
   },
   {

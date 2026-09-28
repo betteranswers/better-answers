@@ -18,7 +18,7 @@ Review the live session transcript and identify candidate retro findings, ranked
 
 The live session's file is the most recently written one.
 
-Run the following command to source the transcript - if the directory is missing or empty, **STOP** and escalate to the Coordinator.
+Run the following command to source the transcript - if the directory is missing or empty, **STOP** and escalate to the session that dispatched you.
 
 ```bash
 SLUG=$(pwd | sed 's|[/.]|-|g')
@@ -65,4 +65,4 @@ date:
 
 ## Step 4 - Delivery
 
-Call SendMessage with `to: "main"` confirming when the draft is complete and ready to be reviewed by the Coordinator.
+Call SendMessage with `to: "main"` confirming when the draft is complete and ready to be reviewed.

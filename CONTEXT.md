@@ -997,28 +997,24 @@ to it by IRI and never restates it (ADR 0014).
 
 How the work from the foundation to a finished v0.1 is cut and ordered.
 
-- **route spec** — the one document that holds the way to a finished v0.1: the `/to-spec` head
-  over the vision's v0.1 row, then the *blocks* in order, each with its edges and the obligations
-  it carries, and a status table that is the product frontier every session reads first. 
-  Each block is specced and ticketed from it. A Wayfinder map is charted only for a
-  destination the route spec does not already hold. _Avoid_: roadmap, plan, master spec.
+- **route spec** — the one document that holds the way to a finished v0.1: a head over the
+  vision's v0.1 row, then the *blocks* in order, each with its edges and the obligations it
+  carries, and a status table that is the product frontier every session reads first. Each
+  block is planned from it. A Wayfinder map is charted only for a destination the route spec
+  does not already hold. _Avoid_: roadmap, plan (a plan is one piece of work's, in
+  `docs/plans/`), master spec.
 - **block** — one section of the route spec: a destination a session can pick, about a page — the
   ADRs and words it rests on, what in the tree it builds on, what it must carry, its blocking
-  edges, a seam sketch. Taken to `/to-spec` before its build and to `/to-tickets` after; its
-  tracer bullets are ordna tasks and the block itself never is. Each block lands its own screen.
-  _Avoid_: phase, milestone, epic; slice (a block's tracer bullet, or a `packages/core` capability).
+  edges, a seam sketch. Taken to `/ce-brainstorm` and `/ce-plan` before its build; its plans
+  are in `docs/plans/`, and the block itself is never one. Each block lands its own screen.
+  _Avoid_: phase, milestone, epic; slice (a `packages/core` capability).
 - **strand** — one chain of blocks the route spec orders by their edges, worked in parallel with the
   other: the *knowledge strand* (a document to a passage, an answer, the producer) and the
   *records strand* (guides, suggestions). A block belongs to one strand; a cross-strand edge is
   stated on the block.
   _Avoid_: lane, track, path (the write path, the answer path).
-- **Coordinator** — the one session that owns a `/goal` over a set of ordna tasks and works it
-  to its end state: it dispatches each task to an agent with a context of its own — in a
-  worktree, beside others in parallel — reads what comes back, and decides what runs next.
-   _Avoid_: orchestrator, ralph.
 - **land** (the verb) — to take a change to `main` through the merge queue: a branch, a commit,
-  a push, a pull request and an armed auto-merge, the queue doing the merge. Step 5 of
-  `docs/agents/workflow.md` is a ticket's landing; `pnpm land` is one command's, for a change
-  too small for a ticket. The adjective is the other sense — a *landed* binding and a *landed
-  copy* are states of the knowledge layer, and nothing here lands those.
+  a push, a pull request and an armed auto-merge, the queue doing the merge
+  (`docs/agents/workflow.md`, *Merging*). The adjective is the other sense — a *landed* binding
+  and a *landed copy* are states of the knowledge layer, and nothing here lands those.
   _Avoid_: ship, merge (the queue merges), push to main.
