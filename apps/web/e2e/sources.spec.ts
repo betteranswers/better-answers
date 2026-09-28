@@ -11,6 +11,7 @@ import {
   addMember,
   anAddress,
   clockTheNextKey,
+  keystrokesDismissed,
   moveTheIndexRun,
   person,
   provision,
@@ -1080,7 +1081,8 @@ test.describe("the Sources screen's keystrokes", () => {
 
     await keystrokes.click();
     await listed.getByRole("checkbox", { name: KEYSTROKE_WORDS.turnedOn }).press("Space");
-    await page.keyboard.press("Escape");
+    // A key sent into the closing list is ignored as the list's own, however the setting reads.
+    await keystrokesDismissed(page, listed);
     await page.keyboard.press("b");
     await page.keyboard.press("?");
     await twoFramesDrawn(page);
