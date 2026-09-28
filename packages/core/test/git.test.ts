@@ -1,8 +1,8 @@
-import { writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   ANY_HEAD,
@@ -201,6 +201,21 @@ describe("one commit's index", () => {
     await commit(bundle.principal, bundle.door, requestFor());
 
     expect(await staged(bundle.door, bundle.workspaceId)).toEqual([]);
+  });
+
+  it("leaves no staging directory behind in the temporary directory", async () => {
+    const bundle = await arrange();
+    const temporary = await mkdtemp(path.join(tmpdir(), "git-staging-"));
+    vi.stubEnv("TMPDIR", temporary);
+    try {
+      const committed = await commit(bundle.principal, bundle.door, requestFor());
+
+      expect(committed.ok).toBe(true);
+      expect(await readdir(temporary)).toEqual([]);
+    } finally {
+      vi.unstubAllEnvs();
+      await rm(temporary, { recursive: true, force: true });
+    }
   });
 });
 
