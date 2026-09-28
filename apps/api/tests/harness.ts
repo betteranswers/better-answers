@@ -65,6 +65,9 @@ const CLAUDE_METADATA_DOCUMENT = {
   token_endpoint_auth_method: "none",
 } as const;
 
+/** A claude.ai client whose metadata document names no `client_name`. */
+export const NAMELESS_CLIENT_ID = "https://claude.ai/oauth/nameless-client-metadata";
+
 /** A claude.ai client that signs its token requests with a key it publishes at `jwks_uri`. */
 export const KEYED_CLIENT_ID = "https://claude.ai/oauth/keyed-client-metadata";
 export const KEYED_CLIENT_JWKS_URI = "https://claude.ai/oauth/keyed-client-jwks.json";
@@ -216,6 +219,9 @@ const cimdFixture = async (input: string | URL | Request): Promise<Response> => 
       { headers: { "content-type": "application/json", "cache-control": "max-age=3600" } },
     );
   if (url.href === CLAUDE_CLIENT_ID) return document(CLAUDE_CLIENT_ID, CLAUDE_REDIRECT_URI);
+  if (url.href === NAMELESS_CLIENT_ID) {
+    return document(NAMELESS_CLIENT_ID, CLAUDE_REDIRECT_URI, { client_name: undefined });
+  }
   if (url.href === KEYED_CLIENT_ID) {
     return document(KEYED_CLIENT_ID, CLAUDE_REDIRECT_URI, {
       token_endpoint_auth_method: "private_key_jwt",

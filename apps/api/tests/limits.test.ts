@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { clientKeyOf } from "../src/ingress/limits.ts";
+import { CLIENT_IP_HEADER, UNKNOWN_CLIENT_IP } from "../src/auth/constants.ts";
+import { clientIpOf, clientKeyOf } from "../src/ingress/limits.ts";
 
 describe("the client key an address becomes", () => {
   it("keys every address in one IPv6 /64 alike, however spelt", () => {
@@ -22,5 +23,19 @@ describe("the client key an address becomes", () => {
     expect(clientKeyOf("203.0.113.9")).toBe("203.0.113.9");
 
     expect(clientKeyOf("::ffff:203.0.113.9")).toBe("203.0.113.9");
+  });
+
+  it("keys a bracket anywhere but the ends as given", () => {
+    expect(clientKeyOf("[2001:db8::1]:443")).toBe("[2001:db8::1]:443");
+    expect(clientKeyOf("2001:db8::[1]")).toBe("2001:db8::[1]");
+  });
+});
+
+describe("the client address a request names", () => {
+  it("counts a blank address among those naming none", () => {
+    for (const blank of ["", "   "]) {
+      expect(clientIpOf(new Headers({ [CLIENT_IP_HEADER]: blank }))).toBe(UNKNOWN_CLIENT_IP);
+    }
+    expect(clientIpOf(new Headers())).toBe(UNKNOWN_CLIENT_IP);
   });
 });

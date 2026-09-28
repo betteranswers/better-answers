@@ -1147,6 +1147,7 @@ describe("a concept file read back", () => {
 
   it.each([
     ["no fences at all", "title: bare\n\nbody\n"],
+    ["a blank line above the fence", '\n---\n"title": "x"\n---\n\nbody\n'],
     ["a bare YAML key", '---\ntitle: bare\n"type": "Policy"\n---\n\nbody\n'],
     ["no blank line after the fence", '---\n"title": "x"\n---\nbody\n'],
     ["a list mixing strings and entries", '---\n"tags":\n  - "a"\n  - "k": 1\n---\n\n'],

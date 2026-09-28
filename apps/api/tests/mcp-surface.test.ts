@@ -14,7 +14,11 @@ import {
   TOOLS_LIST_TTL_MS_DEFAULT,
 } from "@better-answers/core/workspaces";
 
-import { MCP_TOKEN_RULE, MCP_UNAUTHENTICATED_IP_RULE } from "../src/auth/constants.ts";
+import {
+  MCP_TOKEN_RULE,
+  MCP_UNAUTHENTICATED_IP_RULE,
+  PAGE_IP_RULE,
+} from "../src/auth/constants.ts";
 import { connectAsHost } from "./flow.ts";
 import { startApp, type TestApp, type TestClient } from "./harness.ts";
 import { callMcp } from "./mcp-call.ts";
@@ -411,6 +415,19 @@ describe("a call with no bearer", () => {
 
     expect(refused).toEqual(REFUSED_AT_THE_CEILING);
   });
+
+  it("spends the one budget its address has on the pages", async () => {
+    const client = app.client();
+    const consents: number[] = [];
+
+    // Ten rounds cross at most one window edge, so five of them, 35 counts, share a window.
+    for (let round = 0; round < 10; round += 1) {
+      for (let call = 0; call < PAGE_IP_RULE.max / 5; call += 1) await unauthenticated(client);
+      consents.push((await client.fetch("/consent")).status);
+    }
+
+    expect(consents).toContain(429);
+  });
 });
 
 describe("the 2026-07-28 leg", () => {
@@ -495,6 +512,22 @@ describe("the 2026-07-28 leg", () => {
       },
     );
     expect(mismatched.status).toBe(400);
+  });
+
+  it("logs a request the handler rejects, as the mcp module", async () => {
+    const { client, token } = await connect();
+    const before = app.logs.length;
+
+    await modern(client, token, "tools/list", {}, { headers: { "mcp-method": "" } });
+
+    expect(app.logs.slice(before)).toContainEqual(
+      expect.objectContaining({
+        level: 40,
+        module: "mcp",
+        event: "mcp.handler_error",
+        msg: "handler error",
+      }),
+    );
   });
 
   it("names its supported versions to a request declaring another", async () => {

@@ -235,6 +235,8 @@ const PROBE = declareActs("platform", {
   optional: act("platform.probe.optional", { adminUserId: "id?", confirmed: "flag" }),
 
   ended: act("platform.probe.ended", { grants: "grants" }),
+
+  hashed: act("platform.probe.hashed", { contentHash: "contentHash" }),
 });
 
 const rowsOfSubjects = async (subjectIds: readonly string[]) => {
@@ -444,6 +446,22 @@ describe("the first door — record, the actor from the Principal", () => {
         detail: { adminUserId: "priya@example.invalid", confirmed: true },
       }),
     ).rejects.toThrow(/adminUserId is not an id, or absent/);
+  });
+
+  it("rejects a content hash that is no SHA-256 hex digest", async () => {
+    const { door, workspaceId, adminUserId } = await provisioned();
+
+    await expect(
+      writingIn(
+        door,
+        workspaceId,
+      )({
+        id: ulid(),
+        act: PROBE.hashed,
+        subjectId: adminUserId,
+        detail: { contentHash: "sha256:not-a-digest" },
+      }),
+    ).rejects.toThrow(/contentHash is not a contentHash$/);
   });
 
   it("rejects a detail naming a field the act does not", async () => {

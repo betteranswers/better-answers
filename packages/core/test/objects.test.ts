@@ -128,6 +128,20 @@ describe("the object door keeps platform bytes apart from every workspace's", ()
     expect(listed.value).toContain(key);
     expect(listed.value).not.toContain("erasures/not-the-platform.json");
   });
+
+  it("keeps a platform key shaped like a workspace's out", async () => {
+    const workspace = someone();
+    const key = `workspaces/${workspace.workspaceId}/notes.txt`;
+
+    const put = await putPlatformObject(erasure, store().door, key, streamOf("the platform's own"));
+    expect(put).toEqual({ ok: true, value: undefined });
+
+    expect(await getObject(workspace, store().door, "notes.txt")).toEqual({
+      ok: false,
+      error: "no-such-object",
+    });
+    expect(await listObjects(workspace, store().door, "")).toEqual({ ok: true, value: [] });
+  });
 });
 
 describe("the object door refuses keys naming nothing inside a prefix", () => {

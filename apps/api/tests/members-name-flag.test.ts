@@ -278,6 +278,7 @@ describe("the operator's email", () => {
     expect(app.logs.filter((line) => line["person_id"] === person.id)).toEqual([
       expect.objectContaining({
         level: 40,
+        module: "trpc",
         event: "trpc.email_failed",
         msg: "the name flag's email to the operator did not go",
       }),
