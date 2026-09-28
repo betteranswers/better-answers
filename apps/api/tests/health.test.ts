@@ -1,8 +1,7 @@
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { startApp, type TestApp } from "./harness.ts";
-import { serverFor } from "./harness.ts";
+import { capturingLogger, serverFor, startApp, type TestApp } from "./harness.ts";
 
 const PROMOTED = "sha256:4c0ffee5d1a7e2b9f8c3a6d0e1f2a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4";
 
@@ -77,8 +76,9 @@ describe("the api's health endpoint", () => {
     const connection = new URL(String(app.database.superuser.options.connectionString));
     connection.pathname = "/unmigrated";
     const bare = new Pool({ connectionString: connection.href });
+    const { logger, logs } = capturingLogger();
     try {
-      const server = serverFor(bare);
+      const server = serverFor(bare, { logger });
 
       const response = await server.request("/health");
 
@@ -88,6 +88,13 @@ describe("the api's health endpoint", () => {
         database: "reachable",
         identity: "failed",
       });
+      expect(logs).toContainEqual(
+        expect.objectContaining({
+          level: 50,
+          msg: "the authorization server failed to initialise",
+          reason: expect.any(String),
+        }),
+      );
     } finally {
       await bare.end();
       await app.database.superuser.query("DROP DATABASE IF EXISTS unmigrated");

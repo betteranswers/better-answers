@@ -6,7 +6,7 @@ import { Writable } from "node:stream";
 import type { Hono } from "hono";
 import { exportJWK, generateKeyPair, SignJWT, type GenerateKeyPairResult } from "jose";
 import { Pool } from "pg";
-import { pino } from "pino";
+import { pino, type Logger } from "pino";
 import { z } from "zod";
 
 import type { Clock, PlatformPrincipal, UserPrincipal } from "@better-answers/core/kernel";
@@ -245,7 +245,10 @@ export const doorsFor = (database: Pool | string, options: DoorOptions = {}): Do
 /** A server over `pool` with no TestApp around it: emails go nowhere and nothing is logged. */
 export const serverFor = (
   pool: Pool,
-  options: { readonly imageDigest?: string | undefined } = {},
+  options: {
+    readonly imageDigest?: string | undefined;
+    readonly logger?: Logger | undefined;
+  } = {},
 ): Hono =>
   createServer({
     doors: doorsFor(pool),
@@ -254,7 +257,7 @@ export const serverFor = (
     authSecret: AUTH_SECRET,
     sendEmail: async () => {},
     fetchClientMetadataResource: cimdFixture,
-    logger: pino({ level: "silent" }),
+    logger: options.logger ?? pino({ level: "silent" }),
     imageDigest: options.imageDigest,
   });
 

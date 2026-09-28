@@ -556,7 +556,50 @@ describe("the review read of a binding's findings", () => {
     const read = await findingsAs(scenario.admin, bindingId);
 
     expect(read.ok).toBe(false);
-    expect(read.ok ? undefined : read.error).toBeInstanceOf(Error);
+    expect(read.ok ? undefined : read.error).toEqual(
+      new Error(
+        "the binding's last index run names the kept spans an erasure overrode in a shape the review cannot read",
+      ),
+    );
+  });
+
+  it("reads a binding's findings while another holds its row", async () => {
+    const scenario = await arrange();
+    const { bindingId } = await bindingWithTwoDocuments(scenario);
+    const holder = await db().pool.connect();
+    try {
+      await holder.query("BEGIN");
+      await holder.query(
+        "SELECT 1 FROM source_binding WHERE workspace_id = $1 AND id = $2 FOR UPDATE",
+        [scenario.workspaceId, bindingId],
+      );
+
+      const read = await acting(scenario.admin, async (principal, tx) => {
+        await tx.query("SET LOCAL lock_timeout = '2s'");
+        return findingsOf(principal, tx, inputOf(findingsOfInput, { bindingId }));
+      });
+
+      expect(read).toEqual({ ok: true, value: [] });
+    } finally {
+      await holder.query("ROLLBACK");
+      holder.release();
+    }
+  });
+
+  it("answers the store's failure to read the binding", async () => {
+    const scenario = await arrange();
+    const { bindingId } = await bindingWithTwoDocuments(scenario);
+
+    const read = await acting(scenario.admin, async (principal, tx) => {
+      await tx.query("SELECT 1 / 0").catch(() => undefined);
+      return findingsOf(principal, tx, inputOf(findingsOfInput, { bindingId }));
+    });
+
+    expect(read.ok ? undefined : read.error).toEqual(
+      expect.objectContaining({
+        message: expect.stringContaining("current transaction is aborted"),
+      }),
+    );
   });
 
   it("counts a named span only while an Admin's keep stands", async () => {

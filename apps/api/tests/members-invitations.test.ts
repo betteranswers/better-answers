@@ -59,6 +59,9 @@ describe("inviting a person over tRPC", () => {
       },
     ]);
     expect(emailsTo(app(), address)[0]?.text).toContain("as an Editor");
+    expect(emailsTo(app(), address)[0]?.text).toMatch(
+      /The invitation lasts until \d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \d{4}\./,
+    );
     expect(await eventsOn(app(), invited.invitationId)).toEqual(["people.invitation.created"]);
   });
 
