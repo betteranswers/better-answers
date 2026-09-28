@@ -29,6 +29,7 @@ import {
   keyedClientAssertion,
   LOOKALIKE_CLIENT_ID,
   MCP_URL,
+  NAMELESS_CLIENT_ID,
   PUBLIC_URL,
   startApp,
   type TestApp,
@@ -318,6 +319,24 @@ describe("the flow, as claude.ai drives it", () => {
     const registered = await app.database.superuser.query(
       "SELECT 1 FROM oauth_client WHERE client_id = $1",
       [LOOKALIKE_CLIENT_ID],
+    );
+    expect(registered.rowCount).toBe(0);
+  });
+
+  it("refuses a claude.ai metadata document naming no client", async () => {
+    const { challenge } = pkce();
+
+    const response = await app
+      .client()
+      .fetch(authorizeUrl({ challenge, scope: "knowledge:read", clientId: NAMELESS_CLIENT_ID }), {
+        redirect: "manual",
+      });
+
+    expect(response.ok).toBe(false);
+    expect(response.headers.get("location") ?? "").not.toContain("code=");
+    const registered = await app.database.superuser.query(
+      "SELECT 1 FROM oauth_client WHERE client_id = $1",
+      [NAMELESS_CLIENT_ID],
     );
     expect(registered.rowCount).toBe(0);
   });
