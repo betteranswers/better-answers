@@ -417,7 +417,6 @@ test.describe("the console's Everyone view", () => {
     ]);
     await page.keyboard.press("Escape");
     await expect(listed).toHaveCount(0);
-    // The list hands focus back to its button as its exit ends; a key sent sooner goes astray.
     await expect(page.getByRole("button", { name: KEYSTROKE_WORDS.button })).toBeFocused();
 
     await page.keyboard.press("/");

@@ -79,6 +79,12 @@ function TurnedOn() {
   );
 }
 
+/** Focus returns a task after the list goes; a key pressed in that gap has already placed it. */
+const keepFocusAKeyMoved = (event: Event) => {
+  const focused = document.activeElement;
+  if (focused !== null && focused !== document.body) event.preventDefault();
+};
+
 /** Lists `keystrokes` with its own `?`, which opens it, so the caller leaves `?` out. */
 export function KeystrokesAct(properties: {
   readonly screen: string;
@@ -97,7 +103,12 @@ export function KeystrokesAct(properties: {
           {KEYSTROKE_WORDS.button}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" aria-labelledby={headingId} className="grid w-80 gap-3">
+      <PopoverContent
+        align="end"
+        aria-labelledby={headingId}
+        className="grid w-80 gap-3"
+        onCloseAutoFocus={keepFocusAKeyMoved}
+      >
         <h2 id={headingId} className="font-medium">
           {KEYSTROKE_WORDS.button} on {properties.screen}
         </h2>

@@ -124,7 +124,7 @@ Eighteen more helpers in the same module drive the browser rather than the harne
 | `tabOpenedByKeyboard` | A fresh document at a view, the skip link, Tab to its open tab, then the arrow keys along to a named tab, each arrow landing before the next |
 | `editorPickedByKeyboard` | From a role select in focus reading Viewer: open it, one step up to Editor, pick it, and focus is back on the select |
 | `keystrokesListed` | Presses `?` and answers the screen's list of keystrokes once it is open |
-| `keystrokesDismissed` | Presses Escape and waits for the list to go and for focus to come back to its button, which lands a task later and would take focus from a sooner key |
+| `keystrokesDismissed` | Presses Escape and waits for the list to go and for focus to come back to its button, which lands a task later. A key pressed sooner keeps the focus it moved |
 | `clockTheNextKey` | Starts the act's clock in the page: from the next key to the node an XPath names reading a given text |
 | `theActLandedWithinItsBudget` | Reads that clock, annotates the test with it and asserts it under the act's 100 ms |
 | `saysItsSentenceNotItsWord` | Asserts an alert reads the sentence a feature's refusal table holds for a word, and that the word is nowhere on the page |
