@@ -1777,7 +1777,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         "nobody@acme.invalid",
       ]);
 
-      expect(run.exitCode).toBe(1);
+      expect(run.exitCode).toBe(6);
       expect(run.lines).toEqual([
         "provision-workspace: REFUSED — no-such-user: nobody@acme.invalid has not signed in; have them sign in with an email code first, or add them with add-person, then run this again",
       ]);
@@ -1797,7 +1797,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         admin.email,
       ]);
 
-      expect(run.exitCode).toBe(1);
+      expect(run.exitCode).toBe(9);
       expect(run.lines).toEqual([
         `provision-workspace: REFUSED — no-display-name: ${admin.email} has given no display name; have them sign in and give one, then run this again`,
       ]);
@@ -1828,7 +1828,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         second.email,
       ]);
 
-      expect(run.exitCode).toBe(1);
+      expect(run.exitCode).toBe(8);
       expect(run.lines).toEqual([
         `provision-workspace: REFUSED — slug-taken: another workspace already holds the slug ${slug}`,
       ]);
@@ -1848,7 +1848,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         admin.email,
       ]);
 
-      expect(run.exitCode).toBe(1);
+      expect(run.exitCode).toBe(2);
       expect(run.lines).toEqual([
         "provision-workspace: REFUSED — malformed: the name and the slug must each carry at least one character",
       ]);
@@ -1935,7 +1935,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       const run = await adding(app(), workspaceId, "nobody@acme.invalid", "Editor");
 
-      expect(run.exitCode).toBe(1);
+      expect(run.exitCode).toBe(6);
       expect(run.lines).toEqual([
         "add-member: REFUSED — no-such-user: nobody@acme.invalid has not signed in; have them sign in with an email code first, or add them with add-person, then run this again",
       ]);
@@ -1948,7 +1948,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       const run = await adding(app(), workspaceId, person.email, "Editor");
 
-      expect(run.exitCode).toBe(1);
+      expect(run.exitCode).toBe(9);
       expect(run.lines).toEqual([
         `add-member: REFUSED — no-display-name: ${person.email} has given no display name; have them sign in and give one, then run this again`,
       ]);
@@ -1962,7 +1962,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       const run = await adding(app(), nowhere, person.email, "Editor");
 
-      expect(run.exitCode).toBe(1);
+      expect(run.exitCode).toBe(6);
       expect(run.lines).toEqual([
         `add-member: REFUSED — no-such-workspace: ${nowhere} is not a workspace`,
       ]);
@@ -1978,7 +1978,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const again = await adding(app(), workspaceId, person.email, "Admin");
       const theAdmin = await adding(app(), workspaceId, admin.email, "Viewer");
 
-      expect([again.exitCode, theAdmin.exitCode]).toEqual([1, 1]);
+      expect([again.exitCode, theAdmin.exitCode]).toEqual([8, 8]);
       expect(again.lines).toEqual([
         `add-member: REFUSED — already-a-member: ${person.email} is already a member of workspace ${workspaceId}; a role change is the Admin's act on the People screen`,
       ]);
@@ -2258,7 +2258,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       const run = await renaming(app(), workspaceId, ["--name", "Acme Group", "--slug", taken]);
 
-      expect(run.exitCode).toBe(1);
+      expect(run.exitCode).toBe(8);
       expect(run.lines).toEqual([
         "rename-workspace: REFUSED — slug-taken: another workspace already holds that slug",
       ]);
@@ -2273,7 +2273,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       const run = await renaming(app(), nowhere, ["--name", "Acme Group"]);
 
-      expect(run.exitCode).toBe(1);
+      expect(run.exitCode).toBe(6);
       expect(run.lines).toEqual([
         `rename-workspace: REFUSED — no-such-workspace: ${nowhere} is not a workspace`,
       ]);
