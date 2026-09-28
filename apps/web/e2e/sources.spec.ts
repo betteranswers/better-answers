@@ -989,6 +989,11 @@ test.describe("publishing, narrowing and widening a binding", () => {
       .getByRole("button", { name: "Widen Price book to Public for everyone in the workspace" })
       .press("Enter");
 
+    // The row reads widened before the api answers, and a late answer overwrites the next
+    // `w`'s sentence.
+    await expect(bindingsRegion(page).getByRole("status")).toHaveText(
+      "Widened “Price book” to Public for everyone in the workspace. 0 concepts and 0 compositions moved with it.",
+    );
     await expect(audienceOf).toHaveText("Everyone in the workspace");
     await expect(
       bindingNamed(page, "Price book").getByRole("button", { name: "Widen Price book" }),
