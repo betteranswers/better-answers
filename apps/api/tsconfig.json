@@ -5,5 +5,5 @@
     // The mutation run's suite imports both Stryker configurations, which are JavaScript modules.
     "allowJs": true
   },
-  "include": ["src", "lifts", "tests", "vitest.config.ts"]
+  "include": ["src", "lifts", "tests", "vitest.config.ts", "vitest.stryker.config.ts"]
 }

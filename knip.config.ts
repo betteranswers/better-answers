@@ -16,6 +16,8 @@ const config: KnipConfig = {
     },
 
     "apps/api": {
+      vitest: { config: ["vitest.config.ts", "vitest.stryker.config.ts"] },
+
       ignore: [
         "lifts/**",
 
