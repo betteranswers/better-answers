@@ -2,7 +2,7 @@
 export default {
   testRunner: "vitest",
   plugins: ["@stryker-mutator/vitest-runner"],
-  vitest: { configFile: "vitest.config.ts" },
+  vitest: { configFile: "vitest.stryker.config.ts" },
 
   // `main.ts` and `migrate.ts` are entry points, not behaviour: they read the bootstrap and
   // hand off.

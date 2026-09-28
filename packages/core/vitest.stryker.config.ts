@@ -22,4 +22,12 @@ class FailedThenShortest extends BaseSequencer {
   }
 }
 
-export default mergeConfig(base, { test: { sequence: { sequencer: FailedThenShortest } } });
+export default mergeConfig(base, {
+  test: {
+    // A hosted runner adds `github-actions`, whose job summary would be appended once per mutant,
+    // and whose annotations would name only killed mutants.
+    reporters: ["default"],
+
+    sequence: { sequencer: FailedThenShortest },
+  },
+});
