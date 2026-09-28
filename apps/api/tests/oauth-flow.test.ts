@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import {
   CONSENT_WORDS,
+  OAUTH_IP_RULE,
   OAUTH_SCOPES,
   REFRESH_TOKEN_LIFETIME_SECONDS,
   REFUSAL_PAGES,
@@ -65,6 +66,8 @@ const protectedResourceMetadata = z.object({
   resource: z.string(),
   authorization_servers: z.array(z.string()),
   scopes_supported: z.array(z.string()),
+  bearer_methods_supported: z.array(z.string()),
+  resource_documentation: z.string(),
 });
 
 /** `strictObject`, because the suite asserts the whole answer and nothing more. */
@@ -142,6 +145,8 @@ describe("discovery", () => {
       expect(prm.resource).toBe(MCP_URL);
       expect(prm.authorization_servers[0]).toBe(PUBLIC_URL);
       expect(prm.scopes_supported).toEqual(["knowledge:read", "feedback:write"]);
+      expect(prm.bearer_methods_supported).toEqual(["header"]);
+      expect(prm.resource_documentation).toBe("https://app.example.test/");
     }
   });
 
@@ -927,6 +932,34 @@ describe("the limits", () => {
     expect(statuses).toContain(429);
     expect(app.emails.filter((message) => message.to === email).length).toBeLessThanOrEqual(10);
   });
+
+  it("leaves a malformed code request to Better Auth's refusal", async () => {
+    const client = app.client();
+
+    const unparsed = await client.fetch(SEND_EMAIL_CODE_PATH, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{",
+    });
+    const addressless = await client.json(SEND_EMAIL_CODE_PATH, { type: "sign-in" });
+
+    expect([unparsed.status, addressless.status]).toEqual([400, 400]);
+  });
+
+  it.each(["/.well-known/oauth-protected-resource", "/oauth2/authorize", "/jwks"])(
+    "limits %s per address, before Better Auth's own limiter",
+    async (path) => {
+      const client = app.client();
+      const refusals: unknown[] = [];
+
+      for (let attempt = 0; attempt < 2 * OAUTH_IP_RULE.max + 1; attempt += 1) {
+        const answer = await client.fetch(path);
+        if (answer.status === 429) refusals.push(await answer.json());
+      }
+
+      expect(refusals).toContainEqual(expect.objectContaining({ error: "too_many_requests" }));
+    },
+  );
 
   it("lets Better Auth's database limiter refuse an email-code flood", async () => {
     const client = app.client("203.0.113.40");
