@@ -209,7 +209,7 @@ describe("operator — the mark an ops command sets and clears", () => {
     const run = await ops(["operator", "--email", "nobody@acme.invalid", "--grant"]);
 
     expect(run).toEqual({
-      exitCode: 1,
+      exitCode: 6,
       lines: [
         "operator: REFUSED — no-such-user: nobody@acme.invalid has not signed in; have them sign in with an email code first, or add them with add-person, then run this again",
       ],

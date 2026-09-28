@@ -65,7 +65,7 @@ import { REBUILD_REASONS, ROLES, SENSITIVITIES, ulid } from "@better-answers/sch
 
 import { doorTold, type Doors } from "../doors.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
-import { isRefusalWord, refusalOf } from "../refusal.ts";
+import { isRefusalWord, refusalOf, type RefusalWord } from "../refusal.ts";
 
 const DONE = 0;
 const REFUSED = 1;
@@ -434,6 +434,9 @@ const refused = (
   io.say(`${command}: REFUSED — ${refusal.word}${about}`);
   return EXIT_OF_CLASS[refusal.class];
 };
+
+const exitOf = (refusal: RefusalWord | Error): number =>
+  refusal instanceof Error ? REFUSED : EXIT_OF_CLASS[refusalOf(refusal).class];
 
 const graphCountsCommand = async (
   doors: Doors,
@@ -929,6 +932,8 @@ const provisionReason = (
 ): string => {
   if (refusal instanceof Error) return refusal.message;
   switch (refusal) {
+    case "no-such-user":
+      return notSignedIn(email);
     case "no-display-name":
       return noDisplayName(email);
     case "slug-taken":
@@ -943,10 +948,20 @@ const provisionReason = (
 const signedInPerson = async (
   postgres: PostgresDoor,
   email: string,
-): Promise<Result<string, string>> => {
+): Promise<Result<string, "no-such-user" | Error>> => {
   const person = await personIdByEmail(BOOTSTRAP, postgres, email);
-  if (!person.ok) return err(person.error.message);
-  return person.value === undefined ? err(notSignedIn(email)) : ok(person.value);
+  if (!person.ok) return err(person.error);
+  return person.value === undefined ? err("no-such-user") : ok(person.value);
+};
+
+const provisionRefused = (
+  refusal: ProvisionRefusal | Error,
+  slug: string,
+  email: string,
+  io: OpsIo,
+): number => {
+  io.say(`provision-workspace: REFUSED — ${provisionReason(refusal, slug, email)}`);
+  return exitOf(refusal);
 };
 
 /**
@@ -972,10 +987,7 @@ const provisionWorkspaceCommand = async (
   }
   const postgres = doors.postgres;
   const admin = await signedInPerson(postgres, email);
-  if (!admin.ok) {
-    io.say(`provision-workspace: REFUSED — ${admin.error}`);
-    return REFUSED;
-  }
+  if (!admin.ok) return provisionRefused(admin.error, slug, email, io);
   const id = ulid();
   const provisioned = await provisionWorkspace(BOOTSTRAP, postgres, {
     id,
@@ -983,10 +995,7 @@ const provisionWorkspaceCommand = async (
     slug,
     adminUserId: admin.value,
   });
-  if (!provisioned.ok) {
-    io.say(`provision-workspace: REFUSED — ${provisionReason(provisioned.error, slug, email)}`);
-    return REFUSED;
-  }
+  if (!provisioned.ok) return provisionRefused(provisioned.error, slug, email, io);
   const repository = await attempt(() => initRepository(git.value, id));
   if (!repository.ok) {
     io.say(
@@ -1002,9 +1011,11 @@ const memberReason = (
   refusal: AddMemberRefusal | Error,
   workspaceId: string,
   email: string,
-): string | Error => {
-  if (refusal instanceof Error) return refusal;
+): string => {
+  if (refusal instanceof Error) return refusal.message;
   switch (refusal) {
+    case "malformed":
+      return `malformed: --workspace ${workspaceId} is not a workspace id`;
     case "no-such-user":
       return notSignedIn(email);
     case "no-display-name":
@@ -1013,8 +1024,6 @@ const memberReason = (
       return noSuchWorkspace(workspaceId);
     case "already-a-member":
       return `already-a-member: ${email} is already a member of workspace ${workspaceId}; a role change is the Admin's act on the People screen`;
-    default:
-      return refusal;
   }
 };
 
@@ -1035,7 +1044,8 @@ const addMemberCommand = async (doors: Doors, flags: Flags, io: OpsIo): Promise<
   }
   const added = await addMember(BOOTSTRAP, doors.postgres, { workspaceId, email, role });
   if (!added.ok) {
-    return refused("add-member", workspaceId, memberReason(added.error, workspaceId, email), io);
+    io.say(`add-member: REFUSED — ${memberReason(added.error, workspaceId, email)}`);
+    return exitOf(added.error);
   }
   io.say(`add-member: done — ${email} added to workspace ${workspaceId} as ${role}`);
   return DONE;
@@ -1060,7 +1070,7 @@ const personRefused = (refusal: AddPersonRefusal | Error, email: string, io: Ops
     return REFUSED;
   }
   io.say(`add-person: REFUSED — ${personReason(refusal, email)}`);
-  return EXIT_OF_CLASS[refusalOf(refusal).class];
+  return exitOf(refusal);
 };
 
 const addPersonCommand = async (doors: Doors, flags: Flags, io: OpsIo): Promise<number> => {
@@ -1106,7 +1116,7 @@ const renameWorkspaceCommand = async (doors: Doors, flags: Flags, io: OpsIo): Pr
   });
   if (!renamed.ok) {
     io.say(`rename-workspace: REFUSED — ${renameReason(renamed.error, workspaceId)}`);
-    return renamed.error === "malformed" ? EXIT_OF_CLASS.malformed : REFUSED;
+    return exitOf(renamed.error);
   }
   const { name, slug } = renamed.value;
   io.say(`rename-workspace: done — workspace ${workspaceId} is named ${name}, slug ${slug}`);
@@ -1135,7 +1145,7 @@ const operatorCommand = async (doors: Doors, flags: Flags, io: OpsIo): Promise<n
   if (!marked.ok) {
     const reason = marked.error === "no-such-user" ? notSignedIn(email) : marked.error.message;
     io.say(`operator: REFUSED — ${reason}`);
-    return REFUSED;
+    return exitOf(marked.error);
   }
   const said = MARK_SAID[change][marked.value.changed ? "changed" : "unchanged"];
   io.say(`operator: done — ${email} ${said}`);
