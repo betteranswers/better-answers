@@ -16,7 +16,12 @@ import { testData } from "@better-answers/schema/testing";
 
 import type { SweepSettings } from "../src/config.ts";
 import type { Doors } from "../src/doors.ts";
-import { startSweeps, SWEEP_INTERVAL_MS, type SweepsDependencies } from "../src/sweeps.ts";
+import {
+  startSweeps,
+  SWEEP_FIRST_PASS_MS,
+  SWEEP_INTERVAL_MS,
+  type SweepsDependencies,
+} from "../src/sweeps.ts";
 import { capturingLogger, doorsFor, type LogLine } from "./harness.ts";
 
 const PING_URL = "https://hc-ping.com/0f5e8a2c-5d3a-4c55-9d0e-2b8c1f7a6e41";
@@ -131,6 +136,10 @@ const withMapLeftovers = async () => {
 describe("the sweeps' daily pass", () => {
   it("passes once a day after its first", () => {
     expect(SWEEP_INTERVAL_MS).toBe(86_400_000);
+  });
+
+  it("waits ten minutes after a start before its first", () => {
+    expect(SWEEP_FIRST_PASS_MS).toBe(600_000);
   });
 
   it("makes its first pass ten minutes in, and none before", async () => {
