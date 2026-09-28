@@ -245,6 +245,9 @@ test.describe("binding a document on the Sources screen", () => {
     await passesTheAccessibilityGate();
     await skipLinkReachesTheScreen(page);
 
+    // The wait switches on Chromium's chooser interception, which can land after an immediate
+    // key press, leaving the chooser uncaught and cancelled.
+    const choosing = page.waitForEvent("filechooser");
     await page.keyboard.press("b");
     const dialog = page.getByRole("dialog", { name: "Bind a document" });
     await expect(dialog).toBeVisible();
@@ -255,8 +258,8 @@ test.describe("binding a document on the Sources screen", () => {
     await page.keyboard.press("Tab");
     await expect(dialog.getByRole("combobox", { name: "Audience" })).toBeFocused();
     await page.keyboard.press("Tab");
+    await expect(dialog.getByLabel("File")).toBeFocused();
 
-    const choosing = page.waitForEvent("filechooser");
     await page.keyboard.press("Space");
     // Large enough for the throttled upload to be seen partway.
     await (
