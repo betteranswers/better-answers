@@ -106,6 +106,12 @@ const landed = async (scenario: Scenario, input: WriteConceptInput) => {
   return result.value;
 };
 
+const landedAndRead = async (scenario: Scenario, input: WriteConceptInput) => {
+  const written = await landed(scenario, input);
+  const file = await fileAtCommit(scenario.git, scenario.workspaceId, written.sha, input.path);
+  return { written, read: parseConceptFile(file) };
+};
+
 const rowsFor = async (workspaceId: string) => {
   const counted = await db().pool.query<Record<string, string>>(
     `SELECT (SELECT count(*) FROM concept_identity WHERE workspace_id = $1) AS identities,
@@ -209,10 +215,8 @@ describe("a governed write", () => {
 
     const input = writeFor({ frontmatter: { tags: ["finance"] } });
 
-    const written = await landed(scenario, input);
+    const { written, read } = await landedAndRead(scenario, input);
 
-    const file = await fileAtCommit(scenario.git, scenario.workspaceId, written.sha, input.path);
-    const read = parseConceptFile(file);
     expect(read.ok && read.value.frontmatter).toMatchObject({
       type: "Policy",
       title: "Expenses",
@@ -246,6 +250,21 @@ describe("a governed write", () => {
 
     const file = await fileAtCommit(scenario.git, scenario.workspaceId, written.sha, input.path);
     expect(file).toContain('"status": "stable"');
+  });
+
+  it("keeps the file's own type and title over the act's", async () => {
+    const scenario = await arrange();
+
+    const input = writeFor({
+      kind: "Policy",
+      title: "Expenses",
+      frontmatter: { title: "Expense claims", type: "Procedure" },
+    });
+
+    const { read } = await landedAndRead(scenario, input);
+
+    expect(read.ok && read.value.frontmatter["title"]).toBe("Expense claims");
+    expect(read.ok && read.value.frontmatter["type"]).toBe("Procedure");
   });
 
   it("records concept, identity, commit and evidence in one transaction", async () => {
