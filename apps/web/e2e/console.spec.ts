@@ -1,10 +1,11 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
-import { goHome, RAIL, UNKNOWN_SCREEN } from "@/app/words.ts";
+import { goHome, RAIL, TOGGLE, UNKNOWN_SCREEN } from "@/app/words.ts";
 import { PICKER_WORDS } from "@/features/auth/workspace-words.ts";
 import { NOT_THE_OPERATOR, ONLY_THE_OPERATOR } from "@/features/console/refusal-words.ts";
 import { CONSOLE, HOMES } from "@/shared/navigation.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
+import { PRODUCT_NAME } from "@/shared/words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -66,7 +67,7 @@ const anAdmin = async (page: Page, api: APIRequestContext, workspaceName: string
 };
 
 test.describe("the way into the console", () => {
-  test("offers the operator the console from the top bar's menu", async ({
+  test("offers the operator the console from the band's menu", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -81,8 +82,12 @@ test.describe("the way into the console", () => {
 
     await expect(page).toHaveURL(EVERY_WORKSPACE);
     const bar = page.getByRole("banner");
-    await expect(bar.getByText("Console", { exact: true })).toBeVisible();
+    await expect(bar.getByText(CONSOLE.name, { exact: true }).first()).toBeVisible();
     await expect(bar.getByText(workspace.name)).toHaveCount(0);
+    await expect(bar.getByRole("link", { name: PRODUCT_NAME })).toHaveAttribute(
+      "href",
+      EVERY_WORKSPACE,
+    );
     await expect(railOf(page).getByRole("link")).toHaveText([CONSOLE.name]);
     await expect(navOf(page).getByRole("link")).toHaveText([
       "Everyone",
@@ -297,16 +302,19 @@ test.describe("the console's Workspaces screen", () => {
 
     // Back to the first stop, to walk the regions in the order the document gives them.
     await page.getByRole("link", { name: "Skip to the screen" }).focus();
-    await page.keyboard.press("Tab");
-    await expect(railOf(page).getByRole("link", { name: CONSOLE.name })).toBeFocused();
+    for (const stop of [
+      page.getByRole("banner").getByRole("link", { name: PRODUCT_NAME }),
+      page.getByRole("button", { name: TOGGLE.hide }),
+      menuOf(page, workspace.admin.name),
+      railOf(page).getByRole("link", { name: CONSOLE.name }),
+    ]) {
+      await page.keyboard.press("Tab");
+      await expect(stop).toBeFocused();
+    }
     for (const name of ["Everyone", "Names waiting", "Every workspace"]) {
       await page.keyboard.press("Tab");
       await expect(navOf(page).getByRole("link", { name })).toBeFocused();
     }
-    await page.keyboard.press("Tab");
-    await expect(page.getByRole("button", { name: "Hide the secondary nav" })).toBeFocused();
-    await page.keyboard.press("Tab");
-    await expect(menuOf(page, workspace.admin.name)).toBeFocused();
 
     await expect(railOf(page)).toMatchAriaSnapshot(`
       - navigation "${RAIL}":

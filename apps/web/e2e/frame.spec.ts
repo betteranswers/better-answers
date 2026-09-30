@@ -1,8 +1,9 @@
 import type { Locator, Page } from "@playwright/test";
 
-import { RAIL } from "@/app/words.ts";
+import { NAVIGATION_SHEET, RAIL, TOGGLE } from "@/app/words.ts";
 import { ROUTES_WORDS } from "@/features/routes/words.ts";
 import {
+  ASK,
   CONTROL_CENTRE,
   groupIn,
   headingOf,
@@ -11,14 +12,19 @@ import {
   SURFACES,
   visibleTo,
 } from "@/shared/navigation.ts";
+import { PRODUCT_NAME } from "@/shared/words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
+  addMember,
   aMemberSignedInAt,
   anAddress,
+  invite,
+  person,
   provision,
   signIn,
   skipLinkReachesTheScreen,
+  tabUntilFocused,
 } from "./harness.ts";
 
 /** What an Admin is shown today, read off the list: Control Centre and its built screens. */
@@ -30,10 +36,13 @@ const SCREEN_NAMES = AN_ADMINS.flatMap((surface) =>
   surface.groups.flatMap((group) => group.screens.map((each) => each.name)),
 );
 
-const ROUTES_AND_SPEND = screenNamed(
-  groupIn(CONTROL_CENTRE, "agent-operations"),
-  "Routes and spend",
-);
+const AGENT_OPERATIONS = groupIn(CONTROL_CENTRE, "agent-operations");
+
+const ROUTES_AND_SPEND = screenNamed(AGENT_OPERATIONS, "Routes and spend");
+
+const PEOPLE = groupIn(CONTROL_CENTRE, "people");
+
+const MEMBERS = screenNamed(PEOPLE, "Members");
 
 /** The first heading Routes and spend draws: its group's name. */
 const ITS_HEADING = headingOf(ROUTES_AND_SPEND);
@@ -44,31 +53,63 @@ const ACT_BUDGET_MS = 100;
 
 const NARROW = { width: 320, height: 720 };
 
+/** Short enough that the band scrolls out of sight within one screen's content. */
+const NARROW_AND_SHORT = { width: 320, height: 256 };
+
 /** Past `--breakpoint-md`, which `--shell-wide` in `index.css` reads for the shell. */
 const WIDE = { width: 1024, height: 720 };
 
-const SCREENS_AND_VIEWS = "Screens and views";
+const DESKTOP = { width: 1440, height: 900 };
+
+const LONG_NAME = "Wharfedale and Nidderdale Precision Castings and Pattern Co.";
+
+const LONG_PERSON = "Bartholomew Featherstonehaugh-Whittingham";
+
+const bandOf = (page: Page) => page.getByRole("banner");
+
+const logoOf = (page: Page) => bandOf(page).getByRole("link", { name: PRODUCT_NAME });
 
 const railOf = (page: Page) => page.getByRole("navigation", { name: RAIL });
 
 const navOf = (page: Page) => page.getByRole("navigation", { name: CONTROL_CENTRE.name });
 
-const closerOf = (page: Page) => page.getByRole("button", { name: "Hide the secondary nav" });
+const closerOf = (page: Page) => page.getByRole("button", { name: TOGGLE.hide });
 
-const openerOf = (page: Page) => page.getByRole("button", { name: "Show the secondary nav" });
+const openerOf = (page: Page) => page.getByRole("button", { name: TOGGLE.show });
 
-const menuOf = (page: Page) => page.getByRole("button", { name: SCREENS_AND_VIEWS });
+const sheetButtonOf = (page: Page) => page.getByRole("button", { name: NAVIGATION_SHEET });
 
-const panelOf = (page: Page) => page.getByRole("dialog", { name: SCREENS_AND_VIEWS });
+const sheetOf = (page: Page) => page.getByRole("dialog", { name: NAVIGATION_SHEET });
 
-const topOf = async (region: Locator): Promise<number> =>
-  (await region.boundingBox())?.y ?? Number.NaN;
+const youOf = (page: Page, who: string) =>
+  bandOf(page).getByRole("button", { name: new RegExp(who) });
 
-const widthOf = async (region: Locator): Promise<number> =>
-  (await region.boundingBox())?.width ?? Number.NaN;
+const partOf = (page: Page, name: string) => bandOf(page).getByText(name, { exact: true });
 
-const leftOf = async (region: Locator): Promise<number> =>
-  (await region.boundingBox())?.x ?? Number.NaN;
+const TOOLBAR_TABS = ["Routes", "Spend"];
+
+const tabsOf = (page: Page) => page.getByRole("tablist", { name: "Routes and spend" });
+
+const routesCardOf = (page: Page) => page.getByRole("region", { name: "Routes" });
+
+/**
+ * The screen reads the routes after the nav paints, so a screen here has started only once its
+ * card says a new workspace has none.
+ */
+const theRoutesHaveLanded = (page: Page) =>
+  expect(routesCardOf(page).getByText(ROUTES_WORDS.noneSet, { exact: true })).toBeVisible();
+
+const boxOf = async (region: Locator) => {
+  const box = await region.boundingBox();
+  if (box === null) throw new Error("the region is not drawn");
+  return box;
+};
+
+const topOf = async (region: Locator): Promise<number> => (await boxOf(region)).y;
+
+const widthOf = async (region: Locator): Promise<number> => (await boxOf(region)).width;
+
+const leftOf = async (region: Locator): Promise<number> => (await boxOf(region)).x;
 
 const sidewaysRoom = (page: Page) =>
   page.evaluate(() => ({
@@ -76,8 +117,39 @@ const sidewaysRoom = (page: Page) =>
     holds: document.documentElement.clientWidth,
   }));
 
+const scrollsNothingSideways = async (page: Page, when: string) => {
+  const room = await sidewaysRoom(page);
+  expect(room.scrolls, `the page scrolls sideways ${when}`).toBeLessThanOrEqual(room.holds);
+};
+
 const holdsFocus = (panel: Locator) =>
   panel.evaluate((node) => node.contains(document.activeElement));
+
+/** Whether the band is drawn over the middle of what has focus, as a band fixed in place can be. */
+const focusUnderTheBand = (page: Page) =>
+  page.evaluate(() => {
+    const band = document.querySelector("header");
+    const focused = document.activeElement;
+    if (band === null || focused === null || band.contains(focused)) return false;
+    const box = focused.getBoundingClientRect();
+    const drawn = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+    return drawn !== null && band.contains(drawn);
+  });
+
+const inDocumentOrder = async (page: Page, regions: readonly Locator[]): Promise<boolean> => {
+  const nodes = await Promise.all(regions.map((region) => region.elementHandle()));
+  return page.evaluate(
+    (drawn) =>
+      drawn.every(
+        (node, at) =>
+          at === 0 ||
+          ((drawn[at - 1]?.compareDocumentPosition(node) ?? 0) &
+            Node.DOCUMENT_POSITION_FOLLOWING) !==
+            0,
+      ),
+    nodes,
+  );
+};
 
 /** Swept rather than read by key: what matters is that nothing kept here is about the reader. */
 const keptOnThisBrowser = (page: Page) =>
@@ -95,12 +167,53 @@ const weightOf = (page: Page, screenName: string) =>
     .getByRole("link", { name: screenName })
     .evaluate((link) => Number.parseInt(getComputedStyle(link).fontWeight, 10));
 
+const glyphOf = (page: Page, screenName: string) =>
+  navOf(page)
+    .getByRole("link", { name: screenName })
+    .evaluate((link) => link.querySelector("svg")?.innerHTML ?? "");
+
+/** A colour as a greyscale screen shows it, so a mark that is hue alone reads as no mark. */
+const greyOf = (region: Locator, painted: "own" | "behind") =>
+  region.evaluate((node, which) => {
+    let from: Element | null = which === "own" ? node : node.parentElement;
+    while (from !== null && getComputedStyle(from).backgroundColor === "rgba(0, 0, 0, 0)") {
+      from = from.parentElement;
+    }
+    const [red = 0, green = 0, blue = 0] = (
+      from === null ? "0,0,0" : getComputedStyle(from).backgroundColor
+    )
+      .replaceAll(/[^\d,.]/g, "")
+      .split(",")
+      .map(Number);
+    return Math.round(0.2126 * red + 0.7152 * green + 0.0722 * blue);
+  }, painted);
+
+/** Nothing in the band may move when the nav hides: every control it holds, to the pixel. */
+const bandBoxes = async (page: Page, workspaceName: string, who: string) => ({
+  band: await boxOf(bandOf(page)),
+  logo: await boxOf(logoOf(page)),
+  name: await boxOf(partOf(page, workspaceName)),
+  you: await boxOf(youOf(page, who)),
+});
+
 const signedIn = async (page: Page, api: Parameters<typeof provision>[0], name: string) => {
   const email = anAddress("shell");
   const workspace = await provision(api, { name, adminEmail: email });
   await page.goto("/sign-in");
   await signIn(page, api, email);
   return workspace;
+};
+
+/** Drawn before anything is measured or pressed, so the narrow shell is what answers. */
+const narrowAtRoutesAndSpend = async (
+  page: Page,
+  api: Parameters<typeof provision>[0],
+  name: string,
+) => {
+  await signedIn(page, api, name);
+  await page.setViewportSize(NARROW);
+  await page.goto(ROUTES_AND_SPEND.path);
+  await expect(page.getByRole("heading", { level: 1, name: ITS_HEADING })).toBeVisible();
 };
 
 test("names the icon rail's surfaces to eye, pointer and keyboard", async ({ page, request }) => {
@@ -111,10 +224,8 @@ test("names the icon rail's surfaces to eye, pointer and keyboard", async ({ pag
   await expect(rail.getByRole("link")).toHaveText(SURFACE_NAMES);
 
   // The keyboard first, before any pointer has opened one, then the pointer.
-  await page.keyboard.press("Tab");
-  await page.keyboard.press("Tab");
   const entry = rail.getByRole("link", { name: CONTROL_CENTRE.name });
-  await expect(entry).toBeFocused();
+  await tabUntilFocused(page, entry);
   const tooltip = page.getByRole("tooltip").filter({ hasText: CONTROL_CENTRE.name }).first();
   await expect(tooltip).toBeVisible();
 
@@ -148,17 +259,25 @@ test("lists the open surface's groups and screens, marking one", async ({ page, 
 
   const nav = navOf(page);
   await expect(nav.getByRole("link")).toHaveText(SCREEN_NAMES);
-  await expect(nav.getByRole("link", { name: "Audit log" })).toHaveAttribute(
-    "aria-current",
-    "page",
+  const open = nav.getByRole("link", { name: "Audit log" });
+  await expect(open).toHaveAttribute("aria-current", "page");
+
+  // Heavier and filled where its neighbours are neither, so it survives a greyscale screen.
+  expect(await weightOf(page, "Audit log")).toBeGreaterThan(await weightOf(page, "Members"));
+  expect(await greyOf(open, "own"), "the open screen's fill is the nav's own").not.toBe(
+    await greyOf(open, "behind"),
   );
 
-  // Set heavier than its neighbours, so the current screen survives a greyscale screen.
-  expect(await weightOf(page, "Audit log")).toBeGreaterThan(await weightOf(page, "Members"));
+  // Each screen carries its glyph, and the open one's is set bold.
+  const each = await nav
+    .getByRole("link")
+    .evaluateAll((links) => links.map((link) => link.querySelector("svg") !== null));
+  expect(each.every(Boolean), "a screen in the nav has no icon").toBe(true);
+  const membersClosed = await glyphOf(page, "Members");
 
+  // No heading repeats the surface the rail already names.
   await expect(nav).toMatchAriaSnapshot(`
     - navigation "Control Centre":
-      - heading "Control Centre" [level=2]
       - heading "Sources" [level=3]
       - list:
         - listitem:
@@ -185,6 +304,9 @@ test("lists the open surface's groups and screens, marking one", async ({ page, 
   const elapsed = Date.now() - started;
   test.info().annotations.push({ type: "secondary nav move", description: `${elapsed} ms` });
   expect(elapsed).toBeLessThan(SWAP_BUDGET_MS);
+  expect(await glyphOf(page, "Members"), "the open screen's glyph is not set bold").not.toBe(
+    membersClosed,
+  );
 
   // `goto` is the bookmark: a fresh document at a path no file sits at, not a click.
   await page.goto("/people/groups");
@@ -195,24 +317,76 @@ test("lists the open surface's groups and screens, marking one", async ({ page, 
   await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
 });
 
-test("names workspace, group, screen, person, role in the top bar", async ({ page, request }) => {
+test("lists a Viewer's home as the nav's one entry (AE2)", async ({ page, request }) => {
+  await aMemberSignedInAt(page, request, "Viewer", HOMES.Viewer.path);
+
+  const nav = page.getByRole("navigation", { name: ASK.name });
+  await expect(nav.getByRole("link")).toHaveText([HOMES.Viewer.name]);
+  await expect(nav.getByRole("link", { name: HOMES.Viewer.name })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+
+  await closerOf(page).click();
+  await expect(nav).toHaveCount(0);
+  await openerOf(page).click();
+  await expect(nav).toBeVisible();
+});
+
+test("names workspace, place, person and role in the band", async ({ page, request }) => {
   const workspace = await signedIn(page, request, "Halifax Fabrication");
   await page.goto(ROUTES_AND_SPEND.path);
 
-  const bar = page.getByRole("banner");
-  await expect(bar.getByText(workspace.name)).toBeVisible();
-  await expect(bar.getByText(ITS_HEADING, { exact: true })).toBeVisible();
-  await expect(bar.getByText(ROUTES_AND_SPEND.name, { exact: true })).toBeVisible();
+  const band = bandOf(page);
+  await expect(band.getByText(workspace.name)).toBeVisible();
+  for (const name of [CONTROL_CENTRE.name, AGENT_OPERATIONS.name, ROUTES_AND_SPEND.name]) {
+    await expect(partOf(page, name)).toBeVisible();
+  }
 
-  const you = bar.getByRole("button", { name: new RegExp(workspace.admin.name) });
+  const you = youOf(page, workspace.admin.name);
   await expect(you).toContainText("Admin");
-  await expect(bar.getByRole("button", { name: "Sign out" })).toHaveCount(0);
+  await expect(band.getByRole("button", { name: "Sign out" })).toHaveCount(0);
 
   await you.click();
   await expect(page.getByRole("menuitem", { name: "Sign out" })).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  // The logo is the way home from anywhere, named for the product rather than drawn alone.
+  await expect(logoOf(page)).toHaveAttribute("href", HOMES.Admin.path);
+  await logoOf(page).click();
+  await expect(page).toHaveURL(new RegExp(`${HOMES.Admin.path}$`));
 });
 
-test("tabs skip link, icon rail, secondary nav, top bar, screen", async ({ page, request }) => {
+test("sizes the band's cells to the rail and nav below", async ({ page, request }) => {
+  const workspace = await signedIn(page, request, "Ryedale Castings");
+  await page.setViewportSize(DESKTOP);
+  await page.goto(MEMBERS.path);
+  await expect(navOf(page)).toBeVisible();
+
+  const band = await boxOf(bandOf(page));
+  const rail = await boxOf(railOf(page));
+  const nav = await boxOf(navOf(page));
+  expect(band.x).toBe(0);
+  expect(band.width).toBe(DESKTOP.width);
+  expect(band.y + band.height, "the band does not sit above the rail").toBeLessThanOrEqual(rail.y);
+
+  // The logo fills the first cell, so the cell is the rail's width.
+  const logo = await boxOf(logoOf(page));
+  expect(logo.x).toBe(rail.x);
+  expect(logo.width).toBe(rail.width);
+
+  // The second cell ends where the nav does, so the toggle and the name sit over the nav.
+  const toggle = await boxOf(closerOf(page));
+  const name = await boxOf(partOf(page, workspace.name));
+  expect(name.x).toBeGreaterThanOrEqual(nav.x);
+  expect(toggle.x + toggle.width).toBeLessThanOrEqual(nav.x + nav.width);
+  expect(await leftOf(partOf(page, CONTROL_CENTRE.name))).toBeGreaterThanOrEqual(nav.x + nav.width);
+});
+
+test("tabs skip link, band, icon rail, secondary nav, toolbar, screen", async ({
+  page,
+  request,
+}) => {
   const workspace = await signedIn(page, request, "Dales Engineering");
   await page.goto(ROUTES_AND_SPEND.path);
   const rail = railOf(page);
@@ -220,9 +394,25 @@ test("tabs skip link, icon rail, secondary nav, top bar, screen", async ({ page,
     "aria-current",
     "page",
   );
+  await theRoutesHaveLanded(page);
+
+  // The text in the band sits between its controls, so reading order and tab order agree.
+  const band = [
+    logoOf(page),
+    partOf(page, workspace.name),
+    closerOf(page),
+    partOf(page, ROUTES_AND_SPEND.name),
+    youOf(page, workspace.admin.name),
+  ];
+  expect(await inDocumentOrder(page, band), "the band reads out of order").toBe(true);
 
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "Skip to the screen" })).toBeFocused();
+
+  for (const stop of [logoOf(page), closerOf(page), youOf(page, workspace.admin.name)]) {
+    await page.keyboard.press("Tab");
+    await expect(stop).toBeFocused();
+  }
 
   for (const name of SURFACE_NAMES) {
     await page.keyboard.press("Tab");
@@ -234,15 +424,14 @@ test("tabs skip link, icon rail, secondary nav, top bar, screen", async ({ page,
     await expect(navOf(page).getByRole("link", { name })).toBeFocused();
   }
 
-  // The control over the navigation opens the top bar, where it is the same corner a narrow
-  // screen reaches the navigation from.
   await page.keyboard.press("Tab");
-  await expect(closerOf(page)).toBeFocused();
+  await expect(tabsOf(page).getByRole("tab", { name: "Routes" })).toBeFocused();
 
+  // The open tab's panel holds the screen, so the content is reached through the toolbar.
+  const panel = page.getByRole("tabpanel");
   await page.keyboard.press("Tab");
-  await expect(
-    page.getByRole("banner").getByRole("button", { name: new RegExp(workspace.admin.name) }),
-  ).toBeFocused();
+  await expect(panel).toBeFocused();
+  await expect(panel.getByRole("region", { name: "Routes" })).toBeVisible();
 
   /**
    * Nothing carries a positive tabindex, so the document's own order is the tab order. Zero
@@ -276,23 +465,118 @@ test("scrolls nothing sideways at 320 pixels, navigation open or closed", async 
   page,
   request,
 }) => {
-  await signedIn(page, request, "Acme Joinery");
-  await page.setViewportSize(NARROW);
-  await page.goto(ROUTES_AND_SPEND.path);
-  await expect(page.getByRole("heading", { level: 1, name: ITS_HEADING })).toBeVisible();
+  await narrowAtRoutesAndSpend(page, request, "Acme Joinery");
 
-  const closed = await sidewaysRoom(page);
-  expect(closed.scrolls).toBeLessThanOrEqual(closed.holds);
+  await scrollsNothingSideways(page, "with the sheet closed");
 
-  const bar = await topOf(page.getByRole("banner"));
+  const bar = await topOf(bandOf(page));
   const content = await topOf(page.getByRole("main"));
   expect(bar).toBeLessThan(content);
 
-  await menuOf(page).click();
-  await expect(panelOf(page)).toBeVisible();
+  await sheetButtonOf(page).click();
+  await expect(sheetOf(page)).toBeVisible();
 
-  const open = await sidewaysRoom(page);
-  expect(open.scrolls).toBeLessThanOrEqual(open.holds);
+  await scrollsNothingSideways(page, "with the sheet open");
+});
+
+test("names surface, group and screen at 320 pixels, clipping none", async ({ page, request }) => {
+  // Long names in both of the first row's texts, so neither can push the row past the edge.
+  const email = anAddress("long-names");
+  const workspace = await provision(request, { name: LONG_NAME });
+  const admin = await person(request, email, { displayName: LONG_PERSON });
+  await addMember(request, { workspaceId: workspace.workspaceId, userId: admin.id, role: "Admin" });
+  await page.setViewportSize(NARROW);
+  await page.goto("/sign-in");
+  await signIn(page, request, email);
+  await page.goto(MEMBERS.path);
+  await expect(page.getByRole("heading", { level: 1, name: headingOf(MEMBERS) })).toBeVisible();
+
+  // Its own row under the controls, so a long workspace name takes nothing from it.
+  const row = await boxOf(sheetButtonOf(page));
+  for (const name of [CONTROL_CENTRE.name, PEOPLE.name, MEMBERS.name]) {
+    const part = partOf(page, name);
+    await expect(part).toBeVisible();
+    const box = await boxOf(part);
+    expect(box.y, `${name} shares the controls' row`).toBeGreaterThanOrEqual(row.y + row.height);
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width, `${name} is clipped`).toBeLessThanOrEqual(NARROW.width);
+    const cut = await part.evaluate((node) => {
+      const line = node.parentElement ?? node;
+      return line.scrollWidth > line.clientWidth || getComputedStyle(line).textOverflow !== "clip";
+    });
+    expect(cut, `${name} is cut short`).toBe(false);
+  }
+
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    NARROW.width,
+  );
+});
+
+test("narrows the band to two rows scrolling with the page", async ({ page, request }) => {
+  const workspace = await signedIn(page, request, "Swaledale Ironworks");
+  await page.setViewportSize(NARROW_AND_SHORT);
+  await page.goto(MEMBERS.path);
+  await expect(page.getByRole("heading", { level: 1, name: headingOf(MEMBERS) })).toBeVisible();
+
+  const firstRow = [
+    sheetButtonOf(page),
+    logoOf(page),
+    partOf(page, workspace.name),
+    youOf(page, workspace.admin.name),
+  ];
+  const place = await boxOf(partOf(page, CONTROL_CENTRE.name));
+  let before = Number.NEGATIVE_INFINITY;
+  for (const control of firstRow) {
+    const box = await boxOf(control);
+    expect(box.x, "the first row is out of order").toBeGreaterThan(before);
+    expect(box.y + box.height, "the place shares the first row").toBeLessThanOrEqual(place.y);
+    before = box.x;
+  }
+
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("link", { name: "Skip to the screen" })).toBeFocused();
+  for (const stop of [sheetButtonOf(page), logoOf(page), youOf(page, workspace.admin.name)]) {
+    await page.keyboard.press("Tab");
+    await expect(stop).toBeFocused();
+  }
+
+  for (let step = 0; step < 6; step += 1) {
+    await page.keyboard.press("Tab");
+    expect(await focusUnderTheBand(page), `stop ${step + 1} sits under the band`).toBe(false);
+  }
+
+  await scrollsNothingSideways(page, "with the band on two rows");
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.mouse.wheel(0, NARROW_AND_SHORT.height);
+  await expect
+    .poll(async () => (await boxOf(bandOf(page))).y, { message: "the band stays in view" })
+    .toBeLessThan(0);
+});
+
+test("keeps a focused control clear of the fixed band", async ({ page, request }) => {
+  const email = anAddress("long-list");
+  const workspace = await provision(request, { name: "Longdendale Wire", adminEmail: email });
+  for (let at = 1; at <= 12; at += 1) {
+    const member = await person(request, anAddress("member"), { displayName: `Member ${at}` });
+    await addMember(request, {
+      workspaceId: workspace.workspaceId,
+      userId: member.id,
+      role: "Viewer",
+    });
+  }
+  await page.setViewportSize({ width: DESKTOP.width, height: 400 });
+  await page.goto("/sign-in");
+  await signIn(page, request, email);
+  await page.goto(MEMBERS.path);
+  const last = page.getByRole("main").getByRole("button", { name: "Member 9" });
+  await expect(last).toBeVisible();
+
+  // Backwards, so each stop scrolls up to meet the band rather than rise from below it.
+  await tabUntilFocused(page, last, 80);
+  for (let step = 0; step < 12; step += 1) {
+    await page.keyboard.press("Shift+Tab");
+    expect(await focusUnderTheBand(page), `stop ${step + 1} back sits under the band`).toBe(false);
+  }
 });
 
 test("paints the shell in the page's own surface token", async ({ page, request }) => {
@@ -321,19 +605,6 @@ test("paints the shell in the page's own surface token", async ({ page, request 
   expect(painted.behind).toBe(painted.token);
 });
 
-const TOOLBAR_TABS = ["Routes", "Spend"];
-
-const tabsOf = (page: Page) => page.getByRole("tablist", { name: "Routes and spend" });
-
-const routesCardOf = (page: Page) => page.getByRole("region", { name: "Routes" });
-
-/**
- * The screen reads the routes after the nav paints, so a screen here has started only once its
- * card says a new workspace has none.
- */
-const theRoutesHaveLanded = (page: Page) =>
-  expect(routesCardOf(page).getByText(ROUTES_WORDS.noneSet, { exact: true })).toBeVisible();
-
 test("fills the toolbar with tabs the arrow keys move between", async ({ page, request }) => {
   await signedIn(page, request, "Calder Ironworks");
   await page.goto(ROUTES_AND_SPEND.path);
@@ -346,8 +617,8 @@ test("fills the toolbar with tabs the arrow keys move between", async ({ page, r
       - tab "Spend"
   `);
 
-  // The region is the shell's own, between the top bar and the content and inside neither.
-  const bar = await topOf(page.getByRole("banner"));
+  // The region is the shell's own, between the band and the content and inside neither.
+  const bar = await topOf(bandOf(page));
   const toolbar = await topOf(tabs);
   const content = await topOf(page.getByRole("main"));
   expect(bar).toBeLessThan(toolbar);
@@ -372,54 +643,34 @@ test("draws no toolbar over a screen without tabs or acts", async ({ page, reque
 
   await expect(page.getByRole("tablist")).toHaveCount(0);
 
-  /** An empty bar is what this forbids, so the content must follow the top bar itself. */
+  /** An empty bar is what this forbids, so the content must open its own column. */
   const met = await page.evaluate(
-    () => document.querySelector("header")?.nextElementSibling === document.querySelector("main"),
+    () => document.querySelector("main")?.previousElementSibling === null,
   );
   expect(met).toBe(true);
 });
 
-test("tabs to the toolbar between the top bar and content", async ({ page, request }) => {
-  const workspace = await signedIn(page, request, "Wensleydale Precision");
-  await page.goto(ROUTES_AND_SPEND.path);
-  await theRoutesHaveLanded(page);
-
-  // The order down to the top bar is another test's; starting at its last stop proves this
-  // claim without proving that one twice.
-  await page
-    .getByRole("banner")
-    .getByRole("button", { name: new RegExp(workspace.admin.name) })
-    .focus();
-
-  await page.keyboard.press("Tab");
-  await expect(tabsOf(page).getByRole("tab", { name: "Routes" })).toBeFocused();
-
-  // The open tab's panel holds the screen, so the content is reached through the toolbar.
-  const panel = page.getByRole("tabpanel");
-  await page.keyboard.press("Tab");
-  await expect(panel).toBeFocused();
-  await expect(panel.getByRole("region", { name: "Routes" })).toBeVisible();
-});
-
-test("toggles the secondary nav on the navigation control, freeing width", async ({
+test("holds toggle and band still while the nav hides (AE1)", async ({
   page,
   request,
   passesTheAccessibilityGate,
 }) => {
-  await signedIn(page, request, "Calder Pattern Works");
-  await page.goto(ROUTES_AND_SPEND.path);
+  const workspace = await signedIn(page, request, "Calder Pattern Works");
+  await page.setViewportSize(DESKTOP);
+  await page.goto(MEMBERS.path);
 
   const nav = navOf(page);
   await expect(nav).toBeVisible();
-  await expect(tabsOf(page).getByRole("tab")).toHaveText(TOOLBAR_TABS);
-  const rail = railOf(page);
-  const railAt = await leftOf(rail);
-  const railWide = await widthOf(rail);
-  const contentAt = await leftOf(page.getByRole("main"));
-  const contentWide = await widthOf(page.getByRole("main"));
-  const tabsAt = await leftOf(tabsOf(page));
+  const tabs = page.getByRole("tablist", { name: MEMBERS.name });
+  await expect(tabs).toBeVisible();
+  const navWide = await widthOf(nav);
+  const rail = await boxOf(railOf(page));
+  const band = await bandBoxes(page, workspace.name, workspace.admin.name);
+  const main = await boxOf(page.getByRole("main"));
+  const tabsAt = await leftOf(tabs);
 
   const close = closerOf(page);
+  const toggle = await boxOf(close);
   await expect(close).toHaveAttribute("aria-expanded", "true");
   expect(await nav.getAttribute("id")).toBe(await close.getAttribute("aria-controls"));
 
@@ -430,27 +681,116 @@ test("toggles the secondary nav on the navigation control, freeing width", async
   test.info().annotations.push({ type: "closing the secondary nav", description: `${elapsed} ms` });
   expect(elapsed).toBeLessThan(ACT_BUDGET_MS);
 
-  // The rail is where it was, to the pixel: only the nav left the row.
-  await expect(rail).toBeVisible();
-  expect(await leftOf(rail)).toBe(railAt);
-  expect(await widthOf(rail)).toBe(railWide);
+  // The toggle, the band and the rail are where they were, to the pixel: only the nav left.
+  const open = openerOf(page);
+  expect(await boxOf(open), "the toggle moved as the nav hid").toEqual(toggle);
+  expect(await bandBoxes(page, workspace.name, workspace.admin.name)).toEqual(band);
+  expect(await boxOf(railOf(page))).toEqual(rail);
 
-  /**
-   * The toolbar shares the content's column, so one distance answers for both: each starts
-   * that much further left, and the content is that much wider.
-   */
-  const freed = contentAt - (await leftOf(page.getByRole("main")));
-  expect(freed).toBeGreaterThan(0);
-  expect(await widthOf(page.getByRole("main"))).toBe(contentWide + freed);
-  expect(await leftOf(tabsOf(page))).toBe(tabsAt - freed);
+  // The toolbar shares the content's column, so both start the nav's width further left.
+  const hidden = await boxOf(page.getByRole("main"));
+  test.info().annotations.push({
+    type: "AE1 at 1440",
+    description: `toggle ${JSON.stringify(toggle)}; main ${main.width} to ${hidden.width}; nav ${navWide}`,
+  });
+  expect(hidden.x).toBe(main.x - navWide);
+  expect(hidden.width).toBe(main.width + navWide);
+  expect(await leftOf(tabs)).toBe(tabsAt - navWide);
 
   // Audited closed here; the fixture audits the open state the test ends on.
   await passesTheAccessibilityGate();
 
-  const open = openerOf(page);
   await expect(open).toHaveAttribute("aria-expanded", "false");
   await open.click();
   await expect(nav).toBeVisible();
+  expect(await boxOf(closerOf(page)), "the toggle moved as the nav came back").toEqual(toggle);
+  expect(await bandBoxes(page, workspace.name, workspace.admin.name)).toEqual(band);
+  expect(await boxOf(page.getByRole("main"))).toEqual(main);
+});
+
+test("holds the toggle in place beside a 60-character workspace name", async ({
+  page,
+  request,
+}) => {
+  expect(LONG_NAME).toHaveLength(60);
+  const email = anAddress("long");
+  const short = await provision(request, { name: "Airedale Press", adminEmail: email });
+  const long = await provision(request, { name: LONG_NAME });
+  await addMember(request, {
+    workspaceId: long.workspaceId,
+    userId: short.admin.id,
+    role: "Admin",
+  });
+  await page.setViewportSize(DESKTOP);
+  await page.goto("/sign-in");
+  await signIn(page, request, email);
+
+  const toggleIn = async (name: string) => {
+    await page.goto("/choose-workspace");
+    await page.getByRole("button", { name, exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`${HOMES.Admin.path}$`));
+    await expect(partOf(page, name)).toBeVisible();
+    return boxOf(closerOf(page));
+  };
+
+  const beside = await toggleIn(short.name);
+  const besideTheLongOne = await toggleIn(LONG_NAME);
+  test.info().annotations.push({
+    type: "toggle beside a 60-character name",
+    description: `${JSON.stringify(beside)} and ${JSON.stringify(besideTheLongOne)}`,
+  });
+  expect(besideTheLongOne, "a long workspace name moved the toggle").toEqual(beside);
+
+  // Cut with an ellipsis on screen, whole in the document, so a screen reader hears it all.
+  const cut = await partOf(page, LONG_NAME).evaluate((node) => ({
+    whole: node.textContent,
+    ellipsis: getComputedStyle(node).textOverflow,
+    overflows: node.scrollWidth > node.clientWidth,
+  }));
+  expect(cut).toEqual({ whole: LONG_NAME, ellipsis: "ellipsis", overflows: true });
+});
+
+test("keeps a 40-character address on one line, prose measured (AE6)", async ({
+  page,
+  request,
+}) => {
+  const email = anAddress("wide");
+  const workspace = await provision(request, { name: "Holme Valley Tools", adminEmail: email });
+  const address = `i${Date.now()}${Math.floor(Math.random() * 1e6)}`
+    .padEnd(27, "0")
+    .concat("@example.test");
+  expect(address).toHaveLength(40);
+  await invite(request, {
+    workspaceId: workspace.workspaceId,
+    email: address,
+    inviterId: workspace.admin.id,
+    role: "Viewer",
+  });
+  await page.setViewportSize(DESKTOP);
+  await page.goto("/sign-in");
+  await signIn(page, request, email);
+  await page.goto(MEMBERS.path);
+  await page.getByRole("tab", { name: "Invitations" }).click();
+
+  const cell = page.getByRole("main").getByRole("cell", { name: address, exact: true });
+  await expect(cell).toBeVisible();
+  const lines = await cell.evaluate((node) => {
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
+  });
+  expect(lines, "the address wraps").toBe(1);
+
+  const summary = page.getByRole("main").getByText(PEOPLE.summary, { exact: true });
+  const measure = await summary.evaluate((node) =>
+    Number.parseFloat(getComputedStyle(node).maxWidth),
+  );
+  expect(Number.isFinite(measure), "the description has no measure").toBe(true);
+  expect(await widthOf(summary)).toBeLessThanOrEqual(measure);
+  expect(
+    await widthOf(page.getByRole("main").getByRole("table")),
+    "the table is held to the measure",
+  ).toBeGreaterThan(measure);
 });
 
 test("remembers a closed secondary nav on this browser only", async ({ page, request }) => {
@@ -493,18 +833,15 @@ test("opens the navigation over narrow content, holding and returning focus", as
   request,
   passesTheAccessibilityGate,
 }) => {
-  await signedIn(page, request, "Wharfedale Castings");
-  await page.setViewportSize(NARROW);
-  await page.goto(ROUTES_AND_SPEND.path);
-  await expect(page.getByRole("heading", { level: 1, name: ITS_HEADING })).toBeVisible();
+  await narrowAtRoutesAndSpend(page, request, "Wharfedale Castings");
 
   await expect(railOf(page)).toHaveCount(0);
   await expect(navOf(page)).toHaveCount(0);
   const contentWide = await widthOf(page.getByRole("main"));
 
-  const menu = menuOf(page);
+  const menu = sheetButtonOf(page);
   await menu.click();
-  const panel = panelOf(page);
+  const panel = sheetOf(page);
   await expect(panel.getByRole("navigation", { name: RAIL })).toBeVisible();
   await expect(panel.getByRole("navigation", { name: CONTROL_CENTRE.name })).toBeVisible();
   await expect(panel.getByRole("link")).toHaveText([...SURFACE_NAMES, ...SCREEN_NAMES]);
@@ -530,47 +867,40 @@ test("opens the navigation over narrow content, holding and returning focus", as
   await expect(menu).toBeFocused();
 });
 
-test("closes the navigation over the content on a chosen destination", async ({
-  page,
-  request,
-}) => {
-  await signedIn(page, request, "Northern Tooling");
-  await page.setViewportSize(NARROW);
-  await page.goto(ROUTES_AND_SPEND.path);
-  await expect(page.getByRole("heading", { level: 1, name: ITS_HEADING })).toBeVisible();
+test("closes the sheet on a chosen screen, focus returned (AE7)", async ({ page, request }) => {
+  await narrowAtRoutesAndSpend(page, request, "Northern Tooling");
+  await scrollsNothingSideways(page, "before the sheet opens");
 
-  const menu = menuOf(page);
+  const menu = sheetButtonOf(page);
   await menu.click();
-  await panelOf(page).getByRole("link", { name: "Audit log" }).click();
+  await expect(sheetOf(page)).toBeVisible();
+  await scrollsNothingSideways(page, "with the sheet open");
+  await sheetOf(page).getByRole("link", { name: "Audit log" }).click();
 
-  await expect(panelOf(page)).toHaveCount(0);
+  await expect(sheetOf(page)).toHaveCount(0);
   await expect(page.getByRole("heading", { level: 1, name: "System" })).toBeVisible();
   await expect(menu).toBeFocused();
+  await scrollsNothingSideways(page, "once the sheet has closed");
 
   await menu.click();
-  await panelOf(page).getByRole("link", { name: CONTROL_CENTRE.name }).click();
+  await sheetOf(page).getByRole("link", { name: CONTROL_CENTRE.name }).click();
 
-  await expect(panelOf(page)).toHaveCount(0);
+  await expect(sheetOf(page)).toHaveCount(0);
   await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
+  await expect(menu).toBeFocused();
 });
 
-test("closes Screens and views on widening, focusing the navigation control", async ({
-  page,
-  request,
-}) => {
-  await signedIn(page, request, "Calder Pressings");
-  await page.setViewportSize(NARROW);
-  await page.goto(ROUTES_AND_SPEND.path);
-  await expect(page.getByRole("heading", { level: 1, name: ITS_HEADING })).toBeVisible();
+test("closes the sheet on widening, focusing the navigation control", async ({ page, request }) => {
+  await narrowAtRoutesAndSpend(page, request, "Calder Pressings");
 
-  await menuOf(page).click();
-  await expect(panelOf(page)).toBeVisible();
+  await sheetButtonOf(page).click();
+  await expect(sheetOf(page)).toBeVisible();
 
   // The reader never asked for this crossing, so the sheet owes back the focus it borrowed —
   // vanishing would leave it on the body.
   await page.setViewportSize(WIDE);
 
-  await expect(panelOf(page)).toHaveCount(0);
+  await expect(sheetOf(page)).toHaveCount(0);
   await expect(railOf(page)).toBeVisible();
   await expect(navOf(page)).toBeVisible();
   await expect(closerOf(page)).toBeFocused();

@@ -292,7 +292,7 @@ export const codeSentTo = async (api: APIRequestContext, email: string): Promise
 export const anAddress = (who: string): string =>
   `${who}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
 
-/** Sign-out is one disclosure in from the top bar, so a spec that leaves opens the menu first. */
+/** Sign-out is one disclosure in from the band, so a spec that leaves opens the menu first. */
 export const signOutFromTheShell = async (page: Page, who: string): Promise<void> => {
   await page
     .getByRole("banner")

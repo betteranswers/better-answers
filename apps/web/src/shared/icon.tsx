@@ -137,7 +137,7 @@ const GLYPHS = {
 /** Hidden from assistive technology, so the caller names what it stands for beside it. */
 export function Icon(properties: {
   readonly name: IconName;
-  /** Bold is the open rail entry's and nothing else's: it is the register's one heavy glyph. */
+  /** Bold marks the open entry in the rail or the secondary nav, and nothing else. */
   readonly weight?: "regular" | "bold";
   readonly className?: string;
 }) {

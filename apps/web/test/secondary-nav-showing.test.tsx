@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { RAIL } from "@/app/words.ts";
+import { RAIL, TOGGLE } from "@/app/words.ts";
 
 import { openApp } from "./open-app.tsx";
 import { answeringAs } from "./stubbed-api.ts";
@@ -18,9 +18,9 @@ const openAt = async (path: string) => {
   return (await openApp(path)).rendered;
 };
 
-const closer = () => screen.getByRole("button", { name: "Hide the secondary nav" });
+const closer = () => screen.getByRole("button", { name: TOGGLE.hide });
 
-const opener = () => screen.getByRole("button", { name: "Show the secondary nav" });
+const opener = () => screen.getByRole("button", { name: TOGGLE.show });
 
 const secondaryNav = () => screen.queryByRole("navigation", { name: "Control Centre" });
 
@@ -41,6 +41,17 @@ describe("whether the secondary nav is showing", () => {
 
     fireEvent.click(opener());
     expect(secondaryNav()).not.toBeNull();
+  });
+
+  it("keeps one toggle in the band, nav hidden or shown", async () => {
+    await openAt("/system/audit-log");
+    const toggle = closer();
+
+    fireEvent.click(toggle);
+    expect(opener()).toBe(toggle);
+    fireEvent.click(toggle);
+    expect(closer()).toBe(toggle);
+    expect(screen.getByRole("banner").contains(toggle)).toBe(true);
   });
 
   it("names the nav as the region the button controls", async () => {

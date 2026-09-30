@@ -20,9 +20,9 @@ export function IconRail(properties: {
   return (
     <nav
       aria-label={RAIL}
-      /* Sticky at the page's own height rather than a scroll region: a pane that scrolls on
-         its own is one a keyboard can miss. */
-      className="shrink-0 border-b border-border bg-sidebar px-2 py-2 md:sticky md:top-0 md:h-screen md:w-rail md:self-start md:border-r md:border-b-0 md:py-1"
+      /* Sticky under the band rather than a scroll region: a pane that scrolls on its own is
+         one a keyboard can miss. */
+      className="shrink-0 border-b border-border bg-sidebar px-2 py-2 md:sticky md:top-topbar md:flex md:h-[calc(100vh-var(--topbar-h))] md:w-rail md:flex-col md:self-start md:border-r md:border-b-0 md:py-1"
     >
       <TooltipProvider delayDuration={HOVER_DELAY_MS}>
         <ul className="flex flex-col gap-1">

@@ -16,6 +16,7 @@ import {
   type Role,
   type Surface,
 } from "@/shared/navigation.ts";
+import { PRODUCT_NAME } from "@/shared/words.ts";
 
 import { openApp } from "./open-app.tsx";
 import { answeringAs, withTheApiDown } from "./stubbed-api.ts";
@@ -109,12 +110,52 @@ describe("the shell's regions", () => {
     expect(current.textContent).toBe("Groups");
   });
 
-  it("names the group and screen in the top bar", async () => {
+  it("names surface, group and screen in the band", async () => {
     await openAs("Admin", "/agent-operations/routes-and-spend");
 
     const bar = screen.getByRole("banner");
-    expect(within(bar).getByText("Agent Operations", { exact: false })).toBeDefined();
-    expect(within(bar).getByText("Routes and spend", { exact: false })).toBeDefined();
+    for (const name of ["Control Centre", "Agent Operations", "Routes and spend"]) {
+      expect(within(bar).getByText(name, { exact: true })).toBeDefined();
+    }
+  });
+
+  it("names a surface's home once in the band", async () => {
+    await openAs("Viewer", HOMES.Viewer.path);
+
+    expect(within(screen.getByRole("banner")).getAllByText(HOMES.Viewer.name)).toHaveLength(1);
+  });
+
+  it("links the band's logo to the reader's home", async () => {
+    await openAs("Admin", "/system/audit-log");
+
+    const logo = within(screen.getByRole("banner")).getByRole("link", { name: PRODUCT_NAME });
+    expect(logo.getAttribute("href")).toBe(HOMES.Admin.path);
+  });
+
+  it("links the logo to the index with no role held", async () => {
+    await openWithNoRoleAt("/people/members");
+
+    const logo = within(screen.getByRole("banner")).getByRole("link", { name: PRODUCT_NAME });
+    expect(logo.getAttribute("href")).toBe("/");
+  });
+
+  it("names the secondary nav with no heading repeating the rail", async () => {
+    await openAs("Admin", "/people/members");
+
+    const headings = within(secondaryNav())
+      .queryAllByRole("heading")
+      .map((each) => each.textContent);
+    expect(headings).not.toContain("Control Centre");
+  });
+
+  it("gives every screen in the secondary nav its icon", async () => {
+    await openAs("Admin", "/people/members");
+
+    const bare = within(secondaryNav())
+      .getAllByRole("link")
+      .filter((link) => link.querySelector("svg") === null)
+      .map((link) => link.textContent);
+    expect(bare).toEqual([]);
   });
 
   it("says nothing about the person until it knows them", async () => {

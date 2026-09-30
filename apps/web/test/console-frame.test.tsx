@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { RAIL } from "@/app/words.ts";
 import { NOT_THE_OPERATOR, ONLY_THE_OPERATOR } from "@/features/console/refusal-words.ts";
+import { HOMES } from "@/shared/navigation.ts";
+import { PRODUCT_NAME } from "@/shared/words.ts";
 
 import { openApp } from "./open-app.tsx";
 import { addressOf, answered } from "./stubbed-api.ts";
@@ -63,9 +65,11 @@ describe("the console's shell", () => {
     await openApp("/console/workspaces/every-workspace");
     const bar = await screen.findByRole("banner");
 
-    expect(within(bar).getByText("Console", { exact: true })).toBeDefined();
+    expect(within(bar).getAllByText("Console", { exact: true })[0]).toBeDefined();
     const you = within(bar).getByRole("button", { name: /Ada/ });
     expect(you.textContent).toBe("Ada");
+    const logo = within(bar).getByRole("link", { name: PRODUCT_NAME });
+    expect(logo.getAttribute("href")).toBe(HOMES.operator.path);
   });
 
   it("shows a person without the mark the refused state alone", async () => {

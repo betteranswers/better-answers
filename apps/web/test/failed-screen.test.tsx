@@ -5,8 +5,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { FailedScreen } from "@/app/failed-screen.tsx";
 import { createAppClients, Providers } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
-import { FAILED_SCREEN, goHome, RAIL, UNKNOWN_SCREEN } from "@/app/words.ts";
+import { FAILED_SCREEN, goHome, RAIL, TOGGLE, UNKNOWN_SCREEN } from "@/app/words.ts";
 import { HOMES } from "@/shared/navigation.ts";
+import { PRODUCT_NAME } from "@/shared/words.ts";
 
 import { openApp } from "./open-app.tsx";
 
@@ -52,10 +53,13 @@ const openRoutesWithABrokenRead = async () => {
 };
 
 describe("a screen that throws", () => {
-  it("leaves the rail, secondary nav, top bar and content standing", async () => {
+  it("leaves the rail, secondary nav, band and content standing", async () => {
     await openRoutesWithABrokenRead();
 
-    expect(screen.getByRole("banner")).toBeDefined();
+    const band = screen.getByRole("banner");
+    expect(within(band).getByRole("link", { name: PRODUCT_NAME })).toBeDefined();
+    expect(within(band).getByText(A_MEMBERSHIP.workspace.name)).toBeDefined();
+    expect(within(band).getByRole("button", { name: TOGGLE.hide })).toBeDefined();
     expect(screen.getByRole("main")).toBeDefined();
     const rail = screen.getByRole("navigation", { name: RAIL });
     expect(within(rail).getByRole("link", { name: "Control Centre" })).toBeDefined();

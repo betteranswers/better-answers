@@ -367,7 +367,7 @@ function AuditLogRegion() {
   return (
     <section aria-labelledby={headingId} className="mt-6">
       <h2 id={headingId}>{AUDIT_LOG}</h2>
-      <p className="mt-1 max-w-prose text-muted-foreground">{SUMMARY}</p>
+      <p className="mt-1 text-muted-foreground">{SUMMARY}</p>
       <OutcomeLine
         outcome={auditLog.error === null ? undefined : outcomeOfFailure(auditLog.error)}
         className="mt-2"

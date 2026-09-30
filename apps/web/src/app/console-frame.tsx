@@ -9,8 +9,8 @@ import { CONSOLE, visibleTo } from "@/shared/navigation.ts";
 import { RefusalLine } from "@/shared/refusal-outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 
+import type { MenuLink } from "./band.tsx";
 import { Frame } from "./frame.tsx";
-import type { MenuLink } from "./top-bar.tsx";
 
 /** The console frame draws for the operator alone, so what it shows is theirs. */
 const THE_OPERATORS = visibleTo({ role: "operator", owns: [] }, [CONSOLE]);

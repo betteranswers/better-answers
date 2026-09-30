@@ -14,6 +14,15 @@ export const UNKNOWN_SCREEN = {
 /** The secondary nav beside it is named for the open surface, so the rail needs a name apart. */
 export const RAIL = "Surfaces";
 
+/** The narrow layout's sheet holds the rail and the secondary nav, so it is named for both. */
+export const NAVIGATION_SHEET = "Surfaces and screens";
+
+/** Said by the one toggle in the band, which names the state it would move to. */
+export const TOGGLE = {
+  hide: "Hide the secondary nav",
+  show: "Show the secondary nav",
+} as const;
+
 /** No role is held, so no other screen can be offered either. */
 export const ROLE_UNREAD = sentenceOf(NO_RESPONSE_TO_A_READ);
 
