@@ -1,92 +1,39 @@
-# Issue tracker: Ordna
+# Issue tracker: Linear
 
-Issues live as Ordna tasks - git blobs at `refs/ordna/tasks/<id>`.
+Issues live in Linear: workspace `tw-group`, team `better-answers` (ids `BA-N`), project `better-answers`. Reach it through the `linear-server` MCP. In Claude Code its tools are deferred, so load them with `ToolSearch` (`select:mcp__linear-server__save_issue,mcp__linear-server__get_issue,mcp__linear-server__list_issues`) before the first call.
 
 ---
 
-## The `ordna` CLI
+## What an issue is for
 
-`.ordna/config.yaml` sets `storage: namespace`. **There are no task files on disk.** Use the CLI (`ordna show T-001`, `ordna list`, `ordna create`, etc.) for everything — direct file access is not possible.
+- **The backlog.** Work that is known but not yet planned.
+- **A finding put off for later.** A review, a gate or a mutation run finds something that does not belong in the change at hand. It becomes one issue, with no plan and no spec until it is picked up.
 
-| Command                                  | What it does                                                       |
-|------------------------------------------|--------------------------------------------------------------------|
-| `ordna list` / `ordna ls`                | List tasks. Filter with `-s <status>`, `-t <tag>`. |
-| `ordna show <id>`                        | Print a task's frontmatter + body to stdout.                       |
-| `ordna create <title…>`                  | Create a task. See options below.                                  |
-| `ordna move <id> <status>`               | Move a task. Rejected if `done` and any `depends_on` task isn't done. |
-| `ordna commit -m "tasks: ..."`                  | Explicit; **Never auto-runs.**              |
+An issue is not the unit of build work: a plan in `docs/plans/` is. An issue that gets built gets a plan (`/ce-plan`), and the pull request that lands it says `Fixes BA-N` in its description.
 
-### IDs
+## States
 
-IDs have 3-digit padding with prefix `T` → `T-001`, `T-002`, …, `T-1000`. Each new task is auto-incremented from the highest existing numeric ID. Merge conflicts on IDs are resolved by the developer — Ordna does not renumber files.
-
-### `ordna create` options
-
-| Command | Options |
+| State | Meaning |
 |---|---|
-| -p, --priority | <high|medium|low> |
-| -t, --tag <tag...> | one or more tags |
-| -d, --depends-on <id...> | one or more dependency IDs |
-| -s, --status <status> | <todo|doing|done> |
+| Triage | New, and not yet looked at by the owner. An agent files a new issue here. An issue waiting on an answer stays here, with the question in a comment |
+| Backlog | Held. The description's opening lines say what it waits on: an upstream release, a route block, an owner action |
+| Todo | Ready to build. Unassigned means an agent may take it; assigned to the owner means it is theirs |
+| In Progress, In Review | Being built; In Review once its pull request is open |
+| Done | Its pull request merged |
+| Canceled | Will not be done. A comment gives the reason |
+| Duplicate | Folded into the issue it duplicates |
 
-### Titles
+## Filing an issue
 
-A ticket's title takes the commit's form (`docs/agents/workflow.md`, *The commit's form*): `type(scope): summary`, 72 characters at most, the summary imperative and lower-case with no full stop. The title names no ticket id, its own included, and the detail goes in the body. No hook reads a title, so check one before it is written: `printf '%s\n' "<title>" | pnpm exec commitlint`. To retitle a ticket, edit the `title:` line of its frontmatter as a body edit, below.
+Create it with `save_issue`: `team: better-answers`, `project: better-answers`, `state: Triage`, a priority, and one of the workspace's `product` labels: `feature`, `bug` or `improvement`.
 
-### Examples
+**The title** takes the commit's form (`docs/agents/workflow.md`, *The commit's form*): `type(scope): summary`, 72 characters at most, the summary imperative and lower-case with no full stop. The title names no issue id, and the detail goes in the description. Check one before it is written: `printf '%s\n' "<title>" | pnpm exec commitlint`.
 
-```bash
-ordna create "feat(api): take a payment through the checkout" -p high -t payments
-ordna create "test(api): cover the checkout's refusals" -d T-001   # depends on T-001
-ordna list -s todo
-ordna move T-001 doing
-ordna show T-001
-ordna commit -m "tasks: progress on T-001"
-```
-
-### Editing a body: origin first
-
-The CLI has no edit command, and `ordna web` / `ordna board` auto-fetch `refs/ordna/tasks/*` from origin every minute, **overwriting any local task ref origin disagrees with**. A body edit that only touches the local ref is silently reverted within a minute while a board is open. So the order is: write the blob, push it to origin, then set the local ref, then re-read.
-
-```bash
-git cat-file -p refs/ordna/tasks/T-004 > /tmp/T-004.md      # edit this; bump updated_at
-oid=$(git hash-object -w /tmp/T-004.md)
-git push --force origin "$oid:refs/ordna/tasks/T-004"        # origin FIRST
-git update-ref refs/ordna/tasks/T-004 "$oid"
-ordna show T-004                                             # confirm the edit is what the CLI reads
-```
-
-`ordna create` and `ordna move` write the local ref only. `ordna create` also raises the local counter, which needs its own push (*The counter is ordna's alone*, below). Push the task ref by hand within the minute, and with `--force`, since a blob ref never fast-forwards and a plain push is refused: `git push --force origin refs/ordna/tasks/T-030`. Left unpushed, a created ref survives the next fetch but no other clone sees it, and a moved ref is reverted to origin's copy (22/09/2026: T-227's `done` was lost this way). Two sessions editing the same task race on origin; re-read before writing.
-
-`ordna move` fails silently about one time in ten. Read the status line back — `ordna show T-nnn | sed -n 2p` — after every move and before its push.
-
-### The counter is ordna's alone
-
-`refs/ordna/state` holds `next_id`, and ordna only ever raises it. `ordna create` merges origin's copy into the local one, keeping the higher `next_id`, then raises the local one. It does not push it. So origin's counter falls behind each session that creates a task, and another clone's next `ordna create` can collide (26/09/2026: origin read 439 with tasks up to T-451).
-
-After each batch of `ordna create`, push the counter with a lease on origin's copy, and only when the local `next_id` is higher:
-
-```bash
-o=$(git ls-remote origin refs/ordna/state | cut -f1)
-git fetch origin "$o"
-git cat-file -p "$o" | grep next_id                  # origin's
-git cat-file -p refs/ordna/state | grep next_id      # local; push only if higher
-git push --force-with-lease=refs/ordna/state:"$o" origin refs/ordna/state
-```
-
-A refused lease means another session pushed first. Rebuild the counter as the repair below says, then push that.
-
-Apart from that push, git commands move task refs alone. Fetch with `git fetch origin '+refs/ordna/tasks/*:refs/ordna/tasks/*'` or one task's ref, and push one task ref at a time. A wholesale copy of the counter (a fetch of `refs/ordna/*`, a forced push of `refs/ordna/state` without the check above) can lower it, and the next `ordna create` then refuses with "already exists locally despite a fresh allocation" (23/09/2026: origin fell to 333 with tasks up to T-347). The repair is a counter rebuilt from both copies — `next_id` the highest task plus one, the two `ops` lists merged — pushed with `--force-with-lease=refs/ordna/state:<origin's oid>`.
-
-### When a skill says "publish to the issue tracker"
-
-`ordna create` a task, titled as *Titles* above says. Give it a `## Goal`, an `## Acceptance Criteria` checklist and `## Notes`. Set `-d` for every task it genuinely depends on; the CLI enforces it later.
-
-**Body sections:**
+**The description** has these sections:
 
 ```markdown
 ## Goal
-What this task accomplishes.
+What this issue accomplishes.
 
 ## Acceptance Criteria
 - [ ] Criterion one
@@ -94,13 +41,17 @@ What this task accomplishes.
 
 ## Notes
 Anything that doesn't fit elsewhere.
-
-## Progress
-Append-only: one entry per landing, three lines (`docs/agents/workflow.md`).
 ```
 
-The `Acceptance Criteria` checkboxes (`- [ ]` / `- [x]`) are the source of truth for AC progress — they are parsed structurally.
+Progress goes in comments, one per landing. A dependency is a Linear relation (`blockedBy`), not a line in the description. The route block an issue belongs to (`S2`, `S4` …) is named in its Goal or Notes.
 
-### When a skill says "fetch the relevant ticket"
+## The tasks before Linear
 
-`ordna show <id>`. The user normally passes the id.
+Until 30/09/2026 the tracker was ordna, and code, docs and commits cite its tasks as `T-nnn`. The tasks stay in git as blobs at `refs/ordna/tasks/<id>`. A fresh clone does not fetch them, so read one like this:
+
+```bash
+git fetch origin '+refs/ordna/tasks/*:refs/ordna/tasks/*'
+git cat-file -p refs/ordna/tasks/T-123
+```
+
+The eleven tasks still open on 30/09/2026 moved to Linear as BA-11 to BA-21. Each description opens with `Migrated from ordna T-nnn`, so a Linear search for the `T-nnn` finds it, and each ordna task is archived with a line naming its `BA-N`. Nothing writes to the ordna refs any more.

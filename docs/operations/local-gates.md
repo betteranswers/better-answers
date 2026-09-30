@@ -58,7 +58,7 @@ Git hands the hook one line per ref it pushes: the local ref and its sha, then t
 gates skipped: every ref pushed is a deletion or outside refs/heads/, so none carries commits
 ```
 
-That covers a tag's push or deletion, an ordna ref under `refs/ordna/`, and a branch's deletion. A dirty working tree cannot block any of them. A tag pushed beside a branch's new commits still runs the gates, as does a branch push that only deletes files. The suite pushes each of these cases through the hook.
+That covers a tag's push or deletion, a ref in a namespace of its own (such as ordna's archived `refs/ordna/`), and a branch's deletion. A dirty working tree cannot block any of them. A tag pushed beside a branch's new commits still runs the gates, as does a branch push that only deletes files. The suite pushes each of these cases through the hook.
 
 The gates live in a second hook, `pre-push-gates`, because lefthook hands git's lines to a job with `use_stdin` and to nothing else. A `skip` condition, a `setup` step and a `files` command all read an empty stdin, so none of them can tell a tag from a branch. `pre-push` is therefore one job, `gates`, which runs the script, and the script runs `pnpm exec lefthook run pre-push-gates`.
 
