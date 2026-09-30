@@ -1,4 +1,4 @@
-const TICKET = /\bT-\d+\b/;
+const TICKET = /\b(?:T|BA)-\d+\b/;
 
 export default {
   extends: ["@commitlint/config-conventional"],
@@ -8,7 +8,7 @@ export default {
       rules: {
         "header-names-no-ticket": ({ header }) => [
           !TICKET.test(header ?? ""),
-          "header may not name a ticket; put it in a `Refs: T-nnn` footer",
+          "header may not name an issue; put it in a `Refs: BA-N` footer",
         ],
       },
     },

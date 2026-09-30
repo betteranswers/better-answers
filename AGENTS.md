@@ -31,7 +31,6 @@ A living company knowledge map for UK SMBs, on OKF v0.2. It has three knowledge 
 | `docs/personas/` | The personas `/ce-dogfood` walks a screen as: a git-ignored link to `.planning/personas/`, which the worktree hook makes |
 | `.compound-engineering/` | Compound Engineering's settings for this repository |
 | `docs/operations/` | Public-facing ops documents. Documents that are not public-facing are under `.planning/estate/` |
-| ordna | The work queue: tasks as git namespace refs (`refs/ordna/tasks/<id>`), not files |
 | `deploy/` | Compose files and deployment configuration |
 | `.cubic/wiki/` | Cubic's generated wiki |
 
@@ -56,7 +55,9 @@ Other skills live beside the code that uses them most, such as `apps/worker/.cla
 
 ### Issue tracker
 
-Build tasks are cut from a block of the route spec and live in **ordna**. They are git blobs at `refs/ordna/tasks/<id>` (`storage: namespace`), with no files on disk, so use the `ordna` CLI. Push a body edit or a new task to **origin first**, then set it locally. An open board fetches every minute and reverts a ref that is only local. The procedure is in `docs/agents/issue-tracker.md`.
+`project_tracker: linear`
+
+The backlog lives in **Linear**: team `better-answers` (issue ids `BA-N`), project `better-answers`, reached through the `linear-server` MCP. It holds work not yet planned and review findings put off for later. A plan in `docs/plans/` is the unit of build work, and the pull request that lands it names its issue as `Fixes BA-N`. The tasks before Linear were ordna's `T-nnn`, and they stay readable in git. The procedure is in `docs/agents/issue-tracker.md`.
 
 ### Workflow
 
@@ -72,9 +73,9 @@ Every commit reaches `main` through the merge queue. A commit's subject and a PR
 
 After a solved, verified problem, automatically invoke the `ce-compound` skill with `mode:non-interactive` at the completion checkpoint only when the work produced durable project reasoning that is not readily recoverable from the final code, tests, types, comments, or existing documentation, and losing it would plausibly cause recurrence, material risk, or substantial rediscovery. Apply this counterfactual: if the learning document disappeared, would a future engineer reading the final implementation still be likely to repeat the mistake or redo substantial investigation? If not, do not invoke it. Completion, effort, and diff size alone are not enough. Capture at the checkpoint so a qualifying learning can ship in the PR that produced it, and only where the repository treats captured learnings as tracked, committed knowledge.
 
-### Triage labels
+### Triage
 
-The five canonical roles — `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix` — applied as ordna **tags**. See `docs/agents/triage-labels.md`.
+A new issue lands in Linear's **Triage** state. The owner moves it to Todo when it is ready to build, or to Backlog with what it waits on. `docs/agents/issue-tracker.md` gives each state's meaning.
 
 ### Domain docs
 

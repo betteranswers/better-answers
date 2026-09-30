@@ -23,7 +23,6 @@
 .gitignore
 .claude
 .cubic
-.ordna
 .scratch
 
 # The host's build products — the image builds its own

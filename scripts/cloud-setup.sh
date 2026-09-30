@@ -14,9 +14,8 @@ mkdir -p /root/.local/bin
 for b in node npm npx corepack; do ln -sf "/opt/node24/bin/$b" /root/.local/bin/; done
 took node
 
-/opt/node24/bin/npm i -g @frehilm/ordna-cli && ln -sf /opt/node24/bin/ordna /root/.local/bin/
 apt-get install -y gh
-took "ordna and gh"
+took gh
 
 # git-filter-repo at the version apps/api/Dockerfile pins, read rather than restated
 GFR=$(sed -n 's/^ARG GIT_FILTER_REPO_VERSION=//p' "$REPO/apps/api/Dockerfile")

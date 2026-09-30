@@ -38,9 +38,6 @@
       }
     ]
   },
-  "permissions": {
-    "allow": ["Bash(git push --force origin refs/ordna/tasks/*)"]
-  },
   "extraKnownMarketplaces": {
     "compound-engineering-plugin": {
       "source": {

@@ -38,7 +38,7 @@ Draft the retro using the following template:
 ```markdown
 ---
 type: retro
-id: T-NNN
+id: BA-NNN
 date:
 ---
 
@@ -58,7 +58,7 @@ date:
 
 ```
 
-- `id` is the ordna task ID
+- `id` is the Linear issue id the session worked (`docs/agents/issue-tracker.md`)
 - `date` (YYYY-MM-DD)
 
 ---

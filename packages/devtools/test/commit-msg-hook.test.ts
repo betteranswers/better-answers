@@ -26,7 +26,7 @@ afterAll(() => {
 });
 
 const GOOD_SUBJECT = "feat(devtools): take a change through the queue";
-const GOOD = `${GOOD_SUBJECT}\n\nA paragraph saying what changed and why.\n\nRefs: T-332`;
+const GOOD = `${GOOD_SUBJECT}\n\nA paragraph saying what changed and why.\n\nRefs: BA-11`;
 const OVER_THE_CEILING = `docs: say what changed${" and say it again".repeat(3)}`;
 const AT_THE_CEILING = OVER_THE_CEILING.slice(0, 72);
 
@@ -38,9 +38,9 @@ const REFUSED_BY_COMMITLINT = [
     named: "[type-empty]",
   },
   {
-    shape: "a ticket id in the subject",
+    shape: "an issue id in the subject",
     directory: "ticket-in-the-subject",
-    message: `${GOOD_SUBJECT} [T-332]`,
+    message: `${GOOD_SUBJECT} [BA-11]`,
     named: "[header-names-no-ticket]",
   },
   {

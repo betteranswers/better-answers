@@ -325,12 +325,12 @@ const tagged = (pushing: Pushing): void => {
   gitIn(pushing.root, "tag", "probe");
 };
 
-const TASK_REF = "refs/ordna/tasks/T-1";
+const CUSTOM_REF = "refs/probe/one";
 
-const taskFiled = (pushing: Pushing): void => {
-  writeUnder(pushing.root, "task.md", "a task, left untracked\n");
-  const blob = gitIn(pushing.root, "hash-object", "-w", "task.md").trim();
-  gitIn(pushing.root, "update-ref", TASK_REF, blob);
+const customRefWritten = (pushing: Pushing): void => {
+  writeUnder(pushing.root, "blob.md", "a blob, left untracked\n");
+  const blob = gitIn(pushing.root, "hash-object", "-w", "blob.md").trim();
+  gitIn(pushing.root, "update-ref", CUSTOM_REF, blob);
 };
 
 type CarriesNothing = {
@@ -360,11 +360,11 @@ const CARRY_NOTHING: readonly CarriesNothing[] = [
     left: ["refs/heads/main"],
   },
   {
-    push: "an ordna ref",
-    directory: "ordna",
-    before: taskFiled,
-    refspec: TASK_REF,
-    left: ["refs/heads/main", TASK_REF],
+    push: "a custom ref",
+    directory: "custom-ref",
+    before: customRefWritten,
+    refspec: CUSTOM_REF,
+    left: ["refs/heads/main", CUSTOM_REF],
   },
   {
     push: "a branch's deletion",

@@ -61,20 +61,20 @@ gh api graphql -F owner='{owner}' -F name='{repo}' -f query='
 
 ### The commit's form
 
-**Conventional Commits: a subject `type(scope): summary` of 72 characters at most. Then a blank line and the body: what changed and why, in plain prose. Then a blank line and the footer, `Refs: T-nnn`.**
+**Conventional Commits: a subject `type(scope): summary` of 72 characters at most. Then a blank line and the body: what changed and why, in plain prose. Then a blank line and the footer, `Refs: BA-N`, naming the Linear issue.**
 
 ```
-docs: say how a moved ticket ref is pushed to origin
+docs: say how a task from before linear is read
 
-The note said to push a moved ref but not how, and a plain push is refused because a blob ref never fast-forwards. It now gives the command, with --force.
+The tracker note named the ordna refs but not how a fresh clone reads one. It now gives the fetch and the read.
 
-Refs: T-123
+Refs: BA-123
 ```
 
 - The summary is imperative and lower-case, with no full stop. A name keeps its capitals in backticks: `` fix(api): refuse an `OKF` key with no prefix ``.
 - The types: `feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `build`, `ci`, `chore`, `revert`.
 - The scope is optional and names a workspace or an area: `api`, `web`, `worker`, `core`, `schema`, `devtools`, `design-system`, `deploy`, `ci`, `docs`, `auth`, `people`, `ops`. `deps` is Renovate's.
-- The ticket goes in the footer, never in the subject. A change with no ticket has no footer.
+- The issue goes in the footer, never in the subject. A change with no issue has no footer. Commits before Linear cite ordna tasks as `Refs: T-nnn`.
 
 One commitlint config, `commitlint.config.mjs`, holds the form in two places. Each refusal names the rule it broke.
 
@@ -105,7 +105,6 @@ You need:
 ### Platform: macOS
 
 - The shell is macOS with bash 3.2 and BSD userland. Do NOT use GNU-only sed flags (use `sed -i ''` or perl), bash associative arrays, or other bash 4+ features in scripts.
-- Prefer `/usr/bin/git` over Homebrew git for `ordna` commands, because Homebrew git has hung `ordna list`.
 
 ### Platform: Claude Code on the web
 
