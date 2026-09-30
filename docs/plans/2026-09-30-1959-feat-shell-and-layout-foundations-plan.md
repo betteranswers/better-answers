@@ -187,7 +187,7 @@ This plan covers the shell and layout foundations. The breakdown below is the cu
   - it binds ⌘B globally;
   - it has its own breakpoint hook, where the shell reads `--shell-wide`;
   - it animates the collapse, where the specs expect the nav gone within 100ms and the lint rule forbids layout animation;
-  - its mobile sheet is titled "Sidebar", which the glossary avoids, and it brings lucide icons into a Phosphor-only app;
+  - its mobile sheet is titled "Sidebar", which the glossary avoids, and it brings lucide icons into a web client that uses Phosphor only;
   - it is one panel, where this shell needs a rail beside a nav under a band.
 
   The breadcrumb arrives from the registry, and command is already installed. The design system's kits card changes to say so (U3). (session-settled: user-approved — chosen over installing shadcn's Sidebar: six conflicts with current guarantees.) Covers R1, R2, R3, R15.
