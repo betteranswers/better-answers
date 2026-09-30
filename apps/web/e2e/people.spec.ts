@@ -3,14 +3,16 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 import { INVITATION_WORDS } from "@/features/auth/invitation-words.ts";
 import { SAID_OF_ACCEPTING } from "@/features/auth/refusal-words.ts";
 import { SAID_OF_A_MEMBER } from "@/features/people/refusal-words.ts";
+import { aRole } from "@/features/people/role-meanings.ts";
 import { SELECT_FIRST } from "@/shared/keystroke-words.ts";
+import { CONTROL_CENTRE, groupIn, HOMES, screenNamed } from "@/shared/navigation.ts";
 import { SAID_OF_CLASS, sentenceOf } from "@/shared/refusal-words.ts";
-import { screenById, viewNamed, viewsOf } from "@/shared/screens.ts";
 
 import { expect, test } from "./browser.ts";
 import {
   addMember,
   aMemberSignedInAt,
+  notFoundOfferingHome,
   anAddress,
   askToJoin,
   clockTheNextKey,
@@ -30,15 +32,15 @@ const LIST_BUDGET_MS = 1000;
 
 const ACT_BUDGET_MS = 100;
 
-const people = screenById("people");
+const people = groupIn(CONTROL_CENTRE, "people");
 
-const MEMBERS_VIEW = "/people/members";
+const MEMBERS_SCREEN = screenNamed(people, "Members").path;
 
-const AUDIT_LOG_VIEW = "/people/audit-log";
+const AUDIT_LOG_SCREEN = screenNamed(groupIn(CONTROL_CENTRE, "system"), "Audit log").path;
 
-const GROUPS_VIEW = viewNamed(people, "Groups").path;
+const GROUPS_SCREEN = screenNamed(people, "Groups").path;
 
-const rail = (page: Page) => page.getByRole("navigation", { name: "Control Centre" });
+const nav = (page: Page) => page.getByRole("navigation", { name: CONTROL_CENTRE.name });
 
 const membersRegion = (page: Page) => page.getByRole("region", { name: "Members" });
 
@@ -149,7 +151,7 @@ const anAdminAtPeople = async (
 
   await page.goto("/sign-in");
   await signIn(page, api, admin);
-  await rail(page).getByRole("link", { name: "People" }).click();
+  await nav(page).getByRole("link", { name: "Members" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
   return { admin, workspaceId: workspace.workspaceId, joined, stranger, slug: workspace.slug };
 };
@@ -164,7 +166,7 @@ const anAdminBesideAnotherAtPeople = async (
   const workspace = await provision(api, { name: workspaceName, adminEmail: admin });
   const successor = await person(api, anAddress("ada"), { displayName: "Ada Hartley" });
   await addMember(api, { workspaceId: workspace.workspaceId, userId: successor.id, role: "Admin" });
-  await page.goto(MEMBERS_VIEW);
+  await page.goto(MEMBERS_SCREEN);
   await signIn(page, api, admin);
   await expect(memberRows(page)).toHaveCount(2);
 };
@@ -176,20 +178,14 @@ const removedThroughTheirSheet = async (page: Page, name: string): Promise<void>
   await removal.getByRole("button", { name: `Remove ${name} from this workspace` }).click();
 };
 
-test.describe("the People screen's Members view", () => {
-  test("opens People on Members, and no view is called Roles", async ({ page, request }) => {
+test.describe("the People group's Members screen", () => {
+  test("opens People on Members, and no screen is called Roles", async ({ page, request }) => {
     await anAdminAtPeople(page, request, "Calder Joinery");
 
-    await expect(page).toHaveURL(new RegExp(`${MEMBERS_VIEW}$`));
-    await expect(page.getByRole("navigation", { name: "People" }).getByRole("link")).toHaveText([
-      "Members",
-      "Groups",
-      "Owners",
-      "Thresholds",
-      "Erasure and suppression",
-      "Tokens",
-      "Audit log",
-    ]);
+    await expect(page).toHaveURL(new RegExp(`${MEMBERS_SCREEN}$`));
+    await expect(nav(page).getByRole("link", { name: "Members" })).toBeVisible();
+    await expect(nav(page).getByRole("link", { name: "Groups" })).toBeVisible();
+    await expect(nav(page).getByRole("link", { name: "Roles" })).toHaveCount(0);
     await expect(page.getByRole("tab")).toHaveText(["Members", "Invitations", "Requests"]);
     await expect(page.getByRole("tab", { name: "Members" })).toHaveAttribute(
       "aria-selected",
@@ -255,7 +251,7 @@ test.describe("the People screen's Members view", () => {
 
     // A fresh document, so no list is already in the page's cache.
     const started = Date.now();
-    await page.goto(MEMBERS_VIEW);
+    await page.goto(MEMBERS_SCREEN);
     await expect(memberRows(page)).toHaveCount(3);
     const elapsed = Date.now() - started;
 
@@ -266,14 +262,11 @@ test.describe("the People screen's Members view", () => {
   });
 
   for (const role of ["Editor", "Viewer"] as const) {
-    test(`refuses a member at ${role} the list, saying why`, async ({ page, request }) => {
-      const workspace = await aMemberSignedInAt(page, request, role, MEMBERS_VIEW);
+    test(`shows ${aRole(role)} Members as not found, listing no one`, async ({ page, request }) => {
+      const workspace = await aMemberSignedInAt(page, request, role, MEMBERS_SCREEN);
 
-      await saysItsSentenceNotItsWord(membersRegion(page).getByRole("alert"), {
-        table: SAID_OF_A_MEMBER,
-        word: "role-forbids",
-      });
-      await expect(membersRegion(page).getByRole("table")).toHaveCount(0);
+      await notFoundOfferingHome(page, role);
+      await expect(membersRegion(page)).toHaveCount(0);
       await expect(page.locator("body")).not.toContainText(workspace.admin.email);
     });
   }
@@ -285,7 +278,7 @@ test.describe("the People screen's Members view", () => {
   }) => {
     await anAdminAtPeople(page, request, "Calder Castings");
     // A fresh document, so the first Tab starts from the top rather than from the rail's link.
-    await page.goto(MEMBERS_VIEW);
+    await page.goto(MEMBERS_SCREEN);
     await expect(memberRows(page)).toHaveCount(3);
 
     await skipLinkReachesTheScreen(page);
@@ -487,16 +480,24 @@ test.describe("a member, opened as a sheet", () => {
     );
     await page.keyboard.press("Escape");
 
+    await expect(sheet).toHaveCount(0);
     await expect(bar).toContainText("Editor");
     await expect(bar).not.toContainText("Admin");
     await expect(membersRegion(page).getByRole("alert")).toHaveText(
       sentenceOf(SAID_OF_A_MEMBER["role-forbids"]),
     );
+
+    // The screen was decided on arrival; coming back to it asks again, as an Editor.
+    await page.getByRole("link", { name: HOMES.Editor.name, exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`${HOMES.Editor.path}$`));
+    await page.goBack();
+    await expect(page).toHaveURL(new RegExp(`${MEMBERS_SCREEN}$`));
+    await notFoundOfferingHome(page, "Editor");
   });
 
   test("opens a member and changes their role by keyboard alone", async ({ page, request }) => {
     await anAdminAtPeople(page, request, "Calder Rolling");
-    await page.goto(MEMBERS_VIEW);
+    await page.goto(MEMBERS_SCREEN);
     await expect(memberRows(page)).toHaveCount(3);
 
     await page.keyboard.press("c");
@@ -554,7 +555,7 @@ const anAdminWithAMemberOfTwo = async (page: Page, api: APIRequestContext) => {
   const priya = await person(api, anAddress("priya"), { displayName: "Priya Shah" });
   await addMember(api, { workspaceId: workspace.workspaceId, userId: priya.id, role: "Editor" });
   await addMember(api, { workspaceId: elsewhere.workspaceId, userId: priya.id, role: "Viewer" });
-  await page.goto(MEMBERS_VIEW);
+  await page.goto(MEMBERS_SCREEN);
   await signIn(page, api, admin);
   await expect(memberRows(page)).toHaveCount(2);
   return { elsewhere };
@@ -601,7 +602,7 @@ test.describe("revoking a member's credentials here", () => {
   }) => {
     const admin = anAddress("admin");
     await provision(request, { name: "Esk Rolling", adminEmail: admin });
-    await page.goto(MEMBERS_VIEW);
+    await page.goto(MEMBERS_SCREEN);
     await signIn(page, request, admin);
     await expect(memberRows(page)).toHaveCount(1);
 
@@ -619,7 +620,7 @@ test.describe("revoking a member's credentials here", () => {
     );
     await page.reload();
     await signIn(page, request, admin);
-    await expect(page).toHaveURL(new RegExp(`${MEMBERS_VIEW}$`));
+    await expect(page).toHaveURL(new RegExp(`${MEMBERS_SCREEN}$`));
     await expect(memberRows(page)).toHaveCount(1);
     await expect(membersRegion(page).getByRole("alert")).toHaveCount(0);
   });
@@ -629,7 +630,7 @@ test.describe("revoking a member's credentials here", () => {
     request,
   }) => {
     await anAdminAtPeople(page, request, "Nidd Presswork");
-    await page.goto(MEMBERS_VIEW);
+    await page.goto(MEMBERS_SCREEN);
     await expect(memberRows(page)).toHaveCount(3);
 
     await page.keyboard.press("v");
@@ -748,7 +749,7 @@ test.describe("removing a member from their sheet", () => {
 
   test("removes a member by keyboard alone", async ({ page, request }) => {
     await anAdminAtPeople(page, request, "Calder Presswork");
-    await page.goto(MEMBERS_VIEW);
+    await page.goto(MEMBERS_SCREEN);
     await expect(memberRows(page)).toHaveCount(3);
 
     await page.keyboard.press("d");
@@ -862,26 +863,26 @@ test.describe("a member's display name, flagged to the operator", () => {
 
 test.describe("the People screen's words", () => {
   // Every People surface joins this test as it is built: the product's word is workspace.
-  test("says workspace, never organisation, on every People view", async ({ page, request }) => {
+  test("says workspace, never organisation, on every People screen", async ({ page, request }) => {
     const { admin, slug } = await anAdminAtPeople(page, request, "Ryedale Metalwork");
     const organisation = /organi[sz]ation/i;
 
     const said = async (where: string) => {
-      await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
       await expect(page.locator("body"), where).not.toContainText(organisation);
       expect(await page.locator("body").ariaSnapshot(), where).not.toMatch(organisation);
     };
 
-    for (const view of viewsOf(people)) {
-      await page.goto(view.path);
-      await said(view.path);
+    for (const each of people.screens.filter((candidate) => candidate.built)) {
+      await page.goto(each.path);
+      await said(each.path);
     }
 
-    await page.goto(MEMBERS_VIEW);
+    await page.goto(MEMBERS_SCREEN);
     await expect(memberRows(page)).toHaveCount(3);
     for (const tab of ["Members", "Invitations", "Requests"]) {
       await page.getByRole("tab", { name: tab }).click();
-      await said(`${MEMBERS_VIEW}, the ${tab} tab`);
+      await said(`${MEMBERS_SCREEN}, the ${tab} tab`);
     }
 
     await page.getByRole("tab", { name: "Members" }).click();
@@ -893,26 +894,26 @@ test.describe("the People screen's words", () => {
     await expect(page.locator("body"), "a member's sheet").not.toContainText(organisation);
     expect(await sheet.ariaSnapshot(), "a member's sheet").not.toMatch(organisation);
 
-    await page.goto(AUDIT_LOG_VIEW);
+    await page.goto(AUDIT_LOG_SCREEN);
     const auditLog = page.getByRole("region", { name: "Audit log" });
     await expect(auditLog.getByRole("row").filter({ has: page.getByRole("cell") })).toHaveCount(1);
     await auditLog.getByRole("button", { name: /^Details of/ }).click();
     await expect(auditLog).toContainText("platform.workspace.provisioned");
-    await said(`${AUDIT_LOG_VIEW}, an event opened`);
+    await said(`${AUDIT_LOG_SCREEN}, an event opened`);
     await auditLog.getByRole("combobox", { name: "Family" }).click();
     await expect(page.getByRole("listbox"), "the families listed").not.toContainText(organisation);
     await page.keyboard.press("Escape");
 
-    await page.goto(MEMBERS_VIEW);
+    await page.goto(MEMBERS_SCREEN);
     await memberButton(page, "Priya Shah").click();
     await revokeButton(sheet, "Priya Shah").click();
     await expect(sheet.getByRole("status")).toContainText("credentials here are revoked");
     await expect(page.locator("body"), "a revocation").not.toContainText(organisation);
     expect(await sheet.ariaSnapshot(), "a revocation").not.toMatch(organisation);
 
-    await page.goto(AUDIT_LOG_VIEW);
+    await page.goto(AUDIT_LOG_SCREEN);
     await expect(auditLog).toContainText("Member credentials revoked");
-    await said(`${AUDIT_LOG_VIEW}, a revocation logged`);
+    await said(`${AUDIT_LOG_SCREEN}, a revocation logged`);
 
     // A modal hides the page behind it from the tree, so each one is read on its own.
     const saidIn = async (modal: Locator, where: string) => {
@@ -922,7 +923,7 @@ test.describe("the People screen's words", () => {
     };
 
     // Last, so the audit log above reads the one event the workspace's provisioning wrote.
-    await page.goto(MEMBERS_VIEW);
+    await page.goto(MEMBERS_SCREEN);
     await expect(memberRows(page)).toHaveCount(3);
     const inviting = page.getByRole("dialog", { name: "Invite a person" });
     await page.getByRole("tab", { name: "Invitations" }).click();
@@ -949,12 +950,12 @@ test.describe("the People screen's words", () => {
     await expect(page.getByRole("region", { name: "Requests" })).toContainText("Approved.");
     await said("the Requests tab once the request is approved");
 
-    await page.goto(GROUPS_VIEW);
+    await page.goto(GROUPS_SCREEN);
     const naming = page.getByRole("textbox", { name: "Name of a new group" });
     await naming.fill("Site leads");
     await naming.press("Enter");
     await expect(page.getByRole("button", { name: "Site leads", exact: true })).toBeFocused();
-    await said(`${GROUPS_VIEW}, a group created`);
+    await said(`${GROUPS_SCREEN}, a group created`);
     await page.getByRole("button", { name: "Site leads", exact: true }).click();
     const group = page.getByRole("dialog", { name: "Site leads" });
     await saidIn(group, "a group's sheet");

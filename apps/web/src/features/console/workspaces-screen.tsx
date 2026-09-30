@@ -3,8 +3,8 @@ import type { inferOutput } from "@trpc/tanstack-react-query";
 import { useId } from "react";
 
 import { useTRPC } from "@/shared/api/trpc.ts";
+import { CONSOLE, groupIn } from "@/shared/navigation.ts";
 import { RefusalLine } from "@/shared/refusal-outcome.tsx";
-import { consoleScreenById } from "@/shared/screens.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
@@ -17,7 +17,7 @@ type ListedWorkspace = inferOutput<
   ReturnType<typeof useTRPC>["console"]["workspaces"]["list"]
 >[number];
 
-const workspaces = consoleScreenById("workspaces");
+const workspaces = groupIn(CONSOLE, "workspaces");
 
 const useWorkspaces = () => {
   const api = useTRPC();
@@ -95,7 +95,7 @@ function ListState(properties: { readonly listed: ReturnType<typeof useWorkspace
   return <p>{counted(listed.data.length, "workspace", "workspaces")} on the platform.</p>;
 }
 
-export function WorkspacesView() {
+export function WorkspacesScreen() {
   const listed = useWorkspaces();
   const listId = useId();
 

@@ -1,5 +1,5 @@
+import type { Role } from "@/shared/navigation.ts";
 import { aRole, ROLE_FOR_A_NEWCOMER } from "@/shared/role-words.ts";
-import type { Role } from "@/shared/screens.ts";
 
 export const invitedAs = (inviter: string, role: Role): string =>
   `${inviter} invited you as ${aRole(role)}.`;

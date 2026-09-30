@@ -1,19 +1,19 @@
 import { useId } from "react";
 
 import { KeystrokesAct } from "@/shared/keystrokes.tsx";
-import { consoleScreenById } from "@/shared/screens.ts";
-import type { ViewToolbar } from "@/shared/view-toolbar.tsx";
+import { CONSOLE, groupIn } from "@/shared/navigation.ts";
+import type { ScreenToolbar } from "@/shared/screen-toolbar.tsx";
 
 import { EveryoneList } from "./everyone-list.tsx";
 import { PEOPLE_KEYSTROKES } from "./people-keystrokes.ts";
 
-const people = consoleScreenById("people");
+const people = groupIn(CONSOLE, "people");
 
-export const EVERYONE_TOOLBAR: ViewToolbar = {
+export const EVERYONE_TOOLBAR: ScreenToolbar = {
   acts: <KeystrokesAct screen={people.name} keystrokes={Object.values(PEOPLE_KEYSTROKES)} />,
 };
 
-export function EveryoneView() {
+export function EveryoneScreen() {
   const headingId = useId();
 
   return (

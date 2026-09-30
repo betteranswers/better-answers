@@ -1,14 +1,42 @@
 import type { Locator, Page } from "@playwright/test";
 
+import { RAIL } from "@/app/words.ts";
 import { ROUTES_WORDS } from "@/features/routes/words.ts";
-import { SCREENS, viewsOf, type Screen } from "@/shared/screens.ts";
+import {
+  CONTROL_CENTRE,
+  groupIn,
+  headingOf,
+  HOMES,
+  screenNamed,
+  SURFACES,
+  visibleTo,
+} from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
-import { anAddress, provision, signIn, skipLinkReachesTheScreen } from "./harness.ts";
+import {
+  aMemberSignedInAt,
+  anAddress,
+  provision,
+  signIn,
+  skipLinkReachesTheScreen,
+} from "./harness.ts";
 
-const SCREEN_NAMES = ["Sources", "Suggestions", "Knowledge", "Questions", "People", "System"];
+/** What an Admin is shown today, read off the list: Control Centre and its built screens. */
+const AN_ADMINS = visibleTo({ role: "Admin", owns: [] }, SURFACES).surfaces;
 
-const SYSTEM_VIEWS = ["Signals", "Health", "Routes and spend", "Backups"];
+const SURFACE_NAMES = AN_ADMINS.map((surface) => surface.name);
+
+const SCREEN_NAMES = AN_ADMINS.flatMap((surface) =>
+  surface.groups.flatMap((group) => group.screens.map((each) => each.name)),
+);
+
+const ROUTES_AND_SPEND = screenNamed(
+  groupIn(CONTROL_CENTRE, "agent-operations"),
+  "Routes and spend",
+);
+
+/** The first heading Routes and spend draws: its group's name. */
+const ITS_HEADING = headingOf(ROUTES_AND_SPEND);
 
 const SWAP_BUDGET_MS = 1000;
 
@@ -21,10 +49,9 @@ const WIDE = { width: 1024, height: 720 };
 
 const SCREENS_AND_VIEWS = "Screens and views";
 
-const railOf = (page: Page) => page.getByRole("navigation", { name: "Control Centre" });
+const railOf = (page: Page) => page.getByRole("navigation", { name: RAIL });
 
-const navOf = (page: Page, screenName: string) =>
-  page.getByRole("navigation", { name: screenName });
+const navOf = (page: Page) => page.getByRole("navigation", { name: CONTROL_CENTRE.name });
 
 const closerOf = (page: Page) => page.getByRole("button", { name: "Hide the secondary nav" });
 
@@ -63,10 +90,9 @@ const paintedFill = (page: Page, name: string) =>
     .getByRole("link", { name })
     .evaluate((link) => getComputedStyle(link).backgroundColor);
 
-const weightOf = (page: Page, screenName: string, viewName: string) =>
-  page
-    .getByRole("navigation", { name: screenName })
-    .getByRole("link", { name: viewName })
+const weightOf = (page: Page, screenName: string) =>
+  navOf(page)
+    .getByRole("link", { name: screenName })
     .evaluate((link) => Number.parseInt(getComputedStyle(link).fontWeight, 10));
 
 const signedIn = async (page: Page, api: Parameters<typeof provision>[0], name: string) => {
@@ -77,105 +103,106 @@ const signedIn = async (page: Page, api: Parameters<typeof provision>[0], name: 
   return workspace;
 };
 
-test("names the icon rail's screens to eye, pointer and keyboard", async ({ page, request }) => {
+test("names the icon rail's surfaces to eye, pointer and keyboard", async ({ page, request }) => {
   await signedIn(page, request, "Wharfedale Castings");
-  await page.goto("/system/routes-and-spend");
+  await page.goto(ROUTES_AND_SPEND.path);
 
   const rail = railOf(page);
-  await expect(rail.getByRole("link")).toHaveText(SCREEN_NAMES);
+  await expect(rail.getByRole("link")).toHaveText(SURFACE_NAMES);
 
-  // The keyboard first, before any pointer has opened one, then the pointer on another
-  // entry: one provider shows one tooltip at a time.
+  // The keyboard first, before any pointer has opened one, then the pointer.
   await page.keyboard.press("Tab");
   await page.keyboard.press("Tab");
-  await expect(rail.getByRole("link", { name: "Sources" })).toBeFocused();
-  await expect(page.getByRole("tooltip").filter({ hasText: "Sources" }).first()).toBeVisible();
+  const entry = rail.getByRole("link", { name: CONTROL_CENTRE.name });
+  await expect(entry).toBeFocused();
+  const tooltip = page.getByRole("tooltip").filter({ hasText: CONTROL_CENTRE.name }).first();
+  await expect(tooltip).toBeVisible();
 
-  await rail.getByRole("link", { name: "People" }).hover();
-  await expect(page.getByRole("tooltip").filter({ hasText: "People" }).first()).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(tooltip).toHaveCount(0);
+  await entry.hover();
+  await expect(tooltip).toBeVisible();
 });
 
-test("marks only the screen being read in the icon rail", async ({ page, request }) => {
+test("marks the open surface in the rail, on any screen", async ({ page, request }) => {
   await signedIn(page, request, "Pennine Metalwork");
-  await page.goto("/people/thresholds");
+  await page.goto("/people/groups");
 
   const rail = railOf(page);
-  await expect(rail.getByRole("link", { name: "People" })).toHaveAttribute("aria-current", "page");
+  await expect(rail.getByRole("link", { name: CONTROL_CENTRE.name })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
   const marked = await rail
     .getByRole("link")
     .evaluateAll((links) => links.filter((link) => link.hasAttribute("aria-current")).length);
   expect(marked).toBe(1);
 
   // A fill where the others have none reads in greyscale, so the mark is not colour alone.
-  expect(await paintedFill(page, "People")).not.toBe("rgba(0, 0, 0, 0)");
-  expect(await paintedFill(page, "System")).toBe("rgba(0, 0, 0, 0)");
+  expect(await paintedFill(page, CONTROL_CENTRE.name)).not.toBe("rgba(0, 0, 0, 0)");
 });
 
-test("lists, marks and swaps the secondary nav's views by screen", async ({ page, request }) => {
+test("lists the open surface's groups and screens, marking one", async ({ page, request }) => {
   await signedIn(page, request, "Northern Tooling");
-  await page.goto("/system/health");
+  await page.goto("/system/audit-log");
 
-  const system = page.getByRole("navigation", { name: "System" });
-  await expect(system.getByRole("link")).toHaveText(SYSTEM_VIEWS);
-  await expect(system.getByRole("link", { name: "Health" })).toHaveAttribute(
+  const nav = navOf(page);
+  await expect(nav.getByRole("link")).toHaveText(SCREEN_NAMES);
+  await expect(nav.getByRole("link", { name: "Audit log" })).toHaveAttribute(
     "aria-current",
     "page",
   );
 
-  // Set heavier than its neighbours, so the current view survives a greyscale screen.
-  expect(await weightOf(page, "System", "Health")).toBeGreaterThan(
-    await weightOf(page, "System", "Backups"),
-  );
+  // Set heavier than its neighbours, so the current screen survives a greyscale screen.
+  expect(await weightOf(page, "Audit log")).toBeGreaterThan(await weightOf(page, "Members"));
 
-  await expect(system).toMatchAriaSnapshot(`
-    - navigation "System":
-      - heading "System" [level=2]
+  await expect(nav).toMatchAriaSnapshot(`
+    - navigation "Control Centre":
+      - heading "Control Centre" [level=2]
+      - heading "Sources" [level=3]
       - list:
         - listitem:
-          - link "Signals"
-        - listitem:
-          - link "Health"
+          - link "Bindings"
+      - heading "Agent Operations" [level=3]
+      - list:
         - listitem:
           - link "Routes and spend"
+      - heading "People" [level=3]
+      - list:
         - listitem:
-          - link "Backups"
+          - link "Members"
+        - listitem:
+          - link "Groups"
+      - heading "System" [level=3]
+      - list:
+        - listitem:
+          - link "Audit log"
   `);
 
   const started = Date.now();
-  await railOf(page).getByRole("link", { name: "Knowledge" }).click();
-  const knowledge = page.getByRole("navigation", { name: "Knowledge" });
-  await expect(knowledge.getByRole("link")).toHaveText([
-    "Review table",
-    "Conflicts and verification requests",
-    "Exports",
-  ]);
+  await nav.getByRole("link", { name: "Members" }).click();
+  await expect(nav.getByRole("link", { name: "Members" })).toHaveAttribute("aria-current", "page");
   const elapsed = Date.now() - started;
-  test.info().annotations.push({ type: "secondary nav swap", description: `${elapsed} ms` });
+  test.info().annotations.push({ type: "secondary nav move", description: `${elapsed} ms` });
   expect(elapsed).toBeLessThan(SWAP_BUDGET_MS);
 
-  await expect(page.getByRole("navigation", { name: "System" })).toHaveCount(0);
-  await expect(page.getByText("This view is not built yet.")).toBeVisible();
-
   // `goto` is the bookmark: a fresh document at a path no file sits at, not a click.
-  await page.goto("/people/erasure-and-suppression");
-  await expect(
-    page
-      .getByRole("navigation", { name: "People" })
-      .getByRole("link", { name: "Erasure and suppression" }),
-  ).toHaveAttribute("aria-current", "page");
-  await expect(
-    page.getByRole("heading", { level: 2, name: "Erasure and suppression" }),
-  ).toBeVisible();
+  await page.goto("/people/groups");
+  await expect(navOf(page).getByRole("link", { name: "Groups" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
 });
 
-test("names workspace, screen, view, person, role in the top bar", async ({ page, request }) => {
+test("names workspace, group, screen, person, role in the top bar", async ({ page, request }) => {
   const workspace = await signedIn(page, request, "Halifax Fabrication");
-  await page.goto("/system/routes-and-spend");
+  await page.goto(ROUTES_AND_SPEND.path);
 
   const bar = page.getByRole("banner");
   await expect(bar.getByText(workspace.name)).toBeVisible();
-  await expect(bar.getByText("System", { exact: true })).toBeVisible();
-  await expect(bar.getByText("Routes and spend", { exact: true })).toBeVisible();
+  await expect(bar.getByText(ITS_HEADING, { exact: true })).toBeVisible();
+  await expect(bar.getByText(ROUTES_AND_SPEND.name, { exact: true })).toBeVisible();
 
   const you = bar.getByRole("button", { name: new RegExp(workspace.admin.name) });
   await expect(you).toContainText("Admin");
@@ -187,22 +214,24 @@ test("names workspace, screen, view, person, role in the top bar", async ({ page
 
 test("tabs skip link, icon rail, secondary nav, top bar, screen", async ({ page, request }) => {
   const workspace = await signedIn(page, request, "Dales Engineering");
-  await page.goto("/system/routes-and-spend");
+  await page.goto(ROUTES_AND_SPEND.path);
   const rail = railOf(page);
-  await expect(rail.getByRole("link", { name: "System" })).toHaveAttribute("aria-current", "page");
+  await expect(rail.getByRole("link", { name: CONTROL_CENTRE.name })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
 
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "Skip to the screen" })).toBeFocused();
 
-  for (const name of SCREEN_NAMES) {
+  for (const name of SURFACE_NAMES) {
     await page.keyboard.press("Tab");
     await expect(rail.getByRole("link", { name })).toBeFocused();
   }
 
-  const system = page.getByRole("navigation", { name: "System" });
-  for (const name of SYSTEM_VIEWS) {
+  for (const name of SCREEN_NAMES) {
     await page.keyboard.press("Tab");
-    await expect(system.getByRole("link", { name })).toBeFocused();
+    await expect(navOf(page).getByRole("link", { name })).toBeFocused();
   }
 
   // The control over the navigation opens the top bar, where it is the same corner a narrow
@@ -236,9 +265,9 @@ test("tabs skip link, icon rail, secondary nav, top bar, screen", async ({ page,
 // a screen with nothing focused.
 test("moves focus from the skip link into the content", async ({ page, request }) => {
   await signedIn(page, request, "Ribble Toolmaking");
-  await page.goto("/system/routes-and-spend");
+  await page.goto(ROUTES_AND_SPEND.path);
   // A keypress before the shell has drawn is spent on nothing, so wait for the screen first.
-  await expect(page.getByRole("heading", { level: 1, name: "System" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: ITS_HEADING })).toBeVisible();
 
   await skipLinkReachesTheScreen(page);
 });
@@ -249,8 +278,8 @@ test("scrolls nothing sideways at 320 pixels, navigation open or closed", async 
 }) => {
   await signedIn(page, request, "Acme Joinery");
   await page.setViewportSize(NARROW);
-  await page.goto("/system/routes-and-spend");
-  await expect(page.getByRole("heading", { level: 1, name: "System" })).toBeVisible();
+  await page.goto(ROUTES_AND_SPEND.path);
+  await expect(page.getByRole("heading", { level: 1, name: ITS_HEADING })).toBeVisible();
 
   const closed = await sidewaysRoom(page);
   expect(closed.scrolls).toBeLessThanOrEqual(closed.holds);
@@ -268,7 +297,7 @@ test("scrolls nothing sideways at 320 pixels, navigation open or closed", async 
 
 test("paints the shell in the page's own surface token", async ({ page, request }) => {
   await signedIn(page, request, "Southern Castings");
-  await page.goto("/system/routes-and-spend");
+  await page.goto(ROUTES_AND_SPEND.path);
 
   const painted = await page.locator("main").evaluate((main) => {
     const nothing = "rgba(0, 0, 0, 0)";
@@ -299,7 +328,7 @@ const tabsOf = (page: Page) => page.getByRole("tablist", { name: "Routes and spe
 const routesCardOf = (page: Page) => page.getByRole("region", { name: "Routes" });
 
 /**
- * The view reads the routes after the nav paints, so a screen here has started only once its
+ * The screen reads the routes after the nav paints, so a screen here has started only once its
  * card says a new workspace has none.
  */
 const theRoutesHaveLanded = (page: Page) =>
@@ -307,7 +336,7 @@ const theRoutesHaveLanded = (page: Page) =>
 
 test("fills the toolbar with tabs the arrow keys move between", async ({ page, request }) => {
   await signedIn(page, request, "Calder Ironworks");
-  await page.goto("/system/routes-and-spend");
+  await page.goto(ROUTES_AND_SPEND.path);
 
   const tabs = tabsOf(page);
   await expect(tabs.getByRole("tab")).toHaveText(TOOLBAR_TABS);
@@ -335,10 +364,11 @@ test("fills the toolbar with tabs the arrow keys move between", async ({ page, r
   await expect(routesCardOf(page)).toBeVisible();
 });
 
-test("draws no toolbar over a view without tabs or acts", async ({ page, request }) => {
-  await signedIn(page, request, "Airedale Presswork");
-  await page.goto("/system/health");
-  await expect(page.getByRole("heading", { level: 2, name: "Health" })).toBeVisible();
+test("draws no toolbar over a screen without tabs or acts", async ({ page, request }) => {
+  await aMemberSignedInAt(page, request, "Viewer", HOMES.Viewer.path);
+  await expect(
+    page.getByRole("heading", { level: 1, name: headingOf(HOMES.Viewer) }),
+  ).toBeVisible();
 
   await expect(page.getByRole("tablist")).toHaveCount(0);
 
@@ -351,7 +381,7 @@ test("draws no toolbar over a view without tabs or acts", async ({ page, request
 
 test("tabs to the toolbar between the top bar and content", async ({ page, request }) => {
   const workspace = await signedIn(page, request, "Wensleydale Precision");
-  await page.goto("/system/routes-and-spend");
+  await page.goto(ROUTES_AND_SPEND.path);
   await theRoutesHaveLanded(page);
 
   // The order down to the top bar is another test's; starting at its last stop proves this
@@ -364,7 +394,7 @@ test("tabs to the toolbar between the top bar and content", async ({ page, reque
   await page.keyboard.press("Tab");
   await expect(tabsOf(page).getByRole("tab", { name: "Routes" })).toBeFocused();
 
-  // The open tab's panel holds the view, so the content is reached through the toolbar.
+  // The open tab's panel holds the screen, so the content is reached through the toolbar.
   const panel = page.getByRole("tabpanel");
   await page.keyboard.press("Tab");
   await expect(panel).toBeFocused();
@@ -377,9 +407,9 @@ test("toggles the secondary nav on the navigation control, freeing width", async
   passesTheAccessibilityGate,
 }) => {
   await signedIn(page, request, "Calder Pattern Works");
-  await page.goto("/system/routes-and-spend");
+  await page.goto(ROUTES_AND_SPEND.path);
 
-  const nav = navOf(page, "System");
+  const nav = navOf(page);
   await expect(nav).toBeVisible();
   await expect(tabsOf(page).getByRole("tab")).toHaveText(TOOLBAR_TABS);
   const rail = railOf(page);
@@ -425,8 +455,8 @@ test("toggles the secondary nav on the navigation control, freeing width", async
 
 test("remembers a closed secondary nav on this browser only", async ({ page, request }) => {
   const workspace = await signedIn(page, request, "Ribble Toolmaking");
-  await page.goto("/system/routes-and-spend");
-  await expect(navOf(page, "System")).toBeVisible();
+  await page.goto(ROUTES_AND_SPEND.path);
+  await expect(navOf(page)).toBeVisible();
   await theRoutesHaveLanded(page);
 
   // Listening only across the act, so neither the start above nor the reload below is mistaken
@@ -435,13 +465,13 @@ test("remembers a closed secondary nav on this browser only", async ({ page, req
   const noting = (each: { url: () => string }) => asked.push(each.url());
   page.on("request", noting);
   await closerOf(page).click();
-  await expect(navOf(page, "System")).toHaveCount(0);
+  await expect(navOf(page)).toHaveCount(0);
   page.off("request", noting);
   expect(asked).toEqual([]);
 
   await page.reload();
-  await expect(page.getByRole("heading", { level: 1, name: "System" })).toBeVisible();
-  await expect(navOf(page, "System")).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 1, name: ITS_HEADING })).toBeVisible();
+  await expect(navOf(page)).toHaveCount(0);
   await expect(openerOf(page)).toBeVisible();
 
   const kept = await keptOnThisBrowser(page);
@@ -465,19 +495,19 @@ test("opens the navigation over narrow content, holding and returning focus", as
 }) => {
   await signedIn(page, request, "Wharfedale Castings");
   await page.setViewportSize(NARROW);
-  await page.goto("/system/routes-and-spend");
-  await expect(page.getByRole("heading", { level: 1, name: "System" })).toBeVisible();
+  await page.goto(ROUTES_AND_SPEND.path);
+  await expect(page.getByRole("heading", { level: 1, name: ITS_HEADING })).toBeVisible();
 
   await expect(railOf(page)).toHaveCount(0);
-  await expect(navOf(page, "System")).toHaveCount(0);
+  await expect(navOf(page)).toHaveCount(0);
   const contentWide = await widthOf(page.getByRole("main"));
 
   const menu = menuOf(page);
   await menu.click();
   const panel = panelOf(page);
-  await expect(panel.getByRole("navigation", { name: "Control Centre" })).toBeVisible();
-  await expect(panel.getByRole("navigation", { name: "System" })).toBeVisible();
-  await expect(panel.getByRole("link")).toHaveText([...SCREEN_NAMES, ...SYSTEM_VIEWS]);
+  await expect(panel.getByRole("navigation", { name: RAIL })).toBeVisible();
+  await expect(panel.getByRole("navigation", { name: CONTROL_CENTRE.name })).toBeVisible();
+  await expect(panel.getByRole("link")).toHaveText([...SURFACE_NAMES, ...SCREEN_NAMES]);
 
   // Over the content, not beside it: the content keeps every pixel it had.
   expect(await widthOf(page.getByRole("main"))).toBe(contentWide);
@@ -486,7 +516,7 @@ test("opens the navigation over narrow content, holding and returning focus", as
    * Twice round every stop it holds — the destinations and its way out — so a reader behind
    * it can never tab onto the screen.
    */
-  const stops = SCREEN_NAMES.length + SYSTEM_VIEWS.length + 1;
+  const stops = SURFACE_NAMES.length + SCREEN_NAMES.length + 1;
   expect(await holdsFocus(panel)).toBe(true);
   for (let step = 0; step < stops * 2; step += 1) {
     await page.keyboard.press("Tab");
@@ -506,19 +536,19 @@ test("closes the navigation over the content on a chosen destination", async ({
 }) => {
   await signedIn(page, request, "Northern Tooling");
   await page.setViewportSize(NARROW);
-  await page.goto("/system/routes-and-spend");
-  await expect(page.getByRole("heading", { level: 1, name: "System" })).toBeVisible();
+  await page.goto(ROUTES_AND_SPEND.path);
+  await expect(page.getByRole("heading", { level: 1, name: ITS_HEADING })).toBeVisible();
 
   const menu = menuOf(page);
   await menu.click();
-  await panelOf(page).getByRole("link", { name: "Health" }).click();
+  await panelOf(page).getByRole("link", { name: "Audit log" }).click();
 
   await expect(panelOf(page)).toHaveCount(0);
-  await expect(page.getByRole("heading", { level: 2, name: "Health" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "System" })).toBeVisible();
   await expect(menu).toBeFocused();
 
   await menu.click();
-  await panelOf(page).getByRole("link", { name: "People" }).click();
+  await panelOf(page).getByRole("link", { name: CONTROL_CENTRE.name }).click();
 
   await expect(panelOf(page)).toHaveCount(0);
   await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
@@ -530,8 +560,8 @@ test("closes Screens and views on widening, focusing the navigation control", as
 }) => {
   await signedIn(page, request, "Calder Pressings");
   await page.setViewportSize(NARROW);
-  await page.goto("/system/routes-and-spend");
-  await expect(page.getByRole("heading", { level: 1, name: "System" })).toBeVisible();
+  await page.goto(ROUTES_AND_SPEND.path);
+  await expect(page.getByRole("heading", { level: 1, name: ITS_HEADING })).toBeVisible();
 
   await menuOf(page).click();
   await expect(panelOf(page)).toBeVisible();
@@ -542,28 +572,25 @@ test("closes Screens and views on widening, focusing the navigation control", as
 
   await expect(panelOf(page)).toHaveCount(0);
   await expect(railOf(page)).toBeVisible();
-  await expect(navOf(page, "System")).toBeVisible();
+  await expect(navOf(page)).toBeVisible();
   await expect(closerOf(page)).toBeFocused();
 });
 
-const opensABuiltView = (screen: Screen): boolean =>
-  viewsOf(screen).some((view) => view.path === screen.defaultView && view.built);
-
-test("leads each built screen with its line, auditing every screen", async ({
+test("leads each built screen with its group's line, auditing each", async ({
   page,
   request,
   passesTheAccessibilityGate,
 }) => {
   await signedIn(page, request, "Swaledale Foundry");
 
-  for (const screen of SCREENS) {
-    await page.goto(screen.path);
-    await expect(page.getByRole("heading", { level: 1, name: screen.name })).toBeVisible();
-    await passesTheAccessibilityGate();
-  }
-
-  for (const screen of SCREENS.filter(opensABuiltView)) {
-    await page.goto(screen.path);
-    await expect(page.getByRole("main").getByText(screen.summary, { exact: true })).toBeVisible();
+  for (const group of AN_ADMINS.flatMap((surface) => surface.groups)) {
+    for (const screen of group.screens) {
+      await page.goto(screen.path);
+      await expect(page.getByRole("heading", { level: 1, name: headingOf(screen) })).toBeVisible();
+      await expect(
+        page.getByRole("main").getByText(group.summary ?? "", { exact: true }),
+      ).toBeVisible();
+      await passesTheAccessibilityGate();
+    }
   }
 });

@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 
 import { Icon } from "@/shared/icon.tsx";
-import type { Screen, Surface } from "@/shared/screens.ts";
+import type { Place, VisibleSurface } from "@/shared/navigation.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/shared/ui/sheet.tsx";
 
@@ -15,12 +15,11 @@ const SCREENS_AND_VIEWS = "Screens and views";
  * toggle when wide. `controls` is that nav's id.
  */
 export function NavigationControl(properties: {
-  readonly surface: Surface;
+  readonly surfaces: readonly VisibleSurface[];
   readonly wide: boolean;
   readonly showing: boolean;
   readonly controls: string;
-  readonly openScreen: Screen | undefined;
-  readonly openViewPath: string | undefined;
+  readonly open: Place | undefined;
   readonly onShow: (showing: boolean) => void;
 }) {
   const [asked, setAsked] = useState(false);
@@ -50,8 +49,8 @@ export function NavigationControl(properties: {
         </SheetTrigger>
       )}
 
-      {/* An address that is no screen has no views to list, so there is nothing to govern. */}
-      {properties.wide && properties.openScreen !== undefined ? (
+      {/* An address that is no screen has no surface to list, so there is nothing to govern. */}
+      {properties.wide && properties.open !== undefined ? (
         <Button
           ref={control}
           type="button"
@@ -80,17 +79,17 @@ export function NavigationControl(properties: {
         </SheetHeader>
 
         <IconRail
-          surface={properties.surface}
-          openScreen={properties.openScreen}
+          surfaces={properties.surfaces}
+          openSurfaceId={properties.open?.surface.id}
           tooltips={false}
           onChoose={close}
         />
 
-        {properties.openScreen === undefined ? null : (
+        {properties.open === undefined ? null : (
           <SecondaryNav
             showing
-            screen={properties.openScreen}
-            openViewPath={properties.openViewPath}
+            surface={properties.open.surface}
+            openScreenPath={properties.open.screen.path}
             onChoose={close}
           />
         )}

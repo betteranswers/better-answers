@@ -1,0 +1,411 @@
+import { cleanup, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { FAILED_SCREEN, goHome, RAIL, unbuiltLineOf, UNKNOWN_SCREEN } from "@/app/words.ts";
+import { aRole, ROLES } from "@/features/people/role-meanings.ts";
+import {
+  CONSOLE,
+  HOMES,
+  SURFACES,
+  visibleTo,
+  type Role,
+  type Screen,
+  type Surface,
+} from "@/shared/navigation.ts";
+
+import { appAt, openApp } from "./open-app.tsx";
+import { answeringAs, withTheApiDown } from "./stubbed-api.ts";
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
+
+const outline = (surfaces: readonly Surface[]) =>
+  surfaces.map((surface) => [
+    surface.name,
+    surface.groups.map((group) => [group.name ?? null, group.screens.map((each) => each.name)]),
+  ]);
+
+const nothingOwned = (role: Role | "operator" | undefined) => ({ role, owns: [] });
+
+const everyScreenOf = (surfaces: readonly Surface[]): readonly Screen[] =>
+  surfaces.flatMap((surface) => surface.groups.flatMap((group) => group.screens));
+
+/** Every screen called built and no home standing in, so what shows is the roles' doing. */
+const builtThroughout = (surface: Surface): Surface => ({
+  id: surface.id,
+  name: surface.name,
+  icon: surface.icon,
+  groups: surface.groups.map((group) => ({
+    ...group,
+    screens: group.screens.map((each) => ({ ...each, built: true })),
+  })),
+});
+
+const aScreen = (name: string, built: boolean, owners?: true): Screen => ({
+  name,
+  path: `/a/${name.toLowerCase()}`,
+  icon: "map",
+  built,
+  seenBy: ["Admin"],
+  ...(owners === undefined ? {} : { owners }),
+});
+
+describe("the one navigation list", () => {
+  it("declares ADR 0047's surfaces, groups and screens in order", () => {
+    expect(outline(SURFACES)).toEqual([
+      ["Ask", [[null, ["New question", "Your questions"]]]],
+      [
+        "Knowledge",
+        [
+          ["Browse", ["Search", "Guides"]],
+          [
+            "Curation",
+            ["All knowledge", "Checks due", "Conflicts", "Kinds", "Domains and owners", "Exports"],
+          ],
+        ],
+      ],
+      ["Inbox", [[null, ["Waiting on you"]]]],
+      [
+        "Control Centre",
+        [
+          ["Overview", ["Overview"]],
+          ["Suggestions", ["Queue"]],
+          [
+            "Sources",
+            [
+              "Bindings",
+              "Publish and accept gates",
+              "Priced plan",
+              "Backlogs",
+              "Gone-at-source impact",
+              "Agent tokens",
+            ],
+          ],
+          ["Agent Operations", ["Routes and spend", "Ceiling"]],
+          ["Questions", ["Answer audit", "Answer tests"]],
+          ["People", ["Members", "Groups", "Tokens"]],
+          ["Personal data", ["Erasure and suppression"]],
+          ["System", ["Audit log", "Signals", "Health", "Backups"]],
+        ],
+      ],
+    ]);
+  });
+
+  it("declares the console apart, for the operator alone", () => {
+    expect(outline([CONSOLE])).toEqual([
+      [
+        "Console",
+        [
+          ["People", ["Everyone", "Names waiting"]],
+          ["Workspaces", ["Every workspace"]],
+        ],
+      ],
+    ]);
+    expect(SURFACES).not.toContain(CONSOLE);
+    expect(everyScreenOf([CONSOLE]).map((each) => each.seenBy)).toEqual([
+      ["operator"],
+      ["operator"],
+      ["operator"],
+    ]);
+  });
+
+  it("calls only today's eight screens built", () => {
+    expect(
+      everyScreenOf([...SURFACES, CONSOLE])
+        .filter((each) => each.built)
+        .map((each) => each.path),
+    ).toEqual([
+      "/sources/bindings",
+      "/agent-operations/routes-and-spend",
+      "/people/members",
+      "/people/groups",
+      "/system/audit-log",
+      "/console/people/everyone",
+      "/console/people/names-waiting",
+      "/console/workspaces/every-workspace",
+    ]);
+  });
+
+  it("keeps group addresses at the root, the console's under /console", () => {
+    const controlCentre = SURFACES.find((surface) => surface.name === "Control Centre");
+    const strays = (controlCentre?.groups ?? []).flatMap((group) =>
+      group.screens
+        .filter((each) => !each.path.startsWith(`/${group.id}`))
+        .map((each) => each.path),
+    );
+
+    expect(strays).toEqual([]);
+    expect(everyScreenOf([CONSOLE]).filter((each) => !each.path.startsWith("/console/"))).toEqual(
+      [],
+    );
+  });
+
+  it("homes Admins on Members, Editors and Viewers on Ask", () => {
+    expect(ROLES.map((role) => [role, HOMES[role].path])).toEqual([
+      ["Admin", "/people/members"],
+      ["Editor", "/ask"],
+      ["Viewer", "/ask"],
+    ]);
+    expect(HOMES.operator.path).toBe("/console/workspaces/every-workspace");
+  });
+
+  it("gives each surface a glyph of its own", () => {
+    const glyphs = [...SURFACES, CONSOLE].map((surface) => surface.icon);
+
+    expect(new Set(glyphs).size).toBe(glyphs.length);
+  });
+});
+
+describe("what each person is shown", () => {
+  for (const role of ["Editor", "Viewer"] as const) {
+    it(`shows ${aRole(role)} Ask alone, at their home (AE2)`, () => {
+      const shown = visibleTo(nothingOwned(role), SURFACES);
+
+      expect(outline(shown.surfaces)).toEqual([["Ask", [[null, ["Ask"]]]]]);
+      expect(shown.home).toBe(HOMES[role]);
+      expect(shown.surfaces[0]?.opensAt).toBe(HOMES[role]);
+    });
+  }
+
+  it("shows an Admin Control Centre's built screens alone (AE3)", () => {
+    const shown = visibleTo(nothingOwned("Admin"), SURFACES);
+
+    expect(outline(shown.surfaces)).toEqual([
+      [
+        "Control Centre",
+        [
+          ["Sources", ["Bindings"]],
+          ["Agent Operations", ["Routes and spend"]],
+          ["People", ["Members", "Groups"]],
+          ["System", ["Audit log"]],
+        ],
+      ],
+    ]);
+    expect(shown.home).toBe(HOMES.Admin);
+    expect(shown.surfaces[0]?.opensAt).toBe(HOMES.Admin);
+  });
+
+  it("shows nothing and no home while the role is unknown", () => {
+    expect(visibleTo(nothingOwned(undefined), SURFACES)).toEqual({
+      surfaces: [],
+      home: undefined,
+    });
+  });
+
+  it("shows the operator the console, opening on Every workspace", () => {
+    const shown = visibleTo(nothingOwned("operator"), [CONSOLE]);
+
+    expect(outline(shown.surfaces)).toEqual(outline([CONSOLE]));
+    expect(shown.surfaces[0]?.opensAt).toBe(HOMES.operator);
+    expect(visibleTo(nothingOwned("operator"), SURFACES).surfaces).toEqual([]);
+  });
+
+  it("hides unbuilt groups, and surfaces left with no group", () => {
+    const aSurface: Surface = {
+      id: "a",
+      name: "A",
+      icon: "map",
+      groups: [
+        { id: "built", name: "Built", screens: [aScreen("Shown", true), aScreen("Not", false)] },
+        { id: "unbuilt", name: "Unbuilt", screens: [aScreen("Never", false)] },
+      ],
+    };
+    const unbuilt: Surface = { ...aSurface, id: "b", name: "B", groups: aSurface.groups.slice(1) };
+
+    const shown = visibleTo(nothingOwned("Admin"), [aSurface, unbuilt]);
+
+    expect(outline(shown.surfaces)).toEqual([["A", [["Built", ["Shown"]]]]]);
+    expect(shown.surfaces[0]?.opensAt.name).toBe("Shown");
+  });
+
+  it("shows a screen to its roles, and owners where marked", () => {
+    const aSurface: Surface = {
+      id: "a",
+      name: "A",
+      icon: "map",
+      groups: [
+        {
+          id: "g",
+          name: "G",
+          screens: [
+            aScreen("Owned", true, true),
+            aScreen("Roles", true),
+            aScreen("Later", false, true),
+          ],
+        },
+      ],
+    };
+
+    const namesFor = (role: Role, owns: readonly string[]) =>
+      everyScreenOf(visibleTo({ role, owns }, [aSurface]).surfaces).map((each) => each.name);
+
+    expect(namesFor("Admin", [])).toEqual(["Owned", "Roles"]);
+    expect(namesFor("Viewer", [])).toEqual([]);
+    expect(namesFor("Viewer", ["Answer"])).toEqual(["Owned"]);
+  });
+
+  it("declares who sees each group once its screens are built", () => {
+    const groupsFor = (role: Role, owns: readonly string[]) =>
+      visibleTo({ role, owns }, SURFACES.map(builtThroughout)).surfaces.map((surface) => [
+        surface.name,
+        surface.groups.map((group) => group.name ?? null),
+      ]);
+    const controlCentre = [
+      "Overview",
+      "Suggestions",
+      "Sources",
+      "Agent Operations",
+      "Questions",
+      "People",
+      "Personal data",
+      "System",
+    ];
+
+    expect(groupsFor("Admin", [])).toEqual([
+      ["Ask", [null]],
+      ["Knowledge", ["Browse", "Curation"]],
+      ["Inbox", [null]],
+      ["Control Centre", controlCentre],
+    ]);
+    for (const role of ["Editor", "Viewer"] as const) {
+      expect(groupsFor(role, [])).toEqual([
+        ["Ask", [null]],
+        ["Knowledge", ["Browse"]],
+      ]);
+      expect(groupsFor(role, ["Answer"])).toEqual([
+        ["Ask", [null]],
+        ["Knowledge", ["Browse", "Curation"]],
+        ["Inbox", [null]],
+      ]);
+    }
+  });
+});
+
+const heading = () => screen.getByRole("heading", { level: 1 }).textContent;
+
+const MOVED = [
+  ["/people/audit-log", "/system/audit-log"],
+  ["/system/routes-and-spend", "/agent-operations/routes-and-spend"],
+  ["/people", "/people/members"],
+  ["/sources", "/sources/bindings"],
+  ["/system", "/system/audit-log"],
+] as const;
+
+describe("an address that moved", () => {
+  for (const [from, to] of MOVED) {
+    it(`leads an Admin from ${from} to ${to} (AE8)`, async () => {
+      vi.stubGlobal("fetch", answeringAs("Admin"));
+
+      const { router } = await appAt(from);
+
+      expect(router.state.location.pathname).toBe(to);
+    });
+
+    for (const role of ["Editor", "Viewer"] as const) {
+      it(`shows ${aRole(role)} at ${from} the not-found screen`, async () => {
+        vi.stubGlobal("fetch", answeringAs(role));
+
+        const { router } = await openApp(from);
+
+        expect(heading()).toBe(UNKNOWN_SCREEN.heading);
+        expect(router.state.location.pathname).toBe(from);
+      });
+    }
+
+    it(`shows the failed read at ${from}, no role held`, async () => {
+      const clients = withTheApiDown();
+
+      const { router } = await openApp(from, clients);
+      await vi.waitFor(() => expect(clients.queryClient.isFetching()).toBe(0));
+
+      expect(heading()).toBe(FAILED_SCREEN.heading);
+      expect(router.state.location.pathname).toBe(from);
+    });
+  }
+
+  for (const [from, to] of [
+    ["/console/people", "/console/people/everyone"],
+    ["/console/workspaces", "/console/workspaces/every-workspace"],
+  ] as const) {
+    it(`leads the operator from ${from} to ${to}`, async () => {
+      vi.stubGlobal("fetch", answeringAs("Viewer", true));
+
+      const { router } = await appAt(from);
+
+      expect(router.state.location.pathname).toBe(to);
+    });
+  }
+});
+
+describe("an address the person may not see", () => {
+  it("shows a Viewer Members as not found, offering Ask (AE9)", async () => {
+    vi.stubGlobal("fetch", answeringAs("Viewer"));
+
+    const hidden = await openApp("/people/members");
+    const main = screen.getByRole("main");
+    await within(main).findByRole("link", { name: goHome(HOMES.Viewer) });
+    const drawn = { main: main.innerHTML, banner: screen.getByRole("banner").textContent };
+    hidden.rendered.unmount();
+
+    await openApp("/people/not-a-screen");
+    await within(screen.getByRole("main")).findByRole("link", { name: goHome(HOMES.Viewer) });
+
+    expect(heading()).toBe(UNKNOWN_SCREEN.heading);
+    expect(screen.getByRole("main").innerHTML).toBe(drawn.main);
+    expect(screen.getByRole("banner").textContent).toBe(drawn.banner);
+    expect(screen.queryByRole("tablist")).toBeNull();
+  });
+
+  it("shows an Admin Ask as not found, not their home", async () => {
+    vi.stubGlobal("fetch", answeringAs("Admin"));
+
+    await openApp("/ask");
+
+    expect(heading()).toBe(UNKNOWN_SCREEN.heading);
+  });
+
+  it("tells a Viewer at Ask it is on its way", async () => {
+    vi.stubGlobal("fetch", answeringAs("Viewer"));
+
+    await openApp("/ask");
+
+    expect(heading()).toBe(HOMES.Viewer.name);
+    expect(screen.getByText(unbuiltLineOf(HOMES.Viewer))).toBeDefined();
+  });
+
+  for (const path of ["/people/thresholds", "/suggestions/queue", "/knowledge/search"]) {
+    it(`shows an Admin the unbuilt ${path} as not found`, async () => {
+      vi.stubGlobal("fetch", answeringAs("Admin"));
+
+      const { router } = await openApp(path);
+
+      expect(heading()).toBe(UNKNOWN_SCREEN.heading);
+      expect(router.state.location.pathname).toBe(path);
+    });
+  }
+});
+
+describe("a role changed while the person is on a screen", () => {
+  it("keeps the screen until the next move, then hides it", async () => {
+    vi.stubGlobal("fetch", answeringAs("Admin"));
+    const { router, clients } = await openApp("/people/groups");
+    expect(heading()).toBe("People");
+
+    vi.stubGlobal("fetch", answeringAs("Editor"));
+    await clients.queryClient.invalidateQueries();
+    const rail = screen.getByRole("navigation", { name: RAIL });
+    await within(rail).findByRole("link", { name: "Ask" });
+
+    expect(heading()).toBe("People");
+    expect(screen.getByRole("main").textContent).not.toContain(UNKNOWN_SCREEN.heading);
+
+    await router.navigate({ href: HOMES.Editor.path });
+    await router.navigate({ href: "/people/groups" });
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: UNKNOWN_SCREEN.heading }),
+    ).toBeDefined();
+  });
+});

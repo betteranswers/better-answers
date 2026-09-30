@@ -1,25 +1,25 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 
-export type ViewTab = { readonly id: string; readonly name: string };
+export type ScreenTab = { readonly id: string; readonly name: string };
 
-export type ViewToolbar = {
-  readonly tabs?: readonly ViewTab[] | undefined;
+export type ScreenToolbar = {
+  readonly tabs?: readonly ScreenTab[] | undefined;
   /**
    * A route's static data is built once, so an act carries its own behaviour and reads the
-   * view's own state from the slot below.
+   * screen's own state from the slot below.
    */
   readonly acts?: ReactNode | undefined;
 };
 
-/** An empty bar above a view's content is the defect this guards. */
-export const isFilled = (toolbar: ViewToolbar | undefined): toolbar is ViewToolbar =>
+/** An empty bar above a screen's content is the defect this guards. */
+export const isFilled = (toolbar: ScreenToolbar | undefined): toolbar is ScreenToolbar =>
   (toolbar?.tabs ?? []).length > 0 || toolbar?.acts !== undefined;
 
 const OpenTab = createContext<string | undefined>(undefined);
 
 /**
- * A view sits under the outlet, where the shell cannot hand it a prop. Undefined when the view
- * has no tabs.
+ * A screen sits under the outlet, where the shell cannot hand it a prop. Undefined when the
+ * screen has no tabs.
  */
 export const useOpenTab = (): string | undefined => useContext(OpenTab);
 
@@ -49,8 +49,8 @@ export function ViewStateSlot(properties: { readonly children: ReactNode }) {
   const [tabWritingUnder, setTabWritingUnder] = useState(openTab);
 
   /**
-   * The way back into a thrown view is the other tab, so what the view wrote goes with the tab
-   * it was written under.
+   * The way back into a thrown screen is the other tab, so what the screen wrote goes with the
+   * tab it was written under.
    */
   const stale = tabWritingUnder !== openTab;
   if (stale) {
@@ -67,11 +67,11 @@ export function ViewStateSlot(properties: { readonly children: ReactNode }) {
 }
 
 /**
- * A view declares its slot once and its content and its acts call what this hands back, so
+ * A screen declares its slot once and its content and its acts call what this hands back, so
  * the type is stated in one place.
  */
-export function viewStateOf<Value>(view: string) {
-  const key = Symbol(view);
+export function viewStateOf<Value>(screen: string) {
+  const key = Symbol(screen);
   /**
    * The slot holds writes as `unknown`; this declaration's own are kept here under the object
    * it handed over, typed by construction.

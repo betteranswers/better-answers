@@ -4,14 +4,15 @@ import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
 import { consequenceOfDeleting } from "@/features/people/group-words.ts";
 import { GROUPS_KEYSTROKES } from "@/features/people/people-state.ts";
 import { SAID_OF_A_GROUP } from "@/features/people/refusal-words.ts";
+import { aRole } from "@/features/people/role-meanings.ts";
 import { SELECT_FIRST } from "@/shared/keystroke-words.ts";
-import { sentenceOf } from "@/shared/refusal-words.ts";
-import { screenById, viewNamed } from "@/shared/screens.ts";
+import { CONTROL_CENTRE, groupIn, screenNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
   addMember,
   aMemberSignedInAt,
+  notFoundOfferingHome,
   anAddress,
   clockTheNextKey,
   keystrokesDismissed,
@@ -27,11 +28,13 @@ import {
 
 const LIST_BUDGET_MS = 1000;
 
-const people = screenById("people");
+const people = groupIn(CONTROL_CENTRE, "people");
 
-const GROUPS_VIEW = viewNamed(people, "Groups").path;
+const GROUPS_SCREEN = screenNamed(people, "Groups").path;
 
-const MEMBERS_VIEW = viewNamed(people, "Members").path;
+const MEMBERS_SCREEN = screenNamed(people, "Members").path;
+
+const nav = (page: Page) => page.getByRole("navigation", { name: CONTROL_CENTRE.name });
 
 const groupsRegion = (page: Page) => page.getByRole("region", { name: "Groups" });
 
@@ -83,13 +86,13 @@ const anAdminAtGroups = async (page: Page, api: APIRequestContext, workspaceName
   });
 
   // Asked for before signing in, so the sign-in screen carries the Admin back to it.
-  await page.goto(GROUPS_VIEW);
+  await page.goto(GROUPS_SCREEN);
   await signIn(page, api, adminEmail);
-  await expect(page).toHaveURL(new RegExp(`${GROUPS_VIEW}$`));
+  await expect(page).toHaveURL(new RegExp(`${GROUPS_SCREEN}$`));
   await expect(groupRows(page)).toHaveCount(2);
 };
 
-test.describe("the People screen's Groups view", () => {
+test.describe("the People group's Groups screen", () => {
   test("shows an Admin each group's count, and no one else's", async ({
     page,
     request,
@@ -97,9 +100,10 @@ test.describe("the People screen's Groups view", () => {
   }) => {
     await anAdminAtGroups(page, request, "Calder Joinery");
 
-    await expect(
-      page.getByRole("navigation", { name: "People" }).getByRole("link", { name: "Groups" }),
-    ).toHaveAttribute("aria-current", "page");
+    await expect(nav(page).getByRole("link", { name: "Groups" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
     await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
     await expect(page.locator("body")).not.toContainText("Una's crew");
     await expect(groupsRegion(page)).toMatchAriaSnapshot(`
@@ -133,7 +137,7 @@ test.describe("the People screen's Groups view", () => {
 
     // A fresh document, so no list is already in the page's cache.
     const started = Date.now();
-    await page.goto(GROUPS_VIEW);
+    await page.goto(GROUPS_SCREEN);
     await expect(groupRows(page)).toHaveCount(2);
     const elapsed = Date.now() - started;
 
@@ -142,8 +146,8 @@ test.describe("the People screen's Groups view", () => {
   });
 
   for (const role of ["Editor", "Viewer"] as const) {
-    test(`refuses a member at ${role} the groups, saying why`, async ({ page, request }) => {
-      const workspace = await aMemberSignedInAt(page, request, role, GROUPS_VIEW);
+    test(`shows ${aRole(role)} Groups as not found, listing none`, async ({ page, request }) => {
+      const workspace = await aMemberSignedInAt(page, request, role, GROUPS_SCREEN);
       await makeGroups(request, {
         workspaceId: workspace.workspaceId,
         userId: workspace.admin.id,
@@ -151,10 +155,8 @@ test.describe("the People screen's Groups view", () => {
       });
       await page.reload();
 
-      await expect(groupsRegion(page).getByRole("alert")).toHaveText(
-        sentenceOf(SAID_OF_A_GROUP["role-forbids"]),
-      );
-      await expect(groupsRegion(page).getByRole("table")).toHaveCount(0);
+      await notFoundOfferingHome(page, role);
+      await expect(groupsRegion(page)).toHaveCount(0);
       await expect(page.locator("body")).not.toContainText("Hidden from them");
     });
   }
@@ -219,10 +221,7 @@ test.describe("a group's acts", () => {
     await expect(groupButton(page, "People team")).toBeFocused();
     await expect(rowOf(page, "People team").getByRole("cell").nth(1)).toHaveText("2 members");
 
-    await page
-      .getByRole("navigation", { name: "People" })
-      .getByRole("link", { name: "Members" })
-      .click();
+    await nav(page).getByRole("link", { name: "Members" }).click();
     const priya = page
       .getByRole("region", { name: "Members" })
       .getByRole("row")
@@ -330,7 +329,7 @@ test.describe("a group's acts", () => {
   test("lets an Admin reach every group act by keyboard alone", async ({ page, request }) => {
     await anAdminAtGroups(page, request, "Calder Castings");
     // A fresh document, so the first Tab starts from the top rather than from the rail's link.
-    await page.goto(GROUPS_VIEW);
+    await page.goto(GROUPS_SCREEN);
     await expect(groupRows(page)).toHaveCount(2);
     await skipLinkReachesTheScreen(page);
 
@@ -344,7 +343,7 @@ test.describe("a group's acts", () => {
     ]) {
       await expect(keystrokes).toContainText(act);
     }
-    // `d` removes a member on the Members view; here it deletes a group, and says only that.
+    // `d` removes a member on the Members screen; here it deletes a group, and says only that.
     await expect(keystrokes).not.toContainText("Remove the member in focus");
     await keystrokesDismissed(page, keystrokes);
 
@@ -400,7 +399,7 @@ test.describe("a member's groups, on their row and their sheet", () => {
     passesTheAccessibilityGate,
   }) => {
     await anAdminAtGroups(page, request, "Esk Presswork");
-    await page.goto(MEMBERS_VIEW);
+    await page.goto(MEMBERS_SCREEN);
     const members = page.getByRole("region", { name: "Members" });
     const priyaRow = members.getByRole("row").filter({ hasText: "Priya Shah" });
     await expect(members.getByRole("columnheader", { name: "Groups" })).toBeVisible();
@@ -456,7 +455,7 @@ test.describe("a member's groups, on their row and their sheet", () => {
   test("points an Admin at Groups when the workspace has none", async ({ page, request }) => {
     const admin = anAddress("admin");
     await provision(request, { name: "Rye Mill", adminEmail: admin });
-    await page.goto(MEMBERS_VIEW);
+    await page.goto(MEMBERS_SCREEN);
     await signIn(page, request, admin);
 
     await page
@@ -470,11 +469,11 @@ test.describe("a member's groups, on their row and their sheet", () => {
         - /children: equal
         - heading "Groups" [level=3]
         - paragraph: ${EMPTY_LINES.groups}
-        - link "Create one on the Groups view"
+        - link "Create one on the Groups screen"
     `);
-    await groups.getByRole("link", { name: "Create one on the Groups view" }).click();
+    await groups.getByRole("link", { name: "Create one on the Groups screen" }).click();
 
-    await expect(page).toHaveURL(new RegExp(`${GROUPS_VIEW}$`));
+    await expect(page).toHaveURL(new RegExp(`${GROUPS_SCREEN}$`));
     await expect(groupsRegion(page)).toMatchAriaSnapshot(`
       - region "Groups":
         - heading "Groups" [level=2]

@@ -3,6 +3,7 @@ import {
   createRootRouteWithContext,
   createRoute,
   createRouter,
+  Navigate,
   Outlet,
   redirect,
   type AnyRoute,
@@ -15,51 +16,73 @@ import { acceptDetour, displayNameDetour } from "@/features/auth/auth-hooks.ts";
 import { backTo, leavingFor, pageQuery } from "@/features/auth/carried-flow.ts";
 import { ChooseWorkspaceScreen } from "@/features/auth/choose-workspace-screen.tsx";
 import { DisplayNameScreen } from "@/features/auth/display-name-screen.tsx";
-import { membershipRefusal, NEEDS_A_PICK, roleHeld } from "@/features/auth/membership.ts";
+import {
+  membershipRefusal,
+  NEEDS_A_PICK,
+  roleHeld,
+  useMembership,
+} from "@/features/auth/membership.ts";
 import { NoWorkspaceScreen } from "@/features/auth/no-workspace-screen.tsx";
 import { SignInScreen } from "@/features/auth/sign-in-screen.tsx";
-import { EVERYONE_TOOLBAR, EveryoneView } from "@/features/console/everyone-view.tsx";
-import { NAMES_WAITING_TOOLBAR, NamesWaitingView } from "@/features/console/names-waiting-view.tsx";
+import { EVERYONE_TOOLBAR, EveryoneScreen } from "@/features/console/everyone-screen.tsx";
+import {
+  NAMES_WAITING_TOOLBAR,
+  NamesWaitingScreen,
+} from "@/features/console/names-waiting-screen.tsx";
 import { mustSignInForTheConsole } from "@/features/console/operator.ts";
-import { WorkspacesView } from "@/features/console/workspaces-view.tsx";
-import { AUDIT_LOG_TOOLBAR, AuditLogView } from "@/features/people/audit-log-view.tsx";
-import { GROUPS_TOOLBAR, GroupsView } from "@/features/people/groups-view.tsx";
-import { MEMBERS_TOOLBAR, MembersView } from "@/features/people/members-view.tsx";
-import { BINDINGS_TOOLBAR, BindingsView } from "@/features/sources/bindings-view.tsx";
+import { WorkspacesScreen } from "@/features/console/workspaces-screen.tsx";
+import { AUDIT_LOG_TOOLBAR, AuditLogScreen } from "@/features/people/audit-log-screen.tsx";
+import { GROUPS_TOOLBAR, GroupsScreen } from "@/features/people/groups-screen.tsx";
+import { MEMBERS_TOOLBAR, MembersScreen } from "@/features/people/members-screen.tsx";
+import { BINDINGS_TOOLBAR, BindingsScreen } from "@/features/sources/bindings-screen.tsx";
 import { createApiProxy, type ApiProxy } from "@/shared/api/trpc.ts";
 import {
   CONSOLE,
-  CONTROL_CENTRE,
+  hides,
   HOMES,
-  READER_SURFACE,
-  viewsOf,
+  leadsTo,
+  movedWithin,
+  SURFACES,
+  visibleTo,
+  type Moved,
+  type Reader,
   type Screen,
+  type ScreenPath,
   type Surface,
-  type View,
-} from "@/shared/screens.ts";
-import type { ViewToolbar } from "@/shared/view-toolbar.tsx";
+} from "@/shared/navigation.ts";
+import type { ScreenToolbar } from "@/shared/screen-toolbar.tsx";
 
 import { ConsoleFrame } from "./console-frame.tsx";
 import { FailedScreen } from "./failed-screen.tsx";
 import { WorkspaceFrame } from "./frame.tsx";
 import type { AppClients } from "./providers.tsx";
+import {
+  ROUTES_AND_SPEND_TOOLBAR,
+  RoutesAndSpendScreen,
+} from "./screens/routes-and-spend-screen.tsx";
+import { UnbuiltScreen } from "./screens/unbuilt-screen.tsx";
 import { UnknownScreen } from "./unknown-screen.tsx";
-import { ROUTES_AND_SPEND_TOOLBAR, RoutesAndSpendView } from "./views/routes-and-spend-view.tsx";
-import { UnbuiltView } from "./views/unbuilt-view.tsx";
+import { useHiddenOnArrival, useVisibleTree } from "./visible-tree.ts";
+import { ROLE_UNREAD } from "./words.ts";
 
-type BuiltView = { readonly draw: () => ReactElement; readonly toolbar?: ViewToolbar };
+type BuiltScreen = { readonly draw: () => ReactElement; readonly toolbar?: ScreenToolbar };
 
-/** The list decides which views are built; this map only says by what, and with what in hand. */
-const BUILT_VIEWS = new Map<View["path"], BuiltView>([
-  ["/sources/bindings", { draw: BindingsView, toolbar: BINDINGS_TOOLBAR }],
-  ["/people/members", { draw: MembersView, toolbar: MEMBERS_TOOLBAR }],
-  ["/people/groups", { draw: GroupsView, toolbar: GROUPS_TOOLBAR }],
-  ["/people/audit-log", { draw: AuditLogView, toolbar: AUDIT_LOG_TOOLBAR }],
-  ["/system/routes-and-spend", { draw: RoutesAndSpendView, toolbar: ROUTES_AND_SPEND_TOOLBAR }],
-  ["/console/people/everyone", { draw: EveryoneView, toolbar: EVERYONE_TOOLBAR }],
-  ["/console/people/names-waiting", { draw: NamesWaitingView, toolbar: NAMES_WAITING_TOOLBAR }],
-  ["/console/workspaces/every-workspace", { draw: WorkspacesView }],
-]);
+const BUILT: readonly (readonly [ScreenPath, BuiltScreen])[] = [
+  ["/sources/bindings", { draw: BindingsScreen, toolbar: BINDINGS_TOOLBAR }],
+  [
+    "/agent-operations/routes-and-spend",
+    { draw: RoutesAndSpendScreen, toolbar: ROUTES_AND_SPEND_TOOLBAR },
+  ],
+  ["/people/members", { draw: MembersScreen, toolbar: MEMBERS_TOOLBAR }],
+  ["/people/groups", { draw: GroupsScreen, toolbar: GROUPS_TOOLBAR }],
+  ["/system/audit-log", { draw: AuditLogScreen, toolbar: AUDIT_LOG_TOOLBAR }],
+  ["/console/people/everyone", { draw: EveryoneScreen, toolbar: EVERYONE_TOOLBAR }],
+  ["/console/people/names-waiting", { draw: NamesWaitingScreen, toolbar: NAMES_WAITING_TOOLBAR }],
+  ["/console/workspaces/every-workspace", { draw: WorkspacesScreen }],
+];
+
+/** The list decides which screens are built; this map only says by what, and with what in hand. */
+const BUILT_SCREENS: ReadonlyMap<string, BuiltScreen> = new Map(BUILT);
 
 type ShellContext = { readonly queryClient: QueryClient; readonly api: ApiProxy };
 
@@ -130,13 +153,36 @@ const shellRoute = createRoute({
   },
 });
 
+/** Read after the shell's own read, which left no role in hand when it failed. */
+const memberOf = (context: ShellContext): Reader => ({
+  role: roleHeld(context.queryClient, context.api),
+  owns: [],
+});
+
+/** No role is held, so asking again is the one way on; the route moves once it answers. */
+function RoleUnread() {
+  const membership = useMembership();
+
+  return (
+    <FailedScreen
+      reset={() => {
+        void membership.refetch();
+      }}
+      said={ROLE_UNREAD}
+    />
+  );
+}
+
 const indexRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: "/",
   beforeLoad: ({ context }) => {
-    // A read that failed leaves the role unknown, and every role reaches a Viewer's home.
-    const role = roleHeld(context.queryClient, context.api) ?? "Viewer";
-    throw redirect({ href: HOMES[role].path, replace: true });
+    const { role } = memberOf(context);
+    if (role !== undefined) throw redirect({ href: HOMES[role].path, replace: true });
+  },
+  component: function HomeUnread() {
+    const { home } = useVisibleTree();
+    return home === undefined ? <RoleUnread /> : <Navigate to={home.path} replace />;
   },
 });
 
@@ -145,7 +191,7 @@ const consoleRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: "console",
   component: ConsoleFrame,
-  notFoundComponent: () => <UnknownScreen surface={CONSOLE} />,
+  notFoundComponent: () => <UnknownScreen home={HOMES.operator} />,
   // Asked afresh on the way in, and not again on each move between the console's own screens.
   beforeLoad: async ({ context, location, cause }) => {
     if (await mustSignInForTheConsole(context.queryClient, context.api, cause === "enter")) {
@@ -158,51 +204,95 @@ const consoleIndexRoute = createRoute({
   getParentRoute: () => consoleRoute,
   path: "/console",
   beforeLoad: () => {
-    throw redirect({ href: CONSOLE.home.path, replace: true });
+    throw redirect({ href: HOMES.operator.path, replace: true });
   },
 });
 
-const componentFor = (screen: Screen, view: View): (() => ReactElement) => {
-  const built = BUILT_VIEWS.get(view.path);
-  if (view.built && built === undefined) {
-    throw new Error(`the list calls ${view.path} built, and nothing draws it`);
+/** A screen hidden from a held role draws as an address that never existed. */
+function Seen(properties: { readonly draw: () => ReactElement }) {
+  if (useHiddenOnArrival()) return <UnknownScreen />;
+
+  const Draw = properties.draw;
+  return <Draw />;
+}
+
+/** An older address moves on only once the reader may see where it leads. */
+function MovedAway(properties: { readonly moved: Moved }) {
+  const visible = useVisibleTree();
+  if (visible.home === undefined) return <RoleUnread />;
+
+  const to = leadsTo(visible, properties.moved);
+  return to === undefined ? <UnknownScreen /> : <Navigate to={to.path} replace />;
+}
+
+const drawOf = (screen: Screen, isAHome: boolean): (() => ReactElement) | undefined => {
+  const built = BUILT_SCREENS.get(screen.path);
+  if (screen.built && built === undefined) {
+    throw new Error(`the list calls ${screen.path} built, and nothing draws it`);
   }
-  if (!view.built && built !== undefined) {
-    throw new Error(`the list calls ${view.path} unbuilt, and something draws it`);
+  if (!screen.built && built !== undefined) {
+    throw new Error(`the list calls ${screen.path} unbuilt, and something draws it`);
   }
-  return built?.draw ?? (() => <UnbuiltView screen={screen} view={view} />);
+  return built?.draw ?? (isAHome ? () => <UnbuiltScreen home={screen} /> : undefined);
 };
 
-/** A failed view names its own surface and its way home, so the view carries the failure screen. */
-const routesOf = (surface: Surface, shell: AnyRoute): AnyRoute[] => {
+/** A failed screen offers the way home, which in the console is the console's own. */
+const routesOf = (
+  surfaces: readonly Surface[],
+  shell: AnyRoute,
+  readerOf: (context: ShellContext) => Reader,
+  home?: Screen,
+): AnyRoute[] => {
   const failed = (failure: { readonly reset: () => void }) => (
-    <FailedScreen reset={failure.reset} surface={surface} />
+    <FailedScreen reset={failure.reset} home={home} />
   );
-  return surface.screens.flatMap((screen) => [
-    createRoute({
-      getParentRoute: () => shell,
-      path: screen.path,
-      beforeLoad: () => {
-        throw redirect({ href: screen.defaultView, replace: true });
-      },
-    }),
-    ...viewsOf(screen).map((view) =>
+  const homes: readonly Screen[] = Object.values(HOMES);
+
+  // An unbuilt screen has no route at all, so its address is one that never existed.
+  const screens = surfaces.flatMap((surface) => [
+    ...(surface.home === undefined ? [] : [surface.home]),
+    ...surface.groups.flatMap((group) => group.screens),
+  ]);
+  const drawn = screens.flatMap((screen) => {
+    const draw = drawOf(screen, homes.includes(screen));
+    return draw === undefined ? [] : [{ screen, draw }];
+  });
+
+  return [
+    ...drawn.map(({ screen, draw }) =>
       createRoute({
         getParentRoute: () => shell,
-        path: view.path,
-        component: componentFor(screen, view),
+        path: screen.path,
+        beforeLoad: ({ context }) => ({
+          hidden: hides(visibleTo(readerOf(context), surfaces), screen.path),
+        }),
+        component: () => <Seen draw={draw} />,
         errorComponent: failed,
-        staticData: { toolbar: BUILT_VIEWS.get(view.path)?.toolbar },
+        staticData: { toolbar: BUILT_SCREENS.get(screen.path)?.toolbar },
       }),
     ),
-  ]);
+    ...movedWithin(surfaces).map((moved) =>
+      createRoute({
+        getParentRoute: () => shell,
+        path: moved.from,
+        beforeLoad: ({ context }) => {
+          const to = leadsTo(visibleTo(readerOf(context), surfaces), moved);
+          if (to !== undefined) throw redirect({ href: to.path, replace: true });
+        },
+        component: () => <MovedAway moved={moved} />,
+      }),
+    ),
+  ];
 };
 
-const controlCentreRoutes = routesOf(CONTROL_CENTRE, shellRoute);
+const workspaceRoutes = routesOf(SURFACES, shellRoute, memberOf);
 
-const consoleRoutes = routesOf(CONSOLE, consoleRoute);
-
-const readerRoutes = routesOf(READER_SURFACE, shellRoute);
+const consoleRoutes = routesOf(
+  [CONSOLE],
+  consoleRoute,
+  () => ({ role: "operator", owns: [] }),
+  HOMES.operator,
+);
 
 export const createAppRouter = (clients: AppClients, history?: RouterHistory) => {
   const options = {
@@ -212,7 +302,7 @@ export const createAppRouter = (clients: AppClients, history?: RouterHistory) =>
       chooseWorkspaceRoute,
       noWorkspaceRoute,
       acceptInvitationRoute,
-      shellRoute.addChildren([indexRoute, ...controlCentreRoutes, ...readerRoutes]),
+      shellRoute.addChildren([indexRoute, ...workspaceRoutes]),
       consoleRoute.addChildren([consoleIndexRoute, ...consoleRoutes]),
     ]),
 
@@ -231,8 +321,8 @@ declare module "@tanstack/react-router" {
     router: ReturnType<typeof createAppRouter>;
   }
 
-  /** The route is how a view's toolbar reaches the shell: props down, never an import up. */
+  /** The route is how a screen's toolbar reaches the shell: props down, never an import up. */
   interface StaticDataRouteOption {
-    readonly toolbar?: ViewToolbar | undefined;
+    readonly toolbar?: ScreenToolbar | undefined;
   }
 }

@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import { SIGN_IN_WORDS, type Arrival } from "@/features/auth/sign-in-words.ts";
-import { screenById } from "@/shared/screens.ts";
+import { CONTROL_CENTRE, groupIn, headingOf, screenNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -46,9 +46,9 @@ test("brings an ended session through sign-in back to its screen", async ({
   await page.goto("/sign-in");
   await signIn(page, request, email);
   // Not the Admin's home, which sign-in would reach without carrying the screen back.
-  const elsewhere = screenById("system");
+  const elsewhere = screenNamed(groupIn(CONTROL_CENTRE, "system"), "Audit log");
   await page.getByRole("link", { name: elsewhere.name }).click();
-  await expect(page).toHaveURL(new RegExp(`${elsewhere.defaultView}$`));
+  await expect(page).toHaveURL(new RegExp(`${elsewhere.path}$`));
 
   await context.clearCookies();
   await page.reload();
@@ -57,8 +57,8 @@ test("brings an ended session through sign-in back to its screen", async ({
   await passesTheAccessibilityGate();
   await signIn(page, request, email);
 
-  await expect(page).toHaveURL(new RegExp(`${elsewhere.defaultView}$`));
-  await expect(page.getByRole("heading", { level: 1, name: elsewhere.name })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`${elsewhere.path}$`));
+  await expect(page.getByRole("heading", { level: 1, name: headingOf(elsewhere) })).toBeVisible();
 });
 
 test("refuses revoked credentials on the next request", async ({ page, request }) => {
@@ -70,7 +70,7 @@ test("refuses revoked credentials on the next request", async ({ page, request }
 
   await revokeCredentials(request, workspace.admin.id);
 
-  await page.getByRole("link", { name: "Knowledge" }).click();
+  await page.getByRole("link", { name: "Groups" }).click();
   await page.reload();
 
   await signInSays(page, "session-ended");

@@ -5,12 +5,15 @@ import { SignOutButton } from "@/features/auth/sign-out-button.tsx";
 import { useOperatorStanding } from "@/features/console/operator.ts";
 import { ONLY_THE_OPERATOR, STANDING_UNANSWERED } from "@/features/console/refusal-words.ts";
 import { CONSOLE_CLOSED, saidOf } from "@/features/console/words.ts";
+import { CONSOLE, visibleTo } from "@/shared/navigation.ts";
 import { RefusalLine } from "@/shared/refusal-outcome.tsx";
-import { CONSOLE } from "@/shared/screens.ts";
 import { Button } from "@/shared/ui/button.tsx";
 
 import { Frame } from "./frame.tsx";
 import type { MenuLink } from "./top-bar.tsx";
+
+/** The console frame draws for the operator alone, so what it shows is theirs. */
+const THE_OPERATORS = visibleTo({ role: "operator", owns: [] }, [CONSOLE]);
 
 const BACK_TO_YOUR_WORKSPACES: MenuLink = {
   name: "Back to your workspaces",
@@ -80,7 +83,7 @@ export function ConsoleFrame() {
 
   return (
     <Frame
-      surface={CONSOLE}
+      visible={THE_OPERATORS}
       place={CONSOLE.name}
       person={{ name: standing.data.name }}
       links={[BACK_TO_YOUR_WORKSPACES]}

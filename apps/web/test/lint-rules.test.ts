@@ -51,7 +51,7 @@ describe("imports run app \u2192 features \u2192 shared, never back", () => {
     const refused = flagged({
       "apps/web/src/features/routes/reaches-up.ts": probe("@/app/router.tsx"),
       "apps/web/src/features/routes/reaches-up-relatively.ts": probe("../../app/router.tsx"),
-      "apps/web/src/features/routes/reaches-down.ts": probe("@/shared/screens.ts"),
+      "apps/web/src/features/routes/reaches-down.ts": probe("@/shared/navigation.ts"),
     });
 
     expect(refused).toEqual([
@@ -60,9 +60,9 @@ describe("imports run app \u2192 features \u2192 shared, never back", () => {
     ]);
   });
 
-  it("lets a view import shared's toolbar state, not the shell's", () => {
+  it("lets a screen import shared's toolbar state, not the shell's", () => {
     const refused = flagged({
-      "apps/web/src/features/sources/review-toolbar.ts": probe("@/shared/view-toolbar.tsx"),
+      "apps/web/src/features/sources/review-toolbar.ts": probe("@/shared/screen-toolbar.tsx"),
       "apps/web/src/features/sources/reaches-the-shell.ts": probe("@/app/toolbar.tsx"),
     });
 
@@ -76,9 +76,9 @@ describe("imports run app \u2192 features \u2192 shared, never back", () => {
       "apps/web/src/shared/api/reaches-a-feature-relatively.ts": probe(
         "../../features/routes/api.ts",
       ),
-      "apps/web/src/shared/stays-put.ts": probe("./screens.ts"),
+      "apps/web/src/shared/stays-put.ts": probe("./navigation.ts"),
       "apps/web/src/app/composes-a-feature.ts": probe("@/features/routes/api.ts"),
-      "apps/web/src/app/composes-shared.ts": probe("@/shared/screens.ts"),
+      "apps/web/src/app/composes-shared.ts": probe("@/shared/navigation.ts"),
     });
 
     expect(refused).toEqual([

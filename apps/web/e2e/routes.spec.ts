@@ -2,15 +2,16 @@ import type { APIRequestContext, Page } from "@playwright/test";
 
 import { EMBEDDING_DIMENSIONS } from "@better-answers/schema";
 
-import { unbuiltLineOf } from "@/app/words.ts";
+import { goHome } from "@/app/words.ts";
+import { aRole } from "@/features/people/role-meanings.ts";
 import { ROUTES_WORDS } from "@/features/routes/words.ts";
-import { SCREENS, screenById, viewsOf } from "@/shared/screens.ts";
+import { CONTROL_CENTRE, groupIn, HOMES, screenNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
-  addMember,
+  aMemberSignedInAt,
+  notFoundOfferingHome,
   anAddress,
-  person,
   provision,
   seedRoutes,
   signIn,
@@ -34,9 +35,13 @@ const embeddingRow = (page: Page) =>
 
 const PURPOSES = ["Extraction", "Enrichment", "Answering", "Judging", "Embedding"];
 
-/** No role lands on System, so every test here opens it from where sign-in left the member. */
-const openSystem = async (page: Page) => {
-  await page.goto(screenById("system").path);
+const agentOperations = groupIn(CONTROL_CENTRE, "agent-operations");
+
+const ROUTES_AND_SPEND = screenNamed(agentOperations, "Routes and spend");
+
+/** No role lands on Routes and spend, so every test here opens it from the member's home. */
+const openRoutes = async (page: Page) => {
+  await page.goto(ROUTES_AND_SPEND.path);
   await expect(routesCard(page)).toBeVisible();
 };
 
@@ -50,11 +55,11 @@ const signedInWith = async (
   await seedRoutes(api, { workspaceId: workspace.workspaceId, routes: input.routes });
   await page.goto("/sign-in");
   await signIn(page, api, email);
-  await openSystem(page);
+  await openRoutes(page);
   return workspace;
 };
 
-test.describe("the System screen's routes card", () => {
+test.describe("the Routes and spend screen's routes card", () => {
   test("shows a member their five routes, never another workspace's", async ({ page, request }) => {
     const theirs = await provision(request, { name: "Southern Castings" });
     await seedRoutes(request, {
@@ -154,17 +159,12 @@ test.describe("the System screen's routes card", () => {
       routes: ANSWERING_AND_EMBEDDING,
     });
 
-    await page
-      .getByRole("navigation", { name: "Control Centre" })
-      .getByRole("link", { name: "People" })
-      .click();
+    const nav = page.getByRole("navigation", { name: CONTROL_CENTRE.name });
+    await nav.getByRole("link", { name: "Members" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
 
     const started = Date.now();
-    await page
-      .getByRole("navigation", { name: "Control Centre" })
-      .getByRole("link", { name: "System" })
-      .click();
+    await nav.getByRole("link", { name: ROUTES_AND_SPEND.name }).click();
     await expect(routesCard(page).getByRole("listitem")).toHaveCount(5);
     const elapsed = Date.now() - started;
 
@@ -172,27 +172,16 @@ test.describe("the System screen's routes card", () => {
     expect(elapsed).toBeLessThan(LIST_BUDGET_MS);
   });
 
-  for (const role of ["Admin", "Editor", "Viewer"] as const) {
-    test(`shows the list to a member at ${role}`, async ({ page, request }) => {
-      const workspace = await provision(request, { name: `Workspace for a ${role}` });
-      await seedRoutes(request, {
-        workspaceId: workspace.workspaceId,
-        routes: [{ purpose: "answering", provider: "anthropic", model: "claude-sonnet-5" }],
-      });
-      const email = anAddress(role.toLowerCase());
-      const member = await person(request, email);
-      await addMember(request, { workspaceId: workspace.workspaceId, userId: member.id, role });
+  for (const role of ["Editor", "Viewer"] as const) {
+    test(`shows ${aRole(role)} the screen as not found`, async ({ page, request }) => {
+      await aMemberSignedInAt(page, request, role, ROUTES_AND_SPEND.path);
 
-      await page.goto("/sign-in");
-      await signIn(page, request, email);
-      await openSystem(page);
-
-      await expect(routesCard(page).getByRole("listitem")).toHaveCount(5);
-      await expect(routesCard(page)).toContainText("claude-sonnet-5");
+      await notFoundOfferingHome(page, role);
+      await expect(routesCard(page)).toHaveCount(0);
     });
   }
 
-  test("is keyboard-reachable and axe-clean, with the rest unbuilt", async ({
+  test("is keyboard-reachable and axe-clean under its group", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -234,26 +223,66 @@ test.describe("the System screen's routes card", () => {
             - paragraph: ${JSON.stringify(`${ROUTES_WORDS.fixed} ${EMBEDDING_DIMENSIONS} dimensions`)}
             - paragraph: ${JSON.stringify(ROUTES_WORDS.fixedReason)}
     `);
-    // Equal children: the view holds its heading, its lead line and the card, nothing else.
+    // Equal children: the screen holds its heading, its lead line and the card, nothing else.
     await expect(page.getByRole("main", { name: "Screen" })).toMatchAriaSnapshot(`
       - main "Screen":
         - tabpanel "Routes":
           - /children: equal
-          - heading ${JSON.stringify(screenById("system").name)} [level=1]
-          - paragraph: ${JSON.stringify(screenById("system").summary)}
+          - heading ${JSON.stringify(agentOperations.name)} [level=1]
+          - paragraph: ${JSON.stringify(agentOperations.summary)}
           - region "Routes"
     `);
 
     await passesTheAccessibilityGate();
+  });
+});
 
-    const navigation = page.getByRole("navigation", { name: "Control Centre" });
-    const opensUnbuilt = SCREENS.filter((candidate) =>
-      viewsOf(candidate).some((view) => view.path === candidate.defaultView && !view.built),
+const MOVED = [
+  ["/people/audit-log", "/system/audit-log"],
+  ["/system/routes-and-spend", ROUTES_AND_SPEND.path],
+] as const;
+
+test.describe("a screen's older address", () => {
+  for (const [from, to] of MOVED) {
+    test(`leads an Admin from ${from} to ${to}, Back returning (AE8)`, async ({
+      page,
+      request,
+    }) => {
+      await signedInWith(page, request, { name: "Nidderdale Forge", routes: [] });
+      await page
+        .getByRole("navigation", { name: CONTROL_CENTRE.name })
+        .getByRole("link", { name: "Members" })
+        .click();
+      await expect(page).toHaveURL(/\/people\/members$/);
+
+      await page.goto(from);
+
+      await expect(page).toHaveURL(new RegExp(`${to}$`));
+      await page.goBack();
+      await expect(page).toHaveURL(/\/people\/members$/);
+    });
+  }
+
+  test("never shows a Viewer an address under /system/", async ({
+    page,
+    request,
+    passesTheAccessibilityGate,
+  }) => {
+    await aMemberSignedInAt(page, request, "Viewer", HOMES.Viewer.path);
+    await page.goto("/people/not-a-screen");
+    await expect(page.getByRole("link", { name: goHome(HOMES.Viewer) })).toBeVisible();
+    const neverExisted = await page.getByRole("main").ariaSnapshot();
+
+    const visited: string[] = [];
+    page.on("framenavigated", (frame) => visited.push(frame.url()));
+    await page.goto("/people/audit-log");
+
+    await expect(page.getByRole("link", { name: goHome(HOMES.Viewer) })).toBeVisible();
+    await expect(page).toHaveURL(/\/people\/audit-log$/);
+    expect(await page.getByRole("main").ariaSnapshot(), "a hidden screen gives itself away").toBe(
+      neverExisted,
     );
-    for (const screen of opensUnbuilt) {
-      await navigation.getByRole("link", { name: screen.name }).click();
-      await expect(page.getByRole("heading", { level: 1, name: screen.name })).toBeVisible();
-      await expect(page.getByText(unbuiltLineOf(screen))).toBeVisible();
-    }
+    expect(visited.filter((address) => address.includes("/system/"))).toEqual([]);
+    await passesTheAccessibilityGate();
   });
 });

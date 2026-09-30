@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 
+import { RAIL } from "@/app/words.ts";
 import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
 import { DISPLAY_NAME_WORDS } from "@/shared/display-name-words.ts";
 
@@ -55,7 +56,7 @@ test("carries sign-in through consent to Claude's code on one origin", async ({
   expect(landedAt(page).origin).toBe(origin);
   expect(landedAt(page).pathname).toBe("/consent");
 
-  await expect(page.getByRole("navigation", { name: "Control Centre" })).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: RAIL })).toHaveCount(0);
 
   await expect(page.getByText(`Claude will act as you, at ${workspace.name}.`)).toBeVisible();
   await expect(page.getByText("Read what you can see of the company's knowledge")).toBeVisible();

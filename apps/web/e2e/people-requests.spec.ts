@@ -3,6 +3,7 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
 import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
 import { SAID_OF_A_REQUEST } from "@/features/people/refusal-words.ts";
+import { aRole } from "@/features/people/role-meanings.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
@@ -12,6 +13,7 @@ import {
   askToJoin,
   clockTheNextKey,
   keystrokesListed,
+  notFoundOfferingHome,
   person,
   provision,
   editorPickedByKeyboard,
@@ -23,7 +25,7 @@ import {
 
 const LIST_BUDGET_MS = 1000;
 
-const MEMBERS_VIEW = "/people/members";
+const MEMBERS_SCREEN = "/people/members";
 
 const LONG_UK_DATE = /^\d{1,2} [A-Z][a-z]+ \d{4}$/;
 
@@ -76,7 +78,7 @@ const anAdminAtRequests = async (
   const asked: Asked[] = [];
   for (const one of asking) asked.push(await asksToJoin(api, workspace.slug, one));
 
-  await page.goto(MEMBERS_VIEW);
+  await page.goto(MEMBERS_SCREEN);
   await signIn(page, api, adminEmail);
   await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
   return { workspaceId: workspace.workspaceId, slug: workspace.slug, asked };
@@ -140,7 +142,7 @@ test.describe("the People screen's Requests tab", () => {
 
     // A fresh document, so no list is already in the page's cache.
     const startedAtMs = Date.now();
-    await page.goto(MEMBERS_VIEW);
+    await page.goto(MEMBERS_SCREEN);
     await openRequests(page);
     await expect(requestRows(page)).toHaveCount(3);
     const elapsedMs = Date.now() - startedAtMs;
@@ -182,7 +184,7 @@ test.describe("the People screen's Requests tab", () => {
       { displayName: "Approved Kay", reason: "I run the renewals." },
     ]);
     const kay = asked[2]?.email ?? "";
-    await tabOpenedByKeyboard(page, MEMBERS_VIEW, "Requests");
+    await tabOpenedByKeyboard(page, MEMBERS_SCREEN, "Requests");
     await expect(requestRows(page)).toHaveCount(3);
 
     await tabUntilFocused(
@@ -283,7 +285,7 @@ test.describe("the People screen's Requests tab", () => {
     await expect(approving.getByRole("combobox", { name: "Role" })).toBeVisible();
 
     const elsewhere = await context.newPage();
-    await elsewhere.goto(MEMBERS_VIEW);
+    await elsewhere.goto(MEMBERS_SCREEN);
     await openRequests(elsewhere);
     await rowOf(elsewhere, "Priya Shah")
       .getByRole("button", { name: "Decline the request from Priya Shah" })
@@ -315,7 +317,7 @@ test.describe("the People screen's Requests tab", () => {
   });
 
   for (const role of ["Editor", "Viewer"] as const) {
-    test(`refuses a member at ${role} the requests, saying why`, async ({ page, request }) => {
+    test(`shows ${aRole(role)} no requests, Members being hidden`, async ({ page, request }) => {
       const email = anAddress(role.toLowerCase());
       const [member, workspace] = await Promise.all([
         person(request, email, { displayName: `A ${role}` }),
@@ -323,16 +325,13 @@ test.describe("the People screen's Requests tab", () => {
       ]);
       await addMember(request, { role, userId: member.id, workspaceId: workspace.workspaceId });
       await asksToJoin(request, workspace.slug, { displayName: "Priya Shah" });
-      await page.goto(MEMBERS_VIEW);
+      await page.goto(MEMBERS_SCREEN);
       await signIn(page, request, email);
-      await openRequests(page);
 
-      await expect(requestsRegion(page).getByRole("alert")).toHaveText(
-        sentenceOf(SAID_OF_A_REQUEST["role-forbids"]),
-      );
-      await expect(requestsRegion(page).getByRole("table")).toHaveCount(0);
-      await expect(requestsRegion(page)).not.toContainText("Priya Shah");
-      await expect(page.locator("body"), "the refusal").not.toContainText(NAMES_AN_ORGANISATION);
+      await notFoundOfferingHome(page, role);
+      await expect(page.getByRole("tab", { name: "Requests" })).toHaveCount(0);
+      await expect(requestsRegion(page)).toHaveCount(0);
+      await expect(page.locator("body")).not.toContainText("Priya Shah");
     });
   }
 });

@@ -1,17 +1,44 @@
 import {
+  BookOpen,
+  Broadcast,
   Buildings,
+  CalendarCheck,
   CaretDown,
   ChatText,
+  ClockCounterClockwise,
+  CloudArrowUp,
+  CurrencyGbp,
   Database,
+  Eraser,
+  Export,
+  FileX,
   Flag,
+  Gauge,
+  Globe,
   Graph,
+  IdentificationBadge,
+  IdentificationCard,
+  Key,
   List,
+  ListChecks,
   MagnifyingGlass,
+  NotePencil,
+  Path,
   Pulse,
   Question,
+  Scroll,
+  Shapes,
+  ShieldCheck,
   SidebarSimple,
+  SlidersHorizontal,
+  SquaresFour,
+  Stack,
+  Table,
+  TestTube,
   Tray,
   Users,
+  UsersThree,
+  Warning,
   type Icon as PhosphorGlyph,
 } from "@phosphor-icons/react";
 
@@ -20,16 +47,43 @@ import { cn } from "@/shared/lib/utils.ts";
 /** Phosphor stands in until the product has a set of its own; one family, one door to it. */
 export type IconName =
   | "ask"
+  | "backlog"
+  | "backups"
   | "caret-down"
+  | "ceiling"
+  | "checks"
+  | "conflicts"
+  | "console"
+  | "control-centre"
   | "database"
+  | "erasure"
+  | "exports"
   | "flag"
+  | "gates"
+  | "gone"
+  | "groups"
+  | "guides"
+  | "history"
+  | "kinds"
+  | "log"
   | "map"
+  | "names"
   | "navigation"
+  | "new-question"
+  | "overview"
+  | "owners"
   | "people"
+  | "price"
   | "pulse"
   | "question"
+  | "queue"
+  | "routes"
   | "search"
   | "secondary-nav"
+  | "signals"
+  | "table"
+  | "tests"
+  | "token"
   | "tray"
   | "workspaces";
 
@@ -39,16 +93,43 @@ export type IconName =
  */
 const GLYPHS = {
   ask: ChatText,
+  backlog: Stack,
+  backups: CloudArrowUp,
   "caret-down": CaretDown,
+  ceiling: Gauge,
+  checks: CalendarCheck,
+  conflicts: Warning,
+  console: Globe,
+  "control-centre": SlidersHorizontal,
   database: Database,
+  erasure: Eraser,
+  exports: Export,
   flag: Flag,
+  gates: ShieldCheck,
+  gone: FileX,
+  groups: UsersThree,
+  guides: BookOpen,
+  history: ClockCounterClockwise,
+  kinds: Shapes,
+  log: Scroll,
   map: Graph,
+  names: IdentificationCard,
   navigation: List,
+  "new-question": NotePencil,
+  overview: SquaresFour,
+  owners: IdentificationBadge,
   people: Users,
+  price: CurrencyGbp,
   pulse: Pulse,
   question: Question,
+  queue: ListChecks,
+  routes: Path,
   search: MagnifyingGlass,
   "secondary-nav": SidebarSimple,
+  signals: Broadcast,
+  table: Table,
+  tests: TestTube,
+  token: Key,
   tray: Tray,
   workspaces: Buildings,
 } satisfies Readonly<Record<IconName, PhosphorGlyph>>;

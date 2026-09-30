@@ -1,8 +1,7 @@
 import { Link } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
 import { Icon } from "@/shared/icon.tsx";
-import type { Screen } from "@/shared/screens.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import {
   DropdownMenu,
@@ -18,23 +17,23 @@ export type Person = {
   readonly role?: string | undefined;
 };
 
-/** Another surface, reached from the person's menu. */
+/** Somewhere outside this workspace, reached from the person's menu. */
 export type MenuLink = {
   readonly name: string;
-  readonly to: Screen["path"] | "/console" | "/choose-workspace";
+  readonly to: "/console" | "/choose-workspace";
 };
 
 export function TopBar(properties: {
   readonly place: string | undefined;
   readonly person: Person | undefined;
   readonly links: readonly MenuLink[];
-  readonly screenName: string | undefined;
-  readonly viewName: string | undefined;
+  /** The open place's names, broadest first. */
+  readonly where: readonly string[];
   readonly navigation: ReactNode;
   readonly signingOut: boolean;
   readonly onSignOut: () => void;
 }) {
-  const { place, person, screenName, viewName } = properties;
+  const { place, person, where } = properties;
 
   return (
     <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border bg-background px-4 py-2 md:sticky md:top-0 md:z-10 md:min-h-topbar md:flex-nowrap md:px-5">
@@ -44,17 +43,16 @@ export function TopBar(properties: {
 
       {place === undefined ? null : <p className="font-medium text-foreground">{place}</p>}
 
-      {screenName === undefined ? null : (
+      {where.length === 0 ? null : (
         // Truncated only where the row is one line: below the breakpoint it wraps instead,
-        // because a clipped view name is a reader's own place lost.
+        // because a clipped screen name is a reader's own place lost.
         <p className="min-w-0 flex-1 text-muted-foreground md:truncate">
-          <span>{screenName}</span>
-          {viewName === undefined ? null : (
-            <>
-              <span aria-hidden> · </span>
-              <span>{viewName}</span>
-            </>
-          )}
+          {where.map((name, index) => (
+            <Fragment key={name}>
+              {index === 0 ? null : <span aria-hidden> · </span>}
+              <span>{name}</span>
+            </Fragment>
+          ))}
         </p>
       )}
 

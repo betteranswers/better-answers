@@ -1,9 +1,9 @@
-import type { View } from "@/shared/screens.ts";
+import type { ScreenPath } from "@/shared/navigation.ts";
 
-/** Typed by the list of screens, so a view renamed there fails here at compile time. */
-export const EVERYONE_PATH: View["path"] = "/console/people/everyone";
+/** Typed by the navigation list, so a screen moved there fails here at compile time. */
+export const EVERYONE_PATH: ScreenPath = "/console/people/everyone";
 
-export const NAMES_WAITING_PATH: View["path"] = "/console/people/names-waiting";
+export const NAMES_WAITING_PATH: ScreenPath = "/console/people/names-waiting";
 
 const SEARCH = "search";
 
@@ -14,7 +14,7 @@ const ACT = "act";
 /** The sheet's two acts that ask for a sign-in from the last hour. */
 export type FreshAct = "revoke" | "correct";
 
-const addressOf = (path: View["path"], query: Readonly<Record<string, string>>): string =>
+const addressOf = (path: ScreenPath, query: Readonly<Record<string, string>>): string =>
   `${path}?${new URLSearchParams(query).toString()}`;
 
 /** Where signing in again comes back to: the person, found by their address, open at the act. */

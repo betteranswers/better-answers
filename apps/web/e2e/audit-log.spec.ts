@@ -1,12 +1,14 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
-import { SAID_OF_THE_AUDIT_LOG } from "@/features/people/refusal-words.ts";
+import { aRole } from "@/features/people/role-meanings.ts";
+import { CONTROL_CENTRE, groupIn, screenNamed } from "@/shared/navigation.ts";
 import { NO_RESPONSE_TO_A_READ, sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
   addMember,
   aMemberSignedInAt,
+  notFoundOfferingHome,
   anAddress,
   keystrokesListed,
   makeGroups,
@@ -18,7 +20,9 @@ import {
 
 const LIST_BUDGET_MS = 1000;
 
-const AUDIT_LOG_VIEW = "/people/audit-log";
+const system = groupIn(CONTROL_CENTRE, "system");
+
+const AUDIT_LOG_SCREEN = screenNamed(system, "Audit log").path;
 
 const SAID_AT = /^\d{2}:\d{2}$/;
 
@@ -76,18 +80,14 @@ const anAdminAtTheAuditLog = async (
   await page.goto("/sign-in");
   await signIn(page, api, admin);
   await page
-    .getByRole("navigation", { name: "Control Centre" })
-    .getByRole("link", { name: "People" })
-    .click();
-  await page
-    .getByRole("navigation", { name: "People" })
+    .getByRole("navigation", { name: CONTROL_CENTRE.name })
     .getByRole("link", { name: "Audit log" })
     .click();
-  await expect(page).toHaveURL(new RegExp(`${AUDIT_LOG_VIEW}$`));
+  await expect(page).toHaveURL(new RegExp(`${AUDIT_LOG_SCREEN}$`));
   return { workspaceId, adminId: workspace.admin.id };
 };
 
-test.describe("the People screen's Audit log view", () => {
+test.describe("the System group's Audit log screen", () => {
   test("shows an Admin every act, newest first, each actor named", async ({ page, request }) => {
     await anAdminAtTheAuditLog(page, request, "Calder Joinery");
 
@@ -168,7 +168,7 @@ test.describe("the People screen's Audit log view", () => {
     const names = Array.from({ length: 48 }, (_, index) => `Crew ${index + 1}`);
     await makeGroups(request, { workspaceId, userId: adminId, names });
 
-    await page.goto(AUDIT_LOG_VIEW);
+    await page.goto(AUDIT_LOG_SCREEN);
     await expect(eventRows(page)).toHaveCount(50);
     await expect(
       auditLog(page).getByText("The newest 50 events; older ones follow.", { exact: true }),
@@ -198,7 +198,7 @@ test.describe("the People screen's Audit log view", () => {
 
     // A fresh document, so no page of the audit log is already in the page's cache.
     const started = Date.now();
-    await page.goto(AUDIT_LOG_VIEW);
+    await page.goto(AUDIT_LOG_SCREEN);
     await expect(eventRows(page)).toHaveCount(3);
     const elapsed = Date.now() - started;
 
@@ -209,13 +209,11 @@ test.describe("the People screen's Audit log view", () => {
   });
 
   for (const role of ["Editor", "Viewer"] as const) {
-    test(`refuses a member at ${role} the audit log`, async ({ page, request }) => {
-      await aMemberSignedInAt(page, request, role, AUDIT_LOG_VIEW);
+    test(`shows ${aRole(role)} the audit log as not found`, async ({ page, request }) => {
+      await aMemberSignedInAt(page, request, role, AUDIT_LOG_SCREEN);
 
-      await expect(auditLog(page).getByRole("alert")).toHaveText(
-        sentenceOf(SAID_OF_THE_AUDIT_LOG["role-forbids"]),
-      );
-      await expect(auditLog(page).getByRole("table")).toHaveCount(0);
+      await notFoundOfferingHome(page, role);
+      await expect(auditLog(page)).toHaveCount(0);
     });
   }
 
@@ -251,12 +249,12 @@ test.describe("the People screen's Audit log view", () => {
   }) => {
     await anAdminAtTheAuditLog(page, request, "Calder Castings");
     // A fresh document, so the first Tab starts from the top rather than from the rail's link.
-    await page.goto(AUDIT_LOG_VIEW);
+    await page.goto(AUDIT_LOG_SCREEN);
     await expect(eventRows(page)).toHaveCount(3);
 
     await skipLinkReachesTheScreen(page);
 
-    const keystrokes = await keystrokesListed(page, "People");
+    const keystrokes = await keystrokesListed(page, system.name);
     await expect(keystrokes).toContainText("Choose the family of acts to show");
     await expect(keystrokes).toContainText("Show older events");
     await page.keyboard.press("Escape");

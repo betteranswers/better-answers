@@ -5,12 +5,13 @@ import { z } from "zod";
 
 import type { REDACTION_TIERS, SENSITIVITIES } from "@better-answers/schema";
 
+import { goHome, UNKNOWN_SCREEN } from "@/app/words.ts";
 import { SIGN_IN_WORDS, type CarriedOn } from "@/features/auth/sign-in-words.ts";
 import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
 import type { RefusalWord } from "@/shared/api/trpc.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
+import { headingOf, HOMES, type Role } from "@/shared/navigation.ts";
 import { sentenceOf, type Said } from "@/shared/refusal-words.ts";
-import { HOMES, type Role } from "@/shared/screens.ts";
 
 const HARNESS = "/__harness";
 
@@ -412,11 +413,17 @@ export const keystrokesDismissed = async (page: Page, listed: Locator): Promise<
   ).toBeFocused();
 };
 
-/** Read off the screen list, so moving a role's home breaks no spec. */
+/** Read off the navigation list, so moving a role's home breaks no spec. */
 export const landedAtHome = async (page: Page, role: Role): Promise<void> => {
   const home = HOMES[role];
-  await expect(page).toHaveURL(new RegExp(`${home.defaultView}$`));
-  await expect(page.getByRole("heading", { level: 1, name: home.name })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`${home.path}$`));
+  await expect(page.getByRole("heading", { level: 1, name: headingOf(home) })).toBeVisible();
+};
+
+/** A screen hidden from the role says what an address that never existed says. */
+export const notFoundOfferingHome = async (page: Page, role: Role): Promise<void> => {
+  await expect(page.getByRole("heading", { level: 1, name: UNKNOWN_SCREEN.heading })).toBeVisible();
+  await expect(page.getByRole("link", { name: goHome(HOMES[role]) })).toBeVisible();
 };
 
 /** From the sign-in screen to an Admin's home, as the Admin of one workspace arrives. */

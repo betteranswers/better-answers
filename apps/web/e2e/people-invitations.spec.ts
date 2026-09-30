@@ -3,8 +3,9 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
 import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
 import { SAID_OF_AN_INVITATION } from "@/features/people/refusal-words.ts";
+import { aRole } from "@/features/people/role-meanings.ts";
+import { CONTROL_CENTRE, groupIn } from "@/shared/navigation.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
-import { screenById } from "@/shared/screens.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -14,6 +15,7 @@ import {
   invite,
   keystrokesDismissed,
   keystrokesListed,
+  notFoundOfferingHome,
   person,
   provision,
   editorPickedByKeyboard,
@@ -23,11 +25,11 @@ import {
   theActLandedWithinItsBudget,
 } from "./harness.ts";
 
-const people = screenById("people");
+const people = groupIn(CONTROL_CENTRE, "people");
 
 const LIST_BUDGET_MS = 1000;
 
-const MEMBERS_VIEW = "/people/members";
+const MEMBERS_SCREEN = "/people/members";
 
 const LONG_UK_DATE = /^\d{1,2} [A-Z][a-z]+ \d{4}$/;
 
@@ -72,7 +74,7 @@ const anAdminAtInvitations = async (
   const at = { workspaceId: workspace.workspaceId, adminId: workspace.admin.id, editor };
   await seed(at);
 
-  await page.goto(MEMBERS_VIEW);
+  await page.goto(MEMBERS_SCREEN);
   await signIn(page, api, adminEmail);
   await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
   return at;
@@ -90,7 +92,7 @@ const aMemberBelowAdminAtPeople = async (
     provision(api, { name: `Wharfe ${role}s` }),
   ]);
   await addMember(api, { role, userId: member.id, workspaceId: workspace.workspaceId });
-  await page.goto(MEMBERS_VIEW);
+  await page.goto(MEMBERS_SCREEN);
   await signIn(page, api, email);
 };
 
@@ -179,7 +181,7 @@ test.describe("the People screen's Invitations tab", () => {
 
     // A fresh document, so no list is already in the page's cache.
     const started = Date.now();
-    await page.goto(MEMBERS_VIEW);
+    await page.goto(MEMBERS_SCREEN);
     await openInvitations(page);
     await expect(invitationRows(page)).toHaveCount(3);
     const elapsed = Date.now() - started;
@@ -205,7 +207,7 @@ test.describe("the People screen's Invitations tab", () => {
         await invite(request, { workspaceId: at.workspaceId, email, inviterId: at.adminId, role });
       }
     });
-    await tabOpenedByKeyboard(page, MEMBERS_VIEW, "Invitations");
+    await tabOpenedByKeyboard(page, MEMBERS_SCREEN, "Invitations");
     await expect(invitationRows(page)).toHaveCount(2);
 
     await tabUntilFocused(
@@ -300,14 +302,12 @@ test.describe("the People screen's Invitations tab", () => {
   });
 
   for (const role of ["Editor", "Viewer"] as const) {
-    test(`refuses a member at ${role} the invitations, saying why`, async ({ page, request }) => {
+    test(`shows ${aRole(role)} no invitations, Members being hidden`, async ({ page, request }) => {
       await aMemberBelowAdminAtPeople(page, request, role);
-      await openInvitations(page);
 
-      await expect(invitationsRegion(page).getByRole("alert")).toHaveText(
-        sentenceOf(SAID_OF_AN_INVITATION["role-forbids"]),
-      );
-      await expect(invitationsRegion(page).getByRole("table")).toHaveCount(0);
+      await notFoundOfferingHome(page, role);
+      await expect(page.getByRole("tab", { name: "Invitations" })).toHaveCount(0);
+      await expect(invitationsRegion(page)).toHaveCount(0);
     });
   }
 });

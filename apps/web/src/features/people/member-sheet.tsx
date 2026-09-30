@@ -4,9 +4,9 @@ import { useId, useRef, useState, type RefObject } from "react";
 import type { ApiError } from "@/shared/api/trpc.ts";
 import { EmptyState } from "@/shared/empty-state.tsx";
 import { Icon } from "@/shared/icon.tsx";
+import { CONTROL_CENTRE, groupIn, screenNamed } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { RowSheet } from "@/shared/row-sheet.tsx";
-import { screenById, viewNamed } from "@/shared/screens.ts";
 import { SheetPart } from "@/shared/sheet-part.tsx";
 import { SummaryRow } from "@/shared/summary-row.tsx";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar.tsx";
@@ -40,7 +40,7 @@ export type OpenedAt = "member" | "role" | "groups" | "credentials" | "flag" | "
 
 export const memberButtonId = (personId: string): string => `member-${personId}`;
 
-const GROUPS_VIEW = viewNamed(screenById("people"), "Groups").path;
+const GROUPS_SCREEN = screenNamed(groupIn(CONTROL_CENTRE, "people"), "Groups").path;
 
 const initialsOf = (member: ListedMember): string =>
   nameOf(member)
@@ -300,8 +300,8 @@ function GroupsPicker(properties: {
             line={EMPTY_LINES.groups}
             className="gap-1"
             action={
-              <Link to={GROUPS_VIEW} className="text-brand underline">
-                Create one on the Groups view
+              <Link to={GROUPS_SCREEN} className="text-brand underline">
+                Create one on the Groups screen
               </Link>
             }
           />
@@ -353,7 +353,7 @@ export function MemberSheet(properties: {
   const landOn = {
     member: () => titleRef.current,
     role: () => pickerRef.current?.querySelector<HTMLElement>('[aria-checked="true"]'),
-    // A workspace with no groups offers its link to the Groups view in their place.
+    // A workspace with no groups offers its link to the Groups screen in their place.
     groups: () => groupsRef.current?.querySelector<HTMLElement>('[role="checkbox"], a'),
     credentials: () => revokeRef.current,
     // A member with no display name has no flag to land on, so focus goes to who they are.

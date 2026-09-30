@@ -3,9 +3,10 @@ import { createContext, useCallback, useContext, useId, useState, type Ref } fro
 import { refusalOf, type ApiError } from "@/shared/api/trpc.ts";
 import { Icon } from "@/shared/icon.tsx";
 import { KeystrokesAct, useKeystroke } from "@/shared/keystrokes.tsx";
+import { CONTROL_CENTRE, groupIn } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { failureOutcome } from "@/shared/refusal-outcome.tsx";
-import { screenById } from "@/shared/screens.ts";
+import type { ScreenToolbar } from "@/shared/screen-toolbar.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
@@ -26,14 +27,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/shared/ui/table.tsx";
-import type { ViewToolbar } from "@/shared/view-toolbar.tsx";
 import { byWords, counted, instantWords, timeWords, weekdayWords } from "@/shared/words.ts";
 
 import { useAuditLog, type AuditLog, type Family, type ReadAuditEvent } from "./audit-log-api.ts";
 import { AUDIT_LOG_KEYSTROKES } from "./audit-log-state.ts";
 import { SAID_OF_THE_AUDIT_LOG } from "./refusal-words.ts";
 
-const people = screenById("people");
+const system = groupIn(CONTROL_CENTRE, "system");
 
 const AUDIT_LOG = "Audit log";
 
@@ -61,8 +61,8 @@ const isFamily = (value: string): value is Family => Object.hasOwn(FAMILY_WORDS,
 const outcomeOfFailure = (failure: Error | ApiError): Outcome =>
   failureOutcome(SAID_OF_THE_AUDIT_LOG, failure, "read");
 
-export const AUDIT_LOG_TOOLBAR: ViewToolbar = {
-  acts: <KeystrokesAct screen={people.name} keystrokes={Object.values(AUDIT_LOG_KEYSTROKES)} />,
+export const AUDIT_LOG_TOOLBAR: ScreenToolbar = {
+  acts: <KeystrokesAct screen={system.name} keystrokes={Object.values(AUDIT_LOG_KEYSTROKES)} />,
 };
 
 const sentenceCase = (words: string): string => `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
@@ -387,11 +387,11 @@ function AuditLogRegion() {
   );
 }
 
-export function AuditLogView() {
+export function AuditLogScreen() {
   return (
     <>
-      <h1>{people.name}</h1>
-      <p className="mt-2 text-muted-foreground">{people.summary}</p>
+      <h1>{system.name}</h1>
+      <p className="mt-2 text-muted-foreground">{system.summary}</p>
       <AuditLogRegion />
     </>
   );

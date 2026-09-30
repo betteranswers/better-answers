@@ -1,52 +1,46 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 
 import { useRole } from "@/features/auth/membership.ts";
-import { screenAt, type Role, type Screen, type Surface } from "@/shared/screens.ts";
+import { HOMES, type Screen } from "@/shared/navigation.ts";
 
 import { goHome } from "./words.ts";
 
 /** The way to the reader's own home, or nothing where they are on it already. */
-export function GoHome(properties: { readonly surface: Surface; readonly className: string }) {
-  const { surface, className } = properties;
+export function GoHome(properties: {
+  readonly home?: Screen | undefined;
+  readonly className: string;
+}) {
+  const { home, className } = properties;
 
-  return "home" in surface ? (
-    <HomeLink surface={surface} home={surface.home} className={className} />
+  return home === undefined ? (
+    <RoleHomeLink className={className} />
   ) : (
-    <RoleHomeLink surface={surface} homes={surface.homes} className={className} />
+    <HomeLink home={home} className={className} />
   );
 }
 
 /** Asked only here, so the console never reads a membership its reader need not hold. */
-function RoleHomeLink(properties: {
-  readonly surface: Surface;
-  readonly homes: { readonly [held in Role]: Screen };
-  readonly className: string;
-}) {
+function RoleHomeLink(properties: { readonly className: string }) {
   const role = useRole();
 
   return (
     <HomeLink
-      surface={properties.surface}
-      home={role === undefined ? undefined : properties.homes[role]}
+      home={role === undefined ? undefined : HOMES[role]}
       className={properties.className}
     />
   );
 }
 
 /** The index finds the home of a reader whose role is not known yet. */
-function HomeLink(properties: {
-  readonly surface: Surface;
-  readonly home: Screen | undefined;
-  readonly className: string;
-}) {
+function HomeLink(properties: { readonly home: Screen | undefined; readonly className: string }) {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const { home } = properties;
-  if (home !== undefined && screenAt(properties.surface, pathname) === home) return null;
+  const to = properties.home?.path ?? "/";
+  if (pathname === to) return null;
 
   return (
     <p className={properties.className}>
-      <Link to={home?.path ?? "/"} className="text-brand underline">
-        {goHome(home)}
+      <Link to={to} className="text-brand underline">
+        {goHome(properties.home)}
       </Link>
     </p>
   );

@@ -1,10 +1,10 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
-import { goHome, UNKNOWN_SCREEN } from "@/app/words.ts";
+import { goHome, RAIL, UNKNOWN_SCREEN } from "@/app/words.ts";
 import { PICKER_WORDS } from "@/features/auth/workspace-words.ts";
 import { NOT_THE_OPERATOR, ONLY_THE_OPERATOR } from "@/features/console/refusal-words.ts";
+import { CONSOLE, HOMES } from "@/shared/navigation.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
-import { CONSOLE, readerScreenById } from "@/shared/screens.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -21,14 +21,16 @@ import {
 
 const LIST_BUDGET_MS = 1000;
 
-const WORKSPACES_VIEW = "/console/workspaces/every-workspace";
+const EVERY_WORKSPACE = HOMES.operator.path;
 
 const CLOSED = "The console is the operator's alone";
 
 const UK_DAY =
   /^\d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \d{4}$/;
 
-const railOf = (page: Page) => page.getByRole("navigation", { name: "Console" });
+const railOf = (page: Page) => page.getByRole("navigation", { name: RAIL });
+
+const navOf = (page: Page) => page.getByRole("navigation", { name: CONSOLE.name });
 
 const menuOf = (page: Page, who: string) =>
   page.getByRole("banner").getByRole("button", { name: new RegExp(who) });
@@ -77,11 +79,16 @@ test.describe("the way into the console", () => {
     await passesTheAccessibilityGate();
     await theConsole.click();
 
-    await expect(page).toHaveURL(WORKSPACES_VIEW);
+    await expect(page).toHaveURL(EVERY_WORKSPACE);
     const bar = page.getByRole("banner");
     await expect(bar.getByText("Console", { exact: true })).toBeVisible();
     await expect(bar.getByText(workspace.name)).toHaveCount(0);
-    await expect(railOf(page).getByRole("link")).toHaveText(["People", "Workspaces"]);
+    await expect(railOf(page).getByRole("link")).toHaveText([CONSOLE.name]);
+    await expect(navOf(page).getByRole("link")).toHaveText([
+      "Everyone",
+      "Names waiting",
+      "Every workspace",
+    ]);
     await expect(page.getByRole("navigation", { name: "Control Centre" })).toHaveCount(0);
 
     const you = menuOf(page, workspace.admin.name);
@@ -93,7 +100,7 @@ test.describe("the way into the console", () => {
 
     await menuOf(page, workspace.admin.name).click();
 
-    await expect(page.getByRole("menuitem")).toHaveText([readerScreenById("ask").name, "Sign out"]);
+    await expect(page.getByRole("menuitem")).toHaveText(["Sign out"]);
   });
 
   test("shows a non-operator the refused state at /console", async ({
@@ -127,7 +134,7 @@ test.describe("the way into the console", () => {
     await expect(page).toHaveURL("/sign-in?redirect=%2Fconsole");
     await signIn(page, request, email);
 
-    await expect(page).toHaveURL(WORKSPACES_VIEW);
+    await expect(page).toHaveURL(EVERY_WORKSPACE);
     await expect(page.getByRole("heading", { level: 1, name: "Workspaces" })).toBeVisible();
   });
 
@@ -163,7 +170,7 @@ test.describe("the console's Workspaces screen", () => {
       role: "Editor",
     });
 
-    await page.goto(WORKSPACES_VIEW);
+    await page.goto(EVERY_WORKSPACE);
 
     const theirs = itemOf(page, acme.name);
     await expect(theirs.getByText("2 members", { exact: true })).toBeVisible();
@@ -180,7 +187,7 @@ test.describe("the console's Workspaces screen", () => {
     request,
   }) => {
     const workspace = await theOperator(page, request, "Southern Castings");
-    await page.goto(WORKSPACES_VIEW);
+    await page.goto(EVERY_WORKSPACE);
     await expect(itemOf(page, workspace.name)).toBeVisible();
 
     const list = listOf(page);
@@ -196,7 +203,7 @@ test.describe("the console's Workspaces screen", () => {
     const workspace = await theOperator(page, request, "Wensleydale Precision");
 
     const started = Date.now();
-    await page.goto(WORKSPACES_VIEW);
+    await page.goto(EVERY_WORKSPACE);
     await expect(itemOf(page, workspace.name)).toBeVisible();
     const elapsed = Date.now() - started;
 
@@ -206,13 +213,13 @@ test.describe("the console's Workspaces screen", () => {
 
   test("says who may read the list once the mark clears", async ({ page, request }) => {
     const workspace = await theOperator(page, request, "Calder Pressings");
-    await page.goto(WORKSPACES_VIEW);
+    await page.goto(EVERY_WORKSPACE);
     await expect(itemOf(page, workspace.name)).toBeVisible();
 
     await markTheOperator(request, workspace.admin.email, "revoke");
     // A move between the console's own screens keeps its standing, so the list asks again alone.
-    await railOf(page).getByRole("link", { name: "People" }).click();
-    await railOf(page).getByRole("link", { name: "Workspaces" }).click();
+    await navOf(page).getByRole("link", { name: "Everyone" }).click();
+    await navOf(page).getByRole("link", { name: "Every workspace" }).click();
 
     await expect(listOf(page)).toContainText(sentenceOf(ONLY_THE_OPERATOR));
     await expect(listOf(page)).not.toContainText(NOT_THE_OPERATOR);
@@ -235,15 +242,15 @@ test.describe("the console's Workspaces screen", () => {
 
   test("opens People on Everyone, with Names waiting beside it", async ({ page, request }) => {
     await theOperator(page, request, "Halifax Fabrication");
-    await page.goto(WORKSPACES_VIEW);
+    await page.goto(EVERY_WORKSPACE);
 
-    await railOf(page).getByRole("link", { name: "People" }).click();
+    await page.goto("/console/people");
 
     await expect(page).toHaveURL("/console/people/everyone");
     await expect(page.getByRole("region", { name: "Everyone" })).toBeVisible();
-    const views = page.getByRole("navigation", { name: "People" }).getByRole("link");
-    await expect(views).toHaveText(["Everyone", "Names waiting"]);
-    await views.filter({ hasText: "Names waiting" }).click();
+    const screens = navOf(page).getByRole("link");
+    await expect(screens).toHaveText(["Everyone", "Names waiting", "Every workspace"]);
+    await screens.filter({ hasText: "Names waiting" }).click();
     await expect(page).toHaveURL("/console/people/names-waiting");
     await expect(page.getByRole("region", { name: "Names waiting" })).toBeVisible();
   });
@@ -257,16 +264,16 @@ test.describe("the console's Workspaces screen", () => {
       page.getByRole("heading", { level: 1, name: UNKNOWN_SCREEN.heading }),
     ).toBeVisible();
     await expect(railOf(page)).toBeVisible();
-    await expect(page.getByRole("link", { name: goHome(CONSOLE.home) })).toHaveAttribute(
+    await expect(page.getByRole("link", { name: goHome(HOMES.operator) })).toHaveAttribute(
       "href",
-      CONSOLE.home.path,
+      HOMES.operator.path,
     );
   });
 
   test("scrolls nothing sideways at 320 pixels", async ({ page, request }) => {
     await theOperator(page, request, "Acme Joinery");
     await page.setViewportSize({ width: 320, height: 720 });
-    await page.goto(WORKSPACES_VIEW);
+    await page.goto(EVERY_WORKSPACE);
     await expect(page.getByRole("heading", { level: 1, name: "Workspaces" })).toBeVisible();
 
     const room = await page.evaluate(() => ({
@@ -282,7 +289,7 @@ test.describe("the console's Workspaces screen", () => {
     passesTheAccessibilityGate,
   }) => {
     const workspace = await theOperator(page, request, "Pendle Toolworks");
-    await page.goto(WORKSPACES_VIEW);
+    await page.goto(EVERY_WORKSPACE);
     const ours = itemOf(page, workspace.name);
     await expect(ours).toBeVisible();
 
@@ -290,24 +297,22 @@ test.describe("the console's Workspaces screen", () => {
 
     // Back to the first stop, to walk the regions in the order the document gives them.
     await page.getByRole("link", { name: "Skip to the screen" }).focus();
-    for (const name of ["People", "Workspaces"]) {
-      await page.keyboard.press("Tab");
-      await expect(railOf(page).getByRole("link", { name })).toBeFocused();
-    }
     await page.keyboard.press("Tab");
-    await expect(page.getByRole("link", { name: "Every workspace" })).toBeFocused();
+    await expect(railOf(page).getByRole("link", { name: CONSOLE.name })).toBeFocused();
+    for (const name of ["Everyone", "Names waiting", "Every workspace"]) {
+      await page.keyboard.press("Tab");
+      await expect(navOf(page).getByRole("link", { name })).toBeFocused();
+    }
     await page.keyboard.press("Tab");
     await expect(page.getByRole("button", { name: "Hide the secondary nav" })).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(menuOf(page, workspace.admin.name)).toBeFocused();
 
     await expect(railOf(page)).toMatchAriaSnapshot(`
-      - navigation "Console":
+      - navigation "${RAIL}":
         - list:
           - listitem:
-            - link "People"
-          - listitem:
-            - link "Workspaces"
+            - link "${CONSOLE.name}"
     `);
     await expect(ours).toMatchAriaSnapshot(`
       - listitem "${workspace.name}":

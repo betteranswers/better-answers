@@ -3,8 +3,8 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 import { SAID_OF_A_BINDING } from "@/features/sources/refusal-words.ts";
 import { NOTHING_BOUND } from "@/features/sources/words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
+import { CONTROL_CENTRE, groupIn, screenNamed } from "@/shared/navigation.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
-import { screenById } from "@/shared/screens.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -13,6 +13,7 @@ import {
   clockTheNextKey,
   keystrokesDismissed,
   moveTheIndexRun,
+  notFoundOfferingHome,
   person,
   provision,
   saysItsSentenceNotItsWord,
@@ -28,7 +29,9 @@ const LIST_BUDGET_MS = 1000;
 /** Any id the platform mints: the screen shows none, a finding's least of all. */
 const AN_ID = /\b[0-9A-HJKMNP-TV-Z]{26}\b/;
 
-const rail = (page: Page) => page.getByRole("navigation", { name: "Control Centre" });
+const BINDINGS = screenNamed(groupIn(CONTROL_CENTRE, "sources"), "Bindings");
+
+const nav = (page: Page) => page.getByRole("navigation", { name: CONTROL_CENTRE.name });
 
 const bindingsRegion = (page: Page) => page.getByRole("region", { name: "Bindings" });
 
@@ -65,7 +68,7 @@ const anAdminAtSources = async (
       : await seedBindings(api, { workspaceId: workspace.workspaceId, bindings: input.bindings });
   await page.goto("/sign-in");
   await signIn(page, api, email);
-  await rail(page).getByRole("link", { name: "Sources" }).click();
+  await nav(page).getByRole("link", { name: BINDINGS.name }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Sources" })).toBeVisible();
   return { workspace, seeded };
 };
@@ -189,7 +192,7 @@ test.describe("the Sources screen's list of bindings", () => {
     ]);
   });
 
-  test("refuses a non-Admin, naming who can act", async ({ page, request }) => {
+  test("shows an Editor Bindings as not found, binding nothing", async ({ page, request }) => {
     const workspace = await provision(request, { name: "Pennine Fabrication" });
     await seedBindings(request, {
       workspaceId: workspace.workspaceId,
@@ -204,24 +207,15 @@ test.describe("the Sources screen's list of bindings", () => {
     });
     await page.goto("/sign-in");
     await signIn(page, request, email);
-    // An Editor's home is on the reader surface, whose rail holds no Sources.
-    await page.goto(screenById("sources").path);
+    // Control Centre is the Admin's alone, so an Editor reaches Bindings by address only.
+    await page.goto(BINDINGS.path);
 
-    await expect(bindingsRegion(page)).toContainText(sentenceOf(SAID_OF_A_BINDING["role-forbids"]));
-    await expect(bindingsRegion(page)).not.toContainText("Staff handbook");
+    await notFoundOfferingHome(page, "Editor");
+    await expect(bindingsRegion(page)).toHaveCount(0);
+    await expect(page.locator("body")).not.toContainText("Staff handbook");
 
     await page.keyboard.press("b");
-    const dialog = page.getByRole("dialog", { name: "Bind a document" });
-    await dialog.getByLabel("Name").fill("Tender answers");
-    await dialog.getByLabel("File").setInputFiles({
-      name: "answers.md",
-      mimeType: "text/markdown",
-      buffer: Buffer.from("What the company answered."),
-    });
-    await dialog.getByRole("button", { name: "Bind the document" }).click();
-    await expect(dialog.getByRole("alert")).toHaveText(
-      sentenceOf(SAID_OF_A_BINDING["role-forbids"]),
-    );
+    await expect(page.getByRole("dialog", { name: "Bind a document" })).toHaveCount(0);
   });
 });
 

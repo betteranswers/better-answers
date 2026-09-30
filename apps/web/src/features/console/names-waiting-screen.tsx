@@ -1,19 +1,19 @@
 import { useId, useRef } from "react";
 
 import { KeystrokesAct } from "@/shared/keystrokes.tsx";
-import { consoleScreenById } from "@/shared/screens.ts";
-import type { ViewToolbar } from "@/shared/view-toolbar.tsx";
+import { CONSOLE, groupIn } from "@/shared/navigation.ts";
+import type { ScreenToolbar } from "@/shared/screen-toolbar.tsx";
 
 import { NamesWaitingList } from "./names-waiting-list.tsx";
 import { NAMES_WAITING_KEYSTROKES } from "./people-keystrokes.ts";
 
-const people = consoleScreenById("people");
+const people = groupIn(CONSOLE, "people");
 
-export const NAMES_WAITING_TOOLBAR: ViewToolbar = {
+export const NAMES_WAITING_TOOLBAR: ScreenToolbar = {
   acts: <KeystrokesAct screen={people.name} keystrokes={Object.values(NAMES_WAITING_KEYSTROKES)} />,
 };
 
-export function NamesWaitingView() {
+export function NamesWaitingScreen() {
   const headingId = useId();
   const headingRef = useRef<HTMLHeadingElement>(null);
 
