@@ -23,7 +23,7 @@ execution: code
 
 ## Product Contract
 
-Product Contract preservation: changed. Owner decisions of 30/09/2026, made during planning, replaced the one flat rail with surfaces, groups and screens. R9, R10, R12, R19 and AE2 to AE4 were rewritten. R20 to R23 and AE8 to AE9 were added. R4 and R16 now say "logo", because the glossary's *mark* means the operator's mark.
+Product Contract preservation: changed. Owner decisions of 30/09/2026, made during planning, replaced the one flat rail with surfaces, groups and screens. R9, R10, R12, R19 and AE2 to AE4 were rewritten. R20 to R23 and AE8 to AE9 were added. R4 and R16 now say "logo", because the glossary's *mark* means the operator's mark. After document review, R19 no longer closes BA-12, whose Editor half waits on Inbox and ownership (owner-approved). R5, R6, R7, R15 and R22 gained the UI designer's recommendations for narrow breadcrumbs, pending and failed states, and moved addresses (owner-requested).
 
 ### Summary
 
@@ -55,7 +55,7 @@ flowchart TB
   Band --> Below
 ```
 
-When the secondary nav hides, only the nav leaves the row below the band. The band's cells keep their widths and positions.
+When the secondary nav hides, only the nav leaves the row below the band. The band's cells keep their widths and positions. This is the wide layout, where the band is fixed. Below the breakpoint the band takes two rows and scrolls with the page (R15).
 
 ### Key Decisions
 
@@ -66,7 +66,7 @@ When the secondary nav hides, only the nav leaves the row below the band. The ba
 - **Control Centre is one Admin surface of eight groups: Overview, Suggestions, Sources, Agent Operations, Questions, People, Personal data and System.** (session-settled: user-approved — chosen over keeping Personal data in People, or folding Questions into Agent Operations.) Governs R20.
 - **The suggestion queue lives in Control Centre › Suggestions. A person's Inbox holds their own items and points into the queue.** (session-settled: user-approved — chosen over putting every kind in Inbox: unpublished content is shown to Admins only in Control Centre.) Governs R9, R20.
 - **Ownership of a domain grants acts, so a Viewer may own one.** (session-settled: user-approved — chosen over requiring owners to be Editors.) Governs R21.
-- **Visibility is decided per screen, by role or by ownership.** (session-settled: user-approved — chosen over filtering whole rail entries only.) The Editor's Questions views that BA-12 named now reach Editors through Inbox, because Control Centre is Admin-only. Governs R21.
+- **Visibility is decided per screen, by role or by ownership.** (session-settled: user-approved — chosen over filtering whole rail entries only.) Control Centre is Admin-only, so an Editor sees no Questions view there. An Editor who owns the Answer domain reaches the promotions BA-12 named through Inbox. An Editor who owns nothing sees no Questions view. Governs R21.
 - **Unbuilt surfaces, groups and screens are hidden. A role's home always shows.** (session-settled: user-approved — chosen over marking unbuilt entries "Soon", or leaving them as today.) Governs R10, R11.
 - **An unbuilt or hidden address looks like one that never existed.** (session-settled: user-approved — chosen over keeping unbuilt screens as destinations, as T-225 had them: nobody learns what exists by guessing addresses.) Governs R23.
 - **The logo is two square brackets with a square between them, like a citation. It is drawn in this work.** (session-settled: user-directed — chosen over a placeholder tile or an empty cell.) Governs R16.
@@ -84,9 +84,9 @@ When the secondary nav hides, only the nav leaves the row below the band. The ba
 - R2. The band's first cell is as wide as the rail and holds the logo. Its second cell is as wide as the secondary nav and holds the workspace switcher and the sidebar toggle. The third cell holds the breadcrumb, ⌘K jump-to and the avatar menu.
 - R3. Hiding or showing the secondary nav changes nothing in the band: the toggle, the switcher and every other band element stay at the same position, to the pixel.
 - R4. The logo links to the person's home and has the accessible name `better-answers`.
-- R5. The workspace switcher names the current workspace and lists every workspace the person is a member of. It takes them to the one they choose, or to the full list. It lists Console to the operator alone.
-- R6. The breadcrumb names the surface, the group, the screen and the open tab. Each part except the last links to its place. It stays true when a tab changes.
-- R7. ⌘K jump-to opens from the band by click and by ⌘K or Ctrl+K. It finds the surfaces and screens visible to the person, the workspace's members for a person who may see People, and the acts their role may take, such as "Invite a person". It is fully keyboard-operable.
+- R5. The workspace switcher names the current workspace and lists every workspace the person is a member of. It takes them to the one they choose, or to the full list. It lists Console to the operator alone. While the list or a switch is pending, and when either fails, the band's outcome line says so in words, with the next step.
+- R6. The breadcrumb names the surface, the group, the screen and the open tab. Each part except the last links to its place. It stays true when a tab changes. At every width it names all four parts. Only the wide band's cell truncates the middle parts.
+- R7. ⌘K jump-to opens from the band by click and by ⌘K or Ctrl+K. It finds the surfaces and screens visible to the person, the workspace's members for a person who may see People, and the acts their role may take, such as "Invite a person". It is fully keyboard-operable. A pending or failed members read says so in words and never hides screens or acts.
 - R8. The avatar menu shows the person's initials, and opens to their name, their role and "Sign out". A screen's primary action appears in that screen's own row, never in the band.
 
 **Rail and secondary nav**
@@ -98,7 +98,7 @@ When the secondary nav hides, only the nav leaves the row below the band. The ba
 - R11. A role's home appears in the rail even when it is not built, and opens a screen saying plainly that it is on its way. Today that is Ask, for Editors and Viewers. An Admin's home is People › Members until Control Centre › Overview is built.
 - R12. The secondary nav lists the open surface's groups and screens, each screen with an icon. The open screen is distinct in greyscale, and no visible heading repeats the rail entry's name.
 - R13. The rail has a bottom group for utilities, holding Keyboard shortcuts. It opens the open screen's keystrokes, and `?` still does the same.
-- R22. A screen that moved to another group keeps its old address, which leads to its new place.
+- R22. A screen that moved keeps its old address. For a person who may see the screen, the old address leads to its new place. For anyone else it behaves as R23 says, and the address never changes.
 - R23. An address that is not built, or that the person may not see, shows the same not-found screen as an address that never existed, and offers the person's home.
 
 **Width**
@@ -107,14 +107,14 @@ When the secondary nav hides, only the nav leaves the row below the band. The ba
 
 **Narrow viewports**
 
-- R15. Below the wide breakpoint, the band keeps the logo, the workspace switcher, a ⌘K trigger, the avatar menu and the button that opens the rail and secondary nav as a sheet. Nothing scrolls sideways at 320px, and the skip link, focus return and remembered nav state still work as they do today.
+- R15. Below the wide breakpoint, the band's first row keeps the button that opens the rail and secondary nav as a sheet, the logo, the workspace switcher, a ⌘K trigger, the Keyboard shortcuts trigger and the avatar menu. Its second row holds the breadcrumb (R6), which wraps and never truncates. Below the breakpoint the band scrolls with the page. Nothing scrolls sideways at 320px, and the skip link, focus return and remembered nav state still work as they do today.
 
 **Brand and records**
 
 - R16. The logo exists as an SVG in the design system's assets. It is used in the band, on the sign-in screens and as the browser's tab icon.
 - R17. `better-answers` replaces "Better Answers" on every surface a person reads: web screens, the browser tab title, the api's auth pages, and the sign-in code and invitation emails, including their sender name.
 - R18. The design system's readme and guideline cards describe this shell: the band and its cells, the width rule of R14, the logo and the name. The line that says there is no logo is removed, and the shell guidance matches R1 to R15.
-- R19. A new ADR records the platform's structure of surfaces, groups and screens, including what is not built. ADR 0017 and ADR 0046 are edited to match, in the same change that ships it. `CONTEXT.md`'s entries for the product's name, the surfaces and the shell's regions and levels are updated. BA-12 is closed by this work.
+- R19. A new ADR records the platform's structure of surfaces, groups and screens, including what is not built. ADR 0017 and ADR 0046 are edited to match, in the same change that ships it. `CONTEXT.md`'s entries for the product's name, the surfaces and the shell's regions and levels are updated. BA-12's role filter is delivered by this work. Its Editor half (deciding through Inbox and ownership) stays open until Inbox and ownership are built.
 
 ### Acceptance Examples
 
@@ -193,12 +193,12 @@ This plan covers the shell and layout foundations. The breakdown below is the cu
   The breadcrumb arrives from the registry, and command is already installed. The design system's kits card changes to say so (U3). (session-settled: user-approved — chosen over installing shadcn's Sidebar: six conflicts with current guarantees.) Covers R1, R2, R3, R15.
 - KTD2. **One navigation list declares the platform: surfaces, then groups, then screens, then tabs.** It lives in `apps/web/src/shared/`, and every entry carries its address, whether it is built, and the roles (and, from S3, the ownership) that may see it. The rail, secondary nav, router, breadcrumb and ⌘K all read it through one pure visibility function of the person's role, owned domains and built-ness. Role and built-ness filter the list, and never remove entries from it, so T-225's "one list" rule and the both-ways pairing test hold. Covers R9, R10, R20, R21.
 - KTD3. **Code names follow the new levels.** Types and helpers become surface, group and screen, where they are surface, screen and view today, across about 40 importers. Code and glossary then say the same thing. (session-settled: user-approved — chosen over keeping today's code names and mapping them.) Covers R19.
-- KTD4. **Routes exist for built screens and for each role's home. A screen hidden from a held role renders the not-found screen.** Ask's unbuilt home keeps its address, `/ask`, and draws the "on its way" screen (R11). A route renders the unknown screen when the visibility function, given a held role, says the person may not see it. When the membership read has failed, so no role is held, routes draw as they do today, with the screen's own loading or failed state and never not-found. A screen that moved carries its old address as a redirect route to the new one. Control Centre groups keep root addresses (`/<group>/<screen>`), so today's bookmarks for People, Sources and Groups are untouched. Only the audit log (to `/system/audit-log`) and routes and spend (to `/agent-operations/routes-and-spend`) move. Covers R10, R22, R23.
+- KTD4. **Routes exist for built screens and for each role's home. A screen hidden from a held role renders the not-found screen.** Ask's unbuilt home keeps its address, `/ask`, and draws the "on its way" screen (R11). A route renders the unknown screen when the visibility function, given a held role, says the person may not see it. When the membership read has failed, so no role is held, routes draw as they do today, with the screen's own loading or failed state and never not-found. A moved screen's old address asks the visibility function first, in the route's `beforeLoad`, after the shell's membership read. It redirects, replacing the history entry, only when the target is visible to the held role. Otherwise it draws the not-found screen as a hidden screen does, or the failed-read state when no role is held. Control Centre groups keep root addresses (`/<group>/<screen>`), so today's bookmarks for People, Sources and Groups are untouched. Only the audit log (to `/system/audit-log`) and routes and spend (to `/agent-operations/routes-and-spend`) move. Covers R10, R22, R23.
 - KTD5. **The rail waits for the membership read.** Until the person's role is known, the rail shows no role-gated entry, rather than defaulting to Viewer. Nothing flashes, and nothing hidden is revealed. The index route sends a held role to its home, and an unknown role to the shell's failed-read state rather than a Viewer's home. Covers R9, R21.
 - KTD6. **Only the open tab's value is lifted above the band.** The tabs root and its view-state slot stay around the toolbar and screen. The tab root renders a different element for tabbed and untabbed screens, so wrapping the frame in it would remount the band, rail and nav on every such move and lose focus. The tabs root writes the picked tab into a frame-level context, and the breadcrumb reads it. Tabs get no address. The tab is the breadcrumb's last part and is not a link. Covers R6.
 - KTD7. **Keystrokes register through a shell context in `shared/`, which owns `?` and the keystrokes list at every width.** Views declare their keystrokes to that context instead of placing a Keyboard shortcuts button among their acts. The trigger sits in the rail's bottom group when wide. Below the breakpoint the rail lives inside the sheet, a dialog that the keystroke hook ignores, so the trigger sits in the band's narrow form instead. A registration context is chosen over route static data because Members' list depends on its open tab. A screen that registers nothing still shows the trigger, which says the screen has no keystrokes. Covers R13, R15.
-- KTD8. **⌘K is the installed command dialog with its own key listener.** The shared keystroke hook refuses modifier keys, so ⌘K binds its own. Items come from the visibility function, from the members list (read when the dialog opens, Admins only), and from acts the navigation list declares. "Invite a person" navigates to Members with a search parameter the invite act reads to open itself. It is budgeted as a list under ADR 0037's one-second budget. Covers R7.
-- KTD9. **The switcher uses the auth feature's hooks.** It reads the organisation list and sets the active one through `features/auth`, as [WEB2] requires. After a switch it clears every workspace-scoped query and goes to the new workspace's home. "All workspaces" goes to `/choose-workspace`, and Console appears for the operator. Covers R5.
+- KTD8. **⌘K is the installed command dialog with its own key listener.** The shared keystroke hook refuses modifier keys, so ⌘K binds its own. Items come from the visibility function, from the members list (read when the dialog opens, Admins only), and from acts the navigation list declares. "Invite a person" navigates to Members with a search parameter the invite act reads to open itself. The members read reuses the Members list's query, so a cached list shows at once, and a person who may not see People sends no members read. The dialog carries its own outcome line between the input and the list, because the dialog hides the band from screen readers. The "nothing matches" line appears only once every group has finished loading. It is budgeted as a list under ADR 0037's one-second budget. Covers R7.
+- KTD9. **The switcher uses the auth feature's hooks.** It reads the organisation list and sets the active one through `features/auth`, as [WEB2] requires. After a switch succeeds it clears every workspace-scoped query and goes to the new workspace's home. A failed switch leaves the current screen and its queries as they were. "All workspaces" goes to `/choose-workspace`, and Console appears for the operator. The band has one standing outcome line, a full-width row inside the header, empty and hidden until used, for the switcher's pending and failed states. It follows the GOV.UK notification-banner pattern [A11Y1] names, and is never a toast. Its words reuse the picker's (`PICKER_WORDS`, `WORKSPACES_UNREAD`, `PICK_REFUSED`, `noLongerAMember`). Covers R5.
 - KTD10. **The width rule lives in the shell and the design system.** The screen's wrapper takes the page maximum. The design system adds a base rule giving paragraphs and headings inside a screen the prose measure. The three off-token `max-w-prose` uses are retired. Covers R14.
 - KTD11. **The logo is one SVG in the design system's assets, exported by the package.** The web client imports it for the band, the auth screens and the tab icon. The api's server-rendered pages inline the same SVG, so the api declares the design system as a dependency and its runtime image carries the package. Today the image carries only `packages/core` and `packages/schema`. Covers R16.
 - KTD12. **The name lives in one word table per code path.** The web client's `PRODUCT_NAME` feeds screens, the tab title and the specs, which read it rather than pin it (T-441). The api holds its own constant for its pages and emails. Covers R17.
@@ -341,7 +341,9 @@ U1 settles the words before code names them ([GLOSSARY1]). U3 (design system) an
   - Covers AE3. The visibility function for Admin returns Control Centre with Sources, Agent Operations, People and System, and their built screens only.
   - An unknown role returns no role-gated entries (KTD5).
   - A group whose screens are all unbuilt is absent. A surface whose groups are all absent is absent, unless it holds the role's home.
-  - Both ways: every built screen and every role home has a route, and every route belongs to a built screen, a role home or a moved address.
+  - Both ways: every built screen and every role home has a route, and every route belongs to a built screen, a role home or a moved address. Every moved address's target is a built screen.
+  - For each moved address, by role: an Admin is redirected to the target, an Editor or a Viewer gets not-found, and an unknown role gets the failed-read state (`navigation.test.ts`).
+  - A Viewer opening `/people/audit-log` never sees an address containing `/system/`. The address stays `/people/audit-log`, and the main landmark's aria snapshot equals the one at an address that never existed. An Admin opening it from another screen lands on `/system/audit-log`, and Back returns to that screen (`routes.spec.ts`).
   - An Admin whose membership read failed, at `/people/members`, sees the shell and the screen's failed state, never the unknown screen. This keeps `membership-redirect.test.tsx`'s guarantee that the shell is reached when the read fails.
   - The index route sends a person whose membership read failed to the shell's failed-read state, not to Ask.
   - Covers AE8. `/people/audit-log` redirects to `/system/audit-log`, and `/system/routes-and-spend` redirects to `/agent-operations/routes-and-spend`.
@@ -364,7 +366,7 @@ U1 settles the words before code names them ([GLOSSARY1]). U3 (design system) an
   1. Draw the logo on a square grid: two square brackets with a filled square between them, stroke weights from the type scale, and `currentColor`. Give it a `<title>` of `better-answers`.
   2. Add the base rule that gives a screen's paragraphs and headings the prose measure, and reconcile the bridge's second `--prose-measure` (60ch) with `--measure-prose` (68ch).
   3. Rewrite the readme's logo section, layout constants and name, and fix the "248px rail" drift: the rail is 56px, and the secondary nav is 248px.
-  4. Rewrite the kits card's shell guidance to KTD1 (a hand-built frame, breadcrumb and command from the registry), and the wordmark card to the logo and `better-answers`.
+  4. Rewrite the kits card's shell guidance to KTD1 (a hand-built frame, breadcrumb and command from the registry), and the wordmark card to the logo and `better-answers`. Remove the kits card's line that "Sonner replaces our Toast wholesale", which contradicts the no-toast rule.
 - **Patterns to follow:** ADR 0033: literals only in the bridge, and tokens everywhere else. The card format of the existing guideline cards.
 - **Test scenarios:** `Test expectation: none -- assets, tokens and prose; U4 and U8 assert the logo, the name and the width rule in the browser.`
 - **Verification:** the package exports the logo. The readme and cards describe R1 to R15 with no mention of a missing logo or "Better Answers".
@@ -387,7 +389,7 @@ U1 settles the words before code names them ([GLOSSARY1]). U3 (design system) an
      - The secondary nav shows groups as headings over screens with icons, and has an accessible name but no visible heading. A surface whose only visible screen is an unbuilt role home lists that home as its one entry, and the toggle works as for any surface.
   2. The logo cell links home. The toggle stays in cell 2 at every nav state. The workspace name truncates with an ellipsis inside cell 2 and keeps its full name as its accessible name, so a long name can never move the toggle.
   3. The screen wrapper takes the page maximum (KTD10).
-  4. Narrow viewports keep today's sheet, which holds the rail and secondary nav. The band's narrow form keeps R15's controls.
+  4. Narrow viewports keep today's sheet, which holds the rail and secondary nav. The band's narrow form keeps R15's controls in its first row. When narrow, the breadcrumb row renders after the band's controls through the frame's existing `wide` branch, so focus order matches reading order.
 - **Execution note:** Rewrite the shell specs first against the new structure, and keep every current guarantee as an assertion before changing `frame.tsx`.
 - **Patterns to follow:** today's `navigation-control.tsx` sheet and focus handback; `secondary-nav-showing.ts`'s single stored value; `wide-layout.ts` for the breakpoint.
 - **Test scenarios:**
@@ -399,6 +401,8 @@ U1 settles the words before code names them ([GLOSSARY1]). U3 (design system) an
   - The secondary nav's aria snapshot shows group headings and built screens only. The open screen carries `aria-current` and a bold glyph.
   - The remembered nav state is still one stored value with no personal data.
   - Covers AE7. At 320px nothing scrolls sideways with the sheet open or closed. Escape and choosing a screen both return focus to the sheet's button, and widening focuses the toggle.
+  - At 320px, for an Admin on People › Members with Invitations open and a 60-character workspace name, the breadcrumb row lists Control Centre, People, Members and Invitations with nothing clipped. The last part carries `aria-current="page"`, and `documentElement.scrollWidth` is at most 320.
+  - At 320×256, tabbing from the top of the page to the last member row runs through the band's first-row controls, the breadcrumb links, the toolbar and the screen. No focused element's box overlaps the band's.
   - Covers AE6. At 1440px an invitation address of 40 characters sits on one line, and the screen's description paragraph is no wider than the prose measure.
   - A view that throws leaves the band, rail, nav and landmarks standing ([WEB5]).
   - The accessibility gate passes with the nav open, with it closed, and with the sheet open.
@@ -431,6 +435,8 @@ U1 settles the words before code names them ([GLOSSARY1]). U3 (design system) an
   - Going from Members to Groups through the rail keeps the band, rail and nav mounted, and focus stays on the chosen link.
   - The avatar shows initials, its menu shows name and role, and "Sign out" signs out (`sign-out.spec.ts` kept).
   - The avatar button's accessible name contains the full name.
+  - With the operator's workspace list held back, opening the switcher shows the current workspace, "All workspaces", Console and the reading line. The second workspace appears without the menu closing.
+  - A switch to workspace B refused for no membership announces that the person is no longer a member of B in the band's outcome line. Focus is back on the switcher, the address and Members' rows are still A's, and B is gone when the switcher opens again.
 - **Verification:** the specs above pass, and the accessibility gate passes with each menu open.
 
 ### U6. ⌘K jump-to
@@ -455,6 +461,8 @@ U1 settles the words before code names them ([GLOSSARY1]). U3 (design system) an
   - An Admin typing a member's name opens Members with that person findable.
   - An unbuilt screen's name finds nothing.
   - The list draws within ADR 0037's one-second budget, asserted in the page.
+  - With an Admin's members read held back, typing "invite" shows "Invite a person" as choosable and the members reading line, and "Nothing matches" never appears. When the read fails, the failure line announces itself and screens are still listed.
+  - When a Viewer opens ⌘K, no members request is sent.
 - **Verification:** the specs pass, and the accessibility gate passes with the dialog open.
 
 ### U7. Keyboard shortcuts in the rail
@@ -537,5 +545,5 @@ Each browser spec that proves a screen's behaviour asserts its ADR 0037 budget.
 - `pnpm check` passes locally and in CI.
 - The dogfood report's shell scenarios 1 to 9 pass on a re-walk against the reference shell. Scenario 6 is judged against the band Key Decision, which has no primary-action slot. Scenario 15 passes for the address wrapping alone (AE6), and its status tabs, search and row menu are left to the People layout rework.
 - ADR 0047 exists, ADR 0017 and ADR 0046 are edited, and `CONTEXT.md` defines every shell word used on screen, all in the same pull request as the code.
-- BA-12 is closed by the pull request (`Fixes BA-12`).
+- The pull request references BA-12 (`Refs: BA-12`), not `Fixes`. BA-12 is updated to record that the role filter shipped and that its Editor half waits on Inbox and ownership.
 - No code from abandoned approaches remains: no unused two-surface helpers, no registry Sidebar files, no leftover `max-w-prose`.
