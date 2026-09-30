@@ -179,7 +179,6 @@ const under =
     file.startsWith(prefix);
 
 const CARVED_OUT: readonly CarveOut[] = [
-  { holds: under("docs/adr/"), why: "an ADR is a dated record, kept in the words of its day" },
   {
     holds: under("docs/archive/"),
     why: "the archive is frozen history, kept in the words of its day",
@@ -411,7 +410,7 @@ describe("the sense a planted line is read in", () => {
 
   it("reads nothing a carve-out holds but a rules file", () => {
     const findings = findingsIn({
-      "docs/adr/0001-planted.md": `The ${WORD} claims the job.\n`,
+      "docs/archive/adr/0001-planted.md": `The ${WORD} claims the job.\n`,
       "docs/archive/specs/T-001.md": `The ${WORD} claims the job.\n`,
       "docs/specs/v01-route.md": `The ${WORD} claims the job.\n`,
       "apps/web/src/planted.ts": `// The ${WORD} claims the job.\n`,

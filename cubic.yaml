@@ -39,10 +39,10 @@ reviews:
     - `apps/api/CODING_STANDARDS.md`, `apps/web/CODING_STANDARDS.md` and
       `apps/worker/CODING_STANDARDS.md` — workspace rules. Apply a workspace's own file to
       changes in it; the `WEB` prefix is the browser package's family.
-    - `docs/adr/` — the architecture decision records; `docs/adr/README.md` is the
-      one-line live conclusion of each and the list to read first. A change that
-      contradicts an ADR is a NEW ADR in the same pull request, never a quiet edit.
-      Say which ADR is contradicted.
+    - `docs/solutions/architecture-patterns/` — the live architecture decisions, one
+      doc each; code cites one as `ADR NNNN`, and its doc is `adr-NNNN-<slug>.md`. A
+      change that moves a decision edits its doc in the same pull request, never
+      silently. Say which decision is contradicted.
 
     Five things carry more weight here than in most repositories:
 

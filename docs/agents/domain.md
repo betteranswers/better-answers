@@ -2,12 +2,12 @@
 
 How the engineering skills should consume this repo's domain documentation when exploring the codebase.
 
-This repo is **single-context**: one root `CONTEXT.md` and one `docs/adr/`. The pnpm and uv workspaces (`apps/*`, `packages/*`) are runtime tiers, not separate domains — they share one vocabulary by design.
+This repo is **single-context**: one root `CONTEXT.md` and one set of decisions in `docs/solutions/architecture-patterns/`. The pnpm and uv workspaces (`apps/*`, `packages/*`) are runtime tiers, not separate domains — they share one vocabulary by design.
 
 ## Before exploring, read these
 
 - **`CONTEXT.md`** at the repo root — the glossary.
-- **`docs/adr/`** — read ADRs that touch the area you're about to work in.
+- **`docs/solutions/architecture-patterns/`** — the live architecture decisions. Read the ones that touch the area you're about to work in.
 - **`AGENTS.md`** — the map: layout, how a task is worked, which skill to reach for.
 - **`CODING_STANDARDS.md`** — the constitution. A workspace's own rules live in `apps/api/CODING_STANDARDS.md`, `apps/web/CODING_STANDARDS.md` and `apps/worker/CODING_STANDARDS.md`; read a workspace's file too when changing it.
 - **`docs/okf-v02.md`** — read before adding a key, convention or feature that touches a concept file.
@@ -22,7 +22,8 @@ This repo is **single-context**: one root `CONTEXT.md` and one `docs/adr/`. The 
 ├── VISION.md          ← the destination
 ├── docs/
 │   ├── okf-v02.md
-│   └── adr/           ← the decision record, numbered from 0001
+│   ├── solutions/     ← what past work learned; architecture-patterns/ holds the decisions
+│   └── archive/       ← frozen: the ADRs and specs from before Compound Engineering
 ├── apps/
 │   ├── api/           ← + apps/api/CODING_STANDARDS.md
 │   ├── web/           ← + apps/web/CODING_STANDARDS.md
@@ -37,12 +38,12 @@ When your output names a domain concept (in a task title, a refactor proposal, a
 
 `CONTEXT.md` states the stronger rule this repo actually runs on: **a new domain word is settled in the glossary before it appears in code**, and a term moves into the glossary only once it has been settled in a wayfinder ticket. So if the concept you need isn't in the glossary yet, that's a signal — either you're inventing language the project doesn't use (reconsider) or there's a real gap (note it for the next `/ce-brainstorm`).
 
-## Flag ADR conflicts
+## Flag decision conflicts
 
-If your output contradicts an existing ADR, surface it explicitly rather than silently overriding:
+If your output contradicts a decision in `docs/solutions/architecture-patterns/`, surface it explicitly rather than silently overriding:
 
-> _Contradicts ADR-0007 (event-sourced orders) — but worth reopening because…_
+> _Contradicts ADR 0007 (plain Postgres, app-owned migrations) — but worth reopening because…_
 
-## Where an amendment lands
+## Where a changed decision lands
 
-ADRs here amend each other in place (ADR 0023 supersedes 0021; 0026 removes the vocabulary file; 0027 renames the notices file). When you read an ADR, read to the bottom — the amendment sections are load-bearing, and the pre-build gate (`T-001`) exists because six of them once amended earlier files by notes those files did not carry.
+A decision's doc states what is true now. A change that moves it edits the doc in place, in the same commit as the code; git keeps the history. The ADRs these docs came from, amendments and struck text included, are frozen in `docs/archive/adr/`: read one there when you need how a decision got to where it is.
