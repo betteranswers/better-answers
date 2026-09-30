@@ -14,7 +14,7 @@ the hosted product at `better-answers.com`.
 | `VISION.md` | in that repo | The one-line positioning, the three knowledge layers, who uses it |
 | `CONTEXT.md` | in that repo | The **domain glossary** — the names the code uses, which a screen borrows only where they are the reader's words too |
 | `CODING_STANDARDS.md` | in that repo | disclosure model, latency and keyboard budget, WCAG 2.2 AA + GOV.UK semantics |
-| `docs/adr/0001–0027` | in that repo | Answer contract (0016), citation markers (0015), the write path (0012), trust derivation (0019), open-core (0027) |
+| `docs/archive/adr/0001–0027` | in that repo | Answer contract (0016), citation markers (0015), the write path (0012), trust derivation (0019), open-core (0027) |
 | Styling brief (from the user) | — | "better-auth, Vercel, Linear" — the visual register |
 
 **Important: the repository contains no interface code.** It is pre-build: `app/`, `web/`

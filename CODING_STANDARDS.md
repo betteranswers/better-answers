@@ -2,7 +2,7 @@
 
 These rules bind every workspace. A directory's own rules live beside it, in `apps/api/CODING_STANDARDS.md`, `apps/web/CODING_STANDARDS.md`, `apps/worker/CODING_STANDARDS.md` and `deploy/CODING_STANDARDS.md`.
 
-Every rule is an imperative under a tag that a finding can cite. A `Reviewer:` line marks the part of a rule that no mechanism could catch on the way in. It is the only such marker. Where a mechanism is possible but absent, a ticket names it instead. A rule says what it asks for, not which gate catches a breach: the gate prints the tag itself. Why a rule was decided is in `docs/adr/`.
+Every rule is an imperative under a tag that a finding can cite. A `Reviewer:` line marks the part of a rule that no mechanism could catch on the way in. It is the only such marker. Where a mechanism is possible but absent, a ticket names it instead. A rule says what it asks for, not which gate catches a breach: the gate prints the tag itself. Why a rule was decided is in `docs/solutions/architecture-patterns/`.
 
 ## DESIGN
 

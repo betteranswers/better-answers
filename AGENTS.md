@@ -8,7 +8,7 @@ A living company knowledge map for UK SMBs, on OKF v0.2. It has three knowledge 
 - `CONTEXT.md` — the glossary. Name things in code, tests, docs and commits with its words.
 - `docs/okf-v02.md` — what OKF defines, what it leaves open, and where each lands here. Read it before adding a key, convention or feature that relates to the knowledge layer.
 - `CODING_STANDARDS.md` — the constitution: every rule that binds work in this repo. A directory's own rules live beside it, in `apps/api/CODING_STANDARDS.md`, `apps/web/CODING_STANDARDS.md`, `apps/worker/CODING_STANDARDS.md` and `deploy/CODING_STANDARDS.md`.
-- `docs/adr/` — why the architecture is the way it is. Start at `docs/adr/README.md`, which gives each ADR's live conclusion in one line. When a live conclusion moves, its row moves in the same commit. Read the ADR a change touches before touching it. A change that contradicts one is a new ADR, never a quiet edit.
+- `docs/solutions/architecture-patterns/` — why the architecture is the way it is: one doc per live decision. `/ce-plan` finds the ones a plan touches. Code cites a decision as `ADR NNNN`, and its doc is `adr-NNNN-<slug>.md`. A change that moves a decision edits its doc in the same commit, and says so in the pull request. The ADRs these came from, with their amendments, are frozen in `docs/archive/adr/`.
 
 ## Layout
 
@@ -23,10 +23,9 @@ A living company knowledge map for UK SMBs, on OKF v0.2. It has three knowledge 
 | `packages/devtools/` | The repository's own gate tooling: the throwaway-tree runner that every gate's test runs its tool through, the lint rules, the anti-slop lift, and the mutation probe and summary. Its README lists them |
 | `packages/` | The rest of the shared TypeScript: `schema`, `design-system` |
 | `contracts/` | The tier contract's language-neutral fixtures. Both tiers' suites read it, and so does the gate tooling. Nothing imports it and nothing deploys it |
-| `docs/adr/` | Architecture decision records |
 | `docs/architecture/` | The C4 diagrams: context, containers, three component views, deployment and six flows. They are a reading of the tree, which `/c4-architecture` redraws after any review that moves the shape. The README maps each route block to the containers and components it touches |
 | `docs/specs/` | `v01-route.md`, the route |
-| `docs/archive/` | Frozen history: the block and ticket specs the route was built through before Compound Engineering. Read, never edited |
+| `docs/archive/` | Frozen history from before Compound Engineering: the ADRs with their amendments, and the block and ticket specs the route was built through. Read, never edited |
 | `docs/plans/` | Compound Engineering's plans, one per piece of work. A plan has no status: git says what shipped |
 | `docs/solutions/` | Documented solutions to past problems (bugs, best practices, workflow patterns), by category, with YAML frontmatter (`module`, `tags`, `problem_type`). `/ce-plan` searches it before every plan |
 | `docs/personas/` | The personas `/ce-dogfood` walks a screen as: a git-ignored link to `.planning/personas/`, which the worktree hook makes |
@@ -79,7 +78,7 @@ The five canonical roles — `needs-triage`, `needs-info`, `ready-for-agent`, `r
 
 ### Domain docs
 
-Single-context: one root `CONTEXT.md` and one `docs/adr/`. See `docs/agents/domain.md`.
+Single-context: one root `CONTEXT.md` and one set of decisions in `docs/solutions/architecture-patterns/`. See `docs/agents/domain.md`.
 
 ### Mutation triage
 

@@ -1,8 +1,8 @@
 # Architecture — the C4 diagrams
 
-The shape of Better Answers as `origin/main` holds it on 24 September 2026, with S0 and S1 landed, the daily sweeps and the dead-man pings running in the api, and the owner's rulings of the same day on the bind class and on erasure over documents drawn as planned. Drawn from the tree, the compose files and scripts under `deploy/`, the workflows under `.github/workflows/`, `CONTEXT.md` and the ADR index (`docs/adr/README.md`). Where a diagram shows something not built yet, the element names the block or the ticket that lands it.
+The shape of Better Answers as `origin/main` holds it on 24 September 2026, with S0 and S1 landed, the daily sweeps and the dead-man pings running in the api, and the owner's rulings of the same day on the bind class and on erasure over documents drawn as planned. Drawn from the tree, the compose files and scripts under `deploy/`, the workflows under `.github/workflows/`, `CONTEXT.md` and the ADR index (`docs/archive/adr/README.md`, since frozen; the live decisions are in `docs/solutions/architecture-patterns/`). Where a diagram shows something not built yet, the element names the block or the ticket that lands it.
 
-**Authority.** These diagrams are a reading of the tree, never a source: the ADR index wins over a diagram, the ADR body over the index, `CONTEXT.md` over both for a word, and the tree over every document (the route spec's authority order). A diagram that disagrees with the tree is wrong and is redrawn — a `/c4-architecture` pass after any architecture review that moves the shape (`AGENTS.md`, *Skills*).
+**Authority.** These diagrams are a reading of the tree, never a source: a decision in `docs/solutions/architecture-patterns/` wins over a diagram, `CONTEXT.md` over both for a word, and the tree over every document (the route spec's authority order). A diagram that disagrees with the tree is wrong and is redrawn — a `/c4-architecture` pass after any architecture review that moves the shape (`AGENTS.md`, *Skills*).
 
 ## The diagrams
 

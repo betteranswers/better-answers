@@ -2,7 +2,7 @@
 
 A living company knowledge map for UK SMBs on OKF v0.2 — every answer cited, permission-aware and explainable. The code is open under the [Apache License 2.0](LICENSE); the hosted service at `better-answers.com` is the product (ADR 0027).
 
-Start with `AGENTS.md`, then `CONTEXT.md` (the glossary), `docs/okf-v02.md`, `CODING_STANDARDS.md` and `docs/adr/`.
+Start with `AGENTS.md`, then `CONTEXT.md` (the glossary), `docs/okf-v02.md`, `CODING_STANDARDS.md` and the decisions in `docs/solutions/architecture-patterns/`.
 
 ## Browsing the data
 
