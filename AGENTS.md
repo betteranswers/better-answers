@@ -113,7 +113,8 @@ This server runs the **front door** surface. Three tools reach every jCodeMunch 
 - `source: ""` alongside `source_status` means the body could not be read, not that the symbol is empty.
 
 **After editing files:**
-- Edited files are reindexed automatically.
+- A login service per server (`jcodemunch-mcp watch-install`, `jdocmunch-mcp watch-install --no-ai-summaries`) reindexes the main checkout and each worktree on any change on disk, merges included. Check it with `watch-status`.
+- Without the watchers, only the Edit and Write tools reindex, and jCodeMunch's hook skips non-code files. After a change made another way (a Bash edit, a delete, a rename), call `order { "action": "register_edit", "args": { "paths": [...] } }`.
 
 **Announce your model once per session** so the server can size its answers: `announce_model { "model": "<your-model-id>" }`.
 
