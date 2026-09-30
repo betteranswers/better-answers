@@ -1,9 +1,9 @@
-<!-- @dsCard group="Brand" viewport="700x190" name="Wordmark" subtitle="Better Answers — the name a reader meets, set in Geist; better-answers is the handle" -->
+<!-- @dsCard group="Brand" viewport="700x230" name="Logo and name" subtitle="Two square brackets with a square between them; better-answers, lower-case, everywhere a person reads it" -->
 <!doctype html>
 <html lang="en-GB">
   <head>
     <meta charset="utf-8" />
-    <title>Wordmark</title>
+    <title>Logo and name</title>
     <link rel="stylesheet" href="../tokens/fonts-remote.css" />
     <link rel="stylesheet" href="../styles.css" />
     <style>
@@ -12,7 +12,7 @@
         background: var(--surface-card);
         font-family: var(--font-sans);
         color: var(--text-body);
-        height: 190px;
+        height: 230px;
         display: flex;
       }
       .p {
@@ -23,19 +23,31 @@
         justify-content: center;
         gap: 14px;
       }
-      .k {
-        font-size: var(--text-2xs);
-        color: var(--text-muted);
+      .lockup {
+        display: flex;
+        align-items: center;
+        gap: 12px;
       }
       .wm {
+        font-family: var(--font-mono);
         font-weight: 500;
         color: var(--text-primary);
         letter-spacing: -0.02em;
       }
-      .handle {
+      .sizes {
+        display: flex;
+        gap: 28px;
+        align-items: flex-end;
+      }
+      .size {
+        display: flex;
+        align-items: flex-end;
+        gap: 8px;
+      }
+      .v {
         font-family: var(--font-mono);
-        font-size: 13px;
-        color: var(--text-muted);
+        font-size: var(--text-2xs);
+        color: var(--text-faint);
       }
       .no {
         text-decoration: line-through;
@@ -46,20 +58,37 @@
   </head>
   <body>
     <div class="p">
-      <span class="wm" style="font-size: 30px">Better Answers</span>
-      <div style="display: flex; gap: 28px; align-items: baseline">
-        <span class="wm" style="font-size: 15px">Better Answers</span>
-        <span class="handle">better-answers</span>
-        <span class="handle">better-answers.com</span>
+      <div class="lockup">
+        <img src="../assets/logo.svg" width="32" height="32" alt="" />
+        <span class="wm" style="font-size: 26px">better-answers</span>
+      </div>
+      <div class="sizes">
+        <span class="size"
+          ><img src="../assets/logo.svg" width="16" height="16" alt="" /><span class="v"
+            >16 · tab icon</span
+          ></span
+        >
+        <span class="size"
+          ><img src="../assets/logo.svg" width="24" height="24" alt="" /><span class="v"
+            >24 · band</span
+          ></span
+        >
+        <span class="size"
+          ><img src="../assets/logo.svg" width="32" height="32" alt="" /><span class="v"
+            >32 · band</span
+          ></span
+        >
+        <span class="v">better-answers.com</span>
       </div>
       <div style="display: flex; gap: 20px; align-items: baseline; font-size: 13px">
         <span class="no">BetterAnswers</span><span class="no">Better-Answers</span
         ><span class="no">BA</span>
       </div>
       <p style="margin: 0; font-size: var(--text-xs); color: var(--text-muted); max-width: 62ch">
-        A screen names the product as a reader says it: Better Answers, in Geist 500 at −0.02em. The
-        handle and the domain are the lower-case better-answers, in Geist Mono, and a reader never
-        meets it as the name. No logotype exists yet: until one does, this is the mark.
+        The logo is two square brackets with a square between them, like a citation, drawn on a
+        16-unit grid in the colour of the text around it. Set it at a multiple of 8px. The name is
+        better-answers everywhere a person reads it, lower-case and hyphenated: Geist Mono 500
+        beside the logo, the text's own face in a sentence.
       </p>
     </div>
   </body>

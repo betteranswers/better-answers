@@ -1,4 +1,4 @@
-# Better Answers — design system
+# better-answers — design system
 
 A living company knowledge map for UK SMBs, built on OKF v0.2. Every answer cited,
 permission-aware and explainable. This repository is the brand and interface system for
@@ -10,19 +10,19 @@ the hosted product at `better-answers.com`.
 
 | Source | Path / link | What was taken from it |
 | --- | --- | --- |
-| Better Answers repository (mounted, read-only) | `better-answers/` | Product definition, glossary, UX and accessibility rules, the reader-facing word set, Control Centre's six screens |
+| The better-answers repository (mounted, read-only) | `better-answers/` | Product definition, glossary, UX and accessibility rules, the reader-facing word set, Control Centre's screens |
 | `VISION.md` | in that repo | The one-line positioning, the three knowledge layers, who uses it |
 | `CONTEXT.md` | in that repo | The **domain glossary** — the names the code uses, which a screen borrows only where they are the reader's words too |
 | `CODING_STANDARDS.md` | in that repo | disclosure model, latency and keyboard budget, WCAG 2.2 AA + GOV.UK semantics |
 | `docs/archive/adr/0001–0027` | in that repo | Answer contract (0016), citation markers (0015), the write path (0012), trust derivation (0019), open-core (0027) |
 | Styling brief (from the user) | — | "better-auth, Vercel, Linear" — the visual register |
 
-**Important: the repository contains no interface code.** It is pre-build: `app/`, `web/`
-and `worker/` are described in `AGENTS.md` but do not exist on disk yet, and there are no
-components, stylesheets, fonts, icons or logo files anywhere in the tree. Everything
-visual here is therefore **authored from the product's written rules plus the stated
-styling reference**, not recreated from source. Where a decision had no basis in the
-source, it is flagged in §7.
+**When this system was authored, the repository held no interface code.** It was
+pre-build: `app/`, `web/` and `worker/` were described in `AGENTS.md` but did not exist on
+disk, and there were no components, stylesheets, fonts, icons or logo files anywhere in
+the tree. Everything visual here was therefore **authored from the product's written
+rules plus the stated styling reference**, not recreated from source. Where a decision
+had no basis in the source, it is flagged in §7.
 
 ## 2. The product, in brief
 
@@ -34,13 +34,19 @@ Two kinds of user: **people** (Admin, Editor, Viewer) running business activitie
 curating knowledge, and **agents** arriving through the MCP surface. One deployment holds
 many **workspaces**; a workspace is one company.
 
-Surfaces the design system dresses:
+The surfaces the rail lists, each holding groups of screens (§4, *The shell*):
 
-- **Ask** — a question, a cited answer, and what it could not answer.
-- **Search** — hits typed by knowledge layer, each wearing its trust or sensitivity word.
-- **Guides** — assembled *Brief* and quoted *Detail* layers over the concepts, with coverage.
-- **Control Centre** — the one Admin surface, in six screens: Sources, Suggestions, Knowledge, Questions, People, System.
-- **Account** — a person's own small page.
+- **Ask** — a question, a cited answer, and what it could not answer. Every role.
+- **Knowledge** — search, guides and the map's concepts for every role; its curation
+  screens for Admins and the owners of a domain. A search hit is typed by knowledge layer
+  and wears its trust or sensitivity word. A guide is assembled *Brief* and quoted
+  *Detail* layers over the concepts, with coverage.
+- **Inbox** — what waits on a person who decides something: Admins, and the owners of a
+  domain.
+- **Control Centre** — the one Admin surface, in eight groups: Overview, Suggestions,
+  Sources, Agent Operations, Questions, People, Personal data and System.
+
+The avatar menu in the band holds the person's name, their role and "Sign out".
 
 ## 3. Content fundamentals
 
@@ -141,8 +147,44 @@ hashes, actor ids, citation markers, tabular figures). Only three weights ship: 
 Tracking tightens as size grows (−0.022em display → −0.006em body); the 11px micro-label
 opens to +0.06em upper case. Tabular figures wherever numbers stack.
 
-**Spacing.** 4px base, with 2px and 6px for dense controls. Layout constants: 248px left
-rail, 48px top bar, 68ch prose measure, 1200px page maximum. Controls are 26 / 32 / 40px tall.
+**Spacing.** 4px base, with 2px and 6px for dense controls. Layout constants: the 56px
+rail (`--rail-w`), the 248px secondary nav (`--sidebar-w`), the 48px band (`--topbar-h`),
+the 1200px page maximum (`--page-max`) and the 68ch prose measure (`--measure-prose`).
+Tailwind reads them as `w-rail`, `w-sidebar`, `h-topbar`, `max-w-page` and
+`max-w-measure`. Controls are 26 / 32 / 40px tall.
+
+**The shell.** A full-width band runs across the top of every workspace and Console
+screen, above the rail and the secondary nav. It has three cells:
+
+1. As wide as the rail: the logo, which links to the person's home.
+2. As wide as the secondary nav: the workspace switcher, then the sidebar toggle.
+3. The rest: the breadcrumb, ⌘K jump-to and the avatar menu.
+
+Hiding the secondary nav takes only the nav out of the row below the band, so nothing in
+the band moves, to the pixel. The band has no primary-action slot: a screen's primary
+action sits in that screen's own row. The breadcrumb names the surface, the group, the
+screen and the open tab at every width, and every part but the last links to its place;
+only the wide band's cell may truncate the middle parts. When a switch of
+workspace is pending or fails, the band's outcome line says so in words, with the next
+step — never a toast.
+
+Below the band, the rail lists the surfaces the person may use, with a bottom group for
+utilities: Keyboard shortcuts. The secondary nav lists the open surface's groups, each a
+heading over its screens, each screen with an icon. The open screen is marked in
+greyscale, and no visible heading repeats the surface's name from the rail. A surface,
+group or screen that is not built appears nowhere, except a role's home.
+
+Below the wide breakpoint the band takes two rows and scrolls with the page. The first
+keeps the button that opens the rail and secondary nav as a sheet, the logo, the
+switcher, a ⌘K trigger, the Keyboard shortcuts trigger and the avatar menu. The second
+holds the breadcrumb, which wraps and never truncates. Nothing scrolls sideways at 320px.
+
+**Width.** A screen's content fills the pane up to the page maximum. Its paragraphs and
+headings keep the prose measure, and a table or form uses the width it is given. The shell
+marks the screen's wrapper `data-screen-content` and gives it `max-w-page`; the rule in
+`styles.css` caps the text inside, and lifts the cap inside a table, a dialog or a sheet.
+A screen declares nothing. A line that must run wider says so with a utility, which
+always wins over the rule.
 
 **Corners: square.** Every step of the radius ramp resolves to `0`. The ramp names are kept
 so consumers can still write `--radius-md`, but nothing rounds. `--radius-full` survives
@@ -216,8 +258,8 @@ to show says so in words.
 `currentColor`. In the application this is **`@phosphor-icons/react`**; on a static page or
 a specimen card it is the same set as **`@phosphor-icons/web`**, and the kebab-case names
 are identical across both — a screen built here ports to the app with no glyph changes.
-This remains a **flagged substitution**: the repository ships no icon set, sprite, icon
-font or SVG of its own.
+This remains a **flagged substitution**: the repository ships no icon set, sprite or icon
+font of its own. Its one SVG is the logo.
 
 ```jsx
 import { MagnifyingGlass } from "@phosphor-icons/react";   // application
@@ -240,22 +282,28 @@ way to render one.
 `apps/web/src/shared/ui/` and nowhere else**, because a chevron inside a `Select` is behaviour,
 not meaning (ADR 0033).
 
-**Logo: there is none yet.** The source contains no logo, wordmark file or brand mark, so
-none was drawn. Wherever a mark would go on a screen, the name is set in type as a reader
-says it — **Geist 500: Better Answers**. The handle and the domain (`better-answers.com`)
-are the lower-case `better-answers`, in Geist Mono where a machine string is shown; a
-reader never meets it as the name. Never "BetterAnswers", never "BA". **Logo and icon
-files are being produced separately; when they land, drop the SVGs into `assets/` and
-replace the name in `apps/web`'s auth screens and in `thumbnail.html`.**
+**Logo.** Two square brackets with a square between them, like a citation marker:
+`assets/logo.svg`, imported as `@better-answers/design-system/assets/logo.svg`. It is one
+path on a 16-unit grid in `currentColor`, so it takes the colour of the text around it,
+and its weight is Geist Mono's own bracket, between 500 and 600 (`assets/README.md` gives
+the measurements). It stands in the band's first cell, on the sign-in screens and as the
+browser's tab icon, at a multiple of 8px so its edges stay on whole pixels: 16px as the
+tab icon, 24 or 32px in the band. Its accessible name is `better-answers`.
+
+**Name.** The product's name is `better-answers` everywhere a person reads it: a screen,
+the tab title, the api's pages, an email and its sender name. Lower-case and hyphenated,
+at the start of a sentence as anywhere else. Beside the logo it is set in Geist Mono 500;
+in running text it takes the text's own face. The domain is `better-answers.com`. Never
+"BetterAnswers", never "Better-Answers", never "BA", and never two capitalised words.
 
 ## 6. What is in this repository
 
 ```
-package.json            the workspace package apps/web imports; wires the two self-hosted faces
-styles.css              @import list only — the one file consumers link
+package.json            the workspace package apps/web imports; wires the two self-hosted faces; exports ./assets/*
+styles.css              the token imports and the width rule — the one file consumers link
 tokens/                 fonts · fonts-hosted · fonts-remote · colors · typography · spacing · radius · blueprint · elevation · motion · semantic · keyframes · tailwind-bridge
 guidelines/             foundation specimen cards
-assets/                 (empty — logo and icon files are in production separately)
+assets/                 logo.svg, the logo
 SKILL.md                Agent Skills entry point
 ```
 
@@ -267,7 +315,7 @@ application arrived**: the components the product uses come from the shadcn, Kib
 AI Elements registries, and a second set nothing imports is drift. What they proved — that the register can be built — the guidelines cards
 still record.
 
-What stays is the part an application consumes: the tokens, `styles.css`, and
+What stays is the part an application consumes: the tokens, `styles.css`, the logo, and
 `tokens/tailwind-bridge.css`, which turns the tokens into Tailwind v4 theme values so a
 registry component comes out in this styling with no edit to the component file.
 
@@ -305,7 +353,7 @@ GOV.UK brand), **`Icon`** (the Phosphor substitution in one file) and
 
 1. **Fonts.** No brand font binaries exist in the source. **Geist and Geist Mono** were chosen as the closest match to the stated reference styling, and the substitution stands. Since T-035 the product **self-hosts** them from this package's own `@fontsource-variable/geist` and `-geist-mono` dependencies (`tokens/fonts-hosted.css`), so no screen makes a third-party request; the specimen cards under `guidelines/`, which are opened straight from disk and cannot resolve a package name, still link Google Fonts through `tokens/fonts-remote.css`. Replace the two `tokens/fonts-*.css` files if a licensed brand font exists; `tokens/fonts.css` names the families and stays.
 2. **Icons.** No icon set exists in the source. **Phosphor** — `@phosphor-icons/react` in the app, `@phosphor-icons/web` on a page — flagged above.
-3. **Logo.** None exists yet; none was drawn. Until one lands, a screen names the product in type: Better Answers, in Geist. Logo and icon files are in production separately.
+3. **Logo.** Drawn to the owner's description of 30 September 2026: two square brackets with a square between them. `assets/logo.svg` is the logo unless the owner replaces it. The same decision made the name `better-answers` everywhere a person reads it.
 4. **Accent colour.** Ink blue `#2e4bd4` was chosen, not found. The source specifies no palette — only that colour never carries a signal alone.
 7. **Textures.** `GridPattern`, `DotPattern` and `NoiseTexture` are ports of the corresponding Magic UI components, retuned to these tokens rather than pulled from npm — the design system ships no build step. In an application, install `@magicui/grid-pattern`, `@magicui/dot-pattern` and `@magicui/noise-texture` and pass the same tokens.
 5. **Dark theme.** Authored on the reference styling's convention, not on evidence from the source.

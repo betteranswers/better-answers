@@ -2,7 +2,7 @@
  * Tailwind v4 / shadcn bridge
  * ---------------------------------------------------------------------------
  * shadcn, Kibo UI, AI Elements and Magic UI all read one fixed set of CSS
- * variable names. This file points those names at Better Answers tokens, so a
+ * variable names. This file points those names at this design system's tokens, so a
  * component installed from any of those registries comes out in our styling
  * with no edits to the component file.
  *
@@ -121,8 +121,9 @@
  * A separate axis from theme, so it combines with light or dark rather than
  * replacing one. Set data-reading-mode="accessible" on <html> alongside
  * whatever data-theme is already there.
- * Font family is left for the reference repo's face to fill in; everything
- * else — size, measure, leading, tracking — is set here.
+ * Font family is left for the reference repo's face to fill in; size, leading
+ * and tracking are set here. The measure is not: --measure-prose is the one
+ * measure, and it counts characters, so a line keeps its 68 at the larger size.
  * ------------------------------------------------------------------------ */
 [data-reading-mode="accessible"] {
   --font-sans: var(--font-accessible, var(--font-sans-default));
@@ -130,7 +131,6 @@
   --text-interface-size: 16px;
   --prose-size: 18px;
   --prose-leading: 1.8;
-  --prose-measure: 60ch;
   --tracking-body: 0.01em;
   --tracking-caps: 0.08em;
 }
@@ -270,7 +270,8 @@
      --space-4 and there is one scale rather than two that nearly agree. */
   --spacing: var(--space-1);
 
-  /* The layout constants, named: w-sidebar, h-topbar, max-w-measure, max-w-page. */
+  /* The layout constants, named: w-rail, w-sidebar (the secondary nav), h-topbar (the
+     band), max-w-measure, max-w-page. */
   --spacing-sidebar: var(--sidebar-w);
   --spacing-rail: var(--rail-w);
   --spacing-topbar: var(--topbar-h);

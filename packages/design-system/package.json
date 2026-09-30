@@ -2,11 +2,12 @@
   "name": "@better-answers/design-system",
   "version": "0.1.0",
   "private": true,
-  "description": "The tokens, stylesheet and Tailwind bridge apps/web imports (ADR 0029: packages/ is what is imported)",
+  "description": "The tokens, stylesheet, Tailwind bridge and logo apps/web imports (ADR 0029: packages/ is what is imported)",
   "type": "module",
   "exports": {
     "./styles.css": "./styles.css",
-    "./tokens/*.css": "./tokens/*.css"
+    "./tokens/*.css": "./tokens/*.css",
+    "./assets/*": "./assets/*"
   },
   "dependencies": {
     "@fontsource-variable/geist": "5.3.0",

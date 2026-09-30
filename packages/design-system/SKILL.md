@@ -1,6 +1,6 @@
 ---
 name: better-answers-design
-description: Use this skill to generate well-branded interfaces and assets for Better Answers, either for production or throwaway prototypes/mocks/etc. Contains essential design guidelines, colors, type, fonts and assets; the components come from the shadcn, Kibo UI and Vercel AI Elements registries (ADR 0033).
+description: Use this skill to generate well-branded interfaces and assets for better-answers, either for production or throwaway prototypes/mocks/etc. Contains essential design guidelines, colors, type, fonts, the shell's layout and the logo; the components come from the shadcn, Kibo UI and Vercel AI Elements registries (ADR 0033).
 user-invocable: true
 ---
 
