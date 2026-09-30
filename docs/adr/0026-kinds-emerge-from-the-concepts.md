@@ -30,7 +30,7 @@ We decided this because OKF's first non-goal is a fixed taxonomy of concept type
 - **Signals** (ADR 0025): *kinds with two or fewer concepts* per workspace — the tail that shows drift; nothing else.
 - **`CONTEXT.md`**: *type vocabulary* (derived), *company language* (the kinds, names and links the concepts reveal — never a file), *kind* (the reader's word for `type`), *relation* (the link with its sentence), *Kinds list*, *Also known as*; *vocabulary plan* retired. `docs/okf-v02.md` rows for typed relations, equivalence and taxonomy point here.
 - **What goes wrong at 300 people, honestly** (research 76): kind drift — a long tail of one- and two-concept kinds and two departments using *Policy* differently — noticed from the Kinds list and the tail signal, fixed by a merge commit; predicate-less edges that a guide expectation cannot select by relation, met by an enrichment over edge sentences when it is wanted. Each is addressed when it appears; none needs a day-one schema.
-- Amends ADRs 0010 (its rejection read strictly: no relation schema in the bundle either), 0013, 0014, 0019, 0023 as recorded on each; `docs/vision.md`'s "Admins (sources, vocabulary, …)" becomes "kinds".
+- Amends ADRs 0010 (its rejection read strictly: no relation schema in the bundle either), 0013, 0014, 0019, 0023 as recorded on each; `VISION.md`'s "Admins (sources, vocabulary, …)" becomes "kinds".
 
 ## Amendment — 2026-08-30, five named edges — three about concepts, two about the platform's own bookkeeping (ticket 79, the pre-build gate; applied by T-001)
 

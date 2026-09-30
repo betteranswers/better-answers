@@ -1,6 +1,6 @@
 # AGENTS.md
 
-A living company knowledge map for UK SMBs, on OKF v0.2. It has three knowledge layers: **sources** (evidence) → **bundles** (OKF concepts: the curated map) → **graph** (derived). Over them the platform keeps **records** (guides, compositions, usage, bindings, audit), which cite concepts. The destination this repo builds towards is `docs/vision.md`. Two runtime tiers share four stores: Postgres, an object store, a git repository per workspace, and the graph as Postgres tables under RLS. The way to v0.1 is the **route spec**, `docs/specs/v01-route.md`. The map it was cut from (`.scratch/v01-spec/map.md`) is resolved and closed.
+A living company knowledge map for UK SMBs, on OKF v0.2. It has three knowledge layers: **sources** (evidence) → **bundles** (OKF concepts: the curated map) → **graph** (derived). Over them the platform keeps **records** (guides, compositions, usage, bindings, audit), which cite concepts. The destination this repo builds towards is `VISION.md`. Two runtime tiers share four stores: Postgres, an object store, a git repository per workspace, and the graph as Postgres tables under RLS. The way to v0.1 is the **route spec**, `docs/specs/v01-route.md`. The map it was cut from (`.scratch/v01-spec/map.md`) is resolved and closed.
 
 ## Read first
 
@@ -25,7 +25,8 @@ A living company knowledge map for UK SMBs, on OKF v0.2. It has three knowledge 
 | `contracts/` | The tier contract's language-neutral fixtures. Both tiers' suites read it, and so does the gate tooling. Nothing imports it and nothing deploys it |
 | `docs/adr/` | Architecture decision records |
 | `docs/architecture/` | The C4 diagrams: context, containers, three component views, deployment and six flows. They are a reading of the tree, which `/c4-architecture` redraws after any review that moves the shape. The README maps each route block to the containers and components it touches |
-| `docs/specs/` | `<ticket>.md` is a ticket's spec and `v01-route.md` the route |
+| `docs/specs/` | `v01-route.md`, the route |
+| `docs/archive/` | Frozen history: the block and ticket specs the route was built through before Compound Engineering. Read, never edited |
 | `docs/plans/` | Compound Engineering's plans, one per piece of work. A plan has no status: git says what shipped |
 | `docs/solutions/` | Documented solutions to past problems (bugs, best practices, workflow patterns), by category, with YAML frontmatter (`module`, `tags`, `problem_type`). `/ce-plan` searches it before every plan |
 | `docs/personas/` | The personas `/ce-dogfood` walks a screen as: a git-ignored link to `.planning/personas/`, which the worktree hook makes |

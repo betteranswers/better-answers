@@ -11,8 +11,8 @@ the hosted product at `better-answers.com`.
 | Source | Path / link | What was taken from it |
 | --- | --- | --- |
 | Better Answers repository (mounted, read-only) | `better-answers/` | Product definition, glossary, UX and accessibility rules, the reader-facing word set, Control Centre's six screens |
-| `docs/vision.md` | in that repo | The one-line positioning, the three knowledge layers, who uses it |
-| `CONTEXT.md` | in that repo | The **domain glossary** — the source of truth for every word on a screen |
+| `VISION.md` | in that repo | The one-line positioning, the three knowledge layers, who uses it |
+| `CONTEXT.md` | in that repo | The **domain glossary** — the names the code uses, which a screen borrows only where they are the reader's words too |
 | `CODING_STANDARDS.md` | in that repo | disclosure model, latency and keyboard budget, WCAG 2.2 AA + GOV.UK semantics |
 | `docs/adr/0001–0027` | in that repo | Answer contract (0016), citation markers (0015), the write path (0012), trust derivation (0019), open-core (0027) |
 | Styling brief (from the user) | — | "better-auth, Vercel, Linear" — the visual register |
@@ -44,10 +44,12 @@ Surfaces the design system dresses:
 
 ## 3. Content fundamentals
 
-The product's writing is already specified more tightly than most brands specify theirs,
-because `CONTEXT.md` is a glossary that *code obeys*. The design system inherits it.
+A screen is written in its reader's words, not its builders'. `CONTEXT.md` names things
+for the code; a screen borrows a glossary word only when a reader would say it themselves,
+or needs that exact word to act.
 
-**Never contradict the glossary.** A screen uses the glossary's word for a thing. *Map*,
+**Never contradict the glossary.** A screen that names a thing uses the glossary's word for
+it, never a rival one. *Map*,
 never *graph*, on a screen. *Workspace*, never *organisation*, *account*, *team* or *site*.
 *Client*, never *connector*, for an MCP host. *Screen*, never *section*, for Control Centre.
 Terms marked *Avoid* in the glossary are banned outright. The glossary's definition is never

@@ -53,6 +53,7 @@
   "enabledPlugins": {
     "compound-engineering@compound-engineering-plugin": true,
     "mattpocock-skills@mattpocock": false,
-    "mattpocock-skills@claude-plugins-official": false
+    "mattpocock-skills@claude-plugins-official": false,
+    "mattpocock-skills@synced": false
   }
 }
