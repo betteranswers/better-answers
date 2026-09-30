@@ -3,12 +3,12 @@
     "jcodemunch": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["jcodemunch-mcp==1.108.319"]
+      "args": ["jcodemunch-mcp"]
     },
     "jdocmunch": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["jdocmunch-mcp==1.145.0"]
+      "args": ["jdocmunch-mcp"]
     },
     "gitnexus": {
       "type": "stdio",
