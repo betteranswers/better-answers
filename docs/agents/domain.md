@@ -19,9 +19,9 @@ This repo is **single-context**: one root `CONTEXT.md` and one `docs/adr/`. The 
 ├── AGENTS.md          ← the map (CLAUDE.md is a one-line pointer to it)
 ├── CONTEXT.md         ← the glossary
 ├── CODING_STANDARDS.md    ← the constitution
+├── VISION.md          ← the destination
 ├── docs/
 │   ├── okf-v02.md
-│   ├── vision.md
 │   └── adr/           ← the decision record, numbered from 0001
 ├── apps/
 │   ├── api/           ← + apps/api/CODING_STANDARDS.md
