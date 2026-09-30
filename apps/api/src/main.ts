@@ -11,6 +11,7 @@ import {
 } from "./config.ts";
 import { openDoors } from "./doors.ts";
 import { logger } from "./logger.ts";
+import { senderAt } from "./product-name.ts";
 import { RECONCILER_INTERVAL_MS, startReconciler } from "./reconciler.ts";
 import { createServer } from "./server.ts";
 import { startSweeps, SWEEP_FIRST_PASS_MS, SWEEP_INTERVAL_MS } from "./sweeps.ts";
@@ -42,7 +43,7 @@ const failWithoutTransport = async (message: EmailMessage): Promise<void> => {
 
 const sendOverSmtp = (smtpUrl: string): ((message: EmailMessage) => Promise<void>) => {
   const transport = createTransport(smtpUrl);
-  const from = `Better Answers <no-reply@${identity.hostnames.apex}>`;
+  const from = senderAt(identity.hostnames.apex);
   return async (message) => {
     await transport.sendMail({
       from,

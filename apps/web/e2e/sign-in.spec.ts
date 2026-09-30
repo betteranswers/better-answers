@@ -168,6 +168,26 @@ test("offers one way on to a person with no membership", async ({ page, request 
   await expect(signInHeading(page)).toBeVisible();
 });
 
+test("names the product in tab and banner, beside its logo", async ({ page }) => {
+  await page.goto("/sign-in");
+
+  await expect(page).toHaveTitle(PRODUCT_NAME);
+  const icon = (await page.locator('head link[rel="icon"]').getAttribute("href")) ?? "";
+  const inline = /^data:image\/svg\+xml,(?<drawn>.*)$/.exec(icon)?.groups?.["drawn"];
+  expect(inline, "the tab icon is not an inline SVG").toBeDefined();
+  const drawn = decodeURIComponent(inline ?? "");
+  expect(drawn, "the tab icon is not the logo").toContain(`<title>${PRODUCT_NAME}</title>`);
+  expect(drawn, "the logo no longer takes the icon's colour").toContain('fill="currentColor"');
+  expect(drawn, "a dark tab strip would hide the icon").toMatch(
+    /@media \(prefers-color-scheme:dark\)\{svg\{color:#[\da-f]{6}\}\}/,
+  );
+
+  const banner = page.getByRole("banner");
+  await expect(banner).toHaveText(PRODUCT_NAME, { useInnerText: true });
+  await expect(banner.getByRole("img", { name: PRODUCT_NAME, includeHidden: true })).toBeVisible();
+  await expect(banner.getByRole("img"), "the name would be heard twice").toHaveCount(0);
+});
+
 test("says a code is sent, wrong, or asked too often", async ({
   page,
   request,
@@ -177,7 +197,6 @@ test("says a code is sent, wrong, or asked too often", async ({
   await provision(request, { name: "Words", adminEmail: email });
 
   await page.goto("/sign-in");
-  await expect(page.getByRole("banner")).toHaveText(PRODUCT_NAME);
   await expect(signInHeading(page)).toBeVisible();
   await expect(page.getByText(SIGN_IN_WORDS.emailStep.nothing.hint)).toBeVisible();
   await expect(page.locator("body"), "the email step says we").not.toContainText(NO_WE);

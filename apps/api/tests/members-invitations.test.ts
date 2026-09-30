@@ -52,20 +52,22 @@ describe("inviting a person over tRPC", () => {
     expect(emailsTo(app(), address)).toEqual([
       {
         to: address,
-        subject: "Join Calder Joinery on Better Answers",
+        subject: "Join Calder Joinery on better-answers",
         text: expect.stringContaining(
           `https://app.example.test/invitations/${invited.invitationId}`,
         ),
       },
     ]);
-    expect(emailsTo(app(), address)[0]?.text).toContain("as an Editor");
+    expect(emailsTo(app(), address)[0]?.text).toContain(
+      "You are invited to join Calder Joinery on better-answers as an Editor.",
+    );
     expect(emailsTo(app(), address)[0]?.text).toMatch(
       /The invitation lasts until \d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \d{4}\./,
     );
     expect(await eventsOn(app(), invited.invitationId)).toEqual(["people.invitation.created"]);
   });
 
-  it("answers alike whether or not the address uses Better Answers", async () => {
+  it("answers alike whether or not the address uses better-answers", async () => {
     const { api } = await anAdmin();
     const elsewhere = await app().provision();
     const known = await app().person(anAddress("known"));

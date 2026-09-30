@@ -45,7 +45,7 @@ RUN corepack enable && corepack install && pnpm --pm-on-fail=ignore --version \
 
 # Every workspace manifest, and nothing else, so a source edit does not invalidate the
 # install layer. `pnpm-workspace.yaml` lists six projects; the lockfile is checked against
-# all of them, so all six are copied even though the runtime needs three. `packages/devtools`
+# all of them, so all six are copied even though the runtime needs four. `packages/devtools`
 # is here for its manifest alone — it is imported by suites and by the lint config and never
 # deployed, so no stage below copies a line of it.
 FROM base AS manifests
@@ -82,7 +82,9 @@ RUN pnpm --filter @better-answers/web run build
 # `pnpm deploy` bundle copies those workspace packages *into* `node_modules`, so every
 # `@better-answers/*` import would fail at load. A filtered install keeps them where they
 # are — real directories under `/app/packages`, reached by the symlink pnpm writes — and the
-# `...` suffix selects the api together with its workspace dependencies and nothing else.
+# `...` suffix selects the api together with its workspace dependencies and nothing else:
+# those two, and `@better-answers/design-system`, whose logo `src/auth/pages.ts` reads through
+# its `exports` map as a file rather than importing it.
 #
 # pnpm links an optional peer that any workspace brings and `--prod` installs it, so
 # `better-auth`'s peers on drizzle-kit, vitest and react would ship here with their build tooling,
@@ -213,6 +215,9 @@ RUN printf '\n# Set by apps/api/Dockerfile: an image never installs, and corepac
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=prod-deps /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=prod-deps /app/packages/core/node_modules ./packages/core/node_modules
+# The design system's dependencies are its two fonts, which the api never loads. The install
+# above keeps them in the store regardless, and this is the link `tests/image.test.ts` follows.
+COPY --from=prod-deps /app/packages/design-system/node_modules ./packages/design-system/node_modules
 COPY --from=prod-deps /app/packages/schema/node_modules ./packages/schema/node_modules
 
 COPY apps/api/package.json apps/api/
@@ -222,6 +227,9 @@ COPY apps/api/src apps/api/src
 COPY apps/api/lifts apps/api/lifts
 COPY packages/core/package.json packages/core/
 COPY packages/core/src packages/core/src
+# The logo alone: `src/auth/pages.ts` inlines it, and the api reads nothing else of the package.
+COPY packages/design-system/package.json packages/design-system/
+COPY packages/design-system/assets packages/design-system/assets
 COPY packages/schema/package.json packages/schema/
 COPY packages/schema/src packages/schema/src
 # `migrationsFolder` (packages/schema/src/index.ts) is this directory; `pnpm migrate` reads it.

@@ -215,6 +215,9 @@ importers:
       '@better-answers/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@better-answers/design-system':
+        specifier: workspace:*
+        version: link:../../packages/design-system
       '@better-answers/schema':
         specifier: workspace:*
         version: link:../../packages/schema

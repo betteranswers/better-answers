@@ -1,4 +1,14 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
+import { PRODUCT_NAME } from "../product-name.ts";
 import { OAUTH_SCOPES, type OAuthScope, SIGN_IN_PATH } from "./constants.ts";
+
+/** Inline rather than linked, so its `currentColor` is the page's text colour, light or dark. */
+const LOGO = readFileSync(
+  fileURLToPath(import.meta.resolve("@better-answers/design-system/assets/logo.svg")),
+  "utf8",
+).trim();
 
 const escape = (value: string): string =>
   value
@@ -40,7 +50,7 @@ const START_AGAIN = "Start the connection again from where you began it.";
 export const REFUSAL_PAGES = {
   crossSite: {
     title: "Nothing was connected",
-    why: "This form can only be sent from Better Answers.",
+    why: `This form can only be sent from ${PRODUCT_NAME}.`,
     next: START_AGAIN,
   },
   notNavigated: {
@@ -67,15 +77,17 @@ export const REFUSAL_PAGES = {
 
 const shell = (title: string, body: string): string => `<!doctype html>
 <html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${escape(title)} — Better Answers</title><style>
+<title>${escape(title)} — ${PRODUCT_NAME}</title><style>
 :root{color-scheme:light dark}
 body{font:16px/1.5 ui-sans-serif,system-ui,-apple-system,sans-serif;max-width:34rem;margin:6vh auto;padding:0 1.5rem}
+header{display:flex;align-items:center;gap:.6rem;margin-bottom:2rem;font:500 1.125rem/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
+header svg{display:block;width:24px;height:24px}
 h1{font-size:1.35rem;margin:0 0 .25rem}p{margin:.6rem 0}
 button{margin-top:1.1rem;padding:.6rem 1.1rem;font:inherit;border:0;border-radius:.4rem;background:#2f6f4f;color:#fff;cursor:pointer}
 button.secondary{background:transparent;color:inherit;border:1px solid #8888}
 ul{padding-left:1.1rem}.muted{opacity:.7;font-size:.9rem}
 form.inline{display:inline}
-</style></head><body><main>${body}</main></body></html>`;
+</style></head><body><header><span aria-hidden="true">${LOGO}</span>${PRODUCT_NAME}</header><main>${body}</main></body></html>`;
 
 /** `query` is the signed search string, leading `?` included. Every value is escaped here. */
 export const consentPage = (

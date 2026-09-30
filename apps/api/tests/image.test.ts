@@ -141,7 +141,8 @@ for (const entry of readdirSync(store)) {
 }
 const reached = new Set();
 const broken = [];
-const pending = ["apps/api", "packages/core", "packages/schema"].flatMap((workspace) => {
+const carried = ["apps/api", "packages/core", "packages/design-system", "packages/schema"];
+const pending = carried.flatMap((workspace) => {
   const modules = path.join("/app", workspace, "node_modules");
   return namesIn(modules).map((name) => realpathSync(path.join(modules, name)));
 });
@@ -206,7 +207,11 @@ describe.skipIf(nothingToProbeHere)("the api tier's runtime image", () => {
         environment: {
           PROBE_NAMES: JSON.stringify(developmentOnly),
 
-          PROBE_REQUIRED: JSON.stringify(["@better-answers/core/kernel", "@better-answers/schema"]),
+          PROBE_REQUIRED: JSON.stringify([
+            "@better-answers/core/kernel",
+            "@better-answers/design-system/assets/logo.svg",
+            "@better-answers/schema",
+          ]),
           PROBE_COMMANDS: JSON.stringify(["corepack", "npm", "npx", "pnpm"]),
         },
       },
@@ -219,7 +224,7 @@ describe.skipIf(nothingToProbeHere)("the api tier's runtime image", () => {
     expect(contents.resolvable).toEqual([]);
   });
 
-  it("carries the two workspace libraries the api imports", () => {
+  it("carries the three workspace libraries the api reads", () => {
     expect(contents.missing).toEqual([]);
   });
 

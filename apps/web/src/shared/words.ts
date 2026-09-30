@@ -1,5 +1,5 @@
-/** The product's name as a reader meets it; `better-answers` is the handle, never the name. */
-export const PRODUCT_NAME = "Better Answers";
+/** Lower-case and hyphenated, at the start of a sentence as anywhere else. */
+export const PRODUCT_NAME = "better-answers";
 
 const DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" });
 

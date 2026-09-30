@@ -84,7 +84,7 @@ describe("approving an access request over tRPC", () => {
     expect(emailsTo(app(), requester.email)).toEqual([
       {
         to: requester.email,
-        subject: "Join Calder Joinery on Better Answers",
+        subject: "Join Calder Joinery on better-answers",
         text: expect.stringContaining(
           `https://app.example.test/invitations/${approved.invitationId}`,
         ),

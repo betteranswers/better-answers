@@ -1,6 +1,8 @@
 import { useNavigate } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
+import LOGO from "@better-answers/design-system/assets/logo.svg?raw";
+
 import { refusalOf, type ApiError, type Refusal } from "@/shared/api/trpc.ts";
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { cn } from "@/shared/lib/utils.ts";
@@ -15,11 +17,26 @@ export const focusOn = (id: string) => {
   document.getElementById(id)?.focus();
 };
 
+/** Inline, so it takes the text's colour; hidden, so the name beside it is heard once. */
+function Logo() {
+  return (
+    <span
+      aria-hidden="true"
+      className="[&>svg]:block [&>svg]:size-6"
+      // The design system's own file, bundled at build time: no reader's input reaches it.
+      dangerouslySetInnerHTML={{ __html: LOGO }}
+    />
+  );
+}
+
 export function AuthScreen(properties: { readonly title: string; readonly children: ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="px-4 py-5 md:px-8">
-        <p className="font-medium tracking-tight text-foreground">{PRODUCT_NAME}</p>
+        <p className="flex items-center gap-2 font-mono text-lg font-medium tracking-tight text-foreground">
+          <Logo />
+          {PRODUCT_NAME}
+        </p>
       </header>
 
       <main id="screen" className="flex-1 px-4 md:px-8">

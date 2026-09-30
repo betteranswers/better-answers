@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@better-answers/core": "workspace:*",
+    "@better-answers/design-system": "workspace:*",
     "@better-answers/schema": "workspace:*",
     "@better-auth/cimd": "1.7.5",
     "@better-auth/core": "1.7.5",
