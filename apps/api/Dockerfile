@@ -174,7 +174,10 @@ FROM base AS runtime
 # line pins, so a bump here moves the image and the runner together.
 # renovate: datasource=pypi depName=git-filter-repo
 ARG GIT_FILTER_REPO_VERSION=2.47.0
+# The upgrade is there because install leaves a package the base already carries at the
+# base's version, security updates included.
 RUN apt-get update \
+ && apt-get upgrade -y \
  && apt-get install -y --no-install-recommends wget git python3 python3-pip \
  && pip3 install --no-cache-dir --break-system-packages \
       "git-filter-repo==${GIT_FILTER_REPO_VERSION}" \

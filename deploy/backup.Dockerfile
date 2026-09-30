@@ -1,11 +1,12 @@
 # pgvector builds each tag once, so the database's image keeps the Debian packages of that
-# day. Debian's slim image takes a new digest every few weeks, and each one rebuilds the
-# layer below from current packages.
+# day. Here the build cache keeps the apt layer below until this digest or its RUN line
+# changes, so a security update published between two digests waits for one of them.
 FROM debian:trixie-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a
 # Debian 13 carries no PostgreSQL 18, so the client comes from PGDG, whose signing key
 # Debian's own postgresql-common ships; a test holds its major to the database image's.
-# procps is the health check's pgrep.
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates postgresql-common \
+# procps is the health check's pgrep. The upgrade is there because install leaves a package
+# the base already carries at the base's version.
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends ca-certificates postgresql-common \
  && /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y \
  && apt-get install -y --no-install-recommends postgresql-client-18 cron git openssh-client curl jq unzip procps \
  && rm -rf /var/lib/apt/lists/*
