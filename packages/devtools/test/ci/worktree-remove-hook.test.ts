@@ -37,6 +37,7 @@ const stubTools = (name: string, worktree: string, log: string, pullRequests = "
   const registry = JSON.stringify([{ repo_id: REPO_ID, source_root: realpathSync(worktree) }]);
   return stubsOnPath(path.join(scratch, `${name}-bin`), {
     "jcodemunch-mcp": recordsItsArgv(log, [`[ "$1" = list-repos ] && printf '%s' '${registry}'`]),
+    "jdocmunch-mcp": recordsItsArgv(`${log}-doc`, []),
     gh: `printf '%s' '${pullRequests}'\n`,
   });
 };
@@ -65,6 +66,8 @@ describe("the jCodeMunch index a removed worktree leaves behind", () => {
     expect(existsSync(worktree)).toBe(false);
     expect(argvLines(log)).toEqual(["list-repos --json", `delete-index ${REPO_ID}`]);
     expect(run.stderr).toContain(`jcodemunch: dropped the index ${REPO_ID}`);
+    expect(argvLines(`${log}-doc`)).toEqual(["delete-index --repo local/removed-worktree"]);
+    expect(run.stderr).toContain("jdocmunch: dropped the index local/removed-worktree");
   });
 
   it("keeps a worktree holding work, and its index", () => {

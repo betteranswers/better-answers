@@ -55,6 +55,7 @@ const stubTools = (
   const merged = JSON.stringify([{ headRefOid: squashedHead, mergedAt: LONG_AGO }]);
   return stubsOnPath(path.join(scratch, "bin"), {
     "jcodemunch-mcp": recordsItsArgv(log, [`[ "$1" = list-repos ] && printf '%s' '${registry}'`]),
+    "jdocmunch-mcp": recordsItsArgv(`${log}-doc`, []),
     gh: `case "$*" in *"--head t-squashed"*) printf '%s' '${merged}' ;; *) printf '[]' ;; esac\n`,
   });
 };

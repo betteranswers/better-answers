@@ -79,6 +79,28 @@ else
   echo "  jcodemunch: not on PATH — skipped; edits here register in the primary checkout's index" >&2
 fi
 
+# jDocMunch shares one index across a checkout's worktrees unless asked for a branch-local one,
+# and only its Python API asks. The index takes the worktree's folder name, which is how its
+# edit hook finds it; without one, a doc edit here lands in the primary checkout's index.
+if command -v jdocmunch-mcp >/dev/null 2>&1; then
+  START=$SECONDS
+  JDOC_PYTHON="$(dirname "$(readlink -f "$(command -v jdocmunch-mcp)")")/python3"
+  if "$JDOC_PYTHON" - "$WORKTREE_PATH" >&2 2>&1 <<'PY'
+import sys
+from jdocmunch_mcp.tools.index_local import index_local
+result = index_local(path=sys.argv[1], use_ai_summaries=False, use_embeddings=False, worktree_mode="branch_local")
+sys.exit(0 if result.get("success") else 1)
+PY
+  then
+    echo "  jdocmunch index: done in $((SECONDS - START))s" >&2
+  else
+    echo "  jdocmunch index: FAILED — doc edits here land in the primary checkout's index" >&2
+    STATUS=1
+  fi
+else
+  echo "  jdocmunch: not on PATH — skipped; doc edits here land in the primary checkout's index" >&2
+fi
+
 bash "$(dirname "${BASH_SOURCE[0]}")/provision-skills.sh" "$WORKTREE_PATH" || STATUS=1
 
 COMMON_DIR="$(git -C "$WORKTREE_PATH" rev-parse --path-format=absolute --git-common-dir)"

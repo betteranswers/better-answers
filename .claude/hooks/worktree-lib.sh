@@ -17,6 +17,19 @@ drop_index() {
   else
     say "jcodemunch: could not drop the index $repo — run jcodemunch-mcp delete-index $repo by hand"
   fi
+  drop_doc_index "$1"
+}
+
+# $1: a worktree's physical path. provision-worktree.sh names its doc index after the folder.
+drop_doc_index() {
+  command -v jdocmunch-mcp >/dev/null 2>&1 || return 0
+  local repo
+  repo="local/$(basename "$1")"
+  if jdocmunch-mcp delete-index --repo "$repo" >/dev/null 2>&1; then
+    say "jdocmunch: dropped the index $repo"
+  else
+    say "jdocmunch: no index $repo to drop"
+  fi
 }
 
 is_clean() {
