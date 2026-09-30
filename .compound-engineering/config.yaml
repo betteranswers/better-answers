@@ -1,0 +1,9 @@
+# Compound Engineering: this repository's settings. Every key is optional; see
+# docs/guides/configuration.md in EveryInc/compound-engineering-plugin.
+#
+# The second reviewer runs through OpenCode on OpenRouter, so a model family other
+# than the session's reads every review. OpenCode reads its OpenRouter key from its
+# own config; without OpenCode installed the pass is skipped and says why.
+cross_model_review_mode: auto
+cross_model_peer: opencode
+cross_model_model: openrouter/z-ai/glm-5.3

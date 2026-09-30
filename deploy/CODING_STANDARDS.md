@@ -1,6 +1,6 @@
 # Coding rules — `deploy/`
 
-The whole of `CODING_RULES.md` binds this directory. What follows is true of the deployment configuration alone.
+The whole of `CODING_STANDARDS.md` binds this directory. What follows is true of the deployment configuration alone.
 
 ## [OPS1] Own state on disk, prove every job, and wipe staging
 

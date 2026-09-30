@@ -1,31 +1,27 @@
-# Code review: Cubic on the PR, GitNexus and the wiki in the session
+# Code review: CE in the session, Cubic on the pull request
 
-**Paused (10/09/2026).** Cubic's plan limit is reached, so the review loop below runs no PR until further notice.
-
-Three tools touch review here. Each has one job; the loop below is how a build session uses them without re-arguing the same finding five times.
+Two reviews, each with one job. The loop below is how a change passes both without re-arguing the same finding.
 
 | Tool | Job |
 | --- | --- |
-| **Cubic** (`cubic.yaml`, the `cubic` MCP, the `cubic` CLI) | Reviews every PR against the constitution; records triage and learnings on the PR threads |
-| **GitNexus** (the `gitnexus` MCP) | Blast radius before an edit, changed scope before a commit |
-| **The wiki** (`.cubic/wiki/`, also via the MCP's `get_wiki_page`) | Orientation in an unfamiliar area, read first - the wiki is the floor, verify empirically by checking the codebase and/or schema |
+| **`/ce-code-review`** (Compound Engineering) | Reviews the diff before the pull request, against the `CODING_STANDARDS.md` files and the plan. A second model family reads it too (*Before the pull request*, below) |
+| **Cubic** (`cubic.yaml`, the `cubic` MCP) | Reviews every head on the pull request. It is the safety net once work reaches a pull request |
+| **GitNexus** (the `gitnexus` MCP) | Blast radius before a risky edit, changed scope before a large commit. A tool, not a gate |
+| **The wiki** (`.cubic/wiki/`, also the MCP's `get_wiki_page`) | Orientation in an unfamiliar area. It is the floor: check the code and the schema before relying on it |
 
-## The review loop
+## Before the pull request
 
-Cubic reads `cubic.yaml` from `main` only.
+`/lfg` and `/ce-work` run `/ce-code-review` and fix what it finds before the pull request opens. It sizes its depth to what the diff risks, not its line count.
 
-1. **Before pushing** — `cubic review -b` on the branch. **[Skip until further notice: the CLI answers `Subscription expired`; record the step as skipped in the PR body.]** It is a faster, shallower pass than the PR review; fix what it finds so the PR review starts from a cleaner diff.
-2. **Push, open the PR, wait** for Cubic's first review. Then `get_pr_issues` — never read the findings from the GitHub comments by hand.
-3. **Triage every finding in one pass**, then fix in **one commit**. Each finding gets exactly one `update_pr_issue_status`:
-   - `resolved` after the fix is pushed;
-   - `false_positive`, `wont_fix` or `intended_behavior` with the reason in the tool's `comment` field.
-4. **Re-review** with `trigger_pr_review` (a push alone re-reviews only when `incremental_commits` is on, which it is). Return to step 3.
-5. **Stop after three rounds.** A fourth round of findings means the change is wrong-shaped, not under-polished: bring it back to the user with the open findings rather than continuing.
+Its adversarial pass goes to a second model family through OpenCode, on OpenRouter; `.compound-engineering/config.yaml` names the model. To turn it on, install OpenCode and give it an OpenRouter key in its own config. Without OpenCode the pass is skipped, and the review's Coverage line says so. The repository is public, so the diff it sends is not a disclosure.
 
-## Learnings
+## On the pull request
 
-`list_learnings` once at the start of a build session, before the first commit, and `get_learning` on any whose title touches the tier being changed. A learning is Cubic's memory of a triage decision; ignoring one means re-deciding it on the PR.
+1. **Cubic reviews each head.** Its check completing is what arms the merge (`docs/agents/workflow.md`, *Merging*).
+2. **`ce-babysit-pr` works the threads** in one pass per round: a fix for each finding worth fixing, and a reply saying why for each one that is not. One commit per round.
+3. **The ruleset holds the merge** until every thread is resolved. Cubic resolves a thread it sees addressed (`resolve_threads_when_addressed`); a thread answered as a false positive is resolved by whoever answered it.
+4. **Stop after three rounds.** A fourth round of findings means the change is wrong-shaped, not under-polished: bring it back to the owner with the open findings.
 
-## GitNexus
+`get_pr_issues` on the `cubic` MCP lists a pull request's findings when the threads are hard to read. *Fix with cubic* hands a finding to Cubic's coding-agent provider; use it when you are driving the pull request by hand, never while `ce-babysit-pr` is running, because two fixers pushing to one branch undo each other.
 
-The two gates are in `AGENTS.md` and are not optional: `impact` on a symbol before editing it, `detect_changes` before every commit. After a merge to `main`, `node .gitnexus/run.cjs analyze` refreshes the index the next session reads.
+When Cubic's allowance runs out, its check completes neutral with *AI review line limit reached*, and the merge arms with no review. Its allowance resets on the first of each month.

@@ -26,7 +26,7 @@ reviews:
     - `CONTEXT.md` — the glossary. Every domain word has one settled meaning.
       A new domain word is settled here BEFORE it appears in code; a diff that
       introduces a domain term absent from the glossary is a finding.
-    - `CODING_RULES.md` — the constitution. Rules are tagged. Cite the
+    - `CODING_STANDARDS.md` — the constitution. Rules are tagged. Cite the
       tag when a finding rests on a rule; the title rule (a test title says what the system does
       for whom), the comment rule (a comment says why, never what or what happened) and
       the tag rule (a rule tag is written only in a rules file, a review finding or a gate's failure message) are
@@ -36,8 +36,8 @@ reviews:
       the one-run rule (one run of `check` names every failure, so a manifest never chains its
       steps with `&&`) bind any diff that touches a lint rule, a workspace's scripts or its
       test configuration.
-    - `apps/api/CODING_RULES.md`, `apps/web/CODING_RULES.md` and
-      `apps/worker/CODING_RULES.md` — workspace rules. Apply a workspace's own file to
+    - `apps/api/CODING_STANDARDS.md`, `apps/web/CODING_STANDARDS.md` and
+      `apps/worker/CODING_STANDARDS.md` — workspace rules. Apply a workspace's own file to
       changes in it; the `WEB` prefix is the browser package's family.
     - `docs/adr/` — the architecture decision records; `docs/adr/README.md` is the
       one-line live conclusion of each and the list to read first. A change that

@@ -1,6 +1,6 @@
 # Coding rules — `apps/worker/`
 
-The whole of `CODING_RULES.md` binds this workspace. What follows is true of this tier alone.
+The whole of `CODING_STANDARDS.md` binds this workspace. What follows is true of this tier alone.
 
 ## [WRK1] Never migrate, and never hold a git credential
 

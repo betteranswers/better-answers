@@ -83,18 +83,36 @@ bash "$(dirname "${BASH_SOURCE[0]}")/provision-skills.sh" "$WORKTREE_PATH" || ST
 
 COMMON_DIR="$(git -C "$WORKTREE_PATH" rev-parse --path-format=absolute --git-common-dir)"
 PRIMARY_PATH="$(cd "$(dirname "$COMMON_DIR")" && pwd -P)"
-SCRATCH_LINK="$WORKTREE_PATH/.scratch"
-if [ "$PRIMARY_PATH" = "$WORKTREE_PATH" ]; then
-  echo "  scratch: this is the primary checkout — nothing to link" >&2
-# `-L` as well, so a link whose target has gone is left alone rather than failed over by `ln`.
-elif [ -e "$SCRATCH_LINK" ] || [ -L "$SCRATCH_LINK" ]; then
-  echo "  scratch: already here — left alone" >&2
-elif [ ! -d "$PRIMARY_PATH/.scratch" ]; then
-  echo "  scratch: none at $PRIMARY_PATH — nothing to link" >&2
-elif ln -s "$PRIMARY_PATH/.scratch" "$SCRATCH_LINK"; then
-  echo "  scratch: linked to $PRIMARY_PATH/.scratch" >&2
+
+link_from_primary() {
+  local label="$1" dir="$2" link="$WORKTREE_PATH/$2"
+  if [ "$PRIMARY_PATH" = "$WORKTREE_PATH" ]; then
+    echo "  $label: this is the primary checkout — nothing to link" >&2
+  # `-L` as well, so a link whose target has gone is left alone rather than failed over by `ln`.
+  elif [ -e "$link" ] || [ -L "$link" ]; then
+    echo "  $label: already here — left alone" >&2
+  elif [ ! -d "$PRIMARY_PATH/$dir" ]; then
+    echo "  $label: none at $PRIMARY_PATH — nothing to link" >&2
+  elif ln -s "$PRIMARY_PATH/$dir" "$link"; then
+    echo "  $label: linked to $PRIMARY_PATH/$dir" >&2
+  else
+    echo "  $label: FAILED to link — run ln -s \"$PRIMARY_PATH/$dir\" \"$link\" by hand" >&2
+    STATUS=1
+  fi
+}
+link_from_primary scratch .scratch
+link_from_primary planning .planning
+
+# Relative, so it resolves in the primary checkout and, through the `.planning` link, here.
+PERSONAS_LINK="$WORKTREE_PATH/docs/personas"
+if [ -e "$PERSONAS_LINK" ] || [ -L "$PERSONAS_LINK" ]; then
+  echo "  personas: already here — left alone" >&2
+elif [ ! -d "$WORKTREE_PATH/.planning/personas" ]; then
+  echo "  personas: no .planning/personas — nothing to link" >&2
+elif mkdir -p "$WORKTREE_PATH/docs" && ln -s ../.planning/personas "$PERSONAS_LINK"; then
+  echo "  personas: linked to .planning/personas" >&2
 else
-  echo "  scratch: FAILED to link — run ln -s \"$PRIMARY_PATH/.scratch\" \"$SCRATCH_LINK\" by hand" >&2
+  echo "  personas: FAILED to link — run ln -s ../.planning/personas \"$PERSONAS_LINK\" by hand" >&2
   STATUS=1
 fi
 

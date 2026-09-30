@@ -20,21 +20,23 @@ const script = hookScript("provision-worktree");
 
 const scratch = scratchRoot("provision-worktree");
 
-const scratchIgnorePattern = (): string => {
+const ignorePattern = (name: string): string => {
   const ignore = path.resolve(import.meta.dirname, "../../../../.gitignore");
   const pattern = readFileSync(ignore, "utf8")
     .split("\n")
     .map((line) => line.trimEnd())
-    .find((line) => line === ".scratch" || line === ".scratch/");
+    .find((line) => line === name || line === `${name}/`);
   if (pattern === undefined) {
-    throw new Error(`${ignore} carries no \`.scratch\` pattern, so nothing here is being proved.`);
+    throw new Error(`${ignore} carries no \`${name}\` pattern, so nothing here is being proved.`);
   }
   return pattern;
 };
 
+const LINKED = [".scratch", ".planning", "docs/personas"] as const;
+
 const clonedPrimary = (name: string): string => {
   const origin = repositoryHolding(path.join(scratch, `${name}-origin`), {
-    ".gitignore": `.claude/skills/*\n.agents/\ntasks/AGENTS.md\n${scratchIgnorePattern()}\n`,
+    ".gitignore": `.claude/skills/*\n.agents/\ntasks/AGENTS.md\n${LINKED.map(ignorePattern).join("\n")}\n`,
     "skills-lock.json": '{ "version": 1, "skills": {} }\n',
   });
   const primary = path.join(scratch, `${name}-primary`);
@@ -210,5 +212,38 @@ describe("the scratch stage of worktree provisioning", () => {
     ready(run);
     expect(run.stderr).toContain(`scratch: none at ${realpathSync(primary)} — nothing to link`);
     expect(existsSync(path.join(worktree, ".scratch"))).toBe(false);
+  });
+});
+
+describe("the planning and personas stage of worktree provisioning", () => {
+  const treesWithPersonas = (
+    name: string,
+  ): { readonly primary: string; readonly worktree: string } => {
+    const primary = clonedPrimary(name);
+    writeUnder(primary, ".planning/personas/founder.md", "# Sarah\n");
+    return { primary, worktree: worktreeUnder(scratch, primary, name) };
+  };
+
+  it("links .planning and docs/personas, out of git status", () => {
+    const { primary, worktree } = treesWithPersonas("personas");
+
+    const run = provision("personas", worktree);
+
+    ready(run);
+    expect(run.stderr).toContain(`planning: linked to ${realpathSync(primary)}/.planning`);
+    expect(run.stderr).toContain("personas: linked to .planning/personas");
+    expect(readFileSync(path.join(worktree, "docs/personas/founder.md"), "utf8")).toBe("# Sarah\n");
+    expect(gitIn(worktree, "status", "--porcelain")).toBe("");
+  });
+
+  it("says there are no personas to link, and provisions anyway", () => {
+    const primary = clonedPrimary("no-personas");
+    const worktree = worktreeUnder(scratch, primary, "no-personas");
+
+    const run = provision("no-personas", worktree);
+
+    ready(run);
+    expect(run.stderr).toContain("personas: no .planning/personas — nothing to link");
+    expect(existsSync(path.join(worktree, "docs/personas"))).toBe(false);
   });
 });

@@ -414,7 +414,7 @@ describe("the pre-push hook over a throwaway repository", () => {
     expect(ranBy(pushing)).toHaveLength(pushedSteps().length);
   });
 
-  it("runs on a new branch's first push, like `pnpm land`'s", () => {
+  it("runs on a new branch's first push", () => {
     const pushing = hookedRepository("land-shaped");
     seeded(pushing);
     gitIn(pushing.root, "switch", "-q", "-c", "landed");

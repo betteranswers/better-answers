@@ -4,10 +4,10 @@ A living company knowledge map for UK SMBs, on OKF v0.2. It has three knowledge 
 
 ## Read first
 
-- `docs/specs/v01-route.md` — the route: the blocks to v0.1 in order, each with its edges and what it must carry. A product session opens its status table first and picks the first unblocked block. A block goes to `/to-spec` before its build, and to `/to-tickets` after.
+- `docs/specs/v01-route.md` — the route: the blocks to v0.1 in order, each with its edges and what it must carry. A product session opens its status table first and picks the first unblocked block. A block becomes a plan through `/ce-brainstorm` and `/ce-plan` (*Workflow*, below).
 - `CONTEXT.md` — the glossary. Name things in code, tests, docs and commits with its words.
 - `docs/okf-v02.md` — what OKF defines, what it leaves open, and where each lands here. Read it before adding a key, convention or feature that relates to the knowledge layer.
-- `CODING_RULES.md` — the constitution: every rule that binds work in this repo. A directory's own rules live beside it, in `apps/api/CODING_RULES.md`, `apps/web/CODING_RULES.md`, `apps/worker/CODING_RULES.md` and `deploy/CODING_RULES.md`.
+- `CODING_STANDARDS.md` — the constitution: every rule that binds work in this repo. A directory's own rules live beside it, in `apps/api/CODING_STANDARDS.md`, `apps/web/CODING_STANDARDS.md`, `apps/worker/CODING_STANDARDS.md` and `deploy/CODING_STANDARDS.md`.
 - `docs/adr/` — why the architecture is the way it is. Start at `docs/adr/README.md`, which gives each ADR's live conclusion in one line. When a live conclusion moves, its row moves in the same commit. Read the ADR a change touches before touching it. A change that contradicts one is a new ADR, never a quiet edit.
 
 ## Layout
@@ -26,6 +26,10 @@ A living company knowledge map for UK SMBs, on OKF v0.2. It has three knowledge 
 | `docs/adr/` | Architecture decision records |
 | `docs/architecture/` | The C4 diagrams: context, containers, three component views, deployment and six flows. They are a reading of the tree, which `/c4-architecture` redraws after any review that moves the shape. The README maps each route block to the containers and components it touches |
 | `docs/specs/` | `<ticket>.md` is a ticket's spec and `v01-route.md` the route |
+| `docs/plans/` | Compound Engineering's plans, one per piece of work. A plan has no status: git says what shipped |
+| `docs/solutions/` | Documented solutions to past problems (bugs, best practices, workflow patterns), by category, with YAML frontmatter (`module`, `tags`, `problem_type`). `/ce-plan` searches it before every plan |
+| `docs/personas/` | The personas `/ce-dogfood` walks a screen as: a git-ignored link to `.planning/personas/`, which the worktree hook makes |
+| `.compound-engineering/` | Compound Engineering's settings for this repository |
 | `docs/operations/` | Public-facing ops documents. Documents that are not public-facing are under `.planning/estate/` |
 | ordna | The work queue: tasks as git namespace refs (`refs/ordna/tasks/<id>`), not files |
 | `deploy/` | Compose files and deployment configuration |
@@ -35,11 +39,11 @@ Read commands, versions and scripts from each workspace's `package.json` or `pyp
 
 ## Skills
 
-- `/grill-with-docs` and `/domain-modeling` for any design conversation.
-- `/codebase-design` when shaping a module.
-- `/tdd` for red–green work.
-- `/writing-for-agents` when editing a skill, `AGENTS.md` or `CLAUDE.md`.
-- `/diagnosing-bugs` for anything broken or slow.
+- `/lfg` for a change end to end: plan, build, review, compound, browser test and pull request, with no pause for approval.
+- `/ce-brainstorm` when what to build is still open, `/ce-plan` to write the plan, `/ce-work` to build one.
+- `/ce-debug` for anything broken or slow.
+- `/ce-code-review` before a pull request, `/ce-compound` after a solved problem (*Compounding*, below).
+- `/ce-dogfood` for a screen, walked as the personas in `docs/personas/`.
 - `/browser-suite` for any Playwright spec under `apps/web/e2e/`.
 - `/renovate-prs` for Renovate's dependency pull requests, red or waiting.
 - `/better-answers-design` for anything a person will look at.
@@ -56,11 +60,17 @@ Build tasks are cut from a block of the route spec and live in **ordna**. They a
 
 ### Workflow
 
-A set of ordna tickets is built under one `/goal`, in one session called the Coordinator. One agent per ticket runs `/implement` end to end, and fixes what its own `/code-review` finds. Each PR goes into `main`, and CI's root `check` is the arbiter.
+Work runs on the Compound Engineering plugin (CE), pinned in `.claude/settings.json`. A change goes through `/lfg`, or `/ce-plan` then `/ce-work`. `ce-commit-push-pr` opens the pull request. `arm-merge.yml` arms its merge once Cubic has read the head, and the merge queue merges it when `check` is green. CI's `check` is the arbiter.
 
-Every commit reaches `main` through the merge queue. A change too small for a ticket takes `pnpm land --message "<type(scope): summary>"`. That one command branches, commits, pushes, opens the pull request and arms the merge. A commit's subject, a PR's title and a ticket's title all take the Conventional Commits form, and commitlint refuses a commit or a PR title that breaks it.
+Every commit reaches `main` through the merge queue. A commit's subject and a PR's title take the Conventional Commits form, and commitlint refuses a commit or a PR title that breaks it.
 
-`docs/agents/workflow.md` has the steps, the commit's form, the goal's shape, the queue and what `check` runs where.
+`docs/agents/workflow.md` has the loop, the commit's form, the merge and what `check` runs where.
+
+### Compounding
+
+`docs/solutions/` is the repository's memory of solved problems; `/ce-plan` reads it before planning.
+
+After a solved, verified problem, automatically invoke the `ce-compound` skill with `mode:non-interactive` at the completion checkpoint only when the work produced durable project reasoning that is not readily recoverable from the final code, tests, types, comments, or existing documentation, and losing it would plausibly cause recurrence, material risk, or substantial rediscovery. Apply this counterfactual: if the learning document disappeared, would a future engineer reading the final implementation still be likely to repeat the mistake or redo substantial investigation? If not, do not invoke it. Completion, effort, and diff size alone are not enough. Capture at the checkpoint so a qualifying learning can ship in the PR that produced it, and only where the repository treats captured learnings as tracked, committed knowledge.
 
 ### Triage labels
 
@@ -76,7 +86,7 @@ A mutation survivor is a hypothesis until a probe answers it. Triage uses contro
 
 ### Code review
 
-Cubic reviews every PR. Its findings are triaged through the `cubic` MCP on the PR threads: one commit per round, three rounds at most. Cubic has been **paused since 10/09/2026**, at the plan's limit. GitNexus gates every edit and commit. The loop is in `docs/agents/code-review.md`; read it before opening a PR.
+Two reviews, one in the session and one on the pull request. `/ce-code-review` runs before the pull request, with a second model family read through OpenCode (`.compound-engineering/config.yaml`). Cubic reviews every head on the pull request. `ce-babysit-pr` fixes or answers its threads, three rounds at most, and the ruleset holds the merge until every thread is resolved. The loop is in `docs/agents/code-review.md`.
 
 ## Code Exploration Policy
 
@@ -147,20 +157,18 @@ This project is indexed by GitNexus as **better-answers**. Use the GitNexus MCP 
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner.
 
-### Always Do
+GitNexus is a tool to reach for, not a gate: CI's `check` and the two reviews are the gates.
 
-- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
-- **MUST run `detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows. For regression review, compare against the default branch: `detect_changes({scope: "compare", base_ref: "main"})`.
-- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
-- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `context({name: "symbolName"})`.
-- For security review, `explain({target: "fileOrSymbol"})` lists taint findings (source→sink flows; needs `analyze --pdg`).
+### Use it for
+
+- The blast radius of a change to a symbol other code calls: `impact({target: "symbolName", direction: "upstream"})`. Warn the user before editing when it answers HIGH or CRITICAL.
+- The symbols and flows a large diff touches: `detect_changes()`.
+- Full context on a symbol — callers, callees, the flows it takes part in: `context({name: "symbolName"})`.
+- Security review: `explain({target: "fileOrSymbol"})` lists taint findings (source→sink flows; needs `analyze --pdg`).
 
 ### Never Do
 
-- NEVER edit a function, class, or method without first running `impact` on it.
-- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
 - NEVER rename symbols with find-and-replace — use `rename` which understands the call graph. From a worktree it stays a dry run and its edits are applied by hand: *From a worktree, two indexes*, above.
-- NEVER commit changes without running `detect_changes()` to check affected scope.
 
 ### Resources
 

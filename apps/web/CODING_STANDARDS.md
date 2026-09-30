@@ -1,6 +1,6 @@
 # Coding rules — `apps/web/`
 
-The whole of `CODING_RULES.md` binds this workspace. What follows is true of the browser package alone.
+The whole of `CODING_STANDARDS.md` binds this workspace. What follows is true of the browser package alone.
 
 ## [WEB1] Import app → features → shared, never back
 

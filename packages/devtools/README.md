@@ -115,22 +115,10 @@ another piece's shard, and from the previous run only when none left anything. T
 one whole run, then moves a file and reads its results back, and runs a leg with a file cut in
 two against one whole run of it.
 
-`src/land.ts` is the landing command behind `scripts/land.mjs` (`pnpm land --message "…"`): the
-working tree's changes and one message become a branch named from its `Refs:` footer and its
-summary, a commit over `origin/main`'s fetched head, a push, a pull request opened with
-`gh pr create --fill` and an armed auto-merge, with the queue state read back over GraphQL and
-printed. It exists because a one-line docs change cost five commands and so was pushed straight
-to `main`, and a commit that reaches `main` outside the queue rebuilds every entry already in
-it. The message goes through the root's commitlint and `commitlint.config.mjs`. Lefthook's
-`commit-msg` hook and the `pr-title` job in `check.yml` read the same config, so one config
-checks the form (`docs/agents/workflow.md`, *The commit's form*). A refused message comes back
-naming the rule it broke, and a refused tree naming the condition it missed.
-A read-back that shows the pull request neither queued nor armed fails the run and prints the
-command that arms it, because a run that says nothing about the arming is the silence this
-package exists to refuse. Its suite spawns the script over a throwaway git repository whose
-`origin` is a bare repository on disk, with `git push` and the whole of `gh` stubbed on the
-path, so the fetch is real and no case can reach GitHub; it also commits through the hook's
-own command in a throwaway repository, over the same messages.
+`test/commit-msg-hook.test.ts` commits through lefthook's `commit-msg` command in a throwaway
+repository: a Conventional message goes in, and each message `commitlint.config.mjs` refuses
+comes back naming the rule it broke. The `pr-title` job in `check.yml` reads the same config, so
+one config checks the form (`docs/agents/workflow.md`, *The commit's form*).
 
 `src/reap-containers.ts` is the container reaper behind `scripts/reap-containers.mjs` (`pnpm
 reap-containers [--dry-run]`): it removes each stopped testcontainers container, from either
@@ -173,7 +161,7 @@ Three of the suites read documents as well, so the docs lane runs them through
 
 ## `lint-rules/` — the `better-answers` oxlint plugin
 
-The repository's own rules: the ones that hold a rule in `CODING_RULES.md` or an ADR rather
+The repository's own rules: the ones that hold a rule in `CODING_STANDARDS.md` or an ADR rather
 than a generic hygiene pattern. Loaded by `.oxlintrc.json` as a `jsPlugins` specifier. Each
 rule carries its rule line in the message it prints and lands with a functional test through
 the runner.

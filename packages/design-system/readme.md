@@ -13,7 +13,7 @@ the hosted product at `better-answers.com`.
 | Better Answers repository (mounted, read-only) | `better-answers/` | Product definition, glossary, UX and accessibility rules, the reader-facing word set, Control Centre's six screens |
 | `docs/vision.md` | in that repo | The one-line positioning, the three knowledge layers, who uses it |
 | `CONTEXT.md` | in that repo | The **domain glossary** — the source of truth for every word on a screen |
-| `CODING_RULES.md` | in that repo | disclosure model, latency and keyboard budget, WCAG 2.2 AA + GOV.UK semantics |
+| `CODING_STANDARDS.md` | in that repo | disclosure model, latency and keyboard budget, WCAG 2.2 AA + GOV.UK semantics |
 | `docs/adr/0001–0027` | in that repo | Answer contract (0016), citation markers (0015), the write path (0012), trust derivation (0019), open-core (0027) |
 | Styling brief (from the user) | — | "better-auth, Vercel, Linear" — the visual register |
 

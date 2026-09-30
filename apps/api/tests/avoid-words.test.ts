@@ -205,7 +205,7 @@ const CARVED_OUT: readonly CarveOut[] = [
  * holds it.
  */
 const isCarvedOut = (file: string): boolean =>
-  path.basename(file) !== "CODING_RULES.md" && CARVED_OUT.some(({ holds }) => holds(file));
+  path.basename(file) !== "CODING_STANDARDS.md" && CARVED_OUT.some(({ holds }) => holds(file));
 
 const escaped = (word: string): string => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -415,11 +415,11 @@ describe("the sense a planted line is read in", () => {
       "docs/specs/T-001.md": `The ${WORD} claims the job.\n`,
       "docs/specs/v01-route.md": `The ${WORD} claims the job.\n`,
       "apps/web/src/planted.ts": `// The ${WORD} claims the job.\n`,
-      "apps/web/CODING_RULES.md": `The ${WORD} claims the job.\n`,
+      "apps/web/CODING_STANDARDS.md": `The ${WORD} claims the job.\n`,
     });
 
     expect(findings).toEqual([
-      `apps/web/CODING_RULES.md:1: The ${WORD} claims the job.`,
+      `apps/web/CODING_STANDARDS.md:1: The ${WORD} claims the job.`,
       `docs/specs/v01-route.md:1: The ${WORD} claims the job.`,
     ]);
   });
