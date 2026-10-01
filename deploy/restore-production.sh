@@ -18,19 +18,19 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-WORK=$(mktemp -d); chmod 700 "${WORK}"; T0=$(date +%s); LOG="/var/log/better-answers-restore-$(date -u +%Y%m%dT%H%M%SZ).log"
+WORK=$(mktemp -d); chmod 700 "${WORK}"; BUNDLES=$(mktemp -d); T0=$(date +%s); LOG="/var/log/better-answers-restore-$(date -u +%Y%m%dT%H%M%SZ).log"
 say() { printf '%s %s\n' "$(date -u +%T)" "$*" | tee -a "${LOG}"; }
 compose() { docker compose --project-directory "${REPO_DIR}/deploy" "$@"; }
 stores()   { compose --env-file "${STORES_ENV_FILE}" -f stores.compose.yaml -p better-answers-stores "$@"; }
 platform() { compose --env-file "${PLATFORM_ENV_FILE}" -f platform.compose.yaml -p better-answers "$@"; }
 tool() { stores run --rm --no-deps -v "${WORK}:/work" -v "${BACKUP_AGE_IDENTITY_FILE}:/run/age.key:ro" backup "$@"; }
 rclone() { tool rclone "$@"; }
-cleanup_work() { rm -rf "${WORK}"; }   # the decrypted dump is personal data
+cleanup_work() { rm -rf "${WORK}" "${BUNDLES}"; }   # the decrypted dump and bundles are personal data
 
 # No exit trap: the drill's wipe-on-exit is the wrong trap for the box you are saving.
 
 say "# Production restore — dump=${dump} tier=${tier} objectstore=${objectstore} git=${git}"
-say "work directory ${WORK} — the decrypted dump passes through it, and a run that stops leaves it there"
+say "work directories ${WORK} and ${BUNDLES} — the decrypted dump and bundles pass through them, and a run that stops leaves them there"
 
 say "## 0 the copy"
 if [ "${dump}" = latest ]; then
@@ -78,21 +78,23 @@ if [ "${git}" = yes ]; then
   say "## 5 git store — one bare repository per workspace from its latest bundle"
   if [ -n "$(ls -A /data/git 2>/dev/null)" ]; then say "REFUSED: /data/git is not empty — the live repositories are newer than any bundle; clear it deliberately first, or clone from the VPC 2 mirror"; exit 1; fi
   # >>> the git store
-  # Root clones, then hands the store to the api's uid, which cannot enter WORK: it holds the decrypted dump.
+  # The api's uid runs git, so the store holds no file of root's. It cannot enter WORK, which holds the decrypted dump.
+  chown 1000:1000 "${BUNDLES}"
   for ws in $(rclone lsf --dirs-only "dumps:${BACKUP_DUMPS_BUCKET}/git/" | tr -d '/\r'); do
     b=$(rclone lsf "dumps:${BACKUP_DUMPS_BUCKET}/git/${ws}/" | sort | tail -n1 | tr -d '\r')
     rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/git/${ws}/${b}" "/work/${ws}.bundle.age"
     tool age -d -i /run/age.key -o "/work/${ws}.bundle" "/work/${ws}.bundle.age"
-    git clone --quiet --bare "${WORK}/${ws}.bundle" "/data/git/${ws}.git"
+    install -o 1000 -g 1000 -m 400 "${WORK}/${ws}.bundle" "${BUNDLES}/${ws}.bundle"
     rm -f "${WORK}/${ws}.bundle" "${WORK}/${ws}.bundle.age"
+    sudo -u '#1000' git clone --quiet --bare "${BUNDLES}/${ws}.bundle" "/data/git/${ws}.git"
+    rm -f "${BUNDLES}/${ws}.bundle"
   done
   # The nightly bundles no repository without a ref, so a workspace not yet written to has none.
   # shellcheck disable=SC2016 # the tool container's shell expands it, where DATABASE_URL is set
   workspaces=$(tool sh -c 'psql "$DATABASE_URL" -X -At -c "select id from workspace"' | tr -d '\r')
   for ws in ${workspaces}; do
-    [ -d "/data/git/${ws}.git" ] || git init --quiet --bare --initial-branch main "/data/git/${ws}.git"
+    [ -d "/data/git/${ws}.git" ] || sudo -u '#1000' git init --quiet --bare --initial-branch main "/data/git/${ws}.git"
   done
-  chown -R 1000:1000 /data/git
   # <<< the git store
 fi
 cleanup_work

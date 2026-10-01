@@ -542,7 +542,7 @@ const fenced = (script: string, step: string): string => {
   return body;
 };
 
-/** Both restores run their git step as root, in a work directory `mktemp -d` closes to others. */
+/** As both restores run their git step: as root, `mktemp -d`'s directories, `init`'s git store. */
 const restoringTheGitStore = String.raw`
 set -euo pipefail
 git init --quiet --initial-branch=main /tmp/workspace
@@ -554,14 +554,17 @@ mkdir -p "/buckets/dumps/git/$BUNDLED"
 age -r "$(age-keygen -y /run/age.key)" -o "/buckets/dumps/git/$BUNDLED/$BUNDLED-20260930T020017Z.bundle.age" /tmp/bundle
 as_the_api() { HOME=/tmp setpriv --reuid=${API_UID} --regid=${API_UID} --clear-groups "$@"; }
 restore() {
-  rm -rf /data/git /work
-  mkdir -p /data/git
-  mkdir -m 700 /work
+  rm -rf /data/git /work /bundles
+  install -d -o ${API_UID} -g ${API_UID} /data/git
+  mkdir -m 700 /work /bundles
+  : > /tmp/root-ran-git
   ran=0
   bash -c "$2" > /tmp/said 2>&1 || ran=$?
   while IFS= read -r line; do printf '%s\tsaid %s\n' "$1" "$line"; done < /tmp/said
   printf '%s\tran %s\n' "$1" "$ran"
   printf '%s\twork %s\n' "$1" "$(stat -c %a /work)"
+  printf '%s\tdecrypted bundles left %s\n' "$1" "$(find /work /bundles -name '*.bundle' | wc -l)"
+  printf '%s\troot ran git %s\n' "$1" "$(wc -l < /tmp/root-ran-git)"
   printf '%s\towned by another uid %s\n' "$1" "$(find /data/git ! -uid ${API_UID} -o ! -gid ${API_UID} | wc -l)"
   for ws in "$BUNDLED" "$NEVER_WRITTEN"; do
     refs=$(as_the_api git -C "/data/git/$ws.git" for-each-ref --format='%(refname)' || true)
@@ -585,6 +588,12 @@ const seenFromTheImage = (connectionUri: string): string => {
   return uri.toString();
 };
 
+/** The image has no sudo, and a git the step's root shell runs itself is noted. */
+const AS_THE_HOSTS_RUN_IT = [
+  `sudo() { [ "$1 $2" = "-u #${API_UID}" ] || return 2; shift 2; HOME=/tmp setpriv --reuid=${API_UID} --regid=${API_UID} --clear-groups "$@"; }`,
+  'git() { printf "%s\\n" "$*" >> /tmp/root-ran-git; command git "$@"; }',
+];
+
 const restoreEnvironment = (seeded: Seeded, database: string): Record<string, string> => ({
   RCLONE_CONFIG_DUMPS_TYPE: "alias",
   RCLONE_CONFIG_DUMPS_REMOTE: "/buckets",
@@ -595,13 +604,15 @@ const restoreEnvironment = (seeded: Seeded, database: string): Record<string, st
   // As each script leaves them by its git step; production's `tool` runs in this image anyway.
   PRODUCTION_STEP: [
     "set -euo pipefail",
-    "WORK=/work BACKUP_DUMPS_BUCKET=dumps",
+    "WORK=/work BUNDLES=/bundles BACKUP_DUMPS_BUCKET=dumps",
     'tool() { "$@"; }',
+    ...AS_THE_HOSTS_RUN_IT,
     fenced("deploy/restore-production.sh", "the git store"),
   ].join("\n"),
   DRILL_STEP: [
     "set -euo pipefail",
-    "WORK=/work BACKUP_DUMPS_BUCKET=dumps BACKUP_AGE_IDENTITY_FILE=/run/age.key",
+    "WORK=/work BUNDLES=/bundles BACKUP_DUMPS_BUCKET=dumps BACKUP_AGE_IDENTITY_FILE=/run/age.key",
+    ...AS_THE_HOSTS_RUN_IT,
     fenced("deploy/restore-drill.sh", "the git store"),
   ].join("\n"),
 });
@@ -648,13 +659,15 @@ describe.skipIf(nothingToProbeHere)("the restores' git store step", () => {
   };
 
   it.each(["production", "drill"])(
-    "%s: clones bundles for the api through a closed directory",
+    "%s: clones each bundle as the api, keeping WORK closed",
     (restore) => {
       // What the step said rides along, so a failure shows where it stopped.
       expect(stateAfter(restore)).toMatchObject({
         state: [
           "ran 0",
           "work 700",
+          "decrypted bundles left 0",
+          "root ran git 0",
           "owned by another uid 0",
           `${seeded.bundled} refs/heads/main refs/heads/main`,
           expect.any(String),

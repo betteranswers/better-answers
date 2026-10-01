@@ -20,7 +20,7 @@ export RCLONE_CONFIG_STAGINGSTORE_TYPE=s3 RCLONE_CONFIG_STAGINGSTORE_PROVIDER=Ot
        RCLONE_CONFIG_STAGINGSTORE_SECRET_ACCESS_KEY="${STAGING_OBJECTSTORE_ROOT_SECRET}"
 
 NOT_BUILT=3
-STAMP=$(date -u +%Y%m%dT%H%M%SZ); WORK=$(mktemp -d); REPORT="${WORK}/drill-${STAMP}.md"
+STAMP=$(date -u +%Y%m%dT%H%M%SZ); WORK=$(mktemp -d); BUNDLES=$(mktemp -d); REPORT="${WORK}/drill-${STAMP}.md"
 started=$(date -u +%FT%TZ); T0=$(date +%s)
 say() { printf '%s %s\n' "$(date -u +%T)" "$*" | tee -a "${REPORT}"; }
 aside() { printf '%s %s\n' "$(date -u +%T)" "$*" | tee -a "${REPORT}" >&2; }
@@ -60,7 +60,7 @@ on_exit() { rc=$?
   wipe_staging && stores up -d init && platform run --rm migrate \
     && STAGING_DATABASE_URL="${STAGING_DATABASE_URL}" "${REPO_DIR}/deploy/seed-synthetic.sh" \
     && curl -fsS -m 10 -o /dev/null --data-raw "ok" "${HEALTHCHECKS_PING_URL_STAGING_WIPED}" || true
-  sudo rm -rf "${WORK}"
+  sudo rm -rf "${WORK}" "${BUNDLES}"
   exit "${rc}"
 }
 trap on_exit EXIT
@@ -112,19 +112,21 @@ rclone sync "dumps:${BACKUP_MIRROR_BUCKET}/objectstore/" stagingstore:/
 
 say "## 4 git store — one bare repository per workspace from its latest bundle (ADR 0024)"
 # >>> the git store
-# Root clones, then hands the store to the api's uid, which cannot enter WORK: it holds the decrypted dump.
+# The api's uid runs git, so the store holds no file of root's. It cannot enter WORK, which holds the decrypted dump.
+chown 1000:1000 "${BUNDLES}"
 for ws in $(rclone lsf --dirs-only "dumps:${BACKUP_DUMPS_BUCKET}/git/" | tr -d /); do
   b=$(rclone lsf "dumps:${BACKUP_DUMPS_BUCKET}/git/${ws}/" | sort | tail -n1)
   rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/git/${ws}/${b}" "${WORK}/${ws}.bundle.age"
-  age -d -i "${BACKUP_AGE_IDENTITY_FILE}" -o "${WORK}/${ws}.bundle" "${WORK}/${ws}.bundle.age"
-  git clone --quiet --bare "${WORK}/${ws}.bundle" "/data/git/${ws}.git"
+  age -d -i "${BACKUP_AGE_IDENTITY_FILE}" -o "${BUNDLES}/${ws}.bundle" "${WORK}/${ws}.bundle.age"
+  chown 1000:1000 "${BUNDLES}/${ws}.bundle"
+  sudo -u '#1000' git clone --quiet --bare "${BUNDLES}/${ws}.bundle" "/data/git/${ws}.git"
+  rm -f "${BUNDLES}/${ws}.bundle"
 done
 # The nightly bundles no repository without a ref, so a workspace not yet written to has none.
 workspaces=$(psql "${STAGING_DATABASE_URL}" -X -At -c 'select id from workspace')
 for ws in ${workspaces}; do
-  [ -d "/data/git/${ws}.git" ] || git init --quiet --bare --initial-branch main "/data/git/${ws}.git"
+  [ -d "/data/git/${ws}.git" ] || sudo -u '#1000' git init --quiet --bare --initial-branch main "/data/git/${ws}.git"
 done
-chown -R 1000:1000 /data/git
 # <<< the git store
 
 say "## 5 REPLAY ERASURES completed after the dump (ADR 0020 — beyond use, made honest)"
