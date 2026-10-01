@@ -164,7 +164,8 @@ Hiding the secondary nav takes only the nav out of the row below the band, so no
 the band moves, to the pixel. The band has no primary-action slot: a screen's primary
 action sits in that screen's own row. The breadcrumb names the surface, the group, the
 screen and the open tab at every width, and every part but the last links to its place;
-only the wide band's cell may truncate the middle parts. When a switch of
+only the wide band's cell may truncate the middle parts. A name the next part repeats is
+said once, by the deeper part, so Ask's home reads "Ask" alone. When a switch of
 workspace is pending or fails, the band's outcome line says so in words, with the next
 step — never a toast.
 
