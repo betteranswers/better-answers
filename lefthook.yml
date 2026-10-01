@@ -1,5 +1,4 @@
-# What each command is for, how to skip one and how the hook is installed:
-# docs/operations/local-gates.md
+# What each command is for, how to skip one and how it is installed: docs/operations/local-gates.md
 commit-msg:
   commands:
     commitlint:
