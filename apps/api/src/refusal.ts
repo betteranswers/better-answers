@@ -4,6 +4,7 @@ import {
   type FieldIssues,
   type Malformed,
   type RefusalClass,
+  type RefusedItems,
 } from "@better-answers/core/kernel";
 import { MEMBER_REFUSALS } from "@better-answers/core/members";
 import { SOURCE_REFUSALS } from "@better-answers/core/sources";
@@ -25,23 +26,34 @@ const REFUSALS = {
 export type RefusalWord = keyof typeof REFUSALS;
 
 /** A malformed input is the kernel parse's own answer, which says which field and never the value. */
-export type RefusalAnswer = RefusalWord | Malformed;
+export type RefusalAnswer = RefusalWord | Malformed | RefusedItems<RefusalWord>;
+
+type ItemWords = RefusedItems<RefusalWord>["items"];
 
 export type Refusal = {
   readonly word: RefusalWord;
   readonly class: RefusalClass;
 
   readonly fields?: FieldIssues | undefined;
+
+  readonly items?: ItemWords | undefined;
 };
+
+/** By its shape, not its word: `malformed` is also an item's word. */
+const detailOf = (
+  answered: Malformed | RefusedItems<RefusalWord>,
+): { readonly fields: FieldIssues } | { readonly items: ItemWords } =>
+  "fields" in answered ? { fields: answered.fields } : { items: answered.items };
 
 export const refusalOf = (answered: RefusalAnswer): Refusal =>
   typeof answered === "string"
     ? { word: answered, class: REFUSALS[answered] }
-    : { word: answered.word, class: REFUSALS[answered.word], fields: answered.fields };
+    : { word: answered.word, class: REFUSALS[answered.word], ...detailOf(answered) };
 
 export const isRefusalWord = (candidate: string | Error): candidate is RefusalWord =>
   typeof candidate === "string" && Object.hasOwn(REFUSALS, candidate);
 
+/** Word and class alone, so a refusal naming items logs no id of the people it names. */
 export const refusalLogged = (refusal: Refusal) => ({
   refusal: refusal.word,
   class: refusal.class,

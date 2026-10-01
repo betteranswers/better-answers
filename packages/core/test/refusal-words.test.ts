@@ -2,7 +2,12 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, expectTypeOf, it } from "vitest";
 
-import { declareRefusals, REFUSAL_CLASSES, refusalRegister } from "../src/kernel/index.ts";
+import {
+  declareRefusals,
+  REFUSAL_CLASSES,
+  refusalRegister,
+  type RefusedItems,
+} from "../src/kernel/index.ts";
 import type {
   AcceptInvitationRefusal,
   ApproveRefusal,
@@ -11,6 +16,7 @@ import type {
   DecideRefusal,
   InviteMemberRefusal,
   ListInvitationsRefusal,
+  MemberRefusal,
   RemoveMemberRefusal,
   RequestAccessRefusal,
   ResendInvitationRefusal,
@@ -186,5 +192,18 @@ describe("the refusal-word walk", () => {
     expectTypeOf<SourceRefusal<"no-such-binding"> | "invented">().not.toExtend<
       EveryRegisteredWord | Error
     >();
+  });
+
+  it("names each refused item in a registered word alone", () => {
+    expectTypeOf<RefusedItems<MemberRefusal<"last-admin" | "no-such-member">>>().toEqualTypeOf<{
+      readonly word: "last-admin" | "no-such-member";
+      readonly items: Readonly<Record<string, "last-admin" | "no-such-member">>;
+    }>();
+    expectTypeOf<RefusedItems<MemberRefusal<"last-admin">>>().toExtend<{
+      readonly word: EveryRegisteredWord;
+      readonly items: Readonly<Record<string, EveryRegisteredWord>>;
+    }>();
+    // @ts-expect-error — an item's word must be a word some slice declared.
+    expectTypeOf<RefusedItems<MemberRefusal<"no-such-thing">>>().toBeObject();
   });
 });

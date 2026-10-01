@@ -34,5 +34,6 @@ export const crossing = async <Value>(
   }
   const refusal = refusalOf(answered.error);
   log.info({ event: "mcp.refused", entry, ...refusalLogged(refusal) }, "refused");
+  // Items are dropped: an agent acts on the set's word, and no act naming items is an entry.
   return asToolError(`Refused: ${refusal.word} (${refusal.class}).${fieldsSaid(refusal)}`);
 };

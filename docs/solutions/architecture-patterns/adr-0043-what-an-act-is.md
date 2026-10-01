@@ -40,11 +40,21 @@ tags:
 - The register is append-only. A shipped word is never removed and never changes class.
 - `packages/core/test/refusal-words.test.ts` holds that every word is declared once, used and classed.
 
-**A refusal crosses each transport as `{ word, class }`**, through that transport's one crossing function.
+**A refusal crosses each transport as `{ word, class }`**, through that transport's one crossing function. A malformed input adds its `fields`.
 
-- Over tRPC it is a thrown error, typed through `AppRouter` (`apps/api/src/trpc/base.ts`).
-- MCP has its own (`apps/api/src/mcp/crossing.ts`).
-- `pnpm ops` maps each class to an exit code (`apps/api/src/ops/index.ts`).
+**A refusal may name items.** An act that refuses a whole set adds `items`, one word per refused item (`packages/core/src/kernel/refused-items.ts`).
+
+- An item's key is an id the caller sent, or an address's position in the send. It is never an address or a name.
+- An item's word states a fact about this workspace alone, and its act lists it among its refusals.
+- The set's own word is the first refused item's word in id order. Its class picks the status, and no new word enters the register.
+- The items ride the refusal and never a success answer, so a refusal still never crosses as a value.
+
+Each transport:
+
+- Over tRPC it is a thrown error, typed through `AppRouter` (`apps/api/src/trpc/base.ts`). The error carries the items, and the web reads them as plain words.
+- MCP has its own (`apps/api/src/mcp/crossing.ts`). It answers the set's word alone and drops the items, since no act that names items is an entry.
+- `pnpm ops` maps each class to an exit code (`apps/api/src/ops/index.ts`). It takes a word alone, so a refusal naming items cannot reach it.
+- A refusal's log line holds its word and class, never an item's id.
 - Procedures are written by hand, so the call graph stays whole.
 
 **A transport never nests a transaction.** The base procedures:
@@ -66,6 +76,7 @@ Every Postgres door rolls back when its work answers a refusal or throws. A prin
 - A procedure holding a pooled connection for the whole call made an upload hold two of the pool's ten.
 - A door that committed a refused work kept the rows landed before the refusal. When the door folded its own refusal into the work's, a caller could not tell a refused principal from a refused act.
 - tRPC 11.18's multipart handler buffers the whole body. Its octet-stream handler streams: the first byte reached `putObject` 3 ms into a 400 ms body.
+- An act on a set of people changes everyone or no one, and its refusal has to say which person refused and why. A check read before the write would race another Admin, so the words come from the act's own transaction, on its refusal.
 
 ## Rejected
 
@@ -73,6 +84,7 @@ Every Postgres door rolls back when its work answers a refusal or throws. A prin
 - A constructor that also parses or owns the transaction: ownership differs by act.
 - Own-transaction acts each resolving their own Principal: `putObject` and `withRepositoryLock` take one outside any Postgres transaction.
 - A refusal as a value on the wire: every read screen would branch on it, and a cached client could do nothing with a word it had never met.
+- A check read before a set's write, to name the items it would refuse: another Admin's act can land between the read and the write.
 - No classes and a table per transport, or one flat list of words.
 - Capability-typed doors with no declared admission, a per-slice manifest a router is generated from, or schemas generated from types.
 - A multipart upload, or a plain Hono route: both buffer through `formData()`.
@@ -80,3 +92,5 @@ Every Postgres door rolls back when its work answers a refusal or throws. A prin
 ## History
 
 The full record, with its four amendments (T-232, T-230, T-338, the T-027 and T-028 grill): `docs/archive/adr/0043-what-an-act-is.md`.
+
+A refusal naming items came with the people layout rework (`docs/plans/2026-10-01-1807-feat-people-layout-rework-plan.md`, KTD1).

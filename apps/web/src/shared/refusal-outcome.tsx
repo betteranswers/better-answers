@@ -49,3 +49,35 @@ export const failureOutcome = (
     ? refusedWith(UNANSWERED[failedIn])
     : refusalOutcome(featureWords, refusal.word, refusal.class);
 };
+
+type ItemSaid = { readonly id: string; readonly said: Said };
+
+/** An item's word crosses with no class, so a word the feature lacks is said as the whole set's. */
+const saidOfItems = (featureWords: SaidOfWord, failure: Error | ApiError): readonly ItemSaid[] => {
+  const refusal = refusalOf(failure);
+  if (refusal?.items === undefined) return [];
+  const ofTheSet = saidOfRefusal(featureWords, refusal.word, refusal.class);
+  return Object.entries(refusal.items).map(([id, word]) => ({
+    id,
+    said: featureWords[word] ?? ofTheSet,
+  }));
+};
+
+/** One line per item the refusal names; nothing for a refusal naming none. */
+export function RefusedItemLines(properties: {
+  readonly featureWords: SaidOfWord;
+  readonly failure: Error | ApiError;
+  readonly nameOf: (id: string) => string;
+}) {
+  const lines = saidOfItems(properties.featureWords, properties.failure);
+  if (lines.length === 0) return null;
+  return (
+    <ul>
+      {lines.map(({ id, said }) => (
+        <li key={id}>
+          {properties.nameOf(id)}: <RefusalLine said={said} />
+        </li>
+      ))}
+    </ul>
+  );
+}
