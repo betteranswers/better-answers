@@ -407,24 +407,56 @@ describe("the backup jobs' allow-list", () => {
 });
 
 const WORKSPACE = "ws-probe";
+/** A job that reads one repository and loses the rest of its list leaves this one out. */
+const SECOND_WORKSPACE = "ws-second";
+/** As `provision-workspace` leaves a workspace before its first write: a repository with no ref. */
+const UNWRITTEN_WORKSPACE = "ws-unwritten";
 const LEFT_BY_A_FAILED_RUN = "/staging/globals-20260904T143652Z.sql.age";
 /** The stores stack's init hands /data/git to this uid, the one the api writes as. */
 const API_UID = 1000;
 
+/** As ssh to VPC 2: runs the mirror's forced command, and drains stdin to it unless `-n`. */
+const SSH_STAND_IN = String.raw`#!/usr/bin/env bash
+forwarded=yes
+while [ "$#" -gt 1 ]; do
+  case "$1" in
+    -n) forwarded=no; shift ;;
+    -o|-p|-i|-l) shift 2 ;;
+    -*) shift ;;
+    *) break ;;
+  esac
+done
+shift
+[ "$forwarded" = yes ] || exec < /dev/null
+SSH_ORIGINAL_COMMAND="$*" /usr/local/bin/mirror-shell /data/mirror
+status=$?
+cat > /dev/null
+exit "$status"
+`;
+
 const nightlyRun = (script: string): string => String.raw`
 set -eu
-mkdir -p /data/git /staging /objectstore/uploads /buckets
+mkdir -p /data/git /data/mirror /staging /objectstore/uploads /buckets
 git init --quiet --initial-branch=main /tmp/workspace
 git -C /tmp/workspace -c user.name=probe -c user.email=probe@example.invalid \
   commit --quiet --allow-empty --message "a workspace's first commit"
-git clone --quiet --bare /tmp/workspace "/data/git/${WORKSPACE}.git"
+for written in ${WORKSPACE} ${SECOND_WORKSPACE}; do
+  git clone --quiet --bare /tmp/workspace "/data/git/$written.git"
+done
+git init --quiet --bare --initial-branch=main "/data/git/${UNWRITTEN_WORKSPACE}.git"
 chown -R ${API_UID}:${API_UID} /data/git
+printf '%s' "$MIRROR_SHELL" > /usr/local/bin/mirror-shell
+printf '%s' "$SSH_STAND_IN" > /usr/local/bin/ssh
+chmod 0755 /usr/local/bin/mirror-shell /usr/local/bin/ssh
 printf 'an upload\n' > /objectstore/uploads/one
 touch -d '2 days ago' "${LEFT_BY_A_FAILED_RUN}"
 age-keygen -o /tmp/identity 2>/dev/null
 BACKUP_AGE_RECIPIENT=$(age-keygen -y /tmp/identity) "${script}" nightly > /tmp/nightly.log 2>&1 || true
 while IFS= read -r line; do printf 'log\t%s\n' "$line"; done < /tmp/nightly.log
 find /buckets /staging -type f | while IFS= read -r file; do printf 'file\t%s\n' "$file"; done
+find /data/mirror -mindepth 1 -maxdepth 1 -name '*.git' | sort | while IFS= read -r mirror; do
+  printf 'mirrored\t%s %s\n' "$(basename "$mirror" .git)" "$(git -C "$mirror" for-each-ref --format='%(refname)')"
+done
 `;
 
 const NIGHTLY_ENVIRONMENT = {
@@ -438,11 +470,19 @@ const NIGHTLY_ENVIRONMENT = {
   GIT_MIRROR_SSH_TARGET: "mirror@127.0.0.1:/data/mirror",
   HEALTHCHECKS_PING_URL_PG_HOURLY: "http://127.0.0.1:9/pg-hourly",
   HEALTHCHECKS_PING_URL_NIGHTLY: "http://127.0.0.1:9/nightly",
+  MIRROR_SHELL: read("deploy/mirror-shell.sh"),
+  SSH_STAND_IN,
 };
+
+const bundleOf = (workspace: string): unknown =>
+  expect.stringMatching(
+    new RegExp(`^/buckets/dumps/git/${workspace}/${workspace}-\\d{8}T\\d{6}Z\\.bundle\\.age$`),
+  );
 
 describe.skipIf(nothingToProbeHere)("the backup image's nightly job", () => {
   let log: readonly string[] = [];
   let files: readonly string[] = [];
+  let mirrored: readonly string[] = [];
 
   beforeAll(async () => {
     const lines = (
@@ -455,20 +495,21 @@ describe.skipIf(nothingToProbeHere)("the backup image's nightly job", () => {
       lines.filter((line) => line.startsWith(`${tag}\t`)).map((line) => line.slice(tag.length + 1));
     log = tagged("log");
     files = tagged("file");
+    mirrored = tagged("mirrored");
   }, IMAGE_PROBE_ALLOWANCE);
 
-  it("writes, verifies and uploads a bundle of an api-owned repository", () => {
-    const bundles = files.filter((file) => file.startsWith(`/buckets/dumps/git/${WORKSPACE}/`));
+  it("bundles each api-owned repository with a ref, skipping one without", () => {
+    const bundles = files.filter((file) => file.startsWith("/buckets/dumps/git/")).sort();
 
     // The log rides along so a failure shows where the run stopped.
     expect({ bundles, log }).toMatchObject({
-      bundles: [
-        expect.stringMatching(
-          new RegExp(
-            `^/buckets/dumps/git/${WORKSPACE}/${WORKSPACE}-\\d{8}T\\d{6}Z\\.bundle\\.age$`,
-          ),
-        ),
-      ],
+      bundles: [bundleOf(WORKSPACE), bundleOf(SECOND_WORKSPACE)],
+    });
+  });
+
+  it("mirrors each repository with a ref, not only the first", () => {
+    expect({ mirrored, log }).toMatchObject({
+      mirrored: [`${WORKSPACE} refs/heads/main`, `${SECOND_WORKSPACE} refs/heads/main`],
     });
   });
 
@@ -476,13 +517,16 @@ describe.skipIf(nothingToProbeHere)("the backup image's nightly job", () => {
     expect(files.filter((file) => file.startsWith("/staging/"))).toEqual([]);
   });
 
-  it("logs nothing of the workspace when its bundle passes", () => {
-    expect(log.filter((line) => line.includes(WORKSPACE))).toEqual([]);
+  it("logs nothing of the workspaces when their copies pass", () => {
+    const workspaces = [WORKSPACE, SECOND_WORKSPACE, UNWRITTEN_WORKSPACE];
+
+    expect(log.filter((line) => workspaces.some((workspace) => line.includes(workspace)))).toEqual(
+      [],
+    );
   });
 
-  it("ends its log with the words its ping carries", () => {
-    // No mirror host answers here, so the run fails at the push, after the bundles.
-    expect(log.at(-1)).toBe("backup.sh nightly: fail bytes=0 took=0");
+  it("ends its log with the ok its ping carries", () => {
+    expect(log.at(-1)).toMatch(/^backup\.sh nightly: ok bytes=0 took=\d+$/);
   });
 });
 
