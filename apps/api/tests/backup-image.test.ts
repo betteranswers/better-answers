@@ -9,6 +9,11 @@ import { z } from "zod";
 import { repositoryRoot } from "@better-answers/devtools/paths";
 import { legFor } from "@better-answers/devtools/workflows";
 import { POSTGRES_IMAGE } from "@better-answers/schema";
+import {
+  type MigratedPostgres,
+  openMigratedPostgres,
+  testData,
+} from "@better-answers/schema/testing";
 
 import {
   fileFromTheWorkspace,
@@ -18,6 +23,7 @@ import {
   readTheImage,
   type StartedContainer,
   startTheImage,
+  THE_HOST,
 } from "./image-probe.ts";
 
 const read = (relative: string): string =>
@@ -536,17 +542,6 @@ const fenced = (script: string, step: string): string => {
   return body;
 };
 
-const BUNDLED = "ws-bundled";
-const NEVER_WRITTEN = "ws-never-written";
-
-/** Answers only the query the restores make, as the restored database would. */
-const PSQL_STAND_IN = [
-  "#!/usr/bin/env bash",
-  '[ "${!#}" = "select id from workspace" ] || exit 2',
-  `printf '%s\\n' ${BUNDLED} ${NEVER_WRITTEN}`,
-  "",
-].join("\n");
-
 /** Both restores run their git step as root, in a work directory `mktemp -d` closes to others. */
 const restoringTheGitStore = String.raw`
 set -euo pipefail
@@ -555,11 +550,8 @@ git -C /tmp/workspace -c user.name=probe -c user.email=probe@example.invalid \
   commit --quiet --allow-empty --message "a workspace's first commit"
 git -C /tmp/workspace bundle create --quiet /tmp/bundle --all
 age-keygen -o /run/age.key 2>/dev/null
-mkdir -p /buckets/dumps/git/${BUNDLED} /tmp/stand-ins
-age -r "$(age-keygen -y /run/age.key)" -o /buckets/dumps/git/${BUNDLED}/${BUNDLED}-20260930T020017Z.bundle.age /tmp/bundle
-printf '%s' "$PSQL_STAND_IN" > /tmp/stand-ins/psql
-chmod 0755 /tmp/stand-ins/psql
-export PATH="/tmp/stand-ins:$PATH"
+mkdir -p "/buckets/dumps/git/$BUNDLED"
+age -r "$(age-keygen -y /run/age.key)" -o "/buckets/dumps/git/$BUNDLED/$BUNDLED-20260930T020017Z.bundle.age" /tmp/bundle
 as_the_api() { HOME=/tmp setpriv --reuid=${API_UID} --regid=${API_UID} --clear-groups "$@"; }
 restore() {
   rm -rf /data/git /work
@@ -571,7 +563,7 @@ restore() {
   printf '%s\tran %s\n' "$1" "$ran"
   printf '%s\twork %s\n' "$1" "$(stat -c %a /work)"
   printf '%s\towned by another uid %s\n' "$1" "$(find /data/git ! -uid ${API_UID} -o ! -gid ${API_UID} | wc -l)"
-  for ws in ${BUNDLED} ${NEVER_WRITTEN}; do
+  for ws in "$BUNDLED" "$NEVER_WRITTEN"; do
     refs=$(as_the_api git -C "/data/git/$ws.git" for-each-ref --format='%(refname)' || true)
     [ -n "$refs" ] || refs="no ref"
     printf '%s\t%s %s %s\n' "$1" "$ws" "$(as_the_api git -C "/data/git/$ws.git" symbolic-ref HEAD || true)" "$refs"
@@ -581,11 +573,25 @@ restore production "$PRODUCTION_STEP"
 restore drill "$DRILL_STEP"
 `;
 
-const RESTORE_ENVIRONMENT = {
+interface Seeded {
+  readonly bundled: string;
+  readonly neverWritten: string;
+}
+
+/** A port the host publishes, as a container that `reachesTheHost` dials it. */
+const seenFromTheImage = (connectionUri: string): string => {
+  const uri = new URL(connectionUri);
+  uri.hostname = THE_HOST;
+  return uri.toString();
+};
+
+const restoreEnvironment = (seeded: Seeded, database: string): Record<string, string> => ({
   RCLONE_CONFIG_DUMPS_TYPE: "alias",
   RCLONE_CONFIG_DUMPS_REMOTE: "/buckets",
-  DATABASE_URL: "postgresql://restore@127.0.0.1:9/betteranswers",
-  PSQL_STAND_IN,
+  DATABASE_URL: database,
+  STAGING_DATABASE_URL: database,
+  BUNDLED: seeded.bundled,
+  NEVER_WRITTEN: seeded.neverWritten,
   // As each script leaves them by its git step; production's `tool` runs in this image anyway.
   PRODUCTION_STEP: [
     "set -euo pipefail",
@@ -596,22 +602,40 @@ const RESTORE_ENVIRONMENT = {
   DRILL_STEP: [
     "set -euo pipefail",
     "WORK=/work BACKUP_DUMPS_BUCKET=dumps BACKUP_AGE_IDENTITY_FILE=/run/age.key",
-    "STAGING_DATABASE_URL=postgresql://drill@127.0.0.1:9/staging",
     fenced("deploy/restore-drill.sh", "the git store"),
   ].join("\n"),
+});
+
+const seedTwoWorkspaces = async (database: MigratedPostgres): Promise<Seeded> => {
+  const client = await database.pool.connect();
+  try {
+    const data = testData(client);
+    return { bundled: (await data.workspace()).id, neverWritten: (await data.workspace()).id };
+  } finally {
+    client.release();
+  }
 };
 
 describe.skipIf(nothingToProbeHere)("the restores' git store step", () => {
+  let database: MigratedPostgres | undefined;
+  let seeded: Seeded = { bundled: "", neverWritten: "" };
   let lines: readonly string[] = [];
 
   beforeAll(async () => {
+    database = await openMigratedPostgres();
+    seeded = await seedTwoWorkspaces(database);
     lines = (
       await readTheImage(backupImage(), {
         command: ["bash", "-c", restoringTheGitStore],
-        environment: RESTORE_ENVIRONMENT,
+        environment: restoreEnvironment(seeded, seenFromTheImage(database.connectionUri)),
+        reachesTheHost: true,
       })
     ).split("\n");
   }, IMAGE_PROBE_ALLOWANCE);
+
+  afterAll(async () => {
+    await database?.stop();
+  });
 
   const stateAfter = (restore: string) => {
     const told = lines
@@ -632,7 +656,7 @@ describe.skipIf(nothingToProbeHere)("the restores' git store step", () => {
           "ran 0",
           "work 700",
           "owned by another uid 0",
-          `${BUNDLED} refs/heads/main refs/heads/main`,
+          `${seeded.bundled} refs/heads/main refs/heads/main`,
           expect.any(String),
         ],
       });
@@ -642,7 +666,9 @@ describe.skipIf(nothingToProbeHere)("the restores' git store step", () => {
   it.each(["production", "drill"])(
     "%s: inits an empty repository for an unbundled workspace",
     (restore) => {
-      expect(stateAfter(restore).state.at(-1)).toBe(`${NEVER_WRITTEN} refs/heads/main no ref`);
+      expect(stateAfter(restore).state.at(-1)).toBe(
+        `${seeded.neverWritten} refs/heads/main no ref`,
+      );
     },
   );
 });
