@@ -1,5 +1,4 @@
 import { useNavigate } from "@tanstack/react-router";
-import type { BetterFetchError } from "better-auth/client";
 import { useEffect, useState } from "react";
 import { flushSync } from "react-dom";
 
@@ -9,12 +8,12 @@ import { Button } from "@/shared/ui/button.tsx";
 
 import {
   hasADisplayName,
-  refusedForNoMembership,
   useListOrganizations,
   useOAuthContinue,
   useSession,
   useSetActiveOrganization,
   type ResumeAnswer,
+  type SwitchRefused,
 } from "./auth-hooks.ts";
 import { AuthScreen } from "./auth-screen.tsx";
 import { carriedFlow, leavingFor, pageQuery } from "./carried-flow.ts";
@@ -60,13 +59,16 @@ const whereThePersonStands = (
   };
 };
 
+const endedTheMembership = (refused: SwitchRefused | null): boolean =>
+  refused?.noLongerAMember === true;
+
 /** Once a pick is refused, the list or the refusal stands to be read rather than a pick retried. */
 const whereThePickStands = (
   held: readonly Workspace[],
   noLongerHeld: Workspace | undefined,
   went: {
-    readonly pick: BetterFetchError | null;
-    readonly resume: BetterFetchError | null;
+    readonly pick: SwitchRefused | null;
+    readonly resume: Error | null;
     readonly nowhere: boolean;
   },
 ) => {
@@ -75,7 +77,7 @@ const whereThePickStands = (
     notConnected: went.nowhere || went.resume !== null,
     listed: held.length > 1 || (one && noLongerHeld !== undefined),
     refused: went.pick !== null,
-    removedFrom: refusedForNoMembership(went.pick) ? noLongerHeld : undefined,
+    removedFrom: endedTheMembership(went.pick) ? noLongerHeld : undefined,
     opensAlone: one && noLongerHeld === undefined && went.pick === null && went.resume === null,
   };
 };
@@ -138,7 +140,7 @@ export function ChooseWorkspaceScreen() {
       {
         onSuccess: goOn,
         onError: (refused) => {
-          if (!refusedForNoMembership(refused)) return;
+          if (!refused.noLongerAMember) return;
           flushSync(() => {
             setNoLongerHeld(workspace);
           });

@@ -24,7 +24,7 @@ const measuresTheBand = class {
   disconnect = () => undefined;
 };
 
-const reach = () => document.documentElement.style.getPropertyValue("--band-reach");
+const drawnHeight = () => document.documentElement.style.getPropertyValue("--band-drawn-h");
 
 const openTheWideBand = async () => {
   vi.stubGlobal("ResizeObserver", measuresTheBand);
@@ -62,13 +62,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("the wide band's reach", () => {
+describe("the wide band's drawn height", () => {
   it("publishes its whole height while drawn, and lets it go", async () => {
     await openTheWideBand();
-    expect(reach()).toBe(`${String(MEASURED)}px`);
+    expect(drawnHeight()).toBe(`${String(MEASURED)}px`);
 
     cleanup();
 
-    expect(reach(), "a narrow layout would keep the wide band's height").toBe("");
+    expect(drawnHeight(), "a narrow layout would keep the wide band's height").toBe("");
   });
 });

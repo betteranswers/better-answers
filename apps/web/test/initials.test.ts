@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { initialsOf } from "@/shared/initials.ts";
 
@@ -23,6 +23,7 @@ describe("a person's initials", () => {
 
   it("takes a letter with its accent, however it was typed", () => {
     expect(initialsOf("e\u0301mile Zola")).toBe("E\u0301Z");
+    expect(initialsOf("\u00e9mile Zola")).toBe("\u00c9Z");
   });
 
   it("takes a flag whole", () => {
@@ -32,5 +33,23 @@ describe("a person's initials", () => {
   it("gives no initials for an empty name", () => {
     expect(initialsOf("")).toBe("");
     expect(initialsOf("   ")).toBe("");
+  });
+});
+
+describe("a person's initials where the browser has no segmenter", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("takes code points, losing an accent typed apart", async () => {
+    const descriptors = Object.getOwnPropertyDescriptors(Intl);
+    Reflect.deleteProperty(descriptors, "Segmenter");
+    vi.stubGlobal("Intl", Object.defineProperties({}, descriptors));
+    vi.resetModules();
+    const { initialsOf: withoutASegmenter } = await import("@/shared/initials.ts");
+
+    expect(withoutASegmenter("Sam Okoro")).toBe("SO");
+    expect(withoutASegmenter("😀 Okoro")).toBe("😀O");
+    expect(withoutASegmenter("e\u0301mile Zola")).toBe("EZ");
   });
 });

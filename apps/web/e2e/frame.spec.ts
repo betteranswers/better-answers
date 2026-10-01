@@ -181,10 +181,10 @@ const focusUnderTheBand = async (page: Page) => (await focusAgainstTheBand(page)
 
 const overlapsTheBand = async (page: Page) => (await focusAgainstTheBand(page)).overlaps;
 
-/** Tab by tab to `target`, no stop on the way sharing the band's box. */
+/** Tab by tab to `target`, no stop on the way, nor `target` itself, sharing the band's box. */
 const tabClearOfTheBand = (page: Page, target: Locator) =>
   tabUntilFocused(page, target, undefined, async () => {
-    expect(await overlapsTheBand(page), `a stop before ${String(target)} overlaps the band`).toBe(
+    expect(await overlapsTheBand(page), `a stop up to ${String(target)} overlaps the band`).toBe(
       false,
     );
   });

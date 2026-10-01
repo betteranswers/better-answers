@@ -338,6 +338,10 @@ export const skipLinkReachesTheScreen = async (page: Page): Promise<void> => {
   await expect(page.getByRole("main")).toBeFocused();
 };
 
+/**
+ * `eachStop` runs after every press, the one landing on `target` too, but never for the start,
+ * which no press reached.
+ */
 export const tabUntilFocused = async (
   page: Page,
   target: Locator,

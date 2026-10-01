@@ -12,11 +12,13 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients, Providers } from "@/app/providers.tsx";
-import { ALL_WORKSPACES } from "@/app/words.ts";
 import { WorkspaceSwitcher } from "@/app/workspace-switcher.tsx";
-import { SwitchRefused, useSwitchWorkspace } from "@/features/auth/auth-hooks.ts";
+import {
+  SwitchRefused,
+  useSetActiveOrganization,
+  useSwitchWorkspace,
+} from "@/features/auth/auth-hooks.ts";
 import { useTRPC } from "@/shared/api/trpc.ts";
-import { CONSOLE } from "@/shared/navigation.ts";
 
 import { addressOf, answered, answeringAs } from "./stubbed-api.ts";
 
@@ -98,8 +100,8 @@ const refusedWith = (code: string) => () =>
     }),
   );
 
-/** The switch's hook alone, with the api's proxy beside it for reading and seeding the cache. */
-const switchHeld = async () => {
+/** One hook alone, over the app's clients and a router it can navigate. */
+const renderTheHook = async <TResult,>(hook: () => TResult) => {
   const clients = createAppClients();
   const router = createRouter({
     routeTree: createRootRoute(),
@@ -111,11 +113,12 @@ const switchHeld = async () => {
       <RouterContextProvider router={router}>{properties.children}</RouterContextProvider>
     </Providers>
   );
-  const { result } = renderHook(() => ({ switching: useSwitchWorkspace(), api: useTRPC() }), {
-    wrapper,
-  });
+  const { result } = renderHook(hook, { wrapper });
   return { queryClient: clients.queryClient, result };
 };
+
+/** The switch's hook, with the api's proxy beside it for reading and seeding the cache. */
+const switchHeld = () => renderTheHook(() => ({ switching: useSwitchWorkspace(), api: useTRPC() }));
 
 afterEach(() => {
   cleanup();
@@ -123,7 +126,7 @@ afterEach(() => {
 });
 
 describe("the workspace switcher's ways out", () => {
-  it.each([ALL_WORKSPACES, CONSOLE.name])("holds %s while a switch is pending", async (name) => {
+  it.each(["All workspaces", "Console"])("holds %s while a switch is pending", async (name) => {
     const router = await openTheMenu(true);
     const navigating = vi.spyOn(router, "navigate");
 
@@ -138,7 +141,7 @@ describe("the workspace switcher's ways out", () => {
   it("takes the person to all workspaces once nothing is pending", async () => {
     const router = await openTheMenu(false);
 
-    const way = screen.getByRole("menuitem", { name: ALL_WORKSPACES });
+    const way = screen.getByRole("menuitem", { name: "All workspaces" });
     fireEvent.click(way);
 
     expect(way.getAttribute("aria-disabled")).toBeNull();
@@ -159,6 +162,20 @@ describe("a switch's refusal", () => {
     await vi.waitFor(() => expect(result.current.switching.isError).toBe(true));
     expect(result.current.switching.error).toBeInstanceOf(SwitchRefused);
     expect(result.current.switching.error?.noLongerAMember).toBe(noLongerAMember);
+  });
+
+  it.each([
+    ["USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION", true],
+    ["FORBIDDEN", false],
+  ])("reads a pick's %s in the platform's terms", async (code, noLongerAMember) => {
+    authServer.answer = answeringTheSwitch(refusedWith(code));
+    const { result } = await renderTheHook(useSetActiveOrganization);
+
+    act(() => result.current.mutate({ organizationId: HOLME.id }));
+
+    await vi.waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error).toBeInstanceOf(SwitchRefused);
+    expect(result.current.error?.noLongerAMember).toBe(noLongerAMember);
   });
 });
 

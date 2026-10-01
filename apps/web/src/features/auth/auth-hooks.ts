@@ -259,11 +259,29 @@ export const useSignOut = (returnTo?: string) => {
   };
 };
 
+/** Better Auth's code for a pick of a workspace the person holds no membership in. */
+const noMembership = z.object({ code: z.literal("USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION") });
+
+/** A refused switch or pick in the platform's terms, so no screen reads the provider's error. */
+export class SwitchRefused extends Error {
+  readonly noLongerAMember: boolean;
+
+  constructor(noLongerAMember: boolean) {
+    super(noLongerAMember ? "no longer a member" : "switch refused");
+    this.name = "SwitchRefused";
+    this.noLongerAMember = noLongerAMember;
+  }
+}
+
 const setActiveWorkspace = (organizationId: string) =>
-  unwrap(authClient.organization.setActive({ organizationId }));
+  unwrap(authClient.organization.setActive({ organizationId })).catch(
+    (refused: BetterFetchError) => {
+      throw new SwitchRefused(noMembership.safeParse(refused).success);
+    },
+  );
 
 const setActiveOrganizationOptions = () =>
-  mutationOptions<unknown, BetterFetchError, { organizationId: string }>({
+  mutationOptions<unknown, SwitchRefused, { organizationId: string }>({
     mutationFn: (input) => setActiveWorkspace(input.organizationId),
   });
 
@@ -308,23 +326,6 @@ export const useSetActiveOrganization = () => {
   });
 };
 
-/** Better Auth's code for a pick of a workspace the person holds no membership in. */
-const noMembership = z.object({ code: z.literal("USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION") });
-
-export const refusedForNoMembership = (refused: BetterFetchError | null): boolean =>
-  noMembership.safeParse(refused).success;
-
-/** A switch's refusal in the platform's terms, so the shell never reads the provider's error. */
-export class SwitchRefused extends Error {
-  readonly noLongerAMember: boolean;
-
-  constructor(noLongerAMember: boolean) {
-    super(noLongerAMember ? "no longer a member" : "switch refused");
-    this.name = "SwitchRefused";
-    this.noLongerAMember = noLongerAMember;
-  }
-}
-
 export type SwitchedTo = { readonly id: string; readonly name: string };
 
 /**
@@ -336,10 +337,7 @@ export const useSwitchWorkspace = () => {
   const api = useTRPC();
   const navigate = useNavigate();
   return useMutation<unknown, SwitchRefused, SwitchedTo>({
-    mutationFn: (workspace) =>
-      setActiveWorkspace(workspace.id).catch((refused: BetterFetchError) => {
-        throw new SwitchRefused(refusedForNoMembership(refused));
-      }),
+    mutationFn: (workspace) => setActiveWorkspace(workspace.id),
     onSuccess: async () => {
       forgetTheWorkspaceLeft(queryClient, api);
       await rereadMembership(queryClient, api);
@@ -354,9 +352,12 @@ const resumeAnswer = z.object({ redirect: z.boolean().optional(), url: z.string(
 export type ResumeAnswer = z.infer<typeof resumeAnswer>;
 
 const oauthContinueOptions = () =>
-  mutationOptions<ResumeAnswer, BetterFetchError, { postLogin: true }>({
-    mutationFn: async (input) =>
-      resumeAnswer.parse(await unwrap(authClient.oauth2.continue(input))),
+  mutationOptions<ResumeAnswer, Error, { postLogin: true }>({
+    mutationFn: async (input) => {
+      const { data, error } = await authClient.oauth2.continue(input);
+      if (error !== null) throw new Error(`answered ${String(error.status)}`);
+      return resumeAnswer.parse(data);
+    },
   });
 
 export const useOAuthContinue = () => useMutation(oauthContinueOptions());

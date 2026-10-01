@@ -64,13 +64,13 @@
    * until then, and when narrow, it is the token's.
    */
   :root {
-    --band-reach: var(--band-h);
+    --band-drawn-h: var(--band-h);
   }
 
   /* The wide band stays put, so a control scrolled up into view stops below it, not under it. */
   @media (width >= theme(--breakpoint-md)) {
     :root {
-      scroll-padding-top: var(--band-reach);
+      scroll-padding-top: var(--band-drawn-h);
     }
   }
 }
