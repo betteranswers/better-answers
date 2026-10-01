@@ -157,22 +157,23 @@ const nextSort = (sorted: ColumnSort | undefined, id: string): ColumnSort => ({
   desc: sorted?.id === id && !sorted.desc,
 });
 
-/** `span` counts shown columns only, so a group narrows as the reader hides its columns. */
 function ColumnHead<Features extends TableFeatures, Data extends RowData>(properties: {
   readonly header: Header<Features, Data, unknown>;
-  readonly span: number;
   readonly sorting: SortHeads | undefined;
 }) {
-  const { header, span, sorting } = properties;
+  const { header, sorting } = properties;
   const label = flexRender(header.column.columnDef.header, header.getContext());
   const id = header.column.id;
-  const spans = { scope: "col", colSpan: span, rowSpan: header.rowSpan, className: HEAD } as const;
   if (sorting === undefined || !sorting.sortable.has(id)) {
-    return <TableHead {...spans}>{label}</TableHead>;
+    return (
+      <TableHead scope="col" className={HEAD}>
+        {label}
+      </TableHead>
+    );
   }
   const sorted = sorting.sorted?.id === id ? sorting.sorted : undefined;
   return (
-    <TableHead {...spans} aria-sort={ariaSortOf(sorted)}>
+    <TableHead scope="col" className={HEAD} aria-sort={ariaSortOf(sorted)}>
       <SortHead
         sorted={sorted}
         onSort={() => {
@@ -187,44 +188,6 @@ function ColumnHead<Features extends TableFeatures, Data extends RowData>(proper
 
 const isShown = (hidden: ReadonlySet<string> | undefined, columnId: string): boolean =>
   hidden?.has(columnId) !== true;
-
-const shownSpan = <Features extends TableFeatures, Data extends RowData>(
-  header: Header<Features, Data, unknown>,
-  hidden: ReadonlySet<string> | undefined,
-): number =>
-  header
-    .getLeafHeaders()
-    .filter((leaf) => leaf.subHeaders.length === 0 && isShown(hidden, leaf.column.id)).length;
-
-/** A grouped header is rows deep; a header TanStack merges into the one above has no row span. */
-function HeadRows<Features extends TableFeatures, Data extends RowData>(
-  properties: Opted<Data> & {
-    readonly table: HeldTable<Features, Data>;
-    readonly ids: readonly string[];
-  },
-) {
-  const { table, ticking, sorting, hidden, rowMenu } = properties;
-  const groups = table.getHeaderGroups();
-  return groups.map((group, depth) => (
-    <TableRow key={group.id} className="border-border hover:bg-transparent">
-      {depth > 0 || ticking === undefined ? null : (
-        <TableHead scope="col" rowSpan={groups.length} className={cn(HEAD, "w-10")}>
-          <PageTick ids={properties.ids} ticking={ticking} />
-        </TableHead>
-      )}
-      {group.headers.map((header) => {
-        const span = shownSpan(header, hidden);
-        if (span === 0 || header.rowSpan === 0) return null;
-        return <ColumnHead key={header.id} header={header} span={span} sorting={sorting} />;
-      })}
-      {depth > 0 || rowMenu === undefined ? null : (
-        <TableHead scope="col" rowSpan={groups.length} className={cn(HEAD, "w-12")}>
-          <span className="sr-only">Acts</span>
-        </TableHead>
-      )}
-    </TableRow>
-  ));
-}
 
 function GridRow<Features extends TableFeatures, Data extends RowData>(
   properties: Opted<Data> & { readonly row: Row<Features, Data> },
@@ -277,6 +240,7 @@ const columnCount = <Features extends TableFeatures, Data extends RowData>(
  */
 export function GridTable<Features extends TableFeatures, Data extends RowData>(
   properties: Opted<Data> & {
+    /** Flat columns only: the header draws no spans, so a column group's header would misalign. */
     readonly table: HeldTable<Features, Data>;
     readonly caption: string;
     readonly empty: ReactNode;
@@ -289,14 +253,25 @@ export function GridTable<Features extends TableFeatures, Data extends RowData>(
     <Table>
       <TableCaption className="sr-only">{properties.caption}</TableCaption>
       <TableHeader className="bg-muted">
-        <HeadRows
-          table={table}
-          ids={rows.map((row) => row.id)}
-          ticking={ticking}
-          sorting={sorting}
-          hidden={hidden}
-          rowMenu={rowMenu}
-        />
+        {table.getHeaderGroups().map((group) => (
+          <TableRow key={group.id} className="border-border hover:bg-transparent">
+            {ticking === undefined ? null : (
+              <TableHead scope="col" className={cn(HEAD, "w-10")}>
+                <PageTick ids={rows.map((row) => row.id)} ticking={ticking} />
+              </TableHead>
+            )}
+            {group.headers
+              .filter((header) => isShown(hidden, header.column.id))
+              .map((header) => (
+                <ColumnHead key={header.id} header={header} sorting={sorting} />
+              ))}
+            {rowMenu === undefined ? null : (
+              <TableHead scope="col" className={cn(HEAD, "w-12")}>
+                <span className="sr-only">Acts</span>
+              </TableHead>
+            )}
+          </TableRow>
+        ))}
       </TableHeader>
       <TableBody>
         {rows.length === 0 ? (

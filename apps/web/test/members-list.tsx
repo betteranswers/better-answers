@@ -123,45 +123,6 @@ const menuOf = (act: (said: string) => void) => (member: Member) => (
   />
 );
 
-const groupedColumns = column.columns([
-  column.group({
-    id: "person",
-    header: "Person",
-    columns: column.columns([
-      column.accessor("name", { id: "name", header: "Name" }),
-      column.accessor("address", { id: "address", header: "Address" }),
-    ]),
-  }),
-  column.accessor("role", { id: "role", header: "Role", sortFn: "alphanumeric" }),
-]);
-
-/** A header two rows deep, under a tick and a row menu that each head their column once. */
-export function GroupedList(properties: { readonly hidden?: ReadonlySet<string> }) {
-  const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set());
-  const table = useTable({
-    features,
-    columns: groupedColumns,
-    data: [...MEMBERS],
-    getRowId: (member) => member.id,
-  });
-  return (
-    <GridTable
-      table={table}
-      caption="Members of this workspace."
-      ticking={{
-        ticked,
-        onTickedChange: setTicked,
-        nameOf: (member) => member.name,
-        everyOnThePage: "Select every member on this page",
-      }}
-      sorting={{ sortable: new Set(["role"]), sorted: undefined, onSortedChange: NOTHING }}
-      hidden={properties.hidden}
-      rowMenu={menuOf(NOTHING)}
-      empty={null}
-    />
-  );
-}
-
 const linkedColumns = (open: (member: Member) => void) =>
   column.columns([
     column.accessor("name", {

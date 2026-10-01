@@ -6,20 +6,17 @@ import { RowLink } from "@/shared/grid-table.tsx";
 import { ListPages } from "@/shared/list-pages.tsx";
 
 import { placedWithoutMeasuring } from "./measuring.ts";
-import { BareList, GroupedList, MEMBERS, MembersList } from "./members-list.tsx";
+import { BareList, MEMBERS, MembersList } from "./members-list.tsx";
 
 placedWithoutMeasuring();
 
 const headers = () => screen.getAllByRole("columnheader").map((header) => header.textContent);
 
-/** Each header row's cells as text, columns spanned and rows spanned. */
 const headRows = () =>
   screen
     .getAllByRole("row")
     .filter((row) => row.parentElement?.tagName === "THEAD")
-    .map((row) =>
-      [...row.querySelectorAll("th")].map((head) => [head.textContent, head.colSpan, head.rowSpan]),
-    );
+    .map((row) => [...row.querySelectorAll("th")].map((head) => head.textContent));
 
 const people = () => screen.getAllByRole("link").map((link) => link.textContent);
 
@@ -157,34 +154,10 @@ describe("the shared table", () => {
     expect(acts).toEqual(["open bo"]);
   });
 
-  it("heads the tick and acts once, down a grouped header", () => {
-    render(<GroupedList />);
+  it("heads the tick, columns and acts in one row", () => {
+    render(<MembersList />);
 
-    expect(headRows()).toEqual([
-      [
-        ["", 1, 2],
-        ["Person", 2, 1],
-        ["Role", 1, 2],
-        ["Acts", 1, 2],
-      ],
-      [
-        ["Name", 1, 1],
-        ["Address", 1, 1],
-      ],
-    ]);
-    expect(
-      within(screen.getAllByRole("row")[2] ?? document.body).getAllByRole("cell"),
-    ).toHaveLength(5);
-    expect(screen.getAllByRole("button", { name: "Role" })).toHaveLength(1);
-  });
-
-  it("narrows a group as its columns hide, then drops it", () => {
-    const { rerender } = render(<GroupedList hidden={new Set(["address"])} />);
-    expect(headRows()[0]?.[1]).toEqual(["Person", 1, 1]);
-    expect(headRows()[1]).toEqual([["Name", 1, 1]]);
-
-    rerender(<GroupedList hidden={new Set(["name", "address"])} />);
-    expect(headers()).not.toContain("Person");
+    expect(headRows()).toEqual([["", "Person", "Role", "Groups", "Joined", "Acts"]]);
   });
 });
 
