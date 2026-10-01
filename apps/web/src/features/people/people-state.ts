@@ -1,4 +1,5 @@
 import type { Keystroke } from "@/shared/keystrokes.tsx";
+import { INVITE_A_PERSON } from "@/shared/navigation.ts";
 
 export const PEOPLE_KEYSTROKES = {
   search: { key: "/", act: "Search the members by name or address" },
@@ -8,7 +9,7 @@ export const PEOPLE_KEYSTROKES = {
   changeGroups: { key: "g", act: "Change the groups of the member in focus" },
   remove: { key: "d", act: "Remove the member in focus" },
   flagName: { key: "f", act: "Flag the display name of the member in focus" },
-  invite: { key: "i", act: "Invite a person" },
+  invite: { key: "i", act: INVITE_A_PERSON.name },
   resend: { key: "r", act: "Resend the invitation in focus" },
   cancel: { key: "x", act: "Cancel the invitation in focus" },
   approve: { key: "a", act: "Approve the request in focus" },

@@ -1,6 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 
-import { BREADCRUMB, NAVIGATION_SHEET, RAIL, TOGGLE } from "@/app/words.ts";
+import { BREADCRUMB, JUMP_TO, NAVIGATION_SHEET, RAIL, TOGGLE } from "@/app/words.ts";
 import { ROUTES_WORDS } from "@/features/routes/words.ts";
 import {
   ASK,
@@ -82,6 +82,8 @@ const openerOf = (page: Page) => page.getByRole("button", { name: TOGGLE.show })
 const sheetButtonOf = (page: Page) => page.getByRole("button", { name: NAVIGATION_SHEET });
 
 const sheetOf = (page: Page) => page.getByRole("dialog", { name: NAVIGATION_SHEET });
+
+const jumpToOf = (page: Page) => bandOf(page).getByRole("button", { name: JUMP_TO.name });
 
 const youOf = (page: Page, who: string) =>
   bandOf(page).getByRole("button", { name: new RegExp(who) });
@@ -517,7 +519,7 @@ test("tabs skip link, band, icon rail, secondary nav, toolbar, screen", async ({
   );
   await theRoutesHaveLanded(page);
 
-  // Every part but the open tab leads somewhere, so each is a stop between toggle and avatar.
+  // Every part but the open tab leads somewhere, so each is a stop between toggle and jump-to.
   const band = [
     logoOf(page),
     switcherOf(page, workspace.name),
@@ -525,6 +527,7 @@ test("tabs skip link, band, icon rail, secondary nav, toolbar, screen", async ({
     crumbOf(page, CONTROL_CENTRE.name),
     crumbOf(page, AGENT_OPERATIONS.name),
     crumbOf(page, ROUTES_AND_SPEND.name),
+    jumpToOf(page),
     youOf(page, workspace.admin.name),
   ];
   expect(await inDocumentOrder(page, band), "the band reads out of order").toBe(true);
@@ -649,6 +652,7 @@ test("narrows the band to two rows scrolling with the page", async ({ page, requ
     sheetButtonOf(page),
     logoOf(page),
     switcherOf(page, workspace.name),
+    jumpToOf(page),
     youOf(page, workspace.admin.name),
   ];
   const place = await boxOf(crumbsOf(page));

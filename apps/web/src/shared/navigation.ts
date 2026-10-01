@@ -8,6 +8,20 @@ export type Role = (typeof ROLES)[number];
 /** The operator holds no role in the console, so its screens are shown to the mark instead. */
 export type Seer = Role | "operator";
 
+/** Something a screen does that jump-to offers by name, to whoever may see the screen. */
+export type Act = {
+  readonly name: string;
+  /** What the screen's address carries to open it. */
+  readonly asks: string;
+  readonly icon: IconName;
+};
+
+export const INVITE_A_PERSON = {
+  name: "Invite a person",
+  asks: "invite",
+  icon: "invite",
+} as const satisfies Act;
+
 export type Screen = {
   readonly name: string;
   readonly path: string;
@@ -18,6 +32,7 @@ export type Screen = {
   readonly owners?: true;
   /** An older address, which leads here only for a person who may see the screen. */
   readonly movedFrom?: string;
+  readonly acts?: readonly Act[];
 };
 
 export type Group = {
@@ -304,7 +319,14 @@ export const CONTROL_CENTRE = {
       summary: "Who can use this workspace, and what each person can do.",
       movedFrom: "/people",
       screens: [
-        { name: "Members", path: "/people/members", icon: "people", built: true, seenBy: ADMINS },
+        {
+          name: "Members",
+          path: "/people/members",
+          icon: "people",
+          built: true,
+          seenBy: ADMINS,
+          acts: [INVITE_A_PERSON],
+        },
         { name: "Groups", path: "/people/groups", icon: "groups", built: true, seenBy: ADMINS },
         { name: "Tokens", path: "/people/tokens", icon: "token", built: false, seenBy: ADMINS },
       ],

@@ -34,6 +34,7 @@ type BandProperties = {
   readonly switcher: ReactNode;
   /** The toggle when wide, the sheet's button when narrow. */
   readonly navigation: ReactNode;
+  readonly jumpTo: ReactNode;
   readonly parts: readonly Part[];
   readonly person: Person | undefined;
   readonly signingOut: boolean;
@@ -116,6 +117,7 @@ function WideBand(properties: BandProperties) {
         <div className="flex min-w-0 flex-1 items-center gap-4 border-b border-border pr-3 pl-5">
           <BandBreadcrumb parts={properties.parts} wide className="flex-1" />
           <div className="ml-auto flex shrink-0 items-center gap-2">
+            {properties.jumpTo}
             <PersonMenu {...properties} />
           </div>
         </div>
@@ -135,6 +137,7 @@ function NarrowBand(properties: BandProperties) {
         <LogoLink home={properties.home} className="size-8" />
         {properties.switcher}
         <div className="ml-auto flex shrink-0 items-center gap-1">
+          {properties.jumpTo}
           <PersonMenu {...properties} />
         </div>
       </div>

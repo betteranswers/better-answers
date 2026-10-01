@@ -1,6 +1,14 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
-import { ALL_WORKSPACES, BREADCRUMB, goHome, RAIL, TOGGLE, UNKNOWN_SCREEN } from "@/app/words.ts";
+import {
+  ALL_WORKSPACES,
+  BREADCRUMB,
+  goHome,
+  JUMP_TO,
+  RAIL,
+  TOGGLE,
+  UNKNOWN_SCREEN,
+} from "@/app/words.ts";
 import { PICKER_WORDS } from "@/features/auth/workspace-words.ts";
 import { NOT_THE_OPERATOR, ONLY_THE_OPERATOR } from "@/features/console/refusal-words.ts";
 import { CONSOLE, HOMES } from "@/shared/navigation.ts";
@@ -345,6 +353,7 @@ test.describe("the console's Workspaces screen", () => {
       page.getByRole("button", { name: TOGGLE.hide }),
       crumbOf(page, CONSOLE.name),
       crumbOf(page, "Workspaces"),
+      page.getByRole("banner").getByRole("button", { name: JUMP_TO.name }),
       menuOf(page, workspace.admin.name),
       railOf(page).getByRole("link", { name: CONSOLE.name }),
     ]) {

@@ -18,6 +18,7 @@ import { isFilled, type ScreenToolbar } from "@/shared/screen-toolbar.tsx";
 import { Band, type Person } from "./band.tsx";
 import { partsOf } from "./breadcrumb.tsx";
 import { IconRail } from "./icon-rail.tsx";
+import { JumpTo, useJumping } from "./jump-to.tsx";
 import { NavigationButton, NavigationSheet } from "./navigation-control.tsx";
 import { useSecondaryNavShowing } from "./secondary-nav-showing.ts";
 import { SecondaryNav } from "./secondary-nav.tsx";
@@ -58,6 +59,7 @@ export function Frame(properties: {
   const switching = useWorkspaceSwitch();
   // The frame's, not the tabs root's: the band names the open tab, and the root sits below it.
   const picked = useState<string>();
+  const jumping = useJumping(visible.home !== undefined);
 
   const open = placeAt(visible.surfaces, pathname);
   const region = useRegion(pathname);
@@ -96,6 +98,16 @@ export function Frame(properties: {
               controls={navId}
               open={open}
               onShow={show}
+            />
+          }
+          jumpTo={
+            <JumpTo
+              wide={wide}
+              tree={visible}
+              jumping={jumping}
+              onFindMember={() => {
+                picked[1](undefined);
+              }}
             />
           }
           signingOut={signingOut}

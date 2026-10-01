@@ -29,6 +29,25 @@ export const TOGGLE = {
   show: "Show the secondary nav",
 } as const;
 
+/** The band's finder. Never called a search: that is Knowledge's screen, and this goes places. */
+export const JUMP_TO = {
+  name: "Jump to",
+  said: "Type to narrow the list, then choose one.",
+  list: "Matches",
+  groups: { surfaces: "Surfaces", screens: "Screens", acts: "Acts", members: "Members" },
+  kinds: { screen: "a screen", member: "a member", act: "an act" },
+  membersLoading: "The members are still loading.",
+  membersUnread:
+    "The members didn't load, so none are listed. Close this and open it again to retry.",
+} as const;
+
+export const nothingMatches = (typed: string): string => `Nothing matches “${typed}”.`;
+
+const EITHER = new Intl.ListFormat("en-GB", { type: "disjunction" });
+
+/** Names only the kinds this reader can find, so a Viewer is not promised members. */
+export const findWhat = (kinds: readonly string[]): string => `Find ${EITHER.format(kinds)}`;
+
 /** No role is held, so no other screen can be offered either. */
 export const ROLE_UNREAD = sentenceOf(NO_RESPONSE_TO_A_READ);
 

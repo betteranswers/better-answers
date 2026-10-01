@@ -37,6 +37,8 @@ import {
   Table,
   TestTube,
   Tray,
+  User,
+  UserPlus,
   Users,
   UsersThree,
   Warning,
@@ -66,6 +68,7 @@ export type IconName =
   | "groups"
   | "guides"
   | "history"
+  | "invite"
   | "kinds"
   | "log"
   | "map"
@@ -75,6 +78,7 @@ export type IconName =
   | "overview"
   | "owners"
   | "people"
+  | "person"
   | "price"
   | "pulse"
   | "question"
@@ -113,6 +117,7 @@ const GLYPHS = {
   groups: UsersThree,
   guides: BookOpen,
   history: ClockCounterClockwise,
+  invite: UserPlus,
   kinds: Shapes,
   log: Scroll,
   map: Graph,
@@ -122,6 +127,7 @@ const GLYPHS = {
   overview: SquaresFour,
   owners: IdentificationBadge,
   people: Users,
+  person: User,
   price: CurrencyGbp,
   pulse: Pulse,
   question: Question,
