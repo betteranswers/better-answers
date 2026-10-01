@@ -15,8 +15,7 @@ now="$(date -u +%s)"
 
 iso() { jq -nr --argjson at "$1" '$at | todate'; }
 
-# Prints the check's last ping, or refuses: exactly one check, up, last pinged at or after the epoch
-# second given. A job may ping while this reads, after `now` was taken, so no upper bound.
+# No upper bound: a job may ping while this reads, after `now` was taken.
 fresh() {
   local slug="$1" since="$2" answer code status last pinged
   answer="$(mktemp)"
