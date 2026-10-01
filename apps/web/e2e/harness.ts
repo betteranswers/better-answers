@@ -9,7 +9,7 @@ import { goHome, UNKNOWN_SCREEN } from "@/app/words.ts";
 import { SIGN_IN_WORDS, type CarriedOn } from "@/features/auth/sign-in-words.ts";
 import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
 import type { RefusalWord } from "@/shared/api/trpc.ts";
-import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
+import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
 import { headingOf, HOMES, type Role } from "@/shared/navigation.ts";
 import { sentenceOf, type Said } from "@/shared/refusal-words.ts";
 
@@ -408,21 +408,26 @@ export const aMemberSignedInAt = async (
   return workspace;
 };
 
-/** `?` opens a screen's keystrokes from anywhere on it outside a field. */
+/**
+ * `?` opens the keystrokes of `screen`, named as the navigation list names it, from anywhere on
+ * it outside a field.
+ */
 export const keystrokesListed = async (page: Page, screen: string): Promise<Locator> => {
   await page.keyboard.press("?");
-  const listed = page.getByRole("dialog", { name: `${KEYSTROKE_WORDS.button} on ${screen}` });
+  const listed = page.getByRole("dialog", { name: keystrokesOn(screen) });
   await expect(listed).toBeVisible();
   return listed;
 };
+
+/** The one button opening the list: the rail's or the band's, or a screen's outside the shell. */
+export const keystrokesButton = (page: Page): Locator =>
+  page.getByRole("button", { name: KEYSTROKE_WORDS.button, exact: true });
 
 /** Focus lands back on the button a task after the list is gone, unless a key has moved it. */
 export const keystrokesDismissed = async (page: Page, listed: Locator): Promise<void> => {
   await page.keyboard.press("Escape");
   await expect(listed).toHaveCount(0);
-  await expect(
-    page.getByRole("button", { name: KEYSTROKE_WORDS.button, exact: true }),
-  ).toBeFocused();
+  await expect(keystrokesButton(page)).toBeFocused();
 };
 
 /** Read off the navigation list, so moving a role's home breaks no spec. */

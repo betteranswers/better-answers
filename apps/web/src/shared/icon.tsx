@@ -20,6 +20,7 @@ import {
   IdentificationBadge,
   IdentificationCard,
   Key,
+  Keyboard,
   List,
   ListChecks,
   MagnifyingGlass,
@@ -69,6 +70,7 @@ export type IconName =
   | "guides"
   | "history"
   | "invite"
+  | "keystrokes"
   | "kinds"
   | "log"
   | "map"
@@ -118,6 +120,7 @@ const GLYPHS = {
   guides: BookOpen,
   history: ClockCounterClockwise,
   invite: UserPlus,
+  keystrokes: Keyboard,
   kinds: Shapes,
   log: Scroll,
   map: Graph,

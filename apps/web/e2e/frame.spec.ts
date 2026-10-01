@@ -2,6 +2,7 @@ import type { Locator, Page } from "@playwright/test";
 
 import { BREADCRUMB, JUMP_TO, NAVIGATION_SHEET, RAIL, TOGGLE } from "@/app/words.ts";
 import { ROUTES_WORDS } from "@/features/routes/words.ts";
+import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
 import {
   ASK,
   CONTROL_CENTRE,
@@ -20,6 +21,8 @@ import {
   aMemberSignedInAt,
   anAddress,
   invite,
+  keystrokesDismissed,
+  keystrokesListed,
   person,
   personMenuOpened,
   provision,
@@ -84,6 +87,9 @@ const sheetButtonOf = (page: Page) => page.getByRole("button", { name: NAVIGATIO
 const sheetOf = (page: Page) => page.getByRole("dialog", { name: NAVIGATION_SHEET });
 
 const jumpToOf = (page: Page) => bandOf(page).getByRole("button", { name: JUMP_TO.name });
+
+const keystrokesOf = (region: Page | Locator) =>
+  region.getByRole("button", { name: KEYSTROKE_WORDS.button, exact: true });
 
 const youOf = (page: Page, who: string) =>
   bandOf(page).getByRole("button", { name: new RegExp(who) });
@@ -545,6 +551,10 @@ test("tabs skip link, band, icon rail, secondary nav, toolbar, screen", async ({
     await expect(rail.getByRole("link", { name })).toBeFocused();
   }
 
+  // The rail's foot, under its surfaces.
+  await page.keyboard.press("Tab");
+  await expect(keystrokesOf(rail)).toBeFocused();
+
   for (const name of SCREEN_NAMES) {
     await page.keyboard.press("Tab");
     await expect(navOf(page).getByRole("link", { name })).toBeFocused();
@@ -653,6 +663,7 @@ test("narrows the band to two rows scrolling with the page", async ({ page, requ
     logoOf(page),
     switcherOf(page, workspace.name),
     jumpToOf(page),
+    keystrokesOf(bandOf(page)),
     youOf(page, workspace.admin.name),
   ];
   const place = await boxOf(crumbsOf(page));
@@ -683,6 +694,32 @@ test("narrows the band to two rows scrolling with the page", async ({ page, requ
   await expect
     .poll(async () => (await boxOf(bandOf(page))).y, { message: "the band stays in view" })
     .toBeLessThan(0);
+});
+
+test("opens the keystrokes from the narrow band, focus returned (R15)", async ({
+  page,
+  request,
+  passesTheAccessibilityGate,
+}) => {
+  await signedIn(page, request, "Wensleydale Forge");
+  await page.setViewportSize(NARROW);
+  await page.goto(MEMBERS.path);
+  await expect(page.getByRole("heading", { level: 1, name: headingOf(MEMBERS) })).toBeVisible();
+
+  // The rail lives in the sheet here, a dialog the keystrokes ignore, so the band holds the one.
+  const trigger = keystrokesOf(bandOf(page));
+  await expect(keystrokesOf(page)).toHaveCount(1);
+  await expect(trigger).toHaveAttribute("aria-keyshortcuts", "?");
+
+  const listed = await keystrokesListed(page, MEMBERS.name);
+  await expect(listed).toContainText(JUMP_TO.name);
+  await scrollsNothingSideways(page, "with the keystrokes open");
+  await passesTheAccessibilityGate();
+  await keystrokesDismissed(page, listed);
+  await expect(trigger).toBeFocused();
+
+  await trigger.click();
+  await expect(page.getByRole("dialog", { name: keystrokesOn(MEMBERS.name) })).toBeVisible();
 });
 
 test("keeps a focused control clear of the fixed band", async ({ page, request }) => {

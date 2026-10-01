@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 
 import { Icon } from "@/shared/icon.tsx";
 import { cn } from "@/shared/lib/utils.ts";
@@ -16,6 +17,8 @@ export function IconRail(properties: {
   readonly openSurfaceId: string | undefined;
   readonly tooltips: boolean;
   readonly onChoose?: () => void;
+  /** The utilities under the surfaces. The sheet has none: its rail sits in a dialog. */
+  readonly foot?: ReactNode;
 }) {
   return (
     <nav
@@ -66,6 +69,10 @@ export function IconRail(properties: {
             );
           })}
         </ul>
+
+        {properties.foot === undefined ? null : (
+          <div className="mt-auto pt-2">{properties.foot}</div>
+        )}
       </TooltipProvider>
     </nav>
   );

@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
 
-import { KeystrokesAct, type Keystroke } from "@/shared/keystrokes.tsx";
+import { useScreenKeystrokes, type Keystroke } from "@/shared/keystrokes.tsx";
 import { CONTROL_CENTRE, groupIn } from "@/shared/navigation.ts";
 import { useOpenTab, type ScreenTab, type ScreenToolbar } from "@/shared/screen-toolbar.tsx";
 
@@ -55,22 +55,15 @@ const useTheOpenTab = (): Tab => {
   return TABS.find((candidate) => candidate.id === openTab) ?? MEMBERS;
 };
 
-function OpenTabKeystrokes() {
-  return <KeystrokesAct screen={people.name} keystrokes={useTheOpenTab().keystrokes} />;
-}
-
 export const MEMBERS_TOOLBAR: ScreenToolbar = {
   tabs: TABS.map(({ id, name }) => ({ id, name })),
-  acts: (
-    <>
-      <InviteAct />
-      <OpenTabKeystrokes />
-    </>
-  ),
+  acts: <InviteAct />,
 };
 
 export function MembersScreen() {
-  const Content = useTheOpenTab().content;
+  const openTab = useTheOpenTab();
+  useScreenKeystrokes(openTab.keystrokes);
+  const Content = openTab.content;
 
   return (
     <>

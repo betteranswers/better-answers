@@ -4,6 +4,7 @@ import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
 import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
 import { SAID_OF_A_REQUEST } from "@/features/people/refusal-words.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
+import { CONTROL_CENTRE, groupIn, screenNamed } from "@/shared/navigation.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
@@ -25,7 +26,9 @@ import {
 
 const LIST_BUDGET_MS = 1000;
 
-const MEMBERS_SCREEN = "/people/members";
+const MEMBERS = screenNamed(groupIn(CONTROL_CENTRE, "people"), "Members");
+
+const MEMBERS_SCREEN = MEMBERS.path;
 
 const LONG_UK_DATE = /^\d{1,2} [A-Z][a-z]+ \d{4}$/;
 
@@ -203,7 +206,7 @@ test.describe("the People screen's Requests tab", () => {
       "Declined the request from Dropped Ray. They may ask again.",
     );
 
-    const keystrokes = await keystrokesListed(page, "People");
+    const keystrokes = await keystrokesListed(page, MEMBERS.name);
     await expect(keystrokes).toContainText("Approve the request in focus");
     await expect(keystrokes).toContainText("Decline the request in focus");
     await expect(keystrokes, "d removes a member on the Members tab alone").not.toContainText(

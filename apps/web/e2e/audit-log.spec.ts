@@ -22,7 +22,9 @@ const LIST_BUDGET_MS = 1000;
 
 const system = groupIn(CONTROL_CENTRE, "system");
 
-const AUDIT_LOG_SCREEN = screenNamed(system, "Audit log").path;
+const AUDIT_LOG = screenNamed(system, "Audit log");
+
+const AUDIT_LOG_SCREEN = AUDIT_LOG.path;
 
 const SAID_AT = /^\d{2}:\d{2}$/;
 
@@ -254,7 +256,7 @@ test.describe("the System group's Audit log screen", () => {
 
     await skipLinkReachesTheScreen(page);
 
-    const keystrokes = await keystrokesListed(page, system.name);
+    const keystrokes = await keystrokesListed(page, AUDIT_LOG.name);
     await expect(keystrokes).toContainText("Choose the family of acts to show");
     await expect(keystrokes).toContainText("Show older events");
     await page.keyboard.press("Escape");

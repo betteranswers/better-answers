@@ -1,19 +1,17 @@
 import { useId, useRef } from "react";
 
-import { KeystrokesAct } from "@/shared/keystrokes.tsx";
+import { useScreenKeystrokes } from "@/shared/keystrokes.tsx";
 import { CONSOLE, groupIn } from "@/shared/navigation.ts";
-import type { ScreenToolbar } from "@/shared/screen-toolbar.tsx";
 
 import { NamesWaitingList } from "./names-waiting-list.tsx";
 import { NAMES_WAITING_KEYSTROKES } from "./people-keystrokes.ts";
 
 const people = groupIn(CONSOLE, "people");
 
-export const NAMES_WAITING_TOOLBAR: ScreenToolbar = {
-  acts: <KeystrokesAct screen={people.name} keystrokes={Object.values(NAMES_WAITING_KEYSTROKES)} />,
-};
+const LISTED = Object.values(NAMES_WAITING_KEYSTROKES);
 
 export function NamesWaitingScreen() {
+  useScreenKeystrokes(LISTED);
   const headingId = useId();
   const headingRef = useRef<HTMLHeadingElement>(null);
 

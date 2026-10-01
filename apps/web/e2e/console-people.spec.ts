@@ -1,5 +1,6 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { JUMP_TO } from "@/app/words.ts";
 import { ENDED_BY_THE_SERVER } from "@/features/console/grant-words.ts";
 import {
   NOT_THE_OPERATOR,
@@ -39,9 +40,13 @@ import {
 const LIST_BUDGET_MS = 1000;
 
 /** Where the console's People group opens. */
-const EVERYONE_SCREEN = screenNamed(groupIn(CONSOLE, "people"), "Everyone").path;
+const EVERYONE = screenNamed(groupIn(CONSOLE, "people"), "Everyone");
 
-const NAMES_WAITING_SCREEN = screenNamed(groupIn(CONSOLE, "people"), "Names waiting").path;
+const EVERYONE_SCREEN = EVERYONE.path;
+
+const NAMES_WAITING = screenNamed(groupIn(CONSOLE, "people"), "Names waiting");
+
+const NAMES_WAITING_SCREEN = NAMES_WAITING.path;
 
 /** Written once, so an aria snapshot can set it after a workspace's name. */
 const INSTANT_WORDS = String.raw`\d{2}:\d{2} · \d{1,2} [A-Z][a-z]+ \d{4}`;
@@ -405,7 +410,7 @@ test.describe("the console's Everyone screen", () => {
     await page.keyboard.press("o");
     await expect(everyone(page)).toContainText(SELECT_FIRST.person);
 
-    const listed = (await keystrokesListed(page, "People")).getByRole("definition");
+    const listed = (await keystrokesListed(page, EVERYONE.name)).getByRole("definition");
     await expect(listed).toHaveText([
       "Search everyone by name or address",
       "Open the person in focus",
@@ -414,6 +419,7 @@ test.describe("the console's Everyone screen", () => {
       "Show the previous page of people",
       "Show the next page of people",
       KEYSTROKE_WORDS.showTheList,
+      JUMP_TO.name,
     ]);
     await page.keyboard.press("Escape");
     await expect(listed).toHaveCount(0);
@@ -894,10 +900,11 @@ test.describe("the console's Names waiting screen", () => {
     await skipLinkReachesTheScreen(page);
     await page.keyboard.press("c");
     await expect(namesWaiting(page)).toContainText(SELECT_FIRST.name);
-    const listed = await keystrokesListed(page, "People");
+    const listed = await keystrokesListed(page, NAMES_WAITING.name);
     await expect(listed.getByRole("definition")).toHaveText([
       "Correct the display name in focus",
       KEYSTROKE_WORDS.showTheList,
+      JUMP_TO.name,
     ]);
     await keystrokesDismissed(page, listed);
 

@@ -2,11 +2,10 @@ import { createContext, useCallback, useContext, useId, useState, type Ref } fro
 
 import { refusalOf, type ApiError } from "@/shared/api/trpc.ts";
 import { Icon } from "@/shared/icon.tsx";
-import { KeystrokesAct, useKeystroke } from "@/shared/keystrokes.tsx";
+import { useKeystroke, useScreenKeystrokes } from "@/shared/keystrokes.tsx";
 import { CONTROL_CENTRE, groupIn } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { failureOutcome } from "@/shared/refusal-outcome.tsx";
-import type { ScreenToolbar } from "@/shared/screen-toolbar.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
@@ -61,9 +60,7 @@ const isFamily = (value: string): value is Family => Object.hasOwn(FAMILY_WORDS,
 const outcomeOfFailure = (failure: Error | ApiError): Outcome =>
   failureOutcome(SAID_OF_THE_AUDIT_LOG, failure, "read");
 
-export const AUDIT_LOG_TOOLBAR: ScreenToolbar = {
-  acts: <KeystrokesAct screen={system.name} keystrokes={Object.values(AUDIT_LOG_KEYSTROKES)} />,
-};
+const LISTED = Object.values(AUDIT_LOG_KEYSTROKES);
 
 const sentenceCase = (words: string): string => `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
 
@@ -388,6 +385,8 @@ function AuditLogRegion() {
 }
 
 export function AuditLogScreen() {
+  useScreenKeystrokes(LISTED);
+
   return (
     <>
       <h1>{system.name}</h1>

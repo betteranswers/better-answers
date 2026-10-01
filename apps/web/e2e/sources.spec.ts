@@ -1,8 +1,9 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { JUMP_TO, RAIL } from "@/app/words.ts";
 import { SAID_OF_A_BINDING } from "@/features/sources/refusal-words.ts";
 import { NOTHING_BOUND } from "@/features/sources/words.ts";
-import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
+import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
 import { CONTROL_CENTRE, groupIn, screenNamed } from "@/shared/navigation.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
 
@@ -1033,10 +1034,11 @@ test.describe("the Sources screen's keystrokes", () => {
     await anAdminAtSources(page, request, { workspace: "Luddenden Weaving" });
 
     await page.keyboard.press("?");
-    const listed = page.getByRole("dialog", { name: `${KEYSTROKE_WORDS.button} on Sources` });
+    const heading = keystrokesOn(BINDINGS.name);
+    const listed = page.getByRole("dialog", { name: heading });
     await expect(listed).toMatchAriaSnapshot(`
-      - dialog ${JSON.stringify(`${KEYSTROKE_WORDS.button} on Sources`)}:
-        - heading ${JSON.stringify(`${KEYSTROKE_WORDS.button} on Sources`)} [level=2]
+      - dialog ${JSON.stringify(heading)}:
+        - heading ${JSON.stringify(heading)} [level=2]
         - paragraph: ${JSON.stringify(KEYSTROKE_WORDS.where)}
         - checkbox ${JSON.stringify(KEYSTROKE_WORDS.turnedOn)} [checked]
         - text: ${JSON.stringify(KEYSTROKE_WORDS.turnedOn)}
@@ -1060,10 +1062,15 @@ test.describe("the Sources screen's keystrokes", () => {
         - definition: Dismiss the selected finding groups as not special category
         - term: "?"
         - definition: ${JSON.stringify(KEYSTROKE_WORDS.showTheList)}
+        - term: /⌘K|Ctrl K/
+        - definition: ${JSON.stringify(JUMP_TO.name)}
     `);
     await page.keyboard.press("Escape");
     await expect(listed).toHaveCount(0);
-    const keystrokes = page.getByRole("button", { name: KEYSTROKE_WORDS.button });
+    // The rail's: the toolbar keeps the screen's own acts alone.
+    const keystrokes = page
+      .getByRole("navigation", { name: RAIL })
+      .getByRole("button", { name: KEYSTROKE_WORDS.button });
     await expect(keystrokes).toHaveAttribute("aria-keyshortcuts", "?");
     await expect(keystrokes).toBeFocused();
 

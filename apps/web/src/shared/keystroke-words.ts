@@ -1,9 +1,14 @@
 export const KEYSTROKE_WORDS = {
   button: "Keyboard shortcuts",
-  where: "They work anywhere except in a field or dialog.",
+  where: "Single keys work anywhere except in a field or dialog.",
   turnedOn: "Use single-key shortcuts on this browser",
   showTheList: "Show this list",
+  noneOfItsOwn: "This screen has no keyboard shortcuts of its own.",
+  thisScreen: "this screen",
 } as const;
+
+/** The list's heading, naming the screen its keystrokes are for. */
+export const keystrokesOn = (screen: string): string => `${KEYSTROKE_WORDS.button} on ${screen}`;
 
 /** Said when a row's keystroke is pressed and no row has held focus, naming the row to pick. */
 export const SELECT_FIRST = {

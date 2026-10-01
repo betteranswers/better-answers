@@ -24,15 +24,12 @@ import {
 } from "@/features/auth/membership.ts";
 import { NoWorkspaceScreen } from "@/features/auth/no-workspace-screen.tsx";
 import { SignInScreen } from "@/features/auth/sign-in-screen.tsx";
-import { EVERYONE_TOOLBAR, EveryoneScreen } from "@/features/console/everyone-screen.tsx";
-import {
-  NAMES_WAITING_TOOLBAR,
-  NamesWaitingScreen,
-} from "@/features/console/names-waiting-screen.tsx";
+import { EveryoneScreen } from "@/features/console/everyone-screen.tsx";
+import { NamesWaitingScreen } from "@/features/console/names-waiting-screen.tsx";
 import { mustSignInForTheConsole } from "@/features/console/operator.ts";
 import { WorkspacesScreen } from "@/features/console/workspaces-screen.tsx";
-import { AUDIT_LOG_TOOLBAR, AuditLogScreen } from "@/features/people/audit-log-screen.tsx";
-import { GROUPS_TOOLBAR, GroupsScreen } from "@/features/people/groups-screen.tsx";
+import { AuditLogScreen } from "@/features/people/audit-log-screen.tsx";
+import { GroupsScreen } from "@/features/people/groups-screen.tsx";
 import { MEMBERS_TOOLBAR, MembersScreen } from "@/features/people/members-screen.tsx";
 import { BINDINGS_TOOLBAR, BindingsScreen } from "@/features/sources/bindings-screen.tsx";
 import { createApiProxy, type ApiProxy } from "@/shared/api/trpc.ts";
@@ -74,10 +71,10 @@ const BUILT: readonly (readonly [ScreenPath, BuiltScreen])[] = [
     { draw: RoutesAndSpendScreen, toolbar: ROUTES_AND_SPEND_TOOLBAR },
   ],
   ["/people/members", { draw: MembersScreen, toolbar: MEMBERS_TOOLBAR }],
-  ["/people/groups", { draw: GroupsScreen, toolbar: GROUPS_TOOLBAR }],
-  ["/system/audit-log", { draw: AuditLogScreen, toolbar: AUDIT_LOG_TOOLBAR }],
-  ["/console/people/everyone", { draw: EveryoneScreen, toolbar: EVERYONE_TOOLBAR }],
-  ["/console/people/names-waiting", { draw: NamesWaitingScreen, toolbar: NAMES_WAITING_TOOLBAR }],
+  ["/people/groups", { draw: GroupsScreen }],
+  ["/system/audit-log", { draw: AuditLogScreen }],
+  ["/console/people/everyone", { draw: EveryoneScreen }],
+  ["/console/people/names-waiting", { draw: NamesWaitingScreen }],
   ["/console/workspaces/every-workspace", { draw: WorkspacesScreen }],
 ];
 

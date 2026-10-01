@@ -3,7 +3,7 @@ import { flushSync } from "react-dom";
 
 import type { ApiError } from "@/shared/api/trpc.ts";
 import { EmptyState } from "@/shared/empty-state.tsx";
-import { KeystrokesAct, useKeystroke } from "@/shared/keystrokes.tsx";
+import { useKeystroke, useScreenKeystrokes } from "@/shared/keystrokes.tsx";
 import { CONTROL_CENTRE, groupIn } from "@/shared/navigation.ts";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import type { ScreenToolbar } from "@/shared/screen-toolbar.tsx";
@@ -41,13 +41,10 @@ const sources = groupIn(CONTROL_CENTRE, "sources");
  * scroll a 320px screen sideways.
  */
 export const BINDINGS_TOOLBAR: ScreenToolbar = {
-  acts: (
-    <>
-      <BindAct />
-      <KeystrokesAct screen={sources.name} keystrokes={Object.values(SOURCES_KEYSTROKES)} />
-    </>
-  ),
+  acts: <BindAct />,
 };
+
+const LISTED = Object.values(SOURCES_KEYSTROKES);
 
 const NOTHING_IN_FOCUS = selectFirst("binding");
 
@@ -81,6 +78,7 @@ function ListStatus(properties: { readonly bindings: ReturnType<typeof useBindin
 }
 
 export function BindingsScreen() {
+  useScreenKeystrokes(LISTED);
   const bindings = useBindings();
   const listId = useId();
   const [inFocus, setInFocus] = useState<string>();

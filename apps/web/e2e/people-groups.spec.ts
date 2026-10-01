@@ -30,9 +30,13 @@ const LIST_BUDGET_MS = 1000;
 
 const people = groupIn(CONTROL_CENTRE, "people");
 
-const GROUPS_SCREEN = screenNamed(people, "Groups").path;
+const GROUPS = screenNamed(people, "Groups");
 
-const MEMBERS_SCREEN = screenNamed(people, "Members").path;
+const GROUPS_SCREEN = GROUPS.path;
+
+const MEMBERS = screenNamed(people, "Members");
+
+const MEMBERS_SCREEN = MEMBERS.path;
 
 const nav = (page: Page) => page.getByRole("navigation", { name: CONTROL_CENTRE.name });
 
@@ -333,7 +337,7 @@ test.describe("a group's acts", () => {
     await expect(groupRows(page)).toHaveCount(2);
     await skipLinkReachesTheScreen(page);
 
-    const keystrokes = await keystrokesListed(page, people.name);
+    const keystrokes = await keystrokesListed(page, GROUPS.name);
     for (const act of [
       "Create a group",
       "Open the group in focus",
@@ -392,6 +396,29 @@ test.describe("a group's acts", () => {
   });
 });
 
+test.describe("the keystrokes listed across the People group", () => {
+  test("changes the keystrokes listed on moving from Members to Groups", async ({
+    page,
+    request,
+  }) => {
+    await anAdminAtGroups(page, request, "Calder Mills");
+    await nav(page).getByRole("link", { name: MEMBERS.name }).click();
+    await expect(page).toHaveURL(new RegExp(`${MEMBERS_SCREEN}$`));
+
+    const onMembers = await keystrokesListed(page, MEMBERS.name);
+    await expect(onMembers).toContainText("Remove the member in focus");
+    await keystrokesDismissed(page, onMembers);
+
+    await nav(page).getByRole("link", { name: GROUPS.name }).click();
+    await expect(groupRows(page)).toHaveCount(2);
+    const onGroups = await keystrokesListed(page, GROUPS.name);
+    await expect(onGroups).toContainText("Delete the group in focus");
+    await expect(onGroups, "Members' keystrokes outlived the screen").not.toContainText(
+      "Remove the member in focus",
+    );
+  });
+});
+
 test.describe("a member's groups, on their row and their sheet", () => {
   test("lets an Admin change a member's groups from their sheet", async ({
     page,
@@ -405,7 +432,7 @@ test.describe("a member's groups, on their row and their sheet", () => {
     await expect(members.getByRole("columnheader", { name: "Groups" })).toBeVisible();
     await expect(priyaRow.getByRole("cell").nth(2)).toHaveText("HR team");
 
-    const keystrokes = await keystrokesListed(page, people.name);
+    const keystrokes = await keystrokesListed(page, MEMBERS.name);
     await expect(keystrokes).toContainText("Change the groups of the member in focus");
     await expect(keystrokes).toContainText("Remove the member in focus");
     await expect(keystrokes).not.toContainText("Delete the group in focus");

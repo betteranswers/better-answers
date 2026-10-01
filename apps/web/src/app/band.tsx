@@ -35,6 +35,8 @@ type BandProperties = {
   /** The toggle when wide, the sheet's button when narrow. */
   readonly navigation: ReactNode;
   readonly jumpTo: ReactNode;
+  /** Drawn by the narrow band alone: the wide one leaves it to the rail's foot. */
+  readonly keystrokes: ReactNode;
   readonly parts: readonly Part[];
   readonly person: Person | undefined;
   readonly signingOut: boolean;
@@ -138,6 +140,7 @@ function NarrowBand(properties: BandProperties) {
         {properties.switcher}
         <div className="ml-auto flex shrink-0 items-center gap-1">
           {properties.jumpTo}
+          {properties.keystrokes}
           <PersonMenu {...properties} />
         </div>
       </div>

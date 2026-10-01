@@ -3,10 +3,9 @@ import { useId, useMemo, useRef, useState, type FormEvent, type RefObject } from
 
 import { EmptyState } from "@/shared/empty-state.tsx";
 import { GridTable } from "@/shared/grid-table.tsx";
-import { KeystrokesAct, useKeystroke } from "@/shared/keystrokes.tsx";
+import { useKeystroke, useScreenKeystrokes } from "@/shared/keystrokes.tsx";
 import { CONTROL_CENTRE, groupIn } from "@/shared/navigation.ts";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
-import type { ScreenToolbar } from "@/shared/screen-toolbar.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
@@ -29,9 +28,7 @@ import { outcomeOfGroupFailure } from "./refusal.tsx";
 
 const people = groupIn(CONTROL_CENTRE, "people");
 
-export const GROUPS_TOOLBAR: ScreenToolbar = {
-  acts: <KeystrokesAct screen={people.name} keystrokes={Object.values(GROUPS_KEYSTROKES)} />,
-};
+const LISTED = Object.values(GROUPS_KEYSTROKES);
 
 /** A row is a group, or a name asked for whose group the api has not answered yet. */
 type GroupRow = {
@@ -317,6 +314,8 @@ function GroupsSection() {
 }
 
 export function GroupsScreen() {
+  useScreenKeystrokes(LISTED);
+
   return (
     <>
       <h1>{people.name}</h1>

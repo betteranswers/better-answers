@@ -1,9 +1,10 @@
 import { Outlet, useRouterState } from "@tanstack/react-router";
-import { useId, useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { useSignOut } from "@/features/auth/auth-hooks.ts";
 import { useMembership } from "@/features/auth/membership.ts";
 import { useOperatorStanding } from "@/features/console/operator.ts";
+import { ShellKeystrokes, ShellKeystrokesAct, type Keystroke } from "@/shared/keystrokes.tsx";
 import {
   EVERY_SURFACE,
   placeAt,
@@ -18,7 +19,7 @@ import { isFilled, type ScreenToolbar } from "@/shared/screen-toolbar.tsx";
 import { Band, type Person } from "./band.tsx";
 import { partsOf } from "./breadcrumb.tsx";
 import { IconRail } from "./icon-rail.tsx";
-import { JumpTo, useJumping } from "./jump-to.tsx";
+import { JUMP_TO_KEYSTROKE, JumpTo, useJumping } from "./jump-to.tsx";
 import { NavigationButton, NavigationSheet } from "./navigation-control.tsx";
 import { useSecondaryNavShowing } from "./secondary-nav-showing.ts";
 import { SecondaryNav } from "./secondary-nav.tsx";
@@ -28,6 +29,26 @@ import { useWideLayout } from "./wide-layout.ts";
 import { useWorkspaceSwitch, WorkspaceSwitcher, type Here } from "./workspace-switcher.tsx";
 
 type Region = { readonly name: string; readonly toolbar: ScreenToolbar };
+
+const NO_JUMP_TO: readonly Keystroke[] = [];
+
+const WITH_JUMP_TO: readonly Keystroke[] = [JUMP_TO_KEYSTROKE];
+
+/** Jump-to is offered once a role is held, and the list names only what is offered. */
+function FrameKeystrokes(properties: {
+  readonly open: Place | undefined;
+  readonly visible: VisibleTree;
+  readonly children: ReactNode;
+}) {
+  return (
+    <ShellKeystrokes
+      screen={properties.open?.screen.name}
+      shell={properties.visible.home === undefined ? NO_JUMP_TO : WITH_JUMP_TO}
+    >
+      {properties.children}
+    </ShellKeystrokes>
+  );
+}
 
 /** One source for both halves of the region, so a panel never outlives its tab list. */
 const useRegion = (pathname: string): Region | undefined => {
@@ -66,79 +87,82 @@ export function Frame(properties: {
 
   return (
     <VisibleTreeContext value={visible}>
-      <div className="flex min-h-screen flex-col bg-background">
-        <a
-          href="#screen"
-          className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-card focus:px-3 focus:py-2 focus:text-foreground"
-        >
-          Skip to the screen
-        </a>
+      <FrameKeystrokes open={open} visible={visible}>
+        <div className="flex min-h-screen flex-col bg-background">
+          <a
+            href="#screen"
+            className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-card focus:px-3 focus:py-2 focus:text-foreground"
+          >
+            Skip to the screen
+          </a>
 
-        <Band
-          wide={wide}
-          home={visible.home?.path ?? "/"}
-          switcher={
-            here === undefined ? null : (
-              <WorkspaceSwitcher
-                here={here}
-                offersTheConsole={properties.offersTheConsole}
-                switching={switching}
+          <Band
+            wide={wide}
+            home={visible.home?.path ?? "/"}
+            switcher={
+              here === undefined ? null : (
+                <WorkspaceSwitcher
+                  here={here}
+                  offersTheConsole={properties.offersTheConsole}
+                  switching={switching}
+                />
+              )
+            }
+            parts={partsOf(open, openTabIn(region?.toolbar.tabs, picked[0])?.name)}
+            person={properties.person}
+            navigation={
+              <NavigationButton
+                controlRef={controlRef}
+                wide={wide}
+                asked={asked}
+                onAsk={ask}
+                showing={showing}
+                controls={navId}
+                open={open}
+                onShow={show}
               />
-            )
-          }
-          parts={partsOf(open, openTabIn(region?.toolbar.tabs, picked[0])?.name)}
-          person={properties.person}
-          navigation={
-            <NavigationButton
-              controlRef={controlRef}
-              wide={wide}
-              asked={asked}
-              onAsk={ask}
-              showing={showing}
-              controls={navId}
-              open={open}
-              onShow={show}
-            />
-          }
-          jumpTo={
-            <JumpTo
-              wide={wide}
-              tree={visible}
-              jumping={jumping}
-              onFindMember={() => {
-                picked[1](undefined);
-              }}
-            />
-          }
-          signingOut={signingOut}
-          onSignOut={signOut}
-          outcome={switching.outcome}
-        />
+            }
+            jumpTo={
+              <JumpTo
+                wide={wide}
+                tree={visible}
+                jumping={jumping}
+                onFindMember={() => {
+                  picked[1](undefined);
+                }}
+              />
+            }
+            keystrokes={<ShellKeystrokesAct at="band" />}
+            signingOut={signingOut}
+            onSignOut={signOut}
+            outcome={switching.outcome}
+          />
 
-        <NavigationSheet
-          controlRef={controlRef}
-          wide={wide}
-          asked={asked}
-          onAsk={ask}
-          surfaces={visible.surfaces}
-          open={open}
-        />
+          <NavigationSheet
+            controlRef={controlRef}
+            wide={wide}
+            asked={asked}
+            onAsk={ask}
+            surfaces={visible.surfaces}
+            open={open}
+          />
 
-        {/*
-         * A fixed rail and a 320px viewport cannot both be honoured; WCAG's reflow criterion
-         * says which gives, so the navigation moves behind one button.
-         */}
-        <div className="flex flex-1">
-          {wide ? (
-            <Navigation surfaces={visible.surfaces} navId={navId} showing={showing} open={open} />
-          ) : null}
+          {/*
+           * A fixed rail and a 320px viewport cannot both be honoured; WCAG's reflow criterion
+           * says which gives, so the navigation moves behind one button.
+           */}
+          <div className="flex flex-1">
+            {wide ? (
+              <Navigation surfaces={visible.surfaces} navId={navId} showing={showing} open={open} />
+            ) : null}
 
-          <div className="flex min-w-0 flex-1 flex-col">
-            {/* Keyed by the workspace, so a switch draws the screen afresh over its new reads. */}
-            <ToolbarAndScreen key={here?.workspaceId} region={region} picked={picked} />
+            <div className="flex min-w-0 flex-1 flex-col">
+              {/* Keyed by the workspace, so a switch draws the screen afresh over its new reads. */}
+              <ToolbarAndScreen key={here?.workspaceId} region={region} picked={picked} />
+            </div>
           </div>
         </div>
-      </div>
+      </FrameKeystrokes>
     </VisibleTreeContext>
   );
 }
@@ -176,7 +200,12 @@ function Navigation(properties: {
 
   return (
     <>
-      <IconRail surfaces={properties.surfaces} openSurfaceId={open?.surface.id} tooltips />
+      <IconRail
+        surfaces={properties.surfaces}
+        openSurfaceId={open?.surface.id}
+        tooltips
+        foot={<ShellKeystrokesAct at="rail" />}
+      />
 
       {open === undefined ? null : (
         <SecondaryNav

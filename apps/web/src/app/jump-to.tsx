@@ -4,6 +4,7 @@ import { useEffect, useEffectEvent, useRef, useState, type RefObject } from "rea
 import { useMembers } from "@/features/people/people-api.ts";
 import { asking } from "@/shared/address-ask.ts";
 import { Icon, type IconName } from "@/shared/icon.tsx";
+import type { Keystroke } from "@/shared/keystrokes.tsx";
 import {
   CONTROL_CENTRE,
   groupIn,
@@ -200,6 +201,9 @@ const ON_APPLE = typeof navigator !== "undefined" && /Mac|iPhone|iPad/u.test(nav
 
 /** As the reader's own keyboard labels it; either chord works on any. */
 const CHORD = ON_APPLE ? "⌘K" : "Ctrl K";
+
+/** For the shell's list of keystrokes, which names it on every screen. */
+export const JUMP_TO_KEYSTROKE: Keystroke = { key: CHORD, act: JUMP_TO.name };
 
 function Trigger(properties: {
   readonly wide: boolean;

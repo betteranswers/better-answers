@@ -1,10 +1,11 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { JUMP_TO, RAIL } from "@/app/words.ts";
 import { INVITATION_WORDS } from "@/features/auth/invitation-words.ts";
 import { SAID_OF_ACCEPTING } from "@/features/auth/refusal-words.ts";
 import { SAID_OF_A_MEMBER } from "@/features/people/refusal-words.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
-import { SELECT_FIRST } from "@/shared/keystroke-words.ts";
+import { KEYSTROKE_WORDS, keystrokesOn, SELECT_FIRST } from "@/shared/keystroke-words.ts";
 import { CONTROL_CENTRE, groupIn, HOMES, screenNamed } from "@/shared/navigation.ts";
 import { SAID_OF_CLASS, sentenceOf } from "@/shared/refusal-words.ts";
 
@@ -17,6 +18,7 @@ import {
   askToJoin,
   clockTheNextKey,
   invite,
+  keystrokesButton,
   keystrokesDismissed,
   keystrokesListed,
   person,
@@ -35,7 +37,9 @@ const ACT_BUDGET_MS = 100;
 
 const people = groupIn(CONTROL_CENTRE, "people");
 
-const MEMBERS_SCREEN = screenNamed(people, "Members").path;
+const MEMBERS = screenNamed(people, "Members");
+
+const MEMBERS_SCREEN = MEMBERS.path;
 
 const AUDIT_LOG_SCREEN = screenNamed(groupIn(CONTROL_CENTRE, "system"), "Audit log").path;
 
@@ -284,7 +288,7 @@ test.describe("the People group's Members screen", () => {
 
     await skipLinkReachesTheScreen(page);
 
-    const keystrokes = await keystrokesListed(page, people.name);
+    const keystrokes = await keystrokesListed(page, MEMBERS.name);
     await expect(keystrokes).toContainText("Search the members by name or address");
     await keystrokesDismissed(page, keystrokes);
 
@@ -498,6 +502,37 @@ test.describe("a member, opened as a sheet", () => {
     await notFoundOfferingHome(page, "Editor");
   });
 
+  test("lists Members' keystrokes from the rail's foot, as ? does", async ({
+    page,
+    request,
+    passesTheAccessibilityGate,
+  }) => {
+    await anAdminAtPeople(page, request, "Calder Looms");
+    await expect(memberRows(page)).toHaveCount(3);
+
+    // One button, and it is the rail's: no toolbar holds one any more.
+    await expect(keystrokesButton(page)).toHaveCount(1);
+    const inTheRail = page
+      .getByRole("navigation", { name: RAIL })
+      .getByRole("button", { name: KEYSTROKE_WORDS.button });
+    await expect(inTheRail).toHaveAttribute("aria-keyshortcuts", "?");
+
+    await inTheRail.click();
+    const clicked = page.getByRole("dialog", { name: keystrokesOn(MEMBERS.name) });
+    await expect(clicked).toContainText("Open the member in focus");
+    await expect(clicked).toContainText(JUMP_TO.name);
+    await passesTheAccessibilityGate();
+    const listedOnClick = await clicked.ariaSnapshot();
+    await keystrokesDismissed(page, clicked);
+
+    const pressed = await keystrokesListed(page, MEMBERS.name);
+    expect(await pressed.ariaSnapshot(), "? lists other keystrokes than the button").toBe(
+      listedOnClick,
+    );
+    await keystrokesDismissed(page, pressed);
+    await expect(inTheRail).toBeFocused();
+  });
+
   test("opens a member and changes their role by keyboard alone", async ({ page, request }) => {
     await anAdminAtPeople(page, request, "Calder Rolling");
     await page.goto(MEMBERS_SCREEN);
@@ -506,7 +541,7 @@ test.describe("a member, opened as a sheet", () => {
     await page.keyboard.press("c");
     await expect(membersRegion(page)).toContainText(SELECT_FIRST.member);
 
-    const keystrokes = await keystrokesListed(page, people.name);
+    const keystrokes = await keystrokesListed(page, MEMBERS.name);
     await expect(keystrokes).toContainText("Open the member in focus");
     await expect(keystrokes).toContainText("Change the role of the member in focus");
     await expect(keystrokes).toContainText("Revoke the credentials here of the member in focus");
@@ -848,7 +883,7 @@ test.describe("a member's display name, flagged to the operator", () => {
   test("flags a member's name by keyboard alone, from the list", async ({ page, request }) => {
     await anAdminAtPeople(page, request, "Swale Carving");
 
-    const keystrokes = await keystrokesListed(page, people.name);
+    const keystrokes = await keystrokesListed(page, MEMBERS.name);
     await expect(keystrokes).toContainText("Flag the display name of the member in focus");
     await keystrokesDismissed(page, keystrokes);
 

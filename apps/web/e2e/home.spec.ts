@@ -1,13 +1,16 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
-import { goHome, RAIL, unbuiltLineOf, UNKNOWN_SCREEN } from "@/app/words.ts";
+import { goHome, JUMP_TO, RAIL, unbuiltLineOf, UNKNOWN_SCREEN } from "@/app/words.ts";
 import { aRole, ROLES } from "@/features/people/role-meanings.ts";
+import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
 import { CONTROL_CENTRE, headingOf, HOMES, type Role } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
   addMember,
   anAddress,
+  keystrokesDismissed,
+  keystrokesListed,
   landedAtHome,
   person,
   provision,
@@ -142,4 +145,33 @@ test("draws a Viewer's Ask within a second of arriving", async ({ page, request 
 
   test.info().annotations.push({ type: "Ask drawn", description: `${elapsedMs} ms` });
   expect(elapsedMs, "Ask was not drawn within its second").toBeLessThan(READ_BUDGET_MS);
+});
+
+test("lists the shell's keystrokes alone on Ask and unknown screens", async ({
+  page,
+  request,
+  passesTheAccessibilityGate,
+}) => {
+  const home = HOMES.Viewer;
+  await signedInAs(page, request, "Viewer");
+  await landedAtHome(page, "Viewer");
+  const theShells = [KEYSTROKE_WORDS.showTheList, JUMP_TO.name];
+
+  await page
+    .getByRole("navigation", { name: RAIL })
+    .getByRole("button", { name: KEYSTROKE_WORDS.button })
+    .click();
+  const onAsk = page.getByRole("dialog", { name: keystrokesOn(home.name) });
+  await expect(onAsk).toContainText(KEYSTROKE_WORDS.noneOfItsOwn);
+  await expect(onAsk.getByRole("definition")).toHaveText(theShells);
+  await passesTheAccessibilityGate();
+  await keystrokesDismissed(page, onAsk);
+
+  // Hidden from a Viewer, so it is the screen that never existed.
+  await page.goto(HOMES.Admin.path);
+  await expect(unknownScreen(page)).toBeVisible();
+  const onUnknown = await keystrokesListed(page, KEYSTROKE_WORDS.thisScreen);
+  await expect(onUnknown).toContainText(KEYSTROKE_WORDS.noneOfItsOwn);
+  await expect(onUnknown.getByRole("definition")).toHaveText(theShells);
+  await keystrokesDismissed(page, onUnknown);
 });

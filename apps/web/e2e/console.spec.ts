@@ -11,6 +11,7 @@ import {
 } from "@/app/words.ts";
 import { PICKER_WORDS } from "@/features/auth/workspace-words.ts";
 import { NOT_THE_OPERATOR, ONLY_THE_OPERATOR } from "@/features/console/refusal-words.ts";
+import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { CONSOLE, HOMES } from "@/shared/navigation.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
 import { PRODUCT_NAME } from "@/shared/words.ts";
@@ -356,6 +357,7 @@ test.describe("the console's Workspaces screen", () => {
       page.getByRole("banner").getByRole("button", { name: JUMP_TO.name }),
       menuOf(page, workspace.admin.name),
       railOf(page).getByRole("link", { name: CONSOLE.name }),
+      railOf(page).getByRole("button", { name: KEYSTROKE_WORDS.button }),
     ]) {
       await page.keyboard.press("Tab");
       await expect(stop).toBeFocused();
@@ -370,6 +372,7 @@ test.describe("the console's Workspaces screen", () => {
         - list:
           - listitem:
             - link "${CONSOLE.name}"
+        - button "${KEYSTROKE_WORDS.button}"
     `);
     await expect(ours).toMatchAriaSnapshot(`
       - listitem "${workspace.name}":

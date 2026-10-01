@@ -4,7 +4,7 @@ import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
 import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
 import { SAID_OF_AN_INVITATION } from "@/features/people/refusal-words.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
-import { CONTROL_CENTRE, groupIn } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, groupIn, screenNamed } from "@/shared/navigation.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
@@ -29,7 +29,9 @@ const people = groupIn(CONTROL_CENTRE, "people");
 
 const LIST_BUDGET_MS = 1000;
 
-const MEMBERS_SCREEN = "/people/members";
+const MEMBERS = screenNamed(people, "Members");
+
+const MEMBERS_SCREEN = MEMBERS.path;
 
 const LONG_UK_DATE = /^\d{1,2} [A-Z][a-z]+ \d{4}$/;
 
@@ -233,10 +235,13 @@ test.describe("the People screen's Invitations tab", () => {
       `Cancelled the invitation to ${dropped}; its link no longer works.`,
     );
 
-    const keystrokes = await keystrokesListed(page, people.name);
+    const keystrokes = await keystrokesListed(page, MEMBERS.name);
     await expect(keystrokes).toContainText(INVITE);
     await expect(keystrokes).toContainText("Resend the invitation in focus");
     await expect(keystrokes).toContainText("Cancel the invitation in focus");
+    await expect(keystrokes, "the Members tab's keystrokes on Invitations").not.toContainText(
+      "Open the member in focus",
+    );
     await keystrokesDismissed(page, keystrokes);
 
     const invited = anAddress("invited");
