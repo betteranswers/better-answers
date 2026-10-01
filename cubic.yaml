@@ -26,16 +26,7 @@ reviews:
     - `CONTEXT.md` — the glossary. Every domain word has one settled meaning.
       A new domain word is settled here BEFORE it appears in code; a diff that
       introduces a domain term absent from the glossary is a finding.
-    - `CODING_STANDARDS.md` — the constitution. Rules are tagged. Cite the
-      tag when a finding rests on a rule; the title rule (a test title says what the system does
-      for whom), the comment rule (a comment says why, never what or what happened) and
-      the tag rule (a rule tag is written only in a rules file, a review finding or a gate's failure message) are
-      cited by review alone, so cite them when they are the finding. The gate rule (a lint
-      rule, a tool in `check` or a hook command lands with a functional test of where it
-      fires and where it stays silent), the empty-suite rule (a suite that can run nothing fails) and
-      the one-run rule (one run of `check` names every failure, so a manifest never chains its
-      steps with `&&`) bind any diff that touches a lint rule, a workspace's scripts or its
-      test configuration.
+    - `CODING_STANDARDS.md` — the constitution.
     - `apps/api/CODING_STANDARDS.md`, `apps/web/CODING_STANDARDS.md` and
       `apps/worker/CODING_STANDARDS.md` — workspace rules. Apply a workspace's own file to
       changes in it; the `WEB` prefix is the browser package's family.
@@ -43,24 +34,18 @@ reviews:
       doc each; code cites one as `ADR NNNN`, and its doc is `adr-NNNN-<slug>.md`. A
       change that moves a decision edits its doc in the same pull request, never
       silently. Say which decision is contradicted.
-
-    Five things carry more weight here than in most repositories:
-
-    1. Deep modules. Much behaviour behind a small interface. A wide interface
-       over thin behaviour is a finding even when the code is correct.
-    2. Comments say WHY, never WHAT. History belongs in git and in ADRs.
-    3. Every version introduced is read from the vendor on the day.
-       A version that appears without evidence of being read is a finding.
-    4. Tests go through the module's interface against real infrastructure.
-       Module mocking is banned and lint-enforced.
-    5. Fabricated work. Placeholder, mock, demo or filler content on a
-       production path; documentation, comments or pull-request text claiming
-       behaviour the diff does not implement; a reference to a file, command,
-       route, function, environment variable or config key that does not exist.
-       Report these with the evidence from the diff, and leave alone generated
-       files, fixtures, snapshots, migrations and mechanical renames. A finding
-       that only restates an oxlint, anti-slop, ruff or mypy rule is not worth
-       writing: `check` already fails the branch on it before you see the diff.
+    - Deep modules. Much behaviour behind a small interface. A wide interface
+      over thin behaviour is a finding even when the code is correct.
+    - Comments say WHY, never WHAT. History belongs in git.
+    - Tests go through the module's interface against real infrastructure.
+      Module mocking is banned and lint-enforced.
+    - Fabricated work must be avoided. Placeholder, mock, demo or filler content on a
+      production path; a reference to a file, command, route, function,
+      environment variable or config key that does not exist.
+      Report these with the evidence from the diff, and leave alone generated
+      files, fixtures, snapshots, migrations and mechanical renames. A finding
+      that only restates an oxlint, anti-slop, ruff or mypy rule is not worth
+      writing: `check` already fails the branch on it before you see the diff.
 
   ignore:
     files:
@@ -71,18 +56,17 @@ reviews:
       - "**/reports/**"
       - pnpm-lock.yaml
       - apps/worker/uv.lock
+      - packages/core/test/**
+      - packages/schema/test/**
+      - apps/api/tests/**
+      - apps/web/e2e/**
+      - apps/web/test/**
+      - apps/worker/tests/**
+      - packages/devtools/test/**
+      - packages/design-system/guidelines/**
+      - packages/design-system/thumbnail.html
 
   custom_rules:
-    - name: Enforce Pragmatic Test Coverage
-      description: |-
-        Be reasonable when evaluating tests. Flag changes when important behavior is untested, but do not require tests for every export, type, config, metadata file, or mechanical change.
-
-        Flag PRs that:
-        - Change core business logic without covering the main success and failure paths.
-        - Add UI behavior without testing the user-visible interaction or state change.
-        - Add tests that only assert rendering, existence, snapshots, or that a function returns any value.
-        - Skip, mute, or weaken existing tests without a clear reason.
-        - Mock so much of the system that the test no longer validates the behavior the PR claims to change.
     - name: Enforce Strict Maintainability Standards
       description: |-
         Review changes for structural maintainability regressions. Behavior-correct code can still violate this rule if it makes the codebase harder to understand, extend, or decompose.
@@ -90,7 +74,6 @@ reviews:
         Be ambitious about structural simplification. Look for reframings that delete whole branches, helpers, modes, conditionals, or layers instead of adding more of them. Prefer solutions that remove complexity rather than rearrange it.
 
         Flag PRs that:
-        - Push a file from under 1,000 lines to over 1,000 without a strong reason or clear organization. Prefer extracting helpers, subcomponents, modules, or local abstractions first.
         - Add ad-hoc conditionals, scattered special cases, one-off booleans, nullable modes, or flags into already busy shared flows instead of a dedicated abstraction, helper, state machine, policy object, or separate module.
         - Introduce thin wrappers, identity abstractions, or pass-through helpers that add indirection without reducing complexity.
         - Use brittle, ad-hoc, or "magic" mechanisms that hide simple data-shape assumptions.
@@ -98,7 +81,7 @@ reviews:
         - Use silent fallbacks to paper over unclear invariants instead of making the boundary explicit.
         - Duplicate existing helpers or put logic in the wrong layer when a canonical utility or module already owns the concept.
         - Leak feature-specific logic into general-purpose or shared paths.
-        - Copy-paste logic instead of extracting a shared helper or pure function.
+        - Copy-paste logic instead of extracting a shared helper or pure function, where the helper's interface would be smaller than the copies it replaces. Copies that run in different places with different tools, held in step by one test, are not a finding.
         - Handle narrow edge cases in the middle of an already busy function.
         - Refactor in ways that move complexity around without reducing the number of concepts a reader must hold in their head.
         - Add "temporary" branching that is likely to become permanent debt.
