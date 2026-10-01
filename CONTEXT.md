@@ -1024,12 +1024,54 @@ to it by IRI and never restates it (ADR 0014).
   The authorization server can end one too, when the person's session ends or the client
   disconnects. Nothing records that end, so it stands only while the grant's tokens do.
   _Avoid_: connection, token (for the grant as a whole).
-- **Account page** — a person's own small surface outside Control Centre: name, role,
-  workspace, personal tokens.
-- **sign-in** — how a person proves who they are to the platform: an email code, or Microsoft
-  for a company on Microsoft 365 (T-045 grilling Q10, 2026-09-03); never a password. A person
-  signs in first and an Admin then adds them to a workspace; whether an invitation must come first
-  is open (T-027). A Microsoft account signs in only on an exact match with that person's email. _Avoid_: login, social login; SSO only for the per-client shape, a client's own tenant.
+- **Account page** — a person's own small surface outside Control Centre, reached from the
+  avatar menu: name, role, workspace, personal tokens, and two sections of its own. **Sign-in**
+  holds the person's *passkeys*, their *second factor*, their *recovery codes* and any Microsoft
+  account they linked; **Sessions** lists their *sessions*.
+- **sign-in** — how a person proves who they are to the platform: the *sign-in link* or the
+  six-digit code in a sign-in email, a *passkey*, or Microsoft for a company on Microsoft 365
+  (T-045 grilling Q10, 2026-09-03); never a password. A passkey is a whole sign-in on its own; a
+  person who must hold a *second factor* and signs in by email confirms it before reaching any
+  screen. A person signs in first and an Admin then adds them to a workspace; whether an
+  invitation must come first is open (T-027). A Microsoft account signs in only on an exact match
+  with that person's email. _Avoid_: login, social login; SSO only for the per-client shape, a
+  client's own tenant.
+- **sign-in link** — the link in a sign-in email, beside its six-digit code and one credential
+  with it: both last the code's five minutes, and signing in with either spends both. It signs in
+  only the browser that asked for the code, and only when the person presses *Sign in* on the page
+  it opens, so a mail scanner that opens it first changes nothing. Opened anywhere else, the page
+  shows the code to type where the person started. _Avoid_: magic link, login link.
+- **passkey** — a sign-in credential that a person's device or password manager keeps for the
+  platform, unlocked by their face, fingerprint or device PIN and good only on the platform's own
+  address, so a page imitating the platform cannot use it. A person adds, names and removes their
+  own on the *Account page*. Signing in with one needs no email, and it stands for the *second
+  factor* as well. _Avoid_: security key (one kind of device that can hold one), WebAuthn, FIDO.
+- **authenticator** — a phone application that shows a changing six-digit code for the platform,
+  set up from a QR code or from its key written out; one of the two kinds of *second factor*. A
+  page imitating the platform can pass its code on as it is typed, which it cannot do with a
+  *passkey*. _Avoid_: TOTP, one-time password, authenticator app.
+- **second factor** — what a person holds besides their mailbox to prove who they are: a *passkey*
+  or an *authenticator*. A person who is an Admin in any workspace, and the *operator*, must hold
+  one, and sets one up before reaching any screen if they hold none; anyone else may add a passkey
+  for a quicker sign-in. It is the person's own, across every workspace: neither an email nor a
+  workspace Admin can remove, reset or stand in for it, and an Admin cannot remove their last one.
+  Every change to it is announced to the person's email address. _Avoid_: MFA, 2FA, two-factor,
+  multi-factor.
+- **recovery code** — one of ten one-time codes an Admin is shown once, when they first set up a
+  *second factor*, to keep somewhere safe. One gets them in once in place of their second factor
+  and takes them straight to setting up a new one; replacing the set on the *Account page* voids
+  the old one. An Admin with no factor and no code left is restored by the *operator* alone, who
+  first confirms who they are another way and hands over a one-time **restore code** the same way,
+  without which the Admin cannot set up a new factor. _Avoid_: backup code.
+- **re-confirm** — an Admin's confirming their *second factor* again before a high-impact act, such
+  as removing a member, changing a role, revoking credentials or an export, when they last
+  confirmed it over an hour before. The act goes ahead once they have. _Avoid_: step-up, sudo,
+  re-authenticate.
+- **session** — one browser's sign-in, lasting up to thirty days and renewed while it is used. A
+  person sees their own on the *Account page*, each with its device, its browser and when it was
+  last active, never a place, and may sign any one out, or every one but the current one. Signing
+  a session out ends that session alone, never a *client grant* or a *personal token*. _Avoid_:
+  login (as a noun), device (for the session itself).
 
 - **map** — the reader's word for the graph, and the only one that reaches a surface (*graph*,
   *sync*, *traversal* and *generation* never do). **Two** fixed phrases tell its state: **map as of
