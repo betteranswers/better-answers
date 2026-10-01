@@ -417,6 +417,8 @@ const WORKSPACE = "ws-probe";
 const SECOND_WORKSPACE = "ws-second";
 /** As `provision-workspace` leaves a workspace before its first write: a repository with no ref. */
 const UNWRITTEN_WORKSPACE = "ws-unwritten";
+/** Its HEAD is gone, so git finds no repository there. */
+const UNREADABLE_WORKSPACE = "ws-unreadable";
 const LEFT_BY_A_FAILED_RUN = "/staging/globals-20260904T143652Z.sql.age";
 /** The stores stack's init hands /data/git to this uid, the one the api writes as. */
 const API_UID = 1000;
@@ -440,7 +442,12 @@ cat > /dev/null
 exit "$status"
 `;
 
-const nightlyRun = (script: string): string => String.raw`
+const AN_UNREADABLE_REPOSITORY = String.raw`
+git init --quiet --bare "/data/git/${UNREADABLE_WORKSPACE}.git"
+rm "/data/git/${UNREADABLE_WORKSPACE}.git/HEAD"
+`;
+
+const nightlyRun = (script: string, alsoInTheStore = ""): string => String.raw`
 set -eu
 mkdir -p /data/git /data/mirror /staging /objectstore/uploads /buckets
 git init --quiet --initial-branch=main /tmp/workspace
@@ -450,6 +457,7 @@ for written in ${WORKSPACE} ${SECOND_WORKSPACE}; do
   git clone --quiet --bare /tmp/workspace "/data/git/$written.git"
 done
 git init --quiet --bare --initial-branch=main "/data/git/${UNWRITTEN_WORKSPACE}.git"
+${alsoInTheStore}
 chown -R ${API_UID}:${API_UID} /data/git
 printf '%s' "$MIRROR_SHELL" > /usr/local/bin/mirror-shell
 printf '%s' "$SSH_STAND_IN" > /usr/local/bin/ssh
@@ -480,6 +488,9 @@ const NIGHTLY_ENVIRONMENT = {
   SSH_STAND_IN,
 };
 
+const taggedIn = (lines: readonly string[], tag: string): readonly string[] =>
+  lines.filter((line) => line.startsWith(`${tag}\t`)).map((line) => line.slice(tag.length + 1));
+
 const bundleOf = (workspace: string): unknown =>
   expect.stringMatching(
     new RegExp(`^/buckets/dumps/git/${workspace}/${workspace}-\\d{8}T\\d{6}Z\\.bundle\\.age$`),
@@ -497,11 +508,9 @@ describe.skipIf(nothingToProbeHere)("the backup image's nightly job", () => {
         environment: NIGHTLY_ENVIRONMENT,
       })
     ).split("\n");
-    const tagged = (tag: string): readonly string[] =>
-      lines.filter((line) => line.startsWith(`${tag}\t`)).map((line) => line.slice(tag.length + 1));
-    log = tagged("log");
-    files = tagged("file");
-    mirrored = tagged("mirrored");
+    log = taggedIn(lines, "log");
+    files = taggedIn(lines, "file");
+    mirrored = taggedIn(lines, "mirrored");
   }, IMAGE_PROBE_ALLOWANCE);
 
   it("bundles each api-owned repository with a ref, skipping one without", () => {
@@ -535,6 +544,27 @@ describe.skipIf(nothingToProbeHere)("the backup image's nightly job", () => {
     expect(log.at(-1)).toMatch(/^backup\.sh nightly: ok bytes=0 took=\d+$/);
   });
 });
+
+describe.skipIf(nothingToProbeHere)(
+  "the backup image's nightly job, given a broken repository",
+  () => {
+    let log: readonly string[] = [];
+
+    beforeAll(async () => {
+      const lines = (
+        await readTheImage(backupImage(), {
+          command: ["bash", "-c", nightlyRun(scriptPath(), AN_UNREADABLE_REPOSITORY)],
+          environment: NIGHTLY_ENVIRONMENT,
+        })
+      ).split("\n");
+      log = taggedIn(lines, "log");
+    }, IMAGE_PROBE_ALLOWANCE);
+
+    it("ends its log with the fail its ping carries", () => {
+      expect(log.at(-1)).toBe("backup.sh nightly: fail bytes=0 took=0");
+    });
+  },
+);
 
 const fenced = (script: string, step: string): string => {
   const body = read(script).split(`# >>> ${step}\n`)[1]?.split(`# <<< ${step}`)[0];
