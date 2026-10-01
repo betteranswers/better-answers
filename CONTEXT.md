@@ -850,6 +850,14 @@ to it by IRI and never restates it (ADR 0014).
   mints one; a new invitation to an address with one waiting replaces it. Whether the address
   already belongs to a person on the platform never changes what the Admin is told. _Avoid_:
   invite (as a noun), join link.
+- **Activity (of a person)** — one person's part in the workspace's *audit log*, read by an Admin
+  alone, in People: every *audit event* they took and every one done to them, newest first, each
+  marked *by*, *to* or both, as a self-demotion is. It spans their whole history in the workspace,
+  their *access requests* and earlier *memberships* included. An *invitation* names an address,
+  not a person, so one sent before they joined is in its inviter's Activity alone; their
+  *sign-ins* and the *display name* they give are in the *identity-set audit log*, which no
+  workspace reads. A read of the audit log, kept nowhere of its own: not a *record family*.
+  _Avoid_: timeline, activity log.
 
 ## Platform surfaces
 
@@ -927,6 +935,11 @@ to it by IRI and never restates it (ADR 0014).
 - **toolbar** — the region above a screen's content carrying that screen's tabs at one end and its
   acts at the other, filled by the screen; a screen with neither gets no toolbar. _Avoid_: action
   bar, section header.
+- **selection bar** — the strip above a list that shows only while some of its rows are ticked:
+  it says how many are ticked and how many of those the list is not showing, carries the acts the
+  screen takes over every ticked row, and offers *Clear selection*. A tick stays through a change
+  of page, search or filter, which is why the bar counts the ticked rows out of sight. Not the
+  screen's *toolbar*.
 - **view-state slot** — the one place the open screen writes what the acts on its toolbar must
   read, such as what a reader has ticked. It answers empty to any screen but the one that wrote it,
   and it is emptied when the reader opens another tab. _Avoid_: selection store, shared context.
