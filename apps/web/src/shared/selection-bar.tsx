@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { Toolbar as ToolbarPrimitive } from "radix-ui";
+import { useRef, type ComponentProps, type ReactNode, type RefObject } from "react";
 
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { Button } from "@/shared/ui/button.tsx";
@@ -16,9 +17,18 @@ function ClearOn(properties: { readonly keystroke: Keystroke; readonly onClear: 
   return null;
 }
 
+/** A bulk act the arrow keys reach with the bar's others; a plain button would be a tab stop alone. */
+export function SelectionAct(properties: ComponentProps<typeof Button>) {
+  return (
+    <ToolbarPrimitive.Button asChild>
+      <Button variant="outline" size="sm" {...properties} />
+    </ToolbarPrimitive.Button>
+  );
+}
+
 /**
  * Hidden, never unmounted, so its count is a live region before the first tick. Clearing hides
- * the bar, so `onClear` moves focus on.
+ * the bar, so focus inside it moves to `focusAfterClear`.
  */
 export function SelectionBar(properties: {
   readonly label: string;
@@ -26,17 +36,25 @@ export function SelectionBar(properties: {
   readonly shown: readonly string[];
   readonly noun: Noun;
   readonly onClear: () => void;
+  readonly focusAfterClear: RefObject<HTMLElement | null>;
   readonly clearKeystroke?: Keystroke;
   readonly children?: ReactNode;
 }) {
-  const { ticked, clearKeystroke, onClear } = properties;
+  const { ticked, clearKeystroke, onClear, focusAfterClear } = properties;
+  const bar = useRef<HTMLDivElement>(null);
   const shown = new Set(properties.shown);
   const notShown = [...ticked].filter((id) => !shown.has(id)).length;
   const none = ticked.size === 0;
 
+  const clear = () => {
+    const focusWasInside = bar.current?.contains(document.activeElement) === true;
+    onClear();
+    if (focusWasInside) focusAfterClear.current?.focus();
+  };
+
   return (
-    <div
-      role="toolbar"
+    <ToolbarPrimitive.Root
+      ref={bar}
       aria-label={properties.label}
       hidden={none}
       className="flex min-h-10 flex-wrap items-center gap-2 border-b border-border bg-muted px-3 py-1.5"
@@ -47,20 +65,22 @@ export function SelectionBar(properties: {
       {none ? null : (
         <>
           {properties.children}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="ml-auto"
-            aria-keyshortcuts={clearKeystroke?.key}
-            onClick={onClear}
-          >
-            Clear selection
-          </Button>
+          <ToolbarPrimitive.Button asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-auto"
+              aria-keyshortcuts={clearKeystroke?.key}
+              onClick={clear}
+            >
+              Clear selection
+            </Button>
+          </ToolbarPrimitive.Button>
           {clearKeystroke === undefined ? null : (
-            <ClearOn keystroke={clearKeystroke} onClear={onClear} />
+            <ClearOn keystroke={clearKeystroke} onClear={clear} />
           )}
         </>
       )}
-    </div>
+    </ToolbarPrimitive.Root>
   );
 }

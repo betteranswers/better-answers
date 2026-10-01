@@ -34,11 +34,14 @@ export const CountedSwitch = ({ label, value, choices, onValueChange }: CountedS
         value={choice.value}
         className="group min-h-8 outline-none focus-visible:shadow-none"
       >
-        <span className="inline-flex min-h-8 items-center gap-1.5 px-2.5 text-sm font-medium text-muted-foreground group-hover:text-foreground group-focus-visible:shadow-[var(--focus-ring)] group-data-[state=checked]:bg-background group-data-[state=checked]:text-foreground group-data-[state=checked]:shadow-xs">
-          {choice.label}{" "}
-          <Pill variant="outline" className="px-1.5 py-0 tabular-nums">
-            {choice.count}
-          </Pill>
+        <span className="inline-flex min-h-8 group-focus-visible:shadow-[var(--focus-ring)]">
+          {/* Its own span: two shadow utilities on one element set one property, so the checked elevation could hide the focus ring. */}
+          <span className="inline-flex min-h-8 items-center gap-1.5 px-2.5 text-sm font-medium text-muted-foreground group-hover:text-foreground group-data-[state=checked]:bg-background group-data-[state=checked]:text-foreground group-data-[state=checked]:shadow-xs">
+            {choice.label}{" "}
+            <Pill variant="outline" className="px-1.5 py-0 tabular-nums">
+              {choice.count}
+            </Pill>
+          </span>
         </span>
       </RadioGroupPrimitive.Item>
     ))}

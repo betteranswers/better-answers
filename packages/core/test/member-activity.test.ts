@@ -81,7 +81,10 @@ const pageOf = (read: Result<ActivityPage, unknown>): ActivityPage => {
 };
 
 const linesOf = async (workspace: ProvisionedWorkspace, personId: string) =>
-  pageOf(await activityOf(workspace, personId)).events.map(({ act, relation }) => [act, relation]);
+  pageOf(await activityOf(workspace, personId)).events.map(({ act, direction }) => [
+    act,
+    direction,
+  ]);
 
 const roleChanged = (
   workspace: ProvisionedWorkspace,
@@ -151,11 +154,14 @@ describe("a person's activity", () => {
       detail: { previousRole: "Viewer", role: "Editor" },
     };
     expect(onHannahs).toEqual({
-      events: [expect.objectContaining({ ...theChange, relation: "by" })],
+      events: [
+        expect.objectContaining({ ...theChange, direction: "by" }),
+        expect.objectContaining({ act: "platform.workspace.provisioned", direction: "to" }),
+      ],
       nextCursor: null,
     });
     expect(onPriyas).toEqual({
-      events: [expect.objectContaining({ ...theChange, relation: "to" })],
+      events: [expect.objectContaining({ ...theChange, direction: "to" })],
       nextCursor: null,
     });
     expect(onPriyas.events[0]?.id).toBe(onHannahs.events[0]?.id);
@@ -168,8 +174,9 @@ describe("a person's activity", () => {
 
     const page = pageOf(await activityOf(workspace, workspace.adminUserId, null, sam));
 
-    expect(page.events.map(({ act, relation }) => [act, relation])).toEqual([
+    expect(page.events.map(({ act, direction }) => [act, direction])).toEqual([
       ["people.member.role_changed", "both"],
+      ["platform.workspace.provisioned", "to"],
     ]);
   });
 
@@ -266,6 +273,14 @@ describe("a person's activity", () => {
     );
 
     expect(await linesOf(workspace, priya)).toEqual([["people.member.added", "to"]]);
+  });
+
+  it("shows the first Admin's provisioning as done to them", async () => {
+    const workspace = await provisionedWorkspace(db(), "Provisioned");
+
+    expect(await linesOf(workspace, workspace.adminUserId)).toEqual([
+      ["platform.workspace.provisioned", "to"],
+    ]);
   });
 
   it("shows an Admin's flag on Priya's display name", async () => {

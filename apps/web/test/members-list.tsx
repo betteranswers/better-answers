@@ -1,24 +1,20 @@
 import {
-  columnFilteringFeature,
   createColumnHelper,
-  createFilteredRowModel,
   createPaginatedRowModel,
   createSortedRowModel,
-  filterFn_includesString,
-  globalFilteringFeature,
   rowPaginationFeature,
   rowSortingFeature,
   sortFn_alphanumeric,
   tableFeatures,
   useTable,
 } from "@tanstack/react-table";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { FilterRow } from "@/shared/filter-row.tsx";
 import { GridTable, RowLink } from "@/shared/grid-table.tsx";
-import { ListPages, ListState } from "@/shared/list-pages.tsx";
+import { ListPages, ListState, pageWithin } from "@/shared/list-pages.tsx";
 import { RowMenu } from "@/shared/row-menu.tsx";
-import { SelectionBar } from "@/shared/selection-bar.tsx";
+import { SelectionAct, SelectionBar } from "@/shared/selection-bar.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
@@ -78,14 +74,10 @@ export const MEMBERS: readonly Member[] = [
 ];
 
 const features = tableFeatures({
-  columnFilteringFeature,
-  globalFilteringFeature,
   rowSortingFeature,
   rowPaginationFeature,
-  filteredRowModel: createFilteredRowModel(),
   sortedRowModel: createSortedRowModel(),
   paginatedRowModel: createPaginatedRowModel(),
-  filterFns: { includesString: filterFn_includesString },
   sortFns: { alphanumeric: sortFn_alphanumeric },
 });
 
@@ -106,6 +98,68 @@ export function BareList() {
     getRowId: (member) => member.id,
   });
   return <GridTable table={table} caption="Members of this workspace." empty={null} />;
+}
+
+const NOTHING = () => undefined;
+
+const menuOf = (act: (said: string) => void) => (member: Member) => (
+  <RowMenu
+    name={member.name}
+    acts={[
+      {
+        label: "Open",
+        onSelect: () => {
+          act(`open ${member.id}`);
+        },
+      },
+      {
+        label: "Remove from workspace",
+        destructive: true,
+        onSelect: () => {
+          act(`remove ${member.id}`);
+        },
+      },
+    ]}
+  />
+);
+
+const groupedColumns = column.columns([
+  column.group({
+    id: "person",
+    header: "Person",
+    columns: column.columns([
+      column.accessor("name", { id: "name", header: "Name" }),
+      column.accessor("address", { id: "address", header: "Address" }),
+    ]),
+  }),
+  column.accessor("role", { id: "role", header: "Role", sortFn: "alphanumeric" }),
+]);
+
+/** A header two rows deep, under a tick and a row menu that each head their column once. */
+export function GroupedList(properties: { readonly hidden?: ReadonlySet<string> }) {
+  const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set());
+  const table = useTable({
+    features,
+    columns: groupedColumns,
+    data: [...MEMBERS],
+    getRowId: (member) => member.id,
+  });
+  return (
+    <GridTable
+      table={table}
+      caption="Members of this workspace."
+      ticking={{
+        ticked,
+        onTickedChange: setTicked,
+        nameOf: (member) => member.name,
+        everyOnThePage: "Select every member on this page",
+      }}
+      sorting={{ sortable: new Set(["role"]), sorted: undefined, onSortedChange: NOTHING }}
+      hidden={properties.hidden}
+      rowMenu={menuOf(NOTHING)}
+      empty={null}
+    />
+  );
 }
 
 const linkedColumns = (open: (member: Member) => void) =>
@@ -158,52 +212,43 @@ type Asked = {
   readonly onAct?: (act: string) => void;
 };
 
-const NOTHING = () => undefined;
+type Narrowed = { readonly search: string; readonly role: string | undefined };
 
-const menuOf = (act: (said: string) => void) => (member: Member) => (
-  <RowMenu
-    name={member.name}
-    acts={[
-      {
-        label: "Open",
-        onSelect: () => {
-          act(`open ${member.id}`);
-        },
-      },
-      {
-        label: "Remove from workspace",
-        destructive: true,
-        onSelect: () => {
-          act(`remove ${member.id}`);
-        },
-      },
-    ]}
-  />
-);
+const emptyOf = (narrowed: Narrowed, clear: () => void) => {
+  if (narrowed.search === "" && narrowed.role === undefined) {
+    return (
+      <ListState
+        state={{
+          kind: "empty",
+          words: "No one belongs to this workspace yet.",
+          act: <Button>Invite people</Button>,
+        }}
+      />
+    );
+  }
+  const words =
+    narrowed.search === ""
+      ? "No one matches these filters."
+      : `No one matches “${narrowed.search}”.`;
+  return <ListState state={{ kind: "emptied", words, onClear: clear }} />;
+};
 
-const emptyOf = (search: string, clear: () => void) => (
-  <ListState
-    state={
-      search === ""
-        ? {
-            kind: "empty",
-            words: "No one belongs to this workspace yet.",
-            act: <Button>Invite people</Button>,
-          }
-        : { kind: "emptied", words: `No one matches “${search}”.`, onClear: clear }
-    }
-  />
-);
+const matching = (members: readonly Member[], narrowed: Narrowed): Member[] =>
+  members.filter(
+    (member) =>
+      (narrowed.role === undefined || member.role === narrowed.role) &&
+      member.name.toLowerCase().includes(narrowed.search.toLowerCase()),
+  );
 
-/** What a screen holds and hands the shared parts; ticks sit outside the table's rows. */
+/** Ticks sit outside the table's rows. Narrowing comes before the table, so the total is known when the page is chosen. */
 function useMembersList(asked: Asked) {
   const { members = MEMBERS, pageSize = 25, onAct = NOTHING } = asked;
-  const [search, setSearch] = useState("");
-  const [role, setRole] = useState<string>();
+  const [narrowed, setNarrowed] = useState<Narrowed>({ search: "", role: undefined });
   const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set());
   const [sorted, setSorted] = useState<{ readonly id: string; readonly desc: boolean }>();
   const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
-  const [pageIndex, setPageIndex] = useState(0);
+  const [asksForPage, setPageIndex] = useState(0);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const columns = useMemo(
     () =>
@@ -212,29 +257,27 @@ function useMembersList(asked: Asked) {
       }),
     [onAct],
   );
+  const data = matching(members, narrowed);
+  const pageIndex = pageWithin(asksForPage, pageSize, data.length);
   const table = useTable({
     features,
     columns,
-    data: members.filter((member) => role === undefined || member.role === role),
+    data,
     getRowId: (member) => member.id,
-    globalFilterFn: "includesString",
-    getColumnCanGlobalFilter: (candidate) => candidate.id === "person",
     state: {
-      globalFilter: search,
       sorting: sorted === undefined ? [] : [sorted],
       pagination: { pageIndex, pageSize },
     },
   });
-  const searchFor = (value: string) => {
-    setSearch(value);
+  /** A narrower list starts again from its first page. */
+  const narrow = (patch: Partial<Narrowed>) => {
+    setNarrowed({ ...narrowed, ...patch });
     setPageIndex(0);
   };
   return {
     onAct,
-    search,
-    searchFor,
-    role,
-    setRole,
+    narrowed,
+    narrow,
     ticked,
     setTicked,
     sorted,
@@ -244,11 +287,18 @@ function useMembersList(asked: Asked) {
     pageIndex,
     setPageIndex,
     pageSize,
+    total: data.length,
+    searchRef,
     table,
   };
 }
 
 type Held = ReturnType<typeof useMembersList>;
+
+const clearFilters = (held: Held) => () => {
+  held.narrow({ search: "", role: undefined });
+  held.searchRef.current?.focus();
+};
 
 function MembersTable(properties: { readonly held: Held }) {
   const { held } = properties;
@@ -270,9 +320,7 @@ function MembersTable(properties: { readonly held: Held }) {
         }}
         hidden={held.hidden}
         rowMenu={menuOf(held.onAct)}
-        empty={emptyOf(held.search, () => {
-          held.searchFor("");
-        })}
+        empty={emptyOf(held.narrowed, clearFilters(held))}
       />
       <ListPages
         pages={{
@@ -280,7 +328,7 @@ function MembersTable(properties: { readonly held: Held }) {
           label: "Pages of members",
           pageIndex: held.pageIndex,
           pageSize: held.pageSize,
-          total: held.table.getFilteredRowModel().rows.length,
+          total: held.total,
           onTurn: held.setPageIndex,
         }}
       />
@@ -311,16 +359,21 @@ export function MembersList(properties: Asked) {
       <FilterRow
         search={{
           label: "Search by name or address",
-          value: held.search,
-          onChange: held.searchFor,
+          value: held.narrowed.search,
+          onChange: (search) => {
+            held.narrow({ search });
+          },
+          inputRef: held.searchRef,
         }}
         filters={[
           {
             label: "Role",
-            value: held.role,
+            value: held.narrowed.role,
             anyLabel: "Any role",
             choices: ROLES.map((role) => ({ value: role, label: role })),
-            onChange: held.setRole,
+            onChange: (role) => {
+              held.narrow({ role });
+            },
           },
         ]}
         columns={{
@@ -342,16 +395,15 @@ export function MembersList(properties: Asked) {
         onClear={() => {
           held.setTicked(new Set());
         }}
+        focusAfterClear={held.searchRef}
       >
-        <Button
-          variant="outline"
-          size="sm"
+        <SelectionAct
           onClick={() => {
             held.onAct(`change the role of ${[...ticked].join(", ")}`);
           }}
         >
           Change role
-        </Button>
+        </SelectionAct>
       </SelectionBar>
       <MembersRead asked={properties} held={held} />
     </div>

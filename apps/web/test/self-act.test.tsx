@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients, Providers, type AppClients } from "@/app/providers.tsx";
-import { LandedLine, useIncludesYou, useSelfActLanding } from "@/features/people/self-act.tsx";
+import { HomeLine, useIncludesYou, useSelfActHome } from "@/features/people/self-act.tsx";
 import { useTRPC } from "@/shared/api/trpc.ts";
 import { HOMES } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
@@ -41,7 +41,7 @@ const framedBy = (clients: AppClients) =>
 
 /** Members, where the act that included the reader has just succeeded. */
 function ActedOnMyself() {
-  const { land } = useSelfActLanding();
+  const { goHome } = useSelfActHome();
   const [outcome, setOutcome] = useState<Outcome>();
 
   return (
@@ -49,7 +49,7 @@ function ActedOnMyself() {
       <button
         type="button"
         onClick={() => {
-          void land("demoted").then(setOutcome);
+          void goHome("demoted").then(setOutcome);
         }}
       >
         Demoted myself
@@ -57,7 +57,7 @@ function ActedOnMyself() {
       <button
         type="button"
         onClick={() => {
-          void land("removed").then(setOutcome);
+          void goHome("removed").then(setOutcome);
         }}
       >
         Removed myself
@@ -71,7 +71,7 @@ function Home() {
   return (
     <>
       <h1>Home</h1>
-      <LandedLine />
+      <HomeLine />
     </>
   );
 }
@@ -104,8 +104,8 @@ describe("an act's confirmation", () => {
   });
 });
 
-describe("landing after an act on yourself", () => {
-  it("lands a self-demoted Admin on an Editor's home, saying why", async () => {
+describe("going home after an act on yourself", () => {
+  it("sends a self-demoted Admin to an Editor's home, saying why", async () => {
     const { router, history } = await actingAt();
 
     vi.stubGlobal("fetch", answeringAs("Editor"));
@@ -116,10 +116,10 @@ describe("landing after an act on yourself", () => {
       "You changed your own role to Editor. People is for Admins, so this is your home now.",
     );
     expect(screen.getByText("Held: Editor")).toBeDefined();
-    expect(history.length, "the landing pushed an entry of its own").toBe(2);
+    expect(history.length, "the move home pushed an entry of its own").toBe(2);
   });
 
-  it("lands a self-removed Admin on /, holding no membership", async () => {
+  it("sends a self-removed Admin to /, holding no membership", async () => {
     const { router } = await actingAt();
 
     vi.stubGlobal("fetch", () => Promise.reject(new TypeError("the session has ended")));

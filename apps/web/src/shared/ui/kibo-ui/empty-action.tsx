@@ -9,7 +9,7 @@ import {
   EmptyTitle,
 } from "@/shared/ui/empty.tsx";
 
-export type EmptyActionProps = Omit<ComponentProps<typeof Empty>, "title"> & {
+export type EmptyActionProps = Omit<ComponentProps<typeof Empty>, "title" | "children"> & {
   title: ReactNode;
   description?: ReactNode;
   action?: ReactNode;

@@ -6,11 +6,20 @@ import { RowLink } from "@/shared/grid-table.tsx";
 import { ListPages } from "@/shared/list-pages.tsx";
 
 import { placedWithoutMeasuring } from "./measuring.ts";
-import { BareList, MEMBERS, MembersList } from "./members-list.tsx";
+import { BareList, GroupedList, MEMBERS, MembersList } from "./members-list.tsx";
 
 placedWithoutMeasuring();
 
 const headers = () => screen.getAllByRole("columnheader").map((header) => header.textContent);
+
+/** Each header row's cells as text, columns spanned and rows spanned. */
+const headRows = () =>
+  screen
+    .getAllByRole("row")
+    .filter((row) => row.parentElement?.tagName === "THEAD")
+    .map((row) =>
+      [...row.querySelectorAll("th")].map((head) => [head.textContent, head.colSpan, head.rowSpan]),
+    );
 
 const people = () => screen.getAllByRole("link").map((link) => link.textContent);
 
@@ -26,6 +35,25 @@ const opened = (trigger: HTMLElement) => {
 
 const escape = () => {
   fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+};
+
+/** The registry's select opens on a key, and a touch or a key picks a choice. */
+const picked = (filter: string, choice: string) => {
+  // jsdom lays nothing out, and the select scrolls its chosen choice into view as it opens.
+  Object.defineProperty(Element.prototype, "scrollIntoView", {
+    value: () => undefined,
+    configurable: true,
+  });
+  try {
+    fireEvent.keyDown(screen.getByRole("combobox", { name: filter }), { key: "Enter" });
+    fireEvent.click(screen.getByRole("option", { name: choice }));
+  } finally {
+    Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+  }
+};
+
+const pickRole = (role: string) => {
+  picked("Filter by role", role);
 };
 
 describe("the shared table", () => {
@@ -120,6 +148,36 @@ describe("the shared table", () => {
     fireEvent.click(within(opened(trigger)).getByRole("menuitem", { name: "Open" }));
     expect(acts).toEqual(["open bo"]);
   });
+
+  it("heads the tick and acts once, down a grouped header", () => {
+    render(<GroupedList />);
+
+    expect(headRows()).toEqual([
+      [
+        ["", 1, 2],
+        ["Person", 2, 1],
+        ["Role", 1, 2],
+        ["Acts", 1, 2],
+      ],
+      [
+        ["Name", 1, 1],
+        ["Address", 1, 1],
+      ],
+    ]);
+    expect(
+      within(screen.getAllByRole("row")[2] ?? document.body).getAllByRole("cell"),
+    ).toHaveLength(5);
+    expect(screen.getAllByRole("button", { name: "Role" })).toHaveLength(1);
+  });
+
+  it("narrows a group as its columns hide, then drops it", () => {
+    const { rerender } = render(<GroupedList hidden={new Set(["address"])} />);
+    expect(headRows()[0]?.[1]).toEqual(["Person", 1, 1]);
+    expect(headRows()[1]).toEqual([["Name", 1, 1]]);
+
+    rerender(<GroupedList hidden={new Set(["name", "address"])} />);
+    expect(headers()).not.toContain("Person");
+  });
 });
 
 describe("a row's link", () => {
@@ -137,6 +195,30 @@ describe("a row's link", () => {
     expect(open).toHaveBeenCalledTimes(1);
 
     expect(fireEvent.click(link, { metaKey: true })).toBe(true);
+    expect(open).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves a new window or a download to the browser", () => {
+    const open = vi.fn<() => void>();
+    render(
+      <>
+        <RowLink href="/people/members?person=ada" target="_blank" onOpen={open}>
+          Ada in a new tab
+        </RowLink>
+        <RowLink href="/people/members?person=ada" download onOpen={open}>
+          Ada's card
+        </RowLink>
+        <RowLink href="/people/members?person=ada" target="_self" onOpen={open}>
+          Ada here
+        </RowLink>
+      </>,
+    );
+
+    expect(fireEvent.click(screen.getByRole("link", { name: "Ada in a new tab" }))).toBe(true);
+    expect(fireEvent.click(screen.getByRole("link", { name: "Ada's card" }))).toBe(true);
+    expect(open).not.toHaveBeenCalled();
+
+    expect(fireEvent.click(screen.getByRole("link", { name: "Ada here" }))).toBe(false);
     expect(open).toHaveBeenCalledTimes(1);
   });
 });
@@ -172,8 +254,21 @@ describe("the list's states", () => {
   it("says the list is loading on its first read", () => {
     render(<MembersList read="loading" />);
 
-    expect(screen.getByText("The members are still loading.")).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("The members are still loading.");
     expect(screen.queryByRole("table")).toBeNull();
+  });
+
+  it("offers Clear filters when a role filter empties the list", () => {
+    render(<MembersList members={MEMBERS.filter((member) => member.role !== "Admin")} />);
+
+    pickRole("Admin");
+    expect(screen.getByText("No one matches these filters.")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(people()).toHaveLength(MEMBERS.length - 1);
+    expect(document.activeElement).toBe(
+      screen.getByRole("searchbox", { name: "Search by name or address" }),
+    );
   });
 });
 
@@ -195,10 +290,80 @@ describe("the list's pages", () => {
     expect(next.getAttribute("aria-disabled")).toBe("true");
   });
 
+  it("says where a turn landed in one live status", () => {
+    render(<MembersList pageSize={2} />);
+    const pages = screen.getByRole("navigation", { name: "Pages of members" });
+
+    fireEvent.click(within(pages).getByRole("button", { name: "Next page" }));
+    expect(
+      within(pages)
+        .getAllByRole("status")
+        .map((status) => status.textContent),
+    ).toEqual(["Showing 3–4 of 5."]);
+  });
+
   it("draws no pages when one page holds the list", () => {
     render(<MembersList pageSize={25} />);
 
     expect(screen.queryByRole("navigation", { name: "Pages of members" })).toBeNull();
+  });
+
+  it("shows the last page when rows leave a later one", () => {
+    const { rerender } = render(<MembersList pageSize={2} />);
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(people()).toEqual(["Ed Ruscha", "Bo Diddley"]);
+
+    rerender(<MembersList pageSize={2} members={MEMBERS.slice(0, 2)} />);
+    expect(people()).toEqual(["Cy Twombly", "Ada Lovelace"]);
+    expect(screen.queryByRole("navigation", { name: "Pages of members" })).toBeNull();
+  });
+
+  it("starts again from the first page when a filter narrows", () => {
+    render(<MembersList pageSize={1} />);
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(people()).toEqual(["Ada Lovelace"]);
+
+    pickRole("Editor");
+    expect(people()).toEqual(["Ed Ruscha"]);
+    expect(screen.getByText("Page 1 of 2")).toBeTruthy();
+  });
+
+  it("loads more on the screen's keystroke, and not while loading", () => {
+    const more = vi.fn<() => void>();
+    const keystroke = { key: "m", act: "Load older events" };
+    const { rerender } = render(
+      <ListPages
+        pages={{
+          kind: "more",
+          label: "Older events",
+          more: true,
+          loading: false,
+          onMore: more,
+          keystroke,
+        }}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Load more" }).getAttribute("aria-keyshortcuts"),
+    ).toBe("m");
+
+    fireEvent.keyDown(document.body, { key: "m" });
+    expect(more).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <ListPages
+        pages={{
+          kind: "more",
+          label: "Older events",
+          more: true,
+          loading: true,
+          onMore: more,
+          keystroke,
+        }}
+      />,
+    );
+    fireEvent.keyDown(document.body, { key: "m" });
+    expect(more).toHaveBeenCalledTimes(1);
   });
 
   it("loads more until nothing is left", () => {
@@ -257,6 +422,38 @@ describe("the filter row", () => {
     );
 
     expect(screen.getByRole("combobox", { name: "Filter by role" }).textContent).toBe("Any role");
+  });
+
+  it("tells a choice valued “any” from no narrowing at all", () => {
+    const chose: (string | undefined)[] = [];
+    const colourOf = (value: string | undefined) => (
+      <FilterRow
+        search={{ label: "Search by address", value: "", onChange: () => undefined }}
+        filters={[
+          {
+            label: "Colour",
+            value,
+            anyLabel: "Every colour",
+            choices: [
+              { value: "any", label: "Any colour at all" },
+              { value: "red", label: "Red" },
+            ],
+            onChange: (picked) => chose.push(picked),
+          },
+        ]}
+      />
+    );
+    const { rerender } = render(colourOf("any"));
+    const trigger = () => screen.getByRole("combobox", { name: "Filter by colour" });
+    expect(trigger().textContent).toBe("Any colour at all");
+
+    rerender(colourOf(undefined));
+    expect(trigger().textContent).toBe("Every colour");
+
+    picked("Filter by colour", "Any colour at all");
+    rerender(colourOf("any"));
+    picked("Filter by colour", "Every colour");
+    expect(chose).toEqual(["any", undefined]);
   });
 
   it("switches status, saying each status's count", () => {

@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 
-import type { APIRequestContext, Page } from "@playwright/test";
+import type { APIRequestContext, Locator, Page } from "@playwright/test";
 import react from "@vitejs/plugin-react";
 import { build } from "vite";
 
@@ -89,6 +89,15 @@ const bar = (page: Page) => page.getByRole("toolbar", { name: "Selected members"
 
 const tickOf = (page: Page, name: string) => page.getByRole("checkbox", { name: `Select ${name}` });
 
+/** The bar sits above the table, so a reader on a row's tick goes back to reach it. */
+const backUntilFocused = async (page: Page, target: Locator) => {
+  for (let pressed = 0; pressed < 10; pressed += 1) {
+    if (await target.evaluate((node) => node === document.activeElement)) return;
+    await page.keyboard.press("Shift+Tab");
+  }
+  await expect(target, "Shift+Tab never reached it").toBeFocused();
+};
+
 test.describe("the shared list parts, drawn together", () => {
   test("keep every part but the table inside 320 pixels", async ({ page, request }) => {
     await page.setViewportSize({ width: 320, height: 720 });
@@ -167,5 +176,25 @@ test.describe("the shared list parts, drawn together", () => {
 
     await page.keyboard.press("x");
     await expect(bar(page)).toBeHidden();
+  });
+
+  test("the bar takes one tab stop; Clear hands focus on", async ({ page, request }) => {
+    await drawn(page, request);
+    await tabUntilFocused(page, tickOf(page, "Cy Twombly"));
+    await page.keyboard.press("Space");
+
+    const act = bar(page).getByRole("button", { name: "Change role" });
+    const clear = bar(page).getByRole("button", { name: "Clear selection" });
+    await backUntilFocused(page, act);
+    await page.keyboard.press("ArrowRight");
+    await expect(clear).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    await expect(page.getByRole("button", { name: "Columns" })).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(clear).toBeFocused();
+
+    await page.keyboard.press("Enter");
+    await expect(bar(page)).toBeHidden();
+    await expect(page.getByRole("searchbox", { name: "Search by name or address" })).toBeFocused();
   });
 });

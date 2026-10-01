@@ -12,7 +12,7 @@ import { roleOf } from "./role-meanings.ts";
 
 const INCLUDES_YOU = "This includes you.";
 
-const landedAs = (role: Role): string =>
+const homeNowSaid = (role: Role): string =>
   `You changed your own role to ${role}. People is for Admins, so this is your home now.`;
 
 const ROLE_UNREAD = refusedWith({
@@ -20,11 +20,10 @@ const ROLE_UNREAD = refusedWith({
   next: "Reload the page in a moment.",
 });
 
-/** Carried in the landing entry's history state, so it goes once the reader moves on. */
-const LANDED = z.object({ landedAs: z.string().transform(roleOf) });
+/** Carried in the home entry's history state, so it goes once the reader moves on. */
+const SENT_HOME = z.object({ homeOf: z.string().transform(roleOf) });
 
-/** What an act did to the reader's own membership. */
-type Landing = "demoted" | "removed";
+type OwnMembershipChange = "demoted" | "removed";
 
 /** The line an act's confirmation adds when the people it acts on include the reader. */
 export const useIncludesYou = (personIds: readonly string[]): string | undefined => {
@@ -49,16 +48,16 @@ const roleReadAgain = async (
 };
 
 /**
- * Lands where the act left the reader, replacing the screen they can no longer see. Answers the
- * outcome to show when it could not land.
+ * Sends the reader where the act left them, replacing the screen they can no longer see. Answers
+ * the outcome to show when it could not.
  */
-export const useSelfActLanding = () => {
+export const useSelfActHome = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  const land = async (landing: Landing): Promise<Outcome | undefined> => {
-    if (landing === "removed") {
+  const goHome = async (change: OwnMembershipChange): Promise<Outcome | undefined> => {
+    if (change === "removed") {
       // Reset, not removed: the frame's mounted read never hears a removal and draws the old role.
       void queryClient.resetQueries(membershipOf(api));
       await navigate({ href: "/", replace: true });
@@ -70,23 +69,23 @@ export const useSelfActLanding = () => {
     await navigate({
       href: HOMES[role].path,
       replace: true,
-      state: (previous) => ({ ...previous, landedAs: role }),
+      state: (previous) => ({ ...previous, homeOf: role }),
     });
     return undefined;
   };
 
-  return { land };
+  return { goHome };
 };
 
-/** Its live region must stand before the landing, so it belongs where the frame outlives the move. */
-export function LandedLine() {
+/** Its live region must stand before the move home, so it belongs where the frame outlives it. */
+export function HomeLine() {
   const role = useRouterState({
-    select: (state) => LANDED.safeParse(state.location.state).data?.landedAs,
+    select: (state) => SENT_HOME.safeParse(state.location.state).data?.homeOf,
   });
 
   return (
     <OutcomeLine
-      outcome={role === undefined ? undefined : { tone: "said", words: landedAs(role) }}
+      outcome={role === undefined ? undefined : { tone: "said", words: homeNowSaid(role) }}
     />
   );
 }

@@ -60,6 +60,26 @@ describe("a search another place asks of a screen", () => {
   });
 });
 
+const ActAndSearch = () => {
+  const [taken, setTaken] = useState<readonly string[]>([]);
+  useAsked("act", (value) => setTaken((before) => [...before, `act ${value}`]));
+  useAsked("search", (value) => setTaken((before) => [...before, `search ${value}`]));
+  return <output>{taken.join(", ")}</output>;
+};
+
+describe("two asks in one address", () => {
+  it("takes each once and clears both from the address", async () => {
+    const { history, at } = await openScreens(
+      { "/members": ActAndSearch, "/elsewhere": () => null },
+      ["/elsewhere", "/members?act=invite&search=priya"],
+    );
+
+    await at("/members");
+    expect(takenSoFar()).toBe("act invite, search priya");
+    expect(history.length, "a clear pushed an entry of its own").toBe(2);
+  });
+});
+
 describe("asking a screen for an act", () => {
   const HERE = { pathname: "/members", searchStr: "?members.role=Editor&members.page=2" };
 

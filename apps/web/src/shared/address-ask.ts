@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 /** What another place may ask of a screen as it opens: one of its acts, or a search. */
 type Ask = "act" | "search";
 
-/** Where the reader is, as the router last wrote the address. */
 export type Here = { readonly pathname: string; readonly searchStr: string };
 
 export const addressOf = (path: string, query: Readonly<Record<string, string>>): string =>
@@ -45,7 +44,8 @@ export const useAsked = (ask: Ask, take: (value: string) => void): void => {
 
   useEffect(() => {
     if (asked === undefined) return;
-    const { pathname, searchStr } = router.state.location;
+    // The address as history holds it, which a clear by another ask this commit has already moved.
+    const { pathname, searchStr } = router.latestLocation;
     const rest = new URLSearchParams(searchStr);
     rest.delete(ask);
     void router.navigate({ href: hrefOf(pathname, rest), replace: true });

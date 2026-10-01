@@ -104,11 +104,13 @@ export type AuditEventPage = {
   readonly nextCursor: AuditEventId | null;
 };
 
+type CursorAt = { readonly scope: number; readonly cursor: number };
+
 /** Compared in SQL, never through a `Date`, whose milliseconds would tie rows Postgres orders. */
-const afterTheCursor = (cursor: number): string =>
-  `($${cursor}::text IS NULL OR (at, id) < (
+const afterTheCursor = (at: CursorAt): string =>
+  `($${at.cursor}::text IS NULL OR (at, id) < (
      SELECT page_end.at, page_end.id FROM audit_event page_end
-      WHERE page_end.workspace_id = ${scopeClause(1)} AND page_end.id = $${cursor}))`;
+      WHERE page_end.workspace_id = ${scopeClause(at.scope)} AND page_end.id = $${at.cursor}))`;
 
 /** Fetched one row past the page, so that row says another follows. */
 const pageOf = (rows: readonly AuditEventRow[], limit: number): AuditEventPage => {
@@ -134,7 +136,7 @@ export const eventsNewestFirst = async (
        FROM audit_event
       WHERE workspace_id = ${scopeClause(1)}
         AND ($2::text IS NULL OR family = $2)
-        AND ${afterTheCursor(3)}
+        AND ${afterTheCursor({ scope: 1, cursor: 3 })}
       ORDER BY at DESC, id DESC
       LIMIT $4 + 1`,
     [scopeParameter(principal), asked.family ?? null, asked.cursor ?? null, asked.limit],
@@ -152,31 +154,32 @@ export type PersonNamedIn = {
   readonly detail: readonly { readonly key: string; readonly acts: readonly ActName[] }[];
 };
 
-/** Every arm's parameters, in the order the read passes them; each detail arm's three follow. */
-const ARM = { scope: 1, cursor: 2, limit: 3, actor: 4, person: 5, subjectKinds: 6 } as const;
+type Bindable = string | number | null | readonly string[];
 
-const FIRST_DETAIL_PARAMETER = 7;
+/** A placeholder is the number its own value's binding answers, so the two cannot drift apart. */
+const boundValues = () => {
+  const values: Bindable[] = [];
+  return { values, bind: (value: Bindable): number => values.push(value) };
+};
+
+type ArmAt = CursorAt & { readonly limit: number };
 
 /** Each arm is limited on its own index; one query that ORs them would scan the workspace. */
-const armOf = (predicate: string): string =>
+const armOf = (at: ArmAt, predicate: string): string =>
   `(SELECT ${AUDIT_EVENT_ROW}
       FROM audit_event
-     WHERE workspace_id = ${scopeClause(ARM.scope)} AND ${predicate}
-       AND ${afterTheCursor(ARM.cursor)}
+     WHERE workspace_id = ${scopeClause(at.scope)} AND ${predicate}
+       AND ${afterTheCursor(at)}
      ORDER BY at DESC, id DESC
-     LIMIT $${ARM.limit} + 1)`;
+     LIMIT $${at.limit} + 1)`;
 
 /**
  * Naming the kinds the acts' subjects take reaches the subject index. They are a value the
  * planner can see, not a subquery it cannot.
  */
-const detailArm = (key: string, acts: readonly ActName[], first: number) => ({
-  clause: armOf(
-    `subject_kind = ANY($${first}::text[]) AND act = ANY($${first + 1}::text[])
-     AND detail ->> $${first + 2}::text = $${ARM.person}`,
-  ),
-  values: [[...new Set(acts.flatMap((name) => name.split(".").slice(1, 2)))], acts, key],
-});
+const subjectKindsOf = (acts: readonly ActName[]): readonly string[] => [
+  ...new Set(acts.flatMap((name) => name.split(".").slice(1, 2))),
+];
 
 /**
  * Newest first, from the row after `cursor`: the events whose actor is the person, whose subject
@@ -193,25 +196,31 @@ export const eventsNamingNewestFirst = async (
     readonly limit: number;
   },
 ): Promise<AuditEventPage> => {
-  const inDetail = asked.namedIn.detail.map(({ key, acts }, index) =>
-    detailArm(key, acts, FIRST_DETAIL_PARAMETER + index * 3),
-  );
+  const { values, bind } = boundValues();
+  const at: ArmAt = {
+    scope: bind(scopeParameter(principal)),
+    cursor: bind(asked.cursor ?? null),
+    limit: bind(asked.limit),
+  };
+  const person = bind(asked.personId);
+  const arms = [
+    armOf(at, `actor = $${bind(actorIdOfPerson(asked.personId))}`),
+    armOf(
+      at,
+      `subject_kind = ANY($${bind(asked.namedIn.subjectKinds)}::text[]) AND subject_id = $${person}`,
+    ),
+    ...asked.namedIn.detail.map(({ key, acts }) =>
+      armOf(
+        at,
+        `subject_kind = ANY($${bind(subjectKindsOf(acts))}::text[])
+         AND act = ANY($${bind(acts)}::text[]) AND detail ->> $${bind(key)}::text = $${person}`,
+      ),
+    ),
+  ];
   const found = await tx.query(
-    `SELECT * FROM (${[
-      armOf(`actor = $${ARM.actor}`),
-      armOf(`subject_kind = ANY($${ARM.subjectKinds}::text[]) AND subject_id = $${ARM.person}`),
-      ...inDetail.map((arm) => arm.clause),
-    ].join(" UNION ALL ")}) AS arms
+    `SELECT * FROM (${arms.join(" UNION ALL ")}) AS arms
      ORDER BY at DESC, id DESC`,
-    [
-      scopeParameter(principal),
-      asked.cursor ?? null,
-      asked.limit,
-      actorIdOfPerson(asked.personId),
-      asked.personId,
-      asked.namedIn.subjectKinds,
-      ...inDetail.flatMap((arm) => arm.values),
-    ],
+    values,
   );
 
   const rows = found.rows.map((row) => boundarySchemas.auditEvent.select.parse(row));

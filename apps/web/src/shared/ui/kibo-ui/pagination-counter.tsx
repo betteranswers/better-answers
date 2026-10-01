@@ -21,6 +21,7 @@ const PaginationTurn = ({
   children,
 }: PaginationTurnProps & { children: ReactNode }) => (
   <Button
+    type="button"
     variant="outline"
     size="sm"
     aria-label={label}
@@ -42,6 +43,7 @@ export type PaginationCounterProps = ComponentProps<typeof Pagination> & {
   next: PaginationTurnProps;
 };
 
+/** One live region says where a turn landed: the summary when there is one, else the counter. */
 export const PaginationCounter = ({
   summary,
   counter,
@@ -55,7 +57,9 @@ export const PaginationCounter = ({
     {...props}
   >
     {summary === undefined ? null : (
-      <p className="text-sm text-muted-foreground tabular-nums">{summary}</p>
+      <p role="status" className="text-sm text-muted-foreground tabular-nums">
+        {summary}
+      </p>
     )}
     <PaginationContent className="flex-wrap gap-2">
       <PaginationItem>
@@ -65,7 +69,12 @@ export const PaginationCounter = ({
         </PaginationTurn>
       </PaginationItem>
       <PaginationItem>
-        <span className="text-sm text-muted-foreground tabular-nums">{counter}</span>
+        <span
+          role={summary === undefined ? "status" : undefined}
+          className="text-sm text-muted-foreground tabular-nums"
+        >
+          {counter}
+        </span>
       </PaginationItem>
       <PaginationItem>
         <PaginationTurn {...next}>

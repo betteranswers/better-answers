@@ -52,8 +52,12 @@ type ColumnControl = {
   readonly onHiddenChange: (hidden: ReadonlySet<string>) => void;
 };
 
-/** A choice's value can never be empty in the registry's select, so "any" needs a word of its own. */
+/** The registry's select refuses an empty value, so no narrowing needs a word, and each choice a mark that word lacks. */
 const ANY = "any";
+
+const CHOICE = "=";
+
+const carried = (value: string): string => `${CHOICE}${value}`;
 
 function FocusOn(properties: {
   readonly keystroke: Keystroke;
@@ -101,9 +105,9 @@ function FilterSelect(properties: { readonly filter: Filter }) {
   const { label, value, anyLabel, choices, onChange } = properties.filter;
   return (
     <Select
-      value={value ?? ANY}
+      value={value === undefined ? ANY : carried(value)}
       onValueChange={(picked) => {
-        onChange(picked === ANY ? undefined : picked);
+        onChange(picked === ANY ? undefined : picked.slice(CHOICE.length));
       }}
     >
       <SelectTrigger aria-label={`Filter by ${label.toLowerCase()}`} className="min-w-32">
@@ -112,7 +116,7 @@ function FilterSelect(properties: { readonly filter: Filter }) {
       <SelectContent>
         <SelectItem value={ANY}>{anyLabel}</SelectItem>
         {choices.map((choice) => (
-          <SelectItem key={choice.value} value={choice.value}>
+          <SelectItem key={choice.value} value={carried(choice.value)}>
             {choice.label}
           </SelectItem>
         ))}

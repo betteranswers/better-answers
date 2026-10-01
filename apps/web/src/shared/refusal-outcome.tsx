@@ -63,7 +63,6 @@ const saidOfItems = (featureWords: SaidOfWord, failure: Error | ApiError): reado
   }));
 };
 
-/** One line per item the refusal names; nothing for a refusal naming none. */
 export function RefusedItemLines(properties: {
   readonly featureWords: SaidOfWord;
   readonly failure: Error | ApiError;

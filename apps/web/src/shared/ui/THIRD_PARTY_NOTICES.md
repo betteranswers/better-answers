@@ -106,8 +106,8 @@ the pin.
 | `radio-group.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/radio-group.json | `299fa36d5c5df3ae` | `3e0591dd59910958` |
 | `alert-dialog.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/alert-dialog.json | `03c0d4de131a9b04` | `b89696dd357f7246` |
 | `breadcrumb.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/breadcrumb.json | `18043f281e20e08f` | `a8a7adf3bdb2fa3a` |
-| `pagination.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/pagination.json | `e70ae7251fdb0f3c` | `7ff1ac5a4ffa3e72` |
-| `empty.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/empty.json | `2c377f47c4e661d7` | `f4f4308e47f07f4a` |
+| `pagination.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/pagination.json | `e70ae7251fdb0f3c` | `5ba3751a3705925d` |
+| `empty.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/empty.json | `2c377f47c4e661d7` | `af1b98aebc32f8ff` |
 
 The Kibo UI patterns, each read at commit `3d63cdb15b79d972e3dc38a10997987672f9b263` of
 [shadcnblocks/kibo](https://github.com/shadcnblocks/kibo) (MIT), under `packages/patterns/`. The
@@ -119,11 +119,11 @@ source file is listed.
 | --- | --- | --- | --- |
 | `kibo-ui/pagination-counter.tsx` | `pagination/navigation/pagination-navigation-2.tsx` | `3900f88ed99d81a7` | `5aa22f4dc305ec81` |
 | | `pagination/advanced/pagination-advanced-5.tsx` | `367c54e9538b48fe` | |
-| `kibo-ui/empty-action.tsx` | `empty/actions/empty-actions-1.tsx` | `b6b0ab3e7bc394cc` | `0de1316492243671` |
+| `kibo-ui/empty-action.tsx` | `empty/actions/empty-actions-1.tsx` | `b6b0ab3e7bc394cc` | `36cef032c7a8ee57` |
 | | `empty/search/empty-search-2.tsx` | `fe2894413f5fe4d0` | |
 | | `empty/standard/empty-standard-6.tsx` | `25f2152a598a1fe5` | |
 | `kibo-ui/row-actions.tsx` | `dropdown-menu/actions/dropdown-menu-actions-2.tsx` | `58e26bf9f81588b0` | `d9d46adba09ea6e3` |
-| `kibo-ui/counted-switch.tsx` | `tabs/advanced/tabs-advanced-1.tsx` | `06e57ae8224ceace` | `9d254019414305e4` |
+| `kibo-ui/counted-switch.tsx` | `tabs/advanced/tabs-advanced-1.tsx` | `06e57ae8224ceace` | `b2bcfbc2d41b2d03` |
 
 `components.json` writes `https://ui.shadcn.com/r/{name}.json` for the primitives because that is
 the CLI's own default form; the table records the style-qualified URL the CLI resolves it to,
@@ -266,6 +266,18 @@ The arrival edits on the four Kibo UI patterns, which are demonstrations rather 
   no panels leaves each trigger's `aria-controls` pointing nowhere. The count is Kibo's `Pill`, not
   shadcn's `Badge`, as every pill is. The bridge rounds every `role="radio"`, so the drawn segment
   is an inner span and the radio itself stays a bare hit area.
+
+The edits made on 1 October 2026, after review, on four of the files above:
+
+- `empty.tsx`: `EmptyDescription` takes a `div`'s props, the element it renders. Upstream types it
+  with a paragraph's props over that same `div`; the element stays.
+- `pagination.tsx`: `PaginationEllipsis` carries `aria-hidden` on its icon, not its wrapper, where
+  it hid the "More pages" label from assistive technology.
+- `kibo-ui/empty-action.tsx`: `EmptyActionProps` omits `children`, since the part draws its own
+  and a passed one would be dropped.
+- `kibo-ui/counted-switch.tsx`: the focus ring stays on the segment's span and the checked
+  elevation moved to a span inside it. Two shadow utilities on one element set one property, so a
+  checked segment could lose its focus ring.
 
 Everything else is upstream's, unedited. Their behaviour — keyboard handling, focus, ARIA
 wiring, virtualisation — is theirs by ADR 0033; the screens that use them carry the WCAG 2.2 AA

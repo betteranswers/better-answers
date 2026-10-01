@@ -11,19 +11,26 @@ export type AuditEventActor =
 const personIn = (actor: string): UserId | undefined =>
   isActorId(actor) ? personOfActor(actor) : undefined;
 
+export const peopleAmong = (actors: readonly string[]): readonly UserId[] =>
+  actors.flatMap((actor) => personIn(actor) ?? []);
+
 /** By person id, never through the membership, so a name stands after its member leaves. */
-export const namesOfActors = async (
+export const namesOfPeople = async (
   tx: Tx,
-  actors: readonly string[],
+  personIds: readonly string[],
 ): Promise<ReadonlyMap<string, string>> => {
-  const people = new Set(actors.map(personIn));
-  people.delete(undefined);
+  if (personIds.length === 0) return new Map();
   const found = await tx.query<{ id: string; name: string }>(
     'SELECT id, name FROM "user" WHERE id = ANY($1::text[])',
-    [[...people]],
+    [[...new Set(personIds)]],
   );
   return new Map(found.rows.map((row) => [row.id, row.name]));
 };
+
+export const namesOfActors = (
+  tx: Tx,
+  actors: readonly string[],
+): Promise<ReadonlyMap<string, string>> => namesOfPeople(tx, peopleAmong(actors));
 
 export const actorOf = (actor: string, names: ReadonlyMap<string, string>): AuditEventActor => {
   const person = personIn(actor);

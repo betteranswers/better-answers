@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { EmptyAction } from "@/shared/ui/kibo-ui/empty-action.tsx";
 import { PaginationCounter } from "@/shared/ui/kibo-ui/pagination-counter.tsx";
@@ -15,7 +16,7 @@ export function ListState(properties: { readonly state: State }) {
   const { state } = properties;
   switch (state.kind) {
     case "loading":
-      return <EmptyAction title={state.words} />;
+      return <EmptyAction title={<output>{state.words}</output>} />;
     case "empty":
       return <EmptyAction title={state.words} action={state.act} />;
     case "emptied":
@@ -46,6 +47,7 @@ export function ListState(properties: { readonly state: State }) {
 type Pages = {
   readonly kind: "pages";
   readonly label: string;
+  /** The page `pageWithin` chose, the one the screen's rows come from. */
   readonly pageIndex: number;
   readonly pageSize: number;
   readonly total: number;
@@ -60,9 +62,17 @@ type More = {
   readonly more: boolean;
   readonly loading: boolean;
   readonly onMore: () => void;
+  readonly keystroke?: Keystroke;
 };
 
 const BAND = "border-t border-border bg-muted px-3 py-2";
+
+/**
+ * An address can name a page a filter or a removal has since emptied. A screen chooses its rows
+ * and its turns from this page.
+ */
+export const pageWithin = (pageIndex: number, pageSize: number, total: number): number =>
+  Math.min(pageIndex, Math.max(0, Math.ceil(total / pageSize) - 1));
 
 function PageTurns(properties: { readonly pages: Pages }) {
   const { label, pageIndex, pageSize, total, onTurn, keystrokes } = properties.pages;
@@ -96,22 +106,30 @@ function PageTurns(properties: { readonly pages: Pages }) {
   );
 }
 
+function MoreOn(properties: { readonly keystroke: Keystroke; readonly onMore: () => void }) {
+  useKeystroke(properties.keystroke, properties.onMore);
+  return null;
+}
+
 function LoadMore(properties: { readonly more: More }) {
-  const { label, more, loading, onMore } = properties.more;
+  const { label, more, loading, onMore, keystroke } = properties.more;
   if (!more) return null;
+  const load = () => {
+    if (!loading) onMore();
+  };
   return (
     <nav aria-label={label} className={BAND}>
       <Button
         variant="outline"
         size="sm"
         aria-disabled={loading}
+        aria-keyshortcuts={keystroke?.key}
         className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
-        onClick={() => {
-          if (!loading) onMore();
-        }}
+        onClick={load}
       >
         Load more
       </Button>
+      {keystroke === undefined ? null : <MoreOn keystroke={keystroke} onMore={load} />}
     </nav>
   );
 }

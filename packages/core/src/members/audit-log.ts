@@ -19,7 +19,8 @@ import {
   type AuditEventActor,
   detailsNamed,
   hasNoDisplayName,
-  namesOfActors,
+  namesOfPeople,
+  peopleAmong,
 } from "../workspaces/index.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
@@ -82,7 +83,9 @@ const NAMED_KINDS: ReadonlyMap<string, NamedKind> = new Map([
   ["invitation", "invitation"],
 ]);
 
-type SubjectNames = Readonly<Record<NamedKind, ReadonlyMap<string, string>>>;
+type Names = ReadonlyMap<string, string>;
+
+type SubjectNames = Readonly<Record<NamedKind, Names>>;
 
 const idsNamedAs = (rows: readonly AuditEventRow[], kind: NamedKind): readonly string[] => [
   ...new Set(
@@ -90,42 +93,35 @@ const idsNamedAs = (rows: readonly AuditEventRow[], kind: NamedKind): readonly s
   ),
 ];
 
-/** The ids are the statement's last parameter; a kind no row names costs no round trip. */
-const namesById = async (
-  tx: Tx,
-  statement: string,
-  ids: readonly string[],
-  scope: readonly string[] = [],
-): Promise<ReadonlyMap<string, string>> => {
-  if (ids.length === 0) return new Map();
-  const found = await tx.query<{ id: string; name: string }>(statement, [...scope, ids]);
-  return new Map(found.rows.map((row) => [row.id, row.name]));
-};
+const byId = (rows: readonly { id: string; name: string }[]): Names =>
+  new Map(rows.map((row) => [row.id, row.name]));
 
-/** A person by id, never through the membership; the invitation table has no row-level security. */
-const namesOfSubjects = async (
+const groupNames = async (
   principal: UserPrincipal,
   tx: Tx,
-  rows: readonly AuditEventRow[],
-): Promise<SubjectNames> => ({
-  person: await namesById(
-    tx,
-    'SELECT id, name FROM "user" WHERE id = ANY($1::text[])',
-    idsNamedAs(rows, "person"),
-  ),
-  group: await namesById(
-    tx,
+  groupIds: readonly string[],
+): Promise<Names> => {
+  if (groupIds.length === 0) return new Map();
+  const found = await tx.query<{ id: string; name: string }>(
     'SELECT id, name FROM "group" WHERE workspace_id = $1 AND id = ANY($2::text[])',
-    idsNamedAs(rows, "group"),
-    [principal.workspaceId],
-  ),
-  invitation: await namesById(
-    tx,
+    [principal.workspaceId, groupIds],
+  );
+  return byId(found.rows);
+};
+
+/** The invitation table has no row-level security, so the workspace is named here or nowhere. */
+const invitationAddresses = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  invitationIds: readonly string[],
+): Promise<Names> => {
+  if (invitationIds.length === 0) return new Map();
+  const found = await tx.query<{ id: string; name: string }>(
     "SELECT id, email AS name FROM invitation WHERE workspace_id = $1 AND id = ANY($2::text[])",
-    idsNamedAs(rows, "invitation"),
-    [principal.workspaceId],
-  ),
-});
+    [principal.workspaceId, invitationIds],
+  );
+  return byId(found.rows);
+};
 
 const SUBJECT_OF = {
   person: (name) =>
@@ -144,7 +140,7 @@ const subjectOf = (row: AuditEventRow, names: SubjectNames): AuditEventSubject |
 
 const eventOf = (
   row: AuditEventRow,
-  names: { readonly actors: ReadonlyMap<string, string>; readonly subjects: SubjectNames },
+  names: { readonly people: Names; readonly subjects: SubjectNames },
   detail: ReadAuditEvent["detail"] | undefined,
 ): ReadAuditEvent => ({
   id: row.id,
@@ -154,7 +150,7 @@ const eventOf = (
   subjectId: row.subjectId,
   actor: row.actor,
   at: row.at.toISOString(),
-  by: actorOf(row.actor, names.actors),
+  by: actorOf(row.actor, names.people),
   subject: subjectOf(row, names.subjects),
   detail: detail ?? {},
 });
@@ -168,16 +164,20 @@ export const eventsNamed = async (
   tx: Tx,
   rows: readonly AuditEventRow[],
 ): Promise<readonly ReadAuditEvent[]> => {
-  const actors = await namesOfActors(
-    tx,
-    rows.map((row) => row.actor),
-  );
-  const subjects = await namesOfSubjects(principal, tx, rows);
+  const people = await namesOfPeople(tx, [
+    ...peopleAmong(rows.map((row) => row.actor)),
+    ...idsNamedAs(rows, "person"),
+  ]);
+  const subjects = {
+    person: people,
+    group: await groupNames(principal, tx, idsNamedAs(rows, "group")),
+    invitation: await invitationAddresses(principal, tx, idsNamedAs(rows, "invitation")),
+  } satisfies SubjectNames;
   const details = await detailsNamed(
     tx,
     rows.map((row) => row.detail ?? {}),
   );
-  return rows.map((row, index) => eventOf(row, { actors, subjects }, details[index]));
+  return rows.map((row, index) => eventOf(row, { people, subjects }, details[index]));
 };
 
 /**

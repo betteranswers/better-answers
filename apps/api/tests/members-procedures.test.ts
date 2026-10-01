@@ -512,9 +512,12 @@ describe("a person's activity over tRPC", () => {
     const onPriyas = await api.members.activity.query({ personId: priya.id });
 
     const lines = (page: typeof onHannahs) =>
-      page.events.map(({ act, subject, relation }) => [act, subject, relation]);
+      page.events.map(({ act, subject, direction }) => [act, subject, direction]);
     const priyaNamed = { kind: "person", displayName: "Priya Shah" };
-    expect(lines(onHannahs)).toEqual([["people.member.role_changed", priyaNamed, "by"]]);
+    expect(lines(onHannahs)).toEqual([
+      ["people.member.role_changed", priyaNamed, "by"],
+      ["platform.workspace.provisioned", null, "to"],
+    ]);
     expect(lines(onPriyas)).toEqual([["people.member.role_changed", priyaNamed, "to"]]);
     expect(onPriyas.events[0]?.at).toMatch(ISO_INSTANT);
     expect(onPriyas.nextCursor).toBeNull();

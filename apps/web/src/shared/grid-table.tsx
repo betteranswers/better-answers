@@ -22,12 +22,13 @@ import {
 } from "@/shared/ui/table.tsx";
 
 /** Ticks are row ids the screen holds, so a row a search or a page hides stays ticked. */
-type Ticking<Data> = {
+type Ticks = {
   readonly ticked: ReadonlySet<string>;
   readonly onTickedChange: (ticked: ReadonlySet<string>) => void;
-  readonly nameOf: (row: Data) => string;
   readonly everyOnThePage: string;
 };
+
+type Ticking<Data> = Ticks & { readonly nameOf: (row: Data) => string };
 
 type ColumnSort = { readonly id: string; readonly desc: boolean };
 
@@ -53,6 +54,10 @@ const CELL = "h-10 px-3 py-2 whitespace-normal";
 const opensElsewhere = (event: MouseEvent<HTMLAnchorElement>): boolean =>
   event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
 
+/** A link the caller sent to another window, or to a download, is the browser's to follow. */
+const leavesThePage = (link: HTMLAnchorElement): boolean =>
+  !["", "_self"].includes(link.target) || link.hasAttribute("download");
+
 /** A real link, so a new tab or a copied address still reaches the row; a plain click opens it here. */
 export function RowLink(
   properties: Omit<ComponentProps<"a">, "href" | "onClick"> & {
@@ -70,7 +75,7 @@ export function RowLink(
         className,
       )}
       onClick={(event) => {
-        if (opensElsewhere(event)) return;
+        if (opensElsewhere(event) || leavesThePage(event.currentTarget)) return;
         event.preventDefault();
         onOpen();
       }}
@@ -100,10 +105,7 @@ const pageTickState = (ticked: ReadonlySet<string>, ids: readonly string[]) => {
 };
 
 /** Ticks the rows this page shows and no others; a tick on another page stands. */
-function PageTick(properties: {
-  readonly ids: readonly string[];
-  readonly ticking: Ticking<never>;
-}) {
+function PageTick(properties: { readonly ids: readonly string[]; readonly ticking: Ticks }) {
   const { ids, ticking } = properties;
   return (
     <Checkbox
@@ -147,25 +149,22 @@ const nextSort = (sorted: ColumnSort | undefined, id: string): ColumnSort => ({
   desc: sorted?.id === id && !sorted.desc,
 });
 
+/** `span` counts shown columns only, so a group narrows as the reader hides its columns. */
 function ColumnHead<Features extends TableFeatures, Data extends RowData>(properties: {
   readonly header: Header<Features, Data, unknown>;
+  readonly span: number;
   readonly sorting: SortHeads | undefined;
 }) {
-  const { header, sorting } = properties;
-  const label = header.isPlaceholder
-    ? null
-    : flexRender(header.column.columnDef.header, header.getContext());
+  const { header, span, sorting } = properties;
+  const label = flexRender(header.column.columnDef.header, header.getContext());
   const id = header.column.id;
+  const spans = { scope: "col", colSpan: span, rowSpan: header.rowSpan, className: HEAD } as const;
   if (sorting === undefined || !sorting.sortable.has(id)) {
-    return (
-      <TableHead scope="col" className={HEAD}>
-        {label}
-      </TableHead>
-    );
+    return <TableHead {...spans}>{label}</TableHead>;
   }
   const sorted = sorting.sorted?.id === id ? sorting.sorted : undefined;
   return (
-    <TableHead scope="col" className={HEAD} aria-sort={ariaSortOf(sorted)}>
+    <TableHead {...spans} aria-sort={ariaSortOf(sorted)}>
       <SortHead
         sorted={sorted}
         onSort={() => {
@@ -180,6 +179,44 @@ function ColumnHead<Features extends TableFeatures, Data extends RowData>(proper
 
 const isShown = (hidden: ReadonlySet<string> | undefined, columnId: string): boolean =>
   hidden?.has(columnId) !== true;
+
+const shownSpan = <Features extends TableFeatures, Data extends RowData>(
+  header: Header<Features, Data, unknown>,
+  hidden: ReadonlySet<string> | undefined,
+): number =>
+  header
+    .getLeafHeaders()
+    .filter((leaf) => leaf.subHeaders.length === 0 && isShown(hidden, leaf.column.id)).length;
+
+/** A grouped header is rows deep; a header TanStack merges into the one above has no row span. */
+function HeadRows<Features extends TableFeatures, Data extends RowData>(
+  properties: Opted<Data> & {
+    readonly table: HeldTable<Features, Data>;
+    readonly ids: readonly string[];
+  },
+) {
+  const { table, ticking, sorting, hidden, rowMenu } = properties;
+  const groups = table.getHeaderGroups();
+  return groups.map((group, depth) => (
+    <TableRow key={group.id} className="border-border hover:bg-transparent">
+      {depth > 0 || ticking === undefined ? null : (
+        <TableHead scope="col" rowSpan={groups.length} className={cn(HEAD, "w-10")}>
+          <PageTick ids={properties.ids} ticking={ticking} />
+        </TableHead>
+      )}
+      {group.headers.map((header) => {
+        const span = shownSpan(header, hidden);
+        if (span === 0 || header.rowSpan === 0) return null;
+        return <ColumnHead key={header.id} header={header} span={span} sorting={sorting} />;
+      })}
+      {depth > 0 || rowMenu === undefined ? null : (
+        <TableHead scope="col" rowSpan={groups.length} className={cn(HEAD, "w-12")}>
+          <span className="sr-only">Acts</span>
+        </TableHead>
+      )}
+    </TableRow>
+  ));
+}
 
 function GridRow<Features extends TableFeatures, Data extends RowData>(
   properties: Opted<Data> & { readonly row: Row<Features, Data> },
@@ -243,25 +280,14 @@ export function GridTable<Features extends TableFeatures, Data extends RowData>(
     <Table>
       <TableCaption className="sr-only">{properties.caption}</TableCaption>
       <TableHeader className="bg-muted">
-        {table.getHeaderGroups().map((group) => (
-          <TableRow key={group.id} className="border-border hover:bg-transparent">
-            {ticking === undefined ? null : (
-              <TableHead scope="col" className={cn(HEAD, "w-10")}>
-                <PageTick ids={rows.map((row) => row.id)} ticking={ticking} />
-              </TableHead>
-            )}
-            {group.headers
-              .filter((header) => isShown(hidden, header.column.id))
-              .map((header) => (
-                <ColumnHead key={header.id} header={header} sorting={sorting} />
-              ))}
-            {rowMenu === undefined ? null : (
-              <TableHead scope="col" className={cn(HEAD, "w-12")}>
-                <span className="sr-only">Acts</span>
-              </TableHead>
-            )}
-          </TableRow>
-        ))}
+        <HeadRows
+          table={table}
+          ids={rows.map((row) => row.id)}
+          ticking={ticking}
+          sorting={sorting}
+          hidden={hidden}
+          rowMenu={rowMenu}
+        />
       </TableHeader>
       <TableBody>
         {rows.length === 0 ? (
