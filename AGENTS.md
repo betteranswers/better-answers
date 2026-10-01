@@ -120,7 +120,7 @@ This server runs the **front door** surface. Three tools reach every jCodeMunch 
 
 **From a worktree, two indexes.**
 
-- jCodeMunch reads the worktree's own index, which the create hook builds, so it sees this branch's uncommitted edits.
+- jCodeMunch and jDocMunch each read the worktree's own index, which the create hook builds, so they see this branch's uncommitted edits. jDocMunch names it `local/<the worktree's folder name>`. Find it with `doc_resolve_repo` on the worktree's path, because `doc_list_repos` lists the main checkout's index too, and a doc read from that one misses this branch.
 - GitNexus reads the main checkout's index, taken at its last `analyze`. `analyze` runs after every merge to `main`, in the main checkout only; the runner is absent from a worktree.
 
 So from a worktree:
