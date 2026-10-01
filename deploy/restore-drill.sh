@@ -20,6 +20,8 @@ export RCLONE_CONFIG_STAGINGSTORE_TYPE=s3 RCLONE_CONFIG_STAGINGSTORE_PROVIDER=Ot
        RCLONE_CONFIG_STAGINGSTORE_SECRET_ACCESS_KEY="${STAGING_OBJECTSTORE_ROOT_SECRET}"
 
 NOT_BUILT=3
+# The uid the api writes /data/git as: the stores stack's init hands the store to it.
+API_UID=1000
 STAMP=$(date -u +%Y%m%dT%H%M%SZ); WORK=$(mktemp -d); BUNDLES=$(mktemp -d); REPORT="${WORK}/drill-${STAMP}.md"
 started=$(date -u +%FT%TZ); T0=$(date +%s)
 say() { printf '%s %s\n' "$(date -u +%T)" "$*" | tee -a "${REPORT}"; }
@@ -113,21 +115,21 @@ rclone sync "dumps:${BACKUP_MIRROR_BUCKET}/objectstore/" stagingstore:/
 say "## 4 git store — one bare repository per workspace from its latest bundle (ADR 0024)"
 # >>> the git store
 # The api's uid runs git, so the store holds no file of root's. It cannot enter WORK, which holds the decrypted dump.
-chown 1000:1000 "${BUNDLES}"
+chown "${API_UID}:${API_UID}" "${BUNDLES}"
 # Read before the loop: `for` ignores a failed listing, and the init below would leave every workspace empty.
 bundled=$(rclone lsf --dirs-only "dumps:${BACKUP_DUMPS_BUCKET}/git/" | tr -d /)
 for ws in ${bundled}; do
   b=$(rclone lsf "dumps:${BACKUP_DUMPS_BUCKET}/git/${ws}/" | sort | tail -n1)
   rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/git/${ws}/${b}" "${WORK}/${ws}.bundle.age"
   age -d -i "${BACKUP_AGE_IDENTITY_FILE}" -o "${BUNDLES}/${ws}.bundle" "${WORK}/${ws}.bundle.age"
-  chown 1000:1000 "${BUNDLES}/${ws}.bundle"
-  sudo -u '#1000' git clone --quiet --bare "${BUNDLES}/${ws}.bundle" "/data/git/${ws}.git"
+  chown "${API_UID}:${API_UID}" "${BUNDLES}/${ws}.bundle"
+  sudo -u "#${API_UID}" git clone --quiet --bare "${BUNDLES}/${ws}.bundle" "/data/git/${ws}.git"
   rm -f "${BUNDLES}/${ws}.bundle"
 done
 # The nightly bundles no repository without a ref, so a workspace not yet written to has none.
 workspaces=$(psql "${STAGING_DATABASE_URL}" -X -At -c 'select id from workspace')
 for ws in ${workspaces}; do
-  [ -d "/data/git/${ws}.git" ] || sudo -u '#1000' git init --quiet --bare --initial-branch main "/data/git/${ws}.git"
+  [ -d "/data/git/${ws}.git" ] || sudo -u "#${API_UID}" git init --quiet --bare --initial-branch main "/data/git/${ws}.git"
 done
 # <<< the git store
 
@@ -137,7 +139,7 @@ platform run --rm --no-deps api pnpm --silent ops replay-erasures --since "${dum
 say "## 5b the synthetic fixture joins the restored copy: its workspace's rows, chunk partition and an empty repository"
 # No production dump holds it, and it is the one workspace the drill may always rebuild, seed a subject into and erase.
 STAGING_DATABASE_URL="${STAGING_DATABASE_URL}" "${DEPLOY_DIR}/seed-synthetic.sh" | tee -a "${REPORT}"
-[ -d "/data/git/${synthetic_workspace}.git" ] || sudo -u '#1000' git init --quiet --bare --initial-branch main "/data/git/${synthetic_workspace}.git"
+[ -d "/data/git/${synthetic_workspace}.git" ] || sudo -u "#${API_UID}" git init --quiet --bare --initial-branch main "/data/git/${synthetic_workspace}.git"
 
 platform up -d --wait api worker
 say "api up — RTO so far $(( ( $(date +%s) - T0 ) / 60 )) min"
@@ -178,7 +180,7 @@ for tier in hourly daily weekly monthly; do printf '%s: %s copies\n' "${tier}" "
 if [ $(( $(date +%-m) % 3 )) -eq 0 ]; then
   say "## 10 erasure rehearsal on a synthetic subject — the proof that an erasure erases (ADR 0020, 0022; ticket 24)"
   ws_repo="/data/git/${DRILL_WORKSPACE}.git"
-  ws_git() { sudo -u '#1000' git -C "${ws_repo}" "$@"; }
+  ws_git() { sudo -u "#${API_UID}" git -C "${ws_repo}" "$@"; }
   commits_before_seed=$({ ws_git rev-list --all 2>/dev/null || true; } | sort)
 
   # 3 alone means no tables; a wider guard would write that over a refused seed.

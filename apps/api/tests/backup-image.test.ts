@@ -633,6 +633,13 @@ const seenFromTheImage = (address: string): string => {
   return uri.toString();
 };
 
+/** The script's own line, so a uid other than `init`'s fails the sudo below. */
+const theApisUid = (script: string): string => {
+  const line = /^API_UID=\S+$/m.exec(read(script))?.[0];
+  if (line === undefined) throw new Error(`${script} no longer names the api's uid as API_UID`);
+  return line;
+};
+
 /** The image has no sudo, and a git the step's root shell runs itself is noted. */
 const AS_THE_HOSTS_RUN_IT = [
   `sudo() { [ "$1 $2" = "-u #${API_UID}" ] || return 2; shift 2; HOME=/tmp setpriv --reuid=${API_UID} --regid=${API_UID} --clear-groups "$@"; }`,
@@ -660,6 +667,7 @@ const restoreEnvironment = (
   PRODUCTION_STEP: [
     "set -euo pipefail",
     "WORK=/work BUNDLES=/bundles",
+    theApisUid("deploy/restore-production.sh"),
     'tool() { "$@"; }',
     ...AS_THE_HOSTS_RUN_IT,
     fenced("deploy/restore-production.sh", "the git store"),
@@ -667,6 +675,7 @@ const restoreEnvironment = (
   DRILL_STEP: [
     "set -euo pipefail",
     "WORK=/work BUNDLES=/bundles BACKUP_AGE_IDENTITY_FILE=/run/age.key",
+    theApisUid("deploy/restore-drill.sh"),
     ...AS_THE_HOSTS_RUN_IT,
     fenced("deploy/restore-drill.sh", "the git store"),
   ].join("\n"),

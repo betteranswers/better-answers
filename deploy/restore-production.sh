@@ -18,6 +18,8 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+# The uid the api writes /data/git as: the stores stack's init hands the store to it.
+API_UID=1000
 WORK=$(mktemp -d); chmod 700 "${WORK}"; BUNDLES=$(mktemp -d); T0=$(date +%s); LOG="/var/log/better-answers-restore-$(date -u +%Y%m%dT%H%M%SZ).log"
 say() { printf '%s %s\n' "$(date -u +%T)" "$*" | tee -a "${LOG}"; }
 compose() { docker compose --project-directory "${REPO_DIR}/deploy" "$@"; }
@@ -79,23 +81,23 @@ if [ "${git}" = yes ]; then
   if [ -n "$(ls -A /data/git 2>/dev/null)" ]; then say "REFUSED: /data/git is not empty — the live repositories are newer than any bundle; clear it deliberately first, or clone from the VPC 2 mirror"; exit 1; fi
   # >>> the git store
   # The api's uid runs git, so the store holds no file of root's. It cannot enter WORK, which holds the decrypted dump.
-  chown 1000:1000 "${BUNDLES}"
+  chown "${API_UID}:${API_UID}" "${BUNDLES}"
   # Read before the loop: `for` ignores a failed listing, and the init below would leave every workspace empty.
   bundled=$(rclone lsf --dirs-only "dumps:${BACKUP_DUMPS_BUCKET}/git/" | tr -d '/\r')
   for ws in ${bundled}; do
     b=$(rclone lsf "dumps:${BACKUP_DUMPS_BUCKET}/git/${ws}/" | sort | tail -n1 | tr -d '\r')
     rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/git/${ws}/${b}" "/work/${ws}.bundle.age"
     tool age -d -i /run/age.key -o "/work/${ws}.bundle" "/work/${ws}.bundle.age"
-    install -o 1000 -g 1000 -m 400 "${WORK}/${ws}.bundle" "${BUNDLES}/${ws}.bundle"
+    install -o "${API_UID}" -g "${API_UID}" -m 400 "${WORK}/${ws}.bundle" "${BUNDLES}/${ws}.bundle"
     rm -f "${WORK}/${ws}.bundle" "${WORK}/${ws}.bundle.age"
-    sudo -u '#1000' git clone --quiet --bare "${BUNDLES}/${ws}.bundle" "/data/git/${ws}.git"
+    sudo -u "#${API_UID}" git clone --quiet --bare "${BUNDLES}/${ws}.bundle" "/data/git/${ws}.git"
     rm -f "${BUNDLES}/${ws}.bundle"
   done
   # The nightly bundles no repository without a ref, so a workspace not yet written to has none.
   # shellcheck disable=SC2016 # the tool container's shell expands it, where DATABASE_URL is set
   workspaces=$(tool sh -c 'psql "$DATABASE_URL" -X -At -c "select id from workspace"' | tr -d '\r')
   for ws in ${workspaces}; do
-    [ -d "/data/git/${ws}.git" ] || sudo -u '#1000' git init --quiet --bare --initial-branch main "/data/git/${ws}.git"
+    [ -d "/data/git/${ws}.git" ] || sudo -u "#${API_UID}" git init --quiet --bare --initial-branch main "/data/git/${ws}.git"
   done
   # <<< the git store
 fi
