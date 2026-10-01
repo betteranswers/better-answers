@@ -163,7 +163,7 @@ pnpm can select scripts by regular expression and `--no-bail` will keep going pa
 
 ## The tool configuration at the repository root
 
-**`cubic.yaml`** is the reviewer's configuration, read from `main` only. Cubic enables five agents per repository across every source and drops a sixth with no error, so each custom rule costs the generic slot it replaced; the generic API-auth agent was absorbed into the Principal rule rather than deleted, tenant scoping and request validation being what that rule is for.
+**`cubic.yaml`** is the reviewer's configuration, read from `main` only. Cubic enables five custom agents per repository, the repository's own first and then the organization's, and drops a sixth with no error, so each custom rule takes one of those slots; the API-auth agent was absorbed into the Principal rule rather than deleted, tenant scoping and request validation being what that rule is for.
 
 **`jscpd.config.mjs`** is a JavaScript module and not the `.jscpd.json` the tool reads on its own. jscpd 5.1.2 parses its config with a strict JSON parser — a `//` line is rejected, and the run then continues on the defaults and exits zero, so a config nobody could read looks exactly like a tree with nothing in it. `scripts/jscpd.mjs` turns these values into the command line instead, which the tool cannot half-read. The threshold is zero because a percentage is a dial someone tunes down the day it fires; a copy is either folded into a helper or named, in the config or beside the copy itself with jscpd's `jscpd:ignore-start` and `jscpd:ignore-end` comments.
 
