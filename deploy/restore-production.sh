@@ -88,8 +88,10 @@ if [ "${git}" = yes ]; then
     b=$(rclone lsf "dumps:${BACKUP_DUMPS_BUCKET}/git/${ws}/" | sort | tail -n1 | tr -d '\r')
     rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/git/${ws}/${b}" "/work/${ws}.bundle.age"
     tool age -d -i /run/age.key -o "/work/${ws}.bundle" "/work/${ws}.bundle.age"
-    install -o "${API_UID}" -g "${API_UID}" -m 400 "${WORK}/${ws}.bundle" "${BUNDLES}/${ws}.bundle"
-    rm -f "${WORK}/${ws}.bundle" "${WORK}/${ws}.bundle.age"
+    # A rename, never a copy: the plaintext is in one directory at a time.
+    mv "${WORK}/${ws}.bundle" "${BUNDLES}/${ws}.bundle"
+    chown "${API_UID}:${API_UID}" "${BUNDLES}/${ws}.bundle"
+    rm -f "${WORK}/${ws}.bundle.age"
     sudo -u "#${API_UID}" git clone --quiet --bare "${BUNDLES}/${ws}.bundle" "/data/git/${ws}.git"
     rm -f "${BUNDLES}/${ws}.bundle"
   done
