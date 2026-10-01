@@ -17,12 +17,12 @@
   --space-24: 96px;
   --space-32: 128px;
 
-  /* Layout constants. The band's first cell is as wide as the rail and its second as
-     wide as the secondary nav, so hiding the nav moves nothing in the band. */
-  --sidebar-w: 248px; /* the secondary nav, and the band's second cell */
-  --rail-w: 56px; /* the rail of surfaces, and the band's first cell: the logo */
-  --band-h: 48px; /* the band, when wide */
-  --measure-prose: 68ch; /* the one prose measure: a screen's paragraphs and headings */
+  /* The band's first two cells take the rail's and the secondary nav's widths, so hiding
+     the nav moves nothing in the band. */
+  --sidebar-w: 248px;
+  --rail-w: 56px;
+  --band-h: 48px;
+  --measure-prose: 68ch;
   --measure-narrow: 52ch;
-  --page-max: 1200px; /* the most a screen's content fills */
+  --page-max: 1200px;
 }

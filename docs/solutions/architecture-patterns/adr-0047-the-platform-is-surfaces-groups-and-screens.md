@@ -43,7 +43,7 @@ One navigation list in `apps/web/src/shared/` declares every surface, group and 
 - **Control Centre**: the Admin's one surface, in eight groups: Overview, Suggestions, Sources, Agent Operations, Questions, People, Personal data and System.
 - **Briefings** joins at Then: what the platform tells a person unasked, such as sector and account signals, each cited.
 
-The utilities sit at the rail's foot: Keyboard shortcuts today, and help and settings once they exist. The top band, not the rail, reaches three places. The console is reached from the workspace switcher, the Account page from the avatar menu, and any visible screen by jump-to (⌘K).
+The utilities sit at the rail's foot: Keyboard shortcuts today, and help and settings once they exist. The top band, not the rail, reaches the console from the workspace switcher and any visible screen by jump-to (⌘K). Once P1 builds the Account page, the avatar menu reaches it.
 
 **What v0.1 declares.** Screen names are today's words. Screens built today are in bold.
 

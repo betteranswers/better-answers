@@ -1,6 +1,5 @@
-/* The one file a consumer links: the token imports, then the one rule every consumer
-   shares. Every path is explicitly relative, because a bundler reads
-   `tokens/colors.css` as a package name and looks for it beside the file that
+/* The one file a consumer links. Every path is explicitly relative, because a bundler
+   reads `tokens/colors.css` as a package name and looks for it beside the file that
    imported this one. */
 @import "./tokens/fonts.css";
 @import "./tokens/colors.css";
@@ -13,14 +12,8 @@
 @import "./tokens/semantic.css";
 @import "./tokens/keyframes.css";
 
-/* The width rule. A screen's content fills the pane up to --page-max, which the shell
-   sets on the wrapper it marks `data-screen-content`. Inside it, paragraphs and headings
-   keep the prose measure, and a table or form takes the width it is given. The second
-   rule lifts the cap from text in a table, a dialog or a sheet. Every selector sits in
-   :where(), so neither rule has specificity and any utility overrides both; the base
-   layer puts them under Tailwind's utilities as well. An app imports this file before
-   Tailwind, so `base` is declared ahead of Tailwind's `theme` layer. That changes
-   nothing, because `theme` holds only custom properties on :root. */
+/* Zero specificity and the base layer let any utility override these rules. Base precedes
+   Tailwind's theme layer; harmless, since theme holds only custom properties. */
 @layer base {
   :where([data-screen-content]) :where(p, h1, h2, h3, h4, h5, h6) {
     max-width: var(--measure-prose);
