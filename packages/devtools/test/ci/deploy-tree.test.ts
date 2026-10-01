@@ -401,7 +401,7 @@ describe("the deploy tree", () => {
     const gitStore = at("git clone --quiet --bare");
     const seeded = at('"${DEPLOY_DIR}/seed-synthetic.sh" | tee -a "${REPORT}"');
     const repository = at(
-      `[ -d "/data/git/\${synthetic_workspace}.git" ] || sudo -u '#1000' git init --quiet --bare --initial-branch main "/data/git/\${synthetic_workspace}.git"`,
+      `[ -d "/data/git/\${synthetic_workspace}.git" ] || sudo -u "#\${API_UID}" git init --quiet --bare --initial-branch main "/data/git/\${synthetic_workspace}.git"`,
     );
     const apiUp = at("platform up -d --wait api");
 
