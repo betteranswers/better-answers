@@ -1,10 +1,10 @@
 import { useRouterState } from "@tanstack/react-router";
 import { createContext, useContext } from "react";
 
-import type { VisibleTree } from "@/shared/navigation.ts";
+import { NO_TREE, type VisibleTree } from "@/shared/navigation.ts";
 
 /** The frame's live reading of the list, so a route waiting on the role moves once it is read. */
-export const VisibleTreeContext = createContext<VisibleTree>({ surfaces: [], home: undefined });
+export const VisibleTreeContext = createContext<VisibleTree>(NO_TREE);
 
 export const useVisibleTree = (): VisibleTree => useContext(VisibleTreeContext);
 

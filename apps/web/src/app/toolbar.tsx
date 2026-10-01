@@ -18,7 +18,7 @@ export const openTabIn = (
   picked: string | undefined,
 ): ScreenTab | undefined => tabs?.find((tab) => tab.id === picked) ?? tabs?.[0];
 
-export type PickedTab = readonly [string | undefined, (picked: string) => void];
+export type PickedTab = readonly [string | undefined, (picked: string | undefined) => void];
 
 /** Opens on the first tab until one is picked; with no tabs, it holds the view-state slot alone. */
 export function ScreenTabsRoot(properties: {

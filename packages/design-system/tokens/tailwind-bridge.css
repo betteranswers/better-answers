@@ -270,11 +270,11 @@
      --space-4 and there is one scale rather than two that nearly agree. */
   --spacing: var(--space-1);
 
-  /* The layout constants, named: w-rail, w-sidebar (the secondary nav), h-topbar (the
-     band), max-w-measure, max-w-page. */
+  /* The layout constants, named: w-rail, w-sidebar (the secondary nav), h-band,
+     max-w-measure, max-w-page. */
   --spacing-sidebar: var(--sidebar-w);
   --spacing-rail: var(--rail-w);
-  --spacing-topbar: var(--topbar-h);
+  --spacing-band: var(--band-h);
   /* `measure`, not `prose`: Tailwind ships its own `max-w-prose` at 65ch and a theme
      value of that name does not displace it, so the token would silently lose. */
   --container-measure: var(--measure-prose);

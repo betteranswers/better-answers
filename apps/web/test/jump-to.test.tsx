@@ -4,6 +4,7 @@ import { jumpsIn, linesOf, matching, type JumpGroup } from "@/app/jump-to.tsx";
 import { findWhat, JUMP_TO, nothingMatches } from "@/app/words.ts";
 import {
   INVITE_A_PERSON,
+  readerOf,
   SURFACES,
   visibleTo,
   type Role,
@@ -11,7 +12,7 @@ import {
 } from "@/shared/navigation.ts";
 
 const treeOf = (role: Role, surfaces: readonly Surface[] = SURFACES) =>
-  visibleTo({ role, owns: [] }, surfaces);
+  visibleTo(readerOf(role), surfaces);
 
 const outline = (groups: readonly JumpGroup[]) =>
   groups.map((group) => [group.heading, group.jumps.map((jump) => jump.name)]);

@@ -12,8 +12,7 @@ import { PICKER_WORDS } from "@/features/auth/workspace-words.ts";
 import { Icon } from "@/shared/icon.tsx";
 import { CONSOLE } from "@/shared/navigation.ts";
 import type { Outcome } from "@/shared/outcome.tsx";
-import { RefusalLine } from "@/shared/refusal-outcome.tsx";
-import type { Said } from "@/shared/refusal-words.ts";
+import { refusedWith } from "@/shared/refusal-outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import {
   DropdownMenu,
@@ -33,11 +32,6 @@ export type Here = { readonly name: string; readonly workspaceId: string | undef
 type Switching = ReturnType<typeof useSwitchWorkspace>;
 
 type Listed = ReturnType<typeof useListOrganizations>;
-
-const refusedWith = (said: Said): Outcome => ({
-  tone: "refused",
-  words: <RefusalLine said={said} />,
-});
 
 const switchOutcome = (switching: Switching): Outcome | undefined => {
   if (switching.isPending) return { tone: "said", words: PICKER_WORDS.opening };
@@ -86,7 +80,7 @@ export const useWorkspaceSwitch = () => {
   };
 };
 
-export type WorkspaceSwitch = ReturnType<typeof useWorkspaceSwitch>;
+type WorkspaceSwitch = ReturnType<typeof useWorkspaceSwitch>;
 
 /**
  * The open workspace first, shown while the list is read; the rest by name, which the api never

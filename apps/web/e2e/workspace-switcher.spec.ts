@@ -17,14 +17,13 @@ import {
   removeMember,
   signIn,
   signOutFromTheShell,
+  switcherMenuOf,
   switcherOf,
 } from "./harness.ts";
 
 const SWITCH_BUDGET_MS = 1000;
 
 const WORKSPACES_READ = "**/organization/list";
-
-const menuOf = (page: Page, here: string): Locator => page.getByRole("menu", { name: here });
 
 const workspacesIn = (menu: Locator): Locator => menu.getByRole("menuitemradio");
 
@@ -89,7 +88,7 @@ test("lists the operator's workspaces and Console, others none (AE5)", async ({
   await page.reload();
 
   await switcherOf(page, operator.first.name).click();
-  const menu = menuOf(page, operator.first.name);
+  const menu = switcherMenuOf(page, operator.first.name);
   await expect(workspacesIn(menu)).toHaveText([operator.first.name, operator.second.name]);
   await expect(workspacesIn(menu).first()).toHaveAttribute("aria-checked", "true");
   await expect(menu.getByRole("menuitem")).toHaveText([ALL_WORKSPACES, CONSOLE.name]);
@@ -102,7 +101,7 @@ test("lists the operator's workspaces and Console, others none (AE5)", async ({
     second: "Colne Valley Forge",
   });
   await switcherOf(page, other.first.name).click();
-  const theirs = menuOf(page, other.first.name);
+  const theirs = switcherMenuOf(page, other.first.name);
   await expect(workspacesIn(theirs)).toHaveText([other.first.name, other.second.name]);
   await expect(theirs.getByRole("menuitem")).toHaveText([ALL_WORKSPACES]);
 });
@@ -119,7 +118,7 @@ test("switches to another workspace's home, reading its members", async ({ page,
 
   await switcherOf(page, first.name).click();
   const started = Date.now();
-  await workspacesIn(menuOf(page, first.name)).filter({ hasText: second.name }).click();
+  await workspacesIn(switcherMenuOf(page, first.name)).filter({ hasText: second.name }).click();
 
   await expect(memberButton(page, "Only In Aire")).toBeVisible();
   const elapsed = Date.now() - started;
@@ -142,7 +141,7 @@ test("lands a switch on the role's home in that workspace", async ({ page, reque
   );
 
   await switcherOf(page, first.name).click();
-  await workspacesIn(menuOf(page, first.name)).filter({ hasText: second.name }).click();
+  await workspacesIn(switcherMenuOf(page, first.name)).filter({ hasText: second.name }).click();
 
   await landedAtHome(page, "Viewer");
   await expect(switcherOf(page, second.name)).toBeVisible();
@@ -156,7 +155,7 @@ test("takes All workspaces to the picker", async ({ page, request }) => {
   });
 
   await switcherOf(page, first.name).click();
-  await menuOf(page, first.name).getByRole("menuitem", { name: ALL_WORKSPACES }).click();
+  await switcherMenuOf(page, first.name).getByRole("menuitem", { name: ALL_WORKSPACES }).click();
 
   await expect(page).toHaveURL("/choose-workspace");
   await expect(page.getByRole("heading", { level: 1, name: PICKER_WORDS.heading })).toBeVisible();
@@ -177,7 +176,7 @@ test("says it reads the list, filling the open menu", async ({
   const release = await heldBack(page, WORKSPACES_READ);
 
   await switcherOf(page, first.name).click();
-  const menu = menuOf(page, first.name);
+  const menu = switcherMenuOf(page, first.name);
   await expect(workspacesIn(menu)).toHaveText([first.name]);
   await expect(menu.getByRole("menuitem")).toHaveText([ALL_WORKSPACES, CONSOLE.name]);
   await expect(saidInTheBand(page)).toHaveText(PICKER_WORDS.reading);
@@ -204,7 +203,7 @@ test("says a refused switch in the band, keeping the screen", async ({
   await expect(memberButton(page, "Only In Kept")).toBeVisible();
 
   await switcherOf(page, first.name).click();
-  const leaving = workspacesIn(menuOf(page, first.name)).filter({ hasText: second.name });
+  const leaving = workspacesIn(switcherMenuOf(page, first.name)).filter({ hasText: second.name });
   await expect(leaving).toBeVisible();
   await removeMember(request, { workspaceId: second.workspaceId, userId: first.admin.id });
   await leaving.click();
@@ -216,7 +215,7 @@ test("says a refused switch in the band, keeping the screen", async ({
   await passesTheAccessibilityGate();
 
   await switcherOf(page, first.name).click();
-  await expect(workspacesIn(menuOf(page, first.name))).toHaveText([first.name]);
+  await expect(workspacesIn(switcherMenuOf(page, first.name))).toHaveText([first.name]);
 });
 
 test("says an unanswered switch in the band, keeping the screen", async ({ page, request }) => {
@@ -227,7 +226,7 @@ test("says an unanswered switch in the band, keeping the screen", async ({ page,
   await page.route("**/organization/set-active", (route) => route.abort());
 
   await switcherOf(page, first.name).click();
-  await workspacesIn(menuOf(page, first.name)).filter({ hasText: second.name }).click();
+  await workspacesIn(switcherMenuOf(page, first.name)).filter({ hasText: second.name }).click();
 
   await expect(refusedInTheBand(page)).toHaveText(sentenceOf(PICK_REFUSED));
   await expect(switcherOf(page, first.name)).toBeFocused();
@@ -249,5 +248,5 @@ test("says an unread list, and how to read it again", async ({ page, request }) 
   await expect(refusedInTheBand(page)).toHaveText(sentenceOf(SWITCHER_UNREAD), {
     timeout: 15_000,
   });
-  await expect(workspacesIn(menuOf(page, first.name))).toHaveText([first.name]);
+  await expect(workspacesIn(switcherMenuOf(page, first.name))).toHaveText([first.name]);
 });

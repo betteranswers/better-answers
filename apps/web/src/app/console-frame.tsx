@@ -5,14 +5,14 @@ import { SignOutButton } from "@/features/auth/sign-out-button.tsx";
 import { useOperatorStanding } from "@/features/console/operator.ts";
 import { ONLY_THE_OPERATOR, STANDING_UNANSWERED } from "@/features/console/refusal-words.ts";
 import { CONSOLE_CLOSED, saidOf } from "@/features/console/words.ts";
-import { CONSOLE, visibleTo } from "@/shared/navigation.ts";
+import { CONSOLE, OPERATOR_READER, visibleTo } from "@/shared/navigation.ts";
 import { RefusalLine } from "@/shared/refusal-outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 
 import { Frame } from "./frame.tsx";
 
 /** The console frame draws for the operator alone, so what it shows is theirs. */
-const THE_OPERATORS = visibleTo({ role: "operator", owns: [] }, [CONSOLE]);
+const THE_OPERATORS = visibleTo(OPERATOR_READER, [CONSOLE]);
 
 const BACK_TO_YOUR_WORKSPACES = {
   name: "Back to your workspaces",

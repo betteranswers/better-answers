@@ -2,11 +2,14 @@ import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
 /** What another place may ask of a screen as it opens: one of its acts, or a search. */
-export type Ask = "act" | "search";
+type Ask = "act" | "search";
+
+export const addressOf = (path: string, query: Readonly<Record<string, string>>): string =>
+  `${path}?${new URLSearchParams(query).toString()}`;
 
 /** The router re-types a value that reads as JSON, so only words and addresses are asked. */
 export const asking = (path: string, ask: Ask, value: string): string =>
-  `${path}?${new URLSearchParams({ [ask]: value }).toString()}`;
+  addressOf(path, { [ask]: value });
 
 /**
  * Taken in the render that sees it, so an open screen takes it too; then cleared, so a reload

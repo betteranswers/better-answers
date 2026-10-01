@@ -62,7 +62,7 @@
   /* The wide band stays put, so a control scrolled up into view stops below it, not under it. */
   @media (width >= theme(--breakpoint-md)) {
     :root {
-      scroll-padding-top: var(--topbar-h);
+      scroll-padding-top: var(--band-h);
     }
   }
 }

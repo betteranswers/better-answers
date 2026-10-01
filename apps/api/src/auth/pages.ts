@@ -1,12 +1,11 @@
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 
 import { PRODUCT_NAME } from "../product-name.ts";
 import { OAUTH_SCOPES, type OAuthScope, SIGN_IN_PATH } from "./constants.ts";
 
 /** Inline rather than linked, so its `currentColor` is the page's text colour, light or dark. */
 const LOGO = readFileSync(
-  fileURLToPath(import.meta.resolve("@better-answers/design-system/assets/logo.svg")),
+  new URL(import.meta.resolve("@better-answers/design-system/assets/logo.svg")),
   "utf8",
 ).trim();
 

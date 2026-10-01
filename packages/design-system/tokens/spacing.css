@@ -21,7 +21,7 @@
      wide as the secondary nav, so hiding the nav moves nothing in the band. */
   --sidebar-w: 248px; /* the secondary nav, and the band's second cell */
   --rail-w: 56px; /* the rail of surfaces, and the band's first cell: the logo */
-  --topbar-h: 48px; /* the band, when wide */
+  --band-h: 48px; /* the band, when wide */
   --measure-prose: 68ch; /* the one prose measure: a screen's paragraphs and headings */
   --measure-narrow: 52ch;
   --page-max: 1200px; /* the most a screen's content fills */

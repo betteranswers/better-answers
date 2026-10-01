@@ -11,10 +11,11 @@ import {
   headingOf,
   HOMES,
   movedWithin,
+  readerOf,
+  screensOf,
   SURFACES,
   visibleTo,
   type Role,
-  type Surface,
 } from "@/shared/navigation.ts";
 import { PRODUCT_NAME } from "@/shared/words.ts";
 
@@ -210,9 +211,6 @@ const routedPaths = (): readonly string[] =>
       .routesByPath,
   ).filter((path) => !OUTSIDE_THE_LIST.includes(path));
 
-const screensOf = (surfaces: readonly Surface[]) =>
-  surfaces.flatMap((surface) => surface.groups.flatMap((group) => group.screens));
-
 /** One direction finds the screen the router forgot; only the other finds a route nothing declared. */
 const destinations = [
   ...new Set([
@@ -229,7 +227,7 @@ const moved = movedWithin(EVERY_SURFACE);
 const navigatedPaths = async (role: Role): Promise<readonly string[]> => {
   vi.stubGlobal("fetch", answeringAs(role));
   const reached: string[] = [];
-  for (const surface of visibleTo({ role, owns: [] }, SURFACES).surfaces) {
+  for (const surface of visibleTo(readerOf(role), SURFACES).surfaces) {
     const { rendered } = await openApp(surface.opensAt.path);
     const nav = screen.getByRole("navigation", { name: surface.name });
     reached.push(
@@ -243,7 +241,7 @@ const navigatedPaths = async (role: Role): Promise<readonly string[]> => {
 };
 
 const shownPaths = (role: Role): readonly string[] =>
-  screensOf(visibleTo({ role, owns: [] }, SURFACES).surfaces).map((each) => each.path);
+  screensOf(visibleTo(readerOf(role), SURFACES).surfaces).map((each) => each.path);
 
 describe("the routes and navigation built from the one list", () => {
   it("gives every built screen and every role's home a route", () => {

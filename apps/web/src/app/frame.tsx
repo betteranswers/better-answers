@@ -1,5 +1,5 @@
 import { Outlet, useRouterState } from "@tanstack/react-router";
-import { useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useId, useMemo, useState, type ReactNode } from "react";
 
 import { useSignOut } from "@/features/auth/auth-hooks.ts";
 import { useMembership } from "@/features/auth/membership.ts";
@@ -8,6 +8,7 @@ import { ShellKeystrokes, ShellKeystrokesAct, type Keystroke } from "@/shared/ke
 import {
   EVERY_SURFACE,
   placeAt,
+  readerOf,
   SURFACES,
   visibleTo,
   type Place,
@@ -20,7 +21,7 @@ import { Band, type Person } from "./band.tsx";
 import { partsOf } from "./breadcrumb.tsx";
 import { IconRail } from "./icon-rail.tsx";
 import { JUMP_TO_KEYSTROKE, JumpTo, useJumping } from "./jump-to.tsx";
-import { NavigationButton, NavigationSheet } from "./navigation-control.tsx";
+import { NavigationButton, NavigationSheet, useNavigationSheet } from "./navigation-control.tsx";
 import { useSecondaryNavShowing } from "./secondary-nav-showing.ts";
 import { SecondaryNav } from "./secondary-nav.tsx";
 import { openTabIn, ScreenPanel, ScreenTabsRoot, Toolbar, type PickedTab } from "./toolbar.tsx";
@@ -34,16 +35,16 @@ const NO_JUMP_TO: readonly Keystroke[] = [];
 
 const WITH_JUMP_TO: readonly Keystroke[] = [JUMP_TO_KEYSTROKE];
 
-/** Jump-to is offered once a role is held, and the list names only what is offered. */
+/** The list names only what is offered. */
 function FrameKeystrokes(properties: {
   readonly open: Place | undefined;
-  readonly visible: VisibleTree;
+  readonly offersJumpTo: boolean;
   readonly children: ReactNode;
 }) {
   return (
     <ShellKeystrokes
       screen={properties.open?.screen.name}
-      shell={properties.visible.home === undefined ? NO_JUMP_TO : WITH_JUMP_TO}
+      shell={properties.offersJumpTo ? WITH_JUMP_TO : NO_JUMP_TO}
     >
       {properties.children}
     </ShellKeystrokes>
@@ -74,20 +75,21 @@ export function Frame(properties: {
   const { signOut, signingOut } = useSignOut();
   const wide = useWideLayout();
   const { showing, show } = useSecondaryNavShowing();
-  const [asked, ask] = useState(false);
-  const controlRef = useRef<HTMLButtonElement | null>(null);
+  const sheet = useNavigationSheet();
   const navId = useId();
   const switching = useWorkspaceSwitch();
   // The frame's, not the tabs root's: the band names the open tab, and the root sits below it.
-  const picked = useState<string>();
-  const jumping = useJumping(visible.home !== undefined);
+  const [pickedTab, pickTab] = useState<string>();
+  // Once a role is held, so nothing is offered to a reader the shell cannot place.
+  const offersJumpTo = visible.home !== undefined;
+  const jumping = useJumping(offersJumpTo);
 
   const open = placeAt(visible.surfaces, pathname);
   const region = useRegion(pathname);
 
   return (
     <VisibleTreeContext value={visible}>
-      <FrameKeystrokes open={open} visible={visible}>
+      <FrameKeystrokes open={open} offersJumpTo={offersJumpTo}>
         <div className="flex min-h-screen flex-col bg-background">
           <a
             href="#screen"
@@ -108,14 +110,12 @@ export function Frame(properties: {
                 />
               )
             }
-            parts={partsOf(open, openTabIn(region?.toolbar.tabs, picked[0])?.name)}
+            parts={partsOf(open, openTabIn(region?.toolbar.tabs, pickedTab)?.name)}
             person={properties.person}
             navigation={
               <NavigationButton
-                controlRef={controlRef}
+                sheet={sheet}
                 wide={wide}
-                asked={asked}
-                onAsk={ask}
                 showing={showing}
                 controls={navId}
                 open={open}
@@ -124,11 +124,12 @@ export function Frame(properties: {
             }
             jumpTo={
               <JumpTo
+                offered={offersJumpTo}
                 wide={wide}
                 tree={visible}
                 jumping={jumping}
                 onFindMember={() => {
-                  picked[1](undefined);
+                  pickTab(undefined);
                 }}
               />
             }
@@ -138,14 +139,7 @@ export function Frame(properties: {
             outcome={switching.outcome}
           />
 
-          <NavigationSheet
-            controlRef={controlRef}
-            wide={wide}
-            asked={asked}
-            onAsk={ask}
-            surfaces={visible.surfaces}
-            open={open}
-          />
+          <NavigationSheet sheet={sheet} wide={wide} surfaces={visible.surfaces} open={open} />
 
           {/*
            * A fixed rail and a 320px viewport cannot both be honoured; WCAG's reflow criterion
@@ -158,7 +152,11 @@ export function Frame(properties: {
 
             <div className="flex min-w-0 flex-1 flex-col">
               {/* Keyed by the workspace, so a switch draws the screen afresh over its new reads. */}
-              <ToolbarAndScreen key={here?.workspaceId} region={region} picked={picked} />
+              <ToolbarAndScreen
+                key={here?.workspaceId}
+                region={region}
+                picked={[pickedTab, pickTab]}
+              />
             </div>
           </div>
         </div>
@@ -173,7 +171,7 @@ export function WorkspaceFrame() {
   const standing = useOperatorStanding();
   const held = membership.data;
   const role = held?.role;
-  const visible = useMemo(() => visibleTo({ role, owns: [] }, SURFACES), [role]);
+  const visible = useMemo(() => visibleTo(readerOf(role), SURFACES), [role]);
 
   return (
     <Frame

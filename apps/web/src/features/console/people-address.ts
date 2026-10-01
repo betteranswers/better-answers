@@ -1,3 +1,4 @@
+import { addressOf } from "@/shared/address-ask.ts";
 import type { ScreenPath } from "@/shared/navigation.ts";
 
 /** Typed by the navigation list, so a screen moved there fails here at compile time. */
@@ -13,9 +14,6 @@ const ACT = "act";
 
 /** The sheet's two acts that ask for a sign-in from the last hour. */
 export type FreshAct = "revoke" | "correct";
-
-const addressOf = (path: ScreenPath, query: Readonly<Record<string, string>>): string =>
-  `${path}?${new URLSearchParams(query).toString()}`;
 
 /** Where signing in again comes back to: the person, found by their address, open at the act. */
 export const backTo = (

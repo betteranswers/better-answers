@@ -29,6 +29,7 @@ import {
   keystrokesDismissed,
   keystrokesListed,
   markTheOperator,
+  navOf,
   person,
   provision,
   signedInAtHome,
@@ -57,8 +58,6 @@ const REVOKE = "Revoke Priya Shah's credentials everywhere";
 
 /** Everyone the run makes is on this list, so a test finds its own by a tag in their address. */
 const aTag = (): string => `t${Date.now()}${Math.floor(Math.random() * 1e6)}`;
-
-const navOf = (page: Page) => page.getByRole("navigation", { name: CONSOLE.name });
 
 const everyone = (page: Page) => page.getByRole("region", { name: "Everyone" });
 
@@ -359,8 +358,8 @@ test.describe("the console's Everyone screen", () => {
 
     await markTheOperator(request, operators.admin.email, "revoke");
     // A move between the console's own screens keeps its standing, so the list asks again alone.
-    await navOf(page).getByRole("link", { name: "Every workspace" }).click();
-    await navOf(page).getByRole("link", { name: "Everyone" }).click();
+    await navOf(page, CONSOLE).getByRole("link", { name: "Every workspace" }).click();
+    await navOf(page, CONSOLE).getByRole("link", { name: "Everyone" }).click();
 
     await expect(everyone(page)).toContainText(sentenceOf(ONLY_THE_OPERATOR));
     await expect(everyone(page)).not.toContainText(NOT_THE_OPERATOR);

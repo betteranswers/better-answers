@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import { flushSync } from "react-dom";
 
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
-import { RefusalLine } from "@/shared/refusal-outcome.tsx";
-import type { Said } from "@/shared/refusal-words.ts";
+import { refusedWith } from "@/shared/refusal-outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 
 import {
@@ -222,11 +221,6 @@ type Standing = {
   /** Set only while the latest pick's refusal is the ended membership. */
   readonly removedFrom: Workspace | undefined;
 };
-
-const refusedWith = (said: Said): Outcome => ({
-  tone: "refused",
-  words: <RefusalLine said={said} />,
-});
 
 const pickOutcome = (standing: Standing): Outcome | undefined => {
   if (standing.removedFrom !== undefined) {

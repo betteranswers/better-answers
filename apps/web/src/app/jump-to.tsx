@@ -10,6 +10,7 @@ import {
   groupIn,
   placeAt,
   screenNamed,
+  screensOf,
   type Group,
   type Screen,
   type VisibleSurface,
@@ -120,13 +121,10 @@ export const jumpsIn = (
   tree: VisibleTree,
   members: readonly Member[] | undefined,
 ): readonly JumpGroup[] => {
-  const screens = tree.surfaces.flatMap((surface) =>
-    surface.groups.flatMap((group) => group.screens),
-  );
   const groups: readonly JumpGroup[] = [
     { heading: JUMP_TO.groups.surfaces, jumps: tree.surfaces.map(surfaceJump) },
     { heading: JUMP_TO.groups.screens, jumps: tree.surfaces.flatMap(placedIn).map(screenJump) },
-    { heading: JUMP_TO.groups.acts, jumps: screens.flatMap(actJumps) },
+    { heading: JUMP_TO.groups.acts, jumps: screensOf(tree.surfaces).flatMap(actJumps) },
     { heading: JUMP_TO.groups.members, jumps: (members ?? []).map(memberJump) },
   ];
   return groups.filter((group) => group.jumps.length > 0);
@@ -285,7 +283,9 @@ function JumpList(
   const kinds = [
     JUMP_TO.kinds.screen,
     ...(read === "unasked" ? [] : [JUMP_TO.kinds.member]),
-    ...(every.some((group) => group.heading === JUMP_TO.groups.acts) ? [JUMP_TO.kinds.act] : []),
+    ...(every.some(({ jumps }) => jumps.some(({ kind }) => kind === "act"))
+      ? [JUMP_TO.kinds.act]
+      : []),
   ];
 
   return (
@@ -332,8 +332,9 @@ function WithMembers(properties: Listed) {
   );
 }
 
-/** Drawn only once a role is held, so nothing is offered to a reader the shell cannot place. */
+/** The frame says whether it is offered, as it does for the chord and the list of keystrokes. */
 export function JumpTo(properties: {
+  readonly offered: boolean;
   readonly wide: boolean;
   readonly tree: VisibleTree;
   readonly jumping: Jumping;
@@ -344,7 +345,7 @@ export function JumpTo(properties: {
   const navigate = useNavigate();
   const chosen = useRef<Kind>(undefined);
 
-  if (tree.home === undefined) return null;
+  if (!properties.offered) return null;
 
   const choose = (jump: Jump) => {
     chosen.current = jump.kind;

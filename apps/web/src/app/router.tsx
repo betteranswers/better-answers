@@ -39,6 +39,9 @@ import {
   HOMES,
   leadsTo,
   movedWithin,
+  OPERATOR_READER,
+  readerOf,
+  screensOf,
   SURFACES,
   visibleTo,
   type Moved,
@@ -64,7 +67,8 @@ import { ROLE_UNREAD } from "./words.ts";
 
 type BuiltScreen = { readonly draw: () => ReactElement; readonly toolbar?: ScreenToolbar };
 
-const BUILT: readonly (readonly [ScreenPath, BuiltScreen])[] = [
+/** The list decides which screens are built; this map only says by what, and with what in hand. */
+const BUILT_SCREENS: ReadonlyMap<string, BuiltScreen> = new Map<ScreenPath, BuiltScreen>([
   ["/sources/bindings", { draw: BindingsScreen, toolbar: BINDINGS_TOOLBAR }],
   [
     "/agent-operations/routes-and-spend",
@@ -76,10 +80,7 @@ const BUILT: readonly (readonly [ScreenPath, BuiltScreen])[] = [
   ["/console/people/everyone", { draw: EveryoneScreen }],
   ["/console/people/names-waiting", { draw: NamesWaitingScreen }],
   ["/console/workspaces/every-workspace", { draw: WorkspacesScreen }],
-];
-
-/** The list decides which screens are built; this map only says by what, and with what in hand. */
-const BUILT_SCREENS: ReadonlyMap<string, BuiltScreen> = new Map(BUILT);
+]);
 
 type ShellContext = { readonly queryClient: QueryClient; readonly api: ApiProxy };
 
@@ -151,10 +152,8 @@ const shellRoute = createRoute({
 });
 
 /** Read after the shell's own read, which left no role in hand when it failed. */
-const memberOf = (context: ShellContext): Reader => ({
-  role: roleHeld(context.queryClient, context.api),
-  owns: [],
-});
+const memberOf = (context: ShellContext): Reader =>
+  readerOf(roleHeld(context.queryClient, context.api));
 
 /** No role is held, so asking again is the one way on; the route moves once it answers. */
 function RoleUnread() {
@@ -222,7 +221,9 @@ function MovedAway(properties: { readonly moved: Moved }) {
   return to === undefined ? <UnknownScreen /> : <Navigate to={to.path} replace />;
 }
 
-const drawOf = (screen: Screen, isAHome: boolean): (() => ReactElement) | undefined => {
+const HOME_SCREENS: readonly Screen[] = Object.values(HOMES);
+
+const drawOf = (screen: Screen): BuiltScreen | undefined => {
   const built = BUILT_SCREENS.get(screen.path);
   if (screen.built && built === undefined) {
     throw new Error(`the list calls ${screen.path} built, and nothing draws it`);
@@ -230,42 +231,41 @@ const drawOf = (screen: Screen, isAHome: boolean): (() => ReactElement) | undefi
   if (!screen.built && built !== undefined) {
     throw new Error(`the list calls ${screen.path} unbuilt, and something draws it`);
   }
-  return built?.draw ?? (isAHome ? () => <UnbuiltScreen home={screen} /> : undefined);
+  return (
+    built ??
+    (HOME_SCREENS.includes(screen) ? { draw: () => <UnbuiltScreen home={screen} /> } : undefined)
+  );
 };
 
-/** A failed screen offers the way home, which in the console is the console's own. */
-const routesOf = (
-  surfaces: readonly Surface[],
-  shell: AnyRoute,
-  readerOf: (context: ShellContext) => Reader,
-  home?: Screen,
-): AnyRoute[] => {
+type Reading = {
+  readonly readerIn: (context: ShellContext) => Reader;
+  /** A failed screen offers the way home, which in the console is the console's own. */
+  readonly home?: Screen;
+};
+
+const routesOf = (surfaces: readonly Surface[], shell: AnyRoute, reading: Reading): AnyRoute[] => {
+  const { readerIn, home } = reading;
   const failed = (failure: { readonly reset: () => void }) => (
     <FailedScreen reset={failure.reset} home={home} />
   );
-  const homes: readonly Screen[] = Object.values(HOMES);
 
   // An unbuilt screen has no route at all, so its address is one that never existed.
-  const screens = surfaces.flatMap((surface) => [
-    ...(surface.home === undefined ? [] : [surface.home]),
-    ...surface.groups.flatMap((group) => group.screens),
-  ]);
-  const drawn = screens.flatMap((screen) => {
-    const draw = drawOf(screen, homes.includes(screen));
-    return draw === undefined ? [] : [{ screen, draw }];
+  const drawn = screensOf(surfaces).flatMap((screen) => {
+    const built = drawOf(screen);
+    return built === undefined ? [] : [{ screen, built }];
   });
 
   return [
-    ...drawn.map(({ screen, draw }) =>
+    ...drawn.map(({ screen, built }) =>
       createRoute({
         getParentRoute: () => shell,
         path: screen.path,
         beforeLoad: ({ context }) => ({
-          hidden: hides(visibleTo(readerOf(context), surfaces), screen.path),
+          hidden: hides(visibleTo(readerIn(context), surfaces), screen.path),
         }),
-        component: () => <Seen draw={draw} />,
+        component: () => <Seen draw={built.draw} />,
         errorComponent: failed,
-        staticData: { toolbar: BUILT_SCREENS.get(screen.path)?.toolbar },
+        staticData: { toolbar: built.toolbar },
       }),
     ),
     ...movedWithin(surfaces).map((moved) =>
@@ -273,7 +273,7 @@ const routesOf = (
         getParentRoute: () => shell,
         path: moved.from,
         beforeLoad: ({ context }) => {
-          const to = leadsTo(visibleTo(readerOf(context), surfaces), moved);
+          const to = leadsTo(visibleTo(readerIn(context), surfaces), moved);
           if (to !== undefined) throw redirect({ href: to.path, replace: true });
         },
         component: () => <MovedAway moved={moved} />,
@@ -282,14 +282,12 @@ const routesOf = (
   ];
 };
 
-const workspaceRoutes = routesOf(SURFACES, shellRoute, memberOf);
+const workspaceRoutes = routesOf(SURFACES, shellRoute, { readerIn: memberOf });
 
-const consoleRoutes = routesOf(
-  [CONSOLE],
-  consoleRoute,
-  () => ({ role: "operator", owns: [] }),
-  HOMES.operator,
-);
+const consoleRoutes = routesOf([CONSOLE], consoleRoute, {
+  readerIn: () => OPERATOR_READER,
+  home: HOMES.operator,
+});
 
 export const createAppRouter = (clients: AppClients, history?: RouterHistory) => {
   const options = {

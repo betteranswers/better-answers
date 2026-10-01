@@ -5,12 +5,12 @@ import { z } from "zod";
 
 import type { REDACTION_TIERS, SENSITIVITIES } from "@better-answers/schema";
 
-import { goHome, UNKNOWN_SCREEN } from "@/app/words.ts";
+import { BREADCRUMB, goHome, RAIL, UNKNOWN_SCREEN } from "@/app/words.ts";
 import { SIGN_IN_WORDS, type CarriedOn } from "@/features/auth/sign-in-words.ts";
 import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
 import type { RefusalWord } from "@/shared/api/trpc.ts";
 import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
-import { headingOf, HOMES, type Role } from "@/shared/navigation.ts";
+import { headingOf, HOMES, type Role, type Surface } from "@/shared/navigation.ts";
 import { sentenceOf, type Said } from "@/shared/refusal-words.ts";
 
 const HARNESS = "/__harness";
@@ -292,12 +292,13 @@ export const codeSentTo = async (api: APIRequestContext, email: string): Promise
 export const anAddress = (who: string): string =>
   `${who}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
 
+/** Named for the person, though it shows their initials alone. */
+export const avatarOf = (page: Page, who: string): Locator =>
+  page.getByRole("banner").getByRole("button", { name: new RegExp(who) });
+
 /** The avatar shows initials alone, so the person's name and role are one disclosure in. */
 export const personMenuOpened = async (page: Page, who: string): Promise<Locator> => {
-  await page
-    .getByRole("banner")
-    .getByRole("button", { name: new RegExp(who) })
-    .click();
+  await avatarOf(page, who).click();
   const menu = page.getByRole("menu", { name: new RegExp(who) });
   await expect(menu).toBeVisible();
   return menu;
@@ -312,6 +313,22 @@ export const signOutFromTheShell = async (page: Page, who: string): Promise<void
 /** Named for where the person is: the workspace they are reading, or the console. */
 export const switcherOf = (page: Page, here: string): Locator =>
   page.getByRole("banner").getByRole("button", { name: here, exact: true });
+
+export const switcherMenuOf = (page: Page, here: string): Locator =>
+  page.getByRole("menu", { name: here });
+
+export const railOf = (page: Page): Locator => page.getByRole("navigation", { name: RAIL });
+
+/** The secondary nav, named for the open surface. */
+export const navOf = (page: Page, surface: Surface): Locator =>
+  page.getByRole("navigation", { name: surface.name });
+
+/** The current part is `role="link"` too, so a part that leads somewhere is told by its `href`. */
+export const crumbOf = (page: Page, name: string): Locator =>
+  page
+    .getByRole("banner")
+    .getByRole("navigation", { name: BREADCRUMB })
+    .getByRole("link", { name, exact: true });
 
 /** Needs a page with nothing focused yet, so the first Tab lands on the skip link. */
 export const skipLinkReachesTheScreen = async (page: Page): Promise<void> => {
@@ -420,8 +437,8 @@ export const keystrokesListed = async (page: Page, screen: string): Promise<Loca
 };
 
 /** The one button opening the list: the rail's or the band's, or a screen's outside the shell. */
-export const keystrokesButton = (page: Page): Locator =>
-  page.getByRole("button", { name: KEYSTROKE_WORDS.button, exact: true });
+export const keystrokesButton = (within: Page | Locator): Locator =>
+  within.getByRole("button", { name: KEYSTROKE_WORDS.button, exact: true });
 
 /** Focus lands back on the button a task after the list is gone, unless a key has moved it. */
 export const keystrokesDismissed = async (page: Page, listed: Locator): Promise<void> => {

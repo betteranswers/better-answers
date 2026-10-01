@@ -6,6 +6,8 @@ import { aRole, ROLES } from "@/features/people/role-meanings.ts";
 import {
   CONSOLE,
   HOMES,
+  readerOf,
+  screensOf,
   SURFACES,
   visibleTo,
   type Role,
@@ -26,11 +28,6 @@ const outline = (surfaces: readonly Surface[]) =>
     surface.name,
     surface.groups.map((group) => [group.name ?? null, group.screens.map((each) => each.name)]),
   ]);
-
-const nothingOwned = (role: Role | "operator" | undefined) => ({ role, owns: [] });
-
-const everyScreenOf = (surfaces: readonly Surface[]): readonly Screen[] =>
-  surfaces.flatMap((surface) => surface.groups.flatMap((group) => group.screens));
 
 /** Every screen called built and no home standing in, so what shows is the roles' doing. */
 const builtThroughout = (surface: Surface): Surface => ({
@@ -104,7 +101,7 @@ describe("the one navigation list", () => {
       ],
     ]);
     expect(SURFACES).not.toContain(CONSOLE);
-    expect(everyScreenOf([CONSOLE]).map((each) => each.seenBy)).toEqual([
+    expect(screensOf([CONSOLE]).map((each) => each.seenBy)).toEqual([
       ["operator"],
       ["operator"],
       ["operator"],
@@ -113,7 +110,7 @@ describe("the one navigation list", () => {
 
   it("calls only today's eight screens built", () => {
     expect(
-      everyScreenOf([...SURFACES, CONSOLE])
+      screensOf([...SURFACES, CONSOLE])
         .filter((each) => each.built)
         .map((each) => each.path),
     ).toEqual([
@@ -137,9 +134,7 @@ describe("the one navigation list", () => {
     );
 
     expect(strays).toEqual([]);
-    expect(everyScreenOf([CONSOLE]).filter((each) => !each.path.startsWith("/console/"))).toEqual(
-      [],
-    );
+    expect(screensOf([CONSOLE]).filter((each) => !each.path.startsWith("/console/"))).toEqual([]);
   });
 
   it("homes Admins on Members, Editors and Viewers on Ask", () => {
@@ -161,7 +156,7 @@ describe("the one navigation list", () => {
 describe("what each person is shown", () => {
   for (const role of ["Editor", "Viewer"] as const) {
     it(`shows ${aRole(role)} Ask alone, at their home (AE2)`, () => {
-      const shown = visibleTo(nothingOwned(role), SURFACES);
+      const shown = visibleTo(readerOf(role), SURFACES);
 
       expect(outline(shown.surfaces)).toEqual([["Ask", [[null, ["Ask"]]]]]);
       expect(shown.home).toBe(HOMES[role]);
@@ -170,7 +165,7 @@ describe("what each person is shown", () => {
   }
 
   it("shows an Admin Control Centre's built screens alone (AE3)", () => {
-    const shown = visibleTo(nothingOwned("Admin"), SURFACES);
+    const shown = visibleTo(readerOf("Admin"), SURFACES);
 
     expect(outline(shown.surfaces)).toEqual([
       [
@@ -188,18 +183,18 @@ describe("what each person is shown", () => {
   });
 
   it("shows nothing and no home while the role is unknown", () => {
-    expect(visibleTo(nothingOwned(undefined), SURFACES)).toEqual({
+    expect(visibleTo(readerOf(undefined), SURFACES)).toEqual({
       surfaces: [],
       home: undefined,
     });
   });
 
   it("shows the operator the console, opening on Every workspace", () => {
-    const shown = visibleTo(nothingOwned("operator"), [CONSOLE]);
+    const shown = visibleTo(readerOf("operator"), [CONSOLE]);
 
     expect(outline(shown.surfaces)).toEqual(outline([CONSOLE]));
     expect(shown.surfaces[0]?.opensAt).toBe(HOMES.operator);
-    expect(visibleTo(nothingOwned("operator"), SURFACES).surfaces).toEqual([]);
+    expect(visibleTo(readerOf("operator"), SURFACES).surfaces).toEqual([]);
   });
 
   it("hides unbuilt groups, and surfaces left with no group", () => {
@@ -214,7 +209,7 @@ describe("what each person is shown", () => {
     };
     const unbuilt: Surface = { ...aSurface, id: "b", name: "B", groups: aSurface.groups.slice(1) };
 
-    const shown = visibleTo(nothingOwned("Admin"), [aSurface, unbuilt]);
+    const shown = visibleTo(readerOf("Admin"), [aSurface, unbuilt]);
 
     expect(outline(shown.surfaces)).toEqual([["A", [["Built", ["Shown"]]]]]);
     expect(shown.surfaces[0]?.opensAt.name).toBe("Shown");
@@ -239,7 +234,7 @@ describe("what each person is shown", () => {
     };
 
     const namesFor = (role: Role, owns: readonly string[]) =>
-      everyScreenOf(visibleTo({ role, owns }, [aSurface]).surfaces).map((each) => each.name);
+      screensOf(visibleTo({ role, owns }, [aSurface]).surfaces).map((each) => each.name);
 
     expect(namesFor("Admin", [])).toEqual(["Owned", "Roles"]);
     expect(namesFor("Viewer", [])).toEqual([]);

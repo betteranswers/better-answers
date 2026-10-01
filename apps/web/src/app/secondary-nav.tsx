@@ -23,7 +23,7 @@ export function SecondaryNav(properties: {
       // Hidden rather than unmounted, so the button that governs it always names a region
       // that is there to be named.
       hidden={!properties.showing}
-      className="shrink-0 border-b border-border bg-background px-2 py-3 md:sticky md:top-topbar md:h-[calc(100vh-var(--topbar-h))] md:w-sidebar md:self-start md:overflow-y-auto md:border-r md:border-b-0"
+      className="shrink-0 border-b border-border bg-background px-2 py-3 md:sticky md:top-band md:h-[calc(100vh-var(--band-h))] md:w-sidebar md:self-start md:overflow-y-auto md:border-r md:border-b-0"
     >
       {properties.surface.groups.map((group) => (
         <div key={group.id} className="pb-2">

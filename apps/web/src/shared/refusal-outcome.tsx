@@ -19,14 +19,16 @@ export function RefusalLine(properties: { readonly said: Said }) {
   return <>{sentenceOf(properties.said)}</>;
 }
 
+export const refusedWith = (said: Said): Outcome => ({
+  tone: "refused",
+  words: <RefusalLine said={said} />,
+});
+
 export const refusalOutcome = (
   featureWords: SaidOfWord,
   word: RefusalWord,
   refusalClass: RefusalClass,
-): Outcome => ({
-  tone: "refused",
-  words: <RefusalLine said={saidOfRefusal(featureWords, word, refusalClass)} />,
-});
+): Outcome => refusedWith(saidOfRefusal(featureWords, word, refusalClass));
 
 /** A read saves nothing, so its failure with no word must not say nothing was saved. */
 export type FailedIn = "act" | "read";
@@ -44,6 +46,6 @@ export const failureOutcome = (
 ): Outcome => {
   const refusal = refusalOf(failure);
   return refusal === undefined
-    ? { tone: "refused", words: <RefusalLine said={UNANSWERED[failedIn]} /> }
+    ? refusedWith(UNANSWERED[failedIn])
     : refusalOutcome(featureWords, refusal.word, refusal.class);
 };

@@ -2,14 +2,16 @@ import type { Locator, Page } from "@playwright/test";
 
 import { BREADCRUMB, JUMP_TO, NAVIGATION_SHEET, RAIL, TOGGLE } from "@/app/words.ts";
 import { ROUTES_WORDS } from "@/features/routes/words.ts";
-import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
+import { keystrokesOn } from "@/shared/keystroke-words.ts";
 import {
   ASK,
   CONTROL_CENTRE,
   groupIn,
   headingOf,
   HOMES,
+  readerOf,
   screenNamed,
+  screensOf,
   SURFACES,
   visibleTo,
 } from "@/shared/navigation.ts";
@@ -20,12 +22,17 @@ import {
   addMember,
   aMemberSignedInAt,
   anAddress,
+  avatarOf,
+  crumbOf,
   invite,
+  keystrokesButton,
   keystrokesDismissed,
   keystrokesListed,
+  navOf,
   person,
   personMenuOpened,
   provision,
+  railOf,
   signIn,
   skipLinkReachesTheScreen,
   switcherOf,
@@ -33,13 +40,11 @@ import {
 } from "./harness.ts";
 
 /** What an Admin is shown today, read off the list: Control Centre and its built screens. */
-const AN_ADMINS = visibleTo({ role: "Admin", owns: [] }, SURFACES).surfaces;
+const AN_ADMINS = visibleTo(readerOf("Admin"), SURFACES).surfaces;
 
 const SURFACE_NAMES = AN_ADMINS.map((surface) => surface.name);
 
-const SCREEN_NAMES = AN_ADMINS.flatMap((surface) =>
-  surface.groups.flatMap((group) => group.screens.map((each) => each.name)),
-);
+const SCREEN_NAMES = screensOf(AN_ADMINS).map((each) => each.name);
 
 const AGENT_OPERATIONS = groupIn(CONTROL_CENTRE, "agent-operations");
 
@@ -74,10 +79,6 @@ const bandOf = (page: Page) => page.getByRole("banner");
 
 const logoOf = (page: Page) => bandOf(page).getByRole("link", { name: PRODUCT_NAME });
 
-const railOf = (page: Page) => page.getByRole("navigation", { name: RAIL });
-
-const navOf = (page: Page) => page.getByRole("navigation", { name: CONTROL_CENTRE.name });
-
 const closerOf = (page: Page) => page.getByRole("button", { name: TOGGLE.hide });
 
 const openerOf = (page: Page) => page.getByRole("button", { name: TOGGLE.show });
@@ -88,19 +89,9 @@ const sheetOf = (page: Page) => page.getByRole("dialog", { name: NAVIGATION_SHEE
 
 const jumpToOf = (page: Page) => bandOf(page).getByRole("button", { name: JUMP_TO.name });
 
-const keystrokesOf = (region: Page | Locator) =>
-  region.getByRole("button", { name: KEYSTROKE_WORDS.button, exact: true });
-
-const youOf = (page: Page, who: string) =>
-  bandOf(page).getByRole("button", { name: new RegExp(who) });
-
 const partOf = (page: Page, name: string) => bandOf(page).getByText(name, { exact: true });
 
 const crumbsOf = (page: Page) => bandOf(page).getByRole("navigation", { name: BREADCRUMB });
-
-/** The current part is `role="link"` too, so a part that leads somewhere is told by its `href`. */
-const crumbOf = (page: Page, name: string) =>
-  crumbsOf(page).getByRole("link", { name, exact: true });
 
 const TOOLBAR_TABS = ["Routes", "Spend"];
 
@@ -206,12 +197,12 @@ const paintedFill = (page: Page, name: string) =>
     .evaluate((link) => getComputedStyle(link).backgroundColor);
 
 const weightOf = (page: Page, screenName: string) =>
-  navOf(page)
+  navOf(page, CONTROL_CENTRE)
     .getByRole("link", { name: screenName })
     .evaluate((link) => Number.parseInt(getComputedStyle(link).fontWeight, 10));
 
 const glyphOf = (page: Page, screenName: string) =>
-  navOf(page)
+  navOf(page, CONTROL_CENTRE)
     .getByRole("link", { name: screenName })
     .evaluate((link) => link.querySelector("svg")?.innerHTML ?? "");
 
@@ -238,7 +229,7 @@ const bandBoxes = async (page: Page, workspaceName: string, who: string) => ({
   name: await boxOf(partOf(page, workspaceName)),
   switcher: await boxOf(switcherOf(page, workspaceName)),
   place: await boxOf(crumbsOf(page)),
-  you: await boxOf(youOf(page, who)),
+  you: await boxOf(avatarOf(page, who)),
 });
 
 const signedIn = async (page: Page, api: Parameters<typeof provision>[0], name: string) => {
@@ -302,7 +293,7 @@ test("lists the open surface's groups and screens, marking one", async ({ page, 
   await signedIn(page, request, "Northern Tooling");
   await page.goto("/system/audit-log");
 
-  const nav = navOf(page);
+  const nav = navOf(page, CONTROL_CENTRE);
   await expect(nav.getByRole("link")).toHaveText(SCREEN_NAMES);
   const open = nav.getByRole("link", { name: "Audit log" });
   await expect(open).toHaveAttribute("aria-current", "page");
@@ -355,7 +346,7 @@ test("lists the open surface's groups and screens, marking one", async ({ page, 
 
   // `goto` is the bookmark: a fresh document at a path no file sits at, not a click.
   await page.goto("/people/groups");
-  await expect(navOf(page).getByRole("link", { name: "Groups" })).toHaveAttribute(
+  await expect(navOf(page, CONTROL_CENTRE).getByRole("link", { name: "Groups" })).toHaveAttribute(
     "aria-current",
     "page",
   );
@@ -402,7 +393,7 @@ test("shows initials, with name and role one menu in", async ({ page, request })
   await page.goto("/sign-in");
   await signIn(page, request, email);
 
-  const you = youOf(page, LONG_PERSON);
+  const you = avatarOf(page, LONG_PERSON);
   await expect(you).toHaveAccessibleName(LONG_PERSON);
   await expect(you).toHaveText(`BF${LONG_PERSON}`);
   await expect(you.getByText("BF", { exact: true })).toBeVisible();
@@ -471,10 +462,10 @@ test("keeps band, rail and nav mounted between screens, focus kept", async ({ pa
   await page.goto(MEMBERS.path);
   await expect(page.getByRole("heading", { level: 1, name: headingOf(MEMBERS) })).toBeVisible();
 
-  const regions = [bandOf(page), railOf(page), navOf(page)];
+  const regions = [bandOf(page), railOf(page), navOf(page, CONTROL_CENTRE)];
   const before = await Promise.all(regions.map((region) => region.elementHandle()));
 
-  const groups = navOf(page).getByRole("link", { name: "Groups" });
+  const groups = navOf(page, CONTROL_CENTRE).getByRole("link", { name: "Groups" });
   await groups.focus();
   await page.keyboard.press("Enter");
 
@@ -490,11 +481,11 @@ test("sizes the band's cells to the rail and nav below", async ({ page, request 
   const workspace = await signedIn(page, request, "Ryedale Castings");
   await page.setViewportSize(DESKTOP);
   await page.goto(MEMBERS.path);
-  await expect(navOf(page)).toBeVisible();
+  await expect(navOf(page, CONTROL_CENTRE)).toBeVisible();
 
   const band = await boxOf(bandOf(page));
   const rail = await boxOf(railOf(page));
-  const nav = await boxOf(navOf(page));
+  const nav = await boxOf(navOf(page, CONTROL_CENTRE));
   expect(band.x).toBe(0);
   expect(band.width).toBe(DESKTOP.width);
   expect(band.y + band.height, "the band does not sit above the rail").toBeLessThanOrEqual(rail.y);
@@ -534,7 +525,7 @@ test("tabs skip link, band, icon rail, secondary nav, toolbar, screen", async ({
     crumbOf(page, AGENT_OPERATIONS.name),
     crumbOf(page, ROUTES_AND_SPEND.name),
     jumpToOf(page),
-    youOf(page, workspace.admin.name),
+    avatarOf(page, workspace.admin.name),
   ];
   expect(await inDocumentOrder(page, band), "the band reads out of order").toBe(true);
 
@@ -553,11 +544,11 @@ test("tabs skip link, band, icon rail, secondary nav, toolbar, screen", async ({
 
   // The rail's foot, under its surfaces.
   await page.keyboard.press("Tab");
-  await expect(keystrokesOf(rail)).toBeFocused();
+  await expect(keystrokesButton(rail)).toBeFocused();
 
   for (const name of SCREEN_NAMES) {
     await page.keyboard.press("Tab");
-    await expect(navOf(page).getByRole("link", { name })).toBeFocused();
+    await expect(navOf(page, CONTROL_CENTRE).getByRole("link", { name })).toBeFocused();
   }
 
   await page.keyboard.press("Tab");
@@ -663,8 +654,8 @@ test("narrows the band to two rows scrolling with the page", async ({ page, requ
     logoOf(page),
     switcherOf(page, workspace.name),
     jumpToOf(page),
-    keystrokesOf(bandOf(page)),
-    youOf(page, workspace.admin.name),
+    keystrokesButton(bandOf(page)),
+    avatarOf(page, workspace.admin.name),
   ];
   const place = await boxOf(crumbsOf(page));
   let before = Number.NEGATIVE_INFINITY;
@@ -707,8 +698,8 @@ test("opens the keystrokes from the narrow band, focus returned (R15)", async ({
   await expect(page.getByRole("heading", { level: 1, name: headingOf(MEMBERS) })).toBeVisible();
 
   // The rail lives in the sheet here, a dialog the keystrokes ignore, so the band holds the one.
-  const trigger = keystrokesOf(bandOf(page));
-  await expect(keystrokesOf(page)).toHaveCount(1);
+  const trigger = keystrokesButton(bandOf(page));
+  await expect(keystrokesButton(page)).toHaveCount(1);
   await expect(trigger).toHaveAttribute("aria-keyshortcuts", "?");
 
   const listed = await keystrokesListed(page, MEMBERS.name);
@@ -828,7 +819,7 @@ test("holds toggle and band still while the nav hides (AE1)", async ({
   await page.setViewportSize(DESKTOP);
   await page.goto(MEMBERS.path);
 
-  const nav = navOf(page);
+  const nav = navOf(page, CONTROL_CENTRE);
   await expect(nav).toBeVisible();
   const tabs = page.getByRole("tablist", { name: MEMBERS.name });
   await expect(tabs).toBeVisible();
@@ -967,7 +958,7 @@ test("keeps a 40-character address on one line, prose measured (AE6)", async ({
 test("remembers a closed secondary nav on this browser only", async ({ page, request }) => {
   const workspace = await signedIn(page, request, "Ribble Toolmaking");
   await page.goto(ROUTES_AND_SPEND.path);
-  await expect(navOf(page)).toBeVisible();
+  await expect(navOf(page, CONTROL_CENTRE)).toBeVisible();
   await theRoutesHaveLanded(page);
 
   // Listening only across the act, so neither the start above nor the reload below is mistaken
@@ -976,13 +967,13 @@ test("remembers a closed secondary nav on this browser only", async ({ page, req
   const noting = (each: { url: () => string }) => asked.push(each.url());
   page.on("request", noting);
   await closerOf(page).click();
-  await expect(navOf(page)).toHaveCount(0);
+  await expect(navOf(page, CONTROL_CENTRE)).toHaveCount(0);
   page.off("request", noting);
   expect(asked).toEqual([]);
 
   await page.reload();
   await expect(page.getByRole("heading", { level: 1, name: ITS_HEADING })).toBeVisible();
-  await expect(navOf(page)).toHaveCount(0);
+  await expect(navOf(page, CONTROL_CENTRE)).toHaveCount(0);
   await expect(openerOf(page)).toBeVisible();
 
   const kept = await keptOnThisBrowser(page);
@@ -1007,7 +998,7 @@ test("opens the navigation over narrow content, holding and returning focus", as
   await narrowAtRoutesAndSpend(page, request, "Wharfedale Castings");
 
   await expect(railOf(page)).toHaveCount(0);
-  await expect(navOf(page)).toHaveCount(0);
+  await expect(navOf(page, CONTROL_CENTRE)).toHaveCount(0);
   const contentWide = await widthOf(page.getByRole("main"));
 
   const menu = sheetButtonOf(page);
@@ -1073,7 +1064,7 @@ test("closes the sheet on widening, focusing the navigation control", async ({ p
 
   await expect(sheetOf(page)).toHaveCount(0);
   await expect(railOf(page)).toBeVisible();
-  await expect(navOf(page)).toBeVisible();
+  await expect(navOf(page, CONTROL_CENTRE)).toBeVisible();
   await expect(closerOf(page)).toBeFocused();
 });
 

@@ -30,6 +30,7 @@ import { rememberTheSession, sessionRemembered } from "./session-memory.ts";
 import type { Arrival } from "./sign-in-words.ts";
 
 const AUTH_KEYS = {
+  all: ["auth"],
   session: ["auth", "session"],
   workspaces: ["auth", "workspaces"],
 } as const;
@@ -288,7 +289,7 @@ export type SwitchedTo = { readonly id: string; readonly name: string };
 
 /** Every read but the person's own: their session, their list of workspaces and `session.*`. */
 const aboutTheWorkspace = (api: ApiProxy) => {
-  const theirOwn = [{ queryKey: ["auth"] }, api.session.pathFilter()];
+  const theirOwn = [{ queryKey: AUTH_KEYS.all }, api.session.pathFilter()];
   return (query: Query) => !theirOwn.some((filters) => matchQuery(filters, query));
 };
 

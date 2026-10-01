@@ -1,14 +1,6 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
-import {
-  ALL_WORKSPACES,
-  BREADCRUMB,
-  goHome,
-  JUMP_TO,
-  RAIL,
-  TOGGLE,
-  UNKNOWN_SCREEN,
-} from "@/app/words.ts";
+import { ALL_WORKSPACES, goHome, JUMP_TO, RAIL, TOGGLE, UNKNOWN_SCREEN } from "@/app/words.ts";
 import { PICKER_WORDS } from "@/features/auth/workspace-words.ts";
 import { NOT_THE_OPERATOR, ONLY_THE_OPERATOR } from "@/features/console/refusal-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
@@ -20,14 +12,19 @@ import { expect, test } from "./browser.ts";
 import {
   addMember,
   anAddress,
+  avatarOf,
+  crumbOf,
   landedAtHome,
   markTheOperator,
+  navOf,
   person,
   personMenuOpened,
   provision,
+  railOf,
   signedInAtHome,
   signIn,
   skipLinkReachesTheScreen,
+  switcherMenuOf,
   switcherOf,
 } from "./harness.ts";
 
@@ -40,15 +37,6 @@ const CLOSED = "The console is the operator's alone";
 const UK_DAY =
   /^\d{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) \d{4}$/;
 
-const railOf = (page: Page) => page.getByRole("navigation", { name: RAIL });
-
-const navOf = (page: Page) => page.getByRole("navigation", { name: CONSOLE.name });
-
-const menuOf = (page: Page, who: string) =>
-  page.getByRole("banner").getByRole("button", { name: new RegExp(who) });
-
-const switcherMenuOf = (page: Page, here: string) => page.getByRole("menu", { name: here });
-
 /** The way in is the switcher's, offered from the operator's standing as last read. */
 const theConsoleOffered = async (page: Page, workspaceName: string) => {
   await switcherOf(page, workspaceName).click();
@@ -58,12 +46,6 @@ const theConsoleOffered = async (page: Page, workspaceName: string) => {
   await expect(theConsole).toBeVisible();
   return theConsole;
 };
-
-const crumbOf = (page: Page, name: string) =>
-  page
-    .getByRole("banner")
-    .getByRole("navigation", { name: BREADCRUMB })
-    .getByRole("link", { name, exact: true });
 
 const listOf = (page: Page) => page.getByRole("region", { name: "Every workspace" });
 
@@ -116,7 +98,7 @@ test.describe("the way into the console", () => {
       EVERY_WORKSPACE,
     );
     await expect(railOf(page).getByRole("link")).toHaveText([CONSOLE.name]);
-    await expect(navOf(page).getByRole("link")).toHaveText([
+    await expect(navOf(page, CONSOLE).getByRole("link")).toHaveText([
       "Everyone",
       "Names waiting",
       "Every workspace",
@@ -271,8 +253,8 @@ test.describe("the console's Workspaces screen", () => {
 
     await markTheOperator(request, workspace.admin.email, "revoke");
     // A move between the console's own screens keeps its standing, so the list asks again alone.
-    await navOf(page).getByRole("link", { name: "Everyone" }).click();
-    await navOf(page).getByRole("link", { name: "Every workspace" }).click();
+    await navOf(page, CONSOLE).getByRole("link", { name: "Everyone" }).click();
+    await navOf(page, CONSOLE).getByRole("link", { name: "Every workspace" }).click();
 
     await expect(listOf(page)).toContainText(sentenceOf(ONLY_THE_OPERATOR));
     await expect(listOf(page)).not.toContainText(NOT_THE_OPERATOR);
@@ -299,7 +281,7 @@ test.describe("the console's Workspaces screen", () => {
 
     await expect(page).toHaveURL("/console/people/everyone");
     await expect(page.getByRole("region", { name: "Everyone" })).toBeVisible();
-    const screens = navOf(page).getByRole("link");
+    const screens = navOf(page, CONSOLE).getByRole("link");
     await expect(screens).toHaveText(["Everyone", "Names waiting", "Every workspace"]);
     await screens.filter({ hasText: "Names waiting" }).click();
     await expect(page).toHaveURL("/console/people/names-waiting");
@@ -355,7 +337,7 @@ test.describe("the console's Workspaces screen", () => {
       crumbOf(page, CONSOLE.name),
       crumbOf(page, "Workspaces"),
       page.getByRole("banner").getByRole("button", { name: JUMP_TO.name }),
-      menuOf(page, workspace.admin.name),
+      avatarOf(page, workspace.admin.name),
       railOf(page).getByRole("link", { name: CONSOLE.name }),
       railOf(page).getByRole("button", { name: KEYSTROKE_WORDS.button }),
     ]) {
@@ -364,7 +346,7 @@ test.describe("the console's Workspaces screen", () => {
     }
     for (const name of ["Everyone", "Names waiting", "Every workspace"]) {
       await page.keyboard.press("Tab");
-      await expect(navOf(page).getByRole("link", { name })).toBeFocused();
+      await expect(navOf(page, CONSOLE).getByRole("link", { name })).toBeFocused();
     }
 
     await expect(railOf(page)).toMatchAriaSnapshot(`

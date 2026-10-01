@@ -107,7 +107,7 @@ function BandOutcome(properties: { readonly outcome: Outcome | undefined; readon
 function WideBand(properties: BandProperties) {
   return (
     <header className="sticky top-0 z-10 bg-background">
-      <div className="flex h-topbar">
+      <div className="flex h-band">
         {/* No rule beneath: the logo's cell and the rail read as one column. */}
         <LogoLink home={properties.home} className="w-rail border-r border-border bg-sidebar" />
 
@@ -134,7 +134,7 @@ function WideBand(properties: BandProperties) {
 function NarrowBand(properties: BandProperties) {
   return (
     <header className="border-b border-border bg-background">
-      <div className="flex h-topbar items-center gap-2 px-2">
+      <div className="flex h-band items-center gap-2 px-2">
         {properties.navigation}
         <LogoLink home={properties.home} className="size-8" />
         {properties.switcher}

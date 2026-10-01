@@ -148,9 +148,9 @@ Tracking tightens as size grows (−0.022em display → −0.006em body); the 11
 opens to +0.06em upper case. Tabular figures wherever numbers stack.
 
 **Spacing.** 4px base, with 2px and 6px for dense controls. Layout constants: the 56px
-rail (`--rail-w`), the 248px secondary nav (`--sidebar-w`), the 48px band (`--topbar-h`),
+rail (`--rail-w`), the 248px secondary nav (`--sidebar-w`), the 48px band (`--band-h`),
 the 1200px page maximum (`--page-max`) and the 68ch prose measure (`--measure-prose`).
-Tailwind reads them as `w-rail`, `w-sidebar`, `h-topbar`, `max-w-page` and
+Tailwind reads them as `w-rail`, `w-sidebar`, `h-band`, `max-w-page` and
 `max-w-measure`. Controls are 26 / 32 / 40px tall.
 
 **The shell.** A full-width band runs across the top of every workspace and Console

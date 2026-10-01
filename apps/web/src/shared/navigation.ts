@@ -9,7 +9,7 @@ export type Role = (typeof ROLES)[number];
 export type Seer = Role | "operator";
 
 /** Something a screen does that jump-to offers by name, to whoever may see the screen. */
-export type Act = {
+type Act = {
   readonly name: string;
   /** What the screen's address carries to open it. */
   readonly asks: string;
@@ -481,6 +481,11 @@ export type Reader = {
   readonly owns: readonly string[];
 };
 
+/** Owning nothing, until S3 brings domain ownership. */
+export const readerOf = (role: Seer | undefined): Reader => ({ role, owns: [] });
+
+export const OPERATOR_READER: Reader = readerOf("operator");
+
 /** `opensAt` is where its rail entry leads: the reader's home when it is here. */
 export type VisibleSurface = Surface & { readonly opensAt: Screen };
 
@@ -489,6 +494,8 @@ export type VisibleTree = {
   /** Undefined exactly when no role is held. */
   readonly home: Screen | undefined;
 };
+
+export const NO_TREE: VisibleTree = { surfaces: [], home: undefined };
 
 const sees = (role: Seer, owns: readonly string[], screen: Screen): boolean =>
   screen.built && (screen.seenBy.includes(role) || (screen.owners === true && owns.length > 0));
@@ -519,7 +526,7 @@ const shownOf = (
 /** Built-ness and the reader filter the list; a role's home shows whether built or not. */
 export const visibleTo = (reader: Reader, surfaces: readonly Surface[]): VisibleTree => {
   const { role, owns } = reader;
-  if (role === undefined) return { surfaces: [], home: undefined };
+  if (role === undefined) return NO_TREE;
 
   const home = HOMES[role];
   const seen = (screen: Screen) => screen === home || sees(role, owns, screen);
@@ -539,6 +546,10 @@ const placesIn = <Held extends Surface>(surface: Held): readonly Place<Held>[] =
   ...(surface.home === undefined ? [] : [{ surface, group: undefined, screen: surface.home }]),
   ...surface.groups.flatMap((group) => group.screens.map((screen) => ({ surface, group, screen }))),
 ];
+
+/** A surface's own home first: a visible surface carries none, so it adds nothing there. */
+export const screensOf = (surfaces: readonly Surface[]): readonly Screen[] =>
+  surfaces.flatMap(placesIn).map(({ screen }) => screen);
 
 /** An exact match: an address beneath a screen's names no place. */
 export const placeAt = <Held extends Surface>(
@@ -571,9 +582,7 @@ export const movedWithin = (surfaces: readonly Surface[]): readonly Moved[] =>
 
 /** Undefined where the reader may see nothing the older address now names. */
 export const leadsTo = (tree: VisibleTree, moved: Moved): Screen | undefined => {
-  const shown = tree.surfaces.flatMap((surface) =>
-    surface.groups.flatMap((group) => group.screens),
-  );
+  const shown = screensOf(tree.surfaces);
   const named = "screens" in moved.to ? moved.to.screens : [moved.to];
   return named.find((screen) => shown.includes(screen));
 };
