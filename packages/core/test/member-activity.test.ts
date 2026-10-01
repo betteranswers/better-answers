@@ -23,6 +23,7 @@ import {
   type ActivityPage,
 } from "../src/members/index.ts";
 import { openPostgres, type Foldable, type Folded, type Tx } from "../src/store/postgres/index.ts";
+import { addMember } from "../src/workspaces/index.ts";
 import { heldAs } from "./members-suite.ts";
 import {
   bootstrap,
@@ -252,6 +253,21 @@ describe("a person's activity", () => {
     ]);
   });
 
+  it("shows the platform adding Priya as done to her", async () => {
+    const workspace = await provisionedWorkspace(db(), "PlatformAdded");
+    const email = addressOf("priya.shah");
+    const priya = await seedPerson(db().pool, { email, emailVerified: true, name: "Priya Shah" });
+    answered(
+      await addMember(bootstrap, workspace.door, {
+        workspaceId: workspace.workspaceId,
+        email,
+        role: "Editor",
+      }),
+    );
+
+    expect(await linesOf(workspace, priya)).toEqual([["people.member.added", "to"]]);
+  });
+
   it("shows an Admin's flag on Priya's display name", async () => {
     const workspace = await provisionedWorkspace(db(), "Flagged");
     const priya = await memberAt(workspace, "Viewer", "Priya Shah");
@@ -300,12 +316,19 @@ describe("a person's activity", () => {
   });
 });
 
-/** Sixty events a second apart, oldest first; every third names Priya as actor and subject. */
-const sixtyEventsOf = async (workspace: ProvisionedWorkspace, priya: string) =>
+/**
+ * Sixty events, oldest first, the `index`th at `secondOf(index)`; every third names Priya as actor
+ * and subject.
+ */
+const sixtyEventsOf = async (
+  workspace: ProvisionedWorkspace,
+  priya: string,
+  secondOf = (index: number) => index,
+) =>
   seedingWith(db().pool, async (seed) => {
-    const seeded: string[] = [];
-    for (let second = 0; second < 60; second += 1) {
-      const at = new Date(Date.UTC(2026, 8, 1, 9, 0, second));
+    const seeded: { id: string; at: Date }[] = [];
+    for (let index = 0; index < 60; index += 1) {
+      const at = new Date(Date.UTC(2026, 8, 1, 9, 0, secondOf(index)));
       const common = { workspaceId: workspace.workspaceId, at };
       const shapes = [
         { act: "people.group.created", actor: `human:${priya}`, detail: {} },
@@ -321,24 +344,46 @@ const sixtyEventsOf = async (workspace: ProvisionedWorkspace, priya: string) =>
           detail: { previousRole: "Admin", role: "Editor" },
         },
       ] as const;
-      const shape = shapes[second % 3] ?? shapes[0];
-      seeded.push((await seed.auditEvent({ ...common, ...shape })).id);
+      const shape = shapes[index % 3] ?? shapes[0];
+      seeded.push({ id: (await seed.auditEvent({ ...common, ...shape })).id, at });
     }
     return seeded;
   });
+
+/** The order the read promises, spelled out: the later instant first, then the greater id. */
+const newestFirst = (events: readonly { id: string; at: Date }[]) =>
+  events.toSorted((a, b) => b.at.getTime() - a.at.getTime() || (a.id < b.id ? 1 : -1));
 
 describe("paging a person's activity", () => {
   it("pages sixty events as fifty then ten, none repeated", async () => {
     const workspace = await provisionedWorkspace(db(), "Paged");
     const priya = await memberAt(workspace, "Viewer", "Priya Shah");
-    const newestFirst = (await sixtyEventsOf(workspace, priya)).toReversed();
+    const expected = newestFirst(await sixtyEventsOf(workspace, priya)).map(({ id }) => id);
 
     const first = pageOf(await activityOf(workspace, priya));
     const rest = pageOf(await activityOf(workspace, priya, first.nextCursor));
 
-    expect(first.events.map((event) => event.id)).toEqual(newestFirst.slice(0, 50));
-    expect(first.nextCursor).toBe(newestFirst[49]);
-    expect(rest.events.map((event) => event.id)).toEqual(newestFirst.slice(50));
+    expect(first.events.map((event) => event.id)).toEqual(expected.slice(0, 50));
+    expect(first.nextCursor).toBe(expected[49]);
+    expect(rest.events.map((event) => event.id)).toEqual(expected.slice(50));
+    expect(rest.nextCursor).toBeNull();
+  });
+
+  it("pages events sharing an instant across the page's end", async () => {
+    const workspace = await provisionedWorkspace(db(), "PagedTies");
+    const priya = await memberAt(workspace, "Viewer", "Priya Shah");
+    const fourAnInstant = (index: number) => Math.floor(index / 4);
+    const expected = newestFirst(await sixtyEventsOf(workspace, priya, fourAnInstant));
+
+    const first = pageOf(await activityOf(workspace, priya));
+    const rest = pageOf(await activityOf(workspace, priya, first.nextCursor));
+
+    // Unless the page's last event and the next share an instant, the tie-break goes untested.
+    expect(expected[50]?.at).toEqual(expected[49]?.at);
+    expect([...first.events, ...rest.events].map((event) => event.id)).toEqual(
+      expected.map(({ id }) => id),
+    );
+    expect(first.nextCursor).toBe(expected[49]?.id);
     expect(rest.nextCursor).toBeNull();
   });
 });
