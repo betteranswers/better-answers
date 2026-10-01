@@ -118,6 +118,23 @@ const widthOf = async (region: Locator): Promise<number> => (await boxOf(region)
 
 const leftOf = async (region: Locator): Promise<number> => (await boxOf(region)).x;
 
+/** Read off the page, so the design system's token is never copied here. */
+const pageMaximumOf = (page: Page): Promise<number> =>
+  page.evaluate(() =>
+    Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--page-max")),
+  );
+
+/** The width the pane offers a screen's content, inside its padding and before the page maximum. */
+const roomIn = (pane: Locator): Promise<number> =>
+  pane.evaluate((node) => {
+    const style = getComputedStyle(node);
+    return (
+      node.clientWidth -
+      Number.parseFloat(style.paddingLeft) -
+      Number.parseFloat(style.paddingRight)
+    );
+  });
+
 const sidewaysRoom = (page: Page) =>
   page.evaluate(() => ({
     scrolls: document.documentElement.scrollWidth,
@@ -823,7 +840,11 @@ test("holds toggle and band still while the nav hides (AE1)", async ({
   await expect(nav).toBeVisible();
   const tabs = page.getByRole("tablist", { name: MEMBERS.name });
   await expect(tabs).toBeVisible();
+  const table = page.getByRole("main").getByRole("table");
+  await expect(table).toBeVisible();
   const navWide = await widthOf(nav);
+  const tableWide = await widthOf(table);
+  const room = await roomIn(page.getByRole("main"));
   const rail = await boxOf(railOf(page));
   const band = await bandBoxes(page, workspace.name, workspace.admin.name);
   const main = await boxOf(page.getByRole("main"));
@@ -847,15 +868,20 @@ test("holds toggle and band still while the nav hides (AE1)", async ({
   expect(await bandBoxes(page, workspace.name, workspace.admin.name)).toEqual(band);
   expect(await boxOf(railOf(page))).toEqual(rail);
 
-  // The toolbar shares the content's column, so both start the nav's width further left.
+  // The pane takes the nav's width, and the toolbar shares its column, so both move left by it.
   const hidden = await boxOf(page.getByRole("main"));
+  const tableHidden = await widthOf(table);
   test.info().annotations.push({
     type: "AE1 at 1440",
-    description: `toggle ${JSON.stringify(toggle)}; main ${main.width} to ${hidden.width}; nav ${navWide}`,
+    description: `toggle ${JSON.stringify(toggle)}; main ${main.width} to ${hidden.width}; table ${tableWide} to ${tableHidden}; nav ${navWide}`,
   });
   expect(hidden.x).toBe(main.x - navWide);
   expect(hidden.width).toBe(main.width + navWide);
   expect(await leftOf(tabs)).toBe(tabsAt - navWide);
+  // The table takes that width only up to the page maximum (R14).
+  expect(tableHidden - tableWide, "the table did not take the width the nav left").toBe(
+    Math.min(navWide, (await pageMaximumOf(page)) - room),
+  );
 
   // Audited closed here; the fixture audits the open state the test ends on.
   await passesTheAccessibilityGate();
@@ -866,6 +892,7 @@ test("holds toggle and band still while the nav hides (AE1)", async ({
   expect(await boxOf(closerOf(page)), "the toggle moved as the nav came back").toEqual(toggle);
   expect(await bandBoxes(page, workspace.name, workspace.admin.name)).toEqual(band);
   expect(await boxOf(page.getByRole("main"))).toEqual(main);
+  expect(await widthOf(table)).toBe(tableWide);
 });
 
 test("holds the toggle in place beside a 60-character workspace name", async ({

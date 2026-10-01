@@ -118,7 +118,7 @@ When the secondary nav hides, only the nav leaves the row below the band. The ba
 
 ### Acceptance Examples
 
-- AE1. **Covers R3.** **Given** an Admin on People · Members at 1440px with the secondary nav shown, **when** they click the toggle twice, **then** the toggle is at the same position before, between and after the clicks. The table widens, then narrows, by the nav's width.
+- AE1. **Covers R3, R14.** **Given** an Admin on People · Members at 1440px with the secondary nav shown, **when** they click the toggle twice, **then** the toggle is at the same position before, between and after the clicks. The screen's pane widens, then narrows, by the nav's width. The table takes the added width up to the page maximum, so at 1440px it widens by less than the nav's width.
 - AE2. **Covers R9, R10, R11.** **Given** today's build, **when** a Viewer or an Editor signs in, **then** their rail shows Ask alone and they land on Ask's "on its way" screen.
 - AE3. **Covers R9, R10, R20.** **Given** today's build, **when** an Admin signs in, **then** their rail shows Control Centre alone. Its secondary nav shows Sources (Bindings), Agent Operations (Routes and spend), People (Members, Groups) and System (Audit log), and they land on People › Members.
 - AE4. **Covers R7, R10, R21.** **Given** a Viewer, **when** they press ⌘K and type "people", **then** nothing from People appears. **Given** an Admin, **when** they type "invite", **then** "Invite a person" appears, and choosing it opens the invite act on Members.
@@ -393,7 +393,7 @@ U1 settles the words before code names them ([GLOSSARY1]). U3 (design system) an
 - **Execution note:** Rewrite the shell specs first against the new structure, and keep every current guarantee as an assertion before changing `frame.tsx`.
 - **Patterns to follow:** today's `navigation-control.tsx` sheet and focus handback; `secondary-nav-showing.ts`'s single stored value; `wide-layout.ts` for the breakpoint.
 - **Test scenarios:**
-  - Covers AE1. At 1440px the toggle's box is identical before, between and after two clicks. Main's width grows by the nav's width, and the rail stays to the pixel.
+  - Covers AE1. At 1440px the toggle's box is identical before, between and after two clicks. Main's width grows by the nav's width, the table's by that width up to the page maximum, and the rail stays to the pixel.
   - With a 60-character workspace name, the toggle's box is the same as with a short name, and the switcher's accessible name is the full name.
   - Covers AE2. A Viewer's secondary nav lists Ask's home as one entry, carrying `aria-current`.
   - The band spans the viewport's width above the rail, and its first cell's width equals the rail's.
