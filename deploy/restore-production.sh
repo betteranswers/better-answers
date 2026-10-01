@@ -77,14 +77,23 @@ fi
 if [ "${git}" = yes ]; then
   say "## 5 git store — one bare repository per workspace from its latest bundle"
   if [ -n "$(ls -A /data/git 2>/dev/null)" ]; then say "REFUSED: /data/git is not empty — the live repositories are newer than any bundle; clear it deliberately first, or clone from the VPC 2 mirror"; exit 1; fi
+  # >>> the git store
+  # Root clones, then hands the store to the api's uid, which cannot enter WORK: it holds the decrypted dump.
   for ws in $(rclone lsf --dirs-only "dumps:${BACKUP_DUMPS_BUCKET}/git/" | tr -d '/\r'); do
     b=$(rclone lsf "dumps:${BACKUP_DUMPS_BUCKET}/git/${ws}/" | sort | tail -n1 | tr -d '\r')
     rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/git/${ws}/${b}" "/work/${ws}.bundle.age"
     tool age -d -i /run/age.key -o "/work/${ws}.bundle" "/work/${ws}.bundle.age"
-    chmod 644 "${WORK}/${ws}.bundle"
-    sudo -u '#1000' git clone --quiet --bare "${WORK}/${ws}.bundle" "/data/git/${ws}.git"
+    git clone --quiet --bare "${WORK}/${ws}.bundle" "/data/git/${ws}.git"
     rm -f "${WORK}/${ws}.bundle" "${WORK}/${ws}.bundle.age"
   done
+  # The nightly bundles no repository without a ref, so a workspace not yet written to has none.
+  # shellcheck disable=SC2016 # the tool container's shell expands it, where DATABASE_URL is set
+  workspaces=$(tool sh -c 'psql "$DATABASE_URL" -X -At -c "select id from workspace"' | tr -d '\r')
+  for ws in ${workspaces}; do
+    [ -d "/data/git/${ws}.git" ] || git init --quiet --bare --initial-branch main "/data/git/${ws}.git"
+  done
+  chown -R 1000:1000 /data/git
+  # <<< the git store
 fi
 cleanup_work
 

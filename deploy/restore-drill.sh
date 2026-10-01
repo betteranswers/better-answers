@@ -104,12 +104,21 @@ say "## 3 object store — mirror back"
 rclone sync "dumps:${BACKUP_MIRROR_BUCKET}/objectstore/" stagingstore:/
 
 say "## 4 git store — one bare repository per workspace from its latest bundle (ADR 0024)"
+# >>> the git store
+# Root clones, then hands the store to the api's uid, which cannot enter WORK: it holds the decrypted dump.
 for ws in $(rclone lsf --dirs-only "dumps:${BACKUP_DUMPS_BUCKET}/git/" | tr -d /); do
   b=$(rclone lsf "dumps:${BACKUP_DUMPS_BUCKET}/git/${ws}/" | sort | tail -n1)
   rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/git/${ws}/${b}" "${WORK}/${ws}.bundle.age"
   age -d -i "${BACKUP_AGE_IDENTITY_FILE}" -o "${WORK}/${ws}.bundle" "${WORK}/${ws}.bundle.age"
-  sudo -u '#1000' git clone --quiet --bare "${WORK}/${ws}.bundle" "/data/git/${ws}.git"
+  git clone --quiet --bare "${WORK}/${ws}.bundle" "/data/git/${ws}.git"
 done
+# The nightly bundles no repository without a ref, so a workspace not yet written to has none.
+workspaces=$(psql "${STAGING_DATABASE_URL}" -X -At -c 'select id from workspace')
+for ws in ${workspaces}; do
+  [ -d "/data/git/${ws}.git" ] || git init --quiet --bare --initial-branch main "/data/git/${ws}.git"
+done
+chown -R 1000:1000 /data/git
+# <<< the git store
 
 say "## 5 REPLAY ERASURES completed after the dump (ADR 0020 — beyond use, made honest)"
 platform run --rm --no-deps api pnpm --silent ops replay-erasures --since "${dump_at}" | tee -a "${REPORT}"

@@ -530,6 +530,123 @@ describe.skipIf(nothingToProbeHere)("the backup image's nightly job", () => {
   });
 });
 
+const fenced = (script: string, step: string): string => {
+  const body = read(script).split(`# >>> ${step}\n`)[1]?.split(`# <<< ${step}`)[0];
+  if (body === undefined) throw new Error(`${script} no longer fences the lines that ${step}`);
+  return body;
+};
+
+const BUNDLED = "ws-bundled";
+const NEVER_WRITTEN = "ws-never-written";
+
+/** Answers only the query the restores make, as the restored database would. */
+const PSQL_STAND_IN = [
+  "#!/usr/bin/env bash",
+  '[ "${!#}" = "select id from workspace" ] || exit 2',
+  `printf '%s\\n' ${BUNDLED} ${NEVER_WRITTEN}`,
+  "",
+].join("\n");
+
+/** Both restores run their git step as root, in a work directory `mktemp -d` closes to others. */
+const restoringTheGitStore = String.raw`
+set -euo pipefail
+git init --quiet --initial-branch=main /tmp/workspace
+git -C /tmp/workspace -c user.name=probe -c user.email=probe@example.invalid \
+  commit --quiet --allow-empty --message "a workspace's first commit"
+git -C /tmp/workspace bundle create --quiet /tmp/bundle --all
+age-keygen -o /run/age.key 2>/dev/null
+mkdir -p /buckets/dumps/git/${BUNDLED} /tmp/stand-ins
+age -r "$(age-keygen -y /run/age.key)" -o /buckets/dumps/git/${BUNDLED}/${BUNDLED}-20260930T020017Z.bundle.age /tmp/bundle
+printf '%s' "$PSQL_STAND_IN" > /tmp/stand-ins/psql
+chmod 0755 /tmp/stand-ins/psql
+export PATH="/tmp/stand-ins:$PATH"
+as_the_api() { HOME=/tmp setpriv --reuid=${API_UID} --regid=${API_UID} --clear-groups "$@"; }
+restore() {
+  rm -rf /data/git /work
+  mkdir -p /data/git
+  mkdir -m 700 /work
+  ran=0
+  bash -c "$2" > /tmp/said 2>&1 || ran=$?
+  while IFS= read -r line; do printf '%s\tsaid %s\n' "$1" "$line"; done < /tmp/said
+  printf '%s\tran %s\n' "$1" "$ran"
+  printf '%s\twork %s\n' "$1" "$(stat -c %a /work)"
+  printf '%s\towned by another uid %s\n' "$1" "$(find /data/git ! -uid ${API_UID} -o ! -gid ${API_UID} | wc -l)"
+  for ws in ${BUNDLED} ${NEVER_WRITTEN}; do
+    refs=$(as_the_api git -C "/data/git/$ws.git" for-each-ref --format='%(refname)' || true)
+    [ -n "$refs" ] || refs="no ref"
+    printf '%s\t%s %s %s\n' "$1" "$ws" "$(as_the_api git -C "/data/git/$ws.git" symbolic-ref HEAD || true)" "$refs"
+  done
+}
+restore production "$PRODUCTION_STEP"
+restore drill "$DRILL_STEP"
+`;
+
+const RESTORE_ENVIRONMENT = {
+  RCLONE_CONFIG_DUMPS_TYPE: "alias",
+  RCLONE_CONFIG_DUMPS_REMOTE: "/buckets",
+  DATABASE_URL: "postgresql://restore@127.0.0.1:9/betteranswers",
+  PSQL_STAND_IN,
+  // As each script leaves them by its git step; production's `tool` runs in this image anyway.
+  PRODUCTION_STEP: [
+    "set -euo pipefail",
+    "WORK=/work BACKUP_DUMPS_BUCKET=dumps",
+    'tool() { "$@"; }',
+    fenced("deploy/restore-production.sh", "the git store"),
+  ].join("\n"),
+  DRILL_STEP: [
+    "set -euo pipefail",
+    "WORK=/work BACKUP_DUMPS_BUCKET=dumps BACKUP_AGE_IDENTITY_FILE=/run/age.key",
+    "STAGING_DATABASE_URL=postgresql://drill@127.0.0.1:9/staging",
+    fenced("deploy/restore-drill.sh", "the git store"),
+  ].join("\n"),
+};
+
+describe.skipIf(nothingToProbeHere)("the restores' git store step", () => {
+  let lines: readonly string[] = [];
+
+  beforeAll(async () => {
+    lines = (
+      await readTheImage(backupImage(), {
+        command: ["bash", "-c", restoringTheGitStore],
+        environment: RESTORE_ENVIRONMENT,
+      })
+    ).split("\n");
+  }, IMAGE_PROBE_ALLOWANCE);
+
+  const stateAfter = (restore: string) => {
+    const told = lines
+      .filter((line) => line.startsWith(`${restore}\t`))
+      .map((line) => line.slice(restore.length + 1));
+    return {
+      said: told.filter((line) => line.startsWith("said ")),
+      state: told.filter((line) => !line.startsWith("said ")),
+    };
+  };
+
+  it.each(["production", "drill"])(
+    "%s: clones bundles for the api through a closed directory",
+    (restore) => {
+      // What the step said rides along, so a failure shows where it stopped.
+      expect(stateAfter(restore)).toMatchObject({
+        state: [
+          "ran 0",
+          "work 700",
+          "owned by another uid 0",
+          `${BUNDLED} refs/heads/main refs/heads/main`,
+          expect.any(String),
+        ],
+      });
+    },
+  );
+
+  it.each(["production", "drill"])(
+    "%s: inits an empty repository for an unbundled workspace",
+    (restore) => {
+      expect(stateAfter(restore).state.at(-1)).toBe(`${NEVER_WRITTEN} refs/heads/main no ref`);
+    },
+  );
+});
+
 describe("the backup leg of the image job", () => {
   it("names this file as its probe", () => {
     const backup = legFor("backup");
