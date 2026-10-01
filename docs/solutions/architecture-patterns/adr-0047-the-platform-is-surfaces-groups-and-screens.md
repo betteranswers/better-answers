@@ -82,7 +82,7 @@ Control Centre's groups keep root addresses, `/<group>/<screen>`, so today's add
 - A surface, group or screen that is not built appears nowhere: not in the rail, the secondary nav or jump-to.
 - A role's home always shows. Until it is built, it says plainly that it is on its way. Today that is Ask, for Editors and Viewers. An Admin's home is People › Members until Control Centre › Overview is built.
 - An address that is not built, or that the person may not see, shows the same not-found screen as an address that never existed, and offers the person's home.
-- Whether a screen is hidden is decided when the person arrives at it. A role that changes while they are on it takes effect at their next move, so an Admin who demotes themself still sees the act confirmed. While the role cannot be read, a screen draws its own loading or failed state. A screen reached in that state follows the list once the role arrives.
+- Whether a screen is hidden is decided when the person arrives at it. A role that changes while they are on it takes effect at their next move, so an Admin who demotes themself still sees the act confirmed. While the role cannot be read, a screen draws its own loading or failed state. A screen reached in that state is decided when the role arrives, as though the person arrived then. From that point it keeps its verdict until their next move, like any other.
 - Hiding is navigation only. The api still refuses every act by role.
 
 **The console** stays the operator's separate surface. It is reached from the workspace switcher, which lists it to the operator alone. It is a place, not an account setting.

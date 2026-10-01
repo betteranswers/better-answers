@@ -45,6 +45,9 @@ const AUDIT_LOG_SCREEN = screenNamed(groupIn(CONTROL_CENTRE, "system"), "Audit l
 
 const GROUPS_SCREEN = screenNamed(people, "Groups").path;
 
+/** Matched by name anywhere in the path, because the client batches its reads. */
+const MEMBERSHIP_READ = (url: URL): boolean => url.pathname.includes("session.membership");
+
 const nav = (page: Page) => page.getByRole("navigation", { name: CONTROL_CENTRE.name });
 
 const membersRegion = (page: Page) => page.getByRole("region", { name: "Members" });
@@ -174,6 +177,27 @@ const anAdminBesideAnotherAtPeople = async (
   await page.goto(MEMBERS_SCREEN);
   await signIn(page, api, admin);
   await expect(memberRows(page)).toHaveCount(2);
+};
+
+/** The Admin signed in makes themself an Editor through their own sheet, which says so. */
+const demotedThemself = async (page: Page): Promise<Locator> => {
+  await memberButton(page, "Test person").click();
+  const sheet = sheetOf(page, "Test person");
+  await sheet.getByRole("radio", { name: "Editor", exact: true }).click();
+  await sheet.getByRole("button", { name: "Make Test person an Editor" }).click();
+  await expect(sheet.getByRole("status"), "the screen hid mid-act").toHaveText(
+    "Test person is an Editor now, from their next request.",
+  );
+  return sheet;
+};
+
+/** The screen was decided on arrival; coming back to it asks again, as an Editor. */
+const membersHiddenAfterTheNextMove = async (page: Page): Promise<void> => {
+  await page.getByRole("link", { name: HOMES.Editor.name, exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`${HOMES.Editor.path}$`));
+  await page.goBack();
+  await expect(page).toHaveURL(new RegExp(`${MEMBERS_SCREEN}$`));
+  await notFoundOfferingHome(page, "Editor");
 };
 
 const removedThroughTheirSheet = async (page: Page, name: string): Promise<void> => {
@@ -476,13 +500,7 @@ test.describe("a member, opened as a sheet", () => {
     await expect(await personMenuOpened(page, "Test person")).toContainText("Admin");
     await page.keyboard.press("Escape");
 
-    await memberButton(page, "Test person").click();
-    const sheet = sheetOf(page, "Test person");
-    await sheet.getByRole("radio", { name: "Editor", exact: true }).click();
-    await sheet.getByRole("button", { name: "Make Test person an Editor" }).click();
-    await expect(sheet.getByRole("status")).toHaveText(
-      "Test person is an Editor now, from their next request.",
-    );
+    const sheet = await demotedThemself(page);
     await page.keyboard.press("Escape");
 
     await expect(sheet).toHaveCount(0);
@@ -494,12 +512,35 @@ test.describe("a member, opened as a sheet", () => {
       sentenceOf(SAID_OF_A_MEMBER["role-forbids"]),
     );
 
-    // The screen was decided on arrival; coming back to it asks again, as an Editor.
-    await page.getByRole("link", { name: HOMES.Editor.name, exact: true }).click();
-    await expect(page).toHaveURL(new RegExp(`${HOMES.Editor.path}$`));
-    await page.goBack();
-    await expect(page).toHaveURL(new RegExp(`${MEMBERS_SCREEN}$`));
-    await notFoundOfferingHome(page, "Editor");
+    await membersHiddenAfterTheNextMove(page);
+  });
+
+  test("an Admin arriving unread who demotes themself keeps the confirmation", async ({
+    page,
+    request,
+  }) => {
+    await anAdminBesideAnotherAtPeople(page, request, "Ure Presswork");
+    let dropped = false;
+    await page.route(MEMBERSHIP_READ, (route) => {
+      if (dropped) return route.continue();
+      dropped = true;
+      return route.abort();
+    });
+    // The shell's read on arrival is dropped, so the role arrives after the screen does.
+    await page.reload();
+    const controlCentre = page
+      .getByRole("navigation", { name: RAIL })
+      .getByRole("link", { name: CONTROL_CENTRE.name });
+    await expect(controlCentre).toBeVisible();
+    await expect(memberRows(page)).toHaveCount(2);
+
+    const sheet = await demotedThemself(page);
+    await expect(controlCentre, "the rail did not take the new role").toHaveCount(0);
+    await expect(sheet.getByRole("status"), "the screen hid mid-act").toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
+
+    await membersHiddenAfterTheNextMove(page);
   });
 
   test("lists Members' keystrokes from the rail's foot, as ? does", async ({

@@ -25,7 +25,7 @@ import { NavigationButton, NavigationSheet, useNavigationSheet } from "./navigat
 import { useSecondaryNavShowing } from "./secondary-nav-showing.ts";
 import { SecondaryNav } from "./secondary-nav.tsx";
 import { openTabIn, ScreenPanel, ScreenTabsRoot, Toolbar, type PickedTab } from "./toolbar.tsx";
-import { useHidden, VisibleTreeContext } from "./visible-tree.ts";
+import { useArrivalTakenOnceRead, useHidden, VisibleTreeContext } from "./visible-tree.ts";
 import { useWideLayout } from "./wide-layout.ts";
 import { useWorkspaceSwitch, WorkspaceSwitcher, type Here } from "./workspace-switcher.tsx";
 
@@ -86,6 +86,7 @@ export function Frame(properties: {
 
   const open = placeAt(visible.surfaces, pathname);
   const region = useRegion(visible, pathname);
+  useArrivalTakenOnceRead(visible);
 
   return (
     <VisibleTreeContext value={visible}>
