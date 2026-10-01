@@ -87,7 +87,7 @@ Two boxes of 4 vCPU · 4 GB · 120 GB NVMe. VPC 1 runs all of production — the
 | the mirror push fails (VPC 2 down, key rotated) | `git push --mirror` fails → the nightly job fails → missed ping; the bundles in `dumps/git/` are the copy that does not depend on VPC 2 |
 | a job started without its variables | the image probe starts the image as compose does and reads what a job cron starts sees; at run time the job stops at its variable check, logs no closing line and misses its ping |
 | a workspace repository refused as another user's | the image trusts `/data/git/*`; the image probe's nightly run bundles a repository owned by the api's uid |
-| a workspace not yet written to | its repository has no ref, which `git bundle` and `git push --mirror` both refuse, so the nightly job copies it nowhere; one git cannot read is still copied, and fails the job. A restore makes it again, empty, from the workspace's row, because the api refuses a workspace with no repository as an unrestored store. The image probe's nightly run and its restore steps each hold one |
+| a workspace not yet written to | its repository has no ref, which `git bundle` and `git push --mirror` both refuse, so the nightly job copies it nowhere; one git cannot read is still attempted, and fails the job. A restore makes it again, empty, from the workspace's row, because the api refuses a workspace with no repository as an unrestored store. The image probe's nightly run and its restore steps each hold one |
 
 ## How the jobs run, and how to read the last one
 
