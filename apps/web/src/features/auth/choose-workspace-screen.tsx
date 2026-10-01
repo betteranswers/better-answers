@@ -2,7 +2,6 @@ import { useNavigate } from "@tanstack/react-router";
 import type { BetterFetchError } from "better-auth/client";
 import { useEffect, useState } from "react";
 import { flushSync } from "react-dom";
-import { z } from "zod";
 
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { RefusalLine } from "@/shared/refusal-outcome.tsx";
@@ -11,6 +10,7 @@ import { Button } from "@/shared/ui/button.tsx";
 
 import {
   hasADisplayName,
+  refusedForNoMembership,
   useListOrganizations,
   useOAuthContinue,
   useSession,
@@ -33,12 +33,6 @@ type Workspaces = ReturnType<typeof useListOrganizations>;
 type Workspace = NonNullable<Workspaces["data"]>[number];
 
 const WORKSPACE_LIST = "workspace-list";
-
-/** Better Auth's code for a pick of a workspace the person holds no membership in. */
-const noMembership = z.object({ code: z.literal("USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION") });
-
-const refusedForNoMembership = (refused: BetterFetchError | null): boolean =>
-  noMembership.safeParse(refused).success;
 
 const addressIn = (answer: ResumeAnswer): string | undefined => {
   const next = answer.url;

@@ -4,6 +4,7 @@ import { useId, useRef, useState, type RefObject } from "react";
 import type { ApiError } from "@/shared/api/trpc.ts";
 import { EmptyState } from "@/shared/empty-state.tsx";
 import { Icon } from "@/shared/icon.tsx";
+import { initialsOf } from "@/shared/initials.ts";
 import { CONTROL_CENTRE, groupIn, screenNamed } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { RowSheet } from "@/shared/row-sheet.tsx";
@@ -41,13 +42,6 @@ export type OpenedAt = "member" | "role" | "groups" | "credentials" | "flag" | "
 export const memberButtonId = (personId: string): string => `member-${personId}`;
 
 const GROUPS_SCREEN = screenNamed(groupIn(CONTROL_CENTRE, "people"), "Groups").path;
-
-const initialsOf = (member: ListedMember): string =>
-  nameOf(member)
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join("");
 
 function Membership(properties: { readonly member: ListedMember }) {
   const { member } = properties;
@@ -373,7 +367,7 @@ export function MemberSheet(properties: {
       <SheetHeader className="border-b border-border">
         <div className="flex items-center gap-3 pr-8">
           <Avatar aria-hidden className="size-9">
-            <AvatarFallback>{initialsOf(member)}</AvatarFallback>
+            <AvatarFallback>{initialsOf(nameOf(member))}</AvatarFallback>
           </Avatar>
           <div className="flex min-w-0 flex-col leading-tight">
             <SheetTitle asChild>

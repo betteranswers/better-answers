@@ -292,14 +292,26 @@ export const codeSentTo = async (api: APIRequestContext, email: string): Promise
 export const anAddress = (who: string): string =>
   `${who}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
 
-/** Sign-out is one disclosure in from the band, so a spec that leaves opens the menu first. */
-export const signOutFromTheShell = async (page: Page, who: string): Promise<void> => {
+/** The avatar shows initials alone, so the person's name and role are one disclosure in. */
+export const personMenuOpened = async (page: Page, who: string): Promise<Locator> => {
   await page
     .getByRole("banner")
     .getByRole("button", { name: new RegExp(who) })
     .click();
-  await page.getByRole("menuitem", { name: "Sign out" }).click();
+  const menu = page.getByRole("menu", { name: new RegExp(who) });
+  await expect(menu).toBeVisible();
+  return menu;
 };
+
+/** Sign-out is one disclosure in from the band, so a spec that leaves opens the menu first. */
+export const signOutFromTheShell = async (page: Page, who: string): Promise<void> => {
+  const menu = await personMenuOpened(page, who);
+  await menu.getByRole("menuitem", { name: "Sign out" }).click();
+};
+
+/** Named for where the person is: the workspace they are reading, or the console. */
+export const switcherOf = (page: Page, here: string): Locator =>
+  page.getByRole("banner").getByRole("button", { name: here, exact: true });
 
 /** Needs a page with nothing focused yet, so the first Tab lands on the skip link. */
 export const skipLinkReachesTheScreen = async (page: Page): Promise<void> => {

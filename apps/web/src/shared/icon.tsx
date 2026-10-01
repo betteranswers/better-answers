@@ -4,6 +4,7 @@ import {
   Buildings,
   CalendarCheck,
   CaretDown,
+  CaretRight,
   ChatText,
   ClockCounterClockwise,
   CloudArrowUp,
@@ -50,6 +51,7 @@ export type IconName =
   | "backlog"
   | "backups"
   | "caret-down"
+  | "caret-right"
   | "ceiling"
   | "checks"
   | "conflicts"
@@ -96,6 +98,7 @@ const GLYPHS = {
   backlog: Stack,
   backups: CloudArrowUp,
   "caret-down": CaretDown,
+  "caret-right": CaretRight,
   ceiling: Gauge,
   checks: CalendarCheck,
   conflicts: Warning,

@@ -20,6 +20,7 @@ import {
   keystrokesDismissed,
   keystrokesListed,
   person,
+  personMenuOpened,
   provision,
   removeMember,
   saysItsSentenceNotItsWord,
@@ -468,8 +469,8 @@ test.describe("a member, opened as a sheet", () => {
 
   test("an Admin demoting themself sees their new role at once", async ({ page, request }) => {
     await anAdminBesideAnotherAtPeople(page, request, "Esk Presswork");
-    const bar = page.getByRole("banner");
-    await expect(bar).toContainText("Admin");
+    await expect(await personMenuOpened(page, "Test person")).toContainText("Admin");
+    await page.keyboard.press("Escape");
 
     await memberButton(page, "Test person").click();
     const sheet = sheetOf(page, "Test person");
@@ -481,8 +482,10 @@ test.describe("a member, opened as a sheet", () => {
     await page.keyboard.press("Escape");
 
     await expect(sheet).toHaveCount(0);
-    await expect(bar).toContainText("Editor");
-    await expect(bar).not.toContainText("Admin");
+    const you = await personMenuOpened(page, "Test person");
+    await expect(you).toContainText("Editor");
+    await expect(you).not.toContainText("Admin");
+    await page.keyboard.press("Escape");
     await expect(membersRegion(page).getByRole("alert")).toHaveText(
       sentenceOf(SAID_OF_A_MEMBER["role-forbids"]),
     );

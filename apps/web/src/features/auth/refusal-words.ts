@@ -114,6 +114,18 @@ export const noLongerAMember = (workspace: string): string =>
 /** A Try again button stands beside it. */
 export const WORKSPACES_UNREAD = "Your workspaces couldn't be read.";
 
+/** Said in the band, where opening the switcher again reads the list again. */
+export const SWITCHER_UNREAD: Said = {
+  why: WORKSPACES_UNREAD,
+  next: "Open the workspace menu to read them again.",
+};
+
+/** Said in the band, where the switcher lists the workspaces left. */
+export const noLongerAMemberOf = (workspace: string): Said => ({
+  why: noLongerAMember(workspace),
+  next: "Choose another workspace.",
+});
+
 export const PICK_REFUSED: Said = {
   why: "That workspace didn't open.",
   next: "Choose it again.",

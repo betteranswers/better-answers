@@ -49,3 +49,7 @@ export const membershipRefusal = async (
 export const forgetMembership = (queryClient: QueryClient, api: ApiProxy) => {
   queryClient.removeQueries({ queryKey: membershipOptions(api).queryKey });
 };
+
+/** In place, so a shell reading it moves straight to the new answer. */
+export const rereadMembership = (queryClient: QueryClient, api: ApiProxy) =>
+  queryClient.refetchQueries({ queryKey: membershipOptions(api).queryKey, exact: true });

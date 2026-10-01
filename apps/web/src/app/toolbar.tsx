@@ -9,19 +9,28 @@ import {
 } from "@/shared/screen-toolbar.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs.tsx";
 
+/**
+ * Derived, not reset: an id is the declaring screen's own, so a screen that does not declare
+ * the pick opens on its first tab.
+ */
+export const openTabIn = (
+  tabs: readonly ScreenTab[] | undefined,
+  picked: string | undefined,
+): ScreenTab | undefined => tabs?.find((tab) => tab.id === picked) ?? tabs?.[0];
+
+export type PickedTab = readonly [string | undefined, (picked: string) => void];
+
 /** Opens on the first tab until one is picked; with no tabs, it holds the view-state slot alone. */
 export function ScreenTabsRoot(properties: {
   readonly tabs: readonly ScreenTab[] | undefined;
+  /** The frame's, so the band names the open tab; a root drawn alone keeps its own. */
+  readonly picked?: PickedTab;
   readonly children: ReactNode;
 }) {
-  const [picked, setPicked] = useState<string>();
+  const own = useState<string>();
+  const [picked, setPicked] = properties.picked ?? own;
 
-  const tabs = properties.tabs ?? [];
-  /**
-   * Derived, not reset: an id is the declaring screen's own, so a screen that does not declare
-   * the pick opens on its first tab.
-   */
-  const openTab = tabs.find((tab) => tab.id === picked)?.id ?? tabs[0]?.id;
+  const openTab = openTabIn(properties.tabs, picked)?.id;
 
   /**
    * Inside the tabs root, so the slot spans the toolbar and the panel and both halves of a

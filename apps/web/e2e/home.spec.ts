@@ -33,7 +33,7 @@ const unknownScreen = (page: Page) =>
   page.getByRole("heading", { level: 1, name: UNKNOWN_SCREEN.heading });
 
 const personMenu = (page: Page, role: Role) =>
-  page.getByRole("banner").getByRole("button", { name: `A ${role}` });
+  page.getByRole("banner").getByRole("button", { name: `A ${role}`, exact: true });
 
 for (const role of ROLES) {
   const home = HOMES[role];

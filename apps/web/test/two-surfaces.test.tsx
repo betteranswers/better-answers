@@ -54,9 +54,9 @@ const openAt = async (path: string) => {
     component: () => (
       <Frame
         visible={TWO_SURFACES}
-        place="Holme Valley Tools"
+        here={{ name: "Holme Valley Tools", workspaceId: "w" }}
         person={{ name: "Ada", role: "Admin" }}
-        links={[]}
+        offersTheConsole={false}
       />
     ),
   });

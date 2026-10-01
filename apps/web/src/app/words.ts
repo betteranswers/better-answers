@@ -17,6 +17,12 @@ export const RAIL = "Surfaces";
 /** The narrow layout's sheet holds the rail and the secondary nav, so it is named for both. */
 export const NAVIGATION_SHEET = "Surfaces and screens";
 
+/** The band's line of places from the surface down, named apart from the rail and the nav. */
+export const BREADCRUMB = "Breadcrumb";
+
+/** The switcher's way to the whole list of a person's workspaces. */
+export const ALL_WORKSPACES = "All workspaces";
+
 /** Said by the one toggle in the band, which names the state it would move to. */
 export const TOGGLE = {
   hide: "Hide the secondary nav",

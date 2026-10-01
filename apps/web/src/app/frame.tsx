@@ -13,39 +13,41 @@ import {
   type VisibleSurface,
   type VisibleTree,
 } from "@/shared/navigation.ts";
-import { isFilled } from "@/shared/screen-toolbar.tsx";
+import { isFilled, type ScreenToolbar } from "@/shared/screen-toolbar.tsx";
 
-import { Band, type MenuLink, type Person } from "./band.tsx";
+import { Band, type Person } from "./band.tsx";
+import { partsOf } from "./breadcrumb.tsx";
 import { IconRail } from "./icon-rail.tsx";
 import { NavigationButton, NavigationSheet } from "./navigation-control.tsx";
 import { useSecondaryNavShowing } from "./secondary-nav-showing.ts";
 import { SecondaryNav } from "./secondary-nav.tsx";
-import { ScreenPanel, ScreenTabsRoot, Toolbar } from "./toolbar.tsx";
+import { openTabIn, ScreenPanel, ScreenTabsRoot, Toolbar, type PickedTab } from "./toolbar.tsx";
 import { useHiddenOnArrival, VisibleTreeContext } from "./visible-tree.ts";
 import { useWideLayout } from "./wide-layout.ts";
+import { useWorkspaceSwitch, WorkspaceSwitcher, type Here } from "./workspace-switcher.tsx";
 
-const TO_THE_CONSOLE: MenuLink = { name: "Console", to: "/console" };
+type Region = { readonly name: string; readonly toolbar: ScreenToolbar };
 
-/** Surface, group and screen, broadest first, with no name said twice. */
-const namesOf = (open: Place | undefined): readonly string[] =>
-  open === undefined
-    ? []
-    : [
-        ...new Set(
-          [open.surface.name, open.group?.name, open.screen.name].filter(
-            (name): name is string => name !== undefined,
-          ),
-        ),
-      ];
+/** One source for both halves of the region, so a panel never outlives its tab list. */
+const useRegion = (pathname: string): Region | undefined => {
+  /** The open screen's own declaration, carried by its route: the shell fills nothing itself. */
+  const toolbar = useRouterState({ select: (state) => state.matches.at(-1)?.staticData.toolbar });
+  // The route's own verdict, not the live tree: a role changed mid-act keeps the tabs around it.
+  const drawn = useHiddenOnArrival() ? undefined : placeAt(EVERY_SURFACE, pathname);
+  return drawn !== undefined && isFilled(toolbar)
+    ? { name: drawn.screen.name, toolbar }
+    : undefined;
+};
 
 /** A place hidden from the reader is no place here, so it draws as one that never existed. */
 export function Frame(properties: {
   readonly visible: VisibleTree;
-  readonly place: string | undefined;
+  /** The workspace being read, or the console in its place. */
+  readonly here: Here | undefined;
   readonly person: Person | undefined;
-  readonly links: readonly MenuLink[];
+  readonly offersTheConsole: boolean;
 }) {
-  const { visible } = properties;
+  const { visible, here } = properties;
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const { signOut, signingOut } = useSignOut();
   const wide = useWideLayout();
@@ -53,10 +55,12 @@ export function Frame(properties: {
   const [asked, ask] = useState(false);
   const controlRef = useRef<HTMLButtonElement | null>(null);
   const navId = useId();
+  const switching = useWorkspaceSwitch();
+  // The frame's, not the tabs root's: the band names the open tab, and the root sits below it.
+  const picked = useState<string>();
 
   const open = placeAt(visible.surfaces, pathname);
-  // The route's own verdict, not the live tree: a role changed mid-act keeps the tabs around it.
-  const drawn = useHiddenOnArrival() ? undefined : placeAt(EVERY_SURFACE, pathname);
+  const region = useRegion(pathname);
 
   return (
     <VisibleTreeContext value={visible}>
@@ -71,10 +75,17 @@ export function Frame(properties: {
         <Band
           wide={wide}
           home={visible.home?.path ?? "/"}
-          place={properties.place}
-          where={namesOf(open)}
+          switcher={
+            here === undefined ? null : (
+              <WorkspaceSwitcher
+                here={here}
+                offersTheConsole={properties.offersTheConsole}
+                switching={switching}
+              />
+            )
+          }
+          parts={partsOf(open, openTabIn(region?.toolbar.tabs, picked[0])?.name)}
           person={properties.person}
-          links={properties.links}
           navigation={
             <NavigationButton
               controlRef={controlRef}
@@ -89,6 +100,7 @@ export function Frame(properties: {
           }
           signingOut={signingOut}
           onSignOut={signOut}
+          outcome={switching.outcome}
         />
 
         <NavigationSheet
@@ -110,7 +122,8 @@ export function Frame(properties: {
           ) : null}
 
           <div className="flex min-w-0 flex-1 flex-col">
-            <ToolbarAndScreen screenName={drawn?.screen.name} />
+            {/* Keyed by the workspace, so a switch draws the screen afresh over its new reads. */}
+            <ToolbarAndScreen key={here?.workspaceId} region={region} picked={picked} />
           </div>
         </div>
       </div>
@@ -129,10 +142,14 @@ export function WorkspaceFrame() {
   return (
     <Frame
       visible={visible}
-      place={held?.workspace.name}
+      here={
+        held === undefined
+          ? undefined
+          : { name: held.workspace.name, workspaceId: held.workspace.id }
+      }
       person={held === undefined ? undefined : { name: held.person.name, role: held.role }}
-      // Shown to the operator alone: a link anyone else would only be refused at.
-      links={standing.data?.operator === true ? [TO_THE_CONSOLE] : []}
+      // Offered to the operator alone: a way in anyone else would only be refused at.
+      offersTheConsole={standing.data?.operator === true}
     />
   );
 }
@@ -161,16 +178,14 @@ function Navigation(properties: {
   );
 }
 
-function ToolbarAndScreen(properties: { readonly screenName: string | undefined }) {
-  const { screenName } = properties;
-  /** The open screen's own declaration, carried by its route: the shell fills nothing itself. */
-  const toolbar = useRouterState({ select: (state) => state.matches.at(-1)?.staticData.toolbar });
-  /** One source for both halves of the region, so a panel never outlives its tab list. */
-  const region =
-    screenName !== undefined && isFilled(toolbar) ? { name: screenName, toolbar } : undefined;
+function ToolbarAndScreen(properties: {
+  readonly region: Region | undefined;
+  readonly picked: PickedTab;
+}) {
+  const { region } = properties;
 
   return (
-    <ScreenTabsRoot tabs={region?.toolbar.tabs}>
+    <ScreenTabsRoot tabs={region?.toolbar.tabs} picked={properties.picked}>
       {region === undefined ? null : <Toolbar name={region.name} toolbar={region.toolbar} />}
 
       <main id="screen" aria-label="Screen" tabIndex={-1} className="flex-1 px-4 py-6 md:px-8">

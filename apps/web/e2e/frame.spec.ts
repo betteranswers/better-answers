@@ -1,6 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 
-import { NAVIGATION_SHEET, RAIL, TOGGLE } from "@/app/words.ts";
+import { BREADCRUMB, NAVIGATION_SHEET, RAIL, TOGGLE } from "@/app/words.ts";
 import { ROUTES_WORDS } from "@/features/routes/words.ts";
 import {
   ASK,
@@ -21,9 +21,11 @@ import {
   anAddress,
   invite,
   person,
+  personMenuOpened,
   provision,
   signIn,
   skipLinkReachesTheScreen,
+  switcherOf,
   tabUntilFocused,
 } from "./harness.ts";
 
@@ -86,6 +88,12 @@ const youOf = (page: Page, who: string) =>
 
 const partOf = (page: Page, name: string) => bandOf(page).getByText(name, { exact: true });
 
+const crumbsOf = (page: Page) => bandOf(page).getByRole("navigation", { name: BREADCRUMB });
+
+/** The current part is `role="link"` too, so a part that leads somewhere is told by its `href`. */
+const crumbOf = (page: Page, name: string) =>
+  crumbsOf(page).getByRole("link", { name, exact: true });
+
 const TOOLBAR_TABS = ["Routes", "Spend"];
 
 const tabsOf = (page: Page) => page.getByRole("tablist", { name: "Routes and spend" });
@@ -125,16 +133,43 @@ const scrollsNothingSideways = async (page: Page, when: string) => {
 const holdsFocus = (panel: Locator) =>
   panel.evaluate((node) => node.contains(document.activeElement));
 
-/** Whether the band is drawn over the middle of what has focus, as a band fixed in place can be. */
-const focusUnderTheBand = (page: Page) =>
+/** How a band fixed in place can cover what has focus: over its middle, or anywhere in its box. */
+const focusAgainstTheBand = (page: Page) =>
   page.evaluate(() => {
+    const crosses = (one: DOMRect, other: DOMRect) =>
+      one.left < other.right &&
+      other.left < one.right &&
+      one.top < other.bottom &&
+      other.top < one.bottom;
+
     const band = document.querySelector("header");
     const focused = document.activeElement;
-    if (band === null || focused === null || band.contains(focused)) return false;
+    if (band === null || focused === null || band.contains(focused)) {
+      return { under: false, overlaps: false };
+    }
     const box = focused.getBoundingClientRect();
     const drawn = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
-    return drawn !== null && band.contains(drawn);
+    return {
+      under: drawn !== null && band.contains(drawn),
+      overlaps: crosses(box, band.getBoundingClientRect()),
+    };
   });
+
+const focusUnderTheBand = async (page: Page) => (await focusAgainstTheBand(page)).under;
+
+const overlapsTheBand = async (page: Page) => (await focusAgainstTheBand(page)).overlaps;
+
+/** Tab by tab to `target`, no stop on the way sharing the band's box. */
+const tabClearOfTheBand = async (page: Page, target: Locator, most = 40) => {
+  for (let pressed = 0; pressed < most; pressed += 1) {
+    if (await target.evaluate((node) => node === document.activeElement)) return;
+    await page.keyboard.press("Tab");
+    expect(await overlapsTheBand(page), `a stop before ${String(target)} overlaps the band`).toBe(
+      false,
+    );
+  }
+  await expect(target, "Tab never reached it").toBeFocused();
+};
 
 const inDocumentOrder = async (page: Page, regions: readonly Locator[]): Promise<boolean> => {
   const nodes = await Promise.all(regions.map((region) => region.elementHandle()));
@@ -193,6 +228,8 @@ const bandBoxes = async (page: Page, workspaceName: string, who: string) => ({
   band: await boxOf(bandOf(page)),
   logo: await boxOf(logoOf(page)),
   name: await boxOf(partOf(page, workspaceName)),
+  switcher: await boxOf(switcherOf(page, workspaceName)),
+  place: await boxOf(crumbsOf(page)),
   you: await boxOf(youOf(page, who)),
 });
 
@@ -333,28 +370,112 @@ test("lists a Viewer's home as the nav's one entry (AE2)", async ({ page, reques
   await expect(nav).toBeVisible();
 });
 
-test("names workspace, place, person and role in the band", async ({ page, request }) => {
+test("names workspace and place, the logo leading home", async ({ page, request }) => {
   const workspace = await signedIn(page, request, "Halifax Fabrication");
   await page.goto(ROUTES_AND_SPEND.path);
 
-  const band = bandOf(page);
-  await expect(band.getByText(workspace.name)).toBeVisible();
+  await expect(switcherOf(page, workspace.name)).toBeVisible();
   for (const name of [CONTROL_CENTRE.name, AGENT_OPERATIONS.name, ROUTES_AND_SPEND.name]) {
     await expect(partOf(page, name)).toBeVisible();
   }
-
-  const you = youOf(page, workspace.admin.name);
-  await expect(you).toContainText("Admin");
-  await expect(band.getByRole("button", { name: "Sign out" })).toHaveCount(0);
-
-  await you.click();
-  await expect(page.getByRole("menuitem", { name: "Sign out" })).toBeVisible();
-  await page.keyboard.press("Escape");
+  await expect(bandOf(page).getByRole("button", { name: "Sign out" })).toHaveCount(0);
 
   // The logo is the way home from anywhere, named for the product rather than drawn alone.
   await expect(logoOf(page)).toHaveAttribute("href", HOMES.Admin.path);
   await logoOf(page).click();
   await expect(page).toHaveURL(new RegExp(`${HOMES.Admin.path}$`));
+});
+
+test("shows initials, with name and role one menu in", async ({ page, request }) => {
+  const email = anAddress("initials");
+  const workspace = await provision(request, { name: "Esholt Pressings" });
+  const admin = await person(request, email, { displayName: LONG_PERSON });
+  await addMember(request, { workspaceId: workspace.workspaceId, userId: admin.id, role: "Admin" });
+  await page.goto("/sign-in");
+  await signIn(page, request, email);
+
+  const you = youOf(page, LONG_PERSON);
+  await expect(you).toHaveAccessibleName(LONG_PERSON);
+  await expect(you).toHaveText(`BF${LONG_PERSON}`);
+  await expect(you.getByText("BF", { exact: true })).toBeVisible();
+
+  const menu = await personMenuOpened(page, LONG_PERSON);
+  await expect(menu.getByText(LONG_PERSON, { exact: true })).toBeVisible();
+  await expect(menu.getByText("Admin", { exact: true })).toBeVisible();
+  await expect(menu.getByRole("menuitem")).toHaveText(["Sign out"]);
+});
+
+test("names surface, group, screen and open tab, following the tab", async ({ page, request }) => {
+  await signedIn(page, request, "Hebden Castings");
+  await page.goto(MEMBERS.path);
+  await page.getByRole("tab", { name: "Invitations" }).click();
+
+  const parts = crumbsOf(page).getByRole("listitem");
+  await expect(parts).toHaveText([CONTROL_CENTRE.name, PEOPLE.name, MEMBERS.name, "Invitations"]);
+
+  const started = Date.now();
+  await page.getByRole("tab", { name: "Requests" }).click();
+  await expect(parts).toHaveText([CONTROL_CENTRE.name, PEOPLE.name, MEMBERS.name, "Requests"]);
+  const elapsed = Date.now() - started;
+  test
+    .info()
+    .annotations.push({ type: "breadcrumb follows the tab", description: `${elapsed} ms` });
+  expect(elapsed).toBeLessThan(SWAP_BUDGET_MS);
+});
+
+test("links each part but the last, the current page", async ({ page, request }) => {
+  await signedIn(page, request, "Hebden Pressings");
+  await page.goto(MEMBERS.path);
+  await page.getByRole("tab", { name: "Invitations" }).click();
+
+  // Control Centre opens on the Admin's home until Overview is built.
+  for (const name of [CONTROL_CENTRE.name, PEOPLE.name, MEMBERS.name]) {
+    await expect(crumbOf(page, name)).toHaveAttribute("href", MEMBERS.path);
+    await expect(crumbOf(page, name)).not.toHaveAttribute("aria-current");
+  }
+  const current = crumbOf(page, "Invitations");
+  await expect(current).toHaveAttribute("aria-current", "page");
+  await expect(current).not.toHaveAttribute("href");
+
+  await page.goto("/people/groups");
+  await expect(crumbsOf(page).getByRole("listitem")).toHaveText([
+    CONTROL_CENTRE.name,
+    PEOPLE.name,
+    "Groups",
+  ]);
+  await expect(crumbOf(page, PEOPLE.name)).toHaveAttribute("href", MEMBERS.path);
+  await expect(crumbOf(page, "Groups")).toHaveAttribute("aria-current", "page");
+
+  await crumbOf(page, CONTROL_CENTRE.name).click();
+  await expect(page).toHaveURL(new RegExp(`${MEMBERS.path}$`));
+});
+
+test("names Ask once, with no group, on a Viewer's home", async ({ page, request }) => {
+  await aMemberSignedInAt(page, request, "Viewer", HOMES.Viewer.path);
+
+  await expect(crumbsOf(page).getByRole("listitem")).toHaveText([ASK.name]);
+  await expect(crumbOf(page, ASK.name)).toHaveAttribute("aria-current", "page");
+  await expect(crumbOf(page, ASK.name)).not.toHaveAttribute("href");
+});
+
+test("keeps band, rail and nav mounted between screens, focus kept", async ({ page, request }) => {
+  await signedIn(page, request, "Hebden Wireworks");
+  await page.goto(MEMBERS.path);
+  await expect(page.getByRole("heading", { level: 1, name: headingOf(MEMBERS) })).toBeVisible();
+
+  const regions = [bandOf(page), railOf(page), navOf(page)];
+  const before = await Promise.all(regions.map((region) => region.elementHandle()));
+
+  const groups = navOf(page).getByRole("link", { name: "Groups" });
+  await groups.focus();
+  await page.keyboard.press("Enter");
+
+  await expect(page).toHaveURL(/\/people\/groups$/);
+  await expect(groups).toHaveAttribute("aria-current", "page");
+  await expect(groups, "focus left the chosen link").toBeFocused();
+  for (const drawn of before) {
+    expect(await drawn.evaluate((node) => node.isConnected), "a region was drawn again").toBe(true);
+  }
 });
 
 test("sizes the band's cells to the rail and nav below", async ({ page, request }) => {
@@ -396,12 +517,14 @@ test("tabs skip link, band, icon rail, secondary nav, toolbar, screen", async ({
   );
   await theRoutesHaveLanded(page);
 
-  // The text in the band sits between its controls, so reading order and tab order agree.
+  // Every part but the open tab leads somewhere, so each is a stop between toggle and avatar.
   const band = [
     logoOf(page),
-    partOf(page, workspace.name),
+    switcherOf(page, workspace.name),
     closerOf(page),
-    partOf(page, ROUTES_AND_SPEND.name),
+    crumbOf(page, CONTROL_CENTRE.name),
+    crumbOf(page, AGENT_OPERATIONS.name),
+    crumbOf(page, ROUTES_AND_SPEND.name),
     youOf(page, workspace.admin.name),
   ];
   expect(await inDocumentOrder(page, band), "the band reads out of order").toBe(true);
@@ -409,7 +532,7 @@ test("tabs skip link, band, icon rail, secondary nav, toolbar, screen", async ({
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "Skip to the screen" })).toBeFocused();
 
-  for (const stop of [logoOf(page), closerOf(page), youOf(page, workspace.admin.name)]) {
+  for (const stop of band) {
     await page.keyboard.press("Tab");
     await expect(stop).toBeFocused();
   }
@@ -479,7 +602,7 @@ test("scrolls nothing sideways at 320 pixels, navigation open or closed", async 
   await scrollsNothingSideways(page, "with the sheet open");
 });
 
-test("names surface, group and screen at 320 pixels, clipping none", async ({ page, request }) => {
+test("names all four parts at 320 pixels, clipping none", async ({ page, request }) => {
   // Long names in both of the first row's texts, so neither can push the row past the edge.
   const email = anAddress("long-names");
   const workspace = await provision(request, { name: LONG_NAME });
@@ -490,22 +613,26 @@ test("names surface, group and screen at 320 pixels, clipping none", async ({ pa
   await signIn(page, request, email);
   await page.goto(MEMBERS.path);
   await expect(page.getByRole("heading", { level: 1, name: headingOf(MEMBERS) })).toBeVisible();
+  await page.getByRole("tab", { name: "Invitations" }).click();
 
   // Its own row under the controls, so a long workspace name takes nothing from it.
   const row = await boxOf(sheetButtonOf(page));
-  for (const name of [CONTROL_CENTRE.name, PEOPLE.name, MEMBERS.name]) {
-    const part = partOf(page, name);
+  const parts = [CONTROL_CENTRE.name, PEOPLE.name, MEMBERS.name, "Invitations"];
+  await expect(crumbsOf(page).getByRole("listitem")).toHaveText(parts);
+  for (const name of parts) {
+    const part = crumbOf(page, name);
     await expect(part).toBeVisible();
     const box = await boxOf(part);
     expect(box.y, `${name} shares the controls' row`).toBeGreaterThanOrEqual(row.y + row.height);
     expect(box.x).toBeGreaterThanOrEqual(0);
     expect(box.x + box.width, `${name} is clipped`).toBeLessThanOrEqual(NARROW.width);
-    const cut = await part.evaluate((node) => {
-      const line = node.parentElement ?? node;
-      return line.scrollWidth > line.clientWidth || getComputedStyle(line).textOverflow !== "clip";
-    });
+    const cut = await part.evaluate(
+      (node) =>
+        node.scrollWidth > node.clientWidth || getComputedStyle(node).textOverflow !== "clip",
+    );
     expect(cut, `${name} is cut short`).toBe(false);
   }
+  await expect(crumbOf(page, "Invitations")).toHaveAttribute("aria-current", "page");
 
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
     NARROW.width,
@@ -521,10 +648,10 @@ test("narrows the band to two rows scrolling with the page", async ({ page, requ
   const firstRow = [
     sheetButtonOf(page),
     logoOf(page),
-    partOf(page, workspace.name),
+    switcherOf(page, workspace.name),
     youOf(page, workspace.admin.name),
   ];
-  const place = await boxOf(partOf(page, CONTROL_CENTRE.name));
+  const place = await boxOf(crumbsOf(page));
   let before = Number.NEGATIVE_INFINITY;
   for (const control of firstRow) {
     const box = await boxOf(control);
@@ -533,16 +660,17 @@ test("narrows the band to two rows scrolling with the page", async ({ page, requ
     before = box.x;
   }
 
+  // From the top to the last member row: first row, the parts that lead somewhere, toolbar, screen.
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "Skip to the screen" })).toBeFocused();
-  for (const stop of [sheetButtonOf(page), logoOf(page), youOf(page, workspace.admin.name)]) {
-    await page.keyboard.press("Tab");
-    await expect(stop).toBeFocused();
-  }
-
-  for (let step = 0; step < 6; step += 1) {
-    await page.keyboard.press("Tab");
-    expect(await focusUnderTheBand(page), `stop ${step + 1} sits under the band`).toBe(false);
+  for (const stop of [
+    ...firstRow,
+    crumbOf(page, CONTROL_CENTRE.name),
+    crumbOf(page, PEOPLE.name),
+    page.getByRole("tab", { name: MEMBERS.name }),
+    page.getByRole("main").getByRole("button", { name: workspace.admin.name, exact: true }),
+  ]) {
+    await tabClearOfTheBand(page, stop);
   }
 
   await scrollsNothingSideways(page, "with the band on two rows");
@@ -730,6 +858,8 @@ test("holds the toggle in place beside a 60-character workspace name", async ({
     await page.getByRole("button", { name, exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`${HOMES.Admin.path}$`));
     await expect(partOf(page, name)).toBeVisible();
+    // The switcher's accessible name is the whole name, however much of it shows.
+    await expect(switcherOf(page, name)).toBeVisible();
     return boxOf(closerOf(page));
   };
 

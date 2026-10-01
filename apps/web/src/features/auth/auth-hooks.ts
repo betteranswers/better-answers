@@ -1,9 +1,11 @@
 import {
+  matchQuery,
   mutationOptions,
   queryOptions,
   useMutation,
   useQuery,
   useQueryClient,
+  type Query,
   type QueryClient,
 } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -11,7 +13,7 @@ import type { BetterFetchError } from "better-auth/client";
 import { useState } from "react";
 import { z } from "zod";
 
-import { useTRPC } from "@/shared/api/trpc.ts";
+import { useTRPC, type ApiProxy } from "@/shared/api/trpc.ts";
 
 import { authClient } from "./auth-client.ts";
 import {
@@ -23,7 +25,7 @@ import {
   nextAfterSignIn,
   pageQuery,
 } from "./carried-flow.ts";
-import { forgetMembership } from "./membership.ts";
+import { forgetMembership, rereadMembership } from "./membership.ts";
 import { rememberTheSession, sessionRemembered } from "./session-memory.ts";
 import type { Arrival } from "./sign-in-words.ts";
 
@@ -55,7 +57,9 @@ const listOrganizationsOptions = () =>
     queryFn: () => unwrap(authClient.organization.list()),
   });
 
-export const useListOrganizations = () => useQuery(listOrganizationsOptions());
+/** `asked` false reads nothing yet, for a list shown only once a menu opens. */
+export const useListOrganizations = (asked = true) =>
+  useQuery({ ...listOrganizationsOptions(), enabled: asked });
 
 /** The per-email ceiling in front of Better Auth answers the first; Better Auth's own, the second. */
 const WAIT_HEADERS = ["retry-after", "x-retry-after"] as const;
@@ -270,6 +274,37 @@ export const useSetActiveOrganization = () => {
         queryClient.invalidateQueries({ queryKey: AUTH_KEYS.session }),
         queryClient.invalidateQueries({ queryKey: AUTH_KEYS.workspaces }),
       ]);
+    },
+  });
+};
+
+/** Better Auth's code for a pick of a workspace the person holds no membership in. */
+const noMembership = z.object({ code: z.literal("USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION") });
+
+export const refusedForNoMembership = (refused: BetterFetchError | null): boolean =>
+  noMembership.safeParse(refused).success;
+
+export type SwitchedTo = { readonly id: string; readonly name: string };
+
+/** Every read but the person's own: their session, their list of workspaces and `session.*`. */
+const aboutTheWorkspace = (api: ApiProxy) => {
+  const theirOwn = [{ queryKey: ["auth"] }, api.session.pathFilter()];
+  return (query: Query) => !theirOwn.some((filters) => matchQuery(filters, query));
+};
+
+/** The membership is read again in place, not dropped, so the band never blanks between the two. */
+export const useSwitchWorkspace = () => {
+  const queryClient = useQueryClient();
+  const api = useTRPC();
+  const navigate = useNavigate();
+  return useMutation<unknown, BetterFetchError, SwitchedTo>({
+    mutationFn: (workspace) =>
+      unwrap(authClient.organization.setActive({ organizationId: workspace.id })),
+    onSuccess: async () => {
+      queryClient.removeQueries({ predicate: aboutTheWorkspace(api) });
+      await rereadMembership(queryClient, api);
+      void queryClient.invalidateQueries({ queryKey: AUTH_KEYS.session });
+      await navigate({ href: "/", replace: true });
     },
   });
 };

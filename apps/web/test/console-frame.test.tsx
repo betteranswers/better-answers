@@ -65,9 +65,10 @@ describe("the console's shell", () => {
     await openApp("/console/workspaces/every-workspace");
     const bar = await screen.findByRole("banner");
 
-    expect(within(bar).getAllByText("Console", { exact: true })[0]).toBeDefined();
-    const you = within(bar).getByRole("button", { name: /Ada/ });
-    expect(you.textContent).toBe("Ada");
+    expect(within(bar).getByRole("button", { name: "Console" })).toBeDefined();
+    const you = within(bar).getByRole("button", { name: "Ada" });
+    expect(within(you).getByText("A", { exact: true })).toBeDefined();
+    expect(you.textContent).not.toMatch(/Admin|Editor|Viewer/);
     const logo = within(bar).getByRole("link", { name: PRODUCT_NAME });
     expect(logo.getAttribute("href")).toBe(HOMES.operator.path);
   });

@@ -9,16 +9,15 @@ import { CONSOLE, visibleTo } from "@/shared/navigation.ts";
 import { RefusalLine } from "@/shared/refusal-outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 
-import type { MenuLink } from "./band.tsx";
 import { Frame } from "./frame.tsx";
 
 /** The console frame draws for the operator alone, so what it shows is theirs. */
 const THE_OPERATORS = visibleTo({ role: "operator", owns: [] }, [CONSOLE]);
 
-const BACK_TO_YOUR_WORKSPACES: MenuLink = {
+const BACK_TO_YOUR_WORKSPACES = {
   name: "Back to your workspaces",
   to: "/choose-workspace",
-};
+} as const;
 
 function WaysOut() {
   return (
@@ -84,9 +83,9 @@ export function ConsoleFrame() {
   return (
     <Frame
       visible={THE_OPERATORS}
-      place={CONSOLE.name}
+      here={{ name: CONSOLE.name, workspaceId: undefined }}
       person={{ name: standing.data.name }}
-      links={[BACK_TO_YOUR_WORKSPACES]}
+      offersTheConsole={false}
     />
   );
 }

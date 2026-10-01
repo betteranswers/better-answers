@@ -17,6 +17,7 @@ import {
   keystrokesListed,
   landedAtHome,
   person,
+  personMenuOpened,
   provision,
   quoted,
   saysItsSentenceNotItsWord,
@@ -95,7 +96,7 @@ test("an invited newcomer names themselves on the invitation, then joins", async
 
   const bar = page.getByRole("banner");
   await expect(bar.getByText("Calder Joinery")).toBeVisible();
-  await expect(bar.getByRole("button", { name: /Priya Shah/ })).toContainText("Editor");
+  await expect(await personMenuOpened(page, "Priya Shah")).toContainText("Editor");
 });
 
 test("a named invitee reads it within a second, joins keyboard-only", async ({

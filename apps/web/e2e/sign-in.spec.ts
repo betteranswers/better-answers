@@ -33,6 +33,7 @@ import {
   keystrokesListed,
   landedAtHome,
   person,
+  personMenuOpened,
   provision,
   quoted,
   removeMember,
@@ -120,8 +121,10 @@ test("lands a sole member in the shell: workspace, person, role", async ({ page,
   await landedAtHome(page, "Admin");
   const bar = page.getByRole("banner");
   await expect(bar.getByText(workspace.name)).toBeVisible();
-  await expect(bar.getByText(workspace.admin.name, { exact: false })).toBeVisible();
-  await expect(bar.getByText("Admin", { exact: false })).toBeVisible();
+  const you = await personMenuOpened(page, workspace.admin.name);
+  await expect(you.getByText(workspace.admin.name, { exact: true })).toBeVisible();
+  await expect(you.getByText("Admin", { exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
   await expect(page.getByRole("button", { name: "Choose a workspace" })).toHaveCount(0);
 
   await expect(page.getByRole("button", { name: /create/i })).toHaveCount(0);
@@ -152,8 +155,8 @@ test("scopes everything to the workspace a two-workspace member picks", async ({
   await landedAtHome(page, "Viewer");
   const bar = page.getByRole("banner");
   await expect(bar.getByText(second.name)).toBeVisible();
-  await expect(bar.getByText("Viewer", { exact: false })).toBeVisible();
   await expect(bar.getByText(first.name)).toHaveCount(0);
+  await expect(await personMenuOpened(page, first.admin.name)).toContainText("Viewer");
 });
 
 test("offers one way on to a person with no membership", async ({ page, request }) => {
@@ -376,9 +379,8 @@ test("skips the picker when the membership postdates the session", async ({ page
   await page.goto("/choose-workspace");
 
   await landedAtHome(page, "Editor");
-  const bar = page.getByRole("banner");
-  await expect(bar.getByText(workspace.name)).toBeVisible();
-  await expect(bar.getByText("Editor", { exact: false })).toBeVisible();
+  await expect(page.getByRole("banner").getByText(workspace.name)).toBeVisible();
+  await expect(await personMenuOpened(page, "Test person")).toContainText("Editor");
   await expect(thePicker(page)).toHaveCount(0);
 });
 
