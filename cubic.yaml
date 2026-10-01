@@ -27,16 +27,19 @@ reviews:
       A new domain word is settled here BEFORE it appears in code; a diff that
       introduces a domain term absent from the glossary is a finding.
     - `CODING_STANDARDS.md` — the constitution.
-    - `apps/api/CODING_STANDARDS.md`, `apps/web/CODING_STANDARDS.md` and
-      `apps/worker/CODING_STANDARDS.md` — workspace rules. Apply a workspace's own file to
-      changes in it; the `WEB` prefix is the browser package's family.
+    - `apps/api/CODING_STANDARDS.md`, `apps/web/CODING_STANDARDS.md`,
+      `apps/worker/CODING_STANDARDS.md` and `deploy/CODING_STANDARDS.md` — a directory's
+      own rules. Apply each to changes in its directory; the `WEB` prefix is the browser
+      package's family.
     - `docs/solutions/architecture-patterns/` — the live architecture decisions, one
       doc each; code cites one as `ADR NNNN`, and its doc is `adr-NNNN-<slug>.md`. A
       change that moves a decision edits its doc in the same pull request, never
       silently. Say which decision is contradicted.
     - Deep modules. Much behaviour behind a small interface. A wide interface
       over thin behaviour is a finding even when the code is correct.
-    - Comments say WHY, never WHAT. History belongs in git.
+    - Comments say WHY, never WHAT. History belongs in git. A stated precondition, or a
+      note on why something is absent, is a why. In a `deploy/` script, a `# >>> name`
+      and `# <<< name` pair is not a comment: it fences lines a test suite lifts and runs.
     - Tests go through the module's interface against real infrastructure.
       Module mocking is banned and lint-enforced.
     - Fabricated work must be avoided. Placeholder, mock, demo or filler content on a
@@ -65,6 +68,11 @@ reviews:
       - packages/devtools/test/**
       - packages/design-system/guidelines/**
       - packages/design-system/thumbnail.html
+      - docs/**
+      - .claude/skills/**
+      - .claude/agents/**
+      - .claude/settings.json
+      - packages/schema/migrations/meta/**
 
   custom_rules:
     - name: Enforce Strict Maintainability Standards
@@ -86,6 +94,8 @@ reviews:
         - Refactor in ways that move complexity around without reducing the number of concepts a reader must hold in their head.
         - Add "temporary" branching that is likely to become permanent debt.
         - Serialize obviously independent work or leave related updates in a non-atomic shape when a cleaner structure is available.
+
+        A component that sets its own state during render behind a guard, React's documented way to adjust state when a prop changes, is not a finding.
 
         Prioritize findings in this order:
         1. Structural code-quality regressions
@@ -117,7 +127,7 @@ reviews:
       description: |-
         ADR 0009's identity seam. Better Auth is a stay with written leave-triggers, and this seam is what keeps the Keycloak fallback a fortnight of work rather than a rewrite.
 
-        A transport verifies a bearer token and builds a `Principal`. Nothing behind that seam knows which library minted the token. Flag any `better-auth` or `@better-auth/*` import outside the auth module, and flag the subtler leak no lint rule sees: a Better Auth type, interface or object shape re-exported, aliased, structurally copied, or embedded in a `Principal`, a context object or a function signature that crosses into `packages/core` or into the web client. A session object passed onward where a `Principal` belongs is the same finding.
+        A transport verifies a bearer token and builds a `Principal`. Nothing behind that seam knows which library minted the token. There are two auth modules: the api's `apps/api/src/auth/` and the web's `apps/web/src/features/auth/`. Flag any `better-auth` or `@better-auth/*` import outside them, and flag the subtler leak no lint rule sees: a Better Auth type, interface or object shape re-exported, aliased, structurally copied, or embedded in a `Principal`, a context object or a function signature that crosses into `packages/core`, or out of the web's auth module into the rest of the client. Code inside an auth module may use Better Auth's types; the finding is at the module's edge. A session object passed onward where a `Principal` belongs is the same finding.
 
         Rule "One adapter is a hypothetical seam; two is a real one" governs seams generally. A seam is introduced only where something already varies across it — a second store, a second provider — so a seam built for one implementation with no second in sight is a finding. Dependencies arrive as parameters and results are returned rather than written as side effects.
       include:
