@@ -51,6 +51,13 @@ const HEAD =
 /** Wrapping, not scrolling, is what keeps a 320px screen from hiding a column. */
 const CELL = "h-10 px-3 py-2 whitespace-normal";
 
+/**
+ * The drawn box is 16px; a press needs 24px. Centred, not inset, since an inset counts from inside
+ * the border.
+ */
+const TICK =
+  "relative after:absolute after:top-1/2 after:left-1/2 after:size-6 after:-translate-x-1/2 after:-translate-y-1/2";
+
 const opensElsewhere = (event: MouseEvent<HTMLAnchorElement>): boolean =>
   event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
 
@@ -110,6 +117,7 @@ function PageTick(properties: { readonly ids: readonly string[]; readonly tickin
   return (
     <Checkbox
       aria-label={ticking.everyOnThePage}
+      className={TICK}
       checked={pageTickState(ticking.ticked, ids)}
       disabled={ids.length === 0}
       onCheckedChange={(checked) => {
@@ -232,6 +240,7 @@ function GridRow<Features extends TableFeatures, Data extends RowData>(
         <TableCell className={cn(CELL, "w-10")}>
           <Checkbox
             aria-label={`Select ${ticking.nameOf(row.original)}`}
+            className={TICK}
             checked={ticked}
             onCheckedChange={(checked) => {
               ticking.onTickedChange(withEach(ticking.ticked, [row.id], checked === true));

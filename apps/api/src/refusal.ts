@@ -30,19 +30,18 @@ export type RefusalAnswer = RefusalWord | Malformed | RefusedItems<RefusalWord>;
 
 type ItemWords = RefusedItems<RefusalWord>["items"];
 
-export type Refusal = {
-  readonly word: RefusalWord;
-  readonly class: RefusalClass;
+type Detail =
+  | { readonly fields: FieldIssues; readonly items?: never }
+  | { readonly fields?: never; readonly items: ItemWords };
 
-  readonly fields?: FieldIssues | undefined;
-
-  readonly items?: ItemWords | undefined;
-};
+/** One detail at most, so no reader meets fields and items together. */
+export type Refusal = { readonly word: RefusalWord; readonly class: RefusalClass } & (
+  | { readonly fields?: never; readonly items?: never }
+  | Detail
+);
 
 /** By its shape, not its word: `malformed` is also an item's word. */
-const detailOf = (
-  answered: Malformed | RefusedItems<RefusalWord>,
-): { readonly fields: FieldIssues } | { readonly items: ItemWords } =>
+const detailOf = (answered: Malformed | RefusedItems<RefusalWord>): Detail =>
   "fields" in answered ? { fields: answered.fields } : { items: answered.items };
 
 export const refusalOf = (answered: RefusalAnswer): Refusal =>

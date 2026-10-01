@@ -15,11 +15,11 @@ const hrefOf = (path: string, query: URLSearchParams): string => {
 };
 
 /**
- * The router re-types a value that reads as JSON, so only words and addresses are asked. The open
- * screen keeps its own query.
+ * The router re-types a value that reads as JSON, so only words and addresses are asked. Asking
+ * another screen drops the open screen's query.
  */
-export const asking = (path: string, ask: Ask, value: string, here?: Here): string => {
-  const query = new URLSearchParams(here?.pathname === path ? here.searchStr : "");
+export const askingHere = (here: Here, path: string, ask: Ask, value: string): string => {
+  const query = new URLSearchParams(here.pathname === path ? here.searchStr : "");
   query.set(ask, value);
   return hrefOf(path, query);
 };

@@ -1,16 +1,49 @@
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { EmptyAction } from "@/shared/ui/kibo-ui/empty-action.tsx";
 import { PaginationCounter } from "@/shared/ui/kibo-ui/pagination-counter.tsx";
 
-/** Each state takes only the screen's words. Clear filters and Retry unmount it, so their handlers move focus. */
+type FocusTarget = RefObject<HTMLElement | null>;
+
+/** Each state takes only the screen's words. A focus target must outlive the state its act replaces. */
 type State =
   | { readonly kind: "loading"; readonly words: string }
   | { readonly kind: "empty"; readonly words: string; readonly act: ReactNode }
-  | { readonly kind: "emptied"; readonly words: string; readonly onClear: () => void }
-  | { readonly kind: "failed"; readonly words: ReactNode; readonly onRetry: () => void };
+  | {
+      readonly kind: "emptied";
+      readonly words: string;
+      readonly onClear: () => void;
+      readonly focusAfterClear: FocusTarget;
+    }
+  | {
+      readonly kind: "failed";
+      readonly words: ReactNode;
+      readonly onRetry: () => void;
+      readonly focusAfterRetry: FocusTarget;
+    };
+
+/** Its press replaces the state that draws it, so focus on it would fall to the page. */
+function StateAct(properties: {
+  readonly onPress: () => void;
+  readonly focusAfter: FocusTarget;
+  readonly children: ReactNode;
+}) {
+  const { onPress, focusAfter } = properties;
+  return (
+    <Button
+      variant="outline"
+      onClick={(event) => {
+        const focusWasHere = event.currentTarget === document.activeElement;
+        onPress();
+        if (focusWasHere) focusAfter.current?.focus();
+      }}
+    >
+      {properties.children}
+    </Button>
+  );
+}
 
 export function ListState(properties: { readonly state: State }) {
   const { state } = properties;
@@ -24,9 +57,9 @@ export function ListState(properties: { readonly state: State }) {
         <EmptyAction
           title={state.words}
           action={
-            <Button variant="outline" onClick={state.onClear}>
+            <StateAct onPress={state.onClear} focusAfter={state.focusAfterClear}>
               Clear filters
-            </Button>
+            </StateAct>
           }
         />
       );
@@ -35,9 +68,9 @@ export function ListState(properties: { readonly state: State }) {
         <EmptyAction
           title={<span role="alert">{state.words}</span>}
           action={
-            <Button variant="outline" onClick={state.onRetry}>
+            <StateAct onPress={state.onRetry} focusAfter={state.focusAfterRetry}>
               Retry
-            </Button>
+            </StateAct>
           }
         />
       );

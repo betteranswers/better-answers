@@ -7,7 +7,7 @@ import { err, systemClock, type UserPrincipal } from "@better-answers/core/kerne
 import type { Tx } from "@better-answers/core/store/postgres";
 
 import type { Doors } from "../src/doors.ts";
-import type { RefusalAnswer } from "../src/refusal.ts";
+import type { Refusal, RefusalAnswer } from "../src/refusal.ts";
 import {
   crossing,
   mutationProcedure,
@@ -121,6 +121,17 @@ describe("a refusal naming items, crossing tRPC", () => {
 
     expect(crossed.status).toBe(status);
     expect(crossed.refusal).toStrictEqual(sent);
+  });
+
+  it("types a refusal's detail as fields or items, never both", () => {
+    type Malformed = { word: "malformed"; class: "malformed" };
+    type Fields = { fields: { memberIds: "too-big" } };
+    type Items = { items: Record<string, "malformed"> };
+
+    expectTypeOf<Malformed>().toExtend<Refusal>();
+    expectTypeOf<Malformed & Fields>().toExtend<Refusal>();
+    expectTypeOf<Malformed & Items>().toExtend<Refusal>();
+    expectTypeOf<Malformed & Fields & Items>().not.toExtend<Refusal>();
   });
 
   it("logs the set's word and class, never an item id", async () => {

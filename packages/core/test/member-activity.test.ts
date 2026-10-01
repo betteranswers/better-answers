@@ -329,6 +329,33 @@ describe("a person's activity", () => {
 
     expect(pageOf(await activityOf(workspace, ulid()))).toEqual({ events: [], nextCursor: null });
   });
+
+  it("finds every act naming the person in its detail alone", async () => {
+    const workspace = await provisionedWorkspace(db(), "NamedInDetail");
+    const priya = await aPerson("Priya Shah");
+    const namings = [
+      ["userId", "people.group.member_added"],
+      ["userId", "people.group.member_removed"],
+      ["userId", "people.member.added"],
+      ["requesterId", "people.request.asked"],
+      ["requesterId", "people.request.approved"],
+      ["requesterId", "people.request.declined"],
+      ["adminUserId", "platform.workspace.provisioned"],
+    ] as const;
+    await seedingWith(db().pool, async (seed) => {
+      for (const [key, act] of namings) {
+        await seed.auditEvent({
+          workspaceId: workspace.workspaceId,
+          act,
+          detail: { [key]: priya },
+        });
+      }
+    });
+
+    expect((await linesOf(workspace, priya)).toSorted()).toEqual(
+      namings.map(([, act]) => [act, "to"]).toSorted(),
+    );
+  });
 });
 
 /**

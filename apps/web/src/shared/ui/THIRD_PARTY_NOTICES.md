@@ -122,7 +122,7 @@ source file is listed.
 | `kibo-ui/empty-action.tsx` | `empty/actions/empty-actions-1.tsx` | `b6b0ab3e7bc394cc` | `36cef032c7a8ee57` |
 | | `empty/search/empty-search-2.tsx` | `fe2894413f5fe4d0` | |
 | | `empty/standard/empty-standard-6.tsx` | `25f2152a598a1fe5` | |
-| `kibo-ui/row-actions.tsx` | `dropdown-menu/actions/dropdown-menu-actions-2.tsx` | `58e26bf9f81588b0` | `d9d46adba09ea6e3` |
+| `kibo-ui/row-actions.tsx` | `dropdown-menu/actions/dropdown-menu-actions-2.tsx` | `58e26bf9f81588b0` | `6b15bd63236adbec` |
 | `kibo-ui/counted-switch.tsx` | `tabs/advanced/tabs-advanced-1.tsx` | `06e57ae8224ceace` | `b2bcfbc2d41b2d03` |
 
 `components.json` writes `https://ui.shadcn.com/r/{name}.json` for the primitives because that is
@@ -267,7 +267,7 @@ The arrival edits on the four Kibo UI patterns, which are demonstrations rather 
   shadcn's `Badge`, as every pill is. The bridge rounds every `role="radio"`, so the drawn segment
   is an inner span and the radio itself stays a bare hit area.
 
-The edits made on 1 October 2026, after review, on four of the files above:
+The edits made on 1 October 2026, after review, on five of the files above:
 
 - `empty.tsx`: `EmptyDescription` takes a `div`'s props, the element it renders. Upstream types it
   with a paragraph's props over that same `div`; the element stays.
@@ -278,6 +278,9 @@ The edits made on 1 October 2026, after review, on four of the files above:
 - `kibo-ui/counted-switch.tsx`: the focus ring stays on the segment's span and the checked
   elevation moved to a span inside it. Two shadow utilities on one element set one property, so a
   checked segment could lose its focus ring.
+- `kibo-ui/row-actions.tsx`: the destructive acts are drawn after the rest, below one separator,
+  each group in the order the caller gave. A separator placed before the first destructive act
+  left a leading or interleaved one among the others.
 
 Everything else is upstream's, unedited. Their behaviour — keyboard handling, focus, ARIA
 wiring, virtualisation — is theirs by ADR 0033; the screens that use them carry the WCAG 2.2 AA

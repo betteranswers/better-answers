@@ -29,6 +29,9 @@ const outline = (groups: readonly JumpGroup[]) =>
 const valuesOf = (groups: readonly JumpGroup[]) =>
   groups.flatMap((group) => group.jumps.map((jump) => jump.value));
 
+/** Open on no screen an act or a member asks, so no query carries into a jump. */
+const AT_ROOT = { pathname: "/", searchStr: "" };
+
 const PRIYA = { personId: "p1", displayName: "Priya Shah", address: "priya@example.test" };
 
 const NAMELESS = { personId: "p2", displayName: "", address: "new@example.test" };
@@ -78,7 +81,7 @@ const STUB: readonly Surface[] = [
 
 describe("what jump-to lists", () => {
   it("lists a stub tree's built screens and their acts alone", () => {
-    expect(outline(jumpsIn(treeOf("Admin", STUB), undefined))).toEqual([
+    expect(outline(jumpsIn(treeOf("Admin", STUB), undefined, AT_ROOT))).toEqual([
       [JUMP_TO.groups.surfaces, ["Yard"]],
       [JUMP_TO.groups.screens, ["Timber", "Ledger"]],
       [JUMP_TO.groups.acts, ["Order timber"]],
@@ -86,24 +89,24 @@ describe("what jump-to lists", () => {
   });
 
   it("drops an act with the screen hidden from the role", () => {
-    const editors = jumpsIn(treeOf("Editor", STUB), undefined);
+    const editors = jumpsIn(treeOf("Editor", STUB), undefined, AT_ROOT);
 
     expect(outline(editors)).toEqual([
       [JUMP_TO.groups.surfaces, ["Yard"]],
       [JUMP_TO.groups.screens, ["Timber"]],
       [JUMP_TO.groups.acts, ["Order timber"]],
     ]);
-    expect(jumpsIn(treeOf("Viewer", STUB), undefined)).toEqual([]);
+    expect(jumpsIn(treeOf("Viewer", STUB), undefined, AT_ROOT)).toEqual([]);
   });
 
   it("lists a Viewer's Ask once, with no members or acts", () => {
-    expect(outline(jumpsIn(treeOf("Viewer"), undefined))).toEqual([
+    expect(outline(jumpsIn(treeOf("Viewer"), undefined, AT_ROOT))).toEqual([
       [JUMP_TO.groups.surfaces, ["Ask"]],
     ]);
   });
 
   it("lists an Admin's built screens, the invite act and members", () => {
-    expect(outline(jumpsIn(treeOf("Admin"), [PRIYA, NAMELESS]))).toEqual([
+    expect(outline(jumpsIn(treeOf("Admin"), [PRIYA, NAMELESS], AT_ROOT))).toEqual([
       [JUMP_TO.groups.surfaces, ["Control Centre"]],
       [JUMP_TO.groups.screens, ["Bindings", "Routes and spend", "Members", "Groups", "Audit log"]],
       [JUMP_TO.groups.acts, [INVITE_A_PERSON.name]],
@@ -112,13 +115,13 @@ describe("what jump-to lists", () => {
   });
 
   it("gives every item its own value, namesakes included", () => {
-    const values = valuesOf(jumpsIn(treeOf("Admin"), [PRIYA, ANOTHER_PRIYA, NAMELESS]));
+    const values = valuesOf(jumpsIn(treeOf("Admin"), [PRIYA, ANOTHER_PRIYA, NAMELESS], AT_ROOT));
 
     expect(new Set(values).size).toBe(values.length);
   });
 
   it("leads each item to its place, asking Members for acts", () => {
-    const groups = jumpsIn(treeOf("Admin"), [PRIYA]);
+    const groups = jumpsIn(treeOf("Admin"), [PRIYA], AT_ROOT);
     const to = Object.fromEntries(
       groups.flatMap((group) => group.jumps.map((jump) => [jump.name, jump.to])),
     );
@@ -180,23 +183,23 @@ describe("choosing Invite a person in the app", () => {
 
 describe("what typing leaves", () => {
   it("finds no People screen for a Viewer typing people (AE4)", () => {
-    expect(matching(jumpsIn(treeOf("Viewer"), undefined), "people")).toEqual([]);
+    expect(matching(jumpsIn(treeOf("Viewer"), undefined, AT_ROOT), "people")).toEqual([]);
   });
 
   it("finds an Admin's People screens by their group's name", () => {
-    expect(outline(matching(jumpsIn(treeOf("Admin"), [PRIYA]), "People"))).toEqual([
+    expect(outline(matching(jumpsIn(treeOf("Admin"), [PRIYA], AT_ROOT), "People"))).toEqual([
       [JUMP_TO.groups.screens, ["Members", "Groups"]],
     ]);
   });
 
   it("finds Invite a person by its first word (AE4)", () => {
-    expect(outline(matching(jumpsIn(treeOf("Admin"), [PRIYA]), "invite"))).toEqual([
+    expect(outline(matching(jumpsIn(treeOf("Admin"), [PRIYA], AT_ROOT), "invite"))).toEqual([
       [JUMP_TO.groups.acts, [INVITE_A_PERSON.name]],
     ]);
   });
 
   it("finds a member by name or address, every word counting", () => {
-    const groups = jumpsIn(treeOf("Admin"), [PRIYA, NAMELESS]);
+    const groups = jumpsIn(treeOf("Admin"), [PRIYA, NAMELESS], AT_ROOT);
 
     expect(outline(matching(groups, "shah priya"))).toEqual([
       [JUMP_TO.groups.members, ["Priya Shah"]],
@@ -207,7 +210,7 @@ describe("what typing leaves", () => {
   });
 
   it("finds nothing by an unbuilt screen's name", () => {
-    expect(matching(jumpsIn(treeOf("Admin"), [PRIYA]), "Signals")).toEqual([]);
+    expect(matching(jumpsIn(treeOf("Admin"), [PRIYA], AT_ROOT), "Signals")).toEqual([]);
   });
 });
 

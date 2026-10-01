@@ -2,7 +2,7 @@ import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useEffectEvent, useRef, useState, type RefObject } from "react";
 
 import { useMembers } from "@/features/people/people-api.ts";
-import { asking, type Here } from "@/shared/address-ask.ts";
+import { askingHere, type Here } from "@/shared/address-ask.ts";
 import { Icon, type IconName } from "@/shared/icon.tsx";
 import type { Keystroke } from "@/shared/keystrokes.tsx";
 import {
@@ -93,26 +93,26 @@ const screenJump = ({ surface, group, screen }: Placed): Jump =>
     surface.name,
   );
 
-const actJumps = (screen: Screen, here: Here | undefined): readonly Jump[] =>
+const actJumps = (screen: Screen, here: Here): readonly Jump[] =>
   (screen.acts ?? []).map((act) =>
     jumpOf({
       value: `act ${screen.path} ${act.asks}`,
       name: act.name,
       said: screen.name,
       icon: act.icon,
-      to: asking(screen.path, "act", act.asks, here),
+      to: askingHere(here, screen.path, "act", act.asks),
       kind: "act",
     }),
   );
 
 /** Found on Members by their address, which the list's own search box takes. */
-const memberJump = (member: Member, here: Here | undefined): Jump =>
+const memberJump = (member: Member, here: Here): Jump =>
   jumpOf({
     value: `member ${member.personId}`,
     name: nameOrAddress(member.displayName, member.address),
     said: member.displayName === "" ? undefined : member.address,
     icon: "person",
-    to: asking(MEMBERS.path, "search", member.address, here),
+    to: askingHere(here, MEMBERS.path, "search", member.address),
     kind: "member",
   });
 
@@ -120,7 +120,7 @@ const memberJump = (member: Member, here: Here | undefined): Jump =>
 export const jumpsIn = (
   tree: VisibleTree,
   members: readonly Member[] | undefined,
-  here?: Here,
+  here: Here,
 ): readonly JumpGroup[] => {
   const groups: readonly JumpGroup[] = [
     { heading: JUMP_TO.groups.surfaces, jumps: tree.surfaces.map(surfaceJump) },

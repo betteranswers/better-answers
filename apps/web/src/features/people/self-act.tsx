@@ -25,7 +25,6 @@ const SENT_HOME = z.object({ homeOf: z.string().transform(roleOf) });
 
 type OwnMembershipChange = "demoted" | "removed";
 
-/** The line an act's confirmation adds when the people it acts on include the reader. */
 export const useIncludesYou = (personIds: readonly string[]): string | undefined => {
   const readerId = useReaderId();
   return readerId !== undefined && personIds.includes(readerId) ? INCLUDES_YOU : undefined;
@@ -47,10 +46,7 @@ const roleReadAgain = async (
   return read?.status === "success" && read.fetchStatus === "idle" ? read.data?.role : undefined;
 };
 
-/**
- * Sends the reader where the act left them, replacing the screen they can no longer see. Answers
- * the outcome to show when it could not.
- */
+/** The reader can no longer see the screen the act was taken on, so each move replaces it. */
 export const useSelfActHome = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();

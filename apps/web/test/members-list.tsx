@@ -8,7 +8,7 @@ import {
   tableFeatures,
   useTable,
 } from "@tanstack/react-table";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type RefObject } from "react";
 
 import { FilterRow } from "@/shared/filter-row.tsx";
 import { GridTable, RowLink } from "@/shared/grid-table.tsx";
@@ -214,7 +214,9 @@ type Asked = {
 
 type Narrowed = { readonly search: string; readonly role: string | undefined };
 
-const emptyOf = (narrowed: Narrowed, clear: () => void) => {
+type FocusTarget = RefObject<HTMLElement | null>;
+
+const emptyOf = (narrowed: Narrowed, clear: () => void, focusAfterClear: FocusTarget) => {
   if (narrowed.search === "" && narrowed.role === undefined) {
     return (
       <ListState
@@ -230,7 +232,7 @@ const emptyOf = (narrowed: Narrowed, clear: () => void) => {
     narrowed.search === ""
       ? "No one matches these filters."
       : `No one matches “${narrowed.search}”.`;
-  return <ListState state={{ kind: "emptied", words, onClear: clear }} />;
+  return <ListState state={{ kind: "emptied", words, onClear: clear, focusAfterClear }} />;
 };
 
 const matching = (members: readonly Member[], narrowed: Narrowed): Member[] =>
@@ -297,7 +299,6 @@ type Held = ReturnType<typeof useMembersList>;
 
 const clearFilters = (held: Held) => () => {
   held.narrow({ search: "", role: undefined });
-  held.searchRef.current?.focus();
 };
 
 function MembersTable(properties: { readonly held: Held }) {
@@ -320,7 +321,7 @@ function MembersTable(properties: { readonly held: Held }) {
         }}
         hidden={held.hidden}
         rowMenu={menuOf(held.onAct)}
-        empty={emptyOf(held.narrowed, clearFilters(held))}
+        empty={emptyOf(held.narrowed, clearFilters(held), held.searchRef)}
       />
       <ListPages
         pages={{
@@ -343,7 +344,14 @@ function MembersRead(properties: { readonly asked: Asked; readonly held: Held })
   }
   if (read === "failed") {
     return (
-      <ListState state={{ kind: "failed", words: "The members could not be read.", onRetry }} />
+      <ListState
+        state={{
+          kind: "failed",
+          words: "The members could not be read.",
+          onRetry,
+          focusAfterRetry: properties.held.searchRef,
+        }}
+      />
     );
   }
   return <MembersTable held={properties.held} />;

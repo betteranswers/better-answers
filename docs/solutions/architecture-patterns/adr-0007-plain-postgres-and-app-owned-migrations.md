@@ -36,7 +36,12 @@ A workspace's chunk partition is attached, never created as a partition.
 
 - Provisioning makes the partition as a table of its own, `LIKE "index".chunk` with what a partition inherits, revoked, its GIN index built. It then runs `ALTER TABLE "index".chunk ATTACH PARTITION`. It never runs `CREATE TABLE … PARTITION OF`.
 - So provisioning holds the shared `index.chunk` in no mode a read or a write waits on, and no writer needs a lock order.
-- No `lock_timeout` bounds the wait.
+- No `lock_timeout` bounds provisioning's ATTACH wait.
+
+A migration that takes a lock writers wait on bounds its own wait.
+
+- A plain `CREATE INDEX` on a busy table is such a migration. It runs `SET LOCAL lock_timeout` before the lock, and sets it back to `DEFAULT` before the next migration in the batch. `0059_the-actor-index.sql` is the first.
+- A timeout stops the release's `migrate` step, and the release is re-run by hand.
 
 ## Why
 
@@ -46,6 +51,8 @@ A workspace's chunk partition is attached, never created as a partition.
 - `PARTITION OF` holds `index.chunk` in ACCESS EXCLUSIVE, then waits for SHARE ROW EXCLUSIVE on `source_document` to clone the parent's foreign key. A transaction holding a write on `source_document` that then touches `index.chunk` closes a cycle, and Postgres aborts one side with 40P01. Meanwhile every workspace's reads of `index.chunk` queue behind it.
 - ATTACH holds `index.chunk` in SHARE UPDATE EXCLUSIVE and ACCESS SHARE, and the parent's indexes in SHARE UPDATE EXCLUSIVE. Neither conflicts with a read's ACCESS SHARE or a write's ROW EXCLUSIVE. The one mode it contends for with a writer is SHARE ROW EXCLUSIVE on `source_document`, and while it waits for that it holds nothing a chunk read or write waits on. Two provisions queue one behind the other and form no cycle. The modes were read from `pg_locks` on the pinned image, Postgres 18.6.
 - A `lock_timeout` would turn the wait into a refused sign-up that nothing retries. The wait holds up other writes of documents, never a read of them or a chunk's key check.
+- A plain `CREATE INDEX` that waits for its lock queues every later write to the table behind it. A migration has someone to retry it, so a bounded wait costs a re-run release, not a refused person.
+- Drizzle runs every pending migration in one transaction, so a `SET LOCAL` in one would still bind the migrations after it. The reset ends the bound with its own migration.
 - Nothing depends on a vendor helper, so a hosted Postgres stays a connection-string change away.
 
 ## Rejected

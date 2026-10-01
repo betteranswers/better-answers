@@ -47,13 +47,19 @@ const NAMED_IN = {
   detail: [
     {
       key: "userId",
+      subjectKinds: ["group", "member"],
       acts: ["people.group.member_added", "people.group.member_removed", "people.member.added"],
     },
     {
       key: "requesterId",
+      subjectKinds: ["request"],
       acts: ["people.request.asked", "people.request.approved", "people.request.declined"],
     },
-    { key: "adminUserId", acts: ["platform.workspace.provisioned"] },
+    {
+      key: "adminUserId",
+      subjectKinds: ["workspace"],
+      acts: ["platform.workspace.provisioned"],
+    },
   ],
 } as const satisfies PersonNamedIn;
 

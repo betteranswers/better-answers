@@ -1,5 +1,4 @@
 import { DotsThreeVertical } from "@phosphor-icons/react";
-import { Fragment } from "react";
 
 import { Button } from "@/shared/ui/button.tsx";
 import {
@@ -21,29 +20,32 @@ export type RowActionsProps = {
   actions: readonly RowAction[];
 };
 
-/** A destructive act sits apart from the rest, below a separator. */
-const startsTheDestructive = (actions: readonly RowAction[], index: number): boolean =>
-  index > 0 && actions[index]?.destructive === true && actions[index - 1]?.destructive !== true;
-
-export const RowActions = ({ label, actions }: RowActionsProps) => (
-  <DropdownMenu>
-    <DropdownMenuTrigger asChild>
-      <Button className="size-8" size="icon" variant="ghost" aria-label={label}>
-        <DotsThreeVertical aria-hidden className="size-4" />
-      </Button>
-    </DropdownMenuTrigger>
-    <DropdownMenuContent align="end" className="min-w-40">
-      {actions.map((action, index) => (
-        <Fragment key={action.label}>
-          {startsTheDestructive(actions, index) ? <DropdownMenuSeparator /> : null}
-          <DropdownMenuItem
-            variant={action.destructive === true ? "destructive" : "default"}
-            onSelect={action.onSelect}
-          >
-            {action.label}
-          </DropdownMenuItem>
-        </Fragment>
-      ))}
-    </DropdownMenuContent>
-  </DropdownMenu>
+const itemOf = (action: RowAction) => (
+  <DropdownMenuItem
+    key={action.label}
+    variant={action.destructive === true ? "destructive" : "default"}
+    onSelect={action.onSelect}
+  >
+    {action.label}
+  </DropdownMenuItem>
 );
+
+/** A destructive act sits apart, below the rest and one separator, whatever order a caller lists. */
+export const RowActions = ({ label, actions }: RowActionsProps) => {
+  const rest = actions.filter((action) => action.destructive !== true);
+  const destructive = actions.filter((action) => action.destructive === true);
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button className="size-8" size="icon" variant="ghost" aria-label={label}>
+          <DotsThreeVertical aria-hidden className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-40">
+        {rest.map(itemOf)}
+        {rest.length > 0 && destructive.length > 0 ? <DropdownMenuSeparator /> : null}
+        {destructive.map(itemOf)}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+};

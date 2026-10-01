@@ -2,7 +2,7 @@ import { act, cleanup, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { asking, useAsked } from "@/shared/address-ask.ts";
+import { askingHere, useAsked } from "@/shared/address-ask.ts";
 
 import { openScreens } from "./address-router.tsx";
 
@@ -84,13 +84,14 @@ describe("asking a screen for an act", () => {
   const HERE = { pathname: "/members", searchStr: "?members.role=Editor&members.page=2" };
 
   it("adds to the query of the screen already open", () => {
-    expect(asking("/members", "act", "invite", HERE)).toBe(
+    expect(askingHere(HERE, "/members", "act", "invite")).toBe(
       "/members?members.role=Editor&members.page=2&act=invite",
     );
   });
 
   it("carries no other screen's query", () => {
-    expect(asking("/groups", "act", "invite", HERE)).toBe("/groups?act=invite");
-    expect(asking("/members", "act", "invite")).toBe("/members?act=invite");
+    expect(askingHere(HERE, "/groups", "act", "invite")).toBe("/groups?act=invite");
+    const onGroups = { pathname: "/groups", searchStr: "?groups.search=ops" };
+    expect(askingHere(onGroups, "/members", "act", "invite")).toBe("/members?act=invite");
   });
 });

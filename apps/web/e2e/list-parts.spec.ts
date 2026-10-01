@@ -98,6 +98,30 @@ const backUntilFocused = async (page: Page, target: Locator) => {
   await expect(target, "Shift+Tab never reached it").toBeFocused();
 };
 
+/** WCAG's minimum target, measured as the points around a box that a press on it reaches. */
+const TARGET = 24;
+
+/** The box as drawn, and each corner of a 24-pixel square on its centre that misses it. */
+const targetOf = (tick: Locator) =>
+  tick.evaluate((node, side) => {
+    const box = node.getBoundingClientRect();
+    const reach = side / 2 - 0.5;
+    const corners: readonly (readonly [number, number])[] = [
+      [-reach, -reach],
+      [reach, -reach],
+      [-reach, reach],
+      [reach, reach],
+    ];
+    const missed = corners.filter(([across, down]) => {
+      const hit = document.elementFromPoint(
+        box.left + box.width / 2 + across,
+        box.top + box.height / 2 + down,
+      );
+      return hit === null || !node.contains(hit);
+    });
+    return { drawn: [box.width, box.height], missed };
+  }, TARGET);
+
 test.describe("the shared list parts, drawn together", () => {
   test("keep every part but the table inside 320 pixels", async ({ page, request }) => {
     await page.setViewportSize({ width: 320, height: 720 });
@@ -196,5 +220,31 @@ test.describe("the shared list parts, drawn together", () => {
     await page.keyboard.press("Enter");
     await expect(bar(page)).toBeHidden();
     await expect(page.getByRole("searchbox", { name: "Search by name or address" })).toBeFocused();
+  });
+
+  test("each tick takes a 24-pixel press around its 16-pixel box", async ({ page, request }) => {
+    await drawn(page, request);
+
+    for (const tick of [
+      page.getByRole("checkbox", { name: "Select every member on this page" }),
+      tickOf(page, "Cy Twombly"),
+    ]) {
+      const target = await targetOf(tick);
+      expect(target.drawn, "the drawn box changed size").toEqual([16, 16]);
+      expect(target.missed, `a corner of the ${String(TARGET)}-pixel target misses`).toEqual([]);
+    }
+  });
+
+  test("Clear filters by keyboard hands focus to the search", async ({ page, request }) => {
+    await drawn(page, request);
+    const search = page.getByRole("searchbox", { name: "Search by name or address" });
+    await search.fill("Zed");
+
+    const clear = page.getByRole("button", { name: "Clear filters" });
+    await tabUntilFocused(page, clear);
+    await page.keyboard.press("Enter");
+
+    await expect(search).toBeFocused();
+    await expect(tickOf(page, "Cy Twombly")).toBeVisible();
   });
 });

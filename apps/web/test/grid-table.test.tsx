@@ -56,6 +56,14 @@ const pickRole = (role: string) => {
   picked("Filter by role", role);
 };
 
+const searchBox = () => screen.getByRole("searchbox", { name: "Search by name or address" });
+
+/** jsdom's click moves no focus, where a browser's press leaves it on the button. */
+const pressedWithFocus = (button: HTMLElement) => {
+  button.focus();
+  fireEvent.click(button);
+};
+
 describe("the shared table", () => {
   it("draws only the screen's columns when nothing is opted in", () => {
     render(<BareList />);
@@ -242,13 +250,14 @@ describe("the list's states", () => {
     expect(people()).toHaveLength(MEMBERS.length);
   });
 
-  it("offers Retry when the read fails", () => {
+  it("offers Retry on a failed read, handing its focus on", () => {
     const retry = vi.fn<() => void>();
     render(<MembersList read="failed" onRetry={retry} />);
 
     expect(screen.getByRole("alert").textContent).toBe("The members could not be read.");
-    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    pressedWithFocus(screen.getByRole("button", { name: "Retry" }));
     expect(retry).toHaveBeenCalledTimes(1);
+    expect(document.activeElement).toBe(searchBox());
   });
 
   it("says the list is loading on its first read", () => {
@@ -264,11 +273,20 @@ describe("the list's states", () => {
     pickRole("Admin");
     expect(screen.getByText("No one matches these filters.")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    pressedWithFocus(screen.getByRole("button", { name: "Clear filters" }));
     expect(people()).toHaveLength(MEMBERS.length - 1);
-    expect(document.activeElement).toBe(
-      screen.getByRole("searchbox", { name: "Search by name or address" }),
-    );
+    expect(document.activeElement).toBe(searchBox());
+  });
+
+  it("leaves focus alone when Clear filters is pressed without it", () => {
+    render(<MembersList />);
+    const role = screen.getByRole("combobox", { name: "Filter by role" });
+    fireEvent.change(searchBox(), { target: { value: "Zed" } });
+    role.focus();
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(people()).toHaveLength(MEMBERS.length);
+    expect(document.activeElement).toBe(role);
   });
 });
 

@@ -151,7 +151,15 @@ export const eventsNewestFirst = async (
 /** Where a person's id may stand in an event beyond its actor. */
 export type PersonNamedIn = {
   readonly subjectKinds: readonly string[];
-  readonly detail: readonly { readonly key: string; readonly acts: readonly ActName[] }[];
+  readonly detail: readonly {
+    readonly key: string;
+    /**
+     * Every kind the acts' subjects take, so the arm reaches the subject index; a kind left out
+     * hides that act's events.
+     */
+    readonly subjectKinds: readonly string[];
+    readonly acts: readonly ActName[];
+  }[];
 };
 
 type Bindable = string | number | null | readonly string[];
@@ -172,14 +180,6 @@ const armOf = (at: ArmAt, predicate: string): string =>
        AND ${afterTheCursor(at)}
      ORDER BY at DESC, id DESC
      LIMIT $${at.limit} + 1)`;
-
-/**
- * Naming the kinds the acts' subjects take reaches the subject index. They are a value the
- * planner can see, not a subquery it cannot.
- */
-const subjectKindsOf = (acts: readonly ActName[]): readonly string[] => [
-  ...new Set(acts.flatMap((name) => name.split(".").slice(1, 2))),
-];
 
 /**
  * Newest first, from the row after `cursor`: the events whose actor is the person, whose subject
@@ -209,10 +209,10 @@ export const eventsNamingNewestFirst = async (
       at,
       `subject_kind = ANY($${bind(asked.namedIn.subjectKinds)}::text[]) AND subject_id = $${person}`,
     ),
-    ...asked.namedIn.detail.map(({ key, acts }) =>
+    ...asked.namedIn.detail.map(({ key, subjectKinds, acts }) =>
       armOf(
         at,
-        `subject_kind = ANY($${bind(subjectKindsOf(acts))}::text[])
+        `subject_kind = ANY($${bind(subjectKinds)}::text[])
          AND act = ANY($${bind(acts)}::text[]) AND detail ->> $${bind(key)}::text = $${person}`,
       ),
     ),
