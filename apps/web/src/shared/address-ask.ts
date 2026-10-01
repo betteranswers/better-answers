@@ -1,4 +1,4 @@
-import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { useRouter, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
 /** What another place may ask of a screen as it opens: one of its acts, or a search. */
@@ -30,10 +30,11 @@ export const asking = (path: string, ask: Ask, value: string, here?: Here): stri
  * reload from asking again.
  */
 export const useAsked = (ask: Ask, take: (value: string) => void): void => {
-  const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const searchStr = useRouterState({ select: (state) => state.location.searchStr });
-  const asked = new URLSearchParams(searchStr).get(ask) ?? undefined;
-  const navigate = useNavigate();
+  // Its own key alone, so a list writing the rest of the query does not draw the screen again.
+  const asked = useRouterState({
+    select: (state) => new URLSearchParams(state.location.searchStr).get(ask) ?? undefined,
+  });
+  const router = useRouter();
   const [taken, setTaken] = useState<string>();
 
   // During render, so `take` may set only the caller's own state, which an abandoned render drops.
@@ -44,8 +45,9 @@ export const useAsked = (ask: Ask, take: (value: string) => void): void => {
 
   useEffect(() => {
     if (asked === undefined) return;
+    const { pathname, searchStr } = router.state.location;
     const rest = new URLSearchParams(searchStr);
     rest.delete(ask);
-    void navigate({ href: hrefOf(pathname, rest), replace: true });
-  }, [ask, asked, pathname, searchStr, navigate]);
+    void router.navigate({ href: hrefOf(pathname, rest), replace: true });
+  }, [ask, asked, router]);
 };

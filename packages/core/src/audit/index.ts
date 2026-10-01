@@ -152,13 +152,19 @@ export type PersonNamedIn = {
   readonly detail: readonly { readonly key: string; readonly acts: readonly ActName[] }[];
 };
 
+/** Every arm's parameters, in the order the read passes them; each detail arm's three follow. */
+const ARM = { scope: 1, cursor: 2, limit: 3, actor: 4, person: 5, subjectKinds: 6 } as const;
+
+const FIRST_DETAIL_PARAMETER = 7;
+
 /** Each arm is limited on its own index; one query that ORs them would scan the workspace. */
 const armOf = (predicate: string): string =>
   `(SELECT ${AUDIT_EVENT_ROW}
       FROM audit_event
-     WHERE workspace_id = ${scopeClause(1)} AND ${predicate} AND ${afterTheCursor(2)}
+     WHERE workspace_id = ${scopeClause(ARM.scope)} AND ${predicate}
+       AND ${afterTheCursor(ARM.cursor)}
      ORDER BY at DESC, id DESC
-     LIMIT $3 + 1)`;
+     LIMIT $${ARM.limit} + 1)`;
 
 /**
  * Naming the kinds the acts' subjects take reaches the subject index. They are a value the
@@ -167,7 +173,7 @@ const armOf = (predicate: string): string =>
 const detailArm = (key: string, acts: readonly ActName[], first: number) => ({
   clause: armOf(
     `subject_kind = ANY($${first}::text[]) AND act = ANY($${first + 1}::text[])
-     AND detail ->> $${first + 2}::text = $5`,
+     AND detail ->> $${first + 2}::text = $${ARM.person}`,
   ),
   values: [[...new Set(acts.flatMap((name) => name.split(".").slice(1, 2)))], acts, key],
 });
@@ -188,12 +194,12 @@ export const eventsNamingNewestFirst = async (
   },
 ): Promise<AuditEventPage> => {
   const inDetail = asked.namedIn.detail.map(({ key, acts }, index) =>
-    detailArm(key, acts, 7 + index * 3),
+    detailArm(key, acts, FIRST_DETAIL_PARAMETER + index * 3),
   );
   const found = await tx.query(
     `SELECT * FROM (${[
-      armOf("actor = $4"),
-      armOf("subject_kind = ANY($6::text[]) AND subject_id = $5"),
+      armOf(`actor = $${ARM.actor}`),
+      armOf(`subject_kind = ANY($${ARM.subjectKinds}::text[]) AND subject_id = $${ARM.person}`),
       ...inDetail.map((arm) => arm.clause),
     ].join(" UNION ALL ")}) AS arms
      ORDER BY at DESC, id DESC`,

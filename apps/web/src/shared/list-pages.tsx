@@ -4,7 +4,7 @@ import { Button } from "@/shared/ui/button.tsx";
 import { EmptyAction } from "@/shared/ui/kibo-ui/empty-action.tsx";
 import { PaginationCounter } from "@/shared/ui/kibo-ui/pagination-counter.tsx";
 
-/** Each state takes only the screen's words. This state goes once a clear or retry works, so each moves focus on. */
+/** Each state takes only the screen's words. Clear filters and Retry unmount it, so their handlers move focus. */
 type State =
   | { readonly kind: "loading"; readonly words: string }
   | { readonly kind: "empty"; readonly words: string; readonly act: ReactNode }

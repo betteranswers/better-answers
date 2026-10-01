@@ -16,7 +16,7 @@ import {
   type UserPrincipal,
 } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
-import { eventsNamed, type AuditLogPage } from "./audit-log.ts";
+import { eventsNamed, PERSON_SUBJECT_KINDS, type AuditLogPage } from "./audit-log.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
 const ACTIVITY_PAGE = 50;
@@ -43,7 +43,7 @@ export type ReadActivityRefusal = MemberRefusal<RefusalOf<typeof readActivityAct
  * reaches its inviter's stream alone.
  */
 const NAMED_IN = {
-  subjectKinds: ["member", "person"],
+  subjectKinds: PERSON_SUBJECT_KINDS,
   detail: [
     {
       key: "userId",

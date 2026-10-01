@@ -73,9 +73,11 @@ export type AuditLogPage = Omit<AuditEventPage, "rows"> & {
 
 type NamedKind = "person" | "group" | "invitation";
 
+/** The subject kinds a person's id stands under. */
+export const PERSON_SUBJECT_KINDS = ["member", "person"] as const;
+
 const NAMED_KINDS: ReadonlyMap<string, NamedKind> = new Map([
-  ["member", "person"],
-  ["person", "person"],
+  ...PERSON_SUBJECT_KINDS.map((kind): [string, NamedKind] => [kind, "person"]),
   ["group", "group"],
   ["invitation", "invitation"],
 ]);
@@ -88,12 +90,15 @@ const idsNamedAs = (rows: readonly AuditEventRow[], kind: NamedKind): readonly s
   ),
 ];
 
+/** The ids are the statement's last parameter; a kind no row names costs no round trip. */
 const namesById = async (
   tx: Tx,
   statement: string,
-  parameters: readonly (string | readonly string[])[],
+  ids: readonly string[],
+  scope: readonly string[] = [],
 ): Promise<ReadonlyMap<string, string>> => {
-  const found = await tx.query<{ id: string; name: string }>(statement, [...parameters]);
+  if (ids.length === 0) return new Map();
+  const found = await tx.query<{ id: string; name: string }>(statement, [...scope, ids]);
   return new Map(found.rows.map((row) => [row.id, row.name]));
 };
 
@@ -103,18 +108,22 @@ const namesOfSubjects = async (
   tx: Tx,
   rows: readonly AuditEventRow[],
 ): Promise<SubjectNames> => ({
-  person: await namesById(tx, 'SELECT id, name FROM "user" WHERE id = ANY($1::text[])', [
+  person: await namesById(
+    tx,
+    'SELECT id, name FROM "user" WHERE id = ANY($1::text[])',
     idsNamedAs(rows, "person"),
-  ]),
+  ),
   group: await namesById(
     tx,
     'SELECT id, name FROM "group" WHERE workspace_id = $1 AND id = ANY($2::text[])',
-    [principal.workspaceId, idsNamedAs(rows, "group")],
+    idsNamedAs(rows, "group"),
+    [principal.workspaceId],
   ),
   invitation: await namesById(
     tx,
     "SELECT id, email AS name FROM invitation WHERE workspace_id = $1 AND id = ANY($2::text[])",
-    [principal.workspaceId, idsNamedAs(rows, "invitation")],
+    idsNamedAs(rows, "invitation"),
+    [principal.workspaceId],
   ),
 });
 

@@ -16,10 +16,11 @@ type Slots = {
 
 type Sentence = (slots: Slots) => string;
 
-const sentenceCase = (words: string): string => `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
+export const sentenceCase = (words: string): string =>
+  `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
 
 /** `people.member.role_changed` reads "Member role changed": the act's subject, then its verb. */
-const labelOfAct = (act: string): string => {
+export const labelOfAct = (act: string): string => {
   const [, subject = "", verb = ""] = act.split(".");
   return sentenceCase(`${subject} ${verb}`.replaceAll("_", " "));
 };
@@ -34,7 +35,7 @@ const person = (subject: Subject): string => {
   return subject?.kind === "former-member" ? "a former member" : "a person";
 };
 
-const persons = (subject: Subject): string => `${person(subject)}'s`;
+const possessive = (subject: Subject): string => `${person(subject)}'s`;
 
 const group = (subject: Subject): string =>
   subject?.kind === "group" ? `the group ${subject.name}` : "a deleted group";
@@ -77,25 +78,27 @@ const SENTENCES = {
   "people.member.added": ({ by, subject, detail }) =>
     `${by} added ${person(subject)} as ${role(detail)}`,
   "people.member.credentials_revoked": ({ by, subject }) =>
-    `${by} revoked ${persons(subject)} credentials in this workspace`,
+    `${by} revoked ${possessive(subject)} credentials in this workspace`,
   "people.member.joined": ({ by, detail }) => `${by} joined as ${role(detail)}`,
   "people.member.removed": ({ by, subject }) =>
     `${by} removed ${person(subject)} from the workspace`,
   "people.member.role_changed": ({ by, subject, detail }) =>
-    `${by} changed ${persons(subject)} role to ${role(detail)}`,
+    `${by} changed ${possessive(subject)} role to ${role(detail)}`,
   "people.name_flag.raised": ({ by, subject }) =>
-    `${by} flagged ${persons(subject)} display name to the operator`,
+    `${by} flagged ${possessive(subject)} display name to the operator`,
   "people.operator.granted": ({ by, subject }) => `${by} made ${person(subject)} the operator`,
-  "people.operator.revoked": ({ by, subject }) => `${by} revoked ${persons(subject)} operator mark`,
+  "people.operator.revoked": ({ by, subject }) =>
+    `${by} revoked ${possessive(subject)} operator mark`,
   "people.person.added": ({ by, subject }) => `${by} added ${person(subject)} to the platform`,
   "people.person.credentials_revoked": ({ by, subject }) =>
-    `${by} revoked ${persons(subject)} credentials everywhere`,
+    `${by} revoked ${possessive(subject)} credentials everywhere`,
   "people.person.grants_ended": ({ by, subject }) =>
-    `${by} ended ${persons(subject)} client grants in a workspace`,
+    `${by} ended ${possessive(subject)} client grants in a workspace`,
   "people.person.name_flagged": ({ by, subject }) =>
-    `${by} flagged ${persons(subject)} display name`,
+    `${by} flagged ${possessive(subject)} display name`,
   "people.person.named": ({ by }) => `${by} gave their display name`,
-  "people.person.renamed": ({ by, subject }) => `${by} corrected ${persons(subject)} display name`,
+  "people.person.renamed": ({ by, subject }) =>
+    `${by} corrected ${possessive(subject)} display name`,
   "people.person.signed_in": ({ by }) => `${by} signed in`,
   "people.request.approved": ({ by }) => `${by} approved an access request`,
   "people.request.asked": ({ by }) => `${by} asked to join the workspace`,

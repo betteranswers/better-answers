@@ -8,7 +8,7 @@ type Held = string | number | undefined;
 /** Each field's `.catch` is the list's default for a missing or malformed value. */
 type ListFields = Readonly<Record<string, z.ZodCatch<z.ZodType<Held>>>>;
 
-type ListState<Fields extends ListFields> = z.output<z.ZodObject<Fields>>;
+type AddressState<Fields extends ListFields> = z.output<z.ZodObject<Fields>>;
 
 /** The router reads a whole number as one, so a page held as a quoted word is malformed too. */
 export const PAGE_NUMBER = z.number().int().min(1).catch(1);
@@ -45,14 +45,14 @@ export const useListAddress = <Fields extends ListFields>(prefix: string, fields
   const navigate = useNavigate();
   const shape = useMemo(() => z.object(fields), [fields]);
   const defaults: Query = useMemo(() => shape.parse({}), [shape]);
-  const state: ListState<Fields> = useMemo(
+  const state: AddressState<Fields> = useMemo(
     () => shape.parse(fieldsHeld(prefix, fields, QUERY.parse(search))),
     [shape, prefix, fields, search],
   );
 
   // Replaced, never pushed, so typing fills no history; read from the address at the write, so
   // two writes in one handler both land.
-  const write = (patch: Partial<ListState<Fields>>): void => {
+  const write = (patch: Partial<AddressState<Fields>>): void => {
     void navigate({
       to: ".",
       search: (current: Query) => ({
