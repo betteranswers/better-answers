@@ -199,6 +199,11 @@ Five more play Claude's part in its OAuth flow on the suite's own origin — `ap
   keydown listener and a `MutationObserver` — because a matcher's polling is coarser than the
   budget. `apps/web/e2e/sources.spec.ts` times both; the act's clock is the harness's two helpers
   above.
+- **A shared part no screen draws yet is bundled with Vite, not imported.** Playwright compiles
+  every `.tsx` it loads with its own JSX runtime, so React cannot render a component a spec imports.
+  `apps/web/e2e/list-parts.spec.ts` builds a unit-suite harness through Vite from a virtual entry
+  and runs the script on the SPA's origin. The page carries only the served build's stylesheet, so
+  a class that appears in the harness alone is missing from it, with no error.
 
 ## The accessibility gate
 
