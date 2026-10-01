@@ -342,11 +342,18 @@ describe("the gate a dispatched release passes", () => {
   });
 });
 
-/** The dead-man service's own form: seconds, and an offset rather than `Z`. */
-const pingedMinutesAgo = (minutes: number): string =>
-  new Date(Date.now() - minutes * 60_000).toISOString().replace(/\.\d+Z$/, "+00:00");
-
 const READ_KEY = "hcr_read_only_key_for_tests";
+
+/** GitHub starts the 02:35 schedule hours late, about here. */
+const READ_AT = "2026-10-01T09:00:00Z";
+
+/** Answers only the clock read the check makes. */
+const STUB_DATE = [
+  "#!/usr/bin/env bash",
+  '[ "$*" = "-u +%s" ] || exit 2',
+  "printf '%s\\n' \"${STUB_NOW}\"",
+  "",
+].join("\n");
 
 type Check = { readonly status: string; readonly last_ping: string | null };
 
@@ -362,11 +369,16 @@ const checksAnswer =
 const freshnessRead = async (
   checks: Readonly<Record<string, Check>>,
   key: string = READ_KEY,
+  at: string = READ_AT,
 ): Promise<Ran> => {
+  const run = mkdtempSync(path.join(scratch, "fresh-"));
+  mkdirSync(path.join(run, "bin"));
+  writeFileSync(path.join(run, "bin", "date"), STUB_DATE, { mode: 0o755 });
   let result: Ran = { code: null, out: "", err: "" };
   await listening(checksAnswer(checks), async (origin) => {
     result = await ran(deployScript("backup-fresh.sh"), [], {
-      ...PATH_ONLY,
+      PATH: `${path.join(run, "bin")}:${PATH_ONLY.PATH}`,
+      STUB_NOW: String(Date.parse(at) / 1000),
       HEALTHCHECKS_API_URL: origin,
       HEALTHCHECKS_READ_KEY: key,
     });
@@ -374,50 +386,95 @@ const freshnessRead = async (
   return result;
 };
 
+/** Pings in the dead-man service's own form: seconds, and an offset rather than `Z`. */
+const LAST_HOURS_DUMP = "2026-10-01T08:05:12+00:00";
+const TONIGHTS_COPIES = "2026-10-01T02:04:51+00:00";
+
 describe("the backup a nightly release rides on", () => {
   it("names the dump and copies it rides, both fresh", async () => {
-    const dump = pingedMinutesAgo(30);
-    const copies = pingedMinutesAgo(35);
-
     expect(
       await freshnessRead({
-        "pg-hourly": { status: "up", last_ping: dump },
-        nightly: { status: "up", last_ping: copies },
+        "pg-hourly": { status: "up", last_ping: LAST_HOURS_DUMP },
+        nightly: { status: "up", last_ping: TONIGHTS_COPIES },
       }),
     ).toEqual({
       code: 0,
-      out: `the box's own backup: the database dump verified at ${dump}, the object and git store copies at ${copies}\n`,
+      out: `the box's own backup: the database dump verified at ${LAST_HOURS_DUMP}, the object and git store copies at ${TONIGHTS_COPIES}\n`,
       err: "",
     });
   });
 
   it("refuses a dump whose last run failed", async () => {
-    const dump = pingedMinutesAgo(30);
-
     expect(
       await freshnessRead({
-        "pg-hourly": { status: "down", last_ping: dump },
-        nightly: { status: "up", last_ping: pingedMinutesAgo(35) },
+        "pg-hourly": { status: "down", last_ping: LAST_HOURS_DUMP },
+        nightly: { status: "up", last_ping: TONIGHTS_COPIES },
       }),
     ).toEqual({
       code: 1,
       out: "",
-      err: `::error::the pg-hourly backup is not fresh: its check is down, last pinged ${dump}, 30 minutes ago, where 65 is the most allowed, so nothing is released\n`,
+      err: `::error::the pg-hourly backup is not fresh: its check is down, last pinged ${LAST_HOURS_DUMP}, where it needs to be up and pinged from 2026-10-01T07:55:00Z to 2026-10-01T09:00:00Z, so nothing is released\n`,
     });
   });
 
-  it("refuses a copy older than the night's", async () => {
-    const copies = pingedMinutesAgo(200);
+  it("holds the dump to 65 minutes before the read", async () => {
+    const pinged = async (dump: string) =>
+      (
+        await freshnessRead({
+          "pg-hourly": { status: "up", last_ping: dump },
+          nightly: { status: "up", last_ping: TONIGHTS_COPIES },
+        })
+      ).code;
+
+    expect([
+      await pinged("2026-10-01T07:55:00+00:00"),
+      await pinged("2026-10-01T07:54:59+00:00"),
+    ]).toEqual([0, 1]);
+  });
+
+  it("refuses copies from the night before", async () => {
+    const copies = "2026-09-30T02:04:51+00:00";
 
     expect(
       await freshnessRead({
-        "pg-hourly": { status: "up", last_ping: pingedMinutesAgo(30) },
+        "pg-hourly": { status: "up", last_ping: LAST_HOURS_DUMP },
         nightly: { status: "up", last_ping: copies },
       }),
     ).toEqual({
       code: 1,
       out: "",
-      err: `::error::the nightly backup is not fresh: its check is up, last pinged ${copies}, 200 minutes ago, where 180 is the most allowed, so nothing is released\n`,
+      err: `::error::the nightly backup is not fresh: its check is up, last pinged ${copies}, where it needs to be up and pinged from 2026-10-01T02:00:00Z to 2026-10-01T09:00:00Z, so nothing is released\n`,
+    });
+  });
+
+  it("takes the night before's copies when read before 02:00", async () => {
+    const dump = "2026-10-01T01:05:12+00:00";
+    const copies = "2026-09-30T02:04:51+00:00";
+
+    expect(
+      await freshnessRead(
+        {
+          "pg-hourly": { status: "up", last_ping: dump },
+          nightly: { status: "up", last_ping: copies },
+        },
+        READ_KEY,
+        "2026-10-01T01:30:00Z",
+      ),
+    ).toMatchObject({ code: 0, err: "" });
+  });
+
+  it("refuses copies pinged after the read", async () => {
+    const copies = "2026-10-01T09:30:00+00:00";
+
+    expect(
+      await freshnessRead({
+        "pg-hourly": { status: "up", last_ping: LAST_HOURS_DUMP },
+        nightly: { status: "up", last_ping: copies },
+      }),
+    ).toEqual({
+      code: 1,
+      out: "",
+      err: `::error::the nightly backup is not fresh: its check is up, last pinged ${copies}, where it needs to be up and pinged from 2026-10-01T02:00:00Z to 2026-10-01T09:00:00Z, so nothing is released\n`,
     });
   });
 
