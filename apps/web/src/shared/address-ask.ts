@@ -23,6 +23,7 @@ export const useAsked = (ask: Ask, take: (value: string) => void): void => {
   const navigate = useNavigate();
   const [taken, setTaken] = useState<string>();
 
+  // During render, so `take` may set only the caller's own state, which an abandoned render drops.
   if (asked !== taken) {
     setTaken(asked);
     if (asked !== undefined) take(asked);

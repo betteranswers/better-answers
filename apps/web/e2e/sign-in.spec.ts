@@ -321,7 +321,7 @@ test("names the wait when a new code meets the ceiling", async ({
   await floodCodesTo(request, email, 4);
 
   await page.keyboard.press("Tab");
-  const listed = await keystrokesListed(page, SIGN_IN_WORDS.keystrokesOn);
+  const listed = await keystrokesListed(page, KEYSTROKE_WORDS.thisScreen);
   await expect(listed.getByText(SIGN_IN_WORDS.sendAgain)).toBeVisible();
   await expect(listed.getByText(SIGN_IN_WORDS.otherAddress)).toBeVisible();
   await keystrokesDismissed(page, listed);

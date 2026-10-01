@@ -25,23 +25,47 @@ const designSystem = (file: string): string =>
     "utf8",
   );
 
-const tokenIn = (css: string, selector: string, name: string): string => {
-  const rule = css.split(`${selector} {`)[1]?.split("}")[0] ?? "";
-  const value = new RegExp(`(?<![\\w-])${name}:\\s*([^;]+);`).exec(rule)?.[1]?.trim();
-  if (value === undefined) throw new Error(`the design system's ${selector} sets no ${name}`);
-  return value;
+/** In the order `styles.css` imports them, so a later rule wins as it does in the browser. */
+const TOKEN_FILES = ["tokens/colors.css", "tokens/semantic.css"];
+
+const COMMENT = /\/\*[\s\S]*?\*\//g;
+
+const RULE = /([^{};]+)\{([^{}]*)\}/g;
+
+const DECLARATION = /(--[\w-]+)\s*:\s*([^;]+)/g;
+
+const REFERENCE = /^var\(\s*(--[\w-]+)\s*\)$/;
+
+/** A rule inside an at-rule is read as if it stood alone. */
+const tokensUnder = (selectors: readonly string[]): ReadonlyMap<string, string> => {
+  const css = TOKEN_FILES.map(designSystem).join("\n").replaceAll(COMMENT, "");
+  const tokens = new Map<string, string>();
+  for (const [, selector = "", body = ""] of css.matchAll(RULE)) {
+    const named = selector.split(",").map((one) => one.replaceAll(/\s+/g, " ").trim());
+    if (!named.some((one) => selectors.includes(one))) continue;
+    for (const [, name = "", value = ""] of body.matchAll(DECLARATION)) {
+      tokens.set(name, value.trim());
+    }
+  }
+  return tokens;
 };
 
-const textColourOf = (theme: string): string => {
-  const value = tokenIn(designSystem("tokens/semantic.css"), theme, "--text-primary");
-  const step = /^var\((--[\w-]+)\)$/.exec(value)?.[1];
-  return step === undefined ? value : tokenIn(designSystem("tokens/colors.css"), ":root", step);
+const resolvedIn = (tokens: ReadonlyMap<string, string>, name: string, hops = 0): string => {
+  const value = tokens.get(name);
+  if (value === undefined) throw new Error(`the design system sets no ${name}`);
+  const next = REFERENCE.exec(value)?.[1];
+  if (next === undefined) return value;
+  if (hops > tokens.size) throw new Error(`the design system's ${name} refers back to itself`);
+  return resolvedIn(tokens, next, hops + 1);
 };
+
+const textColourOf = (selectors: readonly string[]): string =>
+  resolvedIn(tokensUnder(selectors), "--text-primary");
 
 /** A tab draws the logo's `currentColor` black, which a dark tab strip hides. */
 const tabIcon = (): string => {
-  const light = textColourOf(":root");
-  const dark = textColourOf('[data-theme="dark"]');
+  const light = textColourOf([":root"]);
+  const dark = textColourOf([":root", '[data-theme="dark"]']);
   const style = `<style>svg{color:${light}}@media (prefers-color-scheme:dark){svg{color:${dark}}}</style>`;
   const logo = designSystem("assets/logo.svg");
   const icon = logo.replace(/<svg\b[^>]*>/, (opened) => `${opened}${style}`);

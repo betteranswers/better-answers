@@ -1,4 +1,4 @@
-/** Lower-case and hyphenated, at the start of a sentence as anywhere else. */
+/** Never capitalised, even at the start of a sentence. */
 export const PRODUCT_NAME = "better-answers";
 
 const DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" });

@@ -32,7 +32,6 @@ export const SIGN_IN_WORDS = {
   signingIn: "Signing in",
   sendAgain: "Send a new code",
   otherAddress: "Use a different email address",
-  keystrokesOn: "this screen",
 } as const;
 
 export const codeSent = (address: string): string =>
