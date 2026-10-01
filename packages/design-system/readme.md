@@ -272,11 +272,8 @@ import { MagnifyingGlass } from "@phosphor-icons/react";   // application
 Rules: regular weight everywhere; bold for an active nav item; fill only inside a solid
 accent chip; **never duotone**. An icon never carries meaning alone — it accompanies a label
 or an `aria-label`. One family only, no second set, no emoji, no Unicode
-pictographs. Glyphs actually used: `magnifying-glass`, `tray`, `database`, `graph`,
-`question`, `users`, `pulse`, `book-open`, `chat-text`, `copy`, `flag`, `check-circle`,
-`warning`, `sliders-horizontal`, `funnel`, `plus`, `download-simple`,
-`clock-counter-clockwise`, `keyboard`, `arrow-square-out`. The `Icon` component is the only
-way to render one.
+pictographs. The glyphs in use are the ones `apps/web/src/shared/icon.tsx` maps, and a new
+one is added there. The `Icon` component is the only way to render one.
 
 **The one exception is `lucide-react`, inside the vendored registry primitives under
 `apps/web/src/shared/ui/` and nowhere else**, because a chevron inside a `Select` is behaviour,

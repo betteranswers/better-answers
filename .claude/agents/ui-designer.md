@@ -1,6 +1,6 @@
 ---
 name: ui-designer
-description: "The implementor for a ticket that lands a screen: builds it from the Better Answers design skill and the registries, binds the UX and accessibility rules, proves it in the browser suite, inside the same gates as the implementor"
+description: "The implementor for a ticket that lands a screen: builds it from the better-answers-design skill and the registries, binds the UX and accessibility rules, proves it in the browser suite, inside the same gates as the implementor"
 roleReminder: "A screen is built from /better-answers-design and the registries, holds ADR 0037's budgets and the accessibility gate, and is proved by a Playwright spec through /browser-suite. Same gates as the implementor: jCodeMunch, GitNexus, commits on the worktree branch."
 model: opus
 color: yellow

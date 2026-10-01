@@ -3,8 +3,8 @@
    has corners you can register a "+" against. The ramp is kept so consumers can
    still name a scale, but every step resolves to 0.
 
-   --radius-full survives for the two things that are genuinely circular:
-   the loading spinner ring and a radio control. Nothing else may use it. */
+   --radius-full survives for the three things that are genuinely circular:
+   the loading spinner ring, a radio control and the avatar. Nothing else may use it. */
 :root {
   --radius-xs: 0px;
   --radius-sm: 0px; /* tags, small inputs */
@@ -12,7 +12,7 @@
   --radius-lg: 0px; /* cards, panels */
   --radius-xl: 0px; /* dialogs */
   --radius-2xl: 0px;
-  --radius-full: 999px; /* spinner ring and radio only */
+  --radius-full: 999px; /* spinner ring, radio and avatar only */
 
   --border-width: 1px;
   --border-width-thick: 1.5px;
