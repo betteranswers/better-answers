@@ -63,9 +63,11 @@ export const useWorkspaceSwitch = () => {
   return {
     open,
     onOpenChange: (opening: boolean) => {
-      if (opening) switching.reset();
+      // A reset lets go of a pending switch without stopping it, so its refusal would go unsaid.
+      if (opening && !switching.isPending) switching.reset();
       setOpen(opening);
     },
+    pending: switching.isPending,
     workspaces: (list.data ?? []).filter((workspace) => !gone.includes(workspace.id)),
     switchTo: (to: SwitchedTo) => {
       if (switching.isPending) return;
@@ -123,8 +125,13 @@ export function WorkspaceSwitcher(properties: {
             if (to !== undefined && id !== here.workspaceId) switching.switchTo(to);
           }}
         >
+          {/* Held while a switch is pending, which the band's outcome line names. */}
           {listed.map((workspace) => (
-            <DropdownMenuRadioItem key={workspace.id} value={workspace.id}>
+            <DropdownMenuRadioItem
+              key={workspace.id}
+              value={workspace.id}
+              disabled={switching.pending}
+            >
               <span className="wrap-anywhere">{workspace.name}</span>
             </DropdownMenuRadioItem>
           ))}

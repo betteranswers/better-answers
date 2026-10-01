@@ -270,6 +270,47 @@ test("says a refused switch in the band, keeping the screen", async ({
   await expect(workspacesIn(switcherMenuOf(page, first.name))).toHaveText([first.name]);
 });
 
+test("says a pending switch's refusal, holding others until it answers", async ({
+  page,
+  request,
+  passesTheAccessibilityGate,
+}) => {
+  const { first, second } = await inTwoWorkspaces(page, request, {
+    first: "Settle Castings",
+    second: "Giggleswick Castings",
+  });
+  const switches: string[] = [];
+  page.on("request", (sent) => {
+    if (sent.url().includes("/organization/set-active")) switches.push(sent.url());
+  });
+  const release = await heldBack(page, "**/organization/set-active");
+
+  await switched(page, first.name, second.name);
+  await expect(saidInTheBand(page)).toHaveText(PICKER_WORDS.opening);
+
+  await switcherOf(page, first.name).click();
+  const menu = switcherMenuOf(page, first.name);
+  await expect(saidInTheBand(page), "opening the menu forgot the pending switch").toHaveText(
+    PICKER_WORDS.opening,
+  );
+  await expect(workspacesIn(menu)).toHaveText([first.name, second.name]);
+  for (const workspace of await workspacesIn(menu).all()) {
+    await expect(workspace).toHaveAttribute("aria-disabled", "true");
+  }
+  await passesTheAccessibilityGate();
+  await page.keyboard.press("Escape");
+
+  await removeMember(request, { workspaceId: second.workspaceId, userId: first.admin.id });
+  release();
+
+  await expect(refusedInTheBand(page), "the first switch's refusal was lost").toHaveText(
+    sentenceOf(noLongerAMemberOf(second.name)),
+  );
+  await expect(switcherOf(page, first.name)).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`${HOMES.Admin.path}$`));
+  expect(switches, "a second switch started while the first was pending").toHaveLength(1);
+});
+
 test("says an unanswered switch in the band, keeping the screen", async ({ page, request }) => {
   const { first, second } = await inTwoWorkspaces(page, request, {
     first: "Steady Ironworks",

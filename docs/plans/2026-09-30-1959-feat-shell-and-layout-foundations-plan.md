@@ -437,6 +437,7 @@ U1 settles the words before code names them ([GLOSSARY1]). U3 (design system) an
   - The avatar button's accessible name contains the full name.
   - With the operator's workspace list held back, opening the switcher shows the current workspace, "All workspaces", Console and the reading line. The second workspace appears without the menu closing.
   - A switch to workspace B refused for no membership announces that the person is no longer a member of B in the band's outcome line. Focus is back on the switcher, the address and Members' rows are still A's, and B is gone when the switcher opens again.
+  - While a switch to B is pending, opening the switcher again still says so in the outcome line, and every workspace in the menu is disabled. No second switch starts, and when B refuses, the outcome line says so.
 - **Verification:** the specs above pass, and the accessibility gate passes with each menu open.
 
 ### U6. ⌘K jump-to
