@@ -179,9 +179,9 @@ export const useJumping = (offered: boolean): Jumping => {
 
   const pressed = useEffectEvent((event: KeyboardEvent) => {
     if (!offered || !isTheChord(event)) return;
-    // Both chords open the browser's own search bar unless refused here.
+    // Both chords open the browser's own search bar unless refused here, a held key's repeats too.
     event.preventDefault();
-    setOpen((was) => !was);
+    if (!event.repeat) setOpen((was) => !was);
   });
 
   // The document, so the chord works from inside a field as well as anywhere else.

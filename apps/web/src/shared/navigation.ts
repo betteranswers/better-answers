@@ -6,7 +6,7 @@ import type { IconName } from "./icon.tsx";
 export type Role = (typeof ROLES)[number];
 
 /** The operator holds no role in the console, so its screens are shown to the mark instead. */
-export type Seer = Role | "operator";
+export type RoleOrOperator = Role | "operator";
 
 /** Something a screen does that jump-to offers by name, to whoever may see the screen. */
 type Act = {
@@ -27,7 +27,7 @@ export type Screen = {
   readonly path: string;
   readonly icon: IconName;
   readonly built: boolean;
-  readonly seenBy: readonly Seer[];
+  readonly seenBy: readonly RoleOrOperator[];
   /** Shown as well to anyone owning a domain, whatever their role. */
   readonly owners?: true;
   /** An older address, which leads here only for a person who may see the screen. */
@@ -58,7 +58,7 @@ const EVERY_ROLE = ["Admin", "Editor", "Viewer"] as const satisfies readonly Rol
 
 const ADMINS = ["Admin"] as const satisfies readonly Role[];
 
-const THE_OPERATOR = ["operator"] as const satisfies readonly Seer[];
+const THE_OPERATOR = ["operator"] as const satisfies readonly RoleOrOperator[];
 
 export const ASK = {
   id: "ask",
@@ -473,16 +473,16 @@ export const HOMES = {
   Editor: ASK.home,
   Viewer: ASK.home,
   operator: screenNamed(groupIn(CONSOLE, "workspaces"), "Every workspace"),
-} as const satisfies { readonly [seer in Seer]: Screen };
+} as const satisfies { readonly [who in RoleOrOperator]: Screen };
 
 export type Reader = {
   /** Undefined until the membership read answers, so nothing role-gated shows meanwhile. */
-  readonly role: Seer | undefined;
+  readonly role: RoleOrOperator | undefined;
   readonly owns: readonly string[];
 };
 
-/** Owning nothing, until S3 brings domain ownership. */
-export const readerOf = (role: Seer | undefined): Reader => ({ role, owns: [] });
+/** Nothing records who owns a domain, so a screen marked for owners shows by role alone. */
+export const readerOf = (role: RoleOrOperator | undefined): Reader => ({ role, owns: [] });
 
 export const OPERATOR_READER: Reader = readerOf("operator");
 
@@ -497,7 +497,7 @@ export type VisibleTree = {
 
 export const NO_TREE: VisibleTree = { surfaces: [], home: undefined };
 
-const sees = (role: Seer, owns: readonly string[], screen: Screen): boolean =>
+const sees = (role: RoleOrOperator, owns: readonly string[], screen: Screen): boolean =>
   screen.built && (screen.seenBy.includes(role) || (screen.owners === true && owns.length > 0));
 
 const shownOf = (
@@ -568,14 +568,15 @@ export const headingOf = (screen: Screen): string => {
   return place?.group?.name ?? place?.surface.name ?? screen.name;
 };
 
-export type Moved = { readonly from: string; readonly to: Screen | Group };
+/** `to` is in order: an older address leads to the first screen in it the reader may see. */
+export type Moved = { readonly from: string; readonly to: readonly Screen[] };
 
 export const movedWithin = (surfaces: readonly Surface[]): readonly Moved[] =>
   surfaces.flatMap((surface) =>
     surface.groups.flatMap((group) => [
-      ...(group.movedFrom === undefined ? [] : [{ from: group.movedFrom, to: group }]),
+      ...(group.movedFrom === undefined ? [] : [{ from: group.movedFrom, to: group.screens }]),
       ...group.screens.flatMap((screen) =>
-        screen.movedFrom === undefined ? [] : [{ from: screen.movedFrom, to: screen }],
+        screen.movedFrom === undefined ? [] : [{ from: screen.movedFrom, to: [screen] }],
       ),
     ]),
   );
@@ -583,6 +584,5 @@ export const movedWithin = (surfaces: readonly Surface[]): readonly Moved[] =>
 /** Undefined where the reader may see nothing the older address now names. */
 export const leadsTo = (tree: VisibleTree, moved: Moved): Screen | undefined => {
   const shown = screensOf(tree.surfaces);
-  const named = "screens" in moved.to ? moved.to.screens : [moved.to];
-  return named.find((screen) => shown.includes(screen));
+  return moved.to.find((screen) => shown.includes(screen));
 };

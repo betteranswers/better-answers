@@ -290,10 +290,7 @@ describe("the routes and navigation built from the one list", () => {
   it("routes every moved address, each leading to a built screen", () => {
     const routed = routedPaths();
     const leadsNowhere = moved
-      .filter((each) => {
-        const named = "screens" in each.to ? each.to.screens : [each.to];
-        return !named.some((screen) => screen.built);
-      })
+      .filter((each) => !each.to.some((screen) => screen.built))
       .map((each) => each.from);
 
     expect(moved.filter((each) => !routed.includes(each.from))).toEqual([]);

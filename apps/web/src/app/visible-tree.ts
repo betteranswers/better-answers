@@ -8,7 +8,6 @@ export const VisibleTreeContext = createContext<VisibleTree>(NO_TREE);
 
 export const useVisibleTree = (): VisibleTree => useContext(VisibleTreeContext);
 
-/** What the open screen's `beforeLoad` found on arrival. */
 type Arrival = { readonly hidden?: boolean; readonly unread?: boolean };
 
 const useArrival = (found: keyof Arrival): boolean =>

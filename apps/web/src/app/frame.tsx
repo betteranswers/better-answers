@@ -35,9 +35,8 @@ const NO_JUMP_TO: readonly Keystroke[] = [];
 
 const WITH_JUMP_TO: readonly Keystroke[] = [JUMP_TO_KEYSTROKE];
 
-/** The list names only what is offered. */
 function FrameKeystrokes(properties: {
-  readonly open: Place | undefined;
+  readonly open: Place<VisibleSurface> | undefined;
   readonly offersJumpTo: boolean;
   readonly children: ReactNode;
 }) {
@@ -53,7 +52,6 @@ function FrameKeystrokes(properties: {
 
 /** One source for both halves of the region, so a panel never outlives its tab list. */
 const useRegion = (visible: VisibleTree, pathname: string): Region | undefined => {
-  /** The open screen's own declaration, carried by its route: the shell fills nothing itself. */
   const toolbar = useRouterState({ select: (state) => state.matches.at(-1)?.staticData.toolbar });
   // The screen's own verdict, so its tabs go exactly when it does.
   const drawn = useHidden(visible, pathname) ? undefined : placeAt(EVERY_SURFACE, pathname);
@@ -193,7 +191,7 @@ function Navigation(properties: {
   readonly surfaces: readonly VisibleSurface[];
   readonly navId: string;
   readonly showing: boolean;
-  readonly open: Place | undefined;
+  readonly open: Place<VisibleSurface> | undefined;
 }) {
   const { open } = properties;
 

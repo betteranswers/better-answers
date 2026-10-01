@@ -2,14 +2,13 @@ import { Link } from "@tanstack/react-router";
 
 import { Icon } from "@/shared/icon.tsx";
 import { cn } from "@/shared/lib/utils.ts";
-import type { Surface } from "@/shared/navigation.ts";
+import type { VisibleSurface } from "@/shared/navigation.ts";
 
 const HEADING =
   "px-2 pb-2 font-medium text-muted-foreground uppercase [font-size:var(--text-2xs)] [letter-spacing:var(--tracking-caps)]";
 
-/** `surface` is the reader's own reading of it, so it holds only what they may see. */
 export function SecondaryNav(properties: {
-  readonly surface: Surface;
+  readonly surface: VisibleSurface;
   readonly openScreenPath: string | undefined;
   readonly showing: boolean;
   readonly id?: string;
@@ -23,7 +22,7 @@ export function SecondaryNav(properties: {
       // Hidden rather than unmounted, so the button that governs it always names a region
       // that is there to be named.
       hidden={!properties.showing}
-      className="shrink-0 border-b border-border bg-background px-2 py-3 md:sticky md:top-band md:h-[calc(100vh-var(--band-h))] md:w-sidebar md:self-start md:overflow-y-auto md:border-r md:border-b-0"
+      className="shrink-0 border-b border-border bg-background px-2 py-3 md:sticky md:top-[var(--band-reach)] md:h-[calc(100vh-var(--band-reach))] md:w-sidebar md:self-start md:overflow-y-auto md:border-r md:border-b-0"
     >
       {properties.surface.groups.map((group) => (
         <div key={group.id} className="pb-2">

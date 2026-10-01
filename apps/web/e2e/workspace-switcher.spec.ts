@@ -3,7 +3,7 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 import { ALL_WORKSPACES, FAILED_SCREEN, JUMP_TO, ROLE_UNREAD } from "@/app/words.ts";
 import { noLongerAMemberOf, PICK_REFUSED, SWITCHER_UNREAD } from "@/features/auth/refusal-words.ts";
 import { PICKER_WORDS } from "@/features/auth/workspace-words.ts";
-import { CONSOLE, HOMES } from "@/shared/navigation.ts";
+import { CONSOLE, CONTROL_CENTRE, HOMES } from "@/shared/navigation.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
@@ -12,8 +12,10 @@ import {
   anAddress,
   landedAtHome,
   markTheOperator,
+  navOf,
   person,
   provision,
+  railOf,
   removeMember,
   signIn,
   signOutFromTheShell,
@@ -275,10 +277,14 @@ test("says a pending switch's refusal, holding others until it answers", async (
   request,
   passesTheAccessibilityGate,
 }) => {
-  const { first, second } = await inTwoWorkspaces(page, request, {
+  const { email, first, second } = await inTwoWorkspaces(page, request, {
     first: "Settle Castings",
     second: "Giggleswick Castings",
   });
+  // The operator, so the menu offers both of its ways out of the shell.
+  await markTheOperator(request, email);
+  await page.reload();
+  await expect(switcherOf(page, first.name)).toBeVisible();
   const switches: string[] = [];
   page.on("request", (sent) => {
     if (sent.url().includes("/organization/set-active")) switches.push(sent.url());
@@ -297,6 +303,13 @@ test("says a pending switch's refusal, holding others until it answers", async (
   for (const workspace of await workspacesIn(menu).all()) {
     await expect(workspace).toHaveAttribute("aria-disabled", "true");
   }
+  await expect(menu.getByRole("menuitem")).toHaveText([ALL_WORKSPACES, CONSOLE.name]);
+  for (const wayOut of await menu.getByRole("menuitem").all()) {
+    await expect(wayOut, "a way out of the shell is open mid-switch").toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+  }
   await passesTheAccessibilityGate();
   await page.keyboard.press("Escape");
 
@@ -311,18 +324,70 @@ test("says a pending switch's refusal, holding others until it answers", async (
   expect(switches, "a second switch started while the first was pending").toHaveLength(1);
 });
 
+/** Unanswered, so the refusal stands in the band's outcome row. */
+const unansweredSwitch = async (page: Page, from: string, to: string): Promise<void> => {
+  await page.route("**/organization/set-active", (route) => route.abort());
+  await switched(page, from, to);
+  await expect(refusedInTheBand(page)).toHaveText(sentenceOf(PICK_REFUSED));
+};
+
 test("says an unanswered switch in the band, keeping the screen", async ({ page, request }) => {
   const { first, second } = await inTwoWorkspaces(page, request, {
     first: "Steady Ironworks",
     second: "Unreached Ironworks",
   });
-  await page.route("**/organization/set-active", (route) => route.abort());
 
-  await switched(page, first.name, second.name);
+  await unansweredSwitch(page, first.name, second.name);
 
-  await expect(refusedInTheBand(page)).toHaveText(sentenceOf(PICK_REFUSED));
   await expect(switcherOf(page, first.name)).toBeFocused();
   await expect(page).toHaveURL(new RegExp(`${HOMES.Admin.path}$`));
+});
+
+/** Layout places each edge to a fraction of a pixel, so two that meet may part by less than one. */
+const SUBPIXEL = 0.5;
+
+const boxOf = async (region: Locator) => {
+  const box = await region.boundingBox();
+  if (box === null) throw new Error(`${String(region)} is not drawn`);
+  return box;
+};
+
+/** How far `region` starts below the band's foot: below zero, the band covers its top. */
+const clearOfTheBand = async (page: Page, region: Locator): Promise<number> => {
+  const [band, drawn] = await Promise.all([boxOf(page.getByRole("banner")), boxOf(region)]);
+  return drawn.y - (band.y + band.height);
+};
+
+test("keeps the rail and nav below the band's refusal", async ({ page, request }) => {
+  const { first, second } = await inTwoWorkspaces(page, request, {
+    first: "Marsden Presswork",
+    second: "Slaithwaite Presswork",
+  });
+  // Rows enough that the screen scrolls past the band in a short window.
+  for (let row = 1; row <= 4; row += 1) {
+    await aMemberOnlyOf(request, first.workspaceId, `Row ${String(row)}`);
+  }
+  await page.reload();
+  await expect(memberButton(page, "Row 4")).toBeVisible();
+
+  await unansweredSwitch(page, first.name, second.name);
+
+  await page.setViewportSize({ width: 1280, height: 240 });
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const band = await boxOf(page.getByRole("banner"));
+  await expect
+    .poll(() => page.evaluate(() => window.scrollY), {
+      message: "the screen never scrolled past the band",
+    })
+    .toBeGreaterThan(band.height);
+
+  for (const region of [railOf(page), navOf(page, CONTROL_CENTRE)]) {
+    await expect
+      .poll(() => clearOfTheBand(page, region), {
+        message: `the band's outcome row covers the top of ${String(region)}`,
+      })
+      .toBeGreaterThanOrEqual(-SUBPIXEL);
+  }
 });
 
 test("drops the left workspace's name when the membership read fails", async ({

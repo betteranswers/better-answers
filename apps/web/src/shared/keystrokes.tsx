@@ -57,7 +57,7 @@ export function useKeystroke(keystroke: Keystroke, act: () => void) {
   const pressed = useEffectEvent((event: KeyboardEvent) => {
     if (event.key !== keystroke.key || !isTheScreens(event) || !keystrokesAreOn()) return;
     event.preventDefault();
-    act();
+    if (!event.repeat) act();
   });
 
   // The document is the one listener every region shares, so a keystroke works from wherever
@@ -198,7 +198,7 @@ const NONE: readonly Keystroke[] = [];
 export function ShellKeystrokes(properties: {
   /** The open screen's name; undefined at an address that names no screen. */
   readonly screen: string | undefined;
-  /** Bound by the shell with a modifier, so listed on every screen and never turned off. */
+  /** Bound with a modifier, so turning single-key keystrokes off leaves them on. */
   readonly shell: readonly Keystroke[];
   readonly children: ReactNode;
 }) {

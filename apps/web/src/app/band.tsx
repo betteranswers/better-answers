@@ -103,10 +103,30 @@ function BandOutcome(properties: { readonly outcome: Outcome | undefined; readon
   );
 }
 
+const BAND_REACH = "--band-reach";
+
+/**
+ * The outcome row grows the band past its token's height, so the height is measured. Declared
+ * once, so React attaches it once.
+ */
+const publishTheReach = (band: HTMLElement) => {
+  // Where no observer is offered, the band keeps the token's height.
+  if (typeof ResizeObserver === "undefined") return undefined;
+  const root = document.documentElement;
+  const observer = new ResizeObserver(() => {
+    root.style.setProperty(BAND_REACH, `${String(band.getBoundingClientRect().height)}px`);
+  });
+  observer.observe(band);
+  return () => {
+    observer.disconnect();
+    root.style.removeProperty(BAND_REACH);
+  };
+};
+
 /** Each cell is as wide as the region below it, so hiding the nav moves nothing here. */
 function WideBand(properties: BandProperties) {
   return (
-    <header className="sticky top-0 z-10 bg-background">
+    <header ref={publishTheReach} className="sticky top-0 z-10 bg-background">
       <div className="flex h-band">
         {/* No rule beneath: the logo's cell and the rail read as one column. */}
         <LogoLink home={properties.home} className="w-rail border-r border-border bg-sidebar" />

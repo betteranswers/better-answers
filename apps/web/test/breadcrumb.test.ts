@@ -1,9 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import { partsOf } from "@/app/breadcrumb.tsx";
-import { CONSOLE, placeAt, readerOf, SURFACES, visibleTo, type Seer } from "@/shared/navigation.ts";
+import {
+  CONSOLE,
+  placeAt,
+  readerOf,
+  SURFACES,
+  visibleTo,
+  type RoleOrOperator,
+} from "@/shared/navigation.ts";
 
-const partsAt = (role: Seer, path: string, openTab?: string) => {
+const partsAt = (role: RoleOrOperator, path: string, openTab?: string) => {
   const surfaces = role === "operator" ? [CONSOLE] : SURFACES;
   const visible = visibleTo(readerOf(role), surfaces).surfaces;
   return partsOf(placeAt(visible, path), openTab);

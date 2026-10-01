@@ -59,10 +59,18 @@
     }
   }
 
+  /*
+   * The band's whole height, which its outcome row grows. The wide band measures itself into it;
+   * until then, and when narrow, it is the token's.
+   */
+  :root {
+    --band-reach: var(--band-h);
+  }
+
   /* The wide band stays put, so a control scrolled up into view stops below it, not under it. */
   @media (width >= theme(--breakpoint-md)) {
     :root {
-      scroll-padding-top: var(--band-h);
+      scroll-padding-top: var(--band-reach);
     }
   }
 }

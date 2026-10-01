@@ -33,7 +33,7 @@ export function NavigationButton(properties: {
   readonly wide: boolean;
   readonly showing: boolean;
   readonly controls: string;
-  readonly open: Place | undefined;
+  readonly open: Place<VisibleSurface> | undefined;
   readonly onShow: (showing: boolean) => void;
 }) {
   const { wide, showing, controls, open, onShow } = properties;
@@ -81,17 +81,17 @@ export function NavigationSheet(properties: {
   readonly sheet: Sheeting;
   readonly wide: boolean;
   readonly surfaces: readonly VisibleSurface[];
-  readonly open: Place | undefined;
+  readonly open: Place<VisibleSurface> | undefined;
 }) {
   const { controlRef, asked, ask } = properties.sheet;
   const close = () => ask(false);
 
   const handBackFocus = (event: Event) => {
-    // Radix hands focus to its own trigger, which this sheet has none of; the button in the
-    // band is the one in both layouts.
+    // Radix hands focus to its own trigger, which this sheet lacks; the band's button takes it,
+    // or the screen when no button is drawn.
     event.preventDefault();
     close();
-    controlRef.current?.focus();
+    (controlRef.current ?? document.querySelector("main"))?.focus();
   };
 
   return (
