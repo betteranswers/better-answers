@@ -908,8 +908,9 @@ to it by IRI and never restates it (ADR 0014).
   dashboard, start page.
 - **icon rail** — the region down the left edge, below the *top band*, listing the *surfaces* a
   person may see, each an icon carrying its surface's name and marking the surface open; the
-  **rail** for short. The utilities sit at its foot: Keyboard shortcuts, and help and settings once
-  they exist. _Avoid_: section nav, sidebar.
+  **rail** for short. The utilities sit at its foot: **Keyboard shortcuts**, which lists the open
+  screen's keystrokes as `?` does, and help and settings once they exist. Where the screen is not
+  wide, the top band holds Keyboard shortcuts instead. _Avoid_: section nav, sidebar.
 - **secondary nav** — the region beside the icon rail, below the *top band*, listing the open
   *surface*'s *groups*, each a heading over its *screens*, marking the screen being read, and
   swapping when the surface changes. No heading in it repeats the surface's name. The navigation
@@ -919,7 +920,8 @@ to it by IRI and never restates it (ADR 0014).
   screen is wide, governing whether the navigation is showing: where the screen is wide enough for
   the regions it closes the secondary nav and opens it again, saying which state it is in and
   staying where it is; where it is not, it opens the icon rail and the secondary nav over the
-  content and gives focus back when it closes. _Avoid_: hamburger, burger, drawer, menu toggle.
+  content, in a sheet titled *Surfaces and screens*, and gives focus back when it closes.
+  _Avoid_: hamburger, burger, drawer, menu toggle.
 - **toolbar** — the region above a screen's content carrying that screen's tabs at one end and its
   acts at the other, filled by the screen; a screen with neither gets no toolbar. _Avoid_: action
   bar, section header.
@@ -945,9 +947,10 @@ to it by IRI and never restates it (ADR 0014).
 - **breadcrumb** — the line in the *top band* naming where the person is: the *surface*, the
   *group*, the *screen* and the open *tab*, each part but the last leading to its place. It names
   every part at every width; only the wide band shortens the middle ones.
-- **jump-to** — the finder the *top band* opens by click, ⌘K or Ctrl+K, to go somewhere in one
-  move: the *surfaces* and *screens* the person may see, the workspace's members for a person who
-  may see People, and the acts their role may take, such as *Invite a person*. Knowledge joins it
+- **jump-to** — the finder the *top band* opens by click, ⌘K or Ctrl+K, named *Jump to* on screen,
+  to go somewhere in one move: the *surfaces* and *screens* the person may see, the workspace's
+  members for a person who may see People, and the acts their role may take, such as *Invite a
+  person*, listed under the headings Surfaces, Screens, Acts and Members. Knowledge joins it
   with S2's retrieval; until then it is not a search. _Avoid_: search (Knowledge's *screen*),
   command palette.
 - **promotion** — an Editor's proposal that an answer or a response become an `Answer`

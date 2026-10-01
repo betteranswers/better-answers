@@ -188,8 +188,8 @@ always wins over the rule.
 
 **Corners: square.** Every step of the radius ramp resolves to `0`. The ramp names are kept
 so consumers can still write `--radius-md`, but nothing rounds. `--radius-full` survives
-for the two genuinely circular controls — the loading spinner ring and a radio — and
-nothing else.
+for the three genuinely circular controls — the loading spinner ring, a radio and the
+avatar — and nothing else.
 
 **Registration marks.** A `+` at 7px arms, 1px, centred *on* the corner. It marks a
 board-level object, and it is rationed: **page regions and module frames · figures,
