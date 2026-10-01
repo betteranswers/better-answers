@@ -19,7 +19,7 @@ vi.hoisted(() => {
 afterEach(cleanup);
 
 describe("a refused resume of a carried connection", () => {
-  it("reads in the platform's terms", async () => {
+  it("refuses with the platform's own error, not the provider's", async () => {
     const clients = createAppClients();
     const wrapper = (properties: { readonly children: ReactNode }) => (
       <Providers clients={clients}>{properties.children}</Providers>

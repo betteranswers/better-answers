@@ -153,7 +153,7 @@ describe("a switch's refusal", () => {
   it.each([
     ["USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION", true],
     ["FORBIDDEN", false],
-  ])("reads %s in the platform's terms", async (code, noLongerAMember) => {
+  ])("turns a switch refused with %s into the platform's terms", async (code, noLongerAMember) => {
     authServer.answer = answeringTheSwitch(refusedWith(code));
     const { result } = await switchHeld();
 
@@ -167,7 +167,7 @@ describe("a switch's refusal", () => {
   it.each([
     ["USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION", true],
     ["FORBIDDEN", false],
-  ])("reads a pick's %s in the platform's terms", async (code, noLongerAMember) => {
+  ])("turns a pick refused with %s into the platform's terms", async (code, noLongerAMember) => {
     authServer.answer = answeringTheSwitch(refusedWith(code));
     const { result } = await renderTheHook(useSetActiveOrganization);
 
