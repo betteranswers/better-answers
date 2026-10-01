@@ -30,8 +30,8 @@ verify() {
   local size; size=$(rclone size --json "$2" | jq -r .bytes)
   [ "${size}" = "$(stat -c %s "$1")" ]
 }
-# `bundle create` and `push --mirror` refuse a repository with no ref, as one is before its first
-# write. One git cannot read is listed, so its job fails.
+# Before its first write a repository has no ref, which `bundle create` and `push --mirror` refuse.
+# An unreadable one is listed, to fail.
 repositories() {
   local repo refs
   while read -r repo; do
