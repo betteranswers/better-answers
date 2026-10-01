@@ -1,15 +1,10 @@
-import {
-  createMemoryHistory,
-  createRootRoute,
-  createRoute,
-  createRouter,
-  RouterProvider,
-} from "@tanstack/react-router";
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { useAsked } from "@/shared/address-ask.ts";
+import { asking, useAsked } from "@/shared/address-ask.ts";
+
+import { openScreens } from "./address-router.tsx";
 
 afterEach(cleanup);
 
@@ -22,22 +17,8 @@ const Members = () => {
 
 const takenSoFar = () => screen.getByRole("status").textContent;
 
-const openAt = async (...entries: readonly string[]) => {
-  const root = createRootRoute();
-  const routeTree = root.addChildren([
-    createRoute({ getParentRoute: () => root, path: "/members", component: Members }),
-    createRoute({ getParentRoute: () => root, path: "/elsewhere", component: () => null }),
-  ]);
-  const history = createMemoryHistory({
-    initialEntries: [...entries],
-    initialIndex: entries.length - 1,
-  });
-  const router = createRouter({ routeTree, history });
-  await router.load();
-  render(<RouterProvider router={router} />);
-  const at = (href: string) => waitFor(() => expect(router.state.location.href).toBe(href));
-  return { router, history, at };
-};
+const openAt = (...entries: readonly string[]) =>
+  openScreens({ "/members": Members, "/elsewhere": () => null }, entries);
 
 describe("a search another place asks of a screen", () => {
   it("is taken once, then cleared from the address in place", async () => {
@@ -68,5 +49,28 @@ describe("a search another place asks of a screen", () => {
     await at("/members");
 
     expect(takenSoFar()).toBe("priya tom");
+  });
+
+  it("clears its own key and leaves a list's in place", async () => {
+    const { history, at } = await openAt("/elsewhere", "/members?members.role=Editor&search=priya");
+
+    await at("/members?members.role=Editor");
+    expect(takenSoFar()).toBe("priya");
+    expect(history.length, "the clear pushed an entry of its own").toBe(2);
+  });
+});
+
+describe("asking a screen for an act", () => {
+  const HERE = { pathname: "/members", searchStr: "?members.role=Editor&members.page=2" };
+
+  it("adds to the query of the screen already open", () => {
+    expect(asking("/members", "act", "invite", HERE)).toBe(
+      "/members?members.role=Editor&members.page=2&act=invite",
+    );
+  });
+
+  it("carries no other screen's query", () => {
+    expect(asking("/groups", "act", "invite", HERE)).toBe("/groups?act=invite");
+    expect(asking("/members", "act", "invite")).toBe("/members?act=invite");
   });
 });
