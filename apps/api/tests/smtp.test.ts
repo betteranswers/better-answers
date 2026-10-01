@@ -39,6 +39,26 @@ describe("the SMTP sender", () => {
     ]);
   });
 
+  it("hands a relay's non-error refusal on as an error", async () => {
+    const transport = createTransport({
+      name: "refusing",
+      version: "1",
+      send: (_mail, callback) => {
+        // @ts-expect-error -- a relay that refuses with a string, which the callback's type forbids
+        callback("550 mailbox unavailable");
+      },
+    });
+    const send = emailSender(transport, SENDER, capturingLogger().logger);
+
+    const refused = await send({ to: "a@example.test", subject: "S", text: "T" }).then(
+      () => undefined,
+      (cause: unknown) => cause,
+    );
+
+    expect(refused).toBeInstanceOf(Error);
+    expect(refused).toMatchObject({ message: "550 mailbox unavailable" });
+  });
+
   it("refuses every send when no transport is configured", async () => {
     const { logger, logs } = capturingLogger();
     const send = emailSender(undefined, SENDER, logger);

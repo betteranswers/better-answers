@@ -1024,8 +1024,8 @@ to it by IRI and never restates it (ADR 0014).
   The authorization server can end one too, when the person's session ends or the client
   disconnects. Nothing records that end, so it stands only while the grant's tokens do.
   _Avoid_: connection, token (for the grant as a whole).
-- **Account page** — a person's own small surface outside Control Centre, reached from the
-  avatar menu: name, role, workspace, personal tokens, and two sections of its own. **Sign-in**
+- **Account page** — a person's own small surface outside Control Centre: name, role,
+  workspace, personal tokens, and two sections of its own. **Sign-in**
   holds the person's *passkeys*, their *second factor*, their *recovery codes* and any Microsoft
   account they linked; **Sessions** lists their *sessions*.
 - **sign-in** — how a person proves who they are to the platform: the *sign-in link* or the
@@ -1036,11 +1036,11 @@ to it by IRI and never restates it (ADR 0014).
   invitation must come first is open (T-027). A Microsoft account signs in only on an exact match
   with that person's email. _Avoid_: login, social login; SSO only for the per-client shape, a
   client's own tenant.
-- **sign-in link** — the link in a sign-in email, beside its six-digit code and one credential
-  with it: both last the code's five minutes, and signing in with either spends both. It signs in
-  only the browser that asked for the code, and only when the person presses *Sign in* on the page
-  it opens, so a mail scanner that opens it first changes nothing. Opened anywhere else, the page
-  shows the code to type where the person started. _Avoid_: magic link, login link.
+- **sign-in link** — the link in a sign-in email, which makes one credential with the email's
+  six-digit code: both last the code's five minutes, and signing in with either spends both. It
+  signs in only the browser that asked for the code, and only when the person presses *Sign in* on
+  the page it opens, so a mail scanner that opens it first changes nothing. Opened anywhere else,
+  the page shows the code to type where the person started. _Avoid_: magic link, login link.
 - **passkey** — a sign-in credential that a person's device or password manager keeps for the
   platform, unlocked by their face, fingerprint or device PIN and good only on the platform's own
   address, so a page imitating the platform cannot use it. A person adds, names and removes their
@@ -1060,9 +1060,13 @@ to it by IRI and never restates it (ADR 0014).
 - **recovery code** — one of ten one-time codes an Admin is shown once, when they first set up a
   *second factor*, to keep somewhere safe. One gets them in once in place of their second factor
   and takes them straight to setting up a new one; replacing the set on the *Account page* voids
-  the old one. An Admin with no factor and no code left is restored by the *operator* alone, who
-  first confirms who they are another way and hands over a one-time **restore code** the same way,
-  without which the Admin cannot set up a new factor. _Avoid_: backup code.
+  the old one. An Admin with no factor and no code left is restored by the *operator* alone, with
+  a *restore code*. _Avoid_: backup code.
+- **restore code** — the one code the *operator* issues when restoring an Admin who holds neither
+  a *second factor* nor a *recovery code*. The operator first confirms who the Admin is by a route
+  other than their email, and hands the code over by that same route. It is good once, and setting
+  up a new second factor after the restore needs it, so whoever holds only the Admin's mailbox
+  cannot finish the restore. _Avoid_: reset code, recovery code (one of the ten an Admin keeps).
 - **re-confirm** — an Admin's confirming their *second factor* again before a high-impact act, such
   as removing a member, changing a role, revoking credentials or an export, when they last
   confirmed it over an hour before. The act goes ahead once they have. _Avoid_: step-up, sudo,
@@ -1105,13 +1109,13 @@ How the work from the foundation to a finished v0.1 is cut and ordered.
 
 - **route spec** — the one document that holds the way to a finished v0.1: a head over the
   vision's v0.1 row, then the *blocks* in order, each with its edges and the obligations it
-  carries, and a status table that is the product frontier every session reads first. Each
-  block is planned from it. A Wayfinder map is charted only for a destination the route spec
+  carries, and a status table that is the product frontier every product session reads first.
+  Each block is planned from it. A Wayfinder map is charted only for a destination the route spec
   does not already hold. _Avoid_: roadmap, plan (a plan is one piece of work's, in
   `docs/plans/`), master spec.
-- **block** — one section of the route spec: a destination a session can pick, about a page — the
-  ADRs and words it rests on, what in the tree it builds on, what it must carry, its blocking
-  edges, a seam sketch. Taken to `/ce-brainstorm` and `/ce-plan` before its build; its plans
+- **block** — one section of the route spec: a destination a product session can pick, about a
+  page — the ADRs and words it rests on, what in the tree it builds on, what it must carry, its
+  blocking edges, a seam sketch. Taken to `/ce-brainstorm` and `/ce-plan` before its build; its plans
   are in `docs/plans/`, and the block itself is never one. Each block lands its own screen.
   _Avoid_: phase, milestone, epic; slice (a `packages/core` capability).
 - **strand** — one chain of blocks the route spec orders by their edges, worked in parallel with the
