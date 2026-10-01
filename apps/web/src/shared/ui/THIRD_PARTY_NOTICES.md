@@ -242,4 +242,4 @@ Copyright (c) 2023 shadcn; Copyright (c) 2024 Hayden Bleasel.
 
 **Apache-2.0** (Vercel AI Elements) — Copyright (c) 2025 Vercel, Inc. Licensed under the Apache
 License, Version 2.0; the full text is at `LICENSE` in this repository, which is the same
-licence Better Answers ships under (ADR 0027).
+licence better-answers ships under (ADR 0027).
