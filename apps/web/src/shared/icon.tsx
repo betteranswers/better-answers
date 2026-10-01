@@ -5,9 +5,12 @@ import {
   CalendarCheck,
   CaretDown,
   CaretRight,
+  CaretUp,
+  CaretUpDown,
   ChatText,
   ClockCounterClockwise,
   CloudArrowUp,
+  Columns,
   CurrencyGbp,
   Database,
   Eraser,
@@ -57,6 +60,7 @@ export type IconName =
   | "caret-right"
   | "ceiling"
   | "checks"
+  | "columns"
   | "conflicts"
   | "console"
   | "control-centre"
@@ -89,10 +93,13 @@ export type IconName =
   | "search"
   | "secondary-nav"
   | "signals"
+  | "sorted-ascending"
+  | "sorted-descending"
   | "table"
   | "tests"
   | "token"
   | "tray"
+  | "unsorted"
   | "workspaces";
 
 /**
@@ -107,6 +114,7 @@ const GLYPHS = {
   "caret-right": CaretRight,
   ceiling: Gauge,
   checks: CalendarCheck,
+  columns: Columns,
   conflicts: Warning,
   console: Globe,
   "control-centre": SlidersHorizontal,
@@ -139,10 +147,13 @@ const GLYPHS = {
   search: MagnifyingGlass,
   "secondary-nav": SidebarSimple,
   signals: Broadcast,
+  "sorted-ascending": CaretUp,
+  "sorted-descending": CaretDown,
   table: Table,
   tests: TestTube,
   token: Key,
   tray: Tray,
+  unsorted: CaretUpDown,
   workspaces: Buildings,
 } satisfies Readonly<Record<IconName, PhosphorGlyph>>;
 

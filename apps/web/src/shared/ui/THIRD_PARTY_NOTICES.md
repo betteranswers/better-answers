@@ -43,6 +43,19 @@ showed with `add breadcrumb --dry-run --view`, not by its write, so the dependen
 names never reached `package.json` or the lockfile. Its two digests were taken that day and its
 arrival edits are listed below with the others.
 
+The shared list parts added `pagination` and `empty` on **1 October 2026** with the same CLI,
+`shadcn@4.20.1`, for the list pages and the list states every People list draws on. The CLI
+resolved both from the `new-york-v4` style, and both files were written from the source
+`add pagination --dry-run --view` and `add empty --dry-run --view` showed, as the breadcrumb's
+was, so the dependency on `cn` never reached `package.json` or the lockfile. The CLI's rewrite of
+`button.tsx` was declined, since it was already here. Their two digests were taken that day and
+their arrival edits are listed below with the others.
+
+The same parts copied four Kibo UI **patterns** by hand into `kibo-ui/` that day. A pattern is not
+a registry item: it is a demonstration file in Kibo's repository, so it carries no item JSON and
+the CLI cannot install it. Its pin is the repository commit it was read at and a digest of the
+file as fetched; the second table below records both.
+
 This file records vendored source only. The npm packages those items stand on are ordinary
 dependencies with lockfile entries; their versions live in `apps/web/package.json` and the
 lockfile, which is where a reader reads them and where Renovate moves them.
@@ -57,7 +70,8 @@ the one to recompute before a refresh so the edits can be reapplied deliberately
 discovered missing. `shasum -a 256 <file> | cut -c1-16` reproduces the second column.
 
 Upstream repositories: [shadcn-ui/ui](https://github.com/shadcn-ui/ui) (MIT),
-[haydenbleasel/kibo](https://github.com/haydenbleasel/kibo) (MIT),
+[haydenbleasel/kibo](https://github.com/haydenbleasel/kibo) (MIT; it has since moved to
+[shadcnblocks/kibo](https://github.com/shadcnblocks/kibo), where the patterns were read),
 [vercel/ai-elements](https://github.com/vercel/ai-elements) (Apache-2.0). A shadcn registry item
 carries no commit or version of its own — this is the whole reason the item digest stands in for
 one — so there is no upstream commit to record, and the CLI version and the date are the rest of
@@ -92,6 +106,24 @@ the pin.
 | `radio-group.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/radio-group.json | `299fa36d5c5df3ae` | `3e0591dd59910958` |
 | `alert-dialog.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/alert-dialog.json | `03c0d4de131a9b04` | `b89696dd357f7246` |
 | `breadcrumb.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/breadcrumb.json | `18043f281e20e08f` | `a8a7adf3bdb2fa3a` |
+| `pagination.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/pagination.json | `e70ae7251fdb0f3c` | `7ff1ac5a4ffa3e72` |
+| `empty.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/empty.json | `2c377f47c4e661d7` | `f4f4308e47f07f4a` |
+
+The Kibo UI patterns, each read at commit `3d63cdb15b79d972e3dc38a10997987672f9b263` of
+[shadcnblocks/kibo](https://github.com/shadcnblocks/kibo) (MIT), under `packages/patterns/`. The
+**source** digest is the raw file as fetched from that commit; the **file** digest is the copy as
+it sits here, after the arrival edits below. Some copies draw on more than one pattern, and each
+source file is listed.
+
+| File | Pattern source | Source digest | File digest |
+| --- | --- | --- | --- |
+| `kibo-ui/pagination-counter.tsx` | `pagination/navigation/pagination-navigation-2.tsx` | `3900f88ed99d81a7` | `5aa22f4dc305ec81` |
+| | `pagination/advanced/pagination-advanced-5.tsx` | `367c54e9538b48fe` | |
+| `kibo-ui/empty-action.tsx` | `empty/actions/empty-actions-1.tsx` | `b6b0ab3e7bc394cc` | `0de1316492243671` |
+| | `empty/search/empty-search-2.tsx` | `fe2894413f5fe4d0` | |
+| | `empty/standard/empty-standard-6.tsx` | `25f2152a598a1fe5` | |
+| `kibo-ui/row-actions.tsx` | `dropdown-menu/actions/dropdown-menu-actions-2.tsx` | `58e26bf9f81588b0` | `d9d46adba09ea6e3` |
+| `kibo-ui/counted-switch.tsx` | `tabs/advanced/tabs-advanced-1.tsx` | `06e57ae8224ceace` | `9d254019414305e4` |
 
 `components.json` writes `https://ui.shadcn.com/r/{name}.json` for the primitives because that is
 the CLI's own default form; the table records the style-qualified URL the CLI resolves it to,
@@ -198,6 +230,43 @@ The breadcrumb's arrival edits, on the one item it added:
 - Its default separator, lucide's chevron, stays in the file; the band passes a Phosphor caret in
   its place, so the product's own screens draw one icon family.
 
+The arrival edits on `pagination` and `empty`:
+
+- The `cn` import repointed at `@/shared/lib/utils.ts` and the dependency on `cn` dropped, as
+  every arrival since the tooltip's has needed; the button import given its extension; `empty.tsx`
+  given the `React` import its types name; both files given this repository's format.
+- `EmptyTitle`'s `text-lg` and `tracking-tight` became the design system's `--text-lg` and
+  `--tracking-heading`: Tailwind's own `text-lg` is a second type scale that the bridge leaves
+  unthemed on purpose.
+- `PaginationLink` spreads its words in with its other props, which the `anchor-has-content` rule
+  cannot read, so a directive with that reason sits above its `<a>`. The list pages draw no link:
+  their turns are buttons, below.
+
+The arrival edits on the four Kibo UI patterns, which are demonstrations rather than components:
+
+- Each pattern's scaffolding removed (`"use client"`, `export const title`, the default-exported
+  `Example`), and its fixed demo content turned into props, so one copy is a part a screen fills
+  with its own words.
+- `@/components/ui/*` imports rewritten to `@/shared/ui/*.tsx`, and every lucide icon replaced by
+  its Phosphor counterpart: `MoreVertical` by `DotsThreeVertical`, the pagination chevrons by
+  `CaretLeft` and `CaretRight`. Icons the patterns hang beside menu items and empty-state titles
+  were dropped, since an item's words say what it does.
+- `pagination-counter.tsx` draws its Previous and Next as buttons on the installed `Pagination`,
+  `PaginationContent` and `PaginationItem`, not as `PaginationPrevious` links: a list's pages are
+  its own state, as the console's Everyone list already decided. The disabled state from
+  `pagination-advanced-5` became `aria-disabled`, so a turn at either end keeps its focus. It gained
+  a `summary` slot for the reader's place in the list.
+- `empty-action.tsx` is the one shape `empty-actions-1`, `empty-search-2` and `empty-standard-6`
+  share (a title, an optional description and an optional action), set left-aligned at the table's
+  density instead of centred at `md:p-12`; the media slot was dropped.
+- `row-actions.tsx` takes its acts as a list, puts a separator before the first destructive one,
+  and names its trigger through a prop, so every row's trigger says whose acts it holds.
+- `counted-switch.tsx` keeps `tabs-advanced-1`'s look (a segment and its count) on the installed
+  `radio-group` rather than `tabs`: the owner chose a switch over status tabs, and a tab list with
+  no panels leaves each trigger's `aria-controls` pointing nowhere. The count is Kibo's `Pill`, not
+  shadcn's `Badge`, as every pill is. The bridge rounds every `role="radio"`, so the drawn segment
+  is an inner span and the radio itself stays a bare hit area.
+
 Everything else is upstream's, unedited. Their behaviour — keyboard handling, focus, ARIA
 wiring, virtualisation — is theirs by ADR 0033; the screens that use them carry the WCAG 2.2 AA
 line and are tested with a keyboard and a screen reader.
@@ -238,7 +307,8 @@ line and are tested with a keyboard and a screen reader.
 > DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 > OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-Copyright (c) 2023 shadcn; Copyright (c) 2024 Hayden Bleasel.
+Copyright (c) 2023 shadcn; Copyright (c) 2024 Hayden Bleasel; Copyright (c) 2023 — Present
+shadcnblocks.
 
 **Apache-2.0** (Vercel AI Elements) — Copyright (c) 2025 Vercel, Inc. Licensed under the Apache
 License, Version 2.0; the full text is at `LICENSE` in this repository, which is the same
