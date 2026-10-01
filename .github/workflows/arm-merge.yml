@@ -1,6 +1,6 @@
 name: arm-merge
 
-# Arms a pull request's merge once Cubic has finished with its head, and disarms it when a push
+# Arms a pull request's merge once Cubic has reviewed its head, and disarms it when a push
 # moves the head, so the queue never takes a head Cubic has not read. The main ruleset's
 # review-thread rule then holds the merge until every Cubic thread is resolved.
 # docs/agents/workflow.md, *Merging*, says why.
@@ -25,17 +25,25 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 5
     steps:
-      - name: each open pull request at this head armed
+      - name: each open pull request at this head armed, once Cubic has reviewed it
         env:
           # A merge armed with GITHUB_TOKEN starts no workflow, so the queue's `check` would never run.
           GH_TOKEN: ${{ secrets.ARM_MERGE_TOKEN }}
           REPOSITORY: ${{ github.repository }}
           HEAD_SHA: ${{ github.event.check_run.head_sha }}
+          CONCLUSION: ${{ github.event.check_run.conclusion }}
+          CUBIC_SAID: ${{ github.event.check_run.output.title }}
           OPEN_BY_A_PERSON: >-
             .[] | select(.state == "open" and (.draft | not) and .head.sha == $ENV.HEAD_SHA
             and (.user.login | endswith("[bot]") | not)) | .number
         run: |
           set -euo pipefail
+          if [ "${CONCLUSION}" != "success" ]; then
+            reason="Cubic's check on ${HEAD_SHA} ended ${CONCLUSION} (${CUBIC_SAID}), so nothing is armed; comment @cubic-dev-ai to review, or arm by hand with gh pr merge <n> --auto --merge"
+            echo "::notice::${reason}"
+            echo "${reason}" >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
           if [ -z "${GH_TOKEN}" ]; then
             echo "::error::the ARM_MERGE_TOKEN secret is not set, so nothing is armed; arm by hand with gh pr merge <n> --auto --merge"
             exit 1

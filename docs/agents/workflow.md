@@ -26,11 +26,11 @@ A route block (`docs/specs/v01-route.md`) is one `/ce-brainstorm`, then `/ce-pla
 **Every commit reaches `main` through the merge queue.**
 
 1. `ce-commit-push-pr` opens the pull request. Its title is the commit's subject, and its body is the commit's body, footer included (*The commit's form*, below). Repository settings make these the merge commit's subject and body.
-2. Cubic reviews the head. When its check completes, `arm-merge.yml` arms the merge. A push disarms it, and Cubic's check on the new head arms it again, so the queue never takes a head Cubic has not read.
+2. Cubic reviews the head. When its check completes with success, `arm-merge.yml` arms the merge. A push disarms it, and Cubic's check on the new head arms it again, so the queue never takes a head Cubic has not read.
 3. The `main` ruleset holds the merge until every review thread is resolved. `ce-babysit-pr` fixes or answers Cubic's threads, and Cubic resolves the ones it sees addressed.
 4. The PR's own `check` reads only its title, so it goes green in a minute or two and the armed PR enters the **merge queue**. The queue runs the suites on the merge group and merges on green.
 
-While Cubic is paused, its check completes neutral at once, and the merge is armed with no review. `arm-merge.yml` arms with the `ARM_MERGE_TOKEN` secret, because a merge armed with `GITHUB_TOKEN` starts no workflow and the queue's `check` would never run. Without the secret, arm by hand: `gh pr merge <n> --auto --merge`.
+A check that completes neutral arms nothing. That happens when Cubic's allowance has run out, or when a push rewrote the branch and Cubic did not start. The workflow's summary names the reason. Comment `@cubic-dev-ai` on the pull request to have Cubic review it, or arm it by hand. `arm-merge.yml` arms with the `ARM_MERGE_TOKEN` secret, because a merge armed with `GITHUB_TOKEN` starts no workflow and the queue's `check` would never run. Without the secret, arm by hand: `gh pr merge <n> --auto --merge`.
 
 A red merge group takes the PR out of the queue. Its timeline then ends in a `RemovedFromMergeQueueEvent` whose `reason` is `failed_checks`. The failure is in the merge group's run, not the PR's, so read that run's log and fix what it names:
 
