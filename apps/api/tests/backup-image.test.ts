@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { z } from "zod";
 
+import { type ObjectStore, objectStoreForSuite } from "@better-answers/core/testing/objects";
 import { repositoryRoot } from "@better-answers/devtools/paths";
 import { legFor } from "@better-answers/devtools/workflows";
 import { POSTGRES_IMAGE } from "@better-answers/schema";
@@ -573,6 +574,9 @@ const fenced = (script: string, step: string): string => {
 };
 
 const NOTHING_LISTENS = "postgresql://restore@127.0.0.1:9/betteranswers";
+/** A prefix in the dumps bucket that holds no object, as before any workspace's first bundle. */
+const NOTHING_BUNDLED = "before-the-first-bundle";
+const NOT_THE_KEY = "a-rotated-secret";
 
 /** As both restores run their git step: as root, `mktemp -d`'s directories, `init`'s git store. */
 const restoringTheGitStore = String.raw`
@@ -582,8 +586,8 @@ git -C /tmp/workspace -c user.name=probe -c user.email=probe@example.invalid \
   commit --quiet --allow-empty --message "a workspace's first commit"
 git -C /tmp/workspace bundle create --quiet /tmp/bundle --all
 age-keygen -o /run/age.key 2>/dev/null
-mkdir -p "/buckets/dumps/git/$BUNDLED"
-age -r "$(age-keygen -y /run/age.key)" -o "/buckets/dumps/git/$BUNDLED/$BUNDLED-20260930T020017Z.bundle.age" /tmp/bundle
+age -r "$(age-keygen -y /run/age.key)" -o /tmp/bundle.age /tmp/bundle
+rclone copyto --s3-no-check-bucket /tmp/bundle.age "dumps:$BACKUP_DUMPS_BUCKET/git/$BUNDLED/$BUNDLED-20260930T020017Z.bundle.age"
 as_the_api() { HOME=/tmp setpriv --reuid=${API_UID} --regid=${API_UID} --clear-groups "$@"; }
 restore() {
   local name=$1
@@ -609,8 +613,10 @@ restore() {
 }
 restore production bash -c "$PRODUCTION_STEP"
 restore drill bash -c "$DRILL_STEP"
-restore production-unlisted RCLONE_CONFIG_DUMPS_REMOTE=/nowhere bash -c "$PRODUCTION_STEP"
-restore drill-unlisted RCLONE_CONFIG_DUMPS_REMOTE=/nowhere bash -c "$DRILL_STEP"
+restore production-unbundled BACKUP_DUMPS_BUCKET="$BACKUP_DUMPS_BUCKET/${NOTHING_BUNDLED}" bash -c "$PRODUCTION_STEP"
+restore drill-unbundled BACKUP_DUMPS_BUCKET="$BACKUP_DUMPS_BUCKET/${NOTHING_BUNDLED}" bash -c "$DRILL_STEP"
+restore production-unlisted RCLONE_CONFIG_DUMPS_SECRET_ACCESS_KEY=${NOT_THE_KEY} bash -c "$PRODUCTION_STEP"
+restore drill-unlisted RCLONE_CONFIG_DUMPS_SECRET_ACCESS_KEY=${NOT_THE_KEY} bash -c "$DRILL_STEP"
 restore production-unread DATABASE_URL=${NOTHING_LISTENS} bash -c "$PRODUCTION_STEP"
 restore drill-unread STAGING_DATABASE_URL=${NOTHING_LISTENS} bash -c "$DRILL_STEP"
 `;
@@ -621,8 +627,8 @@ interface Seeded {
 }
 
 /** A port the host publishes, as a container that `reachesTheHost` dials it. */
-const seenFromTheImage = (connectionUri: string): string => {
-  const uri = new URL(connectionUri);
+const seenFromTheImage = (address: string): string => {
+  const uri = new URL(address);
   uri.hostname = THE_HOST;
   return uri.toString();
 };
@@ -633,9 +639,19 @@ const AS_THE_HOSTS_RUN_IT = [
   'git() { printf "%s\\n" "$*" >> /tmp/root-ran-git; command git "$@"; }',
 ];
 
-const restoreEnvironment = (seeded: Seeded, database: string): Record<string, string> => ({
-  RCLONE_CONFIG_DUMPS_TYPE: "alias",
-  RCLONE_CONFIG_DUMPS_REMOTE: "/buckets",
+const restoreEnvironment = (
+  seeded: Seeded,
+  database: string,
+  dumps: ObjectStore,
+): Record<string, string> => ({
+  RCLONE_CONFIG_DUMPS_TYPE: "s3",
+  RCLONE_CONFIG_DUMPS_PROVIDER: "Other",
+  RCLONE_CONFIG_DUMPS_ENDPOINT: seenFromTheImage(dumps.endpoint),
+  RCLONE_CONFIG_DUMPS_REGION: dumps.region,
+  RCLONE_CONFIG_DUMPS_FORCE_PATH_STYLE: "true",
+  RCLONE_CONFIG_DUMPS_ACCESS_KEY_ID: dumps.accessKeyId,
+  RCLONE_CONFIG_DUMPS_SECRET_ACCESS_KEY: dumps.secretAccessKey,
+  BACKUP_DUMPS_BUCKET: dumps.bucket,
   DATABASE_URL: database,
   STAGING_DATABASE_URL: database,
   BUNDLED: seeded.bundled,
@@ -643,14 +659,14 @@ const restoreEnvironment = (seeded: Seeded, database: string): Record<string, st
   // As each script leaves them by its git step; production's `tool` runs in this image anyway.
   PRODUCTION_STEP: [
     "set -euo pipefail",
-    "WORK=/work BUNDLES=/bundles BACKUP_DUMPS_BUCKET=dumps",
+    "WORK=/work BUNDLES=/bundles",
     'tool() { "$@"; }',
     ...AS_THE_HOSTS_RUN_IT,
     fenced("deploy/restore-production.sh", "the git store"),
   ].join("\n"),
   DRILL_STEP: [
     "set -euo pipefail",
-    "WORK=/work BUNDLES=/bundles BACKUP_DUMPS_BUCKET=dumps BACKUP_AGE_IDENTITY_FILE=/run/age.key",
+    "WORK=/work BUNDLES=/bundles BACKUP_AGE_IDENTITY_FILE=/run/age.key",
     ...AS_THE_HOSTS_RUN_IT,
     fenced("deploy/restore-drill.sh", "the git store"),
   ].join("\n"),
@@ -667,6 +683,7 @@ const seedTwoWorkspaces = async (database: MigratedPostgres): Promise<Seeded> =>
 };
 
 describe.skipIf(nothingToProbeHere)("the restores' git store step", () => {
+  const dumps = objectStoreForSuite();
   let database: MigratedPostgres | undefined;
   let seeded: Seeded = { bundled: "", neverWritten: "" };
   let lines: readonly string[] = [];
@@ -677,7 +694,7 @@ describe.skipIf(nothingToProbeHere)("the restores' git store step", () => {
     lines = (
       await readTheImage(backupImage(), {
         command: ["bash", "-c", restoringTheGitStore],
-        environment: restoreEnvironment(seeded, seenFromTheImage(database.connectionUri)),
+        environment: restoreEnvironment(seeded, seenFromTheImage(database.connectionUri), dumps()),
         reachesTheHost: true,
       })
     ).split("\n");
@@ -725,11 +742,28 @@ describe.skipIf(nothingToProbeHere)("the restores' git store step", () => {
   );
 
   it.each(["production", "drill"])(
+    "%s: inits every workspace empty before any bundle exists",
+    (restore) => {
+      expect(stateAfter(`${restore}-unbundled`)).toMatchObject({
+        state: [
+          "ran 0",
+          "work 700",
+          "decrypted bundles left 0",
+          "root ran git 0",
+          "owned by another uid 0",
+          `${seeded.bundled} refs/heads/main no ref`,
+          `${seeded.neverWritten} refs/heads/main no ref`,
+        ],
+      });
+    },
+  );
+
+  it.each(["production", "drill"])(
     "%s: stops at a failed bundle listing, making no repository",
     (restore) => {
       expect(stateAfter(`${restore}-unlisted`)).toMatchObject({
         state: [
-          "ran 3",
+          "ran 1",
           "work 700",
           "decrypted bundles left 0",
           "root ran git 0",
