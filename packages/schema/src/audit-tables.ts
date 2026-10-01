@@ -54,6 +54,8 @@ export const auditEvent = withRLS(
 
     index("audit_event_subject_idx").on(table.workspaceId, table.subjectKind, table.subjectId),
 
+    index("audit_event_actor_idx").on(table.workspaceId, table.actor, table.at, table.id),
+
     uniqueIndex("audit_event_workspace_id_id_uidx").on(table.workspaceId, table.id),
     ...auditLogChecks("audit_event"),
   ],

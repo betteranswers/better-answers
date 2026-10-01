@@ -34,5 +34,6 @@ export const crossing = async <Value>(
   }
   const refusal = refusalOf(answered.error);
   log.info({ event: "mcp.refused", entry, ...refusalLogged(refusal) }, "refused");
+  // Items are dropped: an MCP refusal says the set's word alone, which is what an agent acts on.
   return asToolError(`Refused: ${refusal.word} (${refusal.class}).${fieldsSaid(refusal)}`);
 };

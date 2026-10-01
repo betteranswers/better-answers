@@ -30,6 +30,7 @@ import { byWords, counted, instantWords, timeWords, weekdayWords } from "@/share
 
 import { useAuditLog, type AuditLog, type Family, type ReadAuditEvent } from "./audit-log-api.ts";
 import { AUDIT_LOG_KEYSTROKES } from "./audit-log-state.ts";
+import { labelOfAct, sentenceCase } from "./audit-sentences.ts";
 import { SAID_OF_THE_AUDIT_LOG } from "./refusal-words.ts";
 
 const system = groupIn(CONTROL_CENTRE, "system");
@@ -61,14 +62,6 @@ const outcomeOfFailure = (failure: Error | ApiError): Outcome =>
   failureOutcome(SAID_OF_THE_AUDIT_LOG, failure, "read");
 
 const LISTED = Object.values(AUDIT_LOG_KEYSTROKES);
-
-const sentenceCase = (words: string): string => `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
-
-/** `people.member.role_changed` reads "Member role changed": the act's subject, then its verb. */
-const wordsOfAct = (act: string): string => {
-  const [, subject = "", verb = ""] = act.split(".");
-  return sentenceCase(`${subject} ${verb}`.replaceAll("_", " "));
-};
 
 /** `adminUserId` reads "Admin person id": a screen names a person, never a user. */
 const wordsOfField = (field: string): string =>
@@ -122,11 +115,11 @@ function EventDetails(properties: { readonly event: ReadAuditEvent; readonly ind
 
   return (
     <Collapsible>
-      <span className="block">{wordsOfAct(event.act)}</span>
+      <span className="block">{labelOfAct(event.act)}</span>
       <CollapsibleTrigger asChild>
         <Button ref={takeFocus} variant="link" size="sm" className="group h-auto gap-1 px-0">
           Details
-          <span className="sr-only">{` of ${wordsOfAct(event.act)}, ${instantWords(event.at)}`}</span>
+          <span className="sr-only">{` of ${labelOfAct(event.act)}, ${instantWords(event.at)}`}</span>
           <Icon
             name="caret-down"
             className="transition-transform group-data-[state=open]:rotate-180"

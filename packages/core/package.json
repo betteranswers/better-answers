@@ -31,6 +31,7 @@
     "./testing/cross-tier": "./test/cross-tier-fixture.ts"
   },
   "scripts": {
+    "generate:audit-acts": "node scripts/generate-audit-acts.ts",
     "lint": "oxlint --report-unused-disable-directives-severity=error --config ../../.oxlintrc.json .",
     "typecheck": "tsc --noEmit",
     "test": "node ./node_modules/vitest/vitest.mjs run",

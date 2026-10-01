@@ -1,8 +1,9 @@
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, expectTypeOf, it } from "vitest";
 
-import { failureOutcome, refusalOutcome } from "@/shared/refusal-outcome.tsx";
+import type { Refusal, RefusalWord } from "@/shared/api/trpc.ts";
+import { failureOutcome, RefusedItemLines, refusalOutcome } from "@/shared/refusal-outcome.tsx";
 import { SAID_OF_CLASS, type SaidOfWord } from "@/shared/refusal-words.ts";
 
 import { carrying } from "./stubbed-api.ts";
@@ -68,5 +69,65 @@ describe("the shared refusal template", () => {
     expect(shown(outcome.words).textContent).toBe(
       "No response, so nothing is shown. Try again in a moment.",
     );
+  });
+});
+
+const THE_PEOPLES_WORDS = {
+  ...A_FEATURES_WORDS,
+  "no-such-member": {
+    why: "They're no longer a member here.",
+    next: "Reload the page to see who is.",
+  },
+} satisfies SaidOfWord;
+
+const nameOf = (id: string): string => (id === "p1" ? "Ada Lovelace" : "Grace Hopper");
+
+const itemLinesOf = (featureWords: SaidOfWord, failure: Error): readonly (string | null)[] => {
+  render(<RefusedItemLines featureWords={featureWords} failure={failure} nameOf={nameOf} />);
+  return screen.queryAllByRole("listitem").map((line) => line.textContent);
+};
+
+describe("the lines a refusal naming items draws", () => {
+  it("reads each item's word as a plain api word", () => {
+    expectTypeOf<NonNullable<Refusal["items"]>>().toEqualTypeOf<
+      Readonly<Record<string, RefusalWord>>
+    >();
+  });
+
+  it("draws one line per item, naming the person", () => {
+    const failure = carrying({
+      refusal: {
+        word: "last-admin",
+        class: "precondition",
+        items: { p1: "last-admin", p2: "no-such-member" },
+      },
+    });
+
+    expect(itemLinesOf(THE_PEOPLES_WORDS, failure)).toEqual([
+      "Ada Lovelace: Nobody else here is an Admin. Make someone else an Admin first.",
+      "Grace Hopper: They're no longer a member here. Reload the page to see who is.",
+    ]);
+  });
+
+  it("says an unknown item word as the set's line", () => {
+    const failure = carrying({
+      refusal: {
+        word: "last-admin",
+        class: "precondition",
+        items: { p1: "last-admin", p2: "a-new-word" },
+      },
+    });
+
+    expect(itemLinesOf(A_FEATURES_WORDS, failure)).toEqual([
+      "Ada Lovelace: Nobody else here is an Admin. Make someone else an Admin first.",
+      "Grace Hopper: Nobody else here is an Admin. Make someone else an Admin first.",
+    ]);
+  });
+
+  it.each([
+    ["a refusal naming no items", refusedWith("last-admin", "precondition")],
+    ["a wordless failure", NETWORK_FAILURE],
+  ])("draws no line for %s", (_, failure) => {
+    expect(itemLinesOf(THE_PEOPLES_WORDS, failure)).toEqual([]);
   });
 });

@@ -36,7 +36,7 @@ import type { WorkspaceRefusal } from "./vocabulary.ts";
 export { WORKSPACE_REFUSALS } from "./vocabulary.ts";
 export { addPerson } from "./add-person.ts";
 export type { AddPersonRefusal } from "./add-person.ts";
-export { actorOf, namesOfActors } from "./actors.ts";
+export { actorOf, namesOfPeople, peopleAmong } from "./actors.ts";
 export { recordGrantsEndedHere } from "./grants.ts";
 export { detailsNamed } from "./grant-names.ts";
 export type { AuditEventActor } from "./actors.ts";

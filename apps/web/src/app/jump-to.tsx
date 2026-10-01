@@ -1,8 +1,8 @@
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useEffectEvent, useRef, useState, type RefObject } from "react";
 
 import { useMembers } from "@/features/people/people-api.ts";
-import { asking } from "@/shared/address-ask.ts";
+import { askingHere, type Here } from "@/shared/address-ask.ts";
 import { Icon, type IconName } from "@/shared/icon.tsx";
 import type { Keystroke } from "@/shared/keystrokes.tsx";
 import {
@@ -93,26 +93,26 @@ const screenJump = ({ surface, group, screen }: Placed): Jump =>
     surface.name,
   );
 
-const actJumps = (screen: Screen): readonly Jump[] =>
+const actJumps = (screen: Screen, here: Here): readonly Jump[] =>
   (screen.acts ?? []).map((act) =>
     jumpOf({
       value: `act ${screen.path} ${act.asks}`,
       name: act.name,
       said: screen.name,
       icon: act.icon,
-      to: asking(screen.path, "act", act.asks),
+      to: askingHere(here, screen.path, "act", act.asks),
       kind: "act",
     }),
   );
 
 /** Found on Members by their address, which the list's own search box takes. */
-const memberJump = (member: Member): Jump =>
+const memberJump = (member: Member, here: Here): Jump =>
   jumpOf({
     value: `member ${member.personId}`,
     name: nameOrAddress(member.displayName, member.address),
     said: member.displayName === "" ? undefined : member.address,
     icon: "person",
-    to: asking(MEMBERS.path, "search", member.address),
+    to: askingHere(here, MEMBERS.path, "search", member.address),
     kind: "member",
   });
 
@@ -120,12 +120,19 @@ const memberJump = (member: Member): Jump =>
 export const jumpsIn = (
   tree: VisibleTree,
   members: readonly Member[] | undefined,
+  here: Here,
 ): readonly JumpGroup[] => {
   const groups: readonly JumpGroup[] = [
     { heading: JUMP_TO.groups.surfaces, jumps: tree.surfaces.map(surfaceJump) },
     { heading: JUMP_TO.groups.screens, jumps: tree.surfaces.flatMap(placedIn).map(screenJump) },
-    { heading: JUMP_TO.groups.acts, jumps: screensOf(tree.surfaces).flatMap(actJumps) },
-    { heading: JUMP_TO.groups.members, jumps: (members ?? []).map(memberJump) },
+    {
+      heading: JUMP_TO.groups.acts,
+      jumps: screensOf(tree.surfaces).flatMap((screen) => actJumps(screen, here)),
+    },
+    {
+      heading: JUMP_TO.groups.members,
+      jumps: (members ?? []).map((member) => memberJump(member, here)),
+    },
   ];
   return groups.filter((group) => group.jumps.length > 0);
 };
@@ -273,7 +280,9 @@ function JumpList(
 ) {
   const { read } = properties;
   const [typed, setTyped] = useState("");
-  const every = jumpsIn(properties.tree, properties.members);
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const searchStr = useRouterState({ select: (state) => state.location.searchStr });
+  const every = jumpsIn(properties.tree, properties.members, { pathname, searchStr });
   const shown = matching(every, typed);
   const lines = linesOf(
     read,

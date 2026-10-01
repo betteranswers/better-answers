@@ -1,4 +1,5 @@
 export * from "./accepting.ts";
+export * from "./activity.ts";
 export * from "./audit-log.ts";
 export * from "./credentials.ts";
 export * from "./groups.ts";

@@ -5,15 +5,21 @@ import { testData } from "@better-answers/schema/testing";
 
 import type { Result, Role, UserPrincipal } from "../src/kernel/index.ts";
 import {
+  changeRole,
+  changeRoleInput,
   createGroup,
+  deleteGroup,
+  inviteMember,
   readAuditLog,
   readAuditLogInput,
+  renameGroup,
   type AuditLogPage,
 } from "../src/members/index.ts";
 import type { Foldable, Folded, Tx } from "../src/store/postgres/index.ts";
 import { recordSignIn } from "../src/workspaces/index.ts";
 import {
   bootstrap,
+  erasedFromTheSet,
   provisionedWorkspace,
   seedPerson,
   type ProvisionedWorkspace,
@@ -80,6 +86,49 @@ const pageOf = (read: Result<AuditLogPage, unknown>): AuditLogPage => {
 
 const subjectsOf = (page: AuditLogPage) => page.events.map((event) => event.subjectId);
 
+const namedSubjectsOf = async (workspace: ProvisionedWorkspace) =>
+  pageOf(await readAs(workspace, workspace.adminUserId)).events.map(({ act, subject }) => [
+    act,
+    subject,
+  ]);
+
+const done = <T>(answered: Result<T, unknown>): T => {
+  if (!answered.ok) throw new Error(`the act was refused: ${String(answered.error)}`);
+  return answered.value;
+};
+
+const roleChangedOf = async (workspace: ProvisionedWorkspace, personId: string) =>
+  done(
+    await acting(workspace, workspace.adminUserId, (principal, tx) =>
+      changeRole(principal, tx, inputOf(changeRoleInput, { personId, role: "Editor" })),
+    ),
+  );
+
+const invitedBy = async (workspace: ProvisionedWorkspace, address: string): Promise<string> =>
+  done(
+    await acting(workspace, workspace.adminUserId, (principal, tx) =>
+      inviteMember(principal, tx, { address, role: "Editor", now: new Date() }),
+    ),
+  ).invitationId;
+
+/** An event in `workspace` whose subject is a row `elsewhere` holds under the same id. */
+const eventAboutTheirs = async (
+  workspace: ProvisionedWorkspace,
+  act: "people.invitation.created" | "people.group.created",
+  seedTheirs: (seed: ReturnType<typeof testData>) => Promise<{ readonly id: string }>,
+): Promise<void> => {
+  await seedingWith(db().pool, async (seed) => {
+    const theirs = await seedTheirs(seed);
+    await seed.auditEvent({
+      workspaceId: workspace.workspaceId,
+      act,
+      actor: `human:${workspace.adminUserId}`,
+      subjectId: theirs.id,
+      detail: act === "people.invitation.created" ? { role: "Editor" } : {},
+    });
+  });
+};
+
 describe("the audit log", () => {
   it("reads events newest first, naming actors from the person row", async () => {
     const workspace = await provisionedWorkspace(db(), "Logged", { name: "Priya Shah" });
@@ -98,6 +147,7 @@ describe("the audit log", () => {
           actor: `human:${workspace.adminUserId}`,
           at: expect.stringMatching(ISO_INSTANT),
           by: { kind: "person", displayName: "Priya Shah" },
+          subject: { kind: "group", name: "Bid writers" },
           detail: {},
         },
         {
@@ -109,6 +159,7 @@ describe("the audit log", () => {
           actor: "process:better-answers-bootstrap",
           at: expect.stringMatching(ISO_INSTANT),
           by: { kind: "platform" },
+          subject: null,
           detail: { adminUserId: workspace.adminUserId, role: "Admin" },
         },
       ],
@@ -293,5 +344,113 @@ describe("the audit log", () => {
     ).rejects.toThrow(/did not commit/);
 
     expect(read).toEqual({ ok: false, error: expect.any(Error) });
+  });
+});
+
+describe("the audit log's subjects", () => {
+  it("names a member by their display name", async () => {
+    const workspace = await provisionedWorkspace(db(), "Promoted");
+    const priya = await memberAt(workspace, "Viewer", "Priya Shah");
+    await roleChangedOf(workspace, priya);
+
+    expect((await namedSubjectsOf(workspace))[0]).toEqual([
+      "people.member.role_changed",
+      { kind: "person", displayName: "Priya Shah" },
+    ]);
+  });
+
+  it("names a group by its name as it stands now", async () => {
+    const workspace = await provisionedWorkspace(db(), "Regrouped");
+    const [groupId = ""] = await groupsMadeBy(workspace, workspace.adminUserId, ["Bid writers"]);
+    done(
+      await acting(workspace, workspace.adminUserId, (principal, tx) =>
+        renameGroup(principal, tx, { groupId, name: "Bid team" }),
+      ),
+    );
+
+    expect(await namedSubjectsOf(workspace)).toEqual([
+      ["people.group.renamed", { kind: "group", name: "Bid team" }],
+      ["people.group.created", { kind: "group", name: "Bid team" }],
+      ["platform.workspace.provisioned", null],
+    ]);
+  });
+
+  it("reads a deleted group's events as a deleted group", async () => {
+    const workspace = await provisionedWorkspace(db(), "Ungrouped");
+    const [groupId = ""] = await groupsMadeBy(workspace, workspace.adminUserId, ["Site team"]);
+    done(
+      await acting(workspace, workspace.adminUserId, (principal, tx) =>
+        deleteGroup(principal, tx, { groupId }),
+      ),
+    );
+
+    expect(await namedSubjectsOf(workspace)).toEqual([
+      ["people.group.deleted", { kind: "deleted-group" }],
+      ["people.group.created", { kind: "deleted-group" }],
+      ["platform.workspace.provisioned", null],
+    ]);
+  });
+
+  it("names an erased person a former member", async () => {
+    const workspace = await provisionedWorkspace(db(), "Forgotten");
+    const priya = await memberAt(workspace, "Viewer", "Priya Shah");
+    await roleChangedOf(workspace, priya);
+    await erasedFromTheSet(db(), workspace.workspaceId, priya);
+
+    expect((await namedSubjectsOf(workspace))[0]).toEqual([
+      "people.member.role_changed",
+      { kind: "former-member" },
+    ]);
+  });
+
+  it("names an invitation by the address it was sent to", async () => {
+    const workspace = await provisionedWorkspace(db(), "Invited");
+    await invitedBy(workspace, "jo.bloggs@example.invalid");
+
+    expect((await namedSubjectsOf(workspace))[0]).toEqual([
+      "people.invitation.created",
+      { kind: "invitation", address: "jo.bloggs@example.invalid" },
+    ]);
+  });
+
+  it("reads an invitation erasure deleted without its address", async () => {
+    const workspace = await provisionedWorkspace(db(), "Unaddressed");
+    const invitationId = await invitedBy(workspace, "jo.bloggs@example.invalid");
+    await db().pool.query("DELETE FROM invitation WHERE id = $1", [invitationId]);
+
+    expect((await namedSubjectsOf(workspace))[0]).toEqual([
+      "people.invitation.created",
+      { kind: "erased-invitation" },
+    ]);
+  });
+
+  it("never names another workspace's invitation by its id", async () => {
+    const ours = await provisionedWorkspace(db(), "OurInvitations");
+    const theirs = await provisionedWorkspace(db(), "TheirInvitations");
+    await eventAboutTheirs(ours, "people.invitation.created", (seed) =>
+      seed.invitation({
+        workspaceId: theirs.workspaceId,
+        inviterId: theirs.adminUserId,
+        email: "una.elsewhere@example.invalid",
+      }),
+    );
+
+    expect((await namedSubjectsOf(ours))[0]).toEqual([
+      "people.invitation.created",
+      { kind: "erased-invitation" },
+    ]);
+  });
+
+  it("never names another workspace's group by its id", async () => {
+    const ours = await provisionedWorkspace(db(), "OurGroups");
+    const theirs = await provisionedWorkspace(db(), "TheirGroups");
+    await eventAboutTheirs(ours, "people.group.created", (seed) =>
+      seed.group({ workspaceId: theirs.workspaceId, name: "Their group" }),
+    );
+
+    expect((await namedSubjectsOf(ours))[0]).toEqual([
+      "people.group.created",
+      { kind: "deleted-group" },
+    ]);
   });
 });

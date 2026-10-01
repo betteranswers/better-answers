@@ -2,16 +2,18 @@ import type { z } from "zod";
 
 import { boundarySchemas } from "@better-answers/schema";
 
-import { actorIdOf, ulid } from "../kernel/index.ts";
+import { actorIdOf, actorIdOfPerson, ulid } from "../kernel/index.ts";
 import type {
   ActorId,
   AuditEventId,
   OperatorPrincipal,
   PlatformPrincipal,
   Principal,
+  UserId,
 } from "../kernel/index.ts";
 import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
 import {
+  type ActName,
   DETAIL_KINDS,
   type DetailKind,
   type DetailOf,
@@ -102,6 +104,20 @@ export type AuditEventPage = {
   readonly nextCursor: AuditEventId | null;
 };
 
+type CursorAt = { readonly scope: number; readonly cursor: number };
+
+/** Compared in SQL, never through a `Date`, whose milliseconds would tie rows Postgres orders. */
+const afterTheCursor = (at: CursorAt): string =>
+  `($${at.cursor}::text IS NULL OR (at, id) < (
+     SELECT page_end.at, page_end.id FROM audit_event page_end
+      WHERE page_end.workspace_id = ${scopeClause(at.scope)} AND page_end.id = $${at.cursor}))`;
+
+/** Fetched one row past the page, so that row says another follows. */
+const pageOf = (rows: readonly AuditEventRow[], limit: number): AuditEventPage => {
+  const lastOfAFullPage = rows.length > limit ? rows[limit - 1] : undefined;
+  return { rows: rows.slice(0, limit), nextCursor: lastOfAFullPage?.id ?? null };
+};
+
 /**
  * Newest first, from the row after `cursor`. A cursor naming no row in scope reads nothing, so
  * another workspace's id learns nothing of it; one row past the page says another follows.
@@ -120,17 +136,95 @@ export const eventsNewestFirst = async (
        FROM audit_event
       WHERE workspace_id = ${scopeClause(1)}
         AND ($2::text IS NULL OR family = $2)
-        AND ($3::text IS NULL OR (at, id) < (
-              SELECT page_end.at, page_end.id FROM audit_event page_end
-               WHERE page_end.workspace_id = ${scopeClause(1)} AND page_end.id = $3))
+        AND ${afterTheCursor({ scope: 1, cursor: 3 })}
       ORDER BY at DESC, id DESC
       LIMIT $4 + 1`,
     [scopeParameter(principal), asked.family ?? null, asked.cursor ?? null, asked.limit],
   );
 
+  return pageOf(
+    found.rows.map((row) => boundarySchemas.auditEvent.select.parse(row)),
+    asked.limit,
+  );
+};
+
+/** Where a person's id may stand in an event beyond its actor. */
+export type PersonNamedIn = {
+  readonly subjectKinds: readonly string[];
+  readonly detail: readonly {
+    readonly key: string;
+    /**
+     * Every kind the acts' subjects take, so the arm reaches the subject index; a kind left out
+     * hides that act's events.
+     */
+    readonly subjectKinds: readonly string[];
+    readonly acts: readonly ActName[];
+  }[];
+};
+
+type Bindable = string | number | null | readonly string[];
+
+/** A placeholder is the number its own value's binding answers, so the two cannot drift apart. */
+const boundValues = () => {
+  const values: Bindable[] = [];
+  return { values, bind: (value: Bindable): number => values.push(value) };
+};
+
+type ArmAt = CursorAt & { readonly limit: number };
+
+/** Each arm is limited on its own index; one query that ORs them would scan the workspace. */
+const armOf = (at: ArmAt, predicate: string): string =>
+  `(SELECT ${AUDIT_EVENT_ROW}
+      FROM audit_event
+     WHERE workspace_id = ${scopeClause(at.scope)} AND ${predicate}
+       AND ${afterTheCursor(at)}
+     ORDER BY at DESC, id DESC
+     LIMIT $${at.limit} + 1)`;
+
+/**
+ * Newest first, from the row after `cursor`: the events whose actor is the person, whose subject
+ * is them under one of `namedIn.subjectKinds`, or whose detail names them under a listed act's key.
+ * An event two arms reach is answered once.
+ */
+export const eventsNamingNewestFirst = async (
+  principal: Principal,
+  tx: Tx,
+  asked: {
+    readonly personId: UserId;
+    readonly namedIn: PersonNamedIn;
+    readonly cursor?: string | null | undefined;
+    readonly limit: number;
+  },
+): Promise<AuditEventPage> => {
+  const { values, bind } = boundValues();
+  const at: ArmAt = {
+    scope: bind(scopeParameter(principal)),
+    cursor: bind(asked.cursor ?? null),
+    limit: bind(asked.limit),
+  };
+  const person = bind(asked.personId);
+  const arms = [
+    armOf(at, `actor = $${bind(actorIdOfPerson(asked.personId))}`),
+    armOf(
+      at,
+      `subject_kind = ANY($${bind(asked.namedIn.subjectKinds)}::text[]) AND subject_id = $${person}`,
+    ),
+    ...asked.namedIn.detail.map(({ key, subjectKinds, acts }) =>
+      armOf(
+        at,
+        `subject_kind = ANY($${bind(subjectKinds)}::text[])
+         AND act = ANY($${bind(acts)}::text[]) AND detail ->> $${bind(key)}::text = $${person}`,
+      ),
+    ),
+  ];
+  const found = await tx.query(
+    `SELECT * FROM (${arms.join(" UNION ALL ")}) AS arms
+     ORDER BY at DESC, id DESC`,
+    values,
+  );
+
   const rows = found.rows.map((row) => boundarySchemas.auditEvent.select.parse(row));
-  const lastOfAFullPage = rows.length > asked.limit ? rows[asked.limit - 1] : undefined;
-  return { rows: rows.slice(0, asked.limit), nextCursor: lastOfAFullPage?.id ?? null };
+  return pageOf([...new Map(rows.map((row) => [row.id, row])).values()], asked.limit);
 };
 
 const eventInsert = boundarySchemas.auditEvent.insert.omit({ workspaceId: true });
