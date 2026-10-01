@@ -69,8 +69,8 @@ function PersonMenu(properties: Pick<BandProperties, "person" | "signingOut" | "
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <Button type="button" variant="ghost" size="icon" className="shrink-0">
-          <Avatar aria-hidden className="size-7 rounded-none">
-            <AvatarFallback className="rounded-none text-xs font-medium text-foreground">
+          <Avatar aria-hidden className="size-7">
+            <AvatarFallback className="text-xs font-medium text-foreground">
               {initialsOf(person.name)}
             </AvatarFallback>
           </Avatar>

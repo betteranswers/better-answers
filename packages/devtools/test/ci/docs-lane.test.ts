@@ -302,6 +302,7 @@ const COPIED_SOURCE: readonly string[] = [
   "apps/worker/src",
   "packages/core/src",
   "packages/design-system",
+  "packages/design-system/assets",
   "packages/schema/migrations",
   "packages/schema/src",
 ];
