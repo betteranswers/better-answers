@@ -413,7 +413,7 @@ describe("the backup a nightly release rides on", () => {
     ).toEqual({
       code: 1,
       out: "",
-      err: `::error::the pg-hourly backup is not fresh: its check is down, last pinged ${LAST_HOURS_DUMP}, where it needs to be up and pinged from 2026-10-01T07:55:00Z to 2026-10-01T09:00:00Z, so nothing is released\n`,
+      err: `::error::the pg-hourly backup is not fresh: its check is down, last pinged ${LAST_HOURS_DUMP}, where it needs to be up and pinged since 2026-10-01T07:55:00Z, so nothing is released\n`,
     });
   });
 
@@ -432,10 +432,9 @@ describe("the backup a nightly release rides on", () => {
     ]).toEqual([0, 1]);
   });
 
-  it.each([
-    { when: "from the night before", copies: "2026-09-30T02:04:51+00:00" },
-    { when: "pinged after the read", copies: "2026-10-01T09:30:00+00:00" },
-  ])("refuses copies $when", async ({ copies }) => {
+  it("refuses copies from the night before", async () => {
+    const copies = "2026-09-30T02:04:51+00:00";
+
     expect(
       await freshnessRead({
         "pg-hourly": { status: "up", last_ping: LAST_HOURS_DUMP },
@@ -444,8 +443,17 @@ describe("the backup a nightly release rides on", () => {
     ).toEqual({
       code: 1,
       out: "",
-      err: `::error::the nightly backup is not fresh: its check is up, last pinged ${copies}, where it needs to be up and pinged from 2026-10-01T02:00:00Z to 2026-10-01T09:00:00Z, so nothing is released\n`,
+      err: `::error::the nightly backup is not fresh: its check is up, last pinged ${copies}, where it needs to be up and pinged since 2026-10-01T02:00:00Z, so nothing is released\n`,
     });
+  });
+
+  it("takes a dump pinged while the read is under way", async () => {
+    expect(
+      await freshnessRead({
+        "pg-hourly": { status: "up", last_ping: "2026-10-01T09:00:01+00:00" },
+        nightly: { status: "up", last_ping: TONIGHTS_COPIES },
+      }),
+    ).toMatchObject({ code: 0, err: "" });
   });
 
   it("takes the night before's copies when read before 02:00", async () => {

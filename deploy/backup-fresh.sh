@@ -15,8 +15,8 @@ now="$(date -u +%s)"
 
 iso() { jq -nr --argjson at "$1" '$at | todate'; }
 
-# Prints the check's last ping, or refuses: exactly one check, up, last pinged between the epoch
-# second given and now.
+# Prints the check's last ping, or refuses: exactly one check, up, last pinged at or after the epoch
+# second given. A job may ping while this reads, after `now` was taken, so no upper bound.
 fresh() {
   local slug="$1" since="$2" answer code status last pinged
   answer="$(mktemp)"
@@ -29,8 +29,8 @@ fresh() {
   status="$(jq -r '.checks[0].status' "${answer}")"
   last="$(jq -r '.checks[0].last_ping // "never"' "${answer}")"
   pinged="$(jq '.checks[0].last_ping // "1970-01-01T00:00:00Z" | sub("\\.[0-9]+"; "") | sub("\\+00:00$"; "Z") | fromdateiso8601' "${answer}")"
-  if [ "${status}" != up ] || [ "${pinged}" -lt "${since}" ] || [ "${pinged}" -gt "${now}" ]; then
-    refuse "the ${slug} backup is not fresh: its check is ${status}, last pinged ${last}, where it needs to be up and pinged from $(iso "${since}") to $(iso "${now}"), so nothing is released"
+  if [ "${status}" != up ] || [ "${pinged}" -lt "${since}" ]; then
+    refuse "the ${slug} backup is not fresh: its check is ${status}, last pinged ${last}, where it needs to be up and pinged since $(iso "${since}"), so nothing is released"
   fi
   echo "${last}"
 }
