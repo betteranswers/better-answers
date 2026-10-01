@@ -259,14 +259,24 @@ export const useSignOut = (returnTo?: string) => {
   };
 };
 
+const setActiveWorkspace = (organizationId: string) =>
+  unwrap(authClient.organization.setActive({ organizationId }));
+
 const setActiveOrganizationOptions = () =>
   mutationOptions<unknown, BetterFetchError, { organizationId: string }>({
-    mutationFn: (input) => unwrap(authClient.organization.setActive(input)),
+    mutationFn: (input) => setActiveWorkspace(input.organizationId),
   });
 
-/** Every read but the person's own: their session, their list of workspaces and `session.*`. */
+/**
+ * The session's and the console's reads belong to no workspace, so a switch keeps them. Naming
+ * these fails safe: one left off is read again.
+ */
 const aboutTheWorkspace = (api: ApiProxy) => {
-  const theirOwn = [{ queryKey: AUTH_KEYS.all }, api.session.pathFilter()];
+  const theirOwn = [
+    { queryKey: AUTH_KEYS.all },
+    api.session.pathFilter(),
+    api.console.pathFilter(),
+  ];
   return (query: Query) => !theirOwn.some((filters) => matchQuery(filters, query));
 };
 
@@ -304,6 +314,17 @@ const noMembership = z.object({ code: z.literal("USER_IS_NOT_A_MEMBER_OF_THE_ORG
 export const refusedForNoMembership = (refused: BetterFetchError | null): boolean =>
   noMembership.safeParse(refused).success;
 
+/** A switch's refusal in the platform's terms, so the shell never reads the provider's error. */
+export class SwitchRefused extends Error {
+  readonly noLongerAMember: boolean;
+
+  constructor(noLongerAMember: boolean) {
+    super(noLongerAMember ? "no longer a member" : "switch refused");
+    this.name = "SwitchRefused";
+    this.noLongerAMember = noLongerAMember;
+  }
+}
+
 export type SwitchedTo = { readonly id: string; readonly name: string };
 
 /**
@@ -314,9 +335,11 @@ export const useSwitchWorkspace = () => {
   const queryClient = useQueryClient();
   const api = useTRPC();
   const navigate = useNavigate();
-  return useMutation<unknown, BetterFetchError, SwitchedTo>({
+  return useMutation<unknown, SwitchRefused, SwitchedTo>({
     mutationFn: (workspace) =>
-      unwrap(authClient.organization.setActive({ organizationId: workspace.id })),
+      setActiveWorkspace(workspace.id).catch((refused: BetterFetchError) => {
+        throw new SwitchRefused(refusedForNoMembership(refused));
+      }),
     onSuccess: async () => {
       forgetTheWorkspaceLeft(queryClient, api);
       await rereadMembership(queryClient, api);

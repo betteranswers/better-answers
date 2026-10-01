@@ -2,7 +2,6 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
 import {
-  refusedForNoMembership,
   useListOrganizations,
   useSwitchWorkspace,
   type SwitchedTo,
@@ -37,9 +36,7 @@ const switchOutcome = (switching: Switching): Outcome | undefined => {
   if (switching.isPending) return { tone: "said", words: PICKER_WORDS.opening };
   const to = switching.variables;
   if (switching.error === null || to === undefined) return undefined;
-  return refusedWith(
-    refusedForNoMembership(switching.error) ? noLongerAMemberOf(to.name) : PICK_REFUSED,
-  );
+  return refusedWith(switching.error.noLongerAMember ? noLongerAMemberOf(to.name) : PICK_REFUSED);
 };
 
 /** A list already held stands through a failed read of it again, so only a first read speaks. */
@@ -74,7 +71,7 @@ export const useWorkspaceSwitch = () => {
       switching.mutate(to, {
         // Left out at once, before the list is read again on the next opening.
         onError: (refused) => {
-          if (refusedForNoMembership(refused)) setGone((was) => [...was, to.id]);
+          if (refused.noLongerAMember) setGone((was) => [...was, to.id]);
         },
       });
     },
@@ -95,6 +92,30 @@ const listedFrom = (here: Here, workspaces: readonly SwitchedTo[]): readonly Swi
     .toSorted((one, other) => one.name.localeCompare(other.name, "en-GB"));
   return workspaceId === undefined ? others : [{ id: workspaceId, name: here.name }, ...others];
 };
+
+/**
+ * Held while a switch is pending, since its late answer would move whatever screen the person
+ * left for.
+ */
+function WayOut(properties: {
+  readonly to: "/choose-workspace" | "/console";
+  readonly held: boolean;
+  readonly children: string;
+}) {
+  return (
+    <DropdownMenuItem asChild disabled={properties.held}>
+      {/* The item's hold stops the pointer and the keys, not the link's own click. */}
+      <Link
+        to={properties.to}
+        onClick={(event) => {
+          if (properties.held) event.preventDefault();
+        }}
+      >
+        {properties.children}
+      </Link>
+    </DropdownMenuItem>
+  );
+}
 
 export function WorkspaceSwitcher(properties: {
   readonly here: Here;
@@ -138,13 +159,13 @@ export function WorkspaceSwitcher(properties: {
         </DropdownMenuRadioGroup>
 
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link to="/choose-workspace">{ALL_WORKSPACES}</Link>
-        </DropdownMenuItem>
+        <WayOut to="/choose-workspace" held={switching.pending}>
+          {ALL_WORKSPACES}
+        </WayOut>
         {properties.offersTheConsole ? (
-          <DropdownMenuItem asChild>
-            <Link to="/console">{CONSOLE.name}</Link>
-          </DropdownMenuItem>
+          <WayOut to="/console" held={switching.pending}>
+            {CONSOLE.name}
+          </WayOut>
         ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
