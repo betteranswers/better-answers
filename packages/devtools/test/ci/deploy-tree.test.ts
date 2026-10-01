@@ -514,6 +514,39 @@ describe("the deploy tree", () => {
     });
   });
 
+  it("restores the newest dump of any tier, with its globals", () => {
+    const newest = fencedIn(read("deploy/restore-drill.sh"), "the newest dump");
+    expect({ markers: newest !== undefined }).toEqual({ markers: true });
+
+    // As the bucket stands at 03:00 on the 1st, when the drill runs.
+    const listed: Readonly<Record<string, readonly string[]>> = {
+      hourly: [
+        "globals-20261001T010512Z.sql.age",
+        "pg-20261001T010512Z.dump.age",
+        "pg-20260930T230508Z.dump.age",
+      ],
+      daily: ["pg-20260930T020509Z.dump.age", "globals-20260930T020509Z.sql.age"],
+      weekly: ["pg-20260927T020511Z.dump.age"],
+      monthly: ["globals-20261001T020517Z.sql.age", "pg-20261001T020517Z.dump.age"],
+    };
+    const listing = Object.entries(listed)
+      .map(([tier, files]) => `"dumps:dumps/pg/${tier}/") printf '%s\\n' ${files.join(" ")} ;;`)
+      .join(" ");
+
+    expect(
+      bashRan([
+        "BACKUP_DUMPS_BUCKET=dumps",
+        `rclone() { [ "$1" = lsf ] || return 2; case "$2" in ${listing} *) return 2 ;; esac; }`,
+        newest ?? "",
+        'say "${tier} ${latest} ${globals} ${dump_at}"',
+      ]),
+    ).toEqual({
+      code: 0,
+      output:
+        "monthly pg-20261001T020517Z.dump.age globals-20261001T020517Z.sql.age 20261001T020517Z\n",
+    });
+  });
+
   it("lets the mirror key run init-repo, git-receive-pack and prune-repo only", () => {
     const shell = read("deploy/mirror-shell.sh");
     expect(shell).toContain('"init-repo "*)');

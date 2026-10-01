@@ -75,12 +75,17 @@ fi
 # <<< workspace id
 
 say "## 0 wipe staging (starts from nothing)"; ensure_staging_network; wipe_staging
-say "## 1 postgres — latest daily dump"
-latest=$(rclone lsf "dumps:${BACKUP_DUMPS_BUCKET}/pg/daily/" | grep '^pg-' | sort | tail -n1)
-globals=$(rclone lsf "dumps:${BACKUP_DUMPS_BUCKET}/pg/daily/" | grep '^globals-' | sort | tail -n1)
+say "## 1 postgres — the newest dump in any tier"
+# >>> the newest dump
+# The 02:05 dump is filed weekly on a Sunday and monthly on the 1st, the drill's day.
+read -r latest tier <<<"$(for t in hourly daily weekly monthly; do
+  rclone lsf "dumps:${BACKUP_DUMPS_BUCKET}/pg/${t}/" | grep '^pg-' | sed "s|\$| ${t}|"
+done | sort | tail -n1)"
 dump_at=$(echo "${latest}" | sed -E 's/^pg-([0-9T]+Z)\..*/\1/')
-rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/pg/daily/${globals}" "${WORK}/globals.sql.age"
-rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/pg/daily/${latest}" "${WORK}/pg.dump.age"
+globals="globals-${dump_at}.sql.age"
+# <<< the newest dump
+rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/pg/${tier}/${globals}" "${WORK}/globals.sql.age"
+rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/pg/${tier}/${latest}" "${WORK}/pg.dump.age"
 # Production's globals carry an ALTER ROLE that would reset the staging superuser's password.
 staging_owner=$(printf '%s' "${STAGING_DATABASE_URL}" | sed -E 's|^[a-z]+://([^:/@]+).*|\1|')
 age -d -i "${BACKUP_AGE_IDENTITY_FILE}" "${WORK}/globals.sql.age" | grep -v -E "^(CREATE|ALTER) ROLE \"?${staging_owner}\"?[ ;]" | psql "${STAGING_DATABASE_URL}" -q || true
