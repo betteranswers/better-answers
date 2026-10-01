@@ -78,9 +78,11 @@ say "## 0 wipe staging (starts from nothing)"; ensure_staging_network; wipe_stag
 say "## 1 postgres — the newest dump in any tier"
 # >>> the newest dump
 # The 02:05 dump is filed weekly on a Sunday and monthly on the 1st, the drill's day.
-read -r latest tier <<<"$(for t in hourly daily weekly monthly; do
-  rclone lsf "dumps:${BACKUP_DUMPS_BUCKET}/pg/${t}/" | grep '^pg-' | sed "s|\$| ${t}|"
-done | sort | tail -n1)"
+dumps=""
+for t in hourly daily weekly monthly; do
+  dumps+=$(rclone lsf "dumps:${BACKUP_DUMPS_BUCKET}/pg/${t}/" | { grep '^pg-' || true; } | sed "s|\$| ${t}|")$'\n'
+done
+read -r latest tier <<<"$(printf '%s' "${dumps}" | sort | tail -n1)"
 dump_at=$(echo "${latest}" | sed -E 's/^pg-([0-9T]+Z)\..*/\1/')
 globals="globals-${dump_at}.sql.age"
 # <<< the newest dump

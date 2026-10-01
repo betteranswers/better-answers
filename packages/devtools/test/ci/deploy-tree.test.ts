@@ -529,22 +529,25 @@ describe("the deploy tree", () => {
       weekly: ["pg-20260927T020511Z.dump.age"],
       monthly: ["globals-20261001T020517Z.sql.age", "pg-20261001T020517Z.dump.age"],
     };
-    const listing = Object.entries(listed)
-      .map(([tier, files]) => `"dumps:dumps/pg/${tier}/") printf '%s\\n' ${files.join(" ")} ;;`)
-      .join(" ");
-
-    expect(
-      bashRan([
+    const picked = (answering: readonly string[]): BashRun => {
+      const listing = Object.entries(listed)
+        .filter(([tier]) => answering.includes(tier))
+        .map(([tier, files]) => `"dumps:dumps/pg/${tier}/") printf '%s\\n' ${files.join(" ")} ;;`)
+        .join(" ");
+      return bashRan([
         "BACKUP_DUMPS_BUCKET=dumps",
         `rclone() { [ "$1" = lsf ] || return 2; case "$2" in ${listing} *) return 2 ;; esac; }`,
         newest ?? "",
         'say "${tier} ${latest} ${globals} ${dump_at}"',
-      ]),
-    ).toEqual({
+      ]);
+    };
+
+    expect(picked(Object.keys(listed))).toEqual({
       code: 0,
       output:
         "monthly pg-20261001T020517Z.dump.age globals-20261001T020517Z.sql.age 20261001T020517Z\n",
     });
+    expect(picked(["hourly", "daily", "weekly"])).toEqual({ code: 2, output: "" });
   });
 
   it("lets the mirror key run init-repo, git-receive-pack and prune-repo only", () => {
