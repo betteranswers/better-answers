@@ -50,6 +50,16 @@ export const forgetMembership = (queryClient: QueryClient, api: ApiProxy) => {
   queryClient.removeQueries({ queryKey: membershipOptions(api).queryKey });
 };
 
-/** In place, so a shell reading it moves straight to the new answer. */
-export const rereadMembership = (queryClient: QueryClient, api: ApiProxy) =>
-  queryClient.refetchQueries({ queryKey: membershipOptions(api).queryKey, exact: true });
+/**
+ * In place, so the shell moves straight to the new answer. A failed or paused read keeps the left
+ * workspace's answer, which is dropped.
+ */
+export const rereadMembership = async (queryClient: QueryClient, api: ApiProxy) => {
+  const filters = { queryKey: membershipOptions(api).queryKey, exact: true };
+  await queryClient.refetchQueries(filters);
+  const read = queryClient.getQueryState(filters.queryKey);
+  // Reset, not removed: the frame's mounted read never hears a removal and goes on drawing it.
+  if (read?.status !== "success" || read.fetchStatus !== "idle") {
+    void queryClient.resetQueries(filters);
+  }
+};

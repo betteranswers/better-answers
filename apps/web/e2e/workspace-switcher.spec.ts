@@ -1,6 +1,6 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
-import { ALL_WORKSPACES } from "@/app/words.ts";
+import { ALL_WORKSPACES, FAILED_SCREEN, JUMP_TO, ROLE_UNREAD } from "@/app/words.ts";
 import { noLongerAMemberOf, PICK_REFUSED, SWITCHER_UNREAD } from "@/features/auth/refusal-words.ts";
 import { PICKER_WORDS } from "@/features/auth/workspace-words.ts";
 import { CONSOLE, HOMES } from "@/shared/navigation.ts";
@@ -25,7 +25,22 @@ const SWITCH_BUDGET_MS = 1000;
 
 const WORKSPACES_READ = "**/organization/list";
 
+/** Matched by name anywhere in the path, because the client batches its reads. */
+const readOf =
+  (procedure: string) =>
+  (url: URL): boolean =>
+    url.pathname.includes(procedure);
+
+const MEMBERSHIP_READ = readOf("session.membership");
+
+const MEMBERS_READ = readOf("members.list");
+
 const workspacesIn = (menu: Locator): Locator => menu.getByRole("menuitemradio");
+
+const switched = async (page: Page, from: string, to: string): Promise<void> => {
+  await switcherOf(page, from).click();
+  await workspacesIn(switcherMenuOf(page, from)).filter({ hasText: to }).click();
+};
 
 /** Standing while empty, so the regions are found before they have anything to say. */
 const saidInTheBand = (page: Page): Locator =>
@@ -64,7 +79,7 @@ const inTwoWorkspaces = async (
 };
 
 /** Held until the returned call, so the page meets the read while it is still pending. */
-const heldBack = async (page: Page, url: string): Promise<() => void> => {
+const heldBack = async (page: Page, url: Parameters<Page["route"]>[0]): Promise<() => void> => {
   let release = () => {};
   const released = new Promise<void>((resolve) => {
     release = resolve;
@@ -140,8 +155,7 @@ test("lands a switch on the role's home in that workspace", async ({ page, reque
     "Viewer",
   );
 
-  await switcherOf(page, first.name).click();
-  await workspacesIn(switcherMenuOf(page, first.name)).filter({ hasText: second.name }).click();
+  await switched(page, first.name, second.name);
 
   await landedAtHome(page, "Viewer");
   await expect(switcherOf(page, second.name)).toBeVisible();
@@ -159,6 +173,44 @@ test("takes All workspaces to the picker", async ({ page, request }) => {
 
   await expect(page).toHaveURL("/choose-workspace");
   await expect(page.getByRole("heading", { level: 1, name: PICKER_WORDS.heading })).toBeVisible();
+});
+
+test("drops the left workspace's members when All workspaces picks another", async ({
+  page,
+  request,
+}) => {
+  const { first, second } = await inTwoWorkspaces(page, request, {
+    first: "Esk Castings",
+    second: "Derwent Castings",
+  });
+  await aMemberOnlyOf(request, first.workspaceId, "Only In Esk");
+  await aMemberOnlyOf(request, second.workspaceId, "Only In Derwent");
+  await page.reload();
+  await expect(memberButton(page, "Only In Esk")).toBeVisible();
+  // Held, so whatever the screen draws before the new workspace's list lands is on show.
+  const release = await heldBack(page, MEMBERS_READ);
+
+  await switcherOf(page, first.name).click();
+  await switcherMenuOf(page, first.name).getByRole("menuitem", { name: ALL_WORKSPACES }).click();
+  await page.getByRole("button", { name: second.name, exact: true }).click();
+
+  await expect(switcherOf(page, second.name)).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`${HOMES.Admin.path}$`));
+  await expect(memberButton(page, "Only In Esk"), "drew the left workspace's members").toHaveCount(
+    0,
+  );
+  await page.getByRole("banner").getByRole("button", { name: JUMP_TO.name }).click();
+  const jumpTo = page.getByRole("dialog", { name: JUMP_TO.name });
+  await jumpTo.getByRole("combobox", { name: JUMP_TO.name }).fill("Only In Esk");
+  await expect(jumpTo.getByRole("status")).toHaveText(JUMP_TO.membersLoading);
+  await expect(
+    jumpTo.getByRole("option", { name: /Only In Esk/ }),
+    "jump-to offered the left workspace's members",
+  ).toHaveCount(0);
+
+  release();
+  await page.keyboard.press("Escape");
+  await expect(memberButton(page, "Only In Derwent")).toBeVisible();
 });
 
 test("says it reads the list, filling the open menu", async ({
@@ -225,12 +277,67 @@ test("says an unanswered switch in the band, keeping the screen", async ({ page,
   });
   await page.route("**/organization/set-active", (route) => route.abort());
 
-  await switcherOf(page, first.name).click();
-  await workspacesIn(switcherMenuOf(page, first.name)).filter({ hasText: second.name }).click();
+  await switched(page, first.name, second.name);
 
   await expect(refusedInTheBand(page)).toHaveText(sentenceOf(PICK_REFUSED));
   await expect(switcherOf(page, first.name)).toBeFocused();
   await expect(page).toHaveURL(new RegExp(`${HOMES.Admin.path}$`));
+});
+
+test("drops the left workspace's name when the membership read fails", async ({
+  page,
+  request,
+}) => {
+  const { first, second } = await inTwoWorkspaces(page, request, {
+    first: "Calder Wireworks",
+    second: "Spen Wireworks",
+  });
+  await page.route(MEMBERSHIP_READ, (route) => route.abort());
+
+  await switched(page, first.name, second.name);
+
+  // The switch's read and then the shell's each ask again twice before they give up.
+  await expect(switcherOf(page, first.name), "the band still names the workspace left").toHaveCount(
+    0,
+    { timeout: 15_000 },
+  );
+  await expect(page.getByRole("heading", { level: 1, name: FAILED_SCREEN.heading })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.getByRole("main").getByRole("alert")).toContainText(ROLE_UNREAD);
+
+  await page.unroute(MEMBERSHIP_READ);
+  await page.getByRole("button", { name: FAILED_SCREEN.retry }).click();
+  await landedAtHome(page, "Admin");
+  await expect(switcherOf(page, second.name)).toBeVisible();
+});
+
+test("drops the left workspace's name while the switch waits offline", async ({
+  page,
+  context,
+  request,
+}) => {
+  const { first, second } = await inTwoWorkspaces(page, request, {
+    first: "Hebden Wireworks",
+    second: "Ryburn Wireworks",
+  });
+  // Offline once the pick has landed, so the membership read is the one that waits.
+  await page.route("**/organization/set-active", async (route) => {
+    const answered = await route.fetch();
+    await context.setOffline(true);
+    await route.fulfill({ response: answered });
+  });
+
+  await switched(page, first.name, second.name);
+
+  await expect(saidInTheBand(page)).toHaveText(PICKER_WORDS.opening);
+  await expect(switcherOf(page, first.name), "the band still names the workspace left").toHaveCount(
+    0,
+  );
+
+  await context.setOffline(false);
+  await landedAtHome(page, "Admin");
+  await expect(switcherOf(page, second.name)).toBeVisible();
 });
 
 test("says an unread list, and how to read it again", async ({ page, request }) => {

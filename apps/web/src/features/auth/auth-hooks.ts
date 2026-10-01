@@ -263,7 +263,24 @@ const setActiveOrganizationOptions = () =>
     mutationFn: (input) => unwrap(authClient.organization.setActive(input)),
   });
 
-/** A pick drops the held membership and marks the held session and workspace list stale. */
+/** Every read but the person's own: their session, their list of workspaces and `session.*`. */
+const aboutTheWorkspace = (api: ApiProxy) => {
+  const theirOwn = [{ queryKey: AUTH_KEYS.all }, api.session.pathFilter()];
+  return (query: Query) => !theirOwn.some((filters) => matchQuery(filters, query));
+};
+
+/**
+ * Some reads, such as the members, name no workspace in their key, so a held answer is the left
+ * workspace's.
+ */
+const forgetTheWorkspaceLeft = (queryClient: QueryClient, api: ApiProxy) => {
+  queryClient.removeQueries({ predicate: aboutTheWorkspace(api) });
+};
+
+/**
+ * A pick drops the held membership and every read of the workspace left, and marks the held
+ * session and workspace list stale.
+ */
 export const useSetActiveOrganization = () => {
   const queryClient = useQueryClient();
   const api = useTRPC();
@@ -271,6 +288,7 @@ export const useSetActiveOrganization = () => {
     ...setActiveOrganizationOptions(),
     onSuccess: () => {
       forgetMembership(queryClient, api);
+      forgetTheWorkspaceLeft(queryClient, api);
       return Promise.all([
         queryClient.invalidateQueries({ queryKey: AUTH_KEYS.session }),
         queryClient.invalidateQueries({ queryKey: AUTH_KEYS.workspaces }),
@@ -287,13 +305,10 @@ export const refusedForNoMembership = (refused: BetterFetchError | null): boolea
 
 export type SwitchedTo = { readonly id: string; readonly name: string };
 
-/** Every read but the person's own: their session, their list of workspaces and `session.*`. */
-const aboutTheWorkspace = (api: ApiProxy) => {
-  const theirOwn = [{ queryKey: AUTH_KEYS.all }, api.session.pathFilter()];
-  return (query: Query) => !theirOwn.some((filters) => matchQuery(filters, query));
-};
-
-/** The membership is read again in place, not dropped, so the band never blanks between the two. */
+/**
+ * The membership is read again in place, not dropped, so the band blanks between the two only
+ * when that read fails or waits.
+ */
 export const useSwitchWorkspace = () => {
   const queryClient = useQueryClient();
   const api = useTRPC();
@@ -302,7 +317,7 @@ export const useSwitchWorkspace = () => {
     mutationFn: (workspace) =>
       unwrap(authClient.organization.setActive({ organizationId: workspace.id })),
     onSuccess: async () => {
-      queryClient.removeQueries({ predicate: aboutTheWorkspace(api) });
+      forgetTheWorkspaceLeft(queryClient, api);
       await rereadMembership(queryClient, api);
       void queryClient.invalidateQueries({ queryKey: AUTH_KEYS.session });
       await navigate({ href: "/", replace: true });
