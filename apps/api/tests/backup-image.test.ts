@@ -542,6 +542,8 @@ const fenced = (script: string, step: string): string => {
   return body;
 };
 
+const NOTHING_LISTENS = "postgresql://restore@127.0.0.1:9/betteranswers";
+
 /** As both restores run their git step: as root, `mktemp -d`'s directories, `init`'s git store. */
 const restoringTheGitStore = String.raw`
 set -euo pipefail
@@ -579,6 +581,8 @@ restore production bash -c "$PRODUCTION_STEP"
 restore drill bash -c "$DRILL_STEP"
 restore production-unlisted RCLONE_CONFIG_DUMPS_REMOTE=/nowhere bash -c "$PRODUCTION_STEP"
 restore drill-unlisted RCLONE_CONFIG_DUMPS_REMOTE=/nowhere bash -c "$DRILL_STEP"
+restore production-unread DATABASE_URL=${NOTHING_LISTENS} bash -c "$PRODUCTION_STEP"
+restore drill-unread STAGING_DATABASE_URL=${NOTHING_LISTENS} bash -c "$DRILL_STEP"
 `;
 
 interface Seeded {
@@ -701,6 +705,23 @@ describe.skipIf(nothingToProbeHere)("the restores' git store step", () => {
           "root ran git 0",
           "owned by another uid 0",
           `${seeded.bundled} no repository`,
+          `${seeded.neverWritten} no repository`,
+        ],
+      });
+    },
+  );
+
+  it.each(["production", "drill"])(
+    "%s: stops at a failed workspace read, initing no repository",
+    (restore) => {
+      expect(stateAfter(`${restore}-unread`)).toMatchObject({
+        state: [
+          "ran 2",
+          "work 700",
+          "decrypted bundles left 0",
+          "root ran git 0",
+          "owned by another uid 0",
+          `${seeded.bundled} refs/heads/main refs/heads/main`,
           `${seeded.neverWritten} no repository`,
         ],
       });
