@@ -4,7 +4,7 @@ import { serve } from "@hono/node-server";
 
 import { hostnameOfUrl, originOfUrl } from "../src/ingress/hostnames.ts";
 import { PRODUCT_NAME } from "../src/product-name.ts";
-import { startApp } from "./harness.ts";
+import { codeIn, startApp } from "./harness.ts";
 
 const PORT = 3200;
 const LOOPBACK_URL = `http://127.0.0.1:${PORT}`;
@@ -43,7 +43,7 @@ const app = await startApp({
   publicUrl,
   hostnames,
   onEmail: (message) => {
-    const code = /\b(\d{6})\b/.exec(message.text)?.[1];
+    const code = codeIn(message);
     say("");
     say(`  A code was sent to ${message.to}`);
     say(`  ${code ?? message.text}`);
