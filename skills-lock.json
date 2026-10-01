@@ -247,6 +247,12 @@
       "skillPath": "skills/repo-quality-sweep/SKILL.md",
       "computedHash": "09825ce8212ac56c75a6093bb1620a4b6ce0f8a33f03061302b3805a6a3164f6"
     },
+    "security-audit": {
+      "source": "cloudflare/security-audit-skill",
+      "sourceType": "github",
+      "skillPath": "skills/security-audit/SKILL.md",
+      "computedHash": "98b97aad2873b3b9a8e064007c25e7827b493ba27fda8bfbdb41dab586767973"
+    },
     "server-setup": {
       "source": "trpc/trpc",
       "sourceType": "github",
