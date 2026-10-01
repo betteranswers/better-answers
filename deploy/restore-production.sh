@@ -80,7 +80,9 @@ if [ "${git}" = yes ]; then
   # >>> the git store
   # The api's uid runs git, so the store holds no file of root's. It cannot enter WORK, which holds the decrypted dump.
   chown 1000:1000 "${BUNDLES}"
-  for ws in $(rclone lsf --dirs-only "dumps:${BACKUP_DUMPS_BUCKET}/git/" | tr -d '/\r'); do
+  # Read before the loop: `for` ignores a failed listing, and the init below would leave every workspace empty.
+  bundled=$(rclone lsf --dirs-only "dumps:${BACKUP_DUMPS_BUCKET}/git/" | tr -d '/\r')
+  for ws in ${bundled}; do
     b=$(rclone lsf "dumps:${BACKUP_DUMPS_BUCKET}/git/${ws}/" | sort | tail -n1 | tr -d '\r')
     rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/git/${ws}/${b}" "/work/${ws}.bundle.age"
     tool age -d -i /run/age.key -o "/work/${ws}.bundle" "/work/${ws}.bundle.age"

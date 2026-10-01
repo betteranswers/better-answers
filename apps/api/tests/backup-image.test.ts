@@ -554,26 +554,31 @@ mkdir -p "/buckets/dumps/git/$BUNDLED"
 age -r "$(age-keygen -y /run/age.key)" -o "/buckets/dumps/git/$BUNDLED/$BUNDLED-20260930T020017Z.bundle.age" /tmp/bundle
 as_the_api() { HOME=/tmp setpriv --reuid=${API_UID} --regid=${API_UID} --clear-groups "$@"; }
 restore() {
+  local name=$1
+  shift
   rm -rf /data/git /work /bundles
   install -d -o ${API_UID} -g ${API_UID} /data/git
   mkdir -m 700 /work /bundles
   : > /tmp/root-ran-git
   ran=0
-  bash -c "$2" > /tmp/said 2>&1 || ran=$?
-  while IFS= read -r line; do printf '%s\tsaid %s\n' "$1" "$line"; done < /tmp/said
-  printf '%s\tran %s\n' "$1" "$ran"
-  printf '%s\twork %s\n' "$1" "$(stat -c %a /work)"
-  printf '%s\tdecrypted bundles left %s\n' "$1" "$(find /work /bundles -name '*.bundle' | wc -l)"
-  printf '%s\troot ran git %s\n' "$1" "$(wc -l < /tmp/root-ran-git)"
-  printf '%s\towned by another uid %s\n' "$1" "$(find /data/git ! -uid ${API_UID} -o ! -gid ${API_UID} | wc -l)"
+  env "$@" > /tmp/said 2>&1 || ran=$?
+  while IFS= read -r line; do printf '%s\tsaid %s\n' "$name" "$line"; done < /tmp/said
+  printf '%s\tran %s\n' "$name" "$ran"
+  printf '%s\twork %s\n' "$name" "$(stat -c %a /work)"
+  printf '%s\tdecrypted bundles left %s\n' "$name" "$(find /work /bundles -name '*.bundle' | wc -l)"
+  printf '%s\troot ran git %s\n' "$name" "$(wc -l < /tmp/root-ran-git)"
+  printf '%s\towned by another uid %s\n' "$name" "$(find /data/git ! -uid ${API_UID} -o ! -gid ${API_UID} | wc -l)"
   for ws in "$BUNDLED" "$NEVER_WRITTEN"; do
+    if [ ! -d "/data/git/$ws.git" ]; then printf '%s\t%s no repository\n' "$name" "$ws"; continue; fi
     refs=$(as_the_api git -C "/data/git/$ws.git" for-each-ref --format='%(refname)' || true)
     [ -n "$refs" ] || refs="no ref"
-    printf '%s\t%s %s %s\n' "$1" "$ws" "$(as_the_api git -C "/data/git/$ws.git" symbolic-ref HEAD || true)" "$refs"
+    printf '%s\t%s %s %s\n' "$name" "$ws" "$(as_the_api git -C "/data/git/$ws.git" symbolic-ref HEAD || true)" "$refs"
   done
 }
-restore production "$PRODUCTION_STEP"
-restore drill "$DRILL_STEP"
+restore production bash -c "$PRODUCTION_STEP"
+restore drill bash -c "$DRILL_STEP"
+restore production-unlisted RCLONE_CONFIG_DUMPS_REMOTE=/nowhere bash -c "$PRODUCTION_STEP"
+restore drill-unlisted RCLONE_CONFIG_DUMPS_REMOTE=/nowhere bash -c "$DRILL_STEP"
 `;
 
 interface Seeded {
@@ -682,6 +687,23 @@ describe.skipIf(nothingToProbeHere)("the restores' git store step", () => {
       expect(stateAfter(restore).state.at(-1)).toBe(
         `${seeded.neverWritten} refs/heads/main no ref`,
       );
+    },
+  );
+
+  it.each(["production", "drill"])(
+    "%s: stops at a failed bundle listing, making no repository",
+    (restore) => {
+      expect(stateAfter(`${restore}-unlisted`)).toMatchObject({
+        state: [
+          "ran 3",
+          "work 700",
+          "decrypted bundles left 0",
+          "root ran git 0",
+          "owned by another uid 0",
+          `${seeded.bundled} no repository`,
+          `${seeded.neverWritten} no repository`,
+        ],
+      });
     },
   );
 });

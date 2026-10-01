@@ -114,7 +114,9 @@ say "## 4 git store — one bare repository per workspace from its latest bundle
 # >>> the git store
 # The api's uid runs git, so the store holds no file of root's. It cannot enter WORK, which holds the decrypted dump.
 chown 1000:1000 "${BUNDLES}"
-for ws in $(rclone lsf --dirs-only "dumps:${BACKUP_DUMPS_BUCKET}/git/" | tr -d /); do
+# Read before the loop: `for` ignores a failed listing, and the init below would leave every workspace empty.
+bundled=$(rclone lsf --dirs-only "dumps:${BACKUP_DUMPS_BUCKET}/git/" | tr -d /)
+for ws in ${bundled}; do
   b=$(rclone lsf "dumps:${BACKUP_DUMPS_BUCKET}/git/${ws}/" | sort | tail -n1)
   rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/git/${ws}/${b}" "${WORK}/${ws}.bundle.age"
   age -d -i "${BACKUP_AGE_IDENTITY_FILE}" -o "${BUNDLES}/${ws}.bundle" "${WORK}/${ws}.bundle.age"
