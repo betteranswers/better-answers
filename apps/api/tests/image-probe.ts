@@ -40,7 +40,13 @@ export interface ContainerRun {
   readonly command: readonly string[];
 
   readonly environment?: Readonly<Record<string, string>>;
+
+  /** Linux names the host for a container only when asked; Docker Desktop always does. */
+  readonly reachesTheHost?: boolean;
 }
+
+/** The name a container that `reachesTheHost` dials a port the host publishes on. */
+export const THE_HOST = "host.docker.internal";
 
 const BUILD_ALLOWANCE = 900_000;
 
@@ -206,8 +212,13 @@ export const readTheImage = async (
   container: ContainerRun,
 ): Promise<string> => {
   const toRun = await theImageToRun(image);
+  const host = container.reachesTheHost === true ? ["--add-host", `${THE_HOST}:host-gateway`] : [];
   try {
-    return await docker("run", ["--rm", toRun.id, ...container.command], container.environment);
+    return await docker(
+      "run",
+      ["--rm", ...host, toRun.id, ...container.command],
+      container.environment,
+    );
   } finally {
     await discardIfBuiltHere(toRun);
   }

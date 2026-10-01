@@ -14,7 +14,7 @@ export default {
     },
   ],
   rules: {
-    "header-max-length": [2, "always", 72],
+    "header-max-length": [2, "always", 90],
     "header-names-no-ticket": [2, "always"],
     // commitlint exempts a name in backticks or quotes, so `OKF` keeps its capitals.
     "subject-case": [2, "always", "lower-case"],

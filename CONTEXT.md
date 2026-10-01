@@ -684,6 +684,8 @@ to it by IRI and never restates it (ADR 0014).
 - **backup run** — one scheduled copy of one store, or one restore drill, as a row: what, when,
   outcome, size, where it landed, whether it holds personal data, when it expires, and — for a
   drill — how long the restore took.
+- **tier (of a backup)** — where a database dump is filed by when it was taken, which sets how long
+  it is kept: hourly, daily, weekly or monthly. It is not a *retention class*, which is a binding's.
 - **restore drill** — the monthly rehearsal that restores the platform from its copies into staging,
   proves it answers, records the recovery time, and wipes staging afterwards.
 - **staging** — a second copy of the platform on VPC 2 holding synthetic data only, brought up on

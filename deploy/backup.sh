@@ -30,6 +30,15 @@ verify() {
   local size; size=$(rclone size --json "$2" | jq -r .bytes)
   [ "${size}" = "$(stat -c %s "$1")" ]
 }
+# Before its first write a repository has no ref, which `bundle create` and `push --mirror` refuse.
+# An unreadable one is listed, to fail.
+repositories() {
+  local repo refs
+  while read -r repo; do
+    if refs=$(git -C "${repo}" for-each-ref --count=1) && [ -z "${refs}" ]; then continue; fi
+    printf '%s\n' "${repo}"
+  done < <(find "${GIT_STORE}" -mindepth 1 -maxdepth 1 -type d -name '*.git')
+}
 tier_for_now() {
   local h d w; h=$(date -u +%H) d=$(date -u +%d) w=$(date -u +%u)
   if [ "${h}" = 02 ]; then
@@ -75,7 +84,7 @@ job_bundles() {
       && rclone copyto --s3-no-check-bucket "${out}" "dumps:${BACKUP_DUMPS_BUCKET}/git/${ws}/${ws}-${NOW}.bundle.age" \
       && verify "${out}" "dumps:${BACKUP_DUMPS_BUCKET}/git/${ws}/${ws}-${NOW}.bundle.age" || rc=1
     rm -f "${STAGING}/${ws}.bundle" "${out}"
-  done < <(find "${GIT_STORE}" -mindepth 1 -maxdepth 1 -type d -name '*.git')
+  done < <(repositories)
   if [ "${rc}" -eq 0 ]; then record backup git "${started}" ok 0 "git/" true "now() + interval '30 days'"; else record backup git "${started}" failed 0 "" true NULL; fi
   return "${rc}"
 }
@@ -84,13 +93,14 @@ job_git_mirror() {
   local started rc=0; started=$(date -u +%FT%TZ)
   while read -r repo; do
     ws=$(basename "${repo}" .git)
-    ssh -o BatchMode=yes "${GIT_MIRROR_SSH_TARGET%%:*}" init-repo "${ws}" >/dev/null || { rc=1; continue; }
+    # -n: without it ssh forwards its stdin, the rest of this loop's list, and the loop ends.
+    ssh -n -o BatchMode=yes "${GIT_MIRROR_SSH_TARGET%%:*}" init-repo "${ws}" >/dev/null || { rc=1; continue; }
     if ! pushed=$(git -C "${repo}" push --mirror --porcelain "${GIT_MIRROR_SSH_TARGET}/${ws}.git"); then rc=1; continue; fi
     # The objects a rewrite replaced stay readable there through the reflog until pruned.
     if printf '%s\n' "${pushed}" | grep -qE '^[+-]'; then
-      ssh -o BatchMode=yes "${GIT_MIRROR_SSH_TARGET%%:*}" prune-repo "${ws}" >/dev/null || rc=1
+      ssh -n -o BatchMode=yes "${GIT_MIRROR_SSH_TARGET%%:*}" prune-repo "${ws}" >/dev/null || rc=1
     fi
-  done < <(find "${GIT_STORE}" -mindepth 1 -maxdepth 1 -type d -name '*.git')
+  done < <(repositories)
   if [ "${rc}" -eq 0 ]; then record backup git-mirror "${started}" ok 0 "mirror/" true NULL; else record backup git-mirror "${started}" failed 0 "" true NULL; fi
   return "${rc}"
 }

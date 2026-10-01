@@ -27,7 +27,7 @@ An issue is not the unit of build work: a plan in `docs/plans/` is. An issue tha
 
 Create it with `save_issue`: `team: better-answers`, `project: better-answers`, `state: Triage`, a priority, and one of the workspace's `product` labels: `feature`, `bug` or `improvement`.
 
-**The title** takes the commit's form (`docs/agents/workflow.md`, *The commit's form*): `type(scope): summary`, 72 characters at most, the summary imperative and lower-case with no full stop. The title names no issue id, and the detail goes in the description. Check one before it is written: `printf '%s\n' "<title>" | pnpm exec commitlint`.
+**The title** takes the commit's form (`docs/agents/workflow.md`, *The commit's form*): `type(scope): summary`, 90 characters at most, the summary imperative and lower-case with no full stop. The title names no issue id, and the detail goes in the description. Check one before it is written: `printf '%s\n' "<title>" | pnpm exec commitlint`.
 
 **The description** has these sections:
 

@@ -27,8 +27,8 @@ afterAll(() => {
 
 const GOOD_SUBJECT = "feat(devtools): take a change through the queue";
 const GOOD = `${GOOD_SUBJECT}\n\nA paragraph saying what changed and why.\n\nRefs: BA-11`;
-const OVER_THE_CEILING = `docs: say what changed${" and say it again".repeat(3)}`;
-const AT_THE_CEILING = OVER_THE_CEILING.slice(0, 72);
+const OVER_THE_CEILING = `docs: say what changed${" and say it again".repeat(5)}`;
+const AT_THE_CEILING = OVER_THE_CEILING.slice(0, 90);
 
 const REFUSED_BY_COMMITLINT = [
   {
@@ -44,7 +44,7 @@ const REFUSED_BY_COMMITLINT = [
     named: "[header-names-no-ticket]",
   },
   {
-    shape: "a subject over 72 characters",
+    shape: "a subject over 90 characters",
     directory: "over-the-ceiling",
     message: OVER_THE_CEILING,
     named: "[header-max-length]",
@@ -96,7 +96,7 @@ const commitIn = (root: string, message: string): SpawnSyncReturns<string> =>
 describe("lefthook's commit-msg hook over a throwaway repository", () => {
   it.each([
     { shape: "a Conventional message with a footer", directory: "hook-good", message: GOOD },
-    { shape: "a subject of 72 characters", directory: "hook-at", message: AT_THE_CEILING },
+    { shape: "a subject of 90 characters", directory: "hook-at", message: AT_THE_CEILING },
   ])("commits $shape", ({ directory, message }) => {
     const root = hooked(directory);
 

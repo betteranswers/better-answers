@@ -29,7 +29,7 @@ The forge is bare git repositories the api writes, one per workspace directly un
 - The api writes through the git binary in its own image, one commit per act, under a per-repository lock.
 - `openGit` (`packages/core/src/store/git/index.ts`) is the one place that checks the root: an absolute path to an existing directory, or the door refuses.
 - The worker reads a repository at a commit over a read-only bind mount.
-- The `backup` service bundles each repository nightly and pushes the mirror to VPC 2 over SSH. The mirror key (`deploy/mirror-shell.sh`) takes three verbs, `init-repo`, `git-receive-pack` and `prune-repo`, and refuses everything else. `deploy/backup.sh` calls `prune-repo` only after a push that replaced refs.
+- The `backup` service bundles each repository holding a ref nightly and pushes the mirror to VPC 2 over SSH. A repository with no ref, a workspace not yet written to, is neither bundled nor mirrored, because git refuses both; a restore makes it again, empty, for each workspace the restored database names. The mirror key (`deploy/mirror-shell.sh`) takes three verbs, `init-repo`, `git-receive-pack` and `prune-repo`, and refuses everything else. `deploy/backup.sh` calls `prune-repo` only after a push that replaced refs.
 
 v0.1 runs on two boxes of 4 vCPU · 4 GB · 120 GB:
 

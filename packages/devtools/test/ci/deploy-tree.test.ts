@@ -401,7 +401,7 @@ describe("the deploy tree", () => {
     const gitStore = at("git clone --quiet --bare");
     const seeded = at('"${DEPLOY_DIR}/seed-synthetic.sh" | tee -a "${REPORT}"');
     const repository = at(
-      `[ -d "/data/git/\${synthetic_workspace}.git" ] || sudo -u '#1000' git init --quiet --bare --initial-branch main "/data/git/\${synthetic_workspace}.git"`,
+      `[ -d "/data/git/\${synthetic_workspace}.git" ] || sudo -u "#\${API_UID}" git init --quiet --bare --initial-branch main "/data/git/\${synthetic_workspace}.git"`,
     );
     const apiUp = at("platform up -d --wait api");
 
@@ -512,6 +512,42 @@ describe("the deploy tree", () => {
       code: 1,
       output: "REHEARSAL FAILED: the seeded subject is in no table of the pre-erasure dump\n",
     });
+  });
+
+  it("restores the newest dump of any tier, with its globals", () => {
+    const newest = fencedIn(read("deploy/restore-drill.sh"), "the newest dump");
+    expect({ markers: newest !== undefined }).toEqual({ markers: true });
+
+    // As the bucket stands at 03:00 on the 1st, when the drill runs.
+    const listed: Readonly<Record<string, readonly string[]>> = {
+      hourly: [
+        "globals-20261001T010512Z.sql.age",
+        "pg-20261001T010512Z.dump.age",
+        "pg-20260930T230508Z.dump.age",
+      ],
+      daily: ["pg-20260930T020509Z.dump.age", "globals-20260930T020509Z.sql.age"],
+      weekly: ["pg-20260927T020511Z.dump.age"],
+      monthly: ["globals-20261001T020517Z.sql.age", "pg-20261001T020517Z.dump.age"],
+    };
+    const picked = (answering: readonly string[]): BashRun => {
+      const listing = Object.entries(listed)
+        .filter(([tier]) => answering.includes(tier))
+        .map(([tier, files]) => `"dumps:dumps/pg/${tier}/") printf '%s\\n' ${files.join(" ")} ;;`)
+        .join(" ");
+      return bashRan([
+        "BACKUP_DUMPS_BUCKET=dumps",
+        `rclone() { [ "$1" = lsf ] || return 2; case "$2" in ${listing} *) return 2 ;; esac; }`,
+        newest ?? "",
+        'say "${tier} ${latest} ${globals} ${dump_at}"',
+      ]);
+    };
+
+    expect(picked(Object.keys(listed))).toEqual({
+      code: 0,
+      output:
+        "monthly pg-20261001T020517Z.dump.age globals-20261001T020517Z.sql.age 20261001T020517Z\n",
+    });
+    expect(picked(["hourly", "daily", "weekly"])).toEqual({ code: 2, output: "" });
   });
 
   it("lets the mirror key run init-repo, git-receive-pack and prune-repo only", () => {

@@ -61,7 +61,7 @@ gh api graphql -F owner='{owner}' -F name='{repo}' -f query='
 
 ### The commit's form
 
-**Conventional Commits: a subject `type(scope): summary` of 72 characters at most. Then a blank line and the body: what changed and why, in plain prose. Then a blank line and the footer, `Refs: BA-N`, naming the Linear issue.**
+**Conventional Commits: a subject `type(scope): summary` of 90 characters at most. Then a blank line and the body: what changed and why, in plain prose. Then a blank line and the footer, `Refs: BA-N`, naming the Linear issue.**
 
 ```
 docs: say how a task from before linear is read

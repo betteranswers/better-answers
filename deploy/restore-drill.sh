@@ -20,7 +20,9 @@ export RCLONE_CONFIG_STAGINGSTORE_TYPE=s3 RCLONE_CONFIG_STAGINGSTORE_PROVIDER=Ot
        RCLONE_CONFIG_STAGINGSTORE_SECRET_ACCESS_KEY="${STAGING_OBJECTSTORE_ROOT_SECRET}"
 
 NOT_BUILT=3
-STAMP=$(date -u +%Y%m%dT%H%M%SZ); WORK=$(mktemp -d); REPORT="${WORK}/drill-${STAMP}.md"
+# The uid the api writes /data/git as: the stores stack's init hands the store to it.
+API_UID=1000
+STAMP=$(date -u +%Y%m%dT%H%M%SZ); WORK=$(mktemp -d); BUNDLES=$(mktemp -d); REPORT="${WORK}/drill-${STAMP}.md"
 started=$(date -u +%FT%TZ); T0=$(date +%s)
 say() { printf '%s %s\n' "$(date -u +%T)" "$*" | tee -a "${REPORT}"; }
 aside() { printf '%s %s\n' "$(date -u +%T)" "$*" | tee -a "${REPORT}" >&2; }
@@ -60,7 +62,7 @@ on_exit() { rc=$?
   wipe_staging && stores up -d init && platform run --rm migrate \
     && STAGING_DATABASE_URL="${STAGING_DATABASE_URL}" "${REPO_DIR}/deploy/seed-synthetic.sh" \
     && curl -fsS -m 10 -o /dev/null --data-raw "ok" "${HEALTHCHECKS_PING_URL_STAGING_WIPED}" || true
-  sudo rm -rf "${WORK}"
+  sudo rm -rf "${WORK}" "${BUNDLES}"
   exit "${rc}"
 }
 trap on_exit EXIT
@@ -75,12 +77,19 @@ fi
 # <<< workspace id
 
 say "## 0 wipe staging (starts from nothing)"; ensure_staging_network; wipe_staging
-say "## 1 postgres — latest daily dump"
-latest=$(rclone lsf "dumps:${BACKUP_DUMPS_BUCKET}/pg/daily/" | grep '^pg-' | sort | tail -n1)
-globals=$(rclone lsf "dumps:${BACKUP_DUMPS_BUCKET}/pg/daily/" | grep '^globals-' | sort | tail -n1)
+say "## 1 postgres — the newest dump in any tier"
+# >>> the newest dump
+# The 02:05 dump is filed weekly on a Sunday and monthly on the 1st, the drill's day.
+dumps=""
+for t in hourly daily weekly monthly; do
+  dumps+=$(rclone lsf "dumps:${BACKUP_DUMPS_BUCKET}/pg/${t}/" | { grep '^pg-' || true; } | sed "s|\$| ${t}|")$'\n'
+done
+read -r latest tier <<<"$(printf '%s' "${dumps}" | sort | tail -n1)"
 dump_at=$(echo "${latest}" | sed -E 's/^pg-([0-9T]+Z)\..*/\1/')
-rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/pg/daily/${globals}" "${WORK}/globals.sql.age"
-rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/pg/daily/${latest}" "${WORK}/pg.dump.age"
+globals="globals-${dump_at}.sql.age"
+# <<< the newest dump
+rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/pg/${tier}/${globals}" "${WORK}/globals.sql.age"
+rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/pg/${tier}/${latest}" "${WORK}/pg.dump.age"
 # Production's globals carry an ALTER ROLE that would reset the staging superuser's password.
 staging_owner=$(printf '%s' "${STAGING_DATABASE_URL}" | sed -E 's|^[a-z]+://([^:/@]+).*|\1|')
 age -d -i "${BACKUP_AGE_IDENTITY_FILE}" "${WORK}/globals.sql.age" | grep -v -E "^(CREATE|ALTER) ROLE \"?${staging_owner}\"?[ ;]" | psql "${STAGING_DATABASE_URL}" -q || true
@@ -104,12 +113,25 @@ say "## 3 object store — mirror back"
 rclone sync "dumps:${BACKUP_MIRROR_BUCKET}/objectstore/" stagingstore:/
 
 say "## 4 git store — one bare repository per workspace from its latest bundle (ADR 0024)"
-for ws in $(rclone lsf --dirs-only "dumps:${BACKUP_DUMPS_BUCKET}/git/" | tr -d /); do
+# >>> the git store
+# The api's uid runs git, so the store holds no file of root's. It cannot enter WORK, which holds the decrypted dump.
+chown "${API_UID}:${API_UID}" "${BUNDLES}"
+# Read before the loop: `for` ignores a failed listing, and the init below would leave every workspace empty.
+bundled=$(rclone lsf --dirs-only "dumps:${BACKUP_DUMPS_BUCKET}/git/" | tr -d /)
+for ws in ${bundled}; do
   b=$(rclone lsf "dumps:${BACKUP_DUMPS_BUCKET}/git/${ws}/" | sort | tail -n1)
   rclone copyto "dumps:${BACKUP_DUMPS_BUCKET}/git/${ws}/${b}" "${WORK}/${ws}.bundle.age"
-  age -d -i "${BACKUP_AGE_IDENTITY_FILE}" -o "${WORK}/${ws}.bundle" "${WORK}/${ws}.bundle.age"
-  sudo -u '#1000' git clone --quiet --bare "${WORK}/${ws}.bundle" "/data/git/${ws}.git"
+  age -d -i "${BACKUP_AGE_IDENTITY_FILE}" -o "${BUNDLES}/${ws}.bundle" "${WORK}/${ws}.bundle.age"
+  chown "${API_UID}:${API_UID}" "${BUNDLES}/${ws}.bundle"
+  sudo -u "#${API_UID}" git clone --quiet --bare "${BUNDLES}/${ws}.bundle" "/data/git/${ws}.git"
+  rm -f "${BUNDLES}/${ws}.bundle"
 done
+# The nightly bundles no repository without a ref, so a workspace not yet written to has none.
+workspaces=$(psql "${STAGING_DATABASE_URL}" -X -At -c 'select id from workspace')
+for ws in ${workspaces}; do
+  [ -d "/data/git/${ws}.git" ] || sudo -u "#${API_UID}" git init --quiet --bare --initial-branch main "/data/git/${ws}.git"
+done
+# <<< the git store
 
 say "## 5 REPLAY ERASURES completed after the dump (ADR 0020 — beyond use, made honest)"
 platform run --rm --no-deps api pnpm --silent ops replay-erasures --since "${dump_at}" | tee -a "${REPORT}"
@@ -117,7 +139,7 @@ platform run --rm --no-deps api pnpm --silent ops replay-erasures --since "${dum
 say "## 5b the synthetic fixture joins the restored copy: its workspace's rows, chunk partition and an empty repository"
 # No production dump holds it, and it is the one workspace the drill may always rebuild, seed a subject into and erase.
 STAGING_DATABASE_URL="${STAGING_DATABASE_URL}" "${DEPLOY_DIR}/seed-synthetic.sh" | tee -a "${REPORT}"
-[ -d "/data/git/${synthetic_workspace}.git" ] || sudo -u '#1000' git init --quiet --bare --initial-branch main "/data/git/${synthetic_workspace}.git"
+[ -d "/data/git/${synthetic_workspace}.git" ] || sudo -u "#${API_UID}" git init --quiet --bare --initial-branch main "/data/git/${synthetic_workspace}.git"
 
 platform up -d --wait api worker
 say "api up — RTO so far $(( ( $(date +%s) - T0 ) / 60 )) min"
@@ -158,7 +180,7 @@ for tier in hourly daily weekly monthly; do printf '%s: %s copies\n' "${tier}" "
 if [ $(( $(date +%-m) % 3 )) -eq 0 ]; then
   say "## 10 erasure rehearsal on a synthetic subject — the proof that an erasure erases (ADR 0020, 0022; ticket 24)"
   ws_repo="/data/git/${DRILL_WORKSPACE}.git"
-  ws_git() { sudo -u '#1000' git -C "${ws_repo}" "$@"; }
+  ws_git() { sudo -u "#${API_UID}" git -C "${ws_repo}" "$@"; }
   commits_before_seed=$({ ws_git rev-list --all 2>/dev/null || true; } | sort)
 
   # 3 alone means no tables; a wider guard would write that over a refused seed.

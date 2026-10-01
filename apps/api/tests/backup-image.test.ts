@@ -6,9 +6,15 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { parse } from "yaml";
 import { z } from "zod";
 
+import { type ObjectStore, objectStoreForSuite } from "@better-answers/core/testing/objects";
 import { repositoryRoot } from "@better-answers/devtools/paths";
 import { legFor } from "@better-answers/devtools/workflows";
 import { POSTGRES_IMAGE } from "@better-answers/schema";
+import {
+  type MigratedPostgres,
+  openMigratedPostgres,
+  testData,
+} from "@better-answers/schema/testing";
 
 import {
   fileFromTheWorkspace,
@@ -18,6 +24,7 @@ import {
   readTheImage,
   type StartedContainer,
   startTheImage,
+  THE_HOST,
 } from "./image-probe.ts";
 
 const read = (relative: string): string =>
@@ -407,24 +414,64 @@ describe("the backup jobs' allow-list", () => {
 });
 
 const WORKSPACE = "ws-probe";
+/** A job that reads one repository and loses the rest of its list leaves this one out. */
+const SECOND_WORKSPACE = "ws-second";
+/** As `provision-workspace` leaves a workspace before its first write: a repository with no ref. */
+const UNWRITTEN_WORKSPACE = "ws-unwritten";
+/** Its HEAD is gone, so git finds no repository there. */
+const UNREADABLE_WORKSPACE = "ws-unreadable";
 const LEFT_BY_A_FAILED_RUN = "/staging/globals-20260904T143652Z.sql.age";
 /** The stores stack's init hands /data/git to this uid, the one the api writes as. */
 const API_UID = 1000;
 
-const nightlyRun = (script: string): string => String.raw`
+/** As ssh to VPC 2: runs the mirror's forced command, and drains stdin to it unless `-n`. */
+const SSH_STAND_IN = String.raw`#!/usr/bin/env bash
+forwarded=yes
+while [ "$#" -gt 1 ]; do
+  case "$1" in
+    -n) forwarded=no; shift ;;
+    -o|-p|-i|-l) shift 2 ;;
+    -*) shift ;;
+    *) break ;;
+  esac
+done
+shift
+[ "$forwarded" = yes ] || exec < /dev/null
+SSH_ORIGINAL_COMMAND="$*" /usr/local/bin/mirror-shell /data/mirror
+status=$?
+cat > /dev/null
+exit "$status"
+`;
+
+const AN_UNREADABLE_REPOSITORY = String.raw`
+git init --quiet --bare "/data/git/${UNREADABLE_WORKSPACE}.git"
+rm "/data/git/${UNREADABLE_WORKSPACE}.git/HEAD"
+`;
+
+const nightlyRun = (script: string, alsoInTheStore = ""): string => String.raw`
 set -eu
-mkdir -p /data/git /staging /objectstore/uploads /buckets
+mkdir -p /data/git /data/mirror /staging /objectstore/uploads /buckets
 git init --quiet --initial-branch=main /tmp/workspace
 git -C /tmp/workspace -c user.name=probe -c user.email=probe@example.invalid \
   commit --quiet --allow-empty --message "a workspace's first commit"
-git clone --quiet --bare /tmp/workspace "/data/git/${WORKSPACE}.git"
+for written in ${WORKSPACE} ${SECOND_WORKSPACE}; do
+  git clone --quiet --bare /tmp/workspace "/data/git/$written.git"
+done
+git init --quiet --bare --initial-branch=main "/data/git/${UNWRITTEN_WORKSPACE}.git"
+${alsoInTheStore}
 chown -R ${API_UID}:${API_UID} /data/git
+printf '%s' "$MIRROR_SHELL" > /usr/local/bin/mirror-shell
+printf '%s' "$SSH_STAND_IN" > /usr/local/bin/ssh
+chmod 0755 /usr/local/bin/mirror-shell /usr/local/bin/ssh
 printf 'an upload\n' > /objectstore/uploads/one
 touch -d '2 days ago' "${LEFT_BY_A_FAILED_RUN}"
 age-keygen -o /tmp/identity 2>/dev/null
 BACKUP_AGE_RECIPIENT=$(age-keygen -y /tmp/identity) "${script}" nightly > /tmp/nightly.log 2>&1 || true
 while IFS= read -r line; do printf 'log\t%s\n' "$line"; done < /tmp/nightly.log
 find /buckets /staging -type f | while IFS= read -r file; do printf 'file\t%s\n' "$file"; done
+find /data/mirror -mindepth 1 -maxdepth 1 -name '*.git' | sort | while IFS= read -r mirror; do
+  printf 'mirrored\t%s %s\n' "$(basename "$mirror" .git)" "$(git -C "$mirror" for-each-ref --format='%(refname)')"
+done
 `;
 
 const NIGHTLY_ENVIRONMENT = {
@@ -438,11 +485,22 @@ const NIGHTLY_ENVIRONMENT = {
   GIT_MIRROR_SSH_TARGET: "mirror@127.0.0.1:/data/mirror",
   HEALTHCHECKS_PING_URL_PG_HOURLY: "http://127.0.0.1:9/pg-hourly",
   HEALTHCHECKS_PING_URL_NIGHTLY: "http://127.0.0.1:9/nightly",
+  MIRROR_SHELL: read("deploy/mirror-shell.sh"),
+  SSH_STAND_IN,
 };
+
+const taggedIn = (lines: readonly string[], tag: string): readonly string[] =>
+  lines.filter((line) => line.startsWith(`${tag}\t`)).map((line) => line.slice(tag.length + 1));
+
+const bundleOf = (workspace: string): unknown =>
+  expect.stringMatching(
+    new RegExp(`^/buckets/dumps/git/${workspace}/${workspace}-\\d{8}T\\d{6}Z\\.bundle\\.age$`),
+  );
 
 describe.skipIf(nothingToProbeHere)("the backup image's nightly job", () => {
   let log: readonly string[] = [];
   let files: readonly string[] = [];
+  let mirrored: readonly string[] = [];
 
   beforeAll(async () => {
     const lines = (
@@ -451,24 +509,23 @@ describe.skipIf(nothingToProbeHere)("the backup image's nightly job", () => {
         environment: NIGHTLY_ENVIRONMENT,
       })
     ).split("\n");
-    const tagged = (tag: string): readonly string[] =>
-      lines.filter((line) => line.startsWith(`${tag}\t`)).map((line) => line.slice(tag.length + 1));
-    log = tagged("log");
-    files = tagged("file");
+    log = taggedIn(lines, "log");
+    files = taggedIn(lines, "file");
+    mirrored = taggedIn(lines, "mirrored");
   }, IMAGE_PROBE_ALLOWANCE);
 
-  it("writes, verifies and uploads a bundle of an api-owned repository", () => {
-    const bundles = files.filter((file) => file.startsWith(`/buckets/dumps/git/${WORKSPACE}/`));
+  it("bundles each api-owned repository with a ref, skipping one without", () => {
+    const bundles = files.filter((file) => file.startsWith("/buckets/dumps/git/")).sort();
 
     // The log rides along so a failure shows where the run stopped.
     expect({ bundles, log }).toMatchObject({
-      bundles: [
-        expect.stringMatching(
-          new RegExp(
-            `^/buckets/dumps/git/${WORKSPACE}/${WORKSPACE}-\\d{8}T\\d{6}Z\\.bundle\\.age$`,
-          ),
-        ),
-      ],
+      bundles: [bundleOf(WORKSPACE), bundleOf(SECOND_WORKSPACE)],
+    });
+  });
+
+  it("mirrors each repository with a ref, not only the first", () => {
+    expect({ mirrored, log }).toMatchObject({
+      mirrored: [`${WORKSPACE} refs/heads/main`, `${SECOND_WORKSPACE} refs/heads/main`],
     });
   });
 
@@ -476,14 +533,273 @@ describe.skipIf(nothingToProbeHere)("the backup image's nightly job", () => {
     expect(files.filter((file) => file.startsWith("/staging/"))).toEqual([]);
   });
 
-  it("logs nothing of the workspace when its bundle passes", () => {
-    expect(log.filter((line) => line.includes(WORKSPACE))).toEqual([]);
+  it("logs nothing of the workspaces when their copies pass", () => {
+    const workspaces = [WORKSPACE, SECOND_WORKSPACE, UNWRITTEN_WORKSPACE];
+
+    expect(log.filter((line) => workspaces.some((workspace) => line.includes(workspace)))).toEqual(
+      [],
+    );
   });
 
-  it("ends its log with the words its ping carries", () => {
-    // No mirror host answers here, so the run fails at the push, after the bundles.
-    expect(log.at(-1)).toBe("backup.sh nightly: fail bytes=0 took=0");
+  it("ends its log with the ok its ping carries", () => {
+    expect(log.at(-1)).toMatch(/^backup\.sh nightly: ok bytes=0 took=\d+$/);
   });
+});
+
+describe.skipIf(nothingToProbeHere)(
+  "the backup image's nightly job, given a broken repository",
+  () => {
+    let log: readonly string[] = [];
+
+    beforeAll(async () => {
+      const lines = (
+        await readTheImage(backupImage(), {
+          command: ["bash", "-c", nightlyRun(scriptPath(), AN_UNREADABLE_REPOSITORY)],
+          environment: NIGHTLY_ENVIRONMENT,
+        })
+      ).split("\n");
+      log = taggedIn(lines, "log");
+    }, IMAGE_PROBE_ALLOWANCE);
+
+    it("ends its log with the fail its ping carries", () => {
+      expect(log.at(-1)).toBe("backup.sh nightly: fail bytes=0 took=0");
+    });
+  },
+);
+
+const fenced = (script: string, step: string): string => {
+  const body = read(script).split(`# >>> ${step}\n`)[1]?.split(`# <<< ${step}`)[0];
+  if (body === undefined) throw new Error(`${script} no longer fences the lines that ${step}`);
+  return body;
+};
+
+const NOTHING_LISTENS = "postgresql://restore@127.0.0.1:9/betteranswers";
+/** A prefix in the dumps bucket that holds no object, as before any workspace's first bundle. */
+const NOTHING_BUNDLED = "before-the-first-bundle";
+const NOT_THE_KEY = "a-rotated-secret";
+
+/** As both restores run their git step: as root, `mktemp -d`'s directories, `init`'s git store. */
+const restoringTheGitStore = String.raw`
+set -euo pipefail
+git init --quiet --initial-branch=main /tmp/workspace
+git -C /tmp/workspace -c user.name=probe -c user.email=probe@example.invalid \
+  commit --quiet --allow-empty --message "a workspace's first commit"
+git -C /tmp/workspace bundle create --quiet /tmp/bundle --all
+age-keygen -o /run/age.key 2>/dev/null
+age -r "$(age-keygen -y /run/age.key)" -o /tmp/bundle.age /tmp/bundle
+rclone copyto --s3-no-check-bucket /tmp/bundle.age "dumps:$BACKUP_DUMPS_BUCKET/git/$BUNDLED/$BUNDLED-20260930T020017Z.bundle.age"
+as_the_api() { HOME=/tmp setpriv --reuid=${API_UID} --regid=${API_UID} --clear-groups "$@"; }
+restore() {
+  local name=$1
+  shift
+  rm -rf /data/git /work /bundles
+  install -d -o ${API_UID} -g ${API_UID} /data/git
+  mkdir -m 700 /work /bundles
+  : > /tmp/root-ran-git
+  ran=0
+  env "$@" > /tmp/said 2>&1 || ran=$?
+  while IFS= read -r line; do printf '%s\tsaid %s\n' "$name" "$line"; done < /tmp/said
+  printf '%s\tran %s\n' "$name" "$ran"
+  printf '%s\twork %s\n' "$name" "$(stat -c %a /work)"
+  printf '%s\tdecrypted bundles left %s\n' "$name" "$(find /work /bundles -name '*.bundle' | wc -l)"
+  printf '%s\troot ran git %s\n' "$name" "$(wc -l < /tmp/root-ran-git)"
+  printf '%s\towned by another uid %s\n' "$name" "$(find /data/git ! -uid ${API_UID} -o ! -gid ${API_UID} | wc -l)"
+  for ws in "$BUNDLED" "$NEVER_WRITTEN"; do
+    if [ ! -d "/data/git/$ws.git" ]; then printf '%s\t%s no repository\n' "$name" "$ws"; continue; fi
+    refs=$(as_the_api git -C "/data/git/$ws.git" for-each-ref --format='%(refname)' || true)
+    [ -n "$refs" ] || refs="no ref"
+    printf '%s\t%s %s %s\n' "$name" "$ws" "$(as_the_api git -C "/data/git/$ws.git" symbolic-ref HEAD || true)" "$refs"
+  done
+}
+restore production bash -c "$PRODUCTION_STEP"
+restore drill bash -c "$DRILL_STEP"
+restore production-unbundled BACKUP_DUMPS_BUCKET="$BACKUP_DUMPS_BUCKET/${NOTHING_BUNDLED}" bash -c "$PRODUCTION_STEP"
+restore drill-unbundled BACKUP_DUMPS_BUCKET="$BACKUP_DUMPS_BUCKET/${NOTHING_BUNDLED}" bash -c "$DRILL_STEP"
+restore production-unlisted RCLONE_CONFIG_DUMPS_SECRET_ACCESS_KEY=${NOT_THE_KEY} bash -c "$PRODUCTION_STEP"
+restore drill-unlisted RCLONE_CONFIG_DUMPS_SECRET_ACCESS_KEY=${NOT_THE_KEY} bash -c "$DRILL_STEP"
+restore production-unread DATABASE_URL=${NOTHING_LISTENS} bash -c "$PRODUCTION_STEP"
+restore drill-unread STAGING_DATABASE_URL=${NOTHING_LISTENS} bash -c "$DRILL_STEP"
+`;
+
+interface Seeded {
+  readonly bundled: string;
+  readonly neverWritten: string;
+}
+
+/** A port the host publishes, as a container that `reachesTheHost` dials it. */
+const seenFromTheImage = (address: string): string => {
+  const uri = new URL(address);
+  uri.hostname = THE_HOST;
+  return uri.toString();
+};
+
+/** The script's own line, so a uid other than `init`'s fails the sudo below. */
+const theApisUid = (script: string): string => {
+  const line = /^API_UID=\S+$/m.exec(read(script))?.[0];
+  if (line === undefined) throw new Error(`${script} no longer names the api's uid as API_UID`);
+  return line;
+};
+
+/** The image has no sudo, and a git the step's root shell runs itself is noted. */
+const AS_THE_HOSTS_RUN_IT = [
+  `sudo() { [ "$1 $2" = "-u #${API_UID}" ] || return 2; shift 2; HOME=/tmp setpriv --reuid=${API_UID} --regid=${API_UID} --clear-groups "$@"; }`,
+  'git() { printf "%s\\n" "$*" >> /tmp/root-ran-git; command git "$@"; }',
+];
+
+const restoreEnvironment = (
+  seeded: Seeded,
+  database: string,
+  dumps: ObjectStore,
+): Record<string, string> => ({
+  RCLONE_CONFIG_DUMPS_TYPE: "s3",
+  RCLONE_CONFIG_DUMPS_PROVIDER: "Other",
+  RCLONE_CONFIG_DUMPS_ENDPOINT: seenFromTheImage(dumps.endpoint),
+  RCLONE_CONFIG_DUMPS_REGION: dumps.region,
+  RCLONE_CONFIG_DUMPS_FORCE_PATH_STYLE: "true",
+  RCLONE_CONFIG_DUMPS_ACCESS_KEY_ID: dumps.accessKeyId,
+  RCLONE_CONFIG_DUMPS_SECRET_ACCESS_KEY: dumps.secretAccessKey,
+  BACKUP_DUMPS_BUCKET: dumps.bucket,
+  DATABASE_URL: database,
+  STAGING_DATABASE_URL: database,
+  BUNDLED: seeded.bundled,
+  NEVER_WRITTEN: seeded.neverWritten,
+  // As each script leaves them by its git step; production's `tool` runs in this image anyway.
+  PRODUCTION_STEP: [
+    "set -euo pipefail",
+    "WORK=/work BUNDLES=/bundles",
+    theApisUid("deploy/restore-production.sh"),
+    'tool() { "$@"; }',
+    ...AS_THE_HOSTS_RUN_IT,
+    fenced("deploy/restore-production.sh", "the git store"),
+  ].join("\n"),
+  DRILL_STEP: [
+    "set -euo pipefail",
+    "WORK=/work BUNDLES=/bundles BACKUP_AGE_IDENTITY_FILE=/run/age.key",
+    theApisUid("deploy/restore-drill.sh"),
+    ...AS_THE_HOSTS_RUN_IT,
+    fenced("deploy/restore-drill.sh", "the git store"),
+  ].join("\n"),
+});
+
+const seedTwoWorkspaces = async (database: MigratedPostgres): Promise<Seeded> => {
+  const client = await database.pool.connect();
+  try {
+    const data = testData(client);
+    return { bundled: (await data.workspace()).id, neverWritten: (await data.workspace()).id };
+  } finally {
+    client.release();
+  }
+};
+
+describe.skipIf(nothingToProbeHere)("the restores' git store step", () => {
+  const dumps = objectStoreForSuite();
+  let database: MigratedPostgres | undefined;
+  let seeded: Seeded = { bundled: "", neverWritten: "" };
+  let lines: readonly string[] = [];
+
+  beforeAll(async () => {
+    database = await openMigratedPostgres();
+    seeded = await seedTwoWorkspaces(database);
+    lines = (
+      await readTheImage(backupImage(), {
+        command: ["bash", "-c", restoringTheGitStore],
+        environment: restoreEnvironment(seeded, seenFromTheImage(database.connectionUri), dumps()),
+        reachesTheHost: true,
+      })
+    ).split("\n");
+  }, IMAGE_PROBE_ALLOWANCE);
+
+  afterAll(async () => {
+    await database?.stop();
+  });
+
+  const stateAfter = (restore: string) => {
+    const told = lines
+      .filter((line) => line.startsWith(`${restore}\t`))
+      .map((line) => line.slice(restore.length + 1));
+    return {
+      said: told.filter((line) => line.startsWith("said ")),
+      state: told.filter((line) => !line.startsWith("said ")),
+    };
+  };
+
+  it.each(["production", "drill"])(
+    "%s: clones each bundle as the api, keeping WORK closed",
+    (restore) => {
+      // What the step said rides along, so a failure shows where it stopped.
+      expect(stateAfter(restore)).toMatchObject({
+        state: [
+          "ran 0",
+          "work 700",
+          "decrypted bundles left 0",
+          "root ran git 0",
+          "owned by another uid 0",
+          `${seeded.bundled} refs/heads/main refs/heads/main`,
+          expect.any(String),
+        ],
+      });
+    },
+  );
+
+  it.each(["production", "drill"])(
+    "%s: inits an empty repository for an unbundled workspace",
+    (restore) => {
+      expect(stateAfter(restore).state.at(-1)).toBe(
+        `${seeded.neverWritten} refs/heads/main no ref`,
+      );
+    },
+  );
+
+  it.each(["production", "drill"])(
+    "%s: inits every workspace empty before any bundle exists",
+    (restore) => {
+      expect(stateAfter(`${restore}-unbundled`)).toMatchObject({
+        state: [
+          "ran 0",
+          "work 700",
+          "decrypted bundles left 0",
+          "root ran git 0",
+          "owned by another uid 0",
+          `${seeded.bundled} refs/heads/main no ref`,
+          `${seeded.neverWritten} refs/heads/main no ref`,
+        ],
+      });
+    },
+  );
+
+  it.each(["production", "drill"])(
+    "%s: stops at a failed bundle listing, making no repository",
+    (restore) => {
+      expect(stateAfter(`${restore}-unlisted`)).toMatchObject({
+        state: [
+          "ran 1",
+          "work 700",
+          "decrypted bundles left 0",
+          "root ran git 0",
+          "owned by another uid 0",
+          `${seeded.bundled} no repository`,
+          `${seeded.neverWritten} no repository`,
+        ],
+      });
+    },
+  );
+
+  it.each(["production", "drill"])(
+    "%s: stops at a failed workspace read, initing no repository",
+    (restore) => {
+      expect(stateAfter(`${restore}-unread`)).toMatchObject({
+        state: [
+          "ran 2",
+          "work 700",
+          "decrypted bundles left 0",
+          "root ran git 0",
+          "owned by another uid 0",
+          `${seeded.bundled} refs/heads/main refs/heads/main`,
+          `${seeded.neverWritten} no repository`,
+        ],
+      });
+    },
+  );
 });
 
 describe("the backup leg of the image job", () => {
