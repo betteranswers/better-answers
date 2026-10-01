@@ -10,6 +10,7 @@ import {
   NOT_A_MEMBER_ANSWERED,
   refusalToAMemberAt,
   refusalToAnotherWorkspacesAdmin,
+  refusalToTheAdmin,
   ROLE_FORBIDS_ANSWERED,
 } from "./people-refusals.ts";
 import {
@@ -495,6 +496,69 @@ describe("removing a member over tRPC", () => {
     expect(removed).toEqual({ personId: workspace.admin.id, role: "Admin" });
     expect(await refusalOfCall(api.members.list.query())).toMatchObject(NOT_A_MEMBER_ANSWERED);
     expect(await roleHeldBy(workspace.workspaceId, second.id)).toBe("Admin");
+  });
+});
+
+describe("a person's activity over tRPC", () => {
+  it("AE4: answers a role change by Hannah, to Priya", async () => {
+    const workspace = await app.provision();
+    const hannah = workspace.admin;
+    const priya = await app.person(undefined, "Priya Shah");
+    await app.addMember(workspace.workspaceId, priya.id, "Viewer");
+    const { api } = await webSignedIn(app, hannah.email);
+    await api.members.changeRole.mutate({ personId: priya.id, role: "Editor" });
+
+    const onHannahs = await api.members.activity.query({ personId: hannah.id });
+    const onPriyas = await api.members.activity.query({ personId: priya.id });
+
+    const lines = (page: typeof onHannahs) =>
+      page.events.map(({ act, subject, relation }) => [act, subject, relation]);
+    const priyaNamed = { kind: "person", displayName: "Priya Shah" };
+    expect(lines(onHannahs)).toEqual([["people.member.role_changed", priyaNamed, "by"]]);
+    expect(lines(onPriyas)).toEqual([["people.member.role_changed", priyaNamed, "to"]]);
+    expect(onPriyas.events[0]?.at).toMatch(ISO_INSTANT);
+    expect(onPriyas.nextCursor).toBeNull();
+  });
+
+  it("answers a person never seen here an empty stream", async () => {
+    const workspace = await app.provision();
+    const stranger = await app.person();
+    const { api } = await webSignedIn(app, workspace.admin.email);
+
+    const answered = await api.members.activity.query({ personId: stranger.id });
+
+    expect(answered).toEqual({ events: [], nextCursor: null });
+  });
+});
+
+const SOMEONE = "01J6WWWWWWWWWWWWWWWWWWWWWW";
+
+describe("what a person's activity refuses", () => {
+  it.each(["Editor", "Viewer"] as const)("refuses a member at %s, role-forbids", async (role) => {
+    const refused = await refusalToAMemberAt(app, role, (api) =>
+      api.members.activity.query({ personId: SOMEONE }),
+    );
+
+    expect(refused).toMatchObject(ROLE_FORBIDS_ANSWERED);
+  });
+
+  it("refuses an Admin of another workspace pointed at this one", async () => {
+    const refused = await refusalToAnotherWorkspacesAdmin(app, (api) =>
+      api.members.activity.query({ personId: SOMEONE }),
+    );
+
+    expect(refused).toMatchObject(NOT_A_MEMBER_ANSWERED);
+  });
+
+  it.each([
+    ["a person id that is no id", { personId: "not-an-id" }],
+    ["a cursor that is no event's id", { personId: SOMEONE, cursor: "not-an-id" }],
+  ])("refuses %s, malformed", async (_asked, input) => {
+    const refused = await refusalToTheAdmin(app, (api) => api.members.activity.query(input));
+
+    expect(refused).toMatchObject({
+      data: { httpStatus: 400, refusal: { word: "malformed", class: "malformed" } },
+    });
   });
 });
 

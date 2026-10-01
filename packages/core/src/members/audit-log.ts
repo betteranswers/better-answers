@@ -153,7 +153,6 @@ const eventOf = (
 /**
  * Each event of the principal's workspace with its actor, subject and ended grants named as they
  * stand now, reading each table once for all the rows.
- * @public U9
  */
 export const eventsNamed = async (
   principal: UserPrincipal,

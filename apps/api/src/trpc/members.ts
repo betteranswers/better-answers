@@ -24,6 +24,8 @@ import {
   listInvitations,
   listMembers,
   listWaitingRequests,
+  readActivity,
+  readActivityInput,
   readAuditLog,
   readAuditLogInput,
   removeFromGroup,
@@ -99,6 +101,7 @@ export const membersRouter = router({
   ),
   changeRole: mutationProcedure.input(parsedBy(changeRoleInput)).mutation(answeredBy(changeRole)),
   auditLog: queryProcedure.input(parsedBy(readAuditLogInput)).query(answeredBy(readAuditLog)),
+  activity: queryProcedure.input(parsedBy(readActivityInput)).query(answeredBy(readActivity)),
   invitations: queryProcedure.query(({ ctx }) =>
     crossing(ctx, listInvitations.name, listInvitations(ctx.principal, ctx.tx)),
   ),
