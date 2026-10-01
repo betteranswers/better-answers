@@ -1,11 +1,12 @@
 import { createMemoryHistory } from "@tanstack/react-router";
-import { cleanup, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
-import { goHome, RAIL, UNKNOWN_SCREEN } from "@/app/words.ts";
+import { goHome, JUMP_TO, RAIL, UNKNOWN_SCREEN } from "@/app/words.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
+import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import {
   EVERY_SURFACE,
   headingOf,
@@ -191,6 +192,36 @@ describe("the shell's regions", () => {
     expect(namesIn(rail())).toEqual(["Control Centre"]);
     expect(screen.getByRole("banner")).toBeDefined();
     expect(screen.queryByRole("navigation", { name: "Control Centre" })).toBeNull();
+  });
+});
+
+describe("jump to, while no role is held", () => {
+  it("is not offered in the band", async () => {
+    await openWithNoRoleAt("/people/members");
+
+    const band = within(screen.getByRole("banner"));
+    expect(band.queryByRole("button", { name: JUMP_TO.name })).toBeNull();
+  });
+
+  it("leaves its chord to the browser", async () => {
+    await openWithNoRoleAt("/people/members");
+
+    const unclaimed = fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+
+    expect(unclaimed).toBe(true);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("is left off the keystrokes list", async () => {
+    await openWithNoRoleAt("/people/members");
+
+    fireEvent.keyDown(document.body, { key: "?" });
+    const acts = [...screen.getByRole("dialog").querySelectorAll("dd")].map(
+      (each) => each.textContent,
+    );
+
+    expect(acts).toContain(KEYSTROKE_WORDS.showTheList);
+    expect(acts).not.toContain(JUMP_TO.name);
   });
 });
 

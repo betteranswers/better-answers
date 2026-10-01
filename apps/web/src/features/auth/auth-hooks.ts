@@ -205,8 +205,8 @@ export const useSetDisplayName = () => {
 };
 
 /**
- * A join points the session at the workspace joined, so the held session, membership and list of
- * workspaces are dropped before the shell reads them.
+ * A join points the session at the workspace joined, so what is held of the workspace left is
+ * dropped before the shell reads it.
  */
 export const useAcceptInvitation = () => {
   const api = useTRPC();
@@ -216,6 +216,7 @@ export const useAcceptInvitation = () => {
     api.person.acceptInvitation.mutationOptions({
       onSuccess: () => {
         forgetMembership(queryClient, api);
+        forgetTheWorkspaceLeft(queryClient, api);
         queryClient.removeQueries({ queryKey: AUTH_KEYS.session });
         queryClient.removeQueries({ queryKey: AUTH_KEYS.workspaces });
         void navigate(leavingFor(nextAfterJoining(pageQuery())));

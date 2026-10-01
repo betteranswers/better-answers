@@ -1,14 +1,14 @@
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AppClients } from "@/app/providers.tsx";
-import { FAILED_SCREEN, RAIL, UNKNOWN_SCREEN } from "@/app/words.ts";
+import { FAILED_SCREEN, goHome, RAIL, UNKNOWN_SCREEN } from "@/app/words.ts";
 import { PICKER_WORDS } from "@/features/auth/workspace-words.ts";
 import { ROLES } from "@/features/people/role-meanings.ts";
-import { HOMES, type Role } from "@/shared/navigation.ts";
+import { HOMES, INVITE_A_PERSON, type Role } from "@/shared/navigation.ts";
 
 import { appAt, openApp } from "./open-app.tsx";
-import { addressOf, answered, withTheApiDown } from "./stubbed-api.ts";
+import { addressOf, answered, answeringAs, withTheApiDown } from "./stubbed-api.ts";
 
 const A_MEMBERSHIP = {
   workspace: { id: "w", name: "Northern Tooling" },
@@ -61,6 +61,17 @@ const answering =
       ),
     );
   };
+
+/** The shell's one read of the membership is dropped; the frame's read after it answers. */
+const losingTheShellsRead = (role: Role) => {
+  const answer = answeringAs(role);
+  let lost = false;
+  return (input: string | URL | Request): Promise<Response> => {
+    if (lost || !addressOf(input).pathname.includes("session.membership")) return answer(input);
+    lost = true;
+    return Promise.reject(new TypeError("the request was dropped"));
+  };
+};
 
 const membershipAsks = () => asked.filter((name) => name === "session.membership").length;
 
@@ -115,6 +126,20 @@ describe("a person the api will not answer about", () => {
     expect(heading()).not.toBe(UNKNOWN_SCREEN.heading);
     expect(screen.getByRole("navigation", { name: RAIL })).toBeDefined();
     expect(router.state.location.pathname).toBe("/people/members");
+  });
+
+  it("hides a screen from a role read only after arriving", async () => {
+    vi.stubGlobal("fetch", losingTheShellsRead("Viewer"));
+
+    await openAt("/people/members");
+    await within(screen.getByRole("navigation", { name: RAIL })).findByRole("link", {
+      name: HOMES.Viewer.name,
+    });
+
+    expect(heading()).toBe(UNKNOWN_SCREEN.heading);
+    expect(screen.getByRole("link", { name: goHome(HOMES.Viewer) })).toBeDefined();
+    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(screen.queryByRole("button", { name: INVITE_A_PERSON.name })).toBeNull();
   });
 });
 

@@ -62,7 +62,7 @@ import {
 } from "./screens/routes-and-spend-screen.tsx";
 import { UnbuiltScreen } from "./screens/unbuilt-screen.tsx";
 import { UnknownScreen } from "./unknown-screen.tsx";
-import { useHiddenOnArrival, useVisibleTree } from "./visible-tree.ts";
+import { useHidden, useVisibleTree } from "./visible-tree.ts";
 import { ROLE_UNREAD } from "./words.ts";
 
 type BuiltScreen = { readonly draw: () => ReactElement; readonly toolbar?: ScreenToolbar };
@@ -205,8 +205,8 @@ const consoleIndexRoute = createRoute({
 });
 
 /** A screen hidden from a held role draws as an address that never existed. */
-function Seen(properties: { readonly draw: () => ReactElement }) {
-  if (useHiddenOnArrival()) return <UnknownScreen />;
+function Seen(properties: { readonly path: string; readonly draw: () => ReactElement }) {
+  if (useHidden(useVisibleTree(), properties.path)) return <UnknownScreen />;
 
   const Draw = properties.draw;
   return <Draw />;
@@ -260,10 +260,14 @@ const routesOf = (surfaces: readonly Surface[], shell: AnyRoute, reading: Readin
       createRoute({
         getParentRoute: () => shell,
         path: screen.path,
-        beforeLoad: ({ context }) => ({
-          hidden: hides(visibleTo(readerIn(context), surfaces), screen.path),
-        }),
-        component: () => <Seen draw={built.draw} />,
+        beforeLoad: ({ context }) => {
+          const reader = readerIn(context);
+          return {
+            hidden: hides(visibleTo(reader, surfaces), screen.path),
+            unread: reader.role === undefined,
+          };
+        },
+        component: () => <Seen path={screen.path} draw={built.draw} />,
         errorComponent: failed,
         staticData: { toolbar: built.toolbar },
       }),

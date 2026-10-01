@@ -25,7 +25,7 @@ import { NavigationButton, NavigationSheet, useNavigationSheet } from "./navigat
 import { useSecondaryNavShowing } from "./secondary-nav-showing.ts";
 import { SecondaryNav } from "./secondary-nav.tsx";
 import { openTabIn, ScreenPanel, ScreenTabsRoot, Toolbar, type PickedTab } from "./toolbar.tsx";
-import { useHiddenOnArrival, VisibleTreeContext } from "./visible-tree.ts";
+import { useHidden, VisibleTreeContext } from "./visible-tree.ts";
 import { useWideLayout } from "./wide-layout.ts";
 import { useWorkspaceSwitch, WorkspaceSwitcher, type Here } from "./workspace-switcher.tsx";
 
@@ -52,11 +52,11 @@ function FrameKeystrokes(properties: {
 }
 
 /** One source for both halves of the region, so a panel never outlives its tab list. */
-const useRegion = (pathname: string): Region | undefined => {
+const useRegion = (visible: VisibleTree, pathname: string): Region | undefined => {
   /** The open screen's own declaration, carried by its route: the shell fills nothing itself. */
   const toolbar = useRouterState({ select: (state) => state.matches.at(-1)?.staticData.toolbar });
-  // The route's own verdict, not the live tree: a role changed mid-act keeps the tabs around it.
-  const drawn = useHiddenOnArrival() ? undefined : placeAt(EVERY_SURFACE, pathname);
+  // The screen's own verdict, so its tabs go exactly when it does.
+  const drawn = useHidden(visible, pathname) ? undefined : placeAt(EVERY_SURFACE, pathname);
   return drawn !== undefined && isFilled(toolbar)
     ? { name: drawn.screen.name, toolbar }
     : undefined;
@@ -85,7 +85,7 @@ export function Frame(properties: {
   const jumping = useJumping(offersJumpTo);
 
   const open = placeAt(visible.surfaces, pathname);
-  const region = useRegion(pathname);
+  const region = useRegion(visible, pathname);
 
   return (
     <VisibleTreeContext value={visible}>
