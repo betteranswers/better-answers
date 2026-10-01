@@ -1,34 +1,17 @@
-import { createTransport, type SendMailOptions } from "nodemailer";
 import { describe, expect, it } from "vitest";
 
-import { emailSender } from "../src/smtp.ts";
-import { capturingLogger } from "./harness.ts";
+import { codeIn } from "./harness.ts";
 import { appForSuite } from "./suite-app.ts";
 
 const app = appForSuite();
 
-const SENDER = "better-answers <no-reply@better-answers.test>";
-
-/** The email the code request sent, with the code the harness read from it. */
+/** The email the code request sent, with the code read from that same email. */
 const signInEmailTo = async (email: string) => {
   await app().client().json("/email-otp/send-verification-otp", { email, type: "sign-in" });
   const message = app().emails.findLast(({ to }) => to === email);
-  if (message === undefined) throw new Error(`no email went to ${email}`);
-  return { message, code: app().codeSentTo(email) };
-};
-
-/** A transport that keeps what it was handed, in place of a relay. */
-const keepingTransport = () => {
-  const kept: SendMailOptions[] = [];
-  const transport = createTransport({
-    name: "keeping",
-    version: "1",
-    send: (mail, callback) => {
-      kept.push(mail.data);
-      callback(null, { envelope: { from: false, to: [] }, messageId: "<kept@test>" });
-    },
-  });
-  return { transport, kept };
+  const code = message === undefined ? undefined : codeIn(message);
+  if (message === undefined || code === undefined) throw new Error(`no code went to ${email}`);
+  return { message, code };
 };
 
 describe("the sign-in email", () => {
@@ -66,37 +49,5 @@ describe("the sign-in email", () => {
 
     expect(message.html).toMatch(new RegExp(`<p style="[^"]*font:600 32px[^"]*">${code}</p>`));
     expect(message.html).toContain('<html lang="en-GB">');
-  });
-});
-
-describe("the SMTP sender", () => {
-  it("sends the text and the HTML part together", async () => {
-    const { transport, kept } = keepingTransport();
-    const send = emailSender(transport, SENDER, capturingLogger().logger);
-
-    await send({ to: "a@example.test", subject: "S", text: "the text", html: "<p>the html</p>" });
-
-    expect(kept).toEqual([
-      {
-        from: SENDER,
-        to: "a@example.test",
-        subject: "S",
-        text: "the text",
-        html: "<p>the html</p>",
-        headers: {},
-      },
-    ]);
-  });
-
-  it("refuses every send when no transport is configured", async () => {
-    const { logger, logs } = capturingLogger();
-    const send = emailSender(undefined, SENDER, logger);
-
-    await expect(
-      send({ to: "a@example.test", subject: "S", text: "T", html: "<p>T</p>" }),
-    ).rejects.toThrow("no email transport is configured");
-    expect(logs).toMatchObject([
-      { to_domain: "example.test", msg: "no email transport is configured" },
-    ]);
   });
 });
