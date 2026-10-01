@@ -1,4 +1,5 @@
-import { readerScreenById, type Screen } from "@/shared/screens.ts";
+import { ASK, type Screen } from "@/shared/navigation.ts";
+import { NO_RESPONSE_TO_A_READ, sentenceOf } from "@/shared/refusal-words.ts";
 
 export const FAILED_SCREEN = {
   heading: "This screen didn't load",
@@ -10,7 +11,45 @@ export const UNKNOWN_SCREEN = {
   heading: "No screen at this address",
 } as const;
 
-export const UNBUILT_VIEW = "This view is not built yet.";
+/** The secondary nav beside it is named for the open surface, so the rail needs a name apart. */
+export const RAIL = "Surfaces";
+
+/** The narrow layout's sheet holds the rail and the secondary nav, so it is named for both. */
+export const NAVIGATION_SHEET = "Surfaces and screens";
+
+/** The band's line of places from the surface down, named apart from the rail and the nav. */
+export const BREADCRUMB = "Breadcrumb";
+
+/** The switcher's way to the whole list of a person's workspaces. */
+export const ALL_WORKSPACES = "All workspaces";
+
+/** Said by the one toggle in the band, which names the state it would move to. */
+export const TOGGLE = {
+  hide: "Hide the secondary nav",
+  show: "Show the secondary nav",
+} as const;
+
+/** The band's finder. Never called a search: that is Knowledge's screen, and this goes places. */
+export const JUMP_TO = {
+  name: "Jump to",
+  said: "Type to narrow the list, then choose one.",
+  list: "Matches",
+  groups: { surfaces: "Surfaces", screens: "Screens", acts: "Acts", members: "Members" },
+  kinds: { screen: "a screen", member: "a member", act: "an act" },
+  membersLoading: "The members are still loading.",
+  membersUnread:
+    "The members didn't load, so none are listed. Close this and open it again to retry.",
+} as const;
+
+export const nothingMatches = (typed: string): string => `Nothing matches “${typed}”.`;
+
+const EITHER = new Intl.ListFormat("en-GB", { type: "disjunction" });
+
+/** Names only the kinds this reader can find, so a Viewer is not promised members. */
+export const findWhat = (kinds: readonly string[]): string => `Find ${EITHER.format(kinds)}`;
+
+/** No role is held, so no other screen can be offered either. */
+export const ROLE_UNREAD = sentenceOf(NO_RESPONSE_TO_A_READ);
 
 /** The index finds the home of a reader whose role is not known yet. */
 export const goHome = (home: Screen | undefined): string =>
@@ -18,10 +57,8 @@ export const goHome = (home: Screen | undefined): string =>
 
 /** A role's home says what that role will do there, not only that it is unbuilt. */
 const WHILE_UNBUILT: ReadonlyMap<Screen, string> = new Map([
-  [
-    readerScreenById("ask"),
-    "Ask in Claude for now. Your questions and their answers will be listed here.",
-  ],
+  [ASK.home, "Ask in Claude for now. Your questions and their answers will be listed here."],
 ]);
 
-export const unbuiltLineOf = (screen: Screen): string => WHILE_UNBUILT.get(screen) ?? UNBUILT_VIEW;
+export const unbuiltLineOf = (home: Screen): string =>
+  WHILE_UNBUILT.get(home) ?? "This screen is on its way.";

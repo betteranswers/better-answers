@@ -41,6 +41,7 @@ import {
 
 import type { EmailSender } from "../email.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
+import { PRODUCT_NAME } from "../product-name.ts";
 import {
   ACCESS_TOKEN_LIFETIME_SECONDS,
   BETTER_AUTH_RATE_LIMIT,
@@ -336,7 +337,7 @@ export const createAuth = (deps: AuthDependencies) => {
   const db = drizzle(deps.database, { schema: identitySchema });
 
   return betterAuth({
-    appName: "Better Answers",
+    appName: PRODUCT_NAME,
     baseURL: deps.publicUrl,
 
     basePath: "/",
@@ -454,7 +455,7 @@ export const createAuth = (deps: AuthDependencies) => {
           if (type !== "sign-in") return;
           await deps.sendEmail({
             to: email,
-            subject: "Your Better Answers sign-in code",
+            subject: `Your ${PRODUCT_NAME} sign-in code`,
             text: `Your code is ${otp}. It is valid for five minutes. If you did not ask for it, ignore this email.`,
           });
         },

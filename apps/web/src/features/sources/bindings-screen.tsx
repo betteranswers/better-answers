@@ -3,10 +3,10 @@ import { flushSync } from "react-dom";
 
 import type { ApiError } from "@/shared/api/trpc.ts";
 import { EmptyState } from "@/shared/empty-state.tsx";
-import { KeystrokesAct, useKeystroke } from "@/shared/keystrokes.tsx";
+import { useKeystroke, useScreenKeystrokes } from "@/shared/keystrokes.tsx";
+import { CONTROL_CENTRE, groupIn } from "@/shared/navigation.ts";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
-import { screenById } from "@/shared/screens.ts";
-import type { ViewToolbar } from "@/shared/view-toolbar.tsx";
+import type { ScreenToolbar } from "@/shared/screen-toolbar.tsx";
 
 import { BindAct } from "./bind-act.tsx";
 import {
@@ -34,20 +34,17 @@ import {
 import { REVIEW_HEADING, SOURCES_KEYSTROKES } from "./sources-state.ts";
 import { AUDIENCE_WORDS, NOTHING_BOUND } from "./words.ts";
 
-const sources = screenById("sources");
+const sources = groupIn(CONTROL_CENTRE, "sources");
 
 /**
  * The three bulk acts sit beside the findings they command, in the review: five acts in the band
  * scroll a 320px screen sideways.
  */
-export const BINDINGS_TOOLBAR: ViewToolbar = {
-  acts: (
-    <>
-      <BindAct />
-      <KeystrokesAct screen={sources.name} keystrokes={Object.values(SOURCES_KEYSTROKES)} />
-    </>
-  ),
+export const BINDINGS_TOOLBAR: ScreenToolbar = {
+  acts: <BindAct />,
 };
+
+const LISTED = Object.values(SOURCES_KEYSTROKES);
 
 const NOTHING_IN_FOCUS = selectFirst("binding");
 
@@ -80,7 +77,8 @@ function ListStatus(properties: { readonly bindings: ReturnType<typeof useBindin
   );
 }
 
-export function BindingsView() {
+export function BindingsScreen() {
+  useScreenKeystrokes(LISTED);
   const bindings = useBindings();
   const listId = useId();
   const [inFocus, setInFocus] = useState<string>();

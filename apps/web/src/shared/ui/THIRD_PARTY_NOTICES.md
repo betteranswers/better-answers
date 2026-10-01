@@ -36,6 +36,13 @@ confirmation before a group is deleted: deleting cannot be undone, which is the 
 register gives a modal to. The CLI served it from the `new-york-v4` style, as it did the radio
 group. Its two digests were taken that day and its arrival edits are listed below with the others.
 
+The shell's band added `breadcrumb` on **1 October 2026** with the same CLI, `shadcn@4.20.1`, for
+the line of places that names the surface, group, screen and open tab. The CLI resolved it from
+the `new-york-v4` style, as it did the radio group. The file was written from the source the CLI
+showed with `add breadcrumb --dry-run --view`, not by its write, so the dependency on `cn` it
+names never reached `package.json` or the lockfile. Its two digests were taken that day and its
+arrival edits are listed below with the others.
+
 This file records vendored source only. The npm packages those items stand on are ordinary
 dependencies with lockfile entries; their versions live in `apps/web/package.json` and the
 lockfile, which is where a reader reads them and where Renovate moves them.
@@ -84,6 +91,7 @@ the pin.
 | `kibo-ui/pill.tsx` | https://www.kibo-ui.com/r/pill.json | `c1dd3d46048b0d5f` | `9b0c909d9043c5fc` |
 | `radio-group.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/radio-group.json | `299fa36d5c5df3ae` | `3e0591dd59910958` |
 | `alert-dialog.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/alert-dialog.json | `03c0d4de131a9b04` | `b89696dd357f7246` |
+| `breadcrumb.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/breadcrumb.json | `18043f281e20e08f` | `a8a7adf3bdb2fa3a` |
 
 `components.json` writes `https://ui.shadcn.com/r/{name}.json` for the primitives because that is
 the CLI's own default form; the table records the style-qualified URL the CLI resolves it to,
@@ -182,6 +190,14 @@ T-406's arrival edits, on the one item it added:
   `[backdrop-filter:var(--blur-scrim)]`, the correction `dialog.tsx` and `sheet.tsx` already
   carry.
 
+The breadcrumb's arrival edits, on the one item it added:
+
+- The `cn` import repointed at `@/shared/lib/utils.ts` and the dependency on `cn` dropped, as
+  every arrival since the tooltip's has needed, and the file given this repository's format and
+  import order. Upstream carries no `"use client"` and no extensionless relative import.
+- Its default separator, lucide's chevron, stays in the file; the band passes a Phosphor caret in
+  its place, so the product's own screens draw one icon family.
+
 Everything else is upstream's, unedited. Their behaviour — keyboard handling, focus, ARIA
 wiring, virtualisation — is theirs by ADR 0033; the screens that use them carry the WCAG 2.2 AA
 line and are tested with a keyboard and a screen reader.
@@ -226,4 +242,4 @@ Copyright (c) 2023 shadcn; Copyright (c) 2024 Hayden Bleasel.
 
 **Apache-2.0** (Vercel AI Elements) — Copyright (c) 2025 Vercel, Inc. Licensed under the Apache
 License, Version 2.0; the full text is at `LICENSE` in this repository, which is the same
-licence Better Answers ships under (ADR 0027).
+licence better-answers ships under (ADR 0027).

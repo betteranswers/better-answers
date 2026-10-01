@@ -42,7 +42,10 @@ describe("the SPA's tRPC client", () => {
 describe("the query provider above the router", () => {
   it("wraps the router, so its screens reach the same client", async () => {
     const clients = createAppClients();
-    const router = createAppRouter(clients, createMemoryHistory({ initialEntries: ["/system"] }));
+    const router = createAppRouter(
+      clients,
+      createMemoryHistory({ initialEntries: ["/agent-operations/routes-and-spend"] }),
+    );
     await router.load();
 
     render(
@@ -52,7 +55,7 @@ describe("the query provider above the router", () => {
       </Providers>,
     );
 
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("System");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Agent Operations");
     expect(screen.getByTestId("probe").textContent).toContain("routes");
   });
 });

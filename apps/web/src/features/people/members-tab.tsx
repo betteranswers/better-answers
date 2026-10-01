@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-table";
 import { useId, useMemo, useRef, useState, type RefObject } from "react";
 
+import { useAsked } from "@/shared/address-ask.ts";
 import type { ApiError } from "@/shared/api/trpc.ts";
 import { GridTable } from "@/shared/grid-table.tsx";
 import { Icon } from "@/shared/icon.tsx";
@@ -172,6 +173,7 @@ function MemberList(properties: { readonly members: readonly ListedMember[] }) {
   const searchRef = useRef<HTMLInputElement>(null);
   // Read with the list, so a sheet opened on its groups has boxes to land focus on.
   useGroups();
+  useAsked("search", setSearch);
 
   const columns = useMemo(
     () =>

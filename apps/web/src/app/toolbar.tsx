@@ -1,31 +1,40 @@
 import { useState, type ReactNode } from "react";
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs.tsx";
 import {
   OpenTabProvider,
   useOpenTab,
   ViewStateSlot,
-  type ViewTab,
-  type ViewToolbar,
-} from "@/shared/view-toolbar.tsx";
+  type ScreenTab,
+  type ScreenToolbar,
+} from "@/shared/screen-toolbar.tsx";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs.tsx";
+
+/**
+ * Derived, not reset: an id is the declaring screen's own, so a screen that does not declare
+ * the pick opens on its first tab.
+ */
+export const openTabIn = (
+  tabs: readonly ScreenTab[] | undefined,
+  picked: string | undefined,
+): ScreenTab | undefined => tabs?.find((tab) => tab.id === picked) ?? tabs?.[0];
+
+export type PickedTab = readonly [string | undefined, (picked: string | undefined) => void];
 
 /** Opens on the first tab until one is picked; with no tabs, it holds the view-state slot alone. */
-export function ViewTabsRoot(properties: {
-  readonly tabs: readonly ViewTab[] | undefined;
+export function ScreenTabsRoot(properties: {
+  readonly tabs: readonly ScreenTab[] | undefined;
+  /** The frame's, so the band names the open tab; a root drawn alone keeps its own. */
+  readonly picked?: PickedTab;
   readonly children: ReactNode;
 }) {
-  const [picked, setPicked] = useState<string>();
+  const own = useState<string>();
+  const [picked, setPicked] = properties.picked ?? own;
 
-  const tabs = properties.tabs ?? [];
-  /**
-   * Derived, not reset: an id is the declaring view's own, so a view that does not declare the
-   * pick opens on its first tab.
-   */
-  const openTab = tabs.find((tab) => tab.id === picked)?.id ?? tabs[0]?.id;
+  const openTab = openTabIn(properties.tabs, picked)?.id;
 
   /**
    * Inside the tabs root, so the slot spans the toolbar and the panel and both halves of a
-   * view see one value.
+   * screen see one value.
    */
   const spanned = <ViewStateSlot>{properties.children}</ViewStateSlot>;
 
@@ -46,14 +55,14 @@ export function ViewTabsRoot(properties: {
 }
 
 /** The open tab's panel; with no tab open, its children as they are. */
-export function ViewPanel(properties: { readonly children: ReactNode }) {
+export function ScreenPanel(properties: { readonly children: ReactNode }) {
   const openTab = useOpenTab();
   if (openTab === undefined) return <>{properties.children}</>;
 
-  // The shell's half of the pattern, not the view's: an open tab must control a panel even
-  // where the view inside it failed to draw.
+  // The shell's half of the pattern, not the screen's: an open tab must control a panel even
+  // where the screen inside it failed to draw.
   return (
-    // Keyed, so a picked tab draws on a subtree of its own and asks again for a view that
+    // Keyed, so a picked tab draws on a subtree of its own and asks again for a screen that
     // threw on the last one.
     <TabsContent key={openTab} value={openTab}>
       {properties.children}
@@ -61,7 +70,7 @@ export function ViewPanel(properties: { readonly children: ReactNode }) {
   );
 }
 
-export function Toolbar(properties: { readonly name: string; readonly toolbar: ViewToolbar }) {
+export function Toolbar(properties: { readonly name: string; readonly toolbar: ScreenToolbar }) {
   const { tabs, acts } = properties.toolbar;
 
   return (

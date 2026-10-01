@@ -9,8 +9,8 @@ import {
   NO_WORKSPACE_WORDS,
 } from "@/features/auth/workspace-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
+import type { Role } from "@/shared/navigation.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
-import type { Role } from "@/shared/screens.ts";
 
 import { expect, test } from "./browser.ts";
 import {

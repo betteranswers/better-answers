@@ -1,6 +1,8 @@
 import { useId, useState, type FormEvent } from "react";
 
+import { useAsked } from "@/shared/address-ask.ts";
 import { useKeystroke } from "@/shared/keystrokes.tsx";
+import { INVITE_A_PERSON } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import {
@@ -45,6 +47,9 @@ export function InviteAct() {
     setOpen(true);
   };
   useKeystroke(PEOPLE_KEYSTROKES.invite, show);
+  useAsked("act", (act) => {
+    if (act === INVITE_A_PERSON.asks) show();
+  });
 
   // Never disabled while sending: a disabled button drops focus, and a refusal would land nowhere.
   const submit = (event: FormEvent<HTMLFormElement>) => {

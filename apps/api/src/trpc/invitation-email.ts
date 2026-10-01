@@ -4,6 +4,7 @@ import { attempt } from "@better-answers/core/kernel";
 import type { InvitationToSend } from "@better-answers/core/members";
 
 import type { EmailMessage, Mail } from "../email.ts";
+import { PRODUCT_NAME } from "../product-name.ts";
 
 /** The SPA's accept page, which the link in the email opens with the invitation's id after it. */
 const ACCEPT_INVITATION_PATH = "/invitations";
@@ -23,9 +24,9 @@ const ROLE_WITH_ARTICLE = {
 
 const invitationEmail = (publicUrl: string, invitation: InvitationToSend): EmailMessage => ({
   to: invitation.address,
-  subject: `Join ${invitation.workspaceName} on Better Answers`,
+  subject: `Join ${invitation.workspaceName} on ${PRODUCT_NAME}`,
   text: [
-    `You are invited to join ${invitation.workspaceName} on Better Answers as ${ROLE_WITH_ARTICLE[invitation.role]}.`,
+    `You are invited to join ${invitation.workspaceName} on ${PRODUCT_NAME} as ${ROLE_WITH_ARTICLE[invitation.role]}.`,
     "",
     "To accept, open this link and sign in with this email address:",
     `${publicUrl}${ACCEPT_INVITATION_PATH}/${invitation.invitationId}`,

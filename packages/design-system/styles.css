@@ -11,3 +11,24 @@
 @import "./tokens/motion.css";
 @import "./tokens/semantic.css";
 @import "./tokens/keyframes.css";
+
+/* Zero specificity and the base layer let any utility override these rules. Base precedes
+   Tailwind's theme layer; harmless, since theme holds only custom properties. */
+@layer base {
+  :where([data-screen-content]) :where(p, h1, h2, h3, h4, h5, h6) {
+    max-width: var(--measure-prose);
+  }
+
+  :where(
+      table,
+      [role="table"],
+      [role="grid"],
+      [role="treegrid"],
+      dialog,
+      [role="dialog"],
+      [role="alertdialog"]
+    )
+    :where(p, h1, h2, h3, h4, h5, h6) {
+    max-width: none;
+  }
+}

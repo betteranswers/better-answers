@@ -1,47 +1,78 @@
 import { createMemoryHistory } from "@tanstack/react-router";
-import { cleanup, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
-import { goHome, UNBUILT_VIEW, unbuiltLineOf, UNKNOWN_SCREEN } from "@/app/words.ts";
+import { goHome, JUMP_TO, RAIL, UNKNOWN_SCREEN } from "@/app/words.ts";
+import { aRole } from "@/features/people/role-meanings.ts";
+import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import {
-  CONSOLE,
-  CONSOLE_SCREENS,
-  CONTROL_CENTRE,
-  READER_SCREENS,
-  SCREENS,
-  screenById,
-  viewsOf,
-  type Screen,
-} from "@/shared/screens.ts";
+  EVERY_SURFACE,
+  headingOf,
+  HOMES,
+  movedWithin,
+  readerOf,
+  screensOf,
+  SURFACES,
+  visibleTo,
+  type Role,
+} from "@/shared/navigation.ts";
+import { PRODUCT_NAME } from "@/shared/words.ts";
 
-import { appAt, openApp } from "./open-app.tsx";
+import { openApp } from "./open-app.tsx";
+import { answeringAs, withTheApiDown } from "./stubbed-api.ts";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
-const openAt = async (path: string) => (await openApp(path)).rendered;
+const openAs = async (role: Role, path: string) => {
+  vi.stubGlobal("fetch", answeringAs(role));
+  return (await openApp(path)).rendered;
+};
 
-const rail = () => screen.getByRole("navigation", { name: "Control Centre" });
+const openWithNoRoleAt = async (path: string) => {
+  const clients = withTheApiDown();
+  const opened = await openApp(path, clients);
+  await vi.waitFor(() => expect(clients.queryClient.isFetching()).toBe(0));
+  return opened.rendered;
+};
 
-const secondaryNav = (screenName: string) => screen.getByRole("navigation", { name: screenName });
+const rail = () => screen.getByRole("navigation", { name: RAIL });
 
-describe("Control Centre's three-region shell", () => {
-  it("names six screens in the icon rail, in glossary order", async () => {
-    await openAt("/system");
+const secondaryNav = () => screen.getByRole("navigation", { name: "Control Centre" });
 
-    const named = within(rail())
-      .getAllByRole("link")
-      .map((link) => link.textContent);
+const namesIn = (region: HTMLElement, role: "link" | "heading" = "link") =>
+  within(region)
+    .queryAllByRole(role, role === "heading" ? { level: 3 } : {})
+    .map((each) => each.textContent);
 
-    expect(named).toEqual(SCREENS.map((each) => each.name));
+describe("the shell's regions", () => {
+  it("names only an Admin's surfaces in the icon rail", async () => {
+    await openAs("Admin", "/people/members");
+
+    expect(namesIn(rail())).toEqual(["Control Centre"]);
+  });
+
+  it("names Ask alone in a Viewer's icon rail", async () => {
+    await openAs("Viewer", "/ask");
+
+    expect(namesIn(rail())).toEqual(["Ask"]);
+  });
+
+  it("names no surface while the role is unknown", async () => {
+    await openWithNoRoleAt("/people/members");
+
+    expect(namesIn(rail())).toEqual([]);
   });
 
   it("carries four landmark regions and a skip link first", async () => {
-    const { container } = await openAt("/system");
+    const { container } = await openAs("Admin", "/agent-operations/routes-and-spend");
 
     expect(rail()).toBeDefined();
-    expect(secondaryNav("System")).toBeDefined();
+    expect(secondaryNav()).toBeDefined();
     expect(screen.getByRole("banner")).toBeDefined();
     expect(screen.getByRole("main")).toBeDefined();
 
@@ -50,326 +81,242 @@ describe("Control Centre's three-region shell", () => {
     expect(first?.getAttribute("href")).toBe(`#${screen.getByRole("main").id}`);
   });
 
-  it("lists the open screen's views in the secondary nav", async () => {
-    await openAt("/system/health");
+  it("lists the open surface's groups over their screens", async () => {
+    await openAs("Admin", "/system/audit-log");
 
-    const listed = within(secondaryNav("System"))
-      .getAllByRole("link")
-      .map((link) => link.textContent);
-
-    expect(listed).toEqual(["Signals", "Health", "Routes and spend", "Backups"]);
-    expect(within(secondaryNav("System")).getByRole("heading", { level: 2 }).textContent).toBe(
+    expect(namesIn(secondaryNav(), "heading")).toEqual([
+      "Sources",
+      "Agent Operations",
+      "People",
       "System",
-    );
-  });
-
-  it("swaps the secondary nav to only the new screen's views", async () => {
-    const { unmount } = await openAt("/people/owners");
-    expect(
-      within(secondaryNav("People"))
-        .getAllByRole("link")
-        .map((link) => link.textContent),
-    ).toEqual([
+    ]);
+    expect(namesIn(secondaryNav())).toEqual([
+      "Bindings",
+      "Routes and spend",
       "Members",
       "Groups",
-      "Owners",
-      "Thresholds",
-      "Erasure and suppression",
-      "Tokens",
       "Audit log",
     ]);
-    expect(screen.queryByRole("navigation", { name: "System" })).toBeNull();
-    unmount();
-
-    await openAt("/questions/promotions");
-    expect(
-      within(secondaryNav("Questions"))
-        .getAllByRole("link")
-        .map((link) => link.textContent),
-    ).toEqual(["Answer audit", "Promotions", "Answer tests"]);
-    expect(screen.queryByRole("navigation", { name: "People" })).toBeNull();
   });
 
-  it("marks the open screen and the open view as current", async () => {
-    await openAt("/people/thresholds");
+  it("marks the open surface and the open screen as current", async () => {
+    await openAs("Admin", "/people/groups");
 
     const marked = within(rail())
       .getAllByRole("link")
       .filter((link) => link.hasAttribute("aria-current"))
       .map((link) => link.textContent);
-    expect(marked).toEqual(["People"]);
+    expect(marked).toEqual(["Control Centre"]);
 
-    const current = within(secondaryNav("People")).getByRole("link", { current: "page" });
-    expect(current.textContent).toBe("Thresholds");
+    const current = within(secondaryNav()).getByRole("link", { current: "page" });
+    expect(current.textContent).toBe("Groups");
   });
 
-  it("names where the person is in the top bar", async () => {
-    await openAt("/system/routes-and-spend");
+  it("names surface, group and screen in the band", async () => {
+    await openAs("Admin", "/agent-operations/routes-and-spend");
 
     const bar = screen.getByRole("banner");
-    expect(within(bar).getByText("System", { exact: false })).toBeDefined();
-    expect(within(bar).getByText("Routes and spend", { exact: false })).toBeDefined();
+    for (const name of ["Control Centre", "Agent Operations", "Routes and spend"]) {
+      expect(within(bar).getByText(name, { exact: true })).toBeDefined();
+    }
+  });
+
+  it("names a surface's home once in the band", async () => {
+    await openAs("Viewer", HOMES.Viewer.path);
+
+    expect(within(screen.getByRole("banner")).getAllByText(HOMES.Viewer.name)).toHaveLength(1);
+  });
+
+  it("links the band's logo to the reader's home", async () => {
+    await openAs("Admin", "/system/audit-log");
+
+    const logo = within(screen.getByRole("banner")).getByRole("link", { name: PRODUCT_NAME });
+    expect(logo.getAttribute("href")).toBe(HOMES.Admin.path);
+  });
+
+  it("links the logo to the index with no role held", async () => {
+    await openWithNoRoleAt("/people/members");
+
+    const logo = within(screen.getByRole("banner")).getByRole("link", { name: PRODUCT_NAME });
+    expect(logo.getAttribute("href")).toBe("/");
+  });
+
+  it("names the secondary nav with no heading repeating the rail", async () => {
+    await openAs("Admin", "/people/members");
+
+    const headings = within(secondaryNav())
+      .queryAllByRole("heading")
+      .map((each) => each.textContent);
+    expect(headings).not.toContain("Control Centre");
+  });
+
+  it("gives every screen in the secondary nav its icon", async () => {
+    await openAs("Admin", "/people/members");
+
+    const bare = within(secondaryNav())
+      .getAllByRole("link")
+      .filter((link) => link.querySelector("svg") === null)
+      .map((link) => link.textContent);
+    expect(bare).toEqual([]);
   });
 
   it("says nothing about the person until it knows them", async () => {
-    const { container } = await openAt("/system");
+    const { container } = await openWithNoRoleAt("/people/members");
 
     expect(screen.queryByRole("button", { name: /sign out/i })).toBeNull();
     expect(container.textContent).not.toMatch(/sign out/i);
   });
 
-  it("calls every screen but Sources, People and System unbuilt", async () => {
-    const unbuilt: string[] = [];
-    for (const each of SCREENS) {
-      const { unmount } = await openAt(each.path);
-      if (screen.queryByText(unbuiltLineOf(each)) !== null) unbuilt.push(each.name);
-      unmount();
-    }
-
-    expect(unbuilt).toEqual(["Suggestions", "Knowledge", "Questions"]);
-  });
-
-  it("gives Questions, no role's home, the ordinary unbuilt line", async () => {
-    const questions = screenById("questions");
-    await openAt(questions.path);
-
-    expect(unbuiltLineOf(questions)).toBe(UNBUILT_VIEW);
-    expect(screen.getByText(UNBUILT_VIEW)).toBeDefined();
-    expect(screen.getByText(questions.summary)).toBeDefined();
-  });
-
-  it("gives System the routes card", async () => {
-    await openAt("/system");
+  it("gives Agent Operations the routes card", async () => {
+    await openAs("Admin", "/agent-operations/routes-and-spend");
 
     expect(screen.getByRole("heading", { level: 2, name: "Routes" })).toBeDefined();
   });
 
   it("says an unknown address names no screen", async () => {
-    await openAt("/not-a-screen");
+    await openApp("/not-a-screen");
 
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(UNKNOWN_SCREEN.heading);
   });
 
   it("sends a reader of unknown role home by the index", async () => {
-    await openAt("/not-a-screen");
+    await openApp("/not-a-screen");
 
     expect(screen.getByRole("link", { name: goHome(undefined) }).getAttribute("href")).toBe("/");
   });
 
-  it("says an unknown view names no screen, regions kept", async () => {
-    await openAt("/system/not-a-view");
+  it("says an unknown screen names no place, rail kept", async () => {
+    await openAs("Admin", "/system/not-a-screen");
 
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(UNKNOWN_SCREEN.heading);
-    expect(rail()).toBeDefined();
-    expect(secondaryNav("System")).toBeDefined();
+    expect(namesIn(rail())).toEqual(["Control Centre"]);
     expect(screen.getByRole("banner")).toBeDefined();
+    expect(screen.queryByRole("navigation", { name: "Control Centre" })).toBeNull();
   });
 });
 
-const EVERY_SCREEN: readonly Screen[] = [...SCREENS, ...CONSOLE_SCREENS, ...READER_SCREENS];
+describe("jump to, while no role is held", () => {
+  it("is not offered in the band", async () => {
+    await openWithNoRoleAt("/people/members");
 
-/**
- * One direction finds the view the router forgot; only the other finds the route nothing declared.
- */
-const declaredViewPaths = (screens: readonly Screen[] = SCREENS): readonly string[] =>
-  screens.flatMap((each) => viewsOf(each).map((view) => view.path));
+    const band = within(screen.getByRole("banner"));
+    expect(band.queryByRole("button", { name: JUMP_TO.name })).toBeNull();
+  });
 
-const routedViewPaths = (): readonly string[] => {
-  const router = createAppRouter(
-    createAppClients(),
-    createMemoryHistory({ initialEntries: ["/system"] }),
-  );
-  return Object.keys(router.routesByPath).filter((path) =>
-    EVERY_SCREEN.some((each) => path.startsWith(`${each.path}/`)),
-  );
-};
+  it("leaves its chord to the browser", async () => {
+    await openWithNoRoleAt("/people/members");
 
-const navigatedViewPaths = async (): Promise<readonly string[]> => {
+    const unclaimed = fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+
+    expect(unclaimed).toBe(true);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("is left off the keystrokes list", async () => {
+    await openWithNoRoleAt("/people/members");
+
+    fireEvent.keyDown(document.body, { key: "?" });
+    const acts = [...screen.getByRole("dialog").querySelectorAll("dd")].map(
+      (each) => each.textContent,
+    );
+
+    expect(acts).toContain(KEYSTROKE_WORDS.showTheList);
+    expect(acts).not.toContain(JUMP_TO.name);
+  });
+});
+
+/** Drawn by the router alone: the list's own entries and the ways into and out of the shell. */
+const OUTSIDE_THE_LIST = [
+  "/",
+  "/console",
+  "/sign-in",
+  "/display-name",
+  "/choose-workspace",
+  "/no-workspace",
+  "/invitations/$invitationId",
+];
+
+const routedPaths = (): readonly string[] =>
+  Object.keys(
+    createAppRouter(createAppClients(), createMemoryHistory({ initialEntries: ["/"] }))
+      .routesByPath,
+  ).filter((path) => !OUTSIDE_THE_LIST.includes(path));
+
+/** One direction finds the screen the router forgot; only the other finds a route nothing declared. */
+const destinations = [
+  ...new Set([
+    ...screensOf(EVERY_SURFACE)
+      .filter((each) => each.built)
+      .map((each) => each.path),
+    ...Object.values(HOMES).map((home) => home.path),
+  ]),
+];
+
+const moved = movedWithin(EVERY_SURFACE);
+
+/** Every link in the secondary nav, surface by surface, as the role reaches it from the rail. */
+const navigatedPaths = async (role: Role): Promise<readonly string[]> => {
+  vi.stubGlobal("fetch", answeringAs(role));
   const reached: string[] = [];
-  for (const each of SCREENS) {
-    const { unmount } = await openAt(each.defaultView);
-    for (const link of within(secondaryNav(each.name)).getAllByRole("link")) {
-      reached.push(link.getAttribute("href") ?? "");
-    }
-    unmount();
+  for (const surface of visibleTo(readerOf(role), SURFACES).surfaces) {
+    const { rendered } = await openApp(surface.opensAt.path);
+    const nav = screen.getByRole("navigation", { name: surface.name });
+    reached.push(
+      ...within(nav)
+        .getAllByRole("link")
+        .map((link) => link.getAttribute("href") ?? ""),
+    );
+    rendered.unmount();
   }
   return reached;
 };
 
-describe("Control Centre's one list of screens and their views", () => {
-  it("declares each screen's views in the glossary's words and order", () => {
-    expect(SCREENS.map((each) => [each.name, viewsOf(each).map((view) => view.name)])).toEqual([
-      [
-        "Sources",
-        [
-          "Bindings",
-          "Publish and accept gates",
-          "Priced plan",
-          "Backlogs",
-          "Gone-at-source impact",
-          "Agent tokens",
-          "Ceiling",
-        ],
-      ],
-      ["Suggestions", ["Queue"]],
-      ["Knowledge", ["Review table", "Conflicts and verification requests", "Exports"]],
-      ["Questions", ["Answer audit", "Promotions", "Answer tests"]],
-      [
-        "People",
-        [
-          "Members",
-          "Groups",
-          "Owners",
-          "Thresholds",
-          "Erasure and suppression",
-          "Tokens",
-          "Audit log",
-        ],
-      ],
-      ["System", ["Signals", "Health", "Routes and spend", "Backups"]],
-    ]);
+const shownPaths = (role: Role): readonly string[] =>
+  screensOf(visibleTo(readerOf(role), SURFACES).surfaces).map((each) => each.path);
+
+describe("the routes and navigation built from the one list", () => {
+  it("gives every built screen and every role's home a route", () => {
+    const routed = routedPaths();
+
+    expect(destinations.filter((path) => !routed.includes(path))).toEqual([]);
   });
 
-  it("names the default view each screen's address leads to", () => {
-    expect(SCREENS.map((each) => [each.path, each.defaultView])).toEqual([
-      ["/sources", "/sources/bindings"],
-      ["/suggestions", "/suggestions/queue"],
-      ["/knowledge", "/knowledge/review-table"],
-      ["/questions", "/questions/answer-audit"],
-      ["/people", "/people/members"],
-      ["/system", "/system/routes-and-spend"],
-    ]);
+  it("routes nothing but built screens, homes and moved addresses", () => {
+    const known = [...destinations, ...moved.map((each) => each.from)];
+
+    expect(routedPaths().filter((path) => !known.includes(path))).toEqual([]);
   });
 
-  it("calls only bindings, members, groups, audit log and routes built", () => {
-    const built = SCREENS.flatMap((each) =>
-      viewsOf(each)
-        .filter((view) => view.built)
-        .map((view) => view.path),
-    );
+  it("routes every moved address, each leading to a built screen", () => {
+    const routed = routedPaths();
+    const leadsNowhere = moved
+      .filter((each) => !each.to.some((screen) => screen.built))
+      .map((each) => each.from);
 
-    expect(built).toEqual([
-      "/sources/bindings",
-      "/people/members",
-      "/people/groups",
-      "/people/audit-log",
-      "/system/routes-and-spend",
-    ]);
+    expect(moved.filter((each) => !routed.includes(each.from))).toEqual([]);
+    expect(leadsNowhere).toEqual([]);
   });
 
-  it("gives every declared view a route of its own", () => {
-    const routed = routedViewPaths();
+  for (const role of ["Admin", "Editor", "Viewer"] as const) {
+    it(`lists each screen ${aRole(role)} may see, and no other`, async () => {
+      const reached = await navigatedPaths(role);
+      const shown = shownPaths(role);
 
-    expect(declaredViewPaths(EVERY_SCREEN).filter((path) => !routed.includes(path))).toEqual([]);
-  });
+      expect(shown.filter((path) => !reached.includes(path))).toEqual([]);
+      expect(reached.filter((path) => !shown.includes(path))).toEqual([]);
+    });
+  }
 
-  it("routes no view the list does not declare", () => {
-    const declared = declaredViewPaths(EVERY_SCREEN);
+  it("opens every built screen under its group's heading", async () => {
+    vi.stubGlobal("fetch", answeringAs("Admin"));
 
-    expect(routedViewPaths().filter((path) => !declared.includes(path))).toEqual([]);
-  });
-
-  it("gives every declared view an entry in the secondary nav", async () => {
-    const reached = await navigatedViewPaths();
-
-    expect(declaredViewPaths().filter((path) => !reached.includes(path))).toEqual([]);
-  });
-
-  it("lists no secondary-nav entry the list does not declare", async () => {
-    const declared = declaredViewPaths();
-
-    expect((await navigatedViewPaths()).filter((path) => !declared.includes(path))).toEqual([]);
-  });
-
-  it("gives each screen a glyph of its own", () => {
-    expect(new Set(SCREENS.map((each) => each.icon)).size).toBe(SCREENS.length);
-  });
-
-  it("defaults each screen to one of its declared views", () => {
-    const strangers = SCREENS.filter(
-      (each) => !viewsOf(each).some((view) => view.path === each.defaultView),
-    ).map((each) => each.name);
-
-    expect(strangers).toEqual([]);
-  });
-
-  it("lands a screen's own address on that screen's default view", async () => {
-    const landed: string[] = [];
-    for (const each of SCREENS) {
-      const { router } = await appAt(each.path);
-      landed.push(router.state.location.pathname);
+    for (const each of screensOf(SURFACES).filter((candidate) => candidate.built)) {
+      const { rendered } = await openApp(each.path);
+      const main = screen.getByRole("main");
+      expect(within(main).getAllByRole("heading", { level: 1 })[0]?.textContent).toBe(
+        headingOf(each),
+      );
+      rendered.unmount();
     }
-
-    expect(landed).toEqual([
-      "/sources/bindings",
-      "/suggestions/queue",
-      "/knowledge/review-table",
-      "/questions/answer-audit",
-      "/people/members",
-      "/system/routes-and-spend",
-    ]);
-  });
-
-  it("opens every view at its address, saying which are unbuilt", async () => {
-    for (const each of SCREENS) {
-      for (const view of viewsOf(each)) {
-        const { unmount } = await openAt(view.path);
-        expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(each.name);
-        expect(screen.queryByText(unbuiltLineOf(each)) === null).toBe(view.built);
-        unmount();
-      }
-    }
-  });
-});
-
-describe("the console's own list of screens and their views", () => {
-  it("declares People and Workspaces, apart from Control Centre's six", () => {
-    expect(
-      CONSOLE_SCREENS.map((each) => [each.name, viewsOf(each).map((view) => view.name)]),
-    ).toEqual([
-      ["People", ["Everyone", "Names waiting"]],
-      ["Workspaces", ["Every workspace"]],
-    ]);
-    expect(CONSOLE.screens.map((each) => each.name)).toEqual(["People", "Workspaces"]);
-    expect(CONTROL_CENTRE.screens.map((each) => each.name)).toEqual([
-      "Sources",
-      "Suggestions",
-      "Knowledge",
-      "Questions",
-      "People",
-      "System",
-    ]);
-  });
-
-  it("keeps every console screen and view under the console's address", () => {
-    const outside = declaredViewPaths(CONSOLE_SCREENS)
-      .concat(CONSOLE_SCREENS.map((each) => each.path))
-      .filter((path) => !path.startsWith("/console/"));
-
-    expect(outside).toEqual([]);
-  });
-
-  it("calls every console view built", () => {
-    expect(
-      declaredViewPaths(CONSOLE_SCREENS).filter((path) =>
-        CONSOLE_SCREENS.some((each) =>
-          viewsOf(each).some((view) => view.path === path && view.built),
-        ),
-      ),
-    ).toEqual([
-      "/console/people/everyone",
-      "/console/people/names-waiting",
-      "/console/workspaces/every-workspace",
-    ]);
-  });
-
-  it("lands each console screen's own address on its default view", async () => {
-    const landed: string[] = [];
-    for (const each of CONSOLE_SCREENS) {
-      const { router } = await appAt(each.path);
-      landed.push(router.state.location.pathname);
-    }
-
-    expect(landed).toEqual(["/console/people/everyone", "/console/workspaces/every-workspace"]);
   });
 });

@@ -94,7 +94,7 @@ const WATCHED: readonly Watched[] = [
     entry: "api",
     word: "app",
     permitted: [
-      { sense: "the whole product", written: /\b(?:an app|Better Answers app)\b/gi },
+      { sense: "the whole product", written: /\b(?:an app|better-answers app)\b/gi },
       { sense: "the SPA", written: /\b(?:single-page|web) app\b/gi },
       {
         sense: "the SPA's top layer, the directory it composes in",
@@ -247,19 +247,28 @@ const watchedIn = (root: string): readonly Scan[] => {
   });
 };
 
-const avoidedSenseLines = (root: string): readonly string[] => {
-  const watched = watchedIn(root);
-  return treeFilesUnder(root)
-    .filter((file) => !isCarvedOut(file))
+const linesWhere = (
+  root: string,
+  reads: (file: string) => boolean,
+  finds: (file: string, text: string) => boolean,
+): readonly string[] =>
+  treeFilesUnder(root)
+    .filter(reads)
     .flatMap((file) =>
       readUnder(root, file)
         .split("\n")
         .flatMap((text, index) =>
-          watched.some((one) => usesInAvoidedSense(one, file, text))
-            ? [`${file}:${String(index + 1)}: ${text.trim()}`]
-            : [],
+          finds(file, text) ? [`${file}:${String(index + 1)}: ${text.trim()}`] : [],
         ),
     );
+
+const avoidedSenseLines = (root: string): readonly string[] => {
+  const watched = watchedIn(root);
+  return linesWhere(
+    root,
+    (file) => !isCarvedOut(file),
+    (file, text) => watched.some((one) => usesInAvoidedSense(one, file, text)),
+  );
 };
 
 describe("the words the glossary avoids, read from the glossary", () => {
@@ -290,6 +299,43 @@ describe("where the tree uses a word in its avoided sense", () => {
     expect(
       avoidedSenseLines(repositoryRoot),
       "a line uses a word CONTEXT.md avoids, in the sense it avoids it. Write the glossary's word; where the use is a sense the glossary allows, write that sense's pattern beside the entry in WATCHED.",
+    ).toEqual([]);
+  });
+});
+
+const PRODUCT = "better-answers";
+
+/**
+ * Code alone: a notice is prose, whose name follows the docs. Elsewhere the old form may stand, as
+ * the platform's git author does.
+ */
+const READ_BY_A_PERSON = ["apps/web/index.html", "apps/web/src/", "apps/api/src/"];
+
+const isCode = (file: string): boolean => /\.(?:tsx?|html)$/.test(file);
+
+const avoidedNamesIn = (root: string): readonly string[] => {
+  const entry = entriesOf(readUnder(root, GLOSSARY)).find(({ term }) => term === PRODUCT);
+  return entry === undefined ? [] : avoidedIn(entry);
+};
+
+const avoidedNameLines = (root: string): readonly string[] => {
+  const finds = avoidedNamesIn(root).map((name) => findsIn(name, false));
+  return linesWhere(
+    root,
+    (file) => READ_BY_A_PERSON.some((prefix) => file.startsWith(prefix)) && isCode(file),
+    (_, text) => finds.some((found) => found(text)),
+  );
+};
+
+describe("the product's name, where a person reads it", () => {
+  it("reads the form the name's entry avoids", () => {
+    expect(avoidedNamesIn(repositoryRoot)).toEqual(["Better Answers"]);
+  });
+
+  it("finds it on no screen, tab title, page or email", () => {
+    expect(
+      avoidedNameLines(repositoryRoot),
+      `a line a person reads names the product in a form CONTEXT.md avoids. Write ${PRODUCT}, from the word table of its code path.`,
     ).toEqual([]);
   });
 });
@@ -326,12 +372,13 @@ let trees = 0;
 const findingsIn = (
   files: Readonly<Record<string, string>>,
   glossary = THE_GLOSSARY,
+  scan: (root: string) => readonly string[] = avoidedSenseLines,
 ): readonly string[] => {
   trees += 1;
   const root = throwawayRepository(path.join(scratch, `tree-${String(trees)}`));
   writeUnder(root, GLOSSARY, glossary);
   for (const [file, text] of Object.entries(files)) writeUnder(root, file, text);
-  return avoidedSenseLines(root);
+  return scan(root);
 };
 
 const findingsOver = (planted: string, file = "docs/planted.md"): readonly string[] =>
@@ -358,7 +405,8 @@ describe("the sense a planted line is read in", () => {
   });
 
   it.each([
-    `Better Answers is an ${WORD} for a company's knowledge.`,
+    `better-answers is an ${WORD} for a company's knowledge.`,
+    `The better-answers ${WORD} holds a company's knowledge.`,
     `Vite React single-page ${WORD}; talks to the api over tRPC only.`,
     `The web ${WORD} shows the Sources screen.`,
     `Signed in on ${WORD}., a session cookie host-only.`,
@@ -540,5 +588,40 @@ describe("a word retired outright, beside one merely avoided", () => {
     );
 
     expect(findings).toEqual([`docs/planted.md:2: The ${RETIRED} holds it.`]);
+  });
+});
+
+describe("the product's name in a planted tree", () => {
+  const NAMED = `- **${PRODUCT}** — the product's name. _Avoid_: Better Answers (the prose form).\n`;
+
+  const nameFindingsIn = (files: Readonly<Record<string, string>>): readonly string[] =>
+    findingsIn(files, NAMED, avoidedNameLines);
+
+  it("reads the tab title, word tables and pages alone", () => {
+    const planted = 'export const PRODUCT_NAME = "Better Answers";\n';
+
+    const findings = nameFindingsIn({
+      "apps/web/index.html": "<title>Better Answers</title>\n",
+      "apps/web/src/planted.ts": planted,
+      "apps/api/src/planted.ts": planted,
+      "apps/web/e2e/planted.ts": planted,
+      "apps/web/src/shared/ui/NOTICES.md": "The licence Better Answers ships under.\n",
+      "packages/core/src/planted.ts": planted,
+    });
+
+    expect(findings).toEqual([
+      `apps/api/src/planted.ts:1: ${planted.trim()}`,
+      "apps/web/index.html:1: <title>Better Answers</title>",
+      `apps/web/src/planted.ts:1: ${planted.trim()}`,
+    ]);
+  });
+
+  it("reads the old form in any case, passing the name", () => {
+    const findings = nameFindingsIn({
+      "apps/api/src/planted.ts":
+        'subject: "Your better answers code",\nsubject: "Your better-answers code",\n',
+    });
+
+    expect(findings).toEqual(['apps/api/src/planted.ts:1: subject: "Your better answers code",']);
   });
 });

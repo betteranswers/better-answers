@@ -1,73 +1,101 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type RefObject } from "react";
 
 import { Icon } from "@/shared/icon.tsx";
-import type { Screen, Surface } from "@/shared/screens.ts";
+import type { Place, VisibleSurface } from "@/shared/navigation.ts";
 import { Button } from "@/shared/ui/button.tsx";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/shared/ui/sheet.tsx";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/shared/ui/sheet.tsx";
 
 import { IconRail } from "./icon-rail.tsx";
 import { SecondaryNav } from "./secondary-nav.tsx";
+import { NAVIGATION_SHEET, TOGGLE } from "./words.ts";
 
-const SCREENS_AND_VIEWS = "Screens and views";
+type Sheeting = {
+  readonly asked: boolean;
+  readonly ask: (asked: boolean) => void;
+  /** The one button in the band that governs the navigation, and gets focus back from the sheet. */
+  readonly controlRef: RefObject<HTMLButtonElement | null>;
+};
+
+/** The frame's, so the button in the band and the sheet below it read one state. */
+export const useNavigationSheet = (): Sheeting => {
+  const [asked, ask] = useState(false);
+  const controlRef = useRef<HTMLButtonElement | null>(null);
+
+  return { asked, ask, controlRef };
+};
 
 /**
- * The corner the navigation is governed from: a sheet's trigger when narrow, the secondary nav's
- * toggle when wide. `controls` is that nav's id.
+ * The toggle for the secondary nav when wide, the sheet's button when narrow. `controls` is the
+ * nav's id.
  */
-export function NavigationControl(properties: {
-  readonly surface: Surface;
+export function NavigationButton(properties: {
+  readonly sheet: Sheeting;
   readonly wide: boolean;
   readonly showing: boolean;
   readonly controls: string;
-  readonly openScreen: Screen | undefined;
-  readonly openViewPath: string | undefined;
+  readonly open: Place<VisibleSurface> | undefined;
   readonly onShow: (showing: boolean) => void;
 }) {
-  const [asked, setAsked] = useState(false);
-  const control = useRef<HTMLButtonElement | null>(null);
-  const close = () => setAsked(false);
+  const { wide, showing, controls, open, onShow } = properties;
+  const { controlRef, asked, ask } = properties.sheet;
+
+  if (!wide) {
+    return (
+      <Button
+        ref={controlRef}
+        type="button"
+        variant="ghost"
+        size="icon"
+        aria-haspopup="dialog"
+        aria-expanded={asked}
+        onClick={() => ask(true)}
+      >
+        <Icon name="navigation" className="text-muted-foreground" />
+        <span className="sr-only">{NAVIGATION_SHEET}</span>
+      </Button>
+    );
+  }
+
+  // An address that is no screen has no surface to list, so there is nothing to govern.
+  if (open === undefined) return null;
+
+  return (
+    <Button
+      ref={controlRef}
+      type="button"
+      variant="ghost"
+      size="icon"
+      className="shrink-0"
+      aria-expanded={showing}
+      aria-controls={controls}
+      onClick={() => onShow(!showing)}
+    >
+      <Icon name="secondary-nav" className="text-muted-foreground" />
+      <span className="sr-only">{showing ? TOGGLE.hide : TOGGLE.show}</span>
+    </Button>
+  );
+}
+
+/** Mounted in both layouts, so a crossing is a close it answers, not an unmount taking focus. */
+export function NavigationSheet(properties: {
+  readonly sheet: Sheeting;
+  readonly wide: boolean;
+  readonly surfaces: readonly VisibleSurface[];
+  readonly open: Place<VisibleSurface> | undefined;
+}) {
+  const { controlRef, asked, ask } = properties.sheet;
+  const close = () => ask(false);
 
   const handBackFocus = (event: Event) => {
-    // Radix hands focus to the trigger, which a crossing has taken away; this corner's control
-    // is in both layouts.
+    // Radix hands focus to its own trigger, which this sheet lacks; the band's button takes it,
+    // or the screen when no button is drawn.
     event.preventDefault();
     close();
-    control.current?.focus();
+    (controlRef.current ?? document.querySelector("main"))?.focus();
   };
 
   return (
-    /*
-     * The root stays mounted in both layouts, so a crossing is a close the sheet answers, not an
-     * unmount that takes the reader's focus.
-     */
-    <Sheet open={asked && !properties.wide} onOpenChange={setAsked}>
-      {properties.wide ? null : (
-        <SheetTrigger asChild>
-          <Button ref={control} type="button" variant="ghost" size="icon">
-            <Icon name="navigation" className="text-muted-foreground" />
-            <span className="sr-only">{SCREENS_AND_VIEWS}</span>
-          </Button>
-        </SheetTrigger>
-      )}
-
-      {/* An address that is no screen has no views to list, so there is nothing to govern. */}
-      {properties.wide && properties.openScreen !== undefined ? (
-        <Button
-          ref={control}
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-expanded={properties.showing}
-          aria-controls={properties.controls}
-          onClick={() => properties.onShow(!properties.showing)}
-        >
-          <Icon name="secondary-nav" className="text-muted-foreground" />
-          <span className="sr-only">
-            {properties.showing ? "Hide the secondary nav" : "Show the secondary nav"}
-          </span>
-        </Button>
-      ) : null}
-
+    <Sheet open={asked && !properties.wide} onOpenChange={ask}>
       {/* The regions keep the widths they have in the shell, so nothing here is a second
           layout to maintain. */}
       <SheetContent
@@ -76,21 +104,21 @@ export function NavigationControl(properties: {
         onCloseAutoFocus={handBackFocus}
       >
         <SheetHeader className="border-b border-border">
-          <SheetTitle>{SCREENS_AND_VIEWS}</SheetTitle>
+          <SheetTitle>{NAVIGATION_SHEET}</SheetTitle>
         </SheetHeader>
 
         <IconRail
-          surface={properties.surface}
-          openScreen={properties.openScreen}
+          surfaces={properties.surfaces}
+          openSurfaceId={properties.open?.surface.id}
           tooltips={false}
           onChoose={close}
         />
 
-        {properties.openScreen === undefined ? null : (
+        {properties.open === undefined ? null : (
           <SecondaryNav
             showing
-            screen={properties.openScreen}
-            openViewPath={properties.openViewPath}
+            surface={properties.open.surface}
+            openScreenPath={properties.open.screen.path}
             onChoose={close}
           />
         )}

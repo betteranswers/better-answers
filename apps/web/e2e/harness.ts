@@ -5,12 +5,13 @@ import { z } from "zod";
 
 import type { REDACTION_TIERS, SENSITIVITIES } from "@better-answers/schema";
 
+import { BREADCRUMB, goHome, RAIL, UNKNOWN_SCREEN } from "@/app/words.ts";
 import { SIGN_IN_WORDS, type CarriedOn } from "@/features/auth/sign-in-words.ts";
 import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
 import type { RefusalWord } from "@/shared/api/trpc.ts";
-import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
+import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
+import { headingOf, HOMES, type Role, type Surface } from "@/shared/navigation.ts";
 import { sentenceOf, type Said } from "@/shared/refusal-words.ts";
-import { HOMES, type Role } from "@/shared/screens.ts";
 
 const HARNESS = "/__harness";
 
@@ -291,14 +292,43 @@ export const codeSentTo = async (api: APIRequestContext, email: string): Promise
 export const anAddress = (who: string): string =>
   `${who}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
 
-/** Sign-out is one disclosure in from the top bar, so a spec that leaves opens the menu first. */
-export const signOutFromTheShell = async (page: Page, who: string): Promise<void> => {
-  await page
-    .getByRole("banner")
-    .getByRole("button", { name: new RegExp(who) })
-    .click();
-  await page.getByRole("menuitem", { name: "Sign out" }).click();
+/** Named for the person, though it shows their initials alone. */
+export const avatarOf = (page: Page, who: string): Locator =>
+  page.getByRole("banner").getByRole("button", { name: new RegExp(who) });
+
+/** The avatar shows initials alone, so the person's name and role are one disclosure in. */
+export const personMenuOpened = async (page: Page, who: string): Promise<Locator> => {
+  await avatarOf(page, who).click();
+  const menu = page.getByRole("menu", { name: new RegExp(who) });
+  await expect(menu).toBeVisible();
+  return menu;
 };
+
+/** Sign-out is one disclosure in from the band, so a spec that leaves opens the menu first. */
+export const signOutFromTheShell = async (page: Page, who: string): Promise<void> => {
+  const menu = await personMenuOpened(page, who);
+  await menu.getByRole("menuitem", { name: "Sign out" }).click();
+};
+
+/** Named for where the person is: the workspace they are reading, or the console. */
+export const switcherOf = (page: Page, here: string): Locator =>
+  page.getByRole("banner").getByRole("button", { name: here, exact: true });
+
+export const switcherMenuOf = (page: Page, here: string): Locator =>
+  page.getByRole("menu", { name: here });
+
+export const railOf = (page: Page): Locator => page.getByRole("navigation", { name: RAIL });
+
+/** The secondary nav, named for the open surface. */
+export const navOf = (page: Page, surface: Surface): Locator =>
+  page.getByRole("navigation", { name: surface.name });
+
+/** The current part is `role="link"` too, so a part that leads somewhere is told by its `href`. */
+export const crumbOf = (page: Page, name: string): Locator =>
+  page
+    .getByRole("banner")
+    .getByRole("navigation", { name: BREADCRUMB })
+    .getByRole("link", { name, exact: true });
 
 /** Needs a page with nothing focused yet, so the first Tab lands on the skip link. */
 export const skipLinkReachesTheScreen = async (page: Page): Promise<void> => {
@@ -308,10 +338,20 @@ export const skipLinkReachesTheScreen = async (page: Page): Promise<void> => {
   await expect(page.getByRole("main")).toBeFocused();
 };
 
-export const tabUntilFocused = async (page: Page, target: Locator, most = 40): Promise<void> => {
+/**
+ * `eachStop` runs after every press, the one landing on `target` too, but never for the start,
+ * which no press reached.
+ */
+export const tabUntilFocused = async (
+  page: Page,
+  target: Locator,
+  most = 40,
+  eachStop: () => Promise<void> = async () => {},
+): Promise<void> => {
   for (let pressed = 0; pressed < most; pressed += 1) {
     if (await target.evaluate((node) => node === document.activeElement)) return;
     await page.keyboard.press("Tab");
+    await eachStop();
   }
   await expect(target, "Tab never reached it").toBeFocused();
 };
@@ -395,28 +435,39 @@ export const aMemberSignedInAt = async (
   return workspace;
 };
 
-/** `?` opens a screen's keystrokes from anywhere on it outside a field. */
+/**
+ * `?` opens the keystrokes of `screen`, named as the navigation list names it, from anywhere on
+ * it outside a field.
+ */
 export const keystrokesListed = async (page: Page, screen: string): Promise<Locator> => {
   await page.keyboard.press("?");
-  const listed = page.getByRole("dialog", { name: `${KEYSTROKE_WORDS.button} on ${screen}` });
+  const listed = page.getByRole("dialog", { name: keystrokesOn(screen) });
   await expect(listed).toBeVisible();
   return listed;
 };
+
+/** The one button opening the list: the rail's or the band's, or a screen's outside the shell. */
+export const keystrokesButton = (within: Page | Locator): Locator =>
+  within.getByRole("button", { name: KEYSTROKE_WORDS.button, exact: true });
 
 /** Focus lands back on the button a task after the list is gone, unless a key has moved it. */
 export const keystrokesDismissed = async (page: Page, listed: Locator): Promise<void> => {
   await page.keyboard.press("Escape");
   await expect(listed).toHaveCount(0);
-  await expect(
-    page.getByRole("button", { name: KEYSTROKE_WORDS.button, exact: true }),
-  ).toBeFocused();
+  await expect(keystrokesButton(page)).toBeFocused();
 };
 
-/** Read off the screen list, so moving a role's home breaks no spec. */
+/** Read off the navigation list, so moving a role's home breaks no spec. */
 export const landedAtHome = async (page: Page, role: Role): Promise<void> => {
   const home = HOMES[role];
-  await expect(page).toHaveURL(new RegExp(`${home.defaultView}$`));
-  await expect(page.getByRole("heading", { level: 1, name: home.name })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`${home.path}$`));
+  await expect(page.getByRole("heading", { level: 1, name: headingOf(home) })).toBeVisible();
+};
+
+/** A screen hidden from the role says what an address that never existed says. */
+export const notFoundOfferingHome = async (page: Page, role: Role): Promise<void> => {
+  await expect(page.getByRole("heading", { level: 1, name: UNKNOWN_SCREEN.heading })).toBeVisible();
+  await expect(page.getByRole("link", { name: goHome(HOMES[role]) })).toBeVisible();
 };
 
 /** From the sign-in screen to an Admin's home, as the Admin of one workspace arrives. */

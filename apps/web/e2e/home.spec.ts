@@ -1,27 +1,22 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
-import { goHome, unbuiltLineOf, UNKNOWN_SCREEN } from "@/app/words.ts";
+import { goHome, JUMP_TO, RAIL, unbuiltLineOf, UNKNOWN_SCREEN } from "@/app/words.ts";
 import { aRole, ROLES } from "@/features/people/role-meanings.ts";
-import {
-  CONTROL_CENTRE,
-  controlCentreOpensAt,
-  HOMES,
-  READER_SURFACE,
-  viewAt,
-  type Role,
-} from "@/shared/screens.ts";
+import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
+import { CONTROL_CENTRE, headingOf, HOMES, type Role } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
   addMember,
   anAddress,
+  keystrokesDismissed,
+  keystrokesListed,
   landedAtHome,
   person,
   provision,
   quoted,
   signIn,
   skipLinkReachesTheScreen,
-  tabUntilFocused,
 } from "./harness.ts";
 
 const READ_BUDGET_MS = 1000;
@@ -41,17 +36,7 @@ const unknownScreen = (page: Page) =>
   page.getByRole("heading", { level: 1, name: UNKNOWN_SCREEN.heading });
 
 const personMenu = (page: Page, role: Role) =>
-  page.getByRole("banner").getByRole("button", { name: `A ${role}` });
-
-/** Radix focuses the menu's first entry when a key opens it, and each surface's link comes first. */
-const firstInThePersonMenu = async (page: Page, role: Role, name: string) => {
-  await tabUntilFocused(page, personMenu(page, role));
-  await page.keyboard.press("Enter");
-  await expect(page.getByRole("menuitem", { name })).toBeFocused();
-  await page.keyboard.press("Enter");
-  await expect(page.getByRole("menuitem")).toHaveCount(0);
-  await expect(personMenu(page, role)).toBeFocused();
-};
+  page.getByRole("banner").getByRole("button", { name: `A ${role}`, exact: true });
 
 for (const role of ROLES) {
   const home = HOMES[role];
@@ -82,7 +67,7 @@ for (const role of ROLES) {
   });
 }
 
-test("offers a Viewer's home from an unknown view, shell kept", async ({
+test("offers a Viewer's home from an unknown screen, shell kept", async ({
   page,
   request,
   passesTheAccessibilityGate,
@@ -91,10 +76,10 @@ test("offers a Viewer's home from an unknown view, shell kept", async ({
   await signedInAs(page, request, "Viewer");
   await landedAtHome(page, "Viewer");
 
-  await page.goto("/system/not-a-view");
+  await page.goto("/system/not-a-screen");
 
   await expect(unknownScreen(page)).toBeVisible();
-  await expect(page.getByRole("navigation", { name: CONTROL_CENTRE.name })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: RAIL })).toBeVisible();
   await expect(page.getByRole("link", { name: goHome(home) })).toBeVisible();
   await passesTheAccessibilityGate();
   await skipLinkReachesTheScreen(page);
@@ -105,14 +90,13 @@ test("offers a Viewer's home from an unknown view, shell kept", async ({
 });
 
 for (const role of ["Editor", "Viewer"] as const) {
-  test(`tells ${aRole(role)} on Ask to ask in Claude meanwhile`, async ({ page, request }) => {
+  test(`shows ${aRole(role)} Ask alone, on its way (AE2)`, async ({ page, request }) => {
     const home = HOMES[role];
-    const view = viewAt(READER_SURFACE, home.defaultView);
     await signedInAs(page, request, role);
     await landedAtHome(page, role);
 
-    await expect(page.getByRole("navigation", { name: READER_SURFACE.name })).toMatchAriaSnapshot(`
-      - navigation ${quoted(READER_SURFACE.name)}:
+    await expect(page.getByRole("navigation", { name: RAIL })).toMatchAriaSnapshot(`
+      - navigation ${quoted(RAIL)}:
         - list:
           - /children: equal
           - listitem:
@@ -121,26 +105,31 @@ for (const role of ["Editor", "Viewer"] as const) {
     await expect(page.getByRole("navigation", { name: CONTROL_CENTRE.name })).toHaveCount(0);
     await expect(page.getByRole("main")).toMatchAriaSnapshot(`
       - main "Screen":
-        - heading ${quoted(home.name)} [level=1]
-        - heading ${quoted(view?.name ?? "")} [level=2]
+        - heading ${quoted(headingOf(home))} [level=1]
         - paragraph: ${quoted(unbuiltLineOf(home))}
     `);
   });
 
-  test(`takes ${aRole(role)} from Ask to Control Centre and back`, async ({ page, request }) => {
-    const home = HOMES[role];
-    const opening = controlCentreOpensAt(role);
+  test(`shows ${aRole(role)} Members as if it never existed (AE9)`, async ({ page, request }) => {
     await signedInAs(page, request, role);
     await landedAtHome(page, role);
 
-    await firstInThePersonMenu(page, role, CONTROL_CENTRE.name);
-    await expect(page).toHaveURL(new RegExp(`${opening.defaultView}$`));
-    await expect(page.getByRole("navigation", { name: CONTROL_CENTRE.name })).toBeVisible();
-    await expect(page.getByRole("heading", { level: 1, name: opening.name })).toBeVisible();
+    await page.goto("/people/not-a-screen");
+    await expect(page.getByRole("link", { name: goHome(HOMES[role]) })).toBeVisible();
+    const neverExisted = await page.getByRole("main").ariaSnapshot();
 
-    await firstInThePersonMenu(page, role, home.name);
-    await landedAtHome(page, role);
-    await expect(page.getByRole("navigation", { name: READER_SURFACE.name })).toBeVisible();
+    await page.goto(HOMES.Admin.path);
+
+    await expect(page.getByRole("link", { name: goHome(HOMES[role]) })).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`${HOMES.Admin.path}$`));
+    expect(await page.getByRole("main").ariaSnapshot(), "a hidden screen gives itself away").toBe(
+      neverExisted,
+    );
+    await expect(page.getByRole("tablist")).toHaveCount(0);
+    await expect(page.getByRole("navigation", { name: CONTROL_CENTRE.name })).toHaveCount(0);
+
+    await personMenu(page, role).click();
+    await expect(page.getByRole("menuitem")).toHaveText(["Sign out"]);
   });
 }
 
@@ -156,4 +145,33 @@ test("draws a Viewer's Ask within a second of arriving", async ({ page, request 
 
   test.info().annotations.push({ type: "Ask drawn", description: `${elapsedMs} ms` });
   expect(elapsedMs, "Ask was not drawn within its second").toBeLessThan(READ_BUDGET_MS);
+});
+
+test("lists the shell's keystrokes alone on Ask and unknown screens", async ({
+  page,
+  request,
+  passesTheAccessibilityGate,
+}) => {
+  const home = HOMES.Viewer;
+  await signedInAs(page, request, "Viewer");
+  await landedAtHome(page, "Viewer");
+  const theShells = [KEYSTROKE_WORDS.showTheList, JUMP_TO.name];
+
+  await page
+    .getByRole("navigation", { name: RAIL })
+    .getByRole("button", { name: KEYSTROKE_WORDS.button })
+    .click();
+  const onAsk = page.getByRole("dialog", { name: keystrokesOn(home.name) });
+  await expect(onAsk).toContainText(KEYSTROKE_WORDS.noneOfItsOwn);
+  await expect(onAsk.getByRole("definition")).toHaveText(theShells);
+  await passesTheAccessibilityGate();
+  await keystrokesDismissed(page, onAsk);
+
+  // Hidden from a Viewer, so it is the screen that never existed.
+  await page.goto(HOMES.Admin.path);
+  await expect(unknownScreen(page)).toBeVisible();
+  const onUnknown = await keystrokesListed(page, KEYSTROKE_WORDS.thisScreen);
+  await expect(onUnknown).toContainText(KEYSTROKE_WORDS.noneOfItsOwn);
+  await expect(onUnknown.getByRole("definition")).toHaveText(theShells);
+  await keystrokesDismissed(page, onUnknown);
 });

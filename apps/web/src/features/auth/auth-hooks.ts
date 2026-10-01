@@ -1,9 +1,11 @@
 import {
+  matchQuery,
   mutationOptions,
   queryOptions,
   useMutation,
   useQuery,
   useQueryClient,
+  type Query,
   type QueryClient,
 } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -11,7 +13,7 @@ import type { BetterFetchError } from "better-auth/client";
 import { useState } from "react";
 import { z } from "zod";
 
-import { useTRPC } from "@/shared/api/trpc.ts";
+import { useTRPC, type ApiProxy } from "@/shared/api/trpc.ts";
 
 import { authClient } from "./auth-client.ts";
 import {
@@ -23,11 +25,12 @@ import {
   nextAfterSignIn,
   pageQuery,
 } from "./carried-flow.ts";
-import { forgetMembership } from "./membership.ts";
+import { forgetMembership, rereadMembership } from "./membership.ts";
 import { rememberTheSession, sessionRemembered } from "./session-memory.ts";
 import type { Arrival } from "./sign-in-words.ts";
 
 const AUTH_KEYS = {
+  all: ["auth"],
   session: ["auth", "session"],
   workspaces: ["auth", "workspaces"],
 } as const;
@@ -55,7 +58,9 @@ const listOrganizationsOptions = () =>
     queryFn: () => unwrap(authClient.organization.list()),
   });
 
-export const useListOrganizations = () => useQuery(listOrganizationsOptions());
+/** `asked` false reads nothing yet, for a list shown only once a menu opens. */
+export const useListOrganizations = (asked = true) =>
+  useQuery({ ...listOrganizationsOptions(), enabled: asked });
 
 /** The per-email ceiling in front of Better Auth answers the first; Better Auth's own, the second. */
 const WAIT_HEADERS = ["retry-after", "x-retry-after"] as const;
@@ -200,8 +205,8 @@ export const useSetDisplayName = () => {
 };
 
 /**
- * A join points the session at the workspace joined, so the held session, membership and list of
- * workspaces are dropped before the shell reads them.
+ * A join points the session at the workspace joined, so what is held of the workspace left is
+ * dropped before the shell reads it.
  */
 export const useAcceptInvitation = () => {
   const api = useTRPC();
@@ -211,6 +216,7 @@ export const useAcceptInvitation = () => {
     api.person.acceptInvitation.mutationOptions({
       onSuccess: () => {
         forgetMembership(queryClient, api);
+        forgetTheWorkspaceLeft(queryClient, api);
         queryClient.removeQueries({ queryKey: AUTH_KEYS.session });
         queryClient.removeQueries({ queryKey: AUTH_KEYS.workspaces });
         void navigate(leavingFor(nextAfterJoining(pageQuery())));
@@ -253,12 +259,57 @@ export const useSignOut = (returnTo?: string) => {
   };
 };
 
+/** Better Auth's code for a pick of a workspace the person holds no membership in. */
+const noMembership = z.object({ code: z.literal("USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION") });
+
+/** A refused switch or pick in the platform's terms, so no screen reads the provider's error. */
+export class SwitchRefused extends Error {
+  readonly noLongerAMember: boolean;
+
+  constructor(noLongerAMember: boolean) {
+    super(noLongerAMember ? "no longer a member" : "switch refused");
+    this.name = "SwitchRefused";
+    this.noLongerAMember = noLongerAMember;
+  }
+}
+
+const setActiveWorkspace = (organizationId: string) =>
+  unwrap(authClient.organization.setActive({ organizationId })).catch(
+    (refused: BetterFetchError) => {
+      throw new SwitchRefused(noMembership.safeParse(refused).success);
+    },
+  );
+
 const setActiveOrganizationOptions = () =>
-  mutationOptions<unknown, BetterFetchError, { organizationId: string }>({
-    mutationFn: (input) => unwrap(authClient.organization.setActive(input)),
+  mutationOptions<unknown, SwitchRefused, { organizationId: string }>({
+    mutationFn: (input) => setActiveWorkspace(input.organizationId),
   });
 
-/** A pick drops the held membership and marks the held session and workspace list stale. */
+/**
+ * The session's and the console's reads belong to no workspace, so a switch keeps them. Naming
+ * these fails safe: one left off is read again.
+ */
+const aboutTheWorkspace = (api: ApiProxy) => {
+  const theirOwn = [
+    { queryKey: AUTH_KEYS.all },
+    api.session.pathFilter(),
+    api.console.pathFilter(),
+  ];
+  return (query: Query) => !theirOwn.some((filters) => matchQuery(filters, query));
+};
+
+/**
+ * Some reads, such as the members, name no workspace in their key, so a held answer is the left
+ * workspace's.
+ */
+const forgetTheWorkspaceLeft = (queryClient: QueryClient, api: ApiProxy) => {
+  queryClient.removeQueries({ predicate: aboutTheWorkspace(api) });
+};
+
+/**
+ * A pick drops the held membership and every read of the workspace left, and marks the held
+ * session and workspace list stale.
+ */
 export const useSetActiveOrganization = () => {
   const queryClient = useQueryClient();
   const api = useTRPC();
@@ -266,10 +317,32 @@ export const useSetActiveOrganization = () => {
     ...setActiveOrganizationOptions(),
     onSuccess: () => {
       forgetMembership(queryClient, api);
+      forgetTheWorkspaceLeft(queryClient, api);
       return Promise.all([
         queryClient.invalidateQueries({ queryKey: AUTH_KEYS.session }),
         queryClient.invalidateQueries({ queryKey: AUTH_KEYS.workspaces }),
       ]);
+    },
+  });
+};
+
+export type SwitchedTo = { readonly id: string; readonly name: string };
+
+/**
+ * The membership is read again in place, not dropped, so the band blanks between the two only
+ * when that read fails or waits.
+ */
+export const useSwitchWorkspace = () => {
+  const queryClient = useQueryClient();
+  const api = useTRPC();
+  const navigate = useNavigate();
+  return useMutation<unknown, SwitchRefused, SwitchedTo>({
+    mutationFn: (workspace) => setActiveWorkspace(workspace.id),
+    onSuccess: async () => {
+      forgetTheWorkspaceLeft(queryClient, api);
+      await rereadMembership(queryClient, api);
+      void queryClient.invalidateQueries({ queryKey: AUTH_KEYS.session });
+      await navigate({ href: "/", replace: true });
     },
   });
 };
@@ -279,9 +352,12 @@ const resumeAnswer = z.object({ redirect: z.boolean().optional(), url: z.string(
 export type ResumeAnswer = z.infer<typeof resumeAnswer>;
 
 const oauthContinueOptions = () =>
-  mutationOptions<ResumeAnswer, BetterFetchError, { postLogin: true }>({
-    mutationFn: async (input) =>
-      resumeAnswer.parse(await unwrap(authClient.oauth2.continue(input))),
+  mutationOptions<ResumeAnswer, Error, { postLogin: true }>({
+    mutationFn: async (input) => {
+      const { data, error } = await authClient.oauth2.continue(input);
+      if (error !== null) throw new Error(`answered ${String(error.status)}`);
+      return resumeAnswer.parse(data);
+    },
   });
 
 export const useOAuthContinue = () => useMutation(oauthContinueOptions());

@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
 
 import { hostnameOfUrl, originOfUrl } from "../src/ingress/hostnames.ts";
+import { PRODUCT_NAME } from "../src/product-name.ts";
 import { startApp } from "./harness.ts";
 
 const PORT = 3200;
@@ -54,7 +55,7 @@ const workspace = await app.provision({ name: "Dogfood", adminEmail: "admin@exam
 
 serve({ fetch: app.server.fetch, port: PORT, hostname: "127.0.0.1" }, () => {
   say("");
-  say(`  Better Answers is at ${publicUrl}/sign-in`);
+  say(`  ${PRODUCT_NAME} is at ${publicUrl}/sign-in`);
   if (publicUrl !== LOOPBACK_URL) {
     say(`  Listening on ${LOOPBACK_URL} for the tunnel in front of it`);
   }

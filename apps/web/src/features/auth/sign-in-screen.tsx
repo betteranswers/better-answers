@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { flushSync } from "react-dom";
 
+import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import { KeystrokesAct, useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { RefusalLine } from "@/shared/refusal-outcome.tsx";
 import type { Said } from "@/shared/refusal-words.ts";
@@ -106,7 +107,7 @@ function CodeStepActs(properties: {
         {SIGN_IN_WORDS.otherAddress}
       </Button>
       <KeystrokesAct
-        screen={SIGN_IN_WORDS.keystrokesOn}
+        screen={KEYSTROKE_WORDS.thisScreen}
         keystrokes={[SEND_A_NEW_CODE, CHANGE_ADDRESS]}
       />
     </div>

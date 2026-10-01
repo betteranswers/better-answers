@@ -248,7 +248,8 @@
               ><i>Row actions across Control Centre</i>
             </li>
             <li>
-              <b><span class="src">shadcn</span>Sonner</b><i>Replaces our Toast wholesale</i>
+              <b><span class="src">shadcn</span>Breadcrumb · Command</b
+              ><i>The band's breadcrumb and ⌘K jump-to</i>
             </li>
           </ul>
         </div>
@@ -321,7 +322,7 @@
             <li><b>Button · Frame · Card</b><i>Registration marks; the one solid object</i></li>
             <li><b>SummaryList · Details</b><i>GOV.UK semantics, required</i></li>
             <li><b>EmptyState</b><i>One line. An action only where nothing else offers it</i></li>
-            <li><b>SideNav</b><i>Screens, not sections</i></li>
+            <li><b>Band · rail · secondary nav</b><i>Surfaces, then groups over screens</i></li>
             <li><b>Icon</b><i>The one place Phosphor lives</i></li>
             <li><b>Grid · Dot · Noise</b><i>Already ported and tuned</i></li>
           </ul>
@@ -330,13 +331,13 @@
 
       <div class="foot">
         <div class="note">
-          <strong>The app shell is shadcn Sidebar, not Kibo</strong>
+          <strong>The app shell is hand-built, not shadcn Sidebar</strong>
           <p>
-            Kibo has no shell. Build it from <code>sidebar</code>, <code>breadcrumb</code>,
-            <code>command</code> (⌘K), <code>separator</code> and <code>scroll-area</code>, then
-            dress it: 248px rail on <code>--surface-sunken</code>, 48px top bar, wordmark in Geist
-            Mono, marks on the page region only. Kibo <b>Blocks</b> — Hero, Pricing, Testimonial —
-            are for the marketing site, never the product.
+            A two-row frame: the 48px band, then the 56px rail, the 248px secondary nav and the
+            screen. Only the nav hides, so the band never moves. <code>breadcrumb</code> and
+            <code>command</code> (⌘K) come from shadcn. <code>sidebar</code> is not installed: it
+            keeps its state in a cookie, binds ⌘B and animates the collapse. Kibo <b>Blocks</b> are
+            for the marketing site, never the product.
           </p>
         </div>
         <div class="note">

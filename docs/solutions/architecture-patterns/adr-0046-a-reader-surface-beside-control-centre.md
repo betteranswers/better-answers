@@ -1,5 +1,5 @@
 ---
-title: "Editors and Viewers land on Ask, on a reader surface beside Control Centre"
+title: "Editors and Viewers land on Ask, a surface in the one rail beside Control Centre"
 date: 2026-09-27
 module: apps/web
 problem_type: architecture_pattern
@@ -8,45 +8,48 @@ severity: medium
 applies_when:
   - "Adding a screen for Editors or Viewers, or deciding which surface a screen belongs on"
   - "Changing where a role lands after signing in, or where a lost member is sent"
-  - "Changing Control Centre's screens, Questions' views or a surface's person menu"
+  - "Changing who may read the answer audit, or where a person reads their own questions"
 tags:
   - adr-0046
-  - reader-surface
+  - surface
   - ask
   - control-centre
   - home
-  - person-menu
+  - answer-audit
 ---
 
-# Editors and Viewers land on Ask, on a reader surface beside Control Centre
+# Editors and Viewers land on Ask, a surface in the one rail beside Control Centre
 
 ## The decision
 
-- A **reader surface** sits beside Control Centre and the console. It is drawn in the same three regions: icon rail, secondary nav and top bar. Its navigation is named *Better Answers*.
-- **Ask** is its first screen, at `/ask` (`apps/web/src/shared/screens.ts`). It has two views, *New question* (the default) and *Your questions*.
-- An Editor's and a Viewer's home is Ask. They land there after signing in, and are sent back there when a screen fails or an address names none.
-- An Admin still lands on People.
-- Control Centre stays the one Admin surface. Questions and its three views are unchanged, their names and addresses too, *Answer audit* included.
-- Each workspace surface's person menu links to the other: Control Centre's to Ask, the reader surface's to Control Centre. The link to the console is shown to the operator alone, on either menu.
+- **Ask** is a surface in the one rail, beside Knowledge, Inbox and Control Centre (ADR 0047). It was first drawn apart from Control Centre, as a reader surface in regions of its own. It is now one entry in the same rail.
+- Ask has two screens, *New question* (the default) and *Your questions*, at `/ask`.
+- An Editor's and a Viewer's home is Ask. They land there after signing in, and the not-found screen offers it back. Until Ask is built, it opens a screen saying plainly that it is on its way.
+- An Admin lands on People › Members until Control Centre › Overview is built.
+- Control Centre stays the one Admin surface, shown to Admins alone. Questions keeps the answer audit and the answer tests, their names and addresses too, *Answer audit* included.
+- What this record first set aside as a filtered Control Centre is now the decision, one level up: one rail, filtered screen by screen by role or by ownership of a domain (ADR 0047). Control Centre itself stays Admin-only, so a reader's home is never in it.
+- The answer audit is read by Admins alone, in Control Centre › Questions. Each person reads their own questions in Ask › Your questions.
+- An owner decides in their Inbox, whatever their role (ADR 0047).
+- The console is reached from the workspace switcher, which lists it to the operator alone.
 
-Three things stay open:
-
-- An Editor's home once question sets land: Ask, or the question sets.
-- Who may read the answer audit. It could show a reader only their own questions, or everyone's, with or without who asked.
-- Where an owning Editor decides: in Control Centre, or in a *Your queue* on the reader surface.
+One thing stays open: an Editor's home once question sets land. It is Ask, or the question sets.
 
 ## Why
 
 - Someone who asks questions and reads answers should land where asking happens. Questions is where an Admin judges the answers other people got. Sending a Viewer there first shows them an audit they cannot act on, under a name they have not learnt yet.
 - The first fix proposed was to rename the view *Answers*. ADR 0017 had already refused that word for this door, because it would send readers to the bid library's wrong home, and the first client's bid library is 241 `Answer` concepts. The design review found the home was the fault, and the name never was.
-- The change is cheap. The web client already runs a second surface, the console, through the same frame, so a third is one more table of screens and one more set of routes.
+- The first change was cheap: the web client already ran a second surface, the console, through the same frame. One rail of surfaces then made a second set of regions unnecessary. An Admin who also asks reaches Ask from the same rail.
+- A reader needs their own history and the flags they can act on, not the workspace's questions. Ask gives them the first and their Inbox the second, so the workspace-wide audit stays with the Admin.
 
 ## Rejected
 
 - Renaming *Answer audit* to *Answers*: ADR 0017 refused the word for this door.
 - Keeping readers on Questions and improving its unbuilt line: the screen under it still audits everyone's answers.
-- Showing readers a filtered Control Centre: not rejected, but a different decision. A filtered Control Centre is still the Admin's surface, so it would not become a reader's home.
+- Letting readers read everyone's answers in the audit, with or without who asked: they need their own, not the workspace's.
+- A *Your queue* on the reader surface for an owning Editor: the Inbox serves every owner, whatever their role.
 
 ## History
 
-The full record, with no amendments: `docs/archive/adr/0046-a-reader-surface-beside-control-centre.md`.
+The full record as first written, with no amendments: `docs/archive/adr/0046-a-reader-surface-beside-control-centre.md`.
+
+Edited 30/09/2026 with ADR 0047, after the archived record was frozen: the reader surface became the Ask surface in one rail, the filtered Control Centre it had set aside became the decision, and two of its three open questions were answered, who reads the answer audit and where an owning Editor decides. The filename keeps the old words so references still resolve.

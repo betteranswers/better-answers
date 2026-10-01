@@ -67,7 +67,7 @@ function RequestRow(properties: {
       <TableCell className="whitespace-normal">
         <Requester request={request} />
       </TableCell>
-      <TableCell className="max-w-prose whitespace-normal wrap-anywhere">
+      <TableCell className="max-w-measure whitespace-normal wrap-anywhere">
         {request.reason}
       </TableCell>
       <TableCell>

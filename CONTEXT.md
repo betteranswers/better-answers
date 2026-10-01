@@ -153,8 +153,9 @@ Where a unit lives is decided by **minting**.
   _Avoid_: proposal (the bid document), offered change, revision.
 - **inbox** — where suggestions wait to be decided: the queue of one workspace's suggestions
   and their payloads, platform state in no knowledge layer. Nothing reads a payload but the
-  acceptance path, and no run reads another run's candidates out of it. _Avoid_: queue (a
-  worker's), review queue.
+  acceptance path, and no run reads another run's candidates out of it. An Admin decides from it
+  on Control Centre › Suggestions; a person's **Inbox** *surface* is not it, and points into it.
+  _Avoid_: queue (a worker's), review queue.
 - **concept write request** — a suggestion's payload: the concept file it would write and the
   merge key it means it for, committed on acceptance and never on validation. It carries no
   IRI, because identity is the acceptance's to resolve. _Avoid_: draft, pending concept.
@@ -627,8 +628,8 @@ to it by IRI and never restates it (ADR 0014).
   free string. One *act* may write more than one, and a read writes none (ADR 0043).
   _Avoid_: ledger act (retired 24/09/2026), event type, action name.
 - **audit log** — the one append-only record of every *audit event* a workspace keeps, written in
-  the same act it records; an Admin reads their workspace's own on People's *Audit log* view, and
-  never another's. Not the *answer audit*, which records answers. _Avoid_: ledger (retired
+  the same act it records; an Admin reads their workspace's own on System › Audit log (moved from
+  People on 30/09/2026), and never another's. Not the *answer audit*, which records answers. _Avoid_: ledger (retired
   24/09/2026 for the word an Admin looks for; spend's cost ledger, the `llm_call` rows, keeps
   it), event log, log (alone).
 - **identity-set audit log** — the append-only record of the acts that belong to no workspace
@@ -822,7 +823,8 @@ to it by IRI and never restates it (ADR 0014).
 - **role (of a person)** — what a person may do on every surface, a **level** never a job title:
   **Admin**, **Editor** or **Viewer** in v0.1 (the Principal every call carries; Liam, 27/08/2026 — the
   platform is agnostic about who a bid writer is). Editors and Admins check concepts, run
-  question sets and save Answers from history; Viewers ask, flag and suggest. _Avoid_: Bid
+  question sets and save Answers from history; Viewers ask, flag and suggest. Owning a *domain*
+  grants acts on it to a person of any role, so a Viewer may own one (ADR 0047). _Avoid_: Bid
   writer, Sales (as role names). A guide definition sets, per role, the default layer
   and the action threshold; a binding's *audience* is who may see, never a role. Not a section's
   role label.
@@ -849,67 +851,108 @@ to it by IRI and never restates it (ADR 0014).
 
 ## Platform surfaces
 
-- **Better Answers** — the product's name (ticket 22, 27/08/2026): "Better Answers" in prose,
-  `better-answers` as the handle; in this glossary and the docs it is still *the platform*.
-  Concept IRIs live on its apex, `https://better-answers.com/c/<ulid>`.
+- **better-answers** — the product's name, written so wherever a person reads it: on its screens,
+  the browser tab, the sign-in pages and the emails, the sender's name included (30/09/2026,
+  replacing ticket 22's prose form of 27/08/2026). In this glossary and the docs it is still *the
+  platform*. Concept IRIs live on its apex, `https://better-answers.com/c/<ulid>`.
+  _Avoid_: Better Answers (the prose form until 30/09/2026).
 
-- **Control Centre** — the one Admin surface, in six **screens**, where every agent interaction,
-  suggestion, conflict, review request, export and system signal is seen and acted on:
+- **Control Centre** — the one Admin *surface*, shown to Admins alone, where the workspace's
+  sources, suggestions, agents and spend, the answers it gave, its people, its personal data and
+  its system are seen and acted on. It has eight *groups* (ADR 0017, ADR 0047): **Overview**
+  (where to focus), **Suggestions** (the queue: every waiting suggestion, promotions included),
   **Sources** (bindings, the publish and accept gates, the priced plan, backlogs, gone-at-source
-  impact, agent tokens, the ceiling), **Suggestions** (every waiting suggestion, one queue),
-  **Knowledge** (the review table over every concept and composition; conflicts and
-  verification requests as saved filters; exports), **Questions** (the answer audit, flagged
-  first, with the promotions and the answer tests), **People** (members, groups, owners,
-  thresholds, erasure and suppression, tokens, audit log), **System** (signals, health, routes and
-  spend, backups) (ADR 0017, ticket 37). "Proposal" is the bid document a company completes and is
-  never a screen (Liam, 26/08/2026). _Avoid_: section (a guide's node), "Mission Control".
+  impact, agent tokens), **Agent Operations** (routes and spend, the ceiling), **Questions** (the
+  answer audit, flagged first; the answer tests), **People** (members, groups, tokens), **Personal
+  data** (erasure and suppression) and **System** (the audit log, signals, health, backups).
+  "Proposal" is the bid document a company completes and is never a screen (Liam, 26/08/2026).
+  _Avoid_: section (a guide's node), "Mission Control".
 - **console** — the *operator*'s surface over every workspace, outside any one of them and never
-  a screen of Control Centre, drawn in the same regions with two screens of its own: **People**
-  (every person, the workspaces they belong to and their
-  role in each, their sessions and grants; revoke everywhere, correct a display name) and
-  **Workspaces** (each with its member count, read-only). Shown to the operator alone and reached
-  only from a signed-in session, never from a token. _Avoid_: admin panel, platform console,
+  part of Control Centre, drawn in the same frame as a workspace and reached from the *workspace
+  switcher*, with two groups of its own: **People** (Everyone: every person, the workspaces they
+  belong to and their role in each, their sessions and grants; revoke everywhere. Names waiting:
+  correct a display name) and **Workspaces** (Every workspace: each with its member count,
+  read-only) (ADR 0047). Shown to the operator alone and reached only from a signed-in session,
+  never from a token. _Avoid_: admin panel, platform console,
   back office.
-- **reader surface** — the surface a member asks and reads on, beside Control Centre and the
-  *console* and drawn in the same regions, its navigation named *Better Answers*. Its one screen
-  so far is **Ask** (a new question; your questions), the *home* of an Editor or a Viewer.
-  Control Centre stays the Admin's surface (ADR 0046). _Avoid_: portal, front end, reader view.
-- **screen (of Control Centre)** — one of its six: Sources, Suggestions, Knowledge, Questions,
-  People, System.
-- **view (of a screen)** — one of the parts a screen of Control Centre is divided into: the parts
-  the Control Centre entry above lists for that screen, in that order and in those words. Each has
-  an address of its own; a screen names one of them its **default view**, and the screen's own
-  address leads there. A view nobody has built yet is still a destination, and says in words that
-  it is not built, or, on a role's *home*, what that role will do there. Not a
-  *view (of an MCP App)*. _Avoid_: section (a guide's node), tab (a division inside one view, and
-  the view's own business rather than a word of this glossary's).
-- **home (of a role)** — the screen a member lands on after signing in, and the one offered back
-  when a screen fails or an address names none: People for an Admin, and Ask, on the *reader
-  surface*, for an Editor or a Viewer. The *console* has one home for everyone, Workspaces. _Avoid_: landing page, dashboard,
-  start page.
-- **icon rail** — the region down the left edge listing the screens of Control Centre, of the
-  *reader surface* or of the *console*, each an icon carrying its screen's name and marking the screen being read. _Avoid_:
-  section nav, sidebar.
-- **secondary nav** — the region beside the icon rail listing the open screen's views under that
-  screen's name, marking the view being read, and swapping when the screen changes. The navigation
-  control closes it and opens it again, and that choice is remembered on the browser it was made
-  on. _Avoid_: section nav, sub-nav, sidebar.
-- **navigation control** — the button in the top bar's leading corner governing whether the
-  navigation is showing: where the screen is wide enough for the regions it closes the secondary
-  nav and opens it again, saying which state it is in; where it is not, it opens the icon rail and
-  the secondary nav over the content and gives focus back when it closes. _Avoid_: hamburger,
-  burger, drawer, menu toggle.
-- **toolbar** — the region above a view's content carrying that view's tabs at one end and its acts
-  at the other, filled by the view; a view with neither gets no toolbar. _Avoid_: action bar,
-  section header.
-- **view-state slot** — the one place the open view writes what the acts on its toolbar must read,
-  such as what a reader has ticked. It answers empty to any view but the one that wrote it, and it
-  is emptied when the reader opens another tab. _Avoid_: selection store, shared context.
-- **top bar** — the region across the top of Control Centre carrying the navigation control in its
-  leading corner, then naming the workspace, then which screen and view the person is in, then who
-  they are, their role and the way to sign out. Its menu leads from Control Centre to the
-  *reader surface* and back, and the operator alone to the *console*, whose top bar reads *Console* in place of a workspace, shows no role and leads back
-  to the workspace picker. _Avoid_: masthead, section header.
+- **surface** — the top level of the platform's navigation, one entry in the *icon rail*: **Ask**
+  (every role; the *home* of an Editor or a Viewer), **Knowledge** (every role; its Curation
+  *group* for Admins and owners), **Inbox** (Admins and owners: what waits on the person, pointing
+  into Control Centre's queue; not the *inbox* of suggestions) and **Control Centre** (Admins),
+  with a surface for produced work (named with S6) and **Briefings** (Then) to come (ADR 0047). A
+  person sees only the surfaces holding a *screen* they may see. The *console* is the operator's
+  surface, reached from the *workspace switcher* and never the rail. Until 30/09/2026 Ask was
+  drawn apart from Control Centre, as the reader surface (ADR 0046). _Avoid_: reader surface (the
+  word until 30/09/2026), portal, front end, reader view.
+- **group (of a surface)** — a heading in the *secondary nav* over some of one *surface*'s
+  *screens*: Control Centre's eight, Knowledge's Browse and Curation. A surface with none lists its
+  screens alone, as Ask and Inbox do. A group holding no screen the person may see is hidden
+  whole. What was a screen of Control Centre until 30/09/2026 is now a group. Not a *group* of
+  members, though People › Groups lists those. _Avoid_: section (a guide's node).
+- **screen** — one place a person reads or acts on, with an address of its own and an icon in the
+  *secondary nav*, under its *group* where its surface has groups: Members, Bindings, Audit log.
+  Control Centre's are listed in its entry above, and every surface's in ADR 0047, in the order
+  the secondary nav shows them. A person sees a screen by their *role* or by owning a
+  *domain* it serves. A screen not built, or not theirs to see, appears nowhere, and its address
+  shows the same **not-found screen** as one that never existed, offering their *home*. A screen may
+  carry *tabs*. What was a *view (of a screen)* until 30/09/2026 is now a screen. Not a *view (of
+  an MCP App)*. _Avoid_: view (of a screen; the word until 30/09/2026), section (a guide's node).
+- **tab** — a division inside one *screen*, named in the screen's *toolbar*: Members' Members and
+  Invitations. A tab has no address of its own; the open tab is the *breadcrumb*'s last part.
+  _Avoid_: view, sub-screen.
+- **home (of a role)** — the *screen* a member lands on after signing in, and the one offered back
+  when a screen fails or an address names nothing they may see: Ask for an Editor or a Viewer, and
+  People › Members for an Admin until Control Centre › Overview is built. A role's home shows in
+  the *icon rail* even before it is built, and then says plainly that it is on its way. The
+  *console* has one home for everyone, Workspaces › Every workspace. _Avoid_: landing page,
+  dashboard, start page.
+- **icon rail** — the region down the left edge, below the *top band*, listing the *surfaces* a
+  person may see, each an icon carrying its surface's name and marking the surface open; the
+  **rail** for short. The utilities sit at its foot: **Keyboard shortcuts**, which lists the open
+  screen's keystrokes as `?` does, and help and settings once they exist. Where the screen is not
+  wide, the top band holds Keyboard shortcuts instead. _Avoid_: section nav, sidebar.
+- **secondary nav** — the region beside the icon rail, below the *top band*, listing the open
+  *surface*'s *groups*, each a heading over its *screens*, marking the screen being read, and
+  swapping when the surface changes. No heading in it repeats the surface's name. The navigation
+  control closes it and opens it again, moving nothing in the top band, and that choice is
+  remembered on the browser it was made on. _Avoid_: section nav, sub-nav, sidebar.
+- **navigation control** — the button in the *top band*, beside the *workspace switcher* where the
+  screen is wide, governing whether the navigation is showing: where the screen is wide enough for
+  the regions it closes the secondary nav and opens it again, saying which state it is in and
+  staying where it is; where it is not, it opens the icon rail and the secondary nav over the
+  content, in a sheet titled *Surfaces and screens*, and gives focus back when it closes.
+  _Avoid_: hamburger, burger, drawer, menu toggle.
+- **toolbar** — the region above a screen's content carrying that screen's tabs at one end and its
+  acts at the other, filled by the screen; a screen with neither gets no toolbar. _Avoid_: action
+  bar, section header.
+- **view-state slot** — the one place the open screen writes what the acts on its toolbar must
+  read, such as what a reader has ticked. It answers empty to any screen but the one that wrote it,
+  and it is emptied when the reader opens another tab. _Avoid_: selection store, shared context.
+- **top band** — the region across the full width of every workspace and *console* screen, above
+  the icon rail and the secondary nav, in three cells: the *logo* over the rail; the *workspace
+  switcher* and the *navigation control* over the secondary nav; then the *breadcrumb*, *jump-to*
+  and the **avatar menu**, which shows the person's initials and opens to their name, their role and
+  *Sign out*. It holds no screen's acts: those are in the screen's own *toolbar*. Hiding the
+  secondary nav moves nothing in it. Where the screen is not wide it takes two rows, the
+  breadcrumb alone on the second, and scrolls with the page. _Avoid_: top bar (the word until
+  30/09/2026), masthead, section header.
+- **logo** — the product's symbol: two square brackets with a square between them, like a
+  citation. It fills the *top band*'s first cell and leads to the person's *home*, and it stands
+  on the sign-in screens and as the browser tab's icon. Its accessible name is `better-answers`.
+  _Avoid_: mark (the *operator*'s).
+- **workspace switcher** — the control in the *top band*'s second cell naming the workspace being
+  read and listing every workspace the person is a member of: choosing one takes them to its
+  *home*, and *All workspaces* opens the workspace picker. It lists the *console* to the operator
+  alone. _Avoid_: organisation switcher, team switcher.
+- **breadcrumb** — the line in the *top band* naming where the person is: the *surface*, the
+  *group*, the *screen* and the open *tab*, each part but the last leading to its place. It names
+  every part at every width; only the wide band shortens the middle ones.
+- **jump-to** — the finder the *top band* opens by click, ⌘K or Ctrl+K, named *Jump to* on screen,
+  to go somewhere in one move: the *surfaces* and *screens* the person may see, the workspace's
+  members for a person who may see People, and the acts their role may take, such as *Invite a
+  person*, listed under the headings Surfaces, Screens, Acts and Members. Knowledge joins it
+  with S2's retrieval; until then it is not a search. _Avoid_: search (Knowledge's *screen*),
+  command palette.
 - **promotion** — an Editor's proposal that an answer or a response become an `Answer`
   concept — the button is *Save as an Answer* — kept as a suggestion of kind *promotion* until
   decided at the promotion gate. _Avoid_: promote (as a reader's verb — a marketing word).
@@ -936,7 +979,7 @@ to it by IRI and never restates it (ADR 0014).
   connector.
 - **view (of an MCP App)** — the rendering half of an MCP App: one `ui://` resource bound to one
   entry. Every one has a **human rendering** behind it — the text form of the same result — and not
-  every human rendering has one. Not a *view (of a screen)*.
+  every human rendering has one. Not a *screen*, once called a view.
 - **`ui://`** — the wire URI scheme for a view of an MCP App. Beside `okf://` and meaning something
   different: `okf://` identifies a **concept**, `ui://` identifies a **view (of an MCP App)**. On
   the wire only, never in a file.

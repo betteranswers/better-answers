@@ -17,10 +17,11 @@
   --space-24: 96px;
   --space-32: 128px;
 
-  /* Layout constants */
+  /* The band's first two cells take the rail's and the secondary nav's widths, so hiding
+     the nav moves nothing in the band. */
   --sidebar-w: 248px;
   --rail-w: 56px;
-  --topbar-h: 48px;
+  --band-h: 48px;
   --measure-prose: 68ch;
   --measure-narrow: 52ch;
   --page-max: 1200px;

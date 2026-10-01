@@ -53,6 +53,22 @@ const memberOfTwo = async (testApp: TestApp) => {
   return { person: first.admin, second: second.workspaceId };
 };
 
+describe("the sign-in code's email", () => {
+  it("names the product in its subject", async () => {
+    const person = await app().person();
+
+    const { code } = await codeAskedFor(person.email);
+
+    expect(app().emails.filter(({ to }) => to === person.email)).toEqual([
+      {
+        to: person.email,
+        subject: "Your better-answers sign-in code",
+        text: `Your code is ${code}. It is valid for five minutes. If you did not ask for it, ignore this email.`,
+      },
+    ]);
+  });
+});
+
 describe("a sign-in, recorded on the identity-set audit log", () => {
   it("records the person as actor and subject, with empty detail", async () => {
     const person = await app().person();

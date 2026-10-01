@@ -5,8 +5,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { FailedScreen } from "@/app/failed-screen.tsx";
 import { createAppClients, Providers } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
-import { FAILED_SCREEN, goHome, UNKNOWN_SCREEN } from "@/app/words.ts";
-import { screenById } from "@/shared/screens.ts";
+import { FAILED_SCREEN, goHome, RAIL, TOGGLE, UNKNOWN_SCREEN } from "@/app/words.ts";
+import { HOMES } from "@/shared/navigation.ts";
+import { PRODUCT_NAME } from "@/shared/words.ts";
 
 import { openApp } from "./open-app.tsx";
 
@@ -42,29 +43,34 @@ const answerTrpc = (input: string | URL | Request): Promise<Response> => {
   );
 };
 
-const openSystemWithABrokenRead = async () => {
+const ROUTES_AND_SPEND = "/agent-operations/routes-and-spend";
+
+const openRoutesWithABrokenRead = async () => {
   vi.stubGlobal("fetch", answerTrpc);
-  const { rendered } = await openApp("/system");
+  const { rendered } = await openApp(ROUTES_AND_SPEND);
   await screen.findByRole("alert");
   return rendered;
 };
 
 describe("a screen that throws", () => {
-  it("leaves the rail, secondary nav, top bar and content standing", async () => {
-    await openSystemWithABrokenRead();
+  it("leaves the rail, secondary nav, band and content standing", async () => {
+    await openRoutesWithABrokenRead();
 
-    expect(screen.getByRole("banner")).toBeDefined();
+    const band = screen.getByRole("banner");
+    expect(within(band).getByRole("link", { name: PRODUCT_NAME })).toBeDefined();
+    expect(within(band).getByText(A_MEMBERSHIP.workspace.name)).toBeDefined();
+    expect(within(band).getByRole("button", { name: TOGGLE.hide })).toBeDefined();
     expect(screen.getByRole("main")).toBeDefined();
-    const rail = screen.getByRole("navigation", { name: "Control Centre" });
-    expect(within(rail).getByRole("link", { name: "Knowledge" })).toBeDefined();
-    const views = screen.getByRole("navigation", { name: "System" });
-    expect(within(views).getByRole("link", { name: "Routes and spend" })).toBeDefined();
+    const rail = screen.getByRole("navigation", { name: RAIL });
+    expect(within(rail).getByRole("link", { name: "Control Centre" })).toBeDefined();
+    const nav = screen.getByRole("navigation", { name: "Control Centre" });
+    expect(within(nav).getByRole("link", { name: "Routes and spend" })).toBeDefined();
 
     expect(screen.getByRole("main").contains(screen.getByRole("alert"))).toBe(true);
   });
 
   it("says the screen did not load, as an alert", async () => {
-    await openSystemWithABrokenRead();
+    await openRoutesWithABrokenRead();
 
     const alert = screen.getByRole("alert");
     expect(within(alert).getByRole("heading", { level: 1 }).textContent).toBe(
@@ -74,7 +80,7 @@ describe("a screen that throws", () => {
   });
 
   it("shows no message, name or stack from what threw", async () => {
-    const { container } = await openSystemWithABrokenRead();
+    const { container } = await openRoutesWithABrokenRead();
 
     const shown = container.textContent;
     expect(shown).not.toContain("map is not a function");
@@ -86,7 +92,7 @@ describe("a screen that throws", () => {
   });
 
   it("offers the two ways out as controls a keyboard reaches", async () => {
-    await openSystemWithABrokenRead();
+    await openRoutesWithABrokenRead();
 
     const again = screen.getByRole("button", { name: FAILED_SCREEN.retry });
 
@@ -96,13 +102,13 @@ describe("a screen that throws", () => {
     again.focus();
     expect(document.activeElement).toBe(again);
 
-    const away = await screen.findByRole("link", { name: goHome(screenById("people")) });
-    expect(away.getAttribute("href")).toBe("/people");
+    const away = await screen.findByRole("link", { name: goHome(HOMES.Admin) });
+    expect(away.getAttribute("href")).toBe(HOMES.Admin.path);
   });
 
   it("offers no way home to a reader whose home failed", async () => {
     vi.stubGlobal("fetch", answerTrpc);
-    await openApp("/people");
+    await openApp(HOMES.Admin.path);
 
     expect(await screen.findByRole("button", { name: FAILED_SCREEN.retry })).toBeDefined();
     expect(within(screen.getByRole("main")).queryAllByRole("link")).toEqual([]);
@@ -116,7 +122,10 @@ describe("a screen that throws", () => {
     };
 
     const clients = createAppClients();
-    const router = createAppRouter(clients, createMemoryHistory({ initialEntries: ["/system"] }));
+    const router = createAppRouter(
+      clients,
+      createMemoryHistory({ initialEntries: [ROUTES_AND_SPEND] }),
+    );
     render(
       <Providers clients={clients}>
         <RouterContextProvider router={router}>

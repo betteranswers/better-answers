@@ -102,11 +102,11 @@ call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources
 | `seedRoutes` | The routes a workspace has chosen; a purpose left out of the list has no route, which the screen must show rather than omit |
 | `seedBindings` | Source bindings as their acts and the worker leave them — documents, findings kept or overridden by an erasure, quarantined documents, chunks, an index run at any status, a concept and composition citing a document — answering each binding's and document's id |
 | `moveTheIndexRun` | The worker's two steps over the workspace's one index run, claimed then done, through the queue's own functions under the worker's role — how a spec watches a state word move without a worker process |
-| `makeGroups` | Groups made by a named member through the members slice's own acts, one transaction each, every group holding the members `memberIds` names — the member's own acts on the audit log, and the groups the `Groups` view and a member's sheet start from |
+| `makeGroups` | Groups made by a named member through the members slice's own acts, one transaction each, every group holding the members `memberIds` names — the member's own acts on the audit log, and the groups the `Groups` screen and a member's sheet start from |
 | `askToJoin` | A person's ask to join a workspace by its slug, with a reason, through the members slice's own act and the principal the ask-to-join procedure uses, without its sign-in or its answer's floor — a request waiting on the Requests tab |
-| `flagTheName` | A workspace's Admin flags a member's display name through the members slice's own act and principal, without the email the procedure sends the operator — a name waiting on the console's *Names waiting* view |
+| `flagTheName` | A workspace's Admin flags a member's display name through the members slice's own act and principal, without the email the procedure sends the operator — a name waiting on the console's *Names waiting* screen |
 
-Eighteen more helpers in the same module drive the browser rather than the harness:
+Twenty-seven more helpers in the same module drive the browser rather than the harness:
 
 | Helper | What it does |
 | --- | --- |
@@ -115,15 +115,24 @@ Eighteen more helpers in the same module drive the browser rather than the harne
 | `quoted` | A table's sentence quoted as an inline aria snapshot takes it, so the snapshot reads the words rather than copying them |
 | `signIn` | Signs a person in **through the product's own screen** — fill the address, send, read the six-digit code back from the captured transport, fill it, submit, and wait for the code field to be gone rather than for the click |
 | `aMemberSignedInAt` | A new workspace's Editor or Viewer, signed in having asked for a path first, so sign-in carries them back to it — where a refused screen is proved |
-| `landedAtHome` | Asserts the page is on a role's home, its address and its heading read off the screen list |
+| `landedAtHome` | Asserts the page is on a role's home, its address and its heading read off the navigation list. The heading is the screen's group's name, or its surface's where it has none |
+| `notFoundOfferingHome` | Asserts the not-found screen and its link to a role's home. A screen hidden from the role shows it, as an address that never existed does |
 | `signedInAtHome` | Opens the sign-in screen, runs `signIn`, and waits for an Admin's home, as the Admin of one workspace arrives |
 | `signedInWithNoWorkspace` | A new person with no membership, signed in through `signIn` and waiting on the no-workspace screen, answered as the harness's `person` |
-| `signOutFromTheShell` | Opens the top bar's menu, then signs out, because sign-out is one disclosure in |
+| `avatarOf` | The avatar's button in the band, found by the person's name though it shows their initials alone |
+| `personMenuOpened` | Opens the avatar menu in the band by the person's name and answers it. The avatar shows initials alone, so the name and the role are one disclosure in |
+| `signOutFromTheShell` | Opens the avatar menu through `personMenuOpened`, then signs out, because sign-out is one disclosure in |
+| `switcherOf` | The workspace switcher in the band, named for where the person is: the workspace they are reading, or the console |
+| `switcherMenuOf` | The switcher's open menu, named as its button is |
+| `railOf` | The icon rail, the `navigation` named `RAIL` |
+| `navOf` | The secondary nav, the `navigation` named for the surface it is given, such as `CONTROL_CENTRE` |
+| `crumbOf` | A part of the band's breadcrumb by its name. The current part is a link too, so a part that leads somewhere is told by its `href` |
 | `skipLinkReachesTheScreen` | Tab, the skip link has focus, Enter, `main` has focus — where a shell spec's keyboard traversal starts |
 | `tabUntilFocused` | Presses Tab until a locator has focus, and fails by name when it never does |
-| `tabOpenedByKeyboard` | A fresh document at a view, the skip link, Tab to its open tab, then the arrow keys along to a named tab, each arrow landing before the next |
+| `tabOpenedByKeyboard` | A fresh document at a screen, the skip link, Tab to its open tab, then the arrow keys along to a named tab, each arrow landing before the next |
 | `editorPickedByKeyboard` | From a role select in focus reading Viewer: open it, one step up to Editor, pick it, and focus is back on the select |
-| `keystrokesListed` | Presses `?` and answers the screen's list of keystrokes once it is open |
+| `keystrokesListed` | Presses `?` and answers the list of keystrokes once it is open, named for the open screen as the navigation list names it |
+| `keystrokesButton` | The one *Keyboard shortcuts* button, in the page or in a region it is given: at the rail's foot where the layout is wide, in the band where it is narrow, and a screen's own outside the shell |
 | `keystrokesDismissed` | Presses Escape and waits for the list to go and for focus to come back to its button, which lands a task later. A key pressed sooner keeps the focus it moved |
 | `clockTheNextKey` | Starts the act's clock in the page: from the next key to the node an XPath names reading a given text |
 | `theActLandedWithinItsBudget` | Reads that clock, annotates the test with it and asserts it under the act's 100 ms |
@@ -146,6 +155,24 @@ Five more play Claude's part in its OAuth flow on the suite's own origin — `ap
 
 - **Locate by role and accessible name.** `getByRole`, `getByLabel`, `getByText`. Test ids appear
   nowhere in this suite; adding one adds a handle the reader does not have.
+- **Find the shell by its landmarks**, named from `apps/web/src/app/words.ts` and
+  `apps/web/src/shared/navigation.ts`:
+  - The top band is the `banner`.
+  - The icon rail is the `navigation` named `RAIL`, one link per surface, which `railOf` finds.
+    Its foot holds *Keyboard shortcuts*, which `keystrokesButton` finds.
+  - The secondary nav is the `navigation` named for the open surface, such as
+    `CONTROL_CENTRE.name`, with each group a heading over its screens' links. `navOf` finds it.
+  - The breadcrumb is the `navigation` named `BREADCRUMB`, inside the banner. `crumbOf` finds a
+    part of it.
+  - Jump-to is the banner's button named `JUMP_TO.name`. It opens a `dialog` of the same name
+    holding a `combobox`.
+  - The workspace switcher is `switcherOf` and its menu `switcherMenuOf`. The avatar is
+    `avatarOf`, and its menu is `personMenuOpened`.
+  - At a narrow width the navigation control opens a `dialog` named `NAVIGATION_SHEET`, holding
+    the rail and the secondary nav.
+
+  `apps/web/e2e/frame.spec.ts` holds the shell. `apps/web/e2e/jump-to.spec.ts` and
+  `apps/web/e2e/workspace-switcher.spec.ts` are the worked examples for jump-to and the switcher.
 - **Wait with auto-retrying matchers.** `await expect(…).toBeVisible()`, `.toHaveURL()`,
   `.toHaveCount(0)`. Where a navigation must complete before the next act, assert the thing that
   proves the screen was left. Never a fixed sleep, and never a load state.
@@ -156,9 +183,9 @@ Five more play Claude's part in its OAuth flow on the suite's own origin — `ap
   `${path} answered ${status}` is the pattern, and so are the axe assertion and the gate's refusal
   in `apps/web/e2e/browser.ts`.
 - **Read the SPA's own constants, words as well as screens, rather than copying them.**
-  `apps/web/e2e/routes.spec.ts` imports `@/shared/screens.ts`, so the list of screens is written
-  once. Read a sentence the same way: import it from a feature's word table
-  (`apps/web/src/features/sources/words.ts`), the screen list or the role meanings
+  `apps/web/e2e/routes.spec.ts` imports `@/shared/navigation.ts`, so the list of surfaces, groups
+  and screens is written once. Read a sentence the same way: import it from a feature's word table
+  (`apps/web/src/features/sources/words.ts`), the navigation list or the role meanings
   (`apps/web/src/shared/role-words.ts`). Then assert the state it belongs to: the
   region, its role, the next action. Never pin prose as a literal, so rewording a screen breaks no
   spec. Read a control's accessible name from the same table where one exists. Two things stay
@@ -188,7 +215,7 @@ three things, of which automated rules are only one:
   disabled look is the case. An endless animation, such as a spinner, is audited running.
 - **A keyboard traversal** reaching the screen and each of its acts without a pointer:
   `apps/web/e2e/sign-in.spec.ts` for the three screens outside the shell,
-  `apps/web/e2e/frame.spec.ts` for the rail and the secondary nav, and
+  `apps/web/e2e/frame.spec.ts` for the band, the rail and the secondary nav, and
   `apps/web/e2e/routes.spec.ts` and `apps/web/e2e/failed-screen.spec.ts` for theirs. It is the
   floor, not the extra.
 - **An aria snapshot**, written inline with `toMatchAriaSnapshot`, where what a screen *sounds

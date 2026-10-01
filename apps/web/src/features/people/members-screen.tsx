@@ -1,8 +1,8 @@
 import type { ComponentType } from "react";
 
-import { KeystrokesAct, type Keystroke } from "@/shared/keystrokes.tsx";
-import { screenById } from "@/shared/screens.ts";
-import { useOpenTab, type ViewTab, type ViewToolbar } from "@/shared/view-toolbar.tsx";
+import { useScreenKeystrokes, type Keystroke } from "@/shared/keystrokes.tsx";
+import { CONTROL_CENTRE, groupIn } from "@/shared/navigation.ts";
+import { useOpenTab, type ScreenTab, type ScreenToolbar } from "@/shared/screen-toolbar.tsx";
 
 import { InvitationsTab } from "./invitations-tab.tsx";
 import { InviteAct } from "./invite-act.tsx";
@@ -10,10 +10,10 @@ import { MembersTab } from "./members-tab.tsx";
 import { PEOPLE_KEYSTROKES as KEY } from "./people-state.ts";
 import { RequestsTab } from "./requests-tab.tsx";
 
-const people = screenById("people");
+const people = groupIn(CONTROL_CENTRE, "people");
 
 /** A tab binds its keystrokes only while it is open, so a key two tabs share acts once. */
-type Tab = ViewTab & {
+type Tab = ScreenTab & {
   readonly content: ComponentType;
   readonly keystrokes: readonly Keystroke[];
 };
@@ -55,22 +55,15 @@ const useTheOpenTab = (): Tab => {
   return TABS.find((candidate) => candidate.id === openTab) ?? MEMBERS;
 };
 
-function OpenTabKeystrokes() {
-  return <KeystrokesAct screen={people.name} keystrokes={useTheOpenTab().keystrokes} />;
-}
-
-export const MEMBERS_TOOLBAR: ViewToolbar = {
+export const MEMBERS_TOOLBAR: ScreenToolbar = {
   tabs: TABS.map(({ id, name }) => ({ id, name })),
-  acts: (
-    <>
-      <InviteAct />
-      <OpenTabKeystrokes />
-    </>
-  ),
+  acts: <InviteAct />,
 };
 
-export function MembersView() {
-  const Content = useTheOpenTab().content;
+export function MembersScreen() {
+  const openTab = useTheOpenTab();
+  useScreenKeystrokes(openTab.keystrokes);
+  const Content = openTab.content;
 
   return (
     <>

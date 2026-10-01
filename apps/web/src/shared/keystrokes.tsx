@@ -1,11 +1,23 @@
-import { useEffect, useEffectEvent, useId, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useEffectEvent,
+  useId,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 
 import { keepOnThisBrowser, onThisBrowser } from "@/shared/browser-storage.ts";
-import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
+import { Icon } from "@/shared/icon.tsx";
+import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Checkbox } from "@/shared/ui/checkbox.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/ui/popover.tsx";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip.tsx";
 
 export type Keystroke = {
   readonly key: string;
@@ -45,7 +57,7 @@ export function useKeystroke(keystroke: Keystroke, act: () => void) {
   const pressed = useEffectEvent((event: KeyboardEvent) => {
     if (event.key !== keystroke.key || !isTheScreens(event) || !keystrokesAreOn()) return;
     event.preventDefault();
-    act();
+    if (!event.repeat) act();
   });
 
   // The document is the one listener every region shares, so a keystroke works from wherever
@@ -85,37 +97,38 @@ const keepFocusAKeyMoved = (event: Event) => {
   if (focused !== null && focused !== document.body) event.preventDefault();
 };
 
-/** Lists `keystrokes` with its own `?`, which opens it, so the caller leaves `?` out. */
-export function KeystrokesAct(properties: {
-  readonly screen: string;
+/** `children` holds the trigger, so a caller may wrap it in a tooltip of its own. */
+function KeystrokesList(properties: {
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
+  readonly side: "right" | "bottom";
+  readonly heading: string;
   readonly keystrokes: readonly Keystroke[];
+  readonly said?: string | undefined;
+  readonly children: ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
   const headingId = useId();
-  useKeystroke(LIST_THE_KEYSTROKES, () => {
-    setOpen(true);
-  });
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" aria-keyshortcuts={LIST_THE_KEYSTROKES.key}>
-          {KEYSTROKE_WORDS.button}
-        </Button>
-      </PopoverTrigger>
+    <Popover open={properties.open} onOpenChange={properties.onOpenChange}>
+      {properties.children}
       <PopoverContent
+        side={properties.side}
+        // Beside the rail, clear of its edge rather than over it.
+        sideOffset={properties.side === "right" ? 12 : 4}
         align="end"
         aria-labelledby={headingId}
-        className="grid w-80 gap-3"
+        className="grid max-h-(--radix-popover-content-available-height) w-80 max-w-[calc(100vw-1rem)] gap-3 overflow-y-auto"
         onCloseAutoFocus={keepFocusAKeyMoved}
       >
         <h2 id={headingId} className="font-medium">
-          {KEYSTROKE_WORDS.button} on {properties.screen}
+          {properties.heading}
         </h2>
         <p className="text-sm text-muted-foreground">{KEYSTROKE_WORDS.where}</p>
         <TurnedOn />
+        {properties.said === undefined ? null : <p className="text-sm">{properties.said}</p>}
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-          {[...properties.keystrokes, LIST_THE_KEYSTROKES].map((keystroke) => (
+          {properties.keystrokes.map((keystroke) => (
             <div key={keystroke.key} className="contents">
               <dt>
                 <kbd className="border border-border bg-muted px-1.5 font-mono">
@@ -128,5 +141,148 @@ export function KeystrokesAct(properties: {
         </dl>
       </PopoverContent>
     </Popover>
+  );
+}
+
+/**
+ * For a screen outside the shell. It binds `?` itself and lists it, so the caller leaves `?`
+ * out.
+ */
+export function KeystrokesAct(properties: {
+  readonly screen: string;
+  readonly keystrokes: readonly Keystroke[];
+}) {
+  const [open, setOpen] = useState(false);
+  useKeystroke(LIST_THE_KEYSTROKES, () => {
+    setOpen(true);
+  });
+
+  return (
+    <KeystrokesList
+      open={open}
+      onOpenChange={setOpen}
+      side="bottom"
+      heading={keystrokesOn(properties.screen)}
+      keystrokes={[...properties.keystrokes, LIST_THE_KEYSTROKES]}
+    >
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="sm" aria-keyshortcuts={LIST_THE_KEYSTROKES.key}>
+          {KEYSTROKE_WORDS.button}
+        </Button>
+      </PopoverTrigger>
+    </KeystrokesList>
+  );
+}
+
+type Listing = {
+  readonly open: boolean;
+  readonly setOpen: (open: boolean) => void;
+  readonly heading: string;
+  readonly keystrokes: readonly Keystroke[];
+  readonly said: string | undefined;
+};
+
+const ListingContext = createContext<Listing | undefined>(undefined);
+
+/** Answers the way to take the keystrokes back off the list. */
+type Register = (keystrokes: readonly Keystroke[]) => () => void;
+
+const RegisterContext = createContext<Register | undefined>(undefined);
+
+const NONE: readonly Keystroke[] = [];
+
+/**
+ * Owns `?` and the one list at every width; the open screen adds its own keystrokes through
+ * `useScreenKeystrokes`.
+ */
+export function ShellKeystrokes(properties: {
+  /** The open screen's name; undefined at an address that names no screen. */
+  readonly screen: string | undefined;
+  /** Bound with a modifier, so turning single-key keystrokes off leaves them on. */
+  readonly shell: readonly Keystroke[];
+  readonly children: ReactNode;
+}) {
+  const { screen, shell } = properties;
+  const [open, setOpen] = useState(false);
+  const [own, setOwn] = useState(NONE);
+  useKeystroke(LIST_THE_KEYSTROKES, () => {
+    setOpen(true);
+  });
+
+  const register = useCallback<Register>((keystrokes) => {
+    setOwn(keystrokes);
+    // Only its own: the next screen's arrive in the same commit.
+    return () => {
+      setOwn((current) => (current === keystrokes ? NONE : current));
+    };
+  }, []);
+
+  const listing = useMemo<Listing>(
+    () => ({
+      open,
+      setOpen,
+      heading: keystrokesOn(screen ?? KEYSTROKE_WORDS.thisScreen),
+      keystrokes: [...own, LIST_THE_KEYSTROKES, ...shell],
+      said: own.length === 0 ? KEYSTROKE_WORDS.noneOfItsOwn : undefined,
+    }),
+    [open, own, screen, shell],
+  );
+
+  return (
+    <RegisterContext value={register}>
+      <ListingContext value={listing}>{properties.children}</ListingContext>
+    </RegisterContext>
+  );
+}
+
+/**
+ * A screen sits under the outlet, where the shell cannot hand it a prop. Pass one identity, or
+ * every draw registers again.
+ */
+export function useScreenKeystrokes(keystrokes: readonly Keystroke[]) {
+  const register = useContext(RegisterContext);
+  // The shell's list is outside the screen, so it follows the screen arriving and leaving.
+  useEffect(() => register?.(keystrokes), [register, keystrokes]);
+}
+
+/** The way to the list besides `?`: in the rail's foot when wide, in the band when narrow. */
+export function ShellKeystrokesAct(properties: { readonly at: "rail" | "band" }) {
+  const listing = useContext(ListingContext);
+  if (listing === undefined) return null;
+
+  const inTheRail = properties.at === "rail";
+  const trigger = (
+    <PopoverTrigger asChild>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        aria-keyshortcuts={LIST_THE_KEYSTROKES.key}
+        className={inTheRail ? "size-10 text-muted-foreground" : "shrink-0"}
+      >
+        <Icon name="keystrokes" className="text-muted-foreground" />
+        <span className="sr-only">{KEYSTROKE_WORDS.button}</span>
+      </Button>
+    </PopoverTrigger>
+  );
+
+  return (
+    <KeystrokesList
+      open={listing.open}
+      onOpenChange={listing.setOpen}
+      side={inTheRail ? "right" : "bottom"}
+      heading={listing.heading}
+      keystrokes={listing.keystrokes}
+      said={listing.said}
+    >
+      {inTheRail ? (
+        <Tooltip>
+          <TooltipTrigger asChild>{trigger}</TooltipTrigger>
+          <TooltipContent side="right">{KEYSTROKE_WORDS.button}</TooltipContent>
+        </Tooltip>
+      ) : (
+        trigger
+      )}
+    </KeystrokesList>
   );
 }

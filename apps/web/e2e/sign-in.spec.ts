@@ -33,6 +33,7 @@ import {
   keystrokesListed,
   landedAtHome,
   person,
+  personMenuOpened,
   provision,
   quoted,
   removeMember,
@@ -120,8 +121,10 @@ test("lands a sole member in the shell: workspace, person, role", async ({ page,
   await landedAtHome(page, "Admin");
   const bar = page.getByRole("banner");
   await expect(bar.getByText(workspace.name)).toBeVisible();
-  await expect(bar.getByText(workspace.admin.name, { exact: false })).toBeVisible();
-  await expect(bar.getByText("Admin", { exact: false })).toBeVisible();
+  const you = await personMenuOpened(page, workspace.admin.name);
+  await expect(you.getByText(workspace.admin.name, { exact: true })).toBeVisible();
+  await expect(you.getByText("Admin", { exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
   await expect(page.getByRole("button", { name: "Choose a workspace" })).toHaveCount(0);
 
   await expect(page.getByRole("button", { name: /create/i })).toHaveCount(0);
@@ -152,8 +155,8 @@ test("scopes everything to the workspace a two-workspace member picks", async ({
   await landedAtHome(page, "Viewer");
   const bar = page.getByRole("banner");
   await expect(bar.getByText(second.name)).toBeVisible();
-  await expect(bar.getByText("Viewer", { exact: false })).toBeVisible();
   await expect(bar.getByText(first.name)).toHaveCount(0);
+  await expect(await personMenuOpened(page, first.admin.name)).toContainText("Viewer");
 });
 
 test("offers one way on to a person with no membership", async ({ page, request }) => {
@@ -168,6 +171,26 @@ test("offers one way on to a person with no membership", async ({ page, request 
   await expect(signInHeading(page)).toBeVisible();
 });
 
+test("names the product in tab and banner, beside its logo", async ({ page }) => {
+  await page.goto("/sign-in");
+
+  await expect(page).toHaveTitle(PRODUCT_NAME);
+  const icon = (await page.locator('head link[rel="icon"]').getAttribute("href")) ?? "";
+  const inline = /^data:image\/svg\+xml,(?<drawn>.*)$/.exec(icon)?.groups?.["drawn"];
+  expect(inline, "the tab icon is not an inline SVG").toBeDefined();
+  const drawn = decodeURIComponent(inline ?? "");
+  expect(drawn, "the tab icon is not the logo").toContain(`<title>${PRODUCT_NAME}</title>`);
+  expect(drawn, "the logo no longer takes the icon's colour").toContain('fill="currentColor"');
+  expect(drawn, "a dark tab strip would hide the icon").toMatch(
+    /@media \(prefers-color-scheme:dark\)\{svg\{color:#[\da-f]{6}\}\}/,
+  );
+
+  const banner = page.getByRole("banner");
+  await expect(banner).toHaveText(PRODUCT_NAME, { useInnerText: true });
+  await expect(banner.getByRole("img", { name: PRODUCT_NAME, includeHidden: true })).toBeVisible();
+  await expect(banner.getByRole("img"), "the name would be heard twice").toHaveCount(0);
+});
+
 test("says a code is sent, wrong, or asked too often", async ({
   page,
   request,
@@ -177,7 +200,6 @@ test("says a code is sent, wrong, or asked too often", async ({
   await provision(request, { name: "Words", adminEmail: email });
 
   await page.goto("/sign-in");
-  await expect(page.getByRole("banner")).toHaveText(PRODUCT_NAME);
   await expect(signInHeading(page)).toBeVisible();
   await expect(page.getByText(SIGN_IN_WORDS.emailStep.nothing.hint)).toBeVisible();
   await expect(page.locator("body"), "the email step says we").not.toContainText(NO_WE);
@@ -299,7 +321,7 @@ test("names the wait when a new code meets the ceiling", async ({
   await floodCodesTo(request, email, 4);
 
   await page.keyboard.press("Tab");
-  const listed = await keystrokesListed(page, SIGN_IN_WORDS.keystrokesOn);
+  const listed = await keystrokesListed(page, KEYSTROKE_WORDS.thisScreen);
   await expect(listed.getByText(SIGN_IN_WORDS.sendAgain)).toBeVisible();
   await expect(listed.getByText(SIGN_IN_WORDS.otherAddress)).toBeVisible();
   await keystrokesDismissed(page, listed);
@@ -357,9 +379,8 @@ test("skips the picker when the membership postdates the session", async ({ page
   await page.goto("/choose-workspace");
 
   await landedAtHome(page, "Editor");
-  const bar = page.getByRole("banner");
-  await expect(bar.getByText(workspace.name)).toBeVisible();
-  await expect(bar.getByText("Editor", { exact: false })).toBeVisible();
+  await expect(page.getByRole("banner").getByText(workspace.name)).toBeVisible();
+  await expect(await personMenuOpened(page, "Test person")).toContainText("Editor");
   await expect(thePicker(page)).toHaveCount(0);
 });
 

@@ -1,13 +1,14 @@
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createAppClients, type AppClients } from "@/app/providers.tsx";
+import type { AppClients } from "@/app/providers.tsx";
+import { FAILED_SCREEN, goHome, RAIL, UNKNOWN_SCREEN } from "@/app/words.ts";
 import { PICKER_WORDS } from "@/features/auth/workspace-words.ts";
 import { ROLES } from "@/features/people/role-meanings.ts";
-import { HOMES, type Role } from "@/shared/screens.ts";
+import { CONTROL_CENTRE, HOMES, INVITE_A_PERSON, type Role } from "@/shared/navigation.ts";
 
 import { appAt, openApp } from "./open-app.tsx";
-import { addressOf, answered } from "./stubbed-api.ts";
+import { addressOf, answered, answeringAs, withTheApiDown } from "./stubbed-api.ts";
 
 const A_MEMBERSHIP = {
   workspace: { id: "w", name: "Northern Tooling" },
@@ -61,6 +62,20 @@ const answering =
     );
   };
 
+/** The shell's one read of the membership is dropped; the frame's read after it answers. */
+const losingTheShellsRead = (role: Role) => {
+  const answer = answeringAs(role);
+  let lost = false;
+  return (input: string | URL | Request): Promise<Response> => {
+    if (lost || !addressOf(input).pathname.includes("session.membership")) return answer(input);
+    lost = true;
+    return Promise.reject(new TypeError("the request was dropped"));
+  };
+};
+
+/** What a screen's `beforeLoad` finds once the role is in hand and lets the reader see it. */
+const TAKEN = { hidden: false, unread: false };
+
 const membershipAsks = () => asked.filter((name) => name === "session.membership").length;
 
 const openAt = async (path: string, clients?: AppClients) => (await openApp(path, clients)).router;
@@ -80,16 +95,16 @@ describe("a person the api will not answer about", () => {
   it("meets sign-in, which is told the address they asked for", async () => {
     vi.stubGlobal("fetch", answering(NO_SESSION));
 
-    const router = await openAt("/people/thresholds");
+    const router = await openAt("/people/groups");
 
     expect(heading()).toBe("Sign in");
-    expect(router.state.location.href).toBe("/sign-in?redirect=%2Fpeople%2Fthresholds");
+    expect(router.state.location.href).toBe("/sign-in?redirect=%2Fpeople%2Fgroups");
   });
 
   it("meets the picker instead when the session names no workspace", async () => {
     vi.stubGlobal("fetch", answering(NEEDS_A_PICK));
 
-    const router = await openAt("/people/thresholds");
+    const router = await openAt("/people/groups");
 
     expect(screen.getByText(PICKER_WORDS.reading)).toBeDefined();
     expect(router.state.location.href).toBe("/choose-workspace");
@@ -104,31 +119,59 @@ describe("a person the api will not answer about", () => {
     expect(router.state.location.href).toBe("/sign-in");
   });
 
-  it("reaches the shell when the read fails for another reason", async () => {
-    vi.stubGlobal("fetch", () => Promise.reject(new TypeError("the network is down")));
-    const clients = createAppClients();
-    // The shell's own read is batched and retried past the end of this test, onto the next stub.
-    clients.queryClient.setDefaultOptions({ queries: { retry: false } });
+  it("reaches the shell and the screen's state when unread", async () => {
+    const clients = withTheApiDown();
 
-    const router = await openAt("/people/thresholds", clients);
+    const router = await openAt("/people/members", clients);
     await vi.waitFor(() => expect(clients.queryClient.isFetching()).toBe(0));
 
     expect(heading()).toBe("People");
-    expect(screen.getByRole("navigation", { name: "Control Centre" })).toBeDefined();
-    expect(router.state.location.pathname).toBe("/people/thresholds");
+    expect(heading()).not.toBe(UNKNOWN_SCREEN.heading);
+    expect(screen.getByRole("navigation", { name: RAIL })).toBeDefined();
+    expect(router.state.location.pathname).toBe("/people/members");
+  });
+
+  it("hides a screen from a role read only after arriving", async () => {
+    vi.stubGlobal("fetch", losingTheShellsRead("Viewer"));
+
+    await openAt("/people/members");
+    await within(screen.getByRole("navigation", { name: RAIL })).findByRole("link", {
+      name: HOMES.Viewer.name,
+    });
+
+    expect(heading()).toBe(UNKNOWN_SCREEN.heading);
+    expect(screen.getByRole("link", { name: goHome(HOMES.Viewer) })).toBeDefined();
+    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(screen.queryByRole("button", { name: INVITE_A_PERSON.name })).toBeNull();
+  });
+
+  it("holds the verdict taken when the role arrives", async () => {
+    vi.stubGlobal("fetch", losingTheShellsRead("Admin"));
+    const { router, clients } = await openApp("/people/members");
+    const rail = () => within(screen.getByRole("navigation", { name: RAIL }));
+    await rail().findByRole("link", { name: CONTROL_CENTRE.name });
+    await vi.waitFor(() => expect(router.state.matches.at(-1)?.context).toMatchObject(TAKEN));
+
+    // An Admin who demotes themself reads their membership again, as a Viewer.
+    vi.stubGlobal("fetch", answeringAs("Viewer"));
+    await clients.queryClient.refetchQueries({ queryKey: [["session", "membership"]] });
+    await rail().findByRole("link", { name: HOMES.Viewer.name });
+
+    expect(heading()).toBe("People");
+    expect(screen.getByRole("tablist")).toBeDefined();
   });
 });
 
 describe("the membership the shell and its redirect both read", () => {
-  it("is read once across drawing the shell and changing views", async () => {
+  it("is read once across drawing the shell and changing screens", async () => {
     vi.stubGlobal("fetch", answering());
-    const router = await openAt("/people/thresholds");
+    const router = await openAt("/people/members");
     await screen.findByText("Northern Tooling", { exact: false });
     expect(membershipAsks()).toBe(1);
 
-    await router.navigate({ href: "/people/owners" });
+    await router.navigate({ href: "/people/groups" });
 
-    expect(router.state.location.pathname).toBe("/people/owners");
+    expect(router.state.location.pathname).toBe("/people/groups");
     expect(membershipAsks()).toBe(1);
   });
 });
@@ -137,12 +180,33 @@ describe("the index route", () => {
   for (const role of ROLES) {
     const home = HOMES[role];
 
-    it(`lands a member at ${role} on ${home.name}'s default view`, async () => {
+    it(`lands a member at ${role} on ${home.name}`, async () => {
       vi.stubGlobal("fetch", answering(undefined, role));
 
       const { router } = await appAt("/");
 
-      expect(router.state.location.pathname).toBe(home.defaultView);
+      expect(router.state.location.pathname).toBe(home.path);
     });
   }
+
+  it("shows the failed read, not Ask, holding no role", async () => {
+    const clients = withTheApiDown();
+
+    const router = await openAt("/", clients);
+    await vi.waitFor(() => expect(clients.queryClient.isFetching()).toBe(0));
+
+    expect(heading()).toBe(FAILED_SCREEN.heading);
+    expect(router.state.location.pathname).toBe("/");
+  });
+
+  it("sends the person home once asking again reads their role", async () => {
+    const clients = withTheApiDown();
+    const router = await openAt("/", clients);
+    await vi.waitFor(() => expect(clients.queryClient.isFetching()).toBe(0));
+
+    vi.stubGlobal("fetch", answering(undefined, "Viewer"));
+    fireEvent.click(screen.getByRole("button", { name: FAILED_SCREEN.retry }));
+
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe(HOMES.Viewer.path));
+  });
 });

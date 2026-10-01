@@ -1,12 +1,9 @@
 import { useNavigate } from "@tanstack/react-router";
-import type { BetterFetchError } from "better-auth/client";
 import { useEffect, useState } from "react";
 import { flushSync } from "react-dom";
-import { z } from "zod";
 
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
-import { RefusalLine } from "@/shared/refusal-outcome.tsx";
-import type { Said } from "@/shared/refusal-words.ts";
+import { refusedWith } from "@/shared/refusal-outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 
 import {
@@ -16,6 +13,7 @@ import {
   useSession,
   useSetActiveOrganization,
   type ResumeAnswer,
+  type SwitchRefused,
 } from "./auth-hooks.ts";
 import { AuthScreen } from "./auth-screen.tsx";
 import { carriedFlow, leavingFor, pageQuery } from "./carried-flow.ts";
@@ -33,12 +31,6 @@ type Workspaces = ReturnType<typeof useListOrganizations>;
 type Workspace = NonNullable<Workspaces["data"]>[number];
 
 const WORKSPACE_LIST = "workspace-list";
-
-/** Better Auth's code for a pick of a workspace the person holds no membership in. */
-const noMembership = z.object({ code: z.literal("USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION") });
-
-const refusedForNoMembership = (refused: BetterFetchError | null): boolean =>
-  noMembership.safeParse(refused).success;
 
 const addressIn = (answer: ResumeAnswer): string | undefined => {
   const next = answer.url;
@@ -67,13 +59,16 @@ const whereThePersonStands = (
   };
 };
 
+const endedTheMembership = (refused: SwitchRefused | null): boolean =>
+  refused?.noLongerAMember === true;
+
 /** Once a pick is refused, the list or the refusal stands to be read rather than a pick retried. */
 const whereThePickStands = (
   held: readonly Workspace[],
   noLongerHeld: Workspace | undefined,
   went: {
-    readonly pick: BetterFetchError | null;
-    readonly resume: BetterFetchError | null;
+    readonly pick: SwitchRefused | null;
+    readonly resume: Error | null;
     readonly nowhere: boolean;
   },
 ) => {
@@ -82,7 +77,7 @@ const whereThePickStands = (
     notConnected: went.nowhere || went.resume !== null,
     listed: held.length > 1 || (one && noLongerHeld !== undefined),
     refused: went.pick !== null,
-    removedFrom: refusedForNoMembership(went.pick) ? noLongerHeld : undefined,
+    removedFrom: endedTheMembership(went.pick) ? noLongerHeld : undefined,
     opensAlone: one && noLongerHeld === undefined && went.pick === null && went.resume === null,
   };
 };
@@ -145,7 +140,7 @@ export function ChooseWorkspaceScreen() {
       {
         onSuccess: goOn,
         onError: (refused) => {
-          if (!refusedForNoMembership(refused)) return;
+          if (!refused.noLongerAMember) return;
           flushSync(() => {
             setNoLongerHeld(workspace);
           });
@@ -228,11 +223,6 @@ type Standing = {
   /** Set only while the latest pick's refusal is the ended membership. */
   readonly removedFrom: Workspace | undefined;
 };
-
-const refusedWith = (said: Said): Outcome => ({
-  tone: "refused",
-  words: <RefusalLine said={said} />,
-});
 
 const pickOutcome = (standing: Standing): Outcome | undefined => {
   if (standing.removedFrom !== undefined) {

@@ -4,8 +4,8 @@ import { INVITATION_ACTS, INVITATION_WORDS } from "@/features/auth/invitation-wo
 import { SAID_OF_ACCEPTING } from "@/features/auth/refusal-words.ts";
 import { DISPLAY_NAME_REFUSED, DISPLAY_NAME_WORDS } from "@/shared/display-name-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
+import type { Role } from "@/shared/navigation.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
-import type { Role } from "@/shared/screens.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -17,6 +17,7 @@ import {
   keystrokesListed,
   landedAtHome,
   person,
+  personMenuOpened,
   provision,
   quoted,
   saysItsSentenceNotItsWord,
@@ -95,7 +96,7 @@ test("an invited newcomer names themselves on the invitation, then joins", async
 
   const bar = page.getByRole("banner");
   await expect(bar.getByText("Calder Joinery")).toBeVisible();
-  await expect(bar.getByRole("button", { name: /Priya Shah/ })).toContainText("Editor");
+  await expect(await personMenuOpened(page, "Priya Shah")).toContainText("Editor");
 });
 
 test("a named invitee reads it within a second, joins keyboard-only", async ({

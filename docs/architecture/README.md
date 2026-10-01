@@ -45,6 +45,19 @@ The route's status table says what a block is and what blocks it. This table say
 | V1 | api · web · Postgres · git store | `concepts` slice — verification requests, the cadence, the four conflict resolutions; the Knowledge screen's saved filters |
 | C1 | every container | `importBundle` on the `concepts` slice behind `runOps` `import-bundle` (T-307, landed 22/09/2026) — a governed write per imported `Answer`, run by the operator as a named member; `provision-workspace` and `add-member` at the `runOps` seam over the `workspaces` slice landed ahead of the block (T-329, 22/09/2026); the rest of the block adds no component |
 
+## Not yet redrawn: the shell of 30/09/2026
+
+The shell and layout foundations plan (`docs/plans/2026-09-30-1959-feat-shell-and-layout-foundations-plan.md`) rebuilt the web client's shell as ADR 0047 records. No component view draws `apps/web`, so the one line it moves is the web container in `c4-containers.md`, which still reads "Control Centre's six screens". The single-page app now declares one rail of surfaces: Ask, Knowledge, Inbox and Control Centre, whose eight groups hold its screens. The rail shows only what is built and what the person may see, and the person's home even before it is built. The console is reached from the workspace switcher. A `/c4-architecture` pass after the pre-S2 architecture review redraws that line, and draws a web component view if the review asks for one. What moved, under `apps/web/src/`:
+
+- `shared/navigation.ts`, which replaced `shared/screens.ts`, is the one navigation list: every surface, group and screen, with its address, whether it is built and who may see it. Its `visibleTo` is the visibility function, filtering the list by what is built, by role and by ownership. It keeps the reader's own home, built or not. `placeAt` finds the place an address names, for the frame and jump-to, and `headingOf` a screen's first heading. The router reads `hides`, and `movedWithin` and `leadsTo` for older addresses.
+- `app/visible-tree.ts` carries the frame's reading of the list to the routes.
+- `app/band.tsx`, which replaced `app/top-bar.tsx`, is the top band: the logo, the switcher with the navigation control, the breadcrumb, jump-to and the avatar menu.
+- `app/workspace-switcher.tsx` is the workspace switcher. It lists the console to the operator alone.
+- `app/breadcrumb.tsx` is the breadcrumb, read off the navigation list.
+- `app/jump-to.tsx` is jump-to, opened by ⌘K or Ctrl+K: the surfaces, screens, acts and members the person may see.
+- `shared/keystrokes.tsx` holds the shell's keystrokes context, `ShellKeystrokes`, which lists the shell's keystrokes beside the open screen's own. The rail's foot opens the list, or the band where the layout is narrow.
+- `app/screens/`, which replaced `app/views/`, and each feature's `*-screen.tsx`, which replaced its `*-view.tsx`, are the screens. `shared/screen-toolbar.tsx` replaced `shared/view-toolbar.tsx`.
+
 ## Conventions
 
 - Mermaid's C4 syntax (`C4Context`, `C4Container`, `C4Component`, `C4Deployment`, `C4Dynamic`), one diagram per file, under twenty elements each; an element carries its technology and a one-line description; every arrow is one-way and labelled with a verb.

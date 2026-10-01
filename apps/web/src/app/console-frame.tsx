@@ -5,17 +5,19 @@ import { SignOutButton } from "@/features/auth/sign-out-button.tsx";
 import { useOperatorStanding } from "@/features/console/operator.ts";
 import { ONLY_THE_OPERATOR, STANDING_UNANSWERED } from "@/features/console/refusal-words.ts";
 import { CONSOLE_CLOSED, saidOf } from "@/features/console/words.ts";
+import { CONSOLE, OPERATOR_READER, visibleTo } from "@/shared/navigation.ts";
 import { RefusalLine } from "@/shared/refusal-outcome.tsx";
-import { CONSOLE } from "@/shared/screens.ts";
 import { Button } from "@/shared/ui/button.tsx";
 
 import { Frame } from "./frame.tsx";
-import type { MenuLink } from "./top-bar.tsx";
 
-const BACK_TO_YOUR_WORKSPACES: MenuLink = {
+/** The console frame draws for the operator alone, so what it shows is theirs. */
+const THE_OPERATORS = visibleTo(OPERATOR_READER, [CONSOLE]);
+
+const BACK_TO_YOUR_WORKSPACES = {
   name: "Back to your workspaces",
   to: "/choose-workspace",
-};
+} as const;
 
 function WaysOut() {
   return (
@@ -80,10 +82,10 @@ export function ConsoleFrame() {
 
   return (
     <Frame
-      surface={CONSOLE}
-      place={CONSOLE.name}
+      visible={THE_OPERATORS}
+      here={{ name: CONSOLE.name, workspaceId: undefined }}
       person={{ name: standing.data.name }}
-      links={[BACK_TO_YOUR_WORKSPACES]}
+      offersTheConsole={false}
     />
   );
 }
