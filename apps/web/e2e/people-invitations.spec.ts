@@ -82,7 +82,7 @@ const anAdminAtInvitations = async (
   return at;
 };
 
-/** Signed in on People below Admin, so what the tab shows them is a refusal. */
+/** Signed in at Members in a role that may not see it. */
 const aMemberBelowAdminAtPeople = async (
   page: Page,
   api: APIRequestContext,

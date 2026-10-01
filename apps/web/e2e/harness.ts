@@ -338,10 +338,16 @@ export const skipLinkReachesTheScreen = async (page: Page): Promise<void> => {
   await expect(page.getByRole("main")).toBeFocused();
 };
 
-export const tabUntilFocused = async (page: Page, target: Locator, most = 40): Promise<void> => {
+export const tabUntilFocused = async (
+  page: Page,
+  target: Locator,
+  most = 40,
+  eachStop: () => Promise<void> = async () => {},
+): Promise<void> => {
   for (let pressed = 0; pressed < most; pressed += 1) {
     if (await target.evaluate((node) => node === document.activeElement)) return;
     await page.keyboard.press("Tab");
+    await eachStop();
   }
   await expect(target, "Tab never reached it").toBeFocused();
 };

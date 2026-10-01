@@ -9,11 +9,7 @@ import {
   groupIn,
   headingOf,
   HOMES,
-  readerOf,
   screenNamed,
-  screensOf,
-  SURFACES,
-  visibleTo,
 } from "@/shared/navigation.ts";
 import { PRODUCT_NAME } from "@/shared/words.ts";
 
@@ -39,12 +35,7 @@ import {
   tabUntilFocused,
 } from "./harness.ts";
 
-/** What an Admin is shown today, read off the list: Control Centre and its built screens. */
-const AN_ADMINS = visibleTo(readerOf("Admin"), SURFACES).surfaces;
-
-const SURFACE_NAMES = AN_ADMINS.map((surface) => surface.name);
-
-const SCREEN_NAMES = screensOf(AN_ADMINS).map((each) => each.name);
+const SOURCES = groupIn(CONTROL_CENTRE, "sources");
 
 const AGENT_OPERATIONS = groupIn(CONTROL_CENTRE, "agent-operations");
 
@@ -53,6 +44,21 @@ const ROUTES_AND_SPEND = screenNamed(AGENT_OPERATIONS, "Routes and spend");
 const PEOPLE = groupIn(CONTROL_CENTRE, "people");
 
 const MEMBERS = screenNamed(PEOPLE, "Members");
+
+const SYSTEM = groupIn(CONTROL_CENTRE, "system");
+
+/** What an Admin is shown today, spelled out rather than read through the filter that draws it. */
+const AN_ADMINS_SCREENS = [
+  [SOURCES, screenNamed(SOURCES, "Bindings")],
+  [AGENT_OPERATIONS, ROUTES_AND_SPEND],
+  [PEOPLE, MEMBERS],
+  [PEOPLE, screenNamed(PEOPLE, "Groups")],
+  [SYSTEM, screenNamed(SYSTEM, "Audit log")],
+] as const;
+
+const SURFACE_NAMES = ["Control Centre"];
+
+const SCREEN_NAMES = AN_ADMINS_SCREENS.map(([, screen]) => screen.name);
 
 /** The first heading Routes and spend draws: its group's name. */
 const ITS_HEADING = headingOf(ROUTES_AND_SPEND);
@@ -176,16 +182,12 @@ const focusUnderTheBand = async (page: Page) => (await focusAgainstTheBand(page)
 const overlapsTheBand = async (page: Page) => (await focusAgainstTheBand(page)).overlaps;
 
 /** Tab by tab to `target`, no stop on the way sharing the band's box. */
-const tabClearOfTheBand = async (page: Page, target: Locator, most = 40) => {
-  for (let pressed = 0; pressed < most; pressed += 1) {
-    if (await target.evaluate((node) => node === document.activeElement)) return;
-    await page.keyboard.press("Tab");
+const tabClearOfTheBand = (page: Page, target: Locator) =>
+  tabUntilFocused(page, target, undefined, async () => {
     expect(await overlapsTheBand(page), `a stop before ${String(target)} overlaps the band`).toBe(
       false,
     );
-  }
-  await expect(target, "Tab never reached it").toBeFocused();
-};
+  });
 
 const inDocumentOrder = async (page: Page, regions: readonly Locator[]): Promise<boolean> => {
   const nodes = await Promise.all(regions.map((region) => region.elementHandle()));
@@ -374,7 +376,7 @@ test("lists a Viewer's home as the nav's one entry (AE2)", async ({ page, reques
   await aMemberSignedInAt(page, request, "Viewer", HOMES.Viewer.path);
 
   const nav = page.getByRole("navigation", { name: ASK.name });
-  await expect(nav.getByRole("link")).toHaveText([HOMES.Viewer.name]);
+  await expect(nav.getByRole("link")).toHaveText(["Ask"]);
   await expect(nav.getByRole("link", { name: HOMES.Viewer.name })).toHaveAttribute(
     "aria-current",
     "page",
@@ -982,6 +984,43 @@ test("keeps a 40-character address on one line, prose measured (AE6)", async ({
   ).toBeGreaterThan(measure);
 });
 
+test("measures a screen's prose, but not a table's or dialog's", async ({ page, request }) => {
+  await signedIn(page, request, "Ribblesdale Mouldings");
+  await page.setViewportSize(DESKTOP);
+  await page.goto(MEMBERS.path);
+  await expect(page.getByRole("heading", { level: 1, name: headingOf(MEMBERS) })).toBeVisible();
+
+  const prose = await page.evaluate(() => {
+    const content = document.querySelector("[data-screen-content]");
+    if (content === null) throw new Error("the screen marks no content wrapper");
+    const long = "a sentence long enough to run past the measure, ".repeat(6);
+    const planted = document.createElement("div");
+    planted.innerHTML = `<p>${long}</p><table><tbody><tr><td><p>${long}</p></td></tr></tbody></table><div role="dialog"><h2>${long}</h2></div>`;
+    content.append(planted);
+    const drawn = (selector: string) => {
+      const node = planted.querySelector(selector);
+      if (node === null) throw new Error(`nothing planted matches ${selector}`);
+      return { cap: getComputedStyle(node).maxWidth, width: node.getBoundingClientRect().width };
+    };
+    const read = {
+      alone: drawn(":scope > p"),
+      "a table": drawn("td > p"),
+      "a dialog": drawn("[role='dialog'] > h2"),
+    };
+    planted.remove();
+    return read;
+  });
+
+  const { alone, ...lifted } = prose;
+  const measure = Number.parseFloat(alone.cap);
+  expect(Number.isFinite(measure), "a screen's paragraph has no measure").toBe(true);
+  expect(alone.width, "a long paragraph runs past the measure").toBeCloseTo(measure, 0);
+  for (const [where, each] of Object.entries(lifted)) {
+    expect(each.cap, `prose in ${where} keeps the measure`).toBe("none");
+    expect(each.width, `prose in ${where} stops short of its box`).toBeGreaterThan(measure);
+  }
+});
+
 test("remembers a closed secondary nav on this browser only", async ({ page, request }) => {
   const workspace = await signedIn(page, request, "Ribble Toolmaking");
   await page.goto(ROUTES_AND_SPEND.path);
@@ -1102,14 +1141,10 @@ test("leads each built screen with its group's line, auditing each", async ({
 }) => {
   await signedIn(page, request, "Swaledale Foundry");
 
-  for (const group of AN_ADMINS.flatMap((surface) => surface.groups)) {
-    for (const screen of group.screens) {
-      await page.goto(screen.path);
-      await expect(page.getByRole("heading", { level: 1, name: headingOf(screen) })).toBeVisible();
-      await expect(
-        page.getByRole("main").getByText(group.summary ?? "", { exact: true }),
-      ).toBeVisible();
-      await passesTheAccessibilityGate();
-    }
+  for (const [group, screen] of AN_ADMINS_SCREENS) {
+    await page.goto(screen.path);
+    await expect(page.getByRole("heading", { level: 1, name: group.name })).toBeVisible();
+    await expect(page.getByRole("main").getByText(group.summary, { exact: true })).toBeVisible();
+    await passesTheAccessibilityGate();
   }
 });

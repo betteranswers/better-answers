@@ -247,19 +247,28 @@ const watchedIn = (root: string): readonly Scan[] => {
   });
 };
 
-const avoidedSenseLines = (root: string): readonly string[] => {
-  const watched = watchedIn(root);
-  return treeFilesUnder(root)
-    .filter((file) => !isCarvedOut(file))
+const linesWhere = (
+  root: string,
+  reads: (file: string) => boolean,
+  finds: (file: string, text: string) => boolean,
+): readonly string[] =>
+  treeFilesUnder(root)
+    .filter(reads)
     .flatMap((file) =>
       readUnder(root, file)
         .split("\n")
         .flatMap((text, index) =>
-          watched.some((one) => usesInAvoidedSense(one, file, text))
-            ? [`${file}:${String(index + 1)}: ${text.trim()}`]
-            : [],
+          finds(file, text) ? [`${file}:${String(index + 1)}: ${text.trim()}`] : [],
         ),
     );
+
+const avoidedSenseLines = (root: string): readonly string[] => {
+  const watched = watchedIn(root);
+  return linesWhere(
+    root,
+    (file) => !isCarvedOut(file),
+    (file, text) => watched.some((one) => usesInAvoidedSense(one, file, text)),
+  );
 };
 
 describe("the words the glossary avoids, read from the glossary", () => {
@@ -311,17 +320,11 @@ const avoidedNamesIn = (root: string): readonly string[] => {
 
 const avoidedNameLines = (root: string): readonly string[] => {
   const finds = avoidedNamesIn(root).map((name) => findsIn(name, false));
-  return treeFilesUnder(root)
-    .filter((file) => READ_BY_A_PERSON.some((prefix) => file.startsWith(prefix)) && isCode(file))
-    .flatMap((file) =>
-      readUnder(root, file)
-        .split("\n")
-        .flatMap((text, index) =>
-          finds.some((found) => found(text))
-            ? [`${file}:${String(index + 1)}: ${text.trim()}`]
-            : [],
-        ),
-    );
+  return linesWhere(
+    root,
+    (file) => READ_BY_A_PERSON.some((prefix) => file.startsWith(prefix)) && isCode(file),
+    (_, text) => finds.some((found) => found(text)),
+  );
 };
 
 describe("the product's name, where a person reads it", () => {
