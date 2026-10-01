@@ -39,9 +39,8 @@ jobs:
         run: |
           set -euo pipefail
           if [ "${CONCLUSION}" != "success" ]; then
-            reason="Cubic's check on ${HEAD_SHA} ended ${CONCLUSION} (${CUBIC_SAID}), so nothing is armed; comment @cubic-dev-ai to review, or arm by hand with gh pr merge <n> --auto --merge"
-            echo "::notice::${reason}"
-            echo "${reason}" >> "${GITHUB_STEP_SUMMARY}"
+            echo "::notice::Cubic's check on ${HEAD_SHA} ended ${CONCLUSION}, so nothing is armed; the job summary says why"
+            echo "Cubic's check on ${HEAD_SHA} ended ${CONCLUSION} (${CUBIC_SAID}), so nothing is armed. Comment @cubic-dev-ai on the pull request to review it, or arm it by hand with \`gh pr merge <n> --auto --merge\`." >> "${GITHUB_STEP_SUMMARY}"
             exit 0
           fi
           if [ -z "${GH_TOKEN}" ]; then

@@ -5,7 +5,7 @@ Two reviews, each with one job. The loop below is how a change passes both witho
 | Tool | Job |
 | --- | --- |
 | **`/ce-code-review`** (Compound Engineering) | Reviews the diff before the pull request, against the `CODING_STANDARDS.md` files and the plan. A second model family reads it too (*Before the pull request*, below) |
-| **Cubic** (`cubic.yaml`, the `cubic` MCP) | Reviews every head on the pull request. It is the safety net once work reaches a pull request. Its allowance is counted in reviewed lines, so `cubic.yaml` skips what is not code: tests, `docs/`, skills and generated snapshots |
+| **Cubic** (`cubic.yaml`, the `cubic` MCP) | Reviews every head on the pull request. It is the safety net once work reaches a pull request. Its allowance is counted in reviewed lines, so the ignore list in `cubic.yaml` skips what is not code, such as tests, `docs/`, skills and generated snapshots |
 | **GitNexus** (the `gitnexus` MCP) | Blast radius before a risky edit, changed scope before a large commit. A tool, not a gate |
 | **The wiki** (`.cubic/wiki/`, also the MCP's `get_wiki_page`) | Orientation in an unfamiliar area. It is the floor: check the code and the schema before relying on it |
 
