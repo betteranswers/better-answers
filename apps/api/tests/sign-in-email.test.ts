@@ -5,10 +5,12 @@ import { appForSuite } from "./suite-app.ts";
 
 const app = appForSuite();
 
-/** The email the code request sent, with the code read from that same email. */
+/** The one email a code request sent a fresh address, with the code read from it. */
 const signInEmailTo = async (email: string) => {
   await app().client().json("/email-otp/send-verification-otp", { email, type: "sign-in" });
-  const message = app().emails.findLast(({ to }) => to === email);
+  const sent = app().emails.filter(({ to }) => to === email);
+  expect(sent, "a code request sends exactly one email").toHaveLength(1);
+  const [message] = sent;
   const code = message === undefined ? undefined : codeIn(message);
   if (message === undefined || code === undefined) throw new Error(`no code went to ${email}`);
   return { message, code };
