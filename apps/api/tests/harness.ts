@@ -115,6 +115,10 @@ export const capturingLogger = (level: "debug" | "info" = "info") => {
   return { logger: pino({ level }, sink), logs };
 };
 
+/** The sign-in code stands alone on its line, so digits in a link or an id are never read as it. */
+export const codeIn = (message: EmailMessage): string | undefined =>
+  /^(\d{6})$/m.exec(message.text)?.[1];
+
 export type TestApp = {
   readonly server: Hono;
   readonly database: TestDatabase;
@@ -467,7 +471,7 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
 
   const codeSentTo: TestApp["codeSentTo"] = (email) => {
     const message = emails.findLast((candidate) => candidate.to === email);
-    const code = message?.text.match(/\b(\d{6})\b/)?.[1];
+    const code = message === undefined ? undefined : codeIn(message);
     if (code === undefined) throw new Error(`no code was sent to ${email}`);
     return code;
   };

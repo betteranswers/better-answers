@@ -55,6 +55,7 @@ import {
   SIGN_IN_PATH,
 } from "./constants.ts";
 import { accessControl, creatorRole, roles } from "./roles.ts";
+import { signInEmail } from "./sign-in-email.ts";
 
 type AuthEndpoint = NonNullable<BetterAuthPlugin["endpoints"]>[string];
 
@@ -453,11 +454,7 @@ export const createAuth = (deps: AuthDependencies) => {
         storeOTP: "hashed",
         sendVerificationOTP: async ({ email, otp, type }) => {
           if (type !== "sign-in") return;
-          await deps.sendEmail({
-            to: email,
-            subject: `Your ${PRODUCT_NAME} sign-in code`,
-            text: `Your code is ${otp}. It is valid for five minutes. If you did not ask for it, ignore this email.`,
-          });
+          await deps.sendEmail(signInEmail(email, otp));
         },
       }),
       widenAuthorize(
