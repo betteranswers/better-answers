@@ -7,7 +7,7 @@ import { expect, test as suite } from "../e2e/browser.ts";
 import { codeSentTo } from "../e2e/harness.ts";
 import { noteInbox } from "./inbox.ts";
 import { couldNotRun, playsTheRole } from "./outcome.ts";
-import { signIn, type CodeSource } from "./sign-in.ts";
+import { refusedByTheEdge, signIn, type CodeSource } from "./sign-in.ts";
 
 type JourneyFixtures = {
   /** The test person a journey signs in as. The preflight names none, and signs nobody in. */
@@ -59,6 +59,7 @@ const signedOut = (context: BrowserContext, baseURL: string | undefined): Promis
       data: {},
       headers: { origin: signOut.origin },
     });
+    refusedByTheEdge(answered, "the sign-out");
     expect(answered.ok(), `signing out answered ${answered.status()}`).toBe(true);
   });
 

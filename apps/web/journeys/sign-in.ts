@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Response } from "@playwright/test";
+import { expect, test, type APIResponse, type Page, type Response } from "@playwright/test";
 
 import { SIGN_IN_WORDS } from "@/features/auth/sign-in-words.ts";
 
@@ -9,6 +9,7 @@ import { couldNotRun, type Outcome } from "./outcome.ts";
 const SEND_PATH = "/email-otp/send-verification-otp";
 const SIGN_IN_PATH = "/sign-in/email-otp";
 
+const FORBIDDEN = 403;
 const TOO_MANY_REQUESTS = 429;
 
 /** Noting the inbox, 10 s; its 90 s deadline plus a last poll, 20 s; a re-ask, 20 s; the screen. */
@@ -42,10 +43,18 @@ const codeFrom = (answer: InboxAnswer): string => {
   throw new Error(why);
 };
 
+type Answered = Pick<APIResponse, "status" | "headers">;
+
 /** A ceiling or a challenge stops the run before the product is reached, so it judges nothing. */
-const refusedTheRun = (response: Response, at: string): void => {
-  if (response.status() === TOO_MANY_REQUESTS) couldNotRun(`a sign-in ceiling refused ${at}`);
+const refusedTheRun = (response: Answered, at: string): void => {
+  if (response.status() === TOO_MANY_REQUESTS) couldNotRun(`a rate ceiling refused ${at}`);
   if (response.headers()["cf-mitigated"] === "challenge") couldNotRun(`the edge challenged ${at}`);
+};
+
+/** The product answers 403 here only to a post from a foreign origin, so a 403 is the edge's. */
+export const refusedByTheEdge = (response: Answered, at: string): void => {
+  refusedTheRun(response, at);
+  if (response.status() === FORBIDDEN) couldNotRun(`the edge refused ${at}`);
 };
 
 const answerTo = (page: Page, path: string): Promise<Response> =>
@@ -66,12 +75,12 @@ const refusedCode = async (awaiting: Awaiting, status: number): Promise<never> =
 
 const sendTheCode = async (page: Page, address: string): Promise<void> => {
   const opened = await page.goto("/sign-in");
-  if (opened !== null) refusedTheRun(opened, "the sign-in screen");
+  if (opened !== null) refusedByTheEdge(opened, "the sign-in screen");
   const sent = answerTo(page, SEND_PATH);
   await page.getByLabel(SIGN_IN_WORDS.emailField).fill(address);
   await page.getByRole("button", { name: SIGN_IN_WORDS.send }).click();
   const response = await sent;
-  refusedTheRun(response, "the Send");
+  refusedByTheEdge(response, "the Send");
   expect(response.ok(), `the Send answered ${response.status()}`).toBe(true);
 };
 

@@ -88,6 +88,7 @@ describe("the journeys' sign-in", () => {
       spec: [
         STAND_IN,
         'signsIn("ceiling", inboxAnswering({ answer: "code", code: CODE }), { send: 429 });',
+        'signsIn("refusal", inboxAnswering({ answer: "code", code: CODE }), { send: 403 });',
         'signsIn("challenge", inboxAnswering({ answer: "code", code: CODE }), { challenged: true });',
         'signsIn("unnoted", async () => ({ answer: "unreachable" }), {});',
         'signsIn("no-mail", inboxAnswering({ answer: "no-mail" }), {});',
@@ -103,7 +104,8 @@ describe("the journeys' sign-in", () => {
     expect(run.outcome).toBe("could-not-run\n");
     expect(run.summary).toContain(
       [
-        "| could-not-run | ceiling | Sign in | Send the code | a sign-in ceiling refused the Send |",
+        "| could-not-run | ceiling | Sign in | Send the code | a rate ceiling refused the Send |",
+        "| could-not-run | refusal | Sign in | Send the code | the edge refused the Send |",
         "| could-not-run | challenge | Sign in | Send the code | the edge challenged the sign-in screen |",
         "| could-not-run | unnoted | Sign in | Note the test inbox | the test inbox did not answer |",
         "| fail | no-mail | Sign in | Read the code from the test inbox |  |",
