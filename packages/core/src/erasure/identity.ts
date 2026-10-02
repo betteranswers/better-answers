@@ -56,6 +56,14 @@ export type ErasureSubject = {
 
 const rowsOf = (result: { readonly rowCount: number | null }): number => result.rowCount ?? 0;
 
+type HeldByThePerson =
+  | "session"
+  | "account"
+  | "passkey"
+  | "authenticator"
+  | "recovery_code"
+  | "workspace_last_active";
+
 const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) => {
   const emails = [...subject.emails];
   const verifications = await tx.query(
@@ -67,18 +75,14 @@ const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) =
     "DELETE FROM invitation WHERE lower(email) = ANY($1) RETURNING workspace_id",
     [emails],
   );
-  const sessions = await tx.query("DELETE FROM session WHERE user_id = $1", [subject.personId]);
-  const accounts = await tx.query("DELETE FROM account WHERE user_id = $1", [subject.personId]);
-  const passkeys = await tx.query("DELETE FROM passkey WHERE user_id = $1", [subject.personId]);
-  const authenticators = await tx.query("DELETE FROM authenticator WHERE user_id = $1", [
-    subject.personId,
-  ]);
-  const recoveryCodes = await tx.query("DELETE FROM recovery_code WHERE user_id = $1", [
-    subject.personId,
-  ]);
-  const lastActive = await tx.query("DELETE FROM workspace_last_active WHERE user_id = $1", [
-    subject.personId,
-  ]);
+  const deleted = async (table: HeldByThePerson): Promise<number> =>
+    rowsOf(await tx.query(`DELETE FROM ${table} WHERE user_id = $1`, [subject.personId]));
+  const sessions = await deleted("session");
+  const accounts = await deleted("account");
+  const passkeys = await deleted("passkey");
+  const authenticators = await deleted("authenticator");
+  const recoveryCodes = await deleted("recovery_code");
+  const lastActive = await deleted("workspace_last_active");
 
   const pseudonymised = await tx.query(
     `UPDATE "user"
@@ -90,12 +94,12 @@ const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) =
   );
   return {
     verifications: rowsOf(verifications),
-    sessions: rowsOf(sessions),
-    accounts: rowsOf(accounts),
-    passkeys: rowsOf(passkeys),
-    authenticators: rowsOf(authenticators),
-    recoveryCodes: rowsOf(recoveryCodes),
-    lastActive: rowsOf(lastActive),
+    sessions,
+    accounts,
+    passkeys,
+    authenticators,
+    recoveryCodes,
+    lastActive,
     invitationsHere: invitations.rows.filter((row) => row.workspace_id === subject.workspaceId)
       .length,
     invitationsEverywhere: rowsOf(invitations),

@@ -381,6 +381,7 @@ export const createAuth = (deps: AuthDependencies) => {
   };
 
   const db = drizzle(deps.database, { schema: identitySchema });
+  const appAddress = new URL(deps.publicUrl);
 
   return betterAuth({
     appName: PRODUCT_NAME,
@@ -609,9 +610,9 @@ export const createAuth = (deps: AuthDependencies) => {
         },
       }),
       passkeyPlugin({
-        rpID: new URL(deps.publicUrl).hostname,
+        rpID: appAddress.hostname,
         rpName: PRODUCT_NAME,
-        origin: new URL(deps.publicUrl).origin,
+        origin: appAddress.origin,
         authenticatorSelection: { userVerification: "required" },
       }),
       cimd({

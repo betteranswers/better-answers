@@ -22,6 +22,7 @@ const FACTOR_PATHS = mountedPaths(asBuilt).filter(
   (path) => path.startsWith("/passkey/") || path.startsWith("/two-factor/"),
 );
 
+/** Written out, not imported: a path dropped from `disabledPaths` then fails here. */
 const CLOSED_SESSION_PATHS = [
   "/list-sessions",
   "/revoke-other-sessions",
@@ -84,7 +85,7 @@ const authenticatorHeldBy = async (personId: string) => {
 };
 
 describe("an Admin with an authenticator signing in by email code", () => {
-  // The gate's unit flips this: then the session is pending until the authenticator confirms it.
+  // The library's own factor check skips email-code sign-in; once our gate stands, this session is pending.
   it("gets a whole session while no gate stands", async () => {
     const { admin } = await app().provision();
     await setUpAnAuthenticator(app(), await signedInClient(app(), admin.email));

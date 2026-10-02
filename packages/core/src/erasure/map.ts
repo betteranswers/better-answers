@@ -98,6 +98,11 @@ const aboutTheMember = async (
 ): Promise<readonly string[]> =>
   subject.memberId === null ? [] : located(tx, statement, [subject.memberId, ...extras]);
 
+const rowsOfThePersonIn =
+  (table: "account" | "passkey" | "authenticator" | "recovery_code"): ErasureFinder =>
+  (platform, subject, tx) =>
+    aboutTheMember(tx, subject, `SELECT id AS location FROM ${table} WHERE user_id = $1`);
+
 const MEMBER_HERE = `SELECT u.id AS location
      FROM "user" u
      JOIN member m ON m.user_id = u.id
@@ -184,26 +189,22 @@ const ERASURE_FAMILY_DESCRIPTORS = {
 
   "identity-account": {
     categories: ["linked-account"],
-    find: (platform, subject, tx) =>
-      aboutTheMember(tx, subject, "SELECT id AS location FROM account WHERE user_id = $1"),
+    find: rowsOfThePersonIn("account"),
   },
 
   "identity-passkey": {
     categories: ["sign-in", "device"],
-    find: (platform, subject, tx) =>
-      aboutTheMember(tx, subject, "SELECT id AS location FROM passkey WHERE user_id = $1"),
+    find: rowsOfThePersonIn("passkey"),
   },
 
   "identity-authenticator": {
     categories: ["sign-in"],
-    find: (platform, subject, tx) =>
-      aboutTheMember(tx, subject, "SELECT id AS location FROM authenticator WHERE user_id = $1"),
+    find: rowsOfThePersonIn("authenticator"),
   },
 
   "identity-recovery-code": {
     categories: ["sign-in"],
-    find: (platform, subject, tx) =>
-      aboutTheMember(tx, subject, "SELECT id AS location FROM recovery_code WHERE user_id = $1"),
+    find: rowsOfThePersonIn("recovery_code"),
   },
 
   /** This workspace's row alone: another's would say where else the person has been. */

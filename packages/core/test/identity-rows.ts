@@ -47,36 +47,30 @@ export const secondFactorRowsFor = async (
   const passkeyId = ulid();
   const authenticatorId = ulid();
   const recoveryCodeIds = [ulid(), ulid()];
-  const superuser = await pool.connect();
-  try {
-    await superuser.query(
-      `INSERT INTO passkey (id, name, public_key, user_id, credential_id, counter, device_type, backed_up)
-       VALUES ($1, 'MacBook', 'public-key', $2, $3, 0, 'multiDevice', true)`,
-      [passkeyId, userId, `credential-${passkeyId}`],
-    );
-    await superuser.query("INSERT INTO passkey_last_use (passkey_id, at) VALUES ($1, now())", [
-      passkeyId,
+  await pool.query(
+    `INSERT INTO passkey (id, name, public_key, user_id, credential_id, counter, device_type, backed_up)
+     VALUES ($1, 'MacBook', 'public-key', $2, $3, 0, 'multiDevice', true)`,
+    [passkeyId, userId, `credential-${passkeyId}`],
+  );
+  await pool.query("INSERT INTO passkey_last_use (passkey_id, at) VALUES ($1, now())", [passkeyId]);
+  await pool.query(
+    `INSERT INTO authenticator (id, secret, backup_codes, user_id)
+     VALUES ($1, 'sealed-secret', 'sealed-codes', $2)`,
+    [authenticatorId, userId],
+  );
+  for (const id of recoveryCodeIds) {
+    await pool.query("INSERT INTO recovery_code (id, user_id, code_hash) VALUES ($1, $2, $3)", [
+      id,
+      userId,
+      `hash-${id}`,
     ]);
-    await superuser.query(
-      `INSERT INTO authenticator (id, secret, backup_codes, user_id)
-       VALUES ($1, 'sealed-secret', 'sealed-codes', $2)`,
-      [authenticatorId, userId],
-    );
-    for (const id of recoveryCodeIds) {
-      await superuser.query(
-        "INSERT INTO recovery_code (id, user_id, code_hash) VALUES ($1, $2, $3)",
-        [id, userId, `hash-${id}`],
-      );
-    }
-    await superuser.query(
-      `UPDATE "user" SET authenticator_enabled = true, passkey_offer_dismissed_at = now(),
-              recovery_codes_acknowledged = true
-        WHERE id = $1`,
-      [userId],
-    );
-  } finally {
-    superuser.release();
   }
+  await pool.query(
+    `UPDATE "user" SET authenticator_enabled = true, passkey_offer_dismissed_at = now(),
+            recovery_codes_acknowledged = true
+      WHERE id = $1`,
+    [userId],
+  );
   return { passkeyId, authenticatorId, recoveryCodeIds };
 };
 
