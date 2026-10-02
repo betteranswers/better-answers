@@ -974,7 +974,7 @@ flowchart TB
 2. Move Groups onto the filter row and give its rows a menu with Rename and Delete. Delete keeps today's warning.
 3. Move creating a group into a dialog opened by a new Groups toolbar act. A group's row still opens its sheet.
 
-**Patterns to follow:** today's `ApproveRequest` dialog and its focus return; `RenameGroup` and `DeleteGroup` in `apps/web/src/features/people/group-sheet.tsx`.
+**Patterns to follow:** today's `ApproveRequest` dialog and its focus return; `RenameGroup` and `DeleteGroup` in `apps/web/src/features/people/group-sheet.tsx`. Each read's loading and failure lines go through `ListRead` or `useReadSaid` (`apps/web/src/shared/read-said.ts`), as BA-31 left all three screens: a line drawn into a live region on the render that mounts the region may go unread. A region that stands empty uses `empty:sr-only`, not `empty:hidden`.
 
 **Test scenarios:**
 - Searching Requests narrows them to one requester.
