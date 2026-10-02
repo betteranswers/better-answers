@@ -442,6 +442,13 @@
       "when": 1790970695990,
       "tag": "0062_the-test-workspace-mark",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1790975932505,
+      "tag": "0063_the-test-workspace-mark-kept",
+      "breakpoints": true
     }
   ]
 }

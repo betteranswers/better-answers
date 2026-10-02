@@ -19,6 +19,16 @@ const filesMatching = (root: string, pattern: RegExp): readonly string[] =>
     .filter((file) => pattern.test(readFileSync(path.join(root, file), "utf8")))
     .toSorted();
 
+/** Any mention, read or write, raw or through the schema, so a new one is a reviewed change. */
+const NAMES_THE_MARK = /test_workspace_mark|testWorkspaceMark/;
+
+const NAMING_THE_MARK_IN_CORE = [
+  // The fixture, the mark's one writer, which reads it first to keep or correct it.
+  "members/test-workspace.ts",
+  // The invitation guard, which only reads it.
+  "members/testing-domain.ts",
+];
+
 type Leaf<Path extends string, Output> = { readonly path: Path; readonly output: Output };
 
 type LeavesOf<Node, Here extends string> = Node extends AnyProcedure
@@ -148,11 +158,10 @@ describe("what a procedure may answer the wire", () => {
     >();
   });
 
-  it("writes the test workspace's mark from the ops command alone", () => {
+  it("names the mark only in the fixture and the guard", () => {
     expect(filesMatching(API_SOURCE, /\bensureTestWorkspace\b/)).toEqual(["ops/index.ts"]);
-    expect(filesMatching(CORE_SOURCE, /\b(?:INSERT INTO|UPDATE) test_workspace_mark\b/)).toEqual([
-      "members/test-workspace.ts",
-    ]);
+    expect(filesMatching(API_SOURCE, NAMES_THE_MARK)).toEqual([]);
+    expect(filesMatching(CORE_SOURCE, NAMES_THE_MARK)).toEqual(NAMING_THE_MARK_IN_CORE);
   });
 
   it("answers no Result, which would cross a refusal as success", () => {

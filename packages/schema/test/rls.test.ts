@@ -722,7 +722,7 @@ describe("the test workspace's mark under app_rt", () => {
     });
   });
 
-  it("changes, removes and writes none of another tenant's mark", async () => {
+  it("changes and writes none of another tenant's mark", async () => {
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
       await seed.testWorkspaceMark({ workspaceId: WS_A, testingDomain: "a.testing.invalid" });
@@ -732,8 +732,7 @@ describe("the test workspace's mark under app_rt", () => {
       const moved = await client.query(
         "UPDATE test_workspace_mark SET testing_domain = 'x.invalid'",
       );
-      const removed = await client.query("DELETE FROM test_workspace_mark");
-      expect([moved.rowCount, removed.rowCount]).toEqual([0, 0]);
+      expect(moved.rowCount).toBe(0);
 
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
       const kept = await client.query("SELECT testing_domain FROM test_workspace_mark");
@@ -741,6 +740,39 @@ describe("the test workspace's mark under app_rt", () => {
       await expect(client.query(A_TESTING_DOMAIN_MARKED, [WS_B])).rejects.toThrow(
         /row-level security/,
       );
+    });
+  });
+
+  it("lets the api write its own mark, never remove it", async () => {
+    await withRollback(db.pool, async (client) => {
+      await seedTwoWorkspaces(client);
+      expect(await privilegesHeld(client, "app_rt", "test_workspace_mark")).toEqual({
+        SELECT: true,
+        INSERT: true,
+        UPDATE: true,
+        DELETE: false,
+        TRUNCATE: false,
+        REFERENCES: false,
+        TRIGGER: false,
+        MAINTAIN: false,
+      });
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      await client.query(A_TESTING_DOMAIN_MARKED, [WS_A]);
+      await client.query("UPDATE test_workspace_mark SET testing_domain = 'b.testing.invalid'");
+      const own = await client.query(
+        "SELECT workspace_id, testing_domain FROM test_workspace_mark",
+      );
+      expect(own.rows).toEqual([{ workspace_id: WS_A, testing_domain: "b.testing.invalid" }]);
+
+      await refusesEach(client, [
+        [
+          "DELETE FROM test_workspace_mark",
+          "a mark the api could remove would reopen the workspace's invitations to any address",
+        ],
+        ["TRUNCATE test_workspace_mark", "nor may it empty the table of every workspace's mark"],
+      ]);
     });
   });
 
