@@ -119,7 +119,6 @@ const saidOfTheCode = (sentTo: string, sending: boolean, resent: boolean): strin
 const saidOnArriving = (arriving: boolean, arrival: Arrival | undefined): string | null =>
   arriving && arrival !== undefined ? SIGN_IN_WORDS.arrived[arrival] : null;
 
-/** Selected, so the next digits typed or pasted replace the refused ones. */
 type SessionRead = {
   readonly isError: boolean;
   readonly data:

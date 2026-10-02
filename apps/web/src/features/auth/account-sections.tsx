@@ -56,6 +56,7 @@ function ActButton(properties: {
 function NoAuthenticator(properties: {
   readonly setupOpen: boolean;
   readonly starting: StartingTheSetup;
+  readonly finishing: boolean;
   readonly landsAt: LandsAt;
   readonly onSetUp: () => void;
   readonly onFinished: (recoveryCodes: readonly string[] | null) => void;
@@ -72,7 +73,8 @@ function NoAuthenticator(properties: {
         ref={properties.landsAt("set-up")}
         type="button"
         variant="outline"
-        className="mt-3"
+        className="mt-3 aria-disabled:opacity-50"
+        aria-disabled={properties.finishing}
         aria-expanded={properties.setupOpen}
         aria-controls={properties.setupOpen ? setupId : undefined}
         aria-keyshortcuts={SET_UP.key}
@@ -151,6 +153,7 @@ type AuthenticatorProperties = {
   readonly held: SecondFactor | undefined;
   readonly setupOpen: boolean;
   readonly starting: StartingTheSetup;
+  readonly finishing: boolean;
   readonly removing: boolean;
   readonly landsAt: LandsAt;
   readonly onSetUp: () => void;

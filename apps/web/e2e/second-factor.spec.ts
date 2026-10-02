@@ -215,6 +215,31 @@ test("a wrong setup code is refused, its digits left selected", async ({ page, r
   await expect(codesListed(page)).toHaveCount(RECOVERY_CODES_IN_A_SET);
 });
 
+test("a setup's codes land though Set up is pressed mid-finish", async ({ page, request }) => {
+  await accountWithNoWorkspace(page, request);
+  const key = await setupOpened(page);
+  const pressed = Promise.withResolvers<void>();
+  // The api mints the codes before the press; only their landing in the page waits on it.
+  await page.route("**/authenticator/finish", async (route) => {
+    const answer = await route.fetch();
+    await pressed.promise;
+    await route.fulfill({ response: answer });
+  });
+  const asked = page.waitForRequest("**/authenticator/finish");
+  await codeField(page).fill(authenticatorCodeAt(key, new Date()));
+  await asked;
+
+  await expect(setUpButton(page)).toHaveAttribute("aria-disabled", "true");
+  await setUpButton(page).focus();
+  await page.keyboard.press("Enter");
+  pressed.resolve();
+
+  await expect(codesListed(page)).toHaveCount(RECOVERY_CODES_IN_A_SET);
+  await expect(
+    codesBlock(page).getByRole("heading", { name: RECOVERY_CODE_WORDS.saveHeading }),
+  ).toBeFocused();
+});
+
 test("a member removes their authenticator through its dialog", async ({ page, request }) => {
   const email = await accountWithNoWorkspace(page, request);
   await setUpWithItsCode(page);

@@ -32,6 +32,7 @@ import {
 } from "./refusal-words.ts";
 import {
   useAcknowledgeRecoveryCodes,
+  useFinishingTheSetup,
   useRemoveAuthenticator,
   useReplaceRecoveryCodes,
   useSecondFactor,
@@ -82,6 +83,7 @@ const madeNow = (): string => new Date().toISOString();
 /** Each act clears what the last one said, so the page speaks of one act at a time. */
 const useAccountActs = (address: string) => {
   const starting = useStartAuthenticator();
+  const finishing = useFinishingTheSetup();
   const remove = useRemoveAuthenticator();
   const make = useReplaceRecoveryCodes();
   const acknowledge = useAcknowledgeRecoveryCodes();
@@ -98,6 +100,7 @@ const useAccountActs = (address: string) => {
   };
 
   const toggleSetup = () => {
+    if (finishing) return;
     setSetupOpen(!setupOpen);
     if (!setupOpen && starting.data === undefined && !starting.isPending) starting.mutate();
   };
@@ -150,6 +153,7 @@ const useAccountActs = (address: string) => {
 
   return {
     starting,
+    finishing,
     remove,
     make,
     acknowledge,
@@ -222,6 +226,7 @@ export function AccountPage() {
           held={read.data}
           setupOpen={acts.setupOpen}
           starting={acts.starting}
+          finishing={acts.finishing}
           removing={acts.remove.isPending}
           landsAt={acts.landsAt}
           onSetUp={acts.toggleSetup}

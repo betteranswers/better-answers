@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useMutationState, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 
 import { useTRPC } from "@/shared/api/trpc.ts";
@@ -45,18 +45,29 @@ export const useStartAuthenticator = () =>
 
 export type StartingTheSetup = ReturnType<typeof useStartAuthenticator>;
 
-/** The first code swaps the session's cookie, so the session held here is read again. */
-export const useFinishAuthenticator = () => {
+/**
+ * The codes show once, so the mutation hands them over first, even if the field has closed. The
+ * first code swaps the session's cookie.
+ */
+export const useFinishAuthenticator = (
+  onFinished: (recoveryCodes: readonly string[] | null) => void,
+) => {
   const queryClient = useQueryClient();
   const reread = useRereadTheSecondFactor();
   return useMutation({
+    mutationKey: [FINISH_PATH],
     mutationFn: (code: string) => askOfOurRoute(FINISH_PATH, { code }, setupFinished),
-    onSuccess: async () => {
+    onSuccess: async ({ recoveryCodes }) => {
+      onFinished(recoveryCodes);
       void rereadTheSession(queryClient);
       await reread();
     },
   });
 };
+
+/** Read where the setup is opened, since the code field holding the finish can close first. */
+export const useFinishingTheSetup = (): boolean =>
+  useMutationState({ filters: { mutationKey: [FINISH_PATH], status: "pending" } }).length > 0;
 
 export const useRemoveAuthenticator = () => {
   const api = useTRPC();

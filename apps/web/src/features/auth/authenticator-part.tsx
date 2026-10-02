@@ -84,7 +84,6 @@ const isAWrongCode = (failure: Error | null): boolean =>
 /** Grouped as a phone's keyboard is typed from it; copied whole, with no space. */
 const inFours = (key: string): string => key.match(/.{1,4}/g)?.join(" ") ?? key;
 
-/** Selected, so the next digits typed or pasted replace the refused ones. */
 function TheKey(properties: { readonly started: SetupStarted }) {
   const { started } = properties;
   const keyId = useId();
@@ -135,7 +134,7 @@ function KeyAndCode(properties: {
 }) {
   const fieldId = useId();
   const refusedId = useId();
-  const finish = useFinishAuthenticator();
+  const finish = useFinishAuthenticator(properties.onFinished);
   const [code, setCode] = useState("");
   const [refused, setRefused] = useState<readonly string[]>([]);
   const finishing = finish.isPending || finish.isSuccess;
@@ -151,9 +150,6 @@ function KeyAndCode(properties: {
   const finishWith = (digits: string) => {
     if (finishing || !worthSending(digits, refused, AUTHENTICATOR_CODE_LENGTH)) return;
     finish.mutate(digits, {
-      onSuccess: (answer) => {
-        properties.onFinished(answer.recoveryCodes);
-      },
       onError: (failure) => {
         countTheRefusal(digits, failure);
       },
