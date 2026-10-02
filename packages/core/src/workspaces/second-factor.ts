@@ -20,7 +20,7 @@ import {
 } from "../store/postgres/index.ts";
 import { notErasedAt } from "./display-name.ts";
 import { holdThePerson } from "./person-lock.ts";
-import { issuingRecoveryCodes } from "./recovery-codes.ts";
+import { issuingRecoveryCodes, type RecoveryCodesMade } from "./recovery-codes.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
 /** Ids alone: an authenticator has no name, and its secret never leaves the library's row. */
@@ -101,8 +101,11 @@ type AuthenticatorSetUp = {
   readonly authenticatorId: string;
   readonly stamped: boolean;
 
+  /** False when another finish recorded this authenticator first, so this one sends no notice. */
+  readonly firstRecord: boolean;
+
   /** Issued only to a person who held none, and shown to them once. */
-  readonly recoveryCodes: readonly string[] | undefined;
+  readonly issued: RecoveryCodesMade | undefined;
 };
 
 export type RecordAuthenticatorSetUpRefusal = WorkspaceRefusal<
@@ -110,6 +113,33 @@ export type RecordAuthenticatorSetUpRefusal = WorkspaceRefusal<
 >;
 
 type SetUpAnswer = Result<AuthenticatorSetUp, "person-gone" | "no-authenticator">;
+
+/**
+ * Two finishes at once can both pass the route's check: the second waits on the lock, then finds
+ * the first's row and records nothing.
+ */
+const recordingOnce = async (
+  platform: PlatformPrincipal,
+  tx: Tx,
+  personId: UserId,
+  authenticatorId: string,
+): Promise<boolean> => {
+  const recorded = await tx.query(
+    `SELECT 1 FROM identity_audit_event
+      WHERE subject_kind = split_part($2, '.', 2) AND subject_id = $1 AND act = $2
+        AND detail->>'authenticatorId' = $3`,
+    [personId, SECOND_FACTOR_ACTS.authenticatorAdded.name, authenticatorId],
+  );
+  if ((recorded.rowCount ?? 0) > 0) return false;
+  await recordFor(platform, tx, {
+    id: ulid(),
+    actor: actorIdOfPerson(personId),
+    act: SECOND_FACTOR_ACTS.authenticatorAdded,
+    subjectId: personId,
+    detail: { authenticatorId },
+  });
+  return true;
+};
 
 const settingUp = async (
   platform: PlatformPrincipal,
@@ -121,19 +151,13 @@ const settingUp = async (
   if (facts?.authenticator !== "set-up" || facts.authenticatorId === null) {
     return err("no-authenticator");
   }
-  await recordFor(platform, tx, {
-    id: ulid(),
-    actor: actorIdOfPerson(input.personId),
-    act: SECOND_FACTOR_ACTS.authenticatorAdded,
-    subjectId: input.personId,
-    detail: { authenticatorId: facts.authenticatorId },
-  });
+  const firstRecord = await recordingOnce(platform, tx, input.personId, facts.authenticatorId);
   const stamped = await stamping(tx, input);
-  const recoveryCodes =
+  const issued =
     facts.recoveryCodes === 0
-      ? (await issuingRecoveryCodes(platform, tx, input.personId)).recoveryCodes
+      ? await issuingRecoveryCodes(platform, tx, input.personId, input.at)
       : undefined;
-  return ok({ authenticatorId: facts.authenticatorId, stamped, recoveryCodes });
+  return ok({ authenticatorId: facts.authenticatorId, stamped, firstRecord, issued });
 };
 
 /**

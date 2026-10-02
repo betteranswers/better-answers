@@ -14,6 +14,8 @@ afterEach(() => {
 
 const CODES = ["abcd-efgh-jkmn-pqrs", "tvwx-yz01-2345-6789"];
 
+const MADE_AT = "2026-10-02T09:41:00.000Z";
+
 const wrapperOf = (clients: AppClients) =>
   function Wrapper(properties: { readonly children: ReactNode }) {
     return <Providers clients={clients}>{properties.children}</Providers>;
@@ -24,14 +26,14 @@ describe("finishing the authenticator's setup", () => {
     const answer = Promise.withResolvers<void>();
     const asked = vi.fn<() => Promise<Response>>(async () => {
       await answer.promise;
-      return answered({ recoveryCodes: CODES });
+      return answered({ recoveryCodes: CODES, madeAt: MADE_AT });
     });
     vi.stubGlobal("fetch", asked);
-    const handed: (readonly string[] | null)[] = [];
+    const handed: unknown[] = [];
     const { result, unmount } = renderHook(
       () =>
-        useFinishAuthenticator((codes) => {
-          handed.push(codes);
+        useFinishAuthenticator((issued) => {
+          handed.push(issued);
         }),
       { wrapper: wrapperOf(createAppClients()) },
     );
@@ -46,7 +48,7 @@ describe("finishing the authenticator's setup", () => {
     answer.resolve();
 
     await waitFor(() => {
-      expect(handed).toEqual([CODES]);
+      expect(handed).toEqual([{ recoveryCodes: CODES, madeAt: MADE_AT }]);
     });
   });
 });

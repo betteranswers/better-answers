@@ -9,16 +9,24 @@ import { PRODUCT_NAME } from "./product-name.ts";
 /** The SPA's Account page, where a person sees and changes their own second factor. */
 const ACCOUNT_PATH = "/account";
 
-export type FactorChange = "authenticator-added" | "authenticator-removed" | "codes-replaced";
+export type FactorChange =
+  | "authenticator-added"
+  | "authenticator-removed"
+  | "codes-made"
+  | "codes-replaced";
 
 const CHANGES = {
   "authenticator-added": {
-    subject: `An authenticator now confirms your ${PRODUCT_NAME} sign-in`,
+    subject: `An authenticator was set up on your ${PRODUCT_NAME} account`,
     happened: "An authenticator was set up as your second factor.",
   },
   "authenticator-removed": {
     subject: `Your ${PRODUCT_NAME} authenticator was removed`,
-    happened: "Your authenticator was removed, so it no longer confirms your sign-in.",
+    happened: "Your authenticator was removed from your account.",
+  },
+  "codes-made": {
+    subject: `Recovery codes were made for your ${PRODUCT_NAME} account`,
+    happened: "Ten recovery codes were made for your account. Each signs you in once.",
   },
   "codes-replaced": {
     subject: `Your ${PRODUCT_NAME} recovery codes were replaced`,
@@ -54,7 +62,10 @@ const factorNoticeEmail = (to: string, change: FactorChange, publicUrl: string):
   };
 };
 
-/** A missed notice is a log line: the change stands on the identity-set audit log all the same. */
+/**
+ * Never rejects, so a caller need not await it and a slow relay holds no answer. A missed notice
+ * is a log line.
+ */
 export const sendFactorNotice = async (
   ctx: { readonly mail: Mail; readonly log: Logger },
   to: string,

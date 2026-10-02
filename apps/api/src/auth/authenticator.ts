@@ -53,6 +53,14 @@ const codeAsked = z.object({
   code: z.string().regex(new RegExp(`^\\d{${String(AUTHENTICATOR_CODE_LENGTH)}}$`)),
 });
 
+/** A person who held codes keeps them through a setup, so none are made or answered. */
+const finishedWith = (
+  issued: { readonly recoveryCodes: readonly string[]; readonly madeAt: string } | undefined,
+) =>
+  issued === undefined
+    ? { recoveryCodes: null }
+    : { recoveryCodes: issued.recoveryCodes, madeAt: issued.madeAt };
+
 /** A name and value alone, as a `cookie` header carries each `Set-Cookie` line. */
 const cookieOf = (setCookies: readonly string[]): string =>
   setCookies.map((line) => line.split(";", 1)[0] ?? "").join("; ");
@@ -126,7 +134,7 @@ export const mountTheAuthenticator = (routes: Hono, deps: AuthenticatorDependenc
         { event: "auth.authenticator_not_recorded", principal: person.user.id },
         "an authenticator was set up but not recorded",
       );
-      return { stamped: false, recoveryCodes: undefined };
+      return undefined;
     }
     if (!recorded.value.stamped) {
       log.warn(
@@ -139,14 +147,17 @@ export const mountTheAuthenticator = (routes: Hono, deps: AuthenticatorDependenc
 
   const settle = async (context: Context, person: SignedIn, setCookies: readonly string[]) => {
     const swapped = await sessionAfter(setCookies);
-    const { stamped, recoveryCodes } = await record(person, swapped ?? person.session.id);
+    const recorded = await record(person, swapped ?? person.session.id);
+    if (recorded === undefined) return context.json(REFUSALS.unanswered, 502);
     // The browser gets the new cookie only once its session carries the old one's age; otherwise
     // the old cookie, now void, signs it out.
-    if (stamped && swapped !== undefined) {
+    if (recorded.stamped && swapped !== undefined) {
       for (const cookie of setCookies) context.header("set-cookie", cookie, { append: true });
     }
-    await sendFactorNotice({ mail, log }, person.user.email, "authenticator-added");
-    return context.json({ recoveryCodes: recoveryCodes ?? null });
+    if (recorded.firstRecord) {
+      void sendFactorNotice({ mail, log }, person.user.email, "authenticator-added");
+    }
+    return context.json(finishedWith(recorded.issued));
   };
 
   const verify = async (context: Context, person: SignedIn, code: string) => {

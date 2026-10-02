@@ -1,25 +1,48 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, onTestFinished } from "vitest";
 import { z } from "zod";
 
 import { authenticatorCodeAt, keyIn } from "@better-answers/schema/testing/authenticator-code";
 
 import { setActiveWorkspace } from "./flow.ts";
 import type { TestClient } from "./harness.ts";
-import { sessionsSignedInOverAnHourAgo, signedInClient } from "./provoke.ts";
+import {
+  sessionsSignedInOverAnHourAgo,
+  signedInClient,
+  whileCommitsAreRefused,
+} from "./provoke.ts";
 import { appForSuite } from "./suite-app.ts";
 import { webClientOf, webSignedIn } from "./web-client.ts";
 
-const app = appForSuite();
+/** While set, the relay holds every message to the address until the test ends. */
+let mailHeld: { readonly to: string; readonly until: Promise<void> } | undefined;
+
+const app = appForSuite({
+  onEmail: async (message) => {
+    if (message.to === mailHeld?.to) await mailHeld.until;
+  },
+});
+
+const mailHeldFor = (to: string): void => {
+  const held = Promise.withResolvers<void>();
+  mailHeld = { to, until: held.promise };
+  onTestFinished(() => {
+    mailHeld = undefined;
+    held.resolve();
+  });
+};
 
 const START = "/authenticator/start";
 const FINISH = "/authenticator/finish";
 
 const RECOVERY_CODE = /^[0-9a-hjkmnp-tv-z]{4}(?:-[0-9a-hjkmnp-tv-z]{4}){3}$/;
 
-const ADDED = "An authenticator now confirms your better-answers sign-in";
+const ADDED = "An authenticator was set up on your better-answers account";
 
 const started = z.object({ setupAddress: z.string().startsWith("otpauth://totp/") });
-const finished = z.object({ recoveryCodes: z.array(z.string()).nullable() });
+const finished = z.union([
+  z.object({ recoveryCodes: z.array(z.string()), madeAt: z.iso.datetime() }),
+  z.object({ recoveryCodes: z.null() }),
+]);
 const sessionRead = z.object({ session: z.object({ id: z.string() }) }).nullable();
 
 const codeNow = (setupAddress: string): string =>
@@ -211,6 +234,31 @@ describe("setting up an authenticator", () => {
     for (const code of recoveryCodes ?? []) expect(sent).not.toContain(code);
   });
 
+  it("answers the codes while the notice is still sending", async () => {
+    const { person, client } = await aSignedInPerson();
+    mailHeldFor(person.email);
+
+    const { answered } = await setUpOn(client);
+
+    expect(answered.status).toBe(200);
+    expect(finished.parse(await answered.json()).recoveryCodes).toHaveLength(10);
+  });
+
+  it("answers unanswered when the setup cannot be recorded", async () => {
+    const { person, client } = await aSignedInPerson();
+    const setupAddress = await startOn(client);
+
+    const answered = await whileCommitsAreRefused(app(), "identity_audit_event", () =>
+      client.json(FINISH, { code: codeNow(setupAddress) }),
+    );
+
+    expect(answered.status).toBe(502);
+    expect(await answered.json()).toEqual({ error: "unanswered" });
+    expect(answered.headers.getSetCookie()).toEqual([]);
+    expect(await factorOf(person.id)).toEqual({ enabled: true, verified: true });
+    expect(noticesTo(person.email)).toEqual([]);
+  });
+
   it("answers the key only to the call starting the setup", async () => {
     const { client } = await aSignedInPerson();
 
@@ -245,7 +293,7 @@ describe("setting up an authenticator", () => {
   it("keeps held recovery codes through an abandoned setup", async () => {
     const { client } = await aSignedInPerson();
     const { api } = webClientOf(client);
-    const { recoveryCodes } = await api.person.replaceRecoveryCodes.mutate();
+    const { recoveryCodes } = await api.person.replaceRecoveryCodes.mutate({ replacing: false });
 
     await startOn(client);
 
@@ -323,7 +371,9 @@ describe("replacing recovery codes", () => {
     const { person, client } = await aSignedInPerson();
     await setUpOn(client);
 
-    const { recoveryCodes } = await webClientOf(client).api.person.replaceRecoveryCodes.mutate();
+    const { recoveryCodes } = await webClientOf(client).api.person.replaceRecoveryCodes.mutate({
+      replacing: true,
+    });
 
     expect(recoveryCodes).toHaveLength(10);
     expect(subjectsTo(person.email)).toEqual([
@@ -332,12 +382,49 @@ describe("replacing recovery codes", () => {
     ]);
   });
 
+  it("answers the codes while the notice is still sending", async () => {
+    const { person, client } = await aSignedInPerson();
+    await setUpOn(client);
+    mailHeldFor(person.email);
+
+    const { recoveryCodes } = await webClientOf(client).api.person.replaceRecoveryCodes.mutate({
+      replacing: true,
+    });
+
+    expect(recoveryCodes).toHaveLength(10);
+  });
+
+  it("sends one notice for a first set", async () => {
+    const { person, client } = await aSignedInPerson();
+
+    await webClientOf(client).api.person.replaceRecoveryCodes.mutate({ replacing: false });
+
+    expect(subjectsTo(person.email)).toEqual([
+      "Recovery codes were made for your better-answers account",
+    ]);
+  });
+
+  it("refuses a first set while one is held", async () => {
+    const { person, client } = await aSignedInPerson();
+    const { api } = webClientOf(client);
+    await api.person.replaceRecoveryCodes.mutate({ replacing: false });
+
+    const refused = await refusalOf(api.person.replaceRecoveryCodes.mutate({ replacing: false }));
+
+    expect(refused).toMatchObject({
+      data: { httpStatus: 409, refusal: { word: "recovery-codes-held", class: "conflict" } },
+    });
+    expect(subjectsTo(person.email)).toEqual([
+      "Recovery codes were made for your better-answers account",
+    ]);
+  });
+
   it("marks the set saved once acknowledged", async () => {
     const { person, client } = await aSignedInPerson();
     const { api } = webClientOf(client);
-    await api.person.replaceRecoveryCodes.mutate();
+    const { madeAt } = await api.person.replaceRecoveryCodes.mutate({ replacing: false });
 
-    await api.person.acknowledgeRecoveryCodes.mutate();
+    await api.person.acknowledgeRecoveryCodes.mutate({ madeAt });
 
     const saved = await app().database.superuser.query<{ acknowledged: boolean }>(
       'SELECT recovery_codes_acknowledged AS acknowledged FROM "user" WHERE id = $1',

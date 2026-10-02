@@ -17,11 +17,18 @@ const door = () => openPostgres(db().runtimePool);
 
 const RECOVERY_CODE = /^[0-9a-hjkmnp-tv-z]{4}(?:-[0-9a-hjkmnp-tv-z]{4}){3}$/;
 
-const codesFor = async (personId: string): Promise<readonly string[]> => {
-  const issued = await replaceRecoveryCodes(bootstrap, door(), { personId });
+const MADE_AT = new Date("2026-10-02T12:00:00.000Z");
+
+const MADE_EARLIER = new Date("2026-10-01T09:00:00.000Z");
+
+const issuedTo = async (personId: string, replacing = false, now = MADE_AT) => {
+  const issued = await replaceRecoveryCodes(bootstrap, door(), { personId, replacing, now });
   if (!issued.ok) throw new Error(`no codes were issued: ${String(issued.error)}`);
-  return issued.value.recoveryCodes;
+  return issued.value;
 };
+
+const codesFor = async (personId: string, replacing = false): Promise<readonly string[]> =>
+  (await issuedTo(personId, replacing)).recoveryCodes;
 
 const firstOf = (codes: readonly string[]): string => codes[0] ?? "";
 
@@ -46,7 +53,7 @@ describe("replacing recovery codes", () => {
     const personId = await seedPerson(db().pool);
     const earlier = await codesFor(personId);
 
-    const later = await codesFor(personId);
+    const later = await codesFor(personId, true);
 
     expect(later).toHaveLength(10);
     for (const code of later) expect(code).toMatch(RECOVERY_CODE);
@@ -78,19 +85,54 @@ describe("replacing recovery codes", () => {
     );
   });
 
+  it("answers the one instant its ten rows were made", async () => {
+    const personId = await seedPerson(db().pool);
+
+    const { madeAt } = await issuedTo(personId);
+
+    const made = await db().pool.query<{ at: Date }>(
+      "SELECT DISTINCT created_at AS at FROM recovery_code WHERE user_id = $1",
+      [personId],
+    );
+    expect(madeAt).toBe("2026-10-02T12:00:00.000Z");
+    expect(made.rows).toEqual([{ at: new Date("2026-10-02T12:00:00.000Z") }]);
+  });
+
   it("asks for the new set to be saved again", async () => {
     const personId = await seedPerson(db().pool);
-    await codesFor(personId);
-    await acknowledgeRecoveryCodes(bootstrap, door(), { personId });
+    const { madeAt } = await issuedTo(personId);
+    await acknowledgeRecoveryCodes(bootstrap, door(), { personId, madeAt });
 
-    await codesFor(personId);
+    await codesFor(personId, true);
 
     expect(await acknowledged(personId)).toBe(false);
+  });
+
+  it("refuses a first set while one is held, writing nothing", async () => {
+    const personId = await seedPerson(db().pool);
+    const held = await codesFor(personId);
+
+    const again = await replaceRecoveryCodes(bootstrap, door(), {
+      personId,
+      replacing: false,
+      now: MADE_AT,
+    });
+
+    expect(again).toEqual({ ok: false, error: "recovery-codes-held" });
+    expect(await actsOn(personId)).toEqual([
+      { act: "people.person.recovery_codes_issued", detail: { replaced: false } },
+    ]);
+    expect(await spendRecoveryCode(bootstrap, door(), { personId, code: firstOf(held) })).toEqual({
+      ok: true,
+      value: { unused: 9 },
+    });
   });
 
   it("refuses a person nobody holds", async () => {
     const replaced = await replaceRecoveryCodes(bootstrap, door(), {
       personId: "01J00000000000000000000000",
+      replacing: false,
+      now: MADE_AT,
     });
 
     expect(replaced).toEqual({ ok: false, error: "person-gone" });
@@ -99,12 +141,27 @@ describe("replacing recovery codes", () => {
 
 describe("each recovery-code act", () => {
   it.each([
-    ["replacing", () => replaceRecoveryCodes(bootstrap, door(), { personId: "not-an-id" })],
+    [
+      "replacing",
+      () =>
+        replaceRecoveryCodes(bootstrap, door(), {
+          personId: "not-an-id",
+          replacing: false,
+          now: MADE_AT,
+        }),
+    ],
     [
       "spending",
       () => spendRecoveryCode(bootstrap, door(), { personId: "not-an-id", code: "abcd" }),
     ],
-    ["acknowledging", () => acknowledgeRecoveryCodes(bootstrap, door(), { personId: "not-an-id" })],
+    [
+      "acknowledging",
+      () =>
+        acknowledgeRecoveryCodes(bootstrap, door(), {
+          personId: "not-an-id",
+          madeAt: "2026-10-02T12:00:00.000Z",
+        }),
+    ],
   ])("refuses a malformed person id when %s", async (_act, asked) => {
     expect(await asked()).toEqual({ ok: false, error: "malformed" });
   });
@@ -113,7 +170,7 @@ describe("each recovery-code act", () => {
     const personId = await seedPerson(db().pool);
 
     const answered = await whileWritesAreRefused(db().pool, "recovery_code", () =>
-      replaceRecoveryCodes(bootstrap, door(), { personId }),
+      replaceRecoveryCodes(bootstrap, door(), { personId, replacing: false, now: MADE_AT }),
     );
 
     expect(answered).toEqual({ ok: false, error: expect.any(Error) });
@@ -132,9 +189,10 @@ describe("each recovery-code act", () => {
 
   it("answers the store's failure when acknowledging", async () => {
     const personId = await seedPerson(db().pool);
+    const { madeAt } = await issuedTo(personId);
 
     const answered = await whileWritesAreRefused(db().pool, "user", () =>
-      acknowledgeRecoveryCodes(bootstrap, door(), { personId }),
+      acknowledgeRecoveryCodes(bootstrap, door(), { personId, madeAt }),
     );
 
     expect(answered).toEqual({ ok: false, error: expect.any(Error) });
@@ -211,6 +269,7 @@ describe("acknowledging recovery codes", () => {
   it("refuses a person nobody holds", async () => {
     const answered = await acknowledgeRecoveryCodes(bootstrap, door(), {
       personId: "01J00000000000000000000000",
+      madeAt: "2026-10-02T12:00:00.000Z",
     });
 
     expect(answered).toEqual({ ok: false, error: "person-gone" });
@@ -218,11 +277,38 @@ describe("acknowledging recovery codes", () => {
 
   it("records that the person saved the set", async () => {
     const personId = await seedPerson(db().pool);
-    await codesFor(personId);
+    const { madeAt } = await issuedTo(personId);
 
-    const answered = await acknowledgeRecoveryCodes(bootstrap, door(), { personId });
+    const answered = await acknowledgeRecoveryCodes(bootstrap, door(), { personId, madeAt });
 
     expect(answered).toEqual({ ok: true, value: undefined });
     expect(await acknowledged(personId)).toBe(true);
+  });
+
+  it("refuses a set since replaced, marking nothing", async () => {
+    const personId = await seedPerson(db().pool);
+    await issuedTo(personId, false, MADE_EARLIER);
+    await issuedTo(personId, true, MADE_AT);
+
+    const answered = await acknowledgeRecoveryCodes(bootstrap, door(), {
+      personId,
+      madeAt: "2026-10-01T09:00:00.000Z",
+    });
+
+    expect(answered).toEqual({ ok: false, error: "changed-meanwhile" });
+    expect(await acknowledged(personId)).toBe(false);
+  });
+
+  it("refuses a malformed instant, marking nothing", async () => {
+    const personId = await seedPerson(db().pool);
+    await codesFor(personId);
+
+    const answered = await acknowledgeRecoveryCodes(bootstrap, door(), {
+      personId,
+      madeAt: "yesterday",
+    });
+
+    expect(answered).toEqual({ ok: false, error: "malformed" });
+    expect(await acknowledged(personId)).toBe(false);
   });
 });

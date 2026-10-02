@@ -25,7 +25,7 @@ const ADDRESS = "ada@example.test";
 /** Mid-morning in UTC, so it is 2 October in UTC and every European zone. */
 const MADE_AT = "2026-10-02T09:41:00.000Z";
 
-const drawn = (onDone: () => void = () => {}) =>
+const drawn = (onDone: (madeAt: string) => void = () => {}) =>
   render(
     <RecoveryCodes
       inHand={{ codes: CODES, replacing: false, madeAt: MADE_AT }}
@@ -81,17 +81,17 @@ describe("the recovery codes block", () => {
     expect(doneCalls).toBe(0);
   });
 
-  it("finishes once the box is ticked", () => {
-    let doneCalls = 0;
-    drawn(() => {
-      doneCalls += 1;
+  it("finishes once the box is ticked, naming the set shown", () => {
+    const done: string[] = [];
+    drawn((madeAt) => {
+      done.push(madeAt);
     });
 
     fireEvent.click(savedBox());
     expect(doneButton().getAttribute("aria-disabled")).toBe("false");
     fireEvent.click(doneButton());
 
-    expect(doneCalls).toBe(1);
+    expect(done).toEqual(["2026-10-02T09:41:00.000Z"]);
     expect(screen.getByRole("alert").textContent).toBe("");
   });
 

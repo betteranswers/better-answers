@@ -160,6 +160,16 @@ export const SAID_OF_SECOND_FACTOR = {
     why: "That code is wrong or already used.",
     next: "Check it, or try another code.",
   },
+  /** The page reads again as it says this, so Replace stands beside it. */
+  "recovery-codes-held": {
+    why: "You already have recovery codes, made in another tab or window.",
+    next: "Replace them if you need new ones.",
+  },
+  /** Said under the codes shown: only reloading the page puts them away. */
+  "changed-meanwhile": {
+    why: "These codes were replaced in another tab or window, so they no longer work.",
+    next: "Reload the page to see the codes you hold.",
+  },
 } satisfies SaidOfWord;
 
 export const SETUP_CODE_WRONG: Said = {
@@ -189,8 +199,8 @@ export const KEY_UNANSWERED: Said = {
 };
 
 export const SETUP_UNANSWERED: Said = {
-  why: "No response, so your authenticator isn't set up.",
-  next: "Try again in a moment.",
+  why: "No response, so the setup may not have finished.",
+  next: "Reload the page to see where it stands.",
 };
 
 export const tooManySetupsStarted = (waitSeconds: number | undefined): Said => ({

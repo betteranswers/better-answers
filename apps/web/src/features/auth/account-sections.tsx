@@ -15,7 +15,7 @@ import {
 import { AuthenticatorSetup } from "./authenticator-part.tsx";
 import { RecoveryCodes, type CodesInHand } from "./recovery-codes.tsx";
 import { SAID_OF_SECOND_FACTOR } from "./refusal-words.ts";
-import type { SecondFactor, StartingTheSetup } from "./second-factor-hooks.ts";
+import type { CodesIssued, SecondFactor, StartingTheSetup } from "./second-factor-hooks.ts";
 
 export const SET_UP: Keystroke = { key: "s", act: ACCOUNT_ACTS.setUp };
 
@@ -98,7 +98,7 @@ function NoAuthenticator(properties: {
   readonly finishing: boolean;
   readonly landsAt: LandsAt;
   readonly onSetUp: () => void;
-  readonly onFinished: (recoveryCodes: readonly string[] | null) => void;
+  readonly onFinished: (issued: CodesIssued | null) => void;
 }) {
   const setupId = useId();
 
@@ -190,7 +190,7 @@ type AuthenticatorProperties = {
   readonly removing: boolean;
   readonly landsAt: LandsAt;
   readonly onSetUp: () => void;
-  readonly onFinished: (recoveryCodes: readonly string[] | null) => void;
+  readonly onFinished: (issued: CodesIssued | null) => void;
   readonly onRemove: () => void;
 };
 
@@ -304,7 +304,7 @@ export function RecoveryCodesSection(properties: {
   readonly acknowledgeFailure: Said | undefined;
   readonly landsAt: LandsAt;
   readonly onMake: (replacing: boolean) => void;
-  readonly onDone: () => void;
+  readonly onDone: (madeAt: string) => void;
 }) {
   const { held, inHand } = properties;
   if (inHand !== undefined) {

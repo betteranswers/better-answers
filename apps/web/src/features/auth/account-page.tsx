@@ -37,6 +37,7 @@ import {
   useReplaceRecoveryCodes,
   useSecondFactor,
   useStartAuthenticator,
+  type CodesIssued,
   type SecondFactorRead,
 } from "./second-factor-hooks.ts";
 import { SignOutButton } from "./sign-out-button.tsx";
@@ -78,8 +79,6 @@ const useLanding = () => {
   };
 };
 
-const madeNow = (): string => new Date().toISOString();
-
 /** Each act clears what the last one said, so the page speaks of one act at a time. */
 const useAccountActs = (address: string) => {
   const starting = useStartAuthenticator();
@@ -104,17 +103,17 @@ const useAccountActs = (address: string) => {
     if (!setupOpen && starting.data === undefined && !starting.isPending) starting.mutate();
   };
 
-  const finished = (codes: readonly string[] | null) => {
+  const finished = (issued: CodesIssued | null) => {
     begin();
     setSetupOpen(false);
     starting.reset();
     setSaid(ACT_LANDED.setUp(address));
-    if (codes === null) {
+    if (issued === null) {
       focusOn(AUTHENTICATOR_HEADING);
       return;
     }
     landing.expect("save-codes");
-    setInHand({ codes, replacing: false, madeAt: madeNow() });
+    setInHand({ codes: issued.recoveryCodes, replacing: false, madeAt: issued.madeAt });
   };
 
   const removeTheAuthenticator = () => {
@@ -132,22 +131,28 @@ const useAccountActs = (address: string) => {
 
   const makeCodes = (replacing: boolean) => {
     begin();
-    make.mutate(undefined, {
-      onSuccess: ({ recoveryCodes }) => {
-        landing.expect("save-codes");
-        setInHand({ codes: recoveryCodes, replacing, madeAt: madeNow() });
-        if (replacing) setSaid(ACT_LANDED.replaced(address));
+    make.mutate(
+      { replacing },
+      {
+        onSuccess: ({ recoveryCodes, madeAt }) => {
+          landing.expect("save-codes");
+          setInHand({ codes: recoveryCodes, replacing, madeAt });
+          setSaid(replacing ? ACT_LANDED.replaced(address) : ACT_LANDED.made(address));
+        },
       },
-    });
+    );
   };
 
-  const done = () => {
-    acknowledge.mutate(undefined, {
-      onSuccess: () => {
-        landing.expect("recovery-codes");
-        setInHand(undefined);
+  const done = (madeAt: string) => {
+    acknowledge.mutate(
+      { madeAt },
+      {
+        onSuccess: () => {
+          landing.expect("recovery-codes");
+          setInHand(undefined);
+        },
       },
-    });
+    );
   };
 
   return {

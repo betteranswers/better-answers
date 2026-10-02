@@ -29,6 +29,7 @@ import {
 } from "./refusal-words.ts";
 import {
   useFinishAuthenticator,
+  type CodesIssued,
   type SetupStarted,
   type StartingTheSetup,
 } from "./second-factor-hooks.ts";
@@ -132,7 +133,7 @@ function TheKey(properties: { readonly started: SetupStarted }) {
 /** The key shown, then the code it makes; keyed by the key, so a new one starts clean. */
 function KeyAndCode(properties: {
   readonly started: SetupStarted;
-  readonly onFinished: (recoveryCodes: readonly string[] | null) => void;
+  readonly onFinished: (issued: CodesIssued | null) => void;
 }) {
   const fieldId = useId();
   const refusedId = useId();
@@ -210,7 +211,7 @@ function KeyAndCode(properties: {
 export function AuthenticatorSetup(properties: {
   readonly id: string;
   readonly starting: StartingTheSetup;
-  readonly onFinished: (recoveryCodes: readonly string[] | null) => void;
+  readonly onFinished: (issued: CodesIssued | null) => void;
 }) {
   const { starting } = properties;
   const failure = starting.error;

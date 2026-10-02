@@ -76,6 +76,7 @@ const noticeTo = (address: string): string => `A notice is on its way to ${addre
 export const ACT_LANDED = {
   setUp: (address: string) => `${AUTHENTICATOR_WORDS.held} ${noticeTo(address)}`,
   removed: (address: string) => `Authenticator removed. ${noticeTo(address)}`,
+  made: (address: string) => `Recovery codes made. ${noticeTo(address)}`,
   replaced: (address: string) => `Recovery codes replaced. ${noticeTo(address)}`,
 } as const;
 

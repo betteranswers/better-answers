@@ -87,12 +87,47 @@ describe("recording an authenticator's setup", () => {
 
     expect(recorded.ok).toBe(true);
     if (!recorded.ok) return;
-    expect(recorded.value).toMatchObject({ authenticatorId, stamped: true });
-    expect(recorded.value.recoveryCodes).toHaveLength(10);
-    expect(new Set(recorded.value.recoveryCodes).size).toBe(10);
-    for (const code of recorded.value.recoveryCodes ?? []) expect(code).toMatch(RECOVERY_CODE);
+    expect(recorded.value).toMatchObject({
+      authenticatorId,
+      stamped: true,
+      firstRecord: true,
+      issued: { madeAt: "2026-10-02T12:00:00.000Z" },
+    });
+    const codes = recorded.value.issued?.recoveryCodes;
+    expect(codes).toHaveLength(10);
+    expect(new Set(codes).size).toBe(10);
+    for (const code of codes ?? []) expect(code).toMatch(RECOVERY_CODE);
     expect(await confirmedAt(sessionId)).toEqual({ confirmed: AT, pending: null });
     expect(await recoveryCodesHeldBy(personId)).toBe(10);
+    expect(await identitySetRowsFor(personId)).toEqual([
+      { act: "people.person.authenticator_added", detail: { authenticatorId } },
+      { act: "people.person.recovery_codes_issued", detail: { replaced: false } },
+    ]);
+  });
+
+  it("records a setup once, though each finish stamps its session", async () => {
+    const personId = await seedPerson(db().pool);
+    const authenticatorId = await authenticatorFor(db().pool, personId, { verified: true });
+    const sessions = [await aSession(personId, AT), await aSession(personId, AT)];
+
+    const answers = await Promise.all(
+      sessions.map((sessionId) =>
+        recordAuthenticatorSetUp(bootstrap, door(), {
+          personId,
+          sessionId,
+          at: AT,
+          carried: ITS_OWN_AGE,
+        }),
+      ),
+    );
+
+    expect(answers.map((answer) => answer.ok && answer.value.firstRecord).toSorted()).toEqual([
+      false,
+      true,
+    ]);
+    for (const sessionId of sessions) {
+      expect(await confirmedAt(sessionId)).toEqual({ confirmed: AT, pending: null });
+    }
     expect(await identitySetRowsFor(personId)).toEqual([
       { act: "people.person.authenticator_added", detail: { authenticatorId } },
       { act: "people.person.recovery_codes_issued", detail: { replaced: false } },
@@ -111,7 +146,7 @@ describe("recording an authenticator's setup", () => {
       carried: ITS_OWN_AGE,
     });
 
-    expect(recorded).toMatchObject({ ok: true, value: { recoveryCodes: undefined } });
+    expect(recorded).toMatchObject({ ok: true, value: { issued: undefined } });
     expect(await recoveryCodesHeldBy(personId)).toBe(1);
     expect((await identitySetRowsFor(personId)).map((row) => row.act)).toEqual([
       "people.person.authenticator_added",

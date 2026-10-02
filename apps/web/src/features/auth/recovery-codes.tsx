@@ -89,7 +89,9 @@ export function RecoveryCodes(properties: {
   readonly acknowledging: boolean;
   readonly failure: Said | undefined;
   readonly headingRef?: Ref<HTMLHeadingElement>;
-  readonly onDone: () => void;
+
+  /** Handed the set's `madeAt`, so the acknowledgement names the set shown. */
+  readonly onDone: (madeAt: string) => void;
 }) {
   const { inHand, address, acknowledging, failure, headingRef, onDone } = properties;
   const headingId = useId();
@@ -109,7 +111,7 @@ export function RecoveryCodes(properties: {
       focusOn(savedId);
       return;
     }
-    if (!acknowledging) onDone();
+    if (!acknowledging) onDone(inHand.madeAt);
   };
 
   return (

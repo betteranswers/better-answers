@@ -33,6 +33,7 @@ import {
   personMenuOpened,
   provision,
   quoted,
+  saysItsSentenceNotItsWord,
   signIn,
   signedInAtHome,
   theActLandedWithinItsBudget,
@@ -288,6 +289,29 @@ test("replacing the recovery codes shows a new set", async ({ page, request }) =
     second.filter((code) => first.includes(code)),
     "a code of the first set came back",
   ).toEqual([]);
+});
+
+test("a set replaced in another tab is refused at Done", async ({ page, context, request }) => {
+  await accountWithNoWorkspace(page, request);
+  await setUpWithItsCode(page);
+  const other = await context.newPage();
+  await other.goto("/account");
+  await other.getByRole("button", { name: RECOVERY_CODE_WORDS.replace }).click();
+  await other
+    .getByRole("dialog", { name: RECOVERY_CODE_WORDS.replaceTitle })
+    .getByRole("button", { name: RECOVERY_CODE_WORDS.replaceCommit })
+    .click();
+  await expect(codesListed(other)).toHaveCount(RECOVERY_CODES_IN_A_SET);
+  await other.close();
+
+  await savedBox(page).check();
+  await doneButton(page).click();
+
+  await saysItsSentenceNotItsWord(codesBlock(page).getByRole("alert"), {
+    table: SAID_OF_SECOND_FACTOR,
+    word: "changed-meanwhile",
+  });
+  await expect(codesListed(page)).toHaveCount(RECOVERY_CODES_IN_A_SET);
 });
 
 test("the operator reaches Account from the console's avatar menu", async ({ page, request }) => {

@@ -57,7 +57,9 @@ export { operatorAddresses, setOperatorMark, standingAsOperator } from "./operat
 export { inspectPerson, inspectPersonInput, listPeople, listPeopleInput } from "./people.ts";
 export {
   acknowledgeRecoveryCodes,
+  acknowledgeRecoveryCodesInput,
   replaceRecoveryCodes,
+  replaceRecoveryCodesInput,
   spendRecoveryCode,
 } from "./recovery-codes.ts";
 export {

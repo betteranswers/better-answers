@@ -21,7 +21,15 @@ const setupStarted = z
 export type SetupStarted = z.output<typeof setupStarted>;
 
 /** Null when the person already held codes, which a setup leaves standing. */
-const setupFinished = z.object({ recoveryCodes: z.array(z.string()).nullable() });
+const setupFinished = z
+  .union([
+    z.object({ recoveryCodes: z.array(z.string()), madeAt: z.iso.datetime() }),
+    z.object({ recoveryCodes: z.null() }),
+  ])
+  .transform((answer) => (answer.recoveryCodes === null ? null : answer));
+
+/** A set as its issue answered it; `madeAt` names the set when it is acknowledged. */
+export type CodesIssued = NonNullable<z.output<typeof setupFinished>>;
 
 export const useSecondFactor = () => {
   const api = useTRPC();
@@ -49,16 +57,14 @@ export type StartingTheSetup = ReturnType<typeof useStartAuthenticator>;
  * The codes show once, so the mutation hands them over first, even if the field has closed. The
  * first code swaps the session's cookie.
  */
-export const useFinishAuthenticator = (
-  onFinished: (recoveryCodes: readonly string[] | null) => void,
-) => {
+export const useFinishAuthenticator = (onFinished: (issued: CodesIssued | null) => void) => {
   const queryClient = useQueryClient();
   const reread = useRereadTheSecondFactor();
   return useMutation({
     mutationKey: [FINISH_PATH],
     mutationFn: (code: string) => askOfOurRoute(FINISH_PATH, { code }, setupFinished),
-    onSuccess: async ({ recoveryCodes }) => {
-      onFinished(recoveryCodes);
+    onSuccess: async (issued) => {
+      onFinished(issued);
       await Promise.all([rereadTheSession(queryClient), reread()]);
     },
   });
@@ -74,10 +80,11 @@ export const useRemoveAuthenticator = () => {
   return useMutation(api.person.removeAuthenticator.mutationOptions({ onSuccess: reread }));
 };
 
+/** Rereads on a refusal too: a set made in another tab turns Make into Replace. */
 export const useReplaceRecoveryCodes = () => {
   const api = useTRPC();
   const reread = useRereadTheSecondFactor();
-  return useMutation(api.person.replaceRecoveryCodes.mutationOptions({ onSuccess: reread }));
+  return useMutation(api.person.replaceRecoveryCodes.mutationOptions({ onSettled: reread }));
 };
 
 export const useAcknowledgeRecoveryCodes = () => {

@@ -1,5 +1,7 @@
 import { createHash, randomInt } from "node:crypto";
 
+import { z } from "zod";
+
 import { boundarySchemas } from "@better-answers/schema";
 import { RECOVERY_CODES_IN_A_SET } from "@better-answers/schema/second-factor";
 
@@ -44,29 +46,36 @@ const asMinted = (typed: string): string => typed.toLowerCase().replaceAll(/[\s-
 
 const hashOf = (code: string): string => createHash("sha256").update(code).digest("hex");
 
-type RecoveryCodesIssued = {
+export type RecoveryCodesMade = {
   readonly recoveryCodes: readonly string[];
 
+  /** An ISO instant, as it crosses the wire: acknowledging names the set by it. */
+  readonly madeAt: string;
+};
+
+type RecoveryCodesIssued = RecoveryCodesMade & {
   /** Whether a set stood before, which this one voided. */
   readonly replaced: boolean;
 };
 
 /**
  * Voids the person's codes and keeps ten new ones as hashes, answering the codes themselves: the
- * one time they exist outside the person's hands. The new set waits to be acknowledged.
+ * one time they exist outside the person's hands. Every row carries `now`, which names the set
+ * when it is acknowledged.
  */
 export const issuingRecoveryCodes = async (
   platform: PlatformPrincipal,
   tx: Tx,
   personId: UserId,
+  now: Date,
 ): Promise<RecoveryCodesIssued> => {
   const voided = await tx.query("DELETE FROM recovery_code WHERE user_id = $1", [personId]);
   const replaced = (voided.rowCount ?? 0) > 0;
   const codes = Array.from({ length: RECOVERY_CODES_IN_A_SET }, mintRecoveryCode);
   await tx.query(
-    `INSERT INTO recovery_code (id, user_id, code_hash)
-     SELECT id, $2, code_hash FROM unnest($1::text[], $3::text[]) AS minted (id, code_hash)`,
-    [codes.map(() => ulid()), personId, codes.map((code) => hashOf(asMinted(code)))],
+    `INSERT INTO recovery_code (id, user_id, code_hash, created_at)
+     SELECT id, $2, code_hash, $4 FROM unnest($1::text[], $3::text[]) AS minted (id, code_hash)`,
+    [codes.map(() => ulid()), personId, codes.map((code) => hashOf(asMinted(code))), now],
   );
   await tx.query('UPDATE "user" SET recovery_codes_acknowledged = false WHERE id = $1', [personId]);
   await recordFor(platform, tx, {
@@ -76,19 +85,35 @@ export const issuingRecoveryCodes = async (
     subjectId: personId,
     detail: { replaced },
   });
-  return { recoveryCodes: codes, replaced };
+  return { recoveryCodes: codes, madeAt: now.toISOString(), replaced };
 };
 
 type RecoveryCodesInput = { readonly personId: string };
 
-export type RecoveryCodesRefusal = WorkspaceRefusal<"malformed" | "person-gone">;
+/** Whether the caller's page offered a replacement, or a first set to someone holding none. */
+export const replaceRecoveryCodesInput = z.object({ replacing: z.boolean() });
 
-/** The person is the one caller: a transport hands the id of the session's own person. */
+type ReplaceRecoveryCodesInput = RecoveryCodesInput &
+  z.output<typeof replaceRecoveryCodesInput> & { readonly now: Date };
+
+export type ReplaceRecoveryCodesRefusal = WorkspaceRefusal<
+  "malformed" | "person-gone" | "recovery-codes-held"
+>;
+
+const holdsASet = async (tx: Tx, personId: UserId): Promise<boolean> => {
+  const held = await tx.query("SELECT 1 FROM recovery_code WHERE user_id = $1 LIMIT 1", [personId]);
+  return (held.rowCount ?? 0) > 0;
+};
+
+/**
+ * The person is the one caller: a transport hands the id of the session's own person. A caller
+ * asking for a first set is refused while one stands, so a stale page never voids a set unasked.
+ */
 export const replaceRecoveryCodes = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
-  input: RecoveryCodesInput,
-): Promise<Result<RecoveryCodesIssued, RecoveryCodesRefusal | Error>> => {
+  input: ReplaceRecoveryCodesInput,
+): Promise<Result<RecoveryCodesIssued, ReplaceRecoveryCodesRefusal | Error>> => {
   const personId = boundarySchemas.user.select.shape.id.safeParse(input.personId);
   if (!personId.success) return err("malformed");
 
@@ -96,9 +121,12 @@ export const replaceRecoveryCodes = async (
     withIdentityWrite(
       platform,
       door,
-      async (tx): Promise<Result<RecoveryCodesIssued, "person-gone">> => {
+      async (tx): Promise<Result<RecoveryCodesIssued, "person-gone" | "recovery-codes-held">> => {
         if (!(await holdThePerson(tx, personId.data))) return err("person-gone");
-        return ok(await issuingRecoveryCodes(platform, tx, personId.data));
+        if (!input.replacing && (await holdsASet(tx, personId.data))) {
+          return err("recovery-codes-held");
+        }
+        return ok(await issuingRecoveryCodes(platform, tx, personId.data, input.now));
       },
     ),
   );
@@ -144,6 +172,7 @@ export const spendRecoveryCode = async (
           "SELECT count(*)::int AS unused FROM recovery_code WHERE user_id = $1",
           [personId.data],
         );
+        // Stryker disable next-line OptionalChaining: a count(*) with no GROUP BY always answers one row
         return ok(left.rows[0]?.unused ?? 0);
       },
     ),
@@ -153,22 +182,44 @@ export const spendRecoveryCode = async (
   return ok({ unused: spent.value.value });
 };
 
-/** The person has saved the set, so it is never shown again. */
+/** The set the person saved, named by the instant its issue answered. */
+export const acknowledgeRecoveryCodesInput = z.object({ madeAt: z.iso.datetime() });
+
+type AcknowledgeRecoveryCodesInput = RecoveryCodesInput & { readonly madeAt: string };
+
+export type AcknowledgeRecoveryCodesRefusal = WorkspaceRefusal<
+  "malformed" | "person-gone" | "changed-meanwhile"
+>;
+
+const ACKNOWLEDGING = `
+  UPDATE "user" SET recovery_codes_acknowledged = true
+   WHERE id = $1
+     AND EXISTS (SELECT 1 FROM recovery_code r WHERE r.user_id = $1 AND r.created_at = $2)`;
+
+/**
+ * The person has saved the set, so it is never shown again. Only the set they were shown is
+ * marked: a page still showing one since replaced is refused, and marks nothing.
+ */
 export const acknowledgeRecoveryCodes = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
-  input: RecoveryCodesInput,
-): Promise<Result<undefined, RecoveryCodesRefusal | Error>> => {
+  input: AcknowledgeRecoveryCodesInput,
+): Promise<Result<undefined, AcknowledgeRecoveryCodesRefusal | Error>> => {
   const personId = boundarySchemas.user.select.shape.id.safeParse(input.personId);
-  if (!personId.success) return err("malformed");
+  const madeAt = acknowledgeRecoveryCodesInput.shape.madeAt.safeParse(input.madeAt);
+  if (!personId.success || !madeAt.success) return err("malformed");
 
   const marked = await attempt(() =>
-    withIdentityWrite(platform, door, (tx) =>
-      tx.query('UPDATE "user" SET recovery_codes_acknowledged = true WHERE id = $1', [
-        personId.data,
-      ]),
+    withIdentityWrite(
+      platform,
+      door,
+      async (tx): Promise<Result<undefined, "person-gone" | "changed-meanwhile">> => {
+        if (!(await holdThePerson(tx, personId.data))) return err("person-gone");
+        const flagged = await tx.query(ACKNOWLEDGING, [personId.data, madeAt.data]);
+        return flagged.rowCount === 1 ? ok(undefined) : err("changed-meanwhile");
+      },
     ),
   );
   if (!marked.ok) return err(marked.error);
-  return marked.value.rowCount === 1 ? ok(undefined) : err("person-gone");
+  return marked.value;
 };

@@ -10,9 +10,11 @@ import {
 } from "@better-answers/core/members";
 import {
   acknowledgeRecoveryCodes,
+  acknowledgeRecoveryCodesInput,
   readSecondFactor,
   removeAuthenticator,
   replaceRecoveryCodes,
+  replaceRecoveryCodesInput,
   setDisplayName,
   setDisplayNameInput,
 } from "@better-answers/core/workspaces";
@@ -114,23 +116,38 @@ export const personRouter = router({
       removeAuthenticator.name,
       removeAuthenticator(IDENTITY_PRINCIPAL, ctx.doors.postgres, { personId: ctx.personId }),
     );
-    await sendFactorNotice(ctx, ctx.email, "authenticator-removed");
+    void sendFactorNotice(ctx, ctx.email, "authenticator-removed");
     return removed;
   }),
-  replaceRecoveryCodes: personCeiling(RECOVERY_CODES_PERSON_RULE).mutation(async ({ ctx }) => {
-    const issued = await crossing(
-      ctx,
-      replaceRecoveryCodes.name,
-      replaceRecoveryCodes(IDENTITY_PRINCIPAL, ctx.doors.postgres, { personId: ctx.personId }),
-    );
-    if (issued.replaced) await sendFactorNotice(ctx, ctx.email, "codes-replaced");
-    return { recoveryCodes: issued.recoveryCodes };
-  }),
-  acknowledgeRecoveryCodes: personProcedure.mutation(({ ctx }) =>
-    crossing(
-      ctx,
-      acknowledgeRecoveryCodes.name,
-      acknowledgeRecoveryCodes(IDENTITY_PRINCIPAL, ctx.doors.postgres, { personId: ctx.personId }),
+  replaceRecoveryCodes: personCeiling(RECOVERY_CODES_PERSON_RULE)
+    .input(parsedBy(replaceRecoveryCodesInput))
+    .mutation(async ({ ctx, input }) => {
+      const issued = await crossing(
+        ctx,
+        replaceRecoveryCodes.name,
+        given(input, (asked) =>
+          replaceRecoveryCodes(IDENTITY_PRINCIPAL, ctx.doors.postgres, {
+            personId: ctx.personId,
+            replacing: asked.replacing,
+            now: ctx.clock.now(),
+          }),
+        ),
+      );
+      void sendFactorNotice(ctx, ctx.email, issued.replaced ? "codes-replaced" : "codes-made");
+      return { recoveryCodes: issued.recoveryCodes, madeAt: issued.madeAt };
+    }),
+  acknowledgeRecoveryCodes: personProcedure
+    .input(parsedBy(acknowledgeRecoveryCodesInput))
+    .mutation(({ ctx, input }) =>
+      crossing(
+        ctx,
+        acknowledgeRecoveryCodes.name,
+        given(input, (asked) =>
+          acknowledgeRecoveryCodes(IDENTITY_PRINCIPAL, ctx.doors.postgres, {
+            personId: ctx.personId,
+            madeAt: asked.madeAt,
+          }),
+        ),
+      ),
     ),
-  ),
 });
