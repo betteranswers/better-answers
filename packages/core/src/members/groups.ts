@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { boundarySchemas, CURATED_ORIGIN } from "@better-answers/schema";
+import { byCodeUnit } from "@better-answers/schema/code-unit";
 
 import { act, declareActs, record, recordEach } from "../audit/index.ts";
 import { attempt, err, ok, requireAdmin, ulid } from "../kernel/index.ts";
@@ -212,6 +213,34 @@ const membershipTarget = (
   return ok({ ...target.value, userId: person.data });
 };
 
+/**
+ * A step on rows its act holds: each person into the group, in person id order, so two such steps
+ * over one group never wait on each other in a cycle. Answers those the insert landed, in that
+ * order, one audit event each; one already in lands nothing.
+ */
+export const addedToGroup = async (
+  admin: AdminUserPrincipal,
+  tx: Tx,
+  asked: { readonly groupId: GroupId; readonly personIds: readonly UserId[] },
+): Promise<readonly UserId[]> => {
+  const landed = await tx.query<{ user_id: string }>(
+    `INSERT INTO group_member (workspace_id, group_id, user_id)
+       SELECT $1, $2, asked.user_id FROM unnest($3::text[]) AS asked(user_id) ORDER BY asked.user_id
+         ON CONFLICT DO NOTHING
+     RETURNING user_id`,
+    [admin.workspaceId, asked.groupId, asked.personIds],
+  );
+  // RETURNING promises no order, so the answer and its events are put in it here.
+  const added = landed.rows.map((row) => PERSON_ID.parse(row.user_id)).toSorted(byCodeUnit);
+  await recordEach(
+    admin,
+    tx,
+    GROUP_ACTS.memberAdded,
+    added.map((userId) => ({ subjectId: asked.groupId, detail: { userId } })),
+  );
+  return added;
+};
+
 export const addToGroup = async (
   principal: UserPrincipal,
   tx: Tx,
@@ -234,51 +263,10 @@ export const addToGroup = async (
   if (row?.holds_group !== true) return err("no-such-group");
   if (!row.is_member) return err("no-such-member");
 
-  const added = await attempt(() =>
-    tx.query(
-      `INSERT INTO group_member (workspace_id, group_id, user_id) VALUES ($1, $2, $3)
-         ON CONFLICT DO NOTHING
-       RETURNING group_id`,
-      [admin.workspaceId, groupId, userId],
-    ),
-  );
+  const added = await attempt(() => addedToGroup(admin, tx, { groupId, personIds: [userId] }));
   if (!added.ok) return err(added.error);
-  if (added.value.rowCount === 0) return err("already-in-group");
-
-  await record(admin, tx, {
-    id: ulid(),
-    act: GROUP_ACTS.memberAdded,
-    subjectId: groupId,
-    detail: { userId },
-  });
+  if (added.value.length === 0) return err("already-in-group");
   return ok({ groupId, userId });
-};
-
-/**
- * A step on rows its act holds: each person into the group, in person id order, so two such steps
- * over one group never wait on each other in a cycle. Answers those the insert landed, one audit
- * event each; one already in lands nothing.
- */
-export const addedToGroup = async (
-  admin: AdminUserPrincipal,
-  tx: Tx,
-  asked: { readonly groupId: GroupId; readonly personIds: readonly UserId[] },
-): Promise<readonly UserId[]> => {
-  const landed = await tx.query<{ user_id: string }>(
-    `INSERT INTO group_member (workspace_id, group_id, user_id)
-       SELECT $1, $2, asked.user_id FROM unnest($3::text[]) AS asked(user_id) ORDER BY asked.user_id
-         ON CONFLICT DO NOTHING
-     RETURNING user_id`,
-    [admin.workspaceId, asked.groupId, asked.personIds],
-  );
-  const added = landed.rows.map((row) => PERSON_ID.parse(row.user_id));
-  await recordEach(
-    admin,
-    tx,
-    GROUP_ACTS.memberAdded,
-    added.map((userId) => ({ subjectId: asked.groupId, detail: { userId } })),
-  );
-  return added;
 };
 
 export const removeFromGroup = async (
