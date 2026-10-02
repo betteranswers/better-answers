@@ -25,6 +25,7 @@ import { PRODUCT_NAME } from "@/shared/words.ts";
 import { expect, test } from "./browser.ts";
 import {
   addMember,
+  ageTheCode,
   anAddress,
   claudesAuthorizeUrl,
   clockTheNextKey,
@@ -477,6 +478,17 @@ test("sends a wrong code once, selected, naming two tries left", async ({ page, 
   expect(sent, "the refused code was sent again").toHaveLength(2);
 });
 
+/** A spent code leaves focus on sending another, so Enter alone asks for the code that signs in. */
+const anotherCodeSignsIn = async (page: Page, request: APIRequestContext, email: string) => {
+  await expect(page.getByRole("button", { name: SIGN_IN_WORDS.sendAgain })).toBeFocused();
+
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("status")).toHaveText(newCodeSent(email));
+  await expect(codeField(page)).toBeFocused();
+  await page.keyboard.type(await codeSentTo(request, email));
+  await expect(page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeVisible();
+};
+
 test("a third wrong code hands focus to sending another", async ({ page, request }) => {
   const email = anAddress("spent");
   await person(request, email);
@@ -487,13 +499,23 @@ test("a third wrong code hands focus to sending another", async ({ page, request
     await codeField(page).fill(notTheCode(code, 3 - left));
     await expect(page.getByRole("alert")).toHaveText(sentenceOf(codeWrong(left)));
   }
-  await expect(page.getByRole("button", { name: SIGN_IN_WORDS.sendAgain })).toBeFocused();
 
-  await page.keyboard.press("Enter");
-  await expect(page.getByRole("status")).toHaveText(newCodeSent(email));
-  await expect(codeField(page)).toBeFocused();
-  await page.keyboard.type(await codeSentTo(request, email));
-  await expect(page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeVisible();
+  await anotherCodeSignsIn(page, request, email);
+});
+
+test("an expired code reads as spent, handing focus to another", async ({ page, request }) => {
+  const email = anAddress("expired");
+  await person(request, email);
+  await atTheCodeStep(page, email);
+  const code = await codeSentTo(request, email);
+  await ageTheCode(request, email);
+
+  await codeField(page).fill(code);
+  await expect(page.getByRole("alert"), "the expired code was not refused as spent").toHaveText(
+    sentenceOf(codeWrong(0)),
+  );
+
+  await anotherCodeSignsIn(page, request, email);
 });
 
 test("a code typed in another tab lands the waiting one", async ({ page, context, request }) => {

@@ -21,7 +21,7 @@ import {
   seedBindings,
 } from "./harness-sources.ts";
 import type { TestApp } from "./harness.ts";
-import { sessionsSignedInOverAnHourAgo } from "./provoke.ts";
+import { codeSentPastItsExpiry, sessionsSignedInOverAnHourAgo } from "./provoke.ts";
 
 const HARNESS_PREFIX = "/__harness";
 
@@ -61,6 +61,7 @@ const ending = z.object({ workspaceId: z.string().min(1), userId: z.string().min
 const MARK_CHANGES = ["grant", "revoke"] as const;
 const marking = z.object({ email: z.string().min(1), change: z.enum(MARK_CHANGES) });
 const aging = z.object({ userId: z.string().min(1) });
+const codeAging = z.object({ email: z.string().min(1) });
 
 const readBody = async <T>(request: Request, schema: z.ZodType<T>): Promise<T> => {
   const parsed = schema.safeParse(await request.json());
@@ -104,6 +105,13 @@ export const harnessControl = (app: TestApp): Hono => {
   control.post(`${HARNESS_PREFIX}/sign-ins/aged`, async (context) => {
     const asked = await readBody(context.req.raw, aging);
     await sessionsSignedInOverAnHourAgo(app, asked.userId);
+    return context.json({ aged: true });
+  });
+
+  // A code's lifetime is too long for a spec to wait, so its expiry is moved back the same way.
+  control.post(`${HARNESS_PREFIX}/codes/aged`, async (context) => {
+    const asked = await readBody(context.req.raw, codeAging);
+    await codeSentPastItsExpiry(app, asked.email);
     return context.json({ aged: true });
   });
 

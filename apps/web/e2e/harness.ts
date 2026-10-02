@@ -96,6 +96,10 @@ const signInAged = z.object({ aged: z.boolean() });
 export const ageTheSignIn = (api: APIRequestContext, userId: string) =>
   ask(api, "/sign-ins/aged", { userId }, signInAged);
 
+/** How a spec meets an expired code without waiting out its lifetime. */
+export const ageTheCode = (api: APIRequestContext, email: string) =>
+  ask(api, "/codes/aged", { email }, signInAged);
+
 export const CLAUDES_REDIRECT_URI = "https://claude.ai/api/mcp/auth_callback";
 
 const CLAUDE = {
