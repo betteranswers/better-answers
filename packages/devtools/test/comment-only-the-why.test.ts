@@ -25,11 +25,11 @@ const TOO_LONG = `// ${wordsOf(29)}\n`;
 const lint = oxlintOver(CONFIG, { tree: holding(TOO_LONG), flagged: [FILE] });
 
 describe("the comment rule fires on a long or citing comment", () => {
-  it("refuses a block over the ceiling, naming count and rule", () => {
+  it("refuses a long block, naming its count and rules file", () => {
     const output = lint.output(holding(TOO_LONG));
 
     expect(output).toContain("runs to 29 words");
-    expect(output).toContain(tag("COMMENT", "1"));
+    expect(output).toContain("the root `CODING_STANDARDS.md`");
     expect(output).toContain("better-answers(comment-only-the-why)");
   });
 
@@ -158,11 +158,11 @@ describe("the comment rule holds a directive to a same-line reason", () => {
     ["block-comment ESLint disable", "/* eslint-disable no-console */\n"],
     ["bare-separator disable", "// eslint-disable-line no-console --\n"],
     ["Stryker disable", "// Stryker disable next-line all\n"],
-  ])("refuses a reasonless %s, naming the directive rule", (_what, directive) => {
+  ])("refuses a reasonless %s, naming its rules file", (_what, directive) => {
     const output = lint.output(holding(directive));
 
     expect(output).toContain("gives no reason");
-    expect(output).toContain(tag("COMMENT", "3"));
+    expect(output).toContain("the root `CODING_STANDARDS.md`");
   });
 
   it.each([
@@ -182,7 +182,7 @@ describe("the comment rule holds a directive to a same-line reason", () => {
     const output = lint.output(holding(directive));
 
     expect(output).toContain("reason runs to 26 words");
-    expect(output).toContain(tag("COMMENT", "3"));
+    expect(output).toContain("the root `CODING_STANDARDS.md`");
   });
 
   it.each([

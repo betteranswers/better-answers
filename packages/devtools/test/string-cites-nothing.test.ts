@@ -17,11 +17,11 @@ const lint = oxlintOver(pluginConfigFor({ [RULE]: "error" }), {
 });
 
 describe("the string rule refuses a citation a reader cannot open", () => {
-  it("names what the string cites and the rule it breaks", () => {
+  it("names what the string cites and its rules file", () => {
     const output = lint.output(saying("Ask the owner about T-243 first."));
 
     expect(output).toContain("This string cites a ticket id (`T-243`)");
-    expect(output).toContain(tag("COMMENT", "1"));
+    expect(output).toContain("the root `CODING_STANDARDS.md`");
     expect(output).toContain("better-answers(string-cites-nothing)");
   });
 

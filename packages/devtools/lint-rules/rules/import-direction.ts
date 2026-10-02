@@ -17,38 +17,29 @@ const GRAPH_DOOR = "src/store/graph";
 const ZONES = {
   kernel: {
     reaches: new Set<Zone>(),
-    rule: "1",
     clause: "kernel imports nothing else in core",
   },
   access: {
     reaches: new Set<Zone>(["kernel"]),
-    rule: "2",
     clause: "access imports only kernel",
   },
   door: {
     reaches: new Set<Zone>(["kernel"]),
-    rule: "2",
     clause: "a store door imports only kernel, and store/graph alone also imports access",
   },
   layer: {
     reaches: new Set<Zone>(["kernel", "access", "door"]),
-    rule: "3",
     clause: "llm and audit import kernel, access and the doors — never a slice, never each other",
   },
   slice: {
     reaches: new Set<Zone>(["kernel", "access", "door", "layer", "slice"]),
-    rule: "4",
     clause: "a slice reaches another only through its face",
   },
   test: {
     reaches: new Set<Zone>(["kernel", "access", "door", "layer", "slice"]),
-    rule: "4",
     clause: "a test reaches a slice only through its face",
   },
-} satisfies Record<
-  Zone,
-  { readonly reaches: ReadonlySet<Zone>; readonly rule: string; readonly clause: string }
->;
+} satisfies Record<Zone, { readonly reaches: ReadonlySet<Zone>; readonly clause: string }>;
 
 const TRANSPORTS = [
   "hono",
@@ -174,7 +165,7 @@ type Finding = {
 };
 
 const directionFinding = ({ importer, reached }: Edge): Finding | undefined => {
-  const { reaches, rule, clause } = ZONES[importer.zone];
+  const { reaches, clause } = ZONES[importer.zone];
   if (reaches.has(reached.zone) || (importer.dir === GRAPH_DOOR && reached.zone === "access")) {
     return undefined;
   }
@@ -185,7 +176,6 @@ const directionFinding = ({ importer, reached }: Edge): Finding | undefined => {
       from: importer.zone,
       toDir: reached.dir,
       to: reached.zone,
-      rule,
       clause,
     },
   };
@@ -226,20 +216,18 @@ export const importDirectionRule = defineRule({
   meta: {
     type: "problem",
     docs: {
-      description:
-        "ADR 0029's five import-direction rules over packages/core, by the position of both ends.",
+      description: "The import-direction rules over packages/core, by the position of both ends.",
     },
     messages: {
       transport:
-        "packages/core is transport-agnostic: `{{specifier}}` is a transport or a transport's dependency (ADR 0029 rule 5). A status code, a Request or a Response belongs in apps/api; export a function and a typed error instead.",
-      direction:
-        "`{{fromDir}}` ({{from}}) may not import `{{toDir}}` ({{to}}) — ADR 0029 rule {{rule}}: {{clause}}.",
+        "packages/core is transport-agnostic: `{{specifier}}` is a transport or a transport's dependency. A status code, a Request or a Response belongs in apps/api; export a function and a typed error instead.",
+      direction: "`{{fromDir}}` ({{from}}) may not import `{{toDir}}` ({{to}}): {{clause}}.",
       erasure:
-        "Nothing in core imports `erasure`; it sits at the top of the slice graph, and only a test reaches it (ADR 0029 rule 4).",
+        "Nothing in core imports `erasure`; it sits at the top of the slice graph, and only a test reaches it.",
       internal:
-        "`{{fromDir}}` ({{from}}) reaches `{{dir}}` only through its own index.ts, never `{{inside}}` (ADR 0029 rule 4). Export what you need from that face and import it from there.",
+        "`{{fromDir}}` ({{from}}) reaches `{{dir}}` only through its own index.ts, never `{{inside}}`. Export what you need from that face and import it from there.",
       unexported:
-        "`{{dir}}/index.ts` is a face packages/core's exports map does not name (ADR 0029 rule 4). Add `./{{entry}}` to the map, so a sibling and a transport reach one face and a test reaches an entry point ([TEST1]).",
+        "`{{dir}}/index.ts` is a face packages/core's exports map does not name. Add `./{{entry}}` to the map, so a sibling and a transport reach one face and a test reaches an entry point (the root `CODING_STANDARDS.md`).",
     },
   },
   createOnce(context) {

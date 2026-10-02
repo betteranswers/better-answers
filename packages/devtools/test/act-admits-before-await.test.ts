@@ -4,8 +4,6 @@ import { pluginConfigFor } from "@better-answers/devtools/oxlint-config";
 import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
-import { tag } from "./fixture-text.ts";
-
 const RULE = "better-answers/act-admits-before-await";
 const FILE = "act.ts";
 
@@ -40,11 +38,11 @@ const AWAITS_FIRST = `export const reprocess = async (principal, tx, input) => {
 const lint = oxlintOver(CONFIG, { tree: holding(AWAITS_FIRST), flagged: [FILE] });
 
 describe("the rule that a declared act admits before it awaits", () => {
-  it("refuses an act that reads before admitting, naming its rule", () => {
+  it("refuses an act reading before admitting, naming its rules file", () => {
     const output = lint.output(holding(AWAITS_FIRST));
 
     expect(output).toContain("awaits before it admits");
-    expect(output).toContain(tag("SEC", "5"));
+    expect(output).toContain("the root `CODING_STANDARDS.md`");
     expect(output).toContain("better-answers(act-admits-before-await)");
   });
 

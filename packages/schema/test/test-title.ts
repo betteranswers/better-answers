@@ -7,6 +7,6 @@ export const holdTitle = (title: string): void => {
   const words = title.split(/\s+/).filter((word) => word !== "").length;
   if (words <= MOST_WORDS && !SHOULD.test(title)) return;
   throw new Error(
-    `A test title is a present-tense phrase of 10 words at most, never "should" [TEST5]: ${JSON.stringify(title)} runs to ${String(words)}`,
+    `A test title is a present-tense phrase of 10 words at most, never "should" (the root \`CODING_STANDARDS.md\`): ${JSON.stringify(title)} runs to ${String(words)}`,
   );
 };

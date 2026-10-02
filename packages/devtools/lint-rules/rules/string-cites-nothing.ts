@@ -11,11 +11,11 @@ export const stringCitesNothingRule = defineRule({
     type: "problem",
     docs: {
       description:
-        "A string a person reads cites no ticket, date, rule tag or ADR number. Tests, and gates that print their own tag, are exempt.",
+        "A string a person reads names what they can act on, in words that stand on their own (the root `CODING_STANDARDS.md`). Tests, and gates that print their own tag, are exempt.",
     },
     messages: {
       cites:
-        "This string cites {{what}} (`{{cited}}`); a string that reaches a person names what they can act on, never a document they cannot open from where they read it ([COMMENT1]). Say the thing instead.",
+        "This string cites {{what}} (`{{cited}}`); a string that reaches a person names what they can act on, never a document they cannot open from where they read it (the root `CODING_STANDARDS.md`). Say the thing instead.",
     },
   },
   createOnce(context) {

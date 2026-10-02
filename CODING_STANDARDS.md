@@ -118,7 +118,7 @@ Reviewer: no gate can tell an oracle from an expectation.
 
 ### Land a gate with the test that runs it
 
-A lint rule, a tool in `check` and a hook command each land with a functional test. The test runs the real tool over a throwaway tree. It asserts where the tool fires and where it stays silent. Never assert on its internals. Print the rule's tag in the failure message, so whoever hits it reaches the rule. Every tool named in `check` is a gate, never a report. Its finding is a rule citation, not a matter of taste.
+A lint rule, a tool in `check` and a hook command each land with a functional test. The test runs the real tool over a throwaway tree. It asserts where the tool fires and where it stays silent. Never assert on its internals. The failure message names the rule's file, so whoever hits it reaches the rule. Every tool named in `check` is a gate, never a report. Its finding is a rule citation, not a matter of taste.
 
 ### Fail a suite that can run nothing
 

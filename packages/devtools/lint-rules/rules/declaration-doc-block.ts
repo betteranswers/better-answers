@@ -57,11 +57,11 @@ export const declarationDocBlockRule = defineRule({
     fixable: "code",
     docs: {
       description:
-        "A comment on a module-scope declaration or export is a `/** */` doc block, so an editor shows it wherever the name is used ([COMMENT1]).",
+        "A comment on a module-scope declaration or export is a `/** */` doc block, so an editor shows it wherever the name is used (the root `CODING_STANDARDS.md`).",
     },
     messages: {
       lineComment:
-        "A declaration's comment is a `/** */` doc block, never `//` ([COMMENT1]); an editor shows a doc block wherever the name is used. Write this block as `/** … */`.",
+        "A declaration's comment is a `/** */` doc block, never `//` (the root `CODING_STANDARDS.md`); an editor shows a doc block wherever the name is used. Write this block as `/** … */`.",
     },
   },
   createOnce(context) {

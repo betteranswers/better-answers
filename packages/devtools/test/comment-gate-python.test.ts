@@ -42,11 +42,11 @@ const findings = (tree: Tree): readonly string[] =>
     .filter((line) => line !== "");
 
 describe("the Python check fires on a long or citing comment", () => {
-  it("refuses a comment over the ceiling, naming count and rule", () => {
+  it("refuses a long comment, naming its count and rules file", () => {
     const output = run(holding(TOO_LONG));
 
     expect(output).toContain("runs to 29 words");
-    expect(output).toContain(tag("COMMENT", "1"));
+    expect(output).toContain("the root `CODING_STANDARDS.md`");
   });
 
   it("counts a docstring as a comment, unlike any ruff rule", () => {
@@ -162,11 +162,11 @@ describe("a directive's reason counts against the twenty-five words", () => {
   it.each([
     ["a noqa", "import os  # noqa: F401"],
     ["a type-checker escape", "KEEP: int = 1  # type: ignore[assignment]"],
-  ])("refuses %s's twenty-six-word reason, naming the directive rule", (_what, line) => {
+  ])("refuses %s's twenty-six-word reason, naming its rules file", (_what, line) => {
     const output = run({ [FILE]: `${line}  # ${wordsOf(26)}\n` });
 
     expect(output).toContain("reason runs to 26 words");
-    expect(output).toContain(tag("COMMENT", "3"));
+    expect(output).toContain("the root `CODING_STANDARDS.md`");
   });
 
   it("counts a reason apart from the comment above it", () => {

@@ -58,7 +58,7 @@ def run_over_a_tree(tmp_path_factory: pytest.TempPathFactory) -> str:
 
 def test_errors_an_eleven_word_name_under_its_own_name(outcomes: str) -> None:
     assert f"ERROR test_titles.py::test_{ELEVEN} - Failed" in outcomes
-    assert f"{TAG}: `test_{ELEVEN}` runs to 11" in outcomes
+    assert f"(the root `CODING_STANDARDS.md`): `test_{ELEVEN}` runs to 11" in outcomes
 
 
 def test_passes_a_ten_word_name(outcomes: str) -> None:

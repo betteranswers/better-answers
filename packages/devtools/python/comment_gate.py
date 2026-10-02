@@ -57,30 +57,32 @@ MARKER = re.compile(r"(?:^|\s)#+")
 TOO_LONG = (
     "{path}:{line}: this comment runs to {words} words; a comment says only what the "
     "code cannot — a constraint, a trade-off, a trap — in {limit} at most "
-    "([COMMENT1]). Delete what the code already says."
+    "(the root `CODING_STANDARDS.md`). Delete what the code already says."
 )
 
 REASON_TOO_LONG = (
     "{path}:{line}: this directive's reason runs to {words} words, and a reason counts "
-    "against the comment cap of {limit} ([COMMENT3]). Say the constraint alone."
+    "against the comment cap of {limit} (the root `CODING_STANDARDS.md`). Say the "
+    "constraint alone."
 )
 
 DOCSTRING_TOO_LONG = (
     "{path}:{line}: this docstring runs to {words} words; a public function's "
     "docstring says only what its signature cannot — units, ranges, what None means, "
-    "a side effect, a refusal — in {limit} at most ([COMMENT1]). Delete the rest."
+    "a side effect, a refusal — in {limit} at most (the root `CODING_STANDARDS.md`). "
+    "Delete the rest."
 )
 
 CITES = (
     "{path}:{line}: this comment cites {what} (`{cited}`); a comment never says which "
-    "ticket, decision or rule asked for the code ([COMMENT1]). git, a spec and an ADR "
-    "are where that is read."
+    "ticket, decision or rule asked for the code (the root `CODING_STANDARDS.md`). "
+    "git, a spec and an ADR are where that is read."
 )
 
 STRING_CITES = (
     "{path}:{line}: this string cites {what} (`{cited}`); a string that reaches a "
     "person names what they can act on, never a document they cannot open from where "
-    "they read it ([COMMENT1]). Say the thing instead."
+    "they read it (the root `CODING_STANDARDS.md`). Say the thing instead."
 )
 
 

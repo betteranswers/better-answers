@@ -35,19 +35,19 @@
       "error",
       {
         "selector": "BinaryExpression[operator='in'][right.type='Identifier'][right.name=/^[A-Z][A-Z0-9_]+$/]",
-        "message": "`in` also answers for a name the table inherits, such as `toString`. Test the key with `Object.hasOwn(TABLE, key)`, or hold the table in a `Map` [TYPES10]"
+        "message": "`in` also answers for a name the table inherits, such as `toString`. Test the key with `Object.hasOwn(TABLE, key)`, or hold the table in a `Map` (the root `CODING_STANDARDS.md`)"
       },
       {
         "selector": "ForInStatement",
-        "message": "`for…in` also walks the keys an object inherits. Walk `Object.keys` or `Object.entries` with `for…of` [TYPES10]"
+        "message": "`for…in` also walks the keys an object inherits. Walk `Object.keys` or `Object.entries` with `for…of` (the root `CODING_STANDARDS.md`)"
       },
       {
         "selector": "LabeledStatement",
-        "message": "A label jumps out of a nested loop. Move the inner loop into a function and return from it [DESIGN7]"
+        "message": "A label jumps out of a nested loop. Move the inner loop into a function and return from it (the root `CODING_STANDARDS.md`)"
       },
       {
         "selector": "CallExpression[callee.object.name='z'][callee.property.name='enum'] > :matches(ArrayExpression, TSAsExpression[expression.type='ArrayExpression'], TSSatisfiesExpression[expression.type='ArrayExpression'])",
-        "message": "A list written inside `z.enum` copies a closed set, and drifts from it. Declare the set once as an `as const` tuple, derive its type from it, and pass the tuple to `z.enum` [TYPES3]"
+        "message": "A list written inside `z.enum` copies a closed set, and drifts from it. Declare the set once as an `as const` tuple, derive its type from it, and pass the tuple to `z.enum` (the root `CODING_STANDARDS.md`)"
       }
     ],
     "vitest/no-identical-title": "error",
@@ -56,7 +56,7 @@
       {
         "mustNotMatch": [
           "/(?i:\\bshould\\b)|(?:\\S+\\s+){10}\\S/",
-          "A test title is a present-tense phrase of 10 words at most, never \"should\" [TEST5]"
+          "A test title is a present-tense phrase of 10 words at most, never \"should\" (the root `CODING_STANDARDS.md`)"
         ]
       }
     ],

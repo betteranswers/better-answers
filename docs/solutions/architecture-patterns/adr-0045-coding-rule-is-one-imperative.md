@@ -33,7 +33,7 @@ A coding rule is one imperative in the `CODING_STANDARDS.md` of the directory it
 
 - A `Reviewer:` line is written only where no mechanism could catch a breach: a judgement about depth, an oracle, a comment's intent.
 - Where a gate could exist and does not, the gap is a ticket, and the rule gets no sentence about it.
-- A rule states what it asks for. It does not say which gate catches a breach; the gate prints the tag in its failure message.
+- A rule states what it asks for. It does not say which gate catches a breach; the gate's failure message names the file that holds the rule.
 - A finding quotes the rule's heading.
 
 No suite holds the form now. The review reads the rules in whatever shape they take, so whoever edits a rules file keeps the form.
@@ -47,7 +47,7 @@ No suite holds the form now. The review reads the rules in whatever shape they t
 ## Why
 
 - The rules files were founded on a short imperative form and drifted into narrative: enforcement bookkeeping, mechanism description, ticket history. An agent writes what it sees, and that voice ran through the code.
-- A rule that names its gate repeats it. The gate already prints the tag in the message a reader hits.
+- A rule that names its gate repeats it. The gate already names the rule's file in the message a reader hits.
 - With one lint config, `pnpm lint`, the pre-commit hook and an editor all show a breach as it is written.
 - `string-cites-nothing` is its own rule because it polices text a person reads, which is not a comment.
 - The density ceiling is the volume backstop, and the only gate on a config file's comments.

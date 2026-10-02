@@ -58,9 +58,6 @@ const FORTY_WORDS =
 const A_WHY_OF_TWENTY =
   "Deleting this line changes what the engine memoises, and every caller below then reads a value the store never wrote";
 
-/** Spelled in two halves, so the tag scan does not read a fixture as a citation. */
-const tag = (family: string, number: string): string => `[${family}${number}]`;
-
 const hookText = readFileSync(script, "utf8");
 
 const pathIn = (command: string, pattern: RegExp): string => {
@@ -146,30 +143,30 @@ describe("the write-time hook and the Python gate share roots", () => {
 });
 
 describe("the write-time hook hands back the broken comment rule", () => {
-  it("refuses a 40-word TypeScript comment, naming count and rule", () => {
+  it("refuses a 40-word TypeScript comment, naming count and rules file", () => {
     const run = edit("packages/probe/long.ts", `// ${FORTY_WORDS}\nexport const keep = 1;\n`);
 
     expect(run.status).toBe(2);
     expect(run.stderr).toContain("runs to 40 words");
-    expect(run.stderr).toContain(tag("COMMENT", "1"));
+    expect(run.stderr).toContain("the root `CODING_STANDARDS.md`");
   });
 
-  it("refuses a 40-word Python comment, naming count and rule", () => {
+  it("refuses a 40-word Python comment, naming count and rules file", () => {
     const run = edit("packages/probe/long.py", `# ${FORTY_WORDS}\nKEEP = 1\n`);
 
     expect(run.status).toBe(2);
     expect(run.stderr).toContain("runs to 40 words");
-    expect(run.stderr).toContain(tag("COMMENT", "1"));
+    expect(run.stderr).toContain("the root `CODING_STANDARDS.md`");
   });
 
   it.each([["a root script", "scripts/long.mjs", `// ${FORTY_WORDS}\nexport const keep = 1;\n`]])(
-    "refuses %s's 40-word comment, naming count and rule",
+    "refuses %s's 40-word comment, naming its rules file",
     (_what, file, source) => {
       const run = edit(file, source);
 
       expect(run.status).toBe(2);
       expect(run.stderr).toContain("runs to 40 words");
-      expect(run.stderr).toContain(tag("COMMENT", "1"));
+      expect(run.stderr).toContain("the root `CODING_STANDARDS.md`");
     },
   );
 
