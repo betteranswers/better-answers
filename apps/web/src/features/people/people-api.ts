@@ -98,3 +98,78 @@ export const useRemoveMember = () => {
   );
   return useMutation(api.members.remove.mutationOptions(reconciled));
 };
+
+/** Who a bulk act changed; the rest of the set was already as asked. */
+export type BulkChanged = inferOutput<Api["members"]["bulkChangeRole"]>;
+
+type Ticked = { readonly personIds: readonly string[] };
+
+const tickedIn = (asked: Ticked) => {
+  const ids = new Set(asked.personIds);
+  return (member: ListedMember): boolean => ids.has(member.personId);
+};
+
+export const useBulkChangeRole = () => {
+  const api = useTRPC();
+  const reconciled = useReconciledList((listed, asked: Ticked & { readonly role: string }) => {
+    const role = roleOf(asked.role);
+    const ticked = tickedIn(asked);
+    return listed.map((member) =>
+      ticked(member) && role !== undefined ? { ...member, role } : member,
+    );
+  });
+  return useMutation(api.members.bulkChangeRole.mutationOptions(reconciled));
+};
+
+/** A group's member count moves with these acts, so the groups are read again beside the list. */
+const useGroupsReadAgain = () => {
+  const api = useTRPC();
+  const queryClient = useQueryClient();
+  return () => queryClient.invalidateQueries({ queryKey: api.members.groups.queryKey() });
+};
+
+export const useBulkRemove = () => {
+  const api = useTRPC();
+  const groupsReadAgain = useGroupsReadAgain();
+  const reconciled = useReconciledList((listed, asked: Ticked) => {
+    const ticked = tickedIn(asked);
+    return listed.filter((member) => !ticked(member));
+  });
+  return useMutation(
+    api.members.bulkRemove.mutationOptions({
+      ...reconciled,
+      onSettled: () => Promise.all([reconciled.onSettled(), groupsReadAgain()]),
+    }),
+  );
+};
+
+type GroupHeld = ListedMember["groups"][number];
+
+const joinedTo =
+  (group: GroupHeld) =>
+  (member: ListedMember): ListedMember =>
+    member.groups.some((held) => held.groupId === group.groupId)
+      ? member
+      : { ...member, groups: [...member.groups, group] };
+
+/** The group's name is the groups read's, so the rows show it before the api answers. */
+export const useBulkAddToGroup = () => {
+  const api = useTRPC();
+  const queryClient = useQueryClient();
+  const groupsReadAgain = useGroupsReadAgain();
+  const reconciled = useReconciledList((listed, asked: Ticked & { readonly groupId: string }) => {
+    const named = queryClient
+      .getQueryData(api.members.groups.queryKey())
+      ?.find((group) => group.id === asked.groupId);
+    if (named === undefined) return listed;
+    const ticked = tickedIn(asked);
+    const join = joinedTo({ groupId: named.id, name: named.name });
+    return listed.map((member) => (ticked(member) ? join(member) : member));
+  });
+  return useMutation(
+    api.members.bulkAddToGroup.mutationOptions({
+      ...reconciled,
+      onSettled: () => Promise.all([reconciled.onSettled(), groupsReadAgain()]),
+    }),
+  );
+};

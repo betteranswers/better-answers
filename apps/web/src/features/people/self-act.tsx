@@ -4,16 +4,12 @@ import { z } from "zod";
 
 import { useTRPC, type ApiProxy } from "@/shared/api/trpc.ts";
 import { HOMES, type Role } from "@/shared/navigation.ts";
-import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
+import type { Outcome } from "@/shared/outcome.tsx";
 import { refusedWith } from "@/shared/refusal-outcome.tsx";
 
+import { homeNowSaid, INCLUDES_YOU } from "./member-act-words.ts";
 import { useReaderId } from "./people-api.ts";
 import { roleOf } from "./role-meanings.ts";
-
-const INCLUDES_YOU = "This includes you.";
-
-const homeNowSaid = (role: Role): string =>
-  `You changed your own role to ${role}. People is for Admins, so this is your home now.`;
 
 const ROLE_UNREAD = refusedWith({
   why: "Your role changed, but it couldn't be read again.",
@@ -56,7 +52,10 @@ export const useSelfActHome = () => {
     if (change === "removed") {
       // Reset, not removed: the frame's mounted read never hears a removal and draws the old role.
       void queryClient.resetQueries(membershipOf(api));
-      await navigate({ href: "/", replace: true });
+      // The chooser decides on its first read, so a workspace list held from before must not answer it.
+      void queryClient.resetQueries({ type: "inactive" });
+      // Not `/`: the session still names the workspace left, and the shell sends that refusal to sign-in.
+      await navigate({ href: "/choose-workspace", replace: true });
       return undefined;
     }
     const role = await roleReadAgain(queryClient, api);
@@ -79,9 +78,10 @@ export function HomeLine() {
     select: (state) => SENT_HOME.safeParse(state.location.state).data?.homeOf,
   });
 
+  // A status alone: this line never refuses, and the frame keeps it on every screen.
   return (
-    <OutcomeLine
-      outcome={role === undefined ? undefined : { tone: "said", words: homeNowSaid(role) }}
-    />
+    <output className="mb-4 block text-muted-foreground empty:hidden">
+      {role === undefined ? null : homeNowSaid(role)}
+    </output>
   );
 }

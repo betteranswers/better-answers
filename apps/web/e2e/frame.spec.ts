@@ -747,7 +747,7 @@ test("keeps a focused control clear of the fixed band", async ({ page, request }
   await page.goto("/sign-in");
   await signIn(page, request, email);
   await page.goto(MEMBERS.path);
-  const last = page.getByRole("main").getByRole("button", { name: "Member 9" });
+  const last = page.getByRole("main").getByRole("button", { name: "Member 9", exact: true });
   await expect(last).toBeVisible();
 
   // Backwards, so each stop scrolls up to meet the band rather than rise from below it.

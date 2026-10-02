@@ -129,7 +129,19 @@ describe("what jump-to lists", () => {
     expect(to["Control Centre"]).toBe("/people/members");
     expect(to["Audit log"]).toBe("/system/audit-log");
     expect(to[INVITE_A_PERSON.name]).toBe("/people/members?act=invite");
-    expect(to["Priya Shah"]).toBe("/people/members?search=priya%40example.test");
+    expect(to["Priya Shah"]).toBe("/people/members?members.search=priya%40example.test");
+  });
+
+  it("finds a member past Members' filters, keeping other tabs' keys", () => {
+    const narrowed = {
+      pathname: "/people/members",
+      searchStr: "?members.role=Viewer&members.page=3&invitations.search=ops",
+    };
+    const to = jumpsIn(treeOf("Admin"), [PRIYA], narrowed)
+      .flatMap((group) => group.jumps)
+      .find((jump) => jump.name === "Priya Shah")?.to;
+
+    expect(to).toBe("/people/members?invitations.search=ops&members.search=priya%40example.test");
   });
 
   it("keeps Members' list filters when asking Members for an act", () => {

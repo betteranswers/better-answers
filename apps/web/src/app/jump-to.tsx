@@ -1,6 +1,7 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useEffectEvent, useRef, useState, type RefObject } from "react";
 
+import { membersSeeking } from "@/features/people/members-address.ts";
 import { useMembers } from "@/features/people/people-api.ts";
 import { askingHere, type Here } from "@/shared/address-ask.ts";
 import { Icon, type IconName } from "@/shared/icon.tsx";
@@ -112,7 +113,7 @@ const memberJump = (member: Member, here: Here): Jump =>
     name: nameOrAddress(member.displayName, member.address),
     said: member.displayName === "" ? undefined : member.address,
     icon: "person",
-    to: askingHere(here, MEMBERS.path, "search", member.address),
+    to: membersSeeking(here, MEMBERS.path, member.address),
     kind: "member",
   });
 

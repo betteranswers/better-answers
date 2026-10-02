@@ -4,6 +4,7 @@ import { useId, useMemo, useState, type ReactNode } from "react";
 import { useSignOut } from "@/features/auth/auth-hooks.ts";
 import { useMembership } from "@/features/auth/membership.ts";
 import { useOperatorStanding } from "@/features/console/operator.ts";
+import { HomeLine } from "@/features/people/self-act.tsx";
 import { ShellKeystrokes, ShellKeystrokesAct, type Keystroke } from "@/shared/keystrokes.tsx";
 import {
   EVERY_SURFACE,
@@ -16,6 +17,7 @@ import {
   type VisibleTree,
 } from "@/shared/navigation.ts";
 import { isFilled, type ScreenToolbar } from "@/shared/screen-toolbar.tsx";
+import { useWideLayout } from "@/shared/wide-layout.ts";
 
 import { Band, type Person } from "./band.tsx";
 import { partsOf } from "./breadcrumb.tsx";
@@ -26,7 +28,6 @@ import { useSecondaryNavShowing } from "./secondary-nav-showing.ts";
 import { SecondaryNav } from "./secondary-nav.tsx";
 import { openTabIn, ScreenPanel, ScreenTabsRoot, Toolbar, type PickedTab } from "./toolbar.tsx";
 import { useArrivalTakenOnceRead, useHidden, VisibleTreeContext } from "./visible-tree.ts";
-import { useWideLayout } from "./wide-layout.ts";
 import { useWorkspaceSwitch, WorkspaceSwitcher, type Here } from "./workspace-switcher.tsx";
 
 type Region = { readonly name: string; readonly toolbar: ScreenToolbar };
@@ -229,6 +230,7 @@ function ToolbarAndScreen(properties: {
       <main id="screen" aria-label="Screen" tabIndex={-1} className="flex-1 px-4 py-6 md:px-8">
         {/* The page's width, not the prose measure: the design system's rule keeps text to it. */}
         <div data-screen-content className="max-w-page">
+          <HomeLine />
           <ScreenPanel>
             <Outlet />
           </ScreenPanel>

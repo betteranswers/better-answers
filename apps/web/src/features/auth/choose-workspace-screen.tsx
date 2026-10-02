@@ -153,7 +153,8 @@ export function ChooseWorkspaceScreen() {
 
   const openSoleWorkspace = () => {
     if (sole === undefined) return;
-    if (active !== undefined) {
+    // A session can still name a workspace the person has just left.
+    if (active === sole.id) {
       goOn();
       return;
     }

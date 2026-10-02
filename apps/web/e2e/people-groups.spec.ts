@@ -38,6 +38,9 @@ const MEMBERS = screenNamed(people, "Members");
 
 const MEMBERS_SCREEN = MEMBERS.path;
 
+/** A member's row leads with its tick, then the person and their role. */
+const GROUPS_CELL = 3;
+
 const nav = (page: Page) => page.getByRole("navigation", { name: CONTROL_CENTRE.name });
 
 const groupsRegion = (page: Page) => page.getByRole("region", { name: "Groups" });
@@ -230,7 +233,7 @@ test.describe("a group's acts", () => {
       .getByRole("region", { name: "Members" })
       .getByRole("row")
       .filter({ hasText: "Priya Shah" });
-    await expect(priya.getByRole("cell").nth(2)).toHaveText("People team");
+    await expect(priya.getByRole("cell").nth(GROUPS_CELL)).toHaveText("People team");
   });
 
   test("an Admin deletes a group once told what it takes", async ({
@@ -430,7 +433,7 @@ test.describe("a member's groups, on their row and their sheet", () => {
     const members = page.getByRole("region", { name: "Members" });
     const priyaRow = members.getByRole("row").filter({ hasText: "Priya Shah" });
     await expect(members.getByRole("columnheader", { name: "Groups" })).toBeVisible();
-    await expect(priyaRow.getByRole("cell").nth(2)).toHaveText("HR team");
+    await expect(priyaRow.getByRole("cell").nth(GROUPS_CELL)).toHaveText("HR team");
 
     const keystrokes = await keystrokesListed(page, MEMBERS.name);
     await expect(keystrokes).toContainText("Change the groups of the member in focus");
@@ -474,9 +477,9 @@ test.describe("a member's groups, on their row and their sheet", () => {
 
     await page.keyboard.press("Escape");
     await expect(members.getByRole("button", { name: "Priya Shah", exact: true })).toBeFocused();
-    await expect(priyaRow.getByRole("cell").nth(2)).toHaveText("Bid writers");
+    await expect(priyaRow.getByRole("cell").nth(GROUPS_CELL)).toHaveText("Bid writers");
     await page.reload();
-    await expect(priyaRow.getByRole("cell").nth(2)).toHaveText("Bid writers");
+    await expect(priyaRow.getByRole("cell").nth(GROUPS_CELL)).toHaveText("Bid writers");
   });
 
   test("points an Admin at Groups when the workspace has none", async ({ page, request }) => {

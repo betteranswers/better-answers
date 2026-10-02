@@ -179,10 +179,11 @@ test("opens Members with the member an Admin types findable", async ({ page, req
   await expect(groupOf(page, JUMP_TO.groups.members)).toBeVisible();
   await optionOf(page, new RegExp(PRIYA)).click();
 
-  await expect(page).toHaveURL(new RegExp(`${MEMBERS.path}$`));
+  // The list's own search key, so Back and a reload find the same person.
+  await expect(page).toHaveURL(new RegExp(`${MEMBERS.path}\\?members\\.search=`));
   await expect(searchBox(page)).toHaveValue(team.priya);
   await expect(memberRows(page)).toHaveCount(1);
-  await expect(memberRows(page).getByRole("button", { name: PRIYA })).toBeVisible();
+  await expect(memberRows(page).getByRole("button", { name: PRIYA, exact: true })).toBeVisible();
   await expect(page.getByRole("main")).toBeFocused();
 
   // From another tab of Members, the person is found on the Members tab.
@@ -196,7 +197,7 @@ test("opens Members with the member an Admin types findable", async ({ page, req
   );
   await expect(searchBox(page)).toHaveValue(team.tom);
   await expect(memberRows(page)).toHaveCount(1);
-  await expect(memberRows(page).getByRole("button", { name: TOM })).toBeVisible();
+  await expect(memberRows(page).getByRole("button", { name: TOM, exact: true })).toBeVisible();
 });
 
 test("finds nothing by an unbuilt screen's name", async ({ page, request }) => {

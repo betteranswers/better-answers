@@ -78,19 +78,24 @@ function Home() {
 
 const MEMBERS = "/people/members";
 
+const CHOOSER = "/choose-workspace";
+
 /** The reader, an Admin, on Members with their membership read; a failed read is not asked again. */
 const actingAt = async () => {
   const clients = createAppClients();
   clients.queryClient.setDefaultOptions({ queries: { retry: false } });
   vi.stubGlobal("fetch", answeringAs("Admin"));
   const opened = await openScreens(
-    { [MEMBERS]: ActedOnMyself, [HOMES.Editor.path]: Home, "/": Home },
+    { [MEMBERS]: ActedOnMyself, [HOMES.Editor.path]: Home, [CHOOSER]: Home },
     ["/elsewhere", MEMBERS],
     framedBy(clients),
   );
   await screen.findByText("Held: Admin");
-  return opened;
+  return { ...opened, clients };
 };
+
+/** The chooser's list, as the band's switcher leaves it once its menu has been opened and shut. */
+const WORKSPACES_HELD = ["auth", "workspaces"];
 
 describe("an act's confirmation", () => {
   it("says the set includes the reader, and only then", async () => {
@@ -119,14 +124,19 @@ describe("going home after an act on yourself", () => {
     expect(history.length, "the move home pushed an entry of its own").toBe(2);
   });
 
-  it("sends a self-removed Admin to /, holding no membership", async () => {
-    const { router } = await actingAt();
+  it("sends a self-removed Admin to the chooser, holding no membership", async () => {
+    const { router, clients } = await actingAt();
+    clients.queryClient.setQueryData(WORKSPACES_HELD, [{ id: "w", name: "The workspace left" }]);
 
     vi.stubGlobal("fetch", () => Promise.reject(new TypeError("the session has ended")));
     fireEvent.click(screen.getByRole("button", { name: "Removed myself" }));
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/"));
+    await waitFor(() => expect(router.state.location.pathname).toBe(CHOOSER));
     expect(await screen.findByText("Held: none")).toBeDefined();
+    expect(
+      clients.queryClient.getQueryData(WORKSPACES_HELD),
+      "the chooser would open on the workspace left",
+    ).toBeUndefined();
   });
 
   it("stays put, refusing in words, when the role is unread", async () => {

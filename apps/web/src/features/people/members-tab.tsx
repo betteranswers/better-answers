@@ -1,126 +1,134 @@
-import {
-  columnFilteringFeature,
-  createColumnHelper,
-  createFilteredRowModel,
-  filterFn_includesString,
-  globalFilteringFeature,
-  tableFeatures,
-  useTable,
-} from "@tanstack/react-table";
-import { useId, useMemo, useRef, useState, type RefObject } from "react";
+import { useTable } from "@tanstack/react-table";
+import { useId, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 
-import { useAsked } from "@/shared/address-ask.ts";
 import type { ApiError } from "@/shared/api/trpc.ts";
+import { FilterRow } from "@/shared/filter-row.tsx";
 import { GridTable } from "@/shared/grid-table.tsx";
-import { Icon } from "@/shared/icon.tsx";
 import { useKeystroke } from "@/shared/keystrokes.tsx";
+import { useListAddress } from "@/shared/list-address.ts";
+import { ListPages, ListState, pageWithin } from "@/shared/list-pages.tsx";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
-import { Button } from "@/shared/ui/button.tsx";
-import { Input } from "@/shared/ui/input.tsx";
-import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
+import { RowMenu } from "@/shared/row-menu.tsx";
+import { SelectionBar } from "@/shared/selection-bar.tsx";
+import { useWideLayout } from "@/shared/wide-layout.ts";
 
 import { useGroups } from "./groups-api.ts";
+import { SELECTED_MEMBERS } from "./member-act-words.ts";
+import { MemberBulkActs, MemberBulkDialogs, useMemberBulkActs } from "./member-bulk-acts.tsx";
+import {
+  HIDEABLE,
+  memberColumns,
+  memberFeatures,
+  SORTABLE,
+  type RefusedRows,
+} from "./member-columns.tsx";
 import { MemberSheet, memberButtonId, type OpenedAt } from "./member-sheet.tsx";
-import { useMembers, useRemoveMember, type ListedMember } from "./people-api.ts";
-import { PEOPLE_KEYSTROKES } from "./people-state.ts";
+import {
+  MEMBERS_FIELDS,
+  MEMBERS_LIST,
+  sortedOf,
+  sortOf,
+  useSettledSearch,
+} from "./members-address.ts";
+import {
+  useMembers,
+  useReaderId,
+  useRemoveMember,
+  type ListedMember,
+  type Role,
+} from "./people-api.ts";
+import { PEOPLE_KEYSTROKES as KEY } from "./people-state.ts";
 import { outcomeOfFailure } from "./refusal.tsx";
-import { GroupPills, JoinedOn, nameOf } from "./words.tsx";
+import { ROLES } from "./role-meanings.ts";
+import { useSelfActHome } from "./self-act.tsx";
+import { nameOf } from "./words.tsx";
 
-const features = tableFeatures({
-  columnFilteringFeature,
-  globalFilteringFeature,
-  filteredRowModel: createFilteredRowModel(),
-  filterFns: { includesString: filterFn_includesString },
-});
-
-const column = createColumnHelper<typeof features, ListedMember>();
-
-const PERSON = "person";
+/** The members read returns the whole workspace, so the browser pages it. */
+const PAGE_SIZE = 25;
 
 const SEARCH_LABEL = "Search by name or address";
 
 const NOTHING_IN_FOCUS = selectFirst("member");
 
-const countOfPeople = (count: number): string => (count === 1 ? "1 person" : `${count} people`);
+const NONE: ReadonlySet<string> = new Set();
 
-type MemberActs = {
-  readonly open: (personId: string) => void;
-  readonly focusedOn: (personId: string) => void;
+const NO_ONE: readonly ListedMember[] = [];
+
+const NO_MARKS: RefusedRows = new Map();
+
+/** Person and role are what a narrow screen has room for; the rest can be shown again. */
+const NARROW_HIDES: ReadonlySet<string> = new Set(["groups", "joined"]);
+
+const countOfPeople = (count: number): string =>
+  count === 1 ? "1 person" : `${String(count)} people`;
+
+type Narrowing = {
+  readonly search: string;
+  readonly role: Role | undefined;
+  readonly group: string | undefined;
 };
 
-function PersonCell(properties: { readonly member: ListedMember; readonly acts: MemberActs }) {
-  const { member, acts } = properties;
-  const { personId, displayName, address } = member;
-  return (
-    <span className="flex min-w-0 flex-col items-start leading-tight">
-      <Button
-        id={memberButtonId(personId)}
-        variant="link"
-        aria-haspopup="dialog"
-        className="h-auto p-0 text-left font-medium whitespace-normal text-foreground"
-        onFocus={() => {
-          acts.focusedOn(personId);
-        }}
-        onClick={() => {
-          acts.open(personId);
-        }}
-      >
-        {displayName === "" ? (
-          <span className="text-muted-foreground">No display name yet</span>
-        ) : (
-          displayName
-        )}
-      </Button>
-      <span className="text-xs text-muted-foreground wrap-anywhere">{address}</span>
-    </span>
-  );
-}
+const isNarrowed = (narrowing: Narrowing): boolean =>
+  narrowing.search !== "" || narrowing.role !== undefined || narrowing.group !== undefined;
 
-/** The person's own cell opens them, so its acts ride into the columns. */
-const columnsFor = (acts: MemberActs) =>
-  column.columns([
-    column.accessor((member) => `${member.displayName} ${member.address}`, {
-      id: PERSON,
-      header: "Person",
-      cell: ({ row }) => <PersonCell member={row.original} acts={acts} />,
-    }),
-    column.accessor("role", {
-      header: "Role",
-      cell: ({ getValue }) => <Pill>{getValue()}</Pill>,
-    }),
-    column.accessor("groups", {
-      header: "Groups",
-      cell: ({ getValue }) => <GroupPills groups={getValue()} />,
-    }),
-    column.accessor("joinedAt", {
-      header: "Joined",
-      cell: ({ getValue }) => <JoinedOn instant={getValue()} />,
-    }),
-  ]);
+const saidOfCount = (shown: number, total: number, narrowing: Narrowing): string => {
+  if (!isNarrowed(narrowing)) return countOfPeople(total);
+  const of = `${String(shown)} of ${countOfPeople(total)} match`;
+  return narrowing.search === "" ? `${of} these filters.` : `${of} “${narrowing.search}”.`;
+};
 
-function NoOneMatches(properties: {
-  readonly search: string;
-  readonly total: number;
-  readonly onClear: () => void;
-}) {
-  return (
-    <div className="flex flex-col items-start gap-1 px-4 py-10">
-      <p className="font-medium">No one matches “{properties.search}”.</p>
-      <p className="text-muted-foreground">
-        Clear the search to see all {countOfPeople(properties.total)}.
-      </p>
-      <Button variant="outline" className="mt-3" onClick={properties.onClear}>
-        Clear the search
-      </Button>
-    </div>
-  );
-}
+const matching =
+  (narrowing: Narrowing) =>
+  (member: ListedMember): boolean =>
+    (narrowing.role === undefined || member.role === narrowing.role) &&
+    (narrowing.group === undefined ||
+      member.groups.some((group) => group.groupId === narrowing.group)) &&
+    `${member.displayName} ${member.address}`
+      .toLowerCase()
+      .includes(narrowing.search.toLowerCase());
+
+/** Read in render from the address, so Back and a reload come to the same rows. */
+const useNarrowedMembers = (listed: readonly ListedMember[]) => {
+  const { state, write } = useListAddress(MEMBERS_LIST, MEMBERS_FIELDS);
+  const [search, setSearch] = useSettledSearch(state.search, (settled) => {
+    write({ search: settled, page: 1 });
+  });
+  const narrowing: Narrowing = { search, role: state.role, group: state.group };
+  const data = listed.filter(matching(narrowing));
+  // A search still settling has not reached the address, so it shows its first page.
+  const asked = search === state.search ? state.page - 1 : 0;
+  const pageIndex = pageWithin(asked, PAGE_SIZE, data.length);
+
+  const clear = () => {
+    setSearch("");
+    write({ search: "", role: undefined, group: undefined, page: 1 });
+  };
+
+  return { state, write, search, setSearch, narrowing, data, pageIndex, clear };
+};
+
+type Narrowed = ReturnType<typeof useNarrowedMembers>;
+
+/** A person gone from the list can be acted on no more, so their tick goes with them. */
+const useTicks = (listed: readonly ListedMember[]) => {
+  const [held, setHeld] = useState<ReadonlySet<string>>(NONE);
+  const listedIds: ReadonlySet<string> = new Set(listed.map((member) => member.personId));
+  const ticked: ReadonlySet<string> = new Set([...held].filter((id) => listedIds.has(id)));
+  return [ticked, setHeld] as const;
+};
+
+const toggled = (ticked: ReadonlySet<string>, personId: string): ReadonlySet<string> => {
+  const next = new Set(ticked);
+  if (next.has(personId)) next.delete(personId);
+  else next.add(personId);
+  return next;
+};
 
 type Opened = { readonly personId: string; readonly at: OpenedAt };
 
 /**
- * The removed row goes before the api answers, so focus lands on the row that took its place, else
- * on the search.
+ * The removed row goes before the api answers, so focus lands on the row that took its place,
+ * else on the search.
  */
 function useRemovalFromTheList(properties: {
   readonly shownIds: () => readonly string[];
@@ -130,6 +138,8 @@ function useRemovalFromTheList(properties: {
 }) {
   const { shownIds, closeTheSheet, setOutcome, searchRef } = properties;
   const removeMember = useRemoveMember();
+  const readerId = useReaderId();
+  const { goHome } = useSelfActHome();
   const landing = useRef<{ readonly personId: string | undefined }>(undefined);
 
   const remove = (member: ListedMember) => {
@@ -146,6 +156,7 @@ function useRemovalFromTheList(properties: {
             tone: "said",
             words: `${nameOf(member)} is no longer a member of this workspace.`,
           });
+          if (member.personId === readerId) void goHome("removed");
         },
         onError: (failure: Error | ApiError) => {
           setOutcome(outcomeOfFailure(failure));
@@ -164,72 +175,256 @@ function useRemovalFromTheList(properties: {
   return { remove, returnFocus };
 }
 
-function MemberList(properties: { readonly members: readonly ListedMember[] }) {
-  const { members } = properties;
-  const [search, setSearch] = useState("");
+/** Each of the row's acts opens the member's sheet at that act. */
+const ROW_ACTS: readonly { readonly label: string; readonly at: OpenedAt }[] = [
+  { label: "Open", at: "member" },
+  { label: "Change role", at: "role" },
+  { label: "Add to group", at: "groups" },
+  { label: "Remove", at: "removal" },
+];
+
+const rowMenuOf = (open: (personId: string, at: OpenedAt) => void) => (member: ListedMember) => (
+  <RowMenu
+    name={nameOf(member)}
+    acts={ROW_ACTS.map(({ label, at }) => ({
+      label,
+      destructive: at === "removal",
+      onSelect: () => {
+        open(member.personId, at);
+      },
+    }))}
+  />
+);
+
+function MemberFilters(properties: {
+  readonly narrowed: Narrowed;
+  readonly searchRef: RefObject<HTMLInputElement | null>;
+  readonly hidden: ReadonlySet<string>;
+  readonly onHiddenChange: (hidden: ReadonlySet<string>) => void;
+}) {
+  const { narrowed, searchRef } = properties;
+  const groups = useGroups().data ?? [];
+  const groupFilter = {
+    label: "Group",
+    value: narrowed.state.group,
+    anyLabel: "Any group",
+    choices: groups.map((group) => ({ value: group.id, label: group.name })),
+    onChange: (group: string | undefined) => {
+      narrowed.write({ group, page: 1 });
+    },
+  };
+  return (
+    <FilterRow
+      search={{
+        label: SEARCH_LABEL,
+        value: narrowed.search,
+        onChange: narrowed.setSearch,
+        keystroke: KEY.search,
+        inputRef: searchRef,
+      }}
+      filters={[
+        {
+          label: "Role",
+          value: narrowed.state.role,
+          anyLabel: "Any role",
+          choices: ROLES.map((role) => ({ value: role, label: role })),
+          onChange: (role) => {
+            narrowed.write({ role: ROLES.find((each) => each === role), page: 1 });
+          },
+        },
+        // A filter with nothing to choose is no filter, so it waits for a group to exist.
+        ...(groups.length === 0 ? [] : [groupFilter]),
+      ]}
+      columns={{
+        columns: HIDEABLE,
+        hidden: properties.hidden,
+        onHiddenChange: properties.onHiddenChange,
+      }}
+    />
+  );
+}
+
+/** A failed read stands in for the rows, even stale ones: the reader must not act on them. */
+function MembersRead(properties: {
+  readonly read: ReturnType<typeof useMembers>;
+  readonly searchRef: RefObject<HTMLInputElement | null>;
+  readonly children: ReactNode;
+}) {
+  const { read } = properties;
+  if (read.error !== null) {
+    return (
+      <ListState
+        state={{
+          kind: "failed",
+          words: outcomeOfFailure(read.error, "read").words,
+          onRetry: () => {
+            void read.refetch();
+          },
+          focusAfterRetry: properties.searchRef,
+        }}
+      />
+    );
+  }
+  if (read.data === undefined) {
+    return <ListState state={{ kind: "loading", words: "The members are still loading." }} />;
+  }
+  return properties.children;
+}
+
+function NoOneMatches(properties: {
+  readonly narrowed: Narrowed;
+  readonly focusAfterClear: RefObject<HTMLElement | null>;
+}) {
+  const { narrowed } = properties;
+  return (
+    <ListState
+      state={{
+        kind: "emptied",
+        words:
+          narrowed.search === ""
+            ? "No one matches these filters."
+            : `No one matches “${narrowed.search}”.`,
+        onClear: narrowed.clear,
+        focusAfterClear: properties.focusAfterClear,
+      }}
+    />
+  );
+}
+
+function CountLine(properties: {
+  readonly read: ReturnType<typeof useMembers>;
+  readonly narrowed: Narrowed;
+}) {
+  const { read, narrowed } = properties;
+  return (
+    <output className="mt-1 block text-muted-foreground">
+      {read.data === undefined
+        ? ""
+        : saidOfCount(narrowed.data.length, read.data.length, narrowed.narrowing)}
+    </output>
+  );
+}
+
+/** The reader's own choice, else what a narrow screen has room for. */
+const useHiddenColumns = () => {
+  const [chosen, setChosen] = useState<ReadonlySet<string>>();
+  const wide = useWideLayout();
+  return [chosen ?? (wide ? NONE : NARROW_HIDES), setChosen] as const;
+};
+
+const usePageTurns = (narrowed: Narrowed) => {
+  const pageCount = Math.ceil(narrowed.data.length / PAGE_SIZE);
+  const turn = (pageIndex: number) => {
+    if (pageIndex >= 0 && pageIndex < pageCount) narrowed.write({ page: pageIndex + 1 });
+  };
+  useKeystroke(KEY.previousPage, () => {
+    turn(narrowed.pageIndex - 1);
+  });
+  useKeystroke(KEY.nextPage, () => {
+    turn(narrowed.pageIndex + 1);
+  });
+  return turn;
+};
+
+/** A ticked person the list has since lost is still named by the act that refused them. */
+const namedIn =
+  (listed: readonly ListedMember[]) =>
+  (personId: string): string => {
+    const member = listed.find((each) => each.personId === personId);
+    return member === undefined ? "A member no longer listed" : nameOf(member);
+  };
+
+function OpenedSheet(properties: {
+  readonly opened: Opened | undefined;
+  readonly listed: readonly ListedMember[];
+  readonly onClose: () => void;
+  readonly removal: ReturnType<typeof useRemovalFromTheList>;
+}) {
+  const { opened, removal } = properties;
+  const member = properties.listed.find((each) => each.personId === opened?.personId);
+  if (opened === undefined || member === undefined) return null;
+  return (
+    <MemberSheet
+      key={opened.personId}
+      member={member}
+      openedAt={opened.at}
+      onClose={properties.onClose}
+      onRemove={removal.remove}
+      returnFocus={() => {
+        removal.returnFocus(opened.personId);
+      }}
+    />
+  );
+}
+
+/** Ticks, the sheet and an act's outcome are the screen's; what narrows the rows is the address's. */
+function MemberList(properties: {
+  readonly read: ReturnType<typeof useMembers>;
+  readonly heading: RefObject<HTMLHeadingElement | null>;
+}) {
+  const { read, heading } = properties;
+  const listed = read.data ?? NO_ONE;
+  const narrowed = useNarrowedMembers(listed);
+  const [ticked, setTicked] = useTicks(listed);
   const [inFocus, setInFocus] = useState<string>();
   const [opened, setOpened] = useState<Opened>();
   const [outcome, setOutcome] = useState<Outcome>();
+  const [refused, setRefused] = useState<RefusedRows>(NO_MARKS);
+  const [hidden, setHidden] = useHiddenColumns();
   const searchRef = useRef<HTMLInputElement>(null);
-  // Read with the list, so a sheet opened on its groups has boxes to land focus on.
-  useGroups();
-  useAsked("search", setSearch);
+  const turn = usePageTurns(narrowed);
 
   const columns = useMemo(
     () =>
-      columnsFor({
-        open: (personId) => {
-          setOpened({ personId, at: "member" });
+      memberColumns(
+        {
+          open: (personId) => {
+            setOpened({ personId, at: "member" });
+          },
+          focusedOn: setInFocus,
         },
-        focusedOn: setInFocus,
-      }),
-    [],
+        refused,
+      ),
+    [refused],
   );
 
+  const sorted = sortedOf(narrowed.state.sort);
   const table = useTable({
-    features,
+    features: memberFeatures,
     columns,
-    data: members,
+    data: narrowed.data,
     getRowId: (member) => member.personId,
-    globalFilterFn: "includesString",
-    getColumnCanGlobalFilter: (candidate) => candidate.id === PERSON,
-    state: { globalFilter: search },
+    state: {
+      sorting: sorted === undefined ? [] : [sorted],
+      pagination: { pageIndex: narrowed.pageIndex, pageSize: PAGE_SIZE },
+    },
+  });
+  const shownIds = () => table.getRowModel().rows.map((row) => row.id);
+
+  const acts = useMemberBulkActs({
+    ticked,
+    tick: setTicked,
+    nameOf: namedIn(listed),
+    heading,
+    say: setOutcome,
+    mark: setRefused,
   });
 
-  const memberOf = (personId: string | undefined) =>
-    members.find((member) => member.personId === personId);
-
-  /** A letter pressed outside the list still needs a member, so the one last in focus stands. */
-  const openInFocus = (at: OpenedAt) => {
-    const member = memberOf(inFocus);
-    setOutcome(member === undefined ? NOTHING_IN_FOCUS : undefined);
-    if (member !== undefined) setOpened({ personId: member.personId, at });
-  };
-
-  useKeystroke(PEOPLE_KEYSTROKES.search, () => {
-    searchRef.current?.focus();
-  });
-  useKeystroke(PEOPLE_KEYSTROKES.open, () => {
-    openInFocus("member");
-  });
-  useKeystroke(PEOPLE_KEYSTROKES.changeRole, () => {
-    openInFocus("role");
-  });
-  useKeystroke(PEOPLE_KEYSTROKES.revokeCredentials, () => {
-    openInFocus("credentials");
-  });
-  useKeystroke(PEOPLE_KEYSTROKES.changeGroups, () => {
-    openInFocus("groups");
-  });
-  useKeystroke(PEOPLE_KEYSTROKES.remove, () => {
-    openInFocus("removal");
-  });
-  useKeystroke(PEOPLE_KEYSTROKES.flagName, () => {
-    openInFocus("flag");
+  useInFocusKeystrokes({
+    inFocus: listed.find((member) => member.personId === inFocus),
+    open: (personId, at) => {
+      setOpened({ personId, at });
+    },
+    tick: (personId) => {
+      setTicked(toggled(ticked, personId));
+    },
+    nothingInFocus: () => {
+      setOutcome(NOTHING_IN_FOCUS);
+    },
   });
 
   const removal = useRemovalFromTheList({
-    shownIds: () => table.getRowModel().rows.map((row) => row.id),
+    shownIds,
     closeTheSheet: () => {
       setOpened(undefined);
     },
@@ -237,90 +432,120 @@ function MemberList(properties: { readonly members: readonly ListedMember[] }) {
     searchRef,
   });
 
-  const clear = () => {
-    setSearch("");
-    searchRef.current?.focus();
-  };
-
-  const shown = table.getRowModel().rows.length;
-  const said =
-    search === ""
-      ? countOfPeople(members.length)
-      : `${shown} of ${countOfPeople(members.length)} match “${search}”.`;
-  const openedMember = memberOf(opened?.personId);
-
   return (
     <>
-      <output className="mt-1 block text-muted-foreground">{said}</output>
+      <CountLine read={read} narrowed={narrowed} />
       <OutcomeLine outcome={outcome} className="mt-2" />
 
       <div className="mt-4 border border-border bg-card">
-        <div className="flex flex-wrap items-center gap-2 border-b border-border p-3">
-          <div className="relative">
-            <Icon
-              name="search"
-              className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-muted-foreground"
-            />
-            <Input
-              ref={searchRef}
-              type="search"
-              aria-label={SEARCH_LABEL}
-              aria-keyshortcuts={PEOPLE_KEYSTROKES.search.key}
-              placeholder={SEARCH_LABEL}
-              className="w-64 pl-8"
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
-              }}
-              onKeyDown={(event) => {
-                if (event.key !== "Escape" || search === "") return;
-                event.preventDefault();
-                setSearch("");
-              }}
-            />
-          </div>
-        </div>
-
-        <GridTable
-          table={table}
-          caption="Members of this workspace, each with their address, role, groups and the day they joined. A member's name opens them."
-          empty={<NoOneMatches search={search} total={members.length} onClear={clear} />}
+        <MemberFilters
+          narrowed={narrowed}
+          searchRef={searchRef}
+          hidden={hidden}
+          onHiddenChange={setHidden}
         />
+        <SelectionBar
+          label={SELECTED_MEMBERS}
+          ticked={ticked}
+          shown={shownIds()}
+          noun={["member", "members"]}
+          clearKeystroke={KEY.clearSelection}
+          onClear={() => {
+            setTicked(NONE);
+          }}
+          focusAfterClear={heading}
+        >
+          <MemberBulkActs acts={acts} />
+        </SelectionBar>
+        <MembersRead read={read} searchRef={searchRef}>
+          <GridTable
+            table={table}
+            caption="Members of this workspace, each with their address, role, groups and the day they joined. A member's name opens them; a tick selects them for an act on every member selected."
+            ticking={{
+              ticked,
+              onTickedChange: setTicked,
+              nameOf,
+              everyOnThePage: "Select every member on this page",
+            }}
+            sorting={{
+              sortable: SORTABLE,
+              sorted,
+              onSortedChange: (next) => {
+                narrowed.write({ sort: sortOf(next), page: 1 });
+              },
+            }}
+            hidden={hidden}
+            rowMenu={rowMenuOf((personId, at) => {
+              setOpened({ personId, at });
+            })}
+            empty={<NoOneMatches narrowed={narrowed} focusAfterClear={searchRef} />}
+          />
+          <ListPages
+            pages={{
+              kind: "pages",
+              label: "Pages of members",
+              pageIndex: narrowed.pageIndex,
+              pageSize: PAGE_SIZE,
+              total: narrowed.data.length,
+              onTurn: turn,
+              keystrokes: { previous: KEY.previousPage.key, next: KEY.nextPage.key },
+            }}
+          />
+        </MembersRead>
       </div>
 
-      {opened === undefined || openedMember === undefined ? null : (
-        <MemberSheet
-          key={opened.personId}
-          member={openedMember}
-          openedAt={opened.at}
-          onClose={() => {
-            setOpened(undefined);
-          }}
-          onRemove={removal.remove}
-          returnFocus={() => {
-            removal.returnFocus(opened.personId);
-          }}
-        />
-      )}
+      <MemberBulkDialogs acts={acts} />
+      <OpenedSheet
+        opened={opened}
+        listed={listed}
+        onClose={() => {
+          setOpened(undefined);
+        }}
+        removal={removal}
+      />
     </>
   );
+}
+
+/** A letter pressed outside the list still needs a member, so the one last in focus stands. */
+function useInFocusKeystrokes(properties: {
+  readonly inFocus: ListedMember | undefined;
+  readonly open: (personId: string, at: OpenedAt) => void;
+  readonly tick: (personId: string) => void;
+  readonly nothingInFocus: () => void;
+}) {
+  const { inFocus, nothingInFocus } = properties;
+  const onTheMemberInFocus = (act: (personId: string) => void) => () => {
+    if (inFocus === undefined) nothingInFocus();
+    else act(inFocus.personId);
+  };
+  const opening = (at: OpenedAt) =>
+    onTheMemberInFocus((personId) => {
+      properties.open(personId, at);
+    });
+
+  useKeystroke(KEY.open, opening("member"));
+  useKeystroke(KEY.changeRole, opening("role"));
+  useKeystroke(KEY.revokeCredentials, opening("credentials"));
+  useKeystroke(KEY.changeGroups, opening("groups"));
+  useKeystroke(KEY.remove, opening("removal"));
+  useKeystroke(KEY.flagName, opening("flag"));
+  useKeystroke(KEY.tick, onTheMemberInFocus(properties.tick));
 }
 
 export function MembersTab() {
   const members = useMembers();
   const headingId = useId();
+  const heading = useRef<HTMLHeadingElement>(null);
+  // Read with the list, so a sheet opened on its groups has boxes to land focus on.
+  useGroups();
 
   return (
     <section aria-labelledby={headingId} className="mt-6">
-      <h2 id={headingId}>Members</h2>
-      <OutcomeLine
-        outcome={members.error === null ? undefined : outcomeOfFailure(members.error, "read")}
-        className="mt-2"
-      />
-      <div aria-live="polite">
-        {members.isPending ? <p className="mt-2">The members are still loading.</p> : null}
-      </div>
-      {members.data === undefined ? null : <MemberList members={members.data} />}
+      <h2 id={headingId} ref={heading} tabIndex={-1}>
+        Members
+      </h2>
+      <MemberList read={members} heading={heading} />
     </section>
   );
 }

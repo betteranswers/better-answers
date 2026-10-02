@@ -946,6 +946,15 @@ to it by IRI and never restates it (ADR 0014).
   screen takes over every ticked row, and offers *Clear selection*. A tick stays through a change
   of page, search or filter, which is why the bar counts the ticked rows out of sight. Not the
   screen's *toolbar*.
+- **bulk act** — an act an Admin takes over every ticked row at once, from the *selection bar*:
+  on Members, *Change role*, *Add to group* and *Remove*. It changes every ticked row or none: if
+  any is refused, nothing lands, and the refusal names each refused person with its *refused
+  items*, shown or not. A ticked row whose change is already true is **skipped**, never refused,
+  and the outcome counts it. A set that includes the acting Admin says so before it is confirmed.
+  _Avoid_: batch action, mass edit.
+- **row menu** — the menu at the end of a list's row, its button named for whose acts these are
+  (*Acts for* Priya Shah), holding the acts on that row alone; a destructive act sits last, apart.
+  Not the *selection bar*. _Avoid_: kebab menu, overflow menu.
 - **view-state slot** — the one place the open screen writes what the acts on its toolbar must
   read, such as what a reader has ticked. It answers empty to any screen but the one that wrote it,
   and it is emptied when the reader opens another tab. _Avoid_: selection store, shared context.
