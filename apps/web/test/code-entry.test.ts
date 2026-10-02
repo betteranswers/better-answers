@@ -44,14 +44,14 @@ describe("the code a person enters", () => {
   it.each([
     ["its tries are spent", 403, "TOO_MANY_ATTEMPTS"],
     ["it has expired", 400, "OTP_EXPIRED"],
-  ])("reads a code as spent once %s", (_, status, errorCode) => {
-    expect(codeSpent({ status, errorCode })).toBe(true);
+  ])("reads a code as spent once %s", (_, status, libraryCode) => {
+    expect(codeSpent({ status, libraryCode })).toBe(true);
   });
 
   it.each([
     ["says wrong", "INVALID_OTP"],
     ["names no reason", undefined],
-  ])("keeps a code's tries when its refusal %s", (_, errorCode) => {
-    expect(codeSpent({ status: 400, errorCode })).toBe(false);
+  ])("keeps a code's tries when its refusal %s", (_, libraryCode) => {
+    expect(codeSpent({ status: 400, libraryCode })).toBe(false);
   });
 });

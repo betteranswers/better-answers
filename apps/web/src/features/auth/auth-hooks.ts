@@ -86,14 +86,14 @@ const SERVER_FAILED = 500;
 export class CodeRefused extends Error {
   readonly status: number;
   readonly waitSeconds: number | undefined;
-  readonly errorCode: string | undefined;
+  readonly libraryCode: string | undefined;
 
-  constructor(status: number, waitSeconds: number | undefined, errorCode?: string) {
+  constructor(status: number, waitSeconds: number | undefined, libraryCode?: string) {
     super(`answered ${String(status)}`);
     this.name = "CodeRefused";
     this.status = status;
     this.waitSeconds = waitSeconds;
-    this.errorCode = errorCode;
+    this.libraryCode = libraryCode;
   }
 }
 

@@ -21,20 +21,20 @@ export const sessionRemembered = (): Remembered | undefined =>
 
 const SIGNED_IN = "better-answers.signed-in";
 
-/** None where the browser has no channel between its tabs; a tab then follows on being shown. */
-const channelToOtherTabs = (): BroadcastChannel | undefined =>
+/** None where the browser has no channel between its tabs; a waiting one follows on being shown. */
+const signInChannel = (): BroadcastChannel | undefined =>
   typeof BroadcastChannel === "undefined" ? undefined : new BroadcastChannel(SIGNED_IN);
 
-/** Tells this browser's other tabs, so one waiting on its code follows the sign-in. */
+/** Tells every other browser tab, so one waiting on its code follows the sign-in. */
 export const announceTheSignIn = (): void => {
-  const channel = channelToOtherTabs();
+  const channel = signInChannel();
   channel?.postMessage(null);
   channel?.close();
 };
 
-/** A tab hears its own announcement too, so `heard` must ignore a sign-in this tab made. */
+/** A browser tab hears its own announcement too, so `heard` must ignore a sign-in made in it. */
 export const hearASignInElsewhere = (heard: () => void): (() => void) => {
-  const channel = channelToOtherTabs();
+  const channel = signInChannel();
   channel?.addEventListener("message", heard);
   return () => {
     channel?.close();
