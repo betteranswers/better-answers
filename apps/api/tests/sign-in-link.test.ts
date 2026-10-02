@@ -47,6 +47,25 @@ const signedInAs = async (client: TestClient): Promise<string | undefined> => {
   return session?.user.email;
 };
 
+/** A fresh link, with one of its address's rows rewritten behind the api's back. */
+const aLinkAfterRewriting = async (prefix: "sign-in-otp-" | "sign-in-link-", set: string) => {
+  const person = await app().person();
+  const asking = app().client();
+  const { token } = await askedFor(asking, person.email);
+  await app().database.superuser.query(`UPDATE verification SET ${set} WHERE identifier = $1`, [
+    `${prefix}${person.email.toLowerCase()}`,
+  ]);
+  return { person, asking, token };
+};
+
+/** What reading a link and then signing in with it answer. */
+const readAndSpent = async (client: TestClient, token: string) => ({
+  read: await describedAs(client, token),
+  status: (await client.json(SIGN_IN_BY_LINK, { token })).status,
+});
+
+const READS_DEAD = { read: DEAD, status: 410 };
+
 const ageTheCode = (email: string) =>
   app().database.superuser.query(
     `UPDATE verification SET expires_at = now() - interval '1 minute'
@@ -335,16 +354,12 @@ describe("signing in through a link", () => {
   });
 
   it("dies, spending no tries, once its code is replaced", async () => {
-    const person = await app().person();
-    const asking = app().client();
-    const { token } = await askedFor(asking, person.email);
-    await app().database.superuser.query(
-      "UPDATE verification SET value = 'a-newer-code-hash:0' WHERE identifier = $1",
-      [`sign-in-otp-${person.email.toLowerCase()}`],
+    const { person, asking, token } = await aLinkAfterRewriting(
+      "sign-in-otp-",
+      "value = 'a-newer-code-hash:0'",
     );
 
-    expect(await describedAs(asking, token)).toEqual(DEAD);
-    expect((await asking.json(SIGN_IN_BY_LINK, { token })).status).toBe(410);
+    expect(await readAndSpent(asking, token)).toEqual(READS_DEAD);
     expect(await triesSpentOn(person.email)).toBe("0");
   });
 
@@ -452,17 +467,12 @@ describe("signing in through a link", () => {
     ["altered", "to_jsonb('A' || (value::jsonb ->> 'sealed'))"],
     ["cut short", `'"AAAA"'::jsonb`],
   ])("is dead when its sealed contents were %s", async (_how, sealedBecomes) => {
-    const person = await app().person();
-    const asking = app().client();
-    const { token } = await askedFor(asking, person.email);
-    await app().database.superuser.query(
-      `UPDATE verification SET value = jsonb_set(value::jsonb, '{sealed}', ${sealedBecomes})::text
-        WHERE identifier = $1`,
-      [`sign-in-link-${person.email.toLowerCase()}`],
+    const { asking, token } = await aLinkAfterRewriting(
+      "sign-in-link-",
+      `value = jsonb_set(value::jsonb, '{sealed}', ${sealedBecomes})::text`,
     );
 
-    expect(await describedAs(asking, token)).toEqual(DEAD);
-    expect((await asking.json(SIGN_IN_BY_LINK, { token })).status).toBe(410);
+    expect(await readAndSpent(asking, token)).toEqual(READS_DEAD);
   });
 });
 
