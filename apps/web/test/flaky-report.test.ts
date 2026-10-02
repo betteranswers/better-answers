@@ -4,9 +4,9 @@ import { describe, expect, it } from "vitest";
 
 import { moduleAt, playwrightOver } from "./playwright-tree.ts";
 
-const flakyReportOver = (spec: string) => {
+const flakyReportOver = async (spec: string) => {
   const reporter = moduleAt("e2e/flaky-report.ts");
-  const run = playwrightOver(
+  const run = await playwrightOver(
     {
       "playwright.config.ts": `export default { testDir: ".", retries: 1, reporter: [[${reporter}]], use: { trace: "on-first-retry" } };\n`,
       "a.spec.ts": spec,
@@ -20,8 +20,8 @@ const flakyReportOver = (spec: string) => {
 };
 
 describe("the flaky report", () => {
-  it("names a test that passed only on its retry", () => {
-    const run = flakyReportOver(
+  it("names a test that passed only on its retry", async () => {
+    const run = await flakyReportOver(
       [
         'import { test } from "@playwright/test";',
         'test.describe("the checkout", () => {',
@@ -43,8 +43,8 @@ describe("the flaky report", () => {
     );
   }, 60_000);
 
-  it("names nothing when every test passes at first", () => {
-    const run = flakyReportOver(
+  it("names nothing when every test passes at first", async () => {
+    const run = await flakyReportOver(
       ['import { test } from "@playwright/test";', 'test("takes a payment", () => {});', ""].join(
         "\n",
       ),

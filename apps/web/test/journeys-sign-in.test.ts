@@ -65,26 +65,27 @@ const signsIn = (scenario, source, answers) =>
 `;
 
 describe("the journeys' sign-in", () => {
-  it("signs in through the screen, pressing Send once", () => {
-    const run = journeysOver(
-      [
+  it("signs in through the screen, pressing Send once", async () => {
+    const run = await journeysOver({
+      spec: [
         STAND_IN,
         'test("signs in", async ({ page }) => {',
+        '  playsTheRole("Admin");',
         "  const sends = await theScreen(page);",
         '  await signIn(page, ADDRESS, inboxAnswering({ answer: "code", code: CODE }));',
         "  expect(sends).toHaveLength(1);",
         "});",
         "",
       ].join("\n"),
-      { baseURL: "http://journeys.test" },
-    );
+      use: { baseURL: "http://journeys.test" },
+    });
 
     expect(run.outcome).toBe("held\n");
   }, 120_000);
 
-  it("tells what could not run from what failed", () => {
-    const run = journeysOver(
-      [
+  it("tells what could not run from what failed", async () => {
+    const run = await journeysOver({
+      spec: [
         STAND_IN,
         'signsIn("ceiling", inboxAnswering({ answer: "code", code: CODE }), { send: 429 });',
         'signsIn("challenge", inboxAnswering({ answer: "code", code: CODE }), { challenged: true });',
@@ -96,8 +97,8 @@ describe("the journeys' sign-in", () => {
         'signsIn("refused", inboxAnswering(firstCode, firstCode), {});',
         "",
       ].join("\n"),
-      { baseURL: "http://journeys.test" },
-    );
+      use: { baseURL: "http://journeys.test" },
+    });
 
     expect(run.outcome).toBe("could-not-run\n");
     expect(run.summary).toContain(

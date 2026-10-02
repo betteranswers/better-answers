@@ -26,8 +26,9 @@ export default defineConfig({
 
   // Each Send spends a ceiling the release, a rerun and the owner share.
   retries: 0,
+
+  // Alone, so no reporter prints a failure's detail, which can hold an address, to a public log.
   reporter: [
-    ["list"],
     [
       "./journeys/outcome-reporter.ts",
       {

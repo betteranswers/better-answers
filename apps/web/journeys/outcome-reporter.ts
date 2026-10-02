@@ -1,4 +1,5 @@
-import { appendFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
+import path from "node:path";
 
 import type {
   FullConfig,
@@ -22,9 +23,12 @@ type Finding = {
 
 const OUTSIDE_ANY_STEP = "outside any step";
 
+/** A timeout or a stop leaves its step unfinished, with no error and a duration of -1. */
+const endedThere = (step: TestStep): boolean => step.error !== undefined || step.duration < 0;
+
 /** A screen or an act is a `test.step`, and one may sit inside a fixture's step, as sign-in does. */
 const failingStepsOf = (steps: readonly TestStep[]): readonly string[] => {
-  const failing = steps.find((step) => step.error !== undefined);
+  const failing = steps.find(endedThere);
   if (failing === undefined) return [];
   const below = failingStepsOf(failing.steps);
   return failing.category === "test.step" ? [failing.title, ...below] : below;
@@ -51,7 +55,7 @@ const findingOf = (test: TestCase, result: TestResult): Finding => {
   };
 };
 
-/** A run that judged nothing, such as one that ran no journey, never reads as held. */
+/** Held only once a test person's journey ran, so a run of the preflight alone judges nothing. */
 const outcomeOf = (findings: readonly Finding[], everyJourneyPassed: boolean): Outcome => {
   if (findings.some((finding) => finding.outcome === "could-not-run")) return "could-not-run";
   if (findings.length > 0) return "fail";
@@ -74,15 +78,25 @@ const summaryOf = (outcome: Outcome, findings: readonly Finding[]): string => {
   const said =
     findings.length > 0
       ? tableOf(findings)
-      : [outcome === "held" ? "Every journey passed." : "No journey ran to its end."];
+      : [outcome === "held" ? "Every journey passed." : "No role journey ran to its end."];
   return ["", `### Journeys: ${outcome}`, "", ...said, ""].join("\n");
 };
 
-/** Writes the outcome word to `outcomeFile`, and the role, screen and step to the run's summary. */
+const titleOf = (test: TestCase): string =>
+  test
+    .titlePath()
+    .filter((title) => title !== "")
+    .join(" › ");
+
+/** One line a test, from its title and outcome alone, so the run's log never holds an error. */
+const lineOf = (test: TestCase, said: string): string => `  ${said}  ${titleOf(test)}\n`;
+
+/** The run's only output: the word in `outcomeFile`, the run's summary, and each test's title on stdout. */
 export default class OutcomeReporter implements Reporter {
   readonly #outcomeFile: string;
   #root: Suite | undefined;
   #passed = 0;
+  #rolesPassed = 0;
   readonly #findings: Finding[] = [];
 
   constructor(options: { readonly outcomeFile: string }) {
@@ -94,22 +108,41 @@ export default class OutcomeReporter implements Reporter {
   }
 
   onTestEnd(test: TestCase, result: TestResult): void {
-    if (result.status === "passed") this.#passed += 1;
-    else if (result.status !== "skipped") this.#findings.push(findingOf(test, result));
+    if (result.status === "skipped") {
+      process.stdout.write(lineOf(test, "skipped"));
+      return;
+    }
+    if (result.status === "passed") {
+      this.#passed += 1;
+      if (roleIn(result.annotations) !== undefined) this.#rolesPassed += 1;
+      process.stdout.write(lineOf(test, "passed"));
+      return;
+    }
+    const finding = findingOf(test, result);
+    this.#findings.push(finding);
+    process.stdout.write(lineOf(test, `${finding.outcome} at ${finding.screen} › ${finding.step}`));
+  }
+
+  onError(): void {
+    process.stdout.write(
+      "  an error fell outside every journey; run by hand with --reporter=list\n",
+    );
   }
 
   onEnd(result: FullResult): void {
     const everyJourneyPassed =
       result.status === "passed" &&
-      this.#passed > 0 &&
+      this.#rolesPassed > 0 &&
       this.#passed === this.#root?.allTests().length;
     const outcome = outcomeOf(this.#findings, everyJourneyPassed);
+    mkdirSync(path.dirname(this.#outcomeFile), { recursive: true });
     writeFileSync(this.#outcomeFile, `${outcome}\n`);
+    process.stdout.write(`\njourneys: ${outcome}\n`);
     const summary = process.env["GITHUB_STEP_SUMMARY"];
     if (summary !== undefined) appendFileSync(summary, summaryOf(outcome, this.#findings));
   }
 
   printsToStdio(): boolean {
-    return false;
+    return true;
   }
 }

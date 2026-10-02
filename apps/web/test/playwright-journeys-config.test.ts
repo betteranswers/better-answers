@@ -1,7 +1,10 @@
 // @vitest-environment node
 
+import { readFileSync } from "node:fs";
+
 import type { PlaywrightTestConfig } from "@playwright/test";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 const PUBLIC_URL = "https://app.better-answers.example";
 
@@ -70,13 +73,23 @@ describe("the journeys' configuration", () => {
     expect((await journeysConfigAt(PUBLIC_URL)).forbidOnly).toBe(true);
   });
 
-  it("hands every run to the outcome reporter", async () => {
+  it("reports through the outcome reporter alone", async () => {
     const config = await journeysConfigAt(PUBLIC_URL);
 
-    expect(config.reporter).toContainEqual([
-      "./journeys/outcome-reporter.ts",
-      { outcomeFile: expect.stringMatching(/test-results\/journeys-outcome$/) },
+    expect(config.reporter).toEqual([
+      [
+        "./journeys/outcome-reporter.ts",
+        { outcomeFile: expect.stringMatching(/test-results\/journeys-outcome$/) },
+      ],
     ]);
+  });
+
+  it("runs the journeys with Playwright's page snapshot off", () => {
+    const manifest = z
+      .object({ scripts: z.object({ journeys: z.string() }) })
+      .parse(JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")));
+
+    expect(manifest.scripts.journeys).toMatch(/^PLAYWRIGHT_NO_COPY_PROMPT=1 /);
   });
 
   it.each([undefined, "", "app.better-answers.example"])(
