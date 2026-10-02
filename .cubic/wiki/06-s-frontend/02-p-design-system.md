@@ -136,8 +136,8 @@ The design system enforces compliance with **WCAG 2.2 AA** and **GOV.UK semantic
 
 *  **Focus**: Always visible 2px `--accent-200` ring with a 1px `--accent-600` edge.
 *  **Motion**: Rationed to 80–240ms durations with a single `cubic-bezier(.2,0,.13,1)` curve. `prefers-reduced-motion` collapses durations to 1ms.
-*  **Disclosure Model ([UX1])**: Interfaces show primary info first, use one level of disclosure for details, and place actions beside the disclosure.
-*  **Latency Budget ([UX2])**: Lists must load under 1 second; actions must respond within 100ms; answers must stream.
+*  **Disclosure Model**: Interfaces show primary info first, use one level of disclosure for details, and place actions beside the disclosure.
+*  **Latency Budget**: Lists must load under 1 second; actions must respond within 100ms; answers must stream.
 Sources: [packages/design-system/readme.md:196-203](packages/design-system/readme.md#L196-L203), [CODING_RULES.md:465-485](CODING_RULES.md#L465-L485), [packages/design-system/tokens/tailwind-bridge.css:179-195](packages/design-system/tokens/tailwind-bridge.css#L179-L195)
 
 ## Iconography & Logo

@@ -9,9 +9,9 @@ __pycache__/
 .ruff_cache/
 .turbo/
 coverage/
-# A generic cache root — CI restores the redaction detector's weights here — is never
-# tracked material: every tree walker in the tag scan and the format check reads a
-# checkout's files, and a downloaded weight is neither prose nor small (PR #57 CI).
+# A generic cache root, where CI restores the redaction detector's weights, is never
+# tracked material: the format check walks a checkout's files, and a downloaded weight
+# is neither prose nor small (PR #57 CI).
 .cache/
 # `reports/mutation/` carries a slash, so git anchored it to the repository root and left
 # `apps/api/reports/` and `packages/core/reports/` tracked. Every workspace on the mutation

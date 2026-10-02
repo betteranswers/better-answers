@@ -192,6 +192,13 @@ describe("the ceiling's wrapper, run as the root manifest runs it", () => {
     expect(wrapper(OVER)).toContain(`${WORKSPACE} source: 0.50 comment lines per code line`);
   });
 
+  it("says the fix and names the rules file", () => {
+    const output = wrapper(OVER);
+
+    expect(output).toContain("over the 0.10 ceiling. A comment says only what the code cannot");
+    expect(output).toContain("so delete what it restates (the root `CODING_STANDARDS.md`).");
+  });
+
   it("passes over a tree under both ceilings", () => {
     expect(wrapper(UNDER)).toContain("under the ceiling");
   });

@@ -5,7 +5,7 @@ import { lintFlags } from "@better-answers/devtools/root-commands";
 import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
-import { tag, wordsOf } from "./fixture-text.ts";
+import { wordsOf } from "./fixture-text.ts";
 
 const COMMENT_RULES = [
   "typescript/ban-ts-comment",
@@ -126,10 +126,10 @@ describe("the one lint config refuses a comment breaking a rule", () => {
     expect(lint.flagged(inTheApi)).toEqual([FILE]);
   });
 
-  it("names the directive rule when a disable carries no reason", () => {
+  it("names the rules file when a disable carries no reason", () => {
     const output = lint.output(holding(`// oxlint-disable-next-line ${SUPPRESSIBLE}\n`, PRINTS));
 
-    expect(output).toContain(tag("COMMENT", "3"));
+    expect(output).toContain("the root `CODING_STANDARDS.md`");
   });
 
   it("refuses a 26-word comment in a root script", () => {

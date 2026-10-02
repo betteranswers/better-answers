@@ -91,7 +91,7 @@ test("offers a Viewer's home from an unknown screen, shell kept", async ({
 });
 
 for (const role of ["Editor", "Viewer"] as const) {
-  test(`shows ${aRole(role)} Ask alone, on its way (AE2)`, async ({ page, request }) => {
+  test(`shows ${aRole(role)} Ask alone, on its way`, async ({ page, request }) => {
     const home = HOMES[role];
     await signedInAs(page, request, role);
     await landedAtHome(page, role);
@@ -111,7 +111,7 @@ for (const role of ["Editor", "Viewer"] as const) {
     `);
   });
 
-  test(`shows ${aRole(role)} Members as if it never existed (AE9)`, async ({ page, request }) => {
+  test(`shows ${aRole(role)} Members as if it never existed`, async ({ page, request }) => {
     await signedInAs(page, request, role);
     await landedAtHome(page, role);
 

@@ -34,7 +34,7 @@ These are all open, as they were when the sentence lived in the constitution:
 
 The statement is not written yet. The work that writes it records the date it shipped and the claim it made.
 
-The reason stays in the accessibility rule, `[A11Y1]` in `apps/web/CODING_STANDARDS.md`: the buyers are UK public bodies for whom this is law, and the first client states it of its own products. That reason justifies the whole rule, so it is quoted here and not moved. The rule also keeps the WCAG 2.2 AA bar, the acceptance line and the component semantics. The axe check runs in the browser suite.
+The reason stays in the accessibility rule, *Meet WCAG 2.2 AA, tested with a keyboard and a screen reader*, in `apps/web/CODING_STANDARDS.md`: the buyers are UK public bodies for whom this is law, and the first client states it of its own products. That reason justifies the whole rule, so it is quoted here and not moved. The rule also keeps the WCAG 2.2 AA bar, the acceptance line and the component semantics. The axe check runs in the browser suite.
 
 The decision predates this record and was moved out of the accessibility rule unchanged.
 

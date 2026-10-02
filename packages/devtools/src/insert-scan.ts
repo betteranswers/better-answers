@@ -71,7 +71,7 @@ export const rawInsertsIn = (file: string, source: string): readonly RawInsert[]
     .split("\n")
     .flatMap((text, index) => (RAW_INSERT.test(text) ? [{ file, line: index + 1 }] : []));
 
-const RULE = "[TEST4]";
+const RULES_FILE = "the root `CODING_STANDARDS.md`";
 
 export const reportOf = (found: RawInsert): string =>
-  `${found.file}:${String(found.line)}: a raw \`INSERT\` outside a factory module; move it into one of the modules ${WHERE_THE_LIST_LIVES} names (${RULE}).`;
+  `${found.file}:${String(found.line)}: a raw \`INSERT\` outside a factory module; move it into one of the modules ${WHERE_THE_LIST_LIVES} names (${RULES_FILE}).`;

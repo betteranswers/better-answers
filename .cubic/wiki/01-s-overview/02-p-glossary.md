@@ -13,7 +13,6 @@ The following files were used as context for generating this wiki page:
 - [CODING_RULES.md](CODING_RULES.md)
 - [apps/docs-site/specs/T-022.md](apps/docs-site/specs/T-022.md)
 - [apps/docs-site/specs/T-006.md](apps/docs-site/specs/T-006.md)
-- [apps/api/tests/coding-rules-tags.test.ts](apps/api/tests/coding-rules-tags.test.ts)
 </details>
 
 # Domain Glossary

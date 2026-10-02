@@ -4,7 +4,7 @@ import { pluginConfigFor, readOxlintConfig } from "@better-answers/devtools/oxli
 import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
-import { tag } from "./fixture-text.ts";
+const RULES_FILE = "the root `CODING_STANDARDS.md`";
 
 const RULE = "eslint-js/no-restricted-syntax";
 
@@ -32,12 +32,11 @@ const lint = oxlintOver(pluginConfigFor({ [RULE]: setting }), {
 
 describe("the syntax the lint refuses, with what to write instead", () => {
   it.each([
-    ["`in` over an upper-case table", IN_TABLE, "Object.hasOwn", tag("TYPES", "10")],
+    ["`in` over an upper-case table", IN_TABLE, "Object.hasOwn"],
     [
       "a `for…in` loop",
       holding("  for (const name in refusals) return name;\n  return key;"),
       "for…of",
-      tag("TYPES", "10"),
     ],
     [
       "a labelled statement",
@@ -45,27 +44,19 @@ describe("the syntax the lint refuses, with what to write instead", () => {
         "  outer: for (const name of [key]) {\n    if (name) break outer;\n  }\n  return key;",
       ),
       "return from it",
-      tag("DESIGN", "7"),
     ],
+    ["a list written inside `z.enum`", parsing('  return z.enum(["a", "b"]);'), "as const"],
     [
-      "a list written inside `z.enum`",
-      parsing('  return z.enum(["a", "b"]);'),
-      "as const",
-      tag("TYPES", "3"),
-    ],
-    [
-      "an `as const` list inside `z.enum`",
+      "a const-asserted list inside `z.enum`",
       parsing('  return z.enum(["a", "b"] as const);'),
       "as const",
-      tag("TYPES", "3"),
     ],
     [
       "a `satisfies` list inside `z.enum`",
       parsing('  return z.enum(["a", "b"] satisfies readonly string[]);'),
       "as const",
-      tag("TYPES", "3"),
     ],
-  ])("refuses %s, naming its rule", (_shape, tree, instead, rule) => {
+  ])("refuses %s, naming its rules file", (_shape, tree, instead) => {
     const findings = lint
       .output(tree)
       .split("\n")
@@ -74,7 +65,7 @@ describe("the syntax the lint refuses, with what to write instead", () => {
     expect(findings).toHaveLength(1);
     expect(findings[0]).toContain("eslint-js(no-restricted-syntax)");
     expect(findings[0]).toContain(instead);
-    expect(findings[0]).toContain(rule);
+    expect(findings[0]).toContain(RULES_FILE);
   });
 
   it.each([

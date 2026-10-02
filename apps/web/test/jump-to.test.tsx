@@ -131,7 +131,7 @@ describe("what jump-to lists", () => {
     expect(to[INVITE_A_PERSON.name]).toBe("/people/members?act=invite");
   });
 
-  it("AE3: leads a member to their page from anywhere", () => {
+  it("leads a member to their page from anywhere", () => {
     const narrowed = {
       pathname: "/people/members",
       searchStr: "?members.role=Viewer&members.page=3&invitations.search=ops",
@@ -195,7 +195,7 @@ describe("choosing Invite a person in the app", () => {
 });
 
 describe("what typing leaves", () => {
-  it("finds no People screen for a Viewer typing people (AE4)", () => {
+  it("finds no People screen for a Viewer typing people", () => {
     expect(matching(jumpsIn(treeOf("Viewer"), undefined, AT_ROOT), "people")).toEqual([]);
   });
 
@@ -205,7 +205,7 @@ describe("what typing leaves", () => {
     ]);
   });
 
-  it("finds Invite a person by its first word (AE4)", () => {
+  it("finds Invite a person by its first word", () => {
     expect(outline(matching(jumpsIn(treeOf("Admin"), [PRIYA], AT_ROOT), "invite"))).toEqual([
       [JUMP_TO.groups.acts, [INVITE_A_PERSON.name]],
     ]);

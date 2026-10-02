@@ -109,7 +109,7 @@ const typed = async (page: Page, words: string) => {
   await inputOf(page).fill(words);
 };
 
-test("hides People from a Viewer, reading no members (AE4)", async ({ page, request }) => {
+test("hides People from a Viewer, reading no members", async ({ page, request }) => {
   await aMemberSignedInAt(page, request, "Viewer", ASK.home.path);
   const membersReads: string[] = [];
   page.on("request", (sent) => {
@@ -127,7 +127,7 @@ test("hides People from a Viewer, reading no members (AE4)", async ({ page, requ
   expect(membersReads, "a Viewer's jump-to asked for the members").toEqual([]);
 });
 
-test("opens the invite act on Members for an Admin (AE4)", async ({ page, request }) => {
+test("opens the invite act on Members for an Admin", async ({ page, request }) => {
   await anAdminWithATeam(page, request, "Calder Joinery");
 
   await opened(page, "Meta+k");
@@ -181,7 +181,7 @@ test("opens on either chord anywhere, Escape handing focus back", async ({ page,
 const memberPageNaming = (page: Page, name: string) =>
   page.getByRole("main").getByRole("heading", { level: 2, name, exact: true });
 
-test("AE3: lands an Admin on the member they chose", async ({ page, request }) => {
+test("lands an Admin on the member they chose", async ({ page, request }) => {
   const team = await anAdminWithATeam(page, request, "Swaledale Ironworks");
 
   await opened(page, "Meta+k");

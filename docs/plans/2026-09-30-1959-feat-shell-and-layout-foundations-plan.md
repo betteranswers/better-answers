@@ -198,7 +198,7 @@ This plan covers the shell and layout foundations. The breakdown below is the cu
 - KTD6. **Only the open tab's value is lifted above the band.** The tabs root and its view-state slot stay around the toolbar and screen. The tab root renders a different element for tabbed and untabbed screens, so wrapping the frame in it would remount the band, rail and nav on every such move and lose focus. The tabs root writes the picked tab into a frame-level context, and the breadcrumb reads it. Tabs get no address. The tab is the breadcrumb's last part and is not a link. Covers R6.
 - KTD7. **Keystrokes register through a shell context in `shared/`, which owns `?` and the keystrokes list at every width.** Views declare their keystrokes to that context instead of placing a Keyboard shortcuts button among their acts. The trigger sits in the rail's bottom group when wide. Below the breakpoint the rail lives inside the sheet, a dialog that the keystroke hook ignores, so the trigger sits in the band's narrow form instead. A registration context is chosen over route static data because Members' list depends on its open tab. A screen that registers nothing still shows the trigger, which says the screen has no keystrokes. Covers R13, R15.
 - KTD8. **⌘K is the installed command dialog with its own key listener.** The shared keystroke hook refuses modifier keys, so ⌘K binds its own. Items come from the visibility function, from the members list (read when the dialog opens, Admins only), and from acts the navigation list declares. "Invite a person" navigates to Members with a search parameter the invite act reads to open itself. The members read reuses the Members list's query, so a cached list shows at once, and a person who may not see People sends no members read. The dialog carries its own outcome line between the input and the list, because the dialog hides the band from screen readers. The "nothing matches" line appears only once every group has finished loading. It is budgeted as a list under ADR 0037's one-second budget. Covers R7.
-- KTD9. **The switcher uses the auth feature's hooks.** It reads the organisation list and sets the active one through `features/auth`, as [WEB2] requires. After a switch succeeds it clears every workspace-scoped query and goes to the new workspace's home. A failed switch leaves the current screen and its queries as they were. "All workspaces" goes to `/choose-workspace`, and Console appears for the operator. The band has one standing outcome line, a full-width row inside the header, empty and hidden until used, for the switcher's pending and failed states. It follows the GOV.UK notification-banner pattern [A11Y1] names, and is never a toast. Its words reuse the picker's (`PICKER_WORDS`, `WORKSPACES_UNREAD`, `PICK_REFUSED`, `noLongerAMember`). Covers R5.
+- KTD9. **The switcher uses the auth feature's hooks.** It reads the organisation list and sets the active one through `features/auth`, as the rule *Name Better Auth in one directory* requires. After a switch succeeds it clears every workspace-scoped query and goes to the new workspace's home. A failed switch leaves the current screen and its queries as they were. "All workspaces" goes to `/choose-workspace`, and Console appears for the operator. The band has one standing outcome line, a full-width row inside the header, empty and hidden until used, for the switcher's pending and failed states. It follows the GOV.UK notification-banner pattern named in the rule *Meet WCAG 2.2 AA, tested with a keyboard and a screen reader*, and is never a toast. Its words reuse the picker's (`PICKER_WORDS`, `WORKSPACES_UNREAD`, `PICK_REFUSED`, `noLongerAMember`). Covers R5.
 - KTD10. **The width rule lives in the shell and the design system.** The screen's wrapper takes the page maximum. The design system adds a base rule giving paragraphs and headings inside a screen the prose measure. The three off-token `max-w-prose` uses are retired. Covers R14.
 - KTD11. **The logo is one SVG in the design system's assets, exported by the package.** The web client imports it for the band, the auth screens and the tab icon. The api's server-rendered pages inline the same SVG, so the api declares the design system as a dependency and its runtime image carries the package. Today the image carries only `packages/core` and `packages/schema`. Covers R16.
 - KTD12. **The name lives in one word table per code path.** The web client's `PRODUCT_NAME` feeds screens, the tab title and the specs, which read it rather than pin it (T-441). The api holds its own constant for its pages and emails. Covers R17.
@@ -260,7 +260,7 @@ flowchart LR
   U8 --> U9
 ```
 
-U1 settles the words before code names them ([GLOSSARY1]). U3 (design system) and U8 (name) can run beside U2.
+U1 settles the words before code names them. U3 (design system) and U8 (name) can run beside U2.
 
 ### Risks
 
@@ -404,7 +404,7 @@ U1 settles the words before code names them ([GLOSSARY1]). U3 (design system) an
   - At 320px, for an Admin on People › Members with Invitations open and a 60-character workspace name, the breadcrumb row lists Control Centre, People, Members and Invitations with nothing clipped. The last part carries `aria-current="page"`, and `documentElement.scrollWidth` is at most 320.
   - At 320×256, tabbing from the top of the page to the last member row runs through the band's first-row controls, the breadcrumb links, the toolbar and the screen. No focused element's box overlaps the band's.
   - Covers AE6. At 1440px an invitation address of 40 characters sits on one line, and the screen's description paragraph is no wider than the prose measure.
-  - A view that throws leaves the band, rail, nav and landmarks standing ([WEB5]).
+  - A view that throws leaves the band, rail, nav and landmarks standing.
   - The accessibility gate passes with the nav open, with it closed, and with the sheet open.
   - Console draws in the same frame: its rail holds its screens, and its band shows "Console" in place of a workspace.
 - **Verification:** `apps/web` check passes, including the browser suite. The dogfood report's scenarios 1 to 3 and 7 to 9 pass on a re-walk.
@@ -486,7 +486,7 @@ U1 settles the words before code names them ([GLOSSARY1]). U3 (design system) an
   - On Ask's "on its way" home and on the not-found screen, the trigger and `?` both say the screen has no keystrokes.
   - The switch that turns single-key keystrokes off still works from the shell's list.
   - The sign-in screen still has its own Keyboard shortcuts.
-- **Verification:** the specs pass, and the [UX2] rule holds on every built screen.
+- **Verification:** the specs pass, and the rule *Give every common action a keystroke* holds on every built screen.
 
 ### U8. The name `better-answers` across web and api
 
@@ -534,7 +534,7 @@ U1 settles the words before code names them ([GLOSSARY1]). U3 (design system) an
 | Api | `pnpm check:api` | auth pages, emails and the avoid-words test (U8) |
 | Gates | `pnpm check:gates` | format, lint (layering, react-doctor, comment rules), jscpd and knip |
 | Docs | `pnpm check:docs` | ADR and glossary format and the avoid-words test (U1, U3, U9) |
-| Mutation | the api's mutation workflow on the pull request | changed api strings are asserted ([TEST6]) |
+| Mutation | the api's mutation workflow on the pull request | changed api strings are asserted (*Triage the nightly mutation summary, never the score*) |
 
 Each browser spec that proves a screen's behaviour asserts its ADR 0037 budget.
 

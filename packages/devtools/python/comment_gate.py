@@ -3,14 +3,13 @@ from __future__ import annotations
 
 import ast
 import io
-import json
 import re
 import sys
 import token
 import tokenize
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import NamedTuple
 
 from citations import citation_in
 
@@ -57,30 +56,32 @@ MARKER = re.compile(r"(?:^|\s)#+")
 TOO_LONG = (
     "{path}:{line}: this comment runs to {words} words; a comment says only what the "
     "code cannot — a constraint, a trade-off, a trap — in {limit} at most "
-    "([COMMENT1]). Delete what the code already says."
+    "(the root `CODING_STANDARDS.md`). Delete what the code already says."
 )
 
 REASON_TOO_LONG = (
     "{path}:{line}: this directive's reason runs to {words} words, and a reason counts "
-    "against the comment cap of {limit} ([COMMENT3]). Say the constraint alone."
+    "against the comment cap of {limit} (the root `CODING_STANDARDS.md`). Say the "
+    "constraint alone."
 )
 
 DOCSTRING_TOO_LONG = (
     "{path}:{line}: this docstring runs to {words} words; a public function's "
     "docstring says only what its signature cannot — units, ranges, what None means, "
-    "a side effect, a refusal — in {limit} at most ([COMMENT1]). Delete the rest."
+    "a side effect, a refusal — in {limit} at most (the root `CODING_STANDARDS.md`). "
+    "Delete the rest."
 )
 
 CITES = (
     "{path}:{line}: this comment cites {what} (`{cited}`); a comment never says which "
-    "ticket, decision or rule asked for the code ([COMMENT1]). git, a spec and an ADR "
-    "are where that is read."
+    "ticket, decision or rule asked for the code (the root `CODING_STANDARDS.md`). "
+    "git, a spec and an ADR are where that is read."
 )
 
 STRING_CITES = (
     "{path}:{line}: this string cites {what} (`{cited}`); a string that reaches a "
     "person names what they can act on, never a document they cannot open from where "
-    "they read it ([COMMENT1]). Say the thing instead."
+    "they read it (the root `CODING_STANDARDS.md`). Say the thing instead."
 )
 
 
@@ -98,16 +99,6 @@ A_TEST_PATH = re.compile(r"(?:^|/)(?:tests?|e2e)/|(?:^|/)(?:test_[^/]*|conftest)
 A_WORKER_MODULE = re.compile(r"(?:^|/)apps/worker/src/")
 
 A_SPACE = re.compile(r"\s")
-
-GATES = Path(__file__).resolve().parents[1] / "gates-printing-a-tag.json"
-
-
-def _gates_printing_a_tag() -> tuple[str, ...]:
-    fixture: Any = json.loads(GATES.read_text(encoding="utf8"))
-    return tuple(str(gate) for gate in fixture["gates"])
-
-
-PRINTS_A_TAG = _gates_printing_a_tag()
 
 
 NEVER_WALKED = frozenset(
@@ -233,10 +224,7 @@ def _strings(tree: ast.Module) -> list[tuple[int, str]]:
 
 
 def _strings_go_unread(path: Path) -> bool:
-    text = path.as_posix()
-    return bool(A_TEST_PATH.search(text)) or any(
-        text == gate or text.endswith(f"/{gate}") for gate in PRINTS_A_TAG
-    )
+    return A_TEST_PATH.search(path.as_posix()) is not None
 
 
 def _string_findings(path: Path, tree: ast.Module) -> list[str]:

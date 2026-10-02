@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { runsOverThrowawayTree } from "@better-answers/devtools/throwaway-tree";
 import type { Tool, Tree } from "@better-answers/devtools/throwaway-tree";
 
-import { tag, wordsOf } from "./fixture-text.ts";
+import { wordsOf } from "./fixture-text.ts";
 
 const FILE = "probe.py";
 
@@ -42,11 +42,11 @@ const findings = (tree: Tree): readonly string[] =>
     .filter((line) => line !== "");
 
 describe("the Python check fires on a long or citing comment", () => {
-  it("refuses a comment over the ceiling, naming count and rule", () => {
+  it("refuses a long comment, naming its count and rules file", () => {
     const output = run(holding(TOO_LONG));
 
     expect(output).toContain("runs to 29 words");
-    expect(output).toContain(tag("COMMENT", "1"));
+    expect(output).toContain("the root `CODING_STANDARDS.md`");
   });
 
   it("counts a docstring as a comment, unlike any ruff rule", () => {
@@ -66,11 +66,8 @@ describe("the Python check fires on a long or citing comment", () => {
   it.each([
     ["a ticket id", "# Kept because the claim protocol changed under T-243.\n"],
     ["an ADR number", "# Kept because the graph is Postgres under ADR 0021.\n"],
-    ["a rule tag", `# Kept because a raw insert lives in a factory (${tag("TEST", "4")}).\n`],
-    [
-      "a tag from a digit-bearing family",
-      `# Kept because the outcome is announced (${tag("A11Y", "1")}).\n`,
-    ],
+    ["a rule tag", "# Kept because a raw insert lives in a factory ([TEST4]).\n"],
+    ["a tag from a digit-bearing family", "# Kept because the outcome is announced ([A11Y1]).\n"],
     ["an ISO date", "# Kept because the reading of the registry moved on 2026-09-21.\n"],
     ["a slashed date", "# Kept because the reading of the registry moved on 21/09/2026.\n"],
   ])("refuses a comment citing %s", (_what, comment) => {
@@ -162,11 +159,11 @@ describe("a directive's reason counts against the twenty-five words", () => {
   it.each([
     ["a noqa", "import os  # noqa: F401"],
     ["a type-checker escape", "KEEP: int = 1  # type: ignore[assignment]"],
-  ])("refuses %s's twenty-six-word reason, naming the directive rule", (_what, line) => {
+  ])("refuses %s's twenty-six-word reason, naming its rules file", (_what, line) => {
     const output = run({ [FILE]: `${line}  # ${wordsOf(26)}\n` });
 
     expect(output).toContain("reason runs to 26 words");
-    expect(output).toContain(tag("COMMENT", "3"));
+    expect(output).toContain("the root `CODING_STANDARDS.md`");
   });
 
   it("counts a reason apart from the comment above it", () => {
@@ -305,9 +302,7 @@ describe("the Python check refuses a citation a reader cannot open", () => {
   });
 
   it("refuses a rule tag in a string too", () => {
-    expect(findings(saying(`A raw insert lives in a factory (${tag("TEST", "4")}).`))).toHaveLength(
-      1,
-    );
+    expect(findings(saying("A raw insert lives in a factory ([TEST4])."))).toHaveLength(1);
   });
 
   it("counts a docstring citing a ticket once, not twice", () => {
@@ -328,12 +323,13 @@ describe("the Python check refuses a citation a reader cannot open", () => {
     expect(findings(inATest)).toEqual([]);
   });
 
-  it("walks past the same string in the tag-printing gate", () => {
+  it("refuses the same string in a gate's own source", () => {
     const inAGate = {
-      "packages/devtools/python/comment_gate.py": `SAID = "A raw insert lives in a factory (${tag("TEST", "4")})."\n`,
+      "packages/devtools/python/comment_gate.py":
+        'SAID = "A raw insert lives in a factory ([TEST4])."\n',
     };
 
-    expect(findings(inAGate)).toEqual([]);
+    expect(findings(inAGate)).toHaveLength(1);
   });
 });
 

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { pluginConfigFor } from "@better-answers/devtools/oxlint-config";
 import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 
-import { tag, wordsOf } from "./fixture-text.ts";
+import { wordsOf } from "./fixture-text.ts";
 import { fixedByOxlint } from "./oxlint-fix.ts";
 
 const DOC_BLOCK_RULE = "better-answers/declaration-doc-block";
@@ -23,11 +23,11 @@ const whyLint = oxlintOver(pluginConfigFor({ [WHY_RULE]: "error" }), {
 });
 
 describe("the doc-block rule fires on a declaration's line comment", () => {
-  it("names the form to write and the rule it holds", () => {
+  it("names the form to write and its rules file", () => {
     const output = docBlockLint.output(holding("// Kept short.\nexport const keep = 1;\n"));
 
     expect(output).toContain("`/** */`");
-    expect(output).toContain(tag("COMMENT", "1"));
+    expect(output).toContain("the root `CODING_STANDARDS.md`");
     expect(output).toContain("better-answers(declaration-doc-block)");
   });
 

@@ -8,9 +8,6 @@ import pytest
 
 CONFTEST = Path(__file__).with_name("conftest.py")
 
-# In two halves, so the tag scan does not read a fixture as a citation.
-TAG = "[" + "TEST5]"
-
 ELEVEN = "_".join(f"word{index}" for index in range(1, 12))
 
 TEN = "_".join(f"word{index}" for index in range(1, 11))
@@ -58,7 +55,7 @@ def run_over_a_tree(tmp_path_factory: pytest.TempPathFactory) -> str:
 
 def test_errors_an_eleven_word_name_under_its_own_name(outcomes: str) -> None:
     assert f"ERROR test_titles.py::test_{ELEVEN} - Failed" in outcomes
-    assert f"{TAG}: `test_{ELEVEN}` runs to 11" in outcomes
+    assert f"(the root `CODING_STANDARDS.md`): `test_{ELEVEN}` runs to 11" in outcomes
 
 
 def test_passes_a_ten_word_name(outcomes: str) -> None:

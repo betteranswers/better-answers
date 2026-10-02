@@ -746,7 +746,7 @@ describe("the invitations by status", () => {
     ]);
   });
 
-  it("AE6: lists an eight-day-old invitation as Expired, not Waiting", async () => {
+  it("lists an eight-day-old invitation as Expired, not Waiting", async () => {
     const workspace = await provisionedWorkspace(db(), "EightDays");
     const sent = answeredValue(await invite(workspace, addressOf("late"), "Viewer"));
     const eightDaysOn = new Date("2031-06-23T09:30:00.000Z");

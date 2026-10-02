@@ -156,5 +156,5 @@ With the sort, both acts want the same first key. One inserts it, and the other'
 - [Mutation triage](../../agents/mutation-triage.md): the probe and the controls both ways that turned the survivor into a verified kill. This learning is a second survivor shape beside the one its closing paragraph names: a race that cannot interleave.
 - [ADR 0043, what an act is](../architecture-patterns/adr-0043-what-an-act-is.md): an act counts a ceiling inside its own transaction, which is why two crossing sends contend on the counter rows at all.
 - [The People layout rework plan](../../plans/2026-10-01-1807-feat-people-layout-rework-plan.md), KTD2: a bulk act runs in one transaction, every deadlock maps to `changed-meanwhile`, and a per-act lock order avoids the further deadlocks a mixed order would add.
-- `CODING_STANDARDS.md` [TEST6] (a survivor the nightly summary newly names is a task) and [TEST8] (assert a provoked transaction's outcome before any value; the new test asserts each answer's `ok` before the counter).
+- `CODING_STANDARDS.md`: *Triage the nightly mutation summary, never the score* (a survivor the nightly summary newly names is a task) and *Assert a provoked transaction's outcome before any value* (the new test asserts each answer's `ok` before the counter).
 - PR #511, which adds `released` and the new test.

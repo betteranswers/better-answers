@@ -162,9 +162,9 @@ Three of the suites read documents as well, so the docs lane runs them through
 ## `lint-rules/` — the `better-answers` oxlint plugin
 
 The repository's own rules: the ones that hold a rule in `CODING_STANDARDS.md` or an ADR rather
-than a generic hygiene pattern. Loaded by `.oxlintrc.json` as a `jsPlugins` specifier. Each
-rule carries its rule line in the message it prints and lands with a functional test through
-the runner.
+than a generic hygiene pattern. Loaded by `.oxlintrc.json` as a `jsPlugins` specifier. A rule
+whose line lives in the root `CODING_STANDARDS.md` names that file in the message it prints.
+Each rule lands with a functional test through the runner.
 
 Three rules today. The two MCP entry rules hold ADR 0018's line at the declaration and are
 run by `apps/api/tests/lint-rules.test.ts`. `import-direction` holds all five of ADR 0029's
@@ -208,10 +208,8 @@ the doc block would close early.
 `string-cites-nothing` reads the strings in source. A usage line, a refusal message or a log
 line sends its reader somewhere just as a comment does. A string with no space in it is a value
 — an identifier, a path, a key, a version — and goes past. A string has no word cap, because a
-usage text is long by design. A test is exempt, and so is a gate that prints its own rule tag in
-a failure message. Those files are named in `gates-printing-a-tag.json` beside this README. The
-string rule reads it through `src/tag-printing-gates.ts`, and the Python check and the tag test
-read it directly, so a new gate is one edit.
+usage text is long by design. A test file is exempt in both tiers. Every other file is read, a
+gate's own source included.
 
 The Python check reads `.py` files and nothing else: its comments, grouped into blocks of
 touching lines, and its docstrings. A docstring on a public module-level function under
@@ -301,8 +299,8 @@ both ruff configs, and fails any `C901` entry in the worker's `per-file-ignores`
 oxlint's `vitest/valid-title` refuses a `describe`, `it` or `test` title of 11 words or more,
 and one that says "should". One `mustNotMatch` pattern holds both. The rule's
 `disallowedWords` option is left unset: at oxlint 1.85, setting it skips every check after it,
-the pattern included. The pattern's message prints the rule's tag, so `.oxlintrc.json` is
-named in `gates-printing-a-tag.json`. No file is exempt from it.
+the pattern included. The pattern's message states the rule in words and names the root
+`CODING_STANDARDS.md`. No file is exempt from it.
 
 `test/test-titles.test.ts` runs oxlint over a throwaway tree at the root config's setting. An
 11-word title and a title with "should" are refused, and a 10-word title is accepted. It and

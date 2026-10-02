@@ -325,7 +325,7 @@ test.describe("the People screen's Invitations tab", () => {
     expect(await emailsSentTo(request, other), "a refused send sent nothing").toBe(0);
   });
 
-  test("names an invalid address inline and sends nothing (AE5)", async ({ page, request }) => {
+  test("names an invalid address inline and sends nothing", async ({ page, request }) => {
     await anAdminAtInvitations(page, request, "Ure Mill Fittings");
     await openInvitations(page);
     const ana = anAddress("ana");
@@ -423,7 +423,7 @@ test.describe("the People screen's Invitations tab", () => {
     await countedUnder(page, "waiting", 51);
   });
 
-  test("shows an eight-day-old invitation under Expired, not Waiting (AE6)", async ({
+  test("shows an eight-day-old invitation under Expired, not Waiting", async ({
     page,
     request,
   }) => {
@@ -443,7 +443,7 @@ test.describe("the People screen's Invitations tab", () => {
     await expect(page).toHaveURL(/invitations\.status=expired/);
   });
 
-  test("folds two spellings of one address into one email (AE10)", async ({ page, request }) => {
+  test("folds two spellings of one address into one email", async ({ page, request }) => {
     await anAdminAtInvitations(page, request, "Wensley Forge");
     await openInvitations(page);
     const ana = anAddress("ana");

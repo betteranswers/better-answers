@@ -63,75 +63,93 @@ const lint = oxlintOver(pluginConfigFor({ [RULE]: severity }), {
   flagged: [SLICE],
 });
 
-describe("the rule fires, naming the ADR 0029 rule it holds", () => {
-  it.each([
-    ["5", "a slice importing hono", SLICE, "hono"],
-    ["5", "a slice importing a hono subpath", SLICE, "hono/streaming"],
-    ["5", "a slice importing the node adapter", SLICE, "@hono/node-server"],
-    ["5", "a slice importing trpc", SLICE, "@trpc/server"],
-    ["5", "a slice importing the MCP v2 server", SLICE, "@modelcontextprotocol/server"],
-    ["5", "a slice importing the MCP v1 sdk", SLICE, "@modelcontextprotocol/sdk"],
-    ["5", "a slice importing better-auth", SLICE, "better-auth"],
-    ["5", "a slice importing a better-auth plugin", SLICE, "@better-auth/oauth-provider"],
-    ["5", "a slice importing node:http", SLICE, "node:http"],
-    ["5", "a slice importing node:http2", SLICE, "node:http2"],
-    ["5", "a slice importing node:https", SLICE, "node:https"],
-    ["5", "a test importing hono", TEST, "hono"],
-    ["5", "a package-root file importing hono", ROOT_FILE, "hono"],
+const INTERNAL = "only through its own index.ts";
 
-    ["4", "a slice reaching a sibling's internal file", SLICE, "../guides/renderer.ts"],
-    ["4", "a slice reaching a sibling's extensionless internal", SLICE, "../guides/renderer"],
-    ["4", "a slice reaching a door's internal file", SLICE, "../store/postgres/handle.ts"],
-    ["4", "a slice detouring to a sibling's internal", SLICE, "../concepts/../guides/renderer.ts"],
-    ["4", "a slice subdirectory reaching a sibling's internal", NESTED, "../../concepts/inbox.ts"],
-    ["4", "a door reaching kernel's internal", GRAPH_DOOR, "../../kernel/actor.ts"],
-    ["4", "the graph door reaching access's internal", GRAPH_DOOR, "../../access/predicate.ts"],
-    ["4", "a test reaching a slice's internal", TEST, "../src/concepts/file.ts"],
+/** Each clause as the rule prints it, with the imports that break it. */
+const REFUSED: Readonly<Record<string, readonly (readonly [string, string, string])[]>> = {
+  "packages/core is transport-agnostic": [
+    ["a slice importing hono", SLICE, "hono"],
+    ["a slice importing a hono subpath", SLICE, "hono/streaming"],
+    ["a slice importing the node adapter", SLICE, "@hono/node-server"],
+    ["a slice importing trpc", SLICE, "@trpc/server"],
+    ["a slice importing the MCP v2 server", SLICE, "@modelcontextprotocol/server"],
+    ["a slice importing the MCP v1 sdk", SLICE, "@modelcontextprotocol/sdk"],
+    ["a slice importing better-auth", SLICE, "better-auth"],
+    ["a slice importing a better-auth plugin", SLICE, "@better-auth/oauth-provider"],
+    ["a slice importing node:http", SLICE, "node:http"],
+    ["a slice importing node:http2", SLICE, "node:http2"],
+    ["a slice importing node:https", SLICE, "node:https"],
+    ["a test importing hono", TEST, "hono"],
+    ["a package-root file importing hono", ROOT_FILE, "hono"],
+  ],
+  [INTERNAL]: [
+    ["a slice reaching a sibling's internal file", SLICE, "../guides/renderer.ts"],
+    ["a slice reaching a sibling's extensionless internal", SLICE, "../guides/renderer"],
+    ["a slice reaching a door's internal file", SLICE, "../store/postgres/handle.ts"],
+    ["a slice detouring to a sibling's internal", SLICE, "../concepts/../guides/renderer.ts"],
+    ["a slice subdirectory reaching a sibling's internal", NESTED, "../../concepts/inbox.ts"],
+    ["a door reaching kernel's internal", GRAPH_DOOR, "../../kernel/actor.ts"],
+    ["the graph door reaching access's internal", GRAPH_DOOR, "../../access/predicate.ts"],
+    ["a test reaching a slice's internal", TEST, "../src/concepts/file.ts"],
     [
-      "4",
       "a self-reference to a sibling's internal file",
       SLICE,
       "@better-answers/core/guides/renderer.ts",
     ],
+    ["a slice reaching a sibling's nested face", SLICE, "../guides/internal/index.ts"],
+  ],
+  "is a face packages/core's exports map does not name": [
+    ["a slice reaching an unmapped face", SLICE, "../store/objects/index.ts"],
+    ["a slice reaching an unmapped sibling", SLICE, "../sources/index.ts"],
+    ["a slice reaching an unmapped directory", SLICE, "../sources"],
+    ["a test reaching an unmapped face", TEST, "../src/store/objects/index.ts"],
+    ["a self-reference to an unmapped entry", SLICE, "@better-answers/core/sources"],
+  ],
+  "only a test reaches it": [
+    ["a slice importing erasure's face", SLICE, "../erasure/index.ts"],
+    ["a slice importing erasure by its directory", SLICE, "../erasure"],
+    ["a slice importing erasure's internal", SLICE, "../erasure/replay.ts"],
+    ["a slice importing erasure by self-reference", SLICE, "@better-answers/core/erasure"],
+  ],
+  "kernel imports nothing else in core": [
+    ["kernel importing a slice's face", KERNEL, "../concepts/index.ts"],
+    ["kernel importing a slice's internal", KERNEL, "../concepts/inbox.ts"],
+    ["kernel importing access's face", KERNEL, "../access/index.ts"],
+    ["kernel importing a door's face", KERNEL, "../store/postgres/index.ts"],
+    ["kernel importing a layer's face", KERNEL, "../audit/index.ts"],
+  ],
+  "access imports only kernel": [
+    ["access importing a door's face", ACCESS, "../store/postgres/index.ts"],
+    ["access importing a slice's face", ACCESS, "../concepts/index.ts"],
+  ],
+  "a store door imports only kernel, and store/graph alone also imports access": [
+    ["the postgres door importing access", POSTGRES_DOOR, "../../access/index.ts"],
+    ["the graph door importing a slice's face", GRAPH_DOOR, "../../concepts/index.ts"],
+    ["the graph door importing a layer's face", GRAPH_DOOR, "../../audit/index.ts"],
+    ["a door importing another door", GRAPH_DOOR, "../postgres/index.ts"],
+    ["a door importing the store barrel", POSTGRES_DOOR, "../index.ts"],
+    ["the store barrel importing a door", STORE_BARREL, "./postgres/index.ts"],
+  ],
+  "llm and audit import kernel, access and the doors": [
+    ["audit importing llm", AUDIT, "../llm/index.ts"],
+    ["llm importing audit", LLM, "../audit/index.ts"],
+    ["llm importing a slice's face", LLM, "../concepts/index.ts"],
+    ["audit importing a slice by self-reference", AUDIT, "@better-answers/core/concepts"],
+    ["a layer importing erasure", LLM, "../erasure/index.ts"],
+  ],
+};
 
-    ["4", "a slice reaching an unmapped face", SLICE, "../store/objects/index.ts"],
-    ["4", "a slice reaching an unmapped sibling", SLICE, "../sources/index.ts"],
-    ["4", "a slice reaching an unmapped directory", SLICE, "../sources"],
-    ["4", "a slice reaching a sibling's nested face", SLICE, "../guides/internal/index.ts"],
-    ["4", "a test reaching an unmapped face", TEST, "../src/store/objects/index.ts"],
-    ["4", "a self-reference to an unmapped entry", SLICE, "@better-answers/core/sources"],
+const REFUSALS = Object.entries(REFUSED).flatMap(([clause, cases]) =>
+  cases.map(([title, file, specifier]) => [title, clause, file, specifier] as const),
+);
 
-    ["4", "a slice importing erasure's face", SLICE, "../erasure/index.ts"],
-    ["4", "a slice importing erasure by its directory", SLICE, "../erasure"],
-    ["4", "a slice importing erasure's internal", SLICE, "../erasure/replay.ts"],
-    ["4", "a slice importing erasure by self-reference", SLICE, "@better-answers/core/erasure"],
-
-    ["1", "kernel importing a slice's face", KERNEL, "../concepts/index.ts"],
-    ["1", "kernel importing a slice's internal", KERNEL, "../concepts/inbox.ts"],
-    ["1", "kernel importing access's face", KERNEL, "../access/index.ts"],
-    ["1", "kernel importing a door's face", KERNEL, "../store/postgres/index.ts"],
-    ["1", "kernel importing a layer's face", KERNEL, "../audit/index.ts"],
-
-    ["2", "access importing a door's face", ACCESS, "../store/postgres/index.ts"],
-    ["2", "access importing a slice's face", ACCESS, "../concepts/index.ts"],
-    ["2", "the postgres door importing access", POSTGRES_DOOR, "../../access/index.ts"],
-    ["2", "the graph door importing a slice's face", GRAPH_DOOR, "../../concepts/index.ts"],
-    ["2", "the graph door importing a layer's face", GRAPH_DOOR, "../../audit/index.ts"],
-    ["2", "a door importing another door", GRAPH_DOOR, "../postgres/index.ts"],
-    ["2", "a door importing the store barrel", POSTGRES_DOOR, "../index.ts"],
-    ["2", "the store barrel importing a door", STORE_BARREL, "./postgres/index.ts"],
-
-    ["3", "audit importing llm", AUDIT, "../llm/index.ts"],
-    ["3", "llm importing audit", LLM, "../audit/index.ts"],
-    ["3", "llm importing a slice's face", LLM, "../concepts/index.ts"],
-    ["3", "audit importing a slice by self-reference", AUDIT, "@better-answers/core/concepts"],
-    ["3", "a layer importing erasure", LLM, "../erasure/index.ts"],
-  ])("rule %s — %s", (rule, _title, file, specifier) => {
+describe("the rule fires, stating the clause it holds", () => {
+  it.each(REFUSALS)("refuses %s", (_title, clause, file, specifier) => {
     const output = lint.output(importing(file, specifier));
 
     expect(output).toContain(file);
     expect(output).toContain("import-direction");
-    expect(output).toContain(`ADR 0029 rule ${rule}`);
+    expect(output).toContain(clause);
   });
 
   it("says which entry to export for an unmapped face", () => {
@@ -158,7 +176,7 @@ describe("the rule fires, naming the ADR 0029 rule it holds", () => {
     const output = lint.output(coreTree({ [SLICE]: source }));
 
     expect(output).toContain(SLICE);
-    expect(output).toContain("ADR 0029 rule 4");
+    expect(output).toContain(INTERNAL);
   });
 });
 

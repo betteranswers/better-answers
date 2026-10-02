@@ -121,8 +121,8 @@ The identity seam ensures that core business logic only interacts with a `Princi
 Sources: [CODING_RULES.md:144-149](CODING_RULES.md#L144-L149), [apps/docs-site/specs/T-022.md:132-140](apps/docs-site/specs/T-022.md#L132-L140)
 
 ### Security Rules
-*  **Principal Enforcement (`[SEC2]`):** Every function reading or writing tenant data must take a `Principal` (`workspaceId`, `userId`, `role`) as its first parameter.
-*  **Row-Level Security (`[SEC3]`):** Every tenant table must use RLS (`withRLS()`). Policies must be tested against unauthorized access (zero-rows test).
+*  **Principal Enforcement:** Every function reading or writing tenant data must take a `Principal` (`workspaceId`, `userId`, `role`) as its first parameter.
+*  **Row-Level Security:** Every tenant table must use RLS (`withRLS()`). Policies must be tested against unauthorized access (zero-rows test).
 *  **Visibility Derivation:** A concept's visibility class is derived from its evidence bindings. Access is governed by an audience predicate (`everyone` vs `groups`).
 
 Sources: [CODING_RULES.md:150-165](CODING_RULES.md#L150-L165), [apps/docs-site/specs/T-006.md:144-154](apps/docs-site/specs/T-006.md#L144-L154)

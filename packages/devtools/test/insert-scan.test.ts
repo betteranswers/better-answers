@@ -16,8 +16,6 @@ import { repositoryRoot } from "@better-answers/devtools/paths";
 import { runsOverThrowawayTree } from "@better-answers/devtools/throwaway-tree";
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
-import { tag } from "./fixture-text.ts";
-
 const WORKSPACE = "packages/probe";
 
 /** Spelled in two halves, so the scan does not read this suite's own fixtures as violations. */
@@ -124,11 +122,11 @@ describe("the named list of factory modules", () => {
 });
 
 describe("the scan over a throwaway tree", () => {
-  it("fails on a TypeScript raw insert, naming line and rule", () => {
+  it("refuses a TypeScript raw insert, naming line and rules file", () => {
     const output = scan(withTypescriptInsert());
 
     expect(output).toContain(`${WORKSPACE}/test/one.test.ts:2:`);
-    expect(output).toContain(tag("TEST", "4"));
+    expect(output).toContain("the root `CODING_STANDARDS.md`");
   });
 
   it("names where the list of factory modules lives", () => {

@@ -97,7 +97,7 @@ describe("inviting several addresses at once", () => {
     expect(events.map((event) => event.batch_id)).toEqual([batch, batch, batch]);
   });
 
-  it("AE10: folds addresses in any case into one invitation", async () => {
+  it("folds addresses in any case into one invitation", async () => {
     const workspace = await provisionedWorkspace(db(), "Folding");
     const ana = addressOf("ana");
 
@@ -227,7 +227,7 @@ describe("inviting several addresses at once", () => {
     ]);
   });
 
-  it("AE5: names each malformed address by position, minting nothing", async () => {
+  it("names each malformed address by position, minting nothing", async () => {
     const workspace = await provisionedWorkspace(db(), "MalformedNamed");
 
     const refused = await sending(

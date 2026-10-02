@@ -244,10 +244,7 @@ const MOVED = [
 
 test.describe("a screen's older address", () => {
   for (const [from, to] of MOVED) {
-    test(`leads an Admin from ${from} to ${to}, Back returning (AE8)`, async ({
-      page,
-      request,
-    }) => {
+    test(`leads an Admin from ${from} to ${to}, Back returning`, async ({ page, request }) => {
       await signedInWith(page, request, { name: "Nidderdale Forge", routes: [] });
       await page
         .getByRole("navigation", { name: CONTROL_CENTRE.name })

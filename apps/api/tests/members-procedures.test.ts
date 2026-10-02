@@ -506,7 +506,7 @@ describe("removing a member over tRPC", () => {
 });
 
 describe("a person's activity over tRPC", () => {
-  it("AE4: answers a role change by Hannah, to Priya", async () => {
+  it("answers a role change by Hannah, to Priya", async () => {
     const workspace = await app.provision();
     const hannah = workspace.admin;
     const priya = await app.person(undefined, "Priya Shah");
@@ -621,7 +621,7 @@ describe("bulk acts on members over tRPC", () => {
     });
   });
 
-  it("AE1: refuses demoting both Admins, naming each as an item", async () => {
+  it("refuses demoting both Admins, naming each as an item", async () => {
     const { workspace, second, api } = await aWorkspaceOfTwoAdmins();
     const { admin } = workspace;
 

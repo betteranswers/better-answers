@@ -177,7 +177,7 @@ describe("inviting a person over tRPC", () => {
 });
 
 describe("inviting several addresses over tRPC", () => {
-  it("AE10: sends one email for one address in two cases", async () => {
+  it("sends one email for one address in two cases", async () => {
     const { api } = await anAdmin();
     const ana = anAddress("ana");
 

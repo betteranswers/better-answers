@@ -18,6 +18,7 @@ A route block (`docs/specs/v01-route.md`) is one `/ce-brainstorm`, then `/ce-pla
 
 - Two kinds of change run alone until they merge: one that adds a migration, because the drizzle journal does not merge, and one that edits `contracts/`, because it moves both tiers' generated digest constants, which do not merge either.
 - CE's review reads its rules from `CODING_STANDARDS.md`, plus the `CODING_STANDARDS.md` of each directory the change touches: `apps/api/`, `apps/web/`, `apps/worker/` and `deploy/`. A rule's `Reviewer:` line is the part no gate will catch.
+- A worker prompt names each test scenario by the behaviour it checks, and a test's title is that behaviour (*Title a test by what the system does, in 10 words at most*, in `CODING_STANDARDS.md`).
 - `/mutation-testing` runs after the tests are green, on refactors and on changes to validation, parsing or auth. Skip it for UI, copy and config diffs.
 - A change that moves an architecture decision edits its doc in `docs/solutions/architecture-patterns/` in the same commit, and a new decision lands there as a new doc with the code it decides. `docs/archive/adr/` is frozen.
 

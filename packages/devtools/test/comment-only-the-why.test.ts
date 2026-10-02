@@ -4,7 +4,7 @@ import { pluginConfigFor } from "@better-answers/devtools/oxlint-config";
 import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
-import { tag, wordsOf } from "./fixture-text.ts";
+import { wordsOf } from "./fixture-text.ts";
 import { fixedByOxlint } from "./oxlint-fix.ts";
 
 const RULE = "better-answers/comment-only-the-why";
@@ -25,22 +25,19 @@ const TOO_LONG = `// ${wordsOf(29)}\n`;
 const lint = oxlintOver(CONFIG, { tree: holding(TOO_LONG), flagged: [FILE] });
 
 describe("the comment rule fires on a long or citing comment", () => {
-  it("refuses a block over the ceiling, naming count and rule", () => {
+  it("refuses a long block, naming its count and rules file", () => {
     const output = lint.output(holding(TOO_LONG));
 
     expect(output).toContain("runs to 29 words");
-    expect(output).toContain(tag("COMMENT", "1"));
+    expect(output).toContain("the root `CODING_STANDARDS.md`");
     expect(output).toContain("better-answers(comment-only-the-why)");
   });
 
   it.each([
     ["a ticket id", "// Kept because the claim protocol changed under T-243.\n"],
     ["an ADR number", "// Kept because the graph is Postgres under ADR 0021.\n"],
-    ["a rule tag", `// Kept because a raw insert lives in a factory (${tag("TEST", "4")}).\n`],
-    [
-      "a tag from a digit-bearing family",
-      `// Kept because the outcome is announced (${tag("A11Y", "1")}).\n`,
-    ],
+    ["a rule tag", "// Kept because a raw insert lives in a factory ([TEST4]).\n"],
+    ["a tag from a digit-bearing family", "// Kept because the outcome is announced ([A11Y1]).\n"],
     ["an ISO date", "// Kept because the reading of the registry moved on 2026-09-21.\n"],
     ["a slashed date", "// Kept because the reading of the registry moved on 21/09/2026.\n"],
   ])("refuses a comment citing %s", (_what, comment) => {
@@ -158,11 +155,11 @@ describe("the comment rule holds a directive to a same-line reason", () => {
     ["block-comment ESLint disable", "/* eslint-disable no-console */\n"],
     ["bare-separator disable", "// eslint-disable-line no-console --\n"],
     ["Stryker disable", "// Stryker disable next-line all\n"],
-  ])("refuses a reasonless %s, naming the directive rule", (_what, directive) => {
+  ])("refuses a reasonless %s, naming its rules file", (_what, directive) => {
     const output = lint.output(holding(directive));
 
     expect(output).toContain("gives no reason");
-    expect(output).toContain(tag("COMMENT", "3"));
+    expect(output).toContain("the root `CODING_STANDARDS.md`");
   });
 
   it.each([
@@ -182,7 +179,7 @@ describe("the comment rule holds a directive to a same-line reason", () => {
     const output = lint.output(holding(directive));
 
     expect(output).toContain("reason runs to 26 words");
-    expect(output).toContain(tag("COMMENT", "3"));
+    expect(output).toContain("the root `CODING_STANDARDS.md`");
   });
 
   it.each([

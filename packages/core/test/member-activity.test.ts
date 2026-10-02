@@ -137,7 +137,7 @@ const asked = async (workspace: ProvisionedWorkspace) => {
 };
 
 describe("a person's activity", () => {
-  it("AE4: marks a role change by Hannah, to Priya", async () => {
+  it("marks a role change by Hannah, to Priya", async () => {
     const workspace = await provisionedWorkspace(db(), "Hannahs", { name: "Hannah Reid" });
     const hannah = workspace.adminUserId;
     const priya = await memberAt(workspace, "Viewer", "Priya Shah");
