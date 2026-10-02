@@ -66,7 +66,9 @@ Work runs on the Compound Engineering plugin (CE), pinned in `.claude/settings.j
 
 Every commit reaches `main` through the merge queue. A commit's subject and a PR's title take the Conventional Commits form, and commitlint refuses a commit or a PR title that breaks it.
 
-`docs/agents/workflow.md` has the loop, the commit's form, the merge and what `check` runs where.
+A plan's test scenario opens with the behaviour it checks, and a unit names the acceptance examples it covers in its Requirements field.
+
+`docs/agents/workflow.md` has the loop, the commit's form, the merge, what `check` runs where, and what a worker prompt carries.
 
 ### Compounding
 
