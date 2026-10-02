@@ -891,8 +891,9 @@ For the owner, before the unit named lands; none blocks starting the work:
 2. Confirm by authenticator through the plugin's verify, then stamp (KTD3). Throttle per person across sessions with growing backoff, and send a notice after repeated failures (KTD14).
 3. Spend a recovery code (KTD13). Only this session may now set up. The old factors go in the same transaction that verifies the replacement, and setup then issues a fresh set. The setup screen says the old factors will be replaced.
 4. Add the confirm, setup and recovery screens as root routes sharing the Account page's setup components, ordered before the display-name step.
+5. Add the recovery-codes detour (Appendix item 2), moved here from U7 with the owner's agreement on 02/10/2026. It is a root route after the pending screens and before the display-name step. When the person's `recovery_codes_acknowledged` flag is false and they hold codes, it makes a new set that voids the unseen one and shows the codes screen, with the line "These replace the codes shown before, which no longer work." U7 sets the flag false whenever codes are made and true on Done, and nothing reads it yet.
 **Patterns to follow:** U6 and U7's routes, `displayNameDetour`'s root-route shape, and `personCeiling` for counters.
-**Screen states:** Appendix, item 1.
+**Screen states:** Appendix, items 1 and 2.
 **Test scenarios:**
 - A passkey confirm stamps the existing session and creates no other.
 - A passkey assertion with another person's credential cannot confirm this session.
@@ -902,6 +903,7 @@ For the owner, before the unit named lands; none blocks starting the work:
 - A spent recovery code lands on setup. An abandoned setup leaves the old factors and the remaining codes in place. A completed setup removes the old factors and issues a fresh set.
 - While a recovery session is open, a second email session of the same person reaches confirm, never setup.
 - After an operator restore, setup asks for the restore code first. A wrong or expired code adds nothing, and the right one lets setup proceed once.
+- Leaving the codes screen unticked and reloading shows ten new codes, and a first-set code no longer works.
 - Repeated failures send one notice.
 - The screens pass the accessibility gate.
 **Verification:** a factor-holding person can confirm or recover through the screens, and nothing yet forces anyone to.
@@ -1007,9 +1009,9 @@ Specified by the ui-designer from the better-answers-design skill, today's auth 
   - Without WebAuthn, setup opens with the authenticator steps and no passkey offer.
   - Covers AE7. After a recovery code, setup says the old factors will stop working. Leaving and signing in by email again reaches confirm, where the old authenticator still works.
 
-**2. Recovery codes (U7)**
+**2. Recovery codes (U7; the detour is U15's)**
 - **Shown once, or again as a new set.** Codes are stored hashed, so the screen can reappear only with a new set that voids the unseen one.
-  - A per-person "codes acknowledged" flag in U5's migration drives a detour placed after the pending screens and before the display name.
+  - A per-person "codes acknowledged" flag in U5's migration drives a detour placed after the pending screens and before the display name. U15 builds the detour with those screens (owner, 02/10/2026); U7 builds the screen and keeps the flag.
   - The test reads "a reload never shows the same set again".
 - **The screen:**
   - h1 `Save your recovery codes`, with the line `If you lose your passkey and authenticator, each code signs you in once. This is the only time they're shown.` When shown again, it adds `These replace the codes shown before, which no longer work.`
