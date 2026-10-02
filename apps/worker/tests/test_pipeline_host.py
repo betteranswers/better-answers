@@ -1,12 +1,15 @@
 import asyncio
 import re
-from collections.abc import Iterator
+import threading
+import time
+from collections.abc import Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
 import asyncpg
 import psycopg
 import pytest
+from structlog.testing import capture_logs
 
 from better_answers_worker.config import Bootstrap, Engine, ObjectStore
 from better_answers_worker.pipeline import (
@@ -340,3 +343,99 @@ def test_a_bindings_lmdb_size_is_readable_after_its_run(
 
     assert after > 0
     assert Path(host.binding_directory(run)).is_dir()
+
+
+STILL_OPEN = (
+    "environment already open in this program;"
+    " close it to be able to open it again with different options"
+)
+
+WAITS = "the engine still holds the store, so its open waits for it to let go"
+
+HOLDS_AT_MOST_SECONDS = 10
+
+
+def waits_in(written: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    return [entry for entry in written if entry["event"] == WAITS]
+
+
+def hold_until_waited_on(store: object, written: Sequence[Mapping[str, Any]]) -> None:
+    """Holding `store` keeps the engine's handle open until this returns, as an
+    engine task does after its update."""
+    deadline = time.monotonic() + HOLDS_AT_MOST_SECONDS
+    while not waits_in(written) and time.monotonic() < deadline:
+        time.sleep(0.05)
+
+
+def test_a_held_store_opens_once_the_engine_lets_go(tmp_path: Path) -> None:
+    bootstrap = bootstrap_for("postgresql://unreached/unreached", tmp_path)
+    run = a_run_on("binding-one")
+
+    with capture_logs() as written:
+        with Host(bootstrap) as first:
+            holder = threading.Thread(
+                target=hold_until_waited_on,
+                args=(first.app_config(run, CHUNKS_APP), written),
+            )
+        holder.start()
+        try:
+            with Host(bootstrap) as second:
+                second.app_config(run, CHUNKS_APP)
+                opened = second.held_bindings()
+        finally:
+            holder.join()
+
+    assert opened == ("binding-one",)
+    assert waits_in(written) == [
+        {
+            "event": WAITS,
+            "log_level": "info",
+            "binding_id": "binding-one",
+            "store": "binding",
+            "wait_seconds": 5.0,
+        }
+    ]
+
+
+def test_a_store_never_let_go_raises_after_the_wait(tmp_path: Path) -> None:
+    bootstrap = bootstrap_for("postgresql://unreached/unreached", tmp_path)
+    run = a_run_on("binding-one")
+
+    with Host(bootstrap) as first, capture_logs() as written:
+        first.app_config(run, CHUNKS_APP)
+        started = time.monotonic()
+        with (
+            pytest.raises(RuntimeError) as raised,
+            Host(bootstrap, release_wait_seconds=0.2) as second,
+        ):
+            second.app_config(run, CHUNKS_APP)
+        waited = time.monotonic() - started
+
+    assert str(raised.value) == STILL_OPEN
+    assert waited >= 0.2
+    assert waits_in(written) == [
+        {
+            "event": WAITS,
+            "log_level": "info",
+            "binding_id": "binding-one",
+            "store": "binding",
+            "wait_seconds": 0.2,
+        }
+    ]
+
+
+def test_an_unreadable_store_raises_without_waiting(tmp_path: Path) -> None:
+    run = a_run_on("binding-one")
+
+    with (
+        Host(bootstrap_for("postgresql://unreached/unreached", tmp_path)) as host,
+        capture_logs() as written,
+    ):
+        directory = host.store_directory(run, BINDING_STORE)
+        directory.mkdir(parents=True)
+        (directory / "data.mdb").write_bytes(b"not an lmdb file" * 1000)
+        with pytest.raises(RuntimeError) as raised:
+            host.app_config(run, CHUNKS_APP)
+
+    assert str(raised.value) == "MDB_INVALID: File is not an LMDB file"
+    assert waits_in(written) == []
