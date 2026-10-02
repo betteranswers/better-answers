@@ -57,6 +57,7 @@ export function createServer(dependencies: ServerDependencies): Hono {
     fetchClientMetadataResource:
       dependencies.fetchClientMetadataResource ?? createClientMetadataFetcher(),
     logger,
+    clock: doors.clock,
   });
 
   let identity: "starting" | "ready" | "failed" = "starting";
