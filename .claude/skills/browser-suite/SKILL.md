@@ -113,7 +113,7 @@ Twenty-seven more helpers in the same module drive the browser rather than the h
 | `anAddress` | An email address nobody else in the run will use, so a code read back is this test's |
 | `signInHeading` | The sign-in screen's heading, read off its word table for what the sign-in carries on to: nothing, joining a workspace or connecting Claude |
 | `quoted` | A table's sentence quoted as an inline aria snapshot takes it, so the snapshot reads the words rather than copying them |
-| `signIn` | Signs a person in **through the product's own screen** — fill the address, send, read the six-digit code back from the captured transport, fill it, submit, and wait for the code field to be gone rather than for the click |
+| `signIn` | Signs a person in **through the product's own screen** — fill the address, send, read the six-digit code back from the captured transport, and fill it. Six digits submit on their own, so it clicks nothing, and it waits for the code field to be gone, because leaving the screen sooner cancels the sign-in |
 | `aMemberSignedInAt` | A new workspace's Editor or Viewer, signed in having asked for a path first, so sign-in carries them back to it — where a refused screen is proved |
 | `landedAtHome` | Asserts the page is on a role's home, its address and its heading read off the navigation list. The heading is the screen's group's name, or its surface's where it has none |
 | `notFoundOfferingHome` | Asserts the not-found screen and its link to a role's home. A screen hidden from the role shows it, as an address that never existed does |
