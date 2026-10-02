@@ -855,9 +855,11 @@ to it by IRI and never restates it (ADR 0014).
   whatever its letter case, which is when the membership begins. Approving an *access request*
   mints one; a new invitation to an address with one waiting replaces it. Whether the address
   already belongs to a person on the platform never changes what the Admin is told. Its
-  **status** is one of four: **waiting** until it is accepted, cancelled or replaced; **expired**
-  once its seven days pass unaccepted, until a resend renews it; **accepted**; or **cancelled**,
-  as a replaced one is. _Avoid_: invite (as a noun), join link, pending (the value Better Auth
+  **status** is one of four: **waiting** until it is accepted, cancelled, replaced, or its seven
+  days pass into **expired**; **expired** once its seven days pass unaccepted, until a resend
+  renews it or an Admin cancels it; **accepted**; or **cancelled**, as a replaced one is. Its
+  email goes after the invitation is made, so an invitation can wait with its email **unsent**;
+  a resend sends it again. _Avoid_: invite (as a noun), join link, pending (the value Better Auth
   stores).
 - **Activity (of a person)** — one person's part in the workspace's *audit log*, read by an Admin
   alone, in People: every *audit event* they took and every one done to them, newest first, each

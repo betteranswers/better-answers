@@ -4,7 +4,7 @@ import { PAGE_NUMBER } from "@/shared/list-address.ts";
 
 import type { InvitationStatus } from "./invitations-api.ts";
 
-/** Members' keys carry `members`, so the Invitations tab's carry their own prefix. */
+/** Members' keys carry `members`, so the Invitations tab's keys carry their own prefix. */
 export const INVITATIONS_LIST = "invitations";
 
 /** In the order the status switch offers them, the one the tab opens on first. */

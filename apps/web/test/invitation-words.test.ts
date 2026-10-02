@@ -75,8 +75,8 @@ describe("what a bulk act's outcome says", () => {
 
   it.each([
     [2, 0, "Cancelled 2 invitations; their links no longer work."],
-    [1, 1, "Cancelled 1 invitation; its link no longer works. 1 was cancelled already."],
-    [0, 2, "Nothing was cancelled. 2 were cancelled already."],
+    [1, 1, "Cancelled 1 invitation; its link no longer works. 1 invitation was already cancelled."],
+    [0, 2, "Nothing was cancelled. 2 invitations were already cancelled."],
   ])("says %i cancelled and %i skipped", (changed, skipped, said) => {
     expect(INVITATIONS_WORDS.bulk.cancelled(changed, skipped)).toBe(said);
   });

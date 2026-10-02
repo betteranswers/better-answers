@@ -78,6 +78,7 @@ const useHeldAddresses = (members: ReadonlySet<string>, list: ListRef, left: str
   const [held, setHeld] = useState(NOTHING_HELD);
   const [field, setField] = useState(left);
   const [refused, setRefused] = useState(NO_FLAGS);
+  const removers = useRef(new Map<string, HTMLButtonElement>());
   const flags = held.map((one) => flagOf(one, members, refused));
 
   const place = (moved: Moved) => {
@@ -106,14 +107,23 @@ const useHeldAddresses = (members: ReadonlySet<string>, list: ListRef, left: str
     focusFirstFlagged();
   };
 
+  /** Each row's Remove by its key: focus finds a row by what it holds, not by counting buttons. */
+  const removeRefOf = (key: string) => (button: HTMLButtonElement) => {
+    removers.current.set(key, button);
+    return () => {
+      removers.current.delete(key);
+    };
+  };
+
   /** Focus goes to the row that took its place, else the one before, else the field. */
   const remove = (key: string, fieldRef: FieldRef) => {
     const at = held.findIndex((one) => one.key === key);
+    const kept = held.filter((one) => one.key !== key);
     flushSync(() => {
-      setHeld(held.filter((one) => one.key !== key));
+      setHeld(kept);
     });
-    const buttons = list.current?.querySelectorAll<HTMLElement>("button");
-    (buttons?.[at] ?? buttons?.[at - 1] ?? fieldRef.current)?.focus();
+    const next = kept[at] ?? kept[at - 1];
+    (next === undefined ? fieldRef.current : removers.current.get(next.key))?.focus();
   };
 
   return {
@@ -125,6 +135,7 @@ const useHeldAddresses = (members: ReadonlySet<string>, list: ListRef, left: str
     isFlagged,
     focusFirstFlagged,
     flagNow,
+    removeRefOf,
     remove,
   };
 };
@@ -134,9 +145,10 @@ type Addresses = ReturnType<typeof useHeldAddresses>;
 function HeldRow(properties: {
   readonly one: Held;
   readonly flag: Flag | undefined;
+  readonly removeRef: (button: HTMLButtonElement) => () => void;
   readonly onRemove: () => void;
 }) {
-  const { one, flag } = properties;
+  const { one, flag, removeRef } = properties;
   const flagId = useId();
   return (
     <li
@@ -152,6 +164,7 @@ function HeldRow(properties: {
         {INVITE_WORDS.flag[flag ?? "ready"]}
       </Pill>
       <Button
+        ref={removeRef}
         type="button"
         variant="ghost"
         size="icon-sm"
@@ -183,6 +196,7 @@ function HeldList(properties: {
           key={one.key}
           one={one}
           flag={addresses.flags[at]}
+          removeRef={addresses.removeRefOf(one.key)}
           onRemove={() => {
             addresses.remove(one.key, fieldRef);
           }}

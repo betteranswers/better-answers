@@ -94,7 +94,7 @@ const cancelledSaid = (changed: number, skipped: number): string => {
       : `Cancelled ${invitations(changed)}; ${changed === 1 ? "its link no longer works" : "their links no longer work"}`;
   return skipped === 0
     ? `${done}.`
-    : `${done}. ${counted(skipped, "was", "were")} cancelled already.`;
+    : `${done}. ${counted(skipped, "invitation was", "invitations were")} already cancelled.`;
 };
 
 export const STATUS_WORDS = {

@@ -111,6 +111,26 @@ const capitalised = (address: string): string =>
 const anUnreachableAddress = (who: string): string =>
   anAddress(who).replace("@example.test", "@unreachable.example");
 
+/** A Resend's answer as if its email went, which it never does to that domain. */
+const resentAsIfItWent = (page: Page) =>
+  page.route(
+    (url) => url.pathname.includes("members.resendInvitation"),
+    async (route) => {
+      const answered = await route.fetch();
+      const answers: readonly { readonly result: { readonly data: object } }[] =
+        await answered.json();
+      await route.fulfill({
+        response: answered,
+        json: answers.map(({ result }) => ({
+          result: { data: { ...result.data, emailSent: true } },
+        })),
+      });
+    },
+  );
+
+const unsentIn = (where: Locator): Locator =>
+  where.getByRole("region", { name: INVITATIONS_WORDS.unsent });
+
 /** The act as the page's own client would send it, under the Admin's session. */
 const actedAside = async (page: Page, act: string, input: unknown): Promise<number> =>
   (await page.request.post(`/trpc/members.${act}`, { data: input })).status();
@@ -334,6 +354,7 @@ test.describe("the People screen's Invitations tab", () => {
 
     await page.keyboard.press("Enter");
     await expect(heldAddresses(page)).toHaveCount(2);
+    await expect(removeOf(page, ben), "focus goes to the row that took its place").toBeFocused();
     await expect(sendButton(page)).toBeEnabled();
     await expect(sendButton(page)).toHaveText(INVITE_WORDS.send(2));
     await sendButton(page).click();
@@ -343,6 +364,24 @@ test.describe("the People screen's Invitations tab", () => {
     );
     await inviteDialog(page).getByRole("button", { name: "Done" }).click();
     await expect(invitationRows(page)).toHaveCount(2);
+  });
+
+  test("removal hands focus to the row before, then the field", async ({ page, request }) => {
+    await anAdminAtInvitations(page, request, "Swaledale Lime");
+    await openInvitations(page);
+    const [ana, ben] = [anAddress("ana"), anAddress("ben")];
+
+    await dialogOpened(page);
+    await addressField(page).fill(`${ana}, ${ben}`);
+    await addressField(page).press("Enter");
+    await expect(heldAddresses(page)).toHaveCount(2);
+
+    await removeOf(page, ben).focus();
+    await page.keyboard.press("Enter");
+    await expect(removeOf(page, ana)).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(heldAddresses(page)).toHaveCount(0);
+    await expect(addressField(page)).toBeFocused();
   });
 
   test("sends 50 at once, holding a 51st in the field", async ({ page, request }) => {
@@ -461,6 +500,53 @@ test.describe("the People screen's Invitations tab", () => {
       `The invitation to ${offline} stands, but its email did not go again.`,
     );
     await expect(resend).toBeFocused();
+  });
+
+  test("the dialog's unsent list drops an address whose Resend went", async ({ page, request }) => {
+    await anAdminAtInvitations(page, request, "Calder Weavers");
+    await openInvitations(page);
+    const [offline, other] = [anUnreachableAddress("offline"), anUnreachableAddress("other")];
+
+    await dialogOpened(page);
+    await addressField(page).fill(`${offline}, ${other}`);
+    await sendButton(page).click();
+    const unsent = unsentIn(inviteDialog(page));
+    await expect(unsent.getByRole("listitem")).toHaveCount(2);
+
+    await resentAsIfItWent(page);
+    await unsent.getByRole("button", { name: INVITATIONS_WORDS.resendTo(offline) }).click();
+    await expect(unsent).toContainText(`Sent the invitation to ${offline} again.`);
+    await expect(unsent.getByRole("listitem")).toHaveCount(1);
+    await expect(
+      unsent.getByRole("button", { name: INVITATIONS_WORDS.resendTo(other) }),
+    ).toBeVisible();
+    await expect(
+      unsent.getByRole("heading", { name: INVITATIONS_WORDS.unsent }),
+      "focus left with the row",
+    ).toBeFocused();
+  });
+
+  test("the tab's unsent list drops an address whose Resend went", async ({ page, request }) => {
+    const offline = anUnreachableAddress("offline");
+    await anAdminAtInvitations(page, request, "Wensleydale Twine", (at) =>
+      invitedEach(request, at, [offline]).then(() => undefined),
+    );
+    await openInvitations(page);
+
+    await tickOf(page, offline).check();
+    await selectionAct(page, INVITATIONS_WORDS.resend).click();
+    const unsent = unsentIn(invitationsRegion(page));
+    const resend = unsent.getByRole("button", { name: INVITATIONS_WORDS.resendTo(offline) });
+    await expect(resend).toBeVisible();
+
+    await resentAsIfItWent(page);
+    await resend.click();
+    await expect(unsent).toContainText(`Sent the invitation to ${offline} again.`);
+    await expect(resend).toHaveCount(0);
+    await expect(
+      unsent.getByRole("heading", { name: INVITATIONS_WORDS.unsent }),
+      "focus left with the row",
+    ).toBeFocused();
   });
 
   test("names when to try again past an address's email ceiling", async ({ page, request }) => {

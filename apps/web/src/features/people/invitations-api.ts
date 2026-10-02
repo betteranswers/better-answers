@@ -16,7 +16,7 @@ export type InvitationStatus = NonNullable<
 /** One invitation and whether its email went, as every act that sends one answers it. */
 export type SentInvitation = inferOutput<Api["members"]["resendInvitation"]>;
 
-/** An invite's answer for one address, saying whether it replaced one waiting there. */
+/** What inviting answers for each address: its invitation, and whether it replaced one waiting. */
 export type InvitedOne = inferOutput<Api["members"]["invite"]>["invitations"][number];
 
 export type BulkResent = inferOutput<Api["members"]["bulkResendInvitations"]>;
