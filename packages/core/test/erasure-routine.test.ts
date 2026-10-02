@@ -9,7 +9,7 @@ import {
   openObjects,
 } from "@better-answers/core/store/objects";
 import { withScope } from "@better-answers/core/store/postgres";
-import { boundarySchemas, ulid } from "@better-answers/schema";
+import { boundarySchemas, IDENTITY_SET, ulid } from "@better-answers/schema";
 
 import { open } from "../src/answering/index.ts";
 import {
@@ -542,6 +542,45 @@ const memberHereAndElsewhere = async () => {
     seed.member({ workspaceId: elsewhere.workspaceId, userId: person.id, role: "Editor" }),
   );
   return { scenario, elsewhere, email, person };
+};
+
+/** The identity-set tables naming a person by `user_id` that the last membership's sweep empties. */
+const SWEPT_BY_PERSON = [
+  "public.account",
+  "public.authenticator",
+  "public.member",
+  "public.passkey",
+  "public.recovery_code",
+  "public.session",
+  "public.workspace_last_active",
+];
+
+/** A client's registration, and a grant's tokens and consent: the identity sweep reaches none. */
+const BEYOND_THE_SWEEP = [
+  "public.oauth_access_token",
+  "public.oauth_client",
+  "public.oauth_consent",
+  "public.oauth_refresh_token",
+];
+
+const identityTablesNamingAPerson = async (): Promise<readonly string[]> => {
+  const read = await db().pool.query<{ qualified: string }>(
+    `SELECT table_schema || '.' || table_name AS qualified FROM information_schema.columns
+      WHERE column_name = 'user_id' AND table_schema || '.' || table_name = ANY($1)`,
+    [[...IDENTITY_SET]],
+  );
+  return read.rows.map((row) => row.qualified).toSorted();
+};
+
+const sweptTablesHolding = async (userId: string): Promise<readonly string[]> => {
+  const holding: string[] = [];
+  for (const qualified of SWEPT_BY_PERSON) {
+    const read = await db().pool.query(`SELECT 1 FROM ${qualified} WHERE user_id = $1 LIMIT 1`, [
+      userId,
+    ]);
+    if (read.rowCount !== 0) holding.push(qualified);
+  }
+  return holding;
 };
 
 const NO_SECOND_FACTOR_DELETED = {
@@ -1266,6 +1305,21 @@ describe("the identity set on the person's last membership", () => {
       verifications: 0,
       invitations: 0,
     });
+  });
+
+  it("empties every identity-set table that names the person", async () => {
+    expect(await identityTablesNamingAPerson()).toEqual(
+      [...SWEPT_BY_PERSON, ...BEYOND_THE_SWEEP].toSorted(),
+    );
+    const { scenario, person, email, subjectRequestId } = await workspaceWithAnErasureRequest();
+    await identityRowsFor(db().pool, { userId: person.id, email });
+    await secondFactorRowsFor(db().pool, person.id);
+    await lastActiveIn(db().pool, scenario.workspaceId, person.id);
+    expect(await sweptTablesHolding(person.id)).toEqual(SWEPT_BY_PERSON);
+
+    await completing(scenario, subjectRequestId);
+
+    expect(await sweptTablesHolding(person.id)).toEqual([]);
   });
 
   it("deletes the person's second factor, last activity and their flags", async () => {
