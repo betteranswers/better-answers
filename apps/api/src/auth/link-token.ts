@@ -128,20 +128,24 @@ export type SeenLink = { readonly state: LinkState; readonly use: LinkUse | unde
 
 const NOTHING_TO_SEE: SeenLink = { state: DEAD_LINK, use: undefined };
 
-/** The library keeps a code as `<hash>:<tries spent>`, its hash as `storeOTP: "hashed"` makes it. */
+/** The library stores each code under this hash (`storeOTP.hash`), so a link compares like for like. */
+export const codeHashOf = (code: string): string =>
+  createHash("sha256").update(code).digest("base64url");
+
+/** The library keeps a code as `<hash>:<tries spent>`. */
 const triesSpentOn = (value: string): number => Number(value.slice(value.lastIndexOf(":") + 1));
 
 const hashKeptFor = (value: string): string => value.slice(0, value.lastIndexOf(":"));
 
-const libraryHashOf = (code: string): string =>
-  createHash("sha256").update(code).digest("base64url");
-
 /** A link sealed before its code was replaced would only spend a try of the code that replaced it. */
-const codeLive = (code: LinkRead["code"], sealed: string): code is NonNullable<LinkRead["code"]> =>
+const codeLive = (
+  code: LinkRead["code"],
+  sealedCode: string,
+): code is NonNullable<LinkRead["code"]> =>
   code !== undefined &&
   code.live &&
   triesSpentOn(code.value) < EMAIL_CODE_ATTEMPTS &&
-  hashKeptFor(code.value) === libraryHashOf(sealed);
+  hashKeptFor(code.value) === codeHashOf(sealedCode);
 
 /** One answer for every dead link, so a read never says whether a token was ever real. */
 export const linkSeen = (
