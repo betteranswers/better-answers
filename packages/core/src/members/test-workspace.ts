@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { boundarySchemas } from "@better-answers/schema";
+import { boundarySchemas, INVITATION_WAITING_STATUS } from "@better-answers/schema";
 
 import { act, batchIdFor, declareActs, record } from "../audit/index.ts";
 import {
@@ -175,6 +175,9 @@ type Standing = {
   readonly people: ReadonlyMap<string, PersonStanding>;
 
   readonly members: readonly MemberStanding[];
+
+  /** Accepting never reads the mark, so an off-domain address here could still join once marked. */
+  readonly invited: readonly string[];
 };
 
 const WORKSPACE_BY_SLUG = "SELECT id FROM workspace WHERE slug = $1";
@@ -194,6 +197,19 @@ const MEMBERS_STANDING = `SELECT lower(u.email) AS address, m.role
 
 const membersOf = async (tx: Tx, workspaceId: WorkspaceId): Promise<readonly MemberStanding[]> =>
   z.array(MEMBER_ROW).parse((await tx.query(MEMBERS_STANDING, [workspaceId])).rows);
+
+const INVITED_STANDING = `SELECT lower(email) AS address FROM invitation
+                           WHERE workspace_id = $1 AND status = $2`;
+
+const INVITED_ROW = z.object({ address: z.string() });
+
+const invitedTo = async (tx: Tx, workspaceId: WorkspaceId): Promise<readonly string[]> => {
+  const waiting = await tx.query(INVITED_STANDING, [workspaceId, INVITATION_WAITING_STATUS]);
+  return z
+    .array(INVITED_ROW)
+    .parse(waiting.rows)
+    .map((row) => row.address);
+};
 
 const everyoneIn = (fixture: Fixture): readonly FixturePerson[] => [
   fixture.admin,
@@ -215,6 +231,7 @@ const standingOf = (
       workspaceId,
       people: new Map(people.map((person) => [person.address, person])),
       members: workspaceId === undefined ? [] : await membersOf(tx, workspaceId),
+      invited: workspaceId === undefined ? [] : await invitedTo(tx, workspaceId),
     };
   });
 
@@ -230,8 +247,9 @@ const refusalOf = (
     person.workspace_ids.some((id) => id !== standing.workspaceId),
   );
   if (elsewhere !== undefined) return { word: "member-elsewhere", address: elsewhere.address };
-  const offDomain = (member: MemberStanding) => isOffDomain(fixture.testingDomain, member.address);
-  return standing.members.some(offDomain) ? "slug-taken" : undefined;
+  const held = [...standing.members.map((member) => member.address), ...standing.invited];
+  const offDomain = (address: string) => isOffDomain(fixture.testingDomain, address);
+  return held.some(offDomain) ? "slug-taken" : undefined;
 };
 
 type Held = FixturePerson & { readonly id: UserId; readonly added: boolean };
@@ -409,7 +427,8 @@ const fixtureWritten = async (
 /**
  * Creates or repairs the test workspace, its mark, three test people and 51 invented Viewers.
  * Before writing anything it refuses an address off the testing domain, the operator's or a
- * member's elsewhere, and a slug held with an off-domain member. It removes nobody.
+ * member's elsewhere, and a slug whose workspace holds a member or waiting invitation off it.
+ * It removes nobody.
  */
 export const ensureTestWorkspace = async (
   platform: PlatformPrincipal,

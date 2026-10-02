@@ -2367,7 +2367,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(run).toMatchObject({
         exitCode: 8,
         lines: [
-          `test-workspace: REFUSED — slug-taken: the workspace holding the slug ${fixture.slug} has a member off ${fixture.domain}, so it is not the test workspace; it is left as it is`,
+          `test-workspace: REFUSED — slug-taken: the workspace holding the slug ${fixture.slug} has a member or a waiting invitation off ${fixture.domain}, so it is not the test workspace; it is left as it is`,
         ],
       });
       expect(await auditRowsIn(app(), id)).toBe(recorded);

@@ -1140,7 +1140,7 @@ const testWorkspaceReason = (
     case "malformed":
       return "malformed: --domain is a domain an address can carry, --slug is not blank, and the three addresses are three different addresses";
     case "slug-taken":
-      return `slug-taken: the workspace holding the slug ${asked.slug} has a member off ${asked.testingDomain}, so it is not the test workspace; it is left as it is`;
+      return `slug-taken: the workspace holding the slug ${asked.slug} has a member or a waiting invitation off ${asked.testingDomain}, so it is not the test workspace; it is left as it is`;
     case "no-display-name":
       return "no-display-name: a test person signed in and gave no display name; have them give one, then run this again";
     default:

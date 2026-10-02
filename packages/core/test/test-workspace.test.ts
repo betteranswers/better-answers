@@ -1,13 +1,22 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 
-import { ulid } from "@better-answers/schema";
+import {
+  INVITATION_CANCELLED_STATUS,
+  INVITATION_WAITING_STATUS,
+  ulid,
+} from "@better-answers/schema";
 
 import type { PlatformPrincipal, Result, UserPrincipal, WorkspaceId } from "../src/kernel/index.ts";
 import { changeRole, ensureTestWorkspace, removeMember } from "../src/members/index.ts";
 import { openPostgres, type Tx } from "../src/store/postgres/index.ts";
 import { answeredValue, ULID } from "./invitations-suite.ts";
 import { heldAs } from "./members-suite.ts";
-import { bootstrap, personIdOf, provisionedWorkspace } from "./platform.ts";
+import {
+  bootstrap,
+  personIdOf,
+  provisionedWorkspace,
+  type ProvisionedWorkspace,
+} from "./platform.ts";
 import { postgresForSuite, seedingWith } from "./suite-postgres.ts";
 
 const db = postgresForSuite();
@@ -60,6 +69,20 @@ const personIdAt = async (address: string) => {
   if (id === undefined) throw new Error(`no person holds ${address}`);
   return personIdOf(id);
 };
+
+const invitationsLeftIn = (
+  workspace: ProvisionedWorkspace,
+  rows: readonly { readonly email: string; readonly status: string }[],
+) =>
+  seedingWith(db().pool, async (seed) => {
+    for (const row of rows) {
+      await seed.invitation({
+        ...row,
+        workspaceId: workspace.workspaceId,
+        inviterId: workspace.adminUserId,
+      });
+    }
+  });
 
 const workspacesWithSlug = async (slug: string) =>
   (await db().pool.query("SELECT id FROM workspace WHERE slug = $1", [slug])).rows;
@@ -361,6 +384,35 @@ describe("what ensuring the test workspace refuses", () => {
     expect(await membersOf(held.workspaceId)).toEqual(members);
     expect(await markOf(held.workspaceId)).toEqual([]);
     expect(await peopleOn(fixture)).toEqual([]);
+  });
+
+  it("refuses, never adopts, a slug with an off-domain invitation waiting", async () => {
+    const fixture = aFixture();
+    const held = await provisionedWorkspace(db(), "Inviting", { email: fixture.admin });
+    await invitationsLeftIn(held, [
+      { email: `ana@${fixture.testingDomain}`, status: INVITATION_WAITING_STATUS },
+      { email: "ben@elsewhere.invalid", status: INVITATION_WAITING_STATUS },
+    ]);
+    const events = await eventsIn(held.workspaceId);
+
+    const refused = await ensured({ ...fixture, slug: held.slug });
+
+    expect(refused).toEqual({ ok: false, error: "slug-taken" });
+    expect(await markOf(held.workspaceId)).toEqual([]);
+    expect(await eventsIn(held.workspaceId)).toEqual(events);
+    expect((await peopleOn(fixture)).map((one) => one.address)).toEqual([fixture.admin]);
+  });
+
+  it("adopts a slug whose off-domain invitations no longer wait", async () => {
+    const fixture = aFixture();
+    const held = await provisionedWorkspace(db(), "InvitedOnce", { email: fixture.admin });
+    await invitationsLeftIn(held, [
+      { email: "ben@elsewhere.invalid", status: INVITATION_CANCELLED_STATUS },
+    ]);
+
+    const adopted = await ensured({ ...fixture, slug: held.slug });
+
+    expect(adopted).toMatchObject({ ok: true, value: { provisioned: false, mark: "written" } });
   });
 
   it("refuses one address named for two test people", async () => {
