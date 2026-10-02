@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { describe, expect, it } from "vitest";
 
 import { openPostgres } from "../src/store/postgres/index.ts";
@@ -56,6 +58,24 @@ describe("replacing recovery codes", () => {
       { act: "people.person.recovery_codes_issued", detail: { replaced: false } },
       { act: "people.person.recovery_codes_issued", detail: { replaced: true } },
     ]);
+  });
+
+  it("stores each code hashed in lower case without its dashes", async () => {
+    const personId = await seedPerson(db().pool);
+    const codes = await codesFor(personId);
+
+    const stored = await db().pool.query<{ hash: string }>(
+      "SELECT code_hash AS hash FROM recovery_code WHERE user_id = $1",
+      [personId],
+    );
+
+    expect(stored.rows.map((row) => row.hash).toSorted()).toEqual(
+      codes
+        .map((code) =>
+          createHash("sha256").update(code.replaceAll("-", "").toLowerCase()).digest("hex"),
+        )
+        .toSorted(),
+    );
   });
 
   it("asks for the new set to be saved again", async () => {
