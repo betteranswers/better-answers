@@ -7,6 +7,7 @@ import { testData } from "@better-answers/schema/testing";
 
 import { dropAnExpiredPromotionLock, PROMOTION_LOCK_PREFIX } from "../src/auth/promotion-lock.ts";
 import { signIn } from "./flow.ts";
+import type { TestApp } from "./harness.ts";
 import { appForSuite } from "./suite-app.ts";
 
 const app = appForSuite();
@@ -115,25 +116,35 @@ const whileTheFirstLockDeleteIsRefused = async <T>(work: () => Promise<T>): Prom
   }
 };
 
+/** The lock lands after the code is asked for, so only the sign-in itself can clear it. */
+const askedThenLeftALock = async (person: { readonly id: string; readonly email: string }) => {
+  const asking = app().client();
+  const asked = await asking.json("/email-otp/send-verification-otp", {
+    email: person.email,
+    type: "sign-in",
+  });
+  expect(asked.status).toBe(200);
+  await orphanedLockFor(person.id);
+  return asking;
+};
+
+const signInByCode = (client: ReturnType<TestApp["client"]>, email: string) =>
+  client.json("/sign-in/email-otp", { email, otp: app().codeSentTo(email) });
+
 describe("a sign-in after a promotion left its lock behind", () => {
   it("by code, still ends earlier access and proves the address", async () => {
     const person = await anUnprovenPersonWithAccess();
-    await orphanedLockFor(person.id);
+    const asking = await askedThenLeftALock(person);
 
-    await signIn(app(), app().client(), person.email);
+    const signedIn = await signInByCode(asking, person.email);
 
+    expect(signedIn.status).toBe(200);
     expect(await accessOf(person.id)).toEqual({ verified: true, sessions: 1, accounts: 0 });
   });
 
   it("by link, does the same", async () => {
     const person = await anUnprovenPersonWithAccess();
-    await orphanedLockFor(person.id);
-    const asking = app().client();
-    const asked = await asking.json("/email-otp/send-verification-otp", {
-      email: person.email,
-      type: "sign-in",
-    });
-    expect(asked.status).toBe(200);
+    const asking = await askedThenLeftALock(person);
 
     const signedIn = await asking.json("/sign-in-link/sign-in", {
       token: app().linkSentTo(person.email),
@@ -145,15 +156,28 @@ describe("a sign-in after a promotion left its lock behind", () => {
 
   it("still signs in when the clear is refused, logging it", async () => {
     const person = await anUnprovenPersonWithAccess();
-    await orphanedLockFor(person.id);
+    const asking = await askedThenLeftALock(person);
     const before = app().logs.length;
 
-    await whileTheFirstLockDeleteIsRefused(() => signIn(app(), app().client(), person.email));
+    const signedIn = await whileTheFirstLockDeleteIsRefused(() =>
+      signInByCode(asking, person.email),
+    );
 
+    expect(signedIn.status).toBe(200);
     expect(linesSince(before, "auth.promotion_lock_not_cleared")).toMatchObject([
-      { level: 40, reason: expect.stringContaining("the store refused the first lock delete") },
+      {
+        level: 40,
+        msg: "auth.promotion_lock_not_cleared",
+        reason: expect.stringContaining("the store refused the first lock delete"),
+      },
     ]);
     expect(await accessOf(person.id)).toEqual({ verified: false, sessions: 2, accounts: 1 });
+  });
+
+  it("with no address, meets the library's own refusal", async () => {
+    const refused = await app().client().json("/sign-in/email-otp", { otp: "123456" });
+
+    expect(refused.status).toBe(400);
   });
 });
 
