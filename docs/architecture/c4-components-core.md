@@ -90,7 +90,7 @@ Enforced by one plugin rule, `better-answers/import-direction` (`packages/devtoo
 | --- | --- |
 | Better Auth, `apps/api/src/auth` | `user`, `session`, `account`, `verification`, `jwks`, `workspace`, `member`, `invitation`, the `oauth_*` set, `rate_limit` |
 | the journal's migrator, `apps/api/src` | `contract_stamp` |
-| `store/postgres` | `ingress_counter`, `mcp_call_counter` |
+| `store/postgres` | `ingress_counter`, `mcp_call_counter`, `invitation_email_counter` |
 | `workspaces` | `workspace_config` |
 | `members` | `group`, `group_member`, `access_request` |
 | `llm` | `llm_route`; `llm_call` at S2 |

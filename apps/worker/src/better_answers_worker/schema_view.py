@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0060_the-second-factor"
+MIGRATION_ID = "0061_the-invitation-email-counter"
 
-MIGRATION_WHEN = 1790947205335
+MIGRATION_WHEN = 1790965859556
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -267,6 +267,12 @@ TABLES: dict[str, dict[str, str]] = {
         "expires_at": "timestamp with time zone NOT NULL",
         "created_at": "timestamp with time zone NOT NULL",
         "inviter_id": "text NOT NULL",
+    },
+    "public.invitation_email_counter": {
+        "workspace_id": "text NOT NULL",
+        "key": "text NOT NULL",
+        "window_start": "timestamp with time zone NOT NULL",
+        "count": "integer NOT NULL",
     },
     "public.job": {
         "workspace_id": "text NOT NULL",

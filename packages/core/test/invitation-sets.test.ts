@@ -340,7 +340,7 @@ describe("inviting several addresses at once", () => {
 
     const answers = await racedAt(
       db().pool,
-      "ingress_counter",
+      "invitation_email_counter",
       [
         () => sending(workspace, [ana, ben], "Viewer"),
         () => sending(workspace, [ben, ana], "Editor"),

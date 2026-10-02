@@ -184,6 +184,10 @@ const acceptedRows = {
   recoveryCode: [{ id: "recovery-code-1", userId: USER_ID, codeHash: "a".repeat(64) }],
   workspaceLastActive: [{ workspaceId: WS_ID, userId: USER_ID, at: NOW }],
   mcpCallCounter: [{ workspaceId: WS_ID, tokenId: "jti-1", windowStart: NOW, count: 1 }],
+  invitationEmailCounter: [
+    { workspaceId: WS_ID, key: "a".repeat(64), windowStart: NOW, count: 1 },
+    { workspaceId: WS_ID, key: "workspace", windowStart: NOW, count: 50 },
+  ],
   ingressCounter: [{ scope: "ip", key: "203.0.113.1", windowStart: NOW, count: 1 }],
   contractStamp: [{ onlyRow: true, digest: "a".repeat(64), stampedAt: NOW }],
   sweepPass: [
@@ -813,6 +817,7 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "recoveryCode",
         "workspaceLastActive",
         "mcpCallCounter",
+        "invitationEmailCounter",
         "ingressCounter",
         "contractStamp",
         "sweepPass",
@@ -911,6 +916,11 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { ...acceptedRows.sweepPass[0], removed: 0.5 },
     ],
     mcpCallCounter: [{ ...acceptedRows.mcpCallCounter[0], count: -1 }],
+    invitationEmailCounter: [
+      { ...acceptedRows.invitationEmailCounter[0], workspaceId: "not-a-ulid" },
+      { ...acceptedRows.invitationEmailCounter[0], key: "   " },
+      { ...acceptedRows.invitationEmailCounter[0], count: -1 },
+    ],
 
     auditEvent: [
       { ...acceptedRows.auditEvent[0], id: "audit-1" },
@@ -1362,6 +1372,12 @@ describe("5 — the inferred type is pinned", () => {
       { workspaceId: WorkspaceId; tokenId: string; windowStart: Date; count: number }
     >
   >;
+  type _invitationEmailCounterSelect = Expect<
+    Equal<
+      z.infer<typeof boundarySchemas.invitationEmailCounter.select>,
+      { workspaceId: WorkspaceId; key: string; windowStart: Date; count: number }
+    >
+  >;
   type AuditEventId = string & z.core.$brand<"AuditEventId">;
   type Family = "people" | "knowledge" | "sources" | "platform";
   type _auditEventSelect = Expect<
@@ -1401,12 +1417,7 @@ describe("5 — the inferred type is pinned", () => {
   type _ingressCounterSelect = Expect<
     Equal<
       z.infer<typeof boundarySchemas.ingressCounter.select>,
-      {
-        scope: "ip" | "email" | "person" | "link" | "invitation";
-        key: string;
-        windowStart: Date;
-        count: number;
-      }
+      { scope: "ip" | "email" | "person" | "link"; key: string; windowStart: Date; count: number }
     >
   >;
   type _chunkSelect = Expect<

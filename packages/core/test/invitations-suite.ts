@@ -161,22 +161,25 @@ export const invitationsSuite = (db: () => MigratedPostgres) => {
       )
     ).rows;
 
-  const countedUnder = async (hashed: string) => {
-    const key = createHash("sha256").update(hashed).digest("hex");
+  const countedUnder = async (workspace: ProvisionedWorkspace, key: string) => {
     const counted = await db().pool.query<{ count: number }>(
-      "SELECT coalesce(sum(count), 0)::int AS count FROM ingress_counter WHERE scope = 'invitation' AND key = $1",
-      [key],
+      `SELECT coalesce(sum(count), 0)::int AS count FROM invitation_email_counter
+        WHERE workspace_id = $1 AND key = $2`,
+      [workspace.workspaceId, key],
     );
     return counted.rows[0]?.count;
   };
 
   /** The emails counted to `address` from this workspace, in every window. */
   const emailsCountedTo = (workspace: ProvisionedWorkspace, address: string) =>
-    countedUnder(`${workspace.workspaceId}:${address}`);
+    countedUnder(
+      workspace,
+      createHash("sha256").update(`${workspace.workspaceId}:${address}`).digest("hex"),
+    );
 
   /** The emails counted from this workspace to any address, in every window. */
   const emailsCountedFrom = (workspace: ProvisionedWorkspace) =>
-    countedUnder(workspace.workspaceId);
+    countedUnder(workspace, "workspace");
 
   return {
     as,

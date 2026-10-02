@@ -4,7 +4,7 @@ import { INVITATION_WAITING_STATUS } from "@better-answers/schema";
 import { byCodeUnit } from "@better-answers/schema/code-unit";
 
 import { CeilingMet, err, ok, type AdminUserPrincipal, type Result } from "../kernel/index.ts";
-import { consumeIngressIn, type CounterRule, type Tx } from "../store/postgres/index.ts";
+import { consumeInvitationEmails, type CounterRule, type Tx } from "../store/postgres/index.ts";
 
 /** One workspace emails an address at most this often, by an invite or a resend alike. */
 const INVITATION_CEILING: CounterRule = { windowMs: 60 * 60_000, max: 5 };
@@ -12,13 +12,12 @@ const INVITATION_CEILING: CounterRule = { windowMs: 60 * 60_000, max: 5 };
 /** Every workspace mails through one shared account, which a flood could get suspended; a few hundred people still fit in two hours. */
 const WORKSPACE_INVITATION_CEILING: CounterRule = { windowMs: 60 * 60_000, max: 200 };
 
-/** Hashed, so no address is kept as a counter's key. */
+/** Hashed, so no address is kept as a counter's key, and salted by the workspace, so no two workspaces share one. */
 const counterKeyOf = (admin: AdminUserPrincipal, address: string): string =>
   createHash("sha256").update(`${admin.workspaceId}:${address}`).digest("hex");
 
-/** Hashed alike, from the workspace's ULID alone, which holds no `:` as every address key's input does. */
-const workspaceKeyOf = (admin: AdminUserPrincipal): string =>
-  createHash("sha256").update(admin.workspaceId).digest("hex");
+/** No hex digest spells it, so it never meets an address's key, and every one sorts before it. */
+const WORKSPACE_KEY = "workspace";
 
 type Counter = { readonly key: string; readonly rule: CounterRule; readonly amount: number };
 
@@ -31,10 +30,10 @@ const countersOf = (
     rule: INVITATION_CEILING,
     amount: 1,
   })),
-  { key: workspaceKeyOf(admin), rule: WORKSPACE_INVITATION_CEILING, amount: addresses.length },
+  { key: WORKSPACE_KEY, rule: WORKSPACE_INVITATION_CEILING, amount: addresses.length },
 ];
 
-/** In key order, the workspace's among the addresses', so two acts sharing a counter queue rather than deadlock; past either ceiling the act fails whole. */
+/** In key order, the workspace's last, so two acts sharing a counter queue rather than deadlock; past either ceiling the act fails whole. */
 export const emailsCounted = async (
   admin: AdminUserPrincipal,
   tx: Tx,
@@ -45,7 +44,7 @@ export const emailsCounted = async (
     byCodeUnit(one.key, other.key),
   );
   for (const { key, rule, amount } of counters) {
-    const counted = await consumeIngressIn(tx, "invitation", key, rule, now, amount);
+    const counted = await consumeInvitationEmails(admin, tx, key, rule, now, amount);
     if (!counted.allowed) return err(new CeilingMet(counted.retryAfterSeconds));
   }
   return ok(undefined);

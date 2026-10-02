@@ -474,15 +474,6 @@ const countInWindow = async (
   return outcome(counted.rows[0]?.count ?? 1, rule, start, now);
 };
 
-type IngressScope = (typeof INGRESS_SCOPES)[number];
-
-const INGRESS_COUNTED = `WITH swept AS (
-         DELETE FROM ingress_counter WHERE scope = $1 AND key = $2 AND window_start < $3
-       )
-       INSERT INTO ingress_counter (scope, key, window_start, count) VALUES ($1, $2, $3, $4)
-       ON CONFLICT (scope, key, window_start) DO UPDATE SET count = ingress_counter.count + EXCLUDED.count
-       RETURNING count`;
-
 /**
  * Counts one attempt against `scope` and `key` in the fixed window `now` falls in, and drops the
  * pair's earlier windows. It commits at once. `retryAfterSeconds` runs to the window's end, 1 at
@@ -490,30 +481,21 @@ const INGRESS_COUNTED = `WITH swept AS (
  */
 export const consumeIngress = async (
   door: PostgresDoor,
-  scope: IngressScope,
+  scope: (typeof INGRESS_SCOPES)[number],
   key: string,
   rule: CounterRule,
   now: Date,
 ): Promise<CounterOutcome> =>
   countInWindow(rule, now, (start) =>
-    door.pool.query<{ count: number }>(INGRESS_COUNTED, [scope, key, start, 1]),
-  );
-
-/**
- * As consumeIngress, inside the caller's transaction, counting `amount` attempts at once: an act
- * that refuses or fails after it rolls the count back, and the counter row stays held until it
- * commits.
- */
-export const consumeIngressIn = async (
-  tx: Tx,
-  scope: IngressScope,
-  key: string,
-  rule: CounterRule,
-  now: Date,
-  amount = 1,
-): Promise<CounterOutcome> =>
-  countInWindow(rule, now, (start) =>
-    tx.query<{ count: number }>(INGRESS_COUNTED, [scope, key, start, amount]),
+    door.pool.query<{ count: number }>(
+      `WITH swept AS (
+         DELETE FROM ingress_counter WHERE scope = $1 AND key = $2 AND window_start < $3
+       )
+       INSERT INTO ingress_counter (scope, key, window_start, count) VALUES ($1, $2, $3, 1)
+       ON CONFLICT (scope, key, window_start) DO UPDATE SET count = ingress_counter.count + 1
+       RETURNING count`,
+      [scope, key, start],
+    ),
   );
 
 /** As consumeIngress, for one call on the token `tokenId`, inside the caller's transaction. */
@@ -533,6 +515,33 @@ export const consumeCall = async (
        ON CONFLICT (workspace_id, token_id, window_start) DO UPDATE SET count = mcp_call_counter.count + 1
        RETURNING count`,
       [principal.workspaceId, tokenId, start],
+    ),
+  );
+
+/**
+ * As consumeCall, counting `amount` invitation emails against `key` at once. An act that refuses
+ * or fails after it rolls the count back, and the counter row stays held until it commits.
+ */
+export const consumeInvitationEmails = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  key: string,
+  rule: CounterRule,
+  now: Date,
+  amount: number,
+): Promise<CounterOutcome> =>
+  countInWindow(rule, now, (start) =>
+    tx.query<{ count: number }>(
+      `WITH swept AS (
+         DELETE FROM invitation_email_counter
+          WHERE workspace_id = $1 AND key = $2 AND window_start < $3
+       )
+       INSERT INTO invitation_email_counter (workspace_id, key, window_start, count)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (workspace_id, key, window_start)
+       DO UPDATE SET count = invitation_email_counter.count + EXCLUDED.count
+       RETURNING count`,
+      [principal.workspaceId, key, start, amount],
     ),
   );
 

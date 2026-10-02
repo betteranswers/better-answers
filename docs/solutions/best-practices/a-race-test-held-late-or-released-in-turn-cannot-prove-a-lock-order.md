@@ -37,7 +37,7 @@ tags:
 
 A race test proves that two acts take their locks in one order only when the acts are held at the first statement where they contend and released together, so that their statements interleave from that point. Held at a later statement, or released one act at a time, the first act through takes every lock it needs before the second takes any. The test then passes with the order and without it, and still reads like a race test.
 
-This came up on the invitation send. `emailsCounted` takes one `ingress_counter` row per address and one for the workspace, sorted by key so that two sends sharing a counter queue rather than deadlock. The test written to guard that, "lands both of two crossing sends whole", passed with the sort removed. A Stryker run on 2026-10-02 found it: the ArrowFunction mutant on the sort's comparator survived. The fix is on PR #511, unmerged as of this writing (2026-10-02).
+This came up on the invitation send. `emailsCounted` takes one `invitation_email_counter` row per address and one for the workspace, sorted by key so that two sends sharing a counter queue rather than deadlock. The test written to guard that, "lands both of two crossing sends whole", passed with the sort removed. A Stryker run on 2026-10-02 found it: the ArrowFunction mutant on the sort's comparator survived. The fix is on PR #511, unmerged as of this writing (2026-10-02).
 
 ### The helpers
 
@@ -61,7 +61,7 @@ So after `release` one act won the lock and kept it until its commit, and the ot
   );
 ```
 
-Each counter is taken by `INGRESS_COUNTED` (`packages/core/src/store/postgres/index.ts:479-484`), an `INSERT ... ON CONFLICT (scope, key, window_start) DO UPDATE SET count = ingress_counter.count + EXCLUDED.count`, run inside the act's transaction by `consumeIngressIn` (502-517). Its comment says the counter row "stays held until it commits". So the first counter statement is where two sends contend. Without the sort, a send of `[ana, ben]` takes ana's row and then wants ben's, while a send of `[ben, ana]` holds ben's and wants ana's.
+Each counter is taken by `consumeInvitationEmails` (`packages/core/src/store/postgres/index.ts:521-546`), an `INSERT ... ON CONFLICT (workspace_id, key, window_start) DO UPDATE SET count = invitation_email_counter.count + EXCLUDED.count`, run inside the act's transaction. Its comment says the counter row "stays held until it commits". So the first counter statement is where two sends contend. Without the sort, a send of `[ana, ben]` takes ana's row and then wants ben's, while a send of `[ben, ana]` holds ben's and wants ana's.
 
 Stryker's ArrowFunction mutator replaces the comparator with `() => undefined`. A comparator that answers `undefined` treats every pair as equal, and `toSorted` is stable, so the order falls back to `countersOf`'s: the addresses as sent, then the workspace. That is exactly the crossing the test arranges.
 
@@ -104,7 +104,7 @@ The trigger body now takes whichever lock `released` names (line 190):
 
 Releasing together needs the shared lock. The holder's session-level `pg_advisory_lock` conflicts with both the exclusive and the shared transaction-level lock, so either form blocks every act in the trigger until `release`. They differ after that. The exclusive lock is granted to one waiter, which keeps it to its commit. Shared requests are compatible with one another, so on unlock every waiter is granted at once. Each act's later writes to the table fire the trigger again and take the shared lock again without waiting, since nothing now holds the key exclusively. From the release on, the acts' statements interleave as two unsynchronised acts' would.
 
-A `BEFORE INSERT` row trigger fires before Postgres checks for a conflict, so a hold on `ingress_counter` catches every counter statement, including one that ends on the `ON CONFLICT ... DO UPDATE` path. Held there, neither act holds any counter row at the release.
+A `BEFORE INSERT` row trigger fires before Postgres checks for a conflict, so a hold on `invitation_email_counter` catches every counter statement, including one that ends on the `ON CONFLICT ... DO UPDATE` path. Held there, neither act holds any counter row at the release.
 
 One more trap: `countWaitingOnLocks` counts every statement in the database waiting on any lock (`statementsWaitingOnALock`, 206-211, reads `pg_stat_activity` for `wait_event_type = 'Lock'`). `racedAt`'s wait is satisfied as readily by an act queued on another act's row as by one held at the trigger. A count of waiters does not show where they wait.
 
@@ -132,12 +132,12 @@ The tree after PR #511 carries what `"together"` does (the comment on `Released`
 
 Before: the only crossing race held at `invitation`, after every counter, released in turn. It passed with and without the sort (`invitation-sets.test.ts:313-316`, shown above).
 
-After: a second test, "takes two crossing sends' counters in one order", holds the same two sends at their first `ingress_counter` insert and releases them together (`invitation-sets.test.ts:336-353`):
+After: a second test, "takes two crossing sends' counters in one order", holds the same two sends at their first `invitation_email_counter` insert and releases them together (`invitation-sets.test.ts:336-353`):
 
 ```ts
     const answers = await racedAt(
       db().pool,
-      "ingress_counter",
+      "invitation_email_counter",
       [
         () => sending(workspace, [ana, ben], "Viewer"),
         () => sending(workspace, [ben, ana], "Editor"),
@@ -149,7 +149,7 @@ After: a second test, "takes two crossing sends' counters in one order", holds t
     expect(await emailsCountedFrom(workspace)).toBe(4);
 ```
 
-With the sort, both acts want the same first key. One inserts it, and the other's `INSERT ... ON CONFLICT` waits on that uncommitted row until the first commits, then counts on top. Both land, and the workspace counter reads 4: two sends of two addresses (the workspace's counter in `countersOf` counts `addresses.length`; `emailsCountedFrom` reads the workspace's counter, `packages/core/test/invitations-suite.ts:177-179`). Without the sort, each act inserts a different first row and then wants the other's, and one is aborted as a deadlock.
+With the sort, both acts want the same first key. One inserts it, and the other's `INSERT ... ON CONFLICT` waits on that uncommitted row until the first commits, then counts on top. Both land, and the workspace counter reads 4: two sends of two addresses (the workspace's counter in `countersOf` counts `addresses.length`; `emailsCountedFrom` reads the workspace's counter, `packages/core/test/invitations-suite.ts:180-182`). Without the sort, each act inserts a different first row and then wants the other's, and one is aborted as a deadlock.
 
 ## Related
 

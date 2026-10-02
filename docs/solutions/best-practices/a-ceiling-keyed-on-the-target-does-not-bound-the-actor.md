@@ -11,6 +11,7 @@ applies_when:
   - "Choosing the key a ceiling counts under, or citing a ceiling in a plan's risk row as the guard against flooding a shared resource"
   - "Letting one call fan out to many targets, such as an N-address send, under a ceiling keyed per target"
   - "Adding a second ceiling to an act that already counts one in its own transaction: the lock order of the counter keys, and how the counters' keys stay apart"
+  - "Choosing where a tenant's counter is stored: a workspace-keyed table under row-level security, not the exempt pre-workspace counter"
   - "Writing the words shown when a CeilingMet 429 can come from more than one ceiling and the 429 does not say which"
 symptoms:
   - "The plan's risk row cited a per-address ceiling (5 invitation emails per address per workspace per hour) as the guard against flooding the shared mail relay"
@@ -28,6 +29,7 @@ tags:
   - ceiling
   - ceiling-met
   - shared-resource
+  - row-level-security
   - email
   - invitations
   - people
@@ -62,18 +64,18 @@ When a plan's risk row cites a ceiling as its mitigation, check that the ceiling
 
 The repo already has an actor-keyed ceiling elsewhere: `personCeiling` keys its count on the calling person, `${path}:${ctx.personId}` (`apps/api/src/trpc/base.ts:278-294`).
 
-**The shape this repo used (on PR #511).** `emailsCounted` counts two kinds of counter in one pass, inside the act's own transaction (`invitation-ceilings.ts:37-52`), built by `countersOf` (`:25-35`):
+**The shape this repo used (on PR #511).** `emailsCounted` counts two kinds of counter in one pass, inside the act's own transaction (`invitation-ceilings.ts:36-51`), built by `countersOf` (`:24-34`):
 
-- one per address: `INVITATION_CEILING`, 5 an hour, amount 1 each (`:10`, `:29-33`);
-- one per workspace: `WORKSPACE_INVITATION_CEILING`, 200 an hour, amount N for an N-address send (`:13`, `:34`).
+- one per address: `INVITATION_CEILING`, 5 an hour, amount 1 each (`:10`, `:28-32`);
+- one per workspace: `WORKSPACE_INVITATION_CEILING`, 200 an hour, amount N for an N-address send (`:13`, `:33`).
 
 Four details carry the weight.
 
-1. **One sorted pass, so the lock order stays deadlock-free.** Each count is an upsert into `ingress_counter` (`INGRESS_COUNTED`, `packages/core/src/store/postgres/index.ts:479-484`), and the counter row "stays held until it commits" (`consumeIngressIn`'s doc, `index.ts:502-506`). Two acts that share counters must take them in one order, or they can deadlock. `emailsCounted` puts every counter, the workspace's among the addresses', through one sort by key before it counts any (`invitation-ceilings.ts:44-48`). Counters also come before any invitation row an act holds (`waitingCounted`'s doc, `invitation-ceilings.ts:57`). The test "takes two crossing sends' counters in one order" (`packages/core/test/invitation-sets.test.ts:336`) guards the order; why a race test must be held at the first counter to prove it is the subject of a sibling learning (see Related).
+1. **One sorted pass, so the lock order stays deadlock-free.** Each count is an upsert into the workspace's own rows of `invitation_email_counter` (`consumeInvitationEmails`, `packages/core/src/store/postgres/index.ts:525-546`), and the counter row "stays held until it commits" (its doc, `index.ts:521-524`). Two acts that share counters must take them in one order, or they can deadlock. `emailsCounted` puts every counter, the workspace's with the addresses', through one sort by key before it counts any (`invitation-ceilings.ts:43-47`). Counters also come before any invitation row an act holds (`waitingCounted`'s doc, `invitation-ceilings.ts:56`). The test "takes two crossing sends' counters in one order" (`packages/core/test/invitation-sets.test.ts:336`) guards the order; why a race test must be held at the first counter to prove it is the subject of a sibling learning (see Related).
 
-2. **Count N for an N-item act.** `consumeIngressIn` gained an `amount` parameter, default 1 (`index.ts:507-516`, `amount = 1` at `:513`). The upsert adds it: `count = ingress_counter.count + EXCLUDED.count` (`index.ts:483`). One send to 50 addresses counts 50 against the workspace, not 1. Counting calls instead of emails would let 200 calls of 50 through. The check is `count <= rule.max` after the add (`outcome`, `index.ts:460`), so a workspace at 160 that sends 50 is refused. The act fails whole: `sentUnderLocks` counts before it reads members or mints anything (`invitations.ts:311-319`), and the act's transaction rolls the count back (`index.ts:502-506`). The test "refuses a workspace's 201st email until the next hour" (`packages/core/test/invitations.test.ts:422`) holds the workspace ceiling.
+2. **Count N for an N-item act.** `consumeInvitationEmails` takes an `amount` (`index.ts:531`). The upsert adds it: `count = invitation_email_counter.count + EXCLUDED.count` (`index.ts:542`). One send to 50 addresses counts 50 against the workspace, not 1. Counting calls instead of emails would let 200 calls of 50 through. The check is `count <= rule.max` after the add (`outcome`, `index.ts:460`), so a workspace at 160 that sends 50 is refused. The act fails whole: `sentUnderLocks` counts before it reads members or mints anything (`invitations.ts:311-319`), and the act's transaction rolls the count back (`index.ts:521-524`). The test "refuses a workspace's 201st email until the next hour" (`packages/core/test/invitations.test.ts:422`) holds the workspace ceiling.
 
-3. **Keys that cannot collide.** Both kinds of counter share the one `invitation` scope (`invitation-ceilings.ts:48`). An address key is sha256 of `` `${admin.workspaceId}:${address}` `` (`counterKeyOf`, `:15-17`). The workspace key is sha256 of the workspace id alone (`workspaceKeyOf`, `:19-21`). The workspace key's doc gives the reason they cannot meet: the workspace's ULID "holds no `:` as every address key's input does" (`:19`). Hashing also keeps addresses out of the counter table (`:15`). When two kinds of counter share a scope, make their inputs disjoint by construction, and say why beside the key.
+3. **Keys that cannot collide, in a table that holds the tenant.** Both kinds of counter live in `invitation_email_counter`, keyed by workspace, key and hour, under row-level security with the workspace-isolation policy (`packages/schema/src/counter-tables.ts`, migration `0061_the-invitation-email-counter.sql`). An address key is sha256 of `` `${admin.workspaceId}:${address}` `` (`counterKeyOf`, `invitation-ceilings.ts:15-17`), so no two workspaces share one. The workspace's key is the fixed word `workspace` (`WORKSPACE_KEY`, `:19-20`): the row already names its workspace, no hex digest spells the word, so it cannot meet an address's key, and every address key sorts before it. Hashing also keeps addresses out of the counter table (`:15`). When two kinds of counter share a table, make their keys disjoint by construction, and say why beside the key. The counters began in the RLS-exempt `ingress_counter`, under one `invitation` scope with the workspace hashed into each key; review moved them, since a key that names a tenant does not isolate one. Keep a tenant's counters in a table under row-level security, and leave the exempt counter to what runs before any workspace exists.
 
 4. **The words shown when a ceiling is met name both ceilings.** `CeilingMet` carries only `retryAfterSeconds` (`packages/core/src/kernel/ceiling.ts:2-3`), and the tRPC error formatter adds only that to the error's data (`apps/api/src/trpc/base.ts:165-166`). So the 429 does not say which ceiling was met. Words that blamed an address alone would send an Admin removing addresses to no effect. The web's words name both (`invitationsCeiling`, `apps/web/src/features/people/refusal-words.ts:94-101`).
 
@@ -102,7 +104,8 @@ For each, ask:
 - For each ceiling: does its key bound the target or the actor? Is there one that bounds the actor?
 - Does an N-item act count N against the actor's ceiling?
 - Do all of an act's counters go through one sorted pass, before any other row it holds?
-- Can two kinds of counter in one scope produce the same key?
+- Can two kinds of counter in one table produce the same key?
+- Does a counter that belongs to a tenant sit in a table under row-level security?
 - Do the words shown when a ceiling is met stay true whichever ceiling it was?
 - Can the actor multiply itself, for example across several workspaces? If so, the actor's ceiling may need a wider key still. The code read for this note does not answer that for invitations.
 
@@ -132,15 +135,14 @@ const emailsCounted = async (
 
 Every key names an address. A send to 50 new addresses counts 1 against each and meets no ceiling. The next call's 50 new addresses do the same.
 
-**After: the address's ceiling and the workspace's, in one pass** (on PR #511, unmerged as of this writing; `packages/core/src/members/invitation-ceilings.ts:12-52`).
+**After: the address's ceiling and the workspace's, in one pass** (on PR #511, unmerged as of this writing; `packages/core/src/members/invitation-ceilings.ts:12-51`).
 
 ```ts
 /** Every workspace mails through one shared account, which a flood could get suspended; a few hundred people still fit in two hours. */
 const WORKSPACE_INVITATION_CEILING: CounterRule = { windowMs: 60 * 60_000, max: 200 };
 
-/** Hashed alike, from the workspace's ULID alone, which holds no `:` as every address key's input does. */
-const workspaceKeyOf = (admin: AdminUserPrincipal): string =>
-  createHash("sha256").update(admin.workspaceId).digest("hex");
+/** No hex digest spells it, so it never meets an address's key, and every one sorts before it. */
+const WORKSPACE_KEY = "workspace";
 
 const countersOf = (
   admin: AdminUserPrincipal,
@@ -151,34 +153,36 @@ const countersOf = (
     rule: INVITATION_CEILING,
     amount: 1,
   })),
-  { key: workspaceKeyOf(admin), rule: WORKSPACE_INVITATION_CEILING, amount: addresses.length },
+  { key: WORKSPACE_KEY, rule: WORKSPACE_INVITATION_CEILING, amount: addresses.length },
 ];
 
-/** In key order, the workspace's among the addresses', so two acts sharing a counter queue rather than deadlock; past either ceiling the act fails whole. */
+/** In key order, the workspace's last, so two acts sharing a counter queue rather than deadlock; past either ceiling the act fails whole. */
 export const emailsCounted = async (/* ... */) => {
   const counters = countersOf(admin, addresses).toSorted((one, other) =>
     byCodeUnit(one.key, other.key),
   );
   for (const { key, rule, amount } of counters) {
-    const counted = await consumeIngressIn(tx, "invitation", key, rule, now, amount);
+    const counted = await consumeInvitationEmails(admin, tx, key, rule, now, amount);
     if (!counted.allowed) return err(new CeilingMet(counted.retryAfterSeconds));
   }
   return ok(undefined);
 };
 ```
 
-**The store counts an amount** (`packages/core/src/store/postgres/index.ts:482-483`). Before, the upsert added a fixed 1:
+**The store counts an amount, in the tenant's own rows** (`packages/core/src/store/postgres/index.ts:535-543`). Before, the RLS-exempt counter's upsert added a fixed 1:
 
 ```sql
 INSERT INTO ingress_counter (scope, key, window_start, count) VALUES ($1, $2, $3, 1)
 ON CONFLICT (scope, key, window_start) DO UPDATE SET count = ingress_counter.count + 1
 ```
 
-After, it adds the amount the caller passes (`consumeIngressIn(..., amount = 1)` at `index.ts:513`):
+After, `consumeInvitationEmails` adds the amount the caller passes (`amount` at `index.ts:531`), into a row its policy holds to the transaction's workspace:
 
 ```sql
-INSERT INTO ingress_counter (scope, key, window_start, count) VALUES ($1, $2, $3, $4)
-ON CONFLICT (scope, key, window_start) DO UPDATE SET count = ingress_counter.count + EXCLUDED.count
+INSERT INTO invitation_email_counter (workspace_id, key, window_start, count)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (workspace_id, key, window_start)
+DO UPDATE SET count = invitation_email_counter.count + EXCLUDED.count
 ```
 
 **The words shown when a ceiling is met** (`apps/web/src/features/people/refusal-words.ts:94-101`). Before, they blamed an address:
