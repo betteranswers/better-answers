@@ -54,6 +54,7 @@ import {
   REFRESH_TOKEN_LIFETIME_SECONDS,
   SIGN_IN_PATH,
 } from "./constants.ts";
+import { codeHashOf } from "./link-token.ts";
 import { accessControl, creatorRole, roles } from "./roles.ts";
 import { signInEmail } from "./sign-in-email.ts";
 import { keepALink, signInMethodOfThisCall } from "./sign-in-link.ts";
@@ -456,7 +457,7 @@ export const createAuth = (deps: AuthDependencies) => {
         otpLength: EMAIL_CODE_LENGTH,
         expiresIn: EMAIL_CODE_LIFETIME_SECONDS,
         allowedAttempts: EMAIL_CODE_ATTEMPTS,
-        storeOTP: "hashed",
+        storeOTP: { hash: (otp) => Promise.resolve(codeHashOf(otp)) },
         sendVerificationOTP: async ({ email, otp, type }) => {
           if (type !== "sign-in") return;
           const kept = await attempt(() =>
