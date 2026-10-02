@@ -2374,6 +2374,49 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await peopleOn(app(), fixture)).toBe(0);
     });
 
+    it("refuses a test person who never gave a display name", async () => {
+      const fixture = aFixture();
+      await app().person(fixture.editor, "");
+
+      const run = await fixing(app(), fixture);
+
+      expect(run).toMatchObject({
+        exitCode: 9,
+        lines: [
+          "test-workspace: REFUSED — no-display-name: a test person signed in and gave no display name; have them give one, then run this again",
+        ],
+      });
+    });
+
+    it("says the workspace stands when its repository cannot be made", async () => {
+      const fixture = aFixture();
+      const notADirectory = path.join(await mkdtemp(path.join(tmpdir(), "no-git-")), "a-file");
+      await writeFile(notADirectory, "", "utf8");
+
+      const run = await opsWith(app(), ["test-workspace", ...flagsOf(fixture)], {
+        doors: { git: ok({ root: notADirectory }) },
+      });
+
+      expect(run.exitCode).toBe(1);
+      const held = await app().database.superuser.query<{ id: string }>(
+        "SELECT id FROM workspace WHERE slug = $1",
+        [fixture.slug],
+      );
+      const id = held.rows[0]?.id ?? "";
+      expect(run.lines).toEqual([
+        expect.stringMatching(
+          new RegExp(
+            `^test-workspace: REFUSED — workspace ${id} stands, but its bundle repository could not be made: .+; run this again$`,
+            "s",
+          ),
+        ),
+      ]);
+      const again = await fixing(app(), fixture);
+      expect(again.lines).toEqual([
+        `test-workspace: done — ${id}, slug ${fixture.slug}, testing domain ${fixture.domain}; nothing to do`,
+      ]);
+    });
+
     it("refuses without a repositories' root, before writing anything", async () => {
       const fixture = aFixture();
 

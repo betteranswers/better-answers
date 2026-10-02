@@ -7,7 +7,13 @@ import {
 } from "@better-answers/schema";
 
 import type { PlatformPrincipal, Result, UserPrincipal, WorkspaceId } from "../src/kernel/index.ts";
-import { changeRole, ensureTestWorkspace, removeMember } from "../src/members/index.ts";
+import {
+  changeRole,
+  ensureTestWorkspace,
+  inviteMembers,
+  inviteMembersInput,
+  removeMember,
+} from "../src/members/index.ts";
 import { openPostgres, type Tx } from "../src/store/postgres/index.ts";
 import { answeredValue, ULID } from "./invitations-suite.ts";
 import { heldAs } from "./members-suite.ts";
@@ -17,6 +23,7 @@ import {
   provisionedWorkspace,
   type ProvisionedWorkspace,
 } from "./platform.ts";
+import { inputOf } from "./suite-input.ts";
 import { postgresForSuite, seedingWith } from "./suite-postgres.ts";
 
 const db = postgresForSuite();
@@ -289,6 +296,31 @@ describe("ensuring the test workspace", () => {
 
     expect(again.unexpected).toEqual([{ address: stranger, role: "Editor" }]);
     expect(await membersOf(workspaceId)).toContainEqual({ address: stranger, role: "Editor" });
+  });
+
+  it("finishes a fixture left standing without its mark", async () => {
+    const fixture = aFixture();
+    const halfWritten = await provisionedWorkspace(db(), "HalfWritten", { email: fixture.admin });
+    const workspaceId = halfWritten.workspaceId;
+
+    const finished = answeredValue(await ensured({ ...fixture, slug: halfWritten.slug }));
+
+    expect(finished).toMatchObject({
+      workspaceId,
+      provisioned: false,
+      mark: "written",
+      peopleAdded: 53,
+      membersAdded: 53,
+    });
+    expect(await markOf(workspaceId)).toEqual([{ testing_domain: fixture.testingDomain }]);
+    expect(await membersOf(workspaceId)).toHaveLength(54);
+    const offDomain = await asTheAdmin(fixture, workspaceId, (principal, tx) =>
+      inviteMembers(principal, tx, {
+        ...inputOf(inviteMembersInput, { addresses: ["ben@elsewhere.invalid"], role: "Viewer" }),
+        now: new Date(),
+      }),
+    );
+    expect(offDomain).toMatchObject({ ok: false, error: { word: "off-testing-domain" } });
   });
 
   it("corrects a mark naming another domain", async () => {
