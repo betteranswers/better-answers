@@ -33,7 +33,8 @@ import {
 
 const db = postgresForSuite();
 
-const { joining, rolesOf, auditRowsOf, batchesOf } = membersSuite(db);
+const { joining, rolesOf, auditRowsOf, batchesOf, grantsEndedAbout, grantsHere, endedOf } =
+  membersSuite(db);
 
 const ROLE_CHANGED = "people.member.role_changed";
 const REMOVED = "people.member.removed";
@@ -171,6 +172,58 @@ describe("changing the role of many members", () => {
     expect(await auditRowsOf(workspace, ROLE_CHANGED)).toEqual([]);
   });
 
+  it.each([
+    ["the other", (caller: string, other: string) => [other, caller] as const],
+    ["themself", (caller: string, other: string) => [caller, other] as const],
+  ])("lets one of two Admins demote %s", async (_who, split) => {
+    const workspace = await provisionedWorkspace(db(), "BulkRolesOneOfTwo");
+    const { adminUserId } = workspace;
+    const [demoted, staying] = split(adminUserId, await joining(workspace, "Admin"));
+
+    const changed = await asAdmin(workspace, changingRoles([demoted], "Editor"));
+
+    expect(changed).toEqual({ ok: true, value: { changed: [demoted], skipped: 0 } });
+    expect(await rolesOf(workspace)).toEqual({ [demoted]: "Editor", [staying]: "Admin" });
+    expect(await auditRowsOf(workspace, ROLE_CHANGED)).toEqual([
+      {
+        actor: `human:${adminUserId}`,
+        subject_id: demoted,
+        detail: { previousRole: "Admin", role: "Editor" },
+      },
+    ]);
+  });
+
+  it("lets an Admin demote themself among others, another Admin staying", async () => {
+    const workspace = await provisionedWorkspace(db(), "BulkRolesSelf");
+    const { adminUserId } = workspace;
+    const second = await joining(workspace, "Admin");
+    const viewer = await joining(workspace, "Viewer");
+    const ticked = [viewer, adminUserId];
+    expect(sorted(ticked)[0]).toBe(adminUserId);
+
+    const changed = await asAdmin(workspace, changingRoles(ticked, "Editor"));
+
+    expect(changed).toEqual({ ok: true, value: { changed: [adminUserId, viewer], skipped: 0 } });
+    expect(await rolesOf(workspace)).toEqual({
+      [adminUserId]: "Editor",
+      [second]: "Admin",
+      [viewer]: "Editor",
+    });
+    expect(await auditRowsOf(workspace, ROLE_CHANGED)).toEqual([
+      {
+        actor: `human:${adminUserId}`,
+        subject_id: adminUserId,
+        detail: { previousRole: "Admin", role: "Editor" },
+      },
+      {
+        actor: `human:${adminUserId}`,
+        subject_id: viewer,
+        detail: { previousRole: "Viewer", role: "Editor" },
+      },
+    ]);
+    expect(await oneBatchOf(workspace, ROLE_CHANGED)).toBe(2);
+  });
+
   it("refuses an id no member holds, writing nothing", async () => {
     const workspace = await provisionedWorkspace(db(), "BulkRolesNobody");
     const viewer = await joining(workspace, "Viewer");
@@ -237,6 +290,54 @@ describe("removing many members", () => {
       { role: "Admin", grants: [] },
     ]);
     expect(await oneBatchOf(workspace, REMOVED)).toBe(2);
+  });
+
+  it("lets an Admin remove themself among others, Admins staying", async () => {
+    const workspace = await provisionedWorkspace(db(), "BulkRemovedSelf");
+    const { workspaceId, adminUserId } = workspace;
+    const second = await joining(workspace, "Admin");
+    const third = await joining(workspace, "Admin");
+    const editor = await joining(workspace, "Editor");
+    const viewer = await joining(workspace, "Viewer");
+    const issued = await grantsHere(workspace, {
+      "the caller's": adminUserId,
+      "the editor's": editor,
+      "the viewer's": viewer,
+    });
+    const ticked = [viewer, editor, adminUserId];
+    expect(sorted(ticked)[0]).toBe(adminUserId);
+
+    const removed = await asAdmin(workspace, removing(ticked));
+
+    expect(removed).toEqual({
+      ok: true,
+      value: { changed: [adminUserId, editor, viewer], skipped: 0 },
+    });
+    expect(await rolesOf(workspace)).toEqual({ [second]: "Admin", [third]: "Admin" });
+    const grants = [
+      { clientId: issued.clientId, workspaceId, issuedAt: issued.issuedAt.toISOString() },
+    ];
+    const actor = `human:${adminUserId}`;
+    expect(await auditRowsOf(workspace, REMOVED)).toEqual([
+      { actor, subject_id: adminUserId, detail: { role: "Admin", grants } },
+      { actor, subject_id: editor, detail: { role: "Editor", grants } },
+      { actor, subject_id: viewer, detail: { role: "Viewer", grants } },
+    ]);
+    expect(await oneBatchOf(workspace, REMOVED)).toBe(3);
+    expect(await endedOf(issued)).toEqual([
+      "access the caller's",
+      "access the editor's",
+      "access the viewer's",
+      "refresh the caller's",
+      "refresh the editor's",
+      "refresh the viewer's",
+    ]);
+    const filed = { actor, detail: { workspaceId, grants } };
+    expect([
+      ...(await grantsEndedAbout(adminUserId)),
+      ...(await grantsEndedAbout(editor)),
+      ...(await grantsEndedAbout(viewer)),
+    ]).toEqual([filed, filed, filed]);
   });
 
   it("AE2: refuses removing the only Admin among four, naming them", async () => {

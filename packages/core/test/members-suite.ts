@@ -8,6 +8,7 @@ import {
   type Tx,
   withHeldPrincipal,
 } from "../src/store/postgres/index.ts";
+import { endedGrants, type NamedGrants } from "./identity-rows.ts";
 import type { ProvisionedWorkspace } from "./platform.ts";
 import { seedingWith } from "./suite-postgres.ts";
 
@@ -107,5 +108,30 @@ export const membersSuite = (db: () => MigratedPostgres) => {
     return rows.rows;
   };
 
-  return { joining, rolesOf, adminsOf, auditRowsOf, batchesOf, grantsEndedAbout };
+  /** A refresh and an access token here for each holder, named so an assertion reads whose ended. */
+  const grantsHere = (workspace: ProvisionedWorkspace, holders: Readonly<Record<string, string>>) =>
+    seedingWith(db().pool, async (seed) => {
+      const { clientId } = await seed.oauthClient();
+      const issuedAt = new Date(Date.now() - 60_000);
+      const labelById = new Map<string, string>();
+      for (const [holder, userId] of Object.entries(holders)) {
+        const held = { clientId, userId, referenceId: workspace.workspaceId, createdAt: issuedAt };
+        labelById.set((await seed.oauthRefreshToken(held)).id, `refresh ${holder}`);
+        labelById.set((await seed.oauthAccessToken(held)).id, `access ${holder}`);
+      }
+      return { clientId, labelById, issuedAt };
+    });
+
+  const endedOf = (grants: NamedGrants) => endedGrants(db().pool, grants);
+
+  return {
+    joining,
+    rolesOf,
+    adminsOf,
+    auditRowsOf,
+    batchesOf,
+    grantsEndedAbout,
+    grantsHere,
+    endedOf,
+  };
 };
