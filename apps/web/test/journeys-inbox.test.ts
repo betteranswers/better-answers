@@ -5,7 +5,7 @@ import { createServer } from "node:http";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // oxlint-disable-next-line no-restricted-imports -- the journeys sit outside `src`, where no alias reaches
-import { noteInbox } from "../journeys/inbox.ts";
+import { noteInbox, type Inbox } from "../journeys/inbox.ts";
 
 const KEY = "re_stand_in_key";
 const PERSON = "admin@journeys.example";
@@ -170,6 +170,12 @@ const watching = (inbox: StandIn) => ({
   pollIntervalMs: 10,
 });
 
+const notedOf = async (inbox: StandIn, overrides: Partial<Inbox> = {}) => {
+  const noted = await noteInbox({ ...watching(inbox), ...overrides });
+  if (noted.answer !== "noted") throw new Error(`the inbox answered ${noted.answer}`);
+  return noted;
+};
+
 /** Notes the inbox, lets `arriving` land as a Send would, then waits for the code. */
 const codeAfter = async (inbox: StandIn, ...arriving: readonly Mail[]) => {
   const noted = await noteInbox(watching(inbox));
@@ -307,8 +313,7 @@ describe("noteInbox", () => {
 
   it("answers no-mail when nothing new arrives by the deadline", async () => {
     const inbox = await standIn();
-    const noted = await noteInbox(watching(inbox));
-    if (noted.answer !== "noted") throw new Error(`the inbox answered ${noted.answer}`);
+    const noted = await notedOf(inbox);
     const startedAt = Date.now();
 
     expect(await noted.codeSent()).toEqual({ answer: "no-mail" });
@@ -318,8 +323,7 @@ describe("noteInbox", () => {
 
   it("finds a message that lands while it polls", async () => {
     const inbox = await standIn();
-    const noted = await noteInbox({ ...watching(inbox), deadlineMs: 5_000 });
-    if (noted.answer !== "noted") throw new Error(`the inbox answered ${noted.answer}`);
+    const noted = await notedOf(inbox, { deadlineMs: 5_000 });
     const answer = noted.codeSent();
     await vi.waitFor(() => {
       expect(listCalls(inbox).length).toBeGreaterThan(2);
@@ -345,8 +349,7 @@ describe("noteInbox", () => {
   it("stops paging at the first message it noted", async () => {
     const before = Array.from({ length: 150 }, () => mail("111111", { to: [SOMEONE_ELSE] }));
     const inbox = await standIn(...before);
-    const noted = await noteInbox(watching(inbox));
-    if (noted.answer !== "noted") throw new Error(`the inbox answered ${noted.answer}`);
+    const noted = await notedOf(inbox);
     const notingCalls = listCalls(inbox).length;
     inbox.arrive(mail("305117"));
 
@@ -389,8 +392,7 @@ describe("noteInbox", () => {
     { status: 200, body: JSON.stringify({ object: "list", data: "none" }) },
   ])("answers unreachable when the inbox answers %j", async (answer) => {
     const inbox = await standIn();
-    const noted = await noteInbox(watching(inbox));
-    if (noted.answer !== "noted") throw new Error(`the inbox answered ${noted.answer}`);
+    const noted = await notedOf(inbox);
     inbox.answerEverythingWith(answer);
     inbox.arrive(mail("305117"));
 
@@ -400,8 +402,7 @@ describe("noteInbox", () => {
 
   it("answers unreachable when a retrieve fails", async () => {
     const inbox = await standIn();
-    const noted = await noteInbox(watching(inbox));
-    if (noted.answer !== "noted") throw new Error(`the inbox answered ${noted.answer}`);
+    const noted = await notedOf(inbox);
     inbox.arrive(mail("305117", { vanished: true }));
 
     expect(await noted.codeSent()).toEqual({ answer: "unreachable" });

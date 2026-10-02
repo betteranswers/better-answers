@@ -38,7 +38,8 @@ const PAGE = z.object({
   has_more: z.boolean(),
   data: z.array(z.object({ id: z.string(), to: z.array(z.string()), from: z.string() })),
 });
-type Listed = z.infer<typeof PAGE>["data"][number];
+type Page = z.infer<typeof PAGE>;
+type Listed = Page["data"][number];
 
 const MESSAGE = z.object({
   text: z.string().nullish(),
@@ -73,7 +74,7 @@ const fetched = async <T>(url: URL, key: string, schema: z.ZodType<T>): Promise<
 };
 
 type Client = {
-  readonly page: (after: string | undefined) => Promise<z.infer<typeof PAGE> | undefined>;
+  readonly page: (after: string | undefined) => Promise<Page | undefined>;
   readonly message: (id: string) => Promise<Message | undefined>;
 };
 
