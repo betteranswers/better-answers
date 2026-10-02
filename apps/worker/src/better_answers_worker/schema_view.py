@@ -2,7 +2,7 @@
 
 MIGRATION_ID = "0060_the-second-factor"
 
-MIGRATION_WHEN = 1790940739142
+MIGRATION_WHEN = 1790947205335
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {

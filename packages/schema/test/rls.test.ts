@@ -204,11 +204,7 @@ describe("the identity set", () => {
         .filter(([, reason]) => reason.startsWith("Carries workspace_id on purpose"))
         .map(([qualified]) => qualified),
     );
-    expect([...carrying].toSorted()).toEqual([
-      "public.invitation",
-      "public.member",
-      "public.workspace_last_active",
-    ]);
+    expect([...carrying].toSorted()).toEqual(["public.invitation", "public.member"]);
     for (const qualified of IDENTITY_SET) {
       if (qualified === "public.workspace") continue;
       const [schema, table] = qualified.split(".");
@@ -668,6 +664,37 @@ describe("the group tables under app_rt", () => {
         await expect(client.query(statement, [...values])).rejects.toThrow(/permission denied/);
         await client.query("ROLLBACK TO SAVEPOINT worker_probe");
       }
+    });
+  });
+});
+
+describe("last activity under app_rt", () => {
+  it("returns none unscoped and only the scoped tenant's rows", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      const inA = await seed.workspaceLastActive({ workspaceId: WS_A });
+      await seed.workspaceLastActive({ workspaceId: WS_B });
+      await client.query("SET LOCAL ROLE app_rt");
+
+      const unscoped = await client.query("SELECT user_id FROM workspace_last_active");
+      expect(unscoped.rows).toEqual([]);
+
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      const scoped = await client.query("SELECT user_id, workspace_id FROM workspace_last_active");
+      expect(scoped.rows).toEqual([{ user_id: inA.userId, workspace_id: WS_A }]);
+    });
+  });
+
+  it("refuses the worker every row", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      await seed.workspaceLastActive({ workspaceId: WS_A });
+      await client.query("SET LOCAL ROLE worker_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      await expect(client.query("SELECT 1 FROM workspace_last_active LIMIT 1")).rejects.toThrow(
+        /permission denied/,
+      );
     });
   });
 });

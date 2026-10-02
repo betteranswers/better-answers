@@ -7,7 +7,6 @@ import {
   integer,
   jsonb,
   pgTable,
-  primaryKey,
   text,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
@@ -118,21 +117,16 @@ export const jwks = pgTable("jwks", {
   crv: text("crv"),
 });
 
-/** One person in one workspace: the row goes with either. */
-const personInWorkspace = () => ({
-  workspaceId: text("workspace_id")
-    .notNull()
-    .references(() => workspace.id, { onDelete: "cascade" }),
-  userId: text("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-});
-
 export const member = pgTable(
   "member",
   {
     id: text("id").primaryKey(),
-    ...personInWorkspace(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspace.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
 
     role: text("role").notNull(),
     createdAt: stamp("created_at").notNull(),
@@ -432,19 +426,6 @@ export const recoveryCode = pgTable(
   (table) => [uniqueIndex("recovery_code_user_id_code_hash_uidx").on(table.userId, table.codeHash)],
 );
 
-/** Not a `member` column, so its stamp never waits on the holds every member act takes. */
-export const workspaceLastActive = pgTable(
-  "workspace_last_active",
-  {
-    ...personInWorkspace(),
-    at: stamp("at").notNull(),
-  },
-  (table) => [
-    primaryKey({ columns: [table.workspaceId, table.userId] }),
-    index("workspace_last_active_user_id_idx").on(table.userId),
-  ],
-);
-
 export const rateLimit = pgTable("rate_limit", {
   id: text("id").primaryKey(),
   key: text("key").notNull().unique(),
@@ -473,5 +454,4 @@ export const IDENTITY_SET = [
   "public.passkey",
   "public.passkey_last_use",
   "public.recovery_code",
-  "public.workspace_last_active",
 ] as const;

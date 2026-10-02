@@ -76,6 +76,10 @@ export type TestData = {
 
   accessRequest(overrides?: Partial<InsertInput<"accessRequest">>): Promise<Row<"accessRequest">>;
 
+  workspaceLastActive(
+    overrides?: Partial<InsertInput<"workspaceLastActive">>,
+  ): Promise<Row<"workspaceLastActive">>;
+
   conceptIdentity(
     overrides?: Partial<InsertInput<"conceptIdentity">>,
   ): Promise<Row<"conceptIdentity">>;
@@ -413,6 +417,17 @@ export const testData = (client: pg.PoolClient): TestData => {
       ...overrides,
       workspaceId,
       requesterId,
+    });
+  };
+
+  const workspaceLastActive: TestData["workspaceLastActive"] = async (overrides = {}) => {
+    const workspaceId = overrides.workspaceId ?? (await workspace()).id;
+    const userId = overrides.userId ?? (await member({ workspaceId })).userId;
+    return insertRow(client, "workspaceLastActive", {
+      at: new Date(),
+      ...overrides,
+      workspaceId,
+      userId,
     });
   };
 
@@ -862,6 +877,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     auditEvent,
     identityAuditEvent,
     accessRequest,
+    workspaceLastActive,
     conceptIdentity,
     conceptIndex,
     bundleCommit,

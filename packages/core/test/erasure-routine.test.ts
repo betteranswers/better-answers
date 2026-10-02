@@ -552,7 +552,6 @@ const SWEPT_BY_PERSON = [
   "public.passkey",
   "public.recovery_code",
   "public.session",
-  "public.workspace_last_active",
 ];
 
 /** A client's registration, and a grant's tokens and consent: the identity sweep reaches none. */
@@ -1324,10 +1323,8 @@ describe("the identity set on the person's last membership", () => {
 
   it("deletes the person's second factor, last activity and their flags", async () => {
     const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
-    const left = await arrange();
     const held = await secondFactorRowsFor(db().pool, person.id);
     await lastActiveIn(db().pool, scenario.workspaceId, person.id);
-    await lastActiveIn(db().pool, left.workspaceId, person.id);
     expect(await secondFactorHeldBy(person.id, held.passkeyId)).toEqual(SECOND_FACTOR_HELD);
 
     const done = await completing(scenario, subjectRequestId);
@@ -1347,7 +1344,7 @@ describe("the identity set on the person's last membership", () => {
         passkeys_deleted: 1,
         authenticators_deleted: 1,
         recovery_codes_deleted: 2,
-        last_active_deleted: 2,
+        last_active_deleted: 1,
       }),
     ]);
   });

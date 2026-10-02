@@ -32,8 +32,6 @@ export const RLS_EXEMPTIONS = {
     "Beside its passkey, which no workspace holds: stamped as the passkey signs in, pre-session.",
   "public.recovery_code":
     "A person's own, across every workspace: spent in place of a second factor before any workspace is chosen.",
-  "public.workspace_last_active":
-    "Carries workspace_id on purpose: stamped in its own transaction beside the claim's resolve, and erased with the person across every workspace.",
   "public.ingress_counter":
     "The pre-authentication per-IP and per-email counter: no workspace exists yet to scope it by.",
   "public.contract_stamp":

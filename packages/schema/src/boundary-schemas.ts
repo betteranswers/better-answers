@@ -74,10 +74,10 @@ import {
   session,
   user,
   verification,
-  workspaceLastActive,
 } from "./identity-tables.ts";
 import { chunk, EMBEDDING_DIMENSIONS } from "./index-tables.ts";
 import { job, JOB_KINDS, JOB_REASONS, JOB_STATUSES } from "./job-tables.ts";
+import { workspaceLastActive } from "./last-active-tables.ts";
 import { contractStamp, sweepPass, UPLOAD_SWEEP_MODES } from "./platform-tables.ts";
 import { AUDIENCES, SENSITIVITIES } from "./readable-columns.ts";
 import { ROLES } from "./roles.ts";

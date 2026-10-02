@@ -36,7 +36,6 @@ export const TABLE_OWNERS = {
   "public.passkey": IDENTITY_PROVIDER,
   "public.passkey_last_use": IDENTITY_PROVIDER,
   "public.recovery_code": IDENTITY_PROVIDER,
-  "public.workspace_last_active": IDENTITY_PROVIDER,
 
   "public.ingress_counter": POSTGRES_DOOR,
   "public.mcp_call_counter": POSTGRES_DOOR,
@@ -52,6 +51,7 @@ export const TABLE_OWNERS = {
   "public.audit_event": "audit",
   "public.identity_audit_event": "audit",
   "public.access_request": "members",
+  "public.workspace_last_active": "members",
   "index.chunk": "sources",
 
   "public.concept_identity": "concepts",
@@ -224,7 +224,7 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "erasure",
     access: "write",
     reason:
-      "When the person was last active here is this workspace's record of them, so it goes with every erasure from it; on the last membership, the rows other workspaces kept go too, with the person.",
+      "When the person was last active here is this workspace's record of them, so every erasure from it deletes that row, under the workspace's scope. A workspace the person left already deleted its own row when they left.",
   },
   {
     table: "public.member",

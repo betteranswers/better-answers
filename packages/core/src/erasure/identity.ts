@@ -1,6 +1,11 @@
 import { normalizeError, type PlatformPrincipal } from "../kernel/index.ts";
 import { ERASED_DOMAIN } from "../store/git/index.ts";
-import { withIdentityWrite, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
+import {
+  withIdentityWrite,
+  withScope,
+  type PostgresDoor,
+  type Tx,
+} from "../store/postgres/index.ts";
 import { verificationIdentifiersOf, workspacesHeldBy } from "../workspaces/index.ts";
 
 export type IdentityArm = "no-person" | "last-membership" | "membership-ended";
@@ -56,13 +61,7 @@ export type ErasureSubject = {
 
 const rowsOf = (result: { readonly rowCount: number | null }): number => result.rowCount ?? 0;
 
-type HeldByThePerson =
-  | "session"
-  | "account"
-  | "passkey"
-  | "authenticator"
-  | "recovery_code"
-  | "workspace_last_active";
+type HeldByThePerson = "session" | "account" | "passkey" | "authenticator" | "recovery_code";
 
 const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) => {
   const emails = [...subject.emails];
@@ -82,7 +81,6 @@ const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) =
   const passkeys = await deleted("passkey");
   const authenticators = await deleted("authenticator");
   const recoveryCodes = await deleted("recovery_code");
-  const lastActive = await deleted("workspace_last_active");
 
   const pseudonymised = await tx.query(
     `UPDATE "user"
@@ -99,7 +97,6 @@ const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) =
     passkeys,
     authenticators,
     recoveryCodes,
-    lastActive,
     invitationsHere: invitations.rows.filter((row) => row.workspace_id === subject.workspaceId)
       .length,
     invitationsEverywhere: rowsOf(invitations),
@@ -126,20 +123,19 @@ export const eraseFromTheIdentitySet = async (
   const elsewhere = held.value.filter((workspaceId) => workspaceId !== subject.workspaceId);
   const arm: IdentityArm = elsewhere.length === 0 ? "last-membership" : "membership-ended";
 
+  // Before the membership ends: a rerun after that no longer finds the person here to look for.
+  const lastActive = await withScope(platform, door, subject.workspaceId, async (tx) =>
+    rowsOf(await tx.query("DELETE FROM workspace_last_active WHERE user_id = $1", [personId])),
+  );
+
   return withIdentityWrite(platform, door, async (tx) => {
     const ended = await tx.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
       subject.workspaceId,
       personId,
     ]);
     const membershipsEnded = rowsOf(ended);
-    if (arm === "membership-ended") {
-      const lastActiveHere = await tx.query(
-        "DELETE FROM workspace_last_active WHERE workspace_id = $1 AND user_id = $2",
-        [subject.workspaceId, personId],
-      );
-      return { arm, ...SWEPT_NOTHING, membershipsEnded, lastActive: rowsOf(lastActiveHere) };
-    }
+    if (arm === "membership-ended") return { arm, ...SWEPT_NOTHING, membershipsEnded, lastActive };
     const swept = await sweepTheSet(tx, subject, `${subject.pseudonym}@${ERASED_DOMAIN}`);
-    return { arm, membershipsEnded, ...swept };
+    return { arm, membershipsEnded, lastActive, ...swept };
   });
 };

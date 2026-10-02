@@ -38,6 +38,10 @@ CREATE TABLE "workspace_last_active" (
 	"at" timestamp with time zone NOT NULL,
 	CONSTRAINT "workspace_last_active_workspace_id_user_id_pk" PRIMARY KEY("workspace_id","user_id")
 );--> statement-breakpoint
+ALTER TABLE "workspace_last_active" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+-- Hand-written, as each tenant table's substrate is (ADR 0032): the policy binds the owner too, and the worker never reads it.
+ALTER TABLE "workspace_last_active" FORCE ROW LEVEL SECURITY;--> statement-breakpoint
+REVOKE ALL ON "workspace_last_active" FROM worker_rt;--> statement-breakpoint
 ALTER TABLE "session" ADD COLUMN "second_factor_confirmed_at" timestamp with time zone;--> statement-breakpoint
 ALTER TABLE "session" ADD COLUMN "pending_since" timestamp with time zone;--> statement-breakpoint
 ALTER TABLE "user" ADD COLUMN "authenticator_enabled" boolean DEFAULT false NOT NULL;--> statement-breakpoint
@@ -48,11 +52,12 @@ ALTER TABLE "passkey" ADD CONSTRAINT "passkey_user_id_user_id_fk" FOREIGN KEY ("
 ALTER TABLE "passkey_last_use" ADD CONSTRAINT "passkey_last_use_passkey_id_passkey_id_fk" FOREIGN KEY ("passkey_id") REFERENCES "public"."passkey"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "recovery_code" ADD CONSTRAINT "recovery_code_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "workspace_last_active" ADD CONSTRAINT "workspace_last_active_workspace_id_workspace_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspace"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "workspace_last_active" ADD CONSTRAINT "workspace_last_active_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "workspace_last_active" ADD CONSTRAINT "workspace_last_active_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "authenticator_user_id_uidx" ON "authenticator" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "passkey_user_id_idx" ON "passkey" USING btree ("user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "passkey_credential_id_uidx" ON "passkey" USING btree ("credential_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "recovery_code_user_id_code_hash_uidx" ON "recovery_code" USING btree ("user_id","code_hash");--> statement-breakpoint
 CREATE INDEX "workspace_last_active_user_id_idx" ON "workspace_last_active" USING btree ("user_id");--> statement-breakpoint
+CREATE POLICY "workspace_last_active_workspace_isolation" ON "workspace_last_active" AS PERMISSIVE FOR ALL TO public USING ("workspace_last_active"."workspace_id" = (select current_workspace_id())) WITH CHECK ("workspace_last_active"."workspace_id" = (select current_workspace_id()));--> statement-breakpoint
 -- Every pending migration runs in one transaction, so the bound ends with this one.
 SET LOCAL lock_timeout = DEFAULT;
