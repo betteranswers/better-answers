@@ -28,6 +28,7 @@ const memberAdded = z.object({ added: z.boolean() });
 const credentialsRevoked = z.object({ revoked: z.boolean() });
 const routesSeeded = z.object({ seeded: z.number() });
 const codeSent = z.object({ code: z.string() });
+const linkSent = z.object({ token: z.string() });
 
 const ask = async <T>(
   api: APIRequestContext,
@@ -281,12 +282,24 @@ export const flagTheName = (
   input: { workspaceId: string; adminId: string; personId: string },
 ) => ask(api, "/name-flags", input, nameFlagged);
 
-/** The code the api captured for this address, in place of the email nobody receives. */
-export const codeSentTo = async (api: APIRequestContext, email: string): Promise<string> => {
-  const sent = await api.get(`${HARNESS}/codes?email=${encodeURIComponent(email)}`);
-  expect(sent.ok(), "no code was captured for this address").toBe(true);
-  return codeSent.parse(await sent.json()).code;
+/** What the api captured of the last email to this address, in place of the email nobody receives. */
+const capturedFor = async <T>(
+  api: APIRequestContext,
+  path: string,
+  email: string,
+  answer: z.ZodType<T>,
+): Promise<T> => {
+  const sent = await api.get(`${HARNESS}${path}?email=${encodeURIComponent(email)}`);
+  expect(sent.ok(), `nothing was captured at ${path} for this address`).toBe(true);
+  return answer.parse(await sent.json());
 };
+
+export const codeSentTo = async (api: APIRequestContext, email: string): Promise<string> =>
+  (await capturedFor(api, "/codes", email, codeSent)).code;
+
+/** The token in the fragment of the email's sign-in link. */
+export const linkSentTo = async (api: APIRequestContext, email: string): Promise<string> =>
+  (await capturedFor(api, "/links", email, linkSent)).token;
 
 /** Timestamped and randomised, so a code read back for it is this test's alone. */
 export const anAddress = (who: string): string =>
