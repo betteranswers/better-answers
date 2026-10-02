@@ -121,7 +121,7 @@ flowchart TD
     end
 ```
 
-Configuration follows the `[SEC1]` rule, where only the bootstrap class of secrets reaches the process through environment variables.
+Configuration follows the rule *Keep a secret to its credential class*, where only the bootstrap class of secrets reaches the process through environment variables.
 Sources: [CODING_RULES.md:118-124](CODING_RULES.md#L118-L124), [deploy/platform.compose.yaml:33-43](deploy/platform.compose.yaml#L33-L43), [deploy/wizard-41.sh:318-323](deploy/wizard-41.sh#L318-L323)
 
 ## Deployment Procedures

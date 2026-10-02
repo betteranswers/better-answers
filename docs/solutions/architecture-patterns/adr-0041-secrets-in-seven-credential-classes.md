@@ -38,7 +38,7 @@ What each class is for and where it is read is the table in `docs/operations/SEC
 
 Settling either is a new decision, an amendment to this record and to the record that loses.
 
-The decision predates this record. It was moved out of the credential-class rule, `[SEC1]` in the root `CODING_STANDARDS.md`, which keeps the sentence that classes are never mixed in one scope. `[SEC4]` keeps the seam: the environment is read in the tier's one config module.
+The decision predates this record. It was moved out of the rule *Keep a secret to its credential class*, in the root `CODING_STANDARDS.md`, which keeps the sentence that classes are never mixed in one scope. The rule *Read the environment in the tier's one config module* keeps the seam.
 
 ## Why
 
@@ -48,7 +48,7 @@ The decision predates this record. It was moved out of the credential-class rule
 
 ## Rejected
 
-- Keeping the class list in the credential-class rule: a specification wearing a rule tag, which a reader reasonably expects something to run.
+- Keeping the class list in the credential-class rule: a specification dressed as a coding rule, which a reader reasonably expects something to run.
 
 ## History
 

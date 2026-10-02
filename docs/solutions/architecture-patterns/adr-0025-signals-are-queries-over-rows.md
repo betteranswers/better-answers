@@ -34,7 +34,7 @@ A **signal** is a named query over rows the platform already keeps, with a thres
 - Three channels, each for the case only it can see: healthchecks.io for silence, Coolify through Resend for deploy and container failures, and the api's own email through `SMTP_URL` for the thresholds, immediately for a short list and in a daily digest for the rest.
 - Retention: `platform_event` 90 days; heartbeats one a minute for seven days, then one an hour for ninety; `llm_call` six months, then a monthly per-workspace aggregate.
 
-These shapes live here, not in the rules. `[LOG1]` in `CODING_STANDARDS.md` keeps the checkable sentence that no prompt or completion reaches a logger, an exporter or a row. `[OPS2]` in `deploy/CODING_STANDARDS.md` keeps "no metrics store and no scrape", and the alert-once rule moved here from the deploy rule.
+These shapes live here, not in the rules. The rule *Log through the tier's one structured logger*, in `CODING_STANDARDS.md`, keeps the checkable sentence that no prompt or completion reaches a logger, an exporter or a row. The rule *Keep a signal and an alert as rows*, in `deploy/CODING_STANDARDS.md`, keeps "no metrics store and no scrape", and the alert-once rule moved here from the deploy rule.
 
 `llm_call`, `platform_event`, the threshold rows and the heartbeat's host figures have no table yet. `contracts/cost-ledger/rows.json` holds the `llm_call` row's golden rows and the purposes both tiers already speak.
 
@@ -46,7 +46,7 @@ These shapes live here, not in the rules. `[LOG1]` in `CODING_STANDARDS.md` keep
 - Silence is watched from outside because the api may be what is down.
 - Without the api's own alerts, the statutory case (erasure) and the spend case (the ceiling) go unseen unless someone looks.
 - `llm_call` feeds the ceiling, price drift, replay spend, per-client spend and the onboarding estimate, and ADR 0017's replay reads it.
-- A column list in a rule was specification wearing a rule tag. A rule keeps only what a diff can check.
+- A column list in a rule was a specification dressed as a coding rule. A rule keeps only what a diff can check.
 
 ## Rejected
 

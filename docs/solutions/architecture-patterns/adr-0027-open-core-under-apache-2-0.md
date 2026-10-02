@@ -29,7 +29,7 @@ The repository is public under the Apache License 2.0, one licence over the whol
 - GPL and AGPL software, such as Garage, runs unmodified as a separate process over a network protocol, never linked, vendored or copied. Nothing under an enterprise-licensed directory is read, not even for its shape.
 - The estate's own configuration is not published. The ops documents in `docs/operations/` are public halves naming credential classes, contracts and the deployment shape. The gitignored `.planning/estate/` holds the addresses and the edge-policy placement.
 - No public file names a hostname's Access posture, a rate-limit placement, a firewall rule, a bucket name or an escrow holder. The rule binds operational files, not the ADRs. The compose files, Dockerfiles, wizard, workflows and backup and restore scripts stay public in full.
-- The licence posture binds as this decision's own text; `CODING_STANDARDS.md` carries no licence family. The per-lift file is the api's lift-contract rule, `[APP4]` in `apps/api/CODING_STANDARDS.md`: a `THIRD_PARTY_NOTICES.md` and a contract test in every directory under `lifts/`, as in `apps/api/lifts/better-auth-cimd-node/`.
+- The licence posture binds as this decision's own text; `CODING_STANDARDS.md` carries no licence family. The per-lift file is the api's rule *Test every lift by contract, never by trust*, in `apps/api/CODING_STANDARDS.md`: a `THIRD_PARTY_NOTICES.md` and a contract test in every directory under `lifts/`, as in `apps/api/lifts/better-auth-cimd-node/`.
 - There is no root `THIRD_PARTY_NOTICES.md` aggregate and no `check` licence step.
 - The public face is read-only. Issues are open, outside pull requests are closed with a fixed note, and `SECURITY.md` names one address for vulnerability reports.
 

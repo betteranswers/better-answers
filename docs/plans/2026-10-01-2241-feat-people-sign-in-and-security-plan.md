@@ -246,8 +246,8 @@ flowchart TB
 - KTD2. **The library keeps only what needs its cryptography; everything else is our own act.**
   - **Library-owned:** the `twoFactor` plugin's TOTP (`allowPasswordless`, its account lockout turned off for KTD14) and `@better-auth/passkey` (with `session.freshAge: 0`, so KTD3's helper is the only freshness rule). They own passkey registration, authenticator enable and authenticator verify. Our routes in `apps/api/src/auth/` call them behind the gate.
   - **The session swap:** the library's first-time authenticator verify mints a new session and deletes the old one (`totp/index.mjs:205-213`), yet its response body still names the old one. Our route takes the new session from the response's `Set-Cookie` when one is set, stamps it and forwards its cookie. Otherwise it stamps the request's own session. It never uses the token in the response body.
-  - **Recorded after commit:** these library-owned writes are recorded after the library commits, and `CODING_STANDARDS.md`'s AUDIT8 is amended in the same commit to name them beside sign-in and consent.
-  - **Our own core acts over plain rows:** removing a factor, renaming a passkey, recovery codes (KTD13), the confirmation stamp, the operator restore and session sign-outs. Each locks the person's `user` row `FOR UPDATE`, rechecks under the lock (R16), and records with `recordFor` in the same transaction (AUDIT1), on the `setDisplayName` precedent.
+  - **Recorded after commit:** these library-owned writes are recorded after the library commits, and the rule *Keep a read, a run and a health check out of the audit log* in `CODING_STANDARDS.md` is amended in the same commit to name them beside sign-in and consent.
+  - **Our own core acts over plain rows:** removing a factor, renaming a passkey, recovery codes (KTD13), the confirmation stamp, the operator restore and session sign-outs. Each locks the person's `user` row `FOR UPDATE`, rechecks under the lock (R16), and records with `recordFor` in the same transaction, on the `setDisplayName` precedent.
   - **Closed endpoints:** every plugin endpoint that adds, removes, replaces, verifies or reveals a factor outside our routes. That includes:
     - `/two-factor/get-totp-uri`, which returns the decrypted secret to any session;
     - `/two-factor/disable` and the backup-code endpoints;
@@ -434,10 +434,10 @@ For the owner, before the unit named lands; none blocks starting the work:
 
 - **Auth boundary:** the identity seam is unchanged. `better-auth` stays fenced to `apps/api/src/auth/` and `apps/web/src/features/auth/`, and the Account page, people screens and shell reach it through `features/auth` hooks.
 - **Identity set:** new person-level tables (passkeys, authenticator secrets, recovery codes) are registered in `IDENTITY_SET`, `TABLE_OWNERS` and `RLS_EXEMPTIONS` with a reason. Workspace last-active is a tenant table under RLS instead (KTD8). They also join erasure's families and finders (`packages/core/src/erasure/map.ts`), its swept counts and its routine. That routine runs on the last membership, so factors survive while the person still belongs to another workspace. Erasure also resets the user row's two-factor flag. Link rows live in `verification` and need no new table.
-- **Audit:** AUDIT8 is amended to name the library-owned factor writes (KTD2). Audit details name passkey ids, never passkey names, because the log is append-only (AUDIT5).
+- **Audit:** the rule *Keep a read, a run and a health check out of the audit log* is amended to name the library-owned factor writes (KTD2). Audit details name passkey ids, never passkey names, because the log is append-only.
 - **Operators:** console writes and reads both pass the gate, and writes move from "signed in within the hour" to "confirmed a factor within the hour".
 - **MCP and personal tokens:** unaffected at use time. A pending Admin cannot complete a new "connect Claude" authorisation until confirmed.
-- **Glossary and decisions:** `CONTEXT.md` gains the new words first (GLOSSARY1). ADR 0009, 0034, 0035, 0038 and 0047 are amended by the units that move them, and a new decision doc records the second-factor policy.
+- **Glossary and decisions:** `CONTEXT.md` gains the new words first. ADR 0009, 0034, 0035, 0038 and 0047 are amended by the units that move them, and a new decision doc records the second-factor policy.
 
 ---
 
@@ -471,7 +471,7 @@ For the owner, before the unit named lands; none blocks starting the work:
 **Approach:**
 1. Add entries for *passkey*, *authenticator*, *second factor*, *recovery code*, *re-confirm*, *session* and *sign-in link*, each with one definition and its *Avoid* line.
 2. Extend the *sign-in* entry to name passkeys and the link, and the *Account page* entry to name its Sign-in and Sessions sections.
-3. Keep implementation words out (GLOSSARY1), and keep every word the glossary avoids out of the new entries, as `apps/api/tests/avoid-words.test.ts` checks.
+3. Keep implementation words out, and keep every word the glossary avoids out of the new entries, as `apps/api/tests/avoid-words.test.ts` checks.
 **Patterns to follow:** existing entries' shape, and `apps/api/tests/avoid-words.test.ts` for avoided words.
 **Test scenarios:** Test expectation: none -- glossary text, held by `pnpm check:docs`.
 **Verification:** `pnpm check:docs` passes, and every word the later units use has an entry.
@@ -596,7 +596,7 @@ For the owner, before the unit named lands; none blocks starting the work:
 - `cookieCache` is off, so a session read always comes from the database.
 - Erasing a person on their last membership removes their passkey, authenticator, recovery-code and last-active rows, and clears the two-factor flag.
 - Erasing a person who still belongs to another workspace leaves their factors in place.
-- The new tables appear in the identity set, table ownership, RLS exemptions and erasure's families, each pair checked both ways (TEST7).
+- The new tables appear in the identity set, table ownership, RLS exemptions and erasure's families, each pair checked both ways.
 - The worker's schema stamp matches the new migration.
 **Verification:** `check` is green with the new snapshot, and no existing sign-in spec changes.
 
@@ -616,7 +616,7 @@ For the owner, before the unit named lands; none blocks starting the work:
 3. Add passkeys through our route over the library's registration. Rename and remove are core acts that lock the person's row, so the last factor of an Admin cannot go (R16). Each change is recorded by passkey id and sends its notice (R36).
 4. Refuse a sign-in assertion without user verification. Stamp the session and the passkey's last use at session creation (KTD5). Record passkey sign-in in `AUDITED_PATHS`.
 5. Add the one dismissible offer banner, its dismissal stored for the person, hidden where WebAuthn is unavailable.
-**Patterns to follow:** `features/auth` hooks for every library call (WEB2), the `/display-name` root route, and the `browser-suite` skill. The harness gains a Playwright CDP virtual authenticator.
+**Patterns to follow:** `features/auth` hooks for every library call, the `/display-name` root route, and the `browser-suite` skill. The harness gains a Playwright CDP virtual authenticator.
 **Screen states:** Appendix, items 4 (Account page and banner) and 6 (passkey on the sign-in screen).
 **Test scenarios:**
 - A person adds a passkey on the Account page and signs in with it from the email field's autofill, opening no email.
@@ -766,7 +766,7 @@ For the owner, before the unit named lands; none blocks starting the work:
 - tests: new `packages/core/test/freshness.test.ts`, new `apps/web/e2e/reconfirm.spec.ts`, `apps/api/tests/provoke.ts` and `apps/api/tests/harness-control.ts` (age the confirmation, not `created_at`)
 **Approach:**
 1. Carry the session id through Claims and the operator's input, and give the principal the confirmation stamp from core's identity-set read (KTD3).
-2. Replace the operator's sign-in-age freshness with the one helper (KTD3), checked before the first await (SEC5).
+2. Replace the operator's sign-in-age freshness with the one helper (KTD3), checked before the first await.
 3. Apply it to KTD4's set, with one check per bulk batch.
 4. Add one refusal word, and the SPA dialog that re-confirms by passkey or authenticator and retries with the input kept. A Microsoft re-confirm leaves the page, so it lands back on the same route with a notice instead (U14).
 5. Set sessions to 30 days with daily renewal (KTD8).
@@ -820,7 +820,7 @@ For the owner, before the unit named lands; none blocks starting the work:
 - docs: `docs/solutions/architecture-patterns/adr-0034-*.md`, `CONTEXT.md` (*sign-in*), `docs/operations/SECRETS.md`
 - tests: new `apps/api/tests/microsoft.test.ts`, `apps/web/e2e/harness.ts` (fake OpenID issuer), new `apps/web/e2e/microsoft.spec.ts`
 **Approach:**
-1. Read the client id and secret as a credential class in config (SEC1, SEC4).
+1. Read the client id and secret as a credential class in config.
 2. Register the provider for `organizations`, deriving verified email from `xms_edov`.
 3. Keep the library's linking on, and enforce invitation-first linking in the user and account creation hooks (KTD10). An existing person's first Microsoft sign-in is refused with a pointer to the Account page.
 4. Store `tid` beside `oid`, and match both on later sign-ins.
@@ -928,7 +928,7 @@ For the owner, before the unit named lands; none blocks starting the work:
 
 | Proves | Command | When |
 | --- | --- | --- |
-| api, core and schema behaviour (real Postgres, TEST2) | `pnpm --filter @better-answers/api run test <file>`, likewise `@better-answers/core` and `@better-answers/schema` | every unit, for the files it names |
+| api, core and schema behaviour (real Postgres) | `pnpm --filter @better-answers/api run test <file>`, likewise `@better-answers/core` and `@better-answers/schema` | every unit, for the files it names |
 | SPA components | `pnpm --filter @better-answers/web run test <file>` | U4, U6 to U8, U10, U11, U15 |
 | Browser flows and the accessibility gate | `pnpm --filter @better-answers/web run e2e` with the spec named, per the `browser-suite` skill | every unit with a spec |
 | Endpoint snapshot | `UPDATE_BETTER_AUTH_ENDPOINTS=1 pnpm --filter @better-answers/api run test tests/better-auth-endpoints.test.ts`, then review the `.txt` diff | U3, U5, U13 |
@@ -944,7 +944,7 @@ Run local suites with `IMAGE_PROBE_DEFERRED=true` (`docs/agents/workflow.md`). C
 - Every R1 to R37 is met and traced to a unit and a test, and every AE has a test that names it.
 - U10 flips U5's pinned email-code bypass test, so an Admin's email sign-in is pending. The passkey and Microsoft equivalents are written against the gate in U10 and U14.
 - Every endpoint added by Better Auth is reviewed in the snapshot, and every one that changes, verifies or reveals a factor is proven closed or gated.
-- `CONTEXT.md`, the amended ADR docs (0009, 0034, 0035, 0038, 0047) and the amended AUDIT8 in `CODING_STANDARDS.md` land in the commits that move them, and the new second-factor decision doc exists.
+- `CONTEXT.md`, the amended ADR docs (0009, 0034, 0035, 0038, 0047) and the amended rule *Keep a read, a run and a health check out of the audit log* in `CODING_STANDARDS.md` land in the commits that move them, and the new second-factor decision doc exists.
 - Erasure removes every new identity-set row and the sign-in code and link rows, proven both on a last membership and with another membership remaining.
 - The browser suite passes the accessibility gate on every new screen.
 - No abandoned-attempt code, flags or dead routes remain in the diff.

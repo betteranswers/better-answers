@@ -14,7 +14,6 @@ The following files were used as context for generating this wiki page:
 - [apps/docs-site/specs/T-006.md](apps/docs-site/specs/T-006.md)
 - [apps/docs-site/specs/T-045.md](apps/docs-site/specs/T-045.md)
 - [apps/api/tests/deploy-tree.test.ts](apps/api/tests/deploy-tree.test.ts)
-- [apps/api/tests/coding-rules-tags.test.ts](apps/api/tests/coding-rules-tags.test.ts)
 </details>
 
 # Audit Trail & Event Logging

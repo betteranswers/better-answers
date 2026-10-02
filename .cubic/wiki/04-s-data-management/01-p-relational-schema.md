@@ -97,7 +97,7 @@ The ER diagram displays the primary relationships between multi-tenant workspace
 | `llmRoute` | Configures model providers for specific purposes. | `purpose` includes `extraction`, `enrichment`, `answering`, etc. |
 | `audit_event` | Append-only ledger of governed writes. | Revokes `UPDATE` and `DELETE` at the DB level. |
 
-Sources: [packages/schema/src/boundary-schemas.ts:154-206](packages/schema/src/boundary-schemas.ts#L154-L206), [apps/docs-site/specs/T-006.md:209-215](apps/docs-site/specs/T-006.md#L209-L215), [CODING_RULES.md:[AUDIT6]]()
+Sources: [packages/schema/src/boundary-schemas.ts:154-206](packages/schema/src/boundary-schemas.ts#L154-L206), [apps/docs-site/specs/T-006.md:209-215](apps/docs-site/specs/T-006.md#L209-L215), [CODING_STANDARDS.md](CODING_STANDARDS.md): *Keep the audit log append-only in the database*
 
 ## Database Governance Rules
 
@@ -105,15 +105,15 @@ The project enforces several architectural constraints to maintain data integrit
 
 ### Row Level Security (RLS)
 Every tenant table must be created `withRLS()`. A zero-rows test must ship with every tenant table to prove that the non-owner runtime role returns no rows by default under `FORCE ROW LEVEL SECURITY`.
-Sources: [CODING_RULES.md:[SEC3]]()
+Sources: [CODING_STANDARDS.md](CODING_STANDARDS.md): *Ship a tenant table, a grant or a definer function with the test of what it refuses*
 
 ### Principal-First Access
 Every function in `packages/core` that reads or writes tenant data must take a `Principal` (`workspaceId`, `userId`, `role`) as its first parameter. Data access logic checks the role and the read predicate (published, sensitivity, audience) against the readable unit's columns.
-Sources: [CODING_RULES.md:[SEC2]]()
+Sources: [CODING_STANDARDS.md](CODING_STANDARDS.md): *Take a `Principal` as the first parameter*
 
 ### Postgres testing
 The database is never mocked. Every test touching data runs against a real Postgres instance using Testcontainers or the compose database.
-Sources: [CODING_RULES.md:[TEST2]]()
+Sources: [CODING_STANDARDS.md](CODING_STANDARDS.md): *Run every store the platform runs, for real*
 
 ## Cross-Tier Schema Synchronization
 

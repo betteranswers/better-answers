@@ -38,9 +38,9 @@ The tiers share four stores and never code: the Postgres schema, the object stor
 Third-party code is lifted by contract as pinned snapshots, never tracked as a fork or a submodule.
 
 - Each lift's directory carries a `THIRD_PARTY_NOTICES.md`, as `apps/api/lifts/better-auth-cimd-node/` does.
-- What that file holds, and the contract test a refresh must pass, is the api's lift-contract rule, `[APP4]` in `apps/api/CODING_STANDARDS.md`.
+- What that file holds, and the contract test a refresh must pass, is the api's rule *Test every lift by contract, never by trust*, in `apps/api/CODING_STANDARDS.md`.
 - The licence posture is ADR 0027's own text.
-- The constitution's LIFT family of rules is retired. Lifting by contract stands as this decision.
+- The constitution's rules on lifting are retired. Lifting by contract stands as this decision.
 
 Python is unavoidable because of cocoindex and Google's OKF reference agent. Docling is a dependency of nothing.
 

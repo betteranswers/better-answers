@@ -38,7 +38,7 @@ The authorization server's pages are `/oauth2/*`, the path `@better-auth/oauth-p
 - The MCP surface and `/oauth2/*` answer on the product's origin, `app.<domain>`, beside `/.well-known/*` and `/jwks`, never on `mcp.` (ADR 0034).
 - The host router, `apps/api/src/ingress/hostnames.ts`, holds paths per hostname across three hostnames: `app.`, `agent.` and the apex. It is mounted ahead of every other route and refuses `agent.` anything but `/agent/v1/*` before a body is read.
 
-Business logic lives in `packages/core`. The same function serves every transport because it takes a `Principal` first (`[SEC2]` in `CODING_STANDARDS.md`) and nothing transport-shaped.
+Business logic lives in `packages/core`. The same function serves every transport because it takes a `Principal` first, as `CODING_STANDARDS.md` requires, and nothing transport-shaped.
 
 - A transport is proven by its own tests: its verifier, its refusals, its mounted routes.
 - A capability's functional test goes through the interface a caller crosses in its tier.

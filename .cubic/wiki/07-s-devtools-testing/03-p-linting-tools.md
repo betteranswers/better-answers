@@ -13,7 +13,6 @@ The following files were used as context for generating this wiki page:
 - [packages/devtools/README.md](packages/devtools/README.md)
 - [packages/devtools/lifts/anti-slop/THIRD_PARTY_NOTICES.md](packages/devtools/lifts/anti-slop/THIRD_PARTY_NOTICES.md)
 - [packages/devtools/test/throwaway-tree.test.ts](packages/devtools/test/throwaway-tree.test.ts)
-- [apps/api/tests/coding-rules-tags.test.ts](apps/api/tests/coding-rules-tags.test.ts)
 - [cubic.yaml](cubic.yaml)
 </details>
 
@@ -76,7 +75,7 @@ Every TypeScript workspace runs `oxlint --config ../../.oxlintrc.json .` which l
 Sources: [packages/devtools/lifts/anti-slop/THIRD_PARTY_NOTICES.md:43-52](packages/devtools/lifts/anti-slop/THIRD_PARTY_NOTICES.md#L43-L52)
 
 ## Project-Specific Lint Rules
-Custom rules in `packages/devtools/lint-rules/` enforce internal architecture and coding standards. These rules cite specific rule tags from `CODING_RULES.md`.
+Custom rules in `packages/devtools/lint-rules/` enforce internal architecture and coding standards. Each one enforces a rule in a `CODING_STANDARDS.md` file.
 
 ### Key Enforcements
 - **Shadowing:** Refuses two tests with identical titles to prevent one test from shadowing another.
@@ -102,20 +101,8 @@ Sources: [packages/devtools/README.md:36-40](packages/devtools/README.md#L36-L40
 Sources: [apps/docs-site/specs/T-064.md:161-172](apps/docs-site/specs/T-064.md#L161-L172)
 
 ### Automated AI Review (Cubic)
-The project uses `cubic.yaml` to configure AI-based linting and review. Cubic is instructed to enforce the "constitution" (`CODING_RULES.md`) and report findings that rest on rule tags.
+The project uses `cubic.yaml` to configure AI-based linting and review. Cubic is instructed to enforce the "constitution" (`CODING_RULES.md`) and report findings that rest on its rules.
 Sources: [cubic.yaml:23-55](cubic.yaml#L23-L55)
-
-## Rule Tagging System
-The project uses a tagging system (e.g., `[SEC2]`, `[TEST3]`) to link code and tests to the global coding rules. The test `apps/api/tests/coding-rules-tags.test.ts` enforces `[COMMENT2]`, ensuring tags appear only in permitted locations.
-
-| Allowed Locations for Tags | Forbidden Locations for Tags |
-| :--- | :--- |
-| `CODING_RULES.md` / ADRs / Specs | Application Source Code (`src/`) |
-| `cubic.yaml` / `.oxlintrc.json` | Dockerfiles / CI Workflows |
-| Test files (`.test.ts`) | Deployment configuration |
-| Documentation (`docs/`, READMEs) | Workspace configuration (`package.json`) |
-
-Sources: [apps/api/tests/coding-rules-tags.test.ts:16-55](apps/api/tests/coding-rules-tags.test.ts#L16-L55)
 
 ## Summary of Linting Procedures
 Linting ensures code quality and architectural integrity through automated gates. By utilizing Oxlint with custom plugins and a hardened test runner, the project guarantees that every rule is active and verified. The inclusion of `anti-slop` provides a baseline of strict patterns, while custom rules protect project-specific seams and invariants.
