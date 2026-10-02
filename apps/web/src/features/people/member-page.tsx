@@ -15,7 +15,7 @@ import { useKeystroke, useScreenKeystrokes, type Keystroke } from "@/shared/keys
 import { useLastCrumb } from "@/shared/last-crumb.ts";
 import { cn } from "@/shared/lib/utils.ts";
 import { ListState } from "@/shared/list-pages.tsx";
-import { CONTROL_CENTRE, groupIn, screenNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, groupIn } from "@/shared/navigation.ts";
 import type { Outcome } from "@/shared/outcome.tsx";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
@@ -23,7 +23,13 @@ import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { MEMBER_PAGE_WORDS as WORDS } from "./member-act-words.ts";
 import { MemberActivity } from "./member-activity.tsx";
 import { Access, RemoveAndRevoke, type Landings, type Removal } from "./member-sections.tsx";
-import { membersAt, OPENING, type OpenedAt, type Removed } from "./members-address.ts";
+import {
+  MEMBERS_SCREEN,
+  membersAt,
+  OPENING,
+  type OpenedAt,
+  type Removed,
+} from "./members-address.ts";
 import { useMembers, useReaderId, useRemoveMember, type ListedMember } from "./people-api.ts";
 import { MEMBER_PAGE_KEYSTROKES as KEY } from "./people-state.ts";
 import { outcomeOfFailure } from "./refusal.tsx";
@@ -31,8 +37,6 @@ import { useSelfActHome } from "./self-act.tsx";
 import { nameOf } from "./words.tsx";
 
 const people = groupIn(CONTROL_CENTRE, "people");
-
-const MEMBERS = screenNamed(people, "Members");
 
 const KEYSTROKES: readonly Keystroke[] = Object.values(KEY);
 
@@ -47,8 +51,7 @@ type Drawn = {
 type Section = {
   readonly id: string;
   readonly title: string;
-  /** Absent while the section is not built, which shows it nowhere, as an unbuilt screen. */
-  readonly draw?: ComponentType<Drawn>;
+  readonly draw: ComponentType<Drawn>;
   /** Set apart below the rest, since its acts end the person's access. */
   readonly apart?: true;
 };
@@ -60,14 +63,7 @@ const SECTIONS: readonly Section[] = [
   { id: "remove-and-revoke", title: WORDS.removeAndRevoke, draw: RemoveAndRevoke, apart: true },
 ];
 
-type Shown = Section & { readonly draw: ComponentType<Drawn> };
-
-const SHOWN: readonly Shown[] = SECTIONS.flatMap((section) => {
-  const { draw } = section;
-  return draw === undefined ? [] : [{ ...section, draw }];
-});
-
-const headingIdOf = (section: Shown): string => `member-${section.id}`;
+const headingIdOf = (section: Section): string => `member-${section.id}`;
 
 /** What the move that opened the page asked of it, kept in the page's own history entry. */
 const useOpening = () => {
@@ -129,7 +125,7 @@ function NoSuchMember() {
         kind: "empty",
         words: WORDS.noSuchMember,
         act: (
-          <Link to={MEMBERS.path} className="text-brand underline">
+          <Link to={MEMBERS_SCREEN.path} className="text-brand underline">
             {WORDS.toMembers}
           </Link>
         ),
@@ -162,7 +158,7 @@ function MemberHeader(properties: {
 
 /** Its links move focus within the page and leave the address alone: a section has none. */
 function SectionNav() {
-  const toSection = (event: MouseEvent<HTMLAnchorElement>, section: Shown) => {
+  const toSection = (event: MouseEvent<HTMLAnchorElement>, section: Section) => {
     event.preventDefault();
     document.getElementById(headingIdOf(section))?.focus();
   };
@@ -170,7 +166,7 @@ function SectionNav() {
   return (
     <nav aria-label={WORDS.sections} className="mt-4 border-y border-border py-2">
       <ul className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
-        {SHOWN.map((section) => (
+        {SECTIONS.map((section) => (
           <li key={section.id}>
             <a
               href={`#${headingIdOf(section)}`}
@@ -218,7 +214,7 @@ const useLandings = () => {
 };
 
 function SectionShown(properties: {
-  readonly section: Shown;
+  readonly section: Section;
   readonly drawn: Omit<Drawn, "heading">;
 }) {
   const { section, drawn } = properties;
@@ -277,7 +273,7 @@ function MemberShown(properties: {
       <MemberHeader member={member} titleRef={title} />
       <SectionNav />
       <div className="mt-6 grid gap-6">
-        {SHOWN.map((section) => (
+        {SECTIONS.map((section) => (
           <SectionShown key={section.id} section={section} drawn={{ member, landings, removal }} />
         ))}
       </div>

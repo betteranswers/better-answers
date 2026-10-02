@@ -13,13 +13,19 @@ import { SelectionBar } from "@/shared/selection-bar.tsx";
 import { useWideLayout } from "@/shared/wide-layout.ts";
 
 import { useGroups } from "./groups-api.ts";
-import { MEMBER_PAGE_WORDS, SELECTED_MEMBERS } from "./member-act-words.ts";
+import {
+  MEMBER_PAGE_WORDS,
+  MEMBERS_LOADING,
+  NO_LONGER_LISTED,
+  SELECTED_MEMBERS,
+} from "./member-act-words.ts";
 import { MemberBulkActs, MemberBulkDialogs, useMemberBulkActs } from "./member-bulk-acts.tsx";
 import {
   HIDEABLE,
   MemberActsContext,
   memberColumns,
   memberFeatures,
+  NO_MARKS,
   SORTABLE,
   type RefusedRows,
 } from "./member-columns.tsx";
@@ -51,8 +57,6 @@ const NONE: ReadonlySet<string> = new Set();
 
 const NO_ONE: readonly ListedMember[] = [];
 
-const NO_MARKS: RefusedRows = new Map();
-
 /** Person and role are what a narrow screen has room for; the rest can be shown again. */
 const NARROW_HIDES: ReadonlySet<string> = new Set(["groups", "joined"]);
 
@@ -74,15 +78,14 @@ const saidOfCount = (shown: number, total: number, narrowing: Narrowing): string
   return narrowing.search === "" ? `${of} these filters.` : `${of} “${narrowing.search}”.`;
 };
 
-const matching =
-  (narrowing: Narrowing) =>
-  (member: ListedMember): boolean =>
+const matching = (narrowing: Narrowing) => {
+  const search = narrowing.search.toLowerCase();
+  return (member: ListedMember): boolean =>
     (narrowing.role === undefined || member.role === narrowing.role) &&
     (narrowing.group === undefined ||
       member.groups.some((group) => group.groupId === narrowing.group)) &&
-    `${member.displayName} ${member.address}`
-      .toLowerCase()
-      .includes(narrowing.search.toLowerCase());
+    `${member.displayName} ${member.address}`.toLowerCase().includes(search);
+};
 
 /** Read in render from the address, so Back and a reload come to the same rows. */
 const useNarrowedMembers = (listed: readonly ListedMember[]) => {
@@ -90,8 +93,12 @@ const useNarrowedMembers = (listed: readonly ListedMember[]) => {
   const [search, setSearch, flush] = useSettledSearch(state.search, (settled) => {
     write({ search: settled, page: 1 });
   });
-  const narrowing: Narrowing = { search, role: state.role, group: state.group };
-  const data = listed.filter(matching(narrowing));
+  const { role, group } = state;
+  const narrowing: Narrowing = { search, role, group };
+  const data = useMemo(
+    () => listed.filter(matching({ search, role, group })),
+    [listed, search, role, group],
+  );
   // A search still settling has not reached the address, so it shows its first page.
   const asked = search === state.search ? state.page - 1 : 0;
   const pageIndex = pageWithin(asked, PAGE_SIZE, data.length);
@@ -106,12 +113,20 @@ const useNarrowedMembers = (listed: readonly ListedMember[]) => {
 
 type Narrowed = ReturnType<typeof useNarrowedMembers>;
 
+const stillListed = (
+  held: ReadonlySet<string>,
+  listed: readonly ListedMember[],
+): ReadonlySet<string> => {
+  if (held.size === 0) return held;
+  const listedIds: ReadonlySet<string> = new Set(listed.map((member) => member.personId));
+  const kept = [...held].filter((id) => listedIds.has(id));
+  return kept.length === held.size ? held : new Set(kept);
+};
+
 /** A person gone from the list can be acted on no more, so their tick goes with them. */
 const useTicks = (listed: readonly ListedMember[]) => {
   const [held, setHeld] = useState<ReadonlySet<string>>(NONE);
-  const listedIds: ReadonlySet<string> = new Set(listed.map((member) => member.personId));
-  const ticked: ReadonlySet<string> = new Set([...held].filter((id) => listedIds.has(id)));
-  return [ticked, setHeld] as const;
+  return [stillListed(held, listed), setHeld] as const;
 };
 
 const toggled = (ticked: ReadonlySet<string>, personId: string): ReadonlySet<string> => {
@@ -263,7 +278,7 @@ function MembersRead(properties: {
     );
   }
   if (read.data === undefined) {
-    return <ListState state={{ kind: "loading", words: "The members are still loading." }} />;
+    return <ListState state={{ kind: "loading", words: MEMBERS_LOADING }} />;
   }
   return properties.children;
 }
@@ -328,7 +343,7 @@ const namedIn =
   (listed: readonly ListedMember[]) =>
   (personId: string): string => {
     const member = listed.find((each) => each.personId === personId);
-    return member === undefined ? "A member no longer listed" : nameOf(member);
+    return member === undefined ? NO_LONGER_LISTED : nameOf(member);
   };
 
 /** Ticks and an act's outcome are the screen's; what narrows the rows is the address's. */

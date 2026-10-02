@@ -58,7 +58,7 @@ export const roleWritten = async (
   admin: AdminUserPrincipal,
   tx: Tx,
   changed: RoleChanged,
-  batchId: string | undefined,
+  batchId?: string,
 ): Promise<void> => {
   await tx.query("UPDATE member SET role = $3 WHERE workspace_id = $1 AND user_id = $2", [
     admin.workspaceId,
@@ -84,7 +84,7 @@ const roleSetUnderTheLock = (
     if (changed.previousRole === changed.role) return ok(changed);
     if (leavesNoAdmin(held)) return err("last-admin");
 
-    await roleWritten(admin, tx, changed, undefined);
+    await roleWritten(admin, tx, changed);
     return ok(changed);
   });
 

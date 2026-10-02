@@ -5,7 +5,6 @@ import { ActDialog } from "@/shared/act-dialog.tsx";
 import type { ApiError } from "@/shared/api/trpc.ts";
 import { EmptyState } from "@/shared/empty-state.tsx";
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
-import { CONTROL_CENTRE, groupIn, screenNamed } from "@/shared/navigation.ts";
 import { selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { failureOutcome, RefusedItemLines, saidOfItems } from "@/shared/refusal-outcome.tsx";
 import { SelectionAct } from "@/shared/selection-bar.tsx";
@@ -21,8 +20,9 @@ import {
 
 import { EMPTY_LINES } from "./empty-lines.ts";
 import { useGroups } from "./groups-api.ts";
-import { BULK_WORDS } from "./member-act-words.ts";
-import type { RefusedRows } from "./member-columns.tsx";
+import { BULK_WORDS, NO_LONGER_LISTED } from "./member-act-words.ts";
+import { NO_MARKS, type RefusedRows } from "./member-columns.tsx";
+import { GROUPS_PATH } from "./members-address.ts";
 import {
   useBulkAddToGroup,
   useBulkChangeRole,
@@ -35,8 +35,6 @@ import { PEOPLE_KEYSTROKES as KEY } from "./people-state.ts";
 import { SAID_OF_TICKED_MEMBERS } from "./refusal-words.ts";
 import { ROLE_OFFERED_FIRST, RoleChoice } from "./role-choice.tsx";
 import { useIncludesYou, useSelfActHome } from "./self-act.tsx";
-
-const GROUPS_SCREEN = screenNamed(groupIn(CONTROL_CENTRE, "people"), "Groups").path;
 
 type BulkAct = "role" | "group" | "remove";
 
@@ -57,8 +55,6 @@ export type BulkList = {
 
 const NOTHING_TICKED = selectFirst("member");
 
-const NO_MARKS: RefusedRows = new Map();
-
 const NO_GROUPS: readonly { readonly id: string; readonly name: string }[] = [];
 
 const refusedRowsOf = (failure: Error | ApiError): RefusedRows =>
@@ -77,7 +73,7 @@ const refusalOf = (failure: Error | ApiError, names: ReadonlyMap<string, string>
           <RefusedItemLines
             featureWords={SAID_OF_TICKED_MEMBERS}
             failure={failure}
-            nameOf={(personId) => names.get(personId) ?? "A member no longer listed"}
+            nameOf={(personId) => names.get(personId) ?? NO_LONGER_LISTED}
           />
         </div>
       </>
@@ -262,7 +258,7 @@ function GroupChoice(properties: { readonly acts: Acts; readonly groups: typeof 
         line={EMPTY_LINES.groups}
         className="gap-1"
         action={
-          <Link to={GROUPS_SCREEN} className="text-brand underline">
+          <Link to={GROUPS_PATH} className="text-brand underline">
             Create one on the Groups screen
           </Link>
         }

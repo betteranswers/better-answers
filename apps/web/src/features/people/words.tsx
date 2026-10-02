@@ -3,8 +3,6 @@ import { dayWords, instantWords, nameOrAddress } from "@/shared/words.ts";
 
 import type { ListedMember } from "./people-api.ts";
 
-export const RECORDED = "Recorded on the audit log under your name.";
-
 export const nameOf = (member: ListedMember): string =>
   nameOrAddress(member.displayName, member.address);
 

@@ -8,7 +8,11 @@ import { CONTROL_CENTRE, detailAt, groupIn, screenNamed } from "@/shared/navigat
 
 import type { Role } from "./people-api.ts";
 
-const MEMBERS = screenNamed(groupIn(CONTROL_CENTRE, "people"), "Members");
+const PEOPLE = groupIn(CONTROL_CENTRE, "people");
+
+export const MEMBERS_SCREEN = screenNamed(PEOPLE, "Members");
+
+export const GROUPS_PATH = screenNamed(PEOPLE, "Groups").path;
 
 /** Members, Invitations and Requests share one address, so each tab's keys carry its prefix. */
 export const MEMBERS_LIST = "members";
@@ -36,10 +40,11 @@ export const sortOf = (sorted: Sorted): (typeof SORTS)[number] | undefined =>
 /** A person's id as the api mints it. Anything else names no one, so it is never asked about. */
 export const PERSON_ID = z.string().regex(ULID);
 
-export const memberPageOf = (personId: string): string => detailAt(MEMBERS, personId);
+export const memberPageOf = (personId: string): string => detailAt(MEMBERS_SCREEN, personId);
 
 /** Members with the query its reader left it at, so a return finds the same rows. */
-export const membersAt = (query: string | undefined): string => `${MEMBERS.path}${query ?? ""}`;
+export const membersAt = (query: string | undefined): string =>
+  `${MEMBERS_SCREEN.path}${query ?? ""}`;
 
 const OPENED_AT = ["member", "role", "groups", "credentials", "flag", "removal"] as const;
 

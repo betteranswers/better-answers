@@ -7,8 +7,14 @@ export const SELECTED_MEMBERS = "Selected members";
 
 export const INCLUDES_YOU = "This includes you.";
 
+export const RECORDED = "Recorded on the audit log under your name.";
+
+export const NO_LONGER_LISTED = "A member no longer listed";
+
 export const homeNowSaid = (role: Role): string =>
   `You changed your own role to ${role}. People is for Admins, so this is your home now.`;
+
+export const MEMBERS_LOADING = "The members are still loading.";
 
 /** A member's page: its sections, in order, and what it says where it names no one. */
 export const MEMBER_PAGE_WORDS = {
@@ -34,8 +40,6 @@ export const ACTIVITY_WORDS = {
     both: (name: string) => `By and to ${name}`,
   } satisfies Readonly<Record<Direction, (name: string) => string>>,
 } as const;
-
-const RECORDED = "Recorded on the audit log under your name.";
 
 const members = (count: number): string => counted(count, "member", "members");
 

@@ -4,9 +4,9 @@ import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
 
-import { INCLUDES_YOU } from "./member-act-words.ts";
+import { INCLUDES_YOU, RECORDED } from "./member-act-words.ts";
 import { useReaderId, type ListedMember } from "./people-api.ts";
-import { nameOf, RECORDED } from "./words.tsx";
+import { nameOf } from "./words.tsx";
 
 /** Module-level, so React calls it once as the confirmation mounts, never on a re-render. */
 const focusOnArrival = (node: HTMLElement | null) => {

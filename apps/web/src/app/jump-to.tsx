@@ -1,16 +1,14 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useEffectEvent, useRef, useState, type RefObject } from "react";
 
+import { MEMBERS_SCREEN } from "@/features/people/members-address.ts";
 import { useMembers } from "@/features/people/people-api.ts";
 import { askingHere, type Here } from "@/shared/address-ask.ts";
 import { Icon, type IconName } from "@/shared/icon.tsx";
 import type { Keystroke } from "@/shared/keystrokes.tsx";
 import {
-  CONTROL_CENTRE,
   detailAt,
-  groupIn,
   placeAt,
-  screenNamed,
   screensOf,
   type Group,
   type Screen,
@@ -29,8 +27,6 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/shared/
 import { nameOrAddress } from "@/shared/words.ts";
 
 import { findWhat, JUMP_TO, nothingMatches } from "./words.ts";
-
-const MEMBERS = screenNamed(groupIn(CONTROL_CENTRE, "people"), "Members");
 
 /** Where focus goes once chosen: a place hands it to the screen, an act to its own dialog. */
 type Kind = "place" | "member" | "act";
@@ -113,7 +109,7 @@ const memberJump = (member: Member): Jump =>
     name: nameOrAddress(member.displayName, member.address),
     said: member.displayName === "" ? undefined : member.address,
     icon: "person",
-    to: detailAt(MEMBERS, member.personId),
+    to: detailAt(MEMBERS_SCREEN, member.personId),
     kind: "member",
   });
 
@@ -387,7 +383,7 @@ export function JumpTo(properties: {
         >
           <DialogTitle className="sr-only">{JUMP_TO.name}</DialogTitle>
           <DialogDescription className="sr-only">{JUMP_TO.said}</DialogDescription>
-          {placeAt(tree.surfaces, MEMBERS.path) === undefined ? (
+          {placeAt(tree.surfaces, MEMBERS_SCREEN.path) === undefined ? (
             <JumpList tree={tree} onChoose={choose} read="unasked" members={undefined} />
           ) : (
             <WithMembers tree={tree} onChoose={choose} />

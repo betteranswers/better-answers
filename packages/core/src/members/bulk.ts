@@ -194,9 +194,9 @@ export type BulkAddToGroupRefusal =
   | Error;
 
 /** Key-share holds keep the group and each member from going, and wait on no other add. */
-const HELD_GROUP = `SELECT 1 FROM "group" WHERE workspace_id = $1 AND id = $2 FOR KEY SHARE`;
+const KEY_SHARED_GROUP = `SELECT 1 FROM "group" WHERE workspace_id = $1 AND id = $2 FOR KEY SHARE`;
 
-const HELD_MEMBERS = `SELECT user_id FROM member
+const KEY_SHARED_MEMBERS = `SELECT user_id FROM member
                        WHERE workspace_id = $1 AND user_id = ANY($2::text[])
                        ORDER BY user_id FOR KEY SHARE`;
 
@@ -207,9 +207,9 @@ const addedUnderKeyShare = async (
   tx: Tx,
   asked: Adding,
 ): Promise<Result<BulkOutcome, Exclude<BulkAddToGroupRefusal, Error>>> => {
-  const group = await tx.query(HELD_GROUP, [admin.workspaceId, asked.groupId]);
+  const group = await tx.query(KEY_SHARED_GROUP, [admin.workspaceId, asked.groupId]);
   if (group.rows[0] === undefined) return err("no-such-group");
-  const held = await tx.query<{ user_id: string }>(HELD_MEMBERS, [
+  const held = await tx.query<{ user_id: string }>(KEY_SHARED_MEMBERS, [
     admin.workspaceId,
     asked.personIds,
   ]);

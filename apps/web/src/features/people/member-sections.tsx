@@ -4,7 +4,6 @@ import { useId, useState, type RefObject } from "react";
 import type { ApiError } from "@/shared/api/trpc.ts";
 import { EmptyState } from "@/shared/empty-state.tsx";
 import { Icon } from "@/shared/icon.tsx";
-import { CONTROL_CENTRE, groupIn, screenNamed } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { SheetPart } from "@/shared/sheet-part.tsx";
 import { SummaryRow } from "@/shared/summary-row.tsx";
@@ -17,8 +16,9 @@ import { instantWords } from "@/shared/words.ts";
 import { EMPTY_LINES } from "./empty-lines.ts";
 import { GroupChecklist } from "./group-checklist.tsx";
 import { useGroups } from "./groups-api.ts";
-import { INCLUDES_YOU } from "./member-act-words.ts";
+import { INCLUDES_YOU, RECORDED } from "./member-act-words.ts";
 import { MemberRemoval } from "./member-removal.tsx";
+import { GROUPS_PATH } from "./members-address.ts";
 import {
   useChangeRole,
   useFlagDisplayName,
@@ -32,9 +32,7 @@ import {
 import { outcomeOfFailure, outcomeOfGroupFailure } from "./refusal.tsx";
 import { aRole, ROLE_MEANINGS, roleOf, ROLES } from "./role-meanings.ts";
 import { useSelfActHome } from "./self-act.tsx";
-import { CredentialsHere, GroupPills, JoinedOn, nameOf, RECORDED } from "./words.tsx";
-
-const GROUPS_SCREEN = screenNamed(groupIn(CONTROL_CENTRE, "people"), "Groups").path;
+import { CredentialsHere, GroupPills, JoinedOn, nameOf } from "./words.tsx";
 
 /** The control each of the page's acts lands focus on, so a keystroke can reach any of them. */
 export type Landings = {
@@ -309,7 +307,7 @@ function GroupsPicker(properties: {
             line={EMPTY_LINES.groups}
             className="gap-1"
             action={
-              <Link to={GROUPS_SCREEN} className="text-brand underline">
+              <Link to={GROUPS_PATH} className="text-brand underline">
                 Create one on the Groups screen
               </Link>
             }

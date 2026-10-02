@@ -54,6 +54,8 @@ export const MemberActsContext = createContext<MemberActs | undefined>(undefined
 /** What the last bulk act's refusal said of each person it named. */
 export type RefusedRows = ReadonlyMap<string, Said>;
 
+export const NO_MARKS: RefusedRows = new Map();
+
 function PersonCell(properties: {
   readonly member: ListedMember;
   readonly refused: Said | undefined;

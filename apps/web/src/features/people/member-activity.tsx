@@ -1,4 +1,4 @@
-import { useCallback, useState, type RefObject } from "react";
+import { useCallback, useMemo, useState, type RefObject } from "react";
 
 import { ListPages, ListState } from "@/shared/list-pages.tsx";
 import { OutcomeLine } from "@/shared/outcome.tsx";
@@ -56,7 +56,11 @@ function Stream(properties: { readonly activity: Activity; readonly name: string
   const landed = useCallback(() => {
     setLandAt(undefined);
   }, []);
-  const events = activity.data?.pages.flatMap((page) => page.events) ?? [];
+  const events = useMemo(
+    () => activity.data?.pages.flatMap((page) => page.events) ?? [],
+    [activity.data],
+  );
+  const days = useMemo(() => [...daysOf(events)], [events]);
 
   if (events.length === 0) {
     return <ListState state={{ kind: "empty", words: WORDS.none(name), act: undefined }} />;
@@ -70,7 +74,7 @@ function Stream(properties: { readonly activity: Activity; readonly name: string
   return (
     <div className="border border-border">
       <div className="divide-y divide-border">
-        {[...daysOf(events)].map(([day, lines]) => (
+        {days.map(([day, lines]) => (
           <div key={day}>
             <h3 className="max-w-none border-b border-border bg-muted px-4 py-2 font-medium">
               {day}
