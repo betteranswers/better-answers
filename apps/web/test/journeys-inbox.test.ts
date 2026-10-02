@@ -197,6 +197,13 @@ describe("noteInbox", () => {
     expect(await codeAfter(inbox, mail("305117"))).toEqual({ answer: "code", code: "305117" });
   });
 
+  it("reads the code from a text part with CRLF lines", async () => {
+    const inbox = await standIn();
+    const crlf = mail("305117", { text: signInText("305117").replaceAll("\n", "\r\n") });
+
+    expect(await codeAfter(inbox, crlf)).toEqual({ answer: "code", code: "305117" });
+  });
+
   it("ignores a message already in the inbox before the Send", async () => {
     const inbox = await standIn(mail("111111"));
 

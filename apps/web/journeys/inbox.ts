@@ -9,8 +9,8 @@ const DEADLINE_MS = 90_000;
 const POLL_INTERVAL_MS = 2_000;
 const REQUEST_TIMEOUT_MS = 10_000;
 
-/** The code stands alone on its line, so digits in the link are never read as it. */
-const SIGN_IN_CODE = /^(\d{6})$/m;
+/** Alone on its line, so digits in the link are never read as it; received mail may keep SMTP's `\r`. */
+const SIGN_IN_CODE = /^(\d{6})\r?$/m;
 
 export type Inbox = {
   readonly recipient: string;
