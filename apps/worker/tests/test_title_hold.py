@@ -8,9 +8,6 @@ import pytest
 
 CONFTEST = Path(__file__).with_name("conftest.py")
 
-# In two halves, so the tag scan does not read a fixture as a citation.
-TAG = "[" + "TEST5]"
-
 ELEVEN = "_".join(f"word{index}" for index in range(1, 12))
 
 TEN = "_".join(f"word{index}" for index in range(1, 11))

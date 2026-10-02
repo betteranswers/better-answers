@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { runsOverThrowawayTree } from "@better-answers/devtools/throwaway-tree";
 import type { Tool, Tree } from "@better-answers/devtools/throwaway-tree";
 
-import { tag, wordsOf } from "./fixture-text.ts";
+import { wordsOf } from "./fixture-text.ts";
 
 const FILE = "probe.py";
 
@@ -66,11 +66,8 @@ describe("the Python check fires on a long or citing comment", () => {
   it.each([
     ["a ticket id", "# Kept because the claim protocol changed under T-243.\n"],
     ["an ADR number", "# Kept because the graph is Postgres under ADR 0021.\n"],
-    ["a rule tag", `# Kept because a raw insert lives in a factory (${tag("TEST", "4")}).\n`],
-    [
-      "a tag from a digit-bearing family",
-      `# Kept because the outcome is announced (${tag("A11Y", "1")}).\n`,
-    ],
+    ["a rule tag", "# Kept because a raw insert lives in a factory ([TEST4]).\n"],
+    ["a tag from a digit-bearing family", "# Kept because the outcome is announced ([A11Y1]).\n"],
     ["an ISO date", "# Kept because the reading of the registry moved on 2026-09-21.\n"],
     ["a slashed date", "# Kept because the reading of the registry moved on 21/09/2026.\n"],
   ])("refuses a comment citing %s", (_what, comment) => {
@@ -305,9 +302,7 @@ describe("the Python check refuses a citation a reader cannot open", () => {
   });
 
   it("refuses a rule tag in a string too", () => {
-    expect(findings(saying(`A raw insert lives in a factory (${tag("TEST", "4")}).`))).toHaveLength(
-      1,
-    );
+    expect(findings(saying("A raw insert lives in a factory ([TEST4])."))).toHaveLength(1);
   });
 
   it("counts a docstring citing a ticket once, not twice", () => {
@@ -328,12 +323,13 @@ describe("the Python check refuses a citation a reader cannot open", () => {
     expect(findings(inATest)).toEqual([]);
   });
 
-  it("walks past the same string in the tag-printing gate", () => {
+  it("refuses the same string in a gate's own source", () => {
     const inAGate = {
-      "packages/devtools/python/comment_gate.py": `SAID = "A raw insert lives in a factory (${tag("TEST", "4")})."\n`,
+      "packages/devtools/python/comment_gate.py":
+        'SAID = "A raw insert lives in a factory ([TEST4])."\n',
     };
 
-    expect(findings(inAGate)).toEqual([]);
+    expect(findings(inAGate)).toHaveLength(1);
   });
 });
 

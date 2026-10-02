@@ -3,14 +3,13 @@ from __future__ import annotations
 
 import ast
 import io
-import json
 import re
 import sys
 import token
 import tokenize
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import NamedTuple
 
 from citations import citation_in
 
@@ -100,16 +99,6 @@ A_TEST_PATH = re.compile(r"(?:^|/)(?:tests?|e2e)/|(?:^|/)(?:test_[^/]*|conftest)
 A_WORKER_MODULE = re.compile(r"(?:^|/)apps/worker/src/")
 
 A_SPACE = re.compile(r"\s")
-
-GATES = Path(__file__).resolve().parents[1] / "gates-printing-a-tag.json"
-
-
-def _gates_printing_a_tag() -> tuple[str, ...]:
-    fixture: Any = json.loads(GATES.read_text(encoding="utf8"))
-    return tuple(str(gate) for gate in fixture["gates"])
-
-
-PRINTS_A_TAG = _gates_printing_a_tag()
 
 
 NEVER_WALKED = frozenset(
@@ -235,10 +224,7 @@ def _strings(tree: ast.Module) -> list[tuple[int, str]]:
 
 
 def _strings_go_unread(path: Path) -> bool:
-    text = path.as_posix()
-    return bool(A_TEST_PATH.search(text)) or any(
-        text == gate or text.endswith(f"/{gate}") for gate in PRINTS_A_TAG
-    )
+    return A_TEST_PATH.search(path.as_posix()) is not None
 
 
 def _string_findings(path: Path, tree: ast.Module) -> list[str]:

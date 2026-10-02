@@ -4,7 +4,7 @@ import { pluginConfigFor } from "@better-answers/devtools/oxlint-config";
 import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
-import { tag, wordsOf } from "./fixture-text.ts";
+import { wordsOf } from "./fixture-text.ts";
 import { fixedByOxlint } from "./oxlint-fix.ts";
 
 const RULE = "better-answers/comment-only-the-why";
@@ -36,11 +36,8 @@ describe("the comment rule fires on a long or citing comment", () => {
   it.each([
     ["a ticket id", "// Kept because the claim protocol changed under T-243.\n"],
     ["an ADR number", "// Kept because the graph is Postgres under ADR 0021.\n"],
-    ["a rule tag", `// Kept because a raw insert lives in a factory (${tag("TEST", "4")}).\n`],
-    [
-      "a tag from a digit-bearing family",
-      `// Kept because the outcome is announced (${tag("A11Y", "1")}).\n`,
-    ],
+    ["a rule tag", "// Kept because a raw insert lives in a factory ([TEST4]).\n"],
+    ["a tag from a digit-bearing family", "// Kept because the outcome is announced ([A11Y1]).\n"],
     ["an ISO date", "// Kept because the reading of the registry moved on 2026-09-21.\n"],
     ["a slashed date", "// Kept because the reading of the registry moved on 21/09/2026.\n"],
   ])("refuses a comment citing %s", (_what, comment) => {

@@ -4,8 +4,6 @@ import { pluginConfigFor } from "@better-answers/devtools/oxlint-config";
 import { oxlintOver } from "@better-answers/devtools/throwaway-tree";
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
 
-import { tag } from "./fixture-text.ts";
-
 const RULE = "better-answers/string-cites-nothing";
 const FILE = "probe.ts";
 
@@ -29,7 +27,7 @@ describe("the string rule refuses a citation a reader cannot open", () => {
     ["an ADR number", "The graph is Postgres under ADR 0021."],
     ["an ISO date", "The registry moved on 2026-09-21."],
     ["a slashed date", "The registry moved on 21/09/2026."],
-    ["a rule tag", `A raw insert lives in a factory (${tag("TEST", "4")}).`],
+    ["a rule tag", "A raw insert lives in a factory ([TEST4])."],
   ])("refuses a string citing %s", (_what, text) => {
     expect(lint.flagged(saying(text))).toEqual([FILE]);
   });
@@ -46,6 +44,15 @@ describe("the string rule refuses a citation a reader cannot open", () => {
     const template = { [FILE]: "export const usage = `\\u0054-243 landed, and that is all.`;\n" };
 
     expect(lint.flagged(template)).toEqual([FILE]);
+  });
+
+  it("refuses the same string in a gate's own source", () => {
+    const gate = "packages/devtools/src/insert-scan.ts";
+    const inAGate = {
+      [gate]: 'export const said = "A raw insert lives in a factory ([TEST4]).";\n',
+    };
+
+    expect(lint.flagged(inAGate)).toEqual([gate]);
   });
 });
 
@@ -78,13 +85,5 @@ describe("the string rule walks past a string citing nothing", () => {
     };
 
     expect(lint.flagged(inATest)).toEqual([]);
-  });
-
-  it("walks past the same string in a tag-printing gate", () => {
-    const inAGate = {
-      "packages/devtools/src/insert-scan.ts": `export const said = "A raw insert lives in a factory (${tag("TEST", "4")}).";\n`,
-    };
-
-    expect(lint.flagged(inAGate)).toEqual([]);
   });
 });
