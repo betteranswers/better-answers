@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { authenticatorCodeAt, keyIn } from "@better-answers/schema/testing/authenticator-code";
 
+import { setActiveWorkspace } from "./flow.ts";
 import type { TestClient } from "./harness.ts";
 import { signedInClient } from "./provoke.ts";
 import { appForSuite } from "./suite-app.ts";
@@ -117,6 +118,22 @@ describe("setting up an authenticator", () => {
     expect(held).toEqual([{ id: expect.any(String), confirmed: expect.any(Date) }]);
     expect(await sessionIdOf(client.cookies())).toBe(held[0]?.id);
     expect(await sessionIdOf(before)).toBeUndefined();
+  });
+
+  it("keeps the chosen workspace across the session swap", async () => {
+    const { admin, client } = await anAdminSignedIn();
+    const other = await app().provision();
+    await app().addMember(other.workspaceId, admin.id, "Viewer");
+    const picked = await setActiveWorkspace(client, other.workspaceId);
+    expect(picked.status, "the workspace was not picked").toBe(200);
+
+    await setUpOn(client);
+
+    const held = await app().database.superuser.query<{ workspace: string | null }>(
+      "SELECT active_workspace_id AS workspace FROM session WHERE user_id = $1",
+      [admin.id],
+    );
+    expect(held.rows).toEqual([{ workspace: other.workspaceId }]);
   });
 
   it("sends one notice holding neither the key nor a code", async () => {
