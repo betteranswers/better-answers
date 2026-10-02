@@ -26,7 +26,11 @@ type InboxAnswer =
   | { readonly answer: "no-mail" | "no-code" | "ambiguous" | "unreachable" };
 
 type Noted =
-  | { readonly answer: "noted"; readonly codeSent: () => Promise<InboxAnswer> }
+  | {
+      readonly answer: "noted";
+      /** Ask again after a refused code: one rotated since reads as ambiguous, not as a failure. */
+      readonly codeSent: () => Promise<InboxAnswer>;
+    }
   | { readonly answer: "unreachable" };
 
 const UNREACHABLE = { answer: "unreachable" } as const;

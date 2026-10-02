@@ -265,6 +265,16 @@ describe("noteInbox", () => {
     });
   });
 
+  it("answers ambiguous when asked again after a rotated code", async () => {
+    const inbox = await standIn();
+    const noted = await notedOf(inbox);
+    inbox.arrive(mail("111111"));
+    expect(await noted.codeSent()).toEqual({ answer: "code", code: "111111" });
+    inbox.arrive(mail("222222"));
+
+    expect(await noted.codeSent()).toEqual({ answer: "ambiguous" });
+  });
+
   it.each([
     { spf: "fail", dkim: "fail", dmarc: "fail" },
     { spf: "gray", dkim: "gray", dmarc: "gray" },
