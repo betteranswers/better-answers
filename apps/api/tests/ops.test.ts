@@ -2279,6 +2279,22 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(await auditRowsIn(app(), id)).toBe(recorded);
     });
 
+    it("prints the stored domain and slug, not the padded input", async () => {
+      const fixture = aFixture();
+      const padded = {
+        ...fixture,
+        domain: ` ${fixture.domain.toUpperCase()} `,
+        slug: ` ${fixture.slug} `,
+      };
+
+      const run = await fixing(app(), padded);
+
+      const id = idOnTheDoneLine(run);
+      expect(run.lines).toEqual([
+        `test-workspace: done — ${id}, slug ${fixture.slug}, testing domain ${fixture.domain}; provisioned, mark written, 54 people added, 53 members added`,
+      ]);
+    });
+
     it("names a member outside the fixture, leaving them in place", async () => {
       const fixture = aFixture();
       const id = idOnTheDoneLine(await fixing(app(), fixture));

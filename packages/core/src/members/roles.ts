@@ -84,14 +84,27 @@ export const roleWritten = (
   batchId?: string,
 ): Promise<void> => roleWrittenBy(admin, tx, admin.workspaceId, changed, batchId);
 
-/** As `roleWritten`, by the platform under `workspaceId`'s scope; it judges no last Admin. */
-export const roleWrittenByPlatform = (
+const ROLE_HELD = "SELECT role FROM member WHERE workspace_id = $1 AND user_id = $2 FOR UPDATE";
+
+/**
+ * As `roleWritten`, by the platform under `workspaceId`'s scope, judging no last Admin. It holds
+ * the row itself, so a role moved or a member removed since the caller read records nothing stale.
+ */
+export const roleWrittenByPlatform = async (
   platform: PlatformPrincipal,
   tx: Tx,
   workspaceId: WorkspaceId,
-  changed: RoleChanged,
+  asked: Pick<RoleChanged, "personId" | "role">,
   batchId?: string,
-): Promise<void> => roleWrittenBy(platform, tx, workspaceId, changed, batchId);
+): Promise<boolean> => {
+  const held = await tx.query<{ role: string }>(ROLE_HELD, [workspaceId, asked.personId]);
+  const row = held.rows[0];
+  if (row === undefined) return false;
+  const previousRole = ROLE.parse(row.role);
+  if (previousRole === asked.role) return false;
+  await roleWrittenBy(platform, tx, workspaceId, { ...asked, previousRole }, batchId);
+  return true;
+};
 
 const roleSetUnderTheLock = (
   admin: AdmittedOf<typeof changeRoleAct>,

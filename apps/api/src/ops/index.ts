@@ -1138,7 +1138,7 @@ const testWorkspaceReason = (
 ): string => {
   switch (refusal) {
     case "malformed":
-      return "malformed: --domain is a domain an address can carry, --slug is not blank, and the three addresses are three different addresses";
+      return "malformed: --domain is a domain every test and invented address can carry, --slug is not blank, and the three addresses are three different addresses";
     case "slug-taken":
       return `slug-taken: the workspace holding the slug ${asked.slug} has a member or a waiting invitation off ${asked.testingDomain}, so it is not the test workspace; it is left as it is`;
     case "no-display-name":
@@ -1178,10 +1178,10 @@ const changesOf = (standing: TestWorkspaceStanding): readonly string[] => {
   return changes.filter(([changed]) => changed).map(([, said]) => said);
 };
 
-const doneSaid = (standing: TestWorkspaceStanding, asked: TestWorkspaceInput): string => {
+const doneSaid = (standing: TestWorkspaceStanding): string => {
   const changes = changesOf(standing);
   const said = changes.length === 0 ? "nothing to do" : changes.join(", ");
-  return `test-workspace: done — ${standing.workspaceId}, slug ${asked.slug}, testing domain ${asked.testingDomain}; ${said}`;
+  return `test-workspace: done — ${standing.workspaceId}, slug ${standing.slug}, testing domain ${standing.testingDomain}; ${said}`;
 };
 
 const unexpectedSaid = (member: TestWorkspaceStanding["unexpected"][number]): string => {
@@ -1211,7 +1211,7 @@ const testWorkspaceCommand = async (doors: Doors, flags: Flags, io: OpsIo): Prom
     );
     return REFUSED;
   }
-  io.say(doneSaid(ensured.value, asked));
+  io.say(doneSaid(ensured.value));
   for (const member of ensured.value.unexpected) io.say(unexpectedSaid(member));
   return DONE;
 };

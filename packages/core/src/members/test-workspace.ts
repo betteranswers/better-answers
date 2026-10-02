@@ -87,6 +87,13 @@ type MembersEnsured = {
 
 export type TestWorkspaceStanding = MembersEnsured & {
   readonly workspaceId: WorkspaceId;
+
+  /**
+   * As stored: the domain trimmed and lower-cased, the slug trimmed, so either may differ from
+   * what was asked.
+   */
+  readonly testingDomain: string;
+  readonly slug: string;
   readonly provisioned: boolean;
   readonly mark: MarkStanding;
   readonly peopleAdded: number;
@@ -145,8 +152,11 @@ const fixtureOf = (input: TestWorkspaceInput): Parsed<Fixture> => {
   if (!people.ok) return err(people.error);
 
   const others = [...people.value.others, ...inventedOn(testingDomain.data)];
-  const addresses = new Set([people.value.admin, ...others].map((one) => one.address));
-  if (addresses.size !== others.length + 1) return err(MALFORMED);
+  const everyone = [people.value.admin, ...others];
+  const addresses = new Set(everyone.map((one) => one.address));
+  // A long domain can pass its own check yet make an invented address too long; refuse before any write.
+  const wellFormed = everyone.every((one) => emailAddressOf(one.address) !== undefined);
+  if (!wellFormed || addresses.size !== everyone.length) return err(MALFORMED);
   return ok({
     testingDomain: testingDomain.data,
     slug: slug.data,
@@ -353,13 +363,15 @@ const rolesReset = async (
   door: PostgresDoor,
   workspaceId: WorkspaceId,
   drifted: readonly RoleChanged[],
-): Promise<void> => {
-  if (drifted.length === 0) return;
+): Promise<number> => {
+  if (drifted.length === 0) return 0;
   const batchId = batchIdFor(drifted.length);
-  await withScope(platform, door, workspaceId, async (tx) => {
+  return withScope(platform, door, workspaceId, async (tx) => {
+    let reset = 0;
     for (const changed of drifted) {
-      await roleWrittenByPlatform(platform, tx, workspaceId, changed, batchId);
+      if (await roleWrittenByPlatform(platform, tx, workspaceId, changed, batchId)) reset += 1;
     }
+    return reset;
   });
 };
 
@@ -396,11 +408,15 @@ const membersEnsured = async (
   const inFixture = new Set(everyone.map((one) => one.address));
   return ok({
     membersAdded: missing.length,
-    rolesReset: drifted.length,
+    rolesReset: reset.value,
     unexpected: standing.value.filter((member) => !inFixture.has(member.address)),
   });
 };
 
+/**
+ * Each step is an existing act with its own transaction; a failure leaves what landed, and a
+ * re-run repairs from there.
+ */
 const fixtureWritten = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
@@ -421,7 +437,9 @@ const fixtureWritten = async (
   const members = await membersEnsured(platform, door, workspaceId, everyone);
   if (!members.ok) return err(members.error);
   const peopleAdded = everyone.filter((one) => one.added).length;
-  return ok({ workspaceId, provisioned, mark: mark.value, peopleAdded, ...members.value });
+  const { testingDomain, slug } = fixture;
+  const written = { workspaceId, testingDomain, slug, provisioned, mark: mark.value, peopleAdded };
+  return ok({ ...written, ...members.value });
 };
 
 /**

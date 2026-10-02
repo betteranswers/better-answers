@@ -24,7 +24,7 @@ import {
   type ProvisionedWorkspace,
 } from "./platform.ts";
 import { inputOf } from "./suite-input.ts";
-import { postgresForSuite, seedingWith } from "./suite-postgres.ts";
+import { postgresForSuite, seedingWith, until } from "./suite-postgres.ts";
 
 const db = postgresForSuite();
 
@@ -119,6 +119,18 @@ const identityEventsAbout = async (fixture: Fixture) =>
     )
   ).rows;
 
+const MEMBER_HELD = "SELECT 1 FROM member WHERE workspace_id = $1 AND user_id = $2 FOR UPDATE";
+const MEMBER_SET_BACK =
+  "UPDATE member SET role = 'Viewer' WHERE workspace_id = $1 AND user_id = $2";
+
+const isWaitingOnTheRoleRead = async (): Promise<boolean> => {
+  const found = await db().pool.query(
+    `SELECT 1 FROM pg_stat_activity
+      WHERE wait_event_type = 'Lock' AND query LIKE 'SELECT role FROM member WHERE workspace_id%'`,
+  );
+  return (found.rowCount ?? 0) > 0;
+};
+
 /** As the screen acts: the test Admin, holding their own member row. */
 const asTheAdmin = async <T>(
   fixture: Fixture,
@@ -144,6 +156,8 @@ describe("ensuring the test workspace", () => {
 
     expect(made).toEqual({
       workspaceId: expect.stringMatching(ULID),
+      testingDomain: fixture.testingDomain,
+      slug: fixture.slug,
       provisioned: true,
       mark: "written",
       peopleAdded: 54,
@@ -203,6 +217,8 @@ describe("ensuring the test workspace", () => {
       ok: true,
       value: {
         workspaceId,
+        testingDomain: fixture.testingDomain,
+        slug: fixture.slug,
         provisioned: false,
         mark: "kept",
         peopleAdded: 0,
@@ -281,6 +297,34 @@ describe("ensuring the test workspace", () => {
       address: inventedAt(fixture, "12"),
       role: "Viewer",
     });
+  });
+
+  it("records nothing for a role set back meanwhile", async () => {
+    const fixture = aFixture();
+    const { workspaceId } = answeredValue(await ensured(fixture));
+    const invented = await personIdAt(inventedAt(fixture, "09"));
+    answeredValue(
+      await asTheAdmin(fixture, workspaceId, (principal, tx) =>
+        changeRole(principal, tx, { personId: invented, role: "Editor" }),
+      ),
+    );
+    const before = await eventsIn(workspaceId);
+    const holder = await db().pool.connect();
+    await holder.query("BEGIN");
+    await holder.query(MEMBER_HELD, [workspaceId, invented]);
+    const repairing = ensured(fixture);
+    try {
+      await until(() => isWaitingOnTheRoleRead());
+      await holder.query(MEMBER_SET_BACK, [workspaceId, invented]);
+    } finally {
+      await holder.query("COMMIT");
+      holder.release();
+    }
+
+    const repaired = answeredValue(await repairing);
+
+    expect(repaired.rolesReset).toBe(0);
+    expect(await eventsIn(workspaceId)).toEqual(before);
   });
 
   it("reports a member outside the fixture and leaves them", async () => {
@@ -463,6 +507,24 @@ describe("what ensuring the test workspace refuses", () => {
 
     expect(refused).toEqual({ ok: false, error: "malformed" });
     expect(await workspacesWithSlug(fixture.slug)).toEqual([]);
+  });
+
+  it("refuses a testing domain the invented addresses cannot carry", async () => {
+    const labels = [ulid().toLowerCase(), "a".repeat(63), "b".repeat(63), "c".repeat(63)];
+    const testingDomain = [...labels, "d".repeat(13), "invalid"].join(".");
+    const fixture = {
+      ...aFixture(),
+      testingDomain,
+      admin: `admin@${testingDomain}`,
+      editor: `editor@${testingDomain}`,
+      viewer: `viewer@${testingDomain}`,
+    };
+
+    const refused = await ensured(fixture);
+
+    expect(refused).toEqual({ ok: false, error: "malformed" });
+    expect(await workspacesWithSlug(fixture.slug)).toEqual([]);
+    expect(await peopleOn(fixture)).toEqual([]);
   });
 
   it("takes the platform's principal alone, never a person's", () => {
