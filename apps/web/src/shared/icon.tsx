@@ -46,6 +46,7 @@ import {
   Users,
   UsersThree,
   Warning,
+  X,
   type Icon as PhosphorGlyph,
 } from "@phosphor-icons/react";
 
@@ -89,6 +90,7 @@ export type IconName =
   | "pulse"
   | "question"
   | "queue"
+  | "remove"
   | "routes"
   | "search"
   | "secondary-nav"
@@ -143,6 +145,7 @@ const GLYPHS = {
   pulse: Pulse,
   question: Question,
   queue: ListChecks,
+  remove: X,
   routes: Path,
   search: MagnifyingGlass,
   "secondary-nav": SidebarSimple,

@@ -1,9 +1,21 @@
-import { useId, useState, type FormEvent } from "react";
+import {
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ClipboardEvent,
+  type FormEvent,
+  type RefObject,
+} from "react";
+import { flushSync } from "react-dom";
 
 import { useAsked } from "@/shared/address-ask.ts";
+import { refusalOf } from "@/shared/api/trpc.ts";
+import { Icon } from "@/shared/icon.tsx";
 import { useKeystroke } from "@/shared/keystrokes.tsx";
 import { INVITE_A_PERSON } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
+import { refusedWith } from "@/shared/refusal-outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import {
   Dialog,
@@ -16,34 +28,371 @@ import {
   DialogTrigger,
 } from "@/shared/ui/dialog.tsx";
 import { Input } from "@/shared/ui/input.tsx";
+import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 
-import { invitedOutcome } from "./invitation-words.ts";
-import { useInvite, type SentInvitation } from "./invitations-api.ts";
+import { INVITE_REFUSED, INVITE_WORDS, invitedOutcome } from "./invitation-words.ts";
+import { useInvite, type InvitedOne } from "./invitations-api.ts";
+import {
+  allInto,
+  flagOf,
+  flagsFrom,
+  hasSeparator,
+  membersOf,
+  MOST_AT_ONCE,
+  typedInto,
+  type Flag,
+  type Held,
+  type Moved,
+} from "./invite-addresses.ts";
+import { useMembers, type ListedMember, type Role } from "./people-api.ts";
 import { PEOPLE_KEYSTROKES } from "./people-state.ts";
-import { outcomeOfInvitationFailure } from "./refusal.tsx";
+import { outcomeOfSendingFailure } from "./refusal.tsx";
 import { ROLE_OFFERED_FIRST, RoleChoice } from "./role-choice.tsx";
-
-type Role = SentInvitation["role"];
+import { UnsentEmails } from "./unsent-emails.tsx";
 
 /** The keystroke list names the act as the button does, so inviting has one name. */
 const ACT_NAME = PEOPLE_KEYSTROKES.invite.act;
 
-export function InviteAct() {
-  const [open, setOpen] = useState(false);
+const NO_FLAGS: ReadonlyMap<string, Flag> = new Map();
+
+const NOTHING_HELD: readonly Held[] = [];
+
+const CAPPED = refusedWith(INVITE_REFUSED.capped(MOST_AT_ONCE));
+
+type FieldRef = RefObject<HTMLInputElement | null>;
+
+type ListRef = RefObject<HTMLUListElement | null>;
+
+/** A paste holding several addresses, put where the caret was; one address pastes as typing. */
+const pastedInto = (event: ClipboardEvent<HTMLInputElement>): string | undefined => {
+  const pasted = event.clipboardData.getData("text");
+  if (!hasSeparator(pasted)) return undefined;
+  const { value, selectionStart, selectionEnd } = event.currentTarget;
+  return `${value.slice(0, selectionStart ?? value.length)}${pasted}${value.slice(selectionEnd ?? value.length)}`;
+};
+
+/** The addresses the dialog holds, each with what flags it, and where focus goes as one leaves. */
+const useHeldAddresses = (members: ReadonlySet<string>, list: ListRef) => {
+  const [held, setHeld] = useState(NOTHING_HELD);
+  const [field, setField] = useState("");
+  const [refused, setRefused] = useState(NO_FLAGS);
+  const flags = held.map((one) => flagOf(one, members, refused));
+
+  const place = (moved: Moved) => {
+    setHeld(moved.held);
+    setField(moved.field);
+  };
+
+  /** Drawn at once, so the press that moved the field can check the list and move focus into it. */
+  const placedNow = (moved: Moved): readonly Held[] => {
+    flushSync(() => {
+      place(moved);
+    });
+    return moved.held;
+  };
+
+  const isFlagged = (one: Held): boolean => flagOf(one, members, refused) !== undefined;
+
+  const focusFirstFlagged = () => {
+    list.current?.querySelector<HTMLElement>("[data-flagged] button")?.focus();
+  };
+
+  const flagNow = (byTheApi: ReadonlyMap<string, Flag>) => {
+    flushSync(() => {
+      setRefused((before) => new Map([...before, ...byTheApi]));
+    });
+    focusFirstFlagged();
+  };
+
+  /** Focus goes to the row that took its place, else the one before, else the field. */
+  const remove = (key: string, fieldRef: FieldRef) => {
+    const at = held.findIndex((one) => one.key === key);
+    flushSync(() => {
+      setHeld(held.filter((one) => one.key !== key));
+    });
+    const buttons = list.current?.querySelectorAll<HTMLElement>("button");
+    (buttons?.[at] ?? buttons?.[at - 1] ?? fieldRef.current)?.focus();
+  };
+
+  return {
+    held,
+    field,
+    flags,
+    place,
+    placedNow,
+    isFlagged,
+    focusFirstFlagged,
+    flagNow,
+    remove,
+  };
+};
+
+type Addresses = ReturnType<typeof useHeldAddresses>;
+
+function HeldRow(properties: {
+  readonly one: Held;
+  readonly flag: Flag | undefined;
+  readonly onRemove: () => void;
+}) {
+  const { one, flag } = properties;
+  const flagId = useId();
+  return (
+    <li
+      data-flagged={flag === undefined ? undefined : true}
+      className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-border px-2 py-1 last:border-b-0"
+    >
+      <span className="min-w-40 flex-1 text-sm wrap-anywhere">{one.address}</span>
+      <Pill
+        id={flagId}
+        variant="outline"
+        className={flag === undefined ? "py-0.5" : "border-destructive py-0.5 text-destructive"}
+      >
+        {INVITE_WORDS.flag[flag ?? "ready"]}
+      </Pill>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        aria-label={INVITE_WORDS.remove(one.address)}
+        aria-describedby={flagId}
+        onClick={properties.onRemove}
+      >
+        <Icon name="remove" />
+      </Button>
+    </li>
+  );
+}
+
+function HeldList(properties: {
+  readonly addresses: Addresses;
+  readonly list: ListRef;
+  readonly fieldRef: FieldRef;
+}) {
+  const { addresses, list, fieldRef } = properties;
+  if (addresses.held.length === 0) return null;
+  return (
+    <ul
+      ref={list}
+      aria-label={INVITE_WORDS.list}
+      className="max-h-56 overflow-y-auto border border-border"
+    >
+      {addresses.held.map((one, at) => (
+        <HeldRow
+          key={one.key}
+          one={one}
+          flag={addresses.flags[at]}
+          onRemove={() => {
+            addresses.remove(one.key, fieldRef);
+          }}
+        />
+      ))}
+    </ul>
+  );
+}
+
+const summaryOf = (addresses: Addresses): string => {
+  const flagged = addresses.flags.filter((flag) => flag !== undefined).length;
+  return addresses.held.length === 0
+    ? ""
+    : INVITE_WORDS.summary(addresses.held.length - flagged, flagged);
+};
+
+/** Typed, pasted or entered, whole addresses move into the list below; the one being typed stays. */
+function AddressField(properties: {
+  readonly addresses: Addresses;
+  readonly list: ListRef;
+  readonly fieldRef: FieldRef;
+  readonly onCapped: () => void;
+}) {
+  const { addresses, list, fieldRef } = properties;
+  const ids = { field: useId(), hint: useId(), summary: useId() };
+  const placed = (moved: Moved) => {
+    addresses.place(moved);
+    if (moved.capped) properties.onCapped();
+  };
+
+  return (
+    <div className="grid gap-2">
+      <Label htmlFor={ids.field}>{INVITE_WORDS.field}</Label>
+      <Input
+        ref={fieldRef}
+        id={ids.field}
+        type="text"
+        inputMode="email"
+        autoComplete="off"
+        spellCheck={false}
+        aria-describedby={`${ids.hint} ${ids.summary}`}
+        value={addresses.field}
+        onChange={(event) => {
+          placed(typedInto(addresses.held, event.target.value));
+        }}
+        onKeyDown={(event) => {
+          // An empty field leaves Enter to the form, which sends.
+          if (event.key !== "Enter" || addresses.field.trim() === "") return;
+          event.preventDefault();
+          placed(allInto(addresses.held, addresses.field));
+        }}
+        onPaste={(event) => {
+          const whole = pastedInto(event);
+          if (whole === undefined) return;
+          event.preventDefault();
+          placed(allInto(addresses.held, whole));
+        }}
+      />
+      <p id={ids.hint} className="text-sm text-muted-foreground">
+        {INVITE_WORDS.hint}
+      </p>
+      <output id={ids.summary} className="text-sm empty:hidden">
+        {summaryOf(addresses)}
+      </output>
+      <HeldList addresses={addresses} list={list} fieldRef={fieldRef} />
+    </div>
+  );
+}
+
+function Sent(properties: { readonly sent: readonly InvitedOne[]; readonly onAgain: () => void }) {
+  return (
+    <>
+      <UnsentEmails unsent={properties.sent.filter((one) => !one.emailSent)} />
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={properties.onAgain}>
+          {ACT_NAME}
+        </Button>
+        <DialogClose asChild>
+          {/* oxlint-disable-next-line jsx-a11y/no-autofocus -- the control that had focus is gone, and this is where the act leaves the reader */}
+          <Button type="button" autoFocus>
+            {INVITE_WORDS.done}
+          </Button>
+        </DialogClose>
+      </DialogFooter>
+    </>
+  );
+}
+
+/** Mounted afresh for each invite, so nothing from the last one is left in it. */
+function InviteForm(properties: {
+  readonly members: readonly ListedMember[] | undefined;
+  readonly fieldRef: FieldRef;
+  readonly onAgain: () => void;
+}) {
+  const { fieldRef, members } = properties;
+  const invite = useInvite();
+  const list = useRef<HTMLUListElement>(null);
+  const known = useMemo(
+    () => membersOf((members ?? []).map((member) => member.address)),
+    [members],
+  );
+  const addresses = useHeldAddresses(known, list);
   const [role, setRole] = useState<Role>(ROLE_OFFERED_FIRST);
   const [outcome, setOutcome] = useState<Outcome>();
-  const [sent, setSent] = useState<SentInvitation>();
-  const invite = useInvite();
-  const ids = { form: useId(), address: useId() };
+  // One send at a time: a second call on the mutation takes over the first's callbacks.
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState<readonly InvitedOne[]>();
+  const formId = useId();
+  const toSend = allInto(addresses.held, addresses.field).held.length;
 
-  const again = () => {
-    setOutcome(undefined);
-    setSent(undefined);
-    setRole(ROLE_OFFERED_FIRST);
+  /** The check before anything is sent: the cap, then a flagged row, then an empty list. */
+  const refusedBefore = (moved: Moved, held: readonly Held[]): Outcome | undefined => {
+    if (moved.capped) return CAPPED;
+    if (held.some(addresses.isFlagged)) {
+      addresses.focusFirstFlagged();
+      return refusedWith(INVITE_REFUSED.flagged);
+    }
+    if (held.length > 0) return undefined;
+    fieldRef.current?.focus();
+    return refusedWith(INVITE_REFUSED.none);
   };
+
+  const send = (held: readonly Held[]) => {
+    setSending(true);
+    setOutcome(undefined);
+    invite.mutate(
+      { addresses: held.map((one) => one.address), role },
+      {
+        onSuccess: ({ invitations }) => {
+          setSending(false);
+          setSent(invitations);
+          setOutcome(invitedOutcome(invitations, role));
+        },
+        onError: (failure) => {
+          setSending(false);
+          const flagged = flagsFrom(held, refusalOf(failure)?.items ?? {});
+          if (flagged.size === 0) {
+            setOutcome(outcomeOfSendingFailure(failure));
+            return;
+          }
+          addresses.flagNow(flagged);
+          setOutcome(refusedWith(INVITE_REFUSED.flagged));
+        },
+      },
+    );
+  };
+
+  // Never disabled: a disabled button drops focus, and a refusal would land nowhere.
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (sending) return;
+    const moved = allInto(addresses.held, addresses.field);
+    const held = addresses.placedNow(moved);
+    const refused = refusedBefore(moved, held);
+    if (refused === undefined) send(held);
+    else setOutcome(refused);
+  };
+
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>{ACT_NAME}</DialogTitle>
+        <DialogDescription>{INVITE_WORDS.description}</DialogDescription>
+      </DialogHeader>
+
+      <OutcomeLine outcome={outcome} className="text-sm" />
+
+      {sent === undefined ? (
+        <>
+          <form id={formId} noValidate onSubmit={submit} className="grid gap-4">
+            <AddressField
+              addresses={addresses}
+              list={list}
+              fieldRef={fieldRef}
+              onCapped={() => {
+                setOutcome(CAPPED);
+              }}
+            />
+            <RoleChoice role={role} onChoose={setRole} />
+          </form>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="outline">
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button
+              type="submit"
+              form={formId}
+              aria-disabled={sending || addresses.flags.some((flag) => flag !== undefined)}
+              className="aria-disabled:opacity-50"
+            >
+              {sending ? INVITE_WORDS.sending(toSend) : INVITE_WORDS.send(toSend)}
+            </Button>
+          </DialogFooter>
+        </>
+      ) : (
+        <Sent sent={sent} onAgain={properties.onAgain} />
+      )}
+    </>
+  );
+}
+
+export function InviteAct() {
+  const [open, setOpen] = useState(false);
+  const [invites, setInvites] = useState(0);
+  const fieldRef = useRef<HTMLInputElement>(null);
+  // Held here, where the dialog opens on the list already read: it checks against no fresher one.
+  const members = useMembers().data;
+
   const show = () => {
-    again();
     setOpen(true);
   };
   useKeystroke(PEOPLE_KEYSTROKES.invite, show);
@@ -51,90 +400,24 @@ export function InviteAct() {
     if (act === INVITE_A_PERSON.asks) show();
   });
 
-  // Never disabled while sending: a disabled button drops focus, and a refusal would land nowhere.
-  const submit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const address = new FormData(event.currentTarget).get("address");
-    if (typeof address !== "string" || invite.isPending) return;
-    setOutcome(undefined);
-    invite.mutate(
-      { addresses: [address.trim()], role },
-      {
-        onSuccess: ({ invitations: [invited] }) => {
-          if (invited === undefined) return;
-          setSent(invited);
-          setOutcome(invitedOutcome(invited));
-        },
-        onError: (failure) => {
-          setOutcome(outcomeOfInvitationFailure(failure));
-        },
-      },
-    );
+  /** A fresh form in the open dialog, focus on its field where the pressed button was. */
+  const again = () => {
+    flushSync(() => {
+      setInvites((count) => count + 1);
+    });
+    fieldRef.current?.focus();
   };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {/* The trigger is where a closed dialog hands focus back, however it was opened. */}
       <DialogTrigger asChild>
-        <Button size="sm" aria-keyshortcuts={PEOPLE_KEYSTROKES.invite.key} onClick={again}>
+        <Button size="sm" aria-keyshortcuts={PEOPLE_KEYSTROKES.invite.key}>
           {ACT_NAME}
         </Button>
       </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{ACT_NAME}</DialogTitle>
-          <DialogDescription>
-            They get an email with a link to join. The link lasts seven days, and inviting them
-            again replaces it.
-          </DialogDescription>
-        </DialogHeader>
-
-        <OutcomeLine outcome={outcome} className="text-sm" />
-
-        {sent === undefined ? (
-          <form id={ids.form} onSubmit={submit} className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor={ids.address}>Email address</Label>
-              <Input
-                id={ids.address}
-                name="address"
-                type="email"
-                required
-                autoComplete="off"
-                spellCheck={false}
-              />
-            </div>
-
-            <RoleChoice role={role} onChoose={setRole} />
-          </form>
-        ) : null}
-
-        <DialogFooter>
-          {sent === undefined ? (
-            <>
-              <DialogClose asChild>
-                <Button type="button" variant="outline">
-                  Cancel
-                </Button>
-              </DialogClose>
-              <Button type="submit" form={ids.form}>
-                {invite.isPending ? "Sending the invitation" : "Send the invitation"}
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button type="button" variant="outline" onClick={again}>
-                {ACT_NAME}
-              </Button>
-              <DialogClose asChild>
-                {/* oxlint-disable-next-line jsx-a11y/no-autofocus -- the control that had focus is gone, and this is where the act leaves the reader */}
-                <Button type="button" autoFocus>
-                  Done
-                </Button>
-              </DialogClose>
-            </>
-          )}
-        </DialogFooter>
+      <DialogContent className="wrap-anywhere">
+        <InviteForm key={invites} members={members} fieldRef={fieldRef} onAgain={again} />
       </DialogContent>
     </Dialog>
   );

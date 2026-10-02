@@ -6,11 +6,11 @@ import { FilterRow } from "@/shared/filter-row.tsx";
 import { GridTable } from "@/shared/grid-table.tsx";
 import { useKeystroke } from "@/shared/keystrokes.tsx";
 import { useListAddress } from "@/shared/list-address.ts";
-import { ListPages, ListState, pageWithin } from "@/shared/list-pages.tsx";
+import { ListPages, ListState } from "@/shared/list-pages.tsx";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
 import { RowMenu } from "@/shared/row-menu.tsx";
 import { SelectionBar } from "@/shared/selection-bar.tsx";
-import { useWideLayout } from "@/shared/wide-layout.ts";
+import { useHiddenColumns } from "@/shared/wide-layout.ts";
 
 import { useGroups } from "./groups-api.ts";
 import {
@@ -33,6 +33,7 @@ import {
   MEMBERS_FIELDS,
   MEMBERS_LIST,
   memberPageOf,
+  pageIndexOf,
   RETURNED_FROM_A_REMOVAL,
   sortedOf,
   sortOf,
@@ -99,9 +100,7 @@ const useNarrowedMembers = (listed: readonly ListedMember[]) => {
     () => listed.filter(matching({ search, role, group })),
     [listed, search, role, group],
   );
-  // A search still settling has not reached the address, so it shows its first page.
-  const asked = search === state.search ? state.page - 1 : 0;
-  const pageIndex = pageWithin(asked, PAGE_SIZE, data.length);
+  const pageIndex = pageIndexOf(search, state, PAGE_SIZE, data.length);
 
   const clear = () => {
     setSearch("");
@@ -301,13 +300,6 @@ function CountLine(properties: {
   );
 }
 
-/** The reader's own choice, else what a narrow screen has room for. */
-const useHiddenColumns = () => {
-  const [chosen, setChosen] = useState<ReadonlySet<string>>();
-  const wide = useWideLayout();
-  return [chosen ?? (wide ? NONE : NARROW_HIDES), setChosen] as const;
-};
-
 const usePageTurns = (narrowed: Narrowed) => {
   const pageCount = Math.ceil(narrowed.data.length / PAGE_SIZE);
   const turn = (pageIndex: number) => {
@@ -343,7 +335,7 @@ function MemberList(properties: {
   const [inFocus, setInFocus] = useState<string>();
   const [outcome, setOutcome] = useState<Outcome>();
   const [refused, setRefused] = useState<RefusedRows>(NO_MARKS);
-  const [hidden, setHidden] = useHiddenColumns();
+  const [hidden, setHidden] = useHiddenColumns(NARROW_HIDES);
   const searchRef = useRef<HTMLInputElement>(null);
   const turn = usePageTurns(narrowed);
   const openMember = useOpenMember(narrowed.flush);

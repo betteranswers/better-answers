@@ -133,7 +133,7 @@ test.describe("the People screen's Requests tab", () => {
       .getByRole("region", { name: "Invitations" })
       .getByRole("row")
       .filter({ hasText: priya });
-    await expect(invited.getByRole("cell").nth(1)).toHaveText("Editor");
+    await expect(invited.getByRole("cell", { name: "Editor", exact: true })).toHaveCount(1);
   });
 
   test("renders the waiting requests within the list's budget", async ({ page, request }) => {

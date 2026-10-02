@@ -1,8 +1,9 @@
+import { createColumnHelper, tableFeatures, useTable } from "@tanstack/react-table";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { FilterRow } from "@/shared/filter-row.tsx";
-import { RowLink } from "@/shared/grid-table.tsx";
+import { GridTable, RowLink } from "@/shared/grid-table.tsx";
 import { ListPages } from "@/shared/list-pages.tsx";
 
 import { placedWithoutMeasuring } from "./measuring.ts";
@@ -470,5 +471,53 @@ describe("the filter row", () => {
     ).toBe("true");
     fireEvent.click(within(statuses).getByRole("radio", { name: "Expired 1" }));
     expect(picked).toEqual(["expired"]);
+  });
+});
+
+const FOCUS_FEATURES = tableFeatures({});
+
+const focusColumn = createColumnHelper<typeof FOCUS_FEATURES, (typeof MEMBERS)[number]>();
+
+const FOCUS_COLUMNS = focusColumn.columns([
+  focusColumn.accessor("name", { id: "person", header: "Person" }),
+]);
+
+/** Two controls a row, so focus can move inside one row as well as between rows. */
+function FocusedList(properties: { readonly onRowFocus: (id: string | undefined) => void }) {
+  const table = useTable({
+    features: FOCUS_FEATURES,
+    columns: FOCUS_COLUMNS,
+    data: [...MEMBERS],
+    getRowId: (member) => member.id,
+  });
+  return (
+    <GridTable
+      table={table}
+      caption="Members of this workspace."
+      empty={null}
+      rowMenu={(member) => (
+        <>
+          <button type="button">Resend to {member.name}</button>
+          <button type="button">Cancel for {member.name}</button>
+        </>
+      )}
+      onRowFocus={(member) => {
+        properties.onRowFocus(member?.id);
+      }}
+    />
+  );
+}
+
+describe("the row in focus", () => {
+  it("holds a row only while focus stays inside it", () => {
+    const seen: (string | undefined)[] = [];
+    render(<FocusedList onRowFocus={(id) => seen.push(id)} />);
+
+    screen.getByRole("button", { name: "Resend to Cy Twombly" }).focus();
+    screen.getByRole("button", { name: "Resend to Ada Lovelace" }).focus();
+    screen.getByRole("button", { name: "Cancel for Ada Lovelace" }).focus();
+    screen.getByRole("button", { name: "Cancel for Ada Lovelace" }).blur();
+
+    expect(seen).toEqual(["cy", undefined, "ada", "ada", undefined]);
   });
 });

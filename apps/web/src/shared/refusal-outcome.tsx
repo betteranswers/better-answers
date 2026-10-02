@@ -83,3 +83,26 @@ export function RefusedItemLines(properties: {
     </ul>
   );
 }
+
+/** A set refused whole; each item is named as the screen named it at the press, shown or not. */
+export const setRefusalOutcome = (refused: {
+  readonly featureWords: SaidOfWord;
+  readonly failure: Error | ApiError;
+  readonly nameOf: (id: string) => string;
+  readonly lead: (count: number) => string;
+}): Outcome => {
+  const { featureWords, failure } = refused;
+  const count = saidOfItems(featureWords, failure).length;
+  if (count === 0) return failureOutcome(featureWords, failure);
+  return {
+    tone: "refused",
+    words: (
+      <>
+        <p>{refused.lead(count)}</p>
+        <div className="mt-1">
+          <RefusedItemLines featureWords={featureWords} failure={failure} nameOf={refused.nameOf} />
+        </div>
+      </>
+    ),
+  };
+};

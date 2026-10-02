@@ -1,211 +1,360 @@
-import { useId, useRef, useState } from "react";
+import { useTable } from "@tanstack/react-table";
+import { useId, useMemo, useRef, useState, type RefObject } from "react";
 
+import { FilterRow } from "@/shared/filter-row.tsx";
+import { GridTable } from "@/shared/grid-table.tsx";
+import { useKeystroke } from "@/shared/keystrokes.tsx";
+import { useListAddress } from "@/shared/list-address.ts";
+import { ListPages, ListRead, ListState } from "@/shared/list-pages.tsx";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
-import { Button } from "@/shared/ui/button.tsx";
-import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
-import { TableCell } from "@/shared/ui/table.tsx";
+import { RowMenu } from "@/shared/row-menu.tsx";
+import { SelectionBar } from "@/shared/selection-bar.tsx";
+import { useHiddenColumns } from "@/shared/wide-layout.ts";
 
-import { EMPTY_LINES } from "./empty-lines.ts";
-import { resentOutcome } from "./invitation-words.ts";
+import { InvitationBulkActs, useInvitationActs, type Ticked } from "./invitation-acts.tsx";
+import { EXPIRY, HIDEABLE, INVITATION_COLUMNS, invitationFeatures } from "./invitation-columns.tsx";
+import { INVITATIONS_WORDS as WORDS, STATUS_WORDS } from "./invitation-words.ts";
 import {
-  useCancelInvitation,
+  INVITATION_STATUSES,
+  INVITATIONS_FIELDS,
+  INVITATIONS_LIST,
+  isActable,
+} from "./invitations-address.ts";
+import {
+  useInvitationCounts,
   useInvitations,
-  useResendInvitation,
-  type WaitingInvitation,
+  type ListedInvitation,
+  type SentInvitation,
 } from "./invitations-api.ts";
-import { PEOPLE_KEYSTROKES } from "./people-state.ts";
+import { pageIndexOf, useSettledSearch } from "./members-address.ts";
+import { PEOPLE_KEYSTROKES as KEY } from "./people-state.ts";
 import { outcomeOfInvitationFailure } from "./refusal.tsx";
-import {
-  DayCell,
-  NothingWaiting,
-  useKeystrokeOnHeld,
-  WaitingRow,
-  WaitingTable,
-} from "./waiting-list.tsx";
+import { UnsentEmails } from "./unsent-emails.tsx";
 
-const COLUMNS = ["Address", "Role", "State", "Sent", "Expires", "Invited by", "Acts"] as const;
+/** Each status's list is read whole, so the browser pages it. */
+const PAGE_SIZE = 25;
 
-const NOTHING_HELD = selectFirst("invitation");
+const NOTHING_IN_FOCUS = selectFirst("invitation");
 
-const hasExpired = (invitation: WaitingInvitation, now: number): boolean =>
-  Date.parse(invitation.expiresAt) <= now;
+const NONE: Ticked = new Map();
 
-const countOf = (invitations: readonly WaitingInvitation[], now: number): string => {
-  const said = invitations.length === 1 ? "1 invitation" : `${invitations.length} invitations`;
-  const expired = invitations.filter((invitation) => hasExpired(invitation, now)).length;
-  return expired === 0 ? said : `${said}, ${expired} expired`;
+const NO_ONE: readonly ListedInvitation[] = [];
+
+const NOTHING_UNSENT: readonly SentInvitation[] = [];
+
+/** Address and role are what a narrow screen has room for; the rest can be shown again. */
+const NARROW_HIDES: ReadonlySet<string> = new Set(["sent", "expires", "invitedBy"]);
+
+const matching = (search: string) => {
+  const sought = search.toLowerCase();
+  return (invitation: ListedInvitation): boolean =>
+    invitation.address.toLowerCase().includes(sought);
 };
 
-function InvitationRow(properties: {
-  readonly invitation: WaitingInvitation;
-  readonly now: number;
-  readonly onHeld: (invitation: WaitingInvitation | undefined) => void;
-  readonly onResend: (invitation: WaitingInvitation) => void;
-  readonly onCancel: (invitation: WaitingInvitation) => void;
-}) {
-  const { invitation } = properties;
-  const expired = hasExpired(invitation, properties.now);
+/** Read in render from the address, so a reload or Back comes to the same rows. */
+const useNarrowedInvitations = () => {
+  const { state, write } = useListAddress(INVITATIONS_LIST, INVITATIONS_FIELDS);
+  const read = useInvitations(state.status);
+  const listed = read.data ?? NO_ONE;
+  const [search, setSearch] = useSettledSearch(state.search, (settled) => {
+    write({ search: settled, page: 1 });
+  });
+  const data = useMemo(() => listed.filter(matching(search)), [listed, search]);
+  const pageIndex = pageIndexOf(search, state, PAGE_SIZE, data.length);
 
+  const clear = () => {
+    setSearch("");
+    write({ search: "", page: 1 });
+  };
+
+  return { state, write, read, listed, search, setSearch, data, pageIndex, clear };
+};
+
+type Narrowed = ReturnType<typeof useNarrowedInvitations>;
+
+const countSaid = (narrowed: Narrowed): string => {
+  const { state, listed, data, search } = narrowed;
+  if (listed.length === 0) return "";
+  return search === ""
+    ? WORDS.counted(state.status, listed.length)
+    : WORDS.matched(state.status, data.length, listed.length, search);
+};
+
+function InvitationFilters(properties: {
+  readonly narrowed: Narrowed;
+  readonly searchRef: RefObject<HTMLInputElement | null>;
+  readonly hidden: ReadonlySet<string>;
+  readonly onHiddenChange: (hidden: ReadonlySet<string>) => void;
+}) {
+  const { narrowed } = properties;
+  const counts = useInvitationCounts().data;
+  const actable = isActable(narrowed.state.status);
   return (
-    <WaitingRow item={invitation} onHeld={properties.onHeld}>
-      <TableCell className="whitespace-normal wrap-anywhere">{invitation.address}</TableCell>
-      <TableCell>
-        <Pill>{invitation.role}</Pill>
-      </TableCell>
-      <TableCell>
-        <Pill>{expired ? "Expired" : "Waiting"}</Pill>
-      </TableCell>
-      <DayCell instant={invitation.invitedAt} />
-      <DayCell instant={invitation.expiresAt} />
-      <TableCell>
-        {invitation.invitedBy === "" ? (
-          <span className="text-muted-foreground">No display name yet</span>
-        ) : (
-          invitation.invitedBy
-        )}
-      </TableCell>
-      <TableCell>
-        <span className="flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            aria-label={`Resend the invitation to ${invitation.address}`}
-            aria-keyshortcuts={PEOPLE_KEYSTROKES.resend.key}
-            onClick={() => {
-              properties.onResend(invitation);
-            }}
-          >
-            Resend
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            aria-label={`Cancel the invitation to ${invitation.address}`}
-            aria-keyshortcuts={PEOPLE_KEYSTROKES.cancel.key}
-            onClick={() => {
-              properties.onCancel(invitation);
-            }}
-          >
-            Cancel
-          </Button>
-        </span>
-      </TableCell>
-    </WaitingRow>
+    <FilterRow
+      search={{
+        label: WORDS.search,
+        value: narrowed.search,
+        onChange: narrowed.setSearch,
+        keystroke: KEY.searchInvitations,
+        inputRef: properties.searchRef,
+      }}
+      status={{
+        label: WORDS.status,
+        value: narrowed.state.status,
+        choices: INVITATION_STATUSES.map((status) => ({
+          value: status,
+          label: STATUS_WORDS[status],
+          count: counts?.[status],
+        })),
+        onChange: (status) => {
+          const chosen = INVITATION_STATUSES.find((one) => one === status) ?? "waiting";
+          narrowed.write({ status: chosen, page: 1 });
+        },
+      }}
+      columns={{
+        columns: actable ? HIDEABLE : HIDEABLE.filter((column) => column.id !== EXPIRY),
+        hidden: properties.hidden,
+        onHiddenChange: properties.onHiddenChange,
+      }}
+    />
   );
 }
 
-function InvitationList(properties: {
-  readonly invitations: readonly WaitingInvitation[];
-  readonly onOutcome: (outcome: Outcome) => void;
-  readonly onCancelled: () => void;
+function NoneShown(properties: {
+  readonly narrowed: Narrowed;
+  readonly focusAfterClear: RefObject<HTMLElement | null>;
 }) {
-  const { invitations, onOutcome } = properties;
-  // Read once, so the list does not change its mind between renders.
-  const [now] = useState(Date.now);
-  const [held, setHeld] = useState<WaitingInvitation>();
-  const resend = useResendInvitation();
-  const cancel = useCancelInvitation();
+  const { narrowed } = properties;
+  if (narrowed.search === "") {
+    return (
+      <ListState
+        state={{ kind: "empty", words: WORDS.noneIn[narrowed.state.status], act: undefined }}
+      />
+    );
+  }
+  return (
+    <ListState
+      state={{
+        kind: "emptied",
+        words: WORDS.noneMatch(narrowed.search),
+        onClear: narrowed.clear,
+        focusAfterClear: properties.focusAfterClear,
+      }}
+    />
+  );
+}
 
-  // Never disabled while sending: a disabled button drops the focus the keystrokes read.
-  const resent = (invitation: WaitingInvitation) => {
-    if (resend.isPending) return;
-    onOutcome({ tone: "said", words: `Sending the invitation to ${invitation.address} again.` });
-    resend.mutate(
-      { invitationId: invitation.invitationId },
-      {
-        onSuccess: (sent) => {
-          onOutcome(resentOutcome(sent));
-        },
-        onError: (failure) => {
-          onOutcome(outcomeOfInvitationFailure(failure));
-        },
-      },
+const usePageTurns = (narrowed: Narrowed) => {
+  const lastPage = Math.ceil(narrowed.data.length / PAGE_SIZE) - 1;
+  const turnTo = (pageIndex: number) => {
+    if (pageIndex < 0 || pageIndex > lastPage) return;
+    narrowed.write({ page: pageIndex + 1 });
+  };
+  useKeystroke(KEY.previousInvitations, () => {
+    turnTo(narrowed.pageIndex - 1);
+  });
+  useKeystroke(KEY.nextInvitations, () => {
+    turnTo(narrowed.pageIndex + 1);
+  });
+  return turnTo;
+};
+
+/** A tick taken on another status or page keeps the address it was taken with. */
+const tickedFrom =
+  (ticked: Ticked, listed: readonly ListedInvitation[]) =>
+  (ids: ReadonlySet<string>): Ticked =>
+    new Map(
+      [...ids].map((invitationId) => [
+        invitationId,
+        ticked.get(invitationId) ??
+          listed.find((invitation) => invitation.invitationId === invitationId)?.address ??
+          WORDS.noLongerListed,
+      ]),
+    );
+
+/** The row focus is in stands while the list still holds it. */
+const useInFocusKeystrokes = (properties: {
+  readonly inFocus: ListedInvitation | undefined;
+  readonly resend: (invitation: ListedInvitation) => void;
+  readonly cancel: (invitation: ListedInvitation) => void;
+  readonly tick: (invitation: ListedInvitation) => void;
+  readonly nothingInFocus: () => void;
+}) => {
+  const { inFocus, nothingInFocus } = properties;
+  const onTheRowInFocus = (act: (invitation: ListedInvitation) => void) => () => {
+    if (inFocus === undefined) nothingInFocus();
+    else act(inFocus);
+  };
+  useKeystroke(KEY.resend, onTheRowInFocus(properties.resend));
+  useKeystroke(KEY.cancel, onTheRowInFocus(properties.cancel));
+  useKeystroke(KEY.tickInvitation, onTheRowInFocus(properties.tick));
+};
+
+/** An act that takes its row away hands focus to the list once the menu has shut. */
+const rowMenuOf =
+  (acts: ReturnType<typeof useInvitationActs>, heading: RefObject<HTMLElement | null>) =>
+  (invitation: ListedInvitation) => {
+    const toTheList = () => heading.current;
+    return (
+      <RowMenu
+        name={invitation.address}
+        acts={[
+          {
+            label: WORDS.resend,
+            onSelect: () => {
+              acts.resendOne(invitation);
+            },
+            focusAfter: invitation.status === "expired" ? toTheList : undefined,
+          },
+          {
+            label: WORDS.cancel,
+            destructive: true,
+            onSelect: () => {
+              acts.cancelOne(invitation);
+            },
+            focusAfter: toTheList,
+          },
+        ]}
+      />
     );
   };
 
-  const cancelled = (invitation: WaitingInvitation) => {
-    setHeld(undefined);
-    properties.onCancelled();
-    onOutcome({
-      tone: "said",
-      words: `Cancelled the invitation to ${invitation.address}; its link no longer works.`,
-    });
-    cancel.mutate(
-      { invitationId: invitation.invitationId },
-      {
-        onError: (failure) => {
-          onOutcome(outcomeOfInvitationFailure(failure));
-        },
-      },
-    );
-  };
+/** Ticks and an act's outcome are the screen's; what narrows the rows is the address's. */
+function InvitationList(properties: { readonly heading: RefObject<HTMLHeadingElement | null> }) {
+  const { heading } = properties;
+  const narrowed = useNarrowedInvitations();
+  const { read, listed, state } = narrowed;
+  const actable = isActable(state.status);
+  // A tick outlives its row and its status, so the next act refuses or skips it and says so.
+  const [ticked, setTicked] = useState<Ticked>(NONE);
+  const [inFocusId, setInFocusId] = useState<string>();
+  const [outcome, setOutcome] = useState<Outcome>();
+  const [unsent, setUnsent] = useState(NOTHING_UNSENT);
+  const [hidden, setHidden] = useHiddenColumns(NARROW_HIDES);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const turnTo = usePageTurns(narrowed);
 
-  const nothingHeld = () => {
-    onOutcome(NOTHING_HELD);
-  };
-  useKeystrokeOnHeld(PEOPLE_KEYSTROKES.resend, held, resent, nothingHeld);
-  useKeystrokeOnHeld(PEOPLE_KEYSTROKES.cancel, held, cancelled, nothingHeld);
+  const table = useTable({
+    features: invitationFeatures,
+    columns: INVITATION_COLUMNS,
+    data: narrowed.data,
+    getRowId: (invitation) => invitation.invitationId,
+    state: { pagination: { pageIndex: narrowed.pageIndex, pageSize: PAGE_SIZE } },
+  });
+  const shownIds = () => table.getRowModel().rows.map((row) => row.id);
+  const tickedIds = new Set(ticked.keys());
+  const tick = tickedFrom(ticked, listed);
+
+  const acts = useInvitationActs({
+    readable: read.isSuccess,
+    ticked,
+    tick: setTicked,
+    heading,
+    say: setOutcome,
+    unsent: setUnsent,
+  });
+
+  useInFocusKeystrokes({
+    inFocus: listed.find((invitation) => invitation.invitationId === inFocusId),
+    resend: acts.resendOne,
+    cancel: acts.cancelOne,
+    tick: (invitation) => {
+      const next = new Set(tickedIds);
+      if (!next.delete(invitation.invitationId)) next.add(invitation.invitationId);
+      setTicked(tick(next));
+    },
+    nothingInFocus: () => {
+      setOutcome(NOTHING_IN_FOCUS);
+    },
+  });
 
   return (
     <>
       <output className="mt-1 block text-muted-foreground empty:hidden">
-        {invitations.length === 0 ? null : countOf(invitations, now)}
+        {read.data === undefined ? "" : countSaid(narrowed)}
       </output>
-      {invitations.length === 0 ? (
-        <NothingWaiting line={EMPTY_LINES.invitations} />
-      ) : (
-        <WaitingTable
-          caption="Invitations to this workspace not yet accepted, each with its role, state and expiry."
-          columns={COLUMNS}
+      <OutcomeLine outcome={outcome} className="mt-2" />
+      <UnsentEmails unsent={unsent} />
+
+      <div className="mt-4 border border-border bg-card">
+        <InvitationFilters
+          narrowed={narrowed}
+          searchRef={searchRef}
+          hidden={hidden}
+          onHiddenChange={setHidden}
+        />
+        <ListRead
+          read={read}
+          loading={WORDS.loading}
+          failed={(failure) => outcomeOfInvitationFailure(failure, "read").words}
+          focusAfterRetry={searchRef}
         >
-          {invitations.map((invitation) => (
-            <InvitationRow
-              key={invitation.invitationId}
-              invitation={invitation}
-              now={now}
-              onHeld={setHeld}
-              onResend={resent}
-              onCancel={cancelled}
-            />
-          ))}
-        </WaitingTable>
-      )}
+          <SelectionBar
+            label={WORDS.selected}
+            ticked={tickedIds}
+            shown={shownIds()}
+            noun={["invitation", "invitations"]}
+            clearKeystroke={KEY.clearSelection}
+            onClear={() => {
+              setTicked(NONE);
+            }}
+            focusAfterClear={heading}
+          >
+            <InvitationBulkActs acts={acts} />
+          </SelectionBar>
+          <GridTable
+            table={table}
+            caption={WORDS.caption}
+            ticking={
+              actable
+                ? {
+                    ticked: tickedIds,
+                    onTickedChange: (ids) => {
+                      setTicked(tick(ids));
+                    },
+                    nameOf: (invitation) => invitation.address,
+                    everyOnThePage: WORDS.everyOnThePage,
+                  }
+                : undefined
+            }
+            hidden={actable ? hidden : new Set([...hidden, EXPIRY])}
+            rowMenu={actable ? rowMenuOf(acts, heading) : undefined}
+            onRowFocus={(invitation) => {
+              setInFocusId(invitation?.invitationId);
+            }}
+            empty={<NoneShown narrowed={narrowed} focusAfterClear={searchRef} />}
+          />
+          <ListPages
+            pages={{
+              kind: "pages",
+              label: WORDS.pages,
+              pageIndex: narrowed.pageIndex,
+              pageSize: PAGE_SIZE,
+              total: narrowed.data.length,
+              onTurn: turnTo,
+              keystrokes: {
+                previous: KEY.previousInvitations.key,
+                next: KEY.nextInvitations.key,
+              },
+            }}
+          />
+        </ListRead>
+      </div>
     </>
   );
 }
 
 export function InvitationsTab() {
-  const invitations = useInvitations();
-  const [outcome, setOutcome] = useState<Outcome>();
   const headingId = useId();
   const heading = useRef<HTMLHeadingElement>(null);
 
   return (
     <section aria-labelledby={headingId} className="mt-6">
-      {/* Focusable, so a cancelled row's focus lands here rather than on the page. */}
+      {/* Focusable, so focus lands here when an act takes the row it was in. */}
       <h2 id={headingId} ref={heading} tabIndex={-1}>
         Invitations
       </h2>
-      <OutcomeLine
-        outcome={
-          invitations.error === null
-            ? outcome
-            : outcomeOfInvitationFailure(invitations.error, "read")
-        }
-        className="mt-2"
-      />
-      <div aria-live="polite">
-        {invitations.isPending ? <p className="mt-2">The invitations are still loading.</p> : null}
-      </div>
-      {invitations.data === undefined ? null : (
-        <InvitationList
-          invitations={invitations.data}
-          onOutcome={setOutcome}
-          onCancelled={() => {
-            heading.current?.focus();
-          }}
-        />
-      )}
+      <InvitationList heading={heading} />
     </section>
   );
 }

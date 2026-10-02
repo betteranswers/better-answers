@@ -1,4 +1,5 @@
 import type { Said, SaidOfWord } from "@/shared/refusal-words.ts";
+import { minutesUntil } from "@/shared/words.ts";
 
 /** Said on the invitation screen, of its read and of joining alike. */
 export const SAID_OF_ACCEPTING = {
@@ -57,12 +58,6 @@ export const ASK_REFUSED: Said = {
 export const ASK_UNANSWERED: Said = {
   why: "No response, so your request wasn't sent.",
   next: "Try again in a moment.",
-};
-
-/** Rounded up, so the reader never asks again before the ceiling lifts. */
-const minutesUntil = (seconds: number): string => {
-  const minutes = Math.max(1, Math.ceil(seconds / 60));
-  return minutes === 1 ? "a minute" : `${minutes} minutes`;
 };
 
 export const askedTooOften = (liftsInSeconds: number): Said => ({

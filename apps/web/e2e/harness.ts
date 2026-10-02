@@ -79,7 +79,10 @@ export const markTheOperator = (
 ) => ask(api, "/operators", { email, change }, operatorMarked);
 const invitationWritten = z.object({ id: z.string() });
 
-/** A waiting invitation as the invite act leaves it, less the email, which no spec reads. */
+/** The store keeps Better Auth's spelling; a spec says the glossary's. */
+const STORED_STATUS = { accepted: "accepted", cancelled: "canceled" } as const;
+
+/** As the invite act leaves it, less the email no spec reads; or accepted, cancelled, or past expiry. */
 export const invite = (
   api: APIRequestContext,
   input: {
@@ -87,8 +90,22 @@ export const invite = (
     email: string;
     inviterId: string;
     role: "Admin" | "Editor" | "Viewer";
+    status?: keyof typeof STORED_STATUS;
+    expiresAt?: Date;
   },
-) => ask(api, "/invitations", input, invitationWritten);
+) => {
+  const { status, expiresAt, ...invited } = input;
+  return ask(
+    api,
+    "/invitations",
+    {
+      ...invited,
+      status: status === undefined ? undefined : STORED_STATUS[status],
+      expiresAt: expiresAt?.toISOString(),
+    },
+    invitationWritten,
+  );
+};
 
 const signInAged = z.object({ aged: z.boolean() });
 
@@ -300,6 +317,15 @@ export const codeSentTo = async (api: APIRequestContext, email: string): Promise
 /** The token in the fragment of the email's sign-in link. */
 export const linkSentTo = async (api: APIRequestContext, email: string): Promise<string> =>
   (await capturedFor(api, "/links", email, linkSent)).token;
+
+const emailsCounted = z.object({ sent: z.number() });
+
+/** How many emails the api has sent to an address, each counted as the transport took it. */
+export const emailsSentTo = async (api: APIRequestContext, email: string): Promise<number> => {
+  const counted = await api.get(`${HARNESS}/emails?to=${encodeURIComponent(email)}`);
+  expect(counted.ok(), `counting the emails answered ${counted.status()}`).toBe(true);
+  return emailsCounted.parse(await counted.json()).sent;
+};
 
 /** Timestamped and randomised, so a code read back for it is this test's alone. */
 export const anAddress = (who: string): string =>

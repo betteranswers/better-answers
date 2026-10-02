@@ -43,6 +43,8 @@ type Opted<Data> = {
   readonly sorting?: SortHeads | undefined;
   readonly hidden?: ReadonlySet<string> | undefined;
   readonly rowMenu?: ((row: Data) => ReactNode) | undefined;
+  /** The row focus is in, for keystrokes that act on it; `undefined` once focus leaves it. */
+  readonly onRowFocus?: ((row: Data | undefined) => void) | undefined;
 };
 
 const HEAD =
@@ -189,6 +191,22 @@ function ColumnHead<Features extends TableFeatures, Data extends RowData>(proper
 const isShown = (hidden: ReadonlySet<string> | undefined, columnId: string): boolean =>
   hidden?.has(columnId) !== true;
 
+/** Focus moving between the row's own controls keeps it; only leaving the row lets it go. */
+const focusHandlersOf = <Data,>(
+  onRowFocus: ((row: Data | undefined) => void) | undefined,
+  row: Data,
+): Pick<ComponentProps<"tr">, "onFocus" | "onBlur"> =>
+  onRowFocus === undefined
+    ? {}
+    : {
+        onFocus: () => {
+          onRowFocus(row);
+        },
+        onBlur: (event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) onRowFocus(undefined);
+        },
+      };
+
 function GridRow<Features extends TableFeatures, Data extends RowData>(
   properties: Opted<Data> & { readonly row: Row<Features, Data> },
 ) {
@@ -198,6 +216,7 @@ function GridRow<Features extends TableFeatures, Data extends RowData>(
     <TableRow
       data-state={ticked ? "selected" : undefined}
       className="border-border data-[state=selected]:bg-[var(--surface-selected)]"
+      {...focusHandlersOf(properties.onRowFocus, row.original)}
     >
       {ticking === undefined ? null : (
         <TableCell className={cn(CELL, "w-10")}>
@@ -246,7 +265,7 @@ export function GridTable<Features extends TableFeatures, Data extends RowData>(
     readonly empty: ReactNode;
   },
 ) {
-  const { table, ticking, sorting, hidden, rowMenu } = properties;
+  const { table, ticking, sorting, hidden, rowMenu, onRowFocus } = properties;
   const rows = table.getRowModel().rows;
 
   return (
@@ -282,7 +301,14 @@ export function GridTable<Features extends TableFeatures, Data extends RowData>(
           </TableRow>
         ) : (
           rows.map((row) => (
-            <GridRow key={row.id} row={row} ticking={ticking} hidden={hidden} rowMenu={rowMenu} />
+            <GridRow
+              key={row.id}
+              row={row}
+              ticking={ticking}
+              hidden={hidden}
+              rowMenu={rowMenu}
+              onRowFocus={onRowFocus}
+            />
           ))
         )}
       </TableBody>

@@ -6,7 +6,7 @@ import type { ApiError } from "@/shared/api/trpc.ts";
 import { EmptyState } from "@/shared/empty-state.tsx";
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { selectFirst, type Outcome } from "@/shared/outcome.tsx";
-import { failureOutcome, RefusedItemLines, saidOfItems } from "@/shared/refusal-outcome.tsx";
+import { saidOfItems, setRefusalOutcome } from "@/shared/refusal-outcome.tsx";
 import { SelectionAct } from "@/shared/selection-bar.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Label } from "@/shared/ui/label.tsx";
@@ -69,28 +69,16 @@ const refusedRowsOf = (failure: Error | ApiError): RefusedRows =>
   new Map(saidOfItems(SAID_OF_TICKED_MEMBERS, failure).map(({ id, said }) => [id, said]));
 
 /** Names are taken at the press, so a person the list has since lost is still named. */
-const refusalOf = (failure: Error | ApiError, names: ReadonlyMap<string, string>): Outcome => {
-  const count = saidOfItems(SAID_OF_TICKED_MEMBERS, failure).length;
-  if (count === 0) return failureOutcome(SAID_OF_TICKED_MEMBERS, failure);
-  return {
-    tone: "refused",
-    words: (
-      <>
-        <p>{BULK_WORDS.refused(count)}</p>
-        <div className="mt-1">
-          <RefusedItemLines
-            featureWords={SAID_OF_TICKED_MEMBERS}
-            failure={failure}
-            nameOf={(personId) => names.get(personId) ?? NO_LONGER_LISTED}
-          />
-        </div>
-      </>
-    ),
-  };
-};
+const refusalOf = (failure: Error | ApiError, names: ReadonlyMap<string, string>): Outcome =>
+  setRefusalOutcome({
+    featureWords: SAID_OF_TICKED_MEMBERS,
+    failure,
+    nameOf: (personId) => names.get(personId) ?? NO_LONGER_LISTED,
+    lead: BULK_WORDS.refused,
+  });
 
 /** Shifted, so a selection's act never shares a key with the act on the member in focus. */
-const shortcutOf = (keystroke: Keystroke): string => `Shift+${keystroke.key}`;
+export const shortcutOf = (keystroke: Keystroke): string => `Shift+${keystroke.key}`;
 
 export const useMemberBulkActs = (list: BulkList) => {
   const [open, setOpen] = useState<BulkAct>();

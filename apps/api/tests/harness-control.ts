@@ -2,7 +2,13 @@ import { Hono } from "hono";
 import { z } from "zod";
 
 import { setOperatorMark } from "@better-answers/core/workspaces";
-import { llmPurpose, ROLES } from "@better-answers/schema";
+import {
+  INVITATION_ACCEPTED_STATUS,
+  INVITATION_CANCELLED_STATUS,
+  INVITATION_WAITING_STATUS,
+  llmPurpose,
+  ROLES,
+} from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
 import { IDENTITY_PRINCIPAL } from "../src/identity-principal.ts";
@@ -40,11 +46,19 @@ const membership = z.object({
   role: z.enum(ROLES),
 });
 const revocation = z.object({ userId: z.string().min(1) });
+/** The store's own words for an invitation's status, which a spec may seed one at. */
+const STORED_STATUSES = [
+  INVITATION_WAITING_STATUS,
+  INVITATION_ACCEPTED_STATUS,
+  INVITATION_CANCELLED_STATUS,
+] as const;
 const invitation = z.object({
   workspaceId: z.string().min(1),
   email: z.string().min(1),
   inviterId: z.string().min(1),
   role: z.enum(ROLES),
+  status: z.enum(STORED_STATUSES).optional(),
+  expiresAt: z.coerce.date().optional(),
 });
 const seeding = z.object({
   workspaceId: z.string().min(1),
@@ -168,6 +182,11 @@ export const harnessControl = (app: TestApp): Hono => {
   control.get(`${HARNESS_PREFIX}/links`, (context) => {
     const email = context.req.query("email") ?? "";
     return context.json({ token: app.linkSentTo(email) });
+  });
+
+  control.get(`${HARNESS_PREFIX}/emails`, (context) => {
+    const to = context.req.query("to") ?? "";
+    return context.json({ sent: app.emails.filter((message) => message.to === to).length });
   });
 
   return control;

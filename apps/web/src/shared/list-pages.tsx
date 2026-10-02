@@ -1,4 +1,4 @@
-import type { ReactNode, RefObject } from "react";
+import { useDeferredValue, type ReactNode, type RefObject } from "react";
 
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { Button } from "@/shared/ui/button.tsx";
@@ -75,6 +75,43 @@ export function ListState(properties: { readonly state: State }) {
         />
       );
   }
+}
+
+type Read<Failure> = {
+  readonly error: Failure | null;
+  readonly isPending: boolean;
+  readonly refetch: () => void;
+};
+
+/** A failed read hides even stale rows. A line inserted with its live region may go unread, so it fills a render later. */
+export function ListRead<Failure>(properties: {
+  readonly read: Read<Failure>;
+  readonly loading: string;
+  readonly failed: (failure: Failure) => ReactNode;
+  readonly focusAfterRetry: FocusTarget;
+  readonly children: ReactNode;
+}) {
+  const { read } = properties;
+  const failure = useDeferredValue(read.error, null);
+  const waiting = useDeferredValue(read.isPending, false);
+  if (read.error !== null) {
+    return (
+      <ListState
+        state={{
+          kind: "failed",
+          words: failure === null ? "" : properties.failed(failure),
+          onRetry: () => {
+            read.refetch();
+          },
+          focusAfterRetry: properties.focusAfterRetry,
+        }}
+      />
+    );
+  }
+  if (read.isPending) {
+    return <ListState state={{ kind: "loading", words: waiting ? properties.loading : "" }} />;
+  }
+  return properties.children;
 }
 
 type Pages = {
