@@ -857,7 +857,8 @@ to it by IRI and never restates it (ADR 0014).
   already belongs to a person on the platform never changes what the Admin is told. Its
   **status** is one of four: **waiting** until it is accepted, cancelled or replaced; **expired**
   once its seven days pass unaccepted, until a resend renews it; **accepted**; or **cancelled**,
-  as a replaced one is. _Avoid_: invite (as a noun), join link, pending.
+  as a replaced one is. _Avoid_: invite (as a noun), join link, pending (the value Better Auth
+  stores).
 - **Activity (of a person)** — one person's part in the workspace's *audit log*, read by an Admin
   alone, in People: every *audit event* they took and every one done to them, newest first, each
   marked with its **direction**: *by*, *to* or both, as a self-demotion is. It spans their whole

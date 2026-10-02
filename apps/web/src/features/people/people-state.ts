@@ -29,6 +29,9 @@ export const PEOPLE_KEYSTROKES = {
   decline: { key: "d", act: "Decline the request in focus" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
+/** Shifted, so an act on the selection never shares a key with the act on the row in focus. */
+export const shortcutOf = (keystroke: Keystroke): string => `Shift+${keystroke.key}`;
+
 /**
  * Members' own letters, so a reader who opened the page by one finds each act under it again, and
  * the Audit log's for older events.

@@ -11,10 +11,16 @@ import { RowMenu } from "@/shared/row-menu.tsx";
 import { SelectionBar } from "@/shared/selection-bar.tsx";
 import { useHiddenColumns } from "@/shared/wide-layout.ts";
 
-import { InvitationBulkActs, useInvitationActs, type Ticked } from "./invitation-acts.tsx";
-import { EXPIRY, HIDEABLE, INVITATION_COLUMNS, invitationFeatures } from "./invitation-columns.tsx";
+import { InvitationBulkActs, NONE, useInvitationActs, type Ticked } from "./invitation-acts.tsx";
+import {
+  columnsUnder,
+  INVITATION_COLUMNS,
+  invitationFeatures,
+  NARROW_HIDES,
+} from "./invitation-columns.tsx";
 import { INVITATIONS_WORDS as WORDS, STATUS_WORDS } from "./invitation-words.ts";
 import {
+  DEFAULT_STATUS,
   INVITATION_STATUSES,
   INVITATIONS_FIELDS,
   INVITATIONS_LIST,
@@ -36,14 +42,9 @@ const PAGE_SIZE = 25;
 
 const NOTHING_IN_FOCUS = selectFirst("invitation");
 
-const NONE: Ticked = new Map();
-
 const NO_ONE: readonly ListedInvitation[] = [];
 
 const NOTHING_UNSENT: readonly SentInvitation[] = [];
-
-/** Address and role are what a narrow screen has room for; the rest can be shown again. */
-const NARROW_HIDES: ReadonlySet<string> = new Set(["sent", "expires", "invitedBy"]);
 
 const matching = (search: string) => {
   const sought = search.toLowerCase();
@@ -88,7 +89,6 @@ function InvitationFilters(properties: {
 }) {
   const { narrowed } = properties;
   const counts = useInvitationCounts().data;
-  const actable = isActable(narrowed.state.status);
   return (
     <FilterRow
       search={{
@@ -107,12 +107,12 @@ function InvitationFilters(properties: {
           count: counts?.[status],
         })),
         onChange: (status) => {
-          const chosen = INVITATION_STATUSES.find((one) => one === status) ?? "waiting";
+          const chosen = INVITATION_STATUSES.find((one) => one === status) ?? DEFAULT_STATUS;
           narrowed.write({ status: chosen, page: 1 });
         },
       }}
       columns={{
-        columns: actable ? HIDEABLE : HIDEABLE.filter((column) => column.id !== EXPIRY),
+        columns: columnsUnder(narrowed.state.status, properties.hidden).hideable,
         hidden: properties.hidden,
         onHiddenChange: properties.onHiddenChange,
       }}
@@ -317,7 +317,7 @@ function InvitationList(properties: { readonly heading: RefObject<HTMLHeadingEle
                   }
                 : undefined
             }
-            hidden={actable ? hidden : new Set([...hidden, EXPIRY])}
+            hidden={columnsUnder(state.status, hidden).hidden}
             rowMenu={actable ? rowMenuOf(acts, heading) : undefined}
             onRowFocus={(invitation) => {
               setInFocusId(invitation?.invitationId);

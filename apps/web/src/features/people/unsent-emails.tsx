@@ -3,36 +3,21 @@ import { useId, useState } from "react";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 
-import { INVITATIONS_WORDS, resentOutcome } from "./invitation-words.ts";
-import { useResendInvitation, type SentInvitation } from "./invitations-api.ts";
-import { outcomeOfSendingFailure } from "./refusal.tsx";
+import { useOneAtATime } from "./invitation-acts.tsx";
+import { INVITATIONS_WORDS } from "./invitation-words.ts";
+import type { SentInvitation } from "./invitations-api.ts";
 
 /** The list stays as each Resend answers, so focus stays on the button pressed. */
 export function UnsentEmails(properties: { readonly unsent: readonly SentInvitation[] }) {
-  const resend = useResendInvitation();
-  // One resend at a time: a second call on the mutation takes over the first's callbacks.
-  const [acting, setActing] = useState(false);
   const [outcome, setOutcome] = useState<Outcome>();
+  const { acting, begin, resendOne } = useOneAtATime(setOutcome);
   const headingId = useId();
   if (properties.unsent.length === 0) return null;
 
   const resent = (invitation: SentInvitation) => {
-    if (acting) return;
-    setActing(true);
+    if (!begin()) return;
     setOutcome({ tone: "said", words: INVITATIONS_WORDS.resending(invitation.address) });
-    resend.mutate(
-      { invitationId: invitation.invitationId },
-      {
-        onSuccess: (sent) => {
-          setActing(false);
-          setOutcome(resentOutcome(sent));
-        },
-        onError: (failure) => {
-          setActing(false);
-          setOutcome(outcomeOfSendingFailure(failure));
-        },
-      },
-    );
+    resendOne(invitation.invitationId);
   };
 
   return (

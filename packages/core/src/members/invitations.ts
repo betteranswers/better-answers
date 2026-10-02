@@ -224,6 +224,11 @@ const WORKSPACE_NAMED = z.object({ name: boundarySchemas.workspace.select.shape.
 
 const expiryFrom = (now: Date): Date => new Date(now.getTime() + INVITATION_EXPIRY_SECONDS * 1000);
 
+const windowOf = (now: Date): Pick<WaitingInvitation, "invitedAt" | "expiresAt"> => ({
+  invitedAt: now.toISOString(),
+  expiresAt: expiryFrom(now).toISOString(),
+});
+
 /** The admitted Admin's own workspace, so a row the parse finds missing is a failure. */
 const workspaceNameOf = async (admin: AdminUserPrincipal, tx: Tx): Promise<string> =>
   WORKSPACE_NAMED.parse(
@@ -379,8 +384,7 @@ export const mintInvitation = async (
     invitationId,
     address,
     role,
-    invitedAt: now.toISOString(),
-    expiresAt: expiryFrom(now).toISOString(),
+    ...windowOf(now),
     workspaceName: minted.value.workspaceName,
   });
 };
@@ -439,12 +443,7 @@ const sentUnderLocks = async (
     invitations: addresses.map((address) => ({ invitationId: ulid(), address })),
   };
   const { replaced, workspaceName } = await mintedEach(admin, tx, minting);
-  const sent = {
-    role: sending.role,
-    invitedAt: sending.now.toISOString(),
-    expiresAt: expiryFrom(sending.now).toISOString(),
-    workspaceName,
-  };
+  const sent = { role: sending.role, ...windowOf(sending.now), workspaceName };
   return ok(
     minting.invitations.map(({ invitationId, address }) => ({
       ...sent,
@@ -607,28 +606,19 @@ const HELD_INVITATIONS = `SELECT id, status FROM invitation
                            WHERE workspace_id = $1 AND id = ANY($2::text[])
                            ORDER BY id FOR UPDATE`;
 
-type HeldInvitation = { readonly invitationId: string; readonly status: string };
-
 /** Each id asked for and held here in none of `standing`, named `no-such-invitation`. */
 const refusedOutside = async (
   admin: AdminUserPrincipal,
   tx: Tx,
   invitationIds: readonly string[],
   standing: readonly string[],
-): Promise<{
-  readonly held: readonly HeldInvitation[];
-  readonly refused: RefusedItems<MemberRefusal<"no-such-invitation">> | undefined;
-}> => {
-  const rows = await tx.query<{ id: string; status: string }>(HELD_INVITATIONS, [
+): Promise<RefusedItems<MemberRefusal<"no-such-invitation">> | undefined> => {
+  const held = await tx.query<{ id: string; status: string }>(HELD_INVITATIONS, [
     admin.workspaceId,
     invitationIds,
   ]);
-  const held = rows.rows.map((row) => ({ invitationId: row.id, status: row.status }));
-  const found = held.filter((row) => standing.includes(row.status)).map((row) => row.invitationId);
-  return {
-    held,
-    refused: refusedItemsOf(namedEach(notAmong(invitationIds, found), NO_SUCH_INVITATION)),
-  };
+  const found = held.rows.filter((row) => standing.includes(row.status)).map((row) => row.id);
+  return refusedItemsOf(namedEach(notAmong(invitationIds, found), NO_SUCH_INVITATION));
 };
 
 const RENEWED_EACH = `WITH renewed AS (
@@ -653,7 +643,7 @@ const renewedUnderHold = async (
   const { invitationIds, now } = renewing;
   const counted = await waitingCounted(admin, tx, invitationIds, now);
   if (!counted.ok) return err(counted.error);
-  const { refused } = await refusedOutside(admin, tx, invitationIds, [INVITATION_WAITING_STATUS]);
+  const refused = await refusedOutside(admin, tx, invitationIds, [INVITATION_WAITING_STATUS]);
   if (refused !== undefined) return err(refused);
 
   const renewed = await tx.query(RENEWED_EACH, [admin.workspaceId, invitationIds, expiryFrom(now)]);
@@ -701,7 +691,7 @@ const cancelledUnderHold = async (
   tx: Tx,
   invitationIds: readonly string[],
 ): Promise<Result<BulkOutcome<string>, RefusedItems<MemberRefusal<"no-such-invitation">>>> => {
-  const { refused } = await refusedOutside(admin, tx, invitationIds, [
+  const refused = await refusedOutside(admin, tx, invitationIds, [
     INVITATION_WAITING_STATUS,
     INVITATION_CANCELLED_STATUS,
   ]);

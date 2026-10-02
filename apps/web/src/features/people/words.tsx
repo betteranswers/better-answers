@@ -6,7 +6,7 @@ import type { ListedMember } from "./people-api.ts";
 export const nameOf = (member: ListedMember): string =>
   nameOrAddress(member.displayName, member.address);
 
-export function JoinedOn(properties: { readonly instant: string }) {
+export function Day(properties: { readonly instant: string }) {
   return <span className="tabular-nums">{dayWords(properties.instant)}</span>;
 }
 

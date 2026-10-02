@@ -9,6 +9,9 @@ import { aRole } from "./role-meanings.ts";
 
 const invitations = (count: number): string => counted(count, "invitation", "invitations");
 
+const invitationsIn = (status: InvitationStatus, count: number): string =>
+  counted(count, `${status} invitation`, `${status} invitations`);
+
 /** A failed email is said as loudly as a refusal: the invitation stands, and nobody knows of it. */
 const outcomeOfSending = (
   sent: SentInvitation,
@@ -118,10 +121,9 @@ export const INVITATIONS_WORDS = {
     cancelled: "No invitation has been cancelled.",
   } satisfies Readonly<Record<InvitationStatus, string>>,
   noneMatch: (search: string) => `No invitation matches “${search}”.`,
-  counted: (status: InvitationStatus, total: number) =>
-    counted(total, `${status} invitation`, `${status} invitations`),
+  counted: invitationsIn,
   matched: (status: InvitationStatus, shown: number, total: number, search: string) =>
-    `${String(shown)} of ${counted(total, `${status} invitation`, `${status} invitations`)} match “${search}”.`,
+    `${String(shown)} of ${invitationsIn(status, total)} match “${search}”.`,
   resend: "Resend",
   cancel: "Cancel",
   noLongerListed: "An invitation no longer listed",

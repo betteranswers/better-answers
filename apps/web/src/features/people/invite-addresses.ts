@@ -3,7 +3,10 @@ import { z } from "zod";
 /** Core's own check, so an address the api would take is never stopped here. */
 const ADDRESS = z.email().max(254);
 
-/** Matches the api's cap for one send, which refuses any more as input it cannot read. */
+/**
+ * Matches the api's cap for one send or one act on a set, which refuses any more as input it
+ * cannot read.
+ */
 export const MOST_AT_ONCE = 50;
 
 const SEPARATORS = /[,;\r\n]+/;

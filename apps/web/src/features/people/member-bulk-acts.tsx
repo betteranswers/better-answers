@@ -32,7 +32,7 @@ import {
   type BulkChanged,
   type Role,
 } from "./people-api.ts";
-import { PEOPLE_KEYSTROKES as KEY } from "./people-state.ts";
+import { PEOPLE_KEYSTROKES as KEY, shortcutOf } from "./people-state.ts";
 import { SAID_OF_TICKED_MEMBERS } from "./refusal-words.ts";
 import { ROLE_OFFERED_FIRST, RoleChoice } from "./role-choice.tsx";
 import { useIncludesYou, useSelfActHome } from "./self-act.tsx";
@@ -76,9 +76,6 @@ const refusalOf = (failure: Error | ApiError, names: ReadonlyMap<string, string>
     nameOf: (personId) => names.get(personId) ?? NO_LONGER_LISTED,
     lead: BULK_WORDS.refused,
   });
-
-/** Shifted, so a selection's act never shares a key with the act on the member in focus. */
-export const shortcutOf = (keystroke: Keystroke): string => `Shift+${keystroke.key}`;
 
 export const useMemberBulkActs = (list: BulkList) => {
   const [open, setOpen] = useState<BulkAct>();

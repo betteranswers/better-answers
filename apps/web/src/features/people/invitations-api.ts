@@ -19,6 +19,10 @@ export type SentInvitation = inferOutput<Api["members"]["resendInvitation"]>;
 /** An invite's answer for one address, saying whether it replaced one waiting there. */
 export type InvitedOne = inferOutput<Api["members"]["invite"]>["invitations"][number];
 
+export type BulkResent = inferOutput<Api["members"]["bulkResendInvitations"]>;
+
+export type BulkCancelled = inferOutput<Api["members"]["bulkCancelInvitations"]>;
+
 /** Its key names no workspace: a switch drops it with every read of the workspace left. */
 export const useInvitations = (status: InvitationStatus) => {
   const api = useTRPC();
@@ -30,7 +34,9 @@ export const useInvitationCounts = () => {
   return useQuery(api.members.invitationCounts.queryOptions());
 };
 
-type Held = { readonly before: readonly (readonly [QueryKey, ListedInvitation[] | undefined])[] };
+type Snapshot = {
+  readonly before: readonly (readonly [QueryKey, ListedInvitation[] | undefined])[];
+};
 
 /** Every settled act reads each status and the counts again; an act is a line of its Admin's Activity. */
 const useReconcile = () => {
@@ -53,7 +59,7 @@ const useMoving = () => {
   const without = async (
     invitationIds: readonly string[],
     only: InvitationStatus | undefined,
-  ): Promise<Held> => {
+  ): Promise<Snapshot> => {
     const filter =
       only === undefined
         ? api.members.invitations.pathFilter()
@@ -61,16 +67,18 @@ const useMoving = () => {
     await queryClient.cancelQueries(filter);
     const before = queryClient.getQueriesData<ListedInvitation[]>(filter);
     const leaving = new Set(invitationIds);
-    queryClient.setQueriesData<ListedInvitation[]>(filter, (held) =>
-      held?.filter((invitation) => !leaving.has(invitation.invitationId)),
+    queryClient.setQueriesData<ListedInvitation[]>(filter, (rows) =>
+      rows?.filter((invitation) => !leaving.has(invitation.invitationId)),
     );
     return { before };
   };
 
   return <Asked>(leaving: (asked: Asked) => readonly string[], only?: InvitationStatus) => ({
     onMutate: (asked: Asked) => without(leaving(asked), only),
-    onError: (_refusal: ApiError, _asked: Asked, held: Held | undefined) => {
-      for (const [queryKey, rows] of held?.before ?? []) queryClient.setQueryData(queryKey, rows);
+    onError: (_refusal: ApiError, _asked: Asked, snapshot: Snapshot | undefined) => {
+      for (const [queryKey, rows] of snapshot?.before ?? []) {
+        queryClient.setQueryData(queryKey, rows);
+      }
     },
     onSettled: () => reconcile(),
   });

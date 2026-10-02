@@ -15,9 +15,11 @@ export const INVITATION_STATUSES = [
   "cancelled",
 ] as const satisfies readonly InvitationStatus[];
 
+export const DEFAULT_STATUS = INVITATION_STATUSES[0];
+
 export const INVITATIONS_FIELDS = {
   search: z.string().catch(""),
-  status: z.enum(INVITATION_STATUSES).catch("waiting"),
+  status: z.enum(INVITATION_STATUSES).catch(DEFAULT_STATUS),
   page: PAGE_NUMBER,
 };
 
