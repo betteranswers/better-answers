@@ -104,4 +104,8 @@ describe("the dialog's words", () => {
   it("names the wait a ceiling carried, rounded up", () => {
     expect(invitationsCeiling(61).next).toBe("Try again in 2 minutes.");
   });
+
+  it("names the workspace and an address as either ceiling", () => {
+    expect(invitationsCeiling(61).why).toMatch(/^This workspace, or an address here, has had/);
+  });
 });

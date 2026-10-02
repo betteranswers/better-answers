@@ -91,9 +91,12 @@ export const SAID_OF_TICKED_INVITATIONS = {
   },
 } satisfies SaidOfWord;
 
-/** Invite, Resend and bulk Resend count each address's emails; a ceiling refuses the act whole. */
+/**
+ * Invite, Resend and bulk Resend count each address's emails and the workspace's; either ceiling
+ * refuses the act whole, and the answer does not say which.
+ */
 export const invitationsCeiling = (liftsInSeconds: number): Said => ({
-  why: "An address here has had too many invitation emails this hour, so nothing was sent.",
+  why: "This workspace, or an address here, has had too many invitation emails this hour, so nothing was sent.",
   next: `Try again in ${minutesUntil(liftsInSeconds)}.`,
 });
 
