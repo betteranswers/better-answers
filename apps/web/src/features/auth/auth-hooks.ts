@@ -86,12 +86,14 @@ const SERVER_FAILED = 500;
 export class CodeRefused extends Error {
   readonly status: number;
   readonly waitSeconds: number | undefined;
+  readonly errorCode: string | undefined;
 
-  constructor(status: number, waitSeconds: number | undefined) {
+  constructor(status: number, waitSeconds: number | undefined, errorCode?: string) {
     super(`answered ${String(status)}`);
     this.name = "CodeRefused";
     this.status = status;
     this.waitSeconds = waitSeconds;
+    this.errorCode = errorCode;
   }
 }
 
@@ -102,7 +104,9 @@ type WaitReading = { readonly onError: (context: { readonly response: Response }
  * server's failure is no refusal.
  */
 const unwrapWithTheWait = async <TData>(
-  call: (reading: WaitReading) => Promise<{ data: TData; error: { status: number } | null }>,
+  call: (
+    reading: WaitReading,
+  ) => Promise<{ data: TData; error: { status: number; code?: string | undefined } | null }>,
 ): Promise<TData> => {
   let waitSeconds: number | undefined;
   const { data, error } = await call({
@@ -112,7 +116,7 @@ const unwrapWithTheWait = async <TData>(
   });
   if (error === null) return data;
   if (error.status >= SERVER_FAILED) throw new Error(`answered ${String(error.status)}`);
-  throw new CodeRefused(error.status, waitSeconds);
+  throw new CodeRefused(error.status, waitSeconds, error.code);
 };
 
 /** Sealed into the email's link, so a sign-in through it returns where this page would. */

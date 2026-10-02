@@ -14,3 +14,14 @@ export const worthSending = (code: string, refused: readonly string[]): boolean 
 
 /** The api names no tries left, so they are counted from the refusals since the code was sent. */
 export const triesLeft = (refusals: number): number => Math.max(0, CODE_TRIES - refusals);
+
+/** The library's answer once a code's tries are spent, whichever tab or page spent them. */
+const TRIES_SPENT = 403;
+
+/** The library deletes a code as it reports it expired, so every later try would read as wrong. */
+const EXPIRED = "OTP_EXPIRED";
+
+type Refusal = { readonly status: number; readonly errorCode: string | undefined };
+
+export const codeSpent = (refusal: Refusal): boolean =>
+  refusal.status === TRIES_SPENT || refusal.errorCode === EXPIRED;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { digitsOf, triesLeft, worthSending } from "@/features/auth/code-entry.ts";
+import { codeSpent, digitsOf, triesLeft, worthSending } from "@/features/auth/code-entry.ts";
 
 describe("the code a person enters", () => {
   it.each([
@@ -39,5 +39,19 @@ describe("the code a person enters", () => {
     [4, 0],
   ])("after %i refusals leaves %i tries", (refusals, left) => {
     expect(triesLeft(refusals)).toBe(left);
+  });
+
+  it.each([
+    ["its tries are spent", 403, "TOO_MANY_ATTEMPTS"],
+    ["it has expired", 400, "OTP_EXPIRED"],
+  ])("reads a code as spent once %s", (_, status, errorCode) => {
+    expect(codeSpent({ status, errorCode })).toBe(true);
+  });
+
+  it.each([
+    ["says wrong", "INVALID_OTP"],
+    ["names no reason", undefined],
+  ])("keeps a code's tries when its refusal %s", (_, errorCode) => {
+    expect(codeSpent({ status: 400, errorCode })).toBe(false);
   });
 });

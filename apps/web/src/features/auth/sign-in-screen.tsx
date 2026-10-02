@@ -21,7 +21,7 @@ import {
 } from "./auth-hooks.ts";
 import { AuthScreen, focusOn, Outcome } from "./auth-screen.tsx";
 import { carriedOnTo, leavingFor, nextAfterSignIn, pageQuery } from "./carried-flow.ts";
-import { digitsOf, triesLeft, worthSending } from "./code-entry.ts";
+import { codeSpent, digitsOf, triesLeft, worthSending } from "./code-entry.ts";
 import {
   CODE_NOT_SENT,
   CODE_UNANSWERED,
@@ -52,9 +52,6 @@ const SEND_AGAIN_BUTTON = "send-a-new-code";
 const REFUSED = "sign-in-refused";
 
 const TOO_MANY_REQUESTS = 429;
-
-/** The library's answer once a code's tries are spent, whichever tab or page spent them. */
-const TRIES_SPENT = 403;
 
 /** What each act's failure says: past a ceiling, refused otherwise, or never answered. */
 type SaidOfAnAct = {
@@ -95,7 +92,7 @@ const isAWrongCode = (failure: Error | null): failure is CodeRefused =>
   failure instanceof CodeRefused && failure.status !== TOO_MANY_REQUESTS;
 
 const triesLeftAfter = (refused: readonly string[], failure: Error | null): number =>
-  failure instanceof CodeRefused && failure.status === TRIES_SPENT ? 0 : triesLeft(refused.length);
+  failure instanceof CodeRefused && codeSpent(failure) ? 0 : triesLeft(refused.length);
 
 const saidOfTheCode = (sentTo: string, sending: boolean, resent: boolean): string => {
   if (sending) return sendingANewCode(sentTo);
