@@ -133,7 +133,8 @@ const withMapLeftovers = async () => {
   return workspace;
 };
 
-const HOUR_MS = 60 * 60 * 1000;
+const MINUTE_MS = 60 * 1000;
+const HOUR_MS = 60 * MINUTE_MS;
 
 /** A sign-in code's row expiring `fromThePassMs` after the pass's own clock reads. */
 const codeExpiring = async (fromThePassMs: number): Promise<string> => {
@@ -242,13 +243,14 @@ describe("the sweeps' daily pass", () => {
   });
 
   it("deletes codes over a day expired, keeping later ones", async () => {
-    await codeExpiring(-25 * HOUR_MS);
+    await codeExpiring(-24 * HOUR_MS - MINUTE_MS);
+    const justUnderADay = await codeExpiring(-24 * HOUR_MS + MINUTE_MS);
     const withinTheDay = await codeExpiring(-1 * HOUR_MS);
     const live = await codeExpiring(5 * 60 * 1000);
 
     const sweeps = await onePass({ uploadSweep: "list", pingUrl: PING_URL });
 
-    expect(await verificationsLeft()).toEqual([withinTheDay, live]);
+    expect(await verificationsLeft()).toEqual([justUnderADay, withinTheDay, live]);
     expect(passes(sweeps.logs)).toEqual([
       expect.objectContaining({ level: 30, verifications_deleted: 1 }),
     ]);
