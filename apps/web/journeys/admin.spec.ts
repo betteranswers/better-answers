@@ -76,7 +76,7 @@ const rolesChanged = async (page: Page, names: readonly string[], role: Role): P
   }
 };
 
-const addedToGroup = async (page: Page, names: readonly string[], group: string) => {
+const addedToGroup = async (page: Page, names: readonly string[], group: string): Promise<void> => {
   const { addToGroup } = BULK_WORDS;
   const dialog = await opened(page, names, addToGroup);
   await chosen(dialog, "Group", group);

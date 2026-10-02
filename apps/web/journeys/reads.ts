@@ -23,7 +23,7 @@ const MEMBERSHIP = z.object({
   person: z.object({ name: z.string() }),
 });
 
-export type Membership = z.output<typeof MEMBERSHIP>;
+type Membership = z.output<typeof MEMBERSHIP>;
 
 export const membershipOf = (page: Page): Promise<Membership> =>
   readThroughTheSession(page, "session.membership", MEMBERSHIP);
@@ -37,14 +37,17 @@ export type Member = z.output<typeof MEMBERS>[number];
 export const membersOf = (page: Page): Promise<readonly Member[]> =>
   readThroughTheSession(page, "members.list", MEMBERS);
 
+const INVITATION_COUNTS = z.object({ waiting: z.number() });
+
 export const waitingInvitationsOf = async (page: Page): Promise<number> =>
-  (await readThroughTheSession(page, "members.invitationCounts", z.object({ waiting: z.number() })))
-    .waiting;
+  (await readThroughTheSession(page, "members.invitationCounts", INVITATION_COUNTS)).waiting;
+
+const BINDINGS = z.array(z.unknown());
 
 export const bindingsOf = async (page: Page): Promise<number> =>
-  (await readThroughTheSession(page, "sources.list", z.array(z.unknown()))).length;
+  (await readThroughTheSession(page, "sources.list", BINDINGS)).length;
+
+const GROUPS = z.array(z.object({ name: z.string() }));
 
 export const groupNamesOf = async (page: Page): Promise<readonly string[]> =>
-  (
-    await readThroughTheSession(page, "members.groups", z.array(z.object({ name: z.string() })))
-  ).map((group) => group.name);
+  (await readThroughTheSession(page, "members.groups", GROUPS)).map((group) => group.name);
