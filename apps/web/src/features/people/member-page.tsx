@@ -10,9 +10,9 @@ import {
 } from "react";
 
 import type { ApiError } from "@/shared/api/trpc.ts";
+import { useBreadcrumbLastPart } from "@/shared/breadcrumb-last-part.ts";
 import { initialsOf } from "@/shared/initials.ts";
 import { useKeystroke, useScreenKeystrokes, type Keystroke } from "@/shared/keystrokes.tsx";
-import { useLastCrumb } from "@/shared/last-crumb.ts";
 import { cn } from "@/shared/lib/utils.ts";
 import { ListState } from "@/shared/list-pages.tsx";
 import { CONTROL_CENTRE, groupIn } from "@/shared/navigation.ts";
@@ -242,7 +242,7 @@ function MemberShown(properties: {
 }) {
   const { member, openedAt, removal } = properties;
   const { title, landings, landOn } = useLandings();
-  useLastCrumb(nameOf(member));
+  useBreadcrumbLastPart(nameOf(member));
 
   useScreenKeystrokes(KEYSTROKES);
   useKeystroke(KEY.changeRole, () => {

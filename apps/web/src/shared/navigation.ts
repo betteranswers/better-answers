@@ -24,7 +24,6 @@ export const INVITE_A_PERSON = {
 
 /** One segment beneath a screen, naming a row: listed nowhere, gated and framed as its screen. */
 type Detail = {
-  /** The route's name for the segment. */
   readonly param: string;
 };
 

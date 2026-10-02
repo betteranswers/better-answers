@@ -5,8 +5,8 @@ import { useSignOut } from "@/features/auth/auth-hooks.ts";
 import { useMembership } from "@/features/auth/membership.ts";
 import { useOperatorStanding } from "@/features/console/operator.ts";
 import { HomeLine } from "@/features/people/self-act.tsx";
+import { BreadcrumbLastPartSlot } from "@/shared/breadcrumb-last-part.ts";
 import { ShellKeystrokes, ShellKeystrokesAct, type Keystroke } from "@/shared/keystrokes.tsx";
-import { LastCrumbSlot } from "@/shared/last-crumb.ts";
 import {
   EVERY_SURFACE,
   placeAt,
@@ -66,8 +66,8 @@ const useRegion = (visible: VisibleTree, pathname: string): Region | undefined =
 const belowTheScreen = (
   open: Place<VisibleSurface> | undefined,
   openTab: ScreenTab | undefined,
-  lastCrumb: string | undefined,
-): string | undefined => (open?.detail === undefined ? openTab?.name : lastCrumb);
+  lastPart: string | undefined,
+): string | undefined => (open?.detail === undefined ? openTab?.name : lastPart);
 
 /** A place hidden from the reader is no place here, so it draws as one that never existed. */
 export function Frame(properties: {
@@ -88,7 +88,7 @@ export function Frame(properties: {
   // The frame's, not the tabs root's: the band names the open tab, and the root sits below it.
   const [pickedTab, pickTab] = useState<string>();
   // Given by a page at a detail address, which alone knows whose it is.
-  const [lastCrumb, nameLastCrumb] = useState<string>();
+  const [lastPart, nameLastPart] = useState<string>();
   // Once a role is held, so nothing is offered to a reader the shell cannot place.
   const offersJumpTo = visible.home !== undefined;
   const jumping = useJumping(offersJumpTo);
@@ -122,7 +122,7 @@ export function Frame(properties: {
             }
             parts={partsOf(
               open,
-              belowTheScreen(open, openTabIn(region?.toolbar.tabs, pickedTab), lastCrumb),
+              belowTheScreen(open, openTabIn(region?.toolbar.tabs, pickedTab), lastPart),
             )}
             person={properties.person}
             navigation={
@@ -154,14 +154,14 @@ export function Frame(properties: {
             ) : null}
 
             <div className="flex min-w-0 flex-1 flex-col">
-              <LastCrumbSlot value={nameLastCrumb}>
+              <BreadcrumbLastPartSlot value={nameLastPart}>
                 {/* Keyed by the workspace, so a switch draws the screen afresh over its new reads. */}
                 <ToolbarAndScreen
                   key={here?.workspaceId}
                   region={region}
                   picked={[pickedTab, pickTab]}
                 />
-              </LastCrumbSlot>
+              </BreadcrumbLastPartSlot>
             </div>
           </div>
         </div>
