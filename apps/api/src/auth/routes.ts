@@ -1,7 +1,5 @@
-import { createHash } from "node:crypto";
-
 import { type Context, Hono, type MiddlewareHandler } from "hono";
-import { getCookie } from "hono/cookie";
+import { getCookie, setCookie } from "hono/cookie";
 import type { Logger } from "pino";
 import { z } from "zod";
 
@@ -35,8 +33,9 @@ import {
   DEAD_LINK,
   hashOf,
   isBound,
-  linkStateOf,
-  type LinkState,
+  linkSeen,
+  type LinkUse,
+  type SeenLink,
   mintNonce,
   unseal,
 } from "./link-token.ts";
@@ -126,8 +125,7 @@ const navigationOnly: MiddlewareHandler = async (context, next) => {
   await next();
 };
 
-const emailKey = (email: string): string =>
-  createHash("sha256").update(email.trim().toLowerCase()).digest("hex");
+const emailKey = (email: string): string => hashOf(email.trim().toLowerCase());
 
 const codeRequest = z.object({ email: z.string().trim().min(1) });
 
@@ -226,16 +224,6 @@ const secureOrigin = (publicUrl: string): boolean => publicUrl.startsWith("https
 const bindingCookieName = (publicUrl: string): string =>
   secureOrigin(publicUrl) ? `__Host-${SIGN_IN_LINK_COOKIE}` : SIGN_IN_LINK_COOKIE;
 
-const bindingCookie = (publicUrl: string, nonce: string): string =>
-  [
-    `${bindingCookieName(publicUrl)}=${nonce}`,
-    `Max-Age=${String(EMAIL_CODE_LIFETIME_SECONDS)}`,
-    "Path=/",
-    "HttpOnly",
-    "SameSite=Lax",
-    ...(secureOrigin(publicUrl) ? ["Secure"] : []),
-  ].join("; ");
-
 /** The nonce goes to the email's link and, once the request has gone through, to this browser. */
 const bindTheLink =
   (publicUrl: string): MiddlewareHandler =>
@@ -248,7 +236,14 @@ const bindTheLink =
     }
     const nonce = mintNonce();
     await askingWithALink({ nonce, carried: asked.oauth_query ?? "" }, next);
-    if (context.res.ok) context.res.headers.append("set-cookie", bindingCookie(publicUrl, nonce));
+    if (!context.res.ok) return;
+    setCookie(context, bindingCookieName(publicUrl), nonce, {
+      maxAge: EMAIL_CODE_LIFETIME_SECONDS,
+      path: "/",
+      httpOnly: true,
+      sameSite: "Lax",
+      secure: secureOrigin(publicUrl),
+    });
   };
 
 const linkToken = z.object({ token: z.string().regex(/^[A-Za-z0-9]{1,128}$/) });
@@ -258,12 +253,12 @@ const tokenOf = async (request: Request): Promise<string | undefined> => {
   return read.ok ? linkToken.safeParse(read.value).data?.token : undefined;
 };
 
-type LinkUse = { readonly email: string; readonly code: string; readonly carried: string };
-
-/** `use` stands only for the browser that asked: what its sign-in spends. */
-type SeenLink = { readonly state: LinkState; readonly use: LinkUse | undefined };
-
-const LINK_DEAD = { error: "link-dead" } as const;
+/** The sign-in route's refusal bodies; a read answers every dead link with its state alone. */
+const LINK_REFUSALS = {
+  dead: { error: "link-dead" },
+  notThisBrowser: { error: "not-this-browser" },
+  unanswered: { error: "unanswered" },
+} as const;
 
 const SIGN_IN_WINDOW_SECONDS = BETTER_AUTH_RATE_LIMIT.customRules["/sign-in/email-otp"].window;
 
@@ -307,16 +302,7 @@ const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): void =>
     const read = await readALink(door, token);
     const contents =
       read === undefined ? undefined : unseal(token, deps.secret, hashOf(token), read.sealed);
-    const state = linkStateOf(
-      read,
-      contents,
-      read !== undefined && isBound(cookie, read.nonceHash),
-    );
-    const use =
-      state.state === "bound" && read !== undefined && contents !== undefined
-        ? { email: read.address, code: contents.code, carried: contents.carried }
-        : undefined;
-    return { state, use };
+    return linkSeen(read, contents, read !== undefined && isBound(cookie, read.nonceHash));
   };
 
   const answerTheSignIn = async (
@@ -329,7 +315,7 @@ const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): void =>
       const wait = Number(answered.headers.get("x-retry-after") ?? SIGN_IN_WINDOW_SECONDS);
       return tooManyRequests(wait, "Too many sign-ins from this address; try again later.");
     }
-    if (!answered.ok) return context.json(LINK_DEAD, 410);
+    if (!answered.ok) return context.json(LINK_REFUSALS.dead, 410);
     await dropALink(door, token);
     forwardCookies(answered, context.res.headers);
     return context.json({
@@ -355,7 +341,7 @@ const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): void =>
         { event: "auth.link_sign_in_failed", reason: flowed.error.message },
         "a sign-in through a link went unanswered",
       );
-      return context.json({ error: "unanswered" }, 502);
+      return context.json(LINK_REFUSALS.unanswered, 502);
     }
     return answerTheSignIn(context, token, use, flowed.value);
   };
@@ -384,12 +370,12 @@ const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): void =>
 
   routes.post(SIGN_IN_LINK_SIGN_IN_PATH, async (context) => {
     const token = await tokenOf(context.req.raw);
-    if (token === undefined) return context.json(LINK_DEAD, 410);
+    if (token === undefined) return context.json(LINK_REFUSALS.dead, 410);
     const limited = await ceilingOf(token);
     if (limited !== undefined) return limited;
     const link = await seen(token, getCookie(context, bindingCookieName(publicUrl)));
-    if (link.state.state === "dead") return context.json(LINK_DEAD, 410);
-    if (link.use === undefined) return context.json({ error: "not-this-browser" }, 403);
+    if (link.state.state === "dead") return context.json(LINK_REFUSALS.dead, 410);
+    if (link.use === undefined) return context.json(LINK_REFUSALS.notThisBrowser, 403);
     return signInBy(context, token, link.use);
   });
 };

@@ -27,10 +27,10 @@ export const mintNonce = (): string => randomBytes(NONCE_BYTES).toString("base64
 /** The only form of a token or a nonce the database holds. */
 export const hashOf = (secret: string): string => createHash("sha256").update(secret).digest("hex");
 
-/** What a link seals: its code, and the signed query of a flow the code request carried. */
-export type Opened = { readonly code: string; readonly carried: string };
-
 const opened = z.strictObject({ code: z.string(), carried: z.string() });
+
+/** What a link seals: its code, and the signed query of a flow the code request carried. */
+export type Opened = Readonly<z.infer<typeof opened>>;
 
 const keyOf = (token: string, salt: string): Buffer =>
   Buffer.from(hkdfSync("sha256", token, salt, KEY_INFO, KEY_BYTES));
@@ -110,6 +110,14 @@ export type LinkState =
 
 export const DEAD_LINK: LinkState = { state: "dead" };
 
+/** What a sign-in through the link spends: never said to the browser, only used. */
+export type LinkUse = { readonly email: string; readonly code: string; readonly carried: string };
+
+/** `use` stands only beside a bound state. */
+export type SeenLink = { readonly state: LinkState; readonly use: LinkUse | undefined };
+
+const NOTHING_TO_SEE: SeenLink = { state: DEAD_LINK, use: undefined };
+
 /** The library keeps a code as `<hash>:<tries spent>`. */
 const triesSpentOn = (value: string): number => Number(value.slice(value.lastIndexOf(":") + 1));
 
@@ -117,19 +125,25 @@ const codeLive = (code: LinkRead["code"]): code is NonNullable<LinkRead["code"]>
   code !== undefined && code.live && triesSpentOn(code.value) < EMAIL_CODE_ATTEMPTS;
 
 /** One answer for every dead link, so a read never says whether a token was ever real. */
-export const linkStateOf = (
+export const linkSeen = (
   read: LinkRead | undefined,
   contents: Opened | undefined,
   bound: boolean,
-): LinkState => {
-  if (read === undefined || !read.linkLive || contents === undefined) return DEAD_LINK;
-  if (!codeLive(read.code)) return DEAD_LINK;
-  if (bound) {
+): SeenLink => {
+  if (read === undefined || !read.linkLive || contents === undefined) return NOTHING_TO_SEE;
+  if (!codeLive(read.code)) return NOTHING_TO_SEE;
+  if (!bound) {
     return {
+      state: { state: "elsewhere", code: contents.code, until: read.code.expiresAt },
+      use: undefined,
+    };
+  }
+  return {
+    state: {
       state: "bound",
       address: read.address,
       carriedOn: contents.carried === "" ? null : "connecting",
-    };
-  }
-  return { state: "elsewhere", code: contents.code, until: read.code.expiresAt };
+    },
+    use: { email: read.address, code: contents.code, carried: contents.carried },
+  };
 };

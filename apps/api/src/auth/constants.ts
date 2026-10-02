@@ -68,6 +68,11 @@ export const BETTER_AUTH_RATE_LIMIT = {
     "/email-otp/send-verification-otp": { window: 600, max: 5 },
     "/email-otp/check-verification-otp": { window: 600, max: 10 },
     "/sign-in/email-otp": { window: 600, max: 10 },
+    /**
+     * The link's page reaches the library's handler before the SPA serves it, and the library's
+     * own rule for `/sign-in*` allows three loads in ten seconds.
+     */
+    "/sign-in/link": { window: 60, max: 30 },
   },
 } as const;
 

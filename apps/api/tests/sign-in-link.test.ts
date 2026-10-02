@@ -305,6 +305,17 @@ describe("the link page", () => {
     expect(page.headers.get("cache-control")).toBe("no-store");
   });
 
+  it("serves a few reloads from one address", async () => {
+    const client = app().client();
+
+    const loads: number[] = [];
+    for (let load = 0; load < 6; load += 1) {
+      loads.push((await client.fetch(LINK_PAGE, AS_A_PAGE)).status);
+    }
+
+    expect(loads).toEqual([200, 200, 200, 200, 200, 200]);
+  });
+
   it("leaves no link token in any log line", async () => {
     const person = await app().person();
     const asking = app().client();
