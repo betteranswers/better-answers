@@ -30,8 +30,14 @@ export const SIGN_IN_CODE_PREFIX = "sign-in-otp-";
 /** The row a sign-in link keeps beside its code, keyed the same way. */
 export const SIGN_IN_LINK_PREFIX = "sign-in-link-";
 
-/** What precedes the lowercased address in a verification row's identifier: nothing included. */
-export const VERIFICATION_PREFIXES = ["", SIGN_IN_CODE_PREFIX, SIGN_IN_LINK_PREFIX] as const;
+/** The library writes a verify or reset code's row whenever one is asked for, though none is sent. */
+export const VERIFICATION_PREFIXES = [
+  "",
+  SIGN_IN_CODE_PREFIX,
+  SIGN_IN_LINK_PREFIX,
+  "email-verification-otp-",
+  "forget-password-otp-",
+] as const;
 
 export const verificationIdentifiersOf = (email: string): readonly string[] =>
   VERIFICATION_PREFIXES.map((prefix) => `${prefix}${email.toLowerCase()}`);

@@ -37,7 +37,12 @@ import { revokeCredentialsHere } from "../src/members/index.ts";
 import { setDisplayName, setOperatorMark } from "../src/workspaces/index.ts";
 import { authorLinesOf, bundleHistory, everyObjectOf, objectPresent } from "./bundle.ts";
 import { erasureDoorsFor } from "./erasure-doors.ts";
-import { identityRowsFor, signInLinkFor, verificationCodeFor } from "./identity-rows.ts";
+import {
+  identityRowsFor,
+  otherCodesFor,
+  signInLinkFor,
+  verificationCodeFor,
+} from "./identity-rows.ts";
 import { bootstrap } from "./platform.ts";
 import { auditEventRowsOf } from "./sourced-concept.ts";
 import { objectStoreForSuite, textOf } from "./suite-objects.ts";
@@ -465,9 +470,11 @@ const grantsEndedRowsAbout = async (personId: string) => {
   return read.rows.map((each) => each.row);
 };
 
-/** Counts every verification row the address at `parameter` is behind: its code's and its link's. */
+/** Counts every verification row the address at `parameter` is behind, in each shape written. */
 const verificationsOfAnAddress = (parameter: string): string => `SELECT count(*) FROM verification
-  WHERE lower(identifier) IN ('sign-in-otp-' || ${parameter}, 'sign-in-link-' || ${parameter})`;
+  WHERE lower(identifier) IN ('sign-in-otp-' || ${parameter}, 'sign-in-link-' || ${parameter},
+                              'email-verification-otp-' || ${parameter},
+                              'forget-password-otp-' || ${parameter})`;
 
 const verificationsFor = async (email: string): Promise<number> => {
   const read = await db().pool.query<{ count: string }>(verificationsOfAnAddress("$1"), [
@@ -1211,10 +1218,11 @@ describe("the identity set on the person's last membership", () => {
     const person = await memberOf(db().pool, scenario.workspaceId, email);
 
     const notTheirs = addressOf("a-client-contact");
-    await verificationCodeFor(db().pool, email);
-    await signInLinkFor(db().pool, email);
-    await verificationCodeFor(db().pool, notTheirs);
-    await signInLinkFor(db().pool, notTheirs);
+    for (const address of [email, notTheirs]) {
+      await verificationCodeFor(db().pool, address);
+      await signInLinkFor(db().pool, address);
+      await otherCodesFor(db().pool, address);
+    }
     const subjectRequestId = await erasureRequestAbout(scenario.workspaceId, person.id, email, [
       notTheirs,
     ]);
@@ -1224,7 +1232,7 @@ describe("the identity set on the person's last membership", () => {
     expect({
       theirs: await verificationsFor(email),
       theStranger: await verificationsFor(notTheirs),
-    }).toEqual({ theirs: 0, theStranger: 2 });
+    }).toEqual({ theirs: 0, theStranger: 4 });
   });
 
   it("ends this membership alone while the person holds another", async () => {

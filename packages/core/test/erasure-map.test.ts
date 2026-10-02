@@ -19,7 +19,12 @@ import {
 import { actorIdOfPerson, type UserPrincipal } from "../src/kernel/index.ts";
 import { withScope } from "../src/store/postgres/index.ts";
 import { contractFixture } from "./contract-fixture.ts";
-import { identityRowsFor, signInLinkFor, verificationCodeFor } from "./identity-rows.ts";
+import {
+  identityRowsFor,
+  otherCodesFor,
+  signInLinkFor,
+  verificationCodeFor,
+} from "./identity-rows.ts";
 import { bootstrap } from "./platform.ts";
 import { addressOf, readingAs, seedingWith } from "./suite-postgres.ts";
 import {
@@ -482,9 +487,11 @@ describe("the erasure map for a stranger's address in the set", () => {
     const theirs = [
       await verificationCodeFor(db().pool, email),
       await signInLinkFor(db().pool, email),
+      ...(await otherCodesFor(db().pool, email)),
     ].toSorted();
     await verificationCodeFor(db().pool, notTheirs);
     await signInLinkFor(db().pool, notTheirs);
+    await otherCodesFor(db().pool, notTheirs);
     const request = await requestFor(here, {
       personId: person.id,
       identifiers: { ...identifiersOf(email), emails: [email, notTheirs] },

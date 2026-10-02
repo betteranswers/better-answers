@@ -58,6 +58,20 @@ export const verificationCodeFor = async (pool: pg.Pool, email: string): Promise
     value: "hashed-code:0",
   });
 
+/** The rows Better Auth writes for an address asked to verify or reset, though the product never sends either. */
+export const otherCodesFor = async (pool: pg.Pool, email: string): Promise<readonly string[]> => [
+  await verificationRow(pool, {
+    id: ulid(),
+    identifier: `email-verification-otp-${email.toLowerCase()}`,
+    value: "hashed-code:0",
+  }),
+  await verificationRow(pool, {
+    id: ulid(),
+    identifier: `forget-password-otp-${email.toLowerCase()}`,
+    value: "hashed-code:0",
+  }),
+];
+
 /** The row a sign-in link keeps beside its code: its id the link's hash, keyed by the address. */
 export const signInLinkFor = async (pool: pg.Pool, email: string): Promise<string> =>
   verificationRow(pool, {
