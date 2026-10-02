@@ -1,7 +1,4 @@
-import { z } from "zod";
-
-/** Core's own check, so an address the api would take is never stopped here. */
-const ADDRESS = z.email().max(254);
+import { EMAIL_ADDRESS } from "@better-answers/schema/email-address";
 
 /**
  * Matches the api's cap for one send or one act on a set, which refuses any more as input it
@@ -72,7 +69,7 @@ export const flagOf = (
   members: ReadonlySet<string>,
   refused: ReadonlyMap<string, Flag>,
 ): Flag | undefined => {
-  if (!ADDRESS.safeParse(one.key).success) return "malformed";
+  if (!EMAIL_ADDRESS.safeParse(one.key).success) return "malformed";
   if (members.has(one.key)) return "already-a-member";
   return refused.get(one.key);
 };

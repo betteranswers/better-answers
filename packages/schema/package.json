@@ -8,6 +8,7 @@
     "./ulid": "./src/ulid.ts",
     "./code-unit": "./src/code-unit.ts",
     "./email-code": "./src/email-code.ts",
+    "./email-address": "./src/email-address.ts",
     "./testing": "./test/testing.ts",
     "./testing/apple-git": "./test/apple-git.ts",
     "./testing/probes": "./test/probes.ts",

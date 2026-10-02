@@ -1,27 +1,23 @@
-import { createHash } from "node:crypto";
-
 import { z } from "zod";
 
 import {
   boundarySchemas,
-  INVITATION_ACCEPTED_STATUS,
   INVITATION_CANCELLED_STATUS,
   INVITATION_EXPIRY_SECONDS,
   INVITATION_WAITING_STATUS,
 } from "@better-answers/schema";
 import { byCodeUnit } from "@better-answers/schema/code-unit";
 
-import { act, batchIdFor, declareActs, record, recordEach } from "../audit/index.ts";
+import { act, batchIdFor, declareActs, record } from "../audit/index.ts";
 import {
   admit,
   attempt,
-  CeilingMet,
   declareAct,
   emailAddressOf,
   err,
   ok,
   type AdminUserPrincipal,
-  type KernelRefusal,
+  type CeilingMet,
   type RefusalOf,
   type RefusedItems,
   type Result,
@@ -29,45 +25,29 @@ import {
   type UserPrincipal,
   ulid,
 } from "../kernel/index.ts";
-import {
-  consumeIngressIn,
-  refusalOfDeadlock,
-  type CounterRule,
-  type Tx,
-} from "../store/postgres/index.ts";
+import { refusalOfDeadlock, type Tx } from "../store/postgres/index.ts";
 import type { WORKSPACE_REFUSALS } from "../workspaces/index.ts";
-import {
-  distinct,
-  namedEach,
-  notAmong,
-  outcomeOf,
-  refusedItemsOf,
-  type BulkOutcome,
-} from "./sets.ts";
+import { emailsCounted, waitingCounted } from "./invitation-ceilings.ts";
+import { distinct, namedEach, refusedItemsOf } from "./sets.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
-const INVITATION_ACTS = declareActs("people", {
+export const INVITATION_ACTS = declareActs("people", {
   created: act("people.invitation.created", { role: "role" }),
   resent: act("people.invitation.resent", {}),
   cancelled: act("people.invitation.cancelled", { replacedByInvitationId: "id?" }),
 });
 
-/** One workspace emails an address at most this often, by an invite or a resend alike. */
-const INVITATION_CEILING: CounterRule = { windowMs: 60 * 60_000, max: 5 };
-
-/** Every workspace mails through one shared account, which a flood could get suspended; a few hundred people still fit in two hours. */
-const WORKSPACE_INVITATION_CEILING: CounterRule = { windowMs: 60 * 60_000, max: 200 };
-
 /** One act sends to, or holds, at most this many invitations until it commits. */
-const MOST_AT_ONCE = 50;
+export const MOST_AT_ONCE = 50;
 
 const ROLE = boundarySchemas.member.select.shape.role;
 
-const INVITATION_ID = boundarySchemas.invitation.select.shape.id;
+export const INVITATION_ID = boundarySchemas.invitation.select.shape.id;
 
-const ADMIN_ALONE = { role: "Admin", purposes: [] } as const;
+export const ADMIN_ALONE = { role: "Admin", purposes: [] } as const;
 
-const NO_SUCH_INVITATION = "no-such-invitation" satisfies MemberRefusal<"no-such-invitation">;
+export const NO_SUCH_INVITATION =
+  "no-such-invitation" satisfies MemberRefusal<"no-such-invitation">;
 
 /** An address any case spells, or none, reaches the act, which names each it refuses. */
 export const inviteMembersInput = z.object({
@@ -106,51 +86,6 @@ const cancelInvitationAct = declareAct({
   effect: "write",
 });
 
-export const bulkInvitationsInput = z.object({
-  invitationIds: z.array(INVITATION_ID).min(1).max(MOST_AT_ONCE),
-});
-
-const ON_A_SET: readonly MemberRefusal<
-  "role-forbids" | "no-such-invitation" | "changed-meanwhile"
->[] = ["role-forbids", "no-such-invitation", "changed-meanwhile"];
-
-const bulkResendInvitationsAct = declareAct({
-  admits: ADMIN_ALONE,
-  input: bulkInvitationsInput,
-  refuses: ON_A_SET,
-  effect: "write",
-});
-
-const bulkCancelInvitationsAct = declareAct({
-  admits: ADMIN_ALONE,
-  input: bulkInvitationsInput,
-  refuses: ON_A_SET,
-  effect: "write",
-});
-
-const INVITATION_STATUSES = ["waiting", "accepted", "expired", "cancelled"] as const;
-
-type InvitationStatus = (typeof INVITATION_STATUSES)[number];
-
-/** Asked no status, the list is the waiting invitations. */
-export const listInvitationsInput = z
-  .object({ status: z.enum(INVITATION_STATUSES).default("waiting") })
-  .default({ status: "waiting" });
-
-const listInvitationsAct = declareAct({
-  admits: ADMIN_ALONE,
-  input: listInvitationsInput,
-  refuses: ["role-forbids"],
-  effect: "read",
-});
-
-const countInvitationsAct = declareAct({
-  admits: ADMIN_ALONE,
-  input: z.object({}),
-  refuses: ["role-forbids"],
-  effect: "read",
-});
-
 /** Borrowed from the workspaces slice, whose word it is: joining refuses a member in it too. */
 type AlreadyAMember = Extract<keyof typeof WORKSPACE_REFUSALS, "already-a-member">;
 
@@ -163,21 +98,7 @@ export type ResendInvitationRefusal = MemberRefusal<RefusalOf<typeof resendInvit
 
 export type CancelInvitationRefusal = MemberRefusal<RefusalOf<typeof cancelInvitationAct>> | Error;
 
-type SetRefusal =
-  | MemberRefusal<"role-forbids">
-  | KernelRefusal<"changed-meanwhile">
-  | RefusedItems<MemberRefusal<"no-such-invitation">>
-  | Error;
-
-export type BulkResendInvitationsRefusal = SetRefusal;
-
-export type BulkCancelInvitationsRefusal = SetRefusal;
-
-export type ListInvitationsRefusal =
-  | MemberRefusal<RefusalOf<typeof listInvitationsAct | typeof countInvitationsAct>>
-  | Error;
-
-const WAITING_ROW = z.object({
+export const WAITING_ROW = z.object({
   invitationId: INVITATION_ID,
   address: boundarySchemas.invitation.select.shape.email,
   role: ROLE,
@@ -188,21 +109,10 @@ const WAITING_ROW = z.object({
 type WaitingRow = z.output<typeof WAITING_ROW>;
 
 /** The instants are ISO strings, which is what a `Date` becomes on the wire anyway. */
-type WaitingInvitation = Omit<WaitingRow, "invitedAt" | "expiresAt"> & {
+export type WaitingInvitation = Omit<WaitingRow, "invitedAt" | "expiresAt"> & {
   readonly invitedAt: string;
   readonly expiresAt: string;
 };
-
-/** The inviter by display name, read from their person row, so it stands after they leave. */
-export type ListedInvitation = WaitingInvitation & {
-  readonly invitedBy: string;
-  readonly status: InvitationStatus;
-};
-
-const LISTED_ROW = WAITING_ROW.extend({
-  invitedBy: boundarySchemas.user.select.shape.name,
-  status: z.enum(INVITATION_STATUSES),
-});
 
 /** What the email to the invited address is written from. */
 export type InvitationToSend = WaitingInvitation & { readonly workspaceName: string };
@@ -210,12 +120,10 @@ export type InvitationToSend = WaitingInvitation & { readonly workspaceName: str
 /** Each invitation a send minted, and whether it replaced the one waiting for its address. */
 export type InvitationMinted = InvitationToSend & { readonly replaced: boolean };
 
-export type InvitationCounts = Readonly<Record<InvitationStatus, number>>;
-
-const RETURNED = `id AS "invitationId", email AS address, role, created_at AS "invitedAt",
+export const RETURNED = `id AS "invitationId", email AS address, role, created_at AS "invitedAt",
                   expires_at AS "expiresAt"`;
 
-const waitingOf = <Row extends WaitingRow>(
+export const waitingOf = <Row extends WaitingRow>(
   row: Row,
 ): Omit<Row, "invitedAt" | "expiresAt"> & { invitedAt: string; expiresAt: string } => ({
   ...row,
@@ -225,7 +133,8 @@ const waitingOf = <Row extends WaitingRow>(
 
 const WORKSPACE_NAMED = z.object({ name: boundarySchemas.workspace.select.shape.name });
 
-const expiryFrom = (now: Date): Date => new Date(now.getTime() + INVITATION_EXPIRY_SECONDS * 1000);
+export const expiryFrom = (now: Date): Date =>
+  new Date(now.getTime() + INVITATION_EXPIRY_SECONDS * 1000);
 
 const windowOf = (now: Date): Pick<WaitingInvitation, "invitedAt" | "expiresAt"> => ({
   invitedAt: now.toISOString(),
@@ -233,49 +142,10 @@ const windowOf = (now: Date): Pick<WaitingInvitation, "invitedAt" | "expiresAt">
 });
 
 /** The admitted Admin's own workspace, so a row the parse finds missing is a failure. */
-const workspaceNameOf = async (admin: AdminUserPrincipal, tx: Tx): Promise<string> =>
+export const workspaceNameOf = async (admin: AdminUserPrincipal, tx: Tx): Promise<string> =>
   WORKSPACE_NAMED.parse(
     (await tx.query("SELECT name FROM workspace WHERE id = $1", [admin.workspaceId])).rows[0],
   ).name;
-
-/** Hashed, so no address is kept as a counter's key. */
-const counterKeyOf = (admin: AdminUserPrincipal, address: string): string =>
-  createHash("sha256").update(`${admin.workspaceId}:${address}`).digest("hex");
-
-/** Hashed alike, from the workspace's ULID alone, which holds no `:` as every address key's input does. */
-const workspaceKeyOf = (admin: AdminUserPrincipal): string =>
-  createHash("sha256").update(admin.workspaceId).digest("hex");
-
-type Counter = { readonly key: string; readonly rule: CounterRule; readonly amount: number };
-
-const countersOf = (
-  admin: AdminUserPrincipal,
-  addresses: readonly string[],
-): readonly Counter[] => [
-  ...addresses.map((address) => ({
-    key: counterKeyOf(admin, address),
-    rule: INVITATION_CEILING,
-    amount: 1,
-  })),
-  { key: workspaceKeyOf(admin), rule: WORKSPACE_INVITATION_CEILING, amount: addresses.length },
-];
-
-/** In key order, the workspace's among the addresses', so two acts sharing a counter queue rather than deadlock; past either ceiling the act fails whole. */
-const emailsCounted = async (
-  admin: AdminUserPrincipal,
-  tx: Tx,
-  addresses: readonly string[],
-  now: Date,
-): Promise<Result<undefined, CeilingMet>> => {
-  const counters = countersOf(admin, addresses).toSorted((one, other) =>
-    byCodeUnit(one.key, other.key),
-  );
-  for (const { key, rule, amount } of counters) {
-    const counted = await consumeIngressIn(tx, "invitation", key, rule, now, amount);
-    if (!counted.allowed) return err(new CeilingMet(counted.retryAfterSeconds));
-  }
-  return ok(undefined);
-};
 
 type Minting = {
   readonly invitations: readonly { readonly invitationId: string; readonly address: string }[];
@@ -507,29 +377,6 @@ export const inviteMembers = async (
 
 export type ResendInvitationInput = z.output<typeof invitationInput> & { readonly now: Date };
 
-const ADDRESSES_WAITING = `SELECT lower(email) AS address FROM invitation
-                            WHERE workspace_id = $1 AND id = ANY($2::text[]) AND status = $3`;
-
-/** Read unlocked, so every act takes its counters before any invitation row it holds. */
-const waitingCounted = async (
-  admin: AdminUserPrincipal,
-  tx: Tx,
-  invitationIds: readonly string[],
-  now: Date,
-): Promise<Result<undefined, CeilingMet>> => {
-  const waiting = await tx.query<{ address: string }>(ADDRESSES_WAITING, [
-    admin.workspaceId,
-    invitationIds,
-    INVITATION_WAITING_STATUS,
-  ]);
-  return emailsCounted(
-    admin,
-    tx,
-    waiting.rows.map((row) => row.address),
-    now,
-  );
-};
-
 /** The parse brands the ids; a row it throws on fails the act like the query would. */
 const firstWaitingOf = (rows: readonly unknown[]): WaitingInvitation | undefined => {
   const [row] = rows;
@@ -622,213 +469,4 @@ export const cancelInvitation = async (
     detail: {},
   });
   return ok({ invitationId: invitationId.data });
-};
-
-/** One statement, in id order, so two acts holding overlapping sets take them alike. */
-const HELD_INVITATIONS = `SELECT id, status FROM invitation
-                           WHERE workspace_id = $1 AND id = ANY($2::text[])
-                           ORDER BY id FOR UPDATE`;
-
-/** Each id asked for and held here in none of `standing`, named `no-such-invitation`. */
-const refusedOutside = async (
-  admin: AdminUserPrincipal,
-  tx: Tx,
-  invitationIds: readonly string[],
-  standing: readonly string[],
-): Promise<RefusedItems<MemberRefusal<"no-such-invitation">> | undefined> => {
-  const held = await tx.query<{ id: string; status: string }>(HELD_INVITATIONS, [
-    admin.workspaceId,
-    invitationIds,
-  ]);
-  const found = held.rows.filter((row) => standing.includes(row.status)).map((row) => row.id);
-  return refusedItemsOf(namedEach(notAmong(invitationIds, found), NO_SUCH_INVITATION));
-};
-
-const RENEWED_EACH = `WITH renewed AS (
-                        UPDATE invitation SET expires_at = $3
-                         WHERE workspace_id = $1 AND id = ANY($2::text[])
-                        RETURNING ${RETURNED}
-                      )
-                      SELECT * FROM renewed ORDER BY "invitationId"`;
-
-type Renewing = { readonly invitationIds: readonly string[]; readonly now: Date };
-
-const renewedUnderHold = async (
-  admin: AdminUserPrincipal,
-  tx: Tx,
-  renewing: Renewing,
-): Promise<
-  Result<
-    readonly InvitationToSend[],
-    RefusedItems<MemberRefusal<"no-such-invitation">> | CeilingMet
-  >
-> => {
-  const { invitationIds, now } = renewing;
-  const counted = await waitingCounted(admin, tx, invitationIds, now);
-  if (!counted.ok) return err(counted.error);
-  const refused = await refusedOutside(admin, tx, invitationIds, [INVITATION_WAITING_STATUS]);
-  if (refused !== undefined) return err(refused);
-
-  const renewed = await tx.query(RENEWED_EACH, [admin.workspaceId, invitationIds, expiryFrom(now)]);
-  const invitations = z.array(WAITING_ROW).parse(renewed.rows).map(waitingOf);
-  await recordEach(
-    admin,
-    tx,
-    INVITATION_ACTS.resent,
-    invitations.map(({ invitationId }) => ({ subjectId: invitationId, detail: {} })),
-  );
-  const workspaceName = await workspaceNameOf(admin, tx);
-  return ok(invitations.map((invitation) => ({ ...invitation, workspaceName })));
-};
-
-export type BulkResendInvitationsInput = z.output<typeof bulkInvitationsInput> & {
-  readonly now: Date;
-};
-
-/**
- * Renews every ticked invitation a week from `now`, or none: one accepted, cancelled or not held
- * here refuses the set naming each. Past an address's ceiling or the workspace's, the set fails
- * whole.
- */
-export const bulkResendInvitations = async (
-  principal: UserPrincipal,
-  tx: Tx,
-  input: BulkResendInvitationsInput,
-): Promise<Result<readonly InvitationToSend[], BulkResendInvitationsRefusal>> => {
-  const admitted = admit(bulkResendInvitationsAct, principal, input);
-  if (!admitted.ok) return err(admitted.error);
-  const renewing = { invitationIds: distinct(input.invitationIds), now: input.now };
-
-  const done = await attempt(() => renewedUnderHold(admitted.value, tx, renewing));
-  return done.ok ? done.value : err(refusalOfDeadlock(done.error));
-};
-
-const CANCELLED_WAITING = `WITH cancelled AS (
-                             UPDATE invitation SET status = $3
-                              WHERE workspace_id = $1 AND id = ANY($2::text[]) AND status = $4
-                             RETURNING id
-                           )
-                           SELECT id FROM cancelled ORDER BY id`;
-
-const cancelledUnderHold = async (
-  admin: AdminUserPrincipal,
-  tx: Tx,
-  invitationIds: readonly string[],
-): Promise<Result<BulkOutcome<string>, RefusedItems<MemberRefusal<"no-such-invitation">>>> => {
-  const refused = await refusedOutside(admin, tx, invitationIds, [
-    INVITATION_WAITING_STATUS,
-    INVITATION_CANCELLED_STATUS,
-  ]);
-  if (refused !== undefined) return err(refused);
-
-  const cancelled = await tx.query<{ id: string }>(CANCELLED_WAITING, [
-    admin.workspaceId,
-    invitationIds,
-    INVITATION_CANCELLED_STATUS,
-    INVITATION_WAITING_STATUS,
-  ]);
-  const changed = cancelled.rows.map((row) => INVITATION_ID.parse(row.id));
-  await recordEach(
-    admin,
-    tx,
-    INVITATION_ACTS.cancelled,
-    changed.map((subjectId) => ({ subjectId, detail: {} })),
-  );
-  return ok(outcomeOf<string>(invitationIds, changed));
-};
-
-/**
- * Cancels every ticked invitation still waiting, or none: one accepted or not held here refuses
- * the set naming each. One already cancelled is skipped, counted from what the update landed.
- */
-export const bulkCancelInvitations = async (
-  principal: UserPrincipal,
-  tx: Tx,
-  input: z.output<typeof bulkInvitationsInput>,
-): Promise<Result<BulkOutcome<string>, BulkCancelInvitationsRefusal>> => {
-  const admitted = admit(bulkCancelInvitationsAct, principal, input);
-  if (!admitted.ok) return err(admitted.error);
-  const invitationIds = distinct(input.invitationIds);
-
-  const done = await attempt(() => cancelledUnderHold(admitted.value, tx, invitationIds));
-  return done.ok ? done.value : err(refusalOfDeadlock(done.error));
-};
-
-/** By the server's clock: an invitation never accepted is expired from the instant it expires. */
-const STATUS_OF = `CASE WHEN i.status = $2 AND i.expires_at > $3 THEN 'waiting'
-                        WHEN i.status = $2 THEN 'expired'
-                        WHEN i.status = $4 THEN 'accepted'
-                        WHEN i.status = $5 THEN 'cancelled' END`;
-
-const statusParameters = (admin: AdminUserPrincipal, at: Date) => [
-  admin.workspaceId,
-  INVITATION_WAITING_STATUS,
-  at,
-  INVITATION_ACCEPTED_STATUS,
-  INVITATION_CANCELLED_STATUS,
-];
-
-const LISTED = `SELECT * FROM (
-                  SELECT i.id AS "invitationId", i.email AS address, i.role, i.created_at AS "invitedAt",
-                         i.expires_at AS "expiresAt", u.name AS "invitedBy", ${STATUS_OF} AS status
-                    FROM invitation i JOIN "user" u ON u.id = i.inviter_id
-                   WHERE i.workspace_id = $1
-                ) listed
-                WHERE status = $6
-                ORDER BY "invitedAt" DESC, "invitationId" DESC`;
-
-export type ListInvitationsInput = z.output<typeof listInvitationsInput> & { readonly at: Date };
-
-/** Newest first, each row with its status as of `at`. */
-export const listInvitations = async (
-  principal: UserPrincipal,
-  tx: Tx,
-  input: ListInvitationsInput,
-): Promise<Result<readonly ListedInvitation[], ListInvitationsRefusal>> => {
-  const admitted = admit(listInvitationsAct, principal, input);
-  if (!admitted.ok) return err(admitted.error);
-
-  const listed = await attempt(async () =>
-    z
-      .array(LISTED_ROW)
-      .parse(
-        (await tx.query(LISTED, [...statusParameters(admitted.value, input.at), input.status]))
-          .rows,
-      ),
-  );
-  if (!listed.ok) return err(listed.error);
-  return ok(listed.value.map(waitingOf));
-};
-
-const COUNTED = `SELECT status, count(*)::int AS count FROM (
-                   SELECT ${STATUS_OF} AS status FROM invitation i WHERE i.workspace_id = $1
-                 ) statuses
-                 WHERE status IS NOT NULL
-                 GROUP BY status`;
-
-const COUNTED_ROW = z.object({ status: z.enum(INVITATION_STATUSES), count: z.int() });
-
-/** How many invitations each status holds as of `at`, from one grouped read. */
-export const countInvitations = async (
-  principal: UserPrincipal,
-  tx: Tx,
-  input: { readonly at: Date },
-): Promise<Result<InvitationCounts, ListInvitationsRefusal>> => {
-  const admitted = admit(countInvitationsAct, principal, {});
-  if (!admitted.ok) return err(admitted.error);
-
-  const counted = await attempt(async () =>
-    z
-      .array(COUNTED_ROW)
-      .parse((await tx.query(COUNTED, statusParameters(admitted.value, input.at))).rows),
-  );
-  if (!counted.ok) return err(counted.error);
-  const countOf = (status: InvitationStatus): number =>
-    counted.value.find((row) => row.status === status)?.count ?? 0;
-  return ok({
-    waiting: countOf("waiting"),
-    accepted: countOf("accepted"),
-    expired: countOf("expired"),
-    cancelled: countOf("cancelled"),
-  });
 };
