@@ -16,8 +16,6 @@ const PREFLIGHT_TIMEOUT_MS = 60_000;
 /** A sign-in may wait 150 s on the test inbox; the rest is the journey's screens. */
 const ROLE_JOURNEY_TIMEOUT_MS = 360_000;
 
-const chromium = devices["Desktop Chrome"];
-
 export default defineConfig({
   testDir: "journeys",
   fullyParallel: false,
@@ -38,21 +36,22 @@ export default defineConfig({
     ],
   ],
 
-  // A trace, screenshot or video of a signed-in screen would publish a live session.
-  use: { baseURL: publicUrl.data, trace: "off", screenshot: "off", video: "off" },
+  use: {
+    ...devices["Desktop Chrome"],
+    baseURL: publicUrl.data,
+
+    // A trace, screenshot or video of a signed-in screen would publish a live session.
+    trace: "off",
+    screenshot: "off",
+    video: "off",
+  },
   projects: [
-    {
-      name: "preflight",
-      testMatch: "preflight.spec.ts",
-      timeout: PREFLIGHT_TIMEOUT_MS,
-      use: { ...chromium },
-    },
+    { name: "preflight", testMatch: "preflight.spec.ts", timeout: PREFLIGHT_TIMEOUT_MS },
     {
       name: "roles",
       testIgnore: "preflight.spec.ts",
       dependencies: ["preflight"],
       timeout: ROLE_JOURNEY_TIMEOUT_MS,
-      use: { ...chromium },
     },
   ],
 });
