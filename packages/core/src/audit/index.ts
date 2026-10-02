@@ -11,7 +11,7 @@ import type {
   Principal,
   UserId,
 } from "../kernel/index.ts";
-import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
+import { boundValues, scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
 import {
   type ActName,
   DETAIL_KINDS,
@@ -160,14 +160,6 @@ export type PersonNamedIn = {
     readonly subjectKinds: readonly string[];
     readonly acts: readonly ActName[];
   }[];
-};
-
-type Bindable = string | number | null | readonly string[];
-
-/** A placeholder is the number its own value's binding answers, so the two cannot drift apart. */
-const boundValues = () => {
-  const values: Bindable[] = [];
-  return { values, bind: (value: Bindable): number => values.push(value) };
 };
 
 type ArmAt = CursorAt & { readonly limit: number };
