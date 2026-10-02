@@ -90,6 +90,9 @@ export const A_CONCEPT_WRITE_REQUEST = `INSERT INTO concept_write_request
 export const ONE_CALL_AGAINST_A_TOKEN = `INSERT INTO mcp_call_counter (workspace_id, token_id, window_start, count)
        VALUES ($1, 'jti-1', now(), 1)`;
 
+export const A_TESTING_DOMAIN_MARKED = `INSERT INTO test_workspace_mark (workspace_id, testing_domain)
+       VALUES ($1, 'testing.invalid')`;
+
 export const THREE_INVITATION_EMAILS_COUNTED = `INSERT INTO invitation_email_counter (workspace_id, key, window_start, count)
        VALUES ($1, 'workspace', now(), 3)`;
 

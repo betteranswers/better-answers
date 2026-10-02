@@ -57,6 +57,7 @@ import {
   A_SUPPRESSION,
   A_SWEEP_PASS,
   A_SWEEP_PASS_COUNTING,
+  A_TESTING_DOMAIN_MARKED,
   AN_ACCESS_REQUEST,
   AN_EDGE,
   AN_EDGE_CARRYING_A_SENTENCE,
@@ -696,6 +697,61 @@ describe("last activity under app_rt", () => {
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
 
       await expect(client.query("SELECT 1 FROM workspace_last_active LIMIT 1")).rejects.toThrow(
+        /permission denied/,
+      );
+    });
+  });
+});
+
+describe("the test workspace's mark under app_rt", () => {
+  it("returns none unscoped and only the scoped tenant's mark", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      await seed.testWorkspaceMark({ workspaceId: WS_A, testingDomain: "a.testing.invalid" });
+      await seed.testWorkspaceMark({ workspaceId: WS_B, testingDomain: "b.testing.invalid" });
+      await client.query("SET LOCAL ROLE app_rt");
+
+      const unscoped = await client.query("SELECT testing_domain FROM test_workspace_mark");
+      expect(unscoped.rows).toEqual([]);
+
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      const scoped = await client.query(
+        "SELECT workspace_id, testing_domain FROM test_workspace_mark",
+      );
+      expect(scoped.rows).toEqual([{ workspace_id: WS_A, testing_domain: "a.testing.invalid" }]);
+    });
+  });
+
+  it("changes, removes and writes none of another tenant's mark", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      await seed.testWorkspaceMark({ workspaceId: WS_A, testingDomain: "a.testing.invalid" });
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_B]);
+
+      const moved = await client.query(
+        "UPDATE test_workspace_mark SET testing_domain = 'x.invalid'",
+      );
+      const removed = await client.query("DELETE FROM test_workspace_mark");
+      expect([moved.rowCount, removed.rowCount]).toEqual([0, 0]);
+
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      const kept = await client.query("SELECT testing_domain FROM test_workspace_mark");
+      expect(kept.rows).toEqual([{ testing_domain: "a.testing.invalid" }]);
+      await expect(client.query(A_TESTING_DOMAIN_MARKED, [WS_B])).rejects.toThrow(
+        /row-level security/,
+      );
+    });
+  });
+
+  it("refuses the worker every row", async () => {
+    await withRollback(db.pool, async (client) => {
+      const seed = await seedTwoWorkspaces(client);
+      await seed.testWorkspaceMark({ workspaceId: WS_A });
+      await client.query("SET LOCAL ROLE worker_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+
+      await expect(client.query("SELECT 1 FROM test_workspace_mark LIMIT 1")).rejects.toThrow(
         /permission denied/,
       );
     });

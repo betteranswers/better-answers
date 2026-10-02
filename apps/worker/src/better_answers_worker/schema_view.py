@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0061_the-invitation-email-counter"
+MIGRATION_ID = "0062_the-test-workspace-mark"
 
-MIGRATION_WHEN = 1790965859556
+MIGRATION_WHEN = 1790970695990
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -555,6 +555,10 @@ TABLES: dict[str, dict[str, str]] = {
         "found": "integer NOT NULL",
         "removed": "integer NOT NULL",
         "generations": "integer NOT NULL",
+    },
+    "public.test_workspace_mark": {
+        "workspace_id": "text NOT NULL",
+        "testing_domain": "text NOT NULL",
     },
     "public.user": {
         "id": "text NOT NULL",

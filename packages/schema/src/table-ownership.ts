@@ -53,6 +53,7 @@ export const TABLE_OWNERS = {
   "public.identity_audit_event": "audit",
   "public.access_request": "members",
   "public.workspace_last_active": "members",
+  "public.test_workspace_mark": "members",
   "index.chunk": "sources",
 
   "public.concept_identity": "concepts",

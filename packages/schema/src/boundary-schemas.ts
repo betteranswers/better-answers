@@ -34,6 +34,7 @@ import {
   mcpCallCounter,
 } from "./counter-tables.ts";
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "./drizzle-zod.ts";
+import { EMAIL_ADDRESS } from "./email-address.ts";
 import {
   erasureRequest,
   type SUBJECT_IDENTIFIER_KINDS,
@@ -106,6 +107,7 @@ import {
   SUGGESTION_REASON_MAX,
   SUGGESTION_STATUSES,
 } from "./suggestion-tables.ts";
+import { testWorkspaceMark } from "./test-workspace-tables.ts";
 import { ULID } from "./ulid.ts";
 import { workspace } from "./workspace-table.ts";
 
@@ -279,6 +281,28 @@ export const invitationEmailCounterInsert = createInsertSchema(
 export const invitationEmailCounterUpdate = createUpdateSchema(
   invitationEmailCounter,
   invitationEmailCounterRefinements,
+);
+
+/** What an address carries after its `@`, lower-cased, so a match is a plain comparison. */
+const isTestingDomain = (domain: string): boolean =>
+  domain === domain.toLowerCase() && EMAIL_ADDRESS.safeParse(`mark@${domain}`).success;
+
+const testWorkspaceMarkRefinements = {
+  workspaceId,
+  testingDomain: (schema: z.ZodString) => schema.refine(isTestingDomain),
+};
+
+export const testWorkspaceMarkSelect = createSelectSchema(
+  testWorkspaceMark,
+  testWorkspaceMarkRefinements,
+);
+export const testWorkspaceMarkInsert = createInsertSchema(
+  testWorkspaceMark,
+  testWorkspaceMarkRefinements,
+);
+export const testWorkspaceMarkUpdate = createUpdateSchema(
+  testWorkspaceMark,
+  testWorkspaceMarkRefinements,
 );
 
 const ingressCounterRefinements = {
@@ -954,6 +978,12 @@ export const boundarySchemas = {
   passkeyLastUse: plain(passkeyLastUse),
   recoveryCode: plain(recoveryCode),
   workspaceLastActive: plain(workspaceLastActive),
+  testWorkspaceMark: {
+    table: testWorkspaceMark,
+    select: testWorkspaceMarkSelect,
+    insert: testWorkspaceMarkInsert,
+    update: testWorkspaceMarkUpdate,
+  },
   accessRequest: {
     table: accessRequest,
     select: accessRequestSelect,

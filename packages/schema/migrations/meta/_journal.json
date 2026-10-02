@@ -435,6 +435,13 @@
       "when": 1790965859556,
       "tag": "0061_the-invitation-email-counter",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1790970695990,
+      "tag": "0062_the-test-workspace-mark",
+      "breakpoints": true
     }
   ]
 }
