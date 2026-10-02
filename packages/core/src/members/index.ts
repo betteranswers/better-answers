@@ -56,6 +56,7 @@ export { changeRole, changeRoleInput } from "./roles.ts";
 export {
   ensureTestWorkspace,
   INVENTED_MEMBERS,
+  type TestWorkspaceInput,
   type TestWorkspaceRefusal,
   type TestWorkspaceStanding,
 } from "./test-workspace.ts";

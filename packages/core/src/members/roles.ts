@@ -55,7 +55,7 @@ export type RoleChanged = {
 
 type Asked = { readonly personId: UserId; readonly role: Role };
 
-const written = async (
+const roleWrittenBy = async (
   actor: AdminUserPrincipal | PlatformPrincipal,
   tx: Tx,
   workspaceId: WorkspaceId,
@@ -82,7 +82,7 @@ export const roleWritten = (
   tx: Tx,
   changed: RoleChanged,
   batchId?: string,
-): Promise<void> => written(admin, tx, admin.workspaceId, changed, batchId);
+): Promise<void> => roleWrittenBy(admin, tx, admin.workspaceId, changed, batchId);
 
 /** As `roleWritten`, by the platform under `workspaceId`'s scope; it judges no last Admin. */
 export const roleWrittenByPlatform = (
@@ -91,7 +91,7 @@ export const roleWrittenByPlatform = (
   workspaceId: WorkspaceId,
   changed: RoleChanged,
   batchId?: string,
-): Promise<void> => written(platform, tx, workspaceId, changed, batchId);
+): Promise<void> => roleWrittenBy(platform, tx, workspaceId, changed, batchId);
 
 const roleSetUnderTheLock = (
   admin: AdmittedOf<typeof changeRoleAct>,

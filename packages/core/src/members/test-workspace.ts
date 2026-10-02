@@ -51,7 +51,7 @@ const ROLE = boundarySchemas.member.select.shape.role;
 
 const MALFORMED = "malformed" satisfies MemberRefusal<"malformed">;
 
-type TestWorkspaceInput = {
+export type TestWorkspaceInput = {
   readonly testingDomain: string;
   readonly slug: string;
   readonly admin: string;
@@ -289,8 +289,8 @@ const workspaceEnsured = async (
 const MARK_HELD =
   "SELECT testing_domain FROM test_workspace_mark WHERE workspace_id = $1 FOR UPDATE";
 
-const MARKED = `INSERT INTO test_workspace_mark (workspace_id, testing_domain) VALUES ($1, $2)
-                ON CONFLICT (workspace_id) DO UPDATE SET testing_domain = EXCLUDED.testing_domain`;
+const MARK_WRITTEN = `INSERT INTO test_workspace_mark (workspace_id, testing_domain) VALUES ($1, $2)
+                      ON CONFLICT (workspace_id) DO UPDATE SET testing_domain = EXCLUDED.testing_domain`;
 
 const markEnsured = (
   platform: PlatformPrincipal,
@@ -303,7 +303,7 @@ const markEnsured = (
     const was = held.rows[0]?.testing_domain;
     if (was === testingDomain) return "kept";
 
-    await tx.query(MARKED, [workspaceId, testingDomain]);
+    await tx.query(MARK_WRITTEN, [workspaceId, testingDomain]);
     await record(platform, tx, {
       id: ulid(),
       act: MARK_ACTS.marked,

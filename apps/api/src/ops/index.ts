@@ -36,6 +36,7 @@ import {
 import {
   ensureTestWorkspace,
   INVENTED_MEMBERS,
+  type TestWorkspaceInput,
   type TestWorkspaceRefusal,
   type TestWorkspaceStanding,
 } from "@better-answers/core/members";
@@ -1100,17 +1101,9 @@ const addPersonCommand = async (doors: Doors, flags: Flags, io: OpsIo): Promise<
 const TEST_WORKSPACE_USAGE =
   "test-workspace: --domain <testing domain>, --slug <slug>, --admin <email>, --editor <email> and --viewer <email> are required";
 
-type TestWorkspaceAsked = {
-  readonly testingDomain: string;
-  readonly slug: string;
-  readonly admin: string;
-  readonly editor: string;
-  readonly viewer: string;
-};
-
 const TEST_WORKSPACE_FLAGS = ["domain", "slug", "admin", "editor", "viewer"] as const;
 
-const testWorkspaceAskedOf = (flags: Flags): TestWorkspaceAsked | undefined => {
+const testWorkspaceAskedOf = (flags: Flags): TestWorkspaceInput | undefined => {
   const [testingDomain, slug, admin, editor, viewer] = TEST_WORKSPACE_FLAGS.map((name) =>
     flagValue(flags, name),
   );
@@ -1136,12 +1129,12 @@ const ADDRESS_SAID = {
   "member-elsewhere": (address) =>
     `${address} is a member of another workspace, and a test person belongs to the test workspace alone; give another address`,
 } satisfies Readonly<
-  Record<AddressRefused["word"], (address: string, asked: TestWorkspaceAsked) => string>
+  Record<AddressRefused["word"], (address: string, asked: TestWorkspaceInput) => string>
 >;
 
 const testWorkspaceReason = (
   refusal: Exclude<TestWorkspaceRefusal, AddressRefused | Error>,
-  asked: TestWorkspaceAsked,
+  asked: TestWorkspaceInput,
 ): string => {
   switch (refusal) {
     case "malformed":
@@ -1157,7 +1150,7 @@ const testWorkspaceReason = (
 
 const testWorkspaceRefused = (
   refusal: TestWorkspaceRefusal,
-  asked: TestWorkspaceAsked,
+  asked: TestWorkspaceInput,
   io: OpsIo,
 ): number => {
   if (refusal instanceof Error) {
@@ -1185,7 +1178,7 @@ const changesOf = (standing: TestWorkspaceStanding): readonly string[] => {
   return changes.filter(([changed]) => changed).map(([, said]) => said);
 };
 
-const doneSaid = (standing: TestWorkspaceStanding, asked: TestWorkspaceAsked): string => {
+const doneSaid = (standing: TestWorkspaceStanding, asked: TestWorkspaceInput): string => {
   const changes = changesOf(standing);
   const said = changes.length === 0 ? "nothing to do" : changes.join(", ");
   return `test-workspace: done — ${standing.workspaceId}, slug ${asked.slug}, testing domain ${asked.testingDomain}; ${said}`;
