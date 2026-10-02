@@ -72,9 +72,24 @@ const saidOfSigningIn = (left: number): SaidOfAnAct => ({
   unanswered: SIGN_IN_UNANSWERED,
 });
 
+/** One reading of a failed act, which the screen's words, tries count and styling all follow. */
+type Failed =
+  | { readonly kind: "unanswered" }
+  | { readonly kind: "too-many"; readonly waitSeconds: number | undefined }
+  | { readonly kind: "refused"; readonly spent: boolean };
+
+const failedAs = (failure: Error): Failed => {
+  if (!(failure instanceof CodeRefused)) return { kind: "unanswered" };
+  if (failure.status === TOO_MANY_REQUESTS) {
+    return { kind: "too-many", waitSeconds: failure.waitSeconds };
+  }
+  return { kind: "refused", spent: codeSpent(failure) };
+};
+
 const saidOf = (act: SaidOfAnAct, failure: Error): Said => {
-  if (!(failure instanceof CodeRefused)) return act.unanswered;
-  return failure.status === TOO_MANY_REQUESTS ? act.tooMany(failure.waitSeconds) : act.refused;
+  const failed = failedAs(failure);
+  if (failed.kind === "too-many") return act.tooMany(failed.waitSeconds);
+  return failed.kind === "refused" ? act.refused : act.unanswered;
 };
 
 /** Each act clears the other as it starts, so at most one has failed. */
@@ -88,11 +103,13 @@ const failureSaid = (
 };
 
 /** A ceiling's refusal says nothing of the code, so it spends none of its tries. */
-const isAWrongCode = (failure: Error | null): failure is CodeRefused =>
-  failure instanceof CodeRefused && failure.status !== TOO_MANY_REQUESTS;
+const isAWrongCode = (failure: Error | null): boolean =>
+  failure !== null && failedAs(failure).kind === "refused";
 
-const triesLeftAfter = (refused: readonly string[], failure: Error | null): number =>
-  failure instanceof CodeRefused && codeSpent(failure) ? 0 : triesLeft(refused.length);
+const triesLeftAfter = (refused: readonly string[], failure: Error | null): number => {
+  const failed = failure === null ? undefined : failedAs(failure);
+  return failed?.kind === "refused" && failed.spent ? 0 : triesLeft(refused.length);
+};
 
 const saidOfTheCode = (sentTo: string, sending: boolean, resent: boolean): string => {
   if (sending) return sendingANewCode(sentTo);
