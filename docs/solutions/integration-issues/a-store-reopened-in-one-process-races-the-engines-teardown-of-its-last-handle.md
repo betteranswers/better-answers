@@ -25,7 +25,7 @@ tags:
   - merge-queue
   - teardown-race
   - reopen-retry
-retire_when: "cocoindex adds an Environment.close() that waits for heed to release the path, or heed stops refusing a reopen while a clone of the handle lives; check the cocoindex release notes and the heed changelog for the installed versions"
+retire_when: "cocoindex ships an awaitable or explicit Environment close, or an equivalent contract for when a store is released, and Host adopts it in place of the wait; check the cocoindex release notes and cocoindex-io/cocoindex issue 2467"
 ---
 
 # A store reopened in one process races the engine's teardown of its last handle
@@ -86,7 +86,7 @@ def _opened_once_let_go(run, store, open_store, wait_seconds):
 
 ## Why This Works
 
-heed keeps one process-wide map of open environments, keyed by canonical path. An open takes its lock and returns `EnvAlreadyOpened` when the path is already in it (`src/envs/env_open_options.rs:403`, `419-420`). That variant displays as the exact text above (`src/lib.rs:173-175`, `185-188`). The entry leaves the map only in `EnvInner::drop`, when the last clone of the `Env` goes (`src/envs/env.rs:745-752`).
+heed keeps one process-wide map of open environments, keyed by canonical path. An open takes its lock and returns `EnvAlreadyOpened` when the path is already in it (`src/envs/env_open_options.rs:403`, `419-420`). That variant displays as the exact text above (`src/lib.rs:173-175`, `185-188`). The entry leaves the map only in `EnvInner::drop`, when the last clone of the `Env` goes (`src/envs/env.rs:745-752`). The refusal is not heed's choice to relax: it enforces LMDB's own rule, which says not to open one database twice in a process at the same time (`libraries/liblmdb/lmdb.h:102-105` in heed's bundled LMDB). Only a close that waits for the release can retire the wait.
 
 cocoindex clones the `Env` into its batcher's runner (`rust/core/src/state_store/storage.rs:278-294`). The batcher's spawned tasks hold an `Arc` of the data that owns that runner (`rust/utils/src/batching.rs:209-212`, `228-238`, `270-272`). On the Python side, this session's probe found that a live `coco.AppConfig` keeps the Rust environment alive; the engine's native core is a binary, so no source line says so. Either way, a handle can outlive both the update and `Host.close()`.
 
@@ -123,4 +123,4 @@ Which survivor outlived the first `Host` on the CI runner is not pinned. A probe
 
   `test_a_store_never_let_go_raises_after_the_wait` checks the same message comes back after at least the wait. `test_an_unreadable_store_raises_without_waiting` checks that `MDB_INVALID` raises with no wait logged.
 
-- **The upstream fix.** An `Environment.close()` in cocoindex, built on heed's `prepare_for_closing()` (`src/envs/env.rs:620-627`), would let `Host.close()` wait for the real release and retire the retry. It awaits the repository owner's decision; nothing is filed.
+- **The upstream fix.** An `Environment.close()` in cocoindex, built on heed's `prepare_for_closing()` (`src/envs/env.rs:620-627`), would let `Host.close()` wait for the real release and retire the retry. The request is filed upstream as [cocoindex-io/cocoindex#2467](https://github.com/cocoindex-io/cocoindex/issues/2467), related to [cocoindex-io/cocoindex#2402](https://github.com/cocoindex-io/cocoindex/issues/2402).
