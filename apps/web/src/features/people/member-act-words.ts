@@ -1,6 +1,8 @@
 import type { Role } from "@/shared/navigation.ts";
 import { counted } from "@/shared/words.ts";
 
+import type { Direction } from "./people-api.ts";
+
 export const SELECTED_MEMBERS = "Selected members";
 
 export const INCLUDES_YOU = "This includes you.";
@@ -19,6 +21,18 @@ export const MEMBER_PAGE_WORDS = {
   toMembers: "Go to Members",
   removing: (name: string) => `Removing ${name} from this workspace.`,
   removed: (name: string) => `${name} is no longer a member of this workspace.`,
+} as const;
+
+/** A member's Activity, each line marked with its direction in the glossary's words. */
+export const ACTIVITY_WORDS = {
+  loading: "The activity is still loading.",
+  none: (name: string) => `No acts by or to ${name} in this workspace yet.`,
+  older: "Older activity",
+  direction: {
+    by: (name: string) => `By ${name}`,
+    to: (name: string) => `To ${name}`,
+    both: (name: string) => `By and to ${name}`,
+  } satisfies Readonly<Record<Direction, (name: string) => string>>,
 } as const;
 
 const RECORDED = "Recorded on the audit log under your name.";

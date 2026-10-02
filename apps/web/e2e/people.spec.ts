@@ -4,8 +4,10 @@ import { BREADCRUMB, JUMP_TO, RAIL, UNKNOWN_SCREEN } from "@/app/words.ts";
 import { INVITATION_WORDS } from "@/features/auth/invitation-words.ts";
 import { SAID_OF_ACCEPTING } from "@/features/auth/refusal-words.ts";
 import { NO_WORKSPACE_HEADING, PICKER_WORDS } from "@/features/auth/workspace-words.ts";
+import { sentenceOf as saidOfAct } from "@/features/people/audit-sentences.ts";
 import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
 import {
+  ACTIVITY_WORDS,
   BULK_WORDS,
   homeNowSaid,
   INCLUDES_YOU,
@@ -17,7 +19,7 @@ import { SAID_OF_A_MEMBER, SAID_OF_TICKED_MEMBERS } from "@/features/people/refu
 import { aRole } from "@/features/people/role-meanings.ts";
 import { KEYSTROKE_WORDS, keystrokesOn, SELECT_FIRST } from "@/shared/keystroke-words.ts";
 import { CONTROL_CENTRE, groupIn, headingOf, screenNamed } from "@/shared/navigation.ts";
-import { SAID_OF_CLASS, sentenceOf } from "@/shared/refusal-words.ts";
+import { NO_RESPONSE_TO_A_READ, SAID_OF_CLASS, sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -38,6 +40,7 @@ import {
   person,
   personMenuOpened,
   provision,
+  quoted,
   removeMember,
   saysItsSentenceNotItsWord,
   signIn,
@@ -149,6 +152,32 @@ const displayNameRegion = (page: Page): Locator =>
 
 const flagButton = (page: Page): Locator =>
   thePage(page).getByRole("button", { name: "Flag the name to the operator" });
+
+const activityOf = (page: Page): Locator =>
+  thePage(page).getByRole("region", { name: MEMBER_PAGE_WORDS.activity });
+
+/** Each event is one line of the stream, under its day. */
+const linesOf = (page: Page): Locator => activityOf(page).getByRole("listitem");
+
+const ACTIVITY_READ = (url: URL): boolean => url.pathname.includes("members.activity");
+
+/** Timed from the ask, so the list's second covers the read and the lines it draws. */
+const linesWithinTheBudget = async (
+  page: Page,
+  what: string,
+  ask: () => Promise<unknown>,
+  count: number,
+): Promise<void> => {
+  const started = Date.now();
+  await ask();
+  await expect(linesOf(page)).toHaveCount(count);
+  const elapsed = Date.now() - started;
+  test.info().annotations.push({ type: what, description: `${elapsed} ms` });
+  expect(elapsed, `${what} drew past the list's budget`).toBeLessThan(LIST_BUDGET_MS);
+};
+
+/** A person as the audit read names them, so a line's sentence is the web's own, not a copy. */
+const named = (displayName: string) => ({ kind: "person", displayName }) as const;
 
 /** The page's own address, its last segment a person's id. */
 const AT_A_MEMBER_PAGE = new RegExp(`${MEMBERS_SCREEN}/[0-9A-HJKMNP-TV-Z]{26}$`);
@@ -548,6 +577,8 @@ test.describe("a member's own page", () => {
             - listitem:
               - link "${MEMBER_PAGE_WORDS.access}"
             - listitem:
+              - link "${MEMBER_PAGE_WORDS.activity}"
+            - listitem:
               - link "${MEMBER_PAGE_WORDS.removeAndRevoke}"
         - region "${MEMBER_PAGE_WORDS.access}":
           - heading "${MEMBER_PAGE_WORDS.access}" [level=2]
@@ -579,6 +610,9 @@ test.describe("a member's own page", () => {
             - paragraph: People give their own display name, and no Admin can change one. The operator corrects a name you flag as inappropriate.
             - button "Flag the name to the operator"
             - paragraph: The operator is emailed, and the flag is recorded on the audit log under your name. While a flag from this workspace waits, another adds nothing.
+        - region "${MEMBER_PAGE_WORDS.activity}":
+          - heading "${MEMBER_PAGE_WORDS.activity}" [level=2]
+          - text: ${quoted(ACTIVITY_WORDS.none("Priya Shah"))}
         - region "${MEMBER_PAGE_WORDS.removeAndRevoke}":
           - heading "${MEMBER_PAGE_WORDS.removeAndRevoke}" [level=2]
           - region "Credentials":
@@ -861,6 +895,180 @@ test.describe("a member's own page", () => {
 
     await backToMembers(page);
     await expect(cellOf(page, "Priya Shah", "Role")).toHaveText("Viewer");
+  });
+});
+
+test.describe("a member's Activity", () => {
+  test("AE4: a role change reads by Hannah and to Priya", async ({ page, request }) => {
+    const { workspaceId } = await provision(request, { name: "Swale Brassworks" });
+    const hannahAt = anAddress("hannah");
+    const hannah = await person(request, hannahAt, { displayName: "Hannah Wright" });
+    const priya = await person(request, anAddress("priya"), { displayName: "Priya Shah" });
+    await addMember(request, { workspaceId, userId: hannah.id, role: "Admin" });
+    await addMember(request, { workspaceId, userId: priya.id, role: "Viewer" });
+    await page.goto(memberPageAt(priya.id));
+    await signIn(page, request, hannahAt);
+    await expect(activityOf(page)).toContainText(ACTIVITY_WORDS.none("Priya Shah"));
+
+    await thePage(page).getByRole("radio", { name: "Editor", exact: true }).click();
+    await thePage(page).getByRole("button", { name: "Make Priya Shah an Editor" }).click();
+
+    const changed = saidOfAct({
+      act: "people.member.role_changed",
+      by: named("Hannah Wright"),
+      subject: named("Priya Shah"),
+      detail: { role: "Editor" },
+    });
+    // The page the act was taken on reads its Activity again once the act settles.
+    await expect(linesOf(page)).toHaveCount(1);
+    await expect(linesOf(page)).toContainText(changed);
+    await expect(linesOf(page)).toContainText(ACTIVITY_WORDS.direction.to("Priya Shah"));
+
+    await page.goto(memberPageAt(hannah.id));
+    await expect(personHeading(page, "Hannah Wright")).toBeVisible();
+    await expect(activityOf(page)).toMatchAriaSnapshot(`
+      - region "${MEMBER_PAGE_WORDS.activity}":
+        - heading "${MEMBER_PAGE_WORDS.activity}" [level=2]
+        - heading /\\w+day \\d{1,2} \\w+ \\d{4}/ [level=3]
+        - list:
+          - listitem:
+            - time: /\\d{2}:\\d{2}/
+            - text: ${quoted(`${changed} ${ACTIVITY_WORDS.direction.by("Hannah Wright")}`)}
+    `);
+  });
+
+  test("Load more lands focus on the first older line", async ({ page, request }) => {
+    const { workspaceId, adminId } = await anAdminAtPeople(page, request, "Calder Crewing");
+    const names = Array.from({ length: 51 }, (_, index) => `Crew ${String(index + 1)}`);
+    await makeGroups(request, { workspaceId, userId: adminId, names });
+
+    // A fresh document, so no page of the stream is already in the page's cache.
+    await linesWithinTheBudget(page, "activity", () => page.goto(memberPageAt(adminId)), 50);
+    const loadMore = activityOf(page).getByRole("button", { name: "Load more" });
+    await expect(loadMore).toHaveAttribute(
+      "aria-keyshortcuts",
+      MEMBER_PAGE_KEYSTROKES.olderActivity.key,
+    );
+
+    const { key } = MEMBER_PAGE_KEYSTROKES.olderActivity;
+    await linesWithinTheBudget(page, "older activity", () => page.keyboard.press(key), 52);
+    await expect(linesOf(page).nth(50), "focus did not land on the first older line").toBeFocused();
+    await expect(loadMore).toHaveCount(0);
+  });
+
+  test("shows only joining, marked both, with no Load more", async ({ page, request }) => {
+    const workspace = await provision(request, { name: "Holme Joinery" });
+    const address = anAddress("ola");
+    await person(request, address, { displayName: "Ola Brennan" });
+    const invited = await invite(request, {
+      workspaceId: workspace.workspaceId,
+      email: address,
+      inviterId: workspace.admin.id,
+      role: "Admin",
+    });
+    await page.goto(`/invitations/${invited.id}`);
+    await signIn(page, request, address);
+    await page.getByRole("button", { name: INVITATION_WORDS.join(workspace.name) }).click();
+    await landedAtHome(page, "Admin");
+
+    await openedByName(page, "Ola Brennan");
+
+    const joined = saidOfAct({
+      act: "people.member.joined",
+      by: named("Ola Brennan"),
+      subject: named("Ola Brennan"),
+      detail: { role: "Admin" },
+    });
+    await expect(linesOf(page)).toHaveCount(1);
+    await expect(linesOf(page)).toContainText(joined);
+    await expect(linesOf(page)).toContainText(ACTIVITY_WORDS.direction.both("Ola Brennan"));
+    await expect(activityOf(page).getByRole("button", { name: "Load more" })).toHaveCount(0);
+  });
+
+  test("R36: keeps the access request they made before joining", async ({ page, request }) => {
+    const { workspaceId, slug } = await anAdminAtPeople(page, request, "Swale Wheelwrights");
+    const asker = await person(request, anAddress("asker"), { displayName: "Ola Asker" });
+    await askToJoin(request, { slug, requesterId: asker.id, reason: "I run the night shift." });
+    await addMember(request, { workspaceId, userId: asker.id, role: "Viewer" });
+
+    await page.goto(memberPageAt(asker.id));
+
+    const asked = saidOfAct({
+      act: "people.request.asked",
+      by: named("Ola Asker"),
+      subject: null,
+      detail: {},
+    });
+    await expect(linesOf(page)).toHaveCount(1);
+    await expect(linesOf(page)).toContainText(asked);
+    await expect(linesOf(page)).toContainText(ACTIVITY_WORDS.direction.both("Ola Asker"));
+  });
+
+  test("draws nothing of the workspace left after a switch", async ({ page, request }) => {
+    const left = await provision(request, { name: "Wharfe Smithy" });
+    const entered = await provision(request, { name: "Aire Smithy" });
+    const address = anAddress("rhea");
+    const rhea = await person(request, address, { displayName: "Rhea Kemp" });
+    for (const { workspaceId } of [left, entered]) {
+      await addMember(request, { workspaceId, userId: rhea.id, role: "Admin" });
+    }
+    const { workspaceId } = left;
+    await makeGroups(request, { workspaceId, userId: rhea.id, names: ["Wharfe leads"] });
+    await page.goto("/sign-in");
+    await signIn(page, request, address);
+    await page.getByRole("button", { name: left.name, exact: true }).click();
+    await landedAtHome(page, "Admin");
+    await openedByName(page, "Rhea Kemp");
+    await expect(linesOf(page).filter({ hasText: "Wharfe leads" })).toHaveCount(1);
+
+    // Held, so whatever the page draws before the new workspace's read lands is on show.
+    const held = Promise.withResolvers<void>();
+    await page.route(ACTIVITY_READ, async (route) => {
+      await held.promise;
+      await route.continue();
+    });
+    await switcherOf(page, left.name).click();
+    await switcherMenuOf(page, left.name)
+      .getByRole("menuitemradio")
+      .filter({ hasText: entered.name })
+      .click();
+    await landedAtHome(page, "Admin");
+    await expect(switcherOf(page, entered.name)).toBeVisible();
+    await openedByName(page, "Rhea Kemp");
+
+    await expect(activityOf(page)).toContainText(ACTIVITY_WORDS.loading);
+    await expect(thePage(page), "drew the left workspace's Activity").not.toContainText(
+      "Wharfe leads",
+    );
+    held.resolve();
+    await expect(activityOf(page)).toContainText(ACTIVITY_WORDS.none("Rhea Kemp"));
+    await expect(thePage(page)).not.toContainText("Wharfe leads");
+  });
+
+  test("says a failed read in Activity alone, then retries it", async ({ page, request }) => {
+    const { adminId } = await anAdminAtPeople(page, request, "Swale Cutlers");
+    await page.route(ACTIVITY_READ, (route) => route.abort());
+
+    await page.goto(memberPageAt(adminId));
+
+    // The query client asks twice more before it gives up, a second apart and then two.
+    await expect(activityOf(page).getByRole("alert")).toHaveText(
+      sentenceOf(NO_RESPONSE_TO_A_READ),
+      { timeout: 10_000 },
+    );
+    await expect(accessOf(page), "a failed Activity took Access with it").toBeVisible();
+    await expect(
+      thePage(page).getByRole("region", { name: MEMBER_PAGE_WORDS.removeAndRevoke }),
+      "a failed Activity took Remove and revoke with it",
+    ).toBeVisible();
+
+    await page.unroute(ACTIVITY_READ);
+    await activityOf(page).getByRole("button", { name: "Retry" }).click();
+
+    await expect(
+      activityOf(page).getByRole("heading", { level: 2, name: MEMBER_PAGE_WORDS.activity }),
+    ).toBeFocused();
+    await expect(linesOf(page)).toHaveCount(1);
   });
 });
 

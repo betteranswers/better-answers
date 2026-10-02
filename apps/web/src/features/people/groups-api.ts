@@ -5,7 +5,7 @@ import { z } from "zod";
 import { useOptimistic, type Undo } from "@/shared/api/optimistic.ts";
 import { useTRPC, type ApiError } from "@/shared/api/trpc.ts";
 
-import type { ListedMember } from "./people-api.ts";
+import { useActivityReadAgain, type ListedMember } from "./people-api.ts";
 
 type Api = ReturnType<typeof useTRPC>;
 
@@ -42,11 +42,14 @@ const undoingEach = (undos: readonly Undo[]): Undo => ({
 const useReconcile = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
-  return () =>
-    Promise.all([
+  const activityReadAgain = useActivityReadAgain();
+  return () => {
+    activityReadAgain();
+    return Promise.all([
       queryClient.invalidateQueries({ queryKey: api.members.groups.queryKey() }),
       queryClient.invalidateQueries({ queryKey: api.members.list.queryKey() }),
     ]);
+  };
 };
 
 const ASKED_NAME = z.object({ name: z.string() });

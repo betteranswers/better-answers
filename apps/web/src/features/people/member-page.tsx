@@ -21,6 +21,7 @@ import { Avatar, AvatarFallback } from "@/shared/ui/avatar.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
 import { MEMBER_PAGE_WORDS as WORDS } from "./member-act-words.ts";
+import { MemberActivity } from "./member-activity.tsx";
 import { Access, RemoveAndRevoke, type Landings, type Removal } from "./member-sections.tsx";
 import { membersAt, OPENING, type OpenedAt, type Removed } from "./members-address.ts";
 import { useMembers, useReaderId, useRemoveMember, type ListedMember } from "./people-api.ts";
@@ -39,6 +40,8 @@ type Drawn = {
   readonly member: ListedMember;
   readonly landings: Landings;
   readonly removal: Removal;
+  /** The section's own heading, where focus goes when what the section drew is replaced. */
+  readonly heading: RefObject<HTMLHeadingElement | null>;
 };
 
 type Section = {
@@ -53,7 +56,7 @@ type Section = {
 /** One page, each section drawn at once, in order. The security work adds Sign-in and Sessions. */
 const SECTIONS: readonly Section[] = [
   { id: "access", title: WORDS.access, draw: Access },
-  { id: "activity", title: WORDS.activity },
+  { id: "activity", title: WORDS.activity, draw: MemberActivity },
   { id: "remove-and-revoke", title: WORDS.removeAndRevoke, draw: RemoveAndRevoke, apart: true },
 ];
 
@@ -214,6 +217,27 @@ const useLandings = () => {
   return { title, landings, landOn };
 };
 
+function SectionShown(properties: {
+  readonly section: Shown;
+  readonly drawn: Omit<Drawn, "heading">;
+}) {
+  const { section, drawn } = properties;
+  const heading = useRef<HTMLHeadingElement>(null);
+  const Draw = section.draw;
+
+  return (
+    <section
+      aria-labelledby={headingIdOf(section)}
+      className={cn("grid gap-4", section.apart && "mt-4 border-t border-border pt-8")}
+    >
+      <h2 ref={heading} id={headingIdOf(section)} tabIndex={-1}>
+        {section.title}
+      </h2>
+      <Draw {...drawn} heading={heading} />
+    </section>
+  );
+}
+
 function MemberShown(properties: {
   readonly member: ListedMember;
   readonly openedAt: OpenedAt | undefined;
@@ -253,21 +277,9 @@ function MemberShown(properties: {
       <MemberHeader member={member} titleRef={title} />
       <SectionNav />
       <div className="mt-6 grid gap-6">
-        {SHOWN.map((section) => {
-          const Draw = section.draw;
-          return (
-            <section
-              key={section.id}
-              aria-labelledby={headingIdOf(section)}
-              className={cn("grid gap-4", section.apart && "mt-4 border-t border-border pt-8")}
-            >
-              <h2 id={headingIdOf(section)} tabIndex={-1}>
-                {section.title}
-              </h2>
-              <Draw member={member} landings={landings} removal={removal} />
-            </section>
-          );
-        })}
+        {SHOWN.map((section) => (
+          <SectionShown key={section.id} section={section} drawn={{ member, landings, removal }} />
+        ))}
       </div>
     </>
   );

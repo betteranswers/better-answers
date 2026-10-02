@@ -1,4 +1,10 @@
-import { useMutation, useMutationState, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useMutationState,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import type { inferOutput } from "@trpc/tanstack-react-query";
 import { z } from "zod";
 
@@ -16,9 +22,41 @@ export type RoleChanged = inferOutput<Api["members"]["changeRole"]>;
 
 export type CredentialsRevokedHere = inferOutput<Api["members"]["revokeCredentials"]>;
 
+export type ActivityEvent = inferOutput<Api["members"]["activity"]>["events"][number];
+
+/** Whether the person took the act, it was done to them, or both, as a self-demotion is. */
+export type Direction = ActivityEvent["direction"];
+
+/**
+ * Newest first, a page at a time. Its key names no workspace: a switch drops it with every read of
+ * the workspace left.
+ */
+export const useActivity = (personId: string) => {
+  const api = useTRPC();
+  return useInfiniteQuery(
+    api.members.activity.infiniteQueryOptions(
+      { personId },
+      { getNextPageParam: (page) => page.nextCursor ?? undefined },
+    ),
+  );
+};
+
+/**
+ * An act is a line of the member's Activity. Not awaited: a waiting first read is never cancelled,
+ * so the outcome would wait too.
+ */
+export const useActivityReadAgain = () => {
+  const api = useTRPC();
+  const queryClient = useQueryClient();
+  return (): void => {
+    void queryClient.invalidateQueries(api.members.activity.pathFilter());
+  };
+};
+
 export const useFlagDisplayName = () => {
   const api = useTRPC();
-  return useMutation(api.members.flagDisplayName.mutationOptions());
+  const activityReadAgain = useActivityReadAgain();
+  return useMutation(api.members.flagDisplayName.mutationOptions({ onSettled: activityReadAgain }));
 };
 
 export const useMembers = () => {
@@ -35,6 +73,7 @@ const useReconciledList = <Asked>(
 ) => {
   const api = useTRPC();
   const queryClient = useQueryClient();
+  const activityReadAgain = useActivityReadAgain();
   const listKey = api.members.list.queryKey();
   return {
     onMutate: async (asked: Asked) => {
@@ -52,11 +91,13 @@ const useReconciledList = <Asked>(
     ) => {
       queryClient.setQueryData(listKey, taken?.before);
     },
-    onSettled: () =>
-      Promise.all([
+    onSettled: () => {
+      activityReadAgain();
+      return Promise.all([
         queryClient.invalidateQueries({ queryKey: listKey }),
         queryClient.invalidateQueries({ queryKey: api.session.membership.queryKey() }),
-      ]),
+      ]);
+    },
   };
 };
 
