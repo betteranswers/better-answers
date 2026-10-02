@@ -116,6 +116,37 @@ const whileTheFirstLockDeleteIsRefused = async <T>(work: () => Promise<T>): Prom
   }
 };
 
+/** Finds the lock by its value, a person's id, so it is orphaned whatever form its name is stored in. */
+const whileLockDeletesAreRefused = async <T>(work: () => Promise<T>): Promise<T> => {
+  const superuser = app().database.superuser;
+  await superuser.query(
+    `CREATE FUNCTION test_refuse_lock_deletes() RETURNS trigger
+       LANGUAGE plpgsql SECURITY DEFINER AS $$
+     BEGIN
+       IF EXISTS (SELECT 1 FROM "user" WHERE id = OLD.value) THEN
+         RAISE EXCEPTION 'the store refused a lock delete';
+       END IF;
+       RETURN OLD;
+     END $$`,
+  );
+  await superuser.query(
+    `CREATE TRIGGER test_refuse_lock_deletes BEFORE DELETE ON verification FOR EACH ROW
+     EXECUTE FUNCTION test_refuse_lock_deletes()`,
+  );
+  try {
+    return await work();
+  } finally {
+    await superuser.query("DROP TRIGGER test_refuse_lock_deletes ON verification");
+    await superuser.query("DROP FUNCTION test_refuse_lock_deletes()");
+  }
+};
+
+const locksHeldFor = (personId: string) =>
+  app().database.superuser.query<{ identifier: string }>(
+    "SELECT identifier FROM verification WHERE value = $1",
+    [personId],
+  );
+
 /** The lock lands after the code is asked for, so only the sign-in itself can clear it. */
 const askedThenLeftALock = async (person: { readonly id: string; readonly email: string }) => {
   const asking = app().client();
@@ -172,6 +203,37 @@ describe("a sign-in after a promotion left its lock behind", () => {
       },
     ]);
     expect(await accessOf(person.id)).toEqual({ verified: false, sessions: 2, accounts: 1 });
+  });
+
+  it("clears a lock the library itself left behind", async () => {
+    const person = await anUnprovenPerson();
+    await whileLockDeletesAreRefused(() => signIn(app(), app().client(), person.email));
+    expect((await locksHeldFor(person.id)).rows).toEqual([
+      { identifier: `${LOCK_PREFIX}${person.id}` },
+    ]);
+    await app().setEmailVerified(person.email, false);
+    await withSuperuser((data) => data.account({ userId: person.id }));
+    await app().database.superuser.query(
+      "UPDATE verification SET expires_at = $2 WHERE value = $1",
+      [person.id, new Date(Date.now() - MINUTE_MS)],
+    );
+
+    await signIn(app(), app().client(), person.email);
+
+    expect(await accessOf(person.id)).toEqual({ verified: true, sessions: 1, accounts: 0 });
+  });
+
+  it("leaves the lock when only a code is asked for", async () => {
+    const person = await anUnprovenPerson();
+    await orphanedLockFor(person.id);
+
+    const asked = await app().client().json("/email-otp/send-verification-otp", {
+      email: person.email,
+      type: "sign-in",
+    });
+
+    expect(asked.status).toBe(200);
+    expect(await rowsNamed(`${LOCK_PREFIX}${person.id}`)).toBe(1);
   });
 
   it("with no address, meets the library's own refusal", async () => {

@@ -52,7 +52,7 @@ No fix attempt failed. The defect surfaced while the expired-code browser spec w
 
 Two parts, merged as #514 (Linear BA-34).
 
-**1. Turn the library's deletion at lookup off** (`apps/api/src/auth/auth.ts:428-432`):
+**1. Turn the library's deletion at lookup off** (`apps/api/src/auth/auth.ts:444-448`):
 
 ```ts
     /**
@@ -121,7 +121,7 @@ The day's grace is load-bearing too. A sweep that deletes every expired row the 
 
 ### The 1.7.5 baseline
 
-The api configures `jwt`, `organization`, `emailOTP`, `oauthProvider`, `twoFactor`, `passkey` and `cimd` (`apps/api/src/auth/auth.ts:490-633`), and no `socialProviders`. Paths below are under `apps/api/node_modules/better-auth/dist/`.
+The api configures `jwt`, `organization`, `emailOTP`, `oauthProvider`, `twoFactor`, `passkey` and `cimd` (`apps/api/src/auth/auth.ts:515-658`), and no `socialProviders`. Paths below are under `apps/api/node_modules/better-auth/dist/`.
 
 | `findVerificationValue` site                                                    | Reached here                    | Gate                                                                                        |
 | ------------------------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------- |
@@ -144,7 +144,7 @@ The project's own reads gate too. `READ_A_LINK` computes `link_live` and `code_l
 
 ### Latent: two-factor's no-session branch
 
-`verifyTwoFactor` checks only that the challenge row exists (`verify-two-factor.mjs:19-20`) before it reads the user and carries on. Its `valid()` step consumes through `consumeVerificationValue` (`:26`), so an expired challenge never mints a session, but the steps before it run against an expired row. This is unreachable today. Every `/two-factor/verify-*` path is in `CLOSED_FACTOR_PATHS` (`apps/api/src/auth/auth.ts:151-167`), and nothing in `apps/api/src` calls `verifyTOTP`, `verifyOTP` or `verifyBackupCode` as a server function. Before opening any of those paths, or calling one as a server function, add an expiry check in front of it.
+`verifyTwoFactor` checks only that the challenge row exists (`verify-two-factor.mjs:19-20`) before it reads the user and carries on. Its `valid()` step consumes through `consumeVerificationValue` (`:26`), so an expired challenge never mints a session, but the steps before it run against an expired row. This is unreachable today. Every `/two-factor/verify-*` path is in `CLOSED_FACTOR_PATHS` (`apps/api/src/auth/auth.ts:153-169`), and nothing in `apps/api/src` calls `verifyTOTP`, `verifyOTP` or `verifyBackupCode` as a server function. Before opening any of those paths, or calling one as a server function, add an expiry check in front of it.
 
 ### Fixed: an orphaned lock skipped one promotion
 
