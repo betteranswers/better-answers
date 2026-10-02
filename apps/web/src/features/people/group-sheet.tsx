@@ -1,6 +1,7 @@
 import { useId, useRef, useState, type FormEvent, type RefObject } from "react";
 
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
+import { useReadSaid } from "@/shared/read-said.ts";
 import { RowSheet } from "@/shared/row-sheet.tsx";
 import { SheetPart } from "@/shared/sheet-part.tsx";
 import {
@@ -37,15 +38,17 @@ function GroupMembers(properties: {
 }) {
   const { group, listRef } = properties;
   const members = useMembers();
+  const said = useReadSaid(members);
   const everyone = members.data ?? [];
 
   return (
     <SheetPart title="Members">
       <OutcomeLine
-        outcome={members.error === null ? undefined : outcomeOfFailure(members.error, "read")}
+        outcome={said.error === null ? undefined : outcomeOfFailure(said.error, "read")}
       />
-      <div aria-live="polite" className="empty:hidden">
-        {members.isPending ? <p>The members are still loading.</p> : null}
+      {/* Not `empty:hidden`: a region out of the accessibility tree is not tracked, so its fill would go unread. */}
+      <div aria-live="polite" className="empty:sr-only">
+        {said.isPending ? <p>The members are still loading.</p> : null}
       </div>
       {members.data === undefined ? null : (
         <GroupChecklist

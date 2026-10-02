@@ -1,3 +1,4 @@
+import { useReadSaid } from "@/shared/read-said.ts";
 import { Badge } from "@/shared/ui/badge.tsx";
 
 import { useWorkspaceRoutes, type WorkspaceRoute } from "./list-routes.ts";
@@ -79,6 +80,7 @@ function RouteList(properties: { readonly routes: readonly WorkspaceRoute[] }) {
 
 export function RoutesCard() {
   const routes = useWorkspaceRoutes();
+  const said = useReadSaid(routes);
 
   return (
     <section aria-labelledby="routes" className="mt-6 border border-border bg-card p-4">
@@ -86,8 +88,8 @@ export function RoutesCard() {
       <p className="mt-2 text-muted-foreground">{ROUTES_WORDS.lead}</p>
 
       <div aria-live="polite" className="mt-4">
-        {routes.isPending ? <p>{ROUTES_WORDS.loading}</p> : null}
-        {routes.isError ? <p>{ROUTES_WORDS.failed}</p> : null}
+        {said.isPending ? <p>{ROUTES_WORDS.loading}</p> : null}
+        {said.error === null ? null : <p>{ROUTES_WORDS.failed}</p>}
         {routes.data === undefined ? null : <RouteList routes={routes.data} />}
       </div>
     </section>

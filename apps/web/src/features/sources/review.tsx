@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 
 import { useKeystroke } from "@/shared/keystrokes.tsx";
+import { useReadSaid } from "@/shared/read-said.ts";
 import { Badge } from "@/shared/ui/badge.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Checkbox } from "@/shared/ui/checkbox.tsx";
@@ -85,6 +86,32 @@ function GroupNotes(properties: {
   );
 }
 
+/** Its own component, so the region and the read's words it holds mount together, on opening. */
+function PreviewChunks(properties: {
+  readonly preview: ReturnType<typeof usePreview>;
+  readonly open: boolean;
+}) {
+  const { preview } = properties;
+  const said = useReadSaid(preview);
+
+  return (
+    <div aria-live="polite" className="mt-2">
+      {said.isPending && properties.open ? <p>The chunks are still loading.</p> : null}
+      {said.error === null ? null : <p>{outcomeOfFailure(said.error, "read").words}</p>}
+      {preview.data?.length === 0 ? <p>No chunk has landed yet.</p> : null}
+      {preview.data === undefined || preview.data.length === 0 ? null : (
+        <ol className="grid gap-2">
+          {preview.data.map((chunk) => (
+            <li key={chunk.id} className="border border-border bg-muted p-3">
+              {chunk.content}
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
 function Preview(properties: { readonly binding: ListedBinding }) {
   const [open, setOpen] = useState(false);
   const preview = usePreview(properties.binding.bindingId, open);
@@ -100,20 +127,7 @@ function Preview(properties: { readonly binding: ListedBinding }) {
         <p className="mt-2 text-muted-foreground">
           Seen by Admins here and by nobody else anywhere until the binding is published.
         </p>
-        <div aria-live="polite" className="mt-2">
-          {preview.isPending && open ? <p>The chunks are still loading.</p> : null}
-          {preview.error === null ? null : <p>{outcomeOfFailure(preview.error, "read").words}</p>}
-          {preview.data?.length === 0 ? <p>No chunk has landed yet.</p> : null}
-          {preview.data === undefined || preview.data.length === 0 ? null : (
-            <ol className="grid gap-2">
-              {preview.data.map((chunk) => (
-                <li key={chunk.id} className="border border-border bg-muted p-3">
-                  {chunk.content}
-                </li>
-              ))}
-            </ol>
-          )}
-        </div>
+        <PreviewChunks preview={preview} open={open} />
       </CollapsibleContent>
     </Collapsible>
   );
@@ -207,6 +221,7 @@ function FindingsTable(properties: {
 export function Review(properties: { readonly binding: ListedBinding }) {
   const { binding } = properties;
   const findings = useFindings(binding.bindingId);
+  const said = useReadSaid(findings);
 
   return (
     <section aria-labelledby={REVIEW_HEADING} className="mt-8 border-t border-border pt-6">
@@ -219,8 +234,8 @@ export function Review(properties: { readonly binding: ListedBinding }) {
       </p>
 
       <div aria-live="polite" className="mt-4">
-        {findings.isPending ? <p>The findings are still loading.</p> : null}
-        {findings.error === null ? null : <p>{outcomeOfFailure(findings.error, "read").words}</p>}
+        {said.isPending ? <p>The findings are still loading.</p> : null}
+        {said.error === null ? null : <p>{outcomeOfFailure(said.error, "read").words}</p>}
         {findings.data?.length === 0 ? <p>{NOTHING_FOUND[binding.state]}</p> : null}
       </div>
       {findings.data === undefined || findings.data.length === 0 ? null : (

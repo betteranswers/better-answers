@@ -4,6 +4,7 @@ import { useId } from "react";
 
 import { useTRPC } from "@/shared/api/trpc.ts";
 import { CONSOLE, groupIn } from "@/shared/navigation.ts";
+import { useReadSaid } from "@/shared/read-said.ts";
 import { RefusalLine } from "@/shared/refusal-outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
@@ -76,11 +77,12 @@ function WorkspaceItem(properties: { readonly workspace: ListedWorkspace }) {
 
 function ListState(properties: { readonly listed: ReturnType<typeof useWorkspaces> }) {
   const { listed } = properties;
-  if (listed.isPending) return <p>The workspaces are still loading.</p>;
+  const said = useReadSaid(listed);
+  if (listed.isPending) return said.isPending ? <p>The workspaces are still loading.</p> : null;
   if (listed.error !== null) {
-    return (
+    return said.error === null ? null : (
       <p>
-        <RefusalLine said={readRefused(listed.error)} />
+        <RefusalLine said={readRefused(said.error)} />
       </p>
     );
   }

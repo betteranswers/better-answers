@@ -6,6 +6,7 @@ import { GridTable } from "@/shared/grid-table.tsx";
 import { useKeystroke, useScreenKeystrokes } from "@/shared/keystrokes.tsx";
 import { CONTROL_CENTRE, groupIn } from "@/shared/navigation.ts";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
+import { useReadSaid } from "@/shared/read-said.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Input } from "@/shared/ui/input.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
@@ -290,6 +291,7 @@ function GroupList(properties: {
 
 function GroupsSection() {
   const groups = useGroups();
+  const said = useReadSaid(groups);
   const headingId = useId();
   const headingRef = useRef<HTMLHeadingElement>(null);
 
@@ -299,11 +301,11 @@ function GroupsSection() {
         Groups
       </h2>
       <OutcomeLine
-        outcome={groups.error === null ? undefined : outcomeOfGroupFailure(groups.error, "read")}
+        outcome={said.error === null ? undefined : outcomeOfGroupFailure(said.error, "read")}
         className="mt-2"
       />
       <div aria-live="polite">
-        {groups.isPending ? <p className="mt-2">The groups are still loading.</p> : null}
+        {said.isPending ? <p className="mt-2">The groups are still loading.</p> : null}
       </div>
       {groups.data === undefined ? null : (
         <GroupList groups={groups.data} headingRef={headingRef} />
