@@ -54,7 +54,12 @@ const signInsOf = async (personId: string): Promise<readonly string[]> => {
 };
 
 const signedIn = async (personId: string): Promise<void> => {
-  const recorded = await recordSignIn(bootstrap, openPostgres(db().runtimePool), personId);
+  const recorded = await recordSignIn(
+    bootstrap,
+    openPostgres(db().runtimePool),
+    personId,
+    "email_code",
+  );
   if (!recorded.ok) throw new Error(`the sign-in was not recorded: ${String(recorded.error)}`);
 };
 

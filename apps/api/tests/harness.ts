@@ -119,6 +119,10 @@ export const capturingLogger = (level: "debug" | "info" = "info") => {
 export const codeIn = (message: EmailMessage): string | undefined =>
   /^(\d{6})$/m.exec(message.text)?.[1];
 
+/** The token a sign-in link carries in its fragment, read off the text part's link line. */
+const linkTokenIn = (message: EmailMessage): string | undefined =>
+  /\/sign-in\/link#([A-Za-z0-9]+)$/m.exec(message.text)?.[1];
+
 export type TestApp = {
   readonly server: Hono;
   readonly database: TestDatabase;
@@ -139,6 +143,12 @@ export type TestApp = {
    * @throws when none went to it, or the latest holds no code.
    */
   codeSentTo(email: string): string;
+
+  /**
+   * The sign-in link's token in the latest email to `email`.
+   * @throws when none went to it, or the latest holds no link.
+   */
+  linkSentTo(email: string): string;
 
   /** A new workspace, and a new person as its Admin. */
   provision(input?: {
@@ -476,6 +486,13 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     return code;
   };
 
+  const linkSentTo: TestApp["linkSentTo"] = (email) => {
+    const message = emails.findLast((candidate) => candidate.to === email);
+    const token = message === undefined ? undefined : linkTokenIn(message);
+    if (token === undefined) throw new Error(`no sign-in link was sent to ${email}`);
+    return token;
+  };
+
   const nextDefaultAddress = defaultClientAddresses();
 
   const client: TestApp["client"] = (ip = nextDefaultAddress(), hostname = APP_HOSTNAME) => {
@@ -542,6 +559,7 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     metadataFetches,
     logs,
     codeSentTo,
+    linkSentTo,
     provision,
     person,
     addMember,

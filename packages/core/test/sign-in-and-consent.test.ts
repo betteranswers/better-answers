@@ -34,7 +34,7 @@ describe("recording a sign-in", () => {
     const personId = await seedPerson(db().pool);
     const door = openPostgres(db().runtimePool);
 
-    const recorded = await recordSignIn(bootstrap, door, personId);
+    const recorded = await recordSignIn(bootstrap, door, personId, "email_code");
 
     expect(recorded).toEqual({ ok: true, value: undefined });
     expect(await identitySetRowsFor(personId)).toEqual([
@@ -45,17 +45,28 @@ describe("recording a sign-in", () => {
         actor: `human:${personId}`,
         subject_kind: "person",
         subject_id: personId,
-        detail: {},
+        detail: { method: "email_code" },
         batch_id: null,
       },
     ]);
     expect(await consentRowsBy(personId)).toEqual([]);
   });
 
+  it("names a sign-in through the link by its method", async () => {
+    const personId = await seedPerson(db().pool);
+    const door = openPostgres(db().runtimePool);
+
+    await recordSignIn(bootstrap, door, personId, "email_link");
+
+    expect(await identitySetRowsFor(personId)).toMatchObject([
+      { act: "people.person.signed_in", detail: { method: "email_link" } },
+    ]);
+  });
+
   it("refuses a malformed person id, writing nothing", async () => {
     const door = openPostgres(db().runtimePool);
 
-    const recorded = await recordSignIn(bootstrap, door, "not-a-person-id");
+    const recorded = await recordSignIn(bootstrap, door, "not-a-person-id", "email_code");
 
     expect(recorded).toEqual({ ok: false, error: "malformed" });
     expect(await identitySetRowsFor("not-a-person-id")).toEqual([]);

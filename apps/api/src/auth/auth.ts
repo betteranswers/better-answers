@@ -56,6 +56,7 @@ import {
 } from "./constants.ts";
 import { accessControl, creatorRole, roles } from "./roles.ts";
 import { signInEmail } from "./sign-in-email.ts";
+import { keepALink, signInMethodOfThisCall } from "./sign-in-link.ts";
 
 type AuthEndpoint = NonNullable<BetterAuthPlugin["endpoints"]>[string];
 
@@ -314,7 +315,11 @@ export const createAuth = (deps: AuthDependencies) => {
 
   /** A token's issue, refusal or refresh and a workspace pick stay log lines for good. */
   const recorders = new Map<AuditEvent, Recorder>([
-    ["auth.sign_in", (line) => recordSignIn(IDENTITY_PRINCIPAL, deps.door, line.principal ?? "")],
+    [
+      "auth.sign_in",
+      (line) =>
+        recordSignIn(IDENTITY_PRINCIPAL, deps.door, line.principal ?? "", signInMethodOfThisCall()),
+    ],
     ["auth.consent", recordConsentOf],
   ]);
 
@@ -454,7 +459,12 @@ export const createAuth = (deps: AuthDependencies) => {
         storeOTP: "hashed",
         sendVerificationOTP: async ({ email, otp, type }) => {
           if (type !== "sign-in") return;
-          await deps.sendEmail(signInEmail(email, otp));
+          const link = await keepALink(
+            { door: deps.door, secret: deps.secret, publicUrl: deps.publicUrl },
+            email,
+            otp,
+          );
+          await deps.sendEmail(signInEmail(email, otp, link));
         },
       }),
       widenAuthorize(

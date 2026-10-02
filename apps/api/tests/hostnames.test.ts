@@ -101,7 +101,14 @@ describe("each hostname reaches only its documented surface", () => {
     expect(refusals().some((line) => line["path"] === "/agent/v1/upload")).toBe(false);
     expect(routed.status).toBe(404);
 
-    for (const path of ["/mcp", "/oauth2/token", "/consent", "/sign-in", "/health"]) {
+    for (const path of [
+      "/mcp",
+      "/oauth2/token",
+      "/consent",
+      "/sign-in",
+      "/sign-in-link/sign-in",
+      "/health",
+    ]) {
       const refused = await agent.fetch(path, { method: path === "/mcp" ? "POST" : "GET" });
       expect(refused.status).toBe(404);
       expect(refusals().at(-1)).toMatchObject({ path, role: "agent" });
@@ -223,6 +230,7 @@ describe("each hostname reaches only its documented surface", () => {
     }
     expect(entryFor("/consent")?.hosts).toEqual(["app"]);
     expect(entryFor("/consent")?.paths).toEqual(["/consent"]);
+    expect(entryFor("/sign-in-link/*")?.hosts).toEqual(["app"]);
     expect(HOSTNAME_SURFACES.at(-1)?.paths).toEqual(["/*"]);
     expect(HOSTNAME_SURFACES.at(-1)?.hosts).toEqual(["app"]);
   });

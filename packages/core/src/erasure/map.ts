@@ -4,6 +4,7 @@ import { byCodeUnit } from "@better-answers/schema/code-unit";
 import { actorIdOfPerson, type ActorId, type PlatformPrincipal } from "../kernel/index.ts";
 import { historyNaming, type GitDoor } from "../store/git/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
+import { VERIFICATION_PREFIXES } from "../workspaces/index.ts";
 import { documentsNaming } from "./documents.ts";
 import { soughtIdentifiersOf, type SoughtIdentifier } from "./identifiers.ts";
 import type { SubjectIdentifiers, SubjectRequest } from "./requests.ts";
@@ -156,7 +157,10 @@ const ERASURE_FAMILY_DESCRIPTORS = {
         tx,
         subject,
         `SELECT id AS location FROM verification
-          WHERE lower(identifier) = (SELECT lower(email) FROM "user" WHERE id = $1)`,
+          WHERE lower(identifier) IN (SELECT prefix || lower(u.email)
+                                        FROM "user" u, unnest($2::text[]) AS prefix
+                                       WHERE u.id = $1)`,
+        [[...VERIFICATION_PREFIXES]],
       ),
   },
 

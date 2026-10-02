@@ -55,7 +55,15 @@ export type { SetDisplayNameRefusal } from "./display-name.ts";
 export { listWorkspaces } from "./listing.ts";
 export { operatorAddresses, setOperatorMark, standingAsOperator } from "./operator.ts";
 export { inspectPerson, inspectPersonInput, listPeople, listPeopleInput } from "./people.ts";
-export { recordConsent, recordSignIn } from "./sign-in-and-consent.ts";
+export {
+  recordConsent,
+  recordSignIn,
+  SIGN_IN_CODE_PREFIX,
+  SIGN_IN_LINK_PREFIX,
+  VERIFICATION_PREFIXES,
+  verificationIdentifiersOf,
+} from "./sign-in-and-consent.ts";
+export type { SignInMethod } from "../audit/index.ts";
 
 export const TOOLS_LIST_TTL_MS_DEFAULT = 300_000;
 export const TOOLS_LIST_TTL_CONFIG_KEY = "mcp.tools_list_ttl_ms";

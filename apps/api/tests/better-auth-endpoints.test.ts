@@ -22,9 +22,11 @@ const HEADER = `\
 # that hostname — read it before you commit it, and check it against ADR 0022 and
 # ADR 0034. Two classes are refused by configuration rather than by the fence and are
 # reviewed here for that reason: the password and sign-up paths (no password or sign-up
-# plugin is enabled, and the product never posts to them — sign-in is an email code or
-# Microsoft, never a password), and the social paths, which open for Microsoft in its
-# own task (ADR 0034).
+# plugin is enabled, and the product never posts to them — sign-in is an email code, the
+# sign-in link the same email carries, or Microsoft, never a password), and the social
+# paths, which open for Microsoft in its own task (ADR 0034). The sign-in link's own two
+# routes are the api's, not the library's, so they are not listed here: the hostname
+# fence names them beside consent.
 #
 # Refresh:
 #   UPDATE_BETTER_AUTH_ENDPOINTS=1 pnpm --filter @better-answers/api run test tests/better-auth-endpoints.test.ts

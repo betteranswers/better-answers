@@ -1,6 +1,12 @@
 import { boundarySchemas } from "@better-answers/schema";
 
-import { act, declareActs, declareIdentitySetActs, recordFor } from "../audit/index.ts";
+import {
+  act,
+  declareActs,
+  declareIdentitySetActs,
+  recordFor,
+  type SignInMethod,
+} from "../audit/index.ts";
 import {
   actorIdOfPerson,
   attempt,
@@ -13,10 +19,22 @@ import {
 import { type PostgresDoor, withIdentityWrite, withScope } from "../store/postgres/index.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
-/** Empty detail: an address, an IP or a user agent here would need rewriting on erasure. */
+/** The method word alone: an address, an IP or a user agent here would need rewriting on erasure. */
 export const SIGN_IN_ACTS = declareIdentitySetActs("people", {
-  signedIn: act("people.person.signed_in", {}),
+  signedIn: act("people.person.signed_in", { method: "signInMethod" }),
 });
+
+/** Better Auth keys a sign-in code's verification row by this and the lowercased address. */
+export const SIGN_IN_CODE_PREFIX = "sign-in-otp-";
+
+/** The row a sign-in link keeps beside its code, keyed the same way. */
+export const SIGN_IN_LINK_PREFIX = "sign-in-link-";
+
+/** What precedes the lowercased address in a verification row's identifier: nothing included. */
+export const VERIFICATION_PREFIXES = ["", SIGN_IN_CODE_PREFIX, SIGN_IN_LINK_PREFIX] as const;
+
+export const verificationIdentifiersOf = (email: string): readonly string[] =>
+  VERIFICATION_PREFIXES.map((prefix) => `${prefix}${email.toLowerCase()}`);
 
 const CONSENT_ACTS = declareActs("people", {
   consented: act("people.client.consented", {}),
@@ -32,6 +50,7 @@ export const recordSignIn = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
   personId: string,
+  method: SignInMethod,
 ): Promise<Result<undefined, RecordRefusal | Error>> => {
   const person = boundarySchemas.user.select.shape.id.safeParse(personId);
   if (!person.success) return err("malformed");
@@ -43,7 +62,7 @@ export const recordSignIn = async (
         actor: actorIdOfPerson(person.data),
         act: SIGN_IN_ACTS.signedIn,
         subjectId: person.data,
-        detail: {},
+        detail: { method },
       }),
     ),
   );
