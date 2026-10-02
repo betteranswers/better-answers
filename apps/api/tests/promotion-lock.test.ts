@@ -41,7 +41,7 @@ const lockFor = (personId: string, expiresAt: Date) =>
     }),
   );
 
-/** One left by a sign-in that died, expired a minute ago on this process's clock, as the library's. */
+/** Left by a sign-in that died, expired a minute ago on the process clock the library judges by. */
 const orphanedLockFor = (personId: string) => lockFor(personId, new Date(Date.now() - MINUTE_MS));
 
 const anUnprovenPerson = async () => {
@@ -248,6 +248,7 @@ describe("the library this clears behind", () => {
     readFileSync(new URL(name, import.meta.resolve("better-auth")), "utf8");
 
   it("still names its lock the api's prefix and an id", () => {
+    expect(PROMOTION_LOCK_PREFIX).toBe(LOCK_PREFIX);
     expect(distFile("db/revoke-unproven-account-access.mjs")).toContain(
       `\`${PROMOTION_LOCK_PREFIX}\${userId}\``,
     );
