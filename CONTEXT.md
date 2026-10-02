@@ -125,8 +125,9 @@ Where a unit lives is decided by **minting**.
   never a metric. A hit is a crash window that was recovered, so a run of them is a fact worth
   reading. _Avoid_: reconciliation event, replay count.
 - **sweep pass** — the platform's daily run of the *upload sweep* and the *graph sweep* over every
-  workspace, one pass at a time, a sweep by hand included. Every pass is recorded, a pass that
-  removed nothing too. _Avoid_: cleanup, garbage collection, cron.
+  workspace, one pass at a time, a sweep by hand included, then the deletion of sign-in codes a day
+  past their expiry. Every pass is recorded, a pass that removed nothing too. _Avoid_: cleanup,
+  garbage collection, cron.
 - **upload sweep** — the removal of the originals no document names, once past their grace: what a
   failed bind left, and what a concurrent repeat left when it lost the race to the first bind.
   **List-only** until an operator switches removal on, seven days after the first upload is bound

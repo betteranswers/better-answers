@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { SIGN_IN_CODE_PREFIX } from "@better-answers/core/workspaces";
 import { testData } from "@better-answers/schema/testing";
 
 import { signIn } from "./flow.ts";
@@ -108,6 +109,15 @@ export const sessionsSignedInOverAnHourAgo = async (
     "UPDATE session SET created_at = now() - interval '61 minutes' WHERE user_id = $1",
     [userId],
   );
+};
+
+/** The library judges expiry on the api's clock, so the past is this process's, not the database's. */
+export const codeSentPastItsExpiry = async (app: TestApp, email: string): Promise<void> => {
+  const aged = await app.database.superuser.query(
+    "UPDATE verification SET expires_at = $2 WHERE identifier = $1",
+    [`${SIGN_IN_CODE_PREFIX}${email.toLowerCase()}`, new Date(Date.now() - 60_000)],
+  );
+  if (aged.rowCount === 0) throw new Error(`no code was sent to ${email}`);
 };
 
 /** Points every session `userId` holds at the workspace, behind the api's back. */

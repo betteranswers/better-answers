@@ -68,6 +68,8 @@ export type TestData = {
     overrides?: Partial<InsertInput<"oauthAccessToken">>,
   ): Promise<Row<"oauthAccessToken">>;
 
+  verification(overrides?: Partial<InsertInput<"verification">>): Promise<Row<"verification">>;
+
   auditEvent(overrides?: Partial<InsertInput<"auditEvent">>): Promise<Row<"auditEvent">>;
 
   identityAuditEvent(
@@ -377,6 +379,15 @@ export const testData = (client: pg.PoolClient): TestData => {
       userId,
     });
   };
+
+  const verification: TestData["verification"] = (overrides = {}) =>
+    insertRow(client, "verification", {
+      id: ulid(),
+      identifier: `sign-in-otp-${ulid().toLowerCase()}@example.invalid`,
+      value: "hashed-code:0",
+      expiresAt: new Date(Date.now() + 300_000),
+      ...overrides,
+    });
 
   const auditEvent: TestData["auditEvent"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
@@ -874,6 +885,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     oauthClient,
     oauthRefreshToken,
     oauthAccessToken,
+    verification,
     auditEvent,
     identityAuditEvent,
     accessRequest,
