@@ -301,7 +301,7 @@ The writer mints a ULID through the kernel minter, and the column has no databas
 
 ### [AUDIT8] Keep a read, a run and a health check out of the audit log
 
-A read writes no row, unless a decision names the view an act. An event with no workspace, like a token issued or a workspace pick, is a log line, unless declared for the identity-set audit log, as a sign-in is. A consent lands in its workspace's. Both land after the library's commit: a failed row is a log line, never a refusal. Runs, the answer audit, signals, alerts, spend, backup runs and health checks are their own records.
+A read writes no row, unless a decision names the view an act. An event with no workspace, like a token issued or a workspace pick, is a log line, unless declared for the identity-set audit log, as a sign-in and an authenticator's setup are. A consent lands in its workspace's. Each lands after the library's commit: a failed row is a log line, never a refusal. Runs, the answer audit, signals, alerts, spend, backup runs and health checks are their own records.
 
 ## OKF
 

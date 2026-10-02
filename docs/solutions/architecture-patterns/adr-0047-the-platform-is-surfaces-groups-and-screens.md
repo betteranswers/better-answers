@@ -55,7 +55,7 @@ One navigation list in `apps/web/src/shared/` declares every surface, group and 
 - **Control Centre**: the Admin's one surface, in eight groups: Overview, Suggestions, Sources, Agent Operations, Questions, People, Personal data and System.
 - **Briefings** joins at Then: what the platform tells a person unasked, such as sector and account signals, each cited.
 
-The utilities sit at the rail's foot: Keyboard shortcuts today, and help and settings once they exist. The top band, not the rail, reaches the console from the workspace switcher and any visible screen by jump-to (⌘K). Once P1 builds the Account page, the avatar menu reaches it.
+The utilities sit at the rail's foot: Keyboard shortcuts today, and help and settings once they exist. The top band, not the rail, reaches the console from the workspace switcher and any visible screen by jump-to (⌘K). The avatar menu reaches the Account page. Like the sign-in screens, it stands outside the shell, so a person with no workspace and the operator reach it too, and the no-workspace and choose-workspace screens link to it.
 
 **What v0.1 declares.** Screen names are today's words. Screens built today are in bold.
 
@@ -159,3 +159,5 @@ Three things stay open:
 Written 30/09/2026 from the shell and layout foundations plan (`docs/plans/2026-09-30-1959-feat-shell-and-layout-foundations-plan.md`), the gap audit behind it (`docs/dogfood-reports/2026-09-30-docs-shell-people-dogfood-dogfood.md`) and the owner's decisions of that day. It has no archived record. It re-cut ADR 0017's six screens of Control Centre into eight groups and made ADR 0046's reader surface the Ask surface, and both were edited in the same change.
 
 Amended 02/10/2026 by the people layout rework plan (`docs/plans/2026-10-01-1807-feat-people-layout-rework-plan.md`, KTD3). A member now opens as a page, not a sheet over Members, so the list gained detail addresses and Members declared the member page. The four levels and every rule above stand.
+
+Amended 02/10/2026 by the sign-in and security plan (`docs/plans/2026-10-01-2241-feat-people-sign-in-and-security-plan.md`, KTD11). The Account page now exists, outside the shell beside the display-name screen, with its Sign-in section. The four levels and every rule above stand.

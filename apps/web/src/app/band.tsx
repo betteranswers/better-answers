@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
+import { ACCOUNT_HEADING } from "@/features/auth/account-words.ts";
 import { initialsOf } from "@/shared/initials.ts";
 import { cn } from "@/shared/lib/utils.ts";
 import { Logo } from "@/shared/logo.tsx";
@@ -83,6 +84,9 @@ function PersonMenu(properties: Pick<BandProperties, "person" | "signingOut" | "
           {person.role === undefined ? null : <Pill variant="outline">{person.role}</Pill>}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link to="/account">{ACCOUNT_HEADING}</Link>
+        </DropdownMenuItem>
         <DropdownMenuItem disabled={properties.signingOut} onSelect={() => properties.onSignOut()}>
           Sign out
         </DropdownMenuItem>

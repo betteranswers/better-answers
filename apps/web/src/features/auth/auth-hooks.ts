@@ -186,13 +186,19 @@ const linkDescribed = z.discriminatedUnion("state", [
 
 export type LinkDescribed = z.infer<typeof linkDescribed>;
 
+type RouteBody = Readonly<Record<string, string>>;
+
 /** Neither Better Auth's nor tRPC's, so a ceiling's wait is read off the answer here. */
-const askOfTheLink = async <T>(path: string, token: string, answer: z.ZodType<T>): Promise<T> => {
+export const askOfOurRoute = async <T>(
+  path: string,
+  body: RouteBody,
+  answer: z.ZodType<T>,
+): Promise<T> => {
   const answered = await fetch(path, {
     method: "POST",
     credentials: "same-origin",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ token }),
+    body: JSON.stringify(body),
   });
   if (answered.status >= SERVER_FAILED) throw new Error(`answered ${String(answered.status)}`);
   if (!answered.ok) throw new CodeRefused(answered.status, waitNamedBy(answered));
@@ -208,7 +214,7 @@ export const useDescribeTheLink = (token: string | undefined, reading: boolean) 
     queryFn:
       token === undefined
         ? skipToken
-        : () => askOfTheLink("/sign-in-link/describe", token, linkDescribed),
+        : () => askOfOurRoute("/sign-in-link/describe", { token }, linkDescribed),
     enabled: reading,
     staleTime: Infinity,
     refetchOnWindowFocus: false,
@@ -224,7 +230,7 @@ export type SignedInByLink = z.infer<typeof signedInByLink>;
 
 const signInByLinkOptions = () =>
   mutationOptions<SignedInByLink, Error, string>({
-    mutationFn: (token) => askOfTheLink("/sign-in-link/sign-in", token, signedInByLink),
+    mutationFn: (token) => askOfOurRoute("/sign-in-link/sign-in", { token }, signedInByLink),
     onSuccess: () => {
       rememberTheSession("held");
       announceTheSignIn();
@@ -266,17 +272,18 @@ export const displayNameDetour = async (
   return hasADisplayName(session.user.name) || isAnInvitation(next) ? next : undefined;
 };
 
-/**
- * Only a signed-out person is sent on: the page asks a nameless invitee's name beside its join,
- * so joining is one step. Undefined: it draws.
- */
-export const acceptDetour = async (
+/** Only a signed-out visitor is sent on, to sign in and come back to `path`. Undefined: it draws. */
+export const signedOutDetour = async (
   queryClient: QueryClient,
   path: string,
 ): Promise<string | undefined> => {
   const session = await sessionOrUnread(queryClient);
   return session === null ? backTo("/sign-in", path) : undefined;
 };
+
+/** Read again rather than dropped, for a screen that shows whose session it is. */
+export const rereadTheSession = (queryClient: QueryClient): Promise<void> =>
+  queryClient.invalidateQueries({ queryKey: AUTH_KEYS.session });
 
 /** A save drops the held session, so the next read of it carries the new name. */
 export const useSetDisplayName = () => {

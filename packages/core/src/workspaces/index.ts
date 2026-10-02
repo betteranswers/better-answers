@@ -56,6 +56,18 @@ export { listWorkspaces } from "./listing.ts";
 export { operatorAddresses, setOperatorMark, standingAsOperator } from "./operator.ts";
 export { inspectPerson, inspectPersonInput, listPeople, listPeopleInput } from "./people.ts";
 export {
+  acknowledgeRecoveryCodes,
+  acknowledgeRecoveryCodesInput,
+  replaceRecoveryCodes,
+  replaceRecoveryCodesInput,
+  spendRecoveryCode,
+} from "./recovery-codes.ts";
+export {
+  readSecondFactor,
+  recordAuthenticatorSetUp,
+  removeAuthenticator,
+} from "./second-factor.ts";
+export {
   recordConsent,
   recordSignIn,
   SIGN_IN_CODE_PREFIX,

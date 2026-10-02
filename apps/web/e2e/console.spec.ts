@@ -1,6 +1,7 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
 import { ALL_WORKSPACES, goHome, JUMP_TO, RAIL, TOGGLE, UNKNOWN_SCREEN } from "@/app/words.ts";
+import { ACCOUNT_HEADING } from "@/features/auth/account-words.ts";
 import { PICKER_WORDS } from "@/features/auth/workspace-words.ts";
 import { NOT_THE_OPERATOR, ONLY_THE_OPERATOR } from "@/features/console/refusal-words.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
@@ -108,7 +109,7 @@ test.describe("the way into the console", () => {
     const you = await personMenuOpened(page, workspace.admin.name);
     await expect(you.getByText(workspace.admin.name, { exact: true })).toBeVisible();
     await expect(you).not.toContainText("Admin");
-    await expect(you.getByRole("menuitem")).toHaveText(["Sign out"]);
+    await expect(you.getByRole("menuitem")).toHaveText([ACCOUNT_HEADING, "Sign out"]);
   });
 
   test("offers no console to a person without the mark", async ({ page, request }) => {
@@ -121,7 +122,7 @@ test.describe("the way into the console", () => {
     await page.keyboard.press("Escape");
 
     const you = await personMenuOpened(page, workspace.admin.name);
-    await expect(you.getByRole("menuitem")).toHaveText(["Sign out"]);
+    await expect(you.getByRole("menuitem")).toHaveText([ACCOUNT_HEADING, "Sign out"]);
   });
 
   test("shows a non-operator the refused state at /console", async ({

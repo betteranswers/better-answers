@@ -1,7 +1,7 @@
-import { createHmac } from "node:crypto";
-
 import { afterAll, describe, expect, it } from "vitest";
 import { z } from "zod";
+
+import { authenticatorCodeAt, keyIn } from "@better-answers/schema/testing/authenticator-code";
 
 import { mountedPaths } from "../src/auth/index.ts";
 import { authAsServerBuildsIt, authOver } from "./auth-instance.ts";
@@ -43,28 +43,6 @@ const sessionRead = z.object({
   session: z.record(z.string(), z.unknown()),
 });
 
-const BASE32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-
-/** The key as an authenticator reads it from the setup address: RFC 4648 base32, unpadded. */
-const keyOf = (setupAddress: string): Buffer => {
-  const written = new URL(setupAddress).searchParams.get("secret") ?? "";
-  const bits = written
-    .split("")
-    .map((letter) => BASE32.indexOf(letter).toString(2).padStart(5, "0"))
-    .join("");
-  const bytes = bits.match(/.{8}/g) ?? [];
-  return Buffer.from(bytes.map((byte) => Number.parseInt(byte, 2)));
-};
-
-/** The six digits an authenticator shows now: RFC 6238, SHA-1 over thirty seconds. */
-const codeShownNow = (key: Buffer): string => {
-  const counter = Buffer.alloc(8);
-  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30_000)));
-  const mac = createHmac("sha1", key).update(counter).digest();
-  const offset = (mac.at(-1) ?? 0) & 0x0f;
-  return String((mac.readUInt32BE(offset) & 0x7f_ff_ff_ff) % 1_000_000).padStart(6, "0");
-};
-
 const setUp = z.object({ totpURI: z.string() });
 
 /** Through the library's own enable and first verify, called as server functions. */
@@ -78,7 +56,7 @@ const setUpAnAuthenticator = async (suite: TestApp, client: TestClient): Promise
   );
   await auth.api.verifyTOTP({
     headers: new Headers({ cookie: client.cookies() }),
-    body: { code: codeShownNow(keyOf(enabled.totpURI)) },
+    body: { code: authenticatorCodeAt(keyIn(enabled.totpURI), new Date()) },
   });
 };
 

@@ -22,6 +22,15 @@ export const WORKSPACE_REFUSALS = declareRefusals("workspaces", {
   "display-name-control-character": "malformed",
   "display-name-angle-bracket": "malformed",
   "display-name-too-long": "malformed",
+
+  "no-authenticator": "absent",
+  "recovery-code-wrong": "absent",
+
+  // Asked for a first set while one stands: a page read before it was made would void it unasked.
+  "recovery-codes-held": "conflict",
+
+  // An Admin, or the operator, may hold no fewer than one: removing it waits on adding another.
+  "last-second-factor": "precondition",
 });
 
 export type WorkspaceRefusal<W extends RefusalWordFor<typeof WORKSPACE_REFUSALS>> = W;

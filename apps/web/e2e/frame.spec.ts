@@ -1,6 +1,7 @@
 import type { Locator, Page } from "@playwright/test";
 
 import { BREADCRUMB, JUMP_TO, NAVIGATION_SHEET, RAIL, TOGGLE } from "@/app/words.ts";
+import { ACCOUNT_HEADING } from "@/features/auth/account-words.ts";
 import { ROUTES_WORDS } from "@/features/routes/words.ts";
 import { keystrokesOn } from "@/shared/keystroke-words.ts";
 import {
@@ -446,7 +447,7 @@ test("shows initials, with name and role one menu in", async ({ page, request })
   const menu = await personMenuOpened(page, LONG_PERSON);
   await expect(menu.getByText(LONG_PERSON, { exact: true })).toBeVisible();
   await expect(menu.getByText("Admin", { exact: true })).toBeVisible();
-  await expect(menu.getByRole("menuitem")).toHaveText(["Sign out"]);
+  await expect(menu.getByRole("menuitem")).toHaveText([ACCOUNT_HEADING, "Sign out"]);
 });
 
 test("names surface, group, screen and open tab, following the tab", async ({ page, request }) => {

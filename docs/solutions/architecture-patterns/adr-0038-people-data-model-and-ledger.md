@@ -48,6 +48,7 @@ tags:
 **The identity-set audit log**, `identity_audit_event`, sits beside it, outside RLS and append-only the same way. It holds:
 
 - a person's own display-name act
+- a person's own second-factor acts: an authenticator added or removed (its id as the detail), and recovery codes issued or used
 - each sign-in, with its method as its one detail: `email_code` for a typed code, `email_link` for the sign-in link
 - every operator write
 - an Admin's act that ends a person's grants (ADR 0009)

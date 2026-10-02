@@ -21,7 +21,7 @@ import {
 } from "./auth-hooks.ts";
 import { AuthScreen, focusOn, Outcome } from "./auth-screen.tsx";
 import { carriedOnTo, leavingFor, nextAfterSignIn, pageQuery } from "./carried-flow.ts";
-import { codeSpent, digitsOf, triesLeft, worthSending } from "./code-entry.ts";
+import { codeSpent, digitsOf, selectTheCode, triesLeft, worthSending } from "./code-entry.ts";
 import {
   CODE_NOT_SENT,
   CODE_UNANSWERED,
@@ -118,14 +118,6 @@ const saidOfTheCode = (sentTo: string, sending: boolean, resent: boolean): strin
 
 const saidOnArriving = (arriving: boolean, arrival: Arrival | undefined): string | null =>
   arriving && arrival !== undefined ? SIGN_IN_WORDS.arrived[arrival] : null;
-
-/** Selected, so the next digits typed or pasted replace the refused ones. */
-const selectTheCode = () => {
-  const field = document.getElementById(CODE_FIELD);
-  if (!(field instanceof HTMLInputElement)) return;
-  field.focus();
-  field.select();
-};
 
 type SessionRead = {
   readonly isError: boolean;
@@ -403,7 +395,7 @@ export function SignInScreen() {
       setRefused(nowRefused);
     });
     if (triesLeftAfter(nowRefused, failure) === 0) focusOn(SEND_AGAIN_BUTTON);
-    else selectTheCode();
+    else selectTheCode(CODE_FIELD);
   };
 
   const signInWith = (digits: string) => {

@@ -8,9 +8,23 @@ import {
   requestAccess,
   requestAccessInput,
 } from "@better-answers/core/members";
-import { setDisplayName, setDisplayNameInput } from "@better-answers/core/workspaces";
+import {
+  acknowledgeRecoveryCodes,
+  acknowledgeRecoveryCodesInput,
+  readSecondFactor,
+  removeAuthenticator,
+  replaceRecoveryCodes,
+  replaceRecoveryCodesInput,
+  setDisplayName,
+  setDisplayNameInput,
+} from "@better-answers/core/workspaces";
 
-import { ASK_TO_JOIN_ANSWER_FLOOR_MS, ASK_TO_JOIN_PERSON_RULE } from "../auth/constants.ts";
+import {
+  ASK_TO_JOIN_ANSWER_FLOOR_MS,
+  ASK_TO_JOIN_PERSON_RULE,
+  RECOVERY_CODES_PERSON_RULE,
+} from "../auth/constants.ts";
+import { sendFactorNotice } from "../factor-notice-email.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
 import { crossing, given, parsedBy, personCeiling, personProcedure, router } from "./base.ts";
 
@@ -89,4 +103,51 @@ export const personRouter = router({
       ),
     ),
   ),
+  secondFactor: personProcedure.query(({ ctx }) =>
+    crossing(
+      ctx,
+      readSecondFactor.name,
+      readSecondFactor(IDENTITY_PRINCIPAL, ctx.doors.postgres, { personId: ctx.personId }),
+    ),
+  ),
+  removeAuthenticator: personProcedure.mutation(async ({ ctx }) => {
+    const removed = await crossing(
+      ctx,
+      removeAuthenticator.name,
+      removeAuthenticator(IDENTITY_PRINCIPAL, ctx.doors.postgres, { personId: ctx.personId }),
+    );
+    void sendFactorNotice(ctx, ctx.email, "authenticator-removed");
+    return removed;
+  }),
+  replaceRecoveryCodes: personCeiling(RECOVERY_CODES_PERSON_RULE)
+    .input(parsedBy(replaceRecoveryCodesInput))
+    .mutation(async ({ ctx, input }) => {
+      const issued = await crossing(
+        ctx,
+        replaceRecoveryCodes.name,
+        given(input, (asked) =>
+          replaceRecoveryCodes(IDENTITY_PRINCIPAL, ctx.doors.postgres, {
+            personId: ctx.personId,
+            replacing: asked.replacing,
+            now: ctx.clock.now(),
+          }),
+        ),
+      );
+      void sendFactorNotice(ctx, ctx.email, issued.replaced ? "codes-replaced" : "codes-made");
+      return { recoveryCodes: issued.recoveryCodes, madeAt: issued.madeAt };
+    }),
+  acknowledgeRecoveryCodes: personProcedure
+    .input(parsedBy(acknowledgeRecoveryCodesInput))
+    .mutation(({ ctx, input }) =>
+      crossing(
+        ctx,
+        acknowledgeRecoveryCodes.name,
+        given(input, (asked) =>
+          acknowledgeRecoveryCodes(IDENTITY_PRINCIPAL, ctx.doors.postgres, {
+            personId: ctx.personId,
+            madeAt: asked.madeAt,
+          }),
+        ),
+      ),
+    ),
 });

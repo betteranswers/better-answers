@@ -6,6 +6,7 @@ import { KeystrokesAct, useKeystroke, type Keystroke } from "@/shared/keystrokes
 import { SAID_OF_CLASS, type Said } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 
+import { AccountLink } from "./account-link.tsx";
 import { ASK_TO_JOIN, AskToJoin } from "./ask-to-join.tsx";
 import { AuthScreen, ReadAgain, Refused } from "./auth-screen.tsx";
 import { carriedFlow, invitationAt, pageQuery } from "./carried-flow.ts";
@@ -152,6 +153,7 @@ export function NoWorkspaceScreen() {
       <AskToJoin />
 
       <div className="mt-8 flex flex-wrap items-center gap-2">
+        <AccountLink />
         <SignOutButton />
         <KeystrokesAct screen="this screen" keystrokes={keystrokesOf(invitations)} />
       </div>

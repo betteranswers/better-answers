@@ -314,7 +314,8 @@ export type TestAppOptions = {
 
   readonly publicUrl?: string | undefined;
 
-  readonly onEmail?: ((message: EmailMessage) => void) | undefined;
+  /** Awaited by the transport, so a test can hold a message the way a slow relay would. */
+  readonly onEmail?: ((message: EmailMessage) => void | Promise<void>) | undefined;
 
   readonly clock?: Clock | undefined;
 
@@ -363,7 +364,7 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
     authSecret: AUTH_SECRET,
     sendEmail: async (message) => {
       emails.push(message);
-      options.onEmail?.(message);
+      await options.onEmail?.(message);
     },
     fetchClientMetadataResource: (input) => {
       metadataFetches.push(input instanceof Request ? input.url : String(input));

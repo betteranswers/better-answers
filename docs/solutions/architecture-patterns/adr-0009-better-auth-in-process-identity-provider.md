@@ -62,6 +62,7 @@ A person exists from their first email-code sign-in, or earlier when `pnpm ops a
 The identity-set audit log holds:
 
 - a person's own display-name act and the platform's adding of a person;
+- a person's own second-factor acts: an authenticator added or removed, and recovery codes issued or used;
 - with the console, each sign-in, every operator write and an Admin's act that ends a person's grants.
 
 A token's issue, refusal and refresh, and the workspace pick, stay log lines.

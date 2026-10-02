@@ -108,6 +108,10 @@ const REGISTER = {
   "display-name-control-character": "malformed by workspaces",
   "display-name-angle-bracket": "malformed by workspaces",
   "display-name-too-long": "malformed by workspaces",
+  "no-authenticator": "absent by workspaces",
+  "recovery-code-wrong": "absent by workspaces",
+  "recovery-codes-held": "conflict by workspaces",
+  "last-second-factor": "precondition by workspaces",
 
   "identifier-too-broad": "inapplicable by erasure",
 };

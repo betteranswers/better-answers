@@ -141,7 +141,7 @@ const sessionShape = z.object({
 });
 
 type SessionRecord = {
-  readonly user: { readonly id: string };
+  readonly user: { readonly id: string; readonly email: string };
   readonly session: {
     readonly id: string;
     readonly createdAt: Date;

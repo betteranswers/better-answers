@@ -11,8 +11,10 @@ import {
 } from "@better-answers/core/store/postgres";
 import { hasNoDisplayName } from "@better-answers/core/workspaces";
 
+import type { EmailSender } from "../email.ts";
 import { limitByIp, tooManyRequests } from "../ingress/limits.ts";
 import type { Auth } from "./auth.ts";
+import { mountTheAuthenticator } from "./authenticator.ts";
 import {
   BETTER_AUTH_RATE_LIMIT,
   EMAIL_CODE_EMAIL_RULE,
@@ -40,6 +42,7 @@ import {
   unseal,
 } from "./link-token.ts";
 import { consentPage, refusedPage, REFUSAL_PAGES, signInPage } from "./pages.ts";
+import { sameOriginOnly } from "./same-origin.ts";
 import { askingWithALink, dropALink, readALink, signingInByLink } from "./sign-in-link.ts";
 import { sessionClaims } from "./verify.ts";
 
@@ -54,6 +57,8 @@ export type AuthRoutesDependencies = {
 
   /** The auth secret, which seals what a sign-in link carries. */
   readonly secret: string;
+
+  readonly sendEmail: EmailSender;
 };
 
 const carry = (url: string): string => new URL(url).search;
@@ -94,24 +99,6 @@ const flowHeaders = (request: Request, publicUrl: string): Headers => {
   headers.set("origin", request.headers.get("origin") ?? publicUrl);
   headers.set("accept", "application/json");
   return headers;
-};
-
-const sameOriginOnly = (publicUrl: string): MiddlewareHandler => {
-  return async (context, next) => {
-    if (context.req.method !== "POST") {
-      await next();
-      return;
-    }
-    const origin = context.req.header("origin");
-    const site = context.req.header("sec-fetch-site");
-    const sameOrigin =
-      origin === publicUrl ||
-      (origin === undefined && (site === undefined || site === "same-origin" || site === "none"));
-    if (!sameOrigin) {
-      return context.html(refusedPage(REFUSAL_PAGES.crossSite), 403);
-    }
-    await next();
-  };
 };
 
 /**
@@ -444,6 +431,7 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
   routes.use(SEND_EMAIL_CODE_PATH, limitCodesByEmail(door, clock));
   routes.use(SEND_EMAIL_CODE_PATH, bindTheLink(publicUrl));
   mountTheSignInLink(routes, deps);
+  mountTheAuthenticator(routes, deps);
 
   routes.use("/consent", limitByIp(door, PAGE_IP_RULE, clock));
   routes.use("/consent", sameOriginOnly(publicUrl));

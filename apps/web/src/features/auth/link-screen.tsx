@@ -19,6 +19,7 @@ import {
 } from "./auth-hooks.ts";
 import { AuthScreen, Outcome, ReadAgain } from "./auth-screen.tsx";
 import { carriedOnTo, leavingFor, nextAfterSignIn } from "./carried-flow.ts";
+import { copiedToTheClipboard } from "./clipboard.ts";
 import {
   CODE_NOT_COPIED,
   codeShown,
@@ -273,15 +274,6 @@ const slotsOf = (seen: Seen, acting: Acting): Slots => {
   }
 };
 
-/** Written whole on the clipboard, with no space, so it pastes into the code field as it is. */
-const copied = (code: string): Promise<boolean> =>
-  Promise.resolve()
-    .then(() => navigator.clipboard.writeText(code))
-    .then(
-      () => true,
-      () => false,
-    );
-
 /**
  * Signs in only the browser that asked for the code, and only on a click, so a scanner opening
  * the link changes nothing.
@@ -314,8 +306,9 @@ export function LinkScreen() {
       signIn.mutate(token, { onSuccess: landAfterSignIn });
     },
     copied: copiedIt,
+    // Written whole, with no space, so it pastes into the code field as it is.
     onCopy: (code) => {
-      void copied(code).then(setCopiedIt);
+      void copiedToTheClipboard(code).then(setCopiedIt);
     },
     reading: read.isFetching,
     onReadAgain: () => {

@@ -60,7 +60,7 @@ const SECOND_ID = "01K6H0A7Q3W9E2R5T8Y1U4I6O1";
 const NO_DATABASE = doorsFor("postgres://nobody@127.0.0.1:1/none");
 
 const A_SIGNED_IN_PERSON = {
-  user: { id: "01K6H0A7Q3W9E2R5T8Y1U4I6P0" },
+  user: { id: "01K6H0A7Q3W9E2R5T8Y1U4I6P0", email: "priya@acme.test" },
   session: { id: "01K6H0A7Q3W9E2R5T8Y1U4I6P1", createdAt: new Date("2026-10-01T09:00:00.000Z") },
 };
 
