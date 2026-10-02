@@ -200,6 +200,35 @@ describe("signing in through a link", () => {
     expect((await asking.json(SIGN_IN_BY_LINK, { token })).status).toBe(200);
   });
 
+  it("refuses a browser bound to another address's link", async () => {
+    const person = await app().person();
+    const asking = app().client();
+    const { token } = await askedFor(asking, person.email);
+    const other = await app().person();
+    const elsewhere = app().client();
+    await askedFor(elsewhere, other.email);
+
+    const refused = await elsewhere.json(SIGN_IN_BY_LINK, { token });
+
+    expect(await describedAs(elsewhere, token)).toMatchObject({ state: "elsewhere" });
+    expect(refused.status).toBe(403);
+    expect(await signedInAs(elsewhere)).toBeUndefined();
+  });
+
+  it("dies once the code's three tries are spent", async () => {
+    const person = await app().person();
+    const asking = app().client();
+    const { code, token } = await askedFor(asking, person.email);
+    const wrong = code === "000000" ? "111111" : "000000";
+
+    for (let tried = 0; tried < 3; tried += 1) {
+      await asking.json("/sign-in/email-otp", { email: person.email, otp: wrong });
+    }
+
+    expect(await triesSpentOn(person.email)).toBe("3");
+    expect(await describedAs(asking, token)).toEqual(DEAD);
+  });
+
   it("spends none of the code's tries on a wrong token", async () => {
     const person = await app().person();
     const asking = app().client();
@@ -293,6 +322,19 @@ describe("signing in through a link", () => {
 
     expect(await describedAs(asking, token)).toEqual(DEAD);
     expect((await asking.json(SIGN_IN_BY_LINK, { token })).status).toBe(410);
+  });
+
+  it("is dead when its sealed contents were cut short", async () => {
+    const person = await app().person();
+    const asking = app().client();
+    const { token } = await askedFor(asking, person.email);
+    await app().database.superuser.query(
+      `UPDATE verification SET value = jsonb_set(value::jsonb, '{sealed}', '"AAAA"')::text
+        WHERE identifier = $1`,
+      [`sign-in-link-${person.email.toLowerCase()}`],
+    );
+
+    expect(await describedAs(asking, token)).toEqual(DEAD);
   });
 });
 

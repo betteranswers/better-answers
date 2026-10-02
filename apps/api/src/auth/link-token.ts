@@ -74,12 +74,10 @@ export const unseal = (
   boundTo: string,
   sealed: string,
 ): Opened | undefined => {
-  const bytes = Buffer.from(sealed, "base64url");
-  if (bytes.length <= IV_BYTES + TAG_BYTES) return undefined;
   try {
-    return openedFrom(token, salt, boundTo, bytes);
+    return openedFrom(token, salt, boundTo, Buffer.from(sealed, "base64url"));
   } catch {
-    // The cipher throws on a failed tag; a link that will not open is a dead link, nothing more.
+    // The cipher throws on a short value or a failed tag; a link that will not open is dead.
     return undefined;
   }
 };
