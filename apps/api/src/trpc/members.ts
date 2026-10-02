@@ -55,6 +55,7 @@ import type { Tx } from "@better-answers/core/store/postgres";
 import type { Doors } from "../doors.ts";
 import type { Mail } from "../email.ts";
 import type { RefusalAnswer } from "../refusal.ts";
+import { EMAILS_PER_SECOND } from "../smtp.ts";
 import {
   answeredBy,
   committedAs,
@@ -117,16 +118,17 @@ const committedThenEmailed =
     return answerOf(invitation, await sentInvitation(ctx, invitation));
   };
 
-/** A slow relay holds the answer for each round, so a send of fifty waits ten rounds at most. */
-const EMAILS_AT_ONCE = 5;
-
+/**
+ * A round keeps the shared queue one second deep, so another email, such as a sign-in code,
+ * waits behind one round, not the whole send.
+ */
 const emailedEach = async (
   ctx: Emailing,
   invitations: readonly InvitationToSend[],
 ): Promise<readonly boolean[]> => {
   const sent: boolean[] = [];
-  for (let start = 0; start < invitations.length; start += EMAILS_AT_ONCE) {
-    const round = invitations.slice(start, start + EMAILS_AT_ONCE);
+  for (let start = 0; start < invitations.length; start += EMAILS_PER_SECOND) {
+    const round = invitations.slice(start, start + EMAILS_PER_SECOND);
     sent.push(...(await Promise.all(round.map((invitation) => sentInvitation(ctx, invitation)))));
   }
   return sent;

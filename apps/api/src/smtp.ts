@@ -9,7 +9,7 @@ import type { EmailSender } from "./email.ts";
  * Resend's ten a second binds SMTP too, per team and with Coolify's alerts; a window's edge can
  * pass twice this.
  */
-const EMAILS_PER_SECOND = 5;
+export const EMAILS_PER_SECOND = 5;
 
 /** Build one per process: a second pool would pace itself apart and double the rate. */
 export const pacedTransport = (smtpUrl: string): Transporter =>
