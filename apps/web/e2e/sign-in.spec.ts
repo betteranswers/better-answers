@@ -128,6 +128,15 @@ const aFramePassed = (page: Page): Promise<void> =>
       }),
   );
 
+/** Runs what makes the page re-read its session, then holds that the page still waits at /sign-in. */
+const stillWaitingOnceReread = async (page: Page, prompt: () => Promise<void>): Promise<void> => {
+  const reread = page.waitForRequest((asked) => new URL(asked.url()).pathname === "/get-session");
+  await prompt();
+  await (await (await reread).response())?.finished();
+  await aFramePassed(page);
+  await expect(page, "the waiting tab left the code step").toHaveURL(/\/sign-in/);
+};
+
 const heldSession = z.object({ session: z.object({ id: z.string() }) });
 
 /** As the api reads this browser's cookie, so a session begun since names a new id. */
@@ -498,6 +507,27 @@ test("a code typed in another tab lands the waiting one", async ({ page, context
   await landedAtHome(page, "Admin");
 });
 
+test("a tab waiting on one address ignores another's sign-in", async ({
+  page,
+  context,
+  request,
+}) => {
+  const email = anAddress("asked");
+  await provision(request, { name: "Asked Ltd", adminEmail: email });
+  const elsewhere = anAddress("elsewhere");
+  await provision(request, { name: "Elsewhere Ltd", adminEmail: elsewhere });
+  await atTheCodeStep(page, email);
+
+  const other = await context.newPage();
+  await other.goto("/sign-in");
+  await stillWaitingOnceReread(page, async () => {
+    await signIn(other, request, elsewhere);
+  });
+
+  await codeField(page).pressSequentially(await codeSentTo(request, email));
+  await landedAtHome(page, "Admin");
+});
+
 test("a tab hidden through a sign-in lands once shown", async ({ page, context, request }) => {
   // This tab never hears the announcement, so only its being shown again can land it.
   await page.addInitScript(() => {
@@ -526,11 +556,7 @@ test("a shown tab waits for a sign-in of its own", async ({ page, request }) => 
   await atTheCodeStep(page, email);
 
   await shownAs(page, "hidden");
-  const reread = page.waitForRequest((asked) => new URL(asked.url()).pathname === "/get-session");
-  await shownAs(page, "visible");
-  await (await (await reread).response())?.finished();
-  await aFramePassed(page);
-  await expect(page, "the shown tab left on the session that stood").toHaveURL(/\/sign-in/);
+  await stillWaitingOnceReread(page, () => shownAs(page, "visible"));
   await codeField(page).pressSequentially(await codeSentTo(request, email));
   await landedAtHome(page, "Admin");
 

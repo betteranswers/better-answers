@@ -112,24 +112,36 @@ const selectTheCode = () => {
 
 type SessionRead = {
   readonly isError: boolean;
-  readonly data: { readonly session: { readonly id: string } } | null | undefined;
+  readonly data:
+    | { readonly session: { readonly id: string }; readonly user: { readonly email: string } }
+    | null
+    | undefined;
 };
 
 /** Undefined for a failed read, which keeps whatever it held before and proves nothing. */
 const sessionIdOf = (read: SessionRead): string | null | undefined =>
   read.isError ? undefined : (read.data?.session.id ?? null);
 
-/** Nothing counts as new until the standing session is known, so an early read never lands. */
-const namesANewSession = (read: SessionRead, standing: string | null | undefined): boolean => {
+/** Until the standing session is known nothing is new, and another address's sign-in is not this tab's. */
+const isANewSignInOf = (
+  read: SessionRead,
+  standing: string | null | undefined,
+  sentTo: string,
+): boolean => {
   const id = sessionIdOf(read);
-  return standing !== undefined && typeof id === "string" && id !== standing;
+  return (
+    standing !== undefined &&
+    typeof id === "string" &&
+    id !== standing &&
+    read.data?.user.email.toLowerCase() === sentTo.toLowerCase()
+  );
 };
 
 /**
  * Lands once another tab of this browser signs in: on hearing it announced, or on being shown
  * again, for a tab that missed the announcement.
  */
-function useFollowsASignInElsewhere(waiting: boolean, land: () => void) {
+function useFollowsASignInElsewhere(waiting: boolean, sentTo: string, land: () => void) {
   const session = useSession();
   // Signing in again starts here with a session standing, and only a different one is a sign-in.
   const standing = useRef<string | null | undefined>(undefined);
@@ -139,7 +151,7 @@ function useFollowsASignInElsewhere(waiting: boolean, land: () => void) {
     });
   });
   const landIfNew = useEffectEvent((read: SessionRead) => {
-    if (waiting && namesANewSession(read, standing.current)) land();
+    if (waiting && isANewSignInOf(read, standing.current, sentTo)) land();
   });
   const recheck = useEffectEvent(() => {
     if (!waiting) return;
@@ -163,13 +175,14 @@ function useFollowsASignInElsewhere(waiting: boolean, land: () => void) {
 function CodeStepActs(properties: {
   readonly sending: boolean;
   readonly waiting: boolean;
+  readonly sentTo: string;
   readonly onSendANewCode: () => void;
   readonly onChangeAddress: () => void;
   readonly onSignedInElsewhere: () => void;
 }) {
   useKeystroke(SEND_A_NEW_CODE, properties.onSendANewCode);
   useKeystroke(CHANGE_ADDRESS, properties.onChangeAddress);
-  useFollowsASignInElsewhere(properties.waiting, properties.onSignedInElsewhere);
+  useFollowsASignInElsewhere(properties.waiting, properties.sentTo, properties.onSignedInElsewhere);
 
   return (
     <div className="mt-6 flex flex-wrap items-center gap-2">
@@ -425,6 +438,7 @@ export function SignInScreen() {
             <CodeStepActs
               sending={sendCode.isPending}
               waiting={!signingIn}
+              sentTo={sentTo}
               onSendANewCode={() => {
                 sendANewCode(sentTo);
               }}
