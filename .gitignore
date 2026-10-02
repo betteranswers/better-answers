@@ -75,6 +75,9 @@ AGENTS.md.bak
 .agents/
 tasks/AGENTS.md
 apps/api/.claude/skills/*
+!apps/api/.claude/skills/email-best-practices/
+!apps/api/.claude/skills/resend/
+!apps/api/.claude/skills/THIRD_PARTY_NOTICES.md
 apps/web/.claude/skills/*
 apps/worker/.claude/skills/*
 .github/.claude/skills/*

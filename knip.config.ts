@@ -22,6 +22,8 @@ const config: KnipConfig = {
         "lifts/**",
 
         "tests/fixtures/web-build/**",
+
+        ".claude/skills/**",
       ],
     },
 
