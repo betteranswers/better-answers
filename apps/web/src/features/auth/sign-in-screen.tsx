@@ -122,7 +122,7 @@ type SessionRead = {
 const sessionIdOf = (read: SessionRead): string | null | undefined =>
   read.isError ? undefined : (read.data?.session.id ?? null);
 
-/** Until the standing session is known nothing is new, and another address's sign-in is not this tab's. */
+/** Until the standing session is known nothing is new, and another address's sign-in is not awaited. */
 const isANewSignInOf = (
   read: SessionRead,
   standing: string | null | undefined,
@@ -138,10 +138,10 @@ const isANewSignInOf = (
 };
 
 /**
- * Lands once another tab of this browser signs in: on hearing it announced, or on being shown
- * again, for a tab that missed the announcement.
+ * Moves on once another browser tab signs in: on hearing it announced, or on being shown again,
+ * having missed the announcement.
  */
-function useFollowsASignInElsewhere(waiting: boolean, sentTo: string, land: () => void) {
+function useFollowsASignInElsewhere(waiting: boolean, sentTo: string, follow: () => void) {
   const session = useSession();
   // Signing in again starts here with a session standing, and only a different one is a sign-in.
   const standing = useRef<string | null | undefined>(undefined);
@@ -150,12 +150,14 @@ function useFollowsASignInElsewhere(waiting: boolean, sentTo: string, land: () =
       standing.current = sessionIdOf(read);
     });
   });
-  const landIfNew = useEffectEvent((read: SessionRead) => {
-    if (waiting && isANewSignInOf(read, standing.current, sentTo)) land();
+  const followIfNew = useEffectEvent((read: SessionRead) => {
+    if (waiting && isANewSignInOf(read, standing.current, sentTo)) follow();
   });
   const recheck = useEffectEvent(() => {
     if (!waiting) return;
-    void session.refetch().then(landIfNew);
+    // With no standing session read yet there is nothing to compare, so this read becomes it.
+    if (standing.current === undefined) readWhatStands();
+    else void session.refetch().then(followIfNew);
   });
 
   useEffect(() => {
@@ -326,7 +328,7 @@ export function SignInScreen() {
    * The query rides along, a connector's signed one included, so that screen sends the person
    * where this one would have.
    */
-  const landAfterSignIn = (signedIn: SignedIn) => {
+  const moveOnAfterSignIn = (signedIn: SignedIn) => {
     queryClient.clear();
     const query = pageQuery();
     const next = signedIn.displayNameGiven ? nextAfterSignIn(query) : `/display-name${query}`;
@@ -393,7 +395,7 @@ export function SignInScreen() {
     signIn.mutate(
       { email: sentTo, otp: digits },
       {
-        onSuccess: landAfterSignIn,
+        onSuccess: moveOnAfterSignIn,
         onError: (failure) => {
           countTheRefusal(digits, failure);
         },
@@ -445,7 +447,7 @@ export function SignInScreen() {
               onChangeAddress={changeAddress}
               // Nothing here read the name, so the display-name screen's own read forwards a named person.
               onSignedInElsewhere={() => {
-                landAfterSignIn({ displayNameGiven: false });
+                moveOnAfterSignIn({ displayNameGiven: false });
               }}
             />
           ),

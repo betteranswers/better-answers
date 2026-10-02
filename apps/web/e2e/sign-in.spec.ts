@@ -137,6 +137,8 @@ const stillWaitingOnceReread = async (page: Page, prompt: () => Promise<void>): 
   await expect(page, "the waiting tab left the code step").toHaveURL(/\/sign-in/);
 };
 
+const SESSION_READ = "**/get-session*";
+
 const heldSession = z.object({ session: z.object({ id: z.string() }) });
 
 /** As the api reads this browser's cookie, so a session begun since names a new id. */
@@ -525,6 +527,37 @@ test("a tab waiting on one address ignores another's sign-in", async ({
   });
 
   await codeField(page).pressSequentially(await codeSentTo(request, email));
+  await landedAtHome(page, "Admin");
+});
+
+/** The client asks a failed read three times before it gives up. */
+const READ_ATTEMPTS = 3;
+
+test("a tab whose first read failed still follows a sign-in", async ({
+  page,
+  context,
+  request,
+}) => {
+  const email = anAddress("unread");
+  await provision(request, { name: "Unread Ltd", adminEmail: email });
+  await page.goto("/sign-in");
+  const unread = Promise.withResolvers<void>();
+  let refused = 0;
+  await page.route(SESSION_READ, async (route) => {
+    await route.fulfill({ status: 503 });
+    refused += 1;
+    if (refused === READ_ATTEMPTS) unread.resolve();
+  });
+  await sendTheFirstCode(page, email);
+  await unread.promise;
+  await page.unroute(SESSION_READ);
+
+  await shownAs(page, "hidden");
+  await stillWaitingOnceReread(page, () => shownAs(page, "visible"));
+  const other = await context.newPage();
+  await other.goto("/sign-in");
+  await signIn(other, request, email);
+
   await landedAtHome(page, "Admin");
 });
 
