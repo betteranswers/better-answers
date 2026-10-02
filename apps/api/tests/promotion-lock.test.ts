@@ -223,6 +223,23 @@ describe("a sign-in after a promotion left its lock behind", () => {
     expect(await accessOf(person.id)).toEqual({ verified: true, sessions: 1, accounts: 0 });
   });
 
+  it("leaves a live lock for the library to wait on", async () => {
+    const person = await anUnprovenPersonWithAccess();
+    const asking = app().client();
+    const asked = await asking.json("/email-otp/send-verification-otp", {
+      email: person.email,
+      type: "sign-in",
+    });
+    expect(asked.status).toBe(200);
+    await lockFor(person.id, new Date(Date.now() + MINUTE_MS));
+
+    const signedIn = await signInByCode(asking, person.email);
+
+    expect(signedIn.status).toBe(200);
+    expect(await rowsNamed(`${LOCK_PREFIX}${person.id}`)).toBe(1);
+    expect(await accessOf(person.id)).toEqual({ verified: false, sessions: 2, accounts: 1 });
+  });
+
   it("leaves the lock when only a code is asked for", async () => {
     const person = await anUnprovenPerson();
     await orphanedLockFor(person.id);
