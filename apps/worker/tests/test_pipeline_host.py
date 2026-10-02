@@ -1,4 +1,5 @@
 import asyncio
+import gc
 import re
 import threading
 import time
@@ -393,6 +394,38 @@ def test_a_held_store_opens_once_the_engine_lets_go(tmp_path: Path) -> None:
             "binding_id": "binding-one",
             "store": "binding",
             "wait_seconds": 5.0,
+        }
+    ]
+
+
+def test_a_store_held_in_a_cycle_opens_after_a_collection(tmp_path: Path) -> None:
+    bootstrap = bootstrap_for("postgresql://unreached/unreached", tmp_path)
+    run = a_run_on("binding-one")
+
+    # Off, so that only the open's own collection can free the cycle.
+    gc.disable()
+    try:
+        with Host(bootstrap) as first:
+            cycle: list[object] = [first.app_config(run, CHUNKS_APP)]
+            cycle.append(cycle)
+        del cycle
+        with (
+            capture_logs() as written,
+            Host(bootstrap, release_wait_seconds=0.2) as second,
+        ):
+            second.app_config(run, CHUNKS_APP)
+            opened = second.held_bindings()
+    finally:
+        gc.enable()
+
+    assert opened == ("binding-one",)
+    assert waits_in(written) == [
+        {
+            "event": WAITS,
+            "log_level": "info",
+            "binding_id": "binding-one",
+            "store": "binding",
+            "wait_seconds": 0.2,
         }
     ]
 
