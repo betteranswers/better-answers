@@ -1,6 +1,7 @@
-import { useDeferredValue, type ReactNode, type RefObject } from "react";
+import type { ReactNode, RefObject } from "react";
 
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
+import { useReadSaid } from "@/shared/read-said.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { EmptyAction } from "@/shared/ui/kibo-ui/empty-action.tsx";
 import { PaginationCounter } from "@/shared/ui/kibo-ui/pagination-counter.tsx";
@@ -83,7 +84,7 @@ type Read<Failure> = {
   readonly refetch: () => void;
 };
 
-/** A failed read hides even stale rows. A line inserted with its live region may go unread, so it fills a render later. */
+/** A failed read hides even stale rows. */
 export function ListRead<Failure>(properties: {
   readonly read: Read<Failure>;
   readonly loading: string;
@@ -92,14 +93,13 @@ export function ListRead<Failure>(properties: {
   readonly children: ReactNode;
 }) {
   const { read } = properties;
-  const failure = useDeferredValue(read.error, null);
-  const waiting = useDeferredValue(read.isPending, false);
+  const said = useReadSaid(read);
   if (read.error !== null) {
     return (
       <ListState
         state={{
           kind: "failed",
-          words: failure === null ? "" : properties.failed(failure),
+          words: said.error === null ? "" : properties.failed(said.error),
           onRetry: () => {
             read.refetch();
           },
@@ -109,7 +109,9 @@ export function ListRead<Failure>(properties: {
     );
   }
   if (read.isPending) {
-    return <ListState state={{ kind: "loading", words: waiting ? properties.loading : "" }} />;
+    return (
+      <ListState state={{ kind: "loading", words: said.isPending ? properties.loading : "" }} />
+    );
   }
   return properties.children;
 }

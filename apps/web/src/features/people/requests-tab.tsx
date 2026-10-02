@@ -1,6 +1,7 @@
 import { useId, useRef, useState } from "react";
 
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
+import { useReadSaid } from "@/shared/read-said.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { TableCell } from "@/shared/ui/table.tsx";
@@ -177,6 +178,8 @@ function RequestList(properties: {
 
 export function RequestsTab() {
   const requests = useRequests();
+  const said = useReadSaid(requests);
+  const readRefused = said.error === null ? undefined : outcomeOfRequestFailure(said.error, "read");
   const approve = useApproveRequest();
   const [outcome, setOutcome] = useState<Outcome>();
   const [approving, setApproving] = useState<WaitingRequest>();
@@ -222,14 +225,9 @@ export function RequestsTab() {
       <h2 id={headingId} ref={heading} tabIndex={-1}>
         Requests
       </h2>
-      <OutcomeLine
-        outcome={
-          requests.error === null ? outcome : outcomeOfRequestFailure(requests.error, "read")
-        }
-        className="mt-2"
-      />
+      <OutcomeLine outcome={requests.error === null ? outcome : readRefused} className="mt-2" />
       <div aria-live="polite">
-        {requests.isPending ? <p className="mt-2">The requests are still loading.</p> : null}
+        {said.isPending ? <p className="mt-2">The requests are still loading.</p> : null}
       </div>
       {requests.data === undefined ? null : (
         <RequestList

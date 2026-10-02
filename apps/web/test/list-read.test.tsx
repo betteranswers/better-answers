@@ -1,26 +1,16 @@
 import { cleanup, render, screen } from "@testing-library/react";
-import { createRef, useLayoutEffect } from "react";
+import { createRef } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { ListRead } from "@/shared/list-pages.tsx";
+
+import { regionsSeen } from "./regions-seen.tsx";
 
 afterEach(cleanup);
 
 const LOADING = "The invitations are still loading.";
 
 const NOTHING = () => undefined;
-
-/** What each commit left in the live region a role names, the first commit's included. */
-const regionsSeen = (selector: string) => {
-  const seen: (string | undefined)[] = [];
-  function Probe() {
-    useLayoutEffect(() => {
-      seen.push(document.querySelector(selector)?.textContent ?? undefined);
-    });
-    return null;
-  }
-  return { seen, Probe };
-};
 
 const listRead = (read: { readonly error: Error | null; readonly isPending: boolean }) => (
   <ListRead
@@ -35,28 +25,18 @@ const listRead = (read: { readonly error: Error | null; readonly isPending: bool
 
 describe("a list's read, said after its region mounts (BA-31)", () => {
   it("mounts the loading region empty, then says the line", () => {
-    const { seen, Probe } = regionsSeen("output");
+    const { seen, Seen } = regionsSeen("output");
 
-    render(
-      <>
-        {listRead({ error: null, isPending: true })}
-        <Probe />
-      </>,
-    );
+    render(<Seen>{listRead({ error: null, isPending: true })}</Seen>);
 
     expect(seen[0]).toBe("");
     expect(screen.getByRole("status").textContent).toBe(LOADING);
   });
 
   it("mounts the failure's alert empty, then says it", () => {
-    const { seen, Probe } = regionsSeen("[role=alert]");
+    const { seen, Seen } = regionsSeen("[role=alert]");
 
-    render(
-      <>
-        {listRead({ error: new Error("the network is down"), isPending: false })}
-        <Probe />
-      </>,
-    );
+    render(<Seen>{listRead({ error: new Error("the network is down"), isPending: false })}</Seen>);
 
     expect(seen[0]).toBe("");
     expect(screen.getByRole("alert").textContent).toBe("No list: the network is down");

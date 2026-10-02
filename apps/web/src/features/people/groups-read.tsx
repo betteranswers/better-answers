@@ -1,21 +1,15 @@
-import { useDeferredValue } from "react";
-
 import type { ApiError } from "@/shared/api/trpc.ts";
 import { OutcomeLine } from "@/shared/outcome.tsx";
+import { useReadSaid } from "@/shared/read-said.ts";
 
 import { GROUPS_LOADING } from "./member-act-words.ts";
 import { outcomeOfGroupFailure } from "./refusal.tsx";
 
-/**
- * Both regions mount empty and take the read's state a render later: words inside a live region as
- * it is inserted may go unread.
- */
 export function GroupsReadSaid(properties: {
   readonly error: Error | ApiError | null;
   readonly isPending: boolean;
 }) {
-  const error = useDeferredValue(properties.error, null);
-  const isPending = useDeferredValue(properties.isPending, false);
+  const { error, isPending } = useReadSaid(properties);
   return (
     <>
       <OutcomeLine outcome={error === null ? undefined : outcomeOfGroupFailure(error, "read")} />

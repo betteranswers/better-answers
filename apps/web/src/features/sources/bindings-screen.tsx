@@ -6,6 +6,7 @@ import { EmptyState } from "@/shared/empty-state.tsx";
 import { useKeystroke, useScreenKeystrokes } from "@/shared/keystrokes.tsx";
 import { CONTROL_CENTRE, groupIn } from "@/shared/navigation.ts";
 import { OutcomeLine, selectFirst, type Outcome } from "@/shared/outcome.tsx";
+import { useReadSaid } from "@/shared/read-said.ts";
 import type { ScreenToolbar } from "@/shared/screen-toolbar.tsx";
 
 import { BindAct } from "./bind-act.tsx";
@@ -68,10 +69,11 @@ const nothingWider = (binding: ListedBinding): Outcome => ({
 
 function ListStatus(properties: { readonly bindings: ReturnType<typeof useBindings> }) {
   const { bindings } = properties;
+  const said = useReadSaid(bindings);
   return (
     <div aria-live="polite" className="mt-2">
-      {bindings.isPending ? <p>The bindings are still loading.</p> : null}
-      {bindings.error === null ? null : <p>{outcomeOfFailure(bindings.error, "read").words}</p>}
+      {said.isPending ? <p>The bindings are still loading.</p> : null}
+      {said.error === null ? null : <p>{outcomeOfFailure(said.error, "read").words}</p>}
       {bindings.data?.length === 0 ? <EmptyState line={NOTHING_BOUND} /> : null}
     </div>
   );
