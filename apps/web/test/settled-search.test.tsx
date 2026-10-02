@@ -53,6 +53,12 @@ const typeIn = (typed: string) => {
   });
 };
 
+/** Longer than the box's settle, so any write it would make has landed. */
+const pastTheSettle = () =>
+  new Promise((resolve) => {
+    setTimeout(resolve, 450);
+  });
+
 describe("Members' search, settled into the address", () => {
   it("keeps every key while the address waits for the burst", async () => {
     const { router, at } = await openMembers("/people/members");
@@ -73,6 +79,26 @@ describe("Members' search, settled into the address", () => {
 
     await at("/people/members?members.search=sam");
     expect(box().value).toBe("sam");
+  });
+
+  it("takes back a settled search Back returns to", async () => {
+    const { router, at } = await openMembers("/people/members");
+
+    typeIn("ab");
+    await at("/people/members?members.search=ab");
+    await act(() => router.navigate({ href: "/people/members" }));
+    await at("/people/members");
+    expect(box().value).toBe("");
+    act(() => {
+      router.history.back();
+    });
+
+    await at("/people/members?members.search=ab");
+    expect(box().value, "the box lost the search Back restored").toBe("ab");
+    await act(pastTheSettle);
+    expect(router.state.location.href, "the box wrote over the entry Back restored").toBe(
+      "/people/members?members.search=ab",
+    );
   });
 
   it("sends a search still settling before the reader leaves", async () => {

@@ -78,10 +78,12 @@ export const useSettledSearch = (held: string, write: (search: string) => void) 
   const [seen, setSeen] = useState(held);
   const [sent, setSent] = useState<string>();
 
-  // An address moved by Back or a link, not by this box, is what the box shows.
+  // An address moved by Back or a link is what the box shows; the box's own write is ignored only
+  // until it lands.
   if (held !== seen) {
     setSeen(held);
-    if (held !== sent) setDraft(held);
+    if (held === sent) setSent(undefined);
+    else setDraft(held);
   }
 
   const send = useEffectEvent((search: string) => {

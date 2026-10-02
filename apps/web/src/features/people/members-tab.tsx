@@ -113,22 +113,6 @@ const useNarrowedMembers = (listed: readonly ListedMember[]) => {
 
 type Narrowed = ReturnType<typeof useNarrowedMembers>;
 
-const stillListed = (
-  held: ReadonlySet<string>,
-  listed: readonly ListedMember[],
-): ReadonlySet<string> => {
-  if (held.size === 0) return held;
-  const listedIds: ReadonlySet<string> = new Set(listed.map((member) => member.personId));
-  const kept = [...held].filter((id) => listedIds.has(id));
-  return kept.length === held.size ? held : new Set(kept);
-};
-
-/** A person gone from the list can be acted on no more, so their tick goes with them. */
-const useTicks = (listed: readonly ListedMember[]) => {
-  const [held, setHeld] = useState<ReadonlySet<string>>(NONE);
-  return [stillListed(held, listed), setHeld] as const;
-};
-
 const toggled = (ticked: ReadonlySet<string>, personId: string): ReadonlySet<string> => {
   const next = new Set(ticked);
   if (next.has(personId)) next.delete(personId);
@@ -354,7 +338,8 @@ function MemberList(properties: {
   const { read, heading } = properties;
   const listed = read.data ?? NO_ONE;
   const narrowed = useNarrowedMembers(listed);
-  const [ticked, setTicked] = useTicks(listed);
+  // A tick outlives its row, so the next act refuses or skips that person and says so.
+  const [ticked, setTicked] = useState<ReadonlySet<string>>(NONE);
   const [inFocus, setInFocus] = useState<string>();
   const [outcome, setOutcome] = useState<Outcome>();
   const [refused, setRefused] = useState<RefusedRows>(NO_MARKS);

@@ -55,6 +55,8 @@ export type BulkList = {
 
 const NOTHING_TICKED = selectFirst("member");
 
+const STILL_GOING: Outcome = { tone: "said", words: BULK_WORDS.stillGoing };
+
 const NO_GROUPS: readonly { readonly id: string; readonly name: string }[] = [];
 
 const refusedRowsOf = (failure: Error | ApiError): RefusedRows =>
@@ -89,12 +91,18 @@ export const useMemberBulkActs = (list: BulkList) => {
   const [asked, setAsked] = useState<readonly string[]>([]);
   const [role, setRole] = useState<Role>(ROLE_OFFERED_FIRST);
   const [groupId, setGroupId] = useState<string>();
+  // One act at a time: a dialog's second call on its mutation takes over the first's callbacks.
+  const [acting, setActing] = useState(false);
   const opener = useRef<HTMLElement>(null);
   const sent = useRef(false);
   const readerId = useReaderId();
   const { goHome } = useSelfActHome();
 
   const show = (act: BulkAct) => {
+    if (acting) {
+      list.say(STILL_GOING);
+      return;
+    }
     if (list.ticked.size === 0) {
       list.say(NOTHING_TICKED);
       return;
@@ -121,15 +129,18 @@ export const useMemberBulkActs = (list: BulkList) => {
     readonly landing: "demoted" | "removed" | undefined;
     readonly run: (personIds: string[], settled: Settled) => void;
   }) => {
+    if (acting) return;
     const names = new Map(asked.map((personId) => [personId, list.nameOf(personId)]));
     const yourOwn = readerId !== undefined && asked.includes(readerId) ? said.landing : undefined;
     sent.current = true;
+    setActing(true);
     setOpen(undefined);
     list.tick(new Set());
     list.mark(NO_MARKS);
     list.say({ tone: "said", words: said.pending });
     said.run([...asked], {
       onSuccess: (answer) => {
+        setActing(false);
         list.say({ tone: "said", words: said.done(answer) });
         if (yourOwn === undefined) return;
         void goHome(yourOwn).then((unread) => {
@@ -137,6 +148,7 @@ export const useMemberBulkActs = (list: BulkList) => {
         });
       },
       onError: (failure) => {
+        setActing(false);
         list.tick(new Set(asked));
         list.mark(refusedRowsOf(failure));
         list.say(refusalOf(failure, names));
@@ -154,40 +166,51 @@ export const useMemberBulkActs = (list: BulkList) => {
     show("remove");
   });
 
-  return { open, setOpen, asked, role, setRole, groupId, setGroupId, show, returnFocus, command };
+  return {
+    open,
+    setOpen,
+    asked,
+    role,
+    setRole,
+    groupId,
+    setGroupId,
+    acting,
+    show,
+    returnFocus,
+    command,
+  };
 };
 
 type Acts = ReturnType<typeof useMemberBulkActs>;
+
+const BAR_ACTS: readonly {
+  readonly act: BulkAct;
+  readonly keystroke: Keystroke;
+  readonly label: string;
+}[] = [
+  { act: "role", keystroke: KEY.changeSelectedRoles, label: BULK_WORDS.changeRole.act },
+  { act: "group", keystroke: KEY.addSelectedToGroup, label: BULK_WORDS.addToGroup.act },
+  { act: "remove", keystroke: KEY.removeSelected, label: BULK_WORDS.remove.act },
+];
 
 /** The bar's acts; each opens one dialog holding its value and its confirmation. */
 export function MemberBulkActs(properties: { readonly acts: Acts }) {
   const { acts } = properties;
   return (
     <>
-      <SelectionAct
-        aria-keyshortcuts={shortcutOf(KEY.changeSelectedRoles)}
-        onClick={() => {
-          acts.show("role");
-        }}
-      >
-        {BULK_WORDS.changeRole.act}
-      </SelectionAct>
-      <SelectionAct
-        aria-keyshortcuts={shortcutOf(KEY.addSelectedToGroup)}
-        onClick={() => {
-          acts.show("group");
-        }}
-      >
-        {BULK_WORDS.addToGroup.act}
-      </SelectionAct>
-      <SelectionAct
-        aria-keyshortcuts={shortcutOf(KEY.removeSelected)}
-        onClick={() => {
-          acts.show("remove");
-        }}
-      >
-        {BULK_WORDS.remove.act}
-      </SelectionAct>
+      {BAR_ACTS.map(({ act, keystroke, label }) => (
+        <SelectionAct
+          key={act}
+          aria-keyshortcuts={shortcutOf(keystroke)}
+          aria-disabled={acts.acting}
+          className="aria-disabled:opacity-50"
+          onClick={() => {
+            acts.show(act);
+          }}
+        >
+          {label}
+        </SelectionAct>
+      ))}
     </>
   );
 }

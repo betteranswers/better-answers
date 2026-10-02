@@ -12,6 +12,7 @@ import {
   homeNowSaid,
   INCLUDES_YOU,
   MEMBER_PAGE_WORDS,
+  NO_LONGER_LISTED,
   SELECTED_MEMBERS,
 } from "@/features/people/member-act-words.ts";
 import { MEMBER_PAGE_KEYSTROKES, PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
@@ -72,10 +73,18 @@ const MEMBERS_READ = (url: URL): boolean => url.pathname.includes("members.list"
 
 const REMOVAL = (url: URL): boolean => url.pathname.includes("members.remove");
 
-/** The api's refusal of an act racing another, as the client's batch carries it back. */
-const answeredChangedMeanwhile = (page: Page, act: (url: URL) => boolean) =>
-  page.route(act, (route) =>
-    route.fulfill({
+/**
+ * The api's refusal of an act racing another, as the client's batch carries it back, once `held`
+ * lets it go.
+ */
+const answeredChangedMeanwhile = (
+  page: Page,
+  act: (url: URL) => boolean,
+  held: Promise<void> = Promise.resolve(),
+) =>
+  page.route(act, async (route) => {
+    await held;
+    await route.fulfill({
       status: 409,
       json: [
         {
@@ -90,8 +99,8 @@ const answeredChangedMeanwhile = (page: Page, act: (url: URL) => boolean) =>
           },
         },
       ],
-    }),
-  );
+    });
+  });
 
 const nav = (page: Page) => page.getByRole("navigation", { name: CONTROL_CENTRE.name });
 
@@ -1298,6 +1307,43 @@ test.describe("removing a member from their page", () => {
     await expect(page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeVisible();
   });
 
+  test("removing yourself, pressed twice, asks once and still leaves", async ({
+    page,
+    request,
+  }) => {
+    await anAdminBesideAnotherAtPeople(page, request, "Esk Coopers");
+    await openedByName(page, "Test person");
+    const removal = removalOf(page);
+    await removal.getByRole("button", { name: "Remove Test person", exact: true }).click();
+    const confirm = removal.getByRole("button", { name: "Remove Test person from this workspace" });
+
+    // The first removal reaches the api and its answer is held, so a second press meets it done.
+    const done = Promise.withResolvers<void>();
+    const answered = Promise.withResolvers<void>();
+    let asked = 0;
+    await page.route(REMOVAL, async (route) => {
+      asked += 1;
+      const first = asked === 1;
+      const response = await route.fetch();
+      if (first) {
+        done.resolve();
+        await answered.promise;
+      }
+      await route.fulfill({ response });
+    });
+
+    await confirm.focus();
+    await page.keyboard.press("Enter");
+    await done.promise;
+    await expect(confirm).toHaveAttribute("aria-disabled", "true");
+    await page.keyboard.press("Enter");
+    answered.resolve();
+
+    await expect(page).toHaveURL(/\/no-workspace$/);
+    await expect(page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeVisible();
+    expect(asked, "the second press asked the api again").toBe(1);
+  });
+
   test("removes a member by keyboard alone", async ({ page, request }) => {
     await skippedToMembers(page, request, "Calder Presswork");
 
@@ -1594,14 +1640,18 @@ const changeRoleOpened = async (page: Page, count: number): Promise<Locator> => 
   return dialog;
 };
 
+const removedThroughTheBar = async (page: Page, count: number): Promise<void> => {
+  await selectionAct(page, BULK_WORDS.remove.act).click();
+  await page
+    .getByRole("dialog", { name: BULK_WORDS.remove.title(count) })
+    .getByRole("button", { name: BULK_WORDS.remove.commit(count) })
+    .click();
+};
+
 /** The Admin signed in ticks only themself and confirms the bar's Remove. */
 const removedThemselfThroughTheBar = async (page: Page): Promise<void> => {
   await tickOf(page, "Test person").check();
-  await selectionAct(page, BULK_WORDS.remove.act).click();
-  await page
-    .getByRole("dialog", { name: BULK_WORDS.remove.title(1) })
-    .getByRole("button", { name: BULK_WORDS.remove.commit(1) })
-    .click();
+  await removedThroughTheBar(page, 1);
 };
 
 test.describe("bulk acts on the members ticked", () => {
@@ -1926,24 +1976,40 @@ test.describe("bulk acts on the members ticked", () => {
     await passesTheAccessibilityGate();
   });
 
-  test("a ticked person removed meanwhile is named, the rest kept", async ({ page, request }) => {
+  test("a person removed meanwhile stays ticked, named, until Remove skips", async ({
+    page,
+    request,
+  }) => {
     const { workspaceId, joined } = await anAdminAtPeople(page, request, "Wharfe Spinning");
     const sam = joined.find((member) => member.displayName === "Sam Okoro");
     if (sam === undefined) throw new Error("Sam Okoro was joined");
     await tickOf(page, "Priya Shah").check();
     await tickOf(page, "Sam Okoro").check();
     await removeMember(request, { workspaceId, userId: sam.id });
-
-    const dialog = await changeRoleOpened(page, 2);
-    await dialog.getByRole("button", { name: BULK_WORDS.changeRole.commit(2, "Viewer") }).click();
-
     const refused = membersRegion(page).getByRole("alert");
-    await expect(refused).toContainText(BULK_WORDS.refused(1));
-    await expect(refused.getByRole("listitem")).toHaveText([
-      refusedLine("Sam Okoro", SAID_OF_TICKED_MEMBERS["no-such-member"]),
-    ]);
-    await expect(tickOf(page, "Priya Shah")).toBeChecked();
-    await expect(cellOf(page, "Priya Shah", "Role")).toHaveText("Editor");
+    const ticks = selectionBar(page).getByRole("status");
+    const refusedAsNoMember = async (name: string) => {
+      const dialog = await changeRoleOpened(page, 2);
+      await dialog.getByRole("button", { name: BULK_WORDS.changeRole.commit(2, "Viewer") }).click();
+      await expect(refused).toContainText(BULK_WORDS.refused(1));
+      await expect(refused.getByRole("listitem")).toHaveText([
+        refusedLine(name, SAID_OF_TICKED_MEMBERS["no-such-member"]),
+      ]);
+      await expect(tickOf(page, "Priya Shah")).toBeChecked();
+      await expect(cellOf(page, "Priya Shah", "Role")).toHaveText("Editor");
+    };
+
+    await refusedAsNoMember("Sam Okoro");
+    // The refusal reads the list again, which no longer holds Sam.
+    await expect(rowOf(page, "Sam Okoro")).toHaveCount(0);
+    await expect(ticks).toHaveText("2 members selected, 1 not shown.");
+
+    await refusedAsNoMember(NO_LONGER_LISTED);
+    await expect(ticks).toHaveText("2 members selected, 1 not shown.");
+
+    await removedThroughTheBar(page, 2);
+    await expect(saidInTheList(page, BULK_WORDS.remove.done(1, 1))).toBeVisible();
+    await expect(rowOf(page, "Priya Shah")).toHaveCount(0);
   });
 
   test("a set answered changed-meanwhile comes back, saying try again", async ({
@@ -1965,6 +2031,38 @@ test.describe("bulk acts on the members ticked", () => {
     await expect(tickOf(page, "Priya Shah")).toBeChecked();
     await expect(tickOf(page, "Sam Okoro")).toBeChecked();
     await expect(cellOf(page, "Priya Shah", "Role")).toHaveText("Editor");
+  });
+
+  test("a second act waits on the first, whose refusal lands", async ({
+    page,
+    request,
+    passesTheAccessibilityGate,
+  }) => {
+    await anAdminAtPeople(page, request, "Wharfe Fulling");
+    const answered = Promise.withResolvers<void>();
+    await answeredChangedMeanwhile(page, BULK_ROLE_CHANGE, answered.promise);
+    await tickOf(page, "Priya Shah").check();
+    const dialog = await changeRoleOpened(page, 1);
+    await dialog.getByRole("button", { name: BULK_WORDS.changeRole.commit(1, "Viewer") }).click();
+    await expect(saidInTheList(page, BULK_WORDS.changeRole.pending(1, "Viewer"))).toBeVisible();
+
+    await tickOf(page, "Sam Okoro").check();
+    const act = selectionAct(page, BULK_WORDS.changeRole.act);
+    await expect(act).toHaveAttribute("aria-disabled", "true");
+    await act.focus();
+    await page.keyboard.press("Enter");
+    await expect(saidInTheList(page, BULK_WORDS.stillGoing)).toBeVisible();
+    await page.keyboard.press(`Shift+${PEOPLE_KEYSTROKES.removeSelected.key}`);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await passesTheAccessibilityGate();
+
+    answered.resolve();
+    await saysItsSentenceNotItsWord(membersRegion(page).getByRole("alert"), {
+      table: SAID_OF_TICKED_MEMBERS,
+      word: "changed-meanwhile",
+    });
+    await expect(tickOf(page, "Priya Shah")).toBeChecked();
+    await expect(act).not.toHaveAttribute("aria-disabled", "true");
   });
 
   test("the row menu's Change role acts on its one member", async ({ page, request }) => {

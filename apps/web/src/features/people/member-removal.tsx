@@ -5,7 +5,7 @@ import { Button } from "@/shared/ui/button.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
 
 import { INCLUDES_YOU, RECORDED } from "./member-act-words.ts";
-import { useReaderId, type ListedMember } from "./people-api.ts";
+import { useReaderId, useRemovalOf, type ListedMember } from "./people-api.ts";
 import { nameOf } from "./words.tsx";
 
 /** Module-level, so React calls it once as the confirmation mounts, never on a re-render. */
@@ -28,6 +28,7 @@ export function MemberRemoval(properties: {
   const recordId = useId();
   const name = nameOf(member);
   const yourself = useReaderId() === member.personId;
+  const removing = useRemovalOf(member.personId)?.status === "pending";
 
   return (
     <section aria-labelledby={headingId} className="border border-border">
@@ -64,6 +65,9 @@ export function MemberRemoval(properties: {
               <Button
                 variant="destructive"
                 aria-describedby={recordId}
+                // Not `disabled`: a disabled button drops the focus the act leaves on it.
+                aria-disabled={removing}
+                className="aria-disabled:opacity-50"
                 onClick={() => {
                   onRemove(member);
                 }}

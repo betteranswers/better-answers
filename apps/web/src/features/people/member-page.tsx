@@ -91,6 +91,7 @@ const useRemoval = (
   const [outcome, setOutcome] = useState<Outcome>();
 
   const remove = (member: ListedMember) => {
+    if (removeMember.isPending) return;
     const { personId } = member;
     hold(member);
     setOutcome(undefined);
