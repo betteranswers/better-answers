@@ -46,7 +46,8 @@ export type Landings = {
 
 /** Removal is the page's to take: the person, and the page with them, leave as it lands. */
 export type Removal = {
-  readonly remove: (member: ListedMember) => void;
+  /** None until the reader's own membership is read. */
+  readonly remove: ((member: ListedMember) => void) | undefined;
   readonly outcome: Outcome | undefined;
 };
 
@@ -296,7 +297,7 @@ function GroupsPicker(properties: {
 
   return (
     <SheetPart title="Groups">
-      <GroupsReadSaid groups={groups} />
+      <GroupsReadSaid error={groups.error} isPending={groups.isPending} />
       <div ref={pickerRef} className="contents">
         {groups.data?.length === 0 ? (
           <EmptyState

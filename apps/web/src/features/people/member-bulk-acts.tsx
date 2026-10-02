@@ -317,7 +317,7 @@ function GroupChoice(properties: {
   const { acts, groups } = properties;
   return (
     <>
-      <GroupsReadSaid groups={groups} />
+      <GroupsReadSaid error={groups.error} isPending={groups.isPending} />
       {groups.data?.length === 0 ? (
         <EmptyState
           line={EMPTY_LINES.groups}

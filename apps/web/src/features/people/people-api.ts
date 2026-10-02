@@ -142,13 +142,21 @@ export const useReaderId = (): string | undefined => useHeldMembership()?.person
 /** A switch keeps a removal's state, and the same person may be a member of both workspaces. */
 const ASKED_IN = z.object({ workspaceId: z.string() });
 
+/**
+ * None until the reader's membership is read, which names the workspace a removal is matched by and
+ * whether it removes the reader.
+ */
 export const useRemoveMember = () => {
   const api = useTRPC();
   const workspaceId = useHeldMembership()?.workspace.id;
   const reconciled = useReconciledList((listed, asked: { readonly personId: string }) =>
     listed.filter((member) => member.personId !== asked.personId),
   );
-  return useMutation({ ...api.members.remove.mutationOptions(reconciled), meta: { workspaceId } });
+  const options = api.members.remove.mutationOptions(reconciled);
+  const removal = useMutation(
+    workspaceId === undefined ? options : { ...options, meta: { workspaceId } },
+  );
+  return workspaceId === undefined ? undefined : removal;
 };
 
 const ASKED_OF_ONE = z.object({ personId: z.string() });
@@ -165,6 +173,7 @@ export const useRemovalOf = (personId: string | undefined) => {
       mutationKey: api.members.remove.mutationKey(),
       predicate: (mutation) =>
         personId !== undefined &&
+        workspaceId !== undefined &&
         ASKED_IN.safeParse(mutation.meta).data?.workspaceId === workspaceId &&
         ASKED_OF_ONE.safeParse(mutation.state.variables).data?.personId === personId,
     },

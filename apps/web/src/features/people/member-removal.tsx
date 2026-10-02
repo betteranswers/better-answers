@@ -17,7 +17,8 @@ const focusOnArrival = (node: HTMLElement | null) => {
 export function MemberRemoval(properties: {
   readonly member: ListedMember;
   readonly askRef: RefObject<HTMLButtonElement | null>;
-  readonly onRemove: (member: ListedMember) => void;
+  /** None until the reader's own membership is read, which says whose removal this is. */
+  readonly onRemove: ((member: ListedMember) => void) | undefined;
   /** A refusal of removing yourself, which is answered here before you leave. */
   readonly outcome: Outcome | undefined;
 }) {
@@ -29,6 +30,7 @@ export function MemberRemoval(properties: {
   const name = nameOf(member);
   const yourself = useReaderId() === member.personId;
   const removing = useRemovalOf(member.personId)?.status === "pending";
+  const offered = !removing && onRemove !== undefined;
 
   return (
     <section aria-labelledby={headingId} className="border border-border">
@@ -66,11 +68,11 @@ export function MemberRemoval(properties: {
                 variant="destructive"
                 aria-describedby={recordId}
                 // Not `disabled`: a disabled button drops the focus the act leaves on it.
-                aria-disabled={removing}
+                aria-disabled={!offered}
                 className="aria-disabled:opacity-50"
                 onClick={() => {
                   // A page drawn again mid-removal has an idle act of its own, so this is the guard.
-                  if (!removing) onRemove(member);
+                  if (offered) onRemove(member);
                 }}
               >
                 Remove {name} from this workspace

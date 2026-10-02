@@ -90,6 +90,8 @@ const useRemoval = (
   const navigate = useNavigate();
   const [outcome, setOutcome] = useState<Outcome>();
 
+  if (removeMember === undefined) return { remove: undefined, outcome };
+
   const remove = (member: ListedMember) => {
     if (removeMember.isPending) return;
     const { personId } = member;
