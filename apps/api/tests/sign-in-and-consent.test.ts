@@ -144,10 +144,16 @@ describe("an expired sign-in code", () => {
     const other = await app().person();
     const tried = await codeAskedFor(other.email);
     const wrong = tried.code === "000000" ? "111111" : "000000";
-    await tried.client.json("/sign-in/email-otp", { email: other.email, otp: wrong });
+    const otherTry = await tried.client.json("/sign-in/email-otp", {
+      email: other.email,
+      otp: wrong,
+    });
 
     const typed = await client.json("/sign-in/email-otp", { email: holder.email, otp: code });
 
+    expect(await otherTry.json(), "the other try never reached the library's lookup").toMatchObject(
+      { code: "INVALID_OTP" },
+    );
     expect(typed.status).toBe(400);
     expect(await typed.json()).toMatchObject({ code: "OTP_EXPIRED" });
   });
