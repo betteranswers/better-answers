@@ -1,6 +1,8 @@
 import type { Pool } from "pg";
 import { pino } from "pino";
 
+import { systemClock } from "@better-answers/core/kernel";
+
 import { createAuth } from "../src/auth/index.ts";
 import { AUTH_SECRET, doorsFor, MCP_URL, PUBLIC_URL, type TestApp } from "./harness.ts";
 
@@ -18,6 +20,7 @@ const authOverDoor = (door: TestApp["doors"]["postgres"]): Auth =>
     sendEmail: async () => {},
     fetchClientMetadataResource: async () => new Response("", { status: 404 }),
     logger: pino({ level: "silent" }),
+    clock: systemClock(),
   });
 
 /** Over the suite's database and secret: an endpoint the router refuses is still a server function. */

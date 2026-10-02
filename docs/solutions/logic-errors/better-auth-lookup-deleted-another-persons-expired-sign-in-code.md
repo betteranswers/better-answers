@@ -23,6 +23,7 @@ tags:
   - sweep-pass
   - cross-request
   - flaky-test
+  - promotion-lock
 ---
 
 # Better Auth's lookup deleted every expired code, so a person's just-expired sign-in code read as wrong rather than spent
@@ -49,9 +50,9 @@ No fix attempt failed. The defect surfaced while the expired-code browser spec w
 
 ## Solution
 
-Two parts, on branch `feat/ba-34-u2-expired-code` (Linear BA-34, unmerged as of this writing).
+Two parts, merged as #514 (Linear BA-34).
 
-**1. Turn the library's deletion at lookup off** (`apps/api/src/auth/auth.ts:428-432`):
+**1. Turn the library's deletion at lookup off** (`apps/api/src/auth/auth.ts:444-448`):
 
 ```ts
     /**
@@ -110,11 +111,17 @@ cd ../.. && grep -rn "FROM verification" apps/api/src packages/core/src
 
 For each `findVerificationValue` hit, find its gate in the lines that follow: an `expiresAt` comparison, or a later consume whose null result refuses. In 1.7.5 the first command finds 12 sites. A new site, or a site whose gate has moved, is what the audit is for.
 
+The api also clears the library's promotion lock by its name (_Fixed: an orphaned lock skipped one promotion_, below). `apps/api/tests/promotion-lock.test.ts` fails if a release renames the lock or re-keys its reservation, which would otherwise make the clear delete nothing. When it fails, find the new name with:
+
+```sh
+grep -rn "revoke-unproven-account-access" apps/api/node_modules/better-auth/dist --include=*.mjs
+```
+
 The day's grace is load-bearing too. A sweep that deletes every expired row the moment it runs brings the bug back from the other side: a code that expired minutes before the pass would read as wrong. Any later housekeeping of the identity set keeps the grace, including the plan's U16 step, whose wording ("no expired identity-set row of these kinds remains") would drop it if built literally (`docs/plans/2026-10-01-2241-feat-people-sign-in-and-security-plan.md:909-923`).
 
 ### The 1.7.5 baseline
 
-The api configures `jwt`, `organization`, `emailOTP`, `oauthProvider`, `twoFactor`, `passkey` and `cimd` (`apps/api/src/auth/auth.ts:490-633`), and no `socialProviders`. Paths below are under `apps/api/node_modules/better-auth/dist/`.
+The api configures `jwt`, `organization`, `emailOTP`, `oauthProvider`, `twoFactor`, `passkey` and `cimd` (`apps/api/src/auth/auth.ts:515-658`), and no `socialProviders`. Paths below are under `apps/api/node_modules/better-auth/dist/`.
 
 | `findVerificationValue` site                                                    | Reached here                    | Gate                                                                                        |
 | ------------------------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------- |
@@ -133,23 +140,26 @@ The api configures `jwt`, `organization`, `emailOTP`, `oauthProvider`, `twoFacto
 
 Consumers through `consumeVerificationValue`, gated by `internal-adapter.mjs:856`: passkey (`apps/api/node_modules/@better-auth/passkey/dist/index.mjs:343` and `:459`) and the oauth-provider's authorization code (`apps/api/node_modules/@better-auth/oauth-provider/dist/introspect-njKASm3q.mjs:1895`; the file name is a build hash, so grep rather than trust it). Inside better-auth, `magic-link`, `phone-number`, `one-time-token`, `siwe`, `email-otp`, two-factor's verify and `otp`, `api/routes/password.mjs` and `api/routes/update-user.mjs` also call `consumeVerificationValue`. `@better-auth/cimd` 1.7.5 neither looks up nor consumes a verification row.
 
-The project's own reads gate too. `READ_A_LINK` computes `link_live` and `code_live` as `expires_at > now()` (`apps/api/src/auth/sign-in-link.ts:74-76`), and `linkSeen` refuses a link unless both are live (`apps/api/src/auth/link-token.ts:141-157`). Erasure finds and deletes a person's verification rows by identifier whatever their expiry (`packages/core/src/erasure/map.ts:162-173`, `packages/core/src/erasure/identity.ts:63-66`), so a row kept for its day is still erased on request.
+The project's own reads gate too. `READ_A_LINK` computes `link_live` and `code_live` as `expires_at > now()` (`apps/api/src/auth/sign-in-link.ts:74-76`), and `linkSeen` refuses a link unless both are live (`apps/api/src/auth/link-token.ts:141-157`). Erasure finds and deletes a person's verification rows by identifier whatever their expiry (`packages/core/src/erasure/map.ts:162-173`, `packages/core/src/erasure/identity.ts:63-66`), so a row kept for its day is still erased on request. The promotion-lock clear deletes a lock only once `expires_at <= now` (`apps/api/src/auth/promotion-lock.ts`).
 
 ### Latent: two-factor's no-session branch
 
-`verifyTwoFactor` checks only that the challenge row exists (`verify-two-factor.mjs:19-20`) before it reads the user and carries on. Its `valid()` step consumes through `consumeVerificationValue` (`:26`), so an expired challenge never mints a session, but the steps before it run against an expired row. This is unreachable today. Every `/two-factor/verify-*` path is in `CLOSED_FACTOR_PATHS` (`apps/api/src/auth/auth.ts:151-167`), and nothing in `apps/api/src` calls `verifyTOTP`, `verifyOTP` or `verifyBackupCode` as a server function. Before opening any of those paths, or calling one as a server function, add an expiry check in front of it.
+`verifyTwoFactor` checks only that the challenge row exists (`verify-two-factor.mjs:19-20`) before it reads the user and carries on. Its `valid()` step consumes through `consumeVerificationValue` (`:26`), so an expired challenge never mints a session, but the steps before it run against an expired row. This is unreachable today. Every `/two-factor/verify-*` path is in `CLOSED_FACTOR_PATHS` (`apps/api/src/auth/auth.ts:153-169`), and nothing in `apps/api/src` calls `verifyTOTP`, `verifyOTP` or `verifyBackupCode` as a server function. Before opening any of those paths, or calling one as a server function, add an expiry check in front of it.
 
-### Residual: an orphaned lock skips one revocation
+### Fixed: an orphaned lock skipped one promotion
 
-`revokeUnprovenAccountAccess` reserves a five-second lock row (`db/revoke-unproven-account-access.mjs:3`, `:35-39`) and deletes it in `finally`, swallowing a failed delete (`:53-55`). The reservation's id is a hash of `"reserve:" + identifier` (`internal-adapter.mjs:885`), so a lock left behind, by a failed delete or a process killed mid-revocation, makes the next reservation for that user return `false` (`internal-adapter.mjs:902-909`). The caller then waits, finds the lock expired, deletes it and returns `findUserById` without revoking the unproven accounts and sessions or setting `emailVerified` (`revoke-unproven-account-access.mjs:7-15`, `:42-45`). Email-otp sign-in goes on to sign in as that user (`plugins/email-otp/routes.mjs:432-436`). The next promotion, with the lock gone, revokes as it should.
+`revokeUnprovenAccountAccess` reserves a five-second lock row (`db/revoke-unproven-account-access.mjs:3`, `:35-39`) and deletes it in `finally`, swallowing a failed delete (`:53-55`). The reservation's id is a hash of `"reserve:" + identifier` (`internal-adapter.mjs:885`), so a lock left behind, by a failed delete or a process killed mid-revocation, makes the next reservation for that user return `false` (`internal-adapter.mjs:902-909`). The caller then waits, finds the lock expired, deletes it and returns `findUserById` without revoking the unproven accounts and sessions or setting `emailVerified` (`revoke-unproven-account-access.mjs:7-15`, `:42-45`). Email-otp sign-in goes on to sign in as that user (`plugins/email-otp/routes.mjs:432-436`). The person stays unverified, so accepting an invitation is refused (`packages/core/src/members/accepting.ts:126`) until a later email-code sign-in revokes as it should. It bites only for a user whose `emailVerified` is still false.
 
-The gap existed before, but it was short: any person's lookup deleted an orphaned lock once its five seconds ran out, so only a promotion inside that gap skipped the revocation. It now lasts until the sweep pass, up to about two days, because the day's grace was sized for sign-in codes, not for locks. It bites only for a user whose `emailVerified` is still false.
+Before #514 an orphaned lock lasted about five seconds. The person's own retry looked up their code (`plugins/email-otp/routes.mjs:763`) before it reached the reservation, and that lookup's table-wide delete removed the expired lock. With the deletion at lookup off, the lock stayed until a sign-in used it up or the sweep pass removed it, up to about two days.
+
+The api now clears it first (Linear BA-39). A `hooks.before` on `/sign-in/email-otp` in `apps/api/src/auth/auth.ts`, which the sign-in link reaches too, deletes the signing-in person's lock when they are unverified and the lock has expired (`apps/api/src/auth/promotion-lock.ts`). A live lock stays, so a second sign-in during a promotion still waits. A failed clear is a warning, `auth.promotion_lock_not_cleared`, and the sign-in goes on as it did before the fix.
 
 ### Tests that hold it
 
 - `apps/api/tests/sign-in-and-consent.test.ts:139-160`, "still answers expired after another person's code is tried". It ages the holder's code, has another person try a wrong code, asserts that try reached the library, then expects `OTP_EXPIRED` for the holder. Turn the deletion at lookup back on and it fails.
 - `apps/api/tests/sweeps.test.ts:245-257`, "deletes codes over a day expired, keeping later ones", pins the day's grace to the minute either side and the `verifications_deleted` count.
 - `apps/web/e2e/sign-in.spec.ts:506`, "an expired code reads as spent, handing focus to another", proves the spent reading through the browser.
+- `apps/api/tests/promotion-lock.test.ts` seeds an orphaned lock under the library's reservation id on a person holding a session and an account, then signs in by code and by link and expects both gone and the address proven. Remove the hook and those tests fail. The same file pins the library's lock name and reservation key.
 
 ### When Better Auth changes
 
@@ -157,7 +167,7 @@ If a release stops deleting expired rows at lookup (read `findVerificationValue`
 
 ## Related Issues
 
-- Linear BA-34, branch `feat/ba-34-u2-expired-code`, unmerged and with no pull request as of this writing.
+- Linear BA-34, merged as #514. Linear BA-39 cleared the orphaned promotion lock that #514 had lengthened.
 - `docs/solutions/best-practices/better-auth-closed-endpoints-run-as-server-functions-without-router-guards.md`: another Better Auth 1.7.5 behaviour that differs from what the config suggests, and the record of the closed factor paths that keep two-factor's no-session branch latent.
 - `docs/solutions/architecture-patterns/adr-0009-better-auth-in-process-identity-provider.md`: Better Auth runs in-process as the api's identity provider, which is why its `verification` table sits in the api's Postgres and the api's sweep pass can delete from it.
 - `docs/plans/2026-10-01-2241-feat-people-sign-in-and-security-plan.md`, U16 (identity-set housekeeping): must keep the day's grace.

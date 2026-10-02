@@ -12,7 +12,7 @@ import type pg from "pg";
 import type { Logger } from "pino";
 import { z } from "zod";
 
-import { attempt, err, type Result, ulid } from "@better-answers/core/kernel";
+import { attempt, type Clock, err, type Result, ulid } from "@better-answers/core/kernel";
 import { withIdentityWrite, type PostgresDoor } from "@better-answers/core/store/postgres";
 import {
   hasNoDisplayName,
@@ -57,6 +57,7 @@ import {
   SIGN_IN_PATH,
 } from "./constants.ts";
 import { codeHashOf } from "./link-token.ts";
+import { dropAnExpiredPromotionLock } from "./promotion-lock.ts";
 import { accessControl, creatorRole, roles } from "./roles.ts";
 import { signInEmail } from "./sign-in-email.ts";
 import { keepALink, signInMethodOfThisCall } from "./sign-in-link.ts";
@@ -85,6 +86,7 @@ type AuthDependencies = {
   readonly sendEmail: EmailSender;
   readonly fetchClientMetadataResource: ClientMetadataFetch;
   readonly logger: Logger;
+  readonly clock: Clock;
 };
 
 const identitySchema = {
@@ -204,6 +206,8 @@ const signedInUser = z
   .optional()
   .catch(undefined);
 const redirectedTo = z.object({ url: z.string() }).optional().catch(undefined);
+/** A before-hook reads the body ahead of the endpoint's own validation. */
+const signInAddress = z.object({ email: z.string() }).optional().catch(undefined);
 
 /**
  * A consent the library defers to a fresh sign-in answers a redirect too, but only the one it
@@ -380,6 +384,18 @@ export const createAuth = (deps: AuthDependencies) => {
     );
   };
 
+  /** A lock left standing is today's skipped promotion, so a failed clear never costs the sign-in. */
+  const clearAnExpiredPromotionLock = async (email: string): Promise<void> => {
+    const cleared = await attempt(() =>
+      dropAnExpiredPromotionLock(deps.door, email, deps.clock.now()),
+    );
+    if (!cleared.ok)
+      audit.warn(
+        { event: "auth.promotion_lock_not_cleared", reason: cleared.error.message },
+        "auth.promotion_lock_not_cleared",
+      );
+  };
+
   const db = drizzle(deps.database, { schema: identitySchema });
   const appAddress = new URL(deps.publicUrl);
 
@@ -467,6 +483,15 @@ export const createAuth = (deps: AuthDependencies) => {
       },
     },
     hooks: {
+      /**
+       * The library proves an unverified address under a lock, and one a dead sign-in left would
+       * skip it until the daily sweep.
+       */
+      before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path !== "/sign-in/email-otp") return;
+        const asked = signInAddress.parse(ctx.body);
+        if (asked !== undefined) await clearAnExpiredPromotionLock(asked.email);
+      }),
       after: createAuthMiddleware(async (ctx) => {
         const event = auditedEvent(ctx.path);
         if (event === undefined) return;
