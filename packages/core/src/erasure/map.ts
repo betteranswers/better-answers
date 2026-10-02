@@ -18,6 +18,10 @@ export const ERASURE_FAMILIES = [
   "identity-verification",
   "identity-invitation",
   "identity-account",
+  "identity-passkey",
+  "identity-authenticator",
+  "identity-recovery-code",
+  "identity-last-active",
   "source-document",
 ] as const;
 
@@ -182,6 +186,37 @@ const ERASURE_FAMILY_DESCRIPTORS = {
     categories: ["linked-account"],
     find: (platform, subject, tx) =>
       aboutTheMember(tx, subject, "SELECT id AS location FROM account WHERE user_id = $1"),
+  },
+
+  "identity-passkey": {
+    categories: ["sign-in", "device"],
+    find: (platform, subject, tx) =>
+      aboutTheMember(tx, subject, "SELECT id AS location FROM passkey WHERE user_id = $1"),
+  },
+
+  "identity-authenticator": {
+    categories: ["sign-in"],
+    find: (platform, subject, tx) =>
+      aboutTheMember(tx, subject, "SELECT id AS location FROM authenticator WHERE user_id = $1"),
+  },
+
+  "identity-recovery-code": {
+    categories: ["sign-in"],
+    find: (platform, subject, tx) =>
+      aboutTheMember(tx, subject, "SELECT id AS location FROM recovery_code WHERE user_id = $1"),
+  },
+
+  /** This workspace's row alone: another's would say where else the person has been. */
+  "identity-last-active": {
+    categories: ["sign-in"],
+    find: (platform, subject, tx) =>
+      aboutTheMember(
+        tx,
+        subject,
+        `SELECT workspace_id AS location FROM workspace_last_active
+          WHERE user_id = $1 AND workspace_id = $2`,
+        [subject.workspaceId],
+      ),
   },
 
   "source-document": {

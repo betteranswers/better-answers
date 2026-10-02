@@ -13,6 +13,10 @@ export type IdentitySwept = {
   readonly sessions: number;
   readonly verifications: number;
   readonly accounts: number;
+  readonly passkeys: number;
+  readonly authenticators: number;
+  readonly recoveryCodes: number;
+  readonly lastActive: number;
   readonly invitationsHere: number;
 
   /**
@@ -28,6 +32,10 @@ const SWEPT_NOTHING = {
   sessions: 0,
   verifications: 0,
   accounts: 0,
+  passkeys: 0,
+  authenticators: 0,
+  recoveryCodes: 0,
+  lastActive: 0,
   invitationsHere: 0,
   invitationsEverywhere: 0,
 } as const;
@@ -61,10 +69,22 @@ const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) =
   );
   const sessions = await tx.query("DELETE FROM session WHERE user_id = $1", [subject.personId]);
   const accounts = await tx.query("DELETE FROM account WHERE user_id = $1", [subject.personId]);
+  const passkeys = await tx.query("DELETE FROM passkey WHERE user_id = $1", [subject.personId]);
+  const authenticators = await tx.query("DELETE FROM authenticator WHERE user_id = $1", [
+    subject.personId,
+  ]);
+  const recoveryCodes = await tx.query("DELETE FROM recovery_code WHERE user_id = $1", [
+    subject.personId,
+  ]);
+  const lastActive = await tx.query("DELETE FROM workspace_last_active WHERE user_id = $1", [
+    subject.personId,
+  ]);
 
   const pseudonymised = await tx.query(
     `UPDATE "user"
-        SET email = $2, email_verified = false, name = '', image = NULL, operator = false
+        SET email = $2, email_verified = false, name = '', image = NULL, operator = false,
+            authenticator_enabled = false, passkey_offer_dismissed_at = NULL,
+            recovery_codes_acknowledged = false
       WHERE id = $1`,
     [subject.personId, tombstone],
   );
@@ -72,6 +92,10 @@ const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) =
     verifications: rowsOf(verifications),
     sessions: rowsOf(sessions),
     accounts: rowsOf(accounts),
+    passkeys: rowsOf(passkeys),
+    authenticators: rowsOf(authenticators),
+    recoveryCodes: rowsOf(recoveryCodes),
+    lastActive: rowsOf(lastActive),
     invitationsHere: invitations.rows.filter((row) => row.workspace_id === subject.workspaceId)
       .length,
     invitationsEverywhere: rowsOf(invitations),
@@ -80,9 +104,9 @@ const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) =
 };
 
 /**
- * Does nothing without a person. Otherwise ends the membership here, and only when it was the
- * person's last deletes their sessions, accounts, verifications and invitations, pseudonymises
- * them and clears any operator mark. Throws when their memberships cannot be read.
+ * Does nothing without a person. Otherwise ends the membership and last activity here, and only
+ * when it was the person's last deletes their sessions, accounts, verifications, invitations and
+ * second factor, pseudonymises them and clears their marks. Throws when memberships cannot be read.
  */
 export const eraseFromTheIdentitySet = async (
   platform: PlatformPrincipal,
@@ -104,7 +128,13 @@ export const eraseFromTheIdentitySet = async (
       personId,
     ]);
     const membershipsEnded = rowsOf(ended);
-    if (arm === "membership-ended") return { arm, ...SWEPT_NOTHING, membershipsEnded };
+    if (arm === "membership-ended") {
+      const lastActiveHere = await tx.query(
+        "DELETE FROM workspace_last_active WHERE workspace_id = $1 AND user_id = $2",
+        [subject.workspaceId, personId],
+      );
+      return { arm, ...SWEPT_NOTHING, membershipsEnded, lastActive: rowsOf(lastActiveHere) };
+    }
     const swept = await sweepTheSet(tx, subject, `${subject.pseudonym}@${ERASED_DOMAIN}`);
     return { arm, membershipsEnded, ...swept };
   });

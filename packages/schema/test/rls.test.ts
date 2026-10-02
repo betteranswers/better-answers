@@ -198,7 +198,17 @@ describe("the identity set", () => {
     expect(unpolicied.toSorted()).toEqual([...EXEMPT].toSorted());
   });
 
-  it("carries no workspace column on Better Auth's tables", async () => {
+  it("carries a workspace column only where its exemption says why", async () => {
+    const carrying = new Set(
+      Object.entries(RLS_EXEMPTIONS)
+        .filter(([, reason]) => reason.startsWith("Carries workspace_id on purpose"))
+        .map(([qualified]) => qualified),
+    );
+    expect([...carrying].toSorted()).toEqual([
+      "public.invitation",
+      "public.member",
+      "public.workspace_last_active",
+    ]);
     for (const qualified of IDENTITY_SET) {
       if (qualified === "public.workspace") continue;
       const [schema, table] = qualified.split(".");
@@ -208,7 +218,7 @@ describe("the identity set", () => {
       );
       expect({ table: qualified, hasWorkspaceColumn: column.rowCount === 1 }).toEqual({
         table: qualified,
-        hasWorkspaceColumn: qualified === "public.member" || qualified === "public.invitation",
+        hasWorkspaceColumn: carrying.has(qualified),
       });
     }
   });

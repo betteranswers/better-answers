@@ -56,6 +56,7 @@ import {
 import { group, GROUP_ORIGINS, groupMember } from "./group-tables.ts";
 import {
   account,
+  authenticator,
   invitation,
   jwks,
   member,
@@ -66,10 +67,14 @@ import {
   oauthConsent,
   oauthRefreshToken,
   oauthResource,
+  passkey,
+  passkeyLastUse,
   rateLimit,
+  recoveryCode,
   session,
   user,
   verification,
+  workspaceLastActive,
 } from "./identity-tables.ts";
 import { chunk, EMBEDDING_DIMENSIONS } from "./index-tables.ts";
 import { job, JOB_KINDS, JOB_REASONS, JOB_STATUSES } from "./job-tables.ts";
@@ -914,6 +919,11 @@ export const boundarySchemas = {
   oauthConsent: plain(oauthConsent),
   oauthClientAssertion: plain(oauthClientAssertion),
   rateLimit: plain(rateLimit),
+  authenticator: plain(authenticator),
+  passkey: plain(passkey),
+  passkeyLastUse: plain(passkeyLastUse),
+  recoveryCode: plain(recoveryCode),
+  workspaceLastActive: plain(workspaceLastActive),
   accessRequest: {
     table: accessRequest,
     select: accessRequestSelect,

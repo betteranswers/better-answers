@@ -29,6 +29,7 @@ const WS_ID = "01J6AAAAAAAAAAAAAAAAAAAAAA";
 const USER_ID = "01J6CCCCCCCCCCCCCCCCCCCCCC";
 const MEMBER_ID = "01J6DDDDDDDDDDDDDDDDDDDDDD";
 const SESSION_ID = "01J6EEEEEEEEEEEEEEEEEEEEEE";
+const PASSKEY_ID = "01J6PPPPPPPPPPPPPPPPPPPPPP";
 const INVITATION_ID = "01J6FFFFFFFFFFFFFFFFFFFFFF";
 const GROUP_ID = "01J6JJJJJJJJJJJJJJJJJJJJJJ";
 const AUDIT_EVENT_ID = "01J6GGGGGGGGGGGGGGGGGGGGGG";
@@ -165,6 +166,23 @@ const acceptedRows = {
   ],
   oauthClientAssertion: [{ id: "assertion-1", expiresAt: NOW }],
   rateLimit: [{ id: "limit-1", key: "ip:203.0.113.1", count: 1, lastRequest: 1 }],
+  authenticator: [
+    { id: "authenticator-1", secret: "sealed", backupCodes: "sealed", userId: USER_ID },
+  ],
+  passkey: [
+    {
+      id: PASSKEY_ID,
+      publicKey: "public-key",
+      userId: USER_ID,
+      credentialID: "credential-1",
+      counter: 0,
+      deviceType: "singleDevice",
+      backedUp: false,
+    },
+  ],
+  passkeyLastUse: [{ passkeyId: PASSKEY_ID, at: NOW }],
+  recoveryCode: [{ id: "recovery-code-1", userId: USER_ID, codeHash: "a".repeat(64) }],
+  workspaceLastActive: [{ workspaceId: WS_ID, userId: USER_ID, at: NOW }],
   mcpCallCounter: [{ workspaceId: WS_ID, tokenId: "jti-1", windowStart: NOW, count: 1 }],
   ingressCounter: [{ scope: "ip", key: "203.0.113.1", windowStart: NOW, count: 1 }],
   contractStamp: [{ onlyRow: true, digest: "a".repeat(64), stampedAt: NOW }],
@@ -789,6 +807,11 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "oauthConsent",
         "oauthClientAssertion",
         "rateLimit",
+        "authenticator",
+        "passkey",
+        "passkeyLastUse",
+        "recoveryCode",
+        "workspaceLastActive",
         "mcpCallCounter",
         "ingressCounter",
         "contractStamp",
@@ -1275,6 +1298,9 @@ describe("5 — the inferred type is pinned", () => {
         updatedAt: Date;
         credentialsRevokedAt: Date | null;
         operator: boolean;
+        authenticatorEnabled: boolean;
+        passkeyOfferDismissedAt: Date | null;
+        recoveryCodesAcknowledged: boolean;
       }
     >
   >;
@@ -1310,6 +1336,8 @@ describe("5 — the inferred type is pinned", () => {
         userAgent: string | null;
         userId: string;
         activeWorkspaceId: string | null;
+        secondFactorConfirmedAt: Date | null;
+        pendingSince: Date | null;
       }
     >
   >;
