@@ -133,6 +133,27 @@ const withMapLeftovers = async () => {
   return workspace;
 };
 
+const MINUTE_MS = 60 * 1000;
+const HOUR_MS = 60 * MINUTE_MS;
+
+/** A sign-in code's row expiring `fromThePassMs` after the pass's own clock reads. */
+const codeExpiring = async (fromThePassMs: number): Promise<string> => {
+  const client = await db().pool.connect();
+  try {
+    const expiresAt = new Date(A_DAY_ON().getTime() + fromThePassMs);
+    return (await testData(client).verification({ expiresAt })).identifier;
+  } finally {
+    client.release();
+  }
+};
+
+const verificationsLeft = async (): Promise<readonly string[]> =>
+  (
+    await db().pool.query<{ identifier: string }>(
+      "SELECT identifier FROM verification ORDER BY expires_at",
+    )
+  ).rows.map((row) => row.identifier);
+
 describe("the sweeps' daily pass", () => {
   it("passes once a day after its first", () => {
     expect(SWEEP_INTERVAL_MS).toBe(86_400_000);
@@ -221,6 +242,42 @@ describe("the sweeps' daily pass", () => {
     });
   });
 
+  it("deletes codes over a day expired, keeping later ones", async () => {
+    await codeExpiring(-24 * HOUR_MS - MINUTE_MS);
+    const justUnderADay = await codeExpiring(-24 * HOUR_MS + MINUTE_MS);
+    const withinTheDay = await codeExpiring(-1 * HOUR_MS);
+    const live = await codeExpiring(5 * 60 * 1000);
+
+    const sweeps = await onePass({ uploadSweep: "list", pingUrl: PING_URL });
+
+    expect(await verificationsLeft()).toEqual([justUnderADay, withinTheDay, live]);
+    expect(passes(sweeps.logs)).toEqual([
+      expect.objectContaining({ level: 30, verifications_deleted: 1 }),
+    ]);
+  });
+
+  it("names a refused code deletion in the log, pinging failure", async () => {
+    await codeExpiring(-25 * HOUR_MS);
+
+    const sweeps = await whileWritesAreRefused(db().pool, "verification", () =>
+      onePass({ uploadSweep: "list", pingUrl: PING_URL }),
+    );
+
+    expect(passes(sweeps.logs)).toEqual([
+      expect.objectContaining({
+        level: 40,
+        verifications_deleted: 0,
+        refusals: [{ sweep: "verifications", reason: expect.any(String) }],
+      }),
+    ]);
+    expect(sweeps.pinged).toEqual([
+      {
+        url: `${PING_URL}/fail`,
+        body: "fail workspaces=0 refused=0 upload_sweep=list found=0 removed=0 generations=0",
+      },
+    ]);
+  });
+
   it("skips its pass under a manual sweep's lock, pinging nothing", async () => {
     await withAnOrphan();
 
@@ -297,6 +354,27 @@ describe("the sweeps' daily pass", () => {
         level: 50,
         msg: "the sweep pass failed",
         reason: expect.stringContaining("its row was not written"),
+      }),
+    );
+    expect(sweeps.pinged).toEqual([{ url: `${PING_URL}/fail`, body: "fail" }]);
+  });
+
+  it("deletes expired codes even when the workspace sweep fails", async () => {
+    await provisioned();
+    await codeExpiring(-25 * HOUR_MS);
+    const live = await codeExpiring(5 * MINUTE_MS);
+
+    const sweeps = await whileWritesAreRefused(db().pool, "sweep_pass", () =>
+      onePass({ uploadSweep: "list", pingUrl: PING_URL }),
+    );
+
+    expect(await verificationsLeft()).toEqual([live]);
+    expect(sweeps.logs).toContainEqual(
+      expect.objectContaining({
+        level: 50,
+        msg: "the sweep pass failed",
+        verifications_deleted: 1,
+        refusals: [],
       }),
     );
     expect(sweeps.pinged).toEqual([{ url: `${PING_URL}/fail`, body: "fail" }]);

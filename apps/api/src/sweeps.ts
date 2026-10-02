@@ -1,8 +1,10 @@
 import type { Logger } from "pino";
 
-import { attemptResult, err, ok, type Result } from "@better-answers/core/kernel";
+import { attempt, attemptResult, err, ok, type Result } from "@better-answers/core/kernel";
+import type { PostgresDoor } from "@better-answers/core/store/postgres";
 import { SWEEPS, sweepEveryWorkspace, type SweepPass } from "@better-answers/core/sweeps";
 
+import { dropExpiredVerifications } from "./auth/expired-verifications.ts";
 import type { SweepSettings } from "./config.ts";
 import { deadManPing, type PingFetch, type PingOutcome } from "./dead-man-ping.ts";
 import type { Doors } from "./doors.ts";
@@ -43,6 +45,14 @@ const refusalsOf = (pass: SweepPass) =>
       : [{ workspace_id: workspaceId, sweep: "graph", reason: reasonOf(graph.error) }]),
   ]);
 
+/** No workspace holds a verification row, so a refused delete names its sweep alone. */
+const verificationsDropped = async (postgres: PostgresDoor, now: Date) => {
+  const dropped = await attempt(() => dropExpiredVerifications(postgres, now));
+  return dropped.ok
+    ? { deleted: dropped.value, refusals: [] }
+    : { deleted: 0, refusals: [{ sweep: "verifications", reason: reasonOf(dropped.error) }] };
+};
+
 /** Counts, never a workspace, a key or an error. */
 const sizesOf = (pass: SweepPass): string => {
   const { workspaces, refused, found, removed, generations } = pass.totals;
@@ -64,17 +74,28 @@ export const startSweeps = (dependencies: SweepsDependencies): Result<Sweeps, Sw
 
   const pass = async (): Promise<void> => {
     const swept = await attemptResult(() => sweepEveryWorkspace(SWEEPS, doors, { uploadSweep }));
+    if (!swept.ok && swept.error === "held") {
+      logger.warn("a sweep pass was skipped: another holder has the sweeps' lock");
+      return;
+    }
+    // The deletion needs no workspace, so a failed workspace sweep must not keep expired rows.
+    const verifications = await verificationsDropped(postgres, clock.now());
     if (!swept.ok) {
-      if (swept.error === "held") {
-        logger.warn("a sweep pass was skipped: another holder has the sweeps' lock");
-        return;
-      }
-      logger.error({ reason: swept.error.message }, "the sweep pass failed");
+      const { deleted, refusals } = verifications;
+      logger.error(
+        { reason: reasonOf(swept.error), verifications_deleted: deleted, refusals },
+        "the sweep pass failed",
+      );
       await ping("fail");
       return;
     }
-    const refusals = refusalsOf(swept.value);
-    const summary = { upload_sweep: uploadSweep, ...swept.value.totals, refusals };
+    const refusals = [...refusalsOf(swept.value), ...verifications.refusals];
+    const summary = {
+      upload_sweep: uploadSweep,
+      ...swept.value.totals,
+      verifications_deleted: verifications.deleted,
+      refusals,
+    };
     const outcome: PingOutcome = refusals.length > 0 ? "fail" : "ok";
     if (outcome === "fail") logger.warn(summary, "sweep pass");
     else logger.info(summary, "sweep pass");

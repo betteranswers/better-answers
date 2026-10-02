@@ -5,6 +5,7 @@ import { whileWritesAreRefused } from "@better-answers/core/testing/postgres";
 
 import { authorizeUrl, connectAsHost, driveToPage, pkce, signIn } from "./flow.ts";
 import { CLAUDE_CLIENT_ID, PUBLIC_URL, type TestApp } from "./harness.ts";
+import { codeSentPastItsExpiry } from "./provoke.ts";
 import { appForSuite } from "./suite-app.ts";
 
 const app = appForSuite();
@@ -132,6 +133,29 @@ describe("a sign-in, recorded on the identity-set audit log", () => {
         reason: REFUSED_AUDIT_LOG,
       },
     ]);
+  });
+});
+
+describe("an expired sign-in code", () => {
+  it("still answers expired after another person's code is tried", async () => {
+    const holder = await app().person();
+    const { client, code } = await codeAskedFor(holder.email);
+    await codeSentPastItsExpiry(app(), holder.email);
+    const other = await app().person();
+    const tried = await codeAskedFor(other.email);
+    const wrong = tried.code === "000000" ? "111111" : "000000";
+    const otherTry = await tried.client.json("/sign-in/email-otp", {
+      email: other.email,
+      otp: wrong,
+    });
+
+    const typed = await client.json("/sign-in/email-otp", { email: holder.email, otp: code });
+
+    expect(await otherTry.json(), "the other try never reached the library's lookup").toMatchObject(
+      { code: "INVALID_OTP" },
+    );
+    expect(typed.status).toBe(400);
+    expect(await typed.json()).toMatchObject({ code: "OTP_EXPIRED" });
   });
 });
 

@@ -425,6 +425,11 @@ export const createAuth = (deps: AuthDependencies) => {
         pendingSince: { type: "date", required: false, input: false, returned: false },
       },
     },
+    /**
+     * The library's lookup deletes every expired row, so another person's sign-in would make a
+     * code just expired read as wrong. The daily sweep deletes them.
+     */
+    verification: { disableCleanup: true },
     rateLimit: {
       enabled: true,
       storage: "database",
