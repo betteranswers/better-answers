@@ -260,3 +260,58 @@ describe("the journeys' fixtures", () => {
     );
   }, 120_000);
 });
+
+/** The three journeys under their own names, the Admin's ending as `adminEnds` says. */
+const theThreeJourneys = (adminEnds: string) => ({
+  "admin.spec.ts": journeyOf(
+    `import { stopTheRun } from ${moduleAt("journeys/run-stop.ts")};`,
+    'test.use({ role: "Admin" });',
+    `test("the Admin's journey ends early", async () => { ${adminEnds} });`,
+  ),
+  "editor.spec.ts": journeyOf(...AS_THE_EDITOR),
+  "viewer.spec.ts": journeyOf(
+    'test.use({ role: "Viewer" });',
+    'test("the Viewer passes through the screen", async () => {});',
+  ),
+});
+
+const signInsHeard = (product: Product): number =>
+  product.heard.filter(({ asked }) => asked === "POST /sign-in/email-otp").length;
+
+describe("a run the Admin's journey stops", () => {
+  const ALL_THREE = { JOURNEYS_VIEWER_EMAIL: "viewer@journeys.example" };
+
+  it("signs the Editor and Viewer in nowhere, once stopped", async () => {
+    const product = await theProduct();
+    const run = await journeysOver({
+      specs: theThreeJourneys('stopTheRun("the test workspace holds 1 waiting invitation");'),
+      use: { baseURL: product.origin },
+      env: { ...SETTINGS, ...ALL_THREE },
+    });
+    const STOPPED =
+      "the Admin's journey found the test workspace changed, so nobody else signs in: possible compromise";
+    const GOES_ON = "Check the run goes on | Check the run goes on";
+
+    expect(run.outcome).toBe("could-not-run\n");
+    expect(signInsHeard(product)).toBe(1);
+    expect(run.summary).toContain(
+      [
+        "| could-not-run | Admin | outside any step | outside any step | the test workspace holds 1 waiting invitation: possible compromise |",
+        `| could-not-run | Editor | ${GOES_ON} | ${STOPPED} |`,
+        `| could-not-run | Viewer | ${GOES_ON} | ${STOPPED} |`,
+      ].join("\n"),
+    );
+  }, 120_000);
+
+  it("signs the Editor and Viewer in after an ordinary failure", async () => {
+    const product = await theProduct();
+    const run = await journeysOver({
+      specs: theThreeJourneys('throw new Error("a screen failed");'),
+      use: { baseURL: product.origin },
+      env: { ...SETTINGS, ...ALL_THREE },
+    });
+
+    expect(run.outcome).toBe("fail\n");
+    expect(signInsHeard(product)).toBe(3);
+  }, 120_000);
+});
