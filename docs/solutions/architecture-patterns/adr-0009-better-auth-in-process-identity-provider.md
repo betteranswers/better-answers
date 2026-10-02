@@ -10,6 +10,7 @@ applies_when:
   - "Adding a People act, an invitation step or anything that writes a membership"
   - "Giving the operator a new read or write, or recording a sign-in, consent or token event"
   - "Adding a table that carries no workspace_id or has no row-level security"
+  - "Registering a Better Auth plugin, or calling an endpoint that disabledPaths closes"
 tags:
   - adr-0009
   - better-auth
@@ -26,7 +27,7 @@ tags:
 
 Better Auth runs in-process as a library. The api is its own OAuth 2.1 authorization server for the MCP surface and the email-code sign-in for the SPA.
 
-- Its tables are the identity set, keyed not scoped. They are read by key before any workspace is known, so they carry no `workspace_id` and no RLS policy. The set is named in `packages/schema/src/identity-tables.ts`, and `packages/schema/test/rls.test.ts` holds the exemption both ways.
+- Its tables are the identity set, keyed not scoped, with the platform's own rows about a person's sign-in: recovery codes, a passkey's last use and each workspace's last activity. They are read by key before any workspace is known, so they carry no RLS policy, and a `workspace_id` only where their exemption says why. The set is named in `packages/schema/src/identity-tables.ts`, and `packages/schema/test/rls.test.ts` holds the exemption both ways.
 - It shares one origin, `app.<apex>`, with the SPA's sign-in and the workspace picker.
 - CIMD only, allow-listed to `claude.ai`. Dynamic client registration stays off.
 - A person has one platform-minted id (ADR 0035). Revocation has two scopes: a workspace Admin's, in that workspace, and the operator's, everywhere.
@@ -43,6 +44,11 @@ The `organization` plugin:
 - It keeps its tables, its reads and the picker's `/organization/set-active`.
 - Its other writes and `/organization/check-slug` are in `disabledPaths`, each proven refused for every role.
 - Every People act, accepting an invitation included, is the members slice's over tRPC, keyed by workspace and person id, with its audit event in its own transaction.
+
+The passkey and authenticator plugins:
+
+- Every path they mount is in `disabledPaths`, and so are `/update-session`, `/list-sessions`, the three `/revoke-*` paths and `/unlink-account`. `apps/api/tests/second-factor-foundation.test.ts` holds each refused to a signed-in person.
+- `disabledPaths` refuses over HTTP only. The api's own routes call a closed endpoint as a server function, which also skips the library's rate limiter and origin check, so each such route carries its own (`docs/solutions/best-practices/better-auth-closed-endpoints-run-as-server-functions-without-router-guards.md`).
 
 The operator:
 
