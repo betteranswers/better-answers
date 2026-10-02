@@ -7,7 +7,7 @@ import {
   spendRecoveryCode,
 } from "../src/workspaces/index.ts";
 import { bootstrap, seedPerson } from "./platform.ts";
-import { postgresForSuite } from "./suite-postgres.ts";
+import { postgresForSuite, whileWritesAreRefused } from "./suite-postgres.ts";
 
 const db = postgresForSuite();
 
@@ -74,6 +74,50 @@ describe("replacing recovery codes", () => {
     });
 
     expect(replaced).toEqual({ ok: false, error: "person-gone" });
+  });
+});
+
+describe("each recovery-code act", () => {
+  it.each([
+    ["replacing", () => replaceRecoveryCodes(bootstrap, door(), { personId: "not-an-id" })],
+    [
+      "spending",
+      () => spendRecoveryCode(bootstrap, door(), { personId: "not-an-id", code: "abcd" }),
+    ],
+    ["acknowledging", () => acknowledgeRecoveryCodes(bootstrap, door(), { personId: "not-an-id" })],
+  ])("refuses a malformed person id when %s", async (_act, asked) => {
+    expect(await asked()).toEqual({ ok: false, error: "malformed" });
+  });
+
+  it("answers the store's failure when replacing", async () => {
+    const personId = await seedPerson(db().pool);
+
+    const answered = await whileWritesAreRefused(db().pool, "recovery_code", () =>
+      replaceRecoveryCodes(bootstrap, door(), { personId }),
+    );
+
+    expect(answered).toEqual({ ok: false, error: expect.any(Error) });
+  });
+
+  it("answers the store's failure when spending", async () => {
+    const personId = await seedPerson(db().pool);
+    const code = firstOf(await codesFor(personId));
+
+    const answered = await whileWritesAreRefused(db().pool, "recovery_code", () =>
+      spendRecoveryCode(bootstrap, door(), { personId, code }),
+    );
+
+    expect(answered).toEqual({ ok: false, error: expect.any(Error) });
+  });
+
+  it("answers the store's failure when acknowledging", async () => {
+    const personId = await seedPerson(db().pool);
+
+    const answered = await whileWritesAreRefused(db().pool, "user", () =>
+      acknowledgeRecoveryCodes(bootstrap, door(), { personId }),
+    );
+
+    expect(answered).toEqual({ ok: false, error: expect.any(Error) });
   });
 });
 
@@ -144,6 +188,14 @@ describe("spending a recovery code", () => {
 });
 
 describe("acknowledging recovery codes", () => {
+  it("refuses a person nobody holds", async () => {
+    const answered = await acknowledgeRecoveryCodes(bootstrap, door(), {
+      personId: "01J00000000000000000000000",
+    });
+
+    expect(answered).toEqual({ ok: false, error: "person-gone" });
+  });
+
   it("records that the person saved the set", async () => {
     const personId = await seedPerson(db().pool);
     await codesFor(personId);

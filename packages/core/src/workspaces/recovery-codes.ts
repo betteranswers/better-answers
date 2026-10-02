@@ -28,21 +28,17 @@ const RECOVERY_CODE_COUNT = 10;
 const ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz";
 
 /** Sixteen characters carry 80 bits, past guessing from a leaked hash, so the hash needs no key. */
-const CHARACTERS_IN_A_CODE = 16;
+const GROUPS_IN_A_CODE = 4;
 
 const CHARACTERS_IN_A_GROUP = 4;
 
-const TYPED_CODE = /^[0-9a-hjkmnp-tv-z]{16}$/;
-
-const GROUP = new RegExp(`.{${String(CHARACTERS_IN_A_GROUP)}}`, "g");
-
-const mintRecoveryCode = (): string => {
-  const characters = Array.from(
-    { length: CHARACTERS_IN_A_CODE },
-    () => ALPHABET[randomInt(ALPHABET.length)],
+const mintGroup = (): string =>
+  Array.from({ length: CHARACTERS_IN_A_GROUP }, () => ALPHABET[randomInt(ALPHABET.length)]).join(
+    "",
   );
-  return (characters.join("").match(GROUP) ?? []).join("-");
-};
+
+const mintRecoveryCode = (): string =>
+  Array.from({ length: GROUPS_IN_A_CODE }, mintGroup).join("-");
 
 /** What a person types, as it was minted: no spaces, no dashes, lower case. */
 const asMinted = (typed: string): string => typed.toLowerCase().replaceAll(/[\s-]/g, "");
@@ -116,8 +112,8 @@ type SpendRecoveryCodeInput = RecoveryCodesInput & { readonly code: string };
 export type SpendRecoveryCodeRefusal = WorkspaceRefusal<"malformed" | "recovery-code-wrong">;
 
 /**
- * A conditional delete spends the code, so of two spends at once only one finds it. A code that
- * is not the person's, or not a code at all, is wrong in the same word.
+ * A conditional delete spends the code, so of two spends at once only one finds it. Only a stored
+ * hash matches, so anything else typed is wrong in the same word.
  */
 export const spendRecoveryCode = async (
   platform: PlatformPrincipal,
@@ -127,7 +123,6 @@ export const spendRecoveryCode = async (
   const personId = boundarySchemas.user.select.shape.id.safeParse(input.personId);
   if (!personId.success) return err("malformed");
   const code = asMinted(input.code);
-  if (!TYPED_CODE.test(code)) return err("recovery-code-wrong");
 
   const spent = await attempt(() =>
     withIdentityWrite(
