@@ -21,11 +21,11 @@ export type Inbox = {
   readonly pollIntervalMs?: number;
 };
 
-type InboxAnswer =
+export type InboxAnswer =
   | { readonly answer: "code"; readonly code: string }
   | { readonly answer: "no-mail" | "no-code" | "ambiguous" | "unreachable" };
 
-type Noted =
+export type Noted =
   | {
       readonly answer: "noted";
       /** Ask again after a refused code: one rotated since reads as ambiguous, not as a failure. */
@@ -54,7 +54,7 @@ type Message = z.infer<typeof MESSAGE>;
 const KEY = z.string().min(1);
 
 const inboxKey = (): string | undefined => {
-  // oxlint-disable-next-line node/no-process-env -- read here alone, so no caller ever holds the key to print it
+  // Read here alone, so no caller ever holds the key to print it.
   const parsed = KEY.safeParse(process.env["JOURNEYS_INBOX_KEY"]);
   return parsed.success ? parsed.data : undefined;
 };

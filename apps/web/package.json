@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "check": "node ../../scripts/check.mjs typecheck test e2e",
     "test": "node ./node_modules/vitest/vitest.mjs run",
-    "e2e": "pnpm run build && playwright test"
+    "e2e": "pnpm run build && playwright test",
+    "journeys": "node ./node_modules/@playwright/test/cli.js test --config playwright.journeys.config.ts"
   },
   "dependencies": {
     "@better-answers/design-system": "workspace:*",

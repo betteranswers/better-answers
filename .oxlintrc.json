@@ -206,6 +206,53 @@
       }
     },
     {
+      "files": ["apps/web/journeys/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "../e2e/harness.ts",
+                "allowImportNames": ["codeSentTo"],
+                "message": "The journeys run against production, where the harness does not exist: they take no harness act. `codeSentTo` alone is allowed, as the code source for a run by hand against the browser suite's api."
+              }
+            ],
+            "patterns": [
+              {
+                "group": [
+                  "../*/**",
+                  "../../**",
+                  "!../e2e/browser.ts",
+                  "!../e2e/locators.ts",
+                  "!../e2e/harness.ts"
+                ],
+                "message": "The journeys reach into the browser suite for its fixtures (`../e2e/browser.ts`) and its locators (`../e2e/locators.ts`) only; anything else that crosses a directory is written `@/<zone>/…`."
+              },
+              {
+                "group": ["@better-answers/api", "@better-answers/api/*"],
+                "message": "apps/web imports nothing from apps/api. The one exception is `AppRouter` as an `import type`, in `apps/web/src/shared/api/trpc.ts` and no second file; runtime coupling stays zero."
+              },
+              {
+                "group": ["drizzle-zod"],
+                "message": "drizzle-zod is imported only by packages/schema/src/drizzle-zod.ts; import the boundary schemas from @better-answers/schema."
+              },
+              {
+                "group": [
+                  "better-auth",
+                  "better-auth/*",
+                  "better-auth/*/*",
+                  "@better-auth/*",
+                  "@better-auth/*/*"
+                ],
+                "message": "better-auth is imported only under apps/api/src/auth/ and apps/api/lifts/better-auth-cimd-node/."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "files": ["apps/web/src/features/**"],
       "rules": {
         "no-restricted-imports": [
@@ -383,7 +430,11 @@
       }
     },
     {
-      "files": ["apps/api/src/config.ts", "apps/web/playwright.config.ts"],
+      "files": [
+        "apps/api/src/config.ts",
+        "apps/web/playwright.config.ts",
+        "apps/web/playwright.journeys.config.ts"
+      ],
       "rules": {
         "node/no-process-env": "off"
       }
@@ -401,7 +452,14 @@
       }
     },
     {
-      "files": ["**/*.test.ts", "**/*.test.tsx", "**/test/**", "**/tests/**", "**/e2e/**"],
+      "files": [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/test/**",
+        "**/tests/**",
+        "**/e2e/**",
+        "apps/web/journeys/**"
+      ],
       "rules": {
         "node/no-process-env": "off"
       }

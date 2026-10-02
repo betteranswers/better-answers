@@ -1,64 +1,27 @@
 // @vitest-environment node
 
-import { spawnSync } from "node:child_process";
-import {
-  mkdtempSync,
-  readFileSync,
-  realpathSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from "node:fs";
-import { tmpdir } from "node:os";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
 import { describe, expect, it } from "vitest";
 
-const web = fileURLToPath(new URL("..", import.meta.url));
+import { moduleAt, playwrightOver } from "./playwright-tree.ts";
 
-type Run = { readonly stdout: string; readonly summary: string };
-
-/** The spec's own import of Playwright resolves through the link, to the instance running it. */
-const playwrightOver = (spec: string): Run => {
-  const tree = realpathSync(mkdtempSync(path.join(tmpdir(), "flaky-report-")));
-  try {
-    symlinkSync(path.join(web, "node_modules"), path.join(tree, "node_modules"));
-    const reporter = JSON.stringify(path.join(web, "e2e", "flaky-report.ts"));
-    writeFileSync(
-      path.join(tree, "playwright.config.ts"),
-      `export default { testDir: ".", retries: 1, reporter: [[${reporter}]], use: { trace: "on-first-retry" } };\n`,
-    );
-    writeFileSync(path.join(tree, "a.spec.ts"), spec);
-    const summary = path.join(tree, "summary.md");
-    writeFileSync(summary, "");
-
-    const run = spawnSync(
-      process.execPath,
-      [path.join(web, "node_modules", "@playwright", "test", "cli.js"), "test"],
-      {
-        cwd: tree,
-        encoding: "utf8",
-        env: {
-          ...process.env,
-          GITHUB_STEP_SUMMARY: summary,
-          GITHUB_WORKSPACE: tree,
-          TRACE_ARTIFACT: "browser-traces-attempt-1",
-        },
-      },
-    );
-    if (run.status !== 0) {
-      throw new Error(`playwright exited ${String(run.status)}:\n${run.stdout}\n${run.stderr}`);
-    }
-    return { stdout: run.stdout, summary: readFileSync(summary, "utf8") };
-  } finally {
-    rmSync(tree, { recursive: true, force: true });
+const flakyReportOver = (spec: string) => {
+  const reporter = moduleAt("e2e/flaky-report.ts");
+  const run = playwrightOver(
+    {
+      "playwright.config.ts": `export default { testDir: ".", retries: 1, reporter: [[${reporter}]], use: { trace: "on-first-retry" } };\n`,
+      "a.spec.ts": spec,
+    },
+    { TRACE_ARTIFACT: "browser-traces-attempt-1" },
+  );
+  if (run.status !== 0) {
+    throw new Error(`playwright exited ${String(run.status)}:\n${run.stdout}\n${run.stderr}`);
   }
+  return run;
 };
 
 describe("the flaky report", () => {
   it("names a test that passed only on its retry", () => {
-    const run = playwrightOver(
+    const run = flakyReportOver(
       [
         'import { test } from "@playwright/test";',
         'test.describe("the checkout", () => {',
@@ -81,7 +44,7 @@ describe("the flaky report", () => {
   }, 60_000);
 
   it("names nothing when every test passes at first", () => {
-    const run = playwrightOver(
+    const run = flakyReportOver(
       ['import { test } from "@playwright/test";', 'test("takes a payment", () => {});', ""].join(
         "\n",
       ),
