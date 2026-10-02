@@ -55,6 +55,9 @@ const INVITATION_ACTS = declareActs("people", {
 /** One workspace emails an address at most this often, by an invite or a resend alike. */
 const INVITATION_CEILING: CounterRule = { windowMs: 60 * 60_000, max: 5 };
 
+/** Every workspace mails through one shared account, which a flood could get suspended; a few hundred people still fit in two hours. */
+const WORKSPACE_INVITATION_CEILING: CounterRule = { windowMs: 60 * 60_000, max: 200 };
+
 /** One act sends to, or holds, at most this many invitations until it commits. */
 const MOST_AT_ONCE = 50;
 
@@ -239,16 +242,36 @@ const workspaceNameOf = async (admin: AdminUserPrincipal, tx: Tx): Promise<strin
 const counterKeyOf = (admin: AdminUserPrincipal, address: string): string =>
   createHash("sha256").update(`${admin.workspaceId}:${address}`).digest("hex");
 
-/** In key order, so two acts counting one address queue rather than deadlock; past the ceiling the act fails whole. */
+/** Hashed alike, from the workspace's ULID alone, which holds no `:` as every address key's input does. */
+const workspaceKeyOf = (admin: AdminUserPrincipal): string =>
+  createHash("sha256").update(admin.workspaceId).digest("hex");
+
+type Counter = { readonly key: string; readonly rule: CounterRule; readonly amount: number };
+
+const countersOf = (
+  admin: AdminUserPrincipal,
+  addresses: readonly string[],
+): readonly Counter[] => [
+  ...addresses.map((address) => ({
+    key: counterKeyOf(admin, address),
+    rule: INVITATION_CEILING,
+    amount: 1,
+  })),
+  { key: workspaceKeyOf(admin), rule: WORKSPACE_INVITATION_CEILING, amount: addresses.length },
+];
+
+/** In key order, the workspace's among the addresses', so two acts sharing a counter queue rather than deadlock; past either ceiling the act fails whole. */
 const emailsCounted = async (
   admin: AdminUserPrincipal,
   tx: Tx,
   addresses: readonly string[],
   now: Date,
 ): Promise<Result<undefined, CeilingMet>> => {
-  const keys = addresses.map((address) => counterKeyOf(admin, address)).toSorted(byCodeUnit);
-  for (const key of keys) {
-    const counted = await consumeIngressIn(tx, "invitation", key, INVITATION_CEILING, now);
+  const counters = countersOf(admin, addresses).toSorted((one, other) =>
+    byCodeUnit(one.key, other.key),
+  );
+  for (const { key, rule, amount } of counters) {
+    const counted = await consumeIngressIn(tx, "invitation", key, rule, now, amount);
     if (!counted.allowed) return err(new CeilingMet(counted.retryAfterSeconds));
   }
   return ok(undefined);
@@ -547,7 +570,7 @@ const renewedOne = async (
 
 /**
  * A resent invitation keeps its link and runs seven days from `now`, as the new email says. Each
- * resend counts against the address's ceiling.
+ * resend counts against the address's ceiling and the workspace's.
  */
 export const resendInvitation = async (
   principal: UserPrincipal,
@@ -664,7 +687,8 @@ export type BulkResendInvitationsInput = z.output<typeof bulkInvitationsInput> &
 
 /**
  * Renews every ticked invitation a week from `now`, or none: one accepted, cancelled or not held
- * here refuses the set naming each. Past an address's ceiling, the set fails whole.
+ * here refuses the set naming each. Past an address's ceiling or the workspace's, the set fails
+ * whole.
  */
 export const bulkResendInvitations = async (
   principal: UserPrincipal,

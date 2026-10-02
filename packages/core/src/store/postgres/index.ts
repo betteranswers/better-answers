@@ -479,8 +479,8 @@ type IngressScope = (typeof INGRESS_SCOPES)[number];
 const INGRESS_COUNTED = `WITH swept AS (
          DELETE FROM ingress_counter WHERE scope = $1 AND key = $2 AND window_start < $3
        )
-       INSERT INTO ingress_counter (scope, key, window_start, count) VALUES ($1, $2, $3, 1)
-       ON CONFLICT (scope, key, window_start) DO UPDATE SET count = ingress_counter.count + 1
+       INSERT INTO ingress_counter (scope, key, window_start, count) VALUES ($1, $2, $3, $4)
+       ON CONFLICT (scope, key, window_start) DO UPDATE SET count = ingress_counter.count + EXCLUDED.count
        RETURNING count`;
 
 /**
@@ -496,12 +496,13 @@ export const consumeIngress = async (
   now: Date,
 ): Promise<CounterOutcome> =>
   countInWindow(rule, now, (start) =>
-    door.pool.query<{ count: number }>(INGRESS_COUNTED, [scope, key, start]),
+    door.pool.query<{ count: number }>(INGRESS_COUNTED, [scope, key, start, 1]),
   );
 
 /**
- * As consumeIngress, inside the caller's transaction: an act that refuses or fails after it
- * rolls the count back, and the counter row stays held until it commits.
+ * As consumeIngress, inside the caller's transaction, counting `amount` attempts at once: an act
+ * that refuses or fails after it rolls the count back, and the counter row stays held until it
+ * commits.
  */
 export const consumeIngressIn = async (
   tx: Tx,
@@ -509,9 +510,10 @@ export const consumeIngressIn = async (
   key: string,
   rule: CounterRule,
   now: Date,
+  amount = 1,
 ): Promise<CounterOutcome> =>
   countInWindow(rule, now, (start) =>
-    tx.query<{ count: number }>(INGRESS_COUNTED, [scope, key, start]),
+    tx.query<{ count: number }>(INGRESS_COUNTED, [scope, key, start, amount]),
   );
 
 /** As consumeIngress, for one call on the token `tokenId`, inside the caller's transaction. */

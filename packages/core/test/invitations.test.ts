@@ -39,12 +39,14 @@ const {
   invite,
   resending,
   atTheCeiling,
+  invitedMany,
   cancelledInvitation,
   memberAt,
   invitationLeft,
   invitationsOf,
   invitationEvents,
   emailsCountedTo,
+  emailsCountedFrom,
 } = invitationsSuite(db);
 
 const listed = (workspace: ProvisionedWorkspace, status: string | undefined, at: Date) =>
@@ -323,12 +325,13 @@ describe("an approved access request's invitation", () => {
     return { workspace, requester, approving };
   };
 
-  it("counts against no address's ceiling", async () => {
+  it("counts against no address's ceiling, nor the workspace's", async () => {
     const { workspace, requester, approving } = await aRequestWaiting("ApprovingUncounted");
 
     answeredValue(await approving());
 
     expect(await emailsCountedTo(workspace, requester.email)).toBe(0);
+    expect(await emailsCountedFrom(workspace)).toBe(0);
   });
 
   it("fails as its event fails, in that failure's words", async () => {
@@ -414,6 +417,26 @@ describe("resending an invitation", () => {
 
     expect(ceilingOf(refused)).toBe(1800);
     expect(nextHour).toMatchObject({ ok: true, value: { expiresAt: "2031-06-22T10:00:00.000Z" } });
+  });
+
+  it("refuses a workspace's 201st email until the next hour", async () => {
+    const workspace = await provisionedWorkspace(db(), "ResendWorkspaceCeiling");
+    const [invited] = await invitedMany(workspace, 200);
+    const invitationId = invited?.invitationId ?? "";
+    const lastAllowed = await invitationsOf(workspace);
+    const eventsBefore = await invitationEvents(workspace);
+
+    const refused = await resending(workspace, invitationId, new Date("2031-06-15T09:59:59.000Z"));
+
+    expect(ceilingOf(refused)).toBe(1);
+    expect(await invitationsOf(workspace)).toEqual(lastAllowed);
+    expect(await invitationEvents(workspace)).toEqual(eventsBefore);
+    expect(await emailsCountedFrom(workspace)).toBe(200);
+
+    const nextHour = await resending(workspace, invitationId, new Date("2031-06-15T10:00:00.000Z"));
+
+    expect(nextHour).toMatchObject({ ok: true, value: { expiresAt: "2031-06-22T10:00:00.000Z" } });
+    expect(await emailsCountedFrom(workspace)).toBe(1);
   });
 
   it("counts nothing for an invitation no longer waiting", async () => {

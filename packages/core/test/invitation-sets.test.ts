@@ -40,12 +40,14 @@ const {
   sending,
   invite,
   atTheCeiling,
+  invitedMany,
   cancelledInvitation,
   memberAt,
   invitationLeft,
   invitationsOf,
   invitationEvents,
   emailsCountedTo,
+  emailsCountedFrom,
 } = invitationsSuite(db);
 
 const RESENT_AT = new Date("2031-06-25T12:00:00.000Z");
@@ -269,6 +271,40 @@ describe("inviting several addresses at once", () => {
     expect(await emailsCountedTo(elsewhere, ana)).toBe(1);
   });
 
+  it("refuses a send past the workspace's 200 an hour whole", async () => {
+    const workspace = await provisionedWorkspace(db(), "WorkspaceCeiling");
+    await invitedMany(workspace, 160);
+    const before = await invitationsOf(workspace);
+    const late = addressOf("late");
+    const forty = Array.from({ length: 40 }, () => addressOf("late"));
+
+    const refused = await sending(workspace, [late, ...forty], "Viewer");
+
+    expect(ceilingOf(refused)).toBe(1800);
+    expect(await invitationsOf(workspace)).toEqual(before);
+    expect(before).toHaveLength(160);
+    expect(await emailsCountedFrom(workspace)).toBe(160);
+    expect(await emailsCountedTo(workspace, late)).toBe(0);
+
+    const landed = await sending(workspace, forty, "Viewer");
+
+    expect(landed).toMatchObject({ ok: true });
+    expect(await emailsCountedFrom(workspace)).toBe(200);
+    expect(ceilingOf(await sending(workspace, [addressOf("ana")], "Viewer"))).toBe(1800);
+  });
+
+  it("counts each workspace's emails against its own ceiling", async () => {
+    const workspace = await provisionedWorkspace(db(), "FullHere");
+    const elsewhere = await provisionedWorkspace(db(), "FullThere");
+    await invitedMany(workspace, 200);
+
+    const sent = await sending(elsewhere, [addressOf("ana")], "Viewer");
+
+    expect(sent).toMatchObject({ ok: true });
+    expect(await emailsCountedFrom(elsewhere)).toBe(1);
+    expect(await emailsCountedFrom(workspace)).toBe(200);
+  });
+
   it("lands both of two crossing sends whole", async () => {
     const workspace = await provisionedWorkspace(db(), "Crossing");
     const ana = addressOf("ana");
@@ -433,6 +469,25 @@ describe("resending a set of invitations", () => {
     expect(await invitationsOf(workspace)).toEqual(before);
     expect(await invitationEvents(workspace)).toEqual(eventsBefore);
     expect(await emailsCountedTo(workspace, ben)).toBe(1);
+  });
+
+  it("counts each renewal against the workspace's ceiling, refusing past it", async () => {
+    const workspace = await provisionedWorkspace(db(), "BulkResendWorkspaceCeiling");
+    const sent = (await invitedMany(workspace, 188)).map((one) => one.invitationId);
+
+    const resent = await resendingSet(workspace, sent.slice(0, 12), INVITED_AT);
+
+    expect(resent).toMatchObject({ ok: true });
+    expect(await emailsCountedFrom(workspace)).toBe(200);
+    const before = await invitationsOf(workspace);
+    const eventsBefore = await invitationEvents(workspace);
+
+    const refused = await resendingSet(workspace, sent.slice(12, 13), INVITED_AT);
+
+    expect(ceilingOf(refused)).toBe(1800);
+    expect(await invitationsOf(workspace)).toEqual(before);
+    expect(await invitationEvents(workspace)).toEqual(eventsBefore);
+    expect(await emailsCountedFrom(workspace)).toBe(200);
   });
 
   it("renews an id ticked twice once", async () => {

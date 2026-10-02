@@ -8,11 +8,12 @@ import {
   inviteMembers,
   inviteMembersInput,
   resendInvitation,
+  type InvitationMinted,
 } from "../src/members/index.ts";
 import type { Tx } from "../src/store/postgres/index.ts";
 import type { ProvisionedWorkspace } from "./platform.ts";
 import { inputOf } from "./suite-input.ts";
-import { readingAs, seedingWith } from "./suite-postgres.ts";
+import { addressOf, readingAs, seedingWith } from "./suite-postgres.ts";
 
 export const ULID = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
@@ -88,6 +89,16 @@ export const invitationsSuite = (db: () => MigratedPostgres) => {
     return invited;
   };
 
+  /** `count` new addresses invited in the hour `INVITED_AT` falls in, fifty a send. */
+  const invitedMany = async (workspace: ProvisionedWorkspace, count: number) => {
+    const sent: InvitationMinted[] = [];
+    for (let left = count; left > 0; left -= 50) {
+      const addresses = Array.from({ length: Math.min(left, 50) }, () => addressOf("many"));
+      sent.push(...answeredValue(await sending(workspace, addresses, "Viewer")));
+    }
+    return sent;
+  };
+
   const cancelledInvitation = async (
     workspace: ProvisionedWorkspace,
     address: string,
@@ -150,9 +161,8 @@ export const invitationsSuite = (db: () => MigratedPostgres) => {
       )
     ).rows;
 
-  /** The emails counted to `address` from this workspace, in every window. */
-  const emailsCountedTo = async (workspace: ProvisionedWorkspace, address: string) => {
-    const key = createHash("sha256").update(`${workspace.workspaceId}:${address}`).digest("hex");
+  const countedUnder = async (hashed: string) => {
+    const key = createHash("sha256").update(hashed).digest("hex");
     const counted = await db().pool.query<{ count: number }>(
       "SELECT coalesce(sum(count), 0)::int AS count FROM ingress_counter WHERE scope = 'invitation' AND key = $1",
       [key],
@@ -160,17 +170,27 @@ export const invitationsSuite = (db: () => MigratedPostgres) => {
     return counted.rows[0]?.count;
   };
 
+  /** The emails counted to `address` from this workspace, in every window. */
+  const emailsCountedTo = (workspace: ProvisionedWorkspace, address: string) =>
+    countedUnder(`${workspace.workspaceId}:${address}`);
+
+  /** The emails counted from this workspace to any address, in every window. */
+  const emailsCountedFrom = (workspace: ProvisionedWorkspace) =>
+    countedUnder(workspace.workspaceId);
+
   return {
     as,
     sending,
     invite,
     resending,
     atTheCeiling,
+    invitedMany,
     cancelledInvitation,
     memberAt,
     invitationLeft,
     invitationsOf,
     invitationEvents,
     emailsCountedTo,
+    emailsCountedFrom,
   };
 };
