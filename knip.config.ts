@@ -29,9 +29,14 @@ const config: KnipConfig = {
     },
 
     "apps/web": {
-      // Installed for a surface no ticket has opened yet, so a component nothing imports, or an
-      // export of one, is not dead code.
-      entry: ["src/shared/ui/**"],
+      entry: [
+        // Installed for a surface no ticket has opened yet, so a component nothing imports, or an
+        // export of one, is not dead code.
+        "src/shared/ui/**",
+
+        "journeys/fixtures.ts",
+        "journeys/outcome-reporter.ts",
+      ],
       includeEntryExports: false,
     },
 

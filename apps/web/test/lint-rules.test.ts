@@ -11,8 +11,8 @@ const webOverrides = () =>
         override.rules?.["unicorn/filename-case"] !== undefined),
   );
 
-if (webOverrides().length !== 5) {
-  throw new Error(`expected five apps/web overrides, found ${webOverrides().length}`);
+if (webOverrides().length !== 6) {
+  throw new Error(`expected six apps/web overrides, found ${webOverrides().length}`);
 }
 
 const { flagged } = oxlintOver(
@@ -28,6 +28,9 @@ const probe = (specifier: string): string =>
 
 const typeProbe = (specifier: string): string =>
   `import type { AppRouter } from "${specifier}";\nexport type Kept = AppRouter;\n`;
+
+const namedProbe = (name: string, specifier: string): string =>
+  `import { ${name} } from "${specifier}";\nexport const keep = ${name};\n`;
 
 describe("no feature imports another feature", () => {
   it("refuses a sibling feature, allows its own files and shared", () => {
@@ -121,6 +124,36 @@ describe("better-auth is named in the identity feature and nowhere else", () => 
       "apps/web/src/features/auth/reaches-sideways.ts",
       "apps/web/src/features/auth/reaches-the-api.ts",
       "apps/web/src/features/auth/reaches-up.ts",
+    ]);
+  });
+});
+
+describe("the journeys take no act from the harness", () => {
+  it("refuses a harness act, allows the harness's code reader", () => {
+    const refused = flagged({
+      "apps/web/journeys/provisions.ts": namedProbe("provision", "../e2e/harness.ts"),
+      "apps/web/journeys/takes-the-harness.ts": probe("../e2e/harness.ts"),
+      "apps/web/journeys/reads-the-code.ts": namedProbe("codeSentTo", "../e2e/harness.ts"),
+    });
+
+    expect(refused).toEqual([
+      "apps/web/journeys/provisions.ts",
+      "apps/web/journeys/takes-the-harness.ts",
+    ]);
+  });
+
+  it("allows the suite's fixtures, locators and the SPA's words", () => {
+    const refused = flagged({
+      "apps/web/journeys/extends-the-suite.ts": namedProbe("test", "../e2e/browser.ts"),
+      "apps/web/journeys/locates.ts": namedProbe("navOf", "../e2e/locators.ts"),
+      "apps/web/journeys/reads-words.ts": probe("@/shared/navigation.ts"),
+      "apps/web/journeys/reaches-the-reporter.ts": probe("../e2e/flaky-report.ts"),
+      "apps/web/journeys/reaches-the-api.ts": probe("@better-answers/api/trpc"),
+    });
+
+    expect(refused).toEqual([
+      "apps/web/journeys/reaches-the-api.ts",
+      "apps/web/journeys/reaches-the-reporter.ts",
     ]);
   });
 });
