@@ -115,6 +115,12 @@
       "skillPath": "better-auth/emailAndPassword/SKILL.md",
       "computedHash": "747d7f73bd9e2ec5317b8ef88dc70f97df716d00e3d02de4051feebaa48b062d"
     },
+    "email-best-practices": {
+      "source": "resend/resend-skills",
+      "sourceType": "github",
+      "skillPath": "skills/email-best-practices/SKILL.md",
+      "computedHash": "c7218333381fa335b8a912bd55b3bb58b5b567a174f9e1d8b41940ff82f1a6b6"
+    },
     "error-handling": {
       "source": "trpc/trpc",
       "sourceType": "github",
@@ -246,6 +252,12 @@
       "sourceType": "github",
       "skillPath": "skills/repo-quality-sweep/SKILL.md",
       "computedHash": "09825ce8212ac56c75a6093bb1620a4b6ce0f8a33f03061302b3805a6a3164f6"
+    },
+    "resend": {
+      "source": "resend/resend-skills",
+      "sourceType": "github",
+      "skillPath": "skills/resend/SKILL.md",
+      "computedHash": "7a51e5808711f4c099b1170939ea216520ae18d7a1fa60cb9349c6c345799cb3"
     },
     "security-audit": {
       "source": "cloudflare/security-audit-skill",

@@ -188,6 +188,10 @@ const CARVED_OUT: readonly CarveOut[] = [
     why: "a migration is a dated record, never edited once it has run",
   },
   { holds: under(".cubic/"), why: "Cubic generates it and rewrites it" },
+  {
+    holds: under("apps/api/.claude/skills/"),
+    why: "third-party skills, kept as upstream wrote them so their skills-lock hashes hold",
+  },
   { holds: under("apps/web/"), why: "no tier-sense use: the word there is the SPA's own zone" },
   {
     holds: under("packages/design-system/"),
@@ -461,6 +465,7 @@ describe("the sense a planted line is read in", () => {
       "docs/archive/adr/0001-planted.md": `The ${WORD} claims the job.\n`,
       "docs/archive/specs/T-001.md": `The ${WORD} claims the job.\n`,
       "docs/specs/v01-route.md": `The ${WORD} claims the job.\n`,
+      "apps/api/.claude/skills/resend/SKILL.md": `The ${WORD} claims the job.\n`,
       "apps/web/src/planted.ts": `// The ${WORD} claims the job.\n`,
       "apps/web/CODING_STANDARDS.md": `The ${WORD} claims the job.\n`,
     });

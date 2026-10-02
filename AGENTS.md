@@ -47,6 +47,7 @@ Read commands, versions and scripts from each workspace's `package.json` or `pyp
 - `/renovate-prs` for Renovate's dependency pull requests, red or waiting.
 - `/better-answers-design` for anything a person will look at.
 - The api's tRPC skills under `apps/api/.claude/skills/` for any procedure, link or adapter in `apps/api/`.
+- `resend` and `email-best-practices`, vendored from Resend, for its sending limits, deliverability and webhooks. The api sends through Resend's SMTP relay with nodemailer (`apps/api/src/smtp.ts`), not its SDK, so check any of their samples against the code before copying it.
 - `/c4-architecture` when an architecture review has moved the shape and the diagrams must say so.
 
 Other skills live beside the code that uses them most, such as `apps/worker/.claude/skills/` and `apps/web/.claude/skills/`. If a task has a skill, use it for best practice. For example, coolify and hono for deployment, cocoindex for the worker and its pipeline, and better-auth for authentication.

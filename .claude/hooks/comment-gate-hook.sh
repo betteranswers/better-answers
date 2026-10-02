@@ -44,7 +44,7 @@ esac
 # The root config's ignore patterns: oxlint skips them on a walk and lints a file named to it.
 case "/$RELATIVE" in
 */node_modules/* | */dist/* | */coverage/* | */reports/* | */.venv/* | */stryker-setup-*.js) exit 0 ;;
-/packages/devtools/lifts/anti-slop/* | /.claude/worktrees/* | /.claude/skills/*) exit 0 ;;
+/packages/devtools/lifts/anti-slop/* | /.claude/worktrees/* | /.claude/skills/* | /apps/api/.claude/skills/*) exit 0 ;;
 esac
 
 COMMENT_RULES='better-answers\((comment-only-the-why|declaration-doc-block|string-cites-nothing)\)|typescript\((ban-ts-comment|prefer-ts-expect-error)\)|eslint\(no-warning-comments\)|unicorn\(no-abusive-eslint-disable\)|Unused (eslint|oxlint)-disable directive'

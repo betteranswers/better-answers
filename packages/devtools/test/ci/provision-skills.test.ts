@@ -390,4 +390,16 @@ describe("the skills this repository tracks", () => {
       "repo-quality-sweep",
     ]);
   });
+
+  it("tracks the api's two Resend skills and nothing else there", () => {
+    const skills = tracked("apps/api/.claude/skills");
+
+    expect(skills).toContain("apps/api/.claude/skills/email-best-practices/SKILL.md");
+    expect(skills).toContain("apps/api/.claude/skills/resend/SKILL.md");
+    expect([...new Set(skills.map((file) => file.split("/")[4] ?? ""))].sort()).toEqual([
+      "THIRD_PARTY_NOTICES.md",
+      "email-best-practices",
+      "resend",
+    ]);
+  });
 });
