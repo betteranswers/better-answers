@@ -74,6 +74,48 @@ export const secondFactorRowsFor = async (
   return { passkeyId, authenticatorId, recoveryCodeIds };
 };
 
+/** An authenticator as the plugin writes one: `verified` false while its setup waits on a code. */
+export const authenticatorFor = async (
+  pool: pg.Pool,
+  userId: string,
+  state: { readonly verified: boolean },
+): Promise<string> => {
+  const authenticatorId = ulid();
+  await pool.query(
+    `INSERT INTO authenticator (id, secret, backup_codes, user_id, verified)
+     VALUES ($1, 'sealed-secret', 'sealed-codes', $2, $3)`,
+    [authenticatorId, userId, state.verified],
+  );
+  if (state.verified) {
+    await pool.query('UPDATE "user" SET authenticator_enabled = true WHERE id = $1', [userId]);
+  }
+  return authenticatorId;
+};
+
+/** A recovery code stored as its hash; the hash is the code itself, which no spend reaches. */
+export const recoveryCodeFor = async (
+  pool: pg.Pool,
+  userId: string,
+  createdAt: Date,
+): Promise<string> => {
+  const recoveryCodeId = ulid();
+  await pool.query(
+    "INSERT INTO recovery_code (id, user_id, code_hash, created_at) VALUES ($1, $2, $1, $3)",
+    [recoveryCodeId, userId, createdAt],
+  );
+  return recoveryCodeId;
+};
+
+export const passkeyFor = async (pool: pg.Pool, userId: string): Promise<string> => {
+  const passkeyId = ulid();
+  await pool.query(
+    `INSERT INTO passkey (id, name, public_key, user_id, credential_id, counter, device_type, backed_up)
+     VALUES ($1, 'MacBook', 'public-key', $2, $3, 0, 'multiDevice', true)`,
+    [passkeyId, userId, `credential-${passkeyId}`],
+  );
+  return passkeyId;
+};
+
 export const lastActiveIn = async (
   pool: pg.Pool,
   workspaceId: string,
@@ -135,13 +177,26 @@ export const signInLinkFor = async (pool: pg.Pool, email: string): Promise<strin
 export const sessionFor = async (
   pool: pg.Pool,
   userId: string,
-  at: { readonly createdAt: Date; readonly lastUsedAt: Date; readonly expiresAt: Date },
+  at: {
+    readonly createdAt: Date;
+    readonly lastUsedAt: Date;
+    readonly expiresAt: Date;
+    readonly pendingSince?: Date;
+  },
 ): Promise<string> => {
   const sessionId = ulid();
   await pool.query(
-    `INSERT INTO session (id, expires_at, token, created_at, updated_at, user_id)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
-    [sessionId, at.expiresAt, `token-${sessionId}`, at.createdAt, at.lastUsedAt, userId],
+    `INSERT INTO session (id, expires_at, token, created_at, updated_at, user_id, pending_since)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [
+      sessionId,
+      at.expiresAt,
+      `token-${sessionId}`,
+      at.createdAt,
+      at.lastUsedAt,
+      userId,
+      at.pendingSince ?? null,
+    ],
   );
   return sessionId;
 };

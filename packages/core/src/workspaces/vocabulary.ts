@@ -22,6 +22,12 @@ export const WORKSPACE_REFUSALS = declareRefusals("workspaces", {
   "display-name-control-character": "malformed",
   "display-name-angle-bracket": "malformed",
   "display-name-too-long": "malformed",
+
+  "no-authenticator": "absent",
+  "recovery-code-wrong": "absent",
+
+  // An Admin, or the operator, may hold no fewer than one: removing it waits on adding another.
+  "last-second-factor": "precondition",
 });
 
 export type WorkspaceRefusal<W extends RefusalWordFor<typeof WORKSPACE_REFUSALS>> = W;

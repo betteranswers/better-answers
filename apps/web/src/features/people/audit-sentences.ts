@@ -90,6 +90,8 @@ const SENTENCES = {
   "people.operator.revoked": ({ by, subject }) =>
     `${by} revoked ${possessive(subject)} operator mark`,
   "people.person.added": ({ by, subject }) => `${by} added ${person(subject)} to the platform`,
+  "people.person.authenticator_added": ({ by }) => `${by} set up an authenticator`,
+  "people.person.authenticator_removed": ({ by }) => `${by} removed their authenticator`,
   "people.person.credentials_revoked": ({ by, subject }) =>
     `${by} revoked ${possessive(subject)} credentials everywhere`,
   "people.person.grants_ended": ({ by, subject }) =>
@@ -97,6 +99,11 @@ const SENTENCES = {
   "people.person.name_flagged": ({ by, subject }) =>
     `${by} flagged ${possessive(subject)} display name`,
   "people.person.named": ({ by }) => `${by} gave their display name`,
+  "people.person.recovery_code_used": ({ by }) => `${by} used a recovery code`,
+  "people.person.recovery_codes_issued": ({ by, detail }) =>
+    detail["replaced"] === true
+      ? `${by} replaced their recovery codes`
+      : `${by} was given recovery codes`,
   "people.person.renamed": ({ by, subject }) =>
     `${by} corrected ${possessive(subject)} display name`,
   "people.person.signed_in": ({ by }) => `${by} signed in`,
