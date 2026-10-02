@@ -22,9 +22,9 @@ import {
   ASK_TO_JOIN_PERSON_RULE,
   RECOVERY_CODES_PERSON_RULE,
 } from "../auth/constants.ts";
-import { sendFactorNotice } from "../auth/factor-notice-email.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
 import { crossing, given, parsedBy, personCeiling, personProcedure, router } from "./base.ts";
+import { sendFactorNotice } from "./factor-notice-email.ts";
 
 const answeredNoSoonerThan = async <Answer>(
   floorMs: number,

@@ -1,6 +1,7 @@
 import { createHash, randomInt } from "node:crypto";
 
 import { boundarySchemas } from "@better-answers/schema";
+import { RECOVERY_CODES_IN_A_SET } from "@better-answers/schema/second-factor";
 
 import { act, declareIdentitySetActs, recordFor } from "../audit/index.ts";
 import {
@@ -21,8 +22,6 @@ const RECOVERY_CODE_ACTS = declareIdentitySetActs("people", {
   issued: act("people.person.recovery_codes_issued", { replaced: "flag" }),
   used: act("people.person.recovery_code_used", {}),
 });
-
-const RECOVERY_CODE_COUNT = 10;
 
 /** Crockford's base32, without the letters a reader takes for a digit. */
 const ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz";
@@ -63,7 +62,7 @@ export const issuingRecoveryCodes = async (
 ): Promise<RecoveryCodesIssued> => {
   const voided = await tx.query("DELETE FROM recovery_code WHERE user_id = $1", [personId]);
   const replaced = (voided.rowCount ?? 0) > 0;
-  const codes = Array.from({ length: RECOVERY_CODE_COUNT }, mintRecoveryCode);
+  const codes = Array.from({ length: RECOVERY_CODES_IN_A_SET }, mintRecoveryCode);
   await tx.query(
     `INSERT INTO recovery_code (id, user_id, code_hash)
      SELECT id, $2, code_hash FROM unnest($1::text[], $3::text[]) AS minted (id, code_hash)`,

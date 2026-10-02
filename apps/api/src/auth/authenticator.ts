@@ -6,17 +6,18 @@ import { z } from "zod";
 import { attempt, type Clock } from "@better-answers/core/kernel";
 import { consumeIngress, type PostgresDoor } from "@better-answers/core/store/postgres";
 import { readSecondFactor, recordAuthenticatorSetUp } from "@better-answers/core/workspaces";
+import { AUTHENTICATOR_CODE_LENGTH } from "@better-answers/schema/second-factor";
 
 import type { EmailSender } from "../email.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
 import { tooManyRequests } from "../ingress/limits.ts";
+import { sendFactorNotice } from "../trpc/factor-notice-email.ts";
 import type { Auth } from "./auth.ts";
 import {
   AUTHENTICATOR_FINISH_PATH,
   AUTHENTICATOR_PERSON_RULE,
   AUTHENTICATOR_START_PATH,
 } from "./constants.ts";
-import { sendFactorNotice } from "./factor-notice-email.ts";
 import { sameOriginOnly } from "./same-origin.ts";
 
 type AuthenticatorDependencies = {
@@ -48,7 +49,9 @@ type SignedIn = NonNullable<z.output<typeof signedIn>>;
 
 const setUpAnswer = z.object({ totpURI: z.string() });
 
-const codeAsked = z.object({ code: z.string().regex(/^\d{6}$/) });
+const codeAsked = z.object({
+  code: z.string().regex(new RegExp(`^\\d{${String(AUTHENTICATOR_CODE_LENGTH)}}$`)),
+});
 
 /** A name and value alone, as a `cookie` header carries each `Set-Cookie` line. */
 const cookieOf = (setCookies: readonly string[]): string =>
@@ -102,7 +105,7 @@ export const mountTheAuthenticator = (routes: Hono, deps: AuthenticatorDependenc
       auth.api.enableTwoFactor({ headers: context.req.raw.headers, body: { method: "totp" } }),
     );
     if (!started.ok) return unanswered(context, started.error.message);
-    // The library's own backup codes are dropped here: recovery codes are ours.
+    // The library's own code set is dropped here: recovery codes are ours.
     return context.json({ setupAddress: setUpAnswer.parse(started.value).totpURI });
   };
 
