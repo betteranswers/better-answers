@@ -128,11 +128,20 @@ export type SeenLink = { readonly state: LinkState; readonly use: LinkUse | unde
 
 const NOTHING_TO_SEE: SeenLink = { state: DEAD_LINK, use: undefined };
 
-/** The library keeps a code as `<hash>:<tries spent>`. */
+/** The library keeps a code as `<hash>:<tries spent>`, its hash as `storeOTP: "hashed"` makes it. */
 const triesSpentOn = (value: string): number => Number(value.slice(value.lastIndexOf(":") + 1));
 
-const codeLive = (code: LinkRead["code"]): code is NonNullable<LinkRead["code"]> =>
-  code !== undefined && code.live && triesSpentOn(code.value) < EMAIL_CODE_ATTEMPTS;
+const hashKeptFor = (value: string): string => value.slice(0, value.lastIndexOf(":"));
+
+const libraryHashOf = (code: string): string =>
+  createHash("sha256").update(code).digest("base64url");
+
+/** A link sealed before its code was replaced would only spend a try of the code that replaced it. */
+const codeLive = (code: LinkRead["code"], sealed: string): code is NonNullable<LinkRead["code"]> =>
+  code !== undefined &&
+  code.live &&
+  triesSpentOn(code.value) < EMAIL_CODE_ATTEMPTS &&
+  hashKeptFor(code.value) === libraryHashOf(sealed);
 
 /** One answer for every dead link, so a read never says whether a token was ever real. */
 export const linkSeen = (
@@ -141,7 +150,7 @@ export const linkSeen = (
   bound: boolean,
 ): SeenLink => {
   if (read === undefined || !read.linkLive || contents === undefined) return NOTHING_TO_SEE;
-  if (!codeLive(read.code)) return NOTHING_TO_SEE;
+  if (!codeLive(read.code, contents.code)) return NOTHING_TO_SEE;
   if (!bound) {
     return {
       state: { state: "elsewhere", code: contents.code, until: read.code.expiresAt },

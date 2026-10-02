@@ -334,6 +334,20 @@ describe("signing in through a link", () => {
     expect((await client.json(SIGN_IN_BY_LINK, { token: "not a token!" })).status).toBe(410);
   });
 
+  it("dies, spending no tries, once its code is replaced", async () => {
+    const person = await app().person();
+    const asking = app().client();
+    const { token } = await askedFor(asking, person.email);
+    await app().database.superuser.query(
+      "UPDATE verification SET value = 'a-newer-code-hash:0' WHERE identifier = $1",
+      [`sign-in-otp-${person.email.toLowerCase()}`],
+    );
+
+    expect(await describedAs(asking, token)).toEqual(DEAD);
+    expect((await asking.json(SIGN_IN_BY_LINK, { token })).status).toBe(410);
+    expect(await triesSpentOn(person.email)).toBe("0");
+  });
+
   it("spends none of the code's tries on a wrong token", async () => {
     const person = await app().person();
     const asking = app().client();
