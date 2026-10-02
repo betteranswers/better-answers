@@ -15,14 +15,13 @@ import { counted } from "@/shared/words.ts";
 import { EMPTY_LINES } from "./empty-lines.ts";
 import { GroupSheet, groupButtonId, type GroupOpenedAt } from "./group-sheet.tsx";
 import {
-  inNameOrder,
   useCreateGroup,
   useDeleteGroup,
   useGroups,
   usePendingGroupNames,
   type ListedGroup,
 } from "./groups-api.ts";
-import { useMembers } from "./people-api.ts";
+import { inNameOrder, useMembers } from "./people-api.ts";
 import { GROUPS_KEYSTROKES } from "./people-state.ts";
 import { outcomeOfGroupFailure } from "./refusal.tsx";
 

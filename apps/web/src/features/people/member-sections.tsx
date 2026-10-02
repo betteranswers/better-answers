@@ -16,6 +16,7 @@ import { instantWords } from "@/shared/words.ts";
 import { EMPTY_LINES } from "./empty-lines.ts";
 import { GroupChecklist } from "./group-checklist.tsx";
 import { useGroups } from "./groups-api.ts";
+import { GroupsReadSaid } from "./groups-read.tsx";
 import { INCLUDES_YOU, RECORDED } from "./member-act-words.ts";
 import { MemberRemoval } from "./member-removal.tsx";
 import { GROUPS_PATH } from "./members-address.ts";
@@ -29,7 +30,7 @@ import {
   type Role,
   type RoleChanged,
 } from "./people-api.ts";
-import { outcomeOfFailure, outcomeOfGroupFailure } from "./refusal.tsx";
+import { outcomeOfFailure } from "./refusal.tsx";
 import { aRole, ROLE_MEANINGS, roleOf, ROLES } from "./role-meanings.ts";
 import { useSelfActHome } from "./self-act.tsx";
 import { CredentialsHere, GroupPills, JoinedOn, nameOf } from "./words.tsx";
@@ -295,12 +296,7 @@ function GroupsPicker(properties: {
 
   return (
     <SheetPart title="Groups">
-      <OutcomeLine
-        outcome={groups.error === null ? undefined : outcomeOfGroupFailure(groups.error, "read")}
-      />
-      <div aria-live="polite" className="empty:hidden">
-        {groups.isPending ? <p>The groups are still loading.</p> : null}
-      </div>
+      <GroupsReadSaid groups={groups} />
       <div ref={pickerRef} className="contents">
         {groups.data?.length === 0 ? (
           <EmptyState

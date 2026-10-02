@@ -365,6 +365,7 @@ function MemberList(properties: {
   const shownIds = () => table.getRowModel().rows.map((row) => row.id);
 
   const acts = useMemberBulkActs({
+    readable: read.isSuccess,
     ticked,
     tick: setTicked,
     nameOf: namedIn(listed),
@@ -396,20 +397,20 @@ function MemberList(properties: {
           hidden={hidden}
           onHiddenChange={setHidden}
         />
-        <SelectionBar
-          label={SELECTED_MEMBERS}
-          ticked={ticked}
-          shown={shownIds()}
-          noun={["member", "members"]}
-          clearKeystroke={KEY.clearSelection}
-          onClear={() => {
-            setTicked(NONE);
-          }}
-          focusAfterClear={heading}
-        >
-          <MemberBulkActs acts={acts} />
-        </SelectionBar>
         <MembersRead read={read} searchRef={searchRef}>
+          <SelectionBar
+            label={SELECTED_MEMBERS}
+            ticked={ticked}
+            shown={shownIds()}
+            noun={["member", "members"]}
+            clearKeystroke={KEY.clearSelection}
+            onClear={() => {
+              setTicked(NONE);
+            }}
+            focusAfterClear={heading}
+          >
+            <MemberBulkActs acts={acts} />
+          </SelectionBar>
           <MemberActsContext
             value={{
               open: (personId) => {

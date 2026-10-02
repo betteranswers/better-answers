@@ -16,7 +16,8 @@ export const homeNowSaid = (role: Role): string =>
 
 export const MEMBERS_LOADING = "The members are still loading.";
 
-/** A member's page: its sections, in order, and what it says where it names no one. */
+export const GROUPS_LOADING = "The groups are still loading.";
+
 export const MEMBER_PAGE_WORDS = {
   sections: "On this page",
   access: "Access",
@@ -29,7 +30,6 @@ export const MEMBER_PAGE_WORDS = {
   removed: (name: string) => `${name} is no longer a member of this workspace.`,
 } as const;
 
-/** A member's Activity, each line marked with its direction in the glossary's words. */
 export const ACTIVITY_WORDS = {
   loading: "The activity is still loading.",
   none: (name: string) => `No acts by or to ${name} in this workspace yet.`,
@@ -55,7 +55,7 @@ export const BULK_WORDS = {
     commit: (count: number, role: Role) => `Change ${members(count)} to ${role}`,
     pending: (count: number, role: Role) => `Changing ${members(count)} to ${role}.`,
     done: (changed: number, role: Role, skipped: number) =>
-      `Changed ${members(changed)} to ${role}${andAlready(skipped, `${role} already`)}`,
+      `Changed ${members(changed)} to ${role}${andAlready(skipped, `already in the ${role} role`)}`,
   },
   addToGroup: {
     act: "Add to group",

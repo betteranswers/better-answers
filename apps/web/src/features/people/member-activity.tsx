@@ -112,6 +112,10 @@ function Stream(properties: { readonly activity: Activity; readonly name: string
   );
 }
 
+/** An empty stream has nowhere to say a later read failed, so a failure stands in for it. */
+const streamStands = (activity: Activity): boolean =>
+  activity.error === null || activity.data?.pages.some((page) => page.events.length > 0) === true;
+
 /** The acts the member took and the acts done to them, in one stream, read a page at a time. */
 export function MemberActivity(properties: {
   readonly member: ListedMember;
@@ -120,7 +124,9 @@ export function MemberActivity(properties: {
   const { member, heading } = properties;
   const activity = useActivity(member.personId);
 
-  if (activity.data !== undefined) return <Stream activity={activity} name={nameOf(member)} />;
+  if (activity.data !== undefined && streamStands(activity)) {
+    return <Stream activity={activity} name={nameOf(member)} />;
+  }
   if (activity.error === null)
     return <ListState state={{ kind: "loading", words: WORDS.loading }} />;
   return (

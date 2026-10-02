@@ -19,7 +19,8 @@ import {
 } from "@/shared/ui/select.tsx";
 
 import { EMPTY_LINES } from "./empty-lines.ts";
-import { useGroups } from "./groups-api.ts";
+import { useGroups, type ListedGroup } from "./groups-api.ts";
+import { GroupsReadSaid } from "./groups-read.tsx";
 import { BULK_WORDS, NO_LONGER_LISTED } from "./member-act-words.ts";
 import { NO_MARKS, type RefusedRows } from "./member-columns.tsx";
 import { GROUPS_PATH } from "./members-address.ts";
@@ -45,6 +46,8 @@ type Settled = {
 
 /** What the list hands its bulk acts: the ticks, and where an act's outcome and marks land. */
 export type BulkList = {
+  /** False while the list's read waits or has failed, when its rows are not there to act on. */
+  readonly readable: boolean;
   readonly ticked: ReadonlySet<string>;
   readonly tick: (ticked: ReadonlySet<string>) => void;
   readonly nameOf: (personId: string) => string;
@@ -61,8 +64,6 @@ const STILL_GOING: Outcome = { tone: "said", words: BULK_WORDS.stillGoing };
 const MOST_TICKED = 200;
 
 const TOO_MANY: Outcome = { tone: "said", words: BULK_WORDS.tooMany(MOST_TICKED) };
-
-const NO_GROUPS: readonly { readonly id: string; readonly name: string }[] = [];
 
 const refusedRowsOf = (failure: Error | ApiError): RefusedRows =>
   new Map(saidOfItems(SAID_OF_TICKED_MEMBERS, failure).map(({ id, said }) => [id, said]));
@@ -104,6 +105,8 @@ export const useMemberBulkActs = (list: BulkList) => {
   const { goHome } = useSelfActHome();
 
   const show = (act: BulkAct) => {
+    // The failed or waiting read already says why there is no list to act on.
+    if (!list.readable) return;
     if (acting) {
       list.say(STILL_GOING);
       return;
@@ -135,12 +138,12 @@ export const useMemberBulkActs = (list: BulkList) => {
   const command = (said: {
     readonly pending: string;
     readonly done: (answer: BulkChanged) => string;
-    readonly landing: "demoted" | "removed" | undefined;
+    readonly ownChange: "demoted" | "removed" | undefined;
     readonly run: (personIds: string[], settled: Settled) => void;
   }) => {
     if (acting) return;
     const names = new Map(asked.map((personId) => [personId, list.nameOf(personId)]));
-    const yourOwn = readerId !== undefined && asked.includes(readerId) ? said.landing : undefined;
+    const yourOwn = readerId !== undefined && asked.includes(readerId) ? said.ownChange : undefined;
     sent.current = true;
     setActing(true);
     setOpen(undefined);
@@ -174,6 +177,9 @@ export const useMemberBulkActs = (list: BulkList) => {
   useKeystroke(KEY.removeSelected, () => {
     show("remove");
   });
+
+  // A read failing under an open dialog shuts it for good, rather than reopening it once read.
+  if (!list.readable && open !== undefined) setOpen(undefined);
 
   return {
     open,
@@ -261,7 +267,7 @@ function ChangeRoleDialog(properties: { readonly acts: Acts }) {
     acts.command({
       pending: BULK_WORDS.changeRole.pending(count, role),
       done: (answer) => BULK_WORDS.changeRole.done(answer.changed.length, role, answer.skipped),
-      landing: role === "Admin" ? undefined : "demoted",
+      ownChange: role === "Admin" ? undefined : "demoted",
       run: (personIds, settled) => {
         change.mutate({ personIds, role }, settled);
       },
@@ -281,22 +287,9 @@ function ChangeRoleDialog(properties: { readonly acts: Acts }) {
   );
 }
 
-function GroupChoice(properties: { readonly acts: Acts; readonly groups: typeof NO_GROUPS }) {
+function GroupSelect(properties: { readonly acts: Acts; readonly groups: readonly ListedGroup[] }) {
   const { acts, groups } = properties;
   const id = useId();
-  if (groups.length === 0) {
-    return (
-      <EmptyState
-        line={EMPTY_LINES.groups}
-        className="gap-1"
-        action={
-          <Link to={GROUPS_PATH} className="text-brand underline">
-            Create one on the Groups screen
-          </Link>
-        }
-      />
-    );
-  }
   return (
     <div className="grid gap-2">
       <Label htmlFor={id}>Group</Label>
@@ -316,12 +309,39 @@ function GroupChoice(properties: { readonly acts: Acts; readonly groups: typeof 
   );
 }
 
+/** Only an answered read may say there are no groups; a waiting or failed one says so instead. */
+function GroupChoice(properties: {
+  readonly acts: Acts;
+  readonly groups: ReturnType<typeof useGroups>;
+}) {
+  const { acts, groups } = properties;
+  return (
+    <>
+      <GroupsReadSaid groups={groups} />
+      {groups.data?.length === 0 ? (
+        <EmptyState
+          line={EMPTY_LINES.groups}
+          className="gap-1"
+          action={
+            <Link to={GROUPS_PATH} className="text-brand underline">
+              Create one on the Groups screen
+            </Link>
+          }
+        />
+      ) : null}
+      {groups.data === undefined || groups.data.length === 0 ? null : (
+        <GroupSelect acts={acts} groups={groups.data} />
+      )}
+    </>
+  );
+}
+
 function AddToGroupDialog(properties: { readonly acts: Acts }) {
   const { acts } = properties;
-  const groups = useGroups().data ?? NO_GROUPS;
+  const groups = useGroups();
   const add = useBulkAddToGroup();
   const count = acts.asked.length;
-  const chosen = groups.find((group) => group.id === acts.groupId);
+  const chosen = groups.data?.find((group) => group.id === acts.groupId);
 
   const commit = () => {
     if (chosen === undefined) return;
@@ -329,7 +349,7 @@ function AddToGroupDialog(properties: { readonly acts: Acts }) {
       pending: BULK_WORDS.addToGroup.pending(count, chosen.name),
       done: (answer) =>
         BULK_WORDS.addToGroup.done(answer.changed.length, chosen.name, answer.skipped),
-      landing: undefined,
+      ownChange: undefined,
       run: (personIds, settled) => {
         add.mutate({ groupId: chosen.id, personIds }, settled);
       },
@@ -364,7 +384,7 @@ function RemoveDialog(properties: { readonly acts: Acts }) {
     acts.command({
       pending: BULK_WORDS.remove.pending(count),
       done: (answer) => BULK_WORDS.remove.done(answer.changed.length, answer.skipped),
-      landing: "removed",
+      ownChange: "removed",
       run: (personIds, settled) => {
         remove.mutate({ personIds }, settled);
       },

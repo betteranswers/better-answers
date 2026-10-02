@@ -3,12 +3,14 @@ const CHARACTERS =
   "Segmenter" in Intl ? new Intl.Segmenter("en-GB", { granularity: "grapheme" }) : undefined;
 
 /**
- * Some browsers still lack the segmenter. Code points keep an emoji whole there, but drop an
- * accent typed apart.
+ * Some browsers still lack the segmenter. This keeps a flag, an accent typed apart and a joined
+ * emoji whole there; rarer clusters may still split.
  */
+const FIRST_CLUSTER = /^(?:\p{RI}{2}|\P{M}\p{M}*(?:‍\P{M}\p{M}*)*)/u;
+
 const firstOf = (word: string): string =>
   CHARACTERS === undefined
-    ? (Array.from(word)[0] ?? "")
+    ? (FIRST_CLUSTER.exec(word)?.[0] ?? "")
     : ([...CHARACTERS.segment(word)][0]?.segment ?? "");
 
 export const initialsOf = (name: string): string =>

@@ -69,7 +69,8 @@ export function MemberRemoval(properties: {
                 aria-disabled={removing}
                 className="aria-disabled:opacity-50"
                 onClick={() => {
-                  onRemove(member);
+                  // A page drawn again mid-removal has an idle act of its own, so this is the guard.
+                  if (!removing) onRemove(member);
                 }}
               >
                 Remove {name} from this workspace
