@@ -23,6 +23,7 @@ const config: KnipConfig = {
 
         "tests/fixtures/web-build/**",
 
+        // Vendored skills, whose samples import packages the api does not depend on.
         ".claude/skills/**",
       ],
     },
