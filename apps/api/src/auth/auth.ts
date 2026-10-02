@@ -1,9 +1,10 @@
 import { cimd } from "@better-auth/cimd";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { oauthProvider } from "@better-auth/oauth-provider";
+import { passkey as passkeyPlugin } from "@better-auth/passkey";
 import { betterAuth, type Session } from "better-auth";
 import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
-import { emailOTP, jwt, organization } from "better-auth/plugins";
+import { emailOTP, jwt, organization, twoFactor } from "better-auth/plugins";
 import type { BetterAuthPlugin } from "better-auth/types";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { decodeJwt } from "jose";
@@ -21,6 +22,7 @@ import {
 } from "@better-answers/core/workspaces";
 import {
   account,
+  authenticator,
   invitation,
   INVITATION_EXPIRY_SECONDS,
   jwks,
@@ -32,6 +34,7 @@ import {
   oauthConsent,
   oauthRefreshToken,
   oauthResource,
+  passkey,
   rateLimit,
   session,
   user,
@@ -101,6 +104,8 @@ const identitySchema = {
   oauthConsent,
   oauthClientAssertion,
   rateLimit,
+  authenticator,
+  passkey,
 };
 
 type AuditEvent =
@@ -137,6 +142,41 @@ const CLOSED_ORGANISATION_PATHS = [
   "/organization/update",
   "/organization/delete",
   "/organization/check-slug",
+] as const;
+
+/**
+ * Each adds, removes, reveals or spends a factor past our gate; our routes call the few they need
+ * as server functions.
+ */
+const CLOSED_FACTOR_PATHS = [
+  "/passkey/delete-passkey",
+  "/passkey/generate-authenticate-options",
+  "/passkey/generate-register-options",
+  "/passkey/list-user-passkeys",
+  "/passkey/update-passkey",
+  "/passkey/verify-authentication",
+  "/passkey/verify-registration",
+  "/two-factor/disable",
+  "/two-factor/enable",
+  "/two-factor/generate-backup-codes",
+  "/two-factor/get-totp-uri",
+  "/two-factor/send-otp",
+  "/two-factor/verify-backup-code",
+  "/two-factor/verify-otp",
+  "/two-factor/verify-totp",
+] as const;
+
+/**
+ * `/update-session` lets a session write its own fields; the rest list sessions with their
+ * addresses, end them unrecorded, or drop a linked account.
+ */
+const CLOSED_SESSION_PATHS = [
+  "/list-sessions",
+  "/revoke-other-sessions",
+  "/revoke-session",
+  "/revoke-sessions",
+  "/unlink-account",
+  "/update-session",
 ] as const;
 
 const tokenResponse = z.object({ access_token: z.string() }).optional().catch(undefined);
@@ -341,6 +381,7 @@ export const createAuth = (deps: AuthDependencies) => {
   };
 
   const db = drizzle(deps.database, { schema: identitySchema });
+  const appAddress = new URL(deps.publicUrl);
 
   return betterAuth({
     appName: PRODUCT_NAME,
@@ -355,12 +396,33 @@ export const createAuth = (deps: AuthDependencies) => {
      * /token serves callers with no OAuth flow, which the library asks off under a provider;
      * /update-user writes a display name past its rule.
      */
-    disabledPaths: ["/token", "/update-user", ...CLOSED_ORGANISATION_PATHS],
+    disabledPaths: [
+      "/token",
+      "/update-user",
+      ...CLOSED_ORGANISATION_PATHS,
+      ...CLOSED_FACTOR_PATHS,
+      ...CLOSED_SESSION_PATHS,
+    ],
     user: {
       additionalFields: {
         credentialsRevokedAt: { type: "date", required: false, input: false },
         /** Undeclared, the library would hand the column back on every session it answers. */
         operator: { type: "boolean", required: false, input: false, returned: false },
+        passkeyOfferDismissedAt: { type: "date", required: false, input: false, returned: false },
+        recoveryCodesAcknowledged: {
+          type: "boolean",
+          required: false,
+          input: false,
+          returned: false,
+        },
+      },
+    },
+    session: {
+      /** Our confirmation stamp is the one freshness rule, so the library's own never refuses. */
+      freshAge: 0,
+      additionalFields: {
+        secondFactorConfirmedAt: { type: "date", required: false, input: false, returned: false },
+        pendingSince: { type: "date", required: false, input: false, returned: false },
       },
     },
     rateLimit: {
@@ -537,6 +599,22 @@ export const createAuth = (deps: AuthDependencies) => {
           }),
         }),
       ),
+      twoFactor({
+        issuer: PRODUCT_NAME,
+        allowPasswordless: true,
+        /** Its lock counts per account, so a mailbox holder guessing codes could lock an Admin out. */
+        accountLockout: { enabled: false },
+        schema: {
+          twoFactor: { modelName: "authenticator" },
+          user: { fields: { twoFactorEnabled: "authenticatorEnabled" } },
+        },
+      }),
+      passkeyPlugin({
+        rpID: appAddress.hostname,
+        rpName: PRODUCT_NAME,
+        origin: appAddress.origin,
+        authenticatorSelection: { userVerification: "required" },
+      }),
       cimd({
         fetchClientMetadataResource: deps.fetchClientMetadataResource,
         metadataProfile: "mcp-2026-07-28",

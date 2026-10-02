@@ -32,6 +32,13 @@ export const user = pgTable("user", {
   credentialsRevokedAt: stamp("credentials_revoked_at"),
 
   operator: boolean("operator").default(false).notNull(),
+
+  /** The authenticator plugin's own flag, which it sets at the first verify. */
+  authenticatorEnabled: boolean("authenticator_enabled").default(false).notNull(),
+
+  passkeyOfferDismissedAt: stamp("passkey_offer_dismissed_at"),
+
+  recoveryCodesAcknowledged: boolean("recovery_codes_acknowledged").default(false).notNull(),
 });
 
 export const session = pgTable(
@@ -50,6 +57,11 @@ export const session = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
 
     activeWorkspaceId: text("active_workspace_id"),
+
+    secondFactorConfirmedAt: stamp("second_factor_confirmed_at"),
+
+    /** A clock for the pending session's hour, set once; whether it is pending is derived. */
+    pendingSince: stamp("pending_since"),
   },
   (table) => [index("session_user_id_idx").on(table.userId)],
 );
@@ -347,6 +359,73 @@ export const oauthClientAssertion = pgTable("oauth_client_assertion", {
   expiresAt: stamp("expires_at").notNull(),
 });
 
+/** The authenticator plugin's `twoFactor` model, under the glossary's word. */
+export const authenticator = pgTable(
+  "authenticator",
+  {
+    id: text("id").primaryKey(),
+    secret: text("secret").notNull(),
+
+    /** The plugin writes a set at every setup and nothing reads it: recovery codes are our own. */
+    backupCodes: text("backup_codes").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    verified: boolean("verified").default(true).notNull(),
+    failedVerificationCount: integer("failed_verification_count").default(0).notNull(),
+    lockedUntil: stamp("locked_until"),
+  },
+  // The plugin keeps one row a person and updates it in place, so a second would be a race.
+  (table) => [uniqueIndex("authenticator_user_id_uidx").on(table.userId)],
+);
+
+export const passkey = pgTable(
+  "passkey",
+  {
+    id: text("id").primaryKey(),
+    name: text("name"),
+    publicKey: text("public_key").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    credentialID: text("credential_id").notNull(),
+
+    // WebAuthn's signature counter is an unsigned 32-bit number, past integer's reach.
+    counter: bigint("counter", { mode: "number" }).notNull(),
+    deviceType: text("device_type").notNull(),
+    backedUp: boolean("backed_up").notNull(),
+    transports: text("transports"),
+    createdAt: stamp("created_at").defaultNow().notNull(),
+    aaguid: text("aaguid"),
+  },
+  (table) => [
+    index("passkey_user_id_idx").on(table.userId),
+    uniqueIndex("passkey_credential_id_uidx").on(table.credentialID),
+  ],
+);
+
+/** The passkey plugin's schema takes no field of ours, so its last use is kept beside it. */
+export const passkeyLastUse = pgTable("passkey_last_use", {
+  passkeyId: text("passkey_id")
+    .primaryKey()
+    .references(() => passkey.id, { onDelete: "cascade" }),
+  at: stamp("at").notNull(),
+});
+
+/** Ours, not the plugin's: a passkey-only Admin has no authenticator row to keep them on. */
+export const recoveryCode = pgTable(
+  "recovery_code",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    codeHash: text("code_hash").notNull(),
+    createdAt: stamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("recovery_code_user_id_code_hash_uidx").on(table.userId, table.codeHash)],
+);
+
 export const rateLimit = pgTable("rate_limit", {
   id: text("id").primaryKey(),
   key: text("key").notNull().unique(),
@@ -371,4 +450,8 @@ export const IDENTITY_SET = [
   "public.oauth_consent",
   "public.oauth_client_assertion",
   "public.rate_limit",
+  "public.authenticator",
+  "public.passkey",
+  "public.passkey_last_use",
+  "public.recovery_code",
 ] as const;

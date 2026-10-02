@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { commit, type GitDoor } from "@better-answers/core/store/git";
 import { SUBJECT_IDENTIFIER_KINDS, ulid } from "@better-answers/schema";
+import { byCodeUnit } from "@better-answers/schema/code-unit";
 
 import {
   accessAnswerOf,
@@ -21,7 +22,9 @@ import { withScope } from "../src/store/postgres/index.ts";
 import { contractFixture } from "./contract-fixture.ts";
 import {
   identityRowsFor,
+  lastActiveIn,
   otherCodesFor,
+  secondFactorRowsFor,
   signInLinkFor,
   verificationCodeFor,
 } from "./identity-rows.ts";
@@ -91,6 +94,13 @@ const conceptFileBy = async (
 const locationsOf = (map: ErasureMap): readonly (readonly [ErasureFamily, readonly string[]])[] =>
   map.map((entry) => [entry.family, entry.locations] as const);
 
+const SECOND_FACTOR_FAMILIES: ReadonlySet<ErasureFamily> = new Set([
+  "identity-passkey",
+  "identity-authenticator",
+  "identity-recovery-code",
+  "identity-last-active",
+]);
+
 const workspaceHoldingAMember = async () => {
   const scenario = await arrange();
   const email = addressOf("priya");
@@ -137,6 +147,10 @@ describe("the erasure map's union", () => {
       "identity-verification",
       "identity-invitation",
       "identity-account",
+      "identity-passkey",
+      "identity-authenticator",
+      "identity-recovery-code",
+      "identity-last-active",
       "source-document",
     ]);
   });
@@ -157,10 +171,14 @@ describe("the erasure map's union", () => {
       "identity-verification": findsNothing,
       "identity-invitation": findsNothing,
       "identity-account": findsNothing,
+      "identity-passkey": findsNothing,
+      "identity-authenticator": findsNothing,
+      "identity-recovery-code": findsNothing,
+      "identity-last-active": findsNothing,
     };
 
-    expect(Object.keys(withoutADocumentFinder)).toHaveLength(8);
-    expect(ERASURE_FAMILIES).toHaveLength(9);
+    expect(Object.keys(withoutADocumentFinder)).toHaveLength(12);
+    expect(ERASURE_FAMILIES).toHaveLength(13);
   });
 });
 
@@ -195,7 +213,26 @@ describe("the erasure map for a member", () => {
       },
       { family: "identity-invitation", categories: ["email-address"], locations: [held.invite.id] },
       { family: "identity-account", categories: ["linked-account"], locations: [held.accountId] },
+      { family: "identity-passkey", categories: ["sign-in", "device"], locations: [] },
+      { family: "identity-authenticator", categories: ["sign-in"], locations: [] },
+      { family: "identity-recovery-code", categories: ["sign-in"], locations: [] },
+      { family: "identity-last-active", categories: ["sign-in"], locations: [] },
       { family: "source-document", categories: ["document-text"], locations: [] },
+    ]);
+  });
+
+  it("names their second factor and their last activity here", async () => {
+    const held = await workspaceHoldingAMember();
+    const factors = await secondFactorRowsFor(db().pool, held.person.id);
+    await lastActiveIn(db().pool, held.scenario.workspaceId, held.person.id);
+
+    const map = await mapOf(held.scenario, held.request);
+
+    expect(locationsOf(map).filter(([family]) => SECOND_FACTOR_FAMILIES.has(family))).toEqual([
+      ["identity-passkey", [factors.passkeyId, `${factors.passkeyId} (last use)`]],
+      ["identity-authenticator", [factors.authenticatorId]],
+      ["identity-recovery-code", factors.recoveryCodeIds.toSorted(byCodeUnit)],
+      ["identity-last-active", [held.scenario.workspaceId]],
     ]);
   });
 
@@ -231,6 +268,10 @@ describe("the erasure map for a subject with no user row", () => {
       ["identity-verification", []],
       ["identity-invitation", []],
       ["identity-account", []],
+      ["identity-passkey", []],
+      ["identity-authenticator", []],
+      ["identity-recovery-code", []],
+      ["identity-last-active", []],
       ["source-document", []],
     ]);
   });
@@ -266,6 +307,10 @@ describe("the erasure map in one workspace's scope", () => {
       }),
     }));
 
+    for (const workspaceId of [here.workspaceId, elsewhere.workspaceId]) {
+      await lastActiveIn(db().pool, workspaceId, person.id);
+    }
+
     const elsewherePrincipal = await principalFor(db(), elsewhere.workspaceId, person.id);
     const shaElsewhere = await conceptFileBy(elsewhere, elsewherePrincipal, email, elsewhere.git);
     const request = await requestFor(here, {
@@ -284,10 +329,20 @@ describe("the erasure map in one workspace's scope", () => {
       ["identity-verification", []],
       ["identity-invitation", [mine.invite.id]],
       ["identity-account", []],
+      ["identity-passkey", []],
+      ["identity-authenticator", []],
+      ["identity-recovery-code", []],
+      ["identity-last-active", [here.workspaceId]],
       ["source-document", []],
     ]);
     const named = map.flatMap((entry) => entry.locations);
-    for (const theirsOwn of [theirs.commit.sha, theirs.check.id, theirs.invite.id, shaElsewhere]) {
+    for (const theirsOwn of [
+      theirs.commit.sha,
+      theirs.check.id,
+      theirs.invite.id,
+      shaElsewhere,
+      elsewhere.workspaceId,
+    ]) {
       expect(named).not.toContain(theirsOwn);
     }
   });
@@ -564,7 +619,7 @@ describe("the access answer", () => {
     });
     const map = await mapOf(scenario, request);
 
-    expect(map).toHaveLength(9);
+    expect(map).toHaveLength(13);
     expect(accessAnswerOf(map)).toEqual({ categories: [], locations: [] });
   });
 });

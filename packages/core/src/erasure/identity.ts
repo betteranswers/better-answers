@@ -1,6 +1,6 @@
 import { normalizeError, type PlatformPrincipal } from "../kernel/index.ts";
 import { ERASED_DOMAIN } from "../store/git/index.ts";
-import { withIdentityWrite, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
+import { withScope, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import { verificationIdentifiersOf, workspacesHeldBy } from "../workspaces/index.ts";
 
 export type IdentityArm = "no-person" | "last-membership" | "membership-ended";
@@ -13,6 +13,10 @@ export type IdentitySwept = {
   readonly sessions: number;
   readonly verifications: number;
   readonly accounts: number;
+  readonly passkeys: number;
+  readonly authenticators: number;
+  readonly recoveryCodes: number;
+  readonly lastActive: number;
   readonly invitationsHere: number;
 
   /**
@@ -28,6 +32,10 @@ const SWEPT_NOTHING = {
   sessions: 0,
   verifications: 0,
   accounts: 0,
+  passkeys: 0,
+  authenticators: 0,
+  recoveryCodes: 0,
+  lastActive: 0,
   invitationsHere: 0,
   invitationsEverywhere: 0,
 } as const;
@@ -48,6 +56,8 @@ export type ErasureSubject = {
 
 const rowsOf = (result: { readonly rowCount: number | null }): number => result.rowCount ?? 0;
 
+type HeldByThePerson = "session" | "account" | "passkey" | "authenticator" | "recovery_code";
+
 const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) => {
   const emails = [...subject.emails];
   const verifications = await tx.query(
@@ -59,19 +69,29 @@ const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) =
     "DELETE FROM invitation WHERE lower(email) = ANY($1) RETURNING workspace_id",
     [emails],
   );
-  const sessions = await tx.query("DELETE FROM session WHERE user_id = $1", [subject.personId]);
-  const accounts = await tx.query("DELETE FROM account WHERE user_id = $1", [subject.personId]);
+  const deleted = async (table: HeldByThePerson): Promise<number> =>
+    rowsOf(await tx.query(`DELETE FROM ${table} WHERE user_id = $1`, [subject.personId]));
+  const sessions = await deleted("session");
+  const accounts = await deleted("account");
+  const passkeys = await deleted("passkey");
+  const authenticators = await deleted("authenticator");
+  const recoveryCodes = await deleted("recovery_code");
 
   const pseudonymised = await tx.query(
     `UPDATE "user"
-        SET email = $2, email_verified = false, name = '', image = NULL, operator = false
+        SET email = $2, email_verified = false, name = '', image = NULL, operator = false,
+            authenticator_enabled = false, passkey_offer_dismissed_at = NULL,
+            recovery_codes_acknowledged = false
       WHERE id = $1`,
     [subject.personId, tombstone],
   );
   return {
     verifications: rowsOf(verifications),
-    sessions: rowsOf(sessions),
-    accounts: rowsOf(accounts),
+    sessions,
+    accounts,
+    passkeys,
+    authenticators,
+    recoveryCodes,
     invitationsHere: invitations.rows.filter((row) => row.workspace_id === subject.workspaceId)
       .length,
     invitationsEverywhere: rowsOf(invitations),
@@ -80,9 +100,9 @@ const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) =
 };
 
 /**
- * Does nothing without a person. Otherwise ends the membership here, and only when it was the
- * person's last deletes their sessions, accounts, verifications and invitations, pseudonymises
- * them and clears any operator mark. Throws when their memberships cannot be read.
+ * Does nothing without a person. Otherwise ends the membership and last activity here, and only
+ * when it was the person's last deletes their sessions, accounts, verifications, invitations and
+ * second factor, pseudonymises them and clears their marks. Throws when memberships cannot be read.
  */
 export const eraseFromTheIdentitySet = async (
   platform: PlatformPrincipal,
@@ -98,14 +118,19 @@ export const eraseFromTheIdentitySet = async (
   const elsewhere = held.value.filter((workspaceId) => workspaceId !== subject.workspaceId);
   const arm: IdentityArm = elsewhere.length === 0 ? "last-membership" : "membership-ended";
 
-  return withIdentityWrite(platform, door, async (tx) => {
+  // One transaction for the step: of its tables only the last-activity one is under row-level
+  // security, so the workspace's scope narrows nothing else.
+  return withScope(platform, door, subject.workspaceId, async (tx) => {
+    const lastActive = rowsOf(
+      await tx.query("DELETE FROM workspace_last_active WHERE user_id = $1", [personId]),
+    );
     const ended = await tx.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
       subject.workspaceId,
       personId,
     ]);
     const membershipsEnded = rowsOf(ended);
-    if (arm === "membership-ended") return { arm, ...SWEPT_NOTHING, membershipsEnded };
+    if (arm === "membership-ended") return { arm, ...SWEPT_NOTHING, membershipsEnded, lastActive };
     const swept = await sweepTheSet(tx, subject, `${subject.pseudonym}@${ERASED_DOMAIN}`);
-    return { arm, membershipsEnded, ...swept };
+    return { arm, membershipsEnded, lastActive, ...swept };
   });
 };

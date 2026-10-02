@@ -9,7 +9,7 @@ import {
   openObjects,
 } from "@better-answers/core/store/objects";
 import { withScope } from "@better-answers/core/store/postgres";
-import { boundarySchemas, ulid } from "@better-answers/schema";
+import { boundarySchemas, IDENTITY_SET, ulid } from "@better-answers/schema";
 
 import { open } from "../src/answering/index.ts";
 import {
@@ -39,7 +39,9 @@ import { authorLinesOf, bundleHistory, everyObjectOf, objectPresent } from "./bu
 import { erasureDoorsFor } from "./erasure-doors.ts";
 import {
   identityRowsFor,
+  lastActiveIn,
   otherCodesFor,
+  secondFactorRowsFor,
   signInLinkFor,
   verificationCodeFor,
 } from "./identity-rows.ts";
@@ -201,6 +203,8 @@ const erasedOnEachArm = async (): Promise<{
     [stillMember, heldElsewhere],
   ] as const) {
     await identityRowsFor(db().pool, { userId: person.id, email });
+    await secondFactorRowsFor(db().pool, person.id);
+    await lastActiveIn(db().pool, scenario.workspaceId, person.id);
     await seedingWith(db().pool, (seed) =>
       seed.invitation({ workspaceId: scenario.workspaceId, email }),
     );
@@ -501,6 +505,96 @@ const identityRowCountsFor = async (workspaceId: string, userId: string, email: 
     verifications: Number(row.verifications),
     invitations: Number(row.invitations),
   };
+};
+
+const secondFactorHeldBy = async (userId: string, passkeyId: string) => {
+  const read = await db().pool.query(
+    `SELECT (SELECT count(*)::int FROM passkey WHERE user_id = $1) AS passkeys,
+            (SELECT count(*)::int FROM passkey_last_use WHERE passkey_id = $2) AS passkey_uses,
+            (SELECT count(*)::int FROM authenticator WHERE user_id = $1) AS authenticators,
+            (SELECT count(*)::int FROM recovery_code WHERE user_id = $1) AS recovery_codes,
+            u.authenticator_enabled,
+            u.passkey_offer_dismissed_at IS NOT NULL AS offer_dismissed,
+            u.recovery_codes_acknowledged
+       FROM "user" u WHERE u.id = $1`,
+    [userId, passkeyId],
+  );
+  return read.rows[0];
+};
+
+const SECOND_FACTOR_HELD = {
+  passkeys: 1,
+  passkey_uses: 1,
+  authenticators: 1,
+  recovery_codes: 2,
+  authenticator_enabled: true,
+  offer_dismissed: true,
+  recovery_codes_acknowledged: true,
+};
+
+/** A member here who is an Editor of a second workspace too. */
+const memberHereAndElsewhere = async () => {
+  const scenario = await arrange();
+  const elsewhere = await arrange();
+  const email = addressOf("priya");
+  const person = await memberOf(db().pool, scenario.workspaceId, email);
+  await seedingWith(db().pool, (seed) =>
+    seed.member({ workspaceId: elsewhere.workspaceId, userId: person.id, role: "Editor" }),
+  );
+  return { scenario, elsewhere, email, person };
+};
+
+/** The identity-set tables naming a person by `user_id` that the last membership's sweep empties. */
+const SWEPT_BY_PERSON = [
+  "public.account",
+  "public.authenticator",
+  "public.member",
+  "public.passkey",
+  "public.recovery_code",
+  "public.session",
+];
+
+/** A client's registration, and a grant's tokens and consent: the identity sweep reaches none. */
+const BEYOND_THE_SWEEP = [
+  "public.oauth_access_token",
+  "public.oauth_client",
+  "public.oauth_consent",
+  "public.oauth_refresh_token",
+];
+
+const identityTablesNamingAPerson = async (): Promise<readonly string[]> => {
+  const read = await db().pool.query<{ qualified: string }>(
+    `SELECT table_schema || '.' || table_name AS qualified FROM information_schema.columns
+      WHERE column_name = 'user_id' AND table_schema || '.' || table_name = ANY($1)`,
+    [[...IDENTITY_SET]],
+  );
+  return read.rows.map((row) => row.qualified).toSorted();
+};
+
+const sweptTablesHolding = async (userId: string): Promise<readonly string[]> => {
+  const holding: string[] = [];
+  for (const qualified of SWEPT_BY_PERSON) {
+    const read = await db().pool.query(`SELECT 1 FROM ${qualified} WHERE user_id = $1 LIMIT 1`, [
+      userId,
+    ]);
+    if (read.rowCount !== 0) holding.push(qualified);
+  }
+  return holding;
+};
+
+const NO_SECOND_FACTOR_DELETED = {
+  passkeys_deleted: 0,
+  authenticators_deleted: 0,
+  recovery_codes_deleted: 0,
+  last_active_deleted: 0,
+};
+
+const lastActiveWorkspacesOf = async (userId: string): Promise<readonly string[]> => {
+  const read = await db().pool.query<{ workspace_id: string }>(
+    "SELECT workspace_id FROM workspace_last_active WHERE user_id = $1 ORDER BY workspace_id",
+    [userId],
+  );
+  return read.rows.map((row) => row.workspace_id);
 };
 
 const userRowOf = async (userId: string) => {
@@ -1212,6 +1306,69 @@ describe("the identity set on the person's last membership", () => {
     });
   });
 
+  it("empties every identity-set table that names the person", async () => {
+    expect(await identityTablesNamingAPerson()).toEqual(
+      [...SWEPT_BY_PERSON, ...BEYOND_THE_SWEEP].toSorted(),
+    );
+    const { scenario, person, email, subjectRequestId } = await workspaceWithAnErasureRequest();
+    await identityRowsFor(db().pool, { userId: person.id, email });
+    await secondFactorRowsFor(db().pool, person.id);
+    await lastActiveIn(db().pool, scenario.workspaceId, person.id);
+    expect(await sweptTablesHolding(person.id)).toEqual(SWEPT_BY_PERSON);
+
+    await completing(scenario, subjectRequestId);
+
+    expect(await sweptTablesHolding(person.id)).toEqual([]);
+  });
+
+  it("deletes the person's second factor, last activity and their flags", async () => {
+    const { scenario, person, subjectRequestId } = await workspaceWithAnErasureRequest();
+    const held = await secondFactorRowsFor(db().pool, person.id);
+    await lastActiveIn(db().pool, scenario.workspaceId, person.id);
+    expect(await secondFactorHeldBy(person.id, held.passkeyId)).toEqual(SECOND_FACTOR_HELD);
+
+    const done = await completing(scenario, subjectRequestId);
+
+    expect(await secondFactorHeldBy(person.id, held.passkeyId)).toEqual({
+      passkeys: 0,
+      passkey_uses: 0,
+      authenticators: 0,
+      recovery_codes: 0,
+      authenticator_enabled: false,
+      offer_dismissed: false,
+      recovery_codes_acknowledged: false,
+    });
+    expect(await lastActiveWorkspacesOf(person.id)).toEqual([]);
+    expect(operatorLinesAbout(done.erasureRequestId)).toEqual([
+      expect.objectContaining({
+        passkeys_deleted: 1,
+        authenticators_deleted: 1,
+        recovery_codes_deleted: 2,
+        last_active_deleted: 1,
+      }),
+    ]);
+  });
+
+  it("keeps the second factor, ending only this workspace's last activity", async () => {
+    const { scenario, elsewhere, email, person } = await memberHereAndElsewhere();
+    const held = await secondFactorRowsFor(db().pool, person.id);
+    await lastActiveIn(db().pool, scenario.workspaceId, person.id);
+    await lastActiveIn(db().pool, elsewhere.workspaceId, person.id);
+    const subjectRequestId = await erasureRequestAbout(scenario.workspaceId, person.id, email);
+
+    const done = await completing(scenario, subjectRequestId);
+
+    expect(await secondFactorHeldBy(person.id, held.passkeyId)).toEqual(SECOND_FACTOR_HELD);
+    expect(await lastActiveWorkspacesOf(person.id)).toEqual([elsewhere.workspaceId]);
+    expect(operatorLinesAbout(done.erasureRequestId)).toEqual([
+      expect.objectContaining({
+        arm: "membership-ended",
+        passkeys_deleted: 0,
+        last_active_deleted: 1,
+      }),
+    ]);
+  });
+
   it("deletes the subject's own codes, never a stranger's", async () => {
     const scenario = await arrange();
     const email = addressOf("priya");
@@ -1249,13 +1406,7 @@ describe("the identity set on the person's last membership", () => {
   });
 
   it("ends this membership alone while the person holds another", async () => {
-    const scenario = await arrange();
-    const elsewhere = await arrange();
-    const email = addressOf("priya");
-    const person = await memberOf(db().pool, scenario.workspaceId, email);
-    await seedingWith(db().pool, (seed) =>
-      seed.member({ workspaceId: elsewhere.workspaceId, userId: person.id, role: "Editor" }),
-    );
+    const { scenario, elsewhere, email, person } = await memberHereAndElsewhere();
     await identityRowsFor(db().pool, { userId: person.id, email });
     await theOperator(scenario, email);
     const subjectRequestId = await erasureRequestAbout(scenario.workspaceId, person.id, email);
@@ -1331,6 +1482,7 @@ describe("the identity set on the person's last membership", () => {
         accounts_deleted: 0,
         invitations_deleted_here: 1,
         invitations_deleted: 2,
+        ...NO_SECOND_FACTOR_DELETED,
       },
     ]);
   });
@@ -1357,6 +1509,10 @@ describe("the identity set on the person's last membership", () => {
           accounts_deleted: 1,
           invitations_deleted_here: 1,
           invitations_deleted: 1,
+          passkeys_deleted: 1,
+          authenticators_deleted: 1,
+          recovery_codes_deleted: 2,
+          last_active_deleted: 1,
         },
       ],
       "membership-ended": [
@@ -1369,6 +1525,8 @@ describe("the identity set on the person's last membership", () => {
           accounts_deleted: 0,
           invitations_deleted_here: 0,
           invitations_deleted: 0,
+          ...NO_SECOND_FACTOR_DELETED,
+          last_active_deleted: 1,
         },
       ],
       "no-person": [
@@ -1381,6 +1539,7 @@ describe("the identity set on the person's last membership", () => {
           accounts_deleted: 0,
           invitations_deleted_here: 0,
           invitations_deleted: 0,
+          ...NO_SECOND_FACTOR_DELETED,
         },
       ],
     });
@@ -1430,6 +1589,10 @@ describe("the identity set on the person's last membership", () => {
         "identity-verification": { found: 1 },
         "identity-invitation": { found: 1 },
         "identity-account": { found: 1 },
+        "identity-passkey": { found: 2 },
+        "identity-authenticator": { found: 1 },
+        "identity-recovery-code": { found: 2 },
+        "identity-last-active": { found: 1 },
       },
       report: [
         "- identity-user: found 1, membershipsEnded 1",
@@ -1437,6 +1600,10 @@ describe("the identity set on the person's last membership", () => {
         "- identity-verification: found 1",
         "- identity-invitation: found 1",
         "- identity-account: found 1",
+        "- identity-passkey: found 2",
+        "- identity-authenticator: found 1",
+        "- identity-recovery-code: found 2",
+        "- identity-last-active: found 1",
       ],
     };
     expect({

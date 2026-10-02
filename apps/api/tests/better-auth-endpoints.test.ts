@@ -33,13 +33,21 @@ const HEADER = `\
 #
 # A path here is a path to check, not a path that answers: better-call leaves a
 # \`SERVER_ONLY\` endpoint off its router and \`disabledPaths\` closes \`/token\`,
-# \`/update-user\` and eleven \`/organization/*\` paths. \`/update-user\` would write a
+# \`/update-user\`, eleven \`/organization/*\` paths, every \`/passkey/*\` and
+# \`/two-factor/*\` path, and six session paths. \`/update-user\` would write a
 # display name past the rule (update-user.test.ts holds it refused). The organisation
 # plugin's ten writes would change a membership or a workspace with no audit event,
 # and \`/organization/check-slug\` would tell anyone signed in whether a company is a
 # customer, so of \`/organization/*\` only the picker's \`set-active\` and the reads
 # answer. organisation-plugin.test.ts names each \`/organization/*\` path below as
 # closed or kept, and holds each closed one refused for every role.
+# A \`/passkey/*\` or \`/two-factor/*\` path would add, remove, reveal or spend a second
+# factor past the gate, so the api's own routes call the few they need as server
+# functions. \`/update-session\` would let a session write its own fields, and
+# \`/list-sessions\`, the three \`/revoke-*\` paths and \`/unlink-account\` would list
+# sessions with their addresses, end them unrecorded or drop a linked account.
+# second-factor-foundation.test.ts holds each of these refused to a signed-in person,
+# and every path the two plugins mount among them.
 # The list keeps every closed path anyway, because neither flag is ours to keep and the
 # day one stops applying should be a diff rather than a silence.
 #

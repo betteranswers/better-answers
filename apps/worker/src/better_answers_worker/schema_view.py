@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0059_the-actor-index"
+MIGRATION_ID = "0060_the-second-factor"
 
-MIGRATION_WHEN = 1790884661392
+MIGRATION_WHEN = 1790947205335
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -56,6 +56,15 @@ TABLES: dict[str, dict[str, str]] = {
         "at": "timestamp with time zone NOT NULL",
         "detail": "jsonb NOT NULL",
         "batch_id": "text",
+    },
+    "public.authenticator": {
+        "id": "text NOT NULL",
+        "secret": "text NOT NULL",
+        "backup_codes": "text NOT NULL",
+        "user_id": "text NOT NULL",
+        "verified": "boolean NOT NULL",
+        "failed_verification_count": "integer NOT NULL",
+        "locked_until": "timestamp with time zone",
     },
     "public.bundle_commit": {
         "workspace_id": "text NOT NULL",
@@ -422,11 +431,34 @@ TABLES: dict[str, dict[str, str]] = {
         "policy_version": "integer",
         "metadata": "jsonb",
     },
+    "public.passkey": {
+        "id": "text NOT NULL",
+        "name": "text",
+        "public_key": "text NOT NULL",
+        "user_id": "text NOT NULL",
+        "credential_id": "text NOT NULL",
+        "counter": "bigint NOT NULL",
+        "device_type": "text NOT NULL",
+        "backed_up": "boolean NOT NULL",
+        "transports": "text",
+        "created_at": "timestamp with time zone NOT NULL",
+        "aaguid": "text",
+    },
+    "public.passkey_last_use": {
+        "passkey_id": "text NOT NULL",
+        "at": "timestamp with time zone NOT NULL",
+    },
     "public.rate_limit": {
         "id": "text NOT NULL",
         "key": "text NOT NULL",
         "count": "integer NOT NULL",
         "last_request": "bigint NOT NULL",
+    },
+    "public.recovery_code": {
+        "id": "text NOT NULL",
+        "user_id": "text NOT NULL",
+        "code_hash": "text NOT NULL",
+        "created_at": "timestamp with time zone NOT NULL",
     },
     "public.session": {
         "id": "text NOT NULL",
@@ -438,6 +470,8 @@ TABLES: dict[str, dict[str, str]] = {
         "user_agent": "text",
         "user_id": "text NOT NULL",
         "active_workspace_id": "text",
+        "second_factor_confirmed_at": "timestamp with time zone",
+        "pending_since": "timestamp with time zone",
     },
     "public.source_binding": {
         "workspace_id": "text NOT NULL",
@@ -526,6 +560,9 @@ TABLES: dict[str, dict[str, str]] = {
         "updated_at": "timestamp with time zone NOT NULL",
         "credentials_revoked_at": "timestamp with time zone",
         "operator": "boolean NOT NULL",
+        "authenticator_enabled": "boolean NOT NULL",
+        "passkey_offer_dismissed_at": "timestamp with time zone",
+        "recovery_codes_acknowledged": "boolean NOT NULL",
     },
     "public.verification": {
         "id": "text NOT NULL",
@@ -548,5 +585,10 @@ TABLES: dict[str, dict[str, str]] = {
         "key": "text NOT NULL",
         "value": "text NOT NULL",
         "updated_at": "timestamp with time zone NOT NULL",
+    },
+    "public.workspace_last_active": {
+        "workspace_id": "text NOT NULL",
+        "user_id": "text NOT NULL",
+        "at": "timestamp with time zone NOT NULL",
     },
 }

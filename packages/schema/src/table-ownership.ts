@@ -32,6 +32,10 @@ export const TABLE_OWNERS = {
   "public.oauth_consent": IDENTITY_PROVIDER,
   "public.oauth_client_assertion": IDENTITY_PROVIDER,
   "public.rate_limit": IDENTITY_PROVIDER,
+  "public.authenticator": IDENTITY_PROVIDER,
+  "public.passkey": IDENTITY_PROVIDER,
+  "public.passkey_last_use": IDENTITY_PROVIDER,
+  "public.recovery_code": IDENTITY_PROVIDER,
 
   "public.ingress_counter": POSTGRES_DOOR,
   "public.mcp_call_counter": POSTGRES_DOOR,
@@ -47,6 +51,7 @@ export const TABLE_OWNERS = {
   "public.audit_event": "audit",
   "public.identity_audit_event": "audit",
   "public.access_request": "members",
+  "public.workspace_last_active": "members",
   "index.chunk": "sources",
 
   "public.concept_identity": "concepts",
@@ -185,6 +190,41 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     access: "write",
     reason:
       "A linked account is the external identity a sign-in came through — a name for this person at another provider — so it goes with the identity set on the last membership.",
+  },
+  {
+    table: "public.passkey",
+    by: "erasure",
+    access: "write",
+    reason:
+      "A passkey is the person's own credential, named by them and held for every workspace they belong to, so it goes with the identity set on the last membership and stays while another membership needs it. Its last-use row goes with it by the foreign key's cascade.",
+  },
+  {
+    table: "public.passkey_last_use",
+    by: "erasure",
+    access: "read",
+    reason:
+      "The erasure map names each passkey's last use beside the passkey, so an access answer covers when the person used it; the delete is the cascade from `passkey`.",
+  },
+  {
+    table: "public.authenticator",
+    by: "erasure",
+    access: "write",
+    reason:
+      "An authenticator is the person's own second factor, across every workspace, so it goes with the identity set on the last membership and stays while another membership needs it; the user row's flag for it is cleared in the same step.",
+  },
+  {
+    table: "public.recovery_code",
+    by: "erasure",
+    access: "write",
+    reason:
+      "The recovery codes stand in for the person's second factor, so they go with it on the last membership and stay with it otherwise.",
+  },
+  {
+    table: "public.workspace_last_active",
+    by: "erasure",
+    access: "write",
+    reason:
+      "When the person was last active here is this workspace's record of them, so every erasure from it deletes only that row under the workspace's scope.",
   },
   {
     table: "public.member",

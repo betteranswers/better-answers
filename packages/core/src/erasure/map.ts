@@ -18,6 +18,10 @@ export const ERASURE_FAMILIES = [
   "identity-verification",
   "identity-invitation",
   "identity-account",
+  "identity-passkey",
+  "identity-authenticator",
+  "identity-recovery-code",
+  "identity-last-active",
   "source-document",
 ] as const;
 
@@ -93,6 +97,11 @@ const aboutTheMember = async (
   extras: readonly unknown[] = [],
 ): Promise<readonly string[]> =>
   subject.memberId === null ? [] : located(tx, statement, [subject.memberId, ...extras]);
+
+const rowsOfThePersonIn =
+  (table: "account" | "authenticator" | "recovery_code"): ErasureFinder =>
+  (platform, subject, tx) =>
+    aboutTheMember(tx, subject, `SELECT id AS location FROM ${table} WHERE user_id = $1`);
 
 const MEMBER_HERE = `SELECT u.id AS location
      FROM "user" u
@@ -180,8 +189,45 @@ const ERASURE_FAMILY_DESCRIPTORS = {
 
   "identity-account": {
     categories: ["linked-account"],
+    find: rowsOfThePersonIn("account"),
+  },
+
+  /** A passkey's last use sits in its own row, named after the passkey it belongs to. */
+  "identity-passkey": {
+    categories: ["sign-in", "device"],
     find: (platform, subject, tx) =>
-      aboutTheMember(tx, subject, "SELECT id AS location FROM account WHERE user_id = $1"),
+      aboutTheMember(
+        tx,
+        subject,
+        `SELECT id AS location FROM passkey WHERE user_id = $1
+         UNION ALL
+         SELECT u.passkey_id || ' (last use)' AS location
+           FROM passkey_last_use u JOIN passkey p ON p.id = u.passkey_id
+          WHERE p.user_id = $1`,
+      ),
+  },
+
+  "identity-authenticator": {
+    categories: ["sign-in"],
+    find: rowsOfThePersonIn("authenticator"),
+  },
+
+  "identity-recovery-code": {
+    categories: ["sign-in"],
+    find: rowsOfThePersonIn("recovery_code"),
+  },
+
+  /** This workspace's row alone: another's would say where else the person has been. */
+  "identity-last-active": {
+    categories: ["sign-in"],
+    find: (platform, subject, tx) =>
+      aboutTheMember(
+        tx,
+        subject,
+        `SELECT workspace_id AS location FROM workspace_last_active
+          WHERE user_id = $1 AND workspace_id = $2`,
+        [subject.workspaceId],
+      ),
   },
 
   "source-document": {

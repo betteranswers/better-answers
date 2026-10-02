@@ -2,20 +2,16 @@ import type { Pool } from "pg";
 import { pino } from "pino";
 
 import { createAuth } from "../src/auth/index.ts";
-import { AUTH_SECRET, doorsFor, MCP_URL, PUBLIC_URL } from "./harness.ts";
+import { AUTH_SECRET, doorsFor, MCP_URL, PUBLIC_URL, type TestApp } from "./harness.ts";
 
-type BuiltAuth = { readonly auth: ReturnType<typeof createAuth>; readonly database: Pool };
+type Auth = ReturnType<typeof createAuth>;
 
-/**
- * Over a pool that reaches no database, so fit for reading the instance's shape alone. The caller
- * ends `database`.
- */
-export const authAsServerBuildsIt = (): BuiltAuth => {
-  const doors = doorsFor("postgresql://unused@127.0.0.1:1/unused");
-  const database = doors.postgres.pool;
-  const auth = createAuth({
-    database,
-    door: doors.postgres,
+type BuiltAuth = { readonly auth: Auth; readonly database: Pool };
+
+const authOverDoor = (door: TestApp["doors"]["postgres"]): Auth =>
+  createAuth({
+    database: door.pool,
+    door,
     publicUrl: PUBLIC_URL,
     mcpUrl: MCP_URL,
     secret: AUTH_SECRET,
@@ -23,6 +19,17 @@ export const authAsServerBuildsIt = (): BuiltAuth => {
     fetchClientMetadataResource: async () => new Response("", { status: 404 }),
     logger: pino({ level: "silent" }),
   });
+
+/** Over the suite's database and secret: an endpoint the router refuses is still a server function. */
+export const authOver = (app: TestApp): Auth => authOverDoor(app.doors.postgres);
+
+/**
+ * Over a pool that reaches no database, so fit for reading the instance's shape alone. The caller
+ * ends `database`.
+ */
+export const authAsServerBuildsIt = (): BuiltAuth => {
+  const doors = doorsFor("postgresql://unused@127.0.0.1:1/unused");
+  const auth = authOverDoor(doors.postgres);
   auth.$context.catch(() => {});
-  return { auth, database };
+  return { auth, database: doors.postgres.pool };
 };
