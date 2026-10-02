@@ -163,7 +163,7 @@ describe("the one navigation list", () => {
 
 describe("what each person is shown", () => {
   for (const role of ["Editor", "Viewer"] as const) {
-    it(`shows ${aRole(role)} Ask alone, at their home (AE2)`, () => {
+    it(`shows ${aRole(role)} Ask alone, at their home`, () => {
       const shown = visibleTo(readerOf(role), SURFACES);
 
       expect(outline(shown.surfaces)).toEqual([["Ask", [[null, ["Ask"]]]]]);
@@ -172,7 +172,7 @@ describe("what each person is shown", () => {
     });
   }
 
-  it("shows an Admin Control Centre's built screens alone (AE3)", () => {
+  it("shows an Admin Control Centre's built screens alone", () => {
     const shown = visibleTo(readerOf("Admin"), SURFACES);
 
     expect(outline(shown.surfaces)).toEqual([
@@ -344,7 +344,7 @@ const MOVED = [
 
 describe("an address that moved", () => {
   for (const [from, to] of MOVED) {
-    it(`leads an Admin from ${from} to ${to} (AE8)`, async () => {
+    it(`leads an Admin from ${from} to ${to}`, async () => {
       vi.stubGlobal("fetch", answeringAs("Admin"));
 
       const { router } = await appAt(from);
@@ -389,7 +389,7 @@ describe("an address that moved", () => {
 });
 
 describe("an address the person may not see", () => {
-  it("shows a Viewer Members as not found, offering Ask (AE9)", async () => {
+  it("shows a Viewer Members as not found, offering Ask", async () => {
     vi.stubGlobal("fetch", answeringAs("Viewer"));
 
     const hidden = await openApp("/people/members");

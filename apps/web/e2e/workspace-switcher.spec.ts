@@ -96,10 +96,7 @@ const heldBack = async (page: Page, url: Parameters<Page["route"]>[0]): Promise<
   return release;
 };
 
-test("lists the operator's workspaces and Console, others none (AE5)", async ({
-  page,
-  request,
-}) => {
+test("lists the operator's workspaces and Console, others none", async ({ page, request }) => {
   const operator = await inTwoWorkspaces(page, request, {
     first: "Airedale Castings",
     second: "Nidderdale Tools",

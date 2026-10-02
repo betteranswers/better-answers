@@ -151,8 +151,8 @@ describe("changing the role of many members", () => {
   it.each([
     ["ascending", (ids: readonly string[]) => sorted(ids)],
     ["descending", (ids: readonly string[]) => sorted(ids).toReversed()],
-  ])("AE1: refuses demoting both Admins, naming both, %s", async (_order, ordered) => {
-    const workspace = await provisionedWorkspace(db(), "BulkRolesAE1");
+  ])("refuses demoting both Admins, naming both, %s", async (_order, ordered) => {
+    const workspace = await provisionedWorkspace(db(), "BulkRolesBothAdmins");
     const second = await joining(workspace, "Admin");
     const admins = [workspace.adminUserId, second];
 
@@ -340,8 +340,8 @@ describe("removing many members", () => {
     ]).toEqual([filed, filed, filed]);
   });
 
-  it("AE2: refuses removing the only Admin among four, naming them", async () => {
-    const workspace = await provisionedWorkspace(db(), "BulkRemovedAE2");
+  it("refuses removing the only Admin among four, naming them", async () => {
+    const workspace = await provisionedWorkspace(db(), "BulkRemovedOnlyAdmin");
     const { adminUserId } = workspace;
     const others = await joiningMany(workspace, "Editor", 3);
 
@@ -370,8 +370,8 @@ describe("removing many members", () => {
 });
 
 describe("adding many members to a group", () => {
-  it("AE8: adds eight of ten, counting two already in", async () => {
-    const workspace = await provisionedWorkspace(db(), "BulkAddedAE8");
+  it("adds eight of ten, counting two already in", async () => {
+    const workspace = await provisionedWorkspace(db(), "BulkAddedEightOfTen");
     const ticked = await joiningMany(workspace, "Viewer", 10);
     const alreadyIn = ticked.slice(0, 2);
     const sales = await groupHolding(workspace, alreadyIn);

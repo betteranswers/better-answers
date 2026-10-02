@@ -398,7 +398,7 @@ test("marks Members current on a member page, adding no entry", async ({ page, r
   await expect(page.getByRole("heading", { level: 1, name: headingOf(MEMBERS) })).toBeVisible();
 });
 
-test("lists a Viewer's home as the nav's one entry (AE2)", async ({ page, request }) => {
+test("lists a Viewer's home as the nav's one entry", async ({ page, request }) => {
   await aMemberSignedInAt(page, request, "Viewer", HOMES.Viewer.path);
 
   const nav = page.getByRole("navigation", { name: ASK.name });
@@ -732,7 +732,7 @@ test("narrows the band to two rows scrolling with the page", async ({ page, requ
     .toBeLessThan(0);
 });
 
-test("opens the keystrokes from the narrow band, focus returned (R15)", async ({
+test("opens the keystrokes from the narrow band, focus returned", async ({
   page,
   request,
   passesTheAccessibilityGate,
@@ -855,7 +855,7 @@ test("draws no toolbar over a screen without tabs or acts", async ({ page, reque
   expect(met).toBe(true);
 });
 
-test("holds toggle and band still while the nav hides (AE1)", async ({
+test("holds toggle and band still while the nav hides", async ({
   page,
   request,
   passesTheAccessibilityGate,
@@ -900,13 +900,13 @@ test("holds toggle and band still while the nav hides (AE1)", async ({
   const hidden = await boxOf(page.getByRole("main"));
   const tableHidden = await widthOf(table);
   test.info().annotations.push({
-    type: "AE1 at 1440",
+    type: "toggle, pane and table widths as the nav hides at 1440",
     description: `toggle ${JSON.stringify(toggle)}; main ${main.width} to ${hidden.width}; table ${tableWide} to ${tableHidden}; nav ${navWide}`,
   });
   expect(hidden.x).toBe(main.x - navWide);
   expect(hidden.width).toBe(main.width + navWide);
   expect(await leftOf(tabs)).toBe(tabsAt - navWide);
-  // The table takes that width only up to the page maximum (R14).
+  // The table takes that width only up to the page maximum.
   expect(tableHidden - tableWide, "the table did not take the width the nav left").toBe(
     Math.min(navWide, (await pageMaximumOf(page)) - room),
   );
@@ -967,10 +967,7 @@ test("holds the toggle in place beside a 60-character workspace name", async ({
   expect(cut).toEqual({ whole: LONG_NAME, ellipsis: "ellipsis", overflows: true });
 });
 
-test("keeps a 40-character address on one line, prose measured (AE6)", async ({
-  page,
-  request,
-}) => {
+test("keeps a 40-character address on one line, prose measured", async ({ page, request }) => {
   const email = anAddress("wide");
   const workspace = await provision(request, { name: "Holme Valley Tools", adminEmail: email });
   const address = `i${Date.now()}${Math.floor(Math.random() * 1e6)}`
@@ -1121,7 +1118,7 @@ test("opens the navigation over narrow content, holding and returning focus", as
   await expect(menu).toBeFocused();
 });
 
-test("closes the sheet on a chosen screen, focus returned (AE7)", async ({ page, request }) => {
+test("closes the sheet on a chosen screen, focus returned", async ({ page, request }) => {
   await narrowAtRoutesAndSpend(page, request, "Northern Tooling");
   await scrollsNothingSideways(page, "before the sheet opens");
 

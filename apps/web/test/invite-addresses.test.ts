@@ -40,7 +40,7 @@ describe("the addresses the invite dialog holds", () => {
     expect(addressesOf(allInto(NONE, pasted).held)).toEqual(["ana@example.com", "ben@example.com"]);
   });
 
-  it("folds two spellings of one address into the first (AE10)", () => {
+  it("folds two spellings of one address into the first", () => {
     const moved = allInto(NONE, "Ana@Example.com, ana@example.com ,  ANA@example.com");
 
     expect(moved.held).toEqual([{ key: "ana@example.com", address: "Ana@Example.com" }]);
@@ -79,7 +79,7 @@ describe("the addresses the invite dialog holds", () => {
 describe("what flags an address the dialog holds", () => {
   const [ana, bad] = allInto(NONE, "ana@example.com, not-an-address").held;
 
-  it("flags an address that is no address (AE5)", () => {
+  it("flags an address that is no address", () => {
     expect(bad === undefined ? "missing" : flagOf(bad, new Set(), NO_FLAGS)).toBe("malformed");
   });
 

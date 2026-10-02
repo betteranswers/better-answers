@@ -908,7 +908,7 @@ test.describe("a member's own page", () => {
 });
 
 test.describe("a member's Activity", () => {
-  test("AE4: a role change reads by Hannah and to Priya", async ({ page, request }) => {
+  test("a role change reads by Hannah and to Priya", async ({ page, request }) => {
     const { workspaceId } = await provision(request, { name: "Swale Brassworks" });
     const hannahAt = anAddress("hannah");
     const hannah = await person(request, hannahAt, { displayName: "Hannah Wright" });
@@ -994,7 +994,7 @@ test.describe("a member's Activity", () => {
     await expect(activityOf(page).getByRole("button", { name: "Load more" })).toHaveCount(0);
   });
 
-  test("R36: keeps the access request they made before joining", async ({ page, request }) => {
+  test("keeps the access request they made before joining", async ({ page, request }) => {
     const { workspaceId, slug } = await anAdminAtPeople(page, request, "Swale Wheelwrights");
     const asker = await person(request, anAddress("asker"), { displayName: "Ola Asker" });
     await askToJoin(request, { slug, requesterId: asker.id, reason: "I run the night shift." });
@@ -1655,7 +1655,7 @@ const removedThemselfThroughTheBar = async (page: Page): Promise<void> => {
 };
 
 test.describe("bulk acts on the members ticked", () => {
-  test("AE1: refuses demoting both Admins, naming each, ticks kept", async ({
+  test("refuses demoting both Admins, naming each, ticks kept", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -1738,7 +1738,7 @@ test.describe("bulk acts on the members ticked", () => {
     await expect(names).toHaveText(["Test person", "Sam Okoro", "Priya Shah"]);
   });
 
-  test("AE8: adds ten to a group, counting two already in", async ({
+  test("adds ten to a group, counting two already in", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -1787,7 +1787,7 @@ test.describe("bulk acts on the members ticked", () => {
     await passesTheAccessibilityGate();
   });
 
-  test("AE9: demoting yourself says so, then lands on Editor's home", async ({ page, request }) => {
+  test("demoting yourself says so, then lands on Editor's home", async ({ page, request }) => {
     await anAdminBesideAnotherAtPeople(page, request, "Esk Gilding");
     await tickOf(page, "Test person").check();
 
@@ -1922,7 +1922,7 @@ test.describe("bulk acts on the members ticked", () => {
     await expect(cellOf(page, "Person 01", "Role")).toHaveText("Viewer");
   });
 
-  test("AE12: page 2 of Editors comes back on Back", async ({ page, request }) => {
+  test("page 2 of Editors comes back on Back", async ({ page, request }) => {
     await aWorkspaceOfThirtyEditors(page, request, "Ribble Cabling");
     await membersRegion(page).getByRole("combobox", { name: "Filter by role" }).click();
     await page.getByRole("option", { name: "Editor", exact: true }).click();
