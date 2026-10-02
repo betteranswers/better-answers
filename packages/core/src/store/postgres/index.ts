@@ -474,6 +474,15 @@ const countInWindow = async (
   return outcome(counted.rows[0]?.count ?? 1, rule, start, now);
 };
 
+type IngressScope = (typeof INGRESS_SCOPES)[number];
+
+const INGRESS_COUNTED = `WITH swept AS (
+         DELETE FROM ingress_counter WHERE scope = $1 AND key = $2 AND window_start < $3
+       )
+       INSERT INTO ingress_counter (scope, key, window_start, count) VALUES ($1, $2, $3, 1)
+       ON CONFLICT (scope, key, window_start) DO UPDATE SET count = ingress_counter.count + 1
+       RETURNING count`;
+
 /**
  * Counts one attempt against `scope` and `key` in the fixed window `now` falls in, and drops the
  * pair's earlier windows. It commits at once. `retryAfterSeconds` runs to the window's end, 1 at
@@ -481,21 +490,28 @@ const countInWindow = async (
  */
 export const consumeIngress = async (
   door: PostgresDoor,
-  scope: (typeof INGRESS_SCOPES)[number],
+  scope: IngressScope,
   key: string,
   rule: CounterRule,
   now: Date,
 ): Promise<CounterOutcome> =>
   countInWindow(rule, now, (start) =>
-    door.pool.query<{ count: number }>(
-      `WITH swept AS (
-         DELETE FROM ingress_counter WHERE scope = $1 AND key = $2 AND window_start < $3
-       )
-       INSERT INTO ingress_counter (scope, key, window_start, count) VALUES ($1, $2, $3, 1)
-       ON CONFLICT (scope, key, window_start) DO UPDATE SET count = ingress_counter.count + 1
-       RETURNING count`,
-      [scope, key, start],
-    ),
+    door.pool.query<{ count: number }>(INGRESS_COUNTED, [scope, key, start]),
+  );
+
+/**
+ * As consumeIngress, inside the caller's transaction: an act that refuses or fails after it
+ * rolls the count back, and the counter row stays held until it commits.
+ */
+export const consumeIngressIn = async (
+  tx: Tx,
+  scope: IngressScope,
+  key: string,
+  rule: CounterRule,
+  now: Date,
+): Promise<CounterOutcome> =>
+  countInWindow(rule, now, (start) =>
+    tx.query<{ count: number }>(INGRESS_COUNTED, [scope, key, start]),
   );
 
 /** As consumeIngress, for one call on the token `tokenId`, inside the caller's transaction. */

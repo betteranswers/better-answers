@@ -12,12 +12,14 @@ import type {
   AcceptInvitationRefusal,
   ApproveRefusal,
   BulkAddToGroupRefusal,
+  BulkCancelInvitationsRefusal,
   BulkChangeRoleRefusal,
   BulkRemoveMembersRefusal,
+  BulkResendInvitationsRefusal,
   CancelInvitationRefusal,
   ChangeRoleRefusal,
   DecideRefusal,
-  InviteMemberRefusal,
+  InviteMembersRefusal,
   ListInvitationsRefusal,
   MemberRefusal,
   RemoveMemberRefusal,
@@ -185,7 +187,6 @@ describe("the refusal-word walk", () => {
     expectTypeOf<DecideRefusal>().toExtend<EveryRegisteredWord>();
     expectTypeOf<ApproveRefusal>().toExtend<EveryRegisteredWord>();
     expectTypeOf<ChangeRoleRefusal>().toExtend<EveryRegisteredWord | Error>();
-    expectTypeOf<InviteMemberRefusal>().toExtend<EveryRegisteredWord | Error>();
     expectTypeOf<ResendInvitationRefusal>().toExtend<EveryRegisteredWord | Error>();
     expectTypeOf<CancelInvitationRefusal>().toExtend<EveryRegisteredWord | Error>();
     expectTypeOf<ListInvitationsRefusal>().toExtend<EveryRegisteredWord | Error>();
@@ -215,6 +216,9 @@ describe("the refusal-word walk", () => {
     expectTypeOf<BulkChangeRoleRefusal>().toExtend<Answered>();
     expectTypeOf<BulkRemoveMembersRefusal>().toExtend<Answered>();
     expectTypeOf<BulkAddToGroupRefusal>().toExtend<Answered>();
+    expectTypeOf<InviteMembersRefusal>().toExtend<Answered>();
+    expectTypeOf<BulkResendInvitationsRefusal>().toExtend<Answered>();
+    expectTypeOf<BulkCancelInvitationsRefusal>().toExtend<Answered>();
     expectTypeOf<RefusedItems<"invented">>().not.toExtend<Answered>();
   });
 });

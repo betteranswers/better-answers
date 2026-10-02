@@ -7,13 +7,17 @@ import {
   approveRequestInput,
   bulkAddToGroup,
   bulkAddToGroupInput,
+  bulkCancelInvitations,
   bulkChangeRole,
   bulkChangeRoleInput,
+  bulkInvitationsInput,
   bulkRemoveMembers,
   bulkRemoveMembersInput,
+  bulkResendInvitations,
   cancelInvitation,
   changeRole,
   changeRoleInput,
+  countInvitations,
   createGroup,
   createGroupInput,
   declineRequest,
@@ -24,10 +28,11 @@ import {
   flagDisplayNameInput,
   groupMemberInput,
   invitationInput,
-  inviteMember,
-  inviteMemberInput,
+  inviteMembers,
+  inviteMembersInput,
   listGroups,
   listInvitations,
+  listInvitationsInput,
   listMembers,
   listWaitingRequests,
   readActivity,
@@ -42,6 +47,7 @@ import {
   resendInvitation,
   revokeCredentialsHere,
   revokeCredentialsHereInput,
+  type InvitationMinted,
   type InvitationToSend,
 } from "@better-answers/core/members";
 import type { Tx } from "@better-answers/core/store/postgres";
@@ -71,35 +77,77 @@ type Emailing = {
   readonly clock: Clock;
 };
 
+type Minting<Asked, Minted> = (
+  principal: UserPrincipal,
+  tx: Tx,
+  input: Asked & { readonly now: Date },
+) => Promise<Result<Minted, RefusalAnswer | Error>>;
+
+/** The moment is the server's, and the act answers only once it committed. */
+const committedNow = <Asked, Minted>(
+  ctx: Emailing,
+  act: Minting<Asked, Minted>,
+  input: Result<Asked, Malformed>,
+): Promise<Minted> =>
+  crossing(
+    ctx,
+    act.name,
+    given(input, (asked) =>
+      committedAs(ctx, (principal, tx) => act(principal, tx, { ...asked, now: ctx.clock.now() })),
+    ),
+  );
+
+const answerOf = (invitation: InvitationToSend, emailSent: boolean) => ({
+  invitationId: invitation.invitationId,
+  address: invitation.address,
+  role: invitation.role,
+  invitedAt: invitation.invitedAt,
+  expiresAt: invitation.expiresAt,
+  emailSent,
+});
+
 /**
  * Runs an act that mints or renews an invitation, then emails it once the act committed, and
  * answers the invitation with whether its email went.
  */
 const committedThenEmailed =
-  <Asked>(
-    act: (
-      principal: UserPrincipal,
-      tx: Tx,
-      input: Asked & { readonly now: Date },
-    ) => Promise<Result<InvitationToSend, RefusalAnswer | Error>>,
+  <Asked>(act: Minting<Asked, InvitationToSend>) =>
+  async ({ ctx, input }: { readonly ctx: Emailing; readonly input: Result<Asked, Malformed> }) => {
+    const invitation = await committedNow(ctx, act, input);
+    return answerOf(invitation, await sentInvitation(ctx, invitation));
+  };
+
+/** A slow relay holds the answer for each round, so a send of fifty waits ten rounds at most. */
+const EMAILS_AT_ONCE = 5;
+
+const emailedEach = async (
+  ctx: Emailing,
+  invitations: readonly InvitationToSend[],
+): Promise<readonly boolean[]> => {
+  const sent: boolean[] = [];
+  for (let start = 0; start < invitations.length; start += EMAILS_AT_ONCE) {
+    const round = invitations.slice(start, start + EMAILS_AT_ONCE);
+    sent.push(...(await Promise.all(round.map((invitation) => sentInvitation(ctx, invitation)))));
+  }
+  return sent;
+};
+
+/** As `committedThenEmailed`, for an act on many: each email goes, or fails, on its own. */
+const committedThenEmailedEach =
+  <Asked, Minted extends InvitationToSend, Answer>(
+    act: Minting<Asked, readonly Minted[]>,
+    answer: (minted: Minted, emailSent: boolean) => Answer,
   ) =>
   async ({ ctx, input }: { readonly ctx: Emailing; readonly input: Result<Asked, Malformed> }) => {
-    const invitation = await crossing(
-      ctx,
-      act.name,
-      given(input, (asked) =>
-        committedAs(ctx, (principal, tx) => act(principal, tx, { ...asked, now: ctx.clock.now() })),
-      ),
-    );
-    return {
-      invitationId: invitation.invitationId,
-      address: invitation.address,
-      role: invitation.role,
-      invitedAt: invitation.invitedAt,
-      expiresAt: invitation.expiresAt,
-      emailSent: await sentInvitation(ctx, invitation),
-    };
+    const minted = await committedNow(ctx, act, input);
+    const sent = await emailedEach(ctx, minted);
+    return { invitations: minted.map((one, at) => answer(one, sent[at] === true)) };
   };
+
+const mintedAnswer = (minted: InvitationMinted, emailSent: boolean) => ({
+  ...answerOf(minted, emailSent),
+  replaced: minted.replaced,
+});
 
 type AtTheClock = {
   readonly log: Logger;
@@ -131,18 +179,31 @@ export const membersRouter = router({
   changeRole: mutationProcedure.input(parsedBy(changeRoleInput)).mutation(answeredBy(changeRole)),
   auditLog: queryProcedure.input(parsedBy(readAuditLogInput)).query(answeredBy(readAuditLog)),
   activity: queryProcedure.input(parsedBy(readActivityInput)).query(answeredBy(readActivity)),
-  invitations: queryProcedure.query(({ ctx }) =>
-    crossing(ctx, listInvitations.name, listInvitations(ctx.principal, ctx.tx)),
+  invitations: queryProcedure
+    .input(parsedBy(listInvitationsInput))
+    .query(answeredAt(listInvitations)),
+  invitationCounts: queryProcedure.query(({ ctx }) =>
+    crossing(
+      ctx,
+      countInvitations.name,
+      countInvitations(ctx.principal, ctx.tx, { at: ctx.clock.now() }),
+    ),
   ),
   invite: ownTransactionProcedure
-    .input(parsedBy(inviteMemberInput))
-    .mutation(committedThenEmailed(inviteMember)),
+    .input(parsedBy(inviteMembersInput))
+    .mutation(committedThenEmailedEach(inviteMembers, mintedAnswer)),
   resendInvitation: ownTransactionProcedure
     .input(parsedBy(invitationInput))
     .mutation(committedThenEmailed(resendInvitation)),
+  bulkResendInvitations: ownTransactionProcedure
+    .input(parsedBy(bulkInvitationsInput))
+    .mutation(committedThenEmailedEach(bulkResendInvitations, answerOf)),
   cancelInvitation: mutationProcedure
     .input(parsedBy(invitationInput))
     .mutation(answeredBy(cancelInvitation)),
+  bulkCancelInvitations: mutationProcedure
+    .input(parsedBy(bulkInvitationsInput))
+    .mutation(answeredBy(bulkCancelInvitations)),
   revokeCredentials: mutationProcedure
     .input(parsedBy(revokeCredentialsHereInput))
     .mutation(answeredAt(revokeCredentialsHere)),

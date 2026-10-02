@@ -33,7 +33,7 @@ export const RLS_EXEMPTIONS = {
   "public.recovery_code":
     "A person's own, across every workspace: spent in place of a second factor before any workspace is chosen.",
   "public.ingress_counter":
-    "The pre-authentication per-IP and per-email counter: no workspace exists yet to scope it by.",
+    "The per-IP, per-email, per-person, per-link and per-invitation counter: most run before any workspace exists, and an invitation's key hashes its workspace in.",
   "public.contract_stamp":
     "One row saying which tier contract this deploy's api carries: a fact about the deploy, not about a tenant, and the worker reads it before any workspace is in hand.",
   "public.sweep_pass":

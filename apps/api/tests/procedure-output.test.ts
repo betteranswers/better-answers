@@ -38,8 +38,10 @@ describe("what a procedure may answer the wire", () => {
       "members.approveRequest",
       "members.auditLog",
       "members.bulkAddToGroup",
+      "members.bulkCancelInvitations",
       "members.bulkChangeRole",
       "members.bulkRemove",
+      "members.bulkResendInvitations",
       "members.cancelInvitation",
       "members.changeRole",
       "members.createGroup",
@@ -47,6 +49,7 @@ describe("what a procedure may answer the wire", () => {
       "members.deleteGroup",
       "members.flagDisplayName",
       "members.groups",
+      "members.invitationCounts",
       "members.invitations",
       "members.invite",
       "members.list",
@@ -95,9 +98,12 @@ describe("what a procedure may answer the wire", () => {
       | "members.auditLog"
       | "members.activity"
       | "members.invitations"
+      | "members.invitationCounts"
       | "members.invite"
       | "members.resendInvitation"
+      | "members.bulkResendInvitations"
       | "members.cancelInvitation"
+      | "members.bulkCancelInvitations"
       | "members.revokeCredentials"
       | "members.remove"
       | "members.bulkChangeRole"

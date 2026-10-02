@@ -9,7 +9,7 @@ import {
   changeRoleInput,
   createGroup,
   deleteGroup,
-  inviteMember,
+  inviteMembers,
   readAuditLog,
   readAuditLogInput,
   renameGroup,
@@ -104,12 +104,14 @@ const roleChangedOf = async (workspace: ProvisionedWorkspace, personId: string) 
     ),
   );
 
-const invitedBy = async (workspace: ProvisionedWorkspace, address: string): Promise<string> =>
-  done(
+const invitedBy = async (workspace: ProvisionedWorkspace, address: string): Promise<string> => {
+  const [sent] = done(
     await acting(workspace, workspace.adminUserId, (principal, tx) =>
-      inviteMember(principal, tx, { address, role: "Editor", now: new Date() }),
+      inviteMembers(principal, tx, { addresses: [address], role: "Editor", now: new Date() }),
     ),
-  ).invitationId;
+  );
+  return sent?.invitationId ?? "";
+};
 
 /** An event in `workspace` whose subject is a row `elsewhere` holds under the same id. */
 const eventAboutTheirs = async (

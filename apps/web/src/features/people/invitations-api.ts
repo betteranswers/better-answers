@@ -7,7 +7,8 @@ export type WaitingInvitation = inferOutput<
   ReturnType<typeof useTRPC>["members"]["invitations"]
 >[number];
 
-export type SentInvitation = inferOutput<ReturnType<typeof useTRPC>["members"]["invite"]>;
+/** One invitation and whether its email went, as every act that sends one answers it. */
+export type SentInvitation = inferOutput<ReturnType<typeof useTRPC>["members"]["resendInvitation"]>;
 
 export const useInvitations = () => {
   const api = useTRPC();

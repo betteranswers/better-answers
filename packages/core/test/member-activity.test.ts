@@ -13,7 +13,7 @@ import {
   declineRequest,
   flagDisplayName,
   flagDisplayNameInput,
-  inviteMember,
+  inviteMembers,
   readActivity,
   readActivityInput,
   removeFromGroup,
@@ -111,11 +111,12 @@ const invited = async (workspace: ProvisionedWorkspace, personId: string) => {
     personId,
   ]);
   const address = found.rows[0]?.email ?? "";
-  return answered(
+  const [sent] = answered(
     await as(workspace, workspace.adminUserId, (principal, tx) =>
-      inviteMember(principal, tx, { address, role: "Viewer", now: new Date() }),
+      inviteMembers(principal, tx, { addresses: [address], role: "Viewer", now: new Date() }),
     ),
-  ).invitationId;
+  );
+  return sent?.invitationId ?? "";
 };
 
 /** Priya asks to join `workspace`; answers her id and her request's. */

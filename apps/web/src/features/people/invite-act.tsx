@@ -58,9 +58,10 @@ export function InviteAct() {
     if (typeof address !== "string" || invite.isPending) return;
     setOutcome(undefined);
     invite.mutate(
-      { address: address.trim(), role },
+      { addresses: [address.trim()], role },
       {
-        onSuccess: (invited) => {
+        onSuccess: ({ invitations: [invited] }) => {
+          if (invited === undefined) return;
           setSent(invited);
           setOutcome(invitedOutcome(invited));
         },

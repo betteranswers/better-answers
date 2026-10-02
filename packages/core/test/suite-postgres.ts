@@ -201,6 +201,19 @@ export const statementsWaitingOnALock = async (pool: pg.Pool): Promise<readonly 
 export const countWaitingOnLocks = async (pool: pg.Pool): Promise<number> =>
   (await statementsWaitingOnALock(pool)).length;
 
+/** Starts every act, lets them past `table`'s inserts once each waits on a lock, and answers each. */
+export const racedAt = <T>(
+  pool: pg.Pool,
+  table: string,
+  acts: readonly (() => Promise<T>)[],
+): Promise<readonly T[]> =>
+  whileActsWaitAt(pool, table, "INSERT", async (release) => {
+    const racing = acts.map((act) => act());
+    await until(async () => (await countWaitingOnLocks(pool)) === acts.length);
+    await release();
+    return Promise.all(racing);
+  });
+
 export const whileWritesAreRefused = async <T>(
   pool: pg.Pool,
   table: string,

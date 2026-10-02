@@ -55,6 +55,7 @@ Each transport:
 - MCP has its own (`apps/api/src/mcp/crossing.ts`). It answers the set's word alone and drops the items, since no act that names items is an entry.
 - `pnpm ops` maps each class to an exit code (`apps/api/src/ops/index.ts`). It takes a word alone, so a refusal naming items cannot reach it.
 - A refusal's log line holds its word and class, never an item's id.
+- A ceiling is no refusal, since time is its only remedy. An act counting one in its own transaction fails with the kernel's `CeilingMet` (`packages/core/src/kernel/ceiling.ts`), which rolls the count back. tRPC's crossing answers it 429 with `retryAfterSeconds`, as a ceiling met before the act does.
 - Procedures are written by hand, so the call graph stays whole.
 
 **A transport never nests a transaction.** The base procedures:
@@ -93,4 +94,4 @@ Every Postgres door rolls back when its work answers a refusal or throws. A prin
 
 The full record, with its four amendments (T-232, T-230, T-338, the T-027 and T-028 grill): `docs/archive/adr/0043-what-an-act-is.md`.
 
-A refusal naming items came with the people layout rework (`docs/plans/2026-10-01-1807-feat-people-layout-rework-plan.md`, KTD1).
+A refusal naming items came with the people layout rework (`docs/plans/2026-10-01-1807-feat-people-layout-rework-plan.md`, KTD1), and a ceiling counted inside an act with its invitations (KTD11).
