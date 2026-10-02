@@ -7,7 +7,6 @@ import { createAppClients, Providers } from "@/app/providers.tsx";
 import { WorkspacesScreen } from "@/features/console/workspaces-screen.tsx";
 import { GroupsScreen } from "@/features/people/groups-screen.tsx";
 import { RoutesCard } from "@/features/routes/routes-card.tsx";
-import { ROUTES_WORDS } from "@/features/routes/words.ts";
 import { Review } from "@/features/sources/review.tsx";
 import type { ListedBinding } from "@/features/sources/sources-api.ts";
 
@@ -64,7 +63,7 @@ describe("a screen's read, said after its region mounts (BA-31)", () => {
     const seen = mounted(REGION, <RoutesCard />);
 
     expect(seen[0]).toBe("");
-    expect(seen.at(-1)).toBe(ROUTES_WORDS.loading);
+    expect(seen.at(-1)).toBe("The routes are still loading.");
   });
 
   it("fills a region drawing one state after mount", () => {

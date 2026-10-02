@@ -13,7 +13,7 @@ export function GroupsReadSaid(properties: {
   return (
     <>
       <OutcomeLine outcome={error === null ? undefined : outcomeOfGroupFailure(error, "read")} />
-      <div aria-live="polite" className="empty:hidden">
+      <div aria-live="polite" className="empty:sr-only">
         {isPending ? <p>{GROUPS_LOADING}</p> : null}
       </div>
     </>

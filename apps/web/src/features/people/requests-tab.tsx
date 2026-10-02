@@ -225,7 +225,7 @@ export function RequestsTab() {
       <h2 id={headingId} ref={heading} tabIndex={-1}>
         Requests
       </h2>
-      <OutcomeLine outcome={requests.error === null ? outcome : readRefused} className="mt-2" />
+      <OutcomeLine outcome={readRefused ?? outcome} className="mt-2" />
       <div aria-live="polite">
         {said.isPending ? <p className="mt-2">The requests are still loading.</p> : null}
       </div>

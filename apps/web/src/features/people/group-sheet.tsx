@@ -46,7 +46,8 @@ function GroupMembers(properties: {
       <OutcomeLine
         outcome={said.error === null ? undefined : outcomeOfFailure(said.error, "read")}
       />
-      <div aria-live="polite" className="empty:hidden">
+      {/* Not `empty:hidden`: a region out of the accessibility tree is not tracked, so its fill would go unread. */}
+      <div aria-live="polite" className="empty:sr-only">
         {said.isPending ? <p>The members are still loading.</p> : null}
       </div>
       {members.data === undefined ? null : (
