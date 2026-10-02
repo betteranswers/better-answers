@@ -16,13 +16,18 @@ const door = () => openPostgres(db().runtimePool);
 
 const AT = new Date("2026-10-02T12:00:00.000Z");
 
+const EXPIRES_AT = new Date("2026-10-09T12:00:00.000Z");
+
+/** The age `aSession` writes, so carrying it moves nothing. */
+const ITS_OWN_AGE = { createdAt: AT, expiresAt: EXPIRES_AT };
+
 const RECOVERY_CODE = /^[0-9a-hjkmnp-tv-z]{4}(?:-[0-9a-hjkmnp-tv-z]{4}){3}$/;
 
 const aSession = (userId: string, pendingSince?: Date) =>
   sessionFor(db().pool, userId, {
     createdAt: AT,
     lastUsedAt: AT,
-    expiresAt: new Date("2026-10-09T12:00:00.000Z"),
+    expiresAt: EXPIRES_AT,
     ...(pendingSince === undefined ? {} : { pendingSince }),
   });
 
@@ -38,6 +43,14 @@ const confirmedAt = async (sessionId: string) =>
   (
     await db().pool.query<{ confirmed: Date | null; pending: Date | null }>(
       "SELECT second_factor_confirmed_at AS confirmed, pending_since AS pending FROM session WHERE id = $1",
+      [sessionId],
+    )
+  ).rows[0];
+
+const ageOf = async (sessionId: string) =>
+  (
+    await db().pool.query<{ createdAt: Date; expiresAt: Date }>(
+      'SELECT created_at AS "createdAt", expires_at AS "expiresAt" FROM session WHERE id = $1',
       [sessionId],
     )
   ).rows[0];
@@ -69,6 +82,7 @@ describe("recording an authenticator's setup", () => {
       personId,
       sessionId,
       at: AT,
+      carried: ITS_OWN_AGE,
     });
 
     expect(recorded.ok).toBe(true);
@@ -94,6 +108,7 @@ describe("recording an authenticator's setup", () => {
       personId,
       sessionId: await aSession(personId),
       at: AT,
+      carried: ITS_OWN_AGE,
     });
 
     expect(recorded).toMatchObject({ ok: true, value: { recoveryCodes: undefined } });
@@ -112,6 +127,7 @@ describe("recording an authenticator's setup", () => {
       personId,
       sessionId,
       at: AT,
+      carried: ITS_OWN_AGE,
     });
 
     expect(recorded).toEqual({ ok: false, error: "no-authenticator" });
@@ -128,10 +144,41 @@ describe("recording an authenticator's setup", () => {
       personId,
       sessionId: strangersSession,
       at: AT,
+      carried: ITS_OWN_AGE,
     });
 
     expect(recorded).toMatchObject({ ok: true, value: { stamped: false } });
     expect(await confirmedAt(strangersSession)).toEqual({ confirmed: null, pending: null });
+  });
+
+  it.each([
+    [
+      "moves the session back to an older carried age",
+      { createdAt: "2026-10-01T09:00:00.000Z", expiresAt: "2026-10-02T09:00:00.000Z" },
+      { createdAt: "2026-10-01T09:00:00.000Z", expiresAt: "2026-10-02T09:00:00.000Z" },
+    ],
+    [
+      "keeps the session's own age over a newer carried one",
+      { createdAt: "2026-10-02T12:30:00.000Z", expiresAt: "2026-11-01T12:00:00.000Z" },
+      { createdAt: "2026-10-02T12:00:00.000Z", expiresAt: "2026-10-09T12:00:00.000Z" },
+    ],
+  ])("%s", async (_case, carried, kept) => {
+    const personId = await seedPerson(db().pool);
+    await authenticatorFor(db().pool, personId, { verified: true });
+    const sessionId = await aSession(personId);
+
+    const recorded = await recordAuthenticatorSetUp(bootstrap, door(), {
+      personId,
+      sessionId,
+      at: AT,
+      carried: { createdAt: new Date(carried.createdAt), expiresAt: new Date(carried.expiresAt) },
+    });
+
+    expect(recorded).toMatchObject({ ok: true, value: { stamped: true } });
+    expect(await ageOf(sessionId)).toEqual({
+      createdAt: new Date(kept.createdAt),
+      expiresAt: new Date(kept.expiresAt),
+    });
   });
 
   it("refuses a malformed person id, writing nothing", async () => {
@@ -139,6 +186,7 @@ describe("recording an authenticator's setup", () => {
       personId: "not-a-person-id",
       sessionId: "a-session",
       at: AT,
+      carried: ITS_OWN_AGE,
     });
 
     expect(recorded).toEqual({ ok: false, error: "malformed" });

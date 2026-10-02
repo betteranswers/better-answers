@@ -72,12 +72,13 @@ const factsOf = async (tx: Tx, personId: UserId): Promise<Facts | undefined> => 
 /** Stamps only the person's own session; false, having stamped nothing, for any other. */
 const stamping = async (
   tx: Tx,
-  input: { readonly personId: UserId; readonly sessionId: string; readonly at: Date },
+  input: SetUpInput & { readonly personId: UserId },
 ): Promise<boolean> => {
   const stamped = await tx.query(
-    `UPDATE session SET second_factor_confirmed_at = $3, pending_since = NULL
+    `UPDATE session SET second_factor_confirmed_at = $3, pending_since = NULL,
+                        created_at = LEAST(created_at, $4), expires_at = LEAST(expires_at, $5)
       WHERE id = $1 AND user_id = $2`,
-    [input.sessionId, input.personId, input.at],
+    [input.sessionId, input.personId, input.at, input.carried.createdAt, input.carried.expiresAt],
   );
   return stamped.rowCount === 1;
 };
@@ -88,6 +89,12 @@ type SetUpInput = {
   /** The session the setup ended in: the library's new one when its verify swapped them. */
   readonly sessionId: string;
   readonly at: Date;
+
+  /**
+   * The age of the session the setup began in: revocation and freshness date from creation, so a
+   * swapped-in session is made no younger.
+   */
+  readonly carried: { readonly createdAt: Date; readonly expiresAt: Date };
 };
 
 type AuthenticatorSetUp = {

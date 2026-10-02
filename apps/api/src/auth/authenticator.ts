@@ -39,7 +39,7 @@ const REFUSALS = {
 
 const signedIn = z
   .object({
-    session: z.object({ id: z.string() }),
+    session: z.object({ id: z.string(), createdAt: z.coerce.date(), expiresAt: z.coerce.date() }),
     user: z.object({ id: z.string(), email: z.string() }),
   })
   .nullable()
@@ -114,25 +114,38 @@ export const mountTheAuthenticator = (routes: Hono, deps: AuthenticatorDependenc
     return (await sessionOf(new Headers({ cookie: cookieOf(setCookies) })))?.session.id;
   };
 
-  const settle = async (context: Context, person: SignedIn, sessionId: string) => {
+  const record = async (person: SignedIn, sessionId: string) => {
     const recorded = await recordAuthenticatorSetUp(IDENTITY_PRINCIPAL, door, {
       personId: person.user.id,
       sessionId,
       at: clock.now(),
+      carried: { createdAt: person.session.createdAt, expiresAt: person.session.expiresAt },
     });
     if (!recorded.ok) {
       log.error(
         { event: "auth.authenticator_not_recorded", principal: person.user.id },
         "an authenticator was set up but not recorded",
       );
-    } else if (!recorded.value.stamped) {
+      return { stamped: false, recoveryCodes: undefined };
+    }
+    if (!recorded.value.stamped) {
       log.warn(
         { event: "auth.authenticator_not_stamped", principal: person.user.id },
         "an authenticator was set up but its session was gone",
       );
     }
+    return recorded.value;
+  };
+
+  const settle = async (context: Context, person: SignedIn, setCookies: readonly string[]) => {
+    const swapped = await sessionAfter(setCookies);
+    const { stamped, recoveryCodes } = await record(person, swapped ?? person.session.id);
+    // The browser gets the new cookie only once its session carries the old one's age; otherwise
+    // the old cookie, now void, signs it out.
+    if (stamped && swapped !== undefined) {
+      for (const cookie of setCookies) context.header("set-cookie", cookie, { append: true });
+    }
     await sendFactorNotice({ mail, log }, person.user.email, "authenticator-added");
-    const recoveryCodes = recorded.ok ? recorded.value.recoveryCodes : undefined;
     return context.json({ recoveryCodes: recoveryCodes ?? null });
   };
 
@@ -144,11 +157,7 @@ export const mountTheAuthenticator = (routes: Hono, deps: AuthenticatorDependenc
         returnHeaders: true,
       }),
     );
-    if (verified.ok) {
-      const setCookies = verified.value.headers.getSetCookie();
-      for (const cookie of setCookies) context.header("set-cookie", cookie, { append: true });
-      return settle(context, person, (await sessionAfter(setCookies)) ?? person.session.id);
-    }
+    if (verified.ok) return settle(context, person, verified.value.headers.getSetCookie());
     if (verified.error instanceof APIError && verified.error.statusCode === 401) {
       return context.json(REFUSALS.codeWrong, 400);
     }

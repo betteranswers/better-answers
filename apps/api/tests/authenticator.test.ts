@@ -5,9 +5,9 @@ import { authenticatorCodeAt, keyIn } from "@better-answers/schema/testing/authe
 
 import { setActiveWorkspace } from "./flow.ts";
 import type { TestClient } from "./harness.ts";
-import { signedInClient } from "./provoke.ts";
+import { sessionsSignedInOverAnHourAgo, signedInClient } from "./provoke.ts";
 import { appForSuite } from "./suite-app.ts";
-import { webClientOf } from "./web-client.ts";
+import { webClientOf, webSignedIn } from "./web-client.ts";
 
 const app = appForSuite();
 
@@ -77,6 +77,22 @@ const sessionsOf = async (personId: string) =>
     )
   ).rows;
 
+const agesOf = async (personId: string) =>
+  (
+    await app().database.superuser.query<{ id: string; createdAt: Date; expiresAt: Date }>(
+      'SELECT id, created_at AS "createdAt", expires_at AS "expiresAt" FROM session WHERE user_id = $1',
+      [personId],
+    )
+  ).rows;
+
+const revokedAtOf = async (personId: string) =>
+  (
+    await app().database.superuser.query<{ revokedAt: Date | null }>(
+      'SELECT credentials_revoked_at AS "revokedAt" FROM "user" WHERE id = $1',
+      [personId],
+    )
+  ).rows;
+
 const noticesTo = (email: string) =>
   app().emails.filter((message) => message.to === email && !/^\d{6}$/m.test(message.text));
 
@@ -134,6 +150,53 @@ describe("setting up an authenticator", () => {
       [admin.id],
     );
     expect(held.rows).toEqual([{ workspace: other.workspaceId }]);
+  });
+
+  it("keeps the old session's age across the session swap", async () => {
+    const { person, client } = await aSignedInPerson();
+    const [before] = await agesOf(person.id);
+
+    await setUpOn(client);
+
+    const after = await agesOf(person.id);
+    expect(after).toEqual([
+      { id: expect.any(String), createdAt: before?.createdAt, expiresAt: before?.expiresAt },
+    ]);
+    expect(after[0]?.id).not.toBe(before?.id);
+  });
+
+  it("refuses a revoked member's workspace after the session swap", async () => {
+    const workspace = await app().provision();
+    const person = await app().person();
+    await app().addMember(workspace.workspaceId, person.id, "Editor");
+    const { client, api } = await webSignedIn(app(), person.email);
+    const { api: admin } = await webSignedIn(app(), workspace.admin.email);
+    await admin.members.revokeCredentials.mutate({ personId: person.id });
+
+    const { answered } = await setUpOn(client);
+
+    expect(answered.status).toBe(200);
+    expect(await refusalOf(api.session.membership.query())).toMatchObject({
+      data: { httpStatus: 401, refusal: { word: "credentials-revoked", class: "unauthenticated" } },
+    });
+  });
+
+  it("refuses the operator's hour-old sign-in after the session swap", async () => {
+    const workspace = await app().provision();
+    await app().markOperator(workspace.admin.email, "grant");
+    const { client, api } = await webSignedIn(app(), workspace.admin.email);
+    const person = await app().person();
+    await sessionsSignedInOverAnHourAgo(app(), workspace.admin.id);
+
+    const { answered } = await setUpOn(client);
+
+    expect(answered.status).toBe(200);
+    expect(
+      await refusalOf(api.console.people.revokeCredentials.mutate({ personId: person.id })),
+    ).toMatchObject({
+      data: { httpStatus: 401, refusal: { word: "sign-in-too-old", class: "unauthenticated" } },
+    });
+    expect(await revokedAtOf(person.id)).toEqual([{ revokedAt: null }]);
   });
 
   it("sends one notice holding neither the key nor a code", async () => {
