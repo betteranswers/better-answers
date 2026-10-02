@@ -27,7 +27,7 @@ import {
   pageQuery,
 } from "./carried-flow.ts";
 import { forgetMembership, rereadMembership } from "./membership.ts";
-import { rememberTheSession, sessionRemembered } from "./session-memory.ts";
+import { announceTheSignIn, rememberTheSession, sessionRemembered } from "./session-memory.ts";
 import type { Arrival } from "./sign-in-words.ts";
 
 const AUTH_KEYS = {
@@ -151,6 +151,7 @@ const signInEmailOtpOptions = () =>
     },
     onSuccess: () => {
       rememberTheSession("held");
+      announceTheSignIn();
     },
   });
 
@@ -222,6 +223,7 @@ const signInByLinkOptions = () =>
     mutationFn: (token) => askOfTheLink("/sign-in-link/sign-in", token, signedInByLink),
     onSuccess: () => {
       rememberTheSession("held");
+      announceTheSignIn();
     },
   });
 
