@@ -46,7 +46,7 @@ const codeFrom = (answer: InboxAnswer): string => {
 type Answered = Pick<APIResponse, "status" | "headers">;
 
 /** A ceiling or a challenge stops the run before the product is reached, so it judges nothing. */
-const refusedTheRun = (response: Answered, at: string): void => {
+export const refusedTheRun = (response: Answered, at: string): void => {
   if (response.status() === TOO_MANY_REQUESTS) couldNotRun(`a rate ceiling refused ${at}`);
   if (response.headers()["cf-mitigated"] === "challenge") couldNotRun(`the edge challenged ${at}`);
 };

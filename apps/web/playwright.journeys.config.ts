@@ -45,6 +45,10 @@ export default defineConfig({
     ...devices["Desktop Chrome"],
     baseURL: publicUrl.data,
 
+    // A control that never shows fails its step in seconds, not at the journey's own timeout.
+    actionTimeout: 15_000,
+    navigationTimeout: 30_000,
+
     // A trace, screenshot or video of a signed-in screen would publish a live session.
     trace: "off",
     screenshot: "off",

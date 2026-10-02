@@ -34,6 +34,13 @@ describe("the journeys' configuration", () => {
     expect(config.retries).toBe(0);
   });
 
+  it("fails a control that never shows within seconds", async () => {
+    const config = await journeysConfigAt(PUBLIC_URL);
+
+    expect(config.use?.actionTimeout).toBe(15_000);
+    expect(config.use?.navigationTimeout).toBe(30_000);
+  });
+
   it("records no trace, screenshot or video in any project", async () => {
     const config = await journeysConfigAt(PUBLIC_URL);
     const recorded = (config.projects ?? []).map((project) => {
