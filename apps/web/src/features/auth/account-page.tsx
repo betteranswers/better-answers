@@ -77,7 +77,7 @@ const useLanding = () => {
   };
 };
 
-const nowWords = (): string => new Date().toISOString();
+const madeNow = (): string => new Date().toISOString();
 
 /** Each act clears what the last one said, so the page speaks of one act at a time. */
 const useAccountActs = (address: string) => {
@@ -112,7 +112,7 @@ const useAccountActs = (address: string) => {
       return;
     }
     landing.expect("save-codes");
-    setInHand({ codes, replacing: false, madeAt: nowWords() });
+    setInHand({ codes, replacing: false, madeAt: madeNow() });
   };
 
   const removeTheAuthenticator = () => {
@@ -133,7 +133,7 @@ const useAccountActs = (address: string) => {
     make.mutate(undefined, {
       onSuccess: ({ recoveryCodes }) => {
         landing.expect("save-codes");
-        setInHand({ codes: recoveryCodes, replacing, madeAt: nowWords() });
+        setInHand({ codes: recoveryCodes, replacing, madeAt: madeNow() });
         if (replacing) setSaid(ACT_LANDED.replaced(address));
       },
     });

@@ -1,5 +1,13 @@
 import { EMAIL_CODE_ATTEMPTS, EMAIL_CODE_LENGTH } from "@better-answers/schema/email-code";
 
+/** Focus and selection together, so the next digits typed replace a refused code. */
+export const selectTheCode = (fieldId: string) => {
+  const field = document.getElementById(fieldId);
+  if (!(field instanceof HTMLInputElement)) return;
+  field.focus();
+  field.select();
+};
+
 /** An email client may space, dash or widen the digits it shows, so only digits are kept. */
 export const digitsOf = (entered: string, length = EMAIL_CODE_LENGTH): string =>
   entered.normalize("NFKC").replaceAll(/\D/g, "").slice(0, length);

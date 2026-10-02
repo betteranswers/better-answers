@@ -9,9 +9,9 @@ import { readSecondFactor, recordAuthenticatorSetUp } from "@better-answers/core
 import { AUTHENTICATOR_CODE_LENGTH } from "@better-answers/schema/second-factor";
 
 import type { EmailSender } from "../email.ts";
+import { sendFactorNotice } from "../factor-notice-email.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
 import { tooManyRequests } from "../ingress/limits.ts";
-import { sendFactorNotice } from "../trpc/factor-notice-email.ts";
 import type { Auth } from "./auth.ts";
 import {
   AUTHENTICATOR_FINISH_PATH,
@@ -124,6 +124,11 @@ export const mountTheAuthenticator = (routes: Hono, deps: AuthenticatorDependenc
       log.error(
         { event: "auth.authenticator_not_recorded", principal: person.user.id },
         "an authenticator was set up but not recorded",
+      );
+    } else if (!recorded.value.stamped) {
+      log.warn(
+        { event: "auth.authenticator_not_stamped", principal: person.user.id },
+        "an authenticator was set up but its session was gone",
       );
     }
     await sendFactorNotice({ mail, log }, person.user.email, "authenticator-added");

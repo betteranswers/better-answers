@@ -50,10 +50,10 @@ const FACTS = `
            AS "mustHoldOne",
          (SELECT count(*)::int FROM passkey p WHERE p.user_id = u.id) AS passkeys,
          a.id AS "authenticatorId", a.verified,
-         (SELECT count(*)::int FROM recovery_code r WHERE r.user_id = u.id) AS "recoveryCodes",
-         (SELECT max(r.created_at) FROM recovery_code r WHERE r.user_id = u.id)
-           AS "recoveryCodesMadeAt"
+         codes.held AS "recoveryCodes", codes.made AS "recoveryCodesMadeAt"
     FROM "user" u LEFT JOIN authenticator a ON a.user_id = u.id
+   CROSS JOIN LATERAL (SELECT count(*)::int AS held, max(r.created_at) AS made
+                         FROM recovery_code r WHERE r.user_id = u.id) codes
    WHERE u.id = $1 AND ${notErasedAt("u.email")}`;
 
 const stateOf = (verified: boolean | null): AuthenticatorState => {
@@ -154,7 +154,9 @@ export type RemoveAuthenticatorRefusal = WorkspaceRefusal<
   "malformed" | "person-gone" | "no-authenticator" | "last-second-factor"
 >;
 
-type Removal = Result<{ readonly authenticatorId: string }, RemoveAuthenticatorRefusal>;
+type AuthenticatorRemoved = { readonly authenticatorId: string };
+
+type Removal = Result<AuthenticatorRemoved, RemoveAuthenticatorRefusal>;
 
 const removing = async (
   platform: PlatformPrincipal,
@@ -187,7 +189,7 @@ export const removeAuthenticator = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
   input: { readonly personId: string },
-): Promise<Result<{ readonly authenticatorId: string }, RemoveAuthenticatorRefusal | Error>> => {
+): Promise<Result<AuthenticatorRemoved, RemoveAuthenticatorRefusal | Error>> => {
   const personId = boundarySchemas.user.select.shape.id.safeParse(input.personId);
   if (!personId.success) return err("malformed");
 

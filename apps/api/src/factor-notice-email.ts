@@ -2,8 +2,9 @@ import type { Logger } from "pino";
 
 import { attempt } from "@better-answers/core/kernel";
 
-import type { EmailMessage, Mail } from "../email.ts";
-import { PRODUCT_NAME } from "../product-name.ts";
+import { emailPage, PARAGRAPH } from "./email-page.ts";
+import type { EmailMessage, Mail } from "./email.ts";
+import { PRODUCT_NAME } from "./product-name.ts";
 
 /** The SPA's Account page, where a person sees and changes their own second factor. */
 const ACCOUNT_PATH = "/account";
@@ -31,17 +32,15 @@ const WORDS = {
     "If you didn't, sign in and check your Account page now, then tell the platform's operator:",
 } as const;
 
-const PARAGRAPH = "margin:0 0 16px";
-
 /** Every value is a fixed phrase or the api's own address, so nothing here needs escaping. */
-const htmlOf = (happened: string, subject: string, account: string): string => `<!doctype html>
-<html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${subject}</title></head>
-<body style="margin:0;padding:24px;font:16px/1.5 -apple-system,'Segoe UI',system-ui,sans-serif">
-<p style="${PARAGRAPH}">${happened}</p>
+const htmlOf = (happened: string, subject: string, account: string): string =>
+  emailPage(
+    subject,
+    `<p style="${PARAGRAPH}">${happened}</p>
 <p style="${PARAGRAPH}">${WORDS.ifYou}</p>
 <p style="${PARAGRAPH}">${WORDS.ifNot}</p>
-<p style="margin:0"><a href="${account}">${account}</a></p>
-</body></html>`;
+<p style="margin:0"><a href="${account}">${account}</a></p>`,
+  );
 
 /** Names what changed and never the factor itself: no key, no code, no device. */
 const factorNoticeEmail = (to: string, change: FactorChange, publicUrl: string): EmailMessage => {

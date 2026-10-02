@@ -81,14 +81,14 @@ export const issuingRecoveryCodes = async (
 
 type RecoveryCodesInput = { readonly personId: string };
 
-export type ReplaceRecoveryCodesRefusal = WorkspaceRefusal<"malformed" | "person-gone">;
+export type RecoveryCodesRefusal = WorkspaceRefusal<"malformed" | "person-gone">;
 
 /** The person is the one caller: a transport hands the id of the session's own person. */
 export const replaceRecoveryCodes = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
   input: RecoveryCodesInput,
-): Promise<Result<RecoveryCodesIssued, ReplaceRecoveryCodesRefusal | Error>> => {
+): Promise<Result<RecoveryCodesIssued, RecoveryCodesRefusal | Error>> => {
   const personId = boundarySchemas.user.select.shape.id.safeParse(input.personId);
   if (!personId.success) return err("malformed");
 
@@ -158,7 +158,7 @@ export const acknowledgeRecoveryCodes = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
   input: RecoveryCodesInput,
-): Promise<Result<undefined, ReplaceRecoveryCodesRefusal | Error>> => {
+): Promise<Result<undefined, RecoveryCodesRefusal | Error>> => {
   const personId = boundarySchemas.user.select.shape.id.safeParse(input.personId);
   if (!personId.success) return err("malformed");
 

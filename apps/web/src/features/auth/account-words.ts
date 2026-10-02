@@ -12,9 +12,11 @@ export const ACCOUNT_WORDS = {
   readingAgain: "Reading",
 } as const;
 
+const SET_UP = "Set up an authenticator";
+
 export const ACCOUNT_ACTS = {
   readAgain: "Read your sign-in again",
-  setUp: "Set up an authenticator",
+  setUp: SET_UP,
   copyKey: "Copy the key",
   copyCodes: "Copy the codes",
   download: "Download the codes",
@@ -24,7 +26,7 @@ export const ACCOUNT_ACTS = {
 export const AUTHENTICATOR_WORDS = {
   heading: "Authenticator",
   none: "No authenticator set up.",
-  setUp: "Set up an authenticator",
+  setUp: SET_UP,
   held: "Authenticator set up.",
   remove: "Remove",
   making: "Making a key.",

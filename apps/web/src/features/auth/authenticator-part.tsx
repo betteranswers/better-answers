@@ -15,7 +15,7 @@ import { ACCOUNT_ACTS, AUTHENTICATOR_WORDS } from "./account-words.ts";
 import { CodeRefused } from "./auth-hooks.ts";
 import { Outcome } from "./auth-screen.tsx";
 import { copiedToTheClipboard } from "./clipboard.ts";
-import { digitsOf, worthSending } from "./code-entry.ts";
+import { digitsOf, selectTheCode, worthSending } from "./code-entry.ts";
 import {
   AUTHENTICATOR_HELD,
   KEY_NOT_COPIED,
@@ -85,13 +85,6 @@ const isAWrongCode = (failure: Error | null): boolean =>
 const inFours = (key: string): string => key.match(/.{1,4}/g)?.join(" ") ?? key;
 
 /** Selected, so the next digits typed or pasted replace the refused ones. */
-const selectTheCode = (fieldId: string) => {
-  const field = document.getElementById(fieldId);
-  if (!(field instanceof HTMLInputElement)) return;
-  field.focus();
-  field.select();
-};
-
 function TheKey(properties: { readonly started: SetupStarted }) {
   const { started } = properties;
   const keyId = useId();

@@ -186,9 +186,9 @@ const linkDescribed = z.discriminatedUnion("state", [
 
 export type LinkDescribed = z.infer<typeof linkDescribed>;
 
-/** Neither Better Auth's nor tRPC's, so a ceiling's wait is read off the answer here. */
 type RouteBody = Readonly<Record<string, string>>;
 
+/** Neither Better Auth's nor tRPC's, so a ceiling's wait is read off the answer here. */
 export const askOfOurRoute = async <T>(
   path: string,
   body: RouteBody,
