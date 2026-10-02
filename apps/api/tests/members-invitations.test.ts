@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { ulid } from "@better-answers/schema";
+import { testData } from "@better-answers/schema/testing";
+
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
 import {
   anAddress,
@@ -138,6 +141,37 @@ describe("inviting a person over tRPC", () => {
     });
     expect(emailsTo(app(), editor.email)).toEqual([]);
     expect(emailsTo(app(), other)).toEqual([]);
+    expect(await api.members.invitations.query()).toEqual([]);
+  });
+
+  it("names an address off a marked workspace's domain, emailing nobody", async () => {
+    const { api, workspace } = await anAdmin();
+    const testingDomain = `${ulid().toLowerCase()}.testing.invalid`;
+    const client = await app().database.superuser.connect();
+    try {
+      await testData(client).testWorkspaceMark({
+        workspaceId: workspace.workspaceId,
+        testingDomain,
+      });
+    } finally {
+      client.release();
+    }
+    const onDomain = `ana@${testingDomain}`;
+    const offDomain = anAddress("ben");
+
+    const refused = await refusalOfCall(inviting(api, [onDomain, offDomain]));
+
+    expect(refused).toMatchObject({
+      data: {
+        refusal: {
+          word: "off-testing-domain",
+          class: "inapplicable",
+          items: { "1": "off-testing-domain" },
+        },
+      },
+    });
+    expect(emailsTo(app(), onDomain)).toEqual([]);
+    expect(emailsTo(app(), offDomain)).toEqual([]);
     expect(await api.members.invitations.query()).toEqual([]);
   });
 });

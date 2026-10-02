@@ -114,7 +114,7 @@ export type DecideRefusal = MemberRefusal<
   "role-forbids" | "malformed" | "no-such-request" | "already-decided"
 >;
 
-export type ApproveRefusal = DecideRefusal | MemberRefusal<"no-such-role">;
+export type ApproveRefusal = DecideRefusal | MemberRefusal<"no-such-role" | "off-testing-domain">;
 
 type Claim = {
   readonly admin: AdminUserPrincipal;

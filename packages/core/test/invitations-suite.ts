@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import { ulid } from "@better-answers/schema";
 import type { MigratedPostgres } from "@better-answers/schema/testing";
 
 import { CeilingMet, type Result, type Role, type UserPrincipal } from "../src/kernel/index.ts";
@@ -181,6 +182,15 @@ export const invitationsSuite = (db: () => MigratedPostgres) => {
   const emailsCountedFrom = (workspace: ProvisionedWorkspace) =>
     countedUnder(workspace, "workspace");
 
+  /** Marks the workspace with a testing domain of its own, answering an address on it. */
+  const marked = async (workspace: ProvisionedWorkspace) => {
+    const testingDomain = `${ulid().toLowerCase()}.testing.invalid`;
+    await seedingWith(db().pool, (seed) =>
+      seed.testWorkspaceMark({ workspaceId: workspace.workspaceId, testingDomain }),
+    );
+    return (person: string): string => `${person}@${testingDomain}`;
+  };
+
   return {
     as,
     sending,
@@ -195,5 +205,6 @@ export const invitationsSuite = (db: () => MigratedPostgres) => {
     invitationEvents,
     emailsCountedTo,
     emailsCountedFrom,
+    marked,
   };
 };

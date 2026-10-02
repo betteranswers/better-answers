@@ -89,6 +89,7 @@ const REGISTER = {
   "no-such-invitation": "absent by members",
   "invitation-expired": "precondition by members",
   "invitation-for-another-address": "forbidden by members",
+  "off-testing-domain": "inapplicable by members",
 
   "no-such-user": "absent by workspaces",
   "no-such-workspace": "absent by workspaces",

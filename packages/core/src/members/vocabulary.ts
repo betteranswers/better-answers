@@ -19,6 +19,9 @@ export const MEMBER_REFUSALS = declareRefusals("members", {
 
   // Only the person signed in with the invited address may take it up.
   "invitation-for-another-address": "forbidden",
+
+  // A marked workspace invites its testing domain alone, and nothing an Admin does lifts that.
+  "off-testing-domain": "inapplicable",
 });
 
 export type MemberRefusal<W extends RefusalWordFor<typeof MEMBER_REFUSALS>> = W;

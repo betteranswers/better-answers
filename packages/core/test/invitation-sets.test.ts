@@ -48,6 +48,7 @@ const {
   invitationEvents,
   emailsCountedTo,
   emailsCountedFrom,
+  marked,
 } = invitationsSuite(db);
 
 const RESENT_AT = new Date("2031-06-25T12:00:00.000Z");
@@ -189,6 +190,41 @@ describe("inviting several addresses at once", () => {
     expect(await invitationsOf(workspace)).toEqual([]);
     expect(await invitationEvents(workspace)).toEqual([]);
     expect(await emailsCountedTo(workspace, ana)).toBe(0);
+  });
+
+  it("refuses an address off a marked workspace's domain, minting nothing", async () => {
+    const workspace = await provisionedWorkspace(db(), "MarkedSend");
+    const onDomain = await marked(workspace);
+    const ana = onDomain("ana");
+
+    const refused = await sending(workspace, [ana, addressOf("ben"), onDomain("cai")], "Viewer");
+
+    expect(refused).toEqual({
+      ok: false,
+      error: { word: "off-testing-domain", items: { "1": "off-testing-domain" } },
+    });
+    expect([
+      await invitationsOf(workspace),
+      await invitationEvents(workspace),
+      await emailsCountedTo(workspace, ana),
+      await emailsCountedFrom(workspace),
+    ]).toEqual([[], [], 0, 0]);
+  });
+
+  it("invites a marked workspace's own testing domain, however cased", async () => {
+    const workspace = await provisionedWorkspace(db(), "MarkedSendOnDomain");
+    const onDomain = await marked(workspace);
+
+    const sent = await sending(
+      workspace,
+      [onDomain("ana"), onDomain("ben").toUpperCase()],
+      "Viewer",
+    );
+
+    expect(answeredValue(sent).map((one) => one.address)).toEqual([
+      onDomain("ana"),
+      onDomain("ben"),
+    ]);
   });
 
   it("AE5: names each malformed address by position, minting nothing", async () => {
@@ -507,6 +543,41 @@ describe("resending a set of invitations", () => {
     expect(await invitationsOf(workspace)).toEqual(before);
     expect(await invitationEvents(workspace)).toEqual(eventsBefore);
     expect(await emailsCountedFrom(workspace)).toBe(200);
+  });
+
+  it("refuses a marked workspace's off-domain invitations by id, renewing none", async () => {
+    const workspace = await provisionedWorkspace(db(), "MarkedBulkResend");
+    const offDomain = answeredValue(await invite(workspace, addressOf("ana"), "Viewer"));
+    const onDomain = await marked(workspace);
+    const ben = onDomain("ben");
+    const toBen = answeredValue(await invite(workspace, ben, "Viewer"));
+    const standing = async () => [
+      await invitationsOf(workspace),
+      await invitationEvents(workspace),
+      await emailsCountedTo(workspace, ben),
+    ];
+    const before = await standing();
+
+    const refused = await resendingSet(workspace, [toBen.invitationId, offDomain.invitationId]);
+
+    expect(refused).toEqual({
+      ok: false,
+      error: {
+        word: "off-testing-domain",
+        items: { [offDomain.invitationId]: "off-testing-domain" },
+      },
+    });
+    expect(await standing()).toEqual(before);
+  });
+
+  it("renews a marked workspace's invitations on its domain", async () => {
+    const workspace = await provisionedWorkspace(db(), "MarkedBulkResendOnDomain");
+    const onDomain = await marked(workspace);
+    const toAna = answeredValue(await invite(workspace, onDomain("ana"), "Viewer"));
+
+    const resent = await resendingSet(workspace, [toAna.invitationId]);
+
+    expect(resent).toMatchObject({ ok: true, value: [{ invitationId: toAna.invitationId }] });
   });
 
   it("renews an id ticked twice once", async () => {
