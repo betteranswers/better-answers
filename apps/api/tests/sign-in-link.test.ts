@@ -75,7 +75,58 @@ describe("the sign-in email's link", () => {
   });
 });
 
+/** Refuses the link's own row alone, so the library's code row still lands. */
+const whileLinksAreRefused = async <T>(work: () => Promise<T>): Promise<T> => {
+  const superuser = app().database.superuser;
+  await superuser.query(
+    `CREATE OR REPLACE FUNCTION test_refuse_link() RETURNS trigger LANGUAGE plpgsql AS $$
+     BEGIN RAISE EXCEPTION 'the store refused a link row'; END $$`,
+  );
+  await superuser.query(
+    `CREATE TRIGGER test_refuse_link BEFORE INSERT ON verification FOR EACH ROW
+     WHEN (NEW.identifier LIKE 'sign-in-link-%') EXECUTE FUNCTION test_refuse_link()`,
+  );
+  try {
+    return await work();
+  } finally {
+    await superuser.query("DROP TRIGGER test_refuse_link ON verification");
+    await superuser.query("DROP FUNCTION test_refuse_link()");
+  }
+};
+
+const linkRowsOf = async (email: string): Promise<number> =>
+  (
+    await app().database.superuser.query(
+      "SELECT 1 FROM verification WHERE identifier = 'sign-in-link-' || $1",
+      [email.toLowerCase()],
+    )
+  ).rowCount ?? -1;
+
 describe("the code request", () => {
+  it("still sends the code when its link cannot be kept", async () => {
+    const person = await app().person();
+
+    const asked = await whileLinksAreRefused(() =>
+      app().client().json(SEND_CODE, { email: person.email, type: "sign-in" }),
+    );
+
+    expect(asked.status).toBe(200);
+    expect(app().codeSentTo(person.email)).toMatch(/^\d{6}$/);
+    expect(() => app().linkSentTo(person.email)).toThrow("no sign-in link was sent");
+    expect(app().logs.some((line) => line["event"] === "auth.link_not_kept")).toBe(true);
+  });
+
+  it("keeps one link when two codes are asked at once", async () => {
+    const person = await app().person();
+
+    await Promise.all([
+      app().client().json(SEND_CODE, { email: person.email, type: "sign-in" }),
+      app().client().json(SEND_CODE, { email: person.email, type: "sign-in" }),
+    ]);
+
+    expect(await linkRowsOf(person.email)).toBe(1);
+  });
+
   it("binds the browser that asked with a host-only cookie", async () => {
     const person = await app().person();
 
@@ -156,6 +207,15 @@ describe("reading a link", () => {
     const read = await describeLink(app().client(), token);
 
     expect(read.headers.get("cache-control")).toBe("no-store");
+  });
+
+  it("keeps its sign-in apart from the reads' ceiling", async () => {
+    const person = await app().person();
+    const asking = app().client();
+    const { token } = await askedFor(asking, person.email);
+    for (let read = 0; read < 11; read += 1) await describeLink(app().client(), token);
+
+    expect((await asking.json(SIGN_IN_BY_LINK, { token })).status).toBe(200);
   });
 
   it("refuses one link's reads past its own ceiling", async () => {

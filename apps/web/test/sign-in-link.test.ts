@@ -14,15 +14,18 @@ describe("the sign-in link's token", () => {
     at("/");
   });
 
-  it("reads 43 letters and digits from the fragment", () => {
-    at(`/sign-in/link#${TOKEN}`);
-    expect(linkTokenOnThisPage()).toBe(TOKEN);
+  it.each([
+    ["43", TOKEN],
+    ["128", "a".repeat(128)],
+  ])("reads a token of %s characters from the fragment", (_, token) => {
+    at(`/sign-in/link#${token}`);
+    expect(linkTokenOnThisPage()).toBe(token);
   });
 
   it.each([
     ["missing", ""],
-    ["one short", `#${TOKEN.slice(1)}`],
-    ["one long", `#${TOKEN}a`],
+    ["empty", "#"],
+    ["past what the api accepts", `#${"a".repeat(129)}`],
     ["not letters and digits", `#${TOKEN.slice(1)}-`],
   ])("reads none from a fragment %s", (_, fragment) => {
     at(`/sign-in/link${fragment}`);

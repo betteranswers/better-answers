@@ -49,6 +49,7 @@ const textOf = (code: string, link: string | undefined): string =>
         code,
         "",
         WORDS.bothWork,
+        "",
         WORDS.notAsked,
       ]
   ).join("\n");

@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
@@ -89,6 +89,8 @@ type Acting = {
   readonly onCopy: (code: string) => void;
   readonly reading: boolean;
   readonly onReadAgain: () => void;
+  /** The query the clicked link carried, or nothing before a click. */
+  readonly carried: string;
 };
 
 type Slots = {
@@ -150,10 +152,12 @@ function CodeToType(properties: {
   );
 }
 
-function BackToSignIn(properties: { readonly focused: boolean }) {
+/** `carried` is the flow the clicked link carried, so a fresh sign-in still returns where it would. */
+function BackToSignIn(properties: { readonly focused: boolean; readonly carried: string }) {
   const navigate = useNavigate();
+  const back = `/sign-in${properties.carried}`;
   useKeystroke(BACK_TO_SIGN_IN, () => {
-    void navigate({ to: "/sign-in" });
+    void navigate(leavingFor(back));
   });
   // The Sign in button this replaces held focus; a link takes no `autoFocus` from React.
   const focusedOnArrival = useCallback(
@@ -165,14 +169,15 @@ function BackToSignIn(properties: { readonly focused: boolean }) {
 
   return (
     <div className="mt-6 flex flex-wrap items-center gap-4">
-      <Link
+      {/* A plain link: the router would re-serialise a signed query and break its signature. */}
+      <a
         ref={focusedOnArrival}
-        to="/sign-in"
+        href={back}
         className="text-brand underline"
         aria-keyshortcuts={BACK_TO_SIGN_IN.key}
       >
         {LINK_WORDS.backToSignIn}
-      </Link>
+      </a>
       <KeystrokesAct screen={KEYSTROKE_WORDS.thisScreen} keystrokes={[BACK_TO_SIGN_IN]} />
     </div>
   );
@@ -245,12 +250,12 @@ const elsewhereSlots = (elsewhere: Elsewhere, acting: Acting): Slots => ({
   ),
 });
 
-const deadSlots = (afterSignIn: boolean): Slots => ({
+const deadSlots = (acting: Acting): Slots => ({
   title: LINK_WORDS.deadTitle,
   said: LINK_WORDS.dead,
   body: null,
   refused: undefined,
-  acts: <BackToSignIn focused={afterSignIn} />,
+  acts: <BackToSignIn focused={acting.signInFailure !== null} carried={acting.carried} />,
 });
 
 const slotsOf = (seen: Seen, acting: Acting): Slots => {
@@ -264,7 +269,7 @@ const slotsOf = (seen: Seen, acting: Acting): Slots => {
     case "elsewhere":
       return elsewhereSlots(seen, acting);
     case "dead":
-      return deadSlots(acting.signInFailure !== null);
+      return deadSlots(acting);
   }
 };
 
@@ -316,6 +321,7 @@ export function LinkScreen() {
     onReadAgain: () => {
       void read.refetch();
     },
+    carried: clicked?.carried ?? "",
   };
 
   const slots = slotsOf(seenOf(token, read, clicked, signIn.error), acting);

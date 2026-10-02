@@ -42,6 +42,7 @@ describe("the sign-in email", () => {
         code,
         "",
         "The link and the code work once, for five minutes.",
+        "",
         "If you did not ask to sign in, ignore this email.",
       ].join("\n"),
     );

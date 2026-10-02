@@ -11,7 +11,7 @@ import type pg from "pg";
 import type { Logger } from "pino";
 import { z } from "zod";
 
-import { err, type Result, ulid } from "@better-answers/core/kernel";
+import { attempt, err, type Result, ulid } from "@better-answers/core/kernel";
 import { withIdentityWrite, type PostgresDoor } from "@better-answers/core/store/postgres";
 import {
   hasNoDisplayName,
@@ -459,12 +459,20 @@ export const createAuth = (deps: AuthDependencies) => {
         storeOTP: "hashed",
         sendVerificationOTP: async ({ email, otp, type }) => {
           if (type !== "sign-in") return;
-          const link = await keepALink(
-            { door: deps.door, secret: deps.secret, publicUrl: deps.publicUrl },
-            email,
-            otp,
+          const kept = await attempt(() =>
+            keepALink(
+              { door: deps.door, secret: deps.secret, publicUrl: deps.publicUrl },
+              email,
+              otp,
+            ),
           );
-          await deps.sendEmail(signInEmail(email, otp, link));
+          // The code alone still signs in, so a link that could not be kept never costs the email.
+          if (!kept.ok)
+            audit.warn(
+              { event: "auth.link_not_kept", reason: kept.error.message },
+              "auth.link_not_kept",
+            );
+          await deps.sendEmail(signInEmail(email, otp, kept.ok ? kept.value : undefined));
         },
       }),
       widenAuthorize(

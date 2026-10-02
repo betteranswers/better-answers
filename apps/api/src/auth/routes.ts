@@ -297,11 +297,15 @@ const displayNameGivenIn = async (answered: Response): Promise<boolean> => {
 const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): void => {
   const { auth, door, publicUrl, clock } = deps;
 
-  const ceilingOf = async (token: string): Promise<Response | undefined> => {
+  /** Reads and sign-ins count apart, so re-reading a link never spends the sign-in it offers. */
+  const ceilingOf = async (
+    route: "describe" | "sign-in",
+    token: string,
+  ): Promise<Response | undefined> => {
     const counted = await consumeIngress(
       door,
       "link",
-      hashOf(token),
+      `${route}:${hashOf(token)}`,
       SIGN_IN_LINK_TOKEN_RULE,
       clock.now(),
     );
@@ -388,7 +392,7 @@ const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): void =>
   routes.post(SIGN_IN_LINK_DESCRIBE_PATH, async (context) => {
     const token = await tokenOf(context.req.raw);
     if (token === undefined) return context.json(DEAD_LINK);
-    const limited = await ceilingOf(token);
+    const limited = await ceilingOf("describe", token);
     if (limited !== undefined) return limited;
     const link = await seen(token, getCookie(context, bindingCookieName(publicUrl)));
     return context.json(link.state);
@@ -397,7 +401,7 @@ const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): void =>
   routes.post(SIGN_IN_LINK_SIGN_IN_PATH, async (context) => {
     const token = await tokenOf(context.req.raw);
     if (token === undefined) return context.json(LINK_REFUSALS.dead, 410);
-    const limited = await ceilingOf(token);
+    const limited = await ceilingOf("sign-in", token);
     if (limited !== undefined) return limited;
     const link = await seen(token, getCookie(context, bindingCookieName(publicUrl)));
     if (link.state.state === "dead") return context.json(LINK_REFUSALS.dead, 410);

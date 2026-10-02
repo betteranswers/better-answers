@@ -156,8 +156,8 @@ const signInEmailOtpOptions = () =>
 
 export const useSignInEmailOtp = () => useMutation(signInEmailOtpOptions());
 
-/** As the api mints it; anything else is no link, so nothing is asked. */
-const LINK_TOKEN = /^#([A-Za-z0-9]{43})$/;
+/** The shape the api accepts, not the one it mints, so a change of length never reads as no link. */
+const LINK_TOKEN = /^#([A-Za-z0-9]{1,128})$/;
 
 export const linkTokenOnThisPage = (): string | undefined =>
   LINK_TOKEN.exec(globalThis.location.hash)?.[1];

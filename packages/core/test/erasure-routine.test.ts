@@ -1235,6 +1235,19 @@ describe("the identity set on the person's last membership", () => {
     }).toEqual({ theirs: 0, theStranger: 4 });
   });
 
+  it("keeps a stranger's code whose key holds the subject's address", async () => {
+    const scenario = await arrange();
+    const stranger = addressOf("priya");
+    const lookalike = `sign-in-otp-${stranger}`;
+    const person = await memberOf(db().pool, scenario.workspaceId, lookalike);
+    await verificationCodeFor(db().pool, stranger);
+    const subjectRequestId = await erasureRequestAbout(scenario.workspaceId, person.id, lookalike);
+
+    await completing(scenario, subjectRequestId);
+
+    expect(await verificationsFor(stranger)).toBe(1);
+  });
+
   it("ends this membership alone while the person holds another", async () => {
     const scenario = await arrange();
     const elsewhere = await arrange();
