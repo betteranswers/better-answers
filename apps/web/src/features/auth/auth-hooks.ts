@@ -2,6 +2,7 @@ import {
   matchQuery,
   mutationOptions,
   queryOptions,
+  skipToken,
   useMutation,
   useQuery,
   useQueryClient,
@@ -81,7 +82,7 @@ const waitNamedBy = (response: Response): number | undefined => {
 
 const SERVER_FAILED = 500;
 
-/** Better Auth refused a code's send or its check, with the wait a ceiling named, if it named one. */
+/** The api refused a code's send or its check, by form or by link, with the wait a ceiling named. */
 export class CodeRefused extends Error {
   readonly status: number;
   readonly waitSeconds: number | undefined;
@@ -114,10 +115,21 @@ const unwrapWithTheWait = async <TData>(
   throw new CodeRefused(error.status, waitSeconds);
 };
 
+/** Sealed into the email's link, so a sign-in through it returns where this page would. */
+const returnPathOf = (query: string): { readonly redirect?: string } => {
+  const redirect = new URLSearchParams(query).get("redirect");
+  return redirect === null ? {} : { redirect };
+};
+
 const sendVerificationOtpOptions = () =>
   mutationOptions<unknown, Error, { email: string; type: "sign-in" }>({
     mutationFn: (input) =>
-      unwrapWithTheWait((reading) => authClient.emailOtp.sendVerificationOtp(input, reading)),
+      unwrapWithTheWait((reading) =>
+        authClient.emailOtp.sendVerificationOtp(
+          { ...input, ...returnPathOf(pageQuery()) },
+          reading,
+        ),
+      ),
   });
 
 export const useSendVerificationOtp = () => useMutation(sendVerificationOtpOptions());
@@ -143,6 +155,77 @@ const signInEmailOtpOptions = () =>
   });
 
 export const useSignInEmailOtp = () => useMutation(signInEmailOtpOptions());
+
+/** The shape the api accepts, not the one it mints, so a change of length never reads as no link. */
+const LINK_TOKEN = /^#([A-Za-z0-9]{1,128})$/;
+
+export const linkTokenOnThisPage = (): string | undefined =>
+  LINK_TOKEN.exec(globalThis.location.hash)?.[1];
+
+/** History keeps its state, so the router's key for this entry survives. */
+export const dropTheLinkToken = (): void => {
+  const { hash, pathname, search } = globalThis.location;
+  if (hash === "") return;
+  globalThis.history.replaceState(globalThis.history.state, "", `${pathname}${search}`);
+};
+
+const linkDescribed = z.discriminatedUnion("state", [
+  z.object({
+    state: z.literal("bound"),
+    address: z.string(),
+    carried: z.string(),
+  }),
+  z.object({ state: z.literal("elsewhere"), code: z.string(), until: z.string() }),
+  z.object({ state: z.literal("dead") }),
+]);
+
+export type LinkDescribed = z.infer<typeof linkDescribed>;
+
+/** Neither Better Auth's nor tRPC's, so a ceiling's wait is read off the answer here. */
+const askOfTheLink = async <T>(path: string, token: string, answer: z.ZodType<T>): Promise<T> => {
+  const answered = await fetch(path, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ token }),
+  });
+  if (answered.status >= SERVER_FAILED) throw new Error(`answered ${String(answered.status)}`);
+  if (!answered.ok) throw new CodeRefused(answered.status, waitNamedBy(answered));
+  return answer.parse(await answered.json());
+};
+
+const ASKED_AGAIN_AT_MOST = 2;
+
+/** Each read spends the link's ceiling, and a failed read stays stale, so only Read again reads twice. */
+export const useDescribeTheLink = (token: string | undefined, reading: boolean) =>
+  useQuery({
+    queryKey: [...AUTH_KEYS.all, "link", token],
+    queryFn:
+      token === undefined
+        ? skipToken
+        : () => askOfTheLink("/sign-in-link/describe", token, linkDescribed),
+    enabled: reading,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    retry: (failures, failure) =>
+      !(failure instanceof CodeRefused) && failures < ASKED_AGAIN_AT_MOST,
+  });
+
+const signedInByLink = z.object({ displayNameGiven: z.boolean(), carried: z.string() });
+
+export type SignedInByLink = z.infer<typeof signedInByLink>;
+
+const signInByLinkOptions = () =>
+  mutationOptions<SignedInByLink, Error, string>({
+    mutationFn: (token) => askOfTheLink("/sign-in-link/sign-in", token, signedInByLink),
+    onSuccess: () => {
+      rememberTheSession("held");
+    },
+  });
+
+export const useSignInByLink = () => useMutation(signInByLinkOptions());
 
 /**
  * Said only once the api reads no session: a failed sign-out, or a visit while signed in, leaves

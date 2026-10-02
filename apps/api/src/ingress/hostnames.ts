@@ -39,6 +39,12 @@ export const HOSTNAME_SURFACES: readonly HostnameSurface[] = [
       "Consent, the one page of the OAuth flow this tier still renders itself, on the product's origin but outside its shell. It keeps a name in this list rather than falling to the catch-all because it is the one path here with a fence of its own beside the hostname fence: its POST answers a redirect, so it can be reached only by a document navigation, and `auth/routes.ts` refuses a POST whose `Sec-Fetch-Dest` is not `document` on top of the same-origin check. What makes consent acceptable on the same origin as the product is the closed client list plus PKCE: the CIMD allow-list admits only `claude.ai`, so a code any script in the shell could obtain lands only at Claude's own redirect, bound to a verifier only the host holds.",
   },
   {
+    paths: ["/sign-in-link/*"],
+    hosts: ["app"],
+    reason:
+      "The sign-in link's two reads, what the link is and the sign-in it spends, on the product's origin because the binding cookie the code request set is host-only there. They keep a name in this list for the same reason consent does: each carries a fence of its own beside the hostname fence. Both are POSTs behind the same-origin check, each with a ceiling per client address and one per link, and the sign-in spends a link only for the browser holding the cookie its code request was given. The page the link opens is the SPA's, under the catch-all, with no referrer and no caching, and its token rides in the URL's fragment, which no server ever receives.",
+  },
+  {
     paths: ["/health"],
     hosts: ["app", "loopback"],
     reason:

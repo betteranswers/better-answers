@@ -37,7 +37,12 @@ import { revokeCredentialsHere } from "../src/members/index.ts";
 import { setDisplayName, setOperatorMark } from "../src/workspaces/index.ts";
 import { authorLinesOf, bundleHistory, everyObjectOf, objectPresent } from "./bundle.ts";
 import { erasureDoorsFor } from "./erasure-doors.ts";
-import { identityRowsFor, verificationCodeFor } from "./identity-rows.ts";
+import {
+  identityRowsFor,
+  otherCodesFor,
+  signInLinkFor,
+  verificationCodeFor,
+} from "./identity-rows.ts";
 import { bootstrap } from "./platform.ts";
 import { auditEventRowsOf } from "./sourced-concept.ts";
 import { objectStoreForSuite, textOf } from "./suite-objects.ts";
@@ -465,11 +470,16 @@ const grantsEndedRowsAbout = async (personId: string) => {
   return read.rows.map((each) => each.row);
 };
 
-const verificationsFor = async (identifier: string): Promise<number> => {
-  const read = await db().pool.query<{ count: string }>(
-    "SELECT count(*) AS count FROM verification WHERE lower(identifier) = $1",
-    [identifier.toLowerCase()],
-  );
+/** Counts every verification row the address at `parameter` is behind, in each shape written. */
+const verificationsOfAnAddress = (parameter: string): string => `SELECT count(*) FROM verification
+  WHERE lower(identifier) IN ('sign-in-otp-' || ${parameter}, 'sign-in-link-' || ${parameter},
+                              'email-verification-otp-' || ${parameter},
+                              'forget-password-otp-' || ${parameter})`;
+
+const verificationsFor = async (email: string): Promise<number> => {
+  const read = await db().pool.query<{ count: string }>(verificationsOfAnAddress("$1"), [
+    email.toLowerCase(),
+  ]);
   return Number(read.rows[0]?.count ?? -1);
 };
 
@@ -479,7 +489,7 @@ const identityRowCountsFor = async (workspaceId: string, userId: string, email: 
   const read = await db().pool.query<typeof NOT_COUNTED>(
     `SELECT (SELECT count(*) FROM session WHERE user_id = $1) AS sessions,
             (SELECT count(*) FROM account WHERE user_id = $1) AS accounts,
-            (SELECT count(*) FROM verification WHERE lower(identifier) = $2) AS verifications,
+            (${verificationsOfAnAddress("$2")}) AS verifications,
             (SELECT count(*) FROM invitation WHERE workspace_id = $3 AND lower(email) = $2)
               AS invitations`,
     [userId, email.toLowerCase(), workspaceId],
@@ -1181,13 +1191,14 @@ describe("the identity set on the person's last membership", () => {
   it("deletes the person's sessions, verification rows, invitations and linked accounts", async () => {
     const { scenario, person, email, subjectRequestId } = await workspaceWithAnErasureRequest();
     await identityRowsFor(db().pool, { userId: person.id, email });
+    await signInLinkFor(db().pool, email);
     await seedingWith(db().pool, (seed) =>
       seed.invitation({ workspaceId: scenario.workspaceId, email }),
     );
     expect(await identityRowCountsFor(scenario.workspaceId, person.id, email)).toEqual({
       sessions: 1,
       accounts: 1,
-      verifications: 1,
+      verifications: 2,
       invitations: 1,
     });
 
@@ -1207,8 +1218,11 @@ describe("the identity set on the person's last membership", () => {
     const person = await memberOf(db().pool, scenario.workspaceId, email);
 
     const notTheirs = addressOf("a-client-contact");
-    await verificationCodeFor(db().pool, email);
-    await verificationCodeFor(db().pool, notTheirs);
+    for (const address of [email, notTheirs]) {
+      await verificationCodeFor(db().pool, address);
+      await signInLinkFor(db().pool, address);
+      await otherCodesFor(db().pool, address);
+    }
     const subjectRequestId = await erasureRequestAbout(scenario.workspaceId, person.id, email, [
       notTheirs,
     ]);
@@ -1218,7 +1232,20 @@ describe("the identity set on the person's last membership", () => {
     expect({
       theirs: await verificationsFor(email),
       theStranger: await verificationsFor(notTheirs),
-    }).toEqual({ theirs: 0, theStranger: 1 });
+    }).toEqual({ theirs: 0, theStranger: 4 });
+  });
+
+  it("keeps a stranger's code whose key holds the subject's address", async () => {
+    const scenario = await arrange();
+    const stranger = addressOf("priya");
+    const lookalike = `sign-in-otp-${stranger}`;
+    const person = await memberOf(db().pool, scenario.workspaceId, lookalike);
+    await verificationCodeFor(db().pool, stranger);
+    const subjectRequestId = await erasureRequestAbout(scenario.workspaceId, person.id, lookalike);
+
+    await completing(scenario, subjectRequestId);
+
+    expect(await verificationsFor(stranger)).toBe(1);
   });
 
   it("ends this membership alone while the person holds another", async () => {

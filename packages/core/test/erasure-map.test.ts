@@ -19,7 +19,12 @@ import {
 import { actorIdOfPerson, type UserPrincipal } from "../src/kernel/index.ts";
 import { withScope } from "../src/store/postgres/index.ts";
 import { contractFixture } from "./contract-fixture.ts";
-import { identityRowsFor, verificationCodeFor } from "./identity-rows.ts";
+import {
+  identityRowsFor,
+  otherCodesFor,
+  signInLinkFor,
+  verificationCodeFor,
+} from "./identity-rows.ts";
 import { bootstrap } from "./platform.ts";
 import { addressOf, readingAs, seedingWith } from "./suite-postgres.ts";
 import {
@@ -473,14 +478,20 @@ describe("the erasure map's documents", () => {
 });
 
 describe("the erasure map for a stranger's address in the set", () => {
-  it("names the subject's own verification code, never the stranger's", async () => {
+  it("names the subject's own code and link, never the stranger's", async () => {
     const here = await arrange();
     const email = addressOf("priya");
     const person = await memberOf(db().pool, here.workspaceId, email);
 
     const notTheirs = addressOf("a-stranger");
-    const theirs = await verificationCodeFor(db().pool, email);
+    const theirs = [
+      await verificationCodeFor(db().pool, email),
+      await signInLinkFor(db().pool, email),
+      ...(await otherCodesFor(db().pool, email)),
+    ].toSorted();
     await verificationCodeFor(db().pool, notTheirs);
+    await signInLinkFor(db().pool, notTheirs);
+    await otherCodesFor(db().pool, notTheirs);
     const request = await requestFor(here, {
       personId: person.id,
       identifiers: { ...identifiersOf(email), emails: [email, notTheirs] },
@@ -488,9 +499,9 @@ describe("the erasure map for a stranger's address in the set", () => {
 
     const map = await mapOf(here, request);
 
-    expect(map.find((entry) => entry.family === "identity-verification")?.locations).toEqual([
-      theirs,
-    ]);
+    expect(
+      map.find((entry) => entry.family === "identity-verification")?.locations.toSorted(),
+    ).toEqual(theirs);
   });
 });
 

@@ -54,18 +54,19 @@ const memberOfTwo = async (testApp: TestApp) => {
 };
 
 describe("a sign-in, recorded on the identity-set audit log", () => {
-  it("records the person as actor and subject, with empty detail", async () => {
+  it("records the person as actor and subject, and the method", async () => {
     const person = await app().person();
 
     await signIn(app(), app().client(), person.email);
 
     const recorded = await signInRowsOf(person.id);
-    expect(recorded.rows).toMatchObject([
+    expect(recorded.rows).toEqual([
       {
         act: "people.person.signed_in",
         actor: `human:${person.id}`,
         subject_id: person.id,
-        detail: {},
+        detail: { method: "email_code" },
+        whole: expect.any(String),
       },
     ]);
   });

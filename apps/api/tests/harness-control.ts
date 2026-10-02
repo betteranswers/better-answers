@@ -165,5 +165,10 @@ export const harnessControl = (app: TestApp): Hono => {
     return context.json({ code: app.codeSentTo(email) });
   });
 
+  control.get(`${HARNESS_PREFIX}/links`, (context) => {
+    const email = context.req.query("email") ?? "";
+    return context.json({ token: app.linkSentTo(email) });
+  });
+
   return control;
 };

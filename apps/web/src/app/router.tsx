@@ -18,6 +18,7 @@ import { acceptDetour, displayNameDetour } from "@/features/auth/auth-hooks.ts";
 import { backTo, leavingFor, pageQuery } from "@/features/auth/carried-flow.ts";
 import { ChooseWorkspaceScreen } from "@/features/auth/choose-workspace-screen.tsx";
 import { DisplayNameScreen } from "@/features/auth/display-name-screen.tsx";
+import { LinkScreen } from "@/features/auth/link-screen.tsx";
 import {
   membershipRefusal,
   NEEDS_A_PICK,
@@ -108,6 +109,13 @@ const signInRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sign-in",
   component: SignInScreen,
+});
+
+/** The email's sign-in link, which carries its token in the fragment, so no server log holds it. */
+const signInLinkRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/sign-in/link",
+  component: LinkScreen,
 });
 
 const displayNameRoute = createRoute({
@@ -368,6 +376,7 @@ export const createAppRouter = (clients: AppClients, history?: RouterHistory) =>
   const options = {
     routeTree: rootRoute.addChildren([
       signInRoute,
+      signInLinkRoute,
       displayNameRoute,
       chooseWorkspaceRoute,
       noWorkspaceRoute,

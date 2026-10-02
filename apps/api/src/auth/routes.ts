@@ -1,6 +1,5 @@
-import { createHash } from "node:crypto";
-
-import { Hono, type MiddlewareHandler } from "hono";
+import { type Context, Hono, type MiddlewareHandler } from "hono";
+import { getCookie, setCookie } from "hono/cookie";
 import type { Logger } from "pino";
 import { z } from "zod";
 
@@ -10,17 +9,38 @@ import {
   withPrincipal,
   type PostgresDoor,
 } from "@better-answers/core/store/postgres";
+import { hasNoDisplayName } from "@better-answers/core/workspaces";
 
 import { limitByIp, tooManyRequests } from "../ingress/limits.ts";
 import type { Auth } from "./auth.ts";
 import {
+  BETTER_AUTH_RATE_LIMIT,
   EMAIL_CODE_EMAIL_RULE,
+  EMAIL_CODE_LIFETIME_SECONDS,
   MCP_SCOPES,
   OAUTH_IP_RULE,
   PAGE_IP_RULE,
   SEND_EMAIL_CODE_PATH,
+  SIGN_IN_LINK_COOKIE,
+  SIGN_IN_LINK_DESCRIBE_IP_RULE,
+  SIGN_IN_LINK_DESCRIBE_PATH,
+  SIGN_IN_LINK_PAGE,
+  SIGN_IN_LINK_SIGN_IN_IP_RULE,
+  SIGN_IN_LINK_SIGN_IN_PATH,
+  SIGN_IN_LINK_TOKEN_RULE,
 } from "./constants.ts";
+import {
+  DEAD_LINK,
+  hashOf,
+  isBound,
+  linkSeen,
+  type LinkUse,
+  type SeenLink,
+  mintNonce,
+  unseal,
+} from "./link-token.ts";
 import { consentPage, refusedPage, REFUSAL_PAGES, signInPage } from "./pages.ts";
+import { askingWithALink, dropALink, readALink, signingInByLink } from "./sign-in-link.ts";
 import { sessionClaims } from "./verify.ts";
 
 export type AuthRoutesDependencies = {
@@ -31,6 +51,9 @@ export type AuthRoutesDependencies = {
   readonly logger: Logger;
 
   readonly clock: Clock;
+
+  /** The auth secret, which seals what a sign-in link carries. */
+  readonly secret: string;
 };
 
 const carry = (url: string): string => new URL(url).search;
@@ -102,8 +125,7 @@ const navigationOnly: MiddlewareHandler = async (context, next) => {
   await next();
 };
 
-const emailKey = (email: string): string =>
-  createHash("sha256").update(email.trim().toLowerCase()).digest("hex");
+const emailKey = (email: string): string => hashOf(email.trim().toLowerCase());
 
 const codeRequest = z.object({ email: z.string().trim().min(1) });
 
@@ -135,7 +157,8 @@ const limitCodesByEmail = (door: PostgresDoor, clock: Clock): MiddlewareHandler 
 
 type FlowBody =
   | { readonly postLogin: true; readonly oauth_query: string }
-  | { readonly accept: boolean; readonly oauth_query: string };
+  | { readonly accept: boolean; readonly oauth_query: string }
+  | { readonly email: string; readonly otp: string; readonly oauth_query?: string };
 
 const callFlow = (
   auth: Auth,
@@ -191,6 +214,202 @@ const failureOf = async (decided: Result<Response>) =>
     ? { status: decided.value.status, detail: await decided.value.clone().text() }
     : { status: null, detail: decided.error.message };
 
+/** A path on this origin alone: anything else would be an open redirect once the link signs in. */
+const returnPath = z
+  .string()
+  .max(512)
+  .regex(/^\/(?![/\\])[^\\]*$/)
+  .optional()
+  .catch(undefined);
+
+const codeAsk = z
+  .object({ type: z.string().optional(), oauth_query: z.string().optional(), redirect: returnPath })
+  .catch({});
+
+const secureOrigin = (publicUrl: string): boolean => publicUrl.startsWith("https:");
+
+/** Better Auth drops its own secure prefix on plain http, as the browser suite's loopback is. */
+const bindingCookieName = (publicUrl: string): string =>
+  secureOrigin(publicUrl) ? `__Host-${SIGN_IN_LINK_COOKIE}` : SIGN_IN_LINK_COOKIE;
+
+/** The nonce goes to the email's link and, once the request has gone through, to this browser. */
+const bindTheLink =
+  (publicUrl: string): MiddlewareHandler =>
+  async (context, next) => {
+    const read = await attempt(() => context.req.raw.clone().json());
+    const asked = codeAsk.parse(read.ok ? read.value : {});
+    if (asked.type !== "sign-in") {
+      await next();
+      return;
+    }
+    const nonce = mintNonce();
+    await askingWithALink(
+      { nonce, carried: asked.oauth_query ?? "", returnTo: asked.redirect ?? "" },
+      next,
+    );
+    if (!context.res.ok) return;
+    setCookie(context, bindingCookieName(publicUrl), nonce, {
+      maxAge: EMAIL_CODE_LIFETIME_SECONDS,
+      path: "/",
+      httpOnly: true,
+      sameSite: "Lax",
+      secure: secureOrigin(publicUrl),
+    });
+  };
+
+const linkToken = z.object({ token: z.string().regex(/^[A-Za-z0-9]{1,128}$/) });
+
+const tokenOf = async (request: Request): Promise<string | undefined> => {
+  const read = await attempt(() => request.json());
+  return read.ok ? linkToken.safeParse(read.value).data?.token : undefined;
+};
+
+/** The sign-in route's refusal bodies; a read answers every dead link with its state alone. */
+const LINK_REFUSALS = {
+  dead: { error: "link-dead" },
+  notThisBrowser: { error: "not-this-browser" },
+  unanswered: { error: "unanswered" },
+} as const;
+
+const SIGN_IN_WINDOW_SECONDS = BETTER_AUTH_RATE_LIMIT.customRules["/sign-in/email-otp"].window;
+
+/** The library answers its own failure as a 500 response rather than throwing it. */
+const SERVER_FAILED = 500;
+
+const linkSignInBody = (use: LinkUse): FlowBody =>
+  use.oauthQuery === ""
+    ? { email: use.email, otp: use.code }
+    : { email: use.email, otp: use.code, oauth_query: use.oauthQuery };
+
+const nameGiven = z.object({ user: z.object({ name: z.string() }) });
+
+/** The library answers a carried flow's next step rather than the person; the next screen reads the name. */
+const displayNameGivenIn = async (answered: Response): Promise<boolean> => {
+  const named = nameGiven.safeParse(
+    await answered
+      .clone()
+      .json()
+      .catch(() => undefined),
+  );
+  return named.success && !hasNoDisplayName(named.data.user.name);
+};
+
+const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): void => {
+  const { auth, door, publicUrl, clock } = deps;
+
+  /** Reads and sign-ins count apart, so re-reading a link never spends the sign-in it offers. */
+  const ceilingOf = async (
+    route: "describe" | "sign-in",
+    token: string,
+  ): Promise<Response | undefined> => {
+    const counted = await consumeIngress(
+      door,
+      "link",
+      `${route}:${hashOf(token)}`,
+      SIGN_IN_LINK_TOKEN_RULE,
+      clock.now(),
+    );
+    if (counted.allowed) return undefined;
+    return tooManyRequests(
+      counted.retryAfterSeconds,
+      "Too many tries of this link; try again later.",
+    );
+  };
+
+  const seen = async (token: string, cookie: string | undefined): Promise<SeenLink> => {
+    const read = await readALink(door, token);
+    const contents =
+      read === undefined ? undefined : unseal(token, deps.secret, hashOf(token), read.sealed);
+    return linkSeen(read, contents, read !== undefined && isBound(cookie, read.nonceHash));
+  };
+
+  /** The link may still stand, so the page offers Sign in again rather than the dead page. */
+  const unanswered = (context: Context, reason: string): Response => {
+    deps.logger.warn(
+      { event: "auth.link_sign_in_failed", reason },
+      "a sign-in through a link went unanswered",
+    );
+    return context.json(LINK_REFUSALS.unanswered, 502);
+  };
+
+  const answerTheSignIn = async (
+    context: Context,
+    token: string,
+    use: LinkUse,
+    answered: Response,
+  ): Promise<Response> => {
+    if (answered.status === 429) {
+      const wait = Number(answered.headers.get("x-retry-after") ?? SIGN_IN_WINDOW_SECONDS);
+      return tooManyRequests(wait, "Too many sign-ins from this address; try again later.");
+    }
+    if (answered.status >= SERVER_FAILED)
+      return unanswered(context, `library ${String(answered.status)}`);
+    if (!answered.ok) return context.json(LINK_REFUSALS.dead, 410);
+    forwardCookies(answered, context.res.headers);
+    // The spent code already makes the link dead, so a failed delete must not cost the session.
+    const dropped = await attempt(() => dropALink(door, token));
+    if (!dropped.ok) {
+      deps.logger.warn(
+        { event: "auth.link_drop_failed", reason: dropped.error.message },
+        "a used sign-in link was not deleted",
+      );
+    }
+    return context.json({
+      displayNameGiven: await displayNameGivenIn(answered),
+      carried: use.carried,
+    });
+  };
+
+  const signInBy = async (context: Context, token: string, use: LinkUse): Promise<Response> => {
+    const flowed = await attempt(() =>
+      signingInByLink(() =>
+        callFlow(
+          auth,
+          publicUrl,
+          "/sign-in/email-otp",
+          flowHeaders(context.req.raw, publicUrl),
+          linkSignInBody(use),
+        ),
+      ),
+    );
+    if (!flowed.ok) return unanswered(context, flowed.error.message);
+    return answerTheSignIn(context, token, use, flowed.value);
+  };
+
+  routes.use(SIGN_IN_LINK_PAGE, async (context, next) => {
+    await next();
+    context.res.headers.set("referrer-policy", "no-referrer");
+    context.res.headers.set("cache-control", "no-store");
+  });
+  routes.use(SIGN_IN_LINK_DESCRIBE_PATH, limitByIp(door, SIGN_IN_LINK_DESCRIBE_IP_RULE, clock));
+  routes.use(SIGN_IN_LINK_SIGN_IN_PATH, limitByIp(door, SIGN_IN_LINK_SIGN_IN_IP_RULE, clock));
+  routes.use("/sign-in-link/*", sameOriginOnly(publicUrl));
+  routes.use("/sign-in-link/*", async (context, next) => {
+    await next();
+    context.res.headers.set("cache-control", "no-store");
+  });
+
+  routes.post(SIGN_IN_LINK_DESCRIBE_PATH, async (context) => {
+    const token = await tokenOf(context.req.raw);
+    if (token === undefined) return context.json(DEAD_LINK);
+    const limited = await ceilingOf("describe", token);
+    if (limited !== undefined) return limited;
+    const link = await seen(token, getCookie(context, bindingCookieName(publicUrl)));
+    return context.json(link.state);
+  });
+
+  routes.post(SIGN_IN_LINK_SIGN_IN_PATH, async (context) => {
+    const token = await tokenOf(context.req.raw);
+    if (token === undefined) return context.json(LINK_REFUSALS.dead, 410);
+    const limited = await ceilingOf("sign-in", token);
+    if (limited !== undefined) return limited;
+    const link = await seen(token, getCookie(context, bindingCookieName(publicUrl)));
+    if (link.state.state === "dead") return context.json(LINK_REFUSALS.dead, 410);
+    if (link.use === undefined) return context.json(LINK_REFUSALS.notThisBrowser, 403);
+    return signInBy(context, token, link.use);
+  });
+};
+
 export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
   const routes = new Hono();
   const { auth, door, publicUrl, clock } = deps;
@@ -221,7 +440,10 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
     routes.get(path, (context) => context.json(prm));
   }
 
+  routes.use(SEND_EMAIL_CODE_PATH, sameOriginOnly(publicUrl));
   routes.use(SEND_EMAIL_CODE_PATH, limitCodesByEmail(door, clock));
+  routes.use(SEND_EMAIL_CODE_PATH, bindTheLink(publicUrl));
+  mountTheSignInLink(routes, deps);
 
   routes.use("/consent", limitByIp(door, PAGE_IP_RULE, clock));
   routes.use("/consent", sameOriginOnly(publicUrl));

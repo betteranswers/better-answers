@@ -231,6 +231,7 @@ const OUTSIDE_THE_LIST = [
   "/",
   "/console",
   "/sign-in",
+  "/sign-in/link",
   "/display-name",
   "/choose-workspace",
   "/no-workspace",

@@ -1373,7 +1373,7 @@ describe("5 — the inferred type is pinned", () => {
   type _ingressCounterSelect = Expect<
     Equal<
       z.infer<typeof boundarySchemas.ingressCounter.select>,
-      { scope: "ip" | "email" | "person"; key: string; windowStart: Date; count: number }
+      { scope: "ip" | "email" | "person" | "link"; key: string; windowStart: Date; count: number }
     >
   >;
   type _chunkSelect = Expect<

@@ -33,6 +33,11 @@ type DetailEntry = Readonly<Record<string, string | null>>;
 
 export type DetailValue = string | number | boolean | readonly DetailEntry[];
 
+/** How a person signed in: the code a sign-in email carries, typed, or the link beside it. */
+const SIGN_IN_METHODS = ["email_code", "email_link"] as const;
+
+export type SignInMethod = (typeof SIGN_IN_METHODS)[number];
+
 const isId = (value: DetailValue) => typeof value === "string" && ULID.test(value);
 const isFlag = (value: DetailValue) => typeof value === "boolean";
 const isIri = (value: DetailValue) => typeof value === "string" && IRI.test(value);
@@ -55,6 +60,8 @@ export const DETAIL_KINDS = {
   audience: (value: DetailValue) =>
     typeof value === "string" && AUDIENCES.some((word) => word === value),
   grants: (value: DetailValue) => z.array(endedGrant).safeParse(value).success,
+  signInMethod: (value: DetailValue) =>
+    typeof value === "string" && SIGN_IN_METHODS.some((method) => method === value),
 } as const;
 
 export type DetailKind = keyof typeof DETAIL_KINDS;
@@ -73,7 +80,9 @@ type DetailValueOf<K extends DetailKind> = K extends "role"
       ? number
       : K extends "grants"
         ? readonly EndedGrant[]
-        : string;
+        : K extends "signInMethod"
+          ? SignInMethod
+          : string;
 
 export type DetailOf<Shape extends DetailShape> = {
   readonly [

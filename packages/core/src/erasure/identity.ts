@@ -1,7 +1,7 @@
 import { normalizeError, type PlatformPrincipal } from "../kernel/index.ts";
 import { ERASED_DOMAIN } from "../store/git/index.ts";
 import { withIdentityWrite, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
-import { workspacesHeldBy } from "../workspaces/index.ts";
+import { verificationIdentifiersOf, workspacesHeldBy } from "../workspaces/index.ts";
 
 export type IdentityArm = "no-person" | "last-membership" | "membership-ended";
 
@@ -52,7 +52,7 @@ const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) =
   const emails = [...subject.emails];
   const verifications = await tx.query(
     "DELETE FROM verification WHERE lower(identifier) = ANY($1)",
-    [emails],
+    [emails.flatMap(verificationIdentifiersOf)],
   );
 
   const invitations = await tx.query<{ workspace_id: string }>(

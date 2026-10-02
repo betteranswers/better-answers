@@ -11,7 +11,7 @@ import type pg from "pg";
 import type { Logger } from "pino";
 import { z } from "zod";
 
-import { err, type Result, ulid } from "@better-answers/core/kernel";
+import { attempt, err, type Result, ulid } from "@better-answers/core/kernel";
 import { withIdentityWrite, type PostgresDoor } from "@better-answers/core/store/postgres";
 import {
   hasNoDisplayName,
@@ -54,8 +54,10 @@ import {
   REFRESH_TOKEN_LIFETIME_SECONDS,
   SIGN_IN_PATH,
 } from "./constants.ts";
+import { codeHashOf } from "./link-token.ts";
 import { accessControl, creatorRole, roles } from "./roles.ts";
 import { signInEmail } from "./sign-in-email.ts";
+import { keepALink, signInMethodOfThisCall } from "./sign-in-link.ts";
 
 type AuthEndpoint = NonNullable<BetterAuthPlugin["endpoints"]>[string];
 
@@ -314,7 +316,11 @@ export const createAuth = (deps: AuthDependencies) => {
 
   /** A token's issue, refusal or refresh and a workspace pick stay log lines for good. */
   const recorders = new Map<AuditEvent, Recorder>([
-    ["auth.sign_in", (line) => recordSignIn(IDENTITY_PRINCIPAL, deps.door, line.principal ?? "")],
+    [
+      "auth.sign_in",
+      (line) =>
+        recordSignIn(IDENTITY_PRINCIPAL, deps.door, line.principal ?? "", signInMethodOfThisCall()),
+    ],
     ["auth.consent", recordConsentOf],
   ]);
 
@@ -451,10 +457,23 @@ export const createAuth = (deps: AuthDependencies) => {
         otpLength: EMAIL_CODE_LENGTH,
         expiresIn: EMAIL_CODE_LIFETIME_SECONDS,
         allowedAttempts: EMAIL_CODE_ATTEMPTS,
-        storeOTP: "hashed",
+        storeOTP: { hash: (otp) => Promise.resolve(codeHashOf(otp)) },
         sendVerificationOTP: async ({ email, otp, type }) => {
           if (type !== "sign-in") return;
-          await deps.sendEmail(signInEmail(email, otp));
+          const kept = await attempt(() =>
+            keepALink(
+              { door: deps.door, secret: deps.secret, publicUrl: deps.publicUrl },
+              email,
+              otp,
+            ),
+          );
+          // The code alone still signs in, so a link that could not be kept never costs the email.
+          if (!kept.ok)
+            audit.warn(
+              { event: "auth.link_not_kept", reason: kept.error.message },
+              "auth.link_not_kept",
+            );
+          await deps.sendEmail(signInEmail(email, otp, kept.ok ? kept.value : undefined));
         },
       }),
       widenAuthorize(

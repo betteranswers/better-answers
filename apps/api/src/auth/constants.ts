@@ -29,6 +29,23 @@ export const SEND_EMAIL_CODE_PATH = "/email-otp/send-verification-otp";
 
 export const SIGN_IN_PATH = "/sign-in";
 
+/** The SPA's page a sign-in link opens; its token rides in the fragment, which no server sees. */
+export const SIGN_IN_LINK_PAGE = "/sign-in/link";
+
+export const SIGN_IN_LINK_DESCRIBE_PATH = "/sign-in-link/describe";
+
+export const SIGN_IN_LINK_SIGN_IN_PATH = "/sign-in-link/sign-in";
+
+/** Ties a link to the browser that asked for its code. */
+export const SIGN_IN_LINK_COOKIE = "better-answers.sign-in-link";
+
+export const SIGN_IN_LINK_DESCRIBE_IP_RULE: CounterRule = { windowMs: 60_000, max: 30 };
+
+export const SIGN_IN_LINK_SIGN_IN_IP_RULE: CounterRule = { windowMs: 60_000, max: 10 };
+
+/** Reads and sign-ins of one link together: room for a few reloads, not for a script. */
+export const SIGN_IN_LINK_TOKEN_RULE: CounterRule = { windowMs: 10 * 60_000, max: 10 };
+
 export const MCP_UNAUTHENTICATED_IP_RULE: CounterRule = { windowMs: 60_000, max: 60 };
 
 export const TRPC_IP_RULE: CounterRule = { windowMs: 60_000, max: 120 };
@@ -51,6 +68,11 @@ export const BETTER_AUTH_RATE_LIMIT = {
     "/email-otp/send-verification-otp": { window: 600, max: 5 },
     "/email-otp/check-verification-otp": { window: 600, max: 10 },
     "/sign-in/email-otp": { window: 600, max: 10 },
+    /**
+     * The link's page reaches the library's handler before the SPA serves it, and the library's
+     * own rule for `/sign-in*` allows three loads in ten seconds.
+     */
+    "/sign-in/link": { window: 60, max: 30 },
   },
 } as const;
 

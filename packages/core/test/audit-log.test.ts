@@ -317,7 +317,12 @@ describe("the audit log", () => {
 
   it("never reads the identity-set audit log", async () => {
     const workspace = await provisionedWorkspace(db(), "Identity");
-    const signedIn = await recordSignIn(bootstrap, workspace.door, workspace.adminUserId);
+    const signedIn = await recordSignIn(
+      bootstrap,
+      workspace.door,
+      workspace.adminUserId,
+      "email_code",
+    );
     expect(signedIn.ok).toBe(true);
 
     const page = pageOf(await readAs(workspace, workspace.adminUserId));

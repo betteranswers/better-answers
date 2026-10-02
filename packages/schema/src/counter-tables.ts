@@ -2,7 +2,7 @@ import { integer, pgTable, primaryKey, text } from "drizzle-orm/pg-core";
 
 import { stamp } from "./column-helpers.ts";
 
-export const INGRESS_SCOPES = ["ip", "email", "person"] as const;
+export const INGRESS_SCOPES = ["ip", "email", "person", "link"] as const;
 
 export const ingressCounter = pgTable(
   "ingress_counter",

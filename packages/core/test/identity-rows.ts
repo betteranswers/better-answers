@@ -33,20 +33,52 @@ export const identityRowsFor = async (
   return { sessionId, accountId, verificationId: await verificationCodeFor(pool, person.email) };
 };
 
-export const verificationCodeFor = async (pool: pg.Pool, identifier: string): Promise<string> => {
-  const verificationId = ulid();
+const verificationRow = async (
+  pool: pg.Pool,
+  row: { readonly id: string; readonly identifier: string; readonly value: string },
+): Promise<string> => {
   const superuser = await pool.connect();
   try {
     await superuser.query(
       `INSERT INTO verification (id, identifier, value, expires_at, created_at, updated_at)
-       VALUES ($1, $2, 'code', now(), now(), now())`,
-      [verificationId, identifier],
+       VALUES ($1, $2, $3, now(), now(), now())`,
+      [row.id, row.identifier, row.value],
     );
   } finally {
     superuser.release();
   }
-  return verificationId;
+  return row.id;
 };
+
+/** A sign-in code's row in the shape Better Auth writes it: keyed by the address, hashed, no tries spent. */
+export const verificationCodeFor = async (pool: pg.Pool, email: string): Promise<string> =>
+  verificationRow(pool, {
+    id: ulid(),
+    identifier: `sign-in-otp-${email.toLowerCase()}`,
+    value: "hashed-code:0",
+  });
+
+/** The rows Better Auth writes for an address asked to verify or reset, though the product never sends either. */
+export const otherCodesFor = async (pool: pg.Pool, email: string): Promise<readonly string[]> => [
+  await verificationRow(pool, {
+    id: ulid(),
+    identifier: `email-verification-otp-${email.toLowerCase()}`,
+    value: "hashed-code:0",
+  }),
+  await verificationRow(pool, {
+    id: ulid(),
+    identifier: `forget-password-otp-${email.toLowerCase()}`,
+    value: "hashed-code:0",
+  }),
+];
+
+/** The row a sign-in link keeps beside its code: its id the link's hash, keyed by the address. */
+export const signInLinkFor = async (pool: pg.Pool, email: string): Promise<string> =>
+  verificationRow(pool, {
+    id: `${ulid().toLowerCase()}-link`,
+    identifier: `sign-in-link-${email.toLowerCase()}`,
+    value: '{"nonce":"n","sealed":"s"}',
+  });
 
 export const sessionFor = async (
   pool: pg.Pool,
