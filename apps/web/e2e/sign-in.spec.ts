@@ -1,8 +1,9 @@
 import type { APIRequestContext, Page } from "@playwright/test";
+import { z } from "zod";
 
 import { ASK_TO_JOIN_WORDS } from "@/features/auth/ask-to-join-words.ts";
 import {
-  CODE_REFUSED,
+  codeWrong,
   noLongerAMember,
   PICK_REFUSED,
   SOLE_PICK_REFUSED,
@@ -37,6 +38,7 @@ import {
   provision,
   quoted,
   removeMember,
+  signedInAtHome,
   signedInWithNoWorkspace,
   signIn,
   signInHeading,
@@ -84,9 +86,64 @@ const atTheCodeStep = async (page: Page, email: string): Promise<void> => {
 /** Wrong unless the code sent was six zeros, one chance in a million. */
 const aWrongCodeIsRefused = async (page: Page): Promise<void> => {
   await codeField(page).fill("000000");
-  await page.getByRole("button", { name: SIGN_IN_WORDS.signIn, exact: true }).click();
-  await expect(page.getByRole("alert")).toHaveText(sentenceOf(CODE_REFUSED));
+  await expect(page.getByRole("alert")).toHaveText(sentenceOf(codeWrong(2)));
 };
+
+/** Never the code sent: six digits `step` past it, wrapping at a million. */
+const notTheCode = (code: string, step: number): string =>
+  String((Number(code) + step) % 1_000_000).padStart(6, "0");
+
+const SIGN_IN_PATH = "/sign-in/email-otp";
+
+/** Every code the page sends the api from now on, so a resend shows as a second entry. */
+const codesSentFrom = (page: Page): readonly string[] => {
+  const sent: string[] = [];
+  page.on("request", (asked) => {
+    if (new URL(asked.url()).pathname === SIGN_IN_PATH) sent.push(asked.url());
+  });
+  return sent;
+};
+
+/** Through the clipboard and the keyboard, as a person pastes a code copied from the email. */
+const pastedIntoTheField = async (page: Page, copied: string): Promise<void> => {
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.evaluate((text) => navigator.clipboard.writeText(text), copied);
+  await codeField(page).focus();
+  await page.keyboard.press("ControlOrMeta+V");
+};
+
+/** Headless Chromium shows every tab, so a tab's being hidden or shown is set and told by hand. */
+const shownAs = (page: Page, state: DocumentVisibilityState): Promise<void> =>
+  page.evaluate((now) => {
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => now });
+    document.dispatchEvent(new Event("visibilitychange"));
+  }, state);
+
+/** A frame and a task, so what the page does with an answer it holds is done before a spec reads it. */
+const aFramePassed = (page: Page): Promise<void> =>
+  page.evaluate(
+    () =>
+      new Promise<void>((done) => {
+        requestAnimationFrame(() => setTimeout(done));
+      }),
+  );
+
+/** Runs what makes the page re-read its session, then holds that the page still waits at /sign-in. */
+const stillWaitingOnceReread = async (page: Page, prompt: () => Promise<void>): Promise<void> => {
+  const reread = page.waitForRequest((asked) => new URL(asked.url()).pathname === "/get-session");
+  await prompt();
+  await (await (await reread).response())?.finished();
+  await aFramePassed(page);
+  await expect(page, "the waiting tab left the code step").toHaveURL(/\/sign-in/);
+};
+
+const SESSION_READ = "**/get-session*";
+
+const heldSession = z.object({ session: z.object({ id: z.string() }) });
+
+/** As the api reads this browser's cookie, so a session begun since names a new id. */
+const sessionHeldBy = async (page: Page): Promise<string> =>
+  heldSession.parse(await (await page.request.get("/get-session")).json()).session.id;
 
 const floodCodesTo = async (request: APIRequestContext, email: string, count: number) => {
   for (let asked = 0; asked < count; asked += 1) {
@@ -304,7 +361,6 @@ test("a new code sent from the code step signs in", async ({
   `);
   await passesTheAccessibilityGate();
   await codeField(page).fill(await codeSentTo(request, email));
-  await page.getByRole("button", { name: SIGN_IN_WORDS.signIn, exact: true }).click();
 
   await landedAtHome(page, "Admin");
 });
@@ -364,6 +420,180 @@ test("announces a sent code in the standing region, keeping focus", async ({ pag
   await expect(refused, "the code step stood an alert region of its own").toHaveCount(1);
   await expect(refused, "the code step's alert region holds words").toBeEmpty();
   await expect(codeField(page), "sending the code took focus from the field").toBeFocused();
+});
+
+for (const [named, between] of [
+  ["a space", " "],
+  ["a dash", "-"],
+] as const) {
+  test(`signs in from a code pasted with ${named}`, async ({ page, request }) => {
+    const email = anAddress("pasted");
+    await provision(request, { name: "Pasted Ltd", adminEmail: email });
+    await atTheCodeStep(page, email);
+    const code = await codeSentTo(request, email);
+
+    await pastedIntoTheField(page, `${code.slice(0, 3)}${between}${code.slice(3)}`);
+
+    await landedAtHome(page, "Admin");
+  });
+}
+
+test("drops letters, and five digits never sign in", async ({ page, request }) => {
+  const email = anAddress("five");
+  await person(request, email);
+  await atTheCodeStep(page, email);
+  const code = await codeSentTo(request, email);
+  const sent = codesSentFrom(page);
+
+  await pastedIntoTheField(page, `${code.slice(0, 2)}ab${code.slice(2, 5)}`);
+  await expect(codeField(page)).toHaveValue(code.slice(0, 5));
+  await page.keyboard.press("Enter");
+  await page.keyboard.type(code.slice(5));
+
+  await expect(page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeVisible();
+  expect(sent, "five digits were sent").toHaveLength(1);
+});
+
+test("sends a wrong code once, selected, naming two tries left", async ({ page, request }) => {
+  const email = anAddress("wrong");
+  await person(request, email);
+  await atTheCodeStep(page, email);
+  const code = await codeSentTo(request, email);
+  const sent = codesSentFrom(page);
+
+  await codeField(page).fill(notTheCode(code, 1));
+  await expect(page.getByRole("alert")).toHaveText(sentenceOf(codeWrong(2)));
+  await expect(codeField(page)).toBeFocused();
+  await expect(codeField(page)).toHaveAttribute("aria-invalid", "true");
+  const selected = await codeField(page).evaluate((field: HTMLInputElement) => [
+    field.selectionStart,
+    field.selectionEnd,
+  ]);
+  expect(selected, "the refused digits are not selected").toEqual([0, 6]);
+
+  await page.keyboard.press("Enter");
+  await page.keyboard.type(notTheCode(code, 2));
+  await expect(page.getByRole("alert")).toHaveText(sentenceOf(codeWrong(1)));
+  expect(sent, "the refused code was sent again").toHaveLength(2);
+});
+
+test("a third wrong code hands focus to sending another", async ({ page, request }) => {
+  const email = anAddress("spent");
+  await person(request, email);
+  await atTheCodeStep(page, email);
+  const code = await codeSentTo(request, email);
+
+  for (const left of [2, 1, 0]) {
+    await codeField(page).fill(notTheCode(code, 3 - left));
+    await expect(page.getByRole("alert")).toHaveText(sentenceOf(codeWrong(left)));
+  }
+  await expect(page.getByRole("button", { name: SIGN_IN_WORDS.sendAgain })).toBeFocused();
+
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("status")).toHaveText(newCodeSent(email));
+  await expect(codeField(page)).toBeFocused();
+  await page.keyboard.type(await codeSentTo(request, email));
+  await expect(page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeVisible();
+});
+
+test("a code typed in another tab lands the waiting one", async ({ page, context, request }) => {
+  const email = anAddress("tabs");
+  await provision(request, { name: "Two Tabs Ltd", adminEmail: email });
+  await atTheCodeStep(page, email);
+
+  const other = await context.newPage();
+  await other.goto("/sign-in");
+  await signIn(other, request, email);
+  await landedAtHome(other, "Admin");
+
+  await landedAtHome(page, "Admin");
+});
+
+test("a tab waiting on one address ignores another's sign-in", async ({
+  page,
+  context,
+  request,
+}) => {
+  const email = anAddress("asked");
+  await provision(request, { name: "Asked Ltd", adminEmail: email });
+  const elsewhere = anAddress("elsewhere");
+  await provision(request, { name: "Elsewhere Ltd", adminEmail: elsewhere });
+  await atTheCodeStep(page, email);
+
+  const other = await context.newPage();
+  await other.goto("/sign-in");
+  await stillWaitingOnceReread(page, async () => {
+    await signIn(other, request, elsewhere);
+  });
+
+  await codeField(page).pressSequentially(await codeSentTo(request, email));
+  await landedAtHome(page, "Admin");
+});
+
+/** The client asks a failed read three times before it gives up. */
+const READ_ATTEMPTS = 3;
+
+test("a tab whose first read failed still follows a sign-in", async ({
+  page,
+  context,
+  request,
+}) => {
+  const email = anAddress("unread");
+  await provision(request, { name: "Unread Ltd", adminEmail: email });
+  await page.goto("/sign-in");
+  const unread = Promise.withResolvers<void>();
+  let refused = 0;
+  await page.route(SESSION_READ, async (route) => {
+    await route.fulfill({ status: 503 });
+    refused += 1;
+    if (refused === READ_ATTEMPTS) unread.resolve();
+  });
+  await sendTheFirstCode(page, email);
+  await unread.promise;
+  await page.unroute(SESSION_READ);
+
+  await shownAs(page, "hidden");
+  await stillWaitingOnceReread(page, () => shownAs(page, "visible"));
+  const other = await context.newPage();
+  await other.goto("/sign-in");
+  await signIn(other, request, email);
+
+  await landedAtHome(page, "Admin");
+});
+
+test("a tab hidden through a sign-in lands once shown", async ({ page, context, request }) => {
+  // This tab never hears the announcement, so only its being shown again can land it.
+  await page.addInitScript(() => {
+    Reflect.deleteProperty(globalThis, "BroadcastChannel");
+  });
+  const email = anAddress("hidden");
+  await provision(request, { name: "Hidden Tab Ltd", adminEmail: email });
+  await atTheCodeStep(page, email);
+  await shownAs(page, "hidden");
+
+  const other = await context.newPage();
+  await other.goto("/sign-in");
+  await signIn(other, request, email);
+  await landedAtHome(other, "Admin");
+  await expect(codeField(page), "the hidden tab moved before it was shown").toBeVisible();
+
+  await shownAs(page, "visible");
+  await landedAtHome(page, "Admin");
+});
+
+test("a shown tab waits for a sign-in of its own", async ({ page, request }) => {
+  const email = anAddress("standing");
+  await provision(request, { name: "Standing Ltd", adminEmail: email });
+  await signedInAtHome(page, request, email);
+  const standing = await sessionHeldBy(page);
+  await atTheCodeStep(page, email);
+
+  await shownAs(page, "hidden");
+  await stillWaitingOnceReread(page, () => shownAs(page, "visible"));
+  await codeField(page).pressSequentially(await codeSentTo(request, email));
+  await landedAtHome(page, "Admin");
+
+  expect(await sessionHeldBy(page), "the tab landed on the session that stood").not.toBe(standing);
 });
 
 /** A session begun with no membership names no workspace, so the picker opens the one joined since. */
@@ -505,7 +735,6 @@ test("makes the screens outside the shell keyboard-operable, landmarked and labe
   const sixDigits = await codeSentTo(request, email);
   await codeField(page).focus();
   await page.keyboard.type(sixDigits);
-  await page.keyboard.press("Enter");
 
   await expect(page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING })).toBeVisible();
   await expect(page.getByRole("main")).toHaveCount(1);

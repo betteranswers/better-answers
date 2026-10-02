@@ -423,10 +423,9 @@ export const signIn = async (page: Page, api: APIRequestContext, email: string):
   const code = page.getByLabel(SIGN_IN_WORDS.codeField, { exact: true });
   await expect(code).toBeVisible();
   await code.fill(await codeSentTo(api, email));
-  await page.getByRole("button", { name: SIGN_IN_WORDS.signIn, exact: true }).click();
 
-  // Wait for the screen to be left, not just the click: navigating away cancels the request
-  // in flight and no session is set.
+  // Six digits sign in on their own; navigating before the screen is left cancels the request,
+  // and no session is set.
   await expect(code).toHaveCount(0);
 };
 

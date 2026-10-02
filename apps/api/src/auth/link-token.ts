@@ -10,7 +10,7 @@ import {
 import { generateRandomString } from "better-auth/crypto";
 import { z } from "zod";
 
-import { EMAIL_CODE_ATTEMPTS } from "./constants.ts";
+import { EMAIL_CODE_ATTEMPTS } from "@better-answers/schema/email-code";
 
 const TOKEN_LENGTH = 43;
 const NONCE_BYTES = 32;

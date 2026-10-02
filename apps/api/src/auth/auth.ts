@@ -38,6 +38,7 @@ import {
   verification,
   workspace,
 } from "@better-answers/schema";
+import { EMAIL_CODE_ATTEMPTS, EMAIL_CODE_LENGTH } from "@better-answers/schema/email-code";
 
 import type { EmailSender } from "../email.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
@@ -47,8 +48,6 @@ import {
   BETTER_AUTH_RATE_LIMIT,
   CIMD_ALLOWED_CLIENT_HOSTS,
   CLIENT_IP_HEADER,
-  EMAIL_CODE_ATTEMPTS,
-  EMAIL_CODE_LENGTH,
   EMAIL_CODE_LIFETIME_SECONDS,
   OAUTH_SCOPES,
   REFRESH_TOKEN_LIFETIME_SECONDS,

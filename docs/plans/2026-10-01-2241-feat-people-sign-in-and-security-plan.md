@@ -1112,6 +1112,8 @@ Specified by the ui-designer from the better-answers-design skill, today's auth 
   - Auto-submit fires once per distinct six-digit value. A refused value is never resent until it is edited, and the field is read-only while signing in.
   - The api returns no tries-left count, so the screen counts its own refusals since the last send: `That code is wrong.` / `Check it and try again. 2 tries left.`
   - At zero: `That code can't be used any more.` / `Send a new code.`, with focus on `Send a new code`.
+  - An expired code reads as at zero at once, because the library deletes it as it answers and no later try could work (owner, 02/10/2026).
+- **Waiting tab (R5):** it follows only a new sign-in of the address it sent the code to. A session standing when the code step opened, or another address's sign-in, leaves it waiting (owner, 02/10/2026).
 - **Tests:**
   - A wrong code submits once, and the alert says 2 tries left, with the digits selected.
   - The third wrong code moves focus to `Send a new code`.

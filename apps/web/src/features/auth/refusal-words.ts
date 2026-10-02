@@ -97,10 +97,20 @@ export const CODE_UNANSWERED: Said = {
   next: "Try again in a moment.",
 };
 
-export const CODE_REFUSED: Said = {
-  why: "That code is wrong or has expired.",
-  next: "Check it, or send a new code.",
+const CODE_SPENT: Said = {
+  why: "That code can't be used any more.",
+  next: "Send a new code.",
 };
+
+const triesNamed = (left: number): string => (left === 1 ? "1 try" : `${String(left)} tries`);
+
+export const codeWrong = (triesLeft: number): Said =>
+  triesLeft === 0
+    ? CODE_SPENT
+    : {
+        why: "That code is wrong.",
+        next: `Check it and try again. ${triesNamed(triesLeft)} left.`,
+      };
 
 export const SIGN_IN_UNANSWERED: Said = {
   why: "No response, so you aren't signed in.",

@@ -87,7 +87,6 @@ const aLinkAskedForIn = async (asking: BrowserContext, api: APIRequestContext, w
 /** As a person reading the code off the other device types it. */
 const typedWhereItStarted = async (asking: Page, code: string): Promise<void> => {
   await asking.getByLabel(SIGN_IN_WORDS.codeField, { exact: true }).fill(code);
-  await asking.keyboard.press("Enter");
   await landedAtHome(asking, "Admin");
 };
 
@@ -148,6 +147,17 @@ test("a scanner's read spends nothing; the asking browser signs in", async ({
 
   await page.keyboard.press("Enter");
   await landedAtHome(page, "Admin");
+});
+
+test("signing in by link in another tab lands the asker", async ({ page, context, request }) => {
+  const { asking, token } = await aLinkAskedForIn(context, request, "Follow");
+
+  await page.goto(linkTo(token));
+  await expect(signInButton(page)).toBeFocused();
+  await page.keyboard.press("Enter");
+  await landedAtHome(page, "Admin");
+
+  await landedAtHome(asking, "Admin");
 });
 
 test("another device shows the code and stays signed out", async ({

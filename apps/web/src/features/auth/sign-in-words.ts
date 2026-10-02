@@ -8,14 +8,16 @@ type EmailStep = { readonly title: string; readonly hint: string };
 
 const CODE_LIFETIME = "five minutes";
 
-const HINT = "Enter your work email address to get a six-digit code.";
+const WHAT_COMES = "You'll get an email with a sign-in link and a six-digit code.";
+
+const HINT = `Enter your work email address. ${WHAT_COMES}`;
 
 export const SIGN_IN_WORDS = {
   emailStep: {
     nothing: { title: "Sign in", hint: HINT },
     joining: {
       title: "Sign in to join a workspace",
-      hint: "Enter the email address your invitation was sent to. You'll get a six-digit code.",
+      hint: `Enter the email address your invitation was sent to. ${WHAT_COMES}`,
     },
     connecting: { title: "Sign in to connect Claude", hint: HINT },
   } satisfies Record<CarriedOn | "nothing", EmailStep>,
@@ -24,7 +26,7 @@ export const SIGN_IN_WORDS = {
     "session-ended": "Your session has ended.",
   } satisfies Record<Arrival, string>,
   emailField: "Email address",
-  send: "Send code",
+  send: "Send sign-in email",
   sending: "Sending",
   codeTitle: "Enter your code",
   codeField: "Code",
@@ -34,10 +36,13 @@ export const SIGN_IN_WORDS = {
   otherAddress: "Use a different email address",
 } as const;
 
-export const codeSent = (address: string): string =>
-  `Code sent to ${address}. It works for ${CODE_LIFETIME}.`;
+const EITHER_WORKS = `Open its link, or enter its code here. Both work for ${CODE_LIFETIME}.`;
 
-export const sendingANewCode = (address: string): string => `Sending a new code to ${address}.`;
+export const codeSent = (address: string): string =>
+  `Sign-in email sent to ${address}. ${EITHER_WORKS}`;
+
+export const sendingANewCode = (address: string): string =>
+  `Sending a new sign-in email to ${address}.`;
 
 export const newCodeSent = (address: string): string =>
-  `New code sent to ${address}. It works for ${CODE_LIFETIME}.`;
+  `New sign-in email sent to ${address}. ${EITHER_WORKS}`;
