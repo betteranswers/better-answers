@@ -5,6 +5,12 @@ import {
   addToGroup,
   approveRequest,
   approveRequestInput,
+  bulkAddToGroup,
+  bulkAddToGroupInput,
+  bulkChangeRole,
+  bulkChangeRoleInput,
+  bulkRemoveMembers,
+  bulkRemoveMembersInput,
   cancelInvitation,
   changeRole,
   changeRoleInput,
@@ -134,6 +140,21 @@ export const membersRouter = router({
       ),
     ),
   ),
+  bulkChangeRole: mutationProcedure
+    .input(parsedBy(bulkChangeRoleInput))
+    .mutation(answeredBy(bulkChangeRole)),
+  bulkRemove: mutationProcedure.input(parsedBy(bulkRemoveMembersInput)).mutation(({ ctx, input }) =>
+    crossing(
+      ctx,
+      bulkRemoveMembers.name,
+      given(input, (asked) =>
+        bulkRemoveMembers(ctx.principal, ctx.tx, { ...asked, at: ctx.clock.now() }),
+      ),
+    ),
+  ),
+  bulkAddToGroup: mutationProcedure
+    .input(parsedBy(bulkAddToGroupInput))
+    .mutation(answeredBy(bulkAddToGroup)),
 
   /** A constant answer: whether a flag was raised or already waited is the operator's to know. */
   flagDisplayName: ownTransactionProcedure

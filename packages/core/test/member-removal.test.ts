@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import type { UserPrincipal } from "../src/kernel/index.ts";
 import {
+  bulkRemoveMembers,
+  bulkRemoveMembersInput,
   changeRole,
   changeRoleInput,
   removeMember,
@@ -22,7 +24,7 @@ import {
 
 const db = postgresForSuite();
 
-const { joining, rolesOf, adminsOf, auditRowsOf, grantsEndedAbout } = membersSuite(db);
+const { joining, rolesOf, adminsOf, auditRowsOf, batchesOf, grantsEndedAbout } = membersSuite(db);
 
 const removalsIn = (workspace: ProvisionedWorkspace) =>
   auditRowsOf(workspace, "people.member.removed");
@@ -258,5 +260,77 @@ describe("the last Admin, removed", () => {
     ]);
     expect(await removalsIn(workspace)).toHaveLength(1);
     expect(await adminsOf(workspace)).toHaveLength(1);
+  });
+});
+
+const removedInBulk = (workspace: ProvisionedWorkspace, personIds: readonly string[]) =>
+  heldAs(workspace, workspace.adminUserId, (principal, tx) =>
+    bulkRemoveMembers(principal, tx, {
+      ...inputOf(bulkRemoveMembersInput, { personIds }),
+      at: new Date(),
+    }),
+  );
+
+const REMOVED = "people.member.removed";
+
+describe("removing many members at once", () => {
+  it("ends each person's tokens here, recording grants in one batch", async () => {
+    const workspace = await provisionedWorkspace(db(), "BulkTokens");
+    const { workspaceId, adminUserId } = workspace;
+    const editor = await joining(workspace, "Editor");
+    const viewer = await joining(workspace, "Viewer");
+    const editors = await grantsTo(editor, { "the editor's": { workspaceId } });
+    const viewers = await grantsTo(viewer, { "the viewer's": { workspaceId } });
+
+    const removed = await removedInBulk(workspace, [editor, viewer]);
+
+    expect(removed).toMatchObject({ ok: true, value: { skipped: 0 } });
+    expect([
+      ...(await endedGrants(db().pool, editors)),
+      ...(await endedGrants(db().pool, viewers)),
+    ]).toEqual([
+      "access the editor's",
+      "refresh the editor's",
+      "access the viewer's",
+      "refresh the viewer's",
+    ]);
+    const editorsEnded = [
+      { clientId: editors.clientId, workspaceId, issuedAt: A_MINUTE_AGO.toISOString() },
+    ];
+    const viewersEnded = [
+      { clientId: viewers.clientId, workspaceId, issuedAt: A_MINUTE_AGO.toISOString() },
+    ];
+    const detailOf = Object.fromEntries(
+      (await removalsIn(workspace)).map((row) => [row.subject_id, row.detail]),
+    );
+    expect(detailOf).toEqual({
+      [editor]: { role: "Editor", grants: editorsEnded },
+      [viewer]: { role: "Viewer", grants: viewersEnded },
+    });
+    const [batch] = await batchesOf(workspace, REMOVED);
+    expect(batch).toEqual(expect.any(String));
+    expect(await batchesOf(workspace, REMOVED)).toEqual([batch, batch]);
+    expect([...(await grantsEndedAbout(editor)), ...(await grantsEndedAbout(viewer))]).toEqual([
+      { actor: `human:${adminUserId}`, detail: { workspaceId, grants: editorsEnded } },
+      { actor: `human:${adminUserId}`, detail: { workspaceId, grants: viewersEnded } },
+    ]);
+  });
+
+  it("removes 200 members holding tokens in one act", async () => {
+    const workspace = await provisionedWorkspace(db(), "BulkTwoHundred");
+    const members: string[] = [];
+    for (let each = 0; each < 200; each += 1) {
+      const member = await joining(workspace, "Viewer");
+      await grantsTo(member, { here: { workspaceId: workspace.workspaceId } });
+      members.push(member);
+    }
+
+    const removed = await removedInBulk(workspace, members);
+
+    expect(removed).toMatchObject({ ok: true, value: { skipped: 0 } });
+    expect(await rolesOf(workspace)).toEqual({ [workspace.adminUserId]: "Admin" });
+    const batches = await batchesOf(workspace, REMOVED);
+    expect(batches).toHaveLength(200);
+    expect(new Set(batches)).toEqual(new Set([expect.any(String)]));
   });
 });

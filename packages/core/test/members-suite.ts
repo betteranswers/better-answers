@@ -85,6 +85,15 @@ export const membersSuite = (db: () => MigratedPostgres) => {
     return rows.rows;
   };
 
+  /** The batch each of the workspace's `act` events stands in, in the order they were written. */
+  const batchesOf = async (workspace: ProvisionedWorkspace, act: string) => {
+    const rows = await db().pool.query<{ batch_id: string | null }>(
+      "SELECT batch_id FROM audit_event WHERE workspace_id = $1 AND act = $2 ORDER BY id",
+      [workspace.workspaceId, act],
+    );
+    return rows.rows.map((row) => row.batch_id);
+  };
+
   /** The person's ended grants an Admin's act filed on the identity-set audit log. */
   const grantsEndedAbout = async (personId: string) => {
     const rows = await db().pool.query<{
@@ -98,5 +107,5 @@ export const membersSuite = (db: () => MigratedPostgres) => {
     return rows.rows;
   };
 
-  return { joining, rolesOf, adminsOf, auditRowsOf, grantsEndedAbout };
+  return { joining, rolesOf, adminsOf, auditRowsOf, batchesOf, grantsEndedAbout };
 };

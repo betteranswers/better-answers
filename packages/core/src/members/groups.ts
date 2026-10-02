@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { boundarySchemas, CURATED_ORIGIN } from "@better-answers/schema";
 
-import { act, declareActs, record } from "../audit/index.ts";
+import { act, declareActs, record, recordEach } from "../audit/index.ts";
 import { attempt, err, ok, requireAdmin, ulid } from "../kernel/index.ts";
 import type {
   AdminUserPrincipal,
@@ -252,6 +252,33 @@ export const addToGroup = async (
     detail: { userId },
   });
   return ok({ groupId, userId });
+};
+
+/**
+ * A step on rows its act holds: each person into the group, in person id order, so two such steps
+ * over one group never wait on each other in a cycle. Answers those the insert landed, one audit
+ * event each; one already in lands nothing.
+ */
+export const addedToGroup = async (
+  admin: AdminUserPrincipal,
+  tx: Tx,
+  asked: { readonly groupId: GroupId; readonly personIds: readonly UserId[] },
+): Promise<readonly UserId[]> => {
+  const landed = await tx.query<{ user_id: string }>(
+    `INSERT INTO group_member (workspace_id, group_id, user_id)
+       SELECT $1, $2, asked.user_id FROM unnest($3::text[]) AS asked(user_id) ORDER BY asked.user_id
+         ON CONFLICT DO NOTHING
+     RETURNING user_id`,
+    [admin.workspaceId, asked.groupId, asked.personIds],
+  );
+  const added = landed.rows.map((row) => PERSON_ID.parse(row.user_id));
+  await recordEach(
+    admin,
+    tx,
+    GROUP_ACTS.memberAdded,
+    added.map((userId) => ({ subjectId: asked.groupId, detail: { userId } })),
+  );
+  return added;
 };
 
 export const removeFromGroup = async (

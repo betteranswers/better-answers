@@ -1,6 +1,7 @@
 export * from "./accepting.ts";
 export * from "./activity.ts";
 export * from "./audit-log.ts";
+export * from "./bulk.ts";
 export * from "./credentials.ts";
 export * from "./groups.ts";
 export {

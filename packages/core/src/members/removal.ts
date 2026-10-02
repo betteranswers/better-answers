@@ -2,7 +2,14 @@ import type { z } from "zod";
 
 import { act, declareActs, record } from "../audit/index.ts";
 import { admit, declareAct, err, ok, ulid } from "../kernel/index.ts";
-import type { AdmittedOf, Result, Role, UserId, UserPrincipal } from "../kernel/index.ts";
+import type {
+  AdminUserPrincipal,
+  AdmittedOf,
+  Result,
+  Role,
+  UserId,
+  UserPrincipal,
+} from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import { endWorkspaceTokens, recordGrantsEndedHere } from "../workspaces/index.ts";
 import { leavesNoAdmin, withMemberHeld, type HeldRefusal } from "./last-admin.ts";
@@ -38,6 +45,39 @@ export type MemberRemoved = {
   readonly role: Role;
 };
 
+/** When a removal happens, and the batch its audit event stands in. */
+type RemovedAt = { readonly at: Date; readonly batchId: string | undefined };
+
+/**
+ * A step on a member row its act holds: the membership and the person's tokens here issued before
+ * `at` end, and the removal's audit events land.
+ */
+export const memberRemovedHere = async (
+  admin: AdminUserPrincipal,
+  tx: Tx,
+  removed: MemberRemoved,
+  { at, batchId }: RemovedAt,
+): Promise<void> => {
+  // The composite foreign key takes the person's group memberships here with the row.
+  await tx.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
+    admin.workspaceId,
+    removed.personId,
+  ]);
+  const { grants } = await endWorkspaceTokens(admin, tx, {
+    workspaceId: admin.workspaceId,
+    personId: removed.personId,
+    at,
+  });
+  await record(admin, tx, {
+    id: ulid(),
+    act: REMOVAL_ACTS.removed,
+    subjectId: removed.personId,
+    detail: { role: removed.role, grants },
+    batchId,
+  });
+  await recordGrantsEndedHere(admin, tx, { personId: removed.personId, grants });
+};
+
 const removedUnderTheLock = (
   admin: AdmittedOf<typeof removeMemberAct>,
   tx: Tx,
@@ -46,24 +86,9 @@ const removedUnderTheLock = (
   withMemberHeld(admin, tx, input.personId, async (held) => {
     if (leavesNoAdmin(held)) return err("last-admin");
 
-    // The composite foreign key takes the person's group memberships here with the row.
-    await tx.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
-      admin.workspaceId,
-      input.personId,
-    ]);
-    const { grants } = await endWorkspaceTokens(admin, tx, {
-      workspaceId: admin.workspaceId,
-      personId: input.personId,
-      at: input.at,
-    });
-    await record(admin, tx, {
-      id: ulid(),
-      act: REMOVAL_ACTS.removed,
-      subjectId: input.personId,
-      detail: { role: held.role, grants },
-    });
-    await recordGrantsEndedHere(admin, tx, { personId: input.personId, grants });
-    return ok({ personId: input.personId, role: held.role });
+    const removed: MemberRemoved = { personId: input.personId, role: held.role };
+    await memberRemovedHere(admin, tx, removed, { at: input.at, batchId: undefined });
+    return ok(removed);
   });
 
 /**

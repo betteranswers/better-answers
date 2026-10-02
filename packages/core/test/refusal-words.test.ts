@@ -11,6 +11,9 @@ import {
 import type {
   AcceptInvitationRefusal,
   ApproveRefusal,
+  BulkAddToGroupRefusal,
+  BulkChangeRoleRefusal,
+  BulkRemoveMembersRefusal,
   CancelInvitationRefusal,
   ChangeRoleRefusal,
   DecideRefusal,
@@ -205,5 +208,13 @@ describe("the refusal-word walk", () => {
     }>();
     // @ts-expect-error — an item's word must be a word some slice declared.
     expectTypeOf<RefusedItems<MemberRefusal<"no-such-thing">>>().toBeObject();
+  });
+
+  it("answers a bulk act's items in registered words alone", () => {
+    type Answered = EveryRegisteredWord | RefusedItems<EveryRegisteredWord> | Error;
+    expectTypeOf<BulkChangeRoleRefusal>().toExtend<Answered>();
+    expectTypeOf<BulkRemoveMembersRefusal>().toExtend<Answered>();
+    expectTypeOf<BulkAddToGroupRefusal>().toExtend<Answered>();
+    expectTypeOf<RefusedItems<"invented">>().not.toExtend<Answered>();
   });
 });
