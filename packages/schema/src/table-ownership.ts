@@ -199,6 +199,13 @@ export const CROSS_OWNER_TABLE_ACCESS = [
       "A passkey is the person's own credential, named by them and held for every workspace they belong to, so it goes with the identity set on the last membership and stays while another membership needs it. Its last-use row goes with it by the foreign key's cascade.",
   },
   {
+    table: "public.passkey_last_use",
+    by: "erasure",
+    access: "read",
+    reason:
+      "The erasure map names each passkey's last use beside the passkey, so an access answer covers when the person used it; the delete is the cascade from `passkey`.",
+  },
+  {
     table: "public.authenticator",
     by: "erasure",
     access: "write",

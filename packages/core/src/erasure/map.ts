@@ -99,7 +99,7 @@ const aboutTheMember = async (
   subject.memberId === null ? [] : located(tx, statement, [subject.memberId, ...extras]);
 
 const rowsOfThePersonIn =
-  (table: "account" | "passkey" | "authenticator" | "recovery_code"): ErasureFinder =>
+  (table: "account" | "authenticator" | "recovery_code"): ErasureFinder =>
   (platform, subject, tx) =>
     aboutTheMember(tx, subject, `SELECT id AS location FROM ${table} WHERE user_id = $1`);
 
@@ -192,9 +192,19 @@ const ERASURE_FAMILY_DESCRIPTORS = {
     find: rowsOfThePersonIn("account"),
   },
 
+  /** A passkey's last use sits in its own row, named after the passkey it belongs to. */
   "identity-passkey": {
     categories: ["sign-in", "device"],
-    find: rowsOfThePersonIn("passkey"),
+    find: (platform, subject, tx) =>
+      aboutTheMember(
+        tx,
+        subject,
+        `SELECT id AS location FROM passkey WHERE user_id = $1
+         UNION ALL
+         SELECT u.passkey_id || ' (last use)' AS location
+           FROM passkey_last_use u JOIN passkey p ON p.id = u.passkey_id
+          WHERE p.user_id = $1`,
+      ),
   },
 
   "identity-authenticator": {

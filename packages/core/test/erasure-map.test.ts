@@ -229,7 +229,7 @@ describe("the erasure map for a member", () => {
     const map = await mapOf(held.scenario, held.request);
 
     expect(locationsOf(map).filter(([family]) => SECOND_FACTOR_FAMILIES.has(family))).toEqual([
-      ["identity-passkey", [factors.passkeyId]],
+      ["identity-passkey", [factors.passkeyId, `${factors.passkeyId} (last use)`]],
       ["identity-authenticator", [factors.authenticatorId]],
       ["identity-recovery-code", factors.recoveryCodeIds.toSorted(byCodeUnit)],
       ["identity-last-active", [held.scenario.workspaceId]],
