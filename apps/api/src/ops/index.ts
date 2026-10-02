@@ -34,6 +34,12 @@ import {
   type Result,
 } from "@better-answers/core/kernel";
 import {
+  ensureTestWorkspace,
+  INVENTED_MEMBERS,
+  type TestWorkspaceRefusal,
+  type TestWorkspaceStanding,
+} from "@better-answers/core/members";
+import {
   JOB_IS_OVER,
   jobById,
   type JobStatus,
@@ -179,6 +185,8 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
                                                             a person named before their first sign-in, so add-member can take them; the id it minted is first on the done line
   add-member --workspace <id> --email <email> --role <${ROLES.join("|")}>
                                                             a signed-in person made a member of the workspace; a repeat is refused and never changes a role
+  test-workspace --domain <testing domain> --slug <slug> --admin <email> --editor <email> --viewer <email>
+                                                            the journeys' test workspace, marked to invite its testing domain alone, its three test people and ${String(INVENTED_MEMBERS)} invented Viewers, made or set back; its id first on the done line
   rename-workspace --workspace <id> [--name <name>] [--slug <slug>]
                                                             the workspace's name, its slug, or both; at least one is named, and the other kept
   operator --email <email> --grant|--revoke                 a signed-in person made the platform's operator, or no longer; each change on the identity-set audit log
@@ -1089,6 +1097,132 @@ const addPersonCommand = async (doors: Doors, flags: Flags, io: OpsIo): Promise<
   return DONE;
 };
 
+const TEST_WORKSPACE_USAGE =
+  "test-workspace: --domain <testing domain>, --slug <slug>, --admin <email>, --editor <email> and --viewer <email> are required";
+
+type TestWorkspaceAsked = {
+  readonly testingDomain: string;
+  readonly slug: string;
+  readonly admin: string;
+  readonly editor: string;
+  readonly viewer: string;
+};
+
+const TEST_WORKSPACE_FLAGS = ["domain", "slug", "admin", "editor", "viewer"] as const;
+
+const testWorkspaceAskedOf = (flags: Flags): TestWorkspaceAsked | undefined => {
+  const [testingDomain, slug, admin, editor, viewer] = TEST_WORKSPACE_FLAGS.map((name) =>
+    flagValue(flags, name),
+  );
+  if (
+    testingDomain === undefined ||
+    slug === undefined ||
+    admin === undefined ||
+    editor === undefined ||
+    viewer === undefined
+  ) {
+    return undefined;
+  }
+  return { testingDomain, slug, admin, editor, viewer };
+};
+
+type AddressRefused = Extract<TestWorkspaceRefusal, { readonly address: string }>;
+
+const ADDRESS_SAID = {
+  "off-testing-domain": (address, asked) =>
+    `${address} is not on ${asked.testingDomain}, where every test person's address is`,
+  "operator-marked": (address) =>
+    `${address} carries the operator mark, which no test person may; give another address`,
+  "member-elsewhere": (address) =>
+    `${address} is a member of another workspace, and a test person belongs to the test workspace alone; give another address`,
+} satisfies Readonly<
+  Record<AddressRefused["word"], (address: string, asked: TestWorkspaceAsked) => string>
+>;
+
+const testWorkspaceReason = (
+  refusal: Exclude<TestWorkspaceRefusal, AddressRefused | Error>,
+  asked: TestWorkspaceAsked,
+): string => {
+  switch (refusal) {
+    case "malformed":
+      return "malformed: --domain is a domain an address can carry, --slug is not blank, and the three addresses are three different addresses";
+    case "slug-taken":
+      return `slug-taken: the workspace holding the slug ${asked.slug} has a member off ${asked.testingDomain}, so it is not the test workspace; it is left as it is`;
+    case "no-display-name":
+      return "no-display-name: a test person signed in and gave no display name; have them give one, then run this again";
+    default:
+      return refusal;
+  }
+};
+
+const testWorkspaceRefused = (
+  refusal: TestWorkspaceRefusal,
+  asked: TestWorkspaceAsked,
+  io: OpsIo,
+): number => {
+  if (refusal instanceof Error) {
+    io.say(`test-workspace: REFUSED — ${refusal.message}`);
+    return REFUSED;
+  }
+  if (typeof refusal === "object") {
+    const said = ADDRESS_SAID[refusal.word](refusal.address, asked);
+    io.say(`test-workspace: REFUSED — ${refusal.word}: ${said}`);
+    return exitOf(refusal.word);
+  }
+  io.say(`test-workspace: REFUSED — ${testWorkspaceReason(refusal, asked)}`);
+  return exitOf(refusal);
+};
+
+const changesOf = (standing: TestWorkspaceStanding): readonly string[] => {
+  const people = `${String(standing.peopleAdded)} ${standing.peopleAdded === 1 ? "person" : "people"} added`;
+  const changes: readonly (readonly [boolean, string])[] = [
+    [standing.provisioned, "provisioned"],
+    [standing.mark !== "kept", `mark ${standing.mark}`],
+    [standing.peopleAdded > 0, people],
+    [standing.membersAdded > 0, `${counted(standing.membersAdded, "member")} added`],
+    [standing.rolesReset > 0, `${counted(standing.rolesReset, "role")} set back`],
+  ];
+  return changes.filter(([changed]) => changed).map(([, said]) => said);
+};
+
+const doneSaid = (standing: TestWorkspaceStanding, asked: TestWorkspaceAsked): string => {
+  const changes = changesOf(standing);
+  const said = changes.length === 0 ? "nothing to do" : changes.join(", ");
+  return `test-workspace: done — ${standing.workspaceId}, slug ${asked.slug}, testing domain ${asked.testingDomain}; ${said}`;
+};
+
+const unexpectedSaid = (member: TestWorkspaceStanding["unexpected"][number]): string => {
+  const article = member.role === "Viewer" ? "a" : "an";
+  return `test-workspace: ${member.address}, ${article} ${member.role}, is no part of the fixture; left in place`;
+};
+
+/** The repository lives outside the Postgres transactions, so it is made, or found, after them. */
+const testWorkspaceCommand = async (doors: Doors, flags: Flags, io: OpsIo): Promise<number> => {
+  const asked = testWorkspaceAskedOf(flags);
+  if (asked === undefined) {
+    io.say(TEST_WORKSPACE_USAGE);
+    return USAGE;
+  }
+  const git = bundleStore(doors, "the test workspace's bundle repository cannot be created");
+  if (!git.ok) {
+    io.say(`test-workspace: REFUSED — ${git.error}`);
+    return REFUSED;
+  }
+  const ensured = await ensureTestWorkspace(BOOTSTRAP, doors.postgres, asked);
+  if (!ensured.ok) return testWorkspaceRefused(ensured.error, asked, io);
+  const { workspaceId } = ensured.value;
+  const repository = await attempt(() => initRepository(git.value, workspaceId));
+  if (!repository.ok) {
+    io.say(
+      `test-workspace: REFUSED — workspace ${workspaceId} stands, but its bundle repository could not be made: ${repository.error.message}; run this again`,
+    );
+    return REFUSED;
+  }
+  io.say(doneSaid(ensured.value, asked));
+  for (const member of ensured.value.unexpected) io.say(unexpectedSaid(member));
+  return DONE;
+};
+
 const renameReason = (refusal: RenameRefusal | Error, workspaceId: string): string => {
   if (refusal instanceof Error) return refusal.message;
   switch (refusal) {
@@ -1178,6 +1312,7 @@ const SLICELESS_COMMANDS = new Map<
   ["provision-workspace", provisionWorkspaceCommand],
   ["add-person", addPersonCommand],
   ["add-member", addMemberCommand],
+  ["test-workspace", testWorkspaceCommand],
   ["rename-workspace", renameWorkspaceCommand],
   ["operator", operatorCommand],
 ]);

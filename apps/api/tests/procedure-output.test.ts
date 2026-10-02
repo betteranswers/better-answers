@@ -1,9 +1,23 @@
+import { readdirSync, readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import type { AnyProcedure, inferProcedureOutput } from "@trpc/server";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import type { Result } from "@better-answers/core/kernel";
 
 import { appRouter, type AppRouter } from "../src/trpc/router.ts";
+
+const API_SOURCE = fileURLToPath(new URL("../src/", import.meta.url));
+const CORE_SOURCE = fileURLToPath(new URL("../../../packages/core/src/", import.meta.url));
+
+/** Each TypeScript file under `root` whose text matches, by its path from `root`. */
+const filesMatching = (root: string, pattern: RegExp): readonly string[] =>
+  readdirSync(root, { recursive: true, encoding: "utf8" })
+    .filter((file) => file.endsWith(".ts"))
+    .filter((file) => pattern.test(readFileSync(path.join(root, file), "utf8")))
+    .toSorted();
 
 type Leaf<Path extends string, Output> = { readonly path: Path; readonly output: Output };
 
@@ -132,6 +146,13 @@ describe("what a procedure may answer the wire", () => {
       | "sources.preview"
       | "runs.ofSubject"
     >();
+  });
+
+  it("writes the test workspace's mark from the ops command alone", () => {
+    expect(filesMatching(API_SOURCE, /\bensureTestWorkspace\b/)).toEqual(["ops/index.ts"]);
+    expect(filesMatching(CORE_SOURCE, /\b(?:INSERT INTO|UPDATE) test_workspace_mark\b/)).toEqual([
+      "members/test-workspace.ts",
+    ]);
   });
 
   it("answers no Result, which would cross a refusal as success", () => {

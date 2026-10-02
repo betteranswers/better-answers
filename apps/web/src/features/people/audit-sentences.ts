@@ -108,6 +108,8 @@ const SENTENCES = {
   "platform.erasure.replayed": ({ by }) => `${by} replayed an erasure over a restored copy`,
   "platform.graph.swept": ({ by }) => `${by} swept the graph's older generations`,
   "platform.reconciler.replayed": ({ by }) => `${by} replayed a bundle commit`,
+  "platform.workspace.marked": ({ by }) =>
+    `${by} kept the workspace's invitations to its testing domain`,
   "platform.workspace.provisioned": ({ by }) => `${by} provisioned the workspace`,
   "platform.workspace.renamed": ({ by }) => `${by} renamed the workspace`,
   "sources.binding.bound": ({ by }) => `${by} bound a source`,

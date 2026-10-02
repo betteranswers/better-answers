@@ -10,10 +10,12 @@ import {
   ok,
   type AdminUserPrincipal,
   type AdmittedOf,
+  type PlatformPrincipal,
   type Result,
   type Role,
   type UserId,
   type UserPrincipal,
+  type WorkspaceId,
   ulid,
 } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
@@ -53,19 +55,19 @@ export type RoleChanged = {
 
 type Asked = { readonly personId: UserId; readonly role: Role };
 
-/** A step on a member row its act holds: the role moves, and its audit event lands in `batchId`. */
-export const roleWritten = async (
-  admin: AdminUserPrincipal,
+const written = async (
+  actor: AdminUserPrincipal | PlatformPrincipal,
   tx: Tx,
+  workspaceId: WorkspaceId,
   changed: RoleChanged,
-  batchId?: string,
+  batchId: string | undefined,
 ): Promise<void> => {
   await tx.query("UPDATE member SET role = $3 WHERE workspace_id = $1 AND user_id = $2", [
-    admin.workspaceId,
+    workspaceId,
     changed.personId,
     changed.role,
   ]);
-  await record(admin, tx, {
+  await record(actor, tx, {
     id: ulid(),
     act: ROLE_ACTS.roleChanged,
     subjectId: changed.personId,
@@ -73,6 +75,23 @@ export const roleWritten = async (
     batchId,
   });
 };
+
+/** A step on a member row its act holds: the role moves, and its audit event lands in `batchId`. */
+export const roleWritten = (
+  admin: AdminUserPrincipal,
+  tx: Tx,
+  changed: RoleChanged,
+  batchId?: string,
+): Promise<void> => written(admin, tx, admin.workspaceId, changed, batchId);
+
+/** As `roleWritten`, by the platform under `workspaceId`'s scope; it judges no last Admin. */
+export const roleWrittenByPlatform = (
+  platform: PlatformPrincipal,
+  tx: Tx,
+  workspaceId: WorkspaceId,
+  changed: RoleChanged,
+  batchId?: string,
+): Promise<void> => written(platform, tx, workspaceId, changed, batchId);
 
 const roleSetUnderTheLock = (
   admin: AdmittedOf<typeof changeRoleAct>,

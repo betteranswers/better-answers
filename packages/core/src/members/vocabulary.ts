@@ -22,6 +22,9 @@ export const MEMBER_REFUSALS = declareRefusals("members", {
 
   // A marked workspace invites its testing domain alone, and nothing an Admin does lifts that.
   "off-testing-domain": "inapplicable",
+  // A test person is never the operator nor a member anywhere else: the remedy is another address.
+  "operator-marked": "inapplicable",
+  "member-elsewhere": "inapplicable",
 });
 
 export type MemberRefusal<W extends RefusalWordFor<typeof MEMBER_REFUSALS>> = W;

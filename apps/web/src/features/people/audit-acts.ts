@@ -41,6 +41,7 @@ export const DECLARED_ACTS = [
   "platform.erasure.replayed",
   "platform.graph.swept",
   "platform.reconciler.replayed",
+  "platform.workspace.marked",
   "platform.workspace.provisioned",
   "platform.workspace.renamed",
   "sources.binding.bound",
