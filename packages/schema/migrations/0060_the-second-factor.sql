@@ -1,3 +1,5 @@
+-- Altering user and session waits behind any open transaction on them; five seconds bounds that wait, and a failed release is re-run by hand.
+SET LOCAL lock_timeout = '5s';--> statement-breakpoint
 CREATE TABLE "authenticator" (
 	"id" text PRIMARY KEY NOT NULL,
 	"secret" text NOT NULL,
@@ -51,4 +53,6 @@ CREATE UNIQUE INDEX "authenticator_user_id_uidx" ON "authenticator" USING btree 
 CREATE INDEX "passkey_user_id_idx" ON "passkey" USING btree ("user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "passkey_credential_id_uidx" ON "passkey" USING btree ("credential_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "recovery_code_user_id_code_hash_uidx" ON "recovery_code" USING btree ("user_id","code_hash");--> statement-breakpoint
-CREATE INDEX "workspace_last_active_user_id_idx" ON "workspace_last_active" USING btree ("user_id");
+CREATE INDEX "workspace_last_active_user_id_idx" ON "workspace_last_active" USING btree ("user_id");--> statement-breakpoint
+-- Every pending migration runs in one transaction, so the bound ends with this one.
+SET LOCAL lock_timeout = DEFAULT;

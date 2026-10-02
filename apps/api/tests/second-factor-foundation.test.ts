@@ -32,6 +32,17 @@ const CLOSED_SESSION_PATHS = [
   "/update-session",
 ] as const;
 
+const SESSION_FIELDS = ["secondFactorConfirmedAt", "pendingSince"] as const;
+
+const USER_FIELDS = ["passkeyOfferDismissedAt", "recoveryCodesAcknowledged"] as const;
+
+type Declared = { required?: unknown; input?: unknown; returned?: unknown };
+
+const sessionRead = z.object({
+  user: z.record(z.string(), z.unknown()),
+  session: z.record(z.string(), z.unknown()),
+});
+
 const BASE32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 
 /** The key as an authenticator reads it from the setup address: RFC 4648 base32, unpadded. */
@@ -131,5 +142,38 @@ describe("a session read", () => {
     await app().database.superuser.query("DELETE FROM session WHERE user_id = $1", [person.id]);
 
     expect(await (await client.fetch("/get-session")).json()).toBeNull();
+  });
+
+  it("carries none of the second factor's own fields, once written", async () => {
+    const person = await app().person();
+    const client = await signedInClient(app(), person.email);
+    await app().database.superuser.query(
+      "UPDATE session SET second_factor_confirmed_at = now(), pending_since = now() WHERE user_id = $1",
+      [person.id],
+    );
+    await app().database.superuser.query(
+      `UPDATE "user" SET passkey_offer_dismissed_at = now(), recovery_codes_acknowledged = true
+        WHERE id = $1`,
+      [person.id],
+    );
+
+    const read = sessionRead.parse(await (await client.fetch("/get-session")).json());
+
+    expect(read.user["id"]).toBe(person.id);
+    for (const field of SESSION_FIELDS) expect(read.session).not.toHaveProperty(field);
+    for (const field of USER_FIELDS) expect(read.user).not.toHaveProperty(field);
+  });
+});
+
+describe("the second factor's own fields", () => {
+  it("are declared for the platform alone to write and read", () => {
+    const declared: Record<string, Declared> = {
+      ...asBuilt.options.user.additionalFields,
+      ...asBuilt.options.session.additionalFields,
+    };
+
+    for (const field of [...SESSION_FIELDS, ...USER_FIELDS]) {
+      expect(declared[field]).toMatchObject({ required: false, input: false, returned: false });
+    }
   });
 });
