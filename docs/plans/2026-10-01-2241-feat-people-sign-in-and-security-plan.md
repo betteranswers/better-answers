@@ -1053,11 +1053,11 @@ Specified by the ui-designer from the better-answers-design skill, today's auth 
   - Cancelled: `No passkey was added.`
   - Duplicate: `This device already holds one of your passkeys.` / `Use another device, or remove the old one first.`
   - No user verification: `Your device didn't check it was you, so no passkey was added.` / `Use a device with a fingerprint, face or PIN check.`
-  - Done: `Passkey "<name>" added. A notice has gone to <address>.`, with focus on the new row.
+  - Done: `Passkey "<name>" added. A notice is on its way to <address>.`, with focus on the new row.
 - **Rename:** inline. Enter saves and Escape cancels. A blank name says `A name needs a character other than a space.` / `Type one and save again.`
 - **Remove:** an `ActDialog` titled `Remove the passkey "<name>"`, saying `It stops signing you in at once, on every device that holds it.`, with the destructive commit `Remove passkey`.
-- **An Admin's last factor:** Remove is `aria-disabled`, with the reason beside it: `Admins must keep one passkey or authenticator. Add another before removing this one.` The api's own refusal (R16) uses the same words.
-- **Authenticator:** `No authenticator set up.` with `Set up an authenticator` (item 1's part), or once held, `Authenticator · added <date>` with Remove.
+- **An Admin's or the operator's last factor:** Remove is `aria-disabled`, with the reason beside it: `You must keep one passkey or authenticator. Add another before removing this one.` The api's own refusal (R16) uses the same words.
+- **Authenticator:** `No authenticator set up.` with `Set up an authenticator` (item 1's part), or once held, `Authenticator set up.` with Remove (the plugin's row keeps no date).
 - **Recovery codes:** `8 of 10 unused · made <date>` with `Replace recovery codes`. It opens an `ActDialog` saying `Your current codes stop working at once.`, then item 2's block.
 - **The offer banner (R10):**
   - **Where:** only in the workspace shell and the console frame, above the toolbar row. Never on sign-in, pending, link or Account screens.

@@ -35,6 +35,8 @@ import {
 
 export const COPY_KEY: Keystroke = { key: "k", act: ACCOUNT_ACTS.copyKey };
 
+const CODE_PATTERN = `[0-9]{${String(AUTHENTICATOR_CODE_LENGTH)}}`;
+
 const CODE_WRONG = 400;
 
 const SIGNED_OUT = 401;
@@ -180,7 +182,7 @@ function KeyAndCode(properties: {
           name="code"
           inputMode="numeric"
           autoComplete="one-time-code"
-          pattern="[0-9]{6}"
+          pattern={CODE_PATTERN}
           required
           readOnly={finishing}
           aria-describedby={failure === null ? undefined : refusedId}

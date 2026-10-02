@@ -4,6 +4,7 @@ import { RECOVERY_CODES_IN_A_SET } from "@better-answers/schema/second-factor";
 import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
 
 import {
+  ACCOUNT_ACTS,
   ACCOUNT_HEADING,
   ACCOUNT_WORDS,
   ACT_LANDED,
@@ -213,6 +214,16 @@ test("a wrong setup code is refused, its digits left selected", async ({ page, r
 
   await page.keyboard.type(authenticatorCodeAt(key, new Date()));
   await expect(codesListed(page)).toHaveCount(RECOVERY_CODES_IN_A_SET);
+});
+
+test("the keystroke list drops Set up once the setup opens", async ({ page, request }) => {
+  await accountWithNoWorkspace(page, request);
+  await setupOpened(page);
+
+  const listed = await keystrokesListed(page, ACCOUNT_HEADING);
+  await expect(listed).toContainText(ACCOUNT_ACTS.copyKey);
+  await expect(listed).not.toContainText(ACCOUNT_ACTS.setUp);
+  await keystrokesDismissed(page, listed);
 });
 
 test("a setup's codes land though Set up is pressed mid-finish", async ({ page, request }) => {

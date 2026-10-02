@@ -59,8 +59,7 @@ export const useFinishAuthenticator = (
     mutationFn: (code: string) => askOfOurRoute(FINISH_PATH, { code }, setupFinished),
     onSuccess: async ({ recoveryCodes }) => {
       onFinished(recoveryCodes);
-      void rereadTheSession(queryClient);
-      await reread();
+      await Promise.all([rereadTheSession(queryClient), reread()]);
     },
   });
 };

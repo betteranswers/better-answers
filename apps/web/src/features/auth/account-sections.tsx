@@ -2,6 +2,7 @@ import { useId, useRef, useState, type Ref } from "react";
 
 import { ActDialog } from "@/shared/act-dialog.tsx";
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
+import { cn } from "@/shared/lib/utils.ts";
 import { sentenceOf, type Said } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 
@@ -27,29 +28,67 @@ export type Landing = "set-up" | "save-codes" | "recovery-codes";
 
 export type LandsAt = (landing: Landing) => (node: HTMLElement | null) => void;
 
-/** An act's own button, focusable while it cannot run, so focus never drops as it waits. */
+/** A child, so only a button given a keystroke listens for one. */
+function ActKeystroke(properties: { readonly keystroke: Keystroke; readonly onKey: () => void }) {
+  useKeystroke(properties.keystroke, properties.onKey);
+  return null;
+}
+
+/**
+ * An act's own button, focusable while it cannot run, so focus never drops as it waits. Its
+ * keystroke passes the same guard.
+ */
 function ActButton(properties: {
   readonly unavailable: boolean;
   readonly label: string;
   readonly describedBy?: string | undefined;
   readonly actRef?: Ref<HTMLButtonElement>;
+  readonly className?: string;
+  /** Given by a button that shows and hides a part; its keystroke only ever shows it. */
+  readonly expanded?: boolean;
+  readonly controls?: string | undefined;
+  readonly keystroke?: Keystroke;
   readonly onAct: () => void;
 }) {
-  const { unavailable, label, describedBy, actRef, onAct } = properties;
+  const {
+    unavailable,
+    label,
+    describedBy,
+    actRef,
+    className,
+    expanded,
+    controls,
+    keystroke,
+    onAct,
+  } = properties;
+  const act = () => {
+    if (!unavailable) onAct();
+  };
   return (
-    <Button
-      ref={actRef}
-      type="button"
-      variant="outline"
-      className="aria-disabled:opacity-50"
-      aria-disabled={unavailable}
-      aria-describedby={describedBy}
-      onClick={() => {
-        if (!unavailable) onAct();
-      }}
-    >
-      {label}
-    </Button>
+    <>
+      <Button
+        ref={actRef}
+        type="button"
+        variant="outline"
+        className={cn("aria-disabled:opacity-50", className)}
+        aria-disabled={unavailable}
+        aria-describedby={describedBy}
+        aria-expanded={expanded}
+        aria-controls={controls}
+        aria-keyshortcuts={keystroke?.key}
+        onClick={act}
+      >
+        {label}
+      </Button>
+      {keystroke === undefined ? null : (
+        <ActKeystroke
+          keystroke={keystroke}
+          onKey={() => {
+            if (expanded !== true) act();
+          }}
+        />
+      )}
+    </>
   );
 }
 
@@ -62,26 +101,20 @@ function NoAuthenticator(properties: {
   readonly onFinished: (recoveryCodes: readonly string[] | null) => void;
 }) {
   const setupId = useId();
-  useKeystroke(SET_UP, () => {
-    if (!properties.setupOpen) properties.onSetUp();
-  });
 
   return (
     <>
       <p className="mt-2">{AUTHENTICATOR_WORDS.none}</p>
-      <Button
-        ref={properties.landsAt("set-up")}
-        type="button"
-        variant="outline"
-        className="mt-3 aria-disabled:opacity-50"
-        aria-disabled={properties.finishing}
-        aria-expanded={properties.setupOpen}
-        aria-controls={properties.setupOpen ? setupId : undefined}
-        aria-keyshortcuts={SET_UP.key}
-        onClick={properties.onSetUp}
-      >
-        {AUTHENTICATOR_WORDS.setUp}
-      </Button>
+      <ActButton
+        actRef={properties.landsAt("set-up")}
+        unavailable={properties.finishing}
+        label={AUTHENTICATOR_WORDS.setUp}
+        className="mt-3"
+        expanded={properties.setupOpen}
+        controls={properties.setupOpen ? setupId : undefined}
+        keystroke={SET_UP}
+        onAct={properties.onSetUp}
+      />
       {properties.setupOpen ? (
         <AuthenticatorSetup
           id={setupId}
@@ -93,7 +126,7 @@ function NoAuthenticator(properties: {
   );
 }
 
-/** An Admin's only factor stays: Remove says why beside it rather than after a press. */
+/** Whoever must hold a factor keeps their last: Remove says why beside it, not after a press. */
 function HeldAuthenticator(properties: {
   readonly last: boolean;
   readonly removing: boolean;

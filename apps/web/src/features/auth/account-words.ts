@@ -69,7 +69,8 @@ export const RECOVERY_CODE_WORDS = {
 export const codesLeft = (unused: number, madeAt: string): string =>
   `${String(unused)} of ${String(RECOVERY_CODES_IN_A_SET)} unused · made ${dayWords(madeAt)}`;
 
-const noticeTo = (address: string): string => `A notice has gone to ${address}.`;
+/** The api sends the notice without waiting on it, so the page never says it arrived. */
+const noticeTo = (address: string): string => `A notice is on its way to ${address}.`;
 
 /** Said once an act lands, with the notice every change of a second factor sends. */
 export const ACT_LANDED = {

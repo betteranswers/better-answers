@@ -118,7 +118,7 @@ the pin.
 | `breadcrumb.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/breadcrumb.json | `18043f281e20e08f` | `a8a7adf3bdb2fa3a` |
 | `pagination.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/pagination.json | `e70ae7251fdb0f3c` | `5ba3751a3705925d` |
 | `empty.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/empty.json | `2c377f47c4e661d7` | `af1b98aebc32f8ff` |
-| `kibo-ui/qr-code.tsx` | https://www.kibo-ui.com/r/qr-code.json | `b2e8c658e1d2042a` | `e73e19cc579de184` |
+| `kibo-ui/qr-code.tsx` | https://www.kibo-ui.com/r/qr-code.json | `b2e8c658e1d2042a` | `0be5a141250acb70` |
 
 The Kibo UI patterns, each read at commit `3d63cdb15b79d972e3dc38a10997987672f9b263` of
 [shadcnblocks/kibo](https://github.com/shadcnblocks/kibo) (MIT), under `packages/patterns/`. The
@@ -302,8 +302,16 @@ The arrival edits on `qr-code`:
   them to hex; this repository's tokens resolve to plain hex at the root, so the oklch pattern never
   matched and the code fell back to Kibo's own two colours. The tokens are now passed to the
   encoder as they resolve, so the code takes the design system's ink and page.
+- A colour reaches the encoder only as hex, `#` and 3, 4, 6 or 8 hex digits: the caller's if it
+  is one, then the token, then black on white. The encoder writes a colour into the SVG unescaped
+  and the SVG is set as HTML, so a colour holding a quote could add markup. Upstream's `formatHex`
+  had kept every colour hex, and dropping `culori` took that with it.
+- `margin` is the encoder's default of 4 where upstream set 0, so the code keeps the four-module
+  quiet zone a scanner needs.
+- `QRCodeProps` omits `children` and `dangerouslySetInnerHTML`, since the part sets its own
+  markup and a caller's would conflict with it.
 - The `catch` no longer calls `console.error`: the browser has no logger here, and the caller
-  writes the same data out as text beside the code. The effect's promise is marked `void`.
+  writes the authenticator key out as text beside the code. The effect's promise is marked `void`.
 
 Everything else is upstream's, unedited. Their behaviour — keyboard handling, focus, ARIA
 wiring, virtualisation — is theirs by ADR 0033; the screens that use them carry the WCAG 2.2 AA

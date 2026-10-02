@@ -153,7 +153,7 @@ export const SAID_OF_SECOND_FACTOR = {
     next: "Reload the page to see what you hold.",
   },
   "last-second-factor": {
-    why: "Admins must keep one passkey or authenticator.",
+    why: "You must keep one passkey or authenticator.",
     next: "Add another before removing this one.",
   },
   "recovery-code-wrong": {

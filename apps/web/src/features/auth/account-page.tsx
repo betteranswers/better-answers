@@ -95,12 +95,11 @@ const useAccountActs = (address: string) => {
   const begin = () => {
     setSaid(undefined);
     remove.reset();
-    make.reset();
+    if (!make.isPending) make.reset();
     acknowledge.reset();
   };
 
   const toggleSetup = () => {
-    if (finishing) return;
     setSetupOpen(!setupOpen);
     if (!setupOpen && starting.data === undefined && !starting.isPending) starting.mutate();
   };
@@ -187,7 +186,8 @@ const unread = (read: SecondFactorRead): boolean =>
 
 /** In the order the page shows their acts. */
 const keystrokesOf = (read: SecondFactorRead, acts: AccountActs): readonly Keystroke[] => {
-  const offersSetup = read.data !== undefined && read.data.authenticator !== "set-up";
+  const offersSetup =
+    !acts.setupOpen && read.data !== undefined && read.data.authenticator !== "set-up";
   const keyShown = acts.setupOpen && acts.starting.data !== undefined;
   return [
     ...(unread(read) ? [READ_AGAIN] : []),
