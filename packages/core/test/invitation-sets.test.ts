@@ -333,6 +333,25 @@ describe("inviting several addresses at once", () => {
     expect(rows.filter((row) => row.status === "canceled")).toHaveLength(2);
   });
 
+  it("takes two crossing sends' counters in one order", async () => {
+    const workspace = await provisionedWorkspace(db(), "CrossingCounters");
+    const ana = addressOf("ana");
+    const ben = addressOf("ben");
+
+    const answers = await racedAt(
+      db().pool,
+      "ingress_counter",
+      [
+        () => sending(workspace, [ana, ben], "Viewer"),
+        () => sending(workspace, [ben, ana], "Editor"),
+      ],
+      "together",
+    );
+
+    expect(answers.map((answer) => answer.ok)).toEqual([true, true]);
+    expect(await emailsCountedFrom(workspace)).toBe(4);
+  });
+
   it("answers a send caught in a deadlock changed-meanwhile", async () => {
     const workspace = await provisionedWorkspace(db(), "SendDeadlocked");
     const ana = addressOf("ana");

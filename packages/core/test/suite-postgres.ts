@@ -157,25 +157,37 @@ export const abortTheTransaction = async (tx: Tx): Promise<void> => {
   }
 };
 
+/**
+ * Once released, acts pass `in turn`, each holding the rest back until it commits, or all
+ * `together`, so their statements interleave.
+ */
+type Released = "in turn" | "together";
+
+const HOLD_OF: Readonly<Record<Released, string>> = {
+  "in turn": "pg_advisory_xact_lock",
+  together: "pg_advisory_xact_lock_shared",
+};
+
 /** Each `event` on `table` blocks until `work` calls `release` or ends. */
 export const whileActsWaitAt = async <T>(
   pool: pg.Pool,
   table: string,
   event: "INSERT" | "UPDATE",
   work: (release: () => Promise<void>) => Promise<T>,
+  released: Released = "in turn",
 ): Promise<T> => {
   const holder = await pool.connect();
   const key = "hashtext('test-acts-wait-at')";
-  let released = false;
+  let unlocked = false;
   const release = async (): Promise<void> => {
-    if (released) return;
-    released = true;
+    if (unlocked) return;
+    unlocked = true;
     await holder.query(`SELECT pg_advisory_unlock(${key}, ${key})`);
   };
   await holder.query(`SELECT pg_advisory_lock(${key}, ${key})`);
   await pool.query(
     `CREATE OR REPLACE FUNCTION test_acts_wait_at() RETURNS trigger LANGUAGE plpgsql AS $$
-     BEGIN PERFORM pg_advisory_xact_lock(${key}, ${key}); RETURN NEW; END $$`,
+     BEGIN PERFORM ${HOLD_OF[released]}(${key}, ${key}); RETURN NEW; END $$`,
   );
   await pool.query(
     `CREATE TRIGGER test_acts_wait_at BEFORE ${event} ON "${table}"
@@ -206,13 +218,20 @@ export const racedAt = <T>(
   pool: pg.Pool,
   table: string,
   acts: readonly (() => Promise<T>)[],
+  released: Released = "in turn",
 ): Promise<readonly T[]> =>
-  whileActsWaitAt(pool, table, "INSERT", async (release) => {
-    const racing = acts.map((act) => act());
-    await until(async () => (await countWaitingOnLocks(pool)) === acts.length);
-    await release();
-    return Promise.all(racing);
-  });
+  whileActsWaitAt(
+    pool,
+    table,
+    "INSERT",
+    async (release) => {
+      const racing = acts.map((act) => act());
+      await until(async () => (await countWaitingOnLocks(pool)) === acts.length);
+      await release();
+      return Promise.all(racing);
+    },
+    released,
+  );
 
 export const whileWritesAreRefused = async <T>(
   pool: pg.Pool,
