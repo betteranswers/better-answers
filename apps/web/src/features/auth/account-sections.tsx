@@ -200,7 +200,7 @@ function AuthenticatorState(properties: AuthenticatorProperties & { readonly hel
   if (held.authenticator !== "set-up") return <NoAuthenticator {...properties} />;
   return (
     <HeldAuthenticator
-      last={held.mustHoldOne && held.passkeys === 0}
+      last={held.mustHoldOne && held.passkeys.length === 0}
       removing={properties.removing}
       onRemove={properties.onRemove}
     />
@@ -293,7 +293,7 @@ function MakeCodes(properties: {
 
 /** Codes are offered only to a person holding a second factor for them to stand in for. */
 const offersCodes = (held: SecondFactor): boolean =>
-  held.recoveryCodes !== undefined || held.authenticator === "set-up" || held.passkeys > 0;
+  held.recoveryCodes !== undefined || held.authenticator === "set-up" || held.passkeys.length > 0;
 
 export function RecoveryCodesSection(properties: {
   readonly held: SecondFactor | undefined;

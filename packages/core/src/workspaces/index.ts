@@ -56,6 +56,16 @@ export { listWorkspaces } from "./listing.ts";
 export { operatorAddresses, setOperatorMark, standingAsOperator } from "./operator.ts";
 export { inspectPerson, inspectPersonInput, listPeople, listPeopleInput } from "./people.ts";
 export {
+  applyPasskeyNameRule,
+  dismissPasskeyOffer,
+  recordPasskeyAdded,
+  recordPasskeyUse,
+  removePasskey,
+  removePasskeyInput,
+  renamePasskey,
+  renamePasskeyInput,
+} from "./passkeys.ts";
+export {
   acknowledgeRecoveryCodes,
   acknowledgeRecoveryCodesInput,
   replaceRecoveryCodes,

@@ -41,6 +41,7 @@ type Facts = {
   readonly authenticatorId: string | null;
   readonly recoveryCodes: number;
   readonly recoveryCodesMadeAt: Date | null;
+  readonly passkeyOfferDismissed: boolean;
 };
 
 type FactsRow = Omit<Facts, "authenticator"> & { readonly verified: boolean | null };
@@ -50,7 +51,8 @@ const FACTS = `
            AS "mustHoldOne",
          (SELECT count(*)::int FROM passkey p WHERE p.user_id = u.id) AS passkeys,
          a.id AS "authenticatorId", a.verified,
-         codes.held AS "recoveryCodes", codes.made AS "recoveryCodesMadeAt"
+         codes.held AS "recoveryCodes", codes.made AS "recoveryCodesMadeAt",
+         u.passkey_offer_dismissed_at IS NOT NULL AS "passkeyOfferDismissed"
     FROM "user" u LEFT JOIN authenticator a ON a.user_id = u.id
    CROSS JOIN LATERAL (SELECT count(*)::int AS held, max(r.created_at) AS made
                          FROM recovery_code r WHERE r.user_id = u.id) codes
@@ -61,7 +63,7 @@ const stateOf = (verified: boolean | null): AuthenticatorState => {
   return verified ? "set-up" : "awaiting-code";
 };
 
-const factsOf = async (tx: Tx, personId: UserId): Promise<Facts | undefined> => {
+export const factsOf = async (tx: Tx, personId: UserId): Promise<Facts | undefined> => {
   const found = await tx.query<FactsRow>(FACTS, [personId, ADMIN]);
   const row = found.rows[0];
   if (row === undefined) return undefined;
@@ -70,7 +72,7 @@ const factsOf = async (tx: Tx, personId: UserId): Promise<Facts | undefined> => 
 };
 
 /** Stamps only the person's own session; false, having stamped nothing, for any other. */
-const stamping = async (
+export const stamping = async (
   tx: Tx,
   input: SetUpInput & { readonly personId: UserId },
 ): Promise<boolean> => {
@@ -83,7 +85,7 @@ const stamping = async (
   return stamped.rowCount === 1;
 };
 
-type SetUpInput = {
+export type SetUpInput = {
   readonly personId: string;
 
   /** The session the setup ended in: the library's new one when its verify swapped them. */
@@ -231,23 +233,56 @@ export const removeAuthenticator = async (
   return removed.value;
 };
 
+/** Every instant is ISO, as it crosses the wire; a passkey never used has no last use. */
+type PasskeyHeld = {
+  readonly id: string;
+  readonly name: string | null;
+  readonly createdAt: string;
+  readonly lastUsedAt: string | null;
+};
+
+type PasskeyRow = Omit<PasskeyHeld, "createdAt" | "lastUsedAt"> & {
+  readonly createdAt: Date;
+  readonly lastUsedAt: Date | null;
+};
+
+const PASSKEYS = `
+  SELECT p.id, p.name, p.created_at AS "createdAt", l.at AS "lastUsedAt"
+    FROM passkey p LEFT JOIN passkey_last_use l ON l.passkey_id = p.id
+   WHERE p.user_id = $1
+   ORDER BY p.created_at, p.id`;
+
+const passkeysOf = async (tx: Tx, personId: UserId): Promise<readonly PasskeyHeld[]> =>
+  (await tx.query<PasskeyRow>(PASSKEYS, [personId])).rows.map((row) => ({
+    ...row,
+    createdAt: row.createdAt.toISOString(),
+    lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
+  }));
+
 export type SecondFactorHeld = {
   readonly mustHoldOne: boolean;
-  readonly passkeys: number;
+  readonly passkeys: readonly PasskeyHeld[];
   readonly authenticator: AuthenticatorState;
   /** `madeAt` is an ISO instant, as it crosses the wire. */
   readonly recoveryCodes: { readonly unused: number; readonly madeAt: string } | undefined;
+  readonly passkeyOfferDismissed: boolean;
 };
 
-const heldOf = (facts: Facts): SecondFactorHeld => ({
+const heldOf = (facts: Facts, passkeys: readonly PasskeyHeld[]): SecondFactorHeld => ({
   mustHoldOne: facts.mustHoldOne,
-  passkeys: facts.passkeys,
+  passkeys,
   authenticator: facts.authenticator,
   recoveryCodes:
     facts.recoveryCodesMadeAt === null
       ? undefined
       : { unused: facts.recoveryCodes, madeAt: facts.recoveryCodesMadeAt.toISOString() },
+  passkeyOfferDismissed: facts.passkeyOfferDismissed,
 });
+
+const reading = async (tx: Tx, personId: UserId): Promise<SecondFactorHeld | undefined> => {
+  const facts = await factsOf(tx, personId);
+  return facts === undefined ? undefined : heldOf(facts, await passkeysOf(tx, personId));
+};
 
 /** What the person's own Sign-in section shows; nothing in it is a secret. */
 export const readSecondFactor = async (
@@ -259,8 +294,8 @@ export const readSecondFactor = async (
   if (!personId.success) return err("malformed");
 
   const read = await attempt(() =>
-    withIdentityRead(platform, door, (tx) => factsOf(tx, personId.data)),
+    withIdentityRead(platform, door, (tx) => reading(tx, personId.data)),
   );
   if (!read.ok) return err(read.error);
-  return read.value === undefined ? err("person-gone") : ok(heldOf(read.value));
+  return read.value === undefined ? err("person-gone") : ok(read.value);
 };

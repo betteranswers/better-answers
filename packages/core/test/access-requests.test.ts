@@ -631,6 +631,7 @@ describe("the actor-naming door", () => {
         "members/accepting.ts",
         "members/requests.ts",
         "workspaces/display-name.ts",
+        "workspaces/passkeys.ts",
         "workspaces/recovery-codes.ts",
         "workspaces/second-factor.ts",
         "workspaces/sign-in-and-consent.ts",

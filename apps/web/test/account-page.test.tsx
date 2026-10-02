@@ -14,7 +14,12 @@ afterEach(() => {
 const SESSION = { session: { id: "s" }, user: { id: "p", name: "Ada", email: "ada@example.test" } };
 
 /** An authenticator set up and no codes held, so the page offers a first set. */
-const NO_SET = { mustHoldOne: false, passkeys: 0, authenticator: "set-up" };
+const NO_SET = {
+  mustHoldOne: false,
+  passkeys: [],
+  authenticator: "set-up",
+  passkeyOfferDismissed: false,
+};
 
 const A_SET = { ...NO_SET, recoveryCodes: { unused: 10, madeAt: "2026-10-02T09:41:00.000Z" } };
 

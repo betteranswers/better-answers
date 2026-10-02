@@ -109,7 +109,10 @@ const REGISTER = {
   "display-name-angle-bracket": "malformed by workspaces",
   "display-name-too-long": "malformed by workspaces",
   "no-authenticator": "absent by workspaces",
+  "no-passkey": "absent by workspaces",
   "recovery-code-wrong": "absent by workspaces",
+  "passkey-name-empty": "malformed by workspaces",
+  "passkey-name-too-long": "malformed by workspaces",
   "recovery-codes-held": "conflict by workspaces",
   "last-second-factor": "precondition by workspaces",
 

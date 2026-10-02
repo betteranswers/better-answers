@@ -24,7 +24,11 @@ export const WORKSPACE_REFUSALS = declareRefusals("workspaces", {
   "display-name-too-long": "malformed",
 
   "no-authenticator": "absent",
+  "no-passkey": "absent",
   "recovery-code-wrong": "absent",
+
+  "passkey-name-empty": "malformed",
+  "passkey-name-too-long": "malformed",
 
   // Asked for a first set while one stands: a page read before it was made would void it unasked.
   "recovery-codes-held": "conflict",

@@ -294,9 +294,10 @@ describe("reading a person's second factor", () => {
       ok: true,
       value: {
         mustHoldOne: false,
-        passkeys: 0,
+        passkeys: [],
         authenticator: "none",
         recoveryCodes: undefined,
+        passkeyOfferDismissed: false,
       },
     });
   });
@@ -310,15 +311,59 @@ describe("reading a person's second factor", () => {
 
     const read = await readSecondFactor(bootstrap, door(), { personId: adminUserId });
 
-    expect(read).toEqual({
+    expect(read).toMatchObject({
       ok: true,
       value: {
         mustHoldOne: true,
-        passkeys: 1,
         authenticator: "set-up",
         recoveryCodes: { unused: 2, madeAt: "2026-10-02T12:00:00.000Z" },
       },
     });
+    expect(read.ok && read.value.passkeys).toHaveLength(1);
+  });
+
+  it("answers each passkey's name, added and last used times", async () => {
+    const personId = await seedPerson(db().pool);
+    const used = await passkeyFor(db().pool, personId);
+    const unused = await passkeyFor(db().pool, personId);
+    await db().pool.query(
+      "UPDATE passkey SET created_at = $2, name = CASE WHEN id = $1 THEN 'Phone' ELSE name END WHERE user_id = $3",
+      [unused, AT, personId],
+    );
+    await db().pool.query("UPDATE passkey SET created_at = $2 WHERE id = $1", [
+      used,
+      new Date("2026-10-01T08:00:00.000Z"),
+    ]);
+    await db().pool.query("INSERT INTO passkey_last_use (passkey_id, at) VALUES ($1, $2)", [
+      used,
+      new Date("2026-10-02T09:41:00.000Z"),
+    ]);
+
+    const read = await readSecondFactor(bootstrap, door(), { personId });
+
+    expect(read).toMatchObject({
+      ok: true,
+      value: {
+        passkeys: [
+          {
+            id: used,
+            name: "MacBook",
+            createdAt: "2026-10-01T08:00:00.000Z",
+            lastUsedAt: "2026-10-02T09:41:00.000Z",
+          },
+          { id: unused, name: "Phone", createdAt: "2026-10-02T12:00:00.000Z", lastUsedAt: null },
+        ],
+      },
+    });
+  });
+
+  it("dates a passkey written with no time of its own", async () => {
+    const personId = await seedPerson(db().pool);
+    await passkeyFor(db().pool, personId);
+
+    const read = await readSecondFactor(bootstrap, door(), { personId });
+
+    expect(read.ok && read.value.passkeys[0]?.createdAt).toMatch(/^\d{4}-\d\d-\d\dT/);
   });
 
   it("answers a setup that waits on its code", async () => {
