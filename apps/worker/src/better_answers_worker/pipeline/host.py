@@ -100,17 +100,26 @@ def _pauses_within(cap_seconds: float) -> Iterator[float]:
         yield left
 
 
+def _open_unless_held(
+    open_store: Callable[[], coco.Environment],
+) -> coco.Environment | None:
+    try:
+        return open_store()
+    except RuntimeError as error:
+        if str(error) != STILL_OPEN:
+            raise
+        return None
+
+
 def _opened_once_let_go(
     run: IndexRun,
     store: str,
     open_store: Callable[[], coco.Environment],
     wait_seconds: float,
 ) -> coco.Environment:
-    try:
-        return open_store()
-    except RuntimeError as error:
-        if str(error) != STILL_OPEN:
-            raise
+    opened = _open_unless_held(open_store)
+    if opened is not None:
+        return opened
     logger.info(
         "the engine still holds the store, so its open waits for it to let go",
         binding_id=run.binding_id,
@@ -120,11 +129,9 @@ def _opened_once_let_go(
     # A handle caught in a reference cycle drops only when the collector runs.
     gc.collect()
     for pause in _pauses_within(wait_seconds):
-        try:
-            return open_store()
-        except RuntimeError as error:
-            if str(error) != STILL_OPEN:
-                raise
+        opened = _open_unless_held(open_store)
+        if opened is not None:
+            return opened
         time.sleep(pause)
     return open_store()
 
