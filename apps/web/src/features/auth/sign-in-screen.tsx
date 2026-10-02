@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useEffectEvent, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useEffectEvent, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
@@ -110,8 +110,20 @@ const selectTheCode = () => {
   field.select();
 };
 
-const isASession = (read: { readonly data?: unknown }): boolean =>
-  read.data !== null && read.data !== undefined;
+type SessionRead = {
+  readonly isError: boolean;
+  readonly data: { readonly session: { readonly id: string } } | null | undefined;
+};
+
+/** Undefined for a failed read, which keeps whatever it held before and proves nothing. */
+const sessionIdOf = (read: SessionRead): string | null | undefined =>
+  read.isError ? undefined : (read.data?.session.id ?? null);
+
+/** Nothing counts as new until the standing session is known, so an early read never lands. */
+const namesANewSession = (read: SessionRead, standing: string | null | undefined): boolean => {
+  const id = sessionIdOf(read);
+  return standing !== undefined && typeof id === "string" && id !== standing;
+};
 
 /**
  * Lands once another tab of this browser signs in: on hearing it announced, or on being shown
@@ -119,17 +131,23 @@ const isASession = (read: { readonly data?: unknown }): boolean =>
  */
 function useFollowsASignInElsewhere(waiting: boolean, land: () => void) {
   const session = useSession();
-  const landIfSignedIn = useEffectEvent((signedIn: boolean) => {
-    if (signedIn && waiting) land();
+  // Signing in again starts here with a session standing, and only a different one is a sign-in.
+  const standing = useRef<string | null | undefined>(undefined);
+  const readWhatStands = useEffectEvent(() => {
+    void session.refetch().then((read) => {
+      standing.current = sessionIdOf(read);
+    });
+  });
+  const landIfNew = useEffectEvent((read: SessionRead) => {
+    if (waiting && namesANewSession(read, standing.current)) land();
   });
   const recheck = useEffectEvent(() => {
     if (!waiting) return;
-    void session.refetch().then((read) => {
-      landIfSignedIn(isASession(read));
-    });
+    void session.refetch().then(landIfNew);
   });
 
   useEffect(() => {
+    readWhatStands();
     const shown = () => {
       if (document.visibilityState === "visible") recheck();
     };

@@ -1,4 +1,5 @@
 import type { APIRequestContext, Page } from "@playwright/test";
+import { z } from "zod";
 
 import { ASK_TO_JOIN_WORDS } from "@/features/auth/ask-to-join-words.ts";
 import {
@@ -37,6 +38,7 @@ import {
   provision,
   quoted,
   removeMember,
+  signedInAtHome,
   signedInWithNoWorkspace,
   signIn,
   signInHeading,
@@ -116,6 +118,21 @@ const shownAs = (page: Page, state: DocumentVisibilityState): Promise<void> =>
     Object.defineProperty(document, "visibilityState", { configurable: true, get: () => now });
     document.dispatchEvent(new Event("visibilitychange"));
   }, state);
+
+/** A frame and a task, so what the page does with an answer it holds is done before a spec reads it. */
+const aFramePassed = (page: Page): Promise<void> =>
+  page.evaluate(
+    () =>
+      new Promise<void>((done) => {
+        requestAnimationFrame(() => setTimeout(done));
+      }),
+  );
+
+const heldSession = z.object({ session: z.object({ id: z.string() }) });
+
+/** As the api reads this browser's cookie, so a session begun since names a new id. */
+const sessionHeldBy = async (page: Page): Promise<string> =>
+  heldSession.parse(await (await page.request.get("/get-session")).json()).session.id;
 
 const floodCodesTo = async (request: APIRequestContext, email: string, count: number) => {
   for (let asked = 0; asked < count; asked += 1) {
@@ -499,6 +516,25 @@ test("a tab hidden through a sign-in lands once shown", async ({ page, context, 
 
   await shownAs(page, "visible");
   await landedAtHome(page, "Admin");
+});
+
+test("a shown tab waits for a sign-in of its own", async ({ page, request }) => {
+  const email = anAddress("standing");
+  await provision(request, { name: "Standing Ltd", adminEmail: email });
+  await signedInAtHome(page, request, email);
+  const standing = await sessionHeldBy(page);
+  await atTheCodeStep(page, email);
+
+  await shownAs(page, "hidden");
+  const reread = page.waitForRequest((asked) => new URL(asked.url()).pathname === "/get-session");
+  await shownAs(page, "visible");
+  await (await (await reread).response())?.finished();
+  await aFramePassed(page);
+  await expect(page, "the shown tab left on the session that stood").toHaveURL(/\/sign-in/);
+  await codeField(page).pressSequentially(await codeSentTo(request, email));
+  await landedAtHome(page, "Admin");
+
+  expect(await sessionHeldBy(page), "the tab landed on the session that stood").not.toBe(standing);
 });
 
 /** A session begun with no membership names no workspace, so the picker opens the one joined since. */
