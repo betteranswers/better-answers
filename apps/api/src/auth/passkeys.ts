@@ -1,5 +1,5 @@
 import { APIError } from "better-auth/api";
-import type { Context, Hono } from "hono";
+import type { Context, Hono, MiddlewareHandler } from "hono";
 import type { Logger } from "pino";
 import { z } from "zod";
 
@@ -14,7 +14,7 @@ import {
 import type { EmailSender } from "../email.ts";
 import { sendFactorNotice } from "../factor-notice-email.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
-import { limitByIp, tooManyRequests } from "../ingress/limits.ts";
+import { clientIpOf, tooManyRequests } from "../ingress/limits.ts";
 import { type Auth, USER_NOT_VERIFIED } from "./auth.ts";
 import { finishedWith } from "./authenticator.ts";
 import {
@@ -228,8 +228,26 @@ export const mountThePasskeys = (routes: Hono, deps: PasskeysDependencies): void
     await next();
     context.res.headers.set("cache-control", "no-store");
   });
-  routes.use(PASSKEY_SIGN_IN_OPTIONS_PATH, limitByIp(door, PASSKEY_SIGN_IN_IP_RULE, clock));
-  routes.use(PASSKEY_SIGN_IN_PATH, limitByIp(door, PASSKEY_SIGN_IN_IP_RULE, clock));
+  /** Counted apart from the address's other routes, so the screen's ask on opening spends no link's. */
+  const limitByAddress: MiddlewareHandler = async (context, next) => {
+    const counted = await consumeIngress(
+      door,
+      "ip",
+      `passkey-sign-in:${clientIpOf(context.req.raw.headers)}`,
+      PASSKEY_SIGN_IN_IP_RULE,
+      clock.now(),
+    );
+    if (!counted.allowed) {
+      return tooManyRequests(
+        counted.retryAfterSeconds,
+        "Too many passkey sign-ins from this address; try again shortly.",
+      );
+    }
+    await next();
+  };
+
+  routes.use(PASSKEY_SIGN_IN_OPTIONS_PATH, limitByAddress);
+  routes.use(PASSKEY_SIGN_IN_PATH, limitByAddress);
   routes.post(PASSKEY_ADD_OPTIONS_PATH, asThePerson("ask", askToAdd));
   routes.post(PASSKEY_ADD_PATH, asThePerson("add", add));
   routes.post(PASSKEY_SIGN_IN_OPTIONS_PATH, askToSignIn);

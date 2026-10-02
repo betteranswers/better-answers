@@ -288,6 +288,15 @@ describe("signing in with a passkey", () => {
     expect(answers.at(-2)).toBe(200);
     expect(answers.at(-1)).toBe(429);
   });
+
+  it("spends none of the address's link sign-ins", async () => {
+    const browser = app().client();
+    for (let asked = 0; asked < 11; asked += 1) await browser.json(SIGN_IN_OPTIONS, {});
+
+    const linkTried = await browser.json("/sign-in-link/sign-in", { token: "unknown" });
+
+    expect(linkTried.status).toBe(410);
+  });
 });
 
 describe("renaming and removing a passkey", () => {
