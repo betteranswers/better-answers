@@ -861,6 +861,16 @@ to it by IRI and never restates it (ADR 0014).
   email goes after the invitation is made, so an invitation can wait with its email **unsent**;
   a resend sends it again. _Avoid_: invite (as a noun), join link, pending (the value Better Auth
   stores).
+- **test workspace** — the workspace the nightly journeys sign in to in production, made and set
+  back by the `test-workspace` ops command alone, never by a screen: three test people, an Admin,
+  an Editor and a Viewer, and 51 invented Viewers. It carries a **mark**, a row of its own naming
+  its *testing domain*, which only that command writes and the api cannot remove. While the mark
+  stands, every *invitation* the workspace sends, resends or mints from an *access request* goes
+  to an address on that domain, and one off it is refused `off-testing-domain`. Not the
+  *operator*'s mark, which is on a person.
+- **testing domain** — what follows the `@` of every address a *test workspace* invites,
+  lower-cased and matched whole, so a subdomain is another one. An email domain, never a *domain*
+  of the company's knowledge.
 - **Activity (of a person)** — one person's part in the workspace's *audit log*, read by an Admin
   alone, in People: every *audit event* they took and every one done to them, newest first, each
   marked with its **direction**: *by*, *to* or both, as a self-demotion is. It spans their whole
