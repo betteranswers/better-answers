@@ -81,7 +81,7 @@ export const dropExpiredVerifications = async (door: PostgresDoor, now: Date): P
 };
 ```
 
-`apps/api/src/sweeps.ts:48-54` wraps it, and the pass runs it after the workspace sweeps (`sweeps.ts:86`). A refused delete becomes a refusal whose sweep is `verifications` and which names no workspace, and the pass's log line carries `verifications_deleted` (`sweeps.ts:87-91`). The delete covers every verification row more than a day past expiry, not only sign-in codes: links, OAuth state, trusted devices and the library's locks too. The runbook's "The daily sweeps" says so (`docs/operations/RUNBOOK.md`); CONTEXT.md's **sweep pass** entry and the runbook's §11 name only the sign-in codes.
+`apps/api/src/sweeps.ts:48-54` wraps it, and the pass runs it after the workspace sweeps, whether or not they succeeded; a pass skipped for a held lock skips it too (`sweeps.ts:77-82`). A refused delete becomes a refusal whose sweep is `verifications` and which names no workspace, and the pass's log line carries `verifications_deleted` (`sweeps.ts:92-98`), as does `the sweep pass failed` (`sweeps.ts:83-90`). The delete covers every verification row more than a day past expiry, not only sign-in codes: links, OAuth state, trusted devices and the library's locks too. The runbook's "The daily sweeps" and §11 say so (`docs/operations/RUNBOOK.md`), and so does CONTEXT.md's **sweep pass** entry.
 
 ## Why This Works
 

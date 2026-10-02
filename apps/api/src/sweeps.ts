@@ -74,16 +74,21 @@ export const startSweeps = (dependencies: SweepsDependencies): Result<Sweeps, Sw
 
   const pass = async (): Promise<void> => {
     const swept = await attemptResult(() => sweepEveryWorkspace(SWEEPS, doors, { uploadSweep }));
+    if (!swept.ok && swept.error === "held") {
+      logger.warn("a sweep pass was skipped: another holder has the sweeps' lock");
+      return;
+    }
+    // The deletion needs no workspace, so a failed workspace sweep must not keep expired rows.
+    const verifications = await verificationsDropped(postgres, clock.now());
     if (!swept.ok) {
-      if (swept.error === "held") {
-        logger.warn("a sweep pass was skipped: another holder has the sweeps' lock");
-        return;
-      }
-      logger.error({ reason: swept.error.message }, "the sweep pass failed");
+      const { deleted, refusals } = verifications;
+      logger.error(
+        { reason: reasonOf(swept.error), verifications_deleted: deleted, refusals },
+        "the sweep pass failed",
+      );
       await ping("fail");
       return;
     }
-    const verifications = await verificationsDropped(postgres, clock.now());
     const refusals = [...refusalsOf(swept.value), ...verifications.refusals];
     const summary = {
       upload_sweep: uploadSweep,

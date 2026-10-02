@@ -359,6 +359,27 @@ describe("the sweeps' daily pass", () => {
     expect(sweeps.pinged).toEqual([{ url: `${PING_URL}/fail`, body: "fail" }]);
   });
 
+  it("deletes expired codes even when the workspace sweep fails", async () => {
+    await provisioned();
+    await codeExpiring(-25 * HOUR_MS);
+    const live = await codeExpiring(5 * MINUTE_MS);
+
+    const sweeps = await whileWritesAreRefused(db().pool, "sweep_pass", () =>
+      onePass({ uploadSweep: "list", pingUrl: PING_URL }),
+    );
+
+    expect(await verificationsLeft()).toEqual([live]);
+    expect(sweeps.logs).toContainEqual(
+      expect.objectContaining({
+        level: 50,
+        msg: "the sweep pass failed",
+        verifications_deleted: 1,
+        refusals: [],
+      }),
+    );
+    expect(sweeps.pinged).toEqual([{ url: `${PING_URL}/fail`, body: "fail" }]);
+  });
+
   it("still sweeps and logs when the estate names no check", async () => {
     await provisioned();
     const sweeps = running({ uploadSweep: "list", pingUrl: undefined });
