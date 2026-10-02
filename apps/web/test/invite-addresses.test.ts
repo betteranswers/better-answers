@@ -3,6 +3,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  addressesCounted,
   allInto,
   flagOf,
   flagsFrom,
@@ -67,6 +68,11 @@ describe("the addresses the invite dialog holds", () => {
     ).held;
 
     expect(typedInto(full, "late@example.com, ty").field).toBe("late@example.com, ty");
+  });
+
+  it("counts the field's addresses as the list folds them", () => {
+    expect(addressesCounted("Late@example.com, late@example.com; ty\n")).toBe(2);
+    expect(addressesCounted(" , ")).toBe(0);
   });
 });
 

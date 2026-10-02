@@ -345,21 +345,43 @@ test.describe("the People screen's Invitations tab", () => {
     await expect(invitationRows(page)).toHaveCount(2);
   });
 
-  test("refuses a 51st address in the dialog before sending", async ({ page, request }) => {
+  test("sends 50 at once, holding a 51st in the field", async ({ page, request }) => {
     await anAdminAtInvitations(page, request, "Nidd Bridge Tools");
     await openInvitations(page);
-    const addresses = Array.from({ length: 51 }, (_, at) => `person-${String(at)}@example.test`);
+    const addresses = Array.from({ length: 51 }, (_, at) => anAddress(`person-${String(at)}`));
+    const late = addresses.at(-1) ?? "";
 
     await dialogOpened(page);
     await addressField(page).fill(addresses.join(", "));
     await addressField(page).press("Enter");
 
     await expect(heldAddresses(page)).toHaveCount(50);
-    await expect(addressField(page)).toHaveValue(addresses.at(-1) ?? "");
+    await expect(addressField(page)).toHaveValue(late);
     await expect(inviteDialog(page).getByRole("alert")).toHaveText(
       sentenceOf(INVITE_REFUSED.capped(50)),
     );
     await expect(sendButton(page)).toHaveText(INVITE_WORDS.send(50));
+    await sendButton(page).click();
+
+    const sent = inviteDialog(page).getByRole("status").first();
+    await expect(sent, "a send holding 50 sends them, though more wait in the field").toContainText(
+      "Invited 50 people as Viewers.",
+    );
+    await expect(sent, "the outcome names what still waits").toContainText(INVITE_WORDS.waiting(1));
+    expect(await emailsSentTo(request, late), "the 51st waits, unsent").toBe(0);
+    const next = inviteDialog(page).getByRole("button", { name: INVITE, exact: true });
+    await expect(next, "the outcome leads to the address waiting, not to Done").toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(addressField(page)).toBeFocused();
+    await expect(addressField(page), "the next invite starts from what was left").toHaveValue(late);
+    await sendButton(page).click();
+
+    await expect(sent).toContainText(`Invited ${late} as a Viewer.`);
+    await expect(sent).not.toContainText(INVITE_WORDS.waiting(1));
+    const done = inviteDialog(page).getByRole("button", { name: "Done" });
+    await expect(done).toBeFocused();
+    await done.click();
+    await countedUnder(page, "waiting", 51);
   });
 
   test("shows an eight-day-old invitation under Expired, not Waiting (AE6)", async ({

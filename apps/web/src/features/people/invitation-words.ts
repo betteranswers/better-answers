@@ -162,6 +162,10 @@ export const INVITE_WORDS = {
   send: (count: number) => (count <= 1 ? "Send the invitation" : `Send ${invitations(count)}`),
   sending: (count: number) =>
     count <= 1 ? "Sending the invitation" : `Sending ${invitations(count)}`,
+  waiting: (count: number) =>
+    count === 1
+      ? "1 more address waits: invite it next."
+      : `${String(count)} more addresses wait: invite them next.`,
   done: "Done",
 } as const;
 

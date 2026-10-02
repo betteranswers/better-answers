@@ -96,6 +96,11 @@ describe("the dialog's words", () => {
     expect(INVITE_WORDS.summary(1, 0)).toBe("1 address ready.");
   });
 
+  it("counts the addresses a capped send left waiting", () => {
+    expect(INVITE_WORDS.waiting(1)).toBe("1 more address waits: invite it next.");
+    expect(INVITE_WORDS.waiting(3)).toBe("3 more addresses wait: invite them next.");
+  });
+
   it("names the wait a ceiling carried, rounded up", () => {
     expect(invitationsCeiling(61).next).toBe("Try again in 2 minutes.");
   });

@@ -34,6 +34,7 @@ import { Label } from "@/shared/ui/label.tsx";
 import { INVITE_REFUSED, INVITE_WORDS, invitedOutcome } from "./invitation-words.ts";
 import { useInvite, type InvitedOne } from "./invitations-api.ts";
 import {
+  addressesCounted,
   allInto,
   flagOf,
   flagsFrom,
@@ -73,9 +74,9 @@ const pastedInto = (event: ClipboardEvent<HTMLInputElement>): string | undefined
 };
 
 /** The addresses the dialog holds, each with what flags it, and where focus goes as one leaves. */
-const useHeldAddresses = (members: ReadonlySet<string>, list: ListRef) => {
+const useHeldAddresses = (members: ReadonlySet<string>, list: ListRef, left: string) => {
   const [held, setHeld] = useState(NOTHING_HELD);
-  const [field, setField] = useState("");
+  const [field, setField] = useState(left);
   const [refused, setRefused] = useState(NO_FLAGS);
   const flags = held.map((one) => flagOf(one, members, refused));
 
@@ -251,17 +252,42 @@ function AddressField(properties: {
   );
 }
 
-function Sent(properties: { readonly sent: readonly InvitedOne[]; readonly onAgain: () => void }) {
+/** Read in the outcome's own live region, which stood before the Sent view did. */
+const withWaiting = (outcome: Outcome | undefined, waiting: number): Outcome | undefined =>
+  outcome === undefined || waiting === 0
+    ? outcome
+    : {
+        ...outcome,
+        words: (
+          <>
+            {outcome.words} <span className="block">{INVITE_WORDS.waiting(waiting)}</span>
+          </>
+        ),
+      };
+
+/** Addresses still waiting lead to the next invite, since Done drops them. */
+function Sent(properties: {
+  readonly sent: readonly InvitedOne[];
+  readonly waiting: boolean;
+  readonly onAgain: () => void;
+}) {
+  const { waiting } = properties;
   return (
     <>
       <UnsentEmails unsent={properties.sent.filter((one) => !one.emailSent)} />
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={properties.onAgain}>
+        <Button
+          type="button"
+          variant={waiting ? "default" : "outline"}
+          // oxlint-disable-next-line jsx-a11y/no-autofocus -- the control that had focus is gone, and the addresses waiting are where the act leads
+          autoFocus={waiting}
+          onClick={properties.onAgain}
+        >
           {ACT_NAME}
         </Button>
         <DialogClose asChild>
           {/* oxlint-disable-next-line jsx-a11y/no-autofocus -- the control that had focus is gone, and this is where the act leaves the reader */}
-          <Button type="button" autoFocus>
+          <Button type="button" variant={waiting ? "outline" : "default"} autoFocus={!waiting}>
             {INVITE_WORDS.done}
           </Button>
         </DialogClose>
@@ -270,11 +296,12 @@ function Sent(properties: { readonly sent: readonly InvitedOne[]; readonly onAga
   );
 }
 
-/** Mounted afresh for each invite, so nothing from the last one is left in it. */
+/** Mounted afresh for each invite, so nothing from the last one is in it but what its cap left. */
 function InviteForm(properties: {
   readonly members: readonly ListedMember[] | undefined;
   readonly fieldRef: FieldRef;
-  readonly onAgain: () => void;
+  readonly left: string;
+  readonly onAgain: (left: string) => void;
 }) {
   const { fieldRef, members } = properties;
   const invite = useInvite();
@@ -283,7 +310,7 @@ function InviteForm(properties: {
     () => membersOf((members ?? []).map((member) => member.address)),
     [members],
   );
-  const addresses = useHeldAddresses(known, list);
+  const addresses = useHeldAddresses(known, list, properties.left);
   const [role, setRole] = useState<Role>(ROLE_OFFERED_FIRST);
   const [outcome, setOutcome] = useState<Outcome>();
   // One send at a time: a second call on the mutation takes over the first's callbacks.
@@ -291,10 +318,10 @@ function InviteForm(properties: {
   const [sent, setSent] = useState<readonly InvitedOne[]>();
   const formId = useId();
   const toSend = allInto(addresses.held, addresses.field).held.length;
+  const waiting = sent === undefined ? 0 : addressesCounted(addresses.field);
 
-  /** The check before anything is sent: the cap, then a flagged row, then an empty list. */
-  const refusedBefore = (moved: Moved, held: readonly Held[]): Outcome | undefined => {
-    if (moved.capped) return CAPPED;
+  /** Never refused at the cap: the list holds what one send takes, the rest wait in the field. */
+  const refusedBefore = (held: readonly Held[]): Outcome | undefined => {
     if (held.some(addresses.isFlagged)) {
       addresses.focusFirstFlagged();
       return refusedWith(INVITE_REFUSED.flagged);
@@ -333,9 +360,8 @@ function InviteForm(properties: {
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (sending) return;
-    const moved = allInto(addresses.held, addresses.field);
-    const held = addresses.placedNow(moved);
-    const refused = refusedBefore(moved, held);
+    const held = addresses.placedNow(allInto(addresses.held, addresses.field));
+    const refused = refusedBefore(held);
     if (refused === undefined) send(held);
     else setOutcome(refused);
   };
@@ -347,7 +373,7 @@ function InviteForm(properties: {
         <DialogDescription>{INVITE_WORDS.description}</DialogDescription>
       </DialogHeader>
 
-      <OutcomeLine outcome={outcome} className="text-sm" />
+      <OutcomeLine outcome={withWaiting(outcome, waiting)} className="text-sm" />
 
       {sent === undefined ? (
         <>
@@ -379,7 +405,13 @@ function InviteForm(properties: {
           </DialogFooter>
         </>
       ) : (
-        <Sent sent={sent} onAgain={properties.onAgain} />
+        <Sent
+          sent={sent}
+          waiting={waiting > 0}
+          onAgain={() => {
+            properties.onAgain(addresses.field);
+          }}
+        />
       )}
     </>
   );
@@ -388,6 +420,7 @@ function InviteForm(properties: {
 export function InviteAct() {
   const [open, setOpen] = useState(false);
   const [invites, setInvites] = useState(0);
+  const [left, setLeft] = useState("");
   const fieldRef = useRef<HTMLInputElement>(null);
   // Held here, where the dialog opens on the list already read: it checks against no fresher one.
   const members = useMembers().data;
@@ -401,15 +434,22 @@ export function InviteAct() {
   });
 
   /** A fresh form in the open dialog, focus on its field where the pressed button was. */
-  const again = () => {
+  const again = (leftInTheField: string) => {
     flushSync(() => {
+      setLeft(leftInTheField);
       setInvites((count) => count + 1);
     });
     fieldRef.current?.focus();
   };
 
+  // A closed dialog's content unmounts, so what a capped send left must not reach the next opening.
+  const openedOrClosed = (opened: boolean) => {
+    setOpen(opened);
+    if (!opened) setLeft("");
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={openedOrClosed}>
       {/* The trigger is where a closed dialog hands focus back, however it was opened. */}
       <DialogTrigger asChild>
         <Button size="sm" aria-keyshortcuts={PEOPLE_KEYSTROKES.invite.key}>
@@ -417,7 +457,13 @@ export function InviteAct() {
         </Button>
       </DialogTrigger>
       <DialogContent className="wrap-anywhere">
-        <InviteForm key={invites} members={members} fieldRef={fieldRef} onAgain={again} />
+        <InviteForm
+          key={invites}
+          members={members}
+          fieldRef={fieldRef}
+          left={left}
+          onAgain={again}
+        />
       </DialogContent>
     </Dialog>
   );

@@ -62,6 +62,10 @@ export const allInto = (held: readonly Held[], text: string): Moved =>
 
 export const hasSeparator = (text: string): boolean => SEPARATORS.test(text);
 
+/** Counted as the list would hold them, two spellings of one address once. */
+export const addressesCounted = (text: string): number =>
+  new Set(addressesIn(text.split(SEPARATORS)).map(keyOf)).size;
+
 /** The web's own checks first, then what the api said of the address when it last refused it. */
 export const flagOf = (
   one: Held,
