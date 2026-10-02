@@ -129,7 +129,20 @@ describe("what jump-to lists", () => {
     expect(to["Control Centre"]).toBe("/people/members");
     expect(to["Audit log"]).toBe("/system/audit-log");
     expect(to[INVITE_A_PERSON.name]).toBe("/people/members?act=invite");
-    expect(to["Priya Shah"]).toBe("/people/members?search=priya%40example.test");
+  });
+
+  it("AE3: leads a member to their page from anywhere", () => {
+    const narrowed = {
+      pathname: "/people/members",
+      searchStr: "?members.role=Viewer&members.page=3&invitations.search=ops",
+    };
+    const toOf = (here: typeof AT_ROOT) =>
+      jumpsIn(treeOf("Admin"), [PRIYA], here)
+        .flatMap((group) => group.jumps)
+        .find((jump) => jump.name === "Priya Shah")?.to;
+
+    expect(toOf(AT_ROOT)).toBe("/people/members/p1");
+    expect(toOf(narrowed)).toBe("/people/members/p1");
   });
 
   it("keeps Members' list filters when asking Members for an act", () => {

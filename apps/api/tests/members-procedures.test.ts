@@ -174,6 +174,12 @@ const ACTS_ON_A_MEMBER = [
     ask: (api: WebApi, personId: string) => api.members.remove.mutate({ personId }),
     recorded: REMOVED,
   },
+  {
+    verb: "change roles in bulk",
+    ask: (api: WebApi, personId: string) =>
+      api.members.bulkChangeRole.mutate({ personIds: [personId], role: "Editor" }),
+    recorded: ROLE_CHANGED,
+  },
 ] as const;
 
 /** Its first Admin is the one signed in on the web. */
@@ -587,5 +593,142 @@ describe("a removal that fails partway", () => {
       { workspace_id: workspace.workspaceId, revoked: false },
     ]);
     expect(await removalsIn(workspace.workspaceId)).toEqual([]);
+  });
+});
+
+const sortedIds = (ids: readonly string[]): readonly string[] => ids.toSorted();
+
+describe("bulk acts on members over tRPC", () => {
+  it("changes each ticked role, counting one already held", async () => {
+    const { workspace, editor, viewer } = await aWorkspaceOfThree();
+    const { api } = await webSignedIn(app, workspace.admin.email);
+
+    const changed = await api.members.bulkChangeRole.mutate({
+      personIds: [editor.id, viewer.id],
+      role: "Editor",
+    });
+
+    expect(changed).toEqual({ changed: [viewer.id], skipped: 1 });
+    expect(await whatLanded(workspace.workspaceId, viewer.id)).toEqual({
+      role: "Editor",
+      changes: [
+        {
+          actor: `human:${workspace.admin.id}`,
+          subject_id: viewer.id,
+          detail: { previousRole: "Viewer", role: "Editor" },
+        },
+      ],
+    });
+  });
+
+  it("AE1: refuses demoting both Admins, naming each as an item", async () => {
+    const { workspace, second, api } = await aWorkspaceOfTwoAdmins();
+    const { admin } = workspace;
+
+    const refused = await refusalOfCall(
+      api.members.bulkChangeRole.mutate({ personIds: [second.id, admin.id], role: "Viewer" }),
+    );
+
+    expect(refused).toMatchObject({
+      data: {
+        httpStatus: 412,
+        refusal: {
+          word: "last-admin",
+          class: "precondition",
+          items: { [admin.id]: "last-admin", [second.id]: "last-admin" },
+        },
+      },
+    });
+    expect(await roleHeldBy(workspace.workspaceId, admin.id)).toBe("Admin");
+    expect(await roleHeldBy(workspace.workspaceId, second.id)).toBe("Admin");
+    expect(await roleChangesIn(workspace.workspaceId)).toEqual([]);
+  });
+
+  it("refuses 201 ids, malformed, naming the field", async () => {
+    const { api } = await webSignedIn(app, (await app.provision()).admin.email);
+    const personIds = Array.from({ length: 201 }, () => SOMEONE);
+
+    const refused = await refusalOfCall(api.members.bulkRemove.mutate({ personIds }));
+
+    expect(refused).toMatchObject({
+      data: {
+        httpStatus: 400,
+        refusal: { word: "malformed", class: "malformed", fields: { personIds: "too-big" } },
+      },
+    });
+  });
+
+  it("removes each ticked member, skipping one no member holds", async () => {
+    const { workspace, editor, viewer } = await aWorkspaceOfThree();
+    const { api } = await webSignedIn(app, workspace.admin.email);
+
+    const removed = await api.members.bulkRemove.mutate({
+      personIds: [editor.id, viewer.id, SOMEONE],
+    });
+
+    expect(removed).toEqual({ changed: sortedIds([editor.id, viewer.id]), skipped: 1 });
+    expect(await roleHeldBy(workspace.workspaceId, editor.id)).toBeUndefined();
+    expect(await roleHeldBy(workspace.workspaceId, viewer.id)).toBeUndefined();
+    expect((await removalsIn(workspace.workspaceId)).map((row) => row.subject_id)).toEqual(
+      sortedIds([editor.id, viewer.id]),
+    );
+  });
+
+  it("adds each ticked member to a group, counting one in", async () => {
+    const { workspace, editor, viewer, seeded } = await aWorkspaceOfThree();
+    const { api } = await webSignedIn(app, workspace.admin.email);
+
+    const added = await api.members.bulkAddToGroup.mutate({
+      groupId: seeded.hr,
+      personIds: [editor.id, viewer.id],
+    });
+
+    expect(added).toEqual({ changed: [viewer.id], skipped: 1 });
+    expect(await eventsIn(workspace.workspaceId, "people.group.member_added")).toEqual([
+      {
+        actor: `human:${workspace.admin.id}`,
+        subject_id: seeded.hr,
+        detail: { userId: viewer.id },
+      },
+    ]);
+  });
+
+  it("refuses an old refresh token after re-invite and accept", async () => {
+    const { workspace, editor, viewer } = await aWorkspaceOfThree();
+    const connected = await connectAsHost(app, app.client(), viewer, {
+      pick: workspace.workspaceId,
+    });
+    const oldToken = connected.refreshToken ?? "";
+    expect(oldToken).not.toBe("");
+    const { api } = await webSignedIn(app, workspace.admin.email);
+    await api.members.bulkRemove.mutate({ personIds: [editor.id, viewer.id] });
+    const invited = await app.invite({
+      workspaceId: workspace.workspaceId,
+      email: viewer.email,
+      inviterId: workspace.admin.id,
+      role: "Viewer",
+    });
+    const rejoined = await webSignedIn(app, viewer.email);
+    await rejoined.api.person.acceptInvitation.mutate({ invitationId: invited.id });
+    expect((await rejoined.api.session.membership.query()).role).toBe("Viewer");
+
+    const answered = await refresh(app.client(), oldToken);
+
+    expect(answered.status).toBe(400);
+  });
+});
+
+describe.each([
+  [
+    "remove members in bulk",
+    (api: WebApi) => api.members.bulkRemove.mutate({ personIds: [SOMEONE] }),
+  ],
+  [
+    "add members to a group in bulk",
+    (api: WebApi) => api.members.bulkAddToGroup.mutate({ groupId: SOMEONE, personIds: [SOMEONE] }),
+  ],
+])("who may %s", (_verb, ask) => {
+  it.each(["Editor", "Viewer"] as const)("refuses a member at %s, role-forbids", async (role) => {
+    expect(await refusalToAMemberAt(app, role, ask)).toMatchObject(ROLE_FORBIDS_ANSWERED);
   });
 });

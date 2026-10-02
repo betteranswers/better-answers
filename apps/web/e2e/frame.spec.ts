@@ -372,6 +372,32 @@ test("lists the open surface's groups and screens, marking one", async ({ page, 
   await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
 });
 
+test("marks Members current on a member page, adding no entry", async ({ page, request }) => {
+  const workspace = await signedIn(page, request, "Northern Wiring");
+  await page.goto(`${MEMBERS.path}/${workspace.admin.id}`);
+  await expect(
+    page.getByRole("main").getByRole("heading", { level: 2, name: workspace.admin.name }),
+  ).toBeVisible();
+
+  const nav = navOf(page, CONTROL_CENTRE);
+  await expect(nav.getByRole("link"), "the page took an entry of its own").toHaveText(SCREEN_NAMES);
+  // The page is Members' own, so its entry is the current page, as on Members itself.
+  await expect(nav.getByRole("link", { name: MEMBERS.name })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  const marked = await nav
+    .getByRole("link")
+    .evaluateAll((links) => links.filter((link) => link.hasAttribute("aria-current")).length);
+  expect(marked).toBe(1);
+  expect(await weightOf(page, MEMBERS.name)).toBeGreaterThan(await weightOf(page, "Groups"));
+  await expect(railOf(page).getByRole("link", { name: CONTROL_CENTRE.name })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  await expect(page.getByRole("heading", { level: 1, name: headingOf(MEMBERS) })).toBeVisible();
+});
+
 test("lists a Viewer's home as the nav's one entry (AE2)", async ({ page, request }) => {
   await aMemberSignedInAt(page, request, "Viewer", HOMES.Viewer.path);
 
@@ -693,7 +719,7 @@ test("narrows the band to two rows scrolling with the page", async ({ page, requ
     crumbOf(page, CONTROL_CENTRE.name),
     crumbOf(page, PEOPLE.name),
     page.getByRole("tab", { name: MEMBERS.name }),
-    page.getByRole("main").getByRole("button", { name: workspace.admin.name, exact: true }),
+    page.getByRole("main").getByRole("link", { name: workspace.admin.name, exact: true }),
   ]) {
     await tabClearOfTheBand(page, stop);
   }
@@ -747,7 +773,7 @@ test("keeps a focused control clear of the fixed band", async ({ page, request }
   await page.goto("/sign-in");
   await signIn(page, request, email);
   await page.goto(MEMBERS.path);
-  const last = page.getByRole("main").getByRole("button", { name: "Member 9" });
+  const last = page.getByRole("main").getByRole("link", { name: "Member 9", exact: true });
   await expect(last).toBeVisible();
 
   // Backwards, so each stop scrolls up to meet the band rather than rise from below it.

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { useOptimistic, type Undo } from "@/shared/api/optimistic.ts";
 import { useTRPC, type ApiError } from "@/shared/api/trpc.ts";
 
-import type { ListedMember } from "./people-api.ts";
+import { inNameOrder, useActivityReadAgain, type ListedMember } from "./people-api.ts";
 
 type Api = ReturnType<typeof useTRPC>;
 
@@ -24,11 +24,6 @@ export const useGroups = () => {
   return useQuery(api.members.groups.queryOptions());
 };
 
-/** By name, so a row the cache takes sits among the others where a reader looks for it. */
-export const inNameOrder = <Named extends { readonly name: string }>(
-  named: readonly Named[],
-): Named[] => named.toSorted((one, other) => one.name.localeCompare(other.name));
-
 const undoingEach = (undos: readonly Undo[]): Undo => ({
   undo: () => {
     for (const each of undos.toReversed()) each.undo();
@@ -42,11 +37,14 @@ const undoingEach = (undos: readonly Undo[]): Undo => ({
 const useReconcile = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
-  return () =>
-    Promise.all([
+  const activityReadAgain = useActivityReadAgain();
+  return () => {
+    activityReadAgain();
+    return Promise.all([
       queryClient.invalidateQueries({ queryKey: api.members.groups.queryKey() }),
       queryClient.invalidateQueries({ queryKey: api.members.list.queryKey() }),
     ]);
+  };
 };
 
 const ASKED_NAME = z.object({ name: z.string() });

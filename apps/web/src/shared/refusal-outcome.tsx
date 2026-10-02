@@ -53,7 +53,10 @@ export const failureOutcome = (
 type ItemSaid = { readonly id: string; readonly said: Said };
 
 /** An item's word crosses with no class, so a word the feature lacks is said as the whole set's. */
-const saidOfItems = (featureWords: SaidOfWord, failure: Error | ApiError): readonly ItemSaid[] => {
+export const saidOfItems = (
+  featureWords: SaidOfWord,
+  failure: Error | ApiError,
+): readonly ItemSaid[] => {
   const refusal = refusalOf(failure);
   if (refusal?.items === undefined) return [];
   const ofTheSet = saidOfRefusal(featureWords, refusal.word, refusal.class);

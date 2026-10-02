@@ -916,6 +916,16 @@ to it by IRI and never restates it (ADR 0014).
 - **tab** — a division inside one *screen*, named in the screen's *toolbar*: Members' Members and
   Invitations. A tab has no address of its own; the open tab is the *breadcrumb*'s last part.
   _Avoid_: view, sub-screen.
+- **detail address** — an address one segment beneath a *screen*, naming one of its rows, as a
+  *member page* names a person (ADR 0047). It is the screen's place, not a screen: listed nowhere,
+  seen by whoever may see the screen, and drawn in the screen's frame with no *toolbar*. An
+  address deeper than it names nothing. _Avoid_: sub-screen, child route.
+- **member page** — one *member*'s page, at the *detail address* beneath Members, opened from
+  their row, its *row menu*, a Members keystroke or *jump-to*. A header names them, their address
+  and their role, over three sections: **Access** (their role, their groups, when they joined, when
+  their credentials here were last revoked, and the *display name* flag), their *Activity*, and
+  **Remove and revoke**, set apart last. A section has no address. A page naming no member says so
+  and leads to Members. _Avoid_: member sheet (the word until 02/10/2026), profile.
 - **home (of a role)** — the *screen* a member lands on after signing in, and the one offered back
   when a screen fails or an address names nothing they may see: Ask for an Editor or a Viewer, and
   People › Members for an Admin until Control Centre › Overview is built. A role's home shows in
@@ -946,6 +956,15 @@ to it by IRI and never restates it (ADR 0014).
   screen takes over every ticked row, and offers *Clear selection*. A tick stays through a change
   of page, search or filter, which is why the bar counts the ticked rows out of sight. Not the
   screen's *toolbar*.
+- **bulk act** — an act an Admin takes over every ticked row at once, from the *selection bar*:
+  on Members, *Change role*, *Add to group* and *Remove*. It changes every ticked row or none: if
+  any is refused, nothing lands, and the refusal names each refused person with its *refused
+  items*, shown or not. A ticked row whose change is already true is **skipped**, never refused,
+  and the outcome counts it. A set that includes the acting Admin says so before it is confirmed.
+  _Avoid_: batch action, mass edit.
+- **row menu** — the menu at the end of a list's row, its button named for whose acts these are
+  (*Acts for* Priya Shah), holding the acts on that row alone; a destructive act sits last, apart.
+  Not the *selection bar*. _Avoid_: kebab menu, overflow menu.
 - **view-state slot** — the one place the open screen writes what the acts on its toolbar must
   read, such as what a reader has ticked. It answers empty to any screen but the one that wrote it,
   and it is emptied when the reader opens another tab. _Avoid_: selection store, shared context.
@@ -966,12 +985,14 @@ to it by IRI and never restates it (ADR 0014).
   *home*, and *All workspaces* opens the workspace picker. It lists the *console* to the operator
   alone. _Avoid_: organisation switcher, team switcher.
 - **breadcrumb** — the line in the *top band* naming where the person is: the *surface*, the
-  *group*, the *screen* and the open *tab*, each part but the last leading to its place. It names
-  every part at every width; only the wide band shortens the middle ones.
+  *group*, the *screen* and the open *tab*, or on a *member page* the person's name, each part but
+  the last leading to its place. It names every part at every width; only the wide band shortens
+  the middle ones.
 - **jump-to** — the finder the *top band* opens by click, ⌘K or Ctrl+K, named *Jump to* on screen,
   to go somewhere in one move: the *surfaces* and *screens* the person may see, the workspace's
-  members for a person who may see People, and the acts their role may take, such as *Invite a
-  person*, listed under the headings Surfaces, Screens, Acts and Members. Knowledge joins it
+  members for a person who may see People, each opening their *member page*, and the acts their
+  role may take, such as *Invite a person*, listed under the headings Surfaces, Screens, Acts and
+  Members. Knowledge joins it
   with S2's retrieval; until then it is not a search. _Avoid_: search (Knowledge's *screen*),
   command palette.
 - **promotion** — an Editor's proposal that an answer or a response become an `Answer`

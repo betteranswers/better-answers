@@ -27,6 +27,29 @@ export const SAID_OF_A_MEMBER = {
   },
 } satisfies SaidOfWord;
 
+/** A bulk act refuses the whole set, so each item's line says why that one person stopped it. */
+export const SAID_OF_TICKED_MEMBERS = {
+  "role-forbids": SAID_OF_A_MEMBER["role-forbids"],
+  "not-a-member": SAID_OF_A_MEMBER["not-a-member"],
+  "no-such-role": SAID_OF_A_MEMBER["no-such-role"],
+  "last-admin": {
+    why: "This would leave the workspace with no Admin.",
+    next: "Leave at least one Admin unticked.",
+  },
+  "no-such-member": {
+    why: "They are no longer a member of this workspace.",
+    next: "Try again without them.",
+  },
+  "no-such-group": {
+    why: "That group is no longer in this workspace.",
+    next: "Choose another group.",
+  },
+  "changed-meanwhile": {
+    why: "Another change to these members landed at the same moment, so nothing changed.",
+    next: "Try again.",
+  },
+} satisfies SaidOfWord;
+
 export const SAID_OF_AN_INVITATION = {
   "role-forbids": {
     why: "Only an Admin of this workspace sees and sends its invitations.",

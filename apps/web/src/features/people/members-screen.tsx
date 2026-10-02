@@ -3,10 +3,12 @@ import type { ComponentType } from "react";
 import { useScreenKeystrokes, type Keystroke } from "@/shared/keystrokes.tsx";
 import { CONTROL_CENTRE, groupIn } from "@/shared/navigation.ts";
 import { useOpenTab, type ScreenTab, type ScreenToolbar } from "@/shared/screen-toolbar.tsx";
+import { counted } from "@/shared/words.ts";
 
 import { InvitationsTab } from "./invitations-tab.tsx";
 import { InviteAct } from "./invite-act.tsx";
 import { MembersTab } from "./members-tab.tsx";
+import { useMembers } from "./people-api.ts";
 import { PEOPLE_KEYSTROKES as KEY } from "./people-state.ts";
 import { RequestsTab } from "./requests-tab.tsx";
 
@@ -30,6 +32,13 @@ const MEMBERS: Tab = {
     KEY.changeGroups,
     KEY.remove,
     KEY.flagName,
+    KEY.tick,
+    KEY.changeSelectedRoles,
+    KEY.addSelectedToGroup,
+    KEY.removeSelected,
+    KEY.clearSelection,
+    KEY.previousPage,
+    KEY.nextPage,
     KEY.invite,
   ],
 };
@@ -55,9 +64,25 @@ const useTheOpenTab = (): Tab => {
   return TABS.find((candidate) => candidate.id === openTab) ?? MEMBERS;
 };
 
+/** The workspace's size, said beside the act that grows it, whichever tab is open. */
+function MemberCount() {
+  const members = useMembers();
+  if (members.data === undefined) return null;
+  return (
+    <span className="text-sm text-muted-foreground tabular-nums">
+      {counted(members.data.length, "member", "members")}
+    </span>
+  );
+}
+
 export const MEMBERS_TOOLBAR: ScreenToolbar = {
   tabs: TABS.map(({ id, name }) => ({ id, name })),
-  acts: <InviteAct />,
+  acts: (
+    <>
+      <MemberCount />
+      <InviteAct />
+    </>
+  ),
 };
 
 export function MembersScreen() {

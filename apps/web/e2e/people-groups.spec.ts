@@ -38,6 +38,9 @@ const MEMBERS = screenNamed(people, "Members");
 
 const MEMBERS_SCREEN = MEMBERS.path;
 
+/** A member's row leads with its tick, then the person and their role. */
+const GROUPS_CELL = 3;
+
 const nav = (page: Page) => page.getByRole("navigation", { name: CONTROL_CENTRE.name });
 
 const groupsRegion = (page: Page) => page.getByRole("region", { name: "Groups" });
@@ -230,7 +233,7 @@ test.describe("a group's acts", () => {
       .getByRole("region", { name: "Members" })
       .getByRole("row")
       .filter({ hasText: "Priya Shah" });
-    await expect(priya.getByRole("cell").nth(2)).toHaveText("People team");
+    await expect(priya.getByRole("cell").nth(GROUPS_CELL)).toHaveText("People team");
   });
 
   test("an Admin deletes a group once told what it takes", async ({
@@ -419,8 +422,8 @@ test.describe("the keystrokes listed across the People group", () => {
   });
 });
 
-test.describe("a member's groups, on their row and their sheet", () => {
-  test("lets an Admin change a member's groups from their sheet", async ({
+test.describe("a member's groups, on their row and their page", () => {
+  test("lets an Admin change a member's groups from their page", async ({
     page,
     request,
     passesTheAccessibilityGate,
@@ -430,7 +433,7 @@ test.describe("a member's groups, on their row and their sheet", () => {
     const members = page.getByRole("region", { name: "Members" });
     const priyaRow = members.getByRole("row").filter({ hasText: "Priya Shah" });
     await expect(members.getByRole("columnheader", { name: "Groups" })).toBeVisible();
-    await expect(priyaRow.getByRole("cell").nth(2)).toHaveText("HR team");
+    await expect(priyaRow.getByRole("cell").nth(GROUPS_CELL)).toHaveText("HR team");
 
     const keystrokes = await keystrokesListed(page, MEMBERS.name);
     await expect(keystrokes).toContainText("Change the groups of the member in focus");
@@ -438,30 +441,27 @@ test.describe("a member's groups, on their row and their sheet", () => {
     await expect(keystrokes).not.toContainText("Delete the group in focus");
     await keystrokesDismissed(page, keystrokes);
 
-    await members.getByRole("button", { name: "Priya Shah", exact: true }).focus();
+    await members.getByRole("link", { name: "Priya Shah", exact: true }).focus();
     await page.keyboard.press("g");
-    const sheet = sheetOf(page, "Priya Shah");
-    const picked = sheet.getByRole("group", { name: "Groups Priya Shah is in" });
+    const memberPage = page.getByRole("main");
+    const groups = memberPage.getByRole("region", { name: "Groups", exact: true });
+    const picked = memberPage.getByRole("group", { name: "Groups Priya Shah is in" });
     const bids = picked.getByRole("checkbox", { name: "Bid writers" });
     await expect(bids).toBeFocused();
     await expect(bids).not.toBeChecked();
     await expect(picked.getByRole("checkbox", { name: "HR team" })).toBeChecked();
 
     await clockTheNextKey(page, {
-      at: "//div[@role='dialog']//dt[normalize-space(.)='Groups']/following-sibling::dd[1]",
+      at: "//section[h2='Access']//dt[normalize-space(.)='Groups']/following-sibling::dd[1]",
       reads: "Bid writers",
     });
     await page.keyboard.press("Space");
-    await expect(sheet.getByRole("region", { name: "Groups" }).getByRole("status")).toHaveText(
-      "Priya Shah is in Bid writers now.",
-    );
-    await theActLandedWithinItsBudget(page, "put a member in a group from their sheet");
+    await expect(groups.getByRole("status")).toHaveText("Priya Shah is in Bid writers now.");
+    await theActLandedWithinItsBudget(page, "put a member in a group from their page");
 
     await picked.getByRole("checkbox", { name: "HR team" }).click();
-    await expect(sheet.getByRole("region", { name: "Groups" }).getByRole("status")).toHaveText(
-      "Priya Shah is out of HR team now.",
-    );
-    await expect(sheet.getByRole("region", { name: "Groups" })).toMatchAriaSnapshot(`
+    await expect(groups.getByRole("status")).toHaveText("Priya Shah is out of HR team now.");
+    await expect(groups).toMatchAriaSnapshot(`
       - region "Groups":
         - heading "Groups" [level=3]
         - status: Priya Shah is out of HR team now.
@@ -472,11 +472,10 @@ test.describe("a member's groups, on their row and their sheet", () => {
     await expect(page.locator("body")).not.toContainText(/\bteams\b/i);
     await passesTheAccessibilityGate();
 
-    await page.keyboard.press("Escape");
-    await expect(members.getByRole("button", { name: "Priya Shah", exact: true })).toBeFocused();
-    await expect(priyaRow.getByRole("cell").nth(2)).toHaveText("Bid writers");
+    await page.goBack();
+    await expect(priyaRow.getByRole("cell").nth(GROUPS_CELL)).toHaveText("Bid writers");
     await page.reload();
-    await expect(priyaRow.getByRole("cell").nth(2)).toHaveText("Bid writers");
+    await expect(priyaRow.getByRole("cell").nth(GROUPS_CELL)).toHaveText("Bid writers");
   });
 
   test("points an Admin at Groups when the workspace has none", async ({ page, request }) => {
@@ -487,10 +486,10 @@ test.describe("a member's groups, on their row and their sheet", () => {
 
     await page
       .getByRole("region", { name: "Members" })
-      .getByRole("button", { name: "Test person", exact: true })
+      .getByRole("link", { name: "Test person", exact: true })
       .click();
-    const groups = sheetOf(page, "Test person").getByRole("region", { name: "Groups" });
-    // The sheet has no way to create a group, so its empty state carries the one act.
+    const groups = page.getByRole("main").getByRole("region", { name: "Groups", exact: true });
+    // The page has no way to create a group, so its empty state carries the one act.
     await expect(groups).toMatchAriaSnapshot(`
       - region "Groups":
         - /children: equal

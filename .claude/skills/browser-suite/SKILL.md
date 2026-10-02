@@ -102,7 +102,7 @@ call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources
 | `seedRoutes` | The routes a workspace has chosen; a purpose left out of the list has no route, which the screen must show rather than omit |
 | `seedBindings` | Source bindings as their acts and the worker leave them — documents, findings kept or overridden by an erasure, quarantined documents, chunks, an index run at any status, a concept and composition citing a document — answering each binding's and document's id |
 | `moveTheIndexRun` | The worker's two steps over the workspace's one index run, claimed then done, through the queue's own functions under the worker's role — how a spec watches a state word move without a worker process |
-| `makeGroups` | Groups made by a named member through the members slice's own acts, one transaction each, every group holding the members `memberIds` names — the member's own acts on the audit log, and the groups the `Groups` screen and a member's sheet start from |
+| `makeGroups` | Groups made by a named member through the members slice's own acts, one transaction each, every group holding the members `memberIds` names — the member's own acts on the audit log, and the groups the `Groups` screen and a member's page start from |
 | `askToJoin` | A person's ask to join a workspace by its slug, with a reason, through the members slice's own act and the principal the ask-to-join procedure uses, without its sign-in or its answer's floor — a request waiting on the Requests tab |
 | `flagTheName` | A workspace's Admin flags a member's display name through the members slice's own act and principal, without the email the procedure sends the operator — a name waiting on the console's *Names waiting* screen |
 

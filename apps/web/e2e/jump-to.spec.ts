@@ -70,20 +70,26 @@ const memberRows = (page: Page): Locator =>
 /** Matched by name anywhere in the path, because the client batches its reads. */
 const theMembersRead = (url: URL) => url.pathname.includes("members.list");
 
-type Team = { readonly priya: string; readonly tom: string };
+type Teammate = { readonly address: string; readonly id: string };
+
+type Team = { readonly priya: Teammate; readonly tom: Teammate };
 
 /** An Admin of a workspace with two other members, on a screen that reads none of them. */
 const anAdminWithATeam = async (page: Page, api: APIRequestContext, name: string) => {
   const email = anAddress("jump-to");
   const workspace = await provision(api, { name, adminEmail: email });
-  const team: Team = { priya: anAddress("priya"), tom: anAddress("tom") };
+  const joined: Teammate[] = [];
   for (const [address, displayName, role] of [
-    [team.priya, PRIYA, "Editor"],
-    [team.tom, TOM, "Viewer"],
+    [anAddress("priya"), PRIYA, "Editor"],
+    [anAddress("tom"), TOM, "Viewer"],
   ] as const) {
     const member = await person(api, address, { displayName });
     await addMember(api, { workspaceId: workspace.workspaceId, userId: member.id, role });
+    joined.push({ address, id: member.id });
   }
+  const [priya, tom] = joined;
+  if (priya === undefined || tom === undefined) throw new Error("the team was joined");
+  const team: Team = { priya, tom };
   await page.goto("/sign-in");
   await signIn(page, api, email);
   await page.goto(ROUTES_AND_SPEND.path);
@@ -171,7 +177,11 @@ test("opens on either chord anywhere, Escape handing focus back", async ({ page,
   await expect(triggerOf(page)).toBeFocused();
 });
 
-test("opens Members with the member an Admin types findable", async ({ page, request }) => {
+/** A member's page, told by the person its heading names. */
+const memberPageNaming = (page: Page, name: string) =>
+  page.getByRole("main").getByRole("heading", { level: 2, name, exact: true });
+
+test("AE3: lands an Admin on the member they chose", async ({ page, request }) => {
   const team = await anAdminWithATeam(page, request, "Swaledale Ironworks");
 
   await opened(page, "Meta+k");
@@ -179,24 +189,30 @@ test("opens Members with the member an Admin types findable", async ({ page, req
   await expect(groupOf(page, JUMP_TO.groups.members)).toBeVisible();
   await optionOf(page, new RegExp(PRIYA)).click();
 
-  await expect(page).toHaveURL(new RegExp(`${MEMBERS.path}$`));
-  await expect(searchBox(page)).toHaveValue(team.priya);
-  await expect(memberRows(page)).toHaveCount(1);
-  await expect(memberRows(page).getByRole("button", { name: PRIYA })).toBeVisible();
+  // The person's own page, not a list narrowed to them.
+  await expect(page).toHaveURL(new RegExp(`${MEMBERS.path}/${team.priya.id}$`));
+  await expect(memberPageNaming(page, PRIYA)).toBeVisible();
+  await expect(page.getByRole("main")).toContainText(team.priya.address);
+  await expect(memberRows(page)).toHaveCount(0);
   await expect(page.getByRole("main")).toBeFocused();
 
-  // From another tab of Members, the person is found on the Members tab.
+  // From another tab of Members, the next one chosen opens their page as well.
+  await page.goto(MEMBERS.path);
   await page.getByRole("tab", { name: "Invitations" }).click();
   await opened(page, "Meta+k");
   await typed(page, "tom");
+  await expect(optionOf(page, new RegExp(TOM))).toBeVisible();
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("tab", { name: MEMBERS.name })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
-  await expect(searchBox(page)).toHaveValue(team.tom);
-  await expect(memberRows(page)).toHaveCount(1);
-  await expect(memberRows(page).getByRole("button", { name: TOM })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`${MEMBERS.path}/${team.tom.id}$`));
+  await expect(memberPageNaming(page, TOM)).toBeVisible();
+
+  // From one member's page to another's, so the page names the person it now holds.
+  await opened(page, "Meta+k");
+  await typed(page, "priya");
+  await expect(optionOf(page, new RegExp(PRIYA))).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(memberPageNaming(page, PRIYA)).toBeVisible();
+  await expect(memberPageNaming(page, TOM)).toHaveCount(0);
 });
 
 test("finds nothing by an unbuilt screen's name", async ({ page, request }) => {

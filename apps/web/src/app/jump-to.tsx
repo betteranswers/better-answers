@@ -1,15 +1,14 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useEffectEvent, useRef, useState, type RefObject } from "react";
 
+import { MEMBERS_SCREEN } from "@/features/people/members-address.ts";
 import { useMembers } from "@/features/people/people-api.ts";
 import { askingHere, type Here } from "@/shared/address-ask.ts";
 import { Icon, type IconName } from "@/shared/icon.tsx";
 import type { Keystroke } from "@/shared/keystrokes.tsx";
 import {
-  CONTROL_CENTRE,
-  groupIn,
+  detailAt,
   placeAt,
-  screenNamed,
   screensOf,
   type Group,
   type Screen,
@@ -28,8 +27,6 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/shared/
 import { nameOrAddress } from "@/shared/words.ts";
 
 import { findWhat, JUMP_TO, nothingMatches } from "./words.ts";
-
-const MEMBERS = screenNamed(groupIn(CONTROL_CENTRE, "people"), "Members");
 
 /** Where focus goes once chosen: a place hands it to the screen, an act to its own dialog. */
 type Kind = "place" | "member" | "act";
@@ -105,14 +102,14 @@ const actJumps = (screen: Screen, here: Here): readonly Jump[] =>
     }),
   );
 
-/** Found on Members by their address, which the list's own search box takes. */
-const memberJump = (member: Member, here: Here): Jump =>
+/** A member opens on their own page, never as a narrowed list. */
+const memberJump = (member: Member): Jump =>
   jumpOf({
     value: `member ${member.personId}`,
     name: nameOrAddress(member.displayName, member.address),
     said: member.displayName === "" ? undefined : member.address,
     icon: "person",
-    to: askingHere(here, MEMBERS.path, "search", member.address),
+    to: detailAt(MEMBERS_SCREEN, member.personId),
     kind: "member",
   });
 
@@ -131,7 +128,7 @@ export const jumpsIn = (
     },
     {
       heading: JUMP_TO.groups.members,
-      jumps: (members ?? []).map((member) => memberJump(member, here)),
+      jumps: (members ?? []).map(memberJump),
     },
   ];
   return groups.filter((group) => group.jumps.length > 0);
@@ -347,8 +344,6 @@ export function JumpTo(properties: {
   readonly wide: boolean;
   readonly tree: VisibleTree;
   readonly jumping: Jumping;
-  /** A member is found on Members' first tab, whichever tab was last open. */
-  readonly onFindMember: () => void;
 }) {
   const { tree, jumping } = properties;
   const navigate = useNavigate();
@@ -358,7 +353,6 @@ export function JumpTo(properties: {
 
   const choose = (jump: Jump) => {
     chosen.current = jump.kind;
-    if (jump.kind === "member") properties.onFindMember();
     jumping.setOpen(false);
     void navigate({ href: jump.to });
   };
@@ -389,7 +383,7 @@ export function JumpTo(properties: {
         >
           <DialogTitle className="sr-only">{JUMP_TO.name}</DialogTitle>
           <DialogDescription className="sr-only">{JUMP_TO.said}</DialogDescription>
-          {placeAt(tree.surfaces, MEMBERS.path) === undefined ? (
+          {placeAt(tree.surfaces, MEMBERS_SCREEN.path) === undefined ? (
             <JumpList tree={tree} onChoose={choose} read="unasked" members={undefined} />
           ) : (
             <WithMembers tree={tree} onChoose={choose} />

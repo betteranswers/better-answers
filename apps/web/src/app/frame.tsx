@@ -4,6 +4,8 @@ import { useId, useMemo, useState, type ReactNode } from "react";
 import { useSignOut } from "@/features/auth/auth-hooks.ts";
 import { useMembership } from "@/features/auth/membership.ts";
 import { useOperatorStanding } from "@/features/console/operator.ts";
+import { HomeLine } from "@/features/people/self-act.tsx";
+import { BreadcrumbLastPartSlot } from "@/shared/breadcrumb-last-part.ts";
 import { ShellKeystrokes, ShellKeystrokesAct, type Keystroke } from "@/shared/keystrokes.tsx";
 import {
   EVERY_SURFACE,
@@ -15,7 +17,8 @@ import {
   type VisibleSurface,
   type VisibleTree,
 } from "@/shared/navigation.ts";
-import { isFilled, type ScreenToolbar } from "@/shared/screen-toolbar.tsx";
+import { isFilled, type ScreenTab, type ScreenToolbar } from "@/shared/screen-toolbar.tsx";
+import { useWideLayout } from "@/shared/wide-layout.ts";
 
 import { Band, type Person } from "./band.tsx";
 import { partsOf } from "./breadcrumb.tsx";
@@ -26,7 +29,6 @@ import { useSecondaryNavShowing } from "./secondary-nav-showing.ts";
 import { SecondaryNav } from "./secondary-nav.tsx";
 import { openTabIn, ScreenPanel, ScreenTabsRoot, Toolbar, type PickedTab } from "./toolbar.tsx";
 import { useArrivalTakenOnceRead, useHidden, VisibleTreeContext } from "./visible-tree.ts";
-import { useWideLayout } from "./wide-layout.ts";
 import { useWorkspaceSwitch, WorkspaceSwitcher, type Here } from "./workspace-switcher.tsx";
 
 type Region = { readonly name: string; readonly toolbar: ScreenToolbar };
@@ -60,6 +62,13 @@ const useRegion = (visible: VisibleTree, pathname: string): Region | undefined =
     : undefined;
 };
 
+/** A detail address's page names the part beneath its screen; elsewhere the open tab does. */
+const belowTheScreen = (
+  open: Place<VisibleSurface> | undefined,
+  openTab: ScreenTab | undefined,
+  lastPart: string | undefined,
+): string | undefined => (open?.detail === undefined ? openTab?.name : lastPart);
+
 /** A place hidden from the reader is no place here, so it draws as one that never existed. */
 export function Frame(properties: {
   readonly visible: VisibleTree;
@@ -78,6 +87,8 @@ export function Frame(properties: {
   const switching = useWorkspaceSwitch();
   // The frame's, not the tabs root's: the band names the open tab, and the root sits below it.
   const [pickedTab, pickTab] = useState<string>();
+  // Given by a page at a detail address, which alone knows whose it is.
+  const [lastPart, nameLastPart] = useState<string>();
   // Once a role is held, so nothing is offered to a reader the shell cannot place.
   const offersJumpTo = visible.home !== undefined;
   const jumping = useJumping(offersJumpTo);
@@ -109,7 +120,10 @@ export function Frame(properties: {
                 />
               )
             }
-            parts={partsOf(open, openTabIn(region?.toolbar.tabs, pickedTab)?.name)}
+            parts={partsOf(
+              open,
+              belowTheScreen(open, openTabIn(region?.toolbar.tabs, pickedTab), lastPart),
+            )}
             person={properties.person}
             navigation={
               <NavigationButton
@@ -121,17 +135,7 @@ export function Frame(properties: {
                 onShow={show}
               />
             }
-            jumpTo={
-              <JumpTo
-                offered={offersJumpTo}
-                wide={wide}
-                tree={visible}
-                jumping={jumping}
-                onFindMember={() => {
-                  pickTab(undefined);
-                }}
-              />
-            }
+            jumpTo={<JumpTo offered={offersJumpTo} wide={wide} tree={visible} jumping={jumping} />}
             keystrokes={<ShellKeystrokesAct at="band" />}
             signingOut={signingOut}
             onSignOut={signOut}
@@ -150,12 +154,14 @@ export function Frame(properties: {
             ) : null}
 
             <div className="flex min-w-0 flex-1 flex-col">
-              {/* Keyed by the workspace, so a switch draws the screen afresh over its new reads. */}
-              <ToolbarAndScreen
-                key={here?.workspaceId}
-                region={region}
-                picked={[pickedTab, pickTab]}
-              />
+              <BreadcrumbLastPartSlot value={nameLastPart}>
+                {/* Keyed by the workspace, so a switch draws the screen afresh over its new reads. */}
+                <ToolbarAndScreen
+                  key={here?.workspaceId}
+                  region={region}
+                  picked={[pickedTab, pickTab]}
+                />
+              </BreadcrumbLastPartSlot>
             </div>
           </div>
         </div>
@@ -229,6 +235,7 @@ function ToolbarAndScreen(properties: {
       <main id="screen" aria-label="Screen" tabIndex={-1} className="flex-1 px-4 py-6 md:px-8">
         {/* The page's width, not the prose measure: the design system's rule keeps text to it. */}
         <div data-screen-content className="max-w-page">
+          <HomeLine />
           <ScreenPanel>
             <Outlet />
           </ScreenPanel>

@@ -5,6 +5,12 @@ import {
   addToGroup,
   approveRequest,
   approveRequestInput,
+  bulkAddToGroup,
+  bulkAddToGroupInput,
+  bulkChangeRole,
+  bulkChangeRoleInput,
+  bulkRemoveMembers,
+  bulkRemoveMembersInput,
   cancelInvitation,
   changeRole,
   changeRoleInput,
@@ -95,6 +101,29 @@ const committedThenEmailed =
     };
   };
 
+type AtTheClock = {
+  readonly log: Logger;
+  readonly principal: UserPrincipal;
+  readonly tx: Tx;
+  readonly clock: Clock;
+};
+
+/** The moment is the server's, read as the act runs. The act's function name labels its logs. */
+const answeredAt =
+  <Asked, Value>(
+    act: (
+      principal: UserPrincipal,
+      tx: Tx,
+      input: Asked & { readonly at: Date },
+    ) => Promise<Result<Value, RefusalAnswer | Error>>,
+  ) =>
+  ({ ctx, input }: { readonly ctx: AtTheClock; readonly input: Result<Asked, Malformed> }) =>
+    crossing(
+      ctx,
+      act.name,
+      given(input, (asked) => act(ctx.principal, ctx.tx, { ...asked, at: ctx.clock.now() })),
+    );
+
 export const membersRouter = router({
   list: queryProcedure.query(({ ctx }) =>
     crossing(ctx, listMembers.name, listMembers(ctx.principal, ctx.tx)),
@@ -116,24 +145,17 @@ export const membersRouter = router({
     .mutation(answeredBy(cancelInvitation)),
   revokeCredentials: mutationProcedure
     .input(parsedBy(revokeCredentialsHereInput))
-    .mutation(({ ctx, input }) =>
-      crossing(
-        ctx,
-        revokeCredentialsHere.name,
-        given(input, (asked) =>
-          revokeCredentialsHere(ctx.principal, ctx.tx, { ...asked, at: ctx.clock.now() }),
-        ),
-      ),
-    ),
-  remove: mutationProcedure.input(parsedBy(removeMemberInput)).mutation(({ ctx, input }) =>
-    crossing(
-      ctx,
-      removeMember.name,
-      given(input, (asked) =>
-        removeMember(ctx.principal, ctx.tx, { ...asked, at: ctx.clock.now() }),
-      ),
-    ),
-  ),
+    .mutation(answeredAt(revokeCredentialsHere)),
+  remove: mutationProcedure.input(parsedBy(removeMemberInput)).mutation(answeredAt(removeMember)),
+  bulkChangeRole: mutationProcedure
+    .input(parsedBy(bulkChangeRoleInput))
+    .mutation(answeredBy(bulkChangeRole)),
+  bulkRemove: mutationProcedure
+    .input(parsedBy(bulkRemoveMembersInput))
+    .mutation(answeredAt(bulkRemoveMembers)),
+  bulkAddToGroup: mutationProcedure
+    .input(parsedBy(bulkAddToGroupInput))
+    .mutation(answeredBy(bulkAddToGroup)),
 
   /** A constant answer: whether a flag was raised or already waited is the operator's to know. */
   flagDisplayName: ownTransactionProcedure

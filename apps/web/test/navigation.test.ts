@@ -2,11 +2,19 @@ import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FAILED_SCREEN, goHome, RAIL, unbuiltLineOf, UNKNOWN_SCREEN } from "@/app/words.ts";
+import { MEMBER_PAGE_WORDS } from "@/features/people/member-act-words.ts";
 import { aRole, ROLES } from "@/features/people/role-meanings.ts";
 import {
   CONSOLE,
+  CONTROL_CENTRE,
+  detailAt,
+  groupIn,
+  headingOf,
+  hides,
   HOMES,
+  placeAt,
   readerOf,
+  screenNamed,
   screensOf,
   SURFACES,
   visibleTo,
@@ -16,7 +24,7 @@ import {
 } from "@/shared/navigation.ts";
 
 import { appAt, openApp } from "./open-app.tsx";
-import { answeringAs, withTheApiDown } from "./stubbed-api.ts";
+import { addressOf, answeringAs, withTheApiDown } from "./stubbed-api.ts";
 
 afterEach(() => {
   cleanup();
@@ -278,6 +286,52 @@ describe("what each person is shown", () => {
   });
 });
 
+const MEMBERS = screenNamed(groupIn(CONTROL_CENTRE, "people"), "Members");
+
+const A_PERSON = "01JBZ6Q2V7Y9K3M5N8P0R2T4W6";
+
+describe("a member page, declared beneath Members", () => {
+  it("places a person's address at Members, holding the person", () => {
+    const place = placeAt(SURFACES, `${MEMBERS.path}/${A_PERSON}`);
+
+    expect(place?.screen).toBe(MEMBERS);
+    expect(place?.group?.name).toBe("People");
+    expect(place?.detail).toBe(A_PERSON);
+    expect(placeAt(SURFACES, MEMBERS.path)?.detail).toBeUndefined();
+  });
+
+  it("places nothing deeper, nor beneath a screen declaring no detail", () => {
+    const placed = [
+      `${MEMBERS.path}/${A_PERSON}/x`,
+      `${MEMBERS.path}/`,
+      `/people/groups/${A_PERSON}`,
+      `/system/audit-log/${A_PERSON}`,
+    ].filter((path) => placeAt(SURFACES, path) !== undefined);
+
+    expect(placed).toEqual([]);
+  });
+
+  it("lists the page nowhere, so no screen list grows", () => {
+    const paths = screensOf([...SURFACES, CONSOLE]).map((each) => each.path);
+
+    expect(paths.filter((path) => path.startsWith(`${MEMBERS.path}/`))).toEqual([]);
+  });
+
+  it("hides it exactly where Members is hidden", () => {
+    const path = detailAt(MEMBERS, A_PERSON);
+
+    expect(path).toBe(`${MEMBERS.path}/${A_PERSON}`);
+    expect(hides(visibleTo(readerOf("Admin"), SURFACES), path)).toBe(false);
+    for (const role of ["Editor", "Viewer"] as const) {
+      expect(hides(visibleTo(readerOf(role), SURFACES), path)).toBe(true);
+    }
+  });
+
+  it("refuses an address beneath a screen that declares none", () => {
+    expect(() => detailAt(HOMES.Editor, A_PERSON)).toThrow(/declares no detail address/);
+  });
+});
+
 const heading = () => screen.getByRole("heading", { level: 1 }).textContent;
 
 const MOVED = [
@@ -368,6 +422,41 @@ describe("an address the person may not see", () => {
 
     expect(heading()).toBe(HOMES.Viewer.name);
     expect(screen.getByText(unbuiltLineOf(HOMES.Viewer))).toBeDefined();
+  });
+
+  for (const role of ["Editor", "Viewer"] as const) {
+    it(`shows ${aRole(role)} a member page as not found`, async () => {
+      vi.stubGlobal("fetch", answeringAs(role));
+
+      await openApp(`${MEMBERS.path}/${A_PERSON}`);
+      await within(screen.getByRole("main")).findByRole("link", { name: goHome(HOMES[role]) });
+
+      expect(heading()).toBe(UNKNOWN_SCREEN.heading);
+    });
+  }
+
+  it("shows an Admin a deeper address as not found", async () => {
+    vi.stubGlobal("fetch", answeringAs("Admin"));
+
+    await openApp(`${MEMBERS.path}/${A_PERSON}/x`);
+
+    expect(heading()).toBe(UNKNOWN_SCREEN.heading);
+  });
+
+  it("names no one at a malformed member address, asking nothing", async () => {
+    const asked: string[] = [];
+    const answering = answeringAs("Admin");
+    vi.stubGlobal("fetch", (input: string | URL | Request) => {
+      asked.push(addressOf(input).pathname);
+      return answering(input);
+    });
+
+    await openApp(`${MEMBERS.path}/not-a-person`);
+    await screen.findByText(MEMBER_PAGE_WORDS.noSuchMember);
+
+    expect(heading()).toBe(headingOf(MEMBERS));
+    expect(screen.getByRole("link", { name: MEMBER_PAGE_WORDS.toMembers })).toBeDefined();
+    expect(asked.filter((path) => path.includes("members."))).toEqual([]);
   });
 
   for (const path of ["/people/thresholds", "/suggestions/queue", "/knowledge/search"]) {

@@ -1,27 +1,25 @@
 import { Link } from "@tanstack/react-router";
-import { useId, useRef, useState, type RefObject } from "react";
+import { useId, useState, type RefObject } from "react";
 
 import type { ApiError } from "@/shared/api/trpc.ts";
 import { EmptyState } from "@/shared/empty-state.tsx";
 import { Icon } from "@/shared/icon.tsx";
-import { initialsOf } from "@/shared/initials.ts";
-import { CONTROL_CENTRE, groupIn, screenNamed } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
-import { RowSheet } from "@/shared/row-sheet.tsx";
 import { SheetPart } from "@/shared/sheet-part.tsx";
 import { SummaryRow } from "@/shared/summary-row.tsx";
-import { Avatar, AvatarFallback } from "@/shared/ui/avatar.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 import { RadioGroup, RadioGroupItem } from "@/shared/ui/radio-group.tsx";
-import { SheetDescription, SheetHeader, SheetTitle } from "@/shared/ui/sheet.tsx";
 import { instantWords } from "@/shared/words.ts";
 
 import { EMPTY_LINES } from "./empty-lines.ts";
 import { GroupChecklist } from "./group-checklist.tsx";
 import { useGroups } from "./groups-api.ts";
+import { GroupsReadSaid } from "./groups-read.tsx";
+import { INCLUDES_YOU, RECORDED } from "./member-act-words.ts";
 import { MemberRemoval } from "./member-removal.tsx";
+import { GROUPS_PATH } from "./members-address.ts";
 import {
   useChangeRole,
   useFlagDisplayName,
@@ -32,43 +30,55 @@ import {
   type Role,
   type RoleChanged,
 } from "./people-api.ts";
-import { outcomeOfFailure, outcomeOfGroupFailure } from "./refusal.tsx";
+import { outcomeOfFailure } from "./refusal.tsx";
 import { aRole, ROLE_MEANINGS, roleOf, ROLES } from "./role-meanings.ts";
-import { CredentialsHere, GroupPills, JoinedOn, nameOf, RECORDED } from "./words.tsx";
+import { useSelfActHome } from "./self-act.tsx";
+import { CredentialsHere, GroupPills, JoinedOn, nameOf } from "./words.tsx";
 
-/** Where focus lands when the sheet opens: on who the member is, or straight on an act. */
-export type OpenedAt = "member" | "role" | "groups" | "credentials" | "flag" | "removal";
+/** The control each of the page's acts lands focus on, so a keystroke can reach any of them. */
+export type Landings = {
+  readonly role: RefObject<HTMLDivElement | null>;
+  readonly groups: RefObject<HTMLDivElement | null>;
+  readonly flag: RefObject<HTMLButtonElement | null>;
+  readonly credentials: RefObject<HTMLButtonElement | null>;
+  readonly removal: RefObject<HTMLButtonElement | null>;
+};
 
-export const memberButtonId = (personId: string): string => `member-${personId}`;
+/** Removal is the page's to take: the person, and the page with them, leave as it lands. */
+export type Removal = {
+  /** None until the reader's own membership is read. */
+  readonly remove: ((member: ListedMember) => void) | undefined;
+  readonly outcome: Outcome | undefined;
+};
 
-const GROUPS_SCREEN = screenNamed(groupIn(CONTROL_CENTRE, "people"), "Groups").path;
-
-function Membership(properties: { readonly member: ListedMember }) {
+function AccessSummary(properties: { readonly member: ListedMember }) {
   const { member } = properties;
-  const headingId = useId();
 
   return (
-    <section aria-labelledby={headingId} className="border border-border">
-      <h3 id={headingId} className="border-b border-border px-4 py-2 font-medium">
-        Membership
-      </h3>
-      <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2 px-4 py-3 text-sm">
-        <SummaryRow term="Role">
-          <Pill>{member.role}</Pill>
-        </SummaryRow>
-        <SummaryRow term="Groups">
-          <GroupPills groups={member.groups} />
-        </SummaryRow>
-        <SummaryRow term="Joined">
-          <JoinedOn instant={member.joinedAt} />
-        </SummaryRow>
-        <SummaryRow term="Credentials here">
-          <CredentialsHere revokedAt={member.credentialsRevokedAt} />
-        </SummaryRow>
-      </dl>
-    </section>
+    <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2 text-sm">
+      <SummaryRow term="Role">
+        <Pill>{member.role}</Pill>
+      </SummaryRow>
+      <SummaryRow term="Groups">
+        <GroupPills groups={member.groups} />
+      </SummaryRow>
+      <SummaryRow term="Joined">
+        <JoinedOn instant={member.joinedAt} />
+      </SummaryRow>
+      <SummaryRow term="Credentials here">
+        <CredentialsHere revokedAt={member.credentialsRevokedAt} />
+      </SummaryRow>
+    </dl>
   );
 }
+
+/** The hint beside the commit, which says so when the act is on the reader themself. */
+const roleHint = (name: string, held: Role, unchanged: boolean, yourself: boolean): string => {
+  if (unchanged) return `${name} is ${aRole(held)}. Pick another role to change it.`;
+  return yourself
+    ? `${INCLUDES_YOU} ${RECORDED} It holds from your next request.`
+    : `${RECORDED} It holds from their next request.`;
+};
 
 function RolePicker(properties: {
   readonly member: ListedMember;
@@ -78,6 +88,8 @@ function RolePicker(properties: {
   const [picked, setPicked] = useState<Role>(member.role);
   const [outcome, setOutcome] = useState<Outcome>();
   const changeRole = useChangeRole();
+  const yourself = useReaderId() === member.personId;
+  const { goHome } = useSelfActHome();
   const headingId = useId();
   const hintId = useId();
   const itemId = useId();
@@ -98,6 +110,11 @@ function RolePicker(properties: {
             tone: "said",
             words: `${name} is ${aRole(changed.role)} now, from their next request.`,
           });
+          // People is for Admins, so a reader who is one no longer leaves it for their new home.
+          if (!yourself || changed.role === "Admin") return;
+          void goHome("demoted").then((unread) => {
+            if (unread !== undefined) setOutcome(unread);
+          });
         },
         onError: (failure: Error | ApiError) => {
           setOutcome(outcomeOfFailure(failure));
@@ -110,7 +127,7 @@ function RolePicker(properties: {
 
   return (
     <section aria-labelledby={headingId} className="border border-border">
-      <h3 id={headingId} className="border-b border-border px-4 py-2 font-medium">
+      <h3 id={headingId} className="max-w-none border-b border-border px-4 py-2 font-medium">
         Role
       </h3>
       <div className="grid gap-4 px-4 py-3">
@@ -147,9 +164,7 @@ function RolePicker(properties: {
             Make {name} {aRole(picked)}
           </Button>
           <p id={hintId} className="text-sm text-muted-foreground">
-            {unchanged
-              ? `${name} is ${aRole(member.role)}. Pick another role to change it.`
-              : `${RECORDED} It holds from their next request.`}
+            {roleHint(name, member.role, unchanged, yourself)}
           </p>
         </div>
 
@@ -282,19 +297,14 @@ function GroupsPicker(properties: {
 
   return (
     <SheetPart title="Groups">
-      <OutcomeLine
-        outcome={groups.error === null ? undefined : outcomeOfGroupFailure(groups.error, "read")}
-      />
-      <div aria-live="polite" className="empty:hidden">
-        {groups.isPending ? <p>The groups are still loading.</p> : null}
-      </div>
+      <GroupsReadSaid error={groups.error} isPending={groups.isPending} />
       <div ref={pickerRef} className="contents">
         {groups.data?.length === 0 ? (
           <EmptyState
             line={EMPTY_LINES.groups}
             className="gap-1"
             action={
-              <Link to={GROUPS_SCREEN} className="text-brand underline">
+              <Link to={GROUPS_PATH} className="text-brand underline">
                 Create one on the Groups screen
               </Link>
             }
@@ -327,66 +337,37 @@ function GroupsPicker(properties: {
   );
 }
 
-export function MemberSheet(properties: {
-  readonly member: ListedMember;
-  readonly openedAt: OpenedAt;
-  readonly onClose: () => void;
-  readonly onRemove: (member: ListedMember) => void;
-
-  /** The member's own row may be gone by then, so the list decides where focus lands. */
-  readonly returnFocus: () => void;
-}) {
-  const { member, openedAt, onClose, onRemove, returnFocus } = properties;
-  const titleRef = useRef<HTMLHeadingElement>(null);
-  const pickerRef = useRef<HTMLDivElement>(null);
-  const revokeRef = useRef<HTMLButtonElement>(null);
-  const groupsRef = useRef<HTMLDivElement>(null);
-  const flagRef = useRef<HTMLButtonElement>(null);
-  const askRef = useRef<HTMLButtonElement>(null);
-
-  const landOn = {
-    member: () => titleRef.current,
-    role: () => pickerRef.current?.querySelector<HTMLElement>('[aria-checked="true"]'),
-    // A workspace with no groups offers its link to the Groups screen in their place.
-    groups: () => groupsRef.current?.querySelector<HTMLElement>('[role="checkbox"], a'),
-    credentials: () => revokeRef.current,
-    // A member with no display name has no flag to land on, so focus goes to who they are.
-    flag: () => flagRef.current ?? titleRef.current,
-    removal: () => askRef.current,
-  } satisfies Readonly<Record<OpenedAt, () => HTMLElement | null | undefined>>;
+/** Who the member is and what they may reach here, with each act that changes it. */
+export function Access(properties: { readonly member: ListedMember; readonly landings: Landings }) {
+  const { member, landings } = properties;
 
   return (
-    <RowSheet
-      rowButtonId={memberButtonId(member.personId)}
-      onOpen={() => {
-        (landOn[openedAt]() ?? titleRef.current)?.focus();
-      }}
-      onClose={onClose}
-      returnFocus={returnFocus}
-    >
-      <SheetHeader className="border-b border-border">
-        <div className="flex items-center gap-3 pr-8">
-          <Avatar aria-hidden className="size-9">
-            <AvatarFallback>{initialsOf(nameOf(member))}</AvatarFallback>
-          </Avatar>
-          <div className="flex min-w-0 flex-col leading-tight">
-            <SheetTitle asChild>
-              <h2 ref={titleRef} tabIndex={-1} className="wrap-anywhere">
-                {nameOf(member)}
-              </h2>
-            </SheetTitle>
-            <SheetDescription className="wrap-anywhere">{member.address}</SheetDescription>
-          </div>
-        </div>
-      </SheetHeader>
-      <div className="grid gap-4 px-4 pb-4">
-        <Membership member={member} />
-        <RolePicker member={member} pickerRef={pickerRef} />
-        <GroupsPicker member={member} pickerRef={groupsRef} />
-        <CredentialsRevoker member={member} revokeRef={revokeRef} />
-        <DisplayNameFlag member={member} flagRef={flagRef} />
-        <MemberRemoval member={member} askRef={askRef} onRemove={onRemove} />
-      </div>
-    </RowSheet>
+    <>
+      <AccessSummary member={member} />
+      <RolePicker member={member} pickerRef={landings.role} />
+      <GroupsPicker member={member} pickerRef={landings.groups} />
+      <DisplayNameFlag member={member} flagRef={landings.flag} />
+    </>
+  );
+}
+
+/** The two acts that end the person's access here, set apart from the rest. */
+export function RemoveAndRevoke(properties: {
+  readonly member: ListedMember;
+  readonly landings: Landings;
+  readonly removal: Removal;
+}) {
+  const { member, landings, removal } = properties;
+
+  return (
+    <>
+      <CredentialsRevoker member={member} revokeRef={landings.credentials} />
+      <MemberRemoval
+        member={member}
+        askRef={landings.removal}
+        onRemove={removal.remove}
+        outcome={removal.outcome}
+      />
+    </>
   );
 }

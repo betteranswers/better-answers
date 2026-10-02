@@ -26,9 +26,10 @@ export function OutcomeLine(properties: {
       <output className="block text-muted-foreground empty:hidden">
         {outcome?.tone === "said" ? outcome.words : null}
       </output>
-      <p role="alert" className="text-foreground empty:hidden">
+      {/* Not a paragraph: a refusal that names several items holds their list. */}
+      <div role="alert" className="text-foreground empty:hidden">
         {outcome?.tone === "refused" ? outcome.words : null}
-      </p>
+      </div>
     </div>
   );
 }

@@ -10,11 +10,14 @@ import {
   type RoleOrOperator,
 } from "@/shared/navigation.ts";
 
-const partsAt = (role: RoleOrOperator, path: string, openTab?: string) => {
+/** `below` is the open tab, or on a member page the name the page gives. */
+const partsAt = (role: RoleOrOperator, path: string, below?: string) => {
   const surfaces = role === "operator" ? [CONSOLE] : SURFACES;
   const visible = visibleTo(readerOf(role), surfaces).surfaces;
-  return partsOf(placeAt(visible, path), openTab);
+  return partsOf(placeAt(visible, path), below);
 };
+
+const MEMBER_PAGE = "/people/members/01JBZ6Q2V7Y9K3M5N8P0R2T4W6";
 
 describe("the band's breadcrumb", () => {
   it("names four parts, linking all but the open tab", () => {
@@ -64,5 +67,31 @@ describe("the band's breadcrumb", () => {
 
   it("names nothing where the address is no screen", () => {
     expect(partsAt("Admin", "/system/not-a-screen")).toEqual([]);
+  });
+
+  it("ends a member page on the person's name", () => {
+    expect(partsAt("Admin", MEMBER_PAGE, "Priya Shah")).toEqual([
+      { name: "Control Centre", to: "/people/members" },
+      { name: "People", to: "/people/members" },
+      { name: "Members", to: "/people/members" },
+      { name: "Priya Shah", to: undefined },
+    ]);
+  });
+
+  it("names a person whose name repeats a part above", () => {
+    expect(partsAt("Admin", MEMBER_PAGE, "Members").map((part) => part.name)).toEqual([
+      "Control Centre",
+      "People",
+      "Members",
+      "Members",
+    ]);
+  });
+
+  it("makes Members current on a member page lacking a name", () => {
+    expect(partsAt("Admin", MEMBER_PAGE)).toEqual([
+      { name: "Control Centre", to: "/people/members" },
+      { name: "People", to: "/people/members" },
+      { name: "Members", to: undefined },
+    ]);
   });
 });

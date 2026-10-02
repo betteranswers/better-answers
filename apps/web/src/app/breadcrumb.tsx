@@ -17,25 +17,37 @@ import { BREADCRUMB } from "./words.ts";
 /** `to` is undefined for the last part alone, the place the reader is on. */
 export type Part = { readonly name: string; readonly to: string | undefined };
 
-/** Broadest first. A name said twice in a row is said once, by the deeper part. */
+const placeParts = ({ surface, group, screen }: Place<VisibleSurface>): readonly Part[] => [
+  { name: surface.name, to: surface.opensAt.path },
+  // The reader's own copy of the group, so its first screen is one they may see.
+  ...(group?.name === undefined
+    ? []
+    : [{ name: group.name, to: group.screens[0]?.path ?? screen.path }]),
+  { name: screen.name, to: screen.path },
+];
+
+/** A name said twice in a row is said once, by the deeper part. */
+const saidOnce = (named: readonly Part[]): readonly Part[] =>
+  named.filter((part, at) => part.name !== named[at + 1]?.name);
+
+const lastOnly = (parts: readonly Part[]): readonly Part[] =>
+  parts.map((part, at) => (at === parts.length - 1 ? { ...part, to: undefined } : part));
+
+/**
+ * Broadest first. `below` is the open tab, or the name a detail address's page gives: a person's
+ * own, so never folded into a part above.
+ */
 export const partsOf = (
   open: Place<VisibleSurface> | undefined,
-  openTab: string | undefined,
+  below: string | undefined,
 ): readonly Part[] => {
   if (open === undefined) return [];
-  const { surface, group, screen } = open;
-
-  const named: readonly Part[] = [
-    { name: surface.name, to: surface.opensAt.path },
-    // The reader's own copy of the group, so its first screen is one they may see.
-    ...(group?.name === undefined
-      ? []
-      : [{ name: group.name, to: group.screens[0]?.path ?? screen.path }]),
-    { name: screen.name, to: screen.path },
-    ...(openTab === undefined ? [] : [{ name: openTab, to: undefined }]),
-  ];
-  const once = named.filter((part, at) => part.name !== named[at + 1]?.name);
-  return once.map((part, at) => (at === once.length - 1 ? { ...part, to: undefined } : part));
+  const beneath: readonly Part[] = below === undefined ? [] : [{ name: below, to: undefined }];
+  return lastOnly(
+    open.detail === undefined
+      ? saidOnce([...placeParts(open), ...beneath])
+      : [...saidOnce(placeParts(open)), ...beneath],
+  );
 };
 
 /** The router marks every link to the open address as the page, and only the last part is. */
@@ -73,13 +85,14 @@ export function BandBreadcrumb(properties: {
         {parts.map((part, at) => {
           const middle = at > 0 && at < parts.length - 1;
 
+          // By place, not name: a person's name may repeat a part above it.
           return [
             at === 0 ? null : (
-              <BreadcrumbSeparator key={`${part.name} after`} className="shrink-0">
+              <BreadcrumbSeparator key={`${String(at)} after`} className="shrink-0">
                 <Icon name="caret-right" />
               </BreadcrumbSeparator>
             ),
-            <BreadcrumbItem key={part.name} className={itemClass(wide, middle)}>
+            <BreadcrumbItem key={String(at)} className={itemClass(wide, middle)}>
               {part.to === undefined ? (
                 <BreadcrumbPage>{part.name}</BreadcrumbPage>
               ) : (

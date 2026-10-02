@@ -8,6 +8,7 @@ import {
   declareAct,
   err,
   ok,
+  type AdminUserPrincipal,
   type AdmittedOf,
   type Result,
   type Role,
@@ -52,6 +53,27 @@ export type RoleChanged = {
 
 type Asked = { readonly personId: UserId; readonly role: Role };
 
+/** A step on a member row its act holds: the role moves, and its audit event lands in `batchId`. */
+export const roleWritten = async (
+  admin: AdminUserPrincipal,
+  tx: Tx,
+  changed: RoleChanged,
+  batchId?: string,
+): Promise<void> => {
+  await tx.query("UPDATE member SET role = $3 WHERE workspace_id = $1 AND user_id = $2", [
+    admin.workspaceId,
+    changed.personId,
+    changed.role,
+  ]);
+  await record(admin, tx, {
+    id: ulid(),
+    act: ROLE_ACTS.roleChanged,
+    subjectId: changed.personId,
+    detail: { previousRole: changed.previousRole, role: changed.role },
+    batchId,
+  });
+};
+
 const roleSetUnderTheLock = (
   admin: AdmittedOf<typeof changeRoleAct>,
   tx: Tx,
@@ -62,17 +84,7 @@ const roleSetUnderTheLock = (
     if (changed.previousRole === changed.role) return ok(changed);
     if (leavesNoAdmin(held)) return err("last-admin");
 
-    await tx.query("UPDATE member SET role = $3 WHERE workspace_id = $1 AND user_id = $2", [
-      admin.workspaceId,
-      asked.personId,
-      asked.role,
-    ]);
-    await record(admin, tx, {
-      id: ulid(),
-      act: ROLE_ACTS.roleChanged,
-      subjectId: asked.personId,
-      detail: { previousRole: changed.previousRole, role: changed.role },
-    });
+    await roleWritten(admin, tx, changed);
     return ok(changed);
   });
 

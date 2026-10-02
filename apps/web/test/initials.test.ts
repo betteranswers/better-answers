@@ -41,7 +41,7 @@ describe("a person's initials where the browser has no segmenter", () => {
     vi.unstubAllGlobals();
   });
 
-  it("takes code points, losing an accent typed apart", async () => {
+  it("keeps flags, accents typed apart and joined emoji whole", async () => {
     const descriptors = Object.getOwnPropertyDescriptors(Intl);
     Reflect.deleteProperty(descriptors, "Segmenter");
     vi.stubGlobal("Intl", Object.defineProperties({}, descriptors));
@@ -50,6 +50,8 @@ describe("a person's initials where the browser has no segmenter", () => {
 
     expect(withoutASegmenter("Sam Okoro")).toBe("SO");
     expect(withoutASegmenter("😀 Okoro")).toBe("😀O");
-    expect(withoutASegmenter("e\u0301mile Zola")).toBe("EZ");
+    expect(withoutASegmenter("e\u0301mile Zola")).toBe("E\u0301Z");
+    expect(withoutASegmenter("🇬🇧 Team")).toBe("🇬🇧T");
+    expect(withoutASegmenter("👩\u200D💻 Dev")).toBe("👩\u200D💻D");
   });
 });
