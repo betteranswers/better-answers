@@ -183,6 +183,7 @@ const acceptedRows = {
   passkeyLastUse: [{ passkeyId: PASSKEY_ID, at: NOW }],
   recoveryCode: [{ id: "recovery-code-1", userId: USER_ID, codeHash: "a".repeat(64) }],
   workspaceLastActive: [{ workspaceId: WS_ID, userId: USER_ID, at: NOW }],
+  testWorkspaceMark: [{ workspaceId: WS_ID, testingDomain: "journeys.testing.invalid" }],
   mcpCallCounter: [{ workspaceId: WS_ID, tokenId: "jti-1", windowStart: NOW, count: 1 }],
   invitationEmailCounter: [
     { workspaceId: WS_ID, key: "a".repeat(64), windowStart: NOW, count: 1 },
@@ -816,6 +817,7 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "passkeyLastUse",
         "recoveryCode",
         "workspaceLastActive",
+        "testWorkspaceMark",
         "mcpCallCounter",
         "invitationEmailCounter",
         "ingressCounter",
@@ -916,6 +918,12 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { ...acceptedRows.sweepPass[0], removed: 0.5 },
     ],
     mcpCallCounter: [{ ...acceptedRows.mcpCallCounter[0], count: -1 }],
+    testWorkspaceMark: [
+      { ...acceptedRows.testWorkspaceMark[0], workspaceId: "not-a-ulid" },
+      { ...acceptedRows.testWorkspaceMark[0], testingDomain: "Journeys.Testing.Invalid" },
+      { ...acceptedRows.testWorkspaceMark[0], testingDomain: "journeys" },
+      { ...acceptedRows.testWorkspaceMark[0], testingDomain: "person@journeys.invalid" },
+    ],
     invitationEmailCounter: [
       { ...acceptedRows.invitationEmailCounter[0], workspaceId: "not-a-ulid" },
       { ...acceptedRows.invitationEmailCounter[0], key: "   " },
@@ -1370,6 +1378,12 @@ describe("5 — the inferred type is pinned", () => {
     Equal<
       z.infer<typeof boundarySchemas.mcpCallCounter.select>,
       { workspaceId: WorkspaceId; tokenId: string; windowStart: Date; count: number }
+    >
+  >;
+  type _testWorkspaceMarkSelect = Expect<
+    Equal<
+      z.infer<typeof boundarySchemas.testWorkspaceMark.select>,
+      { workspaceId: WorkspaceId; testingDomain: string }
     >
   >;
   type _invitationEmailCounterSelect = Expect<

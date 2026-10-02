@@ -60,6 +60,10 @@ export const SAID_OF_AN_INVITATION = {
     why: "That address belongs to a member of this workspace already.",
     next: "Find them on the Members tab.",
   },
+  "off-testing-domain": {
+    why: "This workspace is kept for testing, so it invites only addresses on its testing domain.",
+    next: "Use an address on that domain.",
+  },
   "no-such-invitation": {
     why: "That invitation is no longer waiting: it was accepted or cancelled.",
     next: "Read the list again.",
@@ -83,6 +87,10 @@ export const SAID_OF_TICKED_INVITATIONS = {
   "role-forbids": SAID_OF_AN_INVITATION["role-forbids"],
   "no-such-invitation": {
     why: "It is no longer waiting: it was accepted or cancelled.",
+    next: "Try again without it.",
+  },
+  "off-testing-domain": {
+    why: "Its address is off this workspace's testing domain, so nothing was sent.",
     next: "Try again without it.",
   },
   "changed-meanwhile": {
@@ -148,6 +156,10 @@ export const SAID_OF_A_REQUEST = {
   "no-such-role": {
     why: "A role is Admin, Editor or Viewer.",
     next: "Choose one of the three.",
+  },
+  "off-testing-domain": {
+    why: "This workspace is kept for testing, so it invites only addresses on its testing domain.",
+    next: "Decline the request instead.",
   },
   malformed: {
     why: "That request couldn't be read, so nothing was decided.",

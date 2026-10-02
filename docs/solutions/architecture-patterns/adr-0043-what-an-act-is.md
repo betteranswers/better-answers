@@ -53,7 +53,7 @@ Each transport:
 
 - Over tRPC it is a thrown error, typed through `AppRouter` (`apps/api/src/trpc/base.ts`). The error carries the items, and the web reads them as plain words.
 - MCP has its own (`apps/api/src/mcp/crossing.ts`). It answers the set's word alone and drops the items, since no act that names items is an entry.
-- `pnpm ops` maps each class to an exit code (`apps/api/src/ops/index.ts`). It takes a word alone, so a refusal naming items cannot reach it.
+- `pnpm ops` maps each class to an exit code (`apps/api/src/ops/index.ts`). A command's refusal is a word, or a word beside the one thing the operator must change, such as the address the test workspace's fixture refused, and it exits with its word's class. An import's refusal that names the file it stopped at is no word, and exits as refused. No command's act names items, so items never reach it.
 - A refusal's log line holds its word and class, never an item's id.
 - A ceiling is no refusal, since time is its only remedy. An act counting one in its own transaction fails with the kernel's `CeilingMet` (`packages/core/src/kernel/ceiling.ts`), which rolls the count back. tRPC's crossing answers it 429 with `retryAfterSeconds`, as a ceiling met before the act does.
 - Procedures are written by hand, so the call graph stays whole.

@@ -29,6 +29,12 @@ import { refusalOfDeadlock, type Tx } from "../store/postgres/index.ts";
 import type { WORKSPACE_REFUSALS } from "../workspaces/index.ts";
 import { emailsCounted, waitingCounted } from "./invitation-ceilings.ts";
 import { distinct, namedEach, refusedItemsOf } from "./sets.ts";
+import {
+  invitationsOffDomain,
+  isOffDomain,
+  OFF_TESTING_DOMAIN,
+  testingDomainOf,
+} from "./testing-domain.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
 export const INVITATION_ACTS = declareActs("people", {
@@ -58,7 +64,14 @@ export const inviteMembersInput = z.object({
 const inviteMembersAct = declareAct({
   admits: ADMIN_ALONE,
   input: inviteMembersInput,
-  refuses: ["role-forbids", "no-such-role", "malformed", "already-a-member", "changed-meanwhile"],
+  refuses: [
+    "role-forbids",
+    "no-such-role",
+    "malformed",
+    "already-a-member",
+    "off-testing-domain",
+    "changed-meanwhile",
+  ],
   effect: "write",
 });
 
@@ -75,7 +88,7 @@ const ON_AN_INVITATION: readonly OnAnInvitationRefusal[] = [
 const resendInvitationAct = declareAct({
   admits: ADMIN_ALONE,
   input: invitationInput,
-  refuses: ON_AN_INVITATION,
+  refuses: [...ON_AN_INVITATION, OFF_TESTING_DOMAIN],
   effect: "write",
 });
 
@@ -91,7 +104,7 @@ type AlreadyAMember = Extract<keyof typeof WORKSPACE_REFUSALS, "already-a-member
 
 export type InviteMembersRefusal =
   | MemberRefusal<"role-forbids" | "no-such-role" | "changed-meanwhile">
-  | RefusedItems<MemberRefusal<"malformed"> | AlreadyAMember>
+  | RefusedItems<MemberRefusal<"malformed" | "off-testing-domain"> | AlreadyAMember>
   | Error;
 
 export type ResendInvitationRefusal = MemberRefusal<RefusalOf<typeof resendInvitationAct>> | Error;
@@ -264,10 +277,14 @@ export const mintInvitation = async (
   admin: AdminUserPrincipal,
   tx: Tx,
   input: MintInvitationInput,
-): Promise<Result<InvitationToSend, Error>> => {
+): Promise<Result<InvitationToSend, MemberRefusal<"off-testing-domain"> | Error>> => {
   const address = input.address.toLowerCase();
   const invitationId = ulid();
   const { role, now } = input;
+
+  const domain = await attempt(() => testingDomainOf(admin, tx));
+  if (!domain.ok) return err(domain.error);
+  if (isOffDomain(domain.value, address)) return err(OFF_TESTING_DOMAIN);
 
   const minted = await attempt(() =>
     mintedEach(admin, tx, { invitations: [{ invitationId, address }], role, now }),
@@ -308,12 +325,30 @@ const addressesOf = (asked: readonly string[]): Parsed =>
 
 type Sending = { readonly addresses: readonly string[]; readonly role: Role; readonly now: Date };
 
-/** Counts each address's email, then refuses the members among them, then mints. */
+const offDomainRefused = async (
+  admin: AdminUserPrincipal,
+  tx: Tx,
+  addresses: readonly string[],
+): Promise<RefusedItems<MemberRefusal<"off-testing-domain">> | undefined> => {
+  const domain = await testingDomainOf(admin, tx);
+  return refusedItemsOf(
+    namedEach(
+      positionsWhere(addresses, (address) => isOffDomain(domain, address)),
+      OFF_TESTING_DOMAIN,
+    ),
+  );
+};
+
+type SendRefusal = RefusedItems<AlreadyAMember | MemberRefusal<"off-testing-domain">> | CeilingMet;
+
+/** Refuses each address off a marked workspace's domain, counts every email, refuses members, mints. */
 const sentUnderLocks = async (
   admin: AdminUserPrincipal,
   tx: Tx,
   sending: Sending,
-): Promise<Result<readonly InvitationMinted[], RefusedItems<AlreadyAMember> | CeilingMet>> => {
+): Promise<Result<readonly InvitationMinted[], SendRefusal>> => {
+  const offDomain = await offDomainRefused(admin, tx, sending.addresses);
+  if (offDomain !== undefined) return err(offDomain);
   const addresses = distinct(sending.addresses);
   const counted = await emailsCounted(admin, tx, addresses, sending.now);
   if (!counted.ok) return err(counted.error);
@@ -351,8 +386,8 @@ export type InviteMembersInput = z.output<typeof inviteMembersInput> & { readonl
 
 /**
  * One invitation per address, folded however it is cased, or none: an address of no known form,
- * or one a member here holds, refuses the send naming each by its position. A waiting invitation
- * to an address is replaced, and the answer says so.
+ * off a marked workspace's testing domain, or a member's here refuses the send naming each by its
+ * position. A waiting invitation to an address is replaced, and the answer says so.
  */
 export const inviteMembers = async (
   principal: UserPrincipal,
@@ -391,7 +426,11 @@ const renewedOne = async (
   admin: AdminUserPrincipal,
   tx: Tx,
   input: ResendInvitationInput,
-): Promise<Result<InvitationToSend, MemberRefusal<"no-such-invitation"> | CeilingMet>> => {
+): Promise<
+  Result<InvitationToSend, MemberRefusal<"no-such-invitation" | "off-testing-domain"> | CeilingMet>
+> => {
+  const offDomain = await invitationsOffDomain(admin, tx, [input.invitationId]);
+  if (offDomain.length > 0) return err(OFF_TESTING_DOMAIN);
   const counted = await waitingCounted(admin, tx, [input.invitationId], input.now);
   if (!counted.ok) return err(counted.error);
   const renewed = firstWaitingOf(

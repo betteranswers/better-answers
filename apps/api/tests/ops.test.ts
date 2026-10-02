@@ -2188,6 +2188,293 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
   });
 
+  describe("test-workspace — the journeys' fixture, made or repaired", () => {
+    const aFixture = () => {
+      const domain = `${ulid().toLowerCase()}.testing.invalid`;
+      return {
+        domain,
+        slug: `journeys-${ulid().toLowerCase()}`,
+        admin: `admin@${domain}`,
+        editor: `editor@${domain}`,
+        viewer: `viewer@${domain}`,
+      };
+    };
+
+    type Fixture = ReturnType<typeof aFixture>;
+
+    const flagsOf = (fixture: Fixture): readonly string[] => [
+      "--domain",
+      fixture.domain,
+      "--slug",
+      fixture.slug,
+      "--admin",
+      fixture.admin,
+      "--editor",
+      fixture.editor,
+      "--viewer",
+      fixture.viewer,
+    ];
+
+    const fixing = (app: TestApp, fixture: Fixture): Promise<Run> =>
+      opsWith(app, ["test-workspace", ...flagsOf(fixture)], {});
+
+    const rolesIn = async (app: TestApp, workspaceId: string) => {
+      const found = await app.database.superuser.query<{ role: string; members: number }>(
+        "SELECT role, count(*)::int AS members FROM member WHERE workspace_id = $1 GROUP BY role ORDER BY role",
+        [workspaceId],
+      );
+      return found.rows;
+    };
+
+    const auditRowsIn = async (app: TestApp, workspaceId: string): Promise<number> => {
+      const found = await app.database.superuser.query(
+        "SELECT 1 FROM audit_event WHERE workspace_id = $1",
+        [workspaceId],
+      );
+      return found.rowCount ?? 0;
+    };
+
+    const peopleOn = async (app: TestApp, fixture: Fixture): Promise<number> => {
+      const found = await app.database.superuser.query(
+        'SELECT 1 FROM "user" WHERE lower(email) LIKE $1',
+        [`%@${fixture.domain}`],
+      );
+      return found.rowCount ?? 0;
+    };
+
+    it("makes the workspace, its three people and 51 Viewers", async () => {
+      const fixture = aFixture();
+
+      const run = await fixing(app(), fixture);
+
+      expect(run.exitCode).toBe(0);
+      const id = idOnTheDoneLine(run);
+      expect(run.lines).toEqual([
+        `test-workspace: done — ${id}, slug ${fixture.slug}, testing domain ${fixture.domain}; provisioned, mark written, 54 people added, 53 members added`,
+      ]);
+      expect(await rolesIn(app(), id)).toEqual([
+        { role: "Admin", members: 1 },
+        { role: "Editor", members: 1 },
+        { role: "Viewer", members: 52 },
+      ]);
+      const reconciled = await ops(app(), ["reconcile-watermark", "--workspace", id]);
+      expect(reconciled.lines).toEqual([
+        "reconcile-watermark: done — head none, watermark none, replayed 0, already landed 0",
+      ]);
+    });
+
+    it("reports nothing to do on a second run, recording nothing", async () => {
+      const fixture = aFixture();
+      const id = idOnTheDoneLine(await fixing(app(), fixture));
+      const recorded = await auditRowsIn(app(), id);
+
+      const run = await fixing(app(), fixture);
+
+      expect(run).toMatchObject({
+        exitCode: 0,
+        lines: [
+          `test-workspace: done — ${id}, slug ${fixture.slug}, testing domain ${fixture.domain}; nothing to do`,
+        ],
+      });
+      expect(await auditRowsIn(app(), id)).toBe(recorded);
+    });
+
+    it("prints the stored domain and slug, not the padded input", async () => {
+      const fixture = aFixture();
+      const padded = {
+        ...fixture,
+        domain: ` ${fixture.domain.toUpperCase()} `,
+        slug: ` ${fixture.slug} `,
+      };
+
+      const run = await fixing(app(), padded);
+
+      const id = idOnTheDoneLine(run);
+      expect(run.lines).toEqual([
+        `test-workspace: done — ${id}, slug ${fixture.slug}, testing domain ${fixture.domain}; provisioned, mark written, 54 people added, 53 members added`,
+      ]);
+    });
+
+    it("names a member outside the fixture, leaving them in place", async () => {
+      const fixture = aFixture();
+      const id = idOnTheDoneLine(await fixing(app(), fixture));
+      const stranger = await app().person(`stranger@${fixture.domain}`, "Sam Stranger");
+      await app().addMember(id, stranger.id, "Editor");
+
+      const run = await fixing(app(), fixture);
+
+      expect(run).toMatchObject({
+        exitCode: 0,
+        lines: [
+          `test-workspace: done — ${id}, slug ${fixture.slug}, testing domain ${fixture.domain}; nothing to do`,
+          `test-workspace: stranger@${fixture.domain}, an Editor, is no part of the fixture; left in place`,
+        ],
+      });
+      expect(await membershipsOf(app(), id, stranger.id)).toEqual([
+        { id: expect.stringMatching(ULID_SHAPE), role: "Editor" },
+      ]);
+    });
+
+    it("refuses an address off the testing domain, writing nothing", async () => {
+      const fixture = { ...aFixture(), viewer: "viewer@elsewhere.invalid" };
+
+      const run = await fixing(app(), fixture);
+
+      expect(run).toMatchObject({
+        exitCode: 7,
+        lines: [
+          `test-workspace: REFUSED — off-testing-domain: viewer@elsewhere.invalid is not on ${fixture.domain}, where every test person's address is`,
+        ],
+      });
+      expect(await workspacesWithSlug(app(), fixture.slug)).toBe(0);
+      expect(await peopleOn(app(), fixture)).toBe(0);
+    });
+
+    it("refuses an address carrying the operator mark, writing nothing", async () => {
+      const fixture = aFixture();
+      await app().person(fixture.admin, "Olive Operator");
+      await ops(app(), ["operator", "--email", fixture.admin, "--grant"]);
+
+      const run = await fixing(app(), fixture);
+
+      expect(run).toMatchObject({
+        exitCode: 7,
+        lines: [
+          `test-workspace: REFUSED — operator-marked: ${fixture.admin} carries the operator mark, which no test person may; give another address`,
+        ],
+      });
+      expect(await workspacesWithSlug(app(), fixture.slug)).toBe(0);
+      expect(await peopleOn(app(), fixture)).toBe(1);
+    });
+
+    it("refuses a test person who is a member elsewhere", async () => {
+      const fixture = aFixture();
+      const editor = await app().person(fixture.editor, "Eddie Editor");
+      const { workspaceId } = await app().provision();
+      await app().addMember(workspaceId, editor.id, "Viewer");
+
+      const run = await fixing(app(), fixture);
+
+      expect(run).toMatchObject({
+        exitCode: 7,
+        lines: [
+          `test-workspace: REFUSED — member-elsewhere: ${fixture.editor} is a member of another workspace, and a test person belongs to the test workspace alone; give another address`,
+        ],
+      });
+      expect(await workspacesWithSlug(app(), fixture.slug)).toBe(0);
+    });
+
+    it("refuses a slug held by a workspace it cannot adopt", async () => {
+      const fixture = aFixture();
+      const admin = await app().person();
+      const held = await provisioning(app(), [
+        "--name",
+        "Held",
+        "--slug",
+        fixture.slug,
+        "--admin",
+        admin.email,
+      ]);
+      const id = idOnTheDoneLine(held);
+      const recorded = await auditRowsIn(app(), id);
+
+      const run = await fixing(app(), fixture);
+
+      expect(run).toMatchObject({
+        exitCode: 8,
+        lines: [
+          `test-workspace: REFUSED — slug-taken: the workspace holding the slug ${fixture.slug} has a member or a waiting invitation off ${fixture.domain}, so it is not the test workspace; it is left as it is`,
+        ],
+      });
+      expect(await auditRowsIn(app(), id)).toBe(recorded);
+      expect(await peopleOn(app(), fixture)).toBe(0);
+    });
+
+    it("refuses a test person who never gave a display name", async () => {
+      const fixture = aFixture();
+      await app().person(fixture.editor, "");
+
+      const run = await fixing(app(), fixture);
+
+      expect(run).toMatchObject({
+        exitCode: 9,
+        lines: [
+          "test-workspace: REFUSED — no-display-name: a test person signed in and gave no display name; have them give one, then run this again",
+        ],
+      });
+    });
+
+    it("says the workspace stands when its repository cannot be made", async () => {
+      const fixture = aFixture();
+      const notADirectory = path.join(await mkdtemp(path.join(tmpdir(), "no-git-")), "a-file");
+      await writeFile(notADirectory, "", "utf8");
+
+      const run = await opsWith(app(), ["test-workspace", ...flagsOf(fixture)], {
+        doors: { git: ok({ root: notADirectory }) },
+      });
+
+      expect(run.exitCode).toBe(1);
+      const held = await app().database.superuser.query<{ id: string }>(
+        "SELECT id FROM workspace WHERE slug = $1",
+        [fixture.slug],
+      );
+      const id = held.rows[0]?.id ?? "";
+      expect(run.lines).toEqual([
+        expect.stringMatching(
+          new RegExp(
+            `^test-workspace: REFUSED — workspace ${id} stands, but its bundle repository could not be made: .+; run this again$`,
+            "s",
+          ),
+        ),
+      ]);
+      const again = await fixing(app(), fixture);
+      expect(again.lines).toEqual([
+        `test-workspace: done — ${id}, slug ${fixture.slug}, testing domain ${fixture.domain}; nothing to do`,
+      ]);
+    });
+
+    it("refuses without a repositories' root, before writing anything", async () => {
+      const fixture = aFixture();
+
+      const run = await opsWith(app(), ["test-workspace", ...flagsOf(fixture)], {
+        doors: { git: undefined },
+      });
+
+      expect(run.exitCode).toBe(1);
+      expect(run.lines.join("\n")).toContain("GIT_STORE_DIR");
+      expect(await workspacesWithSlug(app(), fixture.slug)).toBe(0);
+    });
+
+    it.each([
+      ["no --domain", 0],
+      ["no --slug", 2],
+      ["no --admin", 4],
+      ["no --editor", 6],
+      ["no --viewer", 8],
+    ])("answers usage to %s, writing nothing", async (_shape, at) => {
+      const fixture = aFixture();
+      const flags = flagsOf(fixture).toSpliced(at, 2);
+
+      const run = await ops(app(), ["test-workspace", ...flags]);
+
+      expect(run).toMatchObject({
+        exitCode: 2,
+        lines: [
+          "test-workspace: --domain <testing domain>, --slug <slug>, --admin <email>, --editor <email> and --viewer <email> are required",
+        ],
+      });
+      expect(await workspacesWithSlug(app(), fixture.slug)).toBe(0);
+    });
+
+    it("names the command in the usage", async () => {
+      const run = await ops(app(), ["help"]);
+
+      expect(run.lines.join("\n")).toContain(
+        "test-workspace --domain <testing domain> --slug <slug> --admin <email> --editor <email> --viewer <email>",
+      );
+    });
+  });
+
   describe("rename-workspace — the platform renames a workspace", () => {
     const renaming = (app: TestApp, workspaceId: string, flags: readonly string[]): Promise<Run> =>
       opsWith(app, ["rename-workspace", "--workspace", workspaceId, ...flags], {});

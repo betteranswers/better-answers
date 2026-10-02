@@ -13,6 +13,7 @@ export * from "./audit-tables.ts";
 export * from "./group-tables.ts";
 export * from "./access-request-tables.ts";
 export * from "./last-active-tables.ts";
+export * from "./test-workspace-tables.ts";
 export * from "./concept-tables.ts";
 export * from "./suggestion-tables.ts";
 export * from "./source-tables.ts";

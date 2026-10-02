@@ -26,6 +26,7 @@ import type {
   RequestAccessRefusal,
   ResendInvitationRefusal,
   RevokeCredentialsHereRefusal,
+  TestWorkspaceRefusal,
 } from "../src/members/index.ts";
 import type { BindUploadRefusal, SourceRefusal } from "../src/sources/index.ts";
 import type {
@@ -89,6 +90,9 @@ const REGISTER = {
   "no-such-invitation": "absent by members",
   "invitation-expired": "precondition by members",
   "invitation-for-another-address": "forbidden by members",
+  "off-testing-domain": "inapplicable by members",
+  "operator-marked": "inapplicable by members",
+  "member-elsewhere": "inapplicable by members",
 
   "no-such-user": "absent by workspaces",
   "no-such-workspace": "absent by workspaces",
@@ -193,6 +197,11 @@ describe("the refusal-word walk", () => {
     expectTypeOf<RevokeCredentialsHereRefusal>().toExtend<EveryRegisteredWord | Error>();
     expectTypeOf<RemoveMemberRefusal>().toExtend<EveryRegisteredWord | Error>();
     expectTypeOf<AcceptInvitationRefusal>().toExtend<EveryRegisteredWord>();
+    type AddressRefused = Extract<TestWorkspaceRefusal, { readonly address: string }>;
+    expectTypeOf<AddressRefused["word"]>().toExtend<EveryRegisteredWord>();
+    expectTypeOf<Exclude<TestWorkspaceRefusal, AddressRefused>>().toExtend<
+      EveryRegisteredWord | Error
+    >();
     expectTypeOf<SourceRefusal<"no-such-binding"> | "invented">().not.toExtend<
       EveryRegisteredWord | Error
     >();

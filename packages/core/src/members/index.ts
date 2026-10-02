@@ -53,4 +53,11 @@ export { removeMember, removeMemberInput } from "./removal.ts";
 export * from "./requests.ts";
 export type * from "./roles.ts";
 export { changeRole, changeRoleInput } from "./roles.ts";
+export {
+  ensureTestWorkspace,
+  INVENTED_MEMBERS,
+  type TestWorkspaceInput,
+  type TestWorkspaceRefusal,
+  type TestWorkspaceStanding,
+} from "./test-workspace.ts";
 export { MEMBER_REFUSALS, type MemberRefusal } from "./vocabulary.ts";

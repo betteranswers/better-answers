@@ -47,6 +47,7 @@ const {
   invitationEvents,
   emailsCountedTo,
   emailsCountedFrom,
+  marked,
 } = invitationsSuite(db);
 
 const listed = (workspace: ProvisionedWorkspace, status: string | undefined, at: Date) =>
@@ -250,6 +251,23 @@ describe("inviting a person by address", () => {
   });
 });
 
+/** A request waiting in `workspace`, and the approval of it the Admin would send. */
+const aRequestIn = async (workspace: ProvisionedWorkspace, requester?: { email: string }) => {
+  const person = await seedingWith(db().pool, (seed) => seed.user(requester));
+  const requestId = await seedingWith(db().pool, async (seed) => {
+    const asked = await seed.accessRequest({
+      workspaceId: workspace.workspaceId,
+      requesterId: person.id,
+    });
+    return asked.id;
+  });
+  const approving = () =>
+    as(workspace, workspace.adminUserId, (principal, tx) =>
+      approveRequest(principal, tx, { requestId, role: "Viewer", now: INVITED_AT }),
+    );
+  return { requester: person, approving };
+};
+
 describe("an approved access request's invitation", () => {
   it("is minted by the same step, replacing a waiting one", async () => {
     const workspace = await provisionedWorkspace(db(), "Approving");
@@ -310,19 +328,7 @@ describe("an approved access request's invitation", () => {
   /** A request waiting in a new workspace, and the approval of it the Admin would send. */
   const aRequestWaiting = async (name: string) => {
     const workspace = await provisionedWorkspace(db(), name);
-    const requester = await seedingWith(db().pool, (seed) => seed.user());
-    const requestId = await seedingWith(db().pool, async (seed) => {
-      const asked = await seed.accessRequest({
-        workspaceId: workspace.workspaceId,
-        requesterId: requester.id,
-      });
-      return asked.id;
-    });
-    const approving = () =>
-      as(workspace, workspace.adminUserId, (principal, tx) =>
-        approveRequest(principal, tx, { requestId, role: "Viewer", now: INVITED_AT }),
-      );
-    return { workspace, requester, approving };
+    return { workspace, ...(await aRequestIn(workspace)) };
   };
 
   it("counts against no address's ceiling, nor the workspace's", async () => {
@@ -346,6 +352,76 @@ describe("an approved access request's invitation", () => {
       }),
     });
     expect(await invitationsOf(workspace)).toEqual([]);
+  });
+});
+
+describe("a marked workspace's invitations", () => {
+  const approvingFrom = async (workspace: ProvisionedWorkspace, email: string) =>
+    (await aRequestIn(workspace, { email })).approving();
+
+  const requestsOf = async (workspace: ProvisionedWorkspace) =>
+    (
+      await db().pool.query<{ status: string }>(
+        "SELECT status FROM access_request WHERE workspace_id = $1",
+        [workspace.workspaceId],
+      )
+    ).rows;
+
+  it("refuses resending to an address off its domain, renewing nothing", async () => {
+    const workspace = await provisionedWorkspace(db(), "MarkedResend");
+    const ana = addressOf("ana");
+    const invited = answeredValue(await invite(workspace, ana, "Viewer"));
+    await marked(workspace);
+    const before = await invitationsOf(workspace);
+
+    const refused = await resending(workspace, invited.invitationId, INVITED_AT);
+
+    expect(refused).toEqual({ ok: false, error: "off-testing-domain" });
+    expect(await invitationsOf(workspace)).toEqual(before);
+    expect(await emailsCountedTo(workspace, ana)).toBe(1);
+  });
+
+  it("resends one to an address on its domain", async () => {
+    const workspace = await provisionedWorkspace(db(), "MarkedResendOnDomain");
+    const onDomain = await marked(workspace);
+    const invited = answeredValue(await invite(workspace, onDomain("ana"), "Viewer"));
+
+    const resent = await resending(workspace, invited.invitationId, INVITED_AT);
+
+    expect(resent).toMatchObject({ ok: true, value: { invitationId: invited.invitationId } });
+  });
+
+  it("refuses approving a request from an address off its domain", async () => {
+    const workspace = await provisionedWorkspace(db(), "MarkedApprove");
+    await marked(workspace);
+
+    const refused = await approvingFrom(workspace, addressOf("ana"));
+
+    expect(refused).toEqual({ ok: false, error: "off-testing-domain" });
+    expect(await invitationsOf(workspace)).toEqual([]);
+    expect(await requestsOf(workspace)).toEqual([{ status: "waiting" }]);
+  });
+
+  it("approves a request from an address on its domain", async () => {
+    const workspace = await provisionedWorkspace(db(), "MarkedApproveOnDomain");
+    const onDomain = await marked(workspace);
+
+    const approved = await approvingFrom(workspace, onDomain("ana"));
+
+    expect(approved).toMatchObject({ ok: true, value: { address: onDomain("ana") } });
+  });
+
+  it("lets an unmarked workspace invite, resend and approve any address", async () => {
+    const elsewhere = await provisionedWorkspace(db(), "MarkedElsewhere");
+    await marked(elsewhere);
+    const workspace = await provisionedWorkspace(db(), "Unmarked");
+    const ana = addressOf("ana");
+
+    const invited = answeredValue(await invite(workspace, ana, "Viewer"));
+    const resent = await resending(workspace, invited.invitationId, INVITED_AT);
+    const approved = await approvingFrom(workspace, addressOf("ben"));
+
+    expect([invited.address, resent.ok, approved.ok]).toEqual([ana, true, true]);
   });
 });
 

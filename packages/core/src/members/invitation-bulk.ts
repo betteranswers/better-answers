@@ -39,6 +39,7 @@ import {
   refusedItemsOf,
   type BulkOutcome,
 } from "./sets.ts";
+import { invitationsOffDomain, OFF_TESTING_DOMAIN } from "./testing-domain.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
 export const bulkInvitationsInput = z.object({
@@ -52,7 +53,7 @@ const ON_A_SET: readonly MemberRefusal<
 const bulkResendInvitationsAct = declareAct({
   admits: ADMIN_ALONE,
   input: bulkInvitationsInput,
-  refuses: ON_A_SET,
+  refuses: [...ON_A_SET, OFF_TESTING_DOMAIN],
   effect: "write",
 });
 
@@ -63,15 +64,17 @@ const bulkCancelInvitationsAct = declareAct({
   effect: "write",
 });
 
-type SetRefusal =
+type SetRefusal<Item extends MemberRefusal<"no-such-invitation" | "off-testing-domain">> =
   | MemberRefusal<"role-forbids">
   | KernelRefusal<"changed-meanwhile">
-  | RefusedItems<MemberRefusal<"no-such-invitation">>
+  | RefusedItems<Item>
   | Error;
 
-export type BulkResendInvitationsRefusal = SetRefusal;
+export type BulkResendInvitationsRefusal = SetRefusal<
+  MemberRefusal<"no-such-invitation" | "off-testing-domain">
+>;
 
-export type BulkCancelInvitationsRefusal = SetRefusal;
+export type BulkCancelInvitationsRefusal = SetRefusal<MemberRefusal<"no-such-invitation">>;
 
 /** One statement, in id order, so two acts holding overlapping sets take them alike. */
 const HELD_INVITATIONS = `SELECT id, status FROM invitation
@@ -109,10 +112,14 @@ const renewedUnderHold = async (
 ): Promise<
   Result<
     readonly InvitationToSend[],
-    RefusedItems<MemberRefusal<"no-such-invitation">> | CeilingMet
+    RefusedItems<MemberRefusal<"no-such-invitation" | "off-testing-domain">> | CeilingMet
   >
 > => {
   const { invitationIds, now } = renewing;
+  const offDomain = refusedItemsOf(
+    namedEach(await invitationsOffDomain(admin, tx, invitationIds), OFF_TESTING_DOMAIN),
+  );
+  if (offDomain !== undefined) return err(offDomain);
   const counted = await waitingCounted(admin, tx, invitationIds, now);
   if (!counted.ok) return err(counted.error);
   const refused = await refusedOutside(admin, tx, invitationIds, [INVITATION_WAITING_STATUS]);
@@ -135,9 +142,9 @@ export type BulkResendInvitationsInput = z.output<typeof bulkInvitationsInput> &
 };
 
 /**
- * Renews every ticked invitation a week from `now`, or none: one accepted, cancelled or not held
- * here refuses the set naming each. Past an address's ceiling or the workspace's, the set fails
- * whole.
+ * Renews every ticked invitation a week from `now`, or none: one accepted, cancelled, not held here
+ * or off a marked workspace's testing domain refuses the set naming each. Past an address's ceiling
+ * or the workspace's, the set fails whole.
  */
 export const bulkResendInvitations = async (
   principal: UserPrincipal,
