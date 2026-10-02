@@ -85,9 +85,12 @@ describe("what a procedure may answer the wire", () => {
       "members.revokeCredentials",
       "person.acceptInvitation",
       "person.acknowledgeRecoveryCodes",
+      "person.dismissPasskeyOffer",
       "person.invitation",
       "person.invitations",
       "person.removeAuthenticator",
+      "person.removePasskey",
+      "person.renamePasskey",
       "person.replaceRecoveryCodes",
       "person.requestAccess",
       "person.secondFactor",
@@ -116,6 +119,9 @@ describe("what a procedure may answer the wire", () => {
       | "person.invitations"
       | "person.acceptInvitation"
       | "person.secondFactor"
+      | "person.renamePasskey"
+      | "person.removePasskey"
+      | "person.dismissPasskeyOffer"
       | "person.removeAuthenticator"
       | "person.replaceRecoveryCodes"
       | "person.acknowledgeRecoveryCodes"

@@ -19,6 +19,7 @@ import {
   AUTHENTICATOR_START_PATH,
 } from "./constants.ts";
 import { sameOriginOnly } from "./same-origin.ts";
+import { signedInPerson, type SignedIn } from "./signed-in.ts";
 
 type AuthenticatorDependencies = {
   readonly auth: Auth;
@@ -37,16 +38,6 @@ const REFUSALS = {
   unanswered: { error: "unanswered" },
 } as const;
 
-const signedIn = z
-  .object({
-    session: z.object({ id: z.string(), createdAt: z.coerce.date(), expiresAt: z.coerce.date() }),
-    user: z.object({ id: z.string(), email: z.string() }),
-  })
-  .nullable()
-  .catch(null);
-
-type SignedIn = NonNullable<z.output<typeof signedIn>>;
-
 const setUpAnswer = z.object({ totpURI: z.string() });
 
 const codeAsked = z.object({
@@ -54,7 +45,7 @@ const codeAsked = z.object({
 });
 
 /** A person who held codes keeps them through a setup, so none are made or answered. */
-const finishedWith = (
+export const finishedWith = (
   issued: { readonly recoveryCodes: readonly string[]; readonly madeAt: string } | undefined,
 ) =>
   issued === undefined
@@ -74,10 +65,7 @@ export const mountTheAuthenticator = (routes: Hono, deps: AuthenticatorDependenc
   const log = deps.logger.child({ module: "auth" });
   const mail = { send: deps.sendEmail, publicUrl: deps.publicUrl };
 
-  const sessionOf = async (headers: Headers): Promise<SignedIn | undefined> => {
-    const read = await attempt(() => auth.api.getSession({ headers }));
-    return read.ok ? (signedIn.parse(read.value) ?? undefined) : undefined;
-  };
+  const sessionOf = (headers: Headers) => signedInPerson(auth, headers);
 
   /** Starts and codes count apart, per person, across every session they hold. */
   const ceilingOf = async (route: "start" | "finish", personId: string) => {

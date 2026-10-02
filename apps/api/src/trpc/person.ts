@@ -11,8 +11,13 @@ import {
 import {
   acknowledgeRecoveryCodes,
   acknowledgeRecoveryCodesInput,
+  dismissPasskeyOffer,
   readSecondFactor,
   removeAuthenticator,
+  removePasskey,
+  removePasskeyInput,
+  renamePasskey,
+  renamePasskeyInput,
   replaceRecoveryCodes,
   replaceRecoveryCodesInput,
   setDisplayName,
@@ -108,6 +113,41 @@ export const personRouter = router({
       ctx,
       readSecondFactor.name,
       readSecondFactor(IDENTITY_PRINCIPAL, ctx.doors.postgres, { personId: ctx.personId }),
+    ),
+  ),
+  renamePasskey: personProcedure.input(parsedBy(renamePasskeyInput)).mutation(({ ctx, input }) =>
+    crossing(
+      ctx,
+      renamePasskey.name,
+      given(input, (asked) =>
+        renamePasskey(IDENTITY_PRINCIPAL, ctx.doors.postgres, { ...asked, personId: ctx.personId }),
+      ),
+    ),
+  ),
+  removePasskey: personProcedure
+    .input(parsedBy(removePasskeyInput))
+    .mutation(async ({ ctx, input }) => {
+      const removed = await crossing(
+        ctx,
+        removePasskey.name,
+        given(input, (asked) =>
+          removePasskey(IDENTITY_PRINCIPAL, ctx.doors.postgres, {
+            ...asked,
+            personId: ctx.personId,
+          }),
+        ),
+      );
+      void sendFactorNotice(ctx, ctx.email, "passkey-removed");
+      return removed;
+    }),
+  dismissPasskeyOffer: personProcedure.mutation(({ ctx }) =>
+    crossing(
+      ctx,
+      dismissPasskeyOffer.name,
+      dismissPasskeyOffer(IDENTITY_PRINCIPAL, ctx.doors.postgres, {
+        personId: ctx.personId,
+        now: ctx.clock.now(),
+      }),
     ),
   ),
   removeAuthenticator: personProcedure.mutation(async ({ ctx }) => {
