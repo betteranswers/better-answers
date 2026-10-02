@@ -47,6 +47,7 @@ No suite holds the form now. The review reads the rules in whatever shape they t
 ## Why
 
 - The rules files were founded on a short imperative form and drifted into narrative: enforcement bookkeeping, mechanism description, ticket history. An agent writes what it sees, and that voice ran through the code.
+- A rule is named by its heading alone, because an agent copies the name it meets into what it writes. A heading in words still says the rule wherever it lands.
 - A rule that names its gate repeats it. The gate already names the rule's file in the message a reader hits.
 - With one lint config, `pnpm lint`, the pre-commit hook and an editor all show a breach as it is written.
 - `string-cites-nothing` is its own rule because it polices text a person reads, which is not a comment.
