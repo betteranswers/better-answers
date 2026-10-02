@@ -224,7 +224,7 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     by: "erasure",
     access: "write",
     reason:
-      "When the person was last active here is this workspace's record of them, so every erasure from it deletes that row, under the workspace's scope. A workspace the person left already deleted its own row when they left.",
+      "When the person was last active here is this workspace's record of them, so every erasure from it deletes only that row under the workspace's scope.",
   },
   {
     table: "public.member",

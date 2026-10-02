@@ -1,11 +1,6 @@
 import { normalizeError, type PlatformPrincipal } from "../kernel/index.ts";
 import { ERASED_DOMAIN } from "../store/git/index.ts";
-import {
-  withIdentityWrite,
-  withScope,
-  type PostgresDoor,
-  type Tx,
-} from "../store/postgres/index.ts";
+import { withScope, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
 import { verificationIdentifiersOf, workspacesHeldBy } from "../workspaces/index.ts";
 
 export type IdentityArm = "no-person" | "last-membership" | "membership-ended";
@@ -123,12 +118,12 @@ export const eraseFromTheIdentitySet = async (
   const elsewhere = held.value.filter((workspaceId) => workspaceId !== subject.workspaceId);
   const arm: IdentityArm = elsewhere.length === 0 ? "last-membership" : "membership-ended";
 
-  // Before the membership ends: a rerun after that no longer finds the person here to look for.
-  const lastActive = await withScope(platform, door, subject.workspaceId, async (tx) =>
-    rowsOf(await tx.query("DELETE FROM workspace_last_active WHERE user_id = $1", [personId])),
-  );
-
-  return withIdentityWrite(platform, door, async (tx) => {
+  // One transaction for the step: of its tables only the last-activity one is under row-level
+  // security, so the workspace's scope narrows nothing else.
+  return withScope(platform, door, subject.workspaceId, async (tx) => {
+    const lastActive = rowsOf(
+      await tx.query("DELETE FROM workspace_last_active WHERE user_id = $1", [personId]),
+    );
     const ended = await tx.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
       subject.workspaceId,
       personId,

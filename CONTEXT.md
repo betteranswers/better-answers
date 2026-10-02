@@ -1097,6 +1097,11 @@ to it by IRI and never restates it (ADR 0014).
   last active, never a place, and may sign any one out, or every one but the current one. Signing
   a session out ends that session alone, never a *client grant* or a *personal token*. _Avoid_:
   login (as a noun), device (for the session itself).
+- **last active** — when a member last used one workspace, through the platform or through
+  Claude. A workspace knows it of its own members alone, never their activity in another workspace
+  or when they last signed in, which would tell one company about another. When a *session* was
+  last active is the person's own, on the *Account page*. _Avoid_: last seen, last sign-in, last
+  login.
 
 - **map** — the reader's word for the graph, and the only one that reaches a surface (*graph*,
   *sync*, *traversal* and *generation* never do). **Two** fixed phrases tell its state: **map as of
