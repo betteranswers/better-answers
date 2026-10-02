@@ -7,6 +7,7 @@ component: web
 severity: medium
 applies_when:
   - "Adding a surface, a group or a screen, or deciding where a screen belongs"
+  - "Giving one of a screen's rows a page of its own at an address beneath the screen"
   - "Deciding who sees a screen, by role or by owning a domain"
   - "Changing a role's home, or what an unbuilt, hidden or moved address shows"
   - "Naming a level of the navigation in code, tests or docs"
@@ -19,6 +20,8 @@ tags:
   - inbox
   - visibility
   - home
+  - detail-address
+  - member-page
 ---
 
 # The platform is a rail of surfaces, each holding groups of screens
@@ -32,7 +35,16 @@ The platform's navigation has four levels, and the code names them the same way:
 - A **screen** has an address of its own and an icon in the secondary nav.
 - A **tab** divides one screen. It has no address.
 
-One navigation list in `apps/web/src/shared/` declares every surface, group and screen, with its address, whether it is built, and who may see it. The rail, the secondary nav, the router, the breadcrumb and jump-to all read it. The shell is the ReUI app-shell-14 block (`https://reui.io/blocks/application/app-shell/app-shell-14`): a full-width top band over the icon rail and a secondary nav that swaps with the surface.
+A screen may also declare a **detail address**, one segment beneath its own, naming one of its rows. Members declares the first: a **member page** at `/people/members/<person>`. A detail address is the screen's place, not a fifth level:
+
+- Nothing lists it. It is not in the rail, the secondary nav, or jump-to's screens and acts. Jump-to's member results lead to it.
+- It is seen exactly where its screen is seen, so a role that may not see Members gets the not-found screen at a member page.
+- The frame draws it as its screen: the same first heading, the same keystroke scope, and the screen's entry in the secondary nav marked current. It draws no toolbar, because the screen's tabs and acts belong to the list.
+- The breadcrumb's last part is the row's name, which the page gives from what it has read. It is never read from the address.
+- Only one segment is declared. Anything deeper names no place and shows the not-found screen. A segment that is not a valid id, or an id the screen holds no row for, draws a state inside the page that names no one and leads back to the screen. A malformed id is asked about nowhere.
+- A detail page's sections have no address. They are regions of one page, reached by in-page links and keystrokes, so Back leaves the page and returns to the list as it was.
+
+One navigation list in `apps/web/src/shared/` declares every surface, group and screen, with its address, its detail address if it has one, whether it is built, and who may see it. The rail, the secondary nav, the router, the breadcrumb and jump-to all read it. The shell is the ReUI app-shell-14 block (`https://reui.io/blocks/application/app-shell/app-shell-14`): a full-width top band over the icon rail and a secondary nav that swaps with the surface.
 
 **The rail**, in order:
 
@@ -139,7 +151,11 @@ Three things stay open:
 - Unbuilt entries marked "Soon", or kept as destinations that say they are not built, as T-225 had them: nobody learns what exists by guessing addresses.
 - Personal data kept in People, or Questions folded into Agent Operations.
 - The console in the avatar menu: it is a place, not an account setting.
+- A member page as a route written beside the generated ones, outside the list: the visibility gate, the frame and the breadcrumb would each need a second source. The list declares it instead.
+- An address for each section of a member page: a section is part of one page, and only a screen has an address.
 
 ## History
 
 Written 30/09/2026 from the shell and layout foundations plan (`docs/plans/2026-09-30-1959-feat-shell-and-layout-foundations-plan.md`), the gap audit behind it (`docs/dogfood-reports/2026-09-30-docs-shell-people-dogfood-dogfood.md`) and the owner's decisions of that day. It has no archived record. It re-cut ADR 0017's six screens of Control Centre into eight groups and made ADR 0046's reader surface the Ask surface, and both were edited in the same change.
+
+Amended 02/10/2026 by the people layout rework plan (`docs/plans/2026-10-01-1807-feat-people-layout-rework-plan.md`, KTD3). A member now opens as a page, not a sheet over Members, so the list gained detail addresses and Members declared the member page. The four levels and every rule above stand.

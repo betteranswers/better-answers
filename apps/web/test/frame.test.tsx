@@ -17,6 +17,7 @@ import {
   SURFACES,
   visibleTo,
   type Role,
+  type Screen,
 } from "@/shared/navigation.ts";
 import { PRODUCT_NAME } from "@/shared/words.ts";
 
@@ -242,12 +243,16 @@ const routedPaths = (): readonly string[] =>
       .routesByPath,
   ).filter((path) => !OUTSIDE_THE_LIST.includes(path));
 
+/** A detail address as the router names its segment. */
+const detailRouteOf = (each: Screen): readonly string[] =>
+  each.detail === undefined ? [] : [`${each.path}/$${each.detail.param}`];
+
 /** One direction finds the screen the router forgot; only the other finds a route nothing declared. */
 const destinations = [
   ...new Set([
     ...screensOf(EVERY_SURFACE)
       .filter((each) => each.built)
-      .map((each) => each.path),
+      .flatMap((each) => [each.path, ...detailRouteOf(each)]),
     ...Object.values(HOMES).map((home) => home.path),
   ]),
 ];
@@ -275,13 +280,14 @@ const shownPaths = (role: Role): readonly string[] =>
   screensOf(visibleTo(readerOf(role), SURFACES).surfaces).map((each) => each.path);
 
 describe("the routes and navigation built from the one list", () => {
-  it("gives every built screen and every role's home a route", () => {
+  it("routes every built screen, its detail and each role's home", () => {
     const routed = routedPaths();
 
     expect(destinations.filter((path) => !routed.includes(path))).toEqual([]);
+    expect(routed).toContain("/people/members/$personId");
   });
 
-  it("routes nothing but built screens, homes and moved addresses", () => {
+  it("routes nothing but built screens, details, homes and moves", () => {
     const known = [...destinations, ...moved.map((each) => each.from)];
 
     expect(routedPaths().filter((path) => !known.includes(path))).toEqual([]);

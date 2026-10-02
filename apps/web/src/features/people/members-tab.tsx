@@ -1,7 +1,7 @@
+import { useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
 import { useTable } from "@tanstack/react-table";
-import { useId, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 
-import type { ApiError } from "@/shared/api/trpc.ts";
 import { FilterRow } from "@/shared/filter-row.tsx";
 import { GridTable } from "@/shared/grid-table.tsx";
 import { useKeystroke } from "@/shared/keystrokes.tsx";
@@ -13,34 +13,31 @@ import { SelectionBar } from "@/shared/selection-bar.tsx";
 import { useWideLayout } from "@/shared/wide-layout.ts";
 
 import { useGroups } from "./groups-api.ts";
-import { SELECTED_MEMBERS } from "./member-act-words.ts";
+import { MEMBER_PAGE_WORDS, SELECTED_MEMBERS } from "./member-act-words.ts";
 import { MemberBulkActs, MemberBulkDialogs, useMemberBulkActs } from "./member-bulk-acts.tsx";
 import {
   HIDEABLE,
+  MemberActsContext,
   memberColumns,
   memberFeatures,
   SORTABLE,
   type RefusedRows,
 } from "./member-columns.tsx";
-import { MemberSheet, memberButtonId, type OpenedAt } from "./member-sheet.tsx";
 import {
   MEMBERS_FIELDS,
   MEMBERS_LIST,
+  memberPageOf,
+  RETURNED_FROM_A_REMOVAL,
   sortedOf,
   sortOf,
   useSettledSearch,
+  type OpenedAt,
+  type Opening,
 } from "./members-address.ts";
-import {
-  useMembers,
-  useReaderId,
-  useRemoveMember,
-  type ListedMember,
-  type Role,
-} from "./people-api.ts";
+import { useMembers, useRemovalOf, type ListedMember, type Role } from "./people-api.ts";
 import { PEOPLE_KEYSTROKES as KEY } from "./people-state.ts";
 import { outcomeOfFailure } from "./refusal.tsx";
 import { ROLES } from "./role-meanings.ts";
-import { useSelfActHome } from "./self-act.tsx";
 import { nameOf } from "./words.tsx";
 
 /** The members read returns the whole workspace, so the browser pages it. */
@@ -90,7 +87,7 @@ const matching =
 /** Read in render from the address, so Back and a reload come to the same rows. */
 const useNarrowedMembers = (listed: readonly ListedMember[]) => {
   const { state, write } = useListAddress(MEMBERS_LIST, MEMBERS_FIELDS);
-  const [search, setSearch] = useSettledSearch(state.search, (settled) => {
+  const [search, setSearch, flush] = useSettledSearch(state.search, (settled) => {
     write({ search: settled, page: 1 });
   });
   const narrowing: Narrowing = { search, role: state.role, group: state.group };
@@ -104,7 +101,7 @@ const useNarrowedMembers = (listed: readonly ListedMember[]) => {
     write({ search: "", role: undefined, group: undefined, page: 1 });
   };
 
-  return { state, write, search, setSearch, narrowing, data, pageIndex, clear };
+  return { state, write, search, setSearch, flush, narrowing, data, pageIndex, clear };
 };
 
 type Narrowed = ReturnType<typeof useNarrowedMembers>;
@@ -124,58 +121,58 @@ const toggled = (ticked: ReadonlySet<string>, personId: string): ReadonlySet<str
   return next;
 };
 
-type Opened = { readonly personId: string; readonly at: OpenedAt };
-
 /**
- * The removed row goes before the api answers, so focus lands on the row that took its place,
- * else on the search.
+ * Pushed, so Back comes to these rows again; a search still settling is sent first, or Back would
+ * lose its last keys.
  */
-function useRemovalFromTheList(properties: {
-  readonly shownIds: () => readonly string[];
-  readonly closeTheSheet: () => void;
-  readonly setOutcome: (outcome: Outcome | undefined) => void;
-  readonly searchRef: RefObject<HTMLInputElement | null>;
-}) {
-  const { shownIds, closeTheSheet, setOutcome, searchRef } = properties;
-  const removeMember = useRemoveMember();
-  const readerId = useReaderId();
-  const { goHome } = useSelfActHome();
-  const landing = useRef<{ readonly personId: string | undefined }>(undefined);
+const useOpenMember = (flush: () => void) => {
+  const navigate = useNavigate();
+  const router = useRouter();
 
-  const remove = (member: ListedMember) => {
-    const shown = shownIds();
-    const at = shown.indexOf(member.personId);
-    landing.current = { personId: shown[at + 1] ?? shown[at - 1] };
-    closeTheSheet();
-    setOutcome(undefined);
-    removeMember.mutate(
-      { personId: member.personId },
-      {
-        onSuccess: () => {
-          setOutcome({
-            tone: "said",
-            words: `${nameOf(member)} is no longer a member of this workspace.`,
-          });
-          if (member.personId === readerId) void goHome("removed");
-        },
-        onError: (failure: Error | ApiError) => {
-          setOutcome(outcomeOfFailure(failure));
-        },
-      },
-    );
+  return (personId: string, openedAt: OpenedAt) => {
+    flush();
+    // The browser's history folds a replace and a push in one task into one push, losing the search.
+    router.history.flush();
+    const opening: Opening = { openedAt, membersQuery: router.latestLocation.searchStr };
+    void navigate({ href: memberPageOf(personId), state: (held) => ({ ...held, ...opening }) });
   };
+};
 
-  const returnFocus = (personId: string) => {
-    const landsOn = landing.current === undefined ? personId : landing.current.personId;
-    landing.current = undefined;
-    const row = landsOn === undefined ? null : document.getElementById(memberButtonId(landsOn));
-    (row ?? searchRef.current)?.focus();
+/** A removal asked on a member's own page lands here before the api answers it. */
+const removalSaid = (
+  name: string | undefined,
+  removal: ReturnType<typeof useRemovalOf>,
+): Outcome | undefined => {
+  if (name === undefined || removal === undefined) return undefined;
+  if (removal.error !== null) return outcomeOfFailure(removal.error);
+  return {
+    tone: "said",
+    words:
+      removal.status === "success"
+        ? MEMBER_PAGE_WORDS.removed(name)
+        : MEMBER_PAGE_WORDS.removing(name),
   };
+};
 
-  return { remove, returnFocus };
-}
+/** Arriving from a removal: the list it changed takes focus, and says how the removal went. */
+const useReturnedFromARemoval = (heading: RefObject<HTMLElement | null>): Outcome | undefined => {
+  const personId = useRouterState({
+    select: (state) =>
+      RETURNED_FROM_A_REMOVAL.safeParse(state.location.state).data?.removed.personId,
+  });
+  const name = useRouterState({
+    select: (state) => RETURNED_FROM_A_REMOVAL.safeParse(state.location.state).data?.removed.name,
+  });
+  const removal = useRemovalOf(personId);
 
-/** Each of the row's acts opens the member's sheet at that act. */
+  useEffect(() => {
+    if (personId !== undefined) heading.current?.focus();
+  }, [personId, heading]);
+
+  return removalSaid(name, removal);
+};
+
+/** Each of the row's acts opens the member's page at that act's control. */
 const ROW_ACTS: readonly { readonly label: string; readonly at: OpenedAt }[] = [
   { label: "Open", at: "member" },
   { label: "Change role", at: "role" },
@@ -334,30 +331,7 @@ const namedIn =
     return member === undefined ? "A member no longer listed" : nameOf(member);
   };
 
-function OpenedSheet(properties: {
-  readonly opened: Opened | undefined;
-  readonly listed: readonly ListedMember[];
-  readonly onClose: () => void;
-  readonly removal: ReturnType<typeof useRemovalFromTheList>;
-}) {
-  const { opened, removal } = properties;
-  const member = properties.listed.find((each) => each.personId === opened?.personId);
-  if (opened === undefined || member === undefined) return null;
-  return (
-    <MemberSheet
-      key={opened.personId}
-      member={member}
-      openedAt={opened.at}
-      onClose={properties.onClose}
-      onRemove={removal.remove}
-      returnFocus={() => {
-        removal.returnFocus(opened.personId);
-      }}
-    />
-  );
-}
-
-/** Ticks, the sheet and an act's outcome are the screen's; what narrows the rows is the address's. */
+/** Ticks and an act's outcome are the screen's; what narrows the rows is the address's. */
 function MemberList(properties: {
   readonly read: ReturnType<typeof useMembers>;
   readonly heading: RefObject<HTMLHeadingElement | null>;
@@ -367,26 +341,15 @@ function MemberList(properties: {
   const narrowed = useNarrowedMembers(listed);
   const [ticked, setTicked] = useTicks(listed);
   const [inFocus, setInFocus] = useState<string>();
-  const [opened, setOpened] = useState<Opened>();
   const [outcome, setOutcome] = useState<Outcome>();
   const [refused, setRefused] = useState<RefusedRows>(NO_MARKS);
   const [hidden, setHidden] = useHiddenColumns();
   const searchRef = useRef<HTMLInputElement>(null);
   const turn = usePageTurns(narrowed);
+  const openMember = useOpenMember(narrowed.flush);
+  const returned = useReturnedFromARemoval(heading);
 
-  const columns = useMemo(
-    () =>
-      memberColumns(
-        {
-          open: (personId) => {
-            setOpened({ personId, at: "member" });
-          },
-          focusedOn: setInFocus,
-        },
-        refused,
-      ),
-    [refused],
-  );
+  const columns = useMemo(() => memberColumns(refused), [refused]);
 
   const sorted = sortedOf(narrowed.state.sort);
   const table = useTable({
@@ -412,9 +375,7 @@ function MemberList(properties: {
 
   useInFocusKeystrokes({
     inFocus: listed.find((member) => member.personId === inFocus),
-    open: (personId, at) => {
-      setOpened({ personId, at });
-    },
+    open: openMember,
     tick: (personId) => {
       setTicked(toggled(ticked, personId));
     },
@@ -423,19 +384,10 @@ function MemberList(properties: {
     },
   });
 
-  const removal = useRemovalFromTheList({
-    shownIds,
-    closeTheSheet: () => {
-      setOpened(undefined);
-    },
-    setOutcome,
-    searchRef,
-  });
-
   return (
     <>
       <CountLine read={read} narrowed={narrowed} />
-      <OutcomeLine outcome={outcome} className="mt-2" />
+      <OutcomeLine outcome={outcome ?? returned} className="mt-2" />
 
       <div className="mt-4 border border-border bg-card">
         <MemberFilters
@@ -458,28 +410,35 @@ function MemberList(properties: {
           <MemberBulkActs acts={acts} />
         </SelectionBar>
         <MembersRead read={read} searchRef={searchRef}>
-          <GridTable
-            table={table}
-            caption="Members of this workspace, each with their address, role, groups and the day they joined. A member's name opens them; a tick selects them for an act on every member selected."
-            ticking={{
-              ticked,
-              onTickedChange: setTicked,
-              nameOf,
-              everyOnThePage: "Select every member on this page",
-            }}
-            sorting={{
-              sortable: SORTABLE,
-              sorted,
-              onSortedChange: (next) => {
-                narrowed.write({ sort: sortOf(next), page: 1 });
+          <MemberActsContext
+            value={{
+              open: (personId) => {
+                openMember(personId, "member");
               },
+              focusedOn: setInFocus,
             }}
-            hidden={hidden}
-            rowMenu={rowMenuOf((personId, at) => {
-              setOpened({ personId, at });
-            })}
-            empty={<NoOneMatches narrowed={narrowed} focusAfterClear={searchRef} />}
-          />
+          >
+            <GridTable
+              table={table}
+              caption="Members of this workspace, each with their address, role, groups and the day they joined. A member's name opens them; a tick selects them for an act on every member selected."
+              ticking={{
+                ticked,
+                onTickedChange: setTicked,
+                nameOf,
+                everyOnThePage: "Select every member on this page",
+              }}
+              sorting={{
+                sortable: SORTABLE,
+                sorted,
+                onSortedChange: (next) => {
+                  narrowed.write({ sort: sortOf(next), page: 1 });
+                },
+              }}
+              hidden={hidden}
+              rowMenu={rowMenuOf(openMember)}
+              empty={<NoOneMatches narrowed={narrowed} focusAfterClear={searchRef} />}
+            />
+          </MemberActsContext>
           <ListPages
             pages={{
               kind: "pages",
@@ -495,14 +454,6 @@ function MemberList(properties: {
       </div>
 
       <MemberBulkDialogs acts={acts} />
-      <OpenedSheet
-        opened={opened}
-        listed={listed}
-        onClose={() => {
-          setOpened(undefined);
-        }}
-        removal={removal}
-      />
     </>
   );
 }
@@ -537,7 +488,7 @@ export function MembersTab() {
   const members = useMembers();
   const headingId = useId();
   const heading = useRef<HTMLHeadingElement>(null);
-  // Read with the list, so a sheet opened on its groups has boxes to land focus on.
+  // Read with the list, so a member's page opened on its groups has boxes to land focus on.
   useGroups();
 
   return (

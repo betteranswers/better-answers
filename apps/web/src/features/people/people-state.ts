@@ -23,6 +23,15 @@ export const PEOPLE_KEYSTROKES = {
   decline: { key: "d", act: "Decline the request in focus" },
 } as const satisfies Readonly<Record<string, Keystroke>>;
 
+/** Members' own letters, so a reader who opened the page by one finds each act under it again. */
+export const MEMBER_PAGE_KEYSTROKES = {
+  changeRole: { key: "c", act: "Change this member's role" },
+  changeGroups: { key: "g", act: "Change this member's groups" },
+  flagName: { key: "f", act: "Flag this member's display name" },
+  revokeCredentials: { key: "v", act: "Revoke this member's credentials here" },
+  remove: { key: "d", act: "Remove this member" },
+} as const satisfies Readonly<Record<string, Keystroke>>;
+
 export const GROUPS_KEYSTROKES = {
   create: { key: "n", act: "Create a group" },
   open: { key: "o", act: "Open the group in focus" },

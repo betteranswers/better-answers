@@ -1,5 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useMutationState, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { inferOutput } from "@trpc/tanstack-react-query";
+import { z } from "zod";
 
 import { useTRPC, type ApiError } from "@/shared/api/trpc.ts";
 
@@ -97,6 +98,25 @@ export const useRemoveMember = () => {
     listed.filter((member) => member.personId !== asked.personId),
   );
   return useMutation(api.members.remove.mutationOptions(reconciled));
+};
+
+const ASKED_OF_ONE = z.object({ personId: z.string() });
+
+/**
+ * The latest removal of one person, read where it was not asked: a removal leaves the page it was
+ * asked on before the api answers.
+ */
+export const useRemovalOf = (personId: string | undefined) => {
+  const api = useTRPC();
+  return useMutationState({
+    filters: {
+      mutationKey: api.members.remove.mutationKey(),
+      predicate: (mutation) =>
+        personId !== undefined &&
+        ASKED_OF_ONE.safeParse(mutation.state.variables).data?.personId === personId,
+    },
+    select: (mutation) => ({ status: mutation.state.status, error: mutation.state.error }),
+  }).at(-1);
 };
 
 /** Who a bulk act changed; the rest of the set was already as asked. */

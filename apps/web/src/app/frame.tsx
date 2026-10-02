@@ -6,6 +6,7 @@ import { useMembership } from "@/features/auth/membership.ts";
 import { useOperatorStanding } from "@/features/console/operator.ts";
 import { HomeLine } from "@/features/people/self-act.tsx";
 import { ShellKeystrokes, ShellKeystrokesAct, type Keystroke } from "@/shared/keystrokes.tsx";
+import { LastCrumbSlot } from "@/shared/last-crumb.ts";
 import {
   EVERY_SURFACE,
   placeAt,
@@ -16,7 +17,7 @@ import {
   type VisibleSurface,
   type VisibleTree,
 } from "@/shared/navigation.ts";
-import { isFilled, type ScreenToolbar } from "@/shared/screen-toolbar.tsx";
+import { isFilled, type ScreenTab, type ScreenToolbar } from "@/shared/screen-toolbar.tsx";
 import { useWideLayout } from "@/shared/wide-layout.ts";
 
 import { Band, type Person } from "./band.tsx";
@@ -61,6 +62,13 @@ const useRegion = (visible: VisibleTree, pathname: string): Region | undefined =
     : undefined;
 };
 
+/** A detail address's page names the part beneath its screen; elsewhere the open tab does. */
+const belowTheScreen = (
+  open: Place<VisibleSurface> | undefined,
+  openTab: ScreenTab | undefined,
+  lastCrumb: string | undefined,
+): string | undefined => (open?.detail === undefined ? openTab?.name : lastCrumb);
+
 /** A place hidden from the reader is no place here, so it draws as one that never existed. */
 export function Frame(properties: {
   readonly visible: VisibleTree;
@@ -79,6 +87,8 @@ export function Frame(properties: {
   const switching = useWorkspaceSwitch();
   // The frame's, not the tabs root's: the band names the open tab, and the root sits below it.
   const [pickedTab, pickTab] = useState<string>();
+  // Given by a page at a detail address, which alone knows whose it is.
+  const [lastCrumb, nameLastCrumb] = useState<string>();
   // Once a role is held, so nothing is offered to a reader the shell cannot place.
   const offersJumpTo = visible.home !== undefined;
   const jumping = useJumping(offersJumpTo);
@@ -110,7 +120,10 @@ export function Frame(properties: {
                 />
               )
             }
-            parts={partsOf(open, openTabIn(region?.toolbar.tabs, pickedTab)?.name)}
+            parts={partsOf(
+              open,
+              belowTheScreen(open, openTabIn(region?.toolbar.tabs, pickedTab), lastCrumb),
+            )}
             person={properties.person}
             navigation={
               <NavigationButton
@@ -122,17 +135,7 @@ export function Frame(properties: {
                 onShow={show}
               />
             }
-            jumpTo={
-              <JumpTo
-                offered={offersJumpTo}
-                wide={wide}
-                tree={visible}
-                jumping={jumping}
-                onFindMember={() => {
-                  pickTab(undefined);
-                }}
-              />
-            }
+            jumpTo={<JumpTo offered={offersJumpTo} wide={wide} tree={visible} jumping={jumping} />}
             keystrokes={<ShellKeystrokesAct at="band" />}
             signingOut={signingOut}
             onSignOut={signOut}
@@ -151,12 +154,14 @@ export function Frame(properties: {
             ) : null}
 
             <div className="flex min-w-0 flex-1 flex-col">
-              {/* Keyed by the workspace, so a switch draws the screen afresh over its new reads. */}
-              <ToolbarAndScreen
-                key={here?.workspaceId}
-                region={region}
-                picked={[pickedTab, pickTab]}
-              />
+              <LastCrumbSlot value={nameLastCrumb}>
+                {/* Keyed by the workspace, so a switch draws the screen afresh over its new reads. */}
+                <ToolbarAndScreen
+                  key={here?.workspaceId}
+                  region={region}
+                  picked={[pickedTab, pickTab]}
+                />
+              </LastCrumbSlot>
             </div>
           </div>
         </div>

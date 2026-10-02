@@ -1,3 +1,4 @@
+import { useNavigate } from "@tanstack/react-router";
 import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -15,22 +16,34 @@ afterEach(cleanup);
 /** Members' search box: the draft in the box, the settled search in the address. */
 function Searched() {
   const { state, write } = useListAddress(MEMBERS_LIST, MEMBERS_FIELDS);
-  const [search, setSearch] = useSettledSearch(state.search, (settled) => {
+  const navigate = useNavigate();
+  const [search, setSearch, flush] = useSettledSearch(state.search, (settled) => {
     write({ search: settled, page: 1 });
   });
   return (
-    <input
-      aria-label="Search the members"
-      value={search}
-      onChange={(event) => {
-        setSearch(event.target.value);
-      }}
-    />
+    <>
+      <input
+        aria-label="Search the members"
+        value={search}
+        onChange={(event) => {
+          setSearch(event.target.value);
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => {
+          flush();
+          void navigate({ href: "/a-member" });
+        }}
+      >
+        Open a member
+      </button>
+    </>
   );
 }
 
 const openMembers = (entry: string) =>
-  openScreens({ "/people/members": Searched }, ["/elsewhere", entry]);
+  openScreens({ "/people/members": Searched, "/a-member": () => null }, ["/elsewhere", entry]);
 
 const box = () => screen.getByRole<HTMLInputElement>("textbox", { name: "Search the members" });
 
@@ -57,6 +70,20 @@ describe("Members' search, settled into the address", () => {
     expect(box().value).toBe("priya");
 
     await act(() => router.navigate({ href: "/people/members?members.search=sam" }));
+
+    await at("/people/members?members.search=sam");
+    expect(box().value).toBe("sam");
+  });
+
+  it("sends a search still settling before the reader leaves", async () => {
+    const { router, at } = await openMembers("/people/members");
+
+    typeIn("sam");
+    fireEvent.click(screen.getByRole("button", { name: "Open a member" }));
+    await at("/a-member");
+    act(() => {
+      router.history.back();
+    });
 
     await at("/people/members?members.search=sam");
     expect(box().value).toBe("sam");

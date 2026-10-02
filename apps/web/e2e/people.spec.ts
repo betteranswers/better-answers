@@ -1,20 +1,22 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
-import { JUMP_TO, RAIL } from "@/app/words.ts";
+import { BREADCRUMB, JUMP_TO, RAIL, UNKNOWN_SCREEN } from "@/app/words.ts";
 import { INVITATION_WORDS } from "@/features/auth/invitation-words.ts";
 import { SAID_OF_ACCEPTING } from "@/features/auth/refusal-words.ts";
 import { NO_WORKSPACE_HEADING, PICKER_WORDS } from "@/features/auth/workspace-words.ts";
+import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
 import {
   BULK_WORDS,
   homeNowSaid,
   INCLUDES_YOU,
+  MEMBER_PAGE_WORDS,
   SELECTED_MEMBERS,
 } from "@/features/people/member-act-words.ts";
-import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
+import { MEMBER_PAGE_KEYSTROKES, PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
 import { SAID_OF_A_MEMBER, SAID_OF_TICKED_MEMBERS } from "@/features/people/refusal-words.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
 import { KEYSTROKE_WORDS, keystrokesOn, SELECT_FIRST } from "@/shared/keystroke-words.ts";
-import { CONTROL_CENTRE, groupIn, HOMES, screenNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, groupIn, headingOf, screenNamed } from "@/shared/navigation.ts";
 import { SAID_OF_CLASS, sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
@@ -25,6 +27,7 @@ import {
   anAddress,
   askToJoin,
   clockTheNextKey,
+  crumbOf,
   editorPickedByKeyboard,
   invite,
   keystrokesButton,
@@ -62,6 +65,31 @@ const GROUPS_SCREEN = screenNamed(people, "Groups").path;
 /** Matched by name anywhere in the path, because the client batches its reads. */
 const MEMBERSHIP_READ = (url: URL): boolean => url.pathname.includes("session.membership");
 
+const MEMBERS_READ = (url: URL): boolean => url.pathname.includes("members.list");
+
+const REMOVAL = (url: URL): boolean => url.pathname.includes("members.remove");
+
+/** The api's refusal of an act racing another, as the client's batch carries it back. */
+const answeredChangedMeanwhile = (page: Page, act: (url: URL) => boolean) =>
+  page.route(act, (route) =>
+    route.fulfill({
+      status: 409,
+      json: [
+        {
+          error: {
+            message: "changed-meanwhile",
+            code: -32_603,
+            data: {
+              code: "CONFLICT",
+              httpStatus: 409,
+              refusal: { word: "changed-meanwhile", class: "conflict" },
+            },
+          },
+        },
+      ],
+    }),
+  );
+
 const nav = (page: Page) => page.getByRole("navigation", { name: CONTROL_CENTRE.name });
 
 const membersRegion = (page: Page) => page.getByRole("region", { name: "Members" });
@@ -83,23 +111,61 @@ const COLUMN = { Person: 1, Role: 2, Groups: 3, Joined: 4 } as const;
 const cellOf = (page: Page, name: string, column: keyof typeof COLUMN): Locator =>
   rowOf(page, name).getByRole("cell").nth(COLUMN[column]);
 
-const memberButton = (page: Page, name: string): Locator =>
-  membersRegion(page).getByRole("button", { name, exact: true });
+const memberLink = (page: Page, name: string): Locator =>
+  membersRegion(page).getByRole("link", { name, exact: true });
 
-const sheetOf = (page: Page, name: string): Locator => page.getByRole("dialog", { name });
+const listHeading = (page: Page): Locator =>
+  membersRegion(page).getByRole("heading", { level: 2, name: "Members" });
 
-const rolePicker = (sheet: Locator): Locator => sheet.getByRole("radiogroup", { name: "Role" });
+/** A member's page is the screen itself, so its sections are found within the screen's region. */
+const thePage = (page: Page): Locator => page.getByRole("main");
 
-const removalOf = (sheet: Locator): Locator => sheet.getByRole("region", { name: "Removal" });
+const memberPageAt = (personId: string): string => `${MEMBERS_SCREEN}/${personId}`;
+
+/** Its heading names the person, so a page left for another is told by who it names. */
+const personHeading = (page: Page, name: string): Locator =>
+  thePage(page).getByRole("heading", { level: 2, name, exact: true });
+
+const accessOf = (page: Page): Locator =>
+  thePage(page).getByRole("region", { name: MEMBER_PAGE_WORDS.access });
+
+const rolePicker = (page: Page): Locator => thePage(page).getByRole("radiogroup", { name: "Role" });
+
+const rolePickerRegion = (page: Page): Locator =>
+  thePage(page).getByRole("region", { name: "Role", exact: true });
+
+const removalOf = (page: Page): Locator =>
+  thePage(page).getByRole("region", { name: "Removal", exact: true });
 
 /** The one output the Members region holds as a child of its own: the count of people. */
 const THE_COUNT = "//section[h2='Members']/output";
 
-const displayNameRegion = (sheet: Locator): Locator =>
-  sheet.getByRole("region", { name: "Display name" });
+/** A member page's summary line, by its term, in the Access section. */
+const accessLine = (term: string): string =>
+  `//section[h2='${MEMBER_PAGE_WORDS.access}']//dt[normalize-space(.)='${term}']/following-sibling::dd[1]`;
 
-const flagButton = (sheet: Locator): Locator =>
-  sheet.getByRole("button", { name: "Flag the name to the operator" });
+const displayNameRegion = (page: Page): Locator =>
+  thePage(page).getByRole("region", { name: "Display name" });
+
+const flagButton = (page: Page): Locator =>
+  thePage(page).getByRole("button", { name: "Flag the name to the operator" });
+
+/** The page's own address, its last segment a person's id. */
+const AT_A_MEMBER_PAGE = new RegExp(`${MEMBERS_SCREEN}/[0-9A-HJKMNP-TV-Z]{26}$`);
+
+/** Opens a member's page from the list by their name, as a pointer does. */
+const openedByName = async (page: Page, name: string): Promise<void> => {
+  await memberLink(page, name).click();
+  await expect(page).toHaveURL(AT_A_MEMBER_PAGE);
+  await expect(personHeading(page, name)).toBeVisible();
+};
+
+/** Back to Members, as the browser's own Back takes the reader there. */
+const backToMembers = async (page: Page): Promise<void> => {
+  await page.goBack();
+  await expect(page).toHaveURL(new RegExp(`${MEMBERS_SCREEN}(\\?[^#]*)?(#.*)?$`));
+  await expect(listHeading(page)).toBeVisible();
+};
 
 const SENT_TO_THE_OPERATOR = "Sent to the operator. The name stands until they correct it.";
 
@@ -216,30 +282,28 @@ const anAdminBesideAnotherAtPeople = async (
   return workspace;
 };
 
-/** The Admin signed in makes themself an Editor through their own sheet, which says so. */
-const demotedThemself = async (page: Page): Promise<Locator> => {
-  await memberButton(page, "Test person").click();
-  const sheet = sheetOf(page, "Test person");
-  await sheet.getByRole("radio", { name: "Editor", exact: true }).click();
-  await sheet.getByRole("button", { name: "Make Test person an Editor" }).click();
-  await expect(sheet.getByRole("status"), "the screen hid mid-act").toHaveText(
-    "Test person is an Editor now, from their next request.",
-  );
-  return sheet;
+/**
+ * The Admin signed in makes themself an Editor on their own page, told first that it includes
+ * them.
+ */
+const demotedThemself = async (page: Page): Promise<void> => {
+  await openedByName(page, "Test person");
+  await thePage(page).getByRole("radio", { name: "Editor", exact: true }).click();
+  const commit = thePage(page).getByRole("button", { name: "Make Test person an Editor" });
+  await expect(commit).toHaveAccessibleDescription(new RegExp(`^${INCLUDES_YOU}`));
+  await commit.click();
 };
 
-/** The screen was decided on arrival; coming back to it asks again, as an Editor. */
-const membersHiddenAfterTheNextMove = async (page: Page): Promise<void> => {
-  await page.getByRole("link", { name: HOMES.Editor.name, exact: true }).click();
-  await expect(page).toHaveURL(new RegExp(`${HOMES.Editor.path}$`));
+/** The page they left was Members', so coming back to it asks again, as an Editor. */
+const membersHiddenOnTheWayBack = async (page: Page): Promise<void> => {
   await page.goBack();
   await expect(page).toHaveURL(new RegExp(`${MEMBERS_SCREEN}$`));
   await notFoundOfferingHome(page, "Editor");
 };
 
-const removedThroughTheirSheet = async (page: Page, name: string): Promise<void> => {
-  await memberButton(page, name).click();
-  const removal = removalOf(sheetOf(page, name));
+const removedThroughTheirPage = async (page: Page, name: string): Promise<void> => {
+  await openedByName(page, name);
+  const removal = removalOf(page);
   await removal.getByRole("button", { name: `Remove ${name}`, exact: true }).click();
   await removal.getByRole("button", { name: `Remove ${name} from this workspace` }).click();
 };
@@ -379,7 +443,7 @@ test.describe("the People group's Members screen", () => {
               - cell:
                 - checkbox "Select Priya Shah"
               - cell /Priya Shah/:
-                - button "Priya Shah"
+                - link "Priya Shah"
               - cell "Editor"
               - cell "No group"
               - cell /\\d{4}/
@@ -389,7 +453,7 @@ test.describe("the People group's Members screen", () => {
               - cell:
                 - checkbox "Select Sam Okoro"
               - cell /Sam Okoro/:
-                - button "Sam Okoro"
+                - link "Sam Okoro"
               - cell "Viewer"
               - cell "No group"
               - cell /\\d{4}/
@@ -399,7 +463,7 @@ test.describe("the People group's Members screen", () => {
               - cell:
                 - checkbox "Select Test person"
               - cell /Test person/:
-                - button "Test person"
+                - link "Test person"
               - cell "Admin"
               - cell "No group"
               - cell /\\d{4}/
@@ -411,7 +475,43 @@ test.describe("the People group's Members screen", () => {
   });
 });
 
-test.describe("a member, opened as a sheet", () => {
+/** The breadcrumb's parts, in order, read as the band names them. */
+const crumbsOf = (page: Page): Locator =>
+  page.getByRole("banner").getByRole("navigation", { name: BREADCRUMB }).getByRole("listitem");
+
+const A_PERSON_NOWHERE = "01JBZ6Q2V7Y9K3M5N8P0R2T4W6";
+
+test.describe("a member's own page", () => {
+  test("opens by name, row menu and link, crumbed by name", async ({ page, request }) => {
+    const { joined } = await anAdminAtPeople(page, request, "Swale Ironmongers");
+    const priya = joined.find((member) => member.displayName === "Priya Shah");
+    if (priya === undefined) throw new Error("Priya Shah was joined");
+    const priyasPage = new RegExp(`${memberPageAt(priya.id)}$`);
+
+    await memberLink(page, "Priya Shah").click();
+    await expect(page).toHaveURL(priyasPage);
+    await expect(crumbsOf(page)).toHaveText([
+      CONTROL_CENTRE.name,
+      people.name,
+      MEMBERS.name,
+      "Priya Shah",
+    ]);
+    await expect(crumbOf(page, MEMBERS.name)).toHaveAttribute("href", MEMBERS_SCREEN);
+    await expect(page.getByRole("tab")).toHaveCount(0);
+
+    await backToMembers(page);
+    await membersRegion(page).getByRole("button", { name: "Acts for Priya Shah" }).click();
+    await page.getByRole("menuitem", { name: "Open" }).click();
+    await expect(page).toHaveURL(priyasPage);
+    await expect(personHeading(page, "Priya Shah")).toBeFocused();
+
+    // A fresh document, as a link someone sent would open it.
+    await page.goto(memberPageAt(priya.id));
+    await expect(personHeading(page, "Priya Shah")).toBeVisible();
+    await expect(crumbsOf(page).last()).toHaveText("Priya Shah");
+    await expect(page.getByRole("heading", { level: 1, name: headingOf(MEMBERS) })).toBeVisible();
+  });
+
   test("shows a member's role, groups and each role's meaning", async ({
     page,
     request,
@@ -421,27 +521,36 @@ test.describe("a member, opened as a sheet", () => {
     const priya = joined.find((member) => member.displayName === "Priya Shah");
     if (priya === undefined) throw new Error("Priya Shah was joined");
 
-    await memberButton(page, "Priya Shah").click();
+    await memberLink(page, "Priya Shah").focus();
+    await page.keyboard.press(PEOPLE_KEYSTROKES.open.key);
 
-    const sheet = sheetOf(page, "Priya Shah");
-    await expect(sheet).toBeVisible();
-    await expect(sheet.getByRole("heading", { level: 2, name: "Priya Shah" })).toBeFocused();
-    await expect(sheet).toContainText(priya.email);
-    await expect(rolePicker(sheet).getByRole("radio")).toHaveCount(3);
+    await expect(personHeading(page, "Priya Shah")).toBeFocused();
+    await expect(thePage(page)).toContainText(priya.email);
+    await expect(rolePicker(page).getByRole("radio")).toHaveCount(3);
     for (const [role, meaning] of Object.entries(EACH_ROLE_MEANS)) {
       await expect(
-        sheet.getByRole("radio", { name: role, exact: true }),
+        thePage(page).getByRole("radio", { name: role, exact: true }),
       ).toHaveAccessibleDescription(meaning);
     }
-    await expect(sheet.getByRole("radio", { name: "Editor", exact: true })).toBeChecked();
-    await expect(sheet.getByRole("button", { name: "Make Priya Shah an Editor" })).toBeDisabled();
+    await expect(thePage(page).getByRole("radio", { name: "Editor", exact: true })).toBeChecked();
+    await expect(
+      thePage(page).getByRole("button", { name: "Make Priya Shah an Editor" }),
+    ).toBeDisabled();
 
-    await expect(sheet).toMatchAriaSnapshot(`
-      - dialog "Priya Shah":
+    await expect(thePage(page)).toMatchAriaSnapshot(`
+      - main "Screen":
+        - heading "People" [level=1]
         - heading "Priya Shah" [level=2]
         - paragraph: /@/
-        - region "Membership":
-          - heading "Membership" [level=3]
+        - text: Editor
+        - navigation "${MEMBER_PAGE_WORDS.sections}":
+          - list:
+            - listitem:
+              - link "${MEMBER_PAGE_WORDS.access}"
+            - listitem:
+              - link "${MEMBER_PAGE_WORDS.removeAndRevoke}"
+        - region "${MEMBER_PAGE_WORDS.access}":
+          - heading "${MEMBER_PAGE_WORDS.access}" [level=2]
           - term: Role
           - definition: Editor
           - term: Groups
@@ -450,33 +559,135 @@ test.describe("a member, opened as a sheet", () => {
           - definition: /\\d{4}/
           - term: Credentials here
           - definition: Never revoked
-        - region "Role":
-          - heading "Role" [level=3]
-          - radiogroup "Role":
-            - radio "Admin"
-            - text: Admin Manages people and sources, and does everything an Editor does.
-            - radio "Editor" [checked]
-            - text: Editor Checks concepts, runs question sets and saves Answers.
-            - radio "Viewer"
-            - text: Viewer Asks questions, flags answers and suggests changes.
-          - button "Make Priya Shah an Editor" [disabled]
-          - paragraph: Priya Shah is an Editor. Pick another role to change it.
-        - region "Credentials":
-          - heading "Credentials" [level=3]
-          - button "Revoke Priya Shah's credentials here"
-          - paragraph: Every session and token Priya Shah holds for this workspace is refused at once, and a fresh sign-in works. Recorded on the audit log under your name.
-        - region "Display name":
-          - heading "Display name" [level=3]
-          - paragraph: People give their own display name, and no Admin can change one. The operator corrects a name you flag as inappropriate.
-          - button "Flag the name to the operator"
-          - paragraph: The operator is emailed, and the flag is recorded on the audit log under your name. While a flag from this workspace waits, another adds nothing.
-        - button "Close"
+          - region "Role":
+            - heading "Role" [level=3]
+            - radiogroup "Role":
+              - radio "Admin"
+              - text: Admin Manages people and sources, and does everything an Editor does.
+              - radio "Editor" [checked]
+              - text: Editor Checks concepts, runs question sets and saves Answers.
+              - radio "Viewer"
+              - text: Viewer Asks questions, flags answers and suggests changes.
+            - button "Make Priya Shah an Editor" [disabled]
+            - paragraph: Priya Shah is an Editor. Pick another role to change it.
+          - region "Groups":
+            - heading "Groups" [level=3]
+            - paragraph: ${EMPTY_LINES.groups}
+            - link "Create one on the Groups screen"
+          - region "Display name":
+            - heading "Display name" [level=3]
+            - paragraph: People give their own display name, and no Admin can change one. The operator corrects a name you flag as inappropriate.
+            - button "Flag the name to the operator"
+            - paragraph: The operator is emailed, and the flag is recorded on the audit log under your name. While a flag from this workspace waits, another adds nothing.
+        - region "${MEMBER_PAGE_WORDS.removeAndRevoke}":
+          - heading "${MEMBER_PAGE_WORDS.removeAndRevoke}" [level=2]
+          - region "Credentials":
+            - heading "Credentials" [level=3]
+            - button "Revoke Priya Shah's credentials here"
+            - paragraph: Every session and token Priya Shah holds for this workspace is refused at once, and a fresh sign-in works. Recorded on the audit log under your name.
+          - region "Removal":
+            - heading "Removal" [level=3]
+            - paragraph: /Priya Shah loses access to this workspace/
+            - button "Remove Priya Shah"
     `);
     await passesTheAccessibilityGate();
 
-    await page.keyboard.press("Escape");
-    await expect(sheet).toHaveCount(0);
-    await expect(memberButton(page, "Priya Shah")).toBeFocused();
+    await thePage(page).getByRole("link", { name: MEMBER_PAGE_WORDS.removeAndRevoke }).click();
+    await expect(
+      thePage(page).getByRole("heading", { level: 2, name: MEMBER_PAGE_WORDS.removeAndRevoke }),
+    ).toBeFocused();
+    await expect(page, "a section took an address of its own").toHaveURL(
+      new RegExp(`${memberPageAt(priya.id)}$`),
+    );
+  });
+
+  test("stacks header and sections at 320 pixels, scrolling nothing sideways", async ({
+    page,
+    request,
+  }) => {
+    await anAdminAtPeople(page, request, "Ure Ironmongers");
+    await openedByName(page, "Priya Shah");
+    await page.setViewportSize({ width: 320, height: 720 });
+
+    const sections = thePage(page).getByRole("navigation", { name: MEMBER_PAGE_WORDS.sections });
+    // The narrow layout answers a resize on its own render, so the stack is waited for, not read once.
+    await expect
+      .poll(
+        async () => {
+          const header = await personHeading(page, "Priya Shah").boundingBox();
+          const nav = await sections.boundingBox();
+          return (nav?.y ?? 0) - ((header?.y ?? 0) + (header?.height ?? 0));
+        },
+        { message: "the section nav does not stack below the header" },
+      )
+      .toBeGreaterThan(0);
+    const room = await page.evaluate(() => [
+      document.documentElement.scrollWidth,
+      document.documentElement.clientWidth,
+    ]);
+    expect(room[0], "the page scrolls sideways").toBeLessThanOrEqual(room[1] ?? 0);
+  });
+
+  for (const role of ["Editor", "Viewer"] as const) {
+    test(`shows ${aRole(role)} a member page as not found`, async ({ page, request }) => {
+      const workspace = await aMemberSignedInAt(
+        page,
+        request,
+        role,
+        memberPageAt(A_PERSON_NOWHERE),
+      );
+
+      await notFoundOfferingHome(page, role);
+      await expect(page.locator("body")).not.toContainText(workspace.admin.email);
+    });
+  }
+
+  test("finds no page deeper than a member's", async ({ page, request }) => {
+    const { adminId } = await anAdminAtPeople(page, request, "Swale Tinsmiths");
+
+    await page.goto(`${memberPageAt(adminId)}/x`);
+
+    await expect(
+      page.getByRole("heading", { level: 1, name: UNKNOWN_SCREEN.heading }),
+    ).toBeVisible();
+    await expect(thePage(page), "a page drew a person past its own address").not.toContainText(
+      "Test person",
+    );
+  });
+
+  test("names no one at a malformed address, asking nothing", async ({ page, request }) => {
+    await anAdminAtPeople(page, request, "Swale Lockmakers");
+    const malformed = "not-a-person";
+    const asked: string[] = [];
+    page.on("request", (sent) => {
+      if (sent.url().includes("/trpc/")) asked.push(`${sent.url()} ${sent.postData() ?? ""}`);
+    });
+
+    await page.goto(memberPageAt(malformed));
+
+    await expect(thePage(page).getByText(MEMBER_PAGE_WORDS.noSuchMember)).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: headingOf(MEMBERS) })).toBeVisible();
+    expect(
+      asked.filter((sent) => sent.includes(malformed) || sent.includes("members.")),
+      "a query asked about a malformed address",
+    ).toEqual([]);
+  });
+
+  test("names no one at an unknown id, leading to Members", async ({
+    page,
+    request,
+    passesTheAccessibilityGate,
+  }) => {
+    await anAdminAtPeople(page, request, "Swale Ropers");
+
+    await page.goto(memberPageAt(A_PERSON_NOWHERE));
+
+    await expect(thePage(page).getByText(MEMBER_PAGE_WORDS.noSuchMember)).toBeVisible();
+    await expect(crumbsOf(page).last()).toHaveText(MEMBERS.name);
+    await passesTheAccessibilityGate();
+    await thePage(page).getByRole("link", { name: MEMBER_PAGE_WORDS.toMembers }).click();
+    await expect(page).toHaveURL(new RegExp(`${MEMBERS_SCREEN}$`));
+    await expect(memberRows(page)).toHaveCount(3);
   });
 
   test("draws a role pill square, the avatar and radios round", async ({ page, request }) => {
@@ -484,13 +695,12 @@ test.describe("a member, opened as a sheet", () => {
     const pill = rowOf(page, "Priya Shah").getByText("Editor", { exact: true });
     await expect(pill, "the kit's rounded-full on a pill").toHaveCSS("border-radius", "0px");
 
-    await memberButton(page, "Priya Shah").click();
-    const sheet = sheetOf(page, "Priya Shah");
+    await openedByName(page, "Priya Shah");
     // The avatar is hidden from assistive technology, so no role or name reaches it.
-    const avatar = sheet.locator("[data-slot='avatar']");
+    const avatar = thePage(page).locator("[data-slot='avatar']");
     await expect(avatar, "the avatar, a kept circle").toHaveCSS("border-radius", "999px");
     await expect(
-      sheet.getByRole("radio", { name: "Admin", exact: true }),
+      thePage(page).getByRole("radio", { name: "Admin", exact: true }),
       "a radio, a kept circle",
     ).toHaveCSS("border-radius", "999px");
   });
@@ -498,26 +708,22 @@ test.describe("a member, opened as a sheet", () => {
   test("changes a member's role within its budget, and it holds", async ({ page, request }) => {
     await anAdminAtPeople(page, request, "Nidd Valley Casting");
 
-    await memberButton(page, "Sam Okoro").click();
-    const sheet = sheetOf(page, "Sam Okoro");
-    await sheet.getByRole("radio", { name: "Editor", exact: true }).click();
-    const commit = sheet.getByRole("button", { name: "Make Sam Okoro an Editor" });
+    await openedByName(page, "Sam Okoro");
+    await thePage(page).getByRole("radio", { name: "Editor", exact: true }).click();
+    const commit = thePage(page).getByRole("button", { name: "Make Sam Okoro an Editor" });
     await commit.focus();
-    await clockTheNextKey(page, {
-      at: "//tr[.//button[normalize-space(.)='Sam Okoro']]/td[3]",
-      reads: "Editor",
-    });
+    await clockTheNextKey(page, { at: accessLine("Role"), reads: "Editor" });
     await page.keyboard.press("Enter");
 
-    await expect(sheet.getByRole("status")).toHaveText(
+    await expect(rolePickerRegion(page).getByRole("status")).toHaveText(
       "Sam Okoro is an Editor now, from their next request.",
     );
     await theActLandedWithinItsBudget(page, "role change");
-    await expect(sheet.getByRole("radio", { name: "Editor", exact: true })).toBeFocused();
-    await expect(sheet.getByRole("region", { name: "Membership" })).toContainText("Editor");
+    await expect(thePage(page).getByRole("radio", { name: "Editor", exact: true })).toBeFocused();
 
-    await page.keyboard.press("Escape");
     await page.reload();
+    await expect(accessOf(page).getByRole("definition").first()).toHaveText("Editor");
+    await backToMembers(page);
     await expect(cellOf(page, "Sam Okoro", "Role")).toHaveText("Editor");
   });
 
@@ -528,68 +734,53 @@ test.describe("a member, opened as a sheet", () => {
   }) => {
     await anAdminAtPeople(page, request, "Ure Mill Tools");
 
-    await memberButton(page, "Test person").click();
-    const sheet = sheetOf(page, "Test person");
-    await sheet.getByRole("radio", { name: "Viewer", exact: true }).click();
-    const commit = sheet.getByRole("button", { name: "Make Test person a Viewer" });
-    await commit.click();
+    await openedByName(page, "Test person");
+    await thePage(page).getByRole("radio", { name: "Viewer", exact: true }).click();
+    await thePage(page).getByRole("button", { name: "Make Test person a Viewer" }).click();
 
-    await saysItsSentenceNotItsWord(sheet.getByRole("alert"), {
+    await saysItsSentenceNotItsWord(rolePickerRegion(page).getByRole("alert"), {
       table: SAID_OF_A_MEMBER,
       word: "last-admin",
     });
-    await expect(sheet.getByRole("region", { name: "Membership" })).toContainText("Admin");
+    await expect(accessOf(page).getByRole("definition").first()).toHaveText("Admin");
     await passesTheAccessibilityGate();
-    await page.keyboard.press("Escape");
-    await expect(cellOf(page, "Test person", "Role")).toHaveText("Admin");
   });
 
-  test("an Admin demoting themself sees their new role at once", async ({ page, request }) => {
+  test("demoting yourself says so, then lands on Editor's home", async ({ page, request }) => {
     await anAdminBesideAnotherAtPeople(page, request, "Esk Presswork");
-    await expect(await personMenuOpened(page, "Test person")).toContainText("Admin");
-    await page.keyboard.press("Escape");
 
-    const sheet = await demotedThemself(page);
-    await page.keyboard.press("Escape");
+    await demotedThemself(page);
 
-    await expect(sheet).toHaveCount(0);
+    await landedAtHome(page, "Editor");
+    await expect(page.getByRole("status").filter({ hasText: homeNowSaid("Editor") })).toBeVisible();
     const you = await personMenuOpened(page, "Test person");
     await expect(you).toContainText("Editor");
     await expect(you).not.toContainText("Admin");
     await page.keyboard.press("Escape");
-    await expect(membersRegion(page).getByRole("alert")).toHaveText(
-      sentenceOf(SAID_OF_A_MEMBER["role-forbids"]),
-    );
-
-    await membersHiddenAfterTheNextMove(page);
+    await membersHiddenOnTheWayBack(page);
   });
 
-  test("an Admin arriving unread who demotes themself keeps the confirmation", async ({
+  test("arriving unread, demoting yourself still lands on Editor's home", async ({
     page,
     request,
   }) => {
     await anAdminBesideAnotherAtPeople(page, request, "Ure Presswork");
+    await openedByName(page, "Test person");
     let dropped = false;
     await page.route(MEMBERSHIP_READ, (route) => {
       if (dropped) return route.continue();
       dropped = true;
       return route.abort();
     });
-    // The shell's read on arrival is dropped, so the role arrives after the screen does.
+    // The shell's read on arrival is dropped, so the role arrives after the page does.
     await page.reload();
-    const controlCentre = page
-      .getByRole("navigation", { name: RAIL })
-      .getByRole("link", { name: CONTROL_CENTRE.name });
-    await expect(controlCentre).toBeVisible();
-    await expect(memberRows(page)).toHaveCount(2);
+    await expect(personHeading(page, "Test person")).toBeVisible();
 
-    const sheet = await demotedThemself(page);
-    await expect(controlCentre, "the rail did not take the new role").toHaveCount(0);
-    await expect(sheet.getByRole("status"), "the screen hid mid-act").toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
+    await thePage(page).getByRole("radio", { name: "Editor", exact: true }).click();
+    await thePage(page).getByRole("button", { name: "Make Test person an Editor" }).click();
 
-    await membersHiddenAfterTheNextMove(page);
+    await landedAtHome(page, "Editor");
+    await expect(page.getByRole("status").filter({ hasText: homeNowSaid("Editor") })).toBeVisible();
   });
 
   test("lists Members' keystrokes from the rail's foot, as ? does", async ({
@@ -624,11 +815,9 @@ test.describe("a member, opened as a sheet", () => {
   });
 
   test("opens a member and changes their role by keyboard alone", async ({ page, request }) => {
-    await anAdminAtPeople(page, request, "Calder Rolling");
-    await page.goto(MEMBERS_SCREEN);
-    await expect(memberRows(page)).toHaveCount(3);
+    await skippedToMembers(page, request, "Calder Rolling");
 
-    await page.keyboard.press("c");
+    await page.keyboard.press(PEOPLE_KEYSTROKES.changeRole.key);
     await expect(membersRegion(page)).toContainText(SELECT_FIRST.member);
 
     const keystrokes = await keystrokesListed(page, MEMBERS.name);
@@ -641,39 +830,47 @@ test.describe("a member, opened as a sheet", () => {
     );
     await keystrokesDismissed(page, keystrokes);
 
-    await memberButton(page, "Priya Shah").focus();
-    await page.keyboard.press("o");
-    const sheet = sheetOf(page, "Priya Shah");
-    await expect(sheet.getByRole("heading", { level: 2, name: "Priya Shah" })).toBeFocused();
-    await page.keyboard.press("Escape");
-    await expect(memberButton(page, "Priya Shah")).toBeFocused();
-
-    await page.keyboard.press("c");
-    await expect(sheet.getByRole("radio", { name: "Editor", exact: true })).toBeFocused();
+    await tabUntilFocused(page, memberLink(page, "Priya Shah"));
+    await page.keyboard.press(PEOPLE_KEYSTROKES.changeRole.key);
+    await expect(thePage(page).getByRole("radio", { name: "Editor", exact: true })).toBeFocused();
     // The group checks the radio it moves to, a task later, only while the arrow is still held.
     await page.keyboard.down("ArrowDown");
-    await expect(sheet.getByRole("radio", { name: "Viewer", exact: true })).toBeChecked();
+    await expect(thePage(page).getByRole("radio", { name: "Viewer", exact: true })).toBeChecked();
     await page.keyboard.up("ArrowDown");
     await page.keyboard.press("Tab");
-    await expect(sheet.getByRole("button", { name: "Make Priya Shah a Viewer" })).toBeFocused();
+    await expect(
+      thePage(page).getByRole("button", { name: "Make Priya Shah a Viewer" }),
+    ).toBeFocused();
     await page.keyboard.press("Enter");
-    await expect(sheet.getByRole("status")).toHaveText(
+    await expect(rolePickerRegion(page).getByRole("status")).toHaveText(
       "Priya Shah is a Viewer now, from their next request.",
     );
 
-    await page.keyboard.press("Escape");
-    await expect(memberButton(page, "Priya Shah")).toBeFocused();
+    // The page's own keystrokes reach each act's control again, listed under Members.
+    const onThePage = await keystrokesListed(page, MEMBERS.name);
+    for (const keystroke of Object.values(MEMBER_PAGE_KEYSTROKES)) {
+      await expect(onThePage).toContainText(keystroke.act);
+    }
+    await keystrokesDismissed(page, onThePage);
+    await page.keyboard.press(MEMBER_PAGE_KEYSTROKES.remove.key);
+    await expect(
+      removalOf(page).getByRole("button", { name: "Remove Priya Shah", exact: true }),
+    ).toBeFocused();
+    await page.keyboard.press(MEMBER_PAGE_KEYSTROKES.changeRole.key);
+    await expect(thePage(page).getByRole("radio", { name: "Viewer", exact: true })).toBeFocused();
+
+    await backToMembers(page);
     await expect(cellOf(page, "Priya Shah", "Role")).toHaveText("Viewer");
   });
 });
 
-const CREDENTIALS_HERE =
-  "//div[@role='dialog']//dt[normalize-space(.)='Credentials here']/following-sibling::dd[1]";
-
 const REVOKED_AT = /Revoked\s*\d{2}:\d{2} · \d{1,2} [A-Z][a-z]+ \d{4}/;
 
-const revokeButton = (sheet: Locator, name: string): Locator =>
-  sheet.getByRole("button", { name: `Revoke ${name}'s credentials here` });
+const revokeButton = (page: Page, name: string): Locator =>
+  thePage(page).getByRole("button", { name: `Revoke ${name}'s credentials here` });
+
+const credentialsRegion = (page: Page): Locator =>
+  thePage(page).getByRole("region", { name: "Credentials" });
 
 /** Priya is a member of a second workspace too, so a screen that told of it would name it. */
 const anAdminWithAMemberOfTwo = async (page: Page, api: APIRequestContext) => {
@@ -697,31 +894,25 @@ test.describe("revoking a member's credentials here", () => {
   }) => {
     const { elsewhere } = await anAdminWithAMemberOfTwo(page, request);
 
-    await memberButton(page, "Priya Shah").click();
-    const sheet = sheetOf(page, "Priya Shah");
-    const membership = sheet.getByRole("region", { name: "Membership" });
-    await expect(membership).toContainText("Never revoked");
-    const revoke = revokeButton(sheet, "Priya Shah");
+    await openedByName(page, "Priya Shah");
+    await expect(accessOf(page)).toContainText("Never revoked");
+    const revoke = revokeButton(page, "Priya Shah");
     await revoke.focus();
-    await clockTheNextKey(page, { at: CREDENTIALS_HERE, reads: "Revoked" });
+    await clockTheNextKey(page, { at: accessLine("Credentials here"), reads: "Revoked" });
     await page.keyboard.press("Enter");
 
-    await expect(sheet.getByRole("status")).toContainText(
+    await expect(credentialsRegion(page).getByRole("status")).toContainText(
       "Priya Shah's credentials here are revoked.",
     );
     await theActLandedWithinItsBudget(page, "revocation");
     await expect(revoke).toBeFocused();
-    await expect(membership).toContainText(REVOKED_AT);
+    await expect(accessOf(page)).toContainText(REVOKED_AT);
     await passesTheAccessibilityGate();
     await expect(page.locator("body")).not.toContainText(elsewhere.name);
-    expect(await sheet.ariaSnapshot()).not.toContain(elsewhere.name);
+    expect(await thePage(page).ariaSnapshot()).not.toContain(elsewhere.name);
 
-    await page.keyboard.press("Escape");
     await page.reload();
-    await memberButton(page, "Priya Shah").click();
-    await expect(
-      sheetOf(page, "Priya Shah").getByRole("region", { name: "Membership" }),
-    ).toContainText(REVOKED_AT);
+    await expect(accessOf(page)).toContainText(REVOKED_AT);
   });
 
   test("revokes the Admin's own credentials, then admits a fresh sign-in", async ({
@@ -734,63 +925,59 @@ test.describe("revoking a member's credentials here", () => {
     await signIn(page, request, admin);
     await expect(memberRows(page)).toHaveCount(1);
 
-    await memberButton(page, "Test person").click();
-    const sheet = sheetOf(page, "Test person");
-    await expect(sheet).toContainText("Your own session here ends with it.");
-    await revokeButton(sheet, "Test person").click();
-    await expect(sheet.getByRole("status")).toContainText(
-      "Test person's credentials here are revoked.",
-    );
-    await page.keyboard.press("Escape");
+    await openedByName(page, "Test person");
+    const ownPage = page.url();
+    await expect(credentialsRegion(page)).toContainText("Your own session here ends with it.");
+    await revokeButton(page, "Test person").click();
 
-    await expect(membersRegion(page).getByRole("alert")).toHaveText(
+    await expect(thePage(page).getByRole("alert")).toHaveText(
       sentenceOf(SAID_OF_CLASS.unauthenticated),
     );
     await page.reload();
     await signIn(page, request, admin);
-    await expect(page).toHaveURL(new RegExp(`${MEMBERS_SCREEN}$`));
-    await expect(memberRows(page)).toHaveCount(1);
-    await expect(membersRegion(page).getByRole("alert")).toHaveCount(0);
+    await expect(page).toHaveURL(ownPage);
+    await expect(personHeading(page, "Test person")).toBeVisible();
+    await expect(accessOf(page)).toContainText(REVOKED_AT);
   });
 
   test("opens a member's credentials and revokes them by keyboard alone", async ({
     page,
     request,
   }) => {
-    await anAdminAtPeople(page, request, "Nidd Presswork");
-    await page.goto(MEMBERS_SCREEN);
-    await expect(memberRows(page)).toHaveCount(3);
+    await skippedToMembers(page, request, "Nidd Presswork");
 
-    await page.keyboard.press("v");
+    await page.keyboard.press(PEOPLE_KEYSTROKES.revokeCredentials.key);
     await expect(membersRegion(page)).toContainText(SELECT_FIRST.member);
 
-    await memberButton(page, "Sam Okoro").focus();
-    await page.keyboard.press("v");
-    const sheet = sheetOf(page, "Sam Okoro");
-    const revoke = revokeButton(sheet, "Sam Okoro");
+    await tabUntilFocused(page, memberLink(page, "Sam Okoro"));
+    await page.keyboard.press(PEOPLE_KEYSTROKES.revokeCredentials.key);
+    const revoke = revokeButton(page, "Sam Okoro");
     await expect(revoke).toBeFocused();
     await page.keyboard.press("Enter");
-    await expect(sheet.getByRole("status")).toContainText(
+    await expect(credentialsRegion(page).getByRole("status")).toContainText(
       "Sam Okoro's credentials here are revoked.",
     );
     await expect(revoke).toBeFocused();
-
-    await page.keyboard.press("Escape");
-    await expect(memberButton(page, "Sam Okoro")).toBeFocused();
   });
 });
 
-test.describe("removing a member from their sheet", () => {
+test.describe("removing a member from their page", () => {
   test("removes a member behind a confirmation, within its budget", async ({
     page,
     request,
     passesTheAccessibilityGate,
   }) => {
     await anAdminAtPeople(page, request, "Rye Foundry");
+    // Sorted, so the return is seen to keep what the list's address held.
+    const person = membersRegion(page).getByRole("columnheader", { name: "Person" });
+    await person.getByRole("button").click();
+    await person.getByRole("button").click();
+    await expect(person).toHaveAttribute("aria-sort", "descending");
+    const sorted = page.url();
 
-    await memberButton(page, "Priya Shah").click();
-    const sheet = sheetOf(page, "Priya Shah");
-    const removal = removalOf(sheet);
+    await openedByName(page, "Priya Shah");
+    const priyasPage = page.url();
+    const removal = removalOf(page);
     const asked = removal.getByRole("button", { name: "Remove Priya Shah", exact: true });
     await expect(asked).toHaveAccessibleDescription(
       "Priya Shah loses access to this workspace on every session and client they hold. Any other workspace they belong to is untouched, and they stay named on what they checked.",
@@ -823,33 +1010,62 @@ test.describe("removing a member from their sheet", () => {
     await clockTheNextKey(page, { at: THE_COUNT, reads: "2 people" });
     await page.keyboard.press("Enter");
 
-    await expect(sheet).toHaveCount(0);
+    await expect(page).toHaveURL(sorted);
     await expect(memberRows(page)).toHaveCount(2);
-    await expect(memberButton(page, "Sam Okoro")).toBeFocused();
-    await expect(membersRegion(page).getByRole("status").last()).toHaveText(
-      "Priya Shah is no longer a member of this workspace.",
-    );
+    await expect(person).toHaveAttribute("aria-sort", "descending");
+    await expect(listHeading(page)).toBeFocused();
+    await expect(
+      membersRegion(page)
+        .getByRole("status")
+        .filter({ hasText: MEMBER_PAGE_WORDS.removed("Priya Shah") }),
+    ).toBeVisible();
     await theActLandedWithinItsBudget(page, "removal");
 
-    await page.reload();
+    await page.goBack();
+    await expect(page).toHaveURL(priyasPage);
+    await expect(thePage(page).getByText(MEMBER_PAGE_WORDS.noSuchMember)).toBeVisible();
+    await expect(personHeading(page, "Priya Shah")).toHaveCount(0);
+
+    await page.goto(MEMBERS_SCREEN);
     await expect(memberRows(page)).toHaveCount(2);
     await expect(rowOf(page, "Priya Shah")).toHaveCount(0);
   });
 
-  test("refuses removing the last Admin, and puts them back", async ({
+  test("says on Members why a removal was refused, row restored", async ({
+    page,
+    request,
+    passesTheAccessibilityGate,
+  }) => {
+    await anAdminAtPeople(page, request, "Rye Ropery");
+    // Refused only once the page has left for Members, as a change landing meanwhile is.
+    await answeredChangedMeanwhile(page, REMOVAL);
+
+    await removedThroughTheirPage(page, "Priya Shah");
+
+    await expect(page).toHaveURL(new RegExp(`${MEMBERS_SCREEN}$`));
+    await saysItsSentenceNotItsWord(membersRegion(page).getByRole("alert"), {
+      table: SAID_OF_A_MEMBER,
+      word: "changed-meanwhile",
+    });
+    await expect(rowOf(page, "Priya Shah")).toBeVisible();
+    await expect(memberRows(page)).toHaveCount(3);
+    await passesTheAccessibilityGate();
+  });
+
+  test("refuses removing the last Admin, and keeps them", async ({
     page,
     request,
     passesTheAccessibilityGate,
   }) => {
     await anAdminAtPeople(page, request, "Hodder Tools");
 
-    await removedThroughTheirSheet(page, "Test person");
+    await removedThroughTheirPage(page, "Test person");
 
-    await expect(membersRegion(page).getByRole("alert")).toHaveText(
+    await expect(removalOf(page).getByRole("alert")).toHaveText(
       sentenceOf(SAID_OF_A_MEMBER["last-admin"]),
     );
-    await expect(memberRows(page)).toHaveCount(3);
-    await expect(cellOf(page, "Test person", "Role")).toHaveText("Admin");
+    await expect(page).toHaveURL(AT_A_MEMBER_PAGE);
+    await expect(accessOf(page).getByRole("definition").first()).toHaveText("Admin");
     await passesTheAccessibilityGate();
   });
 
@@ -858,16 +1074,16 @@ test.describe("removing a member from their sheet", () => {
     request,
   }) => {
     await anAdminBesideAnotherAtPeople(page, request, "Esk Tinsmiths");
-    await memberButton(page, "Test person").click();
+    await openedByName(page, "Test person");
+    const removal = removalOf(page);
     await expect(
-      removalOf(sheetOf(page, "Test person")).getByRole("button", {
-        name: "Remove Test person",
-        exact: true,
-      }),
+      removal.getByRole("button", { name: "Remove Test person", exact: true }),
     ).toHaveAccessibleDescription(/^You lose access to this workspace, People included,/);
-    await page.keyboard.press("Escape");
-
-    await removedThroughTheirSheet(page, "Test person");
+    await removal.getByRole("button", { name: "Remove Test person", exact: true }).click();
+    await expect(
+      removal.getByRole("button", { name: "Remove Test person from this workspace" }),
+    ).toHaveAccessibleDescription(new RegExp(`^${INCLUDES_YOU}`));
+    await removal.getByRole("button", { name: "Remove Test person from this workspace" }).click();
 
     // The chooser sends a person who holds no other workspace straight on.
     await expect(page).toHaveURL(/\/no-workspace$/);
@@ -875,17 +1091,14 @@ test.describe("removing a member from their sheet", () => {
   });
 
   test("removes a member by keyboard alone", async ({ page, request }) => {
-    await anAdminAtPeople(page, request, "Calder Presswork");
-    await page.goto(MEMBERS_SCREEN);
-    await expect(memberRows(page)).toHaveCount(3);
+    await skippedToMembers(page, request, "Calder Presswork");
 
-    await page.keyboard.press("d");
+    await page.keyboard.press(PEOPLE_KEYSTROKES.remove.key);
     await expect(membersRegion(page)).toContainText(SELECT_FIRST.member);
 
-    await memberButton(page, "Sam Okoro").focus();
-    await page.keyboard.press("d");
-    const sheet = sheetOf(page, "Sam Okoro");
-    const removal = removalOf(sheet);
+    await tabUntilFocused(page, memberLink(page, "Sam Okoro"));
+    await page.keyboard.press(PEOPLE_KEYSTROKES.remove.key);
+    const removal = removalOf(page);
     await expect(
       removal.getByRole("button", { name: "Remove Sam Okoro", exact: true }),
     ).toBeFocused();
@@ -897,9 +1110,9 @@ test.describe("removing a member from their sheet", () => {
     ).toBeFocused();
     await page.keyboard.press("Enter");
 
-    await expect(sheet).toHaveCount(0);
+    await expect(page).toHaveURL(new RegExp(`${MEMBERS_SCREEN}$`));
     await expect(memberRows(page)).toHaveCount(2);
-    await expect(memberButton(page, "Test person")).toBeFocused();
+    await expect(listHeading(page)).toBeFocused();
   });
 });
 
@@ -910,11 +1123,10 @@ test.describe("a member's display name, flagged to the operator", () => {
     passesTheAccessibilityGate,
   }) => {
     await anAdminAtPeople(page, request, "Swale Signworks");
-    await memberButton(page, "Sam Okoro").click();
-    const sheet = sheetOf(page, "Sam Okoro");
-    const said = displayNameRegion(sheet).getByRole("status");
+    await openedByName(page, "Sam Okoro");
+    const said = displayNameRegion(page).getByRole("status");
 
-    await flagButton(sheet).focus();
+    await flagButton(page).focus();
     await clockTheNextKey(page, {
       at: "//section[h3[normalize-space(.)='Display name']]//output",
       reads: SENT_TO_THE_OPERATOR,
@@ -923,12 +1135,12 @@ test.describe("a member's display name, flagged to the operator", () => {
 
     await expect(said).toHaveText(SENT_TO_THE_OPERATOR);
     await theActLandedWithinItsBudget(page, "name flag");
-    await expect(flagButton(sheet)).toBeFocused();
+    await expect(flagButton(page)).toBeFocused();
 
     await page.keyboard.press("Enter");
     await expect(said).toHaveText(SENT_TO_THE_OPERATOR);
-    await expect(displayNameRegion(sheet).getByRole("alert")).toHaveCount(0);
-    await expect(sheet.getByRole("heading", { level: 2, name: "Sam Okoro" })).toBeVisible();
+    await expect(displayNameRegion(page).getByRole("alert")).toHaveCount(0);
+    await expect(personHeading(page, "Sam Okoro")).toBeVisible();
     await passesTheAccessibilityGate();
   });
 
@@ -939,8 +1151,10 @@ test.describe("a member's display name, flagged to the operator", () => {
     await addMember(request, { workspaceId, userId: made.id, role: "Viewer" });
     await page.reload();
 
-    await memberButton(page, "No display name yet").click();
-    const region = displayNameRegion(sheetOf(page, unnamed));
+    await memberLink(page, "No display name yet").click();
+    await expect(personHeading(page, unnamed)).toBeVisible();
+    await expect(crumbsOf(page).last()).toHaveText(unnamed);
+    const region = displayNameRegion(page);
 
     await expect(region).toContainText(
       `${unnamed} has given no display name yet, so there is none to flag.`,
@@ -956,35 +1170,32 @@ test.describe("a member's display name, flagged to the operator", () => {
     const { workspaceId, joined } = await anAdminAtPeople(page, request, "Swale Stonecraft");
     const sam = joined.find((member) => member.displayName === "Sam Okoro");
     if (sam === undefined) throw new Error("Sam Okoro was joined");
-    await memberButton(page, "Sam Okoro").click();
-    const sheet = sheetOf(page, "Sam Okoro");
+    // The page reads the list again as it opens; held, so the page still draws Sam to act on.
+    await page.route(MEMBERS_READ, () => Promise.withResolvers<void>().promise);
+    await openedByName(page, "Sam Okoro");
     await removeMember(request, { workspaceId, userId: sam.id });
 
-    await flagButton(sheet).click();
+    await flagButton(page).click();
 
-    await expect(displayNameRegion(sheet).getByRole("alert")).toHaveText(
+    await expect(displayNameRegion(page).getByRole("alert")).toHaveText(
       sentenceOf(SAID_OF_A_MEMBER["no-such-member"]),
     );
-    await expect(displayNameRegion(sheet).getByRole("status")).toHaveCount(0);
+    await expect(displayNameRegion(page).getByRole("status")).toHaveCount(0);
     await passesTheAccessibilityGate();
   });
 
   test("flags a member's name by keyboard alone, from the list", async ({ page, request }) => {
-    await anAdminAtPeople(page, request, "Swale Carving");
+    await skippedToMembers(page, request, "Swale Carving");
 
     const keystrokes = await keystrokesListed(page, MEMBERS.name);
     await expect(keystrokes).toContainText("Flag the display name of the member in focus");
     await keystrokesDismissed(page, keystrokes);
 
-    await memberButton(page, "Priya Shah").focus();
-    await page.keyboard.press("f");
-    const sheet = sheetOf(page, "Priya Shah");
-    await expect(flagButton(sheet)).toBeFocused();
+    await tabUntilFocused(page, memberLink(page, "Priya Shah"));
+    await page.keyboard.press(PEOPLE_KEYSTROKES.flagName.key);
+    await expect(flagButton(page)).toBeFocused();
     await page.keyboard.press("Enter");
-    await expect(displayNameRegion(sheet).getByRole("status")).toHaveText(SENT_TO_THE_OPERATOR);
-
-    await page.keyboard.press("Escape");
-    await expect(memberButton(page, "Priya Shah")).toBeFocused();
+    await expect(displayNameRegion(page).getByRole("status")).toHaveText(SENT_TO_THE_OPERATOR);
   });
 });
 
@@ -1013,13 +1224,10 @@ test.describe("the People screen's words", () => {
     }
 
     await page.getByRole("tab", { name: "Members" }).click();
-    await memberButton(page, "Priya Shah").click();
-    const sheet = sheetOf(page, "Priya Shah");
-    await expect(sheet).toBeVisible();
-    await removalOf(sheet).getByRole("button", { name: "Remove Priya Shah", exact: true }).click();
-    await expect(removalOf(sheet).getByRole("group")).toBeVisible();
-    await expect(page.locator("body"), "a member's sheet").not.toContainText(organisation);
-    expect(await sheet.ariaSnapshot(), "a member's sheet").not.toMatch(organisation);
+    await openedByName(page, "Priya Shah");
+    await removalOf(page).getByRole("button", { name: "Remove Priya Shah", exact: true }).click();
+    await expect(removalOf(page).getByRole("group")).toBeVisible();
+    await said("a member's page");
 
     await page.goto(AUDIT_LOG_SCREEN);
     const auditLog = page.getByRole("region", { name: "Audit log" });
@@ -1032,11 +1240,12 @@ test.describe("the People screen's words", () => {
     await page.keyboard.press("Escape");
 
     await page.goto(MEMBERS_SCREEN);
-    await memberButton(page, "Priya Shah").click();
-    await revokeButton(sheet, "Priya Shah").click();
-    await expect(sheet.getByRole("status")).toContainText("credentials here are revoked");
-    await expect(page.locator("body"), "a revocation").not.toContainText(organisation);
-    expect(await sheet.ariaSnapshot(), "a revocation").not.toMatch(organisation);
+    await openedByName(page, "Priya Shah");
+    await revokeButton(page, "Priya Shah").click();
+    await expect(credentialsRegion(page).getByRole("status")).toContainText(
+      "credentials here are revoked",
+    );
+    await said("a revocation");
 
     await page.goto(AUDIT_LOG_SCREEN);
     await expect(auditLog).toContainText("Member credentials revoked");
@@ -1135,9 +1344,6 @@ const selectionBar = (page: Page): Locator => page.getByRole("toolbar", { name: 
 
 const selectionAct = (page: Page, act: string): Locator =>
   selectionBar(page).getByRole("button", { name: act, exact: true });
-
-const listHeading = (page: Page): Locator =>
-  membersRegion(page).getByRole("heading", { level: 2, name: "Members" });
 
 const pagesOf = (page: Page): Locator => page.getByRole("navigation", { name: "Pages of members" });
 
@@ -1252,7 +1458,7 @@ test.describe("bulk acts on the members ticked", () => {
       memberIds: joined.filter((member) => member.role === "Viewer").map((member) => member.id),
     });
     await page.reload();
-    const names = memberRows(page).getByRole("button", {
+    const names = memberRows(page).getByRole("link", {
       name: /^(Priya Shah|Sam Okoro|Test person)$/,
     });
 
@@ -1443,7 +1649,7 @@ test.describe("bulk acts on the members ticked", () => {
     const commit = dialog.getByRole("button", { name: BULK_WORDS.changeRole.commit(3, "Viewer") });
     await commit.focus();
     await clockTheNextKey(page, {
-      at: "//tr[.//button[normalize-space(.)='Person 27']]/td[3]",
+      at: "//tr[.//a[normalize-space(.)='Person 27']]/td[3]",
       reads: "Viewer",
     });
     await page.keyboard.press("Enter");
@@ -1466,13 +1672,8 @@ test.describe("bulk acts on the members ticked", () => {
     await expect(memberRows(page)).toHaveCount(5);
     await expect(pagesOf(page).getByRole("status")).toHaveText("Showing 26–30 of 30.");
 
-    // A member still opens as a sheet over the list, so the leaving is to another screen.
-    await memberButton(page, "Person 27").click();
-    await expect(sheetOf(page, "Person 27")).toBeVisible();
-    await page.keyboard.press("Escape");
-    await nav(page).getByRole("link", { name: "Groups" }).click();
-    await expect(page).toHaveURL(new RegExp(`${GROUPS_SCREEN}$`));
-    await page.goBack();
+    await openedByName(page, "Person 27");
+    await backToMembers(page);
 
     await expect(memberRows(page)).toHaveCount(5);
     await expect(rowOf(page, "Person 26")).toBeVisible();
@@ -1496,7 +1697,7 @@ test.describe("bulk acts on the members ticked", () => {
 
     await tabUntilFocused(page, tickOf(page, "Priya Shah"));
     await page.keyboard.press("Space");
-    await tabUntilFocused(page, memberButton(page, "Sam Okoro"));
+    await tabUntilFocused(page, memberLink(page, "Sam Okoro"));
     await page.keyboard.press(PEOPLE_KEYSTROKES.tick.key);
     await expect(selectionBar(page).getByRole("status")).toHaveText("2 members selected.");
 
@@ -1542,24 +1743,7 @@ test.describe("bulk acts on the members ticked", () => {
     request,
   }) => {
     await anAdminAtPeople(page, request, "Wharfe Weaving");
-    await page.route(BULK_ROLE_CHANGE, (route) =>
-      route.fulfill({
-        status: 409,
-        json: [
-          {
-            error: {
-              message: "changed-meanwhile",
-              code: -32_603,
-              data: {
-                code: "CONFLICT",
-                httpStatus: 409,
-                refusal: { word: "changed-meanwhile", class: "conflict" },
-              },
-            },
-          },
-        ],
-      }),
-    );
+    await answeredChangedMeanwhile(page, BULK_ROLE_CHANGE);
     await tickOf(page, "Priya Shah").check();
     await tickOf(page, "Sam Okoro").check();
 
@@ -1587,16 +1771,51 @@ test.describe("bulk acts on the members ticked", () => {
     ]);
     await menu.getByRole("menuitem", { name: "Change role" }).click();
 
-    const sheet = sheetOf(page, "Sam Okoro");
-    await expect(sheet.getByRole("radio", { name: "Viewer", exact: true })).toBeFocused();
-    await sheet.getByRole("radio", { name: "Editor", exact: true }).click();
-    await sheet.getByRole("button", { name: "Make Sam Okoro an Editor" }).click();
-    await expect(sheet.getByRole("status")).toHaveText(
+    await expect(page).toHaveURL(AT_A_MEMBER_PAGE);
+    await expect(thePage(page).getByRole("radio", { name: "Viewer", exact: true })).toBeFocused();
+    await thePage(page).getByRole("radio", { name: "Editor", exact: true }).click();
+    await thePage(page).getByRole("button", { name: "Make Sam Okoro an Editor" }).click();
+    await expect(rolePickerRegion(page).getByRole("status")).toHaveText(
       "Sam Okoro is an Editor now, from their next request.",
     );
-    await page.keyboard.press("Escape");
+    await backToMembers(page);
     await expect(cellOf(page, "Sam Okoro", "Role")).toHaveText("Editor");
     await expect(selectionBar(page)).toBeHidden();
+  });
+
+  test("keeps a search still settling when a name opens", async ({ page, request }) => {
+    await anAdminAtPeople(page, request, "Nidd Sailcloth");
+
+    // Typed and opened at once, inside the box's settling time, as a quick reader does it.
+    await searchBox(page).fill("Priya");
+    await memberLink(page, "Priya Shah").click();
+    await expect(personHeading(page, "Priya Shah")).toBeVisible();
+    await backToMembers(page);
+
+    await expect(searchBox(page)).toHaveValue("Priya");
+    await expect(page).toHaveURL(/members\.search=Priya/);
+    await expect(memberRows(page)).toHaveCount(1);
+  });
+
+  test("the row menu's Add to group opens the page's groups", async ({ page, request }) => {
+    const { adminId, workspaceId } = await anAdminAtPeople(page, request, "Nidd Ropery");
+    await makeGroups(request, {
+      workspaceId,
+      userId: adminId,
+      names: ["Site leads"],
+      memberIds: [],
+    });
+    await page.reload();
+    await membersRegion(page).getByRole("button", { name: "Acts for Sam Okoro" }).click();
+    await page.getByRole("menuitem", { name: "Add to group" }).click();
+
+    const box = thePage(page).getByRole("checkbox", { name: "Site leads" });
+    await expect(box).toBeFocused();
+    await page.keyboard.press("Space");
+    await expect(box).toBeChecked();
+    await expect(accessOf(page).getByRole("definition").nth(1)).toHaveText("Site leads");
+    await backToMembers(page);
+    await expect(cellOf(page, "Sam Okoro", "Groups")).toHaveText("Site leads");
   });
 
   test("at 320 pixels shows person and role, hiding the rest", async ({ page, request }) => {

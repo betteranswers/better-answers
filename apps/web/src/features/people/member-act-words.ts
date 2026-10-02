@@ -8,6 +8,19 @@ export const INCLUDES_YOU = "This includes you.";
 export const homeNowSaid = (role: Role): string =>
   `You changed your own role to ${role}. People is for Admins, so this is your home now.`;
 
+/** A member's page: its sections, in order, and what it says where it names no one. */
+export const MEMBER_PAGE_WORDS = {
+  sections: "On this page",
+  access: "Access",
+  activity: "Activity",
+  removeAndRevoke: "Remove and revoke",
+  loading: "The member is still loading.",
+  noSuchMember: "This page names no member of this workspace.",
+  toMembers: "Go to Members",
+  removing: (name: string) => `Removing ${name} from this workspace.`,
+  removed: (name: string) => `${name} is no longer a member of this workspace.`,
+} as const;
+
 const RECORDED = "Recorded on the audit log under your name.";
 
 const members = (count: number): string => counted(count, "member", "members");

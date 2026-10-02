@@ -6,10 +6,12 @@ import {
   Navigate,
   Outlet,
   redirect,
+  useParams,
   type AnyRoute,
   type RouterHistory,
 } from "@tanstack/react-router";
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
+import { z } from "zod";
 
 import { AcceptInvitationScreen } from "@/features/auth/accept-invitation-screen.tsx";
 import { acceptDetour, displayNameDetour } from "@/features/auth/auth-hooks.ts";
@@ -30,6 +32,8 @@ import { mustSignInForTheConsole } from "@/features/console/operator.ts";
 import { WorkspacesScreen } from "@/features/console/workspaces-screen.tsx";
 import { AuditLogScreen } from "@/features/people/audit-log-screen.tsx";
 import { GroupsScreen } from "@/features/people/groups-screen.tsx";
+import { MemberPage } from "@/features/people/member-page.tsx";
+import { PERSON_ID } from "@/features/people/members-address.ts";
 import { MEMBERS_TOOLBAR, MembersScreen } from "@/features/people/members-screen.tsx";
 import { BINDINGS_TOOLBAR, BindingsScreen } from "@/features/sources/bindings-screen.tsx";
 import { createApiProxy, type ApiProxy } from "@/shared/api/trpc.ts";
@@ -80,6 +84,17 @@ const BUILT_SCREENS: ReadonlyMap<string, BuiltScreen> = new Map<ScreenPath, Buil
   ["/console/people/everyone", { draw: EveryoneScreen }],
   ["/console/people/names-waiting", { draw: NamesWaitingScreen }],
   ["/console/workspaces/every-workspace", { draw: WorkspacesScreen }],
+]);
+
+type BuiltDetail = {
+  /** What the address's segment must be; anything else draws as naming no row. */
+  readonly value: z.ZodType<string>;
+  readonly draw: (value: string | undefined) => ReactElement;
+};
+
+/** The list declares each detail address; this map says what draws it, keyed by its screen. */
+const BUILT_DETAILS: ReadonlyMap<string, BuiltDetail> = new Map<ScreenPath, BuiltDetail>([
+  ["/people/members", { value: PERSON_ID, draw: (personId) => <MemberPage personId={personId} /> }],
 ]);
 
 type ShellContext = { readonly queryClient: QueryClient; readonly api: ApiProxy };
@@ -205,11 +220,28 @@ const consoleIndexRoute = createRoute({
 });
 
 /** A screen hidden from a held role draws as an address that never existed. */
-function Seen(properties: { readonly path: string; readonly draw: () => ReactElement }) {
+function Seen(properties: { readonly path: string; readonly children: ReactNode }) {
   if (useHidden(useVisibleTree(), properties.path)) return <UnknownScreen />;
+  return properties.children;
+}
 
-  const Draw = properties.draw;
-  return <Draw />;
+const PARAMS = z.record(z.string(), z.string());
+
+/** The address's segment is read once, here, and reaches the page only once it is valid. */
+function DetailOf(properties: {
+  readonly screen: Screen;
+  readonly param: string;
+  readonly detail: BuiltDetail;
+}) {
+  const { screen, param, detail } = properties;
+  // Typed as every route's params at once, so this route's segment is read by its name.
+  const value = useParams({
+    strict: false,
+    select: (params) => PARAMS.safeParse(params).data?.[param],
+  });
+  const valid = detail.value.safeParse(value);
+
+  return <Seen path={screen.path}>{detail.draw(valid.success ? valid.data : undefined)}</Seen>;
 }
 
 /** An older address moves on only once the reader may see where it leads. */
@@ -222,6 +254,20 @@ function MovedAway(properties: { readonly moved: Moved }) {
 }
 
 const HOME_SCREENS: readonly Screen[] = Object.values(HOMES);
+
+/** A detail address is declared beneath a built screen, and nowhere else is one drawn. */
+const detailOf = (screen: Screen): BuiltDetail | undefined => {
+  const built = BUILT_DETAILS.get(screen.path);
+  if (screen.detail !== undefined && built === undefined) {
+    throw new Error(`the list declares an address beneath ${screen.path}, and nothing draws it`);
+  }
+  if (screen.detail === undefined && built !== undefined) {
+    throw new Error(
+      `something draws an address beneath ${screen.path}, and the list declares none`,
+    );
+  }
+  return built;
+};
 
 const drawOf = (screen: Screen): BuiltScreen | undefined => {
   const built = BUILT_SCREENS.get(screen.path);
@@ -255,21 +301,46 @@ const routesOf = (surfaces: readonly Surface[], shell: AnyRoute, reading: Readin
     return built === undefined ? [] : [{ screen, built }];
   });
 
+  // Decided by the screen's own address, so a detail beneath it is seen exactly as it is.
+  const arriving = (screen: Screen) => (context: ShellContext) => {
+    const reader = readerIn(context);
+    return {
+      hidden: hides(visibleTo(reader, surfaces), screen.path),
+      unread: reader.role === undefined,
+    };
+  };
+
+  const details = drawn.flatMap(({ screen }) => {
+    const detail = detailOf(screen);
+    return detail === undefined || screen.detail === undefined
+      ? []
+      : [{ screen, param: screen.detail.param, detail }];
+  });
+
   return [
-    ...drawn.map(({ screen, built }) =>
-      createRoute({
+    ...drawn.map(({ screen, built }) => {
+      const Draw = built.draw;
+      return createRoute({
         getParentRoute: () => shell,
         path: screen.path,
-        beforeLoad: ({ context }) => {
-          const reader = readerIn(context);
-          return {
-            hidden: hides(visibleTo(reader, surfaces), screen.path),
-            unread: reader.role === undefined,
-          };
-        },
-        component: () => <Seen path={screen.path} draw={built.draw} />,
+        beforeLoad: ({ context }) => arriving(screen)(context),
+        component: () => (
+          <Seen path={screen.path}>
+            <Draw />
+          </Seen>
+        ),
         errorComponent: failed,
         staticData: { toolbar: built.toolbar },
+      });
+    }),
+    // No toolbar: a detail has the screen's place, not its tabs or acts.
+    ...details.map(({ screen, param, detail }) =>
+      createRoute({
+        getParentRoute: () => shell,
+        path: `${screen.path}/$${param}`,
+        beforeLoad: ({ context }) => arriving(screen)(context),
+        component: () => <DetailOf screen={screen} param={param} detail={detail} />,
+        errorComponent: failed,
       }),
     ),
     ...movedWithin(surfaces).map((moved) =>

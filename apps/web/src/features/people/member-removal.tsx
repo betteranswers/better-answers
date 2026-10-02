@@ -1,10 +1,12 @@
 import { useId, useState, type RefObject } from "react";
 
+import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
 
+import { INCLUDES_YOU } from "./member-act-words.ts";
 import { useReaderId, type ListedMember } from "./people-api.ts";
-import { nameOf } from "./words.tsx";
+import { nameOf, RECORDED } from "./words.tsx";
 
 /** Module-level, so React calls it once as the confirmation mounts, never on a re-render. */
 const focusOnArrival = (node: HTMLElement | null) => {
@@ -16,6 +18,8 @@ export function MemberRemoval(properties: {
   readonly member: ListedMember;
   readonly askRef: RefObject<HTMLButtonElement | null>;
   readonly onRemove: (member: ListedMember) => void;
+  /** A refusal of removing yourself, which is answered here before you leave. */
+  readonly outcome: Outcome | undefined;
 }) {
   const { member, askRef, onRemove } = properties;
   const [asking, setAsking] = useState(false);
@@ -27,7 +31,7 @@ export function MemberRemoval(properties: {
 
   return (
     <section aria-labelledby={headingId} className="border border-border">
-      <h3 id={headingId} className="border-b border-border px-4 py-2 font-medium">
+      <h3 id={headingId} className="max-w-none border-b border-border px-4 py-2 font-medium">
         Removal
       </h3>
       <Collapsible open={asking} onOpenChange={setAsking} className="grid gap-3 px-4 py-3">
@@ -52,7 +56,9 @@ export function MemberRemoval(properties: {
               Confirm the removal of {name}
             </legend>
             <p id={recordId} className="text-sm text-muted-foreground">
-              Recorded on the audit log under your name. Their groups here end with the membership.
+              {yourself
+                ? `${INCLUDES_YOU} ${RECORDED} Your groups here end with the membership.`
+                : `${RECORDED} Their groups here end with the membership.`}
             </p>
             <div className="flex flex-wrap gap-2">
               <Button
@@ -76,6 +82,7 @@ export function MemberRemoval(properties: {
             </div>
           </fieldset>
         </CollapsibleContent>
+        <OutcomeLine outcome={properties.outcome} />
       </Collapsible>
     </section>
   );

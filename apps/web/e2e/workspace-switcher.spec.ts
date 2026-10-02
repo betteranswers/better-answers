@@ -3,7 +3,7 @@ import type { APIRequestContext, Locator, Page } from "@playwright/test";
 import { ALL_WORKSPACES, FAILED_SCREEN, JUMP_TO, ROLE_UNREAD } from "@/app/words.ts";
 import { noLongerAMemberOf, PICK_REFUSED, SWITCHER_UNREAD } from "@/features/auth/refusal-words.ts";
 import { PICKER_WORDS } from "@/features/auth/workspace-words.ts";
-import { CONSOLE, CONTROL_CENTRE, HOMES } from "@/shared/navigation.ts";
+import { CONSOLE, CONTROL_CENTRE, groupIn, HOMES, screenNamed } from "@/shared/navigation.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
@@ -24,6 +24,8 @@ import {
 } from "./harness.ts";
 
 const SWITCH_BUDGET_MS = 1000;
+
+const MEMBERS = screenNamed(groupIn(CONTROL_CENTRE, "people"), "Members");
 
 const WORKSPACES_READ = "**/organization/list";
 
@@ -51,13 +53,14 @@ const saidInTheBand = (page: Page): Locator =>
 const refusedInTheBand = (page: Page): Locator =>
   page.getByRole("banner").getByRole("alert", { includeHidden: true });
 
-const memberButton = (page: Page, name: string): Locator =>
-  page.getByRole("main").getByRole("button", { name, exact: true });
+const memberLink = (page: Page, name: string): Locator =>
+  page.getByRole("main").getByRole("link", { name, exact: true });
 
 /** A member of one workspace alone, so a row names the workspace it was read from. */
 const aMemberOnlyOf = async (api: APIRequestContext, workspaceId: string, name: string) => {
   const member = await person(api, anAddress("only"), { displayName: name });
   await addMember(api, { workspaceId, userId: member.id, role: "Viewer" });
+  return member.id;
 };
 
 /** The Admin of `first`, holding `role` in `second`, signed in and reading `first`. */
@@ -131,22 +134,42 @@ test("switches to another workspace's home, reading its members", async ({ page,
   await aMemberOnlyOf(request, first.workspaceId, "Only In Wharfe");
   await aMemberOnlyOf(request, second.workspaceId, "Only In Aire");
   await page.reload();
-  await expect(memberButton(page, "Only In Wharfe")).toBeVisible();
+  await expect(memberLink(page, "Only In Wharfe")).toBeVisible();
 
   await switcherOf(page, first.name).click();
   const started = Date.now();
   await workspacesIn(switcherMenuOf(page, first.name)).filter({ hasText: second.name }).click();
 
-  await expect(memberButton(page, "Only In Aire")).toBeVisible();
+  await expect(memberLink(page, "Only In Aire")).toBeVisible();
   const elapsed = Date.now() - started;
   test.info().annotations.push({ type: "switching workspace", description: `${elapsed} ms` });
   expect(elapsed, "the switch took longer than its second").toBeLessThan(SWITCH_BUDGET_MS);
 
   await landedAtHome(page, "Admin");
-  await expect(memberButton(page, "Only In Wharfe")).toHaveCount(0);
+  await expect(memberLink(page, "Only In Wharfe")).toHaveCount(0);
   await expect(switcherOf(page, second.name)).toBeVisible();
   await expect(switcherOf(page, first.name)).toHaveCount(0);
   await expect(switcherOf(page, second.name)).toBeFocused();
+});
+
+test("switching from a member page lands home, showing no one", async ({ page, request }) => {
+  const { first, second } = await inTwoWorkspaces(page, request, {
+    first: "Wharfe Ropery",
+    second: "Aire Ropery",
+  });
+  const left = await aMemberOnlyOf(request, first.workspaceId, "Only In Wharfe");
+  await page.goto(`${MEMBERS.path}/${left}`);
+  await expect(
+    page.getByRole("main").getByRole("heading", { level: 2, name: "Only In Wharfe" }),
+  ).toBeVisible();
+
+  await switched(page, first.name, second.name);
+
+  await landedAtHome(page, "Admin");
+  await expect(switcherOf(page, second.name)).toBeVisible();
+  await expect(page.locator("body"), "drew a person from the left workspace").not.toContainText(
+    "Only In Wharfe",
+  );
 });
 
 test("lands a switch on the role's home in that workspace", async ({ page, request }) => {
@@ -188,7 +211,7 @@ test("drops the left workspace's members when All workspaces picks another", asy
   await aMemberOnlyOf(request, first.workspaceId, "Only In Esk");
   await aMemberOnlyOf(request, second.workspaceId, "Only In Derwent");
   await page.reload();
-  await expect(memberButton(page, "Only In Esk")).toBeVisible();
+  await expect(memberLink(page, "Only In Esk")).toBeVisible();
   // Held, so whatever the screen draws before the new workspace's list lands is on show.
   const release = await heldBack(page, MEMBERS_READ);
 
@@ -198,9 +221,7 @@ test("drops the left workspace's members when All workspaces picks another", asy
 
   await expect(switcherOf(page, second.name)).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`${HOMES.Admin.path}$`));
-  await expect(memberButton(page, "Only In Esk"), "drew the left workspace's members").toHaveCount(
-    0,
-  );
+  await expect(memberLink(page, "Only In Esk"), "drew the left workspace's members").toHaveCount(0);
   await page.getByRole("banner").getByRole("button", { name: JUMP_TO.name }).click();
   const jumpTo = page.getByRole("dialog", { name: JUMP_TO.name });
   await jumpTo.getByRole("combobox", { name: JUMP_TO.name }).fill("Only In Esk");
@@ -212,7 +233,7 @@ test("drops the left workspace's members when All workspaces picks another", asy
 
   release();
   await page.keyboard.press("Escape");
-  await expect(memberButton(page, "Only In Derwent")).toBeVisible();
+  await expect(memberLink(page, "Only In Derwent")).toBeVisible();
 });
 
 test("says it reads the list, filling the open menu", async ({
@@ -254,7 +275,7 @@ test("says a refused switch in the band, keeping the screen", async ({
   });
   await aMemberOnlyOf(request, first.workspaceId, "Only In Kept");
   await page.reload();
-  await expect(memberButton(page, "Only In Kept")).toBeVisible();
+  await expect(memberLink(page, "Only In Kept")).toBeVisible();
 
   await switcherOf(page, first.name).click();
   const leaving = workspacesIn(switcherMenuOf(page, first.name)).filter({ hasText: second.name });
@@ -265,7 +286,7 @@ test("says a refused switch in the band, keeping the screen", async ({
   await expect(refusedInTheBand(page)).toHaveText(sentenceOf(noLongerAMemberOf(second.name)));
   await expect(switcherOf(page, first.name), "focus left the switcher").toBeFocused();
   await expect(page).toHaveURL(new RegExp(`${HOMES.Admin.path}$`));
-  await expect(memberButton(page, "Only In Kept")).toBeVisible();
+  await expect(memberLink(page, "Only In Kept")).toBeVisible();
   await passesTheAccessibilityGate();
 
   await switcherOf(page, first.name).click();
@@ -368,7 +389,7 @@ test("keeps the rail and nav below the band's refusal", async ({ page, request }
     await aMemberOnlyOf(request, first.workspaceId, `Row ${String(row)}`);
   }
   await page.reload();
-  await expect(memberButton(page, "Row 4")).toBeVisible();
+  await expect(memberLink(page, "Row 4")).toBeVisible();
 
   await unansweredSwitch(page, first.name, second.name);
 

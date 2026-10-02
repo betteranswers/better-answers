@@ -22,6 +22,12 @@ export const INVITE_A_PERSON = {
   icon: "invite",
 } as const satisfies Act;
 
+/** One segment beneath a screen, naming a row: listed nowhere, gated and framed as its screen. */
+type Detail = {
+  /** The route's name for the segment. */
+  readonly param: string;
+};
+
 export type Screen = {
   readonly name: string;
   readonly path: string;
@@ -33,6 +39,7 @@ export type Screen = {
   /** An older address, which leads here only for a person who may see the screen. */
   readonly movedFrom?: string;
   readonly acts?: readonly Act[];
+  readonly detail?: Detail;
 };
 
 export type Group = {
@@ -326,6 +333,7 @@ export const CONTROL_CENTRE = {
           built: true,
           seenBy: ADMINS,
           acts: [INVITE_A_PERSON],
+          detail: { param: "personId" },
         },
         { name: "Groups", path: "/people/groups", icon: "groups", built: true, seenBy: ADMINS },
         { name: "Tokens", path: "/people/tokens", icon: "token", built: false, seenBy: ADMINS },
@@ -540,6 +548,8 @@ export type Place<Held extends Surface = Surface> = {
   readonly surface: Held;
   readonly group: Group | undefined;
   readonly screen: Screen;
+  /** The segment a screen's detail address holds, still encoded as the address has it. */
+  readonly detail?: string;
 };
 
 const placesIn = <Held extends Surface>(surface: Held): readonly Place<Held>[] => [
@@ -551,12 +561,34 @@ const placesIn = <Held extends Surface>(surface: Held): readonly Place<Held>[] =
 export const screensOf = (surfaces: readonly Surface[]): readonly Screen[] =>
   surfaces.flatMap(placesIn).map(({ screen }) => screen);
 
-/** An exact match: an address beneath a screen's names no place. */
+/** One segment and no more, so a deeper address beneath a row names nothing. */
+const detailIn = (screen: Screen, pathname: string): string | undefined => {
+  const beneath = `${screen.path}/`;
+  if (screen.detail === undefined || !pathname.startsWith(beneath)) return undefined;
+  const segment = pathname.slice(beneath.length);
+  return segment === "" || segment.includes("/") ? undefined : segment;
+};
+
+/** An exact match first, then a screen's declared detail address; anything deeper is no place. */
 export const placeAt = <Held extends Surface>(
   surfaces: readonly Held[],
   pathname: string,
-): Place<Held> | undefined =>
-  surfaces.flatMap(placesIn).find((place) => place.screen.path === pathname);
+): Place<Held> | undefined => {
+  const places = surfaces.flatMap(placesIn);
+  const exact = places.find((place) => place.screen.path === pathname);
+  if (exact !== undefined) return exact;
+  for (const place of places) {
+    const detail = detailIn(place.screen, pathname);
+    if (detail !== undefined) return { ...place, detail };
+  }
+  return undefined;
+};
+
+/** The address of one row beneath a screen that declares a detail address. */
+export const detailAt = (screen: Screen, value: string): string => {
+  if (screen.detail === undefined) throw new Error(`${screen.path} declares no detail address`);
+  return `${screen.path}/${encodeURIComponent(value)}`;
+};
 
 /** With no role held nothing is hidden, so a screen draws its own loading or failed state. */
 export const hides = (tree: VisibleTree, path: string): boolean =>

@@ -1,13 +1,13 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useEffectEvent, useRef, useState, type RefObject } from "react";
 
-import { membersSeeking } from "@/features/people/members-address.ts";
 import { useMembers } from "@/features/people/people-api.ts";
 import { askingHere, type Here } from "@/shared/address-ask.ts";
 import { Icon, type IconName } from "@/shared/icon.tsx";
 import type { Keystroke } from "@/shared/keystrokes.tsx";
 import {
   CONTROL_CENTRE,
+  detailAt,
   groupIn,
   placeAt,
   screenNamed,
@@ -106,14 +106,14 @@ const actJumps = (screen: Screen, here: Here): readonly Jump[] =>
     }),
   );
 
-/** Found on Members by their address, which the list's own search box takes. */
-const memberJump = (member: Member, here: Here): Jump =>
+/** A member opens on their own page, never as a narrowed list. */
+const memberJump = (member: Member): Jump =>
   jumpOf({
     value: `member ${member.personId}`,
     name: nameOrAddress(member.displayName, member.address),
     said: member.displayName === "" ? undefined : member.address,
     icon: "person",
-    to: membersSeeking(here, MEMBERS.path, member.address),
+    to: detailAt(MEMBERS, member.personId),
     kind: "member",
   });
 
@@ -132,7 +132,7 @@ export const jumpsIn = (
     },
     {
       heading: JUMP_TO.groups.members,
-      jumps: (members ?? []).map((member) => memberJump(member, here)),
+      jumps: (members ?? []).map(memberJump),
     },
   ];
   return groups.filter((group) => group.jumps.length > 0);
@@ -348,8 +348,6 @@ export function JumpTo(properties: {
   readonly wide: boolean;
   readonly tree: VisibleTree;
   readonly jumping: Jumping;
-  /** A member is found on Members' first tab, whichever tab was last open. */
-  readonly onFindMember: () => void;
 }) {
   const { tree, jumping } = properties;
   const navigate = useNavigate();
@@ -359,7 +357,6 @@ export function JumpTo(properties: {
 
   const choose = (jump: Jump) => {
     chosen.current = jump.kind;
-    if (jump.kind === "member") properties.onFindMember();
     jumping.setOpen(false);
     void navigate({ href: jump.to });
   };

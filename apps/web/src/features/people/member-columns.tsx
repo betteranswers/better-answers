@@ -8,14 +8,15 @@ import {
   sortFn_text,
   tableFeatures,
 } from "@tanstack/react-table";
+import { createContext, useContext } from "react";
 
+import { RowLink } from "@/shared/grid-table.tsx";
 import { initialsOf } from "@/shared/initials.ts";
 import type { Said } from "@/shared/refusal-words.ts";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar.tsx";
-import { Button } from "@/shared/ui/button.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
-import { memberButtonId } from "./member-sheet.tsx";
+import { memberPageOf } from "./members-address.ts";
 import type { ListedMember } from "./people-api.ts";
 import { GroupPills, JoinedOn, nameOf } from "./words.tsx";
 
@@ -38,20 +39,27 @@ export const HIDEABLE = [
   { id: "joined", label: "Joined" },
 ] as const;
 
-export type MemberActs = {
+type MemberActs = {
+  /** Opens the member's page, where the link alone would lose a search still settling. */
   readonly open: (personId: string) => void;
   readonly focusedOn: (personId: string) => void;
 };
+
+/**
+ * The list's acts reach each cell here, not through the columns: new columns draw every link
+ * afresh, dropping focus a press just gave.
+ */
+export const MemberActsContext = createContext<MemberActs | undefined>(undefined);
 
 /** What the last bulk act's refusal said of each person it named. */
 export type RefusedRows = ReadonlyMap<string, Said>;
 
 function PersonCell(properties: {
   readonly member: ListedMember;
-  readonly acts: MemberActs;
   readonly refused: Said | undefined;
 }) {
-  const { member, acts, refused } = properties;
+  const { member, refused } = properties;
+  const acts = useContext(MemberActsContext);
   const { personId, displayName, address } = member;
   return (
     <span className="flex min-w-0 items-start gap-2">
@@ -60,16 +68,13 @@ function PersonCell(properties: {
         <AvatarFallback className="text-xs">{initialsOf(nameOf(member))}</AvatarFallback>
       </Avatar>
       <span className="flex min-w-0 flex-col items-start leading-tight">
-        <Button
-          id={memberButtonId(personId)}
-          variant="link"
-          aria-haspopup="dialog"
-          className="h-auto p-0 text-left font-medium whitespace-normal text-foreground"
+        <RowLink
+          href={memberPageOf(personId)}
           onFocus={() => {
-            acts.focusedOn(personId);
+            acts?.focusedOn(personId);
           }}
-          onClick={() => {
-            acts.open(personId);
+          onOpen={() => {
+            acts?.open(personId);
           }}
         >
           {displayName === "" ? (
@@ -77,7 +82,7 @@ function PersonCell(properties: {
           ) : (
             displayName
           )}
-        </Button>
+        </RowLink>
         <span className="text-xs text-muted-foreground wrap-anywhere">{address}</span>
         {refused === undefined ? null : (
           <span className="mt-1 flex flex-wrap items-center gap-1 text-xs">
@@ -90,19 +95,15 @@ function PersonCell(properties: {
   );
 }
 
-/** The person's own cell opens them and says why a bulk act refused them, so both ride in. */
-export const memberColumns = (acts: MemberActs, refused: RefusedRows) =>
+/** The person's own cell says why a bulk act refused them, so the refusals ride in. */
+export const memberColumns = (refused: RefusedRows) =>
   column.columns([
     column.accessor((member) => nameOf(member), {
       id: "person",
       header: "Person",
       sortFn: "text",
       cell: ({ row }) => (
-        <PersonCell
-          member={row.original}
-          acts={acts}
-          refused={refused.get(row.original.personId)}
-        />
+        <PersonCell member={row.original} refused={refused.get(row.original.personId)} />
       ),
     }),
     column.accessor("role", {
