@@ -49,6 +49,13 @@ const asMinted = (typed: string): string => typed.toLowerCase().replaceAll(/[\s-
 
 const hashOf = (code: string): string => createHash("sha256").update(code).digest("hex");
 
+type RecoveryCodesIssued = {
+  readonly recoveryCodes: readonly string[];
+
+  /** Whether a set stood before, which this one voided. */
+  readonly replaced: boolean;
+};
+
 /**
  * Voids the person's codes and keeps ten new ones as hashes, answering the codes themselves: the
  * one time they exist outside the person's hands. The new set waits to be acknowledged.
@@ -57,8 +64,9 @@ export const issuingRecoveryCodes = async (
   platform: PlatformPrincipal,
   tx: Tx,
   personId: UserId,
-): Promise<readonly string[]> => {
+): Promise<RecoveryCodesIssued> => {
   const voided = await tx.query("DELETE FROM recovery_code WHERE user_id = $1", [personId]);
+  const replaced = (voided.rowCount ?? 0) > 0;
   const codes = Array.from({ length: RECOVERY_CODE_COUNT }, mintRecoveryCode);
   await tx.query(
     `INSERT INTO recovery_code (id, user_id, code_hash)
@@ -71,14 +79,12 @@ export const issuingRecoveryCodes = async (
     actor: actorIdOfPerson(personId),
     act: RECOVERY_CODE_ACTS.issued,
     subjectId: personId,
-    detail: { replaced: (voided.rowCount ?? 0) > 0 },
+    detail: { replaced },
   });
-  return codes;
+  return { recoveryCodes: codes, replaced };
 };
 
 type RecoveryCodesInput = { readonly personId: string };
-
-type RecoveryCodesIssued = { readonly recoveryCodes: readonly string[] };
 
 export type ReplaceRecoveryCodesRefusal = WorkspaceRefusal<"malformed" | "person-gone">;
 
@@ -95,15 +101,14 @@ export const replaceRecoveryCodes = async (
     withIdentityWrite(
       platform,
       door,
-      async (tx): Promise<Result<readonly string[], "person-gone">> => {
+      async (tx): Promise<Result<RecoveryCodesIssued, "person-gone">> => {
         if (!(await holdThePerson(tx, personId.data))) return err("person-gone");
         return ok(await issuingRecoveryCodes(platform, tx, personId.data));
       },
     ),
   );
   if (!issued.ok) return err(issued.error);
-  if (!issued.value.ok) return err(issued.value.error);
-  return ok({ recoveryCodes: issued.value.value });
+  return issued.value;
 };
 
 type SpendRecoveryCodeInput = RecoveryCodesInput & { readonly code: string };

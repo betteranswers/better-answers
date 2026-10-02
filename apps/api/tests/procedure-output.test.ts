@@ -60,9 +60,13 @@ describe("what a procedure may answer the wire", () => {
       "members.resendInvitation",
       "members.revokeCredentials",
       "person.acceptInvitation",
+      "person.acknowledgeRecoveryCodes",
       "person.invitation",
       "person.invitations",
+      "person.removeAuthenticator",
+      "person.replaceRecoveryCodes",
       "person.requestAccess",
+      "person.secondFactor",
       "person.setDisplayName",
       "routes.list",
       "runs.ofSubject",
@@ -87,6 +91,10 @@ describe("what a procedure may answer the wire", () => {
       | "person.invitation"
       | "person.invitations"
       | "person.acceptInvitation"
+      | "person.secondFactor"
+      | "person.removeAuthenticator"
+      | "person.replaceRecoveryCodes"
+      | "person.acknowledgeRecoveryCodes"
       | "console.people.list"
       | "console.people.inspect"
       | "console.people.namesWaiting"

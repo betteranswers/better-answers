@@ -8,9 +8,21 @@ import {
   requestAccess,
   requestAccessInput,
 } from "@better-answers/core/members";
-import { setDisplayName, setDisplayNameInput } from "@better-answers/core/workspaces";
+import {
+  acknowledgeRecoveryCodes,
+  readSecondFactor,
+  removeAuthenticator,
+  replaceRecoveryCodes,
+  setDisplayName,
+  setDisplayNameInput,
+} from "@better-answers/core/workspaces";
 
-import { ASK_TO_JOIN_ANSWER_FLOOR_MS, ASK_TO_JOIN_PERSON_RULE } from "../auth/constants.ts";
+import {
+  ASK_TO_JOIN_ANSWER_FLOOR_MS,
+  ASK_TO_JOIN_PERSON_RULE,
+  RECOVERY_CODES_PERSON_RULE,
+} from "../auth/constants.ts";
+import { sendFactorNotice } from "../auth/factor-notice-email.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
 import { crossing, given, parsedBy, personCeiling, personProcedure, router } from "./base.ts";
 
@@ -87,6 +99,38 @@ export const personRouter = router({
           now: ctx.clock.now(),
         }),
       ),
+    ),
+  ),
+  secondFactor: personProcedure.query(({ ctx }) =>
+    crossing(
+      ctx,
+      readSecondFactor.name,
+      readSecondFactor(IDENTITY_PRINCIPAL, ctx.doors.postgres, { personId: ctx.personId }),
+    ),
+  ),
+  removeAuthenticator: personProcedure.mutation(async ({ ctx }) => {
+    const removed = await crossing(
+      ctx,
+      removeAuthenticator.name,
+      removeAuthenticator(IDENTITY_PRINCIPAL, ctx.doors.postgres, { personId: ctx.personId }),
+    );
+    await sendFactorNotice(ctx, ctx.email, "authenticator-removed");
+    return removed;
+  }),
+  replaceRecoveryCodes: personCeiling(RECOVERY_CODES_PERSON_RULE).mutation(async ({ ctx }) => {
+    const issued = await crossing(
+      ctx,
+      replaceRecoveryCodes.name,
+      replaceRecoveryCodes(IDENTITY_PRINCIPAL, ctx.doors.postgres, { personId: ctx.personId }),
+    );
+    if (issued.replaced) await sendFactorNotice(ctx, ctx.email, "codes-replaced");
+    return { recoveryCodes: issued.recoveryCodes };
+  }),
+  acknowledgeRecoveryCodes: personProcedure.mutation(({ ctx }) =>
+    crossing(
+      ctx,
+      acknowledgeRecoveryCodes.name,
+      acknowledgeRecoveryCodes(IDENTITY_PRINCIPAL, ctx.doors.postgres, { personId: ctx.personId }),
     ),
   ),
 });

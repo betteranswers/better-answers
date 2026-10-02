@@ -233,7 +233,7 @@ describe("reading a person's second factor", () => {
         mustHoldOne: true,
         passkeys: 1,
         authenticator: "set-up",
-        recoveryCodes: { unused: 2, madeAt: AT },
+        recoveryCodes: { unused: 2, madeAt: "2026-10-02T12:00:00.000Z" },
       },
     });
   });

@@ -267,6 +267,7 @@ export const personProcedure = trpc.procedure.use(async ({ ctx, next }) => {
   return next({
     ctx: {
       personId: user.id,
+      email: user.email,
       sessionId: session.id,
       issuedAt: session.createdAt,
       doors: ctx.doors,

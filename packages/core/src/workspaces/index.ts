@@ -60,16 +60,10 @@ export {
   replaceRecoveryCodes,
   spendRecoveryCode,
 } from "./recovery-codes.ts";
-export type { ReplaceRecoveryCodesRefusal, SpendRecoveryCodeRefusal } from "./recovery-codes.ts";
 export {
   readSecondFactor,
   recordAuthenticatorSetUp,
   removeAuthenticator,
-} from "./second-factor.ts";
-export type {
-  RecordAuthenticatorSetUpRefusal,
-  RemoveAuthenticatorRefusal,
-  SecondFactorHeld,
 } from "./second-factor.ts";
 export {
   recordConsent,

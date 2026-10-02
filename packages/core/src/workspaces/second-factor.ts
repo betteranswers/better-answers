@@ -124,7 +124,7 @@ const settingUp = async (
   const stamped = await stamping(tx, input);
   const recoveryCodes =
     facts.recoveryCodes === 0
-      ? await issuingRecoveryCodes(platform, tx, input.personId)
+      ? (await issuingRecoveryCodes(platform, tx, input.personId)).recoveryCodes
       : undefined;
   return ok({ authenticatorId: facts.authenticatorId, stamped, recoveryCodes });
 };
@@ -202,7 +202,8 @@ export type SecondFactorHeld = {
   readonly mustHoldOne: boolean;
   readonly passkeys: number;
   readonly authenticator: AuthenticatorState;
-  readonly recoveryCodes: { readonly unused: number; readonly madeAt: Date } | undefined;
+  /** `madeAt` is an ISO instant, as it crosses the wire. */
+  readonly recoveryCodes: { readonly unused: number; readonly madeAt: string } | undefined;
 };
 
 const heldOf = (facts: Facts): SecondFactorHeld => ({
@@ -212,7 +213,7 @@ const heldOf = (facts: Facts): SecondFactorHeld => ({
   recoveryCodes:
     facts.recoveryCodesMadeAt === null
       ? undefined
-      : { unused: facts.recoveryCodes, madeAt: facts.recoveryCodesMadeAt },
+      : { unused: facts.recoveryCodes, madeAt: facts.recoveryCodesMadeAt.toISOString() },
 });
 
 /** What the person's own Sign-in section shows; nothing in it is a secret. */

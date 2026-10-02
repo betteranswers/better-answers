@@ -50,6 +50,19 @@ export const SIGN_IN_LINK_SIGN_IN_IP_RULE: CounterRule = { windowMs: 60_000, max
 /** Reads and sign-ins of one link together: room for a few reloads, not for a script. */
 export const SIGN_IN_LINK_TOKEN_RULE: CounterRule = { windowMs: 10 * 60_000, max: 10 };
 
+export const AUTHENTICATOR_START_PATH = "/authenticator/start";
+
+export const AUTHENTICATOR_FINISH_PATH = "/authenticator/finish";
+
+/**
+ * Starts and codes of one person's setup, each counted apart: the library's own limit never
+ * reaches a call our route makes.
+ */
+export const AUTHENTICATOR_PERSON_RULE: CounterRule = { windowMs: 10 * 60_000, max: 10 };
+
+/** Each replacement mails a notice, so a script cannot fill the person's inbox. */
+export const RECOVERY_CODES_PERSON_RULE: CounterRule = { windowMs: 60 * 60_000, max: 10 };
+
 export const MCP_UNAUTHENTICATED_IP_RULE: CounterRule = { windowMs: 60_000, max: 60 };
 
 export const TRPC_IP_RULE: CounterRule = { windowMs: 60_000, max: 120 };

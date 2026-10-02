@@ -102,6 +102,7 @@ export function createServer(dependencies: ServerDependencies): Hono {
       logger,
       clock: doors.clock,
       secret: dependencies.authSecret,
+      sendEmail: dependencies.sendEmail,
     }),
   );
 
