@@ -53,10 +53,14 @@ type Replies = { readonly send?: Reply; readonly signOuts?: readonly Reply[] };
 
 const OK: Reply = { status: 200, body: "{}" };
 
+/** A sign-in opens at `/`, which the product's SPA takes to its sign-in screen. */
+const SHOWING_THE_SCREEN = new Set(["GET /", "GET /sign-in"]);
+
 const replyTo = (asked: string, body: string, replies: Replies, signOut: () => Reply): Reply => {
+  if (SHOWING_THE_SCREEN.has(asked)) {
+    return { status: 200, headers: { "content-type": "text/html" }, body: SCREEN };
+  }
   switch (asked) {
-    case "GET /sign-in":
-      return { status: 200, headers: { "content-type": "text/html" }, body: SCREEN };
     case "POST /email-otp/send-verification-otp":
       return replies.send ?? OK;
     case "POST /sign-in/email-otp":
@@ -137,7 +141,7 @@ const journeysAgainst = (product: Product, spec: string, settings: Record<string
   journeysOver({ spec, use: { baseURL: product.origin }, env: { ...SETTINGS, ...settings } });
 
 const SIGNED_IN_AND_OUT = [
-  "GET /sign-in",
+  "GET /",
   "POST /email-otp/send-verification-otp",
   "GET /__harness/codes",
   "POST /sign-in/email-otp",

@@ -33,7 +33,7 @@ const SCREEN =
 
 const theScreen = async (page, answers = {}) => {
   const sends = [];
-  await page.route("**/sign-in", (route) =>
+  await page.route((url) => url.pathname === "/", (route) =>
     route.fulfill({
       status: answers.challenged ? 403 : 200,
       headers: answers.challenged ? { "cf-mitigated": "challenge" } : {},

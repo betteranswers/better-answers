@@ -73,8 +73,12 @@ const refusedCode = async (awaiting: Awaiting, status: number): Promise<never> =
   throw new Error(`the product refused the code its own email carried, answering ${status}`);
 };
 
+/**
+ * At `/`, which the SPA takes to sign-in: the auth library allows an address three loads of
+ * `/sign-in` in ten seconds, and journeys share one.
+ */
 const sendTheCode = async (page: Page, address: string): Promise<void> => {
-  const opened = await page.goto("/sign-in");
+  const opened = await page.goto("/");
   if (opened !== null) refusedByTheEdge(opened, "the sign-in screen");
   const sent = answerTo(page, SEND_PATH);
   await page.getByLabel(SIGN_IN_WORDS.emailField).fill(address);
