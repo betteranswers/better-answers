@@ -57,6 +57,11 @@ const NOTHING_TICKED = selectFirst("member");
 
 const STILL_GOING: Outcome = { tone: "said", words: BULK_WORDS.stillGoing };
 
+/** Matches the api's cap for one act, which refuses any more as input it cannot read. */
+const MOST_TICKED = 200;
+
+const TOO_MANY: Outcome = { tone: "said", words: BULK_WORDS.tooMany(MOST_TICKED) };
+
 const NO_GROUPS: readonly { readonly id: string; readonly name: string }[] = [];
 
 const refusedRowsOf = (failure: Error | ApiError): RefusedRows =>
@@ -105,6 +110,10 @@ export const useMemberBulkActs = (list: BulkList) => {
     }
     if (list.ticked.size === 0) {
       list.say(NOTHING_TICKED);
+      return;
+    }
+    if (list.ticked.size > MOST_TICKED) {
+      list.say(TOO_MANY);
       return;
     }
     opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;

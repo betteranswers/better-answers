@@ -79,4 +79,5 @@ export const BULK_WORDS = {
   refused: (count: number) =>
     `Nothing changed. ${counted(count, "member was", "members were")} refused:`,
   stillGoing: "The act before this one is still going. Try again once it answers.",
+  tooMany: (most: number) => `Select at most ${members(most)} for one act.`,
 } as const;
