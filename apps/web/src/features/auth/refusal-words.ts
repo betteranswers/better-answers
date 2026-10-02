@@ -145,3 +145,85 @@ export const CONNECTION_UNFINISHED: Said = {
   why: "The connection couldn't be finished.",
   next: "Start it again from the app you were connecting.",
 };
+
+/** Said wherever a person changes their own second factor or spends a recovery code. */
+export const SAID_OF_SECOND_FACTOR = {
+  "no-authenticator": {
+    why: "You have no authenticator set up.",
+    next: "Reload the page to see what you hold.",
+  },
+  "last-second-factor": {
+    why: "Admins must keep one passkey or authenticator.",
+    next: "Add another before removing this one.",
+  },
+  "recovery-code-wrong": {
+    why: "That code is wrong or already used.",
+    next: "Check it, or try another code.",
+  },
+} satisfies SaidOfWord;
+
+export const SETUP_CODE_WRONG: Said = {
+  why: "That code doesn't match.",
+  next: "Enter the code your authenticator shows now. If it still fails, check your phone sets its time automatically.",
+};
+
+/** Another tab finished the setup, or started a new one with a new key. */
+export const NO_SETUP_WAITING: Said = {
+  why: "This setup is no longer open.",
+  next: "Reload the page to see what is set up.",
+};
+
+export const AUTHENTICATOR_HELD: Said = {
+  why: "You already have an authenticator set up.",
+  next: "Reload the page to see it.",
+};
+
+export const SETUP_REFUSED: Said = {
+  why: "Your authenticator wasn't set up.",
+  next: "Reload the page and try again.",
+};
+
+export const KEY_UNANSWERED: Said = {
+  why: "No response, so no key was made.",
+  next: "Try again in a moment.",
+};
+
+export const SETUP_UNANSWERED: Said = {
+  why: "No response, so your authenticator isn't set up.",
+  next: "Try again in a moment.",
+};
+
+export const tooManySetupsStarted = (waitSeconds: number | undefined): Said => ({
+  why: "Too many setups have been started.",
+  next: tryAgainAfter(waitSeconds),
+});
+
+export const REMOVAL_UNANSWERED: Said = {
+  why: "No response, so your authenticator wasn't removed.",
+  next: "Try again in a moment.",
+};
+
+export const CODES_UNANSWERED: Said = {
+  why: "No response, so no codes were made.",
+  next: "Try again in a moment.",
+};
+
+export const codesMadeTooOften = (liftsInSeconds: number | undefined): Said => ({
+  why: "New codes have been made too often.",
+  next: tryAgainAfter(liftsInSeconds),
+});
+
+export const CODES_NOT_TICKED: Said = {
+  why: "You haven't ticked that you've saved the codes.",
+  next: "Save them, then tick the box.",
+};
+
+export const KEY_NOT_COPIED: Said = {
+  why: "The key wasn't copied.",
+  next: "Select it and copy it yourself.",
+};
+
+export const CODES_NOT_COPIED: Said = {
+  why: "The codes weren't copied.",
+  next: "Select them and copy them yourself.",
+};

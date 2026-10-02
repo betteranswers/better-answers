@@ -73,4 +73,18 @@
       scroll-padding-top: var(--band-drawn-h);
     }
   }
+
+  /* A part marked to print alone, such as a set of recovery codes, is all the printed page holds. */
+  @media print {
+    body:has([data-print-alone]) {
+      visibility: hidden;
+    }
+
+    [data-print-alone] {
+      position: absolute;
+      inset-block-start: 0;
+      inset-inline-start: 0;
+      visibility: visible;
+    }
+  }
 }

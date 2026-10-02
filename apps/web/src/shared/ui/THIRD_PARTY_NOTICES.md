@@ -56,6 +56,16 @@ a registry item: it is a demonstration file in Kibo's repository, so it carries 
 the CLI cannot install it. Its pin is the repository commit it was read at and a digest of the
 file as fetched; the second table below records both.
 
+The Account page added Kibo UI's `qr-code` on **2 October 2026**, for the authenticator's setup:
+the QR code is drawn in the browser from the setup address, so the key never reaches a
+third-party renderer. The file was written from the registry item as
+`https://www.kibo-ui.com/r/qr-code.json` served it that day, whose item digest the table names,
+as the breadcrumb's was written from the source the CLI showed. The item names `culori` and
+`qrcode` as dependencies; only `qrcode` was kept, pinned at 1.5.4 (with `@types/qrcode` at 1.5.6),
+the latest tag on [soldair/node-qrcode](https://github.com/soldair/node-qrcode/tags), which
+publishes tags rather than releases, and npm's `latest` for both, read the same day. Its arrival
+edits are listed below with the others.
+
 This file records vendored source only. The npm packages those items stand on are ordinary
 dependencies with lockfile entries; their versions live in `apps/web/package.json` and the
 lockfile, which is where a reader reads them and where Renovate moves them.
@@ -108,6 +118,7 @@ the pin.
 | `breadcrumb.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/breadcrumb.json | `18043f281e20e08f` | `a8a7adf3bdb2fa3a` |
 | `pagination.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/pagination.json | `e70ae7251fdb0f3c` | `5ba3751a3705925d` |
 | `empty.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/empty.json | `2c377f47c4e661d7` | `af1b98aebc32f8ff` |
+| `kibo-ui/qr-code.tsx` | https://www.kibo-ui.com/r/qr-code.json | `b2e8c658e1d2042a` | `e73e19cc579de184` |
 
 The Kibo UI patterns, each read at commit `3d63cdb15b79d972e3dc38a10997987672f9b263` of
 [shadcnblocks/kibo](https://github.com/shadcnblocks/kibo) (MIT), under `packages/patterns/`. The
@@ -281,6 +292,18 @@ The edits made on 1 October 2026, after review, on five of the files above:
 - `kibo-ui/row-actions.tsx`: the destructive acts are drawn after the rest, below one separator,
   each group in the order the caller gave. A separator placed before the first destructive act
   left a leading or interleaved one among the others.
+
+The arrival edits on `qr-code`:
+
+- Only the item's `index.tsx` was taken, as `kibo-ui/qr-code.tsx`. Its `server.tsx` is a React
+  Server Component, which this Vite SPA has no use for. The `"use client"` directive went, and the
+  `cn` import was repointed at `@/shared/lib/utils.ts`.
+- `culori` was dropped. Upstream reads `--foreground` and `--background` as `oklch()` and converts
+  them to hex; this repository's tokens resolve to plain hex at the root, so the oklch pattern never
+  matched and the code fell back to Kibo's own two colours. The tokens are now passed to the
+  encoder as they resolve, so the code takes the design system's ink and page.
+- The `catch` no longer calls `console.error`: the browser has no logger here, and the caller
+  writes the same data out as text beside the code. The effect's promise is marked `void`.
 
 Everything else is upstream's, unedited. Their behaviour — keyboard handling, focus, ARIA
 wiring, virtualisation — is theirs by ADR 0033; the screens that use them carry the WCAG 2.2 AA

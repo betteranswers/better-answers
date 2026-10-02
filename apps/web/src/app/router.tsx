@@ -14,7 +14,8 @@ import type { ReactElement, ReactNode } from "react";
 import { z } from "zod";
 
 import { AcceptInvitationScreen } from "@/features/auth/accept-invitation-screen.tsx";
-import { acceptDetour, displayNameDetour } from "@/features/auth/auth-hooks.ts";
+import { AccountPage } from "@/features/auth/account-page.tsx";
+import { displayNameDetour, signedOutDetour } from "@/features/auth/auth-hooks.ts";
 import { backTo, leavingFor, pageQuery } from "@/features/auth/carried-flow.ts";
 import { ChooseWorkspaceScreen } from "@/features/auth/choose-workspace-screen.tsx";
 import { DisplayNameScreen } from "@/features/auth/display-name-screen.tsx";
@@ -128,6 +129,17 @@ const displayNameRoute = createRoute({
   },
 });
 
+/** Outside the shell, so a person with no workspace and the operator reach it too. */
+const accountRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/account",
+  component: AccountPage,
+  beforeLoad: async ({ context, location }) => {
+    const elsewhere = await signedOutDetour(context.queryClient, location.href);
+    if (elsewhere !== undefined) throw redirect(leavingFor(elsewhere));
+  },
+});
+
 const chooseWorkspaceRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/choose-workspace",
@@ -148,8 +160,9 @@ const acceptInvitationRoute = createRoute({
     const { invitationId } = acceptInvitationRoute.useParams();
     return <AcceptInvitationScreen invitationId={invitationId} />;
   },
+  // The page asks a nameless invitee's name beside its join, so only a signed-out one is sent on.
   beforeLoad: async ({ context, location }) => {
-    const elsewhere = await acceptDetour(context.queryClient, location.pathname);
+    const elsewhere = await signedOutDetour(context.queryClient, location.pathname);
     if (elsewhere !== undefined) throw redirect(leavingFor(elsewhere));
   },
 });
@@ -378,6 +391,7 @@ export const createAppRouter = (clients: AppClients, history?: RouterHistory) =>
       signInRoute,
       signInLinkRoute,
       displayNameRoute,
+      accountRoute,
       chooseWorkspaceRoute,
       noWorkspaceRoute,
       acceptInvitationRoute,

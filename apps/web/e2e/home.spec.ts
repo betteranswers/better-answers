@@ -1,6 +1,7 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
 import { goHome, JUMP_TO, RAIL, unbuiltLineOf, UNKNOWN_SCREEN } from "@/app/words.ts";
+import { ACCOUNT_HEADING } from "@/features/auth/account-words.ts";
 import { aRole, ROLES } from "@/features/people/role-meanings.ts";
 import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
 import { CONTROL_CENTRE, headingOf, HOMES, type Role } from "@/shared/navigation.ts";
@@ -129,7 +130,7 @@ for (const role of ["Editor", "Viewer"] as const) {
     await expect(page.getByRole("navigation", { name: CONTROL_CENTRE.name })).toHaveCount(0);
 
     await personMenu(page, role).click();
-    await expect(page.getByRole("menuitem")).toHaveText(["Sign out"]);
+    await expect(page.getByRole("menuitem")).toHaveText([ACCOUNT_HEADING, "Sign out"]);
   });
 }
 

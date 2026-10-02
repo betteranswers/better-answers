@@ -6,6 +6,7 @@ import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { refusedWith } from "@/shared/refusal-outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 
+import { AccountLink } from "./account-link.tsx";
 import {
   hasADisplayName,
   useListOrganizations,
@@ -310,6 +311,11 @@ function WorkspaceChoice(properties: {
       ) : null}
       <OutcomeLine outcome={outcomeOf(standing)} className="mt-4" />
       <NextAct standing={standing} onRetry={properties.onRetry} onCarryOn={properties.onCarryOn} />
+      {listing ? (
+        <div className="mt-8">
+          <AccountLink />
+        </div>
+      ) : null}
     </AuthScreen>
   );
 }

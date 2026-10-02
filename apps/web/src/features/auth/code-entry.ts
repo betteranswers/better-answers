@@ -1,12 +1,15 @@
 import { EMAIL_CODE_ATTEMPTS, EMAIL_CODE_LENGTH } from "@better-answers/schema/email-code";
 
 /** An email client may space, dash or widen the digits it shows, so only digits are kept. */
-export const digitsOf = (entered: string): string =>
-  entered.normalize("NFKC").replaceAll(/\D/g, "").slice(0, EMAIL_CODE_LENGTH);
+export const digitsOf = (entered: string, length = EMAIL_CODE_LENGTH): string =>
+  entered.normalize("NFKC").replaceAll(/\D/g, "").slice(0, length);
 
-/** Six digits go to the api, once: a value it refused for this code would only spend a try. */
-export const worthSending = (code: string, refused: readonly string[]): boolean =>
-  code.length === EMAIL_CODE_LENGTH && !refused.includes(code);
+/** A whole code goes to the api, once: a value it refused for this code would only spend a try. */
+export const worthSending = (
+  code: string,
+  refused: readonly string[],
+  length = EMAIL_CODE_LENGTH,
+): boolean => code.length === length && !refused.includes(code);
 
 /** The api names no tries left, so they are counted from the refusals since the code was sent. */
 export const triesLeft = (refusals: number): number => Math.max(0, EMAIL_CODE_ATTEMPTS - refusals);
