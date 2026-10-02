@@ -33,7 +33,7 @@ import {
 import { outcomeOfFailure } from "./refusal.tsx";
 import { aRole, ROLE_MEANINGS, roleOf, ROLES } from "./role-meanings.ts";
 import { useSelfActHome } from "./self-act.tsx";
-import { CredentialsHere, GroupPills, JoinedOn, nameOf } from "./words.tsx";
+import { CredentialsHere, Day, GroupPills, nameOf } from "./words.tsx";
 
 /** The control each of the page's acts lands focus on, so a keystroke can reach any of them. */
 export type Landings = {
@@ -63,7 +63,7 @@ function AccessSummary(properties: { readonly member: ListedMember }) {
         <GroupPills groups={member.groups} />
       </SummaryRow>
       <SummaryRow term="Joined">
-        <JoinedOn instant={member.joinedAt} />
+        <Day instant={member.joinedAt} />
       </SummaryRow>
       <SummaryRow term="Credentials here">
         <CredentialsHere revokedAt={member.credentialsRevokedAt} />

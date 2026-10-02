@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { RowMenu } from "@/shared/row-menu.tsx";
@@ -41,5 +41,43 @@ describe("a row's menu", () => {
 
   it("draws no separator when every act is destructive", () => {
     expect(menuOf([act("Remove", true), act("Revoke", true)])).toEqual(["Remove", "Revoke"]);
+  });
+
+  it("lands focus where an act that took its row asks", async () => {
+    render(
+      <>
+        <h2 tabIndex={-1}>Invitations</h2>
+        <RowMenu
+          name="Ada Lovelace"
+          acts={[
+            { label: "Resend", onSelect: NOTHING },
+            {
+              label: "Cancel",
+              destructive: true,
+              onSelect: NOTHING,
+              focusAfter: () => screen.getByRole("heading", { name: "Invitations" }),
+            },
+          ]}
+        />
+      </>,
+    );
+    const trigger = screen.getByRole("button", { name: "Acts for Ada Lovelace" });
+    fireEvent.keyDown(trigger, { key: "Enter" });
+    fireEvent.click(screen.getByRole("menuitem", { name: "Cancel" }));
+
+    await waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Invitations" }));
+    });
+  });
+
+  it("hands focus back to its trigger after any other act", async () => {
+    render(<RowMenu name="Ada Lovelace" acts={[act("Resend")]} />);
+    const trigger = screen.getByRole("button", { name: "Acts for Ada Lovelace" });
+    fireEvent.keyDown(trigger, { key: "Enter" });
+    fireEvent.click(screen.getByRole("menuitem", { name: "Resend" }));
+
+    await waitFor(() => {
+      expect(document.activeElement).toBe(trigger);
+    });
   });
 });

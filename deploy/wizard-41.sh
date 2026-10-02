@@ -257,6 +257,7 @@ stage "Transactional email — sign-in codes, invitations, Coolify notifications
 say "Better Auth's email-code login, invitations and Coolify's alerts all need SMTP. A UK/EU-hosted provider preferred; any with a DPA."
 step "Create the account; verify the sending domain $APEX (SPF, DKIM, DMARC records in Cloudflare DNS)."
 step "Create one API key → (a) Coolify env SMTP_URL on the platform resource: smtps://resend:<API key>@smtp.resend.com:465 ; (b) Coolify Settings → Notifications → Resend (the same key) for Coolify's own alerts. Two places, one key."
+note "The api paces its own email below Resend's limit of ten a second per team (EMAILS_PER_SECOND in apps/api/src/smtp.ts); if Resend raises the team's limit, that constant may rise with it."
 ask SMTP_PROVIDER "Provider chosen:"
 write_env SMTP_PROVIDER "$SMTP_PROVIDER"
 pause

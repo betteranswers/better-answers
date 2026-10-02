@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { z } from "zod";
 
 import { ASK_TO_JOIN_PERSON_RULE } from "../src/auth/constants.ts";
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
 import { appForSuite } from "./suite-app.ts";
-import { NO_SESSION_ANSWERED, refusalOfCall, webSignedIn } from "./web-client.ts";
+import { NO_SESSION_ANSWERED, refusalOfCall, statusOf, webSignedIn } from "./web-client.ts";
 
 const app = appForSuite();
 
@@ -32,14 +31,6 @@ const asksBy = async (personId: string) => {
     [personId],
   );
   return found.rows;
-};
-
-const answeredStatus = z.object({ data: z.object({ httpStatus: z.number() }) });
-
-/** An answer with no refusal on it is the acknowledgement, whose status tRPC does not hand over. */
-const statusOf = async (call: Promise<unknown>): Promise<number> => {
-  const refused = answeredStatus.safeParse(await refusalOfCall(call));
-  return refused.success ? refused.data.data.httpStatus : 200;
 };
 
 describe("a signed-in person asking to join a workspace over tRPC", () => {

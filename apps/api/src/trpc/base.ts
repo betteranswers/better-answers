@@ -5,6 +5,7 @@ import type { z } from "zod";
 import {
   attempt,
   attemptResult,
+  CeilingMet,
   err,
   parse,
   type Claims,
@@ -97,9 +98,19 @@ const failed = (log: Logger, act: string, cause: Error): TRPCError => {
   return new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `${act} failed`, cause });
 };
 
+const throttled = (log: Logger, act: string, met: CeilingMet): TRPCError => {
+  const { retryAfterSeconds } = met;
+  log.info({ event: "trpc.throttled", act, retryAfterSeconds }, "throttled");
+  return new TRPCError({
+    code: "TOO_MANY_REQUESTS",
+    message: `Too many calls; ask again in ${retryAfterSeconds} seconds.`,
+    cause: met,
+  });
+};
+
 /**
- * Throws a TRPCError for a refusal or failure. A rejection is caught here, not by tRPC, so it is
- * logged once.
+ * Throws a TRPCError for a refusal, a ceiling met or a failure. A rejection is caught here, not by
+ * tRPC, so it is logged once.
  */
 export const crossing = async <Value>(
   ctx: { readonly log: Logger },
@@ -109,6 +120,7 @@ export const crossing = async <Value>(
   const answered = await attemptResult(() => running);
 
   if (answered.ok) return answered.value;
+  if (answered.error instanceof CeilingMet) throw throttled(ctx.log, act, answered.error);
   if (answered.error instanceof Error) throw failed(ctx.log, act, answered.error);
   throw refused(ctx.log, act, answered.error);
 };
@@ -143,17 +155,6 @@ export const answeredBy =
       act.name,
       given(input, (asked) => act(ctx.principal, ctx.tx, asked)),
     );
-
-/** A ceiling's answer carries this as its cause, so the wire can say when to ask again. */
-export class CeilingMet extends Error {
-  readonly retryAfterSeconds: number;
-
-  constructor(retryAfterSeconds: number) {
-    super(`ceiling met; ask again in ${retryAfterSeconds} seconds`);
-    this.name = "CeilingMet";
-    this.retryAfterSeconds = retryAfterSeconds;
-  }
-}
 
 const trpc = initTRPC.context<TrpcContext>().create({
   errorFormatter: ({ shape, error }) => ({
@@ -273,10 +274,7 @@ export const personProcedure = trpc.procedure.use(async ({ ctx, next }) => {
   });
 });
 
-/**
- * A ceiling is no refusal: time is its only remedy, so past one the call answers 429 and when to
- * ask again.
- */
+/** Past the ceiling the call answers 429 and when to ask again. */
 export const personCeiling = (rule: CounterRule) =>
   personProcedure.use(async ({ ctx, path, next }) => {
     const counted = await attempt(() =>
@@ -290,13 +288,7 @@ export const personCeiling = (rule: CounterRule) =>
     );
     if (!counted.ok) throw failed(ctx.log, consumeIngress.name, counted.error);
     if (!counted.value.allowed) {
-      const { retryAfterSeconds } = counted.value;
-      ctx.log.info({ event: "trpc.throttled", act: path, retryAfterSeconds }, "throttled");
-      throw new TRPCError({
-        code: "TOO_MANY_REQUESTS",
-        message: `Too many calls from this person; ask again in ${retryAfterSeconds} seconds.`,
-        cause: new CeilingMet(retryAfterSeconds),
-      });
+      throw throttled(ctx.log, path, new CeilingMet(counted.value.retryAfterSeconds));
     }
     return next();
   });

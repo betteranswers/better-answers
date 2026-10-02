@@ -69,6 +69,7 @@ import {
   THE_DETAIL_EDITED,
   THE_FAMILY_AND_SUBJECT_IT_LANDS_IN,
   THE_GENERATION_ROW_HELD,
+  THREE_INVITATION_EMAILS_COUNTED,
 } from "./rls-probes.ts";
 import { openMigratedPostgres } from "./warm-postgres.ts";
 
@@ -229,12 +230,13 @@ describe("the identity set", () => {
     });
   });
 
-  it("keeps the two counters UNLOGGED", async () => {
+  it("keeps the three counters UNLOGGED", async () => {
     const persistence = await db.pool.query(
-      "SELECT relname, relpersistence FROM pg_class WHERE relname IN ('ingress_counter', 'mcp_call_counter') ORDER BY relname",
+      "SELECT relname, relpersistence FROM pg_class WHERE relname IN ('ingress_counter', 'mcp_call_counter', 'invitation_email_counter') ORDER BY relname",
     );
     expect(persistence.rows).toEqual([
       { relname: "ingress_counter", relpersistence: "u" },
+      { relname: "invitation_email_counter", relpersistence: "u" },
       { relname: "mcp_call_counter", relpersistence: "u" },
     ]);
   });
@@ -244,6 +246,7 @@ describe("the identity set", () => {
       ...IDENTITY_SET.filter((name) => name !== "public.workspace"),
       "public.ingress_counter",
       "public.mcp_call_counter",
+      "public.invitation_email_counter",
     ];
     await withRollback(db.pool, async (client) => {
       const seed = await seedTwoWorkspaces(client);
@@ -1778,6 +1781,45 @@ describe("a tenant table under app_rt", () => {
       await client.query("SELECT set_config('app.workspace_id', '', true)");
       const missingScope = await client.query("SELECT token_id FROM mcp_call_counter");
       expect(missingScope.rows).toEqual([]);
+    });
+  });
+
+  it("hides and holds a tenant's invitation email counts from another", async () => {
+    await withRollback(db.pool, async (client) => {
+      /* jscpd:ignore-start */
+      await seedTwoWorkspaces(client);
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      /* jscpd:ignore-end */
+      await client.query(THREE_INVITATION_EMAILS_COUNTED, [WS_A]);
+
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_B]);
+      const seen = await client.query("SELECT key FROM invitation_email_counter");
+      const raised = await client.query("UPDATE invitation_email_counter SET count = count + 1");
+      const swept = await client.query("DELETE FROM invitation_email_counter");
+      expect([seen.rows, raised.rowCount, swept.rowCount]).toEqual([[], 0, 0]);
+
+      await client.query("SELECT set_config('app.workspace_id', '', true)");
+      const missingScope = await client.query("SELECT key FROM invitation_email_counter");
+      expect(missingScope.rows).toEqual([]);
+
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_A]);
+      const own = await client.query(
+        "SELECT workspace_id, key, count FROM invitation_email_counter",
+      );
+      expect(own.rows).toEqual([{ workspace_id: WS_A, key: "workspace", count: 3 }]);
+    });
+  });
+
+  it("refuses an invitation email count into another tenant's scope", async () => {
+    await withRollback(db.pool, async (client) => {
+      await seedTwoWorkspaces(client);
+      await client.query("SET LOCAL ROLE app_rt");
+      await client.query("SELECT set_config('app.workspace_id', $1, true)", [WS_B]);
+
+      await expect(client.query(THREE_INVITATION_EMAILS_COUNTED, [WS_A])).rejects.toThrow(
+        /row-level security/,
+      );
     });
   });
 });

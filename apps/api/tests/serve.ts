@@ -17,7 +17,13 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
 /** The Sources screen binds a document, and a bind puts its bytes in the object store first. */
 const objects = await openObjectStore("browser-suite");
 
+/** No email reaches this domain, so a spec meets an invitation whose email did not go. */
+const UNREACHABLE = "@unreachable.example";
+
 const app = await startApp({
+  onEmail: (message) => {
+    if (message.to.endsWith(UNREACHABLE)) throw new Error("the address is unreachable");
+  },
   objectStore: objects,
   webRoot: fileURLToPath(new URL("../../web/dist", import.meta.url)),
   publicUrl: `http://127.0.0.1:${port}`,

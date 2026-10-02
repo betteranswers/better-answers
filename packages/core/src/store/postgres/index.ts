@@ -37,6 +37,16 @@ export const scopeClause = (at: number): string =>
 export const scopeParameter = (principal: Principal | OperatorPrincipal): string | null =>
   principal.kind === "user" ? principal.workspaceId : null;
 
+type Bindable = string | number | Date | null | readonly string[];
+
+/** A placeholder is the number its own value's binding answers, so the two cannot drift apart. */
+export const boundValues = () => {
+  const values: Bindable[] = [];
+  return { values, bind: (value: Bindable): number => values.push(value) };
+};
+
+export type Bind = ReturnType<typeof boundValues>["bind"];
+
 /** An `ILIKE` pattern matching `text` anywhere, its own `%`, `_` and `\` taken literally. */
 export const containing = (text: string): string =>
   `%${text.replaceAll(/[\\%_]/g, String.raw`\$&`)}%`;
@@ -498,6 +508,41 @@ export const consumeIngress = async (
     ),
   );
 
+/** Only these literals reach the statement's text, so no caller's string becomes SQL. */
+const WORKSPACE_COUNTERS = {
+  call: { table: "mcp_call_counter", keyColumn: "token_id", sweptBy: "token_id = $2" },
+  invitationEmail: {
+    table: "invitation_email_counter",
+    keyColumn: "key",
+    sweptBy: "workspace_id = $1 AND key = $2",
+  },
+} as const;
+
+const countForWorkspace = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  counter: keyof typeof WORKSPACE_COUNTERS,
+  key: string,
+  rule: CounterRule,
+  now: Date,
+  amount: number,
+): Promise<CounterOutcome> => {
+  const { table, keyColumn, sweptBy } = WORKSPACE_COUNTERS[counter];
+  return countInWindow(rule, now, (start) =>
+    tx.query<{ count: number }>(
+      `WITH swept AS (
+         DELETE FROM ${table} WHERE ${sweptBy} AND window_start < $3
+       )
+       INSERT INTO ${table} (workspace_id, ${keyColumn}, window_start, count)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (workspace_id, ${keyColumn}, window_start)
+       DO UPDATE SET count = ${table}.count + EXCLUDED.count
+       RETURNING count`,
+      [principal.workspaceId, key, start, amount],
+    ),
+  );
+};
+
 /** As consumeIngress, for one call on the token `tokenId`, inside the caller's transaction. */
 export const consumeCall = async (
   principal: UserPrincipal,
@@ -505,18 +550,21 @@ export const consumeCall = async (
   tokenId: string,
   rule: CounterRule,
   now: Date,
+): Promise<CounterOutcome> => countForWorkspace(principal, tx, "call", tokenId, rule, now, 1);
+
+/**
+ * As consumeCall, counting `amount` invitation emails against `key` at once. An act that refuses
+ * or fails after it rolls the count back, and the counter row stays held until it commits.
+ */
+export const consumeInvitationEmails = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  key: string,
+  rule: CounterRule,
+  now: Date,
+  amount: number,
 ): Promise<CounterOutcome> =>
-  countInWindow(rule, now, (start) =>
-    tx.query<{ count: number }>(
-      `WITH swept AS (
-         DELETE FROM mcp_call_counter WHERE token_id = $2 AND window_start < $3
-       )
-       INSERT INTO mcp_call_counter (workspace_id, token_id, window_start, count) VALUES ($1, $2, $3, 1)
-       ON CONFLICT (workspace_id, token_id, window_start) DO UPDATE SET count = mcp_call_counter.count + 1
-       RETURNING count`,
-      [principal.workspaceId, tokenId, start],
-    ),
-  );
+  countForWorkspace(principal, tx, "invitationEmail", key, rule, now, amount);
 
 export const readWorkspaceConfig = async (
   principal: UserPrincipal,

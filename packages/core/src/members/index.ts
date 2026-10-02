@@ -22,16 +22,28 @@ export {
   renameGroupInput,
 } from "./groups.ts";
 export {
+  bulkCancelInvitations,
+  bulkInvitationsInput,
+  bulkResendInvitations,
+  type BulkCancelInvitationsRefusal,
+  type BulkResendInvitationsRefusal,
+} from "./invitation-bulk.ts";
+export {
+  countInvitations,
+  listInvitations,
+  listInvitationsInput,
+  type ListInvitationsRefusal,
+} from "./invitation-statuses.ts";
+export {
   cancelInvitation,
   invitationInput,
-  inviteMember,
-  inviteMemberInput,
-  listInvitations,
+  inviteMembers,
+  inviteMembersInput,
   resendInvitation,
   type CancelInvitationRefusal,
+  type InvitationMinted,
   type InvitationToSend,
-  type InviteMemberRefusal,
-  type ListInvitationsRefusal,
+  type InviteMembersRefusal,
   type ResendInvitationRefusal,
 } from "./invitations.ts";
 export * from "./memberships.ts";

@@ -1,5 +1,4 @@
 import { serve } from "@hono/node-server";
-import { createTransport } from "nodemailer";
 
 import {
   readHeadCheck,
@@ -14,7 +13,7 @@ import { logger } from "./logger.ts";
 import { senderAt } from "./product-name.ts";
 import { RECONCILER_INTERVAL_MS, startReconciler } from "./reconciler.ts";
 import { createServer } from "./server.ts";
-import { emailSender } from "./smtp.ts";
+import { emailSender, pacedTransport } from "./smtp.ts";
 import { startSweeps, SWEEP_FIRST_PASS_MS, SWEEP_INTERVAL_MS } from "./sweeps.ts";
 
 const bootstrap = requireBootstrap("the api");
@@ -36,7 +35,7 @@ if (doors.git?.ok === false) {
 }
 
 const sendEmail = emailSender(
-  identity.smtpUrl === undefined ? undefined : createTransport(identity.smtpUrl),
+  identity.smtpUrl === undefined ? undefined : pacedTransport(identity.smtpUrl),
   senderAt(identity.hostnames.apex),
   logger,
 );

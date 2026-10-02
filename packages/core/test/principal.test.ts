@@ -627,6 +627,33 @@ describe("the counters", () => {
     expect(outcomes.value[2]?.retryAfterSeconds).toBe(30);
   });
 
+  it("drops a token's earlier windows, keeping another token's", async () => {
+    const seeded = await seedMembership();
+    const door = openPostgres(db().runtimePool);
+    const rule = { windowMs: 60_000, max: 2 };
+    const swept = `jti-${ulid()}`;
+    const kept = `jti-${ulid()}`;
+
+    const left = await withPrincipal(door, claimsFor(seeded), async (principal, tx) => {
+      await consumeCall(principal, tx, swept, rule, new Date("2026-09-01T10:00:30Z"));
+      await consumeCall(principal, tx, kept, rule, new Date("2026-09-01T10:00:30Z"));
+      await consumeCall(principal, tx, swept, rule, new Date("2026-09-01T10:01:00Z"));
+      const rows = await tx.query<{ token_id: string; window_start: Date; count: number }>(
+        `SELECT token_id, window_start, count FROM mcp_call_counter
+          WHERE token_id = ANY($1) ORDER BY window_start`,
+        [[swept, kept]],
+      );
+      return rows.rows;
+    });
+
+    expect(left.ok).toBe(true);
+    if (!left.ok) return;
+    expect(left.value).toEqual([
+      { token_id: kept, window_start: new Date("2026-09-01T10:00:00Z"), count: 1 },
+      { token_id: swept, window_start: new Date("2026-09-01T10:01:00Z"), count: 1 },
+    ]);
+  });
+
   it("counts pre-authentication events per key without any scope", async () => {
     const door = openPostgres(db().runtimePool);
     const rule = { windowMs: 10_000, max: 1 };

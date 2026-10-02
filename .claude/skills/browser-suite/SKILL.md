@@ -97,7 +97,7 @@ call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources
 | `removeMember` | Ends a membership, as the People screen will |
 | `revokeCredentials` | Revokes a person's credentials, so the next request is refused |
 | `markTheOperator` | Grants the operator mark to the person holding an address, or clears it with `"revoke"`, through the ops command's own act and principal — the console's door, and a mark cleared under an open page |
-| `invite` | A waiting invitation to an address at a named role, as the invite act leaves it, with no email sent |
+| `invite` | A waiting invitation to an address at a named role, as the invite act leaves it, with no email sent; or one accepted or cancelled, or with its expiry moved into the past |
 | `ageTheSignIn` | Moves every session a person holds to a sign-in 61 minutes ago, behind the api's back — how a spec meets `sign-in-too-old` without waiting an hour |
 | `seedRoutes` | The routes a workspace has chosen; a purpose left out of the list has no route, which the screen must show rather than omit |
 | `seedBindings` | Source bindings as their acts and the worker leave them — documents, findings kept or overridden by an erasure, quarantined documents, chunks, an index run at any status, a concept and composition citing a document — answering each binding's and document's id |
@@ -139,7 +139,9 @@ Twenty-seven more helpers in the same module drive the browser rather than the h
 | `saysItsSentenceNotItsWord` | Asserts an alert reads the sentence a feature's refusal table holds for a word, and that the word is nowhere on the page |
 
 The sign-in code is read from that capture and from nowhere else: the api's logger is forbidden from ever
-holding one.
+holding one. `emailsSentTo` counts the emails the capture holds for an address, and the suite's
+api delivers nothing to `@unreachable.example`, so a spec can meet an invitation whose email did
+not go.
 
 Five more play Claude's part in its OAuth flow on the suite's own origin — `apps/web/e2e/consent.spec.ts` for the consent screen, `apps/web/e2e/console-people.spec.ts` for a person holding a client grant:
 

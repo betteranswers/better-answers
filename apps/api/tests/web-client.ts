@@ -1,4 +1,5 @@
 import { createTRPCClient } from "@trpc/client";
+import { z } from "zod";
 
 // A path, not a package: the web already depends on the api, and an edge back is a cycle the
 // api's image would install.
@@ -75,6 +76,14 @@ export const refusalOfCall = (call: Promise<unknown>): Promise<unknown> =>
     () => undefined,
     (refused: unknown) => refused,
   );
+
+const answeredStatus = z.object({ data: z.object({ httpStatus: z.number() }) });
+
+/** An answer with no refusal on it is a success, whose status tRPC does not hand over. */
+export const statusOf = async (call: Promise<unknown>): Promise<number> => {
+  const refused = answeredStatus.safeParse(await refusalOfCall(call));
+  return refused.success ? refused.data.data.httpStatus : 200;
+};
 
 /** The body a person's procedure answers a caller with no session, over the wire. */
 export const NO_SESSION_ANSWERED = {

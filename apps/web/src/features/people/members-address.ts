@@ -4,6 +4,7 @@ import { z } from "zod";
 import { ULID } from "@better-answers/schema/ulid";
 
 import { PAGE_NUMBER } from "@/shared/list-address.ts";
+import { pageWithin } from "@/shared/list-pages.tsx";
 import { CONTROL_CENTRE, detailAt, groupIn, screenNamed } from "@/shared/navigation.ts";
 
 import type { Role } from "./people-api.ts";
@@ -109,3 +110,11 @@ export const useSettledSearch = (held: string, write: (search: string) => void) 
 
   return [draft, setDraft, flush] as const;
 };
+
+/** A search still settling has not reached the address, so it shows its first page. */
+export const pageIndexOf = (
+  draft: string,
+  held: { readonly search: string; readonly page: number },
+  pageSize: number,
+  total: number,
+): number => pageWithin(draft === held.search ? held.page - 1 : 0, pageSize, total);

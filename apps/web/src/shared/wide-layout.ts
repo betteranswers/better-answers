@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 const SHELL_WIDE = "--shell-wide";
 
@@ -21,3 +21,12 @@ const wideNow = (): boolean => {
 
 /** True unless the stylesheet says the narrow layout is in force; read again on every resize. */
 export const useWideLayout = (): boolean => useSyncExternalStore(listen, wideNow);
+
+const NONE_HIDDEN: ReadonlySet<string> = new Set();
+
+/** The reader's own choice of a list's columns, else what a narrow screen has room for. */
+export const useHiddenColumns = (narrowHides: ReadonlySet<string>) => {
+  const [chosen, setChosen] = useState<ReadonlySet<string>>();
+  const wide = useWideLayout();
+  return [chosen ?? (wide ? NONE_HIDDEN : narrowHides), setChosen] as const;
+};

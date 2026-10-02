@@ -27,7 +27,12 @@ import {
   VERIFICATION_ORIGINS,
 } from "./concept-tables.ts";
 import { CONTRACT_DIGEST_PATTERN } from "./contract-digest.ts";
-import { INGRESS_SCOPES, ingressCounter, mcpCallCounter } from "./counter-tables.ts";
+import {
+  INGRESS_SCOPES,
+  ingressCounter,
+  invitationEmailCounter,
+  mcpCallCounter,
+} from "./counter-tables.ts";
 import { createInsertSchema, createSelectSchema, createUpdateSchema } from "./drizzle-zod.ts";
 import {
   erasureRequest,
@@ -256,6 +261,25 @@ const mcpCallCounterRefinements = {
 export const mcpCallCounterSelect = createSelectSchema(mcpCallCounter, mcpCallCounterRefinements);
 export const mcpCallCounterInsert = createInsertSchema(mcpCallCounter, mcpCallCounterRefinements);
 export const mcpCallCounterUpdate = createUpdateSchema(mcpCallCounter, mcpCallCounterRefinements);
+
+const invitationEmailCounterRefinements = {
+  workspaceId,
+  key: (schema: z.ZodString) => schema.trim().min(1),
+  count: (schema: z.ZodNumber) => schema.int().nonnegative(),
+};
+
+export const invitationEmailCounterSelect = createSelectSchema(
+  invitationEmailCounter,
+  invitationEmailCounterRefinements,
+);
+export const invitationEmailCounterInsert = createInsertSchema(
+  invitationEmailCounter,
+  invitationEmailCounterRefinements,
+);
+export const invitationEmailCounterUpdate = createUpdateSchema(
+  invitationEmailCounter,
+  invitationEmailCounterRefinements,
+);
 
 const ingressCounterRefinements = {
   scope: (schema: z.ZodString) => schema.pipe(z.enum(INGRESS_SCOPES)),
@@ -877,6 +901,12 @@ export const boundarySchemas = {
     select: mcpCallCounterSelect,
     insert: mcpCallCounterInsert,
     update: mcpCallCounterUpdate,
+  },
+  invitationEmailCounter: {
+    table: invitationEmailCounter,
+    select: invitationEmailCounterSelect,
+    insert: invitationEmailCounterInsert,
+    update: invitationEmailCounterUpdate,
   },
   ingressCounter: {
     table: ingressCounter,

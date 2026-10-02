@@ -3,10 +3,11 @@ import { RadioGroup as RadioGroupPrimitive } from "radix-ui";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 import { RadioGroup } from "@/shared/ui/radio-group.tsx";
 
+/** A count not yet read is left out rather than said as nought. */
 export type CountedChoice = {
   value: string;
   label: string;
-  count: number;
+  count: number | undefined;
 };
 
 export type CountedSwitchProps = {
@@ -37,10 +38,15 @@ export const CountedSwitch = ({ label, value, choices, onValueChange }: CountedS
         <span className="inline-flex min-h-8 group-focus-visible:shadow-[var(--focus-ring)]">
           {/* Its own span: two shadow utilities on one element set one property, so the checked elevation could hide the focus ring. */}
           <span className="inline-flex min-h-8 items-center gap-1.5 px-2.5 text-sm font-medium text-muted-foreground group-hover:text-foreground group-data-[state=checked]:bg-background group-data-[state=checked]:text-foreground group-data-[state=checked]:shadow-xs">
-            {choice.label}{" "}
-            <Pill variant="outline" className="px-1.5 py-0 tabular-nums">
-              {choice.count}
-            </Pill>
+            {choice.label}
+            {choice.count === undefined ? null : (
+              <>
+                {" "}
+                <Pill variant="outline" className="px-1.5 py-0 tabular-nums">
+                  {choice.count}
+                </Pill>
+              </>
+            )}
           </span>
         </span>
       </RadioGroupPrimitive.Item>

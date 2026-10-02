@@ -18,7 +18,7 @@ import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
 
 import { memberPageOf } from "./members-address.ts";
 import type { ListedMember } from "./people-api.ts";
-import { GroupPills, JoinedOn, nameOf } from "./words.tsx";
+import { Day, GroupPills, nameOf } from "./words.tsx";
 
 export const memberFeatures = tableFeatures({
   rowSortingFeature,
@@ -123,6 +123,6 @@ export const memberColumns = (refused: RefusedRows) =>
       id: "joined",
       header: "Joined",
       sortFn: "basic",
-      cell: ({ getValue }) => <JoinedOn instant={getValue()} />,
+      cell: ({ getValue }) => <Day instant={getValue()} />,
     }),
   ]);

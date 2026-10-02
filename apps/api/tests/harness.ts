@@ -164,12 +164,14 @@ export type TestApp = {
     role: "Admin" | "Editor" | "Viewer",
   ): Promise<{ id: string }>;
 
-  /** A waiting invitation, written as a row; the factory's own role when none is named. */
+  /** An invitation written as a row: waiting a week from now at the factory's role, unless named. */
   invite(input: {
     workspaceId: string;
     email: string;
     inviterId: string;
     role?: "Admin" | "Editor" | "Viewer" | undefined;
+    status?: "pending" | "accepted" | "canceled" | undefined;
+    expiresAt?: Date | undefined;
   }): Promise<{ id: string }>;
 
   setEmailVerified(email: string, verified: boolean): Promise<void>;
@@ -418,6 +420,8 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
         email: input.email,
         inviterId: input.inviterId,
         ...(input.role === undefined ? {} : { role: input.role }),
+        ...(input.status === undefined ? {} : { status: input.status }),
+        ...(input.expiresAt === undefined ? {} : { expiresAt: input.expiresAt }),
       });
       return { id: created.id };
     } finally {

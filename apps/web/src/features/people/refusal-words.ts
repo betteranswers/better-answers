@@ -1,4 +1,5 @@
-import type { SaidOfWord } from "@/shared/refusal-words.ts";
+import type { Said, SaidOfWord } from "@/shared/refusal-words.ts";
+import { minutesUntil } from "@/shared/words.ts";
 
 export const SAID_OF_A_MEMBER = {
   "role-forbids": {
@@ -71,7 +72,33 @@ export const SAID_OF_AN_INVITATION = {
     why: "That is not an email address.",
     next: "Check the address and send the invitation again.",
   },
+  "changed-meanwhile": {
+    why: "Another invitation to one of these addresses landed at the same moment, so nothing was sent.",
+    next: "Send them again.",
+  },
 } satisfies SaidOfWord;
+
+/** A set is refused whole, so each item's line says why that one invitation stopped it. */
+export const SAID_OF_TICKED_INVITATIONS = {
+  "role-forbids": SAID_OF_AN_INVITATION["role-forbids"],
+  "no-such-invitation": {
+    why: "It is no longer waiting: it was accepted or cancelled.",
+    next: "Try again without it.",
+  },
+  "changed-meanwhile": {
+    why: "Another change to these invitations landed at the same moment, so nothing changed.",
+    next: "Try again.",
+  },
+} satisfies SaidOfWord;
+
+/**
+ * Invite, Resend and bulk Resend count each address's emails and the workspace's; either ceiling
+ * refuses the act whole, and the answer does not say which.
+ */
+export const invitationsCeiling = (liftsInSeconds: number): Said => ({
+  why: "This workspace, or an address here, has had too many invitation emails this hour, so nothing was sent.",
+  next: `Try again in ${minutesUntil(liftsInSeconds)}.`,
+});
 
 /** A group act refuses `malformed` for a name with no letter or figure in it. */
 export const SAID_OF_A_GROUP = {

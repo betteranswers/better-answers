@@ -42,7 +42,7 @@ const anAdmin = async (name = "Calder Joinery") => {
 const anInvitee = async (role: "Admin" | "Editor" | "Viewer" = "Editor") => {
   const admin = await anAdmin();
   const address = anAddress("priya");
-  await admin.api.members.invite.mutate({ address, role });
+  await admin.api.members.invite.mutate({ addresses: [address], role });
   const invitee = await webSignedIn(app(), address);
   await invitee.api.person.setDisplayName.mutate({ displayName: "Priya Shah" });
   return { admin, address, invitationId: linkedInvitationId(address), ...invitee };
@@ -169,7 +169,7 @@ describe("accepting an invitation over tRPC", () => {
       workspace: { name: "Elsewhere Ltd" },
     });
     const admin = await anAdmin("Ryedale Metalwork");
-    await admin.api.members.invite.mutate({ address: person.email, role: "Admin" });
+    await admin.api.members.invite.mutate({ addresses: [person.email], role: "Admin" });
 
     await api.person.acceptInvitation.mutate({ invitationId: linkedInvitationId(person.email) });
 
@@ -194,7 +194,7 @@ describe("reading a person's own invitations over tRPC", () => {
   it("lists each waiting invitation, newest first", async () => {
     const { api, address, invitationId } = await anInvitee("Editor");
     const second = await anAdmin("Ryedale Metalwork");
-    await second.api.members.invite.mutate({ address, role: "Viewer" });
+    await second.api.members.invite.mutate({ addresses: [address], role: "Viewer" });
 
     expect(await api.person.invitations.query()).toEqual([
       {
@@ -364,7 +364,7 @@ describe("refusing an accept over tRPC", () => {
   it("reads a nameless invitee their invitation, joining them once named", async () => {
     const { workspace, api: adminApi } = await anAdmin();
     const address = anAddress("nameless");
-    await adminApi.members.invite.mutate({ address, role: "Viewer" });
+    await adminApi.members.invite.mutate({ addresses: [address], role: "Viewer" });
     const invitationId = linkedInvitationId(address);
     const { api } = await webSignedIn(app(), address);
 

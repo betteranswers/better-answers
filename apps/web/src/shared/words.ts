@@ -23,6 +23,12 @@ export const instantWords = (iso: string): string => `${timeWords(iso)} · ${day
 export const counted = (count: number, one: string, many: string): string =>
   `${count} ${count === 1 ? one : many}`;
 
+/** Rounded up, so the reader never asks again before a ceiling lifts. */
+export const minutesUntil = (seconds: number): string => {
+  const minutes = Math.max(1, Math.ceil(seconds / 60));
+  return minutes === 1 ? "a minute" : `${minutes} minutes`;
+};
+
 /** A person who has given no display name yet is named by their address. */
 export const nameOrAddress = (displayName: string, address: string): string =>
   displayName === "" ? address : displayName;

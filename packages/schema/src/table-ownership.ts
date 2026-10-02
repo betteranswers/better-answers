@@ -39,6 +39,7 @@ export const TABLE_OWNERS = {
 
   "public.ingress_counter": POSTGRES_DOOR,
   "public.mcp_call_counter": POSTGRES_DOOR,
+  "public.invitation_email_counter": POSTGRES_DOOR,
 
   "public.contract_stamp": JOURNAL_MIGRATOR,
 

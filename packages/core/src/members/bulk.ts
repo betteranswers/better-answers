@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 import { boundarySchemas } from "@better-answers/schema";
-import { byCodeUnit } from "@better-answers/schema/code-unit";
 
 import { batchIdFor } from "../audit/index.ts";
 import {
@@ -22,7 +21,17 @@ import { addedToGroup } from "./groups.ts";
 import { lastAdminsAmong, withMembersHeld } from "./last-admin.ts";
 import { memberRemovedHere } from "./removal.ts";
 import { roleWritten } from "./roles.ts";
+import {
+  distinct,
+  namedEach,
+  notAmong,
+  outcomeOf,
+  refusedItemsOf,
+  type BulkOutcome,
+} from "./sets.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
+
+export type { BulkOutcome } from "./sets.ts";
 
 /** One act holds at most this many member rows until it commits. */
 const MOST_TICKED = 200;
@@ -32,38 +41,6 @@ const PERSON_ID = boundarySchemas.user.select.shape.id;
 const TICKED = z.array(PERSON_ID).min(1).max(MOST_TICKED);
 
 const ROLE = boundarySchemas.member.select.shape.role;
-
-export type BulkOutcome = {
-  /** Each person the act changed, in person id order. */
-  readonly changed: readonly UserId[];
-
-  /** How many it left as they were: already so, or no member here to remove. */
-  readonly skipped: number;
-};
-
-type Named<Word extends string> = readonly (readonly [UserId, Word])[];
-
-const namedEach = <Word extends string>(personIds: readonly UserId[], word: Word): Named<Word> =>
-  personIds.map((personId) => [personId, word] as const);
-
-/** The set's word is its first item's in id order, so no new word joins the register. */
-const refusedItemsOf = <Word extends string>(
-  named: Named<Word>,
-): RefusedItems<Word> | undefined => {
-  const [first] = named.toSorted(([one], [other]) => byCodeUnit(one, other));
-  return first === undefined ? undefined : { word: first[1], items: Object.fromEntries(named) };
-};
-
-const notAmong = (personIds: readonly UserId[], found: readonly UserId[]): readonly UserId[] =>
-  personIds.filter((personId) => !found.includes(personId));
-
-const outcomeOf = (asked: readonly UserId[], changed: readonly UserId[]): BulkOutcome => ({
-  changed,
-  skipped: asked.length - changed.length,
-});
-
-/** A person ticked twice is asked for once. */
-const distinct = (personIds: readonly UserId[]): readonly UserId[] => [...new Set(personIds)];
 
 /** The role is any text, so a role outside the three reaches the act and is refused in its word. */
 export const bulkChangeRoleInput = z.object({ personIds: TICKED, role: z.string() });

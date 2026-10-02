@@ -1,6 +1,7 @@
 import { integer, pgTable, primaryKey, text } from "drizzle-orm/pg-core";
 
 import { stamp } from "./column-helpers.ts";
+import { withRLS } from "./with-rls.ts";
 
 export const INGRESS_SCOPES = ["ip", "email", "person", "link"] as const;
 
@@ -25,6 +26,19 @@ export const mcpCallCounter = pgTable(
     count: integer("count").notNull(),
   },
   (table) => [primaryKey({ columns: [table.workspaceId, table.tokenId, table.windowStart] })],
+);
+
+export const invitationEmailCounter = withRLS(
+  "invitation_email_counter",
+  {
+    workspaceId: text("workspace_id").notNull(),
+
+    key: text("key").notNull(),
+    windowStart: stamp("window_start").notNull(),
+    count: integer("count").notNull(),
+  },
+  "workspaceId",
+  (table) => [primaryKey({ columns: [table.workspaceId, table.key, table.windowStart] })],
 );
 
 export const GLOBAL_TABLE_NAMES_BEYOND_IDENTITY = [
