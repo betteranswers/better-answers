@@ -31,7 +31,6 @@ const config: KnipConfig = {
         // export of one, is not dead code.
         "src/shared/ui/**",
 
-        // Their config refuses to load without PUBLIC_URL, so their script hides it from knip.
         "journeys/fixtures.ts",
         "journeys/outcome-reporter.ts",
       ],

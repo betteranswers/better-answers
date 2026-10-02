@@ -3,6 +3,10 @@ import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
 import { z } from "zod";
 
+/**
+ * Knip loads any config a script names, so the journeys script starts Playwright by path, and
+ * knip.config.ts lists the journeys' entries itself.
+ */
 const publicUrl = z.url({ protocol: /^https?$/ }).safeParse(process.env["PUBLIC_URL"]);
 if (!publicUrl.success) {
   throw new Error(

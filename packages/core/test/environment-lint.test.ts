@@ -44,6 +44,7 @@ describe("the environment lint fires on a setting read in source", () => {
 const EXCUSED: readonly (readonly [string, string])[] = [
   ["the api's config module", "apps/api/src/config.ts"],
   ["the browser suite's configuration", "apps/web/playwright.config.ts"],
+  ["the journeys' configuration", "apps/web/playwright.journeys.config.ts"],
   ["the git store door's pass-through", "packages/core/src/store/git/index.ts"],
   ["a repository script", "scripts/check.mjs"],
   ["the gate tooling", "packages/devtools/src/throwaway-tree.ts"],
@@ -52,6 +53,7 @@ const EXCUSED: readonly (readonly [string, string])[] = [
   ["a test helper beside it", "packages/core/test/bundle.ts"],
   ["a suite under a plural directory", "apps/api/tests/image-probe.ts"],
   ["a browser spec", "apps/web/e2e/routes.spec.ts"],
+  ["a journey's fixture", "apps/web/journeys/fixtures.ts"],
 ];
 
 describe("the environment lint passes where a read is deliberate", () => {
@@ -83,10 +85,21 @@ describe("the configuration the repository commits", () => {
 
   it("excuses config modules, the pass-through, tooling and suites, nothing wider", () => {
     expect(excused.map((override) => override.files)).toEqual([
-      ["apps/api/src/config.ts", "apps/web/playwright.config.ts"],
+      [
+        "apps/api/src/config.ts",
+        "apps/web/playwright.config.ts",
+        "apps/web/playwright.journeys.config.ts",
+      ],
       ["packages/core/src/store/git/index.ts"],
       ["scripts/**", "packages/devtools/src/**"],
-      ["**/*.test.ts", "**/*.test.tsx", "**/test/**", "**/tests/**", "**/e2e/**"],
+      [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/test/**",
+        "**/tests/**",
+        "**/e2e/**",
+        "apps/web/journeys/**",
+      ],
     ]);
   });
 });
