@@ -214,8 +214,16 @@ const failureOf = async (decided: Result<Response>) =>
     ? { status: decided.value.status, detail: await decided.value.clone().text() }
     : { status: null, detail: decided.error.message };
 
+/** A path on this origin alone: anything else would be an open redirect once the link signs in. */
+const returnPath = z
+  .string()
+  .max(512)
+  .regex(/^\/(?![/\\])[^\\]*$/)
+  .optional()
+  .catch(undefined);
+
 const codeAsk = z
-  .object({ type: z.string().optional(), oauth_query: z.string().optional() })
+  .object({ type: z.string().optional(), oauth_query: z.string().optional(), redirect: returnPath })
   .catch({});
 
 const secureOrigin = (publicUrl: string): boolean => publicUrl.startsWith("https:");
@@ -235,7 +243,10 @@ const bindTheLink =
       return;
     }
     const nonce = mintNonce();
-    await askingWithALink({ nonce, carried: asked.oauth_query ?? "" }, next);
+    await askingWithALink(
+      { nonce, carried: asked.oauth_query ?? "", returnTo: asked.redirect ?? "" },
+      next,
+    );
     if (!context.res.ok) return;
     setCookie(context, bindingCookieName(publicUrl), nonce, {
       maxAge: EMAIL_CODE_LIFETIME_SECONDS,
@@ -262,10 +273,13 @@ const LINK_REFUSALS = {
 
 const SIGN_IN_WINDOW_SECONDS = BETTER_AUTH_RATE_LIMIT.customRules["/sign-in/email-otp"].window;
 
+/** The library answers its own failure as a 500 response rather than throwing it. */
+const SERVER_FAILED = 500;
+
 const linkSignInBody = (use: LinkUse): FlowBody =>
-  use.carried === ""
+  use.oauthQuery === ""
     ? { email: use.email, otp: use.code }
-    : { email: use.email, otp: use.code, oauth_query: use.carried };
+    : { email: use.email, otp: use.code, oauth_query: use.oauthQuery };
 
 const nameGiven = z.object({ user: z.object({ name: z.string() }) });
 
@@ -305,6 +319,15 @@ const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): void =>
     return linkSeen(read, contents, read !== undefined && isBound(cookie, read.nonceHash));
   };
 
+  /** The link may still stand, so the page offers Sign in again rather than the dead page. */
+  const unanswered = (context: Context, reason: string): Response => {
+    deps.logger.warn(
+      { event: "auth.link_sign_in_failed", reason },
+      "a sign-in through a link went unanswered",
+    );
+    return context.json(LINK_REFUSALS.unanswered, 502);
+  };
+
   const answerTheSignIn = async (
     context: Context,
     token: string,
@@ -315,12 +338,21 @@ const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): void =>
       const wait = Number(answered.headers.get("x-retry-after") ?? SIGN_IN_WINDOW_SECONDS);
       return tooManyRequests(wait, "Too many sign-ins from this address; try again later.");
     }
+    if (answered.status >= SERVER_FAILED)
+      return unanswered(context, `library ${String(answered.status)}`);
     if (!answered.ok) return context.json(LINK_REFUSALS.dead, 410);
-    await dropALink(door, token);
     forwardCookies(answered, context.res.headers);
+    // The spent code already makes the link dead, so a failed delete must not cost the session.
+    const dropped = await attempt(() => dropALink(door, token));
+    if (!dropped.ok) {
+      deps.logger.warn(
+        { event: "auth.link_drop_failed", reason: dropped.error.message },
+        "a used sign-in link was not deleted",
+      );
+    }
     return context.json({
       displayNameGiven: await displayNameGivenIn(answered),
-      carried: use.carried === "" ? "" : `?${use.carried}`,
+      carried: use.carried,
     });
   };
 
@@ -336,13 +368,7 @@ const mountTheSignInLink = (routes: Hono, deps: AuthRoutesDependencies): void =>
         ),
       ),
     );
-    if (!flowed.ok) {
-      deps.logger.warn(
-        { event: "auth.link_sign_in_failed", reason: flowed.error.message },
-        "a sign-in through a link went unanswered",
-      );
-      return context.json(LINK_REFUSALS.unanswered, 502);
-    }
+    if (!flowed.ok) return unanswered(context, flowed.error.message);
     return answerTheSignIn(context, token, use, flowed.value);
   };
 

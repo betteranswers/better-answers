@@ -27,10 +27,16 @@ export const mintNonce = (): string => randomBytes(NONCE_BYTES).toString("base64
 /** The only form of a token or a nonce the database holds. */
 export const hashOf = (secret: string): string => createHash("sha256").update(secret).digest("hex");
 
-const opened = z.strictObject({ code: z.string(), carried: z.string() });
+const opened = z.strictObject({ code: z.string(), carried: z.string(), returnTo: z.string() });
 
-/** What a link seals: its code, and the signed query of a flow the code request carried. */
+/** What a link seals: its code, a carried flow's signed query, and the sign-in page's return path. */
 export type Opened = Readonly<z.infer<typeof opened>>;
+
+/** The query the sign-in page carried, so the link's page lands where that page would have. */
+const carriedQueryOf = (contents: Opened): string => {
+  if (contents.carried !== "") return `?${contents.carried}`;
+  return contents.returnTo === "" ? "" : `?redirect=${encodeURIComponent(contents.returnTo)}`;
+};
 
 const keyOf = (token: string, salt: string): Buffer =>
   Buffer.from(hkdfSync("sha256", token, salt, KEY_INFO, KEY_BYTES));
@@ -101,15 +107,21 @@ export type LinkRead = {
     | undefined;
 };
 
+/** `carried` is the sign-in page's own query, which the browser that asked already held. */
 export type LinkState =
-  | { readonly state: "bound"; readonly address: string; readonly carriedOn: "connecting" | null }
+  | { readonly state: "bound"; readonly address: string; readonly carried: string }
   | { readonly state: "elsewhere"; readonly code: string; readonly until: string }
   | { readonly state: "dead" };
 
 export const DEAD_LINK: LinkState = { state: "dead" };
 
 /** What a sign-in through the link spends: never said to the browser, only used. */
-export type LinkUse = { readonly email: string; readonly code: string; readonly carried: string };
+export type LinkUse = {
+  readonly email: string;
+  readonly code: string;
+  readonly oauthQuery: string;
+  readonly carried: string;
+};
 
 /** `use` stands only beside a bound state. */
 export type SeenLink = { readonly state: LinkState; readonly use: LinkUse | undefined };
@@ -136,12 +148,9 @@ export const linkSeen = (
       use: undefined,
     };
   }
+  const carried = carriedQueryOf(contents);
   return {
-    state: {
-      state: "bound",
-      address: read.address,
-      carriedOn: contents.carried === "" ? null : "connecting",
-    },
-    use: { email: read.address, code: contents.code, carried: contents.carried },
+    state: { state: "bound", address: read.address, carried },
+    use: { email: read.address, code: contents.code, oauthQuery: contents.carried, carried },
   };
 };

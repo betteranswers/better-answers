@@ -18,7 +18,7 @@ import { EMAIL_CODE_LIFETIME_SECONDS, SIGN_IN_LINK_PAGE } from "./constants.ts";
 import { hashOf, type LinkRead, mintLinkToken, seal } from "./link-token.ts";
 
 /** What a code request hands its email: the nonce its cookie will hold, and any flow it carries. */
-type LinkAsk = { readonly nonce: string; readonly carried: string };
+type LinkAsk = { readonly nonce: string; readonly carried: string; readonly returnTo: string };
 
 /** The library's body validation drops the carried flow before its email hook runs. */
 const asks = new AsyncLocalStorage<LinkAsk>();
@@ -55,7 +55,7 @@ export const keepALink = async (
   const identifier = identifierOf(email);
   const value = JSON.stringify({
     nonce: hashOf(ask.nonce),
-    sealed: seal(token, store.secret, id, { code, carried: ask.carried }),
+    sealed: seal(token, store.secret, id, { code, carried: ask.carried, returnTo: ask.returnTo }),
   });
   await withIdentityWrite(IDENTITY_PRINCIPAL, store.door, async (tx) => {
     await tx.query("DELETE FROM verification WHERE identifier = $1", [identifier]);

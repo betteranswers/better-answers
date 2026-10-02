@@ -3,6 +3,7 @@ import { randomInt } from "node:crypto";
 import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
 import { z } from "zod";
 
+import { INVITATION_WORDS } from "@/features/auth/invitation-words.ts";
 import {
   codeShown,
   codeSpelled,
@@ -20,8 +21,10 @@ import {
   anAddress,
   clockTheNextKey,
   codeSentTo,
+  invite,
   landedAtHome,
   linkSentTo,
+  person,
   provision,
   quoted,
   signInHeading,
@@ -298,4 +301,36 @@ test("the code reads as six digits, and c copies it", async ({
   await clockTheNextKey(page, { at: "//main", reads: LINK_WORDS.copied });
   await page.keyboard.press("c");
   await theActLandedWithinItsBudget(page, "copy");
+});
+
+test("an invitee signing in by link lands on the invitation", async ({
+  page,
+  context,
+  request,
+}) => {
+  const workspace = await provision(request, { name: "The Linnet workspace" });
+  const inviter = await person(request, anAddress("linnet-inviter"), {
+    displayName: "Morgan Reid",
+  });
+  const email = anAddress("linnet-invitee");
+  const invited = await invite(request, {
+    workspaceId: workspace.workspaceId,
+    email,
+    inviterId: inviter.id,
+    role: "Editor",
+  });
+  const asking = await context.newPage();
+  await asking.goto(`/invitations/${invited.id}`);
+  await expect(signInHeading(asking, "joining")).toBeVisible();
+  await asking.getByLabel(SIGN_IN_WORDS.emailField).fill(email);
+  await asking.keyboard.press("Enter");
+  await expect(asking.getByLabel(SIGN_IN_WORDS.codeField, { exact: true })).toBeVisible();
+
+  await page.goto(linkTo(await linkSentTo(request, email)));
+  await expect(headingOf(page, SIGN_IN_WORDS.emailStep.joining.title)).toBeVisible();
+  await page.keyboard.press("Enter");
+
+  await expect(
+    page.getByRole("heading", { level: 1, name: INVITATION_WORDS.heading("The Linnet workspace") }),
+  ).toBeVisible();
 });

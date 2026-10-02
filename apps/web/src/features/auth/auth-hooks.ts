@@ -115,10 +115,21 @@ const unwrapWithTheWait = async <TData>(
   throw new CodeRefused(error.status, waitSeconds);
 };
 
+/** Sealed into the email's link, so a sign-in through it returns where this page would. */
+const returnPathOf = (query: string): { readonly redirect?: string } => {
+  const redirect = new URLSearchParams(query).get("redirect");
+  return redirect === null ? {} : { redirect };
+};
+
 const sendVerificationOtpOptions = () =>
   mutationOptions<unknown, Error, { email: string; type: "sign-in" }>({
     mutationFn: (input) =>
-      unwrapWithTheWait((reading) => authClient.emailOtp.sendVerificationOtp(input, reading)),
+      unwrapWithTheWait((reading) =>
+        authClient.emailOtp.sendVerificationOtp(
+          { ...input, ...returnPathOf(pageQuery()) },
+          reading,
+        ),
+      ),
   });
 
 export const useSendVerificationOtp = () => useMutation(sendVerificationOtpOptions());
@@ -162,7 +173,7 @@ const linkDescribed = z.discriminatedUnion("state", [
   z.object({
     state: z.literal("bound"),
     address: z.string(),
-    carriedOn: z.literal("connecting").nullable(),
+    carried: z.string(),
   }),
   z.object({ state: z.literal("elsewhere"), code: z.string(), until: z.string() }),
   z.object({ state: z.literal("dead") }),
@@ -185,10 +196,7 @@ const askOfTheLink = async <T>(path: string, token: string, answer: z.ZodType<T>
 
 const ASKED_AGAIN_AT_MOST = 2;
 
-/**
- * Read once, never on focus: each read spends the link's ceiling. `reading` false holds it, once
- * the person has clicked Sign in.
- */
+/** Each read spends the link's ceiling, and a failed read stays stale, so only Read again reads twice. */
 export const useDescribeTheLink = (token: string | undefined, reading: boolean) =>
   useQuery({
     queryKey: [...AUTH_KEYS.all, "link", token],
@@ -198,6 +206,9 @@ export const useDescribeTheLink = (token: string | undefined, reading: boolean) 
         : () => askOfTheLink("/sign-in-link/describe", token, linkDescribed),
     enabled: reading,
     staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
     retry: (failures, failure) =>
       !(failure instanceof CodeRefused) && failures < ASKED_AGAIN_AT_MOST,
   });

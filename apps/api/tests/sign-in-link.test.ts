@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { whileWritesAreRefused } from "@better-answers/core/testing/postgres";
+
 import { authorizeUrl, continueAfterPostLogin, pkce } from "./flow.ts";
 import { PUBLIC_URL, type TestClient } from "./harness.ts";
 import { servedApp } from "./suite-app.ts";
@@ -111,7 +113,7 @@ describe("reading a link", () => {
     expect(await describedAs(client, token)).toEqual({
       state: "bound",
       address: person.email,
-      carriedOn: null,
+      carried: "",
     });
   });
 
@@ -229,6 +231,49 @@ describe("signing in through a link", () => {
     expect(await describedAs(asking, token)).toEqual(DEAD);
   });
 
+  it("answers a library failure as unanswered, not dead", async () => {
+    const person = await app().person();
+    const asking = app().client();
+    const { token } = await askedFor(asking, person.email);
+
+    const failed = await whileWritesAreRefused(app().database.superuser, "session", () =>
+      asking.json(SIGN_IN_BY_LINK, { token }),
+    );
+
+    expect(failed.status).toBe(502);
+    expect(await failed.json()).toEqual({ error: "unanswered" });
+  });
+
+  it("refuses a cross-site read or sign-in of a link", async () => {
+    const person = await app().person();
+    const { token } = await askedFor(app().client(), person.email);
+    const crossSite = (path: string) =>
+      app()
+        .client()
+        .fetch(path, {
+          method: "POST",
+          headers: { "content-type": "application/json", origin: "https://elsewhere.example" },
+          body: JSON.stringify({ token }),
+        });
+
+    expect([(await crossSite(DESCRIBE)).status, (await crossSite(SIGN_IN_BY_LINK)).status]).toEqual(
+      [403, 403],
+    );
+  });
+
+  it("answers a malformed token as a dead link", async () => {
+    const client = app().client();
+
+    const answers = [
+      await describedAs(client, "not a token!"),
+      await (await client.json(DESCRIBE, { token: "a".repeat(129) })).json(),
+      await (await client.json(DESCRIBE, {})).json(),
+    ];
+
+    expect(answers).toEqual([DEAD, DEAD, DEAD]);
+    expect((await client.json(SIGN_IN_BY_LINK, { token: "not a token!" })).status).toBe(410);
+  });
+
   it("spends none of the code's tries on a wrong token", async () => {
     const person = await app().person();
     const asking = app().client();
@@ -302,39 +347,48 @@ describe("signing in through a link", () => {
     const read = await describedAs(asking, token);
     const signedIn = await asking.json(SIGN_IN_BY_LINK, { token });
 
-    expect(read).toMatchObject({ state: "bound", carriedOn: "connecting" });
+    expect(read).toMatchObject({ state: "bound", carried: query });
     expect(signedIn.status).toBe(200);
     expect(await signedIn.json()).toMatchObject({ carried: query });
     const next = await continueAfterPostLogin(asking, query);
     expect(`${next.origin}${next.pathname}`).toBe(`${PUBLIC_URL}/consent`);
   });
 
-  it("is dead when its sealed contents were altered", async () => {
+  it("returns where the sign-in page was asked to return", async () => {
+    const person = await app().person();
+    const asking = app().client();
+    const { token } = await askedFor(asking, person.email, { redirect: "/invitations/01ABC" });
+
+    const read = await describedAs(asking, token);
+    const signedIn = await asking.json(SIGN_IN_BY_LINK, { token });
+
+    expect(read).toMatchObject({ state: "bound", carried: "?redirect=%2Finvitations%2F01ABC" });
+    expect(await signedIn.json()).toMatchObject({ carried: "?redirect=%2Finvitations%2F01ABC" });
+  });
+
+  it("drops a return path that leaves this origin", async () => {
+    const person = await app().person();
+    const asking = app().client();
+    const { token } = await askedFor(asking, person.email, { redirect: "//elsewhere.example/x" });
+
+    expect(await describedAs(asking, token)).toMatchObject({ state: "bound", carried: "" });
+  });
+
+  it.each([
+    ["altered", "to_jsonb('A' || (value::jsonb ->> 'sealed'))"],
+    ["cut short", `'"AAAA"'::jsonb`],
+  ])("is dead when its sealed contents were %s", async (_how, sealedBecomes) => {
     const person = await app().person();
     const asking = app().client();
     const { token } = await askedFor(asking, person.email);
     await app().database.superuser.query(
-      `UPDATE verification
-          SET value = jsonb_set(value::jsonb, '{sealed}', to_jsonb('A' || (value::jsonb ->> 'sealed')))::text
+      `UPDATE verification SET value = jsonb_set(value::jsonb, '{sealed}', ${sealedBecomes})::text
         WHERE identifier = $1`,
       [`sign-in-link-${person.email.toLowerCase()}`],
     );
 
     expect(await describedAs(asking, token)).toEqual(DEAD);
     expect((await asking.json(SIGN_IN_BY_LINK, { token })).status).toBe(410);
-  });
-
-  it("is dead when its sealed contents were cut short", async () => {
-    const person = await app().person();
-    const asking = app().client();
-    const { token } = await askedFor(asking, person.email);
-    await app().database.superuser.query(
-      `UPDATE verification SET value = jsonb_set(value::jsonb, '{sealed}', '"AAAA"')::text
-        WHERE identifier = $1`,
-      [`sign-in-link-${person.email.toLowerCase()}`],
-    );
-
-    expect(await describedAs(asking, token)).toEqual(DEAD);
   });
 });
 

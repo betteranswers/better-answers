@@ -18,7 +18,7 @@ import {
   type SignedInByLink,
 } from "./auth-hooks.ts";
 import { AuthScreen, Outcome, ReadAgain } from "./auth-screen.tsx";
-import { leavingFor, nextAfterSignIn } from "./carried-flow.ts";
+import { carriedOnTo, leavingFor, nextAfterSignIn } from "./carried-flow.ts";
 import {
   CODE_NOT_COPIED,
   codeShown,
@@ -208,7 +208,7 @@ const unreadSlots = (failure: Error, acting: Acting): Slots => ({
 });
 
 const boundSlots = (bound: Bound, acting: Acting): Slots => ({
-  title: SIGN_IN_WORDS.emailStep[bound.carriedOn ?? "nothing"].title,
+  title: SIGN_IN_WORDS.emailStep[carriedOnTo(bound.carried) ?? "nothing"].title,
   said: signingInAs(bound.address),
   body: (
     <SignInHere
