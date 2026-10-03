@@ -10,6 +10,7 @@ applies_when:
   - "Importing from one slice into another, or from a transport into packages/core"
   - "Writing a query against a table another slice owns"
   - "Writing a test that reaches Postgres, the object store, a git repository or the graph"
+  - "Adding a deployable under apps/"
 tags:
   - adr-0029
   - slice
@@ -24,7 +25,9 @@ tags:
 
 ## The decision
 
-The tree is `apps/` over `packages/`: `apps/` is what deploys and `packages/` is what is imported. `apps/api` is the one TypeScript deployable and holds transports only. Business logic is `packages/core`, a library the api depends on, organised as capability slices over four store doors.
+The tree is `apps/` over `packages/`: `apps/` is what deploys and `packages/` is what is imported. `apps/api` is the product's one TypeScript deployable and holds transports only. Business logic is `packages/core`, a library the api depends on, organised as capability slices over four store doors.
+
+`apps/test-inbox` is a second TypeScript deployable, and it is not the product. It is the journeys' test inbox: test infrastructure on Cloudflare, outside the product's two stacks and its four stores. The owner deploys it by hand with a pinned `wrangler`, and no image carries it. It imports nothing from `packages/core` at run time, only types from `packages/schema`.
 
 - `kernel/` holds the Principal, branded ids, the error vocabulary and `Result`: types and pure functions.
 - `access/` holds the read predicate, defined once with one SQL renderer.
@@ -44,7 +47,7 @@ All five are one rule in the repository's own lint plugin, `better-answers/impor
 
 Every query reaches its store through a store door in `packages/core/src/store/`. Row-level security is the tenancy guarantee (ADR 0032), and the door is ergonomics over it. A transaction that spans slices lives in the slice that owns the act.
 
-Every one of the four doors is real in a test, and none may be faked: `CODING_STANDARDS.md`'s rule *Run every store the platform runs, for real*. An in-memory adapter is for a service someone else runs, such as an LLM provider, behind that service's own adapter.
+Every one of the four doors is real in a test, and none may be faked: `CODING_STANDARDS.md`'s rule *Run every store the platform runs, for real*. An in-memory adapter is for a service someone else runs, such as an LLM provider, behind that service's own adapter. The test inbox's D1 is such a service: its store takes the few D1 calls it makes, and its suite runs the same SQL through `node:sqlite`.
 
 ## Why
 
@@ -60,7 +63,7 @@ Every one of the four doors is real in a test, and none may be faked: `CODING_ST
 - A directory plus a lint rule: no export list, so an interface by convention only.
 - Folders named for the knowledge layers plus `records/`: every capability cuts across them, and `records/` becomes a wastebasket.
 - A `principal/` folder or a Control Centre folder: a Principal is a kernel type, and Control Centre composes slice reads in the api's routers.
-- Two TypeScript deployables, splitting `/agent/v1` off: nothing varies across that seam yet.
+- Two TypeScript deployables for the product, splitting `/agent/v1` off: nothing varies across that seam yet.
 - Vertical slices with no cross-slice imports at all: slices share one database, so it forces duplicated queries or a `shared/` wastebasket.
 - `resources/` for the persistence modules: *resource* is MCP's word.
 - Flat top-level directories: what deploys against what is imported should be structural.

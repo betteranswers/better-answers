@@ -2,6 +2,12 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import { z } from "zod";
 
+import {
+  TEST_INBOX_PAGE,
+  type TestInboxListed,
+  type TestInboxPage,
+} from "@better-answers/schema/test-inbox";
+
 const RESEND_API = "https://api.resend.com";
 const USER_AGENT = "better-answers-journeys";
 const PAGE_LIMIT = 100;
@@ -38,12 +44,8 @@ const AMBIGUOUS = { answer: "ambiguous" } as const;
 const NO_MAIL = { answer: "no-mail" } as const;
 const NO_CODE = { answer: "no-code" } as const;
 
-const PAGE = z.object({
-  has_more: z.boolean(),
-  data: z.array(z.object({ id: z.string(), to: z.array(z.string()), from: z.string() })),
-});
-type Page = z.infer<typeof PAGE>;
-type Listed = Page["data"][number];
+type Page = TestInboxPage;
+type Listed = TestInboxListed;
 
 const MESSAGE = z.object({
   text: z.string().nullish(),
@@ -87,7 +89,7 @@ const clientOf = (apiUrl: string, key: string): Client => ({
     const url = new URL("/emails/receiving", apiUrl);
     url.searchParams.set("limit", String(PAGE_LIMIT));
     if (after !== undefined) url.searchParams.set("after", after);
-    return fetched(url, key, PAGE);
+    return fetched(url, key, TEST_INBOX_PAGE);
   },
   message: (id) =>
     fetched(new URL(`/emails/receiving/${encodeURIComponent(id)}`, apiUrl), key, MESSAGE),

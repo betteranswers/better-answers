@@ -40,6 +40,11 @@ const config: KnipConfig = {
       includeEntryExports: false,
     },
 
+    "apps/test-inbox": {
+      // `wrangler.jsonc` names it; wrangler is no dependency, so no knip plugin reads that file.
+      entry: ["src/index.ts"],
+    },
+
     "packages/core": {
       // Stryker names the second by string, so nothing imports it.
       vitest: { config: ["vitest.config.ts", "vitest.stryker.config.ts"] },

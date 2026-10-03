@@ -1,0 +1,16 @@
+{
+  "name": "test-inbox",
+  "main": "src/index.ts",
+  // The newest date the pinned wrangler's own workerd knows, so a local run matches the deploy.
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "test-inbox",
+      "migrations_dir": "migrations",
+    },
+  ],
+}

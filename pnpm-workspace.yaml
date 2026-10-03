@@ -1,5 +1,6 @@
 packages:
   - apps/api
+  - apps/test-inbox
   - apps/web
   - packages/*
 

@@ -310,6 +310,21 @@ importers:
         specifier: 2.9.1
         version: 2.9.1
 
+  apps/test-inbox:
+    devDependencies:
+      '@better-answers/schema':
+        specifier: workspace:*
+        version: link:../../packages/schema
+      '@types/node':
+        specifier: 24.13.6
+        version: 24.13.6
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: 5.0.1
+        version: 5.0.1(@types/node@24.13.6)(jsdom@30.1.1(@noble/hashes@2.4.0))(vite@8.3.0(@types/node@24.13.6)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+
   apps/web:
     dependencies:
       '@better-answers/design-system':
