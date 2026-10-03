@@ -11,7 +11,7 @@ import type {
   TestStep,
 } from "@playwright/test/reporter";
 
-import { roleIn, whyItCouldNotRun, type Outcome } from "./outcome.ts";
+import { roleIn, whyItCouldNotRun, whyItFailed, type Outcome } from "./outcome.ts";
 
 type Finding = {
   readonly outcome: Exclude<Outcome, "held">;
@@ -51,7 +51,7 @@ const findingOf = (test: TestCase, result: TestResult): Finding => {
     role: roleOf(test, result),
     screen: path.at(0) ?? OUTSIDE_ANY_STEP,
     step: path.at(-1) ?? OUTSIDE_ANY_STEP,
-    why: why ?? "",
+    why: why ?? whyItFailed(result.annotations) ?? "",
   };
 };
 
@@ -65,7 +65,7 @@ const outcomeOf = (findings: readonly Finding[], everyJourneyPassed: boolean): O
 const cell = (text: string): string => text.replaceAll("|", "\\|");
 
 const tableOf = (findings: readonly Finding[]): readonly string[] => [
-  "| Outcome | Role | Screen | Step | Why it could not run |",
+  "| Outcome | Role | Screen | Step | Why |",
   "| --- | --- | --- | --- | --- |",
   ...findings.map(
     (finding) =>

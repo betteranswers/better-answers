@@ -44,10 +44,11 @@ RUN corepack enable && corepack install && pnpm --pm-on-fail=ignore --version \
  && chmod -R a+rX "$COREPACK_HOME"
 
 # Every workspace manifest, and nothing else, so a source edit does not invalidate the
-# install layer. `pnpm-workspace.yaml` lists six projects; the lockfile is checked against
-# all of them, so all six are copied even though the runtime needs four. `packages/devtools`
-# is here for its manifest alone — it is imported by suites and by the lint config and never
-# deployed, so no stage below copies a line of it.
+# install layer. `pnpm-workspace.yaml` lists seven projects; the lockfile is checked against
+# all of them, so all seven are copied even though the runtime needs four. `packages/devtools`
+# and `apps/test-inbox` are here for their manifests alone. The first is imported by suites and
+# by the lint config, the second is deployed by hand to Cloudflare, and neither runs in this
+# image, so no stage below copies a line of either.
 FROM base AS manifests
 # `tsconfig.base.json` joins them because every workspace's tsconfig extends it and vite
 # reads the chain at build time. Node needs none of it: type stripping reads no tsconfig,
@@ -57,6 +58,7 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 # start without the files, frozen lockfile or not, so they travel with the manifests.
 COPY patches/ patches/
 COPY apps/api/package.json apps/api/
+COPY apps/test-inbox/package.json apps/test-inbox/
 COPY apps/web/package.json apps/web/
 COPY packages/core/package.json packages/core/
 COPY packages/design-system/package.json packages/design-system/

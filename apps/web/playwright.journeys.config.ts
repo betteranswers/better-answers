@@ -14,7 +14,7 @@ if (!publicUrl.success) {
   );
 }
 
-/** The preflight signs nobody in: the health check, the sign-in screen and one inbox list. */
+/** The preflight signs nobody in: the health check, the sign-in screen, an inbox list and a probe. */
 const PREFLIGHT_TIMEOUT_MS = 60_000;
 
 /** A sign-in may wait 150 s on the test inbox; the rest is the journey's screens. */

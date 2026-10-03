@@ -16,7 +16,8 @@ A living company knowledge map for UK SMBs, on OKF v0.2. It has three knowledge 
 
 | Path | What it is |
 | --- | --- |
-| `apps/api/` | The one TypeScript deployable: Hono on Node 24. It holds transports only. Four share one origin: tRPC, the MCP surface, the authorization server and the SPA's static build. The rest are the `pnpm ops` commands, the reconciler's tick and the daily sweep pass. There is no api↔worker HTTP: the control plane is rows |
+| `apps/api/` | The product's one TypeScript deployable: Hono on Node 24. It holds transports only. Four share one origin: tRPC, the MCP surface, the authorization server and the SPA's static build. The rest are the `pnpm ops` commands, the reconciler's tick and the daily sweep pass. There is no api↔worker HTTP: the control plane is rows |
+| `apps/test-inbox/` | The journeys' test inbox: a Cloudflare Email Worker and its D1 table, read by the journeys with a bearer token. It is test infrastructure outside the product's two stacks and four stores. The owner deploys it by hand with the pinned `wrangler`, and no image carries it |
 | `apps/web/` | Vite React single-page app. It talks to `apps/api/` over tRPC only |
 | `apps/worker/` | Python 3.13 knowledge worker (uv). It runs the work loop, the nightly parser audit and the full rebuild. Connectors, conversion, indexing and extraction arrive with the route's S1 onward, built on cocoindex |
 | `packages/core/` | The business logic `apps/api` calls: capability slices over four store doors. It is transport-agnostic, and a lint rule enforces that |

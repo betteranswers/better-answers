@@ -5,7 +5,7 @@ import type { Role } from "@/shared/navigation.ts";
 
 import { expect, test as suite } from "../e2e/browser.ts";
 import { codeSentTo } from "../e2e/harness.ts";
-import { noteInbox } from "./inbox.ts";
+import { noteInbox, probeInbox } from "./inbox.ts";
 import { couldNotRun, playsTheRole } from "./outcome.ts";
 import { goOnUnlessStopped } from "./run-stop.ts";
 import { refusedByTheEdge, signIn, type CodeSource } from "./sign-in.ts";
@@ -18,6 +18,12 @@ type JourneyFixtures = {
 
 const ADDRESS = z.email();
 const SENDER = z.string().min(1);
+
+/** The reader adds each path itself, and sends the key nowhere but over https. */
+const INBOX_URL = z
+  .url({ protocol: /^https$/ })
+  .transform((value) => new URL(value))
+  .refine((url) => url.href === `${url.origin}/`);
 const CODE_SOURCES = ["inbox", "harness"] as const;
 const CODE_SOURCE = z.enum(CODE_SOURCES);
 
@@ -35,38 +41,53 @@ export const theTestPeople = () => ({
   Viewer: addressOf("Viewer"),
 });
 
-const inboxSource = (): CodeSource => {
+type Reader = {
+  readonly source: CodeSource;
+  /** Whether the code source can hold a code at all, asked once before anyone signs in. */
+  readonly stands: () => Promise<boolean>;
+};
+
+/** The URL's value is never named: it is a secret, as the addresses are. */
+const inboxReader = (): Reader => {
   const sender = SENDER.safeParse(process.env["JOURNEYS_SENDER"]);
   if (!sender.success) return couldNotRun("JOURNEYS_SENDER is not set");
-  return (recipient) => noteInbox({ recipient, sender: sender.data });
+  const apiUrl = INBOX_URL.safeParse(process.env["JOURNEYS_INBOX_URL"]);
+  if (!apiUrl.success) return couldNotRun("JOURNEYS_INBOX_URL is not set to a bare https origin");
+  return {
+    source: (recipient) => noteInbox({ recipient, sender: sender.data, apiUrl: apiUrl.data }),
+    stands: () => probeInbox(apiUrl.data),
+  };
 };
 
 /** By hand, against the browser suite's api, its capture holds the code nobody is mailed. */
-const harnessSource =
-  (request: APIRequestContext): CodeSource =>
-  async (address) => ({
+const harnessReader = (request: APIRequestContext): Reader => ({
+  source: async (address) => ({
     answer: "noted",
     codeSent: async () => ({ answer: "code", code: await codeSentTo(request, address) }),
-  });
+  }),
+  stands: async () => true,
+});
 
-const codeSourceOf = (request: APIRequestContext): CodeSource => {
+const readerOf = (request: APIRequestContext): Reader => {
   const named = CODE_SOURCE.safeParse(process.env["JOURNEYS_CODE_SOURCE"]);
   if (!named.success) {
     return couldNotRun(
       `JOURNEYS_CODE_SOURCE names no code source: set it to ${CODE_SOURCES.join(" or ")}`,
     );
   }
-  return named.data === "inbox" ? inboxSource() : harnessSource(request);
+  return named.data === "inbox" ? inboxReader() : harnessReader(request);
 };
 
 /**
- * Before anyone signs in, so a missing setting or a silent inbox spends no sign-in. Noting the
- * inbox sends nothing.
+ * Before anyone signs in, so a missing setting or an inbox that is silent or cannot store spends no
+ * sign-in. Neither check sends anything.
  */
 export const theSettingsAndInboxHold = (request: APIRequestContext): Promise<void> =>
   suite.step("Read the journeys' settings and note the test inbox", async () => {
-    const noted = await codeSourceOf(request)(theTestPeople().Admin);
+    const reader = readerOf(request);
+    const noted = await reader.source(theTestPeople().Admin);
     if (noted.answer !== "noted") couldNotRun("the test inbox did not answer");
+    if (!(await reader.stands())) couldNotRun("the test inbox could not store a message");
   });
 
 /** Through the context's own cookies, so it holds when the page does not. */
@@ -111,7 +132,7 @@ export const test = suite.extend<JourneyFixtures>({
       try {
         const { address, source } = await suite.step("Read the journeys' settings", () => ({
           address: addressOf(role),
-          source: codeSourceOf(request),
+          source: readerOf(request).source,
         }));
         await signIn(page, address, source);
         await use();
