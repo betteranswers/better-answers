@@ -450,3 +450,81 @@ describe("the Admin's check of the test workspace, through its reads", () => {
     );
   }, 120_000);
 });
+
+/** As the api answers a refused act: its word as the message, and the word again in `data`. */
+const refusedWith = (word: string, status: number): Reply => ({
+  status,
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({
+    error: {
+      message: word,
+      code: -32_003,
+      data: { code: "FORBIDDEN", httpStatus: status, refusal: { word, class: "forbidden" } },
+    },
+  }),
+});
+
+describe("the Admin's check, when the Admin's own standing changed", () => {
+  it("stops the run when the test Admin reads as Viewer", async () => {
+    const asAViewer = answered({
+      workspace: { name: "Test workspace" },
+      person: { name: "Test Admin" },
+      role: "Viewer",
+    });
+    const run = await checkedAgainst(aWorkspace({ "GET /trpc/session.membership": asAViewer }));
+
+    expect(run.outcome).toBe("could-not-run\n");
+    expect(run.signIns).toBe(1);
+    expect(run.summary).toContain(stoppedFor("the test Admin no longer holds the Admin role"));
+  }, 120_000);
+
+  it("stops the run when the Admin's members read is refused", async () => {
+    const run = await checkedAgainst(
+      aWorkspace({ "GET /trpc/members.list": refusedWith("role-forbids", 403) }),
+    );
+
+    expect(run.outcome).toBe("could-not-run\n");
+    expect(run.signIns).toBe(1);
+    expect(run.summary).toContain(
+      stoppedFor("the test workspace refused the Admin's read of members.list (role-forbids)"),
+    );
+  }, 120_000);
+
+  it("stops the run when the product refuses the Admin's membership", async () => {
+    const run = await checkedAgainst(
+      aWorkspace({ "GET /trpc/session.membership": refusedWith("not-a-member", 401) }),
+    );
+
+    expect(run.outcome).toBe("could-not-run\n");
+    expect(run.signIns).toBe(1);
+    expect(run.summary).toContain(
+      stoppedFor(
+        "the test workspace refused the Admin's read of session.membership (not-a-member)",
+      ),
+    );
+  }, 120_000);
+
+  it("fails at an edge's 403 naming no word, as before", async () => {
+    const edge: Reply = {
+      status: 403,
+      headers: { "content-type": "text/html" },
+      body: "<h1>403</h1>",
+    };
+    const run = await checkedAgainst(aWorkspace({ "GET /trpc/members.list": edge }));
+
+    expect(run.outcome).toBe("fail\n");
+    expect(run.signIns).toBe(3);
+  }, 120_000);
+
+  it("fails at a 500 read, and the others still run", async () => {
+    const failed: Reply = {
+      status: 500,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ error: { message: "listMembers failed", code: -32_603 } }),
+    };
+    const run = await checkedAgainst(aWorkspace({ "GET /trpc/members.list": failed }));
+
+    expect(run.outcome).toBe("fail\n");
+    expect(run.signIns).toBe(3);
+  }, 120_000);
+});

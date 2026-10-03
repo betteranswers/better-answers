@@ -5,7 +5,7 @@ import { INVENTED_MEMBERS, inventedMemberAddress } from "@better-answers/schema/
 import type { Role } from "@/shared/navigation.ts";
 import { counted } from "@/shared/words.ts";
 
-import { bindingsOf, membersOf, waitingInvitationsOf, type Member } from "./reads.ts";
+import { roleOfTheAdmin, standingOf, type Checked, type Member } from "./reads.ts";
 import { stopTheRun } from "./run-stop.ts";
 
 /** The Admin's journey moves these and puts them back, so a failed run may leave them Editors. */
@@ -89,17 +89,23 @@ const repairMembersAmong = (members: readonly Member[], people: TestPeople): Rep
   };
 };
 
+/** A refusal the product named means the Admin lost their standing, which only someone changed. */
+const readOrStop = <T>(checked: Checked<T>): T =>
+  checked.kind === "read"
+    ? checked.value
+    : stopTheRun(
+        `the test workspace refused the Admin's read of ${checked.procedure} (${checked.word})`,
+      );
+
 /**
- * Read through the Admin's session before any act. A finding stops the run, so the Editor and
- * Viewer never sign in.
+ * Read through the Admin's session before any act, their own role first. A finding stops the
+ * run, so the Editor and Viewer never sign in.
  */
 export const theFixtureHolds = async (page: Page, people: TestPeople): Promise<RepairMembers> => {
-  const [members, waitingInvitations, bindings] = await Promise.all([
-    membersOf(page),
-    waitingInvitationsOf(page),
-    bindingsOf(page),
-  ]);
-  const findings = findingsIn({ members, waitingInvitations, bindings }, people);
+  const role = readOrStop(await roleOfTheAdmin(page));
+  if (role !== "Admin") stopTheRun("the test Admin no longer holds the Admin role");
+  const standing = readOrStop(await standingOf(page));
+  const findings = findingsIn(standing, people);
   if (findings.length > 0) stopTheRun(`the test workspace's check found ${findings.join(", ")}`);
-  return repairMembersAmong(members, people);
+  return repairMembersAmong(standing.members, people);
 };
