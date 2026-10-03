@@ -1,22 +1,16 @@
 import type { Logger } from "pino";
 
-import { attempt, type PlatformPrincipal } from "@better-answers/core/kernel";
+import { attempt } from "@better-answers/core/kernel";
 import type { PostgresDoor } from "@better-answers/core/store/postgres";
 import { type CredentialsHeld, readCredentialsHeld } from "@better-answers/core/workspaces";
 
-import { emailPage, PARAGRAPH } from "./email-page.ts";
+import { emailPage, escaped, LONG_UK_DATE, PARAGRAPH } from "./email-page.ts";
 import type { EmailMessage, Mail } from "./email.ts";
+import { IDENTITY_PRINCIPAL } from "./identity-principal.ts";
 import { PRODUCT_NAME } from "./product-name.ts";
 
 /** The SPA's Account page, where a person removes a passkey or authenticator that is not theirs. */
 const ACCOUNT_PATH = "/account";
-
-const LONG_UK_DATE = new Intl.DateTimeFormat("en-GB", {
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-  timeZone: "Europe/London",
-});
 
 const WORDS = {
   subject: `You're now an Admin on ${PRODUCT_NAME}`,
@@ -37,18 +31,6 @@ const linesOf = (held: CredentialsHeld): readonly string[] => [
   ),
   ...(held.authenticator ? [WORDS.authenticator] : []),
 ];
-
-const ESCAPED = new Map([
-  ["&", "&amp;"],
-  ["<", "&lt;"],
-  [">", "&gt;"],
-  ['"', "&quot;"],
-  ["'", "&#39;"],
-]);
-
-/** A passkey's name is the person's own text. */
-const escaped = (text: string): string =>
-  text.replaceAll(/[&<>"']/g, (one) => ESCAPED.get(one) ?? one);
 
 const heldHtml = (lines: readonly string[]): string =>
   lines.length === 0
@@ -85,12 +67,11 @@ export const sendPromotionNotice = async (
   ctx: {
     readonly mail: Mail;
     readonly log: Logger;
-    readonly door: PostgresDoor;
-    readonly platform: PlatformPrincipal;
+    readonly doors: { readonly postgres: PostgresDoor };
   },
   personId: string,
 ): Promise<boolean> => {
-  const held = await readCredentialsHeld(ctx.platform, ctx.door, { personId });
+  const held = await readCredentialsHeld(IDENTITY_PRINCIPAL, ctx.doors.postgres, { personId });
   const sent = held.ok
     ? await attempt(() => ctx.mail.send(promotionNoticeEmail(held.value, ctx.mail.publicUrl)))
     : held;

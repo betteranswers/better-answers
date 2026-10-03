@@ -15,13 +15,13 @@ export const CODES_STEP = "/recovery-codes";
 
 const DISPLAY_NAME_STEP = "/display-name";
 
-type Standing = "not-required" | "confirmed" | "confirm" | "setup";
+type SessionStanding = "not-required" | "confirmed" | "confirm" | "setup";
 
 type Held = {
   readonly mustHoldOne?: boolean;
   readonly codesAcknowledged: boolean;
   readonly recoveryCodes?: unknown;
-  readonly thisSession?: { readonly standing: Standing } | undefined;
+  readonly thisSession?: { readonly standing: SessionStanding } | undefined;
 };
 
 /** Hashed codes are never shown twice, so an unticked set comes anew; one owing a factor but holding none gets a first set. */
@@ -80,6 +80,14 @@ export const pendingDetour = async (
   const step = pendingStepOf(await secondFactorOrUnread(queryClient, api, fresh));
   return step === undefined ? undefined : detourTo(step, from);
 };
+
+/** The person's own pending step, read afresh; confirm when the read says nothing. */
+export const confirmDetour = async (
+  queryClient: QueryClient,
+  api: ApiProxy,
+  from: LeftFrom,
+): Promise<string> =>
+  (await pendingDetour(queryClient, api, from, true)) ?? detourTo(CONFIRM_STEP, from);
 
 /** Confirm or setup, then unseen codes: the step due before any later one. Undefined: none is. */
 const stepDue = (held: Held | undefined, query: string): string | undefined => {

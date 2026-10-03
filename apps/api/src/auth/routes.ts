@@ -64,13 +64,15 @@ export type AuthRoutesDependencies = {
   readonly sendEmail: EmailSender;
 };
 
-const carry = (url: string): string => new URL(url).search;
-
+/** A session that must confirm its second factor first holds no claims to act on. */
 const PENDING = "pending";
+
+type Pending = typeof PENDING;
 
 const sessionNamed = z.object({ session: z.object({ id: z.string() }) });
 
-type Pending = typeof PENDING;
+const carry = (url: string): string => new URL(url).search;
+
 const oauthQuery = (url: string): string => new URL(url).search.replace(/^\?/, "");
 
 const hostnameOf = (url: string): string => URL.parse(url)?.hostname ?? "an unknown address";
@@ -410,7 +412,7 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
   const routes = new Hono();
   const { auth, door, publicUrl, clock } = deps;
 
-  /** A pending session holds no claims to act on, and a session ended meanwhile none at all. */
+  /** A session ended meanwhile holds none at all. */
   const claimsFrom = async (headers: Headers): Promise<Claims | Pending | undefined> => {
     const read = await auth.api.getSession({ headers });
     const sessionId = sessionNamed.safeParse(read).data?.session.id;
@@ -421,11 +423,8 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
     return sessionClaims(async () => read, headers);
   };
 
-  const sessionHolds = async (headers: Headers): Promise<boolean> => {
-    const claims = await claimsFrom(headers);
-    if (claims === undefined || claims === PENDING) return false;
-    return (await withPrincipal(door, claims, async () => true)).ok;
-  };
+  const holds = async (claims: Claims | undefined): Promise<boolean> =>
+    claims !== undefined && (await withPrincipal(door, claims, async () => true)).ok;
 
   /** Confirming first carries the signed query, so the flow resumes once the session is confirmed. */
   const confirmFirst = (context: Context): Response =>
@@ -493,10 +492,9 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
 
     const accept = form.get("accept") === "true";
 
-    if ((await claimsFrom(flowHeaders(context.req.raw, publicUrl))) === PENDING) {
-      return confirmFirst(context);
-    }
-    if (accept && !(await sessionHolds(flowHeaders(context.req.raw, publicUrl)))) {
+    const claims = await claimsFrom(flowHeaders(context.req.raw, publicUrl));
+    if (claims === PENDING) return confirmFirst(context);
+    if (accept && !(await holds(claims))) {
       return context.html(signInPage(REFUSAL_PAGES.sessionEnded, carry(context.req.url)), 401);
     }
     const decided = await attempt(() =>

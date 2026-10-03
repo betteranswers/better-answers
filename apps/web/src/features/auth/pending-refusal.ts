@@ -8,8 +8,7 @@ import { CodeRefused, SIGNED_OUT } from "./auth-hooks.ts";
 import { SECOND_FACTOR_PENDING } from "./membership.ts";
 import {
   CONFIRM_STEP,
-  detourTo,
-  pendingDetour,
+  confirmDetour,
   RECOVERY_STEP,
   SETUP_STEP,
   type LeftFrom,
@@ -48,6 +47,5 @@ export const detourAfter = async (
   if (onAPendingPage(at.pathname)) return isSignedOut(failure) ? `/sign-in${at.query}` : undefined;
   if (!isPendingRefusal(failure)) return undefined;
   if (during === "change") rememberAChangeUnsaved(at.pathname);
-  const detour = await pendingDetour(reading.queryClient, reading.api, at, true);
-  return detour ?? detourTo(CONFIRM_STEP, at);
+  return confirmDetour(reading.queryClient, reading.api, at);
 };

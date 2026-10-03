@@ -39,7 +39,11 @@ const SECOND_FACTOR_ACTS = declareIdentitySetActs("people", {
   authenticatorRemoved: act("people.person.authenticator_removed", { authenticatorId: "id" }),
 });
 
-const ADMIN: Role = "Admin";
+export const ADMIN: Role = "Admin";
+
+/** Whether the person `person` aliases must hold a second factor; `$2` binds `ADMIN`. */
+export const mustHoldOneOf = (person: string): string =>
+  `${person}.operator OR EXISTS (SELECT 1 FROM member m WHERE m.user_id = ${person}.id AND m.role = $2)`;
 
 /** A person's act on their own second factor: they are its actor and its subject. */
 export const recordingTheirOwn = async <A extends AuditAct>(
@@ -82,8 +86,7 @@ type Facts = {
 type FactsRow = Omit<Facts, "authenticator"> & { readonly verified: boolean | null };
 
 const FACTS = `
-  SELECT u.operator OR EXISTS (SELECT 1 FROM member m WHERE m.user_id = u.id AND m.role = $2)
-           AS "mustHoldOne",
+  SELECT ${mustHoldOneOf("u")} AS "mustHoldOne",
          u.operator, u.promoted_at IS NOT NULL AS promoted,
          (SELECT count(*)::int FROM passkey p WHERE p.user_id = u.id) AS passkeys,
          a.id AS "authenticatorId", a.verified,
@@ -387,7 +390,7 @@ const NEITHER: SessionRow = { confirmed: false, setupGranted: false, adminOf: nu
 
 const thisSessionOf = async (
   tx: Tx,
-  facts: Facts & { readonly personId: UserId; readonly passkeys: number },
+  facts: Facts & { readonly personId: UserId },
   sessionId: string | undefined,
 ): Promise<ThisSession | undefined> => {
   if (sessionId === undefined) return undefined;

@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-import { inThisTab, keepOnThisBrowser, onThisBrowser } from "@/shared/browser-storage.ts";
+import {
+  inThisTab,
+  keepInThisTab,
+  keepOnThisBrowser,
+  onThisBrowser,
+} from "@/shared/browser-storage.ts";
 
 const KEPT_UNDER = "better-answers.session";
 
@@ -23,11 +28,7 @@ const UNSAVED_UNDER = "better-answers.change-unsaved";
 
 /** The page of a change refused while the session waited on its second factor. */
 export const rememberAChangeUnsaved = (pathname: string): void => {
-  try {
-    inThisTab()?.setItem(UNSAVED_UNDER, pathname);
-  } catch {
-    // Unsaid, the person still sees their change missing; failing the detour would strand them.
-  }
+  keepInThisTab(UNSAVED_UNDER, pathname);
 };
 
 export const unsavedChangeRefusedOn = (): string | undefined =>

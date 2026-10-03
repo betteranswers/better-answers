@@ -2,30 +2,33 @@
  * A browser told to block storage throws on the getter rather than answering it; this answers
  * undefined, and the choice is then not kept.
  */
-export const onThisBrowser = (): Storage | undefined => {
+const reached = (store: (browser: Window) => Storage): Storage | undefined => {
   if (typeof window === "undefined") return undefined;
   try {
-    return window.localStorage;
+    return store(window);
   } catch {
     return undefined;
   }
 };
 
 /** A full or refusing store throws on a write; the choice is then not kept, and the act goes on. */
-export const keepOnThisBrowser = (key: string, value: string): void => {
+const kept = (store: Storage | undefined, key: string, value: string): void => {
   try {
-    onThisBrowser()?.setItem(key, value);
+    store?.setItem(key, value);
   } catch {
     // Losing a kept choice costs the reader one click next time; failing the act would cost more.
   }
 };
 
-/** Kept by this tab alone, through a reload, and blocked as `onThisBrowser` is. */
-export const inThisTab = (): Storage | undefined => {
-  if (typeof window === "undefined") return undefined;
-  try {
-    return window.sessionStorage;
-  } catch {
-    return undefined;
-  }
+export const onThisBrowser = (): Storage | undefined => reached((browser) => browser.localStorage);
+
+export const keepOnThisBrowser = (key: string, value: string): void => {
+  kept(onThisBrowser(), key, value);
+};
+
+/** Kept by this tab alone, through a reload. */
+export const inThisTab = (): Storage | undefined => reached((browser) => browser.sessionStorage);
+
+export const keepInThisTab = (key: string, value: string): void => {
+  kept(inThisTab(), key, value);
 };

@@ -110,10 +110,7 @@ export const personRouter = router({
           }),
         ),
       );
-      if (promoted) {
-        const telling = { mail: ctx.mail, log: ctx.log, door: ctx.doors.postgres };
-        void sendPromotionNotice({ ...telling, platform: IDENTITY_PRINCIPAL }, ctx.personId);
-      }
+      if (promoted) void sendPromotionNotice(ctx, ctx.personId);
       return joined;
     }),
   secondFactor: personProcedure.query(({ ctx }) =>

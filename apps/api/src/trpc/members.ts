@@ -54,7 +54,6 @@ import type { Tx } from "@better-answers/core/store/postgres";
 
 import type { Doors } from "../doors.ts";
 import type { Mail } from "../email.ts";
-import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
 import { sendPromotionNotice } from "../promotion-notice-email.ts";
 import type { RefusalAnswer } from "../refusal.ts";
 import { EMAILS_PER_SECOND } from "../smtp.ts";
@@ -167,10 +166,7 @@ const movedThenTold =
       given(input, (asked) => committedAs(ctx, (principal, tx) => act(principal, tx, asked))),
     );
     const { promoted, answer } = told(moved);
-    const telling = { mail: ctx.mail, log: ctx.log, door: ctx.doors.postgres };
-    for (const personId of promoted) {
-      void sendPromotionNotice({ ...telling, platform: IDENTITY_PRINCIPAL }, personId);
-    }
+    for (const personId of promoted) void sendPromotionNotice(ctx, personId);
     return answer;
   };
 

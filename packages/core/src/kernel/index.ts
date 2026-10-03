@@ -47,6 +47,7 @@ export {
   standingOf,
 } from "./second-factor.ts";
 export type {
+  PendingClock,
   PendingStep,
   SecondFactorFacts,
   SecondFactorRefusal,

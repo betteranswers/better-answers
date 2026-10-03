@@ -75,7 +75,7 @@ export const mayTake = (standing: SecondFactorStanding, step: PendingStep | unde
   !isPending(standing) || (step !== undefined && PENDING_SET[step].includes(standing));
 
 /** What a read does to the session's pending clock: a clock, never a stored state. */
-type PendingClock = "none" | "start" | "run" | "stop" | "end";
+export type PendingClock = "none" | "start" | "run" | "stop" | "end";
 
 export const pendingClockOf = (
   standing: SecondFactorStanding,

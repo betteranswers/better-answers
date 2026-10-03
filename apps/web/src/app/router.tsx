@@ -38,7 +38,7 @@ import {
   CODES_STEP,
   codesDetour,
   CONFIRM_STEP,
-  detourTo,
+  confirmDetour,
   pendingDetour,
   RECOVERY_STEP,
   SETUP_STEP,
@@ -239,22 +239,15 @@ const acceptInvitationRoute = createRoute({
 
 const signInAndBackTo = (href: string) => ({ href: backTo("/sign-in", href), replace: true });
 
-/** Asked afresh: the refusal says the session is pending, and a held read may predate that. */
-const confirmAndBackTo = async (context: ShellContext, location: { readonly href: string }) => {
-  const from = leftFrom(location);
-  const detour = await pendingDetour(context.queryClient, context.api, from, true);
-  return leavingFor(detour ?? detourTo(CONFIRM_STEP, from));
-};
-
-const shellDetour = (
+/** A pending session's own step is asked afresh: a held read may predate the refusal. */
+const shellDetour = async (
   context: ShellContext,
   location: { readonly href: string },
   refusal: string,
 ) => {
   if (refusal === NEEDS_A_PICK) return { href: "/choose-workspace", replace: true };
-  return refusal === SECOND_FACTOR_PENDING
-    ? confirmAndBackTo(context, location)
-    : signInAndBackTo(location.href);
+  if (refusal !== SECOND_FACTOR_PENDING) return signInAndBackTo(location.href);
+  return leavingFor(await confirmDetour(context.queryClient, context.api, leftFrom(location)));
 };
 
 const shellRoute = createRoute({

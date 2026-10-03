@@ -3,16 +3,15 @@ import {
   err,
   ok,
   pendingClockOf,
+  type PendingClock,
   type PlatformPrincipal,
   type Result,
-  type Role,
   type SecondFactorFacts,
   type SecondFactorStanding,
   standingOf,
 } from "../kernel/index.ts";
 import { type PostgresDoor, type Tx, withIdentityWrite } from "../store/postgres/index.ts";
-
-const ADMIN: Role = "Admin";
+import { ADMIN, mustHoldOneOf } from "./second-factor.ts";
 
 /** The session the transport holds: by id once the library has read it, by token from its cookie. */
 export type SessionNamed = { readonly id: string } | { readonly token: string };
@@ -31,9 +30,7 @@ type StandingRow = SecondFactorFacts & {
 };
 
 const facts = (keyedBy: "id" | "token") => `
-  SELECT s.id AS "sessionId", s.user_id AS "personId",
-         u.operator OR EXISTS (SELECT 1 FROM member m WHERE m.user_id = u.id AND m.role = $2)
-           AS "mustHoldOne",
+  SELECT s.id AS "sessionId", s.user_id AS "personId", ${mustHoldOneOf("u")} AS "mustHoldOne",
          EXISTS (SELECT 1 FROM passkey p WHERE p.user_id = u.id)
            OR EXISTS (SELECT 1 FROM authenticator a WHERE a.user_id = u.id AND a.verified)
            AS "holdsAFactor",
@@ -67,33 +64,39 @@ const NO_LONGER_PROMOTED = `
    WHERE id = (SELECT id FROM "user" WHERE id = $1 AND promoted_at IS NOT NULL
                 FOR UPDATE SKIP LOCKED)`;
 
-/** False when the session's pending hour is past: ended here, or refused as if it were. */
-const clocked = async (tx: Tx, row: StandingRow, now: Date): Promise<boolean> => {
-  const clock = pendingClockOf(standingOf(row), row.pendingSince, now);
-  if (clock === "start") await tx.query(STARTED, [row.sessionId, now]);
-  if (clock === "stop") await tx.query(STOPPED, [row.sessionId]);
-  if (clock !== "end") return true;
-  await tx.query(ENDED, [row.sessionId]);
-  return false;
+type Due = { readonly clock: PendingClock; readonly unpromoted: boolean };
+
+const dueOf = (row: StandingRow, now: Date): Due => ({
+  clock: pendingClockOf(standingOf(row), row.pendingSince, now),
+  // A promotion cleared every stamp, so any stamp now is a confirmation made since.
+  unpromoted: row.promoted && standingOf(row) === "confirmed",
+});
+
+const writesNothing = (due: Due): boolean =>
+  (due.clock === "none" || due.clock === "run") && !due.unpromoted;
+
+const writing = async (tx: Tx, row: StandingRow, due: Due, now: Date): Promise<void> => {
+  if (due.clock === "start") await tx.query(STARTED, [row.sessionId, now]);
+  if (due.clock === "stop") await tx.query(STOPPED, [row.sessionId]);
+  if (due.clock === "end") await tx.query(ENDED, [row.sessionId]);
+  if (due.unpromoted) await tx.query(NO_LONGER_PROMOTED, [row.personId]);
 };
 
-/** A promotion cleared every stamp, so any stamp now is a confirmation made since. */
-const confirmedSincePromotion = async (tx: Tx, row: StandingRow): Promise<void> => {
-  if (row.promoted && standingOf(row) === "confirmed") {
-    await tx.query(NO_LONGER_PROMOTED, [row.personId]);
-  }
-};
-
-/** Undefined, not a refusal, for an ended session: a refusal would roll its deletion back. */
+/** Read outside a transaction, which opens only when a write is due: most reads write nothing. */
 const judging = async (
-  tx: Tx,
-  session: SessionNamed,
-  now: Date,
+  platform: PlatformPrincipal,
+  door: PostgresDoor,
+  input: { readonly session: SessionNamed; readonly now: Date },
 ): Promise<SessionStanding | undefined> => {
-  const [statement, key] = keyOf(session);
-  const row = (await tx.query<StandingRow>(statement, [key, ADMIN])).rows[0];
-  if (row === undefined || !(await clocked(tx, row, now))) return undefined;
-  await confirmedSincePromotion(tx, row);
+  const [statement, key] = keyOf(input.session);
+  const row = (await door.pool.query<StandingRow>(statement, [key, ADMIN])).rows[0];
+  if (row === undefined) return undefined;
+  const due = dueOf(row, input.now);
+  if (!writesNothing(due)) {
+    await withIdentityWrite(platform, door, (tx) => writing(tx, row, due, input.now));
+  }
+  // Past its hour, a session reads as gone whether or not this read could end it.
+  if (due.clock === "end") return undefined;
   return { sessionId: row.sessionId, personId: row.personId, standing: standingOf(row) };
 };
 
@@ -107,9 +110,7 @@ export const judgeTheSession = async (
   door: PostgresDoor,
   input: { readonly session: SessionNamed; readonly now: Date },
 ): Promise<Result<SessionStanding, "session-gone" | Error>> => {
-  const judged = await attempt(() =>
-    withIdentityWrite(platform, door, (tx) => judging(tx, input.session, input.now)),
-  );
+  const judged = await attempt(() => judging(platform, door, input));
   if (!judged.ok) return err(judged.error);
   return judged.value === undefined ? err("session-gone") : ok(judged.value);
 };
