@@ -225,13 +225,20 @@ function PasskeyRow(properties: {
   readonly onRemove: (passkey: Passkey) => void;
 }) {
   const { passkey } = properties;
-  const renameRef = useRef<HTMLButtonElement>(null);
+  const backToRename = useRef(false);
   const [renaming, setRenaming] = useState(false);
 
+  /** Rename is drawn again once the field closes, and takes focus as it mounts. */
+  const renameMounted = (node: HTMLButtonElement | null) => {
+    if (node === null || !backToRename.current) return;
+    backToRename.current = false;
+    node.focus();
+  };
+
   const renamed = (renamedTo: string | undefined) => {
+    backToRename.current = true;
     setRenaming(false);
     if (renamedTo !== undefined) properties.onRenamed(renamedTo);
-    requestAnimationFrame(() => renameRef.current?.focus());
   };
 
   return (
@@ -254,7 +261,7 @@ function PasskeyRow(properties: {
         <ItemActions className="flex-wrap">
           {renaming ? null : (
             <ActButton
-              actRef={renameRef}
+              actRef={renameMounted}
               unavailable={false}
               label={PASSKEY_WORDS.rename}
               onAct={() => {

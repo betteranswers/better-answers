@@ -5,6 +5,7 @@ import {
   startRegistration,
   WebAuthnAbortService,
   WebAuthnError,
+  type AuthenticationResponseJSON,
   type PublicKeyCredentialCreationOptionsJSON,
   type PublicKeyCredentialRequestOptionsJSON,
 } from "@simplewebauthn/browser";
@@ -130,14 +131,30 @@ export const useDismissPasskeyOffer = () => {
 
 const signedInByPasskey = z.object({ displayNameGiven: z.boolean() });
 
-const signInWithAPasskey = async (autofill: boolean): Promise<SignedIn> => {
-  const optionsJSON = await askOfOurRoute(SIGN_IN_OPTIONS_PATH, {}, askedToSignIn);
-  const response = await startAuthentication({ optionsJSON, useBrowserAutofill: autofill }).catch(
-    (failure: Error) => {
-      throw deviceRefusalOf(failure);
-    },
-  );
-  return askOfOurRoute(SIGN_IN_PATH, { response }, signedInByPasskey);
+const askToSignIn = () => askOfOurRoute(SIGN_IN_OPTIONS_PATH, {}, askedToSignIn);
+
+const signInWith = (response: AuthenticationResponseJSON): Promise<SignedIn> =>
+  askOfOurRoute(SIGN_IN_PATH, { response }, signedInByPasskey);
+
+const signInWithAPasskey = async (): Promise<SignedIn> => {
+  const optionsJSON = await askToSignIn();
+  const response = await startAuthentication({ optionsJSON }).catch((failure: Error) => {
+    throw deviceRefusalOf(failure);
+  });
+  return signInWith(response);
+};
+
+/**
+ * Nothing is said until the person picks a passkey: a browser with none to offer refuses the wait
+ * in its own way.
+ */
+const chosenFromTheAutofill = async (
+  live: () => boolean,
+): Promise<AuthenticationResponseJSON | undefined> => {
+  if (!(await browserSupportsWebAuthnAutofill()) || !live()) return undefined;
+  const optionsJSON = await askToSignIn().catch(() => undefined);
+  if (optionsJSON === undefined || !live()) return undefined;
+  return startAuthentication({ optionsJSON, useBrowserAutofill: true }).catch(() => undefined);
 };
 
 const signedInHere = (): void => {
@@ -153,7 +170,7 @@ export const usePasskeySignIn = (armed: boolean, onSignedIn: (signedIn: SignedIn
   const [round, setRound] = useState(0);
   const [autofillFailure, setAutofillFailure] = useState<Error | undefined>(undefined);
   const pressed = useMutation({
-    mutationFn: () => signInWithAPasskey(false),
+    mutationFn: signInWithAPasskey,
     onSuccess: (signedIn) => {
       signedInHere();
       onSignedIn(signedIn);
@@ -169,7 +186,7 @@ export const usePasskeySignIn = (armed: boolean, onSignedIn: (signedIn: SignedIn
   });
 
   const autofillFailed = useEffectEvent((failure: Error) => {
-    if (!isCancelled(failure)) setAutofillFailure(failure);
+    setAutofillFailure(failure);
   });
 
   useEffect(() => {
@@ -177,8 +194,9 @@ export const usePasskeySignIn = (armed: boolean, onSignedIn: (signedIn: SignedIn
     const disarmed = new AbortController();
     const live = (): boolean => !disarmed.signal.aborted;
     const waitOnTheAutofill = async () => {
-      if (!(await browserSupportsWebAuthnAutofill()) || !live()) return;
-      const signedIn = await signInWithAPasskey(true);
+      const response = await chosenFromTheAutofill(live);
+      if (response === undefined || !live()) return;
+      const signedIn = await signInWith(response);
       if (live()) autofilled(signedIn);
     };
     waitOnTheAutofill().catch((failure: Error) => {
