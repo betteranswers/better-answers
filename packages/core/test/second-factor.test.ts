@@ -1,51 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { openPostgres } from "../src/store/postgres/index.ts";
 import {
   readSecondFactor,
   recordAuthenticatorSetUp,
   removeAuthenticator,
 } from "../src/workspaces/index.ts";
-import { authenticatorFor, passkeyFor, recoveryCodeFor, sessionFor } from "./identity-rows.ts";
+import { authenticatorFor, passkeyFor, passkeyUsedAt, recoveryCodeFor } from "./identity-rows.ts";
 import { bootstrap, provisionedWorkspace, seedPerson } from "./platform.ts";
-import { postgresForSuite } from "./suite-postgres.ts";
+import { AT, ITS_OWN_AGE, secondFactorSuite } from "./second-factor-suite.ts";
 
-const db = postgresForSuite();
-
-const door = () => openPostgres(db().runtimePool);
-
-const AT = new Date("2026-10-02T12:00:00.000Z");
-
-const EXPIRES_AT = new Date("2026-10-09T12:00:00.000Z");
-
-/** The age `aSession` writes, so carrying it moves nothing. */
-const ITS_OWN_AGE = { createdAt: AT, expiresAt: EXPIRES_AT };
+const { db, door, aSession, identitySetRowsFor, confirmedAt, recoveryCodesHeldBy } =
+  secondFactorSuite();
 
 const RECOVERY_CODE = /^[0-9a-hjkmnp-tv-z]{4}(?:-[0-9a-hjkmnp-tv-z]{4}){3}$/;
-
-const aSession = (userId: string, pendingSince?: Date) =>
-  sessionFor(db().pool, userId, {
-    createdAt: AT,
-    lastUsedAt: AT,
-    expiresAt: EXPIRES_AT,
-    ...(pendingSince === undefined ? {} : { pendingSince }),
-  });
-
-const identitySetRowsFor = async (personId: string) =>
-  (
-    await db().pool.query<{ act: string; detail: unknown }>(
-      "SELECT act, detail FROM identity_audit_event WHERE subject_id = $1 ORDER BY at, id",
-      [personId],
-    )
-  ).rows;
-
-const confirmedAt = async (sessionId: string) =>
-  (
-    await db().pool.query<{ confirmed: Date | null; pending: Date | null }>(
-      "SELECT second_factor_confirmed_at AS confirmed, pending_since AS pending FROM session WHERE id = $1",
-      [sessionId],
-    )
-  ).rows[0];
 
 const ageOf = async (sessionId: string) =>
   (
@@ -54,14 +21,6 @@ const ageOf = async (sessionId: string) =>
       [sessionId],
     )
   ).rows[0];
-
-const recoveryCodesHeldBy = async (personId: string) =>
-  (
-    await db().pool.query<{ count: number }>(
-      "SELECT count(*)::int AS count FROM recovery_code WHERE user_id = $1",
-      [personId],
-    )
-  ).rows[0]?.count;
 
 const authenticatorsHeldBy = async (personId: string) =>
   (
@@ -334,10 +293,7 @@ describe("reading a person's second factor", () => {
       used,
       new Date("2026-10-01T08:00:00.000Z"),
     ]);
-    await db().pool.query("INSERT INTO passkey_last_use (passkey_id, at) VALUES ($1, $2)", [
-      used,
-      new Date("2026-10-02T09:41:00.000Z"),
-    ]);
+    await passkeyUsedAt(db().pool, used, new Date("2026-10-02T09:41:00.000Z"));
 
     const read = await readSecondFactor(bootstrap, door(), { personId });
 

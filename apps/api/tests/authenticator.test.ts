@@ -6,8 +6,9 @@ import { authenticatorCodeAt, keyIn } from "@better-answers/schema/testing/authe
 import { setActiveWorkspace } from "./flow.ts";
 import type { TestClient } from "./harness.ts";
 import {
+  aPersonSignedIn,
+  anAdminSignedIn as anAdminSignedInTo,
   sessionsSignedInOverAnHourAgo,
-  signedInClient,
   whileCommitsAreRefused,
 } from "./provoke.ts";
 import { appForSuite } from "./suite-app.ts";
@@ -50,15 +51,9 @@ const codeNow = (setupAddress: string): string =>
 
 const aWrongCode = (right: string): string => (right === "000000" ? "111111" : "000000");
 
-const aSignedInPerson = async () => {
-  const person = await app().person();
-  return { person, client: await signedInClient(app(), person.email) };
-};
+const aSignedInPerson = () => aPersonSignedIn(app());
 
-const anAdminSignedIn = async () => {
-  const { admin } = await app().provision();
-  return { admin, client: await signedInClient(app(), admin.email) };
-};
+const anAdminSignedIn = () => anAdminSignedInTo(app());
 
 const startOn = async (client: TestClient): Promise<string> => {
   const answered = await client.json(START, {});

@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import { PASSKEY_NAME_MAX_LENGTH } from "@better-answers/schema/second-factor";
 
-import { openPostgres } from "../src/store/postgres/index.ts";
 import {
   dismissPasskeyOffer,
   readSecondFactor,
@@ -11,48 +10,23 @@ import {
   removePasskey,
   renamePasskey,
 } from "../src/workspaces/index.ts";
-import { authenticatorFor, passkeyFor, recoveryCodeFor, sessionFor } from "./identity-rows.ts";
+import { authenticatorFor, passkeyFor, recoveryCodeFor } from "./identity-rows.ts";
 import { bootstrap, provisionedWorkspace, seedPerson } from "./platform.ts";
-import { postgresForSuite } from "./suite-postgres.ts";
+import { AT, ITS_OWN_AGE, secondFactorSuite } from "./second-factor-suite.ts";
 
-const db = postgresForSuite();
-
-const door = () => openPostgres(db().runtimePool);
-
-const AT = new Date("2026-10-02T12:00:00.000Z");
+const { db, door, aSession, identitySetRowsFor, recoveryCodesHeldBy, ...reads } =
+  secondFactorSuite();
 
 const LATER = new Date("2026-10-03T09:41:00.000Z");
 
-const EXPIRES_AT = new Date("2026-10-09T12:00:00.000Z");
+const confirmedAt = async (sessionId: string) => (await reads.confirmedAt(sessionId))?.confirmed;
 
-const ITS_OWN_AGE = { createdAt: AT, expiresAt: EXPIRES_AT };
-
-const aSession = (userId: string) =>
-  sessionFor(db().pool, userId, { createdAt: AT, lastUsedAt: AT, expiresAt: EXPIRES_AT });
-
-const identitySetRowsFor = async (personId: string) =>
-  (
-    await db().pool.query<{ act: string; detail: unknown }>(
-      "SELECT act, detail FROM identity_audit_event WHERE subject_id = $1 ORDER BY at, id",
-      [personId],
-    )
-  ).rows;
-
-const confirmedAt = async (sessionId: string) =>
-  (
-    await db().pool.query<{ confirmed: Date | null }>(
-      "SELECT second_factor_confirmed_at AS confirmed FROM session WHERE id = $1",
-      [sessionId],
-    )
-  ).rows[0]?.confirmed;
-
-const recoveryCodesHeldBy = async (personId: string) =>
-  (
-    await db().pool.query<{ count: number }>(
-      "SELECT count(*)::int AS count FROM recovery_code WHERE user_id = $1",
-      [personId],
-    )
-  ).rows[0]?.count;
+/** A person, and a passkey somebody else holds. */
+const aStrangersPasskey = async () => {
+  const personId = await seedPerson(db().pool);
+  const strangerId = await seedPerson(db().pool);
+  return { personId, strangerId, strangersPasskey: await passkeyFor(db().pool, strangerId) };
+};
 
 const passkeysHeldBy = async (personId: string) =>
   (
@@ -230,9 +204,7 @@ describe("renaming a passkey", () => {
   });
 
   it("refuses another person's passkey", async () => {
-    const personId = await seedPerson(db().pool);
-    const strangerId = await seedPerson(db().pool);
-    const strangersPasskey = await passkeyFor(db().pool, strangerId);
+    const { personId, strangerId, strangersPasskey } = await aStrangersPasskey();
 
     const renamed = await renamePasskey(bootstrap, door(), {
       personId,
@@ -264,24 +236,26 @@ describe("removing a passkey", () => {
     ]);
   });
 
-  it("refuses an Admin's last second factor", async () => {
-    const { adminUserId } = await provisionedWorkspace(db(), "Acme");
-    const passkeyId = await passkeyFor(db().pool, adminUserId);
+  it.each([
+    ["an Admin's", async () => (await provisionedWorkspace(db(), "Acme")).adminUserId],
+    ["the operator's", () => seedPerson(db().pool, { operator: true })],
+    [
+      "a half-set-up Admin's",
+      async () => {
+        const { adminUserId } = await provisionedWorkspace(db(), "Acme");
+        await authenticatorFor(db().pool, adminUserId, { verified: false });
+        return adminUserId;
+      },
+    ],
+  ])("refuses to remove %s last factor", async (_whose, someoneWhoMustHoldOne) => {
+    const personId = await someoneWhoMustHoldOne();
+    const passkeyId = await passkeyFor(db().pool, personId);
 
-    const removed = await removePasskey(bootstrap, door(), { personId: adminUserId, passkeyId });
+    const removed = await removePasskey(bootstrap, door(), { personId, passkeyId });
 
     expect(removed).toEqual({ ok: false, error: "last-second-factor" });
-    expect(await passkeysHeldBy(adminUserId)).toHaveLength(1);
-    expect(await identitySetRowsFor(adminUserId)).toEqual([]);
-  });
-
-  it("refuses the operator's last second factor", async () => {
-    const operatorId = await seedPerson(db().pool, { operator: true });
-    const passkeyId = await passkeyFor(db().pool, operatorId);
-
-    const removed = await removePasskey(bootstrap, door(), { personId: operatorId, passkeyId });
-
-    expect(removed).toEqual({ ok: false, error: "last-second-factor" });
+    expect(await passkeysHeldBy(personId)).toHaveLength(1);
+    expect(await identitySetRowsFor(personId)).toEqual([]);
   });
 
   it("lets an Admin with an authenticator remove their passkey", async () => {
@@ -292,16 +266,6 @@ describe("removing a passkey", () => {
     const removed = await removePasskey(bootstrap, door(), { personId: adminUserId, passkeyId });
 
     expect(removed).toEqual({ ok: true, value: { passkeyId } });
-  });
-
-  it("counts an authenticator awaiting its code as no factor", async () => {
-    const { adminUserId } = await provisionedWorkspace(db(), "Acme");
-    await authenticatorFor(db().pool, adminUserId, { verified: false });
-    const passkeyId = await passkeyFor(db().pool, adminUserId);
-
-    const removed = await removePasskey(bootstrap, door(), { personId: adminUserId, passkeyId });
-
-    expect(removed).toEqual({ ok: false, error: "last-second-factor" });
   });
 
   it("leaves an Admin one of two passkeys removed at once", async () => {
@@ -326,9 +290,7 @@ describe("removing a passkey", () => {
   });
 
   it("refuses another person's passkey", async () => {
-    const personId = await seedPerson(db().pool);
-    const strangerId = await seedPerson(db().pool);
-    const strangersPasskey = await passkeyFor(db().pool, strangerId);
+    const { personId, strangerId, strangersPasskey } = await aStrangersPasskey();
 
     const removed = await removePasskey(bootstrap, door(), {
       personId,

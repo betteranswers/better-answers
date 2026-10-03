@@ -3,22 +3,20 @@ import { z } from "zod";
 import { boundarySchemas, ULID } from "@better-answers/schema";
 import { PASSKEY_NAME_MAX_LENGTH } from "@better-answers/schema/second-factor";
 
-import { act, declareIdentitySetActs, recordFor } from "../audit/index.ts";
+import { act, declareIdentitySetActs } from "../audit/index.ts";
 import {
-  actorIdOfPerson,
   attempt,
   err,
   ok,
   type PlatformPrincipal,
   type Result,
   type UserId,
-  ulid,
 } from "../kernel/index.ts";
 import { type PostgresDoor, type Tx, withIdentityWrite } from "../store/postgres/index.ts";
 import { notErasedAt } from "./display-name.ts";
 import { holdThePerson } from "./person-lock.ts";
 import { issuingRecoveryCodes, type RecoveryCodesMade } from "./recovery-codes.ts";
-import { factsOf, type SetUpInput, stamping } from "./second-factor.ts";
+import { factsOf, recordingTheirOwn, type SetUpInput, stamping } from "./second-factor.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
 /** Ids alone: the log is append-only, so a name a person later changes never lands in it. */
@@ -65,20 +63,13 @@ const holds = async (tx: Tx, ids: Ids): Promise<boolean> => {
   return (held.rowCount ?? 0) > 0;
 };
 
-const recording = async (
+const recording = (
   platform: PlatformPrincipal,
   tx: Tx,
   ids: Ids,
   act: (typeof PASSKEY_ACTS)[keyof typeof PASSKEY_ACTS],
-): Promise<void> => {
-  await recordFor(platform, tx, {
-    id: ulid(),
-    actor: actorIdOfPerson(ids.personId),
-    act,
-    subjectId: ids.personId,
-    detail: { passkeyId: ids.passkeyId },
-  });
-};
+): Promise<void> =>
+  recordingTheirOwn(platform, tx, ids.personId, act, { passkeyId: ids.passkeyId });
 
 type PasskeyAdded = {
   readonly passkeyId: string;

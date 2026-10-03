@@ -25,8 +25,7 @@ import {
   PASSKEY_SIGN_IN_OPTIONS_PATH,
   PASSKEY_SIGN_IN_PATH,
 } from "./constants.ts";
-import { sameOriginOnly } from "./same-origin.ts";
-import { signedInPerson, type SignedIn } from "./signed-in.ts";
+import { personRoutesAt, type SignedIn } from "./person-routes.ts";
 
 type PasskeysDependencies = {
   readonly auth: Auth;
@@ -38,7 +37,6 @@ type PasskeysDependencies = {
 };
 
 const REFUSALS = {
-  signedOut: { error: "not_signed_in" },
   malformed: { error: "malformed" },
   notVerified: { error: "not-verified" },
   challengeGone: { error: "challenge-gone" },
@@ -95,32 +93,26 @@ const kept = z.object({ id: z.string() });
 
 const signedInAs = z.object({ user: z.object({ name: z.string() }) });
 
+/** The name under the rule, trimmed, or the refusal to answer with. */
+const judged = (context: Context, name: string) => {
+  const ruled = applyPasskeyNameRule(name);
+  return ruled.ok
+    ? { name: ruled.value, refused: undefined }
+    : { name: "", refused: context.json({ error: ruled.error }, 400) };
+};
+
 /**
  * Each route calls a closed library endpoint as a server function, so it brings what the router
  * would: a rate rule and the same-origin fence.
  */
 export const mountThePasskeys = (routes: Hono, deps: PasskeysDependencies): void => {
   const { auth, door, clock } = deps;
-  const log = deps.logger.child({ module: "auth" });
+  const fenced = personRoutesAt(routes, "/passkeys/*", deps);
+  const { log } = fenced;
   const mail = { send: deps.sendEmail, publicUrl: deps.publicUrl };
 
-  /** Asks and adds count apart, per person, across every session they hold. */
-  const ceilingOf = async (route: "ask" | "add", personId: string) => {
-    const counted = await consumeIngress(
-      door,
-      "person",
-      `passkey-${route}:${personId}`,
-      PASSKEY_PERSON_RULE,
-      clock.now(),
-    );
-    if (counted.allowed) return undefined;
-    return tooManyRequests(counted.retryAfterSeconds, "Too many tries; try again later.");
-  };
-
-  const unanswered = (context: Context, reason: string): Response => {
-    log.warn({ event: "auth.passkey_failed", reason }, "a passkey step went unanswered");
-    return context.json(REFUSALS.unanswered, 502);
-  };
+  const unanswered = (context: Context, reason: string): Response =>
+    fenced.unanswered(context, "auth.passkey_failed", reason);
 
   const refusedBy = (context: Context, failure: Error): Response => {
     const refused = refusalOf(failure);
@@ -139,8 +131,8 @@ export const mountThePasskeys = (routes: Hono, deps: PasskeysDependencies): void
   const askToAdd = async (context: Context): Promise<Response> => {
     const named = naming.safeParse(await context.req.json().catch(() => undefined));
     if (!named.success) return context.json(REFUSALS.malformed, 400);
-    const name = applyPasskeyNameRule(named.data.name);
-    if (!name.ok) return context.json({ error: name.error }, 400);
+    const { refused } = judged(context, named.data.name);
+    if (refused !== undefined) return refused;
     const asked = await attempt(() =>
       auth.api.generatePasskeyRegistrationOptions({
         headers: context.req.raw.headers,
@@ -175,12 +167,12 @@ export const mountThePasskeys = (routes: Hono, deps: PasskeysDependencies): void
   const add = async (context: Context, person: SignedIn): Promise<Response> => {
     const asked = added.safeParse(await context.req.json().catch(() => undefined));
     if (!asked.success) return context.json(REFUSALS.malformed, 400);
-    const name = applyPasskeyNameRule(asked.data.name);
-    if (!name.ok) return context.json({ error: name.error }, 400);
+    const { name, refused } = judged(context, asked.data.name);
+    if (refused !== undefined) return refused;
     const verified = await attempt(() =>
       auth.api.verifyPasskeyRegistration({
         headers: context.req.raw.headers,
-        body: { response: asked.data.response, name: name.value },
+        body: { response: asked.data.response, name },
         returnHeaders: true,
       }),
     );
@@ -188,15 +180,6 @@ export const mountThePasskeys = (routes: Hono, deps: PasskeysDependencies): void
     forward(context, verified.value.headers);
     return settle(context, person, kept.parse(verified.value.response).id);
   };
-
-  const asThePerson =
-    (route: "ask" | "add", step: (context: Context, person: SignedIn) => Promise<Response>) =>
-    async (context: Context): Promise<Response> => {
-      const person = await signedInPerson(auth, context.req.raw.headers);
-      if (person === undefined) return context.json(REFUSALS.signedOut, 401);
-      const limited = await ceilingOf(route, person.user.id);
-      return limited ?? step(context, person);
-    };
 
   /**
    * No cookie goes in, since a standing session narrows the ask to its own passkeys. The library
@@ -230,11 +213,6 @@ export const mountThePasskeys = (routes: Hono, deps: PasskeysDependencies): void
     return context.json({ displayNameGiven: !hasNoDisplayName(user.name) });
   };
 
-  routes.use("/passkeys/*", sameOriginOnly(deps.publicUrl));
-  routes.use("/passkeys/*", async (context, next) => {
-    await next();
-    context.res.headers.set("cache-control", "no-store");
-  });
   /** Counted apart from the address's other routes, so the screen's ask on opening spends no link's. */
   const limitByAddress: MiddlewareHandler = async (context, next) => {
     const counted = await consumeIngress(
@@ -255,8 +233,12 @@ export const mountThePasskeys = (routes: Hono, deps: PasskeysDependencies): void
 
   routes.use(PASSKEY_SIGN_IN_OPTIONS_PATH, limitByAddress);
   routes.use(PASSKEY_SIGN_IN_PATH, limitByAddress);
-  routes.post(PASSKEY_ADD_OPTIONS_PATH, asThePerson("ask", askToAdd));
-  routes.post(PASSKEY_ADD_PATH, asThePerson("add", add));
+  /** Asks and adds count apart. */
+  routes.post(
+    PASSKEY_ADD_OPTIONS_PATH,
+    fenced.asThePerson("passkey-ask", PASSKEY_PERSON_RULE, askToAdd),
+  );
+  routes.post(PASSKEY_ADD_PATH, fenced.asThePerson("passkey-add", PASSKEY_PERSON_RULE, add));
   routes.post(PASSKEY_SIGN_IN_OPTIONS_PATH, askToSignIn);
   routes.post(PASSKEY_SIGN_IN_PATH, signIn);
 };

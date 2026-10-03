@@ -1,6 +1,12 @@
 import { boundarySchemas } from "@better-answers/schema";
 
-import { act, declareIdentitySetActs, recordFor } from "../audit/index.ts";
+import {
+  act,
+  type AuditEvent,
+  type AuditAct,
+  declareIdentitySetActs,
+  recordFor,
+} from "../audit/index.ts";
 import {
   actorIdOfPerson,
   attempt,
@@ -30,6 +36,23 @@ const SECOND_FACTOR_ACTS = declareIdentitySetActs("people", {
 });
 
 const ADMIN: Role = "Admin";
+
+/** A person's act on their own second factor: they are its actor and its subject. */
+export const recordingTheirOwn = async <A extends AuditAct>(
+  platform: PlatformPrincipal,
+  tx: Tx,
+  personId: UserId,
+  act: A,
+  detail: AuditEvent<A>["detail"],
+): Promise<void> => {
+  await recordFor(platform, tx, {
+    id: ulid(),
+    actor: actorIdOfPerson(personId),
+    act,
+    subjectId: personId,
+    detail,
+  });
+};
 
 type AuthenticatorState = "none" | "awaiting-code" | "set-up";
 
@@ -133,12 +156,8 @@ const recordingOnce = async (
     [personId, SECOND_FACTOR_ACTS.authenticatorAdded.name, authenticatorId],
   );
   if ((recorded.rowCount ?? 0) > 0) return false;
-  await recordFor(platform, tx, {
-    id: ulid(),
-    actor: actorIdOfPerson(personId),
-    act: SECOND_FACTOR_ACTS.authenticatorAdded,
-    subjectId: personId,
-    detail: { authenticatorId },
+  await recordingTheirOwn(platform, tx, personId, SECOND_FACTOR_ACTS.authenticatorAdded, {
+    authenticatorId,
   });
   return true;
 };
@@ -204,12 +223,8 @@ const removing = async (
   if (facts.mustHoldOne && facts.passkeys === 0) return err("last-second-factor");
   await tx.query("DELETE FROM authenticator WHERE id = $1", [facts.authenticatorId]);
   await tx.query('UPDATE "user" SET authenticator_enabled = false WHERE id = $1', [personId]);
-  await recordFor(platform, tx, {
-    id: ulid(),
-    actor: actorIdOfPerson(personId),
-    act: SECOND_FACTOR_ACTS.authenticatorRemoved,
-    subjectId: personId,
-    detail: { authenticatorId: facts.authenticatorId },
+  await recordingTheirOwn(platform, tx, personId, SECOND_FACTOR_ACTS.authenticatorRemoved, {
+    authenticatorId: facts.authenticatorId,
   });
   return ok({ authenticatorId: facts.authenticatorId });
 };

@@ -116,6 +116,14 @@ export const passkeyFor = async (pool: pg.Pool, userId: string): Promise<string>
   return passkeyId;
 };
 
+/** As a passkey sign-in leaves it. */
+export const passkeyUsedAt = async (pool: pg.Pool, passkeyId: string, at: Date): Promise<void> => {
+  await pool.query("INSERT INTO passkey_last_use (passkey_id, at) VALUES ($1, $2)", [
+    passkeyId,
+    at,
+  ]);
+};
+
 export const lastActiveIn = async (
   pool: pg.Pool,
   workspaceId: string,

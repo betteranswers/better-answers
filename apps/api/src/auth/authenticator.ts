@@ -4,22 +4,20 @@ import type { Logger } from "pino";
 import { z } from "zod";
 
 import { attempt, type Clock } from "@better-answers/core/kernel";
-import { consumeIngress, type PostgresDoor } from "@better-answers/core/store/postgres";
+import type { PostgresDoor } from "@better-answers/core/store/postgres";
 import { readSecondFactor, recordAuthenticatorSetUp } from "@better-answers/core/workspaces";
 import { AUTHENTICATOR_CODE_LENGTH } from "@better-answers/schema/second-factor";
 
 import type { EmailSender } from "../email.ts";
 import { sendFactorNotice } from "../factor-notice-email.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
-import { tooManyRequests } from "../ingress/limits.ts";
 import type { Auth } from "./auth.ts";
 import {
   AUTHENTICATOR_FINISH_PATH,
   AUTHENTICATOR_PERSON_RULE,
   AUTHENTICATOR_START_PATH,
 } from "./constants.ts";
-import { sameOriginOnly } from "./same-origin.ts";
-import { signedInPerson, type SignedIn } from "./signed-in.ts";
+import { personRoutesAt, signedInPerson, type SignedIn } from "./person-routes.ts";
 
 type AuthenticatorDependencies = {
   readonly auth: Auth;
@@ -31,7 +29,6 @@ type AuthenticatorDependencies = {
 };
 
 const REFUSALS = {
-  signedOut: { error: "not_signed_in" },
   held: { error: "authenticator-held" },
   noSetupWaiting: { error: "no-setup-waiting" },
   codeWrong: { error: "code-wrong" },
@@ -62,31 +59,14 @@ const cookieOf = (setCookies: readonly string[]): string =>
  */
 export const mountTheAuthenticator = (routes: Hono, deps: AuthenticatorDependencies): void => {
   const { auth, door, clock } = deps;
-  const log = deps.logger.child({ module: "auth" });
+  const fenced = personRoutesAt(routes, "/authenticator/*", deps);
+  const { log } = fenced;
   const mail = { send: deps.sendEmail, publicUrl: deps.publicUrl };
 
   const sessionOf = (headers: Headers) => signedInPerson(auth, headers);
 
-  /** Starts and codes count apart, per person, across every session they hold. */
-  const ceilingOf = async (route: "start" | "finish", personId: string) => {
-    const counted = await consumeIngress(
-      door,
-      "person",
-      `authenticator-${route}:${personId}`,
-      AUTHENTICATOR_PERSON_RULE,
-      clock.now(),
-    );
-    if (counted.allowed) return undefined;
-    return tooManyRequests(counted.retryAfterSeconds, "Too many tries; try again later.");
-  };
-
-  const unanswered = (context: Context, reason: string): Response => {
-    log.warn(
-      { event: "auth.authenticator_failed", reason },
-      "an authenticator step went unanswered",
-    );
-    return context.json(REFUSALS.unanswered, 502);
-  };
+  const unanswered = (context: Context, reason: string): Response =>
+    fenced.unanswered(context, "auth.authenticator_failed", reason);
 
   const stateOf = async (personId: string) => {
     const held = await readSecondFactor(IDENTITY_PRINCIPAL, door, { personId });
@@ -173,20 +153,13 @@ export const mountTheAuthenticator = (routes: Hono, deps: AuthenticatorDependenc
     return verify(context, person, asked.data.code);
   };
 
-  const asThePerson =
-    (route: "start" | "finish", step: (context: Context, person: SignedIn) => Promise<Response>) =>
-    async (context: Context): Promise<Response> => {
-      const person = await sessionOf(context.req.raw.headers);
-      if (person === undefined) return context.json(REFUSALS.signedOut, 401);
-      const limited = await ceilingOf(route, person.user.id);
-      return limited ?? step(context, person);
-    };
-
-  routes.use("/authenticator/*", sameOriginOnly(deps.publicUrl));
-  routes.use("/authenticator/*", async (context, next) => {
-    await next();
-    context.res.headers.set("cache-control", "no-store");
-  });
-  routes.post(AUTHENTICATOR_START_PATH, asThePerson("start", start));
-  routes.post(AUTHENTICATOR_FINISH_PATH, asThePerson("finish", finish));
+  /** Starts and codes count apart. */
+  routes.post(
+    AUTHENTICATOR_START_PATH,
+    fenced.asThePerson("authenticator-start", AUTHENTICATOR_PERSON_RULE, start),
+  );
+  routes.post(
+    AUTHENTICATOR_FINISH_PATH,
+    fenced.asThePerson("authenticator-finish", AUTHENTICATOR_PERSON_RULE, finish),
+  );
 };

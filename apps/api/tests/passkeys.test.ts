@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import type { TestClient } from "./harness.ts";
 import { aPasskeyDevice, type PasskeyDevice } from "./passkey-device.ts";
-import { signedInClient } from "./provoke.ts";
+import { aPersonSignedIn, anAdminSignedIn } from "./provoke.ts";
 import { appForSuite } from "./suite-app.ts";
 import { webClientOf } from "./web-client.ts";
 
@@ -26,15 +26,7 @@ const sessionRead = z
   .object({ session: z.object({ id: z.string() }), user: z.object({ id: z.string() }) })
   .nullable();
 
-const aSignedInPerson = async () => {
-  const person = await app().person();
-  return { person, client: await signedInClient(app(), person.email) };
-};
-
-const anAdminSignedIn = async () => {
-  const { admin } = await app().provision();
-  return { person: admin, client: await signedInClient(app(), admin.email) };
-};
+const aSignedInPerson = () => aPersonSignedIn(app());
 
 const askToAdd = async (client: TestClient): Promise<unknown> => {
   const asked = await client.json(ADD_OPTIONS, { name: "Chrome on macOS" });
@@ -128,7 +120,7 @@ describe("adding a passkey", () => {
   });
 
   it("answers ten recovery codes to an Admin holding none", async () => {
-    const { client } = await anAdminSignedIn();
+    const { client } = await anAdminSignedIn(app());
 
     const answered = await addOn(client, aPasskeyDevice(client.origin));
 
@@ -331,7 +323,7 @@ describe("renaming and removing a passkey", () => {
   });
 
   it("refuses an Admin's last second factor, sending no notice", async () => {
-    const { person, client } = await anAdminSignedIn();
+    const { admin: person, client } = await anAdminSignedIn(app());
     const answered = await addOn(client, aPasskeyDevice(client.origin));
     const { passkeyId } = addedAnswer.parse(await answered.json());
 
