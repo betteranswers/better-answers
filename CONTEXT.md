@@ -1,4 +1,4 @@
-# CONTEXT.md — domain glossary
+# CONTEXT.md — glossary
 
 Root glossary for the platform. Each entry a person meets is headed by the word they read on a
 page, in an MCP tool's text or answer, or in an email, and the code, the database and the docs use
@@ -369,7 +369,7 @@ connected sources, audit — citing concepts, never restating them. Where a unit
   batch, one per connected source at a time, parked after repeated failure; its outcome rows record
   what changed per document. A page reads *Last synced*, *Not synced yet* or *Sync failed*.
 - **job** — _Internal._ one unit of background work, as a row on the queue: what to do (its *kind* —
-  the nightly audit or the full rebuild today; the route's S1 adds kinds to a loop that exists), for
+  the nightly audit or the full rebuild today; the route spec's S1 adds kinds to a loop that exists), for
   which workspace, **about which subject** — the connected source an index job is for, the concept a
   catch-up job is for, named on the row by a typed column a kind's CHECK requires (T-113,
   10/09/2026) — and the facts the claim protocol needs. Queued until a *claimant* takes it under a
@@ -643,7 +643,7 @@ to it by IRI and never restates it (ADR 0014).
 - **feedback** — a reader's verdict on one answer, never the platform's: *helpful*, or a **flag**
   with a reason — *wrong* · *out of date* · *incomplete* · *should not have shown* — that becomes
   a record in someone's queue (a verification request, an edit suggestion, or the Admin's to
-  route).
+  pass on).
 - **correction** — an Admin's or owner's action on one answer in *Questions asked* that records the
   level it went wrong at — concept, source or retrieval — and links the action that fixed it; never
   a text edit.
@@ -742,15 +742,15 @@ to it by IRI and never restates it (ADR 0014).
   workspace that the api writes and the worker reads at a commit. **No forge *service* runs** — no
   UI, no SSH server, no user model, no second schema (ADR 0024).
 - **root refusal** — _Internal._ `openGit`'s refusal of a root that is not an absolute path or not
-  an existing directory: checked once, at open, so nothing downstream — `initRepository` included —
+  an existing directory: validated once, at open, so nothing downstream — `initRepository` included —
   trusts a root nobody validated (ADR 0024).
 - **deploy unit** — _Internal._ **what one release changes**: the platform stack — `migrate`, `api`,
   `worker` — deployed by image digest. The stores stack and the database resource are **not** in it:
   they change on their own upgrade drill, not on a release. Use the phrase in this sense only; a
   document that means "everything on the boxes" says **estate** (ADR 0022; A16 of the pre-build
   gate).
-- **release** — _Internal._ the recorded act that promotes a built image digest to production, on
-  its own or by an Admin's dispatch, as the *release mode* says. A release is recorded only once it
+- **release** — _Internal._ the recorded promotion of a built image digest to production, on its
+  own or by an Admin's dispatch, as the *release mode* says. A release is recorded only once it
   has held.
 - **release mode** — _Internal._ how releases happen: **per-merge**, every green build on `main`
   released; **nightly**, one release a night just after a verified backup; **drill**, only a
@@ -1122,8 +1122,8 @@ to it by IRI and never restates it (ADR 0014).
   the old one. An Admin with no factor and no code left is restored by the *operator* alone, with
   a *restore code*.
 - **restore code** — the one code the *operator* issues when restoring an Admin who holds neither
-  a *second factor* nor a *recovery code*. The operator first confirms who the Admin is by a route
-  other than their email, and hands the code over by that same route. It is good once, and setting
+  a *second factor* nor a *recovery code*. The operator first confirms who the Admin is by a
+  channel other than their email, and hands the code over by that same channel. It is good once, and setting
   up a new second factor after the restore needs it, so whoever holds only the Admin's mailbox
   cannot finish the restore.
 - **re-confirm** — an Admin's confirming their *second factor* again before a high-impact action,
