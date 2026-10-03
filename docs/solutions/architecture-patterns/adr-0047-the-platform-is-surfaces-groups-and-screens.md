@@ -55,7 +55,7 @@ One navigation list in `apps/web/src/shared/` declares every surface, group and 
 - **Control Centre**: the Admin's one surface, in eight groups: Overview, Suggestions, Sources, Agent Operations, Questions, People, Personal data and System.
 - **Briefings** joins at Then: what the platform tells a person unasked, such as sector and account signals, each cited.
 
-The utilities sit at the rail's foot: Keyboard shortcuts today, and help and settings once they exist. The top band, not the rail, reaches the console from the workspace switcher and any visible screen by jump-to (⌘K). The avatar menu reaches the Account page. Like the sign-in screens, it stands outside the shell, so a person with no workspace and the operator reach it too, and the no-workspace and choose-workspace screens link to it.
+The utilities sit at the rail's foot: Keyboard shortcuts today, and help and settings once they exist. The top band, not the rail, reaches the console from the workspace switcher and any visible screen by jump-to (⌘K). The avatar menu reaches the Account page. Like the sign-in screens, it stands outside the shell, so a person with no workspace and the operator reach it too, and the no-workspace and choose-workspace screens link to it. The pending screens, confirm, recovery and setup, stand outside it too: a session that must confirm its second factor reaches them from the shell, the console and every screen outside the shell, and from any read or change refused while it waits, and comes back to the address it left (ADR 0048).
 
 **What v0.1 declares.** Screen names are today's words. Screens built today are in bold.
 

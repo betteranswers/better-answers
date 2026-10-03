@@ -53,6 +53,7 @@ The passkey and authenticator plugins:
 - A session confirms its second factor through the api's routes under `/second-factor/` (`apps/api/src/auth/confirm.ts`), which stamp it and mint none:
   - **Passkey:** our own challenge and `@simplewebauthn/server` verification, because the plugin's verify always mints a session and never checks the credential is this person's.
   - **Authenticator:** the plugin's `verifyTOTP`, which with a full session only verifies.
+- The plugin's own second-factor check covers password sign-in alone, so the gate is ours (ADR 0048). A before-hook refuses a pending session every endpoint it reaches over HTTP, outside the pending set and the paths that act on no session, and answers its `/get-session` without renewing it. The OAuth post-login rule sends a pending session's authorize to the post-login page, so no code is issued before it confirms.
 - Replacing an authenticator after a recovery or restore code is the one setup outside the plugin, decided by the owner on 03/10/2026:
   - **Why:** the plugin refuses a second enrol while a verified authenticator stands, and keeps one per person.
   - **How:** the route makes and encrypts the secret as the plugin does, parks it until its code verifies, then swaps it in within the transaction that removes the old factors.

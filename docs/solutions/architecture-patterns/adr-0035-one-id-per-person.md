@@ -39,6 +39,12 @@ Revocation has two scopes. Each deletes the tokens it ends rather than marking t
 - Each act that deletes a person's tokens names the grants it ended, by id, in its audit event: `people.person.credentials_revoked`, `people.member.credentials_revoked` and `people.member.removed`. When a workspace act ended any, it also writes `people.person.grants_ended` to the identity-set audit log.
 - No membership state is put on and taken off. Revocation ends what was issued.
 
+A person's second factor is theirs, across every workspace (ADR 0048). Being an Admin in any one workspace, or the operator, requires it at every sign-in, and a workspace Admin never acts on another person's factors.
+
+- A session that must confirm one and has not is pending. An hour after a request first finds it so, it ends.
+- Making a person an Admin or the operator, from needing no factor, clears every one of their sessions' confirmations in the same act, so each confirms again as an Admin.
+- Removing a factor clears the confirmation of the person's other sessions: a confirmation never outlives the factor that may have made it.
+
 Erasure rewrites `human:<email>` across a workspace's files, history, git author lines, `bundle_commit` rows and verification rows to `human:<erasure pseudonym>`. The pseudonym is minted at erasure, one per workspace, and kept on the erasure request. It is never the person id. The user row is pseudonymised: email to a unique tombstone, name cleared, id kept. The audit log holds ids and never an email or a name, and it is never rewritten.
 
 The audit slice, `packages/core/src/audit/`, has two doors. `record` takes a Principal and derives the actor. `recordFor` takes the platform principal and an explicit actor. The kernel's actor id has three forms: `human:<person id>`, `process:better-answers-<purpose>`, or an agent's id. An audit act is named `family.subject.verb`, in four families: people, knowledge, sources and platform.
@@ -52,6 +58,7 @@ The audit slice, `packages/core/src/audit/`, has two doors. `record` takes a Pri
 - An erasure target shared across workspaces lets two exported histories be joined on the person the request was meant to unlink.
 - A marked token, presented again, reaches the OAuth provider's replay path. That path deletes every refresh token the person holds for the client, with no workspace filter and no check of when each was issued. It ended grants in other workspaces, and a new grant taken after revoking everywhere. A deleted token answers "not found".
 - Deleting a grant's rows left nothing to inspect, so each act records the grants it ended.
+- A factor held per membership would let one company's Admin decide how another's member signs in. Held per person, it follows the strongest role they hold anywhere.
 
 ## Rejected
 
