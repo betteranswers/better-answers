@@ -61,6 +61,7 @@ export const STORED_ACT_NAMES = [
   "people.erasure.completed",
   "platform.erasure.rehearsed",
   "platform.erasure.replayed",
+  "people.person.sign_in_restored",
 ] as const;
 
 /**
