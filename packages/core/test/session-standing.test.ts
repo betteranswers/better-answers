@@ -311,6 +311,25 @@ describe("the pending clock a judged session carries", () => {
     await judged(confirmed, AT);
 
     expect([stillPromoted, await promotedAt(adminUserId)]).toEqual([AT, null]);
+    expect(await confirmedAt(confirmed)).toEqual({ confirmed: AT, pending: null });
+  });
+
+  it("answers a store fault as a failure, never as gone", async () => {
+    const personId = await seedPerson(db().pool);
+    const sessionId = await aSession(personId);
+    await db().pool.query(
+      'ALTER TABLE session RENAME COLUMN pending_since TO "pending_since_gone"',
+    );
+    try {
+      const read = await judged(sessionId, AT);
+
+      expect(read.ok).toBe(false);
+      expect(!read.ok && read.error instanceof Error).toBe(true);
+    } finally {
+      await db().pool.query(
+        'ALTER TABLE session RENAME COLUMN "pending_since_gone" TO pending_since',
+      );
+    }
   });
 
   it("never waits on a row another transaction holds", async () => {
