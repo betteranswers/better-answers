@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# The release's last word on its journeys: the word they wrote, or the one their job's result
-# implies when they wrote none, to the run's summary and then to the journeys check.
+# A journeys job that wrote no word still reports one, so the check hears from every run that owed it.
 set -euo pipefail
 
 : "${GITHUB_STEP_SUMMARY:?}"
