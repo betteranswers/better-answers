@@ -151,6 +151,17 @@ describe("a second factor's audit sentence", () => {
       "Hannah Wright used the operator's restore code",
     );
   });
+
+  it("says the platform restored a person's sign-in", () => {
+    const restored: SaidEvent = {
+      act: "people.person.sign_in_restored",
+      by: { kind: "platform" },
+      subject: { kind: "person", displayName: "Priya Shah" },
+      detail: {},
+    };
+
+    expect(sentenceOf(restored)).toBe("The platform restored Priya Shah's sign-in");
+  });
 });
 
 describe("the sentences against the acts core declares", () => {

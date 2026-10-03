@@ -18,6 +18,8 @@ import {
   withIdentityWrite,
   withOperator,
 } from "../store/postgres/index.ts";
+import { hashOfTyped, mintOneTimeCode } from "./recovery-codes.ts";
+import { OPERATOR_RESTORE_PREFIX, SESSION_VERIFICATION_PREFIXES } from "./sign-in-and-consent.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
 const OPERATOR_ACTS = declareIdentitySetActs("people", {
@@ -84,6 +86,107 @@ export const setOperatorMark = async (
   );
   if (!marked.ok) return err(marked.error);
   return marked.value;
+};
+
+const RESTORE_ACTS = declareIdentitySetActs("people", {
+  restored: act("people.person.sign_in_restored", {}),
+});
+
+const RESTORE_CODE_LIFETIME_MS = 24 * 60 * 60_000;
+
+type RestoreSignInInput = {
+  readonly email: string;
+  readonly now: Date;
+};
+
+export type SignInRestored = {
+  readonly personId: UserId;
+
+  /** As the person's row holds it: where the notice goes. */
+  readonly email: string;
+
+  /** The one time it exists outside the person's hands: only its hash is kept. */
+  readonly code: string;
+  readonly expiresAt: Date;
+};
+
+/** The acceptor keys the code by the stored address, lowered by Postgres, so this does too. */
+const HOLDING_BY_ADDRESS = `
+  SELECT id, email, $2 || lower(email) AS identifier
+    FROM "user" WHERE lower(email) = lower($1) FOR UPDATE`;
+
+/** Before the sessions go: a row keyed by a session is found only through it. */
+const SESSION_ROWS = `
+  DELETE FROM verification
+   WHERE identifier IN (SELECT prefix || s.id FROM session s, unnest($2::text[]) AS prefix
+                         WHERE s.user_id = $1)`;
+
+const HELD_BY_THE_PERSON = ["session", "passkey", "authenticator", "recovery_code"] as const;
+
+const KEEPING_THE_CODE = `
+  INSERT INTO verification (id, identifier, value, expires_at, created_at, updated_at)
+  VALUES ($1, $2, $3, $4, $5, $5)`;
+
+/** Ending every session ends every setup grant with it. */
+const clearingTheFactors = async (tx: Tx, personId: UserId, now: Date): Promise<void> => {
+  await tx.query(SESSION_ROWS, [personId, [...SESSION_VERIFICATION_PREFIXES]]);
+  for (const table of HELD_BY_THE_PERSON) {
+    await tx.query(`DELETE FROM ${table} WHERE user_id = $1`, [personId]);
+  }
+  await tx.query(
+    'UPDATE "user" SET authenticator_enabled = false, restore_required_at = $2, updated_at = now() WHERE id = $1',
+    [personId, now],
+  );
+};
+
+const restoring = async (
+  platform: PlatformPrincipal,
+  tx: Tx,
+  input: RestoreSignInInput,
+): Promise<Result<SignInRestored, WorkspaceRefusal<"no-such-user">>> => {
+  const found = await tx.query<{ id: string; email: string; identifier: string }>(
+    HOLDING_BY_ADDRESS,
+    [input.email, OPERATOR_RESTORE_PREFIX],
+  );
+  const row = found.rows[0];
+  if (row === undefined) return err("no-such-user");
+  const personId = boundarySchemas.user.select.shape.id.parse(row.id);
+
+  await clearingTheFactors(tx, personId, input.now);
+  const code = mintOneTimeCode();
+  const expiresAt = new Date(input.now.getTime() + RESTORE_CODE_LIFETIME_MS);
+  await tx.query("DELETE FROM verification WHERE identifier = $1", [row.identifier]);
+  await tx.query(KEEPING_THE_CODE, [
+    ulid(),
+    row.identifier,
+    hashOfTyped(code),
+    expiresAt,
+    input.now,
+  ]);
+  await record(platform, tx, {
+    id: ulid(),
+    act: RESTORE_ACTS.restored,
+    subjectId: personId,
+    detail: {},
+  });
+  return ok({ personId, email: row.email, code, expiresAt });
+};
+
+/**
+ * Restores the sign-in of the person holding `email`, under their lock: their factors, codes and
+ * sessions end, and setting up a factor waits on a one-time restore code. Recorded under the
+ * platform's actor. Answers the code, which replaces any earlier one.
+ */
+export const restoreSignIn = async (
+  platform: PlatformPrincipal,
+  door: PostgresDoor,
+  input: RestoreSignInInput,
+): Promise<Result<SignInRestored, WorkspaceRefusal<"no-such-user"> | Error>> => {
+  const restored = await attempt(() =>
+    withIdentityWrite(platform, door, (tx) => restoring(platform, tx, input)),
+  );
+  if (!restored.ok) return err(restored.error);
+  return restored.value;
 };
 
 /** Every person carrying the mark, by address: where the platform writes to its operator. */

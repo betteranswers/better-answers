@@ -38,7 +38,8 @@ const mintGroup = (): string =>
     "",
   );
 
-const mintRecoveryCode = (): string =>
+/** A recovery or restore code, in the one form `hashOfTyped` reads back. */
+export const mintOneTimeCode = (): string =>
   Array.from({ length: GROUPS_IN_A_CODE }, mintGroup).join("-");
 
 /** What a person types, as it was minted: no spaces, no dashes, lower case. */
@@ -74,7 +75,7 @@ export const issuingRecoveryCodes = async (
 ): Promise<RecoveryCodesIssued> => {
   const voided = await tx.query("DELETE FROM recovery_code WHERE user_id = $1", [personId]);
   const replaced = (voided.rowCount ?? 0) > 0;
-  const codes = Array.from({ length: RECOVERY_CODES_IN_A_SET }, mintRecoveryCode);
+  const codes = Array.from({ length: RECOVERY_CODES_IN_A_SET }, mintOneTimeCode);
   await tx.query(
     `INSERT INTO recovery_code (id, user_id, code_hash, created_at)
      SELECT id, $2, code_hash, $4 FROM unnest($1::text[], $3::text[]) AS minted (id, code_hash)`,

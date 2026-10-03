@@ -18,7 +18,8 @@ export type FactorChange =
   | "codes-replaced"
   | "recovery-code-used"
   | "factors-replaced"
-  | "confirm-failures";
+  | "confirm-failures"
+  | "sign-in-restored";
 
 type Change = {
   readonly subject: string;
@@ -69,6 +70,12 @@ const CHANGES = {
       "Several wrong codes in a row were entered to confirm your second factor. Each further wrong code makes the next try wait longer.",
     ifYou: "If they were yours, there is nothing more to do.",
   },
+  "sign-in-restored": {
+    subject: `Your ${PRODUCT_NAME} sign-in was restored by the operator`,
+    happened:
+      "The platform's operator restored your sign-in. Your passkeys, authenticator and recovery codes no longer work, and every session was signed out.",
+    ifYou: "If you asked the operator for this, there is nothing more to do.",
+  },
 } as const satisfies Record<FactorChange, Change>;
 
 const WORDS = {
@@ -101,13 +108,13 @@ const factorNoticeEmail = (to: string, change: FactorChange, publicUrl: string):
 
 /**
  * Never rejects, so a caller need not await it and a slow relay holds no answer. A missed notice
- * is a log line.
+ * is a log line and false.
  */
 export const sendFactorNotice = async (
   ctx: { readonly mail: Mail; readonly log: Logger },
   to: string,
   change: FactorChange,
-): Promise<void> => {
+): Promise<boolean> => {
   const sent = await attempt(() =>
     ctx.mail.send(factorNoticeEmail(to, change, ctx.mail.publicUrl)),
   );
@@ -117,4 +124,5 @@ export const sendFactorNotice = async (
       "a second-factor notice did not go",
     );
   }
+  return sent.ok;
 };
