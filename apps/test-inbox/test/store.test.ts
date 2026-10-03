@@ -145,31 +145,30 @@ describe("the test inbox's store over a failing D1", () => {
 describe("the test inbox's store over a row it cannot read", () => {
   const UNREADABLE = { ok: false, error: "D1 answered a row the store cannot read" };
 
-  it("answers a page with a bad-time row as an error", async () => {
+  const keptThenCorrupted = async (column: "received_at" | "raw") => {
     const d1 = d1StandIn();
     const store = storeOver(d1.database);
-    const [id] = await keptAt(store, NOW_MS);
-    d1.corrupt(id ?? "", "received_at");
+    const [id = ""] = await keptAt(store, NOW_MS);
+    d1.corrupt(id, column);
+    return { store, id };
+  };
+
+  it("answers a page with a bad-time row as an error", async () => {
+    const { store } = await keptThenCorrupted("received_at");
 
     expect(await store.page({ after: undefined, limit: 100 })).toEqual(UNREADABLE);
   });
 
   it("answers a message with text for raw as an error", async () => {
-    const d1 = d1StandIn();
-    const store = storeOver(d1.database);
-    const [id] = await keptAt(store, NOW_MS);
-    d1.corrupt(id ?? "", "raw");
+    const { store, id } = await keptThenCorrupted("raw");
 
-    expect(await store.message(id ?? "")).toEqual(UNREADABLE);
+    expect(await store.message(id)).toEqual(UNREADABLE);
   });
 
   it("answers a message with a bad time as an error", async () => {
-    const d1 = d1StandIn();
-    const store = storeOver(d1.database);
-    const [id] = await keptAt(store, NOW_MS);
-    d1.corrupt(id ?? "", "received_at");
+    const { store, id } = await keptThenCorrupted("received_at");
 
-    expect(await store.message(id ?? "")).toEqual(UNREADABLE);
+    expect(await store.message(id)).toEqual(UNREADABLE);
   });
 
   it("answers an error when the probe's delete fails", async () => {

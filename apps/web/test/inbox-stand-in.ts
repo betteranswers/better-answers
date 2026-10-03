@@ -68,9 +68,8 @@ const LIMIT_MOST = 100;
 
 /** As the Worker reads it: a missing or unreadable `limit` is the most a page holds. */
 const limitOf = (given: string | null): number => {
-  const asked = Math.trunc(Number(given));
-  if (given === null || given === "" || Number.isNaN(asked)) return LIMIT_MOST;
-  return Math.min(Math.max(asked, 1), LIMIT_MOST);
+  const asked = given === null || given === "" ? Number.NaN : Math.trunc(Number(given));
+  return Number.isNaN(asked) ? LIMIT_MOST : Math.min(LIMIT_MOST, Math.max(1, asked));
 };
 
 const newestFirst = (one: Stored, other: Stored): number =>
