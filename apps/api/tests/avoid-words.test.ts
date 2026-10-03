@@ -19,6 +19,7 @@ import {
 import { readUnder } from "./tree-walk.ts";
 import {
   type Counts,
+  entriesOf,
   type Finding,
   GLOSSARY,
   type InternalFinding,
@@ -355,6 +356,7 @@ describe("a word retired outright, beside one held to its senses", () => {
   it.each([
     { file: "packages/core/src/planted.ts", planted: `const rows = await ${RETIRED}RowsOf(tx);` },
     { file: "packages/core/src/planted.ts", planted: `type ${Retired}Act = AuditAct;` },
+    { file: "packages/core/src/planted.ts", planted: `const row = readHTTP${Retired}Row();` },
     {
       file: "packages/core/src/planted.ts",
       planted: `export const ${RETIRED.toUpperCase()}_ACT = 1;`,
@@ -471,12 +473,19 @@ describe("a word that lands with its sweep", () => {
 
   it("passes a kept refusal word once the word has landed", () => {
     const refusal = `no-such-${BOUND}`;
-    const files = { "packages/core/src/planted.ts": `return err("${refusal}");` };
+    const line = `return found ? "${refusal}" : err("${refusal}");`;
+    const files = { "packages/core/src/planted.ts": line };
 
     expect(linesOver(files, [BINDING], [refusal])).toEqual([]);
-    expect(linesOver(files, [BINDING])).toEqual([
-      `packages/core/src/planted.ts:1: return err("${refusal}");`,
-    ]);
+    expect(linesOver(files, [BINDING])).toEqual([`packages/core/src/planted.ts:1: ${line}`]);
+  });
+
+  it("keeps a dotted or hyphenated name wherever prose writes it", () => {
+    const act = `sources.${BOUND}.published`;
+    const refusal = `no-such-${BOUND}`;
+    const files = { "docs/planted.md": `It records ${act} and answers ${refusal}.` };
+
+    expect(linesOver(files, [BINDING], [act, refusal])).toEqual([]);
   });
 
   it("passes named parameters, and refuses landed words, in MCP text", () => {
@@ -484,16 +493,20 @@ describe("a word that lands with its sweep", () => {
     const files = {
       "apps/api/src/mcp/entries/index.ts": [
         `const find = defineEntry({`,
-        `  description: "Preview what matches. Use \`open\` with a concept's \`iri\` to read it.",`,
+        `  description: "Use \`open\` with a concept's \`iri\`, or its 'iri' again.",`,
         `  title: "One line per ${hit}",`,
+        `  hint: "Give the iri you found.",`,
         `});`,
       ].join("\n"),
     };
     const rows = [landedNow(rowOf("IRI")), landedNow(rowOf(hit))];
     const tree = plantedTree(files);
+    const scan = { rows, carvedOut: CARVED_OUT, kept: ["iri"] };
 
-    expect(readerFindings(tree, { rows, carvedOut: CARVED_OUT, kept: ["iri"] })).toEqual([]);
-    expect(lineFindings(tree, { rows, carvedOut: CARVED_OUT, kept: ["iri"] }).map(at)).toEqual([
+    expect(readerFindings(tree, scan).map(at)).toEqual([
+      "apps/api/src/mcp/entries/index.ts:4: Give the iri you found.",
+    ]);
+    expect(lineFindings(tree, scan).map(at)).toEqual([
       `apps/api/src/mcp/entries/index.ts:3: title: "One line per ${hit}",`,
     ]);
   });
@@ -556,39 +569,116 @@ const PLANTED_GLOSSARY = [
   "- **job** — _Internal._ one unit of background work.",
   "- **landed copy** — _Internal._ a document's bytes as the platform holds them. A page says",
   "  *Received*.",
+  "- **actor id** — _Internal._ who a record names. A page shows the person's name.",
+  "- **step (of an action)** — _Internal._ a part of an action that runs only inside it.",
+  "- **`ui://`** — _Internal._ the wire URI scheme for a view.",
+  "- **principal** — _Internal._ who a call is made as:",
+  "  - **cursor** — _Internal._ a sub-bullet, part of its entry.",
   "- **connected source** — _Code rename pending._ an Admin's connection of one source.",
   "- **Unverified** — nobody has confirmed it.",
   "",
 ].join("\n");
 
+describe("the glossary's entries", () => {
+  it("joins an entry's indented lines and closes it otherwise", () => {
+    const glossary = [
+      "  an indented line before any entry",
+      "- **watermark** — the last commit",
+      "  a workspace's rows know about.",
+      "",
+      "  an indented line after a blank one",
+      "- **job** — one unit of work.",
+      "A line that is no entry's.",
+      "  indented again",
+    ].join("\n");
+
+    expect(entriesOf(glossary)).toEqual([
+      {
+        term: "watermark",
+        text: "- **watermark** — the last commit a workspace's rows know about.",
+      },
+      { term: "job", text: "- **job** — one unit of work." },
+    ]);
+  });
+});
+
 describe("what a person reads, in a planted tree", () => {
   const WORDS = "apps/web/src/features/sources/words.ts";
 
-  const internalsOver = (text: string, file = WORDS): readonly string[] =>
+  const internalsOver = (
+    text: string,
+    file = WORDS,
+    rows: readonly OldWord[] = [],
+  ): readonly string[] =>
     internalFindings(
       plantedTree({ [file]: text }),
       PLANTED_GLOSSARY,
-      { rows: [], carvedOut: CARVED_OUT, kept: [] },
+      { rows, carvedOut: CARVED_OUT, kept: [] },
       [{ head: "job" }],
     ).map((finding) => `${at(finding)} → ${finding.internal.pagesSay ?? "-"}`);
 
   it("refuses an internal page word and names what to write", () => {
-    expect(internalsOver('export const READY = "The landed copy is ready.";')).toEqual([
+    expect(
+      internalsOver(
+        'export const READY = "The landed copy is ready.";\nexport const BY = "By actor id 7";',
+      ),
+    ).toEqual([
       `${WORDS}:1: The landed copy is ready. → Received`,
+      `${WORDS}:2: By actor id 7 → the person's name`,
     ]);
   });
 
-  it("refuses an internal word in an email", () => {
+  it("finds an internal word in any form, bare of qualifiers", () => {
+    expect(
+      internalsOver(
+        [
+          'export const A = "Take one step back";',
+          'export const B = "Two watermarks moved";',
+          'export const C = "Open the ui:// view";',
+        ].join("\n"),
+      ),
+    ).toEqual([
+      `${WORDS}:1: Take one step back → -`,
+      `${WORDS}:2: Two watermarks moved → -`,
+      `${WORDS}:3: Open the ui:// view → -`,
+    ]);
+  });
+
+  it("reads a sub-bullet as part of its entry", () => {
+    expect(internalsOver('export const C = "Move the cursor here";')).toEqual([]);
+  });
+
+  it("refuses an internal word in an email or the navigation", () => {
     expect(
       internalsOver(
         "const line = `Behind the watermark: ${count}`;",
         "apps/api/src/trpc/invitation-email.ts",
       ),
     ).toEqual(["apps/api/src/trpc/invitation-email.ts:1: Behind the watermark: → -"]);
+    expect(
+      internalsOver('const summary = "Behind the watermark";', "apps/web/src/shared/navigation.ts"),
+    ).toEqual(["apps/web/src/shared/navigation.ts:1: Behind the watermark → -"]);
   });
 
   it("passes an internal head left unwatched as ordinary English", () => {
     expect(internalsOver('export const DONE = "The job is done.";')).toEqual([]);
+  });
+
+  it("waits on a pending row's word, never a landed row's", () => {
+    const text = 'export const MOVED = "The watermark moved";';
+    const row: Renamed = {
+      word: "watermark",
+      use: "last commit",
+      entry: "watermark",
+      sweep: "map",
+      state: "pending",
+      reach: "reader text",
+    };
+
+    expect(internalsOver(text, WORDS, [row])).toEqual([]);
+    expect(internalsOver(text, WORDS, [{ ...row, state: "landed" }])).toEqual([
+      `${WORDS}:1: The watermark moved → -`,
+    ]);
   });
 
   it("reads no file where a person's text is not written", () => {
@@ -611,6 +701,20 @@ describe("what a person reads, in a planted tree", () => {
       readerFindings(tree, { rows: [rowOf(checked)], carvedOut: CARVED_OUT, kept: [] }).map(at),
     ).toEqual([`${WORDS}:1: ${checked}`]);
   });
+
+  it("refuses any form of a landed word in MCP text", () => {
+    const checked = ["Un", "checked"].join("");
+    const tree = plantedTree({
+      "apps/api/src/mcp/entries/index.ts": 'const description = "Lists both IRIs here.";',
+      "packages/core/src/answering/index.ts": `const unverified = (): string => "${checked}";`,
+    });
+    const rows = [landedNow(rowOf("IRI")), rowOf(checked)];
+
+    expect(readerFindings(tree, { rows, carvedOut: CARVED_OUT, kept: [] }).map(at)).toEqual([
+      "apps/api/src/mcp/entries/index.ts:1: Lists both IRIs here.",
+      `packages/core/src/answering/index.ts:1: ${checked}`,
+    ]);
+  });
 });
 
 describe("the strings a person reads in a source file", () => {
@@ -625,6 +729,9 @@ describe("the strings a person reads in a source file", () => {
           'export const B = "Members";',
           "export const C = `Sent to ${who} today`;",
           "export const D = () => <p>Nothing here yet</p>;",
+          'export const E = () => <button aria-label="Close the menu" />;',
+          'export const F = new Set(["Add a person"]);',
+          'export const G = names.join(" and also ");',
         ].join("\n"),
       ),
     ).toEqual([
@@ -633,6 +740,36 @@ describe("the strings a person reads in a source file", () => {
       "3: Sent to",
       "3: today",
       "4: Nothing here yet",
+      "5: Close the menu",
+      "6: Add a person",
+      "7: and also",
+    ]);
+  });
+
+  it("reports each piece at the line its words start", () => {
+    expect(
+      readIn(
+        [
+          "export const H = () => (",
+          "  <p>",
+          "    Words on their own line",
+          "  </p>",
+          ");",
+          "export const T = `First half ${x}",
+          "second half`;",
+          "export const L = [",
+          '"A label at the start",',
+          "];",
+          "export const Z = () => <p>A",
+          "note</p>;",
+        ].join("\n"),
+      ),
+    ).toEqual([
+      "3: Words on their own line",
+      "6: First half",
+      "7: second half",
+      "9: A label at the start",
+      "11: A\nnote",
     ]);
   });
 
@@ -643,9 +780,14 @@ describe("the strings a person reads in a source file", () => {
           'import { x } from "./sources api.ts";',
           'export const KEYS = { "a key with spaces": "kebab-value" };',
           'type Role = "an editor";',
+          "type Path = `/sources ${string} here`;",
+          'export const P = "ListedBinding";',
           'export const E = () => <p className="flex items-center">x</p>;',
+          "export const Q = () => <p> </p>;",
           'throw new Error("the screen declares no detail address");',
+          'throw new TypeError("a type went wrong here");',
           'log.warn(facts, "the name flag did not go");',
+          'ctx.log.warn(facts, "the notice did not go");',
         ].join("\n"),
       ),
     ).toEqual([]);
@@ -654,18 +796,26 @@ describe("the strings a person reads in a source file", () => {
 
 describe("the ratchet on pending words", () => {
   const WORDS = "apps/web/src/features/sources/words.ts";
-  const counted = (text: string): Counts =>
+  const NAVIGATION = "apps/web/src/shared/navigation.ts";
+  const counted = (text: string, navigation = 'export const N = "Members and groups";'): Counts =>
     ratchetCounts(
       plantedTree({
         [WORDS]: text,
+        [NAVIGATION]: navigation,
         "apps/web/src/features/sources/table.tsx": `const T = "${BOUND} ${BOUND}";`,
       }),
-      [rowOf(BOUND), landedNow(rowOf("screen"))],
+      [rowOf(BOUND), rowOf("route"), landedNow(rowOf("screen"))],
     );
 
   it("counts a pending word in a page's words alone", () => {
     expect(counted(`export const A = "Each ${BOUND} and its ${BOUND}s";`)).toEqual({
       [WORDS]: { [BOUND]: 2 },
+    });
+  });
+
+  it("counts in the navigation as in a words module", () => {
+    expect(counted('export const A = "Nothing pending";', 'const name = "Bindings";')).toEqual({
+      [NAVIGATION]: { [BOUND]: 1 },
     });
   });
 
@@ -692,7 +842,7 @@ describe("faults in a planted list", () => {
     entry,
     sweep: null,
   });
-  const PENDING_ROW: OldWord = {
+  const PENDING_ROW: Renamed = {
     word: BOUND,
     use: "connected source",
     entry: "connected source",
@@ -700,6 +850,7 @@ describe("faults in a planted list", () => {
     state: "pending",
     reach: "everywhere",
   };
+  const UNNAMED = `"connected source" is marked pending, but no pending row names its code's word`;
 
   it("passes a sorted list whose rows sit under heads", () => {
     expect(
@@ -725,10 +876,16 @@ describe("faults in a planted list", () => {
       rows: [PENDING_ROW, avoidedRow("cursor", "tracker")],
       found: `"cursor" sits under "tracker", which heads no glossary entry`,
     },
+    { fault: "a pending entry with no row", rows: [avoidedRow("cursor")], found: UNNAMED },
     {
-      fault: "a pending entry with no pending row",
-      rows: [avoidedRow("cursor")],
-      found: `"connected source" is marked pending, but no pending row names its code's word`,
+      fault: "a pending entry named by an avoided row alone",
+      rows: [avoidedRow("connection", "connected source")],
+      found: UNNAMED,
+    },
+    {
+      fault: "a pending entry named by a landed row alone",
+      rows: [{ ...PENDING_ROW, state: "landed" as const }],
+      found: UNNAMED,
     },
   ])("finds $fault", ({ rows, found }) => {
     expect(listFaults(rows, PLANTED_GLOSSARY, [])).toContain(found);

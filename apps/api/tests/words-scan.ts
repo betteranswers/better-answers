@@ -40,20 +40,22 @@ const markOf = ({ text }: Entry): "internal" | "pending" | undefined => {
 /** A head's qualifier tells entries apart in the glossary; a page writes the word alone. */
 const bareWordOf = (head: string): string => head.replace(/ \(.*\)$/, "").replaceAll("`", "");
 
-export type Internal = { readonly head: string; readonly word: string; readonly pagesSay?: string };
+export type Internal = {
+  readonly head: string;
+  readonly word: string;
+  readonly pagesSay: string | undefined;
+};
 
 const PAGES_SAY = /\bA page (?:says|shows|names them) \*?(?<words>[^*.]+?)\*?\./;
 
 export const internalsOf = (glossary: string): readonly Internal[] =>
   entriesOf(glossary)
     .filter((entry) => markOf(entry) === "internal")
-    .map((entry) => {
-      const pagesSay = PAGES_SAY.exec(entry.text)?.groups?.["words"];
-      const word = bareWordOf(entry.term);
-      return pagesSay === undefined
-        ? { head: entry.term, word }
-        : { head: entry.term, word, pagesSay };
-    });
+    .map((entry) => ({
+      head: entry.term,
+      word: bareWordOf(entry.term),
+      pagesSay: PAGES_SAY.exec(entry.text)?.groups?.["words"],
+    }));
 
 export const isRenamed = (row: OldWord): row is Renamed => row.sweep !== null;
 
@@ -106,17 +108,21 @@ export const listFaults = (
 
 const escaped = (word: string): string => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/** `auditRowsOf`, `AUDIT_ACT` and `an_audit_row` read as words, so a word is seen inside each. */
+/**
+ * `auditRowsOf`, `AUDIT_ACT`, `HTTPAudit` and `an_audit_row` read as words, and an acronym's plural
+ * (`IRIs`) stays whole.
+ */
 export const wordsOfCompounds = (text: string): string =>
-  text.replace(/(?<=[a-z\d])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])/g, " ").replaceAll("_", " ");
+  text.replace(/(?<=[a-z\d])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z]{2})/g, " ").replaceAll("_", " ");
 
+/** Bounded by what is not a word character, so a head such as `ui://` is found as well. */
 const anyFormOf = (word: string, flags: string): RegExp =>
-  new RegExp(`\\b${word.split(" ").map(escaped).join("[\\s-]+")}s?\\b`, flags);
+  new RegExp(`(?<!\\w)${word.split(" ").map(escaped).join("[\\s-]+")}s?(?!\\w)`, flags);
 
 /** Every form, compounds and plurals included, for a word refused outright; whole, otherwise. */
 export const findsIn = (word: string, anyForm: boolean): ((text: string) => boolean) => {
   if (!anyForm) {
-    const whole = new RegExp(`\\b${escaped(word)}\\b`, "i");
+    const whole = new RegExp(`(?<!\\w)${escaped(word)}(?!\\w)`, "i");
     return (text) => whole.test(text);
   }
   const forms = anyFormOf(word, "i");
@@ -250,51 +256,28 @@ type Node = { readonly type: string; readonly start: number; readonly [key: stri
 const isNode = (value: unknown): value is Node =>
   typeof value === "object" && value !== null && "type" in value && typeof value.type === "string";
 
-const SKIPPED_TYPES = new Set([
-  "ImportDeclaration",
-  "ExportAllDeclaration",
-  "TSLiteralType",
-  "TSImportType",
-  "TSExternalModuleReference",
-]);
+const nameOf = (value: unknown): string =>
+  isNode(value) && value.type === "Identifier" ? String(value["name"]) : "";
 
-const LOGGERS = new Set(["log", "logger", "console"]);
-
-const calleeNameOf = (node: Node): string | undefined => {
-  const callee = node["callee"];
-  if (!isNode(callee)) return undefined;
-  if (callee.type === "Identifier") return String(callee["name"]);
-  const object = callee["object"];
-  return isNode(object) && object.type === "Identifier" ? `${String(object["name"])}.` : undefined;
-};
+/** `log.warn(…)` or `ctx.log.warn(…)`: the logger is the callee's object, or that object's property. */
+const isLogger = (object: unknown): boolean =>
+  nameOf(object) === "log" || (isNode(object) && nameOf(object["property"]) === "log");
 
 /** A thrown error and a log line are written for whoever runs the platform, not for a reader. */
 const isForTheOperator = (node: Node): boolean => {
-  const name = calleeNameOf(node) ?? "";
-  if (node.type === "NewExpression") return name.endsWith("Error");
-  return node.type === "CallExpression" && LOGGERS.has(name.replace(/\.$/, ""));
+  const callee = node["callee"];
+  if (node.type === "NewExpression") return nameOf(callee).endsWith("Error");
+  return node.type === "CallExpression" && isNode(callee) && isLogger(callee["object"]);
 };
 
-const NOT_READ = new Set([
-  "className",
-  "class",
-  "style",
-  "id",
-  "key",
-  "href",
-  "src",
-  "data-testid",
-]);
-
-const attributeNameOf = (node: Node): string => {
+/** A class name with spaces in it is styling, never words. */
+const isClassName = (node: Node): boolean => {
   const name = node["name"];
-  return isNode(name) ? String(name["name"]) : "";
+  return node.type === "JSXAttribute" && isNode(name) && name["name"] === "className";
 };
 
 const skipsSubtree = (node: Node): boolean =>
-  SKIPPED_TYPES.has(node.type) ||
-  isForTheOperator(node) ||
-  (node.type === "JSXAttribute" && NOT_READ.has(attributeNameOf(node)));
+  node.type === "TSLiteralType" || isForTheOperator(node) || isClassName(node);
 
 /** Keys and import paths are the code's own; only a value can reach a reader. */
 const childrenOf = (node: Node): readonly unknown[] =>
@@ -311,18 +294,33 @@ const CAPITALISED_WORD = /^[A-Z][a-z]+$/;
 const isRead = (text: string): boolean =>
   text.trim() !== "" && (/\s/.test(text) || CAPITALISED_WORD.test(text));
 
-const quasiTextOf = (quasi: unknown): string => {
-  const value = isNode(quasi) ? quasi["value"] : undefined;
-  if (typeof value !== "object" || value === null) return "";
-  if ("cooked" in value && typeof value.cooked === "string") return value.cooked;
-  return "raw" in value ? String(value.raw) : "";
-};
+type Piece = { readonly words: number; readonly text: string };
 
-const textOf = (node: Node): readonly string[] => {
-  if (node.type === "Literal" && typeof node["value"] === "string") return [node["value"]];
-  if (node.type === "JSXText") return [String(node["value"])];
+const leadingSpaceOf = (text: string): number => text.length - text.trimStart().length;
+
+/** A template's piece is found by its raw text, so a sentence split over lines reports each line. */
+const pieceOfQuasi =
+  (source: string) =>
+  (quasi: unknown): readonly Piece[] => {
+    const value = isNode(quasi) ? quasi["value"] : undefined;
+    if (!isNode(quasi) || typeof value !== "object" || value === null) return [];
+    const raw = "raw" in value ? String(value.raw) : "";
+    const cooked = "cooked" in value && typeof value.cooked === "string" ? value.cooked : "";
+    return [{ words: source.indexOf(raw, quasi.start) + leadingSpaceOf(raw), text: cooked }];
+  };
+
+const piecesOf = (node: Node, source: string): readonly Piece[] => {
+  const value = node["value"];
+  if (node.type === "Literal" && typeof value === "string") {
+    return [{ words: node.start, text: value }];
+  }
+  if (node.type === "JSXText") {
+    return [{ words: node.start + leadingSpaceOf(String(value)), text: String(value) }];
+  }
   const quasis = node["quasis"];
-  return node.type === "TemplateLiteral" && Array.isArray(quasis) ? quasis.map(quasiTextOf) : [];
+  return node.type === "TemplateLiteral" && Array.isArray(quasis)
+    ? quasis.flatMap(pieceOfQuasi(source))
+    : [];
 };
 
 const lineAt = (starts: readonly number[], offset: number): number =>
@@ -338,13 +336,13 @@ const visit = (value: unknown, found: (node: Node) => void): void => {
   for (const child of childrenOf(value)) visit(child, found);
 };
 
-/** The strings and JSX text a person reads in one source file, each with its line. */
+/** The strings and JSX text a person reads in one source file, each at the line its words start. */
 export const readerStringsIn = (file: string, source: string): readonly ReaderString[] => {
   const starts = [0, ...[...source.matchAll(/\n/g)].map((match) => match.index + 1)];
   const strings: ReaderString[] = [];
   visit(parseSync(file, source).program, (node) => {
-    for (const text of textOf(node).filter(isRead)) {
-      strings.push({ line: lineAt(starts, node.start), text: text.trim() });
+    for (const { words, text } of piecesOf(node, source).filter((piece) => isRead(piece.text))) {
+      strings.push({ line: lineAt(starts, words), text: text.trim() });
     }
   });
   return strings;
