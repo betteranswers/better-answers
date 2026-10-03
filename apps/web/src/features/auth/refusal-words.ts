@@ -1,6 +1,6 @@
 import type { Refusal } from "@/shared/api/trpc.ts";
 import { saidOfRefusal, type Said, type SaidOfWord } from "@/shared/refusal-words.ts";
-import { minutesUntil } from "@/shared/words.ts";
+import { minutesUntil, PRODUCT_NAME } from "@/shared/words.ts";
 
 /** Said on the invitation screen, of its read and of joining alike. */
 export const SAID_OF_ACCEPTING = {
@@ -187,7 +187,7 @@ export const SAID_OF_SECOND_FACTOR = {
   },
   "restore-code-needed": {
     why: "Your sign-in was restored, so its restore code comes first.",
-    next: "Enter the code the platform's operator gave you.",
+    next: `Enter the code ${PRODUCT_NAME} support gave you.`,
   },
 } satisfies SaidOfWord;
 
@@ -391,7 +391,7 @@ export const RECOVERY_UNANSWERED: Said = {
 
 export const RESTORE_CODE_WRONG: Said = {
   why: "That restore code is wrong or has expired.",
-  next: "Check it, or ask the platform's operator for a new one.",
+  next: `Check it, or ask ${PRODUCT_NAME} support for a new one.`,
 };
 
 /** Said where a sign-in without the right to set up asks to, before the screen moves on. */

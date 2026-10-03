@@ -1,13 +1,15 @@
 import { expect } from "vitest";
 import { z } from "zod";
 
-import { SIGN_IN_CODE_PREFIX } from "@better-answers/core/workspaces";
+import { restoreSignIn, SIGN_IN_CODE_PREFIX } from "@better-answers/core/workspaces";
 import { testData } from "@better-answers/schema/testing";
 import { authenticatorCodeAt, keyIn } from "@better-answers/schema/testing/authenticator-code";
 
+import { IDENTITY_PRINCIPAL } from "../src/identity-principal.ts";
 import { authOver } from "./auth-instance.ts";
 import { signIn } from "./flow.ts";
 import type { TestApp, TestClient } from "./harness.ts";
+import { aPasskeyDevice } from "./passkey-device.ts";
 
 export const signedInClient = async (app: TestApp, email: string): Promise<TestClient> => {
   const client = app.client();
@@ -84,6 +86,48 @@ export const setUpOn = async (client: TestClient) => {
   return {
     setupAddress,
     answered: await client.json("/authenticator/finish", { code: codeNow(setupAddress) }),
+  };
+};
+
+/**
+ * The ops command's own restore under its own principal, sending no notice; answers the code.
+ * @throws when no person holds `email`.
+ */
+export const restoredByTheOperator = async (app: TestApp, email: string): Promise<string> => {
+  const restored = await restoreSignIn(IDENTITY_PRINCIPAL, app.doors.postgres, {
+    email,
+    now: new Date(),
+  });
+  if (!restored.ok) throw new Error(`the restore was refused: ${String(restored.error)}`);
+  return restored.value.code;
+};
+
+/** A passkey added through the api's two steps, from a device of its own. */
+export const passkeyAddedOn = async (client: TestClient) => {
+  const device = aPasskeyDevice(client.origin);
+  const options = await client.json("/passkeys/add-options", { name: "Phone" });
+  expect(options.status, "the add was not asked").toBe(200);
+  const answered = await client.json("/passkeys/add", {
+    name: "Phone",
+    response: device.create(await options.json()),
+  });
+  return { device, answered };
+};
+
+const codesIssued = z.object({ recoveryCodes: z.array(z.string()) });
+
+/** A passkey, an authenticator and its ten codes, set up through the api; then an unconfirmed email session. */
+export const aPersonHoldingEverything = async (app: TestApp) => {
+  const { person, client: setUpIn } = await aPersonSignedIn(app);
+  const { device } = await passkeyAddedOn(setUpIn);
+  const { setupAddress, answered } = await setUpOn(setUpIn);
+  const { recoveryCodes } = codesIssued.parse(await answered.json());
+  return {
+    person,
+    device,
+    key: keyIn(setupAddress),
+    recoveryCodes,
+    client: await signedInClient(app, person.email),
   };
 };
 

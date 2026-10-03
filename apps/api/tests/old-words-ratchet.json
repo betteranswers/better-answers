@@ -10,12 +10,10 @@
     "screen": 1
   },
   "apps/web/src/features/auth/refusal-words.ts": {
-    "check": 11,
-    "operator": 2
+    "check": 11
   },
   "apps/web/src/features/auth/second-factor-words.ts": {
-    "check": 1,
-    "operator": 1
+    "check": 1
   },
   "apps/web/src/features/console/grant-words.ts": {
     "client": 1

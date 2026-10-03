@@ -508,6 +508,20 @@ export const consumeIngress = async (
     ),
   );
 
+/**
+ * Drops every pair's windows that started before `before`, which `consumeIngress` leaves for a
+ * pair never counted again. Answers how many went.
+ */
+export const dropIngressWindowsBefore = async (
+  door: PostgresDoor,
+  before: Date,
+): Promise<number> => {
+  const dropped = await door.pool.query("DELETE FROM ingress_counter WHERE window_start < $1", [
+    before,
+  ]);
+  return dropped.rowCount ?? 0;
+};
+
 /** Only these literals reach the statement's text, so no caller's string becomes SQL. */
 const WORKSPACE_COUNTERS = {
   call: { table: "mcp_call_counter", keyColumn: "token_id", sweptBy: "token_id = $2" },

@@ -64,12 +64,13 @@ The operator:
 - The operator is a third principal kind, beside a user and the platform: a mark on the person's `user` row that only an ops command sets or clears, and that erasure clears.
 - It is built only from a signed-in session, never from an OAuth or personal token. Revoke everywhere and a display-name correction need a session created within the hour.
 - It has one cross-workspace read: people, with the workspaces and role each holds, and workspaces with their member counts, over the identity set alone.
+- A person who has lost every factor and every recovery code is restored by `pnpm ops restore-sign-in`, never from a screen, once the operator has checked who they are by a route other than their email. Under the person's lock it ends their factors, codes and sessions, keeps a one-time restore code's hash for 24 hours, records the act and sends the notice. It prints the code, which the operator hands over by that same route.
 
 A person exists from their first email-code sign-in, or earlier when `pnpm ops add-person` adds them by name. That act writes the `user` row itself, past the library's create hook, which would blank the name.
 
 The identity-set audit log holds:
 
-- a person's own display-name act and the platform's adding of a person;
+- a person's own display-name act, and the platform's adding of a person or restoring their sign-in;
 - a person's own second-factor acts: a passkey added, renamed or removed, an authenticator added or removed, recovery codes issued or used, each confirm, a restore code accepted, and their factors replaced after a recovery or restore code;
 - with the console, each sign-in, every operator write and an Admin's act that ends a person's grants.
 

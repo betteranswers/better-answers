@@ -8,11 +8,14 @@ import { confirmWithTheAuthenticator } from "./flow.ts";
 import type { TestClient } from "./harness.ts";
 import { aPasskeyDevice, type PasskeyDevice } from "./passkey-device.ts";
 import {
+  aPersonHoldingEverything,
   aPersonSignedIn,
   aPersonWithAnAuthenticator,
   aWrongCode,
   anAdminWithAnAuthenticator,
   codeNow,
+  passkeyAddedOn,
+  restoredByTheOperator,
   setUpOn,
   signedInClient,
 } from "./provoke.ts";
@@ -82,18 +85,6 @@ const heldOn = (client: TestClient) => webClientOf(client).api.person.secondFact
 const noticesTo = (email: string, subject: string): number =>
   app().emails.filter((message) => message.to === email && message.subject === subject).length;
 
-/** A passkey added through the api's two steps, from a device of its own. */
-const passkeyAddedOn = async (client: TestClient) => {
-  const device = aPasskeyDevice(client.origin);
-  const options = await client.json("/passkeys/add-options", { name: "Phone" });
-  expect(options.status, "the add was not asked").toBe(200);
-  const answered = await client.json("/passkeys/add", {
-    name: "Phone",
-    response: device.create(await options.json()),
-  });
-  return { device, answered };
-};
-
 const askToConfirm = async (client: TestClient): Promise<unknown> => {
   const asked = await client.json(PASSKEY_OPTIONS, {});
   expect(asked.status, "the confirm was not asked").toBe(200);
@@ -112,21 +103,6 @@ const wrongCodesFrom = async (clients: readonly TestClient[], key: string, times
     statuses.push((await client.json(AUTHENTICATOR, { code: aWrongCode(codeOf(key)) })).status);
   }
   return statuses;
-};
-
-/** A passkey, an authenticator and its ten codes, set up through the api; then an unconfirmed email session. */
-const aPersonHoldingEverything = async () => {
-  const { person, client: setUpIn } = await aPersonSignedIn(app());
-  const { device } = await passkeyAddedOn(setUpIn);
-  const { setupAddress, answered } = await setUpOn(setUpIn);
-  const { recoveryCodes } = issued.parse(await answered.json());
-  return {
-    person,
-    device,
-    key: keyIn(setupAddress),
-    recoveryCodes,
-    client: await signedInClient(app(), person.email),
-  };
 };
 
 describe("confirming with a passkey", () => {
@@ -279,7 +255,7 @@ describe("confirming with an authenticator", () => {
   });
 
   it("lets a recovery code and passkey through while it waits", async () => {
-    const { client, key, device, recoveryCodes } = await aPersonHoldingEverything();
+    const { client, key, device, recoveryCodes } = await aPersonHoldingEverything(app());
     expect(await wrongCodesFrom([client], key, 7)).toContain(429);
 
     const spent = await client.json(RECOVERY, { code: recoveryCodes[0] });
@@ -302,7 +278,7 @@ const aPersonHoldingCodesAlone = async () => {
 
 /** Everything held, a code spent in the unconfirmed session, and a new key's setup started there. */
 const aReplacementStarted = async () => {
-  const held = await aPersonHoldingEverything();
+  const held = await aPersonHoldingEverything(app());
   expect((await held.client.json(RECOVERY, { code: held.recoveryCodes[0] })).status).toBe(200);
   const started = await held.client.json(REPLACE_START, {});
   return { ...held, ...startedAnswer.parse(await started.json()) };
@@ -310,7 +286,7 @@ const aReplacementStarted = async () => {
 
 describe("spending a recovery code", () => {
   it("grants setup to the spending session alone", async () => {
-    const { person, client, recoveryCodes } = await aPersonHoldingEverything();
+    const { person, client, recoveryCodes } = await aPersonHoldingEverything(app());
     const elsewhere = await signedInClient(app(), person.email);
 
     const spent = await client.json(RECOVERY, { code: recoveryCodes[0] });
@@ -326,7 +302,7 @@ describe("spending a recovery code", () => {
   });
 
   it("refuses a code that is not one of the person's", async () => {
-    const { client } = await aPersonHoldingEverything();
+    const { client } = await aPersonHoldingEverything(app());
 
     const spent = await client.json(RECOVERY, { code: "0000-0000-0000-0000" });
 
@@ -379,7 +355,7 @@ describe("replacing the factors after a spent code", () => {
   });
 
   it("swaps in a new passkey, answering ten fresh codes", async () => {
-    const { person, client, recoveryCodes } = await aPersonHoldingEverything();
+    const { person, client, recoveryCodes } = await aPersonHoldingEverything(app());
     await client.json(RECOVERY, { code: recoveryCodes[0] });
 
     const { answered } = await passkeyAddedOn(client);
@@ -407,7 +383,7 @@ describe("replacing the factors after a spent code", () => {
   });
 
   it("refuses a finish from a session without the grant", async () => {
-    const { client } = await aPersonHoldingEverything();
+    const { client } = await aPersonHoldingEverything(app());
 
     const finished = await client.json(REPLACE_FINISH, { code: "123456" });
 
@@ -440,7 +416,7 @@ describe("replacing the factors after a spent code", () => {
   });
 
   it("refuses a finish no setup was started for", async () => {
-    const { client, recoveryCodes } = await aPersonHoldingEverything();
+    const { client, recoveryCodes } = await aPersonHoldingEverything(app());
     await client.json(RECOVERY, { code: recoveryCodes[0] });
 
     const finished = await client.json(REPLACE_FINISH, { code: "123456" });
@@ -450,11 +426,11 @@ describe("replacing the factors after a spent code", () => {
   });
 });
 
-/** A person the operator has restored, signed in by email, with the code they were handed. */
+/** A person the operator has restored, signed in again by email, with the code they were handed. */
 const aRestoredPerson = async () => {
-  const { person, client } = await aPersonSignedIn(app());
-  const code = await restoredWithACode(app().database.superuser, person.email, new Date());
-  return { person, client, code };
+  const person = await app().person();
+  const code = await restoredByTheOperator(app(), person.email);
+  return { person, client: await signedInClient(app(), person.email), code };
 };
 
 describe("setting up after an operator's restore", () => {
@@ -499,7 +475,7 @@ describe("setting up after an operator's restore", () => {
   });
 
   it("refuses setup to a grant from before the restore", async () => {
-    const { person, client, recoveryCodes } = await aPersonHoldingEverything();
+    const { person, client, recoveryCodes } = await aPersonHoldingEverything(app());
     expect((await client.json(RECOVERY, { code: recoveryCodes[0] })).status).toBe(200);
     const restoredLater = new Date(Date.now() + 1000);
     await restoredWithACode(app().database.superuser, person.email, restoredLater);
@@ -520,7 +496,7 @@ describe("setting up after an operator's restore", () => {
   });
 
   it("refuses a recovery code and new codes while restored", async () => {
-    const { person, client, recoveryCodes } = await aPersonHoldingEverything();
+    const { person, client, recoveryCodes } = await aPersonHoldingEverything(app());
     await restoredWithACode(app().database.superuser, person.email, new Date());
 
     const spent = await client.json(RECOVERY, { code: recoveryCodes[0] });

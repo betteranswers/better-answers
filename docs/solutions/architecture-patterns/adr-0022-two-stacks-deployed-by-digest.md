@@ -8,12 +8,14 @@ severity: high
 applies_when:
   - "Adding a service, a volume or an image to either compose stack"
   - "Changing how a release is promoted, tagged or rolled back"
+  - "Changing what a release must pass before it is tagged, or when the journeys run"
   - "Changing a backup job, a restore script or the restore drill"
   - "Adding a hostname or a path at the edge"
 tags:
   - adr-0022
   - deploy-unit
   - release-mode
+  - journeys
   - digest
   - backup
   - restore-drill
@@ -29,7 +31,7 @@ Production runs on VPC 1 as a Coolify Postgres resource and two Compose stacks:
 - `stores` (`deploy/stores.compose.yaml`), redeployed only for a store's upgrade.
 - `platform` (`deploy/platform.compose.yaml`: `migrate` → `api` → `worker`), redeployed on every release.
 
-Every stateful service is a bind mount under `/data/<service>`. Garage is the object store, provisioned by `deploy/wizard-41.sh`. Every image deploys by digest, and the backup image is the third. Every promotion is an annotated `release/*` tag pushed once its smoke has passed, never a commit to `main`. Every call to the orchestrator must answer 2xx. Migrations are forward-only and a rollback is the previous digest; that decision lives here alone.
+Every stateful service is a bind mount under `/data/<service>`. Garage is the object store, provisioned by `deploy/wizard-41.sh`. Every image deploys by digest, and the backup image is the third. Every release that held is an annotated `release/*` tag, never a commit to `main`. A release holds once its smoke has passed, and, under `JOURNEYS_MODE=gate`, once its journeys have ended `held` too. Every call to the orchestrator must answer 2xx. Migrations are forward-only and a rollback is the previous digest; that decision lives here alone.
 
 One variable, `RELEASE_MODE`, phases the releases:
 
@@ -37,6 +39,17 @@ One variable, `RELEASE_MODE`, phases the releases:
 - `nightly`: `main`'s newest green commit is released at 02:35 UTC, once the box's own verified backup is fresh. It runs until go-live.
 - `drill`: a dispatched release names the drill report it rides on, or a hotfix reason. It runs from go-live.
 - Any other value releases nothing.
+
+The journeys sign in to production as the test people and walk the screens each role reaches. A second variable, `JOURNEYS_MODE`, stages them:
+
+- `off`, or unset: they never run, and a release is tagged on its smoke.
+- `report`: they run and report, and the tag still follows the smoke.
+- `gate`: a journeyed release is tagged only when its journeys end `held`. One that does not stays live, untagged.
+- Any other value releases nothing.
+
+Under `report` and `gate` the journeys run after every nightly or dispatched promotion whose smoke passes, before its tag. A release `build.yml` calls after a merge runs none, and keeps its smoke-only tag under every value. A scheduled night with nothing newer to promote runs them alone against the live release, in every release mode, and so does a journeys-only dispatch. They check out the commit the live api image was built from, read from the image's revision label.
+
+Until the first client uses the platform, a failed release never rolls production back: the owner decides, by the runbook's rollback. From that day, a failure re-promotes the last tagged release, unless the failed release added a migration, which alerts the owner instead. That rollback is BA-48, still to be built.
 
 Every irreplaceable byte is encrypted and copied off-host:
 
@@ -58,7 +71,12 @@ The edge is one tunnel and three hostnames. `app.` is open, with Better Auth its
 - The backup identity sits on VPC 2 because the drill runs unattended, and a drill that needs a person present stops happening. The cost: a VPC 2 compromise exposes every dump's plaintext.
 - At about sixty merges a day, a release by hand is sixty dispatches nobody makes. A drill report on every release of a platform nobody relies on yet buys nothing.
 - Nothing reaches the stores stack from GitHub but the orchestrator's API, so the nightly release rides the box's own backup rather than one CI takes.
-- The first automatic release tagged a deploy that never happened: the edge answered empty credentials with a redirect that `curl -f` counted as success. Hence 2xx only, and a tag only for a release that held, so the newest tag is always the rollback target.
+- The first automatic release tagged a deploy that never happened: the edge answered empty credentials with a redirect that `curl -f` counted as success. Hence 2xx only, and a tag only for a release that held, so the newest tag is always the last release that held, and the rollback target. Under `gate` the release production runs may be newer than that tag and untagged, with its migrations applied all the same, so a rollback first lists the migrations it would cross.
+- The smoke reads `/health` and one unauthenticated document, so a release can pass it and refuse every sign-in. Only a run signed in as each role sees that.
+- The journeys skip a release `build.yml` calls because `per-merge` lasts only until the first client's bundle lands, and journeys on every release of a platform nobody relies on yet buy nothing.
+- Every night runs them, with or without a promotion, so the alert hears from each night and a night with no run reads as a late check. They sit in the release's concurrency group, so they never overlap a release.
+- They check out the image's own commit, not `main`'s head, so a rollback night runs the old commit's journeys against the old images.
+- An automatic rollback across a migration would run an api older than its schema: a rollback below migration 0053 fails every sign-in.
 - Forward-only and the digest rollback are a decision, not a rule, because neither half is legible in a diff.
 - The api's list is the second fence because Better Auth's handler answers the wildcard on every hostname the process is given.
 
@@ -73,6 +91,7 @@ The edge is one tunnel and three hostnames. `app.` is open, with Better Auth its
 - A self-hosted dead-man's switch on VPC 2: it cannot report its own outage.
 - SOPS in the repository: one more tool, and Coolify still needs the values pasted.
 - A switch per release phase: the phases never overlap, and one name read in one place cannot contradict another.
+- A daily schedule of the journeys' own: a second place they run, which could overlap a release.
 
 ## History
 

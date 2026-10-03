@@ -51,7 +51,7 @@ tags:
 - a person's own second-factor acts: a passkey added, renamed or removed, and an authenticator added or removed (each by its id alone, since a name the person later changes never belongs on an append-only log), and recovery codes issued or used
 - a person's confirm, naming only the kind of factor it used, `passkey` or `authenticator`; an operator's restore code accepted; and their factors replaced after a recovery or restore code, naming the new factor's kind the same way
 - each sign-in, with its method as its one detail: `email_code` for a typed code, `email_link` for the sign-in link, `passkey` for a passkey
-- every operator write
+- every operator write, and the platform's restore of a person's sign-in for the operator
 - an Admin's act that ends a person's grants (ADR 0009)
 
 The sign-in and the consent are written after Better Auth's own write, and a failed row is a log line. A token's issue, refusal and refresh stay log lines. Both tables are declared in `packages/schema/src/audit-tables.ts`.

@@ -1,6 +1,6 @@
 ---
 name: browser-suite
-description: How this repository drives a browser — the served-build seam, the two client-address fixtures, the api harness's acts, locators, waiting and the accessibility gate. Use when writing, changing, debugging or running a Playwright spec under apps/web/e2e.
+description: How this repository drives a browser — the served-build seam, the two client-address fixtures, the api harness's acts, locators, waiting, the accessibility gate and the journeys. Use when writing, changing, debugging or running a Playwright spec under apps/web/e2e or a journey under apps/web/journeys.
 ---
 
 # The browser suite
@@ -110,7 +110,7 @@ call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources
 | `invite` | A waiting invitation to an address at a named role, as the invite act leaves it, with no email sent; or one accepted or cancelled, or with its expiry moved into the past |
 | `ageTheSignIn` | Moves every session a person holds to a sign-in 61 minutes ago, behind the api's back — how a spec meets `sign-in-too-old` without waiting an hour |
 | `withAnAuthenticator` | Enrols an authenticator for an address through the library, after one emailed sign-in that spends one of its codes, and answers the key a spec makes codes from with `authenticatorCodeAt`. It issues no recovery codes, and it fails for a person already holding an authenticator |
-| `restored` | The platform operator's restore as it leaves a person: marked restored, with a restore code that expires in 24 hours, which it answers. Their factors and sessions stay |
+| `restored` | The platform operator's restore, through the ops command's own act and principal: the person's factors, recovery codes and sessions end, and a restore code that expires in 24 hours is answered. No notice is sent, so a code read back afterwards is still the sign-in's |
 | `seedRoutes` | The routes a workspace has chosen; a purpose left out of the list has no route, which the screen must show rather than omit |
 | `seedBindings` | Source bindings as their acts and the worker leave them — documents, findings kept or overridden by an erasure, quarantined documents, chunks, an index run at any status, a concept and composition citing a document — answering each binding's and document's id |
 | `moveTheIndexRun` | The worker's two steps over the workspace's one index run, claimed then done, through the queue's own functions under the worker's role — how a spec watches a state word move without a worker process |
@@ -288,6 +288,74 @@ Under CI a failed test gets one retry, and the retry records a trace. A test tha
 its retry is flaky, not green. `apps/web/e2e/flaky-report.ts` names it in a warning annotation
 and in the job's summary, with its first failure, so file a ticket with the run id. Nothing is
 retried on your own machine.
+
+## The journeys
+
+The journeys sign in to production as the test workspace's three test people, an Admin, an
+Editor and a Viewer, and walk the screens each role reaches. `.github/workflows/release.yml` runs
+them after a release, and against the live release on a night with nothing to promote;
+`docs/operations/RUNBOOK.md` page 13 is the owner's side of them. They live in
+`apps/web/journeys/`: a preflight, then one spec per role, each screen a `test.step`. Their config
+is `apps/web/playwright.journeys.config.ts`, and `pnpm --filter @better-answers/web run journeys`
+runs them.
+
+They reuse the suite without changing it. `apps/web/journeys/fixtures.ts` extends the `test` from
+`apps/web/e2e/browser.ts`, so the accessibility gate is the suite's own, and each journey calls it
+on every screen it leaves. It overrides `context` and `request` with no client address, because
+production's edge sets one. A journey names its person with `test.use({ role })`, and the fixture
+signs them in on the product's own sign-in screen and signs them out on the server afterwards,
+even after a failure. The locators come from `apps/web/e2e/locators.ts`, which `harness.ts`
+re-exports. Production has no harness, so `.oxlintrc.json` refuses any harness act under
+`apps/web/journeys/` except `codeSentTo`, the harness code source below.
+
+| | The browser suite | The journeys |
+| --- | --- | --- |
+| The server | Playwright starts `apps/api/tests/serve.ts` | None: the base URL is `PUBLIC_URL`, and the config refuses to load without an http or https address |
+| Workers | Fully parallel | One, one journey at a time |
+| Projects | `chromium` | `preflight`, which signs nobody in, then `roles`, which depends on it |
+| Retries | One, under CI | None: each Send spends a ceiling the release, a rerun and the owner share |
+| `test.only` | Refused under CI | Refused everywhere: a focused journey would run alone and report `held` |
+| Traces, screenshots and video | A trace on the retry | Off: a trace, screenshot or video of a signed-in screen would publish a live session |
+| Reporter | `list` and the flaky report | The outcome reporter alone, so no failure's detail, which can hold an address, reaches a public log |
+
+The Admin's journey reads the test workspace before any act. A workspace that differs from its
+fixture stops the run `could-not-run`, and nobody else signs in.
+
+`JOURNEYS_CODE_SOURCE` names where a sign-in's code is read. Unset, or any other value, it ends
+the run `could-not-run`:
+
+- **`inbox`**, which the release's journeys step sets: the code comes from the test inbox,
+  `apps/test-inbox`, through its API, and only from an email whose DKIM signature verifies as
+  production's sender's. It needs `JOURNEYS_INBOX_URL`, `JOURNEYS_INBOX_KEY` and `JOURNEYS_SENDER`.
+- **`harness`**, for a run by hand against the browser suite's api, `apps/api/tests/serve.ts`:
+  `codeSentTo` reads the code from its capture, which no email leaves.
+
+Both read the test people's addresses from `JOURNEYS_ADMIN_EMAIL`, `JOURNEYS_EDITOR_EMAIL` and
+`JOURNEYS_VIEWER_EMAIL`. By hand, build first, start the api with
+`pnpm --filter @better-answers/api run serve:e2e <port>`, and make the test workspace through
+`POST /__harness/test-workspaces`, the fixture command's own act, which
+`apps/api/tests/harness-control.ts` mounts and no spec calls. It takes a testing domain, a slug and
+the three addresses. Then:
+
+```bash
+PUBLIC_URL=http://localhost:<port> JOURNEYS_CODE_SOURCE=harness \
+  JOURNEYS_ADMIN_EMAIL=… JOURNEYS_EDITOR_EMAIL=… JOURNEYS_VIEWER_EMAIL=… \
+  pnpm --filter @better-answers/web run journeys
+```
+
+A run ends in one word, which `apps/web/journeys/outcome-reporter.ts` writes to
+`apps/web/test-results/journeys-outcome` for the release to read: `held` once a role journey ran
+and every test passed, `fail` when a screen's step failed, and `could-not-run` when the run could
+not judge the release. `could-not-run` outranks `fail`. A journey raises those two through
+`couldNotRun` and `failed` in `apps/web/journeys/outcome.ts`. The run's summary names the role,
+the screen and the step from the steps' titles and those reasons alone, never an error's message,
+which can hold an address, so write a reason that names none. The reporter prints no error
+either; by hand, add `--reporter=list` to read one.
+
+`check:web` never runs a journey, since the suite's `testDir` is `e2e`, and nor does a pull
+request or the merge queue. Its typecheck does cover them, so renaming a word they read from a
+word table fails `check` before it lands. A change to a screen a journey walks changes that
+journey in the same pull request and runs it by hand as above (`docs/agents/workflow.md`).
 
 ## Carried from Onyx
 

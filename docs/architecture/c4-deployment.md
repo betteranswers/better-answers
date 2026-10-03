@@ -1,13 +1,13 @@
 # Deployment — two boxes, two stacks, one tunnel
 
-The estate ADRs 0022 and 0024 fix: two IONOS boxes of 4 vCPU · 4 GB · 120 GB NVMe, production on one, Coolify and the mirror on the other, every image deployed by digest, every irreplaceable byte encrypted off-host. The files are `deploy/stores.compose.yaml`, `deploy/platform.compose.yaml` and, for staging only, `deploy/staging.override.yaml` and `deploy/staging.platform.override.yaml`; the release is `.github/workflows/release.yml`; the operations documents are under `docs/operations/`. What runs on a schedule and who watches it is `c4-dynamic-scheduled-work.md`.
+The estate ADRs 0022 and 0024 fix: two IONOS boxes of 4 vCPU · 4 GB · 120 GB NVMe, production on one, Coolify and the mirror on the other, every image deployed by digest, every irreplaceable byte encrypted off-host. The files are `deploy/stores.compose.yaml`, `deploy/platform.compose.yaml` and, for staging only, `deploy/staging.override.yaml` and `deploy/staging.platform.override.yaml`; the release is `.github/workflows/release.yml`; the test inbox its journeys read is `apps/test-inbox`; the operations documents are under `docs/operations/`. What runs on a schedule and who watches it is `c4-dynamic-scheduled-work.md`.
 
 ```mermaid
 C4Deployment
   title Deployment diagram — the v0.1 estate
 
   Deployment_Node(github, "GitHub", "Actions and ghcr.io", "Builds on main; releases per merge, nightly or on dispatch, as RELEASE_MODE says") {
-    Container_Ext(release, "release.yml", "workflow_call from build.yml; nightly schedule; workflow_dispatch", "Resolves its commit's digests, sets them in Coolify, deploys, smokes, then tags the release")
+    Container_Ext(release, "release.yml", "workflow_call from build.yml; nightly schedule; workflow_dispatch, journeys_only too", "gate; promote sets the digests in Coolify, deploys, smokes; journeys signs in as the test people; record tags; report pings")
     Container_Ext(registry, "Image registry", "ghcr.io, private", "api, worker and backup images pushed by build.yml on main, pulled by digest")
   }
 
@@ -42,7 +42,11 @@ C4Deployment
   Deployment_Node(offhost, "Off-host", "Backblaze B2, EU; healthchecks.io", "Nothing here holds a plaintext client byte") {
     ContainerDb(dumps, "Dumps bucket", "S3, versioned, object lock in governance mode", "Encrypted Postgres dumps 48 h · 30 d · 8 w · 6 m; encrypted git bundles under git/; drill reports; the host credential can write and list, never delete")
     ContainerDb(mirrorbucket, "Mirror bucket", "S3, versioned, unlocked, 30-day non-current expiry", "The object-store mirror, so erasure deletions propagate")
-    Container_Ext(healthchecks, "Dead-man switch", "healthchecks.io", "scheduler, sweeps, pg-hourly, nightly, drill, staging-wiped, uptime")
+    Container_Ext(healthchecks, "Dead-man switch", "healthchecks.io", "scheduler, sweeps, pg-hourly, nightly, drill, staging-wiped, uptime; journeys, in a project of its own")
+  }
+
+  Deployment_Node(testzone, "Cloudflare — the testing zone", "a zone of its own on the testing domain, apart from the product's; Email Routing, one catch-all", "Outside the estate: the owner deploys it by hand with a pinned wrangler; no image carries it, nothing in CI deploys it") {
+    Container_Ext(testinbox, "Test inbox", "Cloudflare Email Worker and its D1 table, apps/test-inbox", "Keeps a day of what reaches the testing domain and judges nothing; its API answers the inbox key alone")
   }
 
   Rel(edge, cloudflared, "Reaches over the tunnel", "outbound from cloudflared")
@@ -60,7 +64,11 @@ C4Deployment
   Rel(backup, healthchecks, "Pings pg-hourly and nightly after a verified upload", "HTTPS")
   Rel(api, healthchecks, "Pings scheduler each minute and sweeps each day", "HTTPS")
   Rel(release, coolify, "PATCHes API_IMAGE_DIGEST and WORKER_IMAGE_DIGEST, POSTs /deploy, through Cloudflare Access", "HTTPS, Coolify API")
-  Rel(release, edge, "Waits until /health names the promoted api digest", "HTTPS")
+  Rel(release, edge, "Waits until /health names the api digest; signs in on app. as the test people and walks their screens", "HTTPS, Playwright and Chromium")
+  Rel(release, registry, "Reads the revision label of the live api image from", "HTTPS, registry API")
+  Rel(release, testinbox, "Reads each test person's sign-in email from, through its API", "HTTPS, bearer key")
+  Rel(release, healthchecks, "Pings journeys with the outcome word", "HTTPS")
+  Rel(api, testinbox, "Sends the test people's sign-in codes to, through Resend's relay and the catch-all", "SMTP")
   Rel(coolify, migrate, "Starts a release: migrate, then api, then worker", "SSH, docker compose")
   Rel(coolify, registry, "Pulls by digest from", "read-only token")
   Rel(staging, dumps, "Restores from, in a drill", "rclone")
@@ -74,7 +82,9 @@ C4Deployment
 ## What the diagram claims
 
 - **Two stacks because a Coolify redeploy restarts the whole resource.** The stores stack holds the tunnel and the stores and is redeployed a few times a year; the platform stack is redeployed on every release. `depends_on` is a convenience; the safety is in the process — `migrate` waits for the DSN and stamps the contract digest after the journal, and the worker compares its committed schema view and its baked contract digest to the two stamps and claims nothing until they agree (ADRs 0007, 0031).
-- **A release is a workflow, not a push.** `release.yml` runs as the repository variable `RELEASE_MODE` says: called by `build.yml` after every green build on `main` (`per-merge`), on a schedule at 02:35 UTC once the box's own backup is fresh (`nightly`), or dispatched by the operator with a drill report or a hotfix reason (`drill`), and dispatched for a rollback in any mode. It takes its commit's images by their `sha-<short>` tag unless digests are passed, never moves production back to an older commit, PATCHes `API_IMAGE_DIGEST` and `WORKER_IMAGE_DIGEST` on the platform resource and POSTs Coolify's `/deploy` — both through Cloudflare Access with a service token, and each refused unless it answers 2xx — then runs the smoke: `deploy/await-release.sh` waits until `/health` names the promoted api digest, then the protected-resource document is read (ADR 0022; T-364). Only a release whose smoke passed is recorded, as an annotated `release/<stamp>` tag. The backup image is not in the release: its digest is set on the stores stack from `build.yml`'s run summary, on the stores' own upgrade.
+- **A release is a workflow, not a push.** `release.yml` runs as the repository variable `RELEASE_MODE` says: called by `build.yml` after every green build on `main` (`per-merge`), on a schedule at 02:35 UTC once the box's own backup is fresh (`nightly`), or dispatched by the operator with a drill report or a hotfix reason (`drill`), and dispatched for a rollback in any mode. It takes its commit's images by their `sha-<short>` tag unless digests are passed, never moves production back to an older commit, PATCHes `API_IMAGE_DIGEST` and `WORKER_IMAGE_DIGEST` on the platform resource and POSTs Coolify's `/deploy` — both through Cloudflare Access with a service token, and each refused unless it answers 2xx — then runs the smoke: `deploy/await-release.sh` waits until `/health` names the promoted api digest, then the protected-resource document is read (ADR 0022; T-364). Five jobs carry it: `gate` decides, `promote` deploys and smokes with read access alone, `journeys` runs the journeys, `record` tags and `report` pings. `record` is the only job with write access: it checks out promote's head, reads `/health` again and pushes the annotated `release/<stamp>` tag. While the repository variable `JOURNEYS_MODE` is `off` or `report` a release is recorded on its smoke, and under `gate` only once its journeys end `held`. A release `build.yml` calls after a merge never runs the journeys and is recorded on its smoke. The backup image is not in the release: its digest is set on the stores stack from `build.yml`'s run summary, on the stores' own upgrade.
+- **The journeys sign in to production as the test people.** They run after a promote whose smoke passed, alone on a scheduled night with nothing newer to promote, and alone on a `journeys_only` dispatch. The `journeys` job checks that `/health` names the api digest under test, reads the commit that image was built from off its `org.opencontainers.image.revision` label in the registry (`deploy/build-commit.sh`), checks it out and runs its journeys against `app.` through the public edge. The run ends in one word, `held`, `fail` or `could-not-run`, which `report` pings to the `journeys` check; a missed ping never fails the run. A run that does not hold rolls nothing back: whether to roll back is the owner's decision, as for any release (`docs/operations/RUNBOOK.md`, pages 6 and 13).
+- **The test inbox is outside the estate.** `apps/test-inbox` is a Cloudflare Email Worker and its D1 table, on a testing domain of its own whose zone is apart from the product's. Production's sign-in email to a test person goes out through Resend like any other, and the testing zone's Email Routing catch-all hands it to the Worker. The Worker keeps it for a day and judges nothing: the journeys check each email's DKIM signature themselves. Its API answers only the inbox key, which the `production` environment holds with the test people's addresses. The owner deploys it by hand with the pinned `wrangler`; no image carries it and nothing in CI deploys it.
 - **Three product hostnames, not four, and none behind Access.** `app.` carries the SPA, sign-in, consent, `/oauth2/*`, discovery, `/jwks` and `/mcp`; `agent.` is routed only to `/agent/v1/*`, unbuilt; the apex answers 404. `mcp.` is gone and `docs.` struck (ADR 0034; ADR 0022, amended 2026-09-03). The api derives `app.` from `PUBLIC_URL` and refuses to start unless all three differ. Cloudflare Access guards only the orchestrator's API the release calls; its hostname is estate configuration, in the private file.
 - **What is never backed up**: every per-binding LMDB store (disposable, rebuilt by the next run), the worker's working trees and caches. The graph rides every dump and every restore as ordinary tables (ADR 0032).
 - **Every dump is a personal-data copy**, so every restore replays the erasures completed after the dump before `api` turns healthy — `pnpm ops replay-erasures --since <dump>`, step 5 of `restore-drill.sh` and step 6 of `restore-production.sh` — and the erasure report's dates are computed from the last dump before the rewrite (ADRs 0020, 0022).

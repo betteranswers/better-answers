@@ -28,6 +28,7 @@ import {
   provisionWorkspace,
   readMembership,
   renameWorkspace,
+  restoreSignIn,
   revokeCredentials,
   revokeWorkspaceTokens,
   setOperatorMark,
@@ -894,6 +895,10 @@ describe("what the slice answers when the store cannot be reached", () => {
         await setOperatorMark(bootstrap, door, { email: "acme@example.invalid", change: "grant" }),
       ],
       ["operatorAddresses", await operatorAddresses(bootstrap, door)],
+      [
+        "restoreSignIn",
+        await restoreSignIn(bootstrap, door, { email: "acme@example.invalid", now: at }),
+      ],
     ];
 
     for (const [name, answered] of answers) {

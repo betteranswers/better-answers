@@ -53,7 +53,13 @@ export {
 } from "./display-name.ts";
 export type { SetDisplayNameRefusal } from "./display-name.ts";
 export { listWorkspaces } from "./listing.ts";
-export { operatorAddresses, setOperatorMark, standingAsOperator } from "./operator.ts";
+export {
+  operatorAddresses,
+  restoreSignIn,
+  setOperatorMark,
+  standingAsOperator,
+} from "./operator.ts";
+export type { SignInRestored } from "./operator.ts";
 export { inspectPerson, inspectPersonInput, listPeople, listPeopleInput } from "./people.ts";
 export {
   applyPasskeyNameRule,

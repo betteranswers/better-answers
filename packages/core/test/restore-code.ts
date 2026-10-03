@@ -9,7 +9,8 @@ import { restoreCodeFor } from "./identity-rows.ts";
 const RESTORE_CODE_LIFETIME_MS = 24 * 60 * 60_000;
 
 /**
- * An operator's restore: the person marked restored, a fresh code kept as its hash. Answers the code.
+ * As a session outliving a restore meets it: marked, a hashed code, sessions and factors kept.
+ * Answers the code.
  * @throws when no person holds `email`.
  */
 export const restoredWithACode = async (

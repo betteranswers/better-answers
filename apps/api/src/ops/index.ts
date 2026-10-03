@@ -63,11 +63,13 @@ import {
   principalOfMember,
   provisionWorkspace,
   renameWorkspace,
+  restoreSignIn,
   setOperatorMark,
   type AddMemberRefusal,
   type AddPersonRefusal,
   type ProvisionRefusal,
   type RenameRefusal,
+  type SignInRestored,
 } from "@better-answers/core/workspaces";
 import {
   bundleCommit,
@@ -87,6 +89,8 @@ import {
 } from "@better-answers/schema";
 
 import { doorTold, type Doors } from "../doors.ts";
+import type { Mail } from "../email.ts";
+import { sendFactorNotice } from "../factor-notice-email.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
 import { isRefusalWord, refusalOf, type RefusalWord } from "../refusal.ts";
 
@@ -122,6 +126,9 @@ export type OpsIo = {
   readonly writeReport?: ((path: string, body: string) => Promise<void>) | undefined;
 
   readonly readTree?: ((directory: string) => Promise<BundleTree>) | undefined;
+
+  /** Absent where no email transport is configured, so an act that must notify refuses. */
+  readonly mail?: Mail | undefined;
 };
 
 /** Takes a dump stamp (`20260601T120000Z`) or any instant `Date` reads; `undefined` is neither. */
@@ -210,6 +217,7 @@ const USAGE_TEXT = `usage: pnpm ops <command> [options]
   rename-workspace --workspace <id> [--name <name>] [--slug <slug>]
                                                             the workspace's name, its slug, or both; at least one is named, and the other kept
   operator --email <email> --grant|--revoke                 a signed-in person made the platform's operator, or no longer; each change on the identity-set audit log
+  restore-sign-in --email <email>                           a person who lost every factor and code, once you have checked who they are another way: their factors and sessions ended, a notice sent, a one-time restore code printed
   import-bundle --workspace <id> --from <directory> --as <member email> [--sensitivity <class>] [--dry-run]
                                                             the company's bundle landed through the governed write, its checks imported, its links rewritten to iris
     --sensitivity  one of ${SENSITIVITIES.join(" · ")} (default ${IMPORT_SENSITIVITY_DEFAULT})
@@ -1300,6 +1308,52 @@ const operatorCommand = async (doors: Doors, flags: Flags, io: OpsIo): Promise<n
   return DONE;
 };
 
+const RESTORE_USAGE = "restore-sign-in: --email <email> is required";
+
+const NO_MAIL =
+  "no email transport is configured (SMTP_URL on the api service), so the restore notice cannot go; nothing changed";
+
+const restoredSaid = (restored: SignInRestored, noticed: boolean): readonly string[] => [
+  `restore-sign-in: done — ${restored.email} holds no passkey, authenticator or recovery code now, and every session of theirs is signed out`,
+  noticed
+    ? `restore-sign-in: a notice of the restore went to ${restored.email}`
+    : `restore-sign-in: the notice to ${restored.email} did not go; tell them of the restore yourself`,
+  `restore-sign-in: their restore code, good once until ${restored.expiresAt.toISOString()}: ${restored.code}`,
+  "restore-sign-in: run this only once you have checked who they are by a route other than their email, and hand them the code by that same route, never by email",
+];
+
+/** The code goes to stdout alone: never to the logger, and never in the notice. */
+const restoreSignInCommand = async (doors: Doors, flags: Flags, io: OpsIo): Promise<number> => {
+  const email = flagValue(flags, "email");
+  if (email === undefined) {
+    io.say(RESTORE_USAGE);
+    return USAGE;
+  }
+  if (io.mail === undefined) {
+    io.say(`restore-sign-in: REFUSED — ${NO_MAIL}`);
+    return REFUSED;
+  }
+  const restored = await restoreSignIn(IDENTITY_PRINCIPAL, doors.postgres, {
+    email,
+    now: doors.clock.now(),
+  });
+  if (!restored.ok) {
+    const reason =
+      restored.error === "no-such-user"
+        ? `no-such-user: ${email} is no one's address here; nothing changed`
+        : restored.error.message;
+    io.say(`restore-sign-in: REFUSED — ${reason}`);
+    return exitOf(restored.error);
+  }
+  const noticed = await sendFactorNotice(
+    { mail: io.mail, log: io.logger },
+    restored.value.email,
+    "sign-in-restored",
+  );
+  for (const line of restoredSaid(restored.value, noticed)) io.say(line);
+  return DONE;
+};
+
 const SLICE_RUNNERS = {
   "graph-rebuild": graphRebuildCommand,
   "graph-sweep": (doors, workspaceId, _flags, io) => graphSweepCommand(doors, workspaceId, io),
@@ -1329,6 +1383,7 @@ const SLICELESS_COMMANDS = new Map<
   ["test-workspace", testWorkspaceCommand],
   ["rename-workspace", renameWorkspaceCommand],
   ["operator", operatorCommand],
+  ["restore-sign-in", restoreSignInCommand],
 ]);
 
 /**
