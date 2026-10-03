@@ -119,7 +119,7 @@ const messageOf = async (
  * No recipient or sender, so no reader takes a row a failed delete leaves; the day's prune
  * removes it.
  */
-const PROBE: Omit<Received, "receivedAtMs"> = {
+const PROBE_ROW: Omit<Received, "receivedAtMs"> = {
   recipient: "",
   from: "",
   subject: "",
@@ -128,7 +128,7 @@ const PROBE: Omit<Received, "receivedAtMs"> = {
 
 const probed = async (database: Database, nowMs: number): Promise<Result<undefined>> => {
   const id = mintedId(nowMs);
-  await inserted(database, id, { ...PROBE, receivedAtMs: nowMs });
+  await inserted(database, id, { ...PROBE_ROW, receivedAtMs: nowMs });
   await database.prepare(FORGET).bind(id).run();
   return ok(undefined);
 };

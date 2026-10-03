@@ -20,7 +20,7 @@ const RECEIVING = "/emails/receiving";
 
 const ONE_MESSAGE = /^\/emails\/receiving\/([^/]+)$/;
 
-const PROBE = "/probe";
+const PROBE_PATH = "/probe";
 
 const LIMIT_MOST = 100;
 
@@ -35,7 +35,11 @@ type Body =
   | { readonly name: string }
   | { readonly probed: true };
 
-const answered = (status: number, body: Body, headers: Readonly<Record<string, string>> = {}) =>
+const answered = (
+  status: number,
+  body: Body,
+  headers: Readonly<Record<string, string>> = {},
+): Response =>
   Response.json(body, { status, headers: { "cache-control": "no-store", ...headers } });
 
 const refused = (status: number, name: string): Response => answered(status, { name });
@@ -114,7 +118,7 @@ type Route = {
 /** Matches the id as the path carries it, so a malformed escape is an unknown id, not a throw. */
 const routeOf = (pathname: string): Route | undefined => {
   if (pathname === RECEIVING) return { allowed: "GET", answer: listed };
-  if (pathname === PROBE) return { allowed: "POST", answer: probed };
+  if (pathname === PROBE_PATH) return { allowed: "POST", answer: probed };
   const id = ONE_MESSAGE.exec(pathname)?.[1];
   return id === undefined ? undefined : { allowed: "GET", answer: (api) => retrieved(api, id) };
 };

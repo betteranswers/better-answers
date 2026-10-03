@@ -56,9 +56,6 @@ const UNVERIFIED = { answer: "unverified" } as const;
 const NO_MAIL = { answer: "no-mail" } as const;
 const NO_CODE = { answer: "no-code" } as const;
 
-type Page = TestInboxPage;
-type Listed = TestInboxListed;
-
 const PROBED = z.object({ probed: z.literal(true) });
 
 const KEY = z.string().min(1);
@@ -96,7 +93,7 @@ const fetched = async <T>(
 };
 
 type Client = {
-  readonly page: (after: string | undefined) => Promise<Page | undefined>;
+  readonly page: (after: string | undefined) => Promise<TestInboxPage | undefined>;
   readonly message: (id: string) => Promise<TestInboxMessage | undefined>;
 };
 
@@ -145,7 +142,7 @@ type Watch = {
 const arrivalsAfter = async (
   watch: Watch,
   after: string | undefined,
-): Promise<readonly Listed[] | undefined> => {
+): Promise<readonly TestInboxListed[] | undefined> => {
   const page = await watch.client.page(after);
   if (page === undefined) return undefined;
   const firstNoted = page.data.findIndex(({ id }) => watch.noted.has(id));
@@ -159,7 +156,7 @@ const arrivalsAfter = async (
 const addressOf = (mailbox: string): string =>
   (/<([^<>]*)>\s*$/.exec(mailbox)?.[1] ?? mailbox).trim().toLowerCase();
 
-const isCandidate = (watch: Watch, listed: Listed): boolean =>
+const isCandidate = (watch: Watch, listed: TestInboxListed): boolean =>
   addressOf(listed.from) === watch.sender &&
   listed.to.some((to) => addressOf(to) === watch.recipient);
 
@@ -239,7 +236,7 @@ type Verdicts = ReadonlyMap<string, Verdict>;
 const withVerdicts = async (
   watch: Watch,
   verdicts: Verdicts,
-  candidates: readonly Listed[],
+  candidates: readonly TestInboxListed[],
   deadlineAt: number,
 ): Promise<Verdicts | undefined> => {
   let known = verdicts;
@@ -248,7 +245,7 @@ const withVerdicts = async (
     const message = await watch.client.message(id);
     if (message === undefined) return undefined;
     const verdict = await judged(watch, Buffer.from(message.raw, "base64"), id);
-    if (verdict !== LOOK_AGAIN) known = new Map([...known, [id, verdict]]);
+    if (verdict !== LOOK_AGAIN) known = new Map(known).set(id, verdict);
   }
   return known;
 };
@@ -295,7 +292,7 @@ const codeWithin = async (watch: Watch, verdicts: Verdicts, timing: Timing): Pro
   return poll;
 };
 
-const watchOf = (inbox: Inbox, client: Client, page: Page): Watch => {
+const watchOf = (inbox: Inbox, client: Client, page: TestInboxPage): Watch => {
   const sender = addressOf(inbox.sender);
   return {
     client,
