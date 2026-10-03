@@ -2845,9 +2845,9 @@ describe("pnpm ops — the restore scripts' commands", () => {
       );
     });
 
-    it("accepts the restore code once, refusing it again", async () => {
+    it("accepts the code once, however the address was typed", async () => {
       const person = await app().person();
-      const code = codeIn(await restoring(person.email));
+      const code = codeIn(await restoring(person.email.toUpperCase()));
       const client = await signedInClient(app(), person.email);
 
       const first = await client.json("/second-factor/restore", { code });
