@@ -30,6 +30,7 @@ import {
   claudesAuthorizeUrl,
   clockTheNextKey,
   codeSentTo,
+  confirmedWhenAsked,
   invite,
   keystrokesDismissed,
   keystrokesListed,
@@ -363,6 +364,7 @@ test("a new code sent from the code step signs in", async ({
   await passesTheAccessibilityGate();
   await codeField(page).fill(await codeSentTo(request, email));
 
+  await confirmedWhenAsked(page, request, email);
   await landedAtHome(page, "Admin");
 });
 
@@ -435,6 +437,7 @@ for (const [named, between] of [
 
     await pastedIntoTheField(page, `${code.slice(0, 3)}${between}${code.slice(3)}`);
 
+    await confirmedWhenAsked(page, request, email);
     await landedAtHome(page, "Admin");
   });
 }
@@ -518,17 +521,28 @@ test("an expired code reads as spent, handing focus to another", async ({ page, 
   await anotherCodeSignsIn(page, request, email);
 });
 
-test("a code typed in another tab lands the waiting one", async ({ page, context, request }) => {
+/**
+ * A following tab reads where to go before the other tab confirms, so an Editor, needing no second
+ * factor, shows the following alone.
+ */
+const anEditorOf = async (request: APIRequestContext, name: string): Promise<string> => {
   const email = anAddress("tabs");
-  await provision(request, { name: "Two Tabs Ltd", adminEmail: email });
+  const who = await person(request, email, { displayName: "Tam Editor" });
+  const workspace = await provision(request, { name });
+  await addMember(request, { workspaceId: workspace.workspaceId, userId: who.id, role: "Editor" });
+  return email;
+};
+
+test("a code typed in another tab lands the waiting one", async ({ page, context, request }) => {
+  const email = await anEditorOf(request, "Two Tabs Ltd");
   await atTheCodeStep(page, email);
 
   const other = await context.newPage();
   await other.goto("/sign-in");
   await signIn(other, request, email);
-  await landedAtHome(other, "Admin");
+  await landedAtHome(other, "Editor");
 
-  await landedAtHome(page, "Admin");
+  await landedAtHome(page, "Editor");
 });
 
 test("a tab waiting on one address ignores another's sign-in", async ({
@@ -549,6 +563,7 @@ test("a tab waiting on one address ignores another's sign-in", async ({
   });
 
   await codeField(page).pressSequentially(await codeSentTo(request, email));
+  await confirmedWhenAsked(page, request, email);
   await landedAtHome(page, "Admin");
 });
 
@@ -560,8 +575,7 @@ test("a tab whose first read failed still follows a sign-in", async ({
   context,
   request,
 }) => {
-  const email = anAddress("unread");
-  await provision(request, { name: "Unread Ltd", adminEmail: email });
+  const email = await anEditorOf(request, "Unread Ltd");
   await page.goto("/sign-in");
   const unread = Promise.withResolvers<void>();
   let refused = 0;
@@ -580,7 +594,7 @@ test("a tab whose first read failed still follows a sign-in", async ({
   await other.goto("/sign-in");
   await signIn(other, request, email);
 
-  await landedAtHome(page, "Admin");
+  await landedAtHome(page, "Editor");
 });
 
 test("a tab hidden through a sign-in lands once shown", async ({ page, context, request }) => {
@@ -613,6 +627,7 @@ test("a shown tab waits for a sign-in of its own", async ({ page, request }) => 
   await shownAs(page, "hidden");
   await stillWaitingOnceReread(page, () => shownAs(page, "visible"));
   await codeField(page).pressSequentially(await codeSentTo(request, email));
+  await confirmedWhenAsked(page, request, email);
   await landedAtHome(page, "Admin");
 
   expect(await sessionHeldBy(page), "the tab landed on the session that stood").not.toBe(standing);

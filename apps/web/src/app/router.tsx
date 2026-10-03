@@ -15,7 +15,11 @@ import { z } from "zod";
 
 import { AcceptInvitationScreen } from "@/features/auth/accept-invitation-screen.tsx";
 import { AccountPage } from "@/features/auth/account-page.tsx";
-import { displayNameDetour, signedOutDetour } from "@/features/auth/auth-hooks.ts";
+import {
+  displayNameDetour,
+  signedOutDetour,
+  signedOutOfAStep,
+} from "@/features/auth/auth-hooks.ts";
 import { backTo, leavingFor, pageQuery } from "@/features/auth/carried-flow.ts";
 import { ChooseWorkspaceScreen } from "@/features/auth/choose-workspace-screen.tsx";
 import { DisplayNameScreen } from "@/features/auth/display-name-screen.tsx";
@@ -24,16 +28,21 @@ import {
   membershipRefusal,
   NEEDS_A_PICK,
   roleHeld,
+  SECOND_FACTOR_PENDING,
   useMembership,
 } from "@/features/auth/membership.ts";
 import { NoWorkspaceScreen } from "@/features/auth/no-workspace-screen.tsx";
+import { detourAfter } from "@/features/auth/pending-refusal.ts";
 import { ConfirmScreen, RecoveryScreen } from "@/features/auth/second-factor-screens.tsx";
 import {
   CODES_STEP,
   codesDetour,
   CONFIRM_STEP,
+  detourTo,
+  pendingDetour,
   RECOVERY_STEP,
   SETUP_STEP,
+  type LeftFrom,
 } from "@/features/auth/second-factor-steps.ts";
 import { CodesScreen, SetupScreen } from "@/features/auth/setup-screen.tsx";
 import { SignInScreen } from "@/features/auth/sign-in-screen.tsx";
@@ -47,6 +56,7 @@ import { MemberPage } from "@/features/people/member-page.tsx";
 import { PERSON_ID } from "@/features/people/members-address.ts";
 import { MEMBERS_TOOLBAR, MembersScreen } from "@/features/people/members-screen.tsx";
 import { BINDINGS_TOOLBAR, BindingsScreen } from "@/features/sources/bindings-screen.tsx";
+import type { FailedDuring } from "@/shared/api/query-client.ts";
 import { createApiProxy, type ApiProxy } from "@/shared/api/trpc.ts";
 import {
   CONSOLE,
@@ -110,6 +120,23 @@ const BUILT_DETAILS: ReadonlyMap<string, BuiltDetail> = new Map<ScreenPath, Buil
 
 type ShellContext = { readonly queryClient: QueryClient; readonly api: ApiProxy };
 
+/** The router's address, and the address bar's query, which alone keeps a signed flow whole. */
+const leftFrom = (location: { readonly href: string }): LeftFrom => ({
+  href: location.href,
+  query: pageQuery(),
+});
+
+/** A pending session confirms before any page that reads what the gate holds. */
+const confirmedFirst = async (
+  context: ShellContext,
+  location: { readonly href: string },
+  afresh = false,
+): Promise<void> => {
+  const from = leftFrom(location);
+  const elsewhere = await pendingDetour(context.queryClient, context.api, from, afresh);
+  if (elsewhere !== undefined) throw redirect(leavingFor(elsewhere));
+};
+
 const rootRoute = createRootRouteWithContext<ShellContext>()({
   component: Outlet,
   notFoundComponent: () => <UnknownScreen />,
@@ -144,8 +171,8 @@ const pendingRoute = <const Path extends string>(path: Path, component: () => Re
     getParentRoute: () => rootRoute,
     path,
     component,
-    beforeLoad: async ({ context, location }) => {
-      const elsewhere = await signedOutDetour(context.queryClient, location.href);
+    beforeLoad: async ({ context }) => {
+      const elsewhere = await signedOutOfAStep(context.queryClient, pageQuery());
       if (elsewhere !== undefined) throw redirect(leavingFor(elsewhere));
     },
   });
@@ -175,19 +202,23 @@ const accountRoute = createRoute({
   beforeLoad: async ({ context, location }) => {
     const elsewhere = await signedOutDetour(context.queryClient, location.href);
     if (elsewhere !== undefined) throw redirect(leavingFor(elsewhere));
+    await confirmedFirst(context, location);
   },
 });
 
+/** A pending "connect Claude" flow lands here, and keeps its signed query through confirm. */
 const chooseWorkspaceRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/choose-workspace",
   component: ChooseWorkspaceScreen,
+  beforeLoad: ({ context, location }) => confirmedFirst(context, location),
 });
 
 const noWorkspaceRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/no-workspace",
   component: NoWorkspaceScreen,
+  beforeLoad: ({ context, location }) => confirmedFirst(context, location),
 });
 
 /** Outside the shell: the person joining holds no membership of the workspace yet. */
@@ -202,10 +233,29 @@ const acceptInvitationRoute = createRoute({
   beforeLoad: async ({ context, location }) => {
     const elsewhere = await signedOutDetour(context.queryClient, location.pathname);
     if (elsewhere !== undefined) throw redirect(leavingFor(elsewhere));
+    await confirmedFirst(context, location);
   },
 });
 
 const signInAndBackTo = (href: string) => ({ href: backTo("/sign-in", href), replace: true });
+
+/** Asked afresh: the refusal says the session is pending, and a held read may predate that. */
+const confirmAndBackTo = async (context: ShellContext, location: { readonly href: string }) => {
+  const from = leftFrom(location);
+  const detour = await pendingDetour(context.queryClient, context.api, from, true);
+  return leavingFor(detour ?? detourTo(CONFIRM_STEP, from));
+};
+
+const shellDetour = (
+  context: ShellContext,
+  location: { readonly href: string },
+  refusal: string,
+) => {
+  if (refusal === NEEDS_A_PICK) return { href: "/choose-workspace", replace: true };
+  return refusal === SECOND_FACTOR_PENDING
+    ? confirmAndBackTo(context, location)
+    : signInAndBackTo(location.href);
+};
 
 const shellRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -217,11 +267,7 @@ const shellRoute = createRoute({
     const refusal = await membershipRefusal(context.queryClient, context.api);
     if (refusal === undefined) return;
 
-    throw redirect(
-      refusal === NEEDS_A_PICK
-        ? { href: "/choose-workspace", replace: true }
-        : signInAndBackTo(location.href),
-    );
+    throw redirect(await shellDetour(context, location, refusal));
   },
 });
 
@@ -264,9 +310,12 @@ const consoleRoute = createRoute({
   notFoundComponent: () => <UnknownScreen home={HOMES.operator} />,
   // Asked afresh on the way in, and not again on each move between the console's own screens.
   beforeLoad: async ({ context, location, cause }) => {
-    if (await mustSignInForTheConsole(context.queryClient, context.api, cause === "enter")) {
+    const afresh = cause === "enter";
+    if (await mustSignInForTheConsole(context.queryClient, context.api, afresh)) {
       throw redirect(signInAndBackTo(location.href));
     }
+    // The operator's standing never refuses a pending session, so the console asks itself.
+    await confirmedFirst(context, location, afresh);
   },
 });
 
@@ -423,7 +472,27 @@ const consoleRoutes = routesOf([CONSOLE], consoleRoute, {
   home: HOMES.operator,
 });
 
+/** Each failure is heard where it happened, and acted on only if the person is still there. */
+const detouringOn =
+  (
+    context: ShellContext,
+    routing: {
+      readonly at: () => LeftFrom & { readonly pathname: string };
+      readonly go: (href: string) => void;
+    },
+  ) =>
+  (failure: Error, during: FailedDuring) => {
+    const at = routing.at();
+    void detourAfter(failure, during, at, context).then((href) => {
+      if (href !== undefined && routing.at().href === at.href) routing.go(href);
+    });
+  };
+
 export const createAppRouter = (clients: AppClients, history?: RouterHistory) => {
+  const context = {
+    queryClient: clients.queryClient,
+    api: createApiProxy(clients.apiClient, clients.queryClient),
+  };
   const options = {
     routeTree: rootRoute.addChildren([
       signInRoute,
@@ -441,14 +510,21 @@ export const createAppRouter = (clients: AppClients, history?: RouterHistory) =>
       consoleRoute.addChildren([consoleIndexRoute, ...consoleRoutes]),
     ]),
 
-    context: {
-      queryClient: clients.queryClient,
-      api: createApiProxy(clients.apiClient, clients.queryClient),
-    },
+    context,
     defaultErrorComponent: FailedScreen,
   };
 
-  return history === undefined ? createRouter(options) : createRouter({ ...options, history });
+  const router =
+    history === undefined ? createRouter(options) : createRouter({ ...options, history });
+  clients.failures.answeredBy(
+    detouringOn(context, {
+      at: () => ({ ...leftFrom(router.latestLocation), pathname: router.latestLocation.pathname }),
+      go: (href) => {
+        void router.navigate(leavingFor(href));
+      },
+    }),
+  );
+  return router;
 };
 
 declare module "@tanstack/react-router" {

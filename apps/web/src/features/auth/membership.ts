@@ -2,6 +2,8 @@ import { useQuery, type QueryClient } from "@tanstack/react-query";
 
 import { refusalOf, useTRPC, type ApiProxy, type RefusalWord } from "@/shared/api/trpc.ts";
 
+import { rememberTheSession } from "./session-memory.ts";
+
 /** The route has read this before the shell mounts, so a read on mount would be the second. */
 const membershipOptions = (api: ApiProxy) =>
   api.session.membership.queryOptions(undefined, { refetchOnMount: false });
@@ -20,13 +22,16 @@ export const useRole = () => {
 export const roleHeld = (queryClient: QueryClient, api: ApiProxy) =>
   queryClient.getQueryData(membershipOptions(api).queryKey)?.role;
 
-/** Only a class the reader can answer by signing in again sends them to the sign-in screen. */
-const wordSendingThemToSignIn = (error: Error): RefusalWord | undefined => {
+export const NEEDS_A_PICK: RefusalWord = "no-active-workspace";
+
+export const SECOND_FACTOR_PENDING: RefusalWord = "second-factor-pending";
+
+/** Only what the reader answers by signing in again, or by confirming it's them, sends them on. */
+const wordSendingThemOn = (error: Error): RefusalWord | undefined => {
   const refusal = refusalOf(error);
+  if (refusal?.word === SECOND_FACTOR_PENDING) return refusal.word;
   return refusal?.class === "unauthenticated" ? refusal.word : undefined;
 };
-
-export const NEEDS_A_PICK: RefusalWord = "no-active-workspace";
 
 /**
  * The cache the shell itself reads, so a redirect that has an answer already costs no request.
@@ -39,9 +44,11 @@ export const membershipRefusal = async (
   try {
     // A read that failed for anything else is the shell's own query to retry and report.
     await queryClient.ensureQueryData({ ...membershipOptions(api), retry: false });
+    // Answered, so not pending: a session ending from here ended for some other reason.
+    rememberTheSession("held");
     return undefined;
   } catch (error) {
-    return error instanceof Error ? wordSendingThemToSignIn(error) : undefined;
+    return error instanceof Error ? wordSendingThemOn(error) : undefined;
   }
 };
 

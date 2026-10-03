@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { confirmWithTheAuthenticator } from "./flow.ts";
 import { harnessControl } from "./harness-control.ts";
-import { aPersonSignedIn, signedInClient } from "./provoke.ts";
+import { aPersonSignedIn, signedInByEmailOnly, signedInClient } from "./provoke.ts";
 import { appForSuite } from "./suite-app.ts";
 import { webClientOf } from "./web-client.ts";
 
@@ -13,11 +13,15 @@ const app = appForSuite({
   hostnames: { app: "localhost", agent: "agent.localhost", apex: "apex.localhost" },
 });
 
-const harnessAnswer = async (path: string, email: string): Promise<unknown> => {
+const harnessAnswer = async (
+  path: string,
+  email: string,
+  body: Readonly<Record<string, string>> = { email },
+): Promise<unknown> => {
   const answered = await harnessControl(app()).request(path, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify(body),
   });
   expect(answered.status, `the harness's ${path} failed`).toBe(200);
   return answered.json();
@@ -50,5 +54,17 @@ describe("the browser suite's second-factor harness", () => {
     expect(await (await before.fetch("/get-session")).json()).toBeNull();
     expect((await webClientOf(client).api.person.secondFactor.query()).restoreRequired).toBe(true);
     expect((await client.json("/second-factor/restore", { code })).status).toBe(200);
+  });
+
+  it("ends a pending session once its hour is moved past", async () => {
+    const { admin } = await app().provision();
+    const pending = await signedInByEmailOnly(app(), admin.email);
+    expect((await webClientOf(pending).api.person.secondFactor.query()).thisSession?.standing).toBe(
+      "setup",
+    );
+
+    await harnessAnswer("/__harness/pending-sessions/aged", admin.email, { userId: admin.id });
+
+    expect(await (await pending.fetch("/get-session")).json()).toBeNull();
   });
 });

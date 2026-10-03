@@ -57,16 +57,24 @@ const ADAS_SESSION = {
   user: { id: "p", name: "Ada", email: "ada@example.test" },
 };
 
+/** As the read names a session, by the standing the gate gives it. */
+export const sessionStanding = (
+  standing: "not-required" | "confirmed" | "confirm" | "setup",
+  facts: { confirmed?: boolean; setupGranted?: boolean; adminOf?: string | null } = {},
+) => ({ confirmed: false, setupGranted: false, adminOf: null, ...facts, standing });
+
 /** An Admin with no passkey, no authenticator and no codes, on a session not yet confirmed. */
 export const NOTHING_HELD = {
   mustHoldOne: true,
+  operator: false,
+  promoted: false,
   passkeys: [],
   authenticator: "none",
   codesAcknowledged: true,
   passkeyOfferDismissed: false,
   restoreRequired: false,
   waits: { authenticator: 0, "recovery-code": 0, "restore-code": 0 },
-  thisSession: { confirmed: false, setupGranted: false },
+  thisSession: sessionStanding("setup"),
 };
 
 export const BOTH_HELD = {
@@ -81,6 +89,7 @@ export const BOTH_HELD = {
   ],
   authenticator: "set-up",
   recoveryCodes: { unused: 9, madeAt: MADE_AT },
+  thisSession: sessionStanding("confirm"),
 };
 
 export type Route = () => Promise<Response>;
@@ -117,19 +126,41 @@ const REFUSED = {
   },
 };
 
-type Procedures = ReadonlyMap<string, () => unknown>;
-
-const answerTo = (name: string, held: () => unknown, procedures: Procedures): unknown => {
-  if (name === "person.secondFactor") return { result: { data: held() } };
-  const procedure = procedures.get(name);
-  return procedure === undefined ? REFUSED : { result: { data: procedure() } };
+/** What every procedure outside the pending set answers a session waiting on its second factor. */
+export const PENDING = {
+  error: {
+    message: "second-factor-pending",
+    code: -32_012,
+    data: {
+      code: "PRECONDITION_FAILED",
+      httpStatus: 412,
+      refusal: { word: "second-factor-pending", class: "precondition" },
+    },
+  },
 };
 
-/** `held` answers each read of Ada's second factor, `routes` each post to our own routes. */
+type Procedures = ReadonlyMap<string, () => unknown>;
+
+const answerTo = (
+  name: string,
+  held: () => unknown,
+  procedures: Procedures,
+  otherwise: unknown,
+): unknown => {
+  if (name === "person.secondFactor") return { result: { data: held() } };
+  const procedure = procedures.get(name);
+  return procedure === undefined ? otherwise : { result: { data: procedure() } };
+};
+
+/**
+ * `held` answers each read of Ada's second factor, `routes` each post to our own routes, and
+ * `otherwise` every procedure nothing else answers.
+ */
 export const adasApi = (
   held: () => unknown,
   routes: ReadonlyMap<string, Route> = new Map(),
   procedures: Procedures = new Map(),
+  otherwise: unknown = REFUSED,
 ): readonly string[] => {
   const asked: string[] = [];
   vi.stubGlobal("fetch", (input: string | URL | Request) => {
@@ -137,7 +168,7 @@ export const adasApi = (
     asked.push(pathname);
     if (!pathname.startsWith("/trpc/")) return routes.get(pathname)?.() ?? answered(ADAS_SESSION);
     const names = pathname.replace("/trpc/", "").split(",");
-    return answered(names.map((name) => answerTo(name, held, procedures)));
+    return answered(names.map((name) => answerTo(name, held, procedures, otherwise)));
   });
   return asked;
 };

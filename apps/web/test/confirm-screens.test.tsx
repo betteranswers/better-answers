@@ -12,6 +12,7 @@ import {
   openAsAda,
   readingForever,
   refusing,
+  sessionStanding,
   withPasskeysHere,
 } from "./second-factor-api.ts";
 
@@ -26,9 +27,9 @@ const main = () => screen.getByRole("main");
 /** Every control a keyboard meets on the screen, in document order. */
 const controls = (): readonly Element[] => [...main().querySelectorAll("a, button, input")];
 
-const CONFIRMED = { ...BOTH_HELD, thisSession: { confirmed: true, setupGranted: false } };
+const CONFIRMED = { ...BOTH_HELD, thisSession: sessionStanding("confirmed", { confirmed: true }) };
 
-const GRANTED = { ...BOTH_HELD, thisSession: { confirmed: false, setupGranted: true } };
+const GRANTED = { ...BOTH_HELD, thisSession: sessionStanding("setup", { setupGranted: true }) };
 
 /** The api confirms by passkey, and after it each read says the session is confirmed. */
 const confirmingByPasskey = (refusedCode: () => Promise<Response>) => {

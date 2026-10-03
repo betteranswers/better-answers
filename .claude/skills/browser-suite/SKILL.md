@@ -95,7 +95,7 @@ the side that counts. Read the numbers off those files rather than from here.
 ## The harness's acts
 
 State is built through the api's harness over HTTP, from `apps/web/e2e/harness.ts`, using the
-`request` fixture. Nothing writes a row itself and nothing sets a cookie from outside. Sixteen acts
+`request` fixture. Nothing writes a row itself and nothing sets a cookie from outside. Seventeen acts
 call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources two from
 `apps/api/tests/harness-sources.ts` and the People three from `apps/api/tests/harness-people.ts`:
 
@@ -109,7 +109,8 @@ call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources
 | `markTheOperator` | Grants the operator mark to the person holding an address, or clears it with `"revoke"`, through the ops command's own act and principal — the console's door, and a mark cleared under an open page |
 | `invite` | A waiting invitation to an address at a named role, as the invite act leaves it, with no email sent; or one accepted or cancelled, or with its expiry moved into the past |
 | `ageTheSignIn` | Moves every session a person holds to a sign-in 61 minutes ago, behind the api's back — how a spec meets `sign-in-too-old` without waiting an hour |
-| `withAnAuthenticator` | Enrols an authenticator for an address through the library, after one emailed sign-in that spends one of its codes, and answers the key a spec makes codes from with `authenticatorCodeAt`. It issues no recovery codes, and it fails for a person already holding an authenticator |
+| `ageThePendingHour` | Moves the pending clock of every session a person holds to an hour and a minute ago, behind the api's back — how a spec meets a sign-in that ended unconfirmed without waiting the hour |
+| `withAnAuthenticator` | Writes an authenticator for an address straight to the store, sealed as the library seals one, spending no emailed code and sending no notice, and answers the key a spec makes codes from with `authenticatorCodeAt`. A second ask answers the same key. It issues no recovery codes |
 | `restored` | The platform operator's restore, through the ops command's own act and principal: the person's factors, recovery codes and sessions end, and a restore code that expires in 24 hours is answered. No notice is sent, so a code read back afterwards is still the sign-in's |
 | `seedRoutes` | The routes a workspace has chosen; a purpose left out of the list has no route, which the screen must show rather than omit |
 | `seedBindings` | Source bindings as their acts and the worker leave them — documents, findings kept or overridden by an erasure, quarantined documents, chunks, an index run at any status, a concept and composition citing a document — answering each binding's and document's id |
@@ -118,18 +119,20 @@ call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources
 | `askToJoin` | A person's ask to join a workspace by its slug, with a reason, through the members slice's own act and the principal the ask-to-join procedure uses, without its sign-in or its answer's floor — a request waiting on the Requests tab |
 | `flagTheName` | A workspace's Admin flags a member's display name through the members slice's own act and principal, without the email the procedure sends the operator — a name waiting on the console's *Names waiting* screen |
 
-Twenty-nine more helpers in the same module drive the browser rather than the harness:
+Thirty-one more helpers in the same module drive the browser rather than the harness:
 
 | Helper | What it does |
 | --- | --- |
 | `anAddress` | An email address nobody else in the run will use, so a code read back is this test's |
 | `signInHeading` | The sign-in screen's heading, read off its word table for what the sign-in carries on to: nothing, joining a workspace or connecting Claude |
 | `quoted` | A table's sentence quoted as an inline aria snapshot takes it, so the snapshot reads the words rather than copying them |
-| `signIn` | Signs a person in **through the product's own screen** — fill the address, send, read the six-digit code back from the captured transport, and fill it. Six digits submit on their own, so it clicks nothing, and it waits for the code field to be gone, because leaving the screen sooner cancels the sign-in |
+| `signInByEmail` | Signs a person in **through the product's own screen** — fill the address, send, read the six-digit code back from the captured transport, and fill it. Six digits submit on their own, so it clicks nothing, and it waits for the code field to be gone, because leaving the screen sooner cancels the sign-in. An Admin or the operator is left on the confirm or setup page, which is where a spec about those pages starts |
+| `signIn` | `signInByEmail`, then, once the first page draws, past the confirm or setup page an Admin or the operator meets: it gives the person the harness's authenticator through `withAnAuthenticator`, opens the confirm page afresh with the page's own query, and types the code — the gate passed through the real page, never around it. Anyone else is left where the sign-in sends them. Most specs sign in with this |
+| `confirmedWhenAsked` | Waits for the confirm or setup page an act sent the person to, such as joining as an Admin, then passes it as `signIn` does |
 | `aMemberSignedInAt` | A new workspace's Editor or Viewer, signed in having asked for a path first, so sign-in carries them back to it — where a refused screen is proved |
 | `landedAtHome` | Asserts the page is on a role's home, its address and its heading read off the navigation list. The heading is the screen's group's name, or its surface's where it has none |
 | `notFoundOfferingHome` | Asserts the not-found screen and its link to a role's home. A screen hidden from the role shows it, as an address that never existed does |
-| `signedInAtHome` | Opens the sign-in screen, runs `signIn`, and waits for an Admin's home, as the Admin of one workspace arrives |
+| `signedInAtHome` | Opens the sign-in screen, runs `signIn`, and waits for a role's home, an Admin's unless another is named, as a member of one workspace arrives |
 | `signedInWithNoWorkspace` | A new person with no membership, signed in through `signIn` and waiting on the no-workspace screen, answered as the harness's `person` |
 | `avatarOf` | The avatar's button in the band, found by the person's name though it shows their initials alone |
 | `personMenuOpened` | Opens the avatar menu in the band by the person's name and answers it. The avatar shows initials alone, so the name and the role are one disclosure in |

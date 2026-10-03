@@ -47,7 +47,12 @@ import {
   SETUP_STEP,
   stepAfterTheFactors,
 } from "./second-factor-steps.ts";
-import { CONFIRM_WORDS, RECOVERY_WORDS } from "./second-factor-words.ts";
+import {
+  CONFIRM_WORDS,
+  passkeyThatConfirms,
+  PROMOTION_WORDS,
+  RECOVERY_WORDS,
+} from "./second-factor-words.ts";
 
 const USE_YOUR_PASSKEY: Keystroke = { key: "p", act: CONFIRM_WORDS.passkey };
 
@@ -226,6 +231,29 @@ function AuthenticatorWay(properties: {
   );
 }
 
+const whyOf = (held: SecondFactor): string => {
+  if (held.operator) return CONFIRM_WORDS.whyTheOperator;
+  return held.mustHoldOne ? CONFIRM_WORDS.whyAnAdmin : CONFIRM_WORDS.why;
+};
+
+/** Every credential that can confirm this sign-in, so one the person never added is seen. */
+function WhatCanConfirm(properties: { readonly held: SecondFactor }) {
+  const { held } = properties;
+  const leadId = useId();
+  return (
+    <div className="mt-6 border border-border p-4">
+      <p id={leadId}>{PROMOTION_WORDS.lead}</p>
+      <ul aria-labelledby={leadId} className="mt-2 flex flex-col gap-1">
+        {held.passkeys.map((passkey) => (
+          <li key={passkey.id}>{passkeyThatConfirms(passkey.name, passkey.createdAt)}</li>
+        ))}
+        {authenticatorHeld(held) ? <li>{PROMOTION_WORDS.authenticator}</li> : null}
+      </ul>
+      <p className="mt-2 text-muted-foreground">{PROMOTION_WORDS.after}</p>
+    </div>
+  );
+}
+
 const confirmKeystrokes = (held: SecondFactor): readonly Keystroke[] => [
   ...(passkeyHere(held) ? [USE_YOUR_PASSKEY] : []),
   ...(authenticatorHeld(held) ? [TO_THE_CODE] : []),
@@ -244,9 +272,8 @@ function ConfirmWays(properties: {
 
   return (
     <>
-      <p className="mt-2 text-muted-foreground">
-        {held.mustHoldOne ? CONFIRM_WORDS.whyAnAdmin : CONFIRM_WORDS.why}
-      </p>
+      <p className="mt-2 text-muted-foreground">{whyOf(held)}</p>
+      {held.promoted ? <WhatCanConfirm held={held} /> : null}
       {passkey ? <PasskeyWay buttonRef={first} onConfirmed={properties.onConfirmed} /> : null}
       {authenticator ? (
         <AuthenticatorWay

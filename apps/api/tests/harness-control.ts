@@ -31,6 +31,7 @@ import {
 import type { TestApp } from "./harness.ts";
 import {
   codeSentPastItsExpiry,
+  pendingSessionsPastTheirHour,
   restoredByTheOperator,
   sessionsSignedInOverAnHourAgo,
 } from "./provoke.ts";
@@ -143,6 +144,13 @@ export const harnessControl = (app: TestApp): Hono => {
   control.post(`${HARNESS_PREFIX}/sign-ins/aged`, async (context) => {
     const asked = await readBody(context.req.raw, aging);
     await sessionsSignedInOverAnHourAgo(app, asked.userId);
+    return context.json({ aged: true });
+  });
+
+  // The pending hour is too long for a spec to wait, so its clock is moved back the same way.
+  control.post(`${HARNESS_PREFIX}/pending-sessions/aged`, async (context) => {
+    const asked = await readBody(context.req.raw, aging);
+    await pendingSessionsPastTheirHour(app, asked.userId);
     return context.json({ aged: true });
   });
 

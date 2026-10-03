@@ -10,6 +10,7 @@ import {
   NOTHING_HELD,
   loadedAsAda,
   openAsAda,
+  sessionStanding,
   withPasskeysHere,
 } from "./second-factor-api.ts";
 
@@ -67,7 +68,7 @@ describe("the setup screen", () => {
 
   it("replaces the factors after a recovery code, ending on codes", async () => {
     const asked = adasApi(
-      () => ({ ...BOTH_HELD, thisSession: { confirmed: false, setupGranted: true } }),
+      () => ({ ...BOTH_HELD, thisSession: sessionStanding("setup", { setupGranted: true }) }),
       new Map([
         ["/second-factor/replace/authenticator-start", answering(A_KEY)],
         ["/second-factor/replace/authenticator-finish", answering(ISSUED)],
@@ -96,7 +97,7 @@ describe("the setup screen", () => {
     let accepted = false;
     const restored = { ...NOTHING_HELD, restoreRequired: true };
     adasApi(
-      () => ({ ...restored, thisSession: { confirmed: false, setupGranted: accepted } }),
+      () => ({ ...restored, thisSession: sessionStanding("setup", { setupGranted: accepted }) }),
       new Map([
         [
           "/second-factor/restore",
@@ -137,7 +138,11 @@ describe("the setup screen", () => {
 });
 
 describe("the recovery codes detour", () => {
-  const UNSEEN = { ...BOTH_HELD, codesAcknowledged: false };
+  const CONFIRMED = {
+    ...BOTH_HELD,
+    thisSession: sessionStanding("confirmed", { confirmed: true }),
+  };
+  const UNSEEN = { ...CONFIRMED, codesAcknowledged: false };
 
   it("shows a new set that replaces the one shown before", async () => {
     const acknowledged: unknown[] = [];
@@ -145,7 +150,7 @@ describe("the recovery codes detour", () => {
       () => UNSEEN,
       new Map(),
       new Map<string, () => unknown>([
-        ["person.replaceRecoveryCodes", () => ISSUED],
+        ["person.replaceRecoveryCodes", () => ({ ...ISSUED, replaced: true })],
         [
           "person.acknowledgeRecoveryCodes",
           () => {
@@ -181,8 +186,32 @@ describe("the recovery codes detour", () => {
     expect(router.state.location.search).toEqual({ redirect: "/people/members" });
   });
 
+  it("gives a first set to an Admin holding no codes", async () => {
+    const asked: unknown[] = [];
+    adasApi(
+      () => ({ ...CONFIRMED, recoveryCodes: undefined }),
+      new Map(),
+      new Map<string, () => unknown>([
+        [
+          "person.replaceRecoveryCodes",
+          () => {
+            asked.push("made");
+            return { ...ISSUED, replaced: false };
+          },
+        ],
+      ]),
+    );
+    await openAsAda("/display-name");
+
+    const list = await screen.findByRole("list", { name: "Recovery codes" });
+    expect([within(list).getAllByRole("listitem").length, asked]).toEqual([10, ["made"]]);
+    expect(
+      screen.queryByText("These replace the codes shown before, which no longer work."),
+    ).toBeNull();
+  });
+
   it("passes to the display-name step once the set is seen", async () => {
-    adasApi(() => BOTH_HELD);
+    adasApi(() => CONFIRMED);
 
     const { router } = await loadedAsAda("/recovery-codes");
 

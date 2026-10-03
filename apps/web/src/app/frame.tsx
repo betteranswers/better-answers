@@ -4,6 +4,7 @@ import { useId, useMemo, useState, type ReactNode } from "react";
 import { useSignOut } from "@/features/auth/auth-hooks.ts";
 import { useMembership } from "@/features/auth/membership.ts";
 import { PasskeyOffer } from "@/features/auth/passkey-offer.tsx";
+import { useUnsavedChangeSaid } from "@/features/auth/unsaved-change.ts";
 import { useOperatorStanding } from "@/features/console/operator.ts";
 import { HomeLine } from "@/features/people/self-act.tsx";
 import { BreadcrumbLastPartSlot } from "@/shared/breadcrumb-last-part.ts";
@@ -98,6 +99,7 @@ export function Frame(properties: {
 
   const open = placeAt(visible.surfaces, pathname);
   const region = useRegion(visible, pathname);
+  const unsaved = useUnsavedChangeSaid(pathname);
   useArrivalTakenOnceRead(visible);
 
   return (
@@ -142,7 +144,7 @@ export function Frame(properties: {
             keystrokes={<ShellKeystrokesAct at="band" />}
             signingOut={signingOut}
             onSignOut={signOut}
-            outcome={switching.outcome}
+            outcome={switching.outcome ?? unsaved}
           />
 
           <NavigationSheet sheet={sheet} wide={wide} surfaces={visible.surfaces} open={open} />

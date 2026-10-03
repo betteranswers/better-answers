@@ -30,6 +30,7 @@ import {
   anAddress,
   askToJoin,
   clockTheNextKey,
+  confirmedWhenAsked,
   crumbOf,
   editorPickedByKeyboard,
   invite,
@@ -978,6 +979,7 @@ test.describe("a member's Activity", () => {
     await page.goto(`/invitations/${invited.id}`);
     await signIn(page, request, address);
     await page.getByRole("button", { name: INVITATION_WORDS.join(workspace.name) }).click();
+    await confirmedWhenAsked(page, request, address);
     await landedAtHome(page, "Admin");
 
     await openedByName(page, "Ola Brennan");

@@ -82,6 +82,14 @@ const HEADINGS = {
   restored: { title: SETUP_WORDS.heading, why: SETUP_WORDS.why },
 } satisfies Record<Variant, { readonly title: string; readonly why: string }>;
 
+/** Promoted mid-session, the person is told which workspace made them an Admin. */
+const whyOf = (held: SecondFactor, variant: Variant): string => {
+  const adminOf = held.thisSession?.adminOf ?? null;
+  const promotedHere = variant !== "new" && held.promoted && adminOf !== null;
+  const why = HEADINGS[variant].why;
+  return promotedHere ? `${SETUP_WORDS.nowAnAdmin(adminOf)} ${why}` : why;
+};
+
 /** A restored person's ways wait on the restore code; everyone else's are open at once. */
 const waysOpen = (standing: Standing | undefined): boolean =>
   standing?.kind === "setting-up" && (standing.variant !== "restored" || standing.granted);
@@ -275,7 +283,7 @@ function SettingUpBody(properties: {
   const { held, settingUp } = properties;
   return (
     <>
-      <p className="mt-2 text-muted-foreground">{HEADINGS[settingUp.variant].why}</p>
+      <p className="mt-2 text-muted-foreground">{whyOf(held, settingUp.variant)}</p>
       {settingUp.variant === "restored" ? (
         <RestoreCode held={held} granted={settingUp.granted} />
       ) : null}
@@ -346,7 +354,7 @@ export function SetupScreen() {
   );
 }
 
-/** Each arrival makes a new set, voiding the unseen one; a reload never shows a set twice. */
+/** Each arrival makes a new set, voiding any unseen one; a reload never shows a set twice. */
 export function CodesScreen() {
   const [query] = useState(pageQuery);
   const make = useReplaceRecoveryCodes();
@@ -357,9 +365,9 @@ export function CodesScreen() {
   useOnArrival(makeASet);
 
   if (make.data !== undefined) {
-    const { recoveryCodes, madeAt } = make.data;
+    const { recoveryCodes, madeAt, replaced } = make.data;
     return (
-      <CodesToFinish inHand={{ codes: recoveryCodes, replacing: true, madeAt }} query={query} />
+      <CodesToFinish inHand={{ codes: recoveryCodes, replacing: replaced, madeAt }} query={query} />
     );
   }
 

@@ -24,6 +24,7 @@ import { sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
 import {
+  addMember,
   anAddress,
   clockTheNextKey,
   keyShown,
@@ -118,11 +119,20 @@ const tenCodesInTheList = Array.from(
   () => `        - listitem: ${String(RECOVERY_CODE)}`,
 ).join("\n");
 
-test("an Admin sets up an authenticator from the avatar menu", async ({ page, request }) => {
-  const workspace = await provision(request, { name: "Calder Joinery" });
-  await signedInAtHome(page, request, workspace.admin.email);
-  await accountFromTheBand(page, workspace.admin.name);
+/** An Admin cannot reach Account holding no factor, so an Editor shows the first setup there. */
+const anEditorOnAccount = async (page: Page, api: Parameters<typeof person>[0]) => {
+  const email = anAddress("editor");
+  const editor = await person(api, email, { displayName: "Ines Editor" });
+  const workspace = await provision(api, { name: "Calder Joinery" });
+  await addMember(api, { role: "Editor", userId: editor.id, workspaceId: workspace.workspaceId });
+  await signedInAtHome(page, api, email, "Editor");
+  await accountFromTheBand(page, editor.name);
   await expect(authenticatorPart(page)).toContainText(AUTHENTICATOR_WORDS.none);
+  return email;
+};
+
+test("an Editor sets up an authenticator from the avatar menu", async ({ page, request }) => {
+  const email = await anEditorOnAccount(page, request);
 
   const codes = await setUpWithItsCode(page);
 
@@ -131,7 +141,7 @@ test("an Admin sets up an authenticator from the avatar menu", async ({ page, re
     "a code is not one the api mints",
   ).toBe(true);
   await expect(page.getByRole("status").filter({ hasText: AUTHENTICATOR_WORDS.held })).toHaveText(
-    ACT_LANDED.setUp(workspace.admin.email),
+    ACT_LANDED.setUp(email),
   );
   await expect(
     codesBlock(page).getByRole("heading", { name: RECOVERY_CODE_WORDS.saveHeading }),
@@ -152,9 +162,7 @@ ${tenCodesInTheList}
 });
 
 test("Done waits for the tick, and a reload shows none", async ({ page, request }) => {
-  const workspace = await provision(request, { name: "Pennine Metalwork" });
-  await signedInAtHome(page, request, workspace.admin.email);
-  await accountFromTheBand(page, workspace.admin.name);
+  await anEditorOnAccount(page, request);
   await setUpWithItsCode(page);
 
   await doneButton(page).focus();
@@ -175,6 +183,21 @@ test("Done waits for the tick, and a reload shows none", async ({ page, request 
   const left = codesLeft(RECOVERY_CODES_IN_A_SET, new Date().toISOString());
   const recoveryCodes = regionOf(page, RECOVERY_CODE_WORDS.heading);
   await expect(recoveryCodes).toContainText(left);
+
+  await page.reload();
+  await expect(recoveryCodes).toContainText(left);
+  await expect(authenticatorPart(page)).toContainText(AUTHENTICATOR_WORDS.held);
+  await expect(codesListed(page)).toHaveCount(0);
+});
+
+test("an Admin's only authenticator keeps Remove disabled, saying why", async ({
+  page,
+  request,
+}) => {
+  const workspace = await provision(request, { name: "Pennine Metalwork" });
+  await signedInAtHome(page, request, workspace.admin.email);
+  await accountFromTheBand(page, workspace.admin.name);
+
   const remove = authenticatorPart(page).getByRole("button", { name: AUTHENTICATOR_WORDS.remove });
   await expect(remove).toHaveAttribute("aria-disabled", "true");
   await expect(remove).toHaveAccessibleDescription(
@@ -183,11 +206,6 @@ test("Done waits for the tick, and a reload shows none", async ({ page, request 
   await remove.press("Enter");
   await expect(remove).toBeFocused();
   await expect(page.getByRole("dialog")).toHaveCount(0);
-
-  await page.reload();
-  await expect(recoveryCodes).toContainText(left);
-  await expect(authenticatorPart(page)).toContainText(AUTHENTICATOR_WORDS.held);
-  await expect(codesListed(page)).toHaveCount(0);
 });
 
 test("a wrong setup code is refused, its digits left selected", async ({ page, request }) => {
@@ -315,7 +333,7 @@ test("the operator reaches Account from the console's avatar menu", async ({ pag
   await expect(page.getByRole("navigation", { name: CONSOLE.name })).toBeVisible();
 
   await accountFromTheBand(page, workspace.admin.name);
-  await expect(authenticatorPart(page)).toContainText(AUTHENTICATOR_WORDS.none);
+  await expect(authenticatorPart(page)).toContainText(AUTHENTICATOR_WORDS.held);
 });
 
 test("a signed-out visitor signs in and lands back on Account", async ({ page, request }) => {

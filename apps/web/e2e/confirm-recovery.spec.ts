@@ -35,7 +35,7 @@ import {
   restored,
   saysItsSentenceNotItsWord,
   signIn,
-  signedInAtHome,
+  signInByEmail,
   withAnAuthenticator,
 } from "./harness.ts";
 import { aVirtualAuthenticator, withoutWebAuthn } from "./virtual-authenticator.ts";
@@ -77,17 +77,31 @@ const aWrongCode = (right: string, nth = 1): string =>
     "0",
   );
 
+/** By email alone, so the sign-in waits on the page that confirms or sets up its second factor. */
+const signedInWaiting = async (page: Page, api: APIRequestContext, email: string, on: string) => {
+  await page.goto("/sign-in");
+  await signInByEmail(page, api, email);
+  await expect(heading(page, on)).toBeVisible();
+};
+
 /** Drops the cookie alone, so the session it named stays open on the server. */
 const signedInAgain = async (page: Page, api: APIRequestContext, email: string) => {
   await page.context().clearCookies();
-  await signedInAtHome(page, api, email);
+  await signedInWaiting(page, api, email, CONFIRM_WORDS.heading);
 };
 
+/** Left on the confirm page, not yet confirmed. */
 const anAdminWithAnAuthenticator = async (page: Page, api: APIRequestContext) => {
   const { admin } = await provision(api, { name: "Calder Confirmations" });
   const key = await withAnAuthenticator(api, admin.email);
-  await signedInAtHome(page, api, admin.email);
+  await signedInWaiting(page, api, admin.email, CONFIRM_WORDS.heading);
   return { email: admin.email, key };
+};
+
+/** The gate opens the Account page only to a confirmed session. */
+const confirmedByCode = async (page: Page, key: string): Promise<void> => {
+  await codeField(page).fill(codeOf(key));
+  await landedAtHome(page, "Admin");
 };
 
 /** Ticked on the screen showing them, so no later sign-in shows them again. */
@@ -107,8 +121,10 @@ const codesMadeOnTheAccountPage = async (page: Page): Promise<readonly string[]>
 /** An Admin holding an authenticator and saved codes, signed in by email and not yet confirmed. */
 const anAdminWithSavedCodes = async (page: Page, api: APIRequestContext) => {
   const admin = await anAdminWithAnAuthenticator(page, api);
+  await confirmedByCode(page, admin.key);
   const codes = await codesMadeOnTheAccountPage(page);
   await codesTicked(page, RECOVERY_CODE_WORDS.done);
+  await signedInAgain(page, api, admin.email);
   return { ...admin, codes };
 };
 
@@ -119,6 +135,7 @@ const anAdminWithSavedCodes = async (page: Page, api: APIRequestContext) => {
 const anAdminWithBothFactors = async (page: Page, api: APIRequestContext) => {
   const device = await aVirtualAuthenticator(page);
   const admin = await anAdminWithAnAuthenticator(page, api);
+  await confirmedByCode(page, admin.key);
   await page.goto("/account");
   await page.getByRole("button", { name: PASSKEY_WORDS.add }).click();
   await page.getByLabel(PASSKEY_WORDS.nameField).fill("Work laptop");
@@ -265,8 +282,7 @@ test("a restored Admin gives the restore code before any setup", async ({
 }) => {
   const { admin } = await provision(request, { name: "Restored Glazing" });
   const code = await restored(request, admin.email);
-  await signedInAtHome(page, request, admin.email);
-  await page.goto("/setup");
+  await signedInWaiting(page, request, admin.email, SETUP_WORDS.heading);
   await expect(restoreField(page)).toBeFocused();
   await expect(addAPasskey(page)).toHaveCount(0);
   await expect(authenticatorInstead(page)).toHaveCount(0);
@@ -287,11 +303,9 @@ test("a restored Admin gives the restore code before any setup", async ({
 test("without WebAuthn, setup opens on the authenticator's steps", async ({ page, request }) => {
   await withoutWebAuthn(page);
   const { admin } = await provision(request, { name: "Keyless Roofing" });
-  await signedInAtHome(page, request, admin.email);
 
-  await page.goto("/setup");
+  await signedInWaiting(page, request, admin.email, SETUP_WORDS.heading);
 
-  await expect(heading(page, SETUP_WORDS.heading)).toBeVisible();
   await expect(authenticatorInstead(page)).toHaveAttribute("aria-expanded", "true");
   await expect(page.getByRole("img", { name: AUTHENTICATOR_WORDS.qrCode })).toBeVisible();
   await expect(page.getByLabel(AUTHENTICATOR_WORDS.codeField)).toBeVisible();
@@ -304,7 +318,8 @@ test("unticked codes come back as a new set at sign-in", async ({
   request,
   passesTheAccessibilityGate,
 }) => {
-  const { email } = await anAdminWithAnAuthenticator(page, request);
+  const { email, key } = await anAdminWithAnAuthenticator(page, request);
+  await confirmedByCode(page, key);
   const first = await codesMadeOnTheAccountPage(page);
 
   await page.context().clearCookies();
@@ -324,6 +339,7 @@ test("unticked codes come back as a new set at sign-in", async ({
   await codesTicked(page, RECOVERY_CODE_WORDS.finish);
   await landedAtHome(page, "Admin");
 
+  await signedInAgain(page, request, email);
   await page.goto("/recovery");
   await codeUsed(recoveryField(page), first[0] ?? "");
   await saysItsSentenceNotItsWord(theRefusal(page), {

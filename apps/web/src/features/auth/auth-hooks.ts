@@ -28,8 +28,13 @@ import {
   pageQuery,
 } from "./carried-flow.ts";
 import { forgetMembership, rereadMembership } from "./membership.ts";
-import { CODES_STEP, codesWaitUnseen } from "./second-factor-steps.ts";
-import { announceTheSignIn, rememberTheSession, sessionRemembered } from "./session-memory.ts";
+import { factorStepDue } from "./second-factor-steps.ts";
+import {
+  announceTheSignIn,
+  forgetTheUnsavedChange,
+  rememberTheSession,
+  sessionRemembered,
+} from "./session-memory.ts";
 import type { Arrival } from "./sign-in-words.ts";
 
 const AUTH_KEYS = {
@@ -275,6 +280,13 @@ const signInByLinkOptions = () =>
 
 export const useSignInByLink = () => useMutation(signInByLinkOptions());
 
+/** A session left pending ended on its hour; one confirmed or never pending just ended. */
+const ARRIVAL_AFTER = {
+  held: "session-ended",
+  pending: "confirm-timed-out",
+  "signed-out": "signed-out",
+} as const satisfies Record<NonNullable<ReturnType<typeof sessionRemembered>>, Arrival>;
+
 /**
  * Said only once the api reads no session: a failed sign-out, or a visit while signed in, leaves
  * one standing.
@@ -283,7 +295,7 @@ export const useArrival = (): Arrival | undefined => {
   const [remembered] = useState(sessionRemembered);
   const session = useQuery({ ...sessionOptions(), enabled: remembered !== undefined });
   if (remembered === undefined || session.data !== null) return undefined;
-  return remembered === "signed-out" ? "signed-out" : "session-ended";
+  return ARRIVAL_AFTER[remembered];
 };
 
 /**
@@ -302,7 +314,8 @@ export const displayNameDetour = async (
   api: ApiProxy,
   query: string,
 ): Promise<string | undefined> => {
-  if (await codesWaitUnseen(queryClient, api)) return `${CODES_STEP}${query}`;
+  const due = await factorStepDue(queryClient, api, query);
+  if (due !== undefined) return due;
   const session = await sessionOrUnread(queryClient);
   if (session === undefined) return undefined;
   if (session === null) return `/sign-in${query}`;
@@ -317,6 +330,15 @@ export const signedOutDetour = async (
 ): Promise<string | undefined> => {
   const session = await sessionOrUnread(queryClient);
   return session === null ? backTo("/sign-in", path) : undefined;
+};
+
+/** A step's query already names where the person returns, so sign-in keeps it whole. */
+export const signedOutOfAStep = async (
+  queryClient: QueryClient,
+  query: string,
+): Promise<string | undefined> => {
+  const session = await sessionOrUnread(queryClient);
+  return session === null ? `/sign-in${query}` : undefined;
 };
 
 /** Read again rather than dropped, for a screen that shows whose session it is. */
@@ -385,6 +407,7 @@ export const useSignOut = (returnTo?: string) => {
         onSettled: () => {
           queryClient.clear();
           rememberTheSession("signed-out");
+          forgetTheUnsavedChange();
           const href = returnTo === undefined ? "/sign-in" : backTo("/sign-in", returnTo);
           void navigate({ href, replace: true });
         },
@@ -396,21 +419,28 @@ export const useSignOut = (returnTo?: string) => {
 /** Better Auth's code for a pick of a workspace the person holds no membership in. */
 const noMembership = z.object({ code: z.literal("USER_IS_NOT_A_MEMBER_OF_THE_ORGANIZATION") });
 
+const libraryCode = z.object({ code: z.string() });
+
 /** A refused switch or pick in the platform's terms, so no screen reads the provider's error. */
 export class SwitchRefused extends Error {
   readonly noLongerAMember: boolean;
 
-  constructor(noLongerAMember: boolean) {
+  /** The library's own, so a pending refusal heard app-wide is still told apart. */
+  readonly code: string | undefined;
+
+  constructor(noLongerAMember: boolean, code?: string) {
     super(noLongerAMember ? "no longer a member" : "switch refused");
     this.name = "SwitchRefused";
     this.noLongerAMember = noLongerAMember;
+    this.code = code;
   }
 }
 
 const setActiveWorkspace = (organizationId: string) =>
   unwrap(authClient.organization.setActive({ organizationId })).catch(
     (refused: BetterFetchError) => {
-      throw new SwitchRefused(noMembership.safeParse(refused).success);
+      const { success: noLongerAMember } = noMembership.safeParse(refused);
+      throw new SwitchRefused(noLongerAMember, libraryCode.safeParse(refused).data?.code);
     },
   );
 
@@ -489,7 +519,10 @@ const oauthContinueOptions = () =>
   mutationOptions<ResumeAnswer, Error, { postLogin: true }>({
     mutationFn: async (input) => {
       const { data, error } = await authClient.oauth2.continue(input);
-      if (error !== null) throw new Error(`answered ${String(error.status)}`);
+      if (error !== null) {
+        // The library's code rides along, so a pending refusal heard app-wide is still told apart.
+        throw Object.assign(new Error(`answered ${String(error.status)}`), { code: error.code });
+      }
       return resumeAnswer.parse(data);
     },
   });

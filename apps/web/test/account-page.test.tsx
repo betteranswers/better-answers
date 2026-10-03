@@ -10,6 +10,7 @@ import {
   BOTH_HELD,
   NOTHING_HELD,
   openAsAda,
+  sessionStanding,
 } from "./second-factor-api.ts";
 import { addressOf, answered } from "./stubbed-api.ts";
 
@@ -157,8 +158,9 @@ describe("setting up an authenticator on the Account page", () => {
     const asked = adasRoutes(
       () => ({
         ...NOTHING_HELD,
+        mustHoldOne: false,
         recoveryCodes: BOTH_HELD.recoveryCodes,
-        thisSession: { confirmed: false, setupGranted: true },
+        thisSession: sessionStanding("not-required", { setupGranted: true }),
       }),
       new Map([
         [

@@ -238,6 +238,14 @@ export const sessionsSignedInOverAnHourAgo = async (
   );
 };
 
+/** Moves every session `userId` holds to a pending hour that ended a minute ago, as if unconfirmed. */
+export const pendingSessionsPastTheirHour = async (app: TestApp, userId: string): Promise<void> => {
+  await app.database.superuser.query(
+    "UPDATE session SET pending_since = now() - interval '61 minutes' WHERE user_id = $1",
+    [userId],
+  );
+};
+
 /** The library judges expiry on the api's clock, so the past is this process's, not the database's. */
 export const codeSentPastItsExpiry = async (app: TestApp, email: string): Promise<void> => {
   const aged = await app.database.superuser.query(
