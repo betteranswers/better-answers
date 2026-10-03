@@ -141,3 +141,44 @@ describe("the test inbox's store over a failing D1", () => {
     expect(d1.ran.map((query) => query.split(" ")[0])).toEqual(["INSERT"]);
   });
 });
+
+describe("the test inbox's store over a row it cannot read", () => {
+  const UNREADABLE = { ok: false, error: "D1 answered a row the store cannot read" };
+
+  it("answers a page with a bad-time row as an error", async () => {
+    const d1 = d1StandIn();
+    const store = storeOver(d1.database);
+    const [id] = await keptAt(store, NOW_MS);
+    d1.corrupt(id ?? "", "received_at");
+
+    expect(await store.page({ after: undefined, limit: 100 })).toEqual(UNREADABLE);
+  });
+
+  it("answers a message with text for raw as an error", async () => {
+    const d1 = d1StandIn();
+    const store = storeOver(d1.database);
+    const [id] = await keptAt(store, NOW_MS);
+    d1.corrupt(id ?? "", "raw");
+
+    expect(await store.message(id ?? "")).toEqual(UNREADABLE);
+  });
+
+  it("answers a message with a bad time as an error", async () => {
+    const d1 = d1StandIn();
+    const store = storeOver(d1.database);
+    const [id] = await keptAt(store, NOW_MS);
+    d1.corrupt(id ?? "", "received_at");
+
+    expect(await store.message(id ?? "")).toEqual(UNREADABLE);
+  });
+
+  it("answers an error when the probe's delete fails", async () => {
+    const d1 = d1StandIn(/^DELETE/);
+
+    expect(await storeOver(d1.database).probe(NOW_MS)).toEqual({
+      ok: false,
+      error: "D1_ERROR: the stand-in refuses this statement",
+    });
+    expect(d1.ran.map((query) => query.split(" ")[0])).toEqual(["INSERT", "DELETE"]);
+  });
+});

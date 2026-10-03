@@ -20,6 +20,8 @@ export type D1StandIn = {
   readonly ran: readonly string[];
   /** Deletes one row outside the store, as a prune deletes the row a reader's cursor names. */
   readonly forget: (id: string) => void;
+  /** Overwrites one column with text, which SQLite stores whatever the column's type, so D1 answers a row the store cannot read. */
+  readonly corrupt: (id: string, column: "received_at" | "raw") => void;
 };
 
 /** D1 over `node:sqlite`, set up by the Worker's own migration; `failsOn` names what it refuses. */
@@ -55,6 +57,9 @@ export const d1StandIn = (failsOn?: RegExp): D1StandIn => {
     ran,
     forget: (id) => {
       sqlite.prepare("DELETE FROM messages WHERE id = ?").run(id);
+    },
+    corrupt: (id, column) => {
+      sqlite.prepare(`UPDATE messages SET ${column} = 'unreadable' WHERE id = ?`).run(id);
     },
   };
 };

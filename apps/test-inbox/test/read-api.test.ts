@@ -168,6 +168,18 @@ describe("the test inbox's retrieve", () => {
     expect(new Uint8Array(Buffer.from(message.raw, "base64"))).toEqual(everyByte);
   });
 
+  it("answers a body of several base64 chunks, byte for byte", async () => {
+    const d1 = d1StandIn();
+    const varied = Uint8Array.from({ length: 70_001 }, (_, at) => (at * 31 + (at >> 8)) % 256);
+    const kept = await storeOver(d1.database).keep({ ...receivedAt(NOW_MS), raw: varied });
+    if (!kept.ok) throw new Error(kept.error);
+    const { body } = await answered(await asked(d1, `${RECEIVING}/${kept.value}`));
+
+    expect(new Uint8Array(Buffer.from(TEST_INBOX_MESSAGE.parse(body).raw, "base64"))).toEqual(
+      varied,
+    );
+  });
+
   it("answers 404 JSON for an id it never kept", async () => {
     const path = `${RECEIVING}/0001791000000000-0000000000000000`;
 
@@ -184,6 +196,21 @@ describe("the test inbox's retrieve", () => {
       status: 503,
       body: { name: "store_unavailable" },
     });
+  });
+});
+
+describe("the read API over a row it cannot read", () => {
+  it("answers 503 JSON, never an empty list", async () => {
+    const d1 = d1StandIn();
+    const [id] = await keptAt(d1, NOW_MS);
+    d1.corrupt(id ?? "", "received_at");
+
+    for (const path of [RECEIVING, `${RECEIVING}/${id ?? ""}`]) {
+      expect(await answered(await asked(d1, path))).toEqual({
+        status: 503,
+        body: { name: "store_unavailable" },
+      });
+    }
   });
 });
 
@@ -230,6 +257,12 @@ describe("the test inbox's probe", () => {
 
   it("answers 503 JSON when the store cannot write", async () => {
     expect(await answered(await asked(d1StandIn(/^INSERT/), "/probe", { method: "POST" }))).toEqual(
+      { status: 503, body: { name: "store_unavailable" } },
+    );
+  });
+
+  it("answers 503 JSON when the store cannot delete", async () => {
+    expect(await answered(await asked(d1StandIn(/^DELETE/), "/probe", { method: "POST" }))).toEqual(
       { status: 503, body: { name: "store_unavailable" } },
     );
   });
