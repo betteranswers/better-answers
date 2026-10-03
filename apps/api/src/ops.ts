@@ -13,11 +13,14 @@ const bootstrap = requireBootstrap("pnpm ops");
 const identity = readIdentityBootstrap();
 const objectStore = readObjectStore();
 
-const smtpUrl = identity.ok ? identity.value.smtpUrl : undefined;
 const mail =
-  identity.ok && smtpUrl !== undefined
+  identity.ok && identity.value.smtpUrl !== undefined
     ? {
-        send: emailSender(pacedTransport(smtpUrl), senderAt(identity.value.hostnames.apex), logger),
+        send: emailSender(
+          pacedTransport(identity.value.smtpUrl),
+          senderAt(identity.value.hostnames.apex),
+          logger,
+        ),
         publicUrl: identity.value.publicUrl,
       }
     : undefined;
