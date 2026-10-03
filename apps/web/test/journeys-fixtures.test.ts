@@ -4,6 +4,8 @@ import { createServer, type IncomingHttpHeaders, type IncomingMessage } from "no
 
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
+import { INVENTED_MEMBERS, inventedMemberAddress } from "@better-answers/schema/test-workspace";
+
 import { SIGN_IN_WORDS } from "@/features/auth/sign-in-words.ts";
 
 import { journeysOver, moduleAt } from "./playwright-tree.ts";
@@ -49,17 +51,24 @@ type Product = {
   readonly heard: readonly Heard[];
 };
 
-type Replies = { readonly send?: Reply; readonly signOuts?: readonly Reply[] };
+type Replies = {
+  readonly send?: Reply;
+  readonly signOuts?: readonly Reply[];
+  /** By request, such as `GET /trpc/members.list`, answered whoever asks. */
+  readonly reads?: ReadonlyMap<string, Reply>;
+};
 
 const OK: Reply = { status: 200, body: "{}" };
 
 /** A sign-in opens at `/`, which the product's SPA takes to its sign-in screen. */
 const SHOWING_THE_SCREEN = new Set(["GET /", "GET /sign-in"]);
 
+const THE_SCREEN: Reply = { status: 200, headers: { "content-type": "text/html" }, body: SCREEN };
+
+const readReplyTo = (asked: string, replies: Replies): Reply | undefined =>
+  SHOWING_THE_SCREEN.has(asked) ? THE_SCREEN : replies.reads?.get(asked);
+
 const replyTo = (asked: string, body: string, replies: Replies, signOut: () => Reply): Reply => {
-  if (SHOWING_THE_SCREEN.has(asked)) {
-    return { status: 200, headers: { "content-type": "text/html" }, body: SCREEN };
-  }
   switch (asked) {
     case "POST /email-otp/send-verification-otp":
       return replies.send ?? OK;
@@ -92,7 +101,8 @@ const theProduct = async (replies: Replies = {}): Promise<Product> => {
     void bodyOf(request).then((body) => {
       const asked = `${request.method ?? ""} ${new URL(request.url ?? "/", "http://stand-in").pathname}`;
       if (asked !== "GET /favicon.ico") heard.push({ asked, headers: request.headers });
-      const reply = replyTo(asked, body, replies, () => signOuts.shift() ?? OK);
+      const reply =
+        readReplyTo(asked, replies) ?? replyTo(asked, body, replies, () => signOuts.shift() ?? OK);
       response.writeHead(reply.status, reply.headers);
       response.end(reply.body ?? "");
     });
@@ -261,6 +271,19 @@ describe("the journeys' fixtures", () => {
   }, 120_000);
 });
 
+const VIEWER = "viewer@journeys.example";
+
+const ALL_THREE = { ...SETTINGS, JOURNEYS_VIEWER_EMAIL: VIEWER };
+
+/** The Editor's and Viewer's journeys, which sign in and pass through. */
+const THE_OTHER_TWO = {
+  "editor.spec.ts": journeyOf(...AS_THE_EDITOR),
+  "viewer.spec.ts": journeyOf(
+    'test.use({ role: "Viewer" });',
+    'test("the Viewer passes through the screen", async () => {});',
+  ),
+};
+
 /** The three journeys under their own names, the Admin's ending as `adminEnds` says. */
 const theThreeJourneys = (adminEnds: string) => ({
   "admin.spec.ts": journeyOf(
@@ -268,25 +291,19 @@ const theThreeJourneys = (adminEnds: string) => ({
     'test.use({ role: "Admin" });',
     `test("the Admin's journey ends early", async () => { ${adminEnds} });`,
   ),
-  "editor.spec.ts": journeyOf(...AS_THE_EDITOR),
-  "viewer.spec.ts": journeyOf(
-    'test.use({ role: "Viewer" });',
-    'test("the Viewer passes through the screen", async () => {});',
-  ),
+  ...THE_OTHER_TWO,
 });
 
 const signInsHeard = (product: Product): number =>
   product.heard.filter(({ asked }) => asked === "POST /sign-in/email-otp").length;
 
 describe("a run the Admin's journey stops", () => {
-  const ALL_THREE = { JOURNEYS_VIEWER_EMAIL: "viewer@journeys.example" };
-
   it("signs the Editor and Viewer in nowhere, once stopped", async () => {
     const product = await theProduct();
     const run = await journeysOver({
       specs: theThreeJourneys('stopTheRun("the test workspace holds 1 waiting invitation");'),
       use: { baseURL: product.origin },
-      env: { ...SETTINGS, ...ALL_THREE },
+      env: ALL_THREE,
     });
     const STOPPED =
       "the Admin's journey found the test workspace changed, so nobody else signs in: possible compromise";
@@ -308,10 +325,128 @@ describe("a run the Admin's journey stops", () => {
     const run = await journeysOver({
       specs: theThreeJourneys('throw new Error("a screen failed");'),
       use: { baseURL: product.origin },
-      env: { ...SETTINGS, ...ALL_THREE },
+      env: ALL_THREE,
     });
 
     expect(run.outcome).toBe("fail\n");
     expect(signInsHeard(product)).toBe(3);
+  }, 120_000);
+});
+
+/** The Admin's journey as far as its check, with the other two after it. */
+const THE_CHECK = {
+  "admin.spec.ts": [
+    `import { test, theTestPeople } from ${moduleAt("journeys/fixtures.ts")};`,
+    `import { theFixtureHolds } from ${moduleAt("journeys/test-workspace.ts")};`,
+    'test.use({ role: "Admin" });',
+    'test("the Admin checks the test workspace", async ({ page }) => {',
+    "  await theFixtureHolds(page, theTestPeople());",
+    "});",
+    "",
+  ].join("\n"),
+  ...THE_OTHER_TWO,
+};
+
+const answered = (data: unknown): Reply => ({
+  status: 200,
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ result: { data } }),
+});
+
+const SOUND_MEMBERS = [
+  { displayName: "Test Admin", address: ADMIN, role: "Admin" },
+  { displayName: "Test Editor", address: EDITOR, role: "Editor" },
+  { displayName: "Test Viewer", address: VIEWER, role: "Viewer" },
+  ...Array.from({ length: INVENTED_MEMBERS }, (_, index) => ({
+    displayName: `Invented member ${String(index + 1)}`,
+    address: inventedMemberAddress(index + 1, "journeys.example"),
+    role: "Viewer",
+  })),
+];
+
+/** The test workspace's reads as the fixture command leaves it, less what `changed` answers. */
+const aWorkspace = (changed: Readonly<Record<string, Reply>> = {}): ReadonlyMap<string, Reply> =>
+  new Map(
+    Object.entries({
+      "GET /trpc/session.membership": answered({
+        workspace: { name: "Test workspace" },
+        person: { name: "Test Admin" },
+        role: "Admin",
+      }),
+      "GET /trpc/members.list": answered(SOUND_MEMBERS),
+      "GET /trpc/members.invitationCounts": answered({ waiting: 0, accepted: 0, expired: 0 }),
+      "GET /trpc/sources.list": answered([]),
+      ...changed,
+    }),
+  );
+
+const checkedAgainst = async (reads: ReadonlyMap<string, Reply>) => {
+  const product = await theProduct({ reads });
+  const run = await journeysOver({
+    specs: THE_CHECK,
+    use: { baseURL: product.origin },
+    env: ALL_THREE,
+  });
+  return { ...run, signIns: signInsHeard(product) };
+};
+
+const stoppedFor = (why: string): string =>
+  `| could-not-run | Admin | outside any step | outside any step | ${why}: possible compromise |`;
+
+describe("the Admin's check of the test workspace, through its reads", () => {
+  it("lets the run go on over the fixture as made", async () => {
+    const run = await checkedAgainst(aWorkspace());
+
+    expect(run.outcome).toBe("held\n");
+    expect(run.signIns).toBe(3);
+  }, 120_000);
+
+  it("stops the run for a member outside the fixture", async () => {
+    const stranger = {
+      displayName: "A stranger",
+      address: "stranger@elsewhere.example",
+      role: "Viewer",
+    };
+    const run = await checkedAgainst(
+      aWorkspace({ "GET /trpc/members.list": answered([...SOUND_MEMBERS, stranger]) }),
+    );
+
+    expect(run.outcome).toBe("could-not-run\n");
+    expect(run.signIns).toBe(1);
+    expect(run.summary).toContain(
+      stoppedFor("the test workspace's check found 1 member outside its fixture"),
+    );
+    expect(`${run.summary}${run.stdout}`).not.toContain("@");
+  }, 120_000);
+
+  it("stops the run for a waiting invitation", async () => {
+    const run = await checkedAgainst(
+      aWorkspace({ "GET /trpc/members.invitationCounts": answered({ waiting: 1 }) }),
+    );
+
+    expect(run.signIns).toBe(1);
+    expect(run.summary).toContain(
+      stoppedFor("the test workspace's check found 1 waiting invitation"),
+    );
+  }, 120_000);
+
+  it("stops the run for a binding", async () => {
+    const run = await checkedAgainst(
+      aWorkspace({ "GET /trpc/sources.list": answered([{ id: "a-binding" }]) }),
+    );
+
+    expect(run.signIns).toBe(1);
+    expect(run.summary).toContain(stoppedFor("the test workspace's check found 1 binding"));
+  }, 120_000);
+
+  it("stops the run for a missing invented member", async () => {
+    const gone = inventedMemberAddress(30, "journeys.example");
+    const members = SOUND_MEMBERS.filter((member) => member.address !== gone);
+    const run = await checkedAgainst(aWorkspace({ "GET /trpc/members.list": answered(members) }));
+
+    expect(run.signIns).toBe(1);
+    expect(run.summary).toContain(
+      stoppedFor("the test workspace's check found 1 member of its fixture missing"),
+    );
   }, 120_000);
 });
