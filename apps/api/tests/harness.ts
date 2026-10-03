@@ -31,7 +31,7 @@ import { testData } from "@better-answers/schema/testing";
 import type { EmailMessage } from "../src/auth/index.ts";
 import { CLIENT_IP_HEADER } from "../src/auth/index.ts";
 import { openDoors, type Doors } from "../src/doors.ts";
-import { hostnameOfUrl, type PublicHostnames } from "../src/ingress/hostnames.ts";
+import { hostnameOfUrl, originOfUrl, type PublicHostnames } from "../src/ingress/hostnames.ts";
 import { createServer } from "../src/server.ts";
 import { defaultClientAddresses } from "./client-addresses.ts";
 import { startTestDatabase, type TestDatabase } from "./postgres.ts";
@@ -127,6 +127,9 @@ export type TestApp = {
   readonly server: Hono;
   readonly database: TestDatabase;
 
+  /** The origin the api serves and signs cookies for; the browser suite's differs from the suites'. */
+  readonly publicUrl: string;
+
   readonly doors: Doors;
 
   readonly gitStoreDir: string;
@@ -189,7 +192,10 @@ export type TestApp = {
   /** Updates a key the workspace already holds; a key it lacks stays absent, silently. */
   setWorkspaceConfig(workspaceId: string, key: string, value: string): Promise<void>;
 
-  /** A TestClient with its own cookie jar; without `ip` it takes the next default address. */
+  /**
+   * A TestClient with its own cookie jar; without `ip` it takes the next default address, and
+   * without `hostname` it is on `publicUrl`'s origin.
+   */
   client(ip?: string, hostname?: string): TestClient;
   stop(): Promise<void>;
 };
@@ -500,8 +506,8 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
 
   const nextDefaultAddress = defaultClientAddresses();
 
-  const client: TestApp["client"] = (ip = nextDefaultAddress(), hostname = APP_HOSTNAME) => {
-    const origin = `https://${hostname}`;
+  const client: TestApp["client"] = (ip = nextDefaultAddress(), hostname = hostnames.app) => {
+    const origin = hostname === hostnames.app ? originOfUrl(publicUrl) : `https://${hostname}`;
     const jar = new Map<string, string>();
     const remember = (response: Response) => {
       for (const cookie of response.headers.getSetCookie()) {
@@ -558,6 +564,7 @@ export const startApp = async (options: TestAppOptions = {}): Promise<TestApp> =
   return {
     server,
     database,
+    publicUrl,
     doors,
     gitStoreDir,
     emails,

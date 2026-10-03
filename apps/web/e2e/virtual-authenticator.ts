@@ -25,6 +25,13 @@ export const aVirtualAuthenticator = async (page: Page) => {
     /** A device whose fingerprint, face or PIN check fails. */
     stopsVerifying: () =>
       cdp.send("WebAuthn.setUserVerified", { authenticatorId, isUserVerified: false }),
+
+    /** Its owner away: every prompt waits unanswered, the email field's autofill included. */
+    leftUnattended: () =>
+      cdp.send("WebAuthn.setAutomaticPresenceSimulation", { authenticatorId, enabled: false }),
+
+    attendedAgain: () =>
+      cdp.send("WebAuthn.setAutomaticPresenceSimulation", { authenticatorId, enabled: true }),
   };
 };
 

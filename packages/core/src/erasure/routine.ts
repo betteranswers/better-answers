@@ -53,6 +53,7 @@ export type ErasureLogLine = {
   readonly passkeys_deleted: number;
   readonly authenticators_deleted: number;
   readonly recovery_codes_deleted: number;
+  readonly confirm_failures_deleted: number;
   readonly last_active_deleted: number;
 };
 
@@ -288,6 +289,7 @@ const identityStepLineOf = (
   passkeys_deleted: swept.passkeys,
   authenticators_deleted: swept.authenticators,
   recovery_codes_deleted: swept.recoveryCodes,
+  confirm_failures_deleted: swept.confirmFailures,
   last_active_deleted: swept.lastActive,
 });
 

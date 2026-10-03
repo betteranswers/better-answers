@@ -1,14 +1,17 @@
 import { describe, expect, it, onTestFinished } from "vitest";
 import { z } from "zod";
 
-import { authenticatorCodeAt, keyIn } from "@better-answers/schema/testing/authenticator-code";
+import { keyIn } from "@better-answers/schema/testing/authenticator-code";
 
 import { setActiveWorkspace } from "./flow.ts";
-import type { TestClient } from "./harness.ts";
 import {
   aPersonSignedIn,
+  aWrongCode,
   anAdminSignedIn as anAdminSignedInTo,
+  codeNow,
   sessionsSignedInOverAnHourAgo,
+  setUpOn,
+  startOn,
   whileCommitsAreRefused,
 } from "./provoke.ts";
 import { appForSuite } from "./suite-app.ts";
@@ -39,33 +42,15 @@ const RECOVERY_CODE = /^[0-9a-hjkmnp-tv-z]{4}(?:-[0-9a-hjkmnp-tv-z]{4}){3}$/;
 
 const ADDED = "An authenticator was set up on your better-answers account";
 
-const started = z.object({ setupAddress: z.string().startsWith("otpauth://totp/") });
 const finished = z.union([
   z.object({ recoveryCodes: z.array(z.string()), madeAt: z.iso.datetime() }),
   z.object({ recoveryCodes: z.null() }),
 ]);
 const sessionRead = z.object({ session: z.object({ id: z.string() }) }).nullable();
 
-const codeNow = (setupAddress: string): string =>
-  authenticatorCodeAt(keyIn(setupAddress), new Date());
-
-const aWrongCode = (right: string): string => (right === "000000" ? "111111" : "000000");
-
 const aSignedInPerson = () => aPersonSignedIn(app());
 
 const anAdminSignedIn = () => anAdminSignedInTo(app());
-
-const startOn = async (client: TestClient): Promise<string> => {
-  const answered = await client.json(START, {});
-  expect(answered.status, "the setup did not start").toBe(200);
-  return started.parse(await answered.json()).setupAddress;
-};
-
-/** A setup started and finished with the code its key shows now. */
-const setUpOn = async (client: TestClient) => {
-  const setupAddress = await startOn(client);
-  return { setupAddress, answered: await client.json(FINISH, { code: codeNow(setupAddress) }) };
-};
 
 const refusalOf = (call: Promise<unknown>): Promise<unknown> =>
   call.then(

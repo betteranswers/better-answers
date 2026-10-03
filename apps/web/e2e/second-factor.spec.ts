@@ -26,6 +26,7 @@ import { expect, test } from "./browser.ts";
 import {
   anAddress,
   clockTheNextKey,
+  keyShown,
   keystrokesDismissed,
   keystrokesListed,
   markTheOperator,
@@ -33,6 +34,7 @@ import {
   personMenuOpened,
   provision,
   quoted,
+  refusedDigitsSelected,
   saysItsSentenceNotItsWord,
   signIn,
   signedInAtHome,
@@ -41,9 +43,6 @@ import {
 
 /** A recovery code as the api mints it: four groups of four, none of them easy to misread. */
 const RECOVERY_CODE = /^[0-9a-hjkmnp-tv-z]{4}(?:-[0-9a-hjkmnp-tv-z]{4}){3}$/;
-
-/** The key in fours, as the page writes it out for typing into a phone. */
-const KEY_IN_FOURS = /^[A-Z2-7]{4}(?: [A-Z2-7]{1,4})+$/;
 
 const accountHeading = (page: Page) =>
   page.getByRole("heading", { level: 1, name: ACCOUNT_HEADING });
@@ -85,10 +84,6 @@ const accountWithNoWorkspace = async (page: Page, api: Parameters<typeof person>
   await expect(accountHeading(page)).toBeVisible();
   return email;
 };
-
-/** Read off the page as a person would type it into their phone, spaces and all. */
-const keyShown = async (page: Page): Promise<string> =>
-  (await page.getByText(KEY_IN_FOURS).innerText()).replaceAll(" ", "");
 
 const setupOpened = async (page: Page): Promise<string> => {
   await setUpButton(page).click();
@@ -208,10 +203,7 @@ test("a wrong setup code is refused, its digits left selected", async ({ page, r
   await expect(authenticatorPart(page).getByRole("alert")).toHaveText(sentenceOf(SETUP_CODE_WRONG));
   await expect(codeField(page)).toHaveAttribute("aria-invalid", "true");
   await expect(codeField(page)).toBeFocused();
-  const selected = await codeField(page).evaluate((field) =>
-    field instanceof HTMLInputElement ? [field.selectionStart, field.selectionEnd] : [],
-  );
-  expect(selected, "the refused digits are not selected for retyping").toEqual([0, 6]);
+  await refusedDigitsSelected(codeField(page));
 
   await page.keyboard.type(authenticatorCodeAt(key, new Date()));
   await expect(codesListed(page)).toHaveCount(RECOVERY_CODES_IN_A_SET);

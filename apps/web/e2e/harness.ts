@@ -116,6 +116,19 @@ export const ageTheSignIn = (api: APIRequestContext, userId: string) =>
 export const ageTheCode = (api: APIRequestContext, email: string) =>
   ask(api, "/codes/aged", { email }, signInAged);
 
+const keyEnrolled = z.object({ key: z.string() });
+
+/**
+ * Spends one of the address's emailed sign-in codes, and issues no recovery codes. Answers the key
+ * a spec makes codes from.
+ */
+export const withAnAuthenticator = async (api: APIRequestContext, email: string) =>
+  (await ask(api, "/authenticators", { email }, keyEnrolled)).key;
+
+/** The platform operator's restore, keeping the person's factors and sessions; answers its code. */
+export const restored = async (api: APIRequestContext, email: string) =>
+  (await ask(api, "/restores", { email }, codeSent)).code;
+
 export const CLAUDES_REDIRECT_URI = "https://claude.ai/api/mcp/auth_callback";
 
 const CLAUDE = {

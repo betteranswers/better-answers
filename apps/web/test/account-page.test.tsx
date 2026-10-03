@@ -4,11 +4,19 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createAppClients } from "@/app/providers.tsx";
 
 import { openApp } from "./open-app.tsx";
+import {
+  adasApi as adasRoutes,
+  answering,
+  BOTH_HELD,
+  NOTHING_HELD,
+  openAsAda,
+} from "./second-factor-api.ts";
 import { addressOf, answered } from "./stubbed-api.ts";
 
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  globalThis.history.replaceState(null, "", "/");
 });
 
 const SESSION = { session: { id: "s" }, user: { id: "p", name: "Ada", email: "ada@example.test" } };
@@ -29,17 +37,32 @@ const ISSUED = {
   },
 };
 
-const HELD = {
+type Formatted = { readonly code: string; readonly httpStatus: number; readonly rpc: number };
+
+/** A refusal as the router's error formatter sends it. */
+const refusing = (word: string, refusalClass: string, formatted: Formatted) => ({
   error: {
-    message: "recovery-codes-held",
-    code: -32_009,
+    message: word,
+    code: formatted.rpc,
     data: {
-      code: "CONFLICT",
-      httpStatus: 409,
-      refusal: { word: "recovery-codes-held", class: "conflict" },
+      code: formatted.code,
+      httpStatus: formatted.httpStatus,
+      refusal: { word, class: refusalClass },
     },
   },
-};
+});
+
+const HELD = refusing("recovery-codes-held", "conflict", {
+  code: "CONFLICT",
+  httpStatus: 409,
+  rpc: -32_009,
+});
+
+const RESTORED = refusing("restore-code-needed", "precondition", {
+  code: "PRECONDITION_FAILED",
+  httpStatus: 412,
+  rpc: -32_012,
+});
 
 /** Ada's api: `replace` answers making codes, and `read` her second factor each time it is read. */
 const adasApi =
@@ -129,6 +152,31 @@ describe("the Account page's passkeys", () => {
   });
 });
 
+describe("setting up an authenticator on the Account page", () => {
+  it("replaces the factors for a session a code granted", async () => {
+    const asked = adasRoutes(
+      () => ({
+        ...NOTHING_HELD,
+        recoveryCodes: BOTH_HELD.recoveryCodes,
+        thisSession: { confirmed: false, setupGranted: true },
+      }),
+      new Map([
+        [
+          "/second-factor/replace/authenticator-start",
+          answering({ setupAddress: "otpauth://totp/better-answers:ada?secret=JBSWY3DPEHPK3PXP" }),
+        ],
+      ]),
+    );
+    await openAsAda("/account");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Set up an authenticator" }));
+
+    expect(await screen.findByText("Scan this QR code with your authenticator.")).toBeDefined();
+    expect(asked).toContain("/second-factor/replace/authenticator-start");
+    expect(asked).not.toContain("/authenticator/start");
+  });
+});
+
 describe("making a first set on the Account page", () => {
   it("says a notice is on its way", async () => {
     vi.stubGlobal(
@@ -165,6 +213,24 @@ describe("making a first set on the Account page", () => {
     expect(
       screen.getByText(
         "You already have recovery codes, made in another tab or window. Replace them if you need new ones.",
+      ),
+    ).toBeDefined();
+  });
+
+  it("asks a restored sign-in for its restore code first", async () => {
+    vi.stubGlobal(
+      "fetch",
+      adasApi(
+        () => RESTORED,
+        () => NO_SET,
+      ),
+    );
+
+    await makeCodesPressed();
+
+    expect(
+      await screen.findByText(
+        "Your sign-in was restored, so its restore code comes first. Enter the code the platform's operator gave you.",
       ),
     ).toBeDefined();
   });

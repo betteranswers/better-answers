@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 
 import { ensureTestWorkspace } from "@better-answers/core/members";
+import { restoredWithACode } from "@better-answers/core/testing/restore-code";
 import { BOOTSTRAP, setOperatorMark } from "@better-answers/core/workspaces";
 import {
   INVITATION_ACCEPTED_STATUS,
@@ -28,7 +29,12 @@ import {
   seedBindings,
 } from "./harness-sources.ts";
 import type { TestApp } from "./harness.ts";
-import { codeSentPastItsExpiry, sessionsSignedInOverAnHourAgo } from "./provoke.ts";
+import {
+  codeSentPastItsExpiry,
+  sessionsSignedInOverAnHourAgo,
+  setUpAnAuthenticator,
+  signedInClient,
+} from "./provoke.ts";
 
 const HARNESS_PREFIX = "/__harness";
 
@@ -77,6 +83,7 @@ const MARK_CHANGES = ["grant", "revoke"] as const;
 const marking = z.object({ email: z.string().min(1), change: z.enum(MARK_CHANGES) });
 const aging = z.object({ userId: z.string().min(1) });
 const codeAging = z.object({ email: z.string().min(1) });
+const byEmail = z.object({ email: z.string().min(1) });
 const testWorkspace = z.object({
   testingDomain: z.string().min(1),
   slug: z.string().min(1),
@@ -135,6 +142,20 @@ export const harnessControl = (app: TestApp): Hono => {
     const asked = await readBody(context.req.raw, codeAging);
     await codeSentPastItsExpiry(app, asked.email);
     return context.json({ aged: true });
+  });
+
+  // The library's own setup, signed in by one emailed code; the key answered makes the codes.
+  control.post(`${HARNESS_PREFIX}/authenticators`, async (context) => {
+    const asked = await readBody(context.req.raw, byEmail);
+    const key = await setUpAnAuthenticator(app, await signedInClient(app, asked.email));
+    return context.json({ key });
+  });
+
+  // An operator's restore as it leaves the person: marked restored, holding the code answered.
+  control.post(`${HARNESS_PREFIX}/restores`, async (context) => {
+    const asked = await readBody(context.req.raw, byEmail);
+    const code = await restoredWithACode(app.database.superuser, asked.email, new Date());
+    return context.json({ code });
   });
 
   control.delete(`${HARNESS_PREFIX}/members`, async (context) => {

@@ -20,7 +20,7 @@ import {
   type SignedIn,
 } from "./auth-hooks.ts";
 import { AuthScreen, focusOn, Outcome } from "./auth-screen.tsx";
-import { carriedOnTo, leavingFor, nextAfterSignIn, pageQuery } from "./carried-flow.ts";
+import { carriedOnTo, leavingFor, pageQuery } from "./carried-flow.ts";
 import { codeSpent, digitsOf, selectTheCode, triesLeft, worthSending } from "./code-entry.ts";
 import { passkeysHere, usePasskeySignIn } from "./passkey-hooks.ts";
 import {
@@ -36,6 +36,7 @@ import {
   tooManyCodesAskedFor,
   tooManyCodesTried,
 } from "./refusal-words.ts";
+import { useStepAfterSignIn } from "./second-factor-steps.ts";
 import { hearASignInElsewhere } from "./session-memory.ts";
 import {
   codeSent,
@@ -334,6 +335,7 @@ const codeStepOf = (step: CodeStep): Step => ({
 export function SignInScreen() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const stepAfterSignIn = useStepAfterSignIn();
   const [emailStep] = useState(
     () => SIGN_IN_WORDS.emailStep[carriedOnTo(pageQuery()) ?? "nothing"],
   );
@@ -356,9 +358,9 @@ export function SignInScreen() {
    */
   const moveOnAfterSignIn = (signedIn: SignedIn) => {
     queryClient.clear();
-    const query = pageQuery();
-    const next = signedIn.displayNameGiven ? nextAfterSignIn(query) : `/display-name${query}`;
-    void navigate(leavingFor(next));
+    void stepAfterSignIn(pageQuery(), signedIn.displayNameGiven).then((next) =>
+      navigate(leavingFor(next)),
+    );
   };
 
   const passkey = usePasskeySignIn(sentTo === undefined, moveOnAfterSignIn);

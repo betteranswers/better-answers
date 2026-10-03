@@ -4,7 +4,7 @@ import { byCodeUnit } from "@better-answers/schema/code-unit";
 import { actorIdOfPerson, type ActorId, type PlatformPrincipal } from "../kernel/index.ts";
 import { historyNaming, type GitDoor } from "../store/git/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
-import { VERIFICATION_PREFIXES } from "../workspaces/index.ts";
+import { SESSION_VERIFICATION_PREFIXES, VERIFICATION_PREFIXES } from "../workspaces/index.ts";
 import { documentsNaming } from "./documents.ts";
 import { soughtIdentifiersOf, type SoughtIdentifier } from "./identifiers.ts";
 import type { SubjectIdentifiers, SubjectRequest } from "./requests.ts";
@@ -21,6 +21,7 @@ export const ERASURE_FAMILIES = [
   "identity-passkey",
   "identity-authenticator",
   "identity-recovery-code",
+  "identity-confirm-failures",
   "identity-last-active",
   "source-document",
 ] as const;
@@ -159,6 +160,7 @@ const ERASURE_FAMILY_DESCRIPTORS = {
       aboutTheMember(tx, subject, "SELECT id AS location FROM session WHERE user_id = $1"),
   },
 
+  /** Keyed by an address, or by one of the person's sessions. */
   "identity-verification": {
     categories: ["email-address"],
     find: (platform, subject, tx) =>
@@ -168,8 +170,11 @@ const ERASURE_FAMILY_DESCRIPTORS = {
         `SELECT id AS location FROM verification
           WHERE lower(identifier) IN (SELECT prefix || lower(u.email)
                                         FROM "user" u, unnest($2::text[]) AS prefix
-                                       WHERE u.id = $1)`,
-        [[...VERIFICATION_PREFIXES]],
+                                       WHERE u.id = $1)
+             OR identifier IN (SELECT prefix || s.id
+                                 FROM session s, unnest($3::text[]) AS prefix
+                                WHERE s.user_id = $1)`,
+        [[...VERIFICATION_PREFIXES], [...SESSION_VERIFICATION_PREFIXES]],
       ),
   },
 
@@ -215,6 +220,17 @@ const ERASURE_FAMILY_DESCRIPTORS = {
   "identity-recovery-code": {
     categories: ["sign-in"],
     find: rowsOfThePersonIn("recovery_code"),
+  },
+
+  /** One row a kind of code, named by the kind: the row has no id of its own. */
+  "identity-confirm-failures": {
+    categories: ["sign-in"],
+    find: (platform, subject, tx) =>
+      aboutTheMember(
+        tx,
+        subject,
+        "SELECT kind AS location FROM second_factor_throttle WHERE user_id = $1",
+      ),
   },
 
   /** This workspace's row alone: another's would say where else the person has been. */

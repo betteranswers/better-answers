@@ -135,6 +135,7 @@ export const createTokenVerifier = (options: {
 const sessionShape = z.object({
   user: z.object({ id: z.string().min(1) }),
   session: z.object({
+    id: z.string().min(1),
     createdAt: z.coerce.date(),
     activeOrganizationId: z.string().nullish(),
   }),
@@ -163,5 +164,6 @@ export const sessionClaims = async (
     workspaceId,
     userId: parsed.data.user.id,
     issuedAt: parsed.data.session.createdAt,
+    sessionId: parsed.data.session.id,
   };
 };

@@ -41,6 +41,9 @@ import {
   identityRowsFor,
   lastActiveIn,
   otherCodesFor,
+  parkedSecretFor,
+  passkeyChallengeFor,
+  restoreCodeFor,
   secondFactorRowsFor,
   signInLinkFor,
   verificationCodeFor,
@@ -513,9 +516,12 @@ const secondFactorHeldBy = async (userId: string, passkeyId: string) => {
             (SELECT count(*)::int FROM passkey_last_use WHERE passkey_id = $2) AS passkey_uses,
             (SELECT count(*)::int FROM authenticator WHERE user_id = $1) AS authenticators,
             (SELECT count(*)::int FROM recovery_code WHERE user_id = $1) AS recovery_codes,
+            (SELECT count(*)::int FROM second_factor_throttle WHERE user_id = $1)
+              AS confirm_failures,
             u.authenticator_enabled,
             u.passkey_offer_dismissed_at IS NOT NULL AS offer_dismissed,
-            u.recovery_codes_acknowledged
+            u.recovery_codes_acknowledged,
+            u.restore_required_at IS NOT NULL AS restore_required
        FROM "user" u WHERE u.id = $1`,
     [userId, passkeyId],
   );
@@ -527,9 +533,11 @@ const SECOND_FACTOR_HELD = {
   passkey_uses: 1,
   authenticators: 1,
   recovery_codes: 2,
+  confirm_failures: 2,
   authenticator_enabled: true,
   offer_dismissed: true,
   recovery_codes_acknowledged: true,
+  restore_required: true,
 };
 
 /** A member here who is an Editor of a second workspace too. */
@@ -551,6 +559,7 @@ const SWEPT_BY_PERSON = [
   "public.member",
   "public.passkey",
   "public.recovery_code",
+  "public.second_factor_throttle",
   "public.session",
 ];
 
@@ -586,6 +595,7 @@ const NO_SECOND_FACTOR_DELETED = {
   passkeys_deleted: 0,
   authenticators_deleted: 0,
   recovery_codes_deleted: 0,
+  confirm_failures_deleted: 0,
   last_active_deleted: 0,
 };
 
@@ -1306,6 +1316,37 @@ describe("the identity set on the person's last membership", () => {
     });
   });
 
+  it("deletes the restore code and session-keyed rows, never a stranger's", async () => {
+    const { scenario, person, email, subjectRequestId } = await workspaceWithAnErasureRequest();
+    const { sessionId } = await identityRowsFor(db().pool, { userId: person.id, email });
+    const strangersEmail = addressOf("someone");
+    const stranger = await memberOf(db().pool, scenario.workspaceId, strangersEmail);
+    const strangers = await identityRowsFor(db().pool, {
+      userId: stranger.id,
+      email: strangersEmail,
+    });
+    const theirs = [
+      await restoreCodeFor(db().pool, email, {
+        hash: "a".repeat(64),
+        expiresAt: new Date("2026-10-03T12:00:00.000Z"),
+      }),
+      await parkedSecretFor(db().pool, sessionId),
+      await passkeyChallengeFor(db().pool, sessionId),
+    ];
+    const notTheirs = [
+      await parkedSecretFor(db().pool, strangers.sessionId),
+      await passkeyChallengeFor(db().pool, strangers.sessionId),
+    ];
+
+    await completing(scenario, subjectRequestId);
+
+    const left = await db().pool.query<{ id: string }>(
+      "SELECT id FROM verification WHERE id = ANY($1)",
+      [[...theirs, ...notTheirs]],
+    );
+    expect(left.rows.map((row) => row.id).toSorted()).toEqual(notTheirs.toSorted());
+  });
+
   it("empties every identity-set table that names the person", async () => {
     expect(await identityTablesNamingAPerson()).toEqual(
       [...SWEPT_BY_PERSON, ...BEYOND_THE_SWEEP].toSorted(),
@@ -1334,9 +1375,11 @@ describe("the identity set on the person's last membership", () => {
       passkey_uses: 0,
       authenticators: 0,
       recovery_codes: 0,
+      confirm_failures: 0,
       authenticator_enabled: false,
       offer_dismissed: false,
       recovery_codes_acknowledged: false,
+      restore_required: false,
     });
     expect(await lastActiveWorkspacesOf(person.id)).toEqual([]);
     expect(operatorLinesAbout(done.erasureRequestId)).toEqual([
@@ -1344,6 +1387,7 @@ describe("the identity set on the person's last membership", () => {
         passkeys_deleted: 1,
         authenticators_deleted: 1,
         recovery_codes_deleted: 2,
+        confirm_failures_deleted: 2,
         last_active_deleted: 1,
       }),
     ]);
@@ -1422,6 +1466,27 @@ describe("the identity set on the person's last membership", () => {
     });
 
     expect(await workspacesMemberOf(person.id)).toEqual([elsewhere.workspaceId]);
+  });
+
+  it("keeps restore codes and parked secrets for another membership", async () => {
+    const { scenario, email, person } = await memberHereAndElsewhere();
+    const { sessionId } = await identityRowsFor(db().pool, { userId: person.id, email });
+    const kept = [
+      await parkedSecretFor(db().pool, sessionId),
+      await restoreCodeFor(db().pool, email, {
+        hash: "b".repeat(64),
+        expiresAt: new Date("2026-10-04T09:00:00.000Z"),
+      }),
+    ];
+    const subjectRequestId = await erasureRequestAbout(scenario.workspaceId, person.id, email);
+
+    await completing(scenario, subjectRequestId);
+
+    const left = await db().pool.query<{ id: string }>(
+      "SELECT id FROM verification WHERE id = ANY($1)",
+      [kept],
+    );
+    expect(left.rows.map((row) => row.id).toSorted()).toEqual(kept.toSorted());
   });
 
   it("deletes the address's invitations in every workspace, never a stranger's", async () => {
@@ -1512,6 +1577,7 @@ describe("the identity set on the person's last membership", () => {
           passkeys_deleted: 1,
           authenticators_deleted: 1,
           recovery_codes_deleted: 2,
+          confirm_failures_deleted: 2,
           last_active_deleted: 1,
         },
       ],
@@ -1592,6 +1658,7 @@ describe("the identity set on the person's last membership", () => {
         "identity-passkey": { found: 2 },
         "identity-authenticator": { found: 1 },
         "identity-recovery-code": { found: 2 },
+        "identity-confirm-failures": { found: 2 },
         "identity-last-active": { found: 1 },
       },
       report: [
@@ -1603,6 +1670,7 @@ describe("the identity set on the person's last membership", () => {
         "- identity-passkey: found 2",
         "- identity-authenticator: found 1",
         "- identity-recovery-code: found 2",
+        "- identity-confirm-failures: found 2",
         "- identity-last-active: found 1",
       ],
     };

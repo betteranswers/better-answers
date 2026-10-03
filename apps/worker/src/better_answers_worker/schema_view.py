@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0063_the-test-workspace-mark-kept"
+MIGRATION_ID = "0064_the-confirm-and-recovery"
 
-MIGRATION_WHEN = 1790975932505
+MIGRATION_WHEN = 1791024906925
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -466,6 +466,13 @@ TABLES: dict[str, dict[str, str]] = {
         "code_hash": "text NOT NULL",
         "created_at": "timestamp with time zone NOT NULL",
     },
+    "public.second_factor_throttle": {
+        "user_id": "text NOT NULL",
+        "kind": "text NOT NULL",
+        "failures": "integer NOT NULL",
+        "wait_until": "timestamp with time zone",
+        "noticed_at": "timestamp with time zone",
+    },
     "public.session": {
         "id": "text NOT NULL",
         "expires_at": "timestamp with time zone NOT NULL",
@@ -478,6 +485,7 @@ TABLES: dict[str, dict[str, str]] = {
         "active_workspace_id": "text",
         "second_factor_confirmed_at": "timestamp with time zone",
         "pending_since": "timestamp with time zone",
+        "setup_granted_at": "timestamp with time zone",
     },
     "public.source_binding": {
         "workspace_id": "text NOT NULL",
@@ -573,6 +581,7 @@ TABLES: dict[str, dict[str, str]] = {
         "authenticator_enabled": "boolean NOT NULL",
         "passkey_offer_dismissed_at": "timestamp with time zone",
         "recovery_codes_acknowledged": "boolean NOT NULL",
+        "restore_required_at": "timestamp with time zone",
     },
     "public.verification": {
         "id": "text NOT NULL",

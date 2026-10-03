@@ -256,7 +256,11 @@ describe("reading a person's second factor", () => {
         passkeys: [],
         authenticator: "none",
         recoveryCodes: undefined,
+        codesAcknowledged: false,
         passkeyOfferDismissed: false,
+        restoreRequired: false,
+        waits: { authenticator: 0, "recovery-code": 0, "restore-code": 0 },
+        thisSession: undefined,
       },
     });
   });

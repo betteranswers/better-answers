@@ -27,6 +27,15 @@ import {
   useMembership,
 } from "@/features/auth/membership.ts";
 import { NoWorkspaceScreen } from "@/features/auth/no-workspace-screen.tsx";
+import { ConfirmScreen, RecoveryScreen } from "@/features/auth/second-factor-screens.tsx";
+import {
+  CODES_STEP,
+  codesDetour,
+  CONFIRM_STEP,
+  RECOVERY_STEP,
+  SETUP_STEP,
+} from "@/features/auth/second-factor-steps.ts";
+import { CodesScreen, SetupScreen } from "@/features/auth/setup-screen.tsx";
 import { SignInScreen } from "@/features/auth/sign-in-screen.tsx";
 import { EveryoneScreen } from "@/features/console/everyone-screen.tsx";
 import { NamesWaitingScreen } from "@/features/console/names-waiting-screen.tsx";
@@ -124,7 +133,36 @@ const displayNameRoute = createRoute({
   path: "/display-name",
   component: DisplayNameScreen,
   beforeLoad: async ({ context }) => {
-    const elsewhere = await displayNameDetour(context.queryClient, pageQuery());
+    const elsewhere = await displayNameDetour(context.queryClient, context.api, pageQuery());
+    if (elsewhere !== undefined) throw redirect(leavingFor(elsewhere));
+  },
+});
+
+/** Only a signed-out visitor is sent on; each screen's own read decides the rest as it draws. */
+const pendingRoute = <const Path extends string>(path: Path, component: () => ReactElement) =>
+  createRoute({
+    getParentRoute: () => rootRoute,
+    path,
+    component,
+    beforeLoad: async ({ context, location }) => {
+      const elsewhere = await signedOutDetour(context.queryClient, location.href);
+      if (elsewhere !== undefined) throw redirect(leavingFor(elsewhere));
+    },
+  });
+
+const confirmRoute = pendingRoute(CONFIRM_STEP, ConfirmScreen);
+
+const recoveryRoute = pendingRoute(RECOVERY_STEP, RecoveryScreen);
+
+const setupRoute = pendingRoute(SETUP_STEP, SetupScreen);
+
+/** After the pending screens and before the display name, for a set never ticked as saved. */
+const codesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: CODES_STEP,
+  component: CodesScreen,
+  beforeLoad: async ({ context }) => {
+    const elsewhere = await codesDetour(context.queryClient, context.api, pageQuery());
     if (elsewhere !== undefined) throw redirect(leavingFor(elsewhere));
   },
 });
@@ -391,6 +429,10 @@ export const createAppRouter = (clients: AppClients, history?: RouterHistory) =>
       signInRoute,
       signInLinkRoute,
       displayNameRoute,
+      confirmRoute,
+      recoveryRoute,
+      setupRoute,
+      codesRoute,
       accountRoute,
       chooseWorkspaceRoute,
       noWorkspaceRoute,

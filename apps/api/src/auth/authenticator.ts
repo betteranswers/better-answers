@@ -3,8 +3,7 @@ import type { Context, Hono } from "hono";
 import { z } from "zod";
 
 import { attempt } from "@better-answers/core/kernel";
-import { readSecondFactor, recordAuthenticatorSetUp } from "@better-answers/core/workspaces";
-import { AUTHENTICATOR_CODE_LENGTH } from "@better-answers/schema/second-factor";
+import { recordAuthenticatorSetUp, type SecondFactorHeld } from "@better-answers/core/workspaces";
 
 import { sendFactorNotice } from "../factor-notice-email.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
@@ -14,25 +13,27 @@ import {
   AUTHENTICATOR_START_PATH,
 } from "./constants.ts";
 import {
+  codeAsked,
   finishedWith,
+  heldBy,
+  mayReplace,
+  parsedBody,
   PERSON_ROUTE_REFUSALS,
   type FactorRoutesDependencies,
   personRoutesAt,
   signedInPerson,
   type SignedIn,
+  waitsOnTheRestoreCode,
 } from "./person-routes.ts";
 
 const REFUSALS = {
   held: { error: "authenticator-held" },
   noSetupWaiting: { error: "no-setup-waiting" },
-  codeWrong: { error: "code-wrong" },
+  /** A first setup would leave the old factors standing, so a granted session uses the replacing routes. */
+  replacementSetupNeeded: { error: "replacement-setup-needed" },
 } as const;
 
 const setUpAnswer = z.object({ totpURI: z.string() });
-
-const codeAsked = z.object({
-  code: z.string().regex(new RegExp(`^\\d{${String(AUTHENTICATOR_CODE_LENGTH)}}$`)),
-});
 
 /** A name and value alone, as a `cookie` header carries each `Set-Cookie` line. */
 const cookieOf = (setCookies: readonly string[]): string =>
@@ -51,15 +52,20 @@ export const mountTheAuthenticator = (routes: Hono, deps: FactorRoutesDependenci
   const unanswered = (context: Context, reason: string): Response =>
     fenced.unanswered(context, "auth.authenticator_failed", reason);
 
-  const stateOf = async (personId: string) => {
-    const held = await readSecondFactor(IDENTITY_PRINCIPAL, door, { personId });
-    return held.ok ? held.value.authenticator : undefined;
+  /** Both steps check, since a setup started before a restore or a grant waits on its code unbounded. */
+  const refusedAFirstSetup = (context: Context, held: SecondFactorHeld): Response | undefined => {
+    if (waitsOnTheRestoreCode(held)) {
+      return context.json(PERSON_ROUTE_REFUSALS.restoreCodeNeeded, 409);
+    }
+    return mayReplace(held) ? context.json(REFUSALS.replacementSetupNeeded, 409) : undefined;
   };
 
   const start = async (context: Context, person: SignedIn): Promise<Response> => {
-    const state = await stateOf(person.user.id);
-    if (state === undefined) return unanswered(context, "the second factor was not read");
-    if (state === "set-up") return context.json(REFUSALS.held, 409);
+    const held = await heldBy(deps, person);
+    if (held === undefined) return unanswered(context, "the second factor was not read");
+    const refused = refusedAFirstSetup(context, held);
+    if (refused !== undefined) return refused;
+    if (held.authenticator === "set-up") return context.json(REFUSALS.held, 409);
     const started = await attempt(() =>
       auth.api.enableTwoFactor({ headers: context.req.raw.headers, body: { method: "totp" } }),
     );
@@ -121,18 +127,20 @@ export const mountTheAuthenticator = (routes: Hono, deps: FactorRoutesDependenci
     );
     if (verified.ok) return settle(context, person, verified.value.headers.getSetCookie());
     if (verified.error instanceof APIError && verified.error.statusCode === 401) {
-      return context.json(REFUSALS.codeWrong, 400);
+      return context.json(PERSON_ROUTE_REFUSALS.codeWrong, 400);
     }
     return unanswered(context, verified.error.message);
   };
 
   const finish = async (context: Context, person: SignedIn): Promise<Response> => {
-    const asked = codeAsked.safeParse(await context.req.json().catch(() => undefined));
-    if (!asked.success) return context.json(REFUSALS.codeWrong, 400);
-    const state = await stateOf(person.user.id);
-    if (state === undefined) return unanswered(context, "the second factor was not read");
+    const asked = await parsedBody(context, codeAsked);
+    if (!asked.success) return context.json(PERSON_ROUTE_REFUSALS.codeWrong, 400);
+    const held = await heldBy(deps, person);
+    if (held === undefined) return unanswered(context, "the second factor was not read");
+    const refused = refusedAFirstSetup(context, held);
+    if (refused !== undefined) return refused;
     // Past setup the library checks a code with no count of tries, so no route may reach it.
-    if (state !== "awaiting-code") return context.json(REFUSALS.noSetupWaiting, 409);
+    if (held.authenticator !== "awaiting-code") return context.json(REFUSALS.noSetupWaiting, 409);
     return verify(context, person, asked.data.code);
   };
 

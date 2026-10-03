@@ -112,7 +112,11 @@ export const personRouter = router({
     crossing(
       ctx,
       readSecondFactor.name,
-      readSecondFactor(IDENTITY_PRINCIPAL, ctx.doors.postgres, { personId: ctx.personId }),
+      readSecondFactor(IDENTITY_PRINCIPAL, ctx.doors.postgres, {
+        personId: ctx.personId,
+        sessionId: ctx.sessionId,
+        now: ctx.clock.now(),
+      }),
     ),
   ),
   renamePasskey: personProcedure.input(parsedBy(renamePasskeyInput)).mutation(({ ctx, input }) =>

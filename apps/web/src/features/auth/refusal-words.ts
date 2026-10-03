@@ -1,4 +1,5 @@
-import type { Said, SaidOfWord } from "@/shared/refusal-words.ts";
+import type { Refusal } from "@/shared/api/trpc.ts";
+import { saidOfRefusal, type Said, type SaidOfWord } from "@/shared/refusal-words.ts";
 import { minutesUntil } from "@/shared/words.ts";
 
 /** Said on the invitation screen, of its read and of joining alike. */
@@ -65,10 +66,12 @@ export const askedTooOften = (liftsInSeconds: number): Said => ({
   next: `Ask again in ${minutesUntil(liftsInSeconds)}.`,
 });
 
-const tryAgainAfter = (waitSeconds: number | undefined): string =>
+const tryAgainWhen = (waitSeconds: number | undefined): string =>
   waitSeconds === undefined
-    ? "Wait a few minutes, then try again."
-    : `Try again in ${minutesUntil(waitSeconds)}.`;
+    ? "Wait a few minutes, then try again"
+    : `Try again in ${minutesUntil(waitSeconds)}`;
+
+const tryAgainAfter = (waitSeconds: number | undefined): string => `${tryAgainWhen(waitSeconds)}.`;
 
 /** A ceiling's refusal names the wait whenever its answer carried one. */
 export const tooManyCodesAskedFor = (waitSeconds: number | undefined): Said => ({
@@ -182,7 +185,14 @@ export const SAID_OF_SECOND_FACTOR = {
     why: "These codes were replaced in another tab or window, so they no longer work.",
     next: "Reload the page to see the codes you hold.",
   },
+  "restore-code-needed": {
+    why: "Your sign-in was restored, so its restore code comes first.",
+    next: "Enter the code the platform's operator gave you.",
+  },
 } satisfies SaidOfWord;
+
+export const saidOfASecondFactorRefusal = (refusal: Refusal): Said =>
+  saidOfRefusal(SAID_OF_SECOND_FACTOR, refusal.word, refusal.class);
 
 export const SETUP_CODE_WRONG: Said = {
   why: "That code doesn't match.",
@@ -310,4 +320,95 @@ export const tooManyPasskeySignIns = (waitSeconds: number | undefined): Said => 
 export const CODES_NOT_COPIED: Said = {
   why: "The codes weren't copied.",
   next: "Select them and copy them yourself.",
+};
+
+/** The other ways a throttled code's screen can name, each only when the person holds it. */
+const OTHER_WAYS = {
+  passkey: "your passkey",
+  authenticator: "your authenticator",
+  "recovery-code": "a recovery code",
+} as const;
+
+export type OtherWay = keyof typeof OTHER_WAYS;
+
+const orUsing = (others: readonly OtherWay[]): string =>
+  others.length === 0 ? "" : `, or use ${others.map((way) => OTHER_WAYS[way]).join(" or ")}`;
+
+/** The field waits, with no countdown, while every other way the person holds stays open. */
+export const tooManyCodesTriedOr = (
+  waitSeconds: number | undefined,
+  others: readonly OtherWay[],
+): Said => ({
+  why: "Too many codes have been tried.",
+  next: `${tryAgainWhen(waitSeconds)}${orUsing(others)}.`,
+});
+
+export const AUTHENTICATOR_CODE_WRONG: Said = {
+  why: "That code is wrong.",
+  next: "Enter the code your authenticator shows now.",
+};
+
+export const CONFIRM_UNANSWERED: Said = {
+  why: "No response, so nothing was confirmed.",
+  next: "Try again in a moment.",
+};
+
+export const PASSKEY_NOT_YOURS: Said = {
+  why: "That passkey isn't one of yours.",
+  next: "Use another passkey, or another way below.",
+};
+
+export const PASSKEY_CONFIRM_NOT_VERIFIED: Said = {
+  why: "Your device didn't check it was you, so nothing was confirmed.",
+  next: "Use a device with a fingerprint, face or PIN check, or another way below.",
+};
+
+export const PASSKEY_CONFIRM_EXPIRED: Said = {
+  why: "Your device took too long to answer, so nothing was confirmed.",
+  next: "Use your passkey again.",
+};
+
+export const NO_PASSKEY_TO_CONFIRM: Said = {
+  why: "You have no passkey to confirm with.",
+  next: "Use another way below.",
+};
+
+export const PASSKEY_CONFIRM_REFUSED: Said = {
+  why: "Your passkey didn't confirm it's you.",
+  next: "Try again, or use another way below.",
+};
+
+export const tooManyConfirmations = (waitSeconds: number | undefined): Said => ({
+  why: "Too many confirmations have been tried.",
+  next: tryAgainAfter(waitSeconds),
+});
+
+/** The api may have spent the code before the answer was lost. */
+export const RECOVERY_UNANSWERED: Said = {
+  why: "No response, so the code may not have been used.",
+  next: "Reload the page to see where it stands.",
+};
+
+export const RESTORE_CODE_WRONG: Said = {
+  why: "That restore code is wrong or has expired.",
+  next: "Check it, or ask the platform's operator for a new one.",
+};
+
+/** Said where a sign-in without the right to set up asks to, before the screen moves on. */
+export const SETUP_NOT_GRANTED: Said = {
+  why: "This sign-in can't set up a new second factor.",
+  next: "Confirm it's you first.",
+};
+
+export const RESTORE_CODE_NEEDED: Said = SAID_OF_SECOND_FACTOR["restore-code-needed"];
+
+/** Said to a page that began the first setup before its session was granted a replacing one. */
+export const REPLACEMENT_SETUP_NEEDED: Said = {
+  why: "This sign-in can only set up a factor that replaces your old ones.",
+  next: "Reload the page and start the setup again.",
+};
+
+export const FACTORS_CHANGED_MEANWHILE: Said = {
+  why: "Your second factors changed in another tab or window, so nothing was replaced.",
+  next: "Reload the page to see what you hold.",
 };

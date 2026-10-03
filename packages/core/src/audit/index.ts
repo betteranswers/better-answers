@@ -32,7 +32,14 @@ export {
   declarations,
   endedGrant,
 } from "./vocabulary.ts";
-export type { ActName, AuditAct, DetailOf, EndedGrant, SignInMethod } from "./vocabulary.ts";
+export type {
+  ActName,
+  AuditAct,
+  DetailOf,
+  EndedGrant,
+  SecondFactor,
+  SignInMethod,
+} from "./vocabulary.ts";
 
 export type AuditEvent<A extends AuditAct> = {
   readonly id: string;
