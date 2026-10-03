@@ -799,6 +799,12 @@ describe("the strings a person reads in a source file", () => {
     expect(readIn(source, "apps/web/src/shared/navigation.ts")).toEqual([]);
   });
 
+  it("fails on a file it cannot parse", () => {
+    expect(() => readIn('export const A = "Unclosed;')).toThrow(
+      /^planted-words\.tsx does not parse: /,
+    );
+  });
+
   it("reports each piece at the line its words start", () => {
     expect(
       readIn(

@@ -342,12 +342,15 @@ const visit = (value: unknown, found: (node: Node) => void): void => {
   for (const child of childrenOf(value)) visit(child, found);
 };
 
-/** The strings and JSX text a person reads in one source file, each at the line its words start. */
+/** @throws when the file does not parse, which would otherwise read as holding no words. */
 export const readerStringsIn = (file: string, source: string): readonly ReaderString[] => {
+  const parsed = parseSync(file, source);
+  const [first] = parsed.errors;
+  if (first !== undefined) throw new Error(`${file} does not parse: ${first.message}`);
   const starts = [0, ...[...source.matchAll(/\n/g)].map((match) => match.index + 1)];
   const strings: ReaderString[] = [];
   const inWordsModule = WORDS_MODULE.test(file);
-  visit(parseSync(file, source).program, (node) => {
+  visit(parsed.program, (node) => {
     const read = piecesOf(node, source).filter((piece) => isRead(piece.text, inWordsModule));
     for (const { offset, text } of read) {
       strings.push({ line: lineAt(starts, offset), text: text.trim() });
