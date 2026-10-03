@@ -147,10 +147,15 @@ export const mountTheAuthenticator = (routes: Hono, deps: FactorRoutesDependenci
   /** Starts and codes count apart. */
   routes.post(
     AUTHENTICATOR_START_PATH,
-    fenced.asThePerson("authenticator-start", AUTHENTICATOR_PERSON_RULE, start),
+    fenced.asThePerson("authenticator-start", AUTHENTICATOR_PERSON_RULE, "set-up-a-factor", start),
   );
   routes.post(
     AUTHENTICATOR_FINISH_PATH,
-    fenced.asThePerson("authenticator-finish", AUTHENTICATOR_PERSON_RULE, finish),
+    fenced.asThePerson(
+      "authenticator-finish",
+      AUTHENTICATOR_PERSON_RULE,
+      "set-up-a-factor",
+      finish,
+    ),
   );
 };

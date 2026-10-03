@@ -45,6 +45,7 @@ import {
 import { consentPage, refusedPage, REFUSAL_PAGES, signInPage } from "./pages.ts";
 import { mountThePasskeys } from "./passkeys.ts";
 import { sameOriginOnly } from "./same-origin.ts";
+import { judged, pendingOr, SECOND_FACTOR_PENDING } from "./second-factor-gate.ts";
 import { askingWithALink, dropALink, readALink, signingInByLink } from "./sign-in-link.ts";
 import { sessionClaims } from "./verify.ts";
 
@@ -64,6 +65,12 @@ export type AuthRoutesDependencies = {
 };
 
 const carry = (url: string): string => new URL(url).search;
+
+const PENDING = "pending";
+
+const sessionNamed = z.object({ session: z.object({ id: z.string() }) });
+
+type Pending = typeof PENDING;
 const oauthQuery = (url: string): string => new URL(url).search.replace(/^\?/, "");
 
 const hostnameOf = (url: string): string => URL.parse(url)?.hostname ?? "an unknown address";
@@ -403,14 +410,26 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
   const routes = new Hono();
   const { auth, door, publicUrl, clock } = deps;
 
-  const claimsFrom = (headers: Headers): Promise<Claims | undefined> =>
-    sessionClaims((sent) => auth.api.getSession({ headers: sent }), headers);
+  /** A pending session holds no claims to act on, and a session ended meanwhile none at all. */
+  const claimsFrom = async (headers: Headers): Promise<Claims | Pending | undefined> => {
+    const read = await auth.api.getSession({ headers });
+    const sessionId = sessionNamed.safeParse(read).data?.session.id;
+    if (sessionId === undefined) return undefined;
+    const standing = await judged({ door, clock }, { id: sessionId });
+    if (!standing.ok && standing.error === "session-gone") return undefined;
+    if (pendingOr(standing)) return PENDING;
+    return sessionClaims(async () => read, headers);
+  };
 
   const sessionHolds = async (headers: Headers): Promise<boolean> => {
     const claims = await claimsFrom(headers);
-    if (claims === undefined) return false;
+    if (claims === undefined || claims === PENDING) return false;
     return (await withPrincipal(door, claims, async () => true)).ok;
   };
+
+  /** Confirming first carries the signed query, so the flow resumes once the session is confirmed. */
+  const confirmFirst = (context: Context): Response =>
+    context.redirect(`/confirm${carry(context.req.url)}`, 302);
 
   const prm = {
     resource: deps.mcpUrl,
@@ -454,6 +473,7 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
     if (claims === undefined) {
       return context.html(signInPage(REFUSAL_PAGES.signInFirst, carry(context.req.url)), 401);
     }
+    if (claims === PENDING) return confirmFirst(context);
     const clientName = await clientNameOf(auth, asked.clientId, headers);
     const workspace = await workspaceNameOf(door, claims);
 
@@ -473,6 +493,9 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
 
     const accept = form.get("accept") === "true";
 
+    if ((await claimsFrom(flowHeaders(context.req.raw, publicUrl))) === PENDING) {
+      return confirmFirst(context);
+    }
     if (accept && !(await sessionHolds(flowHeaders(context.req.raw, publicUrl)))) {
       return context.html(signInPage(REFUSAL_PAGES.sessionEnded, carry(context.req.url)), 401);
     }
@@ -497,6 +520,7 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
   routes.get("/me", async (context) => {
     const claims = await claimsFrom(flowHeaders(context.req.raw, publicUrl));
     if (claims === undefined) return context.json({ error: "not_signed_in" }, 401);
+    if (claims === PENDING) return context.json({ error: SECOND_FACTOR_PENDING }, 403);
     const resolved = await withPrincipal(door, claims, async (principal) => ({
       workspaceId: principal.workspaceId,
       userId: principal.userId,

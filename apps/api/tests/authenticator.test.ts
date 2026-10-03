@@ -11,6 +11,7 @@ import {
   codeNow,
   sessionsSignedInOverAnHourAgo,
   setUpOn,
+  signedInByEmailOnly,
   startOn,
   whileCommitsAreRefused,
 } from "./provoke.ts";
@@ -140,9 +141,11 @@ describe("setting up an authenticator", () => {
   });
 
   it("keeps the chosen workspace across the session swap", async () => {
-    const { admin, client } = await anAdminSignedIn();
-    const other = await app().provision();
-    await app().addMember(other.workspaceId, admin.id, "Viewer");
+    const [one, other] = [await app().provision(), await app().provision()];
+    const person = await app().person();
+    await app().addMember(one.workspaceId, person.id, "Viewer");
+    await app().addMember(other.workspaceId, person.id, "Viewer");
+    const client = await signedInByEmailOnly(app(), person.email);
     const picked = await setActiveWorkspace(client, other.workspaceId);
     expect(picked.status, "the workspace was not picked").toBe(200);
 
@@ -150,7 +153,7 @@ describe("setting up an authenticator", () => {
 
     const held = await app().database.superuser.query<{ workspace: string | null }>(
       "SELECT active_workspace_id AS workspace FROM session WHERE user_id = $1",
-      [admin.id],
+      [person.id],
     );
     expect(held.rows).toEqual([{ workspace: other.workspaceId }]);
   });
@@ -187,7 +190,8 @@ describe("setting up an authenticator", () => {
   it("refuses the operator's hour-old sign-in after the session swap", async () => {
     const workspace = await app().provision();
     await app().markOperator(workspace.admin.email, "grant");
-    const { client, api } = await webSignedIn(app(), workspace.admin.email);
+    const client = await signedInByEmailOnly(app(), workspace.admin.email);
+    const { api } = webClientOf(client);
     const person = await app().person();
     await sessionsSignedInOverAnHourAgo(app(), workspace.admin.id);
 

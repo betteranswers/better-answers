@@ -13,6 +13,7 @@ import {
 import { testData } from "@better-answers/schema/testing";
 
 import { IDENTITY_PRINCIPAL } from "../src/identity-principal.ts";
+import { authenticatorKeyOf, holdAnAuthenticator } from "./factor-harness.ts";
 import {
   accessAsking,
   askToJoin,
@@ -32,8 +33,6 @@ import {
   codeSentPastItsExpiry,
   restoredByTheOperator,
   sessionsSignedInOverAnHourAgo,
-  setUpAnAuthenticator,
-  signedInClient,
 } from "./provoke.ts";
 
 const HARNESS_PREFIX = "/__harness";
@@ -92,6 +91,16 @@ const testWorkspace = z.object({
   viewer: z.string().min(1),
 });
 
+const personIdOf = async (app: TestApp, email: string): Promise<string> => {
+  const found = await app.database.superuser.query<{ id: string }>(
+    'SELECT id FROM "user" WHERE lower(email) = lower($1)',
+    [email],
+  );
+  const id = found.rows[0]?.id;
+  if (id === undefined) throw new Error(`the harness holds no person at ${email}`);
+  return id;
+};
+
 const readBody = async <T>(request: Request, schema: z.ZodType<T>): Promise<T> => {
   const parsed = schema.safeParse(await request.json());
   if (!parsed.success) throw new Error(`the harness was called wrongly: ${parsed.error.message}`);
@@ -144,10 +153,11 @@ export const harnessControl = (app: TestApp): Hono => {
     return context.json({ aged: true });
   });
 
-  // The library's own setup, signed in by one emailed code; the key answered makes the codes.
+  // Sealed as the plugin seals one, spending no emailed code; the key answered makes the codes.
   control.post(`${HARNESS_PREFIX}/authenticators`, async (context) => {
     const asked = await readBody(context.req.raw, byEmail);
-    const key = await setUpAnAuthenticator(app, await signedInClient(app, asked.email));
+    const personId = await personIdOf(app, asked.email);
+    const key = authenticatorKeyOf(app, personId) ?? (await holdAnAuthenticator(app, personId));
     return context.json({ key });
   });
 

@@ -31,6 +31,7 @@ import {
 } from "../auth/constants.ts";
 import { sendFactorNotice } from "../factor-notice-email.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
+import { sendPromotionNotice } from "../promotion-notice-email.ts";
 import { crossing, given, parsedBy, personCeiling, personProcedure, router } from "./base.ts";
 
 const answeredNoSoonerThan = async <Answer>(
@@ -94,20 +95,27 @@ export const personRouter = router({
       }),
     ),
   ),
-  acceptInvitation: personProcedure.input(parsedBy(invitationInput)).mutation(({ ctx, input }) =>
-    crossing(
-      ctx,
-      acceptInvitation.name,
-      given(input, (asked) =>
-        acceptInvitation(IDENTITY_PRINCIPAL, ctx.doors.postgres, {
-          invitationId: asked.invitationId,
-          personId: ctx.personId,
-          sessionId: ctx.sessionId,
-          now: ctx.clock.now(),
-        }),
-      ),
-    ),
-  ),
+  acceptInvitation: personProcedure
+    .input(parsedBy(invitationInput))
+    .mutation(async ({ ctx, input }) => {
+      const { promoted, ...joined } = await crossing(
+        ctx,
+        acceptInvitation.name,
+        given(input, (asked) =>
+          acceptInvitation(IDENTITY_PRINCIPAL, ctx.doors.postgres, {
+            invitationId: asked.invitationId,
+            personId: ctx.personId,
+            sessionId: ctx.sessionId,
+            now: ctx.clock.now(),
+          }),
+        ),
+      );
+      if (promoted) {
+        const telling = { mail: ctx.mail, log: ctx.log, door: ctx.doors.postgres };
+        void sendPromotionNotice({ ...telling, platform: IDENTITY_PRINCIPAL }, ctx.personId);
+      }
+      return joined;
+    }),
   secondFactor: personProcedure.query(({ ctx }) =>
     crossing(
       ctx,
@@ -138,6 +146,7 @@ export const personRouter = router({
           removePasskey(IDENTITY_PRINCIPAL, ctx.doors.postgres, {
             ...asked,
             personId: ctx.personId,
+            sessionId: ctx.sessionId,
           }),
         ),
       );
@@ -158,7 +167,10 @@ export const personRouter = router({
     const removed = await crossing(
       ctx,
       removeAuthenticator.name,
-      removeAuthenticator(IDENTITY_PRINCIPAL, ctx.doors.postgres, { personId: ctx.personId }),
+      removeAuthenticator(IDENTITY_PRINCIPAL, ctx.doors.postgres, {
+        personId: ctx.personId,
+        sessionId: ctx.sessionId,
+      }),
     );
     void sendFactorNotice(ctx, ctx.email, "authenticator-removed");
     return removed;

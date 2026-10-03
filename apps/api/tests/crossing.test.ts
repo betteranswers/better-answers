@@ -295,7 +295,8 @@ describe("a refusal crossing tRPC", () => {
     const workspace = await app.provision();
     const client = await signedInClient(app, workspace.admin.email);
 
-    await withColumnRenamed("member", "role", async () => {
+    // A column the gate's read leaves alone, so the fault reaches the resolver.
+    await withColumnRenamed("member", "credentials_revoked_at", async () => {
       const response = await membership(client);
 
       expect(response.status).toBe(500);

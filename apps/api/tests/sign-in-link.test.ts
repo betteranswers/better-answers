@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { whileWritesAreRefused } from "@better-answers/core/testing/postgres";
 
+import { confirmedByTheHarness } from "./factor-harness.ts";
 import { authorizeUrl, continueAfterPostLogin, pkce } from "./flow.ts";
 import { PUBLIC_URL, type TestClient } from "./harness.ts";
 import { servedApp } from "./suite-app.ts";
@@ -439,6 +440,12 @@ describe("signing in through a link", () => {
     expect(read).toMatchObject({ state: "bound", carried: query });
     expect(signedIn.status).toBe(200);
     expect(await signedIn.json()).toMatchObject({ carried: query });
+    const whilePending = await asking.json("/oauth2/continue", {
+      postLogin: true,
+      oauth_query: query.slice(1),
+    });
+    expect(whilePending.status, "an Admin's link sign-in confirms before consent").toBe(403);
+    await confirmedByTheHarness(app(), asking);
     const next = await continueAfterPostLogin(asking, query);
     expect(`${next.origin}${next.pathname}`).toBe(`${PUBLIC_URL}/consent`);
   });

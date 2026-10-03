@@ -3,7 +3,12 @@ import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { z } from "zod";
 
-import { err, systemClock, type UserPrincipal } from "@better-answers/core/kernel";
+import {
+  err,
+  type SecondFactorStanding,
+  systemClock,
+  type UserPrincipal,
+} from "@better-answers/core/kernel";
 import type { Tx } from "@better-answers/core/store/postgres";
 
 import type { Doors } from "../src/doors.ts";
@@ -62,12 +67,16 @@ const NO_DATABASE = doorsFor("postgres://nobody@127.0.0.1:1/none");
 const A_SIGNED_IN_PERSON = {
   user: { id: "01K6H0A7Q3W9E2R5T8Y1U4I6P0", email: "priya@acme.test" },
   session: { id: "01K6H0A7Q3W9E2R5T8Y1U4I6P1", createdAt: new Date("2026-10-01T09:00:00.000Z") },
-};
+  standing: "not-required",
+} as const;
 
 const wire = z.object({ error: z.object({ data: z.object({ refusal: z.unknown() }) }) });
 
 /** A procedure whose act answers `answered`, asked as the web asks, through tRPC's own handler. */
-const refusalCrossing = async (answered: RefusalAnswer) => {
+const refusalCrossing = async (
+  answered: RefusalAnswer,
+  standing: SecondFactorStanding = A_SIGNED_IN_PERSON.standing,
+) => {
   const { logger, logs } = capturingLogger();
   const response = await fetchRequestHandler({
     endpoint: "/trpc",
@@ -83,7 +92,7 @@ const refusalCrossing = async (answered: RefusalAnswer) => {
     createContext: () => ({
       doors: NO_DATABASE,
       clock: systemClock(),
-      readSession: async () => A_SIGNED_IN_PERSON,
+      readSession: async () => ({ ...A_SIGNED_IN_PERSON, standing }),
       headers: new Headers(),
       log: logger,
       mail: { send: async () => {}, publicUrl: "https://app.example.test" },
@@ -145,5 +154,24 @@ describe("a refusal naming items, crossing tRPC", () => {
       ["refuseTheSet", "last-admin", "precondition"],
     ]);
     expect(JSON.stringify(refused)).not.toMatch(/01K6H0A7Q3W9E2R5T8Y1U4I6O[01]/);
+  });
+});
+
+describe("a pending session crossing tRPC", () => {
+  it("refuses a procedure outside the pending set before its act", async () => {
+    for (const standing of ["confirm", "setup"] as const) {
+      const crossed = await refusalCrossing("no-such-member", standing);
+
+      expect([crossed.status, crossed.refusal]).toStrictEqual([
+        412,
+        { word: "second-factor-pending", class: "precondition" },
+      ]);
+    }
+  });
+
+  it("lets a confirmed session through to the act's own answer", async () => {
+    const crossed = await refusalCrossing("no-such-member", "confirmed");
+
+    expect(crossed.refusal).toStrictEqual({ word: "no-such-member", class: "absent" });
   });
 });

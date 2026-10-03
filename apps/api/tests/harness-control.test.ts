@@ -35,6 +35,8 @@ describe("the browser suite's second-factor harness", () => {
     expect((await webClientOf(client).api.person.secondFactor.query()).thisSession).toEqual({
       confirmed: true,
       setupGranted: false,
+      adminOf: null,
+      standing: "not-required",
     });
   });
 

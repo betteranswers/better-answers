@@ -54,6 +54,8 @@ import type { Tx } from "@better-answers/core/store/postgres";
 
 import type { Doors } from "../doors.ts";
 import type { Mail } from "../email.ts";
+import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
+import { sendPromotionNotice } from "../promotion-notice-email.ts";
 import type { RefusalAnswer } from "../refusal.ts";
 import { EMAILS_PER_SECOND } from "../smtp.ts";
 import {
@@ -146,6 +148,32 @@ const committedThenEmailedEach =
     return { invitations: minted.map((one, at) => answer(one, sent[at] === true)) };
   };
 
+type Moving<Asked, Moved> = (
+  principal: UserPrincipal,
+  tx: Tx,
+  input: Asked,
+) => Promise<Result<Moved, RefusalAnswer | Error>>;
+
+/** Once the move committed, tells each person it promoted what can confirm their sign-in. */
+const movedThenTold =
+  <Asked, Moved extends object, Answer>(
+    act: Moving<Asked, Moved>,
+    told: (moved: Moved) => { readonly promoted: readonly string[]; readonly answer: Answer },
+  ) =>
+  async ({ ctx, input }: { readonly ctx: Emailing; readonly input: Result<Asked, Malformed> }) => {
+    const moved = await crossing(
+      ctx,
+      act.name,
+      given(input, (asked) => committedAs(ctx, (principal, tx) => act(principal, tx, asked))),
+    );
+    const { promoted, answer } = told(moved);
+    const telling = { mail: ctx.mail, log: ctx.log, door: ctx.doors.postgres };
+    for (const personId of promoted) {
+      void sendPromotionNotice({ ...telling, platform: IDENTITY_PRINCIPAL }, personId);
+    }
+    return answer;
+  };
+
 const mintedAnswer = (minted: InvitationMinted, emailSent: boolean) => ({
   ...answerOf(minted, emailSent),
   replaced: minted.replaced,
@@ -178,7 +206,12 @@ export const membersRouter = router({
   list: queryProcedure.query(({ ctx }) =>
     crossing(ctx, listMembers.name, listMembers(ctx.principal, ctx.tx)),
   ),
-  changeRole: mutationProcedure.input(parsedBy(changeRoleInput)).mutation(answeredBy(changeRole)),
+  changeRole: ownTransactionProcedure.input(parsedBy(changeRoleInput)).mutation(
+    movedThenTold(changeRole, ({ promoted, ...changed }) => ({
+      promoted: promoted ? [changed.personId] : [],
+      answer: changed,
+    })),
+  ),
   auditLog: queryProcedure.input(parsedBy(readAuditLogInput)).query(answeredBy(readAuditLog)),
   activity: queryProcedure.input(parsedBy(readActivityInput)).query(answeredBy(readActivity)),
   invitations: queryProcedure
@@ -210,9 +243,11 @@ export const membersRouter = router({
     .input(parsedBy(revokeCredentialsHereInput))
     .mutation(answeredAt(revokeCredentialsHere)),
   remove: mutationProcedure.input(parsedBy(removeMemberInput)).mutation(answeredAt(removeMember)),
-  bulkChangeRole: mutationProcedure
+  bulkChangeRole: ownTransactionProcedure
     .input(parsedBy(bulkChangeRoleInput))
-    .mutation(answeredBy(bulkChangeRole)),
+    .mutation(
+      movedThenTold(bulkChangeRole, ({ promoted, ...outcome }) => ({ promoted, answer: outcome })),
+    ),
   bulkRemove: mutationProcedure
     .input(parsedBy(bulkRemoveMembersInput))
     .mutation(answeredAt(bulkRemoveMembers)),

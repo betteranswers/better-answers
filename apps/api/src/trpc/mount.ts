@@ -6,6 +6,7 @@ import { CeilingMet } from "@better-answers/core/kernel";
 
 import type { Auth } from "../auth/index.ts";
 import { TRPC_IP_RULE } from "../auth/index.ts";
+import { gatedReader } from "../auth/second-factor-gate.ts";
 import type { Doors } from "../doors.ts";
 import type { Mail } from "../email.ts";
 import { limitByIp } from "../ingress/limits.ts";
@@ -33,7 +34,10 @@ export const createTrpcRoutes = (deps: TrpcRoutesDependencies): Hono => {
       createContext: (_options, context) => ({
         doors: deps.doors,
         clock: deps.doors.clock,
-        readSession: (headers: Headers) => deps.auth.api.getSession({ headers }),
+        readSession: gatedReader((headers) => deps.auth.api.getSession({ headers }), {
+          door: deps.doors.postgres,
+          clock: deps.doors.clock,
+        }),
         headers: context.req.raw.headers,
         log,
         mail: deps.mail,

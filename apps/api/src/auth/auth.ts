@@ -12,7 +12,14 @@ import type pg from "pg";
 import type { Logger } from "pino";
 import { z } from "zod";
 
-import { attempt, type Clock, err, type Result, ulid } from "@better-answers/core/kernel";
+import {
+  attempt,
+  type Clock,
+  err,
+  isPending,
+  type Result,
+  ulid,
+} from "@better-answers/core/kernel";
 import { withIdentityWrite, type PostgresDoor } from "@better-answers/core/store/postgres";
 import {
   hasNoDisplayName,
@@ -62,6 +69,15 @@ import {
 import { codeHashOf } from "./link-token.ts";
 import { dropAnExpiredPromotionLock } from "./promotion-lock.ts";
 import { accessControl, creatorRole, roles } from "./roles.ts";
+import {
+  AUTHORIZE_PATH,
+  judged,
+  PENDING_LIBRARY_PATHS,
+  pendingOr,
+  refusalFor,
+  SECOND_FACTOR_PENDING,
+  SESSIONLESS_LIBRARY_PATHS,
+} from "./second-factor-gate.ts";
 import { signInEmail } from "./sign-in-email.ts";
 import { keepALink, signInMethodOfThisCall } from "./sign-in-link.ts";
 
@@ -252,6 +268,8 @@ const clientIdOfQuery = (query: string | undefined): string | undefined =>
   query === undefined ? undefined : (new URLSearchParams(query).get("client_id") ?? undefined);
 
 type AuditFields = z.infer<typeof bodyFields>;
+
+type GateContext = Parameters<Parameters<typeof createAuthMiddleware>[0]>[0];
 
 type AuditedCall = {
   readonly fields: AuditFields;
@@ -456,6 +474,36 @@ export const createAuth = (deps: AuthDependencies) => {
     return { secondFactorConfirmedAt: at };
   };
 
+  /** Over HTTP alone: the api's own routes call closed endpoints as server functions and gate themselves. */
+  const gatedToken = async (ctx: GateContext): Promise<string | undefined> => {
+    if (ctx.request === undefined || SESSIONLESS_LIBRARY_PATHS.has(ctx.path)) return undefined;
+    if (ctx.path === AUTHORIZE_PATH) return undefined;
+    const token = await ctx.getSignedCookie(
+      ctx.context.authCookies.sessionToken.name,
+      ctx.context.secret,
+    );
+    return typeof token === "string" ? token : undefined;
+  };
+
+  /** A pending session reads itself without renewing it, and reaches nothing else here. */
+  const gateTheLibrary = async (ctx: GateContext) => {
+    const token = await gatedToken(ctx);
+    if (token === undefined) return undefined;
+    const standing = await judged(deps, { token });
+    if (!standing.ok) {
+      if (standing.error instanceof Error) throw standing.error;
+      return undefined;
+    }
+    if (refusalFor(standing.value.standing, PENDING_LIBRARY_PATHS.get(ctx.path)) !== undefined) {
+      throw new APIError("FORBIDDEN", {
+        code: SECOND_FACTOR_PENDING,
+        message: "Confirm the second factor first",
+      });
+    }
+    if (ctx.path !== "/get-session" || !isPending(standing.value.standing)) return undefined;
+    return { context: { query: { ...ctx.query, disableRefresh: true } } };
+  };
+
   const db = drizzle(deps.database, { schema: identitySchema });
 
   return betterAuth({
@@ -491,6 +539,7 @@ export const createAuth = (deps: AuthDependencies) => {
           returned: false,
         },
         restoreRequiredAt: { type: "date", required: false, input: false, returned: false },
+        promotedAt: { type: "date", required: false, input: false, returned: false },
       },
     },
     session: {
@@ -552,9 +601,11 @@ export const createAuth = (deps: AuthDependencies) => {
        * skip it until the daily sweep.
        */
       before: createAuthMiddleware(async (ctx) => {
-        if (ctx.path !== "/sign-in/email-otp") return;
-        const asked = signInAddress.parse(ctx.body);
-        if (asked !== undefined) await clearAnExpiredPromotionLock(asked.email);
+        if (ctx.path === "/sign-in/email-otp") {
+          const asked = signInAddress.parse(ctx.body);
+          if (asked !== undefined) await clearAnExpiredPromotionLock(asked.email);
+        }
+        return gateTheLibrary(ctx);
       }),
       after: createAuthMiddleware(async (ctx) => {
         const event = auditedEvent(ctx.path);
@@ -666,6 +717,8 @@ export const createAuth = (deps: AuthDependencies) => {
             },
 
             shouldRedirect: async ({ session, user: person }) => {
+              // A pending session confirms on the way, from the post-login page, before any consent.
+              if (pendingOr(await judged(deps, { id: session.id }))) return true;
               // The post-login page asks for a display name first; skipping it for a sole
               // membership would carry an unnamed person straight to consent.
               if (hasNoDisplayName(person.name)) return true;

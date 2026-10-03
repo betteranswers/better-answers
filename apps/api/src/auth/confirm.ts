@@ -6,7 +6,7 @@ import {
   verifyAuthenticationResponse,
 } from "@simplewebauthn/server";
 import { APIError } from "better-auth/api";
-import { generateRandomString, symmetricDecrypt, symmetricEncrypt } from "better-auth/crypto";
+import { symmetricDecrypt } from "better-auth/crypto";
 import type { Context, Hono } from "hono";
 import { z } from "zod";
 
@@ -24,15 +24,13 @@ import {
   spendRecoveryCode,
   takePasskeyChallenge,
 } from "@better-answers/core/workspaces";
-import { AUTHENTICATOR_CODE_LENGTH } from "@better-answers/schema/second-factor";
 
 import { type FactorChange, sendFactorNotice } from "../factor-notice-email.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
-import { PRODUCT_NAME } from "../product-name.ts";
 import { passkeyPartyOf } from "./auth.ts";
+import { mintAuthenticatorKey, OTP_SETTINGS } from "./authenticator-key.ts";
 import {
   AUTHENTICATOR_PERSON_RULE,
-  AUTHENTICATOR_STEP_SECONDS,
   CONFIRM_AUTHENTICATOR_PATH,
   CONFIRM_PASSKEY_OPTIONS_PATH,
   CONFIRM_PASSKEY_PATH,
@@ -67,12 +65,6 @@ const REFUSALS = {
   setupNotGranted: { error: "setup-not-granted" },
   changedMeanwhile: { error: "changed-meanwhile" },
 } as const;
-
-/** The plugin's own, so its verify accepts a key set up here. */
-const OTP_SETTINGS = { digits: AUTHENTICATOR_CODE_LENGTH, period: AUTHENTICATOR_STEP_SECONDS };
-
-/** The plugin's own length for a new key. */
-const SECRET_LENGTH = 32;
 
 /** As typed: spaces, dashes and case are the store's to ignore. */
 const typedCode = z.object({ code: z.string().min(1).max(100) });
@@ -292,20 +284,16 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
     return refused(context, why);
   };
 
-  /** The plugin's own making and sealing of a key, kept aside until its first code works. */
+  /** Kept aside until its first code works. */
   const startTheReplacement = async (context: Context, person: SignedIn): Promise<Response> => {
-    const secret = generateRandomString(SECRET_LENGTH);
-    const sealed = await attempt(async () =>
-      symmetricEncrypt({ key: await secretConfig(), data: secret }),
-    );
-    if (!sealed.ok) return unanswered(context, sealed.error.message);
+    const minted = await attempt(() => mintAuthenticatorKey(auth, person.user.email));
+    if (!minted.ok) return unanswered(context, minted.error.message);
     const parked = await parkAuthenticatorSecret(IDENTITY_PRINCIPAL, door, {
       ...askedBy(clock, person),
-      encryptedSecret: sealed.value,
+      encryptedSecret: minted.value.sealed,
     });
     if (!parked.ok) return refusedToReplace(context, parked.error);
-    const setupAddress = createOTP(secret, OTP_SETTINGS).url(PRODUCT_NAME, person.user.email);
-    return context.json({ setupAddress });
+    return context.json({ setupAddress: minted.value.setupAddress });
   };
 
   const replacingWith = async (
@@ -347,21 +335,22 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
   /** Each counts apart; only the code routes meet the throttle as well. */
   routes.post(
     CONFIRM_PASSKEY_OPTIONS_PATH,
-    fenced.asThePerson("confirm-passkey-options", CONFIRM_PERSON_RULE, askToConfirm),
+    fenced.asThePerson("confirm-passkey-options", CONFIRM_PERSON_RULE, "confirm", askToConfirm),
   );
   routes.post(
     CONFIRM_PASSKEY_PATH,
-    fenced.asThePerson("confirm-passkey", CONFIRM_PERSON_RULE, confirmWithAPasskey),
+    fenced.asThePerson("confirm-passkey", CONFIRM_PERSON_RULE, "confirm", confirmWithAPasskey),
   );
   routes.post(
     CONFIRM_AUTHENTICATOR_PATH,
-    fenced.asThePerson("confirm-authenticator", CONFIRM_PERSON_RULE, confirmWithACode),
+    fenced.asThePerson("confirm-authenticator", CONFIRM_PERSON_RULE, "confirm", confirmWithACode),
   );
   routes.post(
     RECOVERY_CODE_PATH,
     fenced.asThePerson(
       "recovery-code",
       SPEND_A_CODE_PERSON_RULE,
+      "spend-a-recovery-code",
       spending(spendRecoveryCode, REFUSALS.recoveryCodeWrong, "recovery-code-used"),
     ),
   );
@@ -370,6 +359,7 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
     fenced.asThePerson(
       "restore-code",
       SPEND_A_CODE_PERSON_RULE,
+      "give-the-restore-code",
       spending(acceptRestoreCode, REFUSALS.restoreCodeWrong),
     ),
   );
@@ -378,6 +368,7 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
     fenced.asThePerson(
       "replace-authenticator-start",
       AUTHENTICATOR_PERSON_RULE,
+      "set-up-a-factor",
       startTheReplacement,
     ),
   );
@@ -386,6 +377,7 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
     fenced.asThePerson(
       "replace-authenticator-finish",
       AUTHENTICATOR_PERSON_RULE,
+      "set-up-a-factor",
       finishTheReplacement,
     ),
   );

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
+import { confirmedByTheHarness } from "./factor-harness.ts";
 import { whileCommitsAreRefused } from "./provoke.ts";
 import { appForSuite } from "./suite-app.ts";
 import { NO_SESSION_ANSWERED, refusalOfCall, webSignedIn } from "./web-client.ts";
@@ -164,7 +165,7 @@ describe("accepting an invitation over tRPC", () => {
     const elsewhere = await app().provision({ name: "Elsewhere Ltd" });
     const person = await app().person(anAddress("sam"), "Sam Okoro");
     await app().addMember(elsewhere.workspaceId, person.id, "Viewer");
-    const { api } = await webSignedIn(app(), person.email);
+    const { api, client } = await webSignedIn(app(), person.email);
     expect(await api.session.membership.query()).toMatchObject({
       workspace: { name: "Elsewhere Ltd" },
     });
@@ -173,6 +174,10 @@ describe("accepting an invitation over tRPC", () => {
 
     await api.person.acceptInvitation.mutate({ invitationId: linkedInvitationId(person.email) });
 
+    expect(await refusalOfCall(api.session.membership.query())).toMatchObject({
+      data: { httpStatus: 412, refusal: { word: "second-factor-pending" } },
+    });
+    await confirmedByTheHarness(app(), client);
     expect(await api.session.membership.query()).toMatchObject({
       workspace: { id: admin.workspace.workspaceId, name: "Ryedale Metalwork" },
       role: "Admin",
