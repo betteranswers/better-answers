@@ -82,6 +82,7 @@ const tagOf = (commit: string, kind = "release"): string =>
 const STUB_GH = [
   "#!/usr/bin/env bash",
   '[ -n "${STUB_GH_FAILS:-}" ] && exit 1',
+  '[ -n "${STUB_REJECTED_FAILS:-}" ] && [[ "$*" == *tags/rejected/* ]] && exit 1',
   "lines() { for line in $1; do printf '%s\\n' \"${line}\"; done; }",
   'case "$*" in',
   `  "api repos/${REPOSITORY}/git/ref/heads/main --jq .object.sha") printf '%s\\n' "\${STUB_HEAD}" ;;`,
@@ -446,7 +447,7 @@ describe("the gate's word on a refused or rejected night", () => {
   it("stops at a rejected commit, never promoting an older one", async () => {
     expect(await gateRan({ ...rejectedHead, STUB_REJECTED: tagOf(HEAD, "rejected") })).toEqual(
       skipped(
-        `${HEAD} was rejected by its journeys, and no commit after it has a green build, so nothing is released tonight. Delete its rejected/ tag to promote it again. ${LIVE}`,
+        `${HEAD} has a rejected/ tag, whose message names the journeys that ended fail, and no commit after it has a green build, so nothing is released tonight. Delete its rejected/ tag to promote it again. ${LIVE}`,
         "nightly",
         { only: true, mode: "gate" },
       ),
@@ -460,6 +461,14 @@ describe("the gate's word on a refused or rejected night", () => {
       output: decided(true, HEAD, "nightly", { mode: "gate" }),
       summary: "",
     });
+  });
+
+  it("refuses a night whose rejected tags cannot be read", async () => {
+    expect(await gateRan({ ...rejectedHead, STUB_REJECTED_FAILS: "1" })).toEqual(
+      refused("the rejected tags could not be read, so nothing is released tonight", "nightly", {
+        mode: "gate",
+      }),
+    );
   });
 });
 
@@ -903,6 +912,7 @@ const recordedAs = async (env: Readonly<Record<string, string>>): Promise<Record
 const taggedBy = ({ calls }: Recorded) => {
   const tagged = calls.find((call) => call[0] === "tag") ?? [];
   return {
+    on: tagged.at(-1),
     tag: tagged.at(-2),
     message: tagged[tagged.indexOf("--message") + 1],
     pushed: calls.filter((call) => call[0] === "push").map((call) => call.at(-1)),
@@ -910,12 +920,25 @@ const taggedBy = ({ calls }: Recorded) => {
 };
 
 describe("the tag the record job makes", () => {
+  it("decides the tag from the gate's and journeys' outputs", () => {
+    expect(jobOf("record").steps.find(running('git push origin "refs/tags/${tag}"'))?.env).toEqual({
+      TAG: "${{ needs.promote.outputs.tag }}",
+      MESSAGE: "${{ needs.promote.outputs.message }}",
+      RELEASE_HEAD: "${{ needs.promote.outputs.head }}",
+      MODE: "${{ needs.gate.outputs.journeys_mode }}",
+      TRIGGER: "${{ needs.gate.outputs.trigger }}",
+      WORD: "${{ needs.journeys.outputs.word }}",
+      JOURNEYED: "${{ needs.journeys.outputs.commit }}",
+    });
+  });
+
   it("adds the journeys' word and commit to a release", async () => {
     const recorded = taggedBy(
       await recordedAs({ MODE: "report", TRIGGER: "nightly", WORD: "held", JOURNEYED }),
     );
 
     expect(recorded).toEqual({
+      on: RECORDED_HEAD,
       tag: "release/20261003T182337Z-7364d68",
       message: `release: api 938568b7b474 · worker 69e6aeebdb1b\nJourneys: held, run against ${JOURNEYED}`,
       pushed: ["refs/tags/release/20261003T182337Z-7364d68"],
@@ -946,6 +969,7 @@ describe("the tag the record job makes", () => {
     });
 
     expect(taggedBy(recorded)).toEqual({
+      on: RECORDED_HEAD,
       tag: "rejected/20261003T182337Z-7364d68",
       message: `rejected: its journeys ended fail, so the nightly release will not promote it again\n\nrelease: api 938568b7b474 · worker 69e6aeebdb1b\nJourneys: fail, run against ${JOURNEYED}`,
       pushed: ["refs/tags/rejected/20261003T182337Z-7364d68"],

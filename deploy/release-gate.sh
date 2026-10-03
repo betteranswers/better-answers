@@ -104,7 +104,7 @@ nightly() {
     fi
     # A rejection bounds the walk as a release does, so production never moves back past it.
     if grep -q -- "-${candidate:0:7}\$" <<<"${rejected}"; then
-      quiet_night "${candidate} was rejected by its journeys, and no commit after it has a green build, so nothing is released tonight. Delete its rejected/ tag to promote it again."
+      quiet_night "${candidate} has a rejected/ tag, whose message names the journeys that ended fail, and no commit after it has a green build, so nothing is released tonight. Delete its rejected/ tag to promote it again."
     fi
     if grep -qx -- "${candidate}" <<<"${green}"; then
       decide true "${candidate}"
