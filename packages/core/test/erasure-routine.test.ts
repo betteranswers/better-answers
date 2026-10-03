@@ -11,7 +11,7 @@ import {
 import { withScope } from "@better-answers/core/store/postgres";
 import { boundarySchemas, IDENTITY_SET, ulid } from "@better-answers/schema";
 
-import { open } from "../src/answering/index.ts";
+import { open, trustWords } from "../src/answering/index.ts";
 import {
   contentHashOf,
   RECONCILER,
@@ -1204,6 +1204,9 @@ describe("the checks the rewrite moved", () => {
       checkedAt: "2026-04-05T09:00:00.000Z",
       rider: null,
     });
+    expect(trustAfter[0] && trustWords(trustAfter[0])).toBe(
+      "Verified by a former member · 5 April 2026",
+    );
   });
 
   it("leaves a check alone when only unhashed keys were rewritten", async () => {

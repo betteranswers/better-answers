@@ -2906,7 +2906,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         kind: "Answer",
         title: "Data retention period",
         tags: ["company", "data-protection", "g-cloud-15"],
-        words: "Checked by Theo Approver · 1 June 2026 · imported",
+        words: "Verified by Theo Approver · 1 June 2026 · imported",
       });
 
       const opened = await reading(app(), workspaceId, admin.id, (principal, tx) =>
@@ -3012,7 +3012,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         "",
         SUPPORT_HOURS,
         "",
-        "_Checked by Mona Reviewer · 16 April 2026 · imported_",
+        "_Verified by Mona Reviewer · 16 April 2026 · imported_",
       ]);
     });
 
@@ -3183,7 +3183,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       );
       const hit = found.hits[0];
       if (hit?.layer !== "bundles") throw new Error("the hit is not a concept");
-      expect(trustWords(hit.trust)).toBe("Checked by Theo Approver · 1 June 2026 · imported");
+      expect(trustWords(hit.trust)).toBe("Verified by Theo Approver · 1 June 2026 · imported");
     });
   });
 });

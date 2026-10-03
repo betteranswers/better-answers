@@ -82,7 +82,7 @@ describe("the trust words", () => {
         checkedAt: "2026-03-03",
         rider: null,
       }),
-    ).toBe("Checked by Priya Shah · 3 March 2026");
+    ).toBe("Verified by Priya Shah · 3 March 2026");
     expect(
       trustWords({
         tier: "human-reviewed",
@@ -91,7 +91,7 @@ describe("the trust words", () => {
         checkedAt: "2026-03-03",
         rider: "imported",
       }),
-    ).toBe("Checked by Priya Shah · 3 March 2026 · imported");
+    ).toBe("Verified by Priya Shah · 3 March 2026 · imported");
     expect(
       trustWords({
         tier: "machine-confirmed",
@@ -100,11 +100,20 @@ describe("the trust words", () => {
         checkedAt: null,
         rider: "source-moved-on",
       }),
-    ).toBe("Checked by the platform · source moved on");
-    expect(trustWords(unchecked)).toBe("Unchecked");
+    ).toBe("Verified automatically · source moved on");
+    expect(
+      trustWords({
+        tier: "machine-confirmed",
+        status: "current",
+        checkedBy: "process:better-answers-importer",
+        checkedAt: "2026-03-03",
+        rider: null,
+      }),
+    ).toBe("Verified automatically");
+    expect(trustWords(unchecked)).toBe("Unverified");
   });
 
-  it("says a person checked, omitting a missing name or date", () => {
+  it("says a person verified, omitting a missing name or date", () => {
     expect(
       trustWords({
         tier: "human-reviewed",
@@ -113,7 +122,7 @@ describe("the trust words", () => {
         checkedAt: null,
         rider: null,
       }),
-    ).toBe("Checked by Priya Shah");
+    ).toBe("Verified by Priya Shah");
     expect(
       trustWords({
         tier: "human-reviewed",
@@ -122,7 +131,19 @@ describe("the trust words", () => {
         checkedAt: null,
         rider: null,
       }),
-    ).toBe("Checked by a person");
+    ).toBe("Verified by a person");
+  });
+
+  it("names a verifier erasure left nameless a former member", () => {
+    expect(
+      trustWords({
+        tier: "human-reviewed",
+        status: "current",
+        checkedBy: "human:01J8ZQ4M7V3K9T2R5N6P8W1XYD",
+        checkedAt: "2026-04-05T09:00:00.000Z",
+        rider: null,
+      }),
+    ).toBe("Verified by a former member · 5 April 2026");
   });
 
   it("shows an unreadable date as the file wrote it", () => {
@@ -134,7 +155,7 @@ describe("the trust words", () => {
         checkedAt: "when the contract ends",
         rider: null,
       }),
-    ).toBe("Checked by Priya Shah · when the contract ends");
+    ).toBe("Verified by Priya Shah · when the contract ends");
     expect(mapWords({ state: "as_of", at: "when the contract ends" })).toBe(
       "map as of when the contract ends",
     );
@@ -147,7 +168,7 @@ describe("the trust words", () => {
       checkedAt: "2026-01-01",
       rider: null,
     };
-    expect(trustWords({ ...base, status: "changed-since-checked" })).toBe("Changed since checked");
+    expect(trustWords({ ...base, status: "changed-since-checked" })).toBe("Changed since verified");
     expect(trustWords({ ...base, status: "out-of-date" })).toBe("Out of date");
     expect(trustWords({ ...base, status: "draft" })).toBe("Draft");
     expect(trustWords({ ...base, status: "deprecated" })).toBe("Deprecated");
@@ -282,8 +303,8 @@ describe("the preview's rendering", () => {
       }),
     ).toBe(
       [
-        "Policy · Expenses · Unchecked · https://better-answers.com/c/01A",
-        "Guide · Travel · Checked by Priya Shah · 3 March 2026 · https://better-answers.com/c/01B",
+        "Policy · Expenses · Unverified · https://better-answers.com/c/01A",
+        "Guide · Travel · Verified by Priya Shah · 3 March 2026 · https://better-answers.com/c/01B",
       ].join("\n"),
     );
   });
@@ -327,7 +348,7 @@ describe("open's and feedback's renderings", () => {
         "",
         "Expenses are claimed within thirty days.",
         "",
-        "_Unchecked_",
+        "_Unverified_",
         "",
         "Evidence:",
         "- Handbook (p.4)",
@@ -361,7 +382,7 @@ describe("open's and feedback's renderings", () => {
         "",
         "Travel is booked in advance.",
         "",
-        "_Checked by Priya Shah · 3 March 2026_",
+        "_Verified by Priya Shah · 3 March 2026_",
       ].join("\n"),
     );
   });
@@ -579,7 +600,7 @@ describe("the two knowledge layers a search and a fetch reach", () => {
     });
     expect(found.ok && renderFind(found.value)).toBe(
       [
-        `Policy · ${CONCEPT_TITLE} · Unchecked · ${iri}`,
+        `Policy · ${CONCEPT_TITLE} · Unverified · ${iri}`,
         `document · ${INVOICE_TITLE} · ${NOT_COMPANY_KNOWLEDGE} · Internal · ${invoice.locator}`,
       ].join("\n"),
     );
