@@ -3,8 +3,16 @@
  * word it replaced.
  */
 
-/** `within` keeps a sense to the one tree whose code writes it. */
-type Sense = { readonly sense: string; readonly written: RegExp; readonly within?: string };
+/**
+ * `within` keeps a sense to the one tree whose code writes it; `until` keeps it only while the later
+ * sweep that renames it is pending.
+ */
+export type Sense = {
+  readonly sense: string;
+  readonly written: RegExp;
+  readonly within?: string;
+  readonly until?: string;
+};
 
 export type CarveOut = { readonly holds: (file: string) => boolean; readonly why: string };
 
