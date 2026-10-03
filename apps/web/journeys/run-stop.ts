@@ -8,8 +8,8 @@ import { couldNotRun } from "./outcome.ts";
 const POSSIBLE_COMPROMISE = "possible compromise";
 
 /**
- * A file, as a failed journey restarts the worker. Playwright empties this folder as each run
- * starts, so a stop never outlives its run.
+ * A file, as a failed journey restarts the worker. A command-line run empties this folder first;
+ * a stale stop, as UI mode keeps, fails closed.
  */
 const stopFile = (): string => path.join(test.info().project.outputDir, "journeys-stopped");
 
