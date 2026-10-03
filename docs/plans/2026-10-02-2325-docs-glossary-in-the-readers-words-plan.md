@@ -62,6 +62,9 @@ The trust words show the same split. The owner agreed on 28/09/2026 to move from
 - **Completed plans keep their words.** Plans in `docs/plans/` record what was built. Governs R22. (session-settled: user-approved — chosen over sweeping them: every sweep would rewrite history)
 - **Rules say what to use, never what is forbidden.** An agent-facing rule names the word to write and leaves the old one unnamed. The owner set this for BA-37 on 02/10/2026, and it applies here too. Governs R7, R9, R10.
 - **Trust words stay a closed set and never contradict OKF.** The owner's one test for a trust word is OKF (`docs/okf-v02.md`). *Score*, *confidence* and *trusted* stay out. Governs R4.
+- **The restore drill compares counts only where production has them.** It fails on an absent table and on "not built" from a landed slice. It compares counts when production holds a recorded run for the drill's workspace, and otherwise records them. Governs R14. (session-settled: user-approved 03/10/2026 — chosen over keeping AE13 strict: the synthetic workspace never exists in production, and production records no counts yet)
+- **The Audit log names what it can and leaves off what it cannot.** An event with no person as its actor reads "the platform". A thing that no longer exists shows its kind marked removed, such as "a connected source (removed)". A detail with no word is left off. Governs R16. (session-settled: user-approved 03/10/2026 — chosen over naming the actor *better-answers*)
+- **The Audit log shows each person's sign-in address beneath their name.** Two members can share a display name. Governs R16. (session-settled: user-approved 03/10/2026 — chosen over showing the address only when two names clash: a row keeps one layout)
 
 ### Requirements
 
@@ -127,7 +130,7 @@ The trust words show the same split. The owner agreed on 28/09/2026 to move from
 - AE10. **Covers R15.** Given a concept file written before any sweep, when `open` is called with its `iri`, then the concept opens and the file is unchanged in git.
 - AE11. **Covers R12, R21.** Given the `find` description names its `iri` and `locator` parameters, when the words test runs, then it passes. Once the *match* sweep has landed, the word *hit* in the description's prose fails.
 - AE12. **Covers R12.** Given a branch opened before the connected-source sweep that adds a `bindingId` identifier, when it enters the merge queue after the sweep, then the words test fails and names *connected source* and the sweep.
-- AE13. **Covers R14.** Given the map sweep has renamed the map tables, when the restore drill runs, then it compares counts against production's or fails. It never passes on an absent table.
+- AE13. **Covers R14.** Given the map sweep has renamed the map tables, when the restore drill runs, then it fails on an absent table and on "not built" from a slice that has landed. It compares counts with production's when production holds a recorded run for the drill's workspace, and otherwise records them. It never passes on an absent table.
 - AE14. **Covers R14, R22.** Given a bookmark to `/system/routes-and-spend` or `/agent-operations/routes-and-spend`, when an Admin opens it after the model sweep, then *Models and spend* opens.
 - AE15. **Covers R14.** Given a job queued with an old reason value when a sweep's migration runs, when the new worker claims it, then it runs under the new value and is not refused.
 
@@ -514,7 +517,7 @@ sequenceDiagram
 4. Add the stored-names register (KTD15), excluded from every map.
 5. The worker gains a test that prepares each SQL statement it sends against the migrated test database.
 6. The ops commands take their table names from the table objects, not strings.
-7. The restore drill fails on an absent table, and on "not built" from any slice that has landed. Its production-counts diff names `graph_sync_run`, which is no table, so the diff is skipped on every run today.
+7. The restore drill fails on an absent table, and on "not built" from any slice that has landed. It compares counts when production holds a recorded run for the drill's workspace, and otherwise records them. Its production-counts diff names `graph_sync_run`, which is no table, so the diff is skipped on every run today.
 
 **Patterns to follow:**
 - `packages/devtools/src/jscpd.ts`, which wraps `runsOverThrowawayTree`; `executableOf` in `throwaway-tree.ts` requires `@ast-grep/cli` as a devtools dependency.
@@ -533,6 +536,7 @@ sequenceDiagram
 - With the connected-source row landed, a deferred sense lets `binding_id` on `index.chunk` pass until the passage row lands.
 - A worker statement naming a missing table fails the prepare test and names the statement.
 - Covers AE13. The restore drill fails when a table it counts is absent, and when a landed slice answers "not built".
+- Covers AE13. With no recorded run on production for the drill's workspace, the drill records its counts and does not fail.
 
 **Verification:** the devtools, core and worker checks pass, and the drill's counts diff runs. A dry run of the model-choice map lists its occurrences by sense.
 
@@ -582,11 +586,17 @@ sequenceDiagram
 1. Give every declared act name a headline and sentence in today's words. Stored names stay (R22).
 2. Show detail keys and values in today's words.
 3. Replace "Recorded as", the raw subject and the raw actor id with the person's name and the thing's name.
+4. Show each person's sign-in address beneath their name.
+5. Where the page cannot name something: an actor that is no person reads "the platform", a thing that no longer exists shows its kind marked removed, and a detail with no word is left off.
 
 **Test scenarios:**
 - Covers AE5. An event stored as `sources.binding.published` reads as a connected source published, and the row is unchanged.
 - Covers AE8. A credentials ending stored today still scopes "everywhere".
 - The actor shows by display name, and an erased actor reads "a former member".
+- Two members with one display name show their own sign-in addresses.
+- An event with no person as actor reads "the platform".
+- An event whose connected source was deleted reads "a connected source (removed)".
+- A detail key with no word is left off the row.
 - No raw act name, actor id or person id appears on the Audit log.
 - A detail key such as `bindingId` shows as *Connected source*.
 
@@ -649,7 +659,7 @@ sequenceDiagram
 
 **Test scenarios:**
 - A full rebuild over the renamed tables yields the same node and edge counts as before.
-- Covers AE13. The restore drill compares counts on the renamed tables.
+- Covers AE13. The restore drill counts the renamed tables, and compares them when production holds a recorded run.
 - Covers AE15. A job queued with *first-sync* runs under its new reason.
 - The renamed ops commands run, and the RUNBOOK names them.
 
