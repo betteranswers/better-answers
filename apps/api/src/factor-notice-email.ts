@@ -27,6 +27,9 @@ type Change = {
 
   /** Said in place of the usual line, for a notice of something the person may not have done. */
   readonly ifYou?: string;
+
+  /** Said in place of the usual line, where its Account page holds nothing left to check. */
+  readonly ifNot?: string;
 };
 
 const CHANGES = {
@@ -75,6 +78,7 @@ const CHANGES = {
     happened:
       "Your sign-in was restored. Your passkeys, authenticator and recovery codes no longer work, and every session was signed out.",
     ifYou: "If you asked for this, there is nothing more to do.",
+    ifNot: `If you didn't, tell ${PRODUCT_NAME} support now:`,
   },
 } as const satisfies Record<FactorChange, Change>;
 
@@ -90,18 +94,18 @@ const htmlOf = (change: Required<Change>, account: string): string =>
     change.subject,
     `<p style="${PARAGRAPH}">${change.happened}</p>
 <p style="${PARAGRAPH}">${change.ifYou}</p>
-<p style="${PARAGRAPH}">${WORDS.ifNot}</p>
+<p style="${PARAGRAPH}">${change.ifNot}</p>
 <p style="margin:0"><a href="${account}">${account}</a></p>`,
   );
 
 /** Names what changed and never the factor itself: no key, no code, no device. */
 const factorNoticeEmail = (to: string, change: FactorChange, publicUrl: string): EmailMessage => {
-  const said: Required<Change> = { ifYou: WORDS.ifYou, ...CHANGES[change] };
+  const said: Required<Change> = { ifYou: WORDS.ifYou, ifNot: WORDS.ifNot, ...CHANGES[change] };
   const account = `${publicUrl}${ACCOUNT_PATH}`;
   return {
     to,
     subject: said.subject,
-    text: [said.happened, "", said.ifYou, "", WORDS.ifNot, "", account].join("\n"),
+    text: [said.happened, "", said.ifYou, "", said.ifNot, "", account].join("\n"),
     html: htmlOf(said, account),
   };
 };

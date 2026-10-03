@@ -2750,9 +2750,18 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(sent.map((message) => [message.to, message.subject])).toEqual([
         [person.email, NOTICE],
       ]);
-      expect(sent[0]?.text).toContain(
-        "Your sign-in was restored. Your passkeys, authenticator and recovery codes no longer work, and every session was signed out.",
+      expect(sent[0]?.text).toBe(
+        [
+          "Your sign-in was restored. Your passkeys, authenticator and recovery codes no longer work, and every session was signed out.",
+          "",
+          "If you asked for this, there is nothing more to do.",
+          "",
+          "If you didn't, tell better-answers support now:",
+          "",
+          `${PUBLIC_URL}/account`,
+        ].join("\n"),
       );
+      expect(sent[0]?.html).not.toContain("operator");
     });
 
     it("says it must follow an identity check by another route", async () => {
