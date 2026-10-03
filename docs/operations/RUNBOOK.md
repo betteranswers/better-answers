@@ -71,14 +71,17 @@ The estate is two 4 GB boxes (ADR 0024): VPC 1 is production, VPC 2 is the orche
 
   The failed release pushed no tag: a run whose smoke failed says so in its summary, and under `gate` a run whose journeys did not hold has no *Recorded* section. Two tags of 27/09/2026 broke that rule, `release/20260927T193912Z-4bc6a2e` and `release/20260927T200343Z-821c331`: each was pushed before a smoke that failed, and neither release reached production. Both are gone from origin, but a clone that fetched them keeps them until `git fetch --prune --prune-tags`, so pass over either if it is listed. A tag with no `Run:` line predates automatic releases and was dispatched by hand.
 
-  **Under `gate`, the newest tag may be older than what production runs.** A release whose journeys did not hold stays live and untagged, and its migrations ran at its promotion all the same. In `nightly` mode the nights after it promote again, so more than one such release may sit between the tag and production. Before rolling back, list the migrations production holds that the tag's api does not. Each api image names the commit it was built from in its revision label, and `migrate` runs the api image:
+  **Under `gate`, the newest tag may be older than what production runs.** A release whose journeys did not hold stays live and untagged, and its migrations ran at its promotion all the same. In `nightly` mode the nights after it promote again, so more than one such release may sit between the tag and production. Before rolling back, list the migrations production holds that the tag's api does not. Each api image names the commit it was built from in its revision label, and `migrate` runs the api image. The packages are private, so log in to `ghcr.io` first (`docker login ghcr.io`, with a token that reads packages), then from the repository's root:
 
   ```sh
+  git fetch --tags origin main                           # the untagged commits too
   live=$(curl -sS <PUBLIC_URL>/health | jq -r .image)   # the api digest production runs
   target=<the digest on the tag's api: line>
   built() { docker buildx imagetools inspect "ghcr.io/betteranswers/api@$1" --format '{{ index .Image.Config.Labels "org.opencontainers.image.revision" }}'; }
-  git diff --name-only --diff-filter=A "$(built "$target")" "$(built "$live")" -- packages/schema/migrations/
+  git diff --name-only --diff-filter=A "$(built "$target")" "$(built "$live")" -- 'packages/schema/migrations/*.sql'
   ```
+
+  An empty `built` answer is a missing login, not an empty diff: `git` then refuses rather than listing nothing.
 
   No file listed: the digests alone are the rollback. A `.sql` file listed is the migration case below, and its dump is the last one stamped before the first untagged release's promotion. That release has no tag to give its time, so read it from its run.
 

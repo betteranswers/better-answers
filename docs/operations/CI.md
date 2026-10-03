@@ -152,7 +152,7 @@ Any other value fails closed: every trigger refuses, naming the three. A dispatc
 
 - **`off`**, the default while it is unset: the journeys never run, and a release is tagged on its smoke.
 - **`report`**: they run and report, and a release is still tagged on its smoke.
-- **`gate`**: a release whose journeys ran is tagged only when they end `held`. One that does not hold stays live and untagged, and in `nightly` mode the next night promotes the same commit again, restarting the api, until a run holds.
+- **`gate`**: a release whose journeys ran is tagged only when they end `held`. One that does not hold stays live and untagged, and in `nightly` mode the next night promotes again, the same commit or a newer green one, restarting the api, until a run holds.
 
 Any other value fails closed: every trigger refuses, naming the three. Setting it back to `report` or `off` takes hold at the next run, with no pull request.
 
