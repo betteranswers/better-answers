@@ -1,3 +1,5 @@
+import { PRODUCT_NAME } from "@/shared/words.ts";
+
 /** Said when a field that waited on a throttle takes codes again. */
 export const CODE_AGAIN = "You can enter a code again.";
 
@@ -23,8 +25,7 @@ export const RECOVERY_WORDS = {
   why: "Each code works once. Using one lets you set up a new second factor.",
   field: "Recovery code",
   instead: "Use your passkey or authenticator instead",
-  operator:
-    "No codes left? Ask better-answers support to restore your sign-in. They check who you are another way first.",
+  operator: `No codes left? Ask ${PRODUCT_NAME} support to restore your sign-in. They check who you are another way first.`,
 } as const;
 
 export const SETUP_WORDS = {
