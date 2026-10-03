@@ -19,17 +19,20 @@ const mapFile = (name: string): string =>
     ? path.resolve(name)
     : path.join(repositoryRoot, "packages/devtools/renames", `${name}.json`);
 
+const usage = (): number => {
+  process.stderr.write(`${USAGE}\n`);
+  return 2;
+};
+
 /** 0 once the report is written, 2 for arguments it cannot read. */
 const replay = (argv: readonly string[]): number => {
   const flags = flagValues(argv);
-  const name = flags?.get("map");
-  const mode = MODES.find((one) => one === (flags?.get("mode") ?? "dry-run"));
-  if (name === undefined || mode === undefined) {
-    process.stderr.write(`${USAGE}\n`);
-    return 2;
-  }
+  if (flags === undefined) return usage();
+  const name = flags.get("map");
+  const mode = MODES.find((one) => one === (flags.get("mode") ?? "dry-run"));
+  if (name === undefined || mode === undefined) return usage();
   const map = parseRenameMap(readFileSync(mapFile(name), "utf8"));
-  const root = path.resolve(flags?.get("root") ?? repositoryRoot);
+  const root = path.resolve(flags.get("root") ?? repositoryRoot);
   process.stdout.write(formatReport(map, renameOver(root, map, mode), mode));
   return 0;
 };

@@ -18,9 +18,16 @@ const KEPT: readonly { readonly glob: string; readonly reason: string }[] = [
   { glob: "**/lifts/**", reason: "a lifted snapshot" },
 ];
 
+/** Each pass asks once per occurrence, and every ask would compile each glob again. */
+const keptReasons = new Map<string, string | undefined>();
+
 /** The reason a path is never edited, or undefined when a sweep may edit it. */
-export const keptReason = (file: string): string | undefined =>
-  KEPT.find((kept) => path.matchesGlob(file, kept.glob))?.reason;
+export const keptReason = (file: string): string | undefined => {
+  if (keptReasons.has(file)) return keptReasons.get(file);
+  const reason = KEPT.find((kept) => path.matchesGlob(file, kept.glob))?.reason;
+  keptReasons.set(file, reason);
+  return reason;
+};
 
 const GLOB_SYNTAX = /[*?[{]/;
 
@@ -95,10 +102,19 @@ export const parseRenameMap = (json: string): RenameMap => {
 export const inAllowlist = (globs: readonly string[], file: string): boolean =>
   globs.some((glob) => path.matchesGlob(file, glob));
 
+/** Compiled once, when first reached, as an unparsed map's bad pattern must throw no sooner. Flagless, so `test` keeps no state. */
+const patterns = new Map<string, RegExp>();
+
+const patternOf = (source: string): RegExp => {
+  const compiled = patterns.get(source) ?? new RegExp(source);
+  patterns.set(source, compiled);
+  return compiled;
+};
+
 /** The first sense whose paths hold the file and whose patterns match the text, if any. */
 export const senseOf = (map: RenameMap, file: string, found: string): string | undefined =>
   map.senses.find(
     (one) =>
       (one.paths === undefined || inAllowlist(one.paths, file)) &&
-      (one.matches === undefined || one.matches.some((pattern) => new RegExp(pattern).test(found))),
+      (one.matches === undefined || one.matches.some((pattern) => patternOf(pattern).test(found))),
   )?.sense;

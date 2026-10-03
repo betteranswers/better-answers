@@ -4,12 +4,11 @@ import path from "node:path";
 import { Project, ts } from "ts-morph";
 import type { ResolutionHostFactory } from "ts-morph";
 
+import { isPrunedName } from "./edits.ts";
+
 const TYPESCRIPT = "**/*.{ts,tsx,mts,cts}";
 
-const prunes = (entry: string): boolean => {
-  const name = path.basename(entry);
-  return name === "node_modules" || name.startsWith(".");
-};
+const prunes = (entry: string): boolean => isPrunedName(path.basename(entry));
 
 const optionsIn = (config: string): ts.CompilerOptions => {
   const read = ts.readConfigFile(config, (file) => ts.sys.readFile(file));

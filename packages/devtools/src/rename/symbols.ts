@@ -6,7 +6,7 @@ import type { Edit, Occurrence, PassOutcome } from "./edits.ts";
 import { inAllowlist, keptReason, senseOf } from "./map.ts";
 import type { RenameMap } from "./map.ts";
 import { projectAt } from "./project.ts";
-import { renamedText, wordPattern } from "./words.ts";
+import { renamedText, wordSource } from "./words.ts";
 import type { Words } from "./words.ts";
 
 const DECLARED_OUTSIDE = "declared outside the tree";
@@ -27,8 +27,10 @@ type Site = {
   readonly end: number;
 };
 
-const isOwned = (root: string, node: Node): boolean =>
-  isSwept(relativeTo(root, node.getSourceFile().getFilePath()));
+const fileOf = (root: string, node: Node): string =>
+  relativeTo(root, node.getSourceFile().getFilePath());
+
+const isOwned = (root: string, node: Node): boolean => isSwept(fileOf(root, node));
 
 /** A module's own declaration is its file, which a rename cannot move. */
 const ownedDeclaration = (root: string, symbol: MorphSymbol | undefined): Node | undefined =>
@@ -74,7 +76,7 @@ const siteOf = (root: string, identifier: Identifier): Site => {
   const start = identifier.getStart();
   const { line, column } = sourceFile.getLineAndColumnAtPos(start);
   return {
-    file: relativeTo(root, sourceFile.getFilePath()),
+    file: fileOf(root, sourceFile),
     line,
     column,
     found: identifier.getText(),
@@ -84,13 +86,10 @@ const siteOf = (root: string, identifier: Identifier): Site => {
 };
 
 const candidatesIn = (context: Context): readonly Identifier[] => {
-  const narrow = new RegExp(wordPattern(context.words).replace("(?i)", ""), "i");
+  const narrow = new RegExp(wordSource(context.words), "i");
   return context.project
     .getSourceFiles()
-    .filter(
-      (file) =>
-        isSwept(relativeTo(context.root, file.getFilePath())) && narrow.test(file.getFullText()),
-    )
+    .filter((file) => isOwned(context.root, file) && narrow.test(file.getFullText()))
     .flatMap((file) => file.getDescendantsOfKind(SyntaxKind.Identifier))
     .filter(
       (identifier) => renamedText(identifier.getText(), context.words) !== identifier.getText(),
@@ -98,7 +97,7 @@ const candidatesIn = (context: Context): readonly Identifier[] => {
 };
 
 const homeVerdict = (context: Context, home: Node, found: string): string => {
-  const file = relativeTo(context.root, home.getSourceFile().getFilePath());
+  const file = fileOf(context.root, home);
   return (
     keptReason(file) ??
     senseOf(context.map, file, found) ??
@@ -112,7 +111,7 @@ const locatedEdits = (context: Context, home: Node, to: string): readonly Edit[]
     .getLanguageService()
     .findRenameLocations(name, { usePrefixAndSuffixText: false })
     .map((location) => ({
-      file: relativeTo(context.root, location.getSourceFile().getFilePath()),
+      file: fileOf(context.root, location.getSourceFile()),
       start: location.getTextSpan().getStart(),
       end: location.getTextSpan().getEnd(),
       text: to,
@@ -168,8 +167,13 @@ export const symbolPass = (root: string, map: RenameMap, words: Words): PassOutc
   for (const identifier of candidatesIn(context)) {
     const home = homeOf(root, identifier);
     const site = siteOf(root, identifier);
-    if (home === undefined) strays.push(site);
-    else homes.set(home, [...(homes.get(home) ?? []), site]);
+    if (home === undefined) {
+      strays.push(site);
+      continue;
+    }
+    const atHome = homes.get(home) ?? [];
+    atHome.push(site);
+    homes.set(home, atHome);
   }
 
   const occurrences = strays.map((site) =>

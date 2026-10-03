@@ -17,9 +17,9 @@ export const wordsOf = (map: RenameMap): Words =>
     .map((rule) => ({ from: rule.from.split(" "), to: rule.to.split(" ") }))
     .sort((left, right) => right.from.length - left.from.length);
 
-/** Any text a rule could rewrite, for a scan to narrow to before the rules run. */
-export const wordPattern = (words: Words): string =>
-  `(?i)(?:${words.map((rule) => rule.from.join("[-_ ]?")).join("|")})`;
+/** Any text a rule could rewrite, for a scan to narrow to. Flag-free: ast-grep and JavaScript spell case-blind differently. */
+export const wordSource = (words: Words): string =>
+  `(?:${words.map((rule) => rule.from.join("[-_ ]?")).join("|")})`;
 
 type Match = {
   readonly end: number;

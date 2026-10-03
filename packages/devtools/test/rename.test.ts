@@ -242,6 +242,18 @@ def model_choices_of(cursor):
     );
   });
 
+  it("renames strings after multi-byte characters", () => {
+    const root = treeAt("multi-byte", {
+      "web/words.ts": `export const sign = "Café — 🚀";\nexport const pair = ["🚀 an act", "no acts"];\n`,
+    });
+
+    renameOver(root, mapOf(ACTION), "apply");
+
+    expect(read(root, "web/words.ts")).toBe(
+      `export const sign = "Café — 🚀";\nexport const pair = ["🚀 an action", "no actions"];\n`,
+    );
+  });
+
   it("never touches the stored-names register, nor what reaches it", () => {
     const register = `export const routeChanged = "route-change";\n`;
     const jobs = `import { routeChanged } from "./audit/stored-names.ts";

@@ -37,9 +37,11 @@ export const relativeTo = (root: string, file: string): string =>
   path.relative(root, file).split(path.sep).join("/");
 
 /** Pruned from every walk: what a package manager installed, and hidden tool directories. */
+export const isPrunedName = (segment: string): boolean =>
+  segment === "node_modules" || segment.startsWith(".");
+
 export const isSwept = (file: string): boolean =>
-  !file.startsWith("../") &&
-  file.split("/").every((segment) => segment !== "node_modules" && !segment.startsWith("."));
+  !file.startsWith("../") && !file.split("/").some(isPrunedName);
 
 const spliced = (source: string, edits: readonly Edit[]): string => {
   const ordered = [...edits].sort((left, right) => left.start - right.start);
@@ -68,19 +70,10 @@ const distinctOf = (edits: readonly Edit[]): readonly Edit[] => [
 
 /** Writes every edit, refusing outright a file a sweep never edits, whatever pass asked. */
 export const writeEdits = (root: string, edits: readonly Edit[]): void => {
-  const distinct = distinctOf(edits);
-  const files = new Set(distinct.map((edit) => edit.file));
-  for (const file of files) {
+  for (const [file, inFile] of Map.groupBy(distinctOf(edits), (edit) => edit.file)) {
     const reason = keptReason(file);
     if (reason !== undefined) throw new Error(`${file} is ${reason}, which a sweep never edits`);
     const absolute = path.join(root, file);
-    const source = readFileSync(absolute, "utf8");
-    writeFileSync(
-      absolute,
-      spliced(
-        source,
-        distinct.filter((edit) => edit.file === file),
-      ),
-    );
+    writeFileSync(absolute, spliced(readFileSync(absolute, "utf8"), inFile));
   }
 };

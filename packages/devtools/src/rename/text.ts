@@ -4,12 +4,14 @@ import path from "node:path";
 
 import { z } from "zod";
 
+import { FAMILIES } from "@better-answers/schema";
+
 import { executableOf } from "../throwaway-tree.ts";
 import { OUTSIDE_ALLOWLIST, RENAMED, isSwept, relativeTo } from "./edits.ts";
 import type { Edit, Occurrence, PassOutcome } from "./edits.ts";
 import { STORED_HISTORY, inAllowlist, keptReason, senseOf } from "./map.ts";
 import type { RenameMap } from "./map.ts";
-import { renamedText, wordPattern } from "./words.ts";
+import { renamedText, wordSource } from "./words.ts";
 import type { Words } from "./words.ts";
 
 const AST_GREP = { package: "@ast-grep/cli", path: ["ast-grep"] } as const;
@@ -17,7 +19,7 @@ const AST_GREP = { package: "@ast-grep/cli", path: ["ast-grep"] } as const;
 const MODULE_PATH = "module path";
 
 /** `family.subject.verb`: a stored act name, which events keep writing after any sweep. */
-const STORED_ACT = /^(?:people|knowledge|sources|platform)\.[a-z_]+\.[a-z_]+$/;
+const STORED_ACT = new RegExp(`^(?:${FAMILIES.join("|")})\\.[a-z_]+\\.[a-z_]+$`);
 
 /** A whole repository's matches, each with its source line, outgrow the default megabyte. */
 const SCAN_BUFFER_BYTES = 512 * 1024 * 1024;
@@ -39,27 +41,34 @@ const PYTHON_MODULE = {
   ],
 };
 
+type Role = "module" | "text";
+
+/** A match names only its rule, so the id carries the role a verdict reads back. */
+const ruleId = (language: string, role: Role): string => `${language}-${role}`;
+
+const isRole = (id: string, role: Role): boolean => id.endsWith(ruleId("", role));
+
 const rulesFor = (regex: string): string =>
   [
     ...SCRIPT_LANGUAGES.flatMap((language) => [
       {
-        id: `${language}-module`,
+        id: ruleId(language, "module"),
         language,
         rule: { kind: "string_fragment", regex, inside: SCRIPT_MODULE },
       },
       {
-        id: `${language}-text`,
+        id: ruleId(language, "text"),
         language,
         rule: { kind: "string_fragment", regex, not: { inside: SCRIPT_MODULE } },
       },
     ]),
     {
-      id: "Python-module",
+      id: ruleId("Python", "module"),
       language: "Python",
       rule: { kind: "identifier", regex, inside: PYTHON_MODULE },
     },
     {
-      id: "Python-text",
+      id: ruleId("Python", "text"),
       language: "Python",
       rule: {
         any: [{ kind: "identifier" }, { kind: "string_content" }],
@@ -67,7 +76,7 @@ const rulesFor = (regex: string): string =>
         not: { inside: PYTHON_MODULE },
       },
     },
-    { id: "Json-text", language: "Json", rule: { kind: "string_content", regex } },
+    { id: ruleId("Json", "text"), language: "Json", rule: { kind: "string_content", regex } },
   ]
     .map((rule) => JSON.stringify(rule))
     .join("\n---\n");
@@ -91,7 +100,7 @@ const scanned = (root: string, words: Words): readonly ScanMatch[] => {
     [
       "scan",
       "--inline-rules",
-      rulesFor(wordPattern(words)),
+      rulesFor(`(?i)${wordSource(words)}`),
       "--json=stream",
       "--globs",
       "!**/node_modules/**",
@@ -111,7 +120,7 @@ const scanned = (root: string, words: Words): readonly ScanMatch[] => {
 };
 
 const fixedVerdict = (match: ScanMatch): string | undefined => {
-  if (match.ruleId.endsWith("-module")) return MODULE_PATH;
+  if (isRole(match.ruleId, "module")) return MODULE_PATH;
   return STORED_ACT.test(match.text) ? STORED_HISTORY : undefined;
 };
 
@@ -125,9 +134,42 @@ const verdictOf = (map: RenameMap, file: string, match: ScanMatch): string =>
 const offsetIn = (source: Buffer, byte: number): number =>
   source.subarray(0, byte).toString("utf8").length;
 
+type ToUnit = (byte: number) => number;
+
+/** Each character's first byte against its code unit, read once per file rather than once per match. */
+const unitsAt = (source: Buffer, text: string): ToUnit => {
+  const units = new Int32Array(source.length + 1).fill(-1);
+  let byte = 0;
+  let unit = 0;
+  for (const character of text) {
+    units[byte] = unit;
+    byte += Buffer.byteLength(character);
+    unit += character.length;
+  }
+  units[byte] = unit;
+  return (at) => {
+    const found = units[at] ?? -1;
+    return found < 0 ? offsetIn(source, at) : found;
+  };
+};
+
+/** Decoding clamps an offset past the end, as a file edited since the scan could give. */
+const isInside = (source: Buffer, byte: number): boolean =>
+  Number.isInteger(byte) && byte >= 0 && byte <= source.length;
+
+/** One byte per unit means ASCII, or each stray byte as one replacement; only valid UTF-8 re-encodes byte for byte. */
+const offsetsIn = (source: Buffer): ToUnit => {
+  const text = source.toString("utf8");
+  if (text.length === source.length) {
+    return (byte) => (isInside(source, byte) ? byte : offsetIn(source, byte));
+  }
+  if (!Buffer.from(text, "utf8").equals(source)) return (byte) => offsetIn(source, byte);
+  return unitsAt(source, text);
+};
+
 /** Inventories every string, Python name and JSON key holding an old word, and the edits for those the allowlist names. */
 export const textPass = (root: string, map: RenameMap, words: Words): PassOutcome => {
-  const sources = new Map<string, Buffer>();
+  const sources = new Map<string, ToUnit>();
   const occurrences: Occurrence[] = [];
   const edits: Edit[] = [];
   for (const match of scanned(root, words)) {
@@ -146,12 +188,12 @@ export const textPass = (root: string, map: RenameMap, words: Words): PassOutcom
       verdict,
     });
     if (verdict !== RENAMED) continue;
-    const source = sources.get(file) ?? readFileSync(path.join(root, file));
-    sources.set(file, source);
+    const unitOf = sources.get(file) ?? offsetsIn(readFileSync(path.join(root, file)));
+    sources.set(file, unitOf);
     edits.push({
       file,
-      start: offsetIn(source, match.range.byteOffset.start),
-      end: offsetIn(source, match.range.byteOffset.end),
+      start: unitOf(match.range.byteOffset.start),
+      end: unitOf(match.range.byteOffset.end),
       text: to,
     });
   }
