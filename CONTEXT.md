@@ -755,14 +755,36 @@ to it by IRI and never restates it (ADR 0014).
   document that means "everything on the boxes" says **estate** (ADR 0022; A16 of the pre-build
   gate).
 - **release** — _Internal._ the recorded promotion of a built image digest to production, on its
-  own or by an Admin's dispatch, as the *release mode* says. A release is recorded only once it
-  has held.
+  own or by an Admin's dispatch, as the *release mode* says. A release is recorded, as a
+  `release/*` tag, only once it has held: its smoke passed and, under `JOURNEYS_MODE=gate`, its
+  *journeys* ended `held` too. A release `build.yml` calls after a merge runs no journeys, so it
+  holds on its smoke under every value.
 - **release mode** — _Internal._ how releases happen: **per-merge**, every green build on `main`
   released; **nightly**, one release a night just after a verified backup; **drill**, only a
   dispatched release riding a drill or a hotfix. The phases run in that order: per-merge until the
   first client's bundle lands, nightly until *go-live*, drill after it.
 - **go-live** — _Internal._ the day the platform is live for its clients, no earlier than the end of
   v0.1. It comes after the day the first client's data is on the box.
+- **journeys** — _Internal._ the small set of Playwright tests that sign in to production as each
+  *test person*, with an email code read from the *test inbox*. Each **journey** walks the pages
+  its role reaches, taking only actions it can undo and that cost nothing, so it leaves the *test
+  workspace* as it found it. They run after a scheduled or dispatched *release*'s smoke, and alone
+  against the live release on a scheduled night with nothing newer to promote or on a
+  journeys-only dispatch; a release `build.yml` calls after a merge never runs them. A run ends in
+  one **outcome word**, the body of its *dead-man ping*: `held`, every journey passed; `fail`, a
+  page did not do what its journey asks, no code came within 90 seconds, or the promote failed and
+  none ran; `could-not-run`, the run could not judge the release, because the inbox, the edge, a
+  setting or the commit under test stood in its way, or the test workspace was found holding
+  something its fixture does not. `JOURNEYS_MODE` stages them: under `off`, or while it is unset,
+  none run; under `report` they run and report; under `gate` a release they ran on is recorded
+  only once they end `held`. Not the browser suite, whose specs seed a fresh database through its
+  harness.
+- **test inbox** — _Internal._ named in full, because *Inbox* alone is a person's *area*, which
+  points into *To decide*: the Cloudflare Email Worker `apps/test-inbox`, on the *testing domain*,
+  a domain apart from the product's. It keeps what reaches that domain for a day and judges
+  nothing. The *journeys* read each sign-in code from it through its API, with a key that reads it
+  and does nothing else, and verify each email's DKIM signature themselves. Outside the *estate*:
+  the owner deploys it by hand, and nothing in CI can change it.
 - **signal** — a named query over rows the platform already keeps, with a threshold that makes it
   worth a line on System (ADR 0025). Never a metric scraped from a process.
 - **alert** — a signal over its threshold, recorded once as a `platform_event` and emailed by the
@@ -907,16 +929,25 @@ to it by IRI and never restates it (ADR 0014).
   renews it or an Admin cancels it; **accepted**; or **cancelled**, as a replaced one is. Its
   email goes after the invitation is made, so an invitation can wait with its email **unsent**;
   a resend sends it again.
-- **test workspace** — the workspace the nightly journeys sign in to in production, made and set
-  back by the `test-workspace` ops command alone, never by a page: three test people, an Admin,
-  an Editor and a Viewer, and 51 invented Viewers. It carries a **mark**, a row of its own naming
-  its *testing domain*, which only that command writes and the api cannot remove. While the mark
-  stands, every *invitation* the workspace sends, resends or mints from an *access request* goes
-  to an address on that domain, and one off it is refused `off-testing-domain`. Not the
+- **test workspace** — _Internal._ the workspace the *journeys* sign in to in production, made and
+  set back by `pnpm ops test-workspace` alone, never by a page: the three *test people* and the 51
+  *invented members*. A page says *kept for testing*. It carries a **mark**, a row of its own
+  naming its *testing domain*, which only that command writes and the api cannot remove. While the
+  mark stands, every *invitation* the workspace sends, resends or mints from an *access request*
+  goes to an address on that domain, and one off it is refused `off-testing-domain`. Not the
   *operator*'s mark, which is on a person.
 - **testing domain** — what follows the `@` of every address a *test workspace* invites,
   lower-cased and matched whole, so a subdomain is another one. An email domain, never a
   *collection* of the company's knowledge.
+- **test person** — _Internal._ one of the three people the *journeys* sign in as: the test Admin,
+  the test Editor and the test Viewer of the *test workspace*. The workspace also holds 51
+  **invented members**, Viewers nobody signs in as, so that every list a journey pages through runs
+  past one page. None of them is the *operator* or a *member* of another workspace. Each address
+  is on the *testing domain*, so anything that lists or counts people can tell them from real ones,
+  and every code sent to one reaches the *test inbox*. None is ever erased: erasure tombstones the
+  address for good, so one who must go is removed from the test workspace instead. A journey undoes
+  every action it takes, and the next run sets back what a failed one left, so the test
+  workspace's *audit log* is their one lasting record.
 - **Activity (of a person)** — one person's part in the workspace's *audit log*, read by an Admin
   alone, in People: every *audit event* they took and every one done to them, newest first, each
   marked with its **direction**: *by*, *to* or both, as a self-demotion is. It spans their whole
