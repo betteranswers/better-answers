@@ -1,14 +1,13 @@
 import type { Page } from "@playwright/test";
 
+import { INVENTED_MEMBERS, inventedMemberAddress } from "@better-answers/schema/test-workspace";
+
 import type { Role } from "@/shared/navigation.ts";
 import { counted } from "@/shared/words.ts";
 
 import { couldNotRun } from "./outcome.ts";
 import { bindingsOf, membersOf, waitingInvitationsOf, type Member } from "./reads.ts";
 import { stopTheRun } from "./run-stop.ts";
-
-/** As the fixture command makes them: numbered from 01, on the test people's own domain. */
-const INVENTED_MEMBERS = 51;
 
 /** The Admin's journey moves these and puts them back, so a failed run may leave them Editors. */
 const REPAIR_MEMBERS = 3;
@@ -25,8 +24,9 @@ export type Standing = {
 const domainOf = (address: string): string =>
   address.slice(address.lastIndexOf("@") + 1).toLowerCase();
 
+/** On the test people's own domain, as the fixture command puts them. */
 const inventedAt = (people: TestPeople, index: number): string =>
-  `invented-member-${String(index + 1).padStart(2, "0")}@${domainOf(people.Admin)}`;
+  inventedMemberAddress(index + 1, domainOf(people.Admin));
 
 const repairAddressesOf = (people: TestPeople): readonly string[] =>
   Array.from({ length: REPAIR_MEMBERS }, (_, index) => inventedAt(people, index));

@@ -2,6 +2,8 @@
 
 import { describe, expect, it } from "vitest";
 
+import { INVENTED_MEMBERS, inventedMemberAddress } from "@better-answers/schema/test-workspace";
+
 // oxlint-disable-next-line no-restricted-imports -- the journeys sit outside `src`, where no alias reaches
 import { findingsIn, type Standing, type TestPeople } from "../journeys/test-workspace.ts";
 
@@ -12,16 +14,16 @@ const PEOPLE: TestPeople = {
 };
 
 const invented = (number: number, role = "Viewer") => ({
-  address: `invented-member-${String(number).padStart(2, "0")}@journeys.example`,
+  address: inventedMemberAddress(number, "journeys.example"),
   role,
 });
 
-/** The fixture as the command leaves it: the three test people and 51 invented Viewers. */
+/** The fixture as the command leaves it, from the shape it shares with the journeys. */
 const FIXTURE: Standing["members"] = [
   { address: "admin@journeys.example", role: "Admin" },
   { address: "editor@journeys.example", role: "Editor" },
   { address: "viewer@journeys.example", role: "Viewer" },
-  ...Array.from({ length: 51 }, (_, index) => invented(index + 1)),
+  ...Array.from({ length: INVENTED_MEMBERS }, (_, index) => invented(index + 1)),
 ];
 
 const standing = (changed: Partial<Standing> = {}): Standing => ({
