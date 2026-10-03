@@ -63,6 +63,32 @@ export const AUTHENTICATOR_PERSON_RULE: CounterRule = { windowMs: 10 * 60_000, m
 /** Each replacement mails a notice, so a script cannot fill the person's inbox. */
 export const RECOVERY_CODES_PERSON_RULE: CounterRule = { windowMs: 60 * 60_000, max: 10 };
 
+/** The step the library's verify checks a code against, which a setup address must name too. */
+export const AUTHENTICATOR_STEP_SECONDS = 30;
+
+export const CONFIRM_PASSKEY_OPTIONS_PATH = "/second-factor/confirm/passkey-options";
+
+export const CONFIRM_PASSKEY_PATH = "/second-factor/confirm/passkey";
+
+export const CONFIRM_AUTHENTICATOR_PATH = "/second-factor/confirm/authenticator";
+
+export const RECOVERY_CODE_PATH = "/second-factor/recovery";
+
+export const RESTORE_CODE_PATH = "/second-factor/restore";
+
+export const REPLACE_AUTHENTICATOR_START_PATH = "/second-factor/replace/authenticator-start";
+
+export const REPLACE_AUTHENTICATOR_FINISH_PATH = "/second-factor/replace/authenticator-finish";
+
+/**
+ * Asks and tries of one person's confirm, each counted apart. Wrong codes meet the throttle well
+ * before this; it bounds everything else.
+ */
+export const CONFIRM_PERSON_RULE: CounterRule = { windowMs: 10 * 60_000, max: 10 };
+
+/** Recovery and restore codes, each counted apart; a spent recovery code mails a notice. */
+export const SPEND_A_CODE_PERSON_RULE: CounterRule = { windowMs: 60 * 60_000, max: 10 };
+
 /** Outside `/passkey/`, where the library's own closed paths answer 404. */
 export const PASSKEY_ADD_OPTIONS_PATH = "/passkeys/add-options";
 

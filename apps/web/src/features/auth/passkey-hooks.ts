@@ -134,13 +134,18 @@ const askToSignIn = () => askOfOurRoute(SIGN_IN_OPTIONS_PATH, {}, askedToSignIn)
 const signInWith = (response: AuthenticationResponseJSON): Promise<SignedIn> =>
   askOfOurRoute(SIGN_IN_PATH, { response }, signedInByPasskey);
 
-const signInWithAPasskey = async (): Promise<SignedIn> => {
-  const optionsJSON = await askToSignIn();
-  const response = await startAuthentication({ optionsJSON }).catch((failure: Error) => {
+/** The route's challenge, answered by this device; a device's refusal reads as `DeviceRefused`. */
+export const answeredByThisDevice = async (
+  optionsPath: string,
+): Promise<AuthenticationResponseJSON> => {
+  const optionsJSON = await askOfOurRoute(optionsPath, {}, askedToSignIn);
+  return startAuthentication({ optionsJSON }).catch((failure: Error) => {
     throw deviceRefusalOf(failure);
   });
-  return signInWith(response);
 };
+
+const signInWithAPasskey = async (): Promise<SignedIn> =>
+  signInWith(await answeredByThisDevice(SIGN_IN_OPTIONS_PATH));
 
 /**
  * Nothing is said until the person picks a passkey: a browser with none to offer refuses the wait

@@ -52,6 +52,14 @@ const role = (detail: Slots["detail"]): string => {
   return typeof held === "string" ? held : "a role";
 };
 
+const FACTOR_WORDS: ReadonlyMap<unknown, string> = new Map([
+  ["passkey", "a passkey"],
+  ["authenticator", "an authenticator"],
+]);
+
+const factorIn = (detail: Slots["detail"], field: string): string =>
+  FACTOR_WORDS.get(detail[field]) ?? "a second factor";
+
 const SENTENCES = {
   "knowledge.check.imported": ({ by }) => `${by} imported a check of a concept`,
   "knowledge.concept.class_overridden": ({ by }) => `${by} overrode a concept's class`,
@@ -94,6 +102,8 @@ const SENTENCES = {
   "people.person.authenticator_removed": ({ by }) => `${by} removed their authenticator`,
   "people.person.credentials_revoked": ({ by, subject }) =>
     `${by} revoked ${possessive(subject)} credentials everywhere`,
+  "people.person.factors_replaced": ({ by, detail }) =>
+    `${by} replaced their second factors with ${factorIn(detail, "by")}`,
   "people.person.grants_ended": ({ by, subject }) =>
     `${by} ended ${possessive(subject)} client grants in a workspace`,
   "people.person.name_flagged": ({ by, subject }) =>
@@ -109,6 +119,9 @@ const SENTENCES = {
       : `${by} was given recovery codes`,
   "people.person.renamed": ({ by, subject }) =>
     `${by} corrected ${possessive(subject)} display name`,
+  "people.person.restore_code_accepted": ({ by }) => `${by} used the operator's restore code`,
+  "people.person.second_factor_confirmed": ({ by, detail }) =>
+    `${by} confirmed their second factor with ${factorIn(detail, "method")}`,
   "people.person.signed_in": ({ by }) => `${by} signed in`,
   "people.request.approved": ({ by }) => `${by} approved an access request`,
   "people.request.asked": ({ by }) => `${by} asked to join the workspace`,

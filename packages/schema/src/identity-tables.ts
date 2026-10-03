@@ -7,12 +7,14 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 import { listed, stamp } from "./column-helpers.ts";
 import { ROLES } from "./roles.ts";
+import { THROTTLED_KINDS } from "./second-factor.ts";
 import { workspace } from "./workspace-table.ts";
 
 const roleList = listed(ROLES);
@@ -39,6 +41,9 @@ export const user = pgTable("user", {
   passkeyOfferDismissedAt: stamp("passkey_offer_dismissed_at"),
 
   recoveryCodesAcknowledged: boolean("recovery_codes_acknowledged").default(false).notNull(),
+
+  /** Outlives the operator's restore code, so a restore left to expire never opens setup to the mailbox. */
+  restoreRequiredAt: stamp("restore_required_at"),
 });
 
 export const session = pgTable(
@@ -62,6 +67,9 @@ export const session = pgTable(
 
     /** A clock for the pending session's hour, set once; whether it is pending is derived. */
     pendingSince: stamp("pending_since"),
+
+    /** Only the session that spent a recovery code or accepted a restore code may replace the factors. */
+    setupGrantedAt: stamp("setup_granted_at"),
   },
   (table) => [index("session_user_id_idx").on(table.userId)],
 );
@@ -426,6 +434,24 @@ export const recoveryCode = pgTable(
   (table) => [uniqueIndex("recovery_code_user_id_code_hash_uidx").on(table.userId, table.codeHash)],
 );
 
+/** Per person, not per session, so many pending sessions never multiply the guesses. */
+export const secondFactorThrottle = pgTable(
+  "second_factor_throttle",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    failures: integer("failures").notNull(),
+    waitUntil: stamp("wait_until"),
+    noticedAt: stamp("noticed_at"),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.kind] }),
+    check("second_factor_throttle_kind_check", sql.raw(`kind IN (${listed(THROTTLED_KINDS)})`)),
+  ],
+);
+
 export const rateLimit = pgTable("rate_limit", {
   id: text("id").primaryKey(),
   key: text("key").notNull().unique(),
@@ -454,4 +480,5 @@ export const IDENTITY_SET = [
   "public.passkey",
   "public.passkey_last_use",
   "public.recovery_code",
+  "public.second_factor_throttle",
 ] as const;

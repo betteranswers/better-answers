@@ -15,7 +15,18 @@ export type FactorChange =
   | "authenticator-added"
   | "authenticator-removed"
   | "codes-made"
-  | "codes-replaced";
+  | "codes-replaced"
+  | "recovery-code-used"
+  | "factors-replaced"
+  | "confirm-failures";
+
+type Change = {
+  readonly subject: string;
+  readonly happened: string;
+
+  /** Said in place of the usual line, for a notice of something the person may not have done. */
+  readonly ifYou?: string;
+};
 
 const CHANGES = {
   "passkey-added": {
@@ -42,7 +53,23 @@ const CHANGES = {
     subject: `Your ${PRODUCT_NAME} recovery codes were replaced`,
     happened: "New recovery codes were made, and your earlier ones no longer work.",
   },
-} as const satisfies Record<FactorChange, { subject: string; happened: string }>;
+  "recovery-code-used": {
+    subject: `A recovery code was used on your ${PRODUCT_NAME} account`,
+    happened:
+      "One of your recovery codes was used in place of your second factor. It no longer works.",
+  },
+  "factors-replaced": {
+    subject: `Your ${PRODUCT_NAME} second factor was replaced`,
+    happened:
+      "Your second factor was replaced. Your earlier passkeys and authenticator no longer work, and new recovery codes were made.",
+  },
+  "confirm-failures": {
+    subject: `Wrong codes were entered for your ${PRODUCT_NAME} account`,
+    happened:
+      "Several wrong codes in a row were entered to confirm your second factor. Each further wrong code makes the next try wait longer.",
+    ifYou: "If they were yours, there is nothing more to do.",
+  },
+} as const satisfies Record<FactorChange, Change>;
 
 const WORDS = {
   ifYou: "If you made this change, there is nothing more to do.",
@@ -51,24 +78,24 @@ const WORDS = {
 } as const;
 
 /** Every value is a fixed phrase or the api's own address, so nothing here needs escaping. */
-const htmlOf = (happened: string, subject: string, account: string): string =>
+const htmlOf = (change: Required<Change>, account: string): string =>
   emailPage(
-    subject,
-    `<p style="${PARAGRAPH}">${happened}</p>
-<p style="${PARAGRAPH}">${WORDS.ifYou}</p>
+    change.subject,
+    `<p style="${PARAGRAPH}">${change.happened}</p>
+<p style="${PARAGRAPH}">${change.ifYou}</p>
 <p style="${PARAGRAPH}">${WORDS.ifNot}</p>
 <p style="margin:0"><a href="${account}">${account}</a></p>`,
   );
 
 /** Names what changed and never the factor itself: no key, no code, no device. */
 const factorNoticeEmail = (to: string, change: FactorChange, publicUrl: string): EmailMessage => {
-  const { subject, happened } = CHANGES[change];
+  const said: Required<Change> = { ifYou: WORDS.ifYou, ...CHANGES[change] };
   const account = `${publicUrl}${ACCOUNT_PATH}`;
   return {
     to,
-    subject,
-    text: [happened, "", WORDS.ifYou, "", WORDS.ifNot, "", account].join("\n"),
-    html: htmlOf(happened, subject, account),
+    subject: said.subject,
+    text: [said.happened, "", said.ifYou, "", WORDS.ifNot, "", account].join("\n"),
+    html: htmlOf(said, account),
   };
 };
 

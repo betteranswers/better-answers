@@ -8,6 +8,7 @@
     "./ulid": "./src/ulid.ts",
     "./code-unit": "./src/code-unit.ts",
     "./test-workspace": "./src/test-workspace.ts",
+    "./test-inbox": "./src/test-inbox.ts",
     "./email-code": "./src/email-code.ts",
     "./email-address": "./src/email-address.ts",
     "./second-factor": "./src/second-factor.ts",

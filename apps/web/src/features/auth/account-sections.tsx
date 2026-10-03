@@ -15,7 +15,12 @@ import {
 import { AuthenticatorSetup } from "./authenticator-part.tsx";
 import { RecoveryCodes, type CodesInHand } from "./recovery-codes.tsx";
 import { SAID_OF_SECOND_FACTOR } from "./refusal-words.ts";
-import type { CodesIssued, SecondFactor, StartingTheSetup } from "./second-factor-hooks.ts";
+import type {
+  AuthenticatorRoutes,
+  CodesIssued,
+  SecondFactor,
+  StartingTheSetup,
+} from "./second-factor-hooks.ts";
 
 export const SET_UP: Keystroke = { key: "s", act: ACCOUNT_ACTS.setUp };
 
@@ -103,6 +108,7 @@ export function ActButton(properties: {
 
 function NoAuthenticator(properties: {
   readonly setupOpen: boolean;
+  readonly routes: AuthenticatorRoutes;
   readonly starting: StartingTheSetup;
   readonly finishing: boolean;
   readonly landsAt: LandsAt;
@@ -128,6 +134,7 @@ function NoAuthenticator(properties: {
         <AuthenticatorSetup
           id={setupId}
           starting={properties.starting}
+          routes={properties.routes}
           onFinished={properties.onFinished}
         />
       ) : null}
@@ -227,6 +234,7 @@ function HeldAuthenticator(properties: {
 type AuthenticatorProperties = {
   readonly held: SecondFactor | undefined;
   readonly setupOpen: boolean;
+  readonly routes: AuthenticatorRoutes;
   readonly starting: StartingTheSetup;
   readonly finishing: boolean;
   readonly removing: boolean;

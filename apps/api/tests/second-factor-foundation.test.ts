@@ -1,12 +1,9 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { authenticatorCodeAt, keyIn } from "@better-answers/schema/testing/authenticator-code";
-
 import { mountedPaths } from "../src/auth/index.ts";
-import { authAsServerBuildsIt, authOver } from "./auth-instance.ts";
-import type { TestApp, TestClient } from "./harness.ts";
-import { signedInClient } from "./provoke.ts";
+import { authAsServerBuildsIt } from "./auth-instance.ts";
+import { setUpAnAuthenticator, signedInClient } from "./provoke.ts";
 import { appForSuite } from "./suite-app.ts";
 
 const app = appForSuite();
@@ -32,9 +29,13 @@ const CLOSED_SESSION_PATHS = [
   "/update-session",
 ] as const;
 
-const SESSION_FIELDS = ["secondFactorConfirmedAt", "pendingSince"] as const;
+const SESSION_FIELDS = ["secondFactorConfirmedAt", "pendingSince", "setupGrantedAt"] as const;
 
-const USER_FIELDS = ["passkeyOfferDismissedAt", "recoveryCodesAcknowledged"] as const;
+const USER_FIELDS = [
+  "passkeyOfferDismissedAt",
+  "recoveryCodesAcknowledged",
+  "restoreRequiredAt",
+] as const;
 
 type Declared = { required?: unknown; input?: unknown; returned?: unknown };
 
@@ -42,23 +43,6 @@ const sessionRead = z.object({
   user: z.record(z.string(), z.unknown()),
   session: z.record(z.string(), z.unknown()),
 });
-
-const setUp = z.object({ totpURI: z.string() });
-
-/** Through the library's own enable and first verify, called as server functions. */
-const setUpAnAuthenticator = async (suite: TestApp, client: TestClient): Promise<void> => {
-  const auth = authOver(suite);
-  const enabled = setUp.parse(
-    await auth.api.enableTwoFactor({
-      headers: new Headers({ cookie: client.cookies() }),
-      body: { method: "totp" },
-    }),
-  );
-  await auth.api.verifyTOTP({
-    headers: new Headers({ cookie: client.cookies() }),
-    body: { code: authenticatorCodeAt(keyIn(enabled.totpURI), new Date()) },
-  });
-};
 
 const authenticatorHeldBy = async (personId: string) => {
   const found = await app().database.superuser.query<{
@@ -126,11 +110,14 @@ describe("a session read", () => {
     const person = await app().person();
     const client = await signedInClient(app(), person.email);
     await app().database.superuser.query(
-      "UPDATE session SET second_factor_confirmed_at = now(), pending_since = now() WHERE user_id = $1",
+      `UPDATE session SET second_factor_confirmed_at = now(), pending_since = now(),
+                          setup_granted_at = now()
+        WHERE user_id = $1`,
       [person.id],
     );
     await app().database.superuser.query(
-      `UPDATE "user" SET passkey_offer_dismissed_at = now(), recovery_codes_acknowledged = true
+      `UPDATE "user" SET passkey_offer_dismissed_at = now(), recovery_codes_acknowledged = true,
+                         restore_required_at = now()
         WHERE id = $1`,
       [person.id],
     );

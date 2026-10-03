@@ -29,6 +29,9 @@ stryker-setup-*.js
 test-results/
 playwright-report/
 
+# wrangler's local state and build output, from a local run of the test inbox.
+.wrangler/
+
 # local env — every secret lives in Coolify's env or the password manager (docs/operations/SECRETS.md)
 .env
 .env.*

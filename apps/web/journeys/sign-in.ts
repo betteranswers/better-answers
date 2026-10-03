@@ -3,7 +3,7 @@ import { expect, test, type APIResponse, type Page, type Response } from "@playw
 import { SIGN_IN_WORDS } from "@/features/auth/sign-in-words.ts";
 
 import type { InboxAnswer, Noted } from "./inbox.ts";
-import { couldNotRun, type Outcome } from "./outcome.ts";
+import { couldNotRun, failed, type Outcome } from "./outcome.ts";
 
 /** Named, not imported: `apps/web` takes nothing from `apps/api` at runtime. */
 const SEND_PATH = "/email-otp/send-verification-otp";
@@ -12,7 +12,10 @@ const SIGN_IN_PATH = "/sign-in/email-otp";
 const FORBIDDEN = 403;
 const TOO_MANY_REQUESTS = 429;
 
-/** Noting the inbox, 10 s; its 90 s deadline plus a last poll, 20 s; a re-ask, 20 s; the screen. */
+/**
+ * Noting the inbox, 5 s; its 90 s deadline then a list, retrieve and two key lookups, 14 s; a
+ * re-ask, 14 s; the screen.
+ */
 const SIGN_IN_TIMEOUT_MS = 150_000;
 
 /** Asked before Send, so the code it later answers is that Send's alone. */
@@ -21,6 +24,8 @@ export type CodeSource = (address: string) => Promise<Noted>;
 type Awaiting = Extract<Noted, { readonly answer: "noted" }>;
 
 type Fault = Exclude<InboxAnswer["answer"], "code">;
+
+type Judgement = { readonly outcome: Exclude<Outcome, "held">; readonly why: string };
 
 /** A missing email judges the release; an inbox that cannot tell judges nothing. */
 const INBOX_FAULTS = {
@@ -31,17 +36,29 @@ const INBOX_FAULTS = {
   "no-code": { outcome: "fail", why: "the sign-in email carried no code" },
   ambiguous: {
     outcome: "could-not-run",
-    why: "the test inbox held more than one new sign-in email, or one that failed authentication",
+    why: "the test inbox held more than one new sign-in email",
+  },
+  unverified: {
+    outcome: "could-not-run",
+    why: "the only new emails from the sender failed their signature check, or their signing key could not be looked up",
   },
   unreachable: { outcome: "could-not-run", why: "the test inbox did not answer" },
-} as const satisfies Readonly<Record<Fault, { readonly outcome: Outcome; readonly why: string }>>;
+} as const satisfies Readonly<Record<Fault, Judgement>>;
 
-const codeFrom = (answer: InboxAnswer): string => {
-  if (answer.answer === "code") return answer.code;
-  const { outcome, why } = INBOX_FAULTS[answer.answer];
-  if (outcome === "could-not-run") return couldNotRun(why);
-  throw new Error(why);
-};
+/** Asked again after a refused code, where a second email means another Send rotated it. */
+const REASKED_FAULTS = {
+  ...INBOX_FAULTS,
+  ambiguous: {
+    outcome: "could-not-run",
+    why: "another Send rotated the code before it was entered",
+  },
+} as const satisfies Readonly<Record<Fault, Judgement>>;
+
+const judgedAs = ({ outcome, why }: Judgement): never =>
+  outcome === "could-not-run" ? couldNotRun(why) : failed(why);
+
+const codeFrom = (answer: InboxAnswer): string =>
+  answer.answer === "code" ? answer.code : judgedAs(INBOX_FAULTS[answer.answer]);
 
 type Answered = Pick<APIResponse, "status" | "headers">;
 
@@ -67,13 +84,10 @@ const answerTo = (page: Page, path: string): Promise<Response> =>
     { timeout: ANSWER_TIMEOUT_MS },
   );
 
-/** A second email since the first means another Send rotated the code. */
+/** Only the same email again leaves the product's refusal to judge. */
 const refusedCode = async (awaiting: Awaiting, status: number): Promise<never> => {
   const again = await awaiting.codeSent();
-  if (again.answer === "ambiguous") {
-    return couldNotRun("another Send rotated the code before it was entered");
-  }
-  if (again.answer === "unreachable") return couldNotRun(INBOX_FAULTS.unreachable.why);
+  if (again.answer !== "code") return judgedAs(REASKED_FAULTS[again.answer]);
   throw new Error(`the product refused the code its own email carried, answering ${status}`);
 };
 

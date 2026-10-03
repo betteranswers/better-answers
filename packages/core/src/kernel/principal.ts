@@ -54,6 +54,9 @@ export type Claims = {
   readonly userId: string;
   readonly issuedAt: Date;
   readonly role?: Role;
+
+  /** The session a cookie names, whose confirmation stamp is the person's; a bearer names none. */
+  readonly sessionId?: string;
 };
 
 export type PrincipalRefusal = KernelRefusal<

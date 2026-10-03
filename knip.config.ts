@@ -2,8 +2,8 @@ import type { KnipConfig } from "knip";
 
 /** Not gated: `--production`/`--strict` call helpers unused and their devDependencies unlisted. */
 const config: KnipConfig = {
-  // `uv` is installed on the machine and never by npm, so no manifest names it.
-  ignoreBinaries: ["uv"],
+  // `uv` and `openssl` are installed on the machine and never by npm, so no manifest names them.
+  ignoreBinaries: ["uv", "openssl"],
 
   // Nothing here is published, so an unimported entry export is dead; one kept for a later route
   // block carries `/** @public <block> */`.
@@ -38,6 +38,11 @@ const config: KnipConfig = {
         "journeys/outcome-reporter.ts",
       ],
       includeEntryExports: false,
+    },
+
+    "apps/test-inbox": {
+      // `wrangler.jsonc` names it; wrangler is no dependency, so no knip plugin reads that file.
+      entry: ["src/index.ts"],
     },
 
     "packages/core": {

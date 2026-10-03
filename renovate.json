@@ -36,6 +36,14 @@
       "matchStrings": ["(^|\\n)uv (?<currentValue>\\S+)"],
       "datasourceTemplate": "pypi",
       "depNameTemplate": "uv"
+    },
+    {
+      "customType": "regex",
+      "description": "The wrangler the owner deploys the test inbox with, written once in `apps/test-inbox/package.json`'s `wrangler` script and run through `pnpm dlx`. It is no dependency of any workspace, so its binaries stay out of every install and the `npm` manager never sees it",
+      "managerFilePatterns": ["/^apps/test-inbox/package\\.json$/"],
+      "matchStrings": ["pnpm dlx wrangler@(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
+      "datasourceTemplate": "npm",
+      "depNameTemplate": "wrangler"
     }
   ],
   "packageRules": [

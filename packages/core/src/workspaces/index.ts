@@ -68,18 +68,36 @@ export {
 export {
   acknowledgeRecoveryCodes,
   acknowledgeRecoveryCodesInput,
+  hashOfTyped,
   replaceRecoveryCodes,
   replaceRecoveryCodesInput,
-  spendRecoveryCode,
 } from "./recovery-codes.ts";
+export { reserveAuthenticatorTry } from "./confirm-throttle.ts";
+export {
+  acceptRestoreCode,
+  confirmByAuthenticator,
+  confirmByPasskey,
+  parkAuthenticatorSecret,
+  readParkedAuthenticatorSecret,
+  replaceFactorsByAuthenticator,
+  replaceFactorsByPasskey,
+  spendRecoveryCode,
+} from "./confirming.ts";
+export {
+  keepPasskeyChallenge,
+  readPasskeyCredentials,
+  takePasskeyChallenge,
+} from "./passkey-confirm.ts";
 export {
   readSecondFactor,
   recordAuthenticatorSetUp,
   removeAuthenticator,
 } from "./second-factor.ts";
+export type { SecondFactorHeld } from "./second-factor.ts";
 export {
   recordConsent,
   recordSignIn,
+  SESSION_VERIFICATION_PREFIXES,
   SIGN_IN_CODE_PREFIX,
   SIGN_IN_LINK_PREFIX,
   VERIFICATION_PREFIXES,

@@ -65,6 +65,9 @@ const signsIn = (scenario, source, answers) =>
   });
 `;
 
+const UNVERIFIED =
+  "the only new emails from the sender failed their signature check, or their signing key could not be looked up";
+
 describe("the journeys' sign-in", () => {
   it("signs in through the screen, pressing Send once", async () => {
     const run = await journeysOver({
@@ -106,9 +109,13 @@ describe("the journeys' sign-in", () => {
         'signsIn("challenge", inboxAnswering({ answer: "code", code: CODE }), { challenged: true });',
         'signsIn("unnoted", async () => ({ answer: "unreachable" }), {});',
         'signsIn("no-mail", inboxAnswering({ answer: "no-mail" }), {});',
+        'signsIn("no-code", inboxAnswering({ answer: "no-code" }), {});',
         'signsIn("ambiguous", inboxAnswering({ answer: "ambiguous" }), {});',
+        'signsIn("unverified", inboxAnswering({ answer: "unverified" }), {});',
         'const firstCode = { answer: "code", code: "111111" };',
         'signsIn("rotated", inboxAnswering(firstCode, { answer: "ambiguous" }), {});',
+        'signsIn("re-asked", inboxAnswering(firstCode, { answer: "unverified" }), {});',
+        'signsIn("unanswered", inboxAnswering(firstCode, { answer: "unreachable" }), {});',
         'signsIn("refused", inboxAnswering(firstCode, firstCode), {});',
         "",
       ].join("\n"),
@@ -122,12 +129,17 @@ describe("the journeys' sign-in", () => {
         "| could-not-run | refusal | Sign in | Send the code | the edge refused the Send |",
         "| could-not-run | challenge | Sign in | Send the code | the edge challenged the sign-in screen |",
         "| could-not-run | unnoted | Sign in | Note the test inbox | the test inbox did not answer |",
-        "| fail | no-mail | Sign in | Read the code from the test inbox |  |",
-        "| could-not-run | ambiguous | Sign in | Read the code from the test inbox | the test inbox held more than one new sign-in email, or one that failed authentication |",
+        "| fail | no-mail | Sign in | Read the code from the test inbox | no sign-in email reached the test inbox within its deadline |",
+        "| fail | no-code | Sign in | Read the code from the test inbox | the sign-in email carried no code |",
+        "| could-not-run | ambiguous | Sign in | Read the code from the test inbox | the test inbox held more than one new sign-in email |",
+        `| could-not-run | unverified | Sign in | Read the code from the test inbox | ${UNVERIFIED} |`,
         "| could-not-run | rotated | Sign in | Enter the code | another Send rotated the code before it was entered |",
+        `| could-not-run | re-asked | Sign in | Enter the code | ${UNVERIFIED} |`,
+        "| could-not-run | unanswered | Sign in | Enter the code | the test inbox did not answer |",
         "| fail | refused | Sign in | Enter the code |  |",
         "",
       ].join("\n"),
     );
+    expect(run.summary).not.toContain("@");
   }, 120_000);
 });

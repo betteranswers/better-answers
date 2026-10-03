@@ -471,6 +471,7 @@
     "coverage",
     "reports",
     ".venv",
+    ".wrangler",
     "packages/devtools/lifts/anti-slop/**",
     ".claude/worktrees/**",
     ".claude/skills/**",

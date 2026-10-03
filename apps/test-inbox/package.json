@@ -1,0 +1,21 @@
+{
+  "name": "@better-answers/test-inbox",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The journeys' test inbox: a Cloudflare Email Worker that keeps what it receives and lets the journeys read it. The owner deploys it by hand; no image carries it.",
+  "type": "module",
+  "scripts": {
+    "lint": "oxlint --report-unused-disable-directives-severity=error --config ../../.oxlintrc.json .",
+    "typecheck": "tsc --noEmit",
+    "test": "node ./node_modules/vitest/vitest.mjs run",
+    "check": "node ../../scripts/check.mjs typecheck test",
+    "wrangler": "pnpm dlx wrangler@4.147.0",
+    "deploy": "pnpm run wrangler deploy"
+  },
+  "devDependencies": {
+    "@better-answers/schema": "workspace:*",
+    "@types/node": "24.13.6",
+    "typescript": "7.0.2",
+    "vitest": "5.0.1"
+  }
+}

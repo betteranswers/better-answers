@@ -126,6 +126,7 @@ export const RECOVERY_CODE_WORDS = {
   print: "Print",
   saved: "I have saved these codes",
   done: "Done",
+  finish: "Finish setup",
 } as const;
 
 export const codesLeft = (unused: number, madeAt: string): string =>

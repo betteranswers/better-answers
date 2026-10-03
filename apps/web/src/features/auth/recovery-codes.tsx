@@ -1,8 +1,9 @@
 import { useId, useState, type Ref } from "react";
 
+import { ceilingLiftsIn, refusalOf, type ApiError } from "@/shared/api/trpc.ts";
 import { useKeystroke, type Keystroke } from "@/shared/keystrokes.tsx";
 import { RefusalLine } from "@/shared/refusal-outcome.tsx";
-import type { Said } from "@/shared/refusal-words.ts";
+import { NO_RESPONSE, type Said } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Checkbox } from "@/shared/ui/checkbox.tsx";
 import { Label } from "@/shared/ui/label.tsx";
@@ -15,7 +16,13 @@ import {
 } from "./account-words.ts";
 import { focusOn, Outcome } from "./auth-screen.tsx";
 import { copiedToTheClipboard } from "./clipboard.ts";
-import { CODES_NOT_COPIED, CODES_NOT_TICKED } from "./refusal-words.ts";
+import {
+  CODES_NOT_COPIED,
+  CODES_NOT_TICKED,
+  CODES_UNANSWERED,
+  codesMadeTooOften,
+  saidOfASecondFactorRefusal,
+} from "./refusal-words.ts";
 
 const COPY_CODES: Keystroke = { key: "c", act: ACCOUNT_ACTS.copyCodes };
 
@@ -79,6 +86,72 @@ function CodesActs(properties: {
   );
 }
 
+/** A ceiling carries no word, only the wait until it lifts. */
+export const codesUnanswered = (failure: Error | ApiError): Said => {
+  const liftsIn = ceilingLiftsIn(failure);
+  return liftsIn === undefined ? CODES_UNANSWERED : codesMadeTooOften(liftsIn);
+};
+
+export const saidOfAcknowledging = (failure: Error | ApiError | null): Said | undefined => {
+  if (failure === null) return undefined;
+  const refusal = refusalOf(failure);
+  return refusal === undefined ? NO_RESPONSE : saidOfASecondFactorRefusal(refusal);
+};
+
+/** On a root screen the codes are the page, so their heading is its `h1`. */
+const HEADINGS = {
+  1: { Heading: "h1", className: "text-xl font-medium" },
+  3: { Heading: "h3", className: "font-medium" },
+} as const;
+
+type HeadingLevel = keyof typeof HEADINGS;
+
+/** Shown again, a set says it replaces the one before. */
+function CodesHeading(properties: {
+  readonly id: string;
+  readonly headingRef: Ref<HTMLHeadingElement> | undefined;
+  readonly level: HeadingLevel | undefined;
+  readonly replacing: boolean;
+}) {
+  const { id, headingRef, level, replacing } = properties;
+  const { Heading, className } = HEADINGS[level ?? 3];
+  return (
+    <>
+      <Heading id={id} ref={headingRef} tabIndex={-1} className={className}>
+        {RECOVERY_CODE_WORDS.saveHeading}
+      </Heading>
+      <p className="mt-2 text-muted-foreground">{RECOVERY_CODE_WORDS.saveLine}</p>
+      {replacing ? <p className="mt-2">{RECOVERY_CODE_WORDS.replacedLine}</p> : null}
+    </>
+  );
+}
+
+function DoneButton(properties: {
+  readonly label: string | undefined;
+  readonly unavailable: boolean;
+  readonly refused: Said | undefined;
+  readonly refusedId: string;
+  readonly onDone: () => void;
+}) {
+  const { label, unavailable, refused, refusedId, onDone } = properties;
+  return (
+    <>
+      <Button
+        type="button"
+        className="mt-4 aria-disabled:opacity-50"
+        aria-disabled={unavailable}
+        aria-describedby={refused === undefined ? undefined : refusedId}
+        onClick={onDone}
+      >
+        {label ?? RECOVERY_CODE_WORDS.done}
+      </Button>
+      <Outcome tone="refused" id={refusedId}>
+        {refused === undefined ? null : <RefusalLine said={refused} />}
+      </Outcome>
+    </>
+  );
+}
+
 /**
  * Done stays focusable while unticked, so pressing it can say why it did nothing and hand focus
  * to the box.
@@ -89,6 +162,8 @@ export function RecoveryCodes(properties: {
   readonly acknowledging: boolean;
   readonly failure: Said | undefined;
   readonly headingRef?: Ref<HTMLHeadingElement>;
+  readonly headingLevel?: HeadingLevel;
+  readonly doneLabel?: string;
 
   /** Handed the set's `madeAt`, so the acknowledgement names the set shown. */
   readonly onDone: (madeAt: string) => void;
@@ -115,12 +190,16 @@ export function RecoveryCodes(properties: {
   };
 
   return (
-    <section aria-labelledby={headingId} className="mt-6">
-      <h3 id={headingId} ref={headingRef} tabIndex={-1} className="font-medium">
-        {RECOVERY_CODE_WORDS.saveHeading}
-      </h3>
-      <p className="mt-2 text-muted-foreground">{RECOVERY_CODE_WORDS.saveLine}</p>
-      {inHand.replacing ? <p className="mt-2">{RECOVERY_CODE_WORDS.replacedLine}</p> : null}
+    <section
+      aria-labelledby={headingId}
+      className={properties.headingLevel === 1 ? undefined : "mt-6"}
+    >
+      <CodesHeading
+        id={headingId}
+        headingRef={headingRef}
+        level={properties.headingLevel}
+        replacing={inHand.replacing}
+      />
 
       <ol
         aria-label={RECOVERY_CODE_WORDS.list}
@@ -146,18 +225,13 @@ export function RecoveryCodes(properties: {
         />
         <Label htmlFor={savedId}>{RECOVERY_CODE_WORDS.saved}</Label>
       </div>
-      <Button
-        type="button"
-        className="mt-4 aria-disabled:opacity-50"
-        aria-disabled={!ticked || acknowledging}
-        aria-describedby={shown === undefined ? undefined : refusedId}
-        onClick={done}
-      >
-        {RECOVERY_CODE_WORDS.done}
-      </Button>
-      <Outcome tone="refused" id={refusedId}>
-        {shown === undefined ? null : <RefusalLine said={shown} />}
-      </Outcome>
+      <DoneButton
+        label={properties.doneLabel}
+        unavailable={!ticked || acknowledging}
+        refused={shown}
+        refusedId={refusedId}
+        onDone={done}
+      />
     </section>
   );
 }

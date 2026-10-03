@@ -28,7 +28,8 @@
     "./testing/bundle-root": "./test/bundle-root.ts",
     "./testing/documents": "./test/suite-documents.ts",
     "./testing/worker-process": "./test/worker-process.ts",
-    "./testing/cross-tier": "./test/cross-tier-fixture.ts"
+    "./testing/cross-tier": "./test/cross-tier-fixture.ts",
+    "./testing/restore-code": "./test/restore-code.ts"
   },
   "scripts": {
     "generate:audit-acts": "node scripts/generate-audit-acts.ts",

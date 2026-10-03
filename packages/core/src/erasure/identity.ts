@@ -1,7 +1,11 @@
 import { normalizeError, type PlatformPrincipal } from "../kernel/index.ts";
 import { ERASED_DOMAIN } from "../store/git/index.ts";
 import { withScope, type PostgresDoor, type Tx } from "../store/postgres/index.ts";
-import { verificationIdentifiersOf, workspacesHeldBy } from "../workspaces/index.ts";
+import {
+  SESSION_VERIFICATION_PREFIXES,
+  verificationIdentifiersOf,
+  workspacesHeldBy,
+} from "../workspaces/index.ts";
 
 export type IdentityArm = "no-person" | "last-membership" | "membership-ended";
 
@@ -16,6 +20,9 @@ export type IdentitySwept = {
   readonly passkeys: number;
   readonly authenticators: number;
   readonly recoveryCodes: number;
+
+  /** The kinds of code with failures counted against the person. */
+  readonly confirmFailures: number;
   readonly lastActive: number;
   readonly invitationsHere: number;
 
@@ -35,6 +42,7 @@ const SWEPT_NOTHING = {
   passkeys: 0,
   authenticators: 0,
   recoveryCodes: 0,
+  confirmFailures: 0,
   lastActive: 0,
   invitationsHere: 0,
   invitationsEverywhere: 0,
@@ -56,14 +64,28 @@ export type ErasureSubject = {
 
 const rowsOf = (result: { readonly rowCount: number | null }): number => result.rowCount ?? 0;
 
-type HeldByThePerson = "session" | "account" | "passkey" | "authenticator" | "recovery_code";
+type HeldByThePerson =
+  | "session"
+  | "account"
+  | "passkey"
+  | "authenticator"
+  | "recovery_code"
+  | "second_factor_throttle";
+
+/** Before the sessions go: a row keyed by a session is found only through it. */
+const VERIFICATIONS = `
+  DELETE FROM verification
+   WHERE lower(identifier) = ANY($1)
+      OR identifier IN (SELECT prefix || s.id FROM session s, unnest($3::text[]) AS prefix
+                         WHERE s.user_id = $2)`;
 
 const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) => {
   const emails = [...subject.emails];
-  const verifications = await tx.query(
-    "DELETE FROM verification WHERE lower(identifier) = ANY($1)",
-    [emails.flatMap(verificationIdentifiersOf)],
-  );
+  const verifications = await tx.query(VERIFICATIONS, [
+    emails.flatMap(verificationIdentifiersOf),
+    subject.personId,
+    [...SESSION_VERIFICATION_PREFIXES],
+  ]);
 
   const invitations = await tx.query<{ workspace_id: string }>(
     "DELETE FROM invitation WHERE lower(email) = ANY($1) RETURNING workspace_id",
@@ -76,12 +98,13 @@ const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) =
   const passkeys = await deleted("passkey");
   const authenticators = await deleted("authenticator");
   const recoveryCodes = await deleted("recovery_code");
+  const confirmFailures = await deleted("second_factor_throttle");
 
   const pseudonymised = await tx.query(
     `UPDATE "user"
         SET email = $2, email_verified = false, name = '', image = NULL, operator = false,
             authenticator_enabled = false, passkey_offer_dismissed_at = NULL,
-            recovery_codes_acknowledged = false
+            recovery_codes_acknowledged = false, restore_required_at = NULL
       WHERE id = $1`,
     [subject.personId, tombstone],
   );
@@ -92,6 +115,7 @@ const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) =
     passkeys,
     authenticators,
     recoveryCodes,
+    confirmFailures,
     invitationsHere: invitations.rows.filter((row) => row.workspace_id === subject.workspaceId)
       .length,
     invitationsEverywhere: rowsOf(invitations),

@@ -1,13 +1,22 @@
 // @vitest-environment node
 
+import { rmSync } from "node:fs";
 import { createServer, type IncomingHttpHeaders, type IncomingMessage } from "node:http";
+import path from "node:path";
 
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { INVENTED_MEMBERS, inventedMemberAddress } from "@better-answers/schema/test-workspace";
 
 import { SIGN_IN_WORDS } from "@/features/auth/sign-in-words.ts";
 
+import {
+  closeEveryStandIn,
+  inboxStandIn,
+  loopbackTls,
+  STORE_UNAVAILABLE,
+  type Tls,
+} from "./inbox-stand-in.ts";
 import { journeysOver, moduleAt } from "./playwright-tree.ts";
 
 const ADMIN = "admin@journeys.example";
@@ -119,6 +128,7 @@ const theProduct = async (replies: Replies = {}): Promise<Product> => {
 
 afterEach(async () => {
   await Promise.all(closers.splice(0).map((close) => close()));
+  await closeEveryStandIn();
 });
 
 /** Every setting a journey reads, as the journeys' step holds them, unset where left empty. */
@@ -128,6 +138,7 @@ const SETTINGS = {
   JOURNEYS_EDITOR_EMAIL: EDITOR,
   JOURNEYS_VIEWER_EMAIL: "",
   JOURNEYS_SENDER: "",
+  JOURNEYS_INBOX_URL: "",
 };
 
 const journeyOf = (...lines: readonly string[]): string =>
@@ -238,6 +249,41 @@ describe("the journeys' fixtures", () => {
     expect(`${run.summary}${run.stdout}${run.stderr}`).not.toContain(EDITOR);
   }, 120_000);
 
+  it.each([
+    "http://inbox.journeys.example",
+    "https://inbox.journeys.example/emails",
+    "https://reader:hunter2@inbox.journeys.example",
+    "https://inbox.journeys.example/?token=hunter2",
+    "inbox.journeys.example",
+  ])(
+    "names a malformed inbox URL, never its value: %s",
+    async (url) => {
+      const product = await theProduct();
+      const run = await journeysAgainst(product, journeyOf(...AS_THE_EDITOR), {
+        JOURNEYS_CODE_SOURCE: "inbox",
+        JOURNEYS_SENDER: SENDER,
+        JOURNEYS_INBOX_URL: url,
+      });
+
+      expect(run.outcome).toBe("could-not-run\n");
+      expect(run.summary).toContain(`| ${SETTINGS_STEP} | ${NO_INBOX_URL} |\n`);
+      expect(`${run.summary}${run.stdout}${run.stderr}`).not.toContain("inbox.journeys.example");
+    },
+    120_000,
+  );
+
+  it("names an unset inbox URL", async () => {
+    const product = await theProduct();
+    const run = await journeysAgainst(product, journeyOf(...AS_THE_EDITOR), {
+      JOURNEYS_CODE_SOURCE: "inbox",
+      JOURNEYS_SENDER: SENDER,
+    });
+
+    expect(run.outcome).toBe("could-not-run\n");
+    expect(run.summary).toContain(`| ${SETTINGS_STEP} | ${NO_INBOX_URL} |\n`);
+    expect(product.heard.map(({ asked }) => asked)).toEqual(["POST /sign-out"]);
+  }, 120_000);
+
   it("tells a sign-out the edge refused from one that failed", async () => {
     const product = await theProduct({
       signOuts: [
@@ -272,6 +318,10 @@ describe("the journeys' fixtures", () => {
 });
 
 const VIEWER = "viewer@journeys.example";
+
+const SENDER = "Better Answers <no-reply@better-answers.example>";
+const SETTINGS_STEP = "Read the journeys' settings | Read the journeys' settings";
+const NO_INBOX_URL = "JOURNEYS_INBOX_URL is not set to a bare https origin";
 
 const ALL_THREE = { ...SETTINGS, JOURNEYS_VIEWER_EMAIL: VIEWER };
 
@@ -526,5 +576,75 @@ describe("the Admin's check, when the Admin's own standing changed", () => {
 
     expect(run.outcome).toBe("fail\n");
     expect(run.signIns).toBe(3);
+  }, 120_000);
+});
+
+const INBOX_KEY = "a-stand-in-token";
+
+/** The preflight's last two steps: the sign-in screen, then the settings and the test inbox. */
+const PREFLIGHT = [
+  `import { test, theSettingsAndInboxHold } from ${moduleAt("journeys/fixtures.ts")};`,
+  'test("the preflight checks the settings", async ({ page, request }) => {',
+  '  await page.goto("/sign-in");',
+  "  await theSettingsAndInboxHold(request);",
+  "});",
+  "",
+].join("\n");
+
+describe("the preflight, against the test inbox", () => {
+  let tls: Tls;
+
+  beforeAll(() => {
+    tls = loopbackTls();
+  });
+
+  afterAll(() => {
+    rmSync(path.dirname(tls.certFile), { recursive: true, force: true });
+  });
+
+  let product: Product;
+
+  beforeEach(async () => {
+    product = await theProduct();
+  });
+
+  const preflightAgainst = async (inbox: { readonly origin: string }) =>
+    journeysOver({
+      spec: PREFLIGHT,
+      use: { baseURL: product.origin },
+      env: {
+        ...ALL_THREE,
+        JOURNEYS_CODE_SOURCE: "inbox",
+        JOURNEYS_SENDER: SENDER,
+        JOURNEYS_INBOX_URL: inbox.origin,
+        JOURNEYS_INBOX_KEY: INBOX_KEY,
+        NODE_EXTRA_CA_CERTS: tls.certFile,
+      },
+    });
+
+  it("lists then probes the inbox at the set URL", async () => {
+    const inbox = await inboxStandIn({ key: INBOX_KEY, tls });
+    const run = await preflightAgainst(inbox);
+
+    expect(run.status).toBe(0);
+    expect(
+      inbox.heard.map(({ method, url, authorization }) => [method, url.pathname, authorization]),
+    ).toEqual([
+      ["GET", "/emails/receiving", `Bearer ${INBOX_KEY}`],
+      ["POST", "/probe", `Bearer ${INBOX_KEY}`],
+    ]);
+  }, 120_000);
+
+  it("could not run when the inbox cannot store mail", async () => {
+    const inbox = await inboxStandIn({ key: INBOX_KEY, tls });
+    inbox.probeAnswers(STORE_UNAVAILABLE);
+    const run = await preflightAgainst(inbox);
+    const STEP = "Read the journeys' settings and note the test inbox";
+
+    expect(run.outcome).toBe("could-not-run\n");
+    expect(run.summary).toContain(
+      `| could-not-run |  | ${STEP} | ${STEP} | the test inbox could not store a message |\n`,
+    );
+    expect(product.heard.map(({ asked }) => asked)).toEqual(["GET /sign-in"]);
   }, 120_000);
 });

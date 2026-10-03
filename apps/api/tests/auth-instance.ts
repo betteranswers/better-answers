@@ -4,18 +4,18 @@ import { pino } from "pino";
 import { systemClock } from "@better-answers/core/kernel";
 
 import { createAuth } from "../src/auth/index.ts";
-import { AUTH_SECRET, doorsFor, MCP_URL, PUBLIC_URL, type TestApp } from "./harness.ts";
+import { AUTH_SECRET, doorsFor, PUBLIC_URL, type TestApp } from "./harness.ts";
 
 type Auth = ReturnType<typeof createAuth>;
 
 type BuiltAuth = { readonly auth: Auth; readonly database: Pool };
 
-const authOverDoor = (door: TestApp["doors"]["postgres"]): Auth =>
+const authOverDoor = (door: TestApp["doors"]["postgres"], publicUrl = PUBLIC_URL): Auth =>
   createAuth({
     database: door.pool,
     door,
-    publicUrl: PUBLIC_URL,
-    mcpUrl: MCP_URL,
+    publicUrl,
+    mcpUrl: `${publicUrl}/mcp`,
     secret: AUTH_SECRET,
     sendEmail: async () => {},
     fetchClientMetadataResource: async () => new Response("", { status: 404 }),
@@ -23,8 +23,11 @@ const authOverDoor = (door: TestApp["doors"]["postgres"]): Auth =>
     clock: systemClock(),
   });
 
-/** Over the suite's database and secret: an endpoint the router refuses is still a server function. */
-export const authOver = (app: TestApp): Auth => authOverDoor(app.doors.postgres);
+/**
+ * Over the TestApp's database, secret and origin, whose cookies it reads: an endpoint the router
+ * refuses is still a server function.
+ */
+export const authOver = (app: TestApp): Auth => authOverDoor(app.doors.postgres, app.publicUrl);
 
 /**
  * Over a pool that reaches no database, so fit for reading the instance's shape alone. The caller

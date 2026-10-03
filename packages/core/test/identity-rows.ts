@@ -39,7 +39,10 @@ export type SecondFactorRows = {
   readonly recoveryCodeIds: readonly string[];
 };
 
-/** A passkey and its last use, an authenticator, two recovery codes, and the person's three flags set. */
+/**
+ * A passkey and its last use, an authenticator, two recovery codes, failed confirms of two kinds,
+ * and the person's four flags set.
+ */
 export const secondFactorRowsFor = async (
   pool: pg.Pool,
   userId: string,
@@ -66,8 +69,13 @@ export const secondFactorRowsFor = async (
     ]);
   }
   await pool.query(
+    `INSERT INTO second_factor_throttle (user_id, kind, failures, wait_until, noticed_at)
+     VALUES ($1, 'authenticator', 6, now(), now()), ($1, 'restore-code', 1, NULL, NULL)`,
+    [userId],
+  );
+  await pool.query(
     `UPDATE "user" SET authenticator_enabled = true, passkey_offer_dismissed_at = now(),
-            recovery_codes_acknowledged = true
+            recovery_codes_acknowledged = true, restore_required_at = now()
       WHERE id = $1`,
     [userId],
   );
@@ -137,14 +145,19 @@ export const lastActiveIn = async (
 
 const verificationRow = async (
   pool: pg.Pool,
-  row: { readonly id: string; readonly identifier: string; readonly value: string },
+  row: {
+    readonly id: string;
+    readonly identifier: string;
+    readonly value: string;
+    readonly expiresAt?: Date;
+  },
 ): Promise<string> => {
   const superuser = await pool.connect();
   try {
     await superuser.query(
       `INSERT INTO verification (id, identifier, value, expires_at, created_at, updated_at)
-       VALUES ($1, $2, $3, now(), now(), now())`,
-      [row.id, row.identifier, row.value],
+       VALUES ($1, $2, $3, COALESCE($4, now()), now(), now())`,
+      [row.id, row.identifier, row.value, row.expiresAt ?? null],
     );
   } finally {
     superuser.release();
@@ -173,6 +186,35 @@ export const otherCodesFor = async (pool: pg.Pool, email: string): Promise<reado
     value: "hashed-code:0",
   }),
 ];
+
+/** An operator's restore code as issued: keyed by the address, and kept only as the code's hash. */
+export const restoreCodeFor = async (
+  pool: pg.Pool,
+  email: string,
+  code: { readonly hash: string; readonly expiresAt: Date },
+): Promise<string> =>
+  verificationRow(pool, {
+    id: ulid(),
+    identifier: `operator-restore-${email.toLowerCase()}`,
+    value: code.hash,
+    expiresAt: code.expiresAt,
+  });
+
+/** A replacement setup's secret, sealed and parked under the session that started it. */
+export const parkedSecretFor = async (pool: pg.Pool, sessionId: string): Promise<string> =>
+  verificationRow(pool, {
+    id: ulid(),
+    identifier: `second-factor-enrol:${sessionId}`,
+    value: "sealed-secret",
+  });
+
+/** A passkey confirm's challenge, kept under the session that asked for it. */
+export const passkeyChallengeFor = async (pool: pg.Pool, sessionId: string): Promise<string> =>
+  verificationRow(pool, {
+    id: ulid(),
+    identifier: `second-factor-challenge:${sessionId}`,
+    value: "a-challenge",
+  });
 
 /** The row a sign-in link keeps beside its code: its id the link's hash, keyed by the address. */
 export const signInLinkFor = async (pool: pg.Pool, email: string): Promise<string> =>
