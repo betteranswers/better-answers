@@ -14,14 +14,15 @@ deepened: 2026-10-02
 ## Goal Capsule
 
 - **Objective:** every release to production proves, by signing in as each workspace role, that the signed-in product works as deployed, and it does so without slowing how fast changes land.
-- **Means:** a small set of Playwright journeys runs in the nightly release run against a test workspace in production, signing in through a receiving inbox, first reporting and then deciding the tag (KTD1, KTD2, KTD3, KTD12).
-- **Product authority:** the owner, through Linear BA-34. The decisions below were settled with the owner on 02/10/2026; BA-34's original acceptance criteria give way to this contract where the two differ (Scope Boundaries).
+- **Means:** a small set of Playwright journeys runs in the nightly release run against a test workspace in production, signing in through a test inbox of its own, first reporting and then deciding the tag (KTD1, KTD2, KTD3, KTD12).
+- **Product authority:** the owner, through Linear BA-34. The decisions below were settled with the owner on 02/10/2026, and the test inbox's form on 03/10/2026 (KTD3); BA-34's original acceptance criteria give way to this contract where the two differ (Scope Boundaries).
 - **Open blockers:** none. R8, R9 and R16 are deferred to follow-up work with named triggers (Scope Boundaries).
 - **Stop conditions:**
   - The edge refuses a browser from GitHub's runners: stop, and put the choice to the owner, because the zone's bot setting cannot be bypassed by a rule.
   - A settled decision proves unworkable in practice: stop and report it rather than work around it.
   - A unit would edit `apps/api/src/smtp.ts`: stop, because the people-invitations work owns that file.
-- **Execution profile:** `ce-work` builds the units; each change lands through the merge queue under CI's `check`. The owner carries the steps on U8's runbook page: the Resend team and its receiving domain, the secrets, the healthchecks check, running the fixture command, the proof dispatch, and switching the journeys from report to gate.
+  - Any file in the repository would name the testing domain, the Cloudflare account, or the test inbox's URL: stop, because those are estate values (KTD20).
+- **Execution profile:** `ce-work` builds the units; each change lands through the merge queue under CI's `check`. The owner carries the steps on U8's runbook page, as U10 rewrites it: the testing zone and its Email Routing, the test inbox's deploy and token, the secrets, the healthchecks check, running the fixture command, the proof dispatch, and switching the journeys from report to gate.
 
 ---
 
@@ -193,12 +194,13 @@ flowchart TD
 
 - **R16, automatic rollback.** Its own Linear issue, to land before the first client uses the platform. The flow analysis found that a safe version needs: the rollback inside the failed run rather than a dispatched release (a dispatch tags `main`'s head and needs `actions: write`); a rejected marker the nightly gate skips; the migration baseline taken from the commit the live digests were built from, with a check that cannot run treated as a migration; no rollback from a run that is itself a rollback; and a failure at the sign-in step only alerts, because anyone who knows a test address can rotate its code.
 - **R8, passkey journeys.** After BA-28's U6. Playwright 1.63's `context.credentials` can seed a known passkey; a credential re-added each run keeps its stored sign count, which the server may refuse.
+- **ADR 0027 and MIT-0.** Its licence list names MIT but not MIT-0, while `apps/api` already ships `nodemailer` (MIT-0) and U10's `mailauth` and `mailparser` pull it in too. The owner decides whether the list names MIT-0; this work adds no licence the repository does not already ship.
 - **R9, the test Admin's second factor.** Must be enrolled, and its secret stored, before BA-28's U10 lands, or U10's first nightly turns the Admin journey red. The sign-in helper (U4) already absorbs a confirm step.
 
 ### Dependencies / Assumptions
 
 - **BA-28.** R8 waits on passkey sign-in (its U6), and R9 on the second-factor switch-on (its U10, `docs/plans/2026-10-01-2241-feat-people-sign-in-and-security-plan.md`).
-- **A receiving inbox.** Resend receives on a Resend-managed domain and returns the message through its API, so the test inbox needs no DNS record under the product's apex. The `resend` skill that the invitations work is adding to the repository covers it.
+- **A receiving inbox.** The owner registered a testing domain at Cloudflare on 03/10/2026; it is a zone of its own in the account that holds the product's zone, and nothing is set on it yet. Email Routing on its apex hands every message to the test inbox Worker (KTD3, KTD18), so nothing changes on the product's zone, whose apex mail is the owner's Google Workspace.
 - **The client's start.** The owner expects the first client not to use the platform before S2 to S4 are covered. R16 waits on that day.
 - **The release's timing.** Releases run nightly; GitHub starts the schedule hours late, around 09:00 (`docs/operations/CI.md`, *The nightly backup*). The journeys lengthen the release run, not any pull request.
 - **Rollback limits.** Migrations are forward-only and an image rollback across one is recorded as not working (`docs/operations/RUNBOOK.md:74`, `:90`), which is why R16 stops at a migration.
@@ -222,7 +224,11 @@ flowchart TD
 - `packages/core/src/members/bulk.ts:90-239`, `packages/core/src/members/groups.ts`: which bulk acts the screen can undo.
 - `docs/dogfood-reports/2026-09-30-docs-shell-people-dogfood-dogfood.md:104`: dogfood reads codes from the harness.
 - `docs/solutions/architecture-patterns/`: ADR 0022 (two stacks deployed by digest), ADR 0038 (the audit log is append-only), ADR 0041 (secrets in seven credential classes), ADR 0043 (what an act is).
-- Resend receiving: https://resend.com/docs/dashboard/receiving/introduction; API keys have only full or sending access. Playwright 1.63 `context.credentials`.
+- Resend's docs, read 03/10/2026: only a full-access key reads received mail, and a full-access key can also list and retrieve the team's sent emails, so one in production's team could read any person's sign-in code. Playwright 1.63 `context.credentials`.
+- Cloudflare Email Service (the Email Routing docs moved there in 2026): the email handler and `ForwardableEmailMessage` (https://developers.cloudflare.com/email-service/api/route-emails/email-handler/), what Email Routing rejects (https://developers.cloudflare.com/email-service/reference/postmaster/), the catch-all and its apex-only rule (https://developers.cloudflare.com/email-service/configuration/email-routing-addresses/), and the free plan's limits, including the email handler's share of the 10 ms CPU limit (https://developers.cloudflare.com/email-service/platform/limits/, https://developers.cloudflare.com/workers/platform/limits/).
+- cloudflare/workerd#6740 (open): a catch-all-to-Worker message carried no `Authentication-Results`, `Received` or `DKIM-Signature` in `message.headers`; whether `message.raw` keeps them is undocumented, which is why U9 opens with a spike.
+- D1's consistency without the Sessions API and its free-plan limits (https://developers.cloudflare.com/d1/best-practices/read-replication/, https://developers.cloudflare.com/d1/platform/limits/); KV's "60 seconds or more" to show a write (https://developers.cloudflare.com/kv/concepts/how-kv-works/).
+- `mailauth` 7.1.0 (MIT) and `mailparser` 3.9.33 (MIT), read from npm on 03/10/2026. Both depend on `nodemailer`, which is MIT-0 and already a direct dependency of `apps/api`, so they add no licence the repository does not already ship; ADR 0027's list names MIT but not MIT-0.
 
 ---
 
@@ -235,13 +241,14 @@ flowchart TD
 - Added after the doc review, by the owner's decision on 02/10/2026: R25 and KTD17 (the test workspace invites only the testing domain), so a leaked test-Admin sign-in can act inside the test workspace but cannot mail anyone outside it. R17 and the Summary now say no *journey* runs on a pull request, since this work's unit tests run in `check`. U8's leak page now removes what the run flagged.
 - Deferred: the build of R8, R9 and R16 (Deferred to Follow-Up Work). Outstanding Questions resolved into KTD3 to KTD9.
 - R19's 429 half already exists in `apps/web/e2e/sign-in.spec.ts`; U2 adds the expired code.
+- Changed on 03/10/2026, by the owner's decision: KTD3's test inbox becomes a Cloudflare Email Worker on a testing domain of its own. No requirement changes; R5 and R7 hold as written. KTD4 now cites KTD19 for how a message's authentication is judged, and KTD18 to KTD20 and units U9 and U10 are added before U6.
 
 ### Key Technical Decisions
 
 - KTD1. **The journeys get a job of their own in `release.yml`, and the tag moves to a record job.** The promote job keeps backup, redeploy and the unauthenticated smoke, drops to read access, and hands the record job the tag's name, message and resolved head as outputs. A journeys job holds read access and only its own secrets. The record job checks out exactly that head, makes the one tag and the one push, and installs nothing. A package install and a browser never share a job with a write token, and the record cannot tag a commit that landed during the journeys. Governs R13, R14.
 - KTD2. **Every nightly run runs the journeys.** When the gate promotes, they run after the smoke against the new release; when a scheduled run has nothing to promote, in `nightly` mode or after go-live in `drill`, the gate sets a journeys-only flag and they run against the live release. A merge-triggered skip never sets that flag. They sit in the release's concurrency group, so they never overlap a release, and they give the alert a nightly heartbeat. Releases called from `build.yml` do not run them (Scope Boundaries). (session-settled: user-approved — chosen over a separate daily schedule: one place, no overlap with a release.) Governs R13, R22.
-- KTD3. **The test inbox is a Resend-managed receiving domain in a Resend team of its own.** Resend has no read-only key, so the key the journeys hold is full access to whatever team it sits in; a team that owns nothing but that domain keeps the key away from production's sending, and a Resend-managed domain puts nothing under the product's apex that the key could send as. Rotation deletes every key in the team, because a full-access key can mint more. (session-settled: user-approved — chosen over a receiving domain in production's own Resend team.) Governs R5, R7.
-- KTD4. **A code is matched by novelty, recipient and sender, and ambiguity is never guessed.** Before pressing Send, the journey notes the inbox's ids; it then polls, for up to 90 seconds, for a new message to that person from the production sender, and reads the code from its text part by the six-digit line rule the harness uses (`codeIn`). More than one new message in the window, or one whose authentication results do not align to production's sending domain where Resend exposes them, makes the run could-not-run: anyone who knows a test address can rotate its code. It never presses Send twice and never opens the link (R10). Governs R7, R10, R23.
+- KTD3. **The test inbox is a Cloudflare Email Worker on a testing domain of its own.** The testing domain is a Cloudflare zone of its own. One catch-all rule on its apex hands every message to the test inbox (KTD18), and the journeys read it through the inbox's API with a token that reads the inbox and does nothing else. Any Resend key that reads mail is full access, and one in production's team could read every person's sign-in code. The product's zone is untouched: its apex mail is the owner's Google Workspace, and Email Routing on a subdomain needs the apex's Email Routing switched on. (session-settled: user-approved — chosen over a receiving domain in production's own Resend team.) (session-settled: user-directed — chosen over a Resend team of its own: a second team moves the account to a paid plan, and the Worker is free.) (session-settled: user-directed — chosen over a subdomain of the product's zone, Google Workspace's test domain with aliases, and moving another project's domain to Cloudflare: the first would replace the owner's mail exchangers, the second would put a credential to a real mailbox in CI, and the third would tie the inbox to another project's hosting.) Governs R5, R7.
+- KTD4. **A code is matched by novelty, recipient and sender, and ambiguity is never guessed.** Before pressing Send, the journey notes the inbox's ids; it then polls, for up to 90 seconds, for a new message to that person from the production sender, and reads the code from its text part by the six-digit line rule the harness uses (`codeIn`). More than one new verified message in the window (KTD19) makes the run could-not-run: anyone who knows a test address can rotate its code. It never presses Send twice and never opens the link (R10). Governs R7, R10, R23.
 - KTD5. **One sign-in per test person per run, serially, with no retries.** A second send would spend the per-address and per-IP ceilings that the release, a rerun and the owner share. The addresses are held as `production` environment secrets, never committed and never printed: the repository is public, and a variable prints in its logs. (session-settled: user-approved — chosen over committed addresses.) Governs R7, R23.
 - KTD6. **One guarded, idempotent ops command creates and repairs the fixture, run by hand on the api service.** It ensures the test workspace, its mark naming the testing domain (KTD17), the three test people in their roles, and 51 invented members as Viewers, setting back any role that drifted and changing nothing that is already right; each change is an audited act (ADR 0043). It refuses an address off the testing domain, an address carrying the operator mark, and a workspace with that slug whose members are not all on the testing domain; it reports unexpected members and never removes them. CI never runs it. (session-settled: user-approved — chosen over repeating `add-person` and `add-member` by hand, which cannot reset a role.) Governs R1, R2, R3, R4, R5, R6.
 - KTD7. **Journeys take only acts the screen can undo and that cost nothing.** The Admin journey opens by repairing what a failed run left: three fixed invented members back to Viewer, and any group named for the journeys deleted. Its bulk acts move those three from Viewer to Editor and back, and add them to a group made for the run, which it then deletes. No act ever makes anyone an Admin, which mails the person and, after BA-28, makes their next request pending. Bindings and Routes and spend are only read. Governs R11, R12.
@@ -255,6 +262,23 @@ flowchart TD
 - KTD15. **Nothing leaves a run but its outcome word and its summary.** The journeys config turns off traces, screenshots and video; the journeys job uploads nothing; the inbox is called outside any browser context; every role journey signs out on the server in its teardown, even after a failure; no address or URL containing one is printed. A failed run's trace would otherwise publish a live session in a public repository. The inbox key sits on the journeys step's environment, not the job's, so the package install never sees it. Governs R3, R10.
 - KTD16. **The fixture is checked before any act, inside the Admin's one sign-in.** The preflight signs nobody in: it confirms `/health`, the sign-in screen without a challenge, and the inbox. The Admin journey then signs in and, as its first step, reads the test workspace: a member outside the fixture set, a member in another role than the fixture gives them (the test people in theirs, the three repair members Viewer or Editor, every other invented member Viewer), a waiting invitation or a binding ends the run could-not-run with "possible compromise" in its summary, before any act and before the Editor and Viewer sign in. Governs R24.
 - KTD17. **A marked workspace's invitations reach only its testing domain.** The mark is a table of its own under RLS, keyed by workspace and holding the testing domain, after the pattern of `workspace_last_active` (`packages/schema/src/last-active-tables.ts`); it is not Better Auth's `workspace.metadata`. Only the fixture command writes it; no tRPC procedure or screen act does. The check sits where each act learns its addresses, beside the ceilings every send already passes: the invite's per-address check beside `already-a-member` (refused items keyed by position), single and bulk resend (so an invitation minted before the mark cannot go out), and `mintInvitation` for an approved access request. It is one new refusal word, registered and classed in `MEMBER_REFUSALS`, listed in each act's `refuses`, and given its sentence in the SPA's people refusal words. An unmarked workspace is unaffected. (session-settled: user-approved for the guard; its placement agreed with the people-invitations work.) Governs R25.
+- KTD18. **The test inbox stores what it receives and judges nothing.**
+  - **Receiving.** The email handler writes each message to D1 before it does anything else: the envelope recipient, the header `From`, the subject, the time it arrived, and the raw bytes. A header the message lacks is stored as an empty string, so one malformed message cannot break every list for a day. It never rejects, forwards or throws back to Email Routing, because a bounce to production's Resend account puts the test address on Resend's suppression list, and every later night would then read `no-mail`. A message over 256 KiB is dropped and logged, not refused. Each insert deletes rows more than a day old.
+  - **Reading.** The fetch handler serves `GET /emails/receiving` and `GET /emails/receiving/:id` at the root of its hostname, behind a bearer token compared in constant time. The list keeps Resend's shape, which `apps/web/journeys/inbox.ts` already parses: newest first, `limit` up to 100, `after` an id, `has_more`, and items carrying `id`, `to`, `from`, `created_at` and `subject`. A retrieve answers the message's raw bytes, base64, in place of Resend's `text` and `authentication`. `POST /probe`, behind the same token, writes and deletes one probe row, so the preflight sees a store that cannot write before any Send is spent. A store error answers a 503, never an empty list, which would read as `no-mail`. Anything else answers JSON with a 401, 404 or 405, never a redirect or an HTML page.
+  - **Why D1.** KV can take a minute or more to show a write to another location, too close to KTD4's 90 seconds; D1 without its Sessions API reads from the primary, so a write is visible to the next poll.
+  - Governs R7, R23.
+- KTD19. **The reader judges a message's authentication itself, from its DKIM signature, and an unverified message is noise.**
+  - **The rule.** For each new message to the person whose `From` is production's sender, the reader retrieves the raw bytes and verifies their DKIM signatures with `mailauth`, looking each key up in DNS from the runner with a bounded timeout. The message counts only when a signature passes whose signing domain is the domain of production's sender address (`JOURNEYS_SENDER`) and whose signed headers include `From` and a `To` naming the person, so a genuine email re-sent to a test address cannot pass as a new one. If U9's spike shows Resend does not sign `To`, that clause goes. Production's sender is an address on the product's apex and Resend signs as the apex, so strict equality holds.
+  - **Unverified messages.** A message that fails is set aside and the poll goes on, so a forged `From` cannot end the wait. A key lookup that fails is retried on the next poll. A poll that finds exactly one verified message yields its code at once, and two verified messages with different `Message-ID`s answer `ambiguous`; a verified message that lands later is met by the re-ask after a refused code, as today. Only the deadline decides the rest: set-aside messages and no verified one answer a new word, `unverified`, which is could-not-run, because production's own signature breaking in transit looks the same; nothing at all answers `no-mail`.
+  - **Why the reader.** Cloudflare hands the Worker no verdict a sender cannot forge (cloudflare/workerd#6740), and the product domain's DMARC policy is `p=none`, so Email Routing lets a forged `From` through. Checking in the reader keeps all cryptography out of the Worker's 10 ms CPU limit, and makes DNS and the signature the trust anchor rather than the Worker or its store.
+  - **If the spike finds no signature that verifies.** U9's spike settles whether the signature survives the Worker. If it does not, U10 keeps KTD4's novelty rule alone, as `inbox.ts` does today when a provider gives no verdict: every new message to the person from production's sender is a candidate, and more than one is could-not-run. `mailauth`, the lookups and `unverified` then go, and page 13 records that a forged message can force could-not-run, as a rotated code already can. The product's zone and its DMARC policy stay untouched either way.
+  - Governs R7, R10, R23.
+- KTD20. **The test inbox is `apps/test-inbox`, a second TypeScript deployable, deployed by hand.**
+  - **Placement.** It is test infrastructure on Cloudflare, outside the product's two stacks and four stores. ADR 0029's sentence that `apps/api` is the one TypeScript deployable is amended to name it, in the same commit (AGENTS.md).
+  - **Deploy.** The owner deploys it by hand, as the tunnel and edge rules are set by hand, with `wrangler` pinned once in the workspace's `wrangler` script and run through `pnpm dlx`; a Renovate custom manager keeps that one pin current. `wrangler` is not a workspace dependency, so its runtime binaries stay out of every CI install and the api image. CI holds no Cloudflare credential that can change it.
+  - **The deploy credential.** The owner runs `wrangler` with a Cloudflare API token scoped to the account's Workers Scripts and D1 edit permissions, plus only the read permissions `wrangler` asks for, and no zone permission, passed as `CLOUDFLARE_API_TOKEN` for each run and kept in the password manager. Never `wrangler login`: its default grant can write Worker routes across the account, the product's zone included.
+  - **Nothing private in the repository.** Its committed config names no domain, route, zone or account. The catch-all is bound to the Worker in the dashboard, and the Worker answers on its `workers.dev` hostname. Its URL reaches the journeys as the `production` secret `JOURNEYS_INBOX_URL`, read in one place, `apps/web/journeys/fixtures.ts`, and a missing one is could-not-run naming the setting.
+  - Governs R3, R7.
 
 ### High-Level Technical Design
 
@@ -276,18 +300,34 @@ One test person's sign-in:
 ```mermaid
 sequenceDiagram
   participant J as Journey
-  participant I as Test inbox (Resend team of its own)
+  participant I as Test inbox (Worker on the testing zone)
+  participant D as DNS
   participant A as app hostname
   J->>I: list messages, keep the ids already there
   J->>A: type the address, press Send once
-  A-->>I: the sign-in email reaches the Resend-managed domain
+  A-->>I: Resend delivers; Email Routing's catch-all hands it to the Worker, which stores it
   loop up to 90 seconds
     J->>I: list messages
   end
   J->>I: retrieve the one new message to this person from the production sender
-  J->>A: type the six-digit code from the text part
+  J->>D: look up the signing key
+  J->>J: verify the DKIM signature, then read the code from the text part
+  J->>A: type the six-digit code
   A-->>J: the person's home
   Note over J,A: teardown signs the person out on the server, even after a failure
+```
+
+The test inbox's parts, and where each value lives:
+
+```mermaid
+flowchart TB
+  R[production's Resend account] -->|SMTP, DKIM-signed as the product's apex| E[Email Routing on the testing zone's apex: one catch-all]
+  E -->|Send to a Worker| W[apps/test-inbox: email handler stores, never rejects]
+  W --> DB[(D1: one table, a day's retention)]
+  F[apps/test-inbox: fetch handler, bearer token] --> DB
+  JR[the journeys' reader in GitHub Actions] -->|JOURNEYS_INBOX_URL, JOURNEYS_INBOX_KEY| F
+  JR -->|selector lookup| DNS[DNS]
+  O[the owner] -->|wrangler with a scoped token: deploy, secret; dashboard: catch-all| W
 ```
 
 How a run's outcome is decided:
@@ -296,7 +336,7 @@ How a run's outcome is decided:
 | --- | --- | --- |
 | Every journey passed | `held` | yes, when this run promoted |
 | A screen step failed, or no mail arrived within 90 seconds | `fail` | no |
-| The inbox API answered an error; the edge challenged or refused the browser; a code ask was refused as too many; more than one candidate message arrived; `/health` named another digest; the image had no revision label or its commit is not on `main`; the fixture held something it should not; a secret was unset; the job was cancelled or timed out | `could-not-run` | no |
+| The inbox API answered an error; the edge challenged or refused the browser; a code ask was refused as too many; more than one verified sign-in email arrived; only messages whose DKIM signature was missing or failed arrived (`unverified`); the test inbox could not write a probe row; `/health` named another digest; the image had no revision label or its commit is not on `main`; the fixture held something it should not; a secret was unset; the job was cancelled or timed out | `could-not-run` | no |
 
 How the variable stages the record:
 
@@ -309,7 +349,9 @@ How the variable stages the record:
 
 ### Assumptions
 
-- Resend's managed receiving domain accepts mail from production's sending team, and its retrieve call returns the text part; whether it returns authentication results is checked in U3, and KTD4's ambiguity rule stands without them.
+- Email Routing hands the Worker a message from production with its `DKIM-Signature` intact in `message.raw`, and the signature still verifies. Undocumented; U9's spike settles it first, and KTD19's fallback covers the case where it does not hold.
+- Resend's mail reaches the Worker within seconds, and a newly registered zone receives as soon as Email Routing's records are in place. U9's spike records both.
+- The free plan's 10 ms CPU is enough for an email handler that only reads the message's bytes and writes one row; the handler parses nothing.
 - Bot Fight Mode is off on the zone, or does not challenge a headless browser from GitHub's runners. The proof dispatch settles it (Goal Capsule stop conditions).
 - The images `build.yml` pushes carry the revision label its metadata step sets by default. U6 confirms it on a pushed image before relying on it.
 
@@ -318,7 +360,11 @@ How the variable stages the record:
 | Risk | Mitigation |
 | --- | --- |
 | A failed run publishes a live session or a code | Nothing but the outcome and summary leaves a run; server-side sign-out in teardown (KTD15). |
-| A leaked sign-in or inbox key is used inside the test workspace | Its invitations cannot leave the testing domain (KTD17), and a workspace's invitation emails are capped at 200 an hour; the fixture check stops the next run and names it (KTD16); U8's leak page rotates every key, revokes the three people's sessions, cancels invitations and removes what the run flagged. |
+| A leaked sign-in or inbox key is used inside the test workspace | Its invitations cannot leave the testing domain (KTD17), and a workspace's invitation emails are capped at 200 an hour; the fixture check stops the next run and names it (KTD16); the leak page rotates the inbox token in both places it lives, revokes the three people's sessions, cancels invitations and removes what the run flagged. |
+| The test inbox bounces a message, and Resend suppresses a test address | The Worker never rejects or throws (KTD18); a `no-mail` night sends the owner to Resend's suppression list first (U10's page). |
+| Email Routing or the Worker drops production's mail silently | The preflight's probe catches a store that cannot write (KTD18). A routing fault still reads `no-mail`, which is `fail`, so the summary carries that reason and the page's `fail` bullet starts at Resend's suppression list, the Worker's logs and Email Routing's activity log (U10). |
+| The Worker's code and its deployed copy drift apart | The owner redeploys from `main` after any change to `apps/test-inbox`, and the page says so; nothing in CI deploys it (KTD20). The journeys run the reader of the live release's build commit (KTD14), so a change to `packages/schema/src/test-inbox.ts` keeps the Worker answering the previous reader until the releases on both sides of a rollback carry the new one. |
+| Cloudflare changes what an Email Worker sees | The reader's own DKIM check fails closed as could-not-run (KTD19); the spike's finding is recorded where the next session will look (U9). |
 | Someone rotates a test person's code mid-run | More than one candidate is could-not-run (KTD4); R16's design note keeps a sign-in failure from ever rolling back. |
 | The edge's or Better Auth's per-IP rule refuses a run's sign-ins | One sign-in per person, serially, no retries (KTD5); a refusal reads as could-not-run (R23). |
 | U6 misbehaves in production | It lands in report (KTD12); switching the variable back is its rollback. |
@@ -332,10 +378,11 @@ How the variable stages the record:
 
 - **The operator console** lists the test people and invented members in *Everyone* and counts them in *Every workspace*; the testing domain marks them.
 - **Erasure** must never be pointed at a test person: it would tombstone the address and leave a suppression the fixture cannot reuse.
-- **Mail** gains three sign-in emails a night from production's team, received by the separate team.
+- **Mail** gains three sign-in emails a night from production's Resend account, received by the test inbox on the testing zone; the product's zone and its mail exchangers are untouched.
+- **The repository** gains a second TypeScript deployable, `apps/test-inbox`, deployed by the owner to Cloudflare (KTD20); ADR 0029 and AGENTS.md say so, and the api image's install copies one more manifest.
 - **Invitations** gain one refusal, met only in a marked workspace (KTD17); every other workspace invites as before.
 - **The schema** gains one table under RLS and one migration, numbered after #511's 0061.
-- **The release run** gains the journeys' minutes and two jobs; no pull request or merge-queue job changes, and `build.yml`'s call is unchanged.
+- **The release run** gains the journeys' minutes and three jobs (journeys, record and report); no pull request or merge-queue job changes, and `build.yml`'s call is unchanged.
 - **The `production` environment** is restricted to `main` once the proof dispatch has run, and `release/*` gains a tag ruleset that blocks updates and deletions but not creation (U8).
 - **BA-28** gains a dependency: the test Admin's factor before its U10 (Deferred to Follow-Up Work).
 
@@ -351,6 +398,10 @@ flowchart LR
   U4 --> U5
   U5 --> U6[U6 release workflow]
   U8 --> U6
+  U9[U9 test inbox Worker] --> U10[U10 reader reads the Worker; setup page]
+  U4 --> U10
+  U8 --> U10
+  U10 --> U6
   U2[U2 expired code]
   U6 --> U7[U7 records and Linear]
 ```
@@ -443,7 +494,7 @@ flowchart LR
 - `apps/web/test/journeys-inbox.test.ts` (new, against a stand-in server)
 
 **Approach:**
-1. It calls Resend's receiving API with a plain `fetch`, outside any browser context, so the key never reaches a page or a trace.
+1. It calls the test inbox's API with a plain `fetch`, outside any browser context, so the key never reaches a page or a trace. It was built against Resend's receiving API; U10 points it at the Worker.
 2. One call notes the ids already in the inbox; a second polls the receiving list for new messages, filters them by recipient and sender itself (the list has no recipient filter), retrieves the one candidate, and reads the code from the text part.
 3. It answers a code; `no-mail` after the deadline; `ambiguous` when more than one candidate arrived or the authentication results do not align; or `unreachable` when the API answers other than 2xx.
 4. It reads the key from its environment and never logs the key or an address.
@@ -551,10 +602,10 @@ flowchart LR
 
 **Files:**
 - `docs/operations/RUNBOOK.md` (a page for the test workspace)
-- `docs/operations/SECRETS.md` (the inbox key, the ping URL and the three addresses in their classes; the inbox key is not scoped to one action, and the page says so)
+- `docs/operations/SECRETS.md` (the inbox key, the ping URL and the three addresses in their classes)
 
-**Approach:** the page holds, in order:
-1. The Resend team of its own and its managed receiving domain; one key; the three addresses.
+**Approach:** the page holds, in order (U10 rewrites steps 1, 2, 5, 8 and 9 for the test inbox):
+1. The testing zone and the test inbox; its token; the three addresses.
 2. The `production` environment secrets (the key, the addresses, the ping URL) and the `JOURNEYS_MODE` variable set to report.
 3. A healthchecks project apart from the backup checks, one check with a nightly period and a grace past GitHub's late start, and its UUID ping URL.
 4. Running the fixture command on the api service once U1 has been released, then again to see nothing to do.
@@ -562,20 +613,143 @@ flowchart LR
 6. After the proof: restricting the `production` environment to `main`, and a tag ruleset on `release/*` that blocks updates and deletions and leaves creation open, so the record job's workflow token can still push.
 7. Switching to gate after three consecutive held nights, and back to report as U6's rollback.
 8. Reading an alert by its word; recovering from a setup fault by rerunning the failed jobs, and never tagging by hand a release whose journeys did not hold.
-9. The leak page: delete every webhook and every key in the Resend team and mint one key; revoke the sessions and credentials of every member of the test workspace; cancel invitations; mint three new test addresses, update the `production` secrets, rerun the fixture with them, and remove the old test people from the test workspace without erasing them; remove, as the new test Admin on the Members screen, every member the run's summary flagged; read the Audit log. A flagged binding has no act that removes it, so the page instead retires the workspace: rerun the fixture under a new slug with the new addresses, and leave the old workspace, still marked, in place.
+9. The leak page: rotate the inbox token; revoke the sessions and credentials of every member of the test workspace; cancel invitations; mint three new test addresses, update the `production` secrets, rerun the fixture with them, and remove the old test people from the test workspace without erasing them; remove, as the new test Admin on the Members screen, every member the run's summary flagged; read the Audit log. A flagged binding has no act that removes it, so the page instead retires the workspace: rerun the fixture under a new slug with the new addresses, and leave the old workspace, still marked, in place.
 10. Never erase a test person; enrol the test Admin's factor before BA-28's U10.
 
 **Test expectation:** none beyond the docs gates — `check:docs` passes.
 
 **Verification:** `check:docs` passes, and the owner can follow the page from step 1 to step 5 without asking.
 
+### U9. The test inbox Worker
+
+**Goal:** a Worker on the testing zone that keeps every message it receives and lets the journeys read them (KTD18), after a spike that shows whether production's signature survives the trip (KTD19).
+
+**Requirements:** R5, R7, R23; KTD3, KTD18, KTD19, KTD20.
+
+**Dependencies:** none in this plan. The spike needs the owner: Email Routing switched on for the testing zone, and their approval to send one email from production's Resend account.
+
+**Files:**
+- `apps/test-inbox/package.json`, `apps/test-inbox/tsconfig.json`, `apps/test-inbox/vitest.config.ts`, `apps/test-inbox/wrangler.jsonc` (new)
+- `apps/test-inbox/src/index.ts` (new: the two handlers, and the one place `env` is read)
+- `apps/test-inbox/src/store.ts` (new: the adapter over D1: insert, prune, list by cursor, get)
+- `apps/test-inbox/src/read-api.ts` (new: the routes, the token check, the answers)
+- `apps/test-inbox/migrations/0001_messages.sql` (new)
+- `apps/test-inbox/test/store.test.ts`, `apps/test-inbox/test/receive.test.ts`, `apps/test-inbox/test/read-api.test.ts` (new)
+- `packages/schema/src/test-inbox.ts` (new: the list and message shapes, the one statement of the contract the Worker serves and the reader parses)
+- `pnpm-workspace.yaml` (the project, and an `allowBuilds` decision for each build script the new dev dependencies bring)
+- `package.json` (the workspace joins `check:libraries` and `check:libraries:unsharded`)
+- `apps/api/Dockerfile` (a seventh manifest `COPY`, and the comment's count of projects)
+- `knip.config.ts`, `.gitignore`, `.oxlintrc.json` (`.wrangler/` ignored; the Worker's entry named if knip does not find it)
+- `renovate.json` (a custom manager for the one `wrangler` pin)
+- `docs/solutions/architecture-patterns/adr-0029-apps-over-packages-capability-slices.md`, `AGENTS.md` (KTD20's amendment and the layout table's row)
+
+**Approach:**
+1. The spike, outside the repository. Bind a throwaway Worker to the testing zone's catch-all that logs the header names and the whole of `message.raw`, base64. Send one message from production's Resend account to an address on the testing domain that is none of the three test people's, so a bounce cannot suppress one of theirs. Confirm that `raw` carries a `DKIM-Signature` whose `d=` is the product's apex and that `mailauth` verifies those complete bytes offline. Note how many seconds delivery took, the handler's CPU time, whether a second signature (Amazon SES's) rides along, and whether Resend's signature covers `To`. The pull request records the finding without naming the domain; a missing or failing signature sends U10 to KTD19's fallback.
+2. The workspace has no runtime dependency, so the pinned `wrangler` bundles it alone (KTD20). Its type and test dependencies are `@cloudflare/workers-types`, vitest, and `@better-answers/schema` for the shared test-title setup and the contract's types. Its `check` runs typecheck and test through `scripts/check.mjs`, and `lint` stays for running by hand. One `wrangler` script holds the pinned version and runs it through `pnpm dlx`; `deploy` and every page 13 command call through it, so the pin exists once.
+3. The store takes the D1 binding's prepare, bind, run and all, so its tests drive the same SQL against `node:sqlite` (ADR 0029: an in-memory stand-in is for a service someone else runs, behind that service's own adapter). The stand-in returns a BLOB column as D1 does, an Array made with `Array.from`, so the retrieve is tested against the shape it meets in production. One table holds the id, the time received, the envelope recipient, the header `From`, the subject and the raw bytes. Ids sort by time, a zero-padded millisecond count plus a random suffix, so `after` pages by keyset even when the row it names has been pruned.
+4. The email handler reads `message.raw` once, drops an oversized message, inserts, then prunes, all inside one guard that logs a failure and returns (KTD18). It never calls `setReject` or `forward`. Its one log helper carries the only `console` directive, with its reason: Workers Logs reads the console.
+5. The fetch handler answers per KTD18, the probe included. The token check hashes both the offered and the expected token with SHA-256 and folds the two 32-byte digests together with XOR, accepting only an all-zero result, so tokens of different lengths neither throw nor leak their length and the same check runs in the Worker and in Node's tests. While the token secret is unset or shorter than 32 characters, every route answers 503 JSON. `limit` is held between 1 and 100.
+6. The ADR 0029 doc and AGENTS.md change in the same commit, and the pull request says so.
+
+**Execution note:** the spike comes first, because its finding decides U10's reader (KTD19). Build the store and the read API test-first against `node:sqlite`, then the email handler.
+
+**Patterns to follow:** `apps/web/test/journeys-inbox.test.ts`'s `standIn` and `pageOf` are the executable statement of the list's shape and cursor; `packages/schema/src/test-workspace.ts` for a shape shared by a test tool and the code under test; `packages/devtools/vitest.config.ts` for the test-title setup; `scripts/check.mjs` and `packages/devtools/test/ci/check-scripts.test.ts` for the workspace's scripts; the root rule *Read the environment in the tier's one config module*.
+
+**Test scenarios:**
+- The list answers newest first, honours `limit`, and sets `has_more` while older rows remain.
+- `after` an id answers the page after it, and the last page answers `has_more` false.
+- `after` an id whose row was pruned still answers the rows older than it.
+- An insert deletes rows more than a day old and keeps every younger one.
+- A received message is stored with the envelope recipient lower-cased, the header `From` as sent, its subject, and its raw bytes unchanged byte for byte.
+- A message with no `From` or no subject is stored with empty strings, and the list still parses under the shared shape.
+- A message over 256 KiB is dropped: nothing is stored, and the handler returns without rejecting.
+- A store that throws on insert is logged, and the handler returns without rejecting or throwing.
+- No path through the email handler calls `setReject` or `forward`.
+- A request with no token, or a wrong one of a different length or the same length, answers 401 JSON and reads nothing.
+- The list's answer parses under the shared list shape, with `to` an array.
+- A retrieve answers the raw bytes base64, and they decode to the bytes received.
+- An unknown id answers 404 JSON; another method on a read route answers 405 JSON; an unknown path answers 404 JSON; no answer redirects.
+- A `limit` above 100 is held to 100.
+- With the token secret unset or shorter than 32 characters, every route answers 503 JSON, an empty bearer included.
+- A retrieve encodes a BLOB the store returns as an Array to the bytes received.
+- A store that throws on a list or a retrieve answers 503 JSON, never an empty list.
+- The probe writes and deletes one row and answers 200 JSON; with a store that cannot write it answers 503 JSON; without the token it writes nothing.
+
+**Deferred to implementation:**
+- Whether the pinned `wrangler` provisions the D1 database from its name alone. If not, the config carries the database id, which names no domain, zone or account.
+- Whether a deploy with `workers_dev` on and no routes leaves the dashboard's catch-all binding in place. It binds by the Worker's name, so the name never changes.
+- Whether `@cloudflare/workers-types` typechecks under TypeScript 7.0.2. If not, the workspace declares the few interfaces it touches itself.
+- Whether `node:sqlite` in Node 24 runs the store's SQL as D1 does; both are SQLite, and the deployed check in Verification proves the real one.
+
+**Verification:** the workspace's `check` and the root gates pass with it, the image probe passes on its pull request, and once the owner has deployed it, a message sent to an address on the testing domain that is none of the test people's lists through the Worker's URL with the token, its retrieve decodes to the message sent, headers included, and nothing lists without the token.
+
+### U10. The journeys read the test inbox, and the setup page makes it
+
+**Goal:** the journeys take each code from the test inbox, judging the message's signature themselves (KTD19), and the owner's page and the secrets page describe the testing zone instead of a Resend team.
+
+**Requirements:** R3, R5, R7, R10, R23; KTD3, KTD4, KTD15, KTD18, KTD19, KTD20; AE6.
+
+**Dependencies:** U9 (the contract in `packages/schema/src/test-inbox.ts`).
+
+**Files:**
+- `apps/web/journeys/inbox.ts` (each candidate retrieved and verified per KTD19; the new `unverified` answer; no default URL; its comments name no provider)
+- `apps/web/journeys/fixtures.ts` (`inboxSource()` passes `JOURNEYS_INBOX_URL`; the preflight calls the inbox's probe)
+- `apps/web/journeys/sign-in.ts` (`INBOX_FAULTS` and `refusedCode` map `unverified`, and their reasons name each cause truly)
+- `apps/web/journeys/outcome-reporter.ts` (a `fail` from the inbox carries its authored reason into the summary)
+- `apps/web/package.json` (`mailauth` and `mailparser` as dev dependencies)
+- `apps/web/test/journeys-inbox.test.ts` (the stand-in serves the shared shapes; signed fixture messages)
+- `apps/web/test/journeys-fixtures.test.ts` (the new setting in `SETTINGS`, its missing and malformed tests, the probe)
+- `apps/web/test/journeys-sign-in.test.ts`, `apps/web/test/journeys-outcome-reporter.test.ts`
+- `docs/operations/RUNBOOK.md` (page 13)
+- `docs/operations/SECRETS.md`
+
+**Approach:**
+1. `inbox.ts` keeps its note and its answers, and keeps every new hop inside them: nothing it adds may throw, because the reporter reads a throw as `fail`.
+   - The poll lists, then retrieves and verifies each new message to the person from production's sender (KTD19), until the deadline. Verified messages are counted once per `Message-ID`.
+   - Verification uses `mailauth`'s DKIM check alone, not its SPF and DMARC entry point, which wants a connecting IP the runner does not have. A signature with a body-length limit (`l=`), or a message with more than one `From`, does not verify.
+   - The text is the message's `text/plain` part, read with `mailparser`; base64 is decoded strictly.
+   - `fetched` refuses redirects, and the 150 s sign-in budget's comment is redone with the retrieves and the lookups counted.
+2. The signature check takes a DNS resolver with a timeout, so the tests sign a message with a test key and answer the selector lookup themselves, with no network. The tests' production sender moves to an apex address, so strict equality is tested as it runs.
+3. `fixtures.ts` passes `apiUrl` from `JOURNEYS_INBOX_URL` beside `JOURNEYS_SENDER`, and refuses a value that is not a bare `https` origin as could-not-run naming the setting. `inbox.ts`'s `RESEND_API` default goes, so an unset URL can never reach another service. The preflight's inbox check calls the probe after its list.
+4. `sign-in.ts` maps `unverified` to could-not-run in both `INBOX_FAULTS` and `refusedCode`, and each reason names its own cause: a lookup failure or a forged message no longer reads as "another Send rotated the code". The outcome reporter prints `INBOX_FAULTS`' authored reason on a `fail` row, so the owner can tell `no-mail` from `no-code`; those reasons name no address.
+5. RUNBOOK page 13, every value kept to the private file:
+   - Step 1 becomes the testing zone: Email Routing switched on, the catch-all bound to the Worker, bot challenges left off; the scoped deploy token made (KTD20); the D1 database made and its migration applied, the Worker deployed and its token set as its secret, each through the workspace's `wrangler` script; the token minted from 32 random bytes. A message to an address that is none of the test people's is listed before any sign-in runs, so a routing fault cannot bounce and suppress a test address.
+   - Step 2's secrets gain `JOURNEYS_INBOX_URL`, and the step sets `JOURNEYS_SENDER` and `JOURNEYS_CODE_SOURCE`, which `fixtures.ts` already requires and the page never set.
+   - Step 5 lists through the Worker's URL, checks that the stored sign-in email's signature verifies with `mailauth`'s own command, and reads Resend's suppression list for the three addresses. Its "the live release carries U5" check names U10's merge, because the proof runs the journeys of the live release's build commit (KTD14).
+   - The `fail` bullet and the leak bullet start a `no-mail` night at Resend's suppression list for the three addresses, then the Worker's logs and Email Routing's activity log. Leak step 1 sets a new token in the Worker and in `JOURNEYS_INBOX_KEY` together; the token can mint nothing, so nothing else needs deleting.
+6. SECRETS.md: `JOURNEYS_INBOX_KEY` reads the test inbox and nothing else, lives in two places and rotates in both; `JOURNEYS_INBOX_URL` joins the journeys' secrets; the owner's scoped Cloudflare deploy token is named with its scope and rotation, and that it never reaches CI; the CI count is corrected, since it already misses the Access pair.
+
+**Patterns to follow:** `inbox.ts`'s answers, never throws; `couldNotRun("JOURNEYS_SENDER is not set")` for a missing setting; the test "names a missing sender for the inbox, never an address"; `apps/web/test/journeys-inbox-key.test.ts`, which keeps the key's name in `inbox.ts` alone; `INBOX_FAULTS`' `satisfies` check, extended to `refusedCode`.
+
+**Test scenarios:**
+- A new message from production's sender, signed as the sender's domain with a key the resolver returns, yields its code from the text part.
+- A quoted-printable text part yields its code once decoded.
+- A forged message arriving first is set aside, and the genuine one after it yields its code.
+- Only messages with no signature, a failing one, another domain's passing one, or one altered after signing, by the deadline, answer `unverified`.
+- A signature with `l=`, or a message with two `From` headers, does not verify.
+- A genuine signed email to another address, re-sent to the test person, is set aside.
+- A selector lookup that fails is retried on the next poll; one that fails until the deadline answers `unverified`.
+- The same verified message listed twice under one `Message-ID` yields its code; two with different `Message-ID`s answer `ambiguous`.
+- A verifier or parser that throws on malformed bytes answers `unverified`, never a throw.
+- A retrieve whose raw bytes are not strict base64, or whose body fails the shared shape, answers `unreachable`.
+- A redirect from the inbox answers `unreachable`.
+- The existing scenarios hold against the new stand-in: a noted message, another address and another sender are ignored; no message answers `no-mail`; a 401 or 500 answers `unreachable`; a match on the second page is found.
+- Covers AE6. The inbox answering an error makes the sign-in could-not-run.
+- `unverified` maps to could-not-run on the first ask and on the re-ask, with its own reason.
+- A `fail` row from `no-mail` and one from `no-code` carry different reasons in the summary, and neither names an address.
+- An unset or malformed `JOURNEYS_INBOX_URL` is could-not-run naming the setting and no value, and a set one reaches the reader.
+- A probe that answers 503 makes the preflight could-not-run before any Send.
+- `JOURNEYS_INBOX_KEY` is still named in `inbox.ts` alone.
+
+**Verification:** `check:web` and `check:docs` pass; the owner follows page 13 from step 1 to step 5 without asking, and step 5's inbox checks pass against the deployed Worker.
+
 ### U6. The release workflow
 
 **Goal:** the journeys run in every nightly run, report, and then decide the tag (R13, R14, R22, R23).
 
-**Requirements:** R13, R14, R15, R17, R22, R23; F1, F3; KTD1, KTD2, KTD8, KTD9, KTD12, KTD13, KTD14, KTD15; AE1, AE4, AE6.
+**Requirements:** R13, R14, R15, R17, R22, R23; F1, F3; KTD1, KTD2, KTD8, KTD9, KTD12, KTD13, KTD14, KTD15, KTD20; AE1, AE4, AE6.
 
-**Dependencies:** U5, U8 (its go/no-go done).
+**Dependencies:** U5, U8 and U10 (page 13's go/no-go done).
 
 **Files:**
 - `.github/workflows/release.yml` (promote drops its tag and its write access and gains outputs; new journeys, record and report jobs; the journeys-only dispatch input; `JOURNEYS_MODE`)
@@ -590,13 +764,13 @@ flowchart LR
 
 **Approach:**
 1. Promote checks out with `persist-credentials: false` and exports the tag's name, message and resolved head; the `artipacked` suppression moves to the record job.
-2. The journeys job runs when not cancelled and either promote succeeded or the gate set journeys-only, and `JOURNEYS_MODE` is report or gate. In order, it checks `/health` names the digest under test, resolves the build commit with `deploy/build-commit.sh` from the workflow's own checkout, checks out the build commit, installs dependencies and Chromium from that commit's lockfile as `check.yml`'s `full-web` does, and runs the journeys config with the inbox key on that step alone.
+2. The journeys job runs when not cancelled and either promote succeeded or the gate set journeys-only, and `JOURNEYS_MODE` is report or gate. In order, it checks `/health` names the digest under test, resolves the build commit with `deploy/build-commit.sh` from the workflow's own checkout, checks out the build commit, installs dependencies and Chromium from that commit's lockfile as `check.yml`'s `full-web` does, and runs the journeys config with the inbox key and the inbox URL on that step alone. The step also sets `JOURNEYS_CODE_SOURCE` to `inbox` and passes `JOURNEYS_SENDER`, production's public sender address, from a `production` environment variable.
 3. The gate reads the journeys-only dispatch input before `drill` mode's refusal of a dispatch without `rehearsed_by`, so the input works in both modes.
 4. The record job needs promote's success and the mode's rule (KTD12), checks out promote's head, checks `/health` again, and pushes the tag.
 5. The report job runs, whatever the journeys' result, when the gate promoted or set journeys-only and `JOURNEYS_MODE` is not off. It maps the journeys' word; journeys skipped because promote failed map to `fail`; journeys that failed or were cancelled without writing a word map to `could-not-run`. It pings and writes the summary; the existing failure summary's "record it by hand" sentence is rewritten to forbid tagging a release whose journeys did not hold.
 6. Nothing in the journeys job uploads files, and nothing in `check.yml` or the merge queue reads the result (R17).
 
-**Execution note:** before landing, confirm the revision label on a pushed image, and run one journeys-only dispatch from this branch (U8 step 5). Land in report.
+**Execution note:** before landing, confirm the revision label on a pushed image, and run one journeys-only dispatch from this branch (page 13's step 5). Land in report.
 
 **Patterns to follow:** `release.yml`'s promote job and its pinned tests; `deploy/await-release.sh` and `deploy/backup-fresh.sh` for scripts tested against stand-in servers; `RELEASE_MODE`'s fail-closed parsing in `deploy/release-gate.sh`; the rule *Own state on disk, prove every job, and wipe staging* for ping bodies; every `uses:` pinned to a commit SHA.
 
@@ -604,7 +778,8 @@ flowchart LR
 - Promote no longer pushes a tag, holds no write access, and checks out without persisted credentials.
 - The record job is the only job with `contents: write`, installs nothing, and checks out promote's head; exactly one `git push` line remains across workflows.
 - The journeys job's condition: it runs after a successful promote, or on the journeys-only flag, and never when the mode is off.
-- The journeys job receives only the inbox key and the three addresses, and the key appears on one step's environment only.
+- The journeys job receives only the inbox key, the inbox URL and the three addresses as secrets, and the key and the URL appear on one step's environment only.
+- The journeys step sets `JOURNEYS_CODE_SOURCE` to `inbox` and passes `JOURNEYS_SENDER`.
 - The journeys job has no upload step.
 - The gate, on a nightly run with nothing newer, sets the journeys-only flag; on a merge-triggered skip, it never does.
 - The gate, on the journeys-only dispatch input, neither promotes nor records.
@@ -630,8 +805,9 @@ flowchart LR
 
 **Files:**
 - `docs/solutions/architecture-patterns/adr-0022-two-stacks-deployed-by-digest.md` (a release holds only once the journeys pass under gate; the journeys-only night; the build-commit checkout; R16's condition)
-- `CONTEXT.md` (entries for the test workspace and the test people, the Audit log as their permanent record, and the release entry's "held")
-- `docs/operations/CI.md` (`release.yml`: the four jobs, the journeys-only night and dispatch, `JOURNEYS_MODE`, the outcome words)
+- `CONTEXT.md` (entries for the test people and the test inbox, named in full because *inbox* already means the suggestions queue; the Audit log as their permanent record; the release entry's "held")
+- `docs/architecture/` (the test inbox as a system outside the estate, redrawn through `/c4-architecture`)
+- `docs/operations/CI.md` (`release.yml`: the five jobs (gate, promote, journeys, record and report), the journeys-only night and dispatch, `JOURNEYS_MODE`, the outcome words)
 - `docs/operations/RUNBOOK.md` page 6 (the rollback target must account for migrations in live releases that have no tag)
 - `.claude/skills/browser-suite/SKILL.md` (a section on the journeys and their config)
 - `docs/agents/workflow.md` (the UX route of R18, and the rule that a change to a journeyed screen changes its journey in the same pull request and runs it against the browser suite's api before landing)
@@ -650,16 +826,19 @@ flowchart LR
 
 - `pnpm --filter @better-answers/core run check`: U1's core act.
 - `pnpm --filter @better-answers/api run check`: U1's ops command and U2's harness act.
-- `pnpm --filter @better-answers/web run check`: U2's spec, U3's inbox tests, U4's config and reporter tests. `check:web` must not run the journeys.
+- `pnpm --filter @better-answers/web run check`: U2's spec, U3's and U10's inbox tests, U4's config and reporter tests. `check:web` must not run the journeys.
+- `pnpm --filter @better-answers/test-inbox run check`: U9's store, receive and read API tests. `pnpm check:libraries:unsharded` runs it in CI.
 - `pnpm --filter @better-answers/devtools run check`: U6's workflow and script tests.
 - `pnpm check:gates`: format, lint (including U4's import restriction), `lint:workflows` (actionlint, zizmor, shellcheck), the comment gates, `insert-scan`, `jscpd`, `knip`.
 - `pnpm check:docs`: U7's and U8's documents.
 - By hand: `pnpm --filter @better-answers/web run journeys` against the browser suite's api (`apps/api/tests/serve.ts`) with the harness code source (U5).
-- In production: U8's go/no-go, the journeys-only dispatch from U6's branch ending `held`, and the first nightly run after U6 lands showing its outcome in the summary and the healthchecks check. CI's `check` is the arbiter for every change.
+- On the testing zone, before U9 is built: the spike's finding on whether a message from production keeps a verifying DKIM signature, and its delivery time. After U9 merges: the owner's deploy, and a message to an address on the testing domain that is none of the test people's, listed and retrieved through the Worker's URL.
+- In production: page 13's go/no-go, the journeys-only dispatch from U6's branch ending `held`, and the first nightly run after U6 lands showing its outcome in the summary and the healthchecks check. CI's `check` is the arbiter for every change.
 
 ## Definition of Done
 
 - Every unit's verification holds, and `check` is green on each pull request.
+- The test inbox is deployed and bound to the testing zone's catch-all, and nothing in the repository names the testing domain, the account or the Worker's URL.
 - The fixture exists in production, the proof dispatch held, and U6 has landed in report.
 - BA-34's criteria are rewritten, the R16 issue exists, and BA-28 carries the factor note.
 - No experimental or abandoned code remains in the diff.
