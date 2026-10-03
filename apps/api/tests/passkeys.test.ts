@@ -37,7 +37,7 @@ const anAdminSignedIn = async () => {
 };
 
 const askToAdd = async (client: TestClient): Promise<unknown> => {
-  const asked = await client.json(ADD_OPTIONS, {});
+  const asked = await client.json(ADD_OPTIONS, { name: "Chrome on macOS" });
   expect(asked.status, "the add was not asked").toBe(200);
   return asked.json();
 };
@@ -147,6 +147,15 @@ describe("adding a passkey", () => {
   });
 
   it("refuses a blank name before the device is asked", async () => {
+    const { client } = await aSignedInPerson();
+
+    const asked = await client.json(ADD_OPTIONS, { name: "   " });
+
+    expect(asked.status).toBe(400);
+    expect(await asked.json()).toEqual({ error: "passkey-name-empty" });
+  });
+
+  it("refuses a blank name at the add as well", async () => {
     const { person, client } = await aSignedInPerson();
 
     const answered = await addOn(client, aPasskeyDevice(client.origin), { name: "   " });

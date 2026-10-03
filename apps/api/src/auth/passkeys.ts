@@ -66,7 +66,9 @@ const refusalOf = (failure: Error): Refused | undefined =>
     ? REFUSED_AS.get(codeOf.parse(failure.body).code)
     : undefined;
 
-const added = z.object({ name: z.string(), response: z.record(z.string(), z.unknown()) });
+const naming = z.object({ name: z.string() });
+
+const added = naming.extend({ response: z.record(z.string(), z.unknown()) });
 
 type Assertion = NonNullable<
   Parameters<Auth["api"]["verifyPasskeyAuthentication"]>[0]
@@ -133,7 +135,12 @@ export const mountThePasskeys = (routes: Hono, deps: PasskeysDependencies): void
       context.header("set-cookie", cookie, { append: true });
   };
 
+  /** The name is judged before the device is asked, so a refused one leaves no passkey on it. */
   const askToAdd = async (context: Context): Promise<Response> => {
+    const named = naming.safeParse(await context.req.json().catch(() => undefined));
+    if (!named.success) return context.json(REFUSALS.malformed, 400);
+    const name = applyPasskeyNameRule(named.data.name);
+    if (!name.ok) return context.json({ error: name.error }, 400);
     const asked = await attempt(() =>
       auth.api.generatePasskeyRegistrationOptions({
         headers: context.req.raw.headers,
