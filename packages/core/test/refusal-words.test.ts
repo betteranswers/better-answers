@@ -54,6 +54,7 @@ const REGISTER = {
   "not-found": "absent by kernel",
   "not-the-operator": "forbidden by kernel",
   "sign-in-too-old": "unauthenticated by kernel",
+  "second-factor-pending": "precondition by kernel",
   "changed-meanwhile": "conflict by kernel",
   "not-a-member": "unauthenticated by kernel",
   "credentials-revoked": "unauthenticated by kernel",

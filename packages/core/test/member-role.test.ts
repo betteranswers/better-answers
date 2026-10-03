@@ -39,7 +39,7 @@ describe("changing a member's role", () => {
 
     expect(changed).toEqual({
       ok: true,
-      value: { personId: viewer, previousRole: "Viewer", role: "Editor" },
+      value: { personId: viewer, previousRole: "Viewer", role: "Editor", promoted: false },
     });
     expect((await rolesOf(workspace))[viewer]).toBe("Editor");
     expect(await roleChangesIn(workspace)).toEqual([
@@ -80,7 +80,7 @@ describe("changing a member's role", () => {
 
     expect(changed).toEqual({
       ok: true,
-      value: { personId: editor, previousRole: "Editor", role: "Editor" },
+      value: { personId: editor, previousRole: "Editor", role: "Editor", promoted: false },
     });
     expect(await roleChangesIn(workspace)).toEqual([]);
   });
@@ -155,7 +155,7 @@ describe("the last Admin", () => {
 
     expect(changed).toEqual({
       ok: true,
-      value: { personId: adminUserId, previousRole: "Admin", role: "Viewer" },
+      value: { personId: adminUserId, previousRole: "Admin", role: "Viewer", promoted: false },
     });
     expect(await adminsOf(workspace)).toEqual([successor]);
   });

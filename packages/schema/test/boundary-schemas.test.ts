@@ -1322,6 +1322,7 @@ describe("5 — the inferred type is pinned", () => {
         passkeyOfferDismissedAt: Date | null;
         recoveryCodesAcknowledged: boolean;
         restoreRequiredAt: Date | null;
+        promotedAt: Date | null;
       }
     >
   >;

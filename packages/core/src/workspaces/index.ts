@@ -31,6 +31,7 @@ import {
 } from "../store/postgres/index.ts";
 import { hasNoDisplayName } from "./display-name.ts";
 import { endTokens, REVOKED_EVERYWHERE, type TokensEnded } from "./grants.ts";
+import { promoting } from "./promotion.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
 export { WORKSPACE_REFUSALS } from "./vocabulary.ts";
@@ -95,11 +96,15 @@ export {
   takePasskeyChallenge,
 } from "./passkey-confirm.ts";
 export {
+  readCredentialsHeld,
   readSecondFactor,
   recordAuthenticatorSetUp,
   removeAuthenticator,
 } from "./second-factor.ts";
-export type { SecondFactorHeld } from "./second-factor.ts";
+export type { CredentialsHeld, SecondFactorHeld } from "./second-factor.ts";
+export { promoting } from "./promotion.ts";
+export { judgeTheSession } from "./session-standing.ts";
+export type { SessionNamed, SessionStanding } from "./session-standing.ts";
 export {
   recordConsent,
   recordSignIn,
@@ -137,6 +142,7 @@ const insertMembership = async (
   userId: UserId,
   role: Role,
 ): Promise<void> => {
+  if (role === "Admin") await promoting(tx, userId);
   await tx.query(
     "INSERT INTO member (id, workspace_id, user_id, role, created_at) VALUES ($1, $2, $3, $4, now())",
     [ulid(), workspaceId, userId, role],

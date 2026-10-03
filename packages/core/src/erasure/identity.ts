@@ -104,7 +104,7 @@ const sweepTheSet = async (tx: Tx, subject: ErasureSubject, tombstone: string) =
     `UPDATE "user"
         SET email = $2, email_verified = false, name = '', image = NULL, operator = false,
             authenticator_enabled = false, passkey_offer_dismissed_at = NULL,
-            recovery_codes_acknowledged = false, restore_required_at = NULL
+            recovery_codes_acknowledged = false, restore_required_at = NULL, promoted_at = NULL
       WHERE id = $1`,
     [subject.personId, tombstone],
   );

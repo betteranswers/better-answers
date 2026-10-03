@@ -54,6 +54,9 @@ const bulkChangeRoleAct = declareAct({
   effect: "write",
 });
 
+/** Each person the move made hold a second factor for the first time. */
+type BulkPromoted = { readonly promoted: readonly UserId[] };
+
 export type BulkChangeRoleRefusal =
   | MemberRefusal<"role-forbids" | "no-such-role" | "changed-meanwhile">
   | RefusedItems<MemberRefusal<"no-such-member" | "last-admin">>
@@ -68,7 +71,7 @@ export const bulkChangeRole = async (
   principal: UserPrincipal,
   tx: Tx,
   input: BulkChangeRoleInput,
-): Promise<Result<BulkOutcome, BulkChangeRoleRefusal>> => {
+): Promise<Result<BulkOutcome & BulkPromoted, BulkChangeRoleRefusal>> => {
   const admitted = admit(bulkChangeRoleAct, principal, input);
   if (!admitted.ok) return err(admitted.error);
   const role = ROLE.safeParse(input.role);
@@ -91,15 +94,19 @@ export const bulkChangeRole = async (
     if (refused !== undefined) return err(refused);
 
     const batchId = batchIdFor(moving.length);
+    const promoted: UserId[] = [];
     for (const { personId, role: previousRole } of moving) {
-      await roleWritten(admin, tx, { personId, previousRole, role: role.data }, batchId);
+      if (await roleWritten(admin, tx, { personId, previousRole, role: role.data }, batchId)) {
+        promoted.push(personId);
+      }
     }
-    return ok(
-      outcomeOf(
+    return ok({
+      ...outcomeOf(
         personIds,
         moving.map((row) => row.personId),
       ),
-    );
+      promoted,
+    });
   });
 };
 

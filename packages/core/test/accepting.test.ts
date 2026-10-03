@@ -89,7 +89,12 @@ describe("accepting an invitation", () => {
 
     expect(first).toEqual({
       ok: true,
-      value: { workspaceId: workspace.workspaceId, workspaceName: "Twice", role: "Editor" },
+      value: {
+        workspaceId: workspace.workspaceId,
+        workspaceName: "Twice",
+        role: "Editor",
+        promoted: false,
+      },
     });
     expect(second).toEqual({ ok: false, error: "already-a-member" });
     expect(await membersOf(workspace.workspaceId, personId)).toEqual([{ role: "Editor" }]);

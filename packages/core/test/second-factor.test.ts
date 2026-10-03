@@ -253,6 +253,8 @@ describe("reading a person's second factor", () => {
       ok: true,
       value: {
         mustHoldOne: false,
+        operator: false,
+        promoted: false,
         passkeys: [],
         authenticator: "none",
         recoveryCodes: undefined,
@@ -333,6 +335,44 @@ describe("reading a person's second factor", () => {
     const read = await readSecondFactor(bootstrap, door(), { personId });
 
     expect(read).toMatchObject({ ok: true, value: { authenticator: "awaiting-code" } });
+  });
+
+  it("answers this session's standing and the workspace it administers", async () => {
+    const { adminUserId, workspaceId } = await provisionedWorkspace(db(), "Acme");
+    await passkeyFor(db().pool, adminUserId);
+    const sessionId = await aSession(adminUserId);
+    await db().pool.query("UPDATE session SET active_workspace_id = $2 WHERE id = $1", [
+      sessionId,
+      workspaceId,
+    ]);
+
+    const read = await readSecondFactor(bootstrap, door(), { personId: adminUserId, sessionId });
+
+    expect(read).toMatchObject({
+      ok: true,
+      value: {
+        mustHoldOne: true,
+        promoted: true,
+        thisSession: {
+          confirmed: false,
+          setupGranted: false,
+          adminOf: "Acme",
+          standing: "confirm",
+        },
+      },
+    });
+  });
+
+  it("names no workspace the session's person does not administer", async () => {
+    const personId = await seedPerson(db().pool, { operator: true });
+    const sessionId = await aSession(personId);
+
+    const read = await readSecondFactor(bootstrap, door(), { personId, sessionId });
+
+    expect(read).toMatchObject({
+      ok: true,
+      value: { operator: true, thisSession: { adminOf: null, standing: "setup" } },
+    });
   });
 
   it("refuses a person nobody holds", async () => {

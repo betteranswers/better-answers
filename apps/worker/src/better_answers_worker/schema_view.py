@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0064_the-confirm-and-recovery"
+MIGRATION_ID = "0065_the-promotion-mark"
 
-MIGRATION_WHEN = 1791024906925
+MIGRATION_WHEN = 1791053966545
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -582,6 +582,7 @@ TABLES: dict[str, dict[str, str]] = {
         "passkey_offer_dismissed_at": "timestamp with time zone",
         "recovery_codes_acknowledged": "boolean NOT NULL",
         "restore_required_at": "timestamp with time zone",
+        "promoted_at": "timestamp with time zone",
     },
     "public.verification": {
         "id": "text NOT NULL",

@@ -75,7 +75,7 @@ export const secondFactorRowsFor = async (
   );
   await pool.query(
     `UPDATE "user" SET authenticator_enabled = true, passkey_offer_dismissed_at = now(),
-            recovery_codes_acknowledged = true, restore_required_at = now()
+            recovery_codes_acknowledged = true, restore_required_at = now(), promoted_at = now()
       WHERE id = $1`,
     [userId],
   );

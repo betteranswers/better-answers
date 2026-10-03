@@ -19,6 +19,7 @@ import {
   ulid,
 } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
+import { promoting } from "../workspaces/index.ts";
 import { leavesNoAdmin, withMemberHeld, type HeldRefusal } from "./last-admin.ts";
 import { memberKeyed } from "./memberships.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
@@ -53,6 +54,9 @@ export type RoleChanged = {
   readonly role: Role;
 };
 
+/** As changed, and whether the move made them hold a second factor for the first time. */
+export type RoleMoved = RoleChanged & { readonly promoted: boolean };
+
 type Asked = { readonly personId: UserId; readonly role: Role };
 
 const roleWrittenBy = async (
@@ -61,7 +65,8 @@ const roleWrittenBy = async (
   workspaceId: WorkspaceId,
   changed: RoleChanged,
   batchId: string | undefined,
-): Promise<void> => {
+): Promise<boolean> => {
+  const promoted = changed.role === "Admin" && (await promoting(tx, changed.personId));
   await tx.query("UPDATE member SET role = $3 WHERE workspace_id = $1 AND user_id = $2", [
     workspaceId,
     changed.personId,
@@ -74,15 +79,19 @@ const roleWrittenBy = async (
     detail: { previousRole: changed.previousRole, role: changed.role },
     batchId,
   });
+  return promoted;
 };
 
-/** A step on a member row its act holds: the role moves, and its audit event lands in `batchId`. */
+/**
+ * A step on a member row its act holds: the role moves, and its audit event lands in `batchId`.
+ * True when the move made the person hold a second factor for the first time.
+ */
 export const roleWritten = (
   admin: AdminUserPrincipal,
   tx: Tx,
   changed: RoleChanged,
   batchId?: string,
-): Promise<void> => roleWrittenBy(admin, tx, admin.workspaceId, changed, batchId);
+): Promise<boolean> => roleWrittenBy(admin, tx, admin.workspaceId, changed, batchId);
 
 const ROLE_HELD = "SELECT role FROM member WHERE workspace_id = $1 AND user_id = $2 FOR UPDATE";
 
@@ -110,14 +119,13 @@ const roleSetUnderTheLock = (
   admin: AdmittedOf<typeof changeRoleAct>,
   tx: Tx,
   asked: Asked,
-): Promise<Result<RoleChanged, MemberRefusal<"last-admin"> | HeldRefusal | Error>> =>
+): Promise<Result<RoleMoved, MemberRefusal<"last-admin"> | HeldRefusal | Error>> =>
   withMemberHeld(admin, tx, asked.personId, async (held) => {
     const changed: RoleChanged = { ...asked, previousRole: held.role };
-    if (changed.previousRole === changed.role) return ok(changed);
+    if (changed.previousRole === changed.role) return ok({ ...changed, promoted: false });
     if (leavesNoAdmin(held)) return err("last-admin");
 
-    await roleWritten(admin, tx, changed);
-    return ok(changed);
+    return ok({ ...changed, promoted: await roleWritten(admin, tx, changed) });
   });
 
 /**
@@ -129,7 +137,7 @@ export const changeRole = async (
   principal: UserPrincipal,
   tx: Tx,
   input: ChangeRoleInput,
-): Promise<Result<RoleChanged, ChangeRoleRefusal>> => {
+): Promise<Result<RoleMoved, ChangeRoleRefusal>> => {
   const admitted = admit(changeRoleAct, principal, input);
   if (!admitted.ok) return err(admitted.error);
   const role = ROLE.safeParse(input.role);
