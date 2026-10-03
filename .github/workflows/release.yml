@@ -30,6 +30,8 @@ on:
         required: false
       JOURNEYS_VIEWER_EMAIL:
         required: false
+      JOURNEYS_ADMIN_AUTHENTICATOR_KEY:
+        required: false
       JOURNEYS_PING_URL:
         required: false
   # After the box's 02:00 copy and its 02:05 dump; clear of mutation at 02:17 and scan at 03:41.
@@ -323,6 +325,7 @@ jobs:
           JOURNEYS_ADMIN_EMAIL: ${{ secrets.JOURNEYS_ADMIN_EMAIL }}
           JOURNEYS_EDITOR_EMAIL: ${{ secrets.JOURNEYS_EDITOR_EMAIL }}
           JOURNEYS_VIEWER_EMAIL: ${{ secrets.JOURNEYS_VIEWER_EMAIL }}
+          JOURNEYS_ADMIN_AUTHENTICATOR_KEY: ${{ secrets.JOURNEYS_ADMIN_AUTHENTICATOR_KEY }}
         run: pnpm --filter @better-answers/web run journeys
       - name: the journeys' word
         id: word

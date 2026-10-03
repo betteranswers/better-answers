@@ -7,7 +7,9 @@ import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { INVENTED_MEMBERS, inventedMemberAddress } from "@better-answers/schema/test-workspace";
+import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
 
+import { CONFIRM_WORDS } from "@/features/auth/second-factor-words.ts";
 import { SIGN_IN_WORDS } from "@/features/auth/sign-in-words.ts";
 
 import {
@@ -24,12 +26,16 @@ const EDITOR = "editor@journeys.example";
 const CODE = "305117";
 const SESSION = "session=a-journeys-session";
 
-/** Six digits submit on their own, as the product's screen does. */
+/** The test Admin's authenticator key, as the harness answers it. */
+const KEY = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP";
+
+/** Six digits submit on their own, as the product's screen does, and then six more confirm. */
 const SCREEN = [
   '<!doctype html><html lang="en"><title>Sign in</title><main>',
   `<label>${SIGN_IN_WORDS.emailField} <input type="email"></label>`,
   `<button id="send">${SIGN_IN_WORDS.send}</button>`,
   `<label id="step" hidden>${SIGN_IN_WORDS.codeField} <input id="code"></label>`,
+  `<label id="confirm" hidden>${CONFIRM_WORDS.codeField} <input id="factor"></label>`,
   "<script>",
   'document.getElementById("send").onclick = async () => {',
   '  const sent = await fetch("/email-otp/send-verification-otp", { method: "POST" });',
@@ -39,6 +45,12 @@ const SCREEN = [
   "  if (target.value.length !== 6) return;",
   '  const signedIn = await fetch("/sign-in/email-otp", { method: "POST", body: target.value });',
   '  if (signedIn.ok) document.getElementById("step").remove();',
+  '  if (signedIn.ok) document.getElementById("confirm").hidden = false;',
+  "};",
+  'document.getElementById("factor").oninput = async ({ target }) => {',
+  "  if (target.value.length !== 6) return;",
+  '  const confirmed = await fetch("/second-factor/confirm/authenticator", { method: "POST", body: target.value });',
+  '  if (confirmed.ok) document.getElementById("confirm").remove();',
   "};",
   "</script></main></html>",
 ].join("\n");
@@ -62,6 +74,8 @@ type Product = {
 
 type Replies = {
   readonly send?: Reply;
+  /** The confirm's answer, in place of judging the code against the key. */
+  readonly confirm?: Reply;
   readonly signOuts?: readonly Reply[];
   /** By request, such as `GET /trpc/members.list`, answered whoever asks. */
   readonly reads?: ReadonlyMap<string, Reply>;
@@ -77,7 +91,19 @@ const THE_SCREEN: Reply = { status: 200, headers: { "content-type": "text/html" 
 const readReplyTo = (asked: string, replies: Replies): Reply | undefined =>
   SHOWING_THE_SCREEN.has(asked) ? THE_SCREEN : replies.reads?.get(asked);
 
+/** The harness's authenticator for the test Admin, and the confirm page's post. */
+const factorReplyTo = (asked: string, body: string, replies: Replies): Reply | undefined => {
+  if (asked === "POST /__harness/authenticators") {
+    return { status: 200, body: JSON.stringify({ key: KEY, recoveryCodes: [] }) };
+  }
+  if (asked === "POST /second-factor/confirm/authenticator")
+    return replies.confirm ?? confirmed(body);
+  return undefined;
+};
+
 const replyTo = (asked: string, body: string, replies: Replies, signOut: () => Reply): Reply => {
+  const factor = factorReplyTo(asked, body, replies);
+  if (factor !== undefined) return factor;
   switch (asked) {
     case "POST /email-otp/send-verification-otp":
       return replies.send ?? OK;
@@ -92,6 +118,17 @@ const replyTo = (asked: string, body: string, replies: Replies, signOut: () => R
     default:
       return { status: 404 };
   }
+};
+
+const STEP_MS = 30_000;
+
+/** The code the key shows now, or the step either side, so a step's edge never flakes. */
+const confirmed = (body: string): Reply => {
+  const now = Date.now();
+  const shown = [now - STEP_MS, now, now + STEP_MS].map((at) =>
+    authenticatorCodeAt(KEY, new Date(at)),
+  );
+  return shown.includes(body) ? OK : { status: 400, body: '{"error":"code-wrong"}' };
 };
 
 const bodyOf = async (request: IncomingMessage): Promise<string> => {
@@ -162,10 +199,12 @@ const journeysAgainst = (product: Product, spec: string, settings: Record<string
   journeysOver({ spec, use: { baseURL: product.origin }, env: { ...SETTINGS, ...settings } });
 
 const SIGNED_IN_AND_OUT = [
+  "POST /__harness/authenticators",
   "GET /",
   "POST /email-otp/send-verification-otp",
   "GET /__harness/codes",
   "POST /sign-in/email-otp",
+  "POST /second-factor/confirm/authenticator",
   "POST /sign-out",
 ];
 
@@ -178,7 +217,7 @@ describe("a journey that names its role", () => {
     run = await journeysAgainst(product, journeyOf(...AS_THE_ADMIN));
   }, 120_000);
 
-  it("signs its person in, then out on the server", () => {
+  it("signs its person in, confirms, then out on the server", () => {
     expect(run.outcome).toBe("held\n");
     expect(product.heard.map(({ asked }) => asked)).toEqual(SIGNED_IN_AND_OUT);
     const signOut = product.heard.at(-1)?.headers;
@@ -315,6 +354,56 @@ describe("the journeys' fixtures", () => {
       ].join("\n"),
     );
   }, 120_000);
+});
+
+const CONFIRM_STEP = "Confirm the second factor | Confirm the second factor";
+
+describe("the Admin's second factor", () => {
+  it("names a missing authenticator key, never its value", async () => {
+    const product = await theProduct();
+    const run = await journeysAgainst(product, journeyOf(...AS_THE_ADMIN), {
+      JOURNEYS_CODE_SOURCE: "inbox",
+      JOURNEYS_SENDER: "Better Answers <no-reply@better-answers.example>",
+      JOURNEYS_INBOX_URL: "https://inbox.journeys.example/",
+      JOURNEYS_ADMIN_AUTHENTICATOR_KEY: "not-a-key!",
+    });
+
+    expect(run.outcome).toBe("could-not-run\n");
+    expect(run.summary).toContain(
+      "| could-not-run | Admin | Read the journeys' settings | Read the journeys' settings | JOURNEYS_ADMIN_AUTHENTICATOR_KEY is not set to an authenticator's key |\n",
+    );
+    expect(`${run.summary}${run.stdout}${run.stderr}`).not.toContain("not-a-key!");
+    expect(product.heard.map(({ asked }) => asked)).toEqual(["POST /sign-out"]);
+  }, 120_000);
+
+  it("tells a refused confirm from one the ground stopped", async () => {
+    const runs = await Promise.all(
+      [
+        { status: 400, body: '{"error":"code-wrong"}' },
+        { status: 429, body: "{}" },
+        { status: 409, body: '{"error":"no-authenticator"}' },
+      ].map(async (confirm) =>
+        journeysAgainst(await theProduct({ confirm }), journeyOf(...AS_THE_ADMIN)),
+      ),
+    );
+
+    expect(runs.map((run) => run.outcome)).toEqual([
+      "fail\n",
+      "could-not-run\n",
+      "could-not-run\n",
+    ]);
+    expect(runs.map((run) => run.summary)).toEqual([
+      expect.stringContaining(
+        `| fail | Admin | ${CONFIRM_STEP} | the product refused the code the test Admin's authenticator key makes, answering 400 |`,
+      ),
+      expect.stringContaining(
+        `| could-not-run | Admin | ${CONFIRM_STEP} | a rate ceiling refused the confirm |`,
+      ),
+      expect.stringContaining(
+        `| could-not-run | Admin | ${CONFIRM_STEP} | the test Admin holds no authenticator to confirm |`,
+      ),
+    ]);
+  }, 180_000);
 });
 
 const VIEWER = "viewer@journeys.example";

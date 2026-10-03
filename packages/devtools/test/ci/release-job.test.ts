@@ -979,6 +979,7 @@ describe("the tag the record job makes", () => {
 });
 
 const JOURNEYS_SECRETS = [
+  "JOURNEYS_ADMIN_AUTHENTICATOR_KEY",
   "JOURNEYS_ADMIN_EMAIL",
   "JOURNEYS_EDITOR_EMAIL",
   "JOURNEYS_INBOX_KEY",
@@ -1008,6 +1009,16 @@ describe("the journeys a release runs", () => {
     expect(journeys.steps.filter((step) => JSON.stringify(step).includes("secrets."))).toEqual([
       journeysStep(),
     ]);
+  });
+
+  it("hands the Admin's authenticator key to the journeys step alone", () => {
+    expect(journeysStep()?.env).toMatchObject({
+      JOURNEYS_ADMIN_AUTHENTICATOR_KEY: "${{ secrets.JOURNEYS_ADMIN_AUTHENTICATOR_KEY }}",
+    });
+    expect(jobOf("journeys").env ?? {}).not.toHaveProperty("JOURNEYS_ADMIN_AUTHENTICATOR_KEY");
+    expect(release().on.workflow_call.secrets["JOURNEYS_ADMIN_AUTHENTICATOR_KEY"]).toEqual({
+      required: false,
+    });
   });
 
   it("reads codes from the inbox, from production's sender", () => {
