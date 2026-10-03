@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { boundarySchemas, INVITATION_WAITING_STATUS } from "@better-answers/schema";
+import { INVENTED_MEMBERS, inventedMemberAddress } from "@better-answers/schema/test-workspace";
 
 import { act, batchIdFor, declareActs, record } from "../audit/index.ts";
 import {
@@ -40,8 +41,8 @@ const MARK_ACTS = declareActs("platform", {
 
 const TEST_WORKSPACE_NAME = "Test workspace";
 
-/** Enough that a list paged at 25 runs to three pages. */
-export const INVENTED_MEMBERS = 51;
+/** Enough that a list paged at 25 runs to three pages; the journeys read the same number. */
+export { INVENTED_MEMBERS };
 
 const TESTING_DOMAIN = boundarySchemas.testWorkspaceMark.insert.shape.testingDomain;
 const SLUG = boundarySchemas.workspace.insert.shape.slug;
@@ -138,7 +139,7 @@ const inventedOn = (testingDomain: string): readonly FixturePerson[] =>
   Array.from({ length: INVENTED_MEMBERS }, (_, index) => {
     const number = String(index + 1).padStart(2, "0");
     return {
-      address: `invented-member-${number}@${testingDomain}`,
+      address: inventedMemberAddress(index + 1, testingDomain),
       name: `Invented member ${number}`,
       role: "Viewer",
     };
