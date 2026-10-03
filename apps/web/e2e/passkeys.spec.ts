@@ -156,6 +156,7 @@ test("a second passkey from the same device is refused", async ({ page, request 
 
   await expect(page.getByRole("alert")).toContainText(sentenceOf(PASSKEY_HELD));
   await expect(page.getByRole("listitem")).toHaveCount(1);
+  await expect(page.getByRole("button", { name: PASSKEY_WORDS.addCommit })).toBeFocused();
 });
 
 test("an Admin keeps their only passkey, told why beside Remove", async ({ page, request }) => {
@@ -197,6 +198,7 @@ test("a cancelled passkey prompt leaves the email step unchanged", async ({ page
 
   await expect(page.getByText(SIGN_IN_WORDS.passkeyNotUsed)).toBeVisible();
   await expect(page.getByLabel(SIGN_IN_WORDS.emailField)).toHaveValue(address);
+  await expect(page.getByRole("button", { name: SIGN_IN_WORDS.passkey })).toBeFocused();
 });
 
 test("the email step reads email, send, then the passkey", async ({ page }) => {

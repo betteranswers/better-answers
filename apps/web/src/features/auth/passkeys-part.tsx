@@ -122,7 +122,8 @@ function AddAPasskey(properties: {
           setName(event.target.value);
         }}
       />
-      <Button type="submit" className="mt-4" disabled={pending}>
+      {/* Enabled while the device asks, so a cancelled prompt hands focus back to the button. */}
+      <Button type="submit" className="mt-4 aria-disabled:opacity-50" aria-disabled={pending}>
         {PASSKEY_WORDS.addCommit}
       </Button>
       <Outcome tone="said">{saidWhileAdding(pending, adding.error)}</Outcome>
@@ -190,7 +191,12 @@ function RenameAPasskey(properties: {
           setName(event.target.value);
         }}
       />
-      <Button type="submit" size="sm" disabled={renaming.isPending}>
+      <Button
+        type="submit"
+        size="sm"
+        className="aria-disabled:opacity-50"
+        aria-disabled={renaming.isPending}
+      >
         {renaming.isPending ? PASSKEY_WORDS.saving : PASSKEY_WORDS.save}
       </Button>
       <Button

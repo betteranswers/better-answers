@@ -50,12 +50,15 @@ export function PasskeyAct(properties: {
   return (
     <div className="mt-6">
       <p className="text-muted-foreground">{SIGN_IN_WORDS.or}</p>
+      {/* Enabled while the device asks, so a cancelled prompt hands focus back to the button. */}
       <Button
         type="button"
         variant="outline"
-        className="mt-2"
-        disabled={properties.pending}
-        onClick={properties.onSignIn}
+        className="mt-2 aria-disabled:opacity-50"
+        aria-disabled={properties.pending}
+        onClick={() => {
+          if (!properties.pending) properties.onSignIn();
+        }}
       >
         {SIGN_IN_WORDS.passkey}
       </Button>
