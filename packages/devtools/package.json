@@ -14,6 +14,7 @@
     "./mutation-summary": "./src/mutation-summary.ts",
     "./oxlint-config": "./src/oxlint-config.ts",
     "./paths": "./src/paths.ts",
+    "./rename": "./src/rename/index.ts",
     "./root-commands": "./src/root-commands.ts",
     "./throwaway-tree": "./src/throwaway-tree.ts",
     "./workflows": "./src/workflows.ts",
@@ -24,6 +25,7 @@
     "lint:ts": "oxlint --report-unused-disable-directives-severity=error --config ../../.oxlintrc.json .",
     "lint:python": "cd ../../apps/worker && uv run --frozen ruff check ../../packages/devtools/python",
     "lint:python-format": "cd ../../apps/worker && uv run --frozen ruff format --check ../../packages/devtools/python",
+    "rename": "node src/rename/replay.ts",
     "typecheck": "node ../../scripts/check.mjs typecheck:ts typecheck:python",
     "typecheck:ts": "tsc --noEmit",
     "typecheck:python": "cd ../../apps/worker && uv run --frozen mypy --strict ../../packages/devtools/python",
@@ -31,6 +33,7 @@
     "check": "node ../../scripts/check.mjs lint:python lint:python-format typecheck test"
   },
   "devDependencies": {
+    "@ast-grep/cli": "0.45.3",
     "@better-answers/devtools": "workspace:*",
     "@better-answers/schema": "workspace:*",
     "@oxlint/plugins": "1.85.0",
@@ -44,6 +47,7 @@
     "oxlint": "1.85.0",
     "oxlint-tsgolint": "7.0.2002",
     "testcontainers": "12.1.0",
+    "ts-morph": "28.0.0",
     "typescript": "7.0.2",
     "vitest": "5.0.1",
     "yaml": "2.9.1",

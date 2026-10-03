@@ -57,6 +57,7 @@ const config: KnipConfig = {
       ignore: ["lifts/**"],
 
       ignoreDependencies: [
+        "@ast-grep/cli",
         "@better-answers/devtools",
         "@stryker-mutator/core",
         "@stryker-mutator/vitest-runner",

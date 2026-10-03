@@ -327,6 +327,28 @@ the silence the runner above exists to refuse. `test/insert-scan.test.ts` runs t
 through the runner over a throwaway tree, both ways and in both languages, and proves the
 module beside a suite is refused until it is named.
 
+## `src/rename/` and `renames/` — the sweeps' codemod
+
+Each sweep of the glossary plan (`docs/plans/2026-10-02-2325-docs-glossary-in-the-readers-words-plan.md`,
+KTD5) renames one noun with a committed map in `renames/`. A map names the noun, its reader
+word, the word pairs to write, the code word for each collision, the paths each pass may edit,
+and the senses that stay (the plan's Appendix G). `parseRenameMap` refuses a map that names a
+path no sweep edits, or a collision whose code word no pair writes.
+
+`renameOver(root, map, mode)` runs ts-morph's symbol pass through the language service's
+rename locations, then ast-grep's text pass over strings, Python names and JSON. It returns
+every occurrence with its verdict: renamed, or left by a sense, a kept path or the allowlist.
+A dry run writes nothing. The runner holds its own list of kept paths, so no map can forget
+one: migrations, `docs/archive/`, plans, the stored-names register, the generated audit acts,
+the words test's list, the maps themselves and the lifted snapshots. A rename that would reach
+a kept file is refused whole, since half a rename would not compile.
+
+`pnpm --filter @better-answers/devtools rename --map <name> [--root <dir>] [--mode dry-run|apply]`
+replays a map, a dry run by default, so a branch opened before a sweep can take the sweep's
+renames. TypeScript 7's `tsc` proves the symbol pass; ts-morph carries its own compiler.
+`test/rename.test.ts` runs the runner over throwaway trees in both languages, and replays a map
+on a branch git built before the sweep.
+
 ## `lifts/anti-slop/` — the anti-slop plugin, lifted
 
 A verbatim third-party snapshot under ADR 0027, with its provenance, licence and notice text
