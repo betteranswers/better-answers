@@ -8,6 +8,7 @@ import {
   hasNoDisplayName,
   recordPasskeyAdded,
   replaceFactorsByPasskey,
+  type SecondFactorHeld,
 } from "@better-answers/core/workspaces";
 
 import { sendFactorNotice } from "../factor-notice-email.ts";
@@ -117,17 +118,26 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
       context.header("set-cookie", cookie, { append: true });
   };
 
+  /** Both steps check, since a challenge asked for before a restore lives five minutes. */
+  const heldForAnAdd = async (
+    context: Context,
+    person: SignedIn,
+  ): Promise<SecondFactorHeld | Response> => {
+    const held = await heldBy(deps, person);
+    if (held === undefined) return unanswered(context, "the second factor was not read");
+    return waitsOnTheRestoreCode(held)
+      ? context.json(PERSON_ROUTE_REFUSALS.restoreCodeNeeded, 409)
+      : held;
+  };
+
   /** The name is judged before the device is asked, so a refused one leaves no passkey on it. */
   const askToAdd = async (context: Context, person: SignedIn): Promise<Response> => {
     const named = naming.safeParse(await context.req.json().catch(() => undefined));
     if (!named.success) return context.json(REFUSALS.malformed, 400);
     const name = applyPasskeyNameRule(named.data.name);
     if (!name.ok) return nameRefused(context, name.error);
-    const held = await heldBy(deps, person);
-    if (held === undefined) return unanswered(context, "the second factor was not read");
-    if (waitsOnTheRestoreCode(held)) {
-      return context.json(PERSON_ROUTE_REFUSALS.restoreCodeNeeded, 409);
-    }
+    const held = await heldForAnAdd(context, person);
+    if (held instanceof Response) return held;
     const asked = await attempt(() =>
       auth.api.generatePasskeyRegistrationOptions({
         headers: context.req.raw.headers,
@@ -187,12 +197,8 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
     if (!asked.success) return context.json(REFUSALS.malformed, 400);
     const name = applyPasskeyNameRule(asked.data.name);
     if (!name.ok) return nameRefused(context, name.error);
-    const held = await heldBy(deps, person);
-    if (held === undefined) return unanswered(context, "the second factor was not read");
-    /** A challenge asked for before the restore lives five minutes, so the add checks again. */
-    if (waitsOnTheRestoreCode(held)) {
-      return context.json(PERSON_ROUTE_REFUSALS.restoreCodeNeeded, 409);
-    }
+    const held = await heldForAnAdd(context, person);
+    if (held instanceof Response) return held;
     const verified = await attempt(() =>
       auth.api.verifyPasskeyRegistration({
         headers: context.req.raw.headers,
