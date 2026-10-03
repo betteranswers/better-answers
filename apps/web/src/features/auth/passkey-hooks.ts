@@ -149,7 +149,8 @@ const signInWithAPasskey = async (): Promise<SignedIn> => {
 const chosenFromTheAutofill = async (
   live: () => boolean,
 ): Promise<AuthenticationResponseJSON | undefined> => {
-  if (!(await browserSupportsWebAuthnAutofill()) || !live()) return undefined;
+  const offered = await browserSupportsWebAuthnAutofill().catch(() => false);
+  if (!offered || !live()) return undefined;
   const optionsJSON = await askToSignIn().catch(() => undefined);
   if (optionsJSON === undefined || !live()) return undefined;
   return startAuthentication({ optionsJSON, useBrowserAutofill: true }).catch(() => undefined);
@@ -161,19 +162,20 @@ const signedInHere = (): void => {
 };
 
 /**
- * Autofill waits on the email field while `armed`; a press cancels that wait, so a press that
- * fails arms it again.
+ * A press cancels the autofill's wait, so a failed press arms it again; a refused pick does not,
+ * as a device answering unasked would loop.
  */
 export const usePasskeySignIn = (armed: boolean, onSignedIn: (signedIn: SignedIn) => void) => {
   const [round, setRound] = useState(0);
-  const [autofillFailure, setAutofillFailure] = useState<Error | undefined>(undefined);
+  const [lastFailure, setLastFailure] = useState<Error | null>(null);
   const pressed = useMutation({
     mutationFn: signInWithAPasskey,
     onSuccess: (signedIn) => {
       signedInHere();
       onSignedIn(signedIn);
     },
-    onError: () => {
+    onError: (failure) => {
+      setLastFailure(failure);
       setRound((last) => last + 1);
     },
   });
@@ -184,7 +186,7 @@ export const usePasskeySignIn = (armed: boolean, onSignedIn: (signedIn: SignedIn
   });
 
   const autofillFailed = useEffectEvent((failure: Error) => {
-    setAutofillFailure(failure);
+    setLastFailure(failure);
   });
 
   useEffect(() => {
@@ -208,13 +210,13 @@ export const usePasskeySignIn = (armed: boolean, onSignedIn: (signedIn: SignedIn
 
   return {
     signIn: () => {
-      setAutofillFailure(undefined);
+      setLastFailure(null);
       pressed.mutate();
     },
     pending: pressed.isPending || pressed.isSuccess,
-    failure: pressed.error ?? autofillFailure ?? null,
+    failure: lastFailure,
     reset: () => {
-      setAutofillFailure(undefined);
+      setLastFailure(null);
       pressed.reset();
     },
   };
