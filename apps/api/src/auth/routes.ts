@@ -42,6 +42,7 @@ import {
   unseal,
 } from "./link-token.ts";
 import { consentPage, refusedPage, REFUSAL_PAGES, signInPage } from "./pages.ts";
+import { mountThePasskeys } from "./passkeys.ts";
 import { sameOriginOnly } from "./same-origin.ts";
 import { askingWithALink, dropALink, readALink, signingInByLink } from "./sign-in-link.ts";
 import { sessionClaims } from "./verify.ts";
@@ -432,6 +433,7 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
   routes.use(SEND_EMAIL_CODE_PATH, bindTheLink(publicUrl));
   mountTheSignInLink(routes, deps);
   mountTheAuthenticator(routes, deps);
+  mountThePasskeys(routes, deps);
 
   routes.use("/consent", limitByIp(door, PAGE_IP_RULE, clock));
   routes.use("/consent", sameOriginOnly(publicUrl));

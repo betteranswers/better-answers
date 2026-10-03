@@ -49,6 +49,7 @@ The passkey and authenticator plugins:
 
 - Every path they mount is in `disabledPaths`, and so are `/update-session`, `/list-sessions`, the three `/revoke-*` paths and `/unlink-account`. `apps/api/tests/second-factor-foundation.test.ts` holds each refused to a signed-in person.
 - `disabledPaths` refuses over HTTP only. The api's own routes call a closed endpoint as a server function, which also skips the library's rate limiter and origin check, so each such route carries its own (`docs/solutions/best-practices/better-auth-closed-endpoints-run-as-server-functions-without-router-guards.md`).
+- A passkey is added and used through the api's routes under `/passkeys/` (`apps/api/src/auth/passkeys.ts`). The plugin's verification hooks refuse a passkey made or used without user verification, before it is kept or a session made. A passkey sign-in's session is confirmed as the library creates it, and that passkey's last use is kept. Renaming and removing a passkey are core's own acts, never the plugin's.
 
 The operator:
 
@@ -62,7 +63,7 @@ A person exists from their first email-code sign-in, or earlier when `pnpm ops a
 The identity-set audit log holds:
 
 - a person's own display-name act and the platform's adding of a person;
-- a person's own second-factor acts: an authenticator added or removed, and recovery codes issued or used;
+- a person's own second-factor acts: a passkey added, renamed or removed, an authenticator added or removed, and recovery codes issued or used;
 - with the console, each sign-in, every operator write and an Admin's act that ends a person's grants.
 
 A token's issue, refusal and refresh, and the workspace pick, stay log lines.

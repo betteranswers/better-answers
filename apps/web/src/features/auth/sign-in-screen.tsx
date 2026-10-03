@@ -22,6 +22,12 @@ import {
 import { AuthScreen, focusOn, Outcome } from "./auth-screen.tsx";
 import { carriedOnTo, leavingFor, nextAfterSignIn, pageQuery } from "./carried-flow.ts";
 import { codeSpent, digitsOf, selectTheCode, triesLeft, worthSending } from "./code-entry.ts";
+import { passkeysHere, usePasskeySignIn } from "./passkey-hooks.ts";
+import {
+  PasskeyAct,
+  saidOfAPasskeySignIn,
+  saidWhileSigningInWithAPasskey,
+} from "./passkey-sign-in.tsx";
 import {
   CODE_NOT_SENT,
   CODE_UNANSWERED,
@@ -118,6 +124,16 @@ const saidOfTheCode = (sentTo: string, sending: boolean, resent: boolean): strin
 
 const saidOnArriving = (arriving: boolean, arrival: Arrival | undefined): string | null =>
   arriving && arrival !== undefined ? SIGN_IN_WORDS.arrived[arrival] : null;
+
+type PasskeyState = { readonly pending: boolean; readonly failure: Error | null };
+
+const saidOnTheEmailStep = (
+  passkey: PasskeyState,
+  arriving: boolean,
+  arrival: Arrival | undefined,
+): string | null =>
+  saidWhileSigningInWithAPasskey(passkey.pending, passkey.failure) ??
+  saidOnArriving(arriving, arrival);
 
 type SessionRead = {
   readonly isError: boolean;
@@ -241,6 +257,7 @@ type EmailStep = {
   readonly described: string | undefined;
   readonly onAddress: (address: string) => void;
   readonly onAsk: (event: FormEvent) => void;
+  readonly acts: ReactNode;
 };
 
 const emailStepOf = (step: EmailStep): Step => ({
@@ -254,7 +271,7 @@ const emailStepOf = (step: EmailStep): Step => ({
         id={EMAIL_FIELD}
         name="email"
         type="email"
-        autoComplete="username"
+        autoComplete="username webauthn"
         required
         aria-describedby={step.described}
         className="mt-2"
@@ -268,7 +285,7 @@ const emailStepOf = (step: EmailStep): Step => ({
       </Button>
     </form>
   ),
-  acts: null,
+  acts: step.acts,
 });
 
 type CodeStep = {
@@ -344,10 +361,14 @@ export function SignInScreen() {
     void navigate(leavingFor(next));
   };
 
+  const passkey = usePasskeySignIn(sentTo === undefined, moveOnAfterSignIn);
+  const [offersAPasskey] = useState(passkeysHere);
+
   const askForCode = (event: FormEvent) => {
     event.preventDefault();
     const asked = address.trim();
     if (asked === "") return;
+    passkey.reset();
     sendCode.mutate(
       { email: asked, type: "sign-in" },
       {
@@ -423,19 +444,23 @@ export function SignInScreen() {
     signInWith(code);
   };
 
-  const failure = failureSaid(sendCode.error, signIn.error, left);
+  const failure =
+    saidOfAPasskeySignIn(passkey.failure) ?? failureSaid(sendCode.error, signIn.error, left);
   const described = failure === undefined ? undefined : REFUSED;
 
   const step =
     sentTo === undefined
       ? emailStepOf({
           words: emailStep,
-          arrived: saidOnArriving(arriving, arrival),
+          arrived: saidOnTheEmailStep(passkey, arriving, arrival),
           address,
           sending: sendCode.isPending,
           described,
           onAddress: setAddress,
           onAsk: askForCode,
+          acts: offersAPasskey ? (
+            <PasskeyAct pending={passkey.pending} onSignIn={passkey.signIn} />
+          ) : null,
         })
       : codeStepOf({
           said: saidOfTheCode(sentTo, sendCode.isPending, resent),

@@ -10,12 +10,22 @@ import { PRODUCT_NAME } from "./product-name.ts";
 const ACCOUNT_PATH = "/account";
 
 export type FactorChange =
+  | "passkey-added"
+  | "passkey-removed"
   | "authenticator-added"
   | "authenticator-removed"
   | "codes-made"
   | "codes-replaced";
 
 const CHANGES = {
+  "passkey-added": {
+    subject: `A passkey was added to your ${PRODUCT_NAME} account`,
+    happened: "A passkey was added to your account. It signs you in with no email.",
+  },
+  "passkey-removed": {
+    subject: `A passkey was removed from your ${PRODUCT_NAME} account`,
+    happened: "A passkey was removed from your account, so it no longer signs you in.",
+  },
   "authenticator-added": {
     subject: `An authenticator was set up on your ${PRODUCT_NAME} account`,
     happened: "An authenticator was set up as your second factor.",

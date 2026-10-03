@@ -63,6 +63,24 @@ export const AUTHENTICATOR_PERSON_RULE: CounterRule = { windowMs: 10 * 60_000, m
 /** Each replacement mails a notice, so a script cannot fill the person's inbox. */
 export const RECOVERY_CODES_PERSON_RULE: CounterRule = { windowMs: 60 * 60_000, max: 10 };
 
+/** Outside `/passkey/`, where the library's own closed paths answer 404. */
+export const PASSKEY_ADD_OPTIONS_PATH = "/passkeys/add-options";
+
+export const PASSKEY_ADD_PATH = "/passkeys/add";
+
+export const PASSKEY_SIGN_IN_OPTIONS_PATH = "/passkeys/sign-in-options";
+
+export const PASSKEY_SIGN_IN_PATH = "/passkeys/sign-in";
+
+/** The library's verify a passkey sign-in runs, which names the session it creates. */
+export const PASSKEY_VERIFY_PATH = "/passkey/verify-authentication";
+
+/** Asks and adds of one person, counted apart; each add mails a notice. */
+export const PASSKEY_PERSON_RULE: CounterRule = { windowMs: 10 * 60_000, max: 10 };
+
+/** The sign-in screen asks once as it opens, for the browser's autofill, and again per press. */
+export const PASSKEY_SIGN_IN_IP_RULE: CounterRule = { windowMs: 60_000, max: 30 };
+
 export const MCP_UNAUTHENTICATED_IP_RULE: CounterRule = { windowMs: 60_000, max: 60 };
 
 export const TRPC_IP_RULE: CounterRule = { windowMs: 60_000, max: 120 };

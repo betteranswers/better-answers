@@ -1,7 +1,7 @@
 import type { Locator, Page } from "@playwright/test";
 
 import { BREADCRUMB, JUMP_TO, NAVIGATION_SHEET, RAIL, TOGGLE } from "@/app/words.ts";
-import { ACCOUNT_HEADING } from "@/features/auth/account-words.ts";
+import { ACCOUNT_HEADING, PASSKEY_WORDS } from "@/features/auth/account-words.ts";
 import { ROUTES_WORDS } from "@/features/routes/words.ts";
 import { keystrokesOn } from "@/shared/keystroke-words.ts";
 import {
@@ -597,6 +597,13 @@ test("tabs skip link, band, icon rail, secondary nav, toolbar, screen", async ({
     await expect(navOf(page, CONTROL_CENTRE).getByRole("link", { name })).toBeFocused();
   }
 
+  // An Admin holding no passkey is offered one above the toolbar.
+  const offer = page.getByRole("region", { name: PASSKEY_WORDS.heading });
+  await page.keyboard.press("Tab");
+  await expect(offer.getByRole("link", { name: PASSKEY_WORDS.add })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(offer.getByRole("button", { name: PASSKEY_WORDS.dismissOffer })).toBeFocused();
+
   await page.keyboard.press("Tab");
   await expect(tabsOf(page).getByRole("tab", { name: "Routes" })).toBeFocused();
 
@@ -849,11 +856,15 @@ test("draws no toolbar over a screen without tabs or acts", async ({ page, reque
 
   await expect(page.getByRole("tablist")).toHaveCount(0);
 
-  /** An empty bar is what this forbids, so the content must open its own column. */
-  const met = await page.evaluate(
-    () => document.querySelector("main")?.previousElementSibling === null,
-  );
-  expect(met).toBe(true);
+  /**
+   * An empty bar is what this forbids, so the content must open its own column. The passkey offer
+   * alone may stand above it.
+   */
+  const met = await page.evaluate((offer) => {
+    const above = document.querySelector("main")?.previousElementSibling;
+    return above === null || above?.getAttribute("aria-label") === offer;
+  }, PASSKEY_WORDS.heading);
+  expect(met, "something other than the passkey offer stands above the screen").toBe(true);
 });
 
 test("holds toggle and band still while the nav hides", async ({

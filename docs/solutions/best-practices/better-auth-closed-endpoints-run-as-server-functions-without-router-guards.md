@@ -97,7 +97,7 @@ The checks that go quiet:
 - `/delete-user` without a password (`dist/api/routes/update-user.mjs:333-336`, inside the endpoint that opens at `:233`). The file is named `update-user.mjs`, but `/update-user` itself has no freshness check.
 - Passkey registration, under the default `registration.requireSession`: `/passkey/generate-register-options` and `/passkey/verify-registration` (`@better-auth/passkey 1.7.5 dist/index.mjs:88`, `:324`).
 
-Nothing reachable changed here. The first two are in `CLOSED_SESSION_PATHS` and passkey registration is in `CLOSED_FACTOR_PATHS`. `/delete-user` refuses outright, because `createAuth` sets no `user.deleteUser` (`dist/api/routes/update-user.mjs:292`). But a U6 route that calls passkey registration as a server function gets no freshness check from the library. It must apply the platform's own.
+Nothing reachable changed here. The first two are in `CLOSED_SESSION_PATHS` and passkey registration is in `CLOSED_FACTOR_PATHS`. `/delete-user` refuses outright, because `createAuth` sets no `user.deleteUser` (`dist/api/routes/update-user.mjs:292`). So a route that calls passkey registration as a server function gets no freshness check from the library. U6's add route (`apps/api/src/auth/passkeys.ts`) applies none either, as U7's authenticator setup applies none: the plan makes re-confirmation before adding a factor U11's, the one freshness rule, and a first factor has nothing to re-confirm against.
 
 ### A plugin's `schema` option renames; it cannot add a field
 

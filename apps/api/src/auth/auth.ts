@@ -17,7 +17,9 @@ import { withIdentityWrite, type PostgresDoor } from "@better-answers/core/store
 import {
   hasNoDisplayName,
   recordConsent,
+  recordPasskeyUse,
   recordSignIn,
+  type SignInMethod,
   workspacesHeldBy,
 } from "@better-answers/core/workspaces";
 import {
@@ -53,6 +55,7 @@ import {
   CLIENT_IP_HEADER,
   EMAIL_CODE_LIFETIME_SECONDS,
   OAUTH_SCOPES,
+  PASSKEY_VERIFY_PATH,
   REFRESH_TOKEN_LIFETIME_SECONDS,
   SIGN_IN_PATH,
 } from "./constants.ts";
@@ -120,6 +123,7 @@ type AuditEvent =
 
 const AUDITED_PATHS: ReadonlyMap<string, AuditEvent> = new Map([
   ["/sign-in/email-otp", "auth.sign_in"],
+  [PASSKEY_VERIFY_PATH, "auth.sign_in"],
   ["/organization/set-active", "auth.workspace_pick"],
   ["/oauth2/consent", "auth.consent"],
   ["/oauth2/token", "auth.token_issue"],
@@ -209,6 +213,21 @@ const redirectedTo = z.object({ url: z.string() }).optional().catch(undefined);
 /** A before-hook reads the body ahead of the endpoint's own validation. */
 const signInAddress = z.object({ email: z.string() }).optional().catch(undefined);
 
+/** The credential a passkey sign-in presents, as the library's verify was handed it. */
+const presentedCredential = z
+  .object({ response: z.object({ id: z.string() }) })
+  .optional()
+  .catch(undefined);
+
+/** Refused before a passkey is kept or a session made, so neither exists without it. */
+export const USER_NOT_VERIFIED = "USER_NOT_VERIFIED";
+
+const userNotVerified = (): APIError =>
+  new APIError("BAD_REQUEST", {
+    code: USER_NOT_VERIFIED,
+    message: "The device did not verify its user",
+  });
+
 /**
  * A consent the library defers to a fresh sign-in answers a redirect too, but only the one it
  * wrote carries a code.
@@ -240,6 +259,9 @@ type Outcome = "refused" | "declined" | "deferred" | "ok";
 
 type AuditLine = {
   readonly event: AuditEvent;
+
+  /** The library's path the call ran, which names how a sign-in was made. */
+  readonly path: string;
   readonly principal: string | undefined;
   readonly workspaceId: string | undefined;
   readonly clientId: string | undefined;
@@ -251,15 +273,20 @@ const isRedirect = (failure: Error): boolean =>
 
 const openedLine = (
   event: AuditEvent,
+  path: string,
   principal: string | undefined,
   fields: AuditFields,
 ): AuditLine => ({
   event,
+  path,
   principal,
   workspaceId: undefined,
   clientId: fields.client_id ?? clientIdOfQuery(fields.oauth_query),
   tokenId: undefined,
 });
+
+const signInMethodOf = (path: string): SignInMethod =>
+  path === PASSKEY_VERIFY_PATH ? "passkey" : signInMethodOfThisCall();
 
 const claimsOfIssued = (issued: AuditedCall["issued"]) => {
   if (issued === undefined) return undefined;
@@ -274,6 +301,7 @@ const tokenLine = (line: AuditLine, call: AuditedCall): AuditLine => {
   if (claims === undefined) return { ...line, event };
   return {
     event,
+    path: line.path,
     principal: claims.user ?? claims.sub,
     workspaceId: claims.workspace ?? undefined,
     clientId: line.clientId ?? claims.azp ?? claims.client_id,
@@ -362,7 +390,12 @@ export const createAuth = (deps: AuthDependencies) => {
     [
       "auth.sign_in",
       (line) =>
-        recordSignIn(IDENTITY_PRINCIPAL, deps.door, line.principal ?? "", signInMethodOfThisCall()),
+        recordSignIn(
+          IDENTITY_PRINCIPAL,
+          deps.door,
+          line.principal ?? "",
+          signInMethodOf(line.path),
+        ),
     ],
     ["auth.consent", recordConsentOf],
   ]);
@@ -394,6 +427,27 @@ export const createAuth = (deps: AuthDependencies) => {
         { event: "auth.promotion_lock_not_cleared", reason: cleared.error.message },
         "auth.promotion_lock_not_cleared",
       );
+  };
+
+  /** Counts as both factors. A last use not kept is a log line, never a refused sign-in. */
+  const confirmingAPasskeySignIn = async (
+    presented: z.output<typeof presentedCredential>,
+  ): Promise<{ readonly secondFactorConfirmedAt: Date }> => {
+    const at = deps.clock.now();
+    const used =
+      presented === undefined
+        ? undefined
+        : await recordPasskeyUse(IDENTITY_PRINCIPAL, deps.door, {
+            credentialId: presented.response.id,
+            at,
+          });
+    if (used?.ok === false) {
+      audit.warn(
+        { event: "auth.passkey_use_not_kept", reason: used.error.message },
+        "auth.passkey_use_not_kept",
+      );
+    }
+    return { secondFactorConfirmedAt: at };
   };
 
   const db = drizzle(deps.database, { schema: identitySchema });
@@ -473,11 +527,14 @@ export const createAuth = (deps: AuthDependencies) => {
       },
       session: {
         create: {
-          before: async (session) => {
+          before: async (session, context) => {
+            const confirmed =
+              context?.path === PASSKEY_VERIFY_PATH
+                ? await confirmingAPasskeySignIn(presentedCredential.parse(context.body))
+                : {};
             const only = await soleMembershipOf(session.userId);
-            if (only === undefined) return;
-
-            return { data: { ...session, activeOrganizationId: only } };
+            const active = only === undefined ? {} : { activeOrganizationId: only };
+            return { data: { ...session, ...confirmed, ...active } };
           },
         },
       },
@@ -505,7 +562,7 @@ export const createAuth = (deps: AuthDependencies) => {
         };
         const session = await sessionOfCall(ctx);
 
-        const line = auditLineOf(openedLine(event, session?.user.id, call.fields), call);
+        const line = auditLineOf(openedLine(event, ctx.path, session?.user.id, call.fields), call);
         const outcome = outcomeOf(event, call);
         const recorder = outcome === "ok" ? recorders.get(line.event) : undefined;
         if (recorder === undefined) audit.info(auditRecord(line, outcome), line.event);
@@ -644,6 +701,17 @@ export const createAuth = (deps: AuthDependencies) => {
         rpName: PRODUCT_NAME,
         origin: appAddress.origin,
         authenticatorSelection: { userVerification: "required" },
+        /** The library verifies with user verification optional; a passkey counts only with it. */
+        registration: {
+          afterVerification: ({ verification }) => {
+            if (verification.registrationInfo?.userVerified !== true) throw userNotVerified();
+          },
+        },
+        authentication: {
+          afterVerification: ({ verification }) => {
+            if (!verification.authenticationInfo.userVerified) throw userNotVerified();
+          },
+        },
       }),
       cimd({
         fetchClientMetadataResource: deps.fetchClientMetadataResource,

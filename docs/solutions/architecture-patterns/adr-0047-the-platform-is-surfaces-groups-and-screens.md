@@ -160,4 +160,4 @@ Written 30/09/2026 from the shell and layout foundations plan (`docs/plans/2026-
 
 Amended 02/10/2026 by the people layout rework plan (`docs/plans/2026-10-01-1807-feat-people-layout-rework-plan.md`, KTD3). A member now opens as a page, not a sheet over Members, so the list gained detail addresses and Members declared the member page. The four levels and every rule above stand.
 
-Amended 02/10/2026 by the sign-in and security plan (`docs/plans/2026-10-01-2241-feat-people-sign-in-and-security-plan.md`, KTD11). The Account page now exists, outside the shell beside the display-name screen, with its Sign-in section. The four levels and every rule above stand.
+Amended 02/10/2026 by the sign-in and security plan (`docs/plans/2026-10-01-2241-feat-people-sign-in-and-security-plan.md`, KTD11). The Account page now exists, outside the shell beside the display-name screen, with its Sign-in section. Every frame, a workspace's and the console's, offers a person holding no passkey one above its toolbar, once, until they dismiss it; the offer links to the Account page's add. The four levels and every rule above stand.

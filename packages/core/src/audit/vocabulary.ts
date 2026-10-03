@@ -33,8 +33,8 @@ type DetailEntry = Readonly<Record<string, string | null>>;
 
 export type DetailValue = string | number | boolean | readonly DetailEntry[];
 
-/** How a person signed in: the code a sign-in email carries, typed, or the link beside it. */
-const SIGN_IN_METHODS = ["email_code", "email_link"] as const;
+/** How a person signed in: the code a sign-in email carries, typed, the link beside it, or a passkey. */
+const SIGN_IN_METHODS = ["email_code", "email_link", "passkey"] as const;
 
 export type SignInMethod = (typeof SIGN_IN_METHODS)[number];
 

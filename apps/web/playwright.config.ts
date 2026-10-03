@@ -3,7 +3,8 @@ import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
 
 const PORT = 3100;
-const baseURL = `http://127.0.0.1:${PORT}`;
+/** The api's own public address: a passkey's relying party must be a domain, never an IP. */
+const baseURL = `http://localhost:${PORT}`;
 
 const inCi = Boolean(process.env["CI"]);
 

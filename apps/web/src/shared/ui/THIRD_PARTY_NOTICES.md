@@ -66,6 +66,14 @@ the latest tag on [soldair/node-qrcode](https://github.com/soldair/node-qrcode/t
 publishes tags rather than releases, and npm's `latest` for both, read the same day. Its arrival
 edits are listed below with the others.
 
+The Account page's passkeys added shadcn's `item` and Kibo UI's `banner` on **3 October 2026**:
+`item` for each passkey's row, `banner` for the offer of a passkey above a frame's toolbar. Each
+file was written from its registry item as `https://ui.shadcn.com/r/styles/new-york-v4/item.json`
+and `https://www.kibo-ui.com/r/banner.json` served it that day, whose item digests the table names,
+as the QR code's was. Neither brought a dependency: `item`'s `radix-ui` and `banner`'s
+`@radix-ui/react-use-controllable-state` and `lucide-react` were already here. Their arrival edits
+are listed below with the others.
+
 This file records vendored source only. The npm packages those items stand on are ordinary
 dependencies with lockfile entries; their versions live in `apps/web/package.json` and the
 lockfile, which is where a reader reads them and where Renovate moves them.
@@ -119,6 +127,8 @@ the pin.
 | `pagination.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/pagination.json | `e70ae7251fdb0f3c` | `5ba3751a3705925d` |
 | `empty.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/empty.json | `2c377f47c4e661d7` | `af1b98aebc32f8ff` |
 | `kibo-ui/qr-code.tsx` | https://www.kibo-ui.com/r/qr-code.json | `b2e8c658e1d2042a` | `0be5a141250acb70` |
+| `item.tsx` | https://ui.shadcn.com/r/styles/new-york-v4/item.json | `b8ad17f300d4de1d` | `ca3434e1a4223f13` |
+| `kibo-ui/banner.tsx` | https://www.kibo-ui.com/r/banner.json | `77b8679e257a6712` | `a7dd5fee14228771` |
 
 The Kibo UI patterns, each read at commit `3d63cdb15b79d972e3dc38a10997987672f9b263` of
 [shadcnblocks/kibo](https://github.com/shadcnblocks/kibo) (MIT), under `packages/patterns/`. The
@@ -312,6 +322,29 @@ The arrival edits on `qr-code`:
   markup and a caller's would conflict with it.
 - The `catch` no longer calls `console.error`: the browser has no logger here, and the caller
   writes the authenticator key out as text beside the code. The effect's promise is marked `void`.
+
+The arrival edits on `item`:
+
+- The `cn` import repointed at `@/shared/lib/utils.ts` and the file given this repository's format
+  and import order, as every arrival since the tooltip's has needed.
+- `ItemSeparator` dropped, and with it the item's registry dependency on `separator`, which is not
+  installed here: the passkey rows are divided by their own hairlines.
+- The item's `duration-100` became `duration-fast ease-standard`, since the curve and the
+  durations are the design system's to name.
+
+The arrival edits on `banner`:
+
+- Upstream's `index.tsx` taken as `kibo-ui/banner.tsx`, its `"use client"` removed and its `cn`
+  and `Button` imports repointed at `@/shared/lib/utils.ts` and `@/shared/ui/button.tsx`.
+- Reskinned as a hairline card with no fill: the banner's `bg-primary text-primary-foreground`
+  became `border border-border bg-transparent text-foreground`, and the action's and close's
+  hover classes, written for a filled banner, were dropped so they take the button's own.
+- `BannerIcon` dropped: it drew a round chip around a lucide icon, and only three controls may be
+  round.
+- `BannerClose` draws a caller's children in place of its lucide cross, so the offer passes the
+  Phosphor glyph the product's own screens draw.
+- `onChange` passes through an arrow that calls `onClose`, since the hook declares `onChange?:`
+  without `| undefined` while `onClose?:` admits it.
 
 Everything else is upstream's, unedited. Their behaviour — keyboard handling, focus, ARIA
 wiring, virtualisation — is theirs by ADR 0033; the screens that use them carry the WCAG 2.2 AA

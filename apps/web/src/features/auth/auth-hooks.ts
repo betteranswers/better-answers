@@ -1,3 +1,4 @@
+import type { AuthenticationResponseJSON, RegistrationResponseJSON } from "@simplewebauthn/browser";
 import {
   matchQuery,
   mutationOptions,
@@ -82,18 +83,32 @@ const waitNamedBy = (response: Response): number | undefined => {
 
 const SERVER_FAILED = 500;
 
+/** The two refusals our own routes answer by status alone. */
+export const SIGNED_OUT = 401;
+
+export const TOO_MANY_REQUESTS = 429;
+
 /** The api refused a code's send or its check, by form or by link, with the wait a ceiling named. */
 export class CodeRefused extends Error {
   readonly status: number;
   readonly waitSeconds: number | undefined;
   readonly libraryCode: string | undefined;
 
-  constructor(status: number, waitSeconds: number | undefined, libraryCode?: string) {
+  /** The refusal's word, when one of our own routes named it. */
+  readonly word: string | undefined;
+
+  constructor(
+    status: number,
+    waitSeconds: number | undefined,
+    libraryCode?: string,
+    word?: string,
+  ) {
     super(`answered ${String(status)}`);
     this.name = "CodeRefused";
     this.status = status;
     this.waitSeconds = waitSeconds;
     this.libraryCode = libraryCode;
+    this.word = word;
   }
 }
 
@@ -186,7 +201,17 @@ const linkDescribed = z.discriminatedUnion("state", [
 
 export type LinkDescribed = z.infer<typeof linkDescribed>;
 
-type RouteBody = Readonly<Record<string, string>>;
+/** Strings, or the browser's own answer to a passkey's ask. */
+type RouteBody =
+  | Readonly<Record<string, string>>
+  | { readonly name: string; readonly response: RegistrationResponseJSON }
+  | { readonly response: AuthenticationResponseJSON };
+
+const refusalWord = z.object({ error: z.string() });
+
+/** The word a route's refusal names, if its answer names one. */
+const wordOf = async (answered: Response): Promise<string | undefined> =>
+  refusalWord.safeParse(await answered.json().catch(() => undefined)).data?.error;
 
 /** Neither Better Auth's nor tRPC's, so a ceiling's wait is read off the answer here. */
 export const askOfOurRoute = async <T>(
@@ -201,7 +226,14 @@ export const askOfOurRoute = async <T>(
     body: JSON.stringify(body),
   });
   if (answered.status >= SERVER_FAILED) throw new Error(`answered ${String(answered.status)}`);
-  if (!answered.ok) throw new CodeRefused(answered.status, waitNamedBy(answered));
+  if (!answered.ok) {
+    throw new CodeRefused(
+      answered.status,
+      waitNamedBy(answered),
+      undefined,
+      await wordOf(answered),
+    );
+  }
   return answer.parse(await answered.json());
 };
 

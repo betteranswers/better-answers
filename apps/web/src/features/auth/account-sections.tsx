@@ -24,7 +24,13 @@ export const AUTHENTICATOR_HEADING = "authenticator-heading";
 const RECOVERY_CODES_HEADING = "recovery-codes-heading";
 
 /** Where focus goes once an act's result is drawn: each is a node the act brings in. */
-export type Landing = "set-up" | "save-codes" | "recovery-codes";
+export type Landing =
+  | "set-up"
+  | "save-codes"
+  | "recovery-codes"
+  | "passkeys"
+  | "add-a-passkey"
+  | `passkey:${string}`;
 
 export type LandsAt = (landing: Landing) => (node: HTMLElement | null) => void;
 
@@ -38,7 +44,8 @@ function ActKeystroke(properties: { readonly keystroke: Keystroke; readonly onKe
  * An act's own button, focusable while it cannot run, so focus never drops as it waits. Its
  * keystroke passes the same guard.
  */
-function ActButton(properties: {
+export function ActButton(properties: {
+  readonly id?: string;
   readonly unavailable: boolean;
   readonly label: string;
   readonly describedBy?: string | undefined;
@@ -51,6 +58,7 @@ function ActButton(properties: {
   readonly onAct: () => void;
 }) {
   const {
+    id,
     unavailable,
     label,
     describedBy,
@@ -67,6 +75,7 @@ function ActButton(properties: {
   return (
     <>
       <Button
+        id={id}
         ref={actRef}
         type="button"
         variant="outline"
@@ -126,35 +135,46 @@ function NoAuthenticator(properties: {
   );
 }
 
-/** Whoever must hold a factor keeps their last: Remove says why beside it, not after a press. */
-function HeldAuthenticator(properties: {
+/** The words of one factor's removal, from its button to its dialog's commit. */
+export type RemovalWords = {
+  readonly remove: string;
+  readonly title: string;
+  readonly consequence: string;
+  readonly commit: string;
+};
+
+/**
+ * Whoever must hold a factor keeps their last: Remove says why beside it, not after a press. Focus
+ * returns to Remove however the dialog closes.
+ */
+export function RemoveKeepingTheLast(properties: {
+  readonly words: RemovalWords;
   readonly last: boolean;
   readonly removing: boolean;
+  readonly reasonClassName?: string;
   readonly onRemove: () => void;
 }) {
+  const { words } = properties;
   const reasonId = useId();
   const removeRef = useRef<HTMLButtonElement>(null);
   const [confirming, setConfirming] = useState(false);
 
   return (
     <>
-      <p className="mt-2">{AUTHENTICATOR_WORDS.held}</p>
-      <div className="mt-3 flex flex-wrap items-center gap-3">
-        <ActButton
-          actRef={removeRef}
-          unavailable={properties.last || properties.removing}
-          label={AUTHENTICATOR_WORDS.remove}
-          describedBy={properties.last ? reasonId : undefined}
-          onAct={() => {
-            setConfirming(true);
-          }}
-        />
-        {properties.last ? (
-          <p id={reasonId} className="text-muted-foreground">
-            {sentenceOf(SAID_OF_SECOND_FACTOR["last-second-factor"])}
-          </p>
-        ) : null}
-      </div>
+      <ActButton
+        actRef={removeRef}
+        unavailable={properties.last || properties.removing}
+        label={words.remove}
+        describedBy={properties.last ? reasonId : undefined}
+        onAct={() => {
+          setConfirming(true);
+        }}
+      />
+      {properties.last ? (
+        <p id={reasonId} className={cn("text-muted-foreground", properties.reasonClassName)}>
+          {sentenceOf(SAID_OF_SECOND_FACTOR["last-second-factor"])}
+        </p>
+      ) : null}
       <ActDialog
         open={confirming}
         onOpenChange={setConfirming}
@@ -164,8 +184,8 @@ function HeldAuthenticator(properties: {
             removeRef.current?.focus();
           },
         }}
-        title={AUTHENTICATOR_WORDS.removeTitle}
-        consequence={AUTHENTICATOR_WORDS.removeConsequence}
+        title={words.title}
+        consequence={words.consequence}
         commit={
           <Button
             variant="destructive"
@@ -174,10 +194,32 @@ function HeldAuthenticator(properties: {
               properties.onRemove();
             }}
           >
-            {AUTHENTICATOR_WORDS.removeCommit}
+            {words.commit}
           </Button>
         }
       />
+    </>
+  );
+}
+
+const AUTHENTICATOR_REMOVAL: RemovalWords = {
+  remove: AUTHENTICATOR_WORDS.remove,
+  title: AUTHENTICATOR_WORDS.removeTitle,
+  consequence: AUTHENTICATOR_WORDS.removeConsequence,
+  commit: AUTHENTICATOR_WORDS.removeCommit,
+};
+
+function HeldAuthenticator(properties: {
+  readonly last: boolean;
+  readonly removing: boolean;
+  readonly onRemove: () => void;
+}) {
+  return (
+    <>
+      <p className="mt-2">{AUTHENTICATOR_WORDS.held}</p>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <RemoveKeepingTheLast words={AUTHENTICATOR_REMOVAL} {...properties} />
+      </div>
     </>
   );
 }
@@ -200,7 +242,7 @@ function AuthenticatorState(properties: AuthenticatorProperties & { readonly hel
   if (held.authenticator !== "set-up") return <NoAuthenticator {...properties} />;
   return (
     <HeldAuthenticator
-      last={held.mustHoldOne && held.passkeys === 0}
+      last={held.mustHoldOne && held.passkeys.length === 0}
       removing={properties.removing}
       onRemove={properties.onRemove}
     />
@@ -293,7 +335,7 @@ function MakeCodes(properties: {
 
 /** Codes are offered only to a person holding a second factor for them to stand in for. */
 const offersCodes = (held: SecondFactor): boolean =>
-  held.recoveryCodes !== undefined || held.authenticator === "set-up" || held.passkeys > 0;
+  held.recoveryCodes !== undefined || held.authenticator === "set-up" || held.passkeys.length > 0;
 
 export function RecoveryCodesSection(properties: {
   readonly held: SecondFactor | undefined;

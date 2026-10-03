@@ -99,6 +99,9 @@ const SENTENCES = {
   "people.person.name_flagged": ({ by, subject }) =>
     `${by} flagged ${possessive(subject)} display name`,
   "people.person.named": ({ by }) => `${by} gave their display name`,
+  "people.person.passkey_added": ({ by }) => `${by} added a passkey`,
+  "people.person.passkey_removed": ({ by }) => `${by} removed a passkey`,
+  "people.person.passkey_renamed": ({ by }) => `${by} renamed a passkey`,
   "people.person.recovery_code_used": ({ by }) => `${by} used a recovery code`,
   "people.person.recovery_codes_issued": ({ by, detail }) =>
     detail["replaced"] === true

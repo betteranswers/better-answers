@@ -1,51 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { openPostgres } from "../src/store/postgres/index.ts";
 import {
   readSecondFactor,
   recordAuthenticatorSetUp,
   removeAuthenticator,
 } from "../src/workspaces/index.ts";
-import { authenticatorFor, passkeyFor, recoveryCodeFor, sessionFor } from "./identity-rows.ts";
+import { authenticatorFor, passkeyFor, passkeyUsedAt, recoveryCodeFor } from "./identity-rows.ts";
 import { bootstrap, provisionedWorkspace, seedPerson } from "./platform.ts";
-import { postgresForSuite } from "./suite-postgres.ts";
+import { AT, ITS_OWN_AGE, secondFactorSuite } from "./second-factor-suite.ts";
 
-const db = postgresForSuite();
-
-const door = () => openPostgres(db().runtimePool);
-
-const AT = new Date("2026-10-02T12:00:00.000Z");
-
-const EXPIRES_AT = new Date("2026-10-09T12:00:00.000Z");
-
-/** The age `aSession` writes, so carrying it moves nothing. */
-const ITS_OWN_AGE = { createdAt: AT, expiresAt: EXPIRES_AT };
+const { db, door, aSession, identitySetRowsFor, confirmedAt, recoveryCodesHeldBy } =
+  secondFactorSuite();
 
 const RECOVERY_CODE = /^[0-9a-hjkmnp-tv-z]{4}(?:-[0-9a-hjkmnp-tv-z]{4}){3}$/;
-
-const aSession = (userId: string, pendingSince?: Date) =>
-  sessionFor(db().pool, userId, {
-    createdAt: AT,
-    lastUsedAt: AT,
-    expiresAt: EXPIRES_AT,
-    ...(pendingSince === undefined ? {} : { pendingSince }),
-  });
-
-const identitySetRowsFor = async (personId: string) =>
-  (
-    await db().pool.query<{ act: string; detail: unknown }>(
-      "SELECT act, detail FROM identity_audit_event WHERE subject_id = $1 ORDER BY at, id",
-      [personId],
-    )
-  ).rows;
-
-const confirmedAt = async (sessionId: string) =>
-  (
-    await db().pool.query<{ confirmed: Date | null; pending: Date | null }>(
-      "SELECT second_factor_confirmed_at AS confirmed, pending_since AS pending FROM session WHERE id = $1",
-      [sessionId],
-    )
-  ).rows[0];
 
 const ageOf = async (sessionId: string) =>
   (
@@ -54,14 +21,6 @@ const ageOf = async (sessionId: string) =>
       [sessionId],
     )
   ).rows[0];
-
-const recoveryCodesHeldBy = async (personId: string) =>
-  (
-    await db().pool.query<{ count: number }>(
-      "SELECT count(*)::int AS count FROM recovery_code WHERE user_id = $1",
-      [personId],
-    )
-  ).rows[0]?.count;
 
 const authenticatorsHeldBy = async (personId: string) =>
   (
@@ -294,9 +253,10 @@ describe("reading a person's second factor", () => {
       ok: true,
       value: {
         mustHoldOne: false,
-        passkeys: 0,
+        passkeys: [],
         authenticator: "none",
         recoveryCodes: undefined,
+        passkeyOfferDismissed: false,
       },
     });
   });
@@ -310,15 +270,56 @@ describe("reading a person's second factor", () => {
 
     const read = await readSecondFactor(bootstrap, door(), { personId: adminUserId });
 
-    expect(read).toEqual({
+    expect(read).toMatchObject({
       ok: true,
       value: {
         mustHoldOne: true,
-        passkeys: 1,
         authenticator: "set-up",
         recoveryCodes: { unused: 2, madeAt: "2026-10-02T12:00:00.000Z" },
       },
     });
+    expect(read.ok && read.value.passkeys).toHaveLength(1);
+  });
+
+  it("answers each passkey's name, added and last used times", async () => {
+    const personId = await seedPerson(db().pool);
+    const used = await passkeyFor(db().pool, personId);
+    const unused = await passkeyFor(db().pool, personId);
+    await db().pool.query(
+      "UPDATE passkey SET created_at = $2, name = CASE WHEN id = $1 THEN 'Phone' ELSE name END WHERE user_id = $3",
+      [unused, AT, personId],
+    );
+    await db().pool.query("UPDATE passkey SET created_at = $2 WHERE id = $1", [
+      used,
+      new Date("2026-10-01T08:00:00.000Z"),
+    ]);
+    await passkeyUsedAt(db().pool, used, new Date("2026-10-02T09:41:00.000Z"));
+
+    const read = await readSecondFactor(bootstrap, door(), { personId });
+
+    expect(read).toMatchObject({
+      ok: true,
+      value: {
+        passkeys: [
+          {
+            id: used,
+            name: "MacBook",
+            createdAt: "2026-10-01T08:00:00.000Z",
+            lastUsedAt: "2026-10-02T09:41:00.000Z",
+          },
+          { id: unused, name: "Phone", createdAt: "2026-10-02T12:00:00.000Z", lastUsedAt: null },
+        ],
+      },
+    });
+  });
+
+  it("dates a passkey written with no time of its own", async () => {
+    const personId = await seedPerson(db().pool);
+    await passkeyFor(db().pool, personId);
+
+    const read = await readSecondFactor(bootstrap, door(), { personId });
+
+    expect(read.ok && read.value.passkeys[0]?.createdAt).toMatch(/^\d{4}-\d\d-\d\dT/);
   });
 
   it("answers a setup that waits on its code", async () => {

@@ -43,6 +43,7 @@
   },
   "devDependencies": {
     "@better-answers/devtools": "workspace:*",
+    "@simplewebauthn/server": "13.3.3",
     "@stryker-mutator/api": "10.0.0",
     "@stryker-mutator/core": "10.0.0",
     "@stryker-mutator/vitest-runner": "10.0.0",

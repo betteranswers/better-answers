@@ -14,7 +14,12 @@ afterEach(() => {
 const SESSION = { session: { id: "s" }, user: { id: "p", name: "Ada", email: "ada@example.test" } };
 
 /** An authenticator set up and no codes held, so the page offers a first set. */
-const NO_SET = { mustHoldOne: false, passkeys: 0, authenticator: "set-up" };
+const NO_SET = {
+  mustHoldOne: false,
+  passkeys: [],
+  authenticator: "set-up",
+  passkeyOfferDismissed: false,
+};
 
 const A_SET = { ...NO_SET, recoveryCodes: { unused: 10, madeAt: "2026-10-02T09:41:00.000Z" } };
 
@@ -57,6 +62,72 @@ const makeCodesPressed = async () => {
   await openApp("/account", clients);
   fireEvent.click(await screen.findByRole("button", { name: "Make recovery codes" }));
 };
+
+const A_PASSKEY = {
+  id: "01K6AAAAAAAAAAAAAAAAAAAAAA",
+  name: "MacBook",
+  createdAt: "2026-03-03T10:00:00.000Z",
+  lastUsedAt: null,
+};
+
+/** An Admin whose one factor is a passkey, and no authenticator. */
+const ADMINS_ONLY_FACTOR = {
+  mustHoldOne: true,
+  passkeys: [A_PASSKEY],
+  authenticator: "none",
+  passkeyOfferDismissed: false,
+  recoveryCodes: { unused: 10, madeAt: "2026-03-03T10:00:00.000Z" },
+};
+
+const accountOpened = async (held: unknown) => {
+  vi.stubGlobal(
+    "fetch",
+    adasApi(
+      () => ISSUED,
+      () => held,
+    ),
+  );
+  const clients = createAppClients();
+  clients.queryClient.setQueryData(["auth", "session"], SESSION);
+  await openApp("/account", clients);
+};
+
+describe("the Account page's passkeys", () => {
+  it("lists each by name, with when it was added", async () => {
+    await accountOpened(ADMINS_ONLY_FACTOR);
+
+    const row = await screen.findByRole("listitem", { name: "MacBook" });
+
+    expect(row.textContent).toContain("Added 3 March 2026 · Not used yet");
+  });
+
+  it("keeps an Admin's only factor, saying why beside Remove", async () => {
+    await accountOpened(ADMINS_ONLY_FACTOR);
+
+    const remove = await screen.findByRole("button", { name: "Remove" });
+
+    expect(remove.getAttribute("aria-disabled")).toBe("true");
+    expect(remove.getAttribute("aria-describedby")).not.toBeNull();
+    expect(
+      screen.getByText(
+        "You must keep one passkey or authenticator. Add another before removing this one.",
+      ),
+    ).toBeDefined();
+  });
+
+  it("says there are none, and this browser adds none", async () => {
+    await accountOpened(NO_SET);
+
+    expect(
+      await screen.findByText(
+        "No passkeys yet. A passkey signs you in with your fingerprint, face or device PIN, with no email.",
+      ),
+    ).toBeDefined();
+    expect(
+      screen.getByText("This browser can't add a passkey. Use another browser or device."),
+    ).toBeDefined();
+  });
+});
 
 describe("making a first set on the Account page", () => {
   it("says a notice is on its way", async () => {

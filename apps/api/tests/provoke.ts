@@ -12,6 +12,18 @@ export const signedInClient = async (app: TestApp, email: string): Promise<TestC
   return client;
 };
 
+/** A person in no workspace, so nobody requires a factor of them, signed in. */
+export const aPersonSignedIn = async (app: TestApp) => {
+  const person = await app.person();
+  return { person, client: await signedInClient(app, person.email) };
+};
+
+/** A new workspace's Admin, who must hold a factor, signed in. */
+export const anAdminSignedIn = async (app: TestApp) => {
+  const { admin } = await app.provision();
+  return { admin, client: await signedInClient(app, admin.email) };
+};
+
 export const displayNameHeldBy = async (
   app: TestApp,
   personId: string,
