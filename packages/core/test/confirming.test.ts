@@ -1,8 +1,10 @@
 import { createHash } from "node:crypto";
 
+import pg from "pg";
 import { describe, expect, it } from "vitest";
 
 import { CeilingMet } from "../src/kernel/index.ts";
+import { openPostgres } from "../src/store/postgres/index.ts";
 import {
   acceptRestoreCode,
   confirmByAuthenticator,
@@ -134,6 +136,11 @@ const aRestoredPerson = async (expiresAt = after(24 * 3600)) => {
 
 const accepting = (personId: string, sessionId: string, code: string) =>
   acceptRestoreCode(bootstrap, door(), { personId, sessionId, code, now: AT });
+
+const askingAndCounting = async (asked: Parameters<typeof countFailedConfirm>[2], at = door()) => [
+  await readConfirmWait(bootstrap, at, asked),
+  await countFailedConfirm(bootstrap, at, asked),
+];
 
 describe("confirming by passkey", () => {
   it("stamps the existing session and creates no other", async () => {
@@ -276,6 +283,20 @@ describe("the authenticator's failures", () => {
     ).toEqual({ ok: true, value: { waitSeconds: 0 } });
   });
 
+  it("cost an attempt stamped before them no wait", async () => {
+    const personId = await seedPerson(db().pool);
+    await failingTimes(personId, 5, after(1));
+
+    // Of two attempts at once, the one stamped first can read the other's failure.
+    const read = await readConfirmWait(bootstrap, door(), {
+      personId,
+      kind: "authenticator",
+      now: AT,
+    });
+
+    expect(read).toEqual({ ok: true, value: { waitSeconds: 0 } });
+  });
+
   it("make one notice due, and another only after a confirm", async () => {
     const personId = await seedPerson(db().pool);
     await authenticatorFor(db().pool, personId, { verified: true });
@@ -305,6 +326,44 @@ describe("the authenticator's failures", () => {
 
     expect(spent).toMatchObject({ ok: true, value: { granted: true } });
     expect(confirmed).toEqual({ ok: true, value: undefined });
+  });
+});
+
+describe("asking the wait and counting a failure", () => {
+  it("refuse a malformed person id", async () => {
+    const asked = { personId: "not-an-id", kind: "authenticator", now: AT } as const;
+
+    expect(await askingAndCounting(asked)).toEqual([
+      { ok: false, error: "malformed" },
+      { ok: false, error: "malformed" },
+    ]);
+  });
+
+  it("count nothing for a person nobody holds", async () => {
+    const personId = "01J00000000000000000000000";
+
+    const answers = await askingAndCounting({ personId, kind: "authenticator", now: AT });
+
+    expect(answers).toEqual([
+      { ok: true, value: { waitSeconds: 0 } },
+      { ok: false, error: "person-gone" },
+    ]);
+    expect(await failuresOf(personId)).toEqual([]);
+  });
+
+  it("answer the store's failure, not a wait", async () => {
+    const asked = {
+      personId: await seedPerson(db().pool),
+      kind: "authenticator",
+      now: AT,
+    } as const;
+    const gone = new pg.Pool(db().runtimePool.options);
+    await gone.end();
+
+    expect(await askingAndCounting(asked, openPostgres(gone))).toEqual([
+      { ok: false, error: expect.any(Error) },
+      { ok: false, error: expect.any(Error) },
+    ]);
   });
 });
 
@@ -358,6 +417,35 @@ describe("spending a recovery code", () => {
     );
     expect(await recoveryCodesHeldBy(personId)).toBe(10);
     expect(await grantOf(sessionId)).toBeNull();
+  });
+
+  it("counts its failures apart from the authenticator's", async () => {
+    const personId = await seedPerson(db().pool);
+    await failingTimes(personId, 5);
+    await tenCodesFor(personId);
+
+    const wrong = await spending(personId, await aSession(personId), WRONG_CODE);
+
+    expect(wrong).toEqual({
+      ok: true,
+      value: { granted: false, refusal: "recovery-code-wrong", waitSeconds: 0, noticeDue: false },
+    });
+    expect(await failuresOf(personId)).toEqual([
+      { kind: "authenticator", failures: 5 },
+      { kind: "recovery-code", failures: 1 },
+    ]);
+  });
+
+  it("forgets only its own failures when the right code works", async () => {
+    const personId = await seedPerson(db().pool);
+    await failingTimes(personId, 2);
+    const [code = ""] = await tenCodesFor(personId);
+    const sessionId = await aSession(personId);
+    await spending(personId, sessionId, WRONG_CODE);
+
+    await spending(personId, sessionId, code);
+
+    expect(await failuresOf(personId)).toEqual([{ kind: "authenticator", failures: 2 }]);
   });
 
   it("refuses a session the person does not hold, spending nothing", async () => {
@@ -586,6 +674,18 @@ describe("accepting a restore code", () => {
     expect(await grantOf(sessionId)).toBeNull();
     expect(await failuresOf(personId)).toEqual([{ kind: "restore-code", failures: 2 }]);
     expect(await identitySetRowsFor(personId)).toEqual([]);
+  });
+
+  it("waits after six wrong codes, refusing even the right one", async () => {
+    const { personId, sessionId } = await aRestoredPerson();
+    for (let failure = 0; failure < 6; failure += 1) {
+      await accepting(personId, sessionId, WRONG_CODE);
+    }
+
+    const waited = await accepting(personId, sessionId, RESTORE_CODE);
+
+    expect(waited).toEqual({ ok: false, error: new CeilingMet(30) });
+    expect(await grantOf(sessionId)).toBeNull();
   });
 
   it("takes no code once no restore is required", async () => {
