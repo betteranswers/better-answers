@@ -148,6 +148,18 @@ export const CONNECTION_UNFINISHED: Said = {
 
 /** Said wherever a person changes their own second factor or spends a recovery code. */
 export const SAID_OF_SECOND_FACTOR = {
+  "no-passkey": {
+    why: "That passkey is no longer on your account.",
+    next: "Reload the page to see your passkeys.",
+  },
+  "passkey-name-empty": {
+    why: "A name needs a character other than a space.",
+    next: "Type one and save again.",
+  },
+  "passkey-name-too-long": {
+    why: "That name is longer than 64 characters.",
+    next: "Shorten it and save again.",
+  },
   "no-authenticator": {
     why: "You have no authenticator set up.",
     next: "Reload the page to see what you hold.",
@@ -232,6 +244,68 @@ export const KEY_NOT_COPIED: Said = {
   why: "The key wasn't copied.",
   next: "Select it and copy it yourself.",
 };
+
+export const PASSKEY_HELD: Said = {
+  why: "This device already holds one of your passkeys.",
+  next: "Use another device, or remove the old one first.",
+};
+
+export const PASSKEY_NOT_VERIFIED: Said = {
+  why: "Your device didn't check it was you, so no passkey was added.",
+  next: "Use a device with a fingerprint, face or PIN check.",
+};
+
+export const PASSKEY_ASK_EXPIRED: Said = {
+  why: "Your device took too long to answer, so no passkey was added.",
+  next: "Add the passkey again.",
+};
+
+export const PASSKEY_NOT_ADDED: Said = {
+  why: "Your device's passkey couldn't be added.",
+  next: "Try again, or use another device.",
+};
+
+/** The device may have made it and the api kept it before the answer was lost. */
+export const PASSKEY_ADD_UNANSWERED: Said = {
+  why: "No response, so the passkey may not have been added.",
+  next: "Reload the page to see your passkeys.",
+};
+
+export const tooManyPasskeysAdded = (waitSeconds: number | undefined): Said => ({
+  why: "Too many passkeys have been added.",
+  next: tryAgainAfter(waitSeconds),
+});
+
+export const RENAME_UNANSWERED: Said = {
+  why: "No response, so the passkey wasn't renamed.",
+  next: "Try again in a moment.",
+};
+
+export const PASSKEY_REMOVAL_UNANSWERED: Said = {
+  why: "No response, so the passkey wasn't removed.",
+  next: "Try again in a moment.",
+};
+
+/** A device that never held one of ours, or one removed since. */
+export const PASSKEY_UNKNOWN: Said = {
+  why: "That passkey no longer signs in to better-answers.",
+  next: "Send a sign-in email, then remove the passkey from your device.",
+};
+
+export const PASSKEY_SIGN_IN_NOT_VERIFIED: Said = {
+  why: "Your device didn't check it was you, so you aren't signed in.",
+  next: "Use a device with a fingerprint, face or PIN check, or send a sign-in email.",
+};
+
+export const PASSKEY_SIGN_IN_REFUSED: Said = {
+  why: "That passkey didn't sign you in.",
+  next: "Try again, or send a sign-in email.",
+};
+
+export const tooManyPasskeySignIns = (waitSeconds: number | undefined): Said => ({
+  why: "Too many passkey sign-ins have been tried from here.",
+  next: tryAgainAfter(waitSeconds),
+});
 
 export const CODES_NOT_COPIED: Said = {
   why: "The codes weren't copied.",

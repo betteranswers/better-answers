@@ -41,7 +41,7 @@ export type SecondFactorRead = ReturnType<typeof useSecondFactor>;
 export type SecondFactor = NonNullable<SecondFactorRead["data"]>;
 
 /** Awaited by each act, so the act stays pending until the page can show what it changed. */
-const useRereadTheSecondFactor = () => {
+export const useRereadTheSecondFactor = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
   return () => queryClient.invalidateQueries(api.person.secondFactor.queryFilter());

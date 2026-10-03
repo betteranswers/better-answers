@@ -1,6 +1,6 @@
 import { RECOVERY_CODES_IN_A_SET } from "@better-answers/schema/second-factor";
 
-import { dayWords, PRODUCT_NAME } from "@/shared/words.ts";
+import { dayWords, instantWords, PRODUCT_NAME } from "@/shared/words.ts";
 
 /** The page's heading, and its name in the avatar menu and the links that reach it. */
 export const ACCOUNT_HEADING = "Account";
@@ -14,14 +14,76 @@ export const ACCOUNT_WORDS = {
 
 const SET_UP = "Set up an authenticator";
 
+const ADD_A_PASSKEY = "Add a passkey";
+
+/** What a passkey does, said wherever one is offered. */
+const PASSKEY_SIGNS_YOU_IN = "A passkey signs you in with your fingerprint, face or device PIN";
+
 export const ACCOUNT_ACTS = {
   readAgain: "Read your sign-in again",
+  addPasskey: ADD_A_PASSKEY,
   setUp: SET_UP,
   copyKey: "Copy the key",
   copyCodes: "Copy the codes",
   download: "Download the codes",
   print: "Print the codes",
 } as const;
+
+export const PASSKEY_WORDS = {
+  heading: "Passkeys",
+  none: `No passkeys yet. ${PASSKEY_SIGNS_YOU_IN}, with no email.`,
+  noWebAuthn: "This browser can't add a passkey. Use another browser or device.",
+  add: ADD_A_PASSKEY,
+  nameField: "Name",
+  addCommit: "Add passkey",
+  waiting: "Waiting for your device",
+  notAdded: "No passkey was added.",
+  unnamed: "Passkey",
+  notUsed: "Not used yet",
+  rename: "Rename",
+  save: "Save",
+  saving: "Saving",
+  cancel: "Cancel",
+  remove: "Remove",
+  removeConsequence: "It stops signing you in at once, on every device that holds it.",
+  removeCommit: "Remove passkey",
+  offer: "Sign in with your fingerprint, face or device PIN instead of email.",
+  dismissOffer: "Dismiss the passkey offer",
+} as const;
+
+/** `Added 3 March 2026 · Last used 09:41 · 30 September 2026`, or `· Not used yet`. */
+export const passkeyDates = (createdAt: string, lastUsedAt: string | null): string =>
+  `Added ${dayWords(createdAt)} · ${
+    lastUsedAt === null ? PASSKEY_WORDS.notUsed : `Last used ${instantWords(lastUsedAt)}`
+  }`;
+
+export const removePasskeyTitle = (name: string): string => `Remove the passkey "${name}"`;
+
+/** In the order a user agent is read: Edge names Chrome, and Chrome names Safari. */
+const BROWSERS = [
+  { pattern: /Edg\//, browser: "Edge" },
+  { pattern: /Firefox\//, browser: "Firefox" },
+  { pattern: /Chrome\//, browser: "Chrome" },
+  { pattern: /Safari\//, browser: "Safari" },
+] as const;
+
+/** An iPhone names Mac OS X and Android names Linux, so each is read first. */
+const SYSTEMS = [
+  { pattern: /iPhone|iPad/, system: "iOS" },
+  { pattern: /Android/, system: "Android" },
+  { pattern: /Mac OS X|Macintosh/, system: "macOS" },
+  { pattern: /Windows/, system: "Windows" },
+  { pattern: /CrOS/, system: "ChromeOS" },
+  { pattern: /Linux/, system: "Linux" },
+] as const;
+
+/** `Chrome on macOS`, or `Passkey` for a browser the list doesn't name. */
+export const passkeyNameFor = (userAgent: string): string => {
+  const browser = BROWSERS.find((entry) => entry.pattern.test(userAgent))?.browser;
+  const system = SYSTEMS.find((entry) => entry.pattern.test(userAgent))?.system;
+  if (browser === undefined || system === undefined) return PASSKEY_WORDS.unnamed;
+  return `${browser} on ${system}`;
+};
 
 export const AUTHENTICATOR_WORDS = {
   heading: "Authenticator",
@@ -74,6 +136,10 @@ const noticeTo = (address: string): string => `A notice is on its way to ${addre
 
 /** Said once an act lands, with the notice every change of a second factor sends. */
 export const ACT_LANDED = {
+  passkeyAdded: (name: string, address: string) => `Passkey "${name}" added. ${noticeTo(address)}`,
+  passkeyRenamed: (name: string) => `Passkey renamed "${name}".`,
+  passkeyRemoved: (name: string, address: string) =>
+    `Passkey "${name}" removed. ${noticeTo(address)}`,
   setUp: (address: string) => `${AUTHENTICATOR_WORDS.held} ${noticeTo(address)}`,
   removed: (address: string) => `Authenticator removed. ${noticeTo(address)}`,
   made: (address: string) => `Recovery codes made. ${noticeTo(address)}`,

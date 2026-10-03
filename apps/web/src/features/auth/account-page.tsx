@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 
 import { ceilingLiftsIn, refusalOf, type ApiError, type Refusal } from "@/shared/api/trpc.ts";
@@ -19,14 +19,29 @@ import {
   type Landing,
   type LandsAt,
 } from "./account-sections.tsx";
-import { ACCOUNT_ACTS, ACCOUNT_HEADING, ACCOUNT_WORDS, ACT_LANDED } from "./account-words.ts";
+import {
+  ACCOUNT_ACTS,
+  ACCOUNT_HEADING,
+  ACCOUNT_WORDS,
+  ACT_LANDED,
+  PASSKEY_WORDS,
+  passkeyNameFor,
+} from "./account-words.ts";
 import { useSession } from "./auth-hooks.ts";
 import { AuthScreen, focusOn, Outcome, ReadAgain, Refused } from "./auth-screen.tsx";
 import { COPY_KEY } from "./authenticator-part.tsx";
+import { passkeysHere, useRemovePasskey, type PasskeyAdded } from "./passkey-hooks.ts";
+import {
+  ADD_A_PASSKEY,
+  ADD_A_PASSKEY_BUTTON,
+  PasskeysSection,
+  type Passkey,
+} from "./passkeys-part.tsx";
 import { CODES_KEYSTROKES, type CodesInHand } from "./recovery-codes.tsx";
 import {
   CODES_UNANSWERED,
   codesMadeTooOften,
+  PASSKEY_REMOVAL_UNANSWERED,
   REMOVAL_UNANSWERED,
   SAID_OF_SECOND_FACTOR,
 } from "./refusal-words.ts";
@@ -64,8 +79,8 @@ const saidOfAcknowledging = (failure: Error | ApiError | null): Said | undefined
 };
 
 /** The node an act brings in takes focus as it mounts, since it is not there when the act ends. */
-const useLanding = () => {
-  const awaited = useRef<Landing | undefined>(undefined);
+const useLanding = (first: Landing | undefined) => {
+  const awaited = useRef<Landing | undefined>(first);
   const at: LandsAt = (landing) => (node) => {
     if (node === null || awaited.current !== landing) return;
     awaited.current = undefined;
@@ -80,22 +95,62 @@ const useLanding = () => {
 };
 
 /** Each act clears what the last one said, so the page speaks of one act at a time. */
-const useAccountActs = (address: string) => {
+const useAccountActs = (address: string, firstLanding: Landing | undefined) => {
   const starting = useStartAuthenticator();
   const finishing = useFinishingTheSetup();
   const remove = useRemoveAuthenticator();
+  const removePasskey = useRemovePasskey();
   const make = useReplaceRecoveryCodes();
   const acknowledge = useAcknowledgeRecoveryCodes();
-  const landing = useLanding();
+  const landing = useLanding(firstLanding);
   const [said, setSaid] = useState<string | undefined>(undefined);
   const [setupOpen, setSetupOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [suggestedName, setSuggestedName] = useState("");
   const [inHand, setInHand] = useState<CodesInHand | undefined>(undefined);
 
   const begin = () => {
     setSaid(undefined);
     remove.reset();
+    removePasskey.reset();
     if (!make.isPending) make.reset();
     acknowledge.reset();
+  };
+
+  /** The name is suggested as the add opens, from the browser that will hold the passkey. */
+  const toggleAdd = () => {
+    if (!addOpen) setSuggestedName(passkeyNameFor(navigator.userAgent));
+    setAddOpen(!addOpen);
+  };
+
+  const passkeyAdded = (added: PasskeyAdded, name: string) => {
+    begin();
+    setAddOpen(false);
+    setSaid(ACT_LANDED.passkeyAdded(name, address));
+    if (added.recoveryCodes === null) {
+      landing.expect(`passkey:${added.passkeyId}`);
+      return;
+    }
+    landing.expect("save-codes");
+    setInHand({ codes: added.recoveryCodes, replacing: false, madeAt: added.madeAt });
+  };
+
+  const passkeyRenamed = (name: string) => {
+    begin();
+    setSaid(ACT_LANDED.passkeyRenamed(name));
+  };
+
+  const removeAPasskey = (passkey: Passkey) => {
+    begin();
+    removePasskey.mutate(
+      { passkeyId: passkey.id },
+      {
+        onSuccess: () => {
+          landing.expect("passkeys");
+          setSaid(ACT_LANDED.passkeyRemoved(passkey.name ?? PASSKEY_WORDS.unnamed, address));
+        },
+      },
+    );
   };
 
   const toggleSetup = () => {
@@ -159,13 +214,20 @@ const useAccountActs = (address: string) => {
     starting,
     finishing,
     remove,
+    removePasskey,
     make,
     acknowledge,
     landsAt: landing.at,
     said,
     setupOpen,
+    addOpen,
+    suggestedName,
     inHand,
     toggleSetup,
+    toggleAdd,
+    passkeyAdded,
+    passkeyRenamed,
+    removeAPasskey,
     finished,
     removeTheAuthenticator,
     makeCodes,
@@ -182,6 +244,8 @@ const failureOnThePage = (read: SecondFactorRead, acts: AccountActs) => {
   }
   if (acts.remove.error !== null)
     return { failure: acts.remove.error, unanswered: REMOVAL_UNANSWERED };
+  if (acts.removePasskey.error !== null)
+    return { failure: acts.removePasskey.error, unanswered: PASSKEY_REMOVAL_UNANSWERED };
   const made = acts.make.error;
   return { failure: made, unanswered: made === null ? NO_RESPONSE : codesUnanswered(made) };
 };
@@ -189,14 +253,20 @@ const failureOnThePage = (read: SecondFactorRead, acts: AccountActs) => {
 const unread = (read: SecondFactorRead): boolean =>
   read.data === undefined && read.error !== null && refusalOf(read.error) === undefined;
 
+/** The opening acts of the passkeys and the authenticator, each offered while it is closed. */
+const openingKeystrokes = (read: SecondFactorRead, acts: AccountActs): readonly Keystroke[] => {
+  if (read.data === undefined) return [];
+  const offersAdd = !acts.addOpen && passkeysHere();
+  const offersSetup = !acts.setupOpen && read.data.authenticator !== "set-up";
+  return [...(offersAdd ? [ADD_A_PASSKEY] : []), ...(offersSetup ? [SET_UP] : [])];
+};
+
 /** In the order the page shows their acts. */
 const keystrokesOf = (read: SecondFactorRead, acts: AccountActs): readonly Keystroke[] => {
-  const offersSetup =
-    !acts.setupOpen && read.data !== undefined && read.data.authenticator !== "set-up";
   const keyShown = acts.setupOpen && acts.starting.data !== undefined;
   return [
     ...(unread(read) ? [READ_AGAIN] : []),
-    ...(offersSetup ? [SET_UP] : []),
+    ...openingKeystrokes(read, acts),
     ...(keyShown ? [COPY_KEY] : []),
     ...(acts.inHand === undefined ? [] : CODES_KEYSTROKES),
   ];
@@ -206,7 +276,8 @@ const keystrokesOf = (read: SecondFactorRead, acts: AccountActs): readonly Keyst
 export function AccountPage() {
   const read = useSecondFactor();
   const address = useSession().data?.user.email ?? "";
-  const acts = useAccountActs(address);
+  const hash = useLocation({ select: (location) => location.hash });
+  const acts = useAccountActs(address, hash === ADD_A_PASSKEY_BUTTON ? "add-a-passkey" : undefined);
   const { failure, unanswered } = failureOnThePage(read, acts);
 
   return (
@@ -227,6 +298,18 @@ export function AccountPage() {
           />
         ) : null}
 
+        <PasskeysSection
+          held={read.data}
+          here={passkeysHere()}
+          addOpen={acts.addOpen}
+          suggestedName={acts.suggestedName}
+          removing={acts.removePasskey.isPending}
+          landsAt={acts.landsAt}
+          onAddOpen={acts.toggleAdd}
+          onAdded={acts.passkeyAdded}
+          onRenamed={acts.passkeyRenamed}
+          onRemove={acts.removeAPasskey}
+        />
         <AuthenticatorSection
           held={read.data}
           setupOpen={acts.setupOpen}

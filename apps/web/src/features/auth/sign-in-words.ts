@@ -34,6 +34,10 @@ export const SIGN_IN_WORDS = {
   signingIn: "Signing in",
   sendAgain: "Send a new code",
   otherAddress: "Use a different email address",
+  or: "Or",
+  passkey: "Sign in with a passkey",
+  passkeyWaiting: "Waiting for your passkey",
+  passkeyNotUsed: "No passkey was used. Try again, or send a sign-in email.",
 } as const;
 
 const EITHER_WORKS = `Open its link, or enter its code here. Both work for ${CODE_LIFETIME}.`;

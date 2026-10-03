@@ -3,6 +3,7 @@ import { useId, useMemo, useState, type ReactNode } from "react";
 
 import { useSignOut } from "@/features/auth/auth-hooks.ts";
 import { useMembership } from "@/features/auth/membership.ts";
+import { PasskeyOffer } from "@/features/auth/passkey-offer.tsx";
 import { useOperatorStanding } from "@/features/console/operator.ts";
 import { HomeLine } from "@/features/people/self-act.tsx";
 import { BreadcrumbLastPartSlot } from "@/shared/breadcrumb-last-part.ts";
@@ -32,6 +33,8 @@ import { useArrivalTakenOnceRead, useHidden, VisibleTreeContext } from "./visibl
 import { useWorkspaceSwitch, WorkspaceSwitcher, type Here } from "./workspace-switcher.tsx";
 
 type Region = { readonly name: string; readonly toolbar: ScreenToolbar };
+
+const SCREEN = "screen";
 
 const NO_JUMP_TO: readonly Keystroke[] = [];
 
@@ -230,9 +233,14 @@ function ToolbarAndScreen(properties: {
 
   return (
     <ScreenTabsRoot tabs={region?.toolbar.tabs} picked={properties.picked}>
+      <PasskeyOffer
+        onDismissed={() => {
+          document.getElementById(SCREEN)?.focus();
+        }}
+      />
       {region === undefined ? null : <Toolbar name={region.name} toolbar={region.toolbar} />}
 
-      <main id="screen" aria-label="Screen" tabIndex={-1} className="flex-1 px-4 py-6 md:px-8">
+      <main id={SCREEN} aria-label="Screen" tabIndex={-1} className="flex-1 px-4 py-6 md:px-8">
         {/* The page's width, not the prose measure: the design system's rule keeps text to it. */}
         <div data-screen-content className="max-w-page">
           <HomeLine />
