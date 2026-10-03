@@ -124,11 +124,10 @@ Control Centre's groups keep root addresses, `/<group>/<screen>`, so today's add
 | Control Centre | Bindings. Routes and spend. Members, Groups. Audit log | Overview, which no block names. Queue (S5). Priced plan (S4). Publish and accept gates, Backlogs, Gone-at-source impact. Ceiling (S7). Answer audit, Answer tests (S2). Tokens (P1). Erasure and suppression. Signals, Health, Backups (O1) | Agent tokens, with the share agent. Runs, Connected clients, Settings. Then: feeds and referenced systems in Sources, Approvals in Agent Operations |
 | Console | Everyone, Names waiting, Every workspace | none | The identity-set audit log |
 
-Three things stay open:
+Two things stay open:
 
 - **The work surface's name.** It waits for S6, which builds its first screen.
 - **Which surface Search sits on**: Ask or Knowledge. v0.1's list declares it in Knowledge's Browse group.
-- **The trust words.** The owner's vocabulary review of 28/09/2026 agreed a direction, deferred to the pre-S2 glossary rewrite. The glossary gives the reader's word, marks implementation terms as internal, and keeps no separate table of words. *Checked by* becomes *Verified by*, and *Unchecked* becomes *Unverified*, which OKF's `verified [{by, at}]` supports. *Score*, *confidence* and *trusted* stay banned. This record changes none of them. The same rewrite may rename screens, and it changes no structure.
 
 ## Why
 
@@ -161,3 +160,5 @@ Written 30/09/2026 from the shell and layout foundations plan (`docs/plans/2026-
 Amended 02/10/2026 by the people layout rework plan (`docs/plans/2026-10-01-1807-feat-people-layout-rework-plan.md`, KTD3). A member now opens as a page, not a sheet over Members, so the list gained detail addresses and Members declared the member page. The four levels and every rule above stand.
 
 Amended 02/10/2026 by the sign-in and security plan (`docs/plans/2026-10-01-2241-feat-people-sign-in-and-security-plan.md`, KTD11). The Account page now exists, outside the shell beside the display-name screen, with its Sign-in section. Every frame, a workspace's and the console's, offers a person holding no passkey one above its toolbar, once, until they dismiss it; the offer links to the Account page's add. The four levels and every rule above stand.
+
+Amended 03/10/2026 by the glossary plan (`docs/plans/2026-10-02-2325-docs-glossary-in-the-readers-words-plan.md`, KTD1 and KTD5). The glossary rewrite settled the trust words, the third thing this record left open, and ADR 0019 now lists them. It also set the direction for every name. One word holds everywhere: the reader's word heads the glossary entry, and code, types, database tables and columns, contracts and live docs are renamed to it, one noun at a time. Names the platform does not own keep theirs: OKF's vocabulary and the keys the platform writes into concept files (`iri`, `sources[].locator`); names on the wire, which are MCP entry names, MCP tool schema keys and values, token scopes and refusal words; names a library or protocol owns, such as OAuth's and Better Auth's; and stored history, which is audit action names and detail keys, migrations, old page addresses, `docs/archive/` and completed plans in `docs/plans/`. An old word leaves the glossary for `apps/api/tests/old-words.ts`, which only the words test reads. The navigation's levels have reader words now, *area* for an entry in the rail and *page* for a place with an address of its own, and this record takes them when the pages sweep renames the code. The four levels and every rule above stand.

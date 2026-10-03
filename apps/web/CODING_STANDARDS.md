@@ -29,3 +29,7 @@ The router carries a `defaultErrorComponent`, so a screen that throws is caught 
 ## Meet WCAG 2.2 AA, tested with a keyboard and a screen reader
 
 Every UI ticket carries that acceptance line. Every interactive element is a native control or has a role, a name and a focus order; an outcome is announced to assistive technology; a component follows GOV.UK Design System semantics — tag, details, notification banner, warning text, summary list — without the GOV.UK brand. The buyers are UK public bodies for whom this is law, and the first client states it of its own products.
+
+## Write the text on a page in the glossary's reader words
+
+Each thing a person meets has one word: the head of its entry in `CONTEXT.md`. Write that word in every heading, label, message and empty state, and call a place with its own address a *page*. An entry marked `_Internal._` names something only the code meets, so its word stays in the code. `packages/design-system/readme.md` holds the voice, the trust words and the casing.
