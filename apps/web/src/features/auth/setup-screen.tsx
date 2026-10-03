@@ -256,7 +256,7 @@ function RestoreCode(properties: { readonly held: SecondFactor; readonly granted
           sending={accept}
           saids={{ wrong: RESTORE_CODE_WRONG, unanswered: RECOVERY_UNANSWERED }}
           others={[]}
-          waitAtArrival={properties.held.waits["restore-code"]}
+          waitSecondsAtArrival={properties.held.waits["restore-code"]}
           fieldRef={first}
           onGranted={() => undefined}
         />

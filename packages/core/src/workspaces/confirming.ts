@@ -32,9 +32,10 @@ import {
   hashOfTyped,
   issuingRecoveryCodes,
   type RecoveryCodesMade,
+  restoredByTheOperator,
   spendingARecoveryCode,
 } from "./recovery-codes.ts";
-import { factsOf, recordingTheirOwn, stamping } from "./second-factor.ts";
+import { factsOf, recordingTheirOwn, SETUP_GRANTED, stamping } from "./second-factor.ts";
 import { AUTHENTICATOR_SECRET_PREFIX, OPERATOR_RESTORE_PREFIX } from "./sign-in-and-consent.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
@@ -59,7 +60,7 @@ type Held = Confirm & { readonly personId: UserId };
 type Gone = "person-gone" | "session-gone";
 
 const HOLDING_THE_SESSION = `
-  SELECT setup_granted_at IS NOT NULL AS "setupGranted"
+  SELECT ${SETUP_GRANTED} AS "setupGranted"
     FROM session WHERE id = $1 AND user_id = $2 FOR UPDATE`;
 
 /**
@@ -200,17 +201,22 @@ type CodeKind = {
   readonly refusal: WrongCodeRefusal;
 };
 
+const RECOVERY_CODE: CodeKind = { kind: "recovery-code", refusal: "recovery-code-wrong" };
+
+const RESTORE_CODE: CodeKind = { kind: "restore-code", refusal: "restore-code-wrong" };
+
 const GRANTING = "UPDATE session SET setup_granted_at = $3 WHERE id = $1 AND user_id = $2";
 
-/** A kind still waiting refuses even the right code, so no guess is spent while it waits. */
+/**
+ * Run once the person and session are held. A kind still waiting refuses even the right code, so
+ * no guess is spent while it waits.
+ */
 const tryingACode = async <Accepted>(
   tx: Tx,
   held: Held,
   code: CodeKind,
   check: () => Promise<Accepted | undefined>,
-): Promise<Result<Accepted | Wrong, Gone | CeilingMet>> => {
-  const session = await holding(tx, held);
-  if (!session.ok) return session;
+): Promise<Result<Accepted | Wrong, CeilingMet>> => {
   const waitSeconds = (await waitsOf(tx, held.personId, held.now))[code.kind];
   if (waitSeconds > 0) return err(new CeilingMet(waitSeconds));
   const accepted = await check();
@@ -227,7 +233,11 @@ type CodeInput = Confirm & { readonly code: string };
 
 export type CodeRefusal = WorkspaceRefusal<"malformed" | "person-gone" | "session-gone">;
 
+export type SpendRecoveryCodeRefusal = CodeRefusal | WorkspaceRefusal<"restore-code-needed">;
+
 type Spent = { readonly granted: true; readonly unused: number } | Wrong;
+
+type Spending = Result<Spent, Gone | "restore-code-needed" | CeilingMet>;
 
 /**
  * Spends one of the person's recovery codes in place of their second factor. Only this session
@@ -237,13 +247,17 @@ export const spendRecoveryCode = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
   input: CodeInput,
-): Promise<Result<Spent, CodeRefusal | CeilingMet | Error>> =>
-  asThePerson(platform, door, input, (tx, held) =>
-    tryingACode(tx, held, { kind: "recovery-code", refusal: "recovery-code-wrong" }, async () => {
+): Promise<Result<Spent, SpendRecoveryCodeRefusal | CeilingMet | Error>> =>
+  asThePerson(platform, door, input, async (tx, held): Promise<Spending> => {
+    const session = await holding(tx, held);
+    if (!session.ok) return session;
+    // A restore stands for the operator's own check, which a code from the mailbox must not skip.
+    if (await restoredByTheOperator(tx, held.personId)) return err("restore-code-needed");
+    return tryingACode(tx, held, RECOVERY_CODE, async () => {
       const unused = await spendingARecoveryCode(platform, tx, held.personId, input.code);
       return unused === undefined ? undefined : { granted: true as const, unused };
-    }),
-  );
+    });
+  });
 
 /** Only while the restore stands, before the code's day is out, and once. */
 const CONSUMING_THE_RESTORE = `
@@ -253,14 +267,18 @@ const CONSUMING_THE_RESTORE = `
 
 type Accepted = { readonly granted: true } | Wrong;
 
+type Accepting = Result<Accepted, Gone | CeilingMet>;
+
 /** Accepts the operator's restore code; like a spent recovery code, it lets only this session set up a factor. */
 export const acceptRestoreCode = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
   input: CodeInput,
 ): Promise<Result<Accepted, CodeRefusal | CeilingMet | Error>> =>
-  asThePerson(platform, door, input, (tx, held) =>
-    tryingACode(tx, held, { kind: "restore-code", refusal: "restore-code-wrong" }, async () => {
+  asThePerson(platform, door, input, async (tx, held): Promise<Accepting> => {
+    const session = await holding(tx, held);
+    if (!session.ok) return session;
+    return tryingACode(tx, held, RESTORE_CODE, async () => {
       const consumed = await tx.query(CONSUMING_THE_RESTORE, [
         held.personId,
         OPERATOR_RESTORE_PREFIX,
@@ -270,8 +288,8 @@ export const acceptRestoreCode = async (
       if (consumed.rowCount === 0) return undefined;
       await recordingTheirOwn(platform, tx, held.personId, CONFIRMING_ACTS.restoreAccepted, {});
       return { granted: true as const };
-    }),
-  );
+    });
+  });
 
 const parkedUnder = (sessionId: string): string => `${AUTHENTICATOR_SECRET_PREFIX}${sessionId}`;
 

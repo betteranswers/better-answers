@@ -22,6 +22,7 @@ import {
   KEY_NOT_COPIED,
   KEY_UNANSWERED,
   NO_SETUP_WAITING,
+  REPLACEMENT_SETUP_NEEDED,
   RESTORE_CODE_NEEDED,
   SETUP_CODE_WRONG,
   SETUP_NOT_GRANTED,
@@ -46,6 +47,7 @@ const CONFLICT = 409;
 const SAID_OF_A_SETUP_WORD: ReadonlyMap<string, Said> = new Map([
   ["setup-not-granted", SETUP_NOT_GRANTED],
   ["restore-code-needed", RESTORE_CODE_NEEDED],
+  ["replacement-setup-needed", REPLACEMENT_SETUP_NEEDED],
   ["changed-meanwhile", FACTORS_CHANGED_MEANWHILE],
 ]);
 

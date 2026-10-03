@@ -17,7 +17,7 @@ import {
   signedInClient,
 } from "./provoke.ts";
 import { appForSuite } from "./suite-app.ts";
-import { webClientOf } from "./web-client.ts";
+import { refusalOfCall, webClientOf } from "./web-client.ts";
 
 const app = appForSuite();
 
@@ -232,6 +232,21 @@ describe("confirming with an authenticator", () => {
     expect(await confirmedOf(client)).toBeNull();
   });
 
+  it("checks one of several wrong codes sent at once", async () => {
+    const { client, key } = await aPersonWithAnAuthenticator(app());
+    await wrongCodesFrom([client], key, 5);
+
+    const statuses = await Promise.all(
+      Array.from(
+        { length: 4 },
+        async () => (await client.json(AUTHENTICATOR, { code: aWrongCode(codeOf(key)) })).status,
+      ),
+    );
+
+    expect(statuses.toSorted((one, other) => one - other)).toEqual([400, 429, 429, 429]);
+    expect((await heldOn(client)).waits.authenticator).toBeLessThanOrEqual(30);
+  });
+
   it("caps one person's tries across five sessions", async () => {
     const person = await app().person();
     const clients: TestClient[] = [];
@@ -275,6 +290,15 @@ describe("confirming with an authenticator", () => {
     expect(confirmed.status).toBe(200);
   });
 });
+
+/** Ten codes made over tRPC and no factor, in the email session that made them. */
+const aPersonHoldingCodesAlone = async () => {
+  const { client } = await aPersonSignedIn(app());
+  const { recoveryCodes } = await webClientOf(client).api.person.replaceRecoveryCodes.mutate({
+    replacing: false,
+  });
+  return { client, recoveryCodes };
+};
 
 /** Everything held, a code spent in the unconfirmed session, and a new key's setup started there. */
 const aReplacementStarted = async () => {
@@ -391,6 +415,30 @@ describe("replacing the factors after a spent code", () => {
     expect(await finished.json()).toEqual({ error: "setup-not-granted" });
   });
 
+  it("refuses a first setup's start to a granted session", async () => {
+    const { client, recoveryCodes } = await aPersonHoldingCodesAlone();
+    await client.json(RECOVERY, { code: recoveryCodes[0] });
+
+    const started = await client.json("/authenticator/start", {});
+
+    expect(started.status).toBe(409);
+    expect(await started.json()).toEqual({ error: "replacement-setup-needed" });
+  });
+
+  it("refuses a first setup's finish to a granted session", async () => {
+    const { client, recoveryCodes } = await aPersonHoldingCodesAlone();
+    const { setupAddress } = startedAnswer.parse(
+      await (await client.json("/authenticator/start", {})).json(),
+    );
+    await client.json(RECOVERY, { code: recoveryCodes[0] });
+
+    const finished = await client.json("/authenticator/finish", { code: codeNow(setupAddress) });
+
+    expect(finished.status).toBe(409);
+    expect(await finished.json()).toEqual({ error: "replacement-setup-needed" });
+    expect((await heldOn(client)).authenticator).toBe("awaiting-code");
+  });
+
   it("refuses a finish no setup was started for", async () => {
     const { client, recoveryCodes } = await aPersonHoldingEverything();
     await client.json(RECOVERY, { code: recoveryCodes[0] });
@@ -436,6 +484,61 @@ describe("setting up after an operator's restore", () => {
     expect(await answered.json()).toEqual({ error: "restore-code-needed" });
   });
 
+  it("refuses an authenticator started before the restore", async () => {
+    const { person, client } = await aPersonSignedIn(app());
+    const { setupAddress } = startedAnswer.parse(
+      await (await client.json("/authenticator/start", {})).json(),
+    );
+    await restoredWithACode(app().database.superuser, person.email, new Date());
+
+    const finished = await client.json("/authenticator/finish", { code: codeNow(setupAddress) });
+
+    expect(finished.status).toBe(409);
+    expect(await finished.json()).toEqual({ error: "restore-code-needed" });
+    expect((await heldOn(client)).authenticator).toBe("awaiting-code");
+  });
+
+  it("refuses setup to a grant from before the restore", async () => {
+    const { person, client, recoveryCodes } = await aPersonHoldingEverything();
+    expect((await client.json(RECOVERY, { code: recoveryCodes[0] })).status).toBe(200);
+    const restoredLater = new Date(Date.now() + 1000);
+    await restoredWithACode(app().database.superuser, person.email, restoredLater);
+
+    const answers = [
+      await client.json("/authenticator/start", {}),
+      await client.json("/passkeys/add-options", { name: "Phone" }),
+      await client.json(REPLACE_START, {}),
+    ];
+
+    expect(answers.map((answer) => answer.status)).toEqual([409, 409, 409]);
+    expect(await Promise.all(answers.map(async (answer) => answer.json()))).toEqual([
+      { error: "restore-code-needed" },
+      { error: "restore-code-needed" },
+      { error: "setup-not-granted" },
+    ]);
+    expect((await heldOn(client)).thisSession?.setupGranted).toBe(false);
+  });
+
+  it("refuses a recovery code and new codes while restored", async () => {
+    const { person, client, recoveryCodes } = await aPersonHoldingEverything();
+    await restoredWithACode(app().database.superuser, person.email, new Date());
+
+    const spent = await client.json(RECOVERY, { code: recoveryCodes[0] });
+    const made = await refusalOfCall(
+      webClientOf(client).api.person.replaceRecoveryCodes.mutate({ replacing: true }),
+    );
+
+    expect(spent.status).toBe(409);
+    expect(await spent.json()).toEqual({ error: "restore-code-needed" });
+    expect(made).toMatchObject({
+      data: { refusal: { word: "restore-code-needed", class: "precondition" } },
+    });
+    const held = await heldOn(client);
+    expect(held.recoveryCodes?.unused).toBe(10);
+    expect(held.thisSession?.setupGranted).toBe(false);
+    expect(noticesTo(person.email, CODE_USED_NOTICE)).toBe(0);
+  });
+
   it("refuses a wrong or expired restore code, granting nothing", async () => {
     const { person, client, code } = await aRestoredPerson();
     const wrong = await client.json(RESTORE, { code: "not-the-code" });
@@ -456,11 +559,14 @@ describe("setting up after an operator's restore", () => {
 
     const accepted = await client.json(RESTORE, { code });
     const again = await client.json(RESTORE, { code });
-    const started = await client.json("/authenticator/start", {});
+    const firstSetup = await client.json("/authenticator/start", {});
+    const started = await client.json(REPLACE_START, {});
 
     expect(accepted.status).toBe(200);
     expect(await accepted.json()).toEqual({ granted: true });
     expect(again.status).toBe(400);
+    expect(firstSetup.status).toBe(409);
+    expect(await firstSetup.json()).toEqual({ error: "replacement-setup-needed" });
     expect(started.status).toBe(200);
   });
 });

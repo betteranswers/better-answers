@@ -115,6 +115,7 @@ const REGISTER = {
   "restore-code-wrong": "absent by workspaces",
   "passkey-not-yours": "forbidden by workspaces",
   "setup-not-granted": "precondition by workspaces",
+  "restore-code-needed": "precondition by workspaces",
   "passkey-name-empty": "malformed by workspaces",
   "passkey-name-too-long": "malformed by workspaces",
   "recovery-codes-held": "conflict by workspaces",

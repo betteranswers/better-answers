@@ -25,7 +25,7 @@ import {
   withIdentityRead,
   withIdentityWrite,
 } from "../store/postgres/index.ts";
-import { type Waits, waitsOf } from "./confirm-throttle.ts";
+import { type WaitSeconds, waitsOf } from "./confirm-throttle.ts";
 import { notErasedAt } from "./display-name.ts";
 import { holdThePerson } from "./person-lock.ts";
 import { issuingRecoveryCodes, type RecoveryCodesMade } from "./recovery-codes.ts";
@@ -306,7 +306,7 @@ export type SecondFactorHeld = {
   readonly restoreRequired: boolean;
 
   /** Seconds before each kind of code may be tried again. */
-  readonly waits: Waits;
+  readonly waits: WaitSeconds;
 
   /** Only when the read names a session: one the person does not hold is neither. */
   readonly thisSession: ThisSession | undefined;
@@ -329,9 +329,18 @@ const heldOf = (facts: Facts, around: Around): SecondFactorHeld => ({
   thisSession: around.thisSession,
 });
 
+/**
+ * Of session `$1`, held by person `$2`. A grant made before the operator's restore never saw their
+ * restore code, so it lapses.
+ */
+export const SETUP_GRANTED = `
+  setup_granted_at IS NOT NULL
+    AND setup_granted_at >= COALESCE(
+          (SELECT restore_required_at FROM "user" WHERE id = $2), '-infinity')`;
+
 const THIS_SESSION = `
   SELECT second_factor_confirmed_at IS NOT NULL AS confirmed,
-         setup_granted_at IS NOT NULL AS "setupGranted"
+         ${SETUP_GRANTED} AS "setupGranted"
     FROM session WHERE id = $1 AND user_id = $2`;
 
 const NEITHER: ThisSession = { confirmed: false, setupGranted: false };

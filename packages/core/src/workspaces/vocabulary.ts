@@ -33,6 +33,9 @@ export const WORKSPACE_REFUSALS = declareRefusals("workspaces", {
   // Only the session that spent a recovery code or accepted a restore code may replace the factors.
   "setup-not-granted": "precondition",
 
+  // Restored by the operator: only their restore code opens setup, never what the mailbox can reach.
+  "restore-code-needed": "precondition",
+
   "passkey-name-empty": "malformed",
   "passkey-name-too-long": "malformed",
 

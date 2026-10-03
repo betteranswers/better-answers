@@ -3,24 +3,20 @@ import type { THROTTLED_KINDS } from "@better-answers/schema/second-factor";
 
 import {
   attempt,
+  CeilingMet,
   err,
   ok,
   type PlatformPrincipal,
   type Result,
   type UserId,
 } from "../kernel/index.ts";
-import {
-  type PostgresDoor,
-  type Tx,
-  withIdentityRead,
-  withIdentityWrite,
-} from "../store/postgres/index.ts";
+import { type PostgresDoor, type Tx, withIdentityWrite } from "../store/postgres/index.ts";
 import { holdThePerson } from "./person-lock.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
 export type ThrottledKind = (typeof THROTTLED_KINDS)[number];
 
-export type Waits = Readonly<Record<ThrottledKind, number>>;
+export type WaitSeconds = Readonly<Record<ThrottledKind, number>>;
 
 const FREE_FAILURES = 5;
 
@@ -54,7 +50,7 @@ const rowsOf = async (tx: Tx, personId: UserId): Promise<readonly ThrottleRow[]>
   (await tx.query<ThrottleRow>(ROWS, [personId])).rows;
 
 /** Each kind's wait left, in seconds: none for a kind with no failures counted. */
-export const waitsOf = async (tx: Tx, personId: UserId, now: Date): Promise<Waits> => {
+export const waitsOf = async (tx: Tx, personId: UserId, now: Date): Promise<WaitSeconds> => {
   const rows = await rowsOf(tx, personId);
   const waitOf = (kind: ThrottledKind) =>
     secondsUntil(rows.find((row) => row.kind === kind)?.waitUntil ?? null, now);
@@ -118,49 +114,35 @@ export const resettingTheThrottle = async (
   ]);
 };
 
-type ThrottleInput = {
+type TryInput = {
   readonly personId: string;
-  readonly kind: ThrottledKind;
   readonly now: Date;
 };
 
-export type ReadConfirmWaitRefusal = WorkspaceRefusal<"malformed">;
+export type ReserveAuthenticatorTryRefusal = WorkspaceRefusal<"malformed" | "person-gone">;
 
-/** Asked before a code is checked, so a kind still waiting is refused without a guess spent. */
-export const readConfirmWait = async (
-  platform: PlatformPrincipal,
-  door: PostgresDoor,
-  input: ThrottleInput,
-): Promise<Result<{ readonly waitSeconds: number }, ReadConfirmWaitRefusal | Error>> => {
-  const asked = boundarySchemas.user.select.shape.id.safeParse(input.personId);
-  if (!asked.success) return err("malformed");
-
-  const waits = await attempt(() =>
-    withIdentityRead(platform, door, (tx) => waitsOf(tx, asked.data, input.now)),
-  );
-  return waits.ok ? ok({ waitSeconds: waits.value[input.kind] }) : err(waits.error);
-};
-
-export type CountFailedConfirmRefusal = WorkspaceRefusal<"malformed" | "person-gone">;
+type Reserved = Result<Counted, "person-gone" | CeilingMet>;
 
 /**
- * Counts one failed code for the person, whichever session sent it, so many sessions never
- * multiply the guesses. Answers the wait it now costs and whether to send the one notice.
+ * Counted as a failure before its code is checked, under the person's lock, so tries sent at once
+ * meet the wait one by one. A confirm forgets it.
  */
-export const countFailedConfirm = async (
+export const reserveAuthenticatorTry = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
-  input: ThrottleInput,
-): Promise<Result<Counted, CountFailedConfirmRefusal | Error>> => {
+  input: TryInput,
+): Promise<Result<Counted, ReserveAuthenticatorTryRefusal | CeilingMet | Error>> => {
   const personId = boundarySchemas.user.select.shape.id.safeParse(input.personId);
   if (!personId.success) return err("malformed");
 
-  const counted = await attempt(() =>
-    withIdentityWrite(platform, door, async (tx): Promise<Result<Counted, "person-gone">> => {
+  const reserved = await attempt(() =>
+    withIdentityWrite(platform, door, async (tx): Promise<Reserved> => {
       if (!(await holdThePerson(tx, personId.data))) return err("person-gone");
-      return ok(await countingAFailure(tx, personId.data, input.kind, input.now));
+      const waitSeconds = (await waitsOf(tx, personId.data, input.now)).authenticator;
+      if (waitSeconds > 0) return err(new CeilingMet(waitSeconds));
+      return ok(await countingAFailure(tx, personId.data, "authenticator", input.now));
     }),
   );
-  if (!counted.ok) return err(counted.error);
-  return counted.value;
+  if (!reserved.ok) return err(reserved.error);
+  return reserved.value;
 };

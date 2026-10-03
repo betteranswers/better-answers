@@ -185,6 +185,10 @@ export const SAID_OF_SECOND_FACTOR = {
     why: "These codes were replaced in another tab or window, so they no longer work.",
     next: "Reload the page to see the codes you hold.",
   },
+  "restore-code-needed": {
+    why: "Your sign-in was restored, so its restore code comes first.",
+    next: "Enter the code the platform's operator gave you.",
+  },
 } satisfies SaidOfWord;
 
 export const saidOfASecondFactorRefusal = (refusal: Refusal): Said =>
@@ -396,9 +400,12 @@ export const SETUP_NOT_GRANTED: Said = {
   next: "Confirm it's you first.",
 };
 
-export const RESTORE_CODE_NEEDED: Said = {
-  why: "Your sign-in was restored, so its restore code comes first.",
-  next: "Enter the code the platform's operator gave you.",
+export const RESTORE_CODE_NEEDED: Said = SAID_OF_SECOND_FACTOR["restore-code-needed"];
+
+/** Said to a page that began the first setup before its session was granted a replacing one. */
+export const REPLACEMENT_SETUP_NEEDED: Said = {
+  why: "This sign-in can only set up a factor that replaces your old ones.",
+  next: "Reload the page and start the setup again.",
 };
 
 export const FACTORS_CHANGED_MEANWHILE: Said = {

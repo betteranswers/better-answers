@@ -146,6 +146,19 @@ describe("replacing recovery codes", () => {
 
     expect(replaced).toEqual({ ok: false, error: "person-gone" });
   });
+
+  it("makes none for a person the operator restored", async () => {
+    const personId = await seedPerson(db().pool, { restoreRequiredAt: MADE_EARLIER });
+
+    const made = await replaceRecoveryCodes(bootstrap, door(), {
+      personId,
+      replacing: true,
+      now: MADE_AT,
+    });
+
+    expect(made).toEqual({ ok: false, error: "restore-code-needed" });
+    expect(await actsOn(personId)).toEqual([]);
+  });
 });
 
 describe("each recovery-code act", () => {

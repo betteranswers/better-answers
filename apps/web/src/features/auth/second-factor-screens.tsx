@@ -172,18 +172,18 @@ const saidOfConfirmingByCode = (failure: Error | null): Said | undefined => {
 function AuthenticatorWay(properties: {
   readonly primary: boolean;
   readonly fieldRef: FocusOnArrival | undefined;
-  readonly waitAtArrival: number;
+  readonly waitSecondsAtArrival: number;
   readonly others: readonly OtherWay[];
   readonly onConfirmed: () => void;
 }) {
-  const { primary, fieldRef, waitAtArrival, others, onConfirmed } = properties;
+  const { primary, fieldRef, waitSecondsAtArrival, others, onConfirmed } = properties;
   const fieldId = useId();
   const hintId = useId();
   const refusedId = useId();
   const confirm = useConfirmByAuthenticator();
   const { held, said, lifted, refused } = useThrottledSend(
     confirm,
-    waitAtArrival,
+    waitSecondsAtArrival,
     others,
     saidOfConfirmingByCode,
   );
@@ -252,7 +252,7 @@ function ConfirmWays(properties: {
         <AuthenticatorWay
           primary={!passkey}
           fieldRef={passkey ? undefined : first}
-          waitAtArrival={held.waits.authenticator}
+          waitSecondsAtArrival={held.waits.authenticator}
           others={otherWays(held, ["passkey", "recovery-code"])}
           onConfirmed={properties.onConfirmed}
         />
@@ -318,7 +318,7 @@ export function RecoveryScreen() {
               unanswered: RECOVERY_UNANSWERED,
             }}
             others={otherWays(held, ["passkey", "authenticator"])}
-            waitAtArrival={held.waits["recovery-code"]}
+            waitSecondsAtArrival={held.waits["recovery-code"]}
             fieldRef={first}
             onGranted={() => {
               setGranted(true);

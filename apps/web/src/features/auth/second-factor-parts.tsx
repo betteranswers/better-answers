@@ -146,11 +146,11 @@ type SendingState = {
 /** Held while it sends, once it lands and through a wait; a wait is said in place of a refusal. */
 export const useThrottledSend = (
   sending: SendingState,
-  waitAtArrival: number,
+  waitSecondsAtArrival: number,
   others: readonly OtherWay[],
   saidOfFailure: (failure: Error | null) => Said | undefined,
 ) => {
-  const waiting = useWaiting(waitAtArrival, () => {
+  const waiting = useWaiting(waitSecondsAtArrival, () => {
     sending.reset();
   });
   return {
@@ -269,17 +269,17 @@ export function OneTimeCodeForm(properties: {
   readonly sending: SendingACode;
   readonly saids: CodeSaids;
   readonly others: readonly OtherWay[];
-  readonly waitAtArrival: number;
+  readonly waitSecondsAtArrival: number;
   readonly fieldRef?: FocusOnArrival | undefined;
   readonly onGranted: () => void;
 }) {
-  const { label, sending, saids, others, waitAtArrival, fieldRef, onGranted } = properties;
+  const { label, sending, saids, others, waitSecondsAtArrival, fieldRef, onGranted } = properties;
   const fieldId = useId();
   const refusedId = useId();
   const [code, setCode] = useState("");
   const { held, said, lifted, refused } = useThrottledSend(
     sending,
-    waitAtArrival,
+    waitSecondsAtArrival,
     others,
     (failure) => saidOfSending(failure, saids),
   );

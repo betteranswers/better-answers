@@ -38,12 +38,15 @@ import {
 } from "./recovery-codes.tsx";
 import { PASSKEY_REMOVAL_UNANSWERED, REMOVAL_UNANSWERED } from "./refusal-words.ts";
 import {
+  FIRST_AUTHENTICATOR,
+  NEW_AUTHENTICATOR,
   useAcknowledgeRecoveryCodes,
   useFinishingTheSetup,
   useRemoveAuthenticator,
   useReplaceRecoveryCodes,
   useSecondFactor,
   useStartAuthenticator,
+  type AuthenticatorRoutes,
   type CodesIssued,
   type SecondFactorRead,
 } from "./second-factor-hooks.ts";
@@ -71,9 +74,13 @@ const useLanding = (first: Landing | undefined) => {
 };
 
 /** Each act clears what the last one said, so the page speaks of one act at a time. */
-const useAccountActs = (address: string, firstLanding: Landing | undefined) => {
-  const starting = useStartAuthenticator();
-  const finishing = useFinishingTheSetup();
+const useAccountActs = (
+  address: string,
+  firstLanding: Landing | undefined,
+  routes: AuthenticatorRoutes,
+) => {
+  const starting = useStartAuthenticator(routes);
+  const finishing = useFinishingTheSetup(routes);
   const remove = useRemoveAuthenticator();
   const removePasskey = useRemovePasskey();
   const make = useReplaceRecoveryCodes();
@@ -187,6 +194,7 @@ const useAccountActs = (address: string, firstLanding: Landing | undefined) => {
   };
 
   return {
+    routes,
     starting,
     finishing,
     remove,
@@ -250,7 +258,14 @@ export function AccountPage() {
   const read = useSecondFactor();
   const address = useSession().data?.user.email ?? "";
   const hash = useLocation({ select: (location) => location.hash });
-  const acts = useAccountActs(address, hash === ADD_A_PASSKEY_BUTTON ? "add-a-passkey" : undefined);
+  // A session a code granted must swap the factors, which only the replacing routes do.
+  const routes =
+    read.data?.thisSession?.setupGranted === true ? NEW_AUTHENTICATOR : FIRST_AUTHENTICATOR;
+  const acts = useAccountActs(
+    address,
+    hash === ADD_A_PASSKEY_BUTTON ? "add-a-passkey" : undefined,
+    routes,
+  );
   const { failure, unanswered } = failureOnThePage(read, acts);
 
   return (
@@ -275,6 +290,7 @@ export function AccountPage() {
         <AuthenticatorSection
           held={read.data}
           setupOpen={acts.setupOpen}
+          routes={acts.routes}
           starting={acts.starting}
           finishing={acts.finishing}
           removing={acts.remove.isPending}

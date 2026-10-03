@@ -72,7 +72,7 @@ export {
   replaceRecoveryCodes,
   replaceRecoveryCodesInput,
 } from "./recovery-codes.ts";
-export { countFailedConfirm, readConfirmWait } from "./confirm-throttle.ts";
+export { reserveAuthenticatorTry } from "./confirm-throttle.ts";
 export {
   acceptRestoreCode,
   confirmByAuthenticator,

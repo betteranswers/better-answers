@@ -100,12 +100,26 @@ type ReplaceRecoveryCodesInput = RecoveryCodesInput &
   z.output<typeof replaceRecoveryCodesInput> & { readonly now: Date };
 
 export type ReplaceRecoveryCodesRefusal = WorkspaceRefusal<
-  "malformed" | "person-gone" | "recovery-codes-held"
+  "malformed" | "person-gone" | "recovery-codes-held" | "restore-code-needed"
+>;
+
+type Replaced = Result<
+  RecoveryCodesIssued,
+  "person-gone" | "recovery-codes-held" | "restore-code-needed"
 >;
 
 const holdsASet = async (tx: Tx, personId: UserId): Promise<boolean> => {
   const held = await tx.query("SELECT 1 FROM recovery_code WHERE user_id = $1 LIMIT 1", [personId]);
   return (held.rowCount ?? 0) > 0;
+};
+
+/** Marked by the operator's restore, which only their restore code lifts. */
+export const restoredByTheOperator = async (tx: Tx, personId: UserId): Promise<boolean> => {
+  const marked = await tx.query(
+    'SELECT 1 FROM "user" WHERE id = $1 AND restore_required_at IS NOT NULL',
+    [personId],
+  );
+  return (marked.rowCount ?? 0) > 0;
 };
 
 /**
@@ -121,17 +135,15 @@ export const replaceRecoveryCodes = async (
   if (!personId.success) return err("malformed");
 
   const issued = await attempt(() =>
-    withIdentityWrite(
-      platform,
-      door,
-      async (tx): Promise<Result<RecoveryCodesIssued, "person-gone" | "recovery-codes-held">> => {
-        if (!(await holdThePerson(tx, personId.data))) return err("person-gone");
-        if (!input.replacing && (await holdsASet(tx, personId.data))) {
-          return err("recovery-codes-held");
-        }
-        return ok(await issuingRecoveryCodes(platform, tx, personId.data, input.now));
-      },
-    ),
+    withIdentityWrite(platform, door, async (tx): Promise<Replaced> => {
+      if (!(await holdThePerson(tx, personId.data))) return err("person-gone");
+      // A code minted now would open setup to whoever holds only the mailbox.
+      if (await restoredByTheOperator(tx, personId.data)) return err("restore-code-needed");
+      if (!input.replacing && (await holdsASet(tx, personId.data))) {
+        return err("recovery-codes-held");
+      }
+      return ok(await issuingRecoveryCodes(platform, tx, personId.data, input.now));
+    }),
   );
   if (!issued.ok) return err(issued.error);
   return issued.value;

@@ -15,13 +15,12 @@ import {
   acceptRestoreCode,
   confirmByAuthenticator,
   confirmByPasskey,
-  countFailedConfirm,
   keepPasskeyChallenge,
   parkAuthenticatorSecret,
-  readConfirmWait,
   readParkedAuthenticatorSecret,
   readPasskeyCredentials,
   replaceFactorsByAuthenticator,
+  reserveAuthenticatorTry,
   spendRecoveryCode,
   takePasskeyChallenge,
 } from "@better-answers/core/workspaces";
@@ -131,6 +130,9 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
     if (why === "person-gone" || why === "session-gone") {
       return context.json(PERSON_ROUTE_REFUSALS.signedOut, 401);
     }
+    if (why === "restore-code-needed") {
+      return context.json(PERSON_ROUTE_REFUSALS.restoreCodeNeeded, 409);
+    }
     return unanswered(context, why instanceof Error ? why.message : why);
   };
 
@@ -221,42 +223,48 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
       : refused(context, stamped.error);
   };
 
-  const failed = async (context: Context, person: SignedIn): Promise<Response> => {
-    const counted = await countFailedConfirm(IDENTITY_PRINCIPAL, door, {
-      ...askedBy(clock, person),
-      kind: "authenticator",
-    });
-    if (!counted.ok) return refused(context, counted.error);
-    if (counted.value.noticeDue) notify(person, "confirm-failures");
-    return context.json(PERSON_ROUTE_REFUSALS.codeWrong, 400);
-  };
-
-  /** With a whole session and a set-up authenticator, the library's verify only checks the code. */
-  const verifyingTheCode = async (context: Context, person: SignedIn, code: string) => {
+  /**
+   * With a whole session and a set-up authenticator, the library's verify only checks the code; the
+   * try was already counted.
+   */
+  const verifyingTheCode = async (
+    context: Context,
+    person: SignedIn,
+    code: string,
+    noticeDue: boolean,
+  ) => {
     const verified = await attempt(() =>
       auth.api.verifyTOTP({ headers: context.req.raw.headers, body: { code } }),
     );
     if (verified.ok) return confirmed(context, person);
     if (verified.error instanceof APIError && verified.error.statusCode === 401) {
-      return failed(context, person);
+      if (noticeDue) notify(person, "confirm-failures");
+      return context.json(PERSON_ROUTE_REFUSALS.codeWrong, 400);
     }
     return unanswered(context, verified.error.message);
   };
 
-  const confirmWithACode = async (context: Context, person: SignedIn): Promise<Response> => {
+  /** An authenticator's code as sent, with what the person holds; or the answer refusing either. */
+  const codeAndHeld = async (context: Context, person: SignedIn) => {
     const sent = await parsedBody(context, codeAsked);
     if (!sent.success) return context.json(PERSON_ROUTE_REFUSALS.codeWrong, 400);
-    const waiting = await readConfirmWait(IDENTITY_PRINCIPAL, door, {
-      ...askedBy(clock, person),
-      kind: "authenticator",
-    });
-    if (!waiting.ok) return refused(context, waiting.error);
-    if (waiting.value.waitSeconds > 0) return tooManyTries(waiting.value.waitSeconds);
     const held = await heldBy(deps, person);
     if (held === undefined) return unanswered(context, "the second factor was not read");
+    return { code: sent.data.code, held };
+  };
+
+  const confirmWithACode = async (context: Context, person: SignedIn): Promise<Response> => {
+    const asked = await codeAndHeld(context, person);
+    if (asked instanceof Response) return asked;
     // A setup still waiting on its code would be finished by the verify, and its session swapped.
-    if (held.authenticator !== "set-up") return context.json(REFUSALS.noAuthenticator, 409);
-    return verifyingTheCode(context, person, sent.data.code);
+    if (asked.held.authenticator !== "set-up") return context.json(REFUSALS.noAuthenticator, 409);
+    const reserved = await reserveAuthenticatorTry(
+      IDENTITY_PRINCIPAL,
+      door,
+      askedBy(clock, person),
+    );
+    if (!reserved.ok) return refused(context, reserved.error);
+    return verifyingTheCode(context, person, asked.code, reserved.value.noticeDue);
   };
 
   /** The act counts its own failures, and refuses a kind still waiting with the ceiling met. */
@@ -322,11 +330,9 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
   };
 
   const finishTheReplacement = async (context: Context, person: SignedIn): Promise<Response> => {
-    const sent = await parsedBody(context, codeAsked);
-    if (!sent.success) return context.json(PERSON_ROUTE_REFUSALS.codeWrong, 400);
-    const held = await heldBy(deps, person);
-    if (held === undefined) return unanswered(context, "the second factor was not read");
-    if (!mayReplace(held)) return context.json(REFUSALS.setupNotGranted, 409);
+    const asked = await codeAndHeld(context, person);
+    if (asked instanceof Response) return asked;
+    if (!mayReplace(asked.held)) return context.json(REFUSALS.setupNotGranted, 409);
     const parked = await readParkedAuthenticatorSecret(
       IDENTITY_PRINCIPAL,
       door,
@@ -335,7 +341,7 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
     if (!parked.ok) return refused(context, parked.error);
     // Granted, but its key is gone: expired, or replaced by a later start.
     if (parked.value === undefined) return context.json(REFUSALS.changedMeanwhile, 409);
-    return replacingWith(context, person, sent.data.code, parked.value);
+    return replacingWith(context, person, asked.code, parked.value);
   };
 
   /** Each counts apart; only the code routes meet the throttle as well. */
