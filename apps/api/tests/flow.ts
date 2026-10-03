@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
 
+import { confirmedByTheHarness } from "./factor-harness.ts";
 import {
   CLAUDE_CLIENT_ID,
   CLAUDE_REDIRECT_URI,
@@ -83,8 +84,8 @@ export type Tokens = {
   readonly claims: Readonly<Record<string, unknown>>;
 };
 
-/** Signs `client` in by the emailed code, failing the test unless both steps answer 200. */
-export const signIn = async (
+/** By the emailed code alone, failing unless both steps answer 200: one owing a factor stays pending. */
+export const signInByEmailOnly = async (
   app: TestApp,
   client: TestClient,
   email: string,
@@ -97,6 +98,17 @@ export const signIn = async (
   const code = app.codeSentTo(email);
   const signedIn = await client.json("/sign-in/email-otp", { email, otp: code });
   expect(signedIn.status).toBe(200);
+  return signedIn;
+};
+
+/** As `signInByEmailOnly`, then past any required second factor by the harness's own writes. */
+export const signIn = async (
+  app: TestApp,
+  client: TestClient,
+  email: string,
+): Promise<Response> => {
+  const signedIn = await signInByEmailOnly(app, client, email);
+  await confirmedByTheHarness(app, client);
   return signedIn;
 };
 

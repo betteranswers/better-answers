@@ -8,6 +8,12 @@ import { codeSentTo } from "../e2e/harness.ts";
 import { noteInbox, probeInbox } from "./inbox.ts";
 import { couldNotRun, playsTheRole } from "./outcome.ts";
 import { goOnUnlessStopped } from "./run-stop.ts";
+import {
+  confirmedWith,
+  keyFromTheHarness,
+  keyFromTheSetting,
+  type FactorKey,
+} from "./second-factor.ts";
 import { refusedByTheEdge, signIn, type CodeSource } from "./sign-in.ts";
 
 type JourneyFixtures = {
@@ -45,6 +51,8 @@ type Reader = {
   readonly source: CodeSource;
   /** Whether the code source can hold a code at all, asked once before anyone signs in. */
   readonly stands: () => Promise<boolean>;
+  /** Where the test Admin's authenticator key comes from, beside the codes. */
+  readonly factorKey: (address: string) => FactorKey;
 };
 
 /** The URL's value is never named: it is a secret, as the addresses are. */
@@ -56,6 +64,7 @@ const inboxReader = (): Reader => {
   return {
     source: (recipient) => noteInbox({ recipient, sender: sender.data, apiUrl: apiUrl.data }),
     stands: () => probeInbox(apiUrl.data),
+    factorKey: keyFromTheSetting,
   };
 };
 
@@ -66,6 +75,7 @@ const harnessReader = (request: APIRequestContext): Reader => ({
     codeSent: async () => ({ answer: "code", code: await codeSentTo(request, address) }),
   }),
   stands: async () => true,
+  factorKey: (address) => keyFromTheHarness(request, address),
 });
 
 const readerOf = (request: APIRequestContext): Reader => {
@@ -130,11 +140,19 @@ export const test = suite.extend<JourneyFixtures>({
       playsTheRole(role);
       await suite.step("Check the run goes on", goOnUnlessStopped);
       try {
-        const { address, source } = await suite.step("Read the journeys' settings", () => ({
-          address: addressOf(role),
-          source: readerOf(request).source,
-        }));
+        const { address, source, factorKey } = await suite.step(
+          "Read the journeys' settings",
+          () => {
+            const named = addressOf(role);
+            const reader = readerOf(request);
+            // Only the Admin must confirm a second factor; asked here, so a missing key spends no code.
+            const key = role === "Admin" ? reader.factorKey(named) : undefined;
+            return { address: named, source: reader.source, factorKey: key };
+          },
+        );
+        const key = factorKey === undefined ? undefined : await factorKey();
         await signIn(page, address, source);
+        if (key !== undefined) await confirmedWith(page, key);
         await use();
       } finally {
         await signedOut(context, baseURL);

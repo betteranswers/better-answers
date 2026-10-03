@@ -3,18 +3,12 @@ import type { Logger } from "pino";
 import { attempt } from "@better-answers/core/kernel";
 import type { InvitationToSend } from "@better-answers/core/members";
 
+import { LONG_UK_DATE } from "../email-page.ts";
 import type { EmailMessage, Mail } from "../email.ts";
 import { PRODUCT_NAME } from "../product-name.ts";
 
 /** The SPA's accept page, which the link in the email opens with the invitation's id after it. */
 const ACCEPT_INVITATION_PATH = "/invitations";
-
-const LONG_UK_DATE = new Intl.DateTimeFormat("en-GB", {
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-  timeZone: "Europe/London",
-});
 
 const ROLE_WITH_ARTICLE = {
   Admin: "an Admin",

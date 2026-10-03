@@ -70,6 +70,11 @@ export type TestData = {
 
   verification(overrides?: Partial<InsertInput<"verification">>): Promise<Row<"verification">>;
 
+  /** Set up past its first code; `secret` is sealed as the plugin seals one, by the caller. */
+  authenticator(
+    overrides: Partial<InsertInput<"authenticator">> & { readonly secret: string },
+  ): Promise<Row<"authenticator">>;
+
   auditEvent(overrides?: Partial<InsertInput<"auditEvent">>): Promise<Row<"auditEvent">>;
 
   identityAuditEvent(
@@ -392,6 +397,19 @@ export const testData = (client: pg.PoolClient): TestData => {
       expiresAt: new Date(Date.now() + 300_000),
       ...overrides,
     });
+
+  const authenticator: TestData["authenticator"] = async (overrides) => {
+    const userId = overrides.userId ?? (await user()).id;
+    const row = await insertRow(client, "authenticator", {
+      id: ulid(),
+      backupCodes: "sealed-codes-nothing-reads",
+      verified: true,
+      ...overrides,
+      userId,
+    });
+    await client.query('UPDATE "user" SET authenticator_enabled = true WHERE id = $1', [userId]);
+    return row;
+  };
 
   const auditEvent: TestData["auditEvent"] = async (overrides = {}) => {
     const workspaceId = overrides.workspaceId ?? (await workspace()).id;
@@ -899,6 +917,7 @@ export const testData = (client: pg.PoolClient): TestData => {
     oauthRefreshToken,
     oauthAccessToken,
     verification,
+    authenticator,
     auditEvent,
     identityAuditEvent,
     accessRequest,

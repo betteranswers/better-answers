@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 
+import { escaped } from "../email-page.ts";
 import { PRODUCT_NAME } from "../product-name.ts";
 import { OAUTH_SCOPES, type OAuthScope, SIGN_IN_PATH } from "./constants.ts";
 
@@ -9,14 +10,7 @@ const LOGO = readFileSync(
   "utf8",
 ).trim();
 
-const escape = (value: string): string =>
-  value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-
-const strong = (value: string): string => `<strong>${escape(value)}</strong>`;
+const strong = (value: string): string => `<strong>${escaped(value)}</strong>`;
 
 /** The consent page's words. The page's body passes each value in escaped and marked up. */
 export const CONSENT_WORDS = {
@@ -76,7 +70,7 @@ export const REFUSAL_PAGES = {
 
 const shell = (title: string, body: string): string => `<!doctype html>
 <html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${escape(title)} — ${PRODUCT_NAME}</title><style>
+<title>${escaped(title)} — ${PRODUCT_NAME}</title><style>
 :root{color-scheme:light dark}
 body{font:16px/1.5 ui-sans-serif,system-ui,-apple-system,sans-serif;max-width:34rem;margin:6vh auto;padding:0 1.5rem}
 header{display:flex;align-items:center;gap:.6rem;margin-bottom:2rem;font:500 1.125rem/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
@@ -101,7 +95,7 @@ export const consentPage = (
     readonly scopes: readonly string[];
   },
 ): string => {
-  const client = escape(params.clientName);
+  const client = escaped(params.clientName);
   const granted = OAUTH_SCOPES.filter((scope) => params.scopes.includes(scope));
   return shell(
     CONSENT_WORDS.title(params.clientName),
@@ -110,23 +104,23 @@ export const consentPage = (
 <p>${CONSENT_WORDS.hostedAt(client, strong(params.hostedAt))}</p>
 <p>${CONSENT_WORDS.goesNext(strong(params.sendsCodeTo))}</p>
 <ul>
-  ${granted.map((scope) => `<li>${escape(CONSENT_WORDS.scopes[scope])}</li>`).join("\n  ")}
+  ${granted.map((scope) => `<li>${escaped(CONSENT_WORDS.scopes[scope])}</li>`).join("\n  ")}
 </ul>
 <p>${CONSENT_WORDS.recorded(client)}</p>
-<form method="post" action="/consent${escape(query)}" class="inline">
+<form method="post" action="/consent${escaped(query)}" class="inline">
   <input type="hidden" name="accept" value="true"><button type="submit">${CONSENT_WORDS.connect}</button>
 </form>
-<form method="post" action="/consent${escape(query)}" class="inline">
+<form method="post" action="/consent${escaped(query)}" class="inline">
   <input type="hidden" name="accept" value="false"><button type="submit" class="secondary">${CONSENT_WORDS.cancel}</button>
 </form>`,
   );
 };
 
 const refusal = (words: RefusalWords, next: string): string =>
-  shell(words.title, `<h1>${escape(words.title)}</h1><p>${escape(words.why)}</p><p>${next}</p>`);
+  shell(words.title, `<h1>${escaped(words.title)}</h1><p>${escaped(words.why)}</p><p>${next}</p>`);
 
-export const refusedPage = (words: ReadNext): string => refusal(words, escape(words.next));
+export const refusedPage = (words: ReadNext): string => refusal(words, escaped(words.next));
 
 /** `query` is the signed search string, leading `?` included: sign-in carries it back here. */
 export const signInPage = (words: SignInNext, query: string): string =>
-  refusal(words, `<a href="${escape(`${SIGN_IN_PATH}${query}`)}">${escape(words.signIn)}</a>`);
+  refusal(words, `<a href="${escaped(`${SIGN_IN_PATH}${query}`)}">${escaped(words.signIn)}</a>`);

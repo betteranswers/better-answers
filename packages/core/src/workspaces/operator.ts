@@ -18,6 +18,7 @@ import {
   withIdentityWrite,
   withOperator,
 } from "../store/postgres/index.ts";
+import { promoting } from "./promotion.ts";
 import { hashOfTyped, mintOneTimeCode } from "./recovery-codes.ts";
 import { OPERATOR_RESTORE_PREFIX, SESSION_VERIFICATION_PREFIXES } from "./sign-in-and-consent.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
@@ -58,6 +59,7 @@ const marking = async (
   const operator = input.change === "grant";
   if (row.operator === operator) return ok({ personId, changed: false });
 
+  if (operator) await promoting(tx, personId);
   await tx.query('UPDATE "user" SET operator = $2, updated_at = now() WHERE id = $1', [
     personId,
     operator,

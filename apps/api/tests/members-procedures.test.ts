@@ -355,8 +355,9 @@ describe("a role change that fails partway", () => {
       );
     });
 
+    // The act holds the membership itself, so its own name labels the failure.
     expect(failureOf(answered)).toEqual({
-      message: "withPrincipal failed",
+      message: "changeRole failed",
       httpStatus: 500,
       refusal: undefined,
     });

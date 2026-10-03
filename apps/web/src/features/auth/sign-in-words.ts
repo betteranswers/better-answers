@@ -2,7 +2,7 @@
 export type CarriedOn = "joining" | "connecting";
 
 /** Why the person is on the sign-in screen, when this browser knows. */
-export type Arrival = "signed-out" | "session-ended";
+export type Arrival = "signed-out" | "session-ended" | "confirm-timed-out";
 
 type EmailStep = { readonly title: string; readonly hint: string };
 
@@ -24,6 +24,7 @@ export const SIGN_IN_WORDS = {
   arrived: {
     "signed-out": "You have signed out.",
     "session-ended": "Your session has ended.",
+    "confirm-timed-out": "Your sign-in ended because it wasn't confirmed within an hour.",
   } satisfies Record<Arrival, string>,
   emailField: "Email address",
   send: "Send sign-in email",

@@ -18,6 +18,7 @@ import { sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test as base } from "./browser.ts";
 import {
+  addMember,
   anAddress,
   clockTheNextKey,
   codeSentTo,
@@ -70,12 +71,14 @@ const freshlyOpened = async (page: Page, path: string): Promise<void> => {
 const linkTo = (token: string): string => `/sign-in/link#${token}`;
 
 /**
- * A workspace's Admin asks for a code on the sign-in screen in `asking`'s browser, which the
- * binding cookie makes the one the link signs in.
+ * An Editor asks for a code in `asking`'s browser, whose binding cookie the link then signs in; an
+ * Admin would meet the second factor first.
  */
 const aLinkAskedForIn = async (asking: BrowserContext, api: APIRequestContext, who: string) => {
   const email = anAddress(who.toLowerCase());
-  await provision(api, { name: `The ${who} workspace`, adminEmail: email });
+  const editor = await person(api, email, { displayName: `${who} Editor` });
+  const workspace = await provision(api, { name: `The ${who} workspace` });
+  await addMember(api, { workspaceId: workspace.workspaceId, userId: editor.id, role: "Editor" });
   const page = await asking.newPage();
   await page.goto("/sign-in");
   await page.getByLabel(SIGN_IN_WORDS.emailField).fill(email);
@@ -87,7 +90,7 @@ const aLinkAskedForIn = async (asking: BrowserContext, api: APIRequestContext, w
 /** As a person reading the code off the other device types it. */
 const typedWhereItStarted = async (asking: Page, code: string): Promise<void> => {
   await asking.getByLabel(SIGN_IN_WORDS.codeField, { exact: true }).fill(code);
-  await landedAtHome(asking, "Admin");
+  await landedAtHome(asking, "Editor");
 };
 
 const headingOf = (page: Page, name: string) =>
@@ -146,7 +149,7 @@ test("a scanner's read spends nothing; the asking browser signs in", async ({
   await passesTheAccessibilityGate();
 
   await page.keyboard.press("Enter");
-  await landedAtHome(page, "Admin");
+  await landedAtHome(page, "Editor");
 });
 
 test("signing in by link in another tab lands the asker", async ({ page, context, request }) => {
@@ -155,9 +158,9 @@ test("signing in by link in another tab lands the asker", async ({ page, context
   await page.goto(linkTo(token));
   await expect(signInButton(page)).toBeFocused();
   await page.keyboard.press("Enter");
-  await landedAtHome(page, "Admin");
+  await landedAtHome(page, "Editor");
 
-  await landedAtHome(asking, "Admin");
+  await landedAtHome(asking, "Editor");
 });
 
 test("another device shows the code and stays signed out", async ({
@@ -207,7 +210,7 @@ test("unknown, spent and superseded links show one dead page", async ({
 
   await asking.goto(linkTo(spent));
   await signInButton(asking).click();
-  await landedAtHome(asking, "Admin");
+  await landedAtHome(asking, "Editor");
 
   const heard: string[] = [];
   for (const token of [aTokenNeverIssued(), spent, superseded]) {
@@ -278,7 +281,7 @@ test("a ceiling's refusal names its wait, keeping Sign in focused", async ({
   await passesTheAccessibilityGate();
 
   await page.keyboard.press("Enter");
-  await landedAtHome(page, "Admin");
+  await landedAtHome(page, "Editor");
 });
 
 test("the code reads as six digits, and c copies it", async ({

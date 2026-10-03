@@ -10,6 +10,7 @@ import {
   attempt,
   err,
   ok,
+  PENDING_SESSION_LIFETIME_MS,
   ulid,
   type Clock,
   type PlatformPrincipal,
@@ -182,8 +183,6 @@ export const withSweepLock = <T>(
 
 /** Past any wait to type a code from an email, so one that expired just before a pass reads as spent. */
 const VERIFICATION_KEPT_PAST_EXPIRY_MS = 24 * 60 * 60 * 1000;
-
-const PENDING_SESSION_LIFETIME_MS = 60 * 60 * 1000;
 
 /** Far past the longest ingress rule's window, an hour, so no live count goes. */
 const INGRESS_WINDOW_KEPT_MS = 24 * 60 * 60 * 1000;

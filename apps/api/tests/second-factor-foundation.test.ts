@@ -1,18 +1,14 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { mountedPaths } from "../src/auth/index.ts";
-import { authAsServerBuildsIt } from "./auth-instance.ts";
-import { setUpAnAuthenticator, signedInClient } from "./provoke.ts";
+import { authAsBuiltForSuite } from "./auth-instance.ts";
+import { setUpAnAuthenticator, signedInByEmailOnly, signedInClient } from "./provoke.ts";
 import { appForSuite } from "./suite-app.ts";
 
 const app = appForSuite();
 
-const { auth: asBuilt, database: unreached } = authAsServerBuildsIt();
-
-afterAll(async () => {
-  await unreached.end();
-});
+const asBuilt = authAsBuiltForSuite();
 
 /** Read off the instance, so a path a plugin adds on an upgrade is held closed here too. */
 const FACTOR_PATHS = mountedPaths(asBuilt).filter(
@@ -35,6 +31,7 @@ const USER_FIELDS = [
   "passkeyOfferDismissedAt",
   "recoveryCodesAcknowledged",
   "restoreRequiredAt",
+  "promotedAt",
 ] as const;
 
 type Declared = { required?: unknown; input?: unknown; returned?: unknown };
@@ -58,19 +55,22 @@ const authenticatorHeldBy = async (personId: string) => {
 };
 
 describe("an Admin with an authenticator signing in by email code", () => {
-  // The library's own factor check skips email-code sign-in; once our gate stands, this session is pending.
-  it("gets a whole session while no gate stands", async () => {
+  // The library's own factor check skips email-code sign-in; our gate holds the session pending.
+  it("gets a pending session, refused until it confirms", async () => {
     const { admin } = await app().provision();
-    await setUpAnAuthenticator(app(), await signedInClient(app(), admin.email));
+    await setUpAnAuthenticator(app(), await signedInByEmailOnly(app(), admin.email));
     expect(await authenticatorHeldBy(admin.id)).toEqual([
       { authenticator_enabled: true, verified: true },
     ]);
 
-    const elsewhere = await signedInClient(app(), admin.email);
+    const elsewhere = await signedInByEmailOnly(app(), admin.email);
     const read = await elsewhere.fetch("/get-session");
+    const me = await elsewhere.fetch("/me");
 
     expect(read.status).toBe(200);
     expect(await read.json()).toMatchObject({ user: { id: admin.id } });
+    expect(me.status).toBe(403);
+    expect(await me.json()).toEqual({ error: "second-factor-pending" });
   });
 });
 
@@ -117,7 +117,7 @@ describe("a session read", () => {
     );
     await app().database.superuser.query(
       `UPDATE "user" SET passkey_offer_dismissed_at = now(), recovery_codes_acknowledged = true,
-                         restore_required_at = now()
+                         restore_required_at = now(), promoted_at = now()
         WHERE id = $1`,
       [person.id],
     );

@@ -16,7 +16,13 @@ import { type PostgresDoor, type Tx, withIdentityWrite } from "../store/postgres
 import { notErasedAt } from "./display-name.ts";
 import { holdThePerson } from "./person-lock.ts";
 import { issuingRecoveryCodes, type RecoveryCodesMade } from "./recovery-codes.ts";
-import { factsOf, recordingTheirOwn, type SetUpInput, stamping } from "./second-factor.ts";
+import {
+  factsOf,
+  recordingTheirOwn,
+  type SetUpInput,
+  stamping,
+  unconfirmingTheOthers,
+} from "./second-factor.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
 /** Ids alone: the log is append-only, so a name a person later changes never lands in it. */
@@ -172,7 +178,12 @@ export type RemovePasskeyRefusal = WorkspaceRefusal<
 type Removal = Result<{ readonly passkeyId: string }, RemovePasskeyRefusal>;
 
 /** An authenticator still waiting on its code holds nothing, so it keeps no passkey standing. */
-const removing = async (platform: PlatformPrincipal, tx: Tx, ids: Ids): Promise<Removal> => {
+const removing = async (
+  platform: PlatformPrincipal,
+  tx: Tx,
+  ids: Ids,
+  actingSessionId: string | undefined,
+): Promise<Removal> => {
   if (!(await holdThePerson(tx, ids.personId))) return err("person-gone");
   if (!(await holds(tx, ids))) return err("no-passkey");
   const facts = await factsOf(tx, ids.personId);
@@ -180,6 +191,7 @@ const removing = async (platform: PlatformPrincipal, tx: Tx, ids: Ids): Promise<
     return err("last-second-factor");
   }
   await tx.query("DELETE FROM passkey WHERE id = $1", [ids.passkeyId]);
+  await unconfirmingTheOthers(tx, ids.personId, actingSessionId);
   await recording(platform, tx, ids, PASSKEY_ACTS.passkeyRemoved);
   return ok({ passkeyId: ids.passkeyId });
 };
@@ -191,13 +203,15 @@ const removing = async (platform: PlatformPrincipal, tx: Tx, ids: Ids): Promise<
 export const removePasskey = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
-  input: { readonly personId: string } & z.output<typeof removePasskeyInput>,
+  input: { readonly personId: string; readonly sessionId?: string } & z.output<
+    typeof removePasskeyInput
+  >,
 ): Promise<Result<{ readonly passkeyId: string }, RemovePasskeyRefusal | Error>> => {
   const ids = idsOf(input);
   if (ids === undefined) return err("malformed");
 
   const removed = await attempt(() =>
-    withIdentityWrite(platform, door, (tx) => removing(platform, tx, ids)),
+    withIdentityWrite(platform, door, (tx) => removing(platform, tx, ids, input.sessionId)),
   );
   if (!removed.ok) return err(removed.error);
   return removed.value;

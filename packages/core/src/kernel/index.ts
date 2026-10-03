@@ -38,6 +38,21 @@ export type { ActorId } from "./actor.ts";
 export { requireAdmin } from "./role.ts";
 export type { AdminUserPrincipal, RoleRefusal } from "./role.ts";
 export { requireFreshSignIn } from "./freshness.ts";
+export {
+  isPending,
+  mayTake,
+  PENDING_SESSION_LIFETIME_MS,
+  PENDING_STEPS,
+  pendingClockOf,
+  standingOf,
+} from "./second-factor.ts";
+export type {
+  PendingClock,
+  PendingStep,
+  SecondFactorFacts,
+  SecondFactorRefusal,
+  SecondFactorStanding,
+} from "./second-factor.ts";
 export type {
   AccessRequestId,
   AuditEventId,

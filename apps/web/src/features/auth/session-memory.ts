@@ -1,11 +1,16 @@
 import { z } from "zod";
 
-import { keepOnThisBrowser, onThisBrowser } from "@/shared/browser-storage.ts";
+import {
+  inThisTab,
+  keepInThisTab,
+  keepOnThisBrowser,
+  onThisBrowser,
+} from "@/shared/browser-storage.ts";
 
 const KEPT_UNDER = "better-answers.session";
 
-/** What this browser last did with a session: held one, or signed out of it. */
-const REMEMBERED = ["held", "signed-out"] as const;
+/** What this browser last did with a session: held one, held one not yet confirmed, or signed out. */
+const REMEMBERED = ["held", "pending", "signed-out"] as const;
 
 type Remembered = (typeof REMEMBERED)[number];
 
@@ -18,6 +23,21 @@ export const rememberTheSession = (memory: Remembered): void => {
 /** Undefined when this browser never held a session here, or keeps nothing. */
 export const sessionRemembered = (): Remembered | undefined =>
   remembered.safeParse(onThisBrowser()?.getItem(KEPT_UNDER)).data;
+
+const UNSAVED_UNDER = "better-answers.change-unsaved";
+
+/** The page of a change refused while the session waited on its second factor. */
+export const rememberAChangeUnsaved = (pathname: string): void => {
+  keepInThisTab(UNSAVED_UNDER, pathname);
+};
+
+export const unsavedChangeRefusedOn = (): string | undefined =>
+  inThisTab()?.getItem(UNSAVED_UNDER) ?? undefined;
+
+/** Said once: the page it names has lost a change only on the way straight back to it. */
+export const forgetTheUnsavedChange = (): void => {
+  inThisTab()?.removeItem(UNSAVED_UNDER);
+};
 
 const SIGNED_IN = "better-answers.signed-in";
 

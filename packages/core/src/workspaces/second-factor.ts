@@ -15,6 +15,8 @@ import {
   type PlatformPrincipal,
   type Result,
   type Role,
+  type SecondFactorStanding,
+  standingOf,
   systemClock,
   type UserId,
   ulid,
@@ -37,7 +39,11 @@ const SECOND_FACTOR_ACTS = declareIdentitySetActs("people", {
   authenticatorRemoved: act("people.person.authenticator_removed", { authenticatorId: "id" }),
 });
 
-const ADMIN: Role = "Admin";
+export const ADMIN: Role = "Admin";
+
+/** Whether the person `person` aliases must hold a second factor; `$2` binds `ADMIN`. */
+export const mustHoldOneOf = (person: string): string =>
+  `${person}.operator OR EXISTS (SELECT 1 FROM member m WHERE m.user_id = ${person}.id AND m.role = $2)`;
 
 /** A person's act on their own second factor: they are its actor and its subject. */
 export const recordingTheirOwn = async <A extends AuditAct>(
@@ -61,6 +67,10 @@ type AuthenticatorState = "none" | "awaiting-code" | "set-up";
 type Facts = {
   /** An Admin in any workspace, or the operator. */
   readonly mustHoldOne: boolean;
+  readonly operator: boolean;
+
+  /** Made an Admin or the operator and not yet confirmed since. */
+  readonly promoted: boolean;
   readonly passkeys: number;
   readonly authenticator: AuthenticatorState;
   readonly authenticatorId: string | null;
@@ -76,8 +86,8 @@ type Facts = {
 type FactsRow = Omit<Facts, "authenticator"> & { readonly verified: boolean | null };
 
 const FACTS = `
-  SELECT u.operator OR EXISTS (SELECT 1 FROM member m WHERE m.user_id = u.id AND m.role = $2)
-           AS "mustHoldOne",
+  SELECT ${mustHoldOneOf("u")} AS "mustHoldOne",
+         u.operator, u.promoted_at IS NOT NULL AS promoted,
          (SELECT count(*)::int FROM passkey p WHERE p.user_id = u.id) AS passkeys,
          a.id AS "authenticatorId", a.verified,
          codes.held AS "recoveryCodes", codes.made AS "recoveryCodesMadeAt",
@@ -125,6 +135,21 @@ export const stamping = async (tx: Tx, input: Stamp): Promise<boolean> => {
     ],
   );
   return stamped.rowCount === 1;
+};
+
+/**
+ * A confirmation does not outlive the factor that may have made it, so every other session of
+ * the person confirms again; the session that removed it acted as itself.
+ */
+export const unconfirmingTheOthers = async (
+  tx: Tx,
+  personId: UserId,
+  actingSessionId: string | undefined,
+): Promise<void> => {
+  await tx.query(
+    "UPDATE session SET second_factor_confirmed_at = NULL WHERE user_id = $1 AND id IS DISTINCT FROM $2",
+    [personId, actingSessionId ?? null],
+  );
 };
 
 export type SetUpInput = {
@@ -233,6 +258,7 @@ const removing = async (
   platform: PlatformPrincipal,
   tx: Tx,
   personId: UserId,
+  actingSessionId: string | undefined,
 ): Promise<Removal> => {
   if (!(await holdThePerson(tx, personId))) return err("person-gone");
   const facts = await factsOf(tx, personId);
@@ -242,6 +268,7 @@ const removing = async (
   if (facts.mustHoldOne && facts.passkeys === 0) return err("last-second-factor");
   await tx.query("DELETE FROM authenticator WHERE id = $1", [facts.authenticatorId]);
   await tx.query('UPDATE "user" SET authenticator_enabled = false WHERE id = $1', [personId]);
+  await unconfirmingTheOthers(tx, personId, actingSessionId);
   await recordingTheirOwn(platform, tx, personId, SECOND_FACTOR_ACTS.authenticatorRemoved, {
     authenticatorId: facts.authenticatorId,
   });
@@ -255,13 +282,15 @@ const removing = async (
 export const removeAuthenticator = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
-  input: { readonly personId: string },
+  input: { readonly personId: string; readonly sessionId?: string },
 ): Promise<Result<AuthenticatorRemoved, RemoveAuthenticatorRefusal | Error>> => {
   const personId = boundarySchemas.user.select.shape.id.safeParse(input.personId);
   if (!personId.success) return err("malformed");
 
   const removed = await attempt(() =>
-    withIdentityWrite(platform, door, (tx) => removing(platform, tx, personId.data)),
+    withIdentityWrite(platform, door, (tx) =>
+      removing(platform, tx, personId.data, input.sessionId),
+    ),
   );
   if (!removed.ok) return err(removed.error);
   return removed.value;
@@ -293,10 +322,20 @@ const passkeysOf = async (tx: Tx, personId: UserId): Promise<readonly PasskeyHel
     lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
   }));
 
-type ThisSession = { readonly confirmed: boolean; readonly setupGranted: boolean };
+type SessionRow = {
+  readonly confirmed: boolean;
+  readonly setupGranted: boolean;
+
+  /** The name of the session's workspace when the person is an Admin there. */
+  readonly adminOf: string | null;
+};
+
+type ThisSession = SessionRow & { readonly standing: SecondFactorStanding };
 
 export type SecondFactorHeld = {
   readonly mustHoldOne: boolean;
+  readonly operator: boolean;
+  readonly promoted: boolean;
   readonly passkeys: readonly PasskeyHeld[];
   readonly authenticator: AuthenticatorState;
   /** `madeAt` is an ISO instant, as it crosses the wire. */
@@ -316,6 +355,8 @@ type Around = Pick<SecondFactorHeld, "passkeys" | "waits" | "thisSession">;
 
 const heldOf = (facts: Facts, around: Around): SecondFactorHeld => ({
   mustHoldOne: facts.mustHoldOne,
+  operator: facts.operator,
+  promoted: facts.promoted,
   passkeys: around.passkeys,
   authenticator: facts.authenticator,
   recoveryCodes:
@@ -340,14 +381,24 @@ export const SETUP_GRANTED = `
 
 const THIS_SESSION = `
   SELECT second_factor_confirmed_at IS NOT NULL AS confirmed,
-         ${SETUP_GRANTED} AS "setupGranted"
-    FROM session WHERE id = $1 AND user_id = $2`;
+         ${SETUP_GRANTED} AS "setupGranted",
+         (SELECT w.name FROM workspace w JOIN member m ON m.workspace_id = w.id
+           WHERE w.id = s.active_workspace_id AND m.user_id = $2 AND m.role = $3) AS "adminOf"
+    FROM session s WHERE id = $1 AND user_id = $2`;
 
-const NEITHER: ThisSession = { confirmed: false, setupGranted: false };
+const NEITHER: SessionRow = { confirmed: false, setupGranted: false, adminOf: null };
 
-const thisSessionOf = async (tx: Tx, personId: UserId, sessionId: string | undefined) => {
+const thisSessionOf = async (
+  tx: Tx,
+  facts: Facts & { readonly personId: UserId },
+  sessionId: string | undefined,
+): Promise<ThisSession | undefined> => {
   if (sessionId === undefined) return undefined;
-  return (await tx.query<ThisSession>(THIS_SESSION, [sessionId, personId])).rows[0] ?? NEITHER;
+  const row =
+    (await tx.query<SessionRow>(THIS_SESSION, [sessionId, facts.personId, ADMIN])).rows[0] ??
+    NEITHER;
+  const holdsAFactor = facts.passkeys > 0 || facts.authenticator === "set-up";
+  return { ...row, standing: standingOf({ ...row, mustHoldOne: facts.mustHoldOne, holdsAFactor }) };
 };
 
 type ReadSecondFactorInput = {
@@ -366,22 +417,62 @@ const reading = async (
   return heldOf(facts, {
     passkeys: await passkeysOf(tx, personId),
     waits: await waitsOf(tx, personId, input.now ?? systemClock().now()),
-    thisSession: await thisSessionOf(tx, personId, input.sessionId),
+    thisSession: await thisSessionOf(tx, { ...facts, personId }, input.sessionId),
   });
 };
 
+type PersonRead<T> = Result<T, WorkspaceRefusal<"malformed" | "person-gone"> | Error>;
+
+/** One read of a person's own rows by an id the caller hands in, refused where none is held. */
+const readOfThePerson = async <T>(
+  platform: PlatformPrincipal,
+  door: PostgresDoor,
+  personIdAsked: string,
+  read: (tx: Tx, personId: UserId) => Promise<T | undefined>,
+): Promise<PersonRead<T>> => {
+  const personId = boundarySchemas.user.select.shape.id.safeParse(personIdAsked);
+  if (!personId.success) return err("malformed");
+
+  const answered = await attempt(() =>
+    withIdentityRead(platform, door, (tx) => read(tx, personId.data)),
+  );
+  if (!answered.ok) return err(answered.error);
+  return answered.value === undefined ? err("person-gone") : ok(answered.value);
+};
+
 /** What the person's own Sign-in section and the confirm screens show; nothing in it is a secret. */
-export const readSecondFactor = async (
+export const readSecondFactor = (
   platform: PlatformPrincipal,
   door: PostgresDoor,
   input: ReadSecondFactorInput,
-): Promise<Result<SecondFactorHeld, WorkspaceRefusal<"malformed" | "person-gone"> | Error>> => {
-  const personId = boundarySchemas.user.select.shape.id.safeParse(input.personId);
-  if (!personId.success) return err("malformed");
+): Promise<PersonRead<SecondFactorHeld>> =>
+  readOfThePerson(platform, door, input.personId, (tx, personId) => reading(tx, personId, input));
 
-  const read = await attempt(() =>
-    withIdentityRead(platform, door, (tx) => reading(tx, personId.data, input)),
-  );
-  if (!read.ok) return err(read.error);
-  return read.value === undefined ? err("person-gone") : ok(read.value);
+export type CredentialsHeld = {
+  readonly address: string;
+  readonly passkeys: readonly Pick<PasskeyHeld, "name" | "createdAt">[];
+  readonly authenticator: boolean;
 };
+
+const addressOf = async (tx: Tx, personId: UserId): Promise<string | undefined> =>
+  (await tx.query<{ email: string }>('SELECT email FROM "user" WHERE id = $1', [personId])).rows[0]
+    ?.email;
+
+const credentialsOf = async (tx: Tx, personId: UserId): Promise<CredentialsHeld | undefined> => {
+  const facts = await factsOf(tx, personId);
+  const address = await addressOf(tx, personId);
+  if (facts === undefined || address === undefined) return undefined;
+  const passkeys = (await passkeysOf(tx, personId)).map(({ name, createdAt }) => ({
+    name,
+    createdAt,
+  }));
+  return { address, passkeys, authenticator: facts.authenticator === "set-up" };
+};
+
+/** What a promotion's notice lists: the address, and every credential that can confirm a sign-in. */
+export const readCredentialsHeld = (
+  platform: PlatformPrincipal,
+  door: PostgresDoor,
+  input: { readonly personId: string },
+): Promise<PersonRead<CredentialsHeld>> =>
+  readOfThePerson(platform, door, input.personId, credentialsOf);

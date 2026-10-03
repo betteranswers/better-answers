@@ -1,3 +1,19 @@
+/** Text a person typed, made safe to stand in a page's markup. */
+export const escaped = (value: string): string =>
+  value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+
+/** `3 March 2026`, as a UK reader writes a day, on the UK's own clock. */
+export const LONG_UK_DATE = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+  timeZone: "Europe/London",
+});
+
 /** Inline, as a mail client keeps no stylesheet. */
 export const PARAGRAPH = "margin:0 0 16px";
 

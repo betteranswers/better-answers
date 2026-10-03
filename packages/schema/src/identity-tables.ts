@@ -44,6 +44,9 @@ export const user = pgTable("user", {
 
   /** Outlives the operator's restore code, so a restore left to expire never opens setup to the mailbox. */
   restoreRequiredAt: stamp("restore_required_at"),
+
+  /** Made an Admin or the operator while needing no second factor; cleared at the first confirmation since. */
+  promotedAt: stamp("promoted_at"),
 });
 
 export const session = pgTable(

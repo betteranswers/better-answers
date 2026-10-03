@@ -27,15 +27,16 @@ import {
   type Tx,
 } from "@better-answers/core/store/postgres";
 
-import { sessionClaims, type SessionReader } from "../auth/verify.ts";
+import { sessionClaims } from "../auth/verify.ts";
 import type { Doors } from "../doors.ts";
 import type { Mail } from "../email.ts";
 import { refusalLogged, refusalOf, RefusedError, type RefusalAnswer } from "../refusal.ts";
+import { type GatedSessionReader, PENDING_PROCEDURES, refusalFor } from "../second-factor-gate.ts";
 
 type TrpcContext = {
   readonly doors: Doors;
   readonly clock: Clock;
-  readonly readSession: SessionReader;
+  readonly readSession: GatedSessionReader;
   readonly headers: Headers;
   readonly log: Logger;
   readonly mail: Mail;
@@ -174,18 +175,21 @@ const RESOLVER = "withPrincipal";
 
 const OPERATOR_RESOLVER = "withOperator";
 
-type Session = NonNullable<Awaited<ReturnType<SessionReader>>>;
+type Session = NonNullable<Awaited<ReturnType<GatedSessionReader>>>;
 
-const sessionOf = async (ctx: TrpcContext): Promise<Session> => {
+/** Every root a procedure passes through: a pending session reaches only the pending set. */
+const sessionOf = async (ctx: TrpcContext, path: string): Promise<Session> => {
   const read = await attempt(() => ctx.readSession(ctx.headers));
 
   if (!read.ok) throw failed(ctx.log, "readSession", read.error);
   if (read.value === null) throw refused(ctx.log, "readSession", "no-session");
+  const pending = refusalFor(read.value.standing, PENDING_PROCEDURES.get(path));
+  if (pending !== undefined) throw refused(ctx.log, path, pending);
   return read.value;
 };
 
-const claimsOf = async (ctx: TrpcContext): Promise<Claims> => {
-  const session = await sessionOf(ctx);
+const claimsOf = async (ctx: TrpcContext, path: string): Promise<Claims> => {
+  const session = await sessionOf(ctx, path);
 
   const claims = await sessionClaims(async () => session, ctx.headers);
   if (claims === undefined) throw refused(ctx.log, "sessionClaims", "no-active-workspace");
@@ -220,8 +224,8 @@ const thrownIfFailed = <
 };
 
 const inTheResolversTransaction = (resolve: typeof withPrincipal) =>
-  trpc.procedure.use(async ({ ctx, next }) => {
-    const claims = await claimsOf(ctx);
+  trpc.procedure.use(async ({ ctx, path, next }) => {
+    const claims = await claimsOf(ctx, path);
 
     const resolved = await attempt(() =>
       resolve(ctx.doors.postgres, claims, async (principal, tx) =>
@@ -239,8 +243,8 @@ export const mutationProcedure = inTheResolversTransaction(withHeldPrincipal);
  * A Principal outlives the transaction that resolved it only here; never the request, and the
  * act's own door re-judges it.
  */
-export const ownTransactionProcedure = trpc.procedure.use(async ({ ctx, next }) => {
-  const claims = await claimsOf(ctx);
+export const ownTransactionProcedure = trpc.procedure.use(async ({ ctx, path, next }) => {
+  const claims = await claimsOf(ctx, path);
 
   const resolved = await attempt(() =>
     withPrincipal(ctx.doors.postgres, claims, async (principal) => principal),
@@ -262,8 +266,8 @@ export const committedAs = async <Value, Refused>(
  * An act on the person themselves needs no workspace; the person is the session's, never a
  * value the request names.
  */
-export const personProcedure = trpc.procedure.use(async ({ ctx, next }) => {
-  const { user, session } = await sessionOf(ctx);
+export const personProcedure = trpc.procedure.use(async ({ ctx, path, next }) => {
+  const { user, session } = await sessionOf(ctx, path);
   return next({
     ctx: {
       personId: user.id,
@@ -298,8 +302,8 @@ export const personCeiling = (rule: CounterRule) =>
  * Built from the session alone: this surface reads no bearer, so a token never becomes the
  * operator.
  */
-export const operatorProcedure = trpc.procedure.use(async ({ ctx, next }) => {
-  const { user, session } = await sessionOf(ctx);
+export const operatorProcedure = trpc.procedure.use(async ({ ctx, path, next }) => {
+  const { user, session } = await sessionOf(ctx, path);
 
   const resolved = await attempt(() =>
     withOperator(

@@ -93,18 +93,21 @@ test("credits a new member by their given name, asking once", async ({ page, req
   expect(shown).not.toContain("/display-name");
 });
 
+// An Editor, since an Admin's sign-in passes the second-factor pages first.
 test("signs a named member straight into the shell, never asking", async ({ page, request }) => {
   const email = anAddress("already");
-  await provision(request, { name: "Already Named", adminEmail: email });
+  const who = await person(request, email, { displayName: "Alys Named" });
+  const workspace = await provision(request, { name: "Already Named" });
+  await addMember(request, { workspaceId: workspace.workspaceId, userId: who.id, role: "Editor" });
   const shown = screensShown(page);
 
   await page.goto("/sign-in");
   await signIn(page, request, email);
 
-  await landedAtHome(page, "Admin");
+  await landedAtHome(page, "Editor");
   expect(shown).not.toContain("/display-name");
   await page.goto("/display-name");
-  await landedAtHome(page, "Admin");
+  await landedAtHome(page, "Editor");
 });
 
 test("says what to change in a bad name, then saves", async ({

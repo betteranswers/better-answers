@@ -2,7 +2,7 @@ import type { Context, Hono } from "hono";
 import type { Logger } from "pino";
 import { z } from "zod";
 
-import { attempt, type Clock } from "@better-answers/core/kernel";
+import { attempt, type Clock, type PendingStep } from "@better-answers/core/kernel";
 import {
   consumeIngress,
   type CounterRule,
@@ -14,6 +14,7 @@ import { AUTHENTICATOR_CODE_LENGTH } from "@better-answers/schema/second-factor"
 import type { EmailSender } from "../email.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
 import { tooManyRequests } from "../ingress/limits.ts";
+import { judged, refusalFor } from "../second-factor-gate.ts";
 import type { Auth } from "./auth.ts";
 import { sameOriginOnly } from "./same-origin.ts";
 
@@ -45,6 +46,7 @@ export const PERSON_ROUTE_REFUSALS = {
   challengeGone: { error: "challenge-gone" },
   /** Restored by the operator: only a session that gave the restore code may set up a factor. */
   restoreCodeNeeded: { error: "restore-code-needed" },
+  secondFactorPending: { error: "second-factor-pending" },
 } as const;
 
 /** Past a route's ceiling, or while the person's tries of a code wait. */
@@ -116,13 +118,30 @@ export const personRoutesAt = (routes: Hono, prefix: string, deps: PersonRoutes)
   });
   const log = deps.logger.child({ module: "auth" });
 
+  /** The step may have landed, so the page reads again rather than starting over. */
+  const unanswered = (context: Context, event: string, reason: string): Response => {
+    log.warn({ event, reason }, "a second-factor step went unanswered");
+    return context.json(PERSON_ROUTE_REFUSALS.unanswered, 502);
+  };
+
   return {
-    /** Each counter counts apart, across every session the person holds. */
+    /**
+     * Each counter counts apart, across every session the person holds. A pending session takes
+     * the step only where `pending` names one the pending set holds.
+     */
     asThePerson:
-      (counter: string, rule: CounterRule, step: Step) =>
+      (counter: string, rule: CounterRule, pending: PendingStep, step: Step) =>
       async (context: Context): Promise<Response> => {
         const person = await signedInPerson(deps.auth, context.req.raw.headers);
         if (person === undefined) return context.json(PERSON_ROUTE_REFUSALS.signedOut, 401);
+        const standing = await judged(deps, { id: person.session.id });
+        if (!standing.ok && standing.error instanceof Error) {
+          return unanswered(context, "auth.gate_failed", standing.error.message);
+        }
+        if (!standing.ok) return context.json(PERSON_ROUTE_REFUSALS.signedOut, 401);
+        if (refusalFor(standing.value.standing, pending) !== undefined) {
+          return context.json(PERSON_ROUTE_REFUSALS.secondFactorPending, 403);
+        }
         const counted = await consumeIngress(
           deps.door,
           "person",
@@ -134,11 +153,7 @@ export const personRoutesAt = (routes: Hono, prefix: string, deps: PersonRoutes)
         return step(context, person);
       },
 
-    /** The step may have landed, so the page reads again rather than starting over. */
-    unanswered: (context: Context, event: string, reason: string): Response => {
-      log.warn({ event, reason }, "a second-factor step went unanswered");
-      return context.json(PERSON_ROUTE_REFUSALS.unanswered, 502);
-    },
+    unanswered,
 
     log,
   };

@@ -123,6 +123,23 @@ const anAdminRecovering = async () => {
   return { personId, ...(await aGrantedSession(personId)) };
 };
 
+/** The granted session replaces the factors either way, a minute on. */
+const replacedBy = async (by: "passkey" | "authenticator", personId: string, sessionId: string) => {
+  const now = after(60);
+  if (by === "passkey") {
+    const keptPasskeyId = await passkeyFor(db().pool, personId);
+    return replaceFactorsByPasskey(bootstrap, door(), { personId, sessionId, keptPasskeyId, now });
+  }
+  const encryptedSecret = "sealed-new-secret";
+  await parkAuthenticatorSecret(bootstrap, door(), { personId, sessionId, encryptedSecret, now });
+  return replaceFactorsByAuthenticator(bootstrap, door(), {
+    personId,
+    sessionId,
+    encryptedSecret,
+    now,
+  });
+};
+
 const reserving = (personId: string, now = AT, at = door()) =>
   reserveAuthenticatorTry(bootstrap, at, { personId, now });
 
@@ -577,6 +594,25 @@ describe("replacing the factors", () => {
       detail: { by: "authenticator" },
     });
   });
+
+  it.each(["passkey", "authenticator"] as const)(
+    "sends every other session back to confirm, by %s",
+    async (by) => {
+      const { personId, sessionId } = await anAdminRecovering();
+      const lost = await passkeyFor(db().pool, personId);
+      const elsewhere = await aSession(personId);
+      expect(await confirmingByPasskey(personId, elsewhere, lost)).toEqual({
+        ok: true,
+        value: undefined,
+      });
+
+      const replaced = await replacedBy(by, personId, sessionId);
+
+      expect(replaced.ok).toBe(true);
+      expect(await confirmedAt(elsewhere)).toEqual(UNCONFIRMED);
+      expect(await confirmedAt(sessionId)).toEqual({ confirmed: after(60), pending: null });
+    },
+  );
 
   it("parks one secret a session, for ten minutes", async () => {
     const { personId, sessionId } = await anAdminRecovering();

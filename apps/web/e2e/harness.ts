@@ -4,7 +4,9 @@ import { expect, type APIRequestContext, type Page } from "@playwright/test";
 import { z } from "zod";
 
 import type { REDACTION_TIERS, SENSITIVITIES } from "@better-answers/schema";
+import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
 
+import { CONFIRM_WORDS, SETUP_WORDS } from "@/features/auth/second-factor-words.ts";
 import { SIGN_IN_WORDS } from "@/features/auth/sign-in-words.ts";
 import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
 
@@ -112,18 +114,25 @@ const signInAged = z.object({ aged: z.boolean() });
 export const ageTheSignIn = (api: APIRequestContext, userId: string) =>
   ask(api, "/sign-ins/aged", { userId }, signInAged);
 
+/** How a spec meets a pending session's end without waiting out its hour. */
+export const ageThePendingHour = (api: APIRequestContext, userId: string) =>
+  ask(api, "/pending-sessions/aged", { userId }, signInAged);
+
 /** How a spec meets an expired code without waiting out its lifetime. */
 export const ageTheCode = (api: APIRequestContext, email: string) =>
   ask(api, "/codes/aged", { email }, signInAged);
 
-const keyEnrolled = z.object({ key: z.string() });
+const enrolled = z.object({ key: z.string(), recoveryCodes: z.array(z.string()) });
 
-/**
- * Spends one of the address's emailed sign-in codes, and issues no recovery codes. Answers the key
- * a spec makes codes from.
- */
+/** Spends no emailed code; ten codes come saved, as a first setup leaves an Admin, unless `none`. */
+export const enrolledWith = (
+  api: APIRequestContext,
+  email: string,
+  codes: "saved" | "none" = "saved",
+) => ask(api, "/authenticators", { email, codes }, enrolled);
+
 export const withAnAuthenticator = async (api: APIRequestContext, email: string) =>
-  (await ask(api, "/authenticators", { email }, keyEnrolled)).key;
+  (await enrolledWith(api, email)).key;
 
 /** The platform operator's restore, ending the person's factors and sessions; answers its code. */
 export const restored = async (api: APIRequestContext, email: string) =>
@@ -347,8 +356,12 @@ export const emailsSentTo = async (api: APIRequestContext, email: string): Promi
 export const anAddress = (who: string): string =>
   `${who}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
 
-/** Starts on the sign-in screen the page already shows; it does not navigate there. */
-export const signIn = async (page: Page, api: APIRequestContext, email: string): Promise<void> => {
+/** From the sign-in screen the page shows; an Admin or the operator is left on confirm or setup. */
+export const signInByEmail = async (
+  page: Page,
+  api: APIRequestContext,
+  email: string,
+): Promise<void> => {
   await page.getByLabel(SIGN_IN_WORDS.emailField).fill(email);
   await page.getByRole("button", { name: SIGN_IN_WORDS.send }).click();
 
@@ -359,6 +372,58 @@ export const signIn = async (page: Page, api: APIRequestContext, email: string):
   // Six digits sign in on their own; navigating before the screen is left cancels the request,
   // and no session is set.
   await expect(code).toHaveCount(0);
+};
+
+/**
+ * The page's read lands first: one landing after the harness's write would send the page to
+ * confirm itself, racing the visit below.
+ */
+const factorsRead = (page: Page) =>
+  expect(
+    page
+      .getByRole("link", { name: CONFIRM_WORDS.recoveryCode })
+      .or(page.getByRole("button", { name: SETUP_WORDS.authenticatorInstead })),
+  ).toBeVisible();
+
+/** The real confirm page, opened afresh since it drew the factors held before the harness wrote one. */
+const confirmedWithTheHarness = async (
+  page: Page,
+  api: APIRequestContext,
+  email: string,
+): Promise<void> => {
+  await factorsRead(page);
+  const key = await withAnAuthenticator(api, email);
+  await page.goto(`/confirm${new URL(page.url()).search}`);
+  await page
+    .getByRole("textbox", { name: CONFIRM_WORDS.codeField })
+    .fill(authenticatorCodeAt(key, new Date()));
+  await expect(page).not.toHaveURL(/\/confirm(?:\?|$)/);
+};
+
+/** A pending session draws no page before confirm or setup, so the first heading drawn says which. */
+const PENDING_PAGE = /^\/(?:confirm|setup)$/;
+
+const firstPageDrawn = async (page: Page): Promise<boolean> => {
+  await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+  return PENDING_PAGE.test(new URL(page.url()).pathname);
+};
+
+/** For an act that makes the session pending, such as joining as an Admin. */
+export const confirmedWhenAsked = async (
+  page: Page,
+  api: APIRequestContext,
+  email: string,
+): Promise<void> => {
+  await expect(page).toHaveURL(/\/(?:confirm|setup)(?:\?|$)/);
+  await firstPageDrawn(page);
+  await confirmedWithTheHarness(page, api, email);
+};
+
+/** As a person signs in, then past the confirm page an Admin or the operator must pass. */
+export const signIn = async (page: Page, api: APIRequestContext, email: string): Promise<void> => {
+  await signInByEmail(page, api, email);
+  await expect(page).not.toHaveURL(/\/sign-in(?:\?|$)/);
+  if (await firstPageDrawn(page)) await confirmedWithTheHarness(page, api, email);
 };
 
 /** Asked for before signing in, so the sign-in screen carries the member back to it. */
@@ -379,15 +444,16 @@ export const aMemberSignedInAt = async (
   return workspace;
 };
 
-/** From the sign-in screen to an Admin's home, as the Admin of one workspace arrives. */
+/** From the sign-in screen to a role's home, as a member of one workspace arrives. */
 export const signedInAtHome = async (
   page: Page,
   api: APIRequestContext,
   email: string,
+  role: Parameters<typeof landedAtHome>[1] = "Admin",
 ): Promise<void> => {
   await page.goto("/sign-in");
   await signIn(page, api, email);
-  await landedAtHome(page, "Admin");
+  await landedAtHome(page, role);
 };
 
 /** From the sign-in screen to the no-workspace screen, as a person in no workspace arrives. */

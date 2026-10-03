@@ -26,7 +26,7 @@ import {
   withIdentityRead,
   withScope,
 } from "../store/postgres/index.ts";
-import { hasNoDisplayName, type WORKSPACE_REFUSALS } from "../workspaces/index.ts";
+import { hasNoDisplayName, promoting, type WORKSPACE_REFUSALS } from "../workspaces/index.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
 const JOINING_ACTS = declareActs("people", {
@@ -273,6 +273,9 @@ export type Joined = {
   readonly workspaceId: WorkspaceId;
   readonly workspaceName: string;
   readonly role: Role;
+
+  /** Joining as an Admin made the person hold a second factor for the first time. */
+  readonly promoted: boolean;
 };
 
 type Joining = Asked & { readonly sessionId: string };
@@ -292,6 +295,7 @@ const join = async (
     joining.invitationId,
     INVITATION_ACCEPTED_STATUS,
   ]);
+  const promoted = role === "Admin" && (await promoting(tx, joining.personId));
   await tx.query(
     "INSERT INTO member (id, workspace_id, user_id, role, created_at) VALUES ($1, $2, $3, $4, now())",
     [ulid(), workspaceId, joining.personId, role],
@@ -310,7 +314,7 @@ const join = async (
     subjectId: joining.personId,
     detail: { invitationId: joining.invitationId, role },
   });
-  return ok({ workspaceId, workspaceName, role });
+  return ok({ workspaceId, workspaceName, role, promoted });
 };
 
 const JOIN_CONSTRAINTS = {

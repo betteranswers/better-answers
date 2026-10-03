@@ -27,6 +27,7 @@ import { selectTheCode } from "./code-entry.ts";
 import type { SendingACode } from "./confirm-hooks.ts";
 import { saidOfASecondFactorRefusal, tooManyCodesTriedOr, type OtherWay } from "./refusal-words.ts";
 import type { SecondFactor, SecondFactorRead } from "./second-factor-hooks.ts";
+import { rememberTheStanding } from "./second-factor-steps.ts";
 import { CODE_AGAIN, USE_CODE } from "./second-factor-words.ts";
 import { SignOutButton } from "./sign-out-button.tsx";
 
@@ -208,6 +209,13 @@ const listedKeystrokes = (
   return readUnanswered(read) ? [READ_AGAIN] : undefined;
 };
 
+/** Each read the pending page draws from is kept, as the detours keep theirs. */
+const useStandingRemembered = (held: SecondFactor | undefined) => {
+  useEffect(() => {
+    rememberTheStanding(held);
+  }, [held]);
+};
+
 /** h1 from the first draw and Sign out last; until the read lands, nothing between them. */
 export function PendingFrame(properties: {
   readonly title: string;
@@ -218,6 +226,7 @@ export function PendingFrame(properties: {
   const { read } = properties;
   const readId = useId();
   const listed = listedKeystrokes(read, properties.keystrokes);
+  useStandingRemembered(read.data);
   return (
     <AuthScreen title={properties.title}>
       {read.data === undefined ? null : properties.children}

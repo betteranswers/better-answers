@@ -521,7 +521,8 @@ const secondFactorHeldBy = async (userId: string, passkeyId: string) => {
             u.authenticator_enabled,
             u.passkey_offer_dismissed_at IS NOT NULL AS offer_dismissed,
             u.recovery_codes_acknowledged,
-            u.restore_required_at IS NOT NULL AS restore_required
+            u.restore_required_at IS NOT NULL AS restore_required,
+            u.promoted_at IS NOT NULL AS promoted
        FROM "user" u WHERE u.id = $1`,
     [userId, passkeyId],
   );
@@ -538,6 +539,7 @@ const SECOND_FACTOR_HELD = {
   offer_dismissed: true,
   recovery_codes_acknowledged: true,
   restore_required: true,
+  promoted: true,
 };
 
 /** A member here who is an Editor of a second workspace too. */
@@ -1383,6 +1385,7 @@ describe("the identity set on the person's last membership", () => {
       offer_dismissed: false,
       recovery_codes_acknowledged: false,
       restore_required: false,
+      promoted: false,
     });
     expect(await lastActiveWorkspacesOf(person.id)).toEqual([]);
     expect(operatorLinesAbout(done.erasureRequestId)).toEqual([

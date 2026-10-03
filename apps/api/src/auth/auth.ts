@@ -12,7 +12,14 @@ import type pg from "pg";
 import type { Logger } from "pino";
 import { z } from "zod";
 
-import { attempt, type Clock, err, type Result, ulid } from "@better-answers/core/kernel";
+import {
+  attempt,
+  type Clock,
+  err,
+  isPending,
+  type Result,
+  ulid,
+} from "@better-answers/core/kernel";
 import { withIdentityWrite, type PostgresDoor } from "@better-answers/core/store/postgres";
 import {
   hasNoDisplayName,
@@ -48,6 +55,15 @@ import { EMAIL_CODE_ATTEMPTS, EMAIL_CODE_LENGTH } from "@better-answers/schema/e
 import type { EmailSender } from "../email.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
 import { PRODUCT_NAME } from "../product-name.ts";
+import {
+  AUTHORIZE_PATH,
+  judged,
+  PENDING_LIBRARY_PATHS,
+  pendingOr,
+  refusalFor,
+  SECOND_FACTOR_PENDING,
+  SESSIONLESS_LIBRARY_PATHS,
+} from "../second-factor-gate.ts";
 import {
   ACCESS_TOKEN_LIFETIME_SECONDS,
   BETTER_AUTH_RATE_LIMIT,
@@ -253,6 +269,8 @@ const clientIdOfQuery = (query: string | undefined): string | undefined =>
 
 type AuditFields = z.infer<typeof bodyFields>;
 
+type GateContext = Parameters<Parameters<typeof createAuthMiddleware>[0]>[0];
+
 type AuditedCall = {
   readonly fields: AuditFields;
   readonly refused: boolean;
@@ -456,6 +474,44 @@ export const createAuth = (deps: AuthDependencies) => {
     return { secondFactorConfirmedAt: at };
   };
 
+  /** Over HTTP alone: the api's own routes call closed endpoints as server functions and gate themselves. */
+  const gatedToken = async (ctx: GateContext): Promise<string | undefined> => {
+    if (ctx.request === undefined || SESSIONLESS_LIBRARY_PATHS.has(ctx.path)) return undefined;
+    if (ctx.path === AUTHORIZE_PATH) return undefined;
+    const token = await ctx.getSignedCookie(
+      ctx.context.authCookies.sessionToken.name,
+      ctx.context.secret,
+    );
+    return typeof token === "string" ? token : undefined;
+  };
+
+  const readWithoutRenewal = (ctx: GateContext) =>
+    ctx.path === "/get-session"
+      ? { context: { query: { ...ctx.query, disableRefresh: true } } }
+      : undefined;
+
+  /** Past its hour, the row may outlive a skipped delete; signed out, as every other root reads it. */
+  const endedHere = (ctx: GateContext) => {
+    if (!PENDING_LIBRARY_PATHS.has(ctx.path)) throw new APIError("UNAUTHORIZED");
+    return readWithoutRenewal(ctx);
+  };
+
+  /** A pending session reads itself without renewing it, and reaches nothing else here. */
+  const gateTheLibrary = async (ctx: GateContext) => {
+    const token = await gatedToken(ctx);
+    if (token === undefined) return undefined;
+    const standing = await judged(deps, { token });
+    if (!standing.ok && standing.error instanceof Error) throw standing.error;
+    if (!standing.ok) return endedHere(ctx);
+    if (refusalFor(standing.value.standing, PENDING_LIBRARY_PATHS.get(ctx.path)) !== undefined) {
+      throw new APIError("FORBIDDEN", {
+        code: SECOND_FACTOR_PENDING,
+        message: "Confirm the second factor first",
+      });
+    }
+    return isPending(standing.value.standing) ? readWithoutRenewal(ctx) : undefined;
+  };
+
   const db = drizzle(deps.database, { schema: identitySchema });
 
   return betterAuth({
@@ -491,6 +547,7 @@ export const createAuth = (deps: AuthDependencies) => {
           returned: false,
         },
         restoreRequiredAt: { type: "date", required: false, input: false, returned: false },
+        promotedAt: { type: "date", required: false, input: false, returned: false },
       },
     },
     session: {
@@ -552,9 +609,11 @@ export const createAuth = (deps: AuthDependencies) => {
        * skip it until the daily sweep.
        */
       before: createAuthMiddleware(async (ctx) => {
-        if (ctx.path !== "/sign-in/email-otp") return;
-        const asked = signInAddress.parse(ctx.body);
-        if (asked !== undefined) await clearAnExpiredPromotionLock(asked.email);
+        if (ctx.path === "/sign-in/email-otp") {
+          const asked = signInAddress.parse(ctx.body);
+          if (asked !== undefined) await clearAnExpiredPromotionLock(asked.email);
+        }
+        return gateTheLibrary(ctx);
       }),
       after: createAuthMiddleware(async (ctx) => {
         const event = auditedEvent(ctx.path);
@@ -666,6 +725,8 @@ export const createAuth = (deps: AuthDependencies) => {
             },
 
             shouldRedirect: async ({ session, user: person }) => {
+              // A pending session confirms on the way, from the post-login page, before any consent.
+              if (pendingOr(await judged(deps, { id: session.id }))) return true;
               // The post-login page asks for a display name first; skipping it for a sole
               // membership would carry an unnamed person straight to consent.
               if (hasNoDisplayName(person.name)) return true;

@@ -122,7 +122,10 @@ describe("changing the role of many members", () => {
 
     const changed = await asAdmin(workspace, changingRoles(viewers, "Editor"));
 
-    expect(changed).toEqual({ ok: true, value: { changed: sorted(viewers), skipped: 0 } });
+    expect(changed).toEqual({
+      ok: true,
+      value: { changed: sorted(viewers), skipped: 0, promoted: [] },
+    });
     expect(await rolesOf(workspace)).toEqual({
       [workspace.adminUserId]: "Admin",
       [viewers[0] ?? ""]: "Editor",
@@ -144,7 +147,10 @@ describe("changing the role of many members", () => {
 
     const changed = await asAdmin(workspace, changingRoles([...viewers, editor], "Editor"));
 
-    expect(changed).toEqual({ ok: true, value: { changed: sorted(viewers), skipped: 1 } });
+    expect(changed).toEqual({
+      ok: true,
+      value: { changed: sorted(viewers), skipped: 1, promoted: [] },
+    });
     expect(await subjectsOf(workspace, ROLE_CHANGED)).toEqual(sorted(viewers));
   });
 
@@ -182,7 +188,7 @@ describe("changing the role of many members", () => {
 
     const changed = await asAdmin(workspace, changingRoles([demoted], "Editor"));
 
-    expect(changed).toEqual({ ok: true, value: { changed: [demoted], skipped: 0 } });
+    expect(changed).toEqual({ ok: true, value: { changed: [demoted], skipped: 0, promoted: [] } });
     expect(await rolesOf(workspace)).toEqual({ [demoted]: "Editor", [staying]: "Admin" });
     expect(await auditRowsOf(workspace, ROLE_CHANGED)).toEqual([
       {
@@ -203,7 +209,10 @@ describe("changing the role of many members", () => {
 
     const changed = await asAdmin(workspace, changingRoles(ticked, "Editor"));
 
-    expect(changed).toEqual({ ok: true, value: { changed: [adminUserId, viewer], skipped: 0 } });
+    expect(changed).toEqual({
+      ok: true,
+      value: { changed: [adminUserId, viewer], skipped: 0, promoted: [] },
+    });
     expect(await rolesOf(workspace)).toEqual({
       [adminUserId]: "Editor",
       [second]: "Admin",
@@ -245,7 +254,7 @@ describe("changing the role of many members", () => {
 
     const changed = await asAdmin(workspace, changingRoles([viewer, viewer], "Editor"));
 
-    expect(changed).toEqual({ ok: true, value: { changed: [viewer], skipped: 0 } });
+    expect(changed).toEqual({ ok: true, value: { changed: [viewer], skipped: 0, promoted: [] } });
     expect(await subjectsOf(workspace, ROLE_CHANGED)).toEqual([viewer]);
   });
 

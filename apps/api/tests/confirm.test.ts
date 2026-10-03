@@ -186,12 +186,20 @@ describe("confirming with a passkey", () => {
 describe("confirming with an authenticator", () => {
   it("confirms this session with a working code", async () => {
     const { client, key } = await anAdminWithAnAuthenticator(app());
-    expect((await heldOn(client)).thisSession).toEqual({ confirmed: false, setupGranted: false });
+    expect((await heldOn(client)).thisSession).toMatchObject({
+      confirmed: false,
+      setupGranted: false,
+      standing: "confirm",
+    });
 
     const answered = await confirmWithTheAuthenticator(client, key);
 
     expect(await answered.json()).toEqual({ confirmed: true });
-    expect((await heldOn(client)).thisSession).toEqual({ confirmed: true, setupGranted: false });
+    expect((await heldOn(client)).thisSession).toMatchObject({
+      confirmed: true,
+      setupGranted: false,
+      standing: "confirmed",
+    });
   });
 
   it("refuses wrong codes, and the sixth makes the next wait", async () => {
@@ -297,7 +305,10 @@ describe("spending a recovery code", () => {
     expect(refused.status).toBe(409);
     expect(await refused.json()).toEqual({ error: "setup-not-granted" });
     expect(started.status).toBe(200);
-    expect((await heldOn(client)).thisSession).toEqual({ confirmed: false, setupGranted: true });
+    expect((await heldOn(client)).thisSession).toMatchObject({
+      confirmed: false,
+      setupGranted: true,
+    });
     expect(noticesTo(person.email, CODE_USED_NOTICE)).toBe(1);
   });
 
@@ -335,7 +346,7 @@ describe("replacing the factors after a spent code", () => {
     const held = await heldOn(client);
     expect(held.passkeys).toEqual([]);
     expect(held.authenticator).toBe("set-up");
-    expect(held.thisSession).toEqual({ confirmed: true, setupGranted: false });
+    expect(held.thisSession).toMatchObject({ confirmed: true, setupGranted: false });
     expect(noticesTo(person.email, REPLACED_NOTICE)).toBe(1);
     const oldCode = await client.json(RECOVERY, { code: recoveryCodes[1] });
     expect(await oldCode.json()).toEqual({ error: "recovery-code-wrong" });
@@ -366,7 +377,7 @@ describe("replacing the factors after a spent code", () => {
     const held = await heldOn(client);
     expect(held.passkeys.map((passkey) => passkey.id)).toEqual([added.passkeyId]);
     expect(held.authenticator).toBe("none");
-    expect(held.thisSession).toEqual({ confirmed: true, setupGranted: false });
+    expect(held.thisSession).toMatchObject({ confirmed: true, setupGranted: false });
     expect(noticesTo(person.email, REPLACED_NOTICE)).toBe(1);
   });
 

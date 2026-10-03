@@ -13,6 +13,7 @@ import {
 import { testData } from "@better-answers/schema/testing";
 
 import { IDENTITY_PRINCIPAL } from "../src/identity-principal.ts";
+import { authenticatorKeyOf, holdAnAuthenticator, savedRecoveryCodes } from "./factor-harness.ts";
 import {
   accessAsking,
   askToJoin,
@@ -30,10 +31,9 @@ import {
 import type { TestApp } from "./harness.ts";
 import {
   codeSentPastItsExpiry,
+  pendingSessionsPastTheirHour,
   restoredByTheOperator,
   sessionsSignedInOverAnHourAgo,
-  setUpAnAuthenticator,
-  signedInClient,
 } from "./provoke.ts";
 
 const HARNESS_PREFIX = "/__harness";
@@ -84,6 +84,29 @@ const marking = z.object({ email: z.string().min(1), change: z.enum(MARK_CHANGES
 const aging = z.object({ userId: z.string().min(1) });
 const codeAging = z.object({ email: z.string().min(1) });
 const byEmail = z.object({ email: z.string().min(1) });
+/** Saved by default, as a first setup leaves an Admin; `none` is someone just made one. */
+const CODES_GIVEN = ["saved", "none"] as const;
+
+type CodesGiven = (typeof CODES_GIVEN)[number];
+
+const enrolling = byEmail.extend({ codes: z.enum(CODES_GIVEN).default("saved") });
+
+type Enrolled = { readonly key: string; readonly recoveryCodes: readonly string[] };
+
+/** Asked again for the same person, the harness answers what it gave them the first time. */
+const enrolments = (app: TestApp) => {
+  const held = new Map<string, Enrolled>();
+  return {
+    get: (personId: string) => held.get(personId),
+    enrol: async (personId: string, codes: CodesGiven): Promise<Enrolled> => {
+      const key = authenticatorKeyOf(app, personId) ?? (await holdAnAuthenticator(app, personId));
+      const recoveryCodes = codes === "saved" ? await savedRecoveryCodes(app, personId) : [];
+      const enrolled = { key, recoveryCodes };
+      held.set(personId, enrolled);
+      return enrolled;
+    },
+  };
+};
 const testWorkspace = z.object({
   testingDomain: z.string().min(1),
   slug: z.string().min(1),
@@ -91,6 +114,16 @@ const testWorkspace = z.object({
   editor: z.string().min(1),
   viewer: z.string().min(1),
 });
+
+const personIdOf = async (app: TestApp, email: string): Promise<string> => {
+  const found = await app.database.superuser.query<{ id: string }>(
+    'SELECT id FROM "user" WHERE lower(email) = lower($1)',
+    [email],
+  );
+  const id = found.rows[0]?.id;
+  if (id === undefined) throw new Error(`the harness holds no person at ${email}`);
+  return id;
+};
 
 const readBody = async <T>(request: Request, schema: z.ZodType<T>): Promise<T> => {
   const parsed = schema.safeParse(await request.json());
@@ -101,6 +134,7 @@ const readBody = async <T>(request: Request, schema: z.ZodType<T>): Promise<T> =
 /** Routes under `/__harness` through which the browser suite drives the TestApp as a test would. */
 export const harnessControl = (app: TestApp): Hono => {
   const control = new Hono();
+  const enrolled = enrolments(app);
 
   control.post(`${HARNESS_PREFIX}/workspaces`, async (context) => {
     const asked = await readBody(context.req.raw, provisioning);
@@ -137,6 +171,13 @@ export const harnessControl = (app: TestApp): Hono => {
     return context.json({ aged: true });
   });
 
+  // The pending hour is too long for a spec to wait, so its clock is moved back the same way.
+  control.post(`${HARNESS_PREFIX}/pending-sessions/aged`, async (context) => {
+    const asked = await readBody(context.req.raw, aging);
+    await pendingSessionsPastTheirHour(app, asked.userId);
+    return context.json({ aged: true });
+  });
+
   // A code's lifetime is too long for a spec to wait, so its expiry is moved back the same way.
   control.post(`${HARNESS_PREFIX}/codes/aged`, async (context) => {
     const asked = await readBody(context.req.raw, codeAging);
@@ -144,11 +185,12 @@ export const harnessControl = (app: TestApp): Hono => {
     return context.json({ aged: true });
   });
 
-  // The library's own setup, signed in by one emailed code; the key answered makes the codes.
+  // Sealed as the plugin seals one, spending no emailed code; the key answered makes the codes.
   control.post(`${HARNESS_PREFIX}/authenticators`, async (context) => {
-    const asked = await readBody(context.req.raw, byEmail);
-    const key = await setUpAnAuthenticator(app, await signedInClient(app, asked.email));
-    return context.json({ key });
+    const asked = await readBody(context.req.raw, enrolling);
+    const personId = await personIdOf(app, asked.email);
+    const held = enrolled.get(personId) ?? (await enrolled.enrol(personId, asked.codes));
+    return context.json(held);
   });
 
   // The ops command's own restore, so a spec meets the person as the operator leaves them.

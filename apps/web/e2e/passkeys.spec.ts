@@ -13,6 +13,7 @@ import {
   PASSKEY_UNKNOWN,
   SAID_OF_SECOND_FACTOR,
 } from "@/features/auth/refusal-words.ts";
+import { SETUP_WORDS } from "@/features/auth/second-factor-words.ts";
 import { SIGN_IN_WORDS } from "@/features/auth/sign-in-words.ts";
 import { NO_WORKSPACE_HEADING } from "@/features/auth/workspace-words.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
@@ -22,8 +23,9 @@ import {
   aMemberSignedInAt,
   anAddress,
   emailsSentTo,
+  landedAtHome,
   provision,
-  signedInAtHome,
+  signInByEmail,
   signedInWithNoWorkspace,
   tabUntilFocused,
 } from "./harness.ts";
@@ -162,14 +164,18 @@ test("a second passkey from the same device is refused", async ({ page, request 
 test("an Admin keeps their only passkey, told why beside Remove", async ({ page, request }) => {
   await aVirtualAuthenticator(page);
   const { admin } = await provision(request, { name: "Passkeys Ltd" });
-  await signedInAtHome(page, request, admin.email);
-  await accountOpened(page);
-
-  const name = await passkeyAdded(page);
+  // An Admin holding no factor sets their first one up before anything else.
+  await page.goto("/sign-in");
+  await signInByEmail(page, request, admin.email);
+  const name = await suggestedName(page);
+  await expect(page.getByLabel(PASSKEY_WORDS.nameField)).toHaveValue(name);
+  await page.getByRole("button", { name: SETUP_WORDS.addPasskey }).click();
 
   await expect(page.getByRole("heading", { name: RECOVERY_CODE_WORDS.saveHeading })).toBeFocused();
   await page.getByRole("checkbox", { name: RECOVERY_CODE_WORDS.saved }).check();
-  await page.getByRole("button", { name: RECOVERY_CODE_WORDS.done }).click();
+  await page.getByRole("button", { name: RECOVERY_CODE_WORDS.finish }).click();
+  await landedAtHome(page, "Admin");
+  await accountOpened(page);
   const remove = rowOf(page, name).getByRole("button", { name: PASSKEY_WORDS.remove });
   await expect(remove).toHaveAttribute("aria-disabled", "true");
   await expect(remove).toHaveAccessibleDescription(

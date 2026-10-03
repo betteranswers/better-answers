@@ -254,9 +254,12 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
   /** Asks and adds count apart. */
   routes.post(
     PASSKEY_ADD_OPTIONS_PATH,
-    fenced.asThePerson("passkey-ask", PASSKEY_PERSON_RULE, askToAdd),
+    fenced.asThePerson("passkey-ask", PASSKEY_PERSON_RULE, "set-up-a-factor", askToAdd),
   );
-  routes.post(PASSKEY_ADD_PATH, fenced.asThePerson("passkey-add", PASSKEY_PERSON_RULE, add));
+  routes.post(
+    PASSKEY_ADD_PATH,
+    fenced.asThePerson("passkey-add", PASSKEY_PERSON_RULE, "set-up-a-factor", add),
+  );
   routes.post(PASSKEY_SIGN_IN_OPTIONS_PATH, askToSignIn);
   routes.post(PASSKEY_SIGN_IN_PATH, signIn);
 };

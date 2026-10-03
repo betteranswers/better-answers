@@ -7,13 +7,21 @@ import { authenticatorCodeAt, keyIn } from "@better-answers/schema/testing/authe
 
 import { IDENTITY_PRINCIPAL } from "../src/identity-principal.ts";
 import { authOver } from "./auth-instance.ts";
-import { signIn } from "./flow.ts";
+import { signIn, signInByEmailOnly } from "./flow.ts";
 import type { TestApp, TestClient } from "./harness.ts";
 import { aPasskeyDevice } from "./passkey-device.ts";
 
+/** Past the second factor where one is required, by the harness's own writes. */
 export const signedInClient = async (app: TestApp, email: string): Promise<TestClient> => {
   const client = app.client();
   await signIn(app, client, email);
+  return client;
+};
+
+/** By the emailed code alone: a person who must hold a second factor is left pending. */
+export const signedInByEmailOnly = async (app: TestApp, email: string): Promise<TestClient> => {
+  const client = app.client();
+  await signInByEmailOnly(app, client, email);
   return client;
 };
 
@@ -23,10 +31,10 @@ export const aPersonSignedIn = async (app: TestApp) => {
   return { person, client: await signedInClient(app, person.email) };
 };
 
-/** A new workspace's Admin, who must hold a factor, signed in. */
+/** A new workspace's Admin, who must hold a factor and holds none, signed in and pending setup. */
 export const anAdminSignedIn = async (app: TestApp) => {
   const { admin } = await app.provision();
-  return { admin, client: await signedInClient(app, admin.email) };
+  return { admin, client: await signedInByEmailOnly(app, admin.email) };
 };
 
 /**
@@ -50,8 +58,8 @@ export const setUpAnAuthenticator = async (app: TestApp, client: TestClient): Pr
 
 /** An authenticator set up for `email`, then a session signed in by email and not yet confirmed. */
 const heldThenSignedIn = async (app: TestApp, email: string) => {
-  const key = await setUpAnAuthenticator(app, await signedInClient(app, email));
-  return { key, client: await signedInClient(app, email) };
+  const key = await setUpAnAuthenticator(app, await signedInByEmailOnly(app, email));
+  return { key, client: await signedInByEmailOnly(app, email) };
 };
 
 /** A person in no workspace holding an authenticator whose `key` makes its codes. */
@@ -127,7 +135,7 @@ export const aPersonHoldingEverything = async (app: TestApp) => {
     device,
     key: keyIn(setupAddress),
     recoveryCodes,
-    client: await signedInClient(app, person.email),
+    client: await signedInByEmailOnly(app, person.email),
   };
 };
 
@@ -226,6 +234,14 @@ export const sessionsSignedInOverAnHourAgo = async (
 ): Promise<void> => {
   await app.database.superuser.query(
     "UPDATE session SET created_at = now() - interval '61 minutes' WHERE user_id = $1",
+    [userId],
+  );
+};
+
+/** Moves every session `userId` holds to a pending hour that ended a minute ago, as if unconfirmed. */
+export const pendingSessionsPastTheirHour = async (app: TestApp, userId: string): Promise<void> => {
+  await app.database.superuser.query(
+    "UPDATE session SET pending_since = now() - interval '61 minutes' WHERE user_id = $1",
     [userId],
   );
 };
