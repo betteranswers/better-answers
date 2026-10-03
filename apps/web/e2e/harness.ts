@@ -122,11 +122,17 @@ export const ageThePendingHour = (api: APIRequestContext, userId: string) =>
 export const ageTheCode = (api: APIRequestContext, email: string) =>
   ask(api, "/codes/aged", { email }, signInAged);
 
-const keyEnrolled = z.object({ key: z.string() });
+const enrolled = z.object({ key: z.string(), recoveryCodes: z.array(z.string()) });
 
-/** Written straight to the store, spending no emailed code and issuing no recovery codes. */
+/** Spends no emailed code; ten codes come saved, as a first setup leaves an Admin, unless `none`. */
+export const enrolledWith = (
+  api: APIRequestContext,
+  email: string,
+  codes: "saved" | "none" = "saved",
+) => ask(api, "/authenticators", { email, codes }, enrolled);
+
 export const withAnAuthenticator = async (api: APIRequestContext, email: string) =>
-  (await ask(api, "/authenticators", { email }, keyEnrolled)).key;
+  (await enrolledWith(api, email)).key;
 
 /** The platform operator's restore, ending the person's factors and sessions; answers its code. */
 export const restored = async (api: APIRequestContext, email: string) =>

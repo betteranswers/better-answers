@@ -485,23 +485,31 @@ export const createAuth = (deps: AuthDependencies) => {
     return typeof token === "string" ? token : undefined;
   };
 
+  const readWithoutRenewal = (ctx: GateContext) =>
+    ctx.path === "/get-session"
+      ? { context: { query: { ...ctx.query, disableRefresh: true } } }
+      : undefined;
+
+  /** Past its hour, the row may outlive a skipped delete; signed out, as every other root reads it. */
+  const endedHere = (ctx: GateContext) => {
+    if (!PENDING_LIBRARY_PATHS.has(ctx.path)) throw new APIError("UNAUTHORIZED");
+    return readWithoutRenewal(ctx);
+  };
+
   /** A pending session reads itself without renewing it, and reaches nothing else here. */
   const gateTheLibrary = async (ctx: GateContext) => {
     const token = await gatedToken(ctx);
     if (token === undefined) return undefined;
     const standing = await judged(deps, { token });
-    if (!standing.ok) {
-      if (standing.error instanceof Error) throw standing.error;
-      return undefined;
-    }
+    if (!standing.ok && standing.error instanceof Error) throw standing.error;
+    if (!standing.ok) return endedHere(ctx);
     if (refusalFor(standing.value.standing, PENDING_LIBRARY_PATHS.get(ctx.path)) !== undefined) {
       throw new APIError("FORBIDDEN", {
         code: SECOND_FACTOR_PENDING,
         message: "Confirm the second factor first",
       });
     }
-    if (ctx.path !== "/get-session" || !isPending(standing.value.standing)) return undefined;
-    return { context: { query: { ...ctx.query, disableRefresh: true } } };
+    return isPending(standing.value.standing) ? readWithoutRenewal(ctx) : undefined;
   };
 
   const db = drizzle(deps.database, { schema: identitySchema });

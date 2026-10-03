@@ -1,9 +1,11 @@
 import { z } from "zod";
 
+import { acknowledgeRecoveryCodes, replaceRecoveryCodes } from "@better-answers/core/workspaces";
 import { testData } from "@better-answers/schema/testing";
 import { keyIn } from "@better-answers/schema/testing/authenticator-code";
 
 import { mintAuthenticatorKey } from "../src/auth/authenticator-key.ts";
+import { IDENTITY_PRINCIPAL } from "../src/identity-principal.ts";
 import { authOver } from "./auth-instance.ts";
 import type { TestApp, TestClient } from "./harness.ts";
 
@@ -27,6 +29,25 @@ export const holdAnAuthenticator = async (app: TestApp, personId: string): Promi
   const key = keyIn(setupAddress);
   keysOf(app).set(personId, key);
   return key;
+};
+
+/** As a first setup leaves a person: ten codes, ticked as saved. One already holding a set keeps it. */
+export const savedRecoveryCodes = async (
+  app: TestApp,
+  personId: string,
+): Promise<readonly string[]> => {
+  const door = app.doors.postgres;
+  const made = await replaceRecoveryCodes(IDENTITY_PRINCIPAL, door, {
+    personId,
+    replacing: false,
+    now: new Date(),
+  });
+  if (!made.ok && made.error === "recovery-codes-held") return [];
+  if (!made.ok) throw new Error(`no recovery codes were made: ${String(made.error)}`);
+  const { madeAt, recoveryCodes } = made.value;
+  const saved = await acknowledgeRecoveryCodes(IDENTITY_PRINCIPAL, door, { personId, madeAt });
+  if (!saved.ok) throw new Error(`the recovery codes were not saved: ${String(saved.error)}`);
+  return recoveryCodes;
 };
 
 /** The key of an authenticator `holdAnAuthenticator` gave the person, if it gave one. */

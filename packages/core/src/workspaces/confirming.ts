@@ -35,7 +35,13 @@ import {
   restoredByTheOperator,
   spendingARecoveryCode,
 } from "./recovery-codes.ts";
-import { factsOf, recordingTheirOwn, SETUP_GRANTED, stamping } from "./second-factor.ts";
+import {
+  factsOf,
+  recordingTheirOwn,
+  SETUP_GRANTED,
+  stamping,
+  unconfirmingTheOthers,
+} from "./second-factor.ts";
 import { AUTHENTICATOR_SECRET_PREFIX, OPERATOR_RESTORE_PREFIX } from "./sign-in-and-consent.ts";
 import type { WorkspaceRefusal } from "./vocabulary.ts";
 
@@ -402,7 +408,10 @@ type Replaced = { readonly issued: RecoveryCodesMade };
 const REPLACED_FLAGS = `
   UPDATE "user" SET authenticator_enabled = $2, restore_required_at = NULL WHERE id = $1`;
 
-/** Every session's grant goes: one left standing could replace the new factor unconfirmed. */
+/**
+ * Every session's grant goes, and every other session's stamp: either left standing would outlast
+ * the lost factors.
+ */
 const finishingTheReplacement = async (
   platform: PlatformPrincipal,
   tx: Tx,
@@ -411,6 +420,7 @@ const finishingTheReplacement = async (
 ): Promise<Replaced> => {
   await tx.query(REPLACED_FLAGS, [held.personId, by === "authenticator"]);
   await tx.query("UPDATE session SET setup_granted_at = NULL WHERE user_id = $1", [held.personId]);
+  await unconfirmingTheOthers(tx, held.personId, held.sessionId);
   await tx.query("DELETE FROM verification WHERE identifier = $1", [parkedUnder(held.sessionId)]);
   const issued = await issuingRecoveryCodes(platform, tx, held.personId, held.now);
   await stamping(tx, { sessionId: held.sessionId, personId: held.personId, at: held.now });

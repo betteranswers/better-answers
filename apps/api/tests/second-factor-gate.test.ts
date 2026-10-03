@@ -300,6 +300,28 @@ describe("a pending session's hour", () => {
     expect(await sessionRowsOf(admin.id)).toEqual([]);
   });
 
+  it("refuses a held session past its hour at the library", async () => {
+    const { admin } = await anAdminHolding();
+    const client = await signedInByEmailOnly(app(), admin.email);
+    expect(await membershipOf(client)).toMatchObject(PENDING);
+    const holder = await app().database.superuser.connect();
+
+    shift.ms = ONE_HOUR_MS + 60_000;
+    try {
+      await holder.query("BEGIN");
+      await holder.query("SELECT id FROM session WHERE user_id = $1 FOR UPDATE", [admin.id]);
+
+      const listed = await client.fetch("/organization/list");
+
+      expect(listed.status).toBe(401);
+      expect(await sessionRowsOf(admin.id)).toHaveLength(1);
+    } finally {
+      shift.ms = 0;
+      await holder.query("ROLLBACK");
+      holder.release();
+    }
+  });
+
   it("keeps an older session an hour from its next request", async () => {
     const { admin } = await anAdminHolding();
     const client = await signedInByEmailOnly(app(), admin.email);

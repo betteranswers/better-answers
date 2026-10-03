@@ -39,7 +39,7 @@ A person who is an Admin in any workspace, and the operator, must hold a second 
 - **The refusal has its own word,** `second-factor-pending`, in the `precondition` class. Signing in again would only meet it again, so the SPA sends the person to confirm or setup, never to sign-in.
 - **`/get-session` answers a pending session without renewing it.**
 - **Becoming an Admin or the operator is a promotion.** Each act that makes a person one, from needing no factor, clears every session's confirmation and pending clock in its own transaction, and marks the person (`user.promoted_at`) until they first confirm. The confirm page then lists every credential that can confirm, by name and date. The tRPC acts mail the same list once they commit: a role move, a bulk role move and an Admin invitation accepted.
-- **A confirmation does not outlive its factor.** Removing a passkey or the authenticator clears the confirmation of the person's other sessions; the session that removed it keeps its own.
+- **A confirmation does not outlive its factor.** Removing a passkey or the authenticator, or replacing every factor after a recovery code, clears the confirmation of the person's other sessions; the session that acted keeps its own.
 - **Tests sign in past the gate by the harness's own writes,** never by weakening it. The api suites' `signIn` gives a person who must hold a factor an authenticator if they hold none and stamps the session. The browser suite confirms through the real confirm page with an authenticator the harness writes. The gate's own tests sign in by email alone.
 
 ## Why

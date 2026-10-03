@@ -7,6 +7,7 @@ import {
 import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
 
 import {
+  ACT_LANDED,
   AUTHENTICATOR_WORDS,
   PASSKEY_WORDS,
   RECOVERY_CODE_WORDS,
@@ -36,7 +37,7 @@ import {
   saysItsSentenceNotItsWord,
   signIn,
   signInByEmail,
-  withAnAuthenticator,
+  enrolledWith,
 } from "./harness.ts";
 import { aVirtualAuthenticator, withoutWebAuthn } from "./virtual-authenticator.ts";
 
@@ -90,12 +91,16 @@ const signedInAgain = async (page: Page, api: APIRequestContext, email: string) 
   await signedInWaiting(page, api, email, CONFIRM_WORDS.heading);
 };
 
-/** Left on the confirm page, not yet confirmed. */
-const anAdminWithAnAuthenticator = async (page: Page, api: APIRequestContext) => {
+/** Left on the confirm page, not yet confirmed, holding ten saved codes unless told none. */
+const anAdminWithAnAuthenticator = async (
+  page: Page,
+  api: APIRequestContext,
+  codes: "saved" | "none" = "saved",
+) => {
   const { admin } = await provision(api, { name: "Calder Confirmations" });
-  const key = await withAnAuthenticator(api, admin.email);
+  const { key, recoveryCodes } = await enrolledWith(api, admin.email, codes);
   await signedInWaiting(page, api, admin.email, CONFIRM_WORDS.heading);
-  return { email: admin.email, key };
+  return { email: admin.email, key, codes: recoveryCodes };
 };
 
 /** The gate opens the Account page only to a confirmed session. */
@@ -111,23 +116,6 @@ const codesTicked = async (page: Page, finish: string): Promise<void> => {
   await expect(codesListed(page)).toHaveCount(0);
 };
 
-const codesMadeOnTheAccountPage = async (page: Page): Promise<readonly string[]> => {
-  await page.goto("/account");
-  await page.getByRole("button", { name: RECOVERY_CODE_WORDS.make }).click();
-  await expect(codesListed(page)).toHaveCount(RECOVERY_CODES_IN_A_SET);
-  return codesListed(page).allInnerTexts();
-};
-
-/** An Admin holding an authenticator and saved codes, signed in by email and not yet confirmed. */
-const anAdminWithSavedCodes = async (page: Page, api: APIRequestContext) => {
-  const admin = await anAdminWithAnAuthenticator(page, api);
-  await confirmedByCode(page, admin.key);
-  const codes = await codesMadeOnTheAccountPage(page);
-  await codesTicked(page, RECOVERY_CODE_WORDS.done);
-  await signedInAgain(page, api, admin.email);
-  return { ...admin, codes };
-};
-
 /**
  * The add confirms its own session, so the Admin signs in by email again with the device
  * unattended, or its autofill signs in instead.
@@ -140,7 +128,7 @@ const anAdminWithBothFactors = async (page: Page, api: APIRequestContext) => {
   await page.getByRole("button", { name: PASSKEY_WORDS.add }).click();
   await page.getByLabel(PASSKEY_WORDS.nameField).fill("Work laptop");
   await page.getByRole("button", { name: PASSKEY_WORDS.addCommit }).click();
-  await codesTicked(page, RECOVERY_CODE_WORDS.done);
+  await expect(page.getByText(ACT_LANDED.passkeyAdded("Work laptop", admin.email))).toBeVisible();
 
   await device.leftUnattended();
   await signedInAgain(page, api, admin.email);
@@ -244,7 +232,7 @@ test("a recovery code's setup swaps in a new authenticator", async ({
   request,
   passesTheAccessibilityGate,
 }) => {
-  const { email, key, codes } = await anAdminWithSavedCodes(page, request);
+  const { email, key, codes } = await anAdminWithAnAuthenticator(page, request);
 
   await recoveryCodeSpent(page, codes[0] ?? "");
   await expect(page.getByText(SETUP_WORDS.newWhy)).toBeVisible();
@@ -263,7 +251,7 @@ test("a recovery code's setup swaps in a new authenticator", async ({
 });
 
 test("after a recovery code, another email sign-in must confirm", async ({ page, request }) => {
-  const { email, key, codes } = await anAdminWithSavedCodes(page, request);
+  const { email, key, codes } = await anAdminWithAnAuthenticator(page, request);
   await recoveryCodeSpent(page, codes[0] ?? "");
 
   await signedInAgain(page, request, email);
@@ -318,9 +306,12 @@ test("unticked codes come back as a new set at sign-in", async ({
   request,
   passesTheAccessibilityGate,
 }) => {
-  const { email, key } = await anAdminWithAnAuthenticator(page, request);
-  await confirmedByCode(page, key);
-  const first = await codesMadeOnTheAccountPage(page);
+  const { email, key } = await anAdminWithAnAuthenticator(page, request, "none");
+  await codeField(page).fill(codeOf(key));
+  await expect(heading(page, RECOVERY_CODE_WORDS.saveHeading)).toBeVisible();
+  await expect(codesListed(page)).toHaveCount(RECOVERY_CODES_IN_A_SET);
+  await expect(page.getByText(RECOVERY_CODE_WORDS.replacedLine)).toHaveCount(0);
+  const first = await codesListed(page).allInnerTexts();
 
   await page.context().clearCookies();
   await page.goto("/sign-in");

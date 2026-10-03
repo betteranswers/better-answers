@@ -44,6 +44,32 @@ describe("the browser suite's second-factor harness", () => {
     });
   });
 
+  it("gives saved recovery codes beside the authenticator, unless told not", async () => {
+    const [saved, none] = [await app().person(), await app().person()];
+    const enrolled = z.object({ key: z.string(), recoveryCodes: z.array(z.string()) });
+
+    const withCodes = enrolled.parse(await harnessAnswer("/__harness/authenticators", saved.email));
+    const without = enrolled.parse(
+      await harnessAnswer("/__harness/authenticators", none.email, {
+        email: none.email,
+        codes: "none",
+      }),
+    );
+
+    const heldBy = async (email: string) =>
+      webClientOf(await signedInClient(app(), email)).api.person.secondFactor.query();
+    expect(withCodes.recoveryCodes).toHaveLength(10);
+    expect(await heldBy(saved.email)).toMatchObject({
+      authenticator: "set-up",
+      recoveryCodes: { unused: 10 },
+      codesAcknowledged: true,
+    });
+    expect([without.recoveryCodes, (await heldBy(none.email)).recoveryCodes]).toEqual([
+      [],
+      undefined,
+    ]);
+  });
+
   it("restores a person with a code the restore route accepts", async () => {
     const { person, client: before } = await aPersonSignedIn(app());
     const { code } = z
