@@ -202,6 +202,18 @@ describe("adding a passkey", () => {
 
     expect(refused.status).toBe(403);
   });
+
+  it.each([ADD_OPTIONS, ADD])("answers 429 at %s past ten in ten minutes", async (path) => {
+    const { client } = await aSignedInPerson();
+    const answers: number[] = [];
+
+    for (let asked = 0; asked < 11; asked += 1) {
+      answers.push((await client.json(path, { name: "Phone" })).status);
+    }
+
+    expect(answers.slice(0, -1)).not.toContain(429);
+    expect(answers.at(-1)).toBe(429);
+  });
 });
 
 describe("signing in with a passkey", () => {
@@ -278,15 +290,15 @@ describe("signing in with a passkey", () => {
     expect(options).toEqual({ userVerification: "required" });
   });
 
-  it("answers 429 past thirty asks a minute from one address", async () => {
+  it.each([SIGN_IN_OPTIONS, SIGN_IN])("answers 429 at %s past thirty a minute", async (path) => {
     const browser = app().client();
     const answers: number[] = [];
 
     for (let asked = 0; asked < 31; asked += 1) {
-      answers.push((await browser.json(SIGN_IN_OPTIONS, {})).status);
+      answers.push((await browser.json(path, {})).status);
     }
 
-    expect(answers.at(-2)).toBe(200);
+    expect(answers.slice(0, -1)).not.toContain(429);
     expect(answers.at(-1)).toBe(429);
   });
 
