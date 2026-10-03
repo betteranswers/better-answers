@@ -190,7 +190,7 @@ The nightly journeys sign in to production as three test people, the test Admin,
 
    The message is listed. If it bounced instead, fix the routing first: production's sign-in email to a test address that bounces puts the address on production's Resend suppression list, and every later night then reads `no-mail`. Then choose three addresses on the testing domain, one each for the test Admin, Editor and Viewer.
 
-2. **The `production` environment.** Put the inbox key, the Worker's URL and the three addresses in it as secrets, under the names the journeys read. U6's workflow passes them on. The addresses and the URL are secrets and never variables: the repository is public, and a variable prints in a run's logs. The sixth secret, the ping URL, comes from step 3. Production's sender is no secret, since every sign-in email carries it, so `JOURNEYS_SENDER` is a variable of the environment. Then set `JOURNEYS_MODE`, the repository variable U6 adds, to `report`:
+2. **The `production` environment.** Put the inbox key, the Worker's URL and the three addresses in it as secrets, under the names the journeys read. `release.yml`'s journeys job passes them to the journeys' step alone. The addresses and the URL are secrets and never variables: the repository is public, and a variable prints in a run's logs. The sixth secret, the ping URL, comes from step 3. Production's sender is no secret, since every sign-in email carries it, so `JOURNEYS_SENDER` is a variable of the environment. Then set `JOURNEYS_MODE`, the repository variable `release.yml`'s gate reads, to `report`:
 
    ```sh
    gh secret set JOURNEYS_INBOX_KEY --env production      # the inbox key, the Worker's READ_TOKEN
@@ -202,9 +202,9 @@ The nightly journeys sign in to production as three test people, the test Admin,
    gh variable set JOURNEYS_MODE --body report
    ```
 
-   `gh secret set` asks for the value, so it never lands in the shell's history. A run whose `JOURNEYS_INBOX_URL` is anything but that bare `https` address ends `could-not-run` and names the setting. U6's journeys step sets `JOURNEYS_CODE_SOURCE` to `inbox` itself; a run by hand against the browser suite's api sets it to `harness`. `JOURNEYS_MODE` takes three values. Under `off` the journeys do not run. Under `report` they run and report, and a release is tagged on its smoke as today. Under `gate` a release is tagged only when its journeys end `held`. The gate refuses any other value and names the three.
+   `gh secret set` asks for the value, so it never lands in the shell's history. A run whose `JOURNEYS_INBOX_URL` is anything but that bare `https` address ends `could-not-run` and names the setting. U6's journeys step sets `JOURNEYS_CODE_SOURCE` to `inbox` itself; a run by hand against the browser suite's api sets it to `harness`. `JOURNEYS_MODE` takes three values. Under `off`, or while it is unset, the journeys do not run. Under `report` they run and report, and a release is tagged on its smoke as today. Under `gate` a release is tagged only when its journeys end `held`. The gate refuses any other value and names the three. A release that `build.yml` calls after a merge never runs the journeys, and keeps its smoke-only tag under every value.
 
-3. **The check.** At the dead-man service, make a project of its own, apart from the one holding the backup checks, with one check named `journeys`. Its period is one day and its grace 12 hours. The service counts the period from the last ping, and GitHub starts a scheduled run late: the nightly `release` is set for 02:35 UTC, and from 28/09 to 02/10/2026 GitHub started it between 08:55 and 09:52 UTC. A night that starts on time after a late one is no problem, but a late night after an on-time one leaves a gap of more than 31 hours. A ping that says `fail` or `could-not-run` marks the check down at once, whatever the grace. So a long grace only delays the alert for a night with no run at all. A project's integrations are its own, so add the second channel to the new project. Copy the check's ping URL in its UUID form, which pings that check alone. A separate project means a leaked URL can never ping `pg-hourly` or `nightly`. Put the URL in the `production` environment as a secret, under the name U6's `release.yml` reads.
+3. **The check.** At the dead-man service, make a project of its own, apart from the one holding the backup checks, with one check named `journeys`. Its period is one day and its grace 12 hours. The service counts the period from the last ping, and GitHub starts a scheduled run late: the nightly `release` is set for 02:35 UTC, and from 28/09 to 02/10/2026 GitHub started it between 08:55 and 09:52 UTC. A night that starts on time after a late one is no problem, but a late night after an on-time one leaves a gap of more than 31 hours. A ping that says `fail` or `could-not-run` marks the check down at once, whatever the grace. So a long grace only delays the alert for a night with no run at all. A project's integrations are its own, so add the second channel to the new project. Copy the check's ping URL in its UUID form, which pings that check alone. A separate project means a leaked URL can never ping `pg-hourly` or `nightly`. Put the URL in the `production` environment as a secret, where only `release.yml`'s report job reads it: `gh secret set JOURNEYS_PING_URL --env production`.
 4. **The fixture.** Once a release carries U1 (#518), run the command on the `api` service. Check that the newest tag's commit descends from U1's merge first:
 
    ```sh
@@ -251,7 +251,13 @@ The nightly journeys sign in to production as three test people, the test Admin,
 
    - **No test address is suppressed.** In production's Resend team, the suppression list holds none of the three test addresses. A suppressed address is sent nothing, and every night reads `no-mail` until it is removed there.
 
-   - **One proof run ends `held`.** Dispatch `release` once from U6's branch, with the journeys-only input U6 adds. The `production` environment still lets a branch in until step 6. The run promotes nothing and pushes no tag. Its summary and the `journeys` check's last ping both read `held`.
+   - **One proof run ends `held`.** Dispatch `release` once from U6's branch, with its journeys-only input, 10 minutes or more after any other sign-in as a test person:
+
+     ```sh
+     gh workflow run release.yml --ref <U6's branch> -f journeys_only=true
+     ```
+
+     The `production` environment still lets a branch in until step 6. The run promotes nothing and pushes no tag. Its summary and the `journeys` check's last ping both read `held`. Afterwards the same command with `--ref main` is the way to run the journeys again after fixing a setup fault.
 
    One case reads wrong, and is worth knowing before the first alert. An email from production's sender to a test address that carries no code reads `fail`, not `could-not-run`, when it is the only new mail in a run's window. Another workspace's invitation to a test address is one. A notice that the test Admin's second factor changed is another.
 
