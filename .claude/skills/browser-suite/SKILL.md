@@ -22,7 +22,15 @@ argument and listens on it, with the harness's control paths
 `apps/api/src`.
 
 One origin carries the SPA, sign-in, consent and `/oauth2/*`, which is why the consent
-flow is provable in a browser at all.
+flow is provable in a browser at all. It is `http://localhost:3100`, never `127.0.0.1`: a
+passkey's relying party must be a domain, and WebAuthn refuses an IP address.
+
+A spec that makes or uses a passkey attaches a virtual authenticator to its page first, through
+`aVirtualAuthenticator` in `apps/web/e2e/virtual-authenticator.ts`, which drives Chromium's
+WebAuthn domain over the DevTools protocol. It verifies its user and answers every prompt with no
+prompt shown, the email field's autofill included: a page opening the sign-in screen while the
+device holds a passkey the platform keeps is signed in at once. `withoutWebAuthn` is a browser
+with none. `apps/web/e2e/passkeys.spec.ts` is the worked example.
 
 `apps/web/playwright.config.ts` holds the port, the `webServer` command — `node tests/serve.ts`
 run in `apps/api`, handed that port — and `/health` as the readiness URL: the one path the loopback
@@ -302,7 +310,8 @@ The donor is Onyx's Playwright skill. Its practices that are ours too:
 - **The Page Object Model.** A screen is located by role and accessible name where it is used, so
   the spec says the words a person would hear rather than a name only the suite knows.
 - **An import alias for the suite.** Onyx forbids relative imports and resolves `@tests/e2e/`;
-  there are two modules to import here, `./browser.ts` and `./harness.ts`.
+  there are three modules to import here, `./browser.ts`, `./harness.ts` and
+  `./virtual-authenticator.ts`.
 - **Visual regression.** Out of scope for v0.1; the aria snapshot is the structural record instead.
 - **Theme runs.** No light/dark matrix.
 - **Long-running dev servers.** Onyx runs against `next dev` and a separate backend; Playwright

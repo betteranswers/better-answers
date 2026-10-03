@@ -26,11 +26,12 @@ const app = await startApp({
   },
   objectStore: objects,
   webRoot: fileURLToPath(new URL("../../web/dist", import.meta.url)),
-  publicUrl: `http://127.0.0.1:${port}`,
+  // A passkey's relying party is a domain, never an IP, so the product is served on `localhost`.
+  publicUrl: `http://localhost:${port}`,
   hostnames: {
-    app: "127.0.0.1",
+    app: "localhost",
     agent: "agent.localhost",
-    apex: "localhost",
+    apex: "apex.localhost",
   },
 });
 
