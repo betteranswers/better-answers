@@ -309,7 +309,8 @@ production's edge sets one. A journey names its person with `test.use({ role })`
 signs them in on the product's own sign-in screen and signs them out on the server afterwards,
 even after a failure. The locators come from `apps/web/e2e/locators.ts`, which `harness.ts`
 re-exports. Production has no harness, so `.oxlintrc.json` refuses any harness act under
-`apps/web/journeys/` except `codeSentTo`, the harness code source below.
+`apps/web/journeys/` except `codeSentTo`, the harness code source below. The harness's Admin key,
+below, is a request of the journeys' own, made only under that source.
 
 | | The browser suite | The journeys |
 | --- | --- | --- |
@@ -332,6 +333,14 @@ the run `could-not-run`:
   production's sender's. It needs `JOURNEYS_INBOX_URL`, `JOURNEYS_INBOX_KEY` and `JOURNEYS_SENDER`.
 - **`harness`**, for a run by hand against the browser suite's api, `apps/api/tests/serve.ts`:
   `codeSentTo` reads the code from its capture, which no email leaves.
+
+After its code, the Admin confirms a second factor on the confirm page, typing the code an
+authenticator key makes; it never presses the passkey button. Under `inbox` the key is
+`JOURNEYS_ADMIN_AUTHENTICATOR_KEY`, as setup shows it or the `otpauth://` link it is in, and a
+missing or unparseable one ends the run `could-not-run` before any code is sent. Under `harness`
+the run asks `POST /__harness/authenticators` for the test Admin's key before the sign-in. It
+writes the Admin an authenticator with saved recovery codes if they hold none, and answers the same
+key on a second ask, so a by-hand run needs no key and skips no step.
 
 Both read the test people's addresses from `JOURNEYS_ADMIN_EMAIL`, `JOURNEYS_EDITOR_EMAIL` and
 `JOURNEYS_VIEWER_EMAIL`. By hand, build first, start the api with

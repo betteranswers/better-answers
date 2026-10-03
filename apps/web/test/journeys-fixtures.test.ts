@@ -12,6 +12,8 @@ import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticato
 import { CONFIRM_WORDS } from "@/features/auth/second-factor-words.ts";
 import { SIGN_IN_WORDS } from "@/features/auth/sign-in-words.ts";
 
+// oxlint-disable-next-line no-restricted-imports -- the journeys sit outside `src`, where no alias reaches
+import { authenticatorKeyOf } from "../journeys/second-factor.ts";
 import {
   closeEveryStandIn,
   inboxStandIn,
@@ -404,6 +406,30 @@ describe("the Admin's second factor", () => {
       ),
     ]);
   }, 180_000);
+});
+
+describe("the test Admin's authenticator key, as the setting holds it", () => {
+  it.each([
+    ["as setup shows it", KEY],
+    ["in the spaced groups setup shows", "JBSW Y3DP EHPK 3PXP JBSW Y3DP EHPK 3PXP"],
+    ["in lower case, a newline after", `${KEY.toLowerCase()}\n`],
+    [
+      "from its otpauth link",
+      "otpauth://totp/Better%20Answers:admin?secret=jbsw%20y3dp%20ehpk%203pxp%20jbsw%20y3dp%20ehpk%203pxp&issuer=Better%20Answers",
+    ],
+  ])("reads the key %s", (_, held) => {
+    expect(authenticatorKeyOf(held)).toBe(KEY);
+  });
+
+  it.each([
+    ["nothing", undefined],
+    ["an empty setting", ""],
+    ["a value outside base32", "not-a-key!"],
+    ["a key too short", "JBSWY3DP"],
+    ["a link without a secret", "otpauth://totp/Better%20Answers:admin?issuer=Better%20Answers"],
+  ])("reads no key from %s", (_, held) => {
+    expect(authenticatorKeyOf(held)).toBeUndefined();
+  });
 });
 
 const VIEWER = "viewer@journeys.example";

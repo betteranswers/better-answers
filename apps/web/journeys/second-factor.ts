@@ -14,23 +14,36 @@ const CONFIRM_PATH = "/second-factor/confirm/authenticator";
 /** The product answers this when the session's person holds no authenticator to confirm with. */
 const NOTHING_TO_CONFIRM = 409;
 
-/** An authenticator's key as its setup writes it out: base32, padding optional. */
+const OTPAUTH = /^otpauth:\/\//i;
+
+/** The `secret` of the `otpauth://` link a setup's QR code carries, or the value as given. */
+const secretOf = (value: string): string =>
+  OTPAUTH.test(value) && URL.canParse(value)
+    ? (new URL(value).searchParams.get("secret") ?? "")
+    : value;
+
+/** An authenticator's key as its setup shows it: base32, perhaps in spaced groups or lower case. */
 const KEY = z
   .string()
-  .trim()
-  .regex(/^[A-Za-z2-7]{16,}=*$/);
+  .transform((value) => secretOf(value.trim()).replaceAll(/\s/g, "").toUpperCase())
+  .pipe(z.string().regex(/^[A-Z2-7]{16,}=*$/));
 
 const enrolled = z.object({ key: KEY });
+
+/** The key as the code generator takes it, from the key or its link; nothing if neither parses. */
+export const authenticatorKeyOf = (value: string | undefined): string | undefined => {
+  const parsed = KEY.safeParse(value);
+  return parsed.success ? parsed.data : undefined;
+};
 
 /** Where the test Admin's authenticator key comes from; asked before the sign-in, so none is spent. */
 export type FactorKey = () => Promise<string>;
 
 /** The setting is named and its value never is: the key is a secret. */
 export const keyFromTheSetting = (): FactorKey => {
-  const parsed = KEY.safeParse(process.env["JOURNEYS_ADMIN_AUTHENTICATOR_KEY"]);
-  const key = parsed.success
-    ? parsed.data
-    : couldNotRun("JOURNEYS_ADMIN_AUTHENTICATOR_KEY is not set to an authenticator's key");
+  const key =
+    authenticatorKeyOf(process.env["JOURNEYS_ADMIN_AUTHENTICATOR_KEY"]) ??
+    couldNotRun("JOURNEYS_ADMIN_AUTHENTICATOR_KEY is not set to an authenticator's key");
   return async () => key;
 };
 
@@ -53,6 +66,7 @@ const theConfirmPage = async (page: Page): Promise<void> => {
   }
 };
 
+/** A code the product refuses is the release's; an Admin holding no authenticator is the ground's. */
 const judged = (status: number): void => {
   if (status === NOTHING_TO_CONFIRM)
     couldNotRun("the test Admin holds no authenticator to confirm");
