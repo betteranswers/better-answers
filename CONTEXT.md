@@ -476,7 +476,10 @@ connected sources, audit — citing concepts, never restating them. Where a unit
 
 The platform's trust tiers (unverified, machine-confirmed, human-reviewed) and states are shown to
 readers in these words and no others, on a page and in what `find` and `open` return; each is a
-text tag, never a colour. The tier and status values on the MCP wire keep their names.
+text tag, never a colour. The tier and status values on the MCP wire keep their names, which are
+for code and never for a reader: tier `human-reviewed` reads *Verified by*, `machine-confirmed`
+*Verified automatically* and `unverified` *Unverified*; status `changed-since-checked` reads
+*Changed since verified*; `checkedBy` and `checkedAt` carry who verified it and when.
 
 - **Verified by <person>** — human-reviewed: a named person confirmed it against its sources on a
   date; shown as "Verified by Priya Shah · 3 March 2026". The name is the verifier's current
