@@ -65,7 +65,8 @@ const scheduledSchema = z.object({
   on: z.object({ schedule: z.array(z.object({ cron: z.string() })).optional() }),
 });
 
-const release = () => readWorkflow("release.yml", releaseWorkflowSchema);
+let releaseWorkflow: z.infer<typeof releaseWorkflowSchema> | undefined;
+const release = () => (releaseWorkflow ??= readWorkflow("release.yml", releaseWorkflowSchema));
 const build = () => readWorkflow("build.yml", buildWorkflowSchema);
 
 const scratch = scratchDirectory("release-job-");
@@ -645,9 +646,6 @@ describe("the redeploy a release makes", () => {
 
 type Step = z.infer<typeof workflowStepSchema>;
 
-const stepIndex = (steps: readonly Step[], found: (step: Step) => boolean): number =>
-  steps.findIndex(found);
-
 const running = (text: string) => (step: Step) => step.run?.includes(text) ?? false;
 
 const jobOf = (name: string): ReleaseJob => {
@@ -716,9 +714,9 @@ describe("how the workflows hand a release its commit", () => {
 
   it("checks the backup first, then redeploys and smokes", () => {
     const { steps } = jobOf("promote");
-    const backup = stepIndex(steps, running("deploy/backup-fresh.sh"));
-    const redeploy = stepIndex(steps, running("deploy/release-redeploy.sh"));
-    const smoke = stepIndex(steps, running("deploy/await-release.sh"));
+    const backup = steps.findIndex(running("deploy/backup-fresh.sh"));
+    const redeploy = steps.findIndex(running("deploy/release-redeploy.sh"));
+    const smoke = steps.findIndex(running("deploy/await-release.sh"));
 
     expect(steps[backup]?.if).toEqual("needs.gate.outputs.trigger == 'nightly'");
     expect([backup >= 0, backup < redeploy, redeploy < smoke]).toEqual([true, true, true]);
@@ -763,8 +761,8 @@ describe("the tag a release records", () => {
   it("tags promote's head after health names its digest", () => {
     const { steps } = jobOf("record");
     const checkout = steps.find((step) => step.uses?.startsWith("actions/checkout@"));
-    const health = stepIndex(steps, running("deploy/await-release.sh"));
-    const push = stepIndex(steps, running('git push origin "refs/tags/${tag}"'));
+    const health = steps.findIndex(running("deploy/await-release.sh"));
+    const push = steps.findIndex(running('git push origin "refs/tags/${tag}"'));
 
     expect(checkout?.with?.["ref"]).toEqual("${{ needs.promote.outputs.head }}");
     expect(steps[health]?.env?.["API_DIGEST"]).toEqual("${{ needs.promote.outputs.api_digest }}");
@@ -857,14 +855,13 @@ describe("the journeys a release runs", () => {
 
   it("checks out the live image's commit before installing it", () => {
     const { steps } = jobOf("journeys");
-    const health = stepIndex(steps, running("deploy/await-release.sh"));
-    const built = stepIndex(steps, running("deploy/build-commit.sh"));
-    const checkout = stepIndex(
-      steps,
+    const health = steps.findIndex(running("deploy/await-release.sh"));
+    const built = steps.findIndex(running("deploy/build-commit.sh"));
+    const checkout = steps.findIndex(
       (step) => step.with?.["ref"] === "${{ steps.built.outputs.commit }}",
     );
-    const install = stepIndex(steps, running("pnpm install --frozen-lockfile"));
-    const run = stepIndex(steps, running("pnpm --filter @better-answers/web run journeys"));
+    const install = steps.findIndex(running("pnpm install --frozen-lockfile"));
+    const run = steps.findIndex(running("pnpm --filter @better-answers/web run journeys"));
 
     expect(steps[built]?.id).toEqual("built");
     expect([
@@ -959,14 +956,14 @@ const reported = async (word: string, journeys: string): Promise<Reported> => {
   return result;
 };
 
-const pinged = (heard: readonly Heard[]) => heard.map(({ url, body }) => ({ url, body }));
+const pingsOf = (heard: readonly Heard[]) => heard.map(({ url, body }) => ({ url, body }));
 
 describe("the word a journeys run reports", () => {
   it("pings the journeys' own word", async () => {
     const report = await reported("held", "success");
 
     expect(report.code).toBe(0);
-    expect(pinged(report.heard)).toEqual([{ url: "/check-uuid", body: "held" }]);
+    expect(pingsOf(report.heard)).toEqual([{ url: "/check-uuid", body: "held" }]);
     expect(report.summary).toEqual(
       "### Journeys: held\n\nEvery journey passed against the release production runs.\n\n",
     );
@@ -975,7 +972,7 @@ describe("the word a journeys run reports", () => {
   it("reads journeys skipped after a failed promote as fail", async () => {
     const report = await reported("", "skipped");
 
-    expect(pinged(report.heard)).toEqual([{ url: "/check-uuid/fail", body: "fail" }]);
+    expect(pingsOf(report.heard)).toEqual([{ url: "/check-uuid/fail", body: "fail" }]);
     expect(report.summary).toEqual(
       "### Journeys: fail\n\nThe promote failed, so the journeys did not run (RUNBOOK.md page 6).\n\n",
     );
@@ -986,7 +983,7 @@ describe("the word a journeys run reports", () => {
     async (journeys) => {
       const report = await reported("", journeys);
 
-      expect(pinged(report.heard)).toEqual([{ url: "/check-uuid/fail", body: "could-not-run" }]);
+      expect(pingsOf(report.heard)).toEqual([{ url: "/check-uuid/fail", body: "could-not-run" }]);
       expect(report.summary).toContain("### Journeys: could-not-run\n");
     },
   );
@@ -994,13 +991,13 @@ describe("the word a journeys run reports", () => {
   it("distrusts a word outside the three", async () => {
     const report = await reported("passed", "failure");
 
-    expect(pinged(report.heard)).toEqual([{ url: "/check-uuid/fail", body: "could-not-run" }]);
+    expect(pingsOf(report.heard)).toEqual([{ url: "/check-uuid/fail", body: "could-not-run" }]);
   });
 
   it("passes a fail word on as fail", async () => {
     const report = await reported("fail", "failure");
 
-    expect(pinged(report.heard)).toEqual([{ url: "/check-uuid/fail", body: "fail" }]);
+    expect(pingsOf(report.heard)).toEqual([{ url: "/check-uuid/fail", body: "fail" }]);
     expect(report.summary).toContain("RUNBOOK.md page 13");
   });
 });

@@ -8,12 +8,12 @@ refuse() {
 }
 
 [ "$#" -eq 1 ] || refuse "takes one argument, and was given $#"
-case "$1" in
+word="$1"
+case "${word}" in
   held) suffix="" ;;
   fail | could-not-run) suffix="/fail" ;;
-  *) refuse "$1 is not one of the three outcome words" ;;
+  *) refuse "${word} is not one of the three outcome words" ;;
 esac
-word="$1"
 : "${GITHUB_STEP_SUMMARY:?}"
 
 # A ping that misses never fails the run: the journeys' word is its outcome, not the ping's.

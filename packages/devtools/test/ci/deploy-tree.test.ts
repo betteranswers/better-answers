@@ -58,10 +58,6 @@ const renovateSchema = z.object({
 
 const groupOf = (match: RegExpMatchArray, name: string): string => match.groups?.[name] ?? "";
 
-const promoteTimeoutSchema = z.object({
-  jobs: z.object({ promote: z.object({ "timeout-minutes": z.number() }) }),
-});
-
 const releaseJobsSchema = z.object({
   jobs: z.record(
     z.string(),
@@ -576,38 +572,37 @@ describe("the deploy tree", () => {
     expect(read("deploy/backup.sh")).toContain("init-repo");
   });
 
+  /** The longest await-release.sh can run at `polls`, from its first poll to its last. */
+  const awaitSeconds = (polls: number): number => {
+    const script = read("deploy/await-release.sh");
+    const delaySeconds = Number(/AWAIT_RELEASE_DELAY_SECONDS:-(\d+)/.exec(script)?.[1]);
+    const pollSeconds = Number(/curl [^\n]*--max-time (\d+)/.exec(script)?.[1]);
+    return polls * pollSeconds + (polls - 1) * delaySeconds;
+  };
+
+  const releaseJob = (name: string) => readWorkflow("release.yml", releaseJobsSchema).jobs[name];
+
   it("waits out the pull, within the job's timeout", () => {
     const script = read("deploy/await-release.sh");
     const polls = Number(/AWAIT_RELEASE_POLLS:-(\d+)/.exec(script)?.[1]);
     const delaySeconds = Number(/AWAIT_RELEASE_DELAY_SECONDS:-(\d+)/.exec(script)?.[1]);
-    const pollSeconds = Number(/curl [^\n]*--max-time (\d+)/.exec(script)?.[1]);
-    const jobMinutes = readWorkflow("release.yml", promoteTimeoutSchema).jobs.promote[
-      "timeout-minutes"
-    ];
 
     // Twice the three minutes a fresh image took to pull and start, end to end; no sleep follows the last poll.
     expect((polls - 1) * delaySeconds).toBeGreaterThanOrEqual(360);
-    expect(polls * pollSeconds + (polls - 1) * delaySeconds).toBeLessThan(jobMinutes * 60);
+    expect(awaitSeconds(polls)).toBeLessThan(
+      (releaseJob("promote")?.["timeout-minutes"] ?? 0) * 60,
+    );
   });
 
   it("re-reads health briefly after the journeys, within each timeout", () => {
-    const script = read("deploy/await-release.sh");
-    const delaySeconds = Number(/AWAIT_RELEASE_DELAY_SECONDS:-(\d+)/.exec(script)?.[1]);
-    const pollSeconds = Number(/curl [^\n]*--max-time (\d+)/.exec(script)?.[1]);
-    const { jobs } = readWorkflow("release.yml", releaseJobsSchema);
     const rereads = ["journeys", "record"].map((name) => {
-      const job = jobs[name];
+      const job = releaseJob(name);
       const polls = Number(
         job?.steps.find((step) => step.run?.includes("deploy/await-release.sh"))?.env?.[
           "AWAIT_RELEASE_POLLS"
         ],
       );
-      return {
-        name,
-        polls,
-        fits:
-          polls * pollSeconds + (polls - 1) * delaySeconds < (job?.["timeout-minutes"] ?? 0) * 60,
-      };
+      return { name, polls, fits: awaitSeconds(polls) < (job?.["timeout-minutes"] ?? 0) * 60 };
     });
 
     // Production already answered on this digest at the smoke, so a few polls ride out a blip.

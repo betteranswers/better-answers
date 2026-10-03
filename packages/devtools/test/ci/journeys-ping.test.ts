@@ -194,12 +194,12 @@ describe("the words journeys-ping.sh takes", () => {
 
 describe("the ping URL, a secret", () => {
   it("is named in no stream or summary, on any path", async () => {
-    const runs = [
-      await pingedThrough([200], ["held"]),
-      await pingedThrough([500], ["fail"]),
-      await pingedThrough([302], ["could-not-run"]),
-      await pinged(["held"], `${await closedOrigin()}/${CHECK_UUID}`),
-    ];
+    const runs = await Promise.all([
+      pingedThrough([200], ["held"]),
+      pingedThrough([500], ["fail"]),
+      pingedThrough([302], ["could-not-run"]),
+      closedOrigin().then((origin) => pinged(["held"], `${origin}/${CHECK_UUID}`)),
+    ]);
 
     expect(
       runs
