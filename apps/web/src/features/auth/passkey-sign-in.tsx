@@ -1,7 +1,7 @@
 import type { Said } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 
-import { CodeRefused } from "./auth-hooks.ts";
+import { CodeRefused, TOO_MANY_REQUESTS } from "./auth-hooks.ts";
 import { DeviceRefused, isCancelled } from "./passkey-hooks.ts";
 import {
   PASSKEY_SIGN_IN_NOT_VERIFIED,
@@ -11,8 +11,6 @@ import {
   tooManyPasskeySignIns,
 } from "./refusal-words.ts";
 import { SIGN_IN_WORDS } from "./sign-in-words.ts";
-
-const TOO_MANY_REQUESTS = 429;
 
 const SAID_OF_THE_ROUTE: ReadonlyMap<string, Said> = new Map([
   ["passkey-unknown", PASSKEY_UNKNOWN],

@@ -9,6 +9,7 @@ import {
   type PostgresDoor,
 } from "@better-answers/core/store/postgres";
 
+import type { EmailSender } from "../email.ts";
 import { tooManyRequests } from "../ingress/limits.ts";
 import type { Auth } from "./auth.ts";
 import { sameOriginOnly } from "./same-origin.ts";
@@ -32,6 +33,20 @@ export const signedInPerson = async (
   return read.ok ? (signedIn.parse(read.value) ?? undefined) : undefined;
 };
 
+/** The refusals every route changing a person's own factor shares. */
+export const PERSON_ROUTE_REFUSALS = {
+  signedOut: { error: "not_signed_in" },
+  unanswered: { error: "unanswered" },
+} as const;
+
+/** A person who held codes keeps them through a setup, so none are made or answered. */
+export const finishedWith = (
+  issued: { readonly recoveryCodes: readonly string[]; readonly madeAt: string } | undefined,
+) =>
+  issued === undefined
+    ? { recoveryCodes: null }
+    : { recoveryCodes: issued.recoveryCodes, madeAt: issued.madeAt };
+
 type Step = (context: Context, person: SignedIn) => Promise<Response>;
 
 type PersonRoutes = {
@@ -41,6 +56,9 @@ type PersonRoutes = {
   readonly logger: Logger;
   readonly publicUrl: string;
 };
+
+/** What a mount of factor routes needs: the person's routes, and a way to send their notices. */
+export type FactorRoutesDependencies = PersonRoutes & { readonly sendEmail: EmailSender };
 
 /**
  * Routes changing a person's own factor: refused from another site, never cached, each step
@@ -60,7 +78,7 @@ export const personRoutesAt = (routes: Hono, prefix: string, deps: PersonRoutes)
       (counter: string, rule: CounterRule, step: Step) =>
       async (context: Context): Promise<Response> => {
         const person = await signedInPerson(deps.auth, context.req.raw.headers);
-        if (person === undefined) return context.json({ error: "not_signed_in" }, 401);
+        if (person === undefined) return context.json(PERSON_ROUTE_REFUSALS.signedOut, 401);
         const counted = await consumeIngress(
           deps.door,
           "person",
@@ -77,7 +95,7 @@ export const personRoutesAt = (routes: Hono, prefix: string, deps: PersonRoutes)
     /** The step may have landed, so the page reads again rather than starting over. */
     unanswered: (context: Context, event: string, reason: string): Response => {
       log.warn({ event, reason }, "a second-factor step went unanswered");
-      return context.json({ error: "unanswered" }, 502);
+      return context.json(PERSON_ROUTE_REFUSALS.unanswered, 502);
     },
 
     log,

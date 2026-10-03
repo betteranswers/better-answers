@@ -62,13 +62,11 @@ export const isCancelled = (failure: Error | null | undefined): boolean =>
 /** The library checks every value; this reads only what tells an ask from anything else. */
 const challenged = z.object({ challenge: z.string() });
 
-const askedToAdd = z.custom<PublicKeyCredentialCreationOptionsJSON>(
-  (value) => challenged.safeParse(value).success,
-);
+const askedFor = <Options>() => z.custom<Options>((value) => challenged.safeParse(value).success);
 
-const askedToSignIn = z.custom<PublicKeyCredentialRequestOptionsJSON>(
-  (value) => challenged.safeParse(value).success,
-);
+const askedToAdd = askedFor<PublicKeyCredentialCreationOptionsJSON>();
+
+const askedToSignIn = askedFor<PublicKeyCredentialRequestOptionsJSON>();
 
 /** Null when the person already held codes, which an add leaves standing. */
 const passkeyAdded = z.union([

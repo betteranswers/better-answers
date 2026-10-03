@@ -7,7 +7,7 @@ import { Banner, BannerAction, BannerClose, BannerTitle } from "@/shared/ui/kibo
 import { PASSKEY_WORDS } from "./account-words.ts";
 import { passkeysHere, useDismissPasskeyOffer } from "./passkey-hooks.ts";
 import { ADD_A_PASSKEY_BUTTON } from "./passkeys-part.tsx";
-import { useSecondFactor, type SecondFactor } from "./second-factor-hooks.ts";
+import { useSecondFactorOnce, type SecondFactor } from "./second-factor-hooks.ts";
 
 const offered = (held: SecondFactor | undefined): boolean =>
   held !== undefined && held.passkeys.length === 0 && !held.passkeyOfferDismissed;
@@ -25,7 +25,7 @@ export function PasskeyOffer(properties: OfferProperties) {
 
 /** Read only where the browser can use a passkey, so no other browser asks. */
 function OfferWhereHeld(properties: OfferProperties) {
-  const read = useSecondFactor();
+  const read = useSecondFactorOnce();
   const dismiss = useDismissPasskeyOffer();
   if (!offered(read.data)) return null;
 

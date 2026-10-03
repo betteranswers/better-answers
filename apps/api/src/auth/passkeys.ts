@@ -1,22 +1,18 @@
 import { APIError } from "better-auth/api";
-import type { Context, Hono, MiddlewareHandler } from "hono";
-import type { Logger } from "pino";
+import type { Context, Hono } from "hono";
 import { z } from "zod";
 
-import { attempt, type Clock } from "@better-answers/core/kernel";
-import { consumeIngress, type PostgresDoor } from "@better-answers/core/store/postgres";
+import { attempt } from "@better-answers/core/kernel";
 import {
   applyPasskeyNameRule,
   hasNoDisplayName,
   recordPasskeyAdded,
 } from "@better-answers/core/workspaces";
 
-import type { EmailSender } from "../email.ts";
 import { sendFactorNotice } from "../factor-notice-email.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
-import { clientIpOf, tooManyRequests } from "../ingress/limits.ts";
+import { limitByIp } from "../ingress/limits.ts";
 import { type Auth, USER_NOT_VERIFIED } from "./auth.ts";
-import { finishedWith } from "./authenticator.ts";
 import {
   PASSKEY_ADD_OPTIONS_PATH,
   PASSKEY_ADD_PATH,
@@ -25,16 +21,13 @@ import {
   PASSKEY_SIGN_IN_OPTIONS_PATH,
   PASSKEY_SIGN_IN_PATH,
 } from "./constants.ts";
-import { personRoutesAt, type SignedIn } from "./person-routes.ts";
-
-type PasskeysDependencies = {
-  readonly auth: Auth;
-  readonly door: PostgresDoor;
-  readonly publicUrl: string;
-  readonly logger: Logger;
-  readonly clock: Clock;
-  readonly sendEmail: EmailSender;
-};
+import {
+  finishedWith,
+  PERSON_ROUTE_REFUSALS,
+  type FactorRoutesDependencies,
+  personRoutesAt,
+  type SignedIn,
+} from "./person-routes.ts";
 
 const REFUSALS = {
   malformed: { error: "malformed" },
@@ -42,7 +35,6 @@ const REFUSALS = {
   challengeGone: { error: "challenge-gone" },
   unknown: { error: "passkey-unknown" },
   refused: { error: "passkey-refused" },
-  unanswered: { error: "unanswered" },
 } as const;
 
 type Refused = { readonly body: { readonly error: string }; readonly status: 400 | 401 };
@@ -93,19 +85,14 @@ const kept = z.object({ id: z.string() });
 
 const signedInAs = z.object({ user: z.object({ name: z.string() }) });
 
-/** The name under the rule, trimmed, or the refusal to answer with. */
-const judged = (context: Context, name: string) => {
-  const ruled = applyPasskeyNameRule(name);
-  return ruled.ok
-    ? { name: ruled.value, refused: undefined }
-    : { name: "", refused: context.json({ error: ruled.error }, 400) };
-};
+const nameRefused = (context: Context, word: string): Response =>
+  context.json({ error: word }, 400);
 
 /**
  * Each route calls a closed library endpoint as a server function, so it brings what the router
  * would: a rate rule and the same-origin fence.
  */
-export const mountThePasskeys = (routes: Hono, deps: PasskeysDependencies): void => {
+export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): void => {
   const { auth, door, clock } = deps;
   const fenced = personRoutesAt(routes, "/passkeys/*", deps);
   const { log } = fenced;
@@ -131,8 +118,8 @@ export const mountThePasskeys = (routes: Hono, deps: PasskeysDependencies): void
   const askToAdd = async (context: Context): Promise<Response> => {
     const named = naming.safeParse(await context.req.json().catch(() => undefined));
     if (!named.success) return context.json(REFUSALS.malformed, 400);
-    const { refused } = judged(context, named.data.name);
-    if (refused !== undefined) return refused;
+    const name = applyPasskeyNameRule(named.data.name);
+    if (!name.ok) return nameRefused(context, name.error);
     const asked = await attempt(() =>
       auth.api.generatePasskeyRegistrationOptions({
         headers: context.req.raw.headers,
@@ -159,7 +146,7 @@ export const mountThePasskeys = (routes: Hono, deps: PasskeysDependencies): void
         { event: "auth.passkey_not_recorded", principal: person.user.id },
         "a passkey was added but not recorded",
       );
-      return context.json(REFUSALS.unanswered, 502);
+      return context.json(PERSON_ROUTE_REFUSALS.unanswered, 502);
     }
     return context.json({ passkeyId, ...finishedWith(recorded.value.issued) });
   };
@@ -167,12 +154,12 @@ export const mountThePasskeys = (routes: Hono, deps: PasskeysDependencies): void
   const add = async (context: Context, person: SignedIn): Promise<Response> => {
     const asked = added.safeParse(await context.req.json().catch(() => undefined));
     if (!asked.success) return context.json(REFUSALS.malformed, 400);
-    const { name, refused } = judged(context, asked.data.name);
-    if (refused !== undefined) return refused;
+    const name = applyPasskeyNameRule(asked.data.name);
+    if (!name.ok) return nameRefused(context, name.error);
     const verified = await attempt(() =>
       auth.api.verifyPasskeyRegistration({
         headers: context.req.raw.headers,
-        body: { response: asked.data.response, name },
+        body: { response: asked.data.response, name: name.value },
         returnHeaders: true,
       }),
     );
@@ -214,22 +201,7 @@ export const mountThePasskeys = (routes: Hono, deps: PasskeysDependencies): void
   };
 
   /** Counted apart from the address's other routes, so the screen's ask on opening spends no link's. */
-  const limitByAddress: MiddlewareHandler = async (context, next) => {
-    const counted = await consumeIngress(
-      door,
-      "ip",
-      `passkey-sign-in:${clientIpOf(context.req.raw.headers)}`,
-      PASSKEY_SIGN_IN_IP_RULE,
-      clock.now(),
-    );
-    if (!counted.allowed) {
-      return tooManyRequests(
-        counted.retryAfterSeconds,
-        "Too many passkey sign-ins from this address; try again shortly.",
-      );
-    }
-    await next();
-  };
+  const limitByAddress = limitByIp(door, PASSKEY_SIGN_IN_IP_RULE, clock, "passkey-sign-in");
 
   routes.use(PASSKEY_SIGN_IN_OPTIONS_PATH, limitByAddress);
   routes.use(PASSKEY_SIGN_IN_PATH, limitByAddress);

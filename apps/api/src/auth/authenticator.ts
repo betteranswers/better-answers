@@ -1,38 +1,31 @@
 import { APIError } from "better-auth/api";
 import type { Context, Hono } from "hono";
-import type { Logger } from "pino";
 import { z } from "zod";
 
-import { attempt, type Clock } from "@better-answers/core/kernel";
-import type { PostgresDoor } from "@better-answers/core/store/postgres";
+import { attempt } from "@better-answers/core/kernel";
 import { readSecondFactor, recordAuthenticatorSetUp } from "@better-answers/core/workspaces";
 import { AUTHENTICATOR_CODE_LENGTH } from "@better-answers/schema/second-factor";
 
-import type { EmailSender } from "../email.ts";
 import { sendFactorNotice } from "../factor-notice-email.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
-import type { Auth } from "./auth.ts";
 import {
   AUTHENTICATOR_FINISH_PATH,
   AUTHENTICATOR_PERSON_RULE,
   AUTHENTICATOR_START_PATH,
 } from "./constants.ts";
-import { personRoutesAt, signedInPerson, type SignedIn } from "./person-routes.ts";
-
-type AuthenticatorDependencies = {
-  readonly auth: Auth;
-  readonly door: PostgresDoor;
-  readonly publicUrl: string;
-  readonly logger: Logger;
-  readonly clock: Clock;
-  readonly sendEmail: EmailSender;
-};
+import {
+  finishedWith,
+  PERSON_ROUTE_REFUSALS,
+  type FactorRoutesDependencies,
+  personRoutesAt,
+  signedInPerson,
+  type SignedIn,
+} from "./person-routes.ts";
 
 const REFUSALS = {
   held: { error: "authenticator-held" },
   noSetupWaiting: { error: "no-setup-waiting" },
   codeWrong: { error: "code-wrong" },
-  unanswered: { error: "unanswered" },
 } as const;
 
 const setUpAnswer = z.object({ totpURI: z.string() });
@@ -40,14 +33,6 @@ const setUpAnswer = z.object({ totpURI: z.string() });
 const codeAsked = z.object({
   code: z.string().regex(new RegExp(`^\\d{${String(AUTHENTICATOR_CODE_LENGTH)}}$`)),
 });
-
-/** A person who held codes keeps them through a setup, so none are made or answered. */
-export const finishedWith = (
-  issued: { readonly recoveryCodes: readonly string[]; readonly madeAt: string } | undefined,
-) =>
-  issued === undefined
-    ? { recoveryCodes: null }
-    : { recoveryCodes: issued.recoveryCodes, madeAt: issued.madeAt };
 
 /** A name and value alone, as a `cookie` header carries each `Set-Cookie` line. */
 const cookieOf = (setCookies: readonly string[]): string =>
@@ -57,13 +42,11 @@ const cookieOf = (setCookies: readonly string[]): string =>
  * The library's first verify swaps the session, yet its answer names the old one: the stamp goes
  * to the session the new cookie holds.
  */
-export const mountTheAuthenticator = (routes: Hono, deps: AuthenticatorDependencies): void => {
+export const mountTheAuthenticator = (routes: Hono, deps: FactorRoutesDependencies): void => {
   const { auth, door, clock } = deps;
   const fenced = personRoutesAt(routes, "/authenticator/*", deps);
   const { log } = fenced;
   const mail = { send: deps.sendEmail, publicUrl: deps.publicUrl };
-
-  const sessionOf = (headers: Headers) => signedInPerson(auth, headers);
 
   const unanswered = (context: Context, reason: string): Response =>
     fenced.unanswered(context, "auth.authenticator_failed", reason);
@@ -87,7 +70,7 @@ export const mountTheAuthenticator = (routes: Hono, deps: AuthenticatorDependenc
 
   const sessionAfter = async (setCookies: readonly string[]): Promise<string | undefined> => {
     if (setCookies.length === 0) return undefined;
-    return (await sessionOf(new Headers({ cookie: cookieOf(setCookies) })))?.session.id;
+    return (await signedInPerson(auth, new Headers({ cookie: cookieOf(setCookies) })))?.session.id;
   };
 
   const record = async (person: SignedIn, sessionId: string) => {
@@ -116,7 +99,7 @@ export const mountTheAuthenticator = (routes: Hono, deps: AuthenticatorDependenc
   const settle = async (context: Context, person: SignedIn, setCookies: readonly string[]) => {
     const swapped = await sessionAfter(setCookies);
     const recorded = await record(person, swapped ?? person.session.id);
-    if (recorded === undefined) return context.json(REFUSALS.unanswered, 502);
+    if (recorded === undefined) return context.json(PERSON_ROUTE_REFUSALS.unanswered, 502);
     // The browser gets the new cookie only once its session carries the old one's age; otherwise
     // the old cookie, now void, signs it out.
     if (recorded.stamped && swapped !== undefined) {

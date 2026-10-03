@@ -36,6 +36,16 @@ export const useSecondFactor = () => {
   return useQuery(api.person.secondFactor.queryOptions());
 };
 
+/** Every frame reads it, so never again on a window's focus; an Account page act still rereads it. */
+export const useSecondFactorOnce = () => {
+  const api = useTRPC();
+  return useQuery({
+    ...api.person.secondFactor.queryOptions(),
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+  });
+};
+
 export type SecondFactorRead = ReturnType<typeof useSecondFactor>;
 
 export type SecondFactor = NonNullable<SecondFactorRead["data"]>;

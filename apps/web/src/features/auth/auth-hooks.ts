@@ -83,6 +83,11 @@ const waitNamedBy = (response: Response): number | undefined => {
 
 const SERVER_FAILED = 500;
 
+/** The two refusals our own routes answer by status alone. */
+export const SIGNED_OUT = 401;
+
+export const TOO_MANY_REQUESTS = 429;
+
 /** The api refused a code's send or its check, by form or by link, with the wait a ceiling named. */
 export class CodeRefused extends Error {
   readonly status: number;

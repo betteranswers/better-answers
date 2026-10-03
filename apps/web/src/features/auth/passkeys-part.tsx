@@ -11,7 +11,7 @@ import { Label } from "@/shared/ui/label.tsx";
 
 import { ActButton, RemoveKeepingTheLast, type LandsAt } from "./account-sections.tsx";
 import { ACCOUNT_ACTS, PASSKEY_WORDS, passkeyDates, removePasskeyTitle } from "./account-words.ts";
-import { CodeRefused } from "./auth-hooks.ts";
+import { CodeRefused, SIGNED_OUT, TOO_MANY_REQUESTS } from "./auth-hooks.ts";
 import { Outcome } from "./auth-screen.tsx";
 import {
   DeviceRefused,
@@ -42,10 +42,6 @@ export const ADD_A_PASSKEY_BUTTON = "add-a-passkey";
 export type Passkey = SecondFactor["passkeys"][number];
 
 const nameOf = (passkey: Passkey): string => passkey.name ?? PASSKEY_WORDS.unnamed;
-
-const SIGNED_OUT = 401;
-
-const TOO_MANY_REQUESTS = 429;
 
 const SAID_OF_THE_DEVICE = {
   cancelled: undefined,
