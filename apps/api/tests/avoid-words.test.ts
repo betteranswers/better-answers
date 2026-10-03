@@ -32,16 +32,14 @@ import {
   ratchetRises,
   readerFindings,
   readerStringsIn,
+  readerStringsPerSource,
 } from "./words-scan.ts";
 
+/** A sweep that lands a word carves out, on its own row, the plans dated before it. */
 const CARVED_OUT: readonly CarveOut[] = [
   {
     holds: under("docs/archive/"),
     why: "the archive is frozen history, kept in the words of its day",
-  },
-  {
-    holds: under("docs/plans/"),
-    why: "a plan records what was built, in the words of its day",
   },
   {
     holds: (file) =>
@@ -64,7 +62,7 @@ const CARVED_OUT: readonly CarveOut[] = [
   },
 ];
 
-const KEPT = await keptNamesUnder(repositoryRoot);
+const KEPT = keptNamesUnder(repositoryRoot);
 
 const SCAN = { rows: OLD_WORDS, carvedOut: CARVED_OUT, kept: Object.values(KEPT).flat() };
 
@@ -96,6 +94,15 @@ describe("the list of old words", () => {
         .filter(([, names]) => names.length === 0)
         .map(([source]) => source),
       "a source of kept names yielded nothing, so the scan would keep no name from it. Point kept-names.ts at where those names are declared now.",
+    ).toEqual([]);
+  });
+
+  it("reads a string from every source of reader text", () => {
+    expect(
+      Object.entries(readerStringsPerSource(repositoryRoot))
+        .filter(([, count]) => count === 0)
+        .map(([source]) => source),
+      "a source of reader text yielded no string, so every reader-text check passes on nothing there. Point words-scan.ts at where those words are written now.",
     ).toEqual([]);
   });
 
@@ -295,6 +302,7 @@ describe("the sense a planted line is read in", () => {
 
     expect(findings).toEqual([
       `apps/web/CODING_STANDARDS.md:1: The ${WORD} claims the job.`,
+      `docs/plans/2026-01-01-planted-plan.md:1: The ${WORD} claims the job.`,
       `docs/specs/v01-route.md:1: The ${WORD} claims the job.`,
     ]);
   });
@@ -643,6 +651,26 @@ describe("what a person reads, in a planted tree", () => {
     ]);
   });
 
+  it("finds an internal word standing alone in lowercase", () => {
+    expect(internalsOver('export const W = "watermark";')).toEqual([`${WORDS}:1: watermark → -`]);
+  });
+
+  it("skips a string that is a kept name whole", () => {
+    const tree = plantedTree({
+      [WORDS]: [
+        `export const T = "${CHECKED}";`,
+        'export const W = "watermark";',
+        'export const M = "The watermark moved";',
+      ].join("\n"),
+    });
+    const scan = scanOf([rowOf(CHECKED)], [CHECKED, "watermark"]);
+
+    expect(readerFindings(tree, scan)).toEqual([]);
+    expect(internalFindings(tree, PLANTED_GLOSSARY, scan, []).map(at)).toEqual([
+      `${WORDS}:3: The watermark moved`,
+    ]);
+  });
+
   it("reads a sub-bullet as part of its entry", () => {
     expect(internalsOver('export const C = "Move the cursor here";')).toEqual([]);
   });
@@ -712,13 +740,31 @@ describe("what a person reads, in a planted tree", () => {
       `packages/core/src/answering/index.ts:1: ${CHECKED}`,
     ]);
   });
+
+  it("counts the strings each source of reader text holds", () => {
+    const tree = plantedTree({
+      [WORDS]: 'export const A = "Connect a document";\nexport const B = "Members";',
+      "apps/web/src/shared/navigation.ts": 'export const N = "Members and groups";',
+      "apps/api/src/mcp/entries/index.ts": 'const description = "Lists every concept.";',
+      "packages/core/src/answering/index.ts": 'const said = "Nothing found here";',
+      "apps/api/src/emails/invitation.ts": 'const subject = "You are invited";',
+    });
+
+    expect(readerStringsPerSource(tree)).toEqual({
+      "page words modules": 2,
+      "the navigation": 1,
+      "MCP entries": 1,
+      answers: 1,
+      "emails and consent pages": 0,
+    });
+  });
 });
 
 describe("the strings a person reads in a source file", () => {
   const readIn = (source: string, file = "planted-words.tsx"): readonly string[] =>
     readerStringsIn(file, source).map(({ line, text }) => `${String(line)}: ${text}`);
 
-  it("reads sentences, capitalised labels, template text and JSX text", () => {
+  it("reads sentences, one-word labels, template text and JSX text", () => {
     expect(
       readIn(
         [
@@ -741,6 +787,16 @@ describe("the strings a person reads in a source file", () => {
       "6: Add a person",
       "7: and also",
     ]);
+  });
+
+  it("reads a lone lowercase word in a words module alone", () => {
+    const source = 'export const I = counted(n, "member", "members");';
+
+    expect(readIn(source, "apps/web/src/features/people/member-words.ts")).toEqual([
+      "1: member",
+      "1: members",
+    ]);
+    expect(readIn(source, "apps/web/src/shared/navigation.ts")).toEqual([]);
   });
 
   it("reports each piece at the line its words start", () => {
@@ -779,7 +835,8 @@ describe("the strings a person reads in a source file", () => {
           'type Role = "an editor";',
           "type Path = `/sources ${string} here`;",
           'export const P = "ListedBinding";',
-          'export const E = () => <p className="flex items-center">x</p>;',
+          'export const K = ["camelCase", "kebab-case", "snake_case", "dotted.name"];',
+          'export const E = () => <p className="flex items-center">{x}</p>;',
           "export const Q = () => <p> </p>;",
           'throw new Error("the screen declares no detail address");',
           'throw new TypeError("a type went wrong here");',
@@ -807,6 +864,10 @@ describe("the ratchet on pending words", () => {
     expect(counted(`export const A = "Each ${BOUND} and its ${BOUND}s";`)).toEqual({
       [WORDS]: { [BOUND]: 2 },
     });
+  });
+
+  it("counts a pending word standing alone in lowercase", () => {
+    expect(counted(`export const B = "${BOUND}";`)).toEqual({ [WORDS]: { [BOUND]: 1 } });
   });
 
   it("counts in the navigation as in a words module", () => {

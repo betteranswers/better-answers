@@ -1,23 +1,20 @@
+// Every slice that declares refusals, imported so the register holds all of them.
+import "@better-answers/core/access";
+import "@better-answers/core/answering";
+import "@better-answers/core/audit";
+import "@better-answers/core/concepts";
+import "@better-answers/core/erasure";
+import "@better-answers/core/guides";
+import "@better-answers/core/llm";
+import "@better-answers/core/members";
+import "@better-answers/core/runs";
+import "@better-answers/core/sources";
+import "@better-answers/core/sweeps";
+import "@better-answers/core/workspaces";
 import { refusalRegister } from "@better-answers/core/kernel";
 
 import { ENTRIES } from "../src/mcp/entries/index.ts";
 import { readUnder } from "./tree-walk.ts";
-
-/** Every slice that declares refusals, loaded so the register holds all of them. */
-const SLICES = [
-  () => import("@better-answers/core/access"),
-  () => import("@better-answers/core/answering"),
-  () => import("@better-answers/core/audit"),
-  () => import("@better-answers/core/concepts"),
-  () => import("@better-answers/core/erasure"),
-  () => import("@better-answers/core/guides"),
-  () => import("@better-answers/core/llm"),
-  () => import("@better-answers/core/members"),
-  () => import("@better-answers/core/runs"),
-  () => import("@better-answers/core/sources"),
-  () => import("@better-answers/core/sweeps"),
-  () => import("@better-answers/core/workspaces"),
-];
 
 type ZodLike = {
   readonly _zod: { readonly def: { readonly type: string } & Record<string, unknown> };
@@ -65,28 +62,20 @@ const matchesIn = (text: string, pattern: RegExp): readonly string[] =>
  * The names this codebase does not own, read from where each is declared, so a hand-kept pattern
  * cannot drift from them.
  */
-export const keptNamesUnder = async (
-  root: string,
-): Promise<Readonly<Record<string, readonly string[]>>> => {
-  for (const slice of SLICES) await slice();
-  return {
-    "refusal words": refusalRegister().map(({ word }) => word),
-    "MCP entries and schemas": ENTRIES.flatMap((entry) => [
-      entry.name,
-      ...entry.scopes,
-      ...namesInSchema(entry.input),
-      ...namesInSchema(entry.output),
-    ]),
-    "Better Auth's endpoints": readUnder(root, "apps/api/tests/better-auth-endpoints.txt")
-      .split("\n")
-      .filter((line) => line.startsWith("/")),
-    "stored act names": matchesIn(
-      readUnder(root, "apps/web/src/features/people/audit-acts.ts"),
-      QUOTED_ACT,
-    ),
-    "old page addresses": matchesIn(
-      readUnder(root, "apps/web/src/shared/navigation.ts"),
-      MOVED_FROM,
-    ),
-  };
-};
+export const keptNamesUnder = (root: string): Readonly<Record<string, readonly string[]>> => ({
+  "refusal words": refusalRegister().map(({ word }) => word),
+  "MCP entries and schemas": ENTRIES.flatMap((entry) => [
+    entry.name,
+    ...entry.scopes,
+    ...namesInSchema(entry.input),
+    ...namesInSchema(entry.output),
+  ]),
+  "Better Auth's endpoints": readUnder(root, "apps/api/tests/better-auth-endpoints.txt")
+    .split("\n")
+    .filter((line) => line.startsWith("/")),
+  "stored act names": matchesIn(
+    readUnder(root, "apps/web/src/features/people/audit-acts.ts"),
+    QUOTED_ACT,
+  ),
+  "old page addresses": matchesIn(readUnder(root, "apps/web/src/shared/navigation.ts"), MOVED_FROM),
+});

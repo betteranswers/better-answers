@@ -157,8 +157,8 @@ export type Finding = {
   readonly sweep: string;
 };
 
-const holdsAny = (carveOuts: readonly CarveOut[], file: string): boolean =>
-  carveOuts.some(({ holds }) => holds(file));
+const holdsAny = (holders: readonly Pick<CarveOut, "holds">[], file: string): boolean =>
+  holders.some(({ holds }) => holds(file));
 
 /** A rules file binds every directory, so no carve-out holds it. */
 const isCarvedOut = (carveOuts: readonly CarveOut[], file: string): boolean =>
@@ -229,23 +229,28 @@ export const lineFindings = (root: string, { rows, carvedOut, kept }: Scan): rea
   });
 };
 
+type Source = Pick<CarveOut, "holds"> & { readonly name: string };
+
 const WORDS_MODULE = /^apps\/web\/src\/.+words\.ts$/;
-const NAVIGATION = "apps/web/src/shared/navigation.ts";
-const MCP_AND_ANSWERS = new Set([
-  "apps/api/src/mcp/entries/index.ts",
-  "packages/core/src/answering/index.ts",
-]);
 const TEMPLATE = /^apps\/api\/src\/(?:.+-email|email-page|auth\/pages)\.ts$/;
 
-/** Where a page's words, an MCP tool's text, an answer and an email are written. */
-const isReaderText = (file: string): boolean =>
-  WORDS_MODULE.test(file) ||
-  file === NAVIGATION ||
-  MCP_AND_ANSWERS.has(file) ||
-  TEMPLATE.test(file);
+/** Where a page's words are written: the files the ratchet counts in. */
+const PAGE_WORDS: readonly Source[] = [
+  { name: "page words modules", holds: (file) => WORDS_MODULE.test(file) },
+  { name: "the navigation", holds: (file) => file === "apps/web/src/shared/navigation.ts" },
+];
 
-/** The files the ratchet counts in: where a page's words are written. */
-const isPageWords = (file: string): boolean => WORDS_MODULE.test(file) || file === NAVIGATION;
+/** Where a page's words, an MCP tool's text, an answer and an email are written. */
+const READER_TEXT: readonly Source[] = [
+  ...PAGE_WORDS,
+  { name: "MCP entries", holds: (file) => file === "apps/api/src/mcp/entries/index.ts" },
+  { name: "answers", holds: (file) => file === "packages/core/src/answering/index.ts" },
+  { name: "emails and consent pages", holds: (file) => TEMPLATE.test(file) },
+];
+
+const isReaderText = (file: string): boolean => holdsAny(READER_TEXT, file);
+
+const isPageWords = (file: string): boolean => holdsAny(PAGE_WORDS, file);
 
 type ReaderString = { readonly line: number; readonly text: string };
 
@@ -285,12 +290,15 @@ const childrenOf = (node: Node): readonly unknown[] =>
 
 const CAPITALISED_WORD = /^[A-Z][a-z]+$/;
 
+const LOWERCASE_WORD = /^[a-z]+$/;
+
 /**
- * No space marks an identifier, a path or a key; one capitalised word is a label, and a template
- * fragment keeps its joining space.
+ * No space marks a code token, and one capitalised word a label; a lone lowercase word is a label
+ * only in a words module.
  */
-const isRead = (text: string): boolean =>
-  text.trim() !== "" && (/\s/.test(text) || CAPITALISED_WORD.test(text));
+const isRead = (text: string, inWordsModule: boolean): boolean =>
+  text.trim() !== "" &&
+  (/\s/.test(text) || CAPITALISED_WORD.test(text) || (inWordsModule && LOWERCASE_WORD.test(text)));
 
 type Piece = { readonly offset: number; readonly text: string };
 
@@ -338,23 +346,43 @@ const visit = (value: unknown, found: (node: Node) => void): void => {
 export const readerStringsIn = (file: string, source: string): readonly ReaderString[] => {
   const starts = [0, ...[...source.matchAll(/\n/g)].map((match) => match.index + 1)];
   const strings: ReaderString[] = [];
+  const inWordsModule = WORDS_MODULE.test(file);
   visit(parseSync(file, source).program, (node) => {
-    for (const { offset, text } of piecesOf(node, source).filter((piece) => isRead(piece.text))) {
+    const read = piecesOf(node, source).filter((piece) => isRead(piece.text, inWordsModule));
+    for (const { offset, text } of read) {
       strings.push({ line: lineAt(starts, offset), text: text.trim() });
     }
   });
   return strings;
 };
 
+type FileString = ReaderString & { readonly file: string };
+
 const readerStringsUnder = (
   root: string,
   reads: (file: string) => boolean,
-): readonly (ReaderString & { readonly file: string })[] =>
+): readonly FileString[] =>
   treeFilesUnder(root)
     .filter(reads)
     .flatMap((file) =>
       readerStringsIn(file, readUnder(root, file)).map((one) => ({ file, ...one })),
     );
+
+/** A source with none leaves every check of reader text passing on nothing. */
+export const readerStringsPerSource = (root: string): Readonly<Record<string, number>> => {
+  const strings = readerStringsUnder(root, isReaderText);
+  return Object.fromEntries(
+    READER_TEXT.map(
+      ({ name, holds }) => [name, strings.filter(({ file }) => holds(file)).length] as const,
+    ),
+  );
+};
+
+/** A string that is a kept name whole, as an MCP schema's `bundles` is, is the code's own. */
+const readerTextUnder = (root: string, kept: readonly string[]): readonly FileString[] => {
+  const names = new Set(kept);
+  return readerStringsUnder(root, isReaderText).filter(({ text }) => !names.has(text));
+};
 
 /** Every landed word whose reach is reader text, in what a person reads. */
 export const readerFindings = (root: string, { rows, kept }: Scan): readonly Finding[] => {
@@ -362,7 +390,7 @@ export const readerFindings = (root: string, { rows, kept }: Scan): readonly Fin
   const scans = landed(rows)
     .filter(({ reach }) => reach === "reader text")
     .map((row) => ({ row, finds: findsIn(row.word, true) }));
-  return readerStringsUnder(root, isReaderText).flatMap(({ file, line, text }) =>
+  return readerTextUnder(root, kept).flatMap(({ file, line, text }) =>
     scans
       .filter(({ finds }) => finds(text) && finds(blankedBy(text, keptPatterns)))
       .map(({ row }) => findingOf(row, file, line - 1, text)),
@@ -405,7 +433,7 @@ export const internalFindings = (
     internal,
     finds: findsIn(internal.word, true),
   }));
-  return readerStringsUnder(root, isReaderText).flatMap(({ file, line, text }) => {
+  return readerTextUnder(root, kept).flatMap(({ file, line, text }) => {
     const unexplained = blankedBy(text, keptPatterns);
     return scans
       .filter(({ finds }) => finds(unexplained))
