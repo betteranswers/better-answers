@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
-# Decides, before anything is deployed, whether this run of release.yml promotes, and which commit.
+# Decides, before anything is deployed, whether this run of release.yml promotes, and which commit,
+# and whether the journeys run against the live release instead.
 set -euo pipefail
 
 : "${GITHUB_OUTPUT:?}" "${GITHUB_STEP_SUMMARY:?}" "${REPOSITORY:?}"
 commit="${COMMIT:-}"
 mode="${RELEASE_MODE:-per-merge}"
+journeys_mode="${JOURNEYS_MODE:-off}"
+journeys_only=false
 
 if [ -n "${commit}" ]; then
   trigger=merge
@@ -15,7 +18,8 @@ else
 fi
 
 decide() {
-  printf 'promote=%s\ncommit=%s\ntrigger=%s\n' "$1" "$2" "${trigger}" >>"${GITHUB_OUTPUT}"
+  printf 'promote=%s\ncommit=%s\ntrigger=%s\njourneys_only=%s\njourneys_mode=%s\n' \
+    "$1" "$2" "${trigger}" "${journeys_only}" "${journeys_mode}" >>"${GITHUB_OUTPUT}"
   exit 0
 }
 
@@ -34,6 +38,22 @@ case "${mode}" in
   per-merge | nightly | drill) ;;
   *) refuse "RELEASE_MODE is '${mode}', which is not per-merge, nightly or drill, so nothing is released. Set one (gh variable set RELEASE_MODE --body nightly), or delete it for per-merge" ;;
 esac
+
+case "${journeys_mode}" in
+  off | report | gate) ;;
+  *) refuse "JOURNEYS_MODE is '${journeys_mode}', which is not off, report or gate, so nothing is released. Set one (gh variable set JOURNEYS_MODE --body report), or delete it for off" ;;
+esac
+
+LIVE="The journeys run against the live release."
+
+# A scheduled run that promotes nothing still runs the journeys, so the alert hears every night.
+quiet_night() {
+  if [ "${journeys_mode}" = off ]; then
+    skip "$1"
+  fi
+  journeys_only=true
+  skip "$1 ${LIVE}"
+}
 
 # What releases instead, told to a release that is skipped.
 instead() {
@@ -57,7 +77,7 @@ merge() {
 
 # The newest commit on main with a green build, unless a release tag is reached first.
 nightly() {
-  [ "${mode}" = nightly ] || skip "RELEASE_MODE is ${mode}, so the nightly release has nothing to do. $(instead)"
+  [ "${mode}" = nightly ] || quiet_night "RELEASE_MODE is ${mode}, so the nightly release has nothing to do. $(instead)"
   local commits green released candidate
   commits="$(gh api "repos/${REPOSITORY}/commits?sha=main&per_page=100" --jq '.[].sha')" ||
     refuse "main's history could not be read, so nothing is released tonight"
@@ -68,7 +88,7 @@ nightly() {
   for candidate in ${commits}; do
     # A tag's name ends in the seven characters of the commit it records.
     if grep -q -- "-${candidate:0:7}\$" <<<"${released}"; then
-      skip "${candidate} is the newest release on main, and no commit after it has a green build, so nothing is released tonight."
+      quiet_night "${candidate} is the newest release on main, and no commit after it has a green build, so nothing is released tonight."
     fi
     if grep -qx -- "${candidate}" <<<"${green}"; then
       decide true "${candidate}"
@@ -77,7 +97,19 @@ nightly() {
   refuse "none of main's last 100 commits has a green build, so nothing is released tonight"
 }
 
+# Read before drill mode's refusal, which guards promotions and not this.
+journeys_dispatch() {
+  [ "${journeys_mode}" != off ] ||
+    skip "JOURNEYS_MODE is off, so a journeys-only dispatch has nothing to run. Set it to report (RUNBOOK.md page 13)"
+  journeys_only=true
+  local said="A journeys-only dispatch: nothing is promoted or tagged. ${LIVE}"
+  echo "::notice::${said}"
+  printf '### Journeys only\n\n%s\n' "${said}" >>"${GITHUB_STEP_SUMMARY}"
+  decide false ""
+}
+
 dispatch() {
+  [ "${JOURNEYS_ONLY:-false}" != true ] || journeys_dispatch
   if [ "${mode}" = drill ] && [ -z "${REHEARSED_BY:-}" ]; then
     refuse "RELEASE_MODE is drill: a release must ride a drill that just proved a restore, or state a hotfix reason. Fill \`rehearsed_by\` (RUNBOOK.md page 6)"
   fi

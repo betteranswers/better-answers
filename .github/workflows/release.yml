@@ -19,6 +19,19 @@ on:
       # Read by the nightly release alone, which no caller starts.
       HEALTHCHECKS_READ_KEY:
         required: false
+      # Read by the journeys and their report, which a called release never runs.
+      JOURNEYS_INBOX_KEY:
+        required: false
+      JOURNEYS_INBOX_URL:
+        required: false
+      JOURNEYS_ADMIN_EMAIL:
+        required: false
+      JOURNEYS_EDITOR_EMAIL:
+        required: false
+      JOURNEYS_VIEWER_EMAIL:
+        required: false
+      JOURNEYS_PING_URL:
+        required: false
   # After the box's 02:00 copy and its 02:05 dump; clear of mutation at 02:17 and scan at 03:41.
   schedule:
     - cron: "35 2 * * *"
@@ -33,6 +46,10 @@ on:
       rehearsed_by:
         description: "When RELEASE_MODE is drill: the drill report this release rides on (drills/drill-<stamp>.md), or `hotfix: <reason>`"
         required: false
+      journeys_only:
+        description: "Run only the journeys, against the live release: nothing is promoted or tagged (RUNBOOK.md page 13)"
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -54,6 +71,8 @@ jobs:
       promote: ${{ steps.ask.outputs.promote }}
       commit: ${{ steps.ask.outputs.commit }}
       trigger: ${{ steps.ask.outputs.trigger }}
+      journeys_only: ${{ steps.ask.outputs.journeys_only }}
+      journeys_mode: ${{ steps.ask.outputs.journeys_mode }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -67,6 +86,8 @@ jobs:
           EVENT: ${{ github.event_name }}
           RELEASE_MODE: ${{ vars.RELEASE_MODE }}
           REHEARSED_BY: ${{ inputs.rehearsed_by }}
+          JOURNEYS_MODE: ${{ vars.JOURNEYS_MODE }}
+          JOURNEYS_ONLY: ${{ inputs.journeys_only }}
         run: deploy/release-gate.sh
 
   promote:
@@ -76,8 +97,13 @@ jobs:
     timeout-minutes: 20
     environment: production
     permissions:
-      contents: write
+      contents: read
       packages: read
+    outputs:
+      api_digest: ${{ steps.d.outputs.api }}
+      tag: ${{ steps.name.outputs.tag }}
+      message: ${{ steps.name.outputs.message }}
+      head: ${{ steps.name.outputs.head }}
     env:
       COOLIFY_URL: ${{ vars.COOLIFY_URL }}
       COOLIFY_TOKEN: ${{ secrets.COOLIFY_DEPLOY_TOKEN }}
@@ -89,7 +115,8 @@ jobs:
       TRIGGER: ${{ needs.gate.outputs.trigger }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with: # zizmor: ignore[artipacked] the job pushes its release tag with this credential
+        with:
+          persist-credentials: false
           # The commit the gate chose, never main's head as it is now, whose images may not exist yet.
           ref: ${{ needs.gate.outputs.commit || 'main' }}
       - name: the box's own backup is fresh, before a nightly release
@@ -155,8 +182,9 @@ jobs:
           # The uptime check watches this path and /health, so the smoke and the monitor
           # read the same two.
           curl -fsS --retry 5 --retry-delay 6 --retry-all-errors "${PUBLIC_URL}/.well-known/oauth-protected-resource/mcp" | jq -e --arg mcp "${PUBLIC_URL}/mcp" '.resource == $mcp' >/dev/null
-      # Only a release the smoke passed is recorded, so the newest tag is always one that held.
-      - name: record the promotion as an annotated release/<stamp> tag (the release's last step)
+      # Named here, where the inputs and digests are, and pushed by the record job, which holds write access.
+      - name: name the release's annotated release/<stamp> tag
+        id: name
         env:
           API_DIGEST: ${{ steps.d.outputs.api }}
           WORKER_DIGEST: ${{ steps.d.outputs.worker }}
@@ -193,14 +221,19 @@ jobs:
           fi
           message="$(printf 'release: api %s · worker %s\n\nWhen (UTC): %s\nBy: %s\napi: %s\nworker: %s\nRode on: %s\nCommit: %s (%s)\nRun: %s\n' \
             "${API_DIGEST:7:12}" "${WORKER_DIGEST:7:12}" "${when}" "${by}" "${API_DIGEST}" "${WORKER_DIGEST}" "${rode}" "${head}" "${points}" "${RUN_URL}")"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag --annotate --message "${message}" "${tag}" "${head}"
-          git push origin "refs/tags/${tag}"
+          # `rehearsed_by` is typed by whoever dispatches, so no fixed line can end the message.
+          delimiter="message-$(openssl rand -hex 16)"
+          {
+            echo "tag=${tag}"
+            echo "head=${head}"
+            echo "message<<${delimiter}"
+            echo "${message}"
+            echo "${delimiter}"
+          } >> "$GITHUB_OUTPUT"
           {
             echo "### Promoted to production"
             echo ""
-            echo "- recorded as \`${tag}\` on \`${head}\` (${points})"
+            echo "- \`${head}\` (${points}), to be tagged \`${tag}\`"
             echo "- by ${by}"
             echo "- api \`${API_DIGEST}\`"
             echo "- worker \`${WORKER_DIGEST}\`"
@@ -216,7 +249,147 @@ jobs:
         run: |
           case "${SMOKE}" in
             failure) said="The smoke failed: production never answered healthy on api \`${API_DIGEST}\`. No \`release/*\` tag was pushed, so the newest tag is still the release that held (RUNBOOK.md page 6)." ;;
-            success) said="The smoke passed, but its \`release/*\` tag was not pushed: record it by hand (RUNBOOK.md page 6)." ;;
+            success) said="The smoke passed, but the release's tag could not be named, so no \`release/*\` tag was pushed. Tag it by hand (RUNBOOK.md page 6) only once its journeys held, or while JOURNEYS_MODE is report or off: never a release whose journeys did not hold under gate." ;;
             *) said="The release stopped before its smoke, so no \`release/*\` tag was pushed. Production may still be on the release before it (RUNBOOK.md page 6)." ;;
           esac
           printf '### Not released\n\n%s\n' "${said}" >> "$GITHUB_STEP_SUMMARY"
+
+  # A browser and a package install, kept apart from the write token and from every secret but the journeys' own.
+  journeys:
+    needs: [gate, promote]
+    if: ${{ !cancelled() && needs.gate.outputs.journeys_mode != 'off' && needs.gate.outputs.trigger != 'merge' && (needs.promote.result == 'success' || needs.gate.outputs.journeys_only == 'true') }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 35
+    environment: production
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      word: ${{ steps.word.outputs.word }}
+    env:
+      PUBLIC_URL: ${{ vars.PUBLIC_URL }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # build-commit.sh asks whether the image's commit is an ancestor of main.
+          fetch-depth: 0
+      # A late rerun must not journey a release production no longer runs.
+      - name: production answers healthy on the api image under test
+        id: live
+        env:
+          PROMOTED: ${{ needs.promote.outputs.api_digest }}
+          AWAIT_RELEASE_POLLS: "3"
+        run: |
+          set -euo pipefail
+          digest="${PROMOTED:-$(curl -sS --max-time 10 "${PUBLIC_URL}/health" | jq -r '.image // empty')}"
+          deploy/await-release.sh "${PUBLIC_URL}" "${digest}"
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+      # So a rollback night runs the old commit's journeys against the old images.
+      - name: the commit the live api image was built from
+        id: built
+        env:
+          API_DIGEST: ${{ steps.live.outputs.digest }}
+          OWNER: ${{ github.repository_owner }}
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          commit="$(deploy/build-commit.sh "${API_DIGEST}")"
+          echo "commit=${commit}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ steps.built.outputs.commit }}
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      # No toolchain cache: an entry another run wrote would reach a job holding the inbox key.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - run: pnpm install --frozen-lockfile --filter @better-answers/web...
+      - run: pnpm --filter @better-answers/web exec playwright install --with-deps chromium
+      # The key and the inbox's address on this step alone, so the install above never sees them.
+      - name: the journeys, signed in to production as the test people
+        env:
+          JOURNEYS_CODE_SOURCE: inbox
+          JOURNEYS_SENDER: ${{ vars.JOURNEYS_SENDER }}
+          JOURNEYS_INBOX_KEY: ${{ secrets.JOURNEYS_INBOX_KEY }}
+          JOURNEYS_INBOX_URL: ${{ secrets.JOURNEYS_INBOX_URL }}
+          JOURNEYS_ADMIN_EMAIL: ${{ secrets.JOURNEYS_ADMIN_EMAIL }}
+          JOURNEYS_EDITOR_EMAIL: ${{ secrets.JOURNEYS_EDITOR_EMAIL }}
+          JOURNEYS_VIEWER_EMAIL: ${{ secrets.JOURNEYS_VIEWER_EMAIL }}
+        run: pnpm --filter @better-answers/web run journeys
+      - name: the journeys' word
+        id: word
+        if: always()
+        run: |
+          word="$(cat apps/web/test-results/journeys-outcome 2>/dev/null || true)"
+          case "${word}" in
+            held | fail | could-not-run) echo "word=${word}" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::warning::the journeys wrote no outcome word, so the report reads could-not-run" ;;
+          esac
+
+  record:
+    needs: [gate, promote, journeys]
+    if: ${{ !cancelled() && needs.promote.result == 'success' && (needs.gate.outputs.trigger == 'merge' || needs.gate.outputs.journeys_mode != 'gate' || needs.journeys.outputs.word == 'held') }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    environment: production
+    permissions:
+      contents: write
+    env:
+      PUBLIC_URL: ${{ vars.PUBLIC_URL }}
+    steps:
+      # Promote's head, so a commit that landed during the journeys is never the one tagged.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: # zizmor: ignore[artipacked] the job pushes its release tag with this credential
+          ref: ${{ needs.promote.outputs.head }}
+      - name: production still answers healthy on the promoted api image
+        env:
+          API_DIGEST: ${{ needs.promote.outputs.api_digest }}
+          AWAIT_RELEASE_POLLS: "3"
+        run: deploy/await-release.sh "${PUBLIC_URL}" "${API_DIGEST}"
+      # Only a release that held is recorded, so the newest tag is always one that held.
+      - name: record the promotion as an annotated release/<stamp> tag (the release's last step)
+        env:
+          TAG: ${{ needs.promote.outputs.tag }}
+          MESSAGE: ${{ needs.promote.outputs.message }}
+          RELEASE_HEAD: ${{ needs.promote.outputs.head }}
+        run: |
+          set -euo pipefail
+          tag="${TAG}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag --annotate --message "${MESSAGE}" "${tag}" "${RELEASE_HEAD}"
+          git push origin "refs/tags/${tag}"
+          {
+            echo "### Recorded"
+            echo ""
+            echo "- \`${tag}\` on \`${RELEASE_HEAD}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: say that a release that held recorded no tag
+        if: failure()
+        run: |
+          said="The release held, but its \`release/*\` tag was not pushed. Tag it by hand (RUNBOOK.md page 6) only once its journeys held, or while JOURNEYS_MODE is report or off: never a release whose journeys did not hold under gate."
+          printf '### Not recorded\n\n%s\n' "${said}" >> "$GITHUB_STEP_SUMMARY"
+
+  # Last, whatever the journeys did, so the alert hears from every run that owed it a word.
+  report:
+    needs: [gate, promote, journeys, record]
+    if: ${{ always() && needs.gate.outputs.journeys_mode != 'off' && needs.gate.outputs.trigger != 'merge' && (needs.gate.outputs.promote == 'true' || needs.gate.outputs.journeys_only == 'true') }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: the run's outcome word, pinged to the journeys check
+        env:
+          WORD: ${{ needs.journeys.outputs.word }}
+          JOURNEYS: ${{ needs.journeys.result }}
+          JOURNEYS_PING_URL: ${{ secrets.JOURNEYS_PING_URL }}
+        run: deploy/journeys-report.sh
