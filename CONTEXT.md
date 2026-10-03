@@ -758,7 +758,9 @@ to it by IRI and never restates it (ADR 0014).
   own or by an Admin's dispatch, as the *release mode* says. A release is recorded, as a
   `release/*` tag, only once it has held: its smoke passed and, under `JOURNEYS_MODE=gate`, its
   *journeys* ended `held` too. A release `build.yml` calls after a merge runs no journeys, so it
-  holds on its smoke under every value.
+  holds on its smoke under every value. Under `gate` a release whose journeys end `fail` is tagged
+  `rejected/*` instead, and the nightly release never promotes that commit again until the tag is
+  deleted.
 - **release mode** — _Internal._ how releases happen: **per-merge**, every green build on `main`
   released; **nightly**, one release a night just after a verified backup; **drill**, only a
   dispatched release riding a drill or a hotfix. The phases run in that order: per-merge until the
@@ -774,8 +776,8 @@ to it by IRI and never restates it (ADR 0014).
   one **outcome word**, the body of its *dead-man ping*: `held`, every journey passed; `fail`, a
   page did not do what its journey asks, no code came within 90 seconds, or the promote failed and
   none ran; `could-not-run`, the run could not judge the release, because the inbox, the edge, a
-  setting or the commit under test stood in its way, or the test workspace was found holding
-  something its fixture does not. `JOURNEYS_MODE` stages them: under `off`, or while it is unset,
+  setting or the commit under test stood in its way, the gate refused the run or its promote was
+  cancelled, or the test workspace was found holding something its fixture does not. `JOURNEYS_MODE` stages them: under `off`, or while it is unset,
   none run; under `report` they run and report; under `gate` a release they ran on is recorded
   only once they end `held`. Not the browser suite, whose specs seed a fresh database through its
   harness.
