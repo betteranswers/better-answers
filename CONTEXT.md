@@ -143,8 +143,10 @@ connected sources, audit — citing concepts, never restating them. Where a unit
   reading.
 - **sweep pass** — _Internal._ the platform's daily pass of the *upload sweep* and the *graph
   sweep* over every workspace, one pass at a time, a sweep by hand included, then the deletion of
-  the identity set's short-lived tokens a day past their expiry: sign-in codes and links, and
-  Better Auth's others. Every pass is recorded, a pass that removed nothing too.
+  expired sign-in rows: *sessions* past their end or their pending hour, the identity set's
+  short-lived tokens a day past their expiry (sign-in codes and links, and Better Auth's others),
+  and the rate-limit counts no workspace holds, a day old. Every pass is recorded, a pass that
+  removed nothing too.
 - **upload sweep** — _Internal._ the removal of the originals no document names, once past their
   grace: what a failed connect left, and what a concurrent repeat left when it lost the race to the
   first connect. **List-only** until the operator switches removal on, seven days after the first

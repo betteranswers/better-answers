@@ -24,6 +24,8 @@ import {
 } from "../sources/index.ts";
 import type { ObjectDoor } from "../store/objects/index.ts";
 import {
+  dropIngressWindowsBefore,
+  withIdentityWrite,
   withSessionLock,
   withSessionTryLock,
   type LockHeld,
@@ -177,3 +179,58 @@ export const withSweepLock = <T>(
   door: PostgresDoor,
   work: () => Promise<T>,
 ): Promise<T> => withSessionLock(platform, door, SWEEP_LOCK, () => work());
+
+/** Past any wait to type a code from an email, so one that expired just before a pass reads as spent. */
+const VERIFICATION_KEPT_PAST_EXPIRY_MS = 24 * 60 * 60 * 1000;
+
+const PENDING_SESSION_LIFETIME_MS = 60 * 60 * 1000;
+
+/** Far past the longest ingress rule's window, an hour, so no live count goes. */
+const INGRESS_WINDOW_KEPT_MS = 24 * 60 * 60 * 1000;
+
+const EXPIRED_SESSIONS = "DELETE FROM session WHERE expires_at < $1 OR pending_since < $2";
+
+const EXPIRED_VERIFICATIONS = "DELETE FROM verification WHERE expires_at < $1";
+
+export type IdentitySetSwept = {
+  readonly sessions: Result<number, Error>;
+  readonly verifications: Result<number, Error>;
+  readonly ingressWindows: Result<number, Error>;
+};
+
+const before = (now: Date, ms: number): Date => new Date(now.getTime() - ms);
+
+const countDeleted = (
+  platform: SweepsPrincipal,
+  door: PostgresDoor,
+  statement: string,
+  cutoffs: readonly Date[],
+): Promise<Result<number, Error>> =>
+  attempt(async () => {
+    const dropped = await withIdentityWrite(platform, door, (tx) =>
+      tx.query(statement, [...cutoffs]),
+    );
+    return dropped.rowCount ?? 0;
+  });
+
+/**
+ * Deletes sessions past their expiry or their pending hour, verification rows a day past expiry,
+ * and ingress windows a day old. Each delete stands alone, so a refused one keeps no other's
+ * rows. Failed-confirm counts stay: deleting one would reset a person's backoff.
+ */
+export const sweepIdentitySet = async (
+  platform: SweepsPrincipal,
+  door: PostgresDoor,
+  input: { readonly now: Date },
+): Promise<IdentitySetSwept> => ({
+  sessions: await countDeleted(platform, door, EXPIRED_SESSIONS, [
+    input.now,
+    before(input.now, PENDING_SESSION_LIFETIME_MS),
+  ]),
+  verifications: await countDeleted(platform, door, EXPIRED_VERIFICATIONS, [
+    before(input.now, VERIFICATION_KEPT_PAST_EXPIRY_MS),
+  ]),
+  ingressWindows: await attempt(() =>
+    dropIngressWindowsBefore(door, before(input.now, INGRESS_WINDOW_KEPT_MS)),
+  ),
+});

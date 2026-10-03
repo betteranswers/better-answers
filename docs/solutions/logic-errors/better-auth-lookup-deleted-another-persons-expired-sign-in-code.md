@@ -84,6 +84,8 @@ export const dropExpiredVerifications = async (door: PostgresDoor, now: Date): P
 
 `apps/api/src/sweeps.ts:48-54` wraps it, and the pass runs it after the workspace sweeps, whether or not they succeeded; a pass skipped for a held lock skips it too (`sweeps.ts:77-82`). A refused delete becomes a refusal whose sweep is `verifications` and which names no workspace, and the pass's log line carries `verifications_deleted` (`sweeps.ts:92-98`), as does `the sweep pass failed` (`sweeps.ts:83-90`). The delete covers every verification row more than a day past expiry, not only sign-in codes: links, OAuth state, trusted devices and the library's locks too. The runbook's "The daily sweeps" and §11 say so (`docs/operations/RUNBOOK.md`), and so does CONTEXT.md's **sweep pass** entry.
 
+The delete and its day's grace have since moved to core, as one of the three deletes in `sweepIdentitySet` (`packages/core/src/sweeps/index.ts`), beside expired sessions and rate-limit windows. The grace and the refusal word `verifications` are unchanged.
+
 ## Why This Works
 
 `findVerificationValue` reads the newest row for the identifier first (`internal-adapter.mjs:751-752`), then deletes every expired row in the whole table (`:753-757`), then returns what it read (`:758`). A person's own lookup therefore still sees their expired row, and `atomicVerifyOTP` answers `OTP_EXPIRED` (`apps/api/node_modules/better-auth/dist/plugins/email-otp/routes.mjs:763-766`).
