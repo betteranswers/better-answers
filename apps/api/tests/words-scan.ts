@@ -220,11 +220,12 @@ type Scan = {
   readonly kept: readonly string[];
 };
 
-const landed = (rows: readonly OldWord[]): readonly Renamed[] =>
-  rows.filter((row): row is Renamed => isRenamed(row) && row.state === "landed");
+const inState = (rows: readonly OldWord[], state: Renamed["state"]): readonly Renamed[] =>
+  rows.filter((row): row is Renamed => isRenamed(row) && row.state === state);
 
-const stillPending = (rows: readonly OldWord[]): readonly Renamed[] =>
-  rows.filter((row): row is Renamed => isRenamed(row) && row.state === "pending");
+const landed = (rows: readonly OldWord[]): readonly Renamed[] => inState(rows, "landed");
+
+const stillPending = (rows: readonly OldWord[]): readonly Renamed[] => inState(rows, "pending");
 
 /** Every landed word a tracked line still uses, outside its carve-outs and the senses it keeps. */
 export const lineFindings = (root: string, { rows, carvedOut, kept }: Scan): readonly Finding[] => {

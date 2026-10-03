@@ -1,6 +1,6 @@
 import ast
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from functools import cache
 from itertools import product
@@ -117,23 +117,27 @@ def read_module(path: Path, root: Path) -> Module:
     return Module(name=name, tree=tree, parents=parents, constants=constants)
 
 
-def _site(module: Module, node: ast.expr | ast.stmt) -> str:
-    names: list[str] = []
+def _ancestors(module: Module, node: ast.AST) -> Iterator[ast.AST]:
     parent = module.parents.get(node)
     while parent is not None:
-        if isinstance(parent, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
-            names.append(parent.name)
+        yield parent
         parent = module.parents.get(parent)
+
+
+def _site(module: Module, node: ast.expr | ast.stmt) -> str:
+    names = [
+        ancestor.name
+        for ancestor in _ancestors(module, node)
+        if isinstance(ancestor, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef)
+    ]
     scope = ".".join(reversed(names)) or "<module>"
     return f"{module.name}:{scope} line {node.lineno}"
 
 
 def _enclosing_function(module: Module, node: ast.AST) -> Function | None:
-    parent = module.parents.get(node)
-    while parent is not None:
-        if isinstance(parent, ast.FunctionDef | ast.AsyncFunctionDef):
-            return parent
-        parent = module.parents.get(parent)
+    for ancestor in _ancestors(module, node):
+        if isinstance(ancestor, ast.FunctionDef | ast.AsyncFunctionDef):
+            return ancestor
     return None
 
 
@@ -196,12 +200,11 @@ def _readings_of_joined(
 ) -> list[Reading]:
     parts: list[list[Reading]] = []
     for value in node.values:
-        plain = isinstance(value, ast.FormattedValue) and (
-            value.conversion == -1 and value.format_spec is None
-        )
-        if isinstance(value, ast.FormattedValue) and not plain:
-            raise UnreadableError(ast.unparse(node))
-        inner = value.value if isinstance(value, ast.FormattedValue) else value
+        inner = value
+        if isinstance(value, ast.FormattedValue):
+            if value.conversion != -1 or value.format_spec is not None:
+                raise UnreadableError(ast.unparse(node))
+            inner = value.value
         parts.append(readings_of(module, inner, seen))
     return [
         (
@@ -346,7 +349,10 @@ def _check_tables(found: Survey, built: list[str], tables: Mapping[str, Table]) 
 
 
 def _set_aside_unpreparable(found: Survey, unpreparable: Mapping[str, str]) -> None:
-    refused = [s for s in found.statements if not PREPARABLE.match(s.text)]
+    prepared: list[Statement] = []
+    refused: list[Statement] = []
+    for statement in found.statements:
+        (prepared if PREPARABLE.match(statement.text) else refused).append(statement)
     sent = {statement.text for statement in refused}
     found.problems += [
         f"UNPREPARABLE names a statement no send makes unprepared: {text!r}"
@@ -359,7 +365,7 @@ def _set_aside_unpreparable(found: Survey, unpreparable: Mapping[str, str]) -> N
         for statement in refused
         if statement.text not in unpreparable
     ]
-    found.statements = [s for s in found.statements if PREPARABLE.match(s.text)]
+    found.statements = prepared
 
 
 def survey(

@@ -480,7 +480,7 @@ describe("the deploy tree", () => {
 
     const ran = (status: number): BashRun =>
       bashRan([
-        "NOT_BUILT=3",
+        `NOT_BUILT=${String(NOT_BUILT_EXIT)}`,
         'DRILL_WORKSPACE="a-workspace"',
         `platform() { printf 'priya@example.invalid,1 High St,Priya Anand\\n'; return ${String(status)}; }`,
         guard ?? "",
@@ -491,7 +491,7 @@ describe("the deploy tree", () => {
       code: 0,
       output: "the proof ran, subject=priya@example.invalid,1 High St,Priya Anand\n",
     });
-    expect(ran(3)).toEqual({
+    expect(ran(NOT_BUILT_EXIT)).toEqual({
       code: 1,
       output:
         "REHEARSAL FAILED: the synthetic seed answered not built, so a table the erasure slice needs is absent from the restored copy\n",
@@ -508,7 +508,7 @@ describe("the deploy tree", () => {
 
     const ran = (status: number): BashRun =>
       bashRan([
-        "NOT_BUILT=3",
+        `NOT_BUILT=${String(NOT_BUILT_EXIT)}`,
         ...ASIDE,
         `platform() { printf '%s\\n' "ran: $*"; return ${String(status)}; }`,
         commands ?? "",
@@ -521,8 +521,8 @@ describe("the deploy tree", () => {
       output:
         "ran: exec -T api pnpm --silent ops graph-sweep --workspace a-workspace\nthe next step ran\n",
     });
-    expect(ran(3)).toEqual({
-      code: 3,
+    expect(ran(NOT_BUILT_EXIT)).toEqual({
+      code: NOT_BUILT_EXIT,
       output:
         "ran: exec -T api pnpm --silent ops graph-sweep --workspace a-workspace\n" +
         "DRILL FAILED: 'pnpm ops graph-sweep' answered not built, so a table its slice needs is absent from the restored copy\n",
