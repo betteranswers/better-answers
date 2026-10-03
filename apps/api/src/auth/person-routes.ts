@@ -43,8 +43,7 @@ export const PERSON_ROUTE_REFUSALS = {
   codeWrong: { error: "code-wrong" },
   notVerified: { error: "not-verified" },
   challengeGone: { error: "challenge-gone" },
-
-  // Restored by the operator: only a session that gave the restore code may set up a factor.
+  /** Restored by the operator: only a session that gave the restore code may set up a factor. */
   restoreCodeNeeded: { error: "restore-code-needed" },
 } as const;
 
@@ -52,16 +51,23 @@ export const PERSON_ROUTE_REFUSALS = {
 export const tooManyTries = (retryAfterSeconds: number): Response =>
   tooManyRequests(retryAfterSeconds, "Too many tries; try again later.");
 
+/** A body that is no JSON reads as nothing, so `schema` refuses it. */
+export const parsedBody = async <Schema extends z.ZodType>(context: Context, schema: Schema) =>
+  schema.safeParse(await context.req.json().catch(() => undefined));
+
+/** The person and the session a step acts for, at the moment it asks. */
+export const askedBy = (clock: Clock, person: SignedIn) => ({
+  personId: person.user.id,
+  sessionId: person.session.id,
+  now: clock.now(),
+});
+
 /** What the person holds, with this session's own standing; undefined when it could not be read. */
 export const heldBy = async (
   deps: { readonly door: PostgresDoor; readonly clock: Clock },
   person: SignedIn,
 ): Promise<SecondFactorHeld | undefined> => {
-  const held = await readSecondFactor(IDENTITY_PRINCIPAL, deps.door, {
-    personId: person.user.id,
-    sessionId: person.session.id,
-    now: deps.clock.now(),
-  });
+  const held = await readSecondFactor(IDENTITY_PRINCIPAL, deps.door, askedBy(deps.clock, person));
   return held.ok ? held.value : undefined;
 };
 

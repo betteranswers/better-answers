@@ -113,6 +113,9 @@ export class CodeRefused extends Error {
   }
 }
 
+export const isTooMany = (failure: Error | null): failure is CodeRefused =>
+  failure instanceof CodeRefused && failure.status === TOO_MANY_REQUESTS;
+
 type WaitReading = { readonly onError: (context: { readonly response: Response }) => void };
 
 /**

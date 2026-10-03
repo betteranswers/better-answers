@@ -19,7 +19,7 @@ import { Input } from "@/shared/ui/input.tsx";
 import { Label } from "@/shared/ui/label.tsx";
 
 import { ACCOUNT_ACTS, ACCOUNT_WORDS } from "./account-words.ts";
-import { CodeRefused, SIGNED_OUT, TOO_MANY_REQUESTS } from "./auth-hooks.ts";
+import { CodeRefused, isTooMany, SIGNED_OUT } from "./auth-hooks.ts";
 import { AuthScreen, Outcome, ReadAgain, Refused } from "./auth-screen.tsx";
 import { isAWrongCode } from "./authenticator-code.tsx";
 import { leavingFor } from "./carried-flow.ts";
@@ -100,7 +100,7 @@ export const useArrivalFocus = () => {
 export type FocusOnArrival = ReturnType<typeof useArrivalFocus>;
 
 /** No countdown: the wait is named once, and its lifting said once. */
-export const useWaiting = (secondsAtArrival: number, onLifted: () => void) => {
+const useWaiting = (secondsAtArrival: number, onLifted: () => void) => {
   const [wait, setWait] = useState<{ readonly seconds: number | undefined } | undefined>(
     secondsAtArrival > 0 ? { seconds: secondsAtArrival } : undefined,
   );
@@ -135,8 +135,37 @@ export const useWaiting = (secondsAtArrival: number, onLifted: () => void) => {
   };
 };
 
-export const isTooMany = (failure: Error | null): failure is CodeRefused =>
-  failure instanceof CodeRefused && failure.status === TOO_MANY_REQUESTS;
+/** A code's send as its field reads it. */
+type SendingState = {
+  readonly isPending: boolean;
+  readonly isSuccess: boolean;
+  readonly error: Error | null;
+  readonly reset: () => void;
+};
+
+/** Held while it sends, once it lands and through a wait; a wait is said in place of a refusal. */
+export const useThrottledSend = (
+  sending: SendingState,
+  waitAtArrival: number,
+  others: readonly OtherWay[],
+  saidOfFailure: (failure: Error | null) => Said | undefined,
+) => {
+  const waiting = useWaiting(waitAtArrival, () => {
+    sending.reset();
+  });
+  return {
+    held: sending.isPending || sending.isSuccess || waiting.waiting,
+    said: waiting.waiting
+      ? tooManyCodesTriedOr(waiting.seconds, others)
+      : saidOfFailure(sending.error),
+    lifted: waiting.lifted,
+    /** A throttle starts the wait; any other refusal goes to `otherwise`. */
+    refused: (failure: Error, otherwise: (failure: Error) => void) => {
+      if (isTooMany(failure)) waiting.waitFor(failure.waitSeconds);
+      else otherwise(failure);
+    },
+  };
+};
 
 /** A real link, so it opens in a new tab too; a press keeps the page's query. */
 export function StepLink(properties: {
@@ -248,13 +277,12 @@ export function OneTimeCodeForm(properties: {
   const fieldId = useId();
   const refusedId = useId();
   const [code, setCode] = useState("");
-  const waiting = useWaiting(waitAtArrival, () => {
-    sending.reset();
-  });
-  const held = sending.isPending || sending.isSuccess || waiting.waiting;
-  const said = waiting.waiting
-    ? tooManyCodesTriedOr(waiting.seconds, others)
-    : saidOfSending(sending.error, saids);
+  const { held, said, lifted, refused } = useThrottledSend(
+    sending,
+    waitAtArrival,
+    others,
+    (failure) => saidOfSending(failure, saids),
+  );
 
   const send = (event: FormEvent) => {
     event.preventDefault();
@@ -263,8 +291,9 @@ export function OneTimeCodeForm(properties: {
     sending.mutate(asked, {
       onSuccess: onGranted,
       onError: (failure) => {
-        if (isTooMany(failure)) waiting.waitFor(failure.waitSeconds);
-        else selectTheCode(fieldId);
+        refused(failure, () => {
+          selectTheCode(fieldId);
+        });
       },
     });
   };
@@ -292,7 +321,7 @@ export function OneTimeCodeForm(properties: {
       <Button type="submit" className="mt-4 aria-disabled:opacity-50" aria-disabled={held}>
         {USE_CODE}
       </Button>
-      <CodeOutcomes lifted={waiting.lifted} said={said} refusedId={refusedId} />
+      <CodeOutcomes lifted={lifted} said={said} refusedId={refusedId} />
     </form>
   );
 }

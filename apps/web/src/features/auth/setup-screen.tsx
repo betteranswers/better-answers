@@ -128,16 +128,14 @@ function CodesToFinish(properties: { readonly inHand: CodesInHand; readonly quer
   );
 }
 
-/** Open from the first draw where no passkey can be made, so the key is minted as it mounts. */
-const useMintOnArrival = (open: boolean, mint: () => void) => {
-  const minted = useRef(false);
-  const mintOnce = useEffectEvent(() => {
-    if (open) mint();
-  });
+/** Once per mount, though React may run a mount's effects twice. */
+const useOnArrival = (run: () => void) => {
+  const arrived = useRef(false);
+  const runOnce = useEffectEvent(run);
   useEffect(() => {
-    if (minted.current) return;
-    minted.current = true;
-    mintOnce();
+    if (arrived.current) return;
+    arrived.current = true;
+    runOnce();
   }, []);
 };
 
@@ -165,7 +163,7 @@ const useSetup = (standing: Standing | undefined, onNotGranted: () => void) => {
   return {
     starting,
     open,
-    finishPath: routes.finish,
+    routes,
     refused,
     mint,
     toggle: () => {
@@ -192,8 +190,11 @@ function SetupWays(properties: {
   const [suggested] = useState(() =>
     typeof navigator === "undefined" ? PASSKEY_WORDS.unnamed : passkeyNameFor(navigator.userAgent),
   );
-  const finishing = useFinishingTheSetup(setup.finishPath);
-  useMintOnArrival(setup.open, setup.mint);
+  const finishing = useFinishingTheSetup(setup.routes);
+  // Open from the first draw where no passkey can be made, so the key is minted as it mounts.
+  useOnArrival(() => {
+    if (setup.open) setup.mint();
+  });
 
   const added = (passkey: PasskeyAdded) => {
     if (passkey.recoveryCodes === null) properties.onNoCodes();
@@ -233,7 +234,7 @@ function SetupWays(properties: {
         <AuthenticatorSetup
           id={setupId}
           starting={setup.starting}
-          finishPath={setup.finishPath}
+          routes={setup.routes}
           onFinished={finished}
           onRefused={setup.refused}
         />
@@ -350,16 +351,10 @@ export function CodesScreen() {
   const [query] = useState(pageQuery);
   const make = useReplaceRecoveryCodes();
   const refusedId = useId();
-  const asked = useRef(false);
   const makeASet = () => {
     make.mutate({ replacing: true });
   };
-  const makeOnArrival = useEffectEvent(makeASet);
-  useEffect(() => {
-    if (asked.current) return;
-    asked.current = true;
-    makeOnArrival();
-  }, []);
+  useOnArrival(makeASet);
 
   if (make.data !== undefined) {
     const { recoveryCodes, madeAt } = make.data;

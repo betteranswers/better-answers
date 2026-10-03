@@ -46,10 +46,12 @@ import {
 } from "./constants.ts";
 import { presented } from "./passkeys.ts";
 import {
+  askedBy,
   codeAsked,
   finishedWith,
   heldBy,
   mayReplace,
+  parsedBody,
   PERSON_ROUTE_REFUSALS,
   type FactorRoutesDependencies,
   personRoutesAt,
@@ -137,16 +139,10 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
     void sendFactorNotice({ mail, log }, person.user.email, change);
   };
 
-  const asked = (person: SignedIn) => ({
-    personId: person.user.id,
-    sessionId: person.session.id,
-    now: clock.now(),
-  });
-
   const secretConfig = async () => (await auth.$context).secretConfig;
 
   const askToConfirm = async (context: Context, person: SignedIn): Promise<Response> => {
-    const held = await readPasskeyCredentials(IDENTITY_PRINCIPAL, door, asked(person));
+    const held = await readPasskeyCredentials(IDENTITY_PRINCIPAL, door, askedBy(clock, person));
     if (!held.ok) return refused(context, held.error);
     if (held.value.length === 0) return context.json(REFUSALS.noPasskey, 409);
     const options = await attempt(() =>
@@ -161,7 +157,7 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
     );
     if (!options.ok) return unanswered(context, options.error.message);
     const kept = await keepPasskeyChallenge(IDENTITY_PRINCIPAL, door, {
-      ...asked(person),
+      ...askedBy(clock, person),
       challenge: options.value.challenge,
     });
     return kept.ok ? context.json(options.value) : refused(context, kept.error);
@@ -187,7 +183,7 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
     const info = verified.ok && verified.value.verified ? verified.value.authenticationInfo : null;
     if (info?.userVerified !== true) return context.json(PERSON_ROUTE_REFUSALS.notVerified, 400);
     const stamped = await confirmByPasskey(IDENTITY_PRINCIPAL, door, {
-      ...asked(person),
+      ...askedBy(clock, person),
       credentialId: answer.credential.credentialId,
       counter: info.newCounter,
     });
@@ -198,14 +194,14 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
   };
 
   const confirmWithAPasskey = async (context: Context, person: SignedIn): Promise<Response> => {
-    const answered = presented.safeParse(await context.req.json().catch(() => undefined));
+    const answered = await parsedBody(context, presented);
     if (!answered.success) return context.json(PERSON_ROUTE_REFUSALS.notVerified, 400);
-    const challenge = await takePasskeyChallenge(IDENTITY_PRINCIPAL, door, asked(person));
+    const challenge = await takePasskeyChallenge(IDENTITY_PRINCIPAL, door, askedBy(clock, person));
     if (!challenge.ok) return refused(context, challenge.error);
     if (challenge.value === undefined) {
       return context.json(PERSON_ROUTE_REFUSALS.challengeGone, 400);
     }
-    const held = await readPasskeyCredentials(IDENTITY_PRINCIPAL, door, asked(person));
+    const held = await readPasskeyCredentials(IDENTITY_PRINCIPAL, door, askedBy(clock, person));
     if (!held.ok) return refused(context, held.error);
     const { response } = answered.data;
     const credential = held.value.find((each) => each.credentialId === response.id);
@@ -218,7 +214,7 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
   };
 
   const confirmed = async (context: Context, person: SignedIn): Promise<Response> => {
-    const stamped = await confirmByAuthenticator(IDENTITY_PRINCIPAL, door, asked(person));
+    const stamped = await confirmByAuthenticator(IDENTITY_PRINCIPAL, door, askedBy(clock, person));
     if (stamped.ok) return context.json({ confirmed: true });
     return stamped.error === "no-authenticator"
       ? context.json(REFUSALS.noAuthenticator, 409)
@@ -227,7 +223,7 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
 
   const failed = async (context: Context, person: SignedIn): Promise<Response> => {
     const counted = await countFailedConfirm(IDENTITY_PRINCIPAL, door, {
-      ...asked(person),
+      ...askedBy(clock, person),
       kind: "authenticator",
     });
     if (!counted.ok) return refused(context, counted.error);
@@ -248,10 +244,10 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
   };
 
   const confirmWithACode = async (context: Context, person: SignedIn): Promise<Response> => {
-    const sent = codeAsked.safeParse(await context.req.json().catch(() => undefined));
+    const sent = await parsedBody(context, codeAsked);
     if (!sent.success) return context.json(PERSON_ROUTE_REFUSALS.codeWrong, 400);
     const waiting = await readConfirmWait(IDENTITY_PRINCIPAL, door, {
-      ...asked(person),
+      ...askedBy(clock, person),
       kind: "authenticator",
     });
     if (!waiting.ok) return refused(context, waiting.error);
@@ -267,9 +263,12 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
   const spending =
     (act: SpendsACode, wrong: { readonly error: string }, used?: FactorChange) =>
     async (context: Context, person: SignedIn): Promise<Response> => {
-      const sent = typedCode.safeParse(await context.req.json().catch(() => undefined));
+      const sent = await parsedBody(context, typedCode);
       if (!sent.success) return context.json(wrong, 400);
-      const tried = await act(IDENTITY_PRINCIPAL, door, { ...asked(person), code: sent.data.code });
+      const tried = await act(IDENTITY_PRINCIPAL, door, {
+        ...askedBy(clock, person),
+        code: sent.data.code,
+      });
       if (!tried.ok) return refused(context, tried.error);
       if (!tried.value.granted) {
         if (tried.value.noticeDue) notify(person, "confirm-failures");
@@ -279,6 +278,12 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
       return context.json({ granted: true });
     };
 
+  const refusedToReplace = (context: Context, why: string | Error): Response => {
+    if (why === "setup-not-granted") return context.json(REFUSALS.setupNotGranted, 409);
+    if (why === "changed-meanwhile") return context.json(REFUSALS.changedMeanwhile, 409);
+    return refused(context, why);
+  };
+
   /** The plugin's own making and sealing of a key, kept aside until its first code works. */
   const startTheReplacement = async (context: Context, person: SignedIn): Promise<Response> => {
     const secret = generateRandomString(SECRET_LENGTH);
@@ -287,21 +292,12 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
     );
     if (!sealed.ok) return unanswered(context, sealed.error.message);
     const parked = await parkAuthenticatorSecret(IDENTITY_PRINCIPAL, door, {
-      ...asked(person),
+      ...askedBy(clock, person),
       encryptedSecret: sealed.value,
     });
-    if (!parked.ok && parked.error === "setup-not-granted") {
-      return context.json(REFUSALS.setupNotGranted, 409);
-    }
-    if (!parked.ok) return refused(context, parked.error);
+    if (!parked.ok) return refusedToReplace(context, parked.error);
     const setupAddress = createOTP(secret, OTP_SETTINGS).url(PRODUCT_NAME, person.user.email);
     return context.json({ setupAddress });
-  };
-
-  const refusedToReplace = (context: Context, why: string | Error): Response => {
-    if (why === "setup-not-granted") return context.json(REFUSALS.setupNotGranted, 409);
-    if (why === "changed-meanwhile") return context.json(REFUSALS.changedMeanwhile, 409);
-    return refused(context, why);
   };
 
   const replacingWith = async (
@@ -317,7 +313,7 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
     if (!works.ok) return unanswered(context, works.error.message);
     if (!works.value) return context.json(PERSON_ROUTE_REFUSALS.codeWrong, 400);
     const replaced = await replaceFactorsByAuthenticator(IDENTITY_PRINCIPAL, door, {
-      ...asked(person),
+      ...askedBy(clock, person),
       encryptedSecret: sealed,
     });
     if (!replaced.ok) return refusedToReplace(context, replaced.error);
@@ -326,12 +322,16 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
   };
 
   const finishTheReplacement = async (context: Context, person: SignedIn): Promise<Response> => {
-    const sent = codeAsked.safeParse(await context.req.json().catch(() => undefined));
+    const sent = await parsedBody(context, codeAsked);
     if (!sent.success) return context.json(PERSON_ROUTE_REFUSALS.codeWrong, 400);
     const held = await heldBy(deps, person);
     if (held === undefined) return unanswered(context, "the second factor was not read");
     if (!mayReplace(held)) return context.json(REFUSALS.setupNotGranted, 409);
-    const parked = await readParkedAuthenticatorSecret(IDENTITY_PRINCIPAL, door, asked(person));
+    const parked = await readParkedAuthenticatorSecret(
+      IDENTITY_PRINCIPAL,
+      door,
+      askedBy(clock, person),
+    );
     if (!parked.ok) return refused(context, parked.error);
     // Granted, but its key is gone: expired, or replaced by a later start.
     if (parked.value === undefined) return context.json(REFUSALS.changedMeanwhile, 409);

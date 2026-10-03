@@ -24,9 +24,11 @@ import {
   PASSKEY_SIGN_IN_PATH,
 } from "./constants.ts";
 import {
+  askedBy,
   finishedWith,
   heldBy,
   mayReplace,
+  parsedBody,
   PERSON_ROUTE_REFUSALS,
   type FactorRoutesDependencies,
   personRoutesAt,
@@ -132,7 +134,7 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
 
   /** The name is judged before the device is asked, so a refused one leaves no passkey on it. */
   const askToAdd = async (context: Context, person: SignedIn): Promise<Response> => {
-    const named = naming.safeParse(await context.req.json().catch(() => undefined));
+    const named = await parsedBody(context, naming);
     if (!named.success) return context.json(REFUSALS.malformed, 400);
     const name = applyPasskeyNameRule(named.data.name);
     if (!name.ok) return nameRefused(context, name.error);
@@ -172,9 +174,7 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
   /** The library has kept the passkey, so a grant spent meanwhile leaves it an ordinary add. */
   const replace = async (context: Context, person: SignedIn, passkeyId: string) => {
     const replaced = await replaceFactorsByPasskey(IDENTITY_PRINCIPAL, door, {
-      personId: person.user.id,
-      sessionId: person.session.id,
-      now: clock.now(),
+      ...askedBy(clock, person),
       keptPasskeyId: passkeyId,
     });
     if (!replaced.ok && replaced.error === "setup-not-granted") {
@@ -193,7 +193,7 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
 
   /** A session granted setup by a spent code replaces the person's factors with this passkey. */
   const add = async (context: Context, person: SignedIn): Promise<Response> => {
-    const asked = added.safeParse(await context.req.json().catch(() => undefined));
+    const asked = await parsedBody(context, added);
     if (!asked.success) return context.json(REFUSALS.malformed, 400);
     const name = applyPasskeyNameRule(asked.data.name);
     if (!name.ok) return nameRefused(context, name.error);
@@ -231,7 +231,7 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
   };
 
   const signIn = async (context: Context): Promise<Response> => {
-    const asked = presented.safeParse(await context.req.json().catch(() => undefined));
+    const asked = await parsedBody(context, presented);
     if (!asked.success) return context.json(REFUSALS.malformed, 400);
     const verified = await attempt(() =>
       auth.api.verifyPasskeyAuthentication({

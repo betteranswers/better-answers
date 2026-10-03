@@ -5,7 +5,7 @@ import { RefusalLine } from "@/shared/refusal-outcome.tsx";
 import { SAID_OF_CLASS, type Said } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 
-import { CodeRefused, SIGNED_OUT, TOO_MANY_REQUESTS } from "./auth-hooks.ts";
+import { CodeRefused, isTooMany, SIGNED_OUT, TOO_MANY_REQUESTS } from "./auth-hooks.ts";
 import { focusOn, Outcome } from "./auth-screen.tsx";
 import { AuthenticatorCodeField, isAWrongCode, useSixDigits } from "./authenticator-code.tsx";
 import { pageQuery } from "./carried-flow.ts";
@@ -25,7 +25,6 @@ import {
   PASSKEY_NOT_YOURS,
   RECOVERY_UNANSWERED,
   SAID_OF_SECOND_FACTOR,
-  tooManyCodesTriedOr,
   tooManyConfirmations,
   type OtherWay,
 } from "./refusal-words.ts";
@@ -33,14 +32,13 @@ import { useSecondFactor, type SecondFactor } from "./second-factor-hooks.ts";
 import {
   CodeOutcomes,
   holdsAFactor,
-  isTooMany,
   OneTimeCodeForm,
   PendingFrame,
   sessionOf,
   StepLink,
   useArrivalFocus,
   useGoingTo,
-  useWaiting,
+  useThrottledSend,
   type FocusOnArrival,
 } from "./second-factor-parts.tsx";
 import {
@@ -183,19 +181,17 @@ function AuthenticatorWay(properties: {
   const hintId = useId();
   const refusedId = useId();
   const confirm = useConfirmByAuthenticator();
-  const waiting = useWaiting(waitAtArrival, () => {
-    confirm.reset();
-  });
-  const held = confirm.isPending || confirm.isSuccess || waiting.waiting;
-  const said = waiting.waiting
-    ? tooManyCodesTriedOr(waiting.seconds, others)
-    : saidOfConfirmingByCode(confirm.error);
+  const { held, said, lifted, refused } = useThrottledSend(
+    confirm,
+    waitAtArrival,
+    others,
+    saidOfConfirmingByCode,
+  );
   const digits = useSixDigits(fieldId, held, (code, onRefused) => {
     confirm.mutate(code, {
       onSuccess: onConfirmed,
       onError: (failure) => {
-        if (isTooMany(failure)) waiting.waitFor(failure.waitSeconds);
-        else onRefused(failure);
+        refused(failure, onRefused);
       },
     });
   });
@@ -225,7 +221,7 @@ function AuthenticatorWay(properties: {
       >
         {CONFIRM_WORDS.confirm}
       </Button>
-      <CodeOutcomes lifted={waiting.lifted} said={said} refusedId={refusedId} />
+      <CodeOutcomes lifted={lifted} said={said} refusedId={refusedId} />
     </form>
   );
 }

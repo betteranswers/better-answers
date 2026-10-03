@@ -7,9 +7,14 @@ import { Button } from "@/shared/ui/button.tsx";
 import { QRCode } from "@/shared/ui/kibo-ui/qr-code.tsx";
 
 import { ACCOUNT_ACTS, AUTHENTICATOR_WORDS } from "./account-words.ts";
-import { CodeRefused } from "./auth-hooks.ts";
+import { CodeRefused, SIGNED_OUT, TOO_MANY_REQUESTS } from "./auth-hooks.ts";
 import { Outcome } from "./auth-screen.tsx";
-import { AuthenticatorCodeField, isAWrongCode, useSixDigits } from "./authenticator-code.tsx";
+import {
+  AuthenticatorCodeField,
+  CODE_WRONG,
+  isAWrongCode,
+  useSixDigits,
+} from "./authenticator-code.tsx";
 import { copiedToTheClipboard } from "./clipboard.ts";
 import {
   AUTHENTICATOR_HELD,
@@ -27,6 +32,7 @@ import {
 } from "./refusal-words.ts";
 import {
   useFinishAuthenticator,
+  type AuthenticatorRoutes,
   type CodesIssued,
   type SetupStarted,
   type StartingTheSetup,
@@ -34,13 +40,7 @@ import {
 
 export const COPY_KEY: Keystroke = { key: "k", act: ACCOUNT_ACTS.copyKey };
 
-const CODE_WRONG = 400;
-
-const SIGNED_OUT = 401;
-
 const CONFLICT = 409;
-
-const TOO_MANY_REQUESTS = 429;
 
 /** A setup's own words, read before its status: the replacing routes answer 409 for each. */
 const SAID_OF_A_SETUP_WORD: ReadonlyMap<string, Said> = new Map([
@@ -138,7 +138,7 @@ function TheKey(properties: { readonly started: SetupStarted }) {
 
 /** Where a setup finishes, and who hears of a refusal there; the first setup's route by default. */
 type Finishing = {
-  readonly finishPath?: string | undefined;
+  readonly routes?: AuthenticatorRoutes | undefined;
   readonly onRefused?: ((failure: Error) => void) | undefined;
 };
 
@@ -151,7 +151,7 @@ function KeyAndCode(
 ) {
   const fieldId = useId();
   const refusedId = useId();
-  const finish = useFinishAuthenticator(properties.onFinished, properties.finishPath);
+  const finish = useFinishAuthenticator(properties.onFinished, properties.routes);
   const finishing = finish.isPending || finish.isSuccess;
   const digits = useSixDigits(fieldId, finishing, (code, onRefused) => {
     finish.mutate(code, {
@@ -224,7 +224,7 @@ export function AuthenticatorSetup(
         <KeyAndCode
           key={starting.data.key}
           started={starting.data}
-          finishPath={properties.finishPath}
+          routes={properties.routes}
           onRefused={properties.onRefused}
           onFinished={properties.onFinished}
         />

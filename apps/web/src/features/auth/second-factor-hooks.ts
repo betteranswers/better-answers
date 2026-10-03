@@ -79,13 +79,13 @@ export type StartingTheSetup = ReturnType<typeof useStartAuthenticator>;
  */
 export const useFinishAuthenticator = (
   onFinished: (issued: CodesIssued | null) => void,
-  finishPath = FIRST_AUTHENTICATOR.finish,
+  routes = FIRST_AUTHENTICATOR,
 ) => {
   const queryClient = useQueryClient();
   const reread = useRereadTheSecondFactor();
   return useMutation({
-    mutationKey: [finishPath],
-    mutationFn: (code: string) => askOfOurRoute(finishPath, { code }, setupFinished),
+    mutationKey: [routes.finish],
+    mutationFn: (code: string) => askOfOurRoute(routes.finish, { code }, setupFinished),
     onSuccess: async (issued) => {
       onFinished(issued);
       await Promise.all([rereadTheSession(queryClient), reread()]);
@@ -94,8 +94,8 @@ export const useFinishAuthenticator = (
 };
 
 /** Read where the setup is opened, since the code field holding the finish can close first. */
-export const useFinishingTheSetup = (finishPath = FIRST_AUTHENTICATOR.finish): boolean =>
-  useMutationState({ filters: { mutationKey: [finishPath], status: "pending" } }).length > 0;
+export const useFinishingTheSetup = (routes = FIRST_AUTHENTICATOR): boolean =>
+  useMutationState({ filters: { mutationKey: [routes.finish], status: "pending" } }).length > 0;
 
 export const useRemoveAuthenticator = () => {
   const api = useTRPC();

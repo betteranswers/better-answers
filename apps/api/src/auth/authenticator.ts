@@ -16,6 +16,7 @@ import {
   codeAsked,
   finishedWith,
   heldBy,
+  parsedBody,
   PERSON_ROUTE_REFUSALS,
   type FactorRoutesDependencies,
   personRoutesAt,
@@ -124,7 +125,7 @@ export const mountTheAuthenticator = (routes: Hono, deps: FactorRoutesDependenci
   };
 
   const finish = async (context: Context, person: SignedIn): Promise<Response> => {
-    const asked = codeAsked.safeParse(await context.req.json().catch(() => undefined));
+    const asked = await parsedBody(context, codeAsked);
     if (!asked.success) return context.json(PERSON_ROUTE_REFUSALS.codeWrong, 400);
     const state = await stateOf(person);
     if (state === undefined) return unanswered(context, "the second factor was not read");

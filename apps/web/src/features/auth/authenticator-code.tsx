@@ -11,7 +11,7 @@ import { digitsOf, selectTheCode, worthSending } from "./code-entry.ts";
 
 const CODE_PATTERN = `[0-9]{${String(AUTHENTICATOR_CODE_LENGTH)}}`;
 
-const CODE_WRONG = 400;
+export const CODE_WRONG = 400;
 
 export const isAWrongCode = (failure: Error | null): boolean =>
   failure instanceof CodeRefused && failure.status === CODE_WRONG;

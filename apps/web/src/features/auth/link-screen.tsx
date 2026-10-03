@@ -11,6 +11,7 @@ import { Button } from "@/shared/ui/button.tsx";
 import {
   CodeRefused,
   dropTheLinkToken,
+  isTooMany,
   linkTokenOnThisPage,
   useDescribeTheLink,
   useSignInByLink,
@@ -42,8 +43,6 @@ const BACK_TO_SIGN_IN: Keystroke = { key: "s", act: LINK_ACTS.backToSignIn };
 
 const REFUSED = "link-refused";
 
-const TOO_MANY_REQUESTS = 429;
-
 type Bound = Extract<LinkDescribed, { state: "bound" }>;
 
 type Elsewhere = Extract<LinkDescribed, { state: "elsewhere" }>;
@@ -57,10 +56,7 @@ const DEAD: Seen = { state: "dead" };
 
 const CHECKING: Seen = { state: "checking" };
 
-/** Any other refusal is a link spent since its read, or bound to another browser. */
-const isTooMany = (failure: Error): failure is CodeRefused =>
-  failure instanceof CodeRefused && failure.status === TOO_MANY_REQUESTS;
-
+/** Any refusal but a wait is a link spent since its read, or bound to another browser. */
 const linkDied = (failure: Error | null): boolean =>
   failure instanceof CodeRefused && !isTooMany(failure);
 
