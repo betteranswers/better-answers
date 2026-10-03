@@ -330,7 +330,7 @@ fi
 stage "The first restore drill — by hand, before any client's data exists (ADR 0022)"
 say "This is the task's finish line. Nothing of a client's goes on the box until this has run green once."
 step "On VPC 2, as root:  set -a; . /etc/better-answers/drill.env; set +a; /opt/better-answers/deploy/restore-drill.sh"
-step "Read the report in the bucket under drills/. A step marked 'not built yet' is a slice that has not landed and is expected today; a FAIL is not. The 'drill' and 'staging-wiped' checks both pinged."
+step "Read the report in the bucket under drills/. Every step must pass: a line marked FAILED, a not-built answer included, is a failure. The 'drill' and 'staging-wiped' checks both pinged."
 step "Then rehearse 'Coolify lost' once (RUNBOOK.md page 5), and have the second holder open the vault once."
 step "Record the drill's date and RTO in the private RUNBOOK.md. Releases follow the repository variable RELEASE_MODE (page 6): unset, every green build releases itself; the day the first client's bundle lands, gh variable set RELEASE_MODE --body nightly, after adding the dead-man service's read-only key as HEALTHCHECKS_READ_KEY; the day the platform goes live, gh variable set RELEASE_MODE --body drill, and from then on 'release' insists on a drill-day or a hotfix reason."
 if confirm "Did the first drill run green, with its report in drills/ and both pings received"; then

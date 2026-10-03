@@ -32,6 +32,7 @@ export {
   declarations,
   endedGrant,
 } from "./vocabulary.ts";
+export { STORED_ACT_NAMES, STORED_DETAIL_KEYS } from "./stored-names.ts";
 export type {
   ActName,
   AuditAct,

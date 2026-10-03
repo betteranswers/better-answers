@@ -11,6 +11,7 @@ import "@better-answers/core/runs";
 import "@better-answers/core/sources";
 import "@better-answers/core/sweeps";
 import "@better-answers/core/workspaces";
+import { STORED_ACT_NAMES } from "@better-answers/core/audit";
 import { refusalRegister } from "@better-answers/core/kernel";
 
 import { ENTRIES } from "../src/mcp/entries/index.ts";
@@ -73,6 +74,7 @@ export const keptNamesUnder = (root: string): Readonly<Record<string, readonly s
   "Better Auth's endpoints": readUnder(root, "apps/api/tests/better-auth-endpoints.txt")
     .split("\n")
     .filter((line) => line.startsWith("/")),
+  "the stored-names register": STORED_ACT_NAMES,
   "stored act names": matchesIn(
     readUnder(root, "apps/web/src/features/people/audit-acts.ts"),
     QUOTED_ACT,

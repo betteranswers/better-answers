@@ -46,6 +46,18 @@ const CARVED_OUT: readonly CarveOut[] = [
       /^packages\/schema\/migrations\/(?:.*\.sql|meta\/\d{4}_snapshot\.json)$/.test(file),
     why: "a migration and its snapshot are a dated record, never edited once it has run",
   },
+  {
+    holds: (file) => file === "packages/core/src/audit/stored-names.ts",
+    why: "the stored-names register spells each act name and detail key as audit rows keep it",
+  },
+  {
+    holds: under("packages/devtools/renames/"),
+    why: "a rename map names the old word it replaces, as a migration does",
+  },
+  {
+    holds: (file) => file === "packages/devtools/test/rename.test.ts",
+    why: "the rename runner's fixtures spell the old words they rename",
+  },
   { holds: under(".cubic/"), why: "Cubic generates it and rewrites it" },
   {
     holds: under("apps/api/.claude/skills/"),
@@ -296,6 +308,10 @@ describe("the sense a planted line is read in", () => {
         "apps/api/.claude/skills/resend/SKILL.md": `The ${WORD} claims the job.`,
         "apps/web/src/planted.ts": `// The ${WORD} claims the job.`,
         "apps/web/CODING_STANDARDS.md": `The ${WORD} claims the job.`,
+        "packages/core/src/audit/stored-names.ts": `// The ${WORD} claims the job.`,
+        "packages/devtools/renames/planted.ts": `// The ${WORD} claims the job.`,
+        "packages/devtools/test/rename.test.ts": `// The ${WORD} claims the job.`,
+        "packages/devtools/test/planted.test.ts": `// The ${WORD} claims the job.`,
       },
       [APP],
     );
@@ -304,6 +320,7 @@ describe("the sense a planted line is read in", () => {
       `apps/web/CODING_STANDARDS.md:1: The ${WORD} claims the job.`,
       `docs/plans/2026-01-01-planted-plan.md:1: The ${WORD} claims the job.`,
       `docs/specs/v01-route.md:1: The ${WORD} claims the job.`,
+      `packages/devtools/test/planted.test.ts:1: // The ${WORD} claims the job.`,
     ]);
   });
 
@@ -490,6 +507,58 @@ describe("a word that lands with its sweep", () => {
 
     expect(linesOver(files, [BINDING], [refusal])).toEqual([]);
     expect(linesOver(files, [BINDING])).toEqual([`packages/core/src/planted.ts:1: ${line}`]);
+  });
+
+  it("refuses a stored detail key outside the stored-names register", () => {
+    const outside = [
+      `bound: act("sources.${BOUND}.bound", { ${BOUND}Id: "id" }),`,
+      `expect(row.detail["${BOUND}Id"]).toBe(id);`,
+    ];
+    const files = {
+      "packages/core/src/audit/stored-names.ts": `  connectedSourceId: "${BOUND}Id",`,
+      "packages/core/src/sources/planted.ts": [
+        ...outside,
+        `bound: act("sources.${BOUND}.bound", { [STORED_DETAIL_KEYS.connectedSourceId]: "id" }),`,
+      ].join("\n"),
+    };
+
+    expect(linesOver(files, [BINDING], SCAN.kept)).toEqual(
+      outside.map(
+        (line, index) => `packages/core/src/sources/planted.ts:${String(index + 1)}: ${line}`,
+      ),
+    );
+  });
+
+  it("keeps a stored act name the generated list has lost", () => {
+    const tree = plantedTree({
+      "apps/web/src/features/people/audit-acts.ts": `export const DECLARED_ACTS = ["sources.connected_source.bound"] as const;`,
+      "apps/web/src/shared/navigation.ts": `movedFrom: "/sources",`,
+      "apps/api/tests/better-auth-endpoints.txt": "/sign-in/email",
+    });
+    const files = { "docs/planted.md": `Each upload records sources.${BOUND}.bound.` };
+
+    expect(linesOver(files, [BINDING], Object.values(keptNamesUnder(tree)).flat())).toEqual([]);
+  });
+
+  it("passes a deferred sense until its later sweep lands", () => {
+    const chunk = ["ch", "unk"].join("");
+    const passage = rowOf(chunk);
+    const line = `    WHERE ${BOUND}_id = %s`;
+    const deferred = landedNow(rowOf(BOUND), {
+      permitted: [
+        {
+          sense: `the ${BOUND}_id column on index.${chunk}`,
+          written: new RegExp(`\\b${BOUND}_id\\b`, "g"),
+          until: "passage",
+        },
+      ],
+    });
+    const files = { "apps/worker/src/planted.py": line };
+
+    expect(linesOver(files, [deferred, { ...passage, state: "pending" }])).toEqual([]);
+    expect(linesOver(files, [deferred, landedNow(passage)])).toEqual([
+      `apps/worker/src/planted.py:1: ${line.trim()}`,
+    ]);
   });
 
   it("keeps a dotted or hyphenated name wherever prose writes it", () => {

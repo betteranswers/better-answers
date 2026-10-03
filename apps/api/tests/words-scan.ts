@@ -2,7 +2,7 @@ import path from "node:path";
 
 import { parseSync } from "oxc-parser";
 
-import type { CarveOut, OldWord, Renamed } from "./old-words.ts";
+import type { CarveOut, OldWord, Renamed, Sense } from "./old-words.ts";
 import { readUnder, treeFilesUnder } from "./tree-walk.ts";
 
 export const GLOSSARY = "CONTEXT.md";
@@ -171,10 +171,16 @@ type LineScan = {
   readonly unexplained: (file: string, text: string) => string;
 };
 
+/** `waiting` holds each sweep that still has a pending row. */
+const keepsIn = (sense: Sense, file: string, waiting: ReadonlySet<string>): boolean =>
+  (sense.within === undefined || file.startsWith(sense.within)) &&
+  (sense.until === undefined || waiting.has(sense.until));
+
 const lineScanOf = (
   row: Renamed,
   carvedOut: readonly CarveOut[],
   kept: readonly RegExp[],
+  waiting: ReadonlySet<string>,
 ): LineScan => ({
   row,
   reads: (file) =>
@@ -183,7 +189,7 @@ const lineScanOf = (
   unexplained: (file, text) =>
     blankedBy(text, [
       ...(row.permitted ?? [])
-        .filter(({ within }) => within === undefined || file.startsWith(within))
+        .filter((sense) => keepsIn(sense, file, waiting))
         .map(({ written }) => written),
       ...kept,
     ]),
@@ -214,15 +220,20 @@ type Scan = {
   readonly kept: readonly string[];
 };
 
-const landed = (rows: readonly OldWord[]): readonly Renamed[] =>
-  rows.filter((row): row is Renamed => isRenamed(row) && row.state === "landed");
+const inState = (rows: readonly OldWord[], state: Renamed["state"]): readonly Renamed[] =>
+  rows.filter((row): row is Renamed => isRenamed(row) && row.state === state);
+
+const landed = (rows: readonly OldWord[]): readonly Renamed[] => inState(rows, "landed");
+
+const stillPending = (rows: readonly OldWord[]): readonly Renamed[] => inState(rows, "pending");
 
 /** Every landed word a tracked line still uses, outside its carve-outs and the senses it keeps. */
 export const lineFindings = (root: string, { rows, carvedOut, kept }: Scan): readonly Finding[] => {
   const keptPatterns = keptPatternsOf(kept);
+  const waiting = new Set(stillPending(rows).map(({ sweep }) => sweep));
   const scans = landed(rows)
     .filter(({ reach }) => reach !== "reader text")
-    .map((row) => lineScanOf(row, carvedOut, keptPatterns));
+    .map((row) => lineScanOf(row, carvedOut, keptPatterns, waiting));
   return treeFilesUnder(root).flatMap((file) => {
     const reading = scans.filter((scan) => scan.reads(file));
     return reading.length === 0 ? [] : lineFindingsIn(reading, file, readUnder(root, file));
@@ -457,7 +468,7 @@ const countsOf = (strings: readonly string[], rows: readonly Renamed[]): Record<
 
 /** How often each pending word is still written where a page's words are, file by file. */
 export const ratchetCounts = (root: string, rows: readonly OldWord[]): Counts => {
-  const counted = rows.filter((row): row is Renamed => isRenamed(row) && row.state === "pending");
+  const counted = stillPending(rows);
   const byFile = new Map<string, string[]>();
   for (const { file, text } of readerStringsUnder(root, isPageWords)) {
     const strings = byFile.get(file) ?? [];
