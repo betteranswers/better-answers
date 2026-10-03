@@ -398,7 +398,9 @@ describe("the sweeps' daily pass", () => {
       expect.objectContaining({
         level: 50,
         msg: "the sweep pass failed",
+        sessions_deleted: 0,
         verifications_deleted: 1,
+        ingress_windows_deleted: 0,
         refusals: [],
       }),
     );

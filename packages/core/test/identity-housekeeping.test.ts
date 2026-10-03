@@ -46,6 +46,13 @@ const countedAt = async (scope: "ip" | "email", key: string, when: Date): Promis
   await consumeIngress(openPostgres(db().runtimePool), scope, key, ONE_A_MINUTE, when);
 };
 
+const oneOfEachExpired = async (): Promise<void> => {
+  const { userId, email } = await person();
+  await sessionEnding(userId, { expiresAt: at(-MINUTE_MS) });
+  await verificationCodeFor(db().pool, email, at(-2 * DAY_MS));
+  await countedAt("ip", "203.0.113.1", at(-2 * DAY_MS));
+};
+
 const sessionsLeft = async (): Promise<readonly string[]> =>
   (await db().pool.query<{ id: string }>("SELECT id FROM session ORDER BY id")).rows.map(
     (row) => row.id,
@@ -140,10 +147,7 @@ describe("the identity set's housekeeping", () => {
   });
 
   it("still deletes sessions and windows when codes are refused", async () => {
-    const { userId, email } = await person();
-    await sessionEnding(userId, { expiresAt: at(-MINUTE_MS) });
-    await verificationCodeFor(db().pool, email, at(-2 * DAY_MS));
-    await countedAt("ip", "203.0.113.1", at(-2 * DAY_MS));
+    await oneOfEachExpired();
 
     const result = await whileWritesAreRefused(db().pool, "verification", swept);
 
@@ -152,6 +156,18 @@ describe("the identity set's housekeeping", () => {
     expect(result.ingressWindows).toEqual({ ok: true, value: 1 });
     expect(await sessionsLeft()).toEqual([]);
     expect(await windowsLeft()).toEqual([]);
+  });
+
+  it("still deletes sessions and codes when windows are refused", async () => {
+    await oneOfEachExpired();
+
+    const result = await whileWritesAreRefused(db().pool, "ingress_counter", swept);
+
+    expect(result.ingressWindows).toEqual({ ok: false, error: expect.any(Error) });
+    expect(result.sessions).toEqual({ ok: true, value: 1 });
+    expect(result.verifications).toEqual({ ok: true, value: 1 });
+    expect(await sessionsLeft()).toEqual([]);
+    expect(await verificationsLeft()).toEqual([]);
   });
 
   it("answers counts alone, naming no person or address", async () => {
