@@ -424,6 +424,18 @@ describe("setting up after an operator's restore", () => {
     }
   });
 
+  it("refuses an add asked for before the restore", async () => {
+    const { person, client } = await aPersonSignedIn(app());
+    const asked = await client.json("/passkeys/add-options", { name: "Phone" });
+    const response = aPasskeyDevice(client.origin).create(await asked.json());
+    await restoredWithACode(app().database.superuser, person.email, new Date());
+
+    const answered = await client.json("/passkeys/add", { name: "Phone", response });
+
+    expect(answered.status).toBe(409);
+    expect(await answered.json()).toEqual({ error: "restore-code-needed" });
+  });
+
   it("refuses a wrong or expired restore code, granting nothing", async () => {
     const { person, client, code } = await aRestoredPerson();
     const wrong = await client.json(RESTORE, { code: "not-the-code" });

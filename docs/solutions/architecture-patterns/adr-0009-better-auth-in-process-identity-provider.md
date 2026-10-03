@@ -50,6 +50,13 @@ The passkey and authenticator plugins:
 - Every path they mount is in `disabledPaths`, and so are `/update-session`, `/list-sessions`, the three `/revoke-*` paths and `/unlink-account`. `apps/api/tests/second-factor-foundation.test.ts` holds each refused to a signed-in person.
 - `disabledPaths` refuses over HTTP only. The api's own routes call a closed endpoint as a server function, which also skips the library's rate limiter and origin check, so each such route carries its own (`docs/solutions/best-practices/better-auth-closed-endpoints-run-as-server-functions-without-router-guards.md`).
 - A passkey is added and used through the api's routes under `/passkeys/` (`apps/api/src/auth/passkeys.ts`). The plugin's verification hooks refuse a passkey made or used without user verification, before it is kept or a session made. A passkey sign-in's session is confirmed as the library creates it, and that passkey's last use is kept. Renaming and removing a passkey are core's own acts, never the plugin's.
+- A session confirms its second factor through the api's routes under `/second-factor/` (`apps/api/src/auth/confirm.ts`), which stamp it and mint none:
+  - **Passkey:** our own challenge and `@simplewebauthn/server` verification, because the plugin's verify always mints a session and never checks the credential is this person's.
+  - **Authenticator:** the plugin's `verifyTOTP`, which with a full session only verifies.
+- Replacing an authenticator after a recovery or restore code is the one setup outside the plugin, decided by the owner on 03/10/2026:
+  - **Why:** the plugin refuses a second enrol while a verified authenticator stands, and keeps one per person.
+  - **How:** the route makes and encrypts the secret as the plugin does, parks it until its code verifies, then swaps it in within the transaction that removes the old factors.
+  - **Unchanged:** a first authenticator still enrols through the plugin.
 
 The operator:
 

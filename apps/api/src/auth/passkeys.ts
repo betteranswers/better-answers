@@ -189,6 +189,10 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
     if (!name.ok) return nameRefused(context, name.error);
     const held = await heldBy(deps, person);
     if (held === undefined) return unanswered(context, "the second factor was not read");
+    /** A challenge asked for before the restore lives five minutes, so the add checks again. */
+    if (waitsOnTheRestoreCode(held)) {
+      return context.json(PERSON_ROUTE_REFUSALS.restoreCodeNeeded, 409);
+    }
     const verified = await attempt(() =>
       auth.api.verifyPasskeyRegistration({
         headers: context.req.raw.headers,
