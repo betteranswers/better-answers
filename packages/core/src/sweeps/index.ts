@@ -200,7 +200,7 @@ export type IdentitySetSwept = {
 
 const before = (now: Date, ms: number): Date => new Date(now.getTime() - ms);
 
-const deleted = (
+const countDeleted = (
   platform: SweepsPrincipal,
   door: PostgresDoor,
   statement: string,
@@ -223,11 +223,11 @@ export const sweepIdentitySet = async (
   door: PostgresDoor,
   input: { readonly now: Date },
 ): Promise<IdentitySetSwept> => ({
-  sessions: await deleted(platform, door, EXPIRED_SESSIONS, [
+  sessions: await countDeleted(platform, door, EXPIRED_SESSIONS, [
     input.now,
     before(input.now, PENDING_SESSION_LIFETIME_MS),
   ]),
-  verifications: await deleted(platform, door, EXPIRED_VERIFICATIONS, [
+  verifications: await countDeleted(platform, door, EXPIRED_VERIFICATIONS, [
     before(input.now, VERIFICATION_KEPT_PAST_EXPIRY_MS),
   ]),
   ingressWindows: await attempt(() =>

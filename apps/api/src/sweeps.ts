@@ -49,7 +49,11 @@ const refusalsOf = (pass: SweepPass) =>
       : [{ workspace_id: workspaceId, sweep: "graph", reason: reasonOf(graph.error) }]),
   ]);
 
-const refusalOf = (sweep: string, deletion: Result<number, Error>) =>
+type Deletion = Result<number, Error>;
+
+const countOf = (deletion: Deletion): number => (deletion.ok ? deletion.value : 0);
+
+const refusalOf = (sweep: string, deletion: Deletion) =>
   deletion.ok ? [] : [{ sweep, reason: reasonOf(deletion.error) }];
 
 /** No workspace holds an identity-set row, so a refused delete names its sweep alone. */
@@ -59,9 +63,9 @@ const identitySetSwept = async (postgres: PostgresDoor, now: Date) => {
   });
   return {
     deleted: {
-      sessions_deleted: sessions.ok ? sessions.value : 0,
-      verifications_deleted: verifications.ok ? verifications.value : 0,
-      ingress_windows_deleted: ingressWindows.ok ? ingressWindows.value : 0,
+      sessions_deleted: countOf(sessions),
+      verifications_deleted: countOf(verifications),
+      ingress_windows_deleted: countOf(ingressWindows),
     },
     refusals: [
       ...refusalOf("sessions", sessions),
@@ -96,7 +100,7 @@ export const startSweeps = (dependencies: SweepsDependencies): Result<Sweeps, Sw
       logger.warn("a sweep pass was skipped: another holder has the sweeps' lock");
       return;
     }
-    // The deletion needs no workspace, so a failed workspace sweep must not keep expired rows.
+    // The deletions need no workspace, so a failed workspace sweep must not keep expired rows.
     const identitySet = await identitySetSwept(postgres, clock.now());
     if (!swept.ok) {
       const { deleted, refusals } = identitySet;
