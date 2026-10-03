@@ -129,32 +129,41 @@ describe("becoming one who must hold a second factor", () => {
   });
 });
 
+type Removal = (personId: string, removing: string) => Promise<unknown>;
+
+/** The removing session's stamp and another's, once `remove` has run on the first. */
+const stampsAfter = async (personId: string, remove: Removal) => {
+  const removing = await confirmedSession(personId);
+  const other = await confirmedSession(personId);
+  await remove(personId, removing);
+  return [await confirmedAt(removing), await confirmedAt(other)];
+};
+
+const KEPT_HERE_ENDED_THERE = [
+  { confirmed: AT, pending: null },
+  { confirmed: null, pending: null },
+];
+
 describe("a confirmation outliving its factor", () => {
   it("ends with a removed passkey, except on the removing session", async () => {
     const personId = await seedPerson(db().pool);
     const passkeyId = await passkeyFor(db().pool, personId);
-    const removing = await confirmedSession(personId);
-    const other = await confirmedSession(personId);
 
-    await removePasskey(bootstrap, door(), { personId, passkeyId, sessionId: removing });
+    const stamps = await stampsAfter(personId, (_, sessionId) =>
+      removePasskey(bootstrap, door(), { personId, passkeyId, sessionId }),
+    );
 
-    expect([await confirmedAt(removing), await confirmedAt(other)]).toEqual([
-      { confirmed: AT, pending: null },
-      { confirmed: null, pending: null },
-    ]);
+    expect(stamps).toEqual(KEPT_HERE_ENDED_THERE);
   });
 
   it("ends with a removed authenticator, except on the removing session", async () => {
     const personId = await seedPerson(db().pool);
     await authenticatorFor(db().pool, personId, { verified: true });
-    const removing = await confirmedSession(personId);
-    const other = await confirmedSession(personId);
 
-    await removeAuthenticator(bootstrap, door(), { personId, sessionId: removing });
+    const stamps = await stampsAfter(personId, (_, sessionId) =>
+      removeAuthenticator(bootstrap, door(), { personId, sessionId }),
+    );
 
-    expect([await confirmedAt(removing), await confirmedAt(other)]).toEqual([
-      { confirmed: AT, pending: null },
-      { confirmed: null, pending: null },
-    ]);
+    expect(stamps).toEqual(KEPT_HERE_ENDED_THERE);
   });
 });

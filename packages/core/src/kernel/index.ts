@@ -44,12 +44,9 @@ export {
   PENDING_SESSION_LIFETIME_MS,
   PENDING_STEPS,
   pendingClockOf,
-  SECOND_FACTOR_STANDINGS,
   standingOf,
 } from "./second-factor.ts";
 export type {
-  PendingClock,
-  PendingStanding,
   PendingStep,
   SecondFactorFacts,
   SecondFactorRefusal,

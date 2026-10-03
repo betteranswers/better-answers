@@ -4,6 +4,7 @@ import {
   mayTake,
   type PendingStep,
   type Result,
+  type SecondFactorRefusal,
   type SecondFactorStanding,
 } from "@better-answers/core/kernel";
 import type { PostgresDoor } from "@better-answers/core/store/postgres";
@@ -13,11 +14,11 @@ import {
   type SessionStanding,
 } from "@better-answers/core/workspaces";
 
-import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
-import type { SessionReader } from "./verify.ts";
+import type { SessionReader } from "./auth/verify.ts";
+import { IDENTITY_PRINCIPAL } from "./identity-principal.ts";
 
 /** What a pending session meets, in every transport's refusal. */
-export const SECOND_FACTOR_PENDING = "second-factor-pending";
+export const SECOND_FACTOR_PENDING = "second-factor-pending" satisfies SecondFactorRefusal;
 
 /** The tRPC procedures a pending session may still call: the pending screens read these. */
 export const PENDING_PROCEDURES: ReadonlyMap<string, PendingStep> = new Map<string, PendingStep>([
@@ -80,7 +81,7 @@ export const refusalFor = (
 
 type SessionRead = NonNullable<Awaited<ReturnType<SessionReader>>>;
 
-export type GatedSession = SessionRead & { readonly standing: SecondFactorStanding };
+type GatedSession = SessionRead & { readonly standing: SecondFactorStanding };
 
 /** Null for no session, or one this read ended. */
 export type GatedSessionReader = (headers: Headers) => Promise<GatedSession | null>;

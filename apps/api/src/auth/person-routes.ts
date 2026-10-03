@@ -14,9 +14,9 @@ import { AUTHENTICATOR_CODE_LENGTH } from "@better-answers/schema/second-factor"
 import type { EmailSender } from "../email.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
 import { tooManyRequests } from "../ingress/limits.ts";
+import { judged, refusalFor } from "../second-factor-gate.ts";
 import type { Auth } from "./auth.ts";
 import { sameOriginOnly } from "./same-origin.ts";
-import { judged, refusalFor } from "./second-factor-gate.ts";
 
 const signedIn = z
   .object({

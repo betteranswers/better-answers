@@ -418,21 +418,32 @@ const reading = async (
   });
 };
 
+type PersonRead<T> = Result<T, WorkspaceRefusal<"malformed" | "person-gone"> | Error>;
+
+/** One read of a person's own rows by an id the caller hands in, refused where none is held. */
+const readOfThePerson = async <T>(
+  platform: PlatformPrincipal,
+  door: PostgresDoor,
+  personIdAsked: string,
+  read: (tx: Tx, personId: UserId) => Promise<T | undefined>,
+): Promise<PersonRead<T>> => {
+  const personId = boundarySchemas.user.select.shape.id.safeParse(personIdAsked);
+  if (!personId.success) return err("malformed");
+
+  const answered = await attempt(() =>
+    withIdentityRead(platform, door, (tx) => read(tx, personId.data)),
+  );
+  if (!answered.ok) return err(answered.error);
+  return answered.value === undefined ? err("person-gone") : ok(answered.value);
+};
+
 /** What the person's own Sign-in section and the confirm screens show; nothing in it is a secret. */
-export const readSecondFactor = async (
+export const readSecondFactor = (
   platform: PlatformPrincipal,
   door: PostgresDoor,
   input: ReadSecondFactorInput,
-): Promise<Result<SecondFactorHeld, WorkspaceRefusal<"malformed" | "person-gone"> | Error>> => {
-  const personId = boundarySchemas.user.select.shape.id.safeParse(input.personId);
-  if (!personId.success) return err("malformed");
-
-  const read = await attempt(() =>
-    withIdentityRead(platform, door, (tx) => reading(tx, personId.data, input)),
-  );
-  if (!read.ok) return err(read.error);
-  return read.value === undefined ? err("person-gone") : ok(read.value);
-};
+): Promise<PersonRead<SecondFactorHeld>> =>
+  readOfThePerson(platform, door, input.personId, (tx, personId) => reading(tx, personId, input));
 
 export type CredentialsHeld = {
   readonly address: string;
@@ -456,17 +467,9 @@ const credentialsOf = async (tx: Tx, personId: UserId): Promise<CredentialsHeld 
 };
 
 /** What a promotion's notice lists: the address, and every credential that can confirm a sign-in. */
-export const readCredentialsHeld = async (
+export const readCredentialsHeld = (
   platform: PlatformPrincipal,
   door: PostgresDoor,
   input: { readonly personId: string },
-): Promise<Result<CredentialsHeld, WorkspaceRefusal<"malformed" | "person-gone"> | Error>> => {
-  const personId = boundarySchemas.user.select.shape.id.safeParse(input.personId);
-  if (!personId.success) return err("malformed");
-
-  const read = await attempt(() =>
-    withIdentityRead(platform, door, (tx) => credentialsOf(tx, personId.data)),
-  );
-  if (!read.ok) return err(read.error);
-  return read.value === undefined ? err("person-gone") : ok(read.value);
-};
+): Promise<PersonRead<CredentialsHeld>> =>
+  readOfThePerson(platform, door, input.personId, credentialsOf);

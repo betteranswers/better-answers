@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
@@ -6,10 +6,10 @@ import {
   PENDING_LIBRARY_PATHS,
   PENDING_PROCEDURES,
   SESSIONLESS_LIBRARY_PATHS,
-} from "../src/auth/second-factor-gate.ts";
+} from "../src/second-factor-gate.ts";
 import { TRPC_ENDPOINT } from "../src/trpc/mount.ts";
 import { appRouter } from "../src/trpc/router.ts";
-import { authAsServerBuildsIt } from "./auth-instance.ts";
+import { authAsBuiltForSuite } from "./auth-instance.ts";
 import { holdAnAuthenticator } from "./factor-harness.ts";
 import type { TestClient } from "./harness.ts";
 import { signedInByEmailOnly } from "./provoke.ts";
@@ -17,11 +17,7 @@ import { appForSuite } from "./suite-app.ts";
 
 const app = appForSuite();
 
-const { auth: asBuilt, database: unreached } = authAsServerBuildsIt();
-
-afterAll(async () => {
-  await unreached.end();
-});
+const asBuilt = authAsBuiltForSuite();
 
 /** An Admin holding an authenticator, signed in by email alone: pending, its workspace chosen. */
 const aPendingSession = async (): Promise<TestClient> => {

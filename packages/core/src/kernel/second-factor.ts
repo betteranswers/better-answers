@@ -18,11 +18,11 @@ export type SecondFactorFacts = {
   readonly setupGranted: boolean;
 };
 
-export const SECOND_FACTOR_STANDINGS = ["not-required", "confirmed", "confirm", "setup"] as const;
+const SECOND_FACTOR_STANDINGS = ["not-required", "confirmed", "confirm", "setup"] as const;
 
 export type SecondFactorStanding = (typeof SECOND_FACTOR_STANDINGS)[number];
 
-export type PendingStanding = Extract<SecondFactorStanding, "confirm" | "setup">;
+type PendingStanding = Extract<SecondFactorStanding, "confirm" | "setup">;
 
 /**
  * Derived afresh on every request, so a role change, a removed factor or a restore takes effect on
@@ -75,7 +75,7 @@ export const mayTake = (standing: SecondFactorStanding, step: PendingStep | unde
   !isPending(standing) || (step !== undefined && PENDING_SET[step].includes(standing));
 
 /** What a read does to the session's pending clock: a clock, never a stored state. */
-export type PendingClock = "none" | "start" | "run" | "stop" | "end";
+type PendingClock = "none" | "start" | "run" | "stop" | "end";
 
 export const pendingClockOf = (
   standing: SecondFactorStanding,

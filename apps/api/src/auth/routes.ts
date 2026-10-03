@@ -13,6 +13,7 @@ import { hasNoDisplayName } from "@better-answers/core/workspaces";
 
 import type { EmailSender } from "../email.ts";
 import { limitByIp, tooManyRequests } from "../ingress/limits.ts";
+import { judged, pendingOr, SECOND_FACTOR_PENDING } from "../second-factor-gate.ts";
 import type { Auth } from "./auth.ts";
 import { mountTheAuthenticator } from "./authenticator.ts";
 import { mountTheConfirm } from "./confirm.ts";
@@ -45,7 +46,6 @@ import {
 import { consentPage, refusedPage, REFUSAL_PAGES, signInPage } from "./pages.ts";
 import { mountThePasskeys } from "./passkeys.ts";
 import { sameOriginOnly } from "./same-origin.ts";
-import { judged, pendingOr, SECOND_FACTOR_PENDING } from "./second-factor-gate.ts";
 import { askingWithALink, dropALink, readALink, signingInByLink } from "./sign-in-link.ts";
 import { sessionClaims } from "./verify.ts";
 

@@ -190,7 +190,11 @@ export const personRouter = router({
         ),
       );
       void sendFactorNotice(ctx, ctx.email, issued.replaced ? "codes-replaced" : "codes-made");
-      return { recoveryCodes: issued.recoveryCodes, madeAt: issued.madeAt };
+      return {
+        recoveryCodes: issued.recoveryCodes,
+        madeAt: issued.madeAt,
+        replaced: issued.replaced,
+      };
     }),
   acknowledgeRecoveryCodes: personProcedure
     .input(parsedBy(acknowledgeRecoveryCodesInput))

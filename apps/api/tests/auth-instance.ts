@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 import { pino } from "pino";
+import { afterAll } from "vitest";
 
 import { systemClock } from "@better-answers/core/kernel";
 
@@ -38,4 +39,13 @@ export const authAsServerBuildsIt = (): BuiltAuth => {
   const auth = authOverDoor(doors.postgres);
   auth.$context.catch(() => {});
   return { auth, database: doors.postgres.pool };
+};
+
+/** As `authAsServerBuildsIt`, its pool ended once the suite has run. */
+export const authAsBuiltForSuite = (): Auth => {
+  const { auth, database } = authAsServerBuildsIt();
+  afterAll(async () => {
+    await database.end();
+  });
+  return auth;
 };

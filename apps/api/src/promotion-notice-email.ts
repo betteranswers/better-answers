@@ -65,7 +65,7 @@ const htmlOf = (lines: readonly string[], account: string): string =>
   );
 
 /** Lists every credential by name and date, as the confirm page does; never a key or a code. */
-export const promotionNoticeEmail = (held: CredentialsHeld, publicUrl: string): EmailMessage => {
+const promotionNoticeEmail = (held: CredentialsHeld, publicUrl: string): EmailMessage => {
   const lines = linesOf(held);
   const account = `${publicUrl}${ACCOUNT_PATH}`;
   const text =

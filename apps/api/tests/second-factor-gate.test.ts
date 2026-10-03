@@ -64,6 +64,13 @@ const sessionRowsOf = async (personId: string) =>
     )
   ).rows;
 
+/** Through the Members page's own act, by the workspace's confirmed Admin. */
+const madeAnAdminBy = async (adminEmail: string, personId: string): Promise<void> => {
+  const adminClient = await signedInByEmailOnly(app(), adminEmail);
+  await confirmedByTheHarness(app(), adminClient);
+  await apiOf(adminClient).members.changeRole.mutate({ personId, role: "Admin" });
+};
+
 describe("an Admin's sign-in", () => {
   it("reaches confirm by email, and lands directly by passkey", async () => {
     const { admin } = await app().provision();
@@ -259,10 +266,7 @@ describe("becoming an Admin mid-session", () => {
     const { device } = await passkeyAddedOn(await signedInByEmailOnly(app(), editor.email));
     const promoted = await signedInByPasskey(device);
     expect(await membershipOf(promoted)).toMatchObject({ role: "Editor" });
-    const adminClient = await signedInByEmailOnly(app(), workspace.admin.email);
-    await confirmedByTheHarness(app(), adminClient);
-
-    await apiOf(adminClient).members.changeRole.mutate({ personId: editor.id, role: "Admin" });
+    await madeAnAdminBy(workspace.admin.email, editor.id);
 
     expect(await membershipOf(promoted)).toMatchObject(PENDING);
     expect(await standingOf(promoted)).toBe("confirm");
@@ -329,10 +333,7 @@ describe("a pending session's hour", () => {
         WHERE user_id = $1`,
       [editor.id],
     );
-    const adminClient = await signedInByEmailOnly(app(), workspace.admin.email);
-    await confirmedByTheHarness(app(), adminClient);
-
-    await apiOf(adminClient).members.changeRole.mutate({ personId: editor.id, role: "Admin" });
+    await madeAnAdminBy(workspace.admin.email, editor.id);
 
     expect(await membershipOf(client)).toMatchObject(PENDING);
     expect(await standingOf(client)).toBe("setup");

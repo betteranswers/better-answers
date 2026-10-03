@@ -6,10 +6,10 @@ import { CeilingMet } from "@better-answers/core/kernel";
 
 import type { Auth } from "../auth/index.ts";
 import { TRPC_IP_RULE } from "../auth/index.ts";
-import { gatedReader } from "../auth/second-factor-gate.ts";
 import type { Doors } from "../doors.ts";
 import type { Mail } from "../email.ts";
 import { limitByIp } from "../ingress/limits.ts";
+import { gatedReader } from "../second-factor-gate.ts";
 import { appRouter } from "./router.ts";
 
 export const TRPC_ENDPOINT = "/trpc";

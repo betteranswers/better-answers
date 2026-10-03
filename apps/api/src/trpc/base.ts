@@ -27,15 +27,11 @@ import {
   type Tx,
 } from "@better-answers/core/store/postgres";
 
-import {
-  type GatedSessionReader,
-  PENDING_PROCEDURES,
-  refusalFor,
-} from "../auth/second-factor-gate.ts";
 import { sessionClaims } from "../auth/verify.ts";
 import type { Doors } from "../doors.ts";
 import type { Mail } from "../email.ts";
 import { refusalLogged, refusalOf, RefusedError, type RefusalAnswer } from "../refusal.ts";
+import { type GatedSessionReader, PENDING_PROCEDURES, refusalFor } from "../second-factor-gate.ts";
 
 type TrpcContext = {
   readonly doors: Doors;

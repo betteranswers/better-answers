@@ -1,18 +1,14 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { mountedPaths } from "../src/auth/index.ts";
-import { authAsServerBuildsIt } from "./auth-instance.ts";
+import { authAsBuiltForSuite } from "./auth-instance.ts";
 import { setUpAnAuthenticator, signedInByEmailOnly, signedInClient } from "./provoke.ts";
 import { appForSuite } from "./suite-app.ts";
 
 const app = appForSuite();
 
-const { auth: asBuilt, database: unreached } = authAsServerBuildsIt();
-
-afterAll(async () => {
-  await unreached.end();
-});
+const asBuilt = authAsBuiltForSuite();
 
 /** Read off the instance, so a path a plugin adds on an upgrade is held closed here too. */
 const FACTOR_PATHS = mountedPaths(asBuilt).filter(

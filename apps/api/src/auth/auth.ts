@@ -56,6 +56,15 @@ import type { EmailSender } from "../email.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
 import { PRODUCT_NAME } from "../product-name.ts";
 import {
+  AUTHORIZE_PATH,
+  judged,
+  PENDING_LIBRARY_PATHS,
+  pendingOr,
+  refusalFor,
+  SECOND_FACTOR_PENDING,
+  SESSIONLESS_LIBRARY_PATHS,
+} from "../second-factor-gate.ts";
+import {
   ACCESS_TOKEN_LIFETIME_SECONDS,
   BETTER_AUTH_RATE_LIMIT,
   CIMD_ALLOWED_CLIENT_HOSTS,
@@ -69,15 +78,6 @@ import {
 import { codeHashOf } from "./link-token.ts";
 import { dropAnExpiredPromotionLock } from "./promotion-lock.ts";
 import { accessControl, creatorRole, roles } from "./roles.ts";
-import {
-  AUTHORIZE_PATH,
-  judged,
-  PENDING_LIBRARY_PATHS,
-  pendingOr,
-  refusalFor,
-  SECOND_FACTOR_PENDING,
-  SESSIONLESS_LIBRARY_PATHS,
-} from "./second-factor-gate.ts";
 import { signInEmail } from "./sign-in-email.ts";
 import { keepALink, signInMethodOfThisCall } from "./sign-in-link.ts";
 
