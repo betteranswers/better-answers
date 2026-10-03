@@ -776,7 +776,7 @@ describe("an acceptance at a path another concept holds", () => {
 });
 
 describe("the platform's citation repair", () => {
-  it("re-hashes moved checks, so Checked never becomes Changed since checked", async () => {
+  it("re-hashes moved checks, so Verified never becomes Changed since verified", async () => {
     const scenario = await arrange();
 
     const cite = (locator: string) => ({

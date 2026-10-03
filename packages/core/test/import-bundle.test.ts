@@ -885,7 +885,7 @@ describe("an imported concept, opened", () => {
       "",
       SUPPORT_HOURS,
       "",
-      "_Checked by Priya Anand · 16 April 2026 · imported_",
+      "_Verified by Priya Anand · 16 April 2026 · imported_",
     ]);
   });
 });

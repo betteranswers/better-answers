@@ -12,7 +12,7 @@ the hosted product at `better-answers.com`.
 | --- | --- | --- |
 | The better-answers repository (mounted, read-only) | `better-answers/` | Product definition, glossary, UX and accessibility rules, the reader-facing word set, Control Centre's screens |
 | `VISION.md` | in that repo | The one-line positioning, the three knowledge layers, who uses it |
-| `CONTEXT.md` | in that repo | The **domain glossary** — the names the code uses, which a screen borrows only where they are the reader's words too |
+| `CONTEXT.md` | in that repo | The **domain glossary**: each entry a person meets is headed by the word a page uses, and an entry only the code meets is marked internal |
 | `CODING_STANDARDS.md` | in that repo | disclosure model, latency and keyboard budget, WCAG 2.2 AA + GOV.UK semantics |
 | `docs/archive/adr/0001–0027` | in that repo | Answer contract (0016), citation markers (0015), the write path (0012), trust derivation (0019), open-core (0027) |
 | Styling brief (from the user) | — | "better-auth, Vercel, Linear" — the visual register |
@@ -50,74 +50,70 @@ The avatar menu in the band holds the person's name, their role and "Sign out".
 
 ## 3. Content fundamentals
 
-A screen is written in its reader's words, not its builders'. `CONTEXT.md` names things
-for the code; a screen borrows a glossary word only when a reader would say it themselves,
-or needs that exact word to act.
+A page is written in its reader's words. `CONTEXT.md` heads every entry a person meets with
+the word a page uses. An entry only the code meets is marked `_Internal._`.
 
-**Never contradict the glossary.** A screen that names a thing uses the glossary's word for
-it, never a rival one. *Map*,
-never *graph*, on a screen. *Workspace*, never *organisation*, *account*, *team* or *site*.
-*Client*, never *connector*, for an MCP host. *Screen*, never *section*, for Control Centre.
-Terms marked *Avoid* in the glossary are banned outright. The glossary's definition is never
-a screen's sentence.
+**Write the glossary's word.** A page names each thing by the word that heads its glossary
+entry, and by that word alone: *map* for the curated knowledge, *workspace* for one company,
+*assistant* for Claude or ChatGPT connected to it, *page* for a place with its own address.
+An internal entry's word stays in the code. Say a thing in the page's own sentence, and leave
+the glossary's definition in the glossary.
 
-**Trust words are a closed set** and appear verbatim:
-Checked by <person> · Checked by the platform · Unchecked · Changed since checked ·
-Out of date · Draft · Restricted · Left · Deprecated. Two riders only — *· imported* and
-*· source moved on*. Never *verified*, *trusted*, *confidence*, *score*, or a colour alone.
+**Trust words are a closed set**, written verbatim and always as text:
+Verified by <person> · Verified automatically · Unverified · Changed since verified ·
+Out of date · Draft · Left · Deprecated. Two riders may follow *Verified by*, and only these
+two: *· imported* and *· source moved on*. A verifier who has since been erased reads
+"Verified by a former member". A colour sits only behind a word that already says the same
+thing. *Restricted* is a sensitivity value, one of three with Internal and Public.
 
-**Tone: precise, confident, grounded.** The platform names the number, does not hedge, and
-shows its evidence. It states what is true and what is not; it never reassures, apologises
-or enthuses. It is written for a bid writer under deadline, not a browser.
+**Tone: precise, confident, grounded.** Name the number, state it plainly, and show the
+evidence. Say what is true and what is missing, in a level voice. Write for a bid writer
+under deadline.
 
-- *Precise* — the count, the date, the name. "Three passages mention it", not "a few sources".
-- *Confident* — no "we think", "it seems", "you might want to". If it is uncertain, say what is missing.
-- *Grounded* — every claim is attached to something a reader can open. No assertion floats.
+- *Precise* — the count, the date, the name: "Three passages mention it."
+- *Confident* — state what is known. Where something is uncertain, say what is missing.
+- *Grounded* — attach every claim to something a reader can open.
+
+Lines in that tone:
+
+- "Nothing on the map answers this. Three passages mention it."
+- "One governed write. Audited under your name."
+- "Verified by Priya Shah · 3 March 2026"
 
 British spelling and UK conventions throughout.
 
-- Write: "Nothing on the map answers this. Three passages mention it."
-- Not: "Oops! We couldn't find anything — try rephrasing!"
-- Write: "One governed write. Audited under your name."
-- Not: "Are you sure? This action cannot be undone."
-- Write: "Checked by Priya Shah · 3 March 2026"
-- Not: "✅ Verified 6 months ago"
-
-**Person.** Second person for what the reader does ("you asked", "your queue"); never
-first-person plural. No "we". The audit log's actor column names the platform's own acts
-"the platform". That column names an actor; it doesn't address the reader.
+**Person.** The second person for what the reader does ("you asked", "your questions"), and
+the third person for everything else. The Audit log's actor column names the platform's own
+actions "the platform": it names an actor and addresses no one.
 
 **Casing.** Sentence case everywhere — headings, buttons, tabs, table headers (the only
 upper-case is the micro-label at 11px with 0.06em tracking). Proper nouns keep their case:
 Control Centre, Admin, Editor, Viewer, Answer (the concept kind), Restricted, Internal, Public.
 
-**Consequence before the click.** Every action states its effect in the label or the line
-beside it, not in a tooltip and not after the fact: "Accept 12 concepts", "Save as an
-Answer", "One governed write."
+**Consequence before the click.** Every action states its effect in its label or the line
+beside it, in view before the reader acts: "Accept 12 concepts", "Save as an Answer", "One
+governed write."
 
 **Dates and numbers.** UK long form — 3 March 2026; with time, 09:41 · 30 August 2026.
-Never 03/03/2026. Money as £1,240.00. Relative time only under a minute.
+Money as £1,240.00. Relative time only under a minute.
 
-**Emoji: never.** Not in the interface, not in empty states, not in documentation. Unicode
-symbols are used only where they are typographic (·, —, ’, “ ”, ✕ on a dismiss control).
+**Symbols.** Only typographic Unicode symbols appear, in the interface, in empty states and
+in documentation: ·, —, ’, “ ” and ✕ on a dismiss control.
 
-**Clarity.** A screen answers three questions, in order: where am I, what happened, what do I
+**Clarity.** A page answers three questions, in order: where am I, what happened, what do I
 do next. Say those, then stop.
 
-- Say what to do, not how the system works. Explain a rule only when the reader can't act
-  without it.
-- Use the reader's words. A glossary word goes on a screen only when the reader needs that
-  exact word to act, and it's explained where they first meet it.
-- Give one next action, its label naming the effect: "Join Acme", not "Continue".
-- Don't repeat the heading in the body, or the body in the button.
-- An empty state says what is missing, in one line. Add an action only where the screen has
+- Say what to do. Explain a rule only where the reader needs it to act.
+- Use the reader's words, and explain a term where the reader first meets it.
+- Give one next action, its label naming the effect: "Join Acme".
+- Give the heading, the body and the button each something new to say.
+- An empty state says what is missing, in one line. Add an action only where the page offers
   no other way to take it.
 - A consequence line states the one thing the reader would regret not knowing: that it can't
-  be undone, or who will see it. Record-keeping isn't a consequence for the reader.
+  be undone, or who will see it. What the platform records belongs in the Audit log.
 - An error says what went wrong, then what to do. Name who can fix it only when the reader
-  can't. A code word never leads.
-- "The platform" isn't a character. Write "Nothing was saved", not "The platform did not
-  answer".
+  can't. Lead with words, and put any code after them.
+- Make the outcome the subject: "Nothing was saved."
 - Turn stacked conditions into two short sentences.
 
 ## 4. Visual foundations

@@ -237,7 +237,7 @@ describe("the document layer through the MCP entries", () => {
 
     expect(rendered(found)).toBe(
       [
-        `Note · ${COVERING_TITLE} · Unchecked · ${iri}`,
+        `Note · ${COVERING_TITLE} · Unverified · ${iri}`,
         `document · ${INVOICE_TITLE} · Not company knowledge · Internal · ${standalone.locator}`,
       ].join("\n"),
     );

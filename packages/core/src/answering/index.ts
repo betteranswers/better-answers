@@ -2,6 +2,7 @@ import type { Frontmatter, FrontmatterValue } from "../concepts/index.ts";
 import { citedSource, conceptByIri, findConcepts, type OpenedConcept } from "../concepts/index.ts";
 import {
   err,
+  isActorId,
   isPersonActor,
   NOT_FOUND,
   ok,
@@ -43,7 +44,7 @@ const RIDER_WORDS = {
 } satisfies Record<TrustRider, string>;
 
 const STATUS_WORDS = {
-  "changed-since-checked": "Changed since checked",
+  "changed-since-checked": "Changed since verified",
   "out-of-date": "Out of date",
   draft: "Draft",
   deprecated: "Deprecated",
@@ -56,12 +57,18 @@ const checkWords = (trust: Trust): string => {
   const rider = trust.rider === null ? "" : RIDER_WORDS[trust.rider];
   switch (trust.tier) {
     case "human-reviewed":
-      return `Checked by ${trust.checkedBy ?? "a person"}${trust.checkedAt === null ? "" : ` · ${ukLongDate(trust.checkedAt)}`}${rider}`;
+      return `Verified by ${verifierWords(trust.checkedBy)}${trust.checkedAt === null ? "" : ` · ${ukLongDate(trust.checkedAt)}`}${rider}`;
     case "machine-confirmed":
-      return `Checked by the platform${rider}`;
+      return `Verified automatically${rider}`;
     case "unverified":
-      return "Unchecked";
+      return "Unverified";
   }
+};
+
+/** `checkedBy` falls back to the person's actor id once erasure has cleared their name. */
+const verifierWords = (checkedBy: string | null): string => {
+  if (checkedBy === null) return "a person";
+  return isActorId(checkedBy) && isPersonActor(checkedBy) ? "a former member" : checkedBy;
 };
 
 const ukLongDate = (iso: string): string => {

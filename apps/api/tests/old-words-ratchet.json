@@ -1,0 +1,92 @@
+{
+  "apps/web/src/app/words.ts": {
+    "act": 2,
+    "screen": 9,
+    "secondary nav": 2,
+    "surface": 3
+  },
+  "apps/web/src/features/auth/link-words.ts": {
+    "check": 1,
+    "screen": 1
+  },
+  "apps/web/src/features/auth/refusal-words.ts": {
+    "check": 11,
+    "operator": 2
+  },
+  "apps/web/src/features/auth/second-factor-words.ts": {
+    "check": 1,
+    "operator": 1
+  },
+  "apps/web/src/features/console/grant-words.ts": {
+    "client": 1
+  },
+  "apps/web/src/features/console/refusal-words.ts": {
+    "operator": 3,
+    "revoke credentials": 1
+  },
+  "apps/web/src/features/console/words.ts": {
+    "operator": 1
+  },
+  "apps/web/src/features/people/invitation-words.ts": {
+    "act": 2,
+    "operator": 1
+  },
+  "apps/web/src/features/people/member-act-words.ts": {
+    "act": 3,
+    "client": 1,
+    "Remove and revoke": 1
+  },
+  "apps/web/src/features/people/refusal-words.ts": {
+    "check": 1,
+    "domain": 4,
+    "landed": 4
+  },
+  "apps/web/src/features/routes/words.ts": {
+    "route": 2
+  },
+  "apps/web/src/features/sources/refusal-words.ts": {
+    "bind": 1,
+    "binding": 10,
+    "check": 1,
+    "class": 3,
+    "finding group": 5,
+    "run": 2,
+    "screen": 1
+  },
+  "apps/web/src/features/sources/words.ts": {
+    "act": 1,
+    "bundle": 2,
+    "chunk": 4,
+    "graph": 1,
+    "object store": 1,
+    "run": 4
+  },
+  "apps/web/src/shared/keystroke-words.ts": {
+    "binding": 1,
+    "screen": 2
+  },
+  "apps/web/src/shared/navigation.ts": {
+    "act": 1,
+    "Agent Operations": 1,
+    "agent token": 1,
+    "answer audit": 1,
+    "binding": 1,
+    "check": 1,
+    "Checks due": 1,
+    "domain": 2,
+    "Gone-at-source impact": 1,
+    "priced plan": 1,
+    "Publish and accept gates": 1,
+    "Queue": 1,
+    "route": 1,
+    "run": 1,
+    "slug": 1
+  },
+  "apps/web/src/shared/refusal-words.ts": {
+    "check": 1
+  },
+  "apps/web/src/shared/role-words.ts": {
+    "check": 3,
+    "run": 1
+  }
+}
