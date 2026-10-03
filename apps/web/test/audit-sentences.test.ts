@@ -121,6 +121,38 @@ describe("an audit event's sentence", () => {
   });
 });
 
+describe("a second factor's audit sentence", () => {
+  const ofHerself = (act: SaidEvent["act"], detail: SaidEvent["detail"] = {}): SaidEvent =>
+    byHannah({ act, subject: { kind: "person", displayName: "Hannah Wright" }, detail });
+
+  it("names the factor a confirmation used", () => {
+    expect(
+      sentenceOf(ofHerself("people.person.second_factor_confirmed", { method: "passkey" })),
+    ).toBe("Hannah Wright confirmed their second factor with a passkey");
+    expect(
+      sentenceOf(ofHerself("people.person.second_factor_confirmed", { method: "authenticator" })),
+    ).toBe("Hannah Wright confirmed their second factor with an authenticator");
+  });
+
+  it("names the factor that replaced the old ones", () => {
+    expect(sentenceOf(ofHerself("people.person.factors_replaced", { by: "authenticator" }))).toBe(
+      "Hannah Wright replaced their second factors with an authenticator",
+    );
+  });
+
+  it("says an unknown factor as a second factor", () => {
+    expect(sentenceOf(ofHerself("people.person.factors_replaced", { by: "microsoft" }))).toBe(
+      "Hannah Wright replaced their second factors with a second factor",
+    );
+  });
+
+  it("says the operator's restore code was used", () => {
+    expect(sentenceOf(ofHerself("people.person.restore_code_accepted"))).toBe(
+      "Hannah Wright used the operator's restore code",
+    );
+  });
+});
+
 describe("the sentences against the acts core declares", () => {
   it("says every act declared across the four families", () => {
     const unsaid = DECLARED_ACTS.filter((act) => !ACTS_SAID.includes(act));

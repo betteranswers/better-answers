@@ -18,7 +18,7 @@ import {
   type SignedInByLink,
 } from "./auth-hooks.ts";
 import { AuthScreen, Outcome, ReadAgain } from "./auth-screen.tsx";
-import { carriedOnTo, leavingFor, nextAfterSignIn } from "./carried-flow.ts";
+import { carriedOnTo, leavingFor } from "./carried-flow.ts";
 import { copiedToTheClipboard } from "./clipboard.ts";
 import {
   CODE_NOT_COPIED,
@@ -31,6 +31,7 @@ import {
   worksUntil,
 } from "./link-words.ts";
 import { SIGN_IN_UNANSWERED, tooManyCodesTried } from "./refusal-words.ts";
+import { useStepAfterSignIn } from "./second-factor-steps.ts";
 import { SIGN_IN_WORDS } from "./sign-in-words.ts";
 
 const COPY: Keystroke = { key: "c", act: LINK_ACTS.copy };
@@ -281,6 +282,7 @@ const slotsOf = (seen: Seen, acting: Acting): Slots => {
 export function LinkScreen() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const stepAfterSignIn = useStepAfterSignIn();
   const [token] = useState(linkTokenOnThisPage);
   const [clicked, setClicked] = useState<Bound | undefined>(undefined);
   const [copiedIt, setCopiedIt] = useState<boolean | undefined>(undefined);
@@ -292,9 +294,9 @@ export function LinkScreen() {
 
   const landAfterSignIn = (signedIn: SignedInByLink) => {
     queryClient.clear();
-    const { carried } = signedIn;
-    const next = signedIn.displayNameGiven ? nextAfterSignIn(carried) : `/display-name${carried}`;
-    void navigate(leavingFor(next));
+    void stepAfterSignIn(signedIn.carried, signedIn.displayNameGiven).then((next) =>
+      navigate(leavingFor(next)),
+    );
   };
 
   const acting: Acting = {

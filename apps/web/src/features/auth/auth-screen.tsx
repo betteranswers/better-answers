@@ -16,7 +16,8 @@ export const focusOn = (id: string) => {
   document.getElementById(id)?.focus();
 };
 
-export function AuthScreen(properties: { readonly title: string; readonly children: ReactNode }) {
+/** With no title, the children's first heading is the screen's `h1`. */
+export function AuthScreen(properties: { readonly title?: string; readonly children: ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="px-4 py-5 md:px-8">
@@ -28,7 +29,9 @@ export function AuthScreen(properties: { readonly title: string; readonly childr
 
       <main id="screen" className="flex-1 px-4 md:px-8">
         <div className="max-w-measure">
-          <h1 className="text-xl font-medium">{properties.title}</h1>
+          {properties.title === undefined ? null : (
+            <h1 className="text-xl font-medium">{properties.title}</h1>
+          )}
           {properties.children}
         </div>
       </main>

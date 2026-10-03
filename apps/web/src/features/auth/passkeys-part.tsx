@@ -27,7 +27,9 @@ import {
   PASSKEY_NOT_ADDED,
   PASSKEY_NOT_VERIFIED,
   RENAME_UNANSWERED,
+  RESTORE_CODE_NEEDED,
   SAID_OF_SECOND_FACTOR,
+  SETUP_NOT_GRANTED,
   tooManyPasskeysAdded,
 } from "./refusal-words.ts";
 import type { SecondFactor } from "./second-factor-hooks.ts";
@@ -56,6 +58,8 @@ const SAID_OF_THE_ROUTE: ReadonlyMap<string, Said> = new Map([
   ["passkey-refused", PASSKEY_NOT_ADDED],
   ["passkey-name-empty", SAID_OF_SECOND_FACTOR["passkey-name-empty"]],
   ["passkey-name-too-long", SAID_OF_SECOND_FACTOR["passkey-name-too-long"]],
+  ["setup-not-granted", SETUP_NOT_GRANTED],
+  ["restore-code-needed", RESTORE_CODE_NEEDED],
 ]);
 
 const saidOfTheRoute = (refused: CodeRefused): Said => {
@@ -83,10 +87,19 @@ const selectOnMount = (node: HTMLInputElement | null): void => {
   node?.select();
 };
 
-function AddAPasskey(properties: {
+/** For a screen where adding a passkey is the first way on. */
+const focusOnMount = (node: HTMLInputElement | null): void => {
+  node?.focus();
+  node?.select();
+};
+
+export function AddAPasskey(properties: {
   readonly id: string;
   readonly suggested: string;
+  readonly commit?: string;
+  readonly focused?: boolean;
   readonly onAdded: (added: PasskeyAdded, name: string) => void;
+  readonly onRefused?: (failure: Error) => void;
 }) {
   const fieldId = useId();
   const refusedId = useId();
@@ -101,7 +114,7 @@ function AddAPasskey(properties: {
     const asked = name.trim();
     setBlank(asked === "");
     if (asked === "" || pending) return;
-    adding.mutate(asked);
+    adding.mutate(asked, { onError: (failure) => properties.onRefused?.(failure) });
   };
 
   return (
@@ -109,7 +122,7 @@ function AddAPasskey(properties: {
       <Label htmlFor={fieldId}>{PASSKEY_WORDS.nameField}</Label>
       <Input
         id={fieldId}
-        ref={selectOnMount}
+        ref={properties.focused === true ? focusOnMount : selectOnMount}
         name="passkey-name"
         autoComplete="off"
         required
@@ -124,7 +137,7 @@ function AddAPasskey(properties: {
       />
       {/* Enabled while the device asks, so a cancelled prompt hands focus back to the button. */}
       <Button type="submit" className="mt-4 aria-disabled:opacity-50" aria-disabled={pending}>
-        {PASSKEY_WORDS.addCommit}
+        {properties.commit ?? PASSKEY_WORDS.addCommit}
       </Button>
       <Outcome tone="said">{saidWhileAdding(pending, adding.error)}</Outcome>
       <Outcome tone="refused" id={refusedId}>

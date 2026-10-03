@@ -28,6 +28,7 @@ import {
   pageQuery,
 } from "./carried-flow.ts";
 import { forgetMembership, rereadMembership } from "./membership.ts";
+import { CODES_STEP, codesWaitUnseen } from "./second-factor-steps.ts";
 import { announceTheSignIn, rememberTheSession, sessionRemembered } from "./session-memory.ts";
 import type { Arrival } from "./sign-in-words.ts";
 
@@ -291,12 +292,14 @@ const sessionOrUnread = (queryClient: QueryClient) =>
 
 /**
  * Read before the screen draws, so a person it has nothing to ask never sees it; an invitation
- * asks its invitee's name. Undefined: it draws.
+ * asks its invitee's name.
  */
 export const displayNameDetour = async (
   queryClient: QueryClient,
+  api: ApiProxy,
   query: string,
 ): Promise<string | undefined> => {
+  if (await codesWaitUnseen(queryClient, api)) return `${CODES_STEP}${query}`;
   const session = await sessionOrUnread(queryClient);
   if (session === undefined) return undefined;
   if (session === null) return `/sign-in${query}`;

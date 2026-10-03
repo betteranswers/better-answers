@@ -1,14 +1,8 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 
-import { ceilingLiftsIn, refusalOf, type ApiError, type Refusal } from "@/shared/api/trpc.ts";
 import { KeystrokesAct, type Keystroke } from "@/shared/keystrokes.tsx";
-import {
-  NO_RESPONSE,
-  NO_RESPONSE_TO_A_READ,
-  saidOfRefusal,
-  type Said,
-} from "@/shared/refusal-words.ts";
+import { NO_RESPONSE, NO_RESPONSE_TO_A_READ } from "@/shared/refusal-words.ts";
 import { Button } from "@/shared/ui/button.tsx";
 
 import {
@@ -20,7 +14,6 @@ import {
   type LandsAt,
 } from "./account-sections.tsx";
 import {
-  ACCOUNT_ACTS,
   ACCOUNT_HEADING,
   ACCOUNT_WORDS,
   ACT_LANDED,
@@ -28,7 +21,7 @@ import {
   passkeyNameFor,
 } from "./account-words.ts";
 import { useSession } from "./auth-hooks.ts";
-import { AuthScreen, focusOn, Outcome, ReadAgain, Refused } from "./auth-screen.tsx";
+import { AuthScreen, focusOn, Outcome } from "./auth-screen.tsx";
 import { COPY_KEY } from "./authenticator-part.tsx";
 import { passkeysHere, useRemovePasskey, type PasskeyAdded } from "./passkey-hooks.ts";
 import {
@@ -37,14 +30,13 @@ import {
   PasskeysSection,
   type Passkey,
 } from "./passkeys-part.tsx";
-import { CODES_KEYSTROKES, type CodesInHand } from "./recovery-codes.tsx";
 import {
-  CODES_UNANSWERED,
-  codesMadeTooOften,
-  PASSKEY_REMOVAL_UNANSWERED,
-  REMOVAL_UNANSWERED,
-  SAID_OF_SECOND_FACTOR,
-} from "./refusal-words.ts";
+  CODES_KEYSTROKES,
+  codesUnanswered,
+  saidOfAcknowledging,
+  type CodesInHand,
+} from "./recovery-codes.tsx";
+import { PASSKEY_REMOVAL_UNANSWERED, REMOVAL_UNANSWERED } from "./refusal-words.ts";
 import {
   useAcknowledgeRecoveryCodes,
   useFinishingTheSetup,
@@ -55,28 +47,12 @@ import {
   type CodesIssued,
   type SecondFactorRead,
 } from "./second-factor-hooks.ts";
+import { READ_AGAIN, readUnanswered, SecondFactorRefused } from "./second-factor-parts.tsx";
 import { SignOutButton } from "./sign-out-button.tsx";
-
-const READ_AGAIN: Keystroke = { key: "r", act: ACCOUNT_ACTS.readAgain };
 
 const SIGN_IN_HEADING = "sign-in-heading";
 
 const REFUSED = "account-refused";
-
-const saidOf = (refusal: Refusal): Said =>
-  saidOfRefusal(SAID_OF_SECOND_FACTOR, refusal.word, refusal.class);
-
-/** A ceiling carries no word, only the wait until it lifts. */
-const codesUnanswered = (failure: Error | ApiError): Said => {
-  const liftsIn = ceilingLiftsIn(failure);
-  return liftsIn === undefined ? CODES_UNANSWERED : codesMadeTooOften(liftsIn);
-};
-
-const saidOfAcknowledging = (failure: Error | ApiError | null): Said | undefined => {
-  if (failure === null) return undefined;
-  const refusal = refusalOf(failure);
-  return refusal === undefined ? NO_RESPONSE : saidOf(refusal);
-};
 
 /** The node an act brings in takes focus as it mounts, since it is not there when the act ends. */
 const useLanding = (first: Landing | undefined) => {
@@ -250,9 +226,6 @@ const failureOnThePage = (read: SecondFactorRead, acts: AccountActs) => {
   return { failure: made, unanswered: made === null ? NO_RESPONSE : codesUnanswered(made) };
 };
 
-const unread = (read: SecondFactorRead): boolean =>
-  read.data === undefined && read.error !== null && refusalOf(read.error) === undefined;
-
 /** The opening acts of the passkeys and the authenticator, each offered while it is closed. */
 const openingKeystrokes = (read: SecondFactorRead, acts: AccountActs): readonly Keystroke[] => {
   if (read.data === undefined) return [];
@@ -265,7 +238,7 @@ const openingKeystrokes = (read: SecondFactorRead, acts: AccountActs): readonly 
 const keystrokesOf = (read: SecondFactorRead, acts: AccountActs): readonly Keystroke[] => {
   const keyShown = acts.setupOpen && acts.starting.data !== undefined;
   return [
-    ...(unread(read) ? [READ_AGAIN] : []),
+    ...(readUnanswered(read) ? [READ_AGAIN] : []),
     ...openingKeystrokes(read, acts),
     ...(keyShown ? [COPY_KEY] : []),
     ...(acts.inHand === undefined ? [] : CODES_KEYSTROKES),
@@ -285,18 +258,7 @@ export function AccountPage() {
       <section aria-labelledby={SIGN_IN_HEADING} className="mt-8">
         <h2 id={SIGN_IN_HEADING}>{ACCOUNT_WORDS.signIn}</h2>
         <Outcome tone="said">{acts.said}</Outcome>
-        <Refused id={REFUSED} failure={failure} saidOf={saidOf} unanswered={unanswered} />
-        {unread(read) ? (
-          <ReadAgain
-            keystroke={READ_AGAIN}
-            reading={read.isFetching}
-            words={ACCOUNT_WORDS}
-            onReadAgain={() => {
-              void read.refetch();
-            }}
-            className="mt-4"
-          />
-        ) : null}
+        <SecondFactorRefused id={REFUSED} read={read} failure={failure} unanswered={unanswered} />
 
         <PasskeysSection
           held={read.data}

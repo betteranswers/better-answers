@@ -5,9 +5,19 @@ import { useTRPC } from "@/shared/api/trpc.ts";
 
 import { askOfOurRoute, rereadTheSession } from "./auth-hooks.ts";
 
-const START_PATH = "/authenticator/start";
+/** Where an authenticator's setup starts and finishes. */
+export type AuthenticatorRoutes = { readonly start: string; readonly finish: string };
 
-const FINISH_PATH = "/authenticator/finish";
+export const FIRST_AUTHENTICATOR: AuthenticatorRoutes = {
+  start: "/authenticator/start",
+  finish: "/authenticator/finish",
+};
+
+/** Open only to a session granted setup; finishing removes the old factors. */
+export const NEW_AUTHENTICATOR: AuthenticatorRoutes = {
+  start: "/second-factor/replace/authenticator-start",
+  finish: "/second-factor/replace/authenticator-finish",
+};
 
 const keyIn = (setupAddress: string): string =>
   new URL(setupAddress).searchParams.get("secret") ?? "";
@@ -58,8 +68,8 @@ export const useRereadTheSecondFactor = () => {
 };
 
 /** Starting over an unfinished setup mints a new key, so the old one scanned stops matching. */
-export const useStartAuthenticator = () =>
-  useMutation({ mutationFn: () => askOfOurRoute(START_PATH, {}, setupStarted) });
+export const useStartAuthenticator = (routes = FIRST_AUTHENTICATOR) =>
+  useMutation({ mutationFn: () => askOfOurRoute(routes.start, {}, setupStarted) });
 
 export type StartingTheSetup = ReturnType<typeof useStartAuthenticator>;
 
@@ -67,12 +77,15 @@ export type StartingTheSetup = ReturnType<typeof useStartAuthenticator>;
  * The codes show once, so the mutation hands them over first, even if the field has closed. The
  * first code swaps the session's cookie.
  */
-export const useFinishAuthenticator = (onFinished: (issued: CodesIssued | null) => void) => {
+export const useFinishAuthenticator = (
+  onFinished: (issued: CodesIssued | null) => void,
+  finishPath = FIRST_AUTHENTICATOR.finish,
+) => {
   const queryClient = useQueryClient();
   const reread = useRereadTheSecondFactor();
   return useMutation({
-    mutationKey: [FINISH_PATH],
-    mutationFn: (code: string) => askOfOurRoute(FINISH_PATH, { code }, setupFinished),
+    mutationKey: [finishPath],
+    mutationFn: (code: string) => askOfOurRoute(finishPath, { code }, setupFinished),
     onSuccess: async (issued) => {
       onFinished(issued);
       await Promise.all([rereadTheSession(queryClient), reread()]);
@@ -81,8 +94,8 @@ export const useFinishAuthenticator = (onFinished: (issued: CodesIssued | null) 
 };
 
 /** Read where the setup is opened, since the code field holding the finish can close first. */
-export const useFinishingTheSetup = (): boolean =>
-  useMutationState({ filters: { mutationKey: [FINISH_PATH], status: "pending" } }).length > 0;
+export const useFinishingTheSetup = (finishPath = FIRST_AUTHENTICATOR.finish): boolean =>
+  useMutationState({ filters: { mutationKey: [finishPath], status: "pending" } }).length > 0;
 
 export const useRemoveAuthenticator = () => {
   const api = useTRPC();
