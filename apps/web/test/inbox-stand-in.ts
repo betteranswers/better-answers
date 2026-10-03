@@ -40,7 +40,7 @@ type Heard = {
 export type StandIn = {
   readonly origin: string;
   readonly heard: readonly Heard[];
-  /** Each in turn, so the last named is the newest. */
+  /** Listed by id, so a test mints its ids in the order its messages arrive. */
   readonly arrive: (...arriving: readonly Stored[]) => void;
   readonly answerEverythingWith: (answer: Answer) => void;
   readonly probeAnswers: (answer: Answer) => void;
@@ -64,15 +64,30 @@ const listedOf = (one: Stored): TestInboxListed => ({
   subject: "Sign in to Better Answers",
 });
 
-/** The Worker's cursor rule: a page starts after the `after` id, and no `limit` means every item. */
+const LIMIT_MOST = 100;
+
+/** As the Worker reads it: a missing or unreadable `limit` is the most a page holds. */
+const limitOf = (given: string | null): number => {
+  const asked = Math.trunc(Number(given));
+  if (given === null || given === "" || Number.isNaN(asked)) return LIMIT_MOST;
+  return Math.min(Math.max(asked, 1), LIMIT_MOST);
+};
+
+const newestFirst = (one: Stored, other: Stored): number =>
+  Number(other.id > one.id) - Number(other.id < one.id);
+
+/**
+ * The Worker's cursor rule: ids sort as arrivals do, so a page continues below `after` even once
+ * that message is gone.
+ */
 const pageOf = (inbox: readonly Stored[], query: URLSearchParams): TestInboxPage => {
   const after = query.get("after");
-  const start = after === null ? 0 : inbox.findIndex((one) => one.id === after) + 1;
-  const end = start + Number(query.get("limit") ?? inbox.length);
+  const below = inbox.filter(({ id }) => after === null || id < after).toSorted(newestFirst);
+  const limit = limitOf(query.get("limit"));
   return {
     object: "list",
-    has_more: end < inbox.length,
-    data: inbox.slice(start, end).map(listedOf),
+    has_more: below.length > limit,
+    data: below.slice(0, limit).map(listedOf),
   };
 };
 
@@ -101,9 +116,9 @@ type Opening = {
 
 const closers: (() => Promise<void>)[] = [];
 
-/** A stand-in for the test inbox's read API, listing newest first as the Worker does. */
+/** A stand-in for the test inbox's read API, listing the greatest id first as the Worker does. */
 export const inboxStandIn = async ({ key, before = [], tls }: Opening): Promise<StandIn> => {
-  const inbox: Stored[] = before.toReversed();
+  const inbox: Stored[] = [...before];
   const heard: Heard[] = [];
   let failure: Answer | undefined;
   let probe = PROBED;
@@ -132,7 +147,7 @@ export const inboxStandIn = async ({ key, before = [], tls }: Opening): Promise<
   return {
     origin: `${tls === undefined ? "http" : "https"}://127.0.0.1:${String(address.port)}`,
     heard,
-    arrive: (...arriving) => inbox.unshift(...arriving.toReversed()),
+    arrive: (...arriving) => inbox.push(...arriving),
     answerEverythingWith: (answer) => {
       failure = answer;
     },

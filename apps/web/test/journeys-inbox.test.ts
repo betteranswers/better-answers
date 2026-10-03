@@ -34,6 +34,7 @@ const LISTED_FROM = `Better Answers <${PRODUCTION}>`;
 
 let kept = 0;
 
+/** Minted in order, as the Worker's ids sort by arrival: a message made later lists as newer. */
 const nextId = (): string => {
   kept += 1;
   return `0000-${String(kept).padStart(4, "0")}`;
@@ -226,12 +227,30 @@ describe("noteInbox", () => {
     expect(await answer).toEqual(CODE);
   });
 
+  it("reads an email that lands just before the deadline", async () => {
+    const inbox = await standIn();
+    // Two polls alone, the second at the deadline: the email lands between them.
+    const noted = await notedOf(inbox, { deadlineMs: 1_000, pollIntervalMs: 60_000 });
+    const arriving = await mail("305117");
+    const answer = noted.codeSent();
+    await vi.waitFor(
+      () => {
+        expect(listCalls(inbox).length).toBeGreaterThan(1);
+      },
+      { interval: 5 },
+    );
+    inbox.arrive(arriving);
+
+    expect(await answer).toEqual(CODE);
+  });
+
   it("finds a matching message on the list's second page", async () => {
     const inbox = await standIn(await mail("111111"));
+    const arriving = await mail("305117");
     const elsewhere = await mail("444444", { to: [SOMEONE_ELSE] });
     const others = Array.from({ length: 101 }, () => ({ ...elsewhere, id: nextId() }));
 
-    expect(await codeAfter(inbox, await mail("305117"), ...others)).toEqual(CODE);
+    expect(await codeAfter(inbox, arriving, ...others)).toEqual(CODE);
     expect(listCalls(inbox).some((url) => url.searchParams.get("after") === others[1]?.id)).toBe(
       true,
     );
@@ -385,16 +404,21 @@ describe("noteInbox, judging a message's signature", () => {
 
   it("stops judging candidates once the deadline passes", async () => {
     const inbox = await standIn();
+    const lookupMs = 300;
     const slow: DNSResolver = async (name, rrtype) => {
-      await sleep(100);
+      await sleep(lookupMs);
       return publishedKeys(name, rrtype);
     };
     const noted = await notedOf(inbox, { keyLookup: slow });
-    inbox.arrive(...(await Promise.all(Array.from({ length: 10 }, () => forgedBy("111111")))));
+    // Signed as the sender's domain, so each key lookup reaches the slow resolver.
+    const unpublished = async () =>
+      stored(await signed(composed({ body: signInText("111111") }), { by: [AN_UNPUBLISHED_KEY] }));
+    const candidates = await Promise.all(Array.from({ length: 12 }, unpublished));
+    inbox.arrive(...candidates);
     const startedAt = Date.now();
 
     expect(await noted.codeSent()).toEqual({ answer: "unverified" });
-    expect(Date.now() - startedAt).toBeLessThan(DEADLINE_MS + 300);
+    expect(Date.now() - startedAt).toBeLessThan((candidates.length * lookupMs) / 2);
   });
 
   it("answers unverified for bytes that are no message at all", async () => {
@@ -410,6 +434,8 @@ describe("noteInbox, judging a message's signature", () => {
 describe("noteInbox, looking the signing key up", () => {
   const failing = (): Error => Object.assign(new Error("lookup timed out"), { code: "ETIMEOUT" });
 
+  const SENDERS_KEY = "resend._domainkey.better-answers.example";
+
   it("retries a failed lookup on the next poll", async () => {
     const inbox = await standIn();
     const asked: string[] = [];
@@ -422,10 +448,31 @@ describe("noteInbox, looking the signing key up", () => {
     inbox.arrive(stored(await signed(composed({ body: signInText("305117") }))));
 
     expect(await noted.codeSent()).toEqual(CODE);
-    expect(asked).toEqual([
-      "resend._domainkey.better-answers.example",
-      "resend._domainkey.better-answers.example",
-    ]);
+    expect(asked).toEqual([SENDERS_KEY, SENDERS_KEY]);
+  });
+
+  it("never asks another domain's name for a signing key", async () => {
+    const inbox = await standIn();
+    const asked: string[] = [];
+    const noted = await notedOf(inbox, {
+      // Every other domain's nameservers never answer.
+      keyLookup: (name, rrtype) => {
+        asked.push(name);
+        return name === SENDERS_KEY ? publishedKeys(name, rrtype) : new Promise(() => {});
+      },
+      lookupTimeoutMs: 100,
+    });
+    const foreign = Array.from({ length: 24 }, (_, at) => ({
+      ...A_FORGER,
+      domain: `forger-${String(at)}.example`,
+    }));
+    const by = [...foreign, AN_UNPUBLISHED_KEY];
+    inbox.arrive(stored(await signed(composed({ body: signInText("305117") }), { by })));
+    const startedAt = Date.now();
+
+    expect(await noted.codeSent()).toEqual({ answer: "unverified" });
+    expect(Date.now() - startedAt).toBeLessThan(DEADLINE_MS + 1_000);
+    expect(asked).toEqual([SENDERS_KEY]);
   });
 
   it("keeps a vouched email's verdict for the re-ask", async () => {
@@ -467,7 +514,8 @@ describe("noteInbox, looking the signing key up", () => {
     const startedAt = Date.now();
 
     expect(await noted.codeSent()).toEqual({ answer: "unverified" });
-    expect(Date.now() - startedAt).toBeLessThan(DEADLINE_MS + 2 * 50 + 200);
+    // Under the runner's own 2 s lookup timeout, so ignoring this one still fails.
+    expect(Date.now() - startedAt).toBeLessThan(DEADLINE_MS + 1_000);
   });
 });
 

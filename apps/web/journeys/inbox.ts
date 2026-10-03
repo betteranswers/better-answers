@@ -129,6 +129,17 @@ const bounded =
 const runnersDns: DNSResolver = (name) =>
   new Resolver({ timeout: LOOKUP_TIMEOUT_MS, tries: 1 }).resolveTxt(name);
 
+/**
+ * Only the sender's domain vouches, and the verifier asks for each signature's key in turn, so a
+ * forger's many domains would otherwise outlast the sign-in.
+ */
+const sendersOwn =
+  (lookup: DNSResolver, senderDomain: string): DNSResolver =>
+  (name, rrtype) =>
+    name.toLowerCase().endsWith(`._domainkey.${senderDomain}`)
+      ? lookup(name, rrtype)
+      : Promise.reject(Object.assign(new Error("not the sender's key"), { code: "ENODATA" }));
+
 type Watch = {
   readonly client: Client;
   readonly noted: ReadonlySet<string>;
@@ -232,7 +243,7 @@ const judged = async (
 
 type Verdicts = ReadonlyMap<string, Verdict>;
 
-/** Each candidate not yet judged, while the deadline allows; undefined when a retrieve fails. */
+/** The first unjudged candidate even past the deadline, so the last poll still reads what it lists. */
 const withVerdicts = async (
   watch: Watch,
   verdicts: Verdicts,
@@ -241,11 +252,11 @@ const withVerdicts = async (
 ): Promise<Verdicts | undefined> => {
   let known = verdicts;
   for (const { id } of candidates.filter((candidate) => !verdicts.has(candidate.id))) {
-    if (Date.now() >= deadlineAt) return known;
     const message = await watch.client.message(id);
     if (message === undefined) return undefined;
     const verdict = await judged(watch, Buffer.from(message.raw, "base64"), id);
     if (verdict !== LOOK_AGAIN) known = new Map(known).set(id, verdict);
+    if (Date.now() >= deadlineAt) return known;
   }
   return known;
 };
@@ -294,13 +305,15 @@ const codeWithin = async (watch: Watch, verdicts: Verdicts, timing: Timing): Pro
 
 const watchOf = (inbox: Inbox, client: Client, page: TestInboxPage): Watch => {
   const sender = addressOf(inbox.sender);
+  const senderDomain = sender.slice(sender.lastIndexOf("@") + 1);
+  const lookup = bounded(inbox.keyLookup ?? runnersDns, inbox.lookupTimeoutMs ?? LOOKUP_TIMEOUT_MS);
   return {
     client,
     noted: new Set(page.data.map(({ id }) => id)),
     recipient: addressOf(inbox.recipient),
     sender,
-    senderDomain: sender.slice(sender.lastIndexOf("@") + 1),
-    keyLookup: bounded(inbox.keyLookup ?? runnersDns, inbox.lookupTimeoutMs ?? LOOKUP_TIMEOUT_MS),
+    senderDomain,
+    keyLookup: sendersOwn(lookup, senderDomain),
   };
 };
 
