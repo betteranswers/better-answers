@@ -54,6 +54,10 @@ const CARVED_OUT: readonly CarveOut[] = [
     holds: under("packages/devtools/renames/"),
     why: "a rename map names the old word it replaces, as a migration does",
   },
+  {
+    holds: (file) => file === "packages/devtools/test/rename.test.ts",
+    why: "the rename runner's fixtures spell the old words they rename",
+  },
   { holds: under(".cubic/"), why: "Cubic generates it and rewrites it" },
   {
     holds: under("apps/api/.claude/skills/"),
@@ -306,6 +310,8 @@ describe("the sense a planted line is read in", () => {
         "apps/web/CODING_STANDARDS.md": `The ${WORD} claims the job.`,
         "packages/core/src/audit/stored-names.ts": `// The ${WORD} claims the job.`,
         "packages/devtools/renames/planted.ts": `// The ${WORD} claims the job.`,
+        "packages/devtools/test/rename.test.ts": `// The ${WORD} claims the job.`,
+        "packages/devtools/test/planted.test.ts": `// The ${WORD} claims the job.`,
       },
       [APP],
     );
@@ -314,6 +320,7 @@ describe("the sense a planted line is read in", () => {
       `apps/web/CODING_STANDARDS.md:1: The ${WORD} claims the job.`,
       `docs/plans/2026-01-01-planted-plan.md:1: The ${WORD} claims the job.`,
       `docs/specs/v01-route.md:1: The ${WORD} claims the job.`,
+      `packages/devtools/test/planted.test.ts:1: // The ${WORD} claims the job.`,
     ]);
   });
 
