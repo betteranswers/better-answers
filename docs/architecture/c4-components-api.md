@@ -21,7 +21,7 @@ C4Component
     Component(mcp, "mcp/surface.ts and entries/", "MCP SDK v2 behind one fetch-shaped seam", "The token verifier over the JWKS, then four entries: find, ask, open, give_feedback")
     Component(trpc, "trpc/", "tRPC on Hono", "router, mount, base with three roads — query, mutation with the held read, own-transaction carrying the doors; upload.ts reads the descriptor from headers")
     Component(spa, "ingress/spa.ts", "static files", "The SPA's hashed bundles and the shell on app., answered after Better Auth declines")
-    Component(ops, "ops.ts and ops/", "runOps", "pnpm ops, twelve commands: replay-erasures, smoke, dump-grep, provision-workspace, add-member, graph-rebuild, graph-sweep, graph-counts, reconcile-watermark, object-store-orphans, erasure-rehearsal, import-bundle")
+    Component(ops, "ops.ts and ops/", "runOps", "pnpm ops, seventeen commands: replay-erasures, smoke, dump-grep, provision-workspace, add-person, add-member, test-workspace, rename-workspace, operator, restore-sign-in, graph-rebuild, graph-sweep, graph-counts, reconcile-watermark, object-store-orphans, erasure-rehearsal, import-bundle")
     Component(reconciler, "reconciler.ts", "setInterval, 30 s", "The head check: every workspace's head against its watermark, missed commits replayed; reports a stop, never skips")
     Component(sweeps, "sweeps.ts", "setTimeout 10 min, then every 24 h", "The sweep pass: the upload sweep, list-only until UPLOAD_SWEEP says remove, and the graph sweep")
     Component(ping, "dead-man-ping.ts", "fetch, 10 s timeout", "POSTs ok, or fail, with counts and never a path, key or error")
