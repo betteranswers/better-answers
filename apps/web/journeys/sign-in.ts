@@ -57,10 +57,14 @@ export const refusedByTheEdge = (response: Answered, at: string): void => {
   if (response.status() === FORBIDDEN) couldNotRun(`the edge refused ${at}`);
 };
 
+/** Inside the sign-in's budget: the action timeout alone would fail a slow Send after spending it. */
+const ANSWER_TIMEOUT_MS = 60_000;
+
 const answerTo = (page: Page, path: string): Promise<Response> =>
   page.waitForResponse(
     (response) =>
       response.request().method() === "POST" && new URL(response.url()).pathname === path,
+    { timeout: ANSWER_TIMEOUT_MS },
   );
 
 /** A second email since the first means another Send rotated the code. */

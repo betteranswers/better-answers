@@ -91,7 +91,7 @@ type Journeys = {
   readonly spec?: string;
   /** More specs by file name, which Playwright runs one worker through in name order. */
   readonly specs?: Readonly<Record<string, string>>;
-  readonly use?: Readonly<Record<string, string>>;
+  readonly use?: Readonly<Record<string, string | number>>;
   readonly env?: Readonly<Record<string, string>>;
   /** The config's reporter list as written into it; the outcome reporter alone when left out. */
   readonly reporter?: string;
