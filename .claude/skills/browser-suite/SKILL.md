@@ -29,8 +29,10 @@ A spec that makes or uses a passkey attaches a virtual authenticator to its page
 `aVirtualAuthenticator` in `apps/web/e2e/virtual-authenticator.ts`, which drives Chromium's
 WebAuthn domain over the DevTools protocol. It verifies its user and answers every prompt with no
 prompt shown, the email field's autofill included: a page opening the sign-in screen while the
-device holds a passkey the platform keeps is signed in at once. `withoutWebAuthn` is a browser
-with none. `apps/web/e2e/passkeys.spec.ts` is the worked example.
+device holds a passkey the platform keeps is signed in at once. Its `leftUnattended` leaves every
+prompt waiting, so that screen signs in by email, and `attendedAgain` answers prompts again.
+`withoutWebAuthn` is a browser with none. `apps/web/e2e/passkeys.spec.ts` is the worked example,
+and `apps/web/e2e/confirm-recovery.spec.ts` signs in by email while the device holds a passkey.
 
 `apps/web/playwright.config.ts` holds the port, the `webServer` command — `node tests/serve.ts`
 run in `apps/api`, handed that port — and `/health` as the readiness URL: the one path the loopback
@@ -93,7 +95,7 @@ the side that counts. Read the numbers off those files rather than from here.
 ## The harness's acts
 
 State is built through the api's harness over HTTP, from `apps/web/e2e/harness.ts`, using the
-`request` fixture. Nothing writes a row itself and nothing sets a cookie from outside. Fourteen acts
+`request` fixture. Nothing writes a row itself and nothing sets a cookie from outside. Sixteen acts
 call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources two from
 `apps/api/tests/harness-sources.ts` and the People three from `apps/api/tests/harness-people.ts`:
 
@@ -107,6 +109,8 @@ call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources
 | `markTheOperator` | Grants the operator mark to the person holding an address, or clears it with `"revoke"`, through the ops command's own act and principal — the console's door, and a mark cleared under an open page |
 | `invite` | A waiting invitation to an address at a named role, as the invite act leaves it, with no email sent; or one accepted or cancelled, or with its expiry moved into the past |
 | `ageTheSignIn` | Moves every session a person holds to a sign-in 61 minutes ago, behind the api's back — how a spec meets `sign-in-too-old` without waiting an hour |
+| `withAnAuthenticator` | Enrols an authenticator for an address through the library, after one emailed sign-in that spends one of its codes, and answers the key a spec makes codes from with `authenticatorCodeAt`. It issues no recovery codes, and it fails for a person already holding an authenticator |
+| `restored` | The platform operator's restore as it leaves a person: marked restored, with a restore code that expires in 24 hours, which it answers. Their factors and sessions stay |
 | `seedRoutes` | The routes a workspace has chosen; a purpose left out of the list has no route, which the screen must show rather than omit |
 | `seedBindings` | Source bindings as their acts and the worker leave them — documents, findings kept or overridden by an erasure, quarantined documents, chunks, an index run at any status, a concept and composition citing a document — answering each binding's and document's id |
 | `moveTheIndexRun` | The worker's two steps over the workspace's one index run, claimed then done, through the queue's own functions under the worker's role — how a spec watches a state word move without a worker process |
@@ -114,7 +118,7 @@ call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources
 | `askToJoin` | A person's ask to join a workspace by its slug, with a reason, through the members slice's own act and the principal the ask-to-join procedure uses, without its sign-in or its answer's floor — a request waiting on the Requests tab |
 | `flagTheName` | A workspace's Admin flags a member's display name through the members slice's own act and principal, without the email the procedure sends the operator — a name waiting on the console's *Names waiting* screen |
 
-Twenty-seven more helpers in the same module drive the browser rather than the harness:
+Twenty-nine more helpers in the same module drive the browser rather than the harness:
 
 | Helper | What it does |
 | --- | --- |
@@ -145,6 +149,8 @@ Twenty-seven more helpers in the same module drive the browser rather than the h
 | `clockTheNextKey` | Starts the act's clock in the page: from the next key to the node an XPath names reading a given text |
 | `theActLandedWithinItsBudget` | Reads that clock, annotates the test with it and asserts it under the act's 100 ms |
 | `saysItsSentenceNotItsWord` | Asserts an alert reads the sentence a feature's refusal table holds for a word, and that the word is nowhere on the page |
+| `keyShown` | An authenticator's key, read off the page as a person types it into their phone, without the spaces that group it in fours |
+| `refusedDigitsSelected` | Asserts a refused code's six digits are selected, so the next code typed replaces them |
 
 The sign-in code is read from that capture and from nowhere else: the api's logger is forbidden from ever
 holding one. `emailsSentTo` counts the emails the capture holds for an address, and the suite's

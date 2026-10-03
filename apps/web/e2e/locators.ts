@@ -205,3 +205,18 @@ export const saysItsSentenceNotItsWord = async <Word extends RefusalWord>(
     word,
   );
 };
+
+/** The key in fours, as the page writes it out for typing into a phone. */
+const KEY_IN_FOURS = /^[A-Z2-7]{4}(?: [A-Z2-7]{1,4})+$/;
+
+/** An authenticator's key, read off the page as a person would type it into their phone. */
+export const keyShown = async (page: Page): Promise<string> =>
+  (await page.getByText(KEY_IN_FOURS).innerText()).replaceAll(" ", "");
+
+/** A refused code's digits stay selected, so the next code typed replaces them. */
+export const refusedDigitsSelected = async (field: Locator): Promise<void> => {
+  const selected = await field.evaluate((input) =>
+    input instanceof HTMLInputElement ? [input.selectionStart, input.selectionEnd] : [],
+  );
+  expect(selected, "the refused digits are not selected for retyping").toEqual([0, 6]);
+};
