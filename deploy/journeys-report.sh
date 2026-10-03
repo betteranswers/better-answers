@@ -18,10 +18,16 @@ case "${WORD:-}" in
     said="The journeys could not run. The journeys' table above names the cause (RUNBOOK.md page 13)."
     ;;
   *)
-    # The report runs only when the journeys were due, so a skipped journeys job means the promote failed.
-    if [ "${JOURNEYS:-}" = skipped ]; then
+    # A cancel or a refusal says nothing of the release, so only a promote that failed reads fail.
+    if [ "${REFUSED:-}" = true ]; then
+      word=could-not-run
+      said="The gate refused this run, so the journeys did not run: ${REFUSAL:-it gave no reason} (RUNBOOK.md page 6)"
+    elif [ "${JOURNEYS:-}" = skipped ] && [ "${PROMOTE:-}" = failure ]; then
       word=fail
       said="The promote failed, so the journeys did not run (RUNBOOK.md page 6)."
+    elif [ "${JOURNEYS:-}" = skipped ] && [ "${PROMOTE:-}" = cancelled ]; then
+      word=could-not-run
+      said="The promote was cancelled, so the journeys did not run (RUNBOOK.md page 6)."
     else
       word=could-not-run
       said="The journeys ended without an outcome word: their job stopped before the journeys ran, or was cancelled or timed out (RUNBOOK.md page 13)."

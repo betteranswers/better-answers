@@ -73,6 +73,9 @@ jobs:
       trigger: ${{ steps.ask.outputs.trigger }}
       journeys_only: ${{ steps.ask.outputs.journeys_only }}
       journeys_mode: ${{ steps.ask.outputs.journeys_mode }}
+      # Written even when the gate refuses, so a refused night still reaches the report.
+      refused: ${{ steps.ask.outputs.refused }}
+      refusal: ${{ steps.ask.outputs.refusal }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -266,6 +269,7 @@ jobs:
       packages: read
     outputs:
       word: ${{ steps.word.outputs.word }}
+      commit: ${{ steps.built.outputs.commit }}
     env:
       PUBLIC_URL: ${{ vars.PUBLIC_URL }}
     steps:
@@ -332,7 +336,7 @@ jobs:
 
   record:
     needs: [gate, promote, journeys]
-    if: ${{ !cancelled() && needs.promote.result == 'success' && (needs.gate.outputs.trigger == 'merge' || needs.gate.outputs.journeys_mode != 'gate' || needs.journeys.outputs.word == 'held') }}
+    if: ${{ !cancelled() && needs.promote.result == 'success' && (needs.gate.outputs.trigger == 'merge' || needs.gate.outputs.journeys_mode != 'gate' || needs.journeys.outputs.word == 'held' || needs.journeys.outputs.word == 'fail') }}
     runs-on: ubuntu-26.04
     timeout-minutes: 5
     environment: production
@@ -350,34 +354,49 @@ jobs:
           API_DIGEST: ${{ needs.promote.outputs.api_digest }}
           AWAIT_RELEASE_POLLS: "3"
         run: deploy/await-release.sh "${PUBLIC_URL}" "${API_DIGEST}"
-      # Only a release that held is recorded, so the newest tag is always one that held.
-      - name: record the promotion as an annotated release/<stamp> tag (the release's last step)
+      # Only a release that held is tagged release/, so the newest such tag is always one that held. Under
+      # gate a release whose journeys failed is tagged rejected/, which the nightly gate will not promote again.
+      - name: record the promotion as an annotated release/<stamp> or rejected/<stamp> tag (the release's last step)
         env:
           TAG: ${{ needs.promote.outputs.tag }}
           MESSAGE: ${{ needs.promote.outputs.message }}
           RELEASE_HEAD: ${{ needs.promote.outputs.head }}
+          MODE: ${{ needs.gate.outputs.journeys_mode }}
+          TRIGGER: ${{ needs.gate.outputs.trigger }}
+          WORD: ${{ needs.journeys.outputs.word }}
+          JOURNEYED: ${{ needs.journeys.outputs.commit }}
         run: |
           set -euo pipefail
           tag="${TAG}"
+          message="${MESSAGE}"
+          if [ -n "${WORD:-}" ]; then
+            message="${message}"$'\n'"Journeys: ${WORD}, run against ${JOURNEYED}"
+          fi
+          heading="Recorded"
+          if [ "${MODE}" = gate ] && [ "${TRIGGER}" != merge ] && [ "${WORD:-}" = fail ]; then
+            tag="rejected/${TAG#release/}"
+            message="rejected: its journeys ended fail, so the nightly release will not promote it again"$'\n\n'"${message}"
+            heading="Rejected"
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag --annotate --message "${MESSAGE}" "${tag}" "${RELEASE_HEAD}"
+          git tag --annotate --message "${message}" "${tag}" "${RELEASE_HEAD}"
           git push origin "refs/tags/${tag}"
           {
-            echo "### Recorded"
+            echo "### ${heading}"
             echo ""
             echo "- \`${tag}\` on \`${RELEASE_HEAD}\`"
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: say that a release that held recorded no tag
+      - name: say that the record job pushed no tag
         if: failure()
         run: |
-          said="The release held, but its \`release/*\` tag was not pushed. Tag it by hand (RUNBOOK.md page 6) only once its journeys held, or while JOURNEYS_MODE is report or off: never a release whose journeys did not hold under gate."
+          said="Its \`release/*\` or \`rejected/*\` tag was not pushed. Tag it by hand (RUNBOOK.md page 6) only once its journeys held, or while JOURNEYS_MODE is report or off: never a release whose journeys did not hold under gate."
           printf '### Not recorded\n\n%s\n' "${said}" >> "$GITHUB_STEP_SUMMARY"
 
   # Last, whatever the journeys did, so the alert hears from every run that owed it a word.
   report:
     needs: [gate, promote, journeys, record]
-    if: ${{ always() && needs.gate.outputs.journeys_mode != 'off' && needs.gate.outputs.trigger != 'merge' && (needs.gate.outputs.promote == 'true' || needs.gate.outputs.journeys_only == 'true') }}
+    if: ${{ always() && needs.gate.outputs.journeys_mode != 'off' && needs.gate.outputs.trigger != 'merge' && (needs.gate.outputs.promote == 'true' || needs.gate.outputs.journeys_only == 'true' || needs.gate.outputs.refused == 'true') }}
     runs-on: ubuntu-26.04
     timeout-minutes: 5
     environment: production
@@ -391,5 +410,8 @@ jobs:
         env:
           WORD: ${{ needs.journeys.outputs.word }}
           JOURNEYS: ${{ needs.journeys.result }}
+          PROMOTE: ${{ needs.promote.result }}
+          REFUSED: ${{ needs.gate.outputs.refused }}
+          REFUSAL: ${{ needs.gate.outputs.refusal }}
           JOURNEYS_PING_URL: ${{ secrets.JOURNEYS_PING_URL }}
         run: deploy/journeys-report.sh

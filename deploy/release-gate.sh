@@ -29,8 +29,13 @@ skip() {
   decide false ""
 }
 
+# A refused night or journeys-only run still owes the alert a word, so the report job reads why.
 refuse() {
   echo "::error::$1"
+  local due=false
+  if [ "${trigger}" = nightly ] || [ "${JOURNEYS_ONLY:-false}" = true ]; then due=true; fi
+  printf 'promote=false\ncommit=\ntrigger=%s\njourneys_only=false\njourneys_mode=%s\nrefused=%s\nrefusal=%s\n' \
+    "${trigger}" "${journeys_mode}" "${due}" "$1" >>"${GITHUB_OUTPUT}"
   exit 1
 }
 
@@ -75,20 +80,26 @@ merge() {
   decide true "${commit}"
 }
 
-# The newest commit on main with a green build, unless a release tag is reached first.
+# The newest commit on main with a green build, unless a release or a rejection is reached first.
 nightly() {
   [ "${mode}" = nightly ] || quiet_night "RELEASE_MODE is ${mode}, so the nightly release has nothing to do. $(instead)"
-  local commits green released candidate
+  local commits green released rejected candidate
   commits="$(gh api "repos/${REPOSITORY}/commits?sha=main&per_page=100" --jq '.[].sha')" ||
     refuse "main's history could not be read, so nothing is released tonight"
   green="$(gh api "repos/${REPOSITORY}/actions/workflows/build.yml/runs?branch=main&status=success&per_page=100" --jq '.workflow_runs[].head_sha')" ||
     refuse "build.yml's runs could not be read, so nothing is released tonight"
   released="$(gh api --paginate "repos/${REPOSITORY}/git/matching-refs/tags/release/" --jq '.[].ref')" ||
     refuse "the release tags could not be read, so nothing is released tonight"
+  rejected="$(gh api --paginate "repos/${REPOSITORY}/git/matching-refs/tags/rejected/" --jq '.[].ref')" ||
+    refuse "the rejected tags could not be read, so nothing is released tonight"
   for candidate in ${commits}; do
     # A tag's name ends in the seven characters of the commit it records.
     if grep -q -- "-${candidate:0:7}\$" <<<"${released}"; then
       quiet_night "${candidate} is the newest release on main, and no commit after it has a green build, so nothing is released tonight."
+    fi
+    # A rejection bounds the walk as a release does, so production never moves back past it.
+    if grep -q -- "-${candidate:0:7}\$" <<<"${rejected}"; then
+      quiet_night "${candidate} was rejected by its journeys, and no commit after it has a green build, so nothing is released tonight. Delete its rejected/ tag to promote it again."
     fi
     if grep -qx -- "${candidate}" <<<"${green}"; then
       decide true "${candidate}"
