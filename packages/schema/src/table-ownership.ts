@@ -237,6 +237,20 @@ export const CROSS_OWNER_TABLE_ACCESS = [
       "When the person was last active here is this workspace's record of them, so every erasure from it deletes only that row under the workspace's scope.",
   },
   {
+    table: "public.session",
+    by: "sweeps",
+    access: "write",
+    reason:
+      "A session holds the address it came from and the agent that made it, so the daily pass deletes every one past its expiry or its pending hour: nobody signs out of a session they abandoned.",
+  },
+  {
+    table: "public.verification",
+    by: "sweeps",
+    access: "write",
+    reason:
+      "The library no longer deletes expired rows at lookup, because that made another person's just-expired code read as wrong, so the daily pass deletes every row a day past its expiry.",
+  },
+  {
     table: "public.member",
     by: POSTGRES_DOOR,
     access: "read",

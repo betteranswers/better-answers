@@ -149,7 +149,7 @@ const verificationRow = async (
     readonly id: string;
     readonly identifier: string;
     readonly value: string;
-    readonly expiresAt?: Date;
+    readonly expiresAt?: Date | undefined;
   },
 ): Promise<string> => {
   const superuser = await pool.connect();
@@ -166,11 +166,16 @@ const verificationRow = async (
 };
 
 /** A sign-in code's row in the shape Better Auth writes it: keyed by the address, hashed, no tries spent. */
-export const verificationCodeFor = async (pool: pg.Pool, email: string): Promise<string> =>
+export const verificationCodeFor = async (
+  pool: pg.Pool,
+  email: string,
+  expiresAt?: Date,
+): Promise<string> =>
   verificationRow(pool, {
     id: ulid(),
     identifier: `sign-in-otp-${email.toLowerCase()}`,
     value: "hashed-code:0",
+    expiresAt,
   });
 
 /** The rows Better Auth writes for an address asked to verify or reset, though the product never sends either. */
@@ -201,27 +206,42 @@ export const restoreCodeFor = async (
   });
 
 /** A replacement setup's secret, sealed and parked under the session that started it. */
-export const parkedSecretFor = async (pool: pg.Pool, sessionId: string): Promise<string> =>
+export const parkedSecretFor = async (
+  pool: pg.Pool,
+  sessionId: string,
+  expiresAt?: Date,
+): Promise<string> =>
   verificationRow(pool, {
     id: ulid(),
     identifier: `second-factor-enrol:${sessionId}`,
     value: "sealed-secret",
+    expiresAt,
   });
 
 /** A passkey confirm's challenge, kept under the session that asked for it. */
-export const passkeyChallengeFor = async (pool: pg.Pool, sessionId: string): Promise<string> =>
+export const passkeyChallengeFor = async (
+  pool: pg.Pool,
+  sessionId: string,
+  expiresAt?: Date,
+): Promise<string> =>
   verificationRow(pool, {
     id: ulid(),
     identifier: `second-factor-challenge:${sessionId}`,
     value: "a-challenge",
+    expiresAt,
   });
 
 /** The row a sign-in link keeps beside its code: its id the link's hash, keyed by the address. */
-export const signInLinkFor = async (pool: pg.Pool, email: string): Promise<string> =>
+export const signInLinkFor = async (
+  pool: pg.Pool,
+  email: string,
+  expiresAt?: Date,
+): Promise<string> =>
   verificationRow(pool, {
     id: `${ulid().toLowerCase()}-link`,
     identifier: `sign-in-link-${email.toLowerCase()}`,
     value: '{"nonce":"n","sealed":"s"}',
+    expiresAt,
   });
 
 export const sessionFor = async (

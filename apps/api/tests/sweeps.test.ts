@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { ok, type UserPrincipal } from "@better-answers/core/kernel";
 import { listObjects, putObject } from "@better-answers/core/store/objects";
-import { openPostgres } from "@better-answers/core/store/postgres";
+import { consumeIngress, openPostgres } from "@better-answers/core/store/postgres";
 import { SWEEPS, withSweepLock } from "@better-answers/core/sweeps";
 import { objectStoreForSuite } from "@better-answers/core/testing/objects";
 import {
@@ -254,6 +254,31 @@ describe("the sweeps' daily pass", () => {
     expect(passes(sweeps.logs)).toEqual([
       expect.objectContaining({ level: 30, verifications_deleted: 1 }),
     ]);
+  });
+
+  it("logs identity-set deletions by count, naming no address", async () => {
+    const identifier = await codeExpiring(-25 * HOUR_MS);
+    const address = identifier.slice("sign-in-otp-".length);
+    await consumeIngress(
+      openPostgres(db().runtimePool),
+      "email",
+      address,
+      { windowMs: MINUTE_MS, max: 5 },
+      new Date(A_DAY_ON().getTime() - 25 * HOUR_MS),
+    );
+
+    const sweeps = await onePass({ uploadSweep: "list", pingUrl: PING_URL });
+
+    expect(passes(sweeps.logs)).toEqual([
+      expect.objectContaining({
+        level: 30,
+        sessions_deleted: 0,
+        verifications_deleted: 1,
+        ingress_windows_deleted: 1,
+        refusals: [],
+      }),
+    ]);
+    expect(JSON.stringify(sweeps.logs)).not.toContain(address);
   });
 
   it("names a refused code deletion in the log, pinging failure", async () => {

@@ -1,10 +1,14 @@
 import type { Logger } from "pino";
 
-import { attempt, attemptResult, err, ok, type Result } from "@better-answers/core/kernel";
+import { attemptResult, err, ok, type Result } from "@better-answers/core/kernel";
 import type { PostgresDoor } from "@better-answers/core/store/postgres";
-import { SWEEPS, sweepEveryWorkspace, type SweepPass } from "@better-answers/core/sweeps";
+import {
+  SWEEPS,
+  sweepEveryWorkspace,
+  sweepIdentitySet,
+  type SweepPass,
+} from "@better-answers/core/sweeps";
 
-import { dropExpiredVerifications } from "./auth/expired-verifications.ts";
 import type { SweepSettings } from "./config.ts";
 import { deadManPing, type PingFetch, type PingOutcome } from "./dead-man-ping.ts";
 import type { Doors } from "./doors.ts";
@@ -45,12 +49,26 @@ const refusalsOf = (pass: SweepPass) =>
       : [{ workspace_id: workspaceId, sweep: "graph", reason: reasonOf(graph.error) }]),
   ]);
 
-/** No workspace holds a verification row, so a refused delete names its sweep alone. */
-const verificationsDropped = async (postgres: PostgresDoor, now: Date) => {
-  const dropped = await attempt(() => dropExpiredVerifications(postgres, now));
-  return dropped.ok
-    ? { deleted: dropped.value, refusals: [] }
-    : { deleted: 0, refusals: [{ sweep: "verifications", reason: reasonOf(dropped.error) }] };
+const refusalOf = (sweep: string, deletion: Result<number, Error>) =>
+  deletion.ok ? [] : [{ sweep, reason: reasonOf(deletion.error) }];
+
+/** No workspace holds an identity-set row, so a refused delete names its sweep alone. */
+const identitySetSwept = async (postgres: PostgresDoor, now: Date) => {
+  const { sessions, verifications, ingressWindows } = await sweepIdentitySet(SWEEPS, postgres, {
+    now,
+  });
+  return {
+    deleted: {
+      sessions_deleted: sessions.ok ? sessions.value : 0,
+      verifications_deleted: verifications.ok ? verifications.value : 0,
+      ingress_windows_deleted: ingressWindows.ok ? ingressWindows.value : 0,
+    },
+    refusals: [
+      ...refusalOf("sessions", sessions),
+      ...refusalOf("verifications", verifications),
+      ...refusalOf("ingress", ingressWindows),
+    ],
+  };
 };
 
 /** Counts, never a workspace, a key or an error. */
@@ -79,21 +97,21 @@ export const startSweeps = (dependencies: SweepsDependencies): Result<Sweeps, Sw
       return;
     }
     // The deletion needs no workspace, so a failed workspace sweep must not keep expired rows.
-    const verifications = await verificationsDropped(postgres, clock.now());
+    const identitySet = await identitySetSwept(postgres, clock.now());
     if (!swept.ok) {
-      const { deleted, refusals } = verifications;
+      const { deleted, refusals } = identitySet;
       logger.error(
-        { reason: reasonOf(swept.error), verifications_deleted: deleted, refusals },
+        { reason: reasonOf(swept.error), ...deleted, refusals },
         "the sweep pass failed",
       );
       await ping("fail");
       return;
     }
-    const refusals = [...refusalsOf(swept.value), ...verifications.refusals];
+    const refusals = [...refusalsOf(swept.value), ...identitySet.refusals];
     const summary = {
       upload_sweep: uploadSweep,
       ...swept.value.totals,
-      verifications_deleted: verifications.deleted,
+      ...identitySet.deleted,
       refusals,
     };
     const outcome: PingOutcome = refusals.length > 0 ? "fail" : "ok";

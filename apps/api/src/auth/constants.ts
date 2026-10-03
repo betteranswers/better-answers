@@ -17,12 +17,6 @@ export const MCP_REQUIRED_SCOPE: McpScope = "knowledge:read";
 
 export const EMAIL_CODE_LIFETIME_SECONDS = 5 * 60;
 
-/**
- * Past any wait to type a code from an email, so one that expired just before the daily sweep
- * still reads as spent.
- */
-export const VERIFICATION_KEPT_PAST_EXPIRY_SECONDS = 24 * 60 * 60;
-
 export const OAUTH_IP_RULE: CounterRule = { windowMs: 60_000, max: 60 };
 
 export const PAGE_IP_RULE: CounterRule = { windowMs: 60_000, max: 30 };
