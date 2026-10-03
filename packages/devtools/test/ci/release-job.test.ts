@@ -75,10 +75,8 @@ const HEAD = "5c1b9e0f2a7d4c3b8e6f1a0d9c2b7e4f3a8d6c1b";
 const OLDER = "0e7a3c5b9d1f2e4a6c8b0d2f4e6a8c0b2d4f6e8a";
 const OLDEST = "9a8b7c6d5e4f30211203f4e5d6c7b8a9f0e1d2c3";
 const REPOSITORY = "betteranswers/better-answers";
-const rejectedTagOf = (commit: string): string =>
-  `refs/tags/rejected/20260927T023514Z-${commit.slice(0, 7)}`;
-const tagOf = (commit: string): string =>
-  `refs/tags/release/20260926T023514Z-${commit.slice(0, 7)}`;
+const tagOf = (commit: string, kind = "release"): string =>
+  `refs/tags/${kind}/20260926T023514Z-${commit.slice(0, 7)}`;
 
 /** Answers only the calls the gate makes, so a changed call fails as unread. */
 const STUB_GH = [
@@ -446,7 +444,7 @@ describe("the gate's word on a refused or rejected night", () => {
   };
 
   it("stops at a rejected commit, never promoting an older one", async () => {
-    expect(await gateRan({ ...rejectedHead, STUB_REJECTED: rejectedTagOf(HEAD) })).toEqual(
+    expect(await gateRan({ ...rejectedHead, STUB_REJECTED: tagOf(HEAD, "rejected") })).toEqual(
       skipped(
         `${HEAD} was rejected by its journeys, and no commit after it has a green build, so nothing is released tonight. Delete its rejected/ tag to promote it again. ${LIVE}`,
         "nightly",
@@ -456,7 +454,7 @@ describe("the gate's word on a refused or rejected night", () => {
   });
 
   it("promotes a green commit newer than a rejected one", async () => {
-    expect(await gateRan({ ...rejectedHead, STUB_REJECTED: rejectedTagOf(OLDER) })).toEqual({
+    expect(await gateRan({ ...rejectedHead, STUB_REJECTED: tagOf(OLDER, "rejected") })).toEqual({
       code: 0,
       said: "",
       output: decided(true, HEAD, "nightly", { mode: "gate" }),

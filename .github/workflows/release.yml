@@ -354,8 +354,7 @@ jobs:
           API_DIGEST: ${{ needs.promote.outputs.api_digest }}
           AWAIT_RELEASE_POLLS: "3"
         run: deploy/await-release.sh "${PUBLIC_URL}" "${API_DIGEST}"
-      # Only a release that held is tagged release/, so the newest such tag is always one that held. Under
-      # gate a release whose journeys failed is tagged rejected/, which the nightly gate will not promote again.
+      # Only a release that held is tagged release/; under gate a failed one is tagged rejected/, which the nightly never promotes again.
       - name: record the promotion as an annotated release/<stamp> or rejected/<stamp> tag (the release's last step)
         env:
           TAG: ${{ needs.promote.outputs.tag }}

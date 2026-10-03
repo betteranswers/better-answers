@@ -17,9 +17,13 @@ else
   trigger=dispatch
 fi
 
-decide() {
+emit() {
   printf 'promote=%s\ncommit=%s\ntrigger=%s\njourneys_only=%s\njourneys_mode=%s\n' \
     "$1" "$2" "${trigger}" "${journeys_only}" "${journeys_mode}" >>"${GITHUB_OUTPUT}"
+}
+
+decide() {
+  emit "$1" "$2"
   exit 0
 }
 
@@ -34,8 +38,9 @@ refuse() {
   echo "::error::$1"
   local due=false
   if [ "${trigger}" = nightly ] || [ "${JOURNEYS_ONLY:-false}" = true ]; then due=true; fi
-  printf 'promote=false\ncommit=\ntrigger=%s\njourneys_only=false\njourneys_mode=%s\nrefused=%s\nrefusal=%s\n' \
-    "${trigger}" "${journeys_mode}" "${due}" "$1" >>"${GITHUB_OUTPUT}"
+  journeys_only=false
+  emit false ""
+  printf 'refused=%s\nrefusal=%s\n' "${due}" "$1" >>"${GITHUB_OUTPUT}"
   exit 1
 }
 
