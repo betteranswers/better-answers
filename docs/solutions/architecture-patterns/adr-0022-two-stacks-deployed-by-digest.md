@@ -44,12 +44,12 @@ The journeys sign in to production as the test people and walk the screens each 
 
 - `off`, or unset: they never run, and a release is tagged on its smoke.
 - `report`: they run and report, and the tag still follows the smoke.
-- `gate`: a journeyed release is tagged only when its journeys end `held`. One that does not stays live, untagged.
+- `gate`: a journeyed release is tagged only when its journeys end `held`. One that ends `fail` stays live and is tagged `rejected/`, which the nightly gate treats as the edge of its walk, so it never promotes that commit again or moves production back past it. One that cannot run stays live, untagged, and is promoted again the next night.
 - Any other value releases nothing.
 
 Under `report` and `gate` the journeys run after every nightly or dispatched promotion whose smoke passes, before its tag. A release `build.yml` calls after a merge runs none, and keeps its smoke-only tag under every value. A scheduled night with nothing newer to promote runs them alone against the live release, in every release mode, and so does a journeys-only dispatch. They check out the commit the live api image was built from, read from the image's revision label.
 
-Until the first client uses the platform, a failed release never rolls production back: the owner decides, by the runbook's rollback. From that day, a failure re-promotes the last tagged release, unless the failed release added a migration, which alerts the owner instead. That rollback is BA-48, still to be built.
+Until the first client uses the platform, a failed release never rolls production back: the owner decides, by the runbook's rollback. From that day, a failure re-promotes the last tagged release, unless the failed release added a migration, which alerts the owner instead. That rollback is BA-48, still to be built; its rejected marker landed first, with the gate.
 
 Every irreplaceable byte is encrypted and copied off-host:
 
@@ -75,6 +75,8 @@ The edge is one tunnel and three hostnames. `app.` is open, with Better Auth its
 - The smoke reads `/health` and one unauthenticated document, so a release can pass it and refuse every sign-in. Only a run signed in as each role sees that.
 - The journeys skip a release `build.yml` calls because `per-merge` lasts only until the first client's bundle lands, and journeys on every release of a platform nobody relies on yet buy nothing.
 - Every night runs them, with or without a promotion, so the alert hears from each night and a night with no run reads as a late check. They sit in the release's concurrency group, so they never overlap a release.
+- A refused night pings `could-not-run`, so an unknown mode or an unreadable history reaches the alert that night, not a day and a half later.
+- A failed release is rejected rather than promoted again: without the marker, `gate` would redeploy the same broken commit every night, restarting the api, until someone acted. Only `fail` rejects, since `could-not-run` says nothing about the release.
 - They check out the image's own commit, not `main`'s head, so a rollback night runs the old commit's journeys against the old images.
 - An automatic rollback across a migration would run an api older than its schema: a rollback below migration 0053 fails every sign-in.
 - Forward-only and the digest rollback are a decision, not a rule, because neither half is legible in a diff.
