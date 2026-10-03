@@ -230,7 +230,7 @@ describe("making a first set on the Account page", () => {
 
     expect(
       await screen.findByText(
-        "Your sign-in was restored, so its restore code comes first. Enter the code the platform's operator gave you.",
+        "Your sign-in was restored, so its restore code comes first. Enter the code better-answers support gave you.",
       ),
     ).toBeDefined();
   });

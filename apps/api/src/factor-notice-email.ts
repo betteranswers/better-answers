@@ -84,8 +84,7 @@ const CHANGES = {
 
 const WORDS = {
   ifYou: "If you made this change, there is nothing more to do.",
-  ifNot:
-    "If you didn't, sign in and check your Account page now, then tell the platform's operator:",
+  ifNot: `If you didn't, sign in and check your Account page now, then tell ${PRODUCT_NAME} support:`,
 } as const;
 
 /** Every value is a fixed phrase or the api's own address, so nothing here needs escaping. */
