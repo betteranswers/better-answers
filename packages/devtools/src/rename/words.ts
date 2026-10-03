@@ -55,12 +55,28 @@ const matchAt = (
   return { end: index, joiner, matched };
 };
 
-const firstMatch = (tokens: readonly string[], start: number, words: Words) => {
+type Found = { readonly match: Match; readonly to: readonly string[]; readonly start: number };
+
+const firstMatch = (tokens: readonly string[], start: number, words: Words): Found | undefined => {
   for (const rule of words) {
     const match = matchAt(tokens, start, rule.from);
-    if (match !== undefined) return { match, to: rule.to };
+    if (match !== undefined) return { match, to: rule.to, start };
   }
   return undefined;
+};
+
+const tokensOf = (text: string): readonly string[] => text.match(TOKEN) ?? [];
+
+/** Each match in order, with the tokens between them as they were. */
+const piecesOf = (tokens: readonly string[], words: Words): readonly (Found | string)[] => {
+  const pieces: (Found | string)[] = [];
+  let index = 0;
+  while (index < tokens.length) {
+    const found = firstMatch(tokens, index, words);
+    pieces.push(found ?? tokens[index] ?? "");
+    index = found?.match.end ?? index + 1;
+  }
+  return pieces;
 };
 
 const isUpper = (token: string): boolean =>
@@ -71,17 +87,26 @@ const capitalised = (word: string): string => `${word.charAt(0).toUpperCase()}${
 /** A statement's words are names, so `AS routes` becomes `AS model_choices` and never two words. */
 const SQL = /\b(?:SELECT|INSERT|UPDATE|DELETE|FROM|WHERE|ALTER|CREATE)\b/;
 
+const neighboursOf = (tokens: readonly string[], found: Found): readonly string[] => [
+  tokens[found.start - 1] ?? "",
+  tokens[found.match.end] ?? "",
+];
+
+/** A hump beside the word, as `Id` is in `userId`, means camel case. */
+const isHump = (token: string): boolean => /^[A-Za-z0-9]/.test(token);
+
 /** An underscore or hyphen binds tighter than a space: `SELECT route_id` is snake case, `no route set` prose. */
 const joinerNear = (
   tokens: readonly string[],
-  match: Match,
-  start: number,
+  found: Found,
   spaced: string,
-): string => {
-  if (match.joiner !== undefined) return match.joiner;
-  const neighbours = [tokens[start - 1] ?? "", tokens[match.end] ?? ""];
+): string | undefined => {
+  if (found.match.joiner !== undefined) return found.match.joiner;
+  const neighbours = neighboursOf(tokens, found);
   const bound = IDENTIFIER_JOINERS.find((joiner) => neighbours.includes(joiner));
-  return bound ?? (neighbours.some((neighbour) => neighbour.includes(" ")) ? spaced : "");
+  if (bound !== undefined) return bound;
+  if (neighbours.some((neighbour) => neighbour.includes(" "))) return spaced;
+  return neighbours.some(isHump) ? "" : undefined;
 };
 
 const isShouted = (matched: readonly string[]): boolean =>
@@ -97,21 +122,26 @@ const rendered = (to: readonly string[], match: Match, joiner: string): string =
   return [first === first.toLowerCase() ? head : capitalised(head), ...tail].join(joiner);
 };
 
-/** The text with every old word in it rewritten, each in the casing and joiner it was found in. */
-export const renamedText = (text: string, words: Words): string => {
-  const tokens = text.match(TOKEN) ?? [];
+/** Every old word rewritten in the casing and joiner it was found in; `lone` joins a word whose neighbours show none. */
+export const renamedText = (text: string, words: Words, lone = ""): string => {
+  const tokens = tokensOf(text);
   const spaced = SQL.test(text) ? "_" : " ";
-  const parts: string[] = [];
-  let index = 0;
-  while (index < tokens.length) {
-    const found = firstMatch(tokens, index, words);
-    if (found === undefined) {
-      parts.push(tokens[index] ?? "");
-      index += 1;
-      continue;
-    }
-    parts.push(rendered(found.to, found.match, joinerNear(tokens, found.match, index, spaced)));
-    index = found.match.end;
-  }
-  return parts.join("");
+  return piecesOf(tokens, words)
+    .map((piece) =>
+      typeof piece === "string"
+        ? piece
+        : rendered(piece.to, piece.match, joinerNear(tokens, piece, spaced) ?? lone),
+    )
+    .join("");
+};
+
+/** A word whose neighbours show no joiner, where the joiner decides what it becomes. */
+export const hasLoneWord = (text: string, words: Words): boolean => {
+  const tokens = tokensOf(text);
+  return piecesOf(tokens, words).some(
+    (piece) =>
+      typeof piece !== "string" &&
+      piece.to.length > 1 &&
+      joinerNear(tokens, piece, " ") === undefined,
+  );
 };

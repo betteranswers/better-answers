@@ -11,12 +11,17 @@ import { OUTSIDE_ALLOWLIST, RENAMED, isSwept, relativeTo } from "./edits.ts";
 import type { Edit, Occurrence, PassOutcome } from "./edits.ts";
 import { STORED_HISTORY, inAllowlist, keptReason, senseOf } from "./map.ts";
 import type { RenameMap } from "./map.ts";
-import { renamedText, wordSource } from "./words.ts";
+import { hasLoneWord, renamedText, wordSource } from "./words.ts";
 import type { Words } from "./words.ts";
 
 const AST_GREP = { package: "@ast-grep/cli", path: ["ast-grep"] } as const;
 
 const MODULE_PATH = "module path";
+
+const LONE_WORD = "lone word, joiner unknown";
+
+/** A lone word outside a script string is a name: a Python identifier, a dict key or a JSON key. */
+const NAME_JOINER = "_";
 
 /** `family.subject.verb`: a stored act name, which events keep writing after any sweep. */
 const STORED_ACT = new RegExp(`^(?:${FAMILIES.join("|")})\\.[a-z_]+\\.[a-z_]+$`);
@@ -124,11 +129,20 @@ const fixedVerdict = (match: ScanMatch): string | undefined => {
   return STORED_ACT.test(match.text) ? STORED_HISTORY : undefined;
 };
 
-const verdictOf = (map: RenameMap, file: string, match: ScanMatch): string =>
+/** A script string can be reader text, such as a tab label, which camel case would turn into code. */
+const isScriptText = (id: string): boolean =>
+  SCRIPT_LANGUAGES.some((language) => id === ruleId(language, "text"));
+
+const allowedVerdict = (map: RenameMap, words: Words, file: string, match: ScanMatch): string => {
+  if (!inAllowlist(map.text.paths, file)) return OUTSIDE_ALLOWLIST;
+  return isScriptText(match.ruleId) && hasLoneWord(match.text, words) ? LONE_WORD : RENAMED;
+};
+
+const verdictOf = (map: RenameMap, words: Words, file: string, match: ScanMatch): string =>
   keptReason(file) ??
   fixedVerdict(match) ??
   senseOf(map, file, match.text) ??
-  (inAllowlist(map.text.paths, file) ? RENAMED : OUTSIDE_ALLOWLIST);
+  allowedVerdict(map, words, file, match);
 
 /** ast-grep counts UTF-8 bytes, and an edit counts UTF-16 code units. */
 const offsetIn = (source: Buffer, byte: number): number =>
@@ -174,9 +188,9 @@ export const textPass = (root: string, map: RenameMap, words: Words): PassOutcom
   const edits: Edit[] = [];
   for (const match of scanned(root, words)) {
     const file = relativeTo(root, match.file);
-    const to = renamedText(match.text, words);
+    const to = renamedText(match.text, words, NAME_JOINER);
     if (!isSwept(file) || to === match.text) continue;
-    const verdict = verdictOf(map, file, match);
+    const verdict = verdictOf(map, words, file, match);
     const { line, column } = match.range.start;
     occurrences.push({
       pass: "text",

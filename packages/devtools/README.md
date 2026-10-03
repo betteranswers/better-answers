@@ -337,17 +337,23 @@ path no sweep edits, or a collision whose code word no pair writes.
 
 `renameOver(root, map, mode)` runs ts-morph's symbol pass through the language service's
 rename locations, then ast-grep's text pass over strings, Python names and JSON. It returns
-every occurrence with its verdict: renamed, or left by a sense, a kept path or the allowlist.
-A dry run writes nothing. The runner holds its own list of kept paths, so no map can forget
-one: migrations, `docs/archive/`, plans, the stored-names register, the generated audit acts,
-the words test's list, the maps themselves and the lifted snapshots. A rename that would reach
-a kept file is refused whole, since half a rename would not compile.
+every occurrence with its verdict: renamed, left by a sense, a kept path or the allowlist, or
+left for a hand edit. Two cases are left for a person. One is an aliased import
+(`import { a as b }`), since a rename from the target would give the export the alias's new
+name. The other is a lone word in a script string, such as a tab label that is the old word
+alone, where nothing beside the word shows its joiner. In Python and JSON a lone word is a name, and takes
+`_`. A dry run writes nothing. The runner holds its own list of kept paths, so no map can
+forget one: migrations, `docs/archive/`, plans, the stored-names register, the generated audit
+acts, the words test's list, the maps themselves and the lifted snapshots. A rename that would
+reach a kept file is refused whole, since half a rename would not compile, and each pass
+settles every file before it writes one, so a refusal writes nothing.
 
 `pnpm --filter @better-answers/devtools rename --map <name> [--root <dir>] [--mode dry-run|apply]`
 replays a map, a dry run by default, so a branch opened before a sweep can take the sweep's
 renames. TypeScript 7's `tsc` proves the symbol pass; ts-morph carries its own compiler.
 `test/rename.test.ts` runs the runner over throwaway trees in both languages, and replays a map
-on a branch git built before the sweep.
+on a branch git built before the sweep. It also parses every committed map. It does not check a
+map's path globs against today's tree, since a landed sweep moves the files its own map names.
 
 ## `lifts/anti-slop/` — the anti-slop plugin, lifted
 

@@ -68,12 +68,19 @@ const distinctOf = (edits: readonly Edit[]): readonly Edit[] => [
   ).values(),
 ];
 
-/** Writes every edit, refusing outright a file a sweep never edits, whatever pass asked. */
+type Written = { readonly absolute: string; readonly text: string };
+
+const writtenOf = (root: string, file: string, inFile: readonly Edit[]): Written => {
+  const reason = keptReason(file);
+  if (reason !== undefined) throw new Error(`${file} is ${reason}, which a sweep never edits`);
+  const absolute = path.join(root, file);
+  return { absolute, text: spliced(readFileSync(absolute, "utf8"), inFile) };
+};
+
+/** Refuses a file a sweep never edits, whatever pass asked, and settles every file before writing one, so a refusal writes nothing. */
 export const writeEdits = (root: string, edits: readonly Edit[]): void => {
-  for (const [file, inFile] of Map.groupBy(distinctOf(edits), (edit) => edit.file)) {
-    const reason = keptReason(file);
-    if (reason !== undefined) throw new Error(`${file} is ${reason}, which a sweep never edits`);
-    const absolute = path.join(root, file);
-    writeFileSync(absolute, spliced(readFileSync(absolute, "utf8"), inFile));
-  }
+  const written = [...Map.groupBy(distinctOf(edits), (edit) => edit.file)].map(([file, inFile]) =>
+    writtenOf(root, file, inFile),
+  );
+  for (const { absolute, text } of written) writeFileSync(absolute, text);
 };

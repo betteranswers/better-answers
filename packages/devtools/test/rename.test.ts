@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -14,6 +14,8 @@ import {
   writeUnder,
 } from "@better-answers/devtools/throwaway-tree";
 import type { Tree } from "@better-answers/devtools/throwaway-tree";
+
+import { writeEdits } from "../src/rename/edits.ts";
 
 const scratch = mkdtempSync(path.join(tmpdir(), "rename-"));
 afterAll(() => {
@@ -242,6 +244,50 @@ def model_choices_of(cursor):
     );
   });
 
+  it("leaves a lone word in a script string unrenamed", () => {
+    const root = treeAt("lone-script", {
+      "web/tab.ts": `export const tab = { name: "Routes", key: "routeId" };\n`,
+    });
+
+    const report = renameOver(root, mapOf(MODEL_CHOICE), "apply");
+
+    expect(read(root, "web/tab.ts")).toBe(
+      `export const tab = { name: "Routes", key: "modelChoiceId" };\n`,
+    );
+    expect(report.occurrences.map((one) => `${one.found} → ${one.to}: ${one.verdict}`)).toEqual([
+      "Routes → Routes: lone word, joiner unknown",
+      "routeId → modelChoiceId: rename",
+    ]);
+  });
+
+  it("renames a lone word whose new word is one word", () => {
+    const root = treeAt("lone-one-word", { "web/tab.ts": `export const tab = "Acts";\n` });
+
+    renameOver(root, mapOf(ACTION), "apply");
+
+    expect(read(root, "web/tab.ts")).toBe(`export const tab = "Actions";\n`);
+  });
+
+  it("gives a lone Python or JSON name the snake joiner", () => {
+    const root = treeAt("lone-snake", {
+      "worker/seed.py": `def seed(fixture):
+    for route in fixture["routes"]:
+        yield route["id"]
+`,
+      "contracts/cases.json": `{ "routes": [{ "route_id": "embedding" }] }\n`,
+    });
+
+    renameOver(root, mapOf(MODEL_CHOICE), "apply");
+
+    expect(read(root, "worker/seed.py")).toBe(`def seed(fixture):
+    for model_choice in fixture["model_choices"]:
+        yield model_choice["id"]
+`);
+    expect(read(root, "contracts/cases.json")).toBe(
+      `{ "model_choices": [{ "model_choice_id": "embedding" }] }\n`,
+    );
+  });
+
   it("renames strings after multi-byte characters", () => {
     const root = treeAt("multi-byte", {
       "web/words.ts": `export const sign = "Café — 🚀";\nexport const pair = ["🚀 an act", "no acts"];\n`,
@@ -298,6 +344,110 @@ export const reasons = [routeChanged, "model-choice-change"];
       `export const declared = ["platform.route.changed", "model-choice-change"];\n`,
     );
   });
+
+  it("leaves an aliased import for a hand edit", () => {
+    const tree: Tree = {
+      "package.json": JSON.stringify({ type: "module" }),
+      "tsconfig.json": TSCONFIG,
+      "packages/web/src/sentences.ts": `export const sentenceOf = (name: string): string => name;\n`,
+      "packages/web/src/other.ts": `import { sentenceOf } from "./sentences.ts";
+
+export const one = sentenceOf("people.member.role_changed");
+`,
+      "packages/web/e2e/people.spec.ts": `import { sentenceOf as saidOfAct } from "../src/sentences.ts";
+
+export const said = saidOfAct("people.member.role_changed");
+`,
+    };
+    const root = treeAt("aliased-import", tree);
+
+    const report = renameOver(root, mapOf(ACTION), "apply");
+
+    for (const [file, source] of Object.entries(tree)) expect(read(root, file)).toBe(source);
+    expect(
+      report.occurrences.map(
+        (one) => `${String(one.line)} ${one.found} → ${one.to}: ${one.verdict}`,
+      ),
+    ).toEqual([
+      "1 saidOfAct → saidOfAct: aliased import, renamed by hand",
+      "3 saidOfAct → saidOfAct: aliased import, renamed by hand",
+    ]);
+    expect(compiles(root)).toBe("exit 0\n");
+  });
+
+  it("keeps an old word in a module path", () => {
+    const tree: Tree = {
+      "web/paths.ts": `import { x } from "./routes.ts";
+export * from "./llm-route.ts";
+export const y = x;
+`,
+      "worker/paths.py": "from llm_route import x\nimport routes\n",
+    };
+    const root = treeAt("module-paths", tree);
+
+    const report = renameOver(root, mapOf(MODEL_CHOICE), "apply");
+
+    for (const [file, source] of Object.entries(tree)) expect(read(root, file)).toBe(source);
+    expect(report.occurrences.map((one) => `${one.file} ${one.found}: ${one.verdict}`)).toEqual([
+      "web/paths.ts ./routes.ts: module path",
+      "web/paths.ts ./llm-route.ts: module path",
+      "worker/paths.py llm_route: module path",
+      "worker/paths.py routes: module path",
+    ]);
+  });
+
+  it("leaves an old word under a path sense", () => {
+    const routing = `export const route = "the route is set";\n`;
+    const root = treeAt("path-sense", { "server/app.ts": routing, "web/app.ts": routing });
+
+    const report = renameOver(
+      root,
+      mapOf({ ...MODEL_CHOICE, senses: [{ sense: "URL routing", paths: ["server/**"] }] }),
+      "apply",
+    );
+
+    expect(read(root, "server/app.ts")).toBe(routing);
+    expect(read(root, "web/app.ts")).toBe(
+      `export const modelChoice = "the model choice is set";\n`,
+    );
+    expect(report.occurrences.map((one) => `${one.pass} ${one.file}: ${one.verdict}`)).toEqual([
+      "symbol server/app.ts: URL routing",
+      "text server/app.ts: URL routing",
+      "symbol web/app.ts: rename",
+      "text web/app.ts: rename",
+    ]);
+  });
+});
+
+describe("writeEdits", () => {
+  const swept = "export const route = 1;\n";
+
+  it("refuses a kept file and writes no file", () => {
+    const root = treeAt("kept-edit", { "web/app.ts": swept, "docs/plans/plan.md": "a route\n" });
+
+    expect(() =>
+      writeEdits(root, [
+        { file: "web/app.ts", start: 13, end: 18, text: "modelChoice" },
+        { file: "docs/plans/plan.md", start: 2, end: 7, text: "model choice" },
+      ]),
+    ).toThrow("docs/plans/plan.md is stored history, which a sweep never edits");
+    expect(read(root, "web/app.ts")).toBe(swept);
+    expect(read(root, "docs/plans/plan.md")).toBe("a route\n");
+  });
+
+  it("refuses overlapping renames and writes no file", () => {
+    const root = treeAt("overlap", { "web/app.ts": swept, "web/other.ts": swept });
+
+    expect(() =>
+      writeEdits(root, [
+        { file: "web/other.ts", start: 13, end: 18, text: "modelChoice" },
+        { file: "web/app.ts", start: 13, end: 18, text: "modelChoice" },
+        { file: "web/app.ts", start: 15, end: 18, text: "choice" },
+      ]),
+    ).toThrow("web/app.ts: two renames overlap at offset 15");
+    expect(read(root, "web/app.ts")).toBe(swept);
+    expect(read(root, "web/other.ts")).toBe(swept);
+  });
 });
 
 describe("parseRenameMap", () => {
@@ -315,6 +465,15 @@ describe("parseRenameMap", () => {
     expect(() =>
       mapOf({ ...MODEL_CHOICE, collisions: [{ with: "the `model` column", codeWord: "model" }] }),
     ).toThrow(/code word "model"/);
+  });
+});
+
+describe("the committed rename maps", () => {
+  const renames = path.resolve(import.meta.dirname, "../renames");
+
+  // Globs are not checked against today's tree: a landed sweep moves the files its map names.
+  it.each(readdirSync(renames).filter((name) => name.endsWith(".json")))("parses %s", (name) => {
+    expect(() => parseRenameMap(readFileSync(path.join(renames, name), "utf8"))).not.toThrow();
   });
 });
 

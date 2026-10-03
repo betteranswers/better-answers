@@ -11,6 +11,8 @@ import type { Words } from "./words.ts";
 
 const DECLARED_OUTSIDE = "declared outside the tree";
 
+const ALIASED = "aliased import, renamed by hand";
+
 type Context = {
   readonly root: string;
   readonly map: RenameMap;
@@ -133,11 +135,18 @@ const renameEdits = (
 
 type Settled = { readonly verdict: string; readonly edits: readonly Edit[] };
 
+/** Renaming from the target would give it the alias's new name; whether the alias or the export moves is a person's call. */
+const isAliased = (home: Node, sites: readonly Site[]): boolean => {
+  const name = Node.hasName(home) ? home.getName() : sites[0]?.found;
+  return sites.some((site) => site.found !== name);
+};
+
 /** A rename that would reach a kept file is refused whole, since half of one would not compile. */
 const settled = (context: Context, home: Node, sites: readonly Site[]): Settled => {
   const found = sites[0]?.found ?? "";
   const verdict = homeVerdict(context, home, found);
   if (verdict !== RENAMED) return { verdict, edits: [] };
+  if (isAliased(home, sites)) return { verdict: ALIASED, edits: [] };
   const edits = renameEdits(context, home, sites, renamedText(found, context.words));
   const reached = edits.map((edit) => keptReason(edit.file)).find((reason) => reason !== undefined);
   return reached === undefined ? { verdict, edits } : { verdict: reached, edits: [] };
