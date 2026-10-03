@@ -23,14 +23,14 @@ type ZodLike = {
   readonly _zod: { readonly def: { readonly type: string } & Record<string, unknown> };
 };
 
-const isZod = (value: unknown): value is ZodLike =>
-  typeof value === "object" && value !== null && "_zod" in value;
+const isObject = (value: unknown): value is object => typeof value === "object" && value !== null;
 
-const keysOf = (value: unknown): readonly string[] =>
-  typeof value === "object" && value !== null ? Object.keys(value) : [];
+const isZod = (value: unknown): value is ZodLike => isObject(value) && "_zod" in value;
+
+const keysOf = (value: unknown): readonly string[] => (isObject(value) ? Object.keys(value) : []);
 
 const valuesOf = (value: unknown): readonly unknown[] =>
-  typeof value === "object" && value !== null ? Object.values(value) : [];
+  isObject(value) ? Object.values(value) : [];
 
 const ownNamesOf = (def: ZodLike["_zod"]["def"]): readonly string[] => {
   if (def.type === "object") return keysOf(def["shape"]);
@@ -43,9 +43,7 @@ const innerOf = (def: ZodLike["_zod"]["def"]): readonly unknown[] =>
   Object.values(def).flatMap((value) => {
     if (Array.isArray(value)) return value;
     if (isZod(value)) return [value];
-    return def.type === "object" && typeof value === "object" && value !== null
-      ? Object.values(value)
-      : [];
+    return def.type === "object" && isObject(value) ? Object.values(value) : [];
   });
 
 /** Every key, enum value and literal a schema declares: the wire's own names. */

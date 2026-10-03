@@ -4,12 +4,12 @@
  */
 
 /** `within` keeps a sense to the one tree whose code writes it. */
-export type Sense = { readonly sense: string; readonly written: RegExp; readonly within?: string };
+type Sense = { readonly sense: string; readonly written: RegExp; readonly within?: string };
 
 export type CarveOut = { readonly holds: (file: string) => boolean; readonly why: string };
 
 /** A landed word is refused in every form, whole outside its permitted senses, or in reader text alone. */
-export type Reach = "everywhere" | "one sense" | "reader text";
+type Reach = "everywhere" | "one sense" | "reader text";
 
 /** A sweep renames it: pending until the sweep lands, then refused where its reach says. */
 export type Renamed = {
@@ -26,7 +26,7 @@ export type Renamed = {
 };
 
 /** A word the glossary once avoided, which no sweep renames and no scan reads. */
-export type Avoided = {
+type Avoided = {
   readonly word: string;
   readonly use: string;
   readonly entry: string;
@@ -36,7 +36,7 @@ export type Avoided = {
 
 export type OldWord = Renamed | Avoided;
 
-const under =
+export const under =
   (prefix: string) =>
   (file: string): boolean =>
     file.startsWith(prefix);

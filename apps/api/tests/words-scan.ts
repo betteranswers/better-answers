@@ -9,7 +9,7 @@ export const GLOSSARY = "CONTEXT.md";
 
 const ENTRY_HEAD = /^- \*\*(?<term>.+?)\*\* — (?<rest>.*)$/;
 
-export type Entry = { readonly term: string; readonly text: string };
+type Entry = { readonly term: string; readonly text: string };
 
 export const entriesOf = (glossary: string): readonly Entry[] => {
   const entries: Entry[] = [];
@@ -40,7 +40,7 @@ const markOf = ({ text }: Entry): "internal" | "pending" | undefined => {
 /** A head's qualifier tells entries apart in the glossary; a page writes the word alone. */
 const bareWordOf = (head: string): string => head.replace(/ \(.*\)$/, "").replaceAll("`", "");
 
-export type Internal = {
+type Internal = {
   readonly head: string;
   readonly word: string;
   readonly pagesSay: string | undefined;
@@ -48,7 +48,7 @@ export type Internal = {
 
 const PAGES_SAY = /\bA page (?:says|shows|names them) \*?(?<words>[^*.]+?)\*?\./;
 
-export const internalsOf = (glossary: string): readonly Internal[] =>
+const internalsOf = (glossary: string): readonly Internal[] =>
   entriesOf(glossary)
     .filter((entry) => markOf(entry) === "internal")
     .map((entry) => ({
@@ -81,10 +81,9 @@ const unlisted = (rows: readonly OldWord[], glossary: string): readonly string[]
     .map(({ term }) => `"${term}" is marked pending, but no pending row names its code's word`);
 };
 
-const unwatchedStrays = (
-  notWatched: readonly { readonly head: string }[],
-  glossary: string,
-): readonly string[] => {
+type Unwatched = { readonly head: string };
+
+const unwatchedStrays = (notWatched: readonly Unwatched[], glossary: string): readonly string[] => {
   const internal = new Set(internalsOf(glossary).map(({ head }) => head));
   return notWatched
     .filter(({ head }) => !internal.has(head))
@@ -95,7 +94,7 @@ const unwatchedStrays = (
 export const listFaults = (
   rows: readonly OldWord[],
   glossary: string,
-  notWatched: readonly { readonly head: string }[],
+  notWatched: readonly Unwatched[],
 ): readonly string[] => {
   const heads = new Set(entriesOf(glossary).map(({ term }) => term));
   return [
@@ -112,7 +111,7 @@ const escaped = (word: string): string => word.replace(/[.*+?^${}()|[\]\\]/g, "\
  * `auditRowsOf`, `AUDIT_ACT`, `HTTPAudit` and `an_audit_row` read as words, and an acronym's plural
  * (`IRIs`) stays whole.
  */
-export const wordsOfCompounds = (text: string): string =>
+const wordsOfCompounds = (text: string): string =>
   text.replace(/(?<=[a-z\d])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z]{2})/g, " ").replaceAll("_", " ");
 
 /** Bounded by what is not a word character, so a head such as `ui://` is found as well. */
@@ -120,7 +119,7 @@ const anyFormOf = (word: string, flags: string): RegExp =>
   new RegExp(`(?<!\\w)${word.split(" ").map(escaped).join("[\\s-]+")}s?(?!\\w)`, flags);
 
 /** Every form, compounds and plurals included, for a word refused outright; whole, otherwise. */
-export const findsIn = (word: string, anyForm: boolean): ((text: string) => boolean) => {
+const findsIn = (word: string, anyForm: boolean): ((text: string) => boolean) => {
   if (!anyForm) {
     const whole = new RegExp(`(?<!\\w)${escaped(word)}(?!\\w)`, "i");
     return (text) => whole.test(text);
@@ -129,7 +128,7 @@ export const findsIn = (word: string, anyForm: boolean): ((text: string) => bool
   return (text) => forms.test(wordsOfCompounds(text));
 };
 
-export const countIn = (word: string, text: string): number =>
+const countIn = (word: string, text: string): number =>
   wordsOfCompounds(text).match(anyFormOf(word, "gi"))?.length ?? 0;
 
 const blankedBy = (text: string, patterns: readonly RegExp[]): string =>
@@ -142,7 +141,7 @@ const blankedBy = (text: string, patterns: readonly RegExp[]): string =>
  * A kept name that is one plain word is the code's only when written as code, so prose naming the
  * same word stays read.
  */
-export const keptPatternsOf = (kept: readonly string[]): readonly RegExp[] =>
+const keptPatternsOf = (kept: readonly string[]): readonly RegExp[] =>
   [...new Set(kept)].map((name) =>
     /^[a-z]+$/i.test(name)
       ? new RegExp(`[\`"']${escaped(name)}[\`"']`, "g")
@@ -209,7 +208,7 @@ const lineFindingsIn = (scans: readonly LineScan[], file: string, text: string):
         .map(({ row }) => findingOf(row, file, index, line)),
     );
 
-export type Scan = {
+type Scan = {
   readonly rows: readonly OldWord[];
   readonly carvedOut: readonly CarveOut[];
   readonly kept: readonly string[];
@@ -239,17 +238,16 @@ const MCP_AND_ANSWERS = new Set([
 const TEMPLATE = /^apps\/api\/src\/(?:.+-email|email-page|auth\/pages)\.ts$/;
 
 /** Where a page's words, an MCP tool's text, an answer and an email are written. */
-export const isReaderText = (file: string): boolean =>
+const isReaderText = (file: string): boolean =>
   WORDS_MODULE.test(file) ||
   file === NAVIGATION ||
   MCP_AND_ANSWERS.has(file) ||
   TEMPLATE.test(file);
 
 /** The files the ratchet counts in: where a page's words are written. */
-export const isPageWords = (file: string): boolean =>
-  WORDS_MODULE.test(file) || file === NAVIGATION;
+const isPageWords = (file: string): boolean => WORDS_MODULE.test(file) || file === NAVIGATION;
 
-export type ReaderString = { readonly line: number; readonly text: string };
+type ReaderString = { readonly line: number; readonly text: string };
 
 type Node = { readonly type: string; readonly start: number; readonly [key: string]: unknown };
 
@@ -294,7 +292,7 @@ const CAPITALISED_WORD = /^[A-Z][a-z]+$/;
 const isRead = (text: string): boolean =>
   text.trim() !== "" && (/\s/.test(text) || CAPITALISED_WORD.test(text));
 
-type Piece = { readonly words: number; readonly text: string };
+type Piece = { readonly offset: number; readonly text: string };
 
 const leadingSpaceOf = (text: string): number => text.length - text.trimStart().length;
 
@@ -306,16 +304,16 @@ const pieceOfQuasi =
     if (!isNode(quasi) || typeof value !== "object" || value === null) return [];
     const raw = "raw" in value ? String(value.raw) : "";
     const cooked = "cooked" in value && typeof value.cooked === "string" ? value.cooked : "";
-    return [{ words: source.indexOf(raw, quasi.start) + leadingSpaceOf(raw), text: cooked }];
+    return [{ offset: source.indexOf(raw, quasi.start) + leadingSpaceOf(raw), text: cooked }];
   };
 
 const piecesOf = (node: Node, source: string): readonly Piece[] => {
   const value = node["value"];
   if (node.type === "Literal" && typeof value === "string") {
-    return [{ words: node.start, text: value }];
+    return [{ offset: node.start, text: value }];
   }
   if (node.type === "JSXText") {
-    return [{ words: node.start + leadingSpaceOf(String(value)), text: String(value) }];
+    return [{ offset: node.start + leadingSpaceOf(String(value)), text: String(value) }];
   }
   const quasis = node["quasis"];
   return node.type === "TemplateLiteral" && Array.isArray(quasis)
@@ -341,8 +339,8 @@ export const readerStringsIn = (file: string, source: string): readonly ReaderSt
   const starts = [0, ...[...source.matchAll(/\n/g)].map((match) => match.index + 1)];
   const strings: ReaderString[] = [];
   visit(parseSync(file, source).program, (node) => {
-    for (const { words, text } of piecesOf(node, source).filter((piece) => isRead(piece.text))) {
-      strings.push({ line: lineAt(starts, words), text: text.trim() });
+    for (const { offset, text } of piecesOf(node, source).filter((piece) => isRead(piece.text))) {
+      strings.push({ line: lineAt(starts, offset), text: text.trim() });
     }
   });
   return strings;
@@ -382,7 +380,7 @@ export type InternalFinding = {
 const watchedInternals = (
   glossary: string,
   rows: readonly OldWord[],
-  notWatched: readonly { readonly head: string }[],
+  notWatched: readonly Unwatched[],
 ): readonly Internal[] => {
   const unwatched = new Set(notWatched.map(({ head }) => head));
   const stillPending = new Set(
@@ -400,18 +398,19 @@ export const internalFindings = (
   root: string,
   glossary: string,
   { rows, kept }: Scan,
-  notWatched: readonly { readonly head: string }[],
+  notWatched: readonly Unwatched[],
 ): readonly InternalFinding[] => {
   const keptPatterns = keptPatternsOf(kept);
   const scans = watchedInternals(glossary, rows, notWatched).map((internal) => ({
     internal,
     finds: findsIn(internal.word, true),
   }));
-  return readerStringsUnder(root, isReaderText).flatMap(({ file, line, text }) =>
-    scans
-      .filter(({ finds }) => finds(blankedBy(text, keptPatterns)))
-      .map(({ internal }) => ({ file, line, text, internal })),
-  );
+  return readerStringsUnder(root, isReaderText).flatMap(({ file, line, text }) => {
+    const unexplained = blankedBy(text, keptPatterns);
+    return scans
+      .filter(({ finds }) => finds(unexplained))
+      .map(({ internal }) => ({ file, line, text, internal }));
+  });
 };
 
 export type Counts = Readonly<Record<string, Readonly<Record<string, number>>>>;
@@ -430,7 +429,9 @@ export const ratchetCounts = (root: string, rows: readonly OldWord[]): Counts =>
   const counted = rows.filter((row): row is Renamed => isRenamed(row) && row.state === "pending");
   const byFile = new Map<string, string[]>();
   for (const { file, text } of readerStringsUnder(root, isPageWords)) {
-    byFile.set(file, [...(byFile.get(file) ?? []), text]);
+    const strings = byFile.get(file) ?? [];
+    strings.push(text);
+    byFile.set(file, strings);
   }
   return Object.fromEntries(
     [...byFile]

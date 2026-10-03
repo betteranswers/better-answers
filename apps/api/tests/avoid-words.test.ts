@@ -15,6 +15,7 @@ import {
   OLD_WORDS,
   type OldWord,
   type Renamed,
+  under,
 } from "./old-words.ts";
 import { readUnder } from "./tree-walk.ts";
 import {
@@ -32,11 +33,6 @@ import {
   readerFindings,
   readerStringsIn,
 } from "./words-scan.ts";
-
-const under =
-  (prefix: string) =>
-  (file: string): boolean =>
-    file.startsWith(prefix);
 
 const CARVED_OUT: readonly CarveOut[] = [
   {
@@ -192,13 +188,21 @@ const LEDGER_ACT = rowOf(`${RETIRED} act`);
 const BOUND = ["bind", "ing"].join("");
 const BINDING = landedNow(rowOf(BOUND));
 
+const CHECKED = ["Un", "checked"].join("");
+
+const WORDS = "apps/web/src/features/sources/words.ts";
+
+const scanOf = (rows: readonly OldWord[], kept: readonly string[] = []) => ({
+  rows,
+  carvedOut: CARVED_OUT,
+  kept,
+});
+
 const linesOver = (
   files: Readonly<Record<string, string>>,
   rows: readonly OldWord[],
   kept: readonly string[] = [],
-): readonly string[] => [
-  ...new Set(lineFindings(plantedTree(files), { rows, carvedOut: CARVED_OUT, kept }).map(at)),
-];
+): readonly string[] => [...new Set(lineFindings(plantedTree(files), scanOf(rows, kept)).map(at))];
 
 const findingsOver = (planted: string, file = "docs/planted.md"): readonly string[] =>
   linesOver({ [file]: planted }, [APP, LEDGER, LEDGER_ACT]);
@@ -459,7 +463,7 @@ describe("a word that lands with its sweep", () => {
   it("names the reader's word and sweep for a new identifier", () => {
     const tree = plantedTree({ "packages/core/src/planted.ts": `const ${BOUND}Id = ulid();` });
 
-    expect(lineFindings(tree, { rows: [BINDING], carvedOut: CARVED_OUT, kept: [] })).toEqual([
+    expect(lineFindings(tree, scanOf([BINDING]))).toEqual([
       {
         file: "packages/core/src/planted.ts",
         line: 1,
@@ -501,7 +505,7 @@ describe("a word that lands with its sweep", () => {
     };
     const rows = [landedNow(rowOf("IRI")), landedNow(rowOf(hit))];
     const tree = plantedTree(files);
-    const scan = { rows, carvedOut: CARVED_OUT, kept: ["iri"] };
+    const scan = scanOf(rows, ["iri"]);
 
     expect(readerFindings(tree, scan).map(at)).toEqual([
       "apps/api/src/mcp/entries/index.ts:4: Give the iri you found.",
@@ -603,19 +607,14 @@ describe("the glossary's entries", () => {
 });
 
 describe("what a person reads, in a planted tree", () => {
-  const WORDS = "apps/web/src/features/sources/words.ts";
-
   const internalsOver = (
     text: string,
     file = WORDS,
     rows: readonly OldWord[] = [],
   ): readonly string[] =>
-    internalFindings(
-      plantedTree({ [file]: text }),
-      PLANTED_GLOSSARY,
-      { rows, carvedOut: CARVED_OUT, kept: [] },
-      [{ head: "job" }],
-    ).map((finding) => `${at(finding)} → ${finding.internal.pagesSay ?? "-"}`);
+    internalFindings(plantedTree({ [file]: text }), PLANTED_GLOSSARY, scanOf(rows), [
+      { head: "job" },
+    ]).map((finding) => `${at(finding)} → ${finding.internal.pagesSay ?? "-"}`);
 
   it("refuses an internal page word and names what to write", () => {
     expect(
@@ -691,28 +690,26 @@ describe("what a person reads, in a planted tree", () => {
   });
 
   it("refuses a landed word in reader text alone", () => {
-    const checked = ["Un", "checked"].join("");
     const tree = plantedTree({
-      [WORDS]: `export const TRUST = "${checked}";`,
-      "packages/design-system/tokens.css": `--trust-${checked.toLowerCase()}-ink: #444;`,
+      [WORDS]: `export const TRUST = "${CHECKED}";`,
+      "packages/design-system/tokens.css": `--trust-${CHECKED.toLowerCase()}-ink: #444;`,
     });
 
-    expect(
-      readerFindings(tree, { rows: [rowOf(checked)], carvedOut: CARVED_OUT, kept: [] }).map(at),
-    ).toEqual([`${WORDS}:1: ${checked}`]);
+    expect(readerFindings(tree, scanOf([rowOf(CHECKED)])).map(at)).toEqual([
+      `${WORDS}:1: ${CHECKED}`,
+    ]);
   });
 
   it("refuses any form of a landed word in MCP text", () => {
-    const checked = ["Un", "checked"].join("");
     const tree = plantedTree({
       "apps/api/src/mcp/entries/index.ts": 'const description = "Lists both IRIs here.";',
-      "packages/core/src/answering/index.ts": `const unverified = (): string => "${checked}";`,
+      "packages/core/src/answering/index.ts": `const unverified = (): string => "${CHECKED}";`,
     });
-    const rows = [landedNow(rowOf("IRI")), rowOf(checked)];
+    const rows = [landedNow(rowOf("IRI")), rowOf(CHECKED)];
 
-    expect(readerFindings(tree, { rows, carvedOut: CARVED_OUT, kept: [] }).map(at)).toEqual([
+    expect(readerFindings(tree, scanOf(rows)).map(at)).toEqual([
       "apps/api/src/mcp/entries/index.ts:1: Lists both IRIs here.",
-      `packages/core/src/answering/index.ts:1: ${checked}`,
+      `packages/core/src/answering/index.ts:1: ${CHECKED}`,
     ]);
   });
 });
@@ -795,7 +792,6 @@ describe("the strings a person reads in a source file", () => {
 });
 
 describe("the ratchet on pending words", () => {
-  const WORDS = "apps/web/src/features/sources/words.ts";
   const NAVIGATION = "apps/web/src/shared/navigation.ts";
   const counted = (text: string, navigation = 'export const N = "Members and groups";'): Counts =>
     ratchetCounts(
