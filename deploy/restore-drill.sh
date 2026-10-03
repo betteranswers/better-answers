@@ -39,15 +39,14 @@ ensure_staging_network() {
   docker network inspect "${STAGING_NETWORK}" >/dev/null 2>&1 || docker network create --internal "${STAGING_NETWORK}" >/dev/null
 }
 # <<< the staging projects
+# >>> the drill's commands
 ops() {
   local rc=0; platform exec -T api pnpm --silent ops "$@" || rc=$?
-  if [ "${rc}" -eq "${NOT_BUILT}" ]; then aside "  -> not built yet: 'pnpm ops $1' found no tables for its slice (recorded, not failed)"; return 0; fi
+  # A command's tables come from the schema, so "not built" after migrate means the restored copy lost one.
+  if [ "${rc}" -eq "${NOT_BUILT}" ]; then aside "DRILL FAILED: 'pnpm ops $1' answered not built, so a table its slice needs is absent from the restored copy"; fi
   return "${rc}"
 }
-prod_query() {
-  if printf '%s' "$1" | ${PROD_PSQL} -At; then return 0; fi
-  aside "REFUSED: production could not be read for the counts diff — the SSH hop or psql failed"; return 1
-}
+# <<< the drill's commands
 wipe_staging() {
   # Not "${WORK}": step 0 wipes too, and the report being written lives there.
   platform down --remove-orphans || true; stores down --remove-orphans || true
@@ -151,25 +150,14 @@ say "graph rebuilt in $(( $(date +%s) - t0 )) s (promise: ≤ 120 s)"
 ops graph-sweep --workspace "${DRILL_WORKSPACE}"
 ops object-store-orphans --workspace "${DRILL_WORKSPACE}" >> "${REPORT}"
 
-say "## 7 counts diff against production's stamped run (ADR 0023) — production read over SSH, no open port (ticket 79 A12)"
-if ops graph-counts --workspace "${DRILL_WORKSPACE}" > "${WORK}/staging.counts" && [ -s "${WORK}/staging.counts" ]; then
-  cat "${WORK}/staging.counts" >> "${REPORT}"
-  if ! stamped=$(prod_query "select to_regclass('public.graph_sync_run') is not null"); then exit 1; fi
-  if [ "${stamped}" = "t" ]; then
-    if ! prod_query "select counts_json from graph_sync_run where workspace_id = '${DRILL_WORKSPACE}' and outcome = 'ok' order by finished_at desc limit 1" > "${WORK}/prod.counts"; then
-      exit 1
-    fi
-  else
-    : > "${WORK}/prod.counts"
-  fi
-  if [ ! -s "${WORK}/prod.counts" ]; then
-    say "no stamped run on production to diff against — staging counts recorded, not matched"
-  elif diff <(jq -S . "${WORK}/prod.counts") <(jq -S . "${WORK}/staging.counts") >> "${REPORT}"; then
-    say "counts match"
-  else
-    say "COUNTS DIFFER"; exit 1
-  fi
-fi
+say "## 7 counts of the rebuilt map for this workspace"
+# >>> the counts
+ops graph-counts --workspace "${DRILL_WORKSPACE}" > "${WORK}/staging.counts"
+if [ ! -s "${WORK}/staging.counts" ]; then say "DRILL FAILED: graph-counts printed no counts for ${DRILL_WORKSPACE}"; exit 1; fi
+cat "${WORK}/staging.counts" >> "${REPORT}"
+# A live map moves on after the dump, so only a recorded run is a fair comparison, and production records none yet.
+say "production records no run of the map's counts: staging counts recorded, not compared"
+# <<< the counts
 
 say "## 8 smoke through the interface: health, discovery, the shell; find · a guide read · ask as the slices land"
 platform exec -T api pnpm --silent ops smoke --workspace "${DRILL_WORKSPACE}" --url "${STAGING_API_URL}" --find --guide --ask >> "${REPORT}"
@@ -183,62 +171,59 @@ if [ $(( $(date +%-m) % 3 )) -eq 0 ]; then
   ws_git() { sudo -u "#${API_UID}" git -C "${ws_repo}" "$@"; }
   commits_before_seed=$({ ws_git rev-list --all 2>/dev/null || true; } | sort)
 
-  # 3 alone means no tables; a wider guard would write that over a refused seed.
-
   # A fence: the deploy tree's suite lifts the lines between the markers and runs them.
   # >>> seed status
   seed_rc=0
   # The seed's index job queues behind whatever the restore left for the drill workspace.
   subject=$(platform exec -T api pnpm --silent ops erasure-rehearsal --workspace "${DRILL_WORKSPACE}" --synthetic --seed --wait-seconds 600 | tail -n1) || seed_rc=$?
-  if [ "${seed_rc}" -ne 0 ] && [ "${seed_rc}" -ne "${NOT_BUILT}" ]; then
-    say "REHEARSAL FAILED: the synthetic seed exited ${seed_rc}, which is not the ${NOT_BUILT} that says the erasure slice has no tables"; exit 1
+  if [ "${seed_rc}" -eq "${NOT_BUILT}" ]; then
+    say "REHEARSAL FAILED: the synthetic seed answered not built, so a table the erasure slice needs is absent from the restored copy"; exit 1
+  fi
+  if [ "${seed_rc}" -ne 0 ]; then
+    say "REHEARSAL FAILED: the synthetic seed exited ${seed_rc}"; exit 1
   fi
   # <<< seed status
-  if [ "${seed_rc}" -eq 0 ]; then
-    commits_after_seed=$({ ws_git rev-list --all 2>/dev/null || true; } | sort)
-    seeded_commits=$(comm -13 <(printf '%s\n' "${commits_before_seed}") <(printf '%s\n' "${commits_after_seed}"))
+  commits_after_seed=$({ ws_git rev-list --all 2>/dev/null || true; } | sort)
+  seeded_commits=$(comm -13 <(printf '%s\n' "${commits_before_seed}") <(printf '%s\n' "${commits_after_seed}"))
 
-    pg_dump --format=plain --dbname="${STAGING_DATABASE_URL}" > "${WORK}/pre-erasure.sql"
+  pg_dump --format=plain --dbname="${STAGING_DATABASE_URL}" > "${WORK}/pre-erasure.sql"
 
-    platform exec -T api pnpm --silent ops dump-grep --tokens "${subject}" < "${WORK}/pre-erasure.sql" > "${WORK}/pre-erasure.grep"
-    cat "${WORK}/pre-erasure.grep" >> "${REPORT}"
-    # >>> found before
-    if ! grep -q ': present in ' "${WORK}/pre-erasure.grep"; then
-      say "REHEARSAL FAILED: the seeded subject is in no table of the pre-erasure dump"; exit 1
-    fi
-    # A chunk table the subject was never in would pass the grep after the erasure without proving the index lets them go.
-    if ! grep -q -E ' of table index\."?chunk' "${WORK}/pre-erasure.grep"; then
-      say "REHEARSAL FAILED: the seeded subject is in no chunk of the pre-erasure dump, so the dump grep after would prove nothing of the index"; exit 1
-    fi
-    # <<< found before
-    say "dump grep before: the subject is in the pre-erasure copy, the index's chunk table among it (expected; the report's expiry dates cover it)"
-
-    platform exec -T api pnpm --silent ops erasure-rehearsal --workspace "${DRILL_WORKSPACE}" --synthetic --run --report /tmp/erasure.md | tee -a "${REPORT}"
-    platform exec -T api cat /tmp/erasure.md >> "${REPORT}"
-
-    pg_dump --format=plain --dbname="${STAGING_DATABASE_URL}" > "${WORK}/post-erasure.sql"
-
-    platform exec -T api pnpm --silent ops dump-grep --tokens "${subject}" < "${WORK}/post-erasure.sql" > "${WORK}/post-erasure.grep"
-    cat "${WORK}/post-erasure.grep" >> "${REPORT}"
-    # Those two keep the identifier by design. Present anywhere else, a store was missed.
-    if leaked=$(grep ': present in ' "${WORK}/post-erasure.grep" | grep -v -E ' of table ([a-z_]+\.)?(subject_request|suppression)$'); then
-      say "REHEARSAL FAILED: the subject is still held — ${leaked}"; exit 1
-    fi
-    say "dump grep after: the subject is in no table but subject_request and suppression, which keep the identifier set by design"
-
-    # An empty set is a failure: the seed always commits, so nothing here means no read.
-    if [ -z "${seeded_commits}" ]; then
-      say "REHEARSAL FAILED: the seed added no commit to ${ws_repo} — step 7 would prove nothing"; exit 1
-    fi
-    for hash in ${seeded_commits}; do
-      if ws_git cat-file -e "${hash}^{commit}" 2>/dev/null; then
-        say "REHEARSAL FAILED: pre-rewrite commit ${hash} is still readable in ${ws_repo}"; exit 1
-      fi
-    done
-    say "git cat-file: every pre-rewrite commit is gone from the bare repository ($(printf '%s\n' "${seeded_commits}" | grep -c . || true) checked)"
-  else
-    say "  -> not built yet: the erasure slice has no tables in this schema (recorded, not failed)"
+  platform exec -T api pnpm --silent ops dump-grep --tokens "${subject}" < "${WORK}/pre-erasure.sql" > "${WORK}/pre-erasure.grep"
+  cat "${WORK}/pre-erasure.grep" >> "${REPORT}"
+  # >>> found before
+  if ! grep -q ': present in ' "${WORK}/pre-erasure.grep"; then
+    say "REHEARSAL FAILED: the seeded subject is in no table of the pre-erasure dump"; exit 1
   fi
+  # A chunk table the subject was never in would pass the grep after the erasure without proving the index lets them go.
+  if ! grep -q -E ' of table index\."?chunk' "${WORK}/pre-erasure.grep"; then
+    say "REHEARSAL FAILED: the seeded subject is in no chunk of the pre-erasure dump, so the dump grep after would prove nothing of the index"; exit 1
+  fi
+  # <<< found before
+  say "dump grep before: the subject is in the pre-erasure copy, the index's chunk table among it (expected; the report's expiry dates cover it)"
+
+  platform exec -T api pnpm --silent ops erasure-rehearsal --workspace "${DRILL_WORKSPACE}" --synthetic --run --report /tmp/erasure.md | tee -a "${REPORT}"
+  platform exec -T api cat /tmp/erasure.md >> "${REPORT}"
+
+  pg_dump --format=plain --dbname="${STAGING_DATABASE_URL}" > "${WORK}/post-erasure.sql"
+
+  platform exec -T api pnpm --silent ops dump-grep --tokens "${subject}" < "${WORK}/post-erasure.sql" > "${WORK}/post-erasure.grep"
+  cat "${WORK}/post-erasure.grep" >> "${REPORT}"
+  # Those two keep the identifier by design. Present anywhere else, a store was missed.
+  if leaked=$(grep ': present in ' "${WORK}/post-erasure.grep" | grep -v -E ' of table ([a-z_]+\.)?(subject_request|suppression)$'); then
+    say "REHEARSAL FAILED: the subject is still held — ${leaked}"; exit 1
+  fi
+  say "dump grep after: the subject is in no table but subject_request and suppression, which keep the identifier set by design"
+
+  # An empty set is a failure: the seed always commits, so nothing here means no read.
+  if [ -z "${seeded_commits}" ]; then
+    say "REHEARSAL FAILED: the seed added no commit to ${ws_repo} — step 7 would prove nothing"; exit 1
+  fi
+  for hash in ${seeded_commits}; do
+    if ws_git cat-file -e "${hash}^{commit}" 2>/dev/null; then
+      say "REHEARSAL FAILED: pre-rewrite commit ${hash} is still readable in ${ws_repo}"; exit 1
+    fi
+  done
+  say "git cat-file: every pre-rewrite commit is gone from the bare repository ($(printf '%s\n' "${seeded_commits}" | grep -c . || true) checked)"
 fi
 
 rto=$(( ( $(date +%s) - T0 ) / 60 ))

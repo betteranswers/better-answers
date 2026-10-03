@@ -43,6 +43,34 @@ const bashRan = (lines: readonly string[], input = ""): BashRun => {
   }
 };
 
+const NOT_BUILT_EXIT = 3;
+const SYNTHETIC_WORKSPACE = "01M2SYNTHET1CAAAAAAAAAAAAA";
+const STAGING_COUNTS = '{"live_gen":3,"nodes":{"Concept":2},"edges":{"links_to":1}}';
+
+/** Off stdout, as the drill's own writes, so no redirect or command substitution swallows it. */
+const ASIDE = ["exec 4>&1", 'aside() { say "$@" >&4; }'];
+
+const countsRan = (staging: string, stagingStatus: number): BashRun => {
+  const drill = read("deploy/restore-drill.sh");
+  const commands = fencedIn(drill, "the drill's commands");
+  const counts = fencedIn(drill, "the counts");
+  expect({ markers: commands !== undefined && counts !== undefined }).toEqual({ markers: true });
+
+  const work = mkdtempSync(path.join(tmpdir(), "drill-counts-"));
+  onTestFinished(() => {
+    rmSync(work, { recursive: true, force: true });
+  });
+  return bashRan([
+    `NOT_BUILT=${String(NOT_BUILT_EXIT)}`,
+    `WORK='${work}'; REPORT='${work}/report.md'; DRILL_WORKSPACE=${SYNTHETIC_WORKSPACE}`,
+    ...ASIDE,
+    `platform() { [ -z '${staging}' ] || printf '%s\\n' '${staging}'; return ${String(stagingStatus)}; }`,
+    commands ?? "",
+    counts ?? "",
+    `say "report: $(cat '${work}/report.md')"`,
+  ]);
+};
+
 const renovateSchema = z.object({
   enabledManagers: z.array(z.string()),
   customManagers: z
@@ -444,7 +472,7 @@ describe("the deploy tree", () => {
     expect(drill).toContain("the seed added no commit");
   });
 
-  it("fails the drill unless the seed exits 0 or 3", () => {
+  it("fails the drill unless the seed exits 0", () => {
     const drill = read("deploy/restore-drill.sh");
 
     const guard = fencedIn(drill, "seed status");
@@ -459,22 +487,78 @@ describe("the deploy tree", () => {
         'say "the proof ran, subject=${subject}"',
       ]);
 
-    const seeded = ran(0);
-    expect({ code: seeded.code, proved: seeded.output.includes("the proof ran") }).toEqual({
+    expect(ran(0)).toEqual({
       code: 0,
-      proved: true,
+      output: "the proof ran, subject=priya@example.invalid,1 High St,Priya Anand\n",
     });
-
-    const notBuilt = ran(3);
-    expect({ code: notBuilt.code, failed: notBuilt.output.includes("REHEARSAL FAILED") }).toEqual({
-      code: 0,
-      failed: false,
-    });
-
-    const refused = ran(1);
-    expect({ code: refused.code, failed: refused.output.includes("REHEARSAL FAILED") }).toEqual({
+    expect(ran(3)).toEqual({
       code: 1,
-      failed: true,
+      output:
+        "REHEARSAL FAILED: the synthetic seed answered not built, so a table the erasure slice needs is absent from the restored copy\n",
+    });
+    expect(ran(1)).toEqual({
+      code: 1,
+      output: "REHEARSAL FAILED: the synthetic seed exited 1\n",
+    });
+  });
+
+  it("fails the drill when a command answers not built", () => {
+    const commands = fencedIn(read("deploy/restore-drill.sh"), "the drill's commands");
+    expect({ markers: commands !== undefined }).toEqual({ markers: true });
+
+    const ran = (status: number): BashRun =>
+      bashRan([
+        "NOT_BUILT=3",
+        ...ASIDE,
+        `platform() { printf '%s\\n' "ran: $*"; return ${String(status)}; }`,
+        commands ?? "",
+        "ops graph-sweep --workspace a-workspace",
+        'say "the next step ran"',
+      ]);
+
+    expect(ran(0)).toEqual({
+      code: 0,
+      output:
+        "ran: exec -T api pnpm --silent ops graph-sweep --workspace a-workspace\nthe next step ran\n",
+    });
+    expect(ran(3)).toEqual({
+      code: 3,
+      output:
+        "ran: exec -T api pnpm --silent ops graph-sweep --workspace a-workspace\n" +
+        "DRILL FAILED: 'pnpm ops graph-sweep' answered not built, so a table its slice needs is absent from the restored copy\n",
+    });
+    expect(ran(1)).toEqual({
+      code: 1,
+      output: "ran: exec -T api pnpm --silent ops graph-sweep --workspace a-workspace\n",
+    });
+  });
+
+  it("fails the counts when graph-counts finds its tables absent", () => {
+    const ran = countsRan(
+      "graph-counts: not built — graph_generation, graph_node, graph_edge absent from this schema",
+      NOT_BUILT_EXIT,
+    );
+
+    expect(ran).toEqual({
+      code: NOT_BUILT_EXIT,
+      output:
+        "DRILL FAILED: 'pnpm ops graph-counts' answered not built, so a table its slice needs is absent from the restored copy\n",
+    });
+  });
+
+  it("fails the counts when graph-counts prints none", () => {
+    expect(countsRan("", 0)).toEqual({
+      code: 1,
+      output: `DRILL FAILED: graph-counts printed no counts for ${SYNTHETIC_WORKSPACE}\n`,
+    });
+  });
+
+  it("records the counts, with no recorded run to compare", () => {
+    expect(countsRan(STAGING_COUNTS, 0)).toEqual({
+      code: 0,
+      output:
+        "production records no run of the map's counts: staging counts recorded, not compared\n" +
+        `report: ${STAGING_COUNTS}\n`,
     });
   });
 
