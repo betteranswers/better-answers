@@ -15,6 +15,7 @@ import {
   type PlatformPrincipal,
   type Result,
   type Role,
+  systemClock,
   type UserId,
   ulid,
 } from "../kernel/index.ts";
@@ -24,6 +25,7 @@ import {
   withIdentityRead,
   withIdentityWrite,
 } from "../store/postgres/index.ts";
+import { type Waits, waitsOf } from "./confirm-throttle.ts";
 import { notErasedAt } from "./display-name.ts";
 import { holdThePerson } from "./person-lock.ts";
 import { issuingRecoveryCodes, type RecoveryCodesMade } from "./recovery-codes.ts";
@@ -64,7 +66,11 @@ type Facts = {
   readonly authenticatorId: string | null;
   readonly recoveryCodes: number;
   readonly recoveryCodesMadeAt: Date | null;
+  readonly codesAcknowledged: boolean;
   readonly passkeyOfferDismissed: boolean;
+
+  /** Restored by the operator: setting up a factor waits on the restore code. */
+  readonly restoreRequired: boolean;
 };
 
 type FactsRow = Omit<Facts, "authenticator"> & { readonly verified: boolean | null };
@@ -75,7 +81,9 @@ const FACTS = `
          (SELECT count(*)::int FROM passkey p WHERE p.user_id = u.id) AS passkeys,
          a.id AS "authenticatorId", a.verified,
          codes.held AS "recoveryCodes", codes.made AS "recoveryCodesMadeAt",
-         u.passkey_offer_dismissed_at IS NOT NULL AS "passkeyOfferDismissed"
+         u.recovery_codes_acknowledged AS "codesAcknowledged",
+         u.passkey_offer_dismissed_at IS NOT NULL AS "passkeyOfferDismissed",
+         u.restore_required_at IS NOT NULL AS "restoreRequired"
     FROM "user" u LEFT JOIN authenticator a ON a.user_id = u.id
    CROSS JOIN LATERAL (SELECT count(*)::int AS held, max(r.created_at) AS made
                          FROM recovery_code r WHERE r.user_id = u.id) codes
@@ -94,16 +102,27 @@ export const factsOf = async (tx: Tx, personId: UserId): Promise<Facts | undefin
   return { ...facts, authenticator: stateOf(verified) };
 };
 
-/** Stamps only the person's own session; false, having stamped nothing, for any other. */
-export const stamping = async (
-  tx: Tx,
-  input: SetUpInput & { readonly personId: UserId },
-): Promise<boolean> => {
+type Stamp = Pick<SetUpInput, "sessionId" | "at"> & {
+  readonly personId: UserId;
+  readonly carried?: SetUpInput["carried"];
+};
+
+/**
+ * Stamps only the person's own session; false, having stamped nothing, for any other. With nothing
+ * carried, `LEAST` skips the nulls, so the session keeps its own age.
+ */
+export const stamping = async (tx: Tx, input: Stamp): Promise<boolean> => {
   const stamped = await tx.query(
     `UPDATE session SET second_factor_confirmed_at = $3, pending_since = NULL,
                         created_at = LEAST(created_at, $4), expires_at = LEAST(expires_at, $5)
       WHERE id = $1 AND user_id = $2`,
-    [input.sessionId, input.personId, input.at, input.carried.createdAt, input.carried.expiresAt],
+    [
+      input.sessionId,
+      input.personId,
+      input.at,
+      input.carried?.createdAt ?? null,
+      input.carried?.expiresAt ?? null,
+    ],
   );
   return stamped.rowCount === 1;
 };
@@ -274,42 +293,85 @@ const passkeysOf = async (tx: Tx, personId: UserId): Promise<readonly PasskeyHel
     lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
   }));
 
+type ThisSession = { readonly confirmed: boolean; readonly setupGranted: boolean };
+
 export type SecondFactorHeld = {
   readonly mustHoldOne: boolean;
   readonly passkeys: readonly PasskeyHeld[];
   readonly authenticator: AuthenticatorState;
   /** `madeAt` is an ISO instant, as it crosses the wire. */
   readonly recoveryCodes: { readonly unused: number; readonly madeAt: string } | undefined;
+  readonly codesAcknowledged: boolean;
   readonly passkeyOfferDismissed: boolean;
+  readonly restoreRequired: boolean;
+
+  /** Seconds before each kind of code may be tried again. */
+  readonly waits: Waits;
+
+  /** Only when the read names a session: one the person does not hold is neither. */
+  readonly thisSession: ThisSession | undefined;
 };
 
-const heldOf = (facts: Facts, passkeys: readonly PasskeyHeld[]): SecondFactorHeld => ({
+type Around = Pick<SecondFactorHeld, "passkeys" | "waits" | "thisSession">;
+
+const heldOf = (facts: Facts, around: Around): SecondFactorHeld => ({
   mustHoldOne: facts.mustHoldOne,
-  passkeys,
+  passkeys: around.passkeys,
   authenticator: facts.authenticator,
   recoveryCodes:
     facts.recoveryCodesMadeAt === null
       ? undefined
       : { unused: facts.recoveryCodes, madeAt: facts.recoveryCodesMadeAt.toISOString() },
+  codesAcknowledged: facts.codesAcknowledged,
   passkeyOfferDismissed: facts.passkeyOfferDismissed,
+  restoreRequired: facts.restoreRequired,
+  waits: around.waits,
+  thisSession: around.thisSession,
 });
 
-const reading = async (tx: Tx, personId: UserId): Promise<SecondFactorHeld | undefined> => {
-  const facts = await factsOf(tx, personId);
-  return facts === undefined ? undefined : heldOf(facts, await passkeysOf(tx, personId));
+const THIS_SESSION = `
+  SELECT second_factor_confirmed_at IS NOT NULL AS confirmed,
+         setup_granted_at IS NOT NULL AS "setupGranted"
+    FROM session WHERE id = $1 AND user_id = $2`;
+
+const NEITHER: ThisSession = { confirmed: false, setupGranted: false };
+
+const thisSessionOf = async (tx: Tx, personId: UserId, sessionId: string | undefined) => {
+  if (sessionId === undefined) return undefined;
+  return (await tx.query<ThisSession>(THIS_SESSION, [sessionId, personId])).rows[0] ?? NEITHER;
 };
 
-/** What the person's own Sign-in section shows; nothing in it is a secret. */
+type ReadSecondFactorInput = {
+  readonly personId: string;
+  readonly sessionId?: string;
+  readonly now?: Date;
+};
+
+const reading = async (
+  tx: Tx,
+  personId: UserId,
+  input: ReadSecondFactorInput,
+): Promise<SecondFactorHeld | undefined> => {
+  const facts = await factsOf(tx, personId);
+  if (facts === undefined) return undefined;
+  return heldOf(facts, {
+    passkeys: await passkeysOf(tx, personId),
+    waits: await waitsOf(tx, personId, input.now ?? systemClock().now()),
+    thisSession: await thisSessionOf(tx, personId, input.sessionId),
+  });
+};
+
+/** What the person's own Sign-in section and the confirm screens show; nothing in it is a secret. */
 export const readSecondFactor = async (
   platform: PlatformPrincipal,
   door: PostgresDoor,
-  input: { readonly personId: string },
+  input: ReadSecondFactorInput,
 ): Promise<Result<SecondFactorHeld, WorkspaceRefusal<"malformed" | "person-gone"> | Error>> => {
   const personId = boundarySchemas.user.select.shape.id.safeParse(input.personId);
   if (!personId.success) return err("malformed");
 
   const read = await attempt(() =>
-    withIdentityRead(platform, door, (tx) => reading(tx, personId.data)),
+    withIdentityRead(platform, door, (tx) => reading(tx, personId.data, input)),
   );
   if (!read.ok) return err(read.error);
   return read.value === undefined ? err("person-gone") : ok(read.value);

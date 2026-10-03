@@ -49,6 +49,7 @@ tags:
 
 - a person's own display-name act
 - a person's own second-factor acts: a passkey added, renamed or removed, and an authenticator added or removed (each by its id alone, since a name the person later changes never belongs on an append-only log), and recovery codes issued or used
+- a person's confirm, naming only the kind of factor it used, `passkey` or `authenticator`; an operator's restore code accepted; and their factors replaced after a recovery or restore code, naming the new factor's kind the same way
 - each sign-in, with its method as its one detail: `email_code` for a typed code, `email_link` for the sign-in link, `passkey` for a passkey
 - every operator write
 - an Admin's act that ends a person's grants (ADR 0009)

@@ -182,6 +182,7 @@ const acceptedRows = {
   ],
   passkeyLastUse: [{ passkeyId: PASSKEY_ID, at: NOW }],
   recoveryCode: [{ id: "recovery-code-1", userId: USER_ID, codeHash: "a".repeat(64) }],
+  secondFactorThrottle: [{ userId: USER_ID, kind: "authenticator", failures: 6, waitUntil: NOW }],
   workspaceLastActive: [{ workspaceId: WS_ID, userId: USER_ID, at: NOW }],
   testWorkspaceMark: [{ workspaceId: WS_ID, testingDomain: "journeys.testing.invalid" }],
   mcpCallCounter: [{ workspaceId: WS_ID, tokenId: "jti-1", windowStart: NOW, count: 1 }],
@@ -816,6 +817,7 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "passkey",
         "passkeyLastUse",
         "recoveryCode",
+        "secondFactorThrottle",
         "workspaceLastActive",
         "testWorkspaceMark",
         "mcpCallCounter",
@@ -1319,6 +1321,7 @@ describe("5 — the inferred type is pinned", () => {
         authenticatorEnabled: boolean;
         passkeyOfferDismissedAt: Date | null;
         recoveryCodesAcknowledged: boolean;
+        restoreRequiredAt: Date | null;
       }
     >
   >;
@@ -1356,6 +1359,7 @@ describe("5 — the inferred type is pinned", () => {
         activeWorkspaceId: string | null;
         secondFactorConfirmedAt: Date | null;
         pendingSince: Date | null;
+        setupGrantedAt: Date | null;
       }
     >
   >;

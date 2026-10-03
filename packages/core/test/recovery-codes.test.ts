@@ -2,18 +2,16 @@ import { createHash } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
-import { openPostgres } from "../src/store/postgres/index.ts";
 import {
   acknowledgeRecoveryCodes,
   replaceRecoveryCodes,
   spendRecoveryCode,
 } from "../src/workspaces/index.ts";
 import { bootstrap, seedPerson } from "./platform.ts";
-import { postgresForSuite, whileWritesAreRefused } from "./suite-postgres.ts";
+import { secondFactorSuite } from "./second-factor-suite.ts";
+import { whileWritesAreRefused } from "./suite-postgres.ts";
 
-const db = postgresForSuite();
-
-const door = () => openPostgres(db().runtimePool);
+const { db, door, aSession } = secondFactorSuite();
 
 const RECOVERY_CODE = /^[0-9a-hjkmnp-tv-z]{4}(?:-[0-9a-hjkmnp-tv-z]{4}){3}$/;
 
@@ -31,6 +29,22 @@ const codesFor = async (personId: string, replacing = false): Promise<readonly s
   (await issuedTo(personId, replacing)).recoveryCodes;
 
 const firstOf = (codes: readonly string[]): string => codes[0] ?? "";
+
+/** Each spend from a session of its own, as two devices would send them. */
+const spending = async (personId: string, code: string) =>
+  spendRecoveryCode(bootstrap, door(), {
+    personId,
+    sessionId: await aSession(personId),
+    code,
+    now: MADE_AT,
+  });
+
+const NINE_LEFT = { ok: true, value: { granted: true, unused: 9 } };
+
+const WRONG = {
+  ok: true,
+  value: { granted: false, refusal: "recovery-code-wrong", waitSeconds: 0, noticeDue: false },
+};
 
 const actsOn = async (personId: string) =>
   (
@@ -58,9 +72,7 @@ describe("replacing recovery codes", () => {
     expect(later).toHaveLength(10);
     for (const code of later) expect(code).toMatch(RECOVERY_CODE);
     expect(later.filter((code) => earlier.includes(code))).toEqual([]);
-    expect(
-      await spendRecoveryCode(bootstrap, door(), { personId, code: firstOf(earlier) }),
-    ).toEqual({ ok: false, error: "recovery-code-wrong" });
+    expect(await spending(personId, firstOf(earlier))).toEqual(WRONG);
     expect(await actsOn(personId)).toEqual([
       { act: "people.person.recovery_codes_issued", detail: { replaced: false } },
       { act: "people.person.recovery_codes_issued", detail: { replaced: true } },
@@ -122,10 +134,7 @@ describe("replacing recovery codes", () => {
     expect(await actsOn(personId)).toEqual([
       { act: "people.person.recovery_codes_issued", detail: { replaced: false } },
     ]);
-    expect(await spendRecoveryCode(bootstrap, door(), { personId, code: firstOf(held) })).toEqual({
-      ok: true,
-      value: { unused: 9 },
-    });
+    expect(await spending(personId, firstOf(held))).toEqual(NINE_LEFT);
   });
 
   it("refuses a person nobody holds", async () => {
@@ -152,7 +161,13 @@ describe("each recovery-code act", () => {
     ],
     [
       "spending",
-      () => spendRecoveryCode(bootstrap, door(), { personId: "not-an-id", code: "abcd" }),
+      () =>
+        spendRecoveryCode(bootstrap, door(), {
+          personId: "not-an-id",
+          sessionId: "a-session",
+          code: "abcd",
+          now: MADE_AT,
+        }),
     ],
     [
       "acknowledging",
@@ -181,7 +196,7 @@ describe("each recovery-code act", () => {
     const code = firstOf(await codesFor(personId));
 
     const answered = await whileWritesAreRefused(db().pool, "recovery_code", () =>
-      spendRecoveryCode(bootstrap, door(), { personId, code }),
+      spending(personId, code),
     );
 
     expect(answered).toEqual({ ok: false, error: expect.any(Error) });
@@ -204,11 +219,11 @@ describe("spending a recovery code", () => {
     const personId = await seedPerson(db().pool);
     const code = firstOf(await codesFor(personId));
 
-    const spent = await spendRecoveryCode(bootstrap, door(), { personId, code });
-    const again = await spendRecoveryCode(bootstrap, door(), { personId, code });
+    const spent = await spending(personId, code);
+    const again = await spending(personId, code);
 
-    expect(spent).toEqual({ ok: true, value: { unused: 9 } });
-    expect(again).toEqual({ ok: false, error: "recovery-code-wrong" });
+    expect(spent).toEqual(NINE_LEFT);
+    expect(again).toEqual(WRONG);
     expect((await actsOn(personId)).map((row) => row.act)).toEqual([
       "people.person.recovery_codes_issued",
       "people.person.recovery_code_used",
@@ -220,32 +235,29 @@ describe("spending a recovery code", () => {
     const code = firstOf(await codesFor(personId));
     const typed = ` ${code.replaceAll("-", " - ").toUpperCase()}\t`;
 
-    const spent = await spendRecoveryCode(bootstrap, door(), { personId, code: typed });
+    const spent = await spending(personId, typed);
 
-    expect(spent).toEqual({ ok: true, value: { unused: 9 } });
+    expect(spent).toEqual(NINE_LEFT);
   });
 
   it("lets one of two spends of the same code succeed", async () => {
     const personId = await seedPerson(db().pool);
     const code = firstOf(await codesFor(personId));
 
-    const answers = await Promise.all([
-      spendRecoveryCode(bootstrap, door(), { personId, code }),
-      spendRecoveryCode(bootstrap, door(), { personId, code }),
-    ]);
+    const answers = await Promise.all([spending(personId, code), spending(personId, code)]);
 
-    expect(answers.filter((answer) => answer.ok)).toHaveLength(1);
-    expect(answers).toContainEqual({ ok: false, error: "recovery-code-wrong" });
+    expect(answers).toContainEqual(NINE_LEFT);
+    expect(answers).toContainEqual(WRONG);
   });
 
-  it("refuses another person's code, writing nothing", async () => {
+  it("refuses another person's code, recording nothing", async () => {
     const personId = await seedPerson(db().pool);
     const strangersCode = firstOf(await codesFor(await seedPerson(db().pool)));
     await codesFor(personId);
 
-    const spent = await spendRecoveryCode(bootstrap, door(), { personId, code: strangersCode });
+    const spent = await spending(personId, strangersCode);
 
-    expect(spent).toEqual({ ok: false, error: "recovery-code-wrong" });
+    expect(spent).toEqual(WRONG);
     expect((await actsOn(personId)).map((row) => row.act)).toEqual([
       "people.person.recovery_codes_issued",
     ]);
@@ -259,9 +271,9 @@ describe("spending a recovery code", () => {
     const personId = await seedPerson(db().pool);
     await codesFor(personId);
 
-    const spent = await spendRecoveryCode(bootstrap, door(), { personId, code });
+    const spent = await spending(personId, code);
 
-    expect(spent).toEqual({ ok: false, error: "recovery-code-wrong" });
+    expect(spent).toEqual(WRONG);
   });
 });
 

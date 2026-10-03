@@ -46,6 +46,9 @@ const asMinted = (typed: string): string => typed.toLowerCase().replaceAll(/[\s-
 
 const hashOf = (code: string): string => createHash("sha256").update(code).digest("hex");
 
+/** A typed recovery or restore code's stored form: however it was spaced or cased, one hash. */
+export const hashOfTyped = (typed: string): string => hashOf(asMinted(typed));
+
 export type RecoveryCodesMade = {
   readonly recoveryCodes: readonly string[];
 
@@ -75,7 +78,7 @@ export const issuingRecoveryCodes = async (
   await tx.query(
     `INSERT INTO recovery_code (id, user_id, code_hash, created_at)
      SELECT id, $2, code_hash, $4 FROM unnest($1::text[], $3::text[]) AS minted (id, code_hash)`,
-    [codes.map(() => ulid()), personId, codes.map((code) => hashOf(asMinted(code))), now],
+    [codes.map(() => ulid()), personId, codes.map(hashOfTyped), now],
   );
   await tx.query('UPDATE "user" SET recovery_codes_acknowledged = false WHERE id = $1', [personId]);
   await recordFor(platform, tx, {
@@ -134,52 +137,34 @@ export const replaceRecoveryCodes = async (
   return issued.value;
 };
 
-type SpendRecoveryCodeInput = RecoveryCodesInput & { readonly code: string };
-
-export type SpendRecoveryCodeRefusal = WorkspaceRefusal<"malformed" | "recovery-code-wrong">;
-
 /**
- * A conditional delete spends the code, so of two spends at once only one finds it. Only a stored
- * hash matches, so anything else typed is wrong in the same word.
+ * A conditional delete spends the code, so of two spends at once only one finds it. Answers the
+ * codes left, or nothing when no stored hash matches what was typed.
  */
-export const spendRecoveryCode = async (
+export const spendingARecoveryCode = async (
   platform: PlatformPrincipal,
-  door: PostgresDoor,
-  input: SpendRecoveryCodeInput,
-): Promise<Result<{ readonly unused: number }, SpendRecoveryCodeRefusal | Error>> => {
-  const personId = boundarySchemas.user.select.shape.id.safeParse(input.personId);
-  if (!personId.success) return err("malformed");
-  const code = asMinted(input.code);
-
-  const spent = await attempt(() =>
-    withIdentityWrite(
-      platform,
-      door,
-      async (tx): Promise<Result<number, "recovery-code-wrong">> => {
-        const found = await tx.query(
-          "DELETE FROM recovery_code WHERE user_id = $1 AND code_hash = $2",
-          [personId.data, hashOf(code)],
-        );
-        if (found.rowCount !== 1) return err("recovery-code-wrong");
-        await recordFor(platform, tx, {
-          id: ulid(),
-          actor: actorIdOfPerson(personId.data),
-          act: RECOVERY_CODE_ACTS.used,
-          subjectId: personId.data,
-          detail: {},
-        });
-        const left = await tx.query<{ unused: number }>(
-          "SELECT count(*)::int AS unused FROM recovery_code WHERE user_id = $1",
-          [personId.data],
-        );
-        // Stryker disable next-line OptionalChaining: a count(*) with no GROUP BY always answers one row
-        return ok(left.rows[0]?.unused ?? 0);
-      },
-    ),
+  tx: Tx,
+  personId: UserId,
+  typed: string,
+): Promise<number | undefined> => {
+  const found = await tx.query("DELETE FROM recovery_code WHERE user_id = $1 AND code_hash = $2", [
+    personId,
+    hashOfTyped(typed),
+  ]);
+  if (found.rowCount !== 1) return undefined;
+  await recordFor(platform, tx, {
+    id: ulid(),
+    actor: actorIdOfPerson(personId),
+    act: RECOVERY_CODE_ACTS.used,
+    subjectId: personId,
+    detail: {},
+  });
+  const left = await tx.query<{ unused: number }>(
+    "SELECT count(*)::int AS unused FROM recovery_code WHERE user_id = $1",
+    [personId],
   );
-  if (!spent.ok) return err(spent.error);
-  if (!spent.value.ok) return err(spent.value.error);
-  return ok({ unused: spent.value.value });
+  // Stryker disable next-line OptionalChaining: a count(*) with no GROUP BY always answers one row
+  return left.rows[0]?.unused ?? 0;
 };
 
 /** The set the person saved, named by the instant its issue answered. */

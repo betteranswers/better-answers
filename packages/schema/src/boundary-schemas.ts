@@ -77,6 +77,7 @@ import {
   passkeyLastUse,
   rateLimit,
   recoveryCode,
+  secondFactorThrottle,
   session,
   user,
   verification,
@@ -977,6 +978,7 @@ export const boundarySchemas = {
   passkey: plain(passkey),
   passkeyLastUse: plain(passkeyLastUse),
   recoveryCode: plain(recoveryCode),
+  secondFactorThrottle: plain(secondFactorThrottle),
   workspaceLastActive: plain(workspaceLastActive),
   testWorkspaceMark: {
     table: testWorkspaceMark,

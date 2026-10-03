@@ -24,6 +24,8 @@ import {
   identityRowsFor,
   lastActiveIn,
   otherCodesFor,
+  parkedSecretFor,
+  restoreCodeFor,
   secondFactorRowsFor,
   signInLinkFor,
   verificationCodeFor,
@@ -98,6 +100,7 @@ const SECOND_FACTOR_FAMILIES: ReadonlySet<ErasureFamily> = new Set([
   "identity-passkey",
   "identity-authenticator",
   "identity-recovery-code",
+  "identity-confirm-failures",
   "identity-last-active",
 ]);
 
@@ -150,6 +153,7 @@ describe("the erasure map's union", () => {
       "identity-passkey",
       "identity-authenticator",
       "identity-recovery-code",
+      "identity-confirm-failures",
       "identity-last-active",
       "source-document",
     ]);
@@ -174,11 +178,12 @@ describe("the erasure map's union", () => {
       "identity-passkey": findsNothing,
       "identity-authenticator": findsNothing,
       "identity-recovery-code": findsNothing,
+      "identity-confirm-failures": findsNothing,
       "identity-last-active": findsNothing,
     };
 
-    expect(Object.keys(withoutADocumentFinder)).toHaveLength(12);
-    expect(ERASURE_FAMILIES).toHaveLength(13);
+    expect(Object.keys(withoutADocumentFinder)).toHaveLength(13);
+    expect(ERASURE_FAMILIES).toHaveLength(14);
   });
 });
 
@@ -216,6 +221,7 @@ describe("the erasure map for a member", () => {
       { family: "identity-passkey", categories: ["sign-in", "device"], locations: [] },
       { family: "identity-authenticator", categories: ["sign-in"], locations: [] },
       { family: "identity-recovery-code", categories: ["sign-in"], locations: [] },
+      { family: "identity-confirm-failures", categories: ["sign-in"], locations: [] },
       { family: "identity-last-active", categories: ["sign-in"], locations: [] },
       { family: "source-document", categories: ["document-text"], locations: [] },
     ]);
@@ -232,7 +238,24 @@ describe("the erasure map for a member", () => {
       ["identity-passkey", [factors.passkeyId, `${factors.passkeyId} (last use)`]],
       ["identity-authenticator", [factors.authenticatorId]],
       ["identity-recovery-code", factors.recoveryCodeIds.toSorted(byCodeUnit)],
+      ["identity-confirm-failures", ["authenticator", "restore-code"]],
       ["identity-last-active", [held.scenario.workspaceId]],
+    ]);
+  });
+
+  it("names their restore code and a session's parked secret", async () => {
+    const held = await workspaceHoldingAMember();
+    const restoreCode = await restoreCodeFor(db().pool, held.email, {
+      hash: "a".repeat(64),
+      expiresAt: new Date("2026-10-03T12:00:00.000Z"),
+    });
+    const parkedSecret = await parkedSecretFor(db().pool, held.sessionId);
+
+    const map = await mapOf(held.scenario, held.request);
+
+    expect(locationsOf(map).find(([family]) => family === "identity-verification")).toEqual([
+      "identity-verification",
+      [held.verificationId, restoreCode, parkedSecret].toSorted(byCodeUnit),
     ]);
   });
 
@@ -271,6 +294,7 @@ describe("the erasure map for a subject with no user row", () => {
       ["identity-passkey", []],
       ["identity-authenticator", []],
       ["identity-recovery-code", []],
+      ["identity-confirm-failures", []],
       ["identity-last-active", []],
       ["source-document", []],
     ]);
@@ -332,6 +356,7 @@ describe("the erasure map in one workspace's scope", () => {
       ["identity-passkey", []],
       ["identity-authenticator", []],
       ["identity-recovery-code", []],
+      ["identity-confirm-failures", []],
       ["identity-last-active", [here.workspaceId]],
       ["source-document", []],
     ]);
@@ -619,7 +644,7 @@ describe("the access answer", () => {
     });
     const map = await mapOf(scenario, request);
 
-    expect(map).toHaveLength(13);
+    expect(map).toHaveLength(14);
     expect(accessAnswerOf(map)).toEqual({ categories: [], locations: [] });
   });
 });

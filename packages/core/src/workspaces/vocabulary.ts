@@ -8,6 +8,7 @@ export const WORKSPACE_REFUSALS = declareRefusals("workspaces", {
   // for something the reader never named.
   "workspace-gone": "unauthenticated",
   "person-gone": "unauthenticated",
+  "session-gone": "unauthenticated",
 
   "slug-taken": "conflict",
   "workspace-exists": "conflict",
@@ -26,6 +27,11 @@ export const WORKSPACE_REFUSALS = declareRefusals("workspaces", {
   "no-authenticator": "absent",
   "no-passkey": "absent",
   "recovery-code-wrong": "absent",
+  "restore-code-wrong": "absent",
+  "passkey-not-yours": "forbidden",
+
+  // Only the session that spent a recovery code or accepted a restore code may replace the factors.
+  "setup-not-granted": "precondition",
 
   "passkey-name-empty": "malformed",
   "passkey-name-too-long": "malformed",

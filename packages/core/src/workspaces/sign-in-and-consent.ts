@@ -30,16 +30,26 @@ export const SIGN_IN_CODE_PREFIX = "sign-in-otp-";
 /** The row a sign-in link keeps beside its code, keyed the same way. */
 export const SIGN_IN_LINK_PREFIX = "sign-in-link-";
 
+/** The operator's restore code, keyed the same way: its hash, never the code, lives in the row. */
+export const OPERATOR_RESTORE_PREFIX = "operator-restore-";
+
 /** No prefix starts another, so no address names a stranger's row. Verify and reset rows exist too. */
 export const VERIFICATION_PREFIXES = [
   SIGN_IN_CODE_PREFIX,
   SIGN_IN_LINK_PREFIX,
+  OPERATOR_RESTORE_PREFIX,
   "email-verification-otp-",
   "forget-password-otp-",
 ] as const;
 
 export const verificationIdentifiersOf = (email: string): readonly string[] =>
   VERIFICATION_PREFIXES.map((prefix) => `${prefix}${email.toLowerCase()}`);
+
+/** A replacement setup's sealed secret, parked under the session that started it. */
+export const AUTHENTICATOR_SECRET_PREFIX = "second-factor-enrol:";
+
+/** Rows keyed by a session id rather than an address: erasure reaches them through the person's sessions. */
+export const SESSION_VERIFICATION_PREFIXES = [AUTHENTICATOR_SECRET_PREFIX] as const;
 
 const CONSENT_ACTS = declareActs("people", {
   consented: act("people.client.consented", {}),

@@ -36,6 +36,7 @@ export const TABLE_OWNERS = {
   "public.passkey": IDENTITY_PROVIDER,
   "public.passkey_last_use": IDENTITY_PROVIDER,
   "public.recovery_code": IDENTITY_PROVIDER,
+  "public.second_factor_throttle": IDENTITY_PROVIDER,
 
   "public.ingress_counter": POSTGRES_DOOR,
   "public.mcp_call_counter": POSTGRES_DOOR,
@@ -220,6 +221,13 @@ export const CROSS_OWNER_TABLE_ACCESS = [
     access: "write",
     reason:
       "The recovery codes stand in for the person's second factor, so they go with it on the last membership and stay with it otherwise.",
+  },
+  {
+    table: "public.second_factor_throttle",
+    by: "erasure",
+    access: "write",
+    reason:
+      "A person's failed confirms are a record of their sign-in, kept across every workspace, so they go with the second factor on the last membership and stay with it otherwise.",
   },
   {
     table: "public.workspace_last_active",

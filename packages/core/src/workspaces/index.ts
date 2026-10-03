@@ -70,8 +70,18 @@ export {
   acknowledgeRecoveryCodesInput,
   replaceRecoveryCodes,
   replaceRecoveryCodesInput,
-  spendRecoveryCode,
 } from "./recovery-codes.ts";
+export { countFailedConfirm, readConfirmWait } from "./confirm-throttle.ts";
+export {
+  acceptRestoreCode,
+  confirmByAuthenticator,
+  confirmByPasskey,
+  parkAuthenticatorSecret,
+  readParkedAuthenticatorSecret,
+  replaceFactorsByAuthenticator,
+  replaceFactorsByPasskey,
+  spendRecoveryCode,
+} from "./confirming.ts";
 export {
   readSecondFactor,
   recordAuthenticatorSetUp,
@@ -80,6 +90,7 @@ export {
 export {
   recordConsent,
   recordSignIn,
+  SESSION_VERIFICATION_PREFIXES,
   SIGN_IN_CODE_PREFIX,
   SIGN_IN_LINK_PREFIX,
   VERIFICATION_PREFIXES,

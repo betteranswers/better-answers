@@ -38,6 +38,11 @@ const SIGN_IN_METHODS = ["email_code", "email_link", "passkey"] as const;
 
 export type SignInMethod = (typeof SIGN_IN_METHODS)[number];
 
+/** The two kinds of second factor a person can confirm with or set up. */
+const SECOND_FACTORS = ["passkey", "authenticator"] as const;
+
+export type SecondFactor = (typeof SECOND_FACTORS)[number];
+
 const isId = (value: DetailValue) => typeof value === "string" && ULID.test(value);
 const isFlag = (value: DetailValue) => typeof value === "boolean";
 const isIri = (value: DetailValue) => typeof value === "string" && IRI.test(value);
@@ -62,6 +67,8 @@ export const DETAIL_KINDS = {
   grants: (value: DetailValue) => z.array(endedGrant).safeParse(value).success,
   signInMethod: (value: DetailValue) =>
     typeof value === "string" && SIGN_IN_METHODS.some((method) => method === value),
+  secondFactor: (value: DetailValue) =>
+    typeof value === "string" && SECOND_FACTORS.some((factor) => factor === value),
 } as const;
 
 export type DetailKind = keyof typeof DETAIL_KINDS;
@@ -82,7 +89,9 @@ type DetailValueOf<K extends DetailKind> = K extends "role"
         ? readonly EndedGrant[]
         : K extends "signInMethod"
           ? SignInMethod
-          : string;
+          : K extends "secondFactor"
+            ? SecondFactor
+            : string;
 
 export type DetailOf<Shape extends DetailShape> = {
   readonly [
