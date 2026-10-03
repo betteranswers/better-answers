@@ -95,7 +95,7 @@ the side that counts. Read the numbers off those files rather than from here.
 ## The harness's acts
 
 State is built through the api's harness over HTTP, from `apps/web/e2e/harness.ts`, using the
-`request` fixture. Nothing writes a row itself and nothing sets a cookie from outside. Seventeen acts
+`request` fixture. Nothing writes a row itself and nothing sets a cookie from outside. Eighteen acts
 call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources two from
 `apps/api/tests/harness-sources.ts` and the People three from `apps/api/tests/harness-people.ts`:
 
@@ -110,6 +110,7 @@ call `/__harness`, which `apps/api/tests/harness-control.ts` mounts, the Sources
 | `invite` | A waiting invitation to an address at a named role, as the invite act leaves it, with no email sent; or one accepted or cancelled, or with its expiry moved into the past |
 | `ageTheSignIn` | Moves every session a person holds to a sign-in 61 minutes ago, behind the api's back — how a spec meets `sign-in-too-old` without waiting an hour |
 | `ageThePendingHour` | Moves the pending clock of every session a person holds to an hour and a minute ago, behind the api's back — how a spec meets a sign-in that ended unconfirmed without waiting the hour |
+| `ageTheCode` | Moves the expiry of the code sent to an address into the past — how a spec meets an expired code without waiting out its lifetime |
 | `withAnAuthenticator` | Writes an authenticator for an address straight to the store, sealed as the library seals one, spending no emailed code and sending no notice, and answers the key a spec makes codes from with `authenticatorCodeAt`. A second ask answers the same key. It also issues ten recovery codes, marked saved, as a first setup leaves an Admin. `enrolledWith` is the same act answering those codes too, or issuing none with `"none"`, as someone just made an Admin holds |
 | `restored` | The platform operator's restore, through the ops command's own act and principal: the person's factors, recovery codes and sessions end, and a restore code that expires in 24 hours is answered. No notice is sent, so a code read back afterwards is still the sign-in's |
 | `seedRoutes` | The routes a workspace has chosen; a purpose left out of the list has no route, which the screen must show rather than omit |
@@ -278,8 +279,8 @@ pnpm --filter @better-answers/web exec playwright test e2e/routes.spec.ts -g "la
 pnpm --filter @better-answers/web exec playwright test --list
 ```
 
-This workspace's `check` runs lint, types, the vitest suite and then the whole browser suite, so a
-spec left broken fails `check:web` and the root `check` with it.
+This workspace's `check` runs types, the vitest suite and then the whole browser suite, so a
+spec left broken fails `check:web` and the root `check` with it. Lint is the root's `check:gates`.
 
 `test.only` is allowed while debugging and refused under CI by `forbidOnly`: the
 specs import `test` from the fixture module, so oxlint's vitest rules never see them and this is

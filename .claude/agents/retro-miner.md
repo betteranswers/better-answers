@@ -42,7 +42,7 @@ id: BA-NNN
 date:
 ---
 
-# {T-NNN}: {task-slug}
+# {BA-NNN}: {task-slug}
 
 ## Bugs discovered
 

@@ -52,27 +52,29 @@ Two modes:
 ## JS/TS recipe (StrykerJS + Vitest)
 
 Reference implementations in `references/` (working configs, battle-tested):
-- `references/stryker.config.json` — copy and update `mutate` per PR
+- `references/stryker.config.json` — a starting config for a workspace that has none; `apps/api` and `packages/core` already keep `stryker.config.mjs`
 - `references/vitest.stryker.config.mts` — the isolated unit-only runner config
 
 ```bash
 pnpm add -D @stryker-mutator/core @stryker-mutator/vitest-runner
 ```
 
-Scope `mutate` to the PR's changed logic files
-(`git diff --name-only origin/main... -- 'src/**/*.ts' | grep -v test`).
+Scope a run to the PR's changed logic files with `--mutate` after the script
+(`pnpm --filter <workspace> run mutation --mutate '<files>'`; candidates from
+`git diff --name-only origin/main... -- 'src/**/*.ts' | grep -v test`), never by
+editing the config's `mutate`, which the nightly shards read.
 Skip files that are mostly HTML/CSS template strings — string mutants
 there are noise; use Stryker's `"file.ts:120-160"` line-range syntax to
 target just the logic (it works, and it's how to mutate one function
 inside a big route file).
 
 Run the workspace's `mutation` script, `pnpm --filter <workspace> run
-mutation` (flags after it reach Stryker); the HTML report lands in
-`reports/mutation/`.
+mutation` (flags after it reach Stryker); the JSON report lands in
+`reports/mutation/mutation.json`.
 `incremental` caches verdicts so re-runs after adding tests only re-test
 affected mutants — but static mutants (top-level `const` initializers) can
 stay stale in the cache; do a fresh run (delete
-`reports/stryker-incremental.json`) before quoting final numbers.
+`reports/mutation/stryker-incremental.json`) before quoting final numbers.
 
 Known sharp edges (hit in practice):
 - **pnpm**: Stryker core can't auto-discover runner plugins; add
@@ -86,8 +88,8 @@ Known sharp edges (hit in practice):
   `ignorePatterns`, or sandboxes balloon and tests double-run.
 - Add package scripts so runs/cleanup are one approvable command, e.g.
   `"mutation": "node ./node_modules/@stryker-mutator/core/bin/stryker.js
-  run"`, `"clean:mutation": "rm -rf .stryker-tmp reports/mutation
-  reports/stryker-incremental.json"`. Start Stryker and vitest through
+  run"`, `"clean:mutation": "rm -rf reports/mutation"` (this repository's temp dir
+  and incremental file both live there). Start Stryker and vitest through
   `node <entry>`, never `npx`, `pnpm exec` or a bare `stryker`: on macOS a
   process tree rooted in a `.bin` shim pays a policy check on every spawn.
 
@@ -130,13 +132,13 @@ Work the survived list; the score is secondary.
 3. **Timeouts count as killed** (the mutant broke termination — tests caught it).
 
 Don't chase a 100% score; a handful of annotated equivalents is normal.
-Gate CI (`thresholds.break`) only after a suite has a stable baseline, and
-only on the scoped files, or the gate becomes noise.
+Never gate CI on the score (`thresholds.break` stays `null`): a survivor the
+nightly summary newly names is a task, and a falling score is not a failed build.
 
 ## Repo hygiene
 
-- Keep `stryker.config.json` in the repo after first use (update `mutate`
-  per PR, or drive it from the git diff); gitignore `reports/` and
-  `.stryker-tmp/`.
+- Leave each workspace's `stryker.config.mjs` `mutate` as it is
+  (`scripts/mutation-shards.mjs` slices the nightly run from it) and scope a
+  PR's run with `--mutate`. `reports/` is git-ignored.
 - Record the first run's survived-mutant triage in the PR description —
   it's the evidence the refactor's tests mean something.

@@ -51,7 +51,7 @@ Read commands, versions and scripts from each workspace's `package.json` or `pyp
 - `resend` and `email-best-practices`, vendored from Resend, for its sending limits, deliverability and webhooks. The api sends through Resend's SMTP relay with nodemailer (`apps/api/src/smtp.ts`), not its SDK, so check any of their samples against the code before copying it.
 - `/c4-architecture` when an architecture review has moved the shape and the diagrams must say so.
 
-Other skills live beside the code that uses them most, such as `apps/worker/.claude/skills/` and `apps/web/.claude/skills/`. If a task has a skill, use it for best practice. For example, coolify and hono for deployment, cocoindex for the worker and its pipeline, and better-auth for authentication.
+Other skills live beside the code that uses them most, such as `apps/worker/.claude/skills/` and `apps/web/.claude/skills/`. If a task has a skill, use it for best practice: for example, hono for the api's routes and middleware, cocoindex for the worker and its pipeline, and better-auth for authentication. Production deploys only through `release.yml` (ADR 0022), and the procedure, rollback included, is in `docs/operations/RUNBOOK.md` and `docs/operations/CI.md`; the coolify skills describe Coolify itself, not this release path.
 
 ## Agent skills
 
@@ -139,7 +139,7 @@ Always use jDocMunch-MCP tools for documentation navigation. Never fall back to 
 **Exception:** Use `Read` when you need exact line numbers for `Edit`.
 
 **Start any session:**
-1. `doc_list_repos` — check what's indexed. If your docs aren't there: `index_local { "path": "." }`
+1. `doc_resolve_repo` on `.` — check these docs are indexed; from a worktree it finds the worktree's own index (*From a worktree, two indexes*, above). If they aren't: `index_local { "path": "." }`
 
 **Finding content:**
 - keyword/topic search -> `search_sections` (returns summaries only)
@@ -163,7 +163,7 @@ This project is indexed by GitNexus as **better-answers**. Use the GitNexus MCP 
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner.
 
-GitNexus is a tool to reach for, not a gate: CI's `check` and the two reviews are the gates.
+GitNexus is a tool to reach for, not a gate: CI's `check` and the two reviews are the gates. Where a `gitnexus-*` skill says otherwise, this section wins: `impact` warns on HIGH or CRITICAL and never stops an edit, and from a worktree `rename` stays a dry run.
 
 ### Use it for
 
