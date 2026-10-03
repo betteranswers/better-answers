@@ -16,13 +16,13 @@ deepened: 2026-10-02
 - **Objective:** every release to production proves, by signing in as each workspace role, that the signed-in product works as deployed, and it does so without slowing how fast changes land.
 - **Means:** a small set of Playwright journeys runs in the nightly release run against a test workspace in production, signing in through a test inbox of its own, first reporting and then deciding the tag (KTD1, KTD2, KTD3, KTD12).
 - **Product authority:** the owner, through Linear BA-34. The decisions below were settled with the owner on 02/10/2026, and the test inbox's form on 03/10/2026 (KTD3); BA-34's original acceptance criteria give way to this contract where the two differ (Scope Boundaries).
-- **Open blockers:** none. R8, R9 and R16 are deferred to follow-up work with named triggers (Scope Boundaries).
+- **Open blockers:** none. R9 ships inside BA-28's U10 (KTD21); R8 is U11 and U12, which start once that U10 is on `main`; R16 is BA-48 (Scope Boundaries).
 - **Stop conditions:**
   - The edge refuses a browser from GitHub's runners: stop, and put the choice to the owner, because the zone's bot setting cannot be bypassed by a rule.
   - A settled decision proves unworkable in practice: stop and report it rather than work around it.
   - A unit would edit `apps/api/src/smtp.ts`: stop, because the people-invitations work owns that file.
   - Any file in the repository would name the testing domain, the Cloudflare account, or the test inbox's URL: stop, because those are estate values (KTD20).
-- **Execution profile:** `ce-work` builds the units; each change lands through the merge queue under CI's `check`. The owner carries the steps on U8's runbook page, as U10 rewrites it: the testing zone and its Email Routing, the test inbox's deploy and token, the secrets, the healthchecks check, running the fixture command, the proof dispatch, and switching the journeys from report to gate.
+- **Execution profile:** `ce-work` builds the units; each change lands through the merge queue under CI's `check`. The owner carries the steps on U8's runbook page, as U10 rewrites it: the testing zone and its Email Routing, the test inbox's deploy and token, the secrets, the healthchecks check, running the fixture command, the proof dispatch, and switching the journeys from report to gate. For R8 the owner also approves, at the time, the one-time registration of the test Viewer's passkey against production, run from U11's branch before U11 and U12 merge, then proves the passkey after the merge (U12).
 
 ---
 
@@ -193,9 +193,8 @@ flowchart TD
 #### Deferred to Follow-Up Work
 
 - **R16, automatic rollback.** Its own Linear issue, to land before the first client uses the platform. The flow analysis found that a safe version needs: the rollback inside the failed run rather than a dispatched release (a dispatch tags `main`'s head and needs `actions: write`); a rejected marker the nightly gate skips; the migration baseline taken from the commit the live digests were built from, with a check that cannot run treated as a migration; no rollback from a run that is itself a rollback; and a failure at the sign-in step only alerts, because anyone who knows a test address can rotate its code.
-- **R8, passkey journeys.** After BA-28's U6. Playwright 1.63's `context.credentials` can seed a known passkey; a credential re-added each run keeps its stored sign count, which the server may refuse.
 - **ADR 0027 and MIT-0.** Its licence list names MIT but not MIT-0, while `apps/api` already ships `nodemailer` (MIT-0) and U10's `mailauth` and `mailparser` pull it in too. The owner decides whether the list names MIT-0; this work adds no licence the repository does not already ship.
-- **R9, the test Admin's second factor.** Must be enrolled, and its secret stored, before BA-28's U10 lands, or U10's first nightly turns the Admin journey red. The sign-in helper (U4) already absorbs a confirm step.
+- **R9, the test Admin's second factor.** Ships inside BA-28's U10, with the gate that needs it (KTD21). The owner enrolled the test Admin's authenticator and passkey, and set `JOURNEYS_ADMIN_AUTHENTICATOR_KEY`, on 03/10/2026.
 
 ### Dependencies / Assumptions
 
@@ -228,6 +227,7 @@ flowchart TD
 - Cloudflare Email Service (the Email Routing docs moved there in 2026): the email handler and `ForwardableEmailMessage` (https://developers.cloudflare.com/email-service/api/route-emails/email-handler/), what Email Routing rejects (https://developers.cloudflare.com/email-service/reference/postmaster/), the catch-all and its apex-only rule (https://developers.cloudflare.com/email-service/configuration/email-routing-addresses/), and the free plan's limits, including the email handler's share of the 10 ms CPU limit (https://developers.cloudflare.com/email-service/platform/limits/, https://developers.cloudflare.com/workers/platform/limits/).
 - cloudflare/workerd#6740 (open): a catch-all-to-Worker message carried no `Authentication-Results`, `Received` or `DKIM-Signature` in `message.headers`; whether `message.raw` keeps them is undocumented, which is why U9 opens with a spike.
 - D1's consistency without the Sessions API and its free-plan limits (https://developers.cloudflare.com/d1/best-practices/read-replication/, https://developers.cloudflare.com/d1/platform/limits/); KV's "60 seconds or more" to show a write (https://developers.cloudflare.com/kv/concepts/how-kv-works/).
+- For U11 and U12, read from the installed packages on 03/10/2026: `@simplewebauthn/server` 13.3.3's `verifyAuthenticationResponse` refuses a count that does not exceed the stored one, and `@better-auth/passkey` 1.7.5 and `apps/api/src/auth/confirm.ts` store the new count after each sign-in; `playwright-core` 1.63.0's `context.credentials` creates every credential at count zero; Chromium's DevTools `WebAuthn.addCredential` and `getCredentials` carry the private key, user handle and sign count. The browser suite's `apps/web/e2e/virtual-authenticator.ts` and `apps/web/e2e/passkeys.spec.ts` already drive the Account page and autofill sign-in this way. `apps/web/src/features/auth/passkey-hooks.ts` arms autofill when the email step mounts, so a held resident credential signs in on landing.
 - `mailauth` 7.1.0 (MIT) and `mailparser` 3.9.33 (MIT), read from npm on 03/10/2026. Both depend on `nodemailer`, which is MIT-0 and already a direct dependency of `apps/api`, so they add no licence the repository does not already ship; ADR 0027's list names MIT but not MIT-0.
 
 ---
@@ -242,6 +242,7 @@ flowchart TD
 - Deferred: the build of R8, R9 and R16 (Deferred to Follow-Up Work). Outstanding Questions resolved into KTD3 to KTD9.
 - R19's 429 half already exists in `apps/web/e2e/sign-in.spec.ts`; U2 adds the expired code.
 - Changed on 03/10/2026, by the owner's decision: KTD3's test inbox becomes a Cloudflare Email Worker on a testing domain of its own. No requirement changes; R5 and R7 hold as written. KTD4 now cites KTD19 for how a message's authentication is judged, and KTD18 to KTD20 and units U9 and U10 are added before U6.
+- Changed later on 03/10/2026, by the owner's decisions: R9 ships inside BA-28's U10 rather than as a unit here (KTD21), and R8 is planned as U11 and U12 (KTD22 to KTD25). No requirement text changes.
 
 ### Key Technical Decisions
 
@@ -279,6 +280,11 @@ flowchart TD
   - **The deploy credential.** The owner runs `wrangler` with a Cloudflare API token scoped to the account's Workers Scripts and D1 edit permissions, plus only the read permissions `wrangler` asks for, and no zone permission, passed as `CLOUDFLARE_API_TOKEN` for each run and kept in the password manager. Never `wrangler login`: its default grant can write Worker routes across the account, the product's zone included. The narrow token still reaches one thing on the product's zone: Cloudflare accepts the account's Workers Scripts edit alone for attaching a Worker to a custom domain on any zone in the account, so the token is held like a credential to the product's hostnames, and page 13's leak bullet checks the account's Worker domains. A Cloudflare account of the testing zone's own would remove that reach; it is the owner's call.
   - **Nothing private in the repository.** Its committed config names no domain, route, zone or account. The catch-all is bound to the Worker in the dashboard, and the Worker answers on its `workers.dev` hostname. Its URL reaches the journeys as the `production` secret `JOURNEYS_INBOX_URL`, read in one place, `apps/web/journeys/fixtures.ts`, and a missing one is could-not-run naming the setting.
   - Governs R3, R7.
+- KTD21. **R9 ships inside BA-28's U10.** U10's pull request makes the Admin journey confirm with an authenticator code computed from `JOURNEYS_ADMIN_AUTHENTICATOR_KEY` after the email code, and reads a missing or unparseable key as could-not-run. It carries the confirm step and the key's parse in the journeys, the key in `release.yml`'s `workflow_call` secrets and on the journeys step's env alone with its pins in `release-job.test.ts`, and the key's entries in SECRETS.md and page 13. BA-34 reviews those commits against KTD15 and KTD24's split between the release and the ground. (session-settled: user-directed — chosen over BA-34 owning R9 while U10 waits unmerged: the confirm step lands with the gate that needs it, so no night runs the gate without it, and one session edits those files.) Governs R9.
+- KTD22. **The passkey is re-added each run through Chromium's DevTools protocol, with a sign count from the clock.** The Viewer's page gets a virtual authenticator before its first navigation: ctap2, internal, resident keys, user verification held and given, presence simulated. The stored credential is added as a resident one, its rpId the host of `PUBLIC_URL`, its sign count the run's start in epoch seconds. The server refuses an assertion whose count does not exceed the one it stored (`@simplewebauthn/server` 13.3.3, `verifyAuthenticationResponse`), and Playwright's `context.credentials` starts every credential at zero, so a fixed count would sign in once and fail every night after. Once the passkey sign-in answers, the credential is cleared from the authenticator: the sign-in screen re-arms autofill, so a held credential would sign the Viewer straight back in after the journey's sign-out. The count rule is a one-way door, since the stored count only rises, so a browser-suite spec pins the re-add behaviour and a Playwright or Chromium bump that changes it fails `check` rather than a night. Governs R8.
+- KTD23. **The test Viewer signs in by passkey; the Admin and the Editor keep the email code.** The Viewer holds the least if its key leaks. An Admin's passkey sign-in counts as both factors and would skip the confirm step R9 proves, and the Editor keeps R7's email path proven on a member's role. The credential is two `production` secrets, each a single line in the encoding the protocol returns: `JOURNEYS_VIEWER_PASSKEY_KEY`, the private key alone, and `JOURNEYS_VIEWER_PASSKEY_ID`, the credential id and the user handle. GitHub redacts a secret's exact value from logs and advises against structured values, so the key is never part of a larger string. The rpId is never stored. The Viewer's address stays a secret for the fixture check and the by-hand run. (session-settled: user-approved — chosen over the Editor or the Admin.) Governs R8, R10.
+- KTD24. **A refused passkey is the release's; a missing or removed one is the ground's.** A missing or malformed passkey secret is could-not-run at the preflight, naming the setting and never its value. The edge's refusals, a credential the product does not know (it was removed from the account), and a ceremony the virtual authenticator did not answer are could-not-run. The SPA swallows a failed options request and a device refusal alike, so the journey watches the sign-in options answer and the authenticator's assertion itself: options that fail, or name an rpId other than `PUBLIC_URL`'s host, are the release's. Any other refusal, or no answer, is `fail`: a release whose passkey party no longer matches its own origin is what the journey exists to catch, and the clock-derived count rules out the counter. A `fail` straight after the credential was replaced is the credential's, and page 13 says its `rejected/` tag is deleted once it is fixed. (session-settled: user-approved — chosen over reading every passkey refusal as could-not-run.) Governs R8, R14, R23.
+- KTD25. **The credential is registered once, by hand, through the product's own Account page.** A command run on the owner's machine, never by CI, signs the Viewer in by email code, adds a passkey on the Account page under a virtual authenticator, exports it, and hands it to `gh secret set` on standard input, printing nothing. Adding a passkey sends the person a notice, so it runs only while no `release` run is in progress: until U11 merges, the Viewer still signs in by email code, and a notice in that window would be read as its sign-in email. With the harness code source and no stored credential, the by-hand journeys run takes the same path against the browser suite's api and then signs in with what it registered, because a production credential's rpId cannot sign in at `localhost`. No ops command writes a passkey row: that would be a new way to write a credential, around the attestation the product verifies. (session-settled: user-approved — chosen over an ops command that writes the passkey row.) Governs R8, R10.
 
 ### High-Level Technical Design
 
@@ -317,6 +323,27 @@ sequenceDiagram
   Note over J,A: teardown signs the person out on the server, even after a failure
 ```
 
+The test Viewer's passkey, registered once and re-added each night (KTD22, KTD25):
+
+```mermaid
+sequenceDiagram
+  participant O as the owner's machine, once
+  participant J as the Viewer's journey, each night
+  participant V as virtual authenticator
+  participant A as app hostname
+  participant S as production secret
+  O->>A: sign the Viewer in by email code
+  O->>V: make an authenticator, add a passkey on the Account page
+  A-->>O: passkey added, and a notice to the Viewer's address
+  O->>S: export the credential, gh secret set on standard input, key and id apart
+  J->>V: make an authenticator, add the credential with count = now
+  J->>A: open the sign-in screen, whose autofill offers the passkey
+  V-->>A: assertion, user verified, count above the stored one
+  A-->>J: the Viewer's home
+  J->>V: clear the credential, so the sign-in screen cannot sign in again
+  Note over J,A: teardown signs the Viewer out on the server
+```
+
 The test inbox's parts, and where each value lives:
 
 ```mermaid
@@ -335,8 +362,8 @@ How a run's outcome is decided:
 | Observed | Outcome | Release tagged under gate |
 | --- | --- | --- |
 | Every journey passed | `held` | yes, when this run promoted |
-| A screen step failed, or no mail arrived within 90 seconds | `fail` | no |
-| The inbox API answered an error; the edge challenged or refused the browser; a code ask was refused as too many; more than one verified sign-in email arrived; only messages whose DKIM signature was missing or failed arrived (`unverified`); the test inbox could not write a probe row; `/health` named another digest; the image had no revision label or its commit is not on `main`; the fixture held something it should not; a secret was unset; the job was cancelled or timed out | `could-not-run` | no |
+| A screen step failed, no mail arrived within 90 seconds, or the product refused the Viewer's passkey or answered its sign-in options wrongly | `fail` | no; `rejected/` instead since #538 |
+| The inbox API answered an error; the edge challenged or refused the browser; a code ask was refused as too many; more than one verified sign-in email arrived; only messages whose DKIM signature was missing or failed arrived (`unverified`); the test inbox could not write a probe row; `/health` named another digest; the image had no revision label or its commit is not on `main`; the fixture held something it should not; a secret was unset; a Viewer's passkey secret was malformed, its credential was unknown to the product, or the virtual authenticator did not assert; the job was cancelled or timed out | `could-not-run` | no |
 
 How the variable stages the record:
 
@@ -354,6 +381,7 @@ How the variable stages the record:
 - The free plan's 10 ms CPU is enough for an email handler that only reads the message's bytes and writes one row; the handler parses nothing.
 - Bot Fight Mode is off on the zone, or does not challenge a headless browser from GitHub's runners. The proof dispatch settles it (Goal Capsule stop conditions).
 - The images `build.yml` pushes carry the revision label its metadata step sets by default. U6 confirms it on a pushed image before relying on it.
+- Chromium's virtual authenticator presents a re-added credential's seeded sign count plus one on its first assertion, and keeps the private key and user handle as given. U11 proves it with two sign-ins in a row before anything relies on it.
 
 ### Risks
 
@@ -372,19 +400,23 @@ How the variable stages the record:
 | A journey drifts from its screen | The journeys import the SPA's words (KTD10); the workflow doc's rule that a journeyed screen's change carries its journey (U7); in report mode, or until R16, a failure costs a tag and an alert, never a rollback (R15). |
 | A failed run leaves roles or a group behind | The Admin journey's opening repair (KTD7); the fixture command resets roles (KTD6). |
 | Someone erases a test person | Erasure tombstones the address for good; the runbook forbids it (U8). |
+| The Viewer's passkey key leaks, or the inbox key does | A Viewer key signs in as the test Viewer alone, inside the test workspace (KTD23). An inbox key could have added a passkey to any test account. Page 13's leak bullet ends every test account's factors with `restore-sign-in`, since revoking credentials ends sessions and tokens but not passkeys, then registers the journeys' factors again (U12). |
+| A replaced credential is wrong, and a release reads `fail` under gate | The registration command sets the secret itself, so nothing is copied by hand (KTD25); page 13 names the case and deletes the `rejected/` tag once it is fixed (KTD24). |
+| A runner's clock runs ahead for one night | The stored count then sits above the next nights' seeds, which read `fail` until the clock passes it; page 13's `fail` bullet names the case, and registering a new passkey clears it at once (KTD22, KTD24). |
+| `pnpm ops restore-sign-in` is run for the Viewer | It ends every passkey the Viewer holds, the journeys' included; the next night reads could-not-run until the passkey is registered again (KTD24, U12). |
 | The test workspace's Audit log grows without end | About 4,000 rows a year; append-only by design (ADR 0038); the glossary entry says so (U7). |
 
 ### System-Wide Impact
 
 - **The operator console** lists the test people and invented members in *Everyone* and counts them in *Every workspace*; the testing domain marks them.
 - **Erasure** must never be pointed at a test person: it would tombstone the address and leave a suppression the fixture cannot reuse.
-- **Mail** gains three sign-in emails a night from production's Resend account, received by the test inbox on the testing zone; the product's zone and its mail exchangers are untouched.
+- **Mail** gains three sign-in emails a night from production's Resend account, received by the test inbox on the testing zone; the product's zone and its mail exchangers are untouched. Once U11 lands it is two, the Viewer signing in by passkey, plus one passkey notice to the Viewer's address each time its credential is registered.
 - **The repository** gains a second TypeScript deployable, `apps/test-inbox`, deployed by the owner to Cloudflare (KTD20); ADR 0029 and AGENTS.md say so, and the api image's install copies one more manifest.
 - **Invitations** gain one refusal, met only in a marked workspace (KTD17); every other workspace invites as before.
 - **The schema** gains one table under RLS and one migration, numbered after #511's 0061.
 - **The release run** gains the journeys' minutes and three jobs (journeys, record and report); no pull request or merge-queue job changes, and `build.yml`'s call is unchanged.
 - **The `production` environment** is restricted to `main` once the proof dispatch has run, and `release/*` gains a tag ruleset that blocks updates and deletions but not creation (U8).
-- **BA-28** gains a dependency: the test Admin's factor before its U10 (Deferred to Follow-Up Work).
+- **BA-28**'s U10 carries R9's confirm step in the journeys (KTD21), and U11 builds on it.
 
 ---
 
@@ -404,6 +436,9 @@ flowchart LR
   U10 --> U6
   U2[U2 expired code]
   U6 --> U7[U7 records and Linear]
+  BA28[BA-28's U10, carrying R9] --> U11[U11 the Viewer's passkey sign-in]
+  U6 --> U11
+  U11 --> U12[U12 the release reads it; page 13 registers it]
 ```
 
 ### U1. The test workspace fixture command
@@ -820,6 +855,82 @@ flowchart LR
 
 **Verification:** `check:docs` passes; the Linear issue exists and BA-34's criteria match this contract.
 
+### U11. The test Viewer signs in with a passkey
+
+**Goal:** the Viewer's journey signs in with a passkey held by a virtual authenticator, and a by-hand command registers that passkey and stores it as a secret without printing it.
+
+**Requirements:** R8, R10, R23; KTD15, KTD22, KTD23, KTD24, KTD25.
+
+**Dependencies:** BA-28's U10 on `main`, because it changes `sign-in.ts`, `fixtures.ts` and the journeys' secrets (KTD21); U5.
+
+**Files:**
+- `apps/web/e2e/virtual-authenticator.ts` (add a known credential; read back what the page registered; clear it)
+- `apps/web/e2e/passkeys.spec.ts` (a credential read back and re-added with a later count signs in twice: KTD22's pin)
+- `apps/web/journeys/sign-in.ts` (a passkey sign-in beside the email code, sharing its response wait and the edge's refusals)
+- `apps/web/journeys/fixtures.ts` (the Viewer signs in by passkey; the preflight's settings check parses the two passkey secrets)
+- new `apps/web/journeys/register-passkey.ts` (the registration command), with a script in `apps/web/package.json` that `check` never runs
+- `apps/web/test/journeys-fixtures.test.ts`, `apps/web/test/journeys-sign-in.test.ts`, new `apps/web/test/journeys-register-passkey.test.ts`
+
+**Approach:**
+1. The Viewer's sign-in makes the authenticator and adds the credential (KTD22), opens the sign-in screen, and watches the options answer, the authenticator's assertion and the passkey sign-in's answer (KTD24). It never presses Send or the passkey button, so one ceremony runs. Once the sign-in answers, it clears the credential, then confirms the signed-in person is the test Viewer before any screen step.
+2. Refusals map per KTD24 through `couldNotRun` and `failed`. Every reason names its cause and never the credential, an address or a thrown message (KTD15).
+3. The preflight parses `JOURNEYS_VIEWER_PASSKEY_KEY` and `JOURNEYS_VIEWER_PASSKEY_ID` for their shape and encodings beside the addresses, so a missing or malformed value is could-not-run before any Send.
+4. The registration command (KTD25) refuses to run when `CI` is set. It signs the Viewer in through the chosen code source, adds a passkey through the Account page's own words, reads it back from the authenticator and signs out on the server. Against production it hands the key and the id to `gh secret set … --env production` on standard input, one secret each; against the harness it returns them to the caller.
+5. With the harness code source and no passkey secrets, the Viewer's journey registers through the same path first, then signs in with what it registered. A production credential would only meet a database with no row for it there.
+
+**Execution note:** prove KTD22 first: two passkey sign-ins in a row with one stored credential against the browser suite's api, the second seeded later, both landing.
+
+**Patterns to follow:** `apps/web/e2e/passkeys.spec.ts` (adding a passkey on the Account page, and signing in through autofill); `couldNotRun` naming a setting and never its value; `refusedByTheEdge`; `signedOut` in the fixture's teardown.
+
+**Test scenarios:**
+- One stored credential, seeded from a later clock the second time, signs the Viewer in twice in a row against the harness.
+- The Viewer's sign-in never presses Send, and no email reaches the Viewer's address while it runs.
+- An unset `JOURNEYS_VIEWER_PASSKEY_KEY` or `JOURNEYS_VIEWER_PASSKEY_ID` against the inbox code source is could-not-run naming the setting, never a value.
+- A value of the wrong shape, or not in the protocol's encoding, is could-not-run naming the setting.
+- A credential the product does not know, as after its removal from the account, is could-not-run.
+- A credential the product refuses for its rpId reads `fail`, and the reason names no key.
+- The edge's 429 or challenge on the passkey sign-in is could-not-run.
+- Sign-in options that answer an error, or name another rpId, read `fail`; options that answer well with no assertion by the deadline are could-not-run.
+- After the Viewer's sign-out, the sign-in screen stays on the sign-in screen: the cleared credential cannot sign in again.
+- A credential that signs in as someone other than the test Viewer reads could-not-run, with "possible compromise" in the summary, before any screen step.
+- In the browser suite, a passkey read back from the authenticator and re-added with a later count signs in twice in a row.
+- The registration command refuses to run when `CI` is set.
+- Against the harness, the registration command adds a passkey that the Account page lists, and returns a credential that then signs in.
+- With the harness code source and no stored credential, the Viewer's journey registers, signs in and ends `held`.
+- The Admin and the Editor still sign in by email code, and the Admin still confirms (KTD21).
+
+**Verification:** `check:web` passes, and the by-hand journeys run against the browser suite's api ends `held` twice in a row with the Viewer on a passkey.
+
+### U12. The release reads the Viewer's passkey, and page 13 registers it
+
+**Goal:** the nightly journeys receive the Viewer's two passkey secrets, and the owner's page says how to register, replace and revoke them.
+
+**Requirements:** R3, R8, R10; KTD1, KTD15, KTD23, KTD24, KTD25.
+
+**Dependencies:** U11. U11 and U12 land in one pull request, so no release runs U11's passkey sign-in without the two secrets on its journeys step.
+
+**Files:**
+- `.github/workflows/release.yml` (the secret among `workflow_call`'s journeys secrets, and on the journeys step's env alone)
+- `packages/devtools/test/ci/release-job.test.ts` (`JOURNEYS_SECRETS` and the journeys step's env)
+- `docs/operations/RUNBOOK.md` (page 13; *Restore a person's sign-in*)
+- `docs/operations/SECRETS.md`
+- `apps/web/.claude/skills/browser-suite/SKILL.md` (*The journeys*)
+- `CONTEXT.md` (*journeys*)
+
+**Approach:**
+1. The two secrets join the journeys' others where KTD1 and KTD15 keep them, and no other step reads them.
+2. Page 13 gains the registration as a setup step, run from U11's branch with the owner's approval before U11 and U12 merge, so the first night after the merge already holds the secret. The step says why it needs the owner's approval: it sends production mail.
+3. Page 13's leak bullet ends passkeys as well as sessions, because revoking credentials ends sessions and tokens but not passkeys, and anyone holding the inbox key could have signed in as any test person or invented member and added one. After its revoke step it runs `pnpm ops restore-sign-in` on the api service for the three test people and every invented member, away from a run's window, and throws away the restore codes it prints. The owner then enrols the test Admin's authenticator and passkey again and sets `JOURNEYS_ADMIN_AUTHENTICATOR_KEY` anew, and registers the Viewer's passkey with U11's command. Its `fail` bullet carries KTD24's case of a just-replaced credential, and *Restore a person's sign-in* says restoring the Viewer ends the journeys' passkey.
+4. SECRETS.md says what the secret is, why it is one and how it rotates, and corrects the journeys' count. The browser-suite skill names the registration command and the harness path, and the glossary's *journeys* entry says the Viewer signs in by passkey.
+
+**Execution note:** no dispatch before the merge can run U11's sign-in: a journeys-only dispatch runs the journeys of the live release's build commit (KTD14), and the `production` environment admits only `main`. So the registration runs from U11's branch before the merge, and the proof runs after it: the owner dispatches a release from `main`, then a journeys-only dispatch from `main` at least ten minutes after its sign-ins, and both end `held` with the Viewer signed in by passkey. A `fail` there is KTD24's just-replaced-credential case.
+
+**Test scenarios:**
+- `JOURNEYS_VIEWER_PASSKEY_KEY` and `JOURNEYS_VIEWER_PASSKEY_ID` are read by the journeys step alone, never by the job's env or another step.
+- `workflow_call` declares both beside the journeys' other secrets, not required.
+
+**Verification:** the devtools check, `check:gates` and `check:docs` pass; the dispatched release and the journeys-only dispatch after the merge both end `held` with the Viewer signed in by passkey.
+
 ---
 
 ## Verification Contract
@@ -831,9 +942,9 @@ flowchart LR
 - `pnpm --filter @better-answers/devtools run check`: U6's workflow and script tests.
 - `pnpm check:gates`: format, lint (including U4's import restriction), `lint:workflows` (actionlint, zizmor, shellcheck), the comment gates, `insert-scan`, `jscpd`, `knip`.
 - `pnpm check:docs`: U7's and U8's documents.
-- By hand: `pnpm --filter @better-answers/web run journeys` against the browser suite's api (`apps/api/tests/serve.ts`) with the harness code source (U5).
+- By hand: `pnpm --filter @better-answers/web run journeys` against the browser suite's api (`apps/api/tests/serve.ts`) with the harness code source (U5). After U11, the same run ends `held` twice in a row with the Viewer on a passkey it registered itself.
 - On the testing zone, before U9 is built: the spike's finding on whether a message from production keeps a verifying DKIM signature, and its delivery time. After U9 merges: the owner's deploy, and a message to an address on the testing domain that is none of the test people's, listed and retrieved through the Worker's URL.
-- In production: page 13's go/no-go, the journeys-only dispatch from U6's branch ending `held`, and the first nightly run after U6 lands showing its outcome in the summary and the healthchecks check. CI's `check` is the arbiter for every change.
+- In production: page 13's go/no-go, the journeys-only dispatch from U6's branch ending `held`, and the first nightly run after U6 lands showing its outcome in the summary and the healthchecks check. For U11 and U12: the registration from U11's branch, with the owner's approval at the time, before the merge; after it, a dispatched release from `main` and a journeys-only dispatch ten minutes later, both ending `held` with the Viewer signed in by passkey. CI's `check` is the arbiter for every change.
 
 ## Definition of Done
 
@@ -841,6 +952,7 @@ flowchart LR
 - The test inbox is deployed and bound to the testing zone's catch-all, and nothing in the repository names the testing domain, the account or the Worker's URL.
 - The fixture exists in production, the proof dispatch held, and U6 has landed in report.
 - BA-34's criteria are rewritten, the R16 issue exists, and BA-28 carries the factor note.
+- U11 and U12: the Viewer signs in by passkey every night; only the registration command ever writes the two passkey secrets, and only the journeys step reads them; BA-34's R8 criterion is ticked, and R9's once BA-28's U10 merges.
 - No experimental or abandoned code remains in the diff.
 
 **The owner's rollout, tracked on U8's page and on BA-34, not a condition on the units:** the `production` environment restricted to `main`; the `release/*` tag ruleset; three consecutive held nights in report; `JOURNEYS_MODE` set to `gate`; one nightly release tagged under it.
