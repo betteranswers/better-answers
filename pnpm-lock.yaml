@@ -300,6 +300,9 @@ importers:
       '@types/pg':
         specifier: 8.23.1
         version: 8.23.1
+      oxc-parser:
+        specifier: 0.150.0
+        version: 0.150.0
       typescript:
         specifier: 7.0.2
         version: 7.0.2

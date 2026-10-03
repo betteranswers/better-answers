@@ -372,7 +372,8 @@ type ProseSuite = {
 const PROSE_SUITES: readonly ProseSuite[] = [
   {
     file: "apps/api/tests/avoid-words.test.ts",
-    reads: "CONTEXT.md's _Avoid_ lines, then every tracked text file outside its carve-outs",
+    reads:
+      "apps/api/tests/old-words.ts and CONTEXT.md's heads and marks, then every tracked text file outside its carve-outs",
     inTheLane: "check:docs:api",
   },
   {

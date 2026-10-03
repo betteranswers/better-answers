@@ -1,177 +1,36 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { repositoryRoot } from "@better-answers/devtools/paths";
 import { throwawayRepository, writeUnder } from "@better-answers/devtools/throwaway-tree";
 
-import { readUnder, treeFilesUnder } from "./tree-walk.ts";
-
-const GLOSSARY = "CONTEXT.md";
-
-const ENTRY_HEAD = /^- \*\*(?<term>.+?)\*\* — /;
-
-type Entry = { readonly term: string; readonly text: string };
-
-const entriesOf = (glossary: string): readonly Entry[] => {
-  const entries: Entry[] = [];
-  let open: Entry | undefined;
-  for (const line of glossary.split("\n")) {
-    const term = ENTRY_HEAD.exec(line)?.groups?.["term"];
-    if (term !== undefined) {
-      open = { term, text: line };
-      entries.push(open);
-    } else if (open !== undefined && line.startsWith("  ")) {
-      const grown: Entry = { term: open.term, text: `${open.text} ${line.trim()}` };
-      entries[entries.length - 1] = grown;
-      open = grown;
-    } else {
-      open = undefined;
-    }
-  }
-  return entries;
-};
-
-/** Split at the top level only, so a qualifier's own comma stays inside its item. */
-const itemsOf = (clause: string): readonly string[] => {
-  const items: string[] = [];
-  let depth = 0;
-  let item = "";
-  for (const character of clause) {
-    if (character === "(") depth += 1;
-    if (character === ")") depth -= 1;
-    if (depth === 0 && (character === "," || character === ";")) {
-      items.push(item);
-      item = "";
-    } else {
-      item += character;
-    }
-  }
-  return [...items, item];
-};
-
-type Avoided = { readonly word: string; readonly retired: boolean };
-
-const avoidedItemsIn = ({ text }: Entry): readonly Avoided[] => {
-  const clause = text.split("_Avoid_:")[1];
-  if (clause === undefined) return [];
-  return itemsOf(clause)
-    .map((item) => ({
-      word: (item.split(/\(| — /)[0] ?? "").trim().replace(/\.$/, ""),
-      retired: /\(retired\b/.test(item),
-    }))
-    .filter(({ word }) => word.length > 0);
-};
-
-const avoidedIn = (entry: Entry): readonly string[] =>
-  avoidedItemsIn(entry).map(({ word }) => word);
-
-const retiredIn = (entry: Entry): readonly string[] =>
-  avoidedItemsIn(entry)
-    .filter(({ retired }) => retired)
-    .map(({ word }) => word);
-
-/**
- * A sense one directory's code alone writes is read there alone, so its shapes pass
- * nowhere else.
- */
-type Sense = { readonly sense: string; readonly written: RegExp; readonly within?: string };
-
-/**
- * Only a pattern tells the senses apart, so a use no permitted pattern explains is the avoided
- * sense, and an unwatched word goes unscanned.
- */
-type Watched = {
-  readonly entry: string;
-  readonly word: string;
-  readonly permitted: readonly Sense[];
-};
-
-const WATCHED: readonly Watched[] = [
-  {
-    entry: "api",
-    word: "app",
-    permitted: [
-      { sense: "the whole product", written: /\b(?:an app|better-answers app)\b/gi },
-      { sense: "the SPA", written: /\b(?:single-page|web) app\b/gi },
-      {
-        sense: "the SPA's top layer, the directory it composes in",
-        written: /\bapp (?:layer\b|→)/gi,
-      },
-      {
-        sense: "the hostname role",
-        written:
-          /(?<!\bthe )\bapp\.(?!\w)|\bapp (?:hostname\b|·)|\*\*app\*\* hostname|\| `app` \||`app` is a hostname role|"app"(?=, "agent", "apex"\])/gi,
-      },
-      {
-        sense: "a third-party app, the consent page's client among them",
-        written:
-          /\b(?:GitHub(?: Actions')?|OAuth|MCP|Renovate|chat) app\b|\bThis app calls itself\b|"This app"/gi,
-      },
-      {
-        sense: "an identifier: a path, a hyphenated name, a property or setting, a Hono app",
-        written:
-          /(?<![/:])\/app\b|\bapp\/|-app\b|\bapp-|\bapp\.\w|\b(?:const|let) app\b|\bHono app\b/gi,
-      },
-      {
-        sense: "cocoindex's App: the class, a local or a memo's key holding one, one by its name",
-        written:
-          /\bcoco\.App\b|\bapp(?:: coco\.App)? = coco\.App\b|["']app["']: (?:\w+_APP\b|["'](?:landed|chunks)["'])|\b(?:landed|chunks) app\b/gi,
-      },
-      {
-        sense:
-          "the api's own names: the harness's app() getter, a TestApp held as app and passed on, the app hostname's key",
-        within: "apps/api/",
-        written:
-          /"app"(?!:)|(?<!\.)\bapp\(|\b(?:readonly )?app: (?:TestApp\b|APP_HOSTNAME\b|string\b|hostnameOfUrl\(|"[^"]*")|\bapp = await startApp\(|(?<=\w\((?:\w+, )*)app(?=[,)])|^\s*(?:(?:const \w+ = )?await )?app,?$|\bhostnames\.app\b/gi,
-      },
-      {
-        sense: "the glossary naming the word it avoids",
-        written: /"the app" (?:is|reads)\b|_Avoid_: app\b/gi,
-      },
-    ],
-  },
-  {
-    entry: "audit log",
-    word: "ledger",
-    permitted: [
-      {
-        sense: "spend's cost ledger, by its name or the llm_call row it holds",
-        written: /cost[-_ ]?ledger|`?llm_call`? ledger\b/gi,
-      },
-      {
-        sense: "the cost ledger's own agreement, whose every edit moves the contract's digest",
-        within: "contracts/cost-ledger/",
-        written: /\bledger\b/gi,
-      },
-      {
-        sense: "a migration's tag, naming the dated file it was generated as",
-        within: "packages/schema/migrations/meta/",
-        written: /"tag": "\d{4}_[\w-]+"/g,
-      },
-      {
-        sense: "a company's own books, in the source documents the worker's fixtures stand in for",
-        within: "apps/worker/tests/fixtures/",
-        written: /\bledger\b/gi,
-      },
-      {
-        sense: "the glossary naming the word it avoids",
-        written: /_Avoid_: ledger(?: act)?\b/gi,
-      },
-    ],
-  },
-  {
-    entry: "audit act",
-    word: "ledger act",
-    permitted: [
-      { sense: "the glossary naming the word it avoids", written: /_Avoid_: ledger act\b/gi },
-    ],
-  },
-];
-
-type CarveOut = { readonly holds: (file: string) => boolean; readonly why: string };
+import { keptNamesUnder } from "./kept-names.ts";
+import {
+  type CarveOut,
+  NOT_WATCHED_ON_PAGES,
+  OLD_WORDS,
+  type OldWord,
+  type Renamed,
+} from "./old-words.ts";
+import { readUnder } from "./tree-walk.ts";
+import {
+  type Counts,
+  type Finding,
+  GLOSSARY,
+  type InternalFinding,
+  internalFindings,
+  isRenamed,
+  lineFindings,
+  listFaults,
+  ratchetCounts,
+  ratchetRises,
+  readerFindings,
+  readerStringsIn,
+} from "./words-scan.ts";
 
 const under =
   (prefix: string) =>
@@ -184,162 +43,108 @@ const CARVED_OUT: readonly CarveOut[] = [
     why: "the archive is frozen history, kept in the words of its day",
   },
   {
-    holds: (file) => /^packages\/schema\/migrations\/.*\.sql$/.test(file),
-    why: "a migration is a dated record, never edited once it has run",
+    holds: under("docs/plans/"),
+    why: "a plan records what was built, in the words of its day",
+  },
+  {
+    holds: (file) =>
+      /^packages\/schema\/migrations\/(?:.*\.sql|meta\/\d{4}_snapshot\.json)$/.test(file),
+    why: "a migration and its snapshot are a dated record, never edited once it has run",
   },
   { holds: under(".cubic/"), why: "Cubic generates it and rewrites it" },
   {
     holds: under("apps/api/.claude/skills/"),
     why: "third-party skills, kept as upstream wrote them so their skills-lock hashes hold",
   },
-  { holds: under("apps/web/"), why: "no tier-sense use: the word there is the SPA's own zone" },
   {
-    holds: under("packages/design-system/"),
-    why: "no tier-sense use: the word there is the SPA's own zone",
-  },
-  {
-    holds: (file) => file === "apps/api/tests/avoid-words.test.ts",
-    why: "this scan: its patterns spell the word they permit",
+    holds: (file) =>
+      [
+        "apps/api/tests/avoid-words.test.ts",
+        "apps/api/tests/old-words.ts",
+        "apps/api/tests/old-words-ratchet.json",
+      ].includes(file),
+    why: "this scan, its list and its baseline spell the words they refuse",
   },
 ];
 
-/**
- * A rules file binds every directory, so its sweep is this suite's own and no carve-out
- * holds it.
- */
-const isCarvedOut = (file: string): boolean =>
-  path.basename(file) !== "CODING_STANDARDS.md" && CARVED_OUT.some(({ holds }) => holds(file));
+const KEPT = await keptNamesUnder(repositoryRoot);
 
-const escaped = (word: string): string => word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const SCAN = { rows: OLD_WORDS, carvedOut: CARVED_OUT, kept: Object.values(KEPT).flat() };
 
-/** A watched word with the test its glossary entry sets for what the permitted senses leave. */
-type Scan = { readonly watched: Watched; readonly finds: (unexplained: string) => boolean };
+const glossary = readUnder(repositoryRoot, GLOSSARY);
 
-/** `auditRowsOf`, `AUDIT_ACT` and `an_audit_row` read as words, so a retired word is seen inside. */
-const wordsOfCompounds = (text: string): string =>
-  text.replace(/(?<=[a-z\d])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])/g, " ").replaceAll("_", " ");
-
-/** A word its entry retires outright is refused in every form, a merely avoided one whole alone. */
-const findsIn = (word: string, retired: boolean): Scan["finds"] => {
-  if (!retired) {
-    const whole = new RegExp(`\\b${escaped(word)}\\b`, "i");
-    return (unexplained) => whole.test(unexplained);
-  }
-  const anyForm = new RegExp(`\\b${word.split(" ").map(escaped).join("[\\s-]+")}s?\\b`, "i");
-  return (unexplained) => anyForm.test(wordsOfCompounds(unexplained));
-};
-
-const usesInAvoidedSense = ({ watched, finds }: Scan, file: string, text: string): boolean =>
-  finds(
-    watched.permitted
-      .filter(({ within }) => within === undefined || file.startsWith(within))
-      .reduce(
-        (left, { written }) => left.replace(written, (found) => " ".repeat(found.length)),
-        text,
-      ),
+const said = (findings: readonly Finding[]): readonly string[] =>
+  findings.map(
+    ({ file, line, text, word, use, sweep }) =>
+      `${file}:${String(line)}: ${text} → write "${use}" (the ${sweep} sweep replaced "${word}")`,
   );
 
-const watchedIn = (root: string): readonly Scan[] => {
-  const entries = entriesOf(readUnder(root, GLOSSARY));
-  return WATCHED.flatMap((watched) => {
-    const entry = entries.find(
-      (one) => one.term === watched.entry && avoidedIn(one).includes(watched.word),
-    );
-    return entry === undefined
-      ? []
-      : [{ watched, finds: findsIn(watched.word, retiredIn(entry).includes(watched.word)) }];
-  });
-};
-
-const linesWhere = (
-  root: string,
-  reads: (file: string) => boolean,
-  finds: (file: string, text: string) => boolean,
-): readonly string[] =>
-  treeFilesUnder(root)
-    .filter(reads)
-    .flatMap((file) =>
-      readUnder(root, file)
-        .split("\n")
-        .flatMap((text, index) =>
-          finds(file, text) ? [`${file}:${String(index + 1)}: ${text.trim()}`] : [],
-        ),
-    );
-
-const avoidedSenseLines = (root: string): readonly string[] => {
-  const watched = watchedIn(root);
-  return linesWhere(
-    root,
-    (file) => !isCarvedOut(file),
-    (file, text) => watched.some((one) => usesInAvoidedSense(one, file, text)),
-  );
-};
-
-describe("the words the glossary avoids, read from the glossary", () => {
-  it("reads the api entry's avoided words across a wrapped line", () => {
-    const api = entriesOf(readUnder(repositoryRoot, GLOSSARY)).find(({ term }) => term === "api");
-
-    expect(api === undefined ? [] : avoidedIn(api)).toEqual(["app", "the backend", "the server"]);
+const saidOfInternals = (findings: readonly InternalFinding[]): readonly string[] =>
+  findings.map(({ file, line, text, internal }) => {
+    const instead = internal.pagesSay ?? "what it means for the person, in the glossary's words";
+    return `${file}:${String(line)}: ${text} → "${internal.head}" is internal; write ${instead}`;
   });
 
-  it("reads which avoided words an entry retires outright", () => {
-    const retired = entriesOf(readUnder(repositoryRoot, GLOSSARY)).flatMap(retiredIn);
-
-    expect(retired).toEqual(["member id", "ledger act", "ledger"]);
-  });
-
-  it("watches only words the glossary still avoids, under their entry", () => {
-    const glossed = watchedIn(repositoryRoot).map(({ watched }) => watched);
-
+describe("the list of old words", () => {
+  it("agrees with the glossary it serves", () => {
     expect(
-      WATCHED.filter((one) => !glossed.includes(one)).map(({ entry, word }) => `${entry}: ${word}`),
-      "a watched word is no longer in its entry's _Avoid_ line, so the scan has stopped reading it. Take its patterns out with it, or put it back in the glossary.",
+      listFaults(OLD_WORDS, glossary, NOT_WATCHED_ON_PAGES),
+      "apps/api/tests/old-words.ts and CONTEXT.md disagree. Keep the list sorted, one row per word, each under an entry the glossary heads, and a pending row for every entry marked pending.",
     ).toEqual([]);
+  });
+
+  it("reads a name from every source of kept names", () => {
+    expect(
+      Object.entries(KEPT)
+        .filter(([, names]) => names.length === 0)
+        .map(([source]) => source),
+      "a source of kept names yielded nothing, so the scan would keep no name from it. Point kept-names.ts at where those names are declared now.",
+    ).toEqual([]);
+  });
+
+  it("leaves the glossary no list of words to avoid", () => {
+    expect(glossary).not.toMatch(/_Avoid_/);
   });
 });
 
-describe("where the tree uses a word in its avoided sense", () => {
-  it("finds no line outside the carve-outs", () => {
+const RATCHET = path.join(import.meta.dirname, "old-words-ratchet.json");
+
+const COUNTS = z.record(z.string(), z.record(z.string(), z.number().int()));
+
+const baseline = (): Counts =>
+  existsSync(RATCHET) ? COUNTS.parse(JSON.parse(readFileSync(RATCHET, "utf8"))) : {};
+
+describe("the tree, against the list", () => {
+  it("uses no landed word outside the senses it keeps", () => {
     expect(
-      avoidedSenseLines(repositoryRoot),
-      "a line uses a word CONTEXT.md avoids, in the sense it avoids it. Write the glossary's word; where the use is a sense the glossary allows, write that sense's pattern beside the entry in WATCHED.",
+      said(lineFindings(repositoryRoot, SCAN)),
+      "a line writes a word the glossary has replaced. Write the word each line names, as CONTEXT.md and apps/web/CODING_STANDARDS.md say; where the use is a sense the word keeps, add that sense to its row in apps/api/tests/old-words.ts.",
     ).toEqual([]);
   });
-});
 
-const PRODUCT = "better-answers";
-
-/**
- * Code alone: a notice is prose, whose name follows the docs. Elsewhere the old form may stand, as
- * the platform's git author does.
- */
-const READ_BY_A_PERSON = ["apps/web/index.html", "apps/web/src/", "apps/api/src/"];
-
-const isCode = (file: string): boolean => /\.(?:tsx?|html)$/.test(file);
-
-const avoidedNamesIn = (root: string): readonly string[] => {
-  const entry = entriesOf(readUnder(root, GLOSSARY)).find(({ term }) => term === PRODUCT);
-  return entry === undefined ? [] : avoidedIn(entry);
-};
-
-const avoidedNameLines = (root: string): readonly string[] => {
-  const finds = avoidedNamesIn(root).map((name) => findsIn(name, false));
-  return linesWhere(
-    root,
-    (file) => READ_BY_A_PERSON.some((prefix) => file.startsWith(prefix)) && isCode(file),
-    (_, text) => finds.some((found) => found(text)),
-  );
-};
-
-describe("the product's name, where a person reads it", () => {
-  it("reads the form the name's entry avoids", () => {
-    expect(avoidedNamesIn(repositoryRoot)).toEqual(["Better Answers"]);
+  it("writes no landed word in what a person reads", () => {
+    expect(
+      said(readerFindings(repositoryRoot, SCAN)),
+      "a page, an MCP tool's text, an answer or an email writes a word the glossary has replaced. Write the word each line names.",
+    ).toEqual([]);
   });
 
-  it("finds it on no screen, tab title, page or email", () => {
+  it("writes no internal word where a person reads it", () => {
     expect(
-      avoidedNameLines(repositoryRoot),
-      `a line a person reads names the product in a form CONTEXT.md avoids. Write ${PRODUCT}, from the word table of its code path.`,
+      saidOfInternals(internalFindings(repositoryRoot, glossary, SCAN, NOT_WATCHED_ON_PAGES)),
+      "a person would read a word CONTEXT.md marks internal. Write what each line names; where the head is ordinary English, add it to NOT_WATCHED_ON_PAGES in apps/api/tests/old-words.ts.",
+    ).toEqual([]);
+  });
+
+  it("writes no pending word on a page above its baseline", () => {
+    const counts = ratchetCounts(repositoryRoot, OLD_WORDS);
+    if (process.env["UPDATE_OLD_WORDS_RATCHET"] === "1") {
+      writeFileSync(RATCHET, `${JSON.stringify(counts, null, 2)}\n`);
+    }
+
+    expect(
+      ratchetRises(counts, baseline()),
+      "a page's words write a word still pending its sweep more often than before. Write the reader's word its row names in apps/api/tests/old-words.ts. Once counts fall, lower the baseline: UPDATE_OLD_WORDS_RATCHET=1 pnpm --filter @better-answers/api run test tests/avoid-words.test.ts",
     ).toEqual([]);
   });
 });
@@ -349,44 +154,53 @@ afterAll(() => {
   rmSync(scratch, { force: true, recursive: true });
 });
 
-/**
- * Spelled in two halves, so no fixture reads as a finding should the carve-out that holds this file
- * out for its patterns ever be lifted.
- */
+let trees = 0;
+
+const plantedTree = (files: Readonly<Record<string, string>>): string => {
+  trees += 1;
+  const root = throwawayRepository(path.join(scratch, `tree-${String(trees)}`));
+  for (const [file, text] of Object.entries(files)) writeUnder(root, file, `${text}\n`);
+  return root;
+};
+
+const at = ({ file, line, text }: { file: string; line: number; text: string }): string =>
+  `${file}:${String(line)}: ${text}`;
+
+const rowOf = (word: string): Renamed => {
+  const row = OLD_WORDS.find((one) => one.word === word);
+  if (row === undefined || !isRenamed(row)) throw new Error(`no renamed row for ${word}`);
+  return row;
+};
+
+const landedNow = (row: Renamed, change: Partial<Renamed> = {}): Renamed => ({
+  ...row,
+  state: "landed",
+  ...change,
+});
+
+/** Spelled in halves, so no fixture reads as a finding should this file's carve-out be lifted. */
 const WORD = ["a", "pp"].join("");
+const APP = rowOf(WORD);
 
 /** A retired word, spelled in halves for the same reason, and capitalised as a type opens. */
 const RETIRED = ["led", "ger"].join("");
 const Retired = `L${RETIRED.slice(1)}`;
+const LEDGER = rowOf(RETIRED);
+const LEDGER_ACT = rowOf(`${RETIRED} act`);
 
-const THE_GLOSSARY = [
-  "# Glossary",
-  "",
-  `- **api** — the TypeScript deployable. _Avoid_: ${WORD} (for`,
-  "  the tier), the backend, the server.",
-  "- **estate** — the running deployment. _Avoid_: environment.",
-  `- **audit act** — the name an audit event is recorded under. _Avoid_: ${RETIRED} act (retired`,
-  "  24/09/2026), event type.",
-  `- **audit log** — the append-only record. _Avoid_: ${RETIRED} (retired 24/09/2026), log (alone).`,
-  "",
-].join("\n");
+const BOUND = ["bind", "ing"].join("");
+const BINDING = landedNow(rowOf(BOUND));
 
-let trees = 0;
-
-const findingsIn = (
+const linesOver = (
   files: Readonly<Record<string, string>>,
-  glossary = THE_GLOSSARY,
-  scan: (root: string) => readonly string[] = avoidedSenseLines,
-): readonly string[] => {
-  trees += 1;
-  const root = throwawayRepository(path.join(scratch, `tree-${String(trees)}`));
-  writeUnder(root, GLOSSARY, glossary);
-  for (const [file, text] of Object.entries(files)) writeUnder(root, file, text);
-  return scan(root);
-};
+  rows: readonly OldWord[],
+  kept: readonly string[] = [],
+): readonly string[] => [
+  ...new Set(lineFindings(plantedTree(files), { rows, carvedOut: CARVED_OUT, kept }).map(at)),
+];
 
 const findingsOver = (planted: string, file = "docs/planted.md"): readonly string[] =>
-  findingsIn({ [file]: `${planted}\n` });
+  linesOver({ [file]: planted }, [APP, LEDGER, LEDGER_ACT]);
 
 describe("the sense a planted line is read in", () => {
   it.each([
@@ -412,7 +226,7 @@ describe("the sense a planted line is read in", () => {
     `better-answers is an ${WORD} for a company's knowledge.`,
     `The better-answers ${WORD} holds a company's knowledge.`,
     `Vite React single-page ${WORD}; talks to the api over tRPC only.`,
-    `The web ${WORD} shows the Sources screen.`,
+    `The web ${WORD} shows the Sources page.`,
     `Signed in on ${WORD}., a session cookie host-only.`,
     `The uptime check watches \`${WORD}.<apex>\` and two paths on the ${WORD} hostname.`,
     `The ruleset's bypass list names the GitHub ${WORD}.`,
@@ -432,7 +246,7 @@ describe("the sense a planted line is read in", () => {
     `        "${WORD}": LANDED_APP,`,
     `        '${WORD}': "chunks",`,
     `# The second store: the landed ${WORD} and the findings memo.`,
-    `# The binding's store: the chunks ${WORD} and its target-state tracking.`,
+    `# The store: the chunks ${WORD} and its target-state tracking.`,
     `<p>This ${WORD} calls itself “Claude”. It is hosted at <strong>claude.ai</strong>.</p>`,
     `      : undefined) ?? "This ${WORD}",`,
   ])("passes a permitted sense, case %$", (planted) => {
@@ -456,23 +270,42 @@ describe("the sense a planted line is read in", () => {
     expect(findingsOver(planted)).toEqual([`docs/planted.md:1: ${planted.trim()}`]);
   });
 
-  it("passes the glossary's own entry naming the word it avoids", () => {
+  it("reads an ordinary line as nothing", () => {
     expect(findingsOver("An ordinary line.")).toEqual([]);
   });
 
   it("reads nothing a carve-out holds but a rules file", () => {
-    const findings = findingsIn({
-      "docs/archive/adr/0001-planted.md": `The ${WORD} claims the job.\n`,
-      "docs/archive/specs/T-001.md": `The ${WORD} claims the job.\n`,
-      "docs/specs/v01-route.md": `The ${WORD} claims the job.\n`,
-      "apps/api/.claude/skills/resend/SKILL.md": `The ${WORD} claims the job.\n`,
-      "apps/web/src/planted.ts": `// The ${WORD} claims the job.\n`,
-      "apps/web/CODING_STANDARDS.md": `The ${WORD} claims the job.\n`,
-    });
+    const findings = linesOver(
+      {
+        "docs/archive/adr/0001-planted.md": `The ${WORD} claims the job.`,
+        "docs/archive/specs/T-001.md": `The ${WORD} claims the job.`,
+        "docs/plans/2026-01-01-planted-plan.md": `The ${WORD} claims the job.`,
+        "docs/specs/v01-route.md": `The ${WORD} claims the job.`,
+        "apps/api/.claude/skills/resend/SKILL.md": `The ${WORD} claims the job.`,
+        "apps/web/src/planted.ts": `// The ${WORD} claims the job.`,
+        "apps/web/CODING_STANDARDS.md": `The ${WORD} claims the job.`,
+      },
+      [APP],
+    );
 
     expect(findings).toEqual([
       `apps/web/CODING_STANDARDS.md:1: The ${WORD} claims the job.`,
       `docs/specs/v01-route.md:1: The ${WORD} claims the job.`,
+    ]);
+  });
+
+  it("holds a row's own carve-out for that row alone", () => {
+    const findings = linesOver(
+      {
+        "apps/web/src/planted.ts": `// The ${WORD} keeps the ${RETIRED}.`,
+        "packages/design-system/planted.md": `The ${WORD} keeps the ${RETIRED}.`,
+      },
+      [APP, LEDGER],
+    );
+
+    expect(findings).toEqual([
+      `apps/web/src/planted.ts:1: // The ${WORD} keeps the ${RETIRED}.`,
+      `packages/design-system/planted.md:1: The ${WORD} keeps the ${RETIRED}.`,
     ]);
   });
 
@@ -491,12 +324,17 @@ describe("the sense a planted line is read in", () => {
     expect(findingsOver(planted, file)).toEqual([`${file}:1: ${planted.trim()}`]);
   });
 
-  it("reads the api's source and tests, except this scan", () => {
-    const findings = findingsIn({
-      "apps/api/src/planted.ts": `// The ${WORD} claims the job.\n`,
-      "apps/api/tests/planted.test.ts": `// The ${WORD} claims the job.\n`,
-      "apps/api/tests/avoid-words.test.ts": `// The ${WORD} claims the job.\n`,
-    });
+  it("reads the api's source and tests, except this scan's files", () => {
+    const findings = linesOver(
+      {
+        "apps/api/src/planted.ts": `// The ${WORD} claims the job.`,
+        "apps/api/tests/planted.test.ts": `// The ${WORD} claims the job.`,
+        "apps/api/tests/avoid-words.test.ts": `// The ${WORD} claims the job.`,
+        "apps/api/tests/old-words.ts": `// The ${WORD} claims the job.`,
+        "apps/api/tests/old-words-ratchet.json": `{ "${WORD}": 1 }`,
+      },
+      [APP],
+    );
 
     expect(findings).toEqual([
       `apps/api/src/planted.ts:1: // The ${WORD} claims the job.`,
@@ -504,17 +342,16 @@ describe("the sense a planted line is read in", () => {
     ]);
   });
 
-  it("stops reading a word the glossary no longer avoids", () => {
-    const findings = findingsIn(
-      { "docs/planted.md": `The ${WORD} claims the job.\n` },
-      "- **api** — the TypeScript deployable. _Avoid_: the backend.\n",
-    );
+  it("reads a pending word nowhere", () => {
+    const findings = linesOver({ "docs/planted.md": `The ${WORD} claims the job.` }, [
+      { ...APP, state: "pending" },
+    ]);
 
     expect(findings).toEqual([]);
   });
 });
 
-describe("a word retired outright, beside one merely avoided", () => {
+describe("a word retired outright, beside one held to its senses", () => {
   it.each([
     { file: "packages/core/src/planted.ts", planted: `const rows = await ${RETIRED}RowsOf(tx);` },
     { file: "packages/core/src/planted.ts", planted: `type ${Retired}Act = AuditAct;` },
@@ -566,6 +403,12 @@ describe("a word retired outright, beside one merely avoided", () => {
     expect(findingsOver(planted)).toEqual([`docs/planted.md:1: ${planted.trim()}`]);
   });
 
+  it("passes a migration's snapshot, carved out whole", () => {
+    const planted = `      "name": "a_${RETIRED}_row",`;
+
+    expect(findingsOver(planted, "packages/schema/migrations/meta/0008_snapshot.json")).toEqual([]);
+  });
+
   it("passes a company's own books in the worker's fixtures alone", () => {
     const planted = `and the ${RETIRED} is the record the claim rests on`;
 
@@ -573,60 +416,327 @@ describe("a word retired outright, beside one merely avoided", () => {
     expect(findingsOver(planted)).toEqual([`docs/planted.md:1: ${planted}`]);
   });
 
-  it("reads a word merely avoided whole, never inside a compound", () => {
+  it("reads a word held to senses whole, never in compounds", () => {
     expect(findingsOver(`const my_${WORD}_name = ${WORD}Router;`)).toEqual([]);
   });
 
   it("refuses a retired two-word item inside a compound", () => {
-    const findings = findingsIn(
-      { "docs/planted.md": `type ${Retired}Act = string;\nThe ${RETIRED} holds it.\n` },
-      `- **audit act** — the name. _Avoid_: ${RETIRED} act (retired).\n`,
+    const findings = linesOver(
+      { "docs/planted.md": `type ${Retired}Act = string;\nThe ${RETIRED} holds it.` },
+      [LEDGER_ACT],
     );
 
     expect(findings).toEqual([`docs/planted.md:1: type ${Retired}Act = string;`]);
   });
 
-  it("reads the word whole once its entry stops retiring it", () => {
-    const findings = findingsIn(
-      { "docs/planted.md": `${RETIRED}RowsOf\nThe ${RETIRED} holds it.\n` },
-      `- **audit log** — the record. _Avoid_: ${RETIRED}, log.\n`,
+  it("reads the word whole once held to one sense", () => {
+    const findings = linesOver(
+      { "docs/planted.md": `${RETIRED}RowsOf\nThe ${RETIRED} holds it.` },
+      [{ ...LEDGER, reach: "one sense", permitted: [] }],
     );
 
     expect(findings).toEqual([`docs/planted.md:2: The ${RETIRED} holds it.`]);
   });
 });
 
-describe("the product's name in a planted tree", () => {
-  const NAMED = `- **${PRODUCT}** — the product's name. _Avoid_: Better Answers (the prose form).\n`;
+describe("a word that lands with its sweep", () => {
+  const AT_SOURCE = {
+    "packages/core/src/planted.ts": `const ${BOUND} = await read(tx);`,
+    "packages/schema/migrations/0099_planted.sql": `ALTER TABLE source_${BOUND} ADD COLUMN x text;`,
+    "packages/schema/migrations/meta/0099_snapshot.json": `"name": "source_${BOUND}"`,
+    "apps/api/tests/old-words.ts": `word: "${BOUND}",`,
+  };
 
+  it("passes in code while pending, and fails once landed", () => {
+    expect(linesOver(AT_SOURCE, [rowOf(BOUND)])).toEqual([]);
+    expect(linesOver(AT_SOURCE, [BINDING])).toEqual([
+      `packages/core/src/planted.ts:1: const ${BOUND} = await read(tx);`,
+    ]);
+  });
+
+  it("names the reader's word and sweep for a new identifier", () => {
+    const tree = plantedTree({ "packages/core/src/planted.ts": `const ${BOUND}Id = ulid();` });
+
+    expect(lineFindings(tree, { rows: [BINDING], carvedOut: CARVED_OUT, kept: [] })).toEqual([
+      {
+        file: "packages/core/src/planted.ts",
+        line: 1,
+        text: `const ${BOUND}Id = ulid();`,
+        word: BOUND,
+        use: "connected source",
+        sweep: "connected source",
+      },
+    ]);
+  });
+
+  it("passes a kept refusal word once the word has landed", () => {
+    const refusal = `no-such-${BOUND}`;
+    const files = { "packages/core/src/planted.ts": `return err("${refusal}");` };
+
+    expect(linesOver(files, [BINDING], [refusal])).toEqual([]);
+    expect(linesOver(files, [BINDING])).toEqual([
+      `packages/core/src/planted.ts:1: return err("${refusal}");`,
+    ]);
+  });
+
+  it("passes named parameters, and refuses landed words, in MCP text", () => {
+    const hit = ["h", "it"].join("");
+    const files = {
+      "apps/api/src/mcp/entries/index.ts": [
+        `const find = defineEntry({`,
+        `  description: "Preview what matches. Use \`open\` with a concept's \`iri\` to read it.",`,
+        `  title: "One line per ${hit}",`,
+        `});`,
+      ].join("\n"),
+    };
+    const rows = [landedNow(rowOf("IRI")), landedNow(rowOf(hit))];
+    const tree = plantedTree(files);
+
+    expect(readerFindings(tree, { rows, carvedOut: CARVED_OUT, kept: ["iri"] })).toEqual([]);
+    expect(lineFindings(tree, { rows, carvedOut: CARVED_OUT, kept: ["iri"] }).map(at)).toEqual([
+      `apps/api/src/mcp/entries/index.ts:3: title: "One line per ${hit}",`,
+    ]);
+  });
+
+  it("passes React's act in tests, and refuses it on pages", () => {
+    const act = landedNow(rowOf("act"), {
+      permitted: [{ sense: "React's and Testing Library's act", written: /\bact\(/g }],
+    });
+    const findings = linesOver(
+      {
+        "apps/web/test/planted.test.tsx": `await act(async () => render(<Members />));`,
+        "apps/web/src/features/people/planted-words.ts": `export const TAKEN = "Each act lands at once.";`,
+      },
+      [act],
+    );
+
+    expect(findings).toEqual([
+      `apps/web/src/features/people/planted-words.ts:1: export const TAKEN = "Each act lands at once.";`,
+    ]);
+  });
+});
+
+describe("the product's name in a planted tree", () => {
   const nameFindingsIn = (files: Readonly<Record<string, string>>): readonly string[] =>
-    findingsIn(files, NAMED, avoidedNameLines);
+    linesOver(files, [rowOf("Better Answers")]);
 
   it("reads the tab title, word tables and pages alone", () => {
-    const planted = 'export const PRODUCT_NAME = "Better Answers";\n';
+    const planted = 'export const PRODUCT_NAME = "Better Answers";';
 
     const findings = nameFindingsIn({
-      "apps/web/index.html": "<title>Better Answers</title>\n",
+      "apps/web/index.html": "<title>Better Answers</title>",
       "apps/web/src/planted.ts": planted,
       "apps/api/src/planted.ts": planted,
       "apps/web/e2e/planted.ts": planted,
-      "apps/web/src/shared/ui/NOTICES.md": "The licence Better Answers ships under.\n",
+      "apps/web/src/shared/ui/NOTICES.md": "The licence Better Answers ships under.",
       "packages/core/src/planted.ts": planted,
     });
 
     expect(findings).toEqual([
-      `apps/api/src/planted.ts:1: ${planted.trim()}`,
+      `apps/api/src/planted.ts:1: ${planted}`,
       "apps/web/index.html:1: <title>Better Answers</title>",
-      `apps/web/src/planted.ts:1: ${planted.trim()}`,
+      `apps/web/src/planted.ts:1: ${planted}`,
     ]);
   });
 
   it("reads the old form in any case, passing the name", () => {
     const findings = nameFindingsIn({
       "apps/api/src/planted.ts":
-        'subject: "Your better answers code",\nsubject: "Your better-answers code",\n',
+        'subject: "Your better answers code",\nsubject: "Your better-answers code",',
     });
 
     expect(findings).toEqual(['apps/api/src/planted.ts:1: subject: "Your better answers code",']);
+  });
+});
+
+const PLANTED_GLOSSARY = [
+  "# Glossary",
+  "",
+  "- **watermark** — _Internal._ the last commit a workspace's rows know about.",
+  "- **job** — _Internal._ one unit of background work.",
+  "- **landed copy** — _Internal._ a document's bytes as the platform holds them. A page says",
+  "  *Received*.",
+  "- **connected source** — _Code rename pending._ an Admin's connection of one source.",
+  "- **Unverified** — nobody has confirmed it.",
+  "",
+].join("\n");
+
+describe("what a person reads, in a planted tree", () => {
+  const WORDS = "apps/web/src/features/sources/words.ts";
+
+  const internalsOver = (text: string, file = WORDS): readonly string[] =>
+    internalFindings(
+      plantedTree({ [file]: text }),
+      PLANTED_GLOSSARY,
+      { rows: [], carvedOut: CARVED_OUT, kept: [] },
+      [{ head: "job" }],
+    ).map((finding) => `${at(finding)} → ${finding.internal.pagesSay ?? "-"}`);
+
+  it("refuses an internal page word and names what to write", () => {
+    expect(internalsOver('export const READY = "The landed copy is ready.";')).toEqual([
+      `${WORDS}:1: The landed copy is ready. → Received`,
+    ]);
+  });
+
+  it("refuses an internal word in an email", () => {
+    expect(
+      internalsOver(
+        "const line = `Behind the watermark: ${count}`;",
+        "apps/api/src/trpc/invitation-email.ts",
+      ),
+    ).toEqual(["apps/api/src/trpc/invitation-email.ts:1: Behind the watermark: → -"]);
+  });
+
+  it("passes an internal head left unwatched as ordinary English", () => {
+    expect(internalsOver('export const DONE = "The job is done.";')).toEqual([]);
+  });
+
+  it("reads no file where a person's text is not written", () => {
+    expect(
+      internalsOver(
+        'const why = "the watermark moved";',
+        "apps/web/src/features/sources/table.tsx",
+      ),
+    ).toEqual([]);
+  });
+
+  it("refuses a landed word in reader text alone", () => {
+    const checked = ["Un", "checked"].join("");
+    const tree = plantedTree({
+      [WORDS]: `export const TRUST = "${checked}";`,
+      "packages/design-system/tokens.css": `--trust-${checked.toLowerCase()}-ink: #444;`,
+    });
+
+    expect(
+      readerFindings(tree, { rows: [rowOf(checked)], carvedOut: CARVED_OUT, kept: [] }).map(at),
+    ).toEqual([`${WORDS}:1: ${checked}`]);
+  });
+});
+
+describe("the strings a person reads in a source file", () => {
+  const readIn = (source: string, file = "planted-words.tsx"): readonly string[] =>
+    readerStringsIn(file, source).map(({ line, text }) => `${String(line)}: ${text}`);
+
+  it("reads sentences, capitalised labels, template text and JSX text", () => {
+    expect(
+      readIn(
+        [
+          'export const A = "Connect a document";',
+          'export const B = "Members";',
+          "export const C = `Sent to ${who} today`;",
+          "export const D = () => <p>Nothing here yet</p>;",
+        ].join("\n"),
+      ),
+    ).toEqual([
+      "1: Connect a document",
+      "2: Members",
+      "3: Sent to",
+      "3: today",
+      "4: Nothing here yet",
+    ]);
+  });
+
+  it("leaves identifiers, keys, imports, errors and log lines unread", () => {
+    expect(
+      readIn(
+        [
+          'import { x } from "./sources api.ts";',
+          'export const KEYS = { "a key with spaces": "kebab-value" };',
+          'type Role = "an editor";',
+          'export const E = () => <p className="flex items-center">x</p>;',
+          'throw new Error("the screen declares no detail address");',
+          'log.warn(facts, "the name flag did not go");',
+        ].join("\n"),
+      ),
+    ).toEqual([]);
+  });
+});
+
+describe("the ratchet on pending words", () => {
+  const WORDS = "apps/web/src/features/sources/words.ts";
+  const counted = (text: string): Counts =>
+    ratchetCounts(
+      plantedTree({
+        [WORDS]: text,
+        "apps/web/src/features/sources/table.tsx": `const T = "${BOUND} ${BOUND}";`,
+      }),
+      [rowOf(BOUND), landedNow(rowOf("screen"))],
+    );
+
+  it("counts a pending word in a page's words alone", () => {
+    expect(counted(`export const A = "Each ${BOUND} and its ${BOUND}s";`)).toEqual({
+      [WORDS]: { [BOUND]: 2 },
+    });
+  });
+
+  it("refuses one more than the baseline, and passes one fewer", () => {
+    const baselineOf: Counts = { [WORDS]: { [BOUND]: 2 } };
+
+    expect(ratchetRises({ [WORDS]: { [BOUND]: 3 } }, baselineOf)).toEqual([
+      `${WORDS}: "${BOUND}" 3 times, against 2`,
+    ]);
+    expect(ratchetRises({ [WORDS]: { [BOUND]: 1 } }, baselineOf)).toEqual([]);
+  });
+
+  it("starts a word new to a file at none", () => {
+    expect(ratchetRises({ [WORDS]: { route: 1 } }, {})).toEqual([
+      `${WORDS}: "route" 1 times, against 0`,
+    ]);
+  });
+});
+
+describe("faults in a planted list", () => {
+  const avoidedRow = (word: string, entry = "watermark"): OldWord => ({
+    word,
+    use: entry,
+    entry,
+    sweep: null,
+  });
+  const PENDING_ROW: OldWord = {
+    word: BOUND,
+    use: "connected source",
+    entry: "connected source",
+    sweep: "connected source",
+    state: "pending",
+    reach: "everywhere",
+  };
+
+  it("passes a sorted list whose rows sit under heads", () => {
+    expect(
+      listFaults([PENDING_ROW, avoidedRow("checkpoint"), avoidedRow("cursor")], PLANTED_GLOSSARY, [
+        { head: "job" },
+      ]),
+    ).toEqual([]);
+  });
+
+  it.each([
+    {
+      fault: "a row out of order",
+      rows: [avoidedRow("checkpoint"), PENDING_ROW],
+      found: `"checkpoint" is listed before "${BOUND}", out of order or twice`,
+    },
+    {
+      fault: "a word listed twice",
+      rows: [PENDING_ROW, avoidedRow("cursor"), avoidedRow("Cursor")],
+      found: `"cursor" is listed before "Cursor", out of order or twice`,
+    },
+    {
+      fault: "a row under no head",
+      rows: [PENDING_ROW, avoidedRow("cursor", "tracker")],
+      found: `"cursor" sits under "tracker", which heads no glossary entry`,
+    },
+    {
+      fault: "a pending entry with no pending row",
+      rows: [avoidedRow("cursor")],
+      found: `"connected source" is marked pending, but no pending row names its code's word`,
+    },
+  ])("finds $fault", ({ rows, found }) => {
+    expect(listFaults(rows, PLANTED_GLOSSARY, [])).toContain(found);
+  });
+
+  it("finds an unwatched head the glossary does not mark internal", () => {
+    expect(listFaults([PENDING_ROW], PLANTED_GLOSSARY, [{ head: "Unverified" }])).toEqual([
+      `"Unverified" is left unwatched on pages, but it heads no internal entry`,
+    ]);
   });
 });

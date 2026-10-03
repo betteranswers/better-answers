@@ -67,8 +67,8 @@ const STUB: readonly Surface[] = [
             acts: [{ name: "Order steel", asks: "order", icon: "invite" }],
           },
           {
-            name: "Ledger",
-            path: "/stock/ledger",
+            name: "Deliveries",
+            path: "/stock/deliveries",
             icon: "log",
             built: true,
             seenBy: ["Admin"],
@@ -83,7 +83,7 @@ describe("what jump-to lists", () => {
   it("lists a stub tree's built screens and their acts alone", () => {
     expect(outline(jumpsIn(treeOf("Admin", STUB), undefined, AT_ROOT))).toEqual([
       [JUMP_TO.groups.surfaces, ["Yard"]],
-      [JUMP_TO.groups.screens, ["Timber", "Ledger"]],
+      [JUMP_TO.groups.screens, ["Timber", "Deliveries"]],
       [JUMP_TO.groups.acts, ["Order timber"]],
     ]);
   });
