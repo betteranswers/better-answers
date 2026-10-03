@@ -2620,7 +2620,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
   });
 
   describe("restore-sign-in — a person who has lost every factor, restored", () => {
-    const NOTICE = "Your better-answers sign-in was restored by the operator";
+    const NOTICE = "Your better-answers sign-in was restored";
     const RESTORE_CODE = /^[0-9a-hjkmnp-tv-z]{4}(?:-[0-9a-hjkmnp-tv-z]{4}){3}$/;
     const IDENTITY_ACTOR = "process:better-answers-identity";
     const RESTORED_AT = new Date("2026-10-03T09:00:00.000Z");
@@ -2751,7 +2751,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
         [person.email, NOTICE],
       ]);
       expect(sent[0]?.text).toContain(
-        "The platform's operator restored your sign-in. Your passkeys, authenticator and recovery codes no longer work, and every session was signed out.",
+        "Your sign-in was restored. Your passkeys, authenticator and recovery codes no longer work, and every session was signed out.",
       );
     });
 

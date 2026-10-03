@@ -71,10 +71,10 @@ const CHANGES = {
     ifYou: "If they were yours, there is nothing more to do.",
   },
   "sign-in-restored": {
-    subject: `Your ${PRODUCT_NAME} sign-in was restored by the operator`,
+    subject: `Your ${PRODUCT_NAME} sign-in was restored`,
     happened:
-      "The platform's operator restored your sign-in. Your passkeys, authenticator and recovery codes no longer work, and every session was signed out.",
-    ifYou: "If you asked the operator for this, there is nothing more to do.",
+      "Your sign-in was restored. Your passkeys, authenticator and recovery codes no longer work, and every session was signed out.",
+    ifYou: "If you asked for this, there is nothing more to do.",
   },
 } as const satisfies Record<FactorChange, Change>;
 
