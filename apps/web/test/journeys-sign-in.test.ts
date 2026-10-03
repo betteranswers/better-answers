@@ -33,7 +33,7 @@ const SCREEN =
 
 const theScreen = async (page, answers = {}) => {
   const sends = [];
-  await page.route("**/sign-in", (route) =>
+  await page.route((url) => url.pathname === "/", (route) =>
     route.fulfill({
       status: answers.challenged ? 403 : 200,
       headers: answers.challenged ? { "cf-mitigated": "challenge" } : {},
@@ -41,8 +41,9 @@ const theScreen = async (page, answers = {}) => {
       body: SCREEN,
     }),
   );
-  await page.route("**/email-otp/send-verification-otp", (route) => {
+  await page.route("**/email-otp/send-verification-otp", async (route) => {
     sends.push(route.request().url());
+    await new Promise((resolve) => setTimeout(resolve, answers.sendTakesMs ?? 0));
     return route.fulfill({ status: answers.send ?? 200, body: "{}" });
   });
   await page.route("**/sign-in/email-otp", (route) =>
@@ -78,6 +79,19 @@ describe("the journeys' sign-in", () => {
         "",
       ].join("\n"),
       use: { baseURL: "http://journeys.test" },
+    });
+
+    expect(run.outcome).toBe("held\n");
+  }, 120_000);
+
+  it("waits out a Send slower than the action timeout", async () => {
+    const run = await journeysOver({
+      spec: [
+        STAND_IN,
+        'signsIn("Admin", inboxAnswering({ answer: "code", code: CODE }), { sendTakesMs: 2500 });',
+        "",
+      ].join("\n"),
+      use: { baseURL: "http://journeys.test", actionTimeout: 1000 },
     });
 
     expect(run.outcome).toBe("held\n");

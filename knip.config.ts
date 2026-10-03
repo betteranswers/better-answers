@@ -34,7 +34,7 @@ const config: KnipConfig = {
         // export of one, is not dead code.
         "src/shared/ui/**",
 
-        "journeys/fixtures.ts",
+        "journeys/*.spec.ts",
         "journeys/outcome-reporter.ts",
       ],
       includeEntryExports: false,

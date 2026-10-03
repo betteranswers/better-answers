@@ -89,7 +89,9 @@ export const playwrightOver = async (
 type Journeys = {
   /** Left out, the tree holds no spec at all. */
   readonly spec?: string;
-  readonly use?: Readonly<Record<string, string>>;
+  /** More specs by file name, which Playwright runs one worker through in name order. */
+  readonly specs?: Readonly<Record<string, string>>;
+  readonly use?: Readonly<Record<string, string | number>>;
   readonly env?: Readonly<Record<string, string>>;
   /** The config's reporter list as written into it; the outcome reporter alone when left out. */
   readonly reporter?: string;
@@ -106,6 +108,7 @@ export const journeysOver = async (journeys: Journeys) => {
       "package.json": '{ "type": "module" }\n',
       "playwright.config.ts": `export default { testDir: ".", workers: 1, use: ${JSON.stringify(journeys.use ?? {})}, reporter: ${reporter} };\n`,
       ...(journeys.spec === undefined ? {} : { "a.spec.ts": journeys.spec }),
+      ...journeys.specs,
     },
     journeys.env,
   );

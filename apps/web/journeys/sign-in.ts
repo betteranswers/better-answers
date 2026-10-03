@@ -46,7 +46,7 @@ const codeFrom = (answer: InboxAnswer): string => {
 type Answered = Pick<APIResponse, "status" | "headers">;
 
 /** A ceiling or a challenge stops the run before the product is reached, so it judges nothing. */
-const refusedTheRun = (response: Answered, at: string): void => {
+export const refusedTheRun = (response: Answered, at: string): void => {
   if (response.status() === TOO_MANY_REQUESTS) couldNotRun(`a rate ceiling refused ${at}`);
   if (response.headers()["cf-mitigated"] === "challenge") couldNotRun(`the edge challenged ${at}`);
 };
@@ -57,10 +57,14 @@ export const refusedByTheEdge = (response: Answered, at: string): void => {
   if (response.status() === FORBIDDEN) couldNotRun(`the edge refused ${at}`);
 };
 
+/** Inside the sign-in's budget: the action timeout alone would fail a slow Send after spending it. */
+const ANSWER_TIMEOUT_MS = 60_000;
+
 const answerTo = (page: Page, path: string): Promise<Response> =>
   page.waitForResponse(
     (response) =>
       response.request().method() === "POST" && new URL(response.url()).pathname === path,
+    { timeout: ANSWER_TIMEOUT_MS },
   );
 
 /** A second email since the first means another Send rotated the code. */
@@ -73,8 +77,12 @@ const refusedCode = async (awaiting: Awaiting, status: number): Promise<never> =
   throw new Error(`the product refused the code its own email carried, answering ${status}`);
 };
 
+/**
+ * At `/`, which the SPA takes to sign-in: the auth library allows an address three loads of
+ * `/sign-in` in ten seconds, and journeys share one.
+ */
 const sendTheCode = async (page: Page, address: string): Promise<void> => {
-  const opened = await page.goto("/sign-in");
+  const opened = await page.goto("/");
   if (opened !== null) refusedByTheEdge(opened, "the sign-in screen");
   const sent = answerTo(page, SEND_PATH);
   await page.getByLabel(SIGN_IN_WORDS.emailField).fill(address);

@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { z } from "zod";
 
-import { setOperatorMark } from "@better-answers/core/workspaces";
+import { ensureTestWorkspace } from "@better-answers/core/members";
+import { BOOTSTRAP, setOperatorMark } from "@better-answers/core/workspaces";
 import {
   INVITATION_ACCEPTED_STATUS,
   INVITATION_CANCELLED_STATUS,
@@ -76,6 +77,13 @@ const MARK_CHANGES = ["grant", "revoke"] as const;
 const marking = z.object({ email: z.string().min(1), change: z.enum(MARK_CHANGES) });
 const aging = z.object({ userId: z.string().min(1) });
 const codeAging = z.object({ email: z.string().min(1) });
+const testWorkspace = z.object({
+  testingDomain: z.string().min(1),
+  slug: z.string().min(1),
+  admin: z.string().min(1),
+  editor: z.string().min(1),
+  viewer: z.string().min(1),
+});
 
 const readBody = async <T>(request: Request, schema: z.ZodType<T>): Promise<T> => {
   const parsed = schema.safeParse(await request.json());
@@ -165,6 +173,18 @@ export const harnessControl = (app: TestApp): Hono => {
     const marked = await setOperatorMark(IDENTITY_PRINCIPAL, app.doors.postgres, asked);
     if (!marked.ok) throw new Error(`the operator mark was refused: ${String(marked.error)}`);
     return context.json({ marked: true });
+  });
+
+  // The fixture command's own act, so the journeys run by hand meet the workspace it makes.
+  control.post(`${HARNESS_PREFIX}/test-workspaces`, async (context) => {
+    const asked = await readBody(context.req.raw, testWorkspace);
+    const ensured = await ensureTestWorkspace(BOOTSTRAP, app.doors.postgres, asked);
+    if (!ensured.ok) {
+      const { error } = ensured;
+      const why = error instanceof Error ? error.message : JSON.stringify(error);
+      throw new Error(`the test workspace was refused: ${why}`);
+    }
+    return context.json({ workspaceId: ensured.value.workspaceId });
   });
 
   control.post(`${HARNESS_PREFIX}/groups`, async (context) => {

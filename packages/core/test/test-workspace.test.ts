@@ -5,6 +5,7 @@ import {
   INVITATION_WAITING_STATUS,
   ulid,
 } from "@better-answers/schema";
+import { INVENTED_MEMBERS, inventedMemberAddress } from "@better-answers/schema/test-workspace";
 
 import type { PlatformPrincipal, Result, UserPrincipal, WorkspaceId } from "../src/kernel/index.ts";
 import {
@@ -66,6 +67,16 @@ const peopleOn = async (fixture: Fixture) =>
       [`%@${fixture.testingDomain}`],
     )
   ).rows;
+
+/** A fixture made fresh, and the invented people it holds, in address order. */
+const inventedMade = async () => {
+  const fixture = aFixture();
+  answeredValue(await ensured(fixture));
+  const invented = (await peopleOn(fixture)).filter((one) =>
+    one.address.startsWith("invented-member-"),
+  );
+  return { fixture, invented };
+};
 
 const personIdAt = async (address: string) => {
   const found = await db().pool.query<{ id: string }>(
@@ -177,17 +188,22 @@ describe("ensuring the test workspace", () => {
   });
 
   it("names the invented members so they sort together", async () => {
-    const fixture = aFixture();
-    answeredValue(await ensured(fixture));
-
-    const invented = (await peopleOn(fixture)).filter((one) =>
-      one.address.startsWith("invented-member-"),
-    );
+    const { invented } = await inventedMade();
 
     expect(invented.map((one) => one.name)).toEqual(
       Array.from(
         { length: 51 },
         (_, index) => `Invented member ${String(index + 1).padStart(2, "0")}`,
+      ),
+    );
+  });
+
+  it("holds each invented member at the journeys' shared address", async () => {
+    const { fixture, invented } = await inventedMade();
+
+    expect(invented.map((one) => one.address)).toEqual(
+      Array.from({ length: INVENTED_MEMBERS }, (_, index) =>
+        inventedMemberAddress(index + 1, fixture.testingDomain),
       ),
     );
   });

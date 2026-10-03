@@ -7,6 +7,7 @@ import { expect, test as suite } from "../e2e/browser.ts";
 import { codeSentTo } from "../e2e/harness.ts";
 import { noteInbox } from "./inbox.ts";
 import { couldNotRun, playsTheRole } from "./outcome.ts";
+import { goOnUnlessStopped } from "./run-stop.ts";
 import { refusedByTheEdge, signIn, type CodeSource } from "./sign-in.ts";
 
 type JourneyFixtures = {
@@ -26,6 +27,13 @@ const addressOf = (role: Role): string => {
   const parsed = ADDRESS.safeParse(process.env[name]);
   return parsed.success ? parsed.data : couldNotRun(`${name} is not set to an address`);
 };
+
+/** Each test person's address, by role. A caller never prints one. */
+export const theTestPeople = () => ({
+  Admin: addressOf("Admin"),
+  Editor: addressOf("Editor"),
+  Viewer: addressOf("Viewer"),
+});
 
 const inboxSource = (): CodeSource => {
   const sender = SENDER.safeParse(process.env["JOURNEYS_SENDER"]);
@@ -50,6 +58,16 @@ const codeSourceOf = (request: APIRequestContext): CodeSource => {
   }
   return named.data === "inbox" ? inboxSource() : harnessSource(request);
 };
+
+/**
+ * Before anyone signs in, so a missing setting or a silent inbox spends no sign-in. Noting the
+ * inbox sends nothing.
+ */
+export const theSettingsAndInboxHold = (request: APIRequestContext): Promise<void> =>
+  suite.step("Read the journeys' settings and note the test inbox", async () => {
+    const noted = await codeSourceOf(request)(theTestPeople().Admin);
+    if (noted.answer !== "noted") couldNotRun("the test inbox did not answer");
+  });
 
 /** Through the context's own cookies, so it holds when the page does not. */
 const signedOut = (context: BrowserContext, baseURL: string | undefined): Promise<void> =>
@@ -89,6 +107,7 @@ export const test = suite.extend<JourneyFixtures>({
         return;
       }
       playsTheRole(role);
+      await suite.step("Check the run goes on", goOnUnlessStopped);
       try {
         const { address, source } = await suite.step("Read the journeys' settings", () => ({
           address: addressOf(role),

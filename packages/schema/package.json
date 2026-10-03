@@ -7,6 +7,7 @@
     ".": "./src/index.ts",
     "./ulid": "./src/ulid.ts",
     "./code-unit": "./src/code-unit.ts",
+    "./test-workspace": "./src/test-workspace.ts",
     "./email-code": "./src/email-code.ts",
     "./email-address": "./src/email-address.ts",
     "./second-factor": "./src/second-factor.ts",
