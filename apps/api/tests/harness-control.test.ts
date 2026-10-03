@@ -39,11 +39,13 @@ describe("the browser suite's second-factor harness", () => {
   });
 
   it("restores a person with a code the restore route accepts", async () => {
-    const { person, client } = await aPersonSignedIn(app());
+    const { person, client: before } = await aPersonSignedIn(app());
     const { code } = z
       .object({ code: z.string() })
       .parse(await harnessAnswer("/__harness/restores", person.email));
+    const client = await signedInClient(app(), person.email);
 
+    expect(await (await before.fetch("/get-session")).json()).toBeNull();
     expect((await webClientOf(client).api.person.secondFactor.query()).restoreRequired).toBe(true);
     expect((await client.json("/second-factor/restore", { code })).status).toBe(200);
   });

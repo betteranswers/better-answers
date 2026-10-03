@@ -122,6 +122,8 @@ const SENTENCES = {
   "people.person.restore_code_accepted": ({ by }) => `${by} used the operator's restore code`,
   "people.person.second_factor_confirmed": ({ by, detail }) =>
     `${by} confirmed their second factor with ${factorIn(detail, "method")}`,
+  "people.person.sign_in_restored": ({ by, subject }) =>
+    `${by} restored ${possessive(subject)} sign-in`,
   "people.person.signed_in": ({ by }) => `${by} signed in`,
   "people.request.approved": ({ by }) => `${by} approved an access request`,
   "people.request.asked": ({ by }) => `${by} asked to join the workspace`,

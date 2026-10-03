@@ -2,7 +2,6 @@ import { Hono } from "hono";
 import { z } from "zod";
 
 import { ensureTestWorkspace } from "@better-answers/core/members";
-import { restoredWithACode } from "@better-answers/core/testing/restore-code";
 import { BOOTSTRAP, setOperatorMark } from "@better-answers/core/workspaces";
 import {
   INVITATION_ACCEPTED_STATUS,
@@ -31,6 +30,7 @@ import {
 import type { TestApp } from "./harness.ts";
 import {
   codeSentPastItsExpiry,
+  restoredByTheOperator,
   sessionsSignedInOverAnHourAgo,
   setUpAnAuthenticator,
   signedInClient,
@@ -151,11 +151,10 @@ export const harnessControl = (app: TestApp): Hono => {
     return context.json({ key });
   });
 
-  // An operator's restore as it leaves the person: marked restored, holding the code answered.
+  // The ops command's own restore, so a spec meets the person as the operator leaves them.
   control.post(`${HARNESS_PREFIX}/restores`, async (context) => {
     const asked = await readBody(context.req.raw, byEmail);
-    const code = await restoredWithACode(app.database.superuser, asked.email, new Date());
-    return context.json({ code });
+    return context.json({ code: await restoredByTheOperator(app, asked.email) });
   });
 
   control.delete(`${HARNESS_PREFIX}/members`, async (context) => {

@@ -42,6 +42,7 @@ export const DECLARED_ACTS = [
   "people.person.renamed",
   "people.person.restore_code_accepted",
   "people.person.second_factor_confirmed",
+  "people.person.sign_in_restored",
   "people.person.signed_in",
   "people.request.approved",
   "people.request.asked",

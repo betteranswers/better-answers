@@ -125,7 +125,7 @@ const keyEnrolled = z.object({ key: z.string() });
 export const withAnAuthenticator = async (api: APIRequestContext, email: string) =>
   (await ask(api, "/authenticators", { email }, keyEnrolled)).key;
 
-/** The platform operator's restore, keeping the person's factors and sessions; answers its code. */
+/** The platform operator's restore, ending the person's factors and sessions; answers its code. */
 export const restored = async (api: APIRequestContext, email: string) =>
   (await ask(api, "/restores", { email }, codeSent)).code;
 

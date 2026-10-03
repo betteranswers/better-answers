@@ -1,4 +1,4 @@
-# Runbook — thirteen pages and eight procedures
+# Runbook — thirteen pages and nine procedures
 
 **Operational reference, not a page of the docs site.** This file lives in `docs/operations/` because that is where the operational documents are kept; the docs site does not render it, and it is read from the repository.
 
@@ -406,3 +406,13 @@ The operator is the person the console serves, marked on their person row. Only 
 - `pnpm ops operator --email <address> --grant` makes them the operator, and `--revoke` clears the mark. Each change writes `people.operator.granted` or `people.operator.revoked` to the identity-set audit log under the platform's own actor id. A person who already stands as asked is left alone, and the done line says nothing was written.
 - The console answers the operator from their ordinary signed-in session, and never from an OAuth token. Clearing the mark refuses them from their next request.
 - Inside a workspace the operator is a member like any other, with the role they hold there. An erasure that pseudonymises the person clears the mark with the rest of their identity.
+
+## Restore a person's sign-in
+
+An Admin who has lost every second factor and every recovery code asks the operator to restore them. No screen can.
+
+1. Check who they are by a route other than their email: a call to a number already on file, or in person. Someone holding only their mailbox must not get through.
+2. Run `pnpm ops restore-sign-in --email <address>` on the `api` service. In one transaction it ends their passkeys, authenticator, recovery codes and sessions, and records `people.person.sign_in_restored` in the identity-set audit log under the platform's own actor id. It then emails them a notice, which never carries the code.
+3. Read them the restore code it prints, by the route you checked them on and never by email. It works once, for 24 hours, and a second restore voids it. At their next email sign-in, setup asks for it before any factor can be added.
+
+The command changes nothing for an address no person holds (`REFUSED — no-such-user`), or when the `api` service has no `SMTP_URL`, because the notice is part of the act. If the notice does not go, the restore still stands, and the output says to tell them yourself.

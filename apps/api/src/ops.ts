@@ -6,10 +6,24 @@ import { logger } from "./logger.ts";
 import { fetchHonouringHost } from "./ops/http-fetch.ts";
 import { runOps } from "./ops/index.ts";
 import { readTreeUnder } from "./ops/read-tree.ts";
+import { senderAt } from "./product-name.ts";
+import { emailSender, pacedTransport } from "./smtp.ts";
 
 const bootstrap = requireBootstrap("pnpm ops");
 const identity = readIdentityBootstrap();
 const objectStore = readObjectStore();
+
+const mail =
+  identity.ok && identity.value.smtpUrl !== undefined
+    ? {
+        send: emailSender(
+          pacedTransport(identity.value.smtpUrl),
+          senderAt(identity.value.hostnames.apex),
+          logger,
+        ),
+        publicUrl: identity.value.publicUrl,
+      }
+    : undefined;
 
 const doors = openDoors({
   database: bootstrap.databaseUrl,
@@ -37,6 +51,7 @@ const exitCode = await runOps(process.argv.slice(2), doors, {
   },
 
   readTree: readTreeUnder,
+  mail,
 }).finally(() => closeDoors(doors));
 
 process.exit(exitCode);

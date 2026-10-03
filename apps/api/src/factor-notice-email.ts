@@ -18,7 +18,8 @@ export type FactorChange =
   | "codes-replaced"
   | "recovery-code-used"
   | "factors-replaced"
-  | "confirm-failures";
+  | "confirm-failures"
+  | "sign-in-restored";
 
 type Change = {
   readonly subject: string;
@@ -26,6 +27,9 @@ type Change = {
 
   /** Said in place of the usual line, for a notice of something the person may not have done. */
   readonly ifYou?: string;
+
+  /** Said in place of the usual line, where its Account page holds nothing left to check. */
+  readonly ifNot?: string;
 };
 
 const CHANGES = {
@@ -69,6 +73,13 @@ const CHANGES = {
       "Several wrong codes in a row were entered to confirm your second factor. Each further wrong code makes the next try wait longer.",
     ifYou: "If they were yours, there is nothing more to do.",
   },
+  "sign-in-restored": {
+    subject: `Your ${PRODUCT_NAME} sign-in was restored`,
+    happened:
+      "Your sign-in was restored. Your passkeys, authenticator and recovery codes no longer work, and every session was signed out.",
+    ifYou: "If you asked for this, there is nothing more to do.",
+    ifNot: `If you didn't, tell ${PRODUCT_NAME} support now:`,
+  },
 } as const satisfies Record<FactorChange, Change>;
 
 const WORDS = {
@@ -83,31 +94,31 @@ const htmlOf = (change: Required<Change>, account: string): string =>
     change.subject,
     `<p style="${PARAGRAPH}">${change.happened}</p>
 <p style="${PARAGRAPH}">${change.ifYou}</p>
-<p style="${PARAGRAPH}">${WORDS.ifNot}</p>
+<p style="${PARAGRAPH}">${change.ifNot}</p>
 <p style="margin:0"><a href="${account}">${account}</a></p>`,
   );
 
 /** Names what changed and never the factor itself: no key, no code, no device. */
 const factorNoticeEmail = (to: string, change: FactorChange, publicUrl: string): EmailMessage => {
-  const said: Required<Change> = { ifYou: WORDS.ifYou, ...CHANGES[change] };
+  const said: Required<Change> = { ifYou: WORDS.ifYou, ifNot: WORDS.ifNot, ...CHANGES[change] };
   const account = `${publicUrl}${ACCOUNT_PATH}`;
   return {
     to,
     subject: said.subject,
-    text: [said.happened, "", said.ifYou, "", WORDS.ifNot, "", account].join("\n"),
+    text: [said.happened, "", said.ifYou, "", said.ifNot, "", account].join("\n"),
     html: htmlOf(said, account),
   };
 };
 
 /**
  * Never rejects, so a caller need not await it and a slow relay holds no answer. A missed notice
- * is a log line.
+ * is a log line and false.
  */
 export const sendFactorNotice = async (
   ctx: { readonly mail: Mail; readonly log: Logger },
   to: string,
   change: FactorChange,
-): Promise<void> => {
+): Promise<boolean> => {
   const sent = await attempt(() =>
     ctx.mail.send(factorNoticeEmail(to, change, ctx.mail.publicUrl)),
   );
@@ -117,4 +128,5 @@ export const sendFactorNotice = async (
       "a second-factor notice did not go",
     );
   }
+  return sent.ok;
 };
