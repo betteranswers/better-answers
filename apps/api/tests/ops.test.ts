@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { serve } from "@hono/node-server";
+import { getTableName, type Table } from "drizzle-orm";
 import { Pool } from "pg";
 import { beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -37,7 +38,19 @@ import {
   until,
   whileWritesAreRefused,
 } from "@better-answers/core/testing/postgres";
-import { ulid } from "@better-answers/schema";
+import {
+  bundleCommit,
+  conceptIndex,
+  conceptVerification,
+  erasureRequest,
+  graphEdge,
+  graphGeneration,
+  graphNode,
+  job,
+  sourceDocument,
+  suppression,
+  ulid,
+} from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
 import type { Doors } from "../src/doors.ts";
@@ -177,6 +190,17 @@ const answered = (run: Run): unknown => JSON.parse(run.lines[0] ?? "");
 const ULID_SHAPE = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
 const BOOTSTRAP_ACTOR = "process:better-answers-bootstrap";
+
+/** Table objects, never names, so a renamed table renames what each command must find. */
+const SLICE_TABLES: Readonly<Record<string, readonly Table[]>> = {
+  "graph-rebuild": [graphGeneration, graphNode, graphEdge, job],
+  "graph-sweep": [graphGeneration, graphNode, graphEdge],
+  "graph-counts": [graphGeneration, graphNode, graphEdge],
+  "reconcile-watermark": [conceptIndex, bundleCommit],
+  "object-store-orphans": [sourceDocument],
+  "erasure-rehearsal": [erasureRequest, suppression],
+  "import-bundle": [conceptIndex, bundleCommit, conceptVerification],
+};
 
 const idOnTheDoneLine = (run: Run): string => {
   const id = /done — (\S+),/.exec(run.lines[0] ?? "")?.[1];
@@ -775,6 +799,30 @@ describe("pnpm ops — the restore scripts' commands", () => {
         expect(run.lines.join("\n")).toContain("not built");
       },
     );
+
+    it("names absent exactly the tables the schema's objects name", async () => {
+      expect([...SLICE_COMMANDS].toSorted()).toEqual(Object.keys(SLICE_TABLES).toSorted());
+
+      for (const [command, tables] of Object.entries(SLICE_TABLES)) {
+        const run = await opsBeforeTheJournal(app(), [
+          command,
+          "--workspace",
+          "ws_synthetic",
+          "--wait",
+          "--list",
+        ]);
+        const absent = tables.map((table) => getTableName(table)).join(", ");
+
+        expect({ command, exitCode: run.exitCode, said: run.lines }).toEqual({
+          command,
+          exitCode: NOT_BUILT,
+          said: [
+            `${command}: not built — ${absent} absent from this schema; the slice that owns them has not landed`,
+          ],
+        });
+      }
+    });
+
     it("answers in its own name, never another command's", async () => {
       const { workspaceId } = await app().provision();
 

@@ -1,3 +1,4 @@
+import { getTableName, type Table } from "drizzle-orm";
 import type { Logger } from "pino";
 
 import type { Sensitivity } from "@better-answers/core/access";
@@ -68,7 +69,22 @@ import {
   type ProvisionRefusal,
   type RenameRefusal,
 } from "@better-answers/core/workspaces";
-import { REBUILD_REASONS, ROLES, SENSITIVITIES, ulid } from "@better-answers/schema";
+import {
+  bundleCommit,
+  conceptIndex,
+  conceptVerification,
+  erasureRequest,
+  graphEdge,
+  graphGeneration,
+  graphNode,
+  job,
+  REBUILD_REASONS,
+  ROLES,
+  SENSITIVITIES,
+  sourceDocument,
+  suppression,
+  ulid,
+} from "@better-answers/schema";
 
 import { doorTold, type Doors } from "../doors.ts";
 import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
@@ -142,15 +158,18 @@ const flagValue = (flags: Flags, name: string): string | undefined => {
   return typeof value === "string" ? value : undefined;
 };
 
+const MAP_TABLES = [graphGeneration, graphNode, graphEdge];
+
+/** Table objects, never names, so a renamed table renames what each command must find. */
 const NEEDS = {
-  "graph-rebuild": ["graph_generation", "graph_node", "graph_edge", "job"],
-  "graph-sweep": ["graph_generation", "graph_node", "graph_edge"],
-  "graph-counts": ["graph_generation", "graph_node", "graph_edge"],
-  "reconcile-watermark": ["concept_index", "bundle_commit"],
-  "object-store-orphans": ["source_document"],
-  "erasure-rehearsal": ["erasure_request", "suppression"],
-  "import-bundle": ["concept_index", "bundle_commit", "concept_verification"],
-} as const;
+  "graph-rebuild": [...MAP_TABLES, job],
+  "graph-sweep": MAP_TABLES,
+  "graph-counts": MAP_TABLES,
+  "reconcile-watermark": [conceptIndex, bundleCommit],
+  "object-store-orphans": [sourceDocument],
+  "erasure-rehearsal": [erasureRequest, suppression],
+  "import-bundle": [conceptIndex, bundleCommit, conceptVerification],
+};
 
 type SliceCommand = keyof typeof NEEDS;
 
@@ -230,10 +249,11 @@ const replayErasuresCommand = async (doors: Doors, flags: Flags, io: OpsIo): Pro
     io.say("replay-erasures: --since <dump stamp or ISO instant> is required");
     return USAGE;
   }
-  const present = await tablesPresent(doors.postgres, ["erasure_request"]);
+  const requests = getTableName(erasureRequest);
+  const present = await tablesPresent(doors.postgres, [requests]);
   if (present.length === 0) {
     io.say(
-      `replayed 0 erasures since ${since.toISOString()}: no erasure_request table exists in this schema, so no erasure has ever been recorded here`,
+      `replayed 0 erasures since ${since.toISOString()}: no ${requests} table exists in this schema, so no erasure has ever been recorded here`,
     );
     return DONE;
   }
@@ -413,7 +433,8 @@ const sliceCommand = async (
     io.say(`${command}: --workspace <id> is required`);
     return USAGE;
   }
-  const needed = NEEDS[command];
+  const tables: readonly Table[] = NEEDS[command];
+  const needed = tables.map((table) => getTableName(table));
   const present = await tablesPresent(doors.postgres, needed);
   if (present.length < needed.length) {
     io.say(
