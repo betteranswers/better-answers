@@ -15,7 +15,7 @@ const ADDRESS = "admin@journeys.example";
 const specOf = (...lines: readonly string[]): string =>
   [
     'import { expect, test } from "@playwright/test";',
-    `import { couldNotRun, playsTheRole } from ${moduleAt("journeys/outcome.ts")};`,
+    `import { couldNotRun, failed, playsTheRole } from ${moduleAt("journeys/outcome.ts")};`,
     ...lines,
     "",
   ].join("\n");
@@ -121,12 +121,35 @@ describe("the journeys' outcome reporter", () => {
     expect(run.outcome).toBe("could-not-run\n");
     expect(run.summary).toContain(
       [
-        "| Outcome | Role | Screen | Step | Why it could not run |",
+        "| Outcome | Role | Screen | Step | Why |",
         "| --- | --- | --- | --- | --- |",
         "| fail | Admin | Members | moves three members to Editor |  |",
         "| could-not-run | Editor | Sign in | Send the code | a rate ceiling refused the Send |",
       ].join("\n"),
     );
+  }, 60_000);
+
+  it("prints a failure's authored reason, never its error", async () => {
+    const run = await journeysOver({
+      spec: specOf(
+        'test("the Admin signs in", async () => {',
+        '  playsTheRole("Admin");',
+        '  await test.step("Sign in", async () => {',
+        '    await test.step("Read the code", () => failed("the sign-in email carried no code"));',
+        "  });",
+        "});",
+        ...ADMIN_FAILS_ON_MEMBERS,
+      ),
+    });
+
+    expect(run.outcome).toBe("fail\n");
+    expect(run.summary).toContain(
+      [
+        "| fail | Admin | Sign in | Read the code | the sign-in email carried no code |",
+        "| fail | Admin | Members | moves three members to Editor |  |",
+      ].join("\n"),
+    );
+    expect(run.summary).not.toContain(ADDRESS);
   }, 60_000);
 
   it("names a step that failed inside a fixture", async () => {

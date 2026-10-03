@@ -157,22 +157,52 @@ The estate is two 4 GB boxes (ADR 0024): VPC 1 is production, VPC 2 is the orche
 
 ## 13. The test workspace and its nightly journeys
 
-The nightly journeys sign in to production as three test people, the test Admin, Editor and Viewer, each with an email code read from a test inbox through its API. Each then walks the screens their role reaches. The three, 51 invented members and the workspace they stand in are the test workspace. Only `pnpm ops test-workspace` makes it and sets it back. It carries a mark naming its testing domain, a row the api cannot delete (migrations 0062 and 0063). While the mark stands, an invitation from the workspace to an address off that domain is refused `off-testing-domain`. A run ends in one word, `held`, `fail` or `could-not-run`. The word goes to the run's summary and, as a ping's body, to the `journeys` check. The summary names the role, the screen and the step, and never an address. U6 of BA-34 puts the journeys into `release.yml`. Until it lands, nothing runs them against production.
+The nightly journeys sign in to production as three test people, the test Admin, Editor and Viewer, each with an email code read from a test inbox through its API. Each then walks the screens their role reaches. The test inbox is `apps/test-inbox`, a Cloudflare Email Worker on a testing domain of its own. It keeps what reaches the domain for a day and judges nothing: the journeys check each email's DKIM signature themselves, and set aside any that does not verify as production's. The three, 51 invented members and the workspace they stand in are the test workspace. Only `pnpm ops test-workspace` makes it and sets it back. It carries a mark naming its testing domain, a row the api cannot delete (migrations 0062 and 0063). While the mark stands, an invitation from the workspace to an address off that domain is refused `off-testing-domain`. A run ends in one word, `held`, `fail` or `could-not-run`. The word goes to the run's summary and, as a ping's body, to the `journeys` check. The summary names the role, the screen and the step, and never an address. U6 of BA-34 puts the journeys into `release.yml`. Until it lands, nothing runs them against production.
 
-**Set it up, in this order.** Steps 1 to 5 come before U6 lands, and its pull request waits on step 5. The real domain, addresses, slug, key and URL go to the private file and to the `production` environment, never into this file.
+**Set it up, in this order.** Steps 1 to 5 come before U6 lands, and its pull request waits on step 5. The real testing domain, account id, addresses, slug, key and URLs go to the private file and to the `production` environment, never into this file.
 
-1. **A Resend team of its own.** Make a new team in Resend, apart from the one production sends from, and give it a Resend-managed receiving domain. That domain is the testing domain. Resend has no read-only key, so the one key the journeys hold can do anything in its team. A team that holds only this domain keeps the key away from production's sending. A Resend-managed domain puts nothing under the product's own domain that the key could send as. Mint one key. Choose three addresses on the testing domain, one each for the test Admin, Editor and Viewer. Mail to any address on the domain reaches the team's inbox, the invented members' included.
-2. **The `production` environment.** Put the key and the three addresses in it as secrets, under the names the journeys read. U6's workflow passes them on. The addresses are secrets and never variables: the repository is public, and a variable prints in a run's logs. The fifth secret, the ping URL, comes from step 3. Then set `JOURNEYS_MODE`, the repository variable U6 adds, to `report`:
+1. **The testing zone and its test inbox.** The testing domain is a domain of its own, added to the Cloudflare account as a zone of its own. The product's zone is not touched. Mail to any address on the testing domain reaches the test inbox, the invented members' included.
+
+   First make the deploy token. In Cloudflare, under Manage account, Account API tokens, create a custom token with the account's Workers Scripts and D1 edit permissions, Workers Tail and Account Settings read, and no zone permission at all. Keep it in the password manager, and in the Keychain under `ba-test-inbox-deploy`. Never run `wrangler login`: its default grant can write Worker routes across the account, the product's zone included.
+
+   Then deploy the Worker, make its store and set its token, from a checkout of `main`. The deploy makes the D1 database `test-inbox` by its name. Until the migration is applied, the Worker logs each message as unstored and its API answers 503. The inbox key is 32 random bytes, and `pbcopy` puts it on the clipboard without printing it: keep it in the password manager, then paste it when `wrangler` asks for it.
 
    ```sh
-   gh secret set JOURNEYS_INBOX_KEY --env production      # the Resend team's one key
+   export CLOUDFLARE_API_TOKEN="$(security find-generic-password -s ba-test-inbox-deploy -w)"
+   read -r CLOUDFLARE_ACCOUNT_ID && export CLOUDFLARE_ACCOUNT_ID   # paste the account id from the private file
+   pnpm --filter @better-answers/test-inbox run deploy
+   pnpm --filter @better-answers/test-inbox run wrangler d1 migrations apply test-inbox --remote
+   openssl rand -hex 32 | pbcopy
+   pnpm --filter @better-answers/test-inbox run wrangler secret put READ_TOKEN
+   ```
+
+   Bare `pnpm deploy` is pnpm's own command, so the script is always run through `run`. After any change to `apps/test-inbox` merges, deploy again from `main`, and apply its migrations if it added one. Nothing in CI deploys the Worker.
+
+   Then, in the zone's Email Routing, switch routing on and make one catch-all rule on the apex whose action sends to the Worker `test-inbox`. Leave the zone's bot challenges off. A change to the rule takes a minute or so to reach Email Routing, so never delete a Worker the rule last pointed at until a message has reached the new one: mail in between fails, and the sender retries it minutes later. The Worker's URL is its `workers.dev` address, `https://` and the host with nothing after it; keep it in the private file.
+
+   Prove the routing before any sign-in runs. From any mailbox, send a message to an address on the testing domain that is none of the test people's, then list the inbox:
+
+   ```sh
+   read -rs KEY   # paste the inbox key: it is not echoed, and not kept in the history
+   read -r URL    # paste the Worker's URL from the private file
+   curl -sS --proto =https -H "Authorization: Bearer $KEY" "$URL/emails/receiving?limit=5" | jq '.data[] | {id, created_at, from, to, subject}'
+   ```
+
+   The message is listed. If it bounced instead, fix the routing first: production's sign-in email to a test address that bounces puts the address on production's Resend suppression list, and every later night then reads `no-mail`. Then choose three addresses on the testing domain, one each for the test Admin, Editor and Viewer.
+
+2. **The `production` environment.** Put the inbox key, the Worker's URL and the three addresses in it as secrets, under the names the journeys read. U6's workflow passes them on. The addresses and the URL are secrets and never variables: the repository is public, and a variable prints in a run's logs. The sixth secret, the ping URL, comes from step 3. Production's sender is no secret, since every sign-in email carries it, so `JOURNEYS_SENDER` is a variable of the environment. Then set `JOURNEYS_MODE`, the repository variable U6 adds, to `report`:
+
+   ```sh
+   gh secret set JOURNEYS_INBOX_KEY --env production      # the inbox key, the Worker's READ_TOKEN
+   gh secret set JOURNEYS_INBOX_URL --env production      # the Worker's URL
    gh secret set JOURNEYS_ADMIN_EMAIL --env production    # the test Admin's address
    gh secret set JOURNEYS_EDITOR_EMAIL --env production   # the test Editor's address
    gh secret set JOURNEYS_VIEWER_EMAIL --env production   # the test Viewer's address
+   gh variable set JOURNEYS_SENDER --env production --body "<the From of production's sign-in email>"
    gh variable set JOURNEYS_MODE --body report
    ```
 
-   `gh secret set` asks for the value, so it never lands in the shell's history. `JOURNEYS_MODE` takes three values. Under `off` the journeys do not run. Under `report` they run and report, and a release is tagged on its smoke as today. Under `gate` a release is tagged only when its journeys end `held`. The gate refuses any other value and names the three.
+   `gh secret set` asks for the value, so it never lands in the shell's history. A run whose `JOURNEYS_INBOX_URL` is anything but that bare `https` address ends `could-not-run` and names the setting. U6's journeys step sets `JOURNEYS_CODE_SOURCE` to `inbox` itself; a run by hand against the browser suite's api sets it to `harness`. `JOURNEYS_MODE` takes three values. Under `off` the journeys do not run. Under `report` they run and report, and a release is tagged on its smoke as today. Under `gate` a release is tagged only when its journeys end `held`. The gate refuses any other value and names the three.
 
 3. **The check.** At the dead-man service, make a project of its own, apart from the one holding the backup checks, with one check named `journeys`. Its period is one day and its grace 12 hours. The service counts the period from the last ping, and GitHub starts a scheduled run late: the nightly `release` is set for 02:35 UTC, and from 28/09 to 02/10/2026 GitHub started it between 08:55 and 09:52 UTC. A night that starts on time after a late one is no problem, but a late night after an on-time one leaves a gap of more than 31 hours. A ping that says `fail` or `could-not-run` marks the check down at once, whatever the grace. So a long grace only delays the alert for a night with no run at all. A project's integrations are its own, so add the second channel to the new project. Copy the check's ping URL in its UUID form, which pings that check alone. A separate project means a leaked URL can never ping `pg-hourly` or `nightly`. Put the URL in the `production` environment as a secret, under the name U6's `release.yml` reads.
 4. **The fixture.** Once a release carries U1 (#518), run the command on the `api` service. Check that the newest tag's commit descends from U1's merge first:
@@ -199,24 +229,27 @@ The nightly journeys sign in to production as three test people, the test Admin,
    A member of the test workspace outside the fixture is named on a line of its own, ending `is no part of the fixture; left in place`. The command never removes anyone, and never grants or revokes the operator mark. Its lines name addresses, so they go where the private file's records are kept, never anywhere public. CI never runs it.
 
 5. **Go/no-go, before U6 lands.** Every check below holds, or U6 waits.
-   - **The live release carries U5.** The proof runs the journeys of the commit the live api image was built from. So the newest tag's commit must descend from U5's merge (#525), which carries U1, U3 and U4. Run step 4's `merge-base` check with `525`.
-   - **The inbox answers.** Send a message to a test address from any mailbox, then list the inbox:
+   - **The live release carries this unit's pull request.** The proof runs the journeys of the commit the live api image was built from. So the newest tag's commit must descend from the merge of this unit's pull request, U10 of BA-34, which moved the journeys to the test inbox and carries U1 to U5. Run step 4's `merge-base` check with its number.
+   - **The inbox answers and can store.** With `KEY` and `URL` read as in step 1, list the inbox, then probe it:
 
      ```sh
-     read -rs KEY   # paste the inbox key: it is not echoed, and not kept in the history
-     curl -sS -H "Authorization: Bearer $KEY" 'https://api.resend.com/emails/receiving?limit=5' | jq '.data[] | {id, created_at, from, to, subject}'
+     curl -sS --proto =https -H "Authorization: Bearer $KEY" "$URL/emails/receiving?limit=5" | jq '.data[] | {id, created_at, from, to, subject}'
+     curl -sS --proto =https -X POST -H "Authorization: Bearer $KEY" "$URL/probe"
      ```
 
-     The message is listed.
+     The list answers, and the probe answers `{"probed":true}`. A 503 means the store cannot write: apply the migration, as step 1 does.
 
-   - **The list is newest first.** Send a second message and list again. It must come first. Resend does not document the order, and the journeys' reader assumes it.
-   - **Production's sign-in email authenticates.** On production's sign-in screen, ask for a code for the test Viewer and leave it unentered. Read that email by its id from the list:
+   - **Production's sign-in email verifies.** On production's sign-in screen, ask for a code for the test Viewer and leave it unentered. Take that email's id from the list, then check its signature with `mailauth`'s own command, the library the journeys verify with:
 
      ```sh
-     curl -sS -H "Authorization: Bearer $KEY" 'https://api.resend.com/emails/receiving/<id>' | jq '{from, authentication}'
+     curl -sS --proto =https -H "Authorization: Bearer $KEY" "$URL/emails/receiving/<id>" | jq -r .raw | base64 --decode > "$TMPDIR/sign-in.eml"
+     pnpm --filter @better-answers/web exec mailauth report "$TMPDIR/sign-in.eml" | jq '.dkim.results[] | {signingDomain, result: .status.result}'
+     rm "$TMPDIR/sign-in.eml"
      ```
 
-     `authentication.dkim` or `authentication.dmarc` must read `pass`, against production's From domain. If the block is there and neither passes, every run reads the code as ambiguous and ends `could-not-run`. A message with no `authentication` block is accepted on its sender and novelty alone, so a `null` here is a no-go too. Fix the sending domain's DKIM or DMARC before going on.
+     One result must read `pass` with the domain of production's sender as its `signingDomain`. A second signature, the relay's own, may stand beside it. If none passes for production's domain, every run reads `unverified` and ends `could-not-run`: fix the sending domain's DKIM before going on.
+
+   - **No test address is suppressed.** In production's Resend team, the suppression list holds none of the three test addresses. A suppressed address is sent nothing, and every night reads `no-mail` until it is removed there.
 
    - **One proof run ends `held`.** Dispatch `release` once from U6's branch, with the journeys-only input U6 adds. The `production` environment still lets a branch in until step 6. The run promotes nothing and pushes no tag. Its summary and the `journeys` check's last ping both read `held`.
 
@@ -228,23 +261,23 @@ The nightly journeys sign in to production as three test people, the test Admin,
 - **Fires:** the `journeys` check at the dead-man service, on the second channel. A `fail` or `could-not-run` ping marks it down. A day and its grace with no ping marks it late. Under `gate`, a run that did not hold also leaves its release untagged.
 - **Do — read the word.** The run's summary says which journey stopped, at which screen and step.
   - **`held`:** nothing to do.
-  - **`fail`:** a screen did not do what its journey asks, no sign-in email reached the test inbox within 90 seconds, or one came with no code (step 5's last paragraph). Journeys skipped because the promote failed also read `fail`, and that is page 6. Under `report` the release was tagged on its smoke all the same. Under `gate` it was not, and production still runs it. Nothing rolls back on its own yet: whether to roll back is the owner's decision, by page 6, as for any release.
-  - **`could-not-run`:** the run could not judge the release, so it says nothing about the product. The summary gives the reason. It may be a setting not set, which the line names, or the inbox unreachable. The edge may have challenged or refused the browser, or a code was refused for too many asks. Two new codes for one person in the window mean someone else pressed Send. A commit the journeys could not check out also stops a run. Fix the cause, then rerun the run's failed jobs with `gh run rerun <run id> --failed`. **Never tag by hand a release whose journeys did not hold.** Under `gate` a setup fault leaves the live release untagged. Each night then promotes the same commit again, restarting the api, until a run holds, so fix it the same day.
+  - **`fail`:** a screen did not do what its journey asks, no sign-in email reached the test inbox within 90 seconds, or one came with no code (step 5's last paragraph). The summary's last column tells the two inbox cases apart. Journeys skipped because the promote failed also read `fail`, and that is page 6. Start a `no-mail` night at production's Resend suppression list, for the three test addresses: a bounce puts an address there, and it is then sent nothing. Remove it there, then read the Worker's logs and the testing zone's Email Routing activity log for the message that was refused or dropped. Under `report` the release was tagged on its smoke all the same. Under `gate` it was not, and production still runs it. Nothing rolls back on its own yet: whether to roll back is the owner's decision, by page 6, as for any release.
+  - **`could-not-run`:** the run could not judge the release, so it says nothing about the product. The summary gives the reason. It may be a setting not set, which the line names, or the inbox unreachable or unable to store a message. The edge may have challenged or refused the browser, or a code was refused for too many asks. Two new codes for one person in the window mean someone else pressed Send. An email from production's sender whose signature did not verify, or whose signing key DNS did not answer for, is set aside; when only such emails came, the summary says so. Someone may have forged one, or production's own signature broke: step 5's `mailauth` check on the newest of them tells which. A commit the journeys could not check out also stops a run. Fix the cause, then rerun the run's failed jobs with `gh run rerun <run id> --failed`. **Never tag by hand a release whose journeys did not hold.** Under `gate` a setup fault leaves the live release untagged. Each night then promotes the same commit again, restarting the api, until a run holds, so fix it the same day.
   - **Wait 10 minutes after a run.** The runner's address may press Send 5 times and try 10 codes in 10 minutes. A test person's address may be sent 5 codes in 10 minutes. A run presses Send three times, so a rerun or a journeys-only dispatch inside 10 minutes of the last run can find a ceiling spent and end `could-not-run`. A sign-in by hand as a test person counts too.
   - **`possible compromise` in the summary:** the Admin's journey found the test workspace holding something its fixture does not, and stopped before anyone else signed in. That may be a member outside the fixture, one missing, one in another role, a waiting invitation or a binding. The summary gives counts and never addresses. Go to the leak bullet.
   - **No ping at all**, so the check is late. The nightly run did not run, `JOURNEYS_MODE` is `off`, or the ping URL is not set, which the run's summary says. A failed ping never fails the run, so read the night's summary.
 - **Do — a leak.** Start here when a summary says `possible compromise`, or when the inbox key, a test address or a test person's session is known to be out. In this order:
-  1. In the Resend team, delete every webhook and every key, then mint one key and set `JOURNEYS_INBOX_KEY` to it. A full-access key can mint more keys, and add a webhook that forwards the inbox, so deleting the leaked key alone is not enough.
+  1. Mint a new inbox key as step 1 does. Set it in the Worker with step 1's `wrangler secret put READ_TOKEN`, and at once in `JOURNEYS_INBOX_KEY` with step 2's `gh secret set`, so no run reads with a key the Worker no longer holds. The key reads the test inbox and can do nothing else, so nothing else needs deleting.
   2. As the operator, in the console's People, revoke credentials everywhere for every member of the test workspace. That is the three test people and the 51 invented members, because every one of their codes reaches the same inbox.
-  3. Sign in as the test Admin, reading the code with the new key. Cancel every waiting invitation on Members' Invitations tab, and decline every waiting request on its Requests tab. While the key was out, anyone could sign in at a fresh address on the testing domain and ask to join, and the Admin's journey counts invitations, not requests.
-  4. Choose three new test addresses on the testing domain, and set the three `JOURNEYS_*_EMAIL` secrets to them.
+  3. Sign in as the test Admin, reading the code from the inbox with the new key. Cancel every waiting invitation on Members' Invitations tab, and decline every waiting request on its Requests tab. While the key was out, anyone could sign in at a fresh address on the testing domain and ask to join, and the Admin's journey counts invitations, not requests.
+  4. Choose three new test addresses on the testing domain, none of them on production's Resend suppression list, and set the three `JOURNEYS_*_EMAIL` secrets to them.
   5. Find out whether the test workspace holds a binding: the summary of the run that fired counts them, and the Bindings screen lists them. Then choose one of two paths before running the fixture:
      - **No binding found:** run the fixture again with the same slug and the new addresses. It adds the new test people in their roles, sets back any role that drifted and adds back any invented member who was removed. It names each member outside the fixture, the old test people among them, on a line ending `is no part of the fixture; left in place`. Sign in as the new test Admin and, on the Members screen, remove the old test people and every other member those lines name.
      - **A binding found:** no act removes a binding, so retire the workspace instead and leave it where it is, still marked. The invented members' addresses are the same on the same testing domain, and the fixture refuses to make anyone a member of a second workspace (`member-elsewhere`). So first, as the old test Admin, remove the 51 invented members from the old workspace on its Members screen, a page at a time. Then run the fixture with a new slug and the new addresses. The old test people stay in the old workspace with their credentials revoked. Never run the fixture with the old slug and the new addresses on this path: the new test people would become members there, and the new slug would refuse them too.
   6. Read the test workspace's Audit log for what was done while the leak was open, and the retired workspace's too.
   7. If the ping URL leaked, make a new check in the same project, set the secret to its URL and delete the old check. A leaked URL can only make the journeys look green, never a backup.
 
-  The next night proves the new setup. A journeys-only dispatch from `main`, 10 minutes after the last run, proves it sooner.
+  The next night proves the new setup. A journeys-only dispatch from `main`, 10 minutes after the last run, proves it sooner. If it reads `no-mail`, start at the suppression list, as the `fail` bullet does.
 
 - **Never erase a test person.** An erasure tombstones the address for good. A test person who must go is removed from the test workspace, as the leak bullet does, and never erased. **Enrol the test Admin's second factor before BA-28's U10 lands.** From U10 an Admin must hold one, and the Admin journey goes red on the first night after U10 lands without it. Sign in by hand as the test Admin and set up an authenticator in the Account page's Sign-in section. Keep its secret and its recovery codes in the password manager until the journeys gain the setting that presents it (R9 of the BA-34 plan). Every change to a second factor is announced to the person's address, so do it away from a run's window.
 - **Attach:** the run's summary, with its outcome word; the `journeys` check's ping history; for a leak, the fixture command's lines, the Audit log's events for the window and the time each step was done. The fixture's lines name addresses, so they go where the private file's records are kept, never anywhere public.
