@@ -1,6 +1,6 @@
 # Dynamic — scheduled work and its watchers
 
-Everything the estate does on a clock, fastest first, and the *dead-man ping* each job sends only after its work is verified: silence is the alert. Three places keep a clock — the api process, the backup container's cron, and VPC 2's host cron — and the worker's loop schedules one job of its own. Every check lives at healthchecks.io; the names are the checks' own. Coolify's own daily schedules — its dump of the Postgres resource and its instance backup — are the orchestrator's configuration, not the tree's, and are not drawn (`docs/operations/BACKUPS.md`).
+Everything the estate does on a clock, fastest first, and the *dead-man ping* each job sends only after its work is verified: silence is the alert. Three places on the boxes keep a clock — the api process, the backup container's cron, and VPC 2's host cron — and the worker's loop schedules one job of its own. Off the boxes, GitHub's schedule starts the nightly release run, whose journeys report to a check of their own. Every check lives at healthchecks.io; the names are the checks' own. Coolify's own daily schedules — its dump of the Postgres resource and its instance backup — are the orchestrator's configuration, not the tree's, and are not drawn (`docs/operations/BACKUPS.md`).
 
 ```mermaid
 C4Dynamic
@@ -15,11 +15,12 @@ C4Dynamic
   Container(backup, "backup", "cron in the stores stack", "backup.sh hourly at :05; backup.sh nightly at 02:00")
   Container(drill, "restore-drill.sh", "VPC 2 host cron, 03:00 on the 1st", "The monthly restore drill into staging")
   Container(probe, "uptime-probe.sh", "VPC 2 host cron, every 5 min, Free plan", "Two paths on app. through the public edge")
+  Container_Ext(release, "release.yml, nightly", "GitHub Actions schedule, 02:35 UTC, often started hours late", "Promotes, or runs the journeys alone against the live release; its report job pings last")
 
   ContainerDb(postgres, "Postgres", "RLS", "The watermark, the queue, sweep_pass, every table a dump holds")
   ContainerDb(stores, "Git store and object store", "VPC 1", "Bare repositories; landed copies")
   ContainerDb(offhost, "Off-host buckets and the git mirror", "B2, VPC 2", "Dumps and bundles, the object-store mirror, the push mirror")
-  System_Ext(healthchecks, "healthchecks.io", "scheduler, sweeps, pg-hourly, nightly, drill, staging-wiped, uptime")
+  System_Ext(healthchecks, "healthchecks.io", "scheduler, sweeps, pg-hourly, nightly, drill, staging-wiped, uptime; journeys, in a project of its own")
   Person(operator, "Operator", "Reads the alert and the runbook page it names")
 
   Rel(headcheck, postgres, "1. Every 30 s: reads each watermark against the head; replays missed commits oldest-first")
@@ -35,14 +36,15 @@ C4Dynamic
   Rel(probe, healthchecks, "11. Every 5 min: GETs /health and /.well-known/oauth-protected-resource/mcp on app.; pings uptime ok 2/2 or fail")
   Rel(drill, offhost, "12. Monthly: restores staging from the latest daily dump, the mirror and the bundles; replays erasures; smoke; every third month the erasure rehearsal")
   Rel(drill, healthchecks, "13. Pings drill with the recovery time, then staging-wiped once staging is wiped and re-seeded")
-  Rel(healthchecks, operator, "14. Alerts on a check late past its grace or pinged fail: sweeps by email, the rest on the second channel")
+  Rel(release, healthchecks, "14. Nightly, after the promote or alone: the journeys sign in as the test people; pings journeys held, fail or could-not-run")
+  Rel(healthchecks, operator, "15. Alerts by email on a check late past its grace or pinged fail; no second channel while the product is in development")
 
   UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="1")
 ```
 
 ## What the schedules guarantee
 
-- **A ping is sent only after the work is verified.** The backup jobs ping once each uploaded copy's size, read back from the bucket, matches the local file's, and every bundle has passed `git bundle verify`; the sweep pass after its `sweep_pass` row is written; the head check once a minute, `fail` when a tick in that minute failed. A body carries an outcome word and sizes, never a workspace, a key, a path or an error (`CONTEXT.md`, *dead-man ping*).
+- **A ping is sent only after the work is verified.** The backup jobs ping once each uploaded copy's size, read back from the bucket, matches the local file's, and every bundle has passed `git bundle verify`; the sweep pass after its `sweep_pass` row is written; the head check once a minute, `fail` when a tick in that minute failed; the `journeys` check from the release run's last job, with the journeys' outcome word, or one read from their job's result when they wrote none, and a missed ping never fails the run. A body carries an outcome word and sizes, never a workspace, a key, a path or an error (`CONTEXT.md`, *dead-man ping*).
 - **The api's two schedules never stop the api.** A wrong setting leaves the head check running unwatched and stops the sweeps, each logged at start; the check's silence tells the operator (`apps/api/src/main.ts`; T-359, T-336).
 - **One sweep pass at a time.** A pass takes session lock 42 and a pass that finds it held is skipped and logged; `object-store-orphans` and `graph-sweep` by hand wait for it. Lock 41 is the dump's, shared by the erasure routine and the backup job, so no hourly dump is taken mid-erasure. The upload sweep is *list-only* until the operator sets `UPLOAD_SWEEP=remove` (`CONTEXT.md`, *upload sweep*).
 - **Each box is watched from outside.** VPC 1 by the `scheduler` check's silence and the uptime probe, which runs from VPC 2 through the public edge, so DNS, the tunnel and the origin are on the probed path; VPC 2 by the probe's own silence on the Free plan, and on Pro only by `drill` and the `coolify-backup` check Coolify's own daily instance backup pings (`docs/operations/RUNBOOK.md`, page 1).
