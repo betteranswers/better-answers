@@ -1,13 +1,16 @@
+import { expect } from "vitest";
 import { z } from "zod";
 
 import { SIGN_IN_CODE_PREFIX } from "@better-answers/core/workspaces";
 import { testData } from "@better-answers/schema/testing";
+import { authenticatorCodeAt, keyIn } from "@better-answers/schema/testing/authenticator-code";
 
+import { authOver } from "./auth-instance.ts";
 import { signIn } from "./flow.ts";
-import { APP_HOSTNAME, type TestApp, type TestClient } from "./harness.ts";
+import type { TestApp, TestClient } from "./harness.ts";
 
 export const signedInClient = async (app: TestApp, email: string): Promise<TestClient> => {
-  const client = app.client(undefined, APP_HOSTNAME);
+  const client = app.client();
   await signIn(app, client, email);
   return client;
 };
@@ -22,6 +25,66 @@ export const aPersonSignedIn = async (app: TestApp) => {
 export const anAdminSignedIn = async (app: TestApp) => {
   const { admin } = await app.provision();
   return { admin, client: await signedInClient(app, admin.email) };
+};
+
+/**
+ * Through the library's own enable and first verify, as server functions. The verify swaps the
+ * session for one nobody holds, which is ended.
+ */
+export const setUpAnAuthenticator = async (app: TestApp, client: TestClient): Promise<string> => {
+  const auth = authOver(app);
+  const headers = new Headers({ cookie: client.cookies() });
+  const enabled = await auth.api.enableTwoFactor({ headers, body: { method: "totp" } });
+  const key = keyIn(z.object({ totpURI: z.string() }).parse(enabled).totpURI);
+  const verified = await auth.api.verifyTOTP({
+    headers,
+    body: { code: authenticatorCodeAt(key, new Date()) },
+    returnHeaders: true,
+  });
+  const swappedIn = verified.headers.getSetCookie().map((line) => line.split(";")[0] ?? "");
+  await auth.api.signOut({ headers: new Headers({ cookie: swappedIn.join("; ") }) });
+  return key;
+};
+
+/** An authenticator set up for `email`, then a session signed in by email and not yet confirmed. */
+const heldThenSignedIn = async (app: TestApp, email: string) => {
+  const key = await setUpAnAuthenticator(app, await signedInClient(app, email));
+  return { key, client: await signedInClient(app, email) };
+};
+
+/** A person in no workspace holding an authenticator whose `key` makes its codes. */
+export const aPersonWithAnAuthenticator = async (app: TestApp) => {
+  const person = await app.person();
+  return { person, ...(await heldThenSignedIn(app, person.email)) };
+};
+
+/** A new workspace's Admin holding an authenticator whose `key` makes its codes. */
+export const anAdminWithAnAuthenticator = async (app: TestApp) => {
+  const { admin } = await app.provision();
+  return { admin, ...(await heldThenSignedIn(app, admin.email)) };
+};
+
+const started = z.object({ setupAddress: z.string().startsWith("otpauth://totp/") });
+
+export const codeNow = (setupAddress: string): string =>
+  authenticatorCodeAt(keyIn(setupAddress), new Date());
+
+export const aWrongCode = (right: string): string => (right === "000000" ? "111111" : "000000");
+
+/** Starts a setup through the api's own route; answers the address its QR code carries. */
+export const startOn = async (client: TestClient): Promise<string> => {
+  const answered = await client.json("/authenticator/start", {});
+  expect(answered.status, "the setup did not start").toBe(200);
+  return started.parse(await answered.json()).setupAddress;
+};
+
+/** A setup started and finished with the code its key shows now; `client` stays signed in. */
+export const setUpOn = async (client: TestClient) => {
+  const setupAddress = await startOn(client);
+  return {
+    setupAddress,
+    answered: await client.json("/authenticator/finish", { code: codeNow(setupAddress) }),
+  };
 };
 
 export const displayNameHeldBy = async (

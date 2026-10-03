@@ -8,8 +8,11 @@ import {
   type CounterRule,
   type PostgresDoor,
 } from "@better-answers/core/store/postgres";
+import { readSecondFactor, type SecondFactorHeld } from "@better-answers/core/workspaces";
+import { AUTHENTICATOR_CODE_LENGTH } from "@better-answers/schema/second-factor";
 
 import type { EmailSender } from "../email.ts";
+import { IDENTITY_PRINCIPAL } from "../identity-principal.ts";
 import { tooManyRequests } from "../ingress/limits.ts";
 import type { Auth } from "./auth.ts";
 import { sameOriginOnly } from "./same-origin.ts";
@@ -37,7 +40,42 @@ export const signedInPerson = async (
 export const PERSON_ROUTE_REFUSALS = {
   signedOut: { error: "not_signed_in" },
   unanswered: { error: "unanswered" },
+  codeWrong: { error: "code-wrong" },
+  notVerified: { error: "not-verified" },
+  challengeGone: { error: "challenge-gone" },
+
+  // Restored by the operator: only a session that gave the restore code may set up a factor.
+  restoreCodeNeeded: { error: "restore-code-needed" },
 } as const;
+
+/** Past a route's ceiling, or while the person's tries of a code wait. */
+export const tooManyTries = (retryAfterSeconds: number): Response =>
+  tooManyRequests(retryAfterSeconds, "Too many tries; try again later.");
+
+/** What the person holds, with this session's own standing; undefined when it could not be read. */
+export const heldBy = async (
+  deps: { readonly door: PostgresDoor; readonly clock: Clock },
+  person: SignedIn,
+): Promise<SecondFactorHeld | undefined> => {
+  const held = await readSecondFactor(IDENTITY_PRINCIPAL, deps.door, {
+    personId: person.user.id,
+    sessionId: person.session.id,
+    now: deps.clock.now(),
+  });
+  return held.ok ? held.value : undefined;
+};
+
+/** Granted by a spent recovery code or an accepted restore code, to this session alone. */
+export const mayReplace = (held: SecondFactorHeld): boolean =>
+  held.thisSession?.setupGranted === true;
+
+export const waitsOnTheRestoreCode = (held: SecondFactorHeld): boolean =>
+  held.restoreRequired && !mayReplace(held);
+
+/** An authenticator's code as its screen sends it. */
+export const codeAsked = z.object({
+  code: z.string().regex(new RegExp(`^\\d{${String(AUTHENTICATOR_CODE_LENGTH)}}$`)),
+});
 
 /** A person who held codes keeps them through a setup, so none are made or answered. */
 export const finishedWith = (
@@ -86,9 +124,7 @@ export const personRoutesAt = (routes: Hono, prefix: string, deps: PersonRoutes)
           rule,
           deps.clock.now(),
         );
-        if (!counted.allowed) {
-          return tooManyRequests(counted.retryAfterSeconds, "Too many tries; try again later.");
-        }
+        if (!counted.allowed) return tooManyTries(counted.retryAfterSeconds);
         return step(context, person);
       },
 

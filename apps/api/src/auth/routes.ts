@@ -15,6 +15,7 @@ import type { EmailSender } from "../email.ts";
 import { limitByIp, tooManyRequests } from "../ingress/limits.ts";
 import type { Auth } from "./auth.ts";
 import { mountTheAuthenticator } from "./authenticator.ts";
+import { mountTheConfirm } from "./confirm.ts";
 import {
   BETTER_AUTH_RATE_LIMIT,
   EMAIL_CODE_EMAIL_RULE,
@@ -434,6 +435,7 @@ export const createAuthRoutes = (deps: AuthRoutesDependencies): Hono => {
   mountTheSignInLink(routes, deps);
   mountTheAuthenticator(routes, deps);
   mountThePasskeys(routes, deps);
+  mountTheConfirm(routes, deps);
 
   routes.use("/consent", limitByIp(door, PAGE_IP_RULE, clock));
   routes.use("/consent", sameOriginOnly(publicUrl));

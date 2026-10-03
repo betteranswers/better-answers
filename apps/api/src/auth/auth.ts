@@ -222,6 +222,12 @@ const presentedCredential = z
 /** Refused before a passkey is kept or a session made, so neither exists without it. */
 export const USER_NOT_VERIFIED = "USER_NOT_VERIFIED";
 
+/** The site a passkey is made for and the origin its answers come from, for the library and our confirm. */
+export const passkeyPartyOf = (publicUrl: string) => {
+  const address = new URL(publicUrl);
+  return { rpID: address.hostname, origin: address.origin };
+};
+
 const userNotVerified = (): APIError =>
   new APIError("BAD_REQUEST", {
     code: USER_NOT_VERIFIED,
@@ -451,7 +457,6 @@ export const createAuth = (deps: AuthDependencies) => {
   };
 
   const db = drizzle(deps.database, { schema: identitySchema });
-  const appAddress = new URL(deps.publicUrl);
 
   return betterAuth({
     appName: PRODUCT_NAME,
@@ -485,6 +490,7 @@ export const createAuth = (deps: AuthDependencies) => {
           input: false,
           returned: false,
         },
+        restoreRequiredAt: { type: "date", required: false, input: false, returned: false },
       },
     },
     session: {
@@ -493,6 +499,7 @@ export const createAuth = (deps: AuthDependencies) => {
       additionalFields: {
         secondFactorConfirmedAt: { type: "date", required: false, input: false, returned: false },
         pendingSince: { type: "date", required: false, input: false, returned: false },
+        setupGrantedAt: { type: "date", required: false, input: false, returned: false },
       },
     },
     /**
@@ -697,9 +704,8 @@ export const createAuth = (deps: AuthDependencies) => {
         },
       }),
       passkeyPlugin({
-        rpID: appAddress.hostname,
+        ...passkeyPartyOf(deps.publicUrl),
         rpName: PRODUCT_NAME,
-        origin: appAddress.origin,
         authenticatorSelection: { userVerification: "required" },
         /** The library verifies with user verification optional; a passkey counts only with it. */
         registration: {

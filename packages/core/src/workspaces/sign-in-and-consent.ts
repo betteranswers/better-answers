@@ -48,8 +48,14 @@ export const verificationIdentifiersOf = (email: string): readonly string[] =>
 /** A replacement setup's sealed secret, parked under the session that started it. */
 export const AUTHENTICATOR_SECRET_PREFIX = "second-factor-enrol:";
 
+/** A passkey confirm's challenge, kept under the session it was asked for. */
+export const PASSKEY_CHALLENGE_PREFIX = "second-factor-challenge:";
+
 /** Rows keyed by a session id rather than an address: erasure reaches them through the person's sessions. */
-export const SESSION_VERIFICATION_PREFIXES = [AUTHENTICATOR_SECRET_PREFIX] as const;
+export const SESSION_VERIFICATION_PREFIXES = [
+  AUTHENTICATOR_SECRET_PREFIX,
+  PASSKEY_CHALLENGE_PREFIX,
+] as const;
 
 const CONSENT_ACTS = declareActs("people", {
   consented: act("people.client.consented", {}),

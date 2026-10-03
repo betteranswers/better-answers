@@ -42,6 +42,7 @@ import {
   lastActiveIn,
   otherCodesFor,
   parkedSecretFor,
+  passkeyChallengeFor,
   restoreCodeFor,
   secondFactorRowsFor,
   signInLinkFor,
@@ -1315,7 +1316,7 @@ describe("the identity set on the person's last membership", () => {
     });
   });
 
-  it("deletes the restore code and parked secrets, never a stranger's", async () => {
+  it("deletes the restore code and session-keyed rows, never a stranger's", async () => {
     const { scenario, person, email, subjectRequestId } = await workspaceWithAnErasureRequest();
     const { sessionId } = await identityRowsFor(db().pool, { userId: person.id, email });
     const strangersEmail = addressOf("someone");
@@ -1330,16 +1331,20 @@ describe("the identity set on the person's last membership", () => {
         expiresAt: new Date("2026-10-03T12:00:00.000Z"),
       }),
       await parkedSecretFor(db().pool, sessionId),
+      await passkeyChallengeFor(db().pool, sessionId),
     ];
-    const notTheirs = await parkedSecretFor(db().pool, strangers.sessionId);
+    const notTheirs = [
+      await parkedSecretFor(db().pool, strangers.sessionId),
+      await passkeyChallengeFor(db().pool, strangers.sessionId),
+    ];
 
     await completing(scenario, subjectRequestId);
 
     const left = await db().pool.query<{ id: string }>(
       "SELECT id FROM verification WHERE id = ANY($1)",
-      [[...theirs, notTheirs]],
+      [[...theirs, ...notTheirs]],
     );
-    expect(left.rows).toEqual([{ id: notTheirs }]);
+    expect(left.rows.map((row) => row.id).toSorted()).toEqual(notTheirs.toSorted());
   });
 
   it("empties every identity-set table that names the person", async () => {

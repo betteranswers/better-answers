@@ -4,6 +4,8 @@ import { decodeJwt } from "jose";
 import { expect } from "vitest";
 import { z } from "zod";
 
+import { authenticatorCodeAt } from "@better-answers/schema/testing/authenticator-code";
+
 import {
   CLAUDE_CLIENT_ID,
   CLAUDE_REDIRECT_URI,
@@ -96,6 +98,18 @@ export const signIn = async (
   const signedIn = await client.json("/sign-in/email-otp", { email, otp: code });
   expect(signedIn.status).toBe(200);
   return signedIn;
+};
+
+/** Confirms `client`'s session with the code `key` shows now, failing the test unless it answers 200. */
+export const confirmWithTheAuthenticator = async (
+  client: TestClient,
+  key: string,
+): Promise<Response> => {
+  const confirmed = await client.json("/second-factor/confirm/authenticator", {
+    code: authenticatorCodeAt(key, new Date()),
+  });
+  expect(confirmed.status).toBe(200);
+  return confirmed;
 };
 
 export const setActiveWorkspace = async (

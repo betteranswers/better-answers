@@ -208,6 +208,14 @@ export const parkedSecretFor = async (pool: pg.Pool, sessionId: string): Promise
     value: "sealed-secret",
   });
 
+/** A passkey confirm's challenge, kept under the session that asked for it. */
+export const passkeyChallengeFor = async (pool: pg.Pool, sessionId: string): Promise<string> =>
+  verificationRow(pool, {
+    id: ulid(),
+    identifier: `second-factor-challenge:${sessionId}`,
+    value: "a-challenge",
+  });
+
 /** The row a sign-in link keeps beside its code: its id the link's hash, keyed by the address. */
 export const signInLinkFor = async (pool: pg.Pool, email: string): Promise<string> =>
   verificationRow(pool, {

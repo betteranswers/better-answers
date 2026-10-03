@@ -25,6 +25,7 @@ import {
   lastActiveIn,
   otherCodesFor,
   parkedSecretFor,
+  passkeyChallengeFor,
   restoreCodeFor,
   secondFactorRowsFor,
   signInLinkFor,
@@ -243,19 +244,20 @@ describe("the erasure map for a member", () => {
     ]);
   });
 
-  it("names their restore code and a session's parked secret", async () => {
+  it("names their restore code and each session-keyed row", async () => {
     const held = await workspaceHoldingAMember();
     const restoreCode = await restoreCodeFor(db().pool, held.email, {
       hash: "a".repeat(64),
       expiresAt: new Date("2026-10-03T12:00:00.000Z"),
     });
     const parkedSecret = await parkedSecretFor(db().pool, held.sessionId);
+    const challenge = await passkeyChallengeFor(db().pool, held.sessionId);
 
     const map = await mapOf(held.scenario, held.request);
 
     expect(locationsOf(map).find(([family]) => family === "identity-verification")).toEqual([
       "identity-verification",
-      [held.verificationId, restoreCode, parkedSecret].toSorted(byCodeUnit),
+      [held.verificationId, restoreCode, parkedSecret, challenge].toSorted(byCodeUnit),
     ]);
   });
 

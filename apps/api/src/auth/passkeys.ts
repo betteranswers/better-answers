@@ -7,6 +7,7 @@ import {
   applyPasskeyNameRule,
   hasNoDisplayName,
   recordPasskeyAdded,
+  replaceFactorsByPasskey,
 } from "@better-answers/core/workspaces";
 
 import { sendFactorNotice } from "../factor-notice-email.ts";
@@ -23,16 +24,17 @@ import {
 } from "./constants.ts";
 import {
   finishedWith,
+  heldBy,
+  mayReplace,
   PERSON_ROUTE_REFUSALS,
   type FactorRoutesDependencies,
   personRoutesAt,
   type SignedIn,
+  waitsOnTheRestoreCode,
 } from "./person-routes.ts";
 
 const REFUSALS = {
   malformed: { error: "malformed" },
-  notVerified: { error: "not-verified" },
-  challengeGone: { error: "challenge-gone" },
   unknown: { error: "passkey-unknown" },
   refused: { error: "passkey-refused" },
 } as const;
@@ -41,8 +43,8 @@ type Refused = { readonly body: { readonly error: string }; readonly status: 400
 
 /** What the library's refusal of a ceremony means to the person, by the code it carries. */
 const REFUSED_AS: ReadonlyMap<string, Refused> = new Map([
-  [USER_NOT_VERIFIED, { body: REFUSALS.notVerified, status: 400 }],
-  ["CHALLENGE_NOT_FOUND", { body: REFUSALS.challengeGone, status: 400 }],
+  [USER_NOT_VERIFIED, { body: PERSON_ROUTE_REFUSALS.notVerified, status: 400 }],
+  ["CHALLENGE_NOT_FOUND", { body: PERSON_ROUTE_REFUSALS.challengeGone, status: 400 }],
   ["PASSKEY_NOT_FOUND", { body: REFUSALS.unknown, status: 401 }],
   ["AUTHENTICATION_FAILED", { body: REFUSALS.refused, status: 400 }],
   ["FAILED_TO_VERIFY_REGISTRATION", { body: REFUSALS.refused, status: 400 }],
@@ -77,7 +79,8 @@ const assertionShape = z.object({
   clientExtensionResults: z.object({}),
 });
 
-const presented = z.object({
+/** A passkey's answer to a sign-in's or a confirm's challenge, as the browser posts it. */
+export const presented = z.object({
   response: z.custom<Assertion>((value) => assertionShape.safeParse(value).success),
 });
 
@@ -115,11 +118,16 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
   };
 
   /** The name is judged before the device is asked, so a refused one leaves no passkey on it. */
-  const askToAdd = async (context: Context): Promise<Response> => {
+  const askToAdd = async (context: Context, person: SignedIn): Promise<Response> => {
     const named = naming.safeParse(await context.req.json().catch(() => undefined));
     if (!named.success) return context.json(REFUSALS.malformed, 400);
     const name = applyPasskeyNameRule(named.data.name);
     if (!name.ok) return nameRefused(context, name.error);
+    const held = await heldBy(deps, person);
+    if (held === undefined) return unanswered(context, "the second factor was not read");
+    if (waitsOnTheRestoreCode(held)) {
+      return context.json(PERSON_ROUTE_REFUSALS.restoreCodeNeeded, 409);
+    }
     const asked = await attempt(() =>
       auth.api.generatePasskeyRegistrationOptions({
         headers: context.req.raw.headers,
@@ -151,11 +159,36 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
     return context.json({ passkeyId, ...finishedWith(recorded.value.issued) });
   };
 
+  /** The library has kept the passkey, so a grant spent meanwhile leaves it an ordinary add. */
+  const replace = async (context: Context, person: SignedIn, passkeyId: string) => {
+    const replaced = await replaceFactorsByPasskey(IDENTITY_PRINCIPAL, door, {
+      personId: person.user.id,
+      sessionId: person.session.id,
+      now: clock.now(),
+      keptPasskeyId: passkeyId,
+    });
+    if (!replaced.ok && replaced.error === "setup-not-granted") {
+      return settle(context, person, passkeyId);
+    }
+    if (!replaced.ok) {
+      log.error(
+        { event: "auth.factors_not_replaced", principal: person.user.id },
+        "a passkey was added but the factors were not replaced",
+      );
+      return context.json(PERSON_ROUTE_REFUSALS.unanswered, 502);
+    }
+    void sendFactorNotice({ mail, log }, person.user.email, "factors-replaced");
+    return context.json({ passkeyId, ...finishedWith(replaced.value.issued) });
+  };
+
+  /** A session granted setup by a spent code replaces the person's factors with this passkey. */
   const add = async (context: Context, person: SignedIn): Promise<Response> => {
     const asked = added.safeParse(await context.req.json().catch(() => undefined));
     if (!asked.success) return context.json(REFUSALS.malformed, 400);
     const name = applyPasskeyNameRule(asked.data.name);
     if (!name.ok) return nameRefused(context, name.error);
+    const held = await heldBy(deps, person);
+    if (held === undefined) return unanswered(context, "the second factor was not read");
     const verified = await attempt(() =>
       auth.api.verifyPasskeyRegistration({
         headers: context.req.raw.headers,
@@ -165,7 +198,10 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
     );
     if (!verified.ok) return refusedBy(context, verified.error);
     forward(context, verified.value.headers);
-    return settle(context, person, kept.parse(verified.value.response).id);
+    const passkeyId = kept.parse(verified.value.response).id;
+    return mayReplace(held)
+      ? replace(context, person, passkeyId)
+      : settle(context, person, passkeyId);
   };
 
   /**
