@@ -1,11 +1,24 @@
 import { spawn } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
 import { createServer, type IncomingHttpHeaders } from "node:http";
+import { tmpdir } from "node:os";
 import path from "node:path";
+
+import { afterAll } from "vitest";
 
 import { repositoryRoot } from "@better-answers/devtools/paths";
 
 /** A script under `deploy/`, by its file name. */
 export const deployScript = (name: string): string => path.join(repositoryRoot, "deploy", name);
+
+/** A directory of the suite's own, removed once the file's tests have run. */
+export const scratchDirectory = (prefix: string): string => {
+  const made = mkdtempSync(path.join(tmpdir(), prefix));
+  afterAll(() => {
+    rmSync(made, { recursive: true, force: true });
+  });
+  return made;
+};
 
 /** The runner's PATH and nothing else, so a script sees no variable a test did not give it. */
 export const PATH_ONLY = { PATH: process.env["PATH"] ?? "" };

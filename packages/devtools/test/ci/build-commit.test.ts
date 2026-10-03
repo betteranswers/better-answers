@@ -1,8 +1,6 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { afterAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { gitIn, throwawayRepository } from "@better-answers/devtools/throwaway-tree";
 
@@ -14,12 +12,10 @@ import {
   PATH_ONLY,
   type Ran,
   ran,
+  scratchDirectory,
 } from "./script-stand-ins.ts";
 
-const scratch = mkdtempSync(path.join(tmpdir(), "build-commit-"));
-afterAll(() => {
-  rmSync(scratch, { recursive: true, force: true });
-});
+const scratch = scratchDirectory("build-commit-");
 
 const checkout = throwawayRepository(path.join(scratch, "checkout"));
 const committed = (message: string): string => {

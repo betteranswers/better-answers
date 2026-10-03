@@ -1,8 +1,7 @@
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import { afterAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { repositoryRoot } from "@better-answers/devtools/paths";
@@ -16,6 +15,7 @@ import {
   PATH_ONLY,
   type Ran,
   ran,
+  scratchDirectory,
 } from "./script-stand-ins.ts";
 
 const releaseJobSchema = z.object({
@@ -68,10 +68,7 @@ const scheduledSchema = z.object({
 const release = () => readWorkflow("release.yml", releaseWorkflowSchema);
 const build = () => readWorkflow("build.yml", buildWorkflowSchema);
 
-const scratch = mkdtempSync(path.join(tmpdir(), "release-job-"));
-afterAll(() => {
-  rmSync(scratch, { recursive: true, force: true });
-});
+const scratch = scratchDirectory("release-job-");
 
 const HEAD = "5c1b9e0f2a7d4c3b8e6f1a0d9c2b7e4f3a8d6c1b";
 const OLDER = "0e7a3c5b9d1f2e4a6c8b0d2f4e6a8c0b2d4f6e8a";
@@ -259,6 +256,13 @@ describe("the gate the nightly release passes", () => {
   });
 });
 
+/** One run of each trigger, for a refusal every trigger must make. */
+const EVERY_TRIGGER = [
+  { trigger: "merge", env: { COMMIT: HEAD, EVENT: "push" } },
+  { trigger: "nightly", env: { EVENT: "schedule" } },
+  { trigger: "dispatch", env: { EVENT: "workflow_dispatch" } },
+];
+
 describe("the gate a dispatched release passes", () => {
   it("lets a dispatch through outside drill mode, naming no drill", async () => {
     expect(await gateRan({ EVENT: "workflow_dispatch", RELEASE_MODE: "nightly" })).toEqual({
@@ -287,11 +291,7 @@ describe("the gate a dispatched release passes", () => {
     ).toEqual({ code: 0, said: "", output: decided(true, "", "dispatch"), summary: "" });
   });
 
-  it.each([
-    { trigger: "merge", env: { COMMIT: HEAD, EVENT: "push" } },
-    { trigger: "nightly", env: { EVENT: "schedule" } },
-    { trigger: "dispatch", env: { EVENT: "workflow_dispatch" } },
-  ])("fails closed on an unknown mode, for a $trigger", async ({ env }) => {
+  it.each(EVERY_TRIGGER)("fails closed on an unknown mode, for a $trigger", async ({ env }) => {
     expect(await gateRan({ ...env, RELEASE_MODE: "weekly" })).toEqual(
       refused(
         "RELEASE_MODE is 'weekly', which is not per-merge, nightly or drill, so nothing is released. Set one (gh variable set RELEASE_MODE --body nightly), or delete it for per-merge",
@@ -393,17 +393,16 @@ describe("the journeys the gate lets run", () => {
     );
   });
 
-  it.each([
-    { trigger: "merge", env: { COMMIT: HEAD, EVENT: "push" } },
-    { trigger: "nightly", env: { EVENT: "schedule" } },
-    { trigger: "dispatch", env: { EVENT: "workflow_dispatch" } },
-  ])("fails closed on an unknown journeys mode, for a $trigger", async ({ env }) => {
-    expect(await gateRan({ ...env, JOURNEYS_MODE: "on" })).toEqual(
-      refused(
-        "JOURNEYS_MODE is 'on', which is not off, report or gate, so nothing is released. Set one (gh variable set JOURNEYS_MODE --body report), or delete it for off",
-      ),
-    );
-  });
+  it.each(EVERY_TRIGGER)(
+    "fails closed on an unknown journeys mode, for a $trigger",
+    async ({ env }) => {
+      expect(await gateRan({ ...env, JOURNEYS_MODE: "on" })).toEqual(
+        refused(
+          "JOURNEYS_MODE is 'on', which is not off, report or gate, so nothing is released. Set one (gh variable set JOURNEYS_MODE --body report), or delete it for off",
+        ),
+      );
+    },
+  );
 });
 
 const READ_KEY = "hcr_read_only_key_for_tests";

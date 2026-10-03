@@ -1,8 +1,7 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import { afterAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   type Answer,
@@ -12,12 +11,10 @@ import {
   PATH_ONLY,
   type Ran,
   ran,
+  scratchDirectory,
 } from "./script-stand-ins.ts";
 
-const scratch = mkdtempSync(path.join(tmpdir(), "journeys-ping-"));
-afterAll(() => {
-  rmSync(scratch, { recursive: true, force: true });
-});
+const scratch = scratchDirectory("journeys-ping-");
 
 const CHECK_UUID = "0b6c7a4e-3f1d-4c2a-9e8b-5d7f1a2c3e4b";
 
