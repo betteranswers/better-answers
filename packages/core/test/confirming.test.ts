@@ -31,6 +31,8 @@ const after = (seconds: number): Date => new Date(AT.getTime() + seconds * 1000)
 
 const UNCONFIRMED = { confirmed: null, pending: null };
 
+const NOBODY = "01J00000000000000000000000";
+
 const WRONG_CODE = "0000-0000-0000-0000";
 
 const RESTORE_CODE = "7k3m-9pqr-x2v4-h8tw";
@@ -252,6 +254,18 @@ describe("confirming by authenticator", () => {
     expect(confirmed).toEqual({ ok: false, error: "no-authenticator" });
     expect(await confirmedAt(sessionId)).toEqual(UNCONFIRMED);
   });
+
+  it("refuses a person nobody holds, before their session", async () => {
+    const sessionId = await aSession(await seedPerson(db().pool));
+
+    const confirmed = await confirmByAuthenticator(bootstrap, door(), {
+      personId: NOBODY,
+      sessionId,
+      now: AT,
+    });
+
+    expect(confirmed).toEqual({ ok: false, error: "person-gone" });
+  });
 });
 
 describe("the authenticator's failures", () => {
@@ -344,10 +358,8 @@ describe("reserving an authenticator try", () => {
   });
 
   it("counts nothing for a person nobody holds", async () => {
-    const personId = "01J00000000000000000000000";
-
-    expect(await reserving(personId)).toEqual({ ok: false, error: "person-gone" });
-    expect(await failuresOf(personId)).toEqual([]);
+    expect(await reserving(NOBODY)).toEqual({ ok: false, error: "person-gone" });
+    expect(await failuresOf(NOBODY)).toEqual([]);
   });
 
   it("answers the store's failure, not a wait", async () => {
@@ -681,6 +693,39 @@ describe("replacing the factors", () => {
     expect(replaced).toEqual({ ok: false, error: "no-passkey" });
     expect(await grantOf(sessionId)).toEqual(AT);
   });
+
+  it("refuses to park under another person's session", async () => {
+    const personId = await seedPerson(db().pool);
+    const strangersSession = await aSession(await seedPerson(db().pool));
+
+    const parked = await parkAuthenticatorSecret(bootstrap, door(), {
+      personId,
+      sessionId: strangersSession,
+      encryptedSecret: "sealed-new-secret",
+      now: AT,
+    });
+
+    expect(parked).toEqual({ ok: false, error: "session-gone" });
+  });
+
+  it("forgets a parked secret once a passkey replaces them", async () => {
+    const { personId, sessionId } = await anAdminRecovering();
+    const asked = { personId, sessionId, now: AT };
+    await parkAuthenticatorSecret(bootstrap, door(), {
+      ...asked,
+      encryptedSecret: "sealed-unused",
+    });
+
+    await replaceFactorsByPasskey(bootstrap, door(), {
+      ...asked,
+      keptPasskeyId: await passkeyFor(db().pool, personId),
+    });
+
+    expect(await readParkedAuthenticatorSecret(bootstrap, door(), asked)).toEqual({
+      ok: true,
+      value: undefined,
+    });
+  });
 });
 
 describe("accepting a restore code", () => {
@@ -731,6 +776,19 @@ describe("accepting a restore code", () => {
 
     expect(waited).toEqual({ ok: false, error: new CeilingMet(30) });
     expect(await grantOf(sessionId)).toBeNull();
+  });
+
+  it("refuses another person's session, keeping the code", async () => {
+    const { personId, sessionId } = await aRestoredPerson();
+    const strangersSession = await aSession(await seedPerson(db().pool));
+
+    const refused = await accepting(personId, strangersSession, RESTORE_CODE);
+    const accepted = await accepting(personId, sessionId, RESTORE_CODE);
+
+    expect([refused, accepted]).toEqual([
+      { ok: false, error: "session-gone" },
+      { ok: true, value: { granted: true } },
+    ]);
   });
 
   it("takes no code once no restore is required", async () => {
