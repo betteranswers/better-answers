@@ -220,7 +220,7 @@ describe("the recovery screen", () => {
       within(main()).getByRole("link", { name: "Use your passkey or authenticator instead" }),
     ).toBeDefined();
     expect(main().textContent).toContain(
-      "No codes left? Ask the platform's operator to restore your sign-in. They check who you are another way first.",
+      "No codes left? Ask better-answers support to restore your sign-in. They check who you are another way first.",
     );
   });
 });

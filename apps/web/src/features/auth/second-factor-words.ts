@@ -24,7 +24,7 @@ export const RECOVERY_WORDS = {
   field: "Recovery code",
   instead: "Use your passkey or authenticator instead",
   operator:
-    "No codes left? Ask the platform's operator to restore your sign-in. They check who you are another way first.",
+    "No codes left? Ask better-answers support to restore your sign-in. They check who you are another way first.",
 } as const;
 
 export const SETUP_WORDS = {
