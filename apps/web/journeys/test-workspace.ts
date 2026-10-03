@@ -5,7 +5,6 @@ import { INVENTED_MEMBERS, inventedMemberAddress } from "@better-answers/schema/
 import type { Role } from "@/shared/navigation.ts";
 import { counted } from "@/shared/words.ts";
 
-import { couldNotRun } from "./outcome.ts";
 import { bindingsOf, membersOf, waitingInvitationsOf, type Member } from "./reads.ts";
 import { stopTheRun } from "./run-stop.ts";
 
@@ -53,8 +52,11 @@ export const findingsIn = (standing: Standing, people: TestPeople): readonly str
   const misplaced = standing.members.filter(
     (member) => rolesOf(member)?.includes(member.role) === false,
   );
+  const held = new Set(standing.members.map((member) => member.address.toLowerCase()));
+  const missing = [...fixture.keys()].filter((address) => !held.has(address));
   const found: readonly (readonly [number, string, string])[] = [
     [outside.length, "member outside its fixture", "members outside its fixture"],
+    [missing.length, "member of its fixture missing", "members of its fixture missing"],
     [
       misplaced.length,
       "member in a role its fixture does not give",
@@ -75,12 +77,10 @@ export type RepairMembers = {
   readonly editors: readonly string[];
 };
 
+/** Each repair member is here: a missing one is a finding, which stopped the run before now. */
 const repairMembersAmong = (members: readonly Member[], people: TestPeople): RepairMembers => {
   const addresses = repairAddressesOf(people);
   const repair = members.filter((member) => addresses.includes(member.address.toLowerCase()));
-  if (repair.length < REPAIR_MEMBERS) {
-    couldNotRun("the test workspace is missing a repair member: run the fixture command");
-  }
   return {
     names: repair.map((member) => member.displayName),
     editors: repair
@@ -100,6 +100,6 @@ export const theFixtureHolds = async (page: Page, people: TestPeople): Promise<R
     bindingsOf(page),
   ]);
   const findings = findingsIn({ members, waitingInvitations, bindings }, people);
-  if (findings.length > 0) stopTheRun(`the test workspace holds ${findings.join(", ")}`);
+  if (findings.length > 0) stopTheRun(`the test workspace's check found ${findings.join(", ")}`);
   return repairMembersAmong(members, people);
 };

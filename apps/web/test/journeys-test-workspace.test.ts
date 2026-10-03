@@ -69,6 +69,19 @@ describe("the check of the test workspace", () => {
     ]);
   });
 
+  it("counts a missing invented member", () => {
+    const members = FIXTURE.filter((member) => member.address !== invented(30).address);
+
+    expect(findingsIn(standing({ members }), PEOPLE)).toEqual(["1 member of its fixture missing"]);
+  });
+
+  it("counts missing repair members and a missing test person", () => {
+    const gone = new Set([invented(2).address, invented(3).address, "editor@journeys.example"]);
+    const members = FIXTURE.filter((member) => !gone.has(member.address));
+
+    expect(findingsIn(standing({ members }), PEOPLE)).toEqual(["3 members of its fixture missing"]);
+  });
+
   it("counts outsiders, invitations and bindings, naming no address", () => {
     const members = [
       ...FIXTURE,
