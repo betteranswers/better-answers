@@ -755,6 +755,39 @@ describe("the audit log's subjects", () => {
     ]);
   });
 
+  it("names each person and group an export matched", async () => {
+    const workspace = await provisionedWorkspace(db(), "ExportNamed");
+    const address = "priya.exported@example.invalid";
+    const priya = await memberAt(workspace, "Viewer", "Priya Shah", address);
+    const [groupId = ""] = await groupsMadeBy(workspace, workspace.adminUserId, ["Bid writers"]);
+    await seedingWith(db().pool, (seed) =>
+      seed.auditEvent({
+        workspaceId: workspace.workspaceId,
+        act: "platform.audit_log.exported",
+        actor: `human:${workspace.adminUserId}`,
+        subjectId: workspace.workspaceId,
+        detail: {
+          matched: [
+            { kind: "person", id: priya },
+            { kind: "group", id: groupId },
+          ],
+          eventCount: 2,
+          capped: false,
+          searchTooBroad: false,
+        },
+      }),
+    );
+
+    const [exported] = pageOf(await readAs(workspace, workspace.adminUserId)).events;
+
+    expect(exported?.named).toEqual({
+      matched: [
+        { kind: "person", displayName: "Priya Shah", address },
+        { kind: "group", name: "Bid writers" },
+      ],
+    });
+  });
+
   it("reads a deleted group's events as a deleted group", async () => {
     const workspace = await provisionedWorkspace(db(), "Ungrouped");
     const [groupId = ""] = await groupsMadeBy(workspace, workspace.adminUserId, ["Site team"]);

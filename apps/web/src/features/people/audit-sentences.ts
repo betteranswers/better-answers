@@ -1,6 +1,7 @@
 import { byWords, counted, nameOrAddress } from "@/shared/words.ts";
 
 import type { DECLARED_ACTS } from "./audit-acts.ts";
+import { namedIn } from "./audit-details.ts";
 import type { ReadAuditEvent } from "./audit-log-api.ts";
 
 export type SaidEvent = Pick<ReadAuditEvent, "act" | "by" | "subject" | "detail" | "named">;
@@ -93,13 +94,13 @@ const exported = (detail: Slots["detail"]): string => {
 
 const SENTENCES = {
   "knowledge.check.imported": ({ by, named }) =>
-    `${by} imported a verification of ${concept(named["iri"])}`,
+    `${by} imported a verification of ${concept(namedIn(named, "iri"))}`,
   "knowledge.concept.class_overridden": ({ by, subject }) =>
     `${by} overrode the sensitivity of ${concept(subject)}`,
   "knowledge.concept.committed": ({ by, subject }) => `${by} saved ${concept(subject)}`,
   "knowledge.manifest.written": ({ by }) => `${by} updated the knowledge base's description`,
   "knowledge.suggestion.accepted": ({ by, named }) =>
-    `${by} accepted a suggestion, saved as ${concept(named["iri"])}`,
+    `${by} accepted a suggestion, saved as ${concept(namedIn(named, "iri"))}`,
   "knowledge.suggestion.declined": ({ by }) => `${by} declined a suggestion`,
   "knowledge.suggestion.returned": ({ by }) => `${by} sent a suggestion back to whoever made it`,
   "people.client.consented": ({ by }) => `${by} gave an assistant access`,
@@ -107,9 +108,9 @@ const SENTENCES = {
   "people.group.created": ({ by, subject }) => `${by} created ${group(subject)}`,
   "people.group.deleted": ({ by }) => `${by} deleted a group`,
   "people.group.member_added": ({ by, subject, named }) =>
-    `${by} added ${person(named["userId"])} to ${group(subject)}`,
+    `${by} added ${person(namedIn(named, "userId"))} to ${group(subject)}`,
   "people.group.member_removed": ({ by, subject, named }) =>
-    `${by} removed ${person(named["userId"])} from ${group(subject)}`,
+    `${by} removed ${person(namedIn(named, "userId"))} from ${group(subject)}`,
   "people.group.renamed": ({ by, subject }) => `${by} renamed ${groupNow(subject)}`,
   "people.invitation.cancelled": ({ by, subject, detail }) =>
     detail["replacedByInvitationId"] === undefined
@@ -163,10 +164,10 @@ const SENTENCES = {
     `${by} restored ${possessive(subject)} sign-in`,
   "people.person.signed_in": ({ by }) => `${by} signed in`,
   "people.request.approved": ({ by, named }) =>
-    `${by} approved ${possessive(named["requesterId"])} access request`,
+    `${by} approved ${possessive(namedIn(named, "requesterId"))} access request`,
   "people.request.asked": ({ by }) => `${by} asked to join the workspace`,
   "people.request.declined": ({ by, named }) =>
-    `${by} declined ${possessive(named["requesterId"])} access request`,
+    `${by} declined ${possessive(namedIn(named, "requesterId"))} access request`,
   "people.subject_request.received": ({ by }) => `${by} recorded a subject request`,
   "platform.audit_log.exported": ({ by, detail }) =>
     `${by} exported ${exported(detail)} from the audit log`,

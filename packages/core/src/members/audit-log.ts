@@ -9,6 +9,7 @@ import {
   type EventsSought,
   STORED_ACT_NAMES,
   STORED_DETAIL_KEYS,
+  matchedList,
   type AuditEventPage,
   type AuditEventRow,
 } from "../audit/index.ts";
@@ -86,8 +87,8 @@ export type ReadAuditEvent = Pick<
   /** Null for a subject with no name of its own, such as a suggestion or a request. */
   readonly subject: AuditEventSubject | null;
   readonly detail: NonNullable<AuditEventRow["detail"]>;
-  /** Each detail key holding the id of something named, as it stands now. */
-  readonly named: Readonly<Record<string, AuditEventSubject>>;
+  /** Each detail key holding the id of something named, or a list of them, as it stands now. */
+  readonly named: Readonly<Record<string, AuditEventSubject | readonly AuditEventSubject[]>>;
 };
 
 export type AuditLogPage = Omit<AuditEventPage, "rows"> & {
@@ -277,8 +278,16 @@ const NAMES_IN = {
 
 type DetailId = readonly [key: string, kind: NamedKind, id: string];
 
+const MATCHED = STORED_DETAIL_KEYS.matched;
+
+const matchedIds = (value: NonNullable<AuditEventRow["detail"]>[string]): readonly DetailId[] => {
+  const matched = matchedList.safeParse(value);
+  return matched.success ? matched.data.map(({ kind, id }) => [MATCHED, kind, id]) : [];
+};
+
 const detailIds = (row: AuditEventRow): readonly DetailId[] =>
-  Object.entries(row.detail ?? {}).flatMap(([key, value]): DetailId[] => {
+  Object.entries(row.detail ?? {}).flatMap(([key, value]): readonly DetailId[] => {
+    if (key === MATCHED) return matchedIds(value);
     const kind = DETAIL_NAMED_KINDS.get(key);
     return kind === undefined || typeof value !== "string" ? [] : [[key, kind, value]];
   });
@@ -325,6 +334,17 @@ const subjectOf = (row: AuditEventRow, names: AllNames): AuditEventSubject | nul
   return kind === undefined ? null : namedAs(kind, row.subjectId, names);
 };
 
+const namedDetail = (row: AuditEventRow, names: AllNames): ReadAuditEvent["named"] => {
+  const ids = detailIds(row);
+  const single = ids
+    .filter(([key]) => key !== MATCHED)
+    .map(([key, kind, id]) => [key, namedAs(kind, id, names)] as const);
+  const matched = ids
+    .filter(([key]) => key === MATCHED)
+    .map(([, kind, id]) => namedAs(kind, id, names));
+  return Object.fromEntries(matched.length === 0 ? single : [...single, [MATCHED, matched]]);
+};
+
 const eventOf = (
   row: AuditEventRow,
   names: AllNames,
@@ -340,9 +360,7 @@ const eventOf = (
   by: actorOf(row.actor, names.people),
   subject: subjectOf(row, names),
   detail: detail ?? {},
-  named: Object.fromEntries(
-    detailIds(row).map(([key, kind, id]) => [key, namedAs(kind, id, names)]),
-  ),
+  named: namedDetail(row, names),
 });
 
 const thingNames = async (

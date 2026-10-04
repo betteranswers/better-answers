@@ -40,6 +40,8 @@ const matched = z.strictObject({
 
 export type Matched = z.output<typeof matched>;
 
+export const matchedList = z.array(matched);
+
 type DetailEntry = Readonly<Record<string, string | null>>;
 
 export type DetailValue = string | number | boolean | readonly DetailEntry[];
@@ -82,7 +84,7 @@ export const DETAIL_KINDS = {
     typeof value === "string" && SECOND_FACTORS.some((factor) => factor === value),
   "family?": (value: DetailValue) =>
     typeof value === "string" && FAMILIES.some((family) => family === value),
-  matched: (value: DetailValue) => z.array(matched).safeParse(value).success,
+  matched: (value: DetailValue) => matchedList.safeParse(value).success,
 } as const;
 
 export type DetailKind = keyof typeof DETAIL_KINDS;

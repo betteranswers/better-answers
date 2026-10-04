@@ -1,5 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 
+import { AUDIT_LOG_WORDS } from "@/features/people/audit-log-words.ts";
 import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
 import { BULK_WORDS, SELECTED_MEMBERS } from "@/features/people/member-act-words.ts";
 import { ROUTES_WORDS } from "@/features/routes/words.ts";
@@ -157,9 +158,9 @@ const membersWalked = async (page: Page, gate: Gate): Promise<void> => {
 /** The newest page of events, then Load more, which must bring older ones below it. */
 const olderEventsLoaded = async (page: Page, gate: Gate): Promise<void> => {
   await page.goto(AUDIT_LOG);
-  const auditLog = page.getByRole("region", { name: "Audit log" });
-  const events = auditLog.getByRole("row").filter({ has: page.getByRole("cell") });
-  const loadMore = auditLog.getByRole("button", { name: "Show older events" });
+  const auditLog = page.getByRole("region", { name: AUDIT_LOG_WORDS.heading });
+  const events = auditLog.getByRole("listitem");
+  const loadMore = auditLog.getByRole("button", { name: "Load more" });
   await expect(loadMore, "the Audit log offered no Load more").toBeVisible();
   const shown = await events.count();
   await loadMore.click();

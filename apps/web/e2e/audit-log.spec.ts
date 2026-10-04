@@ -1,5 +1,9 @@
+import { readFile } from "node:fs/promises";
+
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
+import { AUDIT_LOG_KEYSTROKES as KEY } from "@/features/people/audit-log-state.ts";
+import { AUDIT_LOG_WORDS as WORDS } from "@/features/people/audit-log-words.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
 import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { NO_RESPONSE_TO_A_READ, sentenceOf } from "@/shared/refusal-words.ts";
@@ -8,10 +12,10 @@ import { expect, test } from "./browser.ts";
 import {
   addMember,
   aMemberSignedInAt,
-  notFoundOfferingHome,
   anAddress,
   keystrokesListed,
   makeGroups,
+  notFoundOfferingHome,
   person,
   provision,
   signIn,
@@ -26,28 +30,37 @@ const AUDIT_LOG = pageNamed(system, "Audit log");
 
 const AUDIT_LOG_PAGE = AUDIT_LOG.path;
 
-const SAID_AT = /^\d{2}:\d{2}$/;
-
 const SAID_DAY = /^[A-Z][a-z]+day \d{1,2} [A-Z][a-z]+ \d{4}$/;
 
-const auditLog = (page: Page) => page.getByRole("region", { name: "Audit log" });
+const auditLog = (page: Page) => page.getByRole("region", { name: WORDS.heading });
 
-/** The header row and each day's heading are rows too, so the events are the rows with a cell. */
-const eventRows = (page: Page): Locator =>
-  auditLog(page)
-    .getByRole("row")
-    .filter({ has: page.getByRole("cell") });
+const linesOf = (page: Page): Locator => auditLog(page).getByRole("listitem");
 
-const familyFilter = (page: Page) => auditLog(page).getByRole("combobox", { name: "Family" });
+const searchBox = (page: Page) => auditLog(page).getByRole("searchbox", { name: WORDS.search });
 
-const showOlder = (page: Page) => auditLog(page).getByRole("button", { name: "Show older events" });
+const familyFilter = (page: Page) =>
+  auditLog(page).getByRole("combobox", { name: `Filter by ${WORDS.family.toLowerCase()}` });
+
+const loadMore = (page: Page) => auditLog(page).getByRole("button", { name: "Load more" });
+
+const exportButton = (page: Page) => auditLog(page).getByRole("button", { name: WORDS.export });
+
+const said = (page: Page) => auditLog(page).getByRole("status").first();
 
 const pickFamily = async (page: Page, family: string): Promise<void> => {
   await familyFilter(page).click();
   await page.getByRole("option", { name: family }).click();
 };
 
-const cellsOf = (row: Locator) => row.getByRole("cell");
+const detailsOf = (line: Locator) => line.getByRole("button", { name: /^Details of / });
+
+type AtTheAuditLog = {
+  readonly workspaceId: string;
+  readonly adminId: string;
+  readonly adminEmail: string;
+  readonly priya: { readonly id: string; readonly email: string };
+  readonly unnamedEmail: string;
+};
 
 /**
  * Three events by three kinds of actor, and another workspace's alongside, so an audit log that
@@ -57,16 +70,18 @@ const anAdminAtTheAuditLog = async (
   page: Page,
   api: APIRequestContext,
   workspaceName: string,
-): Promise<{ readonly workspaceId: string; readonly adminId: string }> => {
-  const admin = anAddress("admin");
-  const workspace = await provision(api, { name: workspaceName, adminEmail: admin });
+): Promise<AtTheAuditLog> => {
+  const adminEmail = anAddress("admin");
+  const workspace = await provision(api, { name: workspaceName, adminEmail });
   const { workspaceId } = workspace;
 
-  const priya = await person(api, anAddress("priya"), { displayName: "Priya Shah" });
+  const priyaEmail = anAddress("priya");
+  const priya = await person(api, priyaEmail, { displayName: "Priya Shah" });
   await addMember(api, { workspaceId, userId: priya.id, role: "Admin" });
   await makeGroups(api, { workspaceId, userId: priya.id, names: ["Bid writers"] });
 
-  const unnamed = await person(api, anAddress("unnamed"), { displayName: "" });
+  const unnamedEmail = anAddress("unnamed");
+  const unnamed = await person(api, unnamedEmail, { displayName: "" });
   await addMember(api, { workspaceId, userId: unnamed.id, role: "Admin" });
   await makeGroups(api, { workspaceId, userId: unnamed.id, names: ["Estimators"] });
 
@@ -80,119 +95,181 @@ const anAdminAtTheAuditLog = async (
   });
 
   await page.goto("/sign-in");
-  await signIn(page, api, admin);
+  await signIn(page, api, adminEmail);
   await page
     .getByRole("navigation", { name: CONTROL_CENTRE.name })
     .getByRole("link", { name: "Audit log" })
     .click();
   await expect(page).toHaveURL(new RegExp(`${AUDIT_LOG_PAGE}$`));
-  return { workspaceId, adminId: workspace.admin.id };
+  return {
+    workspaceId,
+    adminId: workspace.admin.id,
+    adminEmail,
+    priya: { id: priya.id, email: priyaEmail },
+    unnamedEmail,
+  };
 };
 
 test.describe("the System group's Audit log page", () => {
-  test("shows an Admin every act, newest first, each actor named", async ({ page, request }) => {
-    await anAdminAtTheAuditLog(page, request, "Calder Joinery");
+  test("shows an Admin each action as its sentence, by day", async ({ page, request }) => {
+    const { unnamedEmail } = await anAdminAtTheAuditLog(page, request, "Calder Joinery");
 
-    await expect(
-      auditLog(page).getByRole("heading", { level: 2, name: "Audit log" }),
-    ).toBeVisible();
-    await expect(auditLog(page)).toContainText(
-      "Every act in this workspace except answers, newest first",
+    await expect(auditLog(page).getByRole("heading", { level: 2 })).toHaveText(WORDS.heading);
+    await expect(auditLog(page)).toContainText(WORDS.summary);
+    await expect(linesOf(page)).toHaveCount(3);
+    await expect(said(page)).toHaveText(WORDS.counted({ family: undefined, search: "" }, 3, false));
+    await expect(auditLog(page).getByRole("heading", { level: 3 })).toHaveText(SAID_DAY);
+
+    await expect(linesOf(page).nth(0)).toContainText(
+      `${unnamedEmail} created the group Estimators`,
     );
-    await expect(eventRows(page)).toHaveCount(3);
-    await expect(auditLog(page).getByText("3 events.", { exact: true })).toBeVisible();
-
-    const newest = cellsOf(eventRows(page).nth(0));
-    const older = cellsOf(eventRows(page).nth(1));
-    const oldest = cellsOf(eventRows(page).nth(2));
-    await expect(auditLog(page).getByRole("rowheader")).toHaveText(SAID_DAY);
-    await expect(newest.nth(0)).toHaveText(SAID_AT);
-    await expect(newest.nth(1)).toHaveText("People");
-    await expect(newest.nth(2)).toContainText("Group created");
-    await expect(newest.nth(3)).toHaveText("a former member");
-    await expect(older.nth(2)).toContainText("Group created");
-    await expect(older.nth(3)).toHaveText("Priya Shah");
-    await expect(oldest.nth(1)).toHaveText("Platform");
-    await expect(oldest.nth(2)).toContainText("Workspace provisioned");
-    await expect(oldest.nth(3)).toHaveText("the platform");
+    await expect(linesOf(page).nth(1)).toContainText("Priya Shah created the group Bid writers");
+    await expect(linesOf(page).nth(2)).toContainText("The platform provisioned the workspace");
+    await expect(linesOf(page).nth(2)).toContainText(WORDS.families.platform);
 
     await expect(page.locator("body")).not.toContainText("Una Elsewhere");
   });
 
-  test("opens an event for its act, subject, actor and detail", async ({ page, request }) => {
-    const { workspaceId } = await anAdminAtTheAuditLog(page, request, "Aire Valley Tooling");
+  test("opens an event's detail, a sign-in address beneath each name", async ({
+    page,
+    request,
+  }) => {
+    const { priya } = await anAdminAtTheAuditLog(page, request, "Aire Valley Tooling");
 
-    const oldest = eventRows(page).nth(2);
-    const details = oldest.getByRole("button", { name: /^Details of Workspace provisioned/ });
+    const priyas = linesOf(page).nth(1);
+    const details = detailsOf(priyas);
     await expect(details).toHaveAttribute("aria-expanded", "false");
     await details.click();
 
     await expect(details).toHaveAttribute("aria-expanded", "true");
-    await expect(oldest).toContainText("platform.workspace.provisioned");
-    await expect(oldest).toContainText(`workspace ${workspaceId}`);
-    await expect(oldest).toContainText("process:better-answers-bootstrap");
-    await expect(oldest).toContainText("Admin person id");
-    await expect(oldest).not.toContainText(/user/i);
+    await expect(priyas.getByRole("definition").first()).toHaveText(`Priya Shah${priya.email}`);
+
+    const provisioned = linesOf(page).nth(2);
+    await detailsOf(provisioned).click();
+    await expect(provisioned.getByRole("term").first()).toHaveText(WORDS.by);
+    for (const raw of ["platform.workspace.provisioned", "process:", "human:", "Actor id"]) {
+      await expect(auditLog(page), `the audit log shows ${raw}`).not.toContainText(raw);
+    }
   });
 
-  test("filters by family, and says when a family holds nothing", async ({
-    page,
-    request,
-    passesTheAccessibilityGate,
-  }) => {
+  test("tells apart two members of one name by their addresses", async ({ page, request }) => {
+    const { workspaceId } = await anAdminAtTheAuditLog(page, request, "Swale Tooling");
+    const addresses = [anAddress("sam"), anAddress("sam")];
+    for (const [index, address] of addresses.entries()) {
+      const sam = await person(request, address, { displayName: "Sam Okoro" });
+      await addMember(request, { workspaceId, userId: sam.id, role: "Admin" });
+      await makeGroups(request, { workspaceId, userId: sam.id, names: [`Crew ${index}`] });
+    }
+
+    await page.goto(AUDIT_LOG_PAGE);
+    await expect(linesOf(page)).toHaveCount(5);
+    for (const [line, address] of [
+      [linesOf(page).nth(0), addresses[1]],
+      [linesOf(page).nth(1), addresses[0]],
+    ] as const) {
+      await detailsOf(line).click();
+      await expect(line.getByRole("definition").first()).toHaveText(`Sam Okoro${address ?? ""}`);
+    }
+  });
+
+  test("searches past the first page, and Load more keeps it", async ({ page, request }) => {
+    const { workspaceId, adminId } = await anAdminAtTheAuditLog(page, request, "Dales Castings");
+    const crews = Array.from({ length: 55 }, (_, index) => `Crew ${index + 1}`);
+    await makeGroups(request, { workspaceId, userId: adminId, names: crews });
+
+    await page.goto(AUDIT_LOG_PAGE);
+    await expect(linesOf(page)).toHaveCount(50);
+    await searchBox(page).fill("Priya");
+    await expect(linesOf(page)).toHaveCount(1);
+    await expect(linesOf(page).first()).toContainText("Priya Shah created the group Bid writers");
+    await expect(page).toHaveURL(/audit\.search=Priya/);
+
+    await searchBox(page).fill("Crew");
+    await expect(linesOf(page)).toHaveCount(50);
+    await loadMore(page).click();
+    await expect(linesOf(page)).toHaveCount(55);
+    await expect(said(page)).toHaveText(
+      WORDS.counted({ family: undefined, search: "Crew" }, 55, false),
+    );
+    await expect(searchBox(page)).toHaveValue("Crew");
+  });
+
+  test("keeps the search through a change of family", async ({ page, request }) => {
     await anAdminAtTheAuditLog(page, request, "Wharfe Fabrication");
-    await expect(eventRows(page)).toHaveCount(3);
+    await searchBox(page).fill("Priya");
+    await expect(linesOf(page)).toHaveCount(1);
 
     await familyFilter(page).click();
     // Timed from the pick, so the budget is the read's and not the pointer's way to the list.
     const started = Date.now();
-    await page.getByRole("option", { name: "People" }).click();
-    await expect(eventRows(page)).toHaveCount(2);
+    await page.getByRole("option", { name: WORDS.families.platform }).click();
+    await expect(
+      auditLog(page).getByText(WORDS.noneNarrowed({ family: "platform", search: "Priya" })),
+    ).toBeVisible();
     const elapsed = Date.now() - started;
     test.info().annotations.push({ type: "family filter", description: `${elapsed} ms` });
-    expect(elapsed, "the people family's events rendered past the list's budget").toBeLessThan(
+    expect(elapsed, "the platform family's events rendered past the list's budget").toBeLessThan(
       LIST_BUDGET_MS,
     );
-    await expect(auditLog(page).getByText("2 events in the people family.")).toBeVisible();
+    await expect(searchBox(page)).toHaveValue("Priya");
+    await expect(page).toHaveURL(/audit\.family=platform/);
 
-    await pickFamily(page, "Knowledge");
-    await expect(auditLog(page)).toContainText("No acts in the knowledge family yet.");
-    await passesTheAccessibilityGate();
-    await auditLog(page).getByRole("button", { name: "Show all families" }).click();
-
-    await expect(eventRows(page)).toHaveCount(3);
-    await expect(familyFilter(page)).toHaveText("All families");
-    await expect(familyFilter(page)).toBeFocused();
+    await pickFamily(page, WORDS.families.people);
+    await expect(linesOf(page)).toHaveCount(1);
   });
 
-  test("shows older events, focus landing on the first of them", async ({ page, request }) => {
-    const { workspaceId, adminId } = await anAdminAtTheAuditLog(page, request, "Dales Castings");
-    const names = Array.from({ length: 48 }, (_, index) => `Crew ${index + 1}`);
-    await makeGroups(request, { workspaceId, userId: adminId, names });
+  test("exports what matches, and the log shows the export first", async ({ page, request }) => {
+    const { adminEmail, priya } = await anAdminAtTheAuditLog(page, request, "Ryedale Exports");
+    await pickFamily(page, WORDS.families.people);
+    await searchBox(page).fill(priya.email);
+    await expect(linesOf(page)).toHaveCount(1);
 
-    await page.goto(AUDIT_LOG_PAGE);
-    await expect(eventRows(page)).toHaveCount(50);
-    await expect(
-      auditLog(page).getByText("The newest 50 events; older ones follow.", { exact: true }),
-    ).toBeVisible();
-    await expect(cellsOf(eventRows(page).nth(49)).nth(3)).toHaveText("Priya Shah");
-
-    // Timed from the key, so the budget is the page's read and its rows.
-    const started = Date.now();
-    await page.keyboard.press("o");
-    await expect(eventRows(page)).toHaveCount(51);
-    const elapsed = Date.now() - started;
-    test.info().annotations.push({ type: "older events", description: `${elapsed} ms` });
-    expect(elapsed, "the page of older events rendered past the list's budget").toBeLessThan(
-      LIST_BUDGET_MS,
+    const saving = page.waitForEvent("download");
+    await exportButton(page).click();
+    const download = await saving;
+    const csv = await readFile(await download.path(), "utf8");
+    expect(csv, "the file holds Priya's event").toContain("Priya Shah");
+    expect(download.suggestedFilename()).toMatch(/^audit-log-\d{4}-\d{2}-\d{2}\.csv$/);
+    await expect(auditLog(page)).toContainText(
+      WORDS.saved({ count: 1, capped: false, searchTooBroad: false }, download.suggestedFilename()),
     );
-    await expect(auditLog(page).getByText("51 events.", { exact: true })).toBeVisible();
-    await expect(showOlder(page)).toHaveCount(0);
+
+    await searchBox(page).fill("");
+    await pickFamily(page, WORDS.everyFamily);
+    const exported = linesOf(page).first();
+    await expect(exported).toContainText("exported 1 event from the audit log");
+    await detailsOf(exported).click();
+    await expect(exported.getByRole("definition").first()).toContainText(adminEmail);
+    await expect(exported).toContainText(`Family${WORDS.families.people}`);
+    await expect(exported).toContainText("Search matchedPriya Shah");
+    await expect(exported, "the export event shows the address searched for").not.toContainText(
+      priya.email,
+    );
+  });
+
+  test("offers no export when nothing matches", async ({ page, request }) => {
+    await anAdminAtTheAuditLog(page, request, "Holme Wire");
+    const nothing = "zzz-nobody";
+
+    await searchBox(page).fill(nothing);
+
     await expect(
-      eventRows(page)
-        .nth(50)
-        .getByRole("button", { name: /^Details of Workspace provisioned/ }),
-    ).toBeFocused();
+      auditLog(page).getByText(WORDS.noneNarrowed({ family: undefined, search: nothing })),
+    ).toBeVisible();
+    await expect(exportButton(page)).toBeDisabled();
+    await auditLog(page).getByRole("button", { name: "Clear filters" }).click();
+    await expect(linesOf(page)).toHaveCount(3);
+    await expect(searchBox(page)).toBeFocused();
+    await expect(exportButton(page)).toBeEnabled();
+  });
+
+  test("lands an old People bookmark on the Audit log", async ({ page, request }) => {
+    await anAdminAtTheAuditLog(page, request, "Ouse Valley Tools");
+
+    await page.goto("/people/audit-log");
+
+    await expect(page).toHaveURL(new RegExp(`${AUDIT_LOG_PAGE}$`));
+    await expect(linesOf(page)).toHaveCount(3);
   });
 
   test("renders the audit log within the latency budget", async ({ page, request }) => {
@@ -201,7 +278,7 @@ test.describe("the System group's Audit log page", () => {
     // A fresh document, so no page of the audit log is already in the page's cache.
     const started = Date.now();
     await page.goto(AUDIT_LOG_PAGE);
-    await expect(eventRows(page)).toHaveCount(3);
+    await expect(linesOf(page)).toHaveCount(3);
     const elapsed = Date.now() - started;
 
     test.info().annotations.push({ type: "audit log", description: `${elapsed} ms` });
@@ -221,7 +298,7 @@ test.describe("the System group's Audit log page", () => {
 
   test("keeps the filter through a failed read, and says so", async ({ page, request }) => {
     await anAdminAtTheAuditLog(page, request, "Swale Joinery");
-    await expect(eventRows(page)).toHaveCount(3);
+    await expect(linesOf(page)).toHaveCount(3);
     const read = (url: URL) => url.pathname.includes("members.auditLog");
     const held = Promise.withResolvers<void>();
     await page.route(read, async (route) => {
@@ -229,98 +306,60 @@ test.describe("the System group's Audit log page", () => {
       await route.abort();
     });
 
-    await pickFamily(page, "Sources");
-    await expect(auditLog(page).getByText("The audit log is still loading.")).toBeVisible();
+    await pickFamily(page, WORDS.families.sources);
+    await expect(auditLog(page).getByText(WORDS.loading)).toBeVisible();
     held.resolve();
 
     // The query asks twice more before it answers, as it does of any failure with no word.
     await expect(auditLog(page).getByRole("alert")).toHaveText(sentenceOf(NO_RESPONSE_TO_A_READ));
-    await expect(familyFilter(page)).toHaveText("Sources");
+    await expect(familyFilter(page)).toHaveText(WORDS.families.sources);
     await page.unroute(read);
-    await pickFamily(page, "All families");
-    await expect(eventRows(page)).toHaveCount(3);
+    await pickFamily(page, WORDS.everyFamily);
+    await expect(linesOf(page)).toHaveCount(3);
     await expect(auditLog(page).getByRole("alert")).toHaveCount(0);
-    await pickFamily(page, "Sources");
-    await expect(auditLog(page)).toContainText("No acts in the sources family yet.");
   });
 
-  test("filters, pages and opens the audit log by keyboard", async ({
+  test("searches, opens and pages the audit log by keyboard", async ({
     page,
     request,
     passesTheAccessibilityGate,
   }) => {
-    await anAdminAtTheAuditLog(page, request, "Calder Castings");
+    const { workspaceId, adminId } = await anAdminAtTheAuditLog(page, request, "Calder Castings");
+    const crews = Array.from({ length: 51 }, (_, index) => `Crew ${index + 1}`);
+    await makeGroups(request, { workspaceId, userId: adminId, names: crews });
     // A fresh document, so the first Tab starts from the top rather than from the rail's link.
     await page.goto(AUDIT_LOG_PAGE);
-    await expect(eventRows(page)).toHaveCount(3);
+    await expect(linesOf(page)).toHaveCount(50);
 
     await skipLinkReachesThePage(page);
 
     const keystrokes = await keystrokesListed(page, AUDIT_LOG.name);
-    await expect(keystrokes).toContainText("Choose the family of acts to show");
-    await expect(keystrokes).toContainText("Show older events");
+    for (const keystroke of Object.values(KEY))
+      await expect(keystrokes).toContainText(keystroke.act);
     await page.keyboard.press("Escape");
     await expect(keystrokes).toHaveCount(0);
 
-    await page.keyboard.press("f");
-    // The list moves focus a frame after each key, so each key waits for the last to land.
-    await expect(page.getByRole("option", { name: "All families" })).toBeFocused();
-    await page.keyboard.press("ArrowDown");
-    await expect(page.getByRole("option", { name: "People" })).toBeFocused();
-    await page.keyboard.press("Enter");
-    await expect(familyFilter(page)).toHaveText("People");
-    await expect(familyFilter(page)).toBeFocused();
-    await expect(eventRows(page)).toHaveCount(2);
+    await page.keyboard.press(KEY.search.key);
+    await expect(searchBox(page)).toBeFocused();
+    await page.keyboard.type("Crew");
+    await expect(page).toHaveURL(/audit\.search=Crew/);
+    await expect(linesOf(page)).toHaveCount(50);
 
     await page.keyboard.press("Tab");
-    const details = eventRows(page)
-      .nth(0)
-      .getByRole("button", { name: /^Details of/ });
+    await expect(familyFilter(page)).toBeFocused();
+    await page.keyboard.press("Tab");
+    const details = detailsOf(linesOf(page).first());
     await expect(details).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(details).toHaveAttribute("aria-expanded", "true");
 
-    await expect(auditLog(page)).toMatchAriaSnapshot(`
-      - region "Audit log":
-        - heading "Audit log" [level=2]
-        - paragraph: /Every act in this workspace except answers/
-        - status: 2 events in the people family.
-        - text: Family
-        - combobox "Family": People
-        - table /The audit log, newest first under each day/:
-          - caption: /The audit log, newest first under each day/
-          - rowgroup:
-            - row "When Family Act By":
-              - columnheader "When"
-              - columnheader "Family"
-              - columnheader "Act"
-              - columnheader "By"
-          - rowgroup:
-            - row /day \\d{1,2} [A-Z][a-z]+ \\d{4}$/:
-              - rowheader /day \\d{1,2} [A-Z][a-z]+ \\d{4}$/
-            - row /Group created/:
-              - cell /^\\d{2}:\\d{2}$/:
-                - time: /^\\d{2}:\\d{2}$/
-              - cell "People"
-              - cell /Group created/:
-                - text: Group created
-                - button /^Details of Group created, \\d{2}:\\d{2} · / [expanded]
-                - term: Recorded as
-                - definition: people.group.created
-                - term: Subject
-                - definition: /^group /
-                - term: Actor id
-                - definition: /^human:/
-              - cell "a former member"
-            - row /Group created/:
-              - cell /^\\d{2}:\\d{2}$/:
-                - time: /^\\d{2}:\\d{2}$/
-              - cell "People"
-              - cell /Group created/:
-                - text: Group created
-                - button /^Details of Group created, \\d{2}:\\d{2} · /
-              - cell "Priya Shah"
-    `);
+    await details.blur();
+    await page.keyboard.press(KEY.older.key);
+    await expect(linesOf(page)).toHaveCount(51);
+    await expect(
+      linesOf(page).nth(50),
+      "focus did not land on the first older event",
+    ).toBeFocused();
 
     await passesTheAccessibilityGate();
   });

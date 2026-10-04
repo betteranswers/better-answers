@@ -2,7 +2,17 @@ import { nameOrAddress } from "@/shared/words.ts";
 
 import type { ReadAuditEvent } from "./audit-log-api.ts";
 
-type Named = ReadAuditEvent["named"][string];
+type NamedOrList = ReadAuditEvent["named"][string];
+
+type Named = Exclude<NamedOrList, readonly unknown[]>;
+
+const isList = (named: NamedOrList): named is readonly Named[] => Array.isArray(named);
+
+/** One thing a detail key names; a key naming a list names no one thing. */
+export const namedIn = (named: ReadAuditEvent["named"], key: string): Named | undefined => {
+  const held = named[key];
+  return held === undefined || isList(held) ? undefined : held;
+};
 
 type DetailValue = ReadAuditEvent["detail"][string];
 
@@ -26,6 +36,7 @@ const NAMED_LABELS = new Map(
     bindingId: "Connected source",
     documentId: "Document",
     iri: "Concept",
+    matched: "Search matched",
   }),
 );
 
@@ -96,24 +107,32 @@ const GONE_WORDS = {
   "erased-invitation": "an erased invitation",
 } as const;
 
-const namedLine = (key: string, label: string, named: Named): DetailLine => {
+type Said = { readonly value: string; readonly address?: string };
+
+const saidOf = (named: Named): Said => {
   switch (named.kind) {
     case "person": {
-      const line = { key, label, value: nameOrAddress(named.displayName, named.address) };
-      return named.displayName === "" ? line : { ...line, address: named.address };
+      const value = nameOrAddress(named.displayName, named.address);
+      return named.displayName === "" ? { value } : { value, address: named.address };
     }
     case "invitation":
-      return { key, label, value: named.address };
+      return { value: named.address };
     case "removed":
-      return { key, label, value: `${THING_WORDS[named.of]} (removed)` };
+      return { value: `${THING_WORDS[named.of]} (removed)` };
     case "former-member":
     case "deleted-group":
     case "erased-invitation":
-      return { key, label, value: GONE_WORDS[named.kind] };
+      return { value: GONE_WORDS[named.kind] };
     default:
-      return { key, label, value: named.name };
+      return { value: named.name };
   }
 };
+
+/** A list, such as an export's matches, reads as its names alone. */
+const namedLine = (key: string, label: string, named: NamedOrList): DetailLine =>
+  isList(named)
+    ? { key, label, value: named.map((one) => saidOf(one).value).join(", ") }
+    : { key, label, ...saidOf(named) };
 
 /** A list is the assistant access an action ended, each named by its assistant. */
 const wordsOfValue = (value: DetailValue): string => {

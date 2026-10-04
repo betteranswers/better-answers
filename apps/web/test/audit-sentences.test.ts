@@ -291,6 +291,21 @@ describe("an audit event's detail in today's words", () => {
     ]);
   });
 
+  it("names each person and group an export's search matched", () => {
+    const matched = [PRIYA, { kind: "group", name: "Bid writers" }] as const;
+
+    expect(
+      detailLinesOf({
+        detail: { matched: [], family: "people", eventCount: 1 },
+        named: { matched },
+      }),
+    ).toEqual([
+      { key: "matched", label: "Search matched", value: "Priya Shah, Bid writers" },
+      { key: "family", label: "Family", value: "People" },
+      { key: "eventCount", label: "Events", value: "1" },
+    ]);
+  });
+
   it("leaves off an id the read could not name", () => {
     expect(
       detailLinesOf({ detail: { invitationId: "01J6GGGGGGGGGGGGGGGGGGGGGG" }, named: {} }),

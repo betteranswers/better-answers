@@ -4,7 +4,7 @@ import { BREADCRUMB, JUMP_TO, RAIL, UNKNOWN_PAGE } from "@/app/words.ts";
 import { INVITATION_WORDS } from "@/features/auth/invitation-words.ts";
 import { SAID_OF_ACCEPTING } from "@/features/auth/refusal-words.ts";
 import { NO_WORKSPACE_HEADING, PICKER_WORDS } from "@/features/auth/workspace-words.ts";
-import { sentenceOf as saidOfAct } from "@/features/people/audit-sentences.ts";
+import { headlineOf, sentenceOf as saidOfAct } from "@/features/people/audit-sentences.ts";
 import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
 import {
   ACTIVITY_WORDS,
@@ -1488,11 +1488,11 @@ test.describe("the People page's words", () => {
 
     await page.goto(AUDIT_LOG_PAGE);
     const auditLog = page.getByRole("region", { name: "Audit log" });
-    await expect(auditLog.getByRole("row").filter({ has: page.getByRole("cell") })).toHaveCount(1);
+    await expect(auditLog.getByRole("listitem")).toHaveCount(1);
     await auditLog.getByRole("button", { name: /^Details of/ }).click();
-    await expect(auditLog).toContainText("platform.workspace.provisioned");
+    await expect(auditLog.getByRole("term").first()).toBeVisible();
     await said(`${AUDIT_LOG_PAGE}, an event opened`);
-    await auditLog.getByRole("combobox", { name: "Family" }).click();
+    await auditLog.getByRole("combobox", { name: "Filter by family" }).click();
     await expect(page.getByRole("listbox"), "the families listed").not.toContainText(organisation);
     await page.keyboard.press("Escape");
 
@@ -1505,7 +1505,7 @@ test.describe("the People page's words", () => {
     await said("a revocation");
 
     await page.goto(AUDIT_LOG_PAGE);
-    await expect(auditLog).toContainText("Member credentials revoked");
+    await expect(auditLog).toContainText(headlineOf("people.member.credentials_revoked"));
     await said(`${AUDIT_LOG_PAGE}, a revocation logged`);
 
     // A modal hides the page behind it from the tree, so each one is read on its own.
