@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import type { TestClient } from "./harness.ts";
@@ -7,7 +7,18 @@ import { aPersonSignedIn, anAdminSignedIn } from "./provoke.ts";
 import { appForSuite } from "./suite-app.ts";
 import { webClientOf } from "./web-client.ts";
 
-const app = appForSuite();
+/** Held still while a test counts past a ceiling: on the wall clock its asks can straddle two fixed windows. */
+const stopped: { at: number | undefined } = { at: undefined };
+
+const app = appForSuite({ clock: { now: () => new Date(stopped.at ?? Date.now()) } });
+
+const stopTheClock = (): void => {
+  stopped.at = Date.now();
+};
+
+afterEach(() => {
+  stopped.at = undefined;
+});
 
 const ADD_OPTIONS = "/passkeys/add-options";
 const ADD = "/passkeys/add";
@@ -206,6 +217,7 @@ describe("adding a passkey", () => {
   it.each([ADD_OPTIONS, ADD])("answers 429 at %s past ten in ten minutes", async (path) => {
     const { client } = await aSignedInPerson();
     const answers: number[] = [];
+    stopTheClock();
 
     for (let asked = 0; asked < 11; asked += 1) {
       answers.push((await client.json(path, { name: "Phone" })).status);
@@ -293,6 +305,7 @@ describe("signing in with a passkey", () => {
   it.each([SIGN_IN_OPTIONS, SIGN_IN])("answers 429 at %s past thirty a minute", async (path) => {
     const browser = app().client();
     const answers: number[] = [];
+    stopTheClock();
 
     for (let asked = 0; asked < 31; asked += 1) {
       answers.push((await browser.json(path, {})).status);
