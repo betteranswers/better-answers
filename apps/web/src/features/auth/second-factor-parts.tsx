@@ -20,7 +20,7 @@ import { Label } from "@/shared/ui/label.tsx";
 
 import { ACCOUNT_ACTS, ACCOUNT_WORDS } from "./account-words.ts";
 import { CodeRefused, isTooMany, SIGNED_OUT } from "./auth-hooks.ts";
-import { AuthScreen, Outcome, ReadAgain, Refused } from "./auth-screen.tsx";
+import { AuthPage, Outcome, ReadAgain, Refused } from "./auth-page.tsx";
 import { isAWrongCode } from "./authenticator-code.tsx";
 import { leavingFor } from "./carried-flow.ts";
 import { selectTheCode } from "./code-entry.ts";
@@ -228,7 +228,7 @@ export function PendingFrame(properties: {
   const listed = listedKeystrokes(read, properties.keystrokes);
   useStandingRemembered(read.data);
   return (
-    <AuthScreen title={properties.title}>
+    <AuthPage title={properties.title}>
       {read.data === undefined ? null : properties.children}
       <SecondFactorRefused
         id={readId}
@@ -238,11 +238,11 @@ export function PendingFrame(properties: {
       />
       <div className="mt-10 flex flex-wrap items-center gap-2">
         {listed === undefined ? null : (
-          <KeystrokesAct screen={properties.title} keystrokes={listed} />
+          <KeystrokesAct page={properties.title} keystrokes={listed} />
         )}
         <SignOutButton />
       </div>
-    </AuthScreen>
+    </AuthPage>
   );
 }
 

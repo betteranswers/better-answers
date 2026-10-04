@@ -8,7 +8,7 @@ The whole of `CODING_STANDARDS.md` binds this workspace. What follows is true of
 
 ## Name Better Auth in one directory
 
-`src/features/auth/` is the only directory here that may import `better-auth` or a `@better-auth/*` plugin, with no carve-out. Every zone above it speaks screens, workspaces and roles rather than endpoints.
+`src/features/auth/` is the only directory here that may import `better-auth` or a `@better-auth/*` plugin, with no carve-out. Every zone above it speaks pages, workspaces and roles rather than endpoints.
 
 ## Name a file and a folder in kebab-case
 
@@ -18,9 +18,9 @@ Every file and every folder under `src/` is kebab-case, so a name reads the same
 
 `src/shared/api/trpc.ts` is the only file that may name `@better-answers/api`, and only as an `import type`, so the built bundle holds no reference to the api and runtime coupling stays zero. State the endpoint path rather than importing it, for the same reason.
 
-## Catch a thrown screen inside the shell
+## Catch a thrown page inside the shell
 
-The router carries a `defaultErrorComponent`, so a screen that throws is caught inside the shell's outlet and the frame, its landmarks and its navigation survive. It says what happened, offers the way out, announces the outcome to assistive technology, and shows a reader nothing of the error — no message, no name, no stack — and says nothing about where the error went, because no browser-side logger receives it.
+The router carries a `defaultErrorComponent`, so a page that throws is caught inside the shell's outlet and the frame, its landmarks and its navigation survive. It says what happened, offers the way out, announces the outcome to assistive technology, and shows a reader nothing of the error — no message, no name, no stack — and says nothing about where the error went, because no browser-side logger receives it.
 
 ## Give every common action a keystroke
 

@@ -10,45 +10,45 @@ import { HomeLine } from "@/features/people/self-act.tsx";
 import { BreadcrumbLastPartSlot } from "@/shared/breadcrumb-last-part.ts";
 import { ShellKeystrokes, ShellKeystrokesAct, type Keystroke } from "@/shared/keystrokes.tsx";
 import {
-  EVERY_SURFACE,
+  EVERY_AREA,
   placeAt,
   readerOf,
-  SURFACES,
+  AREAS,
   visibleTo,
   type Place,
-  type VisibleSurface,
+  type VisibleArea,
   type VisibleTree,
 } from "@/shared/navigation.ts";
-import { isFilled, type ScreenTab, type ScreenToolbar } from "@/shared/screen-toolbar.tsx";
+import { isFilled, type PageTab, type PageToolbar } from "@/shared/page-toolbar.tsx";
 import { useWideLayout } from "@/shared/wide-layout.ts";
 
 import { Band, type Person } from "./band.tsx";
 import { partsOf } from "./breadcrumb.tsx";
 import { IconRail } from "./icon-rail.tsx";
 import { JUMP_TO_KEYSTROKE, JumpTo, useJumping } from "./jump-to.tsx";
+import { useMenuShowing } from "./menu-showing.ts";
+import { Menu } from "./menu.tsx";
 import { NavigationButton, NavigationSheet, useNavigationSheet } from "./navigation-control.tsx";
-import { useSecondaryNavShowing } from "./secondary-nav-showing.ts";
-import { SecondaryNav } from "./secondary-nav.tsx";
-import { openTabIn, ScreenPanel, ScreenTabsRoot, Toolbar, type PickedTab } from "./toolbar.tsx";
+import { openTabIn, PagePanel, PageTabsRoot, Toolbar, type PickedTab } from "./toolbar.tsx";
 import { useArrivalTakenOnceRead, useHidden, VisibleTreeContext } from "./visible-tree.ts";
 import { useWorkspaceSwitch, WorkspaceSwitcher, type Here } from "./workspace-switcher.tsx";
 
-type Region = { readonly name: string; readonly toolbar: ScreenToolbar };
+type Region = { readonly name: string; readonly toolbar: PageToolbar };
 
-const SCREEN = "screen";
+const PAGE = "page";
 
 const NO_JUMP_TO: readonly Keystroke[] = [];
 
 const WITH_JUMP_TO: readonly Keystroke[] = [JUMP_TO_KEYSTROKE];
 
 function FrameKeystrokes(properties: {
-  readonly open: Place<VisibleSurface> | undefined;
+  readonly open: Place<VisibleArea> | undefined;
   readonly offersJumpTo: boolean;
   readonly children: ReactNode;
 }) {
   return (
     <ShellKeystrokes
-      screen={properties.open?.screen.name}
+      page={properties.open?.page.name}
       shell={properties.offersJumpTo ? WITH_JUMP_TO : NO_JUMP_TO}
     >
       {properties.children}
@@ -59,17 +59,15 @@ function FrameKeystrokes(properties: {
 /** One source for both halves of the region, so a panel never outlives its tab list. */
 const useRegion = (visible: VisibleTree, pathname: string): Region | undefined => {
   const toolbar = useRouterState({ select: (state) => state.matches.at(-1)?.staticData.toolbar });
-  // The screen's own verdict, so its tabs go exactly when it does.
-  const drawn = useHidden(visible, pathname) ? undefined : placeAt(EVERY_SURFACE, pathname);
-  return drawn !== undefined && isFilled(toolbar)
-    ? { name: drawn.screen.name, toolbar }
-    : undefined;
+  // The page's own verdict, so its tabs go exactly when it does.
+  const drawn = useHidden(visible, pathname) ? undefined : placeAt(EVERY_AREA, pathname);
+  return drawn !== undefined && isFilled(toolbar) ? { name: drawn.page.name, toolbar } : undefined;
 };
 
-/** A detail address's page names the part beneath its screen; elsewhere the open tab does. */
-const belowTheScreen = (
-  open: Place<VisibleSurface> | undefined,
-  openTab: ScreenTab | undefined,
+/** A detail address's page names the part beneath its page; elsewhere the open tab does. */
+const belowThePage = (
+  open: Place<VisibleArea> | undefined,
+  openTab: PageTab | undefined,
   lastPart: string | undefined,
 ): string | undefined => (open?.detail === undefined ? openTab?.name : lastPart);
 
@@ -85,7 +83,7 @@ export function Frame(properties: {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const { signOut, signingOut } = useSignOut();
   const wide = useWideLayout();
-  const { showing, show } = useSecondaryNavShowing();
+  const { showing, show } = useMenuShowing();
   const sheet = useNavigationSheet();
   const navId = useId();
   const switching = useWorkspaceSwitch();
@@ -97,7 +95,7 @@ export function Frame(properties: {
   const offersJumpTo = visible.home !== undefined;
   const jumping = useJumping(offersJumpTo);
 
-  const open = placeAt(visible.surfaces, pathname);
+  const open = placeAt(visible.areas, pathname);
   const region = useRegion(visible, pathname);
   const unsaved = useUnsavedChangeSaid(pathname);
   useArrivalTakenOnceRead(visible);
@@ -107,10 +105,10 @@ export function Frame(properties: {
       <FrameKeystrokes open={open} offersJumpTo={offersJumpTo}>
         <div className="flex min-h-screen flex-col bg-background">
           <a
-            href="#screen"
+            href="#page"
             className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-card focus:px-3 focus:py-2 focus:text-foreground"
           >
-            Skip to the screen
+            Skip to the page
           </a>
 
           <Band
@@ -127,7 +125,7 @@ export function Frame(properties: {
             }
             parts={partsOf(
               open,
-              belowTheScreen(open, openTabIn(region?.toolbar.tabs, pickedTab), lastPart),
+              belowThePage(open, openTabIn(region?.toolbar.tabs, pickedTab), lastPart),
             )}
             person={properties.person}
             navigation={
@@ -147,7 +145,7 @@ export function Frame(properties: {
             outcome={switching.outcome ?? unsaved}
           />
 
-          <NavigationSheet sheet={sheet} wide={wide} surfaces={visible.surfaces} open={open} />
+          <NavigationSheet sheet={sheet} wide={wide} areas={visible.areas} open={open} />
 
           {/*
            * A fixed rail and a 320px viewport cannot both be honoured; WCAG's reflow criterion
@@ -155,13 +153,13 @@ export function Frame(properties: {
            */}
           <div className="flex flex-1">
             {wide ? (
-              <Navigation surfaces={visible.surfaces} navId={navId} showing={showing} open={open} />
+              <Navigation areas={visible.areas} navId={navId} showing={showing} open={open} />
             ) : null}
 
             <div className="flex min-w-0 flex-1 flex-col">
               <BreadcrumbLastPartSlot value={nameLastPart}>
-                {/* Keyed by the workspace, so a switch draws the screen afresh over its new reads. */}
-                <ToolbarAndScreen
+                {/* Keyed by the workspace, so a switch draws the page afresh over its new reads. */}
+                <ToolbarAndPage
                   key={here?.workspaceId}
                   region={region}
                   picked={[pickedTab, pickTab]}
@@ -175,13 +173,13 @@ export function Frame(properties: {
   );
 }
 
-/** One frame for every workspace surface, so moving between them keeps the pressed menu button. */
+/** One frame for every workspace area, so moving between them keeps the pressed menu button. */
 export function WorkspaceFrame() {
   const membership = useMembership();
   const standing = useOperatorStanding();
   const held = membership.data;
   const role = held?.role;
-  const visible = useMemo(() => visibleTo(readerOf(role), SURFACES), [role]);
+  const visible = useMemo(() => visibleTo(readerOf(role), AREAS), [role]);
 
   return (
     <Frame
@@ -199,58 +197,58 @@ export function WorkspaceFrame() {
 }
 
 function Navigation(properties: {
-  readonly surfaces: readonly VisibleSurface[];
+  readonly areas: readonly VisibleArea[];
   readonly navId: string;
   readonly showing: boolean;
-  readonly open: Place<VisibleSurface> | undefined;
+  readonly open: Place<VisibleArea> | undefined;
 }) {
   const { open } = properties;
 
   return (
     <>
       <IconRail
-        surfaces={properties.surfaces}
-        openSurfaceId={open?.surface.id}
+        areas={properties.areas}
+        openAreaId={open?.area.id}
         tooltips
         foot={<ShellKeystrokesAct at="rail" />}
       />
 
       {open === undefined ? null : (
-        <SecondaryNav
+        <Menu
           id={properties.navId}
           showing={properties.showing}
-          surface={open.surface}
-          openScreenPath={open.screen.path}
+          area={open.area}
+          openPagePath={open.page.path}
         />
       )}
     </>
   );
 }
 
-function ToolbarAndScreen(properties: {
+function ToolbarAndPage(properties: {
   readonly region: Region | undefined;
   readonly picked: PickedTab;
 }) {
   const { region } = properties;
 
   return (
-    <ScreenTabsRoot tabs={region?.toolbar.tabs} picked={properties.picked}>
+    <PageTabsRoot tabs={region?.toolbar.tabs} picked={properties.picked}>
       <PasskeyOffer
         onDismissed={() => {
-          document.getElementById(SCREEN)?.focus();
+          document.getElementById(PAGE)?.focus();
         }}
       />
       {region === undefined ? null : <Toolbar name={region.name} toolbar={region.toolbar} />}
 
-      <main id={SCREEN} aria-label="Screen" tabIndex={-1} className="flex-1 px-4 py-6 md:px-8">
+      <main id={PAGE} aria-label="Page" tabIndex={-1} className="flex-1 px-4 py-6 md:px-8">
         {/* The page's width, not the prose measure: the design system's rule keeps text to it. */}
-        <div data-screen-content className="max-w-page">
+        <div data-page-content className="max-w-page">
           <HomeLine />
-          <ScreenPanel>
+          <PagePanel>
             <Outlet />
-          </ScreenPanel>
+          </PagePanel>
         </div>
       </main>
-    </ScreenTabsRoot>
+    </PageTabsRoot>
   );
 }

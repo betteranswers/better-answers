@@ -1,13 +1,13 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 
 import { useRole } from "@/features/auth/membership.ts";
-import { HOMES, type Screen } from "@/shared/navigation.ts";
+import { HOMES, type Page } from "@/shared/navigation.ts";
 
 import { goHome } from "./words.ts";
 
 /** The way to the reader's own home, or nothing where they are on it already. */
 export function GoHome(properties: {
-  readonly home?: Screen | undefined;
+  readonly home?: Page | undefined;
   readonly className: string;
 }) {
   const { home, className } = properties;
@@ -32,7 +32,7 @@ function RoleHomeLink(properties: { readonly className: string }) {
 }
 
 /** The index finds the home of a reader whose role is not known yet. */
-function HomeLink(properties: { readonly home: Screen | undefined; readonly className: string }) {
+function HomeLink(properties: { readonly home: Page | undefined; readonly className: string }) {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const to = properties.home?.path ?? "/";
   if (pathname === to) return null;

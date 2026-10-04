@@ -116,7 +116,7 @@ export const mountTheConfirm = (routes: Hono, deps: FactorRoutesDependencies): v
   const unanswered = (context: Context, reason: string): Response =>
     fenced.unanswered(context, "auth.confirm_failed", reason);
 
-  /** A refusal no screen can act on reads as unanswered; a lost session as signed out. */
+  /** A refusal no page can act on reads as unanswered; a lost session as signed out. */
   const refused = (context: Context, why: string | Error): Response => {
     if (why instanceof CeilingMet) return tooManyTries(why.retryAfterSeconds);
     if (why === "person-gone" || why === "session-gone") {

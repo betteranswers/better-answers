@@ -7,7 +7,7 @@ component: answering
 severity: high
 applies_when:
   - "Changing how an answer finds, reuses or drafts from concepts"
-  - "Adding a surface or a transport that returns an answer"
+  - "Adding an endpoint or a transport that returns an answer"
   - "Changing the entry step's search or adding embeddings to it"
 tags:
   - adr-0016
@@ -29,7 +29,7 @@ An answer asserts only what a concept states. It is found by traversal before it
 - An `Answer` concept on the walk that answers the question as asked is reused as it stands. One call on the judging route decides that, over the walk's shortlist.
 - Otherwise prose is drafted over the concepts the walk collected, with a citation marker per claim (ADR 0015).
 - No prose is ever generated from a document. Where no concept answers, the page says "Not answered from the company's knowledge" and shows unmapped passages.
-- Nothing withheld is counted, hinted at or explained on any surface.
+- Nothing withheld is counted, hinted at or explained anywhere.
 
 An answer is served as one answer contract for the UI, MCP and the response record: an event stream, verdict first, folded by one pure function into one object. The verdict is ok, warn or refuse for the caller's role. A refusal ends the stream with no prose.
 

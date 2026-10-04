@@ -28,7 +28,7 @@ The MCP surface is built on MCP SDK v2, `@modelcontextprotocol/server`, in `apps
 
 - It is reached through one fetch-shaped seam. `createMcpSurface` in `apps/api/src/mcp/surface.ts` returns a `(Request) => Response` function that Hono mounts. It verifies the bearer before the SDK's handler sees the request, hands the handler `{ authInfo }`, and runs each entry under the Principal built from the bearer.
 - No MCP library type crosses into `packages/core`. The import-direction lint refuses `@modelcontextprotocol` there.
-- The surface has four entries: `find`, `ask`, `open` and `give_feedback`.
+- The MCP surface has four entries: `find`, `ask`, `open` and `give_feedback`.
 - `open` returns structured content: frontmatter, body, relations, trust state and evidence as fields. The human rendering is derived from it.
 - An MCP App, when built, adds views over three of the entries and no further entry. It uses `@modelcontextprotocol/ext-apps` directly, with `apps/web`'s Vite React toolchain. `okf://` identifies a concept and `ui://` a view; both live on the wire and never in a file.
 - No concept is served as an MCP resource in v0.1. A `ui://` view resource is not a concept.
@@ -49,7 +49,7 @@ The platform builds no outbound connectors to third-party SaaS, no outbound OAut
 ## Rejected
 
 - FastMCP TypeScript: rejected for now, not on principle. Its 1.x line was weeks old, its authors label its authentication interim, and it pulls Express 5 into an all-Hono tier. The seam keeps it a live option.
-- FastMCP Python, with the surface moved to the worker: its SEP-990 attaches to an OAuth proxy, and it would put a transport across the tier boundary from the Principal and the predicate.
+- FastMCP Python, with the MCP surface moved to the worker: its SEP-990 attaches to an OAuth proxy, and it would put a transport across the tier boundary from the Principal and the predicate.
 - `punkpeye/fastmcp`, the unscoped npm `fastmcp`: it implements only legacy MCP revisions.
 - Vercel's `mcp-handler`: a thinner version of what the SDK already gives, with no MCP App support.
 - `mcp-use` as the MCP App framework: the named runner-up, if hand-rolling the bridge over `ext-apps` proves fiddly.

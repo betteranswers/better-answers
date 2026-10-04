@@ -73,7 +73,7 @@ const waitNamedBy = async (
   return waitSeconds;
 };
 
-/** From the email step the page shows to the code step, through the product's own screen. */
+/** From the email step the page shows to the code step, through the product's own page. */
 const sendTheFirstCode = async (page: Page, email: string): Promise<void> => {
   await page.getByLabel(SIGN_IN_WORDS.emailField).fill(email);
   await page.getByRole("button", { name: SIGN_IN_WORDS.send }).click();
@@ -376,11 +376,11 @@ test("names the wait when a new code meets the ceiling", async ({
   const email = anAddress("ceiling");
   await provision(request, { name: "Ceiling Ltd", adminEmail: email });
   await atTheCodeStep(page, email);
-  // The screen sent one, so four more reach the per-email ceiling and the next is refused.
+  // The page sent one, so four more reach the per-email ceiling and the next is refused.
   await floodCodesTo(request, email, 4);
 
   await page.keyboard.press("Tab");
-  const listed = await keystrokesListed(page, KEYSTROKE_WORDS.thisScreen);
+  const listed = await keystrokesListed(page, KEYSTROKE_WORDS.thisPage);
   await expect(listed.getByText(SIGN_IN_WORDS.sendAgain)).toBeVisible();
   await expect(listed.getByText(SIGN_IN_WORDS.otherAddress)).toBeVisible();
   await keystrokesDismissed(page, listed);
@@ -408,9 +408,9 @@ test("announces a sent code in the standing region, keeping focus", async ({ pag
 
   const said = page.getByRole("status", { includeHidden: true });
   const refused = page.getByRole("alert", { includeHidden: true });
-  await expect(said, "the sign-in screen stands no status region").toHaveCount(1);
+  await expect(said, "the sign-in page stands no status region").toHaveCount(1);
   await expect(said, "the status region stands with words already in it").toBeEmpty();
-  await expect(refused, "the sign-in screen stands no alert region").toHaveCount(1);
+  await expect(refused, "the sign-in page stands no alert region").toHaveCount(1);
   await expect(refused, "the alert region stands with words already in it").toBeEmpty();
   const stood = await said.elementHandle();
 
@@ -711,7 +711,7 @@ test("keeps the list, saying so, when a pick is refused", async ({ page, request
   await expect(page.getByRole("button", { name: first.name })).toBeVisible();
 });
 
-test("sends a non-member from the picker to the refused screen", async ({ page, request }) => {
+test("sends a non-member from the picker to the refused page", async ({ page, request }) => {
   await signedInWithNoWorkspace(page, request, "none");
 
   await page.goto("/choose-workspace");
@@ -750,7 +750,7 @@ test("separates an unread workspace list from no membership, offering retry", as
   /* jscpd:ignore-end */
 });
 
-test("makes the screens outside the shell keyboard-operable, landmarked and labelled", async ({
+test("makes the pages outside the shell keyboard-operable, landmarked and labelled", async ({
   page,
   request,
 }) => {

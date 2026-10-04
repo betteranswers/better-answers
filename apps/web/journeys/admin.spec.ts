@@ -4,20 +4,20 @@ import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
 import { BULK_WORDS, SELECTED_MEMBERS } from "@/features/people/member-act-words.ts";
 import { ROUTES_WORDS } from "@/features/routes/words.ts";
 import { NOTHING_BOUND } from "@/features/sources/words.ts";
-import { CONTROL_CENTRE, groupIn, screenNamed, type Role } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageNamed, type Role } from "@/shared/navigation.ts";
 
 import { theConsoleIsRefused, theSwitcherListsOneWorkspace, type Gate } from "./every-role.ts";
 import { expect, test, theTestPeople } from "./fixtures.ts";
 import { groupNamesOf, membershipOf } from "./reads.ts";
 import { theFixtureHolds, type RepairMembers } from "./test-workspace.ts";
 
-const people = groupIn(CONTROL_CENTRE, "people");
-const MEMBERS = screenNamed(people, "Members").path;
-const GROUPS = screenNamed(people, "Groups").path;
-const AUDIT_LOG = screenNamed(groupIn(CONTROL_CENTRE, "system"), "Audit log").path;
-const BINDINGS = screenNamed(groupIn(CONTROL_CENTRE, "sources"), "Bindings").path;
-const ROUTES_AND_SPEND = screenNamed(
-  groupIn(CONTROL_CENTRE, "agent-operations"),
+const people = menuGroupIn(CONTROL_CENTRE, "people");
+const MEMBERS = pageNamed(people, "Members").path;
+const GROUPS = pageNamed(people, "Groups").path;
+const AUDIT_LOG = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), "Audit log").path;
+const BINDINGS = pageNamed(menuGroupIn(CONTROL_CENTRE, "sources"), "Bindings").path;
+const ROUTES_AND_SPEND = pageNamed(
+  menuGroupIn(CONTROL_CENTRE, "agent-operations"),
   "Routes and spend",
 ).path;
 
@@ -170,7 +170,7 @@ const olderEventsLoaded = async (page: Page, gate: Gate): Promise<void> => {
 };
 
 /** Only read: an act on either would upload documents or spend on models. */
-const readOnlyScreensRead = async (page: Page, gate: Gate): Promise<void> => {
+const readOnlyPagesRead = async (page: Page, gate: Gate): Promise<void> => {
   await test.step("Invitations", async () => {
     await page.goto(MEMBERS);
     await page.getByRole("tab", { name: "Invitations" }).click();
@@ -225,7 +225,7 @@ test("an Admin walks the Control Centre and leaves it unchanged", async ({
 
   await test.step("Audit log", () => olderEventsLoaded(page, gate));
 
-  await readOnlyScreensRead(page, gate);
+  await readOnlyPagesRead(page, gate);
 
   await test.step("The workspace switcher", async () => {
     const { workspace } = await membershipOf(page);

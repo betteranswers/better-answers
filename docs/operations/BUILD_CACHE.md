@@ -6,7 +6,7 @@ Two caches, neither the estate's. Nothing deployed builds images — `release.ym
 
 ## Where the policy lives
 
-Docker Desktop's **Settings → Docker Engine**, which writes `~/.docker/daemon.json` under `builder.gc`. Both builders here use the `docker` driver, so their BuildKit is the daemon's own and that file is the only surface it reads. A `buildkitd.toml` binds a `docker-container` builder; there is none.
+Docker Desktop's **Settings → Docker Engine**, which writes `~/.docker/daemon.json` under `builder.gc`. Both builders here use the `docker` driver, so their BuildKit is the daemon's own and that file is all it reads. A `buildkitd.toml` binds a `docker-container` builder; there is none.
 
 ## Prove the policy parses
 

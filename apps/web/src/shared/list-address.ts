@@ -13,7 +13,7 @@ type AddressState<Fields extends ListFields> = z.output<z.ZodObject<Fields>>;
 /** The router reads a whole number as one, so a page held as a quoted word is malformed too. */
 export const PAGE_NUMBER = z.number().int().min(1).catch(1);
 
-/** The query as the router parsed it, every screen's keys together. */
+/** The query as the router parsed it, every page's keys together. */
 const QUERY = z.record(z.string(), z.unknown());
 
 type Query = z.output<typeof QUERY>;

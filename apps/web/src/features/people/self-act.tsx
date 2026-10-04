@@ -42,7 +42,7 @@ const roleReadAgain = async (
   return read?.status === "success" && read.fetchStatus === "idle" ? read.data?.role : undefined;
 };
 
-/** The reader can no longer see the screen the act was taken on, so each move replaces it. */
+/** The reader can no longer see the page the act was taken on, so each move replaces it. */
 export const useSelfActHome = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
@@ -59,7 +59,7 @@ export const useSelfActHome = () => {
       return undefined;
     }
     const role = await roleReadAgain(queryClient, api);
-    // The held answer stays: dropping it would leave the screen with no role to draw.
+    // The held answer stays: dropping it would leave the page with no role to draw.
     if (role === undefined) return ROLE_UNREAD;
     await navigate({
       href: HOMES[role].path,
@@ -78,7 +78,7 @@ export function HomeLine() {
     select: (state) => SENT_HOME.safeParse(state.location.state).data?.homeOf,
   });
 
-  // A status alone: this line never refuses, and the frame keeps it on every screen.
+  // A status alone: this line never refuses, and the frame keeps it on every page.
   return (
     <output className="mb-4 block text-muted-foreground empty:hidden">
       {role === undefined ? null : homeNowSaid(role)}

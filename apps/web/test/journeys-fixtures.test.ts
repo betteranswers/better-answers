@@ -31,8 +31,8 @@ const SESSION = "session=a-journeys-session";
 /** The test Admin's authenticator key, as the harness answers it. */
 const KEY = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP";
 
-/** Six digits submit on their own, as the product's screen does, and then six more confirm. */
-const SCREEN = [
+/** Six digits submit on their own, as the product's page does, and then six more confirm. */
+const PAGE = [
   '<!doctype html><html lang="en"><title>Sign in</title><main>',
   `<label>${SIGN_IN_WORDS.emailField} <input type="email"></label>`,
   `<button id="send">${SIGN_IN_WORDS.send}</button>`,
@@ -85,13 +85,13 @@ type Replies = {
 
 const OK: Reply = { status: 200, body: "{}" };
 
-/** A sign-in opens at `/`, which the product's SPA takes to its sign-in screen. */
-const SHOWING_THE_SCREEN = new Set(["GET /", "GET /sign-in"]);
+/** A sign-in opens at `/`, which the product's SPA takes to its sign-in page. */
+const SHOWING_THE_PAGE = new Set(["GET /", "GET /sign-in"]);
 
-const THE_SCREEN: Reply = { status: 200, headers: { "content-type": "text/html" }, body: SCREEN };
+const THE_PAGE: Reply = { status: 200, headers: { "content-type": "text/html" }, body: PAGE };
 
 const readReplyTo = (asked: string, replies: Replies): Reply | undefined =>
-  SHOWING_THE_SCREEN.has(asked) ? THE_SCREEN : replies.reads?.get(asked);
+  SHOWING_THE_PAGE.has(asked) ? THE_PAGE : replies.reads?.get(asked);
 
 /** The harness's authenticator for the test Admin, and the confirm page's post. */
 const factorReplyTo = (asked: string, body: string, replies: Replies): Reply | undefined => {
@@ -141,7 +141,7 @@ const bodyOf = async (request: IncomingMessage): Promise<string> => {
 
 const closers: (() => Promise<void>)[] = [];
 
-/** The product's sign-in screen and posts, the harness's code reader and the sign-out. */
+/** The product's sign-in page and posts, the harness's code reader and the sign-out. */
 const theProduct = async (replies: Replies = {}): Promise<Product> => {
   const heard: Heard[] = [];
   const signOuts = [...(replies.signOuts ?? [])];
@@ -186,14 +186,14 @@ const journeyOf = (...lines: readonly string[]): string =>
 const AS_THE_ADMIN = [
   'test.describe("as the Admin", () => {',
   '  test.use({ role: "Admin" });',
-  '  test("the Admin passes through the screen", async () => {});',
+  '  test("the Admin passes through the page", async () => {});',
   "});",
 ];
 
 const AS_THE_EDITOR = [
   'test.describe("as the Editor", () => {',
   '  test.use({ role: "Editor" });',
-  '  test("the Editor passes through the screen", async () => {});',
+  '  test("the Editor passes through the page", async () => {});',
   "});",
 ];
 
@@ -250,7 +250,7 @@ describe("the journeys' fixtures", () => {
     const run = await journeysAgainst(
       product,
       journeyOf(
-        'test("the preflight opens the sign-in screen", async ({ page }) => {',
+        'test("the preflight opens the sign-in page", async ({ page }) => {',
         '  await page.goto("/sign-in");',
         "});",
       ),
@@ -445,7 +445,7 @@ const THE_OTHER_TWO = {
   "editor.spec.ts": journeyOf(...AS_THE_EDITOR),
   "viewer.spec.ts": journeyOf(
     'test.use({ role: "Viewer" });',
-    'test("the Viewer passes through the screen", async () => {});',
+    'test("the Viewer passes through the page", async () => {});',
   ),
 };
 
@@ -488,7 +488,7 @@ describe("a run the Admin's journey stops", () => {
   it("signs the Editor and Viewer in after an ordinary failure", async () => {
     const product = await theProduct();
     const run = await journeysOver({
-      specs: theThreeJourneys('throw new Error("a screen failed");'),
+      specs: theThreeJourneys('throw new Error("a page failed");'),
       use: { baseURL: product.origin },
       env: ALL_THREE,
     });
@@ -696,7 +696,7 @@ describe("the Admin's check, when the Admin's own standing changed", () => {
 
 const INBOX_KEY = "a-stand-in-token";
 
-/** The preflight's last two steps: the sign-in screen, then the settings and the test inbox. */
+/** The preflight's last two steps: the sign-in page, then the settings and the test inbox. */
 const PREFLIGHT = [
   `import { test, theSettingsAndInboxHold } from ${moduleAt("journeys/fixtures.ts")};`,
   'test("the preflight checks the settings", async ({ page, request }) => {',

@@ -98,7 +98,7 @@ export const PASSKEY_VERIFY_PATH = "/passkey/verify-authentication";
 /** Asks and adds of one person, counted apart; each add mails a notice. */
 export const PASSKEY_PERSON_RULE: CounterRule = { windowMs: 10 * 60_000, max: 10 };
 
-/** The sign-in screen asks once as it opens, for the browser's autofill, and again per press. */
+/** The sign-in page asks once as it opens, for the browser's autofill, and again per press. */
 export const PASSKEY_SIGN_IN_IP_RULE: CounterRule = { windowMs: 60_000, max: 30 };
 
 export const MCP_UNAUTHENTICATED_IP_RULE: CounterRule = { windowMs: 60_000, max: 60 };

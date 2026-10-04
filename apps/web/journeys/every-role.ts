@@ -8,7 +8,7 @@ import { sentenceOf } from "@/shared/refusal-words.ts";
 import { switcherMenuOf, switcherOf } from "../e2e/locators.ts";
 import { expect } from "./fixtures.ts";
 
-/** The audit of the screen the journey is about to leave. */
+/** The audit of the page the journey is about to leave. */
 export type Gate = () => Promise<void>;
 
 /** A test person belongs to the test workspace alone, and no menu offers them the console. */

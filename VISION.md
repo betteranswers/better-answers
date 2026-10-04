@@ -30,7 +30,7 @@ Provenance (what it was created from), trust (who checked it, when, against what
 
 - **People** — employees of different backgrounds using the platform to run business activities and to curate knowledge: Admins (sources, kinds, suggestions, Control Centre), bid and sales writers, product and technical staff.
 - **Platform Agents** — through the platform's MCP server, plugins and skills; local or hosted; producer agents that map and enrich the knowledge, consumer agents that answer and draft.
-- **External Agents** — the remote MCP server provides an exceptional read surface that enables agents from other platforms, or assistants (e.g., a user in Claude Desktop/AI/Cowork) to carry our knowledge anywhere it's needed - a task in Asana that references a concept file that needs an action, a workspace in Notion or a Channel on Teams where users want to discuss a concept, the map, or anything knowledge-shaped. 
+- **External Agents** — the remote MCP server provides exceptional read access that enables agents from other platforms, or assistants (e.g., a user in Claude Desktop/AI/Cowork) to carry our knowledge anywhere it's needed - a task in Asana that references a concept file that needs an action, a workspace in Notion or a Channel on Teams where users want to discuss a concept, the map, or anything knowledge-shaped. 
 
 ## Turning knowledge into action — the outcome loop
 
@@ -40,7 +40,7 @@ Use cases, in the order they land:
 
 | Stage | Use case | What it needs from the knowledge system |
 | --- | --- | --- |
-| **v0.1 — single source of truth** (this map) | Product, service and sector guides; the bid libraries as `Answer` concepts; search and cited Q&A; answering a question set (a bid pack or proposal document) from the knowledge with citations; a read-only MCP surface; Control Centre (one Admin surface; its sections are named in ticket 37); sensitivity, roles, coverage | The three layers; concepts-only bundle; compositions as records; trust and sensitivity; the concept write path |
+| **v0.1 — single source of truth** (this map) | Product, service and sector guides; the bid libraries as `Answer` concepts; search and cited Q&A; answering a question set (a bid pack or proposal document) from the knowledge with citations; a read-only MCP surface; Control Centre (one Admin area; its sections are named in ticket 37); sensitivity, roles, coverage | The three layers; concepts-only bundle; compositions as records; trust and sensitivity; the concept write path |
 | **Next — bids and proposals** | Opportunities, versioned packs, extracted question sets with constraints, responses, submissions, outcomes; the outcome loop | The composition primitive with prompt = question; Q&A trust and provenance; the promotion gate |
 | **Then** | Renewal packs; intelligence feeds as sources; take-action in connected systems as the user, approval-gated; proposals and prospecting | Acting credentials and the approval layer; feed entries as sources |
 | **Later** | Meeting notes, support-ticket sentiment, marketing campaigns, development documentation; customer-hosted deployment | Broader connectors; the customer-hosted worker |

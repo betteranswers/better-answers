@@ -219,7 +219,7 @@ const rowMenuOf =
     );
   };
 
-/** Ticks and an act's outcome are the screen's; what narrows the rows is the address's. */
+/** Ticks and an act's outcome are the page's; what narrows the rows is the address's. */
 function InvitationList(properties: { readonly heading: RefObject<HTMLHeadingElement | null> }) {
   const { heading } = properties;
   const narrowed = useNarrowedInvitations();

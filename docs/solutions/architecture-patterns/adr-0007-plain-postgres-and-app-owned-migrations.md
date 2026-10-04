@@ -45,7 +45,7 @@ A migration that takes a lock writers wait on bounds its own wait.
 
 ## Why
 
-- The api owns every surface a caller reaches and every policy decision (ADR 0005). Eight of Supabase's ten services would idle while inviting dependence on Supabase-only features. The predecessor's 274 role-keyed RLS policies on a Supabase helper are the cautionary case.
+- The api owns every endpoint a caller reaches and every policy decision (ADR 0005). Eight of Supabase's ten services would idle while inviting dependence on Supabase-only features. The predecessor's 274 role-keyed RLS policies on a Supabase helper are the cautionary case.
 - Two tiers writing one schema with two migration tools is the failure the data-not-code contract must prevent. The schema is the contract, so it has one author.
 - With one cocoindex environment per binding, the engine's default `managed_by="system"` would let one binding's deletion drop `index.chunk` and its index under every other binding.
 - `PARTITION OF` holds `index.chunk` in ACCESS EXCLUSIVE, then waits for SHARE ROW EXCLUSIVE on `source_document` to clone the parent's foreign key. A transaction holding a write on `source_document` that then touches `index.chunk` closes a cycle, and Postgres aborts one side with 40P01. Meanwhile every workspace's reads of `index.chunk` queue behind it.

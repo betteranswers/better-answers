@@ -1,7 +1,7 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
 import { aRole } from "@/features/people/role-meanings.ts";
-import { CONTROL_CENTRE, groupIn, screenNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { NO_RESPONSE_TO_A_READ, sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
@@ -15,16 +15,16 @@ import {
   person,
   provision,
   signIn,
-  skipLinkReachesTheScreen,
+  skipLinkReachesThePage,
 } from "./harness.ts";
 
 const LIST_BUDGET_MS = 1000;
 
-const system = groupIn(CONTROL_CENTRE, "system");
+const system = menuGroupIn(CONTROL_CENTRE, "system");
 
-const AUDIT_LOG = screenNamed(system, "Audit log");
+const AUDIT_LOG = pageNamed(system, "Audit log");
 
-const AUDIT_LOG_SCREEN = AUDIT_LOG.path;
+const AUDIT_LOG_PAGE = AUDIT_LOG.path;
 
 const SAID_AT = /^\d{2}:\d{2}$/;
 
@@ -85,11 +85,11 @@ const anAdminAtTheAuditLog = async (
     .getByRole("navigation", { name: CONTROL_CENTRE.name })
     .getByRole("link", { name: "Audit log" })
     .click();
-  await expect(page).toHaveURL(new RegExp(`${AUDIT_LOG_SCREEN}$`));
+  await expect(page).toHaveURL(new RegExp(`${AUDIT_LOG_PAGE}$`));
   return { workspaceId, adminId: workspace.admin.id };
 };
 
-test.describe("the System group's Audit log screen", () => {
+test.describe("the System group's Audit log page", () => {
   test("shows an Admin every act, newest first, each actor named", async ({ page, request }) => {
     await anAdminAtTheAuditLog(page, request, "Calder Joinery");
 
@@ -170,7 +170,7 @@ test.describe("the System group's Audit log screen", () => {
     const names = Array.from({ length: 48 }, (_, index) => `Crew ${index + 1}`);
     await makeGroups(request, { workspaceId, userId: adminId, names });
 
-    await page.goto(AUDIT_LOG_SCREEN);
+    await page.goto(AUDIT_LOG_PAGE);
     await expect(eventRows(page)).toHaveCount(50);
     await expect(
       auditLog(page).getByText("The newest 50 events; older ones follow.", { exact: true }),
@@ -200,7 +200,7 @@ test.describe("the System group's Audit log screen", () => {
 
     // A fresh document, so no page of the audit log is already in the page's cache.
     const started = Date.now();
-    await page.goto(AUDIT_LOG_SCREEN);
+    await page.goto(AUDIT_LOG_PAGE);
     await expect(eventRows(page)).toHaveCount(3);
     const elapsed = Date.now() - started;
 
@@ -212,7 +212,7 @@ test.describe("the System group's Audit log screen", () => {
 
   for (const role of ["Editor", "Viewer"] as const) {
     test(`shows ${aRole(role)} the audit log as not found`, async ({ page, request }) => {
-      await aMemberSignedInAt(page, request, role, AUDIT_LOG_SCREEN);
+      await aMemberSignedInAt(page, request, role, AUDIT_LOG_PAGE);
 
       await notFoundOfferingHome(page, role);
       await expect(auditLog(page)).toHaveCount(0);
@@ -251,10 +251,10 @@ test.describe("the System group's Audit log screen", () => {
   }) => {
     await anAdminAtTheAuditLog(page, request, "Calder Castings");
     // A fresh document, so the first Tab starts from the top rather than from the rail's link.
-    await page.goto(AUDIT_LOG_SCREEN);
+    await page.goto(AUDIT_LOG_PAGE);
     await expect(eventRows(page)).toHaveCount(3);
 
-    await skipLinkReachesTheScreen(page);
+    await skipLinkReachesThePage(page);
 
     const keystrokes = await keystrokesListed(page, AUDIT_LOG.name);
     await expect(keystrokes).toContainText("Choose the family of acts to show");

@@ -1,12 +1,12 @@
 import type { Said } from "@/shared/refusal-words.ts";
 import { instantWords } from "@/shared/words.ts";
 
-/** Apart from the screen's JSX, so the browser suite reads the words the link's page shows. */
+/** Apart from the page's JSX, so the browser suite reads the words the link's page shows. */
 export const LINK_WORDS = {
   checking: "Checking the link.",
   elsewhereTitle: "Enter this code where you started",
   elsewhere:
-    "This browser didn't ask to sign in, so it stays signed out. Type this code on the screen that asked:",
+    "This browser didn't ask to sign in, so it stays signed out. Type this code on the page that asked:",
   copy: "Copy code",
   copied: "Code copied.",
   warning: "Warning",

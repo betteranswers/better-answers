@@ -195,7 +195,7 @@ export function KeepInTextAct(properties: { readonly bindingId: string }) {
   const keep = useKeepInText();
   const groups = act.ready?.groups ?? [];
   const named = counted(groups.length, "finding group", "finding groups");
-  /** Counted off the groups the review listed, so the screen reads nothing of the spans kept. */
+  /** Counted off the groups the review listed, so the page reads nothing of the spans kept. */
   const spans = counted(
     groups.reduce((sum, group) => sum + group.found, 0),
     "span",
@@ -265,7 +265,7 @@ export function NarrowDocumentsAct(properties: { readonly bindingId: string }) {
           onOpenChange={act.setOpen}
           content={{ onCloseAutoFocus: act.returnFocus }}
           title={`Narrow ${named} to ${NARROWEST}`}
-          consequence={`Each document takes the class ${NARROWEST}. The ticked groups' unreviewed findings are reviewed as narrowed, and every concept citing the documents moves with them. A narrowing never widens, and this screen cannot undo it.`}
+          consequence={`Each document takes the class ${NARROWEST}. The ticked groups' unreviewed findings are reviewed as narrowed, and every concept citing the documents moves with them. A narrowing never widens, and this page cannot undo it.`}
           commit={
             <Button onClick={confirm}>
               Narrow {named} to {NARROWEST}

@@ -62,7 +62,7 @@ describe("each hostname reaches only its documented surface", () => {
     expect(refusals().some((line) => String(line["path"]).startsWith("/oauth2/"))).toBe(false);
   });
 
-  it("carries the resume, screens and consent on app., one origin", async () => {
+  it("carries the resume, pages and consent on app., one origin", async () => {
     const product = app.client();
 
     for (const path of ["/sign-in", "/choose-workspace", "/consent"]) {

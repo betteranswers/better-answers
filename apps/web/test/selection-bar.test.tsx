@@ -62,7 +62,7 @@ describe("the selection bar", () => {
     ).toBe("true");
   });
 
-  it("hosts the screen's bulk acts over every ticked row", () => {
+  it("hosts the page's bulk acts over every ticked row", () => {
     const acts: string[] = [];
     render(<MembersList pageSize={2} onAct={(act) => acts.push(act)} />);
 
@@ -74,7 +74,7 @@ describe("the selection bar", () => {
     expect(acts).toEqual(["change the role of cy, ed"]);
   });
 
-  it("clears on the screen's keystroke", () => {
+  it("clears on the page's keystroke", () => {
     render(<MembersList />);
 
     tick("Ada Lovelace");

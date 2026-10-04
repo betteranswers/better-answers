@@ -10,7 +10,7 @@ the hosted product at `better-answers.com`.
 
 | Source | Path / link | What was taken from it |
 | --- | --- | --- |
-| The better-answers repository (mounted, read-only) | `better-answers/` | Product definition, glossary, UX and accessibility rules, the reader-facing word set, Control Centre's screens |
+| The better-answers repository (mounted, read-only) | `better-answers/` | Product definition, glossary, UX and accessibility rules, the reader-facing word set, Control Centre's pages |
 | `VISION.md` | in that repo | The one-line positioning, the three knowledge layers, who uses it |
 | `CONTEXT.md` | in that repo | The **domain glossary**: each entry a person meets is headed by the word a page uses, and an entry only the code meets is marked internal |
 | `CODING_STANDARDS.md` | in that repo | disclosure model, latency and keyboard budget, WCAG 2.2 AA + GOV.UK semantics |
@@ -34,16 +34,16 @@ Two kinds of user: **people** (Admin, Editor, Viewer) running business activitie
 curating knowledge, and **agents** arriving through the MCP surface. One deployment holds
 many **workspaces**; a workspace is one company.
 
-The surfaces the rail lists, each holding groups of screens (§4, *The shell*):
+The areas the rail lists, each holding groups of pages (§4, *The shell*):
 
 - **Ask** — a question, a cited answer, and what it could not answer. Every role.
 - **Knowledge** — search, guides and the map's concepts for every role; its curation
-  screens for Admins and the owners of a domain. A search hit is typed by knowledge layer
+  pages for Admins and the owners of a domain. A search hit is typed by knowledge layer
   and wears its trust or sensitivity word. A guide is assembled *Brief* and quoted
   *Detail* layers over the concepts, with coverage.
 - **Inbox** — what waits on a person who decides something: Admins, and the owners of a
   domain.
-- **Control Centre** — the one Admin surface, in eight groups: Overview, Suggestions,
+- **Control Centre** — the one Admin area, in eight groups: Overview, Suggestions,
   Sources, Agent Operations, Questions, People, Personal data and System.
 
 The avatar menu in the band holds the person's name, their role and "Sign out".
@@ -127,7 +127,7 @@ Hairlines rather than shadows; near-black rather than colour; type doing the wor
 
 **The modular grid.** 32px module (`--grid-module`), 64px for wide layouts. It is not a
 metaphor: the layout is set on it and `GridPattern` draws the same pitch behind the page,
-so the substrate and the content agree. One grid per screen, masked away from reader prose.
+so the substrate and the content agree. One grid per page, masked away from reader prose.
 
 **Colour.** A cool grey ramp carries everything structural — page `#fcfcfd`, cards
 `#ffffff`, lines `#dfe1e6`, text `#17191c`. One accent, **ink blue `#2e4bd4`**, and it is
@@ -144,43 +144,43 @@ Tracking tightens as size grows (−0.022em display → −0.006em body); the 11
 opens to +0.06em upper case. Tabular figures wherever numbers stack.
 
 **Spacing.** 4px base, with 2px and 6px for dense controls. Layout constants: the 56px
-rail (`--rail-w`), the 248px secondary nav (`--sidebar-w`), the 48px band (`--band-h`),
+rail (`--rail-w`), the 248px menu (`--sidebar-w`), the 48px band (`--band-h`),
 the 1200px page maximum (`--page-max`) and the 68ch prose measure (`--measure-prose`).
 Tailwind reads them as `w-rail`, `w-sidebar`, `h-band`, `max-w-page` and
 `max-w-measure`. Controls are 26 / 32 / 40px tall.
 
 **The shell.** A full-width band runs across the top of every workspace and Console
-screen, above the rail and the secondary nav. It has three cells:
+page, above the rail and the menu. It has three cells:
 
 1. As wide as the rail: the logo, which links to the person's home.
-2. As wide as the secondary nav: the workspace switcher, then the sidebar toggle.
+2. As wide as the menu: the workspace switcher, then the sidebar toggle.
 3. The rest: the breadcrumb, ⌘K jump-to and the avatar menu.
 
-Hiding the secondary nav takes only the nav out of the row below the band, so nothing in
-the band moves, to the pixel. The band has no primary-action slot: a screen's primary
-action sits in that screen's own row. The breadcrumb names the surface, the group, the
-screen and the open tab at every width, and every part but the last links to its place;
+Hiding the menu takes only the nav out of the row below the band, so nothing in
+the band moves, to the pixel. The band has no primary-action slot: a page's primary
+action sits in that page's own row. The breadcrumb names the area, the group, the
+page and the open tab at every width, and every part but the last links to its place;
 only the wide band's cell may truncate the middle parts. A name the next part repeats is
 said once, by the deeper part, so Ask's home reads "Ask" alone. When a switch of
 workspace is pending or fails, the band's outcome line says so in words, with the next
 step — never a toast.
 
-Below the band, the rail lists the surfaces the person may use, with a bottom group for
-utilities: Keyboard shortcuts. The secondary nav lists the open surface's groups, each a
-heading over its screens, each screen with an icon. The open screen is marked in
-greyscale, and no visible heading repeats the surface's name from the rail. A surface,
-group or screen that is not built appears nowhere, except a role's home.
+Below the band, the rail lists the areas the person may use, with a bottom group for
+utilities: Keyboard shortcuts. The menu lists the open area's groups, each a
+heading over its pages, each page with an icon. The open page is marked in
+greyscale, and no visible heading repeats the area's name from the rail. An area,
+group or page that is not built appears nowhere, except a role's home.
 
 Below the wide breakpoint the band takes two rows and scrolls with the page. The first
-keeps the button that opens the rail and secondary nav as a sheet, the logo, the
+keeps the button that opens the rail and menu as a sheet, the logo, the
 switcher, a ⌘K trigger, the Keyboard shortcuts trigger and the avatar menu. The second
 holds the breadcrumb, which wraps and never truncates. Nothing scrolls sideways at 320px.
 
-**Width.** A screen's content fills the pane up to the page maximum. Its paragraphs and
+**Width.** A page's content fills the pane up to the page maximum. Its paragraphs and
 headings keep the prose measure, and a table or form uses the width it is given. The shell
-marks the screen's wrapper `data-screen-content` and gives it `max-w-page`; the rule in
+marks the page's wrapper `data-page-content` and gives it `max-w-page`; the rule in
 `styles.css` caps the text inside, and lifts the cap inside a table, a dialog or a sheet.
-A screen declares nothing. A line that must run wider says so with a utility, which
+A page declares nothing. A line that must run wider says so with a utility, which
 always wins over the rule.
 
 **Corners: square.** Every step of the radius ramp resolves to `0`. The ramp names are kept
@@ -195,7 +195,7 @@ an empty state or drop zone.** Never on inputs, selects, tags, trust tags, badge
 rows, nav items, menu items, tooltips, toasts, anything under 32px tall, or anything inside
 a parent that already carries marks. A committing action *repeated per row* takes the
 unmarked `accent` fill rather than `primary`. **One marked level per stack, at most three
-marked objects per screen** — if everything is registered, nothing is. `Frame` is the marked
+marked objects per page** — if everything is registered, nothing is. `Frame` is the marked
 primitive; `Card` takes `marks` as an opt-in.
 
 **Cards.** A 1px `--border-subtle` hairline, square corners, white surface, no shadow at
@@ -213,7 +213,7 @@ comes from a sunken surface (`#f7f8f9`) behind the rail, table headers and quote
 
 | Component | npm | Where it is allowed |
 | --- | --- | --- |
-| `GridPattern` | `@magicui/grid-pattern` | The page substrate. One per screen, behind everything, at the layout's own 32px pitch. Not inside a card or dialog. |
+| `GridPattern` | `@magicui/grid-pattern` | The page substrate. One per page, behind everything, at the layout's own 32px pitch. Not inside a card or dialog. |
 | `DotPattern` | `@magicui/dot-pattern` | Bounded empty areas only — empty states, drop zones, the unbuilt region of a figure. It *means* "nothing is here yet", so never behind content. |
 | `NoiseTexture` | `@magicui/noise-texture` | Dark and accent surfaces only, at 3.5–5%: the dark page, the dialog scrim, a full-bleed accent band. Never on a white card, never over reader prose, never above 5%. Off under `prefers-reduced-transparency`. |
 
@@ -246,7 +246,7 @@ cards, no translucent panels.
 disclosure reveals more, the action sits beside it. Two levels for a Viewer, never three.
 A modal exists only for an irreversible act.
 
-**Imagery.** None. The product ships no photography or illustration; a screen with nothing
+**Imagery.** None. The product ships no photography or illustration; a page with nothing
 to show says so in words.
 
 ## 5. Iconography
@@ -254,7 +254,7 @@ to show says so in words.
 **Phosphor**, at 16px in the interface (18–20px in empty states), regular weight,
 `currentColor`. In the application this is **`@phosphor-icons/react`**; on a static page or
 a specimen card it is the same set as **`@phosphor-icons/web`**, and the kebab-case names
-are identical across both — a screen built here ports to the app with no glyph changes.
+are identical across both — a page built here ports to the app with no glyph changes.
 This remains a **flagged substitution**: the repository ships no icon set, sprite or icon
 font of its own. Its one SVG is the logo.
 
@@ -280,11 +280,11 @@ not meaning (ADR 0033).
 `assets/logo.svg`, imported as `@better-answers/design-system/assets/logo.svg`. It is one
 path on a 16-unit grid in `currentColor`, so it takes the colour of the text around it,
 and its weight is Geist Mono's own bracket, between 500 and 600 (`assets/README.md` gives
-the measurements). It stands in the band's first cell, on the sign-in screens and as the
+the measurements). It stands in the band's first cell, on the sign-in pages and as the
 browser's tab icon, at a multiple of 8px so its edges stay on whole pixels: 16px as the
 tab icon, 24 or 32px in the band. Its accessible name is `better-answers`.
 
-**Name.** The product's name is `better-answers` everywhere a person reads it: a screen,
+**Name.** The product's name is `better-answers` everywhere a person reads it: a page,
 the tab title, the api's pages, an email and its sender name. Lower-case and hyphenated,
 at the start of a sentence as anywhere else. Beside the logo it is set in Geist Mono 500;
 in running text it takes the text's own face. The domain is `better-answers.com`. Never
@@ -319,15 +319,15 @@ shadcn · Kibo UI · AI Elements.
 
 Three registries, one rule: they own behaviour — keyboard, focus, ARIA, virtualisation,
 streaming. We own meaning — the trust words, the citation unit, the register, the marks,
-and every word on a screen. Where the two meet, take theirs and skin it. The auth screens
+and every word on a page. Where the two meet, take theirs and skin it. The auth pages
 are the platform's own, on the auth module's hooks over the better-auth client (ADR 0033,
 amended 2026-09-05); the client says *organization* throughout and the module's word map
 says *workspace*; that map is not optional.
 
 **A pill is Kibo UI's Pill** (owner, 25/09/2026; <https://www.kibo-ui.com/components/pill>).
-Every pill a screen shows — a role, a group, an invitation's state, a count — is that
+Every pill a page shows — a role, a group, an invitation's state, a count — is that
 component, installed through the registry with its notices entry and skinned by the tokens.
-It is never shadcn's Badge restyled or a hand-rolled span. Screens built before this date are
+It is never shadcn's Badge restyled or a hand-rolled span. Pages built before this date are
 not swept.
 
 The seven product-specific components the set used to hold are the ones to rebuild first on
@@ -345,10 +345,10 @@ GOV.UK brand), **`Icon`** (the Phosphor substitution in one file) and
 
 ## 7. Flagged substitutions and open questions
 
-1. **Fonts.** No brand font binaries exist in the source. **Geist and Geist Mono** were chosen as the closest match to the stated reference styling, and the substitution stands. Since T-035 the product **self-hosts** them from this package's own `@fontsource-variable/geist` and `-geist-mono` dependencies (`tokens/fonts-hosted.css`), so no screen makes a third-party request; the specimen cards under `guidelines/`, which are opened straight from disk and cannot resolve a package name, still link Google Fonts through `tokens/fonts-remote.css`. Replace the two `tokens/fonts-*.css` files if a licensed brand font exists; `tokens/fonts.css` names the families and stays.
+1. **Fonts.** No brand font binaries exist in the source. **Geist and Geist Mono** were chosen as the closest match to the stated reference styling, and the substitution stands. Since T-035 the product **self-hosts** them from this package's own `@fontsource-variable/geist` and `-geist-mono` dependencies (`tokens/fonts-hosted.css`), so no page makes a third-party request; the specimen cards under `guidelines/`, which are opened straight from disk and cannot resolve a package name, still link Google Fonts through `tokens/fonts-remote.css`. Replace the two `tokens/fonts-*.css` files if a licensed brand font exists; `tokens/fonts.css` names the families and stays.
 2. **Icons.** No icon set exists in the source. **Phosphor** — `@phosphor-icons/react` in the app, `@phosphor-icons/web` on a page — flagged above.
 3. **Logo.** Drawn to the owner's description of 30 September 2026: two square brackets with a square between them. `assets/logo.svg` is the logo unless the owner replaces it. The same decision made the name `better-answers` everywhere a person reads it.
 4. **Accent colour.** Ink blue `#2e4bd4` was chosen, not found. The source specifies no palette — only that colour never carries a signal alone.
 7. **Textures.** `GridPattern`, `DotPattern` and `NoiseTexture` are ports of the corresponding Magic UI components, retuned to these tokens rather than pulled from npm — the design system ships no build step. In an application, install `@magicui/grid-pattern`, `@magicui/dot-pattern` and `@magicui/noise-texture` and pass the same tokens.
 5. **Dark theme.** Authored on the reference styling's convention, not on evidence from the source.
-6. **Screen layouts.** Grounded in `CONTEXT.md` and the ADRs (which name every screen and its content) but not in any interface code, because none exists yet.
+6. **Page layouts.** Grounded in `CONTEXT.md` and the ADRs (which name every page and its content) but not in any interface code, because none exists yet.

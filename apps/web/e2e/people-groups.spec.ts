@@ -6,7 +6,7 @@ import { GROUPS_KEYSTROKES } from "@/features/people/people-state.ts";
 import { SAID_OF_A_GROUP } from "@/features/people/refusal-words.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
 import { SELECT_FIRST } from "@/shared/keystroke-words.ts";
-import { CONTROL_CENTRE, groupIn, screenNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -22,21 +22,21 @@ import {
   provision,
   saysItsSentenceNotItsWord,
   signIn,
-  skipLinkReachesTheScreen,
+  skipLinkReachesThePage,
   theActLandedWithinItsBudget,
 } from "./harness.ts";
 
 const LIST_BUDGET_MS = 1000;
 
-const people = groupIn(CONTROL_CENTRE, "people");
+const people = menuGroupIn(CONTROL_CENTRE, "people");
 
-const GROUPS = screenNamed(people, "Groups");
+const GROUPS = pageNamed(people, "Groups");
 
-const GROUPS_SCREEN = GROUPS.path;
+const GROUPS_PAGE = GROUPS.path;
 
-const MEMBERS = screenNamed(people, "Members");
+const MEMBERS = pageNamed(people, "Members");
 
-const MEMBERS_SCREEN = MEMBERS.path;
+const MEMBERS_PAGE = MEMBERS.path;
 
 /** A member's row leads with its tick, then the person and their role. */
 const GROUPS_CELL = 3;
@@ -92,14 +92,14 @@ const anAdminAtGroups = async (page: Page, api: APIRequestContext, workspaceName
     names: ["Una's crew"],
   });
 
-  // Asked for before signing in, so the sign-in screen carries the Admin back to it.
-  await page.goto(GROUPS_SCREEN);
+  // Asked for before signing in, so the sign-in page carries the Admin back to it.
+  await page.goto(GROUPS_PAGE);
   await signIn(page, api, adminEmail);
-  await expect(page).toHaveURL(new RegExp(`${GROUPS_SCREEN}$`));
+  await expect(page).toHaveURL(new RegExp(`${GROUPS_PAGE}$`));
   await expect(groupRows(page)).toHaveCount(2);
 };
 
-test.describe("the People group's Groups screen", () => {
+test.describe("the People group's Groups page", () => {
   test("shows an Admin each group's count, and no one else's", async ({
     page,
     request,
@@ -144,7 +144,7 @@ test.describe("the People group's Groups screen", () => {
 
     // A fresh document, so no list is already in the page's cache.
     const started = Date.now();
-    await page.goto(GROUPS_SCREEN);
+    await page.goto(GROUPS_PAGE);
     await expect(groupRows(page)).toHaveCount(2);
     const elapsed = Date.now() - started;
 
@@ -154,7 +154,7 @@ test.describe("the People group's Groups screen", () => {
 
   for (const role of ["Editor", "Viewer"] as const) {
     test(`shows ${aRole(role)} Groups as not found, listing none`, async ({ page, request }) => {
-      const workspace = await aMemberSignedInAt(page, request, role, GROUPS_SCREEN);
+      const workspace = await aMemberSignedInAt(page, request, role, GROUPS_PAGE);
       await makeGroups(request, {
         workspaceId: workspace.workspaceId,
         userId: workspace.admin.id,
@@ -336,9 +336,9 @@ test.describe("a group's acts", () => {
   test("lets an Admin reach every group act by keyboard alone", async ({ page, request }) => {
     await anAdminAtGroups(page, request, "Calder Castings");
     // A fresh document, so the first Tab starts from the top rather than from the rail's link.
-    await page.goto(GROUPS_SCREEN);
+    await page.goto(GROUPS_PAGE);
     await expect(groupRows(page)).toHaveCount(2);
-    await skipLinkReachesTheScreen(page);
+    await skipLinkReachesThePage(page);
 
     const keystrokes = await keystrokesListed(page, GROUPS.name);
     for (const act of [
@@ -350,7 +350,7 @@ test.describe("a group's acts", () => {
     ]) {
       await expect(keystrokes).toContainText(act);
     }
-    // `d` removes a member on the Members screen; here it deletes a group, and says only that.
+    // `d` removes a member on the Members page; here it deletes a group, and says only that.
     await expect(keystrokes).not.toContainText("Remove the member in focus");
     await keystrokesDismissed(page, keystrokes);
 
@@ -406,7 +406,7 @@ test.describe("the keystrokes listed across the People group", () => {
   }) => {
     await anAdminAtGroups(page, request, "Calder Mills");
     await nav(page).getByRole("link", { name: MEMBERS.name }).click();
-    await expect(page).toHaveURL(new RegExp(`${MEMBERS_SCREEN}$`));
+    await expect(page).toHaveURL(new RegExp(`${MEMBERS_PAGE}$`));
 
     const onMembers = await keystrokesListed(page, MEMBERS.name);
     await expect(onMembers).toContainText("Remove the member in focus");
@@ -416,7 +416,7 @@ test.describe("the keystrokes listed across the People group", () => {
     await expect(groupRows(page)).toHaveCount(2);
     const onGroups = await keystrokesListed(page, GROUPS.name);
     await expect(onGroups).toContainText("Delete the group in focus");
-    await expect(onGroups, "Members' keystrokes outlived the screen").not.toContainText(
+    await expect(onGroups, "Members' keystrokes outlived the page").not.toContainText(
       "Remove the member in focus",
     );
   });
@@ -429,7 +429,7 @@ test.describe("a member's groups, on their row and their page", () => {
     passesTheAccessibilityGate,
   }) => {
     await anAdminAtGroups(page, request, "Esk Presswork");
-    await page.goto(MEMBERS_SCREEN);
+    await page.goto(MEMBERS_PAGE);
     const members = page.getByRole("region", { name: "Members" });
     const priyaRow = members.getByRole("row").filter({ hasText: "Priya Shah" });
     await expect(members.getByRole("columnheader", { name: "Groups" })).toBeVisible();
@@ -481,7 +481,7 @@ test.describe("a member's groups, on their row and their page", () => {
   test("points an Admin at Groups when the workspace has none", async ({ page, request }) => {
     const admin = anAddress("admin");
     await provision(request, { name: "Rye Mill", adminEmail: admin });
-    await page.goto(MEMBERS_SCREEN);
+    await page.goto(MEMBERS_PAGE);
     await signIn(page, request, admin);
 
     await page
@@ -495,11 +495,11 @@ test.describe("a member's groups, on their row and their page", () => {
         - /children: equal
         - heading "Groups" [level=3]
         - paragraph: ${EMPTY_LINES.groups}
-        - link "Create one on the Groups screen"
+        - link "Create one on the Groups page"
     `);
-    await groups.getByRole("link", { name: "Create one on the Groups screen" }).click();
+    await groups.getByRole("link", { name: "Create one on the Groups page" }).click();
 
-    await expect(page).toHaveURL(new RegExp(`${GROUPS_SCREEN}$`));
+    await expect(page).toHaveURL(new RegExp(`${GROUPS_PAGE}$`));
     await expect(groupsRegion(page)).toMatchAriaSnapshot(`
       - region "Groups":
         - heading "Groups" [level=2]

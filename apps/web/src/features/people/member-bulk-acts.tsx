@@ -309,7 +309,7 @@ function GroupChoice(properties: {
           className="gap-1"
           action={
             <Link to={GROUPS_PATH} className="text-brand underline">
-              Create one on the Groups screen
+              Create one on the Groups page
             </Link>
           }
         />

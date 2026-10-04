@@ -43,9 +43,9 @@ A bundle's identity lives in its manifest, a platform-reserved file at the bundl
 - OKF identifies a concept only by its path within a bundle, and gives a bundle no identity at all: no id, owner, origin, version or cross-bundle reference.
 - A workspace's bundle must describe itself outside the platform. Bulk review, rename-safe links and a future bundle estate of vendor bundles all need a key that survives what the path does not.
 - The IRI is the one key that cannot be re-keyed, so its form was fixed before anything was built on it. Opaque, because a derived IRI would carry names into every place it is copied.
-- The apex, because the IRI must outlive every surface. The apex is kept for identity and redirection, and a persistent redirector can front it later without changing any identity.
+- The apex, because the IRI must outlive every product hostname. The apex is kept for identity and redirection, and a persistent redirector can front it later without changing any identity.
 - `iri` says what the value is and drops straight into RDF as a subject.
-- In a file, an absolute HTTPS IRI is spec-legal in links and in `sources[].resource` today, and a link checker can follow it. On the wire, `okf://` is what an MCP resource URI is for: a resource-capable host resolves it through the surface that minted it (ADR 0018).
+- In a file, an absolute HTTPS IRI is spec-legal in links and in `sources[].resource` today, and a link checker can follow it. On the wire, `okf://` is what an MCP resource URI is for: a resource-capable host resolves it through the MCP surface that minted it (ADR 0018).
 
 ## Rejected
 

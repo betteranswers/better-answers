@@ -239,7 +239,7 @@ const seedDocuments = async (
 };
 
 /**
- * Rows written as each act and the worker would leave them, so the screen reads what a real
+ * Rows written as each act and the worker would leave them, so the page reads what a real
  * binding's history leaves behind.
  */
 export const seedBindings = async (
@@ -252,7 +252,7 @@ export const seedBindings = async (
     const seeded: SeededBinding[] = [];
 
     for (const binding of asked.bindings) {
-      /** The audience CHECK wants a named group beside the word; the screen names none. */
+      /** The audience CHECK wants a named group beside the word; the page names none. */
       const readers =
         binding.audience === "groups"
           ? [(await seed.group({ workspaceId, name: `${binding.name} readers` })).id]

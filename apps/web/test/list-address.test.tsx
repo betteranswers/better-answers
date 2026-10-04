@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { PAGE_NUMBER, useListAddress } from "@/shared/list-address.ts";
 
-import { openScreens } from "./address-router.tsx";
+import { openPages } from "./address-router.tsx";
 
 afterEach(cleanup);
 
@@ -63,7 +63,7 @@ function List(properties: { readonly prefix: string }) {
 
 const MEMBERS = () => <List prefix="members" />;
 
-/** Two tabs of one screen; the open tab is the screen's own state, never the address. */
+/** Two tabs of one page; the open tab is the page's own state, never the address. */
 function Tabs() {
   const [open, setOpen] = useState("members");
 
@@ -83,7 +83,7 @@ function Tabs() {
 const ELSEWHERE = () => null;
 
 const openMembers = (...entries: readonly string[]) =>
-  openScreens({ "/members": MEMBERS, "/elsewhere": ELSEWHERE }, entries);
+  openPages({ "/members": MEMBERS, "/elsewhere": ELSEWHERE }, entries);
 
 const searchBox = (prefix = "members") =>
   screen.getByRole<HTMLInputElement>("textbox", {
@@ -165,7 +165,7 @@ describe("a list's state in the address", () => {
   });
 
   it("holds each tab's search under its own prefix", async () => {
-    const { at } = await openScreens({ "/people": Tabs }, ["/people"]);
+    const { at } = await openPages({ "/people": Tabs }, ["/people"]);
 
     typeIn(searchBox("members"), "priya");
     fireEvent.click(screen.getByRole("button", { name: "Invitations tab" }));

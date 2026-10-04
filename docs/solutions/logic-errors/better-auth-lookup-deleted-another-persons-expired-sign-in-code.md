@@ -6,7 +6,7 @@ module: apps/api
 problem_type: logic_error
 component: identity
 symptoms:
-  - "A person typing a just-expired email code got INVALID_OTP, which the sign-in screen reads as 'That code is wrong.' with tries left, instead of OTP_EXPIRED, which it reads as spent"
+  - "A person typing a just-expired email code got INVALID_OTP, which the sign-in page reads as 'That code is wrong.' with tries left, instead of OTP_EXPIRED, which it reads as spent"
   - "It happened only when another request looked up a verification row between the code's expiry and its holder's try; the holder's own lookup alone answered OTP_EXPIRED"
   - "The expired-code spec in apps/web/e2e/sign-in.spec.ts was flaky under parallel Playwright workers, because other workers' sign-ins deleted the aged code"
 root_cause: wrong_api
@@ -36,8 +36,8 @@ That table is the library's store of short-lived tokens: sign-in codes and links
 
 ## Symptoms
 
-- After someone else had tried a code, a person typing a code just past its expiry got `400 INVALID_OTP` rather than `400 OTP_EXPIRED`. The sign-in screen showed "That code is wrong. Check it and try again. 2 tries left." (`apps/web/src/features/auth/refusal-words.ts:107-113`) instead of "That code can't be used any more." (`refusal-words.ts:100-103`). The screen reads a code as spent only on a 403 or `OTP_EXPIRED` (`apps/web/src/features/auth/code-entry.ts:15-23`).
-- Every later try was refused as wrong as well, so the screen counted tries down for a code the database no longer held.
+- After someone else had tried a code, a person typing a code just past its expiry got `400 INVALID_OTP` rather than `400 OTP_EXPIRED`. The sign-in page showed "That code is wrong. Check it and try again. 2 tries left." (`apps/web/src/features/auth/refusal-words.ts:107-113`) instead of "That code can't be used any more." (`refusal-words.ts:100-103`). The page reads a code as spent only on a 403 or `OTP_EXPIRED` (`apps/web/src/features/auth/code-entry.ts:15-23`).
+- Every later try was refused as wrong as well, so the page counted tries down for a code the database no longer held.
 - On its own, the same code read correctly as expired. The fault needed another request's lookup between the expiry and the holder's try.
 - The browser spec "an expired code reads as spent, handing focus to another" (`apps/web/e2e/sign-in.spec.ts:506`) was flaky under parallel Playwright workers: another worker's sign-in deleted the aged code before the spec typed it.
 

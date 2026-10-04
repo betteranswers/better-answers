@@ -1,11 +1,11 @@
 /*
  * The one stylesheet the app has. Everything below comes from the design system:
  * Tailwind reads its tokens through the bridge, so a colour, a size or a radius on a
- * screen is a theme value and never a local invention (ADR 0033).
+ * page is a theme value and never a local invention (ADR 0033).
  *
  * The tokens come first, because `styles.css` reaches them through nested `@import`s and
  * CSS lets an `@import` follow only another `@import`: behind Tailwind's own output those
- * nested imports would sit after a rule, and a build drops them silently — a screen with
+ * nested imports would sit after a rule, and a build drops them silently — a page with
  * every utility and no token values. Then Tailwind, then the bridge that hands the tokens
  * to it, then the faces.
  */
@@ -18,7 +18,7 @@
  * The type scale is read from the tokens directly rather than through a Tailwind theme
  * value, because Tailwind's font-size namespace and the design system's type steps are
  * the same `--text-*` names (the bridge's §7 says why). Setting it once on the elements
- * keeps every screen on the scale without a utility on every heading.
+ * keeps every page on the scale without a utility on every heading.
  */
 @layer base {
   html {

@@ -201,7 +201,7 @@ COPY src src
 USER worker
 
 # A process-level check, not an HTTP one, and deliberately: this tier exposes no HTTP
-# surface at all. It has no server, no port and no `/health` — the api↔worker control plane
+# endpoint at all. It has no server, no port and no `/health` — the api↔worker control plane
 # is rows in Postgres, never HTTP (ADR 0005) — so there is nothing to GET. What the probe
 # asks instead is the two halves of "is this worker working": it holds a claimed lease whose
 # heartbeat is fresh, or nothing anywhere has been waiting longer than a lease. Idle is

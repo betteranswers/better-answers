@@ -118,10 +118,10 @@ describe("the comment rule fires on a long or citing comment", () => {
 
   it("refuses a comment inside JSX, which the line counter misses", () => {
     const tsx = {
-      "screen.tsx": `export const Screen = () => (\n  <div>{/* ${wordsOf(29)} */}</div>\n);\n`,
+      "page.tsx": `export const Page = () => (\n  <div>{/* ${wordsOf(29)} */}</div>\n);\n`,
     };
 
-    expect(lint.flagged(tsx)).toEqual(["screen.tsx"]);
+    expect(lint.flagged(tsx)).toEqual(["page.tsx"]);
   });
 });
 

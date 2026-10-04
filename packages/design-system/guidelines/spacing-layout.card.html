@@ -1,4 +1,4 @@
-<!-- @dsCard group="Spacing" viewport="700x300" name="Layout constants" subtitle="The band over a 56px rail and a 248px secondary nav; screens to 1200px, text at 68ch" -->
+<!-- @dsCard group="Spacing" viewport="700x300" name="Layout constants" subtitle="The band over a 56px rail and a 248px menu; pages to 1200px, text at 68ch" -->
 <!doctype html>
 <html lang="en-GB">
   <head>
@@ -28,7 +28,7 @@
         font-size: var(--text-2xs);
         color: var(--text-faint);
       }
-      /* The rail and the secondary nav at half scale, so they keep their ratio to each other. */
+      /* The rail and the menu at half scale, so they keep their ratio to each other. */
       .shell {
         display: grid;
         grid-template-columns: 28px 124px 1fr;
@@ -55,7 +55,7 @@
         border-right: 1px solid var(--border-subtle);
         padding: 8px;
       }
-      .screen {
+      .page {
         display: flex;
         flex-direction: column;
         gap: 8px;
@@ -101,11 +101,11 @@
         </div>
         <div class="side"></div>
         <div class="side" style="display: flex; flex-direction: column; gap: 4px">
-          <span class="v">secondary nav</span><span class="v">hides alone</span>
+          <span class="v">menu</span><span class="v">hides alone</span>
         </div>
-        <div class="screen">
+        <div class="page">
           <div class="row" style="justify-content: space-between">
-            <span class="v">screen: tab row and primary action</span
+            <span class="v">page: tab row and primary action</span
             ><span class="v">up to 1200px</span>
           </div>
           <div class="line" style="width: 62%"></div>
@@ -119,14 +119,14 @@
         </div>
       </div>
       <div class="row" style="gap: 18px">
-        <span class="v">56px rail</span><span class="v">248px secondary nav</span
+        <span class="v">56px rail</span><span class="v">248px menu</span
         ><span class="v">48px band</span><span class="v">1200px page maximum</span
         ><span class="v">68ch measure</span>
       </div>
       <p style="margin: 0; font-size: var(--text-xs); color: var(--text-muted); max-width: 72ch">
-        The band's first cell is as wide as the rail and its second as wide as the secondary nav, so
-        hiding the nav moves nothing in the band. Mark a screen's wrapper
-        <code class="v">data-screen-content</code> and give it the page maximum: its text keeps the
+        The band's first cell is as wide as the rail and its second as wide as the menu, so hiding
+        the nav moves nothing in the band. Mark a page's wrapper
+        <code class="v">data-page-content</code> and give it the page maximum: its text keeps the
         measure, and a table or form takes the width.
       </p>
     </div>

@@ -18,11 +18,11 @@ T-228 added `sheet` the same day with the same CLI; its two digests were taken t
 arrival edits are listed below with the others.
 
 T-136 added `checkbox` and `progress` on **23 September 2026** with the same CLI,
-`shadcn@4.20.1`, for the Sources screen's finding groups, publish confirmations and upload; their
+`shadcn@4.20.1`, for the Sources page's finding groups, publish confirmations and upload; their
 two digests were taken that day and their arrival edits are listed below with the others.
 
 T-397 added `avatar` and Kibo UI's `pill` on **25 September 2026** with the same CLI,
-`shadcn@4.20.1`: the pill is every pill a People screen shows (the design system's readme, owner
+`shadcn@4.20.1`: the pill is every pill a People page shows (the design system's readme, owner
 25/09/2026), and `avatar` is the registry dependency it names beside `badge` and `button`. Their
 two digests were taken that day and their arrival edits are listed below with the others.
 
@@ -37,7 +37,7 @@ register gives a modal to. The CLI served it from the `new-york-v4` style, as it
 group. Its two digests were taken that day and its arrival edits are listed below with the others.
 
 The shell's band added `breadcrumb` on **1 October 2026** with the same CLI, `shadcn@4.20.1`, for
-the line of places that names the surface, group, screen and open tab. The CLI resolved it from
+the line of places that names the area, group, page and open tab. The CLI resolved it from
 the `new-york-v4` style, as it did the radio group. The file was written from the source the CLI
 showed with `add breadcrumb --dry-run --view`, not by its write, so the dependency on `cn` it
 names never reached `package.json` or the lockfile. Its two digests were taken that day and its
@@ -249,7 +249,7 @@ The breadcrumb's arrival edits, on the one item it added:
   every arrival since the tooltip's has needed, and the file given this repository's format and
   import order. Upstream carries no `"use client"` and no extensionless relative import.
 - Its default separator, lucide's chevron, stays in the file; the band passes a Phosphor caret in
-  its place, so the product's own screens draw one icon family.
+  its place, so the product's own pages draw one icon family.
 
 The arrival edits on `pagination` and `empty`:
 
@@ -266,7 +266,7 @@ The arrival edits on `pagination` and `empty`:
 The arrival edits on the four Kibo UI patterns, which are demonstrations rather than components:
 
 - Each pattern's scaffolding removed (`"use client"`, `export const title`, the default-exported
-  `Example`), and its fixed demo content turned into props, so one copy is a part a screen fills
+  `Example`), and its fixed demo content turned into props, so one copy is a part a page fills
   with its own words.
 - `@/components/ui/*` imports rewritten to `@/shared/ui/*.tsx`, and every lucide icon replaced by
   its Phosphor counterpart: `MoreVertical` by `DotsThreeVertical`, the pagination chevrons by
@@ -342,12 +342,12 @@ The arrival edits on `banner`:
 - `BannerIcon` dropped: it drew a round chip around a lucide icon, and only three controls may be
   round.
 - `BannerClose` draws a caller's children in place of its lucide cross, so the offer passes the
-  Phosphor glyph the product's own screens draw.
+  Phosphor glyph the product's own pages draw.
 - `onChange` passes through an arrow that calls `onClose`, since the hook declares `onChange?:`
   without `| undefined` while `onClose?:` admits it.
 
 Everything else is upstream's, unedited. Their behaviour — keyboard handling, focus, ARIA
-wiring, virtualisation — is theirs by ADR 0033; the screens that use them carry the WCAG 2.2 AA
+wiring, virtualisation — is theirs by ADR 0033; the pages that use them carry the WCAG 2.2 AA
 line and are tested with a keyboard and a screen reader.
 
 ## Refreshing this directory
@@ -363,9 +363,9 @@ line and are tested with a keyboard and a screen reader.
    tree and reaches this directory under the four relaxations in `.oxlintrc.json` and no others,
    then `apps/web`'s own `check` — `tsc --noEmit` (which is what catches the extensionless
    imports coming back), the component and lint-rule suites, the production build, and the
-   Playwright browser suite against the api-served build. A screen that renders any of these
+   Playwright browser suite against the api-served build. A page that renders any of these
    components also carries its own WCAG 2.2 AA check with a keyboard and a screen reader;
-   that check is the screen's, not this file's.
+   that check is the page's, not this file's.
 
 ## Notice text
 

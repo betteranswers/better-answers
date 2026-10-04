@@ -5,7 +5,7 @@ import { EMBEDDING_DIMENSIONS } from "@better-answers/schema";
 import { goHome } from "@/app/words.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
 import { ROUTES_WORDS } from "@/features/routes/words.ts";
-import { CONTROL_CENTRE, groupIn, HOMES, screenNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, HOMES, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -15,7 +15,7 @@ import {
   provision,
   seedRoutes,
   signIn,
-  skipLinkReachesTheScreen,
+  skipLinkReachesThePage,
   type SeedRoute,
 } from "./harness.ts";
 
@@ -35,9 +35,9 @@ const embeddingRow = (page: Page) =>
 
 const PURPOSES = ["Extraction", "Enrichment", "Answering", "Judging", "Embedding"];
 
-const agentOperations = groupIn(CONTROL_CENTRE, "agent-operations");
+const agentOperations = menuGroupIn(CONTROL_CENTRE, "agent-operations");
 
-const ROUTES_AND_SPEND = screenNamed(agentOperations, "Routes and spend");
+const ROUTES_AND_SPEND = pageNamed(agentOperations, "Routes and spend");
 
 /** No role lands on Routes and spend, so every test here opens it from the member's home. */
 const openRoutes = async (page: Page) => {
@@ -59,7 +59,7 @@ const signedInWith = async (
   return workspace;
 };
 
-test.describe("the Routes and spend screen's routes card", () => {
+test.describe("the Routes and spend page's routes card", () => {
   test("shows a member their five routes, never another workspace's", async ({ page, request }) => {
     const theirs = await provision(request, { name: "Southern Castings" });
     await seedRoutes(request, {
@@ -173,7 +173,7 @@ test.describe("the Routes and spend screen's routes card", () => {
   });
 
   for (const role of ["Editor", "Viewer"] as const) {
-    test(`shows ${aRole(role)} the screen as not found`, async ({ page, request }) => {
+    test(`shows ${aRole(role)} the page as not found`, async ({ page, request }) => {
       await aMemberSignedInAt(page, request, role, ROUTES_AND_SPEND.path);
 
       await notFoundOfferingHome(page, role);
@@ -192,7 +192,7 @@ test.describe("the Routes and spend screen's routes card", () => {
     });
     await expect(routesCard(page).getByRole("listitem")).toHaveCount(5);
 
-    await skipLinkReachesTheScreen(page);
+    await skipLinkReachesThePage(page);
 
     await expect(routesCard(page)).toMatchAriaSnapshot(`
       - region "Routes":
@@ -223,9 +223,9 @@ test.describe("the Routes and spend screen's routes card", () => {
             - paragraph: ${JSON.stringify(`${ROUTES_WORDS.fixed} ${EMBEDDING_DIMENSIONS} dimensions`)}
             - paragraph: ${JSON.stringify(ROUTES_WORDS.fixedReason)}
     `);
-    // Equal children: the screen holds its heading, its lead line and the card, nothing else.
-    await expect(page.getByRole("main", { name: "Screen" })).toMatchAriaSnapshot(`
-      - main "Screen":
+    // Equal children: the page holds its heading, its lead line and the card, nothing else.
+    await expect(page.getByRole("main", { name: "Page" })).toMatchAriaSnapshot(`
+      - main "Page":
         - tabpanel "Routes":
           - /children: equal
           - heading ${JSON.stringify(agentOperations.name)} [level=1]
@@ -242,7 +242,7 @@ const MOVED = [
   ["/system/routes-and-spend", ROUTES_AND_SPEND.path],
 ] as const;
 
-test.describe("a screen's older address", () => {
+test.describe("a page's older address", () => {
   for (const [from, to] of MOVED) {
     test(`leads an Admin from ${from} to ${to}, Back returning`, async ({ page, request }) => {
       await signedInWith(page, request, { name: "Nidderdale Forge", routes: [] });
@@ -266,7 +266,7 @@ test.describe("a screen's older address", () => {
     passesTheAccessibilityGate,
   }) => {
     await aMemberSignedInAt(page, request, "Viewer", HOMES.Viewer.path);
-    await page.goto("/people/not-a-screen");
+    await page.goto("/people/not-a-page");
     await expect(page.getByRole("link", { name: goHome(HOMES.Viewer) })).toBeVisible();
     const neverExisted = await page.getByRole("main").ariaSnapshot();
 
@@ -276,7 +276,7 @@ test.describe("a screen's older address", () => {
 
     await expect(page.getByRole("link", { name: goHome(HOMES.Viewer) })).toBeVisible();
     await expect(page).toHaveURL(/\/people\/audit-log$/);
-    expect(await page.getByRole("main").ariaSnapshot(), "a hidden screen gives itself away").toBe(
+    expect(await page.getByRole("main").ariaSnapshot(), "a hidden page gives itself away").toBe(
       neverExisted,
     );
     expect(visited.filter((address) => address.includes("/system/"))).toEqual([]);

@@ -5,15 +5,15 @@ import {
   CONSOLE,
   placeAt,
   readerOf,
-  SURFACES,
+  AREAS,
   visibleTo,
   type RoleOrOperator,
 } from "@/shared/navigation.ts";
 
 /** `below` is the open tab, or on a member page the name the page gives. */
 const partsAt = (role: RoleOrOperator, path: string, below?: string) => {
-  const surfaces = role === "operator" ? [CONSOLE] : SURFACES;
-  const visible = visibleTo(readerOf(role), surfaces).surfaces;
+  const areas = role === "operator" ? [CONSOLE] : AREAS;
+  const visible = visibleTo(readerOf(role), areas).areas;
   return partsOf(placeAt(visible, path), below);
 };
 
@@ -29,7 +29,7 @@ describe("the band's breadcrumb", () => {
     ]);
   });
 
-  it("makes the screen current when no tab is open", () => {
+  it("makes the page current when no tab is open", () => {
     expect(partsAt("Admin", "/system/audit-log")).toEqual([
       { name: "Control Centre", to: "/people/members" },
       { name: "System", to: "/system/audit-log" },
@@ -37,7 +37,7 @@ describe("the band's breadcrumb", () => {
     ]);
   });
 
-  it("links a group to its first screen the reader sees", () => {
+  it("links a group to its first page the reader sees", () => {
     expect(partsAt("Admin", "/people/groups")).toEqual([
       { name: "Control Centre", to: "/people/members" },
       { name: "People", to: "/people/members" },
@@ -45,7 +45,7 @@ describe("the band's breadcrumb", () => {
     ]);
   });
 
-  it("names a tab once where it shares its screen's name", () => {
+  it("names a tab once where it shares its page's name", () => {
     expect(partsAt("Admin", "/people/members", "Members")).toEqual([
       { name: "Control Centre", to: "/people/members" },
       { name: "People", to: "/people/members" },
@@ -57,7 +57,7 @@ describe("the band's breadcrumb", () => {
     expect(partsAt("Viewer", "/ask")).toEqual([{ name: "Ask", to: undefined }]);
   });
 
-  it("names the console's surface, group and screen", () => {
+  it("names the console's area, group and page", () => {
     expect(partsAt("operator", "/console/people/names-waiting")).toEqual([
       { name: "Console", to: "/console/workspaces/every-workspace" },
       { name: "People", to: "/console/people/everyone" },
@@ -65,8 +65,8 @@ describe("the band's breadcrumb", () => {
     ]);
   });
 
-  it("names nothing where the address is no screen", () => {
-    expect(partsAt("Admin", "/system/not-a-screen")).toEqual([]);
+  it("names nothing where the address is no page", () => {
+    expect(partsAt("Admin", "/system/not-a-page")).toEqual([]);
   });
 
   it("ends a member page on the person's name", () => {

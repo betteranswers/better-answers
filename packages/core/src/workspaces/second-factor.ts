@@ -440,7 +440,7 @@ const readOfThePerson = async <T>(
   return answered.value === undefined ? err("person-gone") : ok(answered.value);
 };
 
-/** What the person's own Sign-in section and the confirm screens show; nothing in it is a secret. */
+/** What the person's own Sign-in section and the confirm pages show; nothing in it is a secret. */
 export const readSecondFactor = (
   platform: PlatformPrincipal,
   door: PostgresDoor,

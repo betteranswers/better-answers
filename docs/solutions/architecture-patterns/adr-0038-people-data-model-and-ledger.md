@@ -6,10 +6,10 @@ problem_type: architecture_pattern
 component: identity
 severity: high
 applies_when:
-  - "Adding a group, a membership or a People screen field"
+  - "Adding a group, a membership or a People page field"
   - "Writing an act that lands an audit event, or an act that belongs to no workspace"
   - "Changing how a non-member asks to join a workspace, or how an Admin answers"
-  - "Porting a screen whose fields assume teams, several roles or access that expires"
+  - "Porting a page whose fields assume teams, several roles or access that expires"
 tags:
   - adr-0038
   - group
@@ -60,7 +60,7 @@ The sign-in and the consent are written after Better Auth's own write, and a fai
 
 - A group that could nest would cost every visibility check a walk instead of a lookup, and would have to be reversed before Entra's model could be matched. Nesting stays an additive migration.
 - Two grouping shapes would be two tables an audience could name and two cascades to keep honest.
-- A request surface that answered differently for a real workspace and an unknown one would be an oracle over the tenant list, which a signed-in stranger must not have.
+- A request endpoint that answered differently for a real workspace and an unknown one would be an oracle over the tenant list, which a signed-in stranger must not have.
 - A table outside the tenant guarantee would be the one table a workspace's rows could leak through. Inside it, a row always belongs to a workspace, which is why an act with none goes elsewhere.
 - Append-only enforced in code is a convention the next migration forgets. A revoked privilege is refused by the database to every caller, including ones not yet written.
 - Partitioning a policy-bearing table changes what the RLS suite proves, and a retention delete would need a role that is not the api's. A row-count trigger, not a date, reopens it.
@@ -71,7 +71,7 @@ The sign-in and the consent are written after Better Auth's own write, and a fai
 - Nested groups, or teams beside groups: a walk per check and a second concept for one set of people.
 - A second table for a binding's named people: two grouping shapes an audience could name.
 - A role or permission column on a group: a back door to a role.
-- Refusing to delete a group an audience still names: the predicate is fail-closed, and a warning is the screen's.
+- Refusing to delete a group an audience still names: the predicate is fail-closed, and a warning is the page's.
 - The request under a user principal with a synthetic membership, or under no principal: the first invents a membership, the second a core function with no Principal.
 - Different answers for an unknown slug and an existing member: an enumeration oracle.
 - Approving through Better Auth's invitation endpoint: it would import the identity provider into core.

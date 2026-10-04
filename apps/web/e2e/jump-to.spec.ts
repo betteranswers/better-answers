@@ -4,10 +4,10 @@ import { JUMP_TO, nothingMatches } from "@/app/words.ts";
 import {
   ASK,
   CONTROL_CENTRE,
-  groupIn,
+  menuGroupIn,
   headingOf,
   INVITE_A_PERSON,
-  screenNamed,
+  pageNamed,
 } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
@@ -23,16 +23,16 @@ import {
 
 const LIST_BUDGET_MS = 1000;
 
-const PEOPLE = groupIn(CONTROL_CENTRE, "people");
+const PEOPLE = menuGroupIn(CONTROL_CENTRE, "people");
 
-const MEMBERS = screenNamed(PEOPLE, "Members");
+const MEMBERS = pageNamed(PEOPLE, "Members");
 
-const AGENT_OPERATIONS = groupIn(CONTROL_CENTRE, "agent-operations");
+const AGENT_OPERATIONS = menuGroupIn(CONTROL_CENTRE, "agent-operations");
 
-const ROUTES_AND_SPEND = screenNamed(AGENT_OPERATIONS, "Routes and spend");
+const ROUTES_AND_SPEND = pageNamed(AGENT_OPERATIONS, "Routes and spend");
 
 /** Declared and never built, so no reader may find it. */
-const SIGNALS = screenNamed(groupIn(CONTROL_CENTRE, "system"), "Signals");
+const SIGNALS = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), "Signals");
 
 const NARROW = { width: 320, height: 720 };
 
@@ -74,7 +74,7 @@ type Teammate = { readonly address: string; readonly id: string };
 
 type Team = { readonly priya: Teammate; readonly tom: Teammate };
 
-/** An Admin of a workspace with two other members, on a screen that reads none of them. */
+/** An Admin of a workspace with two other members, on a page that reads none of them. */
 const anAdminWithATeam = async (page: Page, api: APIRequestContext, name: string) => {
   const email = anAddress("jump-to");
   const workspace = await provision(api, { name, adminEmail: email });
@@ -123,7 +123,7 @@ test("hides People from a Viewer, reading no members", async ({ page, request })
   await expect(saidIn(page)).toHaveText(nothingMatches("people"));
   await expect(dialogOf(page).getByRole("option")).toHaveCount(0);
   await expect(groupOf(page, JUMP_TO.groups.members)).toHaveCount(0);
-  await expect(inputOf(page)).toHaveAttribute("placeholder", /^Find a screen$/);
+  await expect(inputOf(page)).toHaveAttribute("placeholder", /^Find a page$/);
   expect(membersReads, "a Viewer's jump-to asked for the members").toEqual([]);
 });
 
@@ -163,7 +163,7 @@ test("opens on either chord anywhere, Escape handing focus back", async ({ page,
   await expect(dialogOf(page)).toHaveCount(0);
   await expect(triggerOf(page)).toBeFocused();
 
-  // From inside a field on another screen: the chord is never the field's.
+  // From inside a field on another page: the chord is never the field's.
   await page.goto(MEMBERS.path);
   await searchBox(page).focus();
   await opened(page, "Control+k");
@@ -215,7 +215,7 @@ test("lands an Admin on the member they chose", async ({ page, request }) => {
   await expect(memberPageNaming(page, TOM)).toHaveCount(0);
 });
 
-test("finds nothing by an unbuilt screen's name", async ({ page, request }) => {
+test("finds nothing by an unbuilt page's name", async ({ page, request }) => {
   await anAdminWithATeam(page, request, "Nidderdale Forge");
 
   await opened(page, "Meta+k");
@@ -240,12 +240,12 @@ test("draws the list within its second, timed in the page", async ({ page, reque
   test.info().annotations.push({ type: "jump-to list", description: `${elapsed} ms` });
   expect(elapsed, "the jump-to list did not draw within its second").toBeLessThan(LIST_BUDGET_MS);
 
-  await expect(groupOf(page, JUMP_TO.groups.screens)).toBeVisible();
+  await expect(groupOf(page, JUMP_TO.groups.pages)).toBeVisible();
   await expect(optionOf(page, new RegExp(PRIYA))).toBeVisible();
   await expect(optionOf(page, INVITE_A_PERSON.name)).toBeVisible();
 });
 
-test("keeps screens and acts through a held, then failed, read", async ({ page, request }) => {
+test("keeps pages and acts through a held, then failed, read", async ({ page, request }) => {
   await anAdminWithATeam(page, request, "Swale Joinery");
   const held = Promise.withResolvers<void>();
   await page.route(theMembersRead, async (route) => {
@@ -289,6 +289,6 @@ test("opens from the narrow band, scrolling nothing sideways", async ({ page, re
     room.holds,
   );
   const box = await dialogOf(page).boundingBox();
-  expect(box?.x ?? -1, "the dialog starts off the screen").toBeGreaterThanOrEqual(0);
+  expect(box?.x ?? -1, "the dialog starts off the page").toBeGreaterThanOrEqual(0);
   expect((box?.x ?? 0) + (box?.width ?? NARROW.width + 1)).toBeLessThanOrEqual(NARROW.width);
 });

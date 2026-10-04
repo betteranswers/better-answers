@@ -271,7 +271,7 @@
             <li><b>Snippet · Code Block</b><i>IRIs, MCP client config, commit hashes</i></li>
             <li><b>Kbd</b><i>Shortcut hints — every common action has a keystroke</i></li>
             <li><b>Spinner · Skeleton</b><i>Answers your loading-state question: yes</i></li>
-            <li><b>Editor</b><i>Only if Guides get an authoring surface</i></li>
+            <li><b>Editor</b><i>Only if Guides are authored in the app</i></li>
             <li><b>Contribution Graph</b><i>Candidate for usage over time</i></li>
           </ul>
         </div>
@@ -282,8 +282,8 @@
           <div class="ch">
             <strong>Take outright — AI Elements</strong
             ><span
-              >The Ask surface, essentially complete. Streaming is genuinely hard to build well and
-              it is the product's one continuous motion.</span
+              >The Ask area, essentially complete. Streaming is genuinely hard to build well and it
+              is the product's one continuous motion.</span
             >
           </div>
           <ul class="li">
@@ -322,7 +322,7 @@
             <li><b>Button · Frame · Card</b><i>Registration marks; the one solid object</i></li>
             <li><b>SummaryList · Details</b><i>GOV.UK semantics, required</i></li>
             <li><b>EmptyState</b><i>One line. An action only where nothing else offers it</i></li>
-            <li><b>Band · rail · secondary nav</b><i>Surfaces, then groups over screens</i></li>
+            <li><b>Band · rail · menu</b><i>Areas, then groups over pages</i></li>
             <li><b>Icon</b><i>The one place Phosphor lives</i></li>
             <li><b>Grid · Dot · Noise</b><i>Already ported and tuned</i></li>
           </ul>
@@ -333,8 +333,8 @@
         <div class="note">
           <strong>The app shell is hand-built, not shadcn Sidebar</strong>
           <p>
-            A two-row frame: the 48px band, then the 56px rail, the 248px secondary nav and the
-            screen. Only the nav hides, so the band never moves. <code>breadcrumb</code> and
+            A two-row frame: the 48px band, then the 56px rail, the 248px menu and the page. Only
+            the nav hides, so the band never moves. <code>breadcrumb</code> and
             <code>command</code> (⌘K) come from shadcn. <code>sidebar</code> is not installed: it
             keeps its state in a cookie, binds ⌘B and animates the collapse. Kibo <b>Blocks</b> are
             for the marketing site, never the product.
@@ -346,7 +346,7 @@
             Every kit ships Lucide. Leave it for internal furniture a reader never reads as an icon
             — chevrons, the ✕ on a dismiss. Swap to Phosphor via <code>Icon</code> for anything
             carrying product meaning. One decision, taken once, or the two sets drift together on
-            screen.
+            page.
           </p>
         </div>
         <div class="note">

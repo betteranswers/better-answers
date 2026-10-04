@@ -2,7 +2,7 @@ import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AppClients } from "@/app/providers.tsx";
-import { FAILED_SCREEN, goHome, RAIL, UNKNOWN_SCREEN } from "@/app/words.ts";
+import { FAILED_PAGE, goHome, RAIL, UNKNOWN_PAGE } from "@/app/words.ts";
 import { PICKER_WORDS } from "@/features/auth/workspace-words.ts";
 import { ROLES } from "@/features/people/role-meanings.ts";
 import { CONTROL_CENTRE, HOMES, INVITE_A_PERSON, type Role } from "@/shared/navigation.ts";
@@ -73,7 +73,7 @@ const losingTheShellsRead = (role: Role) => {
   };
 };
 
-/** What a screen's `beforeLoad` finds once the role is in hand and lets the reader see it. */
+/** What a page's `beforeLoad` finds once the role is in hand and lets the reader see it. */
 const TAKEN = { hidden: false, unread: false };
 
 const membershipAsks = () => asked.filter((name) => name === "session.membership").length;
@@ -110,7 +110,7 @@ describe("a person the api will not answer about", () => {
     expect(router.state.location.href).toBe("/choose-workspace");
   });
 
-  it("stays on the sign-in screen when they went there", async () => {
+  it("stays on the sign-in page when they went there", async () => {
     vi.stubGlobal("fetch", answering(NO_SESSION));
 
     const router = await openAt("/sign-in");
@@ -119,19 +119,19 @@ describe("a person the api will not answer about", () => {
     expect(router.state.location.href).toBe("/sign-in");
   });
 
-  it("reaches the shell and the screen's state when unread", async () => {
+  it("reaches the shell and the page's state when unread", async () => {
     const clients = withTheApiDown();
 
     const router = await openAt("/people/members", clients);
     await vi.waitFor(() => expect(clients.queryClient.isFetching()).toBe(0));
 
     expect(heading()).toBe("People");
-    expect(heading()).not.toBe(UNKNOWN_SCREEN.heading);
+    expect(heading()).not.toBe(UNKNOWN_PAGE.heading);
     expect(screen.getByRole("navigation", { name: RAIL })).toBeDefined();
     expect(router.state.location.pathname).toBe("/people/members");
   });
 
-  it("hides a screen from a role read only after arriving", async () => {
+  it("hides a page from a role read only after arriving", async () => {
     vi.stubGlobal("fetch", losingTheShellsRead("Viewer"));
 
     await openAt("/people/members");
@@ -139,7 +139,7 @@ describe("a person the api will not answer about", () => {
       name: HOMES.Viewer.name,
     });
 
-    expect(heading()).toBe(UNKNOWN_SCREEN.heading);
+    expect(heading()).toBe(UNKNOWN_PAGE.heading);
     expect(screen.getByRole("link", { name: goHome(HOMES.Viewer) })).toBeDefined();
     expect(screen.queryByRole("tablist")).toBeNull();
     expect(screen.queryByRole("button", { name: INVITE_A_PERSON.name })).toBeNull();
@@ -163,7 +163,7 @@ describe("a person the api will not answer about", () => {
 });
 
 describe("the membership the shell and its redirect both read", () => {
-  it("is read once across drawing the shell and changing screens", async () => {
+  it("is read once across drawing the shell and changing pages", async () => {
     vi.stubGlobal("fetch", answering());
     const router = await openAt("/people/members");
     await screen.findByText("Northern Tooling", { exact: false });
@@ -195,7 +195,7 @@ describe("the index route", () => {
     const router = await openAt("/", clients);
     await vi.waitFor(() => expect(clients.queryClient.isFetching()).toBe(0));
 
-    expect(heading()).toBe(FAILED_SCREEN.heading);
+    expect(heading()).toBe(FAILED_PAGE.heading);
     expect(router.state.location.pathname).toBe("/");
   });
 
@@ -205,7 +205,7 @@ describe("the index route", () => {
     await vi.waitFor(() => expect(clients.queryClient.isFetching()).toBe(0));
 
     vi.stubGlobal("fetch", answering(undefined, "Viewer"));
-    fireEvent.click(screen.getByRole("button", { name: FAILED_SCREEN.retry }));
+    fireEvent.click(screen.getByRole("button", { name: FAILED_PAGE.retry }));
 
     await vi.waitFor(() => expect(router.state.location.pathname).toBe(HOMES.Viewer.path));
   });

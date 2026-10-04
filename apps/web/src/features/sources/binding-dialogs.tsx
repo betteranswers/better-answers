@@ -138,7 +138,7 @@ export function PublishDialog(properties: DialogProperties<Confirmations>) {
         onCloseAutoFocus: toTheBinding(binding.bindingId),
       }}
       title={`Publish ${binding.name}`}
-      consequence={`Its passages reach ${AUDIENCE_WORDS[binding.audience].toLowerCase()} at the class ${binding.sensitivity} the moment you publish. This screen cannot unpublish it.`}
+      consequence={`Its passages reach ${AUDIENCE_WORDS[binding.audience].toLowerCase()} at the class ${binding.sensitivity} the moment you publish. This page cannot unpublish it.`}
       commit={
         <Button disabled={!allConfirmed} aria-describedby={hintId} onClick={confirm}>
           Publish {binding.name}

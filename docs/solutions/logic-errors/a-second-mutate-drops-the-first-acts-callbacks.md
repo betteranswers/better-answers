@@ -28,7 +28,7 @@ retire_when: "a released @tanstack/query-core keeps an earlier mutation's per-ca
 
 ## Problem
 
-An act whose answer is handled in callbacks passed to `mutate()` lost that answer when the same act was sent again before the first one returned. The reader then saw the second answer only, or nothing, and in the self-act cases was left on a screen they could no longer use.
+An act whose answer is handled in callbacks passed to `mutate()` lost that answer when the same act was sent again before the first one returned. The reader then saw the second answer only, or nothing, and in the self-act cases was left on a page they could no longer use.
 
 Code review findings #1 and #2 on PR #507 (the People layout rework's Members stream, `docs/plans/2026-10-01-1807-feat-people-layout-rework-plan.md`, U7 and U8) found two instances of the same cause. Library lines below are from `@tanstack/query-core` 5.103.2 (`node_modules/.pnpm/@tanstack+query-core@5.103.2/node_modules/@tanstack/query-core/src/mutationObserver.ts`), and hold for that version only.
 
@@ -67,11 +67,11 @@ The browser specs in `apps/web/e2e/people.spec.ts` hold the first request's answ
 
 ## Why This Works
 
-The callbacks are lost only when a second `mutate()` reaches the same observer before the first request settles. Refusing that second call while the first is pending means the observer never detaches from a request whose answer the screen still needs.
+The callbacks are lost only when a second `mutate()` reaches the same observer before the first request settles. Refusing that second call while the first is pending means the observer never detaches from a request whose answer the page still needs.
 
 ## Prevention
 
-- When a screen keeps one `useMutation` mounted and handles the answer in callbacks passed to `mutate()`, guard every way of calling it (button, keystroke, dialog commit) with the mutation's pending state, or hold an explicit "acting" flag, before calling `mutate()` again.
+- When a page keeps one `useMutation` mounted and handles the answer in callbacks passed to `mutate()`, guard every way of calling it (button, keystroke, dialog commit) with the mutation's pending state, or hold an explicit "acting" flag, before calling `mutate()` again.
 - Put behaviour that must run for every request (cache reconciliation, re-reads) in the options given to `useMutation`, where a later call cannot drop it.
 - Mark the control `aria-disabled` rather than `disabled` while pending, so keyboard focus is not thrown back to the page.
 - A spec for any act that lands somewhere or marks rows should press twice with the first answer held back.

@@ -9,7 +9,7 @@ import {
 } from "@/features/people/members-address.ts";
 import { useListAddress } from "@/shared/list-address.ts";
 
-import { openScreens } from "./address-router.tsx";
+import { openPages } from "./address-router.tsx";
 
 afterEach(cleanup);
 
@@ -43,7 +43,7 @@ function Searched() {
 }
 
 const openMembers = (entry: string) =>
-  openScreens({ "/people/members": Searched, "/a-member": () => null }, ["/elsewhere", entry]);
+  openPages({ "/people/members": Searched, "/a-member": () => null }, ["/elsewhere", entry]);
 
 const box = () => screen.getByRole<HTMLInputElement>("textbox", { name: "Search the members" });
 

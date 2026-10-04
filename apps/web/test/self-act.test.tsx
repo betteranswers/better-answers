@@ -9,7 +9,7 @@ import { useTRPC } from "@/shared/api/trpc.ts";
 import { HOMES } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 
-import { openScreens } from "./address-router.tsx";
+import { openPages } from "./address-router.tsx";
 import { answeringAs } from "./stubbed-api.ts";
 
 afterEach(() => {
@@ -22,7 +22,7 @@ const wrapperOf = (clients: AppClients) =>
     return <Providers clients={clients}>{properties.children}</Providers>;
   };
 
-/** The membership as the frame draws it: one read, mounted across every move between screens. */
+/** The membership as the frame draws it: one read, mounted across every move between pages. */
 function FrameRole() {
   const api = useTRPC();
   const held = useQuery(api.session.membership.queryOptions(undefined, { refetchOnMount: false }));
@@ -85,7 +85,7 @@ const actingAt = async () => {
   const clients = createAppClients();
   clients.queryClient.setDefaultOptions({ queries: { retry: false } });
   vi.stubGlobal("fetch", answeringAs("Admin"));
-  const opened = await openScreens(
+  const opened = await openPages(
     { [MEMBERS]: ActedOnMyself, [HOMES.Editor.path]: Home, [CHOOSER]: Home },
     ["/elsewhere", MEMBERS],
     framedBy(clients),
@@ -153,7 +153,7 @@ describe("going home after an act on yourself", () => {
     expect(router.state.location.pathname).toBe(MEMBERS);
     expect(
       screen.getByText("Held: Admin"),
-      "the screen lost the role it was drawn for",
+      "the page lost the role it was drawn for",
     ).toBeDefined();
   });
 });

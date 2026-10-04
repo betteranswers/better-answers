@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { createAppClients, Providers } from "@/app/providers.tsx";
-import { WorkspacesScreen } from "@/features/console/workspaces-screen.tsx";
-import { GroupsScreen } from "@/features/people/groups-screen.tsx";
+import { WorkspacesPage } from "@/features/console/workspaces-page.tsx";
+import { GroupsPage } from "@/features/people/groups-page.tsx";
 import { RoutesCard } from "@/features/routes/routes-card.tsx";
 import { Review } from "@/features/sources/review.tsx";
 import type { ListedBinding } from "@/features/sources/sources-api.ts";
@@ -51,9 +51,9 @@ const A_BINDING: ListedBinding = {
   quarantinedByError: {},
 };
 
-describe("a screen's read, said after its region mounts (BA-31)", () => {
+describe("a page's read, said after its region mounts (BA-31)", () => {
   it("fills a loading region beside a refusal line after mount", () => {
-    const seen = mounted(REGION, <GroupsScreen />);
+    const seen = mounted(REGION, <GroupsPage />);
 
     expect(seen[0]).toBe("");
     expect(seen.at(-1)).toBe("The groups are still loading.");
@@ -67,7 +67,7 @@ describe("a screen's read, said after its region mounts (BA-31)", () => {
   });
 
   it("fills a region drawing one state after mount", () => {
-    const seen = mounted(REGION, <WorkspacesScreen />);
+    const seen = mounted(REGION, <WorkspacesPage />);
 
     expect(seen[0]).toBe("");
     expect(seen.at(-1)).toBe("The workspaces are still loading.");

@@ -54,10 +54,16 @@ const namesInSchema = (schema: unknown, seen: Set<unknown> = new Set()): readonl
 
 const QUOTED_ACT = /"([a-z_]+\.[a-z_]+\.[a-z_]+)"/g;
 
-const MOVED_FROM = /movedFrom: "([^"]+)"/g;
+/** A page's or group's older addresses, a list that may wrap onto lines of its own. */
+const MOVED_FROM = /movedFrom: \[([^\]]*)\]/g;
+
+const QUOTED = /"([^"]+)"/g;
 
 const matchesIn = (text: string, pattern: RegExp): readonly string[] =>
   [...text.matchAll(pattern)].flatMap((match) => (match[1] === undefined ? [] : [match[1]]));
+
+const movedFromIn = (text: string): readonly string[] =>
+  matchesIn(text, MOVED_FROM).flatMap((list) => matchesIn(list, QUOTED));
 
 /**
  * The names this codebase does not own, read from where each is declared, so a hand-kept pattern
@@ -79,5 +85,5 @@ export const keptNamesUnder = (root: string): Readonly<Record<string, readonly s
     readUnder(root, "apps/web/src/features/people/audit-acts.ts"),
     QUOTED_ACT,
   ),
-  "old page addresses": matchesIn(readUnder(root, "apps/web/src/shared/navigation.ts"), MOVED_FROM),
+  "old page addresses": movedFromIn(readUnder(root, "apps/web/src/shared/navigation.ts")),
 });

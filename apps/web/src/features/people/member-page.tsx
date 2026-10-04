@@ -12,10 +12,10 @@ import {
 import type { ApiError } from "@/shared/api/trpc.ts";
 import { useBreadcrumbLastPart } from "@/shared/breadcrumb-last-part.ts";
 import { initialsOf } from "@/shared/initials.ts";
-import { useKeystroke, useScreenKeystrokes, type Keystroke } from "@/shared/keystrokes.tsx";
+import { useKeystroke, usePageKeystrokes, type Keystroke } from "@/shared/keystrokes.tsx";
 import { cn } from "@/shared/lib/utils.ts";
 import { ListState } from "@/shared/list-pages.tsx";
-import { CONTROL_CENTRE, groupIn } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
 import type { Outcome } from "@/shared/outcome.tsx";
 import { Avatar, AvatarFallback } from "@/shared/ui/avatar.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
@@ -24,7 +24,7 @@ import { MEMBER_PAGE_WORDS as WORDS } from "./member-act-words.ts";
 import { MemberActivity } from "./member-activity.tsx";
 import { Access, RemoveAndRevoke, type Landings, type Removal } from "./member-sections.tsx";
 import {
-  MEMBERS_SCREEN,
+  MEMBERS_PAGE,
   membersAt,
   OPENING,
   type OpenedAt,
@@ -36,7 +36,7 @@ import { outcomeOfFailure } from "./refusal.tsx";
 import { useSelfActHome } from "./self-act.tsx";
 import { nameOf } from "./words.tsx";
 
-const people = groupIn(CONTROL_CENTRE, "people");
+const people = menuGroupIn(CONTROL_CENTRE, "people");
 
 const KEYSTROKES: readonly Keystroke[] = Object.values(KEY);
 
@@ -128,7 +128,7 @@ function NoSuchMember() {
         kind: "empty",
         words: WORDS.noSuchMember,
         act: (
-          <Link to={MEMBERS_SCREEN.path} className="text-brand underline">
+          <Link to={MEMBERS_PAGE.path} className="text-brand underline">
             {WORDS.toMembers}
           </Link>
         ),
@@ -201,7 +201,7 @@ const useLandings = () => {
   const controlAt = {
     member: () => title.current,
     role: () => landings.role.current?.querySelector<HTMLElement>('[aria-checked="true"]'),
-    // A workspace with no groups offers its link to the Groups screen in their place.
+    // A workspace with no groups offers its link to the Groups page in their place.
     groups: () => landings.groups.current?.querySelector<HTMLElement>('[role="checkbox"], a'),
     // A member with no display name has no flag to land on, so focus goes to who they are.
     flag: () => landings.flag.current ?? title.current,
@@ -246,7 +246,7 @@ function MemberShown(properties: {
   const { title, landings, landOn } = useLandings();
   useBreadcrumbLastPart(nameOf(member));
 
-  useScreenKeystrokes(KEYSTROKES);
+  usePageKeystrokes(KEYSTROKES);
   useKeystroke(KEY.changeRole, () => {
     landOn("role");
   });

@@ -4,7 +4,7 @@ How a change becomes merged code. The Compound Engineering plugin (CE) runs the 
 
 ## The loop
 
-**`/lfg <what to do>`** runs a change end to end and never pauses for approval: a plan (`/ce-debug` for a bug), the work, a simplifying pass, `/ce-code-review` with its fixes, `/ce-compound`, a browser test of the screens the diff touches, `ce-commit-push-pr`, then `ce-babysit-pr` for up to three rounds of CI or review fixes. It asks a question only when what to build is unclear, and it never merges.
+**`/lfg <what to do>`** runs a change end to end and never pauses for approval: a plan (`/ce-debug` for a bug), the work, a simplifying pass, `/ce-code-review` with its fixes, `/ce-compound`, a browser test of the pages the diff touches, `ce-commit-push-pr`, then `ce-babysit-pr` for up to three rounds of CI or review fixes. It asks a question only when what to build is unclear, and it never merges.
 
 By hand, the same loop is three skills:
 
@@ -12,14 +12,14 @@ By hand, the same loop is three skills:
 - `/ce-plan` writes the plan to `docs/plans/`, after searching `docs/solutions/` for what past work learned. A plan has no status field: git says what shipped.
 - `/ce-work` builds a plan, unit by unit, and ends in a pull request.
 
-A route block (`docs/specs/v01-route.md`) is one `/ce-brainstorm`, then `/ce-plan`, then one `/lfg` or `/ce-work` per plan. `/ce-dogfood` walks a branch's screens as the personas in `docs/personas/` and fixes the small breakages it finds. It is the route for judging a signed-in screen's UX against its spec: it walks the change as the personas on its own build, beside the browser suite's behaviour and accessibility checks.
+A route block (`docs/specs/v01-route.md`) is one `/ce-brainstorm`, then `/ce-plan`, then one `/lfg` or `/ce-work` per plan. `/ce-dogfood` walks a branch's pages as the personas in `docs/personas/` and fixes the small breakages it finds. It is the route for judging a signed-in page's UX against its spec: it walks the change as the personas on its own build, beside the browser suite's behaviour and accessibility checks.
 
 ## What CE does not know about this repository
 
 - Two kinds of change run alone until they merge: one that adds a migration, because the drizzle journal does not merge, and one that edits `contracts/`, because it moves both tiers' generated digest constants, which do not merge either.
 - CE's review reads its rules from `CODING_STANDARDS.md`, plus the `CODING_STANDARDS.md` of each directory the change touches: `apps/api/`, `apps/web/`, `apps/worker/` and `deploy/`. A rule's `Reviewer:` line is the part no gate will catch.
 - A worker prompt names each test scenario by the behaviour it checks, and a test's title is that behaviour (*Title a test by what the system does, in 10 words at most*, in `CODING_STANDARDS.md`).
-- A change to a screen a journey walks (`apps/web/journeys/`) changes that journey in the same pull request, and runs the journeys against the browser suite's api, with the harness code source, before it lands. Nothing else runs them before the release does: `check` never runs a journey, and the release runs the journeys of the commit its api image was built from, so a screen that moved without its journey ends that night's run `fail`. The browser-suite skill's *The journeys* gives the run.
+- A change to a page a journey walks (`apps/web/journeys/`) changes that journey in the same pull request, and runs the journeys against the browser suite's api, with the harness code source, before it lands. Nothing else runs them before the release does: `check` never runs a journey, and the release runs the journeys of the commit its api image was built from, so a page that moved without its journey ends that night's run `fail`. The browser-suite skill's *The journeys* gives the run.
 - `/mutation-testing` runs after the tests are green, on refactors and on changes to validation, parsing or auth. Skip it for UI, copy and config diffs.
 - A change that moves an architecture decision edits its doc in `docs/solutions/architecture-patterns/` in the same commit, and a new decision lands there as a new doc with the code it decides. `docs/archive/adr/` is frozen.
 
@@ -89,7 +89,7 @@ The repository's `merge_commit_message` is `PR_BODY`. So the body and its footer
 
 | When | What | Who |
 | --- | --- | --- |
-| Before the pull request | Each touched workspace's `lint` and `typecheck` (the worker's `ruff` and `mypy`). The suites the ticket names or touched, by file (`pnpm --filter <workspace> run test <file>…`, which starts vitest through `node` rather than its `.bin` shim; `cd apps/worker && uv run --frozen pytest <file>…`), with `IMAGE_PROBE_DEFERRED=true`. The root gates that the root `package.json`'s `check:gates` names. For a change to a screen a journey walks, the journeys by hand with the harness code source. | the agent |
+| Before the pull request | Each touched workspace's `lint` and `typecheck` (the worker's `ruff` and `mypy`). The suites the ticket names or touched, by file (`pnpm --filter <workspace> run test <file>…`, which starts vitest through `node` rather than its `.bin` shim; `cd apps/worker && uv run --frozen pytest <file>…`), with `IMAGE_PROBE_DEFERRED=true`. The root gates that the root `package.json`'s `check:gates` names. For a change to a page a journey walks, the journeys by hand with the harness code source. | the agent |
 | The PR | No suite (`.github/workflows/check.yml`). The `lane` job puts every pull request in the `pr` lane, where no leg runs, and `pr-title` checks the title. | CI |
 | The merge group | The `lane` job diffs the group against `main`'s tip, not the event's `base_sha`: behind another entry that is the entry's group, and a green group merges every entry ahead of it. A change whose every path ends `.md` takes the docs lane: `docs-gates`, which runs the root `check:docs`. Anything else takes the full lane: `full-root` (the root gates, then `packages/schema`, `packages/devtools` and `packages/core`'s typecheck), `full-core` (`packages/core`'s suite, split by vitest's `--shard` over two jobs), `full-api`, `full-web` and `full-worker`. The shards are CI's alone: a local `pnpm check` or `check:tree` runs `packages/core`'s suite whole. The api and worker legs skip the image suites unless a changed path is an image input, such as a manifest, a lockfile, a Dockerfile or a path under `deploy/`; `scripts/docs-lane.mjs` holds the list. A run that `build.yml` calls is the same, except that it always skips them, because `build.yml` probes every image it pushes. | CI, the arbiter |
 

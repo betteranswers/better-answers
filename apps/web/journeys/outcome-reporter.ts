@@ -16,7 +16,7 @@ import { roleIn, whyItCouldNotRun, whyItFailed, type Outcome } from "./outcome.t
 type Finding = {
   readonly outcome: Exclude<Outcome, "held">;
   readonly role: string;
-  readonly screen: string;
+  readonly page: string;
   readonly step: string;
   readonly why: string;
 };
@@ -26,7 +26,7 @@ const OUTSIDE_ANY_STEP = "outside any step";
 /** A timeout or a stop leaves its step unfinished, with no error and a duration of -1. */
 const endedThere = (step: TestStep): boolean => step.error !== undefined || step.duration < 0;
 
-/** A screen or an act is a `test.step`, and one may sit inside a fixture's step, as sign-in does. */
+/** A page or an act is a `test.step`, and one may sit inside a fixture's step, as sign-in does. */
 const failingStepsOf = (steps: readonly TestStep[]): readonly string[] => {
   const failing = steps.find(endedThere);
   if (failing === undefined) return [];
@@ -49,7 +49,7 @@ const findingOf = (test: TestCase, result: TestResult): Finding => {
   return {
     outcome: why === undefined ? "fail" : "could-not-run",
     role: roleOf(test, result),
-    screen: path.at(0) ?? OUTSIDE_ANY_STEP,
+    page: path.at(0) ?? OUTSIDE_ANY_STEP,
     step: path.at(-1) ?? OUTSIDE_ANY_STEP,
     why: why ?? whyItFailed(result.annotations) ?? "",
   };
@@ -65,11 +65,11 @@ const outcomeOf = (findings: readonly Finding[], everyJourneyPassed: boolean): O
 const cell = (text: string): string => text.replaceAll("|", "\\|");
 
 const tableOf = (findings: readonly Finding[]): readonly string[] => [
-  "| Outcome | Role | Screen | Step | Why |",
+  "| Outcome | Role | Page | Step | Why |",
   "| --- | --- | --- | --- | --- |",
   ...findings.map(
     (finding) =>
-      `| ${finding.outcome} | ${cell(finding.role)} | ${cell(finding.screen)} | ` +
+      `| ${finding.outcome} | ${cell(finding.role)} | ${cell(finding.page)} | ` +
       `${cell(finding.step)} | ${cell(finding.why)} |`,
   ),
 ];
@@ -120,7 +120,7 @@ export default class OutcomeReporter implements Reporter {
     }
     const finding = findingOf(test, result);
     this.#findings.push(finding);
-    process.stdout.write(lineOf(test, `${finding.outcome} at ${finding.screen} › ${finding.step}`));
+    process.stdout.write(lineOf(test, `${finding.outcome} at ${finding.page} › ${finding.step}`));
   }
 
   onError(): void {

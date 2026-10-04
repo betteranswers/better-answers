@@ -109,7 +109,7 @@ const confirmedByCode = async (page: Page, key: string): Promise<void> => {
   await landedAtHome(page, "Admin");
 };
 
-/** Ticked on the screen showing them, so no later sign-in shows them again. */
+/** Ticked on the page showing them, so no later sign-in shows them again. */
 const codesTicked = async (page: Page, finish: string): Promise<void> => {
   await page.getByRole("checkbox", { name: RECOVERY_CODE_WORDS.saved }).check();
   await page.getByRole("button", { name: finish }).click();
@@ -150,7 +150,7 @@ const recoveryCodeSpent = async (page: Page, code: string): Promise<void> => {
   await expect(page).toHaveURL(/\/setup$/);
 };
 
-/** From the setup screen's disclosure to its ten codes; answers the new key. */
+/** From the setup page's disclosure to its ten codes; answers the new key. */
 const authenticatorSetUpThere = async (page: Page): Promise<string> => {
   await authenticatorInstead(page).click();
   const key = await keyShown(page);

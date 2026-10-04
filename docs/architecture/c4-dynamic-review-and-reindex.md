@@ -6,7 +6,7 @@ What happens between a binding's first run and its publish, and after: the Admin
 C4Dynamic
   title Dynamic diagram — review, wipe and the runs they queue
 
-  Person(admin, "Admin", "Reviews a binding's finding groups on the Sources screen, never a span or a value")
+  Person(admin, "Admin", "Reviews a binding's finding groups on the Sources page, never a span or a value")
   Container(trpc, "tRPC sources router", "queryProcedure; mutationProcedure", "findings, keepInText, dismissAsNotSpecialCategory, narrowDocuments, narrow")
   Container(erasure, "erasure routine", "runErasure, platform principal", "Run by erasure-rehearsal and replay-erasures today; no entry records a real request yet")
 

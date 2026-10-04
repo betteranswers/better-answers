@@ -11,7 +11,7 @@ import { BULK_WORDS } from "@/features/people/member-act-words.ts";
 import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
 import { invitationsCeiling, SAID_OF_TICKED_INVITATIONS } from "@/features/people/refusal-words.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
-import { CONTROL_CENTRE, groupIn, INVITE_A_PERSON, screenNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, INVITE_A_PERSON, pageNamed } from "@/shared/navigation.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
@@ -33,13 +33,13 @@ import {
   theActLandedWithinItsBudget,
 } from "./harness.ts";
 
-const people = groupIn(CONTROL_CENTRE, "people");
+const people = menuGroupIn(CONTROL_CENTRE, "people");
 
 const LIST_BUDGET_MS = 1000;
 
-const MEMBERS = screenNamed(people, "Members");
+const MEMBERS = pageNamed(people, "Members");
 
-const MEMBERS_SCREEN = MEMBERS.path;
+const MEMBERS_PAGE = MEMBERS.path;
 
 const LONG_UK_DATE = /^\d{1,2} [A-Z][a-z]+ \d{4}$/;
 
@@ -156,7 +156,7 @@ const anAdminAtInvitations = async (
   const at = { workspaceId: workspace.workspaceId, adminId: workspace.admin.id, editor };
   await seed(at);
 
-  await page.goto(MEMBERS_SCREEN);
+  await page.goto(MEMBERS_PAGE);
   await signIn(page, api, adminEmail);
   await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
   return at;
@@ -174,7 +174,7 @@ const aMemberBelowAdminAtPeople = async (
     provision(api, { name: `Wharfe ${role}s` }),
   ]);
   await addMember(api, { role, userId: member.id, workspaceId: workspace.workspaceId });
-  await page.goto(MEMBERS_SCREEN);
+  await page.goto(MEMBERS_PAGE);
   await signIn(page, api, email);
 };
 
@@ -211,7 +211,7 @@ const dialogOpened = async (page: Page): Promise<void> => {
   await expect(addressField(page)).toBeFocused();
 };
 
-test.describe("the People screen's Invitations tab", () => {
+test.describe("the People page's Invitations tab", () => {
   test("an Admin invites a person by address; the invitation waits", async ({ page, request }) => {
     await anAdminAtInvitations(page, request, "Calder Joinery");
     await openInvitations(page);
@@ -580,7 +580,7 @@ test.describe("the People screen's Invitations tab", () => {
 
     // A fresh document, so no list is already in the page's cache.
     const started = Date.now();
-    await page.goto(MEMBERS_SCREEN);
+    await page.goto(MEMBERS_PAGE);
     await openInvitations(page);
     await expect(invitationRows(page)).toHaveCount(3);
     const elapsed = Date.now() - started;
@@ -775,7 +775,7 @@ test.describe("the People screen's Invitations tab", () => {
     await anAdminAtInvitations(page, request, "Calder Castings", (at) =>
       invitedEach(request, at, [kept, dropped]).then(() => undefined),
     );
-    await tabOpenedByKeyboard(page, MEMBERS_SCREEN, "Invitations");
+    await tabOpenedByKeyboard(page, MEMBERS_PAGE, "Invitations");
     await expect(invitationRows(page)).toHaveCount(2);
 
     await tabUntilFocused(page, menuOf(page, dropped));
@@ -906,7 +906,7 @@ test.describe("the People screen's Invitations tab", () => {
     await expect(invitationRows(page)).toHaveCount(2);
   });
 
-  test("fits a 320px screen, its acts in view", async ({ page, request }) => {
+  test("fits a 320px page, its acts in view", async ({ page, request }) => {
     const long = anAddress("a-rather-long-name.for-wrapping");
     await anAdminAtInvitations(page, request, "Wensleydale Tanning", (at) =>
       invitedEach(request, at, [long]).then(() => undefined),

@@ -16,8 +16,8 @@ const aTaskLater = () =>
     setTimeout(resolve, 0);
   });
 
-/** At an address that is no screen, so the wide layout has no navigation control. */
-function AtNoScreen(properties: { readonly wide: boolean }) {
+/** At an address that is no page, so the wide layout has no navigation control. */
+function AtNoPage(properties: { readonly wide: boolean }) {
   const sheet = useNavigationSheet();
 
   return (
@@ -26,23 +26,23 @@ function AtNoScreen(properties: { readonly wide: boolean }) {
         sheet={sheet}
         wide={properties.wide}
         showing
-        controls="secondary-nav"
+        controls="menu"
         open={undefined}
         onShow={() => undefined}
       />
-      <NavigationSheet sheet={sheet} wide={properties.wide} surfaces={[]} open={undefined} />
+      <NavigationSheet sheet={sheet} wide={properties.wide} areas={[]} open={undefined} />
       <main tabIndex={-1} />
     </>
   );
 }
 
 describe("the navigation sheet", () => {
-  it("hands focus to the screen when widening leaves no control", async () => {
-    const { rerender } = render(<AtNoScreen wide={false} />);
+  it("hands focus to the page when widening leaves no control", async () => {
+    const { rerender } = render(<AtNoPage wide={false} />);
     fireEvent.click(screen.getByRole("button", { name: NAVIGATION_SHEET }));
-    expect(screen.getByRole("dialog", { name: NAVIGATION_SHEET })).toBeDefined();
+    expect(screen.getByRole("dialog", { name: "Menu" })).toBeDefined();
 
-    rerender(<AtNoScreen wide />);
+    rerender(<AtNoPage wide />);
     await aTaskLater();
 
     expect(screen.queryByRole("dialog")).toBeNull();

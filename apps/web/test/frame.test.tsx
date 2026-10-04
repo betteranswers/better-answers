@@ -4,20 +4,20 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createAppClients } from "@/app/providers.tsx";
 import { createAppRouter } from "@/app/router.tsx";
-import { goHome, JUMP_TO, RAIL, UNKNOWN_SCREEN } from "@/app/words.ts";
+import { goHome, JUMP_TO, RAIL, UNKNOWN_PAGE } from "@/app/words.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
 import { KEYSTROKE_WORDS } from "@/shared/keystroke-words.ts";
 import {
-  EVERY_SURFACE,
+  EVERY_AREA,
   headingOf,
   HOMES,
   movedWithin,
   readerOf,
-  screensOf,
-  SURFACES,
+  pagesOf,
+  AREAS,
   visibleTo,
   type Role,
-  type Screen,
+  type Page,
 } from "@/shared/navigation.ts";
 import { PRODUCT_NAME } from "@/shared/words.ts";
 
@@ -43,7 +43,7 @@ const openWithNoRoleAt = async (path: string) => {
 
 const rail = () => screen.getByRole("navigation", { name: RAIL });
 
-const secondaryNav = () => screen.getByRole("navigation", { name: "Control Centre" });
+const menu = () => screen.getByRole("navigation", { name: "Control Centre" });
 
 const namesIn = (region: HTMLElement, role: "link" | "heading" = "link") =>
   within(region)
@@ -51,7 +51,7 @@ const namesIn = (region: HTMLElement, role: "link" | "heading" = "link") =>
     .map((each) => each.textContent);
 
 describe("the shell's regions", () => {
-  it("names only an Admin's surfaces in the icon rail", async () => {
+  it("names only an Admin's areas in the icon rail", async () => {
     await openAs("Admin", "/people/members");
 
     expect(namesIn(rail())).toEqual(["Control Centre"]);
@@ -63,7 +63,7 @@ describe("the shell's regions", () => {
     expect(namesIn(rail())).toEqual(["Ask"]);
   });
 
-  it("names no surface while the role is unknown", async () => {
+  it("names no area while the role is unknown", async () => {
     await openWithNoRoleAt("/people/members");
 
     expect(namesIn(rail())).toEqual([]);
@@ -73,25 +73,20 @@ describe("the shell's regions", () => {
     const { container } = await openAs("Admin", "/agent-operations/routes-and-spend");
 
     expect(rail()).toBeDefined();
-    expect(secondaryNav()).toBeDefined();
+    expect(menu()).toBeDefined();
     expect(screen.getByRole("banner")).toBeDefined();
     expect(screen.getByRole("main")).toBeDefined();
 
     const first = container.querySelector("a");
-    expect(first?.textContent).toBe("Skip to the screen");
+    expect(first?.textContent).toBe("Skip to the page");
     expect(first?.getAttribute("href")).toBe(`#${screen.getByRole("main").id}`);
   });
 
-  it("lists the open surface's groups over their screens", async () => {
+  it("lists the open area's groups over their pages", async () => {
     await openAs("Admin", "/system/audit-log");
 
-    expect(namesIn(secondaryNav(), "heading")).toEqual([
-      "Sources",
-      "Agent Operations",
-      "People",
-      "System",
-    ]);
-    expect(namesIn(secondaryNav())).toEqual([
+    expect(namesIn(menu(), "heading")).toEqual(["Sources", "Agent Operations", "People", "System"]);
+    expect(namesIn(menu())).toEqual([
       "Bindings",
       "Routes and spend",
       "Members",
@@ -100,7 +95,7 @@ describe("the shell's regions", () => {
     ]);
   });
 
-  it("marks the open surface and the open screen as current", async () => {
+  it("marks the open area and the open page as current", async () => {
     await openAs("Admin", "/people/groups");
 
     const marked = within(rail())
@@ -109,11 +104,11 @@ describe("the shell's regions", () => {
       .map((link) => link.textContent);
     expect(marked).toEqual(["Control Centre"]);
 
-    const current = within(secondaryNav()).getByRole("link", { current: "page" });
+    const current = within(menu()).getByRole("link", { current: "page" });
     expect(current.textContent).toBe("Groups");
   });
 
-  it("names surface, group and screen in the band", async () => {
+  it("names area, group and page in the band", async () => {
     await openAs("Admin", "/agent-operations/routes-and-spend");
 
     const bar = screen.getByRole("banner");
@@ -122,7 +117,7 @@ describe("the shell's regions", () => {
     }
   });
 
-  it("names a surface's home once in the band", async () => {
+  it("names an area's home once in the band", async () => {
     await openAs("Viewer", HOMES.Viewer.path);
 
     expect(within(screen.getByRole("banner")).getAllByText(HOMES.Viewer.name)).toHaveLength(1);
@@ -142,19 +137,19 @@ describe("the shell's regions", () => {
     expect(logo.getAttribute("href")).toBe("/");
   });
 
-  it("names the secondary nav with no heading repeating the rail", async () => {
+  it("names the menu with no heading repeating the rail", async () => {
     await openAs("Admin", "/people/members");
 
-    const headings = within(secondaryNav())
+    const headings = within(menu())
       .queryAllByRole("heading")
       .map((each) => each.textContent);
     expect(headings).not.toContain("Control Centre");
   });
 
-  it("gives every screen in the secondary nav its icon", async () => {
+  it("gives every page in the menu its icon", async () => {
     await openAs("Admin", "/people/members");
 
-    const bare = within(secondaryNav())
+    const bare = within(menu())
       .getAllByRole("link")
       .filter((link) => link.querySelector("svg") === null)
       .map((link) => link.textContent);
@@ -174,22 +169,22 @@ describe("the shell's regions", () => {
     expect(screen.getByRole("heading", { level: 2, name: "Routes" })).toBeDefined();
   });
 
-  it("says an unknown address names no screen", async () => {
-    await openApp("/not-a-screen");
+  it("says an unknown address names no page", async () => {
+    await openApp("/not-a-page");
 
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(UNKNOWN_SCREEN.heading);
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(UNKNOWN_PAGE.heading);
   });
 
   it("sends a reader of unknown role home by the index", async () => {
-    await openApp("/not-a-screen");
+    await openApp("/not-a-page");
 
     expect(screen.getByRole("link", { name: goHome(undefined) }).getAttribute("href")).toBe("/");
   });
 
-  it("says an unknown screen names no place, rail kept", async () => {
-    await openAs("Admin", "/system/not-a-screen");
+  it("says an unknown page names no place, rail kept", async () => {
+    await openAs("Admin", "/system/not-a-page");
 
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(UNKNOWN_SCREEN.heading);
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(UNKNOWN_PAGE.heading);
     expect(namesIn(rail())).toEqual(["Control Centre"]);
     expect(screen.getByRole("banner")).toBeDefined();
     expect(screen.queryByRole("navigation", { name: "Control Centre" })).toBeNull();
@@ -250,28 +245,28 @@ const routedPaths = (): readonly string[] =>
   ).filter((path) => !OUTSIDE_THE_LIST.includes(path));
 
 /** A detail address as the router names its segment. */
-const detailRouteOf = (each: Screen): readonly string[] =>
+const detailRouteOf = (each: Page): readonly string[] =>
   each.detail === undefined ? [] : [`${each.path}/$${each.detail.param}`];
 
-/** One direction finds the screen the router forgot; only the other finds a route nothing declared. */
+/** One direction finds the page the router forgot; only the other finds a route nothing declared. */
 const destinations = [
   ...new Set([
-    ...screensOf(EVERY_SURFACE)
+    ...pagesOf(EVERY_AREA)
       .filter((each) => each.built)
       .flatMap((each) => [each.path, ...detailRouteOf(each)]),
     ...Object.values(HOMES).map((home) => home.path),
   ]),
 ];
 
-const moved = movedWithin(EVERY_SURFACE);
+const moved = movedWithin(EVERY_AREA);
 
-/** Every link in the secondary nav, surface by surface, as the role reaches it from the rail. */
+/** Every link in the menu, area by area, as the role reaches it from the rail. */
 const navigatedPaths = async (role: Role): Promise<readonly string[]> => {
   vi.stubGlobal("fetch", answeringAs(role));
   const reached: string[] = [];
-  for (const surface of visibleTo(readerOf(role), SURFACES).surfaces) {
-    const { rendered } = await openApp(surface.opensAt.path);
-    const nav = screen.getByRole("navigation", { name: surface.name });
+  for (const area of visibleTo(readerOf(role), AREAS).areas) {
+    const { rendered } = await openApp(area.opensAt.path);
+    const nav = screen.getByRole("navigation", { name: area.name });
     reached.push(
       ...within(nav)
         .getAllByRole("link")
@@ -283,26 +278,26 @@ const navigatedPaths = async (role: Role): Promise<readonly string[]> => {
 };
 
 const shownPaths = (role: Role): readonly string[] =>
-  screensOf(visibleTo(readerOf(role), SURFACES).surfaces).map((each) => each.path);
+  pagesOf(visibleTo(readerOf(role), AREAS).areas).map((each) => each.path);
 
 describe("the routes and navigation built from the one list", () => {
-  it("routes every built screen, its detail and each role's home", () => {
+  it("routes every built page, its detail and each role's home", () => {
     const routed = routedPaths();
 
     expect(destinations.filter((path) => !routed.includes(path))).toEqual([]);
     expect(routed).toContain("/people/members/$personId");
   });
 
-  it("routes nothing but built screens, details, homes and moves", () => {
+  it("routes nothing but built pages, details, homes and moves", () => {
     const known = [...destinations, ...moved.map((each) => each.from)];
 
     expect(routedPaths().filter((path) => !known.includes(path))).toEqual([]);
   });
 
-  it("routes every moved address, each leading to a built screen", () => {
+  it("routes every moved address, each leading to a built page", () => {
     const routed = routedPaths();
     const leadsNowhere = moved
-      .filter((each) => !each.to.some((screen) => screen.built))
+      .filter((each) => !each.to.some((page) => page.built))
       .map((each) => each.from);
 
     expect(moved.filter((each) => !routed.includes(each.from))).toEqual([]);
@@ -310,7 +305,7 @@ describe("the routes and navigation built from the one list", () => {
   });
 
   for (const role of ["Admin", "Editor", "Viewer"] as const) {
-    it(`lists each screen ${aRole(role)} may see, and no other`, async () => {
+    it(`lists each page ${aRole(role)} may see, and no other`, async () => {
       const reached = await navigatedPaths(role);
       const shown = shownPaths(role);
 
@@ -319,10 +314,10 @@ describe("the routes and navigation built from the one list", () => {
     });
   }
 
-  it("opens every built screen under its group's heading", async () => {
+  it("opens every built page under its group's heading", async () => {
     vi.stubGlobal("fetch", answeringAs("Admin"));
 
-    for (const each of screensOf(SURFACES).filter((candidate) => candidate.built)) {
+    for (const each of pagesOf(AREAS).filter((candidate) => candidate.built)) {
       const { rendered } = await openApp(each.path);
       const main = screen.getByRole("main");
       expect(within(main).getAllByRole("heading", { level: 1 })[0]?.textContent).toBe(

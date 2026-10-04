@@ -7,7 +7,7 @@ import {
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { Refused } from "@/features/auth/auth-screen.tsx";
+import { Refused } from "@/features/auth/auth-page.tsx";
 import { SAID_OF_A_REVOCATION, SAID_OF_CORRECTING } from "@/features/console/refusal-words.ts";
 import type { Refusal } from "@/shared/api/trpc.ts";
 import {
@@ -24,7 +24,7 @@ afterEach(cleanup);
 
 const saidOf = (refusal: Refusal): Said => saidOfRefusal({}, refusal.word, refusal.class);
 
-/** The auth screens' refusal alone on a page, as a screen renders it under its form. */
+/** The auth pages' refusal alone on a page, as a page renders it under its form. */
 const refusedOn = async (failure: Error) => {
   const rootRoute = createRootRoute({
     component: () => <Refused id="refused" failure={failure} saidOf={saidOf} />,

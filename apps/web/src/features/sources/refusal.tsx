@@ -6,7 +6,7 @@ import { sentenceOf } from "@/shared/refusal-words.ts";
 import { SAID_OF_A_BINDING } from "./refusal-words.ts";
 
 /**
- * Where the screen can tell before the click, it says what the api would refuse in the same
+ * Where the page can tell before the click, it says what the api would refuse in the same
  * words.
  */
 export const whyAndNextOf = (word: keyof typeof SAID_OF_A_BINDING): string =>

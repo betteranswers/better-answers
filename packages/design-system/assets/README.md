@@ -5,7 +5,7 @@
 | `logo.svg` | The logo: two square brackets with a square between them, like a citation |
 
 An app imports it as `@better-answers/design-system/assets/logo.svg`; the package exports
-`./assets/*`. The web client uses it in the band, on the sign-in screens and as the
+`./assets/*`. The web client uses it in the band, on the sign-in pages and as the
 browser's tab icon. The api's server-rendered pages inline the same file.
 
 **How it is drawn.** One path on a 16-unit square grid, full bleed, in `currentColor`,

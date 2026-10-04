@@ -9,7 +9,7 @@ const MS_PER_SECOND = 1000;
 
 /**
  * The router's search string turns a repeated key into one JSON array, breaking a signed query,
- * so these screens read theirs off the address bar.
+ * so these pages read theirs off the address bar.
  */
 export const pageQuery = (): string => globalThis.location.search;
 
@@ -55,9 +55,9 @@ export const invitationAt = (invitationId: string): string =>
 
 export const isAnInvitation = (path: string): boolean => path.startsWith(INVITATIONS);
 
-/** A screen, such as the sign-in screen, asked to send the person on to `path` once done. */
-export const backTo = (screen: string, path: string): string =>
-  `${screen}?redirect=${encodeURIComponent(path)}`;
+/** A page, such as the sign-in page, asked to send the person on to `path` once done. */
+export const backTo = (page: string, path: string): string =>
+  `${page}?redirect=${encodeURIComponent(path)}`;
 
 /** A signed flow goes on to the workspace picker; otherwise `redirect` on this origin, or home. */
 export const nextAfterSignIn = (query: string): string => {

@@ -1,7 +1,7 @@
 import { useRouter, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
-/** What another place may ask of a screen as it opens: one of its acts, or a search. */
+/** What another place may ask of a page as it opens: one of its acts, or a search. */
 type Ask = "act" | "search";
 
 export type Here = { readonly pathname: string; readonly searchStr: string };
@@ -16,7 +16,7 @@ const hrefOf = (path: string, query: URLSearchParams): string => {
 
 /**
  * The router re-types a value that reads as JSON, so only words and addresses are asked. Asking
- * another screen drops the open screen's query.
+ * another page drops the open page's query.
  */
 export const askingHere = (here: Here, path: string, ask: Ask, value: string): string => {
   const query = new URLSearchParams(here.pathname === path ? here.searchStr : "");
@@ -25,11 +25,11 @@ export const askingHere = (here: Here, path: string, ask: Ask, value: string): s
 };
 
 /**
- * Taken in the render that sees it, so an open screen takes it too. Clearing only its key keeps a
+ * Taken in the render that sees it, so an open page takes it too. Clearing only its key keeps a
  * reload from asking again.
  */
 export const useAsked = (ask: Ask, take: (value: string) => void): void => {
-  // Its own key alone, so a list writing the rest of the query does not draw the screen again.
+  // Its own key alone, so a list writing the rest of the query does not draw the page again.
   const asked = useRouterState({
     select: (state) => new URLSearchParams(state.location.searchStr).get(ask) ?? undefined,
   });

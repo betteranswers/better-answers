@@ -21,7 +21,7 @@ import {
   passkeyNameFor,
 } from "./account-words.ts";
 import { useSession } from "./auth-hooks.ts";
-import { AuthScreen, focusOn, Outcome } from "./auth-screen.tsx";
+import { AuthPage, focusOn, Outcome } from "./auth-page.tsx";
 import { COPY_KEY } from "./authenticator-part.tsx";
 import { passkeysHere, useRemovePasskey, type PasskeyAdded } from "./passkey-hooks.ts";
 import {
@@ -269,7 +269,7 @@ export function AccountPage() {
   const { failure, unanswered } = failureOnThePage(read, acts);
 
   return (
-    <AuthScreen title={ACCOUNT_HEADING}>
+    <AuthPage title={ACCOUNT_HEADING}>
       <section aria-labelledby={SIGN_IN_HEADING} className="mt-8">
         <h2 id={SIGN_IN_HEADING}>{ACCOUNT_WORDS.signIn}</h2>
         <Outcome tone="said">{acts.said}</Outcome>
@@ -317,8 +317,8 @@ export function AccountPage() {
           <Link to="/">{ACCOUNT_WORDS.goOn}</Link>
         </Button>
         <SignOutButton />
-        <KeystrokesAct screen={ACCOUNT_HEADING} keystrokes={keystrokesOf(read, acts)} />
+        <KeystrokesAct page={ACCOUNT_HEADING} keystrokes={keystrokesOf(read, acts)} />
       </div>
-    </AuthScreen>
+    </AuthPage>
   );
 }

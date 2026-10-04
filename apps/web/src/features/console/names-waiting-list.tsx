@@ -114,7 +114,7 @@ function NothingWaits() {
     <div className="grid justify-items-start gap-1 px-4 py-10">
       <p className="font-medium">Every flagged name is corrected.</p>
       <p className="text-muted-foreground">
-        A name an Admin flags from their workspace's People screen waits here until you correct it.
+        A name an Admin flags from their workspace's People page waits here until you correct it.
       </p>
       <Button asChild variant="outline" className="mt-3">
         <Link to={EVERYONE_PATH}>Find a person in Everyone</Link>

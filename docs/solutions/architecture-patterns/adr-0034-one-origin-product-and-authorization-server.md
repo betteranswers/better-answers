@@ -27,7 +27,7 @@ tags:
 One origin, `app.<apex>`, carries the SPA, sign-in, the workspace picker, consent, `/oauth2/*`, `/.well-known/*`, `/jwks` and `/mcp`. The MCP surface's address is `app.<domain>/mcp`, which is also the protected-resource document's `resource` and every access token's audience.
 
 - There are three hostnames, and all of them must differ: the app hostname, `agent` for the share agent's machine route, and the apex, which answers nothing. `PUBLIC_URL` is the product's origin, and `APP_HOSTNAME` is derived from its host. `AGENT_HOSTNAME` and `APEX_HOSTNAME` are bootstrap settings. The api refuses to start unless all three differ.
-- `apps/api/src/ingress/hostnames.ts` is a path fence on the app hostname. It is one ordered list of surface, hostnames and reason, with a catch-all last, tested both ways. `/consent` keeps an entry of its own, because it carries the navigation-only fence.
+- `apps/api/src/ingress/hostnames.ts` is a path fence on the app hostname. It is one ordered list of paths, hostnames and reason, with a catch-all last, tested both ways. `/consent` keeps an entry of its own, because it carries the navigation-only fence.
 - The session cookie is Better Auth's own `__Secure-`-prefixed, host-only cookie, and the trusted origins are one entry. `__Host-` is a written trigger: the cookie moves to it the day any subdomain of the apex is served by anything but this process.
 - Consent is server-rendered by the api on that origin, outside the SPA's shell. It is safe there because the client list is closed and PKCE binds each code. `CIMD_ALLOWED_CLIENT_HOSTS` in `apps/api/src/auth/constants.ts` admits only `claude.ai`.
 - The consent POST is refused unless its `Sec-Fetch-Dest` is `document`, beside the existing same-origin fence.

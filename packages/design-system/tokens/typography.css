@@ -1,5 +1,5 @@
 /* Type scale. 14px is the app's body size (dense, Linear register);
-   16px is the reading size for prose surfaces (answers, guides, docs). */
+   16px is the reading size for prose (answers, guides, docs). */
 :root {
   --text-2xs: 11px;
   --text-xs: 12px;

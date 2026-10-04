@@ -57,7 +57,7 @@ The test arrived on branch `worktree-ba-29-u1-u4-words`, the first BA-29 pull re
 
 ### The procedure
 
-1. **Before the flip, prove the old word gone in every form.** Run KTD5 step 4's `rg` check case-insensitively, for plurals and compounds too. A landed one-sense row matches the whole word alone (trap 3), so this search is the only proof that `screens` or `screenWords` are gone.
+1. **Before the flip, prove the old word gone in every form.** Run KTD5 step 4's `rg` check case-insensitively, for plurals and compounds too. A landed one-sense row matches the whole word alone (trap 3), so this search is the only proof that its plural, and every compound name holding it, are gone.
 
 2. **Flip the state.** Write the row out in full with `state: "landed"`, as the api and audit log rows are. `pending(...)` cannot express a landed row. Keep the row where it sorts: `outOfOrder` compares words case-insensitively and refuses a duplicate (`words-scan.ts:62-68`).
 

@@ -35,7 +35,7 @@ sweep survives sessions.
 
 For each worklist group, one branch, one PR, reviewable in minutes,
 through the project's own workflow. NEVER mix behavior changes into a
-sweep PR — if a real bug surfaces, file it in the tracker and fix it
+sweep PR — if a real bug turns up, file it in the tracker and fix it
 separately.
 
 Per-file pass, in this order (refactor before documenting — never

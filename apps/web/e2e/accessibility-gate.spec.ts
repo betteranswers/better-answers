@@ -30,20 +30,20 @@ const setASpinnerTurning = (): void => {
   document.querySelector("main")?.append(spinner);
 };
 
-const theSignInScreen = async (page: Page): Promise<void> => {
+const theSignInPage = async (page: Page): Promise<void> => {
   await page.goto("/sign-in");
   await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
 };
 
-test("audits the screen a spec leaves, though it never asked", async ({ page }) => {
+test("audits the page a spec leaves, though it never asked", async ({ page }) => {
   test.fail();
-  await theSignInScreen(page);
+  await theSignInPage(page);
   await page.evaluate(drawAPictureWithNoAltText);
 });
 
 test("refuses a spec that leaves the product and audits nothing", async ({ page }) => {
   test.fail();
-  await theSignInScreen(page);
+  await theSignInPage(page);
 
   await page.goto("about:blank");
 });
@@ -52,25 +52,25 @@ test("lets a spec leave the origin once it has audited", async ({
   page,
   passesTheAccessibilityGate,
 }) => {
-  await theSignInScreen(page);
+  await theSignInPage(page);
   await passesTheAccessibilityGate();
   await page.goto("about:blank");
 });
 
-test("passes a clean screen the spec never asked about", async ({ page }) => {
-  await theSignInScreen(page);
+test("passes a clean page the spec never asked about", async ({ page }) => {
+  await theSignInPage(page);
 });
 
 test("audits a button once its fade from disabled has ended", async ({
   page,
   passesTheAccessibilityGate,
 }) => {
-  await theSignInScreen(page);
+  await theSignInPage(page);
   await page.evaluate(fadeAButtonBackFromItsDisabledLook);
   await passesTheAccessibilityGate();
 });
 
 test("audits beside a spinner that never stops turning", async ({ page }) => {
-  await theSignInScreen(page);
+  await theSignInPage(page);
   await page.evaluate(setASpinnerTurning);
 });

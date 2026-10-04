@@ -58,7 +58,7 @@ const NONE: ReadonlySet<string> = new Set();
 
 const NO_ONE: readonly ListedMember[] = [];
 
-/** Person and role are what a narrow screen has room for; the rest can be shown again. */
+/** Person and role are what a narrow window has room for; the rest can be shown again. */
 const NARROW_HIDES: ReadonlySet<string> = new Set(["groups", "joined"]);
 
 const countOfPeople = (count: number): string =>
@@ -322,7 +322,7 @@ const namedIn =
     return member === undefined ? NO_LONGER_LISTED : nameOf(member);
   };
 
-/** Ticks and an act's outcome are the screen's; what narrows the rows is the address's. */
+/** Ticks and an act's outcome are the page's; what narrows the rows is the address's. */
 function MemberList(properties: {
   readonly read: ReturnType<typeof useMembers>;
   readonly heading: RefObject<HTMLHeadingElement | null>;

@@ -1,9 +1,9 @@
 import type { Keystroke } from "@/shared/keystrokes.tsx";
-import { viewStateOf } from "@/shared/screen-toolbar.tsx";
+import { viewStateOf } from "@/shared/page-toolbar.tsx";
 
 import type { FindingGroup } from "./sources-api.ts";
 
-const BINDINGS_SCREEN = "/sources/bindings";
+const BINDINGS_PAGE = "/sources/bindings";
 
 export const SOURCES_KEYSTROKES = {
   bind: { key: "b", act: "Bind a document" },
@@ -25,7 +25,7 @@ export type TickedGroups = {
   readonly groups: readonly FindingGroup[];
 };
 
-export const useTickedGroups = viewStateOf<TickedGroups>(BINDINGS_SCREEN);
+export const useTickedGroups = viewStateOf<TickedGroups>(BINDINGS_PAGE);
 
 export const groupsTickedIn = (
   ticked: TickedGroups | undefined,

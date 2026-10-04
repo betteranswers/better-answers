@@ -12,15 +12,15 @@ import { expect } from "vitest";
 
 type Wrapper = ComponentType<{ readonly children: ReactNode }>;
 
-/** Each screen at its path in a router of its own, opened at the last of `entries`. */
-export const openScreens = async (
-  screens: Readonly<Record<string, RouteComponent>>,
+/** Each page at its path in a router of its own, opened at the last of `entries`. */
+export const openPages = async (
+  pages: Readonly<Record<string, RouteComponent>>,
   entries: readonly string[],
   wrapper?: Wrapper,
 ) => {
   const root = createRootRoute();
   const routeTree = root.addChildren(
-    Object.entries(screens).map(([path, component]) =>
+    Object.entries(pages).map(([path, component]) =>
       createRoute({ getParentRoute: () => root, path, component }),
     ),
   );

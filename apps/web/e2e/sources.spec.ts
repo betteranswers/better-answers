@@ -4,7 +4,7 @@ import { JUMP_TO, RAIL } from "@/app/words.ts";
 import { SAID_OF_A_BINDING } from "@/features/sources/refusal-words.ts";
 import { NOTHING_BOUND } from "@/features/sources/words.ts";
 import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
-import { CONTROL_CENTRE, groupIn, screenNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
@@ -20,17 +20,17 @@ import {
   saysItsSentenceNotItsWord,
   seedBindings,
   signIn,
-  skipLinkReachesTheScreen,
+  skipLinkReachesThePage,
   theActLandedWithinItsBudget,
   type SeedBinding,
 } from "./harness.ts";
 
 const LIST_BUDGET_MS = 1000;
 
-/** Any id the platform mints: the screen shows none, a finding's least of all. */
+/** Any id the platform mints: the page shows none, a finding's least of all. */
 const AN_ID = /\b[0-9A-HJKMNP-TV-Z]{26}\b/;
 
-const BINDINGS = screenNamed(groupIn(CONTROL_CENTRE, "sources"), "Bindings");
+const BINDINGS = pageNamed(menuGroupIn(CONTROL_CENTRE, "sources"), "Bindings");
 
 const nav = (page: Page) => page.getByRole("navigation", { name: CONTROL_CENTRE.name });
 
@@ -55,7 +55,7 @@ const lastRunOf = (page: Page, name: string) => leadOf(page, name, "Last run");
 
 const classOf = (page: Page, name: string) => leadOf(page, name, "Class");
 
-/** An Admin of a fresh workspace, signed in on the product's own screen and standing on Sources. */
+/** An Admin of a fresh workspace, signed in on the product's own page and standing on Sources. */
 const anAdminAtSources = async (
   page: Page,
   api: APIRequestContext,
@@ -95,7 +95,7 @@ const indexed = (name: string, overrides: Partial<SeedBinding> = {}): SeedBindin
   ...overrides,
 });
 
-test.describe("the Sources screen's list of bindings", () => {
+test.describe("the Sources page's list of bindings", () => {
   test("lists an Admin ten bindings in a second, details folded", async ({ page, request }) => {
     const ten: SeedBinding[] = [
       indexed("Bid library"),
@@ -220,7 +220,7 @@ test.describe("the Sources screen's list of bindings", () => {
   });
 });
 
-test.describe("binding a document on the Sources screen", () => {
+test.describe("binding a document on the Sources page", () => {
   test("an Admin binds by keyboard and sees landed, indexing, indexed", async ({
     page,
     request,
@@ -239,7 +239,7 @@ test.describe("binding a document on the Sources screen", () => {
       "the toolbar's act is the one way to bind",
     ).toHaveCount(1);
     await passesTheAccessibilityGate();
-    await skipLinkReachesTheScreen(page);
+    await skipLinkReachesThePage(page);
 
     // The wait switches on Chromium's chooser interception, which can land after an immediate
     // key press, leaving the chooser uncaught and cancelled.
@@ -712,9 +712,7 @@ test.describe("reviewing a binding's findings", () => {
       scrolls: document.documentElement.scrollWidth,
       holds: document.documentElement.clientWidth,
     }));
-    expect(room.scrolls, "the screen scrolls sideways at 320 pixels").toBeLessThanOrEqual(
-      room.holds,
-    );
+    expect(room.scrolls, "the page scrolls sideways at 320 pixels").toBeLessThanOrEqual(room.holds);
   });
 });
 
@@ -1029,7 +1027,7 @@ test.describe("publishing, narrowing and widening a binding", () => {
   });
 });
 
-test.describe("the Sources screen's keystrokes", () => {
+test.describe("the Sources page's keystrokes", () => {
   test("lists keystrokes on ?, and one switch turns them off", async ({ page, request }) => {
     await anAdminAtSources(page, request, { workspace: "Luddenden Weaving" });
 
@@ -1067,7 +1065,7 @@ test.describe("the Sources screen's keystrokes", () => {
     `);
     await page.keyboard.press("Escape");
     await expect(listed).toHaveCount(0);
-    // The rail's: the toolbar keeps the screen's own acts alone.
+    // The rail's: the toolbar keeps the page's own acts alone.
     const keystrokes = page
       .getByRole("navigation", { name: RAIL })
       .getByRole("button", { name: KEYSTROKE_WORDS.button });

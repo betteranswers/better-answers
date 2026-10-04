@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 
-import { AuthScreen, Outcome, Refused } from "@/features/auth/auth-screen.tsx";
+import { AuthPage, Outcome, Refused } from "@/features/auth/auth-page.tsx";
 import { SignOutButton } from "@/features/auth/sign-out-button.tsx";
 import { useOperatorStanding } from "@/features/console/operator.ts";
 import { ONLY_THE_OPERATOR, STANDING_UNANSWERED } from "@/features/console/refusal-words.ts";
@@ -30,21 +30,21 @@ function WaysOut() {
   );
 }
 
-/** Outside the shell, so a person who is not the operator never sees the console's screens. */
+/** Outside the shell, so a person who is not the operator never sees the console's pages. */
 function ConsoleClosed(properties: { readonly standing: ReturnType<typeof useOperatorStanding> }) {
   const { standing } = properties;
 
   if (standing.isPending) {
     return (
-      <AuthScreen title={CONSOLE.name}>
+      <AuthPage title={CONSOLE.name}>
         <Outcome tone="said">Reading whether the console is open to you.</Outcome>
-      </AuthScreen>
+      </AuthPage>
     );
   }
 
   if (standing.error !== null) {
     return (
-      <AuthScreen title={CONSOLE.name}>
+      <AuthPage title={CONSOLE.name}>
         <Refused
           id="console-unread"
           failure={standing.error}
@@ -61,17 +61,17 @@ function ConsoleClosed(properties: { readonly standing: ReturnType<typeof useOpe
           Try again
         </Button>
         <WaysOut />
-      </AuthScreen>
+      </AuthPage>
     );
   }
 
   return (
-    <AuthScreen title={CONSOLE_CLOSED}>
+    <AuthPage title={CONSOLE_CLOSED}>
       <Outcome tone="refused">
         <RefusalLine said={ONLY_THE_OPERATOR} />
       </Outcome>
       <WaysOut />
-    </AuthScreen>
+    </AuthPage>
   );
 }
 

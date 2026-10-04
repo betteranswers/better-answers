@@ -982,20 +982,20 @@ to it by IRI and never restates it (ADR 0014).
   everywhere. Names waiting: correct a display name) and **Workspaces** (Every workspace: each with
   its member count, read-only) (ADR 0047). Shown to the operator alone and reached only from a
   signed-in session, never from a token.
-- **area** — _Code rename pending._ the top level of the platform's navigation, one entry in the
+- **area** — the top level of the platform's navigation, one entry in the
   *icon rail*: **Ask** (every role; the *home* of an Editor or a Viewer), **Knowledge** (every role;
   its Curation group for Admins and owners), **Inbox** (Admins and owners: what waits on the person,
   pointing into *To decide*) and **Control Centre** (Admins), with an area for produced work (named
   with S6) and **Briefings** (Then) to come (ADR 0047). A person sees only the areas holding a
   *page* they may see. The *console* is the operator's area, reached from the *workspace switcher*
   and never the rail. Until 30/09/2026 Ask was drawn apart from Control Centre (ADR 0046).
-- **group (of an area)** — _Internal._ a heading in the *menu* over some of one *area*'s *pages*:
+- **menu group** — _Internal._ a heading in the *menu* over some of one *area*'s *pages*:
   Control Centre's eight, Knowledge's Browse and Curation. An area with none lists its pages alone,
-  as Ask and Inbox do. A group holding no page the person may see is hidden whole. What was a page
-  of Control Centre until 30/09/2026 is now a group. Not a *group* of members, though People ›
-  Groups lists those.
-- **page** — _Code rename pending._ one place a person reads or acts on, with an address of its own
-  and an icon in the *menu*, under its group where its area has groups: Members, Connected sources,
+  as Ask and Inbox do. A menu group holding no page the person may see is hidden whole. What was a
+  page of Control Centre until 30/09/2026 is now a menu group. Not a *group* of members, though
+  People › Groups lists those.
+- **page** — one place a person reads or acts on, with an address of its own
+  and an icon in the *menu*, under its menu group where its area has them: Members, Connected sources,
   Audit log. Control Centre's are listed in its entry above, and every area's in ADR 0047, in the
   order the menu shows them. A person sees a page by their *role* or by owning a *collection* it
   serves. A page not built, or not theirs to see, appears nowhere, and its address shows the same
@@ -1024,7 +1024,7 @@ to it by IRI and never restates it (ADR 0014).
   named *Areas* on the page. The utilities sit at its foot: **Keyboard shortcuts**, which lists the
   open page's keystrokes as `?` does, and help and settings once they exist. Where the window is not
   wide, the top band holds Keyboard shortcuts instead.
-- **menu** — _Code rename pending._ the region beside the icon rail, below the *top band*, listing
+- **menu** — the region beside the icon rail, below the *top band*, listing
   the open *area*'s groups, each a heading over its *pages*, marking the page being read, and
   swapping when the area changes. No heading in it repeats the area's name. The *navigation control*
   hides it (*Hide the menu*) and shows it again, moving nothing in the top band, and that choice is
@@ -1089,7 +1089,7 @@ to it by IRI and never restates it (ADR 0014).
   `ask`, `open`, `give_feedback` — the principal from the token, the same predicate and audit as the
   api, grown later by token scope, never by a second server (ADR 0018). Guides and the question set
   are not on it. Never named on a page; the System card says *Connected assistants*.
-- **MCP tool** — one of the surface's entries: a named, described, typed function that never
+- **MCP tool** — one of the MCP surface's entries: a named, described, typed function that never
   takes a workspace and returns structured content with its human rendering. Not a connector's
   read-live tool.
 - **open (an MCP entry)** — the verbatim step of two-step retrieval: a concept by its IRI, or the

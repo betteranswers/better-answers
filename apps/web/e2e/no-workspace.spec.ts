@@ -54,7 +54,7 @@ const askRegion = (page: Page) => page.getByRole("region", { name: ASK_TO_JOIN_W
 const consentHeading = (page: Page) =>
   page.getByRole("heading", { level: 1, name: "Connect Claude" });
 
-/** Asked for before the screen loads, so an absence asserted after it is the read's answer. */
+/** Asked for before the page loads, so an absence asserted after it is the read's answer. */
 const invitationsAnswered = (page: Page): Promise<Response> =>
   page.waitForResponse((response) => response.url().includes(INVITATIONS_READ));
 
@@ -179,7 +179,7 @@ test("lists a waiting invitation within a second, then joins it", async ({
   await expect(claudeLine(page)).toHaveCount(0);
   await passesTheAccessibilityGate();
 
-  const keystrokes = await keystrokesListed(page, "this screen");
+  const keystrokes = await keystrokesListed(page, "this page");
   await expect(keystrokes).toContainText(NO_WORKSPACE_ACTS.toInvitations);
   await keystrokesDismissed(page, keystrokes);
   await page.keyboard.press("i");
@@ -215,7 +215,7 @@ test("offers to read the invitations again when no answer came", async ({
   await passesTheAccessibilityGate();
 
   await page.unroute(INVITATIONS_READ_ROUTE);
-  const keystrokes = await keystrokesListed(page, "this screen");
+  const keystrokes = await keystrokesListed(page, "this page");
   await expect(keystrokes).toContainText(NO_WORKSPACE_ACTS.readAgain);
   await keystrokesDismissed(page, keystrokes);
   await page.keyboard.press("r");

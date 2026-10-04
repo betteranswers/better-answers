@@ -26,7 +26,7 @@ tags:
 The MCP surface has four entries: `find`, `ask`, `open` and `give_feedback`. It answers at `app.<domain>/mcp` (ADR 0034).
 
 - The Principal comes from the token. No entry takes a workspace.
-- The surface grows by token scope, never by a second server. The scopes today are `knowledge:read` and `feedback:write`.
+- The MCP surface grows by token scope, never by a second server. The scopes today are `knowledge:read` and `feedback:write`.
 
 `find`'s hit is a union by knowledge layer.
 
@@ -42,7 +42,7 @@ The MCP surface has four entries: `find`, `ask`, `open` and `give_feedback`. It 
 
 ## Why
 
-- The predecessor's fifty-eight-tool surface showed what accretion does: a surface built for curation under outcomes built on consumption.
+- The predecessor's fifty-eight-tool MCP surface showed what accretion does: tools built for curation under outcomes built on consumption.
 - Long and scheduled work (question sets, briefings, exposure sweeps) belongs to headless agents reading through these same entries and proposing into Suggestions.
 - `describe_estate`, the fifth entry, was dropped. All four others answered through the real claude.ai client with no orienting call first, and its budget could not be measured with no estate. `find` is the preview step an agent orients by.
 - The token from claude.ai carries no role, so the role is read per call, in the same transaction as the read it authorises.
@@ -55,7 +55,7 @@ The MCP surface has four entries: `find`, `ask`, `open` and `give_feedback`. It 
 
 - Eight tools, one per record family: doubles payloads, leaks "cited in N" by arithmetic, and carries a question-set task a stateless server cannot serve.
 - Three entries, with `find` carrying orientation and the verbatim fetch: one entry with three jobs.
-- Resources for concepts and guides: claude.ai's surface for these is tools-first, and ADR 0008 fixed tools-only.
+- Resources for concepts and guides: claude.ai's support for these is tools-first, and ADR 0008 fixed tools-only.
 - A second server for acting: two of everything for the same person.
 - Groups in the token: stale for up to an hour.
 - An orienting `describe_estate` entry: dropped after the prototype, as above.

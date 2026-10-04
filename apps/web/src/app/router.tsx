@@ -13,7 +13,7 @@ import {
 import type { ReactElement, ReactNode } from "react";
 import { z } from "zod";
 
-import { AcceptInvitationScreen } from "@/features/auth/accept-invitation-screen.tsx";
+import { AcceptInvitationPage } from "@/features/auth/accept-invitation-page.tsx";
 import { AccountPage } from "@/features/auth/account-page.tsx";
 import {
   displayNameDetour,
@@ -21,9 +21,9 @@ import {
   signedOutOfAStep,
 } from "@/features/auth/auth-hooks.ts";
 import { backTo, leavingFor, pageQuery } from "@/features/auth/carried-flow.ts";
-import { ChooseWorkspaceScreen } from "@/features/auth/choose-workspace-screen.tsx";
-import { DisplayNameScreen } from "@/features/auth/display-name-screen.tsx";
-import { LinkScreen } from "@/features/auth/link-screen.tsx";
+import { ChooseWorkspacePage } from "@/features/auth/choose-workspace-page.tsx";
+import { DisplayNamePage } from "@/features/auth/display-name-page.tsx";
+import { LinkPage } from "@/features/auth/link-page.tsx";
 import {
   membershipRefusal,
   NEEDS_A_PICK,
@@ -31,9 +31,9 @@ import {
   SECOND_FACTOR_PENDING,
   useMembership,
 } from "@/features/auth/membership.ts";
-import { NoWorkspaceScreen } from "@/features/auth/no-workspace-screen.tsx";
+import { NoWorkspacePage } from "@/features/auth/no-workspace-page.tsx";
 import { detourAfter } from "@/features/auth/pending-refusal.ts";
-import { ConfirmScreen, RecoveryScreen } from "@/features/auth/second-factor-screens.tsx";
+import { ConfirmPage, RecoveryPage } from "@/features/auth/second-factor-pages.tsx";
 import {
   CODES_STEP,
   codesDetour,
@@ -44,18 +44,18 @@ import {
   SETUP_STEP,
   type LeftFrom,
 } from "@/features/auth/second-factor-steps.ts";
-import { CodesScreen, SetupScreen } from "@/features/auth/setup-screen.tsx";
-import { SignInScreen } from "@/features/auth/sign-in-screen.tsx";
-import { EveryoneScreen } from "@/features/console/everyone-screen.tsx";
-import { NamesWaitingScreen } from "@/features/console/names-waiting-screen.tsx";
+import { CodesPage, SetupPage } from "@/features/auth/setup-page.tsx";
+import { SignInPage } from "@/features/auth/sign-in-page.tsx";
+import { EveryonePage } from "@/features/console/everyone-page.tsx";
+import { NamesWaitingPage } from "@/features/console/names-waiting-page.tsx";
 import { mustSignInForTheConsole } from "@/features/console/operator.ts";
-import { WorkspacesScreen } from "@/features/console/workspaces-screen.tsx";
-import { AuditLogScreen } from "@/features/people/audit-log-screen.tsx";
-import { GroupsScreen } from "@/features/people/groups-screen.tsx";
+import { WorkspacesPage } from "@/features/console/workspaces-page.tsx";
+import { AuditLogPage } from "@/features/people/audit-log-page.tsx";
+import { GroupsPage } from "@/features/people/groups-page.tsx";
 import { MemberPage } from "@/features/people/member-page.tsx";
 import { PERSON_ID } from "@/features/people/members-address.ts";
-import { MEMBERS_TOOLBAR, MembersScreen } from "@/features/people/members-screen.tsx";
-import { BINDINGS_TOOLBAR, BindingsScreen } from "@/features/sources/bindings-screen.tsx";
+import { MEMBERS_TOOLBAR, MembersPage } from "@/features/people/members-page.tsx";
+import { BINDINGS_TOOLBAR, BindingsPage } from "@/features/sources/bindings-page.tsx";
 import type { FailedDuring } from "@/shared/api/query-client.ts";
 import { createApiProxy, type ApiProxy } from "@/shared/api/trpc.ts";
 import {
@@ -66,45 +66,42 @@ import {
   movedWithin,
   OPERATOR_READER,
   readerOf,
-  screensOf,
-  SURFACES,
+  pagesOf,
+  AREAS,
   visibleTo,
   type Moved,
   type Reader,
-  type Screen,
-  type ScreenPath,
-  type Surface,
+  type Page,
+  type PagePath,
+  type Area,
 } from "@/shared/navigation.ts";
-import type { ScreenToolbar } from "@/shared/screen-toolbar.tsx";
+import type { PageToolbar } from "@/shared/page-toolbar.tsx";
 
 import { ConsoleFrame } from "./console-frame.tsx";
-import { FailedScreen } from "./failed-screen.tsx";
+import { FailedPage } from "./failed-page.tsx";
 import { WorkspaceFrame } from "./frame.tsx";
+import { ROUTES_AND_SPEND_TOOLBAR, RoutesAndSpendPage } from "./pages/routes-and-spend-page.tsx";
+import { UnbuiltPage } from "./pages/unbuilt-page.tsx";
 import type { AppClients } from "./providers.tsx";
-import {
-  ROUTES_AND_SPEND_TOOLBAR,
-  RoutesAndSpendScreen,
-} from "./screens/routes-and-spend-screen.tsx";
-import { UnbuiltScreen } from "./screens/unbuilt-screen.tsx";
-import { UnknownScreen } from "./unknown-screen.tsx";
+import { UnknownPage } from "./unknown-page.tsx";
 import { useHidden, useVisibleTree } from "./visible-tree.ts";
 import { ROLE_UNREAD } from "./words.ts";
 
-type BuiltScreen = { readonly draw: () => ReactElement; readonly toolbar?: ScreenToolbar };
+type BuiltPage = { readonly draw: () => ReactElement; readonly toolbar?: PageToolbar };
 
-/** The list decides which screens are built; this map only says by what, and with what in hand. */
-const BUILT_SCREENS: ReadonlyMap<string, BuiltScreen> = new Map<ScreenPath, BuiltScreen>([
-  ["/sources/bindings", { draw: BindingsScreen, toolbar: BINDINGS_TOOLBAR }],
+/** The list decides which pages are built; this map only says by what, and with what in hand. */
+const BUILT_PAGES: ReadonlyMap<string, BuiltPage> = new Map<PagePath, BuiltPage>([
+  ["/sources/bindings", { draw: BindingsPage, toolbar: BINDINGS_TOOLBAR }],
   [
     "/agent-operations/routes-and-spend",
-    { draw: RoutesAndSpendScreen, toolbar: ROUTES_AND_SPEND_TOOLBAR },
+    { draw: RoutesAndSpendPage, toolbar: ROUTES_AND_SPEND_TOOLBAR },
   ],
-  ["/people/members", { draw: MembersScreen, toolbar: MEMBERS_TOOLBAR }],
-  ["/people/groups", { draw: GroupsScreen }],
-  ["/system/audit-log", { draw: AuditLogScreen }],
-  ["/console/people/everyone", { draw: EveryoneScreen }],
-  ["/console/people/names-waiting", { draw: NamesWaitingScreen }],
-  ["/console/workspaces/every-workspace", { draw: WorkspacesScreen }],
+  ["/people/members", { draw: MembersPage, toolbar: MEMBERS_TOOLBAR }],
+  ["/people/groups", { draw: GroupsPage }],
+  ["/system/audit-log", { draw: AuditLogPage }],
+  ["/console/people/everyone", { draw: EveryonePage }],
+  ["/console/people/names-waiting", { draw: NamesWaitingPage }],
+  ["/console/workspaces/every-workspace", { draw: WorkspacesPage }],
 ]);
 
 type BuiltDetail = {
@@ -113,8 +110,8 @@ type BuiltDetail = {
   readonly draw: (value: string | undefined) => ReactElement;
 };
 
-/** The list declares each detail address; this map says what draws it, keyed by its screen. */
-const BUILT_DETAILS: ReadonlyMap<string, BuiltDetail> = new Map<ScreenPath, BuiltDetail>([
+/** The list declares each detail address; this map says what draws it, keyed by its page. */
+const BUILT_DETAILS: ReadonlyMap<string, BuiltDetail> = new Map<PagePath, BuiltDetail>([
   ["/people/members", { value: PERSON_ID, draw: (personId) => <MemberPage personId={personId} /> }],
 ]);
 
@@ -139,33 +136,33 @@ const confirmedFirst = async (
 
 const rootRoute = createRootRouteWithContext<ShellContext>()({
   component: Outlet,
-  notFoundComponent: () => <UnknownScreen />,
+  notFoundComponent: () => <UnknownPage />,
 });
 
 const signInRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sign-in",
-  component: SignInScreen,
+  component: SignInPage,
 });
 
 /** The email's sign-in link, which carries its token in the fragment, so no server log holds it. */
 const signInLinkRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/sign-in/link",
-  component: LinkScreen,
+  component: LinkPage,
 });
 
 const displayNameRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/display-name",
-  component: DisplayNameScreen,
+  component: DisplayNamePage,
   beforeLoad: async ({ context }) => {
     const elsewhere = await displayNameDetour(context.queryClient, context.api, pageQuery());
     if (elsewhere !== undefined) throw redirect(leavingFor(elsewhere));
   },
 });
 
-/** Only a signed-out visitor is sent on; each screen's own read decides the rest as it draws. */
+/** Only a signed-out visitor is sent on; each page's own read decides the rest as it draws. */
 const pendingRoute = <const Path extends string>(path: Path, component: () => ReactElement) =>
   createRoute({
     getParentRoute: () => rootRoute,
@@ -177,17 +174,17 @@ const pendingRoute = <const Path extends string>(path: Path, component: () => Re
     },
   });
 
-const confirmRoute = pendingRoute(CONFIRM_STEP, ConfirmScreen);
+const confirmRoute = pendingRoute(CONFIRM_STEP, ConfirmPage);
 
-const recoveryRoute = pendingRoute(RECOVERY_STEP, RecoveryScreen);
+const recoveryRoute = pendingRoute(RECOVERY_STEP, RecoveryPage);
 
-const setupRoute = pendingRoute(SETUP_STEP, SetupScreen);
+const setupRoute = pendingRoute(SETUP_STEP, SetupPage);
 
-/** After the pending screens and before the display name, for a set never ticked as saved. */
+/** After the pending pages and before the display name, for a set never ticked as saved. */
 const codesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: CODES_STEP,
-  component: CodesScreen,
+  component: CodesPage,
   beforeLoad: async ({ context }) => {
     const elsewhere = await codesDetour(context.queryClient, context.api, pageQuery());
     if (elsewhere !== undefined) throw redirect(leavingFor(elsewhere));
@@ -210,14 +207,14 @@ const accountRoute = createRoute({
 const chooseWorkspaceRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/choose-workspace",
-  component: ChooseWorkspaceScreen,
+  component: ChooseWorkspacePage,
   beforeLoad: ({ context, location }) => confirmedFirst(context, location),
 });
 
 const noWorkspaceRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/no-workspace",
-  component: NoWorkspaceScreen,
+  component: NoWorkspacePage,
   beforeLoad: ({ context, location }) => confirmedFirst(context, location),
 });
 
@@ -225,9 +222,9 @@ const noWorkspaceRoute = createRoute({
 const acceptInvitationRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/invitations/$invitationId",
-  component: function AcceptInvitationPage(): ReactElement {
+  component: function AcceptInvitationAtAddress(): ReactElement {
     const { invitationId } = acceptInvitationRoute.useParams();
-    return <AcceptInvitationScreen invitationId={invitationId} />;
+    return <AcceptInvitationPage invitationId={invitationId} />;
   },
   // The page asks a nameless invitee's name beside its join, so only a signed-out one is sent on.
   beforeLoad: async ({ context, location }) => {
@@ -254,8 +251,8 @@ const shellRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: "shell",
   component: WorkspaceFrame,
-  notFoundComponent: () => <UnknownScreen />,
-  // The sign-in screen and the picker are this route's siblings, so this never runs on them.
+  notFoundComponent: () => <UnknownPage />,
+  // The sign-in page and the picker are this route's siblings, so this never runs on them.
   beforeLoad: async ({ context, location }) => {
     const refusal = await membershipRefusal(context.queryClient, context.api);
     if (refusal === undefined) return;
@@ -273,7 +270,7 @@ function RoleUnread() {
   const membership = useMembership();
 
   return (
-    <FailedScreen
+    <FailedPage
       reset={() => {
         void membership.refetch();
       }}
@@ -300,8 +297,8 @@ const consoleRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: "console",
   component: ConsoleFrame,
-  notFoundComponent: () => <UnknownScreen home={HOMES.operator} />,
-  // Asked afresh on the way in, and not again on each move between the console's own screens.
+  notFoundComponent: () => <UnknownPage home={HOMES.operator} />,
+  // Asked afresh on the way in, and not again on each move between the console's own pages.
   beforeLoad: async ({ context, location, cause }) => {
     const afresh = cause === "enter";
     if (await mustSignInForTheConsole(context.queryClient, context.api, afresh)) {
@@ -320,9 +317,9 @@ const consoleIndexRoute = createRoute({
   },
 });
 
-/** A screen hidden from a held role draws as an address that never existed. */
+/** A page hidden from a held role draws as an address that never existed. */
 function Seen(properties: { readonly path: string; readonly children: ReactNode }) {
-  if (useHidden(useVisibleTree(), properties.path)) return <UnknownScreen />;
+  if (useHidden(useVisibleTree(), properties.path)) return <UnknownPage />;
   return properties.children;
 }
 
@@ -330,11 +327,11 @@ const PARAMS = z.record(z.string(), z.string());
 
 /** The address's segment is read once, here, and reaches the page only once it is valid. */
 function DetailOf(properties: {
-  readonly screen: Screen;
+  readonly page: Page;
   readonly param: string;
   readonly detail: BuiltDetail;
 }) {
-  const { screen, param, detail } = properties;
+  const { page, param, detail } = properties;
   // Typed as every route's params at once, so this route's segment is read by its name.
   const value = useParams({
     strict: false,
@@ -342,7 +339,7 @@ function DetailOf(properties: {
   });
   const valid = detail.value.safeParse(value);
 
-  return <Seen path={screen.path}>{detail.draw(valid.success ? valid.data : undefined)}</Seen>;
+  return <Seen path={page.path}>{detail.draw(valid.success ? valid.data : undefined)}</Seen>;
 }
 
 /** An older address moves on only once the reader may see where it leads. */
@@ -351,82 +348,79 @@ function MovedAway(properties: { readonly moved: Moved }) {
   if (visible.home === undefined) return <RoleUnread />;
 
   const to = leadsTo(visible, properties.moved);
-  return to === undefined ? <UnknownScreen /> : <Navigate to={to.path} replace />;
+  return to === undefined ? <UnknownPage /> : <Navigate to={to.path} replace />;
 }
 
-const HOME_SCREENS: readonly Screen[] = Object.values(HOMES);
+const HOME_PAGES: readonly Page[] = Object.values(HOMES);
 
-/** A detail address is declared beneath a built screen, and nowhere else is one drawn. */
-const detailOf = (screen: Screen): BuiltDetail | undefined => {
-  const built = BUILT_DETAILS.get(screen.path);
-  if (screen.detail !== undefined && built === undefined) {
-    throw new Error(`the list declares an address beneath ${screen.path}, and nothing draws it`);
+/** A detail address is declared beneath a built page, and nowhere else is one drawn. */
+const detailOf = (page: Page): BuiltDetail | undefined => {
+  const built = BUILT_DETAILS.get(page.path);
+  if (page.detail !== undefined && built === undefined) {
+    throw new Error(`the list declares an address beneath ${page.path}, and nothing draws it`);
   }
-  if (screen.detail === undefined && built !== undefined) {
-    throw new Error(
-      `something draws an address beneath ${screen.path}, and the list declares none`,
-    );
+  if (page.detail === undefined && built !== undefined) {
+    throw new Error(`something draws an address beneath ${page.path}, and the list declares none`);
   }
   return built;
 };
 
-const drawOf = (screen: Screen): BuiltScreen | undefined => {
-  const built = BUILT_SCREENS.get(screen.path);
-  if (screen.built && built === undefined) {
-    throw new Error(`the list calls ${screen.path} built, and nothing draws it`);
+const drawOf = (page: Page): BuiltPage | undefined => {
+  const built = BUILT_PAGES.get(page.path);
+  if (page.built && built === undefined) {
+    throw new Error(`the list calls ${page.path} built, and nothing draws it`);
   }
-  if (!screen.built && built !== undefined) {
-    throw new Error(`the list calls ${screen.path} unbuilt, and something draws it`);
+  if (!page.built && built !== undefined) {
+    throw new Error(`the list calls ${page.path} unbuilt, and something draws it`);
   }
   return (
-    built ??
-    (HOME_SCREENS.includes(screen) ? { draw: () => <UnbuiltScreen home={screen} /> } : undefined)
+    built ?? (HOME_PAGES.includes(page) ? { draw: () => <UnbuiltPage home={page} /> } : undefined)
   );
 };
 
 type Reading = {
   readonly readerIn: (context: ShellContext) => Reader;
-  /** A failed screen offers the way home, which in the console is the console's own. */
-  readonly home?: Screen;
+  /** A failed page offers the way home, which in the console is the console's own. */
+  readonly home?: Page;
 };
 
-const routesOf = (surfaces: readonly Surface[], shell: AnyRoute, reading: Reading): AnyRoute[] => {
+const routesOf = (areas: readonly Area[], shell: AnyRoute, reading: Reading): AnyRoute[] => {
   const { readerIn, home } = reading;
   const failed = (failure: { readonly reset: () => void }) => (
-    <FailedScreen reset={failure.reset} home={home} />
+    <FailedPage reset={failure.reset} home={home} />
   );
 
-  // An unbuilt screen has no route at all, so its address is one that never existed.
-  const drawn = screensOf(surfaces).flatMap((screen) => {
-    const built = drawOf(screen);
-    return built === undefined ? [] : [{ screen, built }];
+  // An unbuilt page has no route at all, so its address is one that never existed.
+  const drawn = pagesOf(areas).flatMap((page) => {
+    const built = drawOf(page);
+    return built === undefined ? [] : [{ page, built }];
   });
 
-  // Decided by the screen's own address, so a detail beneath it is seen exactly as it is.
-  const arriving = (screen: Screen) => (context: ShellContext) => {
+  // Decided by the page's own address, so a detail beneath it is seen exactly as it is.
+  const arriving = (page: Page) => (context: ShellContext) => {
     const reader = readerIn(context);
     return {
-      hidden: hides(visibleTo(reader, surfaces), screen.path),
+      hidden: hides(visibleTo(reader, areas), page.path),
       unread: reader.role === undefined,
     };
   };
 
-  const details = drawn.flatMap(({ screen }) => {
-    const detail = detailOf(screen);
-    return detail === undefined || screen.detail === undefined
+  const details = drawn.flatMap(({ page }) => {
+    const detail = detailOf(page);
+    return detail === undefined || page.detail === undefined
       ? []
-      : [{ screen, param: screen.detail.param, detail }];
+      : [{ page, param: page.detail.param, detail }];
   });
 
   return [
-    ...drawn.map(({ screen, built }) => {
+    ...drawn.map(({ page, built }) => {
       const Draw = built.draw;
       return createRoute({
         getParentRoute: () => shell,
-        path: screen.path,
-        beforeLoad: ({ context }) => arriving(screen)(context),
+        path: page.path,
+        beforeLoad: ({ context }) => arriving(page)(context),
         component: () => (
-          <Seen path={screen.path}>
+          <Seen path={page.path}>
             <Draw />
           </Seen>
         ),
@@ -434,22 +428,22 @@ const routesOf = (surfaces: readonly Surface[], shell: AnyRoute, reading: Readin
         staticData: { toolbar: built.toolbar },
       });
     }),
-    // No toolbar: a detail has the screen's place, not its tabs or acts.
-    ...details.map(({ screen, param, detail }) =>
+    // No toolbar: a detail has the page's place, not its tabs or acts.
+    ...details.map(({ page, param, detail }) =>
       createRoute({
         getParentRoute: () => shell,
-        path: `${screen.path}/$${param}`,
-        beforeLoad: ({ context }) => arriving(screen)(context),
-        component: () => <DetailOf screen={screen} param={param} detail={detail} />,
+        path: `${page.path}/$${param}`,
+        beforeLoad: ({ context }) => arriving(page)(context),
+        component: () => <DetailOf page={page} param={param} detail={detail} />,
         errorComponent: failed,
       }),
     ),
-    ...movedWithin(surfaces).map((moved) =>
+    ...movedWithin(areas).map((moved) =>
       createRoute({
         getParentRoute: () => shell,
         path: moved.from,
         beforeLoad: ({ context }) => {
-          const to = leadsTo(visibleTo(readerIn(context), surfaces), moved);
+          const to = leadsTo(visibleTo(readerIn(context), areas), moved);
           if (to !== undefined) throw redirect({ href: to.path, replace: true });
         },
         component: () => <MovedAway moved={moved} />,
@@ -458,7 +452,7 @@ const routesOf = (surfaces: readonly Surface[], shell: AnyRoute, reading: Readin
   ];
 };
 
-const workspaceRoutes = routesOf(SURFACES, shellRoute, { readerIn: memberOf });
+const workspaceRoutes = routesOf(AREAS, shellRoute, { readerIn: memberOf });
 
 const consoleRoutes = routesOf([CONSOLE], consoleRoute, {
   readerIn: () => OPERATOR_READER,
@@ -504,7 +498,7 @@ export const createAppRouter = (clients: AppClients, history?: RouterHistory) =>
     ]),
 
     context,
-    defaultErrorComponent: FailedScreen,
+    defaultErrorComponent: FailedPage,
   };
 
   const router =
@@ -525,8 +519,8 @@ declare module "@tanstack/react-router" {
     router: ReturnType<typeof createAppRouter>;
   }
 
-  /** The route is how a screen's toolbar reaches the shell: props down, never an import up. */
+  /** The route is how a page's toolbar reaches the shell: props down, never an import up. */
   interface StaticDataRouteOption {
-    readonly toolbar?: ScreenToolbar | undefined;
+    readonly toolbar?: PageToolbar | undefined;
   }
 }

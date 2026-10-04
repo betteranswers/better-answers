@@ -73,7 +73,7 @@ export function RevokeEverywhere(properties: {
           },
         }}
         title={`Revoke ${name}'s credentials everywhere`}
-        consequence={`Every session and client grant ${name} holds ends now, in every workspace they belong to. They can sign in and connect a client again afterwards; this screen cannot undo it.`}
+        consequence={`Every session and client grant ${name} holds ends now, in every workspace they belong to. They can sign in and connect a client again afterwards; this page cannot undo it.`}
         commit={
           <Button variant="destructive" onClick={commit}>
             Revoke everywhere

@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import { SIGN_IN_WORDS, type Arrival } from "@/features/auth/sign-in-words.ts";
-import { CONTROL_CENTRE, groupIn, headingOf, screenNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, headingOf, pageNamed } from "@/shared/navigation.ts";
 
 import { expect, test } from "./browser.ts";
 import {
@@ -35,7 +35,7 @@ test("sign-out from the shell ends the session", async ({ page, request }) => {
   await signInSays(page, "signed-out");
 });
 
-test("brings an ended session through sign-in back to its screen", async ({
+test("brings an ended session through sign-in back to its page", async ({
   page,
   context,
   request,
@@ -45,8 +45,8 @@ test("brings an ended session through sign-in back to its screen", async ({
   await provision(request, { name: "Returning", adminEmail: email });
   await page.goto("/sign-in");
   await signIn(page, request, email);
-  // Not the Admin's home, which sign-in would reach without carrying the screen back.
-  const elsewhere = screenNamed(groupIn(CONTROL_CENTRE, "system"), "Audit log");
+  // Not the Admin's home, which sign-in would reach without carrying the page back.
+  const elsewhere = pageNamed(menuGroupIn(CONTROL_CENTRE, "system"), "Audit log");
   await page.getByRole("link", { name: elsewhere.name }).click();
   await expect(page).toHaveURL(new RegExp(`${elsewhere.path}$`));
 

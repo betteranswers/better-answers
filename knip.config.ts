@@ -30,7 +30,7 @@ const config: KnipConfig = {
 
     "apps/web": {
       entry: [
-        // Installed for a surface no ticket has opened yet, so a component nothing imports, or an
+        // Installed ahead of the pages that use it, so a component nothing imports, or an
         // export of one, is not dead code.
         "src/shared/ui/**",
 

@@ -1,6 +1,6 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
-import { ALL_WORKSPACES, goHome, JUMP_TO, RAIL, TOGGLE, UNKNOWN_SCREEN } from "@/app/words.ts";
+import { ALL_WORKSPACES, goHome, JUMP_TO, RAIL, TOGGLE, UNKNOWN_PAGE } from "@/app/words.ts";
 import { ACCOUNT_HEADING } from "@/features/auth/account-words.ts";
 import { PICKER_WORDS } from "@/features/auth/workspace-words.ts";
 import { NOT_THE_OPERATOR, ONLY_THE_OPERATOR } from "@/features/console/refusal-words.ts";
@@ -24,7 +24,7 @@ import {
   railOf,
   signedInAtHome,
   signIn,
-  skipLinkReachesTheScreen,
+  skipLinkReachesThePage,
   switcherMenuOf,
   switcherOf,
 } from "./harness.ts";
@@ -192,7 +192,7 @@ test.describe("the way into the console", () => {
   });
 });
 
-test.describe("the console's Workspaces screen", () => {
+test.describe("the console's Workspaces page", () => {
   test("lists each workspace with its slug, members and provisioning day", async ({
     page,
     request,
@@ -253,7 +253,7 @@ test.describe("the console's Workspaces screen", () => {
     await expect(itemOf(page, workspace.name)).toBeVisible();
 
     await markTheOperator(request, workspace.admin.email, "revoke");
-    // A move between the console's own screens keeps its standing, so the list asks again alone.
+    // A move between the console's own pages keeps its standing, so the list asks again alone.
     await navOf(page, CONSOLE).getByRole("link", { name: "Everyone" }).click();
     await navOf(page, CONSOLE).getByRole("link", { name: "Every workspace" }).click();
 
@@ -282,9 +282,9 @@ test.describe("the console's Workspaces screen", () => {
 
     await expect(page).toHaveURL("/console/people/everyone");
     await expect(page.getByRole("region", { name: "Everyone" })).toBeVisible();
-    const screens = navOf(page, CONSOLE).getByRole("link");
-    await expect(screens).toHaveText(["Everyone", "Names waiting", "Every workspace"]);
-    await screens.filter({ hasText: "Names waiting" }).click();
+    const pages = navOf(page, CONSOLE).getByRole("link");
+    await expect(pages).toHaveText(["Everyone", "Names waiting", "Every workspace"]);
+    await pages.filter({ hasText: "Names waiting" }).click();
     await expect(page).toHaveURL("/console/people/names-waiting");
     await expect(page.getByRole("region", { name: "Names waiting" })).toBeVisible();
   });
@@ -292,11 +292,9 @@ test.describe("the console's Workspaces screen", () => {
   test("keeps the console's regions on an address it lacks", async ({ page, request }) => {
     await theOperator(page, request, "Northern Tooling");
 
-    await page.goto("/console/not-a-screen");
+    await page.goto("/console/not-a-page");
 
-    await expect(
-      page.getByRole("heading", { level: 1, name: UNKNOWN_SCREEN.heading }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: UNKNOWN_PAGE.heading })).toBeVisible();
     await expect(railOf(page)).toBeVisible();
     await expect(page.getByRole("link", { name: goHome(HOMES.operator) })).toHaveAttribute(
       "href",
@@ -327,10 +325,10 @@ test.describe("the console's Workspaces screen", () => {
     const ours = itemOf(page, workspace.name);
     await expect(ours).toBeVisible();
 
-    await skipLinkReachesTheScreen(page);
+    await skipLinkReachesThePage(page);
 
     // Back to the first stop, to walk the regions in the order the document gives them.
-    await page.getByRole("link", { name: "Skip to the screen" }).focus();
+    await page.getByRole("link", { name: "Skip to the page" }).focus();
     for (const stop of [
       page.getByRole("banner").getByRole("link", { name: PRODUCT_NAME }),
       switcherOf(page, CONSOLE.name),
