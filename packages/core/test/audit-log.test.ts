@@ -538,6 +538,25 @@ describe("searching the audit log", () => {
     expect(actsOf(page)).toEqual(["people.member.role_changed"]);
   });
 
+  it("finds a person named only in an event's detail", async () => {
+    const workspace = await provisionedWorkspace(db(), "SearchedDetailOnly");
+    const [crew = ""] = await groupsMadeBy(workspace, workspace.adminUserId, ["Crew"]);
+    const leaver = await seedPerson(db().pool, { name: "Sam Okoro" });
+    await seedingWith(db().pool, (seed) =>
+      seed.auditEvent({
+        workspaceId: workspace.workspaceId,
+        act: "people.group.member_added",
+        actor: `human:${workspace.adminUserId}`,
+        subjectId: crew,
+        detail: { userId: leaver },
+      }),
+    );
+
+    const page = pageOf(await readAs(workspace, workspace.adminUserId, { search: "Sam" }));
+
+    expect(actsOf(page)).toEqual(["people.group.member_added"]);
+  });
+
   it("reads a search naming 100 groups whole", async () => {
     const workspace = await provisionedWorkspace(db(), "SearchedHundred");
     await crewsSeeded(workspace, 100);

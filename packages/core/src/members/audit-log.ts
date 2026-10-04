@@ -23,7 +23,7 @@ import {
   type UserId,
   type UserPrincipal,
 } from "../kernel/index.ts";
-import { containing, type Tx } from "../store/postgres/index.ts";
+import { type Bind, boundValues, containing, type Tx } from "../store/postgres/index.ts";
 import {
   actorOf,
   type AuditEventActor,
@@ -151,23 +151,39 @@ const actsWorded = (search: string): readonly string[] => {
   return STORED_ACT_NAMES.filter((name) => wordsOfAct(name).includes(words));
 };
 
+/** An event of the workspace in `$scope` naming the person `u` in its detail, as the read finds them. */
+const namedInDetail = (scope: number, bind: Bind): string =>
+  PERSON_NAMED_IN.map(
+    ({ key, subjectKinds, acts }) =>
+      `OR EXISTS (SELECT 1 FROM audit_event e
+                   WHERE e.workspace_id = $${scope}
+                     AND e.subject_kind = ANY($${bind(subjectKinds)}::text[])
+                     AND e.act = ANY($${bind(acts)}::text[])
+                     AND e.detail ->> $${bind(key)}::text = u.id)`,
+  ).join("\n");
+
 /** Members and people its events name: a former member is found, an outsider never. */
 const peopleNamed = async (
   principal: UserPrincipal,
   tx: Tx,
   pattern: string,
 ): Promise<readonly UserId[]> => {
+  const { values, bind } = boundValues();
+  const scope = bind(principal.workspaceId);
+  const like = bind(pattern);
   const found = await tx.query<{ id: string }>(
     `SELECT u.id FROM "user" u
-      WHERE (u.name ILIKE $2 OR u.email ILIKE $2)
-        AND (EXISTS (SELECT 1 FROM member m WHERE m.workspace_id = $1 AND m.user_id = u.id)
+      WHERE (u.name ILIKE $${like} OR u.email ILIKE $${like})
+        AND (EXISTS (SELECT 1 FROM member m WHERE m.workspace_id = $${scope} AND m.user_id = u.id)
           OR EXISTS (SELECT 1 FROM audit_event e
-                      WHERE e.workspace_id = $1 AND e.actor = $3 || u.id)
+                      WHERE e.workspace_id = $${scope} AND e.actor = $${bind(PERSON_PREFIX)} || u.id)
           OR EXISTS (SELECT 1 FROM audit_event e
-                      WHERE e.workspace_id = $1 AND e.subject_kind = ANY($4::text[])
-                        AND e.subject_id = u.id))
-      ORDER BY u.id LIMIT $5`,
-    [principal.workspaceId, pattern, PERSON_PREFIX, PERSON_SUBJECT_KINDS, IDS_SOUGHT + 1],
+                      WHERE e.workspace_id = $${scope}
+                        AND e.subject_kind = ANY($${bind(PERSON_SUBJECT_KINDS)}::text[])
+                        AND e.subject_id = u.id)
+          ${namedInDetail(scope, bind)})
+      ORDER BY u.id LIMIT $${bind(IDS_SOUGHT + 1)}`,
+    values,
   );
   return found.rows.map((row) => boundarySchemas.user.select.shape.id.parse(row.id));
 };
