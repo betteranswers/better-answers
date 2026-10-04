@@ -46,7 +46,7 @@
     "@types/node": "24.13.6",
     "jscpd": "5.3.2",
     "knip": "6.38.0",
-    "lefthook": "2.1.14",
+    "lefthook": "2.1.16",
     "oxfmt": "0.70.0",
     "oxlint": "1.85.0",
     "oxlint-plugin-eslint": "1.85.0",
