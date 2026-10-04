@@ -356,7 +356,7 @@ export const emailsSentTo = async (api: APIRequestContext, email: string): Promi
 export const anAddress = (who: string): string =>
   `${who}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
 
-/** From the sign-in page the page shows; an Admin or the operator is left on confirm or setup. */
+/** From the sign-in page the browser shows; an Admin or the operator is left on confirm or setup. */
 export const signInByEmail = async (
   page: Page,
   api: APIRequestContext,

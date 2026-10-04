@@ -31,7 +31,7 @@ const displayNameField = (page: Page) => page.getByLabel(DISPLAY_NAME_WORDS.labe
 
 const saveButton = (page: Page) => page.getByRole("button", { name: "Save and continue" });
 
-/** Every page the page was shown, so a page that came and went cannot pass unseen. */
+/** Every page the browser was shown, so a page that came and went cannot pass unseen. */
 const pagesShown = (page: Page): readonly string[] => {
   const shown: string[] = [];
   page.on("framenavigated", (frame) => {

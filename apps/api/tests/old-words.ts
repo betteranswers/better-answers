@@ -179,6 +179,11 @@ const SURFACE_SENSES: readonly Sense[] = [
     within: "packages/schema/",
     written: /\bsurfaces?\b/gi,
   },
+  {
+    sense: "what a person decides on, in a fixture whose every edit moves the contract's digest",
+    within: "contracts/concept-inbox/",
+    written: /\bdecision surface\b/g,
+  },
 ];
 
 const PAGE_AREA_MENU = "page, area and menu";
