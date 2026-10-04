@@ -337,6 +337,23 @@ export const withMembership = async <T>(
   principal: UserPrincipal,
   door: PostgresDoor,
   work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
+): Promise<Opened<T>> => resolveAgain(principal, door, work, MEMBERSHIP_QUERY_HELD);
+
+/**
+ * As withMembership, but the rows are read, not held, so a long read never stalls another
+ * Admin's role change or removal.
+ */
+export const withMembershipUnheld = async <T>(
+  principal: UserPrincipal,
+  door: PostgresDoor,
+  work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
+): Promise<Opened<T>> => resolveAgain(principal, door, work, MEMBERSHIP_QUERY);
+
+const resolveAgain = async <T>(
+  principal: UserPrincipal,
+  door: PostgresDoor,
+  work: (principal: UserPrincipal, tx: Tx) => Promise<T>,
+  query: string,
 ): Promise<Opened<T>> =>
   resolveScoped(
     door,
@@ -350,7 +367,7 @@ export const withMembership = async <T>(
       return refusal.value.role === principal.role ? refusal : err("role-disagrees");
     },
     work,
-    MEMBERSHIP_QUERY_HELD,
+    query,
   );
 
 const resolveScoped = async <T>(

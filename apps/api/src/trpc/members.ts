@@ -24,6 +24,8 @@ import {
   declineRequestInput,
   deleteGroup,
   deleteGroupInput,
+  exportAuditLog,
+  exportAuditLogInput,
   flagDisplayName,
   flagDisplayNameInput,
   groupMemberInput,
@@ -52,6 +54,7 @@ import {
 } from "@better-answers/core/members";
 import type { Tx } from "@better-answers/core/store/postgres";
 
+import { AUDIT_EXPORT_PERSON_RULE } from "../auth/constants.ts";
 import type { Doors } from "../doors.ts";
 import type { Mail } from "../email.ts";
 import { sendPromotionNotice } from "../promotion-notice-email.ts";
@@ -63,6 +66,7 @@ import {
   crossing,
   given,
   mutationProcedure,
+  ownTransactionCeiling,
   ownTransactionProcedure,
   parsedBy,
   queryProcedure,
@@ -210,6 +214,15 @@ export const membersRouter = router({
   ),
   auditLog: queryProcedure.input(parsedBy(readAuditLogInput)).query(answeredBy(readAuditLog)),
   activity: queryProcedure.input(parsedBy(readActivityInput)).query(answeredBy(readActivity)),
+  exportAuditLog: ownTransactionCeiling(AUDIT_EXPORT_PERSON_RULE)
+    .input(parsedBy(exportAuditLogInput))
+    .mutation(({ ctx, input }) =>
+      crossing(
+        ctx,
+        exportAuditLog.name,
+        given(input, (asked) => exportAuditLog(ctx.principal, ctx.doors.postgres, asked)),
+      ),
+    ),
   invitations: queryProcedure
     .input(parsedBy(listInvitationsInput))
     .query(answeredAt(listInvitations)),

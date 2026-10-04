@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { boundarySchemas } from "@better-answers/schema";
 
-import { eventsNamingNewestFirst, type PersonNamedIn } from "../audit/index.ts";
+import { eventsSoughtNewestFirst } from "../audit/index.ts";
 import {
   actorIdOfPerson,
   admit,
@@ -16,7 +16,13 @@ import {
   type UserPrincipal,
 } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
-import { eventsNamed, PERSON_SUBJECT_KINDS, type AuditLogPage } from "./audit-log.ts";
+import {
+  eventsNamed,
+  PERSON_NAMED_IN,
+  PERSON_SUBJECT_KINDS,
+  soughtFor,
+  type AuditLogPage,
+} from "./audit-log.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
 const ACTIVITY_PAGE = 50;
@@ -38,31 +44,6 @@ const readActivityAct = declareAct({
 
 export type ReadActivityRefusal = MemberRefusal<RefusalOf<typeof readActivityAct>> | Error;
 
-/**
- * The only places a person's id is read beyond the actor. An invitation names an address, so it
- * reaches its inviter's stream alone.
- */
-const NAMED_IN = {
-  subjectKinds: PERSON_SUBJECT_KINDS,
-  detail: [
-    {
-      key: "userId",
-      subjectKinds: ["group", "member"],
-      acts: ["people.group.member_added", "people.group.member_removed", "people.member.added"],
-    },
-    {
-      key: "requesterId",
-      subjectKinds: ["request"],
-      acts: ["people.request.asked", "people.request.approved", "people.request.declined"],
-    },
-    {
-      key: "adminUserId",
-      subjectKinds: ["workspace"],
-      acts: ["platform.workspace.provisioned"],
-    },
-  ],
-} as const satisfies PersonNamedIn;
-
 type ReadEvent = AuditLogPage["events"][number];
 
 /** Whether the person took the act, it was done to them, or both, as a self-demotion is. */
@@ -76,16 +57,16 @@ const isTakenBy = (event: ReadEvent, personId: UserId): boolean =>
   event.actor === actorIdOfPerson(personId);
 
 const isDoneTo = (event: ReadEvent, personId: UserId): boolean =>
-  (NAMED_IN.subjectKinds.some((kind) => kind === event.subjectKind) &&
+  (PERSON_SUBJECT_KINDS.some((kind) => kind === event.subjectKind) &&
     event.subjectId === personId) ||
-  NAMED_IN.detail.some(
+  PERSON_NAMED_IN.some(
     ({ key, acts }) =>
       acts.some((act) => act === event.act) &&
       Object.hasOwn(event.detail, key) &&
       event.detail[key] === personId,
   );
 
-/** An event naming the person neither way means the read's arms and `NAMED_IN` have drifted. */
+/** An event naming the person neither way means the read and `PERSON_NAMED_IN` have drifted. */
 const directionOf = (event: ReadEvent, personId: UserId): Direction => {
   const by = isTakenBy(event, personId);
   const to = isDoneTo(event, personId);
@@ -108,9 +89,8 @@ export const readActivity = async (
   if (!admitted.ok) return err(admitted.error);
 
   const read = await attempt(async () => {
-    const page = await eventsNamingNewestFirst(admitted.value, tx, {
-      personId: input.personId,
-      namedIn: NAMED_IN,
+    const page = await eventsSoughtNewestFirst(admitted.value, tx, {
+      sought: soughtFor({ people: [input.personId], groups: [], acts: [] }),
       cursor: input.cursor,
       limit: ACTIVITY_PAGE,
     });

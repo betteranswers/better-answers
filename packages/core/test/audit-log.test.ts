@@ -3,8 +3,9 @@ import type { z } from "zod";
 
 import { testData } from "@better-answers/schema/testing";
 
-import type { Result, Role, UserPrincipal } from "../src/kernel/index.ts";
+import { parse, type Result, type Role, type UserPrincipal } from "../src/kernel/index.ts";
 import {
+  addToGroup,
   changeRole,
   changeRoleInput,
   createGroup,
@@ -351,6 +352,148 @@ describe("the audit log", () => {
     ).rejects.toThrow(/did not commit/);
 
     expect(read).toEqual({ ok: false, error: expect.any(Error) });
+  });
+});
+
+/** One address per workspace, as an address is one person's across the platform. */
+const addressOf = (workspace: ProvisionedWorkspace): string =>
+  `priya.${workspace.workspaceId.toLowerCase()}@example.com`;
+
+/** Priya made a group herself, was added to another, then had her role changed. */
+const priyaOf = async (workspace: ProvisionedWorkspace) => {
+  const priya = await seedPerson(db().pool, { name: "Priya Shah", email: addressOf(workspace) });
+  await seedingWith(db().pool, (seed) =>
+    seed.member({ workspaceId: workspace.workspaceId, userId: priya, role: "Admin" }),
+  );
+  const [estimators = ""] = await groupsMadeBy(workspace, priya, ["Estimators"]);
+  const [bidWriters = ""] = await groupsMadeBy(workspace, workspace.adminUserId, ["Bid writers"]);
+  done(
+    await acting(workspace, workspace.adminUserId, (principal, tx) =>
+      addToGroup(principal, tx, { groupId: bidWriters, userId: priya }),
+    ),
+  );
+  await roleChangedOf(workspace, priya);
+  return { priya, estimators, bidWriters };
+};
+
+const actsOf = (page: AuditLogPage) => page.events.map((event) => event.act);
+
+describe("searching the audit log", () => {
+  it("finds a person as actor, subject or group member, paged", async () => {
+    const workspace = await provisionedWorkspace(db(), "Searched", { name: "Hannah Wright" });
+    const { priya, estimators, bidWriters } = await priyaOf(workspace);
+    await groupsMadeBy(workspace, workspace.adminUserId, ["Site team"]);
+
+    const first = pageOf(
+      await readAs(workspace, workspace.adminUserId, { search: "Priya", limit: 2 }),
+    );
+    const second = pageOf(
+      await readAs(workspace, workspace.adminUserId, {
+        search: "Priya",
+        limit: 2,
+        cursor: first.nextCursor,
+      }),
+    );
+
+    expect([...subjectsOf(first), ...subjectsOf(second)]).toEqual([priya, bidWriters, estimators]);
+    expect(actsOf(first)).toEqual(["people.member.role_changed", "people.group.member_added"]);
+    expect(first.nextCursor).toBe(first.events[1]?.id);
+    expect(second.nextCursor).toBeNull();
+  });
+
+  it("finds a person by their address", async () => {
+    const workspace = await provisionedWorkspace(db(), "SearchedByAddress");
+    const { priya } = await priyaOf(workspace);
+
+    const page = pageOf(
+      await readAs(workspace, workspace.adminUserId, {
+        search: addressOf(workspace).toUpperCase(),
+      }),
+    );
+
+    expect(subjectsOf(page)[0]).toBe(priya);
+    expect(page.events).toHaveLength(3);
+  });
+
+  it("finds a group's events by its name", async () => {
+    const workspace = await provisionedWorkspace(db(), "SearchedByGroup");
+    const { bidWriters } = await priyaOf(workspace);
+
+    const page = pageOf(await readAs(workspace, workspace.adminUserId, { search: "bid writ" }));
+
+    expect(actsOf(page)).toEqual(["people.group.member_added", "people.group.created"]);
+    expect(new Set(subjectsOf(page))).toEqual(new Set([bidWriters]));
+  });
+
+  it("finds events by the words of their act", async () => {
+    const workspace = await provisionedWorkspace(db(), "SearchedByAct");
+    await priyaOf(workspace);
+
+    const page = pageOf(
+      await readAs(workspace, workspace.adminUserId, { search: "  Role   changed " }),
+    );
+
+    expect(actsOf(page)).toEqual(["people.member.role_changed"]);
+  });
+
+  it("searches within the family asked for", async () => {
+    const workspace = await provisionedWorkspace(db(), "SearchedInFamily", { name: "Hannah" });
+
+    const people = pageOf(
+      await readAs(workspace, workspace.adminUserId, { search: "Hannah", family: "people" }),
+    );
+    const platform = pageOf(
+      await readAs(workspace, workspace.adminUserId, { search: "Hannah", family: "platform" }),
+    );
+
+    expect(people).toEqual({ events: [], nextCursor: null });
+    expect(actsOf(platform)).toEqual(["platform.workspace.provisioned"]);
+  });
+
+  it("answers an empty last page when nothing matches", async () => {
+    const workspace = await provisionedWorkspace(db(), "SearchedForNothing");
+    await priyaOf(workspace);
+
+    expect(await readAs(workspace, workspace.adminUserId, { search: "Zebedee" })).toEqual({
+      ok: true,
+      value: { events: [], nextCursor: null },
+    });
+  });
+
+  it("reads % and _ in a search as themselves", async () => {
+    const workspace = await provisionedWorkspace(db(), "SearchedLiterally");
+    const [sure, plain, underscored] = await groupsMadeBy(workspace, workspace.adminUserId, [
+      "100% sure",
+      "100 sure",
+      "site_team",
+    ]);
+    await groupsMadeBy(workspace, workspace.adminUserId, ["siteXteam"]);
+
+    const percent = pageOf(await readAs(workspace, workspace.adminUserId, { search: "100%" }));
+    const underscore = pageOf(await readAs(workspace, workspace.adminUserId, { search: "e_t" }));
+
+    expect(subjectsOf(percent)).toEqual([sure]);
+    expect(subjectsOf(percent)).not.toContain(plain);
+    expect(subjectsOf(underscore)).toEqual([underscored]);
+  });
+
+  it("never finds a person known only to another workspace", async () => {
+    const ours = await provisionedWorkspace(db(), "OurSearch");
+    const theirs = await provisionedWorkspace(db(), "TheirSearch", { name: "Una Elsewhere" });
+    await groupsMadeBy(theirs, theirs.adminUserId, ["Their group"]);
+
+    expect(pageOf(await readAs(ours, ours.adminUserId, { search: "Una Elsewhere" }))).toEqual({
+      events: [],
+      nextCursor: null,
+    });
+  });
+
+  it("refuses a search over 100 characters, malformed", () => {
+    expect(parse(readAuditLogInput, { search: "a".repeat(100) }).ok).toBe(true);
+    expect(parse(readAuditLogInput, { search: "a".repeat(101) })).toEqual({
+      ok: false,
+      error: { word: "malformed", fields: { search: expect.anything() } },
+    });
   });
 });
 

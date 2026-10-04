@@ -279,22 +279,32 @@ export const personProcedure = trpc.procedure.use(async ({ ctx, path, next }) =>
   });
 });
 
-/** Past the ceiling the call answers 429 and when to ask again. */
+/** Counted per person and procedure; past the ceiling the call answers 429 and when to ask again. */
+const counted = async (
+  ctx: Pick<TrpcContext, "doors" | "clock" | "log">,
+  path: string,
+  personId: string,
+  rule: CounterRule,
+): Promise<void> => {
+  const outcome = await attempt(() =>
+    consumeIngress(ctx.doors.postgres, "person", `${path}:${personId}`, rule, ctx.clock.now()),
+  );
+  if (!outcome.ok) throw failed(ctx.log, consumeIngress.name, outcome.error);
+  if (!outcome.value.allowed) {
+    throw throttled(ctx.log, path, new CeilingMet(outcome.value.retryAfterSeconds));
+  }
+};
+
 export const personCeiling = (rule: CounterRule) =>
   personProcedure.use(async ({ ctx, path, next }) => {
-    const counted = await attempt(() =>
-      consumeIngress(
-        ctx.doors.postgres,
-        "person",
-        `${path}:${ctx.personId}`,
-        rule,
-        ctx.clock.now(),
-      ),
-    );
-    if (!counted.ok) throw failed(ctx.log, consumeIngress.name, counted.error);
-    if (!counted.value.allowed) {
-      throw throttled(ctx.log, path, new CeilingMet(counted.value.retryAfterSeconds));
-    }
+    await counted(ctx, path, ctx.personId, rule);
+    return next();
+  });
+
+/** As personCeiling, for an act on the own-transaction road. */
+export const ownTransactionCeiling = (rule: CounterRule) =>
+  ownTransactionProcedure.use(async ({ ctx, path, next }) => {
+    await counted(ctx, path, ctx.principal.userId, rule);
     return next();
   });
 

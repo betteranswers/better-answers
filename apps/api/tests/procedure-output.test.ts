@@ -71,6 +71,7 @@ describe("what a procedure may answer the wire", () => {
       "members.createGroup",
       "members.declineRequest",
       "members.deleteGroup",
+      "members.exportAuditLog",
       "members.flagDisplayName",
       "members.groups",
       "members.invitationCounts",
@@ -135,6 +136,7 @@ describe("what a procedure may answer the wire", () => {
       | "members.changeRole"
       | "members.auditLog"
       | "members.activity"
+      | "members.exportAuditLog"
       | "members.invitations"
       | "members.invitationCounts"
       | "members.invite"

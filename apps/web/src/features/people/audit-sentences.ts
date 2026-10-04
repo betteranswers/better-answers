@@ -129,6 +129,7 @@ const SENTENCES = {
   "people.request.asked": ({ by }) => `${by} asked to join the workspace`,
   "people.request.declined": ({ by }) => `${by} declined an access request`,
   "people.subject_request.received": ({ by }) => `${by} recorded a subject request`,
+  "platform.audit_log.exported": ({ by }) => `${by} exported the audit log`,
   "platform.erasure.rehearsed": ({ by }) => `${by} rehearsed an erasure`,
   "platform.erasure.replayed": ({ by }) => `${by} replayed an erasure over a restored copy`,
   "platform.graph.swept": ({ by }) => `${by} swept the graph's older generations`,

@@ -107,6 +107,9 @@ export const TRPC_IP_RULE: CounterRule = { windowMs: 60_000, max: 120 };
 
 export const MCP_TOKEN_RULE: CounterRule = { windowMs: 60_000, max: 120 };
 
+/** Each export reads up to 10,000 events, so an Admin's script cannot keep the database busy. */
+export const AUDIT_EXPORT_PERSON_RULE: CounterRule = { windowMs: 60 * 60_000, max: 10 };
+
 /** Room for a few mistyped slugs, not for a list of guesses. */
 export const ASK_TO_JOIN_PERSON_RULE: CounterRule = { windowMs: 60 * 60_000, max: 10 };
 

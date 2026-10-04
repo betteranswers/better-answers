@@ -11,7 +11,13 @@ import type {
   Principal,
   UserId,
 } from "../kernel/index.ts";
-import { boundValues, scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
+import {
+  type Bind,
+  boundValues,
+  scopeClause,
+  scopeParameter,
+  type Tx,
+} from "../store/postgres/index.ts";
 import {
   type ActName,
   DETAIL_KINDS,
@@ -38,6 +44,7 @@ export type {
   AuditAct,
   DetailOf,
   EndedGrant,
+  Matched,
   SecondFactor,
   SignInMethod,
 } from "./vocabulary.ts";
@@ -156,42 +163,81 @@ export const eventsNewestFirst = async (
   );
 };
 
-/** Where a person's id may stand in an event beyond its actor. */
-export type PersonNamedIn = {
-  readonly subjectKinds: readonly string[];
-  readonly detail: readonly {
-    readonly key: string;
-    /**
-     * Every kind the acts' subjects take, so the arm reaches the subject index; a kind left out
-     * hides that act's events.
-     */
-    readonly subjectKinds: readonly string[];
-    readonly acts: readonly ActName[];
-  }[];
+/** Ids under subject kinds; a kind left out of `kinds` hides the events its subjects stand under. */
+type SoughtSubjects = {
+  readonly kinds: readonly string[];
+  readonly ids: readonly string[];
 };
 
-type ArmAt = CursorAt & { readonly limit: number };
+/** Where a person's id may stand in an event's detail: under `key`, in the listed acts alone. */
+export type DetailNaming = {
+  readonly key: string;
+  /** Every kind the acts' subjects take, so the arm reaches the subject index. */
+  readonly subjectKinds: readonly string[];
+  readonly acts: readonly ActName[];
+};
+
+/** What a read looks for, each list read as its own arm; an empty list adds no arm. */
+export type EventsSought = {
+  readonly people: readonly UserId[];
+  readonly subjects: readonly SoughtSubjects[];
+  readonly acts: readonly string[];
+  /** The keys a person's id stands under in detail, matched against `people`. */
+  readonly detail: readonly DetailNaming[];
+};
+
+type ArmAt = CursorAt & { readonly limit: number; readonly family: number };
 
 /** Each arm is limited on its own index; one query that ORs them would scan the workspace. */
 const armOf = (at: ArmAt, predicate: string): string =>
   `(SELECT ${AUDIT_EVENT_ROW}
       FROM audit_event
      WHERE workspace_id = ${scopeClause(at.scope)} AND ${predicate}
+       AND ($${at.family}::text IS NULL OR family = $${at.family})
        AND ${afterTheCursor(at)}
      ORDER BY at DESC, id DESC
      LIMIT $${at.limit} + 1)`;
 
+/** One value compares by `=`, so an arm on one person keeps its index's order and needs no sort. */
+const oneOf = (values: readonly string[], bind: Bind): string =>
+  values.length === 1 ? `= $${bind(values[0] ?? "")}` : `= ANY($${bind(values)}::text[])`;
+
+const predicatesOf = (sought: EventsSought, bind: Bind): readonly string[] => {
+  const people = sought.people.length === 0 ? undefined : oneOf(sought.people, bind);
+  const subjects = sought.subjects.filter(({ ids }) => ids.length > 0);
+  return [
+    ...(people === undefined
+      ? []
+      : [
+          `actor ${oneOf(
+            sought.people.map((id) => actorIdOfPerson(id)),
+            bind,
+          )}`,
+        ]),
+    ...subjects.map(
+      ({ kinds, ids }) =>
+        `subject_kind = ANY($${bind(kinds)}::text[]) AND subject_id ${oneOf(ids, bind)}`,
+    ),
+    ...(sought.acts.length === 0 ? [] : [`act = ANY($${bind(sought.acts)}::text[])`]),
+    ...(people === undefined ? [] : sought.detail).map(
+      ({ key, subjectKinds, acts }) =>
+        `subject_kind = ANY($${bind(subjectKinds)}::text[]) AND act = ANY($${bind(acts)}::text[])
+         AND detail ->> $${bind(key)}::text ${people}`,
+    ),
+  ];
+};
+
 /**
- * Newest first, from the row after `cursor`: the events whose actor is the person, whose subject
- * is them under one of `namedIn.subjectKinds`, or whose detail names them under a listed act's key.
- * An event two arms reach is answered once.
+ * Newest first, from the row after `cursor`, within `family` when one is asked for: the events
+ * whose actor or detail names one of the people, whose subject is one sought, or whose act is.
+ * An event two arms reach is answered once, and nothing sought reads nothing.
  */
-export const eventsNamingNewestFirst = async (
+export const eventsSoughtNewestFirst = async (
   principal: Principal,
   tx: Tx,
   asked: {
-    readonly personId: UserId;
-    readonly namedIn: PersonNamedIn;
+    readonly sought: EventsSought;
+    readonly family?: AuditEventRow["family"] | undefined;
     readonly cursor?: string | null | undefined;
     readonly limit: number;
   },
@@ -201,22 +247,10 @@ export const eventsNamingNewestFirst = async (
     scope: bind(scopeParameter(principal)),
     cursor: bind(asked.cursor ?? null),
     limit: bind(asked.limit),
+    family: bind(asked.family ?? null),
   };
-  const person = bind(asked.personId);
-  const arms = [
-    armOf(at, `actor = $${bind(actorIdOfPerson(asked.personId))}`),
-    armOf(
-      at,
-      `subject_kind = ANY($${bind(asked.namedIn.subjectKinds)}::text[]) AND subject_id = $${person}`,
-    ),
-    ...asked.namedIn.detail.map(({ key, subjectKinds, acts }) =>
-      armOf(
-        at,
-        `subject_kind = ANY($${bind(subjectKinds)}::text[])
-         AND act = ANY($${bind(acts)}::text[]) AND detail ->> $${bind(key)}::text = $${person}`,
-      ),
-    ),
-  ];
+  const arms = predicatesOf(asked.sought, bind).map((predicate) => armOf(at, predicate));
+  if (arms.length === 0) return { rows: [], nextCursor: null };
   const found = await tx.query(
     `SELECT * FROM (${arms.join(" UNION ALL ")}) AS arms
      ORDER BY at DESC, id DESC`,
