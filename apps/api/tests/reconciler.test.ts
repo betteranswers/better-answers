@@ -139,8 +139,10 @@ describe("the periodic head check", () => {
 
   it("pings failure for a failed minute, then success once recovered", async () => {
     const runtimeRole = app().database.pool.options;
-    const pool = new Pool({ ...runtimeRole, max: 1, connectionTimeoutMillis: 250 });
+    const pool = new Pool({ ...runtimeRole, max: 1 });
     const holder = await pool.connect();
+    // pg-pool reads this per connect; set before the hold, it also bounds the holder's own login on a loaded runner.
+    pool.options.connectionTimeoutMillis = 250;
     let held = true;
     const release = (): void => {
       if (held) holder.release();
