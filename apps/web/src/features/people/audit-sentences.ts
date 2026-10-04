@@ -3,6 +3,7 @@ import { byWords, counted, nameOrAddress } from "@/shared/words.ts";
 import type { DECLARED_ACTS } from "./audit-acts.ts";
 import { namedIn } from "./audit-details.ts";
 import type { ReadAuditEvent } from "./audit-log-api.ts";
+import { GONE_WORDS, removedWords, THING_NOUNS, type Thing } from "./audit-subjects.ts";
 
 export type SaidEvent = Pick<ReadAuditEvent, "act" | "by" | "subject" | "detail" | "named">;
 
@@ -35,43 +36,35 @@ const opening = (by: SaidEvent["by"]): string =>
 /** An action on a person's identity alone names no member, so its subject reads as a person. */
 const person = (subject: Subject | undefined): string => {
   if (subject?.kind === "person") return nameOrAddress(subject.displayName, subject.address);
-  return subject?.kind === "former-member" ? "a former member" : "a person";
+  return subject?.kind === "former-member" ? GONE_WORDS["former-member"] : "a person";
 };
 
 const possessive = (subject: Subject | undefined): string => `${person(subject)}'s`;
 
 const group = (subject: Subject): string =>
-  subject?.kind === "group" ? `the group ${subject.name}` : "a deleted group";
+  subject?.kind === "group" ? `the group ${subject.name}` : GONE_WORDS["deleted-group"];
 
 const groupNow = (subject: Subject): string =>
-  subject?.kind === "group" ? `the group now called ${subject.name}` : "a deleted group";
+  subject?.kind === "group" ? `the group now called ${subject.name}` : GONE_WORDS["deleted-group"];
 
 /** An invitation erasure deleted is said without the address it went to. */
 const invitation = (subject: Subject): string =>
   subject?.kind === "invitation" ? `an invitation to ${subject.address}` : "an invitation";
 
-const THING_WORDS = {
-  "connected-source": "connected source",
-  document: "document",
-  concept: "concept",
-} as const;
-
-type Thing = keyof typeof THING_WORDS;
-
 /** Named as it stands now, or by its kind alone once it is removed. */
 const thing = (kind: Thing) => {
-  const words = THING_WORDS[kind];
+  const noun = THING_NOUNS[kind];
   return (subject: Subject | undefined): string => {
-    if (subject?.kind === kind) return `the ${words} ${subject.name}`;
-    return subject?.kind === "removed" ? `a ${words} (removed)` : `a ${words}`;
+    if (subject?.kind === kind) return `the ${noun} ${subject.name}`;
+    return subject?.kind === "removed" ? removedWords(subject.of) : `a ${noun}`;
   };
 };
 
-const connectedSource = thing("connected-source");
+const connectedSourceNamed = thing("connected-source");
 
-const document = thing("document");
+const documentNamed = thing("document");
 
-const concept = thing("concept");
+const conceptNamed = thing("concept");
 
 const role = (detail: Slots["detail"]): string => {
   const held = detail["role"];
@@ -93,13 +86,13 @@ const exported = (detail: Slots["detail"]): string => {
 
 const SENTENCES = {
   "knowledge.check.imported": ({ by, named }) =>
-    `${by} imported a verification of ${concept(namedIn(named, "iri"))}`,
+    `${by} imported a verification of ${conceptNamed(namedIn(named, "iri"))}`,
   "knowledge.concept.class_overridden": ({ by, subject }) =>
-    `${by} overrode the sensitivity of ${concept(subject)}`,
-  "knowledge.concept.committed": ({ by, subject }) => `${by} saved ${concept(subject)}`,
+    `${by} overrode the sensitivity of ${conceptNamed(subject)}`,
+  "knowledge.concept.committed": ({ by, subject }) => `${by} saved ${conceptNamed(subject)}`,
   "knowledge.manifest.written": ({ by }) => `${by} updated the knowledge base's description`,
   "knowledge.suggestion.accepted": ({ by, named }) =>
-    `${by} accepted a suggestion, saved as ${concept(namedIn(named, "iri"))}`,
+    `${by} accepted a suggestion, saved as ${conceptNamed(namedIn(named, "iri"))}`,
   "knowledge.suggestion.declined": ({ by }) => `${by} declined a suggestion`,
   "knowledge.suggestion.returned": ({ by }) => `${by} sent a suggestion back to whoever made it`,
   "people.client.consented": ({ by }) => `${by} gave an assistant access`,
@@ -178,13 +171,15 @@ const SENTENCES = {
     `${by} kept the workspace's invitations to its testing domain`,
   "platform.workspace.provisioned": ({ by }) => `${by} provisioned the workspace`,
   "platform.workspace.renamed": ({ by }) => `${by} renamed the workspace`,
-  "sources.binding.bound": ({ by, subject }) => `${by} added ${connectedSource(subject)}`,
-  "sources.binding.narrowed": ({ by, subject }) => `${by} narrowed ${connectedSource(subject)}`,
-  "sources.binding.published": ({ by, subject }) => `${by} published ${connectedSource(subject)}`,
-  "sources.binding.widened": ({ by, subject }) => `${by} widened ${connectedSource(subject)}`,
-  "sources.document.narrowed": ({ by, subject }) => `${by} narrowed ${document(subject)}`,
+  "sources.binding.bound": ({ by, subject }) => `${by} added ${connectedSourceNamed(subject)}`,
+  "sources.binding.narrowed": ({ by, subject }) =>
+    `${by} narrowed ${connectedSourceNamed(subject)}`,
+  "sources.binding.published": ({ by, subject }) =>
+    `${by} published ${connectedSourceNamed(subject)}`,
+  "sources.binding.widened": ({ by, subject }) => `${by} widened ${connectedSourceNamed(subject)}`,
+  "sources.document.narrowed": ({ by, subject }) => `${by} narrowed ${documentNamed(subject)}`,
   "sources.document.special_category_dismissed": ({ by, subject }) =>
-    `${by} dismissed the findings in ${document(subject)} as not special category`,
+    `${by} dismissed the findings in ${documentNamed(subject)} as not special category`,
   "sources.finding.restored": ({ by }) => `${by} kept a finding in text`,
   "sources.upload.swept": ({ by }) => `${by} deleted an uploaded file no document uses`,
 } as const satisfies Readonly<Record<DeclaredAct, Sentence>>;

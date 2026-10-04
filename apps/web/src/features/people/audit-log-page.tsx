@@ -12,7 +12,7 @@ import { failureOutcome, refusedWith } from "@/shared/refusal-outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
-import { instantWords, nameOrAddress } from "@/shared/words.ts";
+import { byWords, instantWords } from "@/shared/words.ts";
 
 import { detailLinesOf, type DetailLine } from "./audit-details.ts";
 import {
@@ -30,6 +30,7 @@ import {
 } from "./audit-log-state.ts";
 import { AUDIT_LOG_WORDS as WORDS } from "./audit-log-words.ts";
 import { headlineOf, sentenceOf } from "./audit-sentences.ts";
+import { personSaid } from "./audit-subjects.ts";
 import { EventDays, useLanding } from "./event-days.tsx";
 import { useSettledSearch } from "./members-address.ts";
 import { auditExportCeiling, SAID_OF_THE_AUDIT_LOG } from "./refusal-words.ts";
@@ -38,8 +39,8 @@ const system = menuGroupIn(CONTROL_CENTRE, "system");
 
 const LISTED = Object.values(KEY);
 
-const eventsOf = (auditLog: AuditLog): readonly ReadAuditEvent[] =>
-  auditLog.data?.pages.flatMap((page) => page.events) ?? [];
+const eventsOf = (data: AuditLog["data"]): readonly ReadAuditEvent[] =>
+  data?.pages.flatMap((page) => page.events) ?? [];
 
 /** A sign-in address stands beneath its person's name, so two of one name are told apart. */
 function DetailRow(properties: { readonly line: DetailLine }) {
@@ -57,23 +58,37 @@ function DetailRow(properties: { readonly line: DetailLine }) {
   );
 }
 
-const BY_WORDS = { platform: "the platform", "former-member": "a former member" } as const;
-
 const byLine = (by: ReadAuditEvent["by"]): DetailLine => {
   const line = { key: "by", label: WORDS.by };
-  if (by.kind !== "person") return { ...line, value: BY_WORDS[by.kind] };
-  const value = nameOrAddress(by.displayName, by.address);
-  return by.displayName === "" ? { ...line, value } : { ...line, value, address: by.address };
+  return by.kind === "person"
+    ? { ...line, ...personSaid(by.displayName, by.address) }
+    : { ...line, value: byWords(by) };
 };
 
 const subjectLines = (subject: ReadAuditEvent["subject"]): readonly DetailLine[] =>
   subject?.kind === "person" && subject.displayName !== ""
-    ? [{ key: "subject", label: WORDS.about, value: subject.displayName, address: subject.address }]
+    ? [{ key: "subject", label: WORDS.about, ...personSaid(subject.displayName, subject.address) }]
     : [];
+
+/** Drawn only once the details open. */
+function DetailList(properties: { readonly event: ReadAuditEvent }) {
+  const { event } = properties;
+  const lines = [byLine(event.by), ...subjectLines(event.subject), ...detailLinesOf(event)];
+  return (
+    <dl className="mt-1 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-xs">
+      {lines.map((line) => (
+        <DetailRow key={line.key} line={line} />
+      ))}
+    </dl>
+  );
+}
 
 function EventLine(properties: { readonly event: ReadAuditEvent }) {
   const { event } = properties;
-  const lines = [byLine(event.by), ...subjectLines(event.subject), ...detailLinesOf(event)];
+  const address =
+    event.by.kind === "person"
+      ? personSaid(event.by.displayName, event.by.address).address
+      : undefined;
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-1">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
@@ -81,9 +96,9 @@ function EventLine(properties: { readonly event: ReadAuditEvent }) {
         <Pill>{WORDS.families[event.family]}</Pill>
       </div>
       {/* Beneath the sentence that opens with the name, so two of one name are told apart at once. */}
-      {event.by.kind === "person" && event.by.displayName !== "" ? (
-        <span className="text-xs text-muted-foreground wrap-anywhere">{event.by.address}</span>
-      ) : null}
+      {address === undefined ? null : (
+        <span className="text-xs text-muted-foreground wrap-anywhere">{address}</span>
+      )}
       <Collapsible>
         <CollapsibleTrigger asChild>
           <Button variant="link" size="sm" className="group h-auto gap-1 self-start px-0">
@@ -98,11 +113,7 @@ function EventLine(properties: { readonly event: ReadAuditEvent }) {
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <dl className="mt-1 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-xs">
-            {lines.map((line) => (
-              <DetailRow key={line.key} line={line} />
-            ))}
-          </dl>
+          <DetailList event={event} />
         </CollapsibleContent>
       </Collapsible>
     </div>
@@ -132,13 +143,13 @@ function NoneShown(properties: {
 
 function Events(properties: {
   readonly auditLog: AuditLog;
+  readonly events: readonly ReadAuditEvent[];
   readonly asked: Asked;
   readonly onClear: () => void;
   readonly searchRef: RefObject<HTMLInputElement | null>;
 }) {
-  const { auditLog } = properties;
+  const { auditLog, events } = properties;
   const landing = useLanding();
-  const events = useMemo(() => eventsOf(auditLog), [auditLog]);
 
   if (events.length === 0) {
     return (
@@ -249,7 +260,7 @@ function AuditLogRegion() {
   const { asked, write, search, setSearch, clear } = useAsked();
   const auditLog = useAuditLog(asked);
   const [outcome, setOutcome] = useState<Outcome>();
-  const events = eventsOf(auditLog);
+  const events = useMemo(() => eventsOf(auditLog.data), [auditLog.data]);
   const tooBroad = auditLog.data?.pages[0]?.searchTooBroad === true;
 
   return (
@@ -304,6 +315,7 @@ function AuditLogRegion() {
           <Events
             key={`${asked.family ?? ""}:${asked.search}`}
             auditLog={auditLog}
+            events={events}
             asked={asked}
             onClear={clear}
             searchRef={searchRef}

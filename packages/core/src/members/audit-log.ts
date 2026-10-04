@@ -292,12 +292,15 @@ const detailIds = (row: AuditEventRow): readonly DetailId[] =>
     return kind === undefined || typeof value !== "string" ? [] : [[key, kind, value]];
   });
 
+/** A row with its detail's ids read once, since every kind's lookup asks for them. */
+type Scanned = { readonly row: AuditEventRow; readonly ids: readonly DetailId[] };
+
 /** The ids of one kind the rows name, as subject or in detail. */
-const idsNamedAs = (rows: readonly AuditEventRow[], kind: NamedKind): readonly string[] => [
+const idsNamedAs = (scanned: readonly Scanned[], kind: NamedKind): readonly string[] => [
   ...new Set(
-    rows.flatMap((row) => [
+    scanned.flatMap(({ row, ids }) => [
       ...(NAMED_KINDS.get(row.subjectKind) === kind ? [row.subjectId] : []),
-      ...detailIds(row).flatMap(([, named, id]) => (named === kind ? [id] : [])),
+      ...ids.flatMap(([, named, id]) => (named === kind ? [id] : [])),
     ]),
   ),
 ];
@@ -334,8 +337,7 @@ const subjectOf = (row: AuditEventRow, names: AllNames): AuditEventSubject | nul
   return kind === undefined ? null : namedAs(kind, row.subjectId, names);
 };
 
-const namedDetail = (row: AuditEventRow, names: AllNames): ReadAuditEvent["named"] => {
-  const ids = detailIds(row);
+const namedDetail = (ids: readonly DetailId[], names: AllNames): ReadAuditEvent["named"] => {
   const single = ids
     .filter(([key]) => key !== MATCHED)
     .map(([key, kind, id]) => [key, namedAs(kind, id, names)] as const);
@@ -346,7 +348,7 @@ const namedDetail = (row: AuditEventRow, names: AllNames): ReadAuditEvent["named
 };
 
 const eventOf = (
-  row: AuditEventRow,
+  { row, ids }: Scanned,
   names: AllNames,
   detail: ReadAuditEvent["detail"] | undefined,
 ): ReadAuditEvent => ({
@@ -360,15 +362,15 @@ const eventOf = (
   by: actorOf(row.actor, names.people),
   subject: subjectOf(row, names),
   detail: detail ?? {},
-  named: namedDetail(row, names),
+  named: namedDetail(ids, names),
 });
 
 const thingNames = async (
   principal: UserPrincipal,
   tx: Tx,
-  rows: readonly AuditEventRow[],
+  scanned: readonly Scanned[],
 ): Promise<ThingNames> => {
-  const named = (kind: keyof ThingNames) => namesIn(principal, tx, kind, idsNamedAs(rows, kind));
+  const named = (kind: keyof ThingNames) => namesIn(principal, tx, kind, idsNamedAs(scanned, kind));
   return {
     group: await named("group"),
     invitation: await named("invitation"),
@@ -387,16 +389,17 @@ export const eventsNamed = async (
   tx: Tx,
   rows: readonly AuditEventRow[],
 ): Promise<readonly ReadAuditEvent[]> => {
+  const scanned = rows.map((row) => ({ row, ids: detailIds(row) }));
   const people = await namesOfPeople(tx, [
     ...peopleAmong(rows.map((row) => row.actor)),
-    ...idsNamedAs(rows, "person"),
+    ...idsNamedAs(scanned, "person"),
   ]);
-  const things = await thingNames(principal, tx, rows);
+  const things = await thingNames(principal, tx, scanned);
   const details = await detailsNamed(
     tx,
     rows.map((row) => row.detail ?? {}),
   );
-  return rows.map((row, index) => eventOf(row, { people, things }, details[index]));
+  return scanned.map((one, index) => eventOf(one, { people, things }, details[index]));
 };
 
 /**

@@ -3,12 +3,12 @@ import type { Tx } from "../store/postgres/index.ts";
 import { hasNoDisplayName, notErasedAt } from "./display-name.ts";
 
 /** The kind, not the words: a person may give any display name, "the platform" among them. */
+type NamedPerson = { readonly displayName: string; readonly address: string };
+
 export type AuditEventActor =
-  | { readonly kind: "person"; readonly displayName: string; readonly address: string }
+  | ({ readonly kind: "person" } & NamedPerson)
   | { readonly kind: "former-member" }
   | { readonly kind: "platform" };
-
-type NamedPerson = { readonly displayName: string; readonly address: string };
 
 /** Erasure keeps the person row, so an erased person is one no name is found for. */
 export type PeopleNames = ReadonlyMap<string, NamedPerson>;

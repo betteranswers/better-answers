@@ -1,6 +1,5 @@
-import { nameOrAddress } from "@/shared/words.ts";
-
 import type { ReadAuditEvent } from "./audit-log-api.ts";
+import { GONE_WORDS, personSaid, removedWords } from "./audit-subjects.ts";
 
 type NamedOrList = ReadAuditEvent["named"][string];
 
@@ -95,30 +94,16 @@ const VALUE_WORDS: ReadonlyMap<unknown, string> = new Map([
   ["platform", "Platform"],
 ]);
 
-const THING_WORDS = {
-  "connected-source": "a connected source",
-  document: "a document",
-  concept: "a concept",
-} as const;
-
-const GONE_WORDS = {
-  "former-member": "a former member",
-  "deleted-group": "a deleted group",
-  "erased-invitation": "an erased invitation",
-} as const;
-
 type Said = { readonly value: string; readonly address?: string };
 
 const saidOf = (named: Named): Said => {
   switch (named.kind) {
-    case "person": {
-      const value = nameOrAddress(named.displayName, named.address);
-      return named.displayName === "" ? { value } : { value, address: named.address };
-    }
+    case "person":
+      return personSaid(named.displayName, named.address);
     case "invitation":
       return { value: named.address };
     case "removed":
-      return { value: `${THING_WORDS[named.of]} (removed)` };
+      return { value: removedWords(named.of) };
     case "former-member":
     case "deleted-group":
     case "erased-invitation":
