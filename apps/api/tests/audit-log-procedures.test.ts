@@ -50,8 +50,8 @@ describe("the audit log over tRPC", () => {
     const page = await api.members.auditLog.query({});
 
     expect(page.events.map(({ act, by }) => [act, by])).toEqual([
-      ["people.group.created", { kind: "person", displayName: admin.name }],
-      ["people.group.created", { kind: "former-member" }],
+      ["people.group.created", { kind: "person", displayName: admin.name, address: admin.email }],
+      ["people.group.created", { kind: "person", displayName: "", address: unnamed.email }],
       ["platform.workspace.provisioned", { kind: "platform" }],
     ]);
     expect(page.nextCursor).toBeNull();

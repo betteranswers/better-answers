@@ -1,13 +1,31 @@
 import { describe, expect, it } from "vitest";
 
 import { DECLARED_ACTS } from "@/features/people/audit-acts.ts";
-import { ACTS_SAID, sentenceOf, type SaidEvent } from "@/features/people/audit-sentences.ts";
+import { detailLinesOf } from "@/features/people/audit-details.ts";
+import {
+  ACTS_HEADED,
+  ACTS_SAID,
+  headlineOf,
+  sentenceOf,
+  type SaidEvent,
+} from "@/features/people/audit-sentences.ts";
 
-const HANNAH = { kind: "person", displayName: "Hannah Wright" } as const;
+const HANNAH = {
+  kind: "person",
+  displayName: "Hannah Wright",
+  address: "hannah@example.invalid",
+} as const;
+
+const PRIYA = {
+  kind: "person",
+  displayName: "Priya Shah",
+  address: "priya@example.invalid",
+} as const;
 
 const byHannah = (event: Pick<SaidEvent, "act" | "subject"> & Partial<SaidEvent>): SaidEvent => ({
   by: HANNAH,
   detail: {},
+  named: {},
   ...event,
 });
 
@@ -15,7 +33,7 @@ describe("an audit event's sentence", () => {
   it("says a role change with both people named", () => {
     const changed = byHannah({
       act: "people.member.role_changed",
-      subject: { kind: "person", displayName: "Priya Shah" },
+      subject: PRIYA,
       detail: { previousRole: "Viewer", role: "Editor" },
     });
 
@@ -27,9 +45,10 @@ describe("an audit event's sentence", () => {
       act: "people.group.member_added",
       subject: { kind: "deleted-group" },
       detail: { userId: "01J6AAAAAAAAAAAAAAAAAAAAAA" },
+      named: { userId: PRIYA },
     });
 
-    expect(sentenceOf(added)).toBe("Hannah Wright added a member to a deleted group");
+    expect(sentenceOf(added)).toBe("Hannah Wright added Priya Shah to a deleted group");
   });
 
   it("names a group as it stands now", () => {
@@ -91,12 +110,14 @@ describe("an audit event's sentence", () => {
       by: { kind: "platform" },
       subject: null,
       detail: { role: "Admin" },
+      named: {},
     };
     const created: SaidEvent = {
       act: "people.group.created",
       by: { kind: "former-member" },
       subject: { kind: "group", name: "Bid writers" },
       detail: {},
+      named: {},
     };
 
     expect(sentenceOf(provisioned)).toBe("The platform provisioned the workspace");
@@ -106,15 +127,16 @@ describe("an audit event's sentence", () => {
   it("never changes the case of a person's display name", () => {
     const signedIn: SaidEvent = {
       act: "people.person.signed_in",
-      by: { kind: "person", displayName: "dj okoro" },
-      subject: { kind: "person", displayName: "dj okoro" },
+      by: { kind: "person", displayName: "dj okoro", address: "dj@example.invalid" },
+      subject: { kind: "person", displayName: "dj okoro", address: "dj@example.invalid" },
       detail: {},
+      named: {},
     };
 
     expect(sentenceOf(signedIn)).toBe("dj okoro signed in");
   });
 
-  it("draws today's label for an act it does not know", () => {
+  it("reads an unknown action by its stored name in words", () => {
     const unknown = byHannah({ act: "people.probe.unheard_of", subject: null });
 
     expect(sentenceOf(unknown)).toBe("Probe unheard of");
@@ -123,7 +145,7 @@ describe("an audit event's sentence", () => {
 
 describe("a second factor's audit sentence", () => {
   const ofHerself = (act: SaidEvent["act"], detail: SaidEvent["detail"] = {}): SaidEvent =>
-    byHannah({ act, subject: { kind: "person", displayName: "Hannah Wright" }, detail });
+    byHannah({ act, subject: HANNAH, detail });
 
   it("names the factor a confirmation used", () => {
     expect(
@@ -146,9 +168,9 @@ describe("a second factor's audit sentence", () => {
     );
   });
 
-  it("says the operator's restore code was used", () => {
+  it("says a restore code from better-answers support was used", () => {
     expect(sentenceOf(ofHerself("people.person.restore_code_accepted"))).toBe(
-      "Hannah Wright used the operator's restore code",
+      "Hannah Wright used a restore code from better-answers support",
     );
   });
 
@@ -156,25 +178,168 @@ describe("a second factor's audit sentence", () => {
     const restored: SaidEvent = {
       act: "people.person.sign_in_restored",
       by: { kind: "platform" },
-      subject: { kind: "person", displayName: "Priya Shah" },
+      subject: PRIYA,
       detail: {},
+      named: {},
     };
 
     expect(sentenceOf(restored)).toBe("The platform restored Priya Shah's sign-in");
   });
 });
 
-describe("the sentences against the acts core declares", () => {
-  it("says every act declared across the four families", () => {
-    const unsaid = DECLARED_ACTS.filter((act) => !ACTS_SAID.includes(act));
+describe("an audit event in today's words", () => {
+  const HANDBOOK = { kind: "connected-source", name: "Staff handbook" } as const;
 
-    expect(unsaid, "declared acts with no sentence").toEqual([]);
+  it("says a connected source published, though stored as a binding", () => {
+    const published = byHannah({
+      act: "sources.binding.published",
+      subject: HANDBOOK,
+      detail: { bindingId: "01J6CCCCCCCCCCCCCCCCCCCCCC" },
+      named: { bindingId: HANDBOOK },
+    });
+
+    expect(sentenceOf(published)).toBe(
+      "Hannah Wright published the connected source Staff handbook",
+    );
+    expect(headlineOf(published.act)).toBe("Connected source published");
   });
 
-  it("says no act core never declared", () => {
-    const declared: readonly string[] = DECLARED_ACTS;
-    const undeclared = ACTS_SAID.filter((act) => !declared.includes(act));
+  it("says a connected source since removed by its kind", () => {
+    const widened = byHannah({
+      act: "sources.binding.widened",
+      subject: { kind: "removed", of: "connected-source" },
+    });
 
-    expect(undeclared, "sentences for acts no slice declares").toEqual([]);
+    expect(sentenceOf(widened)).toBe("Hannah Wright widened a connected source (removed)");
+  });
+
+  it("says the platform for an action no person took", () => {
+    const swept: SaidEvent = {
+      act: "platform.graph.swept",
+      by: { kind: "platform" },
+      subject: null,
+      detail: { generation: 3, nodes: 10, edges: 4 },
+      named: {},
+    };
+
+    expect(sentenceOf(swept)).toBe("The platform cleared older copies of the map");
+  });
+
+  it("names a person with no display name by their address", () => {
+    const signedIn = byHannah({
+      act: "people.person.signed_in",
+      by: { kind: "person", displayName: "", address: "new.starter@example.invalid" },
+      subject: null,
+    });
+
+    expect(sentenceOf(signedIn)).toBe("new.starter@example.invalid signed in");
+  });
+
+  it("says no stored action name, actor id or person id", () => {
+    const actorId = `human:${"01J6DDDDDDDDDDDDDDDDDDDDDD"}`;
+    const said = DECLARED_ACTS.map((act) =>
+      sentenceOf(
+        byHannah({
+          act,
+          subject: PRIYA,
+          detail: { userId: "01J6DDDDDDDDDDDDDDDDDDDDDD", role: "Editor" },
+          named: { userId: PRIYA },
+        }),
+      ),
+    );
+
+    for (const sentence of said) {
+      expect(sentence).not.toMatch(/[a-z]+\.[a-z_]+\.[a-z_]+/);
+      expect(sentence).not.toContain(actorId);
+      expect(sentence).not.toContain("01J6DDDDDDDDDDDDDDDDDDDDDD");
+    }
+  });
+});
+
+describe("an audit event's detail in today's words", () => {
+  it("shows a connected source's id as its name", () => {
+    const handbook = { kind: "connected-source", name: "Staff handbook" } as const;
+
+    expect(
+      detailLinesOf({
+        detail: { bindingId: "01J6CCCCCCCCCCCCCCCCCCCCCC", sensitivity: "Restricted" },
+        named: { bindingId: handbook },
+      }),
+    ).toEqual([
+      { key: "bindingId", label: "Connected source", value: "Staff handbook" },
+      { key: "sensitivity", label: "Sensitivity", value: "Restricted" },
+    ]);
+  });
+
+  it("leaves off a detail it has no word for", () => {
+    expect(
+      detailLinesOf({
+        detail: { commitSha: "a".repeat(40), setId: "01J6EEEEEEEEEEEEEEEEEEEEEE", replaced: true },
+        named: {},
+      }),
+    ).toEqual([{ key: "replaced", label: "Replaced earlier codes", value: "Yes" }]);
+  });
+
+  it("puts a person's sign-in address beneath their name", () => {
+    const lines = detailLinesOf({
+      detail: { userId: "01J6FFFFFFFFFFFFFFFFFFFFFF" },
+      named: { userId: PRIYA },
+    });
+
+    expect(lines).toEqual([
+      { key: "userId", label: "Person", value: "Priya Shah", address: "priya@example.invalid" },
+    ]);
+  });
+
+  it("names each person and group an export's search matched", () => {
+    const matched = [PRIYA, { kind: "group", name: "Bid writers" }] as const;
+
+    expect(
+      detailLinesOf({
+        detail: { matched: [], family: "people", eventCount: 1 },
+        named: { matched },
+      }),
+    ).toEqual([
+      { key: "matched", label: "Search matched", value: "Priya Shah, Bid writers" },
+      { key: "family", label: "Family", value: "People" },
+      { key: "eventCount", label: "Events", value: "1" },
+    ]);
+  });
+
+  it("leaves off an id the read could not name", () => {
+    expect(
+      detailLinesOf({ detail: { invitationId: "01J6GGGGGGGGGGGGGGGGGGGGGG" }, named: {} }),
+    ).toEqual([]);
+  });
+
+  it("reads a credentials ending's access as each assistant's name", () => {
+    const grants = [
+      { clientId: "https://claude.ai/metadata", clientName: "Claude", workspaceId: null },
+    ];
+
+    expect(detailLinesOf({ detail: { grants }, named: {} })).toEqual([
+      { key: "grants", label: "Access ended", value: "Claude" },
+    ]);
+  });
+});
+
+describe("the sentences against the actions core declares", () => {
+  it("says every action declared across the four families", () => {
+    const unsaid = DECLARED_ACTS.filter((act) => !ACTS_SAID.includes(act));
+
+    expect(unsaid, "declared actions with no sentence").toEqual([]);
+  });
+
+  it("heads every action declared across the four families", () => {
+    const unheaded = DECLARED_ACTS.filter((act) => !ACTS_HEADED.includes(act));
+
+    expect(unheaded, "declared actions with no headline").toEqual([]);
+  });
+
+  it("says no action core never declared", () => {
+    const declared: readonly string[] = DECLARED_ACTS;
+    const undeclared = [...ACTS_SAID, ...ACTS_HEADED].filter((act) => !declared.includes(act));
+
+    expect(undeclared, "words for actions no slice declares").toEqual([]);
   });
 });

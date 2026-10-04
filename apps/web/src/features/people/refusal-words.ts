@@ -173,3 +173,9 @@ export const SAID_OF_THE_AUDIT_LOG = {
     next: "Ask one of its Admins for what you need.",
   },
 } satisfies SaidOfWord;
+
+/** An export meets its ceiling with no word, so the wait is what it says. */
+export const auditExportCeiling = (liftsInSeconds: number): Said => ({
+  why: "You have exported the audit log 10 times this hour, so no file was saved.",
+  next: `Try again in ${minutesUntil(liftsInSeconds)}.`,
+});

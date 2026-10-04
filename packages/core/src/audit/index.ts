@@ -37,7 +37,9 @@ export {
   declareIdentitySetActs,
   declarations,
   endedGrant,
+  matchedList,
 } from "./vocabulary.ts";
+export { ACTION_HEADLINES } from "./headlines.ts";
 export { STORED_ACT_NAMES, STORED_DETAIL_KEYS } from "./stored-names.ts";
 export type {
   ActName,

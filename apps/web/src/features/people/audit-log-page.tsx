@@ -1,378 +1,328 @@
-import { createContext, useCallback, useContext, useId, useState, type Ref } from "react";
+import { useId, useMemo, useRef, useState, type RefObject } from "react";
 
-import { refusalOf, type ApiError } from "@/shared/api/trpc.ts";
+import { ceilingLiftsIn, type ApiError } from "@/shared/api/trpc.ts";
+import { FilterRow } from "@/shared/filter-row.tsx";
 import { Icon } from "@/shared/icon.tsx";
 import { useKeystroke, usePageKeystrokes } from "@/shared/keystrokes.tsx";
+import { useListAddress } from "@/shared/list-address.ts";
+import { ListPages, ListRead, ListState } from "@/shared/list-pages.tsx";
 import { CONTROL_CENTRE, menuGroupIn } from "@/shared/navigation.ts";
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
-import { failureOutcome } from "@/shared/refusal-outcome.tsx";
+import { failureOutcome, refusedWith } from "@/shared/refusal-outcome.tsx";
 import { Button } from "@/shared/ui/button.tsx";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible.tsx";
 import { Pill } from "@/shared/ui/kibo-ui/pill.tsx";
-import { Label } from "@/shared/ui/label.tsx";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/ui/select.tsx";
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/shared/ui/table.tsx";
-import { byWords, counted, instantWords, timeWords, weekdayWords } from "@/shared/words.ts";
+import { byWords, instantWords } from "@/shared/words.ts";
 
-import { useAuditLog, type AuditLog, type Family, type ReadAuditEvent } from "./audit-log-api.ts";
-import { AUDIT_LOG_KEYSTROKES } from "./audit-log-state.ts";
-import { labelOfAct, sentenceCase } from "./audit-sentences.ts";
-import { SAID_OF_THE_AUDIT_LOG } from "./refusal-words.ts";
+import { detailLinesOf, type DetailLine } from "./audit-details.ts";
+import {
+  useAuditLog,
+  useExportAuditLog,
+  type Asked,
+  type AuditLog,
+  type ReadAuditEvent,
+} from "./audit-log-api.ts";
+import {
+  AUDIT_LOG_FIELDS,
+  AUDIT_LOG_KEYSTROKES as KEY,
+  AUDIT_LOG_LIST,
+  FAMILIES,
+} from "./audit-log-state.ts";
+import { AUDIT_LOG_WORDS as WORDS } from "./audit-log-words.ts";
+import { headlineOf, sentenceOf } from "./audit-sentences.ts";
+import { personSaid } from "./audit-subjects.ts";
+import { EventDays, useLanding } from "./event-days.tsx";
+import { useSettledSearch } from "./members-address.ts";
+import { auditExportCeiling, SAID_OF_THE_AUDIT_LOG } from "./refusal-words.ts";
 
 const system = menuGroupIn(CONTROL_CENTRE, "system");
 
-const AUDIT_LOG = "Audit log";
+const LISTED = Object.values(KEY);
 
-const SUMMARY =
-  "Every act in this workspace except answers, newest first: what was done, to what, by whom and when. Answers are kept apart, in the answer audit on Questions.";
+const eventsOf = (data: AuditLog["data"]): readonly ReadAuditEvent[] =>
+  data?.pages.flatMap((page) => page.events) ?? [];
 
-const CAPTION =
-  "The audit log, newest first under each day: when each act happened, its family, what it was and who did it.";
-
-const COLUMNS = ["When", "Family", "Act", "By"] as const;
-
-const FAMILY_WORDS = {
-  people: "People",
-  knowledge: "Knowledge",
-  sources: "Sources",
-  platform: "Platform",
-} as const satisfies Readonly<Record<Family, string>>;
-
-const EVERY_FAMILY = "all";
-
-type Picked = Family | typeof EVERY_FAMILY;
-
-const isFamily = (value: string): value is Family => Object.hasOwn(FAMILY_WORDS, value);
-
-const outcomeOfFailure = (failure: Error | ApiError): Outcome =>
-  failureOutcome(SAID_OF_THE_AUDIT_LOG, failure, "read");
-
-const LISTED = Object.values(AUDIT_LOG_KEYSTROKES);
-
-/** `adminUserId` reads "Admin person id": a page names a person, never a user. */
-const wordsOfField = (field: string): string =>
-  sentenceCase(
-    field
-      .replaceAll(/([A-Z])/g, " $1")
-      .toLowerCase()
-      .replaceAll("user", "person"),
-  );
-
-type DetailValue = ReadAuditEvent["detail"][string];
-
-/** A list is the client grants an act ended, each named by its client. */
-const wordsOfValue = (value: DetailValue): string => {
-  if (Array.isArray(value)) {
-    const clients = value.map((grant) => grant["clientName"] ?? grant["clientId"] ?? "");
-    return clients.length === 0 ? "none" : clients.join(", ");
-  }
-  if (typeof value !== "boolean") return String(value);
-  return value ? "yes" : "no";
-};
-
-const inTheFamily = (picked: Picked): string =>
-  picked === EVERY_FAMILY ? "" : ` in the ${FAMILY_WORDS[picked].toLowerCase()} family`;
-
-const saidOfTheAuditLog = (picked: Picked, shown: number, older: boolean): string => {
-  if (shown === 0) return `No acts${inTheFamily(picked) || " in this workspace"} yet.`;
-  if (older) return `The newest ${shown} events${inTheFamily(picked)}; older ones follow.`;
-  return `${counted(shown, "event", "events")}${inTheFamily(picked)}.`;
-};
-
-/** The first event a page of older ones brought takes focus as it mounts, where reading resumes. */
-const LandingFocus = createContext<{
-  readonly at: number | undefined;
-  readonly landed: () => void;
-}>({ at: undefined, landed: () => {} });
-
-function EventDetails(properties: { readonly event: ReadAuditEvent; readonly index: number }) {
-  const { event, index } = properties;
-  const landing = useContext(LandingFocus);
-  const landsHere = landing.at === index;
-  const { landed } = landing;
-  const takeFocus = useCallback(
-    (node: HTMLButtonElement | null) => {
-      if (node === null || !landsHere) return;
-      node.focus();
-      landed();
-    },
-    [landsHere, landed],
-  );
-
-  return (
-    <Collapsible>
-      <span className="block">{labelOfAct(event.act)}</span>
-      <CollapsibleTrigger asChild>
-        <Button ref={takeFocus} variant="link" size="sm" className="group h-auto gap-1 px-0">
-          Details
-          <span className="sr-only">{` of ${labelOfAct(event.act)}, ${instantWords(event.at)}`}</span>
-          <Icon
-            name="caret-down"
-            className="transition-transform group-data-[state=open]:rotate-180"
-          />
-        </Button>
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <dl className="mt-1 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-xs">
-          <dt className="text-muted-foreground">Recorded as</dt>
-          <dd className="font-mono wrap-anywhere">{event.act}</dd>
-          <dt className="text-muted-foreground">Subject</dt>
-          <dd className="font-mono wrap-anywhere">{`${event.subjectKind} ${event.subjectId}`}</dd>
-          <dt className="text-muted-foreground">Actor id</dt>
-          <dd className="font-mono wrap-anywhere">{event.actor}</dd>
-          {Object.entries(event.detail).map(([field, value]) => (
-            <div key={field} className="contents">
-              <dt className="text-muted-foreground">{wordsOfField(field)}</dt>
-              <dd className="font-mono wrap-anywhere">{wordsOfValue(value)}</dd>
-            </div>
-          ))}
-        </dl>
-      </CollapsibleContent>
-    </Collapsible>
-  );
-}
-
-type Day = {
-  readonly day: string;
-  readonly events: readonly { readonly event: ReadAuditEvent; readonly index: number }[];
-};
-
-/** Newest first, so each day's events already stand together. */
-const byDay = (events: readonly ReadAuditEvent[]): readonly Day[] => {
-  const days = new Map<string, { event: ReadAuditEvent; index: number }[]>();
-  for (const [index, event] of events.entries()) {
-    const day = weekdayWords(event.at);
-    days.set(day, [...(days.get(day) ?? []), { event, index }]);
-  }
-  return [...days].map(([day, held]) => ({ day, events: held }));
-};
-
-function DayOfEvents(properties: Day) {
-  return (
-    <TableBody>
-      <TableRow className="border-border bg-muted hover:bg-muted">
-        <TableHead scope="rowgroup" colSpan={COLUMNS.length} className="text-foreground">
-          {properties.day}
-        </TableHead>
-      </TableRow>
-      {properties.events.map(({ event, index }) => (
-        <TableRow key={event.id} className="border-border">
-          <TableCell>
-            <time dateTime={event.at} className="tabular-nums">
-              {timeWords(event.at)}
-            </time>
-          </TableCell>
-          <TableCell>
-            <Pill>{FAMILY_WORDS[event.family]}</Pill>
-          </TableCell>
-          <TableCell className="whitespace-normal">
-            <EventDetails event={event} index={index} />
-          </TableCell>
-          <TableCell className="whitespace-normal">{byWords(event.by)}</TableCell>
-        </TableRow>
-      ))}
-    </TableBody>
-  );
-}
-
-function NothingInTheFamily(properties: {
-  readonly picked: Picked;
-  readonly onShowAll: () => void;
-}) {
-  return (
-    <TableBody>
-      <TableRow className="border-border hover:bg-transparent">
-        <TableCell colSpan={COLUMNS.length} className="p-0 whitespace-normal">
-          <div className="flex flex-col items-start gap-1 px-4 py-10">
-            <p className="font-medium">{saidOfTheAuditLog(properties.picked, 0, false)}</p>
-            <p className="text-muted-foreground">Each act is recorded here as it happens.</p>
-            {properties.picked === EVERY_FAMILY ? null : (
-              <Button variant="outline" className="mt-3" onClick={properties.onShowAll}>
-                Show all families
-              </Button>
-            )}
-          </div>
-        </TableCell>
-      </TableRow>
-    </TableBody>
-  );
-}
-
-function EventTable(properties: {
-  readonly events: readonly ReadAuditEvent[];
-  readonly picked: Picked;
-  readonly onShowAll: () => void;
-}) {
-  return (
-    <Table>
-      <TableCaption className="sr-only">{CAPTION}</TableCaption>
-      <TableHeader>
-        <TableRow className="border-border hover:bg-transparent">
-          {COLUMNS.map((column) => (
-            <TableHead key={column} scope="col">
-              {column}
-            </TableHead>
-          ))}
-        </TableRow>
-      </TableHeader>
-      {properties.events.length === 0 ? (
-        <NothingInTheFamily picked={properties.picked} onShowAll={properties.onShowAll} />
-      ) : (
-        byDay(properties.events).map((day) => <DayOfEvents key={day.day} {...day} />)
-      )}
-    </Table>
-  );
-}
-
-function FamilyFilter(properties: {
-  readonly id: string;
-  readonly picked: Picked;
-  readonly onPick: (picked: Picked) => void;
-  readonly ref: Ref<HTMLButtonElement>;
-}) {
-  const { id, picked, onPick, ref } = properties;
-  const [open, setOpen] = useState(false);
-  useKeystroke(AUDIT_LOG_KEYSTROKES.family, () => {
-    setOpen(true);
-  });
-
-  return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-border p-3">
-      <Label htmlFor={id}>Family</Label>
-      <Select
-        value={picked}
-        open={open}
-        onOpenChange={setOpen}
-        onValueChange={(value) => {
-          onPick(isFamily(value) ? value : EVERY_FAMILY);
-        }}
-      >
-        <SelectTrigger
-          id={id}
-          ref={ref}
-          aria-keyshortcuts={AUDIT_LOG_KEYSTROKES.family.key}
-          className="w-48"
-        >
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={EVERY_FAMILY}>All families</SelectItem>
-          {Object.entries(FAMILY_WORDS).map(([family, words]) => (
-            <SelectItem key={family} value={family}>
-              {words}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-}
-
-/** A failure with no refusal word is the network's, so the filter stays for a pick to ask again. */
-const refusedOutright = (auditLog: AuditLog): boolean =>
-  auditLog.data === undefined && auditLog.error !== null && refusalOf(auditLog.error) !== undefined;
-
-const eventsOf = (auditLog: AuditLog): readonly ReadAuditEvent[] =>
-  auditLog.data?.pages.flatMap((page) => page.events) ?? [];
-
-const saidOfTheRead = (auditLog: AuditLog, picked: Picked): string | undefined => {
-  if (auditLog.isPending) return "The audit log is still loading.";
-  if (auditLog.data === undefined) return undefined;
-  return saidOfTheAuditLog(picked, eventsOf(auditLog).length, auditLog.hasNextPage);
-};
-
-function OlderEvents(properties: { readonly fetching: boolean; readonly onShow: () => void }) {
-  return (
-    <div className="border-t border-border p-3">
-      <Button
-        variant="outline"
-        aria-keyshortcuts={AUDIT_LOG_KEYSTROKES.older.key}
-        aria-disabled={properties.fetching}
-        onClick={properties.onShow}
-      >
-        {properties.fetching ? "Showing older events" : "Show older events"}
-      </Button>
-    </div>
-  );
-}
-
-function EventPages(properties: {
-  readonly auditLog: AuditLog;
-  readonly picked: Picked;
-  readonly onShowAll: () => void;
-}) {
-  const { auditLog } = properties;
-  const [landAt, setLandAt] = useState<number>();
-  const landed = useCallback(() => {
-    setLandAt(undefined);
-  }, []);
-  const events = eventsOf(auditLog);
-
-  const showOlder = () => {
-    if (!auditLog.hasNextPage || auditLog.isFetchingNextPage) return;
-    setLandAt(events.length);
-    void auditLog.fetchNextPage();
-  };
-  useKeystroke(AUDIT_LOG_KEYSTROKES.older, showOlder);
-
-  if (auditLog.data === undefined) return null;
+/** A sign-in address stands beneath its person's name, so two of one name are told apart. */
+function DetailRow(properties: { readonly line: DetailLine }) {
+  const { label, value, address } = properties.line;
   return (
     <>
-      <LandingFocus value={{ at: landAt, landed }}>
-        <EventTable events={events} picked={properties.picked} onShowAll={properties.onShowAll} />
-      </LandingFocus>
-      {auditLog.hasNextPage ? (
-        <OlderEvents fetching={auditLog.isFetchingNextPage} onShow={showOlder} />
-      ) : null}
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="wrap-anywhere">
+        {value}
+        {address === undefined ? null : (
+          <span className="block text-muted-foreground">{address}</span>
+        )}
+      </dd>
     </>
   );
 }
 
-function AuditLogRegion() {
-  const headingId = useId();
-  const filterId = useId();
-  const [picked, setPicked] = useState<Picked>(EVERY_FAMILY);
-  const [filter, setFilter] = useState<HTMLButtonElement | null>(null);
-  const auditLog = useAuditLog(picked === EVERY_FAMILY ? undefined : picked);
+const byLine = (by: ReadAuditEvent["by"]): DetailLine => {
+  const line = { key: "by", label: WORDS.by };
+  return by.kind === "person"
+    ? { ...line, ...personSaid(by.displayName, by.address) }
+    : { ...line, value: byWords(by) };
+};
 
-  const showAll = () => {
-    filter?.focus();
-    setPicked(EVERY_FAMILY);
+const subjectLines = (subject: ReadAuditEvent["subject"]): readonly DetailLine[] =>
+  subject?.kind === "person" && subject.displayName !== ""
+    ? [{ key: "subject", label: WORDS.about, ...personSaid(subject.displayName, subject.address) }]
+    : [];
+
+/** Drawn only once the details open. */
+function DetailList(properties: { readonly event: ReadAuditEvent }) {
+  const { event } = properties;
+  const lines = [byLine(event.by), ...subjectLines(event.subject), ...detailLinesOf(event)];
+  return (
+    <dl className="mt-1 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-xs">
+      {lines.map((line) => (
+        <DetailRow key={line.key} line={line} />
+      ))}
+    </dl>
+  );
+}
+
+function EventLine(properties: { readonly event: ReadAuditEvent }) {
+  const { event } = properties;
+  const address =
+    event.by.kind === "person"
+      ? personSaid(event.by.displayName, event.by.address).address
+      : undefined;
+  return (
+    <div className="flex min-w-0 flex-1 flex-col gap-1">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <span className="min-w-0 wrap-anywhere">{sentenceOf(event)}</span>
+        <Pill>{WORDS.families[event.family]}</Pill>
+      </div>
+      {/* Beneath the sentence that opens with the name, so two of one name are told apart at once. */}
+      {address === undefined ? null : (
+        <span className="text-xs text-muted-foreground wrap-anywhere">{address}</span>
+      )}
+      <Collapsible>
+        <CollapsibleTrigger asChild>
+          <Button variant="link" size="sm" className="group h-auto gap-1 self-start px-0">
+            {WORDS.details}
+            <span className="sr-only">
+              {WORDS.detailsOf(headlineOf(event.act), instantWords(event.at))}
+            </span>
+            <Icon
+              name="caret-down"
+              className="transition-transform group-data-[state=open]:rotate-180"
+            />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <DetailList event={event} />
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
+  );
+}
+
+function NoneShown(properties: {
+  readonly asked: Asked;
+  readonly onClear: () => void;
+  readonly focusAfterClear: RefObject<HTMLInputElement | null>;
+}) {
+  const { asked } = properties;
+  if (asked.family === undefined && asked.search === "") {
+    return <ListState state={{ kind: "empty", words: WORDS.none, act: undefined }} />;
+  }
+  return (
+    <ListState
+      state={{
+        kind: "emptied",
+        words: WORDS.noneNarrowed(asked),
+        onClear: properties.onClear,
+        focusAfterClear: properties.focusAfterClear,
+      }}
+    />
+  );
+}
+
+function Events(properties: {
+  readonly auditLog: AuditLog;
+  readonly events: readonly ReadAuditEvent[];
+  readonly asked: Asked;
+  readonly onClear: () => void;
+  readonly searchRef: RefObject<HTMLInputElement | null>;
+}) {
+  const { auditLog, events } = properties;
+  const landing = useLanding();
+
+  if (events.length === 0) {
+    return (
+      <NoneShown
+        asked={properties.asked}
+        onClear={properties.onClear}
+        focusAfterClear={properties.searchRef}
+      />
+    );
+  }
+
+  const showOlder = () => {
+    landing.landOn(events.length);
+    void auditLog.fetchNextPage();
   };
 
   return (
-    <section aria-labelledby={headingId} className="mt-6">
-      <h2 id={headingId}>{AUDIT_LOG}</h2>
-      <p className="mt-1 text-muted-foreground">{SUMMARY}</p>
-      <OutcomeLine
-        outcome={auditLog.error === null ? undefined : outcomeOfFailure(auditLog.error)}
-        className="mt-2"
+    <>
+      <EventDays events={events} landing={landing} line={(event) => <EventLine event={event} />} />
+      <ListPages
+        pages={{
+          kind: "more",
+          label: WORDS.older,
+          more: auditLog.hasNextPage,
+          loading: auditLog.isFetchingNextPage,
+          onMore: showOlder,
+          keystroke: KEY.older,
+        }}
       />
-      <output className="mt-1 block text-muted-foreground">
-        {saidOfTheRead(auditLog, picked)}
-      </output>
+    </>
+  );
+}
 
-      {refusedOutright(auditLog) ? null : (
-        <div className="mt-4 border border-border bg-card">
-          <FamilyFilter id={filterId} picked={picked} onPick={setPicked} ref={setFilter} />
-          {/* Keyed, so a page of older events never lands its focus in another family's list. */}
-          <EventPages key={picked} auditLog={auditLog} picked={picked} onShowAll={showAll} />
-        </div>
-      )}
+/** The reader's own day, which `en-CA` writes year first. */
+const fileName = (): string => `audit-log-${new Date().toLocaleDateString("en-CA")}.csv`;
+
+/** The text is already in the browser, so a link to it saves the file without asking again. */
+const save = (csv: string, name: string): void => {
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  link.click();
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 0);
+};
+
+const exportFailed = (failure: Error | ApiError): Outcome => {
+  const liftsInSeconds = ceilingLiftsIn(failure);
+  return liftsInSeconds === undefined
+    ? failureOutcome(SAID_OF_THE_AUDIT_LOG, failure)
+    : refusedWith(auditExportCeiling(liftsInSeconds));
+};
+
+function ExportAct(properties: {
+  readonly asked: Asked;
+  readonly nothingMatches: boolean;
+  readonly say: (outcome: Outcome) => void;
+}) {
+  const { asked, nothingMatches, say } = properties;
+  const exporting = useExportAuditLog();
+  const run = () => {
+    if (nothingMatches || exporting.isPending) return;
+    exporting.exportFor(asked).then(
+      (exported) => {
+        const name = fileName();
+        save(exported.csv, name);
+        say({ tone: "said", words: WORDS.saved(exported, name) });
+      },
+      (failure: Error | ApiError) => {
+        say(exportFailed(failure));
+      },
+    );
+  };
+  useKeystroke(KEY.export, run);
+
+  return (
+    <Button
+      variant="outline"
+      aria-disabled={nothingMatches || exporting.isPending}
+      aria-keyshortcuts={KEY.export.key}
+      className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
+      onClick={run}
+    >
+      <Icon name="exports" />
+      {exporting.isPending ? WORDS.exporting : WORDS.export}
+    </Button>
+  );
+}
+
+/** Read in render from the address, so a reload or Back comes to the same events. */
+const useAsked = () => {
+  const { state, write } = useListAddress(AUDIT_LOG_LIST, AUDIT_LOG_FIELDS);
+  const [search, setSearch] = useSettledSearch(state.search, (settled) => {
+    write({ search: settled });
+  });
+  const asked: Asked = { family: state.family, search: state.search };
+  const clear = () => {
+    setSearch("");
+    write({ search: "", family: undefined });
+  };
+  return { asked, write, search, setSearch, clear };
+};
+
+function AuditLogRegion() {
+  const headingId = useId();
+  const searchRef = useRef<HTMLInputElement>(null);
+  const { asked, write, search, setSearch, clear } = useAsked();
+  const auditLog = useAuditLog(asked);
+  const [outcome, setOutcome] = useState<Outcome>();
+  const events = useMemo(() => eventsOf(auditLog.data), [auditLog.data]);
+  const tooBroad = auditLog.data?.pages[0]?.searchTooBroad === true;
+
+  return (
+    <section aria-labelledby={headingId} className="mt-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id={headingId}>{WORDS.heading}</h2>
+        <ExportAct
+          asked={asked}
+          nothingMatches={auditLog.data !== undefined && events.length === 0}
+          say={setOutcome}
+        />
+      </div>
+      <p className="mt-1 text-muted-foreground">{WORDS.summary}</p>
+      <output className="mt-1 block text-muted-foreground empty:hidden">
+        {auditLog.data === undefined
+          ? ""
+          : WORDS.counted(asked, events.length, auditLog.hasNextPage)}
+      </output>
+      <OutcomeLine outcome={outcome} className="mt-2" />
+
+      <div className="mt-4 border border-border bg-card">
+        <FilterRow
+          search={{
+            label: WORDS.search,
+            value: search,
+            onChange: setSearch,
+            keystroke: KEY.search,
+            inputRef: searchRef,
+          }}
+          filters={[
+            {
+              label: WORDS.family,
+              value: asked.family,
+              anyLabel: WORDS.everyFamily,
+              choices: FAMILIES.map((family) => ({ value: family, label: WORDS.families[family] })),
+              onChange: (picked) => {
+                write({ family: FAMILIES.find((family) => family === picked) });
+              },
+            },
+          ]}
+        />
+        <p className="border-b border-border px-3 py-2 text-muted-foreground empty:hidden">
+          {tooBroad ? WORDS.tooBroad : ""}
+        </p>
+        <ListRead
+          read={auditLog}
+          loading={WORDS.loading}
+          failed={(failure) => failureOutcome(SAID_OF_THE_AUDIT_LOG, failure, "read").words}
+          focusAfterRetry={searchRef}
+        >
+          {/* Keyed, so a page of older events never lands its focus in another search's list. */}
+          <Events
+            key={`${asked.family ?? ""}:${asked.search}`}
+            auditLog={auditLog}
+            events={events}
+            asked={asked}
+            onClear={clear}
+            searchRef={searchRef}
+          />
+        </ListRead>
+      </div>
     </section>
   );
 }

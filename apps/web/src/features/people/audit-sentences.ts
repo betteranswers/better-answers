@@ -1,9 +1,11 @@
-import { byWords } from "@/shared/words.ts";
+import { byWords, counted, nameOrAddress } from "@/shared/words.ts";
 
-import type { DECLARED_ACTS } from "./audit-acts.ts";
+import { HEADLINES, type DECLARED_ACTS } from "./audit-acts.ts";
+import { namedIn } from "./audit-details.ts";
 import type { ReadAuditEvent } from "./audit-log-api.ts";
+import { GONE_WORDS, removedWords, THING_NOUNS, type Thing } from "./audit-subjects.ts";
 
-export type SaidEvent = Pick<ReadAuditEvent, "act" | "by" | "subject" | "detail">;
+export type SaidEvent = Pick<ReadAuditEvent, "act" | "by" | "subject" | "detail" | "named">;
 
 type Subject = SaidEvent["subject"];
 
@@ -12,40 +14,57 @@ type Slots = {
   readonly by: string;
   readonly subject: Subject;
   readonly detail: SaidEvent["detail"];
+  readonly named: SaidEvent["named"];
 };
 
 type Sentence = (slots: Slots) => string;
 
-export const sentenceCase = (words: string): string =>
-  `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
+type DeclaredAct = (typeof DECLARED_ACTS)[number];
 
-/** `people.member.role_changed` reads "Member role changed": the act's subject, then its verb. */
-export const labelOfAct = (act: string): string => {
+const sentenceCase = (words: string): string => `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
+
+/** `people.member.role_changed` reads "Member role changed": the action's subject, then its verb. */
+const wordsOfName = (act: string): string => {
   const [, subject = "", verb = ""] = act.split(".");
   return sentenceCase(`${subject} ${verb}`.replaceAll("_", " "));
 };
 
 /** A display name is the person's own, so only words the platform supplies take a capital. */
 const opening = (by: SaidEvent["by"]): string =>
-  by.kind === "person" ? by.displayName : sentenceCase(byWords(by));
+  by.kind === "person" ? nameOrAddress(by.displayName, by.address) : sentenceCase(byWords(by));
 
-/** An act on a person's identity alone names no member, so its subject reads as a person. */
-const person = (subject: Subject): string => {
-  if (subject?.kind === "person") return subject.displayName;
-  return subject?.kind === "former-member" ? "a former member" : "a person";
+/** An action on a person's identity alone names no member, so its subject reads as a person. */
+const person = (subject: Subject | undefined): string => {
+  if (subject?.kind === "person") return nameOrAddress(subject.displayName, subject.address);
+  return subject?.kind === "former-member" ? GONE_WORDS["former-member"] : "a person";
 };
 
-const possessive = (subject: Subject): string => `${person(subject)}'s`;
+const possessive = (subject: Subject | undefined): string => `${person(subject)}'s`;
 
 const group = (subject: Subject): string =>
-  subject?.kind === "group" ? `the group ${subject.name}` : "a deleted group";
+  subject?.kind === "group" ? `the group ${subject.name}` : GONE_WORDS["deleted-group"];
 
 const groupNow = (subject: Subject): string =>
-  subject?.kind === "group" ? `the group now called ${subject.name}` : "a deleted group";
+  subject?.kind === "group" ? `the group now called ${subject.name}` : GONE_WORDS["deleted-group"];
 
 /** An invitation erasure deleted is said without the address it went to. */
 const invitation = (subject: Subject): string =>
   subject?.kind === "invitation" ? `an invitation to ${subject.address}` : "an invitation";
+
+/** Named as it stands now, or by its kind alone once it is removed. */
+const thing = (kind: Thing) => {
+  const noun = THING_NOUNS[kind];
+  return (subject: Subject | undefined): string => {
+    if (subject?.kind === kind) return `the ${noun} ${subject.name}`;
+    return subject?.kind === "removed" ? removedWords(subject.of) : `a ${noun}`;
+  };
+};
+
+const connectedSourceNamed = thing("connected-source");
+
+const documentNamed = thing("document");
+
+const conceptNamed = thing("concept");
 
 const role = (detail: Slots["detail"]): string => {
   const held = detail["role"];
@@ -60,21 +79,30 @@ const FACTOR_WORDS: ReadonlyMap<unknown, string> = new Map([
 const factorIn = (detail: Slots["detail"], field: string): string =>
   FACTOR_WORDS.get(detail[field]) ?? "a second factor";
 
+const exported = (detail: Slots["detail"]): string => {
+  const count = detail["eventCount"];
+  return typeof count === "number" ? counted(count, "event", "events") : "events";
+};
+
 const SENTENCES = {
-  "knowledge.check.imported": ({ by }) => `${by} imported a check of a concept`,
-  "knowledge.concept.class_overridden": ({ by }) => `${by} overrode a concept's class`,
-  "knowledge.concept.committed": ({ by }) => `${by} committed a concept`,
-  "knowledge.manifest.written": ({ by }) => `${by} wrote the bundle manifest`,
-  "knowledge.suggestion.accepted": ({ by }) => `${by} accepted a suggestion`,
+  "knowledge.check.imported": ({ by, named }) =>
+    `${by} imported a verification of ${conceptNamed(namedIn(named, "iri"))}`,
+  "knowledge.concept.class_overridden": ({ by, subject }) =>
+    `${by} overrode the sensitivity of ${conceptNamed(subject)}`,
+  "knowledge.concept.committed": ({ by, subject }) => `${by} saved ${conceptNamed(subject)}`,
+  "knowledge.manifest.written": ({ by }) => `${by} updated the knowledge base's description`,
+  "knowledge.suggestion.accepted": ({ by, named }) =>
+    `${by} accepted a suggestion, saved as ${conceptNamed(namedIn(named, "iri"))}`,
   "knowledge.suggestion.declined": ({ by }) => `${by} declined a suggestion`,
-  "knowledge.suggestion.returned": ({ by }) => `${by} returned a suggestion to its proposer`,
-  "people.client.consented": ({ by }) => `${by} gave a client access`,
+  "knowledge.suggestion.returned": ({ by }) => `${by} sent a suggestion back to whoever made it`,
+  "people.client.consented": ({ by }) => `${by} gave an assistant access`,
   "people.erasure.completed": ({ by }) => `${by} carried out an erasure request`,
   "people.group.created": ({ by, subject }) => `${by} created ${group(subject)}`,
   "people.group.deleted": ({ by }) => `${by} deleted a group`,
-  "people.group.member_added": ({ by, subject }) => `${by} added a member to ${group(subject)}`,
-  "people.group.member_removed": ({ by, subject }) =>
-    `${by} removed a member from ${group(subject)}`,
+  "people.group.member_added": ({ by, subject, named }) =>
+    `${by} added ${person(namedIn(named, "userId"))} to ${group(subject)}`,
+  "people.group.member_removed": ({ by, subject, named }) =>
+    `${by} removed ${person(namedIn(named, "userId"))} from ${group(subject)}`,
   "people.group.renamed": ({ by, subject }) => `${by} renamed ${groupNow(subject)}`,
   "people.invitation.cancelled": ({ by, subject, detail }) =>
     detail["replacedByInvitationId"] === undefined
@@ -86,26 +114,27 @@ const SENTENCES = {
   "people.member.added": ({ by, subject, detail }) =>
     `${by} added ${person(subject)} as ${role(detail)}`,
   "people.member.credentials_revoked": ({ by, subject }) =>
-    `${by} revoked ${possessive(subject)} credentials in this workspace`,
+    `${by} ended every sign-in and token ${person(subject)} held in this workspace`,
   "people.member.joined": ({ by, detail }) => `${by} joined as ${role(detail)}`,
   "people.member.removed": ({ by, subject }) =>
     `${by} removed ${person(subject)} from the workspace`,
   "people.member.role_changed": ({ by, subject, detail }) =>
     `${by} changed ${possessive(subject)} role to ${role(detail)}`,
   "people.name_flag.raised": ({ by, subject }) =>
-    `${by} flagged ${possessive(subject)} display name to the operator`,
-  "people.operator.granted": ({ by, subject }) => `${by} made ${person(subject)} the operator`,
+    `${by} flagged ${possessive(subject)} display name to better-answers support`,
+  "people.operator.granted": ({ by, subject }) =>
+    `${by} made ${person(subject)} better-answers support`,
   "people.operator.revoked": ({ by, subject }) =>
-    `${by} revoked ${possessive(subject)} operator mark`,
-  "people.person.added": ({ by, subject }) => `${by} added ${person(subject)} to the platform`,
+    `${by} took ${person(subject)} off better-answers support`,
+  "people.person.added": ({ by, subject }) => `${by} added ${person(subject)} to better-answers`,
   "people.person.authenticator_added": ({ by }) => `${by} set up an authenticator`,
   "people.person.authenticator_removed": ({ by }) => `${by} removed their authenticator`,
   "people.person.credentials_revoked": ({ by, subject }) =>
-    `${by} revoked ${possessive(subject)} credentials everywhere`,
+    `${by} ended every sign-in and token ${person(subject)} held, everywhere`,
   "people.person.factors_replaced": ({ by, detail }) =>
     `${by} replaced their second factors with ${factorIn(detail, "by")}`,
   "people.person.grants_ended": ({ by, subject }) =>
-    `${by} ended ${possessive(subject)} client grants in a workspace`,
+    `${by} ended the access ${person(subject)} gave assistants in a workspace`,
   "people.person.name_flagged": ({ by, subject }) =>
     `${by} flagged ${possessive(subject)} display name`,
   "people.person.named": ({ by }) => `${by} gave their display name`,
@@ -119,45 +148,62 @@ const SENTENCES = {
       : `${by} was given recovery codes`,
   "people.person.renamed": ({ by, subject }) =>
     `${by} corrected ${possessive(subject)} display name`,
-  "people.person.restore_code_accepted": ({ by }) => `${by} used the operator's restore code`,
+  "people.person.restore_code_accepted": ({ by }) =>
+    `${by} used a restore code from better-answers support`,
   "people.person.second_factor_confirmed": ({ by, detail }) =>
     `${by} confirmed their second factor with ${factorIn(detail, "method")}`,
   "people.person.sign_in_restored": ({ by, subject }) =>
     `${by} restored ${possessive(subject)} sign-in`,
   "people.person.signed_in": ({ by }) => `${by} signed in`,
-  "people.request.approved": ({ by }) => `${by} approved an access request`,
+  "people.request.approved": ({ by, named }) =>
+    `${by} approved ${possessive(namedIn(named, "requesterId"))} access request`,
   "people.request.asked": ({ by }) => `${by} asked to join the workspace`,
-  "people.request.declined": ({ by }) => `${by} declined an access request`,
+  "people.request.declined": ({ by, named }) =>
+    `${by} declined ${possessive(namedIn(named, "requesterId"))} access request`,
   "people.subject_request.received": ({ by }) => `${by} recorded a subject request`,
-  "platform.audit_log.exported": ({ by }) => `${by} exported the audit log`,
-  "platform.erasure.rehearsed": ({ by }) => `${by} rehearsed an erasure`,
-  "platform.erasure.replayed": ({ by }) => `${by} replayed an erasure over a restored copy`,
-  "platform.graph.swept": ({ by }) => `${by} swept the graph's older generations`,
-  "platform.reconciler.replayed": ({ by }) => `${by} replayed a bundle commit`,
+  "platform.audit_log.exported": ({ by, detail }) =>
+    `${by} exported ${exported(detail)} from the audit log`,
+  "platform.erasure.rehearsed": ({ by }) => `${by} tested an erasure on a test copy`,
+  "platform.erasure.replayed": ({ by }) => `${by} re-applied an erasure to a restored backup`,
+  "platform.graph.swept": ({ by }) => `${by} cleared older copies of the map`,
+  "platform.reconciler.replayed": ({ by }) => `${by} re-applied a change to the knowledge base`,
   "platform.workspace.marked": ({ by }) =>
     `${by} kept the workspace's invitations to its testing domain`,
   "platform.workspace.provisioned": ({ by }) => `${by} provisioned the workspace`,
   "platform.workspace.renamed": ({ by }) => `${by} renamed the workspace`,
-  "sources.binding.bound": ({ by }) => `${by} bound a source`,
-  "sources.binding.narrowed": ({ by }) => `${by} narrowed a binding`,
-  "sources.binding.published": ({ by }) => `${by} published a binding`,
-  "sources.binding.widened": ({ by }) => `${by} widened a binding`,
-  "sources.document.narrowed": ({ by }) => `${by} narrowed a document`,
-  "sources.document.special_category_dismissed": ({ by }) =>
-    `${by} dismissed a document's findings as not special category`,
+  "sources.binding.bound": ({ by, subject }) => `${by} added ${connectedSourceNamed(subject)}`,
+  "sources.binding.narrowed": ({ by, subject }) =>
+    `${by} narrowed ${connectedSourceNamed(subject)}`,
+  "sources.binding.published": ({ by, subject }) =>
+    `${by} published ${connectedSourceNamed(subject)}`,
+  "sources.binding.widened": ({ by, subject }) => `${by} widened ${connectedSourceNamed(subject)}`,
+  "sources.document.narrowed": ({ by, subject }) => `${by} narrowed ${documentNamed(subject)}`,
+  "sources.document.special_category_dismissed": ({ by, subject }) =>
+    `${by} dismissed the findings in ${documentNamed(subject)} as not special category`,
   "sources.finding.restored": ({ by }) => `${by} kept a finding in text`,
-  "sources.upload.swept": ({ by }) => `${by} swept away an upload no document names`,
-} as const satisfies Readonly<Record<(typeof DECLARED_ACTS)[number], Sentence>>;
+  "sources.upload.swept": ({ by }) => `${by} deleted an uploaded file no document uses`,
+} as const satisfies Readonly<Record<DeclaredAct, Sentence>>;
 
 const SAID: ReadonlyMap<string, Sentence> = new Map(Object.entries(SENTENCES));
 
-/** Each act a sentence says, so a test can hold the list to the acts core declares. */
+const HEADED: ReadonlyMap<string, string> = new Map(Object.entries(HEADLINES));
+
+/** Each action a sentence says, so a test can hold the list to the actions core declares. */
 export const ACTS_SAID: readonly string[] = [...SAID.keys()];
 
-/** An act the web was built before falls back to the act's own name in words. */
+export const ACTS_HEADED: readonly string[] = [...HEADED.keys()];
+
+/** An action the web was built before falls back to its stored name in words. */
+export const headlineOf = (act: string): string => HEADED.get(act) ?? wordsOfName(act);
+
 export const sentenceOf = (event: SaidEvent): string => {
   const sentence = SAID.get(event.act);
   return sentence === undefined
-    ? labelOfAct(event.act)
-    : sentence({ by: opening(event.by), subject: event.subject, detail: event.detail });
+    ? wordsOfName(event.act)
+    : sentence({
+        by: opening(event.by),
+        subject: event.subject,
+        detail: event.detail,
+        named: event.named,
+      });
 };

@@ -52,8 +52,14 @@ type Confirmation = (typeof CONFIRMATIONS)[number]["field"];
 
 type Confirmations = Readonly<Record<Confirmation, boolean>>;
 
+/** What the Audit log will call each action, in the words it shows there. */
+const ACTION_WORDS = {
+  published: "Connected source published",
+  widened: "Connected source widened",
+} as const;
+
 function TheAuditRow(properties: {
-  readonly act: string;
+  readonly action: keyof typeof ACTION_WORDS;
   readonly binding: ListedBinding;
   readonly children: ReactNode;
 }) {
@@ -65,10 +71,8 @@ function TheAuditRow(properties: {
         What the audit row will carry
       </h3>
       <dl className="mt-2 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
-        <SummaryRow term="Act">
-          <span className="font-mono">{properties.act}</span>
-        </SummaryRow>
-        <SummaryRow term="Binding">{properties.binding.name}</SummaryRow>
+        <SummaryRow term="Action">{ACTION_WORDS[properties.action]}</SummaryRow>
+        <SummaryRow term="Connected source">{properties.binding.name}</SummaryRow>
         <SummaryRow term="By">You, at the instant the platform records it</SummaryRow>
         {properties.children}
       </dl>
@@ -87,7 +91,7 @@ function WhatTheRowCarries(properties: {
   }
 
   return (
-    <TheAuditRow act="sources.binding.published" binding={properties.binding}>
+    <TheAuditRow action="published" binding={properties.binding}>
       <SummaryRow term="Class">{properties.binding.sensitivity}</SummaryRow>
       <SummaryRow term="Audience">{AUDIENCE_WORDS[properties.binding.audience]}</SummaryRow>
       {CONFIRMATIONS.map((confirmation) => (
@@ -355,7 +359,7 @@ export function WidenDialog(properties: DialogProperties<Widening>) {
         {binding.audience === EVERYONE ? ", and no audience is wider." : "."}
       </p>
 
-      <TheAuditRow act="sources.binding.widened" binding={binding}>
+      <TheAuditRow action="widened" binding={binding}>
         <SummaryRow term="Class, from">{binding.sensitivity}</SummaryRow>
         <SummaryRow term="Class, to">{asked.sensitivity}</SummaryRow>
         <SummaryRow term="Audience, from">{AUDIENCE_WORDS[binding.audience]}</SummaryRow>

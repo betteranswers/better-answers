@@ -671,6 +671,9 @@ to it by IRI and never restates it (ADR 0014).
 - **audit log** — the one append-only record of every *audit event* a workspace keeps, written in
   the same action it records; an Admin reads their workspace's own on System › Audit log (moved from
   People on 30/09/2026), and never another's. Not *Questions asked*, which records answers.
+- **audit export** — a file of the *audit events* an Admin's search and family matched, itself
+  recorded as an audit event that names the people and groups matched but never the words searched
+  for. Not an *export* of knowledge.
 - **identity-set audit log** — the append-only record of the actions that belong to no workspace
   because they act on a person's identity itself: a person giving their own *display name*, an
   Admin's flag on one, a sign-in, every write the *operator* makes, and an Admin's action that ends

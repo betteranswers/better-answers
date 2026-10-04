@@ -36,8 +36,9 @@ const memberAt = async (
   workspace: ProvisionedWorkspace,
   role: Role,
   name: string,
+  email?: string,
 ): Promise<string> => {
-  const userId = await seedPerson(db().pool, { name });
+  const userId = await seedPerson(db().pool, email === undefined ? { name } : { name, email });
   const client = await db().pool.connect();
   try {
     await testData(client).member({ workspaceId: workspace.workspaceId, userId, role });
@@ -134,7 +135,11 @@ const eventAboutTheirs = async (
 
 describe("the audit log", () => {
   it("reads events newest first, naming actors from the person row", async () => {
-    const workspace = await provisionedWorkspace(db(), "Logged", { name: "Priya Shah" });
+    const address = "priya.logged@example.invalid";
+    const workspace = await provisionedWorkspace(db(), "Logged", {
+      name: "Priya Shah",
+      email: address,
+    });
     const [bidWriters] = await groupsMadeBy(workspace, workspace.adminUserId, ["Bid writers"]);
 
     const page = pageOf(await readAs(workspace, workspace.adminUserId));
@@ -149,9 +154,10 @@ describe("the audit log", () => {
           subjectId: bidWriters,
           actor: `human:${workspace.adminUserId}`,
           at: expect.stringMatching(ISO_INSTANT),
-          by: { kind: "person", displayName: "Priya Shah" },
+          by: { kind: "person", displayName: "Priya Shah", address },
           subject: { kind: "group", name: "Bid writers" },
           detail: {},
+          named: {},
         },
         {
           id: expect.any(String),
@@ -164,6 +170,7 @@ describe("the audit log", () => {
           by: { kind: "platform" },
           subject: null,
           detail: { adminUserId: workspace.adminUserId, role: "Admin" },
+          named: { adminUserId: { kind: "person", displayName: "Priya Shah", address } },
         },
       ],
       nextCursor: null,
@@ -173,22 +180,34 @@ describe("the audit log", () => {
     expect(Date.parse(newest?.at ?? "")).toBeGreaterThan(Date.parse(oldest?.at ?? ""));
   });
 
-  it("names a person with no display name a former member", async () => {
+  it("names an unnamed person by their sign-in address", async () => {
     const workspace = await provisionedWorkspace(db(), "Unnamed");
-    const unnamed = await memberAt(workspace, "Admin", "");
+    const address = "unnamed.admin@example.invalid";
+    const unnamed = await memberAt(workspace, "Admin", "", address);
     await groupsMadeBy(workspace, unnamed, ["Estimators"]);
 
     const page = pageOf(await readAs(workspace, workspace.adminUserId));
 
     expect(page.events.map((event) => event.by)).toEqual([
-      { kind: "former-member" },
+      { kind: "person", displayName: "", address },
       { kind: "platform" },
     ]);
   });
 
+  it("names an erased person a former member", async () => {
+    const workspace = await provisionedWorkspace(db(), "Erased");
+    const erased = await memberAt(workspace, "Admin", "Sam Okoro");
+    await groupsMadeBy(workspace, erased, ["Estimators"]);
+    await erasedFromTheSet(db(), workspace.workspaceId, erased);
+
+    const page = pageOf(await readAs(workspace, workspace.adminUserId));
+
+    expect(page.events[0]?.by).toEqual({ kind: "former-member" });
+  });
+
   it("names a removed member by the name they gave", async () => {
     const workspace = await provisionedWorkspace(db(), "Removed");
-    const leaver = await memberAt(workspace, "Admin", "Sam Okoro");
+    const leaver = await memberAt(workspace, "Admin", "Sam Okoro", "sam.removed@example.invalid");
     await groupsMadeBy(workspace, leaver, ["Estimators"]);
     await db().pool.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
       workspace.workspaceId,
@@ -197,7 +216,11 @@ describe("the audit log", () => {
 
     const page = pageOf(await readAs(workspace, workspace.adminUserId));
 
-    expect(page.events[0]?.by).toEqual({ kind: "person", displayName: "Sam Okoro" });
+    expect(page.events[0]?.by).toEqual({
+      kind: "person",
+      displayName: "Sam Okoro",
+      address: "sam.removed@example.invalid",
+    });
   });
 
   it("names each ended grant's client and workspace, else its ids", async () => {
@@ -463,6 +486,32 @@ describe("searching the audit log", () => {
     expect(actsOf(page)).toEqual(["people.member.role_changed"]);
   });
 
+  it("finds an action by the words the page shows", async () => {
+    const workspace = await provisionedWorkspace(db(), "SearchedByHeadline");
+    await seedingWith(db().pool, async (seed) => {
+      for (const act of ["sources.binding.bound", "people.client.consented"]) {
+        await seed.auditEvent({
+          workspaceId: workspace.workspaceId,
+          act,
+          actor: `human:${workspace.adminUserId}`,
+          detail: {},
+        });
+      }
+    });
+
+    const sourced = pageOf(
+      await readAs(workspace, workspace.adminUserId, { search: "connected source added" }),
+    );
+    const consented = pageOf(
+      await readAs(workspace, workspace.adminUserId, { search: "assistant given" }),
+    );
+
+    expect([actsOf(sourced), actsOf(consented)]).toEqual([
+      ["sources.binding.bound"],
+      ["people.client.consented"],
+    ]);
+  });
+
   it("searches within the family asked for", async () => {
     const workspace = await provisionedWorkspace(db(), "SearchedInFamily", { name: "Hannah" });
 
@@ -618,13 +667,102 @@ describe("searching the audit log", () => {
 describe("the audit log's subjects", () => {
   it("names a member by their display name", async () => {
     const workspace = await provisionedWorkspace(db(), "Promoted");
-    const priya = await memberAt(workspace, "Viewer", "Priya Shah");
+    const address = "priya.promoted@example.invalid";
+    const priya = await memberAt(workspace, "Viewer", "Priya Shah", address);
     await roleChangedOf(workspace, priya);
 
     expect((await namedSubjectsOf(workspace))[0]).toEqual([
       "people.member.role_changed",
-      { kind: "person", displayName: "Priya Shah" },
+      { kind: "person", displayName: "Priya Shah", address },
     ]);
+  });
+
+  it("names a connected source, a document and a concept", async () => {
+    const workspace = await provisionedWorkspace(db(), "Sourced");
+    const { workspaceId } = workspace;
+    const actor = `human:${workspace.adminUserId}`;
+    await seedingWith(db().pool, async (seed) => {
+      const binding = await seed.sourceBinding({ workspaceId, name: "Staff handbook" });
+      const document = await seed.sourceDocument({
+        workspaceId,
+        bindingId: binding.id,
+        title: "Leave policy.pdf",
+      });
+      const concept = await seed.conceptIndex({ workspaceId, title: "Annual leave" });
+      await seed.auditEvent({
+        workspaceId,
+        act: "sources.binding.published",
+        actor,
+        subjectId: binding.id,
+        detail: { bindingId: binding.id },
+      });
+      await seed.auditEvent({
+        workspaceId,
+        act: "sources.document.narrowed",
+        actor,
+        subjectId: document.id,
+        detail: { documentId: document.id, bindingId: binding.id, sensitivity: "Restricted" },
+      });
+      await seed.auditEvent({
+        workspaceId,
+        act: "knowledge.concept.committed",
+        actor,
+        subjectId: concept.iri,
+        detail: { iri: concept.iri },
+      });
+    });
+
+    const events = pageOf(await readAs(workspace, workspace.adminUserId)).events;
+
+    const handbook = { kind: "connected-source", name: "Staff handbook" };
+    expect(events.slice(0, 3).map(({ subject, named }) => [subject, named])).toEqual([
+      [
+        { kind: "concept", name: "Annual leave" },
+        { iri: { kind: "concept", name: "Annual leave" } },
+      ],
+      [
+        { kind: "document", name: "Leave policy.pdf" },
+        { documentId: { kind: "document", name: "Leave policy.pdf" }, bindingId: handbook },
+      ],
+      [handbook, { bindingId: handbook }],
+    ]);
+  });
+
+  it("says a connected source since removed by its kind alone", async () => {
+    const workspace = await provisionedWorkspace(db(), "Unbound");
+    const gone = "01J6ZZZZZZZZZZZZZZZZZZZZZZ";
+    await seedingWith(db().pool, (seed) =>
+      seed.auditEvent({
+        workspaceId: workspace.workspaceId,
+        act: "sources.binding.published",
+        actor: `human:${workspace.adminUserId}`,
+        subjectId: gone,
+        detail: { bindingId: gone },
+      }),
+    );
+
+    const [published] = pageOf(await readAs(workspace, workspace.adminUserId)).events;
+
+    const removed = { kind: "removed", of: "connected-source" };
+    expect([published?.subject, published?.named]).toEqual([removed, { bindingId: removed }]);
+  });
+
+  it("names the person a detail id holds", async () => {
+    const workspace = await provisionedWorkspace(db(), "Detailed");
+    const address = "priya.detailed@example.invalid";
+    const priya = await memberAt(workspace, "Viewer", "Priya Shah", address);
+    const [groupId = ""] = await groupsMadeBy(workspace, workspace.adminUserId, ["Bid writers"]);
+    done(
+      await acting(workspace, workspace.adminUserId, (principal, tx) =>
+        addToGroup(principal, tx, { groupId, userId: priya }),
+      ),
+    );
+
+    const [added] = pageOf(await readAs(workspace, workspace.adminUserId)).events;
+
+    expect(added?.named).toEqual({
+      userId: { kind: "person", displayName: "Priya Shah", address },
+    });
   });
 
   it("names a group by its name as it stands now", async () => {
@@ -641,6 +779,39 @@ describe("the audit log's subjects", () => {
       ["people.group.created", { kind: "group", name: "Bid team" }],
       ["platform.workspace.provisioned", null],
     ]);
+  });
+
+  it("names each person and group an export matched", async () => {
+    const workspace = await provisionedWorkspace(db(), "ExportNamed");
+    const address = "priya.exported@example.invalid";
+    const priya = await memberAt(workspace, "Viewer", "Priya Shah", address);
+    const [groupId = ""] = await groupsMadeBy(workspace, workspace.adminUserId, ["Bid writers"]);
+    await seedingWith(db().pool, (seed) =>
+      seed.auditEvent({
+        workspaceId: workspace.workspaceId,
+        act: "platform.audit_log.exported",
+        actor: `human:${workspace.adminUserId}`,
+        subjectId: workspace.workspaceId,
+        detail: {
+          matched: [
+            { kind: "person", id: priya },
+            { kind: "group", id: groupId },
+          ],
+          eventCount: 2,
+          capped: false,
+          searchTooBroad: false,
+        },
+      }),
+    );
+
+    const [exported] = pageOf(await readAs(workspace, workspace.adminUserId)).events;
+
+    expect(exported?.named).toEqual({
+      matched: [
+        { kind: "person", displayName: "Priya Shah", address },
+        { kind: "group", name: "Bid writers" },
+      ],
+    });
   });
 
   it("reads a deleted group's events as a deleted group", async () => {

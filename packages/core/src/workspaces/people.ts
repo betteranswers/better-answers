@@ -14,7 +14,7 @@ import {
   type WorkspaceId,
 } from "../kernel/index.ts";
 import { containing, type Tx } from "../store/postgres/index.ts";
-import { actorOf, type AuditEventActor, namesOfActors } from "./actors.ts";
+import { actorOf, type AuditEventActor, namesOfActors, type PeopleNames } from "./actors.ts";
 import { grantNamed, type GrantNamed, type GrantNames, namesOfGrants } from "./grant-names.ts";
 import { GRANTS_ENDED_HERE, REVOKED_EVERYWHERE } from "./grants.ts";
 import { SIGN_IN_ACTS } from "./sign-in-and-consent.ts";
@@ -176,7 +176,20 @@ type EndedGrantInspected = GrantNamed & {
    * a grant's is the authorization server ending that grant alone.
    */
   readonly scope: "everywhere" | "workspace" | "grant";
-  readonly endedBy: AuditEventActor | EndedByTheServer;
+  readonly endedBy: EndedBy | EndedByTheServer;
+};
+
+/** The console names an actor as it always has: no address, and no name reads as a former member. */
+type EndedBy =
+  | { readonly kind: "person"; readonly displayName: string }
+  | Exclude<AuditEventActor, { kind: "person" }>;
+
+const endedByOf = (actor: string, names: PeopleNames): EndedBy => {
+  const by = actorOf(actor, names);
+  if (by.kind !== "person") return by;
+  return by.displayName === ""
+    ? { kind: "former-member" }
+    : { kind: "person", displayName: by.displayName };
 };
 
 type PersonInspected = {
@@ -283,7 +296,7 @@ const endingEventsOf = async (tx: Tx, personId: UserId): Promise<readonly Ending
   }));
 };
 
-type Names = { readonly actors: ReadonlyMap<string, string>; readonly grants: GrantNames };
+type Names = { readonly actors: PeopleNames; readonly grants: GrantNames };
 
 type EndedByTheServerRow = {
   readonly client_id: string;
@@ -320,7 +333,7 @@ const grantsOfEnding = (ending: Ending, names: Names): readonly EndedGrantInspec
       ...grantNamed(grant, names.grants),
       endedAt: ending.at.toISOString(),
       scope: ending.act === REVOKED_EVERYWHERE.name ? "everywhere" : "workspace",
-      endedBy: actorOf(ending.actor, names.actors),
+      endedBy: endedByOf(ending.actor, names.actors),
     }));
 
 /**
