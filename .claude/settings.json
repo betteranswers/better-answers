@@ -1,5 +1,4 @@
 {
-  "subagentPromptCacheTtl": "1h",
   "env": {
     "JCODEMUNCH_ENFORCE": "strict"
   },
@@ -37,6 +36,12 @@
       }
     ]
   },
+  "enabledPlugins": {
+    "mattpocock-skills@mattpocock": false,
+    "mattpocock-skills@claude-plugins-official": false,
+    "mattpocock-skills@synced": false,
+    "compound-engineering@compound-engineering-plugin": true
+  },
   "extraKnownMarketplaces": {
     "compound-engineering-plugin": {
       "source": {
@@ -47,10 +52,5 @@
       "autoUpdate": true
     }
   },
-  "enabledPlugins": {
-    "compound-engineering@compound-engineering-plugin": true,
-    "mattpocock-skills@mattpocock": false,
-    "mattpocock-skills@claude-plugins-official": false,
-    "mattpocock-skills@synced": false
-  }
+  "subagentPromptCacheTtl": "1h"
 }
