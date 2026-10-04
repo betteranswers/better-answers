@@ -356,6 +356,13 @@ describe("the audit log", () => {
   });
 });
 
+/** The member row alone goes, as a removal leaves the person and their events behind. */
+const memberRemoved = (workspace: ProvisionedWorkspace, userId: string) =>
+  db().pool.query("DELETE FROM member WHERE workspace_id = $1 AND user_id = $2", [
+    workspace.workspaceId,
+    userId,
+  ]);
+
 /** One address per workspace, as an address is one person's across the platform. */
 const addressOf = (workspace: ProvisionedWorkspace): string =>
   `priya.${workspace.workspaceId.toLowerCase()}@example.com`;
@@ -509,6 +516,28 @@ describe("searching the audit log", () => {
     });
   });
 
+  it("finds a removed member by the acts they took", async () => {
+    const workspace = await provisionedWorkspace(db(), "SearchedLeaverActor");
+    const leaver = await memberAt(workspace, "Admin", "Sam Okoro");
+    const [estimators] = await groupsMadeBy(workspace, leaver, ["Estimators"]);
+    await memberRemoved(workspace, leaver);
+
+    const page = pageOf(await readAs(workspace, workspace.adminUserId, { search: "Sam" }));
+
+    expect(subjectsOf(page)).toEqual([estimators]);
+  });
+
+  it("finds a removed member by the acts done to them", async () => {
+    const workspace = await provisionedWorkspace(db(), "SearchedLeaverSubject");
+    const leaver = await memberAt(workspace, "Viewer", "Sam Okoro");
+    await roleChangedOf(workspace, leaver);
+    await memberRemoved(workspace, leaver);
+
+    const page = pageOf(await readAs(workspace, workspace.adminUserId, { search: "Sam" }));
+
+    expect(actsOf(page)).toEqual(["people.member.role_changed"]);
+  });
+
   it("reads a search naming 100 groups whole", async () => {
     const workspace = await provisionedWorkspace(db(), "SearchedHundred");
     await crewsSeeded(workspace, 100);
@@ -532,6 +561,30 @@ describe("searching the audit log", () => {
       new Set(crews.slice(0, 100)),
     );
     expect(rest.nextCursor).toBeNull();
+  });
+
+  it("flags a search naming over 100 people, not 100", async () => {
+    const workspace = await provisionedWorkspace(db(), "SearchedPeopleBroadly");
+    const crewJoin = (from: number, to: number) =>
+      seedingWith(db().pool, async (seed) => {
+        for (let crew = from; crew <= to; crew += 1) {
+          const person = await seed.user({ name: `Crew member ${crew}` });
+          await seed.member({
+            workspaceId: workspace.workspaceId,
+            userId: person.id,
+            role: "Viewer",
+          });
+        }
+      });
+    const searched = async () =>
+      pageOf(await readAs(workspace, workspace.adminUserId, { search: "Crew member" }));
+
+    await crewJoin(1, 100);
+    const hundred = await searched();
+    await crewJoin(101, 101);
+    const more = await searched();
+
+    expect([hundred.searchTooBroad, more.searchTooBroad]).toEqual([false, true]);
   });
 
   it("refuses a search over 100 characters, malformed", () => {
