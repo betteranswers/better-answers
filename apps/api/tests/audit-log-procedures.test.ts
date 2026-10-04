@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { makeGroups } from "./harness-people.ts";
 import { startApp, type TestApp } from "./harness.ts";
@@ -13,8 +13,15 @@ import { webSignedIn } from "./web-client.ts";
 
 let app: TestApp;
 
+/** Held still while a test counts past a ceiling: on the wall clock its asks can straddle two fixed windows. */
+const stopped: { at: number | undefined } = { at: undefined };
+
 beforeAll(async () => {
-  app = await startApp();
+  app = await startApp({ clock: { now: () => new Date(stopped.at ?? Date.now()) } });
+});
+
+afterEach(() => {
+  stopped.at = undefined;
 });
 
 afterAll(async () => {
@@ -152,6 +159,7 @@ describe("searching and exporting over tRPC", () => {
   it("refuses an Admin past the ceiling, recording nothing more", async () => {
     const { workspaceId, admin } = await app.provision();
     const { api } = await webSignedIn(app, admin.email);
+    stopped.at = Date.now();
     for (let made = 0; made < 10; made += 1) await api.members.exportAuditLog.mutate({});
 
     const refused = await api.members.exportAuditLog.mutate({}).catch((error: unknown) => error);
