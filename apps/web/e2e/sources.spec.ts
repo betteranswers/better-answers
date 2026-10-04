@@ -754,9 +754,9 @@ test.describe("publishing, narrowing and widening a binding", () => {
     await expect(carried).toMatchAriaSnapshot(`
       - region "What the audit row will carry":
         - heading "What the audit row will carry" [level=3]
-        - term: Act
-        - definition: sources.binding.published
-        - term: Binding
+        - term: Action
+        - definition: Connected source published
+        - term: Connected source
         - definition: Staff handbook
         - term: By
         - definition: You, at the instant the platform records it
@@ -887,9 +887,9 @@ test.describe("publishing, narrowing and widening a binding", () => {
       .toMatchAriaSnapshot(`
       - region "What the audit row will carry":
         - heading "What the audit row will carry" [level=3]
-        - term: Act
-        - definition: sources.binding.widened
-        - term: Binding
+        - term: Action
+        - definition: Connected source widened
+        - term: Connected source
         - definition: Tender answers
         - term: By
         - definition: You, at the instant the platform records it
@@ -965,9 +965,9 @@ test.describe("publishing, narrowing and widening a binding", () => {
       .toMatchAriaSnapshot(`
       - region "What the audit row will carry":
         - heading "What the audit row will carry" [level=3]
-        - term: Act
-        - definition: sources.binding.widened
-        - term: Binding
+        - term: Action
+        - definition: Connected source widened
+        - term: Connected source
         - definition: Price book
         - term: By
         - definition: You, at the instant the platform records it

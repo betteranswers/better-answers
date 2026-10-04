@@ -88,13 +88,26 @@ const ACTOR_WORDS = {
   "former-member": GONE_WORDS["former-member"],
 } as const satisfies Readonly<Record<Exclude<AuditEventActor["kind"], "person">, string>>;
 
+const REMOVED_WORDS = {
+  "connected-source": "a connected source (removed)",
+  document: "a document (removed)",
+  concept: "a concept (removed)",
+} as const satisfies Readonly<
+  Record<Extract<AuditEventSubject, { kind: "removed" }>["of"], string>
+>;
+
+/** A person who has given no display name yet is named by their address. */
+const personWords = (person: { readonly displayName: string; readonly address: string }): string =>
+  person.displayName === "" ? person.address : person.displayName;
+
 const actorWords = (by: AuditEventActor): string =>
-  by.kind === "person" ? by.displayName : ACTOR_WORDS[by.kind];
+  by.kind === "person" ? personWords(by) : ACTOR_WORDS[by.kind];
 
 const subjectWords = (subject: AuditEventSubject): string => {
-  if ("displayName" in subject) return subject.displayName;
+  if ("displayName" in subject) return personWords(subject);
   if ("name" in subject) return subject.name;
   if ("address" in subject) return subject.address;
+  if (subject.kind === "removed") return REMOVED_WORDS[subject.of];
   return GONE_WORDS[subject.kind];
 };
 

@@ -138,9 +138,15 @@ const asked = async (workspace: ProvisionedWorkspace) => {
 
 describe("a person's activity", () => {
   it("marks a role change by Hannah, to Priya", async () => {
-    const workspace = await provisionedWorkspace(db(), "Hannahs", { name: "Hannah Reid" });
+    const workspace = await provisionedWorkspace(db(), "Hannahs", {
+      name: "Hannah Reid",
+      email: "hannah.reid@example.invalid",
+    });
     const hannah = workspace.adminUserId;
     const priya = await memberAt(workspace, "Viewer", "Priya Shah");
+    const [priyas] = (
+      await db().pool.query<{ email: string }>('SELECT email FROM "user" WHERE id = $1', [priya])
+    ).rows;
     answered(await roleChanged(workspace, hannah, priya, "Editor"));
 
     const onHannahs = pageOf(await activityOf(workspace, hannah));
@@ -150,8 +156,8 @@ describe("a person's activity", () => {
       act: "people.member.role_changed",
       actor: `human:${hannah}`,
       subjectId: priya,
-      by: { kind: "person", displayName: "Hannah Reid" },
-      subject: { kind: "person", displayName: "Priya Shah" },
+      by: { kind: "person", displayName: "Hannah Reid", address: "hannah.reid@example.invalid" },
+      subject: { kind: "person", displayName: "Priya Shah", address: priyas?.email },
       detail: { previousRole: "Viewer", role: "Editor" },
     };
     expect(onHannahs).toEqual({

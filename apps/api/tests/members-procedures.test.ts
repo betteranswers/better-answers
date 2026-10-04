@@ -520,7 +520,7 @@ describe("a person's activity over tRPC", () => {
 
     const lines = (page: typeof onHannahs) =>
       page.events.map(({ act, subject, direction }) => [act, subject, direction]);
-    const priyaNamed = { kind: "person", displayName: "Priya Shah" };
+    const priyaNamed = { kind: "person", displayName: "Priya Shah", address: priya.email };
     expect(lines(onHannahs)).toEqual([
       ["people.member.role_changed", priyaNamed, "by"],
       ["platform.workspace.provisioned", null, "to"],

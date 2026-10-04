@@ -187,7 +187,7 @@ const linesWithinTheBudget = async (
 };
 
 /** A person as the audit read names them, so a line's sentence is the web's own, not a copy. */
-const named = (displayName: string) => ({ kind: "person", displayName }) as const;
+const named = (displayName: string) => ({ kind: "person", displayName, address: "" }) as const;
 
 /** The page's own address, its last segment a person's id. */
 const AT_A_MEMBER_PAGE = new RegExp(`${MEMBERS_PAGE}/[0-9A-HJKMNP-TV-Z]{26}$`);
@@ -926,6 +926,7 @@ test.describe("a member's Activity", () => {
       by: named("Hannah Wright"),
       subject: named("Priya Shah"),
       detail: { role: "Editor" },
+      named: {},
     });
     // The page the act was taken on reads its Activity again once the act settles.
     await expect(linesOf(page)).toHaveCount(1);
@@ -987,6 +988,7 @@ test.describe("a member's Activity", () => {
       by: named("Ola Brennan"),
       subject: named("Ola Brennan"),
       detail: { role: "Admin" },
+      named: {},
     });
     await expect(linesOf(page)).toHaveCount(1);
     await expect(linesOf(page)).toContainText(joined);
@@ -1007,6 +1009,7 @@ test.describe("a member's Activity", () => {
       by: named("Ola Asker"),
       subject: null,
       detail: {},
+      named: {},
     });
     await expect(linesOf(page)).toHaveCount(1);
     await expect(linesOf(page)).toContainText(asked);

@@ -30,7 +30,7 @@ import { byWords, counted, instantWords, timeWords, weekdayWords } from "@/share
 
 import { useAuditLog, type AuditLog, type Family, type ReadAuditEvent } from "./audit-log-api.ts";
 import { AUDIT_LOG_KEYSTROKES } from "./audit-log-state.ts";
-import { labelOfAct, sentenceCase } from "./audit-sentences.ts";
+import { headlineOf, sentenceCase } from "./audit-sentences.ts";
 import { SAID_OF_THE_AUDIT_LOG } from "./refusal-words.ts";
 
 const system = menuGroupIn(CONTROL_CENTRE, "system");
@@ -115,11 +115,11 @@ function EventDetails(properties: { readonly event: ReadAuditEvent; readonly ind
 
   return (
     <Collapsible>
-      <span className="block">{labelOfAct(event.act)}</span>
+      <span className="block">{headlineOf(event.act)}</span>
       <CollapsibleTrigger asChild>
         <Button ref={takeFocus} variant="link" size="sm" className="group h-auto gap-1 px-0">
           Details
-          <span className="sr-only">{` of ${labelOfAct(event.act)}, ${instantWords(event.at)}`}</span>
+          <span className="sr-only">{` of ${headlineOf(event.act)}, ${instantWords(event.at)}`}</span>
           <Icon
             name="caret-down"
             className="transition-transform group-data-[state=open]:rotate-180"

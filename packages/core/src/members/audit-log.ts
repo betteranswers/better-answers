@@ -8,6 +8,7 @@ import {
   eventsSoughtNewestFirst,
   type EventsSought,
   STORED_ACT_NAMES,
+  STORED_DETAIL_KEYS,
   type AuditEventPage,
   type AuditEventRow,
 } from "../audit/index.ts";
@@ -28,9 +29,10 @@ import {
   actorOf,
   type AuditEventActor,
   detailsNamed,
-  hasNoDisplayName,
   namesOfPeople,
   peopleAmong,
+  type PeopleNames,
+  personNamed,
 } from "../workspaces/index.ts";
 import type { MemberRefusal } from "./vocabulary.ts";
 
@@ -58,17 +60,21 @@ const readAuditLogAct = declareAct({
 
 export type ReadAuditLogRefusal = MemberRefusal<RefusalOf<typeof readAuditLogAct>> | Error;
 
+/** A thing an event names that has a name of its own; one since removed is said by its kind. */
+type ThingKind = "connected-source" | "document" | "concept";
+
 /**
  * The kind, not the words, as an actor's is. Only erasure deletes an invitation, so an invitation
  * no row holds was erased.
  */
 export type AuditEventSubject =
-  | { readonly kind: "person"; readonly displayName: string }
-  | { readonly kind: "former-member" }
+  | Extract<AuditEventActor, { kind: "person" | "former-member" }>
   | { readonly kind: "group"; readonly name: string }
   | { readonly kind: "deleted-group" }
   | { readonly kind: "invitation"; readonly address: string }
-  | { readonly kind: "erased-invitation" };
+  | { readonly kind: "erased-invitation" }
+  | { readonly kind: ThingKind; readonly name: string }
+  | { readonly kind: "removed"; readonly of: ThingKind };
 
 export type ReadAuditEvent = Pick<
   AuditEventRow,
@@ -77,9 +83,11 @@ export type ReadAuditEvent = Pick<
   /** An ISO instant, which is what a `Date` becomes on the wire anyway. */
   readonly at: string;
   readonly by: AuditEventActor;
-  /** Null for a subject that is not a person, a group or an invitation. */
+  /** Null for a subject with no name of its own, such as a suggestion or a request. */
   readonly subject: AuditEventSubject | null;
   readonly detail: NonNullable<AuditEventRow["detail"]>;
+  /** Each detail key holding the id of something named, as it stands now. */
+  readonly named: Readonly<Record<string, AuditEventSubject>>;
 };
 
 export type AuditLogPage = Omit<AuditEventPage, "rows"> & {
@@ -91,7 +99,7 @@ export type SearchedAuditLogPage = AuditLogPage & {
   readonly searchTooBroad: boolean;
 };
 
-type NamedKind = "person" | "group" | "invitation";
+type NamedKind = "person" | "group" | "invitation" | ThingKind;
 
 /** The subject kinds a person's id stands under. */
 export const PERSON_SUBJECT_KINDS = ["member", "person"] as const;
@@ -232,66 +240,94 @@ const NAMED_KINDS: ReadonlyMap<string, NamedKind> = new Map([
   ...PERSON_SUBJECT_KINDS.map((kind): [string, NamedKind] => [kind, "person"]),
   ["group", "group"],
   ["invitation", "invitation"],
+  ["binding", "connected-source"],
+  ["document", "document"],
+  ["concept", "concept"],
+]);
+
+/** Stored detail keys holding an id, by what the id names. */
+const DETAIL_NAMED_KINDS: ReadonlyMap<string, NamedKind> = new Map([
+  [STORED_DETAIL_KEYS.userId, "person"],
+  [STORED_DETAIL_KEYS.requesterId, "person"],
+  [STORED_DETAIL_KEYS.adminUserId, "person"],
+  [STORED_DETAIL_KEYS.personId, "person"],
+  [STORED_DETAIL_KEYS.invitationId, "invitation"],
+  [STORED_DETAIL_KEYS.replacedByInvitationId, "invitation"],
+  [STORED_DETAIL_KEYS.connectedSourceId, "connected-source"],
+  [STORED_DETAIL_KEYS.documentId, "document"],
+  [STORED_DETAIL_KEYS.iri, "concept"],
 ]);
 
 type Names = ReadonlyMap<string, string>;
 
-type SubjectNames = Readonly<Record<NamedKind, Names>>;
+type ThingNames = Readonly<Record<Exclude<NamedKind, "person">, Names>>;
 
+/** The invitation table has no row-level security, so the workspace is named here or nowhere. */
+const NAMES_IN = {
+  group: 'SELECT id, name FROM "group" WHERE workspace_id = $1 AND id = ANY($2::text[])',
+  invitation:
+    "SELECT id, email AS name FROM invitation WHERE workspace_id = $1 AND id = ANY($2::text[])",
+  "connected-source":
+    "SELECT id, name FROM source_binding WHERE workspace_id = $1 AND id = ANY($2::text[])",
+  document:
+    "SELECT id, title AS name FROM source_document WHERE workspace_id = $1 AND id = ANY($2::text[])",
+  concept:
+    "SELECT iri AS id, title AS name FROM concept_index WHERE workspace_id = $1 AND iri = ANY($2::text[])",
+} as const satisfies Readonly<Record<keyof ThingNames, string>>;
+
+type DetailId = readonly [key: string, kind: NamedKind, id: string];
+
+const detailIds = (row: AuditEventRow): readonly DetailId[] =>
+  Object.entries(row.detail ?? {}).flatMap(([key, value]): DetailId[] => {
+    const kind = DETAIL_NAMED_KINDS.get(key);
+    return kind === undefined || typeof value !== "string" ? [] : [[key, kind, value]];
+  });
+
+/** The ids of one kind the rows name, as subject or in detail. */
 const idsNamedAs = (rows: readonly AuditEventRow[], kind: NamedKind): readonly string[] => [
   ...new Set(
-    rows.filter((row) => NAMED_KINDS.get(row.subjectKind) === kind).map((row) => row.subjectId),
+    rows.flatMap((row) => [
+      ...(NAMED_KINDS.get(row.subjectKind) === kind ? [row.subjectId] : []),
+      ...detailIds(row).flatMap(([, named, id]) => (named === kind ? [id] : [])),
+    ]),
   ),
 ];
 
-const byId = (rows: readonly { id: string; name: string }[]): Names =>
-  new Map(rows.map((row) => [row.id, row.name]));
-
-const groupNames = async (
+const namesIn = async (
   principal: UserPrincipal,
   tx: Tx,
-  groupIds: readonly string[],
+  kind: keyof ThingNames,
+  ids: readonly string[],
 ): Promise<Names> => {
-  if (groupIds.length === 0) return new Map();
-  const found = await tx.query<{ id: string; name: string }>(
-    'SELECT id, name FROM "group" WHERE workspace_id = $1 AND id = ANY($2::text[])',
-    [principal.workspaceId, groupIds],
-  );
-  return byId(found.rows);
+  if (ids.length === 0) return new Map();
+  const found = await tx.query<{ id: string; name: string }>(NAMES_IN[kind], [
+    principal.workspaceId,
+    ids,
+  ]);
+  return new Map(found.rows.map((row) => [row.id, row.name]));
 };
 
-/** The invitation table has no row-level security, so the workspace is named here or nowhere. */
-const invitationAddresses = async (
-  principal: UserPrincipal,
-  tx: Tx,
-  invitationIds: readonly string[],
-): Promise<Names> => {
-  if (invitationIds.length === 0) return new Map();
-  const found = await tx.query<{ id: string; name: string }>(
-    "SELECT id, email AS name FROM invitation WHERE workspace_id = $1 AND id = ANY($2::text[])",
-    [principal.workspaceId, invitationIds],
-  );
-  return byId(found.rows);
+const thingOf = (kind: keyof ThingNames, name: string | undefined): AuditEventSubject => {
+  if (kind === "group") return name === undefined ? { kind: "deleted-group" } : { kind, name };
+  if (kind === "invitation") {
+    return name === undefined ? { kind: "erased-invitation" } : { kind, address: name };
+  }
+  return name === undefined ? { kind: "removed", of: kind } : { kind, name };
 };
 
-const SUBJECT_OF = {
-  person: (name) =>
-    name === undefined || hasNoDisplayName(name)
-      ? { kind: "former-member" }
-      : { kind: "person", displayName: name },
-  group: (name) => (name === undefined ? { kind: "deleted-group" } : { kind: "group", name }),
-  invitation: (address) =>
-    address === undefined ? { kind: "erased-invitation" } : { kind: "invitation", address },
-} as const satisfies Readonly<Record<NamedKind, (name: string | undefined) => AuditEventSubject>>;
+type AllNames = { readonly people: PeopleNames; readonly things: ThingNames };
 
-const subjectOf = (row: AuditEventRow, names: SubjectNames): AuditEventSubject | null => {
+const namedAs = (kind: NamedKind, id: string, names: AllNames): AuditEventSubject =>
+  kind === "person" ? personNamed(id, names.people) : thingOf(kind, names.things[kind].get(id));
+
+const subjectOf = (row: AuditEventRow, names: AllNames): AuditEventSubject | null => {
   const kind = NAMED_KINDS.get(row.subjectKind);
-  return kind === undefined ? null : SUBJECT_OF[kind](names[kind].get(row.subjectId));
+  return kind === undefined ? null : namedAs(kind, row.subjectId, names);
 };
 
 const eventOf = (
   row: AuditEventRow,
-  names: { readonly people: Names; readonly subjects: SubjectNames },
+  names: AllNames,
   detail: ReadAuditEvent["detail"] | undefined,
 ): ReadAuditEvent => ({
   id: row.id,
@@ -302,13 +338,31 @@ const eventOf = (
   actor: row.actor,
   at: row.at.toISOString(),
   by: actorOf(row.actor, names.people),
-  subject: subjectOf(row, names.subjects),
+  subject: subjectOf(row, names),
   detail: detail ?? {},
+  named: Object.fromEntries(
+    detailIds(row).map(([key, kind, id]) => [key, namedAs(kind, id, names)]),
+  ),
 });
 
+const thingNames = async (
+  principal: UserPrincipal,
+  tx: Tx,
+  rows: readonly AuditEventRow[],
+): Promise<ThingNames> => {
+  const named = (kind: keyof ThingNames) => namesIn(principal, tx, kind, idsNamedAs(rows, kind));
+  return {
+    group: await named("group"),
+    invitation: await named("invitation"),
+    "connected-source": await named("connected-source"),
+    document: await named("document"),
+    concept: await named("concept"),
+  };
+};
+
 /**
- * Each event of the principal's workspace with its actor, subject and ended grants named as they
- * stand now, reading each table once for all the rows.
+ * Each event of the principal's workspace with its actor, subject, detail ids and ended grants
+ * named as they stand now, reading each table once for all the rows.
  */
 export const eventsNamed = async (
   principal: UserPrincipal,
@@ -319,16 +373,12 @@ export const eventsNamed = async (
     ...peopleAmong(rows.map((row) => row.actor)),
     ...idsNamedAs(rows, "person"),
   ]);
-  const subjects = {
-    person: people,
-    group: await groupNames(principal, tx, idsNamedAs(rows, "group")),
-    invitation: await invitationAddresses(principal, tx, idsNamedAs(rows, "invitation")),
-  } satisfies SubjectNames;
+  const things = await thingNames(principal, tx, rows);
   const details = await detailsNamed(
     tx,
     rows.map((row) => row.detail ?? {}),
   );
-  return rows.map((row, index) => eventOf(row, { people, subjects }, details[index]));
+  return rows.map((row, index) => eventOf(row, { people, things }, details[index]));
 };
 
 /**
