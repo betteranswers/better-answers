@@ -541,6 +541,13 @@ export const OLD_WORDS: readonly OldWord[] = [
     sweep: PAGE_AREA_MENU,
     state: "landed",
     reach: "everywhere",
+    permitted: [
+      {
+        sense: "the menu's showing choice, stored on readers' browsers under its first key (R22)",
+        within: "apps/web/",
+        written: /better-answers\.secondary-nav/g,
+      },
+    ],
     carvedOut: [writtenBefore(PAGE_AREA_MENU_LANDED)],
   },
   avoided("section header", "toolbar"),

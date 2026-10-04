@@ -56,7 +56,14 @@
       "sense": "Tailwind's screen sizes",
       "matches": ["(?:^|[\\s\"'`:])(?:min-|max-)?[hw]-screen"]
     },
-    { "sense": "the design system's surface tokens", "matches": ["--surface-"] },
+    {
+      "sense": "the design system's surface colours and their tokens",
+      "matches": ["--surface-", "[Ss]urfaces? (?:tokens?|colou?rs?)"]
+    },
+    {
+      "sense": "the menu's showing choice, stored on readers' browsers under its first key (R22)",
+      "matches": ["better-answers\\.secondary-nav"]
+    },
     { "sense": "the MCP surface", "matches": ["(?:MCP|Mcp|mcp)[-_ ]?[Ss]urface"] },
     {
       "sense": "the roles' surface, roles-surface.json",

@@ -791,7 +791,7 @@ test("keeps a focused control clear of the fixed band", async ({ page, request }
   }
 });
 
-test("paints the shell in the page's own area token", async ({ page, request }) => {
+test("paints the shell in the page's own surface token", async ({ page, request }) => {
   await signedIn(page, request, "Southern Castings");
   await page.goto(ROUTES_AND_SPEND.path);
 

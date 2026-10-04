@@ -38,7 +38,7 @@ const keystrokesAreOn = (): boolean => onThisBrowser()?.getItem(KEPT_UNDER) !== 
 
 /**
  * A key typed into a field is the field's, one with a modifier the browser's, one inside a
- * dialog or menu that area's.
+ * dialog or menu that control's.
  */
 const OWNED_ELSEWHERE =
   'input, textarea, select, [contenteditable="true"], [role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]';

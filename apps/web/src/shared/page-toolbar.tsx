@@ -31,7 +31,7 @@ export function OpenTabProvider(properties: {
 }
 
 /**
- * Untyped here and typed where a feature declares its own helper, so the shared area
+ * Untyped here and typed where a feature declares its own helper, so the shared module
  * stays two names wide.
  */
 type Written = { readonly key: symbol; readonly value: unknown };

@@ -105,8 +105,8 @@ export type IconName =
   | "workspaces";
 
 /**
- * The keys are the glossary's words, not Phosphor's: the shell says navigation and secondary
- * nav, never list or sidebar.
+ * The keys are the glossary's words, not Phosphor's: the shell says navigation and menu,
+ * never list or sidebar.
  */
 const GLYPHS = {
   ask: ChatText,
