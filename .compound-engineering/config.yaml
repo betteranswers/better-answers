@@ -7,3 +7,7 @@
 cross_model_review_mode: auto
 cross_model_peer: opencode
 cross_model_model: openrouter/z-ai/glm-5.3
+# GLM's variants are low, high and max. With none named, a whole-document review
+# could reason past OpenCode's 32,000-token output cap and return nothing; at high
+# the same brief finished in 20,000.
+cross_model_effort: high

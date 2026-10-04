@@ -15,6 +15,8 @@ Two reviews, each with one job. The loop below is how a change passes both witho
 
 Its adversarial pass goes to a second model family through OpenCode, on OpenRouter; `.compound-engineering/config.yaml` names the model. To turn it on, install OpenCode and give it an OpenRouter key in its own config. Without OpenCode the pass is skipped, and the review's Coverage line says so. The repository is public, so the diff it sends is not a disclosure.
 
+The same config names the model's reasoning effort, `high`. Four machine settings in the `env` block of `~/.claude/settings.json` keep a long review from dying with no output: `OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX=64000` raises OpenCode's default output cap of 32,000, of which reasoning is part, and `CROSS_MODEL_IDLE_SECS=900`, `CROSS_MODEL_HARD_SECS=1800` and `CE_PEER_IDLE_SECS=900` give a single long reasoning step time to finish. `/ce-doc-review` uses the same route. Why each is needed, and how to read a silent peer's tokens from OpenCode's own store: `docs/solutions/integration-issues/the-glm-review-peer-returns-nothing-when-its-reasoning-fills-opencodes-output-cap.md`.
+
 ## On the pull request
 
 1. **Cubic reviews each head.** Its check completing with success is what arms the merge (`docs/agents/workflow.md`, *Merging*).
