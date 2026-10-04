@@ -12,6 +12,9 @@ const FAMILY_WORDS = {
 const TOO_BROAD =
   "The search named more than 100 people or groups, so only the events of the first 100 are shown. Narrow it to see the rest.";
 
+const TOO_BROAD_SAVED =
+  "The search named more than 100 people or groups, so the file holds only the events of the first 100.";
+
 const quoted = (search: string): string => `“${search}”`;
 
 const narrowedBy = (asked: Asked): string =>
@@ -52,5 +55,5 @@ export const AUDIT_LOG_WORDS = {
   export: "Export the events shown",
   exporting: "Exporting the events shown",
   saved: (saved: Saved, name: string): string =>
-    saved.searchTooBroad ? `${savedHeld(saved, name)} ${TOO_BROAD}` : savedHeld(saved, name),
+    saved.searchTooBroad ? `${savedHeld(saved, name)} ${TOO_BROAD_SAVED}` : savedHeld(saved, name),
 } as const;

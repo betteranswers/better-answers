@@ -80,6 +80,10 @@ function EventLine(properties: { readonly event: ReadAuditEvent }) {
         <span className="min-w-0 wrap-anywhere">{sentenceOf(event)}</span>
         <Pill>{WORDS.families[event.family]}</Pill>
       </div>
+      {/* Beneath the sentence that opens with the name, so two of one name are told apart at once. */}
+      {event.by.kind === "person" && event.by.displayName !== "" ? (
+        <span className="text-xs text-muted-foreground wrap-anywhere">{event.by.address}</span>
+      ) : null}
       <Collapsible>
         <CollapsibleTrigger asChild>
           <Button variant="link" size="sm" className="group h-auto gap-1 self-start px-0">
@@ -214,8 +218,7 @@ function ExportAct(properties: {
   return (
     <Button
       variant="outline"
-      disabled={nothingMatches}
-      aria-disabled={exporting.isPending}
+      aria-disabled={nothingMatches || exporting.isPending}
       aria-keyshortcuts={KEY.export.key}
       className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
       onClick={run}

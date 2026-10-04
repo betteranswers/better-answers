@@ -167,8 +167,10 @@ test.describe("the System group's Audit log page", () => {
       [linesOf(page).nth(0), addresses[1]],
       [linesOf(page).nth(1), addresses[0]],
     ] as const) {
-      await detailsOf(line).click();
-      await expect(line.getByRole("definition").first()).toHaveText(`Sam Okoro${address ?? ""}`);
+      await expect(line, "the address shows before the details open").toContainText(
+        `Sam Okoro created the group`,
+      );
+      await expect(line.getByText(address ?? "", { exact: true })).toBeVisible();
     }
   });
 
@@ -353,7 +355,6 @@ test.describe("the System group's Audit log page", () => {
     await page.keyboard.press("Enter");
     await expect(details).toHaveAttribute("aria-expanded", "true");
 
-    await details.blur();
     await page.keyboard.press(KEY.older.key);
     await expect(linesOf(page)).toHaveCount(51);
     await expect(
