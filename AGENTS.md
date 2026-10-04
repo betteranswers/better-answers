@@ -63,7 +63,7 @@ The backlog lives in **Linear**: team `better-answers` (issue ids `BA-N`), proje
 
 ### Workflow
 
-Work runs on the Compound Engineering plugin (CE), which `.claude/settings.json` installs from upstream's default branch and updates at the start of a session once a release lands. A change goes through `/lfg`, or `/ce-plan` then `/ce-work`. `ce-commit-push-pr` opens the pull request. `arm-merge.yml` arms its merge once Cubic has read the head, and the merge queue merges it when `check` is green. CI's `check` is the arbiter.
+Work runs on the Compound Engineering plugin (CE), pinned by release tag in `.claude/settings.json`. Renovate opens a pull request for each new release. A change goes through `/lfg`, or `/ce-plan` then `/ce-work`. `ce-commit-push-pr` opens the pull request. `arm-merge.yml` arms its merge once Cubic has read the head, and the merge queue merges it when `check` is green. CI's `check` is the arbiter.
 
 Every commit reaches `main` through the merge queue. A commit's subject and a PR's title take the Conventional Commits form, and commitlint refuses a commit or a PR title that breaks it.
 

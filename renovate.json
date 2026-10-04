@@ -44,6 +44,15 @@
       "matchStrings": ["pnpm dlx wrangler@(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
       "datasourceTemplate": "npm",
       "depNameTemplate": "wrangler"
+    },
+    {
+      "customType": "regex",
+      "description": "The Compound Engineering plugin every session runs, pinned by release tag in `.claude/settings.json`'s marketplace `ref`. Its scripts run in every session with the session's permissions, so a new release arrives as a pull request someone reads, never on its own. No enabled manager reads that file. The marketplace source takes no commit SHA, so the tag is the pin, and `minimumReleaseAge` gives a bad release a day to be noticed",
+      "managerFilePatterns": ["/^\\.claude/settings\\.json$/"],
+      "matchStrings": ["\"repo\": \"EveryInc/compound-engineering-plugin\",\\s*\"ref\": \"compound-engineering-v(?<currentValue>\\d+\\.\\d+\\.\\d+)\""],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "EveryInc/compound-engineering-plugin",
+      "extractVersionTemplate": "^compound-engineering-v(?<version>\\d+\\.\\d+\\.\\d+)$"
     }
   ],
   "packageRules": [

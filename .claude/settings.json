@@ -41,7 +41,8 @@
     "compound-engineering-plugin": {
       "source": {
         "source": "github",
-        "repo": "EveryInc/compound-engineering-plugin"
+        "repo": "EveryInc/compound-engineering-plugin",
+        "ref": "compound-engineering-v3.30.3"
       },
       "autoUpdate": true
     }
