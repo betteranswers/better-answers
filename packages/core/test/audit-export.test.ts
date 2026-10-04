@@ -10,7 +10,7 @@ import {
   exportAuditLogInput,
   type AuditExport,
 } from "../src/members/index.ts";
-import type { Tx } from "../src/store/postgres/index.ts";
+import type { PostgresDoor, Tx } from "../src/store/postgres/index.ts";
 import { provisionedWorkspace, seedPerson, type ProvisionedWorkspace } from "./platform.ts";
 import { inputOf } from "./suite-input.ts";
 import { answered, postgresForSuite, readingAs, seedingWith } from "./suite-postgres.ts";
@@ -180,6 +180,40 @@ describe("the audit log's export", () => {
     expect((await exportEvents(ours)).map((event) => event.detail["matched"])).toEqual([[], []]);
   });
 
+  it("writes a list in the detail as JSON", async () => {
+    const workspace = await provisionedWorkspace(db(), "ExportListed");
+    const group = await groupMade(workspace, workspace.adminUserId, "Bid writers");
+    exported(await exportAs(workspace, workspace.adminUserId, { search: "bid" }));
+
+    const file = exported(await exportAs(workspace, workspace.adminUserId, { family: "platform" }));
+
+    expect(linesOf(file)[1]).toContain(
+      `matched: [{""id"":""${group.groupId}"",""kind"":""group""}]`,
+    );
+  });
+
+  it("names an invitation by the address it was sent to", async () => {
+    const workspace = await provisionedWorkspace(db(), "ExportInvited");
+    await seedingWith(db().pool, async (seed) => {
+      const invitation = await seed.invitation({
+        workspaceId: workspace.workspaceId,
+        inviterId: workspace.adminUserId,
+        email: "jo.bloggs@example.invalid",
+      });
+      await seed.auditEvent({
+        workspaceId: workspace.workspaceId,
+        act: "people.invitation.created",
+        actor: `human:${workspace.adminUserId}`,
+        subjectId: invitation.id,
+        detail: { role: "Editor" },
+      });
+    });
+
+    const file = exported(await exportAs(workspace, workspace.adminUserId, { family: "people" }));
+
+    expect(linesOf(file)[1]).toContain(`,"jo.bloggs@example.invalid","role: Editor"`);
+  });
+
   it("writes a display name starting with = after an apostrophe", async () => {
     const workspace = await provisionedWorkspace(db(), "ExportFormula", { name: "=Priya" });
     await groupMade(workspace, workspace.adminUserId, "Bid writers");
@@ -288,7 +322,54 @@ const waitingOnTheGroupTable = async (): Promise<void> => {
   throw new Error("the export never reached the group table");
 };
 
+/** The workspace's door, running `before` ahead of each connection it opens, counted from 1. */
+const doorWith = (
+  workspace: ProvisionedWorkspace,
+  before: (opened: number) => Promise<void>,
+): PostgresDoor => {
+  const { pool } = workspace.door;
+  let opened = 0;
+  const connect = async () => {
+    opened += 1;
+    await before(opened);
+    return pool.connect();
+  };
+  return { pool: Object.assign(Object.create(pool), { connect }) };
+};
+
+const exportThrough = async (workspace: ProvisionedWorkspace, door: PostgresDoor) =>
+  exportAuditLog(
+    await principalOf(workspace, workspace.adminUserId),
+    door,
+    inputOf(exportAuditLogInput, {}),
+  );
+
 describe("an export under way", () => {
+  it.each([1, 2])("answers the store failing on connection %i", async (failing) => {
+    const workspace = await provisionedWorkspace(db(), `ExportFailed${failing}`);
+    const door = doorWith(workspace, async (opened) => {
+      if (opened === failing) throw new Error("the store is gone");
+    });
+
+    expect(await exportThrough(workspace, door)).toEqual({ ok: false, error: expect.any(Error) });
+    expect(await exportEvents(workspace)).toEqual([]);
+  });
+
+  it("refuses an Admin demoted while it reads, recording nothing", async () => {
+    const workspace = await provisionedWorkspace(db(), "ExportDemotedMidway");
+    await memberAt(workspace, "Admin", { name: "Bea Admin" });
+    const door = doorWith(workspace, async (opened) => {
+      if (opened !== 2) return;
+      await db().pool.query(
+        "UPDATE member SET role = 'Editor' WHERE workspace_id = $1 AND user_id = $2",
+        [workspace.workspaceId, workspace.adminUserId],
+      );
+    });
+
+    expect(await exportThrough(workspace, door)).toEqual({ ok: false, error: "role-disagrees" });
+    expect(await exportEvents(workspace)).toEqual([]);
+  });
+
   it("lets another Admin change a role meanwhile", async () => {
     const workspace = await provisionedWorkspace(db(), "ExportConcurrent");
     const bea = await memberAt(workspace, "Admin", { name: "Bea Admin" });
