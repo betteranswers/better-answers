@@ -24,6 +24,8 @@ type Choice = { readonly value: string; readonly label: string };
 
 type Search = {
   readonly label: string;
+  /** The longest search the read accepts, so the box never sends one it refuses. */
+  readonly maxLength?: number;
   readonly value: string;
   readonly onChange: (value: string) => void;
   readonly keystroke?: Keystroke;
@@ -70,7 +72,7 @@ function FocusOn(properties: {
 }
 
 function SearchField(properties: { readonly search: Search }) {
-  const { label, value, onChange, keystroke } = properties.search;
+  const { label, value, onChange, keystroke, maxLength } = properties.search;
   const own = useRef<HTMLInputElement>(null);
   const ref = properties.search.inputRef ?? own;
   return (
@@ -84,6 +86,7 @@ function SearchField(properties: { readonly search: Search }) {
         type="search"
         aria-label={label}
         aria-keyshortcuts={keystroke?.key}
+        maxLength={maxLength}
         placeholder={label}
         className="pl-8"
         value={value}

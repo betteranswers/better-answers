@@ -27,6 +27,7 @@ import {
   AUDIT_LOG_KEYSTROKES as KEY,
   AUDIT_LOG_LIST,
   FAMILIES,
+  SEARCH_MAX,
 } from "./audit-log-state.ts";
 import { AUDIT_LOG_WORDS as WORDS } from "./audit-log-words.ts";
 import { headlineOf, sentenceOf } from "./audit-sentences.ts";
@@ -286,6 +287,7 @@ function AuditLogRegion() {
         <FilterRow
           search={{
             label: WORDS.search,
+            maxLength: SEARCH_MAX,
             value: search,
             onChange: setSearch,
             keystroke: KEY.search,
