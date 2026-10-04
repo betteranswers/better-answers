@@ -20,8 +20,7 @@ type Sentence = (slots: Slots) => string;
 
 type DeclaredAct = (typeof DECLARED_ACTS)[number];
 
-export const sentenceCase = (words: string): string =>
-  `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
+const sentenceCase = (words: string): string => `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
 
 /** `people.member.role_changed` reads "Member role changed": the action's subject, then its verb. */
 const wordsOfName = (act: string): string => {

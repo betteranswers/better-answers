@@ -8,7 +8,7 @@ export type AuditEventActor =
   | { readonly kind: "former-member" }
   | { readonly kind: "platform" };
 
-export type NamedPerson = { readonly displayName: string; readonly address: string };
+type NamedPerson = { readonly displayName: string; readonly address: string };
 
 /** Erasure keeps the person row, so an erased person is one no name is found for. */
 export type PeopleNames = ReadonlyMap<string, NamedPerson>;

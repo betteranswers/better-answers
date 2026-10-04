@@ -11,8 +11,6 @@ export type ReadAuditEvent = inferOutput<AuditLogProcedure>["events"][number];
 
 export type Family = NonNullable<inferInput<AuditLogProcedure>["family"]>;
 
-export type AuditExport = inferOutput<Api["members"]["exportAuditLog"]>;
-
 /** What narrows the events, as the address holds it: no family and no search reads them all. */
 export type Asked = { readonly family: Family | undefined; readonly search: string };
 

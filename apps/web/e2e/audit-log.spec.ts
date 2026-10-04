@@ -110,6 +110,19 @@ const anAdminAtTheAuditLog = async (
   };
 };
 
+/** Groups made after the seeded three, so the newest page holds them alone. */
+const aFullPageOpened = async (
+  page: Page,
+  api: APIRequestContext,
+  at: AtTheAuditLog,
+  count: number,
+): Promise<void> => {
+  const names = Array.from({ length: count }, (_, index) => `Crew ${index + 1}`);
+  await makeGroups(api, { workspaceId: at.workspaceId, userId: at.adminId, names });
+  await page.goto(AUDIT_LOG_PAGE);
+  await expect(linesOf(page)).toHaveCount(50);
+};
+
 test.describe("the System group's Audit log page", () => {
   test("shows an Admin each action as its sentence, by day", async ({ page, request }) => {
     const { unnamedEmail } = await anAdminAtTheAuditLog(page, request, "Calder Joinery");
@@ -175,12 +188,9 @@ test.describe("the System group's Audit log page", () => {
   });
 
   test("searches past the first page, and Load more keeps it", async ({ page, request }) => {
-    const { workspaceId, adminId } = await anAdminAtTheAuditLog(page, request, "Dales Castings");
-    const crews = Array.from({ length: 55 }, (_, index) => `Crew ${index + 1}`);
-    await makeGroups(request, { workspaceId, userId: adminId, names: crews });
+    const at = await anAdminAtTheAuditLog(page, request, "Dales Castings");
+    await aFullPageOpened(page, request, at, 55);
 
-    await page.goto(AUDIT_LOG_PAGE);
-    await expect(linesOf(page)).toHaveCount(50);
     await searchBox(page).fill("Priya");
     await expect(linesOf(page)).toHaveCount(1);
     await expect(linesOf(page).first()).toContainText("Priya Shah created the group Bid writers");
@@ -326,12 +336,9 @@ test.describe("the System group's Audit log page", () => {
     request,
     passesTheAccessibilityGate,
   }) => {
-    const { workspaceId, adminId } = await anAdminAtTheAuditLog(page, request, "Calder Castings");
-    const crews = Array.from({ length: 51 }, (_, index) => `Crew ${index + 1}`);
-    await makeGroups(request, { workspaceId, userId: adminId, names: crews });
+    const at = await anAdminAtTheAuditLog(page, request, "Calder Castings");
     // A fresh document, so the first Tab starts from the top rather than from the rail's link.
-    await page.goto(AUDIT_LOG_PAGE);
-    await expect(linesOf(page)).toHaveCount(50);
+    await aFullPageOpened(page, request, at, 51);
 
     await skipLinkReachesThePage(page);
 
