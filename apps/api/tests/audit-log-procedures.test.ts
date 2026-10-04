@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { makeGroups } from "./harness-people.ts";
 import { startApp, type TestApp } from "./harness.ts";
@@ -13,8 +13,15 @@ import { webSignedIn } from "./web-client.ts";
 
 let app: TestApp;
 
+/** Held still while a test counts past a ceiling: on the wall clock its asks can straddle two fixed windows. */
+const stopped: { at: number | undefined } = { at: undefined };
+
 beforeAll(async () => {
-  app = await startApp();
+  app = await startApp({ clock: { now: () => new Date(stopped.at ?? Date.now()) } });
+});
+
+afterEach(() => {
+  stopped.at = undefined;
 });
 
 afterAll(async () => {
@@ -107,6 +114,62 @@ describe("the audit log over tRPC", () => {
   });
 });
 
+const exportsIn = async (workspaceId: string): Promise<number> => {
+  const found = await app.database.superuser.query<{ held: number }>(
+    `SELECT count(*)::int AS held FROM audit_event
+      WHERE workspace_id = $1 AND act = 'platform.audit_log.exported'`,
+    [workspaceId],
+  );
+  return found.rows[0]?.held ?? 0;
+};
+
+describe("searching and exporting over tRPC", () => {
+  it("answers the events a search finds", async () => {
+    const { workspaceId, admin } = await app.provision();
+    await makeGroups(app, { workspaceId, userId: admin.id, names: ["Bid writers", "Site team"] });
+    const { api } = await webSignedIn(app, admin.email);
+
+    const page = await api.members.auditLog.query({ search: "bid" });
+
+    expect(page.events.map((event) => [event.act, event.subject])).toEqual([
+      ["people.group.created", { kind: "group", name: "Bid writers" }],
+    ]);
+    expect(page.searchTooBroad).toBe(false);
+  });
+
+  it("answers an Admin the CSV text, and records the export", async () => {
+    const { workspaceId, admin } = await app.provision();
+    await makeGroups(app, { workspaceId, userId: admin.id, names: ["Bid writers"] });
+    const { api } = await webSignedIn(app, admin.email);
+
+    const file = await api.members.exportAuditLog.mutate({ family: "people" });
+
+    expect(file).toMatchObject({ count: 1, capped: false, searchTooBroad: false });
+    expect(file.csv).toContain('"people.group.created"');
+    expect(await exportsIn(workspaceId)).toBe(1);
+  });
+
+  it.each(["Editor", "Viewer"] as const)("refuses an export at %s, role-forbids", async (role) => {
+    const refused = await refusalToAMemberAt(app, role, (api) =>
+      api.members.exportAuditLog.mutate({}),
+    );
+
+    expect(refused).toMatchObject(ROLE_FORBIDS_ANSWERED);
+  });
+
+  it("refuses an Admin past the ceiling, recording nothing more", async () => {
+    const { workspaceId, admin } = await app.provision();
+    const { api } = await webSignedIn(app, admin.email);
+    stopped.at = Date.now();
+    for (let made = 0; made < 10; made += 1) await api.members.exportAuditLog.mutate({});
+
+    const refused = await api.members.exportAuditLog.mutate({}).catch((error: unknown) => error);
+
+    expect(refused).toMatchObject({ data: { httpStatus: 429, code: "TOO_MANY_REQUESTS" } });
+    expect(await exportsIn(workspaceId)).toBe(10);
+  });
+});
+
 describe("what the audit log refuses", () => {
   it.each(["Editor", "Viewer"] as const)("refuses a member at %s, role-forbids", async (role) => {
     const refused = await refusalToAMemberAt(app, role, (api) => api.members.auditLog.query({}));
@@ -126,6 +189,7 @@ describe("what the audit log refuses", () => {
     ["a cursor that is no event's id", { cursor: "not-an-id" }],
     ["a page of no events", { limit: 0 }],
     ["a page past fifty events", { limit: 51 }],
+    ["a search past 100 characters", { search: "a".repeat(101) }],
   ])("refuses %s, malformed", async (_asked, input) => {
     const refused = await refusalToTheAdmin(app, (api) => api.members.auditLog.query(input));
 

@@ -48,6 +48,7 @@ export const DECLARED_ACTS = [
   "people.request.asked",
   "people.request.declined",
   "people.subject_request.received",
+  "platform.audit_log.exported",
   "platform.erasure.rehearsed",
   "platform.erasure.replayed",
   "platform.graph.swept",

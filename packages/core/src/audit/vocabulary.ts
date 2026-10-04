@@ -5,6 +5,7 @@ import {
   AUDIENCES,
   boundarySchemas,
   CONTENT_HASH,
+  FAMILIES,
   GIT_SHA,
   IRI,
   ROLES,
@@ -28,6 +29,16 @@ export const endedGrant = z.strictObject({
 });
 
 export type EndedGrant = z.output<typeof endedGrant>;
+
+/** A person or group a search found, by id alone: a typed name or address is never stored. */
+const MATCHED_KINDS = ["person", "group"] as const;
+
+const matched = z.strictObject({
+  kind: z.enum(MATCHED_KINDS),
+  id: z.string().regex(ULID),
+});
+
+export type Matched = z.output<typeof matched>;
 
 type DetailEntry = Readonly<Record<string, string | null>>;
 
@@ -69,6 +80,9 @@ export const DETAIL_KINDS = {
     typeof value === "string" && SIGN_IN_METHODS.some((method) => method === value),
   secondFactor: (value: DetailValue) =>
     typeof value === "string" && SECOND_FACTORS.some((factor) => factor === value),
+  "family?": (value: DetailValue) =>
+    typeof value === "string" && FAMILIES.some((family) => family === value),
+  matched: (value: DetailValue) => z.array(matched).safeParse(value).success,
 } as const;
 
 export type DetailKind = keyof typeof DETAIL_KINDS;
@@ -91,7 +105,11 @@ type DetailValueOf<K extends DetailKind> = K extends "role"
           ? SignInMethod
           : K extends "secondFactor"
             ? SecondFactor
-            : string;
+            : K extends "family?"
+              ? Family
+              : K extends "matched"
+                ? readonly Matched[]
+                : string;
 
 export type DetailOf<Shape extends DetailShape> = {
   readonly [
