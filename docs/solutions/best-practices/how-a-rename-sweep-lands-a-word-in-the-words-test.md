@@ -7,7 +7,7 @@ problem_type: best_practice
 component: testing-framework
 severity: medium
 applies_when:
-  - "A BA-29 sweep (U7 to U17) reaches KTD5 step 5 and marks its rows landed in apps/api/tests/old-words.ts"
+  - "A BA-29 sweep (U8 to U17) reaches KTD5 step 5 and marks its rows landed in apps/api/tests/old-words.ts"
   - "Adding or changing a permitted sense, a carve-out or a reach on a row of the old-words list"
   - "Removing a _Code rename pending._ mark from CONTEXT.md"
   - "Refreshing apps/api/tests/old-words-ratchet.json"
@@ -36,7 +36,7 @@ tags:
 
 BA-29 renames the platform's words to the reader's words, one noun per sweep (`docs/plans/2026-10-02-2325-docs-glossary-in-the-readers-words-plan.md`, units U7 to U17, KTD5 at plan:201-208). The words test, `apps/api/tests/avoid-words.test.ts`, refuses an old word once its row in `apps/api/tests/old-words.ts` is landed (KTD1, plan:178). KTD5's step 5 says only that a sweep "marks its rows landed in the words test's list" (plan:206). The state change is one line, but the scan behaves in ways a sweep must know to land a row correctly, and some of them let an old word through with no finding.
 
-The test arrived on branch `worktree-ba-29-u1-u4-words`, the first BA-29 pull request (U1 to U4, merged as #529), in the commits from "test(api): read the old words from their own list" to "test(api): fail the words test on a reader-text file it cannot parse". U6, on branch `feat/ba-29-u6-sweep-tooling`, then added the stored-names register and deferred senses. Line numbers below are from U6's head.
+The test arrived on branch `worktree-ba-29-u1-u4-words`, the first BA-29 pull request (U1 to U4, merged as #529), in the commits from "test(api): read the old words from their own list" to "test(api): fail the words test on a reader-text file it cannot parse". U6, on branch `feat/ba-29-u6-sweep-tooling`, then added the stored-names register and deferred senses. Line numbers below are from U6's head. U7 (#543) since added senses and rows to `old-words.ts`, so its line numbers have moved; find a row or helper there by name.
 
 **Two row shapes** (`old-words.ts`):
 
@@ -51,7 +51,7 @@ The test arrived on branch `worktree-ba-29-u1-u4-words`, the first BA-29 pull re
 | `"one sense"` | the same line scan | the whole word only, any case (124-125) |
 | `"reader text"` | reader strings only, `readerFindings` (402-412), in the files `READER_TEXT` names (255-260) | any form (406) |
 
-**Landed rows to copy:** the api row (one sense, `APP_SENSES`, its own carve-outs; `old-words.ts:157-170`), `Better Answers` (one sense, `reads: isCodeAPersonReads`; 180-189), the audit log row (everywhere, with senses; 327-336), the audit action row (everywhere, no senses; 337-344), and the trust words `Changed since checked` (198-205), `Checked by` (208-216), `needs checking again` (368-375) and `Unchecked` (509-516), all reader text.
+**Landed rows to copy:** the api row (one sense, `APP_SENSES`, its own carve-outs; `old-words.ts:157-170`), `Better Answers` (one sense, `reads: isCodeAPersonReads`; 180-189), the audit log row (everywhere, with senses; 327-336), the audit action row (everywhere, no senses; 337-344), and the trust words `Changed since checked` (198-205), `Checked by` (208-216), `needs checking again` (368-375) and `Unchecked` (509-516), all reader text. The first sweep's three rows, from U7, are the rows whose `sweep` is `PAGE_AREA_MENU`: two one-sense rows whose senses are partly held to one tree by `within`, and one everywhere row with a sense for a stored browser key. All three carve out with `PAGE_AREA_MENU_CARVED_OUT`.
 
 ## Guidance
 
@@ -69,19 +69,15 @@ The test arrived on branch `worktree-ba-29-u1-u4-words`, the first BA-29 pull re
    - Names on the wire and in storage need no sense, because they reach the scan as kept names (step 7).
    - A reader-text row takes no senses. `readerFindings` reads only `rows` and `kept` from the scan (`words-scan.ts:402`), so `permitted`, `carvedOut` and `reads` on such a row do nothing. Its kept senses come from kept names alone.
 
-4. **Carve out, on the row itself, the plans dated before the landing.** `docs/plans/` has no global carve-out: the planted test reports a dated plan as a finding (`avoid-words.test.ts:301-325`, the plan at 321). R22 keeps completed plans' words (plan:103, Key Decision at plan:62), and the comment on `CARVED_OUT` says a sweep carves them out on its own row (`avoid-words.test.ts:38`). No row does this yet. Every plan in `docs/plans/` is dated 2026-09-30 or later, after the api row (19/09/2026) and the audit log row (24/09/2026) landed, so the next sweep to land writes the first one:
+4. **Carve out, on the row itself, the plans and dogfood reports dated before the landing.** `docs/plans/` has no global carve-out: the planted test reports a dated plan as a finding (`avoid-words.test.ts:301-325`, the plan at 321). R22 keeps completed plans' words (plan:103, Key Decision at plan:62), and the comment on `CARVED_OUT` says a sweep carves them out on its own row (`avoid-words.test.ts:38`). U7 (#543) wrote the first such carve-out as a helper in `old-words.ts`, `writtenBefore(day)`. It also covers `docs/dogfood-reports/`, because a dogfood report quotes the page text of its day. Use the helper, with the sweep's landing date in one constant shared by its rows, as U7's three `PAGE_AREA_MENU` rows do:
 
    ```ts
-   carvedOut: [
-     {
-       holds: (file) =>
-         (/^docs\/plans\/(\d{4}-\d{2}-\d{2})-/.exec(file)?.[1] ?? "9999") < "2026-10-10", // the landing date
-       why: "a completed plan keeps the words of its day (R22)",
-     },
-   ],
+   const CONNECTED_SOURCE_LANDED = "2026-10-20";
+   // on each row the sweep lands:
+   carvedOut: [writtenBefore(CONNECTED_SOURCE_LANDED)],
    ```
 
-   The `"9999"` fallback keeps a file with no dated name scanned. The comparison is strict, so a plan dated on the landing day or later is read. Carve out per row, never in the global `CARVED_OUT`: a global entry would stop every landed word being read in those plans, including words that landed before a plan was written. A row's carve-out holds for that row alone (`avoid-words.test.ts:327-340`). `CarveOut.why` is required (`old-words.ts:17`), and no carve-out ever holds a `CODING_STANDARDS.md` (`words-scan.ts:164-165`).
+   Inside the helper, a file with no dated name falls back to `"9999"`, so it is still scanned. The comparison is strict, so a plan or report dated on the landing day or later is read. A sweep whose own learning quotes the words it removes carves that one file out beside the helper, as `PAGE_AREA_MENU_CARVED_OUT` does. Carve out per row, never in the global `CARVED_OUT`: a global entry would stop every landed word being read in those plans, including words that landed before a plan was written. A row's carve-out holds for that row alone (`avoid-words.test.ts:327-340`). `CarveOut.why` is required (`old-words.ts:17`), and no carve-out ever holds a `CODING_STANDARDS.md` (`words-scan.ts:164-165`).
 
 5. **Remove the glossary's pending mark when the entry's last pending row lands.** `unlisted` faults an entry marked `_Code rename pending._` that no pending row names (`words-scan.ts:75-82`). A landed row does not count (the planted case "a pending entry named by a landed row alone", `avoid-words.test.ts:1017-1021`). So landing the entry's last pending row without removing the mark fails the list test. Nothing checks the reverse: removing the mark while another pending row still names the entry passes, and the glossary then says the code is done when it is not. Rows share entries. `bind` (one sense) and `binding` (everywhere) both sit under *connected source* (`old-words.ts:191-192`). Search the list for the entry before removing its mark.
 
@@ -111,9 +107,9 @@ The words test is the one gate on R12, which refuses an old word once it has lan
 
 ## When to Apply
 
-- At KTD5 step 5 of every sweep, U7 to U17.
+- At KTD5 step 5 of every sweep still to come, U8 to U17.
 - On any change to `old-words.ts`, the `_Code rename pending._` marks in `CONTEXT.md`, or `old-words-ratchet.json`.
-- When reviewing a sweep's pull request. Check the diff for `state` flips both ways, `g` on every new sense, `within` where one tree writes a sense, a dated plans carve-out on each newly landed line-scanned row, and a baseline that only fell.
+- When reviewing a sweep's pull request. Check the diff for `state` flips both ways, `g` on every new sense, `within` where one tree writes a sense, a `writtenBefore` carve-out on each newly landed line-scanned row, and a baseline that only fell.
 
 ## Examples
 
@@ -131,13 +127,7 @@ pending("binding", "connected source", "connected source", "connected source", "
   sweep: "connected source",
   state: "landed",
   reach: "everywhere",
-  carvedOut: [
-    {
-      holds: (file) =>
-        (/^docs\/plans\/(\d{4}-\d{2}-\d{2})-/.exec(file)?.[1] ?? "9999") < "2026-10-20",
-      why: "a completed plan keeps the words of its day (R22)",
-    },
-  ],
+  carvedOut: [writtenBefore(CONNECTED_SOURCE_LANDED)], // "2026-10-20"
 },
 ```
 
