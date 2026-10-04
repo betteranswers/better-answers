@@ -113,12 +113,15 @@ export const PERSON_NAMED_IN = [
   },
 ] as const satisfies readonly DetailNaming[];
 
-/** The events naming any of the people or groups, or taking any of the acts. */
-export const soughtFor = (found: {
+/** What a search names inside the workspace; each list is empty when nothing of its kind matched. */
+type Found = {
   readonly people: readonly UserId[];
   readonly groups: readonly string[];
   readonly acts: readonly string[];
-}): EventsSought => ({
+};
+
+/** The events naming any of the people or groups, or taking any of the acts. */
+export const soughtFor = (found: Found): EventsSought => ({
   people: found.people,
   subjects: [
     { kinds: PERSON_SUBJECT_KINDS, ids: found.people },
@@ -175,7 +178,7 @@ const groupsNamed = async (
 };
 
 /** The people, groups and acts a search names, each read inside the principal's workspace. */
-const foundBy = async (principal: UserPrincipal, tx: Tx, search: string) => {
+const foundBy = async (principal: UserPrincipal, tx: Tx, search: string): Promise<Found> => {
   const pattern = containing(search);
   return {
     people: await peopleNamed(principal, tx, pattern),
@@ -183,8 +186,6 @@ const foundBy = async (principal: UserPrincipal, tx: Tx, search: string) => {
     acts: actsWorded(search),
   };
 };
-
-type Found = Awaited<ReturnType<typeof foundBy>>;
 
 /** Newest first, narrowed to the search's events, and what it found, when there is a search. */
 export const eventsAsked = async (

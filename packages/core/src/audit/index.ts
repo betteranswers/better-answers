@@ -203,10 +203,10 @@ const oneOf = (values: readonly string[], bind: Bind): string =>
   values.length === 1 ? `= $${bind(values[0] ?? "")}` : `= ANY($${bind(values)}::text[])`;
 
 const predicatesOf = (sought: EventsSought, bind: Bind): readonly string[] => {
-  const people = sought.people.length === 0 ? undefined : oneOf(sought.people, bind);
+  const personMatch = sought.people.length === 0 ? undefined : oneOf(sought.people, bind);
   const subjects = sought.subjects.filter(({ ids }) => ids.length > 0);
   return [
-    ...(people === undefined
+    ...(personMatch === undefined
       ? []
       : [
           `actor ${oneOf(
@@ -219,10 +219,10 @@ const predicatesOf = (sought: EventsSought, bind: Bind): readonly string[] => {
         `subject_kind = ANY($${bind(kinds)}::text[]) AND subject_id ${oneOf(ids, bind)}`,
     ),
     ...(sought.acts.length === 0 ? [] : [`act = ANY($${bind(sought.acts)}::text[])`]),
-    ...(people === undefined ? [] : sought.detail).map(
+    ...(personMatch === undefined ? [] : sought.detail).map(
       ({ key, subjectKinds, acts }) =>
         `subject_kind = ANY($${bind(subjectKinds)}::text[]) AND act = ANY($${bind(acts)}::text[])
-         AND detail ->> $${bind(key)}::text ${people}`,
+         AND detail ->> $${bind(key)}::text ${personMatch}`,
     ),
   ];
 };

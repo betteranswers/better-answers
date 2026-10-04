@@ -280,7 +280,7 @@ export const personProcedure = trpc.procedure.use(async ({ ctx, path, next }) =>
 });
 
 /** Counted per person and procedure; past the ceiling the call answers 429 and when to ask again. */
-const counted = async (
+const consumeCeiling = async (
   ctx: Pick<TrpcContext, "doors" | "clock" | "log">,
   path: string,
   personId: string,
@@ -297,14 +297,14 @@ const counted = async (
 
 export const personCeiling = (rule: CounterRule) =>
   personProcedure.use(async ({ ctx, path, next }) => {
-    await counted(ctx, path, ctx.personId, rule);
+    await consumeCeiling(ctx, path, ctx.personId, rule);
     return next();
   });
 
 /** As personCeiling, for an act on the own-transaction road. */
 export const ownTransactionCeiling = (rule: CounterRule) =>
   ownTransactionProcedure.use(async ({ ctx, path, next }) => {
-    await counted(ctx, path, ctx.principal.userId, rule);
+    await consumeCeiling(ctx, path, ctx.principal.userId, rule);
     return next();
   });
 

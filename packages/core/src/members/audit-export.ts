@@ -1,6 +1,4 @@
-import { z } from "zod";
-
-import { FAMILIES } from "@better-answers/schema";
+import type { z } from "zod";
 
 import { act, declareActs, type DetailOf, record, type Matched } from "../audit/index.ts";
 import {
@@ -23,9 +21,9 @@ import {
 } from "../store/postgres/index.ts";
 import type { AuditEventActor } from "../workspaces/index.ts";
 import {
-  auditSearch,
   eventsAsked,
   eventsNamed,
+  readAuditLogInput,
   type AuditEventSubject,
   type ReadAuditEvent,
 } from "./audit-log.ts";
@@ -43,10 +41,7 @@ const EXPORT_ACTS = declareActs("platform", {
 /** About 3 to 5 MB of text, which the browser saves as one file. */
 const EXPORT_CAP = 10_000;
 
-export const exportAuditLogInput = z.object({
-  family: z.enum(FAMILIES).optional(),
-  search: auditSearch.optional(),
-});
+export const exportAuditLogInput = readAuditLogInput.pick({ family: true, search: true });
 
 export type ExportAuditLogInput = z.output<typeof exportAuditLogInput>;
 
@@ -79,19 +74,19 @@ const cellOf = (value: string): string => {
 
 const lineOf = (cells: readonly string[]): string => cells.map(cellOf).join(",");
 
-const ACTOR_WORDS = {
-  platform: "the platform",
-  "former-member": "a former member",
-} as const satisfies Readonly<Record<Exclude<AuditEventActor["kind"], "person">, string>>;
-
-const actorWords = (by: AuditEventActor): string =>
-  by.kind === "person" ? by.displayName : ACTOR_WORDS[by.kind];
-
 const GONE_WORDS = {
   "former-member": "a former member",
   "deleted-group": "a deleted group",
   "erased-invitation": "an erased invitation",
 } as const;
+
+const ACTOR_WORDS = {
+  platform: "the platform",
+  "former-member": GONE_WORDS["former-member"],
+} as const satisfies Readonly<Record<Exclude<AuditEventActor["kind"], "person">, string>>;
+
+const actorWords = (by: AuditEventActor): string =>
+  by.kind === "person" ? by.displayName : ACTOR_WORDS[by.kind];
 
 const subjectWords = (subject: AuditEventSubject): string => {
   if ("displayName" in subject) return subject.displayName;
