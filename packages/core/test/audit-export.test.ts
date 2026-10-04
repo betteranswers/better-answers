@@ -235,6 +235,39 @@ describe("the audit log's export", () => {
     expect(linesOf(file)[1]).toContain(`,"jo.bloggs@example.invalid","role: Editor"`);
   });
 
+  it("names a person with no display name by their address", async () => {
+    const workspace = await provisionedWorkspace(db(), "ExportUnnamed");
+    const address = "new.starter@example.invalid";
+    const unnamed = await memberAt(workspace, "Admin", { name: "", email: address });
+    await groupMade(workspace, unnamed, "Estimators");
+
+    const file = exported(await exportAs(workspace, workspace.adminUserId, { family: "people" }));
+
+    expect(linesOf(file)[1]).toContain(`,"${address}","Estimators",`);
+  });
+
+  it("names a connected source, or says it was removed", async () => {
+    const workspace = await provisionedWorkspace(db(), "ExportSources");
+    const { workspaceId } = workspace;
+    await seedingWith(db().pool, async (seed) => {
+      const binding = await seed.sourceBinding({ workspaceId, name: "Staff handbook" });
+      for (const subjectId of ["01J6ZZZZZZZZZZZZZZZZZZZZZZ", binding.id]) {
+        await seed.auditEvent({
+          workspaceId,
+          act: "sources.binding.published",
+          actor: `human:${workspace.adminUserId}`,
+          subjectId,
+          detail: {},
+        });
+      }
+    });
+
+    const file = exported(await exportAs(workspace, workspace.adminUserId, { family: "sources" }));
+
+    expect(linesOf(file)[1]).toContain(`,"Staff handbook",`);
+    expect(linesOf(file)[2]).toContain(`,"a connected source (removed)",`);
+  });
+
   it("writes a display name starting with = after an apostrophe", async () => {
     const workspace = await provisionedWorkspace(db(), "ExportFormula", { name: "=Priya" });
     await groupMade(workspace, workspace.adminUserId, "Bid writers");

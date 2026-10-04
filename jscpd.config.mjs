@@ -10,6 +10,8 @@ export const jscpdConfig = {
   minTokens: 50,
   threshold: 0,
   ignore: [
+    "apps/web/src/features/people/audit-acts.ts",
+
     "apps/web/src/shared/ui/**",
 
     "**/lifts/**",

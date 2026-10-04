@@ -486,6 +486,32 @@ describe("searching the audit log", () => {
     expect(actsOf(page)).toEqual(["people.member.role_changed"]);
   });
 
+  it("finds an action by the words the page shows", async () => {
+    const workspace = await provisionedWorkspace(db(), "SearchedByHeadline");
+    await seedingWith(db().pool, async (seed) => {
+      for (const act of ["sources.binding.bound", "people.client.consented"]) {
+        await seed.auditEvent({
+          workspaceId: workspace.workspaceId,
+          act,
+          actor: `human:${workspace.adminUserId}`,
+          detail: {},
+        });
+      }
+    });
+
+    const sourced = pageOf(
+      await readAs(workspace, workspace.adminUserId, { search: "connected source added" }),
+    );
+    const consented = pageOf(
+      await readAs(workspace, workspace.adminUserId, { search: "assistant given" }),
+    );
+
+    expect([actsOf(sourced), actsOf(consented)]).toEqual([
+      ["sources.binding.bound"],
+      ["people.client.consented"],
+    ]);
+  });
+
   it("searches within the family asked for", async () => {
     const workspace = await provisionedWorkspace(db(), "SearchedInFamily", { name: "Hannah" });
 

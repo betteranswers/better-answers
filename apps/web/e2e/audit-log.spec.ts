@@ -130,7 +130,7 @@ test.describe("the System group's Audit log page", () => {
     await expect(auditLog(page).getByRole("heading", { level: 2 })).toHaveText(WORDS.heading);
     await expect(auditLog(page)).toContainText(WORDS.summary);
     await expect(linesOf(page)).toHaveCount(3);
-    await expect(said(page)).toHaveText(WORDS.counted({ family: undefined, search: "" }, 3, false));
+    await expect(said(page)).toHaveText("3 events.");
     await expect(auditLog(page).getByRole("heading", { level: 3 })).toHaveText(SAID_DAY);
 
     await expect(linesOf(page).nth(0)).toContainText(
@@ -200,9 +200,7 @@ test.describe("the System group's Audit log page", () => {
     await expect(linesOf(page)).toHaveCount(50);
     await loadMore(page).click();
     await expect(linesOf(page)).toHaveCount(55);
-    await expect(said(page)).toHaveText(
-      WORDS.counted({ family: undefined, search: "Crew" }, 55, false),
-    );
+    await expect(said(page)).toHaveText("55 events matching “Crew”.");
     await expect(searchBox(page)).toHaveValue("Crew");
   });
 
@@ -216,7 +214,7 @@ test.describe("the System group's Audit log page", () => {
     const started = Date.now();
     await page.getByRole("option", { name: WORDS.families.platform }).click();
     await expect(
-      auditLog(page).getByText(WORDS.noneNarrowed({ family: "platform", search: "Priya" })),
+      auditLog(page).getByText("No events in the platform family matching “Priya”."),
     ).toBeVisible();
     const elapsed = Date.now() - started;
     test.info().annotations.push({ type: "family filter", description: `${elapsed} ms` });
@@ -242,9 +240,7 @@ test.describe("the System group's Audit log page", () => {
     const csv = await readFile(await download.path(), "utf8");
     expect(csv, "the file holds Priya's event").toContain("Priya Shah");
     expect(download.suggestedFilename()).toMatch(/^audit-log-\d{4}-\d{2}-\d{2}\.csv$/);
-    await expect(auditLog(page)).toContainText(
-      WORDS.saved({ count: 1, capped: false, searchTooBroad: false }, download.suggestedFilename()),
-    );
+    await expect(auditLog(page)).toContainText(`Saved 1 event to ${download.suggestedFilename()}.`);
 
     await searchBox(page).fill("");
     await pickFamily(page, WORDS.everyFamily);
@@ -265,9 +261,7 @@ test.describe("the System group's Audit log page", () => {
 
     await searchBox(page).fill(nothing);
 
-    await expect(
-      auditLog(page).getByText(WORDS.noneNarrowed({ family: undefined, search: nothing })),
-    ).toBeVisible();
+    await expect(auditLog(page).getByText(`No events matching “${nothing}”.`)).toBeVisible();
     await expect(exportButton(page)).toBeDisabled();
     await auditLog(page).getByRole("button", { name: "Clear filters" }).click();
     await expect(linesOf(page)).toHaveCount(3);

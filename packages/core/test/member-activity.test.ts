@@ -44,15 +44,23 @@ import {
 const db = postgresForSuite();
 
 /** A verified, named person who belongs to no workspace yet. */
-const aPerson = (name: string): Promise<string> =>
+const aPerson = (
+  name: string,
+  email = addressOf(name.toLowerCase().replaceAll(" ", ".")),
+): Promise<string> =>
   seedPerson(db().pool, {
-    email: addressOf(name.toLowerCase().replaceAll(" ", ".")),
+    email,
     emailVerified: true,
     name,
   });
 
-const memberAt = async (workspace: ProvisionedWorkspace, role: Role, name: string) => {
-  const personId = await aPerson(name);
+const memberAt = async (
+  workspace: ProvisionedWorkspace,
+  role: Role,
+  name: string,
+  email?: string,
+) => {
+  const personId = await aPerson(name, email);
   await seedingWith(db().pool, (seed) =>
     seed.member({ workspaceId: workspace.workspaceId, userId: personId, role }),
   );
@@ -143,10 +151,8 @@ describe("a person's activity", () => {
       email: "hannah.reid@example.invalid",
     });
     const hannah = workspace.adminUserId;
-    const priya = await memberAt(workspace, "Viewer", "Priya Shah");
-    const [priyas] = (
-      await db().pool.query<{ email: string }>('SELECT email FROM "user" WHERE id = $1', [priya])
-    ).rows;
+    const priyaAt = "priya.shah@example.invalid";
+    const priya = await memberAt(workspace, "Viewer", "Priya Shah", priyaAt);
     answered(await roleChanged(workspace, hannah, priya, "Editor"));
 
     const onHannahs = pageOf(await activityOf(workspace, hannah));
@@ -157,7 +163,7 @@ describe("a person's activity", () => {
       actor: `human:${hannah}`,
       subjectId: priya,
       by: { kind: "person", displayName: "Hannah Reid", address: "hannah.reid@example.invalid" },
-      subject: { kind: "person", displayName: "Priya Shah", address: priyas?.email },
+      subject: { kind: "person", displayName: "Priya Shah", address: priyaAt },
       detail: { previousRole: "Viewer", role: "Editor" },
     };
     expect(onHannahs).toEqual({

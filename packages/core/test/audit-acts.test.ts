@@ -15,7 +15,7 @@ describe("the web's list of declared audit acts", () => {
     );
   });
 
-  it("lists the acts in code-unit order beneath its header", () => {
+  it("lists the acts in code-unit order, then their headlines", () => {
     expect(renderAuditActs(["people.member.role_changed", "knowledge.check.imported"])).toBe(
       [
         "// Generated, never edited: pnpm --filter @better-answers/core run generate:audit-acts",
@@ -24,6 +24,11 @@ describe("the web's list of declared audit acts", () => {
         '  "knowledge.check.imported",',
         '  "people.member.role_changed",',
         "] as const;",
+        "",
+        "export const HEADLINES = {",
+        '  "knowledge.check.imported": "Verification imported",',
+        '  "people.member.role_changed": "Role changed",',
+        "} as const satisfies Readonly<Record<(typeof DECLARED_ACTS)[number], string>>;",
         "",
       ].join("\n"),
     );

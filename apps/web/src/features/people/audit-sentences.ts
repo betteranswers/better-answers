@@ -1,6 +1,6 @@
 import { byWords, counted, nameOrAddress } from "@/shared/words.ts";
 
-import type { DECLARED_ACTS } from "./audit-acts.ts";
+import { HEADLINES, type DECLARED_ACTS } from "./audit-acts.ts";
 import { namedIn } from "./audit-details.ts";
 import type { ReadAuditEvent } from "./audit-log-api.ts";
 import { GONE_WORDS, removedWords, THING_NOUNS, type Thing } from "./audit-subjects.ts";
@@ -183,73 +183,6 @@ const SENTENCES = {
   "sources.finding.restored": ({ by }) => `${by} kept a finding in text`,
   "sources.upload.swept": ({ by }) => `${by} deleted an uploaded file no document uses`,
 } as const satisfies Readonly<Record<DeclaredAct, Sentence>>;
-
-/** A few words for an action, where a sentence is too long: a control's name, a column. */
-const HEADLINES = {
-  "knowledge.check.imported": "Verification imported",
-  "knowledge.concept.class_overridden": "Sensitivity overridden",
-  "knowledge.concept.committed": "Concept saved",
-  "knowledge.manifest.written": "Knowledge base description updated",
-  "knowledge.suggestion.accepted": "Suggestion accepted",
-  "knowledge.suggestion.declined": "Suggestion declined",
-  "knowledge.suggestion.returned": "Suggestion sent back",
-  "people.client.consented": "Assistant given access",
-  "people.erasure.completed": "Erasure request carried out",
-  "people.group.created": "Group created",
-  "people.group.deleted": "Group deleted",
-  "people.group.member_added": "Added to a group",
-  "people.group.member_removed": "Removed from a group",
-  "people.group.renamed": "Group renamed",
-  "people.invitation.cancelled": "Invitation cancelled",
-  "people.invitation.created": "Invitation sent",
-  "people.invitation.resent": "Invitation resent",
-  "people.member.added": "Member added",
-  "people.member.credentials_revoked": "Every sign-in and token ended here",
-  "people.member.joined": "Member joined",
-  "people.member.removed": "Member removed",
-  "people.member.role_changed": "Role changed",
-  "people.name_flag.raised": "Display name flagged to support",
-  "people.operator.granted": "Made better-answers support",
-  "people.operator.revoked": "Taken off better-answers support",
-  "people.person.added": "Person added",
-  "people.person.authenticator_added": "Authenticator set up",
-  "people.person.authenticator_removed": "Authenticator removed",
-  "people.person.credentials_revoked": "Every sign-in and token ended everywhere",
-  "people.person.factors_replaced": "Second factors replaced",
-  "people.person.grants_ended": "Assistant access ended",
-  "people.person.name_flagged": "Display name flagged",
-  "people.person.named": "Display name given",
-  "people.person.passkey_added": "Passkey added",
-  "people.person.passkey_removed": "Passkey removed",
-  "people.person.passkey_renamed": "Passkey renamed",
-  "people.person.recovery_code_used": "Recovery code used",
-  "people.person.recovery_codes_issued": "Recovery codes given",
-  "people.person.renamed": "Display name corrected",
-  "people.person.restore_code_accepted": "Restore code used",
-  "people.person.second_factor_confirmed": "Second factor confirmed",
-  "people.person.sign_in_restored": "Sign-in restored",
-  "people.person.signed_in": "Signed in",
-  "people.request.approved": "Access request approved",
-  "people.request.asked": "Access requested",
-  "people.request.declined": "Access request declined",
-  "people.subject_request.received": "Subject request recorded",
-  "platform.audit_log.exported": "Audit log exported",
-  "platform.erasure.rehearsed": "Erasure tested",
-  "platform.erasure.replayed": "Erasure re-applied",
-  "platform.graph.swept": "Older map copies cleared",
-  "platform.reconciler.replayed": "Change re-applied",
-  "platform.workspace.marked": "Invitations kept to the testing domain",
-  "platform.workspace.provisioned": "Workspace provisioned",
-  "platform.workspace.renamed": "Workspace renamed",
-  "sources.binding.bound": "Connected source added",
-  "sources.binding.narrowed": "Connected source narrowed",
-  "sources.binding.published": "Connected source published",
-  "sources.binding.widened": "Connected source widened",
-  "sources.document.narrowed": "Document narrowed",
-  "sources.document.special_category_dismissed": "Findings dismissed",
-  "sources.finding.restored": "Finding kept in text",
-  "sources.upload.swept": "Unused upload deleted",
-} as const satisfies Readonly<Record<DeclaredAct, string>>;
 
 const SAID: ReadonlyMap<string, Sentence> = new Map(Object.entries(SENTENCES));
 

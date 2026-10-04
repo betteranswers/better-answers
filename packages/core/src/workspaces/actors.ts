@@ -2,9 +2,9 @@ import { isActorId, personOfActor, type UserId } from "../kernel/index.ts";
 import type { Tx } from "../store/postgres/index.ts";
 import { hasNoDisplayName, notErasedAt } from "./display-name.ts";
 
-/** The kind, not the words: a person may give any display name, "the platform" among them. */
 type NamedPerson = { readonly displayName: string; readonly address: string };
 
+/** The kind, not the words: a person may give any display name, "the platform" among them. */
 export type AuditEventActor =
   | ({ readonly kind: "person" } & NamedPerson)
   | { readonly kind: "former-member" }

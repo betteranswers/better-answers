@@ -183,7 +183,8 @@ function Events(properties: {
   );
 }
 
-const fileName = (): string => `audit-log-${new Date().toISOString().slice(0, 10)}.csv`;
+/** The reader's own day, which `en-CA` writes year first. */
+const fileName = (): string => `audit-log-${new Date().toLocaleDateString("en-CA")}.csv`;
 
 /** The text is already in the browser, so a link to it saves the file without asking again. */
 const save = (csv: string, name: string): void => {

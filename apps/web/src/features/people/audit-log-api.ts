@@ -31,13 +31,15 @@ export const useAuditLog = (asked: Asked) => {
 
 export type AuditLog = ReturnType<typeof useAuditLog>;
 
-/** A saved export records itself, so the log is read again to show it at the top. */
+/** A saved export records itself, so the log is read again behind the file, never before it. */
 export const useExportAuditLog = () => {
   const api = useTRPC();
   const queryClient = useQueryClient();
   const exporting = useMutation(
     api.members.exportAuditLog.mutationOptions({
-      onSuccess: () => queryClient.invalidateQueries(api.members.auditLog.pathFilter()),
+      onSuccess: () => {
+        void queryClient.invalidateQueries(api.members.auditLog.pathFilter());
+      },
     }),
   );
   return {

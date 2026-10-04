@@ -7,6 +7,7 @@ import {
   eventsNewestFirst,
   eventsSoughtNewestFirst,
   type EventsSought,
+  ACTION_HEADLINES,
   STORED_ACT_NAMES,
   STORED_DETAIL_KEYS,
   matchedList,
@@ -154,10 +155,16 @@ const IDS_SOUGHT = 100;
 const wordsOfAct = (name: string): string =>
   name.split(".").slice(1).join(" ").replaceAll("_", " ");
 
-/** The stored register, not the declarations, which hold only the slices this process imported. */
+/**
+ * The stored register, since the declarations hold only the slices this process imported. The
+ * page's words find an action, and so do its stored name's.
+ */
 const actsWorded = (search: string): readonly string[] => {
   const words = search.toLowerCase().split(/\s+/).join(" ");
-  return STORED_ACT_NAMES.filter((name) => wordsOfAct(name).includes(words));
+  return STORED_ACT_NAMES.filter(
+    (name) =>
+      wordsOfAct(name).includes(words) || ACTION_HEADLINES[name].toLowerCase().includes(words),
+  );
 };
 
 /** An event of the workspace in `$scope` naming the person `u` in its detail, as the read finds them. */
