@@ -1,13 +1,9 @@
 {
   "apps/web/src/app/words.ts": {
-    "act": 2,
-    "screen": 9,
-    "secondary nav": 2,
-    "surface": 3
+    "act": 2
   },
   "apps/web/src/features/auth/link-words.ts": {
-    "check": 1,
-    "screen": 1
+    "check": 1
   },
   "apps/web/src/features/auth/refusal-words.ts": {
     "check": 11
@@ -48,8 +44,7 @@
     "check": 1,
     "class": 3,
     "finding group": 5,
-    "run": 2,
-    "screen": 1
+    "run": 2
   },
   "apps/web/src/features/sources/words.ts": {
     "act": 1,
@@ -60,8 +55,7 @@
     "run": 4
   },
   "apps/web/src/shared/keystroke-words.ts": {
-    "binding": 1,
-    "screen": 2
+    "binding": 1
   },
   "apps/web/src/shared/navigation.ts": {
     "act": 1,

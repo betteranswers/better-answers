@@ -131,6 +131,60 @@ const LEDGER_SENSES: readonly Sense[] = [
 
 const NO_TIER_SENSE = "no tier-sense use: the word there is the SPA's own zone";
 
+/** A dated plan or dogfood report keeps the words of its day (R22); a later one is read. */
+const writtenBefore = (day: string): CarveOut => ({
+  holds: (file) =>
+    (/^docs\/(?:plans|dogfood-reports)\/(\d{4}-\d{2}-\d{2})-/.exec(file)?.[1] ?? "9999") < day,
+  why: "a completed plan or dogfood report keeps the words of its day (R22)",
+});
+
+/** Names a sweep never renames: ADR filenames keep their slugs (KTD14), and the archive is frozen. */
+const FILED_NAMES: readonly Sense[] = [
+  { sense: "an ADR's filename", written: /\badr-\d{4}-[a-z0-9-]+/g },
+  { sense: "a path into the frozen archive", written: /\bdocs\/archive\/[\w./-]+/g },
+];
+
+const SCREEN_SENSES: readonly Sense[] = [
+  ...FILED_NAMES,
+  { sense: "a screen reader", written: /\bscreen[- ]readers?\b/gi },
+  {
+    sense: "Testing Library's screen, in a query or its import",
+    within: "apps/web/test/",
+    written: /\bscreen(?=\s*\.)|\bscreen\b(?=[^;]*\bfrom "@testing-library\/)/g,
+  },
+  { sense: "Tailwind's screen sizes", written: /(?<![\w-])(?:min-|max-)?[hw]-screen\b/g },
+];
+
+const SURFACE_SENSES: readonly Sense[] = [
+  ...FILED_NAMES,
+  { sense: "the MCP surface", written: /\bmcp[- _/]?surfaces?\b/gi },
+  { sense: "the roles surface, roles-surface.json", written: /\broles['’]?[- _]?surface\b/gi },
+  {
+    sense: "the design system's surface colours and their tokens",
+    written:
+      /--surface-[\w-]+|\b(?:white|sunken|raised|inset|dark|accent|chip|muted|quiet|de-emphasised) surfaces?\b|\bsurfaces? (?:tokens?|colou?rs?)\b/gi,
+  },
+  {
+    sense: "the design system Frame's surface prop, its background",
+    within: "packages/design-system/",
+    written: /\bsurface(?=\s*[,|])/g,
+  },
+  {
+    sense: "what the api exposes to a caller, of which the MCP surface is one",
+    within: "apps/api/",
+    written: /\bsurfaces?\b/gi,
+  },
+  {
+    sense: "the roles surface, as the schema that generates it names it",
+    within: "packages/schema/",
+    written: /\bsurfaces?\b/gi,
+  },
+];
+
+const PAGE_AREA_MENU = "page, area and menu";
+
+const PAGE_AREA_MENU_LANDED = "2026-10-04";
+
 export const OLD_WORDS: readonly OldWord[] = [
   avoided("2FA", "second factor"),
   avoided("access token", "personal token"),
@@ -464,9 +518,26 @@ export const OLD_WORDS: readonly OldWord[] = [
   pending("route", "model choice", "model choice", "model choice", "one sense"),
   pending("run", "sync", "sync", "sync", "one sense"),
   avoided("Sales", "role (of a person)", "a job title", "Admin, Editor or Viewer"),
-  pending("screen", "page", "page", "page, area and menu", "one sense"),
+  {
+    word: "screen",
+    use: "page",
+    entry: "page",
+    sweep: PAGE_AREA_MENU,
+    state: "landed",
+    reach: "one sense",
+    permitted: SCREEN_SENSES,
+    carvedOut: [writtenBefore(PAGE_AREA_MENU_LANDED)],
+  },
   avoided("seat", "member"),
-  pending("secondary nav", "menu", "menu", "page, area and menu", "everywhere"),
+  {
+    word: "secondary nav",
+    use: "menu",
+    entry: "menu",
+    sweep: PAGE_AREA_MENU,
+    state: "landed",
+    reach: "everywhere",
+    carvedOut: [writtenBefore(PAGE_AREA_MENU_LANDED)],
+  },
   avoided("section header", "toolbar"),
   avoided("section nav", "menu"),
   avoided("security key", "passkey", "one kind of device that can hold one"),
@@ -490,7 +561,16 @@ export const OLD_WORDS: readonly OldWord[] = [
   avoided("sub-nav", "menu"),
   avoided("sub-screen", "tab"),
   avoided("sudo", "re-confirm"),
-  pending("surface", "area", "area", "page, area and menu", "one sense"),
+  {
+    word: "surface",
+    use: "area",
+    entry: "area",
+    sweep: PAGE_AREA_MENU,
+    state: "landed",
+    reach: "one sense",
+    permitted: SURFACE_SENSES,
+    carvedOut: [writtenBefore(PAGE_AREA_MENU_LANDED)],
+  },
   avoided("sync lag", "map rebuild"),
   avoided("task", "job"),
   avoided("team", "group", "Liam, 05/09/2026: aligned to the Entra access model; nor a workspace"),
@@ -535,7 +615,6 @@ export const NOT_WATCHED_ON_PAGES: readonly { readonly head: string; readonly wh
   { head: "estate", why: "ordinary English" },
   { head: "forge", why: "ordinary English" },
   { head: "generation", why: "ordinary English" },
-  { head: "group (of an area)", why: "a group of members is a reader's word" },
   { head: "include", why: "ordinary English" },
   { head: "job", why: "ordinary English" },
   { head: "land (the verb)", why: "ordinary English" },
