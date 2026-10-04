@@ -190,6 +190,17 @@ const PAGE_AREA_MENU = "page, area and menu";
 
 const PAGE_AREA_MENU_LANDED = "2026-10-04";
 
+/** The sweep's own learning quotes the words it teaches later sweeps to remove. */
+const PAGE_AREA_MENU_CARVED_OUT: readonly CarveOut[] = [
+  writtenBefore(PAGE_AREA_MENU_LANDED),
+  {
+    holds: (file) =>
+      file ===
+      "docs/solutions/best-practices/what-a-rename-sweeps-runner-and-prose-pass-get-wrong-and-the-checks-that-catch-it.md",
+    why: "the sweep's learning names the words it renamed, as its map does",
+  },
+];
+
 export const OLD_WORDS: readonly OldWord[] = [
   avoided("2FA", "second factor"),
   avoided("access token", "personal token"),
@@ -531,7 +542,7 @@ export const OLD_WORDS: readonly OldWord[] = [
     state: "landed",
     reach: "one sense",
     permitted: SCREEN_SENSES,
-    carvedOut: [writtenBefore(PAGE_AREA_MENU_LANDED)],
+    carvedOut: PAGE_AREA_MENU_CARVED_OUT,
   },
   avoided("seat", "member"),
   {
@@ -548,7 +559,7 @@ export const OLD_WORDS: readonly OldWord[] = [
         written: /better-answers\.secondary-nav/g,
       },
     ],
-    carvedOut: [writtenBefore(PAGE_AREA_MENU_LANDED)],
+    carvedOut: PAGE_AREA_MENU_CARVED_OUT,
   },
   avoided("section header", "toolbar"),
   avoided("section nav", "menu"),
@@ -581,7 +592,7 @@ export const OLD_WORDS: readonly OldWord[] = [
     state: "landed",
     reach: "one sense",
     permitted: SURFACE_SENSES,
-    carvedOut: [writtenBefore(PAGE_AREA_MENU_LANDED)],
+    carvedOut: PAGE_AREA_MENU_CARVED_OUT,
   },
   avoided("sync lag", "map rebuild"),
   avoided("task", "job"),
