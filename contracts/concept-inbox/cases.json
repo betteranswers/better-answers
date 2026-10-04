@@ -104,7 +104,7 @@
       "sqlstate": "42501"
     },
     {
-      "why": "the summary is a decision surface, and deciding is not a producer's act",
+      "why": "the summary is read to decide, and deciding is not a producer's act",
       "role": "worker_rt",
       "workspace_id": "01J6AAAAAAAAAAAAAAAAAAAAAA",
       "statement": "SELECT 1 FROM suggestion_set_summary('01J6RRRRRRRRRRRRRRRRRRRRRR')",

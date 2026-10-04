@@ -1,10 +1,10 @@
 import { addressOf } from "@/shared/address-ask.ts";
-import type { ScreenPath } from "@/shared/navigation.ts";
+import type { PagePath } from "@/shared/navigation.ts";
 
-/** Typed by the navigation list, so a screen moved there fails here at compile time. */
-export const EVERYONE_PATH: ScreenPath = "/console/people/everyone";
+/** Typed by the navigation list, so a page moved there fails here at compile time. */
+export const EVERYONE_PATH: PagePath = "/console/people/everyone";
 
-export const NAMES_WAITING_PATH: ScreenPath = "/console/people/names-waiting";
+export const NAMES_WAITING_PATH: PagePath = "/console/people/names-waiting";
 
 const SEARCH = "search";
 

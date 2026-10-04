@@ -61,7 +61,7 @@ export const SAID_OF_A_BINDING = {
   },
   "no-such-group": {
     why: "A named group is not one this workspace holds.",
-    next: "Name the groups the People screen lists.",
+    next: "Name the groups the People page lists.",
   },
   malformed: {
     why: "Something in the form isn't valid, so nothing was saved.",

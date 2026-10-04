@@ -36,7 +36,7 @@ const accountHeading = (page: Page) =>
 
 const rowOf = (page: Page, name: string) => page.getByRole("listitem", { name, exact: true });
 
-const theNoWorkspaceScreen = (page: Page) =>
+const theNoWorkspacePage = (page: Page) =>
   page.getByRole("heading", { level: 1, name: NO_WORKSPACE_HEADING });
 
 /** The name the page suggests, read from the browser it runs in. */
@@ -97,7 +97,7 @@ test("a person adds a passkey, then signs in without email", async ({ page, requ
 
   await signedOut(page);
 
-  await expect(theNoWorkspaceScreen(page)).toBeVisible();
+  await expect(theNoWorkspacePage(page)).toBeVisible();
   expect(await emailsSentTo(request, person.email), "the passkey sign-in sent an email").toBe(
     emailsBefore,
   );
@@ -119,7 +119,7 @@ test("a renamed passkey shows its name, and its last use", async ({ page, reques
     rowOf(page, "Work laptop").getByRole("button", { name: PASSKEY_WORDS.rename }),
   ).toBeFocused();
   await signedOut(page);
-  await expect(theNoWorkspaceScreen(page)).toBeVisible();
+  await expect(theNoWorkspacePage(page)).toBeVisible();
   await accountOpened(page);
   await expect(rowOf(page, "Work laptop")).toContainText("Last used");
 });
@@ -221,7 +221,7 @@ test("the email step reads email, send, then the passkey", async ({ page }) => {
   await expect(page.getByRole("button", { name: SIGN_IN_WORDS.passkey })).toBeFocused();
 });
 
-test("the offer shows on a shell screen until dismissed", async ({ page, request }) => {
+test("the offer shows on a shell page until dismissed", async ({ page, request }) => {
   await aVirtualAuthenticator(page);
   await aMemberSignedInAt(page, request, "Viewer", "/ask");
   const offer = page.getByText(PASSKEY_WORDS.offer);
@@ -231,10 +231,10 @@ test("the offer shows on a shell screen until dismissed", async ({ page, request
   await page.getByRole("button", { name: PASSKEY_WORDS.dismissOffer }).click();
 
   await expect(offer).toHaveCount(0);
-  await expect(page.getByRole("main", { name: "Screen" })).toBeFocused();
+  await expect(page.getByRole("main", { name: "Page" })).toBeFocused();
   expect((await dismissed).ok(), "the dismissal was not kept").toBe(true);
   await page.reload();
-  await expect(page.getByRole("main", { name: "Screen" })).toBeVisible();
+  await expect(page.getByRole("main", { name: "Page" })).toBeVisible();
   await expect(offer).toHaveCount(0);
 });
 

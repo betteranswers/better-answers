@@ -192,7 +192,7 @@ export function BindAct() {
               </SelectContent>
             </Select>
             <p id={`${ids.audience}-hint`} className="text-sm text-muted-foreground">
-              Named groups are chosen here once the People screen lists them.
+              Named groups are chosen here once the People page lists them.
             </p>
           </div>
 

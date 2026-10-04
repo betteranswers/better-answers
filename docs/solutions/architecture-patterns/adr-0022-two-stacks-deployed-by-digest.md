@@ -40,7 +40,7 @@ One variable, `RELEASE_MODE`, phases the releases:
 - `drill`: a dispatched release names the drill report it rides on, or a hotfix reason. It runs from go-live.
 - Any other value releases nothing.
 
-The journeys sign in to production as the test people and walk the screens each role reaches. A second variable, `JOURNEYS_MODE`, stages them:
+The journeys sign in to production as the test people and walk the pages each role reaches. A second variable, `JOURNEYS_MODE`, stages them:
 
 - `off`, or unset: they never run, and a release is tagged on its smoke.
 - `report`: they run and report, and the tag still follows the smoke.

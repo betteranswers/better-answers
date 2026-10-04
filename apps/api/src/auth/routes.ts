@@ -281,7 +281,7 @@ const linkSignInBody = (use: LinkUse): FlowBody =>
 
 const nameGiven = z.object({ user: z.object({ name: z.string() }) });
 
-/** The library answers a carried flow's next step rather than the person; the next screen reads the name. */
+/** The library answers a carried flow's next step rather than the person; the next page reads the name. */
 const displayNameGivenIn = async (answered: Response): Promise<boolean> => {
   const named = nameGiven.safeParse(
     await answered

@@ -63,9 +63,9 @@ describe("imports run app \u2192 features \u2192 shared, never back", () => {
     ]);
   });
 
-  it("lets a screen import shared's toolbar state, not the shell's", () => {
+  it("lets a page import shared's toolbar state, not the shell's", () => {
     const refused = flagged({
-      "apps/web/src/features/sources/review-toolbar.ts": probe("@/shared/screen-toolbar.tsx"),
+      "apps/web/src/features/sources/review-toolbar.ts": probe("@/shared/page-toolbar.tsx"),
       "apps/web/src/features/sources/reaches-the-shell.ts": probe("@/app/toolbar.tsx"),
     });
 
@@ -186,12 +186,12 @@ describe("AppRouter as a type, in one file only", () => {
   it("refuses a runtime api import, the client-instance file included", () => {
     const refused = flagged({
       "apps/web/src/shared/api/trpc.ts": probe("@better-answers/api/trpc"),
-      "apps/web/src/app/screens/system-screen.ts": probe("@better-answers/api/trpc"),
+      "apps/web/src/app/pages/system-page.ts": probe("@better-answers/api/trpc"),
       "apps/web/src/features/routes/api.ts": probe("@better-answers/api/trpc"),
     });
 
     expect(refused).toEqual([
-      "apps/web/src/app/screens/system-screen.ts",
+      "apps/web/src/app/pages/system-page.ts",
       "apps/web/src/features/routes/api.ts",
       "apps/web/src/shared/api/trpc.ts",
     ]);

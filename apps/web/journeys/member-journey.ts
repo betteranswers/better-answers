@@ -13,7 +13,7 @@ import { theConsoleIsRefused, theSwitcherListsOneWorkspace, type Gate } from "./
 import { expect, test } from "./fixtures.ts";
 import { membershipOf } from "./reads.ts";
 
-/** An Editor or a Viewer: they reach their home, and an Admin's screen says it was never there. */
+/** An Editor or a Viewer: they reach their home, and an Admin's page says it was never there. */
 export const aMembersJourney = async (
   page: Page,
   role: "Editor" | "Viewer",
@@ -31,7 +31,7 @@ export const aMembersJourney = async (
 
   await test.step("The console", () => theConsoleIsRefused(page, gate));
 
-  await test.step("An Admin's screen", async () => {
+  await test.step("An Admin's page", async () => {
     await page.goto(HOMES.Admin.path);
     await notFoundOfferingHome(page, role);
     await gate();

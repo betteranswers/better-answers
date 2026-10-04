@@ -104,7 +104,7 @@ const expectRefusalPage = (html: string, said: RefusalWords): void => {
   expect(read.slice(-next.length)).toBe(next);
 };
 
-/** Signs `email` in on `client`, then follows `href` on as the sign-in screen does. */
+/** Signs `email` in on `client`, then follows `href` on as the sign-in page does. */
 const backThroughSignIn = async (
   client: ReturnType<TestApp["client"]>,
   email: string,

@@ -21,7 +21,7 @@ import {
   TableRow,
 } from "@/shared/ui/table.tsx";
 
-/** Ticks are row ids the screen holds, so a row a search or a page hides stays ticked. */
+/** Ticks are row ids the page holds, so a row a search or a page hides stays ticked. */
 type Ticks = {
   readonly ticked: ReadonlySet<string>;
   readonly onTickedChange: (ticked: ReadonlySet<string>) => void;
@@ -50,7 +50,7 @@ type Opted<Data> = {
 const HEAD =
   "h-9 px-3 font-medium whitespace-normal text-muted-foreground [font-size:var(--text-xs)]";
 
-/** Wrapping, not scrolling, is what keeps a 320px screen from hiding a column. */
+/** Wrapping, not scrolling, is what keeps a 320px page from hiding a column. */
 const CELL = "h-10 px-3 py-2 whitespace-normal";
 
 /**

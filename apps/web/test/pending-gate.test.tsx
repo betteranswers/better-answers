@@ -69,7 +69,7 @@ const NO_SESSION = {
   },
 };
 
-/** The screen's own read, refused for its own reason before the session is pending. */
+/** The page's own read, refused for its own reason before the session is pending. */
 const NO_GROUPS = {
   error: {
     message: "forbidden",

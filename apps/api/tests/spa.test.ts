@@ -9,7 +9,7 @@ const asABrowserNavigates = { headers: { accept: "text/html,application/xhtml+xm
 describe("the api serves the shell on app.", () => {
   const app = servedApp();
 
-  it("answers a screen's address with the shell, so bookmarks work", async () => {
+  it("answers a page's address with the shell, so bookmarks work", async () => {
     const response = await app()
       .client(undefined, APP_HOSTNAME)
       .fetch("/system", asABrowserNavigates);
@@ -26,11 +26,9 @@ describe("the api serves the shell on app.", () => {
     await expect(response.text()).resolves.toContain(`<div id="root">`);
   });
 
-  it("refuses framing by another site on every screen, sign-in included", async () => {
-    for (const screen of ["/sign-in", "/choose-workspace", "/system", "/"]) {
-      const response = await app()
-        .client(undefined, APP_HOSTNAME)
-        .fetch(screen, asABrowserNavigates);
+  it("refuses framing by another site on every page, sign-in included", async () => {
+    for (const page of ["/sign-in", "/choose-workspace", "/system", "/"]) {
+      const response = await app().client(undefined, APP_HOSTNAME).fetch(page, asABrowserNavigates);
 
       expect(response.status).toBe(200);
       expect(response.headers.get("content-security-policy")).toBe("frame-ancestors 'none'");
@@ -39,11 +37,11 @@ describe("the api serves the shell on app.", () => {
   });
 
   it("serves a built asset as itself", async () => {
-    const response = await app().client(undefined, APP_HOSTNAME).fetch("/assets/screen.js");
+    const response = await app().client(undefined, APP_HOSTNAME).fetch("/assets/page.js");
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("javascript");
-    await expect(response.text()).resolves.toContain("the screen");
+    await expect(response.text()).resolves.toContain("the page");
   });
 
   it("answers a missing asset with 404, not the shell", async () => {
@@ -88,7 +86,7 @@ describe("the api serves the shell on app.", () => {
     await expect(response.text()).resolves.not.toContain(`<div id="root">`);
   });
 
-  it("answers a screen's address on a trailing-dot hostname", async () => {
+  it("answers a page's address on a trailing-dot hostname", async () => {
     const response = await app().server.request(
       new Request(`https://${APP_HOSTNAME}./system`, asABrowserNavigates),
     );

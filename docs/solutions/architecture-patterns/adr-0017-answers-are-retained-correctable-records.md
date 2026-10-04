@@ -8,7 +8,7 @@ severity: medium
 applies_when:
   - "Recording an answer, the feedback on it or a correction to it"
   - "Minting or updating an `Answer` concept"
-  - "Adding a group or a screen to Control Centre"
+  - "Adding a group or a page to Control Centre"
 tags:
   - adr-0017
   - answer-audit
@@ -37,12 +37,12 @@ An `Answer` concept is minted or updated only at a gate a person runs, the promo
 - The `Answer` domain's owner or an Admin decides it one at a time, never in bulk: update the existing, add as new, or decline.
 - Accepting is one governed write with the decider as author. A trim makes the decider the generator.
 
-Control Centre is one surface of eight groups: Overview, Suggestions, Sources, Agent Operations, Questions, People, Personal data and System. ADR 0047 lists each group's screens.
+Control Centre is one area of eight groups: Overview, Suggestions, Sources, Agent Operations, Questions, People, Personal data and System. ADR 0047 lists each group's pages.
 
 - Questions holds the answer audit and the answer tests. A promotion waits in Suggestions' queue with every other suggestion.
-- People's screens are members, groups and tokens.
+- People's pages are members, groups and tokens.
 - The audit log, in System, is the workspace's own audit events, never the identity-set audit log.
-- The operator's console is a surface of its own, outside Control Centre, reached from the workspace switcher.
+- The operator's console is an area of its own, outside Control Centre, reached from the workspace switcher.
 
 ## Why
 
@@ -50,8 +50,8 @@ Control Centre is one surface of eight groups: Overview, Suggestions, Sources, A
 - A retrieval fix without a replayable test is a belief.
 - The bid library grows from use. A gate only Admins can feed is a gate nobody feeds, and one with no second pair of eyes turns one tender's wording into company knowledge.
 - One noun per thing an Admin is answerable for is what a person holds without reading, so each of Control Centre's groups is a noun. *Answers* on the door would send them to the bid library's wrong home.
-- Screens named by verbs were refused while Control Centre was the only surface. Ask contradicts that refusal: it is a surface every role opens to do one thing, and the verb names that thing. The refusal was lifted on 30/09/2026 (ADR 0047). Control Centre's groups keep their nouns.
-- The screen is *members*, not *roles*, because the three roles are fixed and ADR 0038 adopts no custom roles.
+- Pages named by verbs were refused while Control Centre was the only area. Ask contradicts that refusal: it is an area every role opens to do one thing, and the verb names that thing. The refusal was lifted on 30/09/2026 (ADR 0047). Control Centre's groups keep their nouns.
+- The page is *members*, not *roles*, because the three roles are fixed and ADR 0038 adopts no custom roles.
 
 ## Rejected
 
@@ -63,10 +63,10 @@ Control Centre is one surface of eight groups: Overview, Suggestions, Sources, A
 - Refusing an uncited answer until evidence is attached: the writer stops proposing.
 - Corrections as notes, an external evaluation tool, replaying the draft, or one pass-rate percentage.
 - A lenient generator at the gate: the check no longer means a second person.
-- Four screens, or "Answers" for the audit screen.
+- Four pages, or "Answers" for the audit page.
 
 ## History
 
 The full record, with its amendments (ADR 0025 of 28/08/2026, ticket 79 applied by T-001, and the T-027 and T-028 grill): `docs/archive/adr/0017-answers-are-retained-correctable-records.md`.
 
-Edited 30/09/2026 with ADR 0047, after the archived record was frozen: Control Centre's six screens became one surface of eight groups, Knowledge left it to become a surface, and the refusal of screens named by verbs was lifted because Ask contradicts it.
+Edited 30/09/2026 with ADR 0047, after the archived record was frozen: Control Centre's six pages became one area of eight groups, Knowledge left it to become an area, and the refusal of pages named by verbs was lifted because Ask contradicts it.

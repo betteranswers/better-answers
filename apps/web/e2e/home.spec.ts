@@ -1,6 +1,6 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
-import { goHome, JUMP_TO, RAIL, unbuiltLineOf, UNKNOWN_SCREEN } from "@/app/words.ts";
+import { goHome, JUMP_TO, RAIL, unbuiltLineOf, UNKNOWN_PAGE } from "@/app/words.ts";
 import { ACCOUNT_HEADING } from "@/features/auth/account-words.ts";
 import { aRole, ROLES } from "@/features/people/role-meanings.ts";
 import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
@@ -17,7 +17,7 @@ import {
   provision,
   quoted,
   signIn,
-  skipLinkReachesTheScreen,
+  skipLinkReachesThePage,
 } from "./harness.ts";
 
 const READ_BUDGET_MS = 1000;
@@ -33,8 +33,8 @@ const signedInAs = async (page: Page, api: APIRequestContext, role: Role) => {
   await signIn(page, api, email);
 };
 
-const unknownScreen = (page: Page) =>
-  page.getByRole("heading", { level: 1, name: UNKNOWN_SCREEN.heading });
+const unknownPage = (page: Page) =>
+  page.getByRole("heading", { level: 1, name: UNKNOWN_PAGE.heading });
 
 const personMenu = (page: Page, role: Role) =>
   page.getByRole("banner").getByRole("button", { name: `A ${role}`, exact: true });
@@ -56,9 +56,9 @@ for (const role of ROLES) {
     await signedInAs(page, request, role);
     await landedAtHome(page, role);
 
-    await page.goto("/not-a-screen");
+    await page.goto("/not-a-page");
 
-    await expect(unknownScreen(page)).toBeVisible();
+    await expect(unknownPage(page)).toBeVisible();
     await expect(page.getByRole("link", { name: goHome(home) })).toBeVisible();
     await passesTheAccessibilityGate();
     await page.keyboard.press("Tab");
@@ -68,7 +68,7 @@ for (const role of ROLES) {
   });
 }
 
-test("offers a Viewer's home from an unknown screen, shell kept", async ({
+test("offers a Viewer's home from an unknown page, shell kept", async ({
   page,
   request,
   passesTheAccessibilityGate,
@@ -77,13 +77,13 @@ test("offers a Viewer's home from an unknown screen, shell kept", async ({
   await signedInAs(page, request, "Viewer");
   await landedAtHome(page, "Viewer");
 
-  await page.goto("/system/not-a-screen");
+  await page.goto("/system/not-a-page");
 
-  await expect(unknownScreen(page)).toBeVisible();
+  await expect(unknownPage(page)).toBeVisible();
   await expect(page.getByRole("navigation", { name: RAIL })).toBeVisible();
   await expect(page.getByRole("link", { name: goHome(home) })).toBeVisible();
   await passesTheAccessibilityGate();
-  await skipLinkReachesTheScreen(page);
+  await skipLinkReachesThePage(page);
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: goHome(home) })).toBeFocused();
   await page.keyboard.press("Enter");
@@ -105,7 +105,7 @@ for (const role of ["Editor", "Viewer"] as const) {
     `);
     await expect(page.getByRole("navigation", { name: CONTROL_CENTRE.name })).toHaveCount(0);
     await expect(page.getByRole("main")).toMatchAriaSnapshot(`
-      - main "Screen":
+      - main "Page":
         - heading ${quoted(headingOf(home))} [level=1]
         - paragraph: ${quoted(unbuiltLineOf(home))}
     `);
@@ -115,7 +115,7 @@ for (const role of ["Editor", "Viewer"] as const) {
     await signedInAs(page, request, role);
     await landedAtHome(page, role);
 
-    await page.goto("/people/not-a-screen");
+    await page.goto("/people/not-a-page");
     await expect(page.getByRole("link", { name: goHome(HOMES[role]) })).toBeVisible();
     const neverExisted = await page.getByRole("main").ariaSnapshot();
 
@@ -123,7 +123,7 @@ for (const role of ["Editor", "Viewer"] as const) {
 
     await expect(page.getByRole("link", { name: goHome(HOMES[role]) })).toBeVisible();
     await expect(page).toHaveURL(new RegExp(`${HOMES.Admin.path}$`));
-    expect(await page.getByRole("main").ariaSnapshot(), "a hidden screen gives itself away").toBe(
+    expect(await page.getByRole("main").ariaSnapshot(), "a hidden page gives itself away").toBe(
       neverExisted,
     );
     await expect(page.getByRole("tablist")).toHaveCount(0);
@@ -148,7 +148,7 @@ test("draws a Viewer's Ask within a second of arriving", async ({ page, request 
   expect(elapsedMs, "Ask was not drawn within its second").toBeLessThan(READ_BUDGET_MS);
 });
 
-test("lists the shell's keystrokes alone on Ask and unknown screens", async ({
+test("lists the shell's keystrokes alone on Ask and unknown pages", async ({
   page,
   request,
   passesTheAccessibilityGate,
@@ -168,10 +168,10 @@ test("lists the shell's keystrokes alone on Ask and unknown screens", async ({
   await passesTheAccessibilityGate();
   await keystrokesDismissed(page, onAsk);
 
-  // Hidden from a Viewer, so it is the screen that never existed.
+  // Hidden from a Viewer, so it is the page that never existed.
   await page.goto(HOMES.Admin.path);
-  await expect(unknownScreen(page)).toBeVisible();
-  const onUnknown = await keystrokesListed(page, KEYSTROKE_WORDS.thisScreen);
+  await expect(unknownPage(page)).toBeVisible();
+  const onUnknown = await keystrokesListed(page, KEYSTROKE_WORDS.thisPage);
   await expect(onUnknown).toContainText(KEYSTROKE_WORDS.noneOfItsOwn);
   await expect(onUnknown.getByRole("definition")).toHaveText(theShells);
   await keystrokesDismissed(page, onUnknown);

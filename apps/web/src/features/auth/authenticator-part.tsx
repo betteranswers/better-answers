@@ -8,7 +8,7 @@ import { QRCode } from "@/shared/ui/kibo-ui/qr-code.tsx";
 
 import { ACCOUNT_ACTS, AUTHENTICATOR_WORDS } from "./account-words.ts";
 import { CodeRefused, SIGNED_OUT, TOO_MANY_REQUESTS } from "./auth-hooks.ts";
-import { Outcome } from "./auth-screen.tsx";
+import { Outcome } from "./auth-page.tsx";
 import {
   AuthenticatorCodeField,
   CODE_WRONG,

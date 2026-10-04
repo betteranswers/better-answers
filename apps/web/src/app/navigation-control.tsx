@@ -1,12 +1,12 @@
 import { useRef, useState, type RefObject } from "react";
 
 import { Icon } from "@/shared/icon.tsx";
-import type { Place, VisibleSurface } from "@/shared/navigation.ts";
+import type { Place, VisibleArea } from "@/shared/navigation.ts";
 import { Button } from "@/shared/ui/button.tsx";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/shared/ui/sheet.tsx";
 
 import { IconRail } from "./icon-rail.tsx";
-import { SecondaryNav } from "./secondary-nav.tsx";
+import { Menu } from "./menu.tsx";
 import { NAVIGATION_SHEET, TOGGLE } from "./words.ts";
 
 type Sheeting = {
@@ -25,7 +25,7 @@ export const useNavigationSheet = (): Sheeting => {
 };
 
 /**
- * The toggle for the secondary nav when wide, the sheet's button when narrow. `controls` is the
+ * The toggle for the menu when wide, the sheet's button when narrow. `controls` is the
  * nav's id.
  */
 export function NavigationButton(properties: {
@@ -33,7 +33,7 @@ export function NavigationButton(properties: {
   readonly wide: boolean;
   readonly showing: boolean;
   readonly controls: string;
-  readonly open: Place<VisibleSurface> | undefined;
+  readonly open: Place<VisibleArea> | undefined;
   readonly onShow: (showing: boolean) => void;
 }) {
   const { wide, showing, controls, open, onShow } = properties;
@@ -56,7 +56,7 @@ export function NavigationButton(properties: {
     );
   }
 
-  // An address that is no screen has no surface to list, so there is nothing to govern.
+  // An address that is no page has no area to list, so there is nothing to govern.
   if (open === undefined) return null;
 
   return (
@@ -70,7 +70,7 @@ export function NavigationButton(properties: {
       aria-controls={controls}
       onClick={() => onShow(!showing)}
     >
-      <Icon name="secondary-nav" className="text-muted-foreground" />
+      <Icon name="menu" className="text-muted-foreground" />
       <span className="sr-only">{showing ? TOGGLE.hide : TOGGLE.show}</span>
     </Button>
   );
@@ -80,15 +80,15 @@ export function NavigationButton(properties: {
 export function NavigationSheet(properties: {
   readonly sheet: Sheeting;
   readonly wide: boolean;
-  readonly surfaces: readonly VisibleSurface[];
-  readonly open: Place<VisibleSurface> | undefined;
+  readonly areas: readonly VisibleArea[];
+  readonly open: Place<VisibleArea> | undefined;
 }) {
   const { controlRef, asked, ask } = properties.sheet;
   const close = () => ask(false);
 
   const handBackFocus = (event: Event) => {
     // Radix hands focus to its own trigger, which this sheet lacks; the band's button takes it,
-    // or the screen when no button is drawn.
+    // or the page when no button is drawn.
     event.preventDefault();
     close();
     (controlRef.current ?? document.querySelector("main"))?.focus();
@@ -108,17 +108,17 @@ export function NavigationSheet(properties: {
         </SheetHeader>
 
         <IconRail
-          surfaces={properties.surfaces}
-          openSurfaceId={properties.open?.surface.id}
+          areas={properties.areas}
+          openAreaId={properties.open?.area.id}
           tooltips={false}
           onChoose={close}
         />
 
         {properties.open === undefined ? null : (
-          <SecondaryNav
+          <Menu
             showing
-            surface={properties.open.surface}
-            openScreenPath={properties.open.screen.path}
+            area={properties.open.area}
+            openPagePath={properties.open.page.path}
             onChoose={close}
           />
         )}

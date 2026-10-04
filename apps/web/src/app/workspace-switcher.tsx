@@ -94,7 +94,7 @@ const listedFrom = (here: Here, workspaces: readonly SwitchedTo[]): readonly Swi
 };
 
 /**
- * Held while a switch is pending, since its late answer would move whatever screen the person
+ * Held while a switch is pending, since its late answer would move whatever page the person
  * left for.
  */
 function WayOut(properties: {

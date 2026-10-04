@@ -21,7 +21,7 @@ const specOf = (...lines: readonly string[]): string =>
   ].join("\n");
 
 const ADMIN_FAILS_ON_MEMBERS = [
-  'test("the Admin acts on every screen", async () => {',
+  'test("the Admin acts on every page", async () => {',
   '  playsTheRole("Admin");',
   '  await test.step("Members", async () => {',
   '    await test.step("moves three members to Editor", async () => {',
@@ -93,7 +93,7 @@ describe("the journeys' outcome reporter", () => {
     expect(run.summary).toBe("\n### Journeys: held\n\nEvery journey passed.\n");
   }, 60_000);
 
-  it("writes fail and names the role, screen and step", async () => {
+  it("writes fail and names the role, page and step", async () => {
     const run = await journeysOver({
       spec: specOf(...ADMIN_FAILS_ON_MEMBERS, 'test("the Viewer lands on their home", () => {});'),
     });
@@ -121,7 +121,7 @@ describe("the journeys' outcome reporter", () => {
     expect(run.outcome).toBe("could-not-run\n");
     expect(run.summary).toContain(
       [
-        "| Outcome | Role | Screen | Step | Why |",
+        "| Outcome | Role | Page | Step | Why |",
         "| --- | --- | --- | --- | --- |",
         "| fail | Admin | Members | moves three members to Editor |  |",
         "| could-not-run | Editor | Sign in | Send the code | a rate ceiling refused the Send |",
@@ -180,7 +180,7 @@ describe("the journeys' outcome reporter", () => {
   it("says outside any step for a failure outside every step", async () => {
     const run = await journeysOver({
       spec: specOf(
-        'test("the Admin acts on every screen", () => {',
+        'test("the Admin acts on every page", () => {',
         '  playsTheRole("Admin");',
         '  throw new Error("the journey broke between its steps");',
         "});",
@@ -194,7 +194,7 @@ describe("the journeys' outcome reporter", () => {
   it("writes fail for a timed-out journey, naming its step", async () => {
     const run = await journeysOver({
       spec: specOf(
-        'test("the Admin acts on every screen", async () => {',
+        'test("the Admin acts on every page", async () => {',
         "  test.setTimeout(1_000);",
         '  playsTheRole("Admin");',
         '  await test.step("Audit log", async () => {',
@@ -211,7 +211,7 @@ describe("the journeys' outcome reporter", () => {
   it("writes could-not-run for a run stopped midway", async () => {
     const run = await journeysOver({
       spec: specOf(
-        'test("the Admin acts on every screen", async () => {',
+        'test("the Admin acts on every page", async () => {',
         '  playsTheRole("Admin");',
         '  await test.step("Members", async () => {',
         '    process.kill(process.ppid, "SIGINT");',
@@ -227,7 +227,7 @@ describe("the journeys' outcome reporter", () => {
 
   it("writes could-not-run when no journey ran", async () => {
     const run = await journeysOver({
-      spec: specOf('test.skip("the Admin acts on every screen", () => {});'),
+      spec: specOf('test.skip("the Admin acts on every page", () => {});'),
     });
 
     expect(run.outcome).toBe("could-not-run\n");

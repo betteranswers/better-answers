@@ -532,12 +532,32 @@ describe("a word that lands with its sweep", () => {
   it("keeps a stored act name the generated list has lost", () => {
     const tree = plantedTree({
       "apps/web/src/features/people/audit-acts.ts": `export const DECLARED_ACTS = ["sources.connected_source.bound"] as const;`,
-      "apps/web/src/shared/navigation.ts": `movedFrom: "/sources",`,
+      "apps/web/src/shared/navigation.ts": `movedFrom: ["/sources"],`,
       "apps/api/tests/better-auth-endpoints.txt": "/sign-in/email",
     });
     const files = { "docs/planted.md": `Each upload records sources.${BOUND}.bound.` };
 
     expect(linesOver(files, [BINDING], Object.values(keptNamesUnder(tree)).flat())).toEqual([]);
+  });
+
+  it("keeps every older address a page lists", () => {
+    const tree = plantedTree({
+      "apps/web/src/features/people/audit-acts.ts": `export const DECLARED_ACTS = [] as const;`,
+      "apps/web/src/shared/navigation.ts": [
+        `movedFrom: ["/system/old-name"],`,
+        `movedFrom: [`,
+        `  "/system/older-name",`,
+        `  "/agent-operations/old-name",`,
+        `],`,
+      ].join("\n"),
+      "apps/api/tests/better-auth-endpoints.txt": "/sign-in/email",
+    });
+
+    expect(keptNamesUnder(tree)["old page addresses"]).toEqual([
+      "/system/old-name",
+      "/system/older-name",
+      "/agent-operations/old-name",
+    ]);
   });
 
   it("passes a deferred sense until its later sweep lands", () => {

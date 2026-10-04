@@ -4,7 +4,7 @@ import { EMPTY_LINES } from "@/features/people/empty-lines.ts";
 import { PEOPLE_KEYSTROKES } from "@/features/people/people-state.ts";
 import { SAID_OF_A_REQUEST } from "@/features/people/refusal-words.ts";
 import { aRole } from "@/features/people/role-meanings.ts";
-import { CONTROL_CENTRE, groupIn, screenNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
@@ -26,9 +26,9 @@ import {
 
 const LIST_BUDGET_MS = 1000;
 
-const MEMBERS = screenNamed(groupIn(CONTROL_CENTRE, "people"), "Members");
+const MEMBERS = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members");
 
-const MEMBERS_SCREEN = MEMBERS.path;
+const MEMBERS_PAGE = MEMBERS.path;
 
 const LONG_UK_DATE = /^\d{1,2} [A-Z][a-z]+ \d{4}$/;
 
@@ -81,7 +81,7 @@ const anAdminAtRequests = async (
   const asked: Asked[] = [];
   for (const one of asking) asked.push(await asksToJoin(api, workspace.slug, one));
 
-  await page.goto(MEMBERS_SCREEN);
+  await page.goto(MEMBERS_PAGE);
   await signIn(page, api, adminEmail);
   await expect(page.getByRole("heading", { level: 1, name: "People" })).toBeVisible();
   return { workspaceId: workspace.workspaceId, slug: workspace.slug, asked };
@@ -92,7 +92,7 @@ const openRequests = async (page: Page): Promise<void> => {
   await expect(requestsRegion(page).getByRole("heading", { name: "Requests" })).toBeVisible();
 };
 
-test.describe("the People screen's Requests tab", () => {
+test.describe("the People page's Requests tab", () => {
   test("an Admin approves a request at a role, inviting them", async ({ page, request }) => {
     const { asked } = await anAdminAtRequests(page, request, "Calder Joinery", [
       { displayName: "Priya Shah" },
@@ -145,7 +145,7 @@ test.describe("the People screen's Requests tab", () => {
 
     // A fresh document, so no list is already in the page's cache.
     const startedAtMs = Date.now();
-    await page.goto(MEMBERS_SCREEN);
+    await page.goto(MEMBERS_PAGE);
     await openRequests(page);
     await expect(requestRows(page)).toHaveCount(3);
     const elapsedMs = Date.now() - startedAtMs;
@@ -187,7 +187,7 @@ test.describe("the People screen's Requests tab", () => {
       { displayName: "Approved Kay", reason: "I run the renewals." },
     ]);
     const kay = asked[2]?.email ?? "";
-    await tabOpenedByKeyboard(page, MEMBERS_SCREEN, "Requests");
+    await tabOpenedByKeyboard(page, MEMBERS_PAGE, "Requests");
     await expect(requestRows(page)).toHaveCount(3);
 
     await tabUntilFocused(
@@ -288,7 +288,7 @@ test.describe("the People screen's Requests tab", () => {
     await expect(approving.getByRole("combobox", { name: "Role" })).toBeVisible();
 
     const elsewhere = await context.newPage();
-    await elsewhere.goto(MEMBERS_SCREEN);
+    await elsewhere.goto(MEMBERS_PAGE);
     await openRequests(elsewhere);
     await rowOf(elsewhere, "Priya Shah")
       .getByRole("button", { name: "Decline the request from Priya Shah" })
@@ -328,7 +328,7 @@ test.describe("the People screen's Requests tab", () => {
       ]);
       await addMember(request, { role, userId: member.id, workspaceId: workspace.workspaceId });
       await asksToJoin(request, workspace.slug, { displayName: "Priya Shah" });
-      await page.goto(MEMBERS_SCREEN);
+      await page.goto(MEMBERS_PAGE);
       await signIn(page, request, email);
 
       await notFoundOfferingHome(page, role);

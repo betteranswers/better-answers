@@ -14,7 +14,7 @@ import {
   RECOVERY_CODES_FILE,
   recoveryCodesText,
 } from "./account-words.ts";
-import { focusOn, Outcome } from "./auth-screen.tsx";
+import { focusOn, Outcome } from "./auth-page.tsx";
 import { copiedToTheClipboard } from "./clipboard.ts";
 import {
   CODES_NOT_COPIED,
@@ -98,7 +98,7 @@ export const saidOfAcknowledging = (failure: Error | ApiError | null): Said | un
   return refusal === undefined ? NO_RESPONSE : saidOfASecondFactorRefusal(refusal);
 };
 
-/** On a root screen the codes are the page, so their heading is its `h1`. */
+/** On a root page the codes are the page, so their heading is its `h1`. */
 const HEADINGS = {
   1: { Heading: "h1", className: "text-xl font-medium" },
   3: { Heading: "h3", className: "font-medium" },

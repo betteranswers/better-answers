@@ -40,7 +40,7 @@ When your output names a domain concept (in a task title, a refactor proposal, a
 
 ## Flag decision conflicts
 
-If your output contradicts a decision in `docs/solutions/architecture-patterns/`, surface it explicitly rather than silently overriding:
+If your output contradicts a decision in `docs/solutions/architecture-patterns/`, raise it explicitly rather than silently overriding:
 
 > _Contradicts ADR 0007 (plain Postgres, app-owned migrations) — but worth reopening because…_
 

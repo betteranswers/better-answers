@@ -39,7 +39,7 @@ const REFUSED = {
 };
 
 /**
- * Ada, a member of Northern Tooling at `role`. Every other read is refused, so a screen draws
+ * Ada, a member of Northern Tooling at `role`. Every other read is refused, so a page draws
  * its own state and never another test's data.
  */
 export const answeringAs =

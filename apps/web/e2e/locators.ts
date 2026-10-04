@@ -1,10 +1,10 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
-import { BREADCRUMB, goHome, RAIL, UNKNOWN_SCREEN } from "@/app/words.ts";
+import { BREADCRUMB, goHome, RAIL, UNKNOWN_PAGE } from "@/app/words.ts";
 import { SIGN_IN_WORDS, type CarriedOn } from "@/features/auth/sign-in-words.ts";
 import type { RefusalWord } from "@/shared/api/trpc.ts";
 import { KEYSTROKE_WORDS, keystrokesOn } from "@/shared/keystroke-words.ts";
-import { headingOf, HOMES, type Role, type Surface } from "@/shared/navigation.ts";
+import { headingOf, HOMES, type Role, type Area } from "@/shared/navigation.ts";
 import { sentenceOf, type Said } from "@/shared/refusal-words.ts";
 
 /** Named for the person, though it shows their initials alone. */
@@ -34,9 +34,9 @@ export const switcherMenuOf = (page: Page, here: string): Locator =>
 
 export const railOf = (page: Page): Locator => page.getByRole("navigation", { name: RAIL });
 
-/** The secondary nav, named for the open surface. */
-export const navOf = (page: Page, surface: Surface): Locator =>
-  page.getByRole("navigation", { name: surface.name });
+/** The menu, named for the open area. */
+export const navOf = (page: Page, area: Area): Locator =>
+  page.getByRole("navigation", { name: area.name });
 
 /** The current part is `role="link"` too, so a part that leads somewhere is told by its `href`. */
 export const crumbOf = (page: Page, name: string): Locator =>
@@ -46,9 +46,9 @@ export const crumbOf = (page: Page, name: string): Locator =>
     .getByRole("link", { name, exact: true });
 
 /** Needs a page with nothing focused yet, so the first Tab lands on the skip link. */
-export const skipLinkReachesTheScreen = async (page: Page): Promise<void> => {
+export const skipLinkReachesThePage = async (page: Page): Promise<void> => {
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("link", { name: "Skip to the screen" })).toBeFocused();
+  await expect(page.getByRole("link", { name: "Skip to the page" })).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("main")).toBeFocused();
 };
@@ -79,7 +79,7 @@ export const tabOpenedByKeyboard = async (page: Page, path: string, name: string
   await page.goto(path);
   const tabs = page.getByRole("tab");
   await expect(tabs.first()).toBeVisible();
-  await skipLinkReachesTheScreen(page);
+  await skipLinkReachesThePage(page);
   await tabUntilFocused(page, page.getByRole("tab", { selected: true }));
 
   const names = await tabs.allInnerTexts();
@@ -118,17 +118,17 @@ export const signInHeading = (page: Page, carriedOn: CarriedOn | "nothing" = "no
 export const quoted = (words: string): string => JSON.stringify(words);
 
 /**
- * `?` opens the keystrokes of `screen`, named as the navigation list names it, from anywhere on
+ * `?` opens the keystrokes of the page `named`, as the navigation list names it, from anywhere on
  * it outside a field.
  */
-export const keystrokesListed = async (page: Page, screen: string): Promise<Locator> => {
+export const keystrokesListed = async (page: Page, named: string): Promise<Locator> => {
   await page.keyboard.press("?");
-  const listed = page.getByRole("dialog", { name: keystrokesOn(screen) });
+  const listed = page.getByRole("dialog", { name: keystrokesOn(named) });
   await expect(listed).toBeVisible();
   return listed;
 };
 
-/** The one button opening the list: the rail's or the band's, or a screen's outside the shell. */
+/** The one button opening the list: the rail's or the band's, or a page's outside the shell. */
 export const keystrokesButton = (within: Page | Locator): Locator =>
   within.getByRole("button", { name: KEYSTROKE_WORDS.button, exact: true });
 
@@ -146,9 +146,9 @@ export const landedAtHome = async (page: Page, role: Role): Promise<void> => {
   await expect(page.getByRole("heading", { level: 1, name: headingOf(home) })).toBeVisible();
 };
 
-/** A screen hidden from the role says what an address that never existed says. */
+/** A page hidden from the role says what an address that never existed says. */
 export const notFoundOfferingHome = async (page: Page, role: Role): Promise<void> => {
-  await expect(page.getByRole("heading", { level: 1, name: UNKNOWN_SCREEN.heading })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: UNKNOWN_PAGE.heading })).toBeVisible();
   await expect(page.getByRole("link", { name: goHome(HOMES[role]) })).toBeVisible();
 };
 

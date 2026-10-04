@@ -11,7 +11,7 @@ import {
 } from "@/features/sources/review-acts.tsx";
 import type { FindingGroup } from "@/features/sources/sources-api.ts";
 import { useTickedGroups } from "@/features/sources/sources-state.ts";
-import { ViewStateSlot } from "@/shared/screen-toolbar.tsx";
+import { ViewStateSlot } from "@/shared/page-toolbar.tsx";
 
 afterEach(cleanup);
 

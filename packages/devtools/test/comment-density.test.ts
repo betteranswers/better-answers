@@ -108,7 +108,7 @@ describe("the arm a file is measured under", () => {
     ["packages/probe/src/one.ts", "source"],
     ["packages/probe/test/one.test.ts", "test"],
     ["packages/probe/tests/one_test.py", "test"],
-    ["apps/web/e2e/screen.spec.ts", "test"],
+    ["apps/web/e2e/page.spec.ts", "test"],
     ["packages/probe/src/one.test.ts", "test"],
     ["packages/probe/src/test_one.py", "test"],
     ["packages/probe/src/latest.ts", "source"],

@@ -12,7 +12,7 @@ export const PICKER_WORDS = {
 
 export const NO_WORKSPACE_HEADING = "No workspace yet";
 
-/** Apart from the screen's JSX, so the browser suite reads the words the no-workspace screen shows. */
+/** Apart from the page's JSX, so the browser suite reads the words the no-workspace page shows. */
 export const NO_WORKSPACE_WORDS = {
   /** Claude's request lapses within minutes, and joining can take an Admin's day. */
   claudeAfterJoining:

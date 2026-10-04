@@ -7,7 +7,7 @@ import {
   KeystrokesAct,
   ShellKeystrokes,
   ShellKeystrokesAct,
-  useScreenKeystrokes,
+  usePageKeystrokes,
   type Keystroke,
 } from "@/shared/keystrokes.tsx";
 
@@ -18,10 +18,10 @@ afterEach(() => {
 
 const SEARCH = "Search";
 
-function AScreen() {
+function APage() {
   return (
     <>
-      <KeystrokesAct screen="People" keystrokes={[{ key: "/", act: SEARCH }]} />
+      <KeystrokesAct page="People" keystrokes={[{ key: "/", act: SEARCH }]} />
       <input aria-label={SEARCH} />
     </>
   );
@@ -42,7 +42,7 @@ const listDismissedByEscape = () => {
 
 describe("the keystrokes list", () => {
   it("hands focus back to its button once dismissed", async () => {
-    render(<AScreen />);
+    render(<APage />);
     listDismissedByEscape();
 
     await aTaskLater();
@@ -53,7 +53,7 @@ describe("the keystrokes list", () => {
   });
 
   it("leaves focus where a sooner key moved it", async () => {
-    render(<AScreen />);
+    render(<APage />);
     listDismissedByEscape();
     // The next key's act, in the task the list left in, before focus is handed back.
     screen.getByRole("textbox", { name: SEARCH }).focus();
@@ -74,17 +74,14 @@ const MEMBERS_KEYSTROKES: readonly Keystroke[] = [
 const GROUPS_KEYSTROKES: readonly Keystroke[] = [{ key: "n", act: "Create a group" }];
 
 function Registering(properties: { readonly keystrokes: readonly Keystroke[] }) {
-  useScreenKeystrokes(properties.keystrokes);
+  usePageKeystrokes(properties.keystrokes);
   return null;
 }
 
-/** The shell as the frame draws it: the trigger in one place, the open screen beneath. */
-function AShell(properties: {
-  readonly screen: string | undefined;
-  readonly children?: ReactNode;
-}) {
+/** The shell as the frame draws it: the trigger in one place, the open page beneath. */
+function AShell(properties: { readonly page: string | undefined; readonly children?: ReactNode }) {
   return (
-    <ShellKeystrokes screen={properties.screen} shell={[JUMP_TO]}>
+    <ShellKeystrokes page={properties.page} shell={[JUMP_TO]}>
       <ShellKeystrokesAct at="band" />
       {properties.children}
     </ShellKeystrokes>
@@ -100,9 +97,9 @@ const actsIn = (listed: HTMLElement) =>
   [...listed.querySelectorAll("dd")].map((definition) => definition.textContent);
 
 describe("the shell's keystrokes list", () => {
-  it("lists the open screen's keystrokes under its name, shell's last", () => {
+  it("lists the open page's keystrokes under its name, shell's last", () => {
     render(
-      <AShell screen="Members">
+      <AShell page="Members">
         <Registering keystrokes={MEMBERS_KEYSTROKES} />
       </AShell>,
     );
@@ -118,14 +115,14 @@ describe("the shell's keystrokes list", () => {
     expect(listed.textContent).not.toContain(KEYSTROKE_WORDS.noneOfItsOwn);
   });
 
-  it("follows the open screen, dropping the one that left", () => {
+  it("follows the open page, dropping the one that left", () => {
     const { rerender } = render(
-      <AShell screen="Members">
+      <AShell page="Members">
         <Registering key="members" keystrokes={MEMBERS_KEYSTROKES} />
       </AShell>,
     );
     rerender(
-      <AShell screen="Groups">
+      <AShell page="Groups">
         <Registering key="groups" keystrokes={GROUPS_KEYSTROKES} />
       </AShell>,
     );
@@ -139,17 +136,17 @@ describe("the shell's keystrokes list", () => {
     ]);
   });
 
-  it("says a screen registering nothing has none, listing the shell's", () => {
-    render(<AShell screen={undefined} />);
+  it("says a page registering nothing has none, listing the shell's", () => {
+    render(<AShell page={undefined} />);
 
-    const listed = listedOnQuestionMark(keystrokesOn(KEYSTROKE_WORDS.thisScreen));
+    const listed = listedOnQuestionMark(keystrokesOn(KEYSTROKE_WORDS.thisPage));
 
     expect(listed.textContent).toContain(KEYSTROKE_WORDS.noneOfItsOwn);
     expect(actsIn(listed)).toStrictEqual([KEYSTROKE_WORDS.showTheList, "Jump to"]);
   });
 
   it("opens from its trigger, which names `?` as its keystroke", () => {
-    render(<AShell screen="Members" />);
+    render(<AShell page="Members" />);
 
     const trigger = screen.getByRole("button", { name: KEYSTROKE_WORDS.button });
     expect(trigger.getAttribute("aria-keyshortcuts")).toBe("?");
@@ -162,7 +159,7 @@ describe("the shell's keystrokes list", () => {
   });
 
   it("stops answering `?` once single-key keystrokes are turned off", () => {
-    render(<AShell screen="Members" />);
+    render(<AShell page="Members" />);
     const listed = listedOnQuestionMark(keystrokesOn("Members"));
 
     fireEvent.click(screen.getByRole("checkbox", { name: KEYSTROKE_WORDS.turnedOn }));

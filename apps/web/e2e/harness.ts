@@ -356,7 +356,7 @@ export const emailsSentTo = async (api: APIRequestContext, email: string): Promi
 export const anAddress = (who: string): string =>
   `${who}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
 
-/** From the sign-in screen the page shows; an Admin or the operator is left on confirm or setup. */
+/** From the sign-in page the page shows; an Admin or the operator is left on confirm or setup. */
 export const signInByEmail = async (
   page: Page,
   api: APIRequestContext,
@@ -369,7 +369,7 @@ export const signInByEmail = async (
   await expect(code).toBeVisible();
   await code.fill(await codeSentTo(api, email));
 
-  // Six digits sign in on their own; navigating before the screen is left cancels the request,
+  // Six digits sign in on their own; navigating before the page is left cancels the request,
   // and no session is set.
   await expect(code).toHaveCount(0);
 };
@@ -426,7 +426,7 @@ export const signIn = async (page: Page, api: APIRequestContext, email: string):
   if (await firstPageDrawn(page)) await confirmedWithTheHarness(page, api, email);
 };
 
-/** Asked for before signing in, so the sign-in screen carries the member back to it. */
+/** Asked for before signing in, so the sign-in page carries the member back to it. */
 export const aMemberSignedInAt = async (
   page: Page,
   api: APIRequestContext,
@@ -444,7 +444,7 @@ export const aMemberSignedInAt = async (
   return workspace;
 };
 
-/** From the sign-in screen to a role's home, as a member of one workspace arrives. */
+/** From the sign-in page to a role's home, as a member of one workspace arrives. */
 export const signedInAtHome = async (
   page: Page,
   api: APIRequestContext,
@@ -456,7 +456,7 @@ export const signedInAtHome = async (
   await landedAtHome(page, role);
 };
 
-/** From the sign-in screen to the no-workspace screen, as a person in no workspace arrives. */
+/** From the sign-in page to the no-workspace page, as a person in no workspace arrives. */
 export const signedInWithNoWorkspace = async (page: Page, api: APIRequestContext, who: string) => {
   const email = anAddress(who);
   const signedIn = await person(api, email);

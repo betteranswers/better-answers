@@ -98,5 +98,5 @@ export const AUDITED_CATEGORIES = [
   "job-title",
 ] as const;
 
-/** A category's or a tier's word is kebab-case on the row and spaced on the screen. */
+/** A category's or a tier's word is kebab-case on the row and spaced on the page. */
 export const spokenWord = (word: string): string => word.replaceAll("-", " ");

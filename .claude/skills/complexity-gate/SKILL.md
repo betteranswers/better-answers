@@ -97,12 +97,12 @@ shallow PR-merge checkout can't compute the merge-base diff):
 - **Before committing**: run `pnpm lint:complexity:changed`; a violation
   in a function you modified is a must-fix.
 - **When the gate fires on a function you did NOT modify** (the gate is
-  file-scoped, so touching any line of a file surfaces its legacy
+  file-scoped, so touching any line of a file brings up its legacy
   offenders): the DEFAULT is to decompose that function now — the firing
   gate IS the sweep arriving there, and the fix is usually minutes. Never
   add an `eslint-disable` to get green without the user's explicit OK;
   present it as a decision with the fix cost attached. A suppression
-  hides the debt from the only mechanism that surfaces it.
+  hides the debt from the only mechanism that reveals it.
 - **Legacy repos**: over-cap functions the gate hasn't surfaced yet are
   out of scope until touched; the changed-files gate enforces exactly
   that without blocking on the backlog.

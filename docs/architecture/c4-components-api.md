@@ -15,7 +15,7 @@ C4Component
   Container_Boundary(api, "apps/api") {
     Component(main, "main.ts, config.ts and doors.ts", "bootstrap", "Reads the env once; doors.ts, the one composition root, opens the Postgres, git and object doors and one Clock for main.ts, ops.ts and the api harness alike")
     Component(server, "server.ts", "createServer, Hono", "Mounts in order: the fence, /health naming the image digest, Better Auth's routes, /mcp, tRPC, the SPA's assets, then Better Auth's handler and the shell")
-    Component(fence, "ingress/hostnames.ts", "Hono middleware", "One list of surface to hostname role to reason; refuses a path outside its hostname's surface before any counter, session or body")
+    Component(fence, "ingress/hostnames.ts", "Hono middleware", "One list of paths to hostname role to reason; refuses a path outside its hostname's paths before any counter, session or body")
     Component(limits, "ingress/limits.ts", "per-IP counters", "The flood limits on the credential-shaped paths, as rows")
     Component(auth, "auth/", "Better Auth in-process", "The identity provider and authorization server: email code, the organisation plugin as the workspace, /oauth2/*, discovery, /jwks, consent, CIMD fetch; Microsoft at P1")
     Component(mcp, "mcp/surface.ts and entries/", "MCP SDK v2 behind one fetch-shaped seam", "The token verifier over the JWKS, then four entries: find, ask, open, give_feedback")

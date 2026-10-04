@@ -13,11 +13,12 @@ placedWithoutMeasuring();
 
 const headers = () => screen.getAllByRole("columnheader").map((header) => header.textContent);
 
-const headRows = () =>
-  screen
-    .getAllByRole("row")
+const headRows = () => {
+  const rows = screen.getAllByRole("row");
+  return rows
     .filter((row) => row.parentElement?.tagName === "THEAD")
     .map((row) => [...row.querySelectorAll("th")].map((head) => head.textContent));
+};
 
 const people = () => screen.getAllByRole("link").map((link) => link.textContent);
 
@@ -63,7 +64,7 @@ const pressedWithFocus = (button: HTMLElement) => {
 };
 
 describe("the shared table", () => {
-  it("draws only the screen's columns when nothing is opted in", () => {
+  it("draws only the page's columns when nothing is opted in", () => {
     render(<BareList />);
 
     expect(headers()).toEqual(["Person", "Role", "Joined"]);
@@ -206,7 +207,7 @@ describe("a row's link", () => {
 });
 
 describe("the list's states", () => {
-  it("offers the screen's primary act when nothing is listed", () => {
+  it("offers the page's primary act when nothing is listed", () => {
     render(<MembersList members={[]} />);
 
     expect(screen.getByText("No one belongs to this workspace yet.")).toBeTruthy();
@@ -320,7 +321,7 @@ describe("the list's pages", () => {
     expect(screen.getByText("Page 1 of 2")).toBeTruthy();
   });
 
-  it("loads more on the screen's keystroke, and not while loading", () => {
+  it("loads more on the page's keystroke, and not while loading", () => {
     const more = vi.fn<() => void>();
     const keystroke = { key: "m", act: "Load older events" };
     const { rerender } = render(

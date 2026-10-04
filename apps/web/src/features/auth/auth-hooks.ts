@@ -173,7 +173,7 @@ const signInEmailOtpOptions = () =>
       const answer = await unwrapWithTheWait((reading) =>
         authClient.signIn.emailOtp(input, reading),
       );
-      // An answer naming nobody sends the person to the display-name screen, whose own read
+      // An answer naming nobody sends the person to the display-name page, whose own read
       // decides.
       return { displayNameGiven: answer !== null && hasADisplayName(answer.user.name) };
     },
@@ -299,14 +299,14 @@ export const useArrival = (): Arrival | undefined => {
 };
 
 /**
- * Undefined when unread: the screen then stands, and its own next request says in words what went
+ * Undefined when unread: the page then stands, and its own next request says in words what went
  * wrong.
  */
 const sessionOrUnread = (queryClient: QueryClient) =>
   queryClient.fetchQuery(sessionOptions()).catch(() => undefined);
 
 /**
- * Read before the screen draws, so a person it has nothing to ask never sees it; an invitation
+ * Read before the page draws, so a person it has nothing to ask never sees it; an invitation
  * asks its invitee's name.
  */
 export const displayNameDetour = async (
@@ -341,7 +341,7 @@ export const signedOutOfAStep = async (
   return session === null ? `/sign-in${query}` : undefined;
 };
 
-/** Read again rather than dropped, for a screen that shows whose session it is. */
+/** Read again rather than dropped, for a page that shows whose session it is. */
 export const rereadTheSession = (queryClient: QueryClient): Promise<void> =>
   queryClient.invalidateQueries({ queryKey: AUTH_KEYS.session });
 
@@ -351,8 +351,8 @@ export const useSetDisplayName = () => {
   const queryClient = useQueryClient();
   return useMutation(
     api.person.setDisplayName.mutationOptions({
-      // Removed, not invalidated: no screen watches it here, so a stale answer would be the next
-      // screen's first read.
+      // Removed, not invalidated: no page watches it here, so a stale answer would be the next
+      // page's first read.
       onSuccess: () => {
         queryClient.removeQueries({ queryKey: AUTH_KEYS.session });
       },
@@ -390,7 +390,7 @@ const signOutOptions = () =>
   });
 
 /**
- * Whatever the server answers, clears every held query and goes to the sign-in screen, which
+ * Whatever the server answers, clears every held query and goes to the sign-in page, which
  * comes back to `returnTo` when one is named.
  */
 export const useSignOut = (returnTo?: string) => {
@@ -421,7 +421,7 @@ const noMembership = z.object({ code: z.literal("USER_IS_NOT_A_MEMBER_OF_THE_ORG
 
 const libraryCode = z.object({ code: z.string() });
 
-/** A refused switch or pick in the platform's terms, so no screen reads the provider's error. */
+/** A refused switch or pick in the platform's terms, so no page reads the provider's error. */
 export class SwitchRefused extends Error {
   readonly noLongerAMember: boolean;
 

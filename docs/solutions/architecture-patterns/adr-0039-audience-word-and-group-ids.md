@@ -46,7 +46,7 @@ A chunk carries no pair of its own. It reads its binding's through `index.readab
 
 **An empty intersection forces the unit Restricted, and is never stored.** It becomes *Restricted* for *everyone*, which the predicate reads as Admins alone. It is never stored as *groups* over an empty list.
 
-**A Restricted binding's named people are a `group` row** of ADR 0038's implicit origin, whose id `audience_groups` names. Nothing here mints one. Minting it is the binding-management surface's act.
+**A Restricted binding's named people are a `group` row** of ADR 0038's implicit origin, whose id `audience_groups` names. Nothing here mints one. Minting it is an act of binding management.
 
 ## Why
 

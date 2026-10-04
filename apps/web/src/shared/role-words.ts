@@ -3,7 +3,7 @@ import type { Role } from "@/shared/navigation.ts";
 /** `an Admin`, `an Editor`, `a Viewer`: a role as a sentence names it. */
 export const aRole = (role: string): string => `${role === "Viewer" ? "a" : "an"} ${role}`;
 
-/** What each role does, as the People screens say it to an Admin choosing one. */
+/** What each role does, as the People pages say it to an Admin choosing one. */
 export const ROLE_MEANINGS = {
   Admin: "Manages people and sources, and does everything an Editor does.",
   Editor: "Checks concepts, runs question sets and saves Answers.",

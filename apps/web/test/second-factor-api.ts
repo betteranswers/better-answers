@@ -182,7 +182,7 @@ export const readingForever = (): void => {
   );
 };
 
-/** The screens read their query off the address bar; the auth library's own read fails here at once. */
+/** The pages read their query off the address bar; the auth library's own read fails here at once. */
 const clientsAt = (path: string) => {
   globalThis.history.replaceState(null, "", path);
   const clients = createAppClients();

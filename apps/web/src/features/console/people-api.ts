@@ -26,7 +26,7 @@ export const PAGE_SIZE = 50;
 
 export type Asked = { readonly search: string; readonly offset: number };
 
-/** The page on screen stays while the next is read, so a search never blanks the table. */
+/** The page showing stays while the next is read, so a search never blanks the table. */
 export const usePeople = (asked: Asked) => {
   const api = useTRPC();
   return useQuery(

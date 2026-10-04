@@ -12,7 +12,7 @@ import {
 import { OutcomeLine, type Outcome } from "@/shared/outcome.tsx";
 import { SelectionBar } from "@/shared/selection-bar.tsx";
 
-import { openScreens } from "./address-router.tsx";
+import { openPages } from "./address-router.tsx";
 import { answeringAs } from "./stubbed-api.ts";
 
 afterEach(() => {
@@ -68,7 +68,7 @@ const ticking = async (count: number, readable = true) => {
   const clients = createAppClients();
   clients.queryClient.setDefaultOptions({ queries: { retry: false } });
   vi.stubGlobal("fetch", answeringAs("Admin"));
-  await openScreens(
+  await openPages(
     { [MEMBERS]: tickedMembers(count, readable) },
     [MEMBERS],
     function Wrapper(properties: { readonly children: ReactNode }) {

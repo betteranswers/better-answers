@@ -74,7 +74,7 @@ const accountFromTheBand = async (page: Page, who: string): Promise<void> => {
   await expect(page).toHaveURL(/\/account$/);
 };
 
-/** A person in no workspace reaches the page from the screen they land on. */
+/** A person in no workspace reaches the page from the page they land on. */
 const accountWithNoWorkspace = async (page: Page, api: Parameters<typeof person>[0]) => {
   const email = anAddress("no-workspace");
   await person(api, email);

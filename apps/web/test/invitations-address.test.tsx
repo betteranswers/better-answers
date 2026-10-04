@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { INVITATIONS_FIELDS, INVITATIONS_LIST } from "@/features/people/invitations-address.ts";
 import { useListAddress } from "@/shared/list-address.ts";
 
-import { openScreens } from "./address-router.tsx";
+import { openPages } from "./address-router.tsx";
 
 afterEach(cleanup);
 
@@ -14,7 +14,7 @@ function StatusShown() {
 }
 
 const statusAt = async (query: string) => {
-  await openScreens({ "/people": StatusShown }, [`/people${query}`]);
+  await openPages({ "/people": StatusShown }, [`/people${query}`]);
   return screen.getByRole("status").textContent;
 };
 

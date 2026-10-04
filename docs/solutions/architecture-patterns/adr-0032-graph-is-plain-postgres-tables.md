@@ -50,7 +50,7 @@ The substrate:
 - drizzle-orm has no query lifecycle hook, so there is no interception layer to trust. A default-deny policy is the stronger guarantee.
 - A second journal would blind the worker's schema stamp to the schema the worker writes.
 - pgvector's HNSW refuses a column with no dimension. The HNSW index was over a column nothing writes until S8, so every workspace paid to build it for no query.
-- Under deny-by-default, a table that forgets its REVOKE no longer hands the worker a write. The generated surface states each role's reach once.
+- Under deny-by-default, a table that forgets its REVOKE no longer hands the worker a write. The generated roles surface states each role's reach once.
 - Without LEAKPROOF, Postgres will not evaluate `search @@ q` beneath the policy, and every `find` scanned its workspace's whole partition. A bare count took 209 ms at a million rows, and 4.2 ms with the mark. The mark changes only the order conditions run in; the policy still filters every row. A logical restore or a major upgrade drops it, so a numbered migration cannot hold it.
 
 ## Rejected

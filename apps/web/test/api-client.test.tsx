@@ -40,7 +40,7 @@ describe("the SPA's tRPC client", () => {
 });
 
 describe("the query provider above the router", () => {
-  it("wraps the router, so its screens reach the same client", async () => {
+  it("wraps the router, so its pages reach the same client", async () => {
     const clients = createAppClients();
     const router = createAppRouter(
       clients,
@@ -87,7 +87,7 @@ describe("routes.list's types crossing from apps/api", () => {
     expectTypeOf<NoInput>().toEqualTypeOf<true>();
   });
 
-  it("answers one route per purpose, in a screen's words", () => {
+  it("answers one route per purpose, in a page's words", () => {
     type Route = inferOutput<ListProcedure>[number];
 
     type ExpectedRoute = {

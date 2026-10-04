@@ -5,7 +5,7 @@
    This file names the two families and nothing else, because the two consumers load the
    faces differently and only one of them can resolve a package name: an application with a
    bundler imports `tokens/fonts-hosted.css` (the self-hosted @fontsource packages, so a
-   screen makes no third-party request), and a page opened straight from disk — the
+   page makes no third-party request), and a page opened straight from disk — the
    specimen cards and the thumbnail — links `tokens/fonts-remote.css` beside `styles.css`.
 
    `--font-sans-default` is the face the product ships; `--font-sans` is what everything

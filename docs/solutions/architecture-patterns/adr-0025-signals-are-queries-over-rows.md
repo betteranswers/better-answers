@@ -54,7 +54,7 @@ These shapes live here, not in the rules. The rule *Log through the tier's one s
 - An ops dashboard outside the api: two logins, and it needs the metrics store.
 - node-exporter or Coolify's server metrics as the host source: the first needs the store, and the second is neither queryable by the api nor restored with the database.
 - The api never sending alerts: the erasure and spend cases go unseen.
-- A webhook channel in v0.1: a surface no client has asked for.
+- A webhook channel in v0.1: no client has asked for one.
 - Spend derived from the answer audit and `connector_run`: it loses enrichment and embedding calls and cannot price a run mid-flight.
 - Thresholds in code: every tune a release.
 

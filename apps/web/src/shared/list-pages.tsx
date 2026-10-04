@@ -8,7 +8,7 @@ import { PaginationCounter } from "@/shared/ui/kibo-ui/pagination-counter.tsx";
 
 type FocusTarget = RefObject<HTMLElement | null>;
 
-/** Each state takes only the screen's words. A focus target must outlive the state its act replaces. */
+/** Each state takes only the page's words. A focus target must outlive the state its act replaces. */
 type State =
   | { readonly kind: "loading"; readonly words: string }
   | { readonly kind: "empty"; readonly words: string; readonly act: ReactNode }
@@ -119,7 +119,7 @@ export function ListRead<Failure>(properties: {
 type Pages = {
   readonly kind: "pages";
   readonly label: string;
-  /** The page `pageWithin` chose, the one the screen's rows come from. */
+  /** The page `pageWithin` chose, the one the page's rows come from. */
   readonly pageIndex: number;
   readonly pageSize: number;
   readonly total: number;
@@ -140,7 +140,7 @@ type More = {
 const BAND = "border-t border-border bg-muted px-3 py-2";
 
 /**
- * An address can name a page a filter or a removal has since emptied. A screen chooses its rows
+ * An address can name a page a filter or a removal has since emptied. A page chooses its rows
  * and its turns from this page.
  */
 export const pageWithin = (pageIndex: number, pageSize: number, total: number): number =>

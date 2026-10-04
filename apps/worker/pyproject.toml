@@ -161,7 +161,7 @@ build-backend = "uv_build"
 # raised against it ran into. The cap is overridden rather than waited out because presidio
 # touches this package at `Cipher(AES, CBC)` and `padding` alone, in
 # `presidio_anonymizer/operators/aes_cipher.py`, and this tier's own use is `AESGCM` in
-# `envelope.py` — none of the three is a surface either reaches, and neither major moved
+# `envelope.py` — none of the three is in code either reaches, and neither major moved
 # either API.
 #
 # It goes when presidio lifts the cap: a `presidio-anonymizer` whose requirement admits 50

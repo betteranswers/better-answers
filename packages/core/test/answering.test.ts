@@ -399,7 +399,7 @@ describe("open's and feedback's renderings", () => {
   it("renders feedback and each flag reason in words, not tokens", () => {
     const iri = "https://better-answers.com/c/01A";
     const received = (what: string): string =>
-      `Received: ${iri} marked ${what}. It reaches the owner's queue when the Suggestions screen ships.`;
+      `Received: ${iri} marked ${what}. It reaches the owner's queue when the Suggestions page ships.`;
     const flagged = (reason: FeedbackReason, detail?: string): string =>
       renderFeedback({
         outcome: "received",

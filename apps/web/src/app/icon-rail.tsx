@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 import { Icon } from "@/shared/icon.tsx";
 import { cn } from "@/shared/lib/utils.ts";
-import type { VisibleSurface } from "@/shared/navigation.ts";
+import type { VisibleArea } from "@/shared/navigation.ts";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/shared/ui/tooltip.tsx";
 
 import { RAIL } from "./words.ts";
@@ -13,11 +13,11 @@ const HOVER_DELAY_MS = 200;
 
 /** `tooltips` is for a rail of icons alone; where each entry shows its name, leave it off. */
 export function IconRail(properties: {
-  readonly surfaces: readonly VisibleSurface[];
-  readonly openSurfaceId: string | undefined;
+  readonly areas: readonly VisibleArea[];
+  readonly openAreaId: string | undefined;
   readonly tooltips: boolean;
   readonly onChoose?: () => void;
-  /** The utilities under the surfaces. The sheet has none: its rail sits in a dialog. */
+  /** The utilities under the areas. The sheet has none: its rail sits in a dialog. */
   readonly foot?: ReactNode;
 }) {
   return (
@@ -29,38 +29,38 @@ export function IconRail(properties: {
     >
       <TooltipProvider delayDuration={HOVER_DELAY_MS}>
         <ul className="flex flex-col gap-1">
-          {properties.surfaces.map((surface) => {
-            const open = surface.id === properties.openSurfaceId;
+          {properties.areas.map((area) => {
+            const open = area.id === properties.openAreaId;
 
             const entry = (
               <Link
-                to={surface.opensAt.path}
+                to={area.opensAt.path}
                 onClick={properties.onChoose}
-                // The router marks only a link to the address itself, and a surface is open on
-                // any of its screens.
+                // The router marks only a link to the address itself, and an area is open on
+                // any of its pages.
                 aria-current={open ? "page" : undefined}
                 className={cn(
                   // A fill and a bold glyph where the rest have neither, so greyscale
-                  // tells the open surface apart.
+                  // tells the open area apart.
                   "flex h-10 items-center gap-2 px-2 transition-colors md:w-10 md:justify-center md:px-0",
                   open
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                 )}
               >
-                <Icon name={surface.icon} weight={open ? "bold" : "regular"} />
-                <span className="md:sr-only">{surface.name}</span>
+                <Icon name={area.icon} weight={open ? "bold" : "regular"} />
+                <span className="md:sr-only">{area.name}</span>
               </Link>
             );
 
             return (
-              <li key={surface.id}>
+              <li key={area.id}>
                 {/* What an icon alone owes a pointer and a keyboard; beside a name on the row
                     it says the same twice and eats an Escape. */}
                 {properties.tooltips ? (
                   <Tooltip>
                     <TooltipTrigger asChild>{entry}</TooltipTrigger>
-                    <TooltipContent side="right">{surface.name}</TooltipContent>
+                    <TooltipContent side="right">{area.name}</TooltipContent>
                   </Tooltip>
                 ) : (
                   entry

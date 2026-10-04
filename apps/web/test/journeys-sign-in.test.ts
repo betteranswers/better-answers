@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { journeysOver, moduleAt } from "./playwright-tree.ts";
 
-/** The sign-in screen in the product's words, keeping the one behaviour the helper leans on: six digits submit. */
+/** The sign-in page in the product's words, keeping the one behaviour the helper leans on: six digits submit. */
 const STAND_IN = String.raw`
 import { expect, test } from "@playwright/test";
 import { SIGN_IN_WORDS } from ${moduleAt("src/features/auth/sign-in-words.ts")};
@@ -14,7 +14,7 @@ import { signIn } from ${moduleAt("journeys/sign-in.ts")};
 const CODE = "305117";
 const ADDRESS = "admin@journeys.example";
 
-const SCREEN =
+const PAGE =
   '<!doctype html><html lang="en"><title>Sign in</title><main>' +
   "<label>" + SIGN_IN_WORDS.emailField + ' <input type="email"></label>' +
   '<button id="send">' + SIGN_IN_WORDS.send + "</button>" +
@@ -31,14 +31,14 @@ const SCREEN =
   "};" +
   "</script></main></html>";
 
-const theScreen = async (page, answers = {}) => {
+const thePage = async (page, answers = {}) => {
   const sends = [];
   await page.route((url) => url.pathname === "/", (route) =>
     route.fulfill({
       status: answers.challenged ? 403 : 200,
       headers: answers.challenged ? { "cf-mitigated": "challenge" } : {},
       contentType: "text/html",
-      body: SCREEN,
+      body: PAGE,
     }),
   );
   await page.route("**/email-otp/send-verification-otp", async (route) => {
@@ -60,7 +60,7 @@ const inboxAnswering = (...answers) => async () => ({
 const signsIn = (scenario, source, answers) =>
   test(scenario, async ({ page }) => {
     playsTheRole(scenario);
-    await theScreen(page, answers);
+    await thePage(page, answers);
     await signIn(page, ADDRESS, source);
   });
 `;
@@ -69,13 +69,13 @@ const UNVERIFIED =
   "the only new emails from the sender failed their signature check, or their signing key could not be looked up";
 
 describe("the journeys' sign-in", () => {
-  it("signs in through the screen, pressing Send once", async () => {
+  it("signs in through the page, pressing Send once", async () => {
     const run = await journeysOver({
       spec: [
         STAND_IN,
         'test("signs in", async ({ page }) => {',
         '  playsTheRole("Admin");',
-        "  const sends = await theScreen(page);",
+        "  const sends = await thePage(page);",
         '  await signIn(page, ADDRESS, inboxAnswering({ answer: "code", code: CODE }));',
         "  expect(sends).toHaveLength(1);",
         "});",
@@ -127,7 +127,7 @@ describe("the journeys' sign-in", () => {
       [
         "| could-not-run | ceiling | Sign in | Send the code | a rate ceiling refused the Send |",
         "| could-not-run | refusal | Sign in | Send the code | the edge refused the Send |",
-        "| could-not-run | challenge | Sign in | Send the code | the edge challenged the sign-in screen |",
+        "| could-not-run | challenge | Sign in | Send the code | the edge challenged the sign-in page |",
         "| could-not-run | unnoted | Sign in | Note the test inbox | the test inbox did not answer |",
         "| fail | no-mail | Sign in | Read the code from the test inbox | no sign-in email reached the test inbox within its deadline |",
         "| fail | no-code | Sign in | Read the code from the test inbox | the sign-in email carried no code |",

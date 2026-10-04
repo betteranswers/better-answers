@@ -20,7 +20,7 @@ import { IDENTITY_PRINCIPAL } from "./identity-principal.ts";
 /** What a pending session meets, in every transport's refusal. */
 export const SECOND_FACTOR_PENDING = "second-factor-pending" satisfies SecondFactorRefusal;
 
-/** The tRPC procedures a pending session may still call: the pending screens read these. */
+/** The tRPC procedures a pending session may still call: the pending pages read these. */
 export const PENDING_PROCEDURES: ReadonlyMap<string, PendingStep> = new Map<string, PendingStep>([
   ["session.operator", "read-the-operator-standing"],
   ["person.secondFactor", "read-the-second-factor"],

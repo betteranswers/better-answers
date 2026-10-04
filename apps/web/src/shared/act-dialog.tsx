@@ -14,7 +14,7 @@ import {
 type Content = Pick<ComponentProps<typeof DialogContent>, "className" | "onCloseAutoFocus">;
 
 /**
- * The consequence is a required part, so no act on the screen can ask for the click before
+ * The consequence is a required part, so no act on the page can ask for the click before
  * saying what it does.
  */
 export function ActDialog(properties: {

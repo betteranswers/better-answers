@@ -93,7 +93,7 @@ export type IconName =
   | "remove"
   | "routes"
   | "search"
-  | "secondary-nav"
+  | "menu"
   | "signals"
   | "sorted-ascending"
   | "sorted-descending"
@@ -148,7 +148,7 @@ const GLYPHS = {
   remove: X,
   routes: Path,
   search: MagnifyingGlass,
-  "secondary-nav": SidebarSimple,
+  menu: SidebarSimple,
   signals: Broadcast,
   "sorted-ascending": CaretUp,
   "sorted-descending": CaretDown,
@@ -163,7 +163,7 @@ const GLYPHS = {
 /** Hidden from assistive technology, so the caller names what it stands for beside it. */
 export function Icon(properties: {
   readonly name: IconName;
-  /** Bold marks the open entry in the rail or the secondary nav, and nothing else. */
+  /** Bold marks the open entry in the rail or the menu, and nothing else. */
   readonly weight?: "regular" | "bold";
   readonly className?: string;
 }) {

@@ -2031,7 +2031,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
       expect([again.exitCode, theAdmin.exitCode]).toEqual([8, 8]);
       expect(again.lines).toEqual([
-        `add-member: REFUSED — already-a-member: ${person.email} is already a member of workspace ${workspaceId}; a role change is the Admin's act on the People screen`,
+        `add-member: REFUSED — already-a-member: ${person.email} is already a member of workspace ${workspaceId}; a role change is the Admin's act on the People page`,
       ]);
       expect((await membershipsOf(app(), workspaceId, person.id)).map((row) => row.role)).toEqual([
         "Editor",

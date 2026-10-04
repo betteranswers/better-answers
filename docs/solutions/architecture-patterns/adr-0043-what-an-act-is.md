@@ -84,7 +84,7 @@ Every Postgres door rolls back when its work answers a refusal or throws. A prin
 - A constructed act: the code index answers a lower bound for it.
 - A constructor that also parses or owns the transaction: ownership differs by act.
 - Own-transaction acts each resolving their own Principal: `putObject` and `withRepositoryLock` take one outside any Postgres transaction.
-- A refusal as a value on the wire: every read screen would branch on it, and a cached client could do nothing with a word it had never met.
+- A refusal as a value on the wire: every read page would branch on it, and a cached client could do nothing with a word it had never met.
 - A check read before a set's write, to name the items it would refuse: another Admin's act can land between the read and the write.
 - No classes and a table per transport, or one flat list of words.
 - Capability-typed doors with no declared admission, a per-slice manifest a router is generated from, or schemas generated from types.

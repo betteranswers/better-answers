@@ -14,7 +14,7 @@ const RESOLVED_ENTRY = "\0list-parts";
 
 const HARNESS = fileURLToPath(new URL("../test/members-list.tsx", import.meta.url));
 
-/** No screen draws every shared part yet, so the unit suite's Members list is drawn on its own. */
+/** No page draws every shared part yet, so the unit suite's Members list is drawn on its own. */
 const ENTRY_SOURCE = [
   'import { createElement } from "react";',
   'import { createRoot } from "react-dom/client";',
@@ -64,7 +64,7 @@ test.beforeAll(async () => {
   parts = await bundledParts();
 });
 
-/** The served build's own stylesheets, so the parts are measured as a screen draws them. */
+/** The served build's own stylesheets, so the parts are measured as a page draws them. */
 const servedStylesheets = async (request: APIRequestContext): Promise<string> => {
   const served = await (await request.get("/")).text();
   const links = served.match(/<link[^>]*rel="stylesheet"[^>]*>/g) ?? [];
@@ -78,7 +78,7 @@ const drawn = async (page: Page, request: APIRequestContext) => {
   await page.goto("/health");
   await page.setContent(
     `<!doctype html><html lang="en-GB"><head><title>Members</title>${head}</head><body>` +
-      '<main class="px-4 py-6"><div data-screen-content class="max-w-page"><div id="root"></div>' +
+      '<main class="px-4 py-6"><div data-page-content class="max-w-page"><div id="root"></div>' +
       "</div></main></body></html>",
   );
   await page.addScriptTag({ content: parts ?? "" });

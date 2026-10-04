@@ -24,7 +24,7 @@ export const useWideLayout = (): boolean => useSyncExternalStore(listen, wideNow
 
 const NONE_HIDDEN: ReadonlySet<string> = new Set();
 
-/** The reader's own choice of a list's columns, else what a narrow screen has room for. */
+/** The reader's own choice of a list's columns, else what a narrow window has room for. */
 export const useHiddenColumns = (narrowHides: ReadonlySet<string>) => {
   const [chosen, setChosen] = useState<ReadonlySet<string>>();
   const wide = useWideLayout();

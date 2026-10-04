@@ -64,7 +64,7 @@ C4Deployment
   Rel(backup, healthchecks, "Pings pg-hourly and nightly after a verified upload", "HTTPS")
   Rel(api, healthchecks, "Pings scheduler each minute and sweeps each day", "HTTPS")
   Rel(release, coolify, "PATCHes API_IMAGE_DIGEST and WORKER_IMAGE_DIGEST, POSTs /deploy, through Cloudflare Access", "HTTPS, Coolify API")
-  Rel(release, edge, "Waits until /health names the api digest; signs in on app. as the test people and walks their screens", "HTTPS, Playwright and Chromium")
+  Rel(release, edge, "Waits until /health names the api digest; signs in on app. as the test people and walks their pages", "HTTPS, Playwright and Chromium")
   Rel(release, registry, "Reads the revision label of the live api image from", "HTTPS, registry API")
   Rel(release, testinbox, "Reads each test person's sign-in email from, through its API", "HTTPS, bearer key")
   Rel(release, healthchecks, "Pings journeys with the outcome word", "HTTPS")

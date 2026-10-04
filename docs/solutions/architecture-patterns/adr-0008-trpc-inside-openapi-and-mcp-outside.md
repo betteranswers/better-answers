@@ -55,7 +55,7 @@ Business logic lives in `packages/core`. The same function serves every transpor
 ## Rejected
 
 - REST and OpenAPI for everything: the SPA loses end-to-end types, and MCP tools would wrap REST calls twice.
-- tRPC only: no surface for anyone outside our own TypeScript, and none for agents.
+- tRPC only: no API for anyone outside our own TypeScript, and none for agents.
 - GraphQL: a second schema language beside zod and OKF frontmatter, which nothing on the roster speaks.
 
 ## History

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { askingHere, useAsked } from "@/shared/address-ask.ts";
 
-import { openScreens } from "./address-router.tsx";
+import { openPages } from "./address-router.tsx";
 
 afterEach(cleanup);
 
@@ -18,9 +18,9 @@ const Members = () => {
 const takenSoFar = () => screen.getByRole("status").textContent;
 
 const openAt = (...entries: readonly string[]) =>
-  openScreens({ "/members": Members, "/elsewhere": () => null }, entries);
+  openPages({ "/members": Members, "/elsewhere": () => null }, entries);
 
-describe("a search another place asks of a screen", () => {
+describe("a search another place asks of a page", () => {
   it("is taken once, then cleared from the address in place", async () => {
     const { history, at } = await openAt("/elsewhere", "/members?search=priya");
 
@@ -38,10 +38,10 @@ describe("a search another place asks of a screen", () => {
     act(() => history.forward());
     await at("/members");
 
-    expect(takenSoFar(), "the screen took an ask on its way back").toBe("");
+    expect(takenSoFar(), "the page took an ask on its way back").toBe("");
   });
 
-  it("is taken by a screen already open", async () => {
+  it("is taken by a page already open", async () => {
     const { router, at } = await openAt("/members?search=priya");
     await at("/members");
 
@@ -69,7 +69,7 @@ const ActAndSearch = () => {
 
 describe("two asks in one address", () => {
   it("takes each once and clears both from the address", async () => {
-    const { history, at } = await openScreens(
+    const { history, at } = await openPages(
       { "/members": ActAndSearch, "/elsewhere": () => null },
       ["/elsewhere", "/members?act=invite&search=priya"],
     );
@@ -80,16 +80,16 @@ describe("two asks in one address", () => {
   });
 });
 
-describe("asking a screen for an act", () => {
+describe("asking a page for an act", () => {
   const HERE = { pathname: "/members", searchStr: "?members.role=Editor&members.page=2" };
 
-  it("adds to the query of the screen already open", () => {
+  it("adds to the query of the page already open", () => {
     expect(askingHere(HERE, "/members", "act", "invite")).toBe(
       "/members?members.role=Editor&members.page=2&act=invite",
     );
   });
 
-  it("carries no other screen's query", () => {
+  it("carries no other page's query", () => {
     expect(askingHere(HERE, "/groups", "act", "invite")).toBe("/groups?act=invite");
     const onGroups = { pathname: "/groups", searchStr: "?groups.search=ops" };
     expect(askingHere(onGroups, "/members", "act", "invite")).toBe("/members?act=invite");

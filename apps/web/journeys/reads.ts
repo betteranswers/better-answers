@@ -21,7 +21,7 @@ const readFrom = async <T>(
   return z.object({ result: z.object({ data }) }).parse(await answered.json()).result.data;
 };
 
-/** Through the person's own session, as their screen asks it, so it reads what they may read. */
+/** Through the person's own session, as their page asks it, so it reads what they may read. */
 const readThroughTheSession = async <T>(
   page: Page,
   procedure: string,

@@ -1,11 +1,11 @@
 import type { SaidOfWord } from "@/shared/refusal-words.ts";
 
 /**
- * The api's rule holds the limit; this is the number a screen tells the reader before they type.
+ * The api's rule holds the limit; this is the number a page tells the reader before they type.
  */
 export const DISPLAY_NAME_MAX_CHARACTERS = 100;
 
-/** Wherever a person gives their own name: the display-name screen and the invitation screen. */
+/** Wherever a person gives their own name: the display-name page and the invitation page. */
 export const DISPLAY_NAME_WORDS = {
   heading: "Your name",
   label: "Display name",

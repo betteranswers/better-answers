@@ -14,10 +14,10 @@ if (!publicUrl.success) {
   );
 }
 
-/** The preflight signs nobody in: the health check, the sign-in screen, an inbox list and a probe. */
+/** The preflight signs nobody in: the health check, the sign-in page, an inbox list and a probe. */
 const PREFLIGHT_TIMEOUT_MS = 60_000;
 
-/** A sign-in may wait 150 s on the test inbox; the rest is the journey's screens. */
+/** A sign-in may wait 150 s on the test inbox; the rest is the journey's pages. */
 const ROLE_JOURNEY_TIMEOUT_MS = 360_000;
 
 export default defineConfig({
@@ -49,7 +49,7 @@ export default defineConfig({
     actionTimeout: 15_000,
     navigationTimeout: 30_000,
 
-    // A trace, screenshot or video of a signed-in screen would publish a live session.
+    // A trace, screenshot or video of a signed-in page would publish a live session.
     trace: "off",
     screenshot: "off",
     video: "off",

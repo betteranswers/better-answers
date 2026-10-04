@@ -1061,7 +1061,7 @@ const memberReason = (
     case "no-such-workspace":
       return noSuchWorkspace(workspaceId);
     case "already-a-member":
-      return `already-a-member: ${email} is already a member of workspace ${workspaceId}; a role change is the Admin's act on the People screen`;
+      return `already-a-member: ${email} is already a member of workspace ${workspaceId}; a role change is the Admin's act on the People page`;
   }
 };
 

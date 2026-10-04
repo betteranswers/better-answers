@@ -12,7 +12,7 @@ import { Label } from "@/shared/ui/label.tsx";
 import { ActButton, RemoveKeepingTheLast, type LandsAt } from "./account-sections.tsx";
 import { ACCOUNT_ACTS, PASSKEY_WORDS, passkeyDates, removePasskeyTitle } from "./account-words.ts";
 import { CodeRefused, SIGNED_OUT, TOO_MANY_REQUESTS } from "./auth-hooks.ts";
-import { Outcome } from "./auth-screen.tsx";
+import { Outcome } from "./auth-page.tsx";
 import {
   DeviceRefused,
   isCancelled,
@@ -87,7 +87,7 @@ const selectOnMount = (node: HTMLInputElement | null): void => {
   node?.select();
 };
 
-/** For a screen where adding a passkey is the first way on. */
+/** For a page where adding a passkey is the first way on. */
 const focusOnMount = (node: HTMLInputElement | null): void => {
   node?.focus();
   node?.select();

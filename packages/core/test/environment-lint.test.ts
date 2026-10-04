@@ -34,7 +34,7 @@ describe("the environment lint fires on a setting read in source", () => {
     ["the api's server", "apps/api/src/server.ts"],
     ["an api transport", "apps/api/src/trpc/router.ts"],
     ["the SPA's entry", "apps/web/src/main.tsx"],
-    ["a screen under a feature", "apps/web/src/features/auth/sign-in-screen.tsx"],
+    ["a page under a feature", "apps/web/src/features/auth/sign-in-page.tsx"],
     ["a shared package", "packages/schema/src/concept-tables.ts"],
   ])("%s", (_what, file) => {
     expect(lint.flagged({ [file]: READS_A_SETTING })).toEqual([file]);

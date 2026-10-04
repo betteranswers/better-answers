@@ -17,7 +17,7 @@
   --space-24: 96px;
   --space-32: 128px;
 
-  /* The band's first two cells take the rail's and the secondary nav's widths, so hiding
+  /* The band's first two cells take the rail's and the menu's widths, so hiding
      the nav moves nothing in the band. */
   --sidebar-w: 248px;
   --rail-w: 56px;

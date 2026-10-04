@@ -1,9 +1,9 @@
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
 
-import { ALL_WORKSPACES, FAILED_SCREEN, JUMP_TO, ROLE_UNREAD } from "@/app/words.ts";
+import { ALL_WORKSPACES, FAILED_PAGE, JUMP_TO, ROLE_UNREAD } from "@/app/words.ts";
 import { noLongerAMemberOf, PICK_REFUSED, SWITCHER_UNREAD } from "@/features/auth/refusal-words.ts";
 import { PICKER_WORDS } from "@/features/auth/workspace-words.ts";
-import { CONSOLE, CONTROL_CENTRE, groupIn, HOMES, screenNamed } from "@/shared/navigation.ts";
+import { CONSOLE, CONTROL_CENTRE, menuGroupIn, HOMES, pageNamed } from "@/shared/navigation.ts";
 import { sentenceOf } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
@@ -25,7 +25,7 @@ import {
 
 const SWITCH_BUDGET_MS = 1000;
 
-const MEMBERS = screenNamed(groupIn(CONTROL_CENTRE, "people"), "Members");
+const MEMBERS = pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members");
 
 const WORKSPACES_READ = "**/organization/list";
 
@@ -209,7 +209,7 @@ test("drops the left workspace's members when All workspaces picks another", asy
   await aMemberOnlyOf(request, second.workspaceId, "Only In Derwent");
   await page.reload();
   await expect(memberLink(page, "Only In Esk")).toBeVisible();
-  // Held, so whatever the screen draws before the new workspace's list lands is on show.
+  // Held, so whatever the page draws before the new workspace's list lands is on show.
   const release = await heldBack(page, MEMBERS_READ);
 
   await switcherOf(page, first.name).click();
@@ -261,7 +261,7 @@ test("says it reads the list, filling the open menu", async ({
   await expect(saidInTheBand(page)).toBeEmpty();
 });
 
-test("says a refused switch in the band, keeping the screen", async ({
+test("says a refused switch in the band, keeping the page", async ({
   page,
   request,
   passesTheAccessibilityGate,
@@ -349,7 +349,7 @@ const unansweredSwitch = async (page: Page, from: string, to: string): Promise<v
   await expect(refusedInTheBand(page)).toHaveText(sentenceOf(PICK_REFUSED));
 };
 
-test("says an unanswered switch in the band, keeping the screen", async ({ page, request }) => {
+test("says an unanswered switch in the band, keeping the page", async ({ page, request }) => {
   const { first, second } = await inTwoWorkspaces(page, request, {
     first: "Steady Ironworks",
     second: "Unreached Ironworks",
@@ -381,7 +381,7 @@ test("keeps the rail and nav below the band's refusal", async ({ page, request }
     first: "Marsden Presswork",
     second: "Slaithwaite Presswork",
   });
-  // Rows enough that the screen scrolls past the band in a short window.
+  // Rows enough that the page scrolls past the band in a short window.
   for (let row = 1; row <= 4; row += 1) {
     await aMemberOnlyOf(request, first.workspaceId, `Row ${String(row)}`);
   }
@@ -395,7 +395,7 @@ test("keeps the rail and nav below the band's refusal", async ({ page, request }
   const band = await boxOf(page.getByRole("banner"));
   await expect
     .poll(() => page.evaluate(() => window.scrollY), {
-      message: "the screen never scrolled past the band",
+      message: "the page never scrolled past the band",
     })
     .toBeGreaterThan(band.height);
 
@@ -425,13 +425,13 @@ test("drops the left workspace's name when the membership read fails", async ({
     0,
     { timeout: 15_000 },
   );
-  await expect(page.getByRole("heading", { level: 1, name: FAILED_SCREEN.heading })).toBeVisible({
+  await expect(page.getByRole("heading", { level: 1, name: FAILED_PAGE.heading })).toBeVisible({
     timeout: 15_000,
   });
   await expect(page.getByRole("main").getByRole("alert")).toContainText(ROLE_UNREAD);
 
   await page.unroute(MEMBERSHIP_READ);
-  await page.getByRole("button", { name: FAILED_SCREEN.retry }).click();
+  await page.getByRole("button", { name: FAILED_PAGE.retry }).click();
   await landedAtHome(page, "Admin");
   await expect(switcherOf(page, second.name)).toBeVisible();
 });

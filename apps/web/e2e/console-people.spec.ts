@@ -10,7 +10,7 @@ import {
   SIGN_IN_TOO_OLD,
 } from "@/features/console/refusal-words.ts";
 import { KEYSTROKE_WORDS, SELECT_FIRST } from "@/shared/keystroke-words.ts";
-import { CONSOLE, groupIn, screenNamed } from "@/shared/navigation.ts";
+import { CONSOLE, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 import { sentenceOf, SIGN_IN_AGAIN } from "@/shared/refusal-words.ts";
 
 import { expect, test } from "./browser.ts";
@@ -34,20 +34,20 @@ import {
   provision,
   signedInAtHome,
   signIn,
-  skipLinkReachesTheScreen,
+  skipLinkReachesThePage,
   theActLandedWithinItsBudget,
 } from "./harness.ts";
 
 const LIST_BUDGET_MS = 1000;
 
 /** Where the console's People group opens. */
-const EVERYONE = screenNamed(groupIn(CONSOLE, "people"), "Everyone");
+const EVERYONE = pageNamed(menuGroupIn(CONSOLE, "people"), "Everyone");
 
-const EVERYONE_SCREEN = EVERYONE.path;
+const EVERYONE_PAGE = EVERYONE.path;
 
-const NAMES_WAITING = screenNamed(groupIn(CONSOLE, "people"), "Names waiting");
+const NAMES_WAITING = pageNamed(menuGroupIn(CONSOLE, "people"), "Names waiting");
 
-const NAMES_WAITING_SCREEN = NAMES_WAITING.path;
+const NAMES_WAITING_PAGE = NAMES_WAITING.path;
 
 /** Written once, so an aria snapshot can set it after a workspace's name. */
 const INSTANT_WORDS = String.raw`\d{2}:\d{2} · \d{1,2} [A-Z][a-z]+ \d{4}`;
@@ -142,7 +142,7 @@ const priyaConnected = async (
 };
 
 const openPriya = async (page: Page, tag: string): Promise<Locator> => {
-  await page.goto(`${EVERYONE_SCREEN}?search=${tag}`);
+  await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
   await personButton(page, "Priya Shah").click();
   const sheet = sheetOf(page, "Priya Shah");
   await expect(regionOf(sheet, "Sessions")).toContainText("1 session open.");
@@ -229,15 +229,15 @@ const clockTheRowLeaving = (page: Page, name: string) =>
 /** The operator lands on Everyone, searched for her. */
 const priyaListed = async (page: Page, api: APIRequestContext, tag: string) => {
   const held = await priyaWithTheOperator(page, api, { tag, displayName: "Priya Shah" });
-  await page.goto(`${EVERYONE_SCREEN}?search=${tag}`);
+  await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
   return held;
 };
 
-/** The saved name's words, which the screen and the sheet both say. */
+/** The saved name's words, which the page and the sheet both say. */
 const savedWords = (was: string, now: string): string =>
   `Saved: ${was}'s display name is ${now} now, wherever the platform names them.`;
 
-test.describe("the console's Everyone screen", () => {
+test.describe("the console's Everyone page", () => {
   test("lists each person with their workspaces, roles and last sign-in", async ({
     page,
     request,
@@ -254,7 +254,7 @@ test.describe("the console's Everyone screen", () => {
     await addMember(request, { workspaceId: beta.workspaceId, userId: priya.id, role: "Viewer" });
     await person(request, anAddress(`${tag}-sam`), { displayName: "Sam Okoro" });
 
-    await page.goto(`${EVERYONE_SCREEN}?search=${tag}`);
+    await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
 
     await expect(personRows(page)).toHaveCount(3);
     await expect(everyone(page).getByRole("status").first()).toHaveText(`3 people match “${tag}”.`);
@@ -278,7 +278,7 @@ test.describe("the console's Everyone screen", () => {
     await signedInAsTheOperator(page, request, tag);
     await person(request, anAddress(`${tag}-priya`), { displayName: "Priya Shah" });
     await person(request, anAddress("ada"), { displayName: `Ada Hartley ${tag}` });
-    await page.goto(EVERYONE_SCREEN);
+    await page.goto(EVERYONE_PAGE);
 
     await searchBox(page).fill(tag.toUpperCase());
     await expect(personRows(page)).toHaveCount(3);
@@ -307,7 +307,7 @@ test.describe("the console's Everyone screen", () => {
       await person(request, anAddress(`${tag}-${made}`), { displayName: `Person ${made}` });
     }
 
-    await page.goto(`${EVERYONE_SCREEN}?search=${tag}`);
+    await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
 
     const paging = everyone(page).getByRole("navigation", { name: "Pages of people" });
     await expect(personRows(page)).toHaveCount(50);
@@ -340,7 +340,7 @@ test.describe("the console's Everyone screen", () => {
 
     // A fresh document, so no list is already in the page's cache.
     const started = Date.now();
-    await page.goto(EVERYONE_SCREEN);
+    await page.goto(EVERYONE_PAGE);
     await expect(personRows(page).first()).toBeVisible();
     const elapsed = Date.now() - started;
 
@@ -353,11 +353,11 @@ test.describe("the console's Everyone screen", () => {
   test("shows the api's refusal once the mark clears", async ({ page, request }) => {
     const tag = aTag();
     const operators = await signedInAsTheOperator(page, request, tag);
-    await page.goto(`${EVERYONE_SCREEN}?search=${tag}`);
+    await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
     await expect(personRows(page)).toHaveCount(1);
 
     await markTheOperator(request, operators.admin.email, "revoke");
-    // A move between the console's own screens keeps its standing, so the list asks again alone.
+    // A move between the console's own pages keeps its standing, so the list asks again alone.
     await navOf(page, CONSOLE).getByRole("link", { name: "Every workspace" }).click();
     await navOf(page, CONSOLE).getByRole("link", { name: "Everyone" }).click();
 
@@ -374,7 +374,7 @@ test.describe("the console's Everyone screen", () => {
     const tag = aTag();
     const operators = await signedInAsTheOperator(page, request, tag);
     await person(request, anAddress(`${tag}-priya`), { displayName: "Priya Shah" });
-    await page.goto(`${EVERYONE_SCREEN}?search=${tag}`);
+    await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
     await expect(personRows(page)).toHaveCount(2);
 
     await expect(everyone(page)).toMatchAriaSnapshot(`
@@ -405,7 +405,7 @@ test.describe("the console's Everyone screen", () => {
     `);
     await passesTheAccessibilityGate();
 
-    await skipLinkReachesTheScreen(page);
+    await skipLinkReachesThePage(page);
     await page.keyboard.press("o");
     await expect(everyone(page)).toContainText(SELECT_FIRST.person);
 
@@ -631,7 +631,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await expect(page).toHaveURL(/\/sign-in\?redirect=/);
     await signIn(page, request, operators.admin.email);
 
-    await expect(page).toHaveURL(new RegExp(`${EVERYONE_SCREEN}\\?`));
+    await expect(page).toHaveURL(new RegExp(`${EVERYONE_PAGE}\\?`));
     const again = sheetOf(page, "Priya Shah");
     const revoke = again.getByRole("button", { name: REVOKE });
     await expect(revoke).toBeFocused();
@@ -644,14 +644,14 @@ test.describe("a person, opened from Everyone as a sheet", () => {
 
     // The way back has served once the person is closed, so a reload does not reopen them.
     await page.keyboard.press("Escape");
-    await expect(page).toHaveURL(EVERYONE_SCREEN);
+    await expect(page).toHaveURL(EVERYONE_PAGE);
     await expect(personButton(page, "Priya Shah")).toBeFocused();
   });
 
   test("revokes the person in focus by keyboard alone", async ({ page, request, baseURL }) => {
     const tag = aTag();
     await priyaConnected(page, request, baseURL, tag);
-    await page.goto(`${EVERYONE_SCREEN}?search=${tag}`);
+    await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
     await expect(personRows(page)).toHaveCount(2);
 
     await personButton(page, "Priya Shah").focus();
@@ -716,7 +716,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
     await signedInAsTheOperator(page, request, tag);
     const flagged = `Priya ${tag}`;
     await person(request, anAddress("priya"), { displayName: flagged });
-    await page.goto(`${EVERYONE_SCREEN}?search=${tag}`);
+    await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
     await personButton(page, flagged).click();
     const correct = regionOf(sheetOf(page, flagged), "Display name").getByRole("button", {
       name: `Correct ${flagged}'s display name`,
@@ -766,7 +766,7 @@ test.describe("a person, opened from Everyone as a sheet", () => {
   });
 });
 
-test.describe("the console's Names waiting screen", () => {
+test.describe("the console's Names waiting page", () => {
   test("lists each flagged name with its flags, within budget", async ({ page, request }) => {
     const tag = aTag();
     const { operators, priya, name } = await priyaFlagged(page, request, tag);
@@ -780,7 +780,7 @@ test.describe("the console's Names waiting screen", () => {
 
     // A fresh document, so no list is already in the page's cache.
     const started = Date.now();
-    await page.goto(NAMES_WAITING_SCREEN);
+    await page.goto(NAMES_WAITING_PAGE);
     await expect(waitingRowOf(page, name)).toBeVisible();
     const elapsed = Date.now() - started;
 
@@ -818,7 +818,7 @@ test.describe("the console's Names waiting screen", () => {
     const tag = aTag();
     const { name } = await priyaFlagged(page, request, tag);
     const corrected = `Priya Sharma ${tag}`;
-    await page.goto(NAMES_WAITING_SCREEN);
+    await page.goto(NAMES_WAITING_PAGE);
     const correct = correctButtonOf(page, name);
 
     const dialog = await correctingCancelled(page, correct, name, {
@@ -835,9 +835,9 @@ test.describe("the console's Names waiting screen", () => {
     await expect(namesWaiting(page)).toContainText(savedWords(name, corrected));
     await expect(namesWaiting(page).getByRole("heading", { name: "Names waiting" })).toBeFocused();
 
-    await page.goto(`${EVERYONE_SCREEN}?search=${tag}`);
+    await page.goto(`${EVERYONE_PAGE}?search=${tag}`);
     await expect(personButton(page, corrected)).toBeVisible();
-    await page.goto(NAMES_WAITING_SCREEN);
+    await page.goto(NAMES_WAITING_PAGE);
     await expect(waitingCount(page)).toBeVisible();
     await expect(waitingRowOf(page, name)).toHaveCount(0);
   });
@@ -845,7 +845,7 @@ test.describe("the console's Names waiting screen", () => {
   test("refuses a name the rule forbids, in the rule's words", async ({ page, request }) => {
     const { name } = await priyaFlagged(page, request, aTag());
     const refusal = sentenceOf(SAID_OF_CORRECTING["display-name-angle-bracket"]);
-    await page.goto(NAMES_WAITING_SCREEN);
+    await page.goto(NAMES_WAITING_PAGE);
     await correctButtonOf(page, name).click();
     const dialog = dialogToCorrect(page, name);
     await nameFieldOf(dialog).fill("Priya <priya@acme.invalid>");
@@ -864,7 +864,7 @@ test.describe("the console's Names waiting screen", () => {
     const { operators, name } = await priyaFlagged(page, request, tag);
     const corrected = `Priya Sharma ${tag}`;
     await ageTheSignIn(request, operators.admin.id);
-    await page.goto(NAMES_WAITING_SCREEN);
+    await page.goto(NAMES_WAITING_PAGE);
     await correctButtonOf(page, name).click();
     await nameFieldOf(dialogToCorrect(page, name)).fill(corrected);
     await page.keyboard.press("Enter");
@@ -879,7 +879,7 @@ test.describe("the console's Names waiting screen", () => {
     await expect(page).toHaveURL(/\/sign-in\?redirect=/);
     await signIn(page, request, operators.admin.email);
 
-    await expect(page).toHaveURL(new RegExp(`${NAMES_WAITING_SCREEN}\\?`));
+    await expect(page).toHaveURL(new RegExp(`${NAMES_WAITING_PAGE}\\?`));
     const again = correctButtonOf(page, name);
     await expect(again).toBeFocused();
     await again.press("Enter");
@@ -888,15 +888,15 @@ test.describe("the console's Names waiting screen", () => {
     await expect(waitingRowOf(page, name)).toHaveCount(0);
     await expect(namesWaiting(page)).toContainText(savedWords(name, corrected));
     // The way back has served once the name is corrected, so a reload lands nowhere in particular.
-    await expect(page).toHaveURL(NAMES_WAITING_SCREEN);
+    await expect(page).toHaveURL(NAMES_WAITING_PAGE);
   });
 
   test("is keyboard-operable and lists its keystrokes", async ({ page, request }) => {
     const { name } = await priyaFlagged(page, request, aTag());
-    await page.goto(NAMES_WAITING_SCREEN);
+    await page.goto(NAMES_WAITING_PAGE);
     await expect(waitingRowOf(page, name)).toBeVisible();
 
-    await skipLinkReachesTheScreen(page);
+    await skipLinkReachesThePage(page);
     await page.keyboard.press("c");
     await expect(namesWaiting(page)).toContainText(SELECT_FIRST.name);
     const listed = await keystrokesListed(page, NAMES_WAITING.name);

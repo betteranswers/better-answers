@@ -29,7 +29,7 @@ const INVITED_BY = { id: "invitedBy", label: "Invited by" } as const;
 /** Every column but the address can hide, so a row always says whose invitation it is. */
 const HIDEABLE = [ROLE, SENT, EXPIRY, INVITED_BY] as const;
 
-/** Address and role are what a narrow screen has room for; the rest can be shown again. */
+/** Address and role are what a narrow window has room for; the rest can be shown again. */
 export const NARROW_HIDES: ReadonlySet<string> = new Set([SENT.id, EXPIRY.id, INVITED_BY.id]);
 
 /**

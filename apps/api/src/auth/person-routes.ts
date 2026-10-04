@@ -80,7 +80,7 @@ export const mayReplace = (held: SecondFactorHeld): boolean =>
 export const waitsOnTheRestoreCode = (held: SecondFactorHeld): boolean =>
   held.restoreRequired && !mayReplace(held);
 
-/** An authenticator's code as its screen sends it. */
+/** An authenticator's code as its page sends it. */
 export const codeAsked = z.object({
   code: z.string().regex(new RegExp(`^\\d{${String(AUTHENTICATOR_CODE_LENGTH)}}$`)),
 });

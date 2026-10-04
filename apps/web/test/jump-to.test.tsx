@@ -6,10 +6,10 @@ import { findWhat, JUMP_TO, nothingMatches } from "@/app/words.ts";
 import {
   INVITE_A_PERSON,
   readerOf,
-  SURFACES,
+  AREAS,
   visibleTo,
   type Role,
-  type Surface,
+  type Area,
 } from "@/shared/navigation.ts";
 
 import { openApp } from "./open-app.tsx";
@@ -20,8 +20,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const treeOf = (role: Role, surfaces: readonly Surface[] = SURFACES) =>
-  visibleTo(readerOf(role), surfaces);
+const treeOf = (role: Role, areas: readonly Area[] = AREAS) => visibleTo(readerOf(role), areas);
 
 const outline = (groups: readonly JumpGroup[]) =>
   groups.map((group) => [group.heading, group.jumps.map((jump) => jump.name)]);
@@ -29,7 +28,7 @@ const outline = (groups: readonly JumpGroup[]) =>
 const valuesOf = (groups: readonly JumpGroup[]) =>
   groups.flatMap((group) => group.jumps.map((jump) => jump.value));
 
-/** Open on no screen an act or a member asks, so no query carries into a jump. */
+/** Open on no page an act or a member asks, so no query carries into a jump. */
 const AT_ROOT = { pathname: "/", searchStr: "" };
 
 const PRIYA = { personId: "p1", displayName: "Priya Shah", address: "priya@example.test" };
@@ -39,17 +38,17 @@ const NAMELESS = { personId: "p2", displayName: "", address: "new@example.test" 
 /** A second Priya Shah, so two members share every word a reader sees but their address. */
 const ANOTHER_PRIYA = { personId: "p3", displayName: "Priya Shah", address: "ps@example.test" };
 
-/** One surface, a built screen with an act, and an unbuilt screen with one. */
-const STUB: readonly Surface[] = [
+/** One area, a built page with an act, and an unbuilt page with one. */
+const STUB: readonly Area[] = [
   {
     id: "yard",
     name: "Yard",
     icon: "map",
-    groups: [
+    menuGroups: [
       {
         id: "stock",
         name: "Stock",
-        screens: [
+        pages: [
           {
             name: "Timber",
             path: "/stock/timber",
@@ -80,20 +79,20 @@ const STUB: readonly Surface[] = [
 ];
 
 describe("what jump-to lists", () => {
-  it("lists a stub tree's built screens and their acts alone", () => {
+  it("lists a stub tree's built pages and their acts alone", () => {
     expect(outline(jumpsIn(treeOf("Admin", STUB), undefined, AT_ROOT))).toEqual([
-      [JUMP_TO.groups.surfaces, ["Yard"]],
-      [JUMP_TO.groups.screens, ["Timber", "Deliveries"]],
+      ["Areas", ["Yard"]],
+      ["Pages", ["Timber", "Deliveries"]],
       [JUMP_TO.groups.acts, ["Order timber"]],
     ]);
   });
 
-  it("drops an act with the screen hidden from the role", () => {
+  it("drops an act with the page hidden from the role", () => {
     const editors = jumpsIn(treeOf("Editor", STUB), undefined, AT_ROOT);
 
     expect(outline(editors)).toEqual([
-      [JUMP_TO.groups.surfaces, ["Yard"]],
-      [JUMP_TO.groups.screens, ["Timber"]],
+      [JUMP_TO.groups.areas, ["Yard"]],
+      [JUMP_TO.groups.pages, ["Timber"]],
       [JUMP_TO.groups.acts, ["Order timber"]],
     ]);
     expect(jumpsIn(treeOf("Viewer", STUB), undefined, AT_ROOT)).toEqual([]);
@@ -101,14 +100,14 @@ describe("what jump-to lists", () => {
 
   it("lists a Viewer's Ask once, with no members or acts", () => {
     expect(outline(jumpsIn(treeOf("Viewer"), undefined, AT_ROOT))).toEqual([
-      [JUMP_TO.groups.surfaces, ["Ask"]],
+      [JUMP_TO.groups.areas, ["Ask"]],
     ]);
   });
 
-  it("lists an Admin's built screens, the invite act and members", () => {
+  it("lists an Admin's built pages, the invite act and members", () => {
     expect(outline(jumpsIn(treeOf("Admin"), [PRIYA, NAMELESS], AT_ROOT))).toEqual([
-      [JUMP_TO.groups.surfaces, ["Control Centre"]],
-      [JUMP_TO.groups.screens, ["Bindings", "Routes and spend", "Members", "Groups", "Audit log"]],
+      [JUMP_TO.groups.areas, ["Control Centre"]],
+      [JUMP_TO.groups.pages, ["Bindings", "Routes and spend", "Members", "Groups", "Audit log"]],
       [JUMP_TO.groups.acts, [INVITE_A_PERSON.name]],
       [JUMP_TO.groups.members, ["Priya Shah", "new@example.test"]],
     ]);
@@ -195,13 +194,13 @@ describe("choosing Invite a person in the app", () => {
 });
 
 describe("what typing leaves", () => {
-  it("finds no People screen for a Viewer typing people", () => {
+  it("finds no People page for a Viewer typing people", () => {
     expect(matching(jumpsIn(treeOf("Viewer"), undefined, AT_ROOT), "people")).toEqual([]);
   });
 
-  it("finds an Admin's People screens by their group's name", () => {
+  it("finds an Admin's People pages by their group's name", () => {
     expect(outline(matching(jumpsIn(treeOf("Admin"), [PRIYA], AT_ROOT), "People"))).toEqual([
-      [JUMP_TO.groups.screens, ["Members", "Groups"]],
+      [JUMP_TO.groups.pages, ["Members", "Groups"]],
     ]);
   });
 
@@ -222,7 +221,7 @@ describe("what typing leaves", () => {
     ]);
   });
 
-  it("finds nothing by an unbuilt screen's name", () => {
+  it("finds nothing by an unbuilt page's name", () => {
     expect(matching(jumpsIn(treeOf("Admin"), [PRIYA], AT_ROOT), "Signals")).toEqual([]);
   });
 });
@@ -250,10 +249,10 @@ describe("what the dialog's outcome line says", () => {
     });
   });
 
-  it("promises a Viewer screens, an Admin members and acts too", () => {
-    expect(findWhat([JUMP_TO.kinds.screen])).toBe("Find a screen");
-    expect(findWhat([JUMP_TO.kinds.screen, JUMP_TO.kinds.member, JUMP_TO.kinds.act])).toBe(
-      "Find a screen, a member or an act",
+  it("promises a Viewer pages, an Admin members and acts too", () => {
+    expect(findWhat([JUMP_TO.kinds.page])).toBe("Find a page");
+    expect(findWhat([JUMP_TO.kinds.page, JUMP_TO.kinds.member, JUMP_TO.kinds.act])).toBe(
+      "Find a page, a member or an act",
     );
   });
 });

@@ -5,13 +5,13 @@ import type { IconName } from "./icon.tsx";
 /** A workspace role, as the session's membership names it. */
 export type Role = (typeof ROLES)[number];
 
-/** The operator holds no role in the console, so its screens are shown to the mark instead. */
+/** The operator holds no role in the console, so its pages are shown to the mark instead. */
 export type RoleOrOperator = Role | "operator";
 
-/** Something a screen does that jump-to offers by name, to whoever may see the screen. */
+/** Something a page does that jump-to offers by name, to whoever may see the page. */
 type Act = {
   readonly name: string;
-  /** What the screen's address carries to open it. */
+  /** What the page's address carries to open it. */
   readonly asks: string;
   readonly icon: IconName;
 };
@@ -22,12 +22,12 @@ export const INVITE_A_PERSON = {
   icon: "invite",
 } as const satisfies Act;
 
-/** One segment beneath a screen, naming a row: listed nowhere, gated and framed as its screen. */
+/** One segment beneath a page, naming a row: listed nowhere, gated and framed as its page. */
 type Detail = {
   readonly param: string;
 };
 
-export type Screen = {
+export type Page = {
   readonly name: string;
   readonly path: string;
   readonly icon: IconName;
@@ -35,29 +35,29 @@ export type Screen = {
   readonly seenBy: readonly RoleOrOperator[];
   /** Shown as well to anyone owning a domain, whatever their role. */
   readonly owners?: true;
-  /** An older address, which leads here only for a person who may see the screen. */
-  readonly movedFrom?: string;
+  /** Every older address, each leading here only for a person who may see the page. */
+  readonly movedFrom?: readonly string[];
   readonly acts?: readonly Act[];
   readonly detail?: Detail;
 };
 
-export type Group = {
+export type MenuGroup = {
   readonly id: string;
-  /** Absent where the surface lists its screens alone, as Ask and Inbox do. */
+  /** Absent where the area lists its pages alone, as Ask and Inbox do. */
   readonly name?: string;
   readonly summary?: string;
-  readonly screens: readonly Screen[];
-  /** An older address naming the group, which leads to its first screen the person may see. */
-  readonly movedFrom?: string;
+  readonly pages: readonly Page[];
+  /** Every older address naming the group, each leading to its first page the person may see. */
+  readonly movedFrom?: readonly string[];
 };
 
-export type Surface = {
+export type Area = {
   readonly id: string;
   readonly name: string;
   readonly icon: IconName;
-  readonly groups: readonly Group[];
-  /** An address of the surface's own, standing as a role's home while none of its screens is built. */
-  readonly home?: Screen;
+  readonly menuGroups: readonly MenuGroup[];
+  /** An address of the area's own, standing as a role's home while none of its pages is built. */
+  readonly home?: Page;
 };
 
 const EVERY_ROLE = ["Admin", "Editor", "Viewer"] as const satisfies readonly Role[];
@@ -71,10 +71,10 @@ export const ASK = {
   name: "Ask",
   icon: "ask",
   home: { name: "Ask", path: "/ask", icon: "ask", built: false, seenBy: EVERY_ROLE },
-  groups: [
+  menuGroups: [
     {
       id: "ask",
-      screens: [
+      pages: [
         {
           name: "New question",
           path: "/ask/new-question",
@@ -92,18 +92,18 @@ export const ASK = {
       ],
     },
   ],
-} as const satisfies Surface;
+} as const satisfies Area;
 
 const KNOWLEDGE = {
   id: "knowledge",
   name: "Knowledge",
   icon: "map",
-  groups: [
+  menuGroups: [
     {
       id: "browse",
       name: "Browse",
       summary: "What this workspace knows, to search and read.",
-      screens: [
+      pages: [
         {
           name: "Search",
           path: "/knowledge/search",
@@ -124,7 +124,7 @@ const KNOWLEDGE = {
       id: "curation",
       name: "Curation",
       summary: "Everything this workspace knows, what needs checking, and who owns each domain.",
-      screens: [
+      pages: [
         {
           name: "All knowledge",
           path: "/knowledge/all-knowledge",
@@ -176,16 +176,16 @@ const KNOWLEDGE = {
       ],
     },
   ],
-} as const satisfies Surface;
+} as const satisfies Area;
 
 const INBOX = {
   id: "inbox",
   name: "Inbox",
   icon: "tray",
-  groups: [
+  menuGroups: [
     {
       id: "inbox",
-      screens: [
+      pages: [
         {
           name: "Waiting on you",
           path: "/inbox/waiting-on-you",
@@ -197,18 +197,18 @@ const INBOX = {
       ],
     },
   ],
-} as const satisfies Surface;
+} as const satisfies Area;
 
 export const CONTROL_CENTRE = {
   id: "control-centre",
   name: "Control Centre",
   icon: "control-centre",
-  groups: [
+  menuGroups: [
     {
       id: "overview",
       name: "Overview",
       summary: "Where this workspace needs your attention.",
-      screens: [
+      pages: [
         { name: "Overview", path: "/overview", icon: "overview", built: false, seenBy: ADMINS },
       ],
     },
@@ -216,7 +216,7 @@ export const CONTROL_CENTRE = {
       id: "suggestions",
       name: "Suggestions",
       summary: "Suggested changes waiting for a decision.",
-      screens: [
+      pages: [
         {
           name: "Queue",
           path: "/suggestions/queue",
@@ -230,8 +230,8 @@ export const CONTROL_CENTRE = {
       id: "sources",
       name: "Sources",
       summary: "The documents this workspace learns from.",
-      movedFrom: "/sources",
-      screens: [
+      movedFrom: ["/sources"],
+      pages: [
         {
           name: "Bindings",
           path: "/sources/bindings",
@@ -280,14 +280,14 @@ export const CONTROL_CENTRE = {
       id: "agent-operations",
       name: "Agent Operations",
       summary: "The model each purpose runs on, and what it spends.",
-      screens: [
+      pages: [
         {
           name: "Routes and spend",
           path: "/agent-operations/routes-and-spend",
           icon: "routes",
           built: true,
           seenBy: ADMINS,
-          movedFrom: "/system/routes-and-spend",
+          movedFrom: ["/system/routes-and-spend"],
         },
         {
           name: "Ceiling",
@@ -302,7 +302,7 @@ export const CONTROL_CENTRE = {
       id: "questions",
       name: "Questions",
       summary: "The questions asked in this workspace, and the answers they got.",
-      screens: [
+      pages: [
         {
           name: "Answer audit",
           path: "/questions/answer-audit",
@@ -323,8 +323,8 @@ export const CONTROL_CENTRE = {
       id: "people",
       name: "People",
       summary: "Who can use this workspace, and what each person can do.",
-      movedFrom: "/people",
-      screens: [
+      movedFrom: ["/people"],
+      pages: [
         {
           name: "Members",
           path: "/people/members",
@@ -342,7 +342,7 @@ export const CONTROL_CENTRE = {
       id: "personal-data",
       name: "Personal data",
       summary: "The personal data this workspace holds, and requests to erase or suppress it.",
-      screens: [
+      pages: [
         {
           name: "Erasure and suppression",
           path: "/personal-data/erasure-and-suppression",
@@ -356,15 +356,15 @@ export const CONTROL_CENTRE = {
       id: "system",
       name: "System",
       summary: "How this workspace is running, and a record of what was done in it.",
-      movedFrom: "/system",
-      screens: [
+      movedFrom: ["/system"],
+      pages: [
         {
           name: "Audit log",
           path: "/system/audit-log",
           icon: "log",
           built: true,
           seenBy: ADMINS,
-          movedFrom: "/people/audit-log",
+          movedFrom: ["/people/audit-log"],
         },
         {
           name: "Signals",
@@ -384,21 +384,21 @@ export const CONTROL_CENTRE = {
       ],
     },
   ],
-} as const satisfies Surface;
+} as const satisfies Area;
 
 /** Reached from the workspace switcher, never the rail. */
 export const CONSOLE = {
   id: "console",
   name: "Console",
   icon: "console",
-  groups: [
+  menuGroups: [
     {
       id: "people",
       name: "People",
       summary:
         "Every person on the platform, the workspaces they belong to and their role in each, with the sessions and grants that can act as them.",
-      movedFrom: "/console/people",
-      screens: [
+      movedFrom: ["/console/people"],
+      pages: [
         {
           name: "Everyone",
           path: "/console/people/everyone",
@@ -420,8 +420,8 @@ export const CONSOLE = {
       name: "Workspaces",
       summary:
         "Every workspace on the platform, with its slug, its member count and the day it was provisioned. Provisioning and renaming are ops commands, so this list is read-only.",
-      movedFrom: "/console/workspaces",
-      screens: [
+      movedFrom: ["/console/workspaces"],
+      pages: [
         {
           name: "Every workspace",
           path: "/console/workspaces/every-workspace",
@@ -432,12 +432,12 @@ export const CONSOLE = {
       ],
     },
   ],
-} as const satisfies Surface;
+} as const satisfies Area;
 
 /** The workspace's rail, in its order. */
-export const SURFACES: readonly Surface[] = [ASK, KNOWLEDGE, INBOX, CONTROL_CENTRE];
+export const AREAS: readonly Area[] = [ASK, KNOWLEDGE, INBOX, CONTROL_CENTRE];
 
-export const EVERY_SURFACE: readonly Surface[] = [...SURFACES, CONSOLE];
+export const EVERY_AREA: readonly Area[] = [...AREAS, CONSOLE];
 
 type Declared =
   | typeof ASK
@@ -447,40 +447,41 @@ type Declared =
   | typeof CONSOLE;
 
 /** Every declared address, so a link written outside the list stops compiling when it moves. */
-export type ScreenPath =
-  | Declared["groups"][number]["screens"][number]["path"]
+export type PagePath =
+  | Declared["menuGroups"][number]["pages"][number]["path"]
   | (typeof ASK)["home"]["path"];
 
-type GroupOf<Held extends Surface> = Held["groups"][number];
+type MenuGroupOf<Held extends Area> = Held["menuGroups"][number];
 
-export const groupIn = <Held extends Surface, Id extends GroupOf<Held>["id"]>(
-  surface: Held,
+export const menuGroupIn = <Held extends Area, Id extends MenuGroupOf<Held>["id"]>(
+  area: Held,
   id: Id,
-): Extract<GroupOf<Held>, { readonly id: Id }> => {
-  const group = surface.groups.find(
-    (candidate): candidate is Extract<GroupOf<Held>, { readonly id: Id }> => candidate.id === id,
+): Extract<MenuGroupOf<Held>, { readonly id: Id }> => {
+  const group = area.menuGroups.find(
+    (candidate): candidate is Extract<MenuGroupOf<Held>, { readonly id: Id }> =>
+      candidate.id === id,
   );
-  if (group === undefined) throw new Error(`${surface.name} has no group ${id}`);
+  if (group === undefined) throw new Error(`${area.name} has no group ${id}`);
   return group;
 };
 
-/** A screen's address read off the list, so a link to it is never a second copy. */
-export const screenNamed = <Held extends Group>(
+/** A page's address read off the list, so a link to it is never a second copy. */
+export const pageNamed = <Held extends MenuGroup>(
   group: Held,
-  name: Held["screens"][number]["name"],
-): Screen => {
-  const screen = group.screens.find((candidate) => candidate.name === name);
-  if (screen === undefined) throw new Error(`${group.id} has no screen named ${name}`);
-  return screen;
+  name: Held["pages"][number]["name"],
+): Page => {
+  const page = group.pages.find((candidate) => candidate.name === name);
+  if (page === undefined) throw new Error(`${group.id} has no page named ${name}`);
+  return page;
 };
 
 /** Where each reader lands, and the way back offered when they are lost. */
 export const HOMES = {
-  Admin: screenNamed(groupIn(CONTROL_CENTRE, "people"), "Members"),
+  Admin: pageNamed(menuGroupIn(CONTROL_CENTRE, "people"), "Members"),
   Editor: ASK.home,
   Viewer: ASK.home,
-  operator: screenNamed(groupIn(CONSOLE, "workspaces"), "Every workspace"),
-} as const satisfies { readonly [who in RoleOrOperator]: Screen };
+  operator: pageNamed(menuGroupIn(CONSOLE, "workspaces"), "Every workspace"),
+} as const satisfies { readonly [who in RoleOrOperator]: Page };
 
 export type Reader = {
   /** Undefined until the membership read answers, so nothing role-gated shows meanwhile. */
@@ -488,132 +489,135 @@ export type Reader = {
   readonly owns: readonly string[];
 };
 
-/** Nothing records who owns a domain, so a screen marked for owners shows by role alone. */
+/** Nothing records who owns a domain, so a page marked for owners shows by role alone. */
 export const readerOf = (role: RoleOrOperator | undefined): Reader => ({ role, owns: [] });
 
 export const OPERATOR_READER: Reader = readerOf("operator");
 
 /** `opensAt` is where its rail entry leads: the reader's home when it is here. */
-export type VisibleSurface = Surface & { readonly opensAt: Screen };
+export type VisibleArea = Area & { readonly opensAt: Page };
 
 export type VisibleTree = {
-  readonly surfaces: readonly VisibleSurface[];
+  readonly areas: readonly VisibleArea[];
   /** Undefined exactly when no role is held. */
-  readonly home: Screen | undefined;
+  readonly home: Page | undefined;
 };
 
-export const NO_TREE: VisibleTree = { surfaces: [], home: undefined };
+export const NO_TREE: VisibleTree = { areas: [], home: undefined };
 
-const sees = (role: RoleOrOperator, owns: readonly string[], screen: Screen): boolean =>
-  screen.built && (screen.seenBy.includes(role) || (screen.owners === true && owns.length > 0));
+const sees = (role: RoleOrOperator, owns: readonly string[], page: Page): boolean =>
+  page.built && (page.seenBy.includes(role) || (page.owners === true && owns.length > 0));
 
 const shownOf = (
-  surface: Surface,
-  seen: (screen: Screen) => boolean,
-  home: Screen,
-): VisibleSurface | undefined => {
-  const groups = surface.groups
-    .map((group) => ({ ...group, screens: group.screens.filter(seen) }))
-    .filter((group) => group.screens.length > 0);
-  // A home standing in for unbuilt screens is the surface's one entry.
-  const shown = surface.home === home ? [{ id: surface.id, screens: [home] }, ...groups] : groups;
-  const first = shown[0]?.screens[0];
+  area: Area,
+  seen: (page: Page) => boolean,
+  home: Page,
+): VisibleArea | undefined => {
+  const groups = area.menuGroups
+    .map((group) => ({ ...group, pages: group.pages.filter(seen) }))
+    .filter((group) => group.pages.length > 0);
+  // A home standing in for unbuilt pages is the area's one entry.
+  const shown = area.home === home ? [{ id: area.id, pages: [home] }, ...groups] : groups;
+  const first = shown[0]?.pages[0];
   if (first === undefined) return undefined;
 
-  const holdsHome = shown.some((group) => group.screens.includes(home));
+  const holdsHome = shown.some((group) => group.pages.includes(home));
   return {
-    id: surface.id,
-    name: surface.name,
-    icon: surface.icon,
-    groups: shown,
+    id: area.id,
+    name: area.name,
+    icon: area.icon,
+    menuGroups: shown,
     opensAt: holdsHome ? home : first,
   };
 };
 
 /** Built-ness and the reader filter the list; a role's home shows whether built or not. */
-export const visibleTo = (reader: Reader, surfaces: readonly Surface[]): VisibleTree => {
+export const visibleTo = (reader: Reader, areas: readonly Area[]): VisibleTree => {
   const { role, owns } = reader;
   if (role === undefined) return NO_TREE;
 
   const home = HOMES[role];
-  const seen = (screen: Screen) => screen === home || sees(role, owns, screen);
+  const seen = (page: Page) => page === home || sees(role, owns, page);
   return {
-    surfaces: surfaces.flatMap((surface) => shownOf(surface, seen, home) ?? []),
+    areas: areas.flatMap((area) => shownOf(area, seen, home) ?? []),
     home,
   };
 };
 
-export type Place<Held extends Surface = Surface> = {
-  readonly surface: Held;
-  readonly group: Group | undefined;
-  readonly screen: Screen;
-  /** The segment a screen's detail address holds, still encoded as the address has it. */
+export type Place<Held extends Area = Area> = {
+  readonly area: Held;
+  readonly menuGroup: MenuGroup | undefined;
+  readonly page: Page;
+  /** The segment a page's detail address holds, still encoded as the address has it. */
   readonly detail?: string;
 };
 
-const placesIn = <Held extends Surface>(surface: Held): readonly Place<Held>[] => [
-  ...(surface.home === undefined ? [] : [{ surface, group: undefined, screen: surface.home }]),
-  ...surface.groups.flatMap((group) => group.screens.map((screen) => ({ surface, group, screen }))),
+const placesIn = <Held extends Area>(area: Held): readonly Place<Held>[] => [
+  ...(area.home === undefined ? [] : [{ area, menuGroup: undefined, page: area.home }]),
+  ...area.menuGroups.flatMap((menuGroup) =>
+    menuGroup.pages.map((page) => ({ area, menuGroup, page })),
+  ),
 ];
 
-/** A surface's own home first: a visible surface carries none, so it adds nothing there. */
-export const screensOf = (surfaces: readonly Surface[]): readonly Screen[] =>
-  surfaces.flatMap(placesIn).map(({ screen }) => screen);
+/** An area's own home first: a visible area carries none, so it adds nothing there. */
+export const pagesOf = (areas: readonly Area[]): readonly Page[] =>
+  areas.flatMap(placesIn).map(({ page }) => page);
 
 /** One segment and no more, so a deeper address beneath a row names nothing. */
-const detailIn = (screen: Screen, pathname: string): string | undefined => {
-  const beneath = `${screen.path}/`;
-  if (screen.detail === undefined || !pathname.startsWith(beneath)) return undefined;
+const detailIn = (page: Page, pathname: string): string | undefined => {
+  const beneath = `${page.path}/`;
+  if (page.detail === undefined || !pathname.startsWith(beneath)) return undefined;
   const segment = pathname.slice(beneath.length);
   return segment === "" || segment.includes("/") ? undefined : segment;
 };
 
-/** An exact match first, then a screen's declared detail address; anything deeper is no place. */
-export const placeAt = <Held extends Surface>(
-  surfaces: readonly Held[],
+/** An exact match first, then a page's declared detail address; anything deeper is no place. */
+export const placeAt = <Held extends Area>(
+  areas: readonly Held[],
   pathname: string,
 ): Place<Held> | undefined => {
-  const places = surfaces.flatMap(placesIn);
-  const exact = places.find((place) => place.screen.path === pathname);
+  const places = areas.flatMap(placesIn);
+  const exact = places.find((place) => place.page.path === pathname);
   if (exact !== undefined) return exact;
   for (const place of places) {
-    const detail = detailIn(place.screen, pathname);
+    const detail = detailIn(place.page, pathname);
     if (detail !== undefined) return { ...place, detail };
   }
   return undefined;
 };
 
-/** The address of one row beneath a screen that declares a detail address. */
-export const detailAt = (screen: Screen, value: string): string => {
-  if (screen.detail === undefined) throw new Error(`${screen.path} declares no detail address`);
-  return `${screen.path}/${encodeURIComponent(value)}`;
+/** The address of one row beneath a page that declares a detail address. */
+export const detailAt = (page: Page, value: string): string => {
+  if (page.detail === undefined) throw new Error(`${page.path} declares no detail address`);
+  return `${page.path}/${encodeURIComponent(value)}`;
 };
 
-/** With no role held nothing is hidden, so a screen draws its own loading or failed state. */
+/** With no role held nothing is hidden, so a page draws its own loading or failed state. */
 export const hides = (tree: VisibleTree, path: string): boolean =>
-  tree.home !== undefined && placeAt(tree.surfaces, path) === undefined;
+  tree.home !== undefined && placeAt(tree.areas, path) === undefined;
 
-/** What a screen's first heading says: its group's name, or its surface's where it has none. */
-export const headingOf = (screen: Screen): string => {
-  const place = placeAt(EVERY_SURFACE, screen.path);
-  return place?.group?.name ?? place?.surface.name ?? screen.name;
+/** What a page's first heading says: its group's name, or its area's where it has none. */
+export const headingOf = (page: Page): string => {
+  const place = placeAt(EVERY_AREA, page.path);
+  return place?.menuGroup?.name ?? place?.area.name ?? page.name;
 };
 
-/** `to` is in order: an older address leads to the first screen in it the reader may see. */
-export type Moved = { readonly from: string; readonly to: readonly Screen[] };
+/** `to` is in order: an older address leads to the first page in it the reader may see. */
+export type Moved = { readonly from: string; readonly to: readonly Page[] };
 
-export const movedWithin = (surfaces: readonly Surface[]): readonly Moved[] =>
-  surfaces.flatMap((surface) =>
-    surface.groups.flatMap((group) => [
-      ...(group.movedFrom === undefined ? [] : [{ from: group.movedFrom, to: group.screens }]),
-      ...group.screens.flatMap((screen) =>
-        screen.movedFrom === undefined ? [] : [{ from: screen.movedFrom, to: [screen] }],
-      ),
+const movesOf = (from: readonly string[] = [], to: readonly Page[]): readonly Moved[] =>
+  from.map((address) => ({ from: address, to }));
+
+export const movedWithin = (areas: readonly Area[]): readonly Moved[] =>
+  areas.flatMap((area) =>
+    area.menuGroups.flatMap((group) => [
+      ...movesOf(group.movedFrom, group.pages),
+      ...group.pages.flatMap((page) => movesOf(page.movedFrom, [page])),
     ]),
   );
 
 /** Undefined where the reader may see nothing the older address now names. */
-export const leadsTo = (tree: VisibleTree, moved: Moved): Screen | undefined => {
-  const shown = screensOf(tree.surfaces);
-  return moved.to.find((screen) => shown.includes(screen));
+export const leadsTo = (tree: VisibleTree, moved: Moved): Page | undefined => {
+  const shown = pagesOf(tree.areas);
+  return moved.to.find((page) => shown.includes(page));
 };

@@ -80,7 +80,7 @@ test("an invited newcomer names themselves on the invitation, then joins", async
   `);
   await passesTheAccessibilityGate();
 
-  const keystrokes = await keystrokesListed(page, "this screen");
+  const keystrokes = await keystrokesListed(page, "this page");
   await expect(keystrokes).toContainText(INVITATION_ACTS.join);
   await keystrokesDismissed(page, keystrokes);
 
@@ -255,7 +255,7 @@ test("refuses a person at another address, offering the invited one", async ({
   await expect(page.getByRole("main")).not.toContainText("Brightwater Estimating");
   await passesTheAccessibilityGate();
 
-  const keystrokes = await keystrokesListed(page, "this screen");
+  const keystrokes = await keystrokesListed(page, "this page");
   await expect(keystrokes).toContainText(INVITATION_ACTS.anotherAddress);
   await page.keyboard.press("Escape");
   await expect(keystrokes).toBeHidden();

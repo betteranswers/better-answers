@@ -154,7 +154,7 @@ function WideBand(properties: BandProperties) {
   );
 }
 
-/** Two rows that scroll with the page: a fixed band would take a short screen's content. */
+/** Two rows that scroll with the page: a fixed band would take a short page's content. */
 function NarrowBand(properties: BandProperties) {
   return (
     <header className="border-b border-border bg-background">

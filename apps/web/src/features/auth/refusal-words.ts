@@ -2,7 +2,7 @@ import type { Refusal } from "@/shared/api/trpc.ts";
 import { saidOfRefusal, type Said, type SaidOfWord } from "@/shared/refusal-words.ts";
 import { minutesUntil, PRODUCT_NAME } from "@/shared/words.ts";
 
-/** Said on the invitation screen, of its read and of joining alike. */
+/** Said on the invitation page, of its read and of joining alike. */
 export const SAID_OF_ACCEPTING = {
   "no-such-invitation": {
     why: "There's no invitation at this link.",
@@ -322,7 +322,7 @@ export const CODES_NOT_COPIED: Said = {
   next: "Select them and copy them yourself.",
 };
 
-/** The other ways a throttled code's screen can name, each only when the person holds it. */
+/** The other ways a throttled code's page can name, each only when the person holds it. */
 const OTHER_WAYS = {
   passkey: "your passkey",
   authenticator: "your authenticator",
@@ -394,7 +394,7 @@ export const RESTORE_CODE_WRONG: Said = {
   next: `Check it, or ask ${PRODUCT_NAME} support for a new one.`,
 };
 
-/** Said where a sign-in without the right to set up asks to, before the screen moves on. */
+/** Said where a sign-in without the right to set up asks to, before the page moves on. */
 export const SETUP_NOT_GRANTED: Said = {
   why: "This sign-in can't set up a new second factor.",
   next: "Confirm it's you first.",

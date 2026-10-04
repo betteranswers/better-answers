@@ -1,7 +1,7 @@
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useEffectEvent, useRef, useState, type RefObject } from "react";
 
-import { MEMBERS_SCREEN } from "@/features/people/members-address.ts";
+import { MEMBERS_PAGE } from "@/features/people/members-address.ts";
 import { useMembers } from "@/features/people/people-api.ts";
 import { askingHere, type Here } from "@/shared/address-ask.ts";
 import { Icon, type IconName } from "@/shared/icon.tsx";
@@ -9,10 +9,10 @@ import type { Keystroke } from "@/shared/keystrokes.tsx";
 import {
   detailAt,
   placeAt,
-  screensOf,
-  type Group,
-  type Screen,
-  type VisibleSurface,
+  pagesOf,
+  type MenuGroup,
+  type Page,
+  type VisibleArea,
   type VisibleTree,
 } from "@/shared/navigation.ts";
 import { Button } from "@/shared/ui/button.tsx";
@@ -28,7 +28,7 @@ import { nameOrAddress } from "@/shared/words.ts";
 
 import { findWhat, JUMP_TO, nothingMatches } from "./words.ts";
 
-/** Where focus goes once chosen: a place hands it to the screen, an act to its own dialog. */
+/** Where focus goes once chosen: a place hands it to the page, an act to its own dialog. */
 type Kind = "place" | "member" | "act";
 
 type Jump = {
@@ -52,52 +52,52 @@ type Member = {
   readonly address: string;
 };
 
-type Placed = { readonly surface: VisibleSurface; readonly group: Group; readonly screen: Screen };
+type Placed = { readonly area: VisibleArea; readonly menuGroup: MenuGroup; readonly page: Page };
 
 const jumpOf = (jump: Omit<Jump, "words">, ...also: readonly string[]): Jump => ({
   ...jump,
   words: [jump.name, jump.said ?? "", ...also].join(" ").toLowerCase(),
 });
 
-const surfaceJump = (surface: VisibleSurface): Jump =>
+const areaJump = (area: VisibleArea): Jump =>
   jumpOf({
-    value: `surface ${surface.id}`,
-    name: surface.name,
+    value: `area ${area.id}`,
+    name: area.name,
     said: undefined,
-    icon: surface.icon,
-    to: surface.opensAt.path,
+    icon: area.icon,
+    to: area.opensAt.path,
     kind: "place",
   });
 
-/** A surface standing in for its own unbuilt home is listed once, as the surface. */
-const placedIn = (surface: VisibleSurface): readonly Placed[] =>
-  surface.groups.flatMap((group) =>
-    group.screens
-      .filter((screen) => screen !== surface.opensAt || screen.name !== surface.name)
-      .map((screen) => ({ surface, group, screen })),
+/** An area standing in for its own unbuilt home is listed once, as the area. */
+const placedIn = (area: VisibleArea): readonly Placed[] =>
+  area.menuGroups.flatMap((menuGroup) =>
+    menuGroup.pages
+      .filter((page) => page !== area.opensAt || page.name !== area.name)
+      .map((page) => ({ area, menuGroup, page })),
   );
 
-const screenJump = ({ surface, group, screen }: Placed): Jump =>
+const pageJump = ({ area, menuGroup, page }: Placed): Jump =>
   jumpOf(
     {
-      value: `screen ${screen.path}`,
-      name: screen.name,
-      said: group.name ?? surface.name,
-      icon: screen.icon,
-      to: screen.path,
+      value: `page ${page.path}`,
+      name: page.name,
+      said: menuGroup.name ?? area.name,
+      icon: page.icon,
+      to: page.path,
       kind: "place",
     },
-    surface.name,
+    area.name,
   );
 
-const actJumps = (screen: Screen, here: Here): readonly Jump[] =>
-  (screen.acts ?? []).map((act) =>
+const actJumps = (page: Page, here: Here): readonly Jump[] =>
+  (page.acts ?? []).map((act) =>
     jumpOf({
-      value: `act ${screen.path} ${act.asks}`,
+      value: `act ${page.path} ${act.asks}`,
       name: act.name,
-      said: screen.name,
+      said: page.name,
       icon: act.icon,
-      to: askingHere(here, screen.path, "act", act.asks),
+      to: askingHere(here, page.path, "act", act.asks),
       kind: "act",
     }),
   );
@@ -109,22 +109,22 @@ const memberJump = (member: Member): Jump =>
     name: nameOrAddress(member.displayName, member.address),
     said: member.displayName === "" ? undefined : member.address,
     icon: "person",
-    to: detailAt(MEMBERS_SCREEN, member.personId),
+    to: detailAt(MEMBERS_PAGE, member.personId),
     kind: "member",
   });
 
-/** Only what the visible tree holds, so an unbuilt or hidden screen and its acts never show. */
+/** Only what the visible tree holds, so an unbuilt or hidden page and its acts never show. */
 export const jumpsIn = (
   tree: VisibleTree,
   members: readonly Member[] | undefined,
   here: Here,
 ): readonly JumpGroup[] => {
   const groups: readonly JumpGroup[] = [
-    { heading: JUMP_TO.groups.surfaces, jumps: tree.surfaces.map(surfaceJump) },
-    { heading: JUMP_TO.groups.screens, jumps: tree.surfaces.flatMap(placedIn).map(screenJump) },
+    { heading: JUMP_TO.groups.areas, jumps: tree.areas.map(areaJump) },
+    { heading: JUMP_TO.groups.pages, jumps: tree.areas.flatMap(placedIn).map(pageJump) },
     {
       heading: JUMP_TO.groups.acts,
-      jumps: screensOf(tree.surfaces).flatMap((screen) => actJumps(screen, here)),
+      jumps: pagesOf(tree.areas).flatMap((page) => actJumps(page, here)),
     },
     {
       heading: JUMP_TO.groups.members,
@@ -204,7 +204,7 @@ const ON_APPLE = typeof navigator !== "undefined" && /Mac|iPhone|iPad/u.test(nav
 /** As the reader's own keyboard labels it; either chord works on any. */
 const CHORD = ON_APPLE ? "⌘K" : "Ctrl K";
 
-/** For the shell's list of keystrokes, which names it on every screen. */
+/** For the shell's list of keystrokes, which names it on every page. */
 export const JUMP_TO_KEYSTROKE: Keystroke = { key: CHORD, act: JUMP_TO.name };
 
 function Trigger(properties: {
@@ -287,7 +287,7 @@ function JumpList(
     typed,
   );
   const kinds = [
-    JUMP_TO.kinds.screen,
+    JUMP_TO.kinds.page,
     ...(read === "unasked" ? [] : [JUMP_TO.kinds.member]),
     ...(every.some(({ jumps }) => jumps.some(({ kind }) => kind === "act"))
       ? [JUMP_TO.kinds.act]
@@ -383,7 +383,7 @@ export function JumpTo(properties: {
         >
           <DialogTitle className="sr-only">{JUMP_TO.name}</DialogTitle>
           <DialogDescription className="sr-only">{JUMP_TO.said}</DialogDescription>
-          {placeAt(tree.surfaces, MEMBERS_SCREEN.path) === undefined ? (
+          {placeAt(tree.areas, MEMBERS_PAGE.path) === undefined ? (
             <JumpList tree={tree} onChoose={choose} read="unasked" members={undefined} />
           ) : (
             <WithMembers tree={tree} onChoose={choose} />

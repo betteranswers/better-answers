@@ -142,7 +142,7 @@ const isWaitingOnTheRoleRead = async (): Promise<boolean> => {
   return (found.rowCount ?? 0) > 0;
 };
 
-/** As the screen acts: the test Admin, holding their own member row. */
+/** As the page acts: the test Admin, holding their own member row. */
 const asTheAdmin = async <T>(
   fixture: Fixture,
   workspaceId: WorkspaceId,

@@ -11,7 +11,7 @@ case "${WORD:-}" in
     ;;
   fail)
     word=fail
-    said="A journey failed, or a sign-in email did not reach the test inbox in time. The journeys' table above names the role, the screen and the step (RUNBOOK.md page 13)."
+    said="A journey failed, or a sign-in email did not reach the test inbox in time. The journeys' table above names the role, the page and the step (RUNBOOK.md page 13)."
     ;;
   could-not-run)
     word=could-not-run

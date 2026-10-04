@@ -2,7 +2,7 @@ import { useLinkProps } from "@tanstack/react-router";
 
 import { Icon } from "@/shared/icon.tsx";
 import { cn } from "@/shared/lib/utils.ts";
-import type { Place, VisibleSurface } from "@/shared/navigation.ts";
+import type { Place, VisibleArea } from "@/shared/navigation.ts";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -17,13 +17,13 @@ import { BREADCRUMB } from "./words.ts";
 /** `to` is undefined for the last part alone, the place the reader is on. */
 export type Part = { readonly name: string; readonly to: string | undefined };
 
-const placeParts = ({ surface, group, screen }: Place<VisibleSurface>): readonly Part[] => [
-  { name: surface.name, to: surface.opensAt.path },
-  // The reader's own copy of the group, so its first screen is one they may see.
-  ...(group?.name === undefined
+const placeParts = ({ area, menuGroup, page }: Place<VisibleArea>): readonly Part[] => [
+  { name: area.name, to: area.opensAt.path },
+  // The reader's own copy of the group, so its first page is one they may see.
+  ...(menuGroup?.name === undefined
     ? []
-    : [{ name: group.name, to: group.screens[0]?.path ?? screen.path }]),
-  { name: screen.name, to: screen.path },
+    : [{ name: menuGroup.name, to: menuGroup.pages[0]?.path ?? page.path }]),
+  { name: page.name, to: page.path },
 ];
 
 /** A name said twice in a row is said once, by the deeper part. */
@@ -38,7 +38,7 @@ const lastOnly = (parts: readonly Part[]): readonly Part[] =>
  * own, so never folded into a part above.
  */
 export const partsOf = (
-  open: Place<VisibleSurface> | undefined,
+  open: Place<VisibleArea> | undefined,
   below: string | undefined,
 ): readonly Part[] => {
   if (open === undefined) return [];

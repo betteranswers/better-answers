@@ -256,13 +256,13 @@
 }
 
 /* ---------------------------------------------------------------------------
- * 7. Layout — the spacing scale and the layout constants, so a screen sizes
+ * 7. Layout — the spacing scale and the layout constants, so a page sizes
  * itself from the tokens rather than from Tailwind's own defaults.
  *
  * The type scale is deliberately absent. Tailwind's font-size namespace is
  * `--text-*` and tokens/typography.css already owns those names, so a theme
  * variable here would point at itself and resolve to nothing, and a copied
- * literal would be a second scale that ages alone. A screen reads a type step
+ * literal would be a second scale that ages alone. A page reads a type step
  * as var(--text-lg).
  * ------------------------------------------------------------------------ */
 @theme inline {
@@ -270,7 +270,7 @@
      --space-4 and there is one scale rather than two that nearly agree. */
   --spacing: var(--space-1);
 
-  /* The layout constants, named: w-rail, w-sidebar (the secondary nav), h-band,
+  /* The layout constants, named: w-rail, w-sidebar (the menu), h-band,
      max-w-measure, max-w-page. */
   --spacing-sidebar: var(--sidebar-w);
   --spacing-rail: var(--rail-w);

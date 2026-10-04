@@ -51,7 +51,7 @@ Name the type for what the function does, as the orphan sweep's is `SweepDoors`.
 - Reach `apps/api` through `server.request(...)`.
 - Reach `apps/worker` through the job or module entry point.
 - Reach `packages/core` through an entry its `exports` map names.
-- Drive `apps/web` as a browser drives the served build. Where a component's own behaviour is under test, render it through Testing Library. Never assert a screen against its source.
+- Drive `apps/web` as a browser drives the served build. Where a component's own behaviour is under test, render it through Testing Library. Never assert a page against its source.
 - Hand a sibling workspace shared test infrastructure through an entry under the `./testing` name, never a bare path.
 
 ### Run every store the platform runs, for real

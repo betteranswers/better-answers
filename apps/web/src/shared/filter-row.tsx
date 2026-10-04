@@ -132,7 +132,7 @@ const toggled = (hidden: ReadonlySet<string>, id: string, shown: boolean): Reado
   return next;
 };
 
-/** Only the columns a screen lists can hide, so the person never leaves the table. */
+/** Only the columns a page lists can hide, so the person never leaves the table. */
 function ColumnMenu(properties: { readonly control: ColumnControl }) {
   const { columns, hidden, onHiddenChange } = properties.control;
   return (

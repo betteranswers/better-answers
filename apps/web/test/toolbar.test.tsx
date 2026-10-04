@@ -2,8 +2,8 @@ import { CatchBoundary } from "@tanstack/react-router";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { Toolbar, ScreenPanel, ScreenTabsRoot } from "@/app/toolbar.tsx";
-import { viewStateOf, type ScreenToolbar } from "@/shared/screen-toolbar.tsx";
+import { Toolbar, PagePanel, PageTabsRoot } from "@/app/toolbar.tsx";
+import { viewStateOf, type PageToolbar } from "@/shared/page-toolbar.tsx";
 
 import { openApp } from "./open-app.tsx";
 
@@ -20,7 +20,7 @@ const openTab = () => within(tabs()).getByRole("tab", { selected: true }).textCo
 /** The registry opens a tab where a pointer commits — the press — and not on the click. */
 const pick = (name: string) => fireEvent.mouseDown(within(tabs()).getByRole("tab", { name }));
 
-const A_TABBED_SCREEN: ScreenToolbar = {
+const A_TABBED_PAGE: PageToolbar = {
   tabs: [
     { id: "bindings-all", name: "All" },
     { id: "bindings-gone", name: "Gone at source" },
@@ -32,7 +32,7 @@ const A_TABBED_SCREEN: ScreenToolbar = {
   ),
 };
 
-const ANOTHER_TABBED_SCREEN: ScreenToolbar = {
+const ANOTHER_TABBED_PAGE: PageToolbar = {
   tabs: [
     { id: "ceiling-spend", name: "Spend" },
     { id: "ceiling-limits", name: "Limits" },
@@ -45,12 +45,12 @@ const ANOTHER_TABBED_SCREEN: ScreenToolbar = {
  */
 const useTickedGroups = viewStateOf<number>("/bindings/review");
 
-const useAnotherScreensTickedGroups = viewStateOf<number>("/bindings/all");
+const useAnotherPagesTickedGroups = viewStateOf<number>("/bindings/all");
 
 function NarrowAct() {
   const [ticked] = useTickedGroups();
 
-  // Inert on an empty slot, which is the act's own property and what makes a thrown screen safe.
+  // Inert on an empty slot, which is the act's own property and what makes a thrown page safe.
   return (
     <button type="button" disabled={ticked === undefined}>
       {ticked === undefined ? "Narrow these documents" : `Narrow ${ticked} documents`}
@@ -58,19 +58,19 @@ function NarrowAct() {
   );
 }
 
-function AnotherScreensAct() {
-  const [ticked] = useAnotherScreensTickedGroups();
+function AnotherPagesAct() {
+  const [ticked] = useAnotherPagesTickedGroups();
 
   return (
     <button type="button" disabled={ticked === undefined}>
-      Narrow another screen's documents
+      Narrow another page's documents
     </button>
   );
 }
 
 function ReviewView(properties: { readonly throwsOnATick: boolean }) {
   const [ticked, tick] = useTickedGroups();
-  if (properties.throwsOnATick && ticked !== undefined) throw new Error("the screen's own bug");
+  if (properties.throwsOnATick && ticked !== undefined) throw new Error("the page's own bug");
 
   return (
     <button type="button" onClick={() => tick(2)}>
@@ -79,7 +79,7 @@ function ReviewView(properties: { readonly throwsOnATick: boolean }) {
   );
 }
 
-const A_REVIEW_VIEW: ScreenToolbar = {
+const A_REVIEW_VIEW: PageToolbar = {
   tabs: [
     { id: "review-open", name: "Open" },
     { id: "review-done", name: "Done" },
@@ -88,36 +88,36 @@ const A_REVIEW_VIEW: ScreenToolbar = {
   acts: (
     <>
       <NarrowAct />
-      <AnotherScreensAct />
+      <AnotherPagesAct />
     </>
   ),
 };
 
 const drawReview = (throwsOnATick: boolean) =>
   render(
-    <ScreenTabsRoot tabs={A_REVIEW_VIEW.tabs}>
+    <PageTabsRoot tabs={A_REVIEW_VIEW.tabs}>
       <Toolbar name="Review" toolbar={A_REVIEW_VIEW} />
-      <ScreenPanel>
+      <PagePanel>
         <CatchBoundary
           getResetKey={() => "the panel's own subtree"}
-          errorComponent={() => <p>The screen failed to draw.</p>}
+          errorComponent={() => <p>The page failed to draw.</p>}
         >
           <ReviewView throwsOnATick={throwsOnATick} />
         </CatchBoundary>
-      </ScreenPanel>
-    </ScreenTabsRoot>,
+      </PagePanel>
+    </PageTabsRoot>,
   );
 
 const narrowAct = () => screen.getByRole("button", { name: /^Narrow (these|\d)/ });
 
-const anotherScreensAct = () =>
-  screen.getByRole("button", { name: "Narrow another screen's documents" });
+const anotherPagesAct = () =>
+  screen.getByRole("button", { name: "Narrow another page's documents" });
 
 const reviewTab = (name: string) =>
   fireEvent.mouseDown(screen.getByRole("tab", { name, selected: false }));
 
-describe("the toolbar the open screen fills", () => {
-  it("carries the screen's tabs in order, the open one selected", async () => {
+describe("the toolbar the open page fills", () => {
+  it("carries the page's tabs in order, the open one selected", async () => {
     await shellAt(ROUTES_AND_SPEND);
 
     expect(
@@ -136,26 +136,26 @@ describe("the toolbar the open screen fills", () => {
     expect(openTab()).toBe("Spend");
     expect(screen.getByText("Spend is not built yet.")).toBeDefined();
     expect(screen.queryByRole("region", { name: "Routes" })).toBeNull();
-    // A tab divides a screen, so the screen's own words stand either way.
+    // A tab divides a page, so the page's own words stand either way.
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Agent Operations");
   });
 
-  it("opens another screen on its own first tab", () => {
-    const shell = (toolbar: ScreenToolbar, name: string) => (
-      <ScreenTabsRoot tabs={toolbar.tabs}>
+  it("opens another page on its own first tab", () => {
+    const shell = (toolbar: PageToolbar, name: string) => (
+      <PageTabsRoot tabs={toolbar.tabs}>
         <Toolbar name={name} toolbar={toolbar} />
-      </ScreenTabsRoot>
+      </PageTabsRoot>
     );
-    const { rerender } = render(shell(A_TABBED_SCREEN, "Bindings"));
+    const { rerender } = render(shell(A_TABBED_PAGE, "Bindings"));
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Gone at source" }));
     expect(screen.getByRole("tab", { selected: true }).textContent).toBe("Gone at source");
 
-    rerender(shell(ANOTHER_TABBED_SCREEN, "Ceiling"));
+    rerender(shell(ANOTHER_TABBED_PAGE, "Ceiling"));
 
     expect(screen.getByRole("tab", { selected: true }).textContent).toBe("Spend");
   });
 
-  it("gives the open tab its own panel, holding the screen", async () => {
+  it("gives the open tab its own panel, holding the page", async () => {
     await shellAt(ROUTES_AND_SPEND);
 
     const panel = screen.getByRole("tabpanel");
@@ -172,14 +172,14 @@ describe("the toolbar the open screen fills", () => {
     expect(screen.queryByRole("tabpanel")).toBeNull();
   });
 
-  it("draws a screen's tabs before its acts in the toolbar", () => {
+  it("draws a page's tabs before its acts in the toolbar", () => {
     render(
-      <ScreenTabsRoot tabs={A_TABBED_SCREEN.tabs}>
-        <Toolbar name="Bindings" toolbar={A_TABBED_SCREEN} />
-        <ScreenPanel>
+      <PageTabsRoot tabs={A_TABBED_PAGE.tabs}>
+        <Toolbar name="Bindings" toolbar={A_TABBED_PAGE} />
+        <PagePanel>
           <p>The bindings.</p>
-        </ScreenPanel>
-      </ScreenTabsRoot>,
+        </PagePanel>
+      </PageTabsRoot>,
     );
 
     const list = screen.getByRole("tablist", { name: "Bindings" });
@@ -188,16 +188,16 @@ describe("the toolbar the open screen fills", () => {
     expect(list.compareDocumentPosition(act) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
   });
 
-  it("draws only the acts for a screen without tabs", () => {
-    render(<Toolbar name="Bindings" toolbar={{ acts: A_TABBED_SCREEN.acts }} />);
+  it("draws only the acts for a page without tabs", () => {
+    render(<Toolbar name="Bindings" toolbar={{ acts: A_TABBED_PAGE.acts }} />);
 
     expect(screen.getByRole("button", { name: "Add a binding" })).toBeDefined();
     expect(screen.queryByRole("tablist")).toBeNull();
   });
 });
 
-describe("the slot a screen writes and its acts read", () => {
-  it("gives an act what its own screen wrote, not another's", () => {
+describe("the slot a page writes and its acts read", () => {
+  it("gives an act what its own page wrote, not another's", () => {
     drawReview(false);
 
     expect(narrowAct().textContent).toBe("Narrow these documents");
@@ -207,15 +207,15 @@ describe("the slot a screen writes and its acts read", () => {
 
     expect(narrowAct().textContent).toBe("Narrow 2 documents");
     expect(narrowAct().hasAttribute("disabled")).toBe(false);
-    expect(anotherScreensAct().hasAttribute("disabled")).toBe(true);
+    expect(anotherPagesAct().hasAttribute("disabled")).toBe(true);
   });
 
-  it("empties the slot when a screen that threw is reopened", () => {
+  it("empties the slot when a page that threw is reopened", () => {
     drawReview(true);
 
     fireEvent.click(screen.getByRole("button", { name: "Tick two groups" }));
 
-    expect(screen.getByText("The screen failed to draw.")).toBeDefined();
+    expect(screen.getByText("The page failed to draw.")).toBeDefined();
     expect(screen.getByRole("tab", { selected: true }).textContent).toBe("Open");
 
     reviewTab("Done");

@@ -246,7 +246,7 @@ export const mountThePasskeys = (routes: Hono, deps: FactorRoutesDependencies): 
     return context.json({ displayNameGiven: !hasNoDisplayName(user.name) });
   };
 
-  /** Counted apart from the address's other routes, so the screen's ask on opening spends no link's. */
+  /** Counted apart from the address's other routes, so the page's ask on opening spends no link's. */
   const limitByAddress = limitByIp(door, PASSKEY_SIGN_IN_IP_RULE, clock, "passkey-sign-in");
 
   routes.use(PASSKEY_SIGN_IN_OPTIONS_PATH, limitByAddress);

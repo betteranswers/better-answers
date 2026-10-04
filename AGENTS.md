@@ -29,7 +29,7 @@ A living company knowledge map for UK SMBs, on OKF v0.2. It has three knowledge 
 | `docs/archive/` | Frozen history from before Compound Engineering: the ADRs with their amendments, and the block and ticket specs the route was built through. Read, never edited |
 | `docs/plans/` | Compound Engineering's plans, one per piece of work. A plan has no status: git says what shipped |
 | `docs/solutions/` | Documented solutions to past problems (bugs, best practices, workflow patterns), by category, with YAML frontmatter (`module`, `tags`, `problem_type`). `/ce-plan` searches it before every plan |
-| `docs/personas/` | The personas `/ce-dogfood` walks a screen as: a git-ignored link to `.planning/personas/`, which the worktree hook makes |
+| `docs/personas/` | The personas `/ce-dogfood` walks a page as: a git-ignored link to `.planning/personas/`, which the worktree hook makes |
 | `.compound-engineering/` | Compound Engineering's settings for this repository |
 | `docs/operations/` | Public-facing ops documents. Documents that are not public-facing are under `.planning/estate/` |
 | `deploy/` | Compose files and deployment configuration |
@@ -43,7 +43,7 @@ Read commands, versions and scripts from each workspace's `package.json` or `pyp
 - `/ce-brainstorm` when what to build is still open, `/ce-plan` to write the plan, `/ce-work` to build one.
 - `/ce-debug` for anything broken or slow.
 - `/ce-code-review` before a pull request, `/ce-compound` after a solved problem (*Compounding*, below).
-- `/ce-dogfood` for a screen, walked as the personas in `docs/personas/`.
+- `/ce-dogfood` for a page, walked as the personas in `docs/personas/`.
 - `/browser-suite` for any Playwright spec under `apps/web/e2e/`.
 - `/renovate-prs` for Renovate's dependency pull requests, red or waiting.
 - `/better-answers-design` for anything a person will look at.
@@ -98,7 +98,7 @@ Two reviews, one in the session and one on the pull request. `/ce-code-review` r
 Always use jCodeMunch-MCP for code navigation. Never fall back to Read, Grep, Glob, or Bash for code exploration.
 **Exception:** use `Read` when you are about to edit a file — the harness requires a `Read` before `Edit`/`Write`. Use jCodeMunch to *find and understand* code, then `Read` only the file you are changing.
 
-This server runs the **front door** surface. Three tools reach every jCodeMunch capability, so the tool list stays small and the catalogue is fetched only when you need it.
+This server runs the **front door** tool set. Three tools reach every jCodeMunch capability, so the tool list stays small and the catalogue is fetched only when you need it.
 
 **Start any session:**
 1. `order { "action": "resolve_repo", "args": { "path": "." } }` — confirm the project is indexed. If it is not: `order { "action": "index_folder", "args": { "path": "." } }`

@@ -7,10 +7,10 @@ import { keystrokesOn } from "@/shared/keystroke-words.ts";
 import {
   ASK,
   CONTROL_CENTRE,
-  groupIn,
+  menuGroupIn,
   headingOf,
   HOMES,
-  screenNamed,
+  pageNamed,
 } from "@/shared/navigation.ts";
 import { PRODUCT_NAME } from "@/shared/words.ts";
 
@@ -31,35 +31,35 @@ import {
   provision,
   railOf,
   signIn,
-  skipLinkReachesTheScreen,
+  skipLinkReachesThePage,
   switcherOf,
   tabUntilFocused,
 } from "./harness.ts";
 
-const SOURCES = groupIn(CONTROL_CENTRE, "sources");
+const SOURCES = menuGroupIn(CONTROL_CENTRE, "sources");
 
-const AGENT_OPERATIONS = groupIn(CONTROL_CENTRE, "agent-operations");
+const AGENT_OPERATIONS = menuGroupIn(CONTROL_CENTRE, "agent-operations");
 
-const ROUTES_AND_SPEND = screenNamed(AGENT_OPERATIONS, "Routes and spend");
+const ROUTES_AND_SPEND = pageNamed(AGENT_OPERATIONS, "Routes and spend");
 
-const PEOPLE = groupIn(CONTROL_CENTRE, "people");
+const PEOPLE = menuGroupIn(CONTROL_CENTRE, "people");
 
-const MEMBERS = screenNamed(PEOPLE, "Members");
+const MEMBERS = pageNamed(PEOPLE, "Members");
 
-const SYSTEM = groupIn(CONTROL_CENTRE, "system");
+const SYSTEM = menuGroupIn(CONTROL_CENTRE, "system");
 
 /** What an Admin is shown today, spelled out rather than read through the filter that draws it. */
-const AN_ADMINS_SCREENS = [
-  [SOURCES, screenNamed(SOURCES, "Bindings")],
+const AN_ADMINS_PAGES = [
+  [SOURCES, pageNamed(SOURCES, "Bindings")],
   [AGENT_OPERATIONS, ROUTES_AND_SPEND],
   [PEOPLE, MEMBERS],
-  [PEOPLE, screenNamed(PEOPLE, "Groups")],
-  [SYSTEM, screenNamed(SYSTEM, "Audit log")],
+  [PEOPLE, pageNamed(PEOPLE, "Groups")],
+  [SYSTEM, pageNamed(SYSTEM, "Audit log")],
 ] as const;
 
-const SURFACE_NAMES = ["Control Centre"];
+const AREA_NAMES = ["Control Centre"];
 
-const SCREEN_NAMES = AN_ADMINS_SCREENS.map(([, screen]) => screen.name);
+const PAGE_NAMES = AN_ADMINS_PAGES.map(([, page]) => page.name);
 
 /** The first heading Routes and spend draws: its group's name. */
 const ITS_HEADING = headingOf(ROUTES_AND_SPEND);
@@ -70,7 +70,7 @@ const ACT_BUDGET_MS = 100;
 
 const NARROW = { width: 320, height: 720 };
 
-/** Short enough that the band scrolls out of sight within one screen's content. */
+/** Short enough that the band scrolls out of sight within one page's content. */
 const NARROW_AND_SHORT = { width: 320, height: 256 };
 
 /** Past `--breakpoint-md`, which `--shell-wide` in `index.css` reads for the shell. */
@@ -90,9 +90,11 @@ const closerOf = (page: Page) => page.getByRole("button", { name: TOGGLE.hide })
 
 const openerOf = (page: Page) => page.getByRole("button", { name: TOGGLE.show });
 
-const sheetButtonOf = (page: Page) => page.getByRole("button", { name: NAVIGATION_SHEET });
+/** Exact, as "Menu" would otherwise match the toggle's "Hide the menu" too. */
+const sheetButtonOf = (page: Page) =>
+  page.getByRole("button", { name: NAVIGATION_SHEET, exact: true });
 
-const sheetOf = (page: Page) => page.getByRole("dialog", { name: NAVIGATION_SHEET });
+const sheetOf = (page: Page) => page.getByRole("dialog", { name: NAVIGATION_SHEET, exact: true });
 
 const jumpToOf = (page: Page) => bandOf(page).getByRole("button", { name: JUMP_TO.name });
 
@@ -107,7 +109,7 @@ const tabsOf = (page: Page) => page.getByRole("tablist", { name: "Routes and spe
 const routesCardOf = (page: Page) => page.getByRole("region", { name: "Routes" });
 
 /**
- * The screen reads the routes after the nav paints, so a screen here has started only once its
+ * The page reads the routes after the nav paints, so a page here has started only once its
  * card says a new workspace has none.
  */
 const theRoutesHaveLanded = (page: Page) =>
@@ -131,7 +133,7 @@ const pageMaximumOf = (page: Page): Promise<number> =>
     Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--page-max")),
   );
 
-/** The width the pane offers a screen's content, inside its padding and before the page maximum. */
+/** The width the pane offers a page's content, inside its padding and before the page maximum. */
 const roomIn = (pane: Locator): Promise<number> =>
   pane.evaluate((node) => {
     const style = getComputedStyle(node);
@@ -216,17 +218,17 @@ const paintedFill = (page: Page, name: string) =>
     .getByRole("link", { name })
     .evaluate((link) => getComputedStyle(link).backgroundColor);
 
-const weightOf = (page: Page, screenName: string) =>
+const weightOf = (page: Page, pageName: string) =>
   navOf(page, CONTROL_CENTRE)
-    .getByRole("link", { name: screenName })
+    .getByRole("link", { name: pageName })
     .evaluate((link) => Number.parseInt(getComputedStyle(link).fontWeight, 10));
 
-const glyphOf = (page: Page, screenName: string) =>
+const glyphOf = (page: Page, pageName: string) =>
   navOf(page, CONTROL_CENTRE)
-    .getByRole("link", { name: screenName })
+    .getByRole("link", { name: pageName })
     .evaluate((link) => link.querySelector("svg")?.innerHTML ?? "");
 
-/** A colour as a greyscale screen shows it, so a mark that is hue alone reads as no mark. */
+/** A colour as a greyscale page shows it, so a mark that is hue alone reads as no mark. */
 const greyOf = (region: Locator, painted: "own" | "behind") =>
   region.evaluate((node, which) => {
     let from: Element | null = which === "own" ? node : node.parentElement;
@@ -272,12 +274,12 @@ const narrowAtRoutesAndSpend = async (
   await expect(page.getByRole("heading", { level: 1, name: ITS_HEADING })).toBeVisible();
 };
 
-test("names the icon rail's surfaces to eye, pointer and keyboard", async ({ page, request }) => {
+test("names the icon rail's areas to eye, pointer and keyboard", async ({ page, request }) => {
   await signedIn(page, request, "Wharfedale Castings");
   await page.goto(ROUTES_AND_SPEND.path);
 
   const rail = railOf(page);
-  await expect(rail.getByRole("link")).toHaveText(SURFACE_NAMES);
+  await expect(rail.getByRole("link")).toHaveText(AREA_NAMES);
 
   // The keyboard first, before any pointer has opened one, then the pointer.
   const entry = rail.getByRole("link", { name: CONTROL_CENTRE.name });
@@ -291,7 +293,7 @@ test("names the icon rail's surfaces to eye, pointer and keyboard", async ({ pag
   await expect(tooltip).toBeVisible();
 });
 
-test("marks the open surface in the rail, on any screen", async ({ page, request }) => {
+test("marks the open area in the rail, on any page", async ({ page, request }) => {
   await signedIn(page, request, "Pennine Metalwork");
   await page.goto("/people/groups");
 
@@ -309,29 +311,29 @@ test("marks the open surface in the rail, on any screen", async ({ page, request
   expect(await paintedFill(page, CONTROL_CENTRE.name)).not.toBe("rgba(0, 0, 0, 0)");
 });
 
-test("lists the open surface's groups and screens, marking one", async ({ page, request }) => {
+test("lists the open area's groups and pages, marking one", async ({ page, request }) => {
   await signedIn(page, request, "Northern Tooling");
   await page.goto("/system/audit-log");
 
   const nav = navOf(page, CONTROL_CENTRE);
-  await expect(nav.getByRole("link")).toHaveText(SCREEN_NAMES);
+  await expect(nav.getByRole("link")).toHaveText(PAGE_NAMES);
   const open = nav.getByRole("link", { name: "Audit log" });
   await expect(open).toHaveAttribute("aria-current", "page");
 
-  // Heavier and filled where its neighbours are neither, so it survives a greyscale screen.
+  // Heavier and filled where its neighbours are neither, so it survives a greyscale page.
   expect(await weightOf(page, "Audit log")).toBeGreaterThan(await weightOf(page, "Members"));
-  expect(await greyOf(open, "own"), "the open screen's fill is the nav's own").not.toBe(
+  expect(await greyOf(open, "own"), "the open page's fill is the nav's own").not.toBe(
     await greyOf(open, "behind"),
   );
 
-  // Each screen carries its glyph, and the open one's is set bold.
+  // Each page carries its glyph, and the open one's is set bold.
   const each = await nav
     .getByRole("link")
     .evaluateAll((links) => links.map((link) => link.querySelector("svg") !== null));
-  expect(each.every(Boolean), "a screen in the nav has no icon").toBe(true);
+  expect(each.every(Boolean), "a page in the nav has no icon").toBe(true);
   const membersClosed = await glyphOf(page, "Members");
 
-  // No heading repeats the surface the rail already names.
+  // No heading repeats the area the rail already names.
   await expect(nav).toMatchAriaSnapshot(`
     - navigation "Control Centre":
       - heading "Sources" [level=3]
@@ -358,9 +360,9 @@ test("lists the open surface's groups and screens, marking one", async ({ page, 
   await nav.getByRole("link", { name: "Members" }).click();
   await expect(nav.getByRole("link", { name: "Members" })).toHaveAttribute("aria-current", "page");
   const elapsed = Date.now() - started;
-  test.info().annotations.push({ type: "secondary nav move", description: `${elapsed} ms` });
+  test.info().annotations.push({ type: "menu move", description: `${elapsed} ms` });
   expect(elapsed).toBeLessThan(SWAP_BUDGET_MS);
-  expect(await glyphOf(page, "Members"), "the open screen's glyph is not set bold").not.toBe(
+  expect(await glyphOf(page, "Members"), "the open page's glyph is not set bold").not.toBe(
     membersClosed,
   );
 
@@ -381,7 +383,7 @@ test("marks Members current on a member page, adding no entry", async ({ page, r
   ).toBeVisible();
 
   const nav = navOf(page, CONTROL_CENTRE);
-  await expect(nav.getByRole("link"), "the page took an entry of its own").toHaveText(SCREEN_NAMES);
+  await expect(nav.getByRole("link"), "the page took an entry of its own").toHaveText(PAGE_NAMES);
   // The page is Members' own, so its entry is the current page, as on Members itself.
   await expect(nav.getByRole("link", { name: MEMBERS.name })).toHaveAttribute(
     "aria-current",
@@ -450,7 +452,7 @@ test("shows initials, with name and role one menu in", async ({ page, request })
   await expect(menu.getByRole("menuitem")).toHaveText([ACCOUNT_HEADING, "Sign out"]);
 });
 
-test("names surface, group, screen and open tab, following the tab", async ({ page, request }) => {
+test("names area, group, page and open tab, following the tab", async ({ page, request }) => {
   await signedIn(page, request, "Hebden Castings");
   await page.goto(MEMBERS.path);
   await page.getByRole("tab", { name: "Invitations" }).click();
@@ -503,7 +505,7 @@ test("names Ask once, with no group, on a Viewer's home", async ({ page, request
   await expect(crumbOf(page, ASK.name)).not.toHaveAttribute("href");
 });
 
-test("keeps band, rail and nav mounted between screens, focus kept", async ({ page, request }) => {
+test("keeps band, rail and nav mounted between pages, focus kept", async ({ page, request }) => {
   await signedIn(page, request, "Hebden Wireworks");
   await page.goto(MEMBERS.path);
   await expect(page.getByRole("heading", { level: 1, name: headingOf(MEMBERS) })).toBeVisible();
@@ -549,10 +551,7 @@ test("sizes the band's cells to the rail and nav below", async ({ page, request 
   expect(await leftOf(partOf(page, CONTROL_CENTRE.name))).toBeGreaterThanOrEqual(nav.x + nav.width);
 });
 
-test("tabs skip link, band, icon rail, secondary nav, toolbar, screen", async ({
-  page,
-  request,
-}) => {
+test("tabs skip link, band, icon rail, menu, toolbar, page", async ({ page, request }) => {
   const workspace = await signedIn(page, request, "Dales Engineering");
   await page.goto(ROUTES_AND_SPEND.path);
   const rail = railOf(page);
@@ -576,23 +575,23 @@ test("tabs skip link, band, icon rail, secondary nav, toolbar, screen", async ({
   expect(await inDocumentOrder(page, band), "the band reads out of order").toBe(true);
 
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("link", { name: "Skip to the screen" })).toBeFocused();
+  await expect(page.getByRole("link", { name: "Skip to the page" })).toBeFocused();
 
   for (const stop of band) {
     await page.keyboard.press("Tab");
     await expect(stop).toBeFocused();
   }
 
-  for (const name of SURFACE_NAMES) {
+  for (const name of AREA_NAMES) {
     await page.keyboard.press("Tab");
     await expect(rail.getByRole("link", { name })).toBeFocused();
   }
 
-  // The rail's foot, under its surfaces.
+  // The rail's foot, under its areas.
   await page.keyboard.press("Tab");
   await expect(keystrokesButton(rail)).toBeFocused();
 
-  for (const name of SCREEN_NAMES) {
+  for (const name of PAGE_NAMES) {
     await page.keyboard.press("Tab");
     await expect(navOf(page, CONTROL_CENTRE).getByRole("link", { name })).toBeFocused();
   }
@@ -607,7 +606,7 @@ test("tabs skip link, band, icon rail, secondary nav, toolbar, screen", async ({
   await page.keyboard.press("Tab");
   await expect(tabsOf(page).getByRole("tab", { name: "Routes" })).toBeFocused();
 
-  // The open tab's panel holds the screen, so the content is reached through the toolbar.
+  // The open tab's panel holds the page, so the content is reached through the toolbar.
   const panel = page.getByRole("tabpanel");
   await page.keyboard.press("Tab");
   await expect(panel).toBeFocused();
@@ -631,14 +630,14 @@ test("tabs skip link, band, icon rail, secondary nav, toolbar, screen", async ({
 });
 
 // Its own test, not the tail of the one above: the skip link is the first stop, so it needs
-// a screen with nothing focused.
+// a page with nothing focused.
 test("moves focus from the skip link into the content", async ({ page, request }) => {
   await signedIn(page, request, "Ribble Toolmaking");
   await page.goto(ROUTES_AND_SPEND.path);
-  // A keypress before the shell has drawn is spent on nothing, so wait for the screen first.
+  // A keypress before the shell has drawn is spent on nothing, so wait for the page first.
   await expect(page.getByRole("heading", { level: 1, name: ITS_HEADING })).toBeVisible();
 
-  await skipLinkReachesTheScreen(page);
+  await skipLinkReachesThePage(page);
 });
 
 test("scrolls nothing sideways at 320 pixels, navigation open or closed", async ({
@@ -719,9 +718,9 @@ test("narrows the band to two rows scrolling with the page", async ({ page, requ
     before = box.x;
   }
 
-  // From the top to the last member row: first row, the parts that lead somewhere, toolbar, screen.
+  // From the top to the last member row: first row, the parts that lead somewhere, toolbar, page.
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("link", { name: "Skip to the screen" })).toBeFocused();
+  await expect(page.getByRole("link", { name: "Skip to the page" })).toBeFocused();
   for (const stop of [
     ...firstRow,
     crumbOf(page, CONTROL_CENTRE.name),
@@ -792,7 +791,7 @@ test("keeps a focused control clear of the fixed band", async ({ page, request }
   }
 });
 
-test("paints the shell in the page's own surface token", async ({ page, request }) => {
+test("paints the shell in the page's own area token", async ({ page, request }) => {
   await signedIn(page, request, "Southern Castings");
   await page.goto(ROUTES_AND_SPEND.path);
 
@@ -805,7 +804,7 @@ test("paints the shell in the page's own surface token", async ({ page, request 
     probe.remove();
 
     /**
-     * The first painted ancestor is what a reader sees behind the screen, whatever the number
+     * The first painted ancestor is what a reader sees behind the page, whatever the number
      * of layout wrappers between.
      */
     let behind = main.parentElement;
@@ -848,7 +847,7 @@ test("fills the toolbar with tabs the arrow keys move between", async ({ page, r
   await expect(routesCardOf(page)).toBeVisible();
 });
 
-test("draws no toolbar over a screen without tabs or acts", async ({ page, request }) => {
+test("draws no toolbar over a page without tabs or acts", async ({ page, request }) => {
   await aMemberSignedInAt(page, request, "Viewer", HOMES.Viewer.path);
   await expect(
     page.getByRole("heading", { level: 1, name: headingOf(HOMES.Viewer) }),
@@ -864,7 +863,7 @@ test("draws no toolbar over a screen without tabs or acts", async ({ page, reque
     const above = document.querySelector("main")?.previousElementSibling;
     return above === null || above?.getAttribute("aria-label") === offer;
   }, PASSKEY_WORDS.heading);
-  expect(met, "something other than the passkey offer stands above the screen").toBe(true);
+  expect(met, "something other than the passkey offer stands above the page").toBe(true);
 });
 
 test("holds toggle and band still while the nav hides", async ({
@@ -899,7 +898,7 @@ test("holds toggle and band still while the nav hides", async ({
   await close.click();
   await expect(nav).toHaveCount(0);
   const elapsed = Date.now() - started;
-  test.info().annotations.push({ type: "closing the secondary nav", description: `${elapsed} ms` });
+  test.info().annotations.push({ type: "closing the menu", description: `${elapsed} ms` });
   expect(elapsed).toBeLessThan(ACT_BUDGET_MS);
 
   // The toggle, the band and the rail are where they were, to the pixel: only the nav left.
@@ -970,7 +969,7 @@ test("holds the toggle in place beside a 60-character workspace name", async ({
   });
   expect(besideTheLongOne, "a long workspace name moved the toggle").toEqual(beside);
 
-  // Cut with an ellipsis on screen, whole in the document, so a screen reader hears it all.
+  // Cut with an ellipsis where it shows, whole in the document, so a screen reader hears it all.
   const cut = await partOf(page, LONG_NAME).evaluate((node) => ({
     whole: node.textContent,
     ellipsis: getComputedStyle(node).textOverflow,
@@ -1019,15 +1018,15 @@ test("keeps a 40-character address on one line, prose measured", async ({ page, 
   ).toBeGreaterThan(measure);
 });
 
-test("measures a screen's prose, but not a table's or dialog's", async ({ page, request }) => {
+test("measures a page's prose, but not a table's or dialog's", async ({ page, request }) => {
   await signedIn(page, request, "Ribblesdale Mouldings");
   await page.setViewportSize(DESKTOP);
   await page.goto(MEMBERS.path);
   await expect(page.getByRole("heading", { level: 1, name: headingOf(MEMBERS) })).toBeVisible();
 
   const prose = await page.evaluate(() => {
-    const content = document.querySelector("[data-screen-content]");
-    if (content === null) throw new Error("the screen marks no content wrapper");
+    const content = document.querySelector("[data-page-content]");
+    if (content === null) throw new Error("the page marks no content wrapper");
     const long = "a sentence long enough to run past the measure, ".repeat(6);
     const planted = document.createElement("div");
     planted.innerHTML = `<p>${long}</p><table><tbody><tr><td><p>${long}</p></td></tr></tbody></table><div role="dialog"><h2>${long}</h2></div>`;
@@ -1048,7 +1047,7 @@ test("measures a screen's prose, but not a table's or dialog's", async ({ page, 
 
   const { alone, ...lifted } = prose;
   const measure = Number.parseFloat(alone.cap);
-  expect(Number.isFinite(measure), "a screen's paragraph has no measure").toBe(true);
+  expect(Number.isFinite(measure), "a page's paragraph has no measure").toBe(true);
   expect(alone.width, "a long paragraph runs past the measure").toBeCloseTo(measure, 0);
   for (const [where, each] of Object.entries(lifted)) {
     expect(each.cap, `prose in ${where} keeps the measure`).toBe("none");
@@ -1056,7 +1055,7 @@ test("measures a screen's prose, but not a table's or dialog's", async ({ page, 
   }
 });
 
-test("remembers a closed secondary nav on this browser only", async ({ page, request }) => {
+test("remembers a closed menu on this browser only", async ({ page, request }) => {
   const workspace = await signedIn(page, request, "Ribble Toolmaking");
   await page.goto(ROUTES_AND_SPEND.path);
   await expect(navOf(page, CONTROL_CENTRE)).toBeVisible();
@@ -1107,16 +1106,16 @@ test("opens the navigation over narrow content, holding and returning focus", as
   const panel = sheetOf(page);
   await expect(panel.getByRole("navigation", { name: RAIL })).toBeVisible();
   await expect(panel.getByRole("navigation", { name: CONTROL_CENTRE.name })).toBeVisible();
-  await expect(panel.getByRole("link")).toHaveText([...SURFACE_NAMES, ...SCREEN_NAMES]);
+  await expect(panel.getByRole("link")).toHaveText([...AREA_NAMES, ...PAGE_NAMES]);
 
   // Over the content, not beside it: the content keeps every pixel it had.
   expect(await widthOf(page.getByRole("main"))).toBe(contentWide);
 
   /**
    * Twice round every stop it holds — the destinations and its way out — so a reader behind
-   * it can never tab onto the screen.
+   * it can never tab onto the page.
    */
-  const stops = SURFACE_NAMES.length + SCREEN_NAMES.length + 1;
+  const stops = AREA_NAMES.length + PAGE_NAMES.length + 1;
   expect(await holdsFocus(panel)).toBe(true);
   for (let step = 0; step < stops * 2; step += 1) {
     await page.keyboard.press("Tab");
@@ -1130,7 +1129,7 @@ test("opens the navigation over narrow content, holding and returning focus", as
   await expect(menu).toBeFocused();
 });
 
-test("closes the sheet on a chosen screen, focus returned", async ({ page, request }) => {
+test("closes the sheet on a chosen page, focus returned", async ({ page, request }) => {
   await narrowAtRoutesAndSpend(page, request, "Northern Tooling");
   await scrollsNothingSideways(page, "before the sheet opens");
 
@@ -1169,15 +1168,15 @@ test("closes the sheet on widening, focusing the navigation control", async ({ p
   await expect(closerOf(page)).toBeFocused();
 });
 
-test("leads each built screen with its group's line, auditing each", async ({
+test("leads each built page with its group's line, auditing each", async ({
   page,
   request,
   passesTheAccessibilityGate,
 }) => {
   await signedIn(page, request, "Swaledale Foundry");
 
-  for (const [group, screen] of AN_ADMINS_SCREENS) {
-    await page.goto(screen.path);
+  for (const [group, listed] of AN_ADMINS_PAGES) {
+    await page.goto(listed.path);
     await expect(page.getByRole("heading", { level: 1, name: group.name })).toBeVisible();
     await expect(page.getByRole("main").getByText(group.summary, { exact: true })).toBeVisible();
     await passesTheAccessibilityGate();

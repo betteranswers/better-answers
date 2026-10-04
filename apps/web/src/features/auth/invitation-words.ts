@@ -4,7 +4,7 @@ import { aRole, ROLE_FOR_A_NEWCOMER } from "@/shared/role-words.ts";
 export const invitedAs = (inviter: string, role: Role): string =>
   `${inviter} invited you as ${aRole(role)}.`;
 
-/** Apart from the screen's JSX, so the browser suite reads the words the invitation screen shows. */
+/** Apart from the page's JSX, so the browser suite reads the words the invitation page shows. */
 export const INVITATION_WORDS = {
   untitled: "Your invitation",
   reading: "Reading the invitation.",

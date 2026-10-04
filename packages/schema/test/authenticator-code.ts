@@ -33,5 +33,5 @@ export const authenticatorCodeAt = (key: string, at: Date): string => {
   return String(truncated % 10 ** DIGITS).padStart(DIGITS, "0");
 };
 
-/** The key an `otpauth://` address carries, as the setup screen writes it out. */
+/** The key an `otpauth://` address carries, as the setup page writes it out. */
 export const keyIn = (uri: string): string => new URL(uri).searchParams.get("secret") ?? "";

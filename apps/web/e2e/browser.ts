@@ -102,7 +102,7 @@ export const test = base.extend<BrowserFixtures>({
       }
       expect(
         audited,
-        `this test left the browser at ${left}, which this product did not serve, so the accessibility gate had no screen of ours to audit — call \`passesTheAccessibilityGate()\` at the screen the test is about`,
+        `this test left the browser at ${left}, which this product did not serve, so the accessibility gate had no page of ours to audit — call \`passesTheAccessibilityGate()\` at the page the test is about`,
       ).toBe(true);
     },
     { auto: true },

@@ -38,12 +38,12 @@ const keystrokesAreOn = (): boolean => onThisBrowser()?.getItem(KEPT_UNDER) !== 
 
 /**
  * A key typed into a field is the field's, one with a modifier the browser's, one inside a
- * dialog or menu that surface's.
+ * dialog or menu that area's.
  */
 const OWNED_ELSEWHERE =
   'input, textarea, select, [contenteditable="true"], [role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]';
 
-const isTheScreens = (event: KeyboardEvent): boolean => {
+const isThePages = (event: KeyboardEvent): boolean => {
   if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return false;
   const { target } = event;
   return !(target instanceof Element) || target.closest(OWNED_ELSEWHERE) === null;
@@ -55,13 +55,13 @@ const isTheScreens = (event: KeyboardEvent): boolean => {
  */
 export function useKeystroke(keystroke: Keystroke, act: () => void) {
   const pressed = useEffectEvent((event: KeyboardEvent) => {
-    if (event.key !== keystroke.key || !isTheScreens(event) || !keystrokesAreOn()) return;
+    if (event.key !== keystroke.key || !isThePages(event) || !keystrokesAreOn()) return;
     event.preventDefault();
     if (!event.repeat) act();
   });
 
   // The document is the one listener every region shares, so a keystroke works from wherever
-  // focus sits on the screen.
+  // focus sits on the page.
   useEffect(() => {
     document.addEventListener("keydown", pressed);
     return () => {
@@ -145,11 +145,11 @@ function KeystrokesList(properties: {
 }
 
 /**
- * For a screen outside the shell. It binds `?` itself and lists it, so the caller leaves `?`
+ * For a page outside the shell. It binds `?` itself and lists it, so the caller leaves `?`
  * out.
  */
 export function KeystrokesAct(properties: {
-  readonly screen: string;
+  readonly page: string;
   readonly keystrokes: readonly Keystroke[];
 }) {
   const [open, setOpen] = useState(false);
@@ -162,7 +162,7 @@ export function KeystrokesAct(properties: {
       open={open}
       onOpenChange={setOpen}
       side="bottom"
-      heading={keystrokesOn(properties.screen)}
+      heading={keystrokesOn(properties.page)}
       keystrokes={[...properties.keystrokes, LIST_THE_KEYSTROKES]}
     >
       <PopoverTrigger asChild>
@@ -192,17 +192,17 @@ const RegisterContext = createContext<Register | undefined>(undefined);
 const NONE: readonly Keystroke[] = [];
 
 /**
- * Owns `?` and the one list at every width; the open screen adds its own keystrokes through
- * `useScreenKeystrokes`.
+ * Owns `?` and the one list at every width; the open page adds its own keystrokes through
+ * `usePageKeystrokes`.
  */
 export function ShellKeystrokes(properties: {
-  /** The open screen's name; undefined at an address that names no screen. */
-  readonly screen: string | undefined;
+  /** The open page's name; undefined at an address that names no page. */
+  readonly page: string | undefined;
   /** Bound with a modifier, so turning single-key keystrokes off leaves them on. */
   readonly shell: readonly Keystroke[];
   readonly children: ReactNode;
 }) {
-  const { screen, shell } = properties;
+  const { page, shell } = properties;
   const [open, setOpen] = useState(false);
   const [own, setOwn] = useState(NONE);
   useKeystroke(LIST_THE_KEYSTROKES, () => {
@@ -211,7 +211,7 @@ export function ShellKeystrokes(properties: {
 
   const register = useCallback<Register>((keystrokes) => {
     setOwn(keystrokes);
-    // Only its own: the next screen's arrive in the same commit.
+    // Only its own: the next page's arrive in the same commit.
     return () => {
       setOwn((current) => (current === keystrokes ? NONE : current));
     };
@@ -221,11 +221,11 @@ export function ShellKeystrokes(properties: {
     () => ({
       open,
       setOpen,
-      heading: keystrokesOn(screen ?? KEYSTROKE_WORDS.thisScreen),
+      heading: keystrokesOn(page ?? KEYSTROKE_WORDS.thisPage),
       keystrokes: [...own, LIST_THE_KEYSTROKES, ...shell],
       said: own.length === 0 ? KEYSTROKE_WORDS.noneOfItsOwn : undefined,
     }),
-    [open, own, screen, shell],
+    [open, own, page, shell],
   );
 
   return (
@@ -236,12 +236,12 @@ export function ShellKeystrokes(properties: {
 }
 
 /**
- * A screen sits under the outlet, where the shell cannot hand it a prop. Pass one identity, or
+ * A page sits under the outlet, where the shell cannot hand it a prop. Pass one identity, or
  * every draw registers again.
  */
-export function useScreenKeystrokes(keystrokes: readonly Keystroke[]) {
+export function usePageKeystrokes(keystrokes: readonly Keystroke[]) {
   const register = useContext(RegisterContext);
-  // The shell's list is outside the screen, so it follows the screen arriving and leaving.
+  // The shell's list is outside the page, so it follows the page arriving and leaving.
   useEffect(() => register?.(keystrokes), [register, keystrokes]);
 }
 

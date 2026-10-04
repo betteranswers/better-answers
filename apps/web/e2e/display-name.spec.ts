@@ -31,8 +31,8 @@ const displayNameField = (page: Page) => page.getByLabel(DISPLAY_NAME_WORDS.labe
 
 const saveButton = (page: Page) => page.getByRole("button", { name: "Save and continue" });
 
-/** Every screen the page was shown, so a screen that came and went cannot pass unseen. */
-const screensShown = (page: Page): readonly string[] => {
+/** Every page the page was shown, so a page that came and went cannot pass unseen. */
+const pagesShown = (page: Page): readonly string[] => {
   const shown: string[] = [];
   page.on("framenavigated", (frame) => {
     if (frame === page.mainFrame()) shown.push(new URL(frame.url()).pathname);
@@ -84,7 +84,7 @@ test("credits a new member by their given name, asking once", async ({ page, req
 
   const workspace = await provision(request, { name: "Named Ltd" });
   await addMember(request, { workspaceId: workspace.workspaceId, userId: who.id, role: "Editor" });
-  const shown = screensShown(page);
+  const shown = pagesShown(page);
   await page.goto("/choose-workspace");
 
   await landedAtHome(page, "Editor");
@@ -99,7 +99,7 @@ test("signs a named member straight into the shell, never asking", async ({ page
   const who = await person(request, email, { displayName: "Alys Named" });
   const workspace = await provision(request, { name: "Already Named" });
   await addMember(request, { workspaceId: workspace.workspaceId, userId: who.id, role: "Editor" });
-  const shown = screensShown(page);
+  const shown = pagesShown(page);
 
   await page.goto("/sign-in");
   await signIn(page, request, email);
@@ -120,7 +120,7 @@ test("says what to change in a bad name, then saves", async ({
   await expect(displayNameHeading(page)).toBeVisible();
 
   const refusal = page.getByRole("alert", { includeHidden: true });
-  await expect(refusal, "the display-name screen stands no refusal region").toHaveCount(1);
+  await expect(refusal, "the display-name page stands no refusal region").toHaveCount(1);
   await expect(refusal, "the refusal region stands with words already in it").toBeEmpty();
   const stood = await refusal.elementHandle();
 
@@ -146,7 +146,7 @@ test("says what to change in a bad name, then saves", async ({
   await expect(noWorkspaceHeading(page)).toBeVisible();
 });
 
-test("sends a signed-out visitor from the display-name screen to sign-in", async ({ page }) => {
+test("sends a signed-out visitor from the display-name page to sign-in", async ({ page }) => {
   await page.goto("/display-name");
 
   await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();

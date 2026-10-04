@@ -71,7 +71,7 @@ export const findingsIn = (standing: Standing, people: TestPeople): readonly str
 };
 
 export type RepairMembers = {
-  /** Display names, as the Members screen's ticks are labelled. */
+  /** Display names, as the Members page's ticks are labelled. */
   readonly names: readonly string[];
   /** Those an earlier run left as Editors. */
   readonly editors: readonly string[];

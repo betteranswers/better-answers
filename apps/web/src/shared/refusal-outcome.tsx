@@ -84,7 +84,7 @@ export function RefusedItemLines(properties: {
   );
 }
 
-/** A set refused whole; each item is named as the screen named it at the press, shown or not. */
+/** A set refused whole; each item is named as the page named it at the press, shown or not. */
 export const setRefusalOutcome = (refused: {
   readonly featureWords: SaidOfWord;
   readonly failure: Error | ApiError;

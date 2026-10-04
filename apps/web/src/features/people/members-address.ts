@@ -5,15 +5,15 @@ import { ULID } from "@better-answers/schema/ulid";
 
 import { PAGE_NUMBER } from "@/shared/list-address.ts";
 import { pageWithin } from "@/shared/list-pages.tsx";
-import { CONTROL_CENTRE, detailAt, groupIn, screenNamed } from "@/shared/navigation.ts";
+import { CONTROL_CENTRE, detailAt, menuGroupIn, pageNamed } from "@/shared/navigation.ts";
 
 import type { Role } from "./people-api.ts";
 
-const PEOPLE = groupIn(CONTROL_CENTRE, "people");
+const PEOPLE = menuGroupIn(CONTROL_CENTRE, "people");
 
-export const MEMBERS_SCREEN = screenNamed(PEOPLE, "Members");
+export const MEMBERS_PAGE = pageNamed(PEOPLE, "Members");
 
-export const GROUPS_PATH = screenNamed(PEOPLE, "Groups").path;
+export const GROUPS_PATH = pageNamed(PEOPLE, "Groups").path;
 
 /** Members, Invitations and Requests share one address, so each tab's keys carry its prefix. */
 export const MEMBERS_LIST = "members";
@@ -41,11 +41,11 @@ export const sortOf = (sorted: Sorted): (typeof SORTS)[number] | undefined =>
 /** A person's id as the api mints it. Anything else names no one, so it is never asked about. */
 export const PERSON_ID = z.string().regex(ULID);
 
-export const memberPageOf = (personId: string): string => detailAt(MEMBERS_SCREEN, personId);
+export const memberPageOf = (personId: string): string => detailAt(MEMBERS_PAGE, personId);
 
 /** Members with the query its reader left it at, so a return finds the same rows. */
 export const membersAt = (query: string | undefined): string =>
-  `${MEMBERS_SCREEN.path}${query ?? ""}`;
+  `${MEMBERS_PAGE.path}${query ?? ""}`;
 
 const OPENED_AT = ["member", "role", "groups", "credentials", "flag", "removal"] as const;
 

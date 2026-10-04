@@ -42,7 +42,7 @@ afterEach(() => {
 });
 
 describe("the console's shell", () => {
-  it("draws the console's surface, groups and screens for the operator", async () => {
+  it("draws the console's area, groups and pages for the operator", async () => {
     vi.stubGlobal("fetch", answering({ result: { data: { operator: true, name: "Ada" } } }));
 
     const { router } = await openApp("/console");
