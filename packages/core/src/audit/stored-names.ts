@@ -129,4 +129,5 @@ export const STORED_DETAIL_KEYS = {
   family: "family",
   eventCount: "eventCount",
   capped: "capped",
+  searchTooBroad: "searchTooBroad",
 } as const;

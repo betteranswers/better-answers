@@ -134,6 +134,7 @@ describe("searching and exporting over tRPC", () => {
     expect(page.events.map((event) => [event.act, event.subject])).toEqual([
       ["people.group.created", { kind: "group", name: "Bid writers" }],
     ]);
+    expect(page.searchTooBroad).toBe(false);
   });
 
   it("answers an Admin the CSV text, and records the export", async () => {
@@ -143,7 +144,7 @@ describe("searching and exporting over tRPC", () => {
 
     const file = await api.members.exportAuditLog.mutate({ family: "people" });
 
-    expect(file).toMatchObject({ count: 1, capped: false });
+    expect(file).toMatchObject({ count: 1, capped: false, searchTooBroad: false });
     expect(file.csv).toContain('"people.group.created"');
     expect(await exportsIn(workspaceId)).toBe(1);
   });

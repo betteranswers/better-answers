@@ -35,6 +35,7 @@ const EXPORT_ACTS = declareActs("platform", {
     family: "family?",
     eventCount: "count",
     capped: "flag",
+    searchTooBroad: "flag",
   }),
 });
 
@@ -62,6 +63,8 @@ export type AuditExport = {
   readonly count: number;
   /** Whether more events matched than the file holds. */
   readonly capped: boolean;
+  /** Whether the search named more people or groups than were read. */
+  readonly searchTooBroad: boolean;
 };
 
 /** A spreadsheet runs a cell starting so as a formula; spaces before the sign do not stop it. */
@@ -116,8 +119,17 @@ const cellsOf = (event: ReadAuditEvent): readonly string[] => [
 
 const STOPPED = `The export stopped at ${EXPORT_CAP.toLocaleString("en-GB")} events. Narrow the search or the family for the rest.`;
 
-const csvOf = (events: readonly ReadAuditEvent[], capped: boolean): string =>
-  [HEADER, ...events.map(cellsOf), ...(capped ? [[STOPPED]] : [])]
+const TOO_BROAD =
+  "The search named more than 100 people or groups. Only the first 100 were read; narrow it for the rest.";
+
+/** A file read short says so in its own last lines, so a copy passed on still says it. */
+const csvOf = (read: Read): string =>
+  [
+    HEADER,
+    ...read.events.map(cellsOf),
+    ...(read.capped ? [[STOPPED]] : []),
+    ...(read.searchTooBroad ? [[TOO_BROAD]] : []),
+  ]
     .map((cells) => `${lineOf(cells)}\r\n`)
     .join("");
 
@@ -131,6 +143,7 @@ type ExportedDetail = {
 type Read = {
   readonly events: readonly ReadAuditEvent[];
   readonly capped: boolean;
+  readonly searchTooBroad: boolean;
   readonly matched: readonly Matched[];
 };
 
@@ -143,6 +156,7 @@ const readForExport = async (
   return {
     events: await eventsNamed(principal, tx, page.rows),
     capped: page.nextCursor !== null,
+    searchTooBroad: found?.tooBroad ?? false,
     matched: [
       ...(found?.people ?? []).map((id) => ({ kind: "person" as const, id })),
       ...(found?.groups ?? []).map((id) => ({ kind: "group" as const, id })),
@@ -160,6 +174,7 @@ const recordExport = async (
     matched: read.matched,
     eventCount: read.events.length,
     capped: read.capped,
+    searchTooBroad: read.searchTooBroad,
   };
   if (input.family !== undefined) detail.family = input.family;
   await record(principal, tx, {
@@ -194,6 +209,6 @@ export const exportAuditLog = async (
   );
   if (!recorded.ok) return err(recorded.error);
   if (!recorded.value.ok) return err(recorded.value.error);
-  const { events, capped } = exported;
-  return ok({ csv: csvOf(events, capped), count: events.length, capped });
+  const { events, capped, searchTooBroad } = exported;
+  return ok({ csv: csvOf(exported), count: events.length, capped, searchTooBroad });
 };

@@ -37,7 +37,7 @@ import type { MemberRefusal } from "./vocabulary.ts";
 const AUDIT_LOG_PAGE = 50;
 
 /** People's names and addresses, group names, or an act's words; never stored, never logged. */
-export const auditSearch = z.string().trim().max(100);
+const auditSearch = z.string().trim().max(100);
 
 export const readAuditLogInput = z.object({
   family: z.enum(FAMILIES).optional(),
@@ -86,6 +86,11 @@ export type AuditLogPage = Omit<AuditEventPage, "rows"> & {
   readonly events: readonly ReadAuditEvent[];
 };
 
+export type SearchedAuditLogPage = AuditLogPage & {
+  /** The search named more than 100 people or groups, and only the first 100 were read. */
+  readonly searchTooBroad: boolean;
+};
+
 type NamedKind = "person" | "group" | "invitation";
 
 /** The subject kinds a person's id stands under. */
@@ -118,10 +123,12 @@ type Found = {
   readonly people: readonly UserId[];
   readonly groups: readonly string[];
   readonly acts: readonly string[];
+  /** More people or groups matched than are read, so the events of the rest are left out. */
+  readonly tooBroad: boolean;
 };
 
 /** The events naming any of the people or groups, or taking any of the acts. */
-export const soughtFor = (found: Found): EventsSought => ({
+export const soughtFor = (found: Omit<Found, "tooBroad">): EventsSought => ({
   people: found.people,
   subjects: [
     { kinds: PERSON_SUBJECT_KINDS, ids: found.people },
@@ -131,7 +138,7 @@ export const soughtFor = (found: Found): EventsSought => ({
   detail: PERSON_NAMED_IN,
 });
 
-/** Enough for any search a person types; a word that matches more is too broad to read. */
+/** Enough for any search a person types; one row past it says the search named more. */
 const IDS_SOUGHT = 100;
 
 /** A subject and verb, as `member.role_changed` reads "member role changed". */
@@ -160,7 +167,7 @@ const peopleNamed = async (
                       WHERE e.workspace_id = $1 AND e.subject_kind = ANY($4::text[])
                         AND e.subject_id = u.id))
       ORDER BY u.id LIMIT $5`,
-    [principal.workspaceId, pattern, PERSON_PREFIX, PERSON_SUBJECT_KINDS, IDS_SOUGHT],
+    [principal.workspaceId, pattern, PERSON_PREFIX, PERSON_SUBJECT_KINDS, IDS_SOUGHT + 1],
   );
   return found.rows.map((row) => boundarySchemas.user.select.shape.id.parse(row.id));
 };
@@ -172,7 +179,7 @@ const groupsNamed = async (
 ): Promise<readonly string[]> => {
   const found = await tx.query<{ id: string }>(
     'SELECT id FROM "group" WHERE workspace_id = $1 AND name ILIKE $2 ORDER BY id LIMIT $3',
-    [principal.workspaceId, pattern, IDS_SOUGHT],
+    [principal.workspaceId, pattern, IDS_SOUGHT + 1],
   );
   return found.rows.map((row) => row.id);
 };
@@ -180,10 +187,13 @@ const groupsNamed = async (
 /** The people, groups and acts a search names, each read inside the principal's workspace. */
 const foundBy = async (principal: UserPrincipal, tx: Tx, search: string): Promise<Found> => {
   const pattern = containing(search);
+  const people = await peopleNamed(principal, tx, pattern);
+  const groups = await groupsNamed(principal, tx, pattern);
   return {
-    people: await peopleNamed(principal, tx, pattern),
-    groups: await groupsNamed(principal, tx, pattern),
+    people: people.slice(0, IDS_SOUGHT),
+    groups: groups.slice(0, IDS_SOUGHT),
     acts: actsWorded(search),
+    tooBroad: people.length > IDS_SOUGHT || groups.length > IDS_SOUGHT,
   };
 };
 
@@ -313,15 +323,16 @@ export const readAuditLog = async (
   principal: UserPrincipal,
   tx: Tx,
   input: ReadAuditLogInput,
-): Promise<Result<AuditLogPage, ReadAuditLogRefusal>> => {
+): Promise<Result<SearchedAuditLogPage, ReadAuditLogRefusal>> => {
   const admitted = admit(readAuditLogAct, principal, input);
   if (!admitted.ok) return err(admitted.error);
 
   const read = await attempt(async () => {
-    const { page } = await eventsAsked(admitted.value, tx, input);
+    const { page, found } = await eventsAsked(admitted.value, tx, input);
     return {
       events: await eventsNamed(admitted.value, tx, page.rows),
       nextCursor: page.nextCursor,
+      searchTooBroad: found?.tooBroad ?? false,
     };
   });
   return read.ok ? ok(read.value) : err(read.error);

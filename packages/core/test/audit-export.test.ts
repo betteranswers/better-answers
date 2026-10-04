@@ -149,6 +149,7 @@ describe("the audit log's export", () => {
           family: "people",
           eventCount: 0,
           capped: false,
+          searchTooBroad: false,
         },
       },
     ]);
@@ -165,7 +166,27 @@ describe("the audit log's export", () => {
       matched: [{ kind: "group", id: group.groupId }],
       eventCount: 1,
       capped: false,
+      searchTooBroad: false,
     });
+  });
+
+  it("flags and records a search naming over 100 groups", async () => {
+    const workspace = await provisionedWorkspace(db(), "ExportTooBroad");
+    await seedingWith(db().pool, async (seed) => {
+      for (let crew = 1; crew <= 101; crew += 1) {
+        await seed.group({ workspaceId: workspace.workspaceId, name: `Crew ${crew}` });
+      }
+    });
+
+    const file = exported(await exportAs(workspace, workspace.adminUserId, { search: "Crew" }));
+
+    expect(file).toMatchObject({ searchTooBroad: true, capped: false });
+    expect(linesOf(file).at(-1)).toBe(
+      `"The search named more than 100 people or groups. Only the first 100 were read; narrow it for the rest."`,
+    );
+    const [recorded] = await exportEvents(workspace);
+    expect(recorded?.detail).toMatchObject({ searchTooBroad: true });
+    expect(recorded?.detail["matched"]).toHaveLength(100);
   });
 
   it("matches no one known only to another workspace", async () => {

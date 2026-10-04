@@ -14,7 +14,7 @@ import {
   readAuditLog,
   readAuditLogInput,
   renameGroup,
-  type AuditLogPage,
+  type SearchedAuditLogPage,
 } from "../src/members/index.ts";
 import type { Foldable, Folded, Tx } from "../src/store/postgres/index.ts";
 import { recordSignIn } from "../src/workspaces/index.ts";
@@ -80,12 +80,12 @@ const readAs = (
     readAuditLog(principal, tx, inputOf(readAuditLogInput, asked)),
   );
 
-const pageOf = (read: Result<AuditLogPage, unknown>): AuditLogPage => {
+const pageOf = (read: Result<SearchedAuditLogPage, unknown>): SearchedAuditLogPage => {
   if (!read.ok) throw new Error(`the audit log was refused: ${String(read.error)}`);
   return read.value;
 };
 
-const subjectsOf = (page: AuditLogPage) => page.events.map((event) => event.subjectId);
+const subjectsOf = (page: SearchedAuditLogPage) => page.events.map((event) => event.subjectId);
 
 const namedSubjectsOf = async (workspace: ProvisionedWorkspace) =>
   pageOf(await readAs(workspace, workspace.adminUserId)).events.map(({ act, subject }) => [
@@ -167,6 +167,7 @@ describe("the audit log", () => {
         },
       ],
       nextCursor: null,
+      searchTooBroad: false,
     });
     const [newest, oldest] = page.events;
     expect(Date.parse(newest?.at ?? "")).toBeGreaterThan(Date.parse(oldest?.at ?? ""));
@@ -247,7 +248,7 @@ describe("the audit log", () => {
 
     expect(people.events.map((event) => event.act)).toEqual(["people.group.created"]);
     expect(platform.events.map((event) => event.act)).toEqual(["platform.workspace.provisioned"]);
-    expect(knowledge).toEqual({ events: [], nextCursor: null });
+    expect(knowledge).toEqual({ events: [], nextCursor: null, searchTooBroad: false });
   });
 
   it("pages from the newest, each resuming where the last stopped", async () => {
@@ -315,7 +316,7 @@ describe("the audit log", () => {
     );
 
     expect(subjectsOf(page)).toEqual([ours.workspaceId]);
-    expect(byTheirCursor).toEqual({ events: [], nextCursor: null });
+    expect(byTheirCursor).toEqual({ events: [], nextCursor: null, searchTooBroad: false });
   });
 
   it("never reads the identity-set audit log", async () => {
@@ -376,7 +377,26 @@ const priyaOf = async (workspace: ProvisionedWorkspace) => {
   return { priya, estimators, bidWriters };
 };
 
-const actsOf = (page: AuditLogPage) => page.events.map((event) => event.act);
+/** Groups "Crew 001" upward, each with its creation's event; answers their ids in id order. */
+const crewsSeeded = (workspace: ProvisionedWorkspace, count: number) =>
+  seedingWith(db().pool, async (seed) => {
+    const ids: string[] = [];
+    for (let crew = 1; crew <= count; crew += 1) {
+      const name = `Crew ${String(crew).padStart(3, "0")}`;
+      const group = await seed.group({ workspaceId: workspace.workspaceId, name });
+      await seed.auditEvent({
+        workspaceId: workspace.workspaceId,
+        act: "people.group.created",
+        actor: `human:${workspace.adminUserId}`,
+        subjectId: group.id,
+        detail: {},
+      });
+      ids.push(group.id);
+    }
+    return ids.toSorted();
+  });
+
+const actsOf = (page: SearchedAuditLogPage) => page.events.map((event) => event.act);
 
 describe("searching the audit log", () => {
   it("finds a person as actor, subject or group member, paged", async () => {
@@ -446,7 +466,7 @@ describe("searching the audit log", () => {
       await readAs(workspace, workspace.adminUserId, { search: "Hannah", family: "platform" }),
     );
 
-    expect(people).toEqual({ events: [], nextCursor: null });
+    expect(people).toEqual({ events: [], nextCursor: null, searchTooBroad: false });
     expect(actsOf(platform)).toEqual(["platform.workspace.provisioned"]);
   });
 
@@ -456,7 +476,7 @@ describe("searching the audit log", () => {
 
     expect(await readAs(workspace, workspace.adminUserId, { search: "Zebedee" })).toEqual({
       ok: true,
-      value: { events: [], nextCursor: null },
+      value: { events: [], nextCursor: null, searchTooBroad: false },
     });
   });
 
@@ -485,7 +505,33 @@ describe("searching the audit log", () => {
     expect(pageOf(await readAs(ours, ours.adminUserId, { search: "Una Elsewhere" }))).toEqual({
       events: [],
       nextCursor: null,
+      searchTooBroad: false,
     });
+  });
+
+  it("reads a search naming 100 groups whole", async () => {
+    const workspace = await provisionedWorkspace(db(), "SearchedHundred");
+    await crewsSeeded(workspace, 100);
+
+    const page = pageOf(await readAs(workspace, workspace.adminUserId, { search: "Crew" }));
+
+    expect(page.searchTooBroad).toBe(false);
+  });
+
+  it("flags a search naming over 100 groups, reading 100", async () => {
+    const workspace = await provisionedWorkspace(db(), "SearchedTooBroadly");
+    const crews = await crewsSeeded(workspace, 101);
+
+    const first = pageOf(await readAs(workspace, workspace.adminUserId, { search: "Crew" }));
+    const rest = pageOf(
+      await readAs(workspace, workspace.adminUserId, { search: "Crew", cursor: first.nextCursor }),
+    );
+
+    expect([first.searchTooBroad, rest.searchTooBroad]).toEqual([true, true]);
+    expect(new Set([...subjectsOf(first), ...subjectsOf(rest)])).toEqual(
+      new Set(crews.slice(0, 100)),
+    );
+    expect(rest.nextCursor).toBeNull();
   });
 
   it("refuses a search over 100 characters, malformed", () => {
