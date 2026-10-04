@@ -4,9 +4,15 @@ import { timeWords, weekdayWords } from "@/shared/words.ts";
 
 type Dated = { readonly id: string; readonly at: string };
 
-/** Newest first, so a day's lines already stand together, each keeping its place in the stream. */
-const daysOf = <Event extends Dated>(events: readonly Event[]) =>
-  Map.groupBy(events.entries(), ([, event]) => weekdayWords(event.at));
+/** Newest first, so a day's lines stand together. A loop: `Map.groupBy` is newer than the build's browsers. */
+const daysOf = <Event extends Dated>(events: readonly Event[]) => {
+  const days = new Map<string, [number, Event][]>();
+  for (const [index, event] of events.entries()) {
+    const day = weekdayWords(event.at);
+    days.set(day, [...(days.get(day) ?? []), [index, event]]);
+  }
+  return days;
+};
 
 /** Load more puts focus on the first line it brings, where reading resumes. */
 export const useLanding = () => {
