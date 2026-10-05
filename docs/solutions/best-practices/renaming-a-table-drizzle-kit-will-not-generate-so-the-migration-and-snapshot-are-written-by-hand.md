@@ -1,6 +1,7 @@
 ---
 title: "Renaming a table: drizzle-kit will not generate it, so the migration and its snapshot are written by hand"
 date: 2026-10-05
+last_updated: 2026-10-05
 category: best-practices
 module: packages/schema
 problem_type: best_practice
@@ -40,6 +41,7 @@ Error: Interactive prompts require a TTY terminal (process.stdin.isTTY or proces
 3. Write the SQL by hand. Its first line is exactly `-- Custom migration (hand-written SQL; ADR 0032).` (`packages/schema/test/migration-ownership.test.ts:22` checks that marker wherever a migration claims to be hand-written). In it:
    - bound the locks with `SET LOCAL lock_timeout = '5s'` and reset it to `DEFAULT` at the end, as migration 0059 does;
    - rename the table, then every name Postgres derived from it, including the ones drizzle never declared: `<table>_pkey`, the foreign key, checks, indexes, and the policy (`ALTER POLICY … RENAME TO`);
+   - rename the NOT NULL constraints too. PostgreSQL 18 stores each one as a named constraint, `<table>_<column>_not_null`, and a table rename leaves those names behind. 0066 missed them, so production still has five `llm_route_*_not_null` constraints on `model_choice`. They are harmless, but a later rename that greps for the old name finds them. List them with `select conname from pg_constraint where conrelid = '<table>'::regclass and contype = 'n'`, and rename each with `ALTER TABLE … RENAME CONSTRAINT`. drizzle's snapshot does not record them, so the snapshot needs no edit for them;
    - rename a function with `ALTER FUNCTION … RENAME TO`, which keeps its grants, then `CREATE OR REPLACE` it, because its body still names the old table. A function created afresh is executable by PUBLIC;
    - for a stored value a CHECK lists, drop the CHECK, update inside each workspace's scope, then add the CHECK back. Migration 0048 has the same shape, with a delete where 0066 updates. `job` forces row-level security, so a bare `UPDATE` by the migration owner reaches no row. Re-adding the CHECK validates every row, which is the proof the rewrite was complete.
 4. Edit the new snapshot in place. In the table's entry, change the key `public.<old>` and every name derived from it: `name`, the index, the foreign key's name and `tableFrom`, the policy's name and its `using` and `withCheck` expressions, and the check. Also change any stored value inside another table's CHECK (U9 changed `job_reason_check`). Keep the key order drizzle wrote, and leave the file with no trailing newline, as drizzle writes none.
