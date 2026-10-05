@@ -72,7 +72,12 @@
     {
       "sense": "the stored values the map's migration replaced, named as stored",
       "paths": ["packages/schema/test/job-kinds.test.ts"],
-      "matches": ["^first-sync$", "'graph'", "first-sync to first-build"]
+      "matches": ["^first-sync$", "^graph$", "'graph'", "first-sync to first-build"]
+    },
+    {
+      "sense": "the old table prefix the catalogue test refuses any name under",
+      "paths": ["packages/schema/test/renamed-names.test.ts"],
+      "matches": ["^graph$"]
     },
     {
       "sense": "a dependency graph: pnpm's, a module's or the slices'",

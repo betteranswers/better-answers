@@ -328,7 +328,12 @@ const GRAPH_SENSES: readonly Sense[] = [
   {
     sense: "the destination value the map's migration replaced, named as stored",
     within: "packages/schema/test/job-kinds.test.ts",
-    written: /'graph'/g,
+    written: /(["'])graph\1/g,
+  },
+  {
+    sense: "the old table prefix the catalogue test refuses any name under",
+    within: "packages/schema/test/renamed-names.test.ts",
+    written: /"graph"/g,
   },
 ];
 
