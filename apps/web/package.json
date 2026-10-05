@@ -17,7 +17,7 @@
   "dependencies": {
     "@better-answers/design-system": "workspace:*",
     "@better-answers/schema": "workspace:*",
-    "@better-auth/oauth-provider": "1.7.5",
+    "@better-auth/oauth-provider": "1.7.7",
     "@phosphor-icons/react": "2.1.10",
     "@radix-ui/react-use-controllable-state": "1.2.6",
     "@simplewebauthn/browser": "13.3.0",
@@ -26,7 +26,7 @@
     "@tanstack/react-table": "9.2.4",
     "@trpc/client": "11.19.0",
     "@trpc/tanstack-react-query": "11.19.0",
-    "better-auth": "1.7.5",
+    "better-auth": "1.7.7",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "cmdk": "1.1.1",
