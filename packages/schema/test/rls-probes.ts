@@ -54,27 +54,27 @@ export const A_BUNDLE_COMMIT = `INSERT INTO bundle_commit (workspace_id, sha, au
 export const A_BUNDLE_COMMIT_WITH_A_PARENT = `INSERT INTO bundle_commit (workspace_id, sha, parent_sha, audit_event_id, actor)
        VALUES ($1, $2, $3, $4, 'process:better-answers-reconciler')`;
 
-export const A_GRAPH_NODE =
-  "INSERT INTO graph_node (workspace_id, gen, uid, label) VALUES ($1, $2, $3, $4)";
+export const A_MAP_NODE =
+  "INSERT INTO map_node (workspace_id, gen, uid, label) VALUES ($1, $2, $3, $4)";
 
-export const A_GRAPH_NODE_OF_KIND =
-  "INSERT INTO graph_node (workspace_id, gen, uid, label, kind) VALUES ($1, $2, $3, $4, $5)";
+export const A_MAP_NODE_OF_KIND =
+  "INSERT INTO map_node (workspace_id, gen, uid, label, kind) VALUES ($1, $2, $3, $4, $5)";
 
-export const A_GRAPH_NODE_CLASSED =
-  "INSERT INTO graph_node (workspace_id, gen, uid, label, sensitivity) VALUES ($1, $2, $3, $4, $5)";
+export const A_MAP_NODE_CLASSED =
+  "INSERT INTO map_node (workspace_id, gen, uid, label, sensitivity) VALUES ($1, $2, $3, $4, $5)";
 
-export const AN_EDGE = `INSERT INTO graph_edge (workspace_id, gen, uid, label, from_uid, to_uid)
+export const AN_EDGE = `INSERT INTO map_edge (workspace_id, gen, uid, label, from_uid, to_uid)
        VALUES ($1, $2, $3, $4, $5, $6)`;
 
-export const AN_EDGE_CARRYING_A_SENTENCE = `INSERT INTO graph_edge
+export const AN_EDGE_CARRYING_A_SENTENCE = `INSERT INTO map_edge
          (workspace_id, gen, uid, label, from_uid, to_uid, sentence)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`;
 
-export const A_GRAPH_GENERATION =
-  "INSERT INTO graph_generation (workspace_id, live_gen) VALUES ($1, $2)";
+export const A_MAP_GENERATION =
+  "INSERT INTO map_generation (workspace_id, live_gen) VALUES ($1, $2)";
 
 export const THE_GENERATION_ROW_HELD =
-  "ON CONFLICT (workspace_id) DO UPDATE SET live_gen = graph_generation.live_gen";
+  "ON CONFLICT (workspace_id) DO UPDATE SET live_gen = map_generation.live_gen";
 
 export const A_SUGGESTION =
   "INSERT INTO suggestion (workspace_id, id, set_id, kind, proposer) VALUES ($1, $2, $3, $4, $5)";

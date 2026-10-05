@@ -16,7 +16,7 @@ export const legs = new Map([
       // Each of these files alone outruns a shard's 120-minute ceiling.
       split: new Map([
         ["src/store/git/index.ts", 4],
-        ["src/store/graph/index.ts", 2],
+        ["src/store/map/index.ts", 2],
       ]),
     },
   ],

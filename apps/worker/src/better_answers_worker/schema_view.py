@@ -1,8 +1,8 @@
 # Generated, never edited: pnpm --filter @better-answers/schema run generate:worker-view
 
-MIGRATION_ID = "0066_the-model-choice"
+MIGRATION_ID = "0067_the-map"
 
-MIGRATION_WHEN = 1791156833419
+MIGRATION_WHEN = 1791193377095
 
 TABLES: dict[str, dict[str, str]] = {
     "index.chunk": {
@@ -197,37 +197,6 @@ TABLES: dict[str, dict[str, str]] = {
         "restored_by": "text",
         "restore_reason": "text",
     },
-    "public.graph_edge": {
-        "workspace_id": "text NOT NULL",
-        "gen": "integer",
-        "uid": "text NOT NULL",
-        "label": "text NOT NULL",
-        "from_uid": "text NOT NULL",
-        "to_uid": "text NOT NULL",
-        "from_kind": "text",
-        "to_kind": "text",
-        "section": "text",
-        "sentence": "text",
-        "published_at": "timestamp with time zone",
-        "sensitivity": "text NOT NULL",
-        "audience": "text NOT NULL",
-        "audience_groups": "text[]",
-    },
-    "public.graph_generation": {
-        "workspace_id": "text NOT NULL",
-        "live_gen": "integer NOT NULL",
-    },
-    "public.graph_node": {
-        "workspace_id": "text NOT NULL",
-        "gen": "integer",
-        "uid": "text NOT NULL",
-        "label": "text NOT NULL",
-        "kind": "text",
-        "published_at": "timestamp with time zone",
-        "sensitivity": "text NOT NULL",
-        "audience": "text NOT NULL",
-        "audience_groups": "text[]",
-    },
     "public.group": {
         "id": "text NOT NULL",
         "workspace_id": "text NOT NULL",
@@ -299,6 +268,37 @@ TABLES: dict[str, dict[str, str]] = {
         "expires_at": "timestamp with time zone",
         "alg": "text",
         "crv": "text",
+    },
+    "public.map_edge": {
+        "workspace_id": "text NOT NULL",
+        "gen": "integer",
+        "uid": "text NOT NULL",
+        "label": "text NOT NULL",
+        "from_uid": "text NOT NULL",
+        "to_uid": "text NOT NULL",
+        "from_kind": "text",
+        "to_kind": "text",
+        "section": "text",
+        "sentence": "text",
+        "published_at": "timestamp with time zone",
+        "sensitivity": "text NOT NULL",
+        "audience": "text NOT NULL",
+        "audience_groups": "text[]",
+    },
+    "public.map_generation": {
+        "workspace_id": "text NOT NULL",
+        "live_gen": "integer NOT NULL",
+    },
+    "public.map_node": {
+        "workspace_id": "text NOT NULL",
+        "gen": "integer",
+        "uid": "text NOT NULL",
+        "label": "text NOT NULL",
+        "kind": "text",
+        "published_at": "timestamp with time zone",
+        "sensitivity": "text NOT NULL",
+        "audience": "text NOT NULL",
+        "audience_groups": "text[]",
     },
     "public.mcp_call_counter": {
         "workspace_id": "text NOT NULL",

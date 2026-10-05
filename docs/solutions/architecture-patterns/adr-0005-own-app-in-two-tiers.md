@@ -29,7 +29,7 @@ The platform is our own application, not a fork, in two runtime tiers.
 - The api, in TypeScript, owns everything a person or an agent touches and every policy decision.
 - The worker, in Python, is one image and one container. It owns everything that turns sources into indexed, governed knowledge.
 
-The tiers share four stores and never code: the Postgres schema, the object store, the git store (a bare repository per workspace) and the graph.
+The tiers share four stores and never code: the Postgres schema, the object store, the git store (a bare repository per workspace) and the map.
 
 - There is no HTTP between the api and the worker. The control plane is rows.
 - The api is the bundle's only writer. A concept the worker produces reaches the bundle as a suggestion's payload, which the api commits on acceptance. The worker holds no git credential.

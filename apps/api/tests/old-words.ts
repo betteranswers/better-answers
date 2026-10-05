@@ -283,6 +283,55 @@ const ROUTE_SENSES: readonly Sense[] = [
   },
 ];
 
+const MAP = "map";
+
+const MAP_LANDED = "2026-10-05";
+
+const GRAPH_SENSES: readonly Sense[] = [
+  ...FILED_NAMES,
+  MIGRATION_TAG,
+  {
+    sense: "the map process's actor id, stored on the audit rows its act writes (R22)",
+    written: /\bprocess:better-answers-graph\b/g,
+  },
+  {
+    sense: "Microsoft Graph, the API a SharePoint connector reads through",
+    written: /\bMicrosoft Graph\b|\bGraph API\b|\bHTTPS, Graph\b|\bread through Graph\b/g,
+  },
+  {
+    sense: "a dependency graph: GitNexus's call or symbol graph, a module's, pnpm's or the slices'",
+    written: /\b(?:call|symbol|module|slice|build|dependency) graph\b/g,
+  },
+  {
+    sense: "a graph engine or store, the kind of database ADR 0032 chose against",
+    written: /\bgraph (?:engines?|database|store)\b/gi,
+  },
+  {
+    sense: "OKF's own structure, graph-shaped through its links",
+    written: /\bgraph-\*?shaped\*?|\bgraph shape\b/g,
+  },
+  {
+    sense: "Phosphor's graph icon, by the name its library exports",
+    within: "apps/web/src/shared/icon.tsx",
+    written: /\bGraph\b/g,
+  },
+  {
+    sense: "a component or icon a design-system card names as its library does",
+    within: "packages/design-system/guidelines/",
+    written: /\bContribution Graph\b|\bph-graph\b/g,
+  },
+  {
+    sense: "the citation fixture's prose, whose every edit moves the contract's digest",
+    within: "contracts/citation/",
+    written: /\bthe graph is Postgres\b/g,
+  },
+  {
+    sense: "the destination value the map's migration replaced, named as stored",
+    within: "packages/schema/test/job-kinds.test.ts",
+    written: /'graph'/g,
+  },
+];
+
 /** Copied from upstream, so their words are upstream's. */
 const VENDORED: readonly CarveOut[] = [
   {
@@ -470,8 +519,25 @@ export const OLD_WORDS: readonly OldWord[] = [
     "Removed at source",
     "reader text",
   ),
-  pending("graph", "map", "map", "map", "one sense"),
-  pending("graph sync run", "map rebuild", "map rebuild", "map", "everywhere"),
+  {
+    word: "graph",
+    use: "map",
+    entry: "map",
+    sweep: MAP,
+    state: "landed",
+    reach: "one sense",
+    permitted: GRAPH_SENSES,
+    carvedOut: [writtenBefore(MAP_LANDED), ...VENDORED],
+  },
+  {
+    word: "graph sync run",
+    use: "map rebuild",
+    entry: "map rebuild",
+    sweep: MAP,
+    state: "landed",
+    reach: "everywhere",
+    carvedOut: [writtenBefore(MAP_LANDED)],
+  },
   avoided("guard", "admission"),
   avoided("hamburger", "navigation control"),
   avoided("helper", "step (of an action)"),

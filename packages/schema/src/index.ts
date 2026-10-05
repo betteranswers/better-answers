@@ -1,5 +1,5 @@
 export * from "./schema.ts";
-export * from "./graph-tables.ts";
+export * from "./map-tables.ts";
 export * from "./index-tables.ts";
 export * from "./counter-tables.ts";
 export * from "./rls-exemptions.ts";

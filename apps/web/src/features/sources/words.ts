@@ -34,7 +34,7 @@ const DESTINATIONS = new Map<string, Meaning>([
       means: "Concepts drawn from it arrive as suggestions an Admin accepts, once extraction runs.",
     },
   ],
-  ["graph", { word: "map", means: "The people, meetings and tasks it names join the map." }],
+  ["map", { word: "map", means: "The people, meetings and tasks it names join the map." }],
 ]);
 
 const RETENTIONS = new Map<string, Meaning>([

@@ -35,7 +35,7 @@ describe("the comment rule fires on a long or citing comment", () => {
 
   it.each([
     ["a ticket id", "// Kept because the claim protocol changed under T-243.\n"],
-    ["an ADR number", "// Kept because the graph is Postgres under ADR 0021.\n"],
+    ["an ADR number", "// Kept because the map is Postgres under ADR 0021.\n"],
     ["a rule tag", "// Kept because a raw insert lives in a factory ([TEST4]).\n"],
     ["a tag from a digit-bearing family", "// Kept because the outcome is announced ([A11Y1]).\n"],
     ["an ISO date", "// Kept because the reading of the registry moved on 2026-09-21.\n"],

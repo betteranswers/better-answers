@@ -14,12 +14,12 @@ C4Dynamic
     Component(audit, "audit", "audit log", "Mints the event id before the commit")
     Component(gitdoor, "store/git", "git binary", "Lock, precondition, commit with the Audit trailer")
     Component(pgdoor, "store/postgres", "pg", "The one transaction the rows land in")
-    Component(graphdoor, "store/graph", "delta builder", "The map's delta under the predicate")
+    Component(mapdoor, "store/map", "delta builder", "The map's delta under the predicate")
     Component(reconciler, "reconcile", "the concepts slice, called by the api's head check every 30 s", "Head against watermark; replay through the live handler")
   }
 
   ContainerDb(git, "Git store", "bare repository", "One per workspace")
-  ContainerDb(postgres, "Postgres", "RLS", "concept_index, concept_identity, evidence, bundle_commit, the graph, audit_event")
+  ContainerDb(postgres, "Postgres", "RLS", "concept_index, concept_identity, evidence, bundle_commit, the map, audit_event")
 
   Rel(person, trpc, "1. Submits the act", "tRPC")
   Rel(trpc, concepts, "2. Calls the act with the Principal and a Tx")
@@ -27,7 +27,7 @@ C4Dynamic
   Rel(concepts, audit, "4. Mints the audit_event id for the trailer")
   Rel(gitdoor, git, "5. Writes one commit: the person as author, the platform bot as committer, the Audit trailer", "git")
   Rel(concepts, pgdoor, "6. Writes concept_index (its tsvector from S2), concept_identity, evidence, bundle_commit; runs the audience cascade")
-  Rel(concepts, graphdoor, "7. Writes the delta into the same transaction, under the predicate")
+  Rel(concepts, mapdoor, "7. Writes the delta into the same transaction, under the predicate")
   Rel(concepts, audit, "8. Books the audit event, insert-only, under the id from step 4")
   Rel(pgdoor, postgres, "9. COMMIT; the lock releases after it, so bundle_commit is a prefix of git history", "pg")
   Rel(reconciler, git, "10. Every 30 s reads each workspace's head", "git")

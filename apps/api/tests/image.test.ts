@@ -83,7 +83,7 @@ const contentsSchema = z.object({
 type ImageContents = z.infer<typeof contentsSchema>;
 
 /**
- * No peer is followed: pnpm links one from anywhere in the workspace's graph, and a peer the api
+ * No peer is followed: pnpm links one from anywhere in the workspace's dependency graph, and a peer the api
  * loads is one it declares.
  */
 const probe = `

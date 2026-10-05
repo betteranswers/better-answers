@@ -317,7 +317,7 @@ const acceptedRows = {
       name: "The HR handbook",
       connector: "upload",
 
-      destination: ["graph"],
+      destination: ["map"],
       retentionClass: "mirror",
       state: "published",
     },
@@ -577,9 +577,9 @@ const acceptedRows = {
       origin: "imported",
     },
   ],
-  graphGeneration: [{ workspaceId: WS_ID, liveGen: 1 }],
+  mapGeneration: [{ workspaceId: WS_ID, liveGen: 1 }],
 
-  graphNode: [
+  mapNode: [
     {
       workspaceId: WS_ID,
       gen: 1,
@@ -600,7 +600,7 @@ const acceptedRows = {
     },
   ],
 
-  graphEdge: [
+  mapEdge: [
     {
       workspaceId: WS_ID,
       gen: 1,
@@ -838,9 +838,9 @@ describe("4 — a refinement only narrows, proved against the column", () => {
         "evidence",
         "conceptVerification",
 
-        "graphGeneration",
-        "graphNode",
-        "graphEdge",
+        "mapGeneration",
+        "mapNode",
+        "mapEdge",
 
         "job",
 
@@ -967,19 +967,19 @@ describe("the rejection half: a violated refinement never reaches Postgres", () 
       { ...acceptedRows.chunk[0], embeddingRouteId: "   " },
     ],
 
-    graphGeneration: [{ ...acceptedRows.graphGeneration[0], liveGen: 0 }],
-    graphNode: [
-      { ...acceptedRows.graphNode[0], label: "Widget" },
-      { ...acceptedRows.graphNode[0], sensitivity: "Secret" },
-      { ...acceptedRows.graphNode[0], gen: 0 },
-      { ...acceptedRows.graphNode[0], gen: null },
-      { ...acceptedRows.graphNode[1], gen: 1 },
+    mapGeneration: [{ ...acceptedRows.mapGeneration[0], liveGen: 0 }],
+    mapNode: [
+      { ...acceptedRows.mapNode[0], label: "Widget" },
+      { ...acceptedRows.mapNode[0], sensitivity: "Secret" },
+      { ...acceptedRows.mapNode[0], gen: 0 },
+      { ...acceptedRows.mapNode[0], gen: null },
+      { ...acceptedRows.mapNode[1], gen: 1 },
     ],
-    graphEdge: [
-      { ...acceptedRows.graphEdge[0], label: "RELATES_TO" },
-      { ...acceptedRows.graphEdge[0], sensitivity: "Secret" },
-      { ...acceptedRows.graphEdge[0], fromUid: "   " },
-      { ...acceptedRows.graphEdge[1], label: "source-entity:mentions" },
+    mapEdge: [
+      { ...acceptedRows.mapEdge[0], label: "RELATES_TO" },
+      { ...acceptedRows.mapEdge[0], sensitivity: "Secret" },
+      { ...acceptedRows.mapEdge[0], fromUid: "   " },
+      { ...acceptedRows.mapEdge[1], label: "source-entity:mentions" },
     ],
 
     suggestion: [

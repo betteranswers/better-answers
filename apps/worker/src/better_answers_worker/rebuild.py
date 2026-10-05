@@ -61,10 +61,10 @@ def _records(cursor: psycopg.Cursor, workspace_id: str) -> list[ConceptRecord]:
 
 
 def live_generation(cursor: psycopg.Cursor, workspace_id: str) -> int:
-    """The workspace's live graph generation, first created at 1 when it has none."""
+    """The workspace's live map generation, first created at 1 when it has none."""
     cursor.execute(
-        "INSERT INTO graph_generation (workspace_id, live_gen) VALUES (%s, 1)"
-        " ON CONFLICT (workspace_id) DO UPDATE SET live_gen = graph_generation.live_gen"
+        "INSERT INTO map_generation (workspace_id, live_gen) VALUES (%s, 1)"
+        " ON CONFLICT (workspace_id) DO UPDATE SET live_gen = map_generation.live_gen"
         " RETURNING live_gen",
         (workspace_id,),
     )
@@ -77,7 +77,7 @@ def live_generation(cursor: psycopg.Cursor, workspace_id: str) -> int:
 def run_rebuild(
     cursor: psycopg.Cursor, git_store_dir: str, workspace_id: str
 ) -> RebuildOutcome:
-    """Writes the whole graph as the generation after the live one and makes it live,
+    """Writes the whole map as the generation after the live one and makes it live,
     leaving older generations for the api's sweep. Nodes come from `concept_index` rows
     and edges from the files at head, each hash checked as `run_audit` checks it."""
     outcome = RebuildOutcome()
@@ -106,7 +106,7 @@ def run_rebuild(
 
     for record in records:
         cursor.execute(
-            "INSERT INTO graph_node (workspace_id, gen, uid, label, kind, published_at,"
+            "INSERT INTO map_node (workspace_id, gen, uid, label, kind, published_at,"
             " sensitivity, audience, audience_groups)"
             " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
             (
@@ -147,7 +147,7 @@ def run_rebuild(
             by_iri=by_iri,
         ):
             cursor.execute(
-                "INSERT INTO graph_edge (workspace_id, gen, uid, label, from_uid,"
+                "INSERT INTO map_edge (workspace_id, gen, uid, label, from_uid,"
                 " to_uid, from_kind, to_kind, section, sentence, published_at,"
                 " sensitivity, audience, audience_groups)"
                 " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
@@ -171,7 +171,7 @@ def run_rebuild(
             outcome.edges += 1
 
     cursor.execute(
-        "UPDATE graph_generation SET live_gen = %s WHERE workspace_id = %s",
+        "UPDATE map_generation SET live_gen = %s WHERE workspace_id = %s",
         (outcome.generation, workspace_id),
     )
     return outcome

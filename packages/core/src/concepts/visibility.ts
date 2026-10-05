@@ -29,7 +29,7 @@ import {
   type UserPrincipal,
 } from "../kernel/index.ts";
 import { holdsEveryGroup } from "../members/index.ts";
-import { writeConceptVisibility } from "../store/graph/index.ts";
+import { writeConceptVisibility } from "../store/map/index.ts";
 import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
 import { restsAlsoOnItsReconcilerHit } from "./reconciler-hit.ts";
 

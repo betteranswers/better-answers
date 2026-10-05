@@ -1,0 +1,82 @@
+{
+  "noun": "graph",
+  "readerWord": "map",
+  "sweep": "U10. Map",
+  "collisions": [
+    {
+      "with": "JavaScript's `.map` and `Map`, and Python's `map` builtin",
+      "codeWord": "map"
+    }
+  ],
+  "words": [
+    { "from": "graph", "to": "map" },
+    { "from": "graphs", "to": "maps" },
+    { "from": "first sync", "to": "first build" }
+  ],
+  "symbols": {
+    "paths": [
+      "packages/schema/src/**",
+      "packages/schema/test/**",
+      "packages/core/src/**",
+      "packages/core/test/**",
+      "apps/api/src/**",
+      "apps/api/tests/**",
+      "apps/web/src/features/sources/**",
+      "apps/web/test/**",
+      "packages/devtools/lint-rules/**",
+      "packages/devtools/test/**"
+    ]
+  },
+  "text": {
+    "paths": [
+      "packages/schema/src/**",
+      "packages/schema/test/**",
+      "packages/core/src/**",
+      "packages/core/test/**",
+      "apps/api/src/**",
+      "apps/api/tests/**",
+      "apps/web/src/features/sources/**",
+      "apps/web/test/**",
+      "packages/devtools/lint-rules/**",
+      "packages/devtools/test/**",
+      "apps/worker/src/better_answers_worker/**",
+      "apps/worker/tests/**",
+      "scripts/mutation-shards.mjs"
+    ]
+  },
+  "senses": [
+    {
+      "sense": "generated after the migration",
+      "paths": [
+        "packages/schema/roles-surface.json",
+        "apps/worker/src/better_answers_worker/schema_view.py"
+      ]
+    },
+    {
+      "sense": "the stored act name the map sweep writes, kept (R22)",
+      "matches": ["platform\\.graph\\.swept"]
+    },
+    {
+      "sense": "the map process's actor id, stored on the audit rows its act writes",
+      "matches": ["better-answers-graph"]
+    },
+    {
+      "sense": "Apache AGE's drop_graph, which the drill must never call",
+      "matches": ["drop_graph"]
+    },
+    {
+      "sense": "the map tables' names before migration 0067, as an older migration writes them",
+      "paths": ["packages/schema/test/migration-ownership.test.ts"],
+      "matches": ["^graph_(?:node|edge)$"]
+    },
+    {
+      "sense": "the stored values the map's migration replaced, named as stored",
+      "paths": ["packages/schema/test/job-kinds.test.ts"],
+      "matches": ["^first-sync$", "'graph'", "first-sync to first-build"]
+    },
+    {
+      "sense": "a dependency graph: pnpm's, a module's or the slices'",
+      "matches": ["(?:module|workspace's|build|slice|call|dependency) graph"]
+    }
+  ]
+}

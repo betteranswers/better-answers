@@ -16,11 +16,11 @@ Three knowledge layers, and the platform's records over them:
 
 1. **Sources** — the company's systems and documents, connected (or referenced without connection), reviewed for sensitivity, indexed for search. Sources stay where they are and keep evolving.
 2. **Bundles** — the OKF concepts: the curated map of what the company knows, one trust-bearing unit per file, written to the spec and readable without the platform. OKF's structure is explicit, graph-shaped by default, providing rich queryable, traversable context, able to be reasoned over even before any extraction has taken place. Each concept file holds its own trust and credibility signals; portable; the company's asset.
-3. **Graph** — derived from the bundles and the records: It keeps the map's shape standing as knowledge grows, and grows itself — from what each bundle already holds (people, teams, products, datasets, systems, policies) to the edges between them. 
+3. **Map** — derived from the bundles and the records: It keeps the map's shape standing as knowledge grows, and grows itself — from what each bundle already holds (people, teams, products, datasets, systems, policies) to the edges between them. 
 
 **Records** are what the platform keeps because it runs use cases: guides and their compositions, usage and outcomes, opportunities and responses, bindings, audit, review. They cite concepts by IRI and never restate them. Where a unit lives is decided by the minting rule: a concept when a company with no platform would keep it as knowledge — the client's Q&A pairs are concepts — a record when it exists only because the platform runs a use case.
 
-Every layer answers questions; the path depends on the question — search over documents, traversal over concepts and the graph as a tool that extends the bundles - "What breaks if this policy changes?" a recursive grep over files becomes one prepared graph traversal.
+Every layer answers questions; the path depends on the question — search over documents, traversal over concepts and the map as a tool that extends the bundles - "What breaks if this policy changes?" a recursive grep over files becomes one prepared map traversal.
 
 ## What a consumer sees on every concept
 
@@ -47,7 +47,7 @@ Use cases, in the order they land:
 
 ## Principles that do not move
 
-- **Simplicity through OKF.** The concept file stays to spec; the spec's silences are met in the graph and records. If a feature needs more in the file, the approach is re-evaluated. (`docs/okf-v02.md`)
+- **Simplicity through OKF.** The concept file stays to spec; the spec's silences are met in the map and records. If a feature needs more in the file, the approach is re-evaluated. (`docs/okf-v02.md`)
 - **Private by default.** A connected source counts as restricted until an Admin publishes it; personal data never enters the bundle; every call carries a principal; every answer is permission-aware.
 - **Local models are preferred**, per purpose, per workspace — the model choice keyed by purpose is what delivers it. Local *embedding* is a named precondition, triggered by the first workspace that asks for it and not by a date: it needs a model-host box the first estate has no room for.
 - **Multi-tenant-ready data model, single deployment**, UK-preferred hosting, customer-hosted later.

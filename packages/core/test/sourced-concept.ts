@@ -299,7 +299,7 @@ export type HeldVisibility = {
 
 const KEY_COLUMN = {
   concept_index: "iri",
-  graph_node: "uid",
+  map_node: "uid",
   composition: "id",
   source_binding: "id",
 } as const;
@@ -324,7 +324,7 @@ export const edgeVisibilityHeld = async (
   fromUid: string,
 ): Promise<readonly HeldVisibility[]> => {
   const read = await pool.query<HeldVisibility>(
-    "SELECT sensitivity, audience, audience_groups FROM graph_edge WHERE workspace_id = $1 AND from_uid = $2 ORDER BY uid",
+    "SELECT sensitivity, audience, audience_groups FROM map_edge WHERE workspace_id = $1 AND from_uid = $2 ORDER BY uid",
     [workspaceId, fromUid],
   );
   return read.rows;

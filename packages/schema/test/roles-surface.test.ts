@@ -19,7 +19,7 @@ import { identityOf, SECURITY_DEFINER_REACH, ulid } from "../src/index.ts";
 import { testData } from "./factory.ts";
 import { withRollback } from "./harness.ts";
 import { postgresForSuite, privilegesHeld, refusesEach } from "./probes.ts";
-import { A_GRAPH_NODE } from "./rls-probes.ts";
+import { A_MAP_NODE } from "./rls-probes.ts";
 
 /**
  * Read from the database, not parsed back out of the file: the drift test ties the two, so
@@ -325,8 +325,8 @@ describe("the functions the journal installs", () => {
           "SELECT suggestion_decides_once()",
           "a trigger's function fires under the trigger and is called by nobody directly",
         ],
-        ["SELECT graph_generation_flip_guard()", "the same for the generation flip's guard"],
-        ["SELECT graph_row_generation_guard()", "and for the guard on a map row's generation"],
+        ["SELECT map_generation_flip_guard()", "the same for the generation flip's guard"],
+        ["SELECT map_row_generation_guard()", "and for the guard on a map row's generation"],
       ]);
 
       const resolved = await client.query(
@@ -391,7 +391,7 @@ describe("the functions the journal installs", () => {
       const seed = testData(client);
       const workspace = await seed.workspace();
       const decided = await seed.suggestion({ workspaceId: workspace.id });
-      await seed.graphGeneration({ workspaceId: workspace.id, liveGen: 1 });
+      await seed.mapGeneration({ workspaceId: workspace.id, liveGen: 1 });
       await client.query("SET LOCAL ROLE app_rt");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [workspace.id]);
 
@@ -403,11 +403,11 @@ describe("the functions the journal installs", () => {
           [workspace.id, decided.id],
         ],
         [
-          "graph_generation_flip_guard",
-          "UPDATE graph_generation SET live_gen = 9 WHERE workspace_id = $1",
+          "map_generation_flip_guard",
+          "UPDATE map_generation SET live_gen = 9 WHERE workspace_id = $1",
           [workspace.id],
         ],
-        ["graph_row_generation_guard", A_GRAPH_NODE, [workspace.id, 9, ulid(), "a node"]],
+        ["map_row_generation_guard", A_MAP_NODE, [workspace.id, 9, ulid(), "a node"]],
       ] as const) {
         await client.query("SAVEPOINT guard");
         fired[guard] = await client
@@ -419,8 +419,8 @@ describe("the functions the journal installs", () => {
 
       expect(fired).toEqual({
         suggestion_decides_once: expect.stringContaining("this transaction is not making it"),
-        graph_generation_flip_guard: expect.stringContaining("a generation flips only to the next"),
-        graph_row_generation_guard: expect.stringContaining("lands in the live generation"),
+        map_generation_flip_guard: expect.stringContaining("a generation flips only to the next"),
+        map_row_generation_guard: expect.stringContaining("lands in the live generation"),
       });
     });
   });

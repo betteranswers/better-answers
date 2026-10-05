@@ -410,26 +410,26 @@ def seed_concept(
     return content
 
 
-def seed_graph_generation(
+def seed_map_generation(
     cursor: Cursor[Any],
     *,
     workspace_id: str,
     live_gen: int = 1,
 ) -> dict[str, Any]:
     cursor.execute(
-        "INSERT INTO graph_generation (workspace_id, live_gen) VALUES (%s, %s)"
+        "INSERT INTO map_generation (workspace_id, live_gen) VALUES (%s, %s)"
         " RETURNING *",
         (workspace_id, live_gen),
     )
     return _returning_row(cursor)
 
 
-def hold_graph_generation(cursor: Cursor[Any], *, workspace_id: str) -> int:
+def hold_map_generation(cursor: Cursor[Any], *, workspace_id: str) -> int:
     # The no-op update takes the row lock a rebuild beside it must wait on.
     cursor.execute(
-        "INSERT INTO graph_generation (workspace_id, live_gen) VALUES (%s, 1)"
+        "INSERT INTO map_generation (workspace_id, live_gen) VALUES (%s, 1)"
         " ON CONFLICT (workspace_id) DO UPDATE"
-        " SET live_gen = graph_generation.live_gen RETURNING live_gen",
+        " SET live_gen = map_generation.live_gen RETURNING live_gen",
         (workspace_id,),
     )
     return int(_returning_row(cursor)["live_gen"])

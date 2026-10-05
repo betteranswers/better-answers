@@ -22,7 +22,7 @@ import {
 import { recomputeCompositionsIncluding } from "../guides/index.ts";
 import type { ActorId, PlatformPrincipal, Principal } from "../kernel/index.ts";
 import { fileAt, type Committed, type GitDoor } from "../store/git/index.ts";
-import { writeConceptDelta } from "../store/graph/index.ts";
+import { writeConceptDelta } from "../store/map/index.ts";
 import { scopeClause, scopeParameter, type Tx } from "../store/postgres/index.ts";
 import { contentHashOf, parseConceptFile, type Frontmatter, type HashedSource } from "./file.ts";
 import { markDeciding } from "./inbox.ts";
@@ -286,7 +286,7 @@ const landEvidence = async (
 };
 
 /**
- * Writes the concept's identity, evidence, citations, index row, bundle commit and graph delta,
+ * Writes the concept's identity, evidence, citations, index row, bundle commit and map delta,
  * recomputes compositions when its visibility moved, and decides an accepted suggestion.
  * @throws when somebody else decided that suggestion first.
  */

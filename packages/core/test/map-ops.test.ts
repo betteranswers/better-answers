@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  GRAPH_MAINTENANCE,
-  graphCounts,
-  rebuildGraph,
-  sweepGraph,
-} from "@better-answers/core/concepts";
+import { MAP_MAINTENANCE, mapCounts, rebuildMap, sweepMap } from "@better-answers/core/concepts";
 import type { TestData } from "@better-answers/schema/testing";
 
 import { provisionedWorkspace, type ProvisionedWorkspace } from "./platform.ts";
@@ -19,13 +14,13 @@ const seeded = <T>(work: (seed: TestData) => Promise<T>): Promise<T> =>
 const arrange = (): Promise<ProvisionedWorkspace> => provisionedWorkspace(db(), "Mapped");
 
 const counting = (workspace: ProvisionedWorkspace, workspaceId: string = workspace.workspaceId) =>
-  graphCounts(GRAPH_MAINTENANCE, workspace.door, { workspaceId });
+  mapCounts(MAP_MAINTENANCE, workspace.door, { workspaceId });
 
 const sweeping = (workspace: ProvisionedWorkspace, workspaceId: string = workspace.workspaceId) =>
-  sweepGraph(GRAPH_MAINTENANCE, workspace.door, { workspaceId });
+  sweepMap(MAP_MAINTENANCE, workspace.door, { workspaceId });
 
 const rebuilding = (workspace: ProvisionedWorkspace, workspaceId: string = workspace.workspaceId) =>
-  rebuildGraph(GRAPH_MAINTENANCE, workspace.door, { workspaceId, reason: "upgrade" });
+  rebuildMap(MAP_MAINTENANCE, workspace.door, { workspaceId, reason: "upgrade" });
 
 const jobsOf = async (workspaceId: string) => {
   const found = await db().pool.query<{
@@ -41,11 +36,11 @@ const rowsOf = async (workspaceId: string, gen: number | null): Promise<[number,
   const clause = gen === null ? "gen IS NULL" : "gen = $2";
   const parameters = gen === null ? [workspaceId] : [workspaceId, gen];
   const nodes = await db().pool.query(
-    `SELECT 1 FROM graph_node WHERE workspace_id = $1 AND ${clause}`,
+    `SELECT 1 FROM map_node WHERE workspace_id = $1 AND ${clause}`,
     parameters,
   );
   const edges = await db().pool.query(
-    `SELECT 1 FROM graph_edge WHERE workspace_id = $1 AND ${clause}`,
+    `SELECT 1 FROM map_edge WHERE workspace_id = $1 AND ${clause}`,
     parameters,
   );
   return [nodes.rowCount ?? 0, edges.rowCount ?? 0];
@@ -69,15 +64,15 @@ const sweptEvents = async (
 const mapWithLeftovers = async (workspace: ProvisionedWorkspace): Promise<void> => {
   const workspaceId = workspace.workspaceId;
   await seeded(async (seed) => {
-    const live = await seed.graphNode({ workspaceId });
-    await seed.graphEdge({ workspaceId, fromUid: live.uid });
-    const person = await seed.graphNode({
+    const live = await seed.mapNode({ workspaceId });
+    await seed.mapEdge({ workspaceId, fromUid: live.uid });
+    const person = await seed.mapNode({
       workspaceId,
       gen: null,
       label: "source-entity:Person",
       kind: null,
     });
-    await seed.graphEdge({
+    await seed.mapEdge({
       workspaceId,
       gen: null,
       label: "IS_CONCEPT",
@@ -85,8 +80,8 @@ const mapWithLeftovers = async (workspace: ProvisionedWorkspace): Promise<void> 
       toUid: live.uid,
       uid: `is_concept:${person.uid}`,
     });
-    const left = await seed.graphNode({ workspaceId, gen: 2 });
-    await seed.graphEdge({ workspaceId, gen: 2, fromUid: left.uid });
+    const left = await seed.mapNode({ workspaceId, gen: 2 });
+    await seed.mapEdge({ workspaceId, gen: 2, fromUid: left.uid });
   });
 };
 
@@ -161,12 +156,12 @@ describe("sweeping a workspace's map", () => {
     await mapWithLeftovers(workspace);
 
     await seeded(async (seed) => {
-      await db().pool.query("UPDATE graph_generation SET live_gen = 2 WHERE workspace_id = $1", [
+      await db().pool.query("UPDATE map_generation SET live_gen = 2 WHERE workspace_id = $1", [
         workspace.workspaceId,
       ]);
-      const third = await seed.graphNode({ workspaceId: workspace.workspaceId, gen: 3 });
-      await seed.graphEdge({ workspaceId: workspace.workspaceId, gen: 3, fromUid: third.uid });
-      await db().pool.query("UPDATE graph_generation SET live_gen = 3 WHERE workspace_id = $1", [
+      const third = await seed.mapNode({ workspaceId: workspace.workspaceId, gen: 3 });
+      await seed.mapEdge({ workspaceId: workspace.workspaceId, gen: 3, fromUid: third.uid });
+      await db().pool.query("UPDATE map_generation SET live_gen = 3 WHERE workspace_id = $1", [
         workspace.workspaceId,
       ]);
     });
@@ -194,7 +189,7 @@ describe("sweeping a workspace's map", () => {
 
   it("sweeps nothing from a live-only map, and writes no row", async () => {
     const workspace = await arrange();
-    await seeded((seed) => seed.graphNode({ workspaceId: workspace.workspaceId }));
+    await seeded((seed) => seed.mapNode({ workspaceId: workspace.workspaceId }));
 
     const swept = await sweeping(workspace);
 
@@ -207,10 +202,10 @@ describe("sweeping a workspace's map", () => {
     const workspace = await arrange();
 
     await seeded(async (seed) => {
-      await seed.graphGeneration({ workspaceId: workspace.workspaceId, liveGen: 7 });
-      await seed.graphNode({ workspaceId: workspace.workspaceId, gen: 7 });
+      await seed.mapGeneration({ workspaceId: workspace.workspaceId, liveGen: 7 });
+      await seed.mapNode({ workspaceId: workspace.workspaceId, gen: 7 });
     });
-    await db().pool.query("DELETE FROM graph_generation WHERE workspace_id = $1", [
+    await db().pool.query("DELETE FROM map_generation WHERE workspace_id = $1", [
       workspace.workspaceId,
     ]);
 

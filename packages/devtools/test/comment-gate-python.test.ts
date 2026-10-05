@@ -65,7 +65,7 @@ describe("the Python check fires on a long or citing comment", () => {
 
   it.each([
     ["a ticket id", "# Kept because the claim protocol changed under T-243.\n"],
-    ["an ADR number", "# Kept because the graph is Postgres under ADR 0021.\n"],
+    ["an ADR number", "# Kept because the map is Postgres under ADR 0021.\n"],
     ["a rule tag", "# Kept because a raw insert lives in a factory ([TEST4]).\n"],
     ["a tag from a digit-bearing family", "# Kept because the outcome is announced ([A11Y1]).\n"],
     ["an ISO date", "# Kept because the reading of the registry moved on 2026-09-21.\n"],
@@ -294,7 +294,7 @@ describe("the Python check refuses a citation a reader cannot open", () => {
 
   it.each([
     ["a ticket id", "Ask the owner about T-243 first."],
-    ["an ADR number", "The graph is Postgres under ADR 0021."],
+    ["an ADR number", "The map is Postgres under ADR 0021."],
     ["an ISO date", "The registry moved on 2026-09-21."],
     ["a slashed date", "The registry moved on 21/09/2026."],
   ])("refuses a string citing %s", (_what, text) => {
@@ -318,7 +318,7 @@ describe("the Python check refuses a citation a reader cannot open", () => {
   });
 
   it("walks past the same string in a test", () => {
-    const inATest = { "tests/test_probe.py": 'USAGE = "The graph is Postgres under ADR 0021."\n' };
+    const inATest = { "tests/test_probe.py": 'USAGE = "The map is Postgres under ADR 0021."\n' };
 
     expect(findings(inATest)).toEqual([]);
   });

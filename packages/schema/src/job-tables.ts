@@ -13,7 +13,7 @@ export const FULL_REBUILD_KIND = "full-rebuild";
 export const INDEX_KIND = "index";
 
 export const REBUILD_REASONS = [
-  "first-sync",
+  "first-build",
   "model-choice-change",
   "reconciler",
   "erasure",

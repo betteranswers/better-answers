@@ -43,9 +43,9 @@ import {
   conceptIndex,
   conceptVerification,
   erasureRequest,
-  graphEdge,
-  graphGeneration,
-  graphNode,
+  mapEdge,
+  mapGeneration,
+  mapNode,
   job,
   sourceDocument,
   suppression,
@@ -179,10 +179,10 @@ const mapped = async (app: TestApp, workspaceId: string): Promise<void> => {
   const client = await app.database.superuser.connect();
   try {
     const seed = testData(client);
-    const entry = await seed.graphNode({ workspaceId });
-    await seed.graphEdge({ workspaceId, fromUid: entry.uid });
-    const left = await seed.graphNode({ workspaceId, gen: 2 });
-    await seed.graphEdge({ workspaceId, gen: 2, fromUid: left.uid });
+    const entry = await seed.mapNode({ workspaceId });
+    await seed.mapEdge({ workspaceId, fromUid: entry.uid });
+    const left = await seed.mapNode({ workspaceId, gen: 2 });
+    await seed.mapEdge({ workspaceId, gen: 2, fromUid: left.uid });
   } finally {
     client.release();
   }
@@ -196,9 +196,9 @@ const BOOTSTRAP_ACTOR = "process:better-answers-bootstrap";
 
 /** Table objects, never names, so a renamed table renames what each command must find. */
 const SLICE_TABLES: Readonly<Record<string, readonly Table[]>> = {
-  "graph-rebuild": [graphGeneration, graphNode, graphEdge, job],
-  "graph-sweep": [graphGeneration, graphNode, graphEdge],
-  "graph-counts": [graphGeneration, graphNode, graphEdge],
+  "map-rebuild": [mapGeneration, mapNode, mapEdge, job],
+  "map-sweep": [mapGeneration, mapNode, mapEdge],
+  "map-counts": [mapGeneration, mapNode, mapEdge],
   "reconcile-watermark": [conceptIndex, bundleCommit],
   "object-store-orphans": [sourceDocument],
   "erasure-rehearsal": [erasureRequest, suppression],
@@ -558,7 +558,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
   it("answers usage to a missing or unknown command, never guessing", async () => {
     expect((await ops(app(), [])).exitCode).toBe(2);
     expect((await ops(app(), ["make-it-so"])).exitCode).toBe(2);
-    expect((await ops(app(), ["graph-counts"])).exitCode).toBe(2);
+    expect((await ops(app(), ["map-counts"])).exitCode).toBe(2);
     expect((await ops(app(), ["replay-erasures"])).exitCode).toBe(2);
   });
 
@@ -573,7 +573,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
   );
 
   it("prints a refusal's word and exits with its class's code", async () => {
-    const run = await ops(app(), ["graph-counts", "--workspace", "not-a-workspace-id"]);
+    const run = await ops(app(), ["map-counts", "--workspace", "not-a-workspace-id"]);
 
     expect(run.exitCode).toBe(2);
     expect(run.lines.join("\n")).toContain("REFUSED — malformed");
@@ -861,16 +861,16 @@ describe("pnpm ops — the restore scripts' commands", () => {
             "reconcile-watermark: done — head none, watermark none, replayed 0, already landed 0",
         },
         {
-          command: "graph-rebuild",
+          command: "map-rebuild",
           flags: [],
           exitCode: 0,
-          first: expect.stringMatching(/^graph-rebuild: done — enqueued [0-9A-HJKMNP-TV-Z]{26}$/),
+          first: expect.stringMatching(/^map-rebuild: done — enqueued [0-9A-HJKMNP-TV-Z]{26}$/),
         },
         {
-          command: "graph-sweep",
+          command: "map-sweep",
           flags: [],
           exitCode: 0,
-          first: "graph-sweep: done — nothing to sweep",
+          first: "map-sweep: done — nothing to sweep",
         },
         {
           command: "object-store-orphans",
@@ -880,7 +880,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
             "object-store-orphans: done — 0 objects past the 24-hour grace no document names, removed none",
         },
         {
-          command: "graph-counts",
+          command: "map-counts",
           flags: [],
           exitCode: 0,
           first: '{"live_gen":null,"nodes":{},"edges":{}}',
@@ -1265,11 +1265,11 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
   });
 
-  describe("graph-rebuild — the map made again, on the worker's queue", () => {
+  describe("map-rebuild — the map made again, on the worker's queue", () => {
     it("queues a drill's full rebuild and answers the job's id", async () => {
       const { workspaceId } = await app().provision();
 
-      const run = await ops(app(), ["graph-rebuild", "--workspace", workspaceId]);
+      const run = await ops(app(), ["map-rebuild", "--workspace", workspaceId]);
 
       expect(run.exitCode).toBe(0);
       const queued = await jobsOf(app(), workspaceId);
@@ -1277,14 +1277,14 @@ describe("pnpm ops — the restore scripts' commands", () => {
       expect(queued).toEqual([
         { id: expect.any(String), kind: "full-rebuild", reason: "drill", status: "queued" },
       ]);
-      expect(run.lines).toEqual([`graph-rebuild: done — enqueued ${queued[0]?.id}`]);
+      expect(run.lines).toEqual([`map-rebuild: done — enqueued ${queued[0]?.id}`]);
     });
 
     it("takes the caller's reason from among the six", async () => {
       const { workspaceId } = await app().provision();
 
       const run = await ops(app(), [
-        "graph-rebuild",
+        "map-rebuild",
         "--workspace",
         workspaceId,
         "--reason",
@@ -1299,7 +1299,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const { workspaceId } = await app().provision();
 
       const run = await ops(app(), [
-        "graph-rebuild",
+        "map-rebuild",
         "--workspace",
         workspaceId,
         "--reason",
@@ -1311,11 +1311,11 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
 
     it("refuses a non-id workspace as malformed, naming its flag", async () => {
-      const run = await ops(app(), ["graph-rebuild", "--workspace", "ws_synthetic"]);
+      const run = await ops(app(), ["map-rebuild", "--workspace", "ws_synthetic"]);
 
       expect(run.exitCode).toBe(2);
       expect(run.lines).toEqual([
-        "graph-rebuild: REFUSED — malformed: --workspace ws_synthetic is not a workspace id",
+        "map-rebuild: REFUSED — malformed: --workspace ws_synthetic is not a workspace id",
       ]);
     });
 
@@ -1326,7 +1326,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     ])("answers usage to %s, queueing nothing", async (_shape, flags) => {
       const { workspaceId } = await app().provision();
 
-      const run = await ops(app(), ["graph-rebuild", "--workspace", workspaceId, ...flags]);
+      const run = await ops(app(), ["map-rebuild", "--workspace", workspaceId, ...flags]);
 
       expect(run.exitCode).toBe(2);
       expect(await jobsOf(app(), workspaceId)).toEqual([]);
@@ -1345,7 +1345,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
     it("waits for its job, done once the worker finishes it", async () => {
       const { workspaceId } = await app().provision();
 
-      const waiting = ops(app(), ["graph-rebuild", "--workspace", workspaceId, "--wait"]);
+      const waiting = ops(app(), ["map-rebuild", "--workspace", workspaceId, "--wait"]);
       await finishTheJob(app(), workspaceId, "done");
       const run = await waiting;
 
@@ -1358,7 +1358,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       async (status) => {
         const { workspaceId } = await app().provision();
 
-        const waiting = ops(app(), ["graph-rebuild", "--workspace", workspaceId, "--wait"]);
+        const waiting = ops(app(), ["map-rebuild", "--workspace", workspaceId, "--wait"]);
         await finishTheJob(app(), workspaceId, status);
         const run = await waiting;
 
@@ -1372,7 +1372,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
       const { workspaceId } = await app().provision();
 
       const run = await ops(app(), [
-        "graph-rebuild",
+        "map-rebuild",
         "--workspace",
         workspaceId,
         "--wait-seconds",
@@ -1385,12 +1385,12 @@ describe("pnpm ops — the restore scripts' commands", () => {
     });
   });
 
-  describe("graph-counts — nodes per label and edges, as JSON", () => {
+  describe("map-counts — nodes per label and edges, as JSON", () => {
     it("answers the live generation's counts on one diffable line", async () => {
       const { workspaceId } = await app().provision();
       await mapped(app(), workspaceId);
 
-      const run = await ops(app(), ["graph-counts", "--workspace", workspaceId]);
+      const run = await ops(app(), ["map-counts", "--workspace", workspaceId]);
 
       expect(run.exitCode).toBe(0);
 
@@ -1405,30 +1405,30 @@ describe("pnpm ops — the restore scripts' commands", () => {
     it("answers zero of everything for an unmapped workspace, never refusing", async () => {
       const { workspaceId } = await app().provision();
 
-      const run = await ops(app(), ["graph-counts", "--workspace", workspaceId]);
+      const run = await ops(app(), ["map-counts", "--workspace", workspaceId]);
 
       expect(run.exitCode).toBe(0);
       expect(answered(run)).toEqual({ live_gen: null, nodes: {}, edges: {} });
     });
 
     it("answers usage to a non-id workspace before reading anything", async () => {
-      const run = await ops(app(), ["graph-counts", "--workspace", "ws_synthetic"]);
+      const run = await ops(app(), ["map-counts", "--workspace", "ws_synthetic"]);
 
       expect(run.exitCode).toBe(2);
     });
   });
 
-  describe("graph-sweep — the generations a finished rebuild left behind", () => {
+  describe("map-sweep — the generations a finished rebuild left behind", () => {
     it("sweeps all but the live generation, saying what each held", async () => {
       const { workspaceId } = await app().provision();
       await mapped(app(), workspaceId);
 
-      const run = await ops(app(), ["graph-sweep", "--workspace", workspaceId, "--wait"]);
+      const run = await ops(app(), ["map-sweep", "--workspace", workspaceId, "--wait"]);
 
       expect(run.exitCode).toBe(0);
-      expect(run.lines).toEqual(["graph-sweep: done — swept generation 2 (2 nodes, 1 edge)"]);
+      expect(run.lines).toEqual(["map-sweep: done — swept generation 2 (2 nodes, 1 edge)"]);
 
-      const counted = await ops(app(), ["graph-counts", "--workspace", workspaceId]);
+      const counted = await ops(app(), ["map-counts", "--workspace", workspaceId]);
       expect(answered(counted)).toEqual({
         live_gen: 1,
         nodes: { Concept: 2 },
@@ -1439,14 +1439,14 @@ describe("pnpm ops — the restore scripts' commands", () => {
     it("sweeps nothing when only the live generation stands", async () => {
       const { workspaceId } = await app().provision();
 
-      const run = await ops(app(), ["graph-sweep", "--workspace", workspaceId]);
+      const run = await ops(app(), ["map-sweep", "--workspace", workspaceId]);
 
       expect(run.exitCode).toBe(0);
-      expect(run.lines).toEqual(["graph-sweep: done — nothing to sweep"]);
+      expect(run.lines).toEqual(["map-sweep: done — nothing to sweep"]);
     });
 
     it("answers usage to a non-id workspace before deleting anything", async () => {
-      const run = await ops(app(), ["graph-sweep", "--workspace", "ws_synthetic"]);
+      const run = await ops(app(), ["map-sweep", "--workspace", "ws_synthetic"]);
 
       expect(run.exitCode).toBe(2);
     });
@@ -1454,7 +1454,7 @@ describe("pnpm ops — the restore scripts' commands", () => {
 
   describe("the two sweeps by hand never overlap the daily pass", () => {
     it.each([
-      ["graph-sweep", "graph-sweep: done — nothing to sweep"],
+      ["map-sweep", "map-sweep: done — nothing to sweep"],
       [
         "object-store-orphans",
         "object-store-orphans: done — removed 0 objects past the 24-hour grace no document names",

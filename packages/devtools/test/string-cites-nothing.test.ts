@@ -24,7 +24,7 @@ describe("the string rule refuses a citation a reader cannot open", () => {
   });
 
   it.each([
-    ["an ADR number", "The graph is Postgres under ADR 0021."],
+    ["an ADR number", "The map is Postgres under ADR 0021."],
     ["an ISO date", "The registry moved on 2026-09-21."],
     ["a slashed date", "The registry moved on 21/09/2026."],
     ["a rule tag", "A raw insert lives in a factory ([TEST4])."],
@@ -81,7 +81,7 @@ describe("the string rule walks past a string citing nothing", () => {
 
   it("walks past the same string in a test", () => {
     const inATest = {
-      "tests/probe.ts": 'export const usage = "The graph is Postgres under ADR 0021.";\n',
+      "tests/probe.ts": 'export const usage = "The map is Postgres under ADR 0021.";\n',
     };
 
     expect(lint.flagged(inATest)).toEqual([]);

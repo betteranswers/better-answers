@@ -99,7 +99,7 @@ const accepted = async (
 const nodesAt = async (workspaceId: string, gen: number) => {
   const rows = await db().pool.query(
     `SELECT uid, label, kind, published_at, sensitivity, audience, audience_groups
-       FROM graph_node WHERE workspace_id = $1 AND gen = $2 ORDER BY uid`,
+       FROM map_node WHERE workspace_id = $1 AND gen = $2 ORDER BY uid`,
     [workspaceId, gen],
   );
   return rows.rows;
@@ -109,7 +109,7 @@ const edgesAt = async (workspaceId: string, gen: number) => {
   const rows = await db().pool.query(
     `SELECT uid, label, from_uid, to_uid, from_kind, to_kind, section, sentence,
             published_at, sensitivity, audience, audience_groups
-       FROM graph_edge WHERE workspace_id = $1 AND gen = $2 ORDER BY uid`,
+       FROM map_edge WHERE workspace_id = $1 AND gen = $2 ORDER BY uid`,
     [workspaceId, gen],
   );
   return rows.rows;
@@ -117,7 +117,7 @@ const edgesAt = async (workspaceId: string, gen: number) => {
 
 const liveGenerationOf = async (workspaceId: string): Promise<number | undefined> => {
   const rows = await db().pool.query<{ live_gen: number }>(
-    "SELECT live_gen FROM graph_generation WHERE workspace_id = $1",
+    "SELECT live_gen FROM map_generation WHERE workspace_id = $1",
     [workspaceId],
   );
   return rows.rows[0]?.live_gen;

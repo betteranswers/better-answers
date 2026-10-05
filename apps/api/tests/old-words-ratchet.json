@@ -47,7 +47,6 @@
     "act": 1,
     "bundle": 2,
     "chunk": 4,
-    "graph": 1,
     "object store": 1,
     "run": 4
   },

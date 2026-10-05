@@ -51,9 +51,9 @@ export type WalkStep = {
   readonly path: readonly string[];
 };
 
-export const GRAPH_WALK_DEPTH = 4;
+export const MAP_WALK_DEPTH = 4;
 
-export const GRAPH_WALK_ROW_LIMIT = 1_000;
+export const MAP_WALK_ROW_LIMIT = 1_000;
 
 const LINK_DEFINITION = /^ {0,3}\[([^\]]+)\]:\s*(\S+)/gm;
 
@@ -324,13 +324,13 @@ const replaceOutgoingEdges = async (gen: number, tx: Tx, concept: EdgeSource): P
   const workspaceId = concept.workspaceId;
   const edges = await resolveOutgoing(tx, concept);
   await tx.query(
-    `DELETE FROM graph_edge
+    `DELETE FROM map_edge
       WHERE workspace_id = $1 AND gen = $2 AND from_uid = $3 AND label = ANY($4::text[])`,
     [workspaceId, gen, concept.iri, DERIVED_EDGE_LABELS],
   );
   for (const edge of edges) {
     await tx.query(
-      `INSERT INTO graph_edge (workspace_id, gen, uid, label, from_uid, to_uid, from_kind,
+      `INSERT INTO map_edge (workspace_id, gen, uid, label, from_uid, to_uid, from_kind,
                                to_kind, section, sentence, published_at, sensitivity, audience,
                                audience_groups)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
@@ -359,8 +359,8 @@ const namePattern = (filename: string): string =>
 
 const liveGeneration = async (workspaceId: string, tx: Tx): Promise<number> => {
   const row = await tx.query<{ live_gen: number }>(
-    `INSERT INTO graph_generation (workspace_id, live_gen) VALUES ($1, 1)
-     ON CONFLICT (workspace_id) DO UPDATE SET live_gen = graph_generation.live_gen
+    `INSERT INTO map_generation (workspace_id, live_gen) VALUES ($1, 1)
+     ON CONFLICT (workspace_id) DO UPDATE SET live_gen = map_generation.live_gen
      RETURNING live_gen`,
     [workspaceId],
   );
@@ -372,7 +372,7 @@ const liveGeneration = async (workspaceId: string, tx: Tx): Promise<number> => {
 
 const existingLiveGen = async (workspaceId: string, tx: Tx): Promise<number | null> => {
   const live = await tx.query<{ live_gen: number }>(
-    "SELECT live_gen FROM graph_generation WHERE workspace_id = $1",
+    "SELECT live_gen FROM map_generation WHERE workspace_id = $1",
     [workspaceId],
   );
   return live.rows[0]?.live_gen ?? null;
@@ -392,13 +392,13 @@ export const writeConceptDelta = async (
   const gen = await liveGeneration(workspaceId, tx);
 
   const mapped = await tx.query(
-    "SELECT 1 FROM graph_node WHERE workspace_id = $1 AND gen = $2 AND uid = $3",
+    "SELECT 1 FROM map_node WHERE workspace_id = $1 AND gen = $2 AND uid = $3",
     [workspaceId, gen, delta.iri],
   );
   const isNew = mapped.rowCount === 0;
 
   await tx.query(
-    `INSERT INTO graph_node (workspace_id, gen, uid, label, kind, published_at, sensitivity,
+    `INSERT INTO map_node (workspace_id, gen, uid, label, kind, published_at, sensitivity,
                              audience, audience_groups)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      ON CONFLICT (workspace_id, gen, uid) WHERE gen IS NOT NULL
@@ -418,17 +418,17 @@ export const writeConceptDelta = async (
     ],
   );
   await tx.query(
-    `UPDATE graph_edge SET to_kind = $4
+    `UPDATE map_edge SET to_kind = $4
       WHERE workspace_id = $1 AND gen = $2 AND label = '${LINKS_TO_LABEL}' AND to_uid = $3
         AND to_kind IS DISTINCT FROM $4`,
     [workspaceId, gen, delta.iri, delta.kind],
   );
 
   await tx.query(
-    `UPDATE graph_edge SET label = CASE
-        WHEN $4 AND EXISTS (SELECT 1 FROM graph_node n
+    `UPDATE map_edge SET label = CASE
+        WHEN $4 AND EXISTS (SELECT 1 FROM map_node n
                              WHERE n.workspace_id = $1 AND n.gen = $2
-                               AND n.uid = graph_edge.from_uid AND n.kind = $5)
+                               AND n.uid = map_edge.from_uid AND n.kind = $5)
         THEN '${SUPERSEDES_LABEL}' ELSE '${DERIVED_FROM_LABEL}' END
       WHERE workspace_id = $1 AND gen = $2 AND to_uid = $3
         AND label IN ('${SUPERSEDES_LABEL}', '${DERIVED_FROM_LABEL}')`,
@@ -483,12 +483,12 @@ export const writeConceptVisibility = async (
     visibility.audienceGroups,
   ];
   await tx.query(
-    `UPDATE graph_node SET sensitivity = $4, audience = $5, audience_groups = $6
+    `UPDATE map_node SET sensitivity = $4, audience = $5, audience_groups = $6
       WHERE workspace_id = $1 AND gen = $2 AND uid = $3`,
     columns,
   );
   await tx.query(
-    `UPDATE graph_edge SET sensitivity = $4, audience = $5, audience_groups = $6
+    `UPDATE map_edge SET sensitivity = $4, audience = $5, audience_groups = $6
       WHERE workspace_id = $1 AND gen = $2 AND from_uid = $3 AND label = ANY($7::text[])`,
     [...columns, DERIVED_EDGE_LABELS],
   );
@@ -501,28 +501,28 @@ export const writeConceptVisibility = async (
 const walkStatement = (outward: boolean): string => {
   const [source, sink] = outward ? ["from_uid", "to_uid"] : ["to_uid", "from_uid"];
   return `WITH RECURSIVE live AS (
-    SELECT live_gen FROM graph_generation WHERE workspace_id = $1
+    SELECT live_gen FROM map_generation WHERE workspace_id = $1
   ),
   walk AS (
     SELECT n.uid, n.label, n.kind, 0 AS depth, ARRAY[n.uid] AS path
-      FROM graph_node n
+      FROM map_node n
       JOIN live ON n.gen IS NULL OR n.gen = live.live_gen
      WHERE n.workspace_id = $1 AND n.uid = $2
        AND ${readableClause("n", 3)}
     UNION ALL
     SELECT m.uid, m.label, m.kind, w.depth + 1, w.path || m.uid
       FROM walk w
-      JOIN graph_edge e ON e.workspace_id = $1 AND e.${source} = w.uid
+      JOIN map_edge e ON e.workspace_id = $1 AND e.${source} = w.uid
       JOIN live edge_live ON e.gen IS NULL OR e.gen = edge_live.live_gen
-      JOIN graph_node m ON m.workspace_id = $1 AND m.uid = e.${sink}
+      JOIN map_node m ON m.workspace_id = $1 AND m.uid = e.${sink}
       JOIN live node_live ON m.gen IS NULL OR m.gen = node_live.live_gen
-     WHERE w.depth < ${GRAPH_WALK_DEPTH}
+     WHERE w.depth < ${MAP_WALK_DEPTH}
        AND m.uid <> ALL(w.path)
        AND ${readableClause("e", 3)}
        AND ${readableClause("m", 3)}
   )
   SELECT uid, label, kind, depth, path
-    FROM (SELECT uid, label, kind, depth, path FROM walk LIMIT ${GRAPH_WALK_ROW_LIMIT}) reached
+    FROM (SELECT uid, label, kind, depth, path FROM walk LIMIT ${MAP_WALK_ROW_LIMIT}) reached
    ORDER BY depth, uid`;
 };
 
@@ -544,8 +544,8 @@ const walk = async (
 };
 
 /**
- * One step per acyclic path out of `uid`, the start at depth 0, to GRAPH_WALK_DEPTH hops and at
- * most GRAPH_WALK_ROW_LIMIT rows. A path stops at the first node or edge the principal cannot
+ * One step per acyclic path out of `uid`, the start at depth 0, to MAP_WALK_DEPTH hops and at
+ * most MAP_WALK_ROW_LIMIT rows. A path stops at the first node or edge the principal cannot
  * read. With no live generation the walk finds nothing.
  */
 export const walkFrom = (
@@ -561,21 +561,21 @@ export const walkTo = (
   uid: string,
 ): Promise<readonly WalkStep[]> => walk(WALK_TO, principal, tx, uid);
 
-export type GraphCounts = {
+export type MapCounts = {
   readonly liveGen: number | null;
   readonly nodes: Readonly<Record<string, number>>;
   readonly edges: Readonly<Record<string, number>>;
 };
 
-const countsStatement = (table: "graph_node" | "graph_edge"): string =>
+const countsStatement = (table: "map_node" | "map_edge"): string =>
   `SELECT label, count(*)::int AS count
      FROM ${table}
     WHERE workspace_id = $1 AND (gen IS NULL OR gen = $2::int)
     GROUP BY label
     ORDER BY label`;
 
-const COUNT_NODES = countsStatement("graph_node");
-const COUNT_EDGES = countsStatement("graph_edge");
+const COUNT_NODES = countsStatement("map_node");
+const COUNT_EDGES = countsStatement("map_edge");
 
 const countsOf = async (
   statement: string,
@@ -595,7 +595,7 @@ export const countMap = async (
   platform: PlatformPrincipal,
   tx: Tx,
   workspaceId: string,
-): Promise<GraphCounts> => {
+): Promise<MapCounts> => {
   const liveGen = await existingLiveGen(workspaceId, tx);
   return {
     liveGen,
@@ -612,15 +612,15 @@ export type SweptGeneration = {
 
 /** A missing generation row makes the `<>` comparison NULL, which deletes nothing. */
 const SWEEP = `WITH live AS (
-    SELECT live_gen FROM graph_generation WHERE workspace_id = $1
+    SELECT live_gen FROM map_generation WHERE workspace_id = $1
   ),
   swept_nodes AS (
-    DELETE FROM graph_node
+    DELETE FROM map_node
      WHERE workspace_id = $1 AND gen IS NOT NULL AND gen <> (SELECT live_gen FROM live)
     RETURNING gen
   ),
   swept_edges AS (
-    DELETE FROM graph_edge
+    DELETE FROM map_edge
      WHERE workspace_id = $1 AND gen IS NOT NULL AND gen <> (SELECT live_gen FROM live)
     RETURNING gen
   ),

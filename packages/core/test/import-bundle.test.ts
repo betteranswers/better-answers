@@ -752,7 +752,7 @@ describe("the second pass: each relative link becomes its concept's iri", () => 
       "knowledge.concept.committed",
     ]);
     const edges = await db().pool.query<{ from_uid: string; to_uid: string }>(
-      `SELECT from_uid, to_uid FROM graph_edge
+      `SELECT from_uid, to_uid FROM map_edge
         WHERE workspace_id = $1 AND label = 'LINKS_TO' ORDER BY from_uid, uid`,
       [scenario.workspaceId],
     );

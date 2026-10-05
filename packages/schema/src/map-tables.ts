@@ -6,7 +6,7 @@ import { AUDIENCE_CHECK, readableUnitColumns, SENSITIVITIES } from "./readable-c
 import { withRLS } from "./with-rls.ts";
 import { workspace } from "./workspace-table.ts";
 
-export const GRAPH_NODE_LABELS = [
+export const MAP_NODE_LABELS = [
   "Concept",
   "Section",
   "Source",
@@ -16,9 +16,9 @@ export const GRAPH_NODE_LABELS = [
   "CanonicalEntity",
 ] as const;
 
-export const CONCEPT_NODE_LABEL = "Concept" satisfies (typeof GRAPH_NODE_LABELS)[number];
+export const CONCEPT_NODE_LABEL = "Concept" satisfies (typeof MAP_NODE_LABELS)[number];
 
-export const GRAPH_EDGE_LABELS = [
+export const MAP_EDGE_LABELS = [
   "LINKS_TO",
   "SUPERSEDES",
   "CITES",
@@ -27,19 +27,19 @@ export const GRAPH_EDGE_LABELS = [
   "SAME_AS",
 ] as const;
 
-export const LINKS_TO_LABEL = "LINKS_TO" satisfies (typeof GRAPH_EDGE_LABELS)[number];
-export const SUPERSEDES_LABEL = "SUPERSEDES" satisfies (typeof GRAPH_EDGE_LABELS)[number];
-export const DERIVED_FROM_LABEL = "DERIVED_FROM" satisfies (typeof GRAPH_EDGE_LABELS)[number];
+export const LINKS_TO_LABEL = "LINKS_TO" satisfies (typeof MAP_EDGE_LABELS)[number];
+export const SUPERSEDES_LABEL = "SUPERSEDES" satisfies (typeof MAP_EDGE_LABELS)[number];
+export const DERIVED_FROM_LABEL = "DERIVED_FROM" satisfies (typeof MAP_EDGE_LABELS)[number];
 
 export const SOURCE_ENTITY_LABEL_PREFIX = "source-entity:";
 
-const nodeLabelCheck = `(gen IS NOT NULL AND label IN (${listed(GRAPH_NODE_LABELS)})) OR (gen IS NULL AND label LIKE '${SOURCE_ENTITY_LABEL_PREFIX}%')`;
+const nodeLabelCheck = `(gen IS NOT NULL AND label IN (${listed(MAP_NODE_LABELS)})) OR (gen IS NULL AND label LIKE '${SOURCE_ENTITY_LABEL_PREFIX}%')`;
 
-const edgeLabelCheck = `label IN (${listed(GRAPH_EDGE_LABELS)}) OR (gen IS NULL AND label LIKE '${SOURCE_ENTITY_LABEL_PREFIX}%')`;
+const edgeLabelCheck = `label IN (${listed(MAP_EDGE_LABELS)}) OR (gen IS NULL AND label LIKE '${SOURCE_ENTITY_LABEL_PREFIX}%')`;
 
 const genCheck = "gen IS NULL OR gen > 0";
 
-const graphRowColumns = () => ({
+const mapRowColumns = () => ({
   workspaceId: text("workspace_id")
     .notNull()
     .references(() => workspace.id, { onDelete: "cascade" }),
@@ -49,7 +49,7 @@ const graphRowColumns = () => ({
 });
 
 const partitionKeys = (
-  prefix: "graph_node" | "graph_edge",
+  prefix: "map_node" | "map_edge",
   table: Readonly<Record<"workspaceId" | "gen" | "uid", AnyPgColumn>>,
 ) => [
   uniqueIndex(`${prefix}_bundle_uidx`)
@@ -60,8 +60,8 @@ const partitionKeys = (
     .where(sql`gen IS NULL`),
 ];
 
-export const graphGeneration = withRLS(
-  "graph_generation",
+export const mapGeneration = withRLS(
+  "map_generation",
   {
     workspaceId: text("workspace_id")
       .primaryKey()
@@ -69,32 +69,32 @@ export const graphGeneration = withRLS(
     liveGen: integer("live_gen").notNull(),
   },
   "workspaceId",
-  () => [check("graph_generation_live_gen_check", sql.raw("live_gen > 0"))],
+  () => [check("map_generation_live_gen_check", sql.raw("live_gen > 0"))],
 );
 
-export const graphNode = withRLS(
-  "graph_node",
+export const mapNode = withRLS(
+  "map_node",
   {
-    ...graphRowColumns(),
+    ...mapRowColumns(),
 
     kind: text("kind"),
     ...readableUnitColumns(),
   },
   "workspaceId",
   (table) => [
-    ...partitionKeys("graph_node", table),
-    index("graph_node_kind_idx").on(table.workspaceId, table.kind),
-    check("graph_node_label_check", sql.raw(nodeLabelCheck)),
-    check("graph_node_gen_check", sql.raw(genCheck)),
-    check("graph_node_sensitivity_check", sql.raw(`sensitivity IN (${listed(SENSITIVITIES)})`)),
-    check("graph_node_audience_check", sql.raw(AUDIENCE_CHECK)),
+    ...partitionKeys("map_node", table),
+    index("map_node_kind_idx").on(table.workspaceId, table.kind),
+    check("map_node_label_check", sql.raw(nodeLabelCheck)),
+    check("map_node_gen_check", sql.raw(genCheck)),
+    check("map_node_sensitivity_check", sql.raw(`sensitivity IN (${listed(SENSITIVITIES)})`)),
+    check("map_node_audience_check", sql.raw(AUDIENCE_CHECK)),
   ],
 );
 
-export const graphEdge = withRLS(
-  "graph_edge",
+export const mapEdge = withRLS(
+  "map_edge",
   {
-    ...graphRowColumns(),
+    ...mapRowColumns(),
     fromUid: text("from_uid").notNull(),
     toUid: text("to_uid").notNull(),
     fromKind: text("from_kind"),
@@ -106,16 +106,16 @@ export const graphEdge = withRLS(
   },
   "workspaceId",
   (table) => [
-    ...partitionKeys("graph_edge", table),
+    ...partitionKeys("map_edge", table),
 
-    index("graph_edge_from_idx").on(table.workspaceId, table.fromUid),
-    index("graph_edge_to_idx").on(table.workspaceId, table.toUid),
-    check("graph_edge_label_check", sql.raw(edgeLabelCheck)),
-    check("graph_edge_gen_check", sql.raw(genCheck)),
-    check("graph_edge_sensitivity_check", sql.raw(`sensitivity IN (${listed(SENSITIVITIES)})`)),
-    check("graph_edge_audience_check", sql.raw(AUDIENCE_CHECK)),
+    index("map_edge_from_idx").on(table.workspaceId, table.fromUid),
+    index("map_edge_to_idx").on(table.workspaceId, table.toUid),
+    check("map_edge_label_check", sql.raw(edgeLabelCheck)),
+    check("map_edge_gen_check", sql.raw(genCheck)),
+    check("map_edge_sensitivity_check", sql.raw(`sensitivity IN (${listed(SENSITIVITIES)})`)),
+    check("map_edge_audience_check", sql.raw(AUDIENCE_CHECK)),
     check(
-      "graph_edge_links_to_check",
+      "map_edge_links_to_check",
       sql.raw(
         `label = 'LINKS_TO' OR (from_kind IS NULL AND to_kind IS NULL AND section IS NULL AND sentence IS NULL)`,
       ),

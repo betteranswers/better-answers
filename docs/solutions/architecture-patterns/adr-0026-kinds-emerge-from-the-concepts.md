@@ -7,7 +7,7 @@ component: knowledge-layer
 severity: medium
 applies_when:
   - "Adding a field, a table or a check that lists or validates concept types"
-  - "Adding an edge label to the graph, or a relation between concepts"
+  - "Adding an edge label to the map, or a relation between concepts"
   - "Renaming or merging a kind, or changing how concept identity is keyed"
   - "Handling an alias, a tag or the definition of a company word"
 tags:

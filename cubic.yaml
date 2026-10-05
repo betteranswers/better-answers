@@ -112,7 +112,7 @@ reviews:
       description: |-
         Rule "Take a `Principal` as the first parameter". Every `packages/core` function that reads or writes tenant data takes a `Principal` (`workspaceId`, `userId`, `role`) as its first parameter; transports build it, business logic checks the role, the role's action threshold and the read predicate (published, sensitivity, audience) beside the data access.
 
-        Flag a function that reaches a table, a store door or the graph and takes no `Principal` first, or takes one later in its parameter list, or takes a bare `workspaceId` string in place of one. Flag a transport that trusts a user-supplied workspace, organisation or account identifier instead of deriving it from the verified session or bearer token, and flag a request body accepted without runtime validation.
+        Flag a function that reaches a table, a store door or the map and takes no `Principal` first, or takes one later in its parameter list, or takes a bare `workspaceId` string in place of one. Flag a transport that trusts a user-supplied workspace, organisation or account identifier instead of deriving it from the verified session or bearer token, and flag a request body accepted without runtime validation.
 
         Flag a read that checks the workspace but skips the read predicate, and flag a read predicate tested against a source binding's fields rather than against the `published_at`, `sensitivity` and `audience` columns on the readable unit itself — a concept and a composition have no binding (ADR 0023).
 

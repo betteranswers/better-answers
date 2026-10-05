@@ -2,7 +2,7 @@ import pg from "pg";
 import { describe, expect, it } from "vitest";
 
 import { commit, head, PLATFORM_BOT, withRepositoryLock } from "@better-answers/core/store/git";
-import { walkFrom } from "@better-answers/core/store/graph";
+import { walkFrom } from "@better-answers/core/store/map";
 import { conceptIriOf, ulid } from "@better-answers/schema";
 import { testData } from "@better-answers/schema/testing";
 
@@ -119,8 +119,8 @@ const rowsFor = async (workspaceId: string) => {
             (SELECT count(*) FROM bundle_commit WHERE workspace_id = $1) AS commits,
             (SELECT count(*) FROM evidence WHERE workspace_id = $1) AS evidence,
             (SELECT count(*) FROM audit_event WHERE workspace_id = $1) AS events,
-            (SELECT count(*) FROM graph_node WHERE workspace_id = $1) AS nodes,
-            (SELECT count(*) FROM graph_edge WHERE workspace_id = $1) AS edges`,
+            (SELECT count(*) FROM map_node WHERE workspace_id = $1) AS nodes,
+            (SELECT count(*) FROM map_edge WHERE workspace_id = $1) AS edges`,
     [workspaceId],
   );
   return counted.rows[0];
@@ -618,7 +618,7 @@ describe("the map a governed write leaves behind", () => {
     }));
 
     const nodes = await db().pool.query(
-      "SELECT uid, label, kind, gen, sensitivity, audience FROM graph_node WHERE workspace_id = $1 ORDER BY kind",
+      "SELECT uid, label, kind, gen, sensitivity, audience FROM map_node WHERE workspace_id = $1 ORDER BY kind",
       [scenario.workspaceId],
     );
     expect(nodes.rows).toEqual([
@@ -641,7 +641,7 @@ describe("the map a governed write leaves behind", () => {
     ]);
 
     const edges = await db().pool.query(
-      "SELECT uid, label, from_uid, to_uid, from_kind, to_kind, section, sentence FROM graph_edge WHERE workspace_id = $1",
+      "SELECT uid, label, from_uid, to_uid, from_kind, to_kind, section, sentence FROM map_edge WHERE workspace_id = $1",
       [scenario.workspaceId],
     );
     expect(edges.rows).toEqual([
@@ -685,7 +685,7 @@ describe("the map a governed write leaves behind", () => {
     const written = await landed(scenario, travel);
 
     const edges = await db().pool.query(
-      "SELECT from_uid, to_uid, to_kind FROM graph_edge WHERE workspace_id = $1",
+      "SELECT from_uid, to_uid, to_kind FROM map_edge WHERE workspace_id = $1",
       [scenario.workspaceId],
     );
     expect(edges.rows).toEqual([
@@ -707,7 +707,7 @@ describe("the map a governed write leaves behind", () => {
     }));
 
     const edges = await db().pool.query(
-      "SELECT uid, to_uid, to_kind, section, sentence FROM graph_edge WHERE workspace_id = $1 ORDER BY uid",
+      "SELECT uid, to_uid, to_kind, section, sentence FROM map_edge WHERE workspace_id = $1 ORDER BY uid",
       [scenario.workspaceId],
     );
     const sentence = `See the product, target and ${product.iri}.`;
@@ -756,7 +756,7 @@ describe("the map a governed write leaves behind", () => {
     }));
 
     const edges = await db().pool.query(
-      "SELECT uid, to_uid, section, sentence FROM graph_edge WHERE workspace_id = $1",
+      "SELECT uid, to_uid, section, sentence FROM map_edge WHERE workspace_id = $1",
       [scenario.workspaceId],
     );
     expect(edges.rows).toEqual([
@@ -789,7 +789,7 @@ describe("the map a governed write leaves behind", () => {
     }));
 
     const edges = await db().pool.query(
-      "SELECT uid, to_uid, sentence FROM graph_edge WHERE workspace_id = $1",
+      "SELECT uid, to_uid, sentence FROM map_edge WHERE workspace_id = $1",
       [scenario.workspaceId],
     );
     expect(edges.rows).toEqual([
@@ -813,13 +813,13 @@ describe("the map a governed write leaves behind", () => {
     });
     const second = await landed(scenario, policy);
 
-    await db().pool.query("DELETE FROM graph_edge WHERE workspace_id = $1", [scenario.workspaceId]);
-    await db().pool.query("DELETE FROM graph_node WHERE workspace_id = $1", [scenario.workspaceId]);
+    await db().pool.query("DELETE FROM map_edge WHERE workspace_id = $1", [scenario.workspaceId]);
+    await db().pool.query("DELETE FROM map_node WHERE workspace_id = $1", [scenario.workspaceId]);
 
     await landed(scenario, { ...product, iri: first.iri, expects: { head: second.sha } });
 
     const edges = await db().pool.query(
-      "SELECT from_uid, to_uid FROM graph_edge WHERE workspace_id = $1",
+      "SELECT from_uid, to_uid FROM map_edge WHERE workspace_id = $1",
       [scenario.workspaceId],
     );
     expect(edges.rows).toEqual([{ from_uid: second.iri, to_uid: first.iri }]);
@@ -845,7 +845,7 @@ describe("the map a governed write leaves behind", () => {
     const third = await landed(scenario, successor);
 
     const edges = await db().pool.query(
-      "SELECT uid, label, from_uid, to_uid, from_kind, to_kind, section, sentence FROM graph_edge WHERE workspace_id = $1 ORDER BY uid",
+      "SELECT uid, label, from_uid, to_uid, from_kind, to_kind, section, sentence FROM map_edge WHERE workspace_id = $1 ORDER BY uid",
       [scenario.workspaceId],
     );
 
@@ -886,7 +886,7 @@ describe("the map a governed write leaves behind", () => {
 
     const lineageLabel = async (): Promise<readonly string[]> => {
       const rows = await db().pool.query<{ label: string }>(
-        "SELECT label FROM graph_edge WHERE workspace_id = $1 AND from_uid = $2",
+        "SELECT label FROM map_edge WHERE workspace_id = $1 AND from_uid = $2",
         [scenario.workspaceId, second.iri],
       );
       return rows.rows.map((row) => row.label);

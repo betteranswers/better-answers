@@ -6,7 +6,7 @@ problem_type: architecture_pattern
 component: stores
 severity: high
 applies_when:
-  - "Adding or changing a table, index, partition or constraint, in public, index or the graph"
+  - "Adding or changing a table, index, partition or constraint, in public, index or the map"
   - "Letting the worker or cocoindex create, drop or alter anything in the database"
   - "Changing how a workspace's chunk partition is made at provisioning"
   - "Proposing Supabase, Neon or another database host"
@@ -27,7 +27,7 @@ tags:
 The database is one plain, self-hosted Postgres 18 with pgvector. The api owns every migration and all DDL.
 
 - The schema is Drizzle's, in `packages/schema`, with generated SQL migrations in `packages/schema/migrations`.
-- The api's DDL covers `public`, `index` and the graph: tables, workspace partitions, constraints and indexes. Every cocoindex target declares `managed_by="user"`, so the engine manages rows and never tables.
+- The api's DDL covers `public`, `index` and the map: tables, workspace partitions, constraints and indexes. Every cocoindex target declares `managed_by="user"`, so the engine manages rows and never tables.
 - The worker never runs a migration. It treats the schema as read-only structure and follows an api change.
 - The deploy order is `migrate`, then `api`, then `worker` (`deploy/platform.compose.yaml`).
 - The graph engine and the database image are ADR 0032's.

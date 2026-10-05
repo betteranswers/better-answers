@@ -26,8 +26,8 @@ had no basis in the source, it is flagged in §7.
 
 ## 2. The product, in brief
 
-Three knowledge layers — **sources** (evidence) → **bundles** (OKF concepts, the map) →
-**graph** (derived) — with **records** the platform keeps over them (guides, compositions,
+Three knowledge layers — **sources** (evidence) → **bundles** (OKF concepts, curated) →
+the **map** (derived) — with **records** the platform keeps over them (guides, compositions,
 usage, bindings, audit), citing concepts by IRI and never restating them.
 
 Two kinds of user: **people** (Admin, Editor, Viewer) running business activities and

@@ -12,7 +12,7 @@ const LAYERS = ["llm", "audit"] as const;
 
 const TOP_SLICE = "erasure";
 
-const GRAPH_DOOR = "src/store/graph";
+const MAP_DOOR = "src/store/map";
 
 const ZONES = {
   kernel: {
@@ -25,7 +25,7 @@ const ZONES = {
   },
   door: {
     reaches: new Set<Zone>(["kernel"]),
-    clause: "a store door imports only kernel, and store/graph alone also imports access",
+    clause: "a store door imports only kernel, and store/map alone also imports access",
   },
   layer: {
     reaches: new Set<Zone>(["kernel", "access", "door"]),
@@ -166,7 +166,7 @@ type Finding = {
 
 const directionFinding = ({ importer, reached }: Edge): Finding | undefined => {
   const { reaches, clause } = ZONES[importer.zone];
-  if (reaches.has(reached.zone) || (importer.dir === GRAPH_DOOR && reached.zone === "access")) {
+  if (reaches.has(reached.zone) || (importer.dir === MAP_DOOR && reached.zone === "access")) {
     return undefined;
   }
   return {

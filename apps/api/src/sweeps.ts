@@ -40,13 +40,11 @@ export type Sweeps = {
 };
 
 const refusalsOf = (pass: SweepPass) =>
-  pass.swept.flatMap(({ workspaceId, uploads, graph }) => [
+  pass.swept.flatMap(({ workspaceId, uploads, map }) => [
     ...(uploads.ok
       ? []
       : [{ workspace_id: workspaceId, sweep: "uploads", reason: reasonOf(uploads.error) }]),
-    ...(graph.ok
-      ? []
-      : [{ workspace_id: workspaceId, sweep: "graph", reason: reasonOf(graph.error) }]),
+    ...(map.ok ? [] : [{ workspace_id: workspaceId, sweep: "map", reason: reasonOf(map.error) }]),
   ]);
 
 type Deletion = Result<number, Error>;

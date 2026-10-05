@@ -56,7 +56,7 @@ Name the type for what the function does, as the orphan sweep's is `SweepDoors`.
 
 ### Run every store the platform runs, for real
 
-A test uses the real thing for every store this platform deploys, never a stand-in. Those stores are Postgres, the object store, the git repository and the graph. An in-memory adapter is for a service someone else runs, such as an LLM provider or a SaaS API. It sits behind that service's own adapter.
+A test uses the real thing for every store this platform deploys, never a stand-in. Those stores are Postgres, the object store, the git repository and the map. An in-memory adapter is for a service someone else runs, such as an LLM provider or a SaaS API. It sits behind that service's own adapter.
 
 ### Never mock our own code
 
@@ -193,7 +193,7 @@ Wrap an external library's throw through `normalizeError`. No `catch` is empty: 
 
 ### Import statically
 
-A dynamic `import()` hides a dependency from every tool that reads the graph.
+A dynamic `import()` hides a dependency from every tool that reads the module graph.
 
 ### Type every public Python signature
 
@@ -232,7 +232,7 @@ Every `packages/core` function that reads or writes tenant data takes a `Princip
 
 ### Ship a tenant table, a grant or a definer function with the test of what it refuses
 
-Create every tenant table `withRLS()` and ship its zero-rows test. Under forced row-level security and the non-owner runtime role, a policy-less table returns no rows. The graph tables are tenant tables; only the identity set is exempt.
+Create every tenant table `withRLS()` and ship its zero-rows test. Under forced row-level security and the non-owner runtime role, a policy-less table returns no rows. The map tables are tenant tables; only the identity set is exempt.
 
 Every privilege a migration installs, default ones included, lands with a test of the path it must **refuse**, beside the one it serves. Such paths are the wrong role, another tenant's scope and a partition reached directly. A partition child is a table of its own, so assert its denial directly, not the parent's.
 
@@ -303,7 +303,7 @@ A read writes no row, unless a decision names the view an act. An event with no 
 
 ### Keep a concept file spec-pure
 
-A concept file carries what OKF v0.2 defines, plus two platform keys: `iri` and `sources[].locator`. What the spec leaves open is met in the graph and records: supersession, conflicting claims, typed relations, access. A new key needs a decision record. It argues the key against the bundle-alone test in `docs/okf-v02.md`, and says why neither can carry it.
+A concept file carries what OKF v0.2 defines, plus two platform keys: `iri` and `sources[].locator`. What the spec leaves open is met in the map and records: supersession, conflicting claims, typed relations, access. A new key needs a decision record. It argues the key against the bundle-alone test in `docs/okf-v02.md`, and says why neither can carry it.
 
 Reviewer: the schema is open, so a foreign file round-trips. Only a person holds a diff to the two platform keys.
 

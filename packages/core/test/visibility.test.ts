@@ -177,7 +177,7 @@ const landedFor = async (workspaceId: string, path: string, documentId: string) 
 
 const rowAndNode = async (workspaceId: string, iri: string) => ({
   row: await visibilityHeld(db().pool, "concept_index", workspaceId, iri),
-  node: await visibilityHeld(db().pool, "graph_node", workspaceId, iri),
+  node: await visibilityHeld(db().pool, "map_node", workspaceId, iri),
 });
 
 const bothAt = (pair: object) => ({ row: pair, node: pair });

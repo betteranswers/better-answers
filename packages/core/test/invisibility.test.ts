@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { walkFrom, walkTo } from "@better-answers/core/store/graph";
+import { walkFrom, walkTo } from "@better-answers/core/store/map";
 import { conceptIriOf, ulid } from "@better-answers/schema";
 
 import { readableClause, readableParameters } from "../src/access/index.ts";
@@ -145,7 +145,7 @@ describe("the audience arm of the read predicate", () => {
 });
 
 describe("a Restricted-sourced concept, to a Viewer", () => {
-  it("is invisible to either graph walk, as if never mapped", async () => {
+  it("is invisible to either map walk, as if never mapped", async () => {
     const scenario = await arrange();
     const { restricted, internal } = await restrictedAndInternal(db(), scenario.workspaceId);
     const withheld = await conceptCiting(scenario, scenario.editor, [restricted.documentId]);
